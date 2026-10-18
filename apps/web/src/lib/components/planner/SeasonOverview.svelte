@@ -54,7 +54,14 @@
     travelGuess: boolean;
   };
 
-  export type SeasonGapVM = { from: string; to: string; nights: number };
+  export type SeasonGapVM = {
+    from: string;
+    to: string;
+    nights: number;
+    /** Who is out on some of these nights: a hole with a performer away is
+        not a hole you can sell as it is (uso #9). */
+    away: Array<{ key: string; who: string; from: string; to: string; tentative: boolean }>;
+  };
 
   export type SeasonAwayVM = {
     key: string;
@@ -329,6 +336,14 @@
             <button type="button" class="row" onclick={() => onGap(g.from)}>
               <span class="row__when">{range(g.from, g.to)}</span>
               <span class="row__what">{t('planner.season_nights', locale, { n: g.nights })}</span>
+              {#each g.away as a (a.key)}
+                <span class="row__note" class:guess={a.tentative}
+                  >{t(a.tentative ? 'planner.season_gap_away_t' : 'planner.season_gap_away', locale, {
+                    who: a.who,
+                    when: range(a.from, a.to),
+                  })}</span
+                >
+              {/each}
             </button>
           {/each}
         {/if}
@@ -696,6 +711,13 @@
       font-size: var(--text-xs);
       color: var(--text-muted);
       margin-inline-start: 6px;
+    }
+    .row__note {
+      grid-column: 2;
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
     }
     .row__miss {
       grid-column: 2;

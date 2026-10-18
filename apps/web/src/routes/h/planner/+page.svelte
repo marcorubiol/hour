@@ -1906,12 +1906,28 @@
     }
     return out;
   });
-  let seasonGaps = $derived(
+  let seasonGaps = $derived.by((): SeasonGapVM[] => {
+    if (view !== 'overview') return [];
     // A hole to sell skips the company's firm closures as it skips a tour.
-    view === 'overview'
-      ? gapWindows(season.days, engine.occupiedDays, new Set([...seasonTourDays, ...engine.unsellableDays]))
-      : [],
-  );
+    const windows = gapWindows(
+      season.days,
+      engine.occupiedDays,
+      new Set([...seasonTourDays, ...engine.unsellableDays]),
+    );
+    const people = blackoutVMs.filter((b) => !b.company);
+    return windows.map((g) => ({
+      ...g,
+      away: people
+        .filter((b) => b.from <= g.to && b.to >= g.from)
+        .map((b) => ({
+          key: b.id,
+          who: b.subject ?? b.label,
+          from: b.from < g.from ? g.from : b.from,
+          to: b.to > g.to ? g.to : b.to,
+          tentative: b.tentative,
+        })),
+    }));
+  });
   let seasonAway = $derived.by((): SeasonAwayVM[] => {
     if (view !== 'overview') return [];
     const touches = (from: string, to: string) => to >= todayIso && from <= season.to;

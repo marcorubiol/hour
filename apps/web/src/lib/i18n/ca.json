@@ -1974,6 +1974,8 @@
   "planner.season_unclosed_meta": "{n} de {m} confirmats · {w} setmanes",
   "planner.season_gaps_meta": "finestres de {n}+ nits",
   "planner.season_nights": "{n} nits",
+  "planner.season_gap_away": "{who} fora {when}",
+  "planner.season_gap_away_t": "{who} fora? {when}",
   "planner.season_miss_time": "hora",
   "planner.season_miss_cast": "qui hi va",
   "planner.season_miss_travel": "viatge?",
