@@ -35,7 +35,7 @@
   import { toStore } from 'svelte/store';
   import { tick, untrack } from 'svelte';
   import { page } from '$app/state';
-  import { goto, replaceState } from '$app/navigation';
+  import { goto, pushState, replaceState } from '$app/navigation';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import LensHeader from '$lib/components/LensHeader.svelte';
   import LensTitle from '$lib/components/LensTitle.svelte';
@@ -295,7 +295,13 @@
    * Legacy parameters are dropped here, never rewritten — they were already
    * translated on the way in.
    */
-  function syncUrl() {
+  /* A NEW VIEW IS A NEW PAGE OF HISTORY (revisión del Planner, 2026-10-18).
+     Everything used to replace the entry, so Season → a day → back left the
+     Planner altogether. Changing the drawing pushes; moving inside one (the
+     Day's arrows, the board's dial) still replaces. The entry's state carries
+     its own search so going back is a change `page.state` can see: shallow
+     routing never moves `page.url` (see tests/scope-url.spec.ts). */
+  function syncUrl(mode: 'push' | 'replace' = 'replace') {
     const url = new URL(location.href);
     url.searchParams.set('view', view);
     if (view === 'board') url.searchParams.set('lanes', laneAxis);
@@ -306,15 +312,16 @@
     if (view === 'day') url.searchParams.set('d', dayIso ?? todayIso);
     else url.searchParams.delete('d');
     url.searchParams.delete('group');
-    replaceState(url, {});
+    if (url.href === location.href) return;
+    (mode === 'push' ? pushState : replaceState)(url, { planner: url.search });
   }
   function setView(v: PlannerView) {
     if (view === v) return;
     view = v;
-    // The address bar is the truth: replaceState (shallow routing) never
-    // updates the reactive page.url (see tests/scope-url.spec.ts), so both
-    // read and write go through location.href.
-    syncUrl();
+    // The address bar is the truth: shallow routing never updates the
+    // reactive page.url (see tests/scope-url.spec.ts), so both read and
+    // write go through location.href.
+    syncUrl('push');
   }
   function setLaneAxis(g: LaneAxis) {
     if (laneAxis === g) return;
@@ -331,6 +338,8 @@
   // Every legacy generation is translated HERE, once, and never written back.
   $effect(() => {
     void page.url;
+    // Back/forward between the Planner's own entries moves page.state only.
+    void page.state;
     const params = new URL(location.href).searchParams;
     // No `view` at all is the nav's door (ADR-117): it always opens the
     // season, even when you arrive from another drawing of this page.
