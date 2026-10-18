@@ -568,11 +568,14 @@
     .row__settle:hover {
       color: var(--text-color);
     }
+    /* Touch: always there, in the row's corner over the kind label. 24 px
+       (WCAG 2.5.8): the full 44 would cover the date above it. */
     @media (pointer: coarse) {
       .row__settle {
-        position: static;
+        inset-block-end: var(--space-2xs);
+        min-block-size: 1.5rem;
+        background: var(--bg);
         opacity: 1;
-        min-block-size: var(--touch-target);
       }
     }
     .row__org {
@@ -753,6 +756,25 @@
       }
       .block__foot :global(button) {
         inline-size: 100%;
+      }
+      /* The contact wraps under the venue instead of both being cut (móvil #11). */
+      .row__who {
+        flex-wrap: wrap;
+        row-gap: 0;
+      }
+      /* The legend in one compact run: «6 Contactado · 4 Hold…». */
+      .season__legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2xs) var(--space-m);
+      }
+      .season__item {
+        flex-direction: row;
+        align-items: baseline;
+        gap: var(--space-2xs);
+      }
+      .season__n {
+        font-size: var(--text-m);
       }
     }
 

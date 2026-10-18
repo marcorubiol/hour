@@ -530,6 +530,10 @@
       <a class="lenshead__frag" href="/h/conversations?view=threads" aria-current={view === 'threads' ? 'page' : undefined}
         >{t('conversations.view_what', locale)}</a
       >
+      {#if view === 'people'}
+        <!-- On a phone the list starts a screen and a half down: a way straight to it (móvil #11). -->
+        <a class="lenshead__frag conversations__skip" href="#lista">{t('overview.go_to_list', locale)}</a>
+      {/if}
     {/snippet}
   </LensHeader>
 
@@ -830,6 +834,14 @@
       margin-block-start: var(--space-s);
     }
 
+    .conversations__skip {
+      display: none;
+    }
+    @media (max-width: 47.999rem) {
+      .conversations__skip {
+        display: inline-flex;
+      }
+    }
     /* Touch: the two projections at the finger's size (móvil #8). */
     @media (pointer: coarse) {
       .conversations :global(.lenshead__frag) {
