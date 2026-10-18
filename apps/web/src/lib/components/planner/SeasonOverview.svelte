@@ -370,7 +370,7 @@
             <button type="button" class="row" onclick={() => onDay(a.from)}>
               <span class="row__when">{range(a.from, a.to)}</span>
               <span class="row__what" class:row__what--tent={a.tentative}
-                >{a.who}{#if a.tentative}?{/if}{#if a.what}<small>{a.what}</small>{/if}{#if a.legs}<small class="guess"
+                >{a.who}{#if a.tentative}?{/if}{#if a.what}<small>{a.what}</small>{/if}{#if a.legs}<small class="guess row__legs"
                     >{a.legs}</small
                   >{/if}</span
               >
@@ -685,7 +685,9 @@
     /* ── Lists ──────────────────────────────────────────────────────── */
     .row {
       display: grid;
-      grid-template-columns: 5.4rem minmax(0, 1fr);
+      /* Wide enough for the longest short range («24 oct → 25 oct»), and the
+         range never wraps: rows of one list keep one height (diseño B7). */
+      grid-template-columns: 6.8rem minmax(0, 1fr);
       gap: 2px var(--space-s);
       padding-block: 5px;
       text-decoration: none;
@@ -703,6 +705,7 @@
       text-underline-offset: 2px;
     }
     .row__when {
+      white-space: nowrap;
       font-family: var(--font-mono);
       font-size: 10px;
       color: var(--text-muted);
@@ -726,6 +729,12 @@
       font-size: var(--text-xs);
       color: var(--text-muted);
       margin-inline-start: 6px;
+    }
+    /* Where a tour came from is its own line, so its «·» never hangs at the
+       end of the name's line. */
+    .row__what .row__legs {
+      display: block;
+      margin-inline-start: 0;
     }
     .row__note {
       grid-column: 2;
