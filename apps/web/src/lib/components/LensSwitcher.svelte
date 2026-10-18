@@ -21,18 +21,20 @@
   // Desk is the home/digest, not a peer lens (grill 2026-07-23): it gets its own
   // pill; the segmented "view as" holds only the three concern lenses.
   // Cuentas only for whoever reads money in some project (ADR-117), and
-  // Conversations for whoever reads conversations in some (ADR-124). Until the
-  // answer lands they show, so a lens does not blink for those who have it.
+  // Conversations for whoever reads conversations in some (ADR-124). Cuentas
+  // keeps its place but draws nothing until an explicit «yes»: it does not
+  // blink in for those who have it, nor flash its name at those who do not.
   const moneyAccess = createQuery(moneyAccessAnyQueryOptions());
   const conversationAccess = createQuery(conversationAccessQueryOptions());
+  let moneyPending = $derived($moneyAccess.isPending);
   let VIEW_AS = $derived<{ id: Lens; label: string }[]>([
     { id: 'planner', label: t('lens.planner', locale) },
     ...($conversationAccess.data?.read === false && !$conversationAccess.isPending
       ? []
       : [{ id: 'conversations' as const, label: t('lens.conversations', locale) }]),
-    ...($moneyAccess.data?.read_money === false && !$moneyAccess.isPending
-      ? []
-      : [{ id: 'books' as const, label: t('lens.money', locale) }]),
+    ...($moneyAccess.data?.read_money === true || moneyPending
+      ? [{ id: 'books' as const, label: t('lens.money', locale) }]
+      : []),
   ]);
 
   let active = $derived((page.url.pathname.split('/')[2] ?? 'desk') as Lens);
@@ -60,6 +62,9 @@
         role="tab"
         aria-selected={active === v.id}
         class:is-on={active === v.id}
+        class:is-reserved={v.id === 'books' && moneyPending}
+        aria-hidden={v.id === 'books' && moneyPending ? 'true' : undefined}
+        tabindex={v.id === 'books' && moneyPending ? -1 : undefined}
         onclick={() => pick(v.id)}
       >
         {v.label}
@@ -69,6 +74,9 @@
 </div>
 
 <style>
+  .is-reserved {
+    visibility: hidden;
+  }
   .lensswitch-wrap {
     display: inline-flex;
     align-items: center;

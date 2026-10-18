@@ -5,8 +5,10 @@ import {
 	boloSeason,
 	expectedInflow,
 	invoicesByBolo,
+	isQuietPosition,
 	matchesLedgerFilter,
 	moneyPosition,
+	paymentProposal,
 	seasonLabel,
 	seasonOf,
 	seasonRange,
@@ -87,8 +89,8 @@ describe('season (September to August, by function date)', () => {
 		expect(seasonOf('2026-08-31')).toBe(2025);
 		expect(seasonOf('2027-08-31T22:00:00Z')).toBe(2026);
 		expect(seasonRange(2026)).toEqual({ from: '2026-09-01', to: '2027-08-31' });
-		expect(seasonLabel(2026)).toBe('26/27');
-		expect(seasonLabel(2099)).toBe('99/00');
+		expect(seasonLabel(2026)).toBe('26-27');
+		expect(seasonLabel(2099)).toBe('99-00');
 	});
 
 	it('puts a bolo without functions in the season of today', () => {
@@ -128,6 +130,46 @@ describe('boloMoney', () => {
 		expect(m.collect).toBe('partial');
 	});
 
+	it('a document of a deal not yet confirmed is not owed (ADR-123)', () => {
+		const pro = invoice({ id: 'p', bolo: 'b', doc_type: 'proforma', expected_on: '2026-10-01' });
+		for (const status of ['proposed', 'hold_1']) {
+			const m = boloMoney(bolo({ id: 'b', status, next_performed_at: '2031-05-01' }), ctx([pro]));
+			expect(m.owed).toBe(0);
+			expect(m.overdue).toBe(false);
+			expect(m.docOpen).toBe(1000);
+		}
+		const confirmed = boloMoney(bolo({ id: 'b', status: 'confirmed' }), ctx([pro]));
+		expect(confirmed.owed).toBe(1000);
+	});
+
+	it('two live invoices on one bolo: the issued one does not swallow the paid one', () => {
+		const pay = (invoice_id: string, amount: number) => ({
+			id: `p-${invoice_id}`,
+			workspace_id: 'w',
+			invoice_id,
+			amount,
+			received_on: '2026-09-10',
+			method: 'transfer' as const,
+			reference: null,
+			notes: null,
+			created_at: '2026-09-10T10:00:00Z',
+		});
+		const docs = [
+			invoice({ id: 'first', bolo: 'b', status: 'paid', total: 1060, payments: [pay('first', 1060)] }),
+			invoice({ id: 'second', bolo: 'b', total: 1060, expected_on: '2026-10-01' }),
+		];
+		const m = boloMoney(bolo({ id: 'b', collected: 1060 }), ctx(docs));
+		expect(m.doc?.id).toBe('second');
+		expect(m.owed).toBe(1060);
+		expect(m.overdue).toBe(true);
+	});
+
+	it('reads today on the local clock, not UTC (00:30 on 1 Oct is already 1 Oct)', () => {
+		const inv = invoice({ id: 'i', bolo: 'b', expected_on: '2026-09-30' });
+		const justAfterMidnight = new Date(2026, 9, 1, 0, 30);
+		expect(boloMoney(bolo({ id: 'b' }), ctx([inv], { today: justAfterMidnight })).overdue).toBe(true);
+	});
+
 	it('is overdue against the EXPECTED date, not due_on', () => {
 		// due_on passed, but the payer observably pays at 60 days: not late yet.
 		const inv = invoice({
@@ -148,7 +190,9 @@ describe('boloMoney', () => {
 		const b = bolo({ id: 'b', next_performed_at: '2026-10-03T19:00:00Z' });
 		expect(boloMoney(b, ctx()).toInvoice).toBe(true);
 		expect(boloMoney(b, ctx([], { modeOf: () => 'off' })).toInvoice).toBe(false);
-		expect(boloMoney(b, ctx([invoice({ id: 'd', bolo: 'b', status: 'draft' })])).toInvoice).toBe(false);
+		// a draft nobody issued still has to be invoiced
+		expect(boloMoney(b, ctx([invoice({ id: 'd', bolo: 'b', status: 'draft' })])).toInvoice).toBe(true);
+		expect(boloMoney(b, ctx([invoice({ id: 'i', bolo: 'b' })])).toInvoice).toBe(false);
 		// a cancelled document is no document
 		expect(boloMoney(b, ctx([invoice({ id: 'c', bolo: 'b', status: 'cancelled' })])).toInvoice).toBe(true);
 		expect(boloMoney({ ...b, fee_amount: null }, ctx()).toInvoice).toBe(false);
@@ -181,10 +225,12 @@ describe('moneyPosition', () => {
 		invoice({ id: 'i-paid', bolo: 'paid', total: 2400, status: 'paid' }),
 	];
 
-	it('keeps currencies apart', () => {
+	it('keeps currencies apart, the one that moves most first', () => {
 		const pos = moneyPosition(bolos, ctx(invoices), 2026);
-		expect(pos.map((p) => p.currency)).toEqual(['CHF', 'EUR']);
-		expect(pos[0]).toMatchObject({ sold: 900, owed: 0, toInvoice: 0 });
+		expect(pos.map((p) => p.currency)).toEqual(['EUR', 'CHF']);
+		expect(pos[1]).toMatchObject({ sold: 900, owed: 0, toInvoice: 0 });
+		expect(isQuietPosition(pos[1]!)).toBe(true);
+		expect(isQuietPosition(pos[0]!)).toBe(false);
 	});
 
 	it('does not clip debts and invoicing to the season; the season figure is clipped', () => {
@@ -213,6 +259,25 @@ describe('moneyPosition', () => {
 		for (const p of moneyPosition(bolos, ctx(invoices), 2026)) {
 			expect(p.collected + p.invoicedOpen + p.uninvoiced).toBeCloseTo(p.sold);
 		}
+	});
+
+	it('measures the season in one base: the invoice total where there is one (ADR-123)', () => {
+		const season = [
+			// Palma: fee 4.000, invoiced 4.840 with IVA, collected in full
+			bolo({ id: 'palma', next_performed_at: '2026-09-12', fee_amount: 4000, collected: 4840 }),
+			// Vitoria: fee 3.500, invoiced 3.710, 2.000 collected
+			bolo({ id: 'vit', next_performed_at: '2026-09-20', fee_amount: 3500, collected: 2000 }),
+			// Beckett: fee 2.000, no document yet
+			bolo({ id: 'beckett', next_performed_at: '2026-10-24', status: 'confirmed', fee_amount: 2000 }),
+		];
+		const docs = [
+			invoice({ id: 'ip', bolo: 'palma', status: 'paid', subtotal: 4000, total: 4840 }),
+			invoice({ id: 'iv', bolo: 'vit', subtotal: 3500, total: 3710 }),
+		];
+		const [eur] = moneyPosition(season, ctx(docs), 2026);
+		expect(eur).toMatchObject({ sold: 4840 + 3710 + 2000, collected: 6840, invoicedOpen: 1710, uninvoiced: 2000 });
+		expect(eur!.collected).toBeLessThanOrEqual(eur!.sold);
+		expect(eur!.collected + eur!.invoicedOpen + eur!.uninvoiced).toBeCloseTo(eur!.sold);
 	});
 
 	it('a past season shows only its own bolos in the season figure', () => {
@@ -255,6 +320,35 @@ describe('attentionItems', () => {
 		expect(items[0]).toMatchObject({ daysLate: 68, amount: 1000 });
 	});
 
+	it('a done function with a draft nobody issued asks to issue it, and counts as por facturar', () => {
+		const bolos = [bolo({ id: 'reus', next_performed_at: '2026-09-05' })];
+		const invoices = [invoice({ id: 'd', bolo: 'reus', status: 'draft', total: 1060 })];
+		const items = attentionItems(bolos, ctx(invoices));
+		expect(items.map((i) => [i.kind, i.doc?.id, i.amount])).toEqual([['draft', 'd', 1060]]);
+		const [eur] = moneyPosition(bolos, ctx(invoices), 2026);
+		expect(eur).toMatchObject({ toInvoice: 1000, toInvoiceCount: 1, owed: 0 });
+		// the fiscal block wins: issuing is impossible until the payer has data
+		const blocked = invoice({
+			id: 'd',
+			bolo: 'reus',
+			status: 'draft',
+			payer_fiscal_identity_id: null,
+			payer: { id: 'o', slug: 'o', name: 'Girona', fiscal_identity_id: null },
+		});
+		expect(attentionItems(bolos, ctx([blocked])).map((i) => i.kind)).toEqual(['fiscal']);
+	});
+
+	it('a function done without a fee asks for one, before the confirmed ones', () => {
+		const bolos = [
+			bolo({ id: 'future', status: 'confirmed', fee_amount: null, next_performed_at: '2026-11-01' }),
+			bolo({ id: 'granollers', status: 'done', fee_amount: null, next_performed_at: '2026-09-20' }),
+		];
+		expect(attentionItems(bolos, ctx()).map((i) => [i.kind, i.bolo.id])).toEqual([
+			['no_fee', 'granollers'],
+			['no_fee', 'future'],
+		]);
+	});
+
 	it('a proforma draft is never blocked by fiscal data', () => {
 		const items = attentionItems(
 			[bolo({ id: 'b', status: 'confirmed', next_performed_at: '2026-11-01' })],
@@ -281,12 +375,32 @@ describe('expectedInflow', () => {
 		];
 		const [eur] = expectedInflow(bolos, ctx(invoices));
 		expect(eur!.months).toEqual([
-			{ month: '2026-10', expected: 0, contracted: 0 },
+			// «nodate» has no date at all: expected 60 days after issue, 31 oct
+			{ month: '2026-10', expected: 1000, contracted: 0 },
 			{ month: '2026-11', expected: 1590, contracted: 2100 },
 			{ month: '2026-12', expected: 0, contracted: 0 },
 			{ month: '2027-01', expected: 0, contracted: 0 },
 		]);
 		expect(eur!.undated).toBe(1);
+	});
+
+	it('a future function with only a draft still comes in as contracted', () => {
+		const [eur] = expectedInflow(
+			[bolo({ id: 'b', status: 'confirmed', next_performed_at: '2026-11-20', fee_amount: 1200 })],
+			ctx([invoice({ id: 'd', bolo: 'b', status: 'draft', total: 1272 })]),
+		);
+		expect(eur!.months[1]).toEqual({ month: '2026-11', expected: 0, contracted: 1200 });
+	});
+
+	it('leaves out a currency with nothing coming in, and puts the biggest first', () => {
+		const out = expectedInflow(
+			[
+				bolo({ id: 'eur', status: 'confirmed', next_performed_at: '2026-11-08', fee_amount: 2100 }),
+				bolo({ id: 'chf', status: 'confirmed', next_performed_at: '2027-02-10', fee_currency: 'CHF', fee_amount: 4000 }),
+			],
+			ctx(),
+		);
+		expect(out.map((f) => f.currency)).toEqual(['EUR']);
 	});
 
 	it('crosses the year end', () => {
@@ -308,5 +422,37 @@ describe('matchesLedgerFilter', () => {
 		expect(matchesLedgerFilter(m, 'overdue')).toBe(true);
 		expect(matchesLedgerFilter(m, 'to_invoice')).toBe(false);
 		expect(matchesLedgerFilter(boloMoney(bolo({ id: 'h', status: 'hold' }), c), 'in_progress')).toBe(true);
+	});
+});
+
+describe('paymentProposal (ADR-123)', () => {
+	it('goes against the issued invoice for what it still lacks WITH taxes, from its payer', () => {
+		const b = bolo({ id: 'b', fee_amount: 3500, collected: 2000, venue_name: 'Teatro Principal' });
+		const inv = invoice({
+			id: 'i',
+			bolo: 'b',
+			subtotal: 3500,
+			total: 3710,
+			payer: { id: 'o', slug: 'o', name: 'Ayuntamiento de Vitoria-Gasteiz', fiscal_identity_id: 'f' },
+		});
+		const p = paymentProposal(b, boloMoney(b, ctx([inv])));
+		expect(p).toEqual({ invoiceId: 'i', amount: 1710, counterparty: 'Ayuntamiento de Vitoria-Gasteiz' });
+	});
+
+	it('without an issued document anchors to the bolo, against the fee', () => {
+		const b = bolo({ id: 'b', fee_amount: 1000, collected: 300 });
+		expect(paymentProposal(b, boloMoney(b, ctx()))).toEqual({ invoiceId: null, amount: 700, counterparty: 'Sala b' });
+		// a draft is not a document you can be paid against
+		const draft = invoice({ id: 'd', bolo: 'b', status: 'draft', total: 1060 });
+		expect(paymentProposal(b, boloMoney(b, ctx([draft]))).invoiceId).toBeNull();
+	});
+
+	it('accepting the proposal leaves nothing owed (no false overdue residue)', () => {
+		const inv = invoice({ id: 'i', bolo: 'b', total: 1060, expected_on: '2026-10-01' });
+		const before = bolo({ id: 'b', fee_amount: 1000 });
+		const p = paymentProposal(before, boloMoney(before, ctx([inv])));
+		const after = boloMoney({ ...before, collected: p.amount }, ctx([inv]));
+		expect(after.owed).toBe(0);
+		expect(after.overdue).toBe(false);
 	});
 });

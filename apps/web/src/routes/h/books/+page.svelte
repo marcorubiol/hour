@@ -38,6 +38,7 @@
   import StateBadge from '$lib/components/StateBadge.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { dayLabel, localDayISO } from '$lib/datetime';
+  import { DASH } from '$lib/glyphs';
   import { categoryLabel, EXPENSE_CATEGORIES, type ExpenseItem } from '$lib/expense';
   import {
     applyTaxLines,
@@ -52,11 +53,13 @@
     fmtMoneyCompact,
     invoicesByBolo as groupInvoicesByBolo,
     invoiceStatusLabel,
+    isQuietPosition,
     LEDGER_FILTERS,
     matchesLedgerFilter,
     moneyPosition,
     observedPayerTermsDays,
     PAYMENT_METHODS,
+    paymentProposal,
     paymentMethodLabel,
     seasonLabel,
     seasonOf,
@@ -74,6 +77,7 @@
   import { moneyAccessAnyQueryOptions } from '$lib/bolo-queries';
   import { detectLocale, LOCALE_TAG, t } from '$lib/i18n';
   import { performanceStatusTone } from '$lib/performance';
+  import { plannerDayHref } from '$lib/planner';
   import { usePins } from '$lib/stores/pins.svelte';
   import {
     buildLineIndex,
@@ -142,6 +146,11 @@
     void goto(`/h/${ws}/project/${projectSlug}/`);
   }
 
+  // The feeds' ceilings. Past them the oldest rows drop silently (the
+  // invoices come newest first, and the oldest are the most overdue), so the
+  // page says so instead (`capped` below). Desk reads the same URLs.
+  const BOLOS_CAP = 500;
+  const INVOICES_CAP = 200;
   // The bolos feed comes whole (up to 500) and the season is cut here: por
   // cobrar and por facturar must see every season, the season figure only one.
   const bolosOptions = toStore(() => {
@@ -150,7 +159,7 @@
       queryKey: ['money-bolos', { p: k.projectIds, w: k.workspaceIds }] as const,
       enabled: !k.unresolved && !k.gated,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
-        fetchJSON<{ items: MoneyBolo[] }>(`/api/money/bolos?${feedParams(k, { limit: '500' })}`, signal),
+        fetchJSON<{ items: MoneyBolo[] }>(`/api/money/bolos?${feedParams(k, { limit: String(BOLOS_CAP) })}`, signal),
     };
   });
   const invoicesOptions = toStore(() => {
@@ -159,7 +168,7 @@
       queryKey: ['invoices', { p: k.projectIds, w: k.workspaceIds }] as const,
       enabled: !k.unresolved && !k.gated,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
-        fetchJSON<{ items: MoneyInvoiceItem[] }>(`/api/invoices?${feedParams(k)}`, signal),
+        fetchJSON<{ items: MoneyInvoiceItem[] }>(`/api/invoices?${feedParams(k, { limit: String(INVOICES_CAP) })}`, signal),
     };
   });
   const expensesOptions = toStore(() => {
@@ -202,7 +211,9 @@
   function boloMode(b: MoneyBolo): InvoicingMode {
     return workspaceModeById.get(b.project?.workspace_id ?? '') ?? 'legal';
   }
-  let anyDocMode = $derived(bolos.some((b) => boloMode(b) !== 'off'));
+  // From the spaces, not the bolos: they answer first, so the Documentos tab
+  // is there from the start instead of appearing once the feed lands.
+  let anyDocMode = $derived(($workspacesQuery.data?.items ?? []).some((w) => (w.invoicing_mode ?? 'legal') !== 'off'));
 
   // Live "today" so aging re-derives across midnight on a dashboard left open.
   let nowMs = $state(Date.now());
@@ -219,7 +230,7 @@
   const moneyOf = (b: MoneyBolo): BoloMoney => moneyById.get(b.id) ?? boloMoney(b, ctx);
 
   // ── Season ────────────────────────────────────────────────────────────
-  let currentSeason = $derived(seasonOf(today.toISOString()));
+  let currentSeason = $derived(seasonOf(localDayISO(today)));
   let seasons = $derived(seasonsOf(bolos, today));
   let pickedSeason = $state<number | null>(null);
   let season = $derived(pickedSeason ?? currentSeason);
@@ -251,7 +262,7 @@
     return whole > 0 ? Math.max(0, Math.min(100, (part / whole) * 100)) : 0;
   }
   function where(b: MoneyBolo): string {
-    return [b.venue_name, b.city].filter(Boolean).join(' · ') || b.project?.name || '—';
+    return [b.venue_name, b.city].filter(Boolean).join(' · ') || b.project?.name || DASH;
   }
 
   /** The why of an attention row, in words («68 days, usually pays at 45»). */
@@ -262,25 +273,42 @@
       case 'overdue': {
         const late = t(item.daysLate === 1 ? 'books.att_late_one' : 'books.att_late_many', locale, { n: item.daysLate });
         if (item.observedDays != null) return t('books.att_late_observed', locale, { late, days: Math.round(item.observedDays) });
+        if (item.aging?.source === 'default') return t('books.att_late_default', locale, { late });
         if (item.aging?.expectedOn) return t('books.att_late_expected', locale, { late, date: dayLabel(item.aging.expectedOn) });
         return late;
       }
       case 'to_invoice':
         return day ? t('books.att_to_invoice', locale, { date: day }) : t('books.att_to_invoice_nodate', locale);
+      case 'draft':
+        return day ? t('books.att_draft', locale, { date: day }) : t('books.att_draft_nodate', locale);
       case 'fiscal':
         return t('books.att_fiscal', locale);
       case 'no_fee':
+        if (b.status === 'done') return day ? t('books.att_no_fee_done', locale, { date: day }) : t('books.att_no_fee_done_nodate', locale);
         return day ? t('books.att_no_fee', locale, { date: day }) : t('books.att_no_fee_nodate', locale);
     }
   }
   const ATTENTION_ACTION: Record<AttentionItem['kind'], string> = {
     overdue: 'books.record_payment',
     to_invoice: 'books.att_act_invoice',
+    draft: 'books.att_act_issue',
     fiscal: 'books.att_act_fiscal',
     no_fee: 'books.att_act_fee',
   };
+  /** The bolo's conversation, where a late payment is chased. */
+  function conversationHref(b: MoneyBolo): string | null {
+    if (!b.conversation_id || !b.project) return null;
+    return `/h/${workspaceSlugById.get(b.project.workspace_id) ?? defaultWorkspaceSlug}/conversation/${b.conversation_id}`;
+  }
+  /** Late money is chased, not recorded: the row opens the conversation; «Registrar pago» stays in the sheet. */
+  function actionKey(item: AttentionItem): string {
+    if (item.kind === 'overdue' && conversationHref(item.bolo)) return 'books.att_act_chase';
+    return ATTENTION_ACTION[item.kind];
+  }
   function act(item: AttentionItem) {
-    if (item.kind === 'overdue') openPay(item.bolo);
+    const chase = item.kind === 'overdue' ? conversationHref(item.bolo) : null;
+    if (chase) void goto(chase);
+    else if (item.kind === 'overdue') openPay(item.bolo);
     else if (item.kind === 'to_invoice') openInvoice(item.bolo);
     else if (item.kind === 'no_fee') openFee(item.bolo);
     else if (item.doc) void showDocument(item.doc.id);
@@ -318,7 +346,7 @@
         map.get(key) ??
         {
           projectId: key,
-          name: b.project?.name ?? '—',
+          name: b.project?.name ?? DASH,
           accent: b.project?.accent ?? 'var(--text-faint)',
           slug: b.project?.slug ?? '',
           workspaceId: b.project?.workspace_id ?? '',
@@ -351,6 +379,36 @@
     await tick();
     document.getElementById('mny-ledger')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   }
+  /**
+   * Bring one bolo into view, unfolded: its season (a July overdue lives in
+   * last season's ledger), the filter in «all», the Bolos tab. The table waits
+   * for invoices and expenses too (`loading`), so the scroll waits for the row
+   * to exist, not for the bolos.
+   */
+  let pendingFocus = $state<string | null>(null);
+  function focusBolo(id: string) {
+    const target = bolos.find((b) => b.id === id);
+    if (!target) return;
+    const s = boloSeason(target, today);
+    pickedSeason = s === currentSeason ? null : s;
+    filter = 'all';
+    tab = 'bolos';
+    expandedId = id;
+    pendingFocus = id;
+    const url = new URL(location.href);
+    url.hash = `bolo-${id}`;
+    replaceState(url, {});
+  }
+  $effect(() => {
+    const id = pendingFocus;
+    if (!id || loading) return;
+    void tick().then(() => {
+      const row = document.getElementById(`bolo-${id}`);
+      if (!row) return;
+      row.scrollIntoView({ block: 'center' });
+      pendingFocus = null;
+    });
+  });
   function toggleRow(b: MoneyBolo) {
     expandedId = expandedId === b.id ? null : b.id;
     const url = new URL(location.href);
@@ -358,12 +416,21 @@
     replaceState(url, {});
   }
 
-  function collectLabel(m: BoloMoney): { tone: string; label: string } | null {
+  const shortDayFormat = new Intl.DateTimeFormat(localeTag, { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  function shortDay(day: string): string {
+    return shortDayFormat.format(new Date(`${day.slice(0, 10)}T00:00:00Z`));
+  }
+  function collectLabel(b: MoneyBolo, m: BoloMoney): { tone: 'success' | 'warning' | 'danger' | 'faint'; label: string } | null {
     if (m.overdue) return { tone: 'danger', label: t('books.pill_overdue', locale, { n: m.daysLate }) };
-    if (m.toInvoice) return { tone: 'warn', label: t('books.filter_to_invoice', locale).toLowerCase() };
-    if (m.collect === 'full') return { tone: 'ok', label: t('books.collected', locale) };
-    if (m.collect === 'partial') return { tone: 'warn', label: t('books.pill_partial', locale) };
-    if (m.collect === 'unpaid') return { tone: 'faint', label: t('books.pill_unpaid', locale) };
+    if (m.toInvoice) return { tone: 'warning', label: t('books.filter_to_invoice', locale).toLowerCase() };
+    // A deal whose status already says «paid» needs no second «collected».
+    if (m.collect === 'full') return b.status === 'paid' ? null : { tone: 'success', label: t('books.collected', locale) };
+    // Owed and not late yet: when it is expected says more than «unpaid».
+    const expected = m.owed > 0 && m.aging?.expectedOn ? shortDay(m.aging.expectedOn) : null;
+    if (m.collect === 'partial') return { tone: 'warning', label: expected ? t('books.pill_partial_expected', locale, { date: expected }) : t('books.pill_partial', locale) };
+    // Nothing owed yet (no issued document, or the deal is not confirmed): not a debt, no pill.
+    if (m.collect === 'unpaid' && m.owed === 0) return null;
+    if (m.collect === 'unpaid') return { tone: 'faint', label: expected ? t('books.pill_expected', locale, { date: expected }) : t('books.pill_unpaid', locale) };
     return null;
   }
 
@@ -384,11 +451,17 @@
     !noAccess &&
       ($accessQuery.isPending || $workspacesQuery.isPending || $projectsQuery.isPending || $linesQuery.isPending || loading),
   );
-  const errText = (e: unknown) => (e instanceof Error ? e.message : '');
-  let bolosError = $derived(errText($bolosQuery.error));
-  let invoicesError = $derived(errText($invoicesQuery.error));
-  let expensesError = $derived(errText($expensesQuery.error));
+  // A failed feed says so in the page's own words, with a way to try again;
+  // the server's text is for the logs, not for the reader.
+  let bolosError = $derived($bolosQuery.isError);
+  let invoicesError = $derived($invoicesQuery.isError);
+  let expensesError = $derived($expensesQuery.isError);
   let currencies = $derived([...new Set(bolos.map((b) => b.fee_currency ?? 'EUR'))].sort());
+  /** With more than one currency every amount carries its code: a column of numbers invites summing. */
+  let multiCurrency = $derived(currencies.length > 1);
+  let capped = $derived(
+    ($bolosQuery.data?.items.length ?? 0) >= BOLOS_CAP || ($invoicesQuery.data?.items.length ?? 0) >= INVOICES_CAP,
+  );
   let expenseTotals = $derived(totalsByCurrency(expenses, (e) => e.currency, (e) => Number(e.amount)));
   let seasonEmpty = $derived(!loading && seasonBolos.length === 0 && attention.length === 0);
   let previousSeason = $derived(seasons.find((s) => s < season) ?? null);
@@ -447,13 +520,17 @@
   // it (unique index + ON CONFLICT), preventing a duplicated, over-counted
   // payment. Fresh key each time openPay runs = each intended payment is new.
   let payIdempotencyKey = $state('');
+  // With an issued document the payment goes against it, for what it still
+  // lacks WITH taxes (ADR-123); without one, against the bolo's fee.
+  let payInvoiceId = $state<string | null>(null);
   function openPay(b: MoneyBolo) {
     payBolo = b;
-    const remaining = Math.max(0, Number(b.fee_amount ?? 0) - Number(b.collected ?? 0));
-    payAmount = remaining ? remaining.toFixed(2) : '';
+    const proposal = paymentProposal(b, moneyOf(b));
+    payInvoiceId = proposal.invoiceId;
+    payAmount = proposal.amount ? proposal.amount.toFixed(2) : '';
     payReceivedOn = localDayISO();
     payMethod = 'transfer';
-    payCounterparty = b.venue_name ?? '';
+    payCounterparty = proposal.counterparty;
     payCategory = '';
     payReference = '';
     payIdempotencyKey = crypto.randomUUID();
@@ -467,7 +544,7 @@
         amount,
         received_on: payReceivedOn || localDayISO(),
         method: payMethod,
-        bolo_id: payBolo!.id,
+        ...(payInvoiceId ? { invoice_id: payInvoiceId } : { bolo_id: payBolo!.id }),
         counterparty: payCounterparty.trim() || null,
         category: payCategory.trim() || null,
         reference: payReference.trim() || null,
@@ -480,7 +557,8 @@
       payOpen = false;
       payBolo = null;
       void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
-      addToast({ tone: 'success', message: t('books.payment_recorded_fee', locale) });
+      void queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      addToast({ tone: 'success', message: t(payInvoiceId ? 'books.payment_recorded_doc' : 'books.payment_recorded_fee', locale) });
     },
     onError: (err) => addToast({ tone: 'danger', title: t('books.payment_not_recorded', locale), message: err instanceof Error ? err.message : t('perf.unexpected', locale) }),
   });
@@ -500,10 +578,22 @@
   /** A chosen payer without fiscal data: a factura from it cannot be issued yet. */
   let invPayerNoFiscal = $derived(availablePayers.find((payer) => payer.id === iPayerId)?.has_fiscal_identity === false);
   let invDocType = $derived(invBolo ? (boloMode(invBolo) === 'interno' ? 'proforma' : 'factura') : 'factura');
+  /**
+   * The rates of the space's latest document, as a starting point: a company
+   * that bills town halls types 21 and 15 every time otherwise.
+   */
+  function lastRates(b: MoneyBolo): { vat: string; irpf: string } {
+    const last = invoices
+      .filter((inv) => inv.workspace_id === b.project?.workspace_id && inv.status !== 'cancelled' && inv.tax_lines.length > 0)
+      .sort((x, y) => (y.issued_on ?? '').localeCompare(x.issued_on ?? ''))[0];
+    const rate = (kind: 'add' | 'withhold') => last?.tax_lines.find((l) => l.kind === kind)?.rate_pct;
+    return { vat: rate('add')?.toString() ?? '', irpf: rate('withhold')?.toString() ?? '' };
+  }
   function openInvoice(b: MoneyBolo) {
     invBolo = b;
-    iVat = '';
-    iIrpf = '';
+    const rates = lastRates(b);
+    iVat = rates.vat;
+    iIrpf = rates.irpf;
     iDueOn = '';
     iExpectedOn = '';
     iPaymentCondition = '';
@@ -578,7 +668,7 @@
     ...scopedLines.map((l) => ({ value: `line:${l.id}`, label: t('books.anchor_line', locale, { name: l.name, project: l.projectName }) })),
     ...bolos.map((b) => ({
       value: `bolo:${b.id}`,
-      label: t('books.anchor_deal', locale, { where: [b.venue_name, b.city].filter(Boolean).join(', ') || b.project?.name || '—' }),
+      label: t('books.anchor_deal', locale, { where: [b.venue_name, b.city].filter(Boolean).join(', ') || b.project?.name || DASH }),
     })),
   ]);
   function openExpense(b?: MoneyBolo) {
@@ -678,22 +768,21 @@
   });
   // `#bolo-<id>` es la ficha del bolo: la fila existe solo cuando el feed
   // llega, así que el navegador no puede desplazarse solo. Una vez, cuando
-  // aparece: su temporada, el filtro en «todos», la fila desplegada.
+  // llegan los bolos: `focusBolo`.
   let targetHandled = false;
   $effect(() => {
-    if (targetHandled || bolos.length === 0 || !location.hash.startsWith('#bolo-')) return;
-    const id = location.hash.slice('#bolo-'.length);
-    const target = bolos.find((b) => b.id === id);
+    if (targetHandled || !$bolosQuery.isSuccess || !location.hash.startsWith('#bolo-')) return;
     targetHandled = true;
-    if (!target) return;
-    const s = boloSeason(target, today);
-    pickedSeason = s === currentSeason ? null : s;
-    filter = 'all';
-    tab = 'bolos';
-    expandedId = id;
-    void tick().then(() => document.getElementById(`bolo-${id}`)?.scrollIntoView({ block: 'center' }));
+    focusBolo(location.hash.slice('#bolo-'.length));
   });
 </script>
+
+{#snippet failed(key: string, retry: () => unknown)}
+  <p class="mny__fail">
+    <span>{t(key, locale)}</span>
+    <Button size="xs" variant="outline" onclick={() => void retry()}>{t('books.retry', locale)}</Button>
+  </p>
+{/snippet}
 
 <svelte:head>
   <title>{t('books.head_title', locale)}</title>
@@ -704,15 +793,32 @@
     {#snippet title()}<LensTitle text={t('lens.money', locale)} />{/snippet}
     {#snippet sub()}
       {#if !noAccess}
-        <span>{t('books.season_sub', locale, { season: seasonLabel(season) })}{#if obraNames.length === 1}&nbsp;· {obraNames[0]}{/if}</span>
-        {#each seasons as s (s)}
-          <button
-            type="button"
-            class="lenshead__frag mny__season"
-            aria-current={s === season ? 'true' : undefined}
-            onclick={() => (pickedSeason = s === currentSeason ? null : s)}
-          >{seasonSpan(s)}</button>
-        {/each}
+        <!-- One child, so the sub line's «·» separators stay out of it (as Desk's «+ Tarea»). -->
+        <span class="mny__subrow">
+          <span class="mny__subleft">
+            {#if seasons.length > 1}
+              <!-- One way to write a season, the «26-27» of the figure and of Desk: «sept 26» read as a day. -->
+              <span class="mny__seasons" role="group" aria-label={t('books.season_pick', locale)}>
+                {t('books.season_word', locale)}
+                {#each seasons as s (s)}
+                  <button
+                    type="button"
+                    class="lenshead__frag mny__season"
+                    aria-current={s === season ? 'true' : undefined}
+                    title={seasonSpan(s)}
+                    onclick={() => (pickedSeason = s === currentSeason ? null : s)}
+                  >{seasonLabel(s)}</button>
+                {/each}
+              </span>
+            {:else}
+              <span>{t('books.season_sub', locale, { season: seasonLabel(season) })}</span>
+            {/if}
+            {#if obraNames.length === 1}<span>· {obraNames[0]}</span>{/if}
+          </span>
+          {#if !seasonEmpty}
+            <Button size="xs" variant="outline" onclick={openDeal} disabled={projectIndex.length === 0}>{t('books.new_deal', locale)}</Button>
+          {/if}
+        </span>
       {/if}
     {/snippet}
   </LensHeader>
@@ -720,12 +826,9 @@
   {#if noAccess}
     <p class="mny__state" data-testid="money-no-access">{t('books.no_access', locale)}</p>
   {:else}
-    <div class="mny__actions">
-      <Button size="xs" variant="outline" onclick={openDeal} disabled={projectIndex.length === 0}>{t('books.new_deal', locale)}</Button>
-    </div>
 
     {#if bolosError}
-      <p class="mny__state mny__state--danger">{t('books.err_bolos', locale)} {bolosError}</p>
+      {@render failed('books.err_bolos', () => $bolosQuery.refetch())}
     {:else}
       <!-- 1 · Las cuatro cifras, una fila por moneda -->
       <div class="figs" aria-label={t('books.figures', locale)}>
@@ -736,7 +839,12 @@
             {/each}
           </div>
         {:else if !seasonEmpty}
-          {#each position as pos (pos.currency)}
+          {#each position as pos, i (pos.currency)}
+            {#if i > 0 && isQuietPosition(pos)}
+            {#if pos.sold > 0 || pos.holds > 0}
+            <p class="figs__quiet" data-currency={pos.currency}>{t('books.fig_quiet_currency', locale, { amount: fmtMoneyCompact(pos.sold), currency: pos.currency, season: seasonLabel(season) })}{#if pos.holds > 0}{` · ${t('books.fig_holds', locale, { amount: fmtMoneyCompact(pos.holds), n: pos.holdsCount })}`}{/if}</p>
+            {/if}
+            {:else}
             <div class="figs__row" data-currency={pos.currency}>
               <button type="button" class="fig" data-fig="owed" onclick={() => showLedger('owed')}>
                 <span class="fig__label">{t('books.fig_owed', locale)}</span>
@@ -764,17 +872,24 @@
               </div>
               <button type="button" class="fig" data-fig="season" onclick={() => showLedger('all')}>
                 <span class="fig__label">{t('books.fig_season', locale)} {seasonLabel(season)}</span>
-                <span class="fig__num">{fmtMoneyCompact(pos.collected)}<span class="fig__of">{t('books.fig_of_sold', locale, { amount: fmtMoneyCompact(pos.sold) })}</span></span>
+                <span class="fig__num">{fmtMoneyCompact(pos.collected)}<span class="fig__cur">{pos.currency}</span></span>
+                <span class="fig__sub">{t('books.fig_collected_of_sold', locale, { amount: fmtMoneyCompact(pos.sold) })}</span>
                 <span class="fig__bar" role="img" aria-label={t('books.fig_bar_aria', locale, { collected: fmtMoney(pos.collected), invoiced: fmtMoney(pos.invoicedOpen), uninvoiced: fmtMoney(pos.uninvoiced) })}>
-                  <span class="fig__seg fig__seg--coll" style={`inline-size:${pct(pos.collected, pos.sold)}%`}></span>
-                  <span class="fig__seg fig__seg--inv" style={`inline-size:${pct(pos.invoicedOpen, pos.sold)}%`}></span>
-                  <span class="fig__seg fig__seg--un" style={`inline-size:${pct(pos.uninvoiced, pos.sold)}%`}></span>
+                  {#each [['collected', pos.collected], ['invoiced', pos.invoicedOpen], ['open', pos.uninvoiced]] as [tone, value] (tone)}
+                    {#if Number(value) > 0}<span class="mbar__seg" data-tone={tone} style={`inline-size:${pct(Number(value), pos.sold)}%`}></span>{/if}
+                  {/each}
+                </span>
+                <span class="mkeys" aria-hidden="true">
+                  <span><i class="mkey" data-tone="collected"></i>{t('books.key_collected', locale)}</span>
+                  <span><i class="mkey" data-tone="invoiced"></i>{t('books.key_invoiced', locale)}</span>
+                  <span><i class="mkey" data-tone="open"></i>{t('books.key_open', locale)}</span>
                 </span>
                 {#if pos.holds > 0}
                   <span class="fig__sub">{t('books.fig_holds', locale, { amount: fmtMoneyCompact(pos.holds), n: pos.holdsCount })}</span>
                 {/if}
               </button>
             </div>
+            {/if}
           {/each}
         {/if}
       </div>
@@ -790,10 +905,10 @@
           </div>
         </div>
       {:else}
-        <div class="radar">
+        <div class="radar" aria-busy={loading}>
           <!-- 2 · Pide atención -->
           <section class="att" aria-label={t('books.attention', locale)}>
-            <header class="radar__head">
+            <header class="block-head">
               <p class="eyebrow">{t('books.attention', locale)}{#if attention.length > 0}&nbsp;· {attention.length}{/if}</p>
               {#if attention.length > ATTENTION_VISIBLE}
                 <button type="button" class="radar__more" onclick={() => (attentionAll = !attentionAll)}>
@@ -802,7 +917,7 @@
               {/if}
             </header>
             {#if invoicesError}
-              <p class="mny__state mny__state--danger">{t('books.err_invoices', locale)}</p>
+              {@render failed('books.err_invoices', () => $invoicesQuery.refetch())}
             {:else if loading}
               <p class="mny__state">{t('desk.loading', locale)}</p>
             {:else if attention.length === 0}
@@ -812,14 +927,14 @@
                 {#each attentionShown as item (item.kind + item.bolo.id)}
                   <li class="att__row" data-kind={item.kind}>
                     <span class="att__what">
-                      <a class="att__who" href={`#bolo-${item.bolo.id}`} onclick={(e) => { e.preventDefault(); expandedId = item.bolo.id; void showLedger('all').then(() => document.getElementById(`bolo-${item.bolo.id}`)?.scrollIntoView({ block: 'center' })); }}>
-                        {item.doc?.payer?.name ?? item.bolo.venue_name ?? item.bolo.project?.name ?? '—'}
+                      <a class="att__who" href={`#bolo-${item.bolo.id}`} onclick={(e) => { e.preventDefault(); focusBolo(item.bolo.id); }}>
+                        {item.doc?.payer?.name ?? item.bolo.venue_name ?? item.bolo.project?.name ?? DASH}
                       </a>
-                      <span class="att__ctx">{[item.doc?.number ?? item.bolo.city, item.kind === 'fiscal' ? invoiceStatusLabel('draft', locale) : null].filter(Boolean).map((x) => ` · ${x}`).join('')}</span>
+                      <span class="att__ctx">{[item.doc?.number ?? item.bolo.city, item.kind === 'fiscal' || item.kind === 'draft' ? invoiceStatusLabel('draft', locale) : null].filter(Boolean).map((x) => ` · ${x}`).join('')}</span>
                       <span class="att__why">{attentionWhy(item)}</span>
                     </span>
-                    <span class="att__amt">{item.amount === null ? '·' : fmtMoney(item.amount)}{#if item.amount !== null && currencies.length > 1}&nbsp;{item.currency}{/if}</span>
-                    <Button size="xs" variant="outline" onclick={() => act(item)}>{t(ATTENTION_ACTION[item.kind], locale)}</Button>
+                    <span class="att__amt">{item.amount === null ? DASH : fmtMoney(item.amount)}{#if item.amount !== null && multiCurrency}&nbsp;{item.currency}{/if}</span>
+                    <Button size="xs" variant="outline" onclick={() => act(item)}>{t(actionKey(item), locale)}</Button>
                   </li>
                 {/each}
               </ul>
@@ -828,10 +943,15 @@
 
           <!-- 3 · Lo que entra -->
           <section class="inflow" aria-label={t('books.inflow', locale)}>
-            <header class="radar__head"><p class="eyebrow">{t('books.inflow', locale)}</p></header>
+            <header class="block-head"><p class="eyebrow">{t('books.inflow', locale)}</p></header>
             {#if invoicesError}
-              <p class="mny__state mny__state--danger">{t('books.err_invoices', locale)}</p>
+              {@render failed('books.err_invoices', () => $invoicesQuery.refetch())}
+            {:else if loading}
+              <p class="mny__state">{t('desk.loading', locale)}</p>
             {:else}
+              {#each position.filter((p) => p.overdue > 0) as p (p.currency)}
+                <p class="mny__note inflow__overdue">{t('books.inflow_plus_overdue', locale, { amount: fmtMoneyCompact(p.overdue), currency: p.currency })}</p>
+              {/each}
               {#each inflow as f (f.currency)}
                 {@const max = Math.max(1, ...f.months.map((m) => m.expected + m.contracted))}
                 {#if inflow.length > 1}<p class="inflow__cur">{f.currency}</p>{/if}
@@ -840,8 +960,8 @@
                     <li class="inflow__row">
                       <span class="inflow__month">{monthLabel(m.month)}</span>
                       <span class="inflow__bar" aria-hidden="true">
-                        <span class="inflow__seg inflow__seg--exp" style={`inline-size:${pct(m.expected, max)}%`}></span>
-                        <span class="inflow__seg inflow__seg--con" style={`inline-size:${pct(m.contracted, max)}%`}></span>
+                        {#if m.expected > 0}<span class="mbar__seg" data-tone="invoiced" style={`inline-size:${pct(m.expected, max)}%`}></span>{/if}
+                        {#if m.contracted > 0}<span class="mbar__seg" data-tone="open" style={`inline-size:${pct(m.contracted, max)}%`}></span>{/if}
                       </span>
                       <span class="inflow__amt">{fmtMoneyCompact(m.expected)}{#if m.contracted > 0}<span class="inflow__con">{` + ${fmtMoneyCompact(m.contracted)}`}</span>{/if}</span>
                     </li>
@@ -851,13 +971,17 @@
                   <p class="mny__note">{t(f.undated === 1 ? 'books.inflow_undated_one' : 'books.inflow_undated_many', locale, { n: f.undated })}</p>
                 {/if}
               {/each}
-              <p class="inflow__legend">
-                <span><i class="inflow__key inflow__key--exp"></i>{t('books.inflow_expected', locale)}</span>
-                <span><i class="inflow__key inflow__key--con"></i>{t('books.inflow_contracted', locale)}</span>
+              <p class="mkeys">
+                <span><i class="mkey" data-tone="invoiced"></i>{t('books.inflow_expected', locale)}</span>
+                <span><i class="mkey" data-tone="open"></i>{t('books.inflow_contracted', locale)}</span>
               </p>
             {/if}
           </section>
         </div>
+      {/if}
+
+      {#if capped}
+        <p class="mny__note" data-testid="money-capped">{t('books.capped', locale, { bolos: BOLOS_CAP, invoices: INVOICES_CAP })}</p>
       {/if}
 
       <!-- 4 · El libro -->
@@ -875,15 +999,21 @@
             {#each LEDGER_FILTERS as f (f)}
               <Chip size="xs" selected={filter === f} onclick={() => (filter = f)}>
                 {t(FILTER_LABEL[f], locale)}
-                {#snippet tail()}<span class="ledger__count">{filterCounts[f]}</span>{/snippet}
+                {#snippet tail()}<span class="ledger__count">{loading ? DASH : filterCounts[f]}</span>{/snippet}
               </Chip>
             {/each}
+            <!-- Debts do not expire with the season: these three read every season, «all» only the chosen one. -->
+            {#if filter === 'owed' || filter === 'overdue' || filter === 'to_invoice'}
+              <span class="ledger__scope">{t('books.filter_all_seasons', locale)}</span>
+            {/if}
           </div>
 
           {#if loading}
             <p class="mny__state">{t('desk.loading', locale)}</p>
           {:else if ledgerRows.length === 0}
-            <p class="mny__state">{t(filter === 'all' ? 'books.ledger_empty' : 'books.ledger_empty_filter', locale)}</p>
+            {#if !(seasonEmpty && filter === 'all')}
+              <p class="mny__state">{t(filter === 'all' ? 'books.ledger_empty' : 'books.ledger_empty_filter', locale)}</p>
+            {/if}
           {:else}
             <table class="book">
               <thead>
@@ -894,14 +1024,15 @@
                   <th scope="col">{t('books.col_doc', locale)}</th>
                   <th scope="col" class="book__num">{t('books.fee', locale)}</th>
                   <th scope="col" class="book__num">{t('books.collected', locale)}</th>
-                  <th scope="col">{t('books.col_collect', locale)}</th>
+                  <th scope="col" class="book__num book__owed">{t('books.col_owed', locale)}</th>
+                  <th scope="col" class="book__collect">{t('books.col_collect', locale)}</th>
                 </tr>
               </thead>
               {#each ledgerGroups as group (group.projectId)}
                 <tbody style={`--c: ${group.accent}`}>
                   {#if grouped}
                     <tr class="book__group">
-                      <th colspan="7" scope="rowgroup">
+                      <th colspan="8" scope="rowgroup">
                         <button type="button" class="book__obra" onclick={() => group.slug && openProject(group.slug, group.workspaceId)} disabled={!group.slug}>
                           <span class="book__dot"></span>{group.name}
                         </button>
@@ -910,32 +1041,39 @@
                   {/if}
                   {#each group.rows as b (b.id)}
                     {@const m = moneyOf(b)}
-                    {@const pill = collectLabel(m)}
+                    {@const pill = collectLabel(b, m)}
                     {@const open = expandedId === b.id}
                     <tr class="book__row" class:is-open={open} id={`bolo-${b.id}`} data-overdue={m.overdue || undefined}>
                       <td class="book__date">{b.next_performed_at ? dayLabel(b.next_performed_at) : t('books.no_date', locale)}{#if b.function_count > 1}<span class="book__fns">{` · ${t('books.fn_count', locale, { n: b.function_count })}`}</span>{/if}</td>
                       <td class="book__venue">
                         <button type="button" class="book__toggle" aria-expanded={open} aria-controls={`bolo-sheet-${b.id}`} onclick={() => toggleRow(b)}>
-                          {b.venue_name || '—'}{#if b.city}<span class="book__city">{` · ${b.city}`}</span>{/if}
+                          {b.venue_name || DASH}{#if b.city}<span class="book__city">{` · ${b.city}`}</span>{/if}
                         </button>
                       </td>
                       <td class="book__status"><StateBadge label={boloStatusLabel(b.status, locale)} tone={performanceStatusTone(b.status)} /></td>
-                      <td class="book__doc">{#if m.doc}<span class="book__chip">{m.doc.number ?? invoiceStatusLabel(m.doc.status, locale)}</span>{:else}<span class="book__faint">·</span>{/if}</td>
-                      <td class="book__num"><button type="button" class="book__fee" title={t('books.edit_fee', locale)} onclick={() => openFee(b)}>{b.fee_amount === null ? t('books.no_fee', locale) : fmtMoney(Number(b.fee_amount))}</button></td>
-                      <td class="book__num">{m.fee === null && !m.doc ? '·' : fmtMoney(m.collected)}</td>
-                      <td class="book__collect">{#if pill}<span class="pill" data-tone={pill.tone}>{pill.label}</span>{/if}</td>
+                      <td class="book__doc">{#if m.doc}<span class="book__chip">{m.doc.number ?? invoiceStatusLabel(m.doc.status, locale)}</span>{:else}<span class="book__faint">{DASH}</span>{/if}</td>
+                      <td class="book__num"><button type="button" class="book__fee" title={t('books.edit_fee', locale)} onclick={() => openFee(b)}>{b.fee_amount === null ? t('books.no_fee', locale) : fmtMoney(Number(b.fee_amount))}</button>{#if multiCurrency && b.fee_amount !== null}<span class="book__cur">{m.currency}</span>{/if}</td>
+                      <td class="book__num">{#if m.fee === null && !m.doc}<span class="book__faint">{DASH}</span>{:else}{fmtMoney(m.collected)}{#if multiCurrency}<span class="book__cur">{m.currency}</span>{/if}{/if}</td>
+                      <td class="book__num book__owed">{#if m.owed > 0}{fmtMoney(m.owed)}{#if multiCurrency}<span class="book__cur">{m.currency}</span>{/if}{/if}</td>
+                      <td class="book__collect">{#if pill}<StateBadge label={pill.label} tone={pill.tone} />{/if}</td>
                     </tr>
                     {#if open}
                       {@const docs = docsByBolo.get(b.id) ?? []}
                       {@const spent = expensesByBolo.get(b.id) ?? []}
                       {@const mode = boloMode(b)}
                       <tr class="book__sheet" id={`bolo-sheet-${b.id}`}>
-                        <td colspan="7">
+                        <td colspan="8">
                           <div class="sheet">
                             <div class="sheet__col">
                               <p class="sheet__h">{t('books.sheet_functions', locale)}</p>
-                              <p>{b.next_performed_at ? dayLabel(b.next_performed_at) : t('books.no_date', locale)} · {t(b.function_count === 1 ? 'books.sheet_fn_one' : 'books.sheet_fn_many', locale, { n: b.function_count })}</p>
+                              <p>
+                                {#if b.next_performed_at}<a class="sheet__a" href={plannerDayHref('day', b.next_performed_at.slice(0, 10))}>{dayLabel(b.next_performed_at)}</a>{:else}{t('books.no_date', locale)}{/if}
+                                · {t(b.function_count === 1 ? 'books.sheet_fn_one' : 'books.sheet_fn_many', locale, { n: b.function_count })}
+                              </p>
                               {#if b.project}<p class="sheet__faint">{b.project.name}</p>{/if}
+                              {#if conversationHref(b)}
+                                <p><a class="sheet__a" href={conversationHref(b)}>{t('books.sheet_conversation', locale)}</a></p>
+                              {/if}
                             </div>
                             <div class="sheet__col">
                               <p class="sheet__h">{t('books.documents', locale)}</p>
@@ -945,7 +1083,7 @@
                                 {#each docs as d (d.id)}
                                   <p>
                                     <button type="button" class="sheet__link" onclick={() => void showDocument(d.id)}>{d.number ?? invoiceStatusLabel(d.status, locale)}</button>
-                                    · {invoiceStatusLabel(d.status, locale)} · {fmtMoney(Number(d.total))} {d.currency}
+                                    · {invoiceStatusLabel(d.status, locale)} · <span class="sheet__num">{fmtMoney(Number(d.total))} {d.currency}</span>
                                   </p>
                                   {#if d.id === m.doc?.id && m.aging?.expectedOn && d.status === 'issued'}
                                     <p class="sheet__faint" class:sheet__danger={m.overdue}>{t('books.sheet_expected', locale, { date: dayLabel(m.aging.expectedOn) })}{#if d.payer}{` · ${d.payer.name}`}{/if}</p>
@@ -955,13 +1093,15 @@
                             </div>
                             <div class="sheet__col">
                               <p class="sheet__h">{t('books.sheet_money', locale)}</p>
-                              <p>{t('books.collected_of', locale, { collected: fmtMoney(m.collected), fee: m.fee === null ? '·' : fmtMoney(m.fee) })}</p>
+                              <p class="sheet__num">{t('books.collected_of', locale, { collected: fmtMoney(m.collected), fee: m.fee === null ? DASH : fmtMoney(m.fee) })}</p>
                               {#if spent.length > 0}
                                 <p class="sheet__faint">{t('books.expenses', locale)}: {spent.map((e) => `${e.description} ${fmtMoney(Number(e.amount))}`).join(' · ')}</p>
                               {/if}
                             </div>
                             <div class="sheet__acts">
-                              <Button size="xs" variant="outline" onclick={() => openPay(b)}>{t('books.record_payment', locale)}</Button>
+                              {#if m.collect !== 'full'}
+                                <Button size="xs" variant="outline" onclick={() => openPay(b)}>{t('books.record_payment', locale)}</Button>
+                              {/if}
                               <Button size="xs" variant="outline" onclick={() => openExpense(b)}>{t('books.add_expense', locale)}</Button>
                               {#if mode !== 'off' && !m.doc}
                                 <Button size="xs" variant="outline" onclick={() => openInvoice(b)}>{t(mode === 'interno' ? 'books.create_proforma' : 'books.create_invoice', locale)}</Button>
@@ -978,7 +1118,7 @@
           {/if}
         {:else if tab === 'documents'}
           {#if invoicesError}
-            <p class="mny__state mny__state--danger">{t('books.err_invoices', locale)} {invoicesError}</p>
+            {@render failed('books.err_invoices', () => $invoicesQuery.refetch())}
           {:else}
             <MoneyInvoices {invoices} {payers} focusId={focusInvoiceId} />
           {/if}
@@ -992,14 +1132,14 @@
             <Button size="xs" variant="outline" onclick={() => openExpense()} disabled={expenseAnchorOptions.length === 0}>{t('books.add_expense', locale)}</Button>
           </div>
           {#if expensesError}
-            <p class="mny__state mny__state--danger">{t('books.err_expenses', locale)} {expensesError}</p>
+            {@render failed('books.err_expenses', () => $expensesQuery.refetch())}
           {:else if expenses.length === 0}
             <p class="mny__state">{t('books.no_expenses_scope', locale)}</p>
           {:else}
             <ul class="mny__expenses" role="list">
               {#each expenses as expense (expense.id)}
                 <li>
-                  <span class="mny__cell-date">{expense.incurred_on ? dayLabel(expense.incurred_on) : '—'}</span>
+                  <span class="mny__cell-date">{expense.incurred_on ? dayLabel(expense.incurred_on) : DASH}</span>
                   <span class="mny__expense-description"><b>{expense.description}</b>{#if expense.counterparty}<span class="mny__expense-counter"> · {expense.counterparty}</span>{/if}</span>
                   <span class="mny__expense-category">{categoryLabel(expense.category, locale)}</span>
                   <strong>− {fmtMoney(expense.amount)} {expense.currency}</strong>
@@ -1015,7 +1155,7 @@
 
 <Dialog bind:open={feeOpen} title={t('books.fee', locale)} size="s" onclose={() => (feeEditing = null)}>
   {#if feeEditing}
-    <p class="mny__dialog-who">{feeEditing.project?.name ?? ''} — {[feeEditing.venue_name, feeEditing.city].filter(Boolean).join(', ')}</p>
+    <p class="mny__dialog-who">{[feeEditing.project?.name, [feeEditing.venue_name, feeEditing.city].filter(Boolean).join(', ')].filter(Boolean).join(' · ')}</p>
   {/if}
   <div class="mny__fee-form">
     <Input label={t('books.amount', locale)} type="number" bind:value={fAmount} placeholder={t('books.ph_fee_clear', locale)} />
@@ -1039,7 +1179,7 @@
     </div>
     <Input label={t('books.reference_opt', locale)} bind:value={payReference} placeholder={t('books.ph_reference', locale)} />
   </div>
-  <p class="mny__dialog-note">{t('books.pay_note', locale)}</p>
+  <p class="mny__dialog-note">{t(payInvoiceId ? 'books.pay_note_doc' : 'books.pay_note', locale)}</p>
   {#snippet actions()}
     <Button variant="outline" onclick={() => (payOpen = false)}>{t('create.cancel', locale)}</Button>
     <Button onclick={() => !$payMutation.isPending && $payMutation.mutate()} loading={$payMutation.isPending}>{t('books.record', locale)}</Button>
@@ -1048,7 +1188,7 @@
 
 <Dialog bind:open={invOpen} title={t(invDocType === 'proforma' ? 'books.new_proforma' : 'books.new_invoice', locale)} size="m" onclose={() => (invBolo = null)}>
   {#if invBolo}
-    <p class="mny__dialog-who">{invBolo.project?.name ?? ''} — {[invBolo.venue_name, invBolo.city].filter(Boolean).join(', ')}</p>
+    <p class="mny__dialog-who">{[invBolo.project?.name, [invBolo.venue_name, invBolo.city].filter(Boolean).join(', ')].filter(Boolean).join(' · ')}</p>
     <p class="mny__inv-fee-line">{t('books.fee_subtotal', locale)} <strong>{fmtFee(invBolo.fee_amount, invBolo.fee_currency)}</strong> {t('books.snapshot_note', locale)}</p>
     <div class="mny__inv-form">
       <Input label={t('books.vat_pct', locale)} type="number" bind:value={iVat} placeholder={t('books.ph_vat', locale)} />
@@ -1115,11 +1255,40 @@
 
 <style>
   @layer components {
-    .mny { display: flex; flex-direction: column; gap: var(--space-l); }
-    .mny__actions { display: flex; justify-content: flex-end; margin-block-end: calc(-1 * var(--space-m)); }
-    .mny__season { appearance: none; border: 0; background: none; padding: 0; font: inherit; cursor: pointer; }
+    /* The three states of the money, one grammar for both bars (season and
+       «lo que entra»): collected, invoiced and not collected, contracted and
+       not invoiced. Separated by lightness, not by a mix that fades into the
+       track: in light they step up from the green toward the track, in dark
+       they step down, because the mixes go toward --bg-light either way. */
+    .mny {
+      display: flex; flex-direction: column; gap: var(--space-l);
+      --money-collected: var(--success);
+      --money-invoiced: color-mix(in oklch, var(--success) 60%, var(--bg-light));
+      --money-open: color-mix(in oklch, var(--text-color) 16%, var(--bg-light));
+    }
+    /* Dark: the track sits at 25 % L, so the two lighter steps need more ink
+       to stay apart from it and from each other (68 · 55 · 42 · 25). */
+    :global(:root[data-mode='dark']) .mny {
+      --money-invoiced: color-mix(in oklch, var(--success) 72%, var(--bg-light));
+      --money-open: color-mix(in oklch, var(--text-color) 30%, var(--bg-light));
+    }
+    .mbar__seg, .mkey { display: block; background: var(--mbar-tone); }
+    .mbar__seg { block-size: 100%; }
+    [data-tone='collected'] { --mbar-tone: var(--money-collected); }
+    [data-tone='invoiced'] { --mbar-tone: var(--money-invoiced); }
+    [data-tone='open'] { --mbar-tone: var(--money-open); }
+    .mkeys { display: flex; flex-wrap: wrap; gap: var(--space-2xs) var(--space-m); font-size: var(--text-xs); color: var(--text-muted); }
+    .mkeys span { display: inline-flex; align-items: center; gap: var(--space-2xs); }
+    .mkey { inline-size: 0.75rem; block-size: 0.5rem; border-radius: 2px; }
+    .mny__subrow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-m); inline-size: 100%; }
+    .mny__subleft { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-xs) var(--space-s); }
+    .mny__seasons { display: inline-flex; gap: var(--space-xs); align-items: baseline; }
+    .mny__season { appearance: none; border: 0; background: none; padding: 0; font: inherit; cursor: pointer; text-underline-offset: 0.25em; }
+    .mny__season:hover { color: var(--text-color); }
+    .mny__season[aria-current='true'] { text-decoration: underline; }
     .mny__state { font-size: var(--text-s); color: var(--text-faint); }
-    .mny__state--danger { color: var(--danger); }
+    /* The system's voice for a failure, as Desk says it (dband__err). */
+    .mny__fail { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-s); margin: 0; font-family: var(--font-display); font-style: italic; font-size: var(--text-s); color: var(--danger); }
     .mny__note { font-size: var(--text-xs); color: var(--text-faint); }
     .mny__empty { display: flex; flex-direction: column; gap: var(--space-s); align-items: flex-start; }
     .mny__empty-acts { display: flex; gap: var(--space-xs); flex-wrap: wrap; }
@@ -1127,6 +1296,7 @@
 
     /* ── 1 · the four figures ── */
     .figs { display: flex; flex-direction: column; gap: var(--space-s); }
+    .figs__quiet { font-size: var(--text-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
     .figs__row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-s); }
     .fig {
       appearance: none; text-align: start; font: inherit; color: inherit;
@@ -1139,42 +1309,41 @@
     .fig__label { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); }
     .fig__num { font-family: var(--font-display); font-size: var(--text-xl); line-height: 1.1; color: var(--text-color); font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: var(--space-2xs); flex-wrap: wrap; }
     .fig__num--skel { color: transparent; background: var(--bg-light); border-radius: var(--radius-s); inline-size: 6ch; }
-    .fig__cur, .fig__of { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); letter-spacing: 0.04em; }
+    .fig__cur { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); letter-spacing: 0.04em; }
     .fig__sub { font-size: var(--text-xs); color: var(--text-muted); }
     .fig__danger { color: var(--danger); }
-    .fig__bar { display: flex; block-size: 6px; border-radius: var(--radius-circle); background: var(--bg-light); overflow: hidden; margin-block: var(--space-2xs); }
-    .fig__seg { display: block; block-size: 100%; }
-    .fig__seg--coll { background: var(--success); }
-    .fig__seg--inv { background: color-mix(in oklch, var(--success) 45%, var(--bg-light)); }
-    .fig__seg--un { background: color-mix(in oklch, var(--text-faint) 35%, var(--bg-light)); }
+    .fig__bar { display: flex; gap: 2px; block-size: 6px; border-radius: var(--radius-circle); background: var(--bg-light); overflow: hidden; margin-block: var(--space-2xs); }
 
     /* ── 2 + 3 · the radar ── */
+    /* While the feeds load the radar keeps roughly its height, so the ledger does not jump down. */
+    .radar[aria-busy='true'] { min-block-size: 14rem; }
     .radar { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: var(--space-l); align-items: start; }
-    .radar__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-m); padding-block-end: var(--space-xs); border-block-end: 1px solid var(--border-color-light); margin-block-end: var(--space-xs); }
+    .radar .block-head { margin-block-end: var(--space-xs); }
     .radar__more { appearance: none; border: 0; background: none; padding: 0; font: inherit; font-size: var(--text-xs); color: var(--text-muted); cursor: pointer; }
     .radar__more:hover { color: var(--text-color); }
-    .att__list { display: flex; flex-direction: column; }
-    .att__row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: var(--space-m); align-items: center; padding-block: var(--space-xs); border-block-end: 1px solid var(--border-color-light); }
+    /* One grid for the whole list (rows are subgrids): amounts and buttons
+       fall in columns whatever each row's text measures. */
+    .att__list { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; column-gap: var(--space-m); }
+    .att__row { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; padding-block: var(--space-xs); border-block-end: 1px solid var(--border-color-light); }
+    .att__row :global(.btn) { justify-self: stretch; }
     .att__what { min-inline-size: 0; display: flex; flex-wrap: wrap; column-gap: var(--space-2xs); align-items: baseline; }
     .att__who { color: var(--text-color); font-weight: 500; text-decoration: none; }
     .att__who:hover { text-decoration: underline; }
     .att__ctx { font-size: var(--text-s); color: var(--text-muted); }
     .att__why { inline-size: 100%; font-size: var(--text-xs); color: var(--text-muted); }
     .att__row[data-kind='overdue'] .att__why { color: var(--danger); }
-    .att__amt { font-family: var(--font-mono); font-size: var(--text-s); font-variant-numeric: tabular-nums; color: var(--text-color); white-space: nowrap; }
+    .att__amt { font-family: var(--font-mono); font-size: var(--text-s); font-variant-numeric: tabular-nums; color: var(--text-color); white-space: nowrap; text-align: end; }
+    .inflow__overdue { color: var(--danger); }
     .inflow__cur { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); }
-    .inflow__list { display: flex; flex-direction: column; gap: var(--space-xs); padding-block: var(--space-2xs); }
-    .inflow__row { display: grid; grid-template-columns: 3.5ch minmax(0, 1fr) auto; gap: var(--space-s); align-items: center; }
+    .inflow__list + .inflow__cur, .mny__note + .inflow__cur { margin-block-start: var(--space-s); padding-block-start: var(--space-xs); border-block-start: 1px solid var(--border-color-light); }
+    /* One grid per currency, rows as subgrids: every bar has the same length,
+       so the scale is the same in every month. */
+    .inflow__list { display: grid; grid-template-columns: 3.5ch minmax(0, 1fr) auto; gap: var(--space-xs) var(--space-s); padding-block: var(--space-2xs); }
+    .inflow__row { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; }
     .inflow__month { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); text-transform: lowercase; }
-    .inflow__bar { display: flex; block-size: 10px; border-radius: var(--radius-s); background: var(--bg-light); overflow: hidden; }
-    .inflow__seg { display: block; block-size: 100%; }
-    .inflow__seg--exp, .inflow__key--exp { background: var(--success); }
-    .inflow__seg--con, .inflow__key--con { background: color-mix(in oklch, var(--success) 30%, var(--bg-light)); }
-    .inflow__amt { font-family: var(--font-mono); font-size: var(--text-xs); font-variant-numeric: tabular-nums; color: var(--text-color); white-space: nowrap; }
+    .inflow__bar { display: flex; gap: 2px; block-size: 10px; border-radius: var(--radius-s); background: var(--bg-light); overflow: hidden; }
+    .inflow__amt { font-family: var(--font-mono); font-size: var(--text-xs); font-variant-numeric: tabular-nums; color: var(--text-color); white-space: nowrap; text-align: end; }
     .inflow__con { color: var(--text-faint); }
-    .inflow__legend { display: flex; flex-wrap: wrap; gap: var(--space-m); font-size: var(--text-xs); color: var(--text-faint); margin-block-start: var(--space-xs); }
-    .inflow__legend span { display: inline-flex; align-items: center; gap: var(--space-2xs); }
-    .inflow__key { display: inline-block; inline-size: 0.75rem; block-size: 0.5rem; border-radius: 2px; }
 
     /* ── 4 · the ledger ── */
     .ledger { display: flex; flex-direction: column; gap: var(--space-s); scroll-margin-block-start: var(--space-l); }
@@ -1183,10 +1352,12 @@
     .ledger__tabs button[aria-selected='true'] { color: var(--text-color); border-block-end-color: var(--text-color); }
     .ledger__filters { display: flex; gap: var(--space-xs); flex-wrap: wrap; }
     .ledger__filters :global(button) { white-space: nowrap; flex-shrink: 0; }
+    .ledger__scope { align-self: center; font-size: var(--text-xs); color: var(--text-muted); }
     .ledger__count { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-faint); margin-inline-start: var(--space-2xs); }
     .book { inline-size: 100%; border-collapse: collapse; font-size: var(--text-s); }
     .book th { text-align: start; font-family: var(--font-mono); font-size: var(--text-xs); font-weight: 400; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); padding: var(--space-2xs) var(--space-xs); border-block-end: 1px solid var(--border-color-light); }
     .book td { padding: var(--space-xs); border-block-end: 1px solid var(--border-color-light); vertical-align: baseline; }
+    .book .book__collect { padding-inline-start: var(--space-m); }
     .book__num { text-align: end !important; font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
     .book__row { scroll-margin-block: var(--space-xl); }
     .book__row:hover, .book__row.is-open { background: color-mix(in oklch, var(--bg-light) 55%, transparent); }
@@ -1196,7 +1367,9 @@
     .book__toggle { appearance: none; border: 0; background: none; padding: 0; font: inherit; color: var(--text-color); font-weight: 500; cursor: pointer; text-align: start; }
     .book__toggle:hover { text-decoration: underline; }
     .book__city { font-weight: 400; }
-    .book__chip { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); padding: 1px 8px; border: 1px solid var(--border-color-dark); border-radius: var(--radius-circle); white-space: nowrap; }
+    /* The document is named, not boxed: the row already has two badges' worth of chrome. */
+    .book__chip { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); white-space: nowrap; }
+    .book__cur { margin-inline-start: 0.5ch; font-size: var(--text-xs); color: var(--text-muted); letter-spacing: 0.04em; }
     .book__fee { appearance: none; border: 0; background: none; padding: 0; font: inherit; color: var(--text-color); cursor: pointer; }
     .book__fee:hover { text-decoration: underline; }
     .book__group th { padding-block-start: var(--space-m); text-transform: none; letter-spacing: 0; }
@@ -1206,21 +1379,14 @@
     .book__sheet td { background: color-mix(in oklch, var(--bg-light) 55%, transparent); padding: var(--space-s) var(--space-m) var(--space-m); }
     .sheet { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-m); font-size: var(--text-s); }
     .sheet p { margin: 0; }
+    .sheet__num { font-family: var(--font-mono); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
     .sheet__col { display: flex; flex-direction: column; gap: var(--space-2xs); min-inline-size: 0; }
     .sheet__h { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); }
     .sheet__faint { color: var(--text-muted); font-size: var(--text-xs); }
     .sheet__danger { color: var(--danger); }
+    .sheet__a { color: var(--text-color); text-underline-offset: 0.2em; }
     .sheet__link { appearance: none; border: 0; background: none; padding: 0; font: inherit; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-color); text-decoration: underline; cursor: pointer; }
     .sheet__acts { grid-column: 1 / -1; display: flex; gap: var(--space-xs); flex-wrap: wrap; }
-    .pill {
-      display: inline-block; font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.04em;
-      text-transform: lowercase; padding: 2px 8px; border-radius: var(--radius-circle);
-      border: 1px solid var(--border-color-dark); color: var(--text-muted); white-space: nowrap;
-    }
-    .pill[data-tone='ok'] { color: var(--success); border-color: color-mix(in oklch, var(--success) 42%, var(--border-color-light)); }
-    .pill[data-tone='warn'] { color: var(--warning); border-color: color-mix(in oklch, var(--warning) 42%, var(--border-color-light)); }
-    .pill[data-tone='danger'] { color: var(--danger); border-color: color-mix(in oklch, var(--danger) 42%, var(--border-color-light)); }
-    .pill[data-tone='faint'] { color: var(--text-faint); }
 
     .mny__expense-totals { display: flex; flex-wrap: wrap; gap: var(--space-m); font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); }
     .mny__expenses { display: flex; flex-direction: column; }
@@ -1242,7 +1408,7 @@
     @media (max-width: 760px) {
       .figs__row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .radar { grid-template-columns: 1fr; }
-      .att__row { grid-template-columns: minmax(0, 1fr) auto; }
+      .att__list { grid-template-columns: minmax(0, 1fr) auto; }
       .att__row :global(.btn) { grid-column: 1 / -1; justify-self: stretch; }
       .ledger__filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
       .book thead { display: none; }
@@ -1256,7 +1422,8 @@
       .book__row .book__num:nth-of-type(5) { grid-column: 2; grid-row: 1; }
       .book__date { grid-column: 1; grid-row: 2; }
       .book__collect { grid-column: 2; grid-row: 2; justify-self: end; }
-      .book__status, .book__doc, .book__row .book__num:nth-of-type(6) { display: none; }
+      .book .book__collect { padding-inline-start: 0; }
+      .book__status, .book__doc, .book__row .book__num:nth-of-type(6), .book__owed { display: none; }
       .book__group, .book__sheet { display: block; }
       .book__group th, .book__sheet td { display: block; }
       .sheet { grid-template-columns: 1fr; }

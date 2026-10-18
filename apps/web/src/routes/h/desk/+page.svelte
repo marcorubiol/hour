@@ -60,6 +60,8 @@
   import { setCommitment } from '$lib/commitments';
   import {
     invoicesByBolo,
+    fmtCurrency,
+    isContracted,
     moneyPosition,
     observedPayerTermsDays,
     seasonOf as moneySeasonOf,
@@ -91,8 +93,7 @@
   });
   let today = $derived(dayKeyInTz(clockNow.toISOString(), viewerTz));
 
-  const money = (n: number, cur: string | null) =>
-    new Intl.NumberFormat(LOCALE_TAG[locale], { style: 'currency', currency: cur || 'EUR', maximumFractionDigits: 0 }).format(n);
+  const money = (n: number, cur: string | null) => fmtCurrency(n, cur, locale);
 
   // ── «Since your last visit»: per device, in this browser (Phase 0: one
   //    device is enough). Read once on arrival; written on the way out, so a
@@ -206,7 +207,8 @@
       enabled: readMoney && !scopeUnresolved,
       retry: false,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
-        fetchJSON<{ items: MoneyInvoiceItem[] }>(`/api/invoices?${feedParams(filterIds)}`, signal),
+        // Same URL as Cuentas (`limit=200`): one cache key, one answer.
+        fetchJSON<{ items: MoneyInvoiceItem[] }>(`/api/invoices?${feedParams(filterIds, { limit: '200' })}`, signal),
     })),
   );
   const bolosQuery = createQuery(
@@ -227,12 +229,21 @@
   let scopedPerfs = $derived(feeds.performances.filter((p) => byProject(p.project?.id, p.project?.workspace_id)));
   let scopedDates = $derived(feeds.dates.filter((d) => byProject(d.project?.id, d.project?.workspace_id)));
 
+  // A document of a deal not yet confirmed is a quote, not a debt (ADR-123):
+  // «te espera» leaves it out, as Cuentas and this page's own door do.
+  let debtInvoices = $derived.by(() => {
+    const statusById = new Map(($bolosQuery.data?.items ?? []).map((b) => [b.id, b.status]));
+    return invoices.filter((inv) =>
+      inv.lines.every((l) => !l.bolo_id || !statusById.has(l.bolo_id) || isContracted(statusById.get(l.bolo_id)!)),
+    );
+  });
+
   let feed = $derived(
     buildDeskFeed(
       {
         conversations: scopedConversations as DeskConvInput[],
         tasks: scopedTasks,
-        invoices: readMoney && $invoicesQuery.isSuccess ? invoices : undefined,
+        invoices: readMoney && $invoicesQuery.isSuccess && $bolosQuery.isSuccess ? debtInvoices : undefined,
         showToday: scopedPerfs.some((p) => p.status !== 'cancelled' && perfDayKey(p) === today),
       },
       clockNow,
@@ -334,9 +345,16 @@
       moneySeasonOf(clockNow.toISOString()),
     );
     const pos = positions.find((p) => p.currency === 'EUR') ?? positions[0];
-    return pos
-      ? { owed: money(pos.owed, pos.currency), overdue: money(pos.overdue, pos.currency), overdueCount: pos.overdueCount }
-      : { owed: money(0, 'EUR'), overdue: money(0, 'EUR'), overdueCount: 0 };
+    if (!pos) return { owed: money(0, 'EUR'), overdue: money(0, 'EUR'), overdueCount: 0 };
+    // Other currencies ride behind the main one («60 € + 3.000 US$»): never summed, never hidden.
+    const others = positions.filter((p) => p !== pos);
+    const withOthers = (main: number, pick: (p: (typeof positions)[number]) => number) =>
+      [money(main, pos.currency), ...others.filter((p) => pick(p) > 0).map((p) => money(pick(p), p.currency))].join(' + ');
+    return {
+      owed: withOthers(pos.owed, (p) => p.owed),
+      overdue: withOthers(pos.overdue, (p) => p.overdue),
+      overdueCount: positions.reduce((n, p) => n + p.overdueCount, 0),
+    };
   });
   let seasonLabel = $derived(t('overview.season_of', locale, { season: currentSeason(clockNow).label }));
 

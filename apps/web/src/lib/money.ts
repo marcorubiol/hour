@@ -8,7 +8,8 @@
 
 import * as v from 'valibot';
 import { Constants, type Enums } from './db-types';
-import { t, type Locale } from './i18n';
+import { localDayISO } from './datetime';
+import { appLocale, LOCALE_TAG, t, type Locale } from './i18n';
 
 export type PaymentMethod = Enums<'payment_method'>;
 export const PAYMENT_METHODS = Constants.public.Enums.payment_method;
@@ -254,7 +255,14 @@ export function payerFiscalState(
 }
 
 export type AgingStateName = 'within' | 'approaching' | 'past-expected' | 'paid';
-export type AgingSource = 'explicit' | 'observed' | 'due' | 'none';
+export type AgingSource = 'explicit' | 'observed' | 'due' | 'default';
+
+/**
+ * An issued invoice with no expected date, no due date and no observed terms
+ * of its payer is expected this many days after issue (ADR-123): without it,
+ * the debt most likely to be forgotten never fell due.
+ */
+export const DEFAULT_TERMS_DAYS = 60;
 
 export interface AgingInvoice extends TermsInvoice {
 	status: string;
@@ -290,15 +298,15 @@ export function agingState(
 		? invoice.expected_on.slice(0, 10)
 		: observedDays != null
 			? addDays(invoice.issued_on, Math.round(observedDays))
-			: invoice.due_on?.slice(0, 10) ?? null;
+			: invoice.due_on?.slice(0, 10) ?? addDays(invoice.issued_on, DEFAULT_TERMS_DAYS);
 	const source: AgingSource = invoice.expected_on
 		? 'explicit'
 		: observedDays != null
 			? 'observed'
 			: invoice.due_on
 				? 'due'
-				: 'none';
-	const todayDay = today.toISOString().slice(0, 10);
+				: 'default';
+	const todayDay = localDayISO(today);
 	const daysRunning = Math.max(0, daysBetween(invoice.issued_on, todayDay));
 	const expectedDays = expectedOn
 		? Math.max(0, daysBetween(invoice.issued_on, expectedOn))
@@ -349,30 +357,44 @@ export function totalsByCurrency<T>(
 	return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
 }
 
-const money = new Intl.NumberFormat('en-GB', {
-	minimumFractionDigits: 2,
-	maximumFractionDigits: 2,
-});
-
-const moneyCompact = new Intl.NumberFormat('en-GB', {
-	minimumFractionDigits: 0,
-	maximumFractionDigits: 0,
-});
-
-/** "22,900.00" — bare full-form number (caller renders the currency). */
-export function fmtMoney(amount: number): string {
-	return money.format(amount);
+// One formatter per language and precision, made once. Grouping is forced:
+// Spanish and Catalan leave four-digit numbers ungrouped by default («3710»),
+// and the same money must read the same in Desk and in Cuentas.
+const formatters = new Map<string, Intl.NumberFormat>();
+function numberFormat(locale: Locale, digits: 0 | 2, currency?: string): Intl.NumberFormat {
+	const key = `${locale}:${digits}:${currency ?? ''}`;
+	let found = formatters.get(key);
+	if (!found) {
+		found = new Intl.NumberFormat(LOCALE_TAG[locale], {
+			minimumFractionDigits: digits,
+			maximumFractionDigits: digits,
+			useGrouping: 'always',
+			...(currency ? { style: 'currency', currency } : {}),
+		});
+		formatters.set(key, found);
+	}
+	return found;
 }
 
-/** "3,200.00 EUR" — full form for tables and totals. */
-export function fmtFee(amount: number | null, currency: string | null): string {
+/** "22.900,00" in Spanish, "22,900.00" in English: bare full-form number (caller renders the currency). */
+export function fmtMoney(amount: number, locale: Locale = appLocale()): string {
+	return numberFormat(locale, 2).format(amount);
+}
+
+/** "3.200,00 EUR" — full form for tables and totals. */
+export function fmtFee(amount: number | null, currency: string | null, locale: Locale = appLocale()): string {
 	if (amount === null) return '—';
-	return `${money.format(amount)} ${currency ?? 'EUR'}`;
+	return `${fmtMoney(amount, locale)} ${currency ?? 'EUR'}`;
 }
 
-/** "22,900" — whole-number form for header stats where decimals are noise. */
-export function fmtMoneyCompact(amount: number): string {
-	return moneyCompact.format(amount);
+/** "22.900" — whole-number form for header stats where decimals are noise. */
+export function fmtMoneyCompact(amount: number, locale: Locale = appLocale()): string {
+	return numberFormat(locale, 0).format(amount);
+}
+
+/** "14.430 €": whole amount with the currency's symbol, for prose and doors (Desk). */
+export function fmtCurrency(amount: number, currency: string | null, locale: Locale = appLocale()): string {
+	return numberFormat(locale, 0, currency || 'EUR').format(amount);
 }
 
 /** A dictionary word for `books.<prefix><value>`, or the raw value if none. */
@@ -496,10 +518,13 @@ export function seasonRange(start: number): { from: string; to: string } {
 	return { from: `${start}-09-01`, to: `${start + 1}-08-31` };
 }
 
-/** "26/27". */
+/**
+ * "26-27": the one way the app writes a season, as Desk, Conversations
+ * (`currentSeason` in `conversation-overview.ts`) and the line names do.
+ */
 export function seasonLabel(start: number): string {
 	const two = (y: number) => String(y % 100).padStart(2, '0');
-	return `${two(start)}/${two(start + 1)}`;
+	return `${two(start)}-${two(start + 1)}`;
 }
 
 /**
@@ -507,12 +532,12 @@ export function seasonLabel(start: number): string {
  * no function yet is a live deal, so it lives in the season of today.
  */
 export function boloSeason(bolo: Pick<MoneyBolo, 'next_performed_at'>, today: Date): number {
-	return seasonOf(bolo.next_performed_at ?? today.toISOString());
+	return seasonOf(bolo.next_performed_at ?? localDayISO(today));
 }
 
 /** The seasons there is anything to show for, newest first; today's always included. */
 export function seasonsOf(bolos: readonly Pick<MoneyBolo, 'next_performed_at'>[], today: Date): number[] {
-	const set = new Set<number>([seasonOf(today.toISOString())]);
+	const set = new Set<number>([seasonOf(localDayISO(today))]);
 	for (const b of bolos) set.add(boloSeason(b, today));
 	return [...set].sort((a, b) => b - a);
 }
@@ -580,14 +605,23 @@ export interface BoloMoney {
 	inProgress: boolean;
 	/** The live document: issued, else paid, else draft. Cancelled never. */
 	doc: MoneyInvoiceItem | null;
-	/** Por cobrar: the issued document's total less what the bolo collected (ADR-117 § 6). */
+	/**
+	 * What the issued document still lacks: its total less what the bolo
+	 * collected, leaving out what was paid against the bolo's other documents.
+	 */
+	docOpen: number;
+	/** Por cobrar: `docOpen`, once the deal is contracted (ADR-117 § 6, ADR-123). */
 	owed: number;
 	/** The issued document's aging, when there is one. */
 	aging: InvoiceAgingState | null;
 	overdue: boolean;
 	/** Days past the expected date (0 when not overdue). */
 	daysLate: number;
-	/** Contracted, with a fee, invoicing on, no live document, first function already past. */
+	/**
+	 * Contracted, with a fee, invoicing on, first function already past, and
+	 * nothing issued: no document, or only a draft (a draft nobody issues is
+	 * the easiest way never to bill a function).
+	 */
 	toInvoice: boolean;
 	/** Contracted and no fee yet. */
 	noFee: boolean;
@@ -601,8 +635,9 @@ export interface MoneyContext {
 	today: Date;
 }
 
+/** Today on the reader's wall clock: at 00:30 in Madrid it is already tomorrow's date, not UTC's. */
 function todayDay(today: Date): string {
-	return today.toISOString().slice(0, 10);
+	return localDayISO(today);
 }
 
 export function boloMoney(b: MoneyBolo, ctx: MoneyContext): BoloMoney {
@@ -613,7 +648,18 @@ export function boloMoney(b: MoneyBolo, ctx: MoneyContext): BoloMoney {
 	const docs = ctx.invoicesByBolo.get(b.id) ?? [];
 	const doc = docs.find((d) => d.status !== 'cancelled') ?? null;
 	const issued = doc?.status === 'issued' ? doc : null;
-	const owed = issued ? Math.max(0, Number(issued.total) - collected) : 0;
+	// What went to the bolo's OTHER documents is theirs: a second live invoice
+	// must not swallow the first one's payments (the RPC does not forbid two).
+	const elsewhere = issued
+		? docs
+				.filter((d) => d.id !== issued.id)
+				.flatMap((d) => d.payments)
+				.filter((p) => !p.deleted_at)
+				.reduce((sum, p) => sum + Number(p.amount), 0)
+		: 0;
+	const docOpen = issued ? Math.max(0, Number(issued.total) - (collected - elsewhere)) : 0;
+	// A document of a deal not yet confirmed is a quote, not a debt (ADR-123).
+	const owed = contracted ? docOpen : 0;
 	const aging = issued ? invoiceAging(issued, ctx.termsByPayer, ctx.today) : null;
 	const overdue = owed > 0 && aging?.state === 'past-expected';
 	const daysLate =
@@ -624,7 +670,7 @@ export function boloMoney(b: MoneyBolo, ctx: MoneyContext): BoloMoney {
 		fee !== null &&
 		fee > 0 &&
 		ctx.modeOf(b) !== 'off' &&
-		doc === null &&
+		(doc === null || doc.status === 'draft') &&
 		performed;
 	const target = issued ? Number(issued.total) : fee ?? 0;
 	const collect: CollectState =
@@ -642,6 +688,7 @@ export function boloMoney(b: MoneyBolo, ctx: MoneyContext): BoloMoney {
 		contracted,
 		inProgress: isInProgress(b.status),
 		doc,
+		docOpen,
 		owed,
 		aging,
 		overdue,
@@ -649,6 +696,38 @@ export function boloMoney(b: MoneyBolo, ctx: MoneyContext): BoloMoney {
 		toInvoice,
 		noFee: contracted && fee === null,
 		collect,
+	};
+}
+
+// ── Registrar un cobro (ADR-123) ──
+
+export interface PaymentProposal {
+	/** The issued document the payment goes against; null = anchored to the bolo. */
+	invoiceId: string | null;
+	/** What is still owed: the document's open amount WITH taxes, else the fee less collected. */
+	amount: number;
+	/** Who pays: the document's payer, else the venue. */
+	counterparty: string;
+}
+
+/**
+ * A payment recorded from Cuentas goes against the bolo's issued document
+ * when there is one (that is the path that marks the invoice paid, feeds the
+ * payer's observed terms and keeps Documentos and Desk in step); without a
+ * document it anchors to the bolo, against the fee.
+ */
+export function paymentProposal(b: MoneyBolo, m: BoloMoney): PaymentProposal {
+	if (m.doc?.status === 'issued') {
+		return {
+			invoiceId: m.doc.id,
+			amount: m.docOpen,
+			counterparty: m.doc.payer?.name ?? b.venue_name ?? '',
+		};
+	}
+	return {
+		invoiceId: null,
+		amount: Math.max(0, (m.fee ?? 0) - m.collected),
+		counterparty: b.venue_name ?? '',
 	};
 }
 
@@ -667,7 +746,10 @@ export interface MoneyPosition {
 	/** Expected in the next 30 days (issued, unpaid, expected date in [today, today+30]). */
 	inflow30: number;
 	inflow30Count: number;
-	/** Season figures: only bolos of the chosen season. */
+	/**
+	 * Season figures: only bolos of the chosen season. `sold` is the issued or
+	 * paid document's total (taxes in) where there is one, else the fee.
+	 */
 	sold: number;
 	collected: number;
 	/** Invoiced and not yet collected, inside the season. */
@@ -701,7 +783,8 @@ function emptyPosition(currency: string): MoneyPosition {
 }
 
 /**
- * The four figures per currency — never EUR plus USD. Por cobrar, por facturar
+ * The four figures per currency, never EUR plus USD, the currency that
+ * moves most first. Por cobrar, por facturar
  * and the 30-day inflow ignore the season (a July invoice of last season is
  * still owed); only the season figure is clipped to `season`.
  */
@@ -742,27 +825,44 @@ export function moneyPosition(
 		pos.seasonCount += 1;
 		if (m.fee === null) continue;
 		if (m.contracted) {
-			const collected = Math.min(m.collected, Math.max(m.fee, m.doc ? Number(m.doc.total) : 0));
-			pos.sold += m.fee;
+			// One base for the whole bar (ADR-123): what the invoice says, taxes
+			// included, where there is one; the fee where there is none yet. So
+			// a bolo collected in full is 100 %, never 121 % of its fee.
+			const invoiced = m.doc && m.doc.status !== 'draft' ? Number(m.doc.total) : null;
+			const value = invoiced ?? m.fee;
+			const collected = Math.min(m.collected, value);
+			pos.sold += value;
 			pos.collected += collected;
 			pos.invoicedOpen += m.owed;
-			pos.uninvoiced += Math.max(0, m.fee - collected - m.owed);
+			pos.uninvoiced += Math.max(0, value - collected - m.owed);
 		} else if (m.inProgress) {
 			pos.holds += m.fee;
 			pos.holdsCount += 1;
 		}
 	}
-	return [...map.values()].sort((a, b) => a.currency.localeCompare(b.currency));
+	return [...map.values()].sort(
+		(a, b) => positionWeight(b) - positionWeight(a) || a.currency.localeCompare(b.currency),
+	);
+}
+
+/** How much a currency moves: the main one goes first, not the first in the alphabet. */
+function positionWeight(p: MoneyPosition): number {
+	return p.owed + p.toInvoice + p.sold + p.holds;
+}
+
+/** A currency with nothing owed, to invoice or coming in: one line, not four cards of zeros. */
+export function isQuietPosition(p: MoneyPosition): boolean {
+	return p.owed === 0 && p.toInvoice === 0 && p.inflow30 === 0;
 }
 
 // ── Pide atención ──
 
-export type AttentionKind = 'overdue' | 'to_invoice' | 'fiscal' | 'no_fee';
+export type AttentionKind = 'overdue' | 'to_invoice' | 'draft' | 'fiscal' | 'no_fee';
 
 export interface AttentionItem {
 	kind: AttentionKind;
 	bolo: MoneyBolo;
-	/** The document the item is about (overdue, fiscal). */
+	/** The document the item is about (overdue, draft, fiscal). */
 	doc: MoneyInvoiceItem | null;
 	amount: number | null;
 	currency: string;
@@ -773,12 +873,13 @@ export interface AttentionItem {
 	observedDays: number | null;
 }
 
-const KIND_ORDER: Record<AttentionKind, number> = { overdue: 0, to_invoice: 1, fiscal: 2, no_fee: 3 };
+const KIND_ORDER: Record<AttentionKind, number> = { overdue: 0, to_invoice: 1, draft: 2, fiscal: 3, no_fee: 4 };
 
 /**
  * What asks for a hand, worst first: overdue (most days late first), functions
- * done without a document (oldest first), factura drafts the payer's missing
- * fiscal data blocks, contracted deals with no fee. One row per problem, each
+ * done without a document (oldest first), done with a draft nobody issued,
+ * factura drafts the payer's missing fiscal data blocks, contracted deals with
+ * no fee. One row per problem, each
  * with ONE action (the screen maps kind → action).
  */
 export function attentionItems(bolos: readonly MoneyBolo[], ctx: MoneyContext): AttentionItem[] {
@@ -798,7 +899,7 @@ export function attentionItems(bolos: readonly MoneyBolo[], ctx: MoneyContext): 
 					? ctx.termsByPayer.get(m.doc.payer_organization_id)?.days ?? null
 					: null,
 			});
-		} else if (m.toInvoice) {
+		} else if (m.toInvoice && !m.doc) {
 			out.push({ ...base, kind: 'to_invoice', doc: null, amount: m.fee });
 		} else if (
 			m.doc?.status === 'draft' &&
@@ -806,13 +907,18 @@ export function attentionItems(bolos: readonly MoneyBolo[], ctx: MoneyContext): 
 			payerFiscalState(m.doc) !== 'ready'
 		) {
 			out.push({ ...base, kind: 'fiscal', doc: m.doc, amount: Number(m.doc.total) });
-		} else if (m.noFee && b.status === 'confirmed') {
+		} else if (m.toInvoice && m.doc) {
+			out.push({ ...base, kind: 'draft', doc: m.doc, amount: Number(m.doc.total) });
+		} else if (m.noFee && (b.status === 'confirmed' || b.status === 'done')) {
+			// A function done without a fee is one nobody will ever invoice.
 			out.push({ ...base, kind: 'no_fee', doc: null, amount: null });
 		}
 	}
+	const doneFirst = (i: AttentionItem) => (i.kind === 'no_fee' && i.bolo.status === 'done' ? 0 : 1);
 	return out.sort(
 		(a, b) =>
 			KIND_ORDER[a.kind] - KIND_ORDER[b.kind] ||
+			doneFirst(a) - doneFirst(b) ||
 			b.daysLate - a.daysLate ||
 			(a.bolo.next_performed_at ?? '9999').localeCompare(b.bolo.next_performed_at ?? '9999'),
 	);
@@ -832,7 +938,7 @@ export interface InflowMonth {
 export interface InflowForecast {
 	currency: string;
 	months: InflowMonth[];
-	/** Issued and unpaid with no expected date, no due date and no observed terms. */
+	/** Issued and unpaid with no expected date, no due date and no observed terms: placed at DEFAULT_TERMS_DAYS. */
 	undated: number;
 }
 
@@ -878,20 +984,25 @@ export function expectedInflow(
 		if (m.owed > 0 && !m.overdue) {
 			const f = ensure(m.currency);
 			const on = m.aging?.expectedOn;
-			if (!on) f.undated += 1;
-			else if (on >= today) {
+			if (m.aging?.source === 'default') f.undated += 1;
+			if (on && on >= today) {
 				const slot = f.months.find((x) => x.month === monthKey(on));
 				if (slot) slot.expected += m.owed;
 			}
 		}
-		if (m.contracted && m.doc === null && m.fee && b.next_performed_at) {
+		// A draft is not an invoice yet: the deal still comes in as «contracted».
+		if (m.contracted && (m.doc === null || m.doc.status === 'draft') && m.fee && b.next_performed_at) {
 			const day = b.next_performed_at.slice(0, 10);
 			if (day < today) continue;
 			const slot = ensure(m.currency).months.find((x) => x.month === monthKey(day));
 			if (slot) slot.contracted += Math.max(0, m.fee - m.collected);
 		}
 	}
-	return [...map.values()].sort((a, b) => a.currency.localeCompare(b.currency));
+	const weight = (f: InflowForecast) => f.months.reduce((sum, m) => sum + m.expected + m.contracted, 0);
+	// A currency with nothing coming in these months is not drawn: four zero bars say nothing.
+	return [...map.values()]
+		.filter((f) => weight(f) > 0 || f.undated > 0)
+		.sort((a, b) => weight(b) - weight(a) || a.currency.localeCompare(b.currency));
 }
 
 // ── El libro: los filtros son las cifras ──
