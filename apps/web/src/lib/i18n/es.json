@@ -1974,6 +1974,7 @@
   "planner.season_none_gaps": "Ningún hueco de {n} noches o más.",
   "planner.season_none_away": "Nadie fuera.",
   "planner.season_unclosed_meta": "{n} de {m} confirmados · {w} semanas",
+  "planner.season_unclosed_guess": "{n} solo ¿viaje?",
   "planner.season_gaps_meta": "ventanas de {n}+ noches",
   "planner.season_nights": "{n} noches",
   "planner.season_gap_away": "{who} fuera {when}",

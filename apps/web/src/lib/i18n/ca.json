@@ -1974,6 +1974,7 @@
   "planner.season_none_gaps": "Cap forat de {n} nits o més.",
   "planner.season_none_away": "Ningú fora.",
   "planner.season_unclosed_meta": "{n} de {m} confirmats · {w} setmanes",
+  "planner.season_unclosed_guess": "{n} només viatge?",
   "planner.season_gaps_meta": "finestres de {n}+ nits",
   "planner.season_nights": "{n} nits",
   "planner.season_gap_away": "{who} fora {when}",

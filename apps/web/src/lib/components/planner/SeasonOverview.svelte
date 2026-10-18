@@ -167,6 +167,10 @@
   function day(iso: string): string {
     return `${localeWeekdayShort(iso, localeTag)} ${localeDayMonth(iso, localeTag)}`;
   }
+  /** Rows that are on the list only for the trip guess: they do not count as
+      «sin cerrar», and the head says so instead of the list disagreeing with
+      it (uso #14: «2 de 6» over four rows). */
+  let travelOnly = $derived(unclosed.filter((u) => u.missing.length === 0 && u.travelGuess).length);
   function n(v: number): string {
     return loading ? DASH : String(v);
   }
@@ -300,7 +304,7 @@
                   n: facts.unclosed,
                   m: firmAhead,
                   w: UNCLOSED_WEEKS,
-                })}</span
+                }) + (travelOnly > 0 ? ` · ${t('planner.season_unclosed_guess', locale, { n: travelOnly })}` : '')}</span
           >
         </div>
         {#if loading}

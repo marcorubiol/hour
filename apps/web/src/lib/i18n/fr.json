@@ -1974,6 +1974,7 @@
   "planner.season_none_gaps": "Aucun créneau de {n} nuits ou plus.",
   "planner.season_none_away": "Personne d’absent.",
   "planner.season_unclosed_meta": "{n} sur {m} confirmées · {w} semaines",
+  "planner.season_unclosed_guess": "{n} seulement trajet ?",
   "planner.season_gaps_meta": "fenêtres de {n}+ nuits",
   "planner.season_nights": "{n} nuits",
   "planner.season_gap_away": "{who} absent {when}",
