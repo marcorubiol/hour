@@ -8,6 +8,7 @@
    * One list at a time, never both: a task drawn twice is two checkboxes
    * with one name.
    */
+  import BlockHead from '$lib/components/BlockHead.svelte';
   import { localeDayMonth } from '$lib/datetime';
   import { relativeContactDate } from '$lib/conversation';
   import { tick } from 'svelte';
@@ -190,12 +191,15 @@
 
 <section class="dband waits" aria-labelledby="desk-waits-h" aria-busy={loading}>
   <!-- The region is named by the words alone, not by the count beside them. -->
-  <h2 class="dband__h" tabindex="-1" bind:this={headEl}>
-    <span id="desk-waits-h">{t('desk.band_waiting', locale)}</span>
-    {#if !loading && !errored && waiting.total > waiting.rows.length && !all}
-      <span class="dband__count">{t('desk.waiting_count', locale, { shown: waiting.rows.length, total: waiting.total })}</span>
-    {/if}
-  </h2>
+  <BlockHead
+    title={t('desk.band_waiting', locale)}
+    titleId="desk-waits-h"
+    focusable
+    bind:el={headEl}
+    count={!loading && !errored && waiting.total > waiting.rows.length && !all
+      ? t('desk.waiting_count', locale, { shown: waiting.rows.length, total: waiting.total })
+      : null}
+  />
 
   {#if loading}
     <ul class="list" aria-hidden="true">
@@ -216,7 +220,7 @@
           {#if later}
             <section class="bucket">
               <button type="button" class="bucket__head later" aria-expanded={laterOpen} onclick={() => (laterOpen = !laterOpen)}>
-                <span class="bucket__label">{t('desk.bucket_later', locale)}</span>
+                <span class="bucket__label eyebrow eyebrow--sub">{t('desk.bucket_later', locale)}</span>
                 <span class="bucket__date">{laterText(later)}</span>
                 <span class="bucket__count" aria-hidden="true">{laterOpen ? '↑' : '↓'}</span>
               </button>
@@ -226,7 +230,7 @@
         {:else}
           <section class="bucket" class:bucket--today={bucket.sortKey === 0}>
             <header class="bucket__head" class:bucket__head--overdue={bucket.overdue}>
-              <span class="bucket__label"
+              <span class="bucket__label eyebrow eyebrow--sub"
                 >{bucket.labelKey === 'weekday' ? bucket.weekday : t(`desk.bucket_${bucket.labelKey}`, locale)}</span
               >
               {#if bucket.dateLabel}<span class="bucket__date">{bucket.dateLabel}</span>{/if}
@@ -455,18 +459,11 @@
     font-size: var(--text-xs);
     color: var(--text-faint);
   }
-  .bucket__label {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--text-faint);
-  }
   .bucket--today .bucket__label {
-    color: var(--primary);
+    --eyebrow-color: var(--primary);
   }
   .bucket__head--overdue .bucket__label {
-    color: var(--danger);
+    --eyebrow-color: var(--danger);
   }
   .bucket__date {
     font-family: var(--font-display);

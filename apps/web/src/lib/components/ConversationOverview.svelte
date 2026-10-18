@@ -15,9 +15,11 @@
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import { addToast } from '$lib/components/Toast.svelte';
+  import BlockHead from '$lib/components/BlockHead.svelte';
   import Button from '$lib/components/Button.svelte';
   import MailoutFigures from '$lib/components/MailoutFigures.svelte';
   import { dayMonth } from '$lib/datetime';
+  import { DASH } from '$lib/glyphs';
   import { t, type Locale } from '$lib/i18n';
   import {
     daysAgoLabel,
@@ -180,12 +182,12 @@
 {#if loading}
   <div class="board" aria-busy="true" aria-label={t('overview.loading', locale)}>
     <div class="board__col">
-      <section class="block block--due"><div class="block-head"><h2 class="eyebrow eyebrow--sub">{t('overview.due', locale)}</h2></div>{@render ghost(5)}</section>
-      <section class="block block--hot"><div class="block-head"><h2 class="eyebrow eyebrow--sub">{t('overview.hot', locale)}</h2></div>{@render ghost(5)}</section>
+      <section class="block block--due"><BlockHead title={t('overview.due', locale)} count={DASH} />{@render ghost(5)}</section>
+      <section class="block block--hot"><BlockHead title={t('overview.hot', locale)} count={DASH} />{@render ghost(5)}</section>
     </div>
     <div class="board__col">
       <section class="block block--season">
-        <div class="block-head"><h2 class="eyebrow eyebrow--sub">{t('overview.season_of', locale, { season: currentSeason(new Date()).label })}</h2></div>
+        <BlockHead title={t('overview.season_of', locale, { season: currentSeason(new Date()).label })} count={DASH} />
         <div class="season__bar season__bar--ghost"></div>
         <div class="season__legend" aria-hidden="true">
           {#each Array(6) as _, i (i)}
@@ -195,11 +197,11 @@
         <p class="season__note" aria-hidden="true"><span class="ghost-line" style:inline-size="60%">&nbsp;</span></p>
       </section>
       <section class="block block--cold">
-        <div class="block-head"><h2 class="eyebrow eyebrow--sub">{t('overview.cold', locale)}</h2></div>
+        <BlockHead title={t('overview.cold', locale)} count={DASH} />
         {@render ghost(5)}
       </section>
       <section class="block block--mailout" aria-hidden="true">
-        <div class="block-head"><h2 class="eyebrow eyebrow--sub">{t('overview.last_mailout', locale)}</h2></div>
+        <BlockHead title={t('overview.last_mailout', locale)} />
         <p class="mailout__subject"><span class="ghost-line" style:inline-size="50%">&nbsp;</span></p>
         <p class="mailout__meta"><span class="ghost-line" style:inline-size="70%">&nbsp;</span></p>
         <p class="mailout__ghost-figs"><span class="ghost-line">&nbsp;</span></p>
@@ -215,10 +217,9 @@
   <div class="board" data-testid="conversation-overview">
     <div class="board__col">
       <section class="block block--due" aria-labelledby="ov-due" data-testid="block-due">
-        <div class="block-head">
-          <h2 class="eyebrow eyebrow--sub" id="ov-due">{t('overview.due', locale)}&nbsp;· {data.due.count}</h2>
-          {#if data.due.count > 0}<a class="block__more" href="?turno=nuestro#lista">{t('overview.see_in_list', locale)}</a>{/if}
-        </div>
+        <BlockHead id="ov-due" title={t('overview.due', locale)} count={data.due.count}>
+          {#if data.due.count > 0}<a class="block-head__act" href="?turno=nuestro#lista">{t('overview.see_in_list', locale)}</a>{/if}
+        </BlockHead>
         {#if data.due.count === 0}
           <p class="block__empty">{t('overview.due_empty', locale)}</p>
         {:else}
@@ -264,10 +265,9 @@
       </section>
 
       <section class="block block--hot" aria-labelledby="ov-hot" data-testid="block-hot">
-        <div class="block-head">
-          <h2 class="eyebrow eyebrow--sub" id="ov-hot">{t('overview.hot', locale)}&nbsp;· {data.hot.count}</h2>
-          {#if data.hot.count > 0}<a class="block__more" href="?temp=caliente#lista">{t('overview.see_n', locale, { n: data.hot.count })}</a>{/if}
-        </div>
+        <BlockHead id="ov-hot" title={t('overview.hot', locale)} count={data.hot.count}>
+          {#if data.hot.count > 0}<a class="block-head__act" href="?temp=caliente#lista">{t('overview.see_n', locale, { n: data.hot.count })}</a>{/if}
+        </BlockHead>
         {#if data.hot.count === 0}
           <p class="block__empty">{t('overview.hot_empty', locale)}</p>
         {:else}
@@ -294,10 +294,9 @@
 
       {#if data.team.count > 0}
         <section class="block block--team" aria-labelledby="ov-team" data-testid="block-team">
-          <div class="block-head">
-            <h2 class="eyebrow eyebrow--sub" id="ov-team">{t('overview.team', locale)}&nbsp;· {t('overview.team_new', locale, { n: data.team.count })}</h2>
-            <a class="block__more" href="/h/conversations?view=threads">{t('conversations.view_what', locale)}</a>
-          </div>
+          <BlockHead id="ov-team" title={t('overview.team', locale)} count={t('overview.team_new', locale, { n: data.team.count })}>
+            <a class="block-head__act" href="/h/conversations?view=threads">{t('conversations.view_what', locale)}</a>
+          </BlockHead>
           <ol class="rows">
             {#each data.team.threads as th (th.thread_id)}
               {@const id = th.last_message.author_id}
@@ -319,10 +318,9 @@
 
     <div class="board__col">
       <section class="block block--season" aria-labelledby="ov-season" data-testid="block-season">
-        <div class="block-head">
-          <h2 class="eyebrow eyebrow--sub" id="ov-season">{t('overview.season_of', locale, { season: data.season.label })}&nbsp;· {data.season.total}</h2>
+        <BlockHead id="ov-season" title={t('overview.season_of', locale, { season: data.season.label })} count={data.season.total}>
           <span class="block__hint">{t('overview.season_hint', locale)}</span>
-        </div>
+        </BlockHead>
         {#if data.season.total === 0}
           <p class="block__empty">{t('overview.season_empty', locale)}</p>
         {:else}
@@ -357,10 +355,9 @@
       </section>
 
       <section class="block block--cold" aria-labelledby="ov-cold" data-testid="block-cold">
-        <div class="block-head">
-          <h2 class="eyebrow eyebrow--sub" id="ov-cold">{t('overview.cold', locale)}&nbsp;· {data.cold.count}</h2>
-          {#if data.cold.count > 0}<a class="block__more" href="?temp=fria#lista">{t('overview.see_n', locale, { n: data.cold.count })}</a>{/if}
-        </div>
+        <BlockHead id="ov-cold" title={t('overview.cold', locale)} count={data.cold.count}>
+          {#if data.cold.count > 0}<a class="block-head__act" href="?temp=fria#lista">{t('overview.see_n', locale, { n: data.cold.count })}</a>{/if}
+        </BlockHead>
         {#if data.cold.count === 0}
           <p class="block__empty">{t('overview.cold_empty', locale)}</p>
         {:else}
@@ -415,10 +412,9 @@
         {@const m = data.last_mailout}
         {@const ws = workspaceSlugById.get(m.workspace_id)}
         <section class="block block--mailout" aria-labelledby="ov-mail" data-testid="block-mailout">
-          <div class="block-head">
-            <h2 class="eyebrow eyebrow--sub" id="ov-mail">{t('overview.last_mailout', locale)}</h2>
-            {#if ws}<a class="block__more" href={`/h/${ws}/mailout/${m.id}`}>{t('overview.open_mailout', locale)}</a>{/if}
-          </div>
+          <BlockHead id="ov-mail" title={t('overview.last_mailout', locale)}>
+            {#if ws}<a class="block-head__act" href={`/h/${ws}/mailout/${m.id}`}>{t('overview.open_mailout', locale)}</a>{/if}
+          </BlockHead>
           <p class="mailout__subject">
             {m.subject || t('overview.no_subject', locale)}
             <!-- While sending is simulated, «45 delivered» must not read as real (diseño M3). -->
@@ -495,15 +491,6 @@
       flex-direction: column;
       gap: var(--space-xs);
       min-inline-size: 0;
-    }
-    .block__more {
-      font-size: var(--text-s);
-      color: var(--text-muted);
-      text-decoration: none;
-      white-space: nowrap;
-    }
-    .block__more:hover {
-      color: var(--text-color);
     }
     .block__hint {
       font-size: var(--text-xs);
@@ -791,11 +778,6 @@
 
     /* Touch: the links and the legend reach the finger's size (móvil #8). */
     @media (pointer: coarse) {
-      .block__more {
-        display: inline-flex;
-        align-items: center;
-        min-block-size: var(--touch-target);
-      }
       .season__item {
         min-block-size: var(--touch-target);
       }

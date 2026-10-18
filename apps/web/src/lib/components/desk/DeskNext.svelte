@@ -10,6 +10,7 @@
    * happening to you, wherever you are looking. And it never changes height
    * while the answer lands: the card is drawn with dashes first.
    */
+  import BlockHead from '$lib/components/BlockHead.svelte';
   import { useQueryClient } from '@tanstack/svelte-query';
   import { addToast } from '$lib/components/Toast.svelte';
   import { ApiError } from '$lib/api';
@@ -110,10 +111,9 @@
 {/snippet}
 
 <section class="dband next" aria-labelledby="desk-next-h">
-  <h2 class="dband__h">
-    <span id="desk-next-h">{t('desk.band_next', locale)}</span>
-    <a class="dband__more" href="/h/planner">{t('lens.planner', locale)} →</a>
-  </h2>
+  <BlockHead title={t('desk.band_next', locale)} titleId="desk-next-h">
+    <a class="block-head__act" href="/h/planner">{t('lens.planner', locale)} →</a>
+  </BlockHead>
 
   {#if errored}
     <p class="load-fail">{t('desk.next_error', locale)}</p>

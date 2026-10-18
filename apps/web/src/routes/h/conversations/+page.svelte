@@ -30,6 +30,7 @@
   import { afterNavigate, goto } from '$app/navigation';
   import { page } from '$app/state';
   import { fetchJSON, mutateJSON, ApiError } from '$lib/api';
+  import BlockHead from '$lib/components/BlockHead.svelte';
   import Button from '$lib/components/Button.svelte';
   import LensHeader from '$lib/components/LensHeader.svelte';
   import LensTitle from '$lib/components/LensTitle.svelte';
@@ -557,8 +558,8 @@
       onwrite={canEdit ? writeTo : undefined}
     />
 
-    <div class="conversations__list-head block-head" id="lista">
-      <h2 class="eyebrow eyebrow--sub conversations__list-title" tabindex="-1" bind:this={listHeading}>{t('overview.list', locale)}</h2>
+    <div class="conversations__list-head" id="lista">
+      <BlockHead title={t('overview.list', locale)} focusable bind:el={listHeading} />
     </div>
     <div class="conversations__controls">
       <div class="conversations__search">
@@ -730,10 +731,6 @@
       block-size: var(--control-size-m);
     }
 
-    /* Focused by script after a filter: the ring only for the keyboard. */
-    .conversations__list-title:focus:not(:focus-visible) {
-      outline: none;
-    }
     .conversations__list-head {
       scroll-margin-block-start: var(--space-l);
       margin-block-start: var(--space-m);

@@ -9,6 +9,7 @@
    * place. A door whose lens failed says so alone. Cuentas exists only with
    * `read:money`: without it, no trace.
    */
+  import BlockHead from '$lib/components/BlockHead.svelte';
   import { t, type Locale } from '$lib/i18n';
   import type { PlannerDoor } from '$lib/desk-bands';
 
@@ -31,7 +32,7 @@
 <section class="dband season" aria-labelledby="desk-season-h">
   <!-- No common window over the doors: each one says its own, in its lens's
        words (the Planner's twelve weeks, Conversations' season). -->
-  <h2 class="dband__h" id="desk-season-h">{t('desk.band_season', locale)}</h2>
+  <BlockHead id="desk-season-h" title={t('desk.band_season', locale)} />
 
   <div class="doors">
     <a class="door" href="/h/planner" data-testid="door-planner">

@@ -27,6 +27,7 @@
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
+  import BlockHead from '$lib/components/BlockHead.svelte';
   import Button from '$lib/components/Button.svelte';
   import Chip from '$lib/components/Chip.svelte';
   import MoneyInvoices from '$lib/components/MoneyInvoices.svelte';
@@ -908,14 +909,13 @@
         <div class="radar" aria-busy={loading}>
           <!-- 2 · Pide atención -->
           <section class="att" aria-label={t('books.attention', locale)}>
-            <header class="block-head">
-              <p class="eyebrow">{t('books.attention', locale)}{#if attention.length > 0}&nbsp;· {attention.length}{/if}</p>
+            <BlockHead title={t('books.attention', locale)} count={loading || invoicesError ? DASH : attention.length}>
               {#if attention.length > ATTENTION_VISIBLE}
-                <button type="button" class="radar__more" onclick={() => (attentionAll = !attentionAll)}>
+                <button type="button" class="block-head__act" onclick={() => (attentionAll = !attentionAll)}>
                   {attentionAll ? t('books.attention_less', locale) : t('books.attention_all', locale, { n: attention.length })}
                 </button>
               {/if}
-            </header>
+            </BlockHead>
             {#if invoicesError}
               {@render failed('books.err_invoices', () => $invoicesQuery.refetch())}
             {:else if loading}
@@ -943,7 +943,7 @@
 
           <!-- 3 · Lo que entra -->
           <section class="inflow" aria-label={t('books.inflow', locale)}>
-            <header class="block-head"><p class="eyebrow">{t('books.inflow', locale)}</p></header>
+            <BlockHead title={t('books.inflow', locale)} />
             {#if invoicesError}
               {@render failed('books.err_invoices', () => $invoicesQuery.refetch())}
             {:else if loading}
@@ -1318,9 +1318,7 @@
     /* While the feeds load the radar keeps roughly its height, so the ledger does not jump down. */
     .radar[aria-busy='true'] { min-block-size: 14rem; }
     .radar { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: var(--space-l); align-items: start; }
-    .radar .block-head { margin-block-end: var(--space-xs); }
-    .radar__more { appearance: none; border: 0; background: none; padding: 0; font: inherit; font-size: var(--text-xs); color: var(--text-muted); cursor: pointer; }
-    .radar__more:hover { color: var(--text-color); }
+    .radar :global(.block-head) { margin-block-end: var(--space-xs); }
     /* One grid for the whole list (rows are subgrids): amounts and buttons
        fall in columns whatever each row's text measures. */
     .att__list { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; column-gap: var(--space-m); }

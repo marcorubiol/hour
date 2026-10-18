@@ -620,7 +620,7 @@
     {#snippet sub()}
       <!-- One child, so the sub line's «·» separators stay out of it. -->
       <span class="desk__subrow">
-        <span class="desk__date">{dateWords}</span>
+        <span class="desk__date eyebrow eyebrow--sub">{dateWords}</span>
         <button type="button" class="desk__add btn--outline btn--s" bind:this={addBtn} aria-expanded={composerOpen} onclick={openComposer}
           >{t('desk.add_task', locale)}</button
         >
@@ -718,14 +718,6 @@
       flex-direction: column;
       gap: var(--space-l);
     }
-    .desk__date {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      /* The rail already says the day: here it whispers. */
-      color: var(--text-faint);
-    }
     .desk__subrow {
       display: flex;
       align-items: center;
@@ -781,43 +773,9 @@
       display: block;
       padding: 0;
     }
-    .desk :global(.dband__h:focus) {
-      outline: none;
-    }
-    .desk :global(.dband__h:focus-visible) {
-      outline: var(--focus-width) solid var(--focus-color);
-      outline-offset: var(--focus-offset);
-    }
-    .desk :global(.dband__h) {
-      display: flex;
-      align-items: baseline;
-      gap: var(--space-s);
-      margin: 0 0 var(--space-s);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      font-weight: 400;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--text-faint);
-    }
-    .desk :global(.dband__count),
-    .desk :global(.dband__more) {
-      margin-inline-start: auto;
-      letter-spacing: var(--mono-letter-spacing);
-      text-transform: none;
-      color: var(--text-faint);
-      text-decoration: none;
-    }
-    .desk :global(.dband__more:hover) {
-      color: var(--text-color);
-    }
-    @media (pointer: coarse) {
-      .desk :global(.dband__more) {
-        display: inline-flex;
-        align-items: center;
-        min-block-size: var(--touch-target);
-        margin-block: calc(-0.5 * var(--touch-target) + 0.5em);
-      }
+    /* Each band's head is the dashboards' one (BlockHead); here only its place. */
+    .desk :global(.dband > .block-head) {
+      margin-block-end: var(--space-s);
     }
     /* A failure is base.css's `.load-fail`, the one voice of the dashboards. */
     .desk :global(.dband__empty) {

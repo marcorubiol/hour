@@ -6,6 +6,7 @@
    * that says since when (amends ADR-121 § 5); if a source failed it says so,
    * because a silent band would claim «nothing changed».
    */
+  import BlockHead from '$lib/components/BlockHead.svelte';
   import { t, type Locale } from '$lib/i18n';
   import { feedHref, feedThreadName, feedTitle } from '$lib/threads';
   import type { Change } from '$lib/desk-bands';
@@ -56,7 +57,7 @@
 </script>
 
 <section class="dband changed" aria-labelledby="desk-changed-h" aria-busy={loading} data-testid="desk-changed">
-  <h2 class="dband__h" id="desk-changed-h">{t('desk.changed_since', locale, { when: sinceLabel })}</h2>
+  <BlockHead id="desk-changed-h" title={t('desk.changed_since', locale, { when: sinceLabel })} />
   {#if loading}
     <ul class="feed" aria-hidden="true">
       {#each [0, 1] as i (i)}

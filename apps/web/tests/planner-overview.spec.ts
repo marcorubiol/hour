@@ -57,7 +57,7 @@ test.describe('the season (ADR-117)', () => {
   }) => {
     await open(page);
     // Strip + decide + clashes + unclosed + gaps + away.
-    await expect(page.locator('.ov .blk__t')).toHaveCount(6);
+    await expect(page.locator('.ov .block-head h2')).toHaveCount(6);
     // Nothing is still waiting once the lens says it has loaded.
     // The census lives in the head's window line, with every other drawing's.
     expect(await page.locator('.cal__meta--window').innerText()).not.toContain('–');

@@ -1803,8 +1803,9 @@
     font-style: normal;
   }
 
-  /* Block head — a sub-eyebrow over a hairline, with its actions at the end
-     (the conversation file, the mailout screen). */
+  /* Block head — a sub-eyebrow over a hairline, its figure after the title and
+     its action at the end. The one head of every dashboard block (the
+     `BlockHead` component) and of the file and mailout screens (ADR-130 § 1). */
   .block-head {
     display: flex;
     align-items: center;
@@ -1816,6 +1817,45 @@
   }
   .block-head h2 {
     margin: 0;
+  }
+  .block-head h2:focus {
+    outline: none;
+  }
+  .block-head h2:focus-visible {
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: var(--focus-offset);
+  }
+  /* The figure keeps its case: «7 de 16», «0 de 0 confirmados · 8 semanas». */
+  .block-head__n {
+    letter-spacing: var(--mono-letter-spacing);
+    text-transform: none;
+  }
+  .block-head__n--alert {
+    color: var(--danger);
+  }
+  /* The block's action: quiet text at the end of the head line. */
+  .block-head__act {
+    appearance: none;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: var(--text-s);
+    color: var(--text-muted);
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .block-head__act:hover {
+    color: var(--text-color);
+  }
+  @media (pointer: coarse) {
+    .block-head__act {
+      display: inline-flex;
+      align-items: center;
+      min-block-size: var(--touch-target);
+      margin-block: calc(-0.5 * var(--touch-target) + 0.5em);
+    }
   }
 
   /* Mail card — one email as Hour shows it: a soft box with its From/To
