@@ -97,7 +97,7 @@ test.describe('tasks — Desk feed + line module', () => {
 
     // An undated task is «anytime»: «Waiting for you» keeps to the week, the
     // whole list by days has it.
-    await page.getByRole('button', { name: /^See all \(\d+\) by day/ }).click();
+    await page.getByRole('button', { name: /^See all by day/ }).click();
     const row = page.getByRole('checkbox', { name: TASK_FREE });
     await expect(row).toBeVisible({ timeout: 10_000 });
 
