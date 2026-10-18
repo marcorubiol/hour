@@ -413,13 +413,14 @@
   function shortDay(day: string): string {
     return shortDayFormat.format(new Date(`${day.slice(0, 10)}T00:00:00Z`));
   }
-  function collectLabel(m: BoloMoney): { tone: string; label: string } | null {
+  function collectLabel(b: MoneyBolo, m: BoloMoney): { tone: 'success' | 'warning' | 'danger' | 'faint'; label: string } | null {
     if (m.overdue) return { tone: 'danger', label: t('books.pill_overdue', locale, { n: m.daysLate }) };
-    if (m.toInvoice) return { tone: 'warn', label: t('books.filter_to_invoice', locale).toLowerCase() };
-    if (m.collect === 'full') return { tone: 'ok', label: t('books.collected', locale) };
+    if (m.toInvoice) return { tone: 'warning', label: t('books.filter_to_invoice', locale).toLowerCase() };
+    // A deal whose status already says «paid» needs no second «collected».
+    if (m.collect === 'full') return b.status === 'paid' ? null : { tone: 'success', label: t('books.collected', locale) };
     // Owed and not late yet: when it is expected says more than «unpaid».
     const expected = m.owed > 0 && m.aging?.expectedOn ? shortDay(m.aging.expectedOn) : null;
-    if (m.collect === 'partial') return { tone: 'warn', label: expected ? t('books.pill_partial_expected', locale, { date: expected }) : t('books.pill_partial', locale) };
+    if (m.collect === 'partial') return { tone: 'warning', label: expected ? t('books.pill_partial_expected', locale, { date: expected }) : t('books.pill_partial', locale) };
     // Nothing owed yet (no issued document, or the deal is not confirmed): not a debt, no pill.
     if (m.collect === 'unpaid' && m.owed === 0) return null;
     if (m.collect === 'unpaid') return { tone: 'faint', label: expected ? t('books.pill_expected', locale, { date: expected }) : t('books.pill_unpaid', locale) };
@@ -1003,7 +1004,7 @@
                   {/if}
                   {#each group.rows as b (b.id)}
                     {@const m = moneyOf(b)}
-                    {@const pill = collectLabel(m)}
+                    {@const pill = collectLabel(b, m)}
                     {@const open = expandedId === b.id}
                     <tr class="book__row" class:is-open={open} id={`bolo-${b.id}`} data-overdue={m.overdue || undefined}>
                       <td class="book__date">{b.next_performed_at ? dayLabel(b.next_performed_at) : t('books.no_date', locale)}{#if b.function_count > 1}<span class="book__fns">{` · ${t('books.fn_count', locale, { n: b.function_count })}`}</span>{/if}</td>
@@ -1017,7 +1018,7 @@
                       <td class="book__num"><button type="button" class="book__fee" title={t('books.edit_fee', locale)} onclick={() => openFee(b)}>{b.fee_amount === null ? t('books.no_fee', locale) : fmtMoney(Number(b.fee_amount))}</button>{#if multiCurrency && b.fee_amount !== null}<span class="book__cur">{m.currency}</span>{/if}</td>
                       <td class="book__num">{#if m.fee === null && !m.doc}<span class="book__faint">{DASH}</span>{:else}{fmtMoney(m.collected)}{#if multiCurrency}<span class="book__cur">{m.currency}</span>{/if}{/if}</td>
                       <td class="book__num book__owed">{#if m.owed > 0}{fmtMoney(m.owed)}{#if multiCurrency}<span class="book__cur">{m.currency}</span>{/if}{/if}</td>
-                      <td class="book__collect">{#if pill}<span class="pill" data-tone={pill.tone}>{pill.label}</span>{/if}</td>
+                      <td class="book__collect">{#if pill}<StateBadge label={pill.label} tone={pill.tone} />{/if}</td>
                     </tr>
                     {#if open}
                       {@const docs = docsByBolo.get(b.id) ?? []}
@@ -1325,7 +1326,8 @@
     .book__toggle { appearance: none; border: 0; background: none; padding: 0; font: inherit; color: var(--text-color); font-weight: 500; cursor: pointer; text-align: start; }
     .book__toggle:hover { text-decoration: underline; }
     .book__city { font-weight: 400; }
-    .book__chip { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); padding: 1px 8px; border: 1px solid var(--border-color-dark); border-radius: var(--radius-circle); white-space: nowrap; }
+    /* The document is named, not boxed: the row already has two badges' worth of chrome. */
+    .book__chip { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); white-space: nowrap; }
     .book__cur { margin-inline-start: 0.5ch; font-size: var(--text-xs); color: var(--text-muted); letter-spacing: 0.04em; }
     .book__fee { appearance: none; border: 0; background: none; padding: 0; font: inherit; color: var(--text-color); cursor: pointer; }
     .book__fee:hover { text-decoration: underline; }
@@ -1344,15 +1346,6 @@
     .sheet__a { color: var(--text-color); text-underline-offset: 0.2em; }
     .sheet__link { appearance: none; border: 0; background: none; padding: 0; font: inherit; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-color); text-decoration: underline; cursor: pointer; }
     .sheet__acts { grid-column: 1 / -1; display: flex; gap: var(--space-xs); flex-wrap: wrap; }
-    .pill {
-      display: inline-block; font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.04em;
-      text-transform: lowercase; padding: 2px 8px; border-radius: var(--radius-circle);
-      border: 1px solid var(--border-color-dark); color: var(--text-muted); white-space: nowrap;
-    }
-    .pill[data-tone='ok'] { color: var(--success); border-color: color-mix(in oklch, var(--success) 42%, var(--border-color-light)); }
-    .pill[data-tone='warn'] { color: var(--warning); border-color: color-mix(in oklch, var(--warning) 42%, var(--border-color-light)); }
-    .pill[data-tone='danger'] { color: var(--danger); border-color: color-mix(in oklch, var(--danger) 42%, var(--border-color-light)); }
-    .pill[data-tone='faint'] { color: var(--text-faint); }
 
     .mny__expense-totals { display: flex; flex-wrap: wrap; gap: var(--space-m); font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); }
     .mny__expenses { display: flex; flex-direction: column; }
