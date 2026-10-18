@@ -110,8 +110,8 @@
 {/snippet}
 
 <section class="dband next" aria-labelledby="desk-next-h">
-  <h2 class="dband__h" id="desk-next-h">
-    {t('desk.band_next', locale)}
+  <h2 class="dband__h">
+    <span id="desk-next-h">{t('desk.band_next', locale)}</span>
     <a class="dband__more" href="/h/planner">{t('lens.planner', locale)} →</a>
   </h2>
 

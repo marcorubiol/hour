@@ -10,6 +10,7 @@
    */
   import { localeDayMonth } from '$lib/datetime';
   import { relativeContactDate } from '$lib/conversation';
+  import { tick } from 'svelte';
   import { t, type Locale } from '$lib/i18n';
   import type { DeskBucket, DeskConcern, DeskItem, DeskRun, Waiting } from '$lib/desk-feed';
 
@@ -56,6 +57,14 @@
   }: Props = $props();
 
   let all = $state(false);
+  let headEl = $state<HTMLElement | null>(null);
+  /** Swapping the lists removes the button that was pressed: the focus goes to
+      the band's heading instead of falling to <body> (móvil #9). */
+  async function showAll(on: boolean) {
+    all = on;
+    await tick();
+    headEl?.focus();
+  }
   let laterOpen = $state(false);
   let feedCount = $derived(feed.reduce((n, b) => n + b.runs.reduce((m, r) => m + r.items.length, 0), 0));
 
@@ -180,8 +189,9 @@
 {/snippet}
 
 <section class="dband waits" aria-labelledby="desk-waits-h" aria-busy={loading}>
-  <h2 class="dband__h" id="desk-waits-h">
-    {t('desk.band_waiting', locale)}
+  <!-- The region is named by the words alone, not by the count beside them. -->
+  <h2 class="dband__h" tabindex="-1" bind:this={headEl}>
+    <span id="desk-waits-h">{t('desk.band_waiting', locale)}</span>
     {#if !loading && !errored && waiting.total > waiting.rows.length && !all}
       <span class="dband__count">{t('desk.waiting_count', locale, { shown: waiting.rows.length, total: waiting.total })}</span>
     {/if}
@@ -221,7 +231,7 @@
         {/if}
       {/each}
     </div>
-    <button type="button" class="more" onclick={() => (all = false)}>{t('desk.see_less', locale)}</button>
+    <button type="button" class="more" onclick={() => showAll(false)}>{t('desk.see_less', locale)}</button>
   {:else if waiting.rows.length === 0}
     <div class="caughtup">
       <p class="caughtup__g" aria-hidden="true">·</p>
@@ -229,14 +239,14 @@
       <p class="caughtup__s">{t('desk.caughtup_s', locale)}</p>
     </div>
     {#if feedCount > waiting.rows.length && !calm}
-      <button type="button" class="more" onclick={() => (all = true)}>{t('desk.see_all', locale)} →</button>
+      <button type="button" class="more" onclick={() => showAll(true)}>{t('desk.see_all', locale)} →</button>
     {/if}
   {:else}
     <ul class="list">
       {#each waiting.rows as item (item.id)}{@render row(item)}{/each}
     </ul>
     {#if feedCount > waiting.rows.length && !calm}
-      <button type="button" class="more" onclick={() => (all = true)}>{t('desk.see_all', locale)} →</button>
+      <button type="button" class="more" onclick={() => showAll(true)}>{t('desk.see_all', locale)} →</button>
     {/if}
   {/if}
 </section>

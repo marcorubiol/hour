@@ -781,6 +781,13 @@
       display: block;
       padding: 0;
     }
+    .desk :global(.dband__h:focus) {
+      outline: none;
+    }
+    .desk :global(.dband__h:focus-visible) {
+      outline: var(--focus-width) solid var(--focus-color);
+      outline-offset: var(--focus-offset);
+    }
     .desk :global(.dband__h) {
       display: flex;
       align-items: baseline;
