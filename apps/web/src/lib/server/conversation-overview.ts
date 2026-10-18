@@ -151,17 +151,30 @@ export async function loadLastMailout(
   scope: OverviewScope,
   rows: readonly OverviewInput[],
 ): Promise<LastMailout | null> {
+  // The 4 latest, and the first with a recipient you can read: a mailout
+  // whose recipients are all conversations you no longer see (deleted, or
+  // someone else's private ones) would say «done, 0 recipients» and name a
+  // venue in its subject (`permisos.md` § 3).
   const search = new URLSearchParams({
     select: 'id,workspace_id,subject,from_address,status,queued_at',
     status: 'in.(queued,sending,paused,done)',
     order: 'queued_at.desc.nullslast',
-    limit: '1',
+    limit: '4',
   });
   setScope(search, scope.projectIds, scope.workspaceIds);
   const { data } = await pgGet<Omit<LastMailout, 'figures'>>(env, 'mailout', jwt, { search });
-  const m = data[0];
+  let m: Omit<LastMailout, 'figures'> | undefined;
+  let recipients: { data: (MailoutRecipientLite & { recipient_id: string })[] } = { data: [] };
+  for (const candidate of data) {
+    recipients = await pgPostRpc<MailoutRecipientLite & { recipient_id: string }>(env, 'mailout_preview', jwt, {
+      p_id: candidate.id,
+    });
+    if (recipients.data.length > 0) {
+      m = candidate;
+      break;
+    }
+  }
   if (!m) return null;
-  const recipients = await pgPostRpc<MailoutRecipientLite & { recipient_id: string }>(env, 'mailout_preview', jwt, { p_id: m.id });
   const sentAt = await pgGet<{ id: string; sent_at: string | null }>(env, 'mailout_recipient', jwt, {
     search: { select: 'id,sent_at', mailout_id: `eq.${m.id}` },
   });
