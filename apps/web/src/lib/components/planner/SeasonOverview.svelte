@@ -384,7 +384,9 @@
 <style>
   @layer components {
     .ov {
-      container-type: inline-size;
+      /* Named: the day cells are containers too (for the slip), and an
+         unnamed query below would measure the cell instead of the season. */
+      container: season / inline-size;
       display: grid;
       gap: var(--space-m);
       margin-block-start: var(--space-s);
@@ -495,6 +497,9 @@
       display: block;
     }
     .d {
+      /* The cell is the slip's size container: below a measured width the
+         compact card keeps only its monogram (ADR-095 §8, diseño M10). */
+      container-type: inline-size;
       position: relative;
       display: flex;
       flex-direction: column;
@@ -757,7 +762,7 @@
 
     /* ── Narrow: one column, the queue above the strip (the thumb's job),
        the strip as marks only. Measured on the ELEMENT (ADR-095 §8). ─── */
-    @container (max-width: 640px) {
+    @container season (max-width: 640px) {
       .ov__grid {
         grid-template-columns: minmax(0, 1fr);
         grid-template-areas: 'decide' 'strip' 'lists';
@@ -787,7 +792,7 @@
         display: none;
       }
     }
-    @container (min-width: 641px) and (max-width: 900px) {
+    @container season (min-width: 641px) and (max-width: 900px) {
       .ov__grid {
         grid-template-columns: minmax(0, 1fr);
         grid-template-areas: 'strip' 'decide' 'lists';

@@ -616,6 +616,14 @@
       font-family: var(--font-display);
       font-size: 10.5px;
     }
+    /* Too narrow for a place that can be read: the monogram alone, never
+       «Giro…». The title still says everything. */
+    @container (max-width: 60px) {
+      .slip[data-placing='compact'] .slip__n,
+      .slip[data-placing='compact'] .slip__c {
+        display: none;
+      }
+    }
 
     /* ══ THE CERTAINTY VOCABULARY ═══════════════════════════════════════
        Geometry states the certainty. A theme may repaint the material; it may
