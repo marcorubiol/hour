@@ -160,3 +160,38 @@ export function cellMark(rows: SeasonCellIn[]): CellMark {
   }
   return mark;
 }
+
+/** What the season overview needs of a conflict ($lib/planner `Conflict`). */
+export interface SeasonConflictIn {
+  severity: string;
+  event_ids: string[];
+}
+
+/**
+ * «CHOQUES», the season's figure and its list (ADR-120, 122): the engine's
+ * conflicts on a day of the window that are not a choice between options.
+ * Left out: `possible` (nobody entered the team: a missing fact, not a
+ * clash; the queue names it where it is a call to make), the status-aware
+ * `double` and `concurrence` (the queue's, never a mark), and any pair the
+ * decisions queue already holds (said there, once).
+ *
+ * The Planner's Season draws the list and the Desk's Planner door counts it:
+ * one rule, so the door says what the lens says. Sorted by day, stable.
+ */
+export function clashesInSeason<C extends SeasonConflictIn>(
+  conflicts: readonly C[],
+  dayOf: ReadonlyMap<string, string>,
+  decisions: readonly { a: { id: string }; b: { id: string } }[],
+  window: { from: string; to: string },
+): Array<{ day: string; conflict: C }> {
+  const decided = new Set(decisions.flatMap((d) => [`${d.a.id}|${d.b.id}`, `${d.b.id}|${d.a.id}`]));
+  const out: Array<{ day: string; conflict: C }> = [];
+  for (const c of conflicts) {
+    if (c.severity === 'possible' || c.severity === 'double' || c.severity === 'concurrence') continue;
+    const day = dayOf.get(c.event_ids[0]);
+    if (!day || day < window.from || day > window.to) continue;
+    if (c.event_ids.length === 2 && decided.has(`${c.event_ids[0]}|${c.event_ids[1]}`)) continue;
+    out.push({ day, conflict: c });
+  }
+  return out.sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
+}

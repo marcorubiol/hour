@@ -4434,3 +4434,37 @@ lente (ADR-124 § 7, `conversation_access` y `/api/money/access`). Carril `claud
 **Abierto, no construido.** Si además cada persona puede ocultarse una lente para sí (un técnico que no hace difusión).
 Sería una preferencia de usuario, no del espacio, y se sumaría a esta regla (sale si el espacio la usa, tienes acceso
 y no te la has ocultado); no tiene caso real todavía en Phase 0.
+
+## [2026-10-19] ADR-133 · Desk: quién va en lo siguiente, choques en la puerta del Planner, cobros en «Ha cambiado»
+
+**Contexto.** La revisión de Desk (ADR-121, 127) dejó tres cosas fuera: quién va en la tarjeta de lo siguiente, los
+choques en la puerta del Planner y los cobros y cambios de estado en «Ha cambiado». Carril `claude/desk-rest`.
+
+**Decisión.**
+1. **Quién va.** La tarjeta de una función dice su reparto con la línea compartida (`Slip` `cast`, `styles/cast.css`),
+   a tamaño de la tarjeta, y lleva «Quién va →» a `#who-goes` de la ficha, donde vive el editor (`WhoGoes` no cabe en
+   una tarjeta). La regla es la del Día del Planner, ahora en `castNames` ($lib/people) para los dos: los nombres del
+   reparto apuntado, y «sin reparto» en la voz callada si no hay nadie; nunca el equipo del proyecto como deducción
+   (ley de `cast.css`). La deducción sobre ti sigue donde estaba: el nombre en cursiva del slip y el «¿vas?». Una
+   fecha (viaje, prensa) no lleva reparto ni enlace, como en el Día. Los nombres salen del feed de equipo del Planner
+   (misma clave); mientras no llega, no se dibuja la línea.
+2. **Choques en la puerta.** La puerta cuenta lo que la Temporada lista bajo «Choques», con la misma regla, ahora en
+   `clashesInSeason` ($lib/season) para los dos: conflictos del motor en la ventana desde hoy, sin `possible`, sin las
+   severidades de la cola (`double`, `concurrence`) y sin los pares que la cola de decisiones ya tiene. El Desk crea el
+   motor del Planner (`createPlannerEngine`) sobre las filas del pulso y lee las ausencias del feed de la Temporada
+   (`seasonAvailabilityQueryOptions`, misma clave). Sale en rojo tras «por decidir · días de viaje» cuando hay alguno.
+   De paso, confirmadas y por decidir son ahora las del censo del motor: una propuesta cuenta como opción, como en el
+   Planner desde su revisión del 18-10 (la puerta contaba solo `hold`).
+3. **Cobros.** Un pago es append-only y tiene su `created_at`: basta para «Cobrado 1.200 € · Kursaal · Manresa» sin
+   migración. `GET /api/payments` acepta `recorded_since` y `others=1` (lo apuntado después, por otro que no seas tú;
+   lo tuyo no es noticia, una importación sin firma sí) y devuelve `bolo_id`. Se nombra por su bolo, directo o por la
+   factura, con los feeds de Cuentas ya en caché, y se acota al ámbito como ellos. Solo con `read:money` y Cuentas
+   encendida.
+4. **Cambios de estado: no.** Nada registra cuándo un bolo o una función cambió de estado ni desde cuál: `updated_at`
+   se mueve con cualquier edición y `conversation_event` no tiene cambios de estado. «X pasa a confirmado» desde ahí
+   sería inventarlo. Haría falta un historial: una tabla `status_event` (entidad, id, de, a, cuándo, quién) escrita
+   por un trigger AFTER UPDATE OF status en `bolo` y `performance` (y `conversation` si se quiere), con RLS por la
+   entidad. Es migración y queda fuera de este carril.
+
+**Límite conocido.** El feed de funciones del pulso trae 200 desde hoy, sin paginar; la Temporada pagina. En una
+compañía con más de 200 funciones en doce semanas la puerta contaría de menos. No es el caso en Phase 0.

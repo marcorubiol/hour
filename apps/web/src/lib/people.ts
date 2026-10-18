@@ -283,6 +283,17 @@ export function noCastProjectId(key: string): string | null {
 }
 
 /**
+ * WHO GOES, as a drawing says it (styles/cast.css): the names of the roster on
+ * file, in its order. Data only: never the project's team as an inference
+ * (design law: four people affirmed at a radio at 10h). [] is «nobody on
+ * file», which the drawing says in its quieter voice. One rule for the
+ * Planner's Day and the Desk's card.
+ */
+export function castNames(personIds: readonly string[] | null | undefined, names: ReadonlyMap<string, string>): string[] {
+  return (personIds ?? []).map((id) => names.get(id)).filter((n): n is string => Boolean(n));
+}
+
+/**
  * A narrowed person axis, ready to judge calendar rows — everything the
  * predicate needs resolved once instead of per row.
  *

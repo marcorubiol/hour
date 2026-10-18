@@ -123,7 +123,7 @@
     normalizePlannerView,
     statusWord as statusWordIn,
   } from '$lib/planner';
-  import { buildPersonScope } from '$lib/people';
+  import { buildPersonScope, castNames } from '$lib/people';
   import { createPlannerFeeds, primeAgendaWindow } from '$lib/planner-feeds.svelte';
   import { createPlannerEngine } from '$lib/planner-engine.svelte';
   import SeasonOverview, {
@@ -135,6 +135,7 @@
   import {
     UNCLOSED_WEEKS,
     cellMark,
+    clashesInSeason,
     gapWindows,
     seasonWindow,
     unclosed as unclosedOf,
@@ -1379,9 +1380,7 @@
         slip: sl,
         // Data or the honest word — the project-team inference is not drawn
         // here (design law: four people affirmed at a radio at 10h).
-        cast: (p.person_ids ?? [])
-          .map((id) => personNames.get(id))
-          .filter((n): n is string => Boolean(n)),
+        cast: castNames(p.person_ids, personNames),
         roadSheetHref: p.slug && ws ? `/h/${ws}/performance/${p.slug}/roadsheet` : null,
         clash: cl?.clash ?? null,
         clashPeople: cl?.people ?? false,
@@ -1988,20 +1987,14 @@
       there, once. */
   let seasonClashes = $derived.by(() => {
     if (view !== 'overview') return [];
-    const decided = new Set(decisionVMs.flatMap((d) => [`${d.a.id}|${d.b.id}`, `${d.b.id}|${d.a.id}`]));
-    const out: Array<{ key: string; day: string; title: string; body: string }> = [];
-    for (const [day, list] of clashesByDay) {
-      if (day < todayIso || day > season.to) continue;
-      for (const [i, c] of list.entries()) {
-        // «Could clash, nobody entered the team» is a missing fact, not a
-        // clash: the queue already names it where it is a call to make.
-        if (c.severity === 'possible') continue;
-        if (c.event_ids.length === 2 && decided.has(`${c.event_ids[0]}|${c.event_ids[1]}`)) continue;
-        const what = c.rows.map((r) => r.label).join(' · ');
-        out.push({ key: `${day}:${i}`, day, title: c.title, body: what ? `${c.body} · ${what}` : c.body });
-      }
-    }
-    return out.sort((a, b) => (a.day < b.day ? -1 : 1));
+    return clashesInSeason(conflicts, eventDayById, decisionQueue.decisions, { from: todayIso, to: season.to }).flatMap(
+      ({ day, conflict }, i) => {
+        const vm = clashVM(conflict);
+        if (!vm) return [];
+        const what = vm.rows.map((r) => r.label).join(' · ');
+        return [{ key: `${day}:${i}`, day, title: vm.title, body: what ? `${vm.body} · ${what}` : vm.body }];
+      },
+    );
   });
   /** THE RED DOT IS WHAT «CHOQUES» COUNTS, AND NOTHING ELSE (revisión del
       Planner, 2026-10-18). It also lit the days of a decision between two

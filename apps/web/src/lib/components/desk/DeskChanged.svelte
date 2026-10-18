@@ -12,6 +12,7 @@
   import { lensOn } from '$lib/lenses.svelte';
   import { feedHref, feedThreadName, feedTitle } from '$lib/threads';
   import type { Change } from '$lib/desk-bands';
+  import { fmtCurrency } from '$lib/money';
   import MailoutFigures from '$lib/components/MailoutFigures.svelte';
 
   interface Props {
@@ -40,6 +41,21 @@
         // A bolo's facet thread («Técnica») is the bolo's, not «the team's».
         kind: t(th.anchor_kind === 'bolo' ? 'desk.changed_kind_bolo' : 'desk.changed_kind_thread', locale),
         href: feedHref(th, workspaceSlugById.get(th.workspace_id)),
+      };
+    }
+    if (c.kind === 'payment') {
+      const p = c.payment;
+      const subject = p.bolo
+        ? [p.bolo.venue_name, p.bolo.city].filter(Boolean).join(' · ') || (p.bolo.project?.name ?? '')
+        : (p.payer ?? '');
+      return {
+        text: t(subject ? 'desk.changed_payment' : 'desk.changed_payment_bare', locale, {
+          amount: fmtCurrency(p.amount, p.currency, locale),
+          subject,
+        }),
+        kind: t('desk.changed_kind_payment', locale),
+        // The deal in Cuentas, as «Te espera» sends an overdue invoice.
+        href: lensOn('books') ? (p.bolo ? `/h/books#bolo-${p.bolo.id}` : '/h/books') : null,
       };
     }
     if (c.kind === 'reply') {
