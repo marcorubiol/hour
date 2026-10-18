@@ -345,7 +345,8 @@
     selected = selectedIds.has(item.id) ? selected.filter((s) => s.id !== item.id) : [...selected, item];
   }
 
-  function togglePage() {
+  /** Pick (or unpick) the visible page; the selection bar offers it on a phone. */
+  export function togglePage() {
     const page = new Set(visibleItems.map((i) => i.id));
     selected =
       pagePicked === visibleItems.length
@@ -466,7 +467,7 @@
       </tbody>
     </table>
   {:else}
-    <table class="conversation-table">
+    <table class="conversation-table" class:conversation-table--picking={selectable}>
       <thead>
         <tr>
           {#if selectable}
@@ -497,13 +498,16 @@
           <tr class:is-picked={selectable && selectedIds.has(item.id)}>
             {#if selectable}
               <td class="cell--pick">
-                <input
-                  type="checkbox"
-                  class="pick"
-                  checked={selectedIds.has(item.id)}
-                  aria-label={t('mailout.pick_one', locale, { name: organizationOf(item) ?? item.person?.full_name ?? '' })}
-                  onchange={() => togglePick(item)}
-                />
+                <!-- On a phone the label covers the whole card: a tap anywhere picks it (móvil #2). -->
+                <label class="pick-label">
+                  <input
+                    type="checkbox"
+                    class="pick"
+                    checked={selectedIds.has(item.id)}
+                    aria-label={t('mailout.pick_one', locale, { name: organizationOf(item) ?? item.person?.full_name ?? '' })}
+                    onchange={() => togglePick(item)}
+                  />
+                </label>
               </td>
             {/if}
             <!-- ADR-102: the conversation is with the organization; it titles the row and opens the file. -->
@@ -837,6 +841,12 @@
     tbody tr.is-picked td {
       background: var(--bg-ultra-light);
     }
+    @media (pointer: coarse) {
+      .pick {
+        inline-size: 1.5rem;
+        block-size: 1.5rem;
+      }
+    }
 
     .next-action {
       display: flex;
@@ -1000,6 +1010,22 @@
         order: 1;
         inline-size: auto;
         align-self: center;
+      }
+      /* Picking: the whole card is the checkbox's label. The page's own
+         checkbox lives in the hidden header, so it leaves the tab order; the
+         selection bar offers it instead. */
+      .conversation-table--picking tbody tr {
+        position: relative;
+      }
+      .conversation-table--picking .pick-label::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        cursor: pointer;
+      }
+      thead .pick {
+        visibility: hidden;
       }
       :is(.conversation-table, .contact-table) .cell--name {
         order: 1;

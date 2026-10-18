@@ -476,6 +476,7 @@
 
   // ── Selection → mailout (plan § 10) ───────────────────────────────────
   let picking = $state(false);
+  let table = $state<ReturnType<typeof ConversationTable>>();
   let picked = $state<Pick<ConversationItem, 'id' | 'project_id'>[]>([]);
   let pickedProjects = $derived([...new Set(picked.map((c) => c.project_id))]);
 
@@ -576,6 +577,7 @@
     </div>
 
     <ConversationTable
+      bind:this={table}
       {filters}
       {personHref}
       {conversationHref}
@@ -589,7 +591,8 @@
 
     {#if picking}
       <div class="action-bar" role="region" aria-label={t('mailout.pick_bar', locale)}>
-        <p class="action-bar__note">
+        <!-- Picking and unpicking is announced (móvil #2). -->
+        <p class="action-bar__note" aria-live="polite">
           {#if pickedProjects.length > 1}
             {t('mailout.one_project', locale)}
             <!-- The way out in one click (uso #6): keep one project's picks. -->
@@ -605,6 +608,11 @@
             {t(picked.length === 1 ? 'mailout.picked_one' : 'mailout.picked_other', locale, { n: picked.length })}
           {/if}
         </p>
+        <!-- On a phone the bar is where the thumb is: the page's «all» and the way out live here too. -->
+        <span class="action-bar__more">
+          <Button size="s" variant="outline" onclick={() => table?.togglePage()}>{t('mailout.pick_page_short', locale)}</Button>
+          <Button size="s" variant="outline" onclick={togglePicking}>{t('mailout.pick_done', locale)}</Button>
+        </span>
         <Button
           size="s"
           disabled={picked.length === 0 || pickedProjects.length !== 1}
@@ -724,6 +732,10 @@
     .conversations__list-head {
       scroll-margin-block-start: var(--space-l);
       margin-block-start: var(--space-m);
+    }
+    .action-bar__more {
+      display: flex;
+      gap: var(--space-xs);
     }
     .action-bar__keep {
       margin-inline-start: var(--space-s);

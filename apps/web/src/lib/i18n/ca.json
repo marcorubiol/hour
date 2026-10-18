@@ -1848,6 +1848,7 @@
   "unsub.invalid": "Aquest enllaç de baixa no és vàlid o ja no existeix.",
   "unsub.busy": "Massa intents. Torna-ho a provar d'aquí a uns minuts.",
   "mailout.missing_one": "A 1 destinatari li falta un camp. Treu-lo o canvia el text.",
+  "mailout.pick_page_short": "Aquesta pàgina",
   "mailout.simulated_mark": "simulat",
   "overview.aria_call": "{name}, et va trucar {when}",
   "overview.aria_follow_up": "{name}, seguiment el {when}: {what}",
