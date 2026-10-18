@@ -109,9 +109,9 @@
       >
       <span class="row__when">{whenOf(item)}</span>
       <span class="row__acts">
-        <button type="button" class="row__act" onclick={() => item.taskId && onaccept(item.taskId)}
+        <button type="button" class="row__act btn--outline btn--xs" onclick={() => item.taskId && onaccept(item.taskId)}
           >{t('desk.proposal_add', locale)}</button
-        ><button type="button" class="row__act row__act--quiet" onclick={() => item.taskId && ontoggle(item.taskId, true)}
+        ><button type="button" class="row__act row__act--quiet btn--outline btn--xs" onclick={() => item.taskId && ontoggle(item.taskId, true)}
           >{t('desk.proposal_dismiss', locale)}</button
         >
       </span>
@@ -136,8 +136,8 @@
       <span class="row__acts">
         {#if item.concern === 'going' && item.going}
           {@const g = item.going}
-          <button type="button" class="row__act" onclick={() => onanswer(g, 'going')}>{t('pulse.going', locale)}</button
-          ><button type="button" class="row__act row__act--quiet" onclick={() => onanswer(g, 'not_going')}
+          <button type="button" class="row__act btn--outline btn--xs" onclick={() => onanswer(g, 'going')}>{t('pulse.going', locale)}</button
+          ><button type="button" class="row__act row__act--quiet btn--outline btn--xs" onclick={() => onanswer(g, 'not_going')}
             >{t('pulse.not_going', locale)}</button
           >
         {:else if item.concern === 'task'}
@@ -339,27 +339,15 @@
     gap: var(--space-xs);
     justify-self: end;
   }
+  /* The system's outline button (base.css); the quiet one drops its edge. */
   .row__act {
-    padding: var(--space-2xs) var(--space-s);
-    border: 1px solid var(--border-color-dark);
-    border-radius: var(--radius);
-    background: var(--bg-ultra-light);
-    font-family: var(--font-sans);
-    font-size: var(--text-xs);
-    color: var(--text-muted);
-    cursor: pointer;
-    transition:
-      color var(--transition),
-      border-color var(--transition);
-  }
-  .row__act:hover {
-    color: var(--text-color);
-    border-color: var(--text-muted);
+    --btn-padding-block: var(--space-2xs);
+    --btn-padding-inline: var(--space-s);
   }
   .row__act--quiet {
-    border-color: transparent;
-    background: none;
-    color: var(--text-faint);
+    --btn-border-color: transparent;
+    --btn-background-hover: transparent;
+    --btn-text-color: var(--text-faint);
   }
   .row__remove {
     border: 0;

@@ -620,7 +620,7 @@
       <!-- One child, so the sub line's «·» separators stay out of it. -->
       <span class="desk__subrow">
         <span class="desk__date">{dateWords}</span>
-        <button type="button" class="desk__add" bind:this={addBtn} aria-expanded={composerOpen} onclick={openComposer}
+        <button type="button" class="desk__add btn--outline btn--s" bind:this={addBtn} aria-expanded={composerOpen} onclick={openComposer}
           >{t('desk.add_task', locale)}</button
         >
       </span>
@@ -732,23 +732,13 @@
       gap: var(--space-m);
       inline-size: 100%;
     }
+    /* The system's outline button (base.css), a step tighter in the sub line. */
     .desk__add {
-      padding: var(--space-2xs) var(--space-m);
-      border: 1px solid var(--border-color-dark);
-      border-radius: var(--radius);
-      background: var(--bg-ultra-light);
-      font-family: var(--font-sans);
-      font-size: var(--text-s);
-      color: var(--text-muted);
-      cursor: pointer;
-      transition:
-        color var(--transition),
-        border-color var(--transition);
+      --btn-padding-block: var(--space-2xs);
     }
-    .desk__add:hover,
     .desk__add[aria-expanded='true'] {
-      color: var(--text-color);
-      border-color: var(--text-muted);
+      --btn-text-color: var(--heading-color);
+      --btn-border-color: var(--neutral-semi-light);
     }
     .desk__composer {
       margin-block-start: calc(-1 * var(--space-s));

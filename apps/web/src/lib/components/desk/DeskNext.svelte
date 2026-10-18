@@ -158,7 +158,7 @@
               ><button type="button" class="card__btn" onclick={() => answer('not_going')}>{t('pulse.not_going', locale)}</button>
             </span>
           {/if}
-          {#if roadsheet}<a class="card__rs" href={roadsheet}>{t('desk.roadsheet', locale)} ↗</a>{/if}
+          {#if roadsheet}<a class="card__rs btn--outline btn--s" href={roadsheet}>{t('desk.roadsheet', locale)} ↗</a>{/if}
         </div>
       {/if}
     </div>
@@ -251,22 +251,8 @@
   }
   .card__rs {
     flex: none;
-    padding-block: var(--space-2xs);
-    padding-inline: var(--space-s);
-    border: 1px solid var(--border-color-dark);
-    border-radius: var(--radius);
-    background: var(--bg-ultra-light);
-    font-size: var(--text-s);
-    color: var(--text-muted);
-    text-decoration: none;
+    --btn-padding-block: var(--space-2xs);
     white-space: nowrap;
-    transition:
-      color var(--transition),
-      border-color var(--transition);
-  }
-  .card__rs:hover {
-    color: var(--text-color);
-    border-color: var(--text-muted);
   }
   .then {
     display: flex;
