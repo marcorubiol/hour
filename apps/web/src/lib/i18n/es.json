@@ -1490,6 +1490,8 @@
   "desk.toast_change_failed": "Cambio no guardado",
   "desk.toast_try_again": "{reason}. Vuelve a intentarlo.",
   "desk.toast_remove_failed": "Tarea no eliminada",
+  "desk.toast_removed": "Tarea quitada: {title}",
+  "desk.undo": "Deshacer",
   "desk.remove_task": "Quitar tarea",
   "desk.remove_task_aria": "Quitar tarea: {title}",
   "desk.remove_aria": "Quitar: {subject}",

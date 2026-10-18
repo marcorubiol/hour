@@ -342,9 +342,16 @@
       opacity var(--transition);
   }
   .row:hover .row__remove,
-  .row--over .row__remove,
   .row__remove:focus-visible {
     opacity: 1;
+  }
+  /* No hover on a finger: the × is always there, with a finger's room. */
+  @media (hover: none) {
+    .row__remove {
+      opacity: 1;
+      min-inline-size: var(--touch-target);
+      min-block-size: var(--touch-target);
+    }
   }
   .row__remove:hover {
     color: var(--danger);

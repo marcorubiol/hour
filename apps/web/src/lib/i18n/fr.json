@@ -1459,6 +1459,8 @@
   "desk.toast_change_failed": "Modification non enregistrée",
   "desk.toast_try_again": "{reason}. Réessayez.",
   "desk.toast_remove_failed": "Tâche non supprimée",
+  "desk.toast_removed": "Tâche retirée : {title}",
+  "desk.undo": "Annuler",
   "desk.remove_task": "Retirer la tâche",
   "desk.remove_task_aria": "Retirer la tâche : {title}",
   "desk.remove_aria": "Retirer : {subject}",

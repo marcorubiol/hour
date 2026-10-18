@@ -1490,6 +1490,8 @@
   "desk.toast_change_failed": "Canvi no desat",
   "desk.toast_try_again": "{reason}. Torna-ho a provar.",
   "desk.toast_remove_failed": "Tasca no eliminada",
+  "desk.toast_removed": "Tasca treta: {title}",
+  "desk.undo": "Desfés",
   "desk.remove_task": "Treu la tasca",
   "desk.remove_task_aria": "Treu la tasca: {title}",
   "desk.remove_aria": "Treu: {subject}",

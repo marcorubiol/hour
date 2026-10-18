@@ -237,7 +237,9 @@
   let tasks = $derived<TaskItem[]>($tasksQuery.data?.items ?? []);
   let invoices = $derived<MoneyInvoiceItem[]>(readMoney ? ($invoicesQuery.data?.items ?? []) : []);
   let scopedConversations = $derived(conversations.filter((e) => byProject(e.project?.id, e.workspace_id)));
-  let scopedTasks = $derived(tasks.filter((tk) => byProject(taskProjectId(tk), tk.workspace_id)));
+  let scopedTasks = $derived(
+    tasks.filter((tk) => !removing.has(tk.id) && byProject(taskProjectId(tk), tk.workspace_id)),
+  );
   let scopedPerfs = $derived(feeds.performances.filter((p) => byProject(p.project?.id, p.project?.workspace_id)));
   let scopedDates = $derived(feeds.dates.filter((d) => byProject(d.project?.id, d.project?.workspace_id)));
 
@@ -442,9 +444,51 @@
   });
   const removeTask = createMutation({
     mutationFn: (id: string) => mutateJSON('DELETE', `/api/tasks/${id}`),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+    onSettled: (_d, _e, id) => {
+      removing.delete(id);
+      removing = new Set(removing);
+      void queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
     onError: (err) =>
       addToast({ tone: 'danger', title: t('desk.toast_remove_failed', locale), message: err instanceof ApiError ? err.message : t('perf.unexpected', locale) }),
+  });
+
+  // Removing a task is a toast with «Deshacer»: the row leaves at once and
+  // the DELETE waits out the toast. Leaving the Desk sends what is pending.
+  const UNDO_MS = 5000;
+  let removing = $state(new Set<string>());
+  const pendingRemovals = new Map<string, ReturnType<typeof setTimeout>>();
+  function removeWithUndo(id: string) {
+    const title = tasks.find((tk) => tk.id === id)?.title ?? '';
+    removing = new Set(removing).add(id);
+    pendingRemovals.set(
+      id,
+      setTimeout(() => {
+        pendingRemovals.delete(id);
+        $removeTask.mutate(id);
+      }, UNDO_MS),
+    );
+    addToast({
+      tone: 'info',
+      message: t('desk.toast_removed', locale, { title }),
+      duration: UNDO_MS,
+      action: {
+        label: t('desk.undo', locale),
+        run: () => {
+          clearTimeout(pendingRemovals.get(id));
+          pendingRemovals.delete(id);
+          removing.delete(id);
+          removing = new Set(removing);
+        },
+      },
+    });
+  }
+  $effect(() => () => {
+    for (const [id, timer] of pendingRemovals) {
+      clearTimeout(timer);
+      void mutateJSON('DELETE', `/api/tasks/${id}`).finally(() => queryClient.invalidateQueries({ queryKey: ['tasks'] }));
+    }
+    pendingRemovals.clear();
   });
 
   // AI consent inbox: dismiss = complete it (real PATCH). Accept = keep as a
@@ -587,7 +631,7 @@
           {money}
           {isGhost}
           ontoggle={(id, done) => $toggleTask.mutate({ id, status: done ? 'done' : 'open' })}
-          onremove={(id) => $removeTask.mutate(id)}
+          onremove={removeWithUndo}
           onaccept={acceptProposal}
           onanswer={answerGoing}
         />

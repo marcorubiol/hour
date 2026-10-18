@@ -1499,6 +1499,8 @@
   "desk.toast_change_failed": "Change not saved",
   "desk.toast_try_again": "{reason} — try again.",
   "desk.toast_remove_failed": "Task not removed",
+  "desk.toast_removed": "Task removed: {title}",
+  "desk.undo": "Undo",
   "desk.remove_task": "Remove task",
   "desk.remove_task_aria": "Remove task: {title}",
   "desk.remove_aria": "Remove: {subject}",
