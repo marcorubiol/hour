@@ -1585,7 +1585,7 @@
   "mail.private_confirm": "Make it private? It disappears for the rest of the team, with its history, and only you can share it again.",
   "mail.private_label": "Private conversation",
   "mail.private_on_hint": "Only you see it. For the rest of the space it does not exist, counts included.",
-  "mail.private_off_hint": "Everyone who sees conversations in this space sees it, with its emails.",
+  "mail.private_off_hint": "Everyone who sees the conversations of this project sees it, with its emails.",
   "mail.mailboxes_here": "Mailboxes bringing email here",
   "mail.no_mail_yet": "No email yet.",
   "mail.personal_mailbox": "Personal mailbox",

@@ -1576,7 +1576,7 @@
   "mail.private_confirm": "¿Volverla privada? Desaparece para el resto del equipo, con su historial, y solo tú podrás volver a compartirla.",
   "mail.private_label": "Conversación privada",
   "mail.private_on_hint": "Solo la ves tú. Para el resto del espacio no existe, tampoco en los recuentos.",
-  "mail.private_off_hint": "La ve todo el que ve conversaciones en este espacio, con sus correos.",
+  "mail.private_off_hint": "La ve todo el que ve las conversaciones de este proyecto, con sus correos.",
   "mail.mailboxes_here": "Buzones que traen correo aquí",
   "mail.no_mail_yet": "Todavía ningún correo.",
   "mail.personal_mailbox": "Buzón personal",

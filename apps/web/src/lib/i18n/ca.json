@@ -1576,7 +1576,7 @@
   "mail.private_confirm": "La fas privada? Desapareix per a la resta de l'equip, amb el seu historial, i només tu la podràs tornar a compartir.",
   "mail.private_label": "Conversa privada",
   "mail.private_on_hint": "Només la veus tu. Per a la resta de l'espai no existeix, tampoc als recomptes.",
-  "mail.private_off_hint": "La veu tothom qui veu converses en aquest espai, amb els seus correus.",
+  "mail.private_off_hint": "La veu tothom qui veu les converses d'aquest projecte, amb els seus correus.",
   "mail.mailboxes_here": "Bústies que porten correu aquí",
   "mail.no_mail_yet": "Encara cap correu.",
   "mail.personal_mailbox": "Bústia personal",
