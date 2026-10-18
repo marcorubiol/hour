@@ -1031,6 +1031,7 @@
   "planner.state_cancelled": "annulée",
   "planner.slip_to": "vers",
   "planner.slip_from": "depuis",
+  "planner.slip_loadin": "montage",
   "planner.feed_title": "Flux du calendrier",
   "planner.feed_hint": "Abonnez-vous depuis Google ou Apple Calendar : les représentations confirmées et les dates restent synchronisées, sans rien recopier à la main. Le lien est la clé : quiconque le possède voit le flux (jamais l’argent, jamais les notes) jusqu’à ce que vous le révoquiez.",
   "planner.feed_workspace": "Espace",

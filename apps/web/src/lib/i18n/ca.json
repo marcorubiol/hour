@@ -1062,6 +1062,7 @@
   "planner.state_cancelled": "cancel·lat",
   "planner.slip_to": "a",
   "planner.slip_from": "des de",
+  "planner.slip_loadin": "càrrega",
   "planner.feed_title": "Feed del calendari",
   "planner.feed_hint": "Subscriu-t’hi des de Google o Apple Calendar: les funcions confirmades i les dates es mantenen sincronitzades, sense copiar res a mà. L’enllaç és la clau: qui el tingui veu el feed (mai diners, mai notes) fins que el revoquis.",
   "planner.feed_workspace": "Espai",

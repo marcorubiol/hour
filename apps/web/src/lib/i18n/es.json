@@ -1062,6 +1062,7 @@
   "planner.state_cancelled": "cancelado",
   "planner.slip_to": "a",
   "planner.slip_from": "desde",
+  "planner.slip_loadin": "carga",
   "planner.feed_title": "Feed del calendario",
   "planner.feed_hint": "Suscríbete desde Google o Apple Calendar: las funciones confirmadas y las fechas se mantienen sincronizadas, sin copiar nada a mano. El enlace es la llave: quien lo tenga ve el feed (nunca dinero, nunca notas) hasta que lo revoques.",
   "planner.feed_workspace": "Espacio",

@@ -1071,6 +1071,7 @@
   "planner.state_cancelled": "cancelled",
   "planner.slip_to": "to",
   "planner.slip_from": "from",
+  "planner.slip_loadin": "load-in",
   "planner.feed_title": "Calendar feed",
   "planner.feed_hint": "Subscribe from Google/Apple Calendar: confirmed gigs and dates stay in sync — no copying by hand. The link is the key: anyone holding it sees the feed (never money, never notes) until you revoke it.",
   "planner.feed_workspace": "Workspace",

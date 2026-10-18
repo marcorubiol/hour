@@ -384,6 +384,12 @@ export type SlipTime = {
   /** The reader's clock, only when the two disagree. A GLOSS: it takes its
       own line and can never push an hour out of its box. */
   secondary: string | null;
+  /**
+   * The hour is the LOAD-IN, not the show (ADR-078: the working time is the
+   * load-in when there is one). «SHOW 15h» read as the curtain; the slip says
+   * «load-in 15h» instead (revisión del Planner, 2026-10-18).
+   */
+  loadIn?: boolean;
 };
 
 /**
@@ -493,7 +499,12 @@ export function performanceSlip(p: PerformanceEvent, ctx: SlipContext): Slip {
   // A gig is ONE instant on the sheet — the working time. Its running order
   // (load-in, soundcheck, wrap) is the Day's business, through runSheetSteps.
   const time: SlipTime | null = dual
-    ? { primary: hourMark(dual.primary), end: null, secondary: clock(dual.secondary) }
+    ? {
+        primary: hourMark(dual.primary),
+        end: null,
+        secondary: clock(dual.secondary),
+        loadIn: Boolean(p.load_in_at) && at === p.load_in_at,
+      }
     : null;
   const ws = ctx.workspaceSlugById.get(p.project?.workspace_id ?? '') ?? ctx.workspaceSlug;
   const cc = p.venue?.country ?? p.country ?? null;

@@ -198,7 +198,7 @@
            container queries below). A start hour alone is a whole assertion;
            half a range is not, so nothing is ever cut mid-string. -->
       <span class="slip__t"
-        >{slip.time.primary}{#if slip.time.end}<i>–{slip.time.end}</i>{/if}</span
+        >{#if slip.time.loadIn}<span class="slip__pre">{t('planner.slip_loadin', L)}</span>{/if}{slip.time.primary}{#if slip.time.end}<i>–{slip.time.end}</i>{/if}</span
       >
     {/if}
   </span>
