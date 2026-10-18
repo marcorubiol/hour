@@ -443,6 +443,7 @@
 
 ## Producto — después
 
+- [ ] **«La temporada» de la lente de venta se reparte por línea de trabajo** (drop 18-10, validado): cada línea de difusión (por ejemplo «MaMeMi 26-27 Catalunya») con su barra de estados y sus cifras, y al fijar una línea en el ámbito la temporada es solo la suya. (sin estimar)
 - [ ] **Dos sitios, cada uno con lo suyo** (drop 18-10, validado): **Difusión / Contratación** se queda con todas las conversaciones con salas (panel, lista, ficha, envío en bloque); **Equipo** (ES), Equip (CA), Équipe (FR), Team (EN) es un sitio nuevo al lado con las conversaciones del equipo entre vosotros: lo que hoy es «De qué se habla», los hilos de cada bolo, sala y proyecto. El hilo del equipo sigue dentro de la ficha de cada sala, y Desk sigue enseñando lo nuevo del equipo. Enmienda ADR-106 y ADR-116. Va después del carril de lentes por espacio, que toca la misma navegación. (sin estimar)
 - [ ] **Pasada de coherencia de los cuatro dashboards** (Marco, 18-10): títulos de bloque en una sola versalita mono, una sola insignia de estado basada en la de Conversations, error y carga iguales, y el título de la pestaña tras el login (drop 18-10). Carril en marcha, sobre `claude/wording`.
 - [ ] **Vocabulario de oficio (ADR-128)**: neutras donde existan y un ajuste por espacio, escena o música en directo, para unas pocas etiquetas; corrige los errores de FR, CA y ES de los informes (`build/coordination/wording/`). Carril en marcha; Marco ve la lista final antes del deploy.
