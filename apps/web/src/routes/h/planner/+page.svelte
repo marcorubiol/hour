@@ -1229,17 +1229,18 @@
 
   /* ── the board's words (the component is t()-free) ─────────────────── */
   function boardTallyCounts(confirmed: number, options: number, notCast: number): string {
+    // A figure never parts from its word (diseño B11: «2 / OPTIONS»).
     const parts: string[] = [];
     if (confirmed > 0)
       parts.push(
-        `${confirmed} ${t(confirmed === 1 ? 'planner.week_confirmed_one' : 'planner.week_confirmed', locale)}`,
+        `${confirmed}\u00a0${t(confirmed === 1 ? 'planner.week_confirmed_one' : 'planner.week_confirmed', locale)}`,
       );
     if (options > 0) {
       parts.push(
-        `${options} ${t(options === 1 ? 'planner.week_option_one' : 'planner.week_options', locale)}`,
+        `${options}\u00a0${t(options === 1 ? 'planner.week_option_one' : 'planner.week_options', locale)}`,
       );
     }
-    if (notCast > 0) parts.push(`${notCast} ${t('planner.no_cast', locale)}`);
+    if (notCast > 0) parts.push(`${notCast}\u00a0${t('planner.no_cast', locale)}`);
     return parts.join(' · ');
   }
   /** The three silences are three different facts (law 9), worded here. */
@@ -1264,7 +1265,7 @@
           ? 'planner.board_project_one'
           : 'planner.board_projects';
     const counts = boardTallyCounts(g.confirmed, g.options, g.notCast);
-    const head = `${g.units} ${t(unitKey, locale)}`;
+    const head = `${g.units}\u00a0${t(unitKey, locale)}`;
     return counts ? `${head} · ${counts}` : head;
   }
   /** The slip's state line — the month's own wording, said by this caller
