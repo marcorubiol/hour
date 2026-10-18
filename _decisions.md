@@ -4313,3 +4313,55 @@ palabras de oficio neutras para el resto. Al construirlo salieron decisiones que
 
 **Consecuencias.** 141 claves cambian de texto en algún idioma, 85 tienen variante de música y 6 son nuevas (el
 ajuste). La lista por idioma, con antes y después, está fuera de git en `build/coordination/wording/lista-final.md`.
+
+## [2026-10-18] ADR-130 · Pasada de coherencia: una cabecera de bloque, una insignia de estado, un fallo, una carga y un título de pestaña
+
+**Contexto.** Tras convertir las cuatro secciones en dashboards (ADR-117) y aplicar las revisiones de Desk,
+Planner, Conversations y Cuentas (ADR-122 a 127), cada dashboard quedó con su propio título de bloque, su insignia, su
+fallo y su carga (`build/coordination/review-desk/diseno.md` M4, M5, M7, M8; `review-conversations/diseno.md` M1, B4;
+fuera de git). Marco (2026-10-18) decidió unificarlos: una sola versalita mono para los títulos de bloque y la insignia
+de Conversations para todo estado. El Drop validó además que la pestaña decía «Hour, Sign in» con la sesión abierta.
+Carril `claude/coherence`, sobre `claude/wording` (ADR-128, 129). Sin migración.
+
+**Decisión.**
+1. **Una cabecera de bloque** (`BlockHead.svelte` sobre `.block-head` + `.eyebrow--sub` de `base.css`): la versalita
+   mono sobre una línea fina, la cifra detrás del título («Te toca · 3», mientras carga «· –») y la acción al final de
+   la línea (`.block-head__act`). La cifra va dentro del encabezado y conserva su caja («7 de 16», «0 de 0 confirmadas
+   · 8 semanas»); `alert` la pinta en peligro (el «Por decidir» del Planner). Desk (`.dband__h`), Planner (`.blk__t`,
+   9,5 px fijos), Conversations y Cuentas la consumen; el tracking escrito a mano del Desk (`.desk__date`,
+   `.bucket__label`) pasa a `.eyebrow--sub`. Una banda del Desk sigue llamándose solo por su nombre (`titleId`). La
+   cursiva serif queda para el título de cada pantalla.
+2. **Una insignia de estado**, la de Conversations: relleno suave en su tono, borde del mismo tono, fondos mezclados en
+   `oklab` para el oscuro. `StateBadge` la dibuja para conversaciones, bolos, funciones, facturas, proyectos y líneas;
+   la píldora de solo borde en minúscula (`.state-badge`) desaparece. El componente recibe un tono, nunca un color:
+   `statusTone()` (conversación, nuevo), `performanceStatusTone()`, `invoiceTone()`. Los tonos por estado de
+   conversación dejan de ser clases propias (`.badge--hold`…): `hold` es `neutral`, `dormant` el nuevo `faint`,
+   `recurring` `primary`. La barra de la temporada sigue leyendo `--status` por `[data-conv-status]`. Un estado que
+   abre menú es el disparador con las mismas clases y su nombre empieza por el estado, también en la función
+   («confirmado, cambiar estado», clave `perf.status_menu`).
+3. **Un fallo y una carga.** Un fallo de lectura es `.load-fail`: nuestra frase en la cursiva en peligro y
+   «Reintentar» (`ui.retry`) al lado, nunca el texto del servidor (el Planner lo enseñaba en mono). En el Desk,
+   «Reintentar» vuelve a leer solo las consultas que fallaron. Mientras carga, una cifra es una raya (`DASH` de
+   `$lib/glyphs`, también en las puertas del Desk, que ponían «·», y en la temporada de Conversations) y una lista es
+   `.ghost-line` (Cuentas decía «Cargando…»; el Planner, «–» en el cuerpo de cada bloque; enmienda ADR-096 § 6 en el
+   cuerpo, no en la cifra).
+4. **Las tiras de cifras**: un solo cuerpo, `.stat` en `base.css` (la display a `--stat-lead`, tabular), bajo una
+   sola etiqueta, `.eyebrow--sub` (las puertas del Desk, las cuatro cifras de Cuentas, la temporada de Conversations).
+   Una cifra dicha en línea con su palabra sigue siendo `MailoutFigures` a `--stat-inline`. En el Planner, «confirmados»
+   concuerda con la función: «confirmadas» en escena, «confirmados» en música (ES, CA, FR), como ya decía la puerta del
+   Desk.
+5. **El título de la pestaña** lo pone cada pantalla con `docTitle()`: lo más concreto primero y «Hour» al final,
+   unidos por « · » («Planificador · Hour», «Teatre de la Llum · Conversación · Hour»); el Hall, «Hour» solo. El Hall no
+   ponía título y la pestaña conservaba el del login. Las palabras son las de la lente, así que el oficio (ADR-129) entra
+   solo («Contratación · Hour» en música). Fuera las claves `desk.title` y `books.head_title`.
+6. **Lo pequeño:** los botones del Desk usan el botón del sistema a su medida, sin relleno propio (M8); «hoy» lee
+   `--today-*` también en «Te espera» y en la semana del Hall, que lo pintaban en `--primary`. `--accent-*` ya no se usa
+   como color de interfaz en ningún dashboard (M7, resuelto por ADR-127 § 9).
+
+**Fuera, y por qué.** Los botones de crear de cada cabecera («+ Tarea», «+ FECHA», «Añadir conversación», «Nuevo
+bolo») siguen con cuatro tamaños y dos variantes: es una decisión de jerarquía, no de coherencia mecánica, y es de
+Marco. El estado de un envío (`.mo__status`) es texto, no píldora, y se queda. Las pantallas que no son dashboard
+(ficha de línea, de persona, módulos) siguen diciendo «Cargando…»: esta pasada era de los cuatro dashboards.
+
+**Re-evaluar cuando** Marco use los cuatro una semana: si la cifra en la cabecera pesa poco en el Desk (antes iba a la
+derecha) y si `faint` distingue lo cobrado de lo dormido en oscuro.
