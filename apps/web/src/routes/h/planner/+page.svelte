@@ -2362,6 +2362,20 @@
     return n;
   });
 
+  /* A FIGURE WITHOUT ITS ROWS IS A DASH, NEVER A ZERO (ADR-096 §6, and the
+     season already did it). «0 confirmed · 30 nights free» over a month whose
+     feed is still in flight, or failed, reads exactly as «nothing booked» —
+     the worst sentence this strip can say about the business. */
+  const DASH = '–';
+  let figuresKnown = $derived(!loading && !errorMsg);
+  function fig(v: number): string {
+    return figuresKnown ? String(v) : DASH;
+  }
+  /** The plural is the safe form for a dash: «– options», never «– option». */
+  function figOne(v: number): boolean {
+    return figuresKnown && v === 1;
+  }
+
   let monthTitle = $derived(monthName(ym.year, ym.month, localeTag));
   // Capitalized "Julio 2026" — LensTitle then keeps the month italic and the
   // year upright (the title rule). (Month names are lowercase in es/ca.)
@@ -3023,18 +3037,18 @@
              have no last day, so they name where they begin and count
              nothing. -->
         {#if view === 'month'}
-        <span class="cal__stat"><b>{stats.confirmed}</b> {t('planner.stat_confirmed', locale)}</span>
+        <span class="cal__stat"><b>{fig(stats.confirmed)}</b> {t('planner.stat_confirmed', locale)}</span>
         <!-- `1 holds` was printing on every single-hold month. The design's own
              word for this counter is `option`, and it agrees in number. -->
         <span class="cal__stat"
-          ><b>{stats.holds}</b>
-          {t(stats.holds === 1 ? 'planner.stat_holds_one' : 'planner.stat_holds', locale)}</span
+          ><b>{fig(stats.holds)}</b>
+          {t(figOne(stats.holds) ? 'planner.stat_holds_one' : 'planner.stat_holds', locale)}</span
         >
         <!-- The number about the business, not the calendar. It counts the
              WINDOW and never the drawing, so calm does not move it. -->
         <span class="cal__stat"
-          ><b>{stats.free}</b>
-          {t(stats.free === 1 ? 'planner.stat_free_one' : 'planner.stat_free', locale)}</span
+          ><b>{fig(stats.free)}</b>
+          {t(figOne(stats.free) ? 'planner.stat_free_one' : 'planner.stat_free', locale)}</span
         >
         <!-- THESE TWO COUNT THE MONTH TOO, so they live inside the same gate
              and not after it. Outside, the agenda printed `3 people away · 2
@@ -3043,14 +3057,14 @@
              that are not a month. On the board the bands are ON the sheet
              anyway, so the counter was saying twice what one of the two
              sayings had wrong. -->
-        {#if statAwayPersons > 0}
+        {#if figuresKnown && statAwayPersons > 0}
           <span class="cal__stat cal__stat--soft"
             >{statAwayPersons === 1
               ? t('planner.stat_away_one', locale)
               : t('planner.stat_away', locale, { z: statAwayPersons })}</span
           >
         {/if}
-        {#if statTrips > 0}
+        {#if figuresKnown && statTrips > 0}
           <span class="cal__stat cal__stat--soft"
             >{statTrips === 1
               ? t('planner.stat_trips_one', locale)
@@ -3324,15 +3338,20 @@
       weekLabel={(n) => `${t('planner.week_n', locale)} ${n}`}
       weekRange={(from, to) => `${localeDayMonth(from, localeTag)} → ${localeDayMonth(to, localeTag)}`}
       weekTally={(firm, held, free) =>
-        [
-          firm ? `${firm} ${t('planner.week_confirmed', locale)}` : '',
-          // ONE IS NOT «1 OPTIONS». The month's gutter kept its counts in a
-          // tooltip, so nobody had ever read them as a sentence.
-          held ? `${held} ${t(held === 1 ? 'planner.week_option_one' : 'planner.week_options', locale)}` : '',
-          free ? `${free} ${t(free === 1 ? 'planner.week_free_one' : 'planner.week_free', locale)}` : '',
-        ]
-          .filter(Boolean)
-          .join(' · ') || t('planner.week_nothing', locale)}
+        // The week's tally is a census too: a dash until its rows are in.
+        !figuresKnown
+          ? DASH
+          : [
+              firm ? `${firm} ${t('planner.week_confirmed', locale)}` : '',
+              // ONE IS NOT «1 OPTIONS». The month's gutter kept its counts in a
+              // tooltip, so nobody had ever read them as a sentence.
+              held
+                ? `${held} ${t(held === 1 ? 'planner.week_option_one' : 'planner.week_options', locale)}`
+                : '',
+              free ? `${free} ${t(free === 1 ? 'planner.week_free_one' : 'planner.week_free', locale)}` : '',
+            ]
+              .filter(Boolean)
+              .join(' · ') || t('planner.week_nothing', locale)}
       onDayOpen={(iso) => {
         dayIso = iso;
         setView('day');
