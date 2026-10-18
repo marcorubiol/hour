@@ -199,7 +199,13 @@
 
   {#if loading}
     <ul class="list" aria-hidden="true">
-      {#each [0, 1, 2] as i (i)}<li class="row row--wait"><span class="row__bar"></span></li>{/each}
+      {#each [0, 1, 2] as i (i)}<li class="row row--wait">
+          <span class="row__subject"
+            ><span class="ghost-line" style:inline-size="{60 - i * 8}%">&nbsp;</span><span class="row__ctx"
+              ><span class="ghost-line" style:inline-size="30%">&nbsp;</span></span
+            ></span
+          >
+        </li>{/each}
     </ul>
   {:else if errored}
     <p class="load-fail">{t('desk.error', locale)}</p>
@@ -271,17 +277,9 @@
     padding-block: var(--space-xs);
     border-block-end: 1px solid var(--border-color-light);
   }
+  /* The wait row is a row's own lines in ghost: subject and context. */
   .row--wait {
-    display: flex;
-    block-size: 2.4rem;
-    align-items: center;
-  }
-  .row__bar {
     display: block;
-    block-size: 0.6rem;
-    inline-size: 60%;
-    border-radius: var(--radius);
-    background: var(--bg-hover);
   }
   .row__verb {
     font-family: var(--font-mono);

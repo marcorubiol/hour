@@ -118,11 +118,16 @@
   {#if errored}
     <p class="load-fail">{t('desk.next_error', locale)}</p>
   {:else if !settled}
+    <!-- The wait holds the lines a card usually draws (eyebrow, the slip's
+         head, its name, the running order, the foot) and the line under it,
+         so «Te espera» does not move when the answer lands (diseño M5). -->
     <div class="card card--wait" aria-hidden="true">
-      <span class="card__eye">—</span>
-      <span class="card__dash">—</span>
-      <span class="card__eye">—</span>
+      <span class="card__eye"><span class="ghost-line" style:inline-size="40%">&nbsp;</span></span>
+      <span class="card__eye"><span class="ghost-line" style:inline-size="18%">&nbsp;</span></span>
+      <span class="card__dash"><span class="ghost-line" style:inline-size="55%">&nbsp;</span></span>
+      <span class="card__slots"><span class="ghost-line" style:inline-size="45%">&nbsp;</span></span>
     </div>
+    <p class="then" aria-hidden="true"><span class="ghost-line" style:inline-size="35%">&nbsp;</span></p>
   {:else if !next || !slip}
     <p class="dband__empty">{t('desk.next_empty', locale)}</p>
   {:else if daysTo(next.day) > 14}
@@ -209,6 +214,7 @@
   .card__dash {
     font-family: var(--font-display);
     font-size: var(--text-xl);
+    line-height: 1.15;
   }
   /* The slip, with room: `size="l"` sets its type (never rescaled here). */
   .card__slip {

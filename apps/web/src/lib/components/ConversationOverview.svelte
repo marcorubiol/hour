@@ -167,9 +167,9 @@
     {#each Array(n) as _, i (i)}
       <li>
         <div class="row row--ghost">
-          <span class="row__who"><span class="g" style:inline-size="{55 - (i % 3) * 8}%">&nbsp;</span></span>
-          <span class="row__what"><span class="g" style:inline-size="{40 + (i % 2) * 10}%">&nbsp;</span></span>
-          <span class="row__when"><strong><span class="g">&nbsp;</span></strong><span class="g">&nbsp;</span></span>
+          <span class="row__who"><span class="ghost-line" style:inline-size="{55 - (i % 3) * 8}%">&nbsp;</span></span>
+          <span class="row__what"><span class="ghost-line" style:inline-size="{40 + (i % 2) * 10}%">&nbsp;</span></span>
+          <span class="row__when"><strong><span class="ghost-line">&nbsp;</span></strong><span class="ghost-line">&nbsp;</span></span>
         </div>
       </li>
     {/each}
@@ -189,10 +189,10 @@
         <div class="season__bar season__bar--ghost"></div>
         <div class="season__legend" aria-hidden="true">
           {#each Array(6) as _, i (i)}
-            <span class="season__item"><span class="season__n"><span class="g">&nbsp;</span></span><span class="season__k"><span class="g">&nbsp;</span></span></span>
+            <span class="season__item"><span class="season__n"><span class="ghost-line">&nbsp;</span></span><span class="season__k"><span class="ghost-line">&nbsp;</span></span></span>
           {/each}
         </div>
-        <p class="season__note" aria-hidden="true"><span class="g" style:inline-size="60%">&nbsp;</span></p>
+        <p class="season__note" aria-hidden="true"><span class="ghost-line" style:inline-size="60%">&nbsp;</span></p>
       </section>
       <section class="block block--cold">
         <div class="block-head"><h2 class="eyebrow eyebrow--sub">{t('overview.cold', locale)}</h2></div>
@@ -200,9 +200,9 @@
       </section>
       <section class="block block--mailout" aria-hidden="true">
         <div class="block-head"><h2 class="eyebrow eyebrow--sub">{t('overview.last_mailout', locale)}</h2></div>
-        <p class="mailout__subject"><span class="g" style:inline-size="50%">&nbsp;</span></p>
-        <p class="mailout__meta"><span class="g" style:inline-size="70%">&nbsp;</span></p>
-        <p class="mailout__ghost-figs"><span class="g">&nbsp;</span></p>
+        <p class="mailout__subject"><span class="ghost-line" style:inline-size="50%">&nbsp;</span></p>
+        <p class="mailout__meta"><span class="ghost-line" style:inline-size="70%">&nbsp;</span></p>
+        <p class="mailout__ghost-figs"><span class="ghost-line">&nbsp;</span></p>
       </section>
     </div>
   </div>
@@ -649,14 +649,7 @@
       padding-block: var(--space-xs) 0;
     }
     /* Carga: filas de la altura real, para que nada salte al llegar. */
-    .g {
-      display: inline-block;
-      inline-size: 3.5rem;
-      border-radius: var(--radius-s);
-      background: var(--bg-light);
-      line-height: inherit;
-    }
-    .row__when .g {
+    .row__when .ghost-line {
       inline-size: 3.5rem;
     }
 
@@ -740,7 +733,7 @@
       font-family: var(--font-display);
       font-size: var(--stat-inline);
     }
-    .mailout__ghost-figs .g {
+    .mailout__ghost-figs .ghost-line {
       inline-size: 60%;
     }
     .mailout__simulated {

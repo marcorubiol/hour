@@ -1771,6 +1771,17 @@
     --eyebrow-tracking: 0.08em;
   }
 
+  /* Ghost line — the one skeleton of the dashboards: a bar exactly one line
+     of the surrounding text high (give it `&nbsp;`), in the sunk surface.
+     Width is the caller's. Conversations drew it first (`.g`); Desk reuses it. */
+  .ghost-line {
+    display: inline-block;
+    inline-size: 3.5rem;
+    border-radius: var(--radius-s);
+    background: var(--bg-light);
+    line-height: inherit;
+  }
+
   /* Load failure — what a block or a list says when its read fails: its own
      sentence (never the server's text) in the display italic, in danger, so
      it never reads as an empty state, and a way to try again beside it. The

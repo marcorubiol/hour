@@ -59,8 +59,15 @@
   <h2 class="dband__h" id="desk-changed-h">{t('desk.changed_since', locale, { when: sinceLabel })}</h2>
   {#if loading}
     <ul class="feed" aria-hidden="true">
-      <li class="feed__wait"></li>
-      <li class="feed__wait"></li>
+      {#each [0, 1] as i (i)}
+        <li>
+          <span class="feed__dot feed__dot--quiet"></span>
+          <div class="feed__body">
+            <span class="ghost-line" style:inline-size="{70 - i * 15}%">&nbsp;</span>
+            <small><span class="ghost-line" style:inline-size="25%">&nbsp;</span></small>
+          </div>
+        </li>
+      {/each}
     </ul>
   {:else}
     {#if changes.length > 0}
@@ -144,9 +151,5 @@
   .feed__dot--quiet {
     background: var(--text-faint);
   }
-  .feed__wait {
-    block-size: 1.8rem;
-    border-radius: var(--radius);
-    background: var(--bg-hover);
-  }
+
 </style>
