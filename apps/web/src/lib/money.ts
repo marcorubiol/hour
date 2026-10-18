@@ -601,7 +601,10 @@ export interface BoloMoney {
 	inProgress: boolean;
 	/** The live document: issued, else paid, else draft. Cancelled never. */
 	doc: MoneyInvoiceItem | null;
-	/** What the issued document still lacks: its total less what the bolo collected. */
+	/**
+	 * What the issued document still lacks: its total less what the bolo
+	 * collected, leaving out what was paid against the bolo's other documents.
+	 */
 	docOpen: number;
 	/** Por cobrar: `docOpen`, once the deal is contracted (ADR-117 § 6, ADR-123). */
 	owed: number;
@@ -640,7 +643,16 @@ export function boloMoney(b: MoneyBolo, ctx: MoneyContext): BoloMoney {
 	const docs = ctx.invoicesByBolo.get(b.id) ?? [];
 	const doc = docs.find((d) => d.status !== 'cancelled') ?? null;
 	const issued = doc?.status === 'issued' ? doc : null;
-	const docOpen = issued ? Math.max(0, Number(issued.total) - collected) : 0;
+	// What went to the bolo's OTHER documents is theirs: a second live invoice
+	// must not swallow the first one's payments (the RPC does not forbid two).
+	const elsewhere = issued
+		? docs
+				.filter((d) => d.id !== issued.id)
+				.flatMap((d) => d.payments)
+				.filter((p) => !p.deleted_at)
+				.reduce((sum, p) => sum + Number(p.amount), 0)
+		: 0;
+	const docOpen = issued ? Math.max(0, Number(issued.total) - (collected - elsewhere)) : 0;
 	// A document of a deal not yet confirmed is a quote, not a debt (ADR-123).
 	const owed = contracted ? docOpen : 0;
 	const aging = issued ? invoiceAging(issued, ctx.termsByPayer, ctx.today) : null;

@@ -142,6 +142,28 @@ describe('boloMoney', () => {
 		expect(confirmed.owed).toBe(1000);
 	});
 
+	it('two live invoices on one bolo: the issued one does not swallow the paid one', () => {
+		const pay = (invoice_id: string, amount: number) => ({
+			id: `p-${invoice_id}`,
+			workspace_id: 'w',
+			invoice_id,
+			amount,
+			received_on: '2026-09-10',
+			method: 'transfer' as const,
+			reference: null,
+			notes: null,
+			created_at: '2026-09-10T10:00:00Z',
+		});
+		const docs = [
+			invoice({ id: 'first', bolo: 'b', status: 'paid', total: 1060, payments: [pay('first', 1060)] }),
+			invoice({ id: 'second', bolo: 'b', total: 1060, expected_on: '2026-10-01' }),
+		];
+		const m = boloMoney(bolo({ id: 'b', collected: 1060 }), ctx(docs));
+		expect(m.doc?.id).toBe('second');
+		expect(m.owed).toBe(1060);
+		expect(m.overdue).toBe(true);
+	});
+
 	it('is overdue against the EXPECTED date, not due_on', () => {
 		// due_on passed, but the payer observably pays at 60 days: not late yet.
 		const inv = invoice({
