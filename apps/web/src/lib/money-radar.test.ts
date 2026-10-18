@@ -288,6 +288,17 @@ describe('attentionItems', () => {
 		expect(attentionItems(bolos, ctx([blocked])).map((i) => i.kind)).toEqual(['fiscal']);
 	});
 
+	it('a function done without a fee asks for one, before the confirmed ones', () => {
+		const bolos = [
+			bolo({ id: 'future', status: 'confirmed', fee_amount: null, next_performed_at: '2026-11-01' }),
+			bolo({ id: 'granollers', status: 'done', fee_amount: null, next_performed_at: '2026-09-20' }),
+		];
+		expect(attentionItems(bolos, ctx()).map((i) => [i.kind, i.bolo.id])).toEqual([
+			['no_fee', 'granollers'],
+			['no_fee', 'future'],
+		]);
+	});
+
 	it('a proforma draft is never blocked by fiscal data', () => {
 		const items = attentionItems(
 			[bolo({ id: 'b', status: 'confirmed', next_performed_at: '2026-11-01' })],

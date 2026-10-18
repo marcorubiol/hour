@@ -1904,6 +1904,8 @@
   "books.att_fiscal": "al pagador li falten les dades fiscals: no es pot emetre",
   "books.att_no_fee": "confirmat per al {date}, sense caixet",
   "books.att_no_fee_nodate": "confirmat, sense caixet",
+  "books.att_no_fee_done": "feta el {date}, sense caché: no es pot facturar",
+  "books.att_no_fee_done_nodate": "feta, sense caché: no es pot facturar",
   "books.att_act_invoice": "Fer factura",
   "books.att_act_issue": "Emetre",
   "books.att_act_fiscal": "Dades fiscals",

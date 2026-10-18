@@ -1904,6 +1904,8 @@
   "books.att_fiscal": "al pagador le faltan los datos fiscales: no se puede emitir",
   "books.att_no_fee": "confirmado para el {date}, sin caché",
   "books.att_no_fee_nodate": "confirmado, sin caché",
+  "books.att_no_fee_done": "hecha el {date}, sin caché: no se puede facturar",
+  "books.att_no_fee_done_nodate": "hecha, sin caché: no se puede facturar",
   "books.att_act_invoice": "Hacer factura",
   "books.att_act_issue": "Emitir",
   "books.att_act_fiscal": "Datos fiscales",

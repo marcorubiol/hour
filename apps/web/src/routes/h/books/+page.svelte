@@ -274,6 +274,7 @@
       case 'fiscal':
         return t('books.att_fiscal', locale);
       case 'no_fee':
+        if (b.status === 'done') return day ? t('books.att_no_fee_done', locale, { date: day }) : t('books.att_no_fee_done_nodate', locale);
         return day ? t('books.att_no_fee', locale, { date: day }) : t('books.att_no_fee_nodate', locale);
     }
   }

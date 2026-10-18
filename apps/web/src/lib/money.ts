@@ -850,13 +850,16 @@ export function attentionItems(bolos: readonly MoneyBolo[], ctx: MoneyContext): 
 			out.push({ ...base, kind: 'fiscal', doc: m.doc, amount: Number(m.doc.total) });
 		} else if (m.toInvoice && m.doc) {
 			out.push({ ...base, kind: 'draft', doc: m.doc, amount: Number(m.doc.total) });
-		} else if (m.noFee && b.status === 'confirmed') {
+		} else if (m.noFee && (b.status === 'confirmed' || b.status === 'done')) {
+			// A function done without a fee is one nobody will ever invoice.
 			out.push({ ...base, kind: 'no_fee', doc: null, amount: null });
 		}
 	}
+	const doneFirst = (i: AttentionItem) => (i.kind === 'no_fee' && i.bolo.status === 'done' ? 0 : 1);
 	return out.sort(
 		(a, b) =>
 			KIND_ORDER[a.kind] - KIND_ORDER[b.kind] ||
+			doneFirst(a) - doneFirst(b) ||
 			b.daysLate - a.daysLate ||
 			(a.bolo.next_performed_at ?? '9999').localeCompare(b.bolo.next_performed_at ?? '9999'),
 	);
