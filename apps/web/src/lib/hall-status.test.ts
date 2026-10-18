@@ -189,7 +189,7 @@ describe('hallSentence — copy building (ca)', () => {
       'ca',
       { viewerTz: 'Europe/Madrid' },
     );
-    expect(s).toBe('Avui: Kursaal. Load-in a les 17:00.');
+    expect(s).toBe('Avui: Kursaal. Càrrega a les 17:00.');
   });
 
   it('show day abroad: venue time primary, viewer courtesy in parentheses', () => {
@@ -204,7 +204,7 @@ describe('hallSentence — copy building (ca)', () => {
       'ca',
       { viewerTz: 'Europe/Madrid' },
     );
-    expect(s).toBe('Avui: Roundhouse. Load-in a les 16:00 (17:00 la teva hora).');
+    expect(s).toBe('Avui: Roundhouse. Càrrega a les 16:00 (17:00 la teva hora).');
   });
 
   it('show day at home: venue tz equals viewer tz, no courtesy', () => {
@@ -218,7 +218,7 @@ describe('hallSentence — copy building (ca)', () => {
       'ca',
       { viewerTz: 'Europe/Madrid' },
     );
-    expect(s).toBe('Avui: Kursaal. Load-in a les 17:00.');
+    expect(s).toBe('Avui: Kursaal. Càrrega a les 17:00.');
   });
 
   it('show day without any time drops the time part', () => {

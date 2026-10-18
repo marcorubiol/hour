@@ -2,6 +2,9 @@ import ca from './ca.json';
 import en from './en.json';
 import es from './es.json';
 import fr from './fr.json';
+import { currentTrade, DEFAULT_TRADE, type Trade } from './trade.svelte';
+
+export { currentTrade, setTrade, tradeOf, TRADES, type Trade } from './trade.svelte';
 
 const dictionaries = { ca, es, en, fr } as const;
 
@@ -14,18 +17,22 @@ export const LOCALES = Object.keys(dictionaries) as Locale[];
 export const LOCALE_TAG: Record<Locale, string> = { ca: 'ca-ES', es: 'es-ES', en: 'en-GB', fr: 'fr-FR' };
 
 /**
- * Dictionary lookup with {name} interpolation. Missing keys fall back to
- * the English dictionary, then to the key itself — a sparse locale file
- * never blanks the UI.
+ * Dictionary lookup with {name} interpolation. The trade's variant
+ * (`key@music`, ADR-128) wins when the dictionary has one; otherwise the
+ * plain key, which speaks stage. Missing keys fall back to the English
+ * dictionary, then to the key itself — a sparse locale file never blanks the UI.
  */
 export function t(
   key: string,
   locale: Locale = 'en',
   params?: Record<string, string | number>,
+  trade: Trade = currentTrade(),
 ): string {
   const dict = dictionaries[locale] as Record<string, string>;
   const fallback = dictionaries.en as Record<string, string>;
-  let out = dict[key] ?? fallback[key] ?? key;
+  const variant = trade === DEFAULT_TRADE ? undefined : `${key}@${trade}`;
+  let out =
+    (variant && dict[variant]) ?? dict[key] ?? (variant && fallback[variant]) ?? fallback[key] ?? key;
   if (params) {
     for (const [name, value] of Object.entries(params)) {
       out = out.replaceAll(`{${name}}`, String(value));

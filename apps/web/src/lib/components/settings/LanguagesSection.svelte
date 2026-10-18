@@ -1,5 +1,8 @@
 <script lang="ts">
   import { t, appLocale, LOCALES, type Locale } from '$lib/i18n';
+  import WorkspaceTrade from './WorkspaceTrade.svelte';
+
+  let { workspaceId }: { workspaceId?: string } = $props();
 
   const locale = appLocale();
 
@@ -59,3 +62,5 @@
     </div>
   </div>
 </section>
+
+<WorkspaceTrade {workspaceId} />

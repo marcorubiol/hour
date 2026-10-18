@@ -3833,6 +3833,7 @@ export type Database = {
           settings: Json
           slug: string
           timezone: string
+          trade: string
           updated_at: string
           website: string | null
         }
@@ -3864,6 +3865,7 @@ export type Database = {
           settings?: Json
           slug: string
           timezone?: string
+          trade?: string
           updated_at?: string
           website?: string | null
         }
@@ -3895,6 +3897,7 @@ export type Database = {
           settings?: Json
           slug?: string
           timezone?: string
+          trade?: string
           updated_at?: string
           website?: string | null
         }
@@ -5432,6 +5435,7 @@ export type Database = {
           settings: Json
           slug: string
           timezone: string
+          trade: string
           updated_at: string
           website: string | null
         }
@@ -7003,6 +7007,7 @@ export type Database = {
           settings: Json
           slug: string
           timezone: string
+          trade: string
           updated_at: string
           website: string | null
         }

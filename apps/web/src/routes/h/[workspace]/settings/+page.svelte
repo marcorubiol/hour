@@ -92,7 +92,7 @@
   {/if}
 
   {#if active === 'languages'}
-    <LanguagesSection />
+    <LanguagesSection workspaceId={currentWorkspace?.id} />
   {/if}
 
   <!-- "Connections" section killed: 7 providers (Fastmail, Holded,

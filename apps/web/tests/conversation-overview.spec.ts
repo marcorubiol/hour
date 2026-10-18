@@ -6,14 +6,14 @@ import { loadEnvFile } from 'node:process';
  * ADR-117: «con quién hablas» abre con su dashboard.
  *
  * Lo que fija:
- *   - una sala que nos acaba de escribir sale en «Te toca», y su filtro la
- *     encuentra en la lista con la columna Turno;
+ *   - una sala que nos acaba de escribir sale en «Esperan respuesta», y su filtro la
+ *     encuentra en la lista con la columna Respuesta;
  *   - una sala contactada a la que escribimos hace 40 días sin respuesta se
  *     enfría en la segunda ronda, y «Escribir a estas» abre el modo selección
  *     con ella ya marcada (ADR-126 § 8: las paradas no van en bloque);
  *   - el chip del filtro lo quita, y un tramo de la temporada filtra por estado;
  *   - en el móvil, una sola columna en el orden del documento: lo que pide
- *     acción (te toca, caliente) antes que la temporada (ADR-126 § 11).
+ *     acción (esperan respuesta, se mueve) antes que la temporada (ADR-126 § 11).
  *
  * En el espacio `playwright`, en `zzz-e2e-collab`, con dos conversaciones del
  * propio spec (nunca `muk-cia`). Autolimpiante: las borra al acabar (sus
@@ -88,12 +88,12 @@ test.describe('el dashboard de Conversations (ADR-117)', () => {
     for (const id of ids) await h.pgRpc('delete_conversation', jwt, { p_conversation_id: id });
   });
 
-  test('te toca: el bloque cuenta y su filtro la encuentra con su turno', async ({ page }) => {
+  test('esperan respuesta: el bloque cuenta y su filtro la encuentra con su columna Respuesta', async ({ page }) => {
     test.setTimeout(60_000);
     await page.goto('/h/conversations');
     const due = page.getByTestId('block-due');
     await expect(due).toBeVisible({ timeout: 30_000 });
-    // The count rides in the block's title: «Te toca · N».
+    // The count rides in the block's title: «Esperan respuesta · N».
     await expect(due.getByRole('heading')).not.toHaveText(/·\s*0$/);
 
     await due.getByRole('link', { name: /lista|list|llista|liste/i }).click();
@@ -105,7 +105,7 @@ test.describe('el dashboard de Conversations (ADR-117)', () => {
     await expect(page.locator('.conversation-table tbody tr', { hasText: COLD })).toHaveCount(0);
   });
 
-  test('se enfría: «Escribir a estas» deja la selección hecha; el chip quita el filtro', async ({ page }) => {
+  test('sin noticias: «Escribir a estas» deja la selección hecha; el chip quita el filtro', async ({ page }) => {
     test.setTimeout(60_000);
     await page.goto('/h/conversations');
     const cold = page.getByTestId('block-cold');
@@ -136,7 +136,7 @@ test.describe('el dashboard de Conversations (ADR-117)', () => {
     await expect(page.locator('.conversation-table tbody tr').first()).toBeVisible({ timeout: 30_000 });
   });
 
-  test('en el móvil, una columna en el orden del documento, «Te toca» primero', async ({ page }) => {
+  test('en el móvil, una columna en el orden del documento, «Esperan respuesta» primero', async ({ page }) => {
     test.setTimeout(60_000);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/h/conversations');

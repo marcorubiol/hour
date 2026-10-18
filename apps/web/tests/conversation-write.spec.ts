@@ -199,7 +199,7 @@ test.describe('conversation inline write', () => {
       const row = rowByName(page, name!);
       const trigger = row.locator('button[aria-haspopup="menu"]');
       const originalLabel = (await trigger.innerText()).replace('▾', '').trim();
-      const target = original.status === 'hold' ? 'Dormant' : 'Hold';
+      const target = original.status === 'hold' ? 'Parked' : 'Hold';
 
       // Change status via the badge menu; require the server ack.
       await trigger.click();
