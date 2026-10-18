@@ -443,6 +443,7 @@
 
 ## Producto — después
 
+- [ ] **Vocabulario de oficio (ADR-128)**: neutras donde existan y un ajuste por espacio, escena o música en directo, para unas pocas etiquetas; corrige los errores de FR, CA y ES de los informes (`build/coordination/wording/`). Carril en marcha; Marco ve la lista final antes del deploy.
 - [ ] **Arreglos de la revisión de Desk, Conversations y Cuentas (18-10)** (`build/coordination/review-{desk,conversations,books}/`, fuera de git). Marco (18-10): el directorio de salas y contactos pide permiso de conversaciones y una sala o contacto que solo existe por una conversación privada hereda su privacidad; un cobro se ata a la factura emitida si la hay y propone lo pendiente con IVA; una proforma de un trato sin confirmar no cuenta en «Por cobrar». Marco (18-10): todo lo recomendado en los diez informes, de todas las gravedades. Privacidad, Cuentas, Conversations y Desk en producción el 2026-10-18; Desk y una pasada de coherencia (títulos de bloque, error y carga iguales) al final.
   - [ ] Bug: la pestaña del navegador dice «Hour — Sign in» con la sesión abierta en el Hall: el título del login se queda puesto al entrar. Cada pantalla pone su propio título («Hour» en el Hall, «Desk · Hour», «Planner · Hour»…). Va en la pasada de coherencia. (drop 18-10, pequeño)
   - [ ] En Desk, «Ha cambiado» no desaparece cuando no hay nada: se queda con una línea («Nada nuevo desde tu última visita, hace 3 h»), y si falla lo dice. Enmienda ADR-121, que la ocultaba vacía. (drop 18-10)

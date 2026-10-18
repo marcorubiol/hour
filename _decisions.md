@@ -4245,3 +4245,27 @@ shell.
 
 **Re-evaluar cuando** Marco use el Desk una temporada de gira: si las respuestas en «Te espera» deben llevar «tarde»
 como en Conversations, si 5 filas de «te toca» bastan, y si los 5 s de «Deshacer» son pocos.
+
+## [2026-10-18] ADR-128 · Vocabulario: palabras de oficio, neutras donde existan y un ajuste por espacio para el resto
+
+**Contexto.** Marco quiere alejar el vocabulario de Hour del de un CRM. Dos agentes (teatro y música en directo)
+propusieron alternativas en castellano, catalán, francés e inglés, contrastadas con fuentes:
+`build/coordination/wording/teatro.md` (§ 15) y `musica.md` (§ 32), fuera de git. Teatro y música piden palabras
+distintas para unas pocas cosas.
+
+**Decisión (Marco, 2026-10-18, opción b).**
+1. **Neutras donde existan**, iguales para todos: Bolo, Temporada, Hoja de ruta, Opción (ES y CA; FR *option*; EN
+   *hold*, con *pencil* como variante británica si hace falta), y fuera la temperatura y el turno de CRM: «caliente»,
+   «se enfría», «te toca», «rechazada», «hacer seguimiento» pasan a palabras de oficio («sin noticias», «volver a
+   escribir», «no esta vez»…), con la elección exacta por idioma tomada de los dos informes.
+2. **Un ajuste por espacio, el oficio**, que cambia unas pocas etiquetas. Empieza con dos: **escena** (teatro, danza,
+   circo, títeres, calle; por defecto) y **música en directo**. Lo cambia un admin en Ajustes. Añadir un tercero
+   (comedia, por ejemplo) es añadir datos, no reescribir.
+3. Lo que cambia con el oficio: el nombre de la lente de venta (escena: Difusión / Difusió / Diffusion / Booking;
+   música: Contratación / Contractació / Booking / Booking), la unidad que se actúa (Función / Concierto…), quién
+   actúa (Reparto / Formación…), el horario del día (Plan de trabajo / Escaleta…), quién compra (Programador /
+   Promotor…). La entidad por dentro no cambia de nombre (`conversation`, `performance`, `bolo`).
+4. **Errores que se corrigen elijas lo que elijas:** FR «cachet» es el salario del artista (lo que paga la sala es el
+   *prix de cession*); CA «caixet»; ES «Load-in»; FR tutea («à toi / à eux») en una app que trata de *vous*;
+   «hold» y «opción» mezclados.
+5. Marco ve la lista final por oficio e idioma antes de desplegar.
