@@ -242,8 +242,7 @@
     color: var(--text-faint);
     text-transform: lowercase;
   }
-  .row--over .row__verb,
-  .row__when--over {
+  .row--over .row__verb {
     color: var(--danger);
   }
   .row--conversation .row__verb {
@@ -300,6 +299,10 @@
     font-size: var(--text-xs);
     color: var(--text-muted);
     white-space: nowrap;
+  }
+  /* After the base rule, so the overdue date is red (it lost the cascade). */
+  .row__when--over {
+    color: var(--danger);
   }
   .row__acts {
     display: inline-flex;
