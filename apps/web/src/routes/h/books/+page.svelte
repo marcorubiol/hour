@@ -1247,22 +1247,27 @@
     .radar__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-m); padding-block-end: var(--space-xs); border-block-end: 1px solid var(--border-color-light); margin-block-end: var(--space-xs); }
     .radar__more { appearance: none; border: 0; background: none; padding: 0; font: inherit; font-size: var(--text-xs); color: var(--text-muted); cursor: pointer; }
     .radar__more:hover { color: var(--text-color); }
-    .att__list { display: flex; flex-direction: column; }
-    .att__row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: var(--space-m); align-items: center; padding-block: var(--space-xs); border-block-end: 1px solid var(--border-color-light); }
+    /* One grid for the whole list (rows are subgrids): amounts and buttons
+       fall in columns whatever each row's text measures. */
+    .att__list { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; column-gap: var(--space-m); }
+    .att__row { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; padding-block: var(--space-xs); border-block-end: 1px solid var(--border-color-light); }
+    .att__row :global(.btn) { justify-self: stretch; }
     .att__what { min-inline-size: 0; display: flex; flex-wrap: wrap; column-gap: var(--space-2xs); align-items: baseline; }
     .att__who { color: var(--text-color); font-weight: 500; text-decoration: none; }
     .att__who:hover { text-decoration: underline; }
     .att__ctx { font-size: var(--text-s); color: var(--text-muted); }
     .att__why { inline-size: 100%; font-size: var(--text-xs); color: var(--text-muted); }
     .att__row[data-kind='overdue'] .att__why { color: var(--danger); }
-    .att__amt { font-family: var(--font-mono); font-size: var(--text-s); font-variant-numeric: tabular-nums; color: var(--text-color); white-space: nowrap; }
+    .att__amt { font-family: var(--font-mono); font-size: var(--text-s); font-variant-numeric: tabular-nums; color: var(--text-color); white-space: nowrap; text-align: end; }
     .inflow__cur { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); }
     .inflow__list + .inflow__cur, .mny__note + .inflow__cur { margin-block-start: var(--space-s); padding-block-start: var(--space-xs); border-block-start: 1px solid var(--border-color-light); }
-    .inflow__list { display: flex; flex-direction: column; gap: var(--space-xs); padding-block: var(--space-2xs); }
-    .inflow__row { display: grid; grid-template-columns: 3.5ch minmax(0, 1fr) auto; gap: var(--space-s); align-items: center; }
+    /* One grid per currency, rows as subgrids: every bar has the same length,
+       so the scale is the same in every month. */
+    .inflow__list { display: grid; grid-template-columns: 3.5ch minmax(0, 1fr) auto; gap: var(--space-xs) var(--space-s); padding-block: var(--space-2xs); }
+    .inflow__row { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; }
     .inflow__month { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); text-transform: lowercase; }
     .inflow__bar { display: flex; gap: 2px; block-size: 10px; border-radius: var(--radius-s); background: var(--bg-light); overflow: hidden; }
-    .inflow__amt { font-family: var(--font-mono); font-size: var(--text-xs); font-variant-numeric: tabular-nums; color: var(--text-color); white-space: nowrap; }
+    .inflow__amt { font-family: var(--font-mono); font-size: var(--text-xs); font-variant-numeric: tabular-nums; color: var(--text-color); white-space: nowrap; text-align: end; }
     .inflow__con { color: var(--text-faint); }
 
     /* ── 4 · the ledger ── */
@@ -1333,7 +1338,7 @@
     @media (max-width: 760px) {
       .figs__row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .radar { grid-template-columns: 1fr; }
-      .att__row { grid-template-columns: minmax(0, 1fr) auto; }
+      .att__list { grid-template-columns: minmax(0, 1fr) auto; }
       .att__row :global(.btn) { grid-column: 1 / -1; justify-self: stretch; }
       .ledger__filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
       .book thead { display: none; }
