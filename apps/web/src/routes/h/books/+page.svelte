@@ -576,10 +576,22 @@
   /** A chosen payer without fiscal data: a factura from it cannot be issued yet. */
   let invPayerNoFiscal = $derived(availablePayers.find((payer) => payer.id === iPayerId)?.has_fiscal_identity === false);
   let invDocType = $derived(invBolo ? (boloMode(invBolo) === 'interno' ? 'proforma' : 'factura') : 'factura');
+  /**
+   * The rates of the space's latest document, as a starting point: a company
+   * that bills town halls types 21 and 15 every time otherwise.
+   */
+  function lastRates(b: MoneyBolo): { vat: string; irpf: string } {
+    const last = invoices
+      .filter((inv) => inv.workspace_id === b.project?.workspace_id && inv.status !== 'cancelled' && inv.tax_lines.length > 0)
+      .sort((x, y) => (y.issued_on ?? '').localeCompare(x.issued_on ?? ''))[0];
+    const rate = (kind: 'add' | 'withhold') => last?.tax_lines.find((l) => l.kind === kind)?.rate_pct;
+    return { vat: rate('add')?.toString() ?? '', irpf: rate('withhold')?.toString() ?? '' };
+  }
   function openInvoice(b: MoneyBolo) {
     invBolo = b;
-    iVat = '';
-    iIrpf = '';
+    const rates = lastRates(b);
+    iVat = rates.vat;
+    iIrpf = rates.irpf;
     iDueOn = '';
     iExpectedOn = '';
     iPaymentCondition = '';
