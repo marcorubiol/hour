@@ -27,7 +27,7 @@
    */
 
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
-  import { goto } from '$app/navigation';
+  import { afterNavigate, goto } from '$app/navigation';
   import { page } from '$app/state';
   import { fetchJSON, mutateJSON, ApiError } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
@@ -185,13 +185,26 @@
     if (listFilter.temporada) params.delete('estado');
     for (const k of ['turno', 'temp', 'temporada', 'envio', 'r']) params.delete(k);
     const qs = params.toString();
-    void goto(`${page.url.pathname}${qs ? `?${qs}` : ''}`, { noScroll: true, keepFocus: true });
+    // The chip goes away with the focus on it: the focus goes to the list.
+    void goto(`${page.url.pathname}${qs ? `?${qs}` : ''}`, { noScroll: true, keepFocus: true }).then(() =>
+      listHeading?.focus({ preventScroll: true }),
+    );
   }
 
+  // After a filter the focus lands on the list's title, not on `body`: the
+  // next Tab goes into the list, not back to the top (móvil #3).
+  let listHeading = $state<HTMLElement>();
   async function showList() {
     await tick();
-    document.getElementById('lista')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    document.getElementById('lista')?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+    listHeading?.focus({ preventScroll: true });
   }
+  // A block's link (`?turno=nuestro#lista`) is a plain link: the browser
+  // scrolls, the focus follows here.
+  afterNavigate(({ to }) => {
+    if (to?.url.hash === '#lista') listHeading?.focus({ preventScroll: true });
+  });
 
   /** A season segment: that status, in the season (and the pinned lines). */
   async function filterSeasonStatus(status: ConversationStatus) {
@@ -539,7 +552,7 @@
     />
 
     <div class="conversations__list-head block-head" id="lista">
-      <h2 class="eyebrow eyebrow--sub">{t('overview.list', locale)}</h2>
+      <h2 class="eyebrow eyebrow--sub conversations__list-title" tabindex="-1" bind:this={listHeading}>{t('overview.list', locale)}</h2>
     </div>
     <div class="conversations__controls">
       <div class="conversations__search">
@@ -704,6 +717,10 @@
       block-size: var(--control-size-m);
     }
 
+    /* Focused by script after a filter: the ring only for the keyboard. */
+    .conversations__list-title:focus:not(:focus-visible) {
+      outline: none;
+    }
     .conversations__list-head {
       scroll-margin-block-start: var(--space-l);
       margin-block-start: var(--space-m);
