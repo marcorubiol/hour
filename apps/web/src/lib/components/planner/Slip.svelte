@@ -157,6 +157,9 @@
 
   let state = $derived(stateLabel(slip));
   let held = $derived(slip.cert === 'hold' || slip.cert === 'proposed');
+  let nameIsKind = $derived(
+    !slip.lead && slip.name.trim().toLowerCase() === kindLabel(slip.kind).trim().toLowerCase(),
+  );
 </script>
 
 <!-- One body, two shells: a thing with a page of its own is a link, one
@@ -216,9 +219,14 @@
   <!-- A travel day's place is ambiguous on its own — «London» is a departure
        or an arrival depending on a column nobody can see — so the direction
        governs the name, in the margin voice. -->
+  <!-- A date with no title of its own falls back to its kind for a name, and
+       the kind word already said it: «DAY OFF / day off» (diseño B6). The
+       name is not printed twice; the title keeps it. -->
+  {#if !nameIsKind}
   <span class="slip__n" class:guess
     >{#if slip.lead}<i class="slip__pre">{slip.lead === 'to' ? t('planner.slip_to', L) : slip.lead}</i>{/if}{slip.name}</span
   >
+  {/if}
 
   <!-- WHERE THE LEG BEGAN, under where it goes — the shape the design draws
        for a travel day: `to Brussels` over `from Barcelona`. It is deduced
