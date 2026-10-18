@@ -141,7 +141,7 @@
   } from '$lib/season';
   import { normalizeLaneAxis, resolveLaneAxis, type LaneAxis } from '$lib/carrils';
   import type { AvailabilityItem } from '$lib/availability';
-  import { localeDayMonth, localeWeekdayShort, dualTime } from '$lib/datetime';
+  import { localeDayMonth, localeDayMonthNear, localeWeekdayShort, dualTime } from '$lib/datetime';
   import {
     holdDeadlineLabel,
     isHoldStatus,
@@ -2132,6 +2132,27 @@
     agendaExhausted = false;
     pastExhausted = false;
   });
+  /* PAST THE HORIZON, ONE MORE LOOK (uso #11). «Nothing more planned» was
+     absolute while a gig sat four years out; now the end names its horizon
+     and, if something lies beyond, says when and opens that day. */
+  let farNext = $state<string | null>(null);
+  $effect(() => {
+    if (!agendaExhausted) {
+      farNext = null;
+      return;
+    }
+    const from = addDaysIso(agendaHorizonIso, 1);
+    const to = `${Number(from.slice(0, 4)) + 20}${from.slice(4)}`;
+    let alive = true;
+    probePlan(from, to)
+      .then((d) => {
+        if (alive) farNext = d;
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  });
   /** Earliest planned day in [from, to] under the current scope, or null.
       Both feeds return ascending, so `limit=1` IS the earliest. */
   async function probePlan(from: string, to: string): Promise<string | null> {
@@ -3445,7 +3466,16 @@
         ? t('planner.agenda_no_earlier', locale)
         : undefined}
       onPlanEnds={probePlanAhead}
-      endLabel={agendaExhausted ? t('planner.agenda_end', locale) : undefined}
+      endLabel={agendaExhausted ? t('planner.agenda_end_n', locale, { n: AGENDA_FLOOR }) : undefined}
+      endBeyond={agendaExhausted && farNext
+        ? {
+            label: t('planner.agenda_beyond', locale, { day: localeDayMonthNear(farNext, todayIso, localeTag) }),
+            onGo: () => {
+              dayIso = farNext;
+              setView('day');
+            },
+          }
+        : undefined}
       weekLabel={(n) => `${t('planner.week_n', locale)} ${n}`}
       weekRange={(from, to) => `${localeDayMonth(from, localeTag)} → ${localeDayMonth(to, localeTag)}`}
       weekTally={(firm, held, free) =>

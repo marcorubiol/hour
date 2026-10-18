@@ -174,6 +174,10 @@
     /** «nothing more planned» — the book's honest end, printed only when
         the page's look-ahead came back empty. */
     endLabel?: string;
+    /** Beyond the book's horizon there is still something: its date and the
+        way there (uso #11 — «nothing more» was absolute while a gig sat in
+        2031). */
+    endBeyond?: { label: string; onGo: () => void };
     /** Jump to the DecisionBand (where the pick/release actions live). */
     onDecideJump?: () => void;
     /**
@@ -248,6 +252,7 @@
     noEarlierLabel,
     onPlanEnds,
     endLabel,
+    endBeyond,
     onDecideJump,
     onDateOpen,
   }: Props = $props();
@@ -1123,7 +1128,11 @@
          content in today's month the tail is never quiet, yet the plan can
          still be finished — the line must win over the sentinel then. -->
     {#if endLabel}
-      <p class="ag__end">{endLabel}</p>
+      <p class="ag__end">
+        {endLabel}{#if endBeyond}{' · '}<button type="button" class="ag__beyond" onclick={endBeyond.onGo}
+            >{endBeyond.label} ›</button
+          >{/if}
+      </p>
     {:else if onReachEnd && !endStop}
       <div class="ag__sentinel" bind:this={endSentinel} aria-hidden="true"></div>
     {/if}
@@ -1261,6 +1270,18 @@
     }
     .ag__earlier:disabled {
       cursor: default;
+    }
+    .ag__beyond {
+      font: inherit;
+      letter-spacing: inherit;
+      text-transform: inherit;
+      color: var(--text-color);
+      background: none;
+      border: 0;
+      padding: 0;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 2px;
     }
 /* The book's honest ends — «nothing more planned» · «nothing further
    back». Margin voice, centred on the text column like the door above. */
