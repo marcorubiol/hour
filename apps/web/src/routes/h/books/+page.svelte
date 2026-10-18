@@ -38,6 +38,7 @@
   import StateBadge from '$lib/components/StateBadge.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { dayLabel, localDayISO } from '$lib/datetime';
+  import { DASH } from '$lib/glyphs';
   import { categoryLabel, EXPENSE_CATEGORIES, type ExpenseItem } from '$lib/expense';
   import {
     applyTaxLines,
@@ -423,6 +424,8 @@
   let invoicesError = $derived(errText($invoicesQuery.error));
   let expensesError = $derived(errText($expensesQuery.error));
   let currencies = $derived([...new Set(bolos.map((b) => b.fee_currency ?? 'EUR'))].sort());
+  /** With more than one currency every amount carries its code: a column of numbers invites summing. */
+  let multiCurrency = $derived(currencies.length > 1);
   let expenseTotals = $derived(totalsByCurrency(expenses, (e) => e.currency, (e) => Number(e.amount)));
   let seasonEmpty = $derived(!loading && seasonBolos.length === 0 && attention.length === 0);
   let previousSeason = $derived(seasons.find((s) => s < season) ?? null);
@@ -854,7 +857,7 @@
                       <span class="att__ctx">{[item.doc?.number ?? item.bolo.city, item.kind === 'fiscal' || item.kind === 'draft' ? invoiceStatusLabel('draft', locale) : null].filter(Boolean).map((x) => ` · ${x}`).join('')}</span>
                       <span class="att__why">{attentionWhy(item)}</span>
                     </span>
-                    <span class="att__amt">{item.amount === null ? '·' : fmtMoney(item.amount)}{#if item.amount !== null && currencies.length > 1}&nbsp;{item.currency}{/if}</span>
+                    <span class="att__amt">{item.amount === null ? '·' : fmtMoney(item.amount)}{#if item.amount !== null && multiCurrency}&nbsp;{item.currency}{/if}</span>
                     <Button size="xs" variant="outline" onclick={() => act(item)}>{t(ATTENTION_ACTION[item.kind], locale)}</Button>
                   </li>
                 {/each}
@@ -867,6 +870,8 @@
             <header class="radar__head"><p class="eyebrow">{t('books.inflow', locale)}</p></header>
             {#if invoicesError}
               <p class="mny__state mny__state--danger">{t('books.err_invoices', locale)}</p>
+            {:else if loading}
+              <p class="mny__state">{t('desk.loading', locale)}</p>
             {:else}
               {#each inflow as f (f.currency)}
                 {@const max = Math.max(1, ...f.months.map((m) => m.expected + m.contracted))}
@@ -911,7 +916,7 @@
             {#each LEDGER_FILTERS as f (f)}
               <Chip size="xs" selected={filter === f} onclick={() => (filter = f)}>
                 {t(FILTER_LABEL[f], locale)}
-                {#snippet tail()}<span class="ledger__count">{filterCounts[f]}</span>{/snippet}
+                {#snippet tail()}<span class="ledger__count">{loading ? DASH : filterCounts[f]}</span>{/snippet}
               </Chip>
             {/each}
           </div>
@@ -957,8 +962,8 @@
                       </td>
                       <td class="book__status"><StateBadge label={boloStatusLabel(b.status, locale)} tone={performanceStatusTone(b.status)} /></td>
                       <td class="book__doc">{#if m.doc}<span class="book__chip">{m.doc.number ?? invoiceStatusLabel(m.doc.status, locale)}</span>{:else}<span class="book__faint">·</span>{/if}</td>
-                      <td class="book__num"><button type="button" class="book__fee" title={t('books.edit_fee', locale)} onclick={() => openFee(b)}>{b.fee_amount === null ? t('books.no_fee', locale) : fmtMoney(Number(b.fee_amount))}</button></td>
-                      <td class="book__num">{m.fee === null && !m.doc ? '·' : fmtMoney(m.collected)}</td>
+                      <td class="book__num"><button type="button" class="book__fee" title={t('books.edit_fee', locale)} onclick={() => openFee(b)}>{b.fee_amount === null ? t('books.no_fee', locale) : fmtMoney(Number(b.fee_amount))}</button>{#if multiCurrency && b.fee_amount !== null}<span class="book__cur">{m.currency}</span>{/if}</td>
+                      <td class="book__num">{#if m.fee === null && !m.doc}·{:else}{fmtMoney(m.collected)}{#if multiCurrency}<span class="book__cur">{m.currency}</span>{/if}{/if}</td>
                       <td class="book__collect">{#if pill}<span class="pill" data-tone={pill.tone}>{pill.label}</span>{/if}</td>
                     </tr>
                     {#if open}
@@ -1241,6 +1246,7 @@
     .book__toggle:hover { text-decoration: underline; }
     .book__city { font-weight: 400; }
     .book__chip { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); padding: 1px 8px; border: 1px solid var(--border-color-dark); border-radius: var(--radius-circle); white-space: nowrap; }
+    .book__cur { margin-inline-start: 0.5ch; font-size: var(--text-xs); color: var(--text-muted); letter-spacing: 0.04em; }
     .book__fee { appearance: none; border: 0; background: none; padding: 0; font: inherit; color: var(--text-color); cursor: pointer; }
     .book__fee:hover { text-decoration: underline; }
     .book__group th { padding-block-start: var(--space-m); text-transform: none; letter-spacing: 0; }
