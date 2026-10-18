@@ -161,7 +161,9 @@ describe('boloMoney', () => {
 		const b = bolo({ id: 'b', next_performed_at: '2026-10-03T19:00:00Z' });
 		expect(boloMoney(b, ctx()).toInvoice).toBe(true);
 		expect(boloMoney(b, ctx([], { modeOf: () => 'off' })).toInvoice).toBe(false);
-		expect(boloMoney(b, ctx([invoice({ id: 'd', bolo: 'b', status: 'draft' })])).toInvoice).toBe(false);
+		// a draft nobody issued still has to be invoiced
+		expect(boloMoney(b, ctx([invoice({ id: 'd', bolo: 'b', status: 'draft' })])).toInvoice).toBe(true);
+		expect(boloMoney(b, ctx([invoice({ id: 'i', bolo: 'b' })])).toInvoice).toBe(false);
 		// a cancelled document is no document
 		expect(boloMoney(b, ctx([invoice({ id: 'c', bolo: 'b', status: 'cancelled' })])).toInvoice).toBe(true);
 		expect(boloMoney({ ...b, fee_amount: null }, ctx()).toInvoice).toBe(false);
@@ -266,6 +268,24 @@ describe('attentionItems', () => {
 			['no_fee', 'noFee'],
 		]);
 		expect(items[0]).toMatchObject({ daysLate: 68, amount: 1000 });
+	});
+
+	it('a done function with a draft nobody issued asks to issue it, and counts as por facturar', () => {
+		const bolos = [bolo({ id: 'reus', next_performed_at: '2026-09-05' })];
+		const invoices = [invoice({ id: 'd', bolo: 'reus', status: 'draft', total: 1060 })];
+		const items = attentionItems(bolos, ctx(invoices));
+		expect(items.map((i) => [i.kind, i.doc?.id, i.amount])).toEqual([['draft', 'd', 1060]]);
+		const [eur] = moneyPosition(bolos, ctx(invoices), 2026);
+		expect(eur).toMatchObject({ toInvoice: 1000, toInvoiceCount: 1, owed: 0 });
+		// the fiscal block wins: issuing is impossible until the payer has data
+		const blocked = invoice({
+			id: 'd',
+			bolo: 'reus',
+			status: 'draft',
+			payer_fiscal_identity_id: null,
+			payer: { id: 'o', slug: 'o', name: 'Girona', fiscal_identity_id: null },
+		});
+		expect(attentionItems(bolos, ctx([blocked])).map((i) => i.kind)).toEqual(['fiscal']);
 	});
 
 	it('a proforma draft is never blocked by fiscal data', () => {

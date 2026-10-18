@@ -589,7 +589,11 @@ export interface BoloMoney {
 	overdue: boolean;
 	/** Days past the expected date (0 when not overdue). */
 	daysLate: number;
-	/** Contracted, with a fee, invoicing on, no live document, first function already past. */
+	/**
+	 * Contracted, with a fee, invoicing on, first function already past, and
+	 * nothing issued: no document, or only a draft (a draft nobody issues is
+	 * the easiest way never to bill a function).
+	 */
 	toInvoice: boolean;
 	/** Contracted and no fee yet. */
 	noFee: boolean;
@@ -628,7 +632,7 @@ export function boloMoney(b: MoneyBolo, ctx: MoneyContext): BoloMoney {
 		fee !== null &&
 		fee > 0 &&
 		ctx.modeOf(b) !== 'off' &&
-		doc === null &&
+		(doc === null || doc.status === 'draft') &&
 		performed;
 	const target = issued ? Number(issued.total) : fee ?? 0;
 	const collect: CollectState =
@@ -794,12 +798,12 @@ export function moneyPosition(
 
 // ── Pide atención ──
 
-export type AttentionKind = 'overdue' | 'to_invoice' | 'fiscal' | 'no_fee';
+export type AttentionKind = 'overdue' | 'to_invoice' | 'draft' | 'fiscal' | 'no_fee';
 
 export interface AttentionItem {
 	kind: AttentionKind;
 	bolo: MoneyBolo;
-	/** The document the item is about (overdue, fiscal). */
+	/** The document the item is about (overdue, draft, fiscal). */
 	doc: MoneyInvoiceItem | null;
 	amount: number | null;
 	currency: string;
@@ -810,12 +814,13 @@ export interface AttentionItem {
 	observedDays: number | null;
 }
 
-const KIND_ORDER: Record<AttentionKind, number> = { overdue: 0, to_invoice: 1, fiscal: 2, no_fee: 3 };
+const KIND_ORDER: Record<AttentionKind, number> = { overdue: 0, to_invoice: 1, draft: 2, fiscal: 3, no_fee: 4 };
 
 /**
  * What asks for a hand, worst first: overdue (most days late first), functions
- * done without a document (oldest first), factura drafts the payer's missing
- * fiscal data blocks, contracted deals with no fee. One row per problem, each
+ * done without a document (oldest first), done with a draft nobody issued,
+ * factura drafts the payer's missing fiscal data blocks, contracted deals with
+ * no fee. One row per problem, each
  * with ONE action (the screen maps kind → action).
  */
 export function attentionItems(bolos: readonly MoneyBolo[], ctx: MoneyContext): AttentionItem[] {
@@ -835,7 +840,7 @@ export function attentionItems(bolos: readonly MoneyBolo[], ctx: MoneyContext): 
 					? ctx.termsByPayer.get(m.doc.payer_organization_id)?.days ?? null
 					: null,
 			});
-		} else if (m.toInvoice) {
+		} else if (m.toInvoice && !m.doc) {
 			out.push({ ...base, kind: 'to_invoice', doc: null, amount: m.fee });
 		} else if (
 			m.doc?.status === 'draft' &&
@@ -843,6 +848,8 @@ export function attentionItems(bolos: readonly MoneyBolo[], ctx: MoneyContext): 
 			payerFiscalState(m.doc) !== 'ready'
 		) {
 			out.push({ ...base, kind: 'fiscal', doc: m.doc, amount: Number(m.doc.total) });
+		} else if (m.toInvoice && m.doc) {
+			out.push({ ...base, kind: 'draft', doc: m.doc, amount: Number(m.doc.total) });
 		} else if (m.noFee && b.status === 'confirmed') {
 			out.push({ ...base, kind: 'no_fee', doc: null, amount: null });
 		}

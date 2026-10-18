@@ -268,6 +268,8 @@
       }
       case 'to_invoice':
         return day ? t('books.att_to_invoice', locale, { date: day }) : t('books.att_to_invoice_nodate', locale);
+      case 'draft':
+        return day ? t('books.att_draft', locale, { date: day }) : t('books.att_draft_nodate', locale);
       case 'fiscal':
         return t('books.att_fiscal', locale);
       case 'no_fee':
@@ -277,6 +279,7 @@
   const ATTENTION_ACTION: Record<AttentionItem['kind'], string> = {
     overdue: 'books.record_payment',
     to_invoice: 'books.att_act_invoice',
+    draft: 'books.att_act_issue',
     fiscal: 'books.att_act_fiscal',
     no_fee: 'books.att_act_fee',
   };
@@ -821,7 +824,7 @@
                       <a class="att__who" href={`#bolo-${item.bolo.id}`} onclick={(e) => { e.preventDefault(); expandedId = item.bolo.id; void showLedger('all').then(() => document.getElementById(`bolo-${item.bolo.id}`)?.scrollIntoView({ block: 'center' })); }}>
                         {item.doc?.payer?.name ?? item.bolo.venue_name ?? item.bolo.project?.name ?? '—'}
                       </a>
-                      <span class="att__ctx">{[item.doc?.number ?? item.bolo.city, item.kind === 'fiscal' ? invoiceStatusLabel('draft', locale) : null].filter(Boolean).map((x) => ` · ${x}`).join('')}</span>
+                      <span class="att__ctx">{[item.doc?.number ?? item.bolo.city, item.kind === 'fiscal' || item.kind === 'draft' ? invoiceStatusLabel('draft', locale) : null].filter(Boolean).map((x) => ` · ${x}`).join('')}</span>
                       <span class="att__why">{attentionWhy(item)}</span>
                     </span>
                     <span class="att__amt">{item.amount === null ? '·' : fmtMoney(item.amount)}{#if item.amount !== null && currencies.length > 1}&nbsp;{item.currency}{/if}</span>
