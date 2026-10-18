@@ -261,7 +261,8 @@
     gap: var(--space-s);
     align-items: baseline;
     margin: var(--space-s) 0 0;
-    padding-inline: var(--space-l);
+    /* On the card's text edge: its padding plus its 1px border. */
+    padding-inline: calc(var(--space-l) + 1px);
     font-size: var(--text-s);
     color: var(--text-muted);
   }
@@ -304,7 +305,7 @@
       min-block-size: 6rem;
     }
     .then {
-      padding-inline: var(--space-m);
+      padding-inline: calc(var(--space-m) + 1px);
     }
   }
 </style>
