@@ -364,7 +364,7 @@
   /** The Turn cell: a reply owed, a follow-up due, or their turn (ADR-117). */
   function turnCell(item: ConversationItem): { tone: 'ours' | 'theirs'; text: string } | null {
     const now = new Date();
-    const turn = turnOf({ status: item.status, last: item.last_turn?.[0] ?? null }, now);
+    const turn = turnOf({ status: item.status, last: item.last_turn?.[0] ?? null, reply_settled_at: item.reply_settled_at }, now);
     if (turn?.side === 'ours') {
       return { tone: 'ours', text: `${t('overview.turn_ours_cap', locale)} · ${relativeContactDate(turn.since, locale)}` };
     }

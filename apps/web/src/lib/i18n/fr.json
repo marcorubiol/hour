@@ -1875,6 +1875,8 @@
   "overview.season_of": "Saison {season}",
   "overview.see_in_list": "Voir dans la liste",
   "overview.see_n": "Voir les {n}",
+  "overview.settle": "Pas de réponse à faire",
+  "overview.settle_aria": "{name} : pas de réponse à faire",
   "overview.team": "De l’équipe",
   "overview.team_new": "{n} avec du nouveau",
   "overview.this_season": "Cette saison",

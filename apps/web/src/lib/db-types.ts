@@ -782,6 +782,7 @@ export type Database = {
           previous_slugs: string[]
           private_to: string | null
           project_id: string
+          reply_settled_at: string | null
           slug: string
           status: Database["public"]["Enums"]["conversation_status"]
           updated_at: string
@@ -802,6 +803,7 @@ export type Database = {
           previous_slugs?: string[]
           private_to?: string | null
           project_id: string
+          reply_settled_at?: string | null
           slug: string
           status?: Database["public"]["Enums"]["conversation_status"]
           updated_at?: string
@@ -822,6 +824,7 @@ export type Database = {
           previous_slugs?: string[]
           private_to?: string | null
           project_id?: string
+          reply_settled_at?: string | null
           slug?: string
           status?: Database["public"]["Enums"]["conversation_status"]
           updated_at?: string
@@ -4525,6 +4528,7 @@ export type Database = {
           previous_slugs: string[]
           private_to: string | null
           project_id: string
+          reply_settled_at: string | null
           slug: string
           status: Database["public"]["Enums"]["conversation_status"]
           updated_at: string
@@ -4558,6 +4562,7 @@ export type Database = {
           previous_slugs: string[]
           private_to: string | null
           project_id: string
+          reply_settled_at: string | null
           slug: string
           status: Database["public"]["Enums"]["conversation_status"]
           updated_at: string
@@ -4717,6 +4722,7 @@ export type Database = {
           previous_slugs: string[]
           private_to: string | null
           project_id: string
+          reply_settled_at: string | null
           slug: string
           status: Database["public"]["Enums"]["conversation_status"]
           updated_at: string

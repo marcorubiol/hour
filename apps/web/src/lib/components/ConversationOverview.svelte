@@ -11,9 +11,10 @@
    * conversaciones en el alcance no se pinta nada: la lista enseña su vacío.
    */
 
-  import { createQuery } from '@tanstack/svelte-query';
+  import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
-  import { fetchJSON } from '$lib/api';
+  import { fetchJSON, mutateJSON } from '$lib/api';
+  import { addToast } from '$lib/components/Toast.svelte';
   import Button from '$lib/components/Button.svelte';
   import { dayMonth } from '$lib/datetime';
   import { t, type Locale } from '$lib/i18n';
@@ -30,6 +31,7 @@
     COLD_IDLE_DAYS,
     COLD_REPLY_DAYS,
     type BlockRow,
+    type DueRow,
     type OverviewResponse,
   } from '$lib/conversation-overview';
   import { feedHref, feedThreadName, feedTitle, messageWhen } from '$lib/threads';
@@ -72,6 +74,24 @@
   let seasonStatuses = $derived(
     data ? CONVERSATION_STATUSES.filter((s) => data.season.counts[s] > 0) : [],
   );
+
+  // «No pide respuesta» (ADR-126 § 1): settles that reply, not «now».
+  const queryClient = useQueryClient();
+  const settle = createMutation({
+    mutationFn: (row: DueRow) =>
+      mutateJSON('PATCH', `/api/conversations/${row.id}`, { reply_settled_at: row.at }),
+    onError: (err) =>
+      addToast({
+        tone: 'danger',
+        title: t('conversations.change_not_saved', locale),
+        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
+      }),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['conversation-overview'] });
+      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      void queryClient.invalidateQueries({ queryKey: ['conversation'] });
+    },
+  });
 
   function href(row: BlockRow): string | undefined {
     const ws = workspaceSlugById.get(row.workspace_id);
@@ -136,7 +156,7 @@
               {#if row.reason === 'follow_up' && (i === 0 || data.due.rows[i - 1].reason === 'reply')}
                 <li class="rows__sep">{t('overview.follow_ups', locale)}</li>
               {/if}
-              <li>
+              <li class="rows__item">
                 <a class="row" class:row--late={row.days >= 7} href={href(row)}>
                   {@render who(row)}
                   {#if row.reason === 'reply'}
@@ -147,6 +167,15 @@
                     <span class="row__when"><strong>{dayMonth(row.at)}</strong>{t('overview.follow_up', locale)}</span>
                   {/if}
                 </a>
+                {#if row.reason === 'reply' && onwrite}
+                  <button
+                    type="button"
+                    class="row__settle"
+                    aria-label={t('overview.settle_aria', locale, { name: row.title })}
+                    disabled={$settle.isPending}
+                    onclick={() => $settle.mutate(row)}>{t('overview.settle', locale)}</button
+                  >
+                {/if}
               </li>
             {/each}
           </ol>
@@ -403,6 +432,42 @@
       gap: var(--space-xs);
       align-items: baseline;
       min-inline-size: 0;
+    }
+    /* «No pide respuesta» sits beside the link (never inside it: a button in
+       a link is two controls in one), quiet until the row is under the
+       pointer or the keyboard; always there on a touch screen. */
+    .rows__item {
+      position: relative;
+    }
+    .row__settle {
+      position: absolute;
+      inset-block-end: var(--space-xs);
+      inset-inline-end: 0;
+      padding: 0 var(--space-2xs);
+      border: 0;
+      /* The row's hover ground: on hover it covers the kind label below the date. */
+      background: var(--bg-ultra-light);
+      color: var(--text-muted);
+      font-size: var(--text-xs);
+      text-decoration: underline;
+      text-underline-offset: 0.2em;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity var(--transition);
+    }
+    .rows__item:hover .row__settle,
+    .row__settle:focus-visible {
+      opacity: 1;
+    }
+    .row__settle:hover {
+      color: var(--text-color);
+    }
+    @media (pointer: coarse) {
+      .row__settle {
+        position: static;
+        opacity: 1;
+        min-block-size: var(--touch-target);
+      }
     }
     .row__org {
       font-weight: 500;

@@ -11,7 +11,9 @@
  *
  * Las reglas (ADR-117 § 5, puntos de partida para ajustar con uso):
  * - **Te toca**: el último correo, mensaje o llamada con dirección es de fuera
- *   (`inbound`) y no le hemos contestado; detrás, los seguimientos vencidos.
+ *   (`inbound`), no le hemos contestado y no se marcó «no pide respuesta»;
+ *   detrás, los seguimientos vencidos. Una confirmada no pide respuesta por
+ *   correo, solo por seguimiento (ADR-126 § 1).
  * - **Caliente**: en conversación o hold con actividad en 14 días, o cualquier
  *   sala que nos escribió en 14 días.
  * - **Se enfría**: nuestro último correo sin respuesta hace 21 días o más; o
@@ -38,6 +40,12 @@ export const TURN_KINDS = ['email', 'message', 'call'] as const;
 
 /** Ni te toca ni se enfría: la sala dijo que no, o se dejó dormir a propósito. */
 const CLOSED: ReadonlySet<ConversationStatus> = new Set(['declined', 'dormant']);
+/**
+ * Sin turno por correo: las cerradas y la confirmada, cuyo último correo suele
+ * ser el «perfecto, quedamos así» que no pide nada. Lo que quede pendiente de
+ * una confirmada se apunta como seguimiento (ADR-126 § 1).
+ */
+const NO_TURN: ReadonlySet<ConversationStatus> = new Set([...CLOSED, 'confirmed']);
 /** Esperamos su respuesta a un correo nuestro (la regla de 21 días). */
 const AWAITING: ReadonlySet<ConversationStatus> = new Set(['contacted', 'in_conversation', 'hold', 'recurring']);
 /** Conversación abierta: la regla de 30 días y la mitad de «caliente». */
@@ -69,6 +77,8 @@ export interface OverviewInput {
   last: TurnEvent | null;
   /** Último que vino de fuera. */
   last_in: Pick<TurnEvent, 'occurred_at'> | null;
+  /** «No pide respuesta»: lo de fuera hasta este instante ya está atendido (ADR-126 § 1). */
+  reply_settled_at?: string | null;
   /** Días (YYYY-MM-DD) de sus funciones vivas, directas o por su bolo. */
   performance_days: string[];
 }
@@ -109,15 +119,25 @@ export interface Turn {
 
 /**
  * De quién es el turno: de quien no escribió el último. Una conversación
- * cerrada (rechazada o en pausa) no tiene turno.
+ * cerrada (rechazada o en pausa) o confirmada no tiene turno, ni una cuyo
+ * último correo de fuera se marcó «no pide respuesta».
  */
-export function turnOf(row: Pick<OverviewInput, 'status' | 'last'>, now: Date): Turn | null {
-  if (!row.last || CLOSED.has(row.status)) return null;
+export function turnOf(
+  row: Pick<OverviewInput, 'status' | 'last' | 'reply_settled_at'>,
+  now: Date,
+): Turn | null {
+  if (!row.last || NO_TURN.has(row.status)) return null;
+  if (row.last.direction === 'inbound' && isSettled(row.last.occurred_at, row.reply_settled_at)) return null;
   return {
     side: row.last.direction === 'inbound' ? 'ours' : 'theirs',
     since: row.last.occurred_at,
     days: daysSince(row.last.occurred_at, now),
   };
+}
+
+/** Lo de fuera hasta `settledAt` ya está atendido. */
+function isSettled(at: string, settledAt: string | null | undefined): boolean {
+  return Boolean(settledAt) && Date.parse(at) <= Date.parse(settledAt!);
 }
 
 /** Un seguimiento apuntado para hoy o antes, en una conversación que no está cerrada. */
@@ -128,7 +148,10 @@ export function followUpDue(row: Pick<OverviewInput, 'status' | 'next_action_at'
 export type DueReason = 'reply' | 'follow_up';
 
 /** Por qué te toca, o null: primero una respuesta pendiente, después un seguimiento. */
-export function dueReason(row: Pick<OverviewInput, 'status' | 'last' | 'next_action_at'>, now: Date): DueReason | null {
+export function dueReason(
+  row: Pick<OverviewInput, 'status' | 'last' | 'next_action_at' | 'reply_settled_at'>,
+  now: Date,
+): DueReason | null {
   if (turnOf(row, now)?.side === 'ours') return 'reply';
   return followUpDue(row, now) ? 'follow_up' : null;
 }
@@ -156,7 +179,7 @@ export interface Cooling {
  * historial, ADR-098) cuenta su sello de contacto como nuestro último correo.
  */
 export function coolingOf(
-  row: Pick<OverviewInput, 'status' | 'last' | 'last_in' | 'last_contacted_at'>,
+  row: Pick<OverviewInput, 'status' | 'last' | 'last_in' | 'last_contacted_at' | 'reply_settled_at'>,
   now: Date,
 ): Cooling | null {
   if (!AWAITING.has(row.status)) return null;
@@ -271,10 +294,15 @@ export function applyListFilter<R extends OverviewInput>(
   return out;
 }
 
+/**
+ * Respuestas primero, la más reciente arriba: lo que escribieron ayer no
+ * queda debajo de lo que lleva semanas (ADR-126 § 1; «tarde» lo marca la
+ * fila). Después los seguimientos, el más vencido primero.
+ */
 function sortDue<R extends OverviewInput>(rows: R[], now: Date): R[] {
   const key = (r: R) =>
     dueReason(r, now) === 'reply'
-      ? [0, Date.parse(r.last!.occurred_at)]
+      ? [0, -Date.parse(r.last!.occurred_at)]
       : [1, Date.parse(r.next_action_at!)];
   return rows.sort((a, b) => {
     const [ga, ta] = key(a);

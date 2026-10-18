@@ -57,6 +57,12 @@ export const ConversationPatchSchema = v.object({
   // module can detach. Cross-project integrity is the endpoint's guard
   // (pattern ADR-043) — RLS gives zero backup on FK coherence.
   line_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
+  // ADR-126 § 1: «no pide respuesta». The instant of the reply being
+  // settled (its `occurred_at`), not now: a reply synced later but written
+  // after it must still put the turn on us. Null clears.
+  reply_settled_at: v.optional(
+    v.nullable(v.pipe(v.string(), v.check((s) => !Number.isNaN(Date.parse(s)) && /^\d{4}-\d{2}-\d{2}T/.test(s)))),
+  ),
 });
 
 export type ConversationPatch = v.InferOutput<typeof ConversationPatchSchema>;

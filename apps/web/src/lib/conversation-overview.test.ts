@@ -77,6 +77,16 @@ describe('turnOf', () => {
     expect(turnOf(row('a', inbound(2)), NOW)).toEqual({ side: 'ours', since: ago(2), days: 2 });
     expect(turnOf(row('b', outbound(5)), NOW)?.side).toBe('theirs');
   });
+  it('una confirmada no tiene turno por correo: su último suele ser «quedamos así»', () => {
+    expect(turnOf(row('a', { status: 'confirmed', ...inbound(50) }), NOW)).toBeNull();
+    expect(dueReason(row('b', { status: 'confirmed', ...inbound(1), next_action_at: day(-1) }), NOW)).toBe('follow_up');
+  });
+  it('«no pide respuesta» atiende esa respuesta, no la siguiente', () => {
+    const settled = row('a', { ...inbound(3), reply_settled_at: ago(3) });
+    expect(turnOf(settled, NOW)).toBeNull();
+    expect(dueReason(settled, NOW)).toBeNull();
+    expect(turnOf(row('b', { ...inbound(1), reply_settled_at: ago(3) }), NOW)?.side).toBe('ours');
+  });
   it('sin eventos, o cerrada, no hay turno', () => {
     expect(turnOf(row('a'), NOW)).toBeNull();
     expect(turnOf(row('b', { status: 'declined', ...inbound(1) }), NOW)).toBeNull();
@@ -179,7 +189,7 @@ describe('filtros de la lista', () => {
       temporada: undefined,
     });
   });
-  it('te toca: respuestas por días de espera, después seguimientos por fecha', () => {
+  it('te toca: respuestas, la más reciente arriba; después seguimientos, el más vencido primero', () => {
     const rows = [
       row('seg-tarde', { next_action_at: day(-1) }),
       row('resp-nueva', inbound(1)),
@@ -188,8 +198,8 @@ describe('filtros de la lista', () => {
       row('les-toca', outbound(2)),
     ];
     expect(applyListFilter(rows, { turno: 'nuestro' }, NOW).map((r) => r.id)).toEqual([
-      'resp-vieja',
       'resp-nueva',
+      'resp-vieja',
       'seg-viejo',
       'seg-tarde',
     ]);
@@ -218,7 +228,7 @@ describe('buildOverview', () => {
     expect(o.total).toBe(rows.length);
     expect(o.due.count).toBe(BLOCK_ROWS + 2);
     expect(o.due.rows).toHaveLength(BLOCK_ROWS);
-    expect(o.due.rows[0]).toMatchObject({ id: `due${BLOCK_ROWS + 1}`, reason: 'reply', subject: `Re: ${BLOCK_ROWS + 1}` });
+    expect(o.due.rows[0]).toMatchObject({ id: 'due0', reason: 'reply', subject: 'Re: 0' });
     expect(o.cold.count).toBe(3);
     expect(o.cold.picks).toEqual([
       { id: 'cold2', project_id: 'p2' },

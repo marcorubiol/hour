@@ -53,7 +53,7 @@ export function setLastTurnEmbed(search: URLSearchParams): void {
 }
 
 const OVERVIEW_SELECT = [
-  'id,workspace_id,project_id,line_id,status,last_contacted_at,next_action_at,next_action_note',
+  'id,workspace_id,project_id,line_id,status,last_contacted_at,next_action_at,next_action_note,reply_settled_at',
   'organization:workspace_organization!conversation_workspace_organization_fkey(name)',
   'contacts:conversation_contact(person:workspace_person!conversation_contact_workspace_person_fkey(full_name))',
   LAST_TURN_EMBED,
@@ -69,6 +69,7 @@ interface OverviewDbRow {
   last_contacted_at: string | null;
   next_action_at: string | null;
   next_action_note: string | null;
+  reply_settled_at: string | null;
   organization: { name: string } | null;
   contacts: { person: { full_name: string } | null }[] | null;
   last_turn: TurnEvent[] | null;
@@ -135,6 +136,7 @@ export async function loadOverviewRows(env: SupabaseEnv, jwt: string, scope: Ove
       last_contacted_at: r.last_contacted_at,
       next_action_at: r.next_action_at,
       next_action_note: r.next_action_note,
+      reply_settled_at: r.reply_settled_at,
       title,
       person: person && person !== title ? person : null,
       last: r.last_turn?.[0] ?? null,

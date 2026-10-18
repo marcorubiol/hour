@@ -1884,6 +1884,8 @@
   "overview.season_of": "Season {season}",
   "overview.see_in_list": "See in the list",
   "overview.see_n": "See all {n}",
+  "overview.settle": "Needs no reply",
+  "overview.settle_aria": "{name}: needs no reply",
   "overview.team": "From the team",
   "overview.team_new": "{n} with new",
   "overview.this_season": "This season",

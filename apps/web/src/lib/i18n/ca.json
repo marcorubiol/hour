@@ -1875,6 +1875,8 @@
   "overview.season_of": "Temporada {season}",
   "overview.see_in_list": "Veure a la llista",
   "overview.see_n": "Veure-les totes ({n})",
+  "overview.settle": "No demana resposta",
+  "overview.settle_aria": "{name}: no demana resposta",
   "overview.team": "De l’equip",
   "overview.team_new": "{n} amb nous",
   "overview.this_season": "Aquesta temporada",
