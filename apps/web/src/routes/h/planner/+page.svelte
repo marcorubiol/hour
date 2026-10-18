@@ -2827,6 +2827,16 @@
       }
       // A dialog is open: it owns the keyboard until it closes.
       if (createOpen || editOpen || marksOpen) return;
+      // Inside a drawing's days the arrows are not «move the window»: on the
+      // month they changed the month under the focused day and dropped the
+      // focus on <body> (móvil #3). There they are the drawing's, or nothing.
+      if (
+        (e.key === 'ArrowLeft' || e.key === 'ArrowRight') &&
+        el instanceof HTMLElement &&
+        el.closest('.cal__grid, .strip, .board__wrap')
+      ) {
+        return;
+      }
 
       // The SAME order as the words on screen (CalToolbar's VIEW_ORDER).
       const views: PlannerView[] = ['overview', 'day', 'agenda', 'month', 'board'];

@@ -981,7 +981,7 @@
 <div
   class="cal__grid"
   class:cal__grid--loading={loading}
-  role="grid"
+  role="group"
   tabindex="-1"
   aria-label={label}
   bind:this={gridEl}
