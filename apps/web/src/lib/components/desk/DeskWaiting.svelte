@@ -94,7 +94,7 @@
   <input
     type="checkbox"
     class="row__check"
-    aria-label={item.subject}
+    id="desk-task-{item.taskId}"
     checked={item.taskDone}
     onchange={(e) => item.taskId && ontoggle(item.taskId, (e.currentTarget as HTMLInputElement).checked)}
   />
@@ -125,7 +125,10 @@
         <span class="row__verb">{t(`desk.verb_${item.verbKey}`, locale)}</span>
       {/if}
       <span class="row__subject">
-        {#if href}<a href={href}>{item.subject}</a>{:else}{item.subject}{/if}
+        {#if href}<a href={href}>{item.subject}</a>{:else if item.concern === 'task'}<!-- The name is the checkbox's
+            label: tapping it ticks, a finger's target the size of the line. --><label for="desk-task-{item.taskId}"
+            >{item.subject}</label
+          >{:else}{item.subject}{/if}
         {#if contextPath(item) || item.amount != null}<span class="row__ctx"
             >{[contextPath(item), item.amount != null ? money(item.amount, item.currency) : null]
               .filter(Boolean)
@@ -321,6 +324,9 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  .row__subject label {
+    cursor: pointer;
+  }
   .row__subject a:hover {
     text-decoration: underline;
     text-underline-offset: 3px;
@@ -373,6 +379,21 @@
   .row:hover .row__remove,
   .row__remove:focus-visible {
     opacity: 1;
+  }
+  /* A finger's room without moving a pixel: the hit area grows, the line
+     does not (subject links, the box, the band's own buttons). */
+  @media (pointer: coarse) {
+    .row__check {
+      inline-size: 1.25rem;
+      block-size: 1.25rem;
+    }
+    .row__subject :is(a, label) {
+      padding-block: var(--space-xs);
+      margin-block: calc(-1 * var(--space-xs));
+    }
+    .more {
+      min-block-size: var(--touch-target);
+    }
   }
   /* No hover on a finger: the × is always there, with a finger's room. */
   @media (hover: none) {

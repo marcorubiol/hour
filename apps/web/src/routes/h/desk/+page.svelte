@@ -804,6 +804,14 @@
     .desk :global(.dband__more:hover) {
       color: var(--text-color);
     }
+    @media (pointer: coarse) {
+      .desk :global(.dband__more) {
+        display: inline-flex;
+        align-items: center;
+        min-block-size: var(--touch-target);
+        margin-block: calc(-0.5 * var(--touch-target) + 0.5em);
+      }
+    }
     .desk :global(.dband__empty),
     .desk :global(.dband__err) {
       margin: 0;
