@@ -91,7 +91,7 @@
 </script>
 
 <script lang="ts">
-  import { localeDayMonth, localeWeekdayShort } from '$lib/datetime';
+  import { localeDayMonth, localeWeekdayShort, weekdayLabels } from '$lib/datetime';
   import { t, type Locale } from '$lib/i18n';
   import { isoWeek } from '$lib/planner';
   import Slip from '$lib/components/planner/Slip.svelte';
@@ -149,12 +149,9 @@
   }: Props = $props();
 
   const DASH = '–';
-  /** Monday-first narrow weekday letters, in the reader's language. */
-  let dows = $derived.by(() => {
-    const fmt = new Intl.DateTimeFormat(localeTag, { weekday: 'narrow', timeZone: 'UTC' });
-    // 2026-10-12 is a Monday.
-    return Array.from({ length: 7 }, (_, i) => fmt.format(new Date(Date.UTC(2026, 9, 12 + i))));
-  });
+  /** Monday-first weekday words — the month's own (diseño B3: one shape
+      for a day's head in every drawing). */
+  let dows = $derived(weekdayLabels(localeTag));
 
   let empty = $derived(
     !loading && weeks.every((w) => w.every((c) => c.past || (c.mark === null && !c.travel))),
