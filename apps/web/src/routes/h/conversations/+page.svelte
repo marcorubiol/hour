@@ -539,7 +539,7 @@
     />
 
     <div class="conversations__list-head block-head" id="lista">
-      <h2 class="conversations__list-title">{t('overview.list', locale)}</h2>
+      <h2 class="eyebrow eyebrow--sub">{t('overview.list', locale)}</h2>
     </div>
     <div class="conversations__controls">
       <div class="conversations__search">
@@ -701,30 +701,6 @@
     .conversations__list-head {
       scroll-margin-block-start: var(--space-l);
       margin-block-start: var(--space-m);
-    }
-    .conversations__list-title {
-      font-family: var(--font-display);
-      font-size: var(--text-l);
-      font-weight: 400;
-      font-style: italic;
-      color: var(--heading-color);
-    }
-
-    .action-bar__keep {
-      margin-inline-start: var(--space-s);
-      padding: 0;
-      border: 0;
-      background: none;
-      color: inherit;
-      font: inherit;
-      text-decoration: underline;
-      text-underline-offset: 0.2em;
-      cursor: pointer;
-    }
-    @media (pointer: coarse) {
-      .action-bar__keep {
-        min-block-size: var(--touch-target);
-      }
     }
     .conversations__state {
       font-size: var(--text-s);

@@ -159,12 +159,12 @@
 {#if loading}
   <div class="board" aria-busy="true" aria-label={t('overview.loading', locale)}>
     <div class="board__col">
-      <section class="block block--due"><div class="block-head"><h2 class="block__title">{t('overview.due', locale)}</h2></div>{@render ghost(5)}</section>
-      <section class="block block--hot"><div class="block-head"><h2 class="block__title">{t('overview.hot', locale)}</h2></div>{@render ghost(5)}</section>
+      <section class="block block--due"><div class="block-head"><h2 class="eyebrow eyebrow--sub">{t('overview.due', locale)}</h2></div>{@render ghost(5)}</section>
+      <section class="block block--hot"><div class="block-head"><h2 class="eyebrow eyebrow--sub">{t('overview.hot', locale)}</h2></div>{@render ghost(5)}</section>
     </div>
     <div class="board__col">
       <section class="block block--season">
-        <div class="block-head"><h2 class="block__title">{t('overview.season_of', locale, { season: currentSeason(new Date()).label })}</h2></div>
+        <div class="block-head"><h2 class="eyebrow eyebrow--sub">{t('overview.season_of', locale, { season: currentSeason(new Date()).label })}</h2></div>
         <div class="season__bar season__bar--ghost"></div>
         <div class="season__legend" aria-hidden="true">
           {#each Array(6) as _, i (i)}
@@ -174,11 +174,11 @@
         <p class="season__note" aria-hidden="true"><span class="g" style:inline-size="60%">&nbsp;</span></p>
       </section>
       <section class="block block--cold">
-        <div class="block-head"><h2 class="block__title">{t('overview.cold', locale)}</h2></div>
+        <div class="block-head"><h2 class="eyebrow eyebrow--sub">{t('overview.cold', locale)}</h2></div>
         {@render ghost(5)}
       </section>
       <section class="block block--mailout" aria-hidden="true">
-        <div class="block-head"><h2 class="block__title">{t('overview.last_mailout', locale)}</h2></div>
+        <div class="block-head"><h2 class="eyebrow eyebrow--sub">{t('overview.last_mailout', locale)}</h2></div>
         <p class="mailout__subject"><span class="g" style:inline-size="50%">&nbsp;</span></p>
         <p class="mailout__meta"><span class="g" style:inline-size="70%">&nbsp;</span></p>
         <p class="mailout__figs"><span><b><span class="g">&nbsp;</span></b></span></p>
@@ -192,7 +192,7 @@
     <div class="board__col">
       <section class="block block--due" aria-labelledby="ov-due" data-testid="block-due">
         <div class="block-head">
-          <h2 class="block__title" id="ov-due">{t('overview.due', locale)} <span class="count">{data.due.count}</span></h2>
+          <h2 class="eyebrow eyebrow--sub" id="ov-due">{t('overview.due', locale)}&nbsp;· {data.due.count}</h2>
           {#if data.due.count > 0}<a class="block__more" href="?turno=nuestro#lista">{t('overview.see_in_list', locale)}</a>{/if}
         </div>
         {#if data.due.count === 0}
@@ -240,7 +240,7 @@
 
       <section class="block block--hot" aria-labelledby="ov-hot" data-testid="block-hot">
         <div class="block-head">
-          <h2 class="block__title" id="ov-hot">{t('overview.hot', locale)} <span class="count">{data.hot.count}</span></h2>
+          <h2 class="eyebrow eyebrow--sub" id="ov-hot">{t('overview.hot', locale)}&nbsp;· {data.hot.count}</h2>
           {#if data.hot.count > 0}<a class="block__more" href="?temp=caliente#lista">{t('overview.see_n', locale, { n: data.hot.count })}</a>{/if}
         </div>
         {#if data.hot.count === 0}
@@ -270,7 +270,7 @@
     <div class="board__col">
       <section class="block block--season" aria-labelledby="ov-season" data-testid="block-season">
         <div class="block-head">
-          <h2 class="block__title" id="ov-season">{t('overview.season_of', locale, { season: data.season.label })} <span class="count">{data.season.total}</span></h2>
+          <h2 class="eyebrow eyebrow--sub" id="ov-season">{t('overview.season_of', locale, { season: data.season.label })}&nbsp;· {data.season.total}</h2>
           <span class="block__hint">{t('overview.season_hint', locale)}</span>
         </div>
         {#if data.season.total === 0}
@@ -305,7 +305,7 @@
 
       <section class="block block--cold" aria-labelledby="ov-cold" data-testid="block-cold">
         <div class="block-head">
-          <h2 class="block__title" id="ov-cold">{t('overview.cold', locale)} <span class="count">{data.cold.count}</span></h2>
+          <h2 class="eyebrow eyebrow--sub" id="ov-cold">{t('overview.cold', locale)}&nbsp;· {data.cold.count}</h2>
           {#if data.cold.count > 0}<a class="block__more" href="?temp=fria#lista">{t('overview.see_n', locale, { n: data.cold.count })}</a>{/if}
         </div>
         {#if data.cold.count === 0}
@@ -365,7 +365,7 @@
         {@const ws = workspaceSlugById.get(m.workspace_id)}
         <section class="block block--mailout" aria-labelledby="ov-mail" data-testid="block-mailout">
           <div class="block-head">
-            <h2 class="block__title" id="ov-mail">{t('overview.last_mailout', locale)}</h2>
+            <h2 class="eyebrow eyebrow--sub" id="ov-mail">{t('overview.last_mailout', locale)}</h2>
             {#if ws}<a class="block__more" href={`/h/${ws}/mailout/${m.id}`}>{t('overview.open_mailout', locale)}</a>{/if}
           </div>
           <p class="mailout__subject">{m.subject || t('overview.no_subject', locale)}</p>
@@ -390,7 +390,7 @@
       {#if data.team.count > 0}
         <section class="block block--team" aria-labelledby="ov-team" data-testid="block-team">
           <div class="block-head">
-            <h2 class="block__title" id="ov-team">{t('overview.team', locale)} <span class="count">{t('overview.team_new', locale, { n: data.team.count })}</span></h2>
+            <h2 class="eyebrow eyebrow--sub" id="ov-team">{t('overview.team', locale)}&nbsp;· {t('overview.team_new', locale, { n: data.team.count })}</h2>
             <a class="block__more" href="/h/conversations?view=threads">{t('conversations.view_what', locale)}</a>
           </div>
           <ol class="rows">
@@ -443,22 +443,6 @@
       flex-direction: column;
       gap: var(--space-xs);
       min-inline-size: 0;
-    }
-    .block__title {
-      display: flex;
-      align-items: baseline;
-      gap: var(--space-xs);
-      font-family: var(--font-display);
-      font-size: var(--text-l);
-      font-weight: 400;
-      font-style: italic;
-      color: var(--heading-color);
-    }
-    .count {
-      font-style: normal;
-      font-family: var(--font-mono);
-      font-size: var(--text-s);
-      color: var(--text-muted);
     }
     .block__more {
       font-size: var(--text-s);
