@@ -95,6 +95,8 @@
      *
      * `cell` (month, board): the clock sits BESIDE the pack, so the head
      * reads as a sentence — `MM SHOW? 18h30`.
+     * `compact` (the season's strip): one line, monogram and place, no
+     * clock at all — see THE COMPACT PLACING below.
      * `row` (the diary): the clock sits UNDER the pack in a fixed column, so
      * it aligns down the page and time can be scanned with the eye. That is
      * the one difference the design grants, and it is a difference of
@@ -105,7 +107,7 @@
      * not — and how the diary grew an `ag__row` that had drifted from this
      * one in five ways by the time anybody compared them.
      */
-    placing?: 'cell' | 'row';
+    placing?: 'cell' | 'row' | 'compact';
     /**
      * WHETHER THERE IS A CARD UNDER IT.
      *
@@ -546,6 +548,58 @@
       gap: var(--space-xs);
     }
 
+    /* ══ THE COMPACT PLACING · the season's strip ══════════════════════
+       Twelve weeks on one screen give a day ~80px, and the strip answers
+       «whose, and where» (ADR-117): monogram + place, ONE line. It used to
+       draw its own box for this, with its own option voice and a ground
+       (`--bg-surface`) that existed nowhere, so the firm card was white on
+       the dark theme (revisión del Planner, 2026-10-18). Now it is this
+       card, placed small: the same paper, the same dashed edge and grain
+       for an option, the same leaning name. What it drops is what the cell
+       cannot say at that size (kind word, hour, state, gloss); the title
+       keeps all of it.
+       The place is the CITY when there is one (a tour reads by towns), the
+       name otherwise: `cityUnder` already keeps the two from repeating. */
+    .slip[data-placing='compact'] {
+      flex-direction: row;
+      align-items: center;
+      gap: 3px;
+      padding: 1px 3px;
+      white-space: nowrap;
+    }
+    .slip[data-placing='compact'] + :global(.slip) {
+      margin-block-start: 0;
+    }
+    .slip[data-placing='compact'] .slip__h {
+      width: auto;
+      flex: none;
+    }
+    .slip[data-placing='compact'] .slip__kind,
+    .slip[data-placing='compact'] .slip__t,
+    .slip[data-placing='compact'] .slip__state,
+    .slip[data-placing='compact'] .slip__tz,
+    .slip[data-placing='compact'] .slip__acts,
+    .slip[data-placing='compact']:has(.slip__c) .slip__n {
+      display: none;
+    }
+    .slip[data-placing='compact'] .slip__n,
+    .slip[data-placing='compact'] .slip__c {
+      display: block;
+      min-width: 0;
+      margin: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 10.5px;
+      line-height: 1.15;
+      color: var(--text-color);
+    }
+    .slip[data-placing='compact'][data-kind='show'] .slip__n,
+    .slip[data-placing='compact'][data-kind='show'] .slip__c {
+      font-family: var(--font-display);
+      font-size: 10.5px;
+    }
+
     /* ══ THE CERTAINTY VOCABULARY ═══════════════════════════════════════
        Geometry states the certainty. A theme may repaint the material; it may
        never re-shape the geometry. */
@@ -577,11 +631,14 @@
        value for one state. And it leans — an option is written in italic
        wherever its name appears. */
     .slip[data-family='hold'] .slip__n,
-    .slip[data-family='proposed'] .slip__n {
+    .slip[data-family='proposed'] .slip__n,
+    .slip[data-placing='compact'][data-family='hold'] .slip__c,
+    .slip[data-placing='compact'][data-family='proposed'] .slip__c {
       color: var(--text-muted);
       font-style: italic;
     }
-    .slip[data-family='proposed'] .slip__n {
+    .slip[data-family='proposed'] .slip__n,
+    .slip[data-placing='compact'][data-family='proposed'] .slip__c {
       color: var(--text-faint);
     }
 

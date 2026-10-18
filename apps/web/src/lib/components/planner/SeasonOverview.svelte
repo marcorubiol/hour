@@ -24,8 +24,8 @@
     /** Short month word when the day is the 1st — the strip's only month mark. */
     monthWord: string | null;
     mark: 'firm' | 'option' | 'date' | null;
-    /** Up to two gigs, firm first. */
-    slips: Array<{ id: string; firm: boolean; accent: string; initials: string | null; project: string; place: string }>;
+    /** Up to two gigs, firm first — the app's one card (`Slip`), placed compact. */
+    slips: SlipVM[];
     more: number;
     /** A non-gig date's word (rehearsal, residency…), when that is all there is. */
     dateWord: string | null;
@@ -38,6 +38,8 @@
     /** A call between two options that «Por decidir» holds. */
     decide: boolean;
   };
+
+  import type { Slip as SlipVM } from '$lib/month-events';
 
   export type SeasonUnclosedVM = {
     id: string;
@@ -81,7 +83,7 @@
   import { localeDayMonth, localeWeekdayShort } from '$lib/datetime';
   import { t, type Locale } from '$lib/i18n';
   import { isoWeek } from '$lib/planner';
-  import IdentityMark from '$lib/components/IdentityMark.svelte';
+  import Slip from '$lib/components/planner/Slip.svelte';
   import DecisionBand, {
     type ConcurrenceVM,
     type DecisionVM,
@@ -218,11 +220,7 @@
               >
                 <span class="d__n">{Number(c.iso.slice(8))}{#if c.monthWord}<i>{c.monthWord}</i>{/if}</span>
                 {#each c.slips as sl (sl.id)}
-                  <span class="ev" class:ev--firm={sl.firm} class:ev--option={!sl.firm} class:grain={!sl.firm}
-                    ><IdentityMark mini accent={sl.accent} name={sl.project} initials={sl.initials} /><span
-                      class="ev__place">{sl.place}</span
-                    ></span
-                  >
+                  <Slip slip={sl} placing="compact" kindLabel={() => ''} stateLabel={() => null} />
                 {/each}
                 {#if c.more > 0}<span class="ev__more">+{c.more}</span>{/if}
                 {#if c.slips.length === 0 && c.dateWord}<span class="ev ev--date">{c.dateWord}</span>{/if}
@@ -561,19 +559,6 @@
       min-width: 0;
       white-space: nowrap;
     }
-    .ev__place {
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .ev--firm {
-      background: var(--bg-surface, var(--white));
-      border: 1px solid color-mix(in oklch, var(--text-color) 35%, transparent);
-      font-family: var(--font-display);
-    }
-    .ev--option {
-      border: 1px dashed color-mix(in oklch, var(--text-color) 35%, transparent);
-      color: var(--text-muted);
-    }
     .ev--date {
       font-family: var(--font-mono);
       font-size: 9px;
@@ -646,11 +631,14 @@
       margin-inline-end: 4px;
       border-radius: 2px;
     }
+    /* The key draws the slip's own edges and paper (Slip.svelte § certainty). */
     .k--firm {
-      border: 1px solid color-mix(in oklch, var(--text-color) 35%, transparent);
+      background: var(--bg-ultra-light);
+      border: 1px solid color-mix(in oklch, var(--text-color) 15%, var(--border-color-light));
     }
     .k--option {
-      border: 1px dashed color-mix(in oklch, var(--text-color) 35%, transparent);
+      background: var(--bg-ultra-light);
+      border: 1px dashed color-mix(in oklch, var(--text-color) 13%, var(--border-color-light));
     }
     .k--tour {
       height: 3px;
@@ -769,13 +757,11 @@
         min-height: 2.2rem;
         padding: 2px 2px 5px;
       }
-      .ev {
+      .d :global(.slip) {
         padding: 0;
         height: 8px;
-        font-size: 0;
       }
-      .ev :global(.mark),
-      .ev__place,
+      .d :global(.slip > *),
       .ev__more,
       .ev--date,
       .d__travel {

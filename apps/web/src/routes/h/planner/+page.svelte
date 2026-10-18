@@ -1779,14 +1779,10 @@
           today: iso === todayIso,
           monthWord: iso.endsWith('-01') ? MONTH_SHORT.format(new Date(`${iso}T00:00:00Z`)) : null,
           mark: cellMark(rows),
-          slips: gigs.slice(0, 2).map(({ p, firm }) => ({
-            id: p.id,
-            firm,
-            accent: p.project ? accentVarFor(p.project) : 'var(--accent-1)',
-            initials: p.project?.initials ?? null,
-            project: p.project?.name ?? '',
-            place: p.venue?.city ?? p.city ?? p.venue?.name ?? p.venue_name ?? '—',
-          })),
+          // THE APP'S ONE CARD, placed small (ADR-095 §0). No link: the whole
+          // cell is the door to its day, and a link inside a button is two
+          // doors in one place.
+          slips: gigs.slice(0, 2).map(({ p }) => ({ ...performanceSlip(p, slipCtxPage), href: null })),
           more: Math.max(0, gigs.length - 2),
           dateWord: other ? kindLabel(other.kind) : null,
           travel: travel
