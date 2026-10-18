@@ -320,7 +320,7 @@
   function whoLine(item: ConversationItem): string {
     const title = conversationTitle(item) || t('conversations.conversation', locale);
     const person = item.person?.full_name;
-    return person && person !== title ? `${title} — ${person}` : title;
+    return person && person !== title ? `${title} · ${person}` : title;
   }
 
   function personPath(item: ConversationItem): string | null {
