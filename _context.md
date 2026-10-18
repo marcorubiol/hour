@@ -33,16 +33,16 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
 ## Producción (verificado 2026-10-14, tarde)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`b7faea88`**, `dirty:false`, builtAt
-  2026-10-18T17:04Z (vocabulario de oficio, ADR-128 y 129; pasada de coherencia, ADR-130). `main` lleva además `20261018170000_money_bolos_last_function` (ADR-131) **sin aplicar**: no desplegar `main` sin aplicarla antes.
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`d244ecf4`**, `dirty:false`, builtAt
+  2026-10-18T22:25Z (lentes por espacio, ADR-132; por facturar tras la última función y propuestas de la IA, ADR-131; sobre vocabulario y coherencia). `main` == prod salvo documentos y tests.
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free, con keepalive diario
   (`.github/workflows/keepalive.yml`) contra la pausa por inactividad. Pasar a Pro antes de la beta, aún no
   (`_tasks.md § 9`). Si algo de Supabase falla tras días sin uso, lo primero es `dig <ref>.supabase.co`.
-- **Última migración aplicada: `20261018160000_workspace_trade`** (2026-10-18, run 39146021972; backup 39145226340, plan 39145414393): el oficio por espacio (ADR-129). Antes, las de Conversations (ADR-126). Pendiente: `20261018170000_money_bolos_last_function`. Las migraciones van por `production-migrate.yml`: backup, plan, apply.
+- **Última migración aplicada: `20261018180000_workspace_lenses`** (2026-10-18, run 39172107865; backup 39171759019, plan 39171938506), con `20261018170000_money_bolos_last_function` (ADR-131, 132). Antes, `20261018160000_workspace_trade`. Las migraciones van por `production-migrate.yml`: backup, plan, apply.
 - `hour-staging` (ref `slccyknqpgmzhyiyclsq`, `eu-west-1`): reconstruido el 2026-10-13 con el contract de permisos
   (run 38469017859: RLS 309/313, smoke 2/2). Se volverá a pausar sin uso.
-- Últimas suites contra producción: RLS 393/393 (2026-10-18, `a4db0711`, en serie); E2E 88/88 (2026-10-18, `b7faea88`, por `hour-web.marco-rubiol.workers.dev`). **Nunca la RLS y el E2E a la vez.** Si el dominio no responde y `workers.dev` sí, es la red local (rango de Cloudflare `188.114.96.0/20`).
+- Últimas suites contra producción (2026-10-18, `d244ecf4`): RLS 401/401 (en serie; `commitment-person` falló una vez en la pasada entera y pasa solo); E2E 96/96 por `hour-web.marco-rubiol.workers.dev`. **Nunca la RLS y el E2E a la vez.** Si el dominio no responde y `workers.dev` sí, es la red local (rango de Cloudflare `188.114.96.0/20`).
 - Desde el checkout principal (`~/Developer/hour`), nunca desde un worktree: los worktrees no llevan `.env` ni
   `.env.test` (RLS sale saltado, el login del E2E falla).
 - `pnpm --filter web test:rls`: siempre contra producción; carga `.env` + `.env.test` y no mira `.env.local`.
