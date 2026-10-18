@@ -1,4 +1,4 @@
--- ADR-123: el directorio de salas y contactos pide Converses y hereda la
+-- ADR-124: el directorio de salas y contactos pide Converses y hereda la
 -- privacidad de las conversaciones.
 --
 -- Revisión del 2026-10-18 (`build/coordination/review-conversations/permisos.md`,

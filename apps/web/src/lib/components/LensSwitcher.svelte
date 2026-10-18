@@ -21,7 +21,7 @@
   // Desk is the home/digest, not a peer lens (grill 2026-07-23): it gets its own
   // pill; the segmented "view as" holds only the three concern lenses.
   // Cuentas only for whoever reads money in some project (ADR-117), and
-  // Conversations for whoever reads conversations in some (ADR-123). Until the
+  // Conversations for whoever reads conversations in some (ADR-124). Until the
   // answer lands they show, so a lens does not blink for those who have it.
   const moneyAccess = createQuery(moneyAccessAnyQueryOptions());
   const conversationAccess = createQuery(conversationAccessQueryOptions());

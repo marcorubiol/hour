@@ -16,7 +16,7 @@ import {
 } from './_helpers';
 
 /**
- * ADR-123 § 2 · volver privada una compartida: solo quien la creó o el admin
+ * ADR-124 § 2 · volver privada una compartida: solo quien la creó o el admin
  * (20261018110000_conversation_private_guard).
  *
  * Lo que fija este fichero: el editor de Converses que no la creó no vuelve
@@ -42,7 +42,7 @@ const one = <T>(data: T | T[] | null): T | undefined =>
   Array.isArray(data) ? data[0] : (data ?? undefined);
 
 describe.skipIf(!envReady() || !limitedEnvReady())(
-  'only who created a shared conversation, or an admin, makes it private (ADR-123)',
+  'only who created a shared conversation, or an admin, makes it private (ADR-124)',
   () => {
     let admin: string;
     let adminSub: string;

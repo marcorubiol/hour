@@ -1,4 +1,4 @@
--- Rollback de 20261018110000_conversation_private_guard (ADR-123 § 2).
+-- Rollback de 20261018110000_conversation_private_guard (ADR-124 § 2).
 -- El guard vuelve a su versión de 20261011200000: cualquiera que edita una
 -- conversación compartida puede volverla privada para sí. Sin datos.
 

@@ -198,7 +198,7 @@
     },
   });
 
-  // ADR-123: marking a shared one private makes it vanish for the rest of the
+  // ADR-124: marking a shared one private makes it vanish for the rest of the
   // team, and only you can bring it back, so it asks first. Unmarking does not.
   function togglePrivate() {
     if (!conv) return;

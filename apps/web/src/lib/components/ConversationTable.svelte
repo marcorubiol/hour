@@ -71,7 +71,7 @@
     /** Whose turn it is, from the last directional event (ADR-117). */
     turnColumn?: boolean;
     /**
-     * Whether the status menu is offered (ADR-123, `permisos.md` § 8). The
+     * Whether the status menu is offered (ADR-124, `permisos.md` § 8). The
      * caller passes `edit:conversation` in some project; the PATCH still
      * decides per project.
      */

@@ -1,4 +1,4 @@
--- ADR-123 § 2: solo quien creó una conversación compartida, o el admin, la
+-- ADR-124 § 2: solo quien creó una conversación compartida, o el admin, la
 -- vuelve privada (`build/coordination/review-conversations/permisos.md`,
 -- hallazgo 2).
 --

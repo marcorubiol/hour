@@ -3961,7 +3961,7 @@ Conversations, Planner y Cuentas. Cuatro bandas: lo siguiente, te espera, ha cam
 demasiado al rail en escritorio) o cuando exista la RPC `conversation_overview` (ADR-118), que haría barata la
 lectura que la banda 3 y la puerta de Conversations hacen en cada visita.
 
-## [2026-10-18] ADR-123 · El directorio pide Converses y hereda la privacidad; una compartida la vuelve privada quien la creó
+## [2026-10-18] ADR-124 · El directorio pide Converses y hereda la privacidad; una compartida la vuelve privada quien la creó
 
 **Contexto.** Revisión de permisos de Conversations del 2026-10-18 (`build/coordination/review-conversations/permisos.md`,
 hallazgos 1 y 2). `workspace_person` y `workspace_organization` se leían con `is_workspace_internal_member` (matriz RBAC
@@ -3969,9 +3969,9 @@ del 2026-07-20, anterior a las privadas): cualquier miembro recibía el director
 también los de una conversación privada ajena, y un performer sin Converses la cartera entera de la compañía. Y
 `guard_conversation_private` dejaba a cualquiera que edita Converses volver privada una conversación compartida, que
 desaparecía para todos sin que nadie pudiera recuperarla (ADR-100). Marco decide (2026-10-18) cerrar el directorio con
-el permiso de conversaciones y herencia de privacidad. Migraciones `20261018100000_directory_privacy` y
-`20261018110000_conversation_private_guard` (rollback en `build/runbooks/rollback-20261018-*.sql`, probados ida y
-vuelta en local); no aplicadas en producción.
+el permiso de conversaciones y herencia de privacidad. Migraciones `20261018100000_directory_privacy`,
+`20261018110000_conversation_private_guard` y `20261018120000_mailout_select_readable` (rollback en
+`build/runbooks/rollback-20261018-*.sql`, probados ida y vuelta en local); no aplicadas en producción.
 
 **Decisión.**
 1. **Dos clases de dossier.** Es **del equipo** si está enlazado a una membresía aceptada (`user_profile.person_id`,
@@ -4001,7 +4001,11 @@ vuelta en local); no aplicadas en producción.
    hay acceso; sin `edit`, no ofrece «Añadir», «Seleccionar», importar, «escribir a estas» ni el menú de estado, y no
    pide `/api/organizations`. La ficha enseña el interruptor de privada solo a quien puede usarlo (`can_set_private`) y
    pide confirmación al marcar.
+8. **Un envío lo lee quien lo creó, o quien lee conversaciones del proyecto si el envío aún no tiene destinatarios o
+   tiene al menos uno que puede leer** (hallazgo 3). Su asunto y su cuerpo son texto libre y pueden nombrar la sala de
+   una privada ajena; un borrador vacío no nombra a nadie y sigue a la vista del equipo. «Último envío» del dashboard
+   mira los cuatro más recientes y salta los que no tienen ningún destinatario legible.
 
 **Fuera.** `person` (la identidad global) sigue con `can_see_person`: la de un contacto es anónima (ADR-107), pero la
-regla no hereda la privacidad. El texto del interruptor («en este espacio», hallazgo 6) y «Último envío» (hallazgo 3)
-quedan para el carril de Conversations.
+regla no hereda la privacidad. La puerta de Conversations del Desk, que sigue apareciendo sin Converses, la lleva el
+carril de Desk.

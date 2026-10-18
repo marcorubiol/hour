@@ -5,7 +5,7 @@
  * ve quien la marcó y desaparece para los demás, también de los recuentos.
  * La regla vive en la base (trigger `conversation_private_guard` y las
  * policies): solo te la marcas a ti, solo quien la marcó la desmarca y una
- * compartida solo la vuelve privada quien la creó o el admin (ADR-123).
+ * compartida solo la vuelve privada quien la creó o el admin (ADR-124).
  */
 
 import type { RequestHandler } from './$types';

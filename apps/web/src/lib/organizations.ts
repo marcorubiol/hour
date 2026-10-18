@@ -14,7 +14,7 @@ export interface OrganizationOption {
 /**
  * Una caché para toda la app: los diálogos de alta la comparten. `enabled`
  * falso para quien no puede crear conversaciones: no la usaría, y el
- * directorio pide Converses (ADR-123).
+ * directorio pide Converses (ADR-124).
  */
 export function organizationsQueryOptions(enabled = true) {
   return {

@@ -2,7 +2,7 @@
  * GET /api/conversations/access — ¿lee o edita conversaciones quien llama, en
  * ALGUNO de sus proyectos? `{ read: boolean, edit: boolean }`.
  *
- * La puerta de la lente Conversations (ADR-123, `permisos.md` § 4), como
+ * La puerta de la lente Conversations (ADR-124, `permisos.md` § 4), como
  * `/api/money/access` lo es de Cuentas: sin `read` el selector de lentes la
  * esconde y la lente dice «no tienes acceso»; sin `edit` no ofrece «Añadir»,
  * «Seleccionar» ni importar, ni pide el directorio de organizaciones (que la

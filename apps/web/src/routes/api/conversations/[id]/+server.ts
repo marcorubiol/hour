@@ -46,7 +46,7 @@ function json(body: unknown, status = 200): Response {
  * llega por `/h/[workspace]/conversation/[slug]`; con slug, `?workspace=` es el
  * slug del espacio). RLS decide: privada de otro o sin permiso = 404.
  *
- * Lleva lo que la ficha puede ofrecer (ADR-123, `permisos.md` § 2 y § 8):
+ * Lleva lo que la ficha puede ofrecer (ADR-124, `permisos.md` § 2 y § 8):
  * `can_edit` (`edit:conversation` en su proyecto) y `can_set_private` (quien
  * edita y, si es compartida, la creó o es admin; si es privada, es suya). Las
  * mismas reglas que la base; la pantalla solo deja de ofrecer lo que la base

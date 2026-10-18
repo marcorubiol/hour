@@ -1,6 +1,6 @@
--- Rollback de 20261018100000_directory_privacy (ADR-123: el directorio pide
+-- Rollback de 20261018100000_directory_privacy (ADR-124: el directorio pide
 -- Converses y hereda la privacidad).
--- Desplegar antes el Worker anterior: el de ADR-123 llama a
+-- Desplegar antes el Worker anterior: el de ADR-124 llama a
 -- conversation_access desde GET /api/conversations/access. No hay datos que
 -- recuperar: dos políticas vuelven a la matriz del 2026-07-20 y se borran las
 -- funciones nuevas.

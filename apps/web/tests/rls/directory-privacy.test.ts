@@ -16,7 +16,7 @@ import {
 } from './_helpers';
 
 /**
- * ADR-123 · el directorio pide Converses y hereda la privacidad
+ * ADR-124 · el directorio pide Converses y hereda la privacidad
  * (20261018100000_directory_privacy).
  *
  * Lo que fija este fichero:
@@ -50,7 +50,7 @@ const one = <T>(data: T | T[] | null): T | undefined =>
   Array.isArray(data) ? data[0] : (data ?? undefined);
 
 describe.skipIf(!envReady() || !limitedEnvReady())(
-  'the directory needs Converses and inherits privacy (ADR-123)',
+  'the directory needs Converses and inherits privacy (ADR-124)',
   () => {
     let admin: string;
     let adminSub: string;

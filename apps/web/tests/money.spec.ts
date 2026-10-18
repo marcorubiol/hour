@@ -187,7 +187,7 @@ test.describe('Cuentas without read:money', () => {
     const tabs = page.locator('.lensswitch');
     await expect(tabs.getByRole('tab', { name: 'Planner' })).toBeVisible();
     await expect(tabs.getByRole('tab', { name: 'Books' })).toHaveCount(0);
-    // ADR-123: without Converses in any project, Conversations is not offered
+    // ADR-124: without Converses in any project, Conversations is not offered
     // either, and its page says so instead of offering to add or import.
     await expect(tabs.getByRole('tab', { name: 'Conversations' })).toHaveCount(0);
     await page.goto('/h/conversations');

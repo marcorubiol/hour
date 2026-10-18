@@ -44,7 +44,7 @@
   const queryClient = useQueryClient();
   const locale = appLocale();
 
-  // ADR-123: «Añadir» and its directory autocomplete only for whoever edits
+  // ADR-124: «Añadir» and its directory autocomplete only for whoever edits
   // conversations somewhere (the API still decides per project).
   const accessQuery = createQuery(conversationAccessQueryOptions());
   let canEdit = $derived($accessQuery.data?.edit !== false);

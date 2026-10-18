@@ -78,7 +78,7 @@
   const workspacesQuery = createQuery(workspacesQueryOptions());
   const linesQuery = createQuery(allLinesQueryOptions());
   const projectsQuery = createQuery(activeProjectsQueryOptions());
-  // ADR-123: without `read` in any project the lens says so; without `edit`
+  // ADR-124: without `read` in any project the lens says so; without `edit`
   // it offers no add, select or import, and never asks for the directory (the
   // autocomplete of «Añadir», which RLS no longer gives without Converses).
   // Only an explicit «no» hides: while pending or on failure it shows.
