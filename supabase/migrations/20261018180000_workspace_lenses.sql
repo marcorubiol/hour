@@ -1,4 +1,4 @@
--- ADR-131 · cada espacio enciende o apaga sus tres lentes.
+-- ADR-132 · cada espacio enciende o apaga sus tres lentes.
 --
 -- `workspace.lenses_off` guarda las lentes que el espacio NO usa: `planner`,
 -- `conversations` (la lente de venta: Difusión o Contratación según el
@@ -22,7 +22,7 @@ ALTER TABLE public.workspace
     CHECK (lenses_off <@ ARRAY['planner', 'conversations', 'books']::text[]);
 
 COMMENT ON COLUMN public.workspace.lenses_off IS
-  'ADR-131: the lenses this workspace does not use (planner | conversations | books). Empty = all on. Hides the entry points in the app, deletes nothing. Owner/admin edit it.';
+  'ADR-132: the lenses this workspace does not use (planner | conversations | books). Empty = all on. Hides the entry points in the app, deletes nothing. Owner/admin edit it.';
 
 GRANT UPDATE (lenses_off) ON TABLE public.workspace TO authenticated;
 
@@ -79,7 +79,7 @@ BEGIN
       USING ERRCODE = '22023';
   END IF;
 
-  -- ADR-131: las lentes apagadas, un array JSON de ids; null o [] las
+  -- ADR-132: las lentes apagadas, un array JSON de ids; null o [] las
   -- enciende todas. Sin repetidos y en orden, para que el valor sea uno.
   IF p_patch ? 'lenses_off' THEN
     IF jsonb_typeof(p_patch->'lenses_off') NOT IN ('array', 'null') THEN
@@ -133,7 +133,7 @@ $function$
 ;
 
 COMMENT ON FUNCTION public.update_workspace(uuid, jsonb) IS
-  'Patch a workspace (name, description, accent, domain, city, logo_url, fiscal_identity_id, trade, lenses_off) and settings.booking_mode / invoicing_mode. SECURITY DEFINER; owner/admin only. Only present keys change; "" clears nullable fields; "" or null trade goes back to stage; null or [] lenses_off turns every lens on. ADR-062, ADR-002, ADR-086, ADR-128, ADR-131.';
+  'Patch a workspace (name, description, accent, domain, city, logo_url, fiscal_identity_id, trade, lenses_off) and settings.booking_mode / invoicing_mode. SECURITY DEFINER; owner/admin only. Only present keys change; "" clears nullable fields; "" or null trade goes back to stage; null or [] lenses_off turns every lens on. ADR-062, ADR-002, ADR-086, ADR-128, ADR-132.';
 
 CREATE OR REPLACE FUNCTION public.workspace_admin_names(p_workspace_id uuid)
  RETURNS SETOF text
@@ -155,7 +155,7 @@ AS $function$
 $function$;
 
 COMMENT ON FUNCTION public.workspace_admin_names(uuid) IS
-  'ADR-131: the names of whoever administers the workspace, for an internal member who finds a lens off. No emails, no roles; nothing for a guest or a stranger.';
+  'ADR-132: the names of whoever administers the workspace, for an internal member who finds a lens off. No emails, no roles; nothing for a guest or a stranger.';
 
 REVOKE ALL ON FUNCTION public.workspace_admin_names(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.workspace_admin_names(uuid) TO authenticated;

@@ -74,7 +74,7 @@
   let laterOpen = $state(false);
   let feedCount = $derived(feed.reduce((n, b) => n + b.runs.reduce((m, r) => m + r.items.length, 0), 0));
 
-  // A lens the space does not use (ADR-131) is no destination.
+  // A lens the space does not use (ADR-132) is no destination.
   let LENS_HREF = $derived<Record<DeskConcern, string | null>>({
     task: null,
     going: lensOn('planner') ? '/h/planner' : null,

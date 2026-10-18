@@ -147,7 +147,7 @@
 
   // ADR-128: the screen speaks the trade of the workspaces it shows. Set
   // here, once, for every lens and dialog; `t()` reads it.
-  // ADR-131: and the lenses they use. Both read the same workspaces.
+  // ADR-132: and the lenses they use. Both read the same workspaces.
   let onScreen = $derived(workspacesOnScreen(workspaceSlug, pins.pins, wsItems, lineIndex, projectIndex));
   $effect(() => {
     setTrade(tradeOf(onScreen));
@@ -673,7 +673,7 @@
 
       <div class="shell__content" class:shell__content--calm={calm.on}>
         {#if routedLens && routedLens !== 'desk' && !lensOn(routedLens)}
-          <!-- ADR-131: a lens off in every space on screen, reached by URL. -->
+          <!-- ADR-132: a lens off in every space on screen, reached by URL. -->
           <LensOff lens={routedLens} workspaces={onScreen} />
         {:else if children}{@render children()}{/if}
       </div>

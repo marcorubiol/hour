@@ -165,7 +165,7 @@ export function pulseSlipContext(
  * correctly (on the month and the diary a date opens its edit dialog, and
  * those views own that dialog). The rail and the Desk do not, so a date sends
  * you to the day that holds it, a real address the Planner already answers;
- * no address at all while the space does not use the Planner (ADR-131).
+ * no address at all while the space does not use the Planner (ADR-132).
  */
 export function pulseSlip(ref: PulseRef, day: string, ctx: SlipContext): Slip {
   if (ref.of === 'performance') return performanceSlip(ref.row as PerformanceEvent, ctx);

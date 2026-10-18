@@ -1,4 +1,4 @@
--- Rollback de 20261018180000_workspace_lenses (ADR-131).
+-- Rollback de 20261018180000_workspace_lenses (ADR-132).
 -- `update_workspace` vuelve a su versión de 20261018160000_workspace_trade,
 -- `workspace_admin_names` se borra y la columna también. Lo que se pierde: qué
 -- lentes había apagado cada espacio (todas vuelven a verse). Antes de

@@ -219,7 +219,7 @@
 
   // Money: the Books keys and URLs, so the Desk and Cuentas share one cache.
   // Only an explicit «yes» to read:money opens it: without it, no trace. A
-  // space that does not use Cuentas (ADR-131) leaves no trace either.
+  // space that does not use Cuentas (ADR-132) leaves no trace either.
   const accessQuery = createQuery(moneyAccessAnyQueryOptions());
   let readMoney = $derived($accessQuery.data?.read_money === true && lensOn('books'));
   const invoicesQuery = createQuery(
@@ -257,7 +257,7 @@
   // Conversations exists for whoever reads them somewhere (ADR-124), the
   // LensSwitcher's own flag: only an explicit «no» hides the door.
   const convAccessQuery = createQuery(conversationAccessQueryOptions());
-  // And only where the space uses the lens (ADR-131): off, its calls, replies,
+  // And only where the space uses the lens (ADR-132): off, its calls, replies,
   // movement and door leave the Desk with it.
   let readConversations = $derived($convAccessQuery.data?.read !== false && lensOn('conversations'));
   const overviewQuery = createQuery(

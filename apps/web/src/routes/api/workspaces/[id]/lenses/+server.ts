@@ -1,5 +1,5 @@
 /**
- * Las lentes del espacio (ADR-131): cuáles no usa y quién puede cambiarlo.
+ * Las lentes del espacio (ADR-132): cuáles no usa y quién puede cambiarlo.
  *
  * GET → { lenses_off, can_edit, admins } (admins: los nombres de quien
  *     administra el espacio, para que la pantalla de una lente apagada diga a

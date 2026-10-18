@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { isToggleLens, lensesOnFor, lensOn, setLensesOn, TOGGLE_LENSES } from './lenses.svelte';
 
-describe('lensesOnFor (ADR-131)', () => {
+describe('lensesOnFor (ADR-132)', () => {
   it('turns every lens on while no workspace has answered', () => {
     expect([...lensesOnFor([])]).toEqual([...TOGGLE_LENSES]);
   });

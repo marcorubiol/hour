@@ -4390,3 +4390,47 @@ hecha: una propuesta rechazada acababa en la lista de lo hecho.
 **Fuera.** Cualquier miembro puede crear por PostgREST directo una tarea con `origin = 'ai'` (la política de
 inserción no mira `origin`; `POST /api/tasks` sí lo quita). No es un hueco de datos, solo de procedencia; se cierra
 cuando exista la IA que propone, con su propia vía de escritura.
+
+## [2026-10-18] ADR-132 · Cada espacio enciende o apaga sus tres lentes; apagar quita la entrada, no los datos
+
+**Contexto.** Marco validó en el Drop (16-10) que cada espacio pueda activar y desactivar las tres lentes (ADR-088):
+Planner, la lente de venta (Difusión en escena, Contratación en música, ADR-128 y 129) y Cuentas, porque no todas las
+compañías lo usan todo (hay quien no factura en Hour). Precedentes: el oficio por espacio (ADR-129) y el acceso por
+lente (ADR-124 § 7, `conversation_access` y `/api/money/access`). Carril `claude/lens-toggle`.
+
+**Decisión.**
+1. **Dónde vive.** Columna `workspace.lenses_off text[] NOT NULL DEFAULT '{}'` con CHECK contra `planner`,
+   `conversations` y `books`: se guarda lo que el espacio NO usa, así que una lente que se añada mañana nace encendida
+   en todos. Columna y no clave de `settings`, como `trade`: la app la lee siempre, en el mismo `/api/workspaces`. La
+   escribe un owner/admin por `update_workspace` (`lenses_off`: array; `null` o `[]` encienden todas; la RPC quita
+   repetidos y ordena) y entra en el grant de UPDATE por columnas. Migración `20261018180000_workspace_lenses`,
+   aditiva, sin aplicar; rollback en `build/runbooks/rollback-20261018-workspace-lenses.sql`, probado ida y vuelta en
+   local (la función vuelve idéntica a la de ADR-129). **Desk no es una lente y no se apaga**: el CHECK no la admite.
+2. **Una lente sale si está encendida y además tienes acceso.** El selector, ⌘K y el Desk combinan las dos cosas: la
+   regla de acceso de cada lente sigue igual (ADR-117, 124) y `lensOn()` se suma. Con varios espacios en el ámbito, una
+   lente se ve si está encendida en alguno: un ámbito que mezcla un espacio que factura con otro que no sigue teniendo
+   Cuentas. Mientras los espacios no responden, todas encendidas (solo un «apagada» explícito esconde, como el acceso).
+   Las lentes en pantalla son estado del shell, como el oficio: el layout las fija con los mismos espacios
+   (`workspacesOnScreen`), una runa en `$lib/lenses.svelte.ts`.
+3. **Qué desaparece.** El enlace del selector; en ⌘K, el día escrito (lleva al Planner); en el Desk, la puerta de la
+   lente y los enlaces a ella («Planner →», el día de una fecha, la etiqueta de un grupo de «Te espera»); los enlaces
+   de vuelta a la lente desde la ficha de una conversación o de un envío, el «ver todas» de las conversaciones de una
+   función, el enlace al bolo y el «crear bolo» desde una función, el día en el Planner desde Cuentas. Con Cuentas o
+   la lente de venta apagadas, el Desk además deja de leer su dominio (cobros vencidos, llamadas, respuestas, lo que
+   se mueve): son de esa lente. Con el Planner apagado, «Lo siguiente» y el «voy, no voy» se quedan, sin enlace al
+   calendario: la función es también del proyecto y de su hoja de ruta, no solo del Planner.
+4. **Qué no cambia.** Ningún dato se borra ni se oculta en la base: las fichas (función, conversación, bolo, proyecto)
+   y sus módulos siguen abiertos, la RLS y las RPC son las mismas y la API sigue respondiendo. Es una decisión de
+   interfaz, no un permiso; quien necesite que alguien no vea el dinero tiene el permiso de dinero (ADR-117).
+5. **Por URL.** Si se entra en una lente apagada en todos los espacios en pantalla, el shell no pinta la lente: su
+   cabecera con el selector y «La sección Cuentas está apagada en este espacio». A un admin le da el camino
+   («Encenderla en Ajustes», `?section=lenses`); a los demás, los nombres de quien administra el espacio
+   («pídeselo a …»). Esos nombres los da `workspace_admin_names(ws)`, SECURITY DEFINER, solo a un miembro interno y
+   solo nombres (ni emails ni roles), porque la policy de `membership` no deja a un miembro ver más que su fila. Un
+   invitado lee «pídeselo a quien administra el espacio».
+6. **Ajustes → Secciones** (la palabra que la app ya usa para las lentes, `lens.nav_aria`): un interruptor por lente
+   con su nombre de oficio. Lo cambia un admin; los demás lo ven sin poder tocarlo.
+
+**Abierto, no construido.** Si además cada persona puede ocultarse una lente para sí (un técnico que no hace difusión).
+Sería una preferencia de usuario, no del espacio, y se sumaría a esta regla (sale si el espacio la usa, tienes acceso
+y no te la has ocultado); no tiene caso real todavía en Phase 0.

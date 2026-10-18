@@ -270,7 +270,7 @@
       // Una fecha escrita es un destino, y solo aparece si se puede leer
       // ENTERA: `parseDayQuery` devuelve el día o nada, nunca una aproximación.
       const parsedDay = parseDayQuery(q, { today: todayIso, locales: [localeTag, 'es', 'ca', 'en'] });
-      // A day lands in the Planner: none while the space does not use it (ADR-131).
+      // A day lands in the Planner: none while the space does not use it (ADR-132).
       const dayRows: Row[] = parsedDay && lensOn('planner')
         ? [
             {

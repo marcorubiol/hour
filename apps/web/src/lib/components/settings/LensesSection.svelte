@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * Las lentes del espacio (ADR-131): Planner, la lente de venta y Cuentas se
+   * Las lentes del espacio (ADR-132): Planner, la lente de venta y Cuentas se
    * encienden o se apagan para todo el espacio, porque no todas las compañías
    * lo usan todo (hay quien no factura en Hour). Apagar quita la entrada, no
    * los datos. Desk no es una lente y no está aquí. Lo decide un admin; los

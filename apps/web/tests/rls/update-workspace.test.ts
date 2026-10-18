@@ -340,7 +340,7 @@ describe.skipIf(!envReady())('RLS — update_workspace (ADR-062)', () => {
     expect(direct.rows).toHaveLength(0);
     expect((await read()).trade).toBe(fixture.trade);
   });
-  // ADR-131 · the lenses: an array with a CHECK, written by owner/admin through
+  // ADR-132 · the lenses: an array with a CHECK, written by owner/admin through
   // the RPC; null or [] turns every lens on; the RPC sorts and dedups.
   test('owner/admin turns lenses off and on; the value is one', async () => {
     try {

@@ -44,7 +44,7 @@ export type NavWorkspace = {
   /** ADR-128 — the trade whose words this workspace speaks (`stage` |
       `music`); absent reads as stage. */
   trade?: string | null;
-  /** ADR-131 — the lenses this workspace does not use; absent reads as none. */
+  /** ADR-132 — the lenses this workspace does not use; absent reads as none. */
   lenses_off?: string[] | null;
   /** IANA home timezone — the timeslot-entry fallback when a gig has no
       linked venue (timezone rule, spec § Timezone rule). */

@@ -29,7 +29,7 @@
   // Conversations for whoever reads conversations in some (ADR-124). Cuentas
   // keeps its place but draws nothing until an explicit «yes»: it does not
   // blink in for those who have it, nor flash its name at those who do not.
-  // And a lens shows only where the space uses it (ADR-131): on AND access.
+  // And a lens shows only where the space uses it (ADR-132): on AND access.
   const moneyAccess = createQuery(moneyAccessAnyQueryOptions());
   const conversationAccess = createQuery(conversationAccessQueryOptions());
   let moneyPending = $derived($moneyAccess.isPending);

@@ -49,7 +49,7 @@
   const queryClient = useQueryClient();
 
   let slip = $derived(next ? pulseSlip(next.ref, next.day, slipCtx) : null);
-  // Its own page, else the day in the Planner while the space uses it (ADR-131).
+  // Its own page, else the day in the Planner while the space uses it (ADR-132).
   let farHref = $derived(slip?.href ?? (next && lensOn('planner') ? plannerDayHref('day', next.day) : undefined));
   let thenSlip = $derived(then ? pulseSlip(then.ref, then.day, slipCtx) : null);
 

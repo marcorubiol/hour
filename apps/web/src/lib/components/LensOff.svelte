@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * A lens reached by URL that is off in every space on screen (ADR-131). It
+   * A lens reached by URL that is off in every space on screen (ADR-132). It
    * says so, and to whom to say it: the names of whoever administers each of
    * those spaces, or, if that is you, the way to Settings. The lens keeps its
    * header and the switcher, so the way out is where it always is.
@@ -52,7 +52,7 @@
   <title>{docTitle(label)}</title>
 </svelte:head>
 
-<section class="lens-off" data-testid="lens-off" data-lens={lens}>
+<section class="lens-off" data-testid="lens-off" data-lens={lens} aria-busy={$settings.some((q) => q.isPending)}>
   <LensHeader>
     {#snippet title()}<LensTitle text={label} />{/snippet}
   </LensHeader>
