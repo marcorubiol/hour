@@ -394,12 +394,18 @@
     replaceState(url, {});
   }
 
+  const shortDayFormat = new Intl.DateTimeFormat(localeTag, { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  function shortDay(day: string): string {
+    return shortDayFormat.format(new Date(`${day.slice(0, 10)}T00:00:00Z`));
+  }
   function collectLabel(m: BoloMoney): { tone: string; label: string } | null {
     if (m.overdue) return { tone: 'danger', label: t('books.pill_overdue', locale, { n: m.daysLate }) };
     if (m.toInvoice) return { tone: 'warn', label: t('books.filter_to_invoice', locale).toLowerCase() };
     if (m.collect === 'full') return { tone: 'ok', label: t('books.collected', locale) };
-    if (m.collect === 'partial') return { tone: 'warn', label: t('books.pill_partial', locale) };
-    if (m.collect === 'unpaid') return { tone: 'faint', label: t('books.pill_unpaid', locale) };
+    // Owed and not late yet: when it is expected says more than «unpaid».
+    const expected = m.owed > 0 && m.aging?.expectedOn ? shortDay(m.aging.expectedOn) : null;
+    if (m.collect === 'partial') return { tone: 'warn', label: expected ? t('books.pill_partial_expected', locale, { date: expected }) : t('books.pill_partial', locale) };
+    if (m.collect === 'unpaid') return { tone: 'faint', label: expected ? t('books.pill_expected', locale, { date: expected }) : t('books.pill_unpaid', locale) };
     return null;
   }
 
@@ -936,6 +942,7 @@
                   <th scope="col">{t('books.col_doc', locale)}</th>
                   <th scope="col" class="book__num">{t('books.fee', locale)}</th>
                   <th scope="col" class="book__num">{t('books.collected', locale)}</th>
+                  <th scope="col" class="book__num book__owed">{t('books.col_owed', locale)}</th>
                   <th scope="col">{t('books.col_collect', locale)}</th>
                 </tr>
               </thead>
@@ -943,7 +950,7 @@
                 <tbody style={`--c: ${group.accent}`}>
                   {#if grouped}
                     <tr class="book__group">
-                      <th colspan="7" scope="rowgroup">
+                      <th colspan="8" scope="rowgroup">
                         <button type="button" class="book__obra" onclick={() => group.slug && openProject(group.slug, group.workspaceId)} disabled={!group.slug}>
                           <span class="book__dot"></span>{group.name}
                         </button>
@@ -965,6 +972,7 @@
                       <td class="book__doc">{#if m.doc}<span class="book__chip">{m.doc.number ?? invoiceStatusLabel(m.doc.status, locale)}</span>{:else}<span class="book__faint">·</span>{/if}</td>
                       <td class="book__num"><button type="button" class="book__fee" title={t('books.edit_fee', locale)} onclick={() => openFee(b)}>{b.fee_amount === null ? t('books.no_fee', locale) : fmtMoney(Number(b.fee_amount))}</button>{#if multiCurrency && b.fee_amount !== null}<span class="book__cur">{m.currency}</span>{/if}</td>
                       <td class="book__num">{#if m.fee === null && !m.doc}·{:else}{fmtMoney(m.collected)}{#if multiCurrency}<span class="book__cur">{m.currency}</span>{/if}{/if}</td>
+                      <td class="book__num book__owed">{#if m.owed > 0}{fmtMoney(m.owed)}{#if multiCurrency}<span class="book__cur">{m.currency}</span>{/if}{/if}</td>
                       <td class="book__collect">{#if pill}<span class="pill" data-tone={pill.tone}>{pill.label}</span>{/if}</td>
                     </tr>
                     {#if open}
@@ -972,7 +980,7 @@
                       {@const spent = expensesByBolo.get(b.id) ?? []}
                       {@const mode = boloMode(b)}
                       <tr class="book__sheet" id={`bolo-sheet-${b.id}`}>
-                        <td colspan="7">
+                        <td colspan="8">
                           <div class="sheet">
                             <div class="sheet__col">
                               <p class="sheet__h">{t('books.sheet_functions', locale)}</p>
@@ -1307,7 +1315,7 @@
       .book__row .book__num:nth-of-type(5) { grid-column: 2; grid-row: 1; }
       .book__date { grid-column: 1; grid-row: 2; }
       .book__collect { grid-column: 2; grid-row: 2; justify-self: end; }
-      .book__status, .book__doc, .book__row .book__num:nth-of-type(6) { display: none; }
+      .book__status, .book__doc, .book__row .book__num:nth-of-type(6), .book__owed { display: none; }
       .book__group, .book__sheet { display: block; }
       .book__group th, .book__sheet td { display: block; }
       .sheet { grid-template-columns: 1fr; }
