@@ -189,7 +189,7 @@ test.describe('Cuentas without read:money', () => {
     await expect(tabs.getByRole('link', { name: 'Books' })).toHaveCount(0);
     // ADR-124: without Converses in any project, Conversations is not offered
     // either, and its page says so instead of offering to add or import.
-    await expect(tabs.getByRole('link', { name: 'Conversations' })).toHaveCount(0);
+    await expect(tabs.getByRole('link', { name: 'Booking' })).toHaveCount(0);
     await page.goto('/h/conversations');
     await waitForLoaded(page);
     await expect(page.getByTestId('conversations-no-access')).toBeVisible();
