@@ -1223,7 +1223,10 @@
   /* ── the board's words (the component is t()-free) ─────────────────── */
   function boardTallyCounts(confirmed: number, options: number, notCast: number): string {
     const parts: string[] = [];
-    if (confirmed > 0) parts.push(`${confirmed} ${t('planner.week_confirmed', locale)}`);
+    if (confirmed > 0)
+      parts.push(
+        `${confirmed} ${t(confirmed === 1 ? 'planner.week_confirmed_one' : 'planner.week_confirmed', locale)}`,
+      );
     if (options > 0) {
       parts.push(
         `${options} ${t(options === 1 ? 'planner.week_option_one' : 'planner.week_options', locale)}`,
@@ -3033,10 +3036,41 @@
              grows, so neither prints one. -->
         <!-- Weeks range: BOUNDED drawings only — the board grew a horizon
              and what grows is never counted. -->
-        <!-- The season names its horizon; its census is the overview's own
-             first line, so it is not said twice. -->
+        <!-- The season names its horizon AND counts it, here, in the strip
+             every other drawing counts in: one strip, one style, one word per
+             fact (revisión del Planner, 2026-10-18). It used to carry its own
+             census under the tabs, lowercase, with «firm» where this line
+             said «confirmed». -->
         {#if view === 'overview'}
           <span class="cal__stat cal__stat--soft">{seasonWindowLabel}</span>
+          <span class="cal__stat"
+            ><b>{fig(seasonFacts.perfs)}</b>
+            {t(figOne(seasonFacts.perfs) ? 'planner.season_perf_one' : 'planner.season_perfs', locale)}</span
+          >
+          <span class="cal__stat"
+            ><b>{fig(seasonFacts.confirmed)}</b>
+            {t(figOne(seasonFacts.confirmed) ? 'planner.stat_confirmed_one' : 'planner.stat_confirmed', locale)}</span
+          >
+          <span class="cal__stat"
+            ><b>{fig(seasonFacts.holds)}</b>
+            {t(figOne(seasonFacts.holds) ? 'planner.stat_holds_one' : 'planner.stat_holds', locale)}</span
+          >
+          {#if !decisionsAbsent}
+            <span class="cal__stat" class:cal__stat--red={figuresKnown && decisionVMs.length > 0}
+              ><b>{fig(decisionVMs.length)}</b> {t('planner.season_to_decide', locale)}</span
+            >
+          {/if}
+          <span class="cal__stat" class:cal__stat--red={figuresKnown && seasonFacts.clashes > 0}
+            ><b>{fig(seasonFacts.clashes)}</b>
+            {t(figOne(seasonFacts.clashes) ? 'planner.season_clash_one' : 'planner.season_clashes', locale)}</span
+          >
+          <span class="cal__stat"
+            ><b>{fig(seasonFacts.unclosed)}</b> {t('planner.season_unclosed', locale)}</span
+          >
+          <span class="cal__stat"
+            ><b>{fig(seasonFacts.free)}</b>
+            {t(figOne(seasonFacts.free) ? 'planner.stat_free_one' : 'planner.stat_free', locale)}</span
+          >
         {/if}
         {#if view === 'agenda'}
           <span class="cal__stat cal__stat--soft"
@@ -3088,7 +3122,10 @@
              have no last day, so they name where they begin and count
              nothing. -->
         {#if view === 'month'}
-        <span class="cal__stat"><b>{fig(stats.confirmed)}</b> {t('planner.stat_confirmed', locale)}</span>
+        <span class="cal__stat"
+          ><b>{fig(stats.confirmed)}</b>
+          {t(figOne(stats.confirmed) ? 'planner.stat_confirmed_one' : 'planner.stat_confirmed', locale)}</span
+        >
         <!-- `1 holds` was printing on every single-hold month. The design's own
              word for this counter is `option`, and it agrees in number. -->
         <span class="cal__stat"
@@ -3393,7 +3430,9 @@
         !figuresKnown
           ? DASH
           : [
-              firm ? `${firm} ${t('planner.week_confirmed', locale)}` : '',
+              firm
+                ? `${firm} ${t(firm === 1 ? 'planner.week_confirmed_one' : 'planner.week_confirmed', locale)}`
+                : '',
               // ONE IS NOT «1 OPTIONS». The month's gutter kept its counts in a
               // tooltip, so nobody had ever read them as a sentence.
               held
@@ -3403,6 +3442,7 @@
             ]
               .filter(Boolean)
               .join(' · ') || t('planner.week_nothing', locale)}
+      freeNight={engine.isFreeNight}
       onDayOpen={(iso) => {
         dayIso = iso;
         setView('day');
@@ -3639,6 +3679,11 @@
       margin-inline-end: var(--space-2xs);
     }
     /* The stat "per decidir" — the one red figure; a jump, not a decoration. */
+    /* A count that asks for a call takes the danger ink, digits and word. */
+    .cal__stat--red,
+    .cal__stat--red b {
+      color: var(--danger-semi-dark);
+    }
     .cal__stat-chev {
       font-style: normal;
       margin-inline-start: 5px;

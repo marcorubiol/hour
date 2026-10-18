@@ -114,6 +114,9 @@
     weekLabel?: (n: number) => string;
     weekRange?: (from: string, to: string) => string;
     weekTally?: (firm: number, held: number, free: number) => string;
+    /** The census's rule for a free night (today on, not on tour, nothing of
+        the company's own). Without it a night is free when it has no rows. */
+    freeNight?: (day: string) => boolean;
     /**
      * THE VERBS, on the row itself. A hold is a question the diary is asking
      * you; answering it belonged three clicks away in a drawer, so the row
@@ -206,9 +209,10 @@
     allDayWord = t('planner.all_day', L),
     weekLabel = (n: number) => `${t('planner.week_n', L)} ${n}`,
     weekRange = (from: string, to: string) => `${from} → ${to}`,
+    freeNight,
     weekTally = (firm: number, held: number, free: number) =>
       [
-        firm ? `${firm} ${t('planner.week_confirmed', L)}` : '',
+        firm ? `${firm} ${t(firm === 1 ? 'planner.week_confirmed_one' : 'planner.week_confirmed', L)}` : '',
         held ? `${held} ${t(held === 1 ? 'planner.week_option_one' : 'planner.week_options', L)}` : '',
         free ? `${free} ${t(free === 1 ? 'planner.week_free_one' : 'planner.week_free', L)}` : '',
       ]
@@ -388,6 +392,7 @@
     }
     return {
       free: rows.length === 0,
+      sellable: freeNight ? freeNight(day) : rows.length === 0,
       marked:
         Boolean(clashesByDay?.get(day)?.length) || Boolean(notesByDay?.get(day)?.length),
       firm,

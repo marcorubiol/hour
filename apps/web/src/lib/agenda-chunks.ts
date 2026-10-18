@@ -40,6 +40,13 @@ export type AgendaDayStats = {
    * still a free night, but it is not quiet — see `marked`.
    */
   free: boolean;
+  /**
+   * A night the tally COUNTS as free, when the caller has a stricter rule
+   * than «no rows»: from today on, and not on tour (the census's own rule,
+   * so the week and the month say the same number). `free` still decides
+   * what is quiet; this only decides what is sold. Defaults to `free`.
+   */
+  sellable?: boolean;
   /** Something non-calendar marks it (a clash, a note) — it keeps its
       containers from auto-collapsing, or the reader's own writing hides. */
   marked: boolean;
@@ -136,7 +143,7 @@ export function agendaChunks({
     for (const d of span) {
       const s = dayStats(d);
       if (!s.free || s.marked) empty = false;
-      if (s.free) free++;
+      if (s.sellable ?? s.free) free++;
       firm += s.firm;
       held += s.held;
     }
@@ -174,7 +181,7 @@ export function agendaChunks({
       for (const d of seg) {
         const s = dayStats(d);
         if (!s.free || s.marked) wempty = false;
-        if (s.free) wfree++;
+        if (s.sellable ?? s.free) wfree++;
         wfirm += s.firm;
         wheld += s.held;
       }

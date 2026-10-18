@@ -59,7 +59,8 @@ test.describe('the season (ADR-117)', () => {
     // Strip + decide + clashes + unclosed + gaps + away.
     await expect(page.locator('.ov .blk__t')).toHaveCount(6);
     // Nothing is still waiting once the lens says it has loaded.
-    expect(await page.locator('.ov__facts').innerText()).not.toContain('–');
+    // The census lives in the head's window line, with every other drawing's.
+    expect(await page.locator('.cal__meta--window').innerText()).not.toContain('–');
   });
 
   test('A DAY OF THE STRIP OPENS THAT DAY', async ({ page }) => {

@@ -166,25 +166,8 @@
 </script>
 
 <div class="ov">
-  <!-- 1 · THE CENSUS, IN ONE LINE — every figure counts the twelve weeks,
-       never the drawing; a `–` until the feeds land, never a false zero. -->
-  <p class="ov__facts">
-    <span><b>{n(facts.perfs)}</b> {t(facts.perfs === 1 ? 'planner.season_perf_one' : 'planner.season_perfs', locale)}</span>
-    <span><b>{n(facts.confirmed)}</b> {t('planner.season_firm', locale)}</span>
-    <span><b>{n(facts.holds)}</b> {t(facts.holds === 1 ? 'planner.stat_holds_one' : 'planner.stat_holds', locale)}</span>
-    {#if !decisionsAbsent}
-      <span class:ov__red={decisions.length > 0}
-        ><b>{n(decisions.length)}</b> {t('planner.season_to_decide', locale)}</span
-      >
-    {/if}
-    <span class:ov__red={facts.clashes > 0}
-      ><b>{n(facts.clashes)}</b>
-      {t(facts.clashes === 1 ? 'planner.season_clash_one' : 'planner.season_clashes', locale)}</span
-    >
-    <span><b>{n(facts.unclosed)}</b> {t('planner.season_unclosed', locale)}</span>
-    <span><b>{n(facts.free)}</b> {t(facts.free === 1 ? 'planner.stat_free_one' : 'planner.stat_free', locale)}</span>
-  </p>
-
+  <!-- 1 · THE CENSUS lives in the head's window line (the page), in the one
+       strip and the one style every drawing counts in. -->
   <div class="ov__grid">
     <!-- 2 · THE STRIP. Drawn from the first frame, empty, so nothing below
          it moves when the rows arrive. -->
@@ -385,21 +368,7 @@
       gap: var(--space-m);
       margin-block-start: var(--space-s);
     }
-    .ov__facts {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-muted);
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0 0.9em;
-      margin: 0;
-    }
-    .ov__facts b {
-      color: var(--text-color);
-      font-weight: 500;
-    }
-    .ov__red,
-    .ov__red b {
+    .ov__red {
       color: var(--danger-semi-dark);
     }
     .ov__grid {

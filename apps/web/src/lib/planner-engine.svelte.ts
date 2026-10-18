@@ -148,6 +148,13 @@ export function createPlannerEngine(inputs: PlannerEngineInputs) {
     return occupied;
   });
 
+  const tourDays = $derived(daysCoveredBy(aways));
+  /** The census's rule for one night: from today, nothing of the company's
+      own on it, not on tour. The agenda's weekly tally asks this too. */
+  function isFreeNight(day: string): boolean {
+    return day >= todayIso && !occupiedDays.has(day) && !tourDays.has(day);
+  }
+
   // ── Census — counts of the window, every figure a real row (ADR-078
   // §12; no read:money gate — nothing monetary here). ───────────────────
   const stats = $derived.by(() => {
@@ -191,7 +198,13 @@ export function createPlannerEngine(inputs: PlannerEngineInputs) {
        The fix is an unfiltered availability feed — the precedent is the
        blackouts, already fetched without a workspace filter for exactly this
        reason. */
-    const free = nightsFree(days, occupiedDays, daysCoveredBy(aways));
+    // FROM TODAY: a night already lived is not for sale (revisión del
+    // Planner, 2026-10-18 — October said 27 with 18 days gone).
+    const free = nightsFree(
+      days.filter((d) => d >= todayIso),
+      occupiedDays,
+      tourDays,
+    );
 
     return { confirmed, holds, conflicts: conflictCount, blackouts: blackoutCount, free };
   });
@@ -254,6 +267,7 @@ export function createPlannerEngine(inputs: PlannerEngineInputs) {
     get stats() {
       return stats;
     },
+    isFreeNight,
     get decisionPerfById() {
       return decisionPerfById;
     },
