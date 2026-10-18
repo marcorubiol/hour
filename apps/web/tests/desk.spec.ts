@@ -12,6 +12,7 @@ const EMAIL = process.env.PW_TEST_EMAIL ?? '';
 const PASSWORD = process.env.PW_TEST_PASSWORD ?? '';
 const RUN_TAG = Date.now().toString(36);
 const TASK_TODAY = `ZZZ E2E Desk Today ${RUN_TAG}`;
+const TASK_LOOSE = `ZZZ E2E Desk Loose ${RUN_TAG}`;
 const DESK = '/h/desk?scope=s:playwright';
 
 async function playwrightWsId(page: Page): Promise<string> {
@@ -77,18 +78,19 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
       const d = new Date();
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     });
+    // Plus an undated one: «See all» is offered only when the full list has
+    // more than the short one (ADR-127 § 5), and «anytime» stays out of it.
     const status = await page.evaluate(
-      async ({ wsId, title, today }) => {
-        const r = await fetch('/api/tasks', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ title, workspace_id: wsId, due_at: today }),
-        });
-        return r.status;
+      async ({ wsId, title, loose, today }) => {
+        const post = (body: object) =>
+          fetch('/api/tasks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+        const a = await post({ title, workspace_id: wsId, due_at: today });
+        const b = await post({ title: loose, workspace_id: wsId });
+        return [a.status, b.status];
       },
-      { wsId, title: TASK_TODAY, today },
+      { wsId, title: TASK_TODAY, loose: TASK_LOOSE, today },
     );
-    expect(status).toBe(201);
+    expect(status).toEqual([201, 201]);
 
     await page.goto(DESK);
     await waitForLoaded(page);
@@ -99,6 +101,9 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
     await waits.getByRole('button', { name: /^See all by day/ }).click();
     await expect(waits.getByRole('checkbox', { name: TASK_TODAY })).toHaveCount(1);
     await expect(waits.locator('.bucket--today')).toBeVisible();
+    await expect(waits.getByRole('checkbox', { name: TASK_LOOSE })).toHaveCount(1);
+    // The swap leaves the focus on the band's heading, not on <body>.
+    await expect(waits.getByRole('heading', { name: /^Waiting for you/ })).toBeFocused();
     await waits.getByRole('button', { name: 'See less' }).click();
     await expect(waits.getByRole('checkbox', { name: TASK_TODAY })).toHaveCount(1);
 
