@@ -3967,7 +3967,8 @@ lectura que la banda 3 y la puerta de Conversations hacen en cada visita.
 fuera de git): las cifras no cuadraban entre Cuentas, Documentos y Desk. El cobro desde Cuentas iba siempre al bolo y
 nunca a la factura, el diálogo proponía el caché sin impuestos, y la base de «vendido» y «cobrado» no era la misma.
 Marco (2026-10-18) decidió los dos primeros puntos; el resto lo decide el carril `claude/books-fixes` por lo que
-recomendaron los informes, y Marco pidió aplicar todo lo recomendado. Sin migración.
+recomendaron los informes, y Marco pidió aplicar todo lo recomendado. Una migración, solo para las funciones
+canceladas (§ 12).
 
 **Decisión.**
 1. **Un cobro va contra la factura emitida del bolo si la hay** (Marco). Así la factura pasa a cobrada, la pauta
@@ -3989,11 +3990,17 @@ recomendaron los informes, y Marco pidió aplicar todo lo recomendado. Sin migra
 8. **Los pagos de facturas canceladas siguen contando en lo cobrado:** el dinero entró. Decidido a propósito.
 9. Un vencido con conversación se reclama desde la fila (abre la conversación); «Registrar pago» queda en la ficha.
 10. Un formateador de dinero por idioma, con miles siempre, para Cuentas y Desk (`fmtMoney`, `fmtCurrency`).
+11. **Una temporada se escribe «26-27»** en toda la app, como ya hacían Desk, Conversations y los nombres de línea.
+12. **Las funciones canceladas no cuentan** para la fecha de un bolo ni para su número de funciones
+    (`20261018100000_money_bolos_live_functions`, rollback en `build/runbooks/`): la primera función viva decide la
+    temporada y el «por facturar». Un bolo con todas canceladas guarda su primera fecha. Migración sin aplicar en
+    producción: va por su gate.
+13. El selector de lentes guarda el sitio de Cuentas sin nombre mientras pregunta el acceso, y solo la enseña con un sí.
 
 **Queda fuera.** Los pagos que ya se registraron contra el bolo de un bolo con factura siguen fuera de la factura:
 Cuentas los cuenta, Documentos y Desk no. Reanclarlos es una migración de datos sobre producción, que pide su gate
-(`_notes/tasks-archive.md § 34`) y una consulta antes para saber si hay alguno. `list_money_bolos` sigue tomando la
-primera función sin mirar si está cancelada (RPC, migración).
+(`_notes/tasks-archive.md § 34`) y una consulta antes para saber si hay alguno. Quedan para decisión de diseño: una
+sola insignia de estado para las cuatro lentes y cuál de las dos cabeceras de bloque manda (cursiva o eyebrow).
 
 **Re-evaluar cuando** Marco cobre una temporada real con esto (los 60 días por defecto, si «Reclamar» es la acción
 que quiere en la fila) o cuando el modelo de facturación admita varias facturas por bolo a propósito.
