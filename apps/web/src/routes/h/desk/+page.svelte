@@ -722,7 +722,8 @@
       font-size: var(--text-xs);
       letter-spacing: 0.12em;
       text-transform: uppercase;
-      color: var(--primary);
+      /* The rail already says the day: here it whispers. */
+      color: var(--text-faint);
     }
     .desk__subrow {
       display: flex;
