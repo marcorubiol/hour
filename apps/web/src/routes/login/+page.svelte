@@ -8,6 +8,7 @@
    * cost of fetching real conversations before auth.
    */
 
+  import { docTitle } from '$lib/doc-title';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
@@ -100,7 +101,7 @@
 </script>
 
 <svelte:head>
-  <title>{t('app.name')} — {t('login.submit')}</title>
+  <title>{docTitle(t('login.submit'))}</title>
 </svelte:head>
 
 <main class="login">

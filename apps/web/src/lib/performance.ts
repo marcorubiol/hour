@@ -32,7 +32,8 @@ export const PERFORMANCE_CREATE_STATUSES = [
   'confirmed',
 ] as const;
 
-export type StatusTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'faint';
+/** The tones of the one status badge (`StateBadge`, base.css `.badge--*`). */
+export type StatusTone = 'neutral' | 'primary' | 'info' | 'success' | 'warning' | 'danger' | 'faint';
 
 const TONES: Record<PerformanceStatus, StatusTone> = {
   proposed: 'neutral',

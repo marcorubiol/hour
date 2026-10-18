@@ -207,7 +207,8 @@
       align-self: start;
     }
     .week__day--today {
-      color: var(--primary);
+      color: var(--today-ink);
+      font-weight: var(--today-weight);
     }
     .week__day--overdue {
       color: var(--danger);

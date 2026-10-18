@@ -11,6 +11,7 @@
    * token on the next request.
    */
 
+  import { docTitle } from '$lib/doc-title';
   import { page } from '$app/state';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
@@ -132,7 +133,7 @@
 </script>
 
 <svelte:head>
-  <title>{sheet ? `${sheet.title} — ${t('roadsheet.title', locale)}` : t('roadsheet.title', locale)} — Hour</title>
+  <title>{docTitle(sheet?.title, t('roadsheet.title', locale))}</title>
 </svelte:head>
 
 <article class="rs" aria-busy={loading}>

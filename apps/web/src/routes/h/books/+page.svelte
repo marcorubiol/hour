@@ -24,9 +24,11 @@
    * instead of «no bolos». Fee editing lives here by design (ADR-043).
    */
 
+  import { docTitle } from '$lib/doc-title';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
+  import BlockHead from '$lib/components/BlockHead.svelte';
   import Button from '$lib/components/Button.svelte';
   import Chip from '$lib/components/Chip.svelte';
   import MoneyInvoices from '$lib/components/MoneyInvoices.svelte';
@@ -778,14 +780,21 @@
 </script>
 
 {#snippet failed(key: string, retry: () => unknown)}
-  <p class="mny__fail">
+  <p class="load-fail" role="alert">
     <span>{t(key, locale)}</span>
-    <Button size="xs" variant="outline" onclick={() => void retry()}>{t('books.retry', locale)}</Button>
+    <Button size="xs" variant="outline" onclick={() => void retry()}>{t('ui.retry', locale)}</Button>
   </p>
 {/snippet}
 
+<!-- The dashboards' one skeleton (base.css `.ghost-line`): lines a line high. -->
+{#snippet ghost(n: number)}
+  <div class="mny__ghost" aria-hidden="true">
+    {#each Array(n) as _, i (i)}<span class="ghost-line" style:inline-size="{70 - (i % 3) * 15}%">&nbsp;</span>{/each}
+  </div>
+{/snippet}
+
 <svelte:head>
-  <title>{t('books.head_title', locale)}</title>
+  <title>{docTitle(t('lens.money', locale))}</title>
 </svelte:head>
 
 <section class="mny" aria-busy={busy}>
@@ -835,7 +844,7 @@
         {#if loading}
           <div class="figs__row" aria-hidden="true">
             {#each ['books.fig_owed', 'books.fig_to_invoice', 'books.fig_inflow', 'books.fig_season'] as key (key)}
-              <div class="fig"><span class="fig__label">{t(key, locale)}</span><span class="fig__num fig__num--skel">0.000</span></div>
+              <div class="fig"><span class="fig__label eyebrow eyebrow--sub">{t(key, locale)}</span><span class="fig__num stat">{DASH}</span></div>
             {/each}
           </div>
         {:else if !seasonEmpty}
@@ -847,8 +856,8 @@
             {:else}
             <div class="figs__row" data-currency={pos.currency}>
               <button type="button" class="fig" data-fig="owed" onclick={() => showLedger('owed')}>
-                <span class="fig__label">{t('books.fig_owed', locale)}</span>
-                <span class="fig__num">{fmtMoneyCompact(pos.owed)}<span class="fig__cur">{pos.currency}</span></span>
+                <span class="fig__label eyebrow eyebrow--sub">{t('books.fig_owed', locale)}</span>
+                <span class="fig__num stat">{fmtMoneyCompact(pos.owed)}<span class="fig__cur">{pos.currency}</span></span>
                 <span class="fig__sub">
                   {#if pos.overdue > 0}
                     <span class="fig__danger">{t('books.fig_overdue', locale, { amount: fmtMoneyCompact(pos.overdue) })}</span>
@@ -861,18 +870,18 @@
                 </span>
               </button>
               <button type="button" class="fig" data-fig="to_invoice" onclick={() => showLedger('to_invoice')}>
-                <span class="fig__label">{t('books.fig_to_invoice', locale)}</span>
-                <span class="fig__num">{fmtMoneyCompact(pos.toInvoice)}<span class="fig__cur">{pos.currency}</span></span>
+                <span class="fig__label eyebrow eyebrow--sub">{t('books.fig_to_invoice', locale)}</span>
+                <span class="fig__num stat">{fmtMoneyCompact(pos.toInvoice)}<span class="fig__cur">{pos.currency}</span></span>
                 <span class="fig__sub">{pos.toInvoiceCount === 0 ? t('books.fig_to_invoice_none', locale) : t(pos.toInvoiceCount === 1 ? 'books.fig_to_invoice_one' : 'books.fig_to_invoice_many', locale, { n: pos.toInvoiceCount })}</span>
               </button>
               <div class="fig" data-fig="inflow">
-                <span class="fig__label">{t('books.fig_inflow', locale)}</span>
-                <span class="fig__num">{fmtMoneyCompact(pos.inflow30)}<span class="fig__cur">{pos.currency}</span></span>
+                <span class="fig__label eyebrow eyebrow--sub">{t('books.fig_inflow', locale)}</span>
+                <span class="fig__num stat">{fmtMoneyCompact(pos.inflow30)}<span class="fig__cur">{pos.currency}</span></span>
                 <span class="fig__sub">{pos.inflow30Count === 0 ? t('books.fig_inflow_none', locale) : t(pos.inflow30Count === 1 ? 'books.fig_inflow_one' : 'books.fig_inflow_many', locale, { n: pos.inflow30Count })}</span>
               </div>
               <button type="button" class="fig" data-fig="season" onclick={() => showLedger('all')}>
-                <span class="fig__label">{t('books.fig_season', locale)} {seasonLabel(season)}</span>
-                <span class="fig__num">{fmtMoneyCompact(pos.collected)}<span class="fig__cur">{pos.currency}</span></span>
+                <span class="fig__label eyebrow eyebrow--sub">{t('books.fig_season', locale)} {seasonLabel(season)}</span>
+                <span class="fig__num stat">{fmtMoneyCompact(pos.collected)}<span class="fig__cur">{pos.currency}</span></span>
                 <span class="fig__sub">{t('books.fig_collected_of_sold', locale, { amount: fmtMoneyCompact(pos.sold) })}</span>
                 <span class="fig__bar" role="img" aria-label={t('books.fig_bar_aria', locale, { collected: fmtMoney(pos.collected), invoiced: fmtMoney(pos.invoicedOpen), uninvoiced: fmtMoney(pos.uninvoiced) })}>
                   {#each [['collected', pos.collected], ['invoiced', pos.invoicedOpen], ['open', pos.uninvoiced]] as [tone, value] (tone)}
@@ -908,18 +917,17 @@
         <div class="radar" aria-busy={loading}>
           <!-- 2 · Pide atención -->
           <section class="att" aria-label={t('books.attention', locale)}>
-            <header class="block-head">
-              <p class="eyebrow">{t('books.attention', locale)}{#if attention.length > 0}&nbsp;· {attention.length}{/if}</p>
+            <BlockHead title={t('books.attention', locale)} count={loading || invoicesError ? DASH : attention.length}>
               {#if attention.length > ATTENTION_VISIBLE}
-                <button type="button" class="radar__more" onclick={() => (attentionAll = !attentionAll)}>
+                <button type="button" class="block-head__act" onclick={() => (attentionAll = !attentionAll)}>
                   {attentionAll ? t('books.attention_less', locale) : t('books.attention_all', locale, { n: attention.length })}
                 </button>
               {/if}
-            </header>
+            </BlockHead>
             {#if invoicesError}
               {@render failed('books.err_invoices', () => $invoicesQuery.refetch())}
             {:else if loading}
-              <p class="mny__state">{t('desk.loading', locale)}</p>
+              {@render ghost(3)}
             {:else if attention.length === 0}
               <p class="mny__state">{t('books.attention_none', locale)}</p>
             {:else}
@@ -943,11 +951,11 @@
 
           <!-- 3 · Lo que entra -->
           <section class="inflow" aria-label={t('books.inflow', locale)}>
-            <header class="block-head"><p class="eyebrow">{t('books.inflow', locale)}</p></header>
+            <BlockHead title={t('books.inflow', locale)} />
             {#if invoicesError}
               {@render failed('books.err_invoices', () => $invoicesQuery.refetch())}
             {:else if loading}
-              <p class="mny__state">{t('desk.loading', locale)}</p>
+              {@render ghost(3)}
             {:else}
               {#each position.filter((p) => p.overdue > 0) as p (p.currency)}
                 <p class="mny__note inflow__overdue">{t('books.inflow_plus_overdue', locale, { amount: fmtMoneyCompact(p.overdue), currency: p.currency })}</p>
@@ -1009,7 +1017,7 @@
           </div>
 
           {#if loading}
-            <p class="mny__state">{t('desk.loading', locale)}</p>
+            {@render ghost(4)}
           {:else if ledgerRows.length === 0}
             {#if !(seasonEmpty && filter === 'all')}
               <p class="mny__state">{t(filter === 'all' ? 'books.ledger_empty' : 'books.ledger_empty_filter', locale)}</p>
@@ -1287,8 +1295,7 @@
     .mny__season:hover { color: var(--text-color); }
     .mny__season[aria-current='true'] { text-decoration: underline; }
     .mny__state { font-size: var(--text-s); color: var(--text-faint); }
-    /* The system's voice for a failure, as Desk says it (dband__err). */
-    .mny__fail { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-s); margin: 0; font-family: var(--font-display); font-style: italic; font-size: var(--text-s); color: var(--danger); }
+    .mny__ghost { display: grid; gap: var(--space-xs); font-size: var(--text-s); }
     .mny__note { font-size: var(--text-xs); color: var(--text-faint); }
     .mny__empty { display: flex; flex-direction: column; gap: var(--space-s); align-items: flex-start; }
     .mny__empty-acts { display: flex; gap: var(--space-xs); flex-wrap: wrap; }
@@ -1306,9 +1313,7 @@
     }
     button.fig { cursor: pointer; transition: border-color var(--transition); }
     button.fig:hover { border-color: var(--text-faint); }
-    .fig__label { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); }
-    .fig__num { font-family: var(--font-display); font-size: var(--text-xl); line-height: 1.1; color: var(--text-color); font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: var(--space-2xs); flex-wrap: wrap; }
-    .fig__num--skel { color: transparent; background: var(--bg-light); border-radius: var(--radius-s); inline-size: 6ch; }
+    .fig__num { display: flex; align-items: baseline; gap: var(--space-2xs); flex-wrap: wrap; }
     .fig__cur { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); letter-spacing: 0.04em; }
     .fig__sub { font-size: var(--text-xs); color: var(--text-muted); }
     .fig__danger { color: var(--danger); }
@@ -1318,9 +1323,7 @@
     /* While the feeds load the radar keeps roughly its height, so the ledger does not jump down. */
     .radar[aria-busy='true'] { min-block-size: 14rem; }
     .radar { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: var(--space-l); align-items: start; }
-    .radar .block-head { margin-block-end: var(--space-xs); }
-    .radar__more { appearance: none; border: 0; background: none; padding: 0; font: inherit; font-size: var(--text-xs); color: var(--text-muted); cursor: pointer; }
-    .radar__more:hover { color: var(--text-color); }
+    .radar :global(.block-head) { margin-block-end: var(--space-xs); }
     /* One grid for the whole list (rows are subgrids): amounts and buttons
        fall in columns whatever each row's text measures. */
     .att__list { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; column-gap: var(--space-m); }

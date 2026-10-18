@@ -19,6 +19,7 @@
    * backfill are id-addressed (lineUrl falls back to id).
    */
 
+  import { docTitle } from '$lib/doc-title';
   import { page } from '$app/state';
   import { createQuery, createMutation, useQueryClient } from '@tanstack/svelte-query';
   import { goto } from '$app/navigation';
@@ -343,9 +344,7 @@
 </script>
 
 <svelte:head>
-  <title>
-    {activeLine ? `${activeLine.name} · ${activeProject?.name ?? ''}` : t('create.line', locale)}
-  </title>
+  <title>{activeLine ? docTitle(activeLine.name, activeProject?.name) : docTitle(t('create.line', locale))}</title>
 </svelte:head>
 
 <article class="line-detail" aria-busy={isLoading}>

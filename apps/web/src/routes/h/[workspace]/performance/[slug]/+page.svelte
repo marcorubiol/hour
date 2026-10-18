@@ -8,6 +8,7 @@
    * The road sheet sub-view (ADR-023) links from the header.
    */
 
+  import { docTitle } from '$lib/doc-title';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
@@ -625,7 +626,7 @@
 </script>
 
 <svelte:head>
-  <title>{title} — {t('perf.label', locale)} — Hour</title>
+  <title>{docTitle(title, t('perf.label', locale))}</title>
 </svelte:head>
 
 <article class="perf" aria-busy={loading}>
@@ -651,7 +652,7 @@
       </p>
       <h1 class="perf__title"><em>{title}</em></h1>
       <div class="perf__meta">
-        <Menu label={t('perf.change_status', locale)} triggerClass="state-badge" triggerAttrs={{ 'data-tone': performanceStatusTone(perf.status) }}>
+        <Menu label={t('perf.status_menu', locale, { status: performanceStatusLabel(perf.status, locale) })} triggerClass={`badge badge--xs badge--${performanceStatusTone(perf.status)}`}>
           {#snippet trigger()}{performanceStatusLabel(perf.status, locale)}<span class="status-caret" aria-hidden="true">▾</span>{/snippet}
           {#snippet children({ close })}
             {#each PERFORMANCE_STATUSES as s (s)}

@@ -11,8 +11,9 @@
    *
    * Two rules from ADR-096 §6 and the proposal:
    * · THE HEIGHT NEVER JUMPS. The strip's grid is drawn from the first frame,
-   *   and every block keeps its title and a `–` while the feeds load. A block
-   *   that appears late reads as «it didn't load».
+   *   and every block keeps its title, a `–` for its figure and the
+   *   dashboards' one skeleton (`.ghost-line`) for its rows while the feeds
+   *   load (ADR-130 § 3). A block that appears late reads as «it didn't load».
    * · AN EMPTY BLOCK STAYS, IN ONE LINE. A block that disappears reads the
    *   same as one that failed.
    */
@@ -92,8 +93,10 @@
 
 <script lang="ts">
   import { localeDayMonth, localeWeekdayShort, weekdayLabels } from '$lib/datetime';
+  import { DASH } from '$lib/glyphs';
   import { t, type Locale } from '$lib/i18n';
   import { isoWeek } from '$lib/planner';
+  import BlockHead from '$lib/components/BlockHead.svelte';
   import Slip from '$lib/components/planner/Slip.svelte';
   import DecisionBand, {
     type ConcurrenceVM,
@@ -148,7 +151,6 @@
     onCreate,
   }: Props = $props();
 
-  const DASH = '–';
   /** Monday-first weekday words — the month's own (diseño B3: one shape
       for a day's head in every drawing). */
   let dows = $derived(weekdayLabels(localeTag));
@@ -219,9 +221,7 @@
     <!-- 2 · THE STRIP. Drawn from the first frame, empty, so nothing below
          it moves when the rows arrive. -->
     <section class="blk ov__strip" aria-label={t('planner.season_strip', locale, { n: SEASON_WEEKS })}>
-      <div class="blk__h">
-        <h2 class="blk__t">{t('planner.season_strip', locale, { n: SEASON_WEEKS })}</h2>
-      </div>
+      <BlockHead title={t('planner.season_strip', locale, { n: SEASON_WEEKS })} />
       <!-- ONE TAB STOP, ARROWS INSIDE (móvil #8, WCAG 2.4.3): 84 days and 12
            weeks were 96 stops between the head and «Por decidir». The strip
            is one stop that lands on today; ← → walk days, ↑ ↓ weeks, Home
@@ -302,12 +302,9 @@
          choice between two holds. -->
     {#if !decisionsAbsent}
       <section class="blk ov__decide">
-        <div class="blk__h">
-          <h2 class="blk__t">{t('planner.season_b_decide', locale)}</h2>
-          <span class="blk__n" class:ov__red={decisions.length > 0}>{n(decisions.length)}</span>
-        </div>
+        <BlockHead title={t('planner.season_b_decide', locale)} count={n(decisions.length)} alert={decisions.length > 0} />
         {#if loading}
-          <p class="blk__empty">{DASH}</p>
+          <p class="blk__empty" aria-hidden="true"><span class="ghost-line" style:inline-size="60%">&nbsp;</span></p>
         {:else if decisions.length === 0 && concurrences.length === 0}
           <p class="blk__empty">{t('planner.season_none_decide', locale)}</p>
         {:else}
@@ -323,12 +320,9 @@
             id="season-decisions"
           />
         {/if}
-        <div class="blk__h">
-          <h2 class="blk__t">{t('planner.season_b_clashes', locale)}</h2>
-          <span class="blk__n" class:ov__red={clashes.length > 0}>{n(clashes.length)}</span>
-        </div>
+        <BlockHead title={t('planner.season_b_clashes', locale)} count={n(clashes.length)} alert={clashes.length > 0} />
         {#if loading}
-          <p class="blk__empty">{DASH}</p>
+          <p class="blk__empty" aria-hidden="true"><span class="ghost-line" style:inline-size="60%">&nbsp;</span></p>
         {:else if clashes.length === 0}
           <p class="blk__empty">{t('planner.season_none_clashes', locale)}</p>
         {:else}
@@ -346,20 +340,18 @@
       <!-- 4 · NOT CLOSED — confirmed, and something is still empty. Facts as
            chips; the trip is a guess and says so in the inference voice. -->
       <section class="blk">
-        <div class="blk__h">
-          <h2 class="blk__t">{t('planner.season_b_unclosed', locale)}</h2>
-          <span class="blk__n"
-            >{loading
+        <BlockHead
+          title={t('planner.season_b_unclosed', locale)}
+          count={loading
               ? DASH
               : t('planner.season_unclosed_meta', locale, {
                   n: facts.unclosed,
                   m: firmAhead,
                   w: UNCLOSED_WEEKS,
-                }) + (travelOnly > 0 ? ` · ${t('planner.season_unclosed_guess', locale, { n: travelOnly })}` : '')}</span
-          >
-        </div>
+                }) + (travelOnly > 0 ? ` · ${t('planner.season_unclosed_guess', locale, { n: travelOnly })}` : '')}
+        />
         {#if loading}
-          <p class="blk__empty">{DASH}</p>
+          <p class="blk__empty" aria-hidden="true"><span class="ghost-line" style:inline-size="60%">&nbsp;</span></p>
         {:else if unclosed.length === 0}
           <p class="blk__empty">{t('planner.season_none_unclosed', locale, { n: UNCLOSED_WEEKS })}</p>
         {:else}
@@ -378,12 +370,9 @@
 
       <!-- 5 · HOLES — free runs of three nights or more, to sell. -->
       <section class="blk">
-        <div class="blk__h">
-          <h2 class="blk__t">{t('planner.season_b_gaps', locale)}</h2>
-          <span class="blk__n">{t('planner.season_gaps_meta', locale, { n: GAP_MIN_NIGHTS })}</span>
-        </div>
+        <BlockHead title={t('planner.season_b_gaps', locale)} count={t('planner.season_gaps_meta', locale, { n: GAP_MIN_NIGHTS })} />
         {#if loading}
-          <p class="blk__empty">{DASH}</p>
+          <p class="blk__empty" aria-hidden="true"><span class="ghost-line" style:inline-size="60%">&nbsp;</span></p>
         {:else if gaps.length === 0}
           <p class="blk__empty">{t('planner.season_none_gaps', locale, { n: GAP_MIN_NIGHTS })}</p>
         {:else}
@@ -406,11 +395,9 @@
 
       <!-- 6 · OUT — absences and tours that touch the twelve weeks. -->
       <section class="blk">
-        <div class="blk__h">
-          <h2 class="blk__t">{t('planner.season_b_away', locale)}</h2>
-        </div>
+        <BlockHead title={t('planner.season_b_away', locale)} />
         {#if loading}
-          <p class="blk__empty">{DASH}</p>
+          <p class="blk__empty" aria-hidden="true"><span class="ghost-line" style:inline-size="60%">&nbsp;</span></p>
         {:else if away.length === 0}
           <p class="blk__empty">{t('planner.season_none_away', locale)}</p>
         {:else}
@@ -440,9 +427,6 @@
       gap: var(--space-m);
       margin-block-start: var(--space-s);
     }
-    .ov__red {
-      color: var(--danger-semi-dark);
-    }
     .ov__grid {
       display: grid;
       gap: var(--space-l);
@@ -470,29 +454,10 @@
       align-content: start;
       min-width: 0;
     }
-    .blk__h {
-      display: flex;
-      align-items: baseline;
-      gap: var(--space-s);
-      border-block-end: 1px solid color-mix(in oklch, var(--text-color) 12%, transparent);
-      padding-block-end: 4px;
-    }
-    .blk__h:not(:first-child) {
+    /* The head is the dashboards' one (BlockHead); a second head inside a
+       block (the clashes under «to decide») keeps its breath above. */
+    .blk > :global(.block-head:not(:first-child)) {
       margin-block-start: var(--space-s);
-    }
-    .blk__t {
-      font-family: var(--font-mono);
-      font-size: 9.5px;
-      font-weight: 400;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--text-color);
-      margin: 0;
-    }
-    .blk__n {
-      font-family: var(--font-mono);
-      font-size: 9.5px;
-      color: var(--text-muted);
     }
     .blk__empty {
       font-size: var(--text-s);

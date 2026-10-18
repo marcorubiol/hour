@@ -1,27 +1,24 @@
 <script lang="ts">
   /**
-   * StateBadge — show lifecycle indicator.
+   * StateBadge — the one status pill of the app (ADR-130 § 2): conversations,
+   * bolos, functions, invoices, projects, lines. Conversations drew it first
+   * (a soft fill in its tone, a border of the same hue, fills mixed in oklab
+   * so it reads in dark); everything that had its own pill wears this one.
    *
-   * Maps the show.status enum to a visual tone. Border-only, lowercase mono.
-   * Tone via data-tone (see base.css for the variable swap).
-   *
-   * Status → tone mapping (centralised here so consumers pass status, not tone):
-   * - proposed       → neutral
-   * - hold/1st/2nd   → info (blue)
-   * - confirmed      → success (green)
-   * - invoiced       → warning (amber)
-   * - paid/done      → faint
-   * - cancelled      → danger (red)
+   * Consumers pass a tone, never a colour: `statusTone()` for a conversation,
+   * `performanceStatusTone()` for a bolo or a function, `invoiceTone()` for an
+   * invoice. A status that opens a menu is the menu's trigger with the same
+   * classes (`statusBadgeClass`), so it looks the same and its name starts
+   * with the status.
    */
-
-  type Tone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'faint';
+  import type { StatusTone } from '$lib/performance';
 
   interface Props {
     label: string;
-    tone?: Tone;
+    tone?: StatusTone;
   }
 
   let { label, tone = 'neutral' }: Props = $props();
 </script>
 
-<span class="state-badge" data-tone={tone}>{label}</span>
+<span class="badge badge--xs badge--{tone}">{label}</span>

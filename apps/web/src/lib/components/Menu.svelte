@@ -19,8 +19,8 @@
     direction?: 'up' | 'down';
     label?: string;
     triggerClass?: string;
-    /** Extra attributes for the trigger button (e.g. data-tone for a
-        state-badge trigger). Explicit attributes below still win. */
+    /** Extra attributes for the trigger button. Explicit attributes below
+        still win. */
     triggerAttrs?: Record<string, string | undefined>;
     trigger?: Snippet;
     children?: Snippet<[{ close: (returnFocus?: boolean) => void }]>;
