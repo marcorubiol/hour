@@ -723,6 +723,10 @@
     const out: Array<{ key: string; who: string; rest: string; tentative: boolean }> = [];
     railItems.forEach((item, i) => {
       if (!coversDay(day, item.from, item.to)) return;
+      // ONCE PER STRETCH (diseño M2): seven days of «away until 29 Nov · 6
+      // days left», «5 days left»… said one thing seven times. The sentence
+      // lands on the first shown day of the absence; the rail carries it on.
+      if (railLabelDay[i] !== day) return;
       out.push({
         key: `${i}:${day}`,
         // `label` and not `subject`: the naming that already carries the verb
