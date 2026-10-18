@@ -160,21 +160,23 @@
   // ── Dashboard filters (ADR-117): in the URL, so a block's link is the filter ──
   let listFilter = $derived(parseListFilter(page.url.searchParams));
   let lineIds = $derived(scope.lines.map((l) => l.id));
-  let filterChip = $derived(
-    listFilter.temporada && statusFilter !== 'any'
-      ? `${statusLabel(statusFilter as ConversationStatus, locale)} · ${t('overview.this_season', locale).toLowerCase()}`
-      : listFilter.turno === 'nuestro'
-      ? t('overview.due', locale)
-      : listFilter.turno === 'suyo'
-        ? t('overview.turn_theirs_cap', locale)
-        : listFilter.temp === 'caliente'
-          ? t('overview.hot', locale)
-          : listFilter.temp === 'fria'
-            ? t('overview.cold', locale)
-            : listFilter.temporada
-              ? t('overview.this_season', locale)
-              : null,
-  );
+  const TEMP_CHIP: Record<string, string> = {
+    caliente: 'overview.hot',
+    fria: 'overview.cold',
+    ronda: 'overview.cold_round_chip',
+    parada: 'overview.cold_stalled_chip',
+  };
+  /** The chip names the block filter the list wears; a season segment, with its status. */
+  function chipLabel(f: typeof listFilter, status: string): string | null {
+    if (f.temporada && status !== 'any') {
+      return `${statusLabel(status as ConversationStatus, locale)} · ${t('overview.this_season', locale).toLowerCase()}`;
+    }
+    if (f.turno === 'nuestro') return t('overview.due', locale);
+    if (f.turno === 'suyo') return t('overview.turn_theirs_cap', locale);
+    if (f.temp) return t(TEMP_CHIP[f.temp], locale);
+    return f.temporada ? t('overview.this_season', locale) : null;
+  }
+  let filterChip = $derived(chipLabel(listFilter, statusFilter));
 
   function clearListFilter() {
     const params = new URLSearchParams(page.url.searchParams);
@@ -200,7 +202,7 @@
   async function writeTo(picks: { id: string; project_id: string }[]) {
     picking = true;
     picked = picks;
-    await goto('?temp=fria', { noScroll: true, keepFocus: true });
+    await goto('?temp=ronda', { noScroll: true, keepFocus: true });
     await showList();
   }
   let statusOptions = [
@@ -529,6 +531,7 @@
     <ConversationOverview
       filters={{ projectIds: filterIds.projectIds, workspaceIds: filterIds.workspaceIds, lineIds, enabled: !scopeUnresolved }}
       {workspaceSlugById}
+      {projectNameById}
       {locale}
       onstatus={filterSeasonStatus}
       onwrite={canEdit ? writeTo : undefined}

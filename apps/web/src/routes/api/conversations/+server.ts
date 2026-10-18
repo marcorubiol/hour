@@ -10,7 +10,7 @@
  *
  * Each row carries `last_turn` (its last directional email, message or call),
  * so the list can say whose turn it is (ADR-117). The dashboard filters
- * (`turno=nuestro|suyo`, `temp=caliente|fria`, `temporada=actual`, with
+ * (`turno=nuestro|suyo`, `temp=caliente|fria|ronda|parada`, `temporada=actual`, with
  * `line_ids` for the season) are derived, not columns: the scope is read and
  * filtered with `$lib/conversation-overview` (the same rules as the blocks),
  * in the block's order, and only the page is read in full.
@@ -47,7 +47,7 @@ const QuerySchema = v.object({
   q: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(120))),
   season: v.optional(v.string(), 'any'),
   turno: v.optional(v.picklist(['nuestro', 'suyo'])),
-  temp: v.optional(v.picklist(['caliente', 'fria'])),
+  temp: v.optional(v.picklist(['caliente', 'fria', 'ronda', 'parada'])),
   temporada: v.optional(v.literal('actual')),
   line_ids: v.optional(v.string()),
   limit: v.optional(

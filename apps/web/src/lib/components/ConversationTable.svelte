@@ -1,4 +1,6 @@
 <script module lang="ts">
+  import type { TempFilter } from '$lib/conversation-overview';
+
   export interface ConversationFilters {
     projectSlug?: string;
     projectIds?: string[];
@@ -9,7 +11,7 @@
     status?: string;
     /** The dashboard's derived filters (ADR-117): global lens only. */
     turno?: 'nuestro' | 'suyo';
-    temp?: 'caliente' | 'fria';
+    temp?: TempFilter;
     /** Only the current season; `lineIds` (pinned lines) narrow it. */
     temporada?: boolean;
     lineIds?: string[];

@@ -17,7 +17,9 @@
  * - **Caliente**: en conversación o hold con actividad en 14 días, o cualquier
  *   sala que nos escribió en 14 días.
  * - **Se enfría**: nuestro último correo sin respuesta hace 21 días o más; o
- *   una conversación abierta sin nada en 30.
+ *   una conversación abierta sin nada en 30; o ninguna fecha. En dos grupos
+ *   (ADR-126 § 8): las que no contestaron al envío (contactada, recurrente:
+ *   segunda ronda, en bloque) y las paradas (en conversación, hold: una a una).
  * - **La temporada**: de septiembre a agosto por fecha de función; una
  *   conversación sin funciones es de la temporada en curso (está en difusión).
  */
@@ -38,6 +40,14 @@ export const BLOCK_ROWS = 5;
  * apuntaste tú, y diez respuestas no deben esconderlos (ADR-126 § 7).
  */
 export const FOLLOW_UP_ROWS = 2;
+
+/** Las filas de «Se enfría»: las paradas primero, y siempre sitio para la segunda ronda. */
+export function coldBlockRows<R extends OverviewInput>(sorted: readonly R[], now: Date, size = BLOCK_ROWS): R[] {
+  const stalled = sorted.filter((r) => coolingOf(r, now)?.group === 'stalled');
+  const round = sorted.filter((r) => coolingOf(r, now)?.group === 'round');
+  const stalledRows = Math.min(stalled.length, size - Math.min(round.length, FOLLOW_UP_ROWS));
+  return [...stalled.slice(0, stalledRows), ...round.slice(0, size - stalledRows)];
+}
 
 /** Las filas de «Te toca»: respuestas y, con sitio guardado, seguimientos. */
 export function dueBlockRows<R extends OverviewInput>(sorted: readonly R[], now: Date, size = BLOCK_ROWS): R[] {
@@ -190,35 +200,47 @@ export function isHot(row: Pick<OverviewInput, 'status' | 'last' | 'last_in' | '
   return OPEN.has(row.status) && activity !== null && daysSince(activity, now) <= HOT_DAYS;
 }
 
-export type CoolingReason = 'no_reply' | 'idle';
+export type CoolingReason = 'no_reply' | 'idle' | 'no_history';
+/** `round`: no contestó al envío, se recupera con otro; `stalled`: se hablaba de algo, una a una. */
+export type CoolingGroup = 'round' | 'stalled';
 
 export interface Cooling {
   reason: CoolingReason;
-  days: number;
+  /** null: no se sabe de ninguna fecha. */
+  days: number | null;
+  group: CoolingGroup;
 }
+
+const ROUND: ReadonlySet<ConversationStatus> = new Set(['contacted', 'recurring']);
 
 /**
  * Se enfría: le tocaba a la sala y no contesta (nuestro último correo, 21 días),
  * o la conversación abierta lleva 30 días parada. Si te toca a ti, no se enfría:
  * es tuya. Una conversación «contactada» sin ningún evento (de antes del
  * historial, ADR-098) cuenta su sello de contacto como nuestro último correo.
+ * Sin ninguna fecha (alta a mano, importada) también se enfría: son justo las
+ * olvidadas, y no salían en ningún bloque.
  */
 export function coolingOf(
-  row: Pick<OverviewInput, 'status' | 'last' | 'last_in' | 'last_contacted_at' | 'reply_settled_at'>,
+  row: Pick<OverviewInput, 'status' | 'last' | 'last_in' | 'last_contacted_at' | 'reply_settled_at' | 'next_action_at'>,
   now: Date,
 ): Cooling | null {
   if (!AWAITING.has(row.status)) return null;
+  const group: CoolingGroup = ROUND.has(row.status) ? 'round' : 'stalled';
   const turn = turnOf(row, now);
-  if (turn?.side === 'ours') return null;
-  if (turn?.side === 'theirs' && turn.days >= COLD_REPLY_DAYS) return { reason: 'no_reply', days: turn.days };
+  // Te toca (una respuesta o un seguimiento vencido): es tuya, no se enfría.
+  if (turn?.side === 'ours' || followUpDue(row, now)) return null;
+  if (turn?.side === 'theirs' && turn.days >= COLD_REPLY_DAYS) return { reason: 'no_reply', days: turn.days, group };
   if (!row.last && !row.last_in && row.status === 'contacted' && row.last_contacted_at) {
     const days = daysSince(row.last_contacted_at, now);
-    if (days >= COLD_REPLY_DAYS) return { reason: 'no_reply', days };
+    if (days >= COLD_REPLY_DAYS) return { reason: 'no_reply', days, group };
   }
   const activity = lastActivity(row);
+  // Sin ninguna fecha y sin nada apuntado: olvidada. Con un seguimiento futuro, no.
+  if (!activity && !turn && !row.next_action_at) return { reason: 'no_history', days: null, group };
   if (OPEN.has(row.status) && activity) {
     const days = daysSince(activity, now);
-    if (days >= COLD_IDLE_DAYS) return { reason: 'idle', days };
+    if (days >= COLD_IDLE_DAYS) return { reason: 'idle', days, group };
   }
   return null;
 }
@@ -274,7 +296,9 @@ export function countByStatus(rows: readonly Pick<OverviewInput, 'status'>[]): S
 // ── Los filtros de la lista ────────────────────────────────────────────────
 
 export type TurnFilter = 'nuestro' | 'suyo';
-export type TempFilter = 'caliente' | 'fria';
+/** `ronda` y `parada`: los dos grupos de «se enfría» (ADR-126 § 8). */
+export type TempFilter = 'caliente' | 'fria' | 'ronda' | 'parada';
+const TEMP_FILTERS: readonly string[] = ['caliente', 'fria', 'ronda', 'parada'];
 
 export interface ListFilter {
   turno?: TurnFilter;
@@ -288,7 +312,7 @@ export function parseListFilter(params: URLSearchParams): ListFilter {
   const temp = params.get('temp');
   return {
     turno: turno === 'nuestro' || turno === 'suyo' ? turno : undefined,
-    temp: temp === 'caliente' || temp === 'fria' ? temp : undefined,
+    temp: temp && TEMP_FILTERS.includes(temp) ? (temp as TempFilter) : undefined,
     temporada: params.get('temporada') === 'actual' || undefined,
   };
 }
@@ -316,6 +340,8 @@ export function applyListFilter<R extends OverviewInput>(
   }
   if (f.temp === 'caliente') out = sortHot(out.filter((r) => isHot(r, now)));
   if (f.temp === 'fria') out = sortCold(out.filter((r) => coolingOf(r, now) !== null), now);
+  if (f.temp === 'ronda') out = sortCold(out.filter((r) => coolingOf(r, now)?.group === 'round'), now);
+  if (f.temp === 'parada') out = sortCold(out.filter((r) => coolingOf(r, now)?.group === 'stalled'), now);
   return out;
 }
 
@@ -340,8 +366,17 @@ function sortHot<R extends OverviewInput>(rows: R[]): R[] {
   return rows.sort((a, b) => Date.parse(lastActivity(b) ?? '') - Date.parse(lastActivity(a) ?? ''));
 }
 
+/** Paradas primero (se recuperan una a una), y dentro la más fría; sin fecha, al final. */
 function sortCold<R extends OverviewInput>(rows: R[], now: Date): R[] {
-  return rows.sort((a, b) => coolingOf(b, now)!.days - coolingOf(a, now)!.days);
+  const key = (r: R) => {
+    const c = coolingOf(r, now)!;
+    return [c.group === 'stalled' ? 0 : 1, c.days === null ? 1 : 0, -(c.days ?? 0)];
+  };
+  return rows.sort((a, b) => {
+    const [ga, na, da] = key(a);
+    const [gb, nb, db] = key(b);
+    return ga - gb || na - nb || da - db;
+  });
 }
 
 // ── Los bloques ────────────────────────────────────────────────────────────
@@ -374,7 +409,8 @@ export interface HotRow extends BlockRow {
 
 export interface ColdRow extends BlockRow {
   reason: CoolingReason;
-  days: number;
+  days: number | null;
+  group: CoolingGroup;
   subject: string | null;
 }
 
@@ -397,8 +433,12 @@ export interface ConversationOverview {
   };
   due: Block<DueRow>;
   hot: Block<HotRow>;
-  /** `ids`: todas, para «Escribir a estas» (con su proyecto: un envío es de uno). */
-  cold: Block<ColdRow> & { picks: { id: string; project_id: string }[] };
+  /**
+   * `picks`: las de segunda ronda, para «Escribir a estas» (con su proyecto: un
+   * envío es de uno). Las paradas no van en bloque. `round`/`stalled`: cuántas
+   * hay de cada grupo.
+   */
+  cold: Block<ColdRow> & { round: number; stalled: number; picks: { id: string; project_id: string }[] };
 }
 
 function blockRow(r: OverviewInput): BlockRow {
@@ -457,11 +497,19 @@ export function buildOverview(
     },
     cold: {
       count: cold.length,
-      rows: cold.slice(0, BLOCK_ROWS).map((r) => {
+      rows: coldBlockRows(cold, now).map((r) => {
         const c = coolingOf(r, now)!;
-        return { ...blockRow(r), reason: c.reason, days: c.days, subject: c.reason === 'no_reply' ? (r.last?.subject ?? null) : null };
+        return {
+          ...blockRow(r),
+          reason: c.reason,
+          days: c.days,
+          group: c.group,
+          subject: c.reason === 'no_reply' ? (r.last?.subject ?? null) : null,
+        };
       }),
-      picks: cold.map((r) => ({ id: r.id, project_id: r.project_id })),
+      round: cold.filter((r) => coolingOf(r, now)!.group === 'round').length,
+      stalled: cold.filter((r) => coolingOf(r, now)!.group === 'stalled').length,
+      picks: cold.filter((r) => coolingOf(r, now)!.group === 'round').map((r) => ({ id: r.id, project_id: r.project_id })),
     },
   };
 }

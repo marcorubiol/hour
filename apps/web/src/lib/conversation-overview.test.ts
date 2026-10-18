@@ -123,13 +123,14 @@ describe('isHot', () => {
 
 describe('coolingOf', () => {
   it(`nuestro correo sin respuesta desde hace ${COLD_REPLY_DAYS} días`, () => {
-    expect(coolingOf(row('a', outbound(COLD_REPLY_DAYS)), NOW)).toEqual({ reason: 'no_reply', days: COLD_REPLY_DAYS });
+    expect(coolingOf(row('a', outbound(COLD_REPLY_DAYS)), NOW)).toEqual({ reason: 'no_reply', days: COLD_REPLY_DAYS, group: 'round' });
     expect(coolingOf(row('b', outbound(COLD_REPLY_DAYS - 1)), NOW)).toBeNull();
   });
   it(`una conversación abierta parada ${COLD_IDLE_DAYS} días`, () => {
     expect(coolingOf(row('a', { status: 'in_conversation', last_contacted_at: ago(COLD_IDLE_DAYS) }), NOW)).toEqual({
       reason: 'idle',
       days: COLD_IDLE_DAYS,
+      group: 'stalled',
     });
     expect(coolingOf(row('b', { status: 'hold', last_contacted_at: ago(COLD_IDLE_DAYS - 1) }), NOW)).toBeNull();
   });
@@ -137,8 +138,18 @@ describe('coolingOf', () => {
     expect(coolingOf(row('a', { status: 'in_conversation', ...inbound(60) }), NOW)).toBeNull();
   });
   it('una contactada de antes del historial cuenta su sello de contacto', () => {
-    expect(coolingOf(row('a', { last_contacted_at: ago(40) }), NOW)).toEqual({ reason: 'no_reply', days: 40 });
-    expect(coolingOf(row('b'), NOW)).toBeNull();
+    expect(coolingOf(row('a', { last_contacted_at: ago(40) }), NOW)).toEqual({ reason: 'no_reply', days: 40, group: 'round' });
+  });
+  it('sin ninguna fecha se enfría: son las olvidadas', () => {
+    expect(coolingOf(row('b'), NOW)).toEqual({ reason: 'no_history', days: null, group: 'round' });
+    expect(coolingOf(row('c', { status: 'hold' }), NOW)).toEqual({ reason: 'no_history', days: null, group: 'stalled' });
+  });
+  it('un seguimiento vencido es tuyo y uno futuro no está olvidado: no se enfrían', () => {
+    expect(coolingOf(row('a', { status: 'hold', next_action_at: day(-2) }), NOW)).toBeNull();
+    expect(coolingOf(row('b', { status: 'hold', next_action_at: day(5) }), NOW)).toBeNull();
+  });
+  it('una negociación sin respuesta es una parada, no segunda ronda', () => {
+    expect(coolingOf(row('a', { status: 'in_conversation', ...outbound(40) }), NOW)?.group).toBe('stalled');
   });
   it('confirmada, rechazada o en pausa no se enfrían', () => {
     for (const status of ['confirmed', 'declined', 'dormant'] as const) {
@@ -206,8 +217,17 @@ describe('filtros de la lista', () => {
     expect(applyListFilter(rows, { turno: 'suyo' }, NOW).map((r) => r.id)).toEqual(['les-toca']);
   });
   it('se enfría: la más fría primero; caliente: la más reciente primero', () => {
-    const rows = [row('a', outbound(25)), row('b', outbound(40)), row('c', inbound(3)), row('d', inbound(1))];
-    expect(applyListFilter(rows, { temp: 'fria' }, NOW).map((r) => r.id)).toEqual(['b', 'a']);
+    const rows = [
+      row('a', outbound(25)),
+      row('b', outbound(40)),
+      row('c', inbound(3)),
+      row('d', inbound(1)),
+      row('e', { status: 'in_conversation', ...outbound(30) }),
+      row('f'),
+    ];
+    expect(applyListFilter(rows, { temp: 'fria' }, NOW).map((r) => r.id)).toEqual(['e', 'b', 'a', 'f']);
+    expect(applyListFilter(rows, { temp: 'ronda' }, NOW).map((r) => r.id)).toEqual(['b', 'a', 'f']);
+    expect(applyListFilter(rows, { temp: 'parada' }, NOW).map((r) => r.id)).toEqual(['e']);
     expect(applyListFilter(rows, { temp: 'caliente' }, NOW).map((r) => r.id)).toEqual(['d', 'c']);
   });
   it('temporada y estado se combinan con el resto', () => {
@@ -230,6 +250,7 @@ describe('buildOverview', () => {
     expect(o.due.rows).toHaveLength(BLOCK_ROWS);
     expect(o.due.rows[0]).toMatchObject({ id: 'due0', reason: 'reply', subject: 'Re: 0' });
     expect(o.cold.count).toBe(3);
+    expect(o.cold.round).toBe(3);
     expect(o.cold.picks).toEqual([
       { id: 'cold2', project_id: 'p2' },
       { id: 'cold1', project_id: 'p1' },

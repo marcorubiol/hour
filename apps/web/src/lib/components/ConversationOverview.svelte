@@ -19,6 +19,7 @@
   import { dayMonth } from '$lib/datetime';
   import { t, type Locale } from '$lib/i18n';
   import {
+    daysAgoLabel,
     eventKindLabel,
     relativeContactDate,
     statusBadgeClass,
@@ -40,6 +41,8 @@
   interface Props {
     filters: { projectIds: string[]; workspaceIds: string[]; lineIds: string[]; enabled: boolean };
     workspaceSlugById: Map<string, string>;
+    /** Names «Escribir a estas» per project when the cooling spans several. */
+    projectNameById: Map<string, string>;
     locale: Locale;
     /** Pulsar un tramo de la temporada: filtra la lista por ese estado en la temporada. */
     onstatus: (status: ConversationStatus) => void;
@@ -48,7 +51,14 @@
     onwrite?: (picks: { id: string; project_id: string }[]) => void;
   }
 
-  let { filters, workspaceSlugById, locale, onstatus, onwrite }: Props = $props();
+  let { filters, workspaceSlugById, projectNameById, locale, onstatus, onwrite }: Props = $props();
+
+  type Pick = { id: string; project_id: string };
+  function picksByProject(picks: Pick[]): { projectId: string; picks: Pick[] }[] {
+    const by = new Map<string, Pick[]>();
+    for (const p of picks) by.set(p.project_id, [...(by.get(p.project_id) ?? []), p]);
+    return [...by.entries()].map(([projectId, list]) => ({ projectId, picks: list })).sort((a, b) => b.picks.length - a.picks.length);
+  }
 
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -71,6 +81,7 @@
   );
 
   let data = $derived($query.data ?? null);
+  let pickGroups = $derived(data ? new Set(data.cold.picks.map((p) => p.project_id)).size : 0);
   let loading = $derived($query.isLoading || !filters.enabled);
   let seasonStatuses = $derived(
     data ? CONVERSATION_STATUSES.filter((s) => data.season.counts[s] > 0) : [],
@@ -293,21 +304,31 @@
           <p class="block__empty">{t('overview.cold_empty', locale)}</p>
         {:else}
           <ol class="rows">
-            {#each data.cold.rows as row (row.id)}
+            {#each data.cold.rows as row, i (row.id)}
+              {#if i === 0 || data.cold.rows[i - 1].group !== row.group}
+                <li class="rows__sep">
+                  {#if row.group === 'stalled'}
+                    <a href="?temp=parada#lista">{t('overview.cold_stalled', locale, { n: data.cold.stalled })}</a>
+                  {:else}
+                    <a href="?temp=ronda#lista">{t('overview.cold_round', locale, { n: data.cold.round })}</a>
+                  {/if}
+                </li>
+              {/if}
               <li>
                 <a class="row" href={href(row)}>
                   {@render who(row)}
                   <span class="row__what"
-                    >{row.reason === 'no_reply'
-                      ? row.subject
-                        ? t('overview.cold_last_mail', locale, { subject: row.subject })
-                        : t('overview.cold_no_reply', locale)
-                      : t('overview.cold_idle', locale, { status: statusLabel(row.status, locale) })}</span
+                    >{row.reason === 'no_history'
+                      ? t('overview.cold_no_history', locale)
+                      : row.reason === 'no_reply'
+                        ? row.subject
+                          ? t('overview.cold_last_mail', locale, { subject: row.subject })
+                          : t('overview.cold_no_reply', locale)
+                        : t('overview.cold_idle', locale, { status: statusLabel(row.status, locale) })}</span
                   >
                   <span class="row__when"
-                    ><strong>{t('overview.days', locale, { n: row.days })}</strong>{row.reason === 'no_reply'
-                      ? t('overview.no_reply', locale)
-                      : t('overview.idle', locale)}</span
+                    ><strong>{row.days === null ? t('overview.no_date', locale) : daysAgoLabel(row.days, locale)}</strong
+                    >{row.group === 'stalled' && row.reason !== 'no_reply' ? t('overview.idle', locale) : t('overview.no_reply', locale)}</span
                   >
                 </a>
               </li>
@@ -315,8 +336,17 @@
           </ol>
           <div class="block__foot">
             <span class="block__hint">{t('overview.cold_rule', locale, { reply: COLD_REPLY_DAYS, idle: COLD_IDLE_DAYS })}</span>
-            {#if onwrite}
-              <Button size="s" onclick={() => onwrite(data.cold.picks)}>{t('overview.write_these', locale, { n: data.cold.count })}</Button>
+            {#if onwrite && data.cold.picks.length > 0}
+              <!-- A mailout is of one project (ADR-118 § 8): one button per project, never a blocked bar. -->
+              <span class="block__acts">
+                {#each picksByProject(data.cold.picks) as g (g.projectId)}
+                  <Button size="s" onclick={() => onwrite(g.picks)}
+                    >{pickGroups > 1
+                      ? t('overview.write_these_project', locale, { project: projectNameById.get(g.projectId) ?? '', n: g.picks.length })
+                      : t('overview.write_these', locale, { n: g.picks.length })}</Button
+                  >
+                {/each}
+              </span>
             {/if}
           </div>
         {/if}
@@ -433,6 +463,18 @@
     .block__hint {
       font-size: var(--text-xs);
       color: var(--text-faint);
+    }
+    .block__acts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-xs);
+    }
+    .rows__sep a {
+      color: inherit;
+      text-decoration: none;
+    }
+    .rows__sep a:hover {
+      color: var(--text-color);
     }
     .block__foot {
       display: flex;
