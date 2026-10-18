@@ -789,7 +789,9 @@
         {:else if !seasonEmpty}
           {#each position as pos, i (pos.currency)}
             {#if i > 0 && isQuietPosition(pos)}
+            {#if pos.sold > 0 || pos.holds > 0}
             <p class="figs__quiet" data-currency={pos.currency}>{t('books.fig_quiet_currency', locale, { amount: fmtMoneyCompact(pos.sold), currency: pos.currency, season: seasonLabel(season) })}{#if pos.holds > 0}{` · ${t('books.fig_holds', locale, { amount: fmtMoneyCompact(pos.holds), n: pos.holdsCount })}`}{/if}</p>
+            {/if}
             {:else}
             <div class="figs__row" data-currency={pos.currency}>
               <button type="button" class="fig" data-fig="owed" onclick={() => showLedger('owed')}>
