@@ -223,7 +223,7 @@
   const moneyOf = (b: MoneyBolo): BoloMoney => moneyById.get(b.id) ?? boloMoney(b, ctx);
 
   // ── Season ────────────────────────────────────────────────────────────
-  let currentSeason = $derived(seasonOf(today.toISOString()));
+  let currentSeason = $derived(seasonOf(localDayISO(today)));
   let seasons = $derived(seasonsOf(bolos, today));
   let pickedSeason = $state<number | null>(null);
   let season = $derived(pickedSeason ?? currentSeason);

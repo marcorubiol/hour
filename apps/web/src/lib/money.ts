@@ -8,6 +8,7 @@
 
 import * as v from 'valibot';
 import { Constants, type Enums } from './db-types';
+import { localDayISO } from './datetime';
 import { appLocale, LOCALE_TAG, t, type Locale } from './i18n';
 
 export type PaymentMethod = Enums<'payment_method'>;
@@ -305,7 +306,7 @@ export function agingState(
 			: invoice.due_on
 				? 'due'
 				: 'default';
-	const todayDay = today.toISOString().slice(0, 10);
+	const todayDay = localDayISO(today);
 	const daysRunning = Math.max(0, daysBetween(invoice.issued_on, todayDay));
 	const expectedDays = expectedOn
 		? Math.max(0, daysBetween(invoice.issued_on, expectedOn))
@@ -528,12 +529,12 @@ export function seasonLabel(start: number): string {
  * no function yet is a live deal, so it lives in the season of today.
  */
 export function boloSeason(bolo: Pick<MoneyBolo, 'next_performed_at'>, today: Date): number {
-	return seasonOf(bolo.next_performed_at ?? today.toISOString());
+	return seasonOf(bolo.next_performed_at ?? localDayISO(today));
 }
 
 /** The seasons there is anything to show for, newest first; today's always included. */
 export function seasonsOf(bolos: readonly Pick<MoneyBolo, 'next_performed_at'>[], today: Date): number[] {
-	const set = new Set<number>([seasonOf(today.toISOString())]);
+	const set = new Set<number>([seasonOf(localDayISO(today))]);
 	for (const b of bolos) set.add(boloSeason(b, today));
 	return [...set].sort((a, b) => b - a);
 }
@@ -631,8 +632,9 @@ export interface MoneyContext {
 	today: Date;
 }
 
+/** Today on the reader's wall clock: at 00:30 in Madrid it is already tomorrow's date, not UTC's. */
 function todayDay(today: Date): string {
-	return today.toISOString().slice(0, 10);
+	return localDayISO(today);
 }
 
 export function boloMoney(b: MoneyBolo, ctx: MoneyContext): BoloMoney {

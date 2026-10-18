@@ -164,6 +164,12 @@ describe('boloMoney', () => {
 		expect(m.overdue).toBe(true);
 	});
 
+	it('reads today on the local clock, not UTC (00:30 on 1 Oct is already 1 Oct)', () => {
+		const inv = invoice({ id: 'i', bolo: 'b', expected_on: '2026-09-30' });
+		const justAfterMidnight = new Date(2026, 9, 1, 0, 30);
+		expect(boloMoney(bolo({ id: 'b' }), ctx([inv], { today: justAfterMidnight })).overdue).toBe(true);
+	});
+
 	it('is overdue against the EXPECTED date, not due_on', () => {
 		// due_on passed, but the payer observably pays at 60 days: not late yet.
 		const inv = invoice({
