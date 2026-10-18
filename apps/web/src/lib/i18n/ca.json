@@ -2073,12 +2073,16 @@
   "desk.changed_kind_reply": "conversa",
   "desk.changed_kind_mailout": "enviament en bloc",
   "desk.door_planner_n": "funcions confirmades",
-  "desk.door_planner_sub": "{holds} en hold · {travel} viatges · 12 setmanes",
-  "desk.door_conv_n": "holds a la temporada",
+  "desk.door_planner_sub": "{holds} per decidir · {travel}",
+  "desk.door_planner_window": "properes 12 setmanes",
+  "desk.door_travel_one": "1 dia de viatge",
+  "desk.door_travel_many": "{n} dies de viatge",
+  "desk.door_conv_n": "converses en hold",
   "desk.door_conv_sub": "{live} vives",
   "desk.door_conv_due": "et toca a {n}",
   "desk.door_money_n": "per cobrar",
   "desk.door_money_sub": "{amount} vençut",
+  "desk.door_money_none": "res vençut",
   "desk.door_error": "no disponible",
   "desk.calm_folded": "El que ha canviat i la temporada esperen fora del mode calma"
 }

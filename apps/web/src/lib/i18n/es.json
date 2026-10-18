@@ -2073,12 +2073,16 @@
   "desk.changed_kind_reply": "conversación",
   "desk.changed_kind_mailout": "envío en bloque",
   "desk.door_planner_n": "funciones confirmadas",
-  "desk.door_planner_sub": "{holds} en hold · {travel} viajes · 12 semanas",
-  "desk.door_conv_n": "holds en la temporada",
+  "desk.door_planner_sub": "{holds} por decidir · {travel}",
+  "desk.door_planner_window": "próximas 12 semanas",
+  "desk.door_travel_one": "1 día de viaje",
+  "desk.door_travel_many": "{n} días de viaje",
+  "desk.door_conv_n": "conversaciones en hold",
   "desk.door_conv_sub": "{live} vivas",
   "desk.door_conv_due": "te toca en {n}",
   "desk.door_money_n": "por cobrar",
   "desk.door_money_sub": "{amount} vencido",
+  "desk.door_money_none": "nada vencido",
   "desk.door_error": "no disponible",
   "desk.calm_folded": "Lo que ha cambiado y la temporada esperan fuera del modo calma"
 }
