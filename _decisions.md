@@ -4468,3 +4468,49 @@ choques en la puerta del Planner y los cobros y cambios de estado en «Ha cambia
 
 **Límite conocido.** El feed de funciones del pulso trae 200 desde hoy, sin paginar; la Temporada pagina. En una
 compañía con más de 200 funciones en doce semanas la puerta contaría de menos. No es el caso en Phase 0.
+
+## [2026-10-19] ADR-134 · Conversaciones, una lente con dos vistas: Difusión y Equipo (enmienda ADR-106, 116, 124 y 128)
+
+**Contexto.** Con el vocabulario de oficio (ADR-128) la lente de conversaciones pasó a llamarse Difusión (o
+Contratación en música), y lo que el equipo habla entre sí quedó escondido dentro, como su segunda proyección «de qué
+se habla» (ADR-106, ADR-116). Marco validó en el Drop (18-10) separarlo en dos lentes; el carril `claude/team-place`
+construyó Equipo como lente propia (`/h/team`, apagable con `team` en `lenses_off`), y antes de integrarla Marco
+decidió otra cosa (19-10): una sola lente, Conversaciones, con dos vistas dentro. **Esta decisión sustituye la
+separación en dos lentes, que se construyó y no llegó a integrarse.**
+
+**Decisión.**
+1. **La lente se llama Conversaciones** (Converses, Conversations, Conversations), igual en los dos oficios: es el
+   concepto de Hour, hablar con salas, con el equipo o con quien sea. Enmienda ADR-128 § 3: la palabra de oficio
+   (Difusión o Contratación) ya no nombra la lente, nombra su vista de venta (`conversations.view_sales`, con su
+   variante `@music`). Donde la app decía la lente para hablar de conversaciones (la columna de la tabla, el bloque de
+   la ficha de una persona o de una organización, la puerta del Desk), ahora dice Conversaciones.
+2. **Dos vistas en la cabecera de la lente**, como los antiguos fragmentos «Con quién hablas · De qué se habla»:
+   **Difusión** (Contratación en música; Difusió/Contractació, Diffusion/Booking, Booking/Booking), con el panel, la
+   lista de salas, la ficha y el envío; y **Equipo** (Equip, Équipe, Team), con los hilos que quien mira puede leer
+   (`thread_feed` sin cambios, ADR-116: los nuevos arriba, solo lectura, se escribe en la ficha).
+3. **URL.** `/h/conversations` abre Difusión y `/h/conversations?view=team` abre Equipo, con el mismo alcance.
+   `?view=threads` redirige con 301 a `?view=team` (conserva el resto de la query): una carga completa en
+   `hooks.server.ts`, como `/h/money`, y una navegación dentro de la app en el `+page.ts` de la lente. Solo el `load`
+   universal no basta: en una carga completa el shell se queda en blanco («replaceState before router is
+   initialized»). No hay ruta `/h/team`.
+4. **Sin Converses la lente sigue, por Equipo** (enmienda ADR-124 § sobre la lente). Un hilo se lee por su regla
+   (ADR-106: la conversación, la cadena del contenedor o la faceta), no por Converses: quien no lee conversaciones
+   puede leer el General de un bolo. Así que el selector ya no esconde Conversaciones por acceso; sin Converses la
+   lente abre en Equipo, no enseña la vista Difusión ni «Añadir», «Seleccionar» o importar, y la línea «No tienes
+   acceso a las conversaciones» desaparece. La puerta de Conversaciones del Desk sigue gateada por Converses: su cifra
+   es de venta.
+5. **Apagar la lente** (ADR-132) apaga las dos vistas: Conversaciones es una lente, no dos. Con ella apagada el Desk
+   deja de leer también los hilos.
+6. **Difusión pierde su bloque «Del equipo».** El dashboard de la vista de venta responde a cómo van las salas; lo
+   del equipo está a un clic, en la cabecera. `/api/conversations/overview` deja de leer `thread_feed` (una RPC menos
+   por carga). El hilo del equipo de cada sala sigue dentro de su ficha.
+7. **Desk.** «Ha cambiado» sigue enseñando los hilos con nuevos; cuando hay alguno, su cabecera lleva «Equipo →» a
+   la vista Equipo.
+8. **De la versión en dos lentes no queda nada en el esquema.** La migración de `team` en `lenses_off` se retiró. Se
+   queda, aparte, `20261019100000_reserve_books_slug`: `is_reserved_slug` reserva `books`, que el espejo de la app
+   reservaba desde ADR-119 y la base no (un alias `books` pasaba la base y nunca resolvía). Aditiva, aborta si algún
+   espacio usa ese alias; rollback en `build/runbooks/rollback-20261019-reserve-books-slug.sql`, probado ida y vuelta
+   en local (la función vuelve idéntica). Independiente del Worker: se aplica antes o después del deploy.
+
+**Enmienda.** ADR-106, «La lente»: siguen siendo dos proyecciones de una lente, ahora con nombre propio (Difusión y
+Equipo). ADR-116 § 6: la proyección va en `?view=team` y los fragmentos se llaman Difusión · Equipo.

@@ -242,6 +242,10 @@ The nav layer is **one home + three lenses**:
   direction). A ⌘K lens.
 - **Money** — fees / invoices / expenses; gated by `read:money`. A ⌘K lens.
 
+Since 2026-10-19 (ADR-134) the Conversations lens has two views in its header: **Difusión** (the trade word,
+Contratación in music: conversations with venues, dashboard, list, mailout) and **Equipo** (`?view=team`, the
+internal threads the viewer can read). The lens keeps the name Conversaciones in every trade.
+
 **Dropped: the "Time" merge** (Desk + Planner into one lens). Good naming dissolved it — with **Desk**
 clearly ≠ **Planner**, the redundancy that motivated the merge is gone. They stay separate (the "now /
 what do I do" vs planning), a gap D3 (tasks) only widens.
