@@ -482,7 +482,7 @@
     }
     .wk {
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size: 11px;
       color: var(--text-muted);
       text-align: start;
       align-self: center;
@@ -493,6 +493,9 @@
       border: 0;
       padding: 0;
       cursor: pointer;
+    }
+    .wk__w {
+      font-size: 9px;
     }
     .wk b {
       color: var(--text-color);
@@ -545,9 +548,11 @@
         transparent 1px 8px
       );
     }
+    /* What is READ takes an 11px floor (móvil #6): the day's number and the
+       week's. 9px stays for what is only a key. */
     .d__n {
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size: 11px;
       color: var(--text-muted);
     }
     .d__n i {
