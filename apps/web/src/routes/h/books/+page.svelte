@@ -408,6 +408,8 @@
     // Owed and not late yet: when it is expected says more than «unpaid».
     const expected = m.owed > 0 && m.aging?.expectedOn ? shortDay(m.aging.expectedOn) : null;
     if (m.collect === 'partial') return { tone: 'warn', label: expected ? t('books.pill_partial_expected', locale, { date: expected }) : t('books.pill_partial', locale) };
+    // Nothing owed yet (no issued document, or the deal is not confirmed): not a debt, no pill.
+    if (m.collect === 'unpaid' && m.owed === 0) return null;
     if (m.collect === 'unpaid') return { tone: 'faint', label: expected ? t('books.pill_expected', locale, { date: expected }) : t('books.pill_unpaid', locale) };
     return null;
   }
