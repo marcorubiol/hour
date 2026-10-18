@@ -47,7 +47,7 @@ const QuerySchema = v.object({
   q: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(120))),
   season: v.optional(v.string(), 'any'),
   turno: v.optional(v.picklist(['nuestro', 'suyo'])),
-  temp: v.optional(v.picklist(['caliente', 'fria', 'ronda', 'parada'])),
+  temp: v.optional(v.picklist(['caliente', 'fria', 'ronda', 'parada', 'sin-fecha'])),
   temporada: v.optional(v.literal('actual')),
   // ADR-126 § 9: the recipients of a mailout behind one of its figures.
   envio: v.optional(v.pipe(v.string(), v.uuid())),

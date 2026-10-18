@@ -14,6 +14,7 @@ import {
   followUpDue,
   inSeason,
   isHot,
+  isUndated,
   mailoutFigures,
   parseListFilter,
   seasonOf,
@@ -140,9 +141,22 @@ describe('coolingOf', () => {
   it('una contactada de antes del historial cuenta su sello de contacto', () => {
     expect(coolingOf(row('a', { last_contacted_at: ago(40) }), NOW)).toEqual({ reason: 'no_reply', days: 40, group: 'round' });
   });
-  it('sin ninguna fecha se enfría: son las olvidadas', () => {
-    expect(coolingOf(row('b'), NOW)).toEqual({ reason: 'no_history', days: null, group: 'round' });
-    expect(coolingOf(row('c', { status: 'hold' }), NOW)).toEqual({ reason: 'no_history', days: null, group: 'stalled' });
+  it('sin ninguna fecha no se enfría ni te toca: no lo sabemos, se cuenta aparte', () => {
+    const undated = row('b');
+    expect(coolingOf(undated, NOW)).toBeNull();
+    expect(dueReason(undated, NOW)).toBeNull();
+    expect(isUndated(undated)).toBe(true);
+    expect(isUndated(row('c', { status: 'hold' }))).toBe(true);
+    // A date, an event or a follow-up: not undated. Closed or confirmed: not counted.
+    expect(isUndated(row('d', { last_contacted_at: ago(3) }))).toBe(false);
+    expect(isUndated(row('e', outbound(3)))).toBe(false);
+    expect(isUndated(row('f', { next_action_at: day(5) }))).toBe(false);
+    expect(isUndated(row('g', { status: 'confirmed' }))).toBe(false);
+    const o = buildOverview([undated, row('c', { status: 'hold' }), row('x', outbound(30))], NOW);
+    expect(o.undated).toBe(2);
+    expect(o.cold.count).toBe(1);
+    expect(o.due.count).toBe(0);
+    expect(applyListFilter([undated, row('x', outbound(30))], { temp: 'sin-fecha' }, NOW).map((r) => r.id)).toEqual(['b']);
   });
   it('un seguimiento vencido es tuyo y uno futuro no está olvidado: no se enfrían', () => {
     expect(coolingOf(row('a', { status: 'hold', next_action_at: day(-2) }), NOW)).toBeNull();
@@ -229,8 +243,8 @@ describe('filtros de la lista', () => {
       row('e', { status: 'in_conversation', ...outbound(30) }),
       row('f'),
     ];
-    expect(applyListFilter(rows, { temp: 'fria' }, NOW).map((r) => r.id)).toEqual(['e', 'b', 'a', 'f']);
-    expect(applyListFilter(rows, { temp: 'ronda' }, NOW).map((r) => r.id)).toEqual(['b', 'a', 'f']);
+    expect(applyListFilter(rows, { temp: 'fria' }, NOW).map((r) => r.id)).toEqual(['e', 'b', 'a']);
+    expect(applyListFilter(rows, { temp: 'ronda' }, NOW).map((r) => r.id)).toEqual(['b', 'a']);
     expect(applyListFilter(rows, { temp: 'parada' }, NOW).map((r) => r.id)).toEqual(['e']);
     expect(applyListFilter(rows, { temp: 'caliente' }, NOW).map((r) => r.id)).toEqual(['d', 'c']);
   });

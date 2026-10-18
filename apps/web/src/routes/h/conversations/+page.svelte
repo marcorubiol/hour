@@ -165,6 +165,7 @@
     fria: 'overview.cold',
     ronda: 'overview.cold_round_chip',
     parada: 'overview.cold_stalled_chip',
+    'sin-fecha': 'overview.undated_chip',
   };
   /** The chip names the block filter the list wears; a season segment, with its status. */
   function chipLabel(f: typeof listFilter, status: string): string | null {

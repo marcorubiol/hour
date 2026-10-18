@@ -133,11 +133,10 @@
   }
   /** «parada» for a stalled one that is not waiting on our email; «sin respuesta» otherwise. */
   function coldWord(row: ColdRow): string {
-    return row.group === 'stalled' && row.reason !== 'no_reply' ? t('overview.idle', locale) : t('overview.no_reply', locale);
+    return row.reason === 'idle' ? t('overview.idle', locale) : t('overview.no_reply', locale);
   }
   function coldAria(row: ColdRow): string {
-    const when = row.days === null ? t('overview.no_date', locale) : daysAgoLabel(row.days, locale);
-    return [name(row), when, coldWord(row)].join(', ');
+    return [name(row), daysAgoLabel(row.days, locale), coldWord(row)].join(', ');
   }
 
   function kindLabel(kind: string | null): string {
@@ -380,16 +379,14 @@
                 <a class="row" href={href(row)} aria-label={coldAria(row)}>
                   {@render who(row)}
                   <span class="row__what"
-                    >{row.reason === 'no_history'
-                      ? t('overview.cold_no_history', locale)
-                      : row.reason === 'no_reply'
-                        ? row.subject
-                          ? t('overview.cold_last_mail', locale, { subject: row.subject })
-                          : t('overview.cold_no_reply', locale)
-                        : t('overview.cold_idle', locale, { status: statusLabel(row.status, locale) })}</span
+                    >{row.reason === 'no_reply'
+                      ? row.subject
+                        ? t('overview.cold_last_mail', locale, { subject: row.subject })
+                        : t('overview.cold_no_reply', locale)
+                      : t('overview.cold_idle', locale, { status: statusLabel(row.status, locale) })}</span
                   >
                   <span class="row__when"
-                    ><strong>{row.days === null ? t('overview.no_date', locale) : daysAgoLabel(row.days, locale)}</strong
+                    ><strong>{daysAgoLabel(row.days, locale)}</strong
                     >{coldWord(row)}</span
                   >
                 </a>
@@ -447,6 +444,12 @@
       {/if}
 
     </div>
+    {#if data.undated > 0}
+      <!-- No date at all: not cold, not due (we do not know). Counted apart, a quiet line with its filter. -->
+      <p class="board__undated" data-testid="overview-undated">
+        <a href="?temp=sin-fecha#lista">{t('overview.undated', locale, { n: data.undated })}</a>
+      </p>
+    {/if}
   </div>
 {/if}
 </div>
@@ -466,6 +469,21 @@
       flex-direction: column;
       gap: var(--space-l);
       min-inline-size: 0;
+    }
+    .board__undated {
+      grid-column: 1 / -1;
+      margin: 0;
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+    }
+    .board__undated a {
+      color: inherit;
+      text-decoration: underline;
+      text-decoration-color: var(--border-color-dark);
+      text-underline-offset: 0.25em;
+    }
+    .board__undated a:hover {
+      color: var(--text-color);
     }
     .block__empty {
       font-size: var(--text-s);

@@ -4162,9 +4162,11 @@ local). **El Worker de esta rama lee `conversation.reply_settled_at`: las dos mi
 8. **«Se enfría» en dos grupos (enmienda ADR-117 § 5 y ADR-118 § 4 y 8):** *paradas* (en conversación, hold: una a
    una, sin envío en bloque) y *sin respuesta al envío* (contactada, recurrente: segunda ronda). «Escribir a estas»
    marca solo la segunda ronda y hay un botón por proyecto cuando hay varios; la barra de selección ofrece
-   «Quedarse con…» un proyecto. Se enfría también la que **no tiene ninguna fecha** ni seguimiento apuntado (eran
-   las olvidadas, fuera de todo bloque); un seguimiento vencido es tuyo y no se enfría. Filtros `?temp=ronda` y
-   `?temp=parada`.
+   «Quedarse con…» un proyecto. Un seguimiento vencido es tuyo y no se enfría. Una conversación abierta **sin
+   ninguna fecha** (sin evento, sin sello de contacto, sin seguimiento) no se enfría ni te toca: no sabemos cuándo se
+   habló. Se cuenta aparte, en una línea del dashboard («151 sin fecha de contacto») que filtra la lista
+   (`?temp=sin-fecha`); en `muk-cia` son 151 de 152 (comprobado por el coordinador en producción). Filtros
+   `?temp=ronda`, `?temp=parada` y `?temp=sin-fecha`.
 9. **Las cifras del último envío llevan a alguien:** respuestas y rebotes filtran la lista
    (`?envio=<id>&r=respuestas|rebotes`), con la misma regla que la cifra. Una sola voz y un solo vocabulario para las
    cifras de un envío en el bloque y en su pantalla (`MailoutFigures`); el bloque dice «simulado» mientras lo sea.
@@ -4184,5 +4186,5 @@ pasada de coherencia. El asunto de un envío con campos (`Propuesta para {sala}`
 Que Safari con VoiceOver pierda la semántica de tabla en las tarjetas es una suposición del informe, sin WebKit aquí.
 
 **Re-evaluar cuando** Marco lleve una temporada de difusión con esto: si «No pide respuesta» se usa poco (y conviene
-inferirlo), si la confirmada debe volver a tener turno, y si «sin fecha» llena «Se enfría» con lo importado de
-`muk-cia`.
+inferirlo), si la confirmada debe volver a tener turno, y qué hacer con las «sin fecha de contacto» de `muk-cia`
+(fecharlas en bloque o dejarlas aparte).
