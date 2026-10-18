@@ -224,6 +224,16 @@
       .cal__window--none > :global(*) {
         display: none;
       }
+      /* TWO ROWS, NOT THREE (móvil #4): on a phone the content started at
+         y=380 of 812. The words that name the drawing take the first row;
+         the window's controls and the two acts share the second. */
+      .cal__views {
+        order: -1;
+        flex-basis: 100%;
+      }
+      .cal__sep {
+        display: none;
+      }
     }
     .cal__nav {
       display: inline-flex;
