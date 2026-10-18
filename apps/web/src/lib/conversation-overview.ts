@@ -48,6 +48,18 @@ const CLOSED: ReadonlySet<ConversationStatus> = new Set(['declined', 'dormant'])
 const NO_TURN: ReadonlySet<ConversationStatus> = new Set([...CLOSED, 'confirmed']);
 /** Esperamos su respuesta a un correo nuestro (la regla de 21 días). */
 const AWAITING: ReadonlySet<ConversationStatus> = new Set(['contacted', 'in_conversation', 'hold', 'recurring']);
+/**
+ * Estados que ya implican una respuesta de la sala: una confirmada o una
+ * rechazada no está «sin respuesta», aunque lo hablado no esté en el
+ * historial (ADR-126 § 2).
+ */
+const ANSWERED: ReadonlySet<ConversationStatus> = new Set(['in_conversation', 'hold', 'confirmed', 'declined', 'recurring']);
+
+/** Ha contestado: nos escribió alguna vez, o su estado ya lo dice. */
+export function hasAnswered(row: Pick<OverviewInput, 'status' | 'last_in'>): boolean {
+  return Boolean(row.last_in) || ANSWERED.has(row.status);
+}
+
 /** Conversación abierta: la regla de 30 días y la mitad de «caliente». */
 const OPEN: ReadonlySet<ConversationStatus> = new Set(['in_conversation', 'hold']);
 
@@ -367,7 +379,7 @@ export interface ConversationOverview {
     end: string;
     total: number;
     counts: StatusCounts;
-    /** Las que nos han escrito alguna vez. */
+    /** Las que han contestado algo: nos escribieron, o su estado lo implica. */
     answered: number;
   };
   due: Block<DueRow>;
@@ -405,7 +417,7 @@ export function buildOverview(
       ...season,
       total: inSeasonRows.length,
       counts: countByStatus(inSeasonRows),
-      answered: inSeasonRows.filter((r) => r.last_in).length,
+      answered: inSeasonRows.filter(hasAnswered).length,
     },
     due: {
       count: due.length,

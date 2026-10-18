@@ -238,8 +238,16 @@ describe('buildOverview', () => {
     expect(o.season.label).toBe('26-27');
     expect(o.season.total).toBe(rows.length - 1);
     expect(o.season.counts.confirmed).toBe(1);
-    expect(o.season.answered).toBe(BLOCK_ROWS + 2);
+    // The replies, plus the confirmed one: a deal is an answer.
+    expect(o.season.answered).toBe(BLOCK_ROWS + 3);
     expect(o.hot.rows.length).toBeLessThanOrEqual(6);
+  });
+  it('«sin respuesta» no cuenta los estados que ya son una respuesta', () => {
+    const rows = (['contacted', 'in_conversation', 'hold', 'confirmed', 'declined', 'dormant', 'recurring'] as const).map((status, i) =>
+      row(`s${i}`, { status }),
+    );
+    expect(buildOverview(rows, NOW).season.answered).toBe(5);
+    expect(buildOverview([row('a', inbound(4))], NOW).season.answered).toBe(1);
   });
   it('un seguimiento lleva su nota y su día', () => {
     const o = buildOverview([row('a', { next_action_at: `${day(-7)}T00:00:00+00:00`, next_action_note: 'Mandar vídeo' })], NOW);
