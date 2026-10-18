@@ -33,6 +33,19 @@ export const COLD_REPLY_DAYS = 21;
 export const COLD_IDLE_DAYS = 30;
 /** Filas que enseña cada bloque; el resto, en la lista. */
 export const BLOCK_ROWS = 5;
+/**
+ * Sitio guardado en «Te toca» para los seguimientos vencidos: son lo único que
+ * apuntaste tú, y diez respuestas no deben esconderlos (ADR-126 § 7).
+ */
+export const FOLLOW_UP_ROWS = 2;
+
+/** Las filas de «Te toca»: respuestas y, con sitio guardado, seguimientos. */
+export function dueBlockRows<R extends OverviewInput>(sorted: readonly R[], now: Date, size = BLOCK_ROWS): R[] {
+  const replies = sorted.filter((r) => dueReason(r, now) === 'reply');
+  const followUps = sorted.filter((r) => dueReason(r, now) === 'follow_up');
+  const replyRows = Math.min(replies.length, size - Math.min(followUps.length, FOLLOW_UP_ROWS));
+  return [...replies.slice(0, replyRows), ...followUps.slice(0, size - replyRows)];
+}
 export const HOT_ROWS = 6;
 
 /** Los canales que cuentan para el turno: una nota no es una interacción. */
@@ -421,7 +434,7 @@ export function buildOverview(
     },
     due: {
       count: due.length,
-      rows: due.slice(0, BLOCK_ROWS).map((r) => {
+      rows: dueBlockRows(due, now).map((r) => {
         const reason = dueReason(r, now)!;
         const at = reason === 'reply' ? r.last!.occurred_at : r.next_action_at!.slice(0, 10);
         return {

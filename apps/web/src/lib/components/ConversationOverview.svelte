@@ -181,10 +181,19 @@
         {:else}
           <ol class="rows">
             {#each data.due.rows as row, i (row.id)}
-              {#if row.reason === 'follow_up' && (i === 0 || data.due.rows[i - 1].reason === 'reply')}
+              {@const firstFollowUp = data.due.rows.findIndex((r) => r.reason === 'follow_up')}
+              {#if i === firstFollowUp}
                 <li class="rows__sep">{t('overview.follow_ups', locale)}</li>
               {/if}
-              <li class="rows__item">
+              <!-- On a phone the block keeps three: two replies and a follow-up when there are both. -->
+              <li
+                class="rows__item"
+                class:rows__more={firstFollowUp === -1 || firstFollowUp === 0
+                  ? i >= 3
+                  : i < firstFollowUp
+                    ? i >= Math.min(2, firstFollowUp)
+                    : i > firstFollowUp}
+              >
                 <a class="row" class:row--late={row.days >= 7} href={href(row)}>
                   {@render who(row)}
                   {#if row.reason === 'reply'}
@@ -687,7 +696,8 @@
       .block--season {
         order: -1;
       }
-      .rows > li:nth-child(n + 4) {
+      .block:not(.block--due) .rows > li:nth-child(n + 4),
+      .rows__more {
         display: none;
       }
       .block__foot :global(button) {

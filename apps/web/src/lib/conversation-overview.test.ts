@@ -249,6 +249,17 @@ describe('buildOverview', () => {
     expect(buildOverview(rows, NOW).season.answered).toBe(5);
     expect(buildOverview([row('a', inbound(4))], NOW).season.answered).toBe(1);
   });
+  it('diez respuestas no esconden los seguimientos vencidos', () => {
+    const rows = [
+      ...Array.from({ length: 10 }, (_, i) => row(`r${i}`, inbound(i + 1))),
+      row('seg', { next_action_at: day(-4) }),
+      row('hoy', { next_action_at: day(0) }),
+      row('otro', { next_action_at: day(-1) }),
+    ];
+    const o = buildOverview(rows, NOW);
+    expect(o.due.rows.map((r) => r.id)).toEqual(['r0', 'r1', 'r2', 'seg', 'otro']);
+    expect(buildOverview(rows.slice(0, 2).concat(rows.slice(10)), NOW).due.rows.map((r) => r.id)).toEqual(['r0', 'r1', 'seg', 'otro', 'hoy']);
+  });
   it('un seguimiento lleva su nota y su día', () => {
     const o = buildOverview([row('a', { next_action_at: `${day(-7)}T00:00:00+00:00`, next_action_note: 'Mandar vídeo' })], NOW);
     expect(o.due.rows[0]).toMatchObject({ reason: 'follow_up', at: day(-7), days: 7, note: 'Mandar vídeo', subject: null });
