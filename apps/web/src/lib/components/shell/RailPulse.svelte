@@ -34,7 +34,7 @@
    * the opposite of noise.
    */
   import { useQueryClient } from '@tanstack/svelte-query';
-  import { dualTime, hourMark, localeDayMonth, localeWeekdayShort } from '$lib/datetime';
+  import { dualTime, hourMark, localeDayMonthNear, localeWeekdayShort } from '$lib/datetime';
   import { t, type Locale } from '$lib/i18n';
   import type { SlipKind } from '$lib/month-events';
   import type { CommitmentState } from '$lib/people';
@@ -134,7 +134,7 @@
     );
     return days <= 6
       ? `${localeWeekdayShort(pulse.next.day, locale)} ${Number(pulse.next.day.slice(8, 10))}`
-      : localeDayMonth(pulse.next.day, locale);
+      : localeDayMonthNear(pulse.next.day, today, locale);
   });
 </script>
 

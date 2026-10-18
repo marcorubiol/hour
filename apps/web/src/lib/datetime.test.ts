@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { dualTime, hourMark, instantToWallClock, timeInTz, wallClockToInstant } from './datetime';
+import {
+  dualTime,
+  hourMark,
+  instantToWallClock,
+  localeDayMonthNear,
+  timeInTz,
+  wallClockToInstant,
+} from './datetime';
 
 describe('timeInTz', () => {
   it('renders wall time in the requested zone', () => {
@@ -147,5 +154,17 @@ describe('hourMark — the Planner’s clock', () => {
     expect(hourMark(null)).toBe('');
     expect(hourMark(undefined)).toBe('');
     expect(hourMark('  ')).toBe('');
+  });
+});
+
+describe('localeDayMonthNear', () => {
+  const today = '2026-10-18';
+  it('no year inside this year or the next twelve months', () => {
+    expect(localeDayMonthNear('2026-12-05', today, 'es-ES')).toBe('5 dic');
+    expect(localeDayMonthNear('2027-10-17', today, 'es-ES')).toBe('17 oct');
+  });
+  it('the year once it is further than that', () => {
+    expect(localeDayMonthNear('2027-10-18', today, 'es-ES')).toBe('18 oct 2027');
+    expect(localeDayMonthNear('2031-01-15', today, 'es-ES')).toBe('15 ene 2031');
   });
 });
