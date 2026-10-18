@@ -1891,6 +1891,7 @@
   "books.key_invoiced": "facturat",
   "books.key_open": "sense facturar",
   "books.fig_holds": "+ {amount} en holds ({n})",
+  "books.fig_quiet_currency": "A més {amount} {currency} venuts a la temporada {season}, res per cobrar ni per facturar",
   "books.attention": "Demana atenció",
   "books.attention_all": "veure-les totes ({n})",
   "books.attention_less": "veure'n menys",

@@ -53,6 +53,7 @@
     fmtMoneyCompact,
     invoicesByBolo as groupInvoicesByBolo,
     invoiceStatusLabel,
+    isQuietPosition,
     LEDGER_FILTERS,
     matchesLedgerFilter,
     moneyPosition,
@@ -777,7 +778,10 @@
             {/each}
           </div>
         {:else if !seasonEmpty}
-          {#each position as pos (pos.currency)}
+          {#each position as pos, i (pos.currency)}
+            {#if i > 0 && isQuietPosition(pos)}
+            <p class="figs__quiet" data-currency={pos.currency}>{t('books.fig_quiet_currency', locale, { amount: fmtMoneyCompact(pos.sold), currency: pos.currency, season: seasonLabel(season) })}{#if pos.holds > 0}{` · ${t('books.fig_holds', locale, { amount: fmtMoneyCompact(pos.holds), n: pos.holdsCount })}`}{/if}</p>
+            {:else}
             <div class="figs__row" data-currency={pos.currency}>
               <button type="button" class="fig" data-fig="owed" onclick={() => showLedger('owed')}>
                 <span class="fig__label">{t('books.fig_owed', locale)}</span>
@@ -821,6 +825,7 @@
                 {/if}
               </button>
             </div>
+            {/if}
           {/each}
         {/if}
       </div>
@@ -1195,6 +1200,7 @@
 
     /* ── 1 · the four figures ── */
     .figs { display: flex; flex-direction: column; gap: var(--space-s); }
+    .figs__quiet { font-size: var(--text-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
     .figs__row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-s); }
     .fig {
       appearance: none; text-align: start; font: inherit; color: inherit;
@@ -1227,6 +1233,7 @@
     .att__row[data-kind='overdue'] .att__why { color: var(--danger); }
     .att__amt { font-family: var(--font-mono); font-size: var(--text-s); font-variant-numeric: tabular-nums; color: var(--text-color); white-space: nowrap; }
     .inflow__cur { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); }
+    .inflow__list + .inflow__cur, .mny__note + .inflow__cur { margin-block-start: var(--space-s); padding-block-start: var(--space-xs); border-block-start: 1px solid var(--border-color-light); }
     .inflow__list { display: flex; flex-direction: column; gap: var(--space-xs); padding-block: var(--space-2xs); }
     .inflow__row { display: grid; grid-template-columns: 3.5ch minmax(0, 1fr) auto; gap: var(--space-s); align-items: center; }
     .inflow__month { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); text-transform: lowercase; }

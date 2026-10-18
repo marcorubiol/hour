@@ -5,6 +5,7 @@ import {
 	boloSeason,
 	expectedInflow,
 	invoicesByBolo,
+	isQuietPosition,
 	matchesLedgerFilter,
 	moneyPosition,
 	paymentProposal,
@@ -196,10 +197,12 @@ describe('moneyPosition', () => {
 		invoice({ id: 'i-paid', bolo: 'paid', total: 2400, status: 'paid' }),
 	];
 
-	it('keeps currencies apart', () => {
+	it('keeps currencies apart, the one that moves most first', () => {
 		const pos = moneyPosition(bolos, ctx(invoices), 2026);
-		expect(pos.map((p) => p.currency)).toEqual(['CHF', 'EUR']);
-		expect(pos[0]).toMatchObject({ sold: 900, owed: 0, toInvoice: 0 });
+		expect(pos.map((p) => p.currency)).toEqual(['EUR', 'CHF']);
+		expect(pos[1]).toMatchObject({ sold: 900, owed: 0, toInvoice: 0 });
+		expect(isQuietPosition(pos[1]!)).toBe(true);
+		expect(isQuietPosition(pos[0]!)).toBe(false);
 	});
 
 	it('does not clip debts and invoicing to the season; the season figure is clipped', () => {
@@ -350,6 +353,17 @@ describe('expectedInflow', () => {
 			{ month: '2027-01', expected: 0, contracted: 0 },
 		]);
 		expect(eur!.undated).toBe(1);
+	});
+
+	it('leaves out a currency with nothing coming in, and puts the biggest first', () => {
+		const out = expectedInflow(
+			[
+				bolo({ id: 'eur', status: 'confirmed', next_performed_at: '2026-11-08', fee_amount: 2100 }),
+				bolo({ id: 'chf', status: 'confirmed', next_performed_at: '2027-02-10', fee_currency: 'CHF', fee_amount: 4000 }),
+			],
+			ctx(),
+		);
+		expect(out.map((f) => f.currency)).toEqual(['EUR']);
 	});
 
 	it('crosses the year end', () => {

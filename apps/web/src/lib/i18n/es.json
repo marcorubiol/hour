@@ -1891,6 +1891,7 @@
   "books.key_invoiced": "facturado",
   "books.key_open": "sin facturar",
   "books.fig_holds": "+ {amount} en holds ({n})",
+  "books.fig_quiet_currency": "Además {amount} {currency} vendidos en la temporada {season}, sin nada por cobrar ni por facturar",
   "books.attention": "Pide atención",
   "books.attention_all": "ver las {n}",
   "books.attention_less": "ver menos",

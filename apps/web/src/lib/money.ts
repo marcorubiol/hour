@@ -759,7 +759,8 @@ function emptyPosition(currency: string): MoneyPosition {
 }
 
 /**
- * The four figures per currency — never EUR plus USD. Por cobrar, por facturar
+ * The four figures per currency — never EUR plus USD — the currency that
+ * moves most first. Por cobrar, por facturar
  * and the 30-day inflow ignore the season (a July invoice of last season is
  * still owed); only the season figure is clipped to `season`.
  */
@@ -815,7 +816,19 @@ export function moneyPosition(
 			pos.holdsCount += 1;
 		}
 	}
-	return [...map.values()].sort((a, b) => a.currency.localeCompare(b.currency));
+	return [...map.values()].sort(
+		(a, b) => positionWeight(b) - positionWeight(a) || a.currency.localeCompare(b.currency),
+	);
+}
+
+/** How much a currency moves: the main one goes first, not the first in the alphabet. */
+function positionWeight(p: MoneyPosition): number {
+	return p.owed + p.toInvoice + p.sold + p.holds;
+}
+
+/** A currency with nothing owed, to invoice or coming in: one line, not four cards of zeros. */
+export function isQuietPosition(p: MoneyPosition): boolean {
+	return p.owed === 0 && p.toInvoice === 0 && p.inflow30 === 0;
 }
 
 // ── Pide atención ──
@@ -960,7 +973,11 @@ export function expectedInflow(
 			if (slot) slot.contracted += Math.max(0, m.fee - m.collected);
 		}
 	}
-	return [...map.values()].sort((a, b) => a.currency.localeCompare(b.currency));
+	const weight = (f: InflowForecast) => f.months.reduce((sum, m) => sum + m.expected + m.contracted, 0);
+	// A currency with nothing coming in these months is not drawn: four zero bars say nothing.
+	return [...map.values()]
+		.filter((f) => weight(f) > 0 || f.undated > 0)
+		.sort((a, b) => weight(b) - weight(a) || a.currency.localeCompare(b.currency));
 }
 
 // ── El libro: los filtros son las cifras ──

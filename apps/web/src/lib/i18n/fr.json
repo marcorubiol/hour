@@ -1891,6 +1891,7 @@
   "books.key_invoiced": "facturé",
   "books.key_open": "non facturé",
   "books.fig_holds": "+ {amount} en options ({n})",
+  "books.fig_quiet_currency": "Aussi {amount} {currency} vendus sur la saison {season}, rien à encaisser ni à facturer",
   "books.attention": "À traiter",
   "books.attention_all": "tout voir ({n})",
   "books.attention_less": "en voir moins",
