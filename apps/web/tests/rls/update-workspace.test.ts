@@ -39,6 +39,7 @@ type WorkspaceRow = {
   domain: string | null;
   city: string | null;
   logo_url: string | null;
+  trade: string;
 };
 
 /**
@@ -64,7 +65,7 @@ describe.skipIf(!envReady())('RLS — update_workspace (ADR-062)', () => {
       jwt,
       new URLSearchParams({
         slug: 'eq.playwright',
-        select: 'id,slug,name,description,accent,domain,city,logo_url',
+        select: 'id,slug,name,description,accent,domain,city,logo_url,trade',
       }),
     );
     expect(res.status).toBe(200);
@@ -101,6 +102,7 @@ describe.skipIf(!envReady())('RLS — update_workspace (ADR-062)', () => {
         accent: fixture.accent ?? '',
         domain: fixture.domain ?? '',
         city: fixture.city ?? '',
+        trade: fixture.trade,
       },
     });
   }
@@ -111,7 +113,7 @@ describe.skipIf(!envReady())('RLS — update_workspace (ADR-062)', () => {
       jwt,
       new URLSearchParams({
         id: `eq.${fixture.id}`,
-        select: 'id,slug,name,description,accent,domain,city,logo_url',
+        select: 'id,slug,name,description,accent,domain,city,logo_url,trade',
       }),
     );
     return res.rows[0];
@@ -285,5 +287,55 @@ describe.skipIf(!envReady())('RLS — update_workspace (ADR-062)', () => {
     });
     expect(res.status).toBeGreaterThanOrEqual(400); // 22P02
     expect((await read()).domain).toBe(fixture.domain);
+  });
+
+  // ADR-128 · the trade: a column with a CHECK, written by owner/admin through
+  // the RPC; '' goes back to the default instead of clearing a NOT NULL.
+  test('owner/admin sets the trade; "" goes back to stage', async () => {
+    try {
+      const set = await pgRpc<WorkspaceRow[]>('update_workspace', jwt, {
+        p_workspace_id: fixture.id,
+        p_patch: { trade: 'music' },
+      });
+      expect(set.status).toBe(200);
+      expect((await read()).trade).toBe('music');
+
+      // A patch without the key leaves it alone.
+      await pgRpc('update_workspace', jwt, { p_workspace_id: fixture.id, p_patch: { city: 'Testville' } });
+      expect((await read()).trade).toBe('music');
+
+      await pgRpc('update_workspace', jwt, { p_workspace_id: fixture.id, p_patch: { trade: '' } });
+      expect((await read()).trade).toBe('stage');
+    } finally {
+      await restore();
+    }
+  });
+
+  test('a trade the app does not know is refused by the CHECK', async () => {
+    const res = await pgRpc('update_workspace', jwt, {
+      p_workspace_id: fixture.id,
+      p_patch: { trade: 'comedy' },
+    });
+    expect(res.status).toBeGreaterThanOrEqual(400); // 23514
+    expect((await read()).trade).toBe(fixture.trade);
+  });
+
+  test.runIf(limitedEnvReady())('a plain member reads the trade but cannot change it', async () => {
+    const visible = await pgGet<{ trade: string }>(
+      'workspace',
+      limitedJwt,
+      new URLSearchParams({ id: `eq.${fixture.id}`, select: 'trade' }),
+    );
+    expect(visible.rows).toEqual([{ trade: fixture.trade }]);
+
+    const rpc = await pgRpc('update_workspace', limitedJwt, {
+      p_workspace_id: fixture.id,
+      p_patch: { trade: 'music' },
+    });
+    expect(rpc.status).toBe(403);
+
+    const direct = await pgPatch('workspace', limitedJwt, { trade: 'music' }, new URLSearchParams({ id: `eq.${fixture.id}` }));
+    expect(direct.rows).toHaveLength(0);
+    expect((await read()).trade).toBe(fixture.trade);
   });
 });
