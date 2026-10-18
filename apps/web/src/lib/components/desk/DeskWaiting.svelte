@@ -136,8 +136,16 @@
       <span class="row__acts">
         {#if item.concern === 'going' && item.going}
           {@const g = item.going}
-          <button type="button" class="row__act btn--outline btn--xs" onclick={() => onanswer(g, 'going')}>{t('pulse.going', locale)}</button
-          ><button type="button" class="row__act row__act--quiet btn--outline btn--xs" onclick={() => onanswer(g, 'not_going')}
+          <button
+            type="button"
+            class="row__act btn--outline btn--xs"
+            aria-label={t('desk.going_aria', locale, { subject: item.subject })}
+            onclick={() => onanswer(g, 'going')}>{t('pulse.going', locale)}</button
+          ><button
+            type="button"
+            class="row__act row__act--quiet btn--outline btn--xs"
+            aria-label={t('desk.not_going_aria', locale, { subject: item.subject })}
+            onclick={() => onanswer(g, 'not_going')}
             >{t('pulse.not_going', locale)}</button
           >
         {:else if item.concern === 'task'}

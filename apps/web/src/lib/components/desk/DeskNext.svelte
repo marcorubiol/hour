@@ -153,9 +153,18 @@
           {#if canAnswer}
             <span class="card__ask">
               {t('desk.next_ask', locale)}
-              <button type="button" class="card__btn" onclick={() => answer('going')}>{t('pulse.going', locale)}</button><i
-                class="card__sep">·</i
-              ><button type="button" class="card__btn" onclick={() => answer('not_going')}>{t('pulse.not_going', locale)}</button>
+              <!-- The same answer as a «¿vas?» row of «Te espera»: the system's button. -->
+              <button
+                type="button"
+                class="card__btn btn--outline btn--xs"
+                aria-label={t('desk.going_aria', locale, { subject: slip.name })}
+                onclick={() => answer('going')}>{t('pulse.going', locale)}</button
+              ><button
+                type="button"
+                class="card__btn card__btn--quiet btn--outline btn--xs"
+                aria-label={t('desk.not_going_aria', locale, { subject: slip.name })}
+                onclick={() => answer('not_going')}>{t('pulse.not_going', locale)}</button
+              >
             </span>
           {/if}
           {#if roadsheet}<a class="card__rs btn--outline btn--s" href={roadsheet}>{t('desk.roadsheet', locale)} ↗</a>{/if}
@@ -231,23 +240,19 @@
     font-size: var(--text-xs);
     letter-spacing: var(--mono-letter-spacing-loose);
     color: var(--text-faint);
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-xs);
   }
   .card__btn {
-    all: unset;
-    cursor: pointer;
-    color: var(--text-muted);
-    margin-inline-start: 0.35em;
+    --btn-padding-block: var(--space-2xs);
+    --btn-padding-inline: var(--space-s);
   }
-  .card__btn:hover {
-    color: var(--text-color);
-  }
-  .card__btn:focus-visible {
-    outline: var(--focus-width) solid var(--focus-color);
-    outline-offset: var(--focus-offset);
-  }
-  .card__sep {
-    font-style: normal;
-    margin-inline-start: 0.35em;
+  .card__btn--quiet {
+    --btn-border-color: transparent;
+    --btn-background-hover: transparent;
+    --btn-text-color: var(--text-faint);
   }
   .card__rs {
     flex: none;

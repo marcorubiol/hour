@@ -2065,6 +2065,8 @@
   "desk.see_all": "Tout voir par jour",
   "desk.see_less": "Voir moins",
   "desk.verb_going": "vous y allez ?",
+  "desk.going_aria": "J'y vais : {subject}",
+  "desk.not_going_aria": "Je n'y vais pas : {subject}",
   "desk.concern_going": "vous y allez ?",
   "desk.changed_thread_one": "1 nouveau message dans {thread}",
   "desk.changed_thread_many": "{n} nouveaux messages dans {thread}",

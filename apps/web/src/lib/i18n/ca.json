@@ -2065,6 +2065,8 @@
   "desk.see_all": "Veure-ho tot per dies",
   "desk.see_less": "Veure'n menys",
   "desk.verb_going": "hi vas?",
+  "desk.going_aria": "Hi vaig: {subject}",
+  "desk.not_going_aria": "No hi vaig: {subject}",
   "desk.concern_going": "hi vas?",
   "desk.changed_thread_one": "1 missatge nou a {thread}",
   "desk.changed_thread_many": "{n} missatges nous a {thread}",

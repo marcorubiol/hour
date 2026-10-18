@@ -2074,6 +2074,8 @@
   "desk.see_all": "See all by day",
   "desk.see_less": "See less",
   "desk.verb_going": "going?",
+  "desk.going_aria": "Going: {subject}",
+  "desk.not_going_aria": "Not going: {subject}",
   "desk.concern_going": "going?",
   "desk.changed_thread_one": "1 new message in {thread}",
   "desk.changed_thread_many": "{n} new messages in {thread}",
