@@ -1050,7 +1050,9 @@
                from annotating came and went. What had to go was the DECORATION
                it used to hold — a dot grid and the word NOTES over nothing —
                not the column. An empty margin is fine; a jumping one is not. -->
-          <aside class="ag__marg">
+          <!-- A div, not an <aside>: a complementary landmark inside <main> is
+               a landmark nobody can reach as one (axe, móvil #12). -->
+          <div class="ag__marg">
             {#each marginCards(day) as card (card.key)}
                 <div class="ag__card" data-severity={card.severity}>
                   <p class="ag__card-eyebrow">{decideCardLabel}</p>
@@ -1123,7 +1125,7 @@
                 >
               {/if}
             {/if}
-          </aside>
+          </div>
       </section>
       {/if}
     {/each}
