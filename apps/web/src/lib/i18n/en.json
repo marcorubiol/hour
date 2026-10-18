@@ -89,6 +89,7 @@
   "planner.away_left_one": "1 day left",
   "planner.away_back": "back tomorrow",
   "planner.band_person": "{person} — away",
+  "planner.band_person_t": "{person} — away?",
   "planner.band_away": "away",
   "planner.band_tour": "on tour",
   "planner.band_until": "until {day}",

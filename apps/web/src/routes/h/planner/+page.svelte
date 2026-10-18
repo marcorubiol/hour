@@ -762,7 +762,10 @@
         // and the agenda's away line all read from here.
         label: company
           ? spaceName(workspaceNameById.get(b.workspace_id) ?? '—')
-          : t('planner.band_person', locale, { person: personName ?? '—' }),
+          : // A provisional absence asks, in every sentence that names it.
+            t(b.certainty === 'tentative' ? 'planner.band_person_t' : 'planner.band_person', locale, {
+              person: personName ?? '—',
+            }),
         subject: company
           ? spaceName(workspaceNameById.get(b.workspace_id) ?? '—')
           : (personName ?? '—'),
@@ -1758,13 +1761,22 @@
         .map((tr) => ({ from: addDaysIso(tr.out, 1), to: addDaysIso(tr.back, -1) })),
     ),
   );
+  /* THE STRIP HATCHES WHAT CLOSES THE COMPANY, and a maybe more faintly
+     (revisión del Planner, 2026-10-18). One person away hatched the whole
+     week as if the company were shut, and a provisional absence looked
+     settled. A person's absence is said in «Fuera», and in «Choques» when it
+     costs a gig. Firm wins when a firm and a provisional closure overlap. */
   let seasonBlockDays = $derived.by(() => {
-    const out = new Set<string>();
+    const out = new Map<string, 'firm' | 'tent'>();
     if (view !== 'overview') return out;
     for (const b of visibleBlackouts) {
+      if (b.person_id) continue;
       const from = b.starts_on < season.weeks[0][0] ? season.weeks[0][0] : b.starts_on;
       const to = b.ends_on > season.to ? season.to : b.ends_on;
-      for (let d = from; d <= to; d = addDaysIso(d, 1)) out.add(d);
+      const kind = b.certainty === 'tentative' ? 'tent' : 'firm';
+      for (let d = from; d <= to; d = addDaysIso(d, 1)) {
+        if (out.get(d) !== 'firm') out.set(d, kind);
+      }
     }
     return out;
   });
@@ -1822,7 +1834,7 @@
               : 'out'
             : null,
           tour: seasonTourDays.has(iso),
-          away: seasonBlockDays.has(iso),
+          away: seasonBlockDays.get(iso) ?? null,
           clash: seasonClashDays.has(iso),
           decide: seasonDecideDays.has(iso),
         };

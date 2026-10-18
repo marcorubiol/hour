@@ -32,7 +32,9 @@
     travel: 'out' | 'back' | null;
     /** On tour — always deduced from two travel legs. */
     tour: boolean;
-    away: boolean;
+    /** The company is closed: for sure, or maybe. A person's absence is not
+        drawn here (it is in «Fuera»). */
+    away: 'firm' | 'tent' | null;
     /** Something «Choques» lists: the only red dot. */
     clash: boolean;
     /** A call between two options that «Por decidir» holds. */
@@ -212,7 +214,8 @@
                 class="d"
                 class:d--past={c.past}
                 class:d--today={c.today}
-                class:d--away={c.away}
+                class:d--away={c.away === 'firm'}
+                class:d--away-tent={c.away === 'tent'}
                 data-day={c.iso}
                 data-mark={c.mark ?? ''}
                 title={day(c.iso)}
@@ -362,7 +365,7 @@
             <button type="button" class="row" onclick={() => onDay(a.from)}>
               <span class="row__when">{range(a.from, a.to)}</span>
               <span class="row__what" class:row__what--tent={a.tentative}
-                >{a.who}{#if a.what}<small>{a.what}</small>{/if}{#if a.legs}<small class="guess"
+                >{a.who}{#if a.tentative}?{/if}{#if a.what}<small>{a.what}</small>{/if}{#if a.legs}<small class="guess"
                     >{a.legs}</small
                   >{/if}</span
               >
@@ -530,6 +533,15 @@
         135deg,
         color-mix(in oklch, var(--text-color) 9%, transparent) 0 1px,
         transparent 1px 5px
+      );
+    }
+    /* A maybe closes the company more faintly, and dashed: the geometry of
+       doubt, like the option's edge. */
+    .d--away-tent {
+      background-image: repeating-linear-gradient(
+        135deg,
+        color-mix(in oklch, var(--text-color) 7%, transparent) 0 1px,
+        transparent 1px 8px
       );
     }
     .d__n {
@@ -708,6 +720,7 @@
     }
     .row__what--tent {
       color: var(--text-muted);
+      font-style: italic;
     }
     .row__what small {
       font-family: var(--font-sans);

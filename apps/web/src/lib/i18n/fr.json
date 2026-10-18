@@ -57,6 +57,7 @@
   "planner.away_left_one": "encore 1 jour",
   "planner.away_back": "retour demain",
   "planner.band_person": "{person} : absent",
+  "planner.band_person_t": "{person} : absent ?",
   "planner.band_away": "absent",
   "planner.band_tour": "en tournée",
   "planner.band_until": "jusqu’au {day}",
