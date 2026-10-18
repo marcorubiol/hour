@@ -37,7 +37,8 @@
     type DueRow,
     type OverviewResponse,
   } from '$lib/conversation-overview';
-  import { feedHref, feedThreadName, feedTitle, messageWhen } from '$lib/threads';
+  import ThreadFeedRow from '$lib/components/ThreadFeedRow.svelte';
+  import { feedHref } from '$lib/threads';
 
   interface Props {
     filters: { projectIds: string[]; workspaceIds: string[]; lineIds: string[]; enabled: boolean };
@@ -396,17 +397,16 @@
           </div>
           <ol class="rows">
             {#each data.team.threads as th (th.thread_id)}
-              {@const link = feedHref(th, workspaceSlugById.get(th.workspace_id))}
-              {@const author = th.last_message.author_id ? data.team.authors[th.last_message.author_id] : null}
+              {@const id = th.last_message.author_id}
               <li>
-                <svelte:element this={link ? 'a' : 'div'} href={link} class="row">
-                  <span class="row__who">
-                    <span class="row__org"><span class="dot" aria-hidden="true"></span>{feedTitle(th)}</span>
-                    <span class="row__person">{feedThreadName(th, locale)}</span>
-                  </span>
-                  <span class="row__what">{author ? `${author}: ` : ''}{th.last_message.body}</span>
-                  <span class="row__when"><strong>{messageWhen(th.last_message_at, locale, tz)}</strong></span>
-                </svelte:element>
+                <ThreadFeedRow
+                  {th}
+                  href={feedHref(th, workspaceSlugById.get(th.workspace_id)) ?? null}
+                  author={id && id === data.team.me ? t('threads.you', locale) : (id && data.team.authors[id]) || t('threads.someone', locale)}
+                  dense
+                  {locale}
+                  {tz}
+                />
               </li>
             {/each}
           </ol>
@@ -585,6 +585,9 @@
     .row--late .row__when strong {
       color: var(--warning-dark);
     }
+    .block--team .rows > li {
+      border-block-end: 1px solid var(--border-color-light);
+    }
     .rows__sep {
       padding-block: var(--space-xs) 0;
       font-family: var(--font-mono);
@@ -706,16 +709,6 @@
       font-size: var(--text-xs);
       color: var(--text-muted);
     }
-    .dot {
-      display: inline-block;
-      inline-size: 0.45rem;
-      block-size: 0.45rem;
-      margin-inline-end: var(--space-2xs);
-      border-radius: 50%;
-      background: var(--info);
-      transform: translateY(-0.1em);
-    }
-
     /* Móvil: una columna en el orden de las preguntas (te toca, temporada,
        caliente, se enfría…), tres filas por bloque y el botón a lo ancho. */
     @container (max-width: 44rem) {

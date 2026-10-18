@@ -12,15 +12,12 @@
   import { createQuery } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON } from '$lib/api';
-  import Badge from '$lib/components/Badge.svelte';
+  import ThreadFeedRow from '$lib/components/ThreadFeedRow.svelte';
   import { t, type Locale } from '$lib/i18n';
   import {
     THREAD_REFRESH_MS,
     boloDays,
     feedHref,
-    feedThreadName,
-    feedTitle,
-    messageWhen,
     type FeedThread,
     type ThreadFeedView,
   } from '$lib/threads';
@@ -82,19 +79,8 @@
     <ul class="feed__list">
       {#each feed.threads as th (th.thread_id)}
         {@const href = feedHref(th, workspaceSlugById.get(th.workspace_id))}
-        <li class="feed__row" class:feed__row--new={th.unread_count > 0} data-testid="feed-row">
-          <svelte:element this={href ? 'a' : 'div'} {href} class="feed__link">
-            <span class="feed__head">
-              <span class="feed__name">{feedThreadName(th, locale)}</span>
-              <span class="feed__title">{feedTitle(th)}</span>
-              {#if th.unread_count > 0}
-                <Badge tone="info" size="xs">{t(th.unread_count === 1 ? 'threads.unread_one' : 'threads.unread', locale, { n: th.unread_count })}</Badge>
-              {/if}
-            </span>
-            <time class="feed__when" datetime={th.last_message_at}>{messageWhen(th.last_message_at, locale, tz)}</time>
-            <span class="feed__where">{where(th)}</span>
-            <span class="feed__last"><span class="feed__author">{author(feed, th)}:</span> {th.last_message.body}</span>
-          </svelte:element>
+        <li class="feed__row" data-testid="feed-row">
+          <ThreadFeedRow {th} {href} author={author(feed, th)} where={where(th)} {locale} {tz} />
         </li>
       {/each}
     </ul>
@@ -119,66 +105,5 @@
       border-block-end: var(--border);
     }
 
-    /* Cabecera y hora en la primera línea; dónde y el último mensaje debajo. */
-    .feed__link {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: var(--space-2xs) var(--space-m);
-      padding: var(--space-s) var(--space-2xs);
-      color: inherit;
-      text-decoration: none;
-      transition: background-color var(--transition);
-    }
-    a.feed__link:hover {
-      background: var(--bg-ultra-light);
-    }
-
-    .feed__head {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: baseline;
-      gap: var(--space-xs);
-      min-inline-size: 0;
-    }
-
-    .feed__name {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing);
-      color: var(--text-faint);
-    }
-
-    .feed__title {
-      font-size: var(--text-m);
-      color: var(--text-muted);
-    }
-    /* Con nuevos, el título en tinta: el único peso que cambia. */
-    .feed__row--new .feed__title {
-      color: var(--text-color);
-    }
-
-    .feed__when {
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      white-space: nowrap;
-    }
-
-    .feed__where {
-      grid-column: 1 / -1;
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-    }
-
-    .feed__last {
-      grid-column: 1 / -1;
-      font-size: var(--text-s);
-      color: var(--text-muted);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .feed__author {
-      color: var(--text-color);
-    }
   }
 </style>

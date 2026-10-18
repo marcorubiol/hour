@@ -606,5 +606,5 @@ export interface LastMailout {
 export interface OverviewResponse extends ConversationOverview {
   last_mailout: LastMailout | null;
   /** Hilos del equipo con mensajes nuevos («Del equipo»): los primeros y cuántos son. */
-  team: { count: number; threads: FeedThread[]; authors: Record<string, string> };
+  team: { count: number; me: string; threads: FeedThread[]; authors: Record<string, string> };
 }
