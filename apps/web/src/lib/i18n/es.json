@@ -1931,6 +1931,7 @@
   "books.filter_overdue": "Vencidos",
   "books.filter_to_invoice": "Por facturar",
   "books.filter_in_progress": "En curso",
+  "books.filter_all_seasons": "de todas las temporadas",
   "books.ledger_empty": "No hay bolos en esta temporada.",
   "books.ledger_empty_filter": "Ninguno.",
   "books.col_date": "Función",

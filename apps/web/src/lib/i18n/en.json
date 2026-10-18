@@ -1940,6 +1940,7 @@
   "books.filter_overdue": "Overdue",
   "books.filter_to_invoice": "To invoice",
   "books.filter_in_progress": "In progress",
+  "books.filter_all_seasons": "across all seasons",
   "books.ledger_empty": "No deals in this season.",
   "books.ledger_empty_filter": "None.",
   "books.col_date": "Function",

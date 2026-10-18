@@ -1931,6 +1931,7 @@
   "books.filter_overdue": "Vençuts",
   "books.filter_to_invoice": "Per facturar",
   "books.filter_in_progress": "En curs",
+  "books.filter_all_seasons": "de totes les temporades",
   "books.ledger_empty": "No hi ha bolos en aquesta temporada.",
   "books.ledger_empty_filter": "Cap.",
   "books.col_date": "Funció",

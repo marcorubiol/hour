@@ -1931,6 +1931,7 @@
   "books.filter_overdue": "En retard",
   "books.filter_to_invoice": "À facturer",
   "books.filter_in_progress": "En cours",
+  "books.filter_all_seasons": "toutes saisons confondues",
   "books.ledger_empty": "Aucune cession dans cette saison.",
   "books.ledger_empty_filter": "Aucune.",
   "books.col_date": "Représentation",

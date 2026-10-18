@@ -1000,6 +1000,10 @@
                 {#snippet tail()}<span class="ledger__count">{loading ? DASH : filterCounts[f]}</span>{/snippet}
               </Chip>
             {/each}
+            <!-- Debts do not expire with the season: these three read every season, «all» only the chosen one. -->
+            {#if filter === 'owed' || filter === 'overdue' || filter === 'to_invoice'}
+              <span class="ledger__scope">{t('books.filter_all_seasons', locale)}</span>
+            {/if}
           </div>
 
           {#if loading}
@@ -1344,6 +1348,7 @@
     .ledger__tabs button[aria-selected='true'] { color: var(--text-color); border-block-end-color: var(--text-color); }
     .ledger__filters { display: flex; gap: var(--space-xs); flex-wrap: wrap; }
     .ledger__filters :global(button) { white-space: nowrap; flex-shrink: 0; }
+    .ledger__scope { align-self: center; font-size: var(--text-xs); color: var(--text-muted); }
     .ledger__count { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-faint); margin-inline-start: var(--space-2xs); }
     .book { inline-size: 100%; border-collapse: collapse; font-size: var(--text-s); }
     .book th { text-align: start; font-family: var(--font-mono); font-size: var(--text-xs); font-weight: 400; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); padding: var(--space-2xs) var(--space-xs); border-block-end: 1px solid var(--border-color-light); }
