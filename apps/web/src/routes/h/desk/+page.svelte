@@ -345,9 +345,16 @@
       moneySeasonOf(clockNow.toISOString()),
     );
     const pos = positions.find((p) => p.currency === 'EUR') ?? positions[0];
-    return pos
-      ? { owed: money(pos.owed, pos.currency), overdue: money(pos.overdue, pos.currency), overdueCount: pos.overdueCount }
-      : { owed: money(0, 'EUR'), overdue: money(0, 'EUR'), overdueCount: 0 };
+    if (!pos) return { owed: money(0, 'EUR'), overdue: money(0, 'EUR'), overdueCount: 0 };
+    // Other currencies ride behind the main one («60 € + 3.000 US$»): never summed, never hidden.
+    const others = positions.filter((p) => p !== pos);
+    const withOthers = (main: number, pick: (p: (typeof positions)[number]) => number) =>
+      [money(main, pos.currency), ...others.filter((p) => pick(p) > 0).map((p) => money(pick(p), p.currency))].join(' + ');
+    return {
+      owed: withOthers(pos.owed, (p) => p.owed),
+      overdue: withOthers(pos.overdue, (p) => p.overdue),
+      overdueCount: positions.reduce((n, p) => n + p.overdueCount, 0),
+    };
   });
   let seasonLabel = $derived(t('overview.season_of', locale, { season: currentSeason(clockNow).label }));
 
