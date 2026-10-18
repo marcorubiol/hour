@@ -1882,7 +1882,7 @@
   "overview.open_mailout": "Ouvrir l’envoi",
   "overview.recipients": "{n} destinataires",
   "overview.season_empty": "Rien cette saison.",
-  "overview.season_hint": "touche un segment pour filtrer",
+  "overview.season_hint": "choisissez un statut pour filtrer",
   "overview.season_note": "{answered} ont répondu · {silent} sans réponse pour l’instant",
   "overview.season_of": "Saison {season}",
   "overview.see_in_list": "Voir dans la liste",

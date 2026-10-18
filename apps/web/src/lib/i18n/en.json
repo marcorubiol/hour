@@ -1891,7 +1891,7 @@
   "overview.open_mailout": "Open the mailout",
   "overview.recipients": "{n} recipients",
   "overview.season_empty": "Nothing this season.",
-  "overview.season_hint": "tap a segment to filter",
+  "overview.season_hint": "pick a status to filter",
   "overview.season_note": "{answered} have replied · {silent} no reply yet",
   "overview.season_of": "Season {season}",
   "overview.see_in_list": "See in the list",

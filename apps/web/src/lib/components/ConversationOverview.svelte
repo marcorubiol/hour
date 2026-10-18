@@ -299,7 +299,9 @@
         {#if data.season.total === 0}
           <p class="block__empty">{t('overview.season_empty', locale)}</p>
         {:else}
-          <div class="season__bar" role="group" aria-label={seasonAria(data)}>
+          <!-- A drawing for the pointer; the legend below is the control for the
+               keyboard and the screen reader (móvil #7): one stop per status. -->
+          <div class="season__bar" role="img" aria-label={seasonAria(data)}>
             {#each seasonStatuses as s (s)}
               <button
                 type="button"
@@ -307,7 +309,8 @@
                 data-conv-status={s}
                 style:flex-grow={data.season.counts[s]}
                 title={`${statusLabel(s, locale)} · ${data.season.counts[s]}`}
-                aria-label={`${statusLabel(s, locale)} · ${data.season.counts[s]}`}
+                tabindex="-1"
+                aria-hidden="true"
                 onclick={() => onstatus(s)}
               ></button>
             {/each}
