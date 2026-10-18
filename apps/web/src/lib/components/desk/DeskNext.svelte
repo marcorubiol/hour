@@ -130,8 +130,8 @@
     {#if thenBefore}{@render thenLine()}{/if}
     <div class="card" data-testid="desk-next">
       <div class="card__eye">
-        <span class="card__when">{relDay(next.day)} · {dateWords(next.day)}</span>{#if next.ref.row.project?.name}
-          · {next.ref.row.project.name}{/if}
+        <span class="card__when">{relDay(next.day)} · {dateWords(next.day)}</span>{#if next.ref.row.project?.name}{' · '}{next
+            .ref.row.project.name}{/if}
       </div>
       <div class="card__slip">
         <Slip {slip} {kindLabel} stateLabel={() => null} showCountry ground="bare" placing="cell" {guess} />
