@@ -1130,6 +1130,7 @@
   "conversations.next_note_ph": "Call back after summer…",
   "conversations.next_page": "Next",
   "conversations.no_match": "No conversations match these filters.",
+  "conversations.no_access": "You have no access to the conversations of these projects.",
   "conversations.no_projects": "No projects to add to yet.",
   "conversations.not_added": "Conversation not added",
   "conversations.not_future": "Not in the future",

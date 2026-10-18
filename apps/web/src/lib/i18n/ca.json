@@ -1121,6 +1121,7 @@
   "conversations.next_note_ph": "Tornar a trucar després de l'estiu…",
   "conversations.next_page": "Següent",
   "conversations.no_match": "Cap conversa no coincideix amb aquests filtres.",
+  "conversations.no_access": "No tens accés a les converses d'aquests projectes.",
   "conversations.no_projects": "Encara no hi ha projectes on afegir-lo.",
   "conversations.not_added": "Conversa no afegida",
   "conversations.not_future": "No pot ser futur",

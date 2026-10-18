@@ -1121,6 +1121,7 @@
   "conversations.next_note_ph": "Volver a llamar después del verano…",
   "conversations.next_page": "Siguiente",
   "conversations.no_match": "Ninguna conversación coincide con estos filtros.",
+  "conversations.no_access": "No tienes acceso a las conversaciones de estos proyectos.",
   "conversations.no_projects": "Aún no hay proyectos a los que añadir.",
   "conversations.not_added": "Conversación no añadida",
   "conversations.not_future": "No puede ser futuro",

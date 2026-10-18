@@ -41,7 +41,8 @@
     /** Pulsar un tramo de la temporada: filtra la lista por ese estado en la temporada. */
     onstatus: (status: ConversationStatus) => void;
     /** «Escribir a estas»: precarga el modo selección del envío en bloque (ADR-115). */
-    onwrite: (picks: { id: string; project_id: string }[]) => void;
+    /** Absent for whoever cannot edit conversations: no «write to these». */
+    onwrite?: (picks: { id: string; project_id: string }[]) => void;
   }
 
   let { filters, workspaceSlugById, locale, onstatus, onwrite }: Props = $props();
@@ -248,7 +249,9 @@
           </ol>
           <div class="block__foot">
             <span class="block__hint">{t('overview.cold_rule', locale, { reply: COLD_REPLY_DAYS, idle: COLD_IDLE_DAYS })}</span>
-            <Button size="s" onclick={() => onwrite(data.cold.picks)}>{t('overview.write_these', locale, { n: data.cold.count })}</Button>
+            {#if onwrite}
+              <Button size="s" onclick={() => onwrite(data.cold.picks)}>{t('overview.write_these', locale, { n: data.cold.count })}</Button>
+            {/if}
           </div>
         {/if}
       </section>

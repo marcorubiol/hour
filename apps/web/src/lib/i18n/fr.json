@@ -1090,6 +1090,7 @@
   "conversations.next_note_ph": "Rappeler après l'été…",
   "conversations.next_page": "Suivant",
   "conversations.no_match": "Aucune conversation ne correspond à ces filtres.",
+  "conversations.no_access": "Tu n'as pas accès aux conversations de ces projets.",
   "conversations.no_projects": "Pas encore de projet où l'ajouter.",
   "conversations.not_added": "Conversation non ajoutée",
   "conversations.not_future": "Pas dans le futur",
