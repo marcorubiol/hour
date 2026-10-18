@@ -45,6 +45,9 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
     await expect(main.getByRole('heading', { name: /^Next up/ })).toBeVisible();
     await expect(main.getByRole('heading', { name: /^Waiting for you/ })).toBeVisible();
     await expect(main.getByRole('heading', { name: /^The season/ })).toBeVisible();
+    // «What changed» never disappears (ADR-127 § 4): a line when there is nothing.
+    await expect(page.getByTestId('desk-changed')).toBeVisible();
+    await expect(page.getByTestId('desk-changed')).toContainText(/Since|Nothing new|\d/);
     await expect(page.getByTestId('door-planner')).toHaveAttribute('href', '/h/planner');
     await expect(page.getByTestId('door-conversations')).toHaveAttribute('href', '/h/conversations');
 
