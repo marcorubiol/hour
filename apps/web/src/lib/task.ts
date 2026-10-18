@@ -52,7 +52,7 @@ export type TaskCreate = v.InferOutput<typeof TaskCreateSchema>;
  * (task_update is member-gated, not claim-bound, and the row stays
  * SELECT-visible after a field edit; ADR-048 only bites soft-deletes).
  * Unknown keys are stripped, so RLS-sensitive columns (workspace_id,
- * parent FKs, origin, created_by…) can never ride along.
+ * parent FKs, created_by…) can never ride along; origin only toward manual.
  */
 export const TaskPatchSchema = v.object({
   title: v.optional(v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200))),
@@ -63,6 +63,12 @@ export const TaskPatchSchema = v.object({
     v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(365))),
   ),
   status: v.optional(v.picklist(TASK_STATUSES)),
+  /**
+   * Accepting an AI proposal (ADR-069): it becomes a normal task. Only toward
+   * `manual`: a PATCH never makes a task look proposed by the AI or a protocol
+   * (ADR-131).
+   */
+  origin: v.optional(v.literal('manual')),
 });
 
 export type TaskPatch = v.InferOutput<typeof TaskPatchSchema>;
