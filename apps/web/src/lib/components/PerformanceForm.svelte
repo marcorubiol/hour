@@ -28,6 +28,7 @@
 
 <script lang="ts">
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
+  import { lensOn } from '$lib/lenses.svelte';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import Input from './Input.svelte';
@@ -390,9 +391,11 @@
   {#snippet boloMessage()}
     {t('perf.bolo_helper_short', locale)}
     <!-- Otra pestaña: el alta a medio escribir no se pierde (Marco, 2026-10-10). -->
-    <a href={booksHref(cProject, { newBolo: true })} target="_blank" rel="noopener"
-      >{t('perf.bolo_create_link', locale)}</a
-    >
+    {#if lensOn('books')}
+      <a href={booksHref(cProject, { newBolo: true })} target="_blank" rel="noopener"
+        >{t('perf.bolo_create_link', locale)}</a
+      >
+    {/if}
   {/snippet}
   {#if showBoloSelect}
     <Select

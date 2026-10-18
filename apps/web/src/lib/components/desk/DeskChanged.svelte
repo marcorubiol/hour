@@ -9,6 +9,7 @@
   import Button from '$lib/components/Button.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import { t, type Locale } from '$lib/i18n';
+  import { lensOn } from '$lib/lenses.svelte';
   import { feedHref, feedThreadName, feedTitle } from '$lib/threads';
   import type { Change } from '$lib/desk-bands';
   import MailoutFigures from '$lib/components/MailoutFigures.svelte';
@@ -54,7 +55,7 @@
       text: t('desk.changed_mailout', locale, { subject: c.mailout.subject || t('overview.no_subject', locale) }),
       kind: t('desk.changed_kind_mailout', locale),
       // The send itself, as «Abrir el envío» in the lens.
-      href: ws ? `/h/${ws}/mailout/${c.mailout.id}` : '/h/conversations',
+      href: ws ? `/h/${ws}/mailout/${c.mailout.id}` : lensOn('conversations') ? '/h/conversations' : null,
     };
   }
 </script>

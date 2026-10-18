@@ -3819,6 +3819,7 @@ export type Database = {
           fiscal_identity_id: string | null
           id: string
           kind: Database["public"]["Enums"]["workspace_kind"]
+          lenses_off: string[]
           logo_url: string | null
           mail_signature: string | null
           mailout_daily_cap: number
@@ -3851,6 +3852,7 @@ export type Database = {
           fiscal_identity_id?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["workspace_kind"]
+          lenses_off?: string[]
           logo_url?: string | null
           mail_signature?: string | null
           mailout_daily_cap?: number
@@ -3883,6 +3885,7 @@ export type Database = {
           fiscal_identity_id?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["workspace_kind"]
+          lenses_off?: string[]
           logo_url?: string | null
           mail_signature?: string | null
           mailout_daily_cap?: number
@@ -5421,6 +5424,7 @@ export type Database = {
           fiscal_identity_id: string | null
           id: string
           kind: Database["public"]["Enums"]["workspace_kind"]
+          lenses_off: string[]
           logo_url: string | null
           mail_signature: string | null
           mailout_daily_cap: number
@@ -6994,6 +6998,7 @@ export type Database = {
           fiscal_identity_id: string | null
           id: string
           kind: Database["public"]["Enums"]["workspace_kind"]
+          lenses_off: string[]
           logo_url: string | null
           mail_signature: string | null
           mailout_daily_cap: number
@@ -7071,6 +7076,10 @@ export type Database = {
       withdraw_mail_basis: {
         Args: { p_address: string; p_workspace_id: string }
         Returns: undefined
+      }
+      workspace_admin_names: {
+        Args: { p_workspace_id: string }
+        Returns: string[]
       }
     }
     Enums: {

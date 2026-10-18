@@ -47,6 +47,7 @@
   import { performanceRoster } from '$lib/planner';
   import Select from '$lib/components/Select.svelte';
   import { boloOf, boloOptions, boloPatch, booksHref, type BoloLite } from '$lib/bolo-pick';
+  import { lensOn } from '$lib/lenses.svelte';
   import { performanceBoloQueryOptions, projectBolosQueryOptions } from '$lib/bolo-queries';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { accentVar } from '$lib/utils/accent';
@@ -645,7 +646,7 @@
           · {perf.line.name}
         {/if}
         {#if boloReadable && currentBolo && perf.project}
-          · <a href={booksHref(perf.project.id, { boloId: currentBolo.id })}>{boloOf(currentBolo, locale)}</a>
+          · {#if lensOn('books')}<a href={booksHref(perf.project.id, { boloId: currentBolo.id })}>{boloOf(currentBolo, locale)}</a>{:else}{boloOf(currentBolo, locale)}{/if}
         {:else if boloReadable && currentBoloId === null}
           · {boloOf(null, locale)}
         {/if}
@@ -863,7 +864,7 @@
 
 {#snippet boloMessage()}
   {t('perf.bolo_helper_short', locale)}
-  {#if perf?.project}
+  {#if perf?.project && lensOn('books')}
     <!-- Otra pestaña: la edición a medio escribir no se pierde (Marco, 2026-10-10). -->
     <a href={booksHref(perf.project.id, { newBolo: true })} target="_blank" rel="noopener"
       >{t('perf.bolo_create_link', locale)}</a

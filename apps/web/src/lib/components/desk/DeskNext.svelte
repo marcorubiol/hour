@@ -20,6 +20,7 @@
   import { dayMoments, type SlipContext, type SlipKind } from '$lib/month-events';
   import { setCommitment } from '$lib/commitments';
   import { plannerDayHref } from '$lib/planner';
+  import { lensOn } from '$lib/lenses.svelte';
   import type { CommitmentState } from '$lib/people';
   import type { PulseNext } from '$lib/pulse';
   import { pulseSlip } from '$lib/pulse-feeds.svelte';
@@ -48,6 +49,8 @@
   const queryClient = useQueryClient();
 
   let slip = $derived(next ? pulseSlip(next.ref, next.day, slipCtx) : null);
+  // Its own page, else the day in the Planner while the space uses it (ADR-131).
+  let farHref = $derived(slip?.href ?? (next && lensOn('planner') ? plannerDayHref('day', next.day) : undefined));
   let thenSlip = $derived(then ? pulseSlip(then.ref, then.day, slipCtx) : null);
 
   function daysTo(day: string): number {
@@ -115,7 +118,7 @@
 
 <section class="dband next" aria-labelledby="desk-next-h">
   <BlockHead title={t('desk.band_next', locale)} titleId="desk-next-h">
-    <a class="block-head__act" href="/h/planner">{t('lens.planner', locale)} →</a>
+    {#if lensOn('planner')}<a class="block-head__act" href="/h/planner">{t('lens.planner', locale)} →</a>{/if}
   </BlockHead>
 
   {#if errored}
@@ -136,8 +139,10 @@
   {:else if daysTo(next.day) > 14}
     <!-- Far away is still «the next thing»: the band says which, as the rail does. -->
     <p class="dband__empty">
-      <a href={slip.href ?? plannerDayHref('day', next.day)}
-        >{t('desk.next_far', locale, { day: localeDayMonthNear(next.day, today, locale), place: slip.city || slip.name })} →</a
+      <svelte:element
+        this={farHref ? 'a' : 'span'}
+        href={farHref}
+        >{t('desk.next_far', locale, { day: localeDayMonthNear(next.day, today, locale), place: slip.city || slip.name })}{farHref ? ' →' : ''}</svelte:element
       >
     </p>
   {:else}

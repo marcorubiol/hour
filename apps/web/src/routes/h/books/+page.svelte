@@ -80,6 +80,7 @@
   import { detectLocale, LOCALE_TAG, t } from '$lib/i18n';
   import { performanceStatusTone } from '$lib/performance';
   import { plannerDayHref } from '$lib/planner';
+  import { lensOn } from '$lib/lenses.svelte';
   import { usePins } from '$lib/stores/pins.svelte';
   import {
     buildLineIndex,
@@ -1075,7 +1076,7 @@
                             <div class="sheet__col">
                               <p class="sheet__h">{t('books.sheet_functions', locale)}</p>
                               <p>
-                                {#if b.first_performed_at}<a class="sheet__a" href={plannerDayHref('day', b.first_performed_at.slice(0, 10))}>{dayLabel(b.first_performed_at)}</a>{:else}{t('books.no_date', locale)}{/if}
+                                {#if b.first_performed_at && lensOn('planner')}<a class="sheet__a" href={plannerDayHref('day', b.first_performed_at.slice(0, 10))}>{dayLabel(b.first_performed_at)}</a>{:else if b.first_performed_at}{dayLabel(b.first_performed_at)}{:else}{t('books.no_date', locale)}{/if}
                                 · {t(b.function_count === 1 ? 'books.sheet_fn_one' : 'books.sheet_fn_many', locale, { n: b.function_count })}
                               </p>
                               {#if b.project}<p class="sheet__faint">{b.project.name}</p>{/if}

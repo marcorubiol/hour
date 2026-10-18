@@ -25,6 +25,7 @@ import {
 import { meQueryOptions, teamQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
 import { buildPersonAttribution } from '$lib/people';
 import { plannerDayHref } from '$lib/planner';
+import { lensOn } from '$lib/lenses.svelte';
 import type { PulseRef } from '$lib/pulse';
 import type { AvailabilityItem } from '$lib/availability';
 import type { NavWorkspace } from '$lib/nav';
@@ -163,9 +164,10 @@ export function pulseSlipContext(
  * A DATE HAS NO PAGE, BUT IT HAS A DAY: `dateSlip` returns `href: null`
  * correctly (on the month and the diary a date opens its edit dialog, and
  * those views own that dialog). The rail and the Desk do not, so a date sends
- * you to the day that holds it, a real address the Planner already answers.
+ * you to the day that holds it, a real address the Planner already answers;
+ * no address at all while the space does not use the Planner (ADR-131).
  */
 export function pulseSlip(ref: PulseRef, day: string, ctx: SlipContext): Slip {
   if (ref.of === 'performance') return performanceSlip(ref.row as PerformanceEvent, ctx);
-  return { ...dateSlip(ref.row as DateEvent, ctx), href: plannerDayHref('day', day) };
+  return { ...dateSlip(ref.row as DateEvent, ctx), href: lensOn('planner') ? plannerDayHref('day', day) : null };
 }

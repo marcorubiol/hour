@@ -28,6 +28,7 @@
   import WorkspacesSection from '$lib/components/settings/WorkspacesSection.svelte';
   import PrivacySection from '$lib/components/settings/PrivacySection.svelte';
   import LanguagesSection from '$lib/components/settings/LanguagesSection.svelte';
+  import LensesSection from '$lib/components/settings/LensesSection.svelte';
   import MailSection from '$lib/components/settings/MailSection.svelte';
   import NotificationsSection from '$lib/components/settings/NotificationsSection.svelte';
   import BillingSection from '$lib/components/settings/BillingSection.svelte';
@@ -94,6 +95,10 @@
 
   {#if active === 'languages'}
     <LanguagesSection workspaceId={currentWorkspace?.id} />
+  {/if}
+
+  {#if active === 'lenses'}
+    <LensesSection workspaceId={currentWorkspace?.id} />
   {/if}
 
   <!-- "Connections" section killed: 7 providers (Fastmail, Holded,

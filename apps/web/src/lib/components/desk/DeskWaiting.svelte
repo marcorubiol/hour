@@ -8,6 +8,7 @@
    * One list at a time, never both: a task drawn twice is two checkboxes
    * with one name.
    */
+  import { lensOn } from '$lib/lenses.svelte';
   import Button from '$lib/components/Button.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import { localeDayMonth } from '$lib/datetime';
@@ -73,12 +74,13 @@
   let laterOpen = $state(false);
   let feedCount = $derived(feed.reduce((n, b) => n + b.runs.reduce((m, r) => m + r.items.length, 0), 0));
 
-  const LENS_HREF: Record<DeskConcern, string | null> = {
+  // A lens the space does not use (ADR-131) is no destination.
+  let LENS_HREF = $derived<Record<DeskConcern, string | null>>({
     task: null,
-    going: '/h/planner',
-    conversation: '/h/conversations',
-    money: '/h/books',
-  };
+    going: lensOn('planner') ? '/h/planner' : null,
+    conversation: lensOn('conversations') ? '/h/conversations' : null,
+    money: lensOn('books') ? '/h/books' : null,
+  });
   const runHref = (run: DeskRun) => run.items[0]?.href ?? LENS_HREF[run.concern];
   const concernLabel = (c: DeskConcern) => t(`desk.concern_${c}`, locale);
   const laterText = (l: NonNullable<typeof later>) =>

@@ -36,6 +36,7 @@
   import { parsePin, personPin } from '$lib/stores/pins.svelte';
   import { parseDayQuery } from '$lib/day-query';
   import { dayKeyInTz, plannerDayHref } from '$lib/planner';
+  import { lensOn } from '$lib/lenses.svelte';
   import { localeDayMonth } from '$lib/datetime';
   import { detectLocale, LOCALE_TAG, t } from '$lib/i18n';
   import { accentVarFor } from '$lib/utils/accent';
@@ -269,7 +270,8 @@
       // Una fecha escrita es un destino, y solo aparece si se puede leer
       // ENTERA: `parseDayQuery` devuelve el día o nada, nunca una aproximación.
       const parsedDay = parseDayQuery(q, { today: todayIso, locales: [localeTag, 'es', 'ca', 'en'] });
-      const dayRows: Row[] = parsedDay
+      // A day lands in the Planner: none while the space does not use it (ADR-131).
+      const dayRows: Row[] = parsedDay && lensOn('planner')
         ? [
             {
               token: `d:${parsedDay}`,

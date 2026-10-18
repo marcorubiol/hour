@@ -40,6 +40,7 @@ type WorkspaceRow = {
   city: string | null;
   logo_url: string | null;
   trade: string;
+  lenses_off: string[];
 };
 
 /**
@@ -65,7 +66,7 @@ describe.skipIf(!envReady())('RLS — update_workspace (ADR-062)', () => {
       jwt,
       new URLSearchParams({
         slug: 'eq.playwright',
-        select: 'id,slug,name,description,accent,domain,city,logo_url,trade',
+        select: 'id,slug,name,description,accent,domain,city,logo_url,trade,lenses_off',
       }),
     );
     expect(res.status).toBe(200);
@@ -103,6 +104,7 @@ describe.skipIf(!envReady())('RLS — update_workspace (ADR-062)', () => {
         domain: fixture.domain ?? '',
         city: fixture.city ?? '',
         trade: fixture.trade,
+        lenses_off: fixture.lenses_off,
       },
     });
   }
@@ -113,7 +115,7 @@ describe.skipIf(!envReady())('RLS — update_workspace (ADR-062)', () => {
       jwt,
       new URLSearchParams({
         id: `eq.${fixture.id}`,
-        select: 'id,slug,name,description,accent,domain,city,logo_url,trade',
+        select: 'id,slug,name,description,accent,domain,city,logo_url,trade,lenses_off',
       }),
     );
     return res.rows[0];
@@ -337,5 +339,80 @@ describe.skipIf(!envReady())('RLS — update_workspace (ADR-062)', () => {
     const direct = await pgPatch('workspace', limitedJwt, { trade: 'music' }, new URLSearchParams({ id: `eq.${fixture.id}` }));
     expect(direct.rows).toHaveLength(0);
     expect((await read()).trade).toBe(fixture.trade);
+  });
+  // ADR-131 · the lenses: an array with a CHECK, written by owner/admin through
+  // the RPC; null or [] turns every lens on; the RPC sorts and dedups.
+  test('owner/admin turns lenses off and on; the value is one', async () => {
+    try {
+      const set = await pgRpc<WorkspaceRow[]>('update_workspace', jwt, {
+        p_workspace_id: fixture.id,
+        p_patch: { lenses_off: ['books', 'planner', 'books'] },
+      });
+      expect(set.status).toBe(200);
+      expect((await read()).lenses_off).toEqual(['books', 'planner']);
+
+      // A patch without the key leaves it alone.
+      await pgRpc('update_workspace', jwt, { p_workspace_id: fixture.id, p_patch: { city: 'Testville' } });
+      expect((await read()).lenses_off).toEqual(['books', 'planner']);
+
+      await pgRpc('update_workspace', jwt, { p_workspace_id: fixture.id, p_patch: { lenses_off: null } });
+      expect((await read()).lenses_off).toEqual([]);
+    } finally {
+      await restore();
+    }
+  });
+
+  test('Desk, an unknown lens or a non-array is refused', async () => {
+    for (const bad of [['desk'], ['money'], 'books']) {
+      const res = await pgRpc('update_workspace', jwt, {
+        p_workspace_id: fixture.id,
+        p_patch: { lenses_off: bad },
+      });
+      expect(res.status, JSON.stringify(bad)).toBeGreaterThanOrEqual(400); // 23514 / 22023
+    }
+    expect((await read()).lenses_off).toEqual(fixture.lenses_off);
+  });
+
+  test.runIf(limitedEnvReady())('a plain member reads the lenses but cannot change them', async () => {
+    const visible = await pgGet<{ lenses_off: string[] }>(
+      'workspace',
+      limitedJwt,
+      new URLSearchParams({ id: `eq.${fixture.id}`, select: 'lenses_off' }),
+    );
+    expect(visible.rows).toEqual([{ lenses_off: fixture.lenses_off }]);
+
+    const rpc = await pgRpc('update_workspace', limitedJwt, {
+      p_workspace_id: fixture.id,
+      p_patch: { lenses_off: ['books'] },
+    });
+    expect(rpc.status).toBe(403);
+
+    const direct = await pgPatch(
+      'workspace',
+      limitedJwt,
+      { lenses_off: ['books'] },
+      new URLSearchParams({ id: `eq.${fixture.id}` }),
+    );
+    expect(direct.rows).toHaveLength(0);
+    expect((await read()).lenses_off).toEqual(fixture.lenses_off);
+  });
+
+  // Who to ask when a lens is off: names, never emails, and only to members.
+  test.runIf(limitedEnvReady())('a member learns the admins\' names; a stranger and anon learn nothing', async () => {
+    const own = await pgRpc<string[]>('workspace_admin_names', jwt, { p_workspace_id: fixture.id });
+    expect(own.status).toBe(200);
+    const names = own.data as unknown as string[];
+    expect(names.length).toBeGreaterThan(0);
+    expect(names.every((n) => !n.includes('@'))).toBe(true);
+
+    const member = await pgRpc<string[]>('workspace_admin_names', limitedJwt, { p_workspace_id: fixture.id });
+    expect(member.status).toBe(200);
+    expect(member.data).toEqual(names);
+
+    const stranger = await pgRpc<string[]>('workspace_admin_names', jwt, { p_workspace_id: NOT_A_MEMBER_UUID });
+    expect(stranger.data).toEqual([]);
+
+    const anon = await pgRpc('workspace_admin_names', null, { p_workspace_id: fixture.id });
+    expect(anon.status).toBeGreaterThanOrEqual(400);
   });
 });

@@ -18,6 +18,7 @@
   import { detectLocale, t } from '$lib/i18n';
   import { moneyAccessAnyQueryOptions } from '$lib/bolo-queries';
   import { conversationAccessQueryOptions } from '$lib/conversation-access';
+  import { lensOn } from '$lib/lenses.svelte';
 
   const lens = useLens();
   const locale = detectLocale(navigator.language);
@@ -28,18 +29,21 @@
   // Conversations for whoever reads conversations in some (ADR-124). Cuentas
   // keeps its place but draws nothing until an explicit «yes»: it does not
   // blink in for those who have it, nor flash its name at those who do not.
+  // And a lens shows only where the space uses it (ADR-131): on AND access.
   const moneyAccess = createQuery(moneyAccessAnyQueryOptions());
   const conversationAccess = createQuery(conversationAccessQueryOptions());
   let moneyPending = $derived($moneyAccess.isPending);
-  let VIEW_AS = $derived<{ id: Lens; label: string }[]>([
-    { id: 'planner', label: t('lens.planner', locale) },
-    ...($conversationAccess.data?.read === false && !$conversationAccess.isPending
-      ? []
-      : [{ id: 'conversations' as const, label: t('lens.conversations', locale) }]),
-    ...($moneyAccess.data?.read_money === true || moneyPending
-      ? [{ id: 'books' as const, label: t('lens.money', locale) }]
-      : []),
-  ]);
+  let VIEW_AS = $derived<{ id: Lens; label: string }[]>(
+    [
+      { id: 'planner' as const, label: t('lens.planner', locale) },
+      ...($conversationAccess.data?.read === false && !$conversationAccess.isPending
+        ? []
+        : [{ id: 'conversations' as const, label: t('lens.conversations', locale) }]),
+      ...($moneyAccess.data?.read_money === true || moneyPending
+        ? [{ id: 'books' as const, label: t('lens.money', locale) }]
+        : []),
+    ].filter((v) => lensOn(v.id)),
+  );
 
   let active = $derived((page.url.pathname.split('/')[2] ?? 'desk') as Lens);
 

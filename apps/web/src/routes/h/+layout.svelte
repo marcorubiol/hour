@@ -36,6 +36,8 @@
   import { isReservedWorkspaceSlug } from '$lib/reserved-slugs';
   import { detectLocale, setTrade, t, tradeOf } from '$lib/i18n';
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
+  import { lensesOnFor, lensOn, setLensesOn } from '$lib/lenses.svelte';
+  import LensOff from '$lib/components/LensOff.svelte';
   import { provideCalm } from '$lib/stores/calm.svelte';
   import { providePins, parsePin, type PinKind } from '$lib/stores/pins.svelte';
   import { provideScopes, sameSet as scopesSameSet, type Scope } from '$lib/stores/scopes.svelte';
@@ -145,8 +147,11 @@
 
   // ADR-128: the screen speaks the trade of the workspaces it shows. Set
   // here, once, for every lens and dialog; `t()` reads it.
+  // ADR-131: and the lenses they use. Both read the same workspaces.
+  let onScreen = $derived(workspacesOnScreen(workspaceSlug, pins.pins, wsItems, lineIndex, projectIndex));
   $effect(() => {
-    setTrade(tradeOf(workspacesOnScreen(workspaceSlug, pins.pins, wsItems, lineIndex, projectIndex)));
+    setTrade(tradeOf(onScreen));
+    setLensesOn(lensesOnFor(onScreen));
   });
 
   // A person pin is the one token whose label lives outside the nav caches —
@@ -240,7 +245,7 @@
    *  (from the hall, Desk: the catch-up surface). On a lens route it stays
    *  put: the lens refilters in place. */
   function landOnScopedLens() {
-    if (!routedLens) void goto(`/h/${lens.current}`);
+    if (!routedLens) void goto(`/h/${lensOn(lens.current) ? lens.current : 'desk'}`);
   }
 
   function applyScope(s: Scope) {
@@ -667,7 +672,10 @@
       <ShellBreadcrumb />
 
       <div class="shell__content" class:shell__content--calm={calm.on}>
-        {#if children}{@render children()}{/if}
+        {#if routedLens && routedLens !== 'desk' && !lensOn(routedLens)}
+          <!-- ADR-131: a lens off in every space on screen, reached by URL. -->
+          <LensOff lens={routedLens} workspaces={onScreen} />
+        {:else if children}{@render children()}{/if}
       </div>
     </main>
   </div>

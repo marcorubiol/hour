@@ -14,6 +14,7 @@
    */
 
   import StateBadge from '$lib/components/StateBadge.svelte';
+  import { lensOn } from '$lib/lenses.svelte';
   import { createQuery } from '@tanstack/svelte-query';
   import { writable, derived } from 'svelte/store';
   import { fetchJSON } from '$lib/api';
@@ -111,7 +112,7 @@
       {/each}
     </ul>
 
-    {#if total > items.length}
+    {#if total > items.length && lensOn('conversations')}
       <footer class="rel-stub__footer">
         <a class="link-arrow" href="/h/conversations">
           {t('perf.rel_view_all', locale, { n: total })}

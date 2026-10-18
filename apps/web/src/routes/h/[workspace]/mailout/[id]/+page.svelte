@@ -17,6 +17,7 @@
    * nombra el servicio.
    */
   import { docTitle } from '$lib/doc-title';
+  import { lensOn } from '$lib/lenses.svelte';
   import { page } from '$app/state';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
@@ -315,7 +316,7 @@
   <section class="mo">
     <p class="eyebrow">{t('mailout.title', locale)}</p>
     <p class="mo__msg">{t('mailout.not_found', locale)}</p>
-    <p><a class="link-arrow" href="/h/conversations">{t('conversations.back', locale)}</a></p>
+    {#if lensOn('conversations')}<p><a class="link-arrow" href="/h/conversations">{t('conversations.back', locale)}</a></p>{/if}
   </section>
 {:else}
   <section class="mo" data-testid="mailout">

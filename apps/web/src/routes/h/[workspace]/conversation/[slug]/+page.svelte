@@ -20,6 +20,7 @@
    * El segmento [slug] admite también el id de la conversación.
    */
   import { docTitle } from '$lib/doc-title';
+  import { lensOn } from '$lib/lenses.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
@@ -279,7 +280,7 @@
   <section class="conv">
     <p class="eyebrow">{t('conversations.conversation', locale)}</p>
     <p class="conv__msg">{t('mail.conv_not_found', locale)}</p>
-    <p><a class="link-arrow" href="/h/conversations">{t('conversations.back', locale)}</a></p>
+    {#if lensOn('conversations')}<p><a class="link-arrow" href="/h/conversations">{t('conversations.back', locale)}</a></p>{/if}
   </section>
 {:else}
   <section class="conv">

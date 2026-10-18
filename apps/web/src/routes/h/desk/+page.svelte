@@ -42,6 +42,7 @@
   import { workspacesQueryOptions, activeProjectsQueryOptions, allLinesQueryOptions } from '$lib/nav-queries';
   import { moneyAccessAnyQueryOptions } from '$lib/bolo-queries';
   import { conversationAccessQueryOptions } from '$lib/conversation-access';
+  import { lensOn } from '$lib/lenses.svelte';
   import type { DeskConversation } from '$lib/components/DeskBoard.svelte';
   import { taskProjectId, type TaskItem, type TasksCache, type TaskTarget } from '$lib/task';
   import {
@@ -217,9 +218,10 @@
   });
 
   // Money: the Books keys and URLs, so the Desk and Cuentas share one cache.
-  // Only an explicit «yes» to read:money opens it: without it, no trace.
+  // Only an explicit «yes» to read:money opens it: without it, no trace. A
+  // space that does not use Cuentas (ADR-131) leaves no trace either.
   const accessQuery = createQuery(moneyAccessAnyQueryOptions());
-  let readMoney = $derived($accessQuery.data?.read_money === true);
+  let readMoney = $derived($accessQuery.data?.read_money === true && lensOn('books'));
   const invoicesQuery = createQuery(
     toStore(() => ({
       queryKey: ['invoices', { p: filterIds.projectIds, w: filterIds.workspaceIds }] as const,
@@ -255,7 +257,9 @@
   // Conversations exists for whoever reads them somewhere (ADR-124), the
   // LensSwitcher's own flag: only an explicit «no» hides the door.
   const convAccessQuery = createQuery(conversationAccessQueryOptions());
-  let readConversations = $derived($convAccessQuery.data?.read !== false);
+  // And only where the space uses the lens (ADR-131): off, its calls, replies,
+  // movement and door leave the Desk with it.
+  let readConversations = $derived($convAccessQuery.data?.read !== false && lensOn('conversations'));
   const overviewQuery = createQuery(
     toStore(() => ({
       queryKey: ['conversation-overview', filterIds.projectIds, filterIds.workspaceIds, lineIds] as const,
@@ -313,14 +317,14 @@
         subject: [slip.name, slip.city].filter(Boolean).join(' · '),
         projectId: a.row.project?.id ?? null,
         projectName: a.row.project?.name ?? '',
-        href: slip.href ?? plannerDayHref('day', a.day),
+        href: slip.href ?? (lensOn('planner') ? plannerDayHref('day', a.day) : null),
       });
     }),
   );
   let feed = $derived(
     buildDeskFeed(
       {
-        conversations: scopedConversations as DeskConvInput[],
+        conversations: (readConversations ? scopedConversations : []) as DeskConvInput[],
         tasks: scopedTasks,
         invoices: readMoney && $invoicesQuery.isSuccess && $bolosQuery.isSuccess ? debtInvoices : undefined,
         showToday: scopedPerfs.some((p) => p.status !== 'cancelled' && perfDayKey(p) === today),
@@ -687,7 +691,7 @@
       <div class="desk__col">
         <div class="slot slot--season">
           <DeskSeason
-            planner={{ value: plannerFig, errored: feeds.errored }}
+            planner={lensOn('planner') ? { value: plannerFig, errored: feeds.errored } : null}
             conversations={readConversations ? { value: convFig, errored: $overviewQuery.isError } : null}
             money={readMoney ? { value: moneyFig, errored: $invoicesQuery.isError || $bolosQuery.isError } : null}
             {seasonLabel}

@@ -7,7 +7,8 @@
    *
    * Never empty — zero is a figure. While loading, a `·` holds the figure's
    * place. A door whose lens failed says so alone. Cuentas exists only with
-   * `read:money`: without it, no trace.
+   * `read:money`: without it, no trace. A lens the space does not use
+   * (ADR-131) has no door either.
    */
   import BlockHead from '$lib/components/BlockHead.svelte';
   import { DASH } from '$lib/glyphs';
@@ -17,7 +18,8 @@
   type Door<T> = { value: T | null; errored: boolean };
 
   interface Props {
-    planner: Door<PlannerDoor>;
+    /** null: the Planner is off in every space on screen (ADR-131). */
+    planner: Door<PlannerDoor> | null;
     /** null: no read on conversations anywhere (ADR-124), the door does not exist. */
     conversations: Door<{ holds: number; live: number; due: number }> | null;
     /** null: no read:money, the door does not exist. */
@@ -35,6 +37,7 @@
   <BlockHead id="desk-season-h" title={t('desk.band_season', locale)} />
 
   <div class="doors">
+    {#if planner}
     <a class="door" href="/h/planner" data-testid="door-planner">
       <span class="door__lens eyebrow eyebrow--sub">{t('lens.planner', locale)}<i>{t('desk.door_planner_window', locale)}</i></span>
       {#if planner.errored}
@@ -54,6 +57,7 @@
       {/if}
       <span class="door__arrow" aria-hidden="true">→</span>
     </a>
+    {/if}
 
     {#if conversations}
       <a class="door" href="/h/conversations" data-testid="door-conversations">

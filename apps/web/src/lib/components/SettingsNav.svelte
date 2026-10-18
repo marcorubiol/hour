@@ -9,6 +9,7 @@
     | 'workspaces'
     | 'privacy'
     | 'languages'
+    | 'lenses'
     | 'mail'
     | 'notifications'
     | 'billing'
@@ -27,6 +28,7 @@
     { id: 'workspaces', labelKey: 'settings.nav_workspaces', glyph: '▸' },
     { id: 'privacy', labelKey: 'settings.nav_privacy', glyph: '◌' },
     { id: 'languages', labelKey: 'settings.nav_languages', glyph: '¶' },
+    { id: 'lenses', labelKey: 'settings.nav_lenses', glyph: '◫' },
     { id: 'mail', labelKey: 'settings.nav_mail', glyph: '@' },
     { id: 'notifications', labelKey: 'settings.nav_notifications', glyph: '◉' },
     { id: 'billing', labelKey: 'settings.nav_billing', glyph: '€' },
