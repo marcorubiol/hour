@@ -1968,7 +1968,6 @@
   "planner.season_unclosed": "not closed",
   "planner.season_strip": "Next {n} weeks",
   "planner.season_open_month": "Open the month",
-  "planner.season_week_short": "W",
   "planner.season_key_firm": "confirmed",
   "planner.season_key_option": "option",
   "planner.season_key_tour": "on tour (deduced)",

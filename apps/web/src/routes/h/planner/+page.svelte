@@ -3490,7 +3490,11 @@
           }
         : undefined}
       weekLabel={(n) => `${t('planner.week_n', locale)} ${n}`}
-      weekRange={(from, to) => `${localeDayMonth(from, localeTag)} → ${localeDayMonth(to, localeTag)}`}
+      weekRange={(from, to) =>
+        // One day is a day, not a range («18 oct → 18 oct», móvil #12).
+        from === to
+          ? localeDayMonth(from, localeTag)
+          : `${localeDayMonth(from, localeTag)} → ${localeDayMonth(to, localeTag)}`}
       weekTally={(firm, held, free) =>
         // The week's tally is a census too: a dash until its rows are in.
         !figuresKnown

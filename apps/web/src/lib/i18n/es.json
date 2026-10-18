@@ -1959,7 +1959,6 @@
   "planner.season_unclosed": "sin cerrar",
   "planner.season_strip": "Próximas {n} semanas",
   "planner.season_open_month": "Abrir el mes",
-  "planner.season_week_short": "S",
   "planner.season_key_firm": "confirmado",
   "planner.season_key_option": "opción",
   "planner.season_key_tour": "de gira (deducida)",

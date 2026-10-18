@@ -200,7 +200,11 @@
               class="wk"
               title={t('planner.season_open_month', locale)}
               onclick={() => onWeek(week[0].iso)}
-              >{t('planner.season_week_short', locale)}{isoWeek(week[0].iso)}<b
+              ><!-- One label for a week-row in every drawing: «semana 42»
+                   (diseño B2); the Season adds the Monday under it. --><span class="wk__w"
+                >{t('planner.week_n', locale)}</span
+              >
+              {isoWeek(week[0].iso)}<b
                 >{localeDayMonth(week[0].iso, localeTag)}</b
               ></button
             >
@@ -486,6 +490,8 @@
       text-align: start;
       align-self: center;
       line-height: 1.2;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
       background: none;
       border: 0;
       padding: 0;
@@ -774,7 +780,8 @@
         grid-template-columns: 2.2rem repeat(7, minmax(0, 1fr));
         gap: 2px;
       }
-      .wk b {
+      .wk b,
+      .wk__w {
         display: none;
       }
       .d {
