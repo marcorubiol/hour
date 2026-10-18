@@ -118,10 +118,19 @@
   </span>
 {/snippet}
 
+<!-- Loading: the same rows as the real ones (two lines and the time column,
+     `&nbsp;` so each bar is exactly a line high) and the typical blocks, so
+     the list below does not jump when the overview arrives (diseño A3). -->
 {#snippet ghost(n: number)}
   <ol class="rows" aria-hidden="true">
     {#each Array(n) as _, i (i)}
-      <li class="row row--ghost"><span></span><span></span></li>
+      <li>
+        <div class="row row--ghost">
+          <span class="row__who"><span class="g" style:inline-size="{55 - (i % 3) * 8}%">&nbsp;</span></span>
+          <span class="row__what"><span class="g" style:inline-size="{40 + (i % 2) * 10}%">&nbsp;</span></span>
+          <span class="row__when"><strong><span class="g">&nbsp;</span></strong><span class="g">&nbsp;</span></span>
+        </div>
+      </li>
     {/each}
   </ol>
 {/snippet}
@@ -130,12 +139,30 @@
 {#if loading}
   <div class="board" aria-busy="true" aria-label={t('overview.loading', locale)}>
     <div class="board__col">
-      <section class="block block--due"><div class="block-head"><h2 class="block__title">{t('overview.due', locale)}</h2></div>{@render ghost(3)}</section>
-      <section class="block block--hot"><div class="block-head"><h2 class="block__title">{t('overview.hot', locale)}</h2></div>{@render ghost(3)}</section>
+      <section class="block block--due"><div class="block-head"><h2 class="block__title">{t('overview.due', locale)}</h2></div>{@render ghost(5)}</section>
+      <section class="block block--hot"><div class="block-head"><h2 class="block__title">{t('overview.hot', locale)}</h2></div>{@render ghost(5)}</section>
     </div>
     <div class="board__col">
-      <section class="block block--season"><div class="block-head"><h2 class="block__title">{t('overview.season', locale)}</h2></div><div class="season__bar season__bar--ghost"></div></section>
-      <section class="block block--cold"><div class="block-head"><h2 class="block__title">{t('overview.cold', locale)}</h2></div>{@render ghost(3)}</section>
+      <section class="block block--season">
+        <div class="block-head"><h2 class="block__title">{t('overview.season', locale)}</h2></div>
+        <div class="season__bar season__bar--ghost"></div>
+        <div class="season__legend" aria-hidden="true">
+          {#each Array(6) as _, i (i)}
+            <span class="season__item"><span class="season__n"><span class="g">&nbsp;</span></span><span class="season__k"><span class="g">&nbsp;</span></span></span>
+          {/each}
+        </div>
+        <p class="season__note" aria-hidden="true"><span class="g" style:inline-size="60%">&nbsp;</span></p>
+      </section>
+      <section class="block block--cold">
+        <div class="block-head"><h2 class="block__title">{t('overview.cold', locale)}</h2></div>
+        {@render ghost(5)}
+      </section>
+      <section class="block block--mailout" aria-hidden="true">
+        <div class="block-head"><h2 class="block__title">{t('overview.last_mailout', locale)}</h2></div>
+        <p class="mailout__subject"><span class="g" style:inline-size="50%">&nbsp;</span></p>
+        <p class="mailout__meta"><span class="g" style:inline-size="70%">&nbsp;</span></p>
+        <p class="mailout__figs"><span><b><span class="g">&nbsp;</span></b></span></p>
+      </section>
     </div>
   </div>
 {:else if $query.isError}
@@ -519,13 +546,15 @@
       color: var(--text-faint);
     }
     /* Carga: filas de la altura real, para que nada salte al llegar. */
-    .row--ghost > span {
-      block-size: 1em;
+    .g {
+      display: inline-block;
+      inline-size: 3.5rem;
       border-radius: var(--radius-s);
       background: var(--bg-light);
+      line-height: inherit;
     }
-    .row--ghost > span:last-child {
-      inline-size: 4rem;
+    .row__when .g {
+      inline-size: 3.5rem;
     }
 
     /* La temporada: una barra apilada con los tonos de los badges de estado
