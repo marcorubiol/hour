@@ -598,6 +598,8 @@ export interface LastMailout {
   status: string;
   queued_at: string | null;
   figures: MailoutFigures;
+  /** Sent through the simulator (ADR-111): its figures are not real. */
+  simulated: boolean;
 }
 
 /** `GET /api/conversations/overview`. */

@@ -22,6 +22,7 @@ import {
   type TurnEvent,
 } from '$lib/conversation-overview';
 import type { ConversationStatus } from '$lib/conversation';
+import { defaultProviderKind, type MailoutEnv } from '$lib/server/mailout';
 
 export interface OverviewScope {
   projectIds: string[];
@@ -163,14 +164,15 @@ export async function loadLastMailout(
   // someone else's private ones) would say «done, 0 recipients» and name a
   // venue in its subject (`permisos.md` § 3).
   const search = new URLSearchParams({
-    select: 'id,workspace_id,subject,from_address,status,queued_at',
+    select: 'id,workspace_id,subject,from_address,status,queued_at,mail_domain_id',
     status: 'in.(queued,sending,paused,done)',
     order: 'queued_at.desc.nullslast',
     limit: '4',
   });
   setScope(search, scope.projectIds, scope.workspaceIds);
-  const { data } = await pgGet<Omit<LastMailout, 'figures'>>(env, 'mailout', jwt, { search });
-  let m: Omit<LastMailout, 'figures'> | undefined;
+  type Row = Omit<LastMailout, 'figures' | 'simulated'> & { mail_domain_id: string | null };
+  const { data } = await pgGet<Row>(env, 'mailout', jwt, { search });
+  let m: Row | undefined;
   let recipients: { data: (MailoutRecipientLite & { recipient_id: string })[] } = { data: [] };
   for (const candidate of data) {
     recipients = await pgPostRpc<MailoutRecipientLite & { recipient_id: string }>(env, 'mailout_preview', jwt, {
@@ -182,9 +184,15 @@ export async function loadLastMailout(
     }
   }
   if (!m) return null;
+  const { mail_domain_id, ...rest } = m;
+  const domain = mail_domain_id
+    ? (await pgGet<{ provider: string }>(env, 'mail_domain', jwt, { search: { select: 'provider', id: `eq.${mail_domain_id}` } })).data[0]
+    : undefined;
   return {
-    ...m,
+    ...rest,
     figures: mailoutFigures(await withSentAt(env, jwt, m.id, recipients.data), m.queued_at, lastInMap(rows)),
+    // The rule of the mailout screen (`route.ts`): its domain's provider, or the default one.
+    simulated: (domain?.provider ?? defaultProviderKind(env as Partial<MailoutEnv>)) === 'simulator',
   };
 }
 
