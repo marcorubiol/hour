@@ -1871,7 +1871,6 @@
   "overview.open_mailout": "Obrir l’enviament",
   "overview.recipients": "{n} destinataris",
   "overview.replies": "respostes",
-  "overview.season": "La temporada",
   "overview.season_empty": "Res en aquesta temporada.",
   "overview.season_hint": "prem un tram per filtrar",
   "overview.season_note": "{answered} han contestat alguna cosa · {silent} encara sense resposta",

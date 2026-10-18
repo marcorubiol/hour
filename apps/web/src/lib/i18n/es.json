@@ -1871,7 +1871,6 @@
   "overview.open_mailout": "Abrir el envío",
   "overview.recipients": "{n} destinatarios",
   "overview.replies": "respuestas",
-  "overview.season": "La temporada",
   "overview.season_empty": "Nada en esta temporada.",
   "overview.season_hint": "pulsa un tramo para filtrar",
   "overview.season_note": "{answered} han contestado algo · {silent} sin respuesta todavía",

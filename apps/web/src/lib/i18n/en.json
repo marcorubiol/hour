@@ -1880,7 +1880,6 @@
   "overview.open_mailout": "Open the mailout",
   "overview.recipients": "{n} recipients",
   "overview.replies": "replies",
-  "overview.season": "The season",
   "overview.season_empty": "Nothing this season.",
   "overview.season_hint": "tap a segment to filter",
   "overview.season_note": "{answered} have replied · {silent} no reply yet",
