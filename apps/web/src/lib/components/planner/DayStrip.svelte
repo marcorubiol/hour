@@ -187,15 +187,21 @@
               clash={t.clash ?? 'none'}
               clashPeople={t.clashPeople ?? false}
             />
-            {#if t.roadSheetHref}
-              <a class="ds__rs ds__rs--corner" href={t.roadSheetHref}>{roadSheetWord} ↗</a>
-            {/if}
-            {#if t.cast !== null && t.cast !== undefined}
-              <!-- Who is inside the thread — data or the honest word, never
-                   the inference. -->
-              <span class="ds__cast cast-line" class:cast-line--none={t.cast.length === 0}
-                >{t.cast.length > 0 ? t.cast.join(' · ') : noCastWord}</span
-              >
+            <!-- THE FOOT: who is inside the thread (data or the honest word,
+                 never the inference) and the road-sheet door. The door sat in
+                 the card's corner and a longer head («SHOW LOAD-IN 14h») ran
+                 under it; on the foot it cannot cover anything. -->
+            {#if (t.cast !== null && t.cast !== undefined) || t.roadSheetHref}
+              <span class="ds__foot">
+                {#if t.cast !== null && t.cast !== undefined}
+                  <span class="cast-line" class:cast-line--none={t.cast.length === 0}
+                    >{t.cast.length > 0 ? t.cast.join(' · ') : noCastWord}</span
+                  >
+                {/if}
+                {#if t.roadSheetHref}
+                  <a class="ds__rs" href={t.roadSheetHref}>{roadSheetWord} ↗</a>
+                {/if}
+              </span>
             {/if}
           </span>
 
@@ -282,13 +288,17 @@
                 clash={t.clash ?? 'none'}
                 clashPeople={t.clashPeople ?? false}
               />
-              {#if t.roadSheetHref}
-                <a class="ds__rs ds__rs--corner" href={t.roadSheetHref}>{roadSheetWord} ↗</a>
-              {/if}
-              {#if t.cast !== null && t.cast !== undefined}
-                <span class="ds__cast cast-line" class:cast-line--none={t.cast.length === 0}
-                  >{t.cast.length > 0 ? t.cast.join(' · ') : noCastWord}</span
-                >
+              {#if (t.cast !== null && t.cast !== undefined) || t.roadSheetHref}
+                <span class="ds__foot">
+                  {#if t.cast !== null && t.cast !== undefined}
+                    <span class="cast-line" class:cast-line--none={t.cast.length === 0}
+                      >{t.cast.length > 0 ? t.cast.join(' · ') : noCastWord}</span
+                    >
+                  {/if}
+                  {#if t.roadSheetHref}
+                    <a class="ds__rs" href={t.roadSheetHref}>{roadSheetWord} ↗</a>
+                  {/if}
+                </span>
               {/if}
             </span>
             <span class="ds__t ds__t--unp"><em class="ds__nohour">{noHourWord}</em></span>
@@ -331,11 +341,6 @@
     .ds__l :global(.slip) {
       inline-size: 100%;
     }
-    .ds__rs--corner {
-      position: absolute;
-      inset-block-start: 12px;
-      inset-inline-end: 14px;
-    }
     .ds__l--k {
       display: flex;
       font-family: var(--font-mono);
@@ -361,8 +366,12 @@
     }
     /* Who is on file. The honest absence is quieter than a name. */
     /* The line's voice is `.cast-line` (styles/cast.css); here, its place. */
-    .ds__cast {
+    .ds__foot {
       grid-column: 1 / -1;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 2px var(--space-s);
     }
     /* The pair's rule now rides THE SLIP itself (same classes as the
        agenda's rows) — the label draws no second version of it. */
