@@ -1951,6 +1951,7 @@
   "books.err_bolos": "No se han podido leer los bolos.",
   "books.err_invoices": "No se han podido leer los documentos.",
   "books.err_expenses": "No se han podido leer los gastos.",
+  "books.capped": "Hay más de lo que se puede leer de una vez ({bolos} bolos o {invoices} documentos): lo más antiguo no cuenta en estas cifras. Acota el ámbito.",
   "books.retry": "Reintentar",
   "planner.view_overview": "Temporada",
   "planner.season_window": "{from} → {to} · {n} semanas",

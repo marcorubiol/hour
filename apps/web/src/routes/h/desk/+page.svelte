@@ -207,7 +207,8 @@
       enabled: readMoney && !scopeUnresolved,
       retry: false,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
-        fetchJSON<{ items: MoneyInvoiceItem[] }>(`/api/invoices?${feedParams(filterIds)}`, signal),
+        // Same URL as Cuentas (`limit=200`): one cache key, one answer.
+        fetchJSON<{ items: MoneyInvoiceItem[] }>(`/api/invoices?${feedParams(filterIds, { limit: '200' })}`, signal),
     })),
   );
   const bolosQuery = createQuery(

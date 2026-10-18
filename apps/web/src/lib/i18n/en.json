@@ -1960,6 +1960,7 @@
   "books.err_bolos": "Could not read the deals.",
   "books.err_invoices": "Could not read the documents.",
   "books.err_expenses": "Could not read the expenses.",
+  "books.capped": "There is more than can be read at once ({bolos} bolos or {invoices} documents): the oldest does not count in these figures. Narrow the scope.",
   "books.retry": "Try again",
   "planner.view_overview": "Season",
   "planner.season_window": "{from} → {to} · {n} weeks",

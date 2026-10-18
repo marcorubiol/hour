@@ -1951,6 +1951,7 @@
   "books.err_bolos": "Impossible de lire les cessions.",
   "books.err_invoices": "Impossible de lire les documents.",
   "books.err_expenses": "Impossible de lire les dépenses.",
+  "books.capped": "Il y a plus que ce qui peut être lu d’un coup ({bolos} dates ou {invoices} documents) : le plus ancien ne compte pas dans ces chiffres. Restreins le périmètre.",
   "books.retry": "Réessayer",
   "planner.view_overview": "Saison",
   "planner.season_window": "{from} → {to} · {n} semaines",

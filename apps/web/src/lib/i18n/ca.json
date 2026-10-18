@@ -1951,6 +1951,7 @@
   "books.err_bolos": "No s'han pogut llegir els bolos.",
   "books.err_invoices": "No s'han pogut llegir els documents.",
   "books.err_expenses": "No s'han pogut llegir les despeses.",
+  "books.capped": "Hi ha més del que es pot llegir de cop ({bolos} bolos o {invoices} documents): el més antic no compta en aquestes xifres. Acota l’àmbit.",
   "books.retry": "Tornar-ho a provar",
   "planner.view_overview": "Temporada",
   "planner.season_window": "{from} → {to} · {n} setmanes",

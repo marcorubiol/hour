@@ -146,6 +146,11 @@
     void goto(`/h/${ws}/project/${projectSlug}/`);
   }
 
+  // The feeds' ceilings. Past them the oldest rows drop silently (the
+  // invoices come newest first, and the oldest are the most overdue), so the
+  // page says so instead (`capped` below). Desk reads the same URLs.
+  const BOLOS_CAP = 500;
+  const INVOICES_CAP = 200;
   // The bolos feed comes whole (up to 500) and the season is cut here: por
   // cobrar and por facturar must see every season, the season figure only one.
   const bolosOptions = toStore(() => {
@@ -154,7 +159,7 @@
       queryKey: ['money-bolos', { p: k.projectIds, w: k.workspaceIds }] as const,
       enabled: !k.unresolved && !k.gated,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
-        fetchJSON<{ items: MoneyBolo[] }>(`/api/money/bolos?${feedParams(k, { limit: '500' })}`, signal),
+        fetchJSON<{ items: MoneyBolo[] }>(`/api/money/bolos?${feedParams(k, { limit: String(BOLOS_CAP) })}`, signal),
     };
   });
   const invoicesOptions = toStore(() => {
@@ -163,7 +168,7 @@
       queryKey: ['invoices', { p: k.projectIds, w: k.workspaceIds }] as const,
       enabled: !k.unresolved && !k.gated,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
-        fetchJSON<{ items: MoneyInvoiceItem[] }>(`/api/invoices?${feedParams(k)}`, signal),
+        fetchJSON<{ items: MoneyInvoiceItem[] }>(`/api/invoices?${feedParams(k, { limit: String(INVOICES_CAP) })}`, signal),
     };
   });
   const expensesOptions = toStore(() => {
@@ -452,6 +457,9 @@
   let currencies = $derived([...new Set(bolos.map((b) => b.fee_currency ?? 'EUR'))].sort());
   /** With more than one currency every amount carries its code: a column of numbers invites summing. */
   let multiCurrency = $derived(currencies.length > 1);
+  let capped = $derived(
+    ($bolosQuery.data?.items.length ?? 0) >= BOLOS_CAP || ($invoicesQuery.data?.items.length ?? 0) >= INVOICES_CAP,
+  );
   let expenseTotals = $derived(totalsByCurrency(expenses, (e) => e.currency, (e) => Number(e.amount)));
   let seasonEmpty = $derived(!loading && seasonBolos.length === 0 && attention.length === 0);
   let previousSeason = $derived(seasons.find((s) => s < season) ?? null);
@@ -951,6 +959,10 @@
             {/if}
           </section>
         </div>
+      {/if}
+
+      {#if capped}
+        <p class="mny__note" data-testid="money-capped">{t('books.capped', locale, { bolos: BOLOS_CAP, invoices: INVOICES_CAP })}</p>
       {/if}
 
       <!-- 4 · El libro -->
