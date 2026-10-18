@@ -330,6 +330,8 @@
     text-overflow: ellipsis;
   }
   .row__subject label {
+    font: inherit;
+    color: inherit;
     cursor: pointer;
   }
   .row__subject a:hover {
