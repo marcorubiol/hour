@@ -16,6 +16,7 @@
    * Mientras el envío sea simulado (ADR-111), la pantalla lo dice; nunca
    * nombra el servicio.
    */
+  import { docTitle } from '$lib/doc-title';
   import { page } from '$app/state';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
@@ -305,7 +306,7 @@
 </script>
 
 <svelte:head>
-  <title>{m?.subject || t('mailout.title', locale)} · Hour</title>
+  <title>{docTitle(m?.subject || t('mailout.title', locale))}</title>
 </svelte:head>
 
 {#if $query.isLoading}

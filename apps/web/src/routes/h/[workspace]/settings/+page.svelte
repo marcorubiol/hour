@@ -18,6 +18,7 @@
    * (promoted to `.set-page :global(…)` so it reaches the section children).
    */
 
+  import { docTitle } from '$lib/doc-title';
   import { page } from '$app/state';
   import { createQuery } from '@tanstack/svelte-query';
   import { fetchJSON } from '$lib/api';
@@ -75,7 +76,7 @@
 </script>
 
 <svelte:head>
-  <title>{t('settings.title', locale)} — Hour</title>
+  <title>{docTitle(t('settings.title', locale))}</title>
 </svelte:head>
 
 <article class="set-page">

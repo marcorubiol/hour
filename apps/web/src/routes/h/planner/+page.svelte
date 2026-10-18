@@ -31,6 +31,7 @@
    * itself while the availability/team feeds are absent.
    */
 
+  import { docTitle } from '$lib/doc-title';
   import { createMutation, createQueries, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { tick, untrack } from 'svelte';
@@ -2973,7 +2974,7 @@
 </script>
 
 <svelte:head>
-  <title>{t('lens.planner', locale)} — Hour</title>
+  <title>{docTitle(t('lens.planner', locale))}</title>
 </svelte:head>
 
 <section class="cal" aria-busy={busy}>

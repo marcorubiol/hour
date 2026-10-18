@@ -10,6 +10,8 @@ async function login(page: Page) {
   await page.getByRole('button', { name: /sign in/i }).click();
   // ADR-067 lands on `/h` with no trailing slash — the old /\/h\// never matches.
   await page.waitForURL(/\/h\/?$/);
+  // The Hall names the tab: it used to keep the login's «Sign in» (ADR-130 § 5).
+  await expect(page).toHaveTitle('Hour');
 }
 
 async function sessionCookies(context: BrowserContext) {

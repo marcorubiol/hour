@@ -18,6 +18,7 @@
    * scopes and hands down. Queries share their keys with the lenses they
    * summarise (Books, Conversations, the thread feed, the rail) — one cache.
    */
+  import { docTitle } from '$lib/doc-title';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { tick } from 'svelte';
@@ -610,7 +611,7 @@
   };
 </script>
 
-<svelte:head><title>{t('desk.title', locale)}</title></svelte:head>
+<svelte:head><title>{docTitle(t('lens.desk', locale))}</title></svelte:head>
 
 <div class="desk" aria-busy={busy}>
   <LensHeader>

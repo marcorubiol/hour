@@ -26,6 +26,7 @@
    * shown as a removable chip; «Escribir a estas» preloads the selection.
    */
 
+  import { docTitle } from '$lib/doc-title';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { afterNavigate, goto } from '$app/navigation';
   import { page } from '$app/state';
@@ -519,7 +520,7 @@
 </script>
 
 <svelte:head>
-  <title>{t('lens.conversations', locale)} — Hour</title>
+  <title>{docTitle(t('lens.conversations', locale))}</title>
 </svelte:head>
 
 <section class="conversations" aria-busy={busy}>

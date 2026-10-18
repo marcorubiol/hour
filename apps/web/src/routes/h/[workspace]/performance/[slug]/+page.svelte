@@ -8,6 +8,7 @@
    * The road sheet sub-view (ADR-023) links from the header.
    */
 
+  import { docTitle } from '$lib/doc-title';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
@@ -625,7 +626,7 @@
 </script>
 
 <svelte:head>
-  <title>{title} — {t('perf.label', locale)} — Hour</title>
+  <title>{docTitle(title, t('perf.label', locale))}</title>
 </svelte:head>
 
 <article class="perf" aria-busy={loading}>

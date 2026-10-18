@@ -9,6 +9,7 @@
    * (`venue_directory_source`, filled by each import), so the dates are the
    * ones of the data actually loaded.
    */
+  import { docTitle } from '$lib/doc-title';
   import { createQuery } from '@tanstack/svelte-query';
   import { fetchJSON } from '$lib/api';
   import { detectLocale, t } from '$lib/i18n';
@@ -35,7 +36,7 @@
     new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 </script>
 
-<svelte:head><title>{t('legal.title', locale)} · Hour</title></svelte:head>
+<svelte:head><title>{docTitle(t('legal.title', locale))}</title></svelte:head>
 
 <section class="legal" aria-busy={$sources.isPending}>
   <h1>{t('legal.title', locale)}</h1>

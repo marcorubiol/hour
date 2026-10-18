@@ -14,6 +14,7 @@
    * activity (conversations + confirmed + holds).
    */
 
+  import { docTitle } from '$lib/doc-title';
   import { createQuery } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON } from '$lib/api';
@@ -263,7 +264,7 @@
   }
 </script>
 
-<svelte:head><title>{currentWorkspace ? `${spaceName(currentWorkspace.name)} — Hour` : 'Hour'}</title></svelte:head>
+<svelte:head><title>{docTitle(currentWorkspace ? spaceName(currentWorkspace.name) : null)}</title></svelte:head>
 
 <!-- Plain <div> (not <section>) so it dodges base.css's section defaults (big
      padding-block + a space-l flex gap between children); the vertical rhythm

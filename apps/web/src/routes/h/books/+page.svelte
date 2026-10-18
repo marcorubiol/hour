@@ -24,6 +24,7 @@
    * instead of «no bolos». Fee editing lives here by design (ADR-043).
    */
 
+  import { docTitle } from '$lib/doc-title';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
@@ -793,7 +794,7 @@
 {/snippet}
 
 <svelte:head>
-  <title>{t('books.head_title', locale)}</title>
+  <title>{docTitle(t('lens.money', locale))}</title>
 </svelte:head>
 
 <section class="mny" aria-busy={busy}>

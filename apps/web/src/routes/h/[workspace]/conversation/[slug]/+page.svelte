@@ -19,6 +19,7 @@
    *
    * El segmento [slug] admite también el id de la conversación.
    */
+  import { docTitle } from '$lib/doc-title';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
@@ -269,7 +270,7 @@
 </script>
 
 <svelte:head>
-  <title>{title} · {t('conversations.conversation', locale)} · Hour</title>
+  <title>{docTitle(title, t('conversations.conversation', locale))}</title>
 </svelte:head>
 
 {#if $convQuery.isLoading}

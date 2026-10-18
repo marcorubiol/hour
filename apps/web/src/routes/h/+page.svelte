@@ -21,6 +21,7 @@
    * absent (sentence, relation, teaser): silence over lies. The clock and
    * greeting are the only always-present copy.
    */
+  import { docTitle } from '$lib/doc-title';
   import { goto } from '$app/navigation';
   import { createQuery } from '@tanstack/svelte-query';
   import { fetchJSON } from '$lib/api';
@@ -207,6 +208,8 @@
   );
   let hasTeaser = $derived(teaserTimes.length > 0 || notesLabel !== null);
 </script>
+
+<svelte:head><title>{docTitle()}</title></svelte:head>
 
 <section class="hall" aria-label={t('hall.aria', locale)} aria-busy={busy}>
   <div class="hall__center">

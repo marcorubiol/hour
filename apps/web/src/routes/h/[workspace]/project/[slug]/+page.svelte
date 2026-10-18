@@ -12,6 +12,7 @@
    * (ADR-024), so slug alone could hit the wrong space's project.
    */
 
+  import { docTitle } from '$lib/doc-title';
   import { page } from '$app/state';
   import { createQuery } from '@tanstack/svelte-query';
   import {
@@ -124,7 +125,7 @@
 </script>
 
 <svelte:head>
-  <title>{displayName} — Hour</title>
+  <title>{docTitle(displayName)}</title>
 </svelte:head>
 
 <article class="project" aria-busy={projectLoading} style={`--c: ${project ? accentVarFor(project) : accentVar(projectSlug)}`}>

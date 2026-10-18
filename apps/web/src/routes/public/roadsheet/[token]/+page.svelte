@@ -6,6 +6,7 @@
    * RoadsheetView as the operator page.
    */
 
+  import { docTitle } from '$lib/doc-title';
   import { page } from '$app/state';
   import { createQuery } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
@@ -51,7 +52,7 @@
 </script>
 
 <svelte:head>
-  <title>{sheet ? `${sheet.title} — ${t('roadsheet.title', locale)}` : t('roadsheet.title', locale)} — Hour</title>
+  <title>{docTitle(sheet?.title, t('roadsheet.title', locale))}</title>
   <meta name="robots" content="noindex" />
 </svelte:head>
 

@@ -5,6 +5,7 @@
    * workspace in the URL; the global person id is only the identity bridge.
    */
 
+  import { docTitle } from '$lib/doc-title';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import { page } from '$app/state';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
@@ -388,7 +389,7 @@
 </script>
 
 <svelte:head>
-  <title>{file?.person.full_name ?? slug} — Hour</title>
+  <title>{docTitle(file?.person.full_name ?? slug)}</title>
 </svelte:head>
 
 <article class="person" aria-busy={loading}>
