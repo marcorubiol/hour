@@ -264,9 +264,15 @@
   }));
 
   function toggleProject(id: string) {
-    aProjectIds = aProjectIds.includes(id)
-      ? aProjectIds.filter((x) => x !== id)
-      : [...aProjectIds, id];
+    if (aProjectIds.includes(id)) {
+      aProjectIds = aProjectIds.filter((x) => x !== id);
+      return;
+    }
+    // The line Select binds `aLineByProject[id]`: binding `undefined` to a
+    // prop with a fallback throws (svelte props_invalid_value), so a checked
+    // project always has a key; '' is «No line».
+    aLineByProject = { ...aLineByProject, [id]: aLineByProject[id] ?? '' };
+    aProjectIds = [...aProjectIds, id];
   }
 
   // ADR-102: the organization completes from those of the chosen spaces (all
@@ -305,7 +311,9 @@
           ? [scopedProjects[0].id]
           : [];
     aLineByProject =
-      scope.lines.length === 1 ? { [scope.lines[0].projectId]: scope.lines[0].id } : {};
+      scope.lines.length === 1
+        ? { [scope.lines[0].projectId]: scope.lines[0].id }
+        : Object.fromEntries(aProjectIds.map((id) => [id, '']));
     addOpen = true;
   }
 
