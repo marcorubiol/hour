@@ -214,10 +214,11 @@
                   {@render who(row)}
                   {#if row.reason === 'reply'}
                     <span class="row__what"><b>{row.subject || kindLabel(row.kind)}</b></span>
-                    <span class="row__when"><strong>{relativeContactDate(row.at, locale)}</strong>{kindLabel(row.kind)}</span>
+                    <!-- The kind goes under the date only when the subject took the line: never twice (diseño B7). -->
+                    <span class="row__when"><strong>{relativeContactDate(row.at, locale)}</strong>{row.subject ? kindLabel(row.kind) : ''}</span>
                   {:else}
                     <span class="row__what">{row.note || t('overview.follow_up', locale)}</span>
-                    <span class="row__when"><strong>{dayMonth(row.at)}</strong>{t('overview.follow_up', locale)}</span>
+                    <span class="row__when"><strong>{dayMonth(row.at)}</strong>{row.note ? t('overview.follow_up', locale) : ''}</span>
                   {/if}
                 </a>
                 {#if row.reason === 'reply' && onwrite}
