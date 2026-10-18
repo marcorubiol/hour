@@ -107,7 +107,7 @@ test.describe('el hilo del equipo de una conversación (ADR-106)', () => {
 
     await page.goto(`/h/playwright/conversation/${conversationId}`);
     // En «registro», el hilo del equipo va al lado de lo hablado con fuera.
-    const team = page.locator('aside .inside article.thread');
+    const team = page.locator('.conv__aside .inside article.thread');
     await expect(team).toBeVisible({ timeout: 30_000 });
     await expect(team.locator('.thread__empty')).toBeVisible();
     // La línea de audiencia, sin plegar: quien ve esta conversación.
@@ -121,7 +121,8 @@ test.describe('el hilo del equipo de una conversación (ADR-106)', () => {
     messageId = ((await res.json()) as { message: { id: string } }).message.id;
 
     await expect(team.locator('.msg', { hasText: BODY })).toBeVisible({ timeout: 15_000 });
-    await expect(team.locator('.thread__count')).toHaveText('1');
+    // In the file the count rides in its eyebrow: «Equipo · 1» (ADR-126 § 10).
+    await expect(team.getByRole('heading')).toHaveText(/·\s*1$/);
     await context.close();
   });
 

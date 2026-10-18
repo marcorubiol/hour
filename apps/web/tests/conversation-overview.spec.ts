@@ -8,10 +8,12 @@ import { loadEnvFile } from 'node:process';
  * Lo que fija:
  *   - una sala que nos acaba de escribir sale en «Te toca», y su filtro la
  *     encuentra en la lista con la columna Turno;
- *   - una sala a la que escribimos hace 40 días sin respuesta se enfría, y
- *     «Escribir a estas» abre el modo selección con ella ya marcada;
+ *   - una sala contactada a la que escribimos hace 40 días sin respuesta se
+ *     enfría en la segunda ronda, y «Escribir a estas» abre el modo selección
+ *     con ella ya marcada (ADR-126 § 8: las paradas no van en bloque);
  *   - el chip del filtro lo quita, y un tramo de la temporada filtra por estado;
- *   - en el móvil, una sola columna con «Te toca» primero.
+ *   - en el móvil, una sola columna en el orden del documento: lo que pide
+ *     acción (te toca, caliente) antes que la temporada (ADR-126 § 11).
  *
  * En el espacio `playwright`, en `zzz-e2e-collab`, con dos conversaciones del
  * propio spec (nunca `muk-cia`). Autolimpiante: las borra al acabar (sus
@@ -42,14 +44,14 @@ test.describe('el dashboard de Conversations (ADR-117)', () => {
   let jwt = '';
   const ids: string[] = [];
 
-  async function conversation(name: string): Promise<string> {
+  async function conversation(name: string, status = 'in_conversation'): Promise<string> {
     const project = await h.pgGet<{ id: string }>('project', jwt, new URLSearchParams({ slug: 'eq.zzz-e2e-collab', select: 'id' }));
     const conv = await h.pgRpc<{ id: string }>('create_conversation', jwt, {
       p_project_id: project.rows[0].id,
       p_organization_name: name,
       p_full_name: `${name} contacto`,
       p_email: `e2e-dash-${ids.length}-${RUN}@example.test`,
-      p_status: 'in_conversation',
+      p_status: status,
     });
     expect(conv.status, conv.error).toBe(200);
     const id = one(conv.data).id;
@@ -77,7 +79,7 @@ test.describe('el dashboard de Conversations (ADR-117)', () => {
     const warm = await conversation(WARM);
     await event(warm, 'outbound', 3, 'Propuesta');
     await event(warm, 'inbound', 0, SUBJECT);
-    const cold = await conversation(COLD);
+    const cold = await conversation(COLD, 'contacted');
     await event(cold, 'outbound', 40, `Propuesta ${RUN}`);
   });
 
@@ -91,7 +93,8 @@ test.describe('el dashboard de Conversations (ADR-117)', () => {
     await page.goto('/h/conversations');
     const due = page.getByTestId('block-due');
     await expect(due).toBeVisible({ timeout: 30_000 });
-    await expect(due.locator('.count')).not.toHaveText('0');
+    // The count rides in the block's title: «Te toca · N».
+    await expect(due.getByRole('heading')).not.toHaveText(/·\s*0$/);
 
     await due.getByRole('link', { name: /lista|list|llista|liste/i }).click();
     await expect(page).toHaveURL(/turno=nuestro/);
@@ -107,9 +110,11 @@ test.describe('el dashboard de Conversations (ADR-117)', () => {
     await page.goto('/h/conversations');
     const cold = page.getByTestId('block-cold');
     await expect(cold).toBeVisible({ timeout: 30_000 });
-    await cold.getByRole('button').click();
+    // One «write to these» per project when the cooling spans several: ours is zzz-e2e-collab.
+    const write = cold.locator('.block__acts button');
+    await ((await write.count()) > 1 ? write.filter({ hasText: /Collab/i }) : write).click();
 
-    await expect(page).toHaveURL(/temp=fria/);
+    await expect(page).toHaveURL(/temp=ronda/);
     await expect(page.locator('.action-bar')).toBeVisible();
     await page.getByRole('searchbox').fill(COLD);
     const row = page.locator('.conversation-table tbody tr', { hasText: COLD });
@@ -131,7 +136,7 @@ test.describe('el dashboard de Conversations (ADR-117)', () => {
     await expect(page.locator('.conversation-table tbody tr').first()).toBeVisible({ timeout: 30_000 });
   });
 
-  test('en el móvil, una columna con «Te toca» primero', async ({ page }) => {
+  test('en el móvil, una columna en el orden del documento, «Te toca» primero', async ({ page }) => {
     test.setTimeout(60_000);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/h/conversations');
@@ -140,8 +145,8 @@ test.describe('el dashboard de Conversations (ADR-117)', () => {
     const hot = page.getByTestId('block-hot');
     await expect(due).toBeVisible({ timeout: 30_000 });
     const [d, s, ho] = await Promise.all([due.boundingBox(), season.boundingBox(), hot.boundingBox()]);
-    expect(d!.y).toBeLessThan(s!.y);
-    expect(s!.y).toBeLessThan(ho!.y);
+    expect(d!.y).toBeLessThan(ho!.y);
+    expect(ho!.y).toBeLessThan(s!.y);
     expect(Math.abs(d!.x - s!.x)).toBeLessThan(2);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
