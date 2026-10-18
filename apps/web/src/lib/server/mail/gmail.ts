@@ -277,6 +277,19 @@ export function parseMessageIds(header: string | null | undefined): string[] {
   return [...header.matchAll(/<[^<>\s]+>/g)].map((m) => m[0]).filter((id) => id.length <= 998);
 }
 
+/**
+ * Una respuesta automática (fuera de oficina, acuse): RFC 3834
+ * `Auto-Submitted` distinto de `no`, o las cabeceras de facto que ponen
+ * Exchange y los autorespondedores. No es una respuesta de la sala (ADR-126 § 3).
+ */
+export function isAutoReply(get: (name: string) => string | null): boolean {
+  const submitted = get('Auto-Submitted')?.trim().toLowerCase();
+  if (submitted && submitted !== 'no') return true;
+  if (get('X-Autoreply') || get('X-Autorespond')) return true;
+  const precedence = get('Precedence')?.trim().toLowerCase();
+  return precedence === 'auto_reply';
+}
+
 /** El correo de Gmail en la forma neutra del proveedor. */
 export function parseGmailMessage(raw: GmailRawMessage): MailMessage {
   const p = raw.payload;
@@ -300,6 +313,7 @@ export function parseGmailMessage(raw: GmailRawMessage): MailMessage {
     occurredAt: Number.isFinite(dateMs) ? new Date(dateMs).toISOString() : new Date().toISOString(),
     body: trimQuoted(body).slice(0, 20000),
     isDraft: (raw.labelIds ?? []).includes('DRAFT'),
+    auto: isAutoReply((name) => header(p, name)),
   };
 }
 

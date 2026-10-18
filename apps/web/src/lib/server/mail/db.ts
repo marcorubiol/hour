@@ -70,6 +70,8 @@ export interface IngestPayload {
   cc: string[];
   counterparts: string[];
   body: string | null;
+  /** An automatic reply: stored as `metadata.auto` (ADR-126 § 3). */
+  auto?: boolean;
 }
 
 /** La interfaz que sync.ts usa: los tests la simulan en memoria. */

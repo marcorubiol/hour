@@ -994,6 +994,26 @@
      pattern (consumer parameterises, skeleton stays the same). Class
      names mirror the enum with underscores replaced by dashes
      (in_conversation → in-conversation). */
+  /* The tone of each conversation status, one source for the pill below and
+     for anything that draws a status without being one (the season bar of
+     Conversations). `--status` is the family; a drawing mixes it once, with
+     one recipe, so bar and pills move together (diseño B6). */
+  .badge--contacted,
+  [data-conv-status='contacted'] { --status: var(--info); }
+  .badge--in-conversation,
+  [data-conv-status='in_conversation'] { --status: var(--warning); }
+  .badge--hold,
+  [data-conv-status='hold'] { --status: var(--neutral); }
+  .badge--confirmed,
+  [data-conv-status='confirmed'] { --status: var(--success); }
+  .badge--declined,
+  [data-conv-status='declined'] { --status: var(--danger); }
+  /* Asleep: the neutral, faded, as the pill's opacity fades it. */
+  .badge--dormant,
+  [data-conv-status='dormant'] { --status: color-mix(in oklab, var(--neutral) 45%, transparent); }
+  .badge--recurring,
+  [data-conv-status='recurring'] { --status: var(--primary); }
+
   .badge--contacted {
     --badge-background: var(--info-ultra-light);
     --badge-color: var(--info-ultra-dark);
@@ -1242,6 +1262,26 @@
   .toast__message {
     font-size: var(--text-s);
     color: inherit;
+  }
+
+  /* The one action a toast may carry («Deshacer»): a link-like button. */
+  .toast__action {
+    align-self: flex-start;
+    margin-block-start: var(--space-2xs);
+    padding: 0;
+    background: none;
+    border: 0;
+    color: inherit;
+    font: inherit;
+    font-weight: 500;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+    cursor: pointer;
+  }
+  @media (pointer: coarse) {
+    .toast__action {
+      min-block-size: var(--touch-target);
+    }
   }
 
   .toast__dismiss {
@@ -1731,6 +1771,27 @@
     --eyebrow-tracking: 0.08em;
   }
 
+  /* Load failure — what a block or a list says when its read fails: its own
+     sentence (never the server's text) in the display italic, in danger, so
+     it never reads as an empty state, and a way to try again beside it. The
+     treatment Desk (`.dband__err`) and Cuentas (`.mny__fail`) drew each on
+     their own; Conversations consumes it from here (diseño M2). */
+  .load-fail {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-s);
+    margin: 0;
+    color: var(--danger);
+    font-family: var(--font-display);
+    font-size: var(--text-s);
+    font-style: italic;
+  }
+  .load-fail button {
+    font-family: var(--font-sans);
+    font-style: normal;
+  }
+
   /* Block head — a sub-eyebrow over a hairline, with its actions at the end
      (the conversation file, the mailout screen). */
   .block-head {
@@ -1786,6 +1847,12 @@
     border: var(--border);
     border-radius: var(--radius-s);
     box-shadow: var(--box-shadow-2);
+  }
+  /* While a sticky action bar is on the page, what gets scrolled into view
+     (a focused field, the line being typed) stops above it, not under it
+     (Conversations review, móvil #5: the mailout body under its bar). */
+  :root:has(.action-bar) {
+    scroll-padding-block-end: calc(var(--control-size-m) + 2 * var(--space-s) + var(--space-m));
   }
   .action-bar__note {
     margin: 0 auto 0 0;

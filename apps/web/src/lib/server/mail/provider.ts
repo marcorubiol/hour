@@ -39,6 +39,8 @@ export interface MailMessage {
   /** Texto plano, sin la cita del correo anterior, recortado a 20 000. */
   body: string;
   isDraft: boolean;
+  /** An automatic reply (Auto-Submitted, X-Autoreply…): not an answer (ADR-126 § 3). */
+  auto: boolean;
 }
 
 export interface OutgoingMail {

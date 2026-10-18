@@ -27,7 +27,7 @@
    */
 
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
-  import { goto } from '$app/navigation';
+  import { afterNavigate, goto } from '$app/navigation';
   import { page } from '$app/state';
   import { fetchJSON, mutateJSON, ApiError } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
@@ -141,41 +141,75 @@
     return () => clearTimeout(timer);
   });
 
-  let statusFilter = $state('any');
+  // The status travels in the URL too (`?estado=`, ADR-126 § 4): a block's
+  // link carries only its own filter, so following one clears the status and
+  // the list counts what the block counts; a season segment carries both.
+  let statusFilter = $derived.by(() => {
+    const raw = page.url.searchParams.get('estado');
+    return raw && (CONVERSATION_STATUSES as readonly string[]).includes(raw) ? raw : 'any';
+  });
+
+  function setStatus(next: string) {
+    const params = new URLSearchParams(page.url.searchParams);
+    if (next === 'any') params.delete('estado');
+    else params.set('estado', next);
+    const qs = params.toString();
+    void goto(`${page.url.pathname}${qs ? `?${qs}` : ''}`, { noScroll: true, keepFocus: true, replaceState: true });
+  }
 
   // ── Dashboard filters (ADR-117): in the URL, so a block's link is the filter ──
   let listFilter = $derived(parseListFilter(page.url.searchParams));
   let lineIds = $derived(scope.lines.map((l) => l.id));
-  let filterChip = $derived(
-    listFilter.turno === 'nuestro'
-      ? t('overview.due', locale)
-      : listFilter.turno === 'suyo'
-        ? t('overview.turn_theirs_cap', locale)
-        : listFilter.temp === 'caliente'
-          ? t('overview.hot', locale)
-          : listFilter.temp === 'fria'
-            ? t('overview.cold', locale)
-            : listFilter.temporada
-              ? t('overview.this_season', locale)
-              : null,
-  );
+  const TEMP_CHIP: Record<string, string> = {
+    caliente: 'overview.hot',
+    fria: 'overview.cold',
+    ronda: 'overview.cold_round_chip',
+    parada: 'overview.cold_stalled_chip',
+    'sin-fecha': 'overview.undated_chip',
+  };
+  /** The chip names the block filter the list wears; a season segment, with its status. */
+  function chipLabel(f: typeof listFilter, status: string): string | null {
+    if (f.temporada && status !== 'any') {
+      return `${statusLabel(status as ConversationStatus, locale)} · ${t('overview.this_season', locale).toLowerCase()}`;
+    }
+    if (f.turno === 'nuestro') return t('overview.due', locale);
+    if (f.turno === 'suyo') return t('overview.turn_theirs_cap', locale);
+    if (f.temp) return t(TEMP_CHIP[f.temp], locale);
+    if (f.envio && f.r) return t(f.r === 'respuestas' ? 'overview.mailout_replies_chip' : 'overview.mailout_bounced_chip', locale);
+    return f.temporada ? t('overview.this_season', locale) : null;
+  }
+  let filterChip = $derived(chipLabel(listFilter, statusFilter));
 
   function clearListFilter() {
     const params = new URLSearchParams(page.url.searchParams);
-    for (const k of ['turno', 'temp', 'temporada']) params.delete(k);
+    // A season segment is status + season: its chip names both, and goes as one.
+    if (listFilter.temporada) params.delete('estado');
+    for (const k of ['turno', 'temp', 'temporada', 'envio', 'r']) params.delete(k);
     const qs = params.toString();
-    void goto(`${page.url.pathname}${qs ? `?${qs}` : ''}`, { noScroll: true, keepFocus: true });
+    // The chip goes away with the focus on it: the focus goes to the list.
+    void goto(`${page.url.pathname}${qs ? `?${qs}` : ''}`, { noScroll: true, keepFocus: true }).then(() =>
+      listHeading?.focus({ preventScroll: true }),
+    );
   }
 
+  // After a filter the focus lands on the list's title, not on `body`: the
+  // next Tab goes into the list, not back to the top (móvil #3).
+  let listHeading = $state<HTMLElement>();
   async function showList() {
     await tick();
-    document.getElementById('lista')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    document.getElementById('lista')?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+    listHeading?.focus({ preventScroll: true });
   }
+  // A block's link (`?turno=nuestro#lista`) is a plain link: the browser
+  // scrolls, the focus follows here.
+  afterNavigate(({ to }) => {
+    if (to?.url.hash === '#lista') listHeading?.focus({ preventScroll: true });
+  });
 
   /** A season segment: that status, in the season (and the pinned lines). */
   async function filterSeasonStatus(status: ConversationStatus) {
-    statusFilter = status;
-    await goto('?temporada=actual', { noScroll: true, keepFocus: true });
+    await goto(`?temporada=actual&estado=${status}`, { noScroll: true, keepFocus: true });
     await showList();
   }
 
@@ -183,7 +217,7 @@
   async function writeTo(picks: { id: string; project_id: string }[]) {
     picking = true;
     picked = picks;
-    await goto('?temp=fria', { noScroll: true, keepFocus: true });
+    await goto('?temp=ronda', { noScroll: true, keepFocus: true });
     await showList();
   }
   let statusOptions = [
@@ -443,6 +477,7 @@
 
   // ── Selection → mailout (plan § 10) ───────────────────────────────────
   let picking = $state(false);
+  let table = $state<ReturnType<typeof ConversationTable>>();
   let picked = $state<Pick<ConversationItem, 'id' | 'project_id'>[]>([]);
   let pickedProjects = $derived([...new Set(picked.map((c) => c.project_id))]);
 
@@ -496,6 +531,10 @@
       <a class="lenshead__frag" href="/h/conversations?view=threads" aria-current={view === 'threads' ? 'page' : undefined}
         >{t('conversations.view_what', locale)}</a
       >
+      {#if view === 'people'}
+        <!-- On a phone the list starts a screen and a half down: a way straight to it (móvil #11). -->
+        <a class="lenshead__frag conversations__skip" href="#lista">{t('overview.go_to_list', locale)}</a>
+      {/if}
     {/snippet}
   </LensHeader>
 
@@ -512,13 +551,14 @@
     <ConversationOverview
       filters={{ projectIds: filterIds.projectIds, workspaceIds: filterIds.workspaceIds, lineIds, enabled: !scopeUnresolved }}
       {workspaceSlugById}
+      {projectNameById}
       {locale}
       onstatus={filterSeasonStatus}
       onwrite={canEdit ? writeTo : undefined}
     />
 
     <div class="conversations__list-head block-head" id="lista">
-      <h2 class="conversations__list-title">{t('overview.list', locale)}</h2>
+      <h2 class="eyebrow eyebrow--sub conversations__list-title" tabindex="-1" bind:this={listHeading}>{t('overview.list', locale)}</h2>
     </div>
     <div class="conversations__controls">
       <div class="conversations__search">
@@ -529,7 +569,7 @@
           bind:value={qRaw}
         />
       </div>
-      <Select label={t('edit.status', locale)} options={statusOptions} bind:value={statusFilter} />
+      <Select label={t('edit.status', locale)} options={statusOptions} bind:value={() => statusFilter, setStatus} />
       {#if filterChip}
         <Chip selected onRemove={clearListFilter} removeLabel={t('overview.clear_filter', locale)}>{filterChip}</Chip>
       {/if}
@@ -542,6 +582,7 @@
     </div>
 
     <ConversationTable
+      bind:this={table}
       {filters}
       {personHref}
       {conversationHref}
@@ -555,13 +596,28 @@
 
     {#if picking}
       <div class="action-bar" role="region" aria-label={t('mailout.pick_bar', locale)}>
-        <p class="action-bar__note">
+        <!-- Picking and unpicking is announced (móvil #2). -->
+        <p class="action-bar__note" aria-live="polite">
           {#if pickedProjects.length > 1}
             {t('mailout.one_project', locale)}
+            <!-- The way out in one click (uso #6): keep one project's picks. -->
+            {#each pickedProjects as pid (pid)}
+              <button type="button" class="action-bar__keep" onclick={() => (picked = picked.filter((c) => c.project_id === pid))}
+                >{t('mailout.keep_project', locale, {
+                  project: projectNameById.get(pid) ?? '',
+                  n: picked.filter((c) => c.project_id === pid).length,
+                })}</button
+              >
+            {/each}
           {:else}
             {t(picked.length === 1 ? 'mailout.picked_one' : 'mailout.picked_other', locale, { n: picked.length })}
           {/if}
         </p>
+        <!-- On a phone the bar is where the thumb is: the page's «all» and the way out live here too. -->
+        <span class="action-bar__more">
+          <Button size="s" variant="outline" onclick={() => table?.togglePage()}>{t('mailout.pick_page_short', locale)}</Button>
+          <Button size="s" variant="outline" onclick={togglePicking}>{t('mailout.pick_done', locale)}</Button>
+        </span>
         <Button
           size="s"
           disabled={picked.length === 0 || pickedProjects.length !== 1}
@@ -668,16 +724,39 @@
       flex-wrap: wrap;
     }
 
+    /* One height for the search, the status and the two buttons (diseño M9). */
+    .conversations__controls :global(.field__control),
+    .conversations__controls > :global(button) {
+      block-size: var(--control-size-m);
+    }
+
+    /* Focused by script after a filter: the ring only for the keyboard. */
+    .conversations__list-title:focus:not(:focus-visible) {
+      outline: none;
+    }
     .conversations__list-head {
       scroll-margin-block-start: var(--space-l);
       margin-block-start: var(--space-m);
     }
-    .conversations__list-title {
-      font-family: var(--font-display);
-      font-size: var(--text-l);
-      font-weight: 400;
-      font-style: italic;
-      color: var(--heading-color);
+    .action-bar__more {
+      display: flex;
+      gap: var(--space-xs);
+    }
+    .action-bar__keep {
+      margin-inline-start: var(--space-s);
+      padding: 0;
+      border: 0;
+      background: none;
+      color: inherit;
+      font: inherit;
+      text-decoration: underline;
+      text-underline-offset: 0.2em;
+      cursor: pointer;
+    }
+    @media (pointer: coarse) {
+      .action-bar__keep {
+        min-block-size: var(--touch-target);
+      }
     }
 
     .conversations__state {
@@ -754,6 +833,23 @@
       grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
       gap: var(--space-s) var(--space-m);
       margin-block-start: var(--space-s);
+    }
+
+    .conversations__skip {
+      display: none;
+    }
+    @media (max-width: 47.999rem) {
+      .conversations__skip {
+        display: inline-flex;
+      }
+    }
+    /* Touch: the two projections at the finger's size (móvil #8). */
+    @media (pointer: coarse) {
+      .conversations :global(.lenshead__frag) {
+        display: inline-flex;
+        align-items: center;
+        min-block-size: var(--touch-target);
+      }
     }
   }
 </style>

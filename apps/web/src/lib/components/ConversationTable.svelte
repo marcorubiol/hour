@@ -1,4 +1,6 @@
 <script module lang="ts">
+  import type { MailoutPick, TempFilter } from '$lib/conversation-overview';
+
   export interface ConversationFilters {
     projectSlug?: string;
     projectIds?: string[];
@@ -9,10 +11,13 @@
     status?: string;
     /** The dashboard's derived filters (ADR-117): global lens only. */
     turno?: 'nuestro' | 'suyo';
-    temp?: 'caliente' | 'fria';
+    temp?: TempFilter;
     /** Only the current season; `lineIds` (pinned lines) narrow it. */
     temporada?: boolean;
     lineIds?: string[];
+    /** A mailout's figure as a filter (ADR-126 § 9). */
+    envio?: string;
+    r?: MailoutPick;
     /** Hold the query (e.g. while a sidebar selection hasn't resolved). */
     enabled?: boolean;
   }
@@ -36,12 +41,11 @@
   import Button from '$lib/components/Button.svelte';
   import ConversationHistory from '$lib/components/ConversationHistory.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
-  import Input from '$lib/components/Input.svelte';
-  import Menu from '$lib/components/Menu.svelte';
+  import ConversationStatusMenu from '$lib/components/ConversationStatusMenu.svelte';
+  import NextActionDialog from '$lib/components/NextActionDialog.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { followUpDue, turnOf } from '$lib/conversation-overview';
   import {
-    CONVERSATION_STATUSES,
     groupConversationsByContact,
     relativeContactDate,
     statusBadgeClass,
@@ -148,6 +152,10 @@
     if (f.q) p.set('q', f.q);
     if (f.turno) p.set('turno', f.turno);
     if (f.temp) p.set('temp', f.temp);
+    if (f.envio && f.r) {
+      p.set('envio', f.envio);
+      p.set('r', f.r);
+    }
     if (f.temporada) {
       p.set('temporada', 'actual');
       if (f.lineIds && f.lineIds.length > 0) p.set('line_ids', f.lineIds.join(','));
@@ -264,31 +272,15 @@
   // ── Next action editor (dialog) ─────────────────────────────────────────
   let dialogOpen = $state(false);
   let editing = $state<ConversationItem | null>(null);
-  let formDate = $state('');
-  let formNote = $state('');
 
   function openNextAction(item: ConversationItem) {
     editing = item;
-    formDate = item.next_action_at ? item.next_action_at.slice(0, 10) : '';
-    formNote = item.next_action_note ?? '';
     dialogOpen = true;
   }
 
-  function closeNextAction() {
-    dialogOpen = false;
-    editing = null;
-  }
-
-  function saveNextAction() {
+  function saveNextAction(patch: Pick<ConversationPatch, 'next_action_at' | 'next_action_note'>) {
     if (!editing) return;
-    $patchMutation.mutate({
-      id: editing.id,
-      patch: {
-        next_action_at: formDate || null,
-        next_action_note: formNote.trim() || null,
-      },
-    });
-    closeNextAction();
+    $patchMutation.mutate({ id: editing.id, patch });
   }
 
   let total = $derived($query.data?.total ?? 0);
@@ -328,7 +320,7 @@
   function whoLine(item: ConversationItem): string {
     const title = conversationTitle(item) || t('conversations.conversation', locale);
     const person = item.person?.full_name;
-    return person && person !== title ? `${title} — ${person}` : title;
+    return person && person !== title ? `${title} · ${person}` : title;
   }
 
   function personPath(item: ConversationItem): string | null {
@@ -353,7 +345,8 @@
     selected = selectedIds.has(item.id) ? selected.filter((s) => s.id !== item.id) : [...selected, item];
   }
 
-  function togglePage() {
+  /** Pick (or unpick) the visible page; the selection bar offers it on a phone. */
+  export function togglePage() {
     const page = new Set(visibleItems.map((i) => i.id));
     selected =
       pagePicked === visibleItems.length
@@ -364,7 +357,7 @@
   /** The Turn cell: a reply owed, a follow-up due, or their turn (ADR-117). */
   function turnCell(item: ConversationItem): { tone: 'ours' | 'theirs'; text: string } | null {
     const now = new Date();
-    const turn = turnOf({ status: item.status, last: item.last_turn?.[0] ?? null }, now);
+    const turn = turnOf({ status: item.status, last: item.last_turn?.[0] ?? null, reply_settled_at: item.reply_settled_at }, now);
     if (turn?.side === 'ours') {
       return { tone: 'ours', text: `${t('overview.turn_ours_cap', locale)} · ${relativeContactDate(turn.since, locale)}` };
     }
@@ -474,7 +467,7 @@
       </tbody>
     </table>
   {:else}
-    <table class="conversation-table">
+    <table class="conversation-table" class:conversation-table--picking={selectable}>
       <thead>
         <tr>
           {#if selectable}
@@ -505,13 +498,16 @@
           <tr class:is-picked={selectable && selectedIds.has(item.id)}>
             {#if selectable}
               <td class="cell--pick">
-                <input
-                  type="checkbox"
-                  class="pick"
-                  checked={selectedIds.has(item.id)}
-                  aria-label={t('mailout.pick_one', locale, { name: organizationOf(item) ?? item.person?.full_name ?? '' })}
-                  onchange={() => togglePick(item)}
-                />
+                <!-- On a phone the label covers the whole card: a tap anywhere picks it (móvil #2). -->
+                <label class="pick-label">
+                  <input
+                    type="checkbox"
+                    class="pick"
+                    checked={selectedIds.has(item.id)}
+                    aria-label={t('mailout.pick_one', locale, { name: organizationOf(item) ?? item.person?.full_name ?? '' })}
+                    onchange={() => togglePick(item)}
+                  />
+                </label>
               </td>
             {/if}
             <!-- ADR-102: the conversation is with the organization; it titles the row and opens the file. -->
@@ -540,44 +536,13 @@
               {#if !editable}
                 <span class={`badge badge--xs ${statusBadgeClass(item.status)}`}>{statusLabel(item.status, locale)}</span>
               {:else}
-              <Menu
-                label={t('conversations.status_menu', locale)}
-                triggerClass={statusBadgeClass(item.status)}
+              <ConversationStatusMenu
+                status={item.status}
+                {locale}
                 direction={i >= visibleItems.length - 2 && i > 2 ? 'up' : 'down'}
-              >
-                {#snippet trigger()}
-                  {statusLabel(item.status, locale)}<span class="status-caret" aria-hidden="true">▾</span>
-                {/snippet}
-                {#snippet children({ close })}
-                  {#each CONVERSATION_STATUSES as s (s)}
-                    <li role="none">
-                      <button
-                        type="button"
-                        role="menuitem"
-                        class="menu__item{s === item.status ? ' menu__item--active' : ''}"
-                        onclick={() => {
-                          close();
-                          changeStatus(item, s);
-                        }}
-                      >
-                        {statusLabel(s, locale)}
-                      </button>
-                    </li>
-                  {/each}
-                  <li class="menu-separator" role="separator"></li>
-                  <li role="none">
-                    <button
-                      type="button"
-                      role="menuitem"
-                      class="menu__item"
-                      onclick={() => {
-                        close();
-                        openHistory(item);
-                      }}
-                    >{t('conversations.log_contact', locale)}</button>
-                  </li>
-                {/snippet}
-              </Menu>
+                onchange={(next) => changeStatus(item, next)}
+                onlog={() => openHistory(item)}
+              />
               {/if}
             </td>
             {#if turnColumn}
@@ -607,6 +572,7 @@
                 class="next-action"
                 onclick={() => openNextAction(item)}
                 title={item.next_action_note ?? t('conversations.set_next_action', locale)}
+                aria-label={item.next_action_at || item.next_action_note ? undefined : t('conversations.set_next_action', locale)}
               >
                 <span class="next-action__date">{formatDate(item.next_action_at)}</span>
                 {#if item.next_action_note}
@@ -622,9 +588,13 @@
 </div>
 
 {#if errorMsg}
-  <div class="msg msg--error">{errorMsg}</div>
+  <!-- Our sentence, not the server's text (diseño M2); the detail stays in Sentry. -->
+  <p class="load-fail" role="alert">
+    <span>{t('conversations.load_error', locale)}</span>
+    <Button size="xs" variant="outline" onclick={() => void $query.refetch()}>{t('ui.retry', locale)}</Button>
+  </p>
 {:else if !loading && items.length === 0}
-  {#if importEmptyState && !filters.q && !filters.turno && !filters.temp && !filters.temporada && (!filters.status || filters.status === 'any')}
+  {#if importEmptyState && !filters.q && !filters.turno && !filters.temp && !filters.temporada && !filters.envio && (!filters.status || filters.status === 'any')}
     <div class="empty-book">
       <p class="empty-book__title">{t('conversations.empty_title', locale)}</p>
       <p>{t('conversations.empty_body', locale)}</p>
@@ -677,28 +647,15 @@
   {/snippet}
 </Dialog>
 
-<Dialog bind:open={dialogOpen} title={t('conversations.col_next_action', locale)} size="s" onclose={() => (editing = null)}>
-  {#if editing}
-    <p class="next-action-who">
-      {whoLine(editing)}
-    </p>
-  {/if}
-  <Input label={t('perf.date', locale)} type="date" bind:value={formDate} />
-  <div class="field">
-    <label for="next-action-note">{t('blackout.note', locale)}</label>
-    <textarea
-      id="next-action-note"
-      rows="3"
-      maxlength="500"
-      bind:value={formNote}
-      placeholder={t('conversations.next_move_ph', locale)}
-    ></textarea>
-  </div>
-  {#snippet actions()}
-    <Button variant="outline" onclick={closeNextAction}>{t('create.cancel', locale)}</Button>
-    <Button onclick={saveNextAction}>{t('blackout.save', locale)}</Button>
-  {/snippet}
-</Dialog>
+<NextActionDialog
+  bind:open={dialogOpen}
+  who={editing ? whoLine(editing) : ''}
+  date={editing?.next_action_at ? editing.next_action_at.slice(0, 10) : ''}
+  note={editing?.next_action_note ?? ''}
+  {locale}
+  onsave={saveNextAction}
+  onclose={() => (editing = null)}
+/>
 
 <style>
   @layer components {
@@ -757,10 +714,6 @@
       padding-block: var(--space-xxl);
       color: var(--text-dark-muted);
     }
-    .msg--error {
-      color: var(--danger-dark);
-    }
-
     .empty-book {
       padding-block: clamp(var(--space-xl), 8vw, var(--space-3xl));
       padding-inline: var(--space-m);
@@ -768,11 +721,17 @@
       border-block-end: var(--divider);
       color: var(--text-muted);
     }
+    /* The display italic of the lens titles (`--font-serif` does not exist,
+       so this fell back to a big sans, diseño B10). */
     .empty-book__title {
       margin-block-end: var(--space-xs);
-      font-family: var(--font-serif);
+      font-family: var(--font-display);
+      font-style: italic;
       font-size: var(--text-xl);
       color: var(--heading-color);
+    }
+    .empty-book p {
+      margin-block-start: 0;
     }
 
     .grouping-note {
@@ -882,11 +841,11 @@
     tbody tr.is-picked td {
       background: var(--bg-ultra-light);
     }
-
-    .menu-separator {
-      block-size: 1px;
-      margin-block: var(--space-2xs);
-      background: var(--border-color);
+    @media (pointer: coarse) {
+      .pick {
+        inline-size: 1.5rem;
+        block-size: 1.5rem;
+      }
     }
 
     .next-action {
@@ -898,6 +857,7 @@
       max-inline-size: 100%;
     }
     .next-action__date {
+      white-space: nowrap;
       color: var(--text-dark-muted);
       font-family: var(--font-mono);
       font-size: var(--text-xs);
@@ -1052,6 +1012,22 @@
         inline-size: auto;
         align-self: center;
       }
+      /* Picking: the whole card is the checkbox's label. The page's own
+         checkbox lives in the hidden header, so it leaves the tab order; the
+         selection bar offers it instead. */
+      .conversation-table--picking tbody tr {
+        position: relative;
+      }
+      .conversation-table--picking .pick-label::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        cursor: pointer;
+      }
+      thead .pick {
+        visibility: hidden;
+      }
       :is(.conversation-table, .contact-table) .cell--name {
         order: 1;
         flex: 1 1 0;
@@ -1145,6 +1121,25 @@
       }
       .conversation-table .cell--next .next-action__note {
         min-inline-size: 0;
+      }
+    }
+
+    /* Touch: every control of a row or card reaches the finger's size, the
+       empty «—» of the next step included (móvil #8). */
+    @media (pointer: coarse) {
+      .view-toggle button,
+      .last-contact__open,
+      .next-action {
+        min-block-size: var(--touch-target);
+      }
+      .next-action {
+        min-inline-size: var(--touch-target);
+        justify-content: center;
+      }
+      .cell--name-link {
+        display: inline-flex;
+        align-items: center;
+        min-block-size: var(--touch-target);
       }
     }
   }

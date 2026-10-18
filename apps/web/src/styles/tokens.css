@@ -277,6 +277,11 @@
     --text-m: clamp(0.875rem, 0.831rem + 0.188vw, 1rem); /* 14-16 — default body (anchor) */
     --text-l: clamp(1.05rem, 0.9796rem + 0.3vw, 1.25rem); /* 16.8-20 — card titles */
     --text-xl: clamp(1.26rem, 1.1535rem + 0.454vw, 1.5625rem); /* 20.2-25 — wordmark, clock, h4 */
+    /* A dashboard figure in the display face: the lead one of a block (the
+       season's counts) and one inline with its word (a mailout's figures).
+       Two named sizes, not a size per screen (Conversations review, B4). */
+    --stat-lead: var(--text-xl);
+    --stat-inline: var(--text-l);
     --text-xxl: clamp(1.512rem, 1.3567rem + 0.663vw, 1.9531rem); /* 24.2-31.3 — section title, h2 */
 
     --h1: clamp(1.8rem, 1.5rem + 1.5vw, 2.4rem); /* 29-38 — masthead. Retuned 2026-07-12 to the size mastheads actually render (person/performance canonical); the old 32-48 was never consumed — every page rolled its own clamp to undershoot it. */
@@ -355,6 +360,9 @@
        icon column inside menus and rows stays optically aligned across
        viewport sizes. */
     --control-size-s: 2rem; /* 32px — icon action default */
+    /* A filter bar's fields and buttons share one height, so their tops
+       line up (Conversations review, diseño M9; other bars, coherence pass). */
+    --control-size-m: 2.5rem; /* 40px */
 
     /* ============================================================ */
     /* RADIUS — semantic scale (no duplicate aliases)                 */
@@ -578,32 +586,36 @@
        hover borders and outline tones consume them as "lighter than ink",
        which stays true when ink is light. --text-faint does not: it is
        set above, toward the canvas. */
-    --neutral-ultra-light: color-mix(in oklch, var(--neutral), var(--base) 82%);
+    /* Fills mix in oklab, not oklch: --base carries a warm hue (85), and
+       oklch interpolates hue the short way, so every status fill drifted
+       to 50-120 (Declined ≈ In conversation, Contacted ≈ Confirmed).
+       oklab keeps the status hue (Conversations review, diseño A1). */
+    --neutral-ultra-light: color-mix(in oklab, var(--neutral), var(--base) 82%);
     --neutral-semi-dark: color-mix(in oklch, var(--neutral), white 40%);
     --neutral-dark: color-mix(in oklch, var(--neutral), white 45%);
     --neutral-ultra-dark: color-mix(in oklch, var(--neutral), white 55%);
 
-    --primary-ultra-light: color-mix(in oklch, var(--primary), var(--base) 78%);
+    --primary-ultra-light: color-mix(in oklab, var(--primary), var(--base) 78%);
     --primary-semi-dark: color-mix(in oklch, var(--primary), white 40%);
     --primary-dark: color-mix(in oklch, var(--primary), white 45%);
     --primary-ultra-dark: color-mix(in oklch, var(--primary), white 55%);
 
-    --info-ultra-light: color-mix(in oklch, var(--info), var(--base) 78%);
+    --info-ultra-light: color-mix(in oklab, var(--info), var(--base) 78%);
     --info-semi-dark: color-mix(in oklch, var(--info), white 40%);
     --info-dark: color-mix(in oklch, var(--info), white 45%);
     --info-ultra-dark: color-mix(in oklch, var(--info), white 55%);
 
-    --success-ultra-light: color-mix(in oklch, var(--success), var(--base) 78%);
+    --success-ultra-light: color-mix(in oklab, var(--success), var(--base) 78%);
     --success-semi-dark: color-mix(in oklch, var(--success), white 40%);
     --success-dark: color-mix(in oklch, var(--success), white 45%);
     --success-ultra-dark: color-mix(in oklch, var(--success), white 55%);
 
-    --warning-ultra-light: color-mix(in oklch, var(--warning), var(--base) 78%);
+    --warning-ultra-light: color-mix(in oklab, var(--warning), var(--base) 78%);
     --warning-semi-dark: color-mix(in oklch, var(--warning), white 40%);
     --warning-dark: color-mix(in oklch, var(--warning), white 45%);
     --warning-ultra-dark: color-mix(in oklch, var(--warning), white 55%);
 
-    --danger-ultra-light: color-mix(in oklch, var(--danger), var(--base) 78%);
+    --danger-ultra-light: color-mix(in oklab, var(--danger), var(--base) 78%);
     --danger-semi-dark: color-mix(in oklch, var(--danger), white 40%);
     --danger-dark: color-mix(in oklch, var(--danger), white 45%);
     --danger-ultra-dark: color-mix(in oklch, var(--danger), white 55%);

@@ -60,6 +60,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       last_mailout: await loadLastMailout(env, jwt, scope, rows),
       team: {
         count: unread.length,
+        me,
         threads: shown,
         authors: Object.fromEntries(Object.entries(feed.authors).filter(([id]) => authorIds.has(id))),
       },

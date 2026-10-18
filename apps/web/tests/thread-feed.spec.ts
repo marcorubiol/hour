@@ -178,7 +178,7 @@ test.describe('«de qué se habla» en Conversations (ADR-116)', () => {
     await expect(row).toBeVisible({ timeout: 30_000 });
     await row.locator('a').click();
     await page.waitForURL(new RegExp(`/h/playwright/conversation/${conversationId}#team$`));
-    await expect(page.locator('aside .inside .msg', { hasText: TEAM_BODY })).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('.conv__aside .inside .msg', { hasText: TEAM_BODY })).toBeVisible({ timeout: 30_000 });
   });
 
   test('con Mínim: el General del bolo, ni Diners ni la conversación', async ({ browser }) => {

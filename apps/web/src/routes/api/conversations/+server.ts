@@ -10,7 +10,7 @@
  *
  * Each row carries `last_turn` (its last directional email, message or call),
  * so the list can say whose turn it is (ADR-117). The dashboard filters
- * (`turno=nuestro|suyo`, `temp=caliente|fria`, `temporada=actual`, with
+ * (`turno=nuestro|suyo`, `temp=caliente|fria|ronda|parada`, `temporada=actual`, with
  * `line_ids` for the season) are derived, not columns: the scope is read and
  * filtered with `$lib/conversation-overview` (the same rules as the blocks),
  * in the block's order, and only the page is read in full.
@@ -32,7 +32,7 @@ import {
 } from '$lib/conversation';
 import { PostgrestError, pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
-import { LAST_TURN_EMBED, loadOverviewRows, setLastTurnEmbed, setScope } from '$lib/server/conversation-overview';
+import { LAST_TURN_EMBED, loadOverviewRows, mailoutPickIds, setLastTurnEmbed, setScope } from '$lib/server/conversation-overview';
 import { applyListFilter, hasListFilter, type ListFilter } from '$lib/conversation-overview';
 
 const QuerySchema = v.object({
@@ -47,8 +47,11 @@ const QuerySchema = v.object({
   q: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(120))),
   season: v.optional(v.string(), 'any'),
   turno: v.optional(v.picklist(['nuestro', 'suyo'])),
-  temp: v.optional(v.picklist(['caliente', 'fria'])),
+  temp: v.optional(v.picklist(['caliente', 'fria', 'ronda', 'parada', 'sin-fecha'])),
   temporada: v.optional(v.literal('actual')),
+  // ADR-126 § 9: the recipients of a mailout behind one of its figures.
+  envio: v.optional(v.pipe(v.string(), v.uuid())),
+  r: v.optional(v.picklist(['respuestas', 'rebotes'])),
   line_ids: v.optional(v.string()),
   limit: v.optional(
     v.pipe(
@@ -111,7 +114,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       400,
     );
   }
-  const { status, project_slug, project_ids, workspace_ids, line_id, q, season, limit, offset, turno, temp, temporada, line_ids } =
+  const { status, project_slug, project_ids, workspace_ids, line_id, q, season, limit, offset, turno, temp, temporada, line_ids, envio, r } =
     parsed.output;
 
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -154,11 +157,16 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
 
   setLastTurnEmbed(search);
 
-  const listFilter = { turno, temp, temporada: temporada === 'actual' || undefined };
+  const listFilter = {
+    turno,
+    temp,
+    temporada: temporada === 'actual' || undefined,
+    ...(envio && r ? { envio, r } : {}),
+  };
   if (hasListFilter(listFilter)) {
     // The derived filters only exist for the global lens: project and line
     // modules keep their own params (project_slug, line_id, season).
-    if (project_slug || line_id || season !== 'any') return json({ error: 'invalid_query', hint: 'turno/temp/temporada go with project_ids/workspace_ids only.' }, 400);
+    if (project_slug || line_id || season !== 'any') return json({ error: 'invalid_query', hint: 'turno/temp/temporada/envio go with project_ids/workspace_ids only.' }, 400);
     try {
       return json(
         await filteredPage(env, jwt, search, {
@@ -226,6 +234,10 @@ async function filteredPage(
 ) {
   const rows = await loadOverviewRows(env, jwt, { projectIds: o.projectIds, workspaceIds: o.workspaceIds, status: o.status });
   let matched = applyListFilter(rows, o.filter, new Date(), o.lineIds);
+  if (o.filter.envio && o.filter.r) {
+    const ids = await mailoutPickIds(env, jwt, o.filter.envio, o.filter.r, rows);
+    matched = matched.filter((r) => ids.has(r.id));
+  }
   if (o.q) {
     const search = new URLSearchParams({ select: 'id', p_q: o.q, deleted_at: 'is.null', limit: '5000' });
     setScope(search, o.projectIds, o.workspaceIds);

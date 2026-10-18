@@ -154,6 +154,7 @@ export async function syncAccount(deps: SyncDeps, account: MailAccountRow): Prom
           cc: match ? msg.cc : [],
           counterparts: match?.counterparts ?? [],
           body: match ? msg.body || null : null,
+          auto: msg.auto,
         });
       }
     };

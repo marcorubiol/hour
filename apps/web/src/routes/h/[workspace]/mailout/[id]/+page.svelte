@@ -28,6 +28,7 @@
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
   import MailoutTestMode from '$lib/components/MailoutTestMode.svelte';
+  import MailoutFigures from '$lib/components/MailoutFigures.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import {
     recipientCounts,
@@ -174,16 +175,26 @@
     void queryClient.invalidateQueries({ queryKey: ['mailout', id] });
   }
 
-  const removeOne = createMutation({
-    mutationFn: (recipientId: string) =>
-      mutateJSON('PUT', `/api/mailout/${id}/recipients`, {
-        conversation_ids: (d?.recipients ?? [])
-          .filter((r) => r.recipient_id !== recipientId)
-          .map((r) => r.conversation_id),
-      }),
+  // Removing is immediate, so it says who and offers to undo (móvil #6): the
+  // undo puts the same set back, the one this removal started from.
+  const setRecipients = createMutation({
+    mutationFn: (conversationIds: string[]) =>
+      mutateJSON('PUT', `/api/mailout/${id}/recipients`, { conversation_ids: conversationIds }),
     onSuccess: refresh,
     onError: failed,
   });
+  function removeOne(r: MailoutRecipientRow, name: string) {
+    const before = (d?.recipients ?? []).map((x) => x.conversation_id);
+    $setRecipients.mutate(before.filter((cid) => cid !== r.conversation_id), {
+      onSuccess: () =>
+        addToast({
+          tone: 'info',
+          message: t('mailout.removed_one', locale, { name }),
+          duration: 8000,
+          action: { label: t('mailout.undo', locale), run: () => $setRecipients.mutate(before) },
+        }),
+    });
+  }
 
   let basisFor = $state<MailoutRecipientRow | null>(null);
   let basisOpen = $state(false);
@@ -288,7 +299,8 @@
     touch();
   }
 
-  const STATUS_COUNTS: RecipientState[] = ['queued', 'sent', 'delivered', 'bounced', 'complained', 'failed'];
+  const STATUS_COUNTS = ['queued', 'sent', 'delivered', 'bounced', 'complained', 'failed'] as const satisfies readonly RecipientState[];
+  const WARN_COUNTS: readonly RecipientState[] = ['bounced', 'complained', 'failed'];
   let excludedCount = $derived(rows.filter((x) => OUT_STATES.includes(x.state)).length);
 </script>
 
@@ -308,7 +320,7 @@
   <section class="mo" data-testid="mailout">
     <header class="mo__mast">
       <p class="eyebrow">
-        {t('mailout.title', locale)}{#if d.project?.name} · {d.project.name}{/if}
+        {t('mailout.title', locale)}{#if d.project?.name}&nbsp;· {d.project.name}{/if}
       </p>
       <h1 class="mo__title"><em>{m.subject || t('mailout.untitled', locale)}</em></h1>
       <p class="mo__sub">
@@ -324,16 +336,14 @@
 
     {#if m.status !== 'draft'}
       <div class="mo__counts" data-testid="mailout-counts">
-        {#each STATUS_COUNTS as s (s)}
-          <div class="mo__count" data-state={s}>
-            <span class="mo__count-n">{counts[s] ?? 0}</span>
-            <span class="mo__count-l">{t(`mailout.c_${s}`, locale)}</span>
-          </div>
-        {/each}
-        <div class="mo__count" data-state="excluded">
-          <span class="mo__count-n">{excludedCount}</span>
-          <span class="mo__count-l">{t('mailout.c_excluded', locale)}</span>
-        </div>
+        <MailoutFigures
+          {locale}
+          testid="mailout-figures"
+          figures={[
+            ...STATUS_COUNTS.map((s) => ({ key: s, n: counts[s] ?? 0, warn: WARN_COUNTS.includes(s) })),
+            { key: 'excluded' as const, n: excludedCount },
+          ]}
+        />
         {#if d.can_edit && ['queued', 'sending', 'paused', 'review'].includes(m.status)}
           <div class="mo__count-act">
             <Button size="s" variant="outline" tone="warn" loading={$cancel.isPending} onclick={() => $cancel.mutate()}>
@@ -432,7 +442,7 @@
         {/if}
       </div>
 
-      <aside class="mo__aside">
+      <div class="mo__aside">
         <div class="block-head">
           <h2 class="eyebrow eyebrow--sub">{t('mailout.recipients', locale)} · {rows.length}</h2>
         </div>
@@ -447,15 +457,26 @@
               {#if editable}
                 <div class="rcp__acts">
                   {#if x.state === 'no_basis'}
-                    <button type="button" class="rcp__act" onclick={() => openBasis(x.row)}>{t('mailout.set_basis', locale)}</button>
+                    <button
+                      type="button"
+                      class="rcp__act"
+                      aria-label={t('mailout.set_basis_named', locale, { name: who(x) })}
+                      onclick={() => openBasis(x.row)}>{t('mailout.set_basis', locale)}</button
+                    >
                   {/if}
-                  <button type="button" class="rcp__act" onclick={() => $removeOne.mutate(x.row.recipient_id)}>{t('mailout.remove_one', locale)}</button>
+                  <button
+                    type="button"
+                    class="rcp__act"
+                    aria-label={t('mailout.remove_named', locale, { name: who(x) })}
+                    disabled={$setRecipients.isPending}
+                    onclick={() => removeOne(x.row, who(x))}>{t('mailout.remove_one', locale)}</button
+                  >
                 </div>
               {/if}
             </li>
           {/each}
         </ul>
-      </aside>
+      </div>
     </div>
 
     {#if editable}
@@ -563,24 +584,6 @@
       flex-wrap: wrap;
       align-items: stretch;
       gap: var(--space-s);
-    }
-    .mo__count {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-2xs);
-      min-inline-size: 6.5rem;
-      padding: var(--space-xs) var(--space-s);
-      border: 1px solid var(--border-color-light);
-      border-radius: var(--radius);
-    }
-    .mo__count-n {
-      color: var(--heading-color);
-      font-family: var(--font-mono);
-      font-size: var(--text-l);
-    }
-    .mo__count-l {
-      color: var(--text-faint);
-      font-size: var(--text-xs);
     }
     .mo__count-act {
       display: flex;
@@ -782,6 +785,12 @@
     }
     .rcp__act:hover {
       color: var(--text-color);
+    }
+    @media (pointer: coarse) {
+      .rcp__act {
+        min-block-size: var(--touch-target);
+        padding-inline: var(--space-xs);
+      }
     }
 
   }

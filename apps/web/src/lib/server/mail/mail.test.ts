@@ -23,6 +23,7 @@ import {
   googleAdapter,
   googleAuthUrl,
   hasRequiredScopes,
+  isAutoReply,
   parseAddressList,
   parseGmailMessage,
   ProviderAuthError,
@@ -191,7 +192,18 @@ describe('gmail parsing', () => {
       body: 'Nos interesa.',
       occurredAt: '2026-10-07T09:30:00.000Z',
       isDraft: false,
+      auto: false,
     });
+  });
+
+  test('an automatic reply is flagged, a plain one is not (ADR-126 § 3)', () => {
+    const get = (h: Record<string, string>) => (name: string) => h[name] ?? null;
+    expect(isAutoReply(get({ 'Auto-Submitted': 'auto-replied' }))).toBe(true);
+    expect(isAutoReply(get({ 'Auto-Submitted': 'no' }))).toBe(false);
+    expect(isAutoReply(get({ 'X-Autoreply': 'yes' }))).toBe(true);
+    expect(isAutoReply(get({ Precedence: 'auto_reply' }))).toBe(true);
+    expect(isAutoReply(get({ Precedence: 'bulk' }))).toBe(false);
+    expect(isAutoReply(get({}))).toBe(false);
   });
 
   test('html only falls back to text; drafts are flagged', () => {

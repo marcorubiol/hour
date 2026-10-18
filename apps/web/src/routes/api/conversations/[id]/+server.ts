@@ -31,6 +31,7 @@ import {
 import { pgGet, pgPatch, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import { jwtSubject } from '$lib/server/mail/http';
+import { LAST_TURN_EMBED, setLastTurnEmbed } from '$lib/server/conversation-overview';
 
 const IdSchema = v.pipe(v.string(), v.uuid());
 
@@ -64,10 +65,12 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
     return json({ error: 'invalid_id' }, 400);
   }
   const search = new URLSearchParams({
-    select: `${CONVERSATION_SELECT},private_to,workspace:workspace_id!inner(slug)`,
+    // The turn (ADR-126 § 5): the file shows it beside the last contact.
+    select: `${CONVERSATION_SELECT},private_to,workspace:workspace_id!inner(slug),${LAST_TURN_EMBED}`,
     deleted_at: 'is.null',
     limit: '1',
   });
+  setLastTurnEmbed(search);
   if (byId) search.set('id', `eq.${params.id}`);
   else {
     search.set('slug', `eq.${params.id}`);

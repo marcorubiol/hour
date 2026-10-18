@@ -4131,3 +4131,60 @@ sola insignia de estado para las cuatro lentes y cuál de las dos cabeceras de b
 
 **Re-evaluar cuando** Marco cobre una temporada real con esto (los 60 días por defecto, si «Reclamar» es la acción
 que quiere en la fila) o cuando el modelo de facturación admita varias facturas por bolo a propósito.
+
+## [2026-10-18] ADR-126 · Revisión de Conversations: el turno, «se enfría» en dos grupos y decidir desde la ficha
+
+**Contexto.** Revisión de Conversations del 2026-10-18 (uso, diseño y móvil y accesibilidad;
+`build/coordination/review-conversations/`, fuera de git). Marco pidió aplicar todo lo recomendado. El hallazgo 3 de
+permisos («Último envío» con destinatarios ilegibles) ya lo cerró ADR-124 § 8. Carril `claude/conv-fixes`. Dos
+migraciones aditivas, sin aplicar en producción: `20261018140000_conversation_reply_settled` y
+`20261018150000_mail_ingest_auto` (rollback en `build/runbooks/rollback-20261018-*.sql`, probados ida y vuelta en
+local). **El Worker de esta rama lee `conversation.reply_settled_at`: las dos migraciones van antes del deploy.**
+
+**Decisión.**
+1. **«Te toca» (enmienda ADR-118 § 3).** Una confirmada no tiene turno por correo: su último correo suele ser
+   «perfecto, quedamos así»; lo que quede pendiente se apunta como seguimiento. Una respuesta se puede marcar «No pide
+   respuesta» (fila del bloque y ficha): `conversation.reply_settled_at` guarda el instante de esa respuesta, no
+   «ahora», y el turno vuelve a ser nuestro solo con una posterior. Las respuestas van **la más reciente arriba**; la
+   espera larga la marca «tarde». Desk lee la misma cifra (`due.count`).
+2. **«Sin respuesta» de la temporada** no cuenta los estados que ya son una respuesta: en conversación, hold,
+   confirmada, rechazada, recurrente.
+3. **Una respuesta automática no es una respuesta.** La sincronización del correo marca `metadata.auto` cuando llega
+   con `Auto-Submitted` (distinto de `no`), `X-Autoreply`, `X-Autorespond` o `Precedence: auto_reply`; el turno,
+   «caliente» y las respuestas de un envío la saltan. Lo ya sincronizado no lleva la marca.
+4. **El estado de la lista va en la URL** (`?estado=`). El enlace de un bloque lleva solo su filtro, así que lo limpia;
+   un tramo de la temporada lleva los dos y su chip los nombra («Hold · esta temporada»).
+5. **La ficha decide:** estado, siguiente paso y turno en el lateral, con los mismos componentes que la lista
+   (`ConversationStatusMenu`, `NextActionDialog`). `GET /api/conversations/:id` trae `last_turn`.
+6. **Días de calendario** también en «hace N días» (`relativeContactDate`): un correo de ayer a las 16:00 es «ayer»
+   a las 06:40. Una sola escala («hace 6 semanas») para todos los «cuánto» de la lente.
+7. **Seguimientos con sitio:** «Te toca» guarda dos filas a los seguimientos vencidos (en el móvil, una).
+8. **«Se enfría» en dos grupos (enmienda ADR-117 § 5 y ADR-118 § 4 y 8):** *paradas* (en conversación, hold: una a
+   una, sin envío en bloque) y *sin respuesta al envío* (contactada, recurrente: segunda ronda). «Escribir a estas»
+   marca solo la segunda ronda y hay un botón por proyecto cuando hay varios; la barra de selección ofrece
+   «Quedarse con…» un proyecto. Un seguimiento vencido es tuyo y no se enfría. Una conversación abierta **sin
+   ninguna fecha** (sin evento, sin sello de contacto, sin seguimiento) no se enfría ni te toca: no sabemos cuándo se
+   habló. Se cuenta aparte, en una línea del dashboard («151 sin fecha de contacto») que filtra la lista
+   (`?temp=sin-fecha`); en `muk-cia` son 151 de 152 (comprobado por el coordinador en producción). Filtros
+   `?temp=ronda`, `?temp=parada` y `?temp=sin-fecha`.
+9. **Las cifras del último envío llevan a alguien:** respuestas y rebotes filtran la lista
+   (`?envio=<id>&r=respuestas|rebotes`), con la misma regla que la cifra. Una sola voz y un solo vocabulario para las
+   cifras de un envío en el bloque y en su pantalla (`MailoutFigures`); el bloque dice «simulado» mientras lo sea.
+10. **Lo visual sin decisión nueva:** los títulos de bloque de Conversations consumen la cabecera compartida
+    (`.block-head` + `.eyebrow--sub`), como Cuentas; un fallo de lectura usa `.load-fail` de `base.css` (Desk y Cuentas
+    siguen con su copia hasta la pasada de coherencia); el tono de cada estado vive en `base.css` (`--status`) para
+    pastillas y barra; en oscuro los fondos de estado mezclan en `oklab`; tokens nuevos `--control-size-m` (barras de
+    filtros) y `--stat-lead` / `--stat-inline` (cifras de dashboard).
+11. **Accesibilidad:** el DOM del dashboard es el orden que se ve (sin `order` en el móvil): primero lo que pide
+    acción (te toca, caliente, del equipo), después el estado (temporada, se enfría, envío). La barra de la temporada es
+    un dibujo y la leyenda su control. Tras filtrar, el foco va al título de la lista. Un toast puede llevar una acción
+    («Deshacer»).
+
+**Fuera, y por qué.** Desk sigue con su banda de envío y su error propios: los lleva el carril de Desk (componente y
+clase ya disponibles). La unificación de cabeceras de bloque de los cuatro dashboards (cursiva o eyebrow) es de la
+pasada de coherencia. El asunto de un envío con campos (`Propuesta para {sala}`) se enseña tal cual: es la plantilla.
+Que Safari con VoiceOver pierda la semántica de tabla en las tarjetas es una suposición del informe, sin WebKit aquí.
+
+**Re-evaluar cuando** Marco lleve una temporada de difusión con esto: si «No pide respuesta» se usa poco (y conviene
+inferirlo), si la confirmada debe volver a tener turno, y qué hacer con las «sin fecha de contacto» de `muk-cia`
+(fecharlas en bloque o dejarlas aparte).

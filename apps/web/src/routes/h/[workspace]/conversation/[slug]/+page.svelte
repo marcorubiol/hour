@@ -28,6 +28,8 @@
   import { appLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
   import ConversationHistory from '$lib/components/ConversationHistory.svelte';
+  import ConversationStatusMenu from '$lib/components/ConversationStatusMenu.svelte';
+  import NextActionDialog from '$lib/components/NextActionDialog.svelte';
   import MessageItem from '$lib/components/MessageItem.svelte';
   import ThreadBlock from '$lib/components/ThreadBlock.svelte';
   import OrganizationFiscal from '$lib/components/OrganizationFiscal.svelte';
@@ -41,7 +43,9 @@
     statusLabel,
     type ConversationEventItem,
     type ConversationItem,
+    type ConversationPatch,
   } from '$lib/conversation';
+  import { followUpDue, turnOf } from '$lib/conversation-overview';
   import { firstLine, replySubject, type MailAccountsResponse } from '$lib/mail';
   import { markReadWhenSeen, readAtOpen, scrollWhenNamed } from '$lib/thread-reading.svelte';
   import { THREAD_REFRESH_MS, firstUnreadId, teamTimeline, type ConversationThreadView } from '$lib/threads';
@@ -221,6 +225,38 @@
     return `${a.address} · ${a.scope === 'personal' ? t('mail.your_mailbox', locale) : t('mail.shared_mailbox', locale)}`;
   }
 
+  // ── Decidir desde la ficha (ADR-126 § 5): estado, turno y siguiente paso ──
+  // Lo que el dashboard pide se resuelve aquí, sin volver a la lista.
+  const patch = createMutation({
+    mutationFn: (body: ConversationPatch) =>
+      mutateJSON<{ item: ConversationItem }>('PATCH', `/api/conversations/${conv!.id}`, body),
+    onError: (err) =>
+      addToast({
+        tone: 'danger',
+        title: t('conversations.change_not_saved', locale),
+        message: err instanceof Error ? err.message : String(err),
+      }),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['conversation'] });
+      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      void queryClient.invalidateQueries({ queryKey: ['conversation-overview'] });
+      void queryClient.invalidateQueries({ queryKey: ['line-eng-stats'] });
+    },
+  });
+  let nextOpen = $state(false);
+  let turn = $derived(
+    conv ? turnOf({ status: conv.status, last: conv.last_turn?.[0] ?? null, reply_settled_at: conv.reply_settled_at }, new Date()) : null,
+  );
+  let followUp = $derived(conv ? followUpDue(conv, new Date()) : false);
+  /** «Anotar contacto…» del menú de estado: abre el apunte de abajo. */
+  let logOpen = $state(false);
+  let logEl = $state<HTMLElement>();
+  function openLog() {
+    if (reading !== 'registro') setReading('registro');
+    logOpen = true;
+    requestAnimationFrame(() => logEl?.scrollIntoView({ block: 'nearest' }));
+  }
+
   // ADR-102: el título es la organización; debajo, el contacto principal.
   let title = $derived((conv && conversationTitle(conv)) || slug);
   /** A quién sale un correo: el contacto principal (`mail_send_authorize`). */
@@ -247,14 +283,13 @@
   <section class="conv">
     <header class="conv__mast">
       <p class="eyebrow">
-        {t('conversations.conversation', locale)}{#if conv.project} · {conv.project.name}{/if}
+        {t('conversations.conversation', locale)}{#if conv.project}&nbsp;· {conv.project.name}{/if}
       </p>
       <h1 class="conv__title"><em>{title}</em></h1>
       <p class="conv__sub">
         {#if conv.person && conv.person.full_name !== title}<span>{conv.person.full_name}</span>{/if}
         {#if conv.person?.email}<span>{conv.person.email}</span>{/if}
         {#if conv.person?.city || conv.organization?.city}<span>{conv.person?.city || conv.organization?.city}</span>{/if}
-        <span><span class={`badge badge--xs ${statusBadgeClass(conv.status)}`}>{statusLabel(conv.status, locale)}</span></span>
         {#if conv.private}<span class="conv__private">{t('mail.private_badge', locale)}</span>{/if}
       </p>
     </header>
@@ -291,8 +326,9 @@
               {/each}
             </ol>
           {/if}
-          <details class="log">
+          <details class="log" bind:open={logOpen} bind:this={logEl}>
             <summary>{t('mail.log_other', locale)}</summary>
+            <p class="muted">{t('mail.log_turn_hint', locale)}</p>
             <ConversationHistory conversationId={conv.id} showList={false} />
           </details>
         {:else}
@@ -324,17 +360,65 @@
         {/if}
       </div>
 
-      <aside class="conv__aside">
+      <div class="conv__aside">
         <dl class="facts">
+          <div>
+            <dt>{t('edit.status', locale)}</dt>
+            <dd>
+              {#if conv.can_edit}
+                <ConversationStatusMenu
+                  status={conv.status}
+                  {locale}
+                  onchange={(status) => $patch.mutate({ status })}
+                  onlog={openLog}
+                />
+              {:else}
+                <span class={`badge badge--xs ${statusBadgeClass(conv.status)}`}>{statusLabel(conv.status, locale)}</span>
+              {/if}
+            </dd>
+          </div>
           <div>
             <dt>{t('mail.last_contact', locale)}</dt>
             <dd>{relativeContactDate(conv.last_contacted_at, locale)}</dd>
           </div>
-          {#if conv.next_action_at || conv.next_action_note}
+          {#if turn || followUp}
+            <div>
+              <dt>{t('overview.col_turn', locale)}</dt>
+              <dd class="facts__turn" class:facts__turn--ours={turn?.side === 'ours' || (!turn && followUp)}>
+                {#if turn?.side === 'ours'}
+                  {t('overview.turn_ours_cap', locale)} · {relativeContactDate(turn.since, locale)}
+                  {#if conv.can_edit}
+                    <button
+                      type="button"
+                      class="facts__act"
+                      disabled={$patch.isPending}
+                      onclick={() => $patch.mutate({ reply_settled_at: turn!.since })}>{t('overview.settle', locale)}</button
+                    >
+                  {/if}
+                {:else if followUp}
+                  {t('overview.follow_up_cap', locale)} · {dayMonthYear(conv.next_action_at!)}
+                {:else if turn}
+                  {t('overview.turn_theirs_cap', locale)} · {relativeContactDate(turn.since, locale)}
+                {/if}
+              </dd>
+            </div>
+          {/if}
+          {#if conv.next_action_at || conv.next_action_note || conv.can_edit}
             <div>
               <dt>{t('mail.next_step', locale)}</dt>
               <dd>
-                {conv.next_action_note ?? ''}{#if conv.next_action_at}<span class="muted"> · {dayMonthYear(conv.next_action_at)}</span>{/if}
+                {conv.next_action_note ?? ''}{#if conv.next_action_at}<span class="muted">{conv.next_action_note ? ' · ' : ''}{dayMonthYear(conv.next_action_at)}</span>{/if}
+                {#if conv.can_edit}
+                  <button
+                    type="button"
+                    class="facts__act"
+                    aria-label={conv.next_action_at || conv.next_action_note ? t('conversations.edit_next_action_aria', locale) : undefined}
+                    onclick={() => (nextOpen = true)}
+                    >{conv.next_action_at || conv.next_action_note
+                      ? t('conversations.edit_next_action', locale)
+                      : t('conversations.set_next_action', locale)}</button
+                  >
+                {/if}
               </dd>
             </div>
           {/if}
@@ -347,7 +431,7 @@
         {#if conv.can_set_private}
         <div class="privacy">
           <div class="privacy__row">
-            <span class="privacy__label">{t('mail.private_label', locale)}</span>
+            <span class="eyebrow eyebrow--sub">{t('mail.private_label', locale)}</span>
             <button
               type="button"
               class="toggle"
@@ -386,9 +470,20 @@
             {@render teamThread(true)}
           </div>
         {/if}
-      </aside>
+      </div>
     </div>
   </section>
+{/if}
+
+{#if conv}
+  <NextActionDialog
+    bind:open={nextOpen}
+    who={conv.person && conv.person.full_name !== title ? `${title} · ${conv.person.full_name}` : title}
+    date={conv.next_action_at ? conv.next_action_at.slice(0, 10) : ''}
+    note={conv.next_action_note ?? ''}
+    {locale}
+    onsave={(next) => $patch.mutate(next)}
+  />
 {/if}
 
 {#snippet teamThread(list: boolean)}
@@ -398,6 +493,7 @@
       anchorKind="conversation"
       anchorId={conv.id}
       title={t('threads.team', locale)}
+      heading="eyebrow"
       messages={team.messages}
       authors={team.authors}
       me={team.me}
@@ -797,6 +893,30 @@
       margin: 0;
       font-size: var(--text-s);
     }
+    .facts__turn--ours {
+      font-weight: 500;
+    }
+    .facts__act {
+      margin-inline-start: var(--space-xs);
+      padding: 0;
+      border: 0;
+      background: none;
+      color: var(--text-muted);
+      font: inherit;
+      font-size: var(--text-xs);
+      font-weight: 400;
+      text-decoration: underline;
+      text-underline-offset: 0.2em;
+      cursor: pointer;
+    }
+    .facts__act:hover {
+      color: var(--text-color);
+    }
+    @media (pointer: coarse) {
+      .facts__act {
+        min-block-size: var(--touch-target);
+      }
+    }
     .privacy {
       padding-block: var(--space-s);
       border-block: 1px solid var(--border-color-light);
@@ -806,10 +926,6 @@
       align-items: center;
       justify-content: space-between;
       gap: var(--space-s);
-    }
-    .privacy__label {
-      font-size: var(--text-s);
-      font-weight: 500;
     }
     .privacy__hint {
       margin: var(--space-xs) 0 0;
@@ -901,6 +1017,22 @@
     @media (max-width: 47.999rem) {
       .rec__item {
         grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    /* Touch (móvil #8): the reading switch at the finger's size, and the
+       privacy switch with a hit area larger than its 36×20 drawing. */
+    @media (pointer: coarse) {
+      .seg button {
+        min-block-size: var(--touch-target);
+      }
+      .toggle {
+        position: relative;
+      }
+      .toggle::before {
+        content: '';
+        position: absolute;
+        inset: calc((20px - var(--touch-target)) / 2) calc((36px - var(--touch-target)) / 2);
       }
     }
   }

@@ -14,6 +14,7 @@ import {
   followUpDue,
   inSeason,
   isHot,
+  isUndated,
   mailoutFigures,
   parseListFilter,
   seasonOf,
@@ -77,6 +78,16 @@ describe('turnOf', () => {
     expect(turnOf(row('a', inbound(2)), NOW)).toEqual({ side: 'ours', since: ago(2), days: 2 });
     expect(turnOf(row('b', outbound(5)), NOW)?.side).toBe('theirs');
   });
+  it('una confirmada no tiene turno por correo: su último suele ser «quedamos así»', () => {
+    expect(turnOf(row('a', { status: 'confirmed', ...inbound(50) }), NOW)).toBeNull();
+    expect(dueReason(row('b', { status: 'confirmed', ...inbound(1), next_action_at: day(-1) }), NOW)).toBe('follow_up');
+  });
+  it('«no pide respuesta» atiende esa respuesta, no la siguiente', () => {
+    const settled = row('a', { ...inbound(3), reply_settled_at: ago(3) });
+    expect(turnOf(settled, NOW)).toBeNull();
+    expect(dueReason(settled, NOW)).toBeNull();
+    expect(turnOf(row('b', { ...inbound(1), reply_settled_at: ago(3) }), NOW)?.side).toBe('ours');
+  });
   it('sin eventos, o cerrada, no hay turno', () => {
     expect(turnOf(row('a'), NOW)).toBeNull();
     expect(turnOf(row('b', { status: 'declined', ...inbound(1) }), NOW)).toBeNull();
@@ -113,13 +124,14 @@ describe('isHot', () => {
 
 describe('coolingOf', () => {
   it(`nuestro correo sin respuesta desde hace ${COLD_REPLY_DAYS} días`, () => {
-    expect(coolingOf(row('a', outbound(COLD_REPLY_DAYS)), NOW)).toEqual({ reason: 'no_reply', days: COLD_REPLY_DAYS });
+    expect(coolingOf(row('a', outbound(COLD_REPLY_DAYS)), NOW)).toEqual({ reason: 'no_reply', days: COLD_REPLY_DAYS, group: 'round' });
     expect(coolingOf(row('b', outbound(COLD_REPLY_DAYS - 1)), NOW)).toBeNull();
   });
   it(`una conversación abierta parada ${COLD_IDLE_DAYS} días`, () => {
     expect(coolingOf(row('a', { status: 'in_conversation', last_contacted_at: ago(COLD_IDLE_DAYS) }), NOW)).toEqual({
       reason: 'idle',
       days: COLD_IDLE_DAYS,
+      group: 'stalled',
     });
     expect(coolingOf(row('b', { status: 'hold', last_contacted_at: ago(COLD_IDLE_DAYS - 1) }), NOW)).toBeNull();
   });
@@ -127,8 +139,31 @@ describe('coolingOf', () => {
     expect(coolingOf(row('a', { status: 'in_conversation', ...inbound(60) }), NOW)).toBeNull();
   });
   it('una contactada de antes del historial cuenta su sello de contacto', () => {
-    expect(coolingOf(row('a', { last_contacted_at: ago(40) }), NOW)).toEqual({ reason: 'no_reply', days: 40 });
-    expect(coolingOf(row('b'), NOW)).toBeNull();
+    expect(coolingOf(row('a', { last_contacted_at: ago(40) }), NOW)).toEqual({ reason: 'no_reply', days: 40, group: 'round' });
+  });
+  it('sin ninguna fecha no se enfría ni te toca: no lo sabemos, se cuenta aparte', () => {
+    const undated = row('b');
+    expect(coolingOf(undated, NOW)).toBeNull();
+    expect(dueReason(undated, NOW)).toBeNull();
+    expect(isUndated(undated)).toBe(true);
+    expect(isUndated(row('c', { status: 'hold' }))).toBe(true);
+    // A date, an event or a follow-up: not undated. Closed or confirmed: not counted.
+    expect(isUndated(row('d', { last_contacted_at: ago(3) }))).toBe(false);
+    expect(isUndated(row('e', outbound(3)))).toBe(false);
+    expect(isUndated(row('f', { next_action_at: day(5) }))).toBe(false);
+    expect(isUndated(row('g', { status: 'confirmed' }))).toBe(false);
+    const o = buildOverview([undated, row('c', { status: 'hold' }), row('x', outbound(30))], NOW);
+    expect(o.undated).toBe(2);
+    expect(o.cold.count).toBe(1);
+    expect(o.due.count).toBe(0);
+    expect(applyListFilter([undated, row('x', outbound(30))], { temp: 'sin-fecha' }, NOW).map((r) => r.id)).toEqual(['b']);
+  });
+  it('un seguimiento vencido es tuyo y uno futuro no está olvidado: no se enfrían', () => {
+    expect(coolingOf(row('a', { status: 'hold', next_action_at: day(-2) }), NOW)).toBeNull();
+    expect(coolingOf(row('b', { status: 'hold', next_action_at: day(5) }), NOW)).toBeNull();
+  });
+  it('una negociación sin respuesta es una parada, no segunda ronda', () => {
+    expect(coolingOf(row('a', { status: 'in_conversation', ...outbound(40) }), NOW)?.group).toBe('stalled');
   });
   it('confirmada, rechazada o en pausa no se enfrían', () => {
     for (const status of ['confirmed', 'declined', 'dormant'] as const) {
@@ -173,13 +208,17 @@ describe('filtros de la lista', () => {
       temp: 'fria',
       temporada: true,
     });
+    const id = '01a14f54-6096-7361-9932-a9e3837f466d';
+    expect(parseListFilter(new URLSearchParams(`envio=${id}&r=rebotes`))).toMatchObject({ envio: id, r: 'rebotes' });
+    expect(parseListFilter(new URLSearchParams('envio=nope&r=rebotes')).envio).toBeUndefined();
+    expect(parseListFilter(new URLSearchParams(`envio=${id}&r=todo`)).envio).toBeUndefined();
     expect(parseListFilter(new URLSearchParams('turno=x&temp=tibia'))).toEqual({
       turno: undefined,
       temp: undefined,
       temporada: undefined,
     });
   });
-  it('te toca: respuestas por días de espera, después seguimientos por fecha', () => {
+  it('te toca: respuestas, la más reciente arriba; después seguimientos, el más vencido primero', () => {
     const rows = [
       row('seg-tarde', { next_action_at: day(-1) }),
       row('resp-nueva', inbound(1)),
@@ -188,16 +227,25 @@ describe('filtros de la lista', () => {
       row('les-toca', outbound(2)),
     ];
     expect(applyListFilter(rows, { turno: 'nuestro' }, NOW).map((r) => r.id)).toEqual([
-      'resp-vieja',
       'resp-nueva',
+      'resp-vieja',
       'seg-viejo',
       'seg-tarde',
     ]);
     expect(applyListFilter(rows, { turno: 'suyo' }, NOW).map((r) => r.id)).toEqual(['les-toca']);
   });
   it('se enfría: la más fría primero; caliente: la más reciente primero', () => {
-    const rows = [row('a', outbound(25)), row('b', outbound(40)), row('c', inbound(3)), row('d', inbound(1))];
-    expect(applyListFilter(rows, { temp: 'fria' }, NOW).map((r) => r.id)).toEqual(['b', 'a']);
+    const rows = [
+      row('a', outbound(25)),
+      row('b', outbound(40)),
+      row('c', inbound(3)),
+      row('d', inbound(1)),
+      row('e', { status: 'in_conversation', ...outbound(30) }),
+      row('f'),
+    ];
+    expect(applyListFilter(rows, { temp: 'fria' }, NOW).map((r) => r.id)).toEqual(['e', 'b', 'a']);
+    expect(applyListFilter(rows, { temp: 'ronda' }, NOW).map((r) => r.id)).toEqual(['b', 'a']);
+    expect(applyListFilter(rows, { temp: 'parada' }, NOW).map((r) => r.id)).toEqual(['e']);
     expect(applyListFilter(rows, { temp: 'caliente' }, NOW).map((r) => r.id)).toEqual(['d', 'c']);
   });
   it('temporada y estado se combinan con el resto', () => {
@@ -218,8 +266,9 @@ describe('buildOverview', () => {
     expect(o.total).toBe(rows.length);
     expect(o.due.count).toBe(BLOCK_ROWS + 2);
     expect(o.due.rows).toHaveLength(BLOCK_ROWS);
-    expect(o.due.rows[0]).toMatchObject({ id: `due${BLOCK_ROWS + 1}`, reason: 'reply', subject: `Re: ${BLOCK_ROWS + 1}` });
+    expect(o.due.rows[0]).toMatchObject({ id: 'due0', reason: 'reply', subject: 'Re: 0' });
     expect(o.cold.count).toBe(3);
+    expect(o.cold.round).toBe(3);
     expect(o.cold.picks).toEqual([
       { id: 'cold2', project_id: 'p2' },
       { id: 'cold1', project_id: 'p1' },
@@ -228,8 +277,27 @@ describe('buildOverview', () => {
     expect(o.season.label).toBe('26-27');
     expect(o.season.total).toBe(rows.length - 1);
     expect(o.season.counts.confirmed).toBe(1);
-    expect(o.season.answered).toBe(BLOCK_ROWS + 2);
+    // The replies, plus the confirmed one: a deal is an answer.
+    expect(o.season.answered).toBe(BLOCK_ROWS + 3);
     expect(o.hot.rows.length).toBeLessThanOrEqual(6);
+  });
+  it('«sin respuesta» no cuenta los estados que ya son una respuesta', () => {
+    const rows = (['contacted', 'in_conversation', 'hold', 'confirmed', 'declined', 'dormant', 'recurring'] as const).map((status, i) =>
+      row(`s${i}`, { status }),
+    );
+    expect(buildOverview(rows, NOW).season.answered).toBe(5);
+    expect(buildOverview([row('a', inbound(4))], NOW).season.answered).toBe(1);
+  });
+  it('diez respuestas no esconden los seguimientos vencidos', () => {
+    const rows = [
+      ...Array.from({ length: 10 }, (_, i) => row(`r${i}`, inbound(i + 1))),
+      row('seg', { next_action_at: day(-4) }),
+      row('hoy', { next_action_at: day(0) }),
+      row('otro', { next_action_at: day(-1) }),
+    ];
+    const o = buildOverview(rows, NOW);
+    expect(o.due.rows.map((r) => r.id)).toEqual(['r0', 'r1', 'r2', 'seg', 'otro']);
+    expect(buildOverview(rows.slice(0, 2).concat(rows.slice(10)), NOW).due.rows.map((r) => r.id)).toEqual(['r0', 'r1', 'seg', 'otro', 'hoy']);
   });
   it('un seguimiento lleva su nota y su día', () => {
     const o = buildOverview([row('a', { next_action_at: `${day(-7)}T00:00:00+00:00`, next_action_note: 'Mandar vídeo' })], NOW);

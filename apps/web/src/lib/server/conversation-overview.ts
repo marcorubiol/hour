@@ -14,12 +14,15 @@ import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import {
   TURN_KINDS,
   mailoutFigures,
+  mailoutReplied,
+  type MailoutPick,
   type LastMailout,
   type MailoutRecipientLite,
   type OverviewInput,
   type TurnEvent,
 } from '$lib/conversation-overview';
 import type { ConversationStatus } from '$lib/conversation';
+import { defaultProviderKind, type MailoutEnv } from '$lib/server/mailout';
 
 export interface OverviewScope {
   projectIds: string[];
@@ -48,12 +51,14 @@ export const LAST_TURN_EMBED = 'last_turn:conversation_event(direction,occurred_
 export function setLastTurnEmbed(search: URLSearchParams): void {
   search.set('last_turn.direction', 'not.is.null');
   search.set('last_turn.kind', `in.(${TURN_KINDS.join(',')})`);
+  // An automatic reply is not an answer (ADR-126 § 3): the sync marks it.
+  search.set('last_turn.metadata->>auto', 'is.null');
   search.set('last_turn.order', 'occurred_at.desc');
   search.set('last_turn.limit', '1');
 }
 
 const OVERVIEW_SELECT = [
-  'id,workspace_id,project_id,line_id,status,last_contacted_at,next_action_at,next_action_note',
+  'id,workspace_id,project_id,line_id,status,last_contacted_at,next_action_at,next_action_note,reply_settled_at',
   'organization:workspace_organization!conversation_workspace_organization_fkey(name)',
   'contacts:conversation_contact(person:workspace_person!conversation_contact_workspace_person_fkey(full_name))',
   LAST_TURN_EMBED,
@@ -69,6 +74,7 @@ interface OverviewDbRow {
   last_contacted_at: string | null;
   next_action_at: string | null;
   next_action_note: string | null;
+  reply_settled_at: string | null;
   organization: { name: string } | null;
   contacts: { person: { full_name: string } | null }[] | null;
   last_turn: TurnEvent[] | null;
@@ -94,6 +100,7 @@ export async function loadOverviewRows(env: SupabaseEnv, jwt: string, scope: Ove
       setLastTurnEmbed(search);
       search.set('last_in.direction', 'eq.inbound');
       search.set('last_in.kind', `in.(${TURN_KINDS.join(',')})`);
+      search.set('last_in.metadata->>auto', 'is.null');
       search.set('last_in.order', 'occurred_at.desc');
       search.set('last_in.limit', '1');
       search.set('contacts.is_primary', 'eq.true');
@@ -135,6 +142,7 @@ export async function loadOverviewRows(env: SupabaseEnv, jwt: string, scope: Ove
       last_contacted_at: r.last_contacted_at,
       next_action_at: r.next_action_at,
       next_action_note: r.next_action_note,
+      reply_settled_at: r.reply_settled_at,
       title,
       person: person && person !== title ? person : null,
       last: r.last_turn?.[0] ?? null,
@@ -156,14 +164,15 @@ export async function loadLastMailout(
   // someone else's private ones) would say «done, 0 recipients» and name a
   // venue in its subject (`permisos.md` § 3).
   const search = new URLSearchParams({
-    select: 'id,workspace_id,subject,from_address,status,queued_at',
+    select: 'id,workspace_id,subject,from_address,status,queued_at,mail_domain_id',
     status: 'in.(queued,sending,paused,done)',
     order: 'queued_at.desc.nullslast',
     limit: '4',
   });
   setScope(search, scope.projectIds, scope.workspaceIds);
-  const { data } = await pgGet<Omit<LastMailout, 'figures'>>(env, 'mailout', jwt, { search });
-  let m: Omit<LastMailout, 'figures'> | undefined;
+  type Row = Omit<LastMailout, 'figures' | 'simulated'> & { mail_domain_id: string | null };
+  const { data } = await pgGet<Row>(env, 'mailout', jwt, { search });
+  let m: Row | undefined;
   let recipients: { data: (MailoutRecipientLite & { recipient_id: string })[] } = { data: [] };
   for (const candidate of data) {
     recipients = await pgPostRpc<MailoutRecipientLite & { recipient_id: string }>(env, 'mailout_preview', jwt, {
@@ -175,17 +184,54 @@ export async function loadLastMailout(
     }
   }
   if (!m) return null;
+  const { mail_domain_id, ...rest } = m;
+  const domain = mail_domain_id
+    ? (await pgGet<{ provider: string }>(env, 'mail_domain', jwt, { search: { select: 'provider', id: `eq.${mail_domain_id}` } })).data[0]
+    : undefined;
+  return {
+    ...rest,
+    figures: mailoutFigures(await withSentAt(env, jwt, m.id, recipients.data), m.queued_at, lastInMap(rows)),
+    // The rule of the mailout screen (`route.ts`): its domain's provider, or the default one.
+    simulated: (domain?.provider ?? defaultProviderKind(env as Partial<MailoutEnv>)) === 'simulator',
+  };
+}
+
+type PreviewRecipient = MailoutRecipientLite & { recipient_id: string };
+
+async function withSentAt(env: SupabaseEnv, jwt: string, mailoutId: string, recipients: PreviewRecipient[]) {
   const sentAt = await pgGet<{ id: string; sent_at: string | null }>(env, 'mailout_recipient', jwt, {
-    search: { select: 'id,sent_at', mailout_id: `eq.${m.id}` },
+    search: { select: 'id,sent_at', mailout_id: `eq.${mailoutId}` },
   });
   const sentById = new Map(sentAt.data.map((r) => [r.id, r.sent_at]));
-  const lastIn = new Map(rows.filter((r) => r.last_in).map((r) => [r.id, r.last_in!.occurred_at]));
-  return {
-    ...m,
-    figures: mailoutFigures(
-      recipients.data.map((r) => ({ ...r, sent_at: sentById.get(r.recipient_id) ?? null })),
-      m.queued_at,
-      lastIn,
-    ),
-  };
+  return recipients.map((r) => ({ ...r, sent_at: sentById.get(r.recipient_id) ?? null }));
+}
+
+function lastInMap(rows: readonly OverviewInput[]): Map<string, string> {
+  return new Map(rows.filter((r) => r.last_in).map((r) => [r.id, r.last_in!.occurred_at]));
+}
+
+/**
+ * The conversations behind a figure of a mailout (ADR-126 § 9): those that
+ * replied, or those that bounced. Same rule as the figure, so «22 replies»
+ * lists 22. Only recipients the caller can read (`mailout_preview`).
+ */
+export async function mailoutPickIds(
+  env: SupabaseEnv,
+  jwt: string,
+  mailoutId: string,
+  pick: MailoutPick,
+  rows: readonly OverviewInput[],
+): Promise<Set<string>> {
+  const [preview, mailout] = await Promise.all([
+    pgPostRpc<PreviewRecipient>(env, 'mailout_preview', jwt, { p_id: mailoutId }),
+    pgGet<{ queued_at: string | null }>(env, 'mailout', jwt, { search: { select: 'queued_at', id: `eq.${mailoutId}` } }),
+  ]);
+  const queuedAt = mailout.data[0]?.queued_at ?? null;
+  const recipients = await withSentAt(env, jwt, mailoutId, preview.data);
+  const lastIn = lastInMap(rows);
+  return new Set(
+    recipients
+      .filter((r) => (pick === 'rebotes' ? r.status === 'bounced' : mailoutReplied(r, queuedAt, lastIn)))
+      .map((r) => r.conversation_id),
+  );
 }
