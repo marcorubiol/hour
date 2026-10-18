@@ -16,7 +16,8 @@
 
   interface Props {
     planner: Door<PlannerDoor>;
-    conversations: Door<{ holds: number; live: number; due: number }>;
+    /** null: no read on conversations anywhere (ADR-124), the door does not exist. */
+    conversations: Door<{ holds: number; live: number; due: number }> | null;
     /** null: no read:money, the door does not exist. */
     money: Door<{ owed: string; overdue: string; overdueCount: number }> | null;
     seasonLabel: string;
@@ -49,22 +50,24 @@
       <span class="door__arrow" aria-hidden="true">→</span>
     </a>
 
-    <a class="door" href="/h/conversations" data-testid="door-conversations">
-      <span class="door__lens">{t('lens.conversations', locale)}</span>
-      {#if conversations.errored}
-        <span class="door__n door__n--na">{DOT}</span><span class="door__txt">{t('desk.door_error', locale)}</span>
-      {:else}
-        <span class="door__n">{conversations.value ? conversations.value.holds : DOT}</span>
-        <span class="door__txt"
-          >{t('desk.door_conv_n', locale)}<br />{#if conversations.value}{t('desk.door_conv_sub', locale, {
-              live: conversations.value.live,
-            })} · <em class:door__hot={conversations.value.due > 0}
-              >{t('desk.door_conv_due', locale, { n: conversations.value.due })}</em
-            >{:else}{DOT}{/if}</span
-        >
-      {/if}
-      <span class="door__arrow" aria-hidden="true">→</span>
-    </a>
+    {#if conversations}
+      <a class="door" href="/h/conversations" data-testid="door-conversations">
+        <span class="door__lens">{t('lens.conversations', locale)}</span>
+        {#if conversations.errored}
+          <span class="door__n door__n--na">{DOT}</span><span class="door__txt">{t('desk.door_error', locale)}</span>
+        {:else}
+          <span class="door__n">{conversations.value ? conversations.value.holds : DOT}</span>
+          <span class="door__txt"
+            >{t('desk.door_conv_n', locale)}<br />{#if conversations.value}{t('desk.door_conv_sub', locale, {
+                live: conversations.value.live,
+              })} · <em class:door__hot={conversations.value.due > 0}
+                >{t('desk.door_conv_due', locale, { n: conversations.value.due })}</em
+              >{:else}{DOT}{/if}</span
+          >
+        {/if}
+        <span class="door__arrow" aria-hidden="true">→</span>
+      </a>
+    {/if}
 
     {#if money}
       <a class="door" href="/h/books" data-testid="door-books">

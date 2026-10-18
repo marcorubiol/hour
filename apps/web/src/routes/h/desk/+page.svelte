@@ -39,6 +39,7 @@
   import { buildLineIndex, buildProjectIndex, resolveScope, type NavWorkspace, type RawLine } from '$lib/nav';
   import { workspacesQueryOptions, activeProjectsQueryOptions, allLinesQueryOptions } from '$lib/nav-queries';
   import { moneyAccessAnyQueryOptions } from '$lib/bolo-queries';
+  import { conversationAccessQueryOptions } from '$lib/conversation-access';
   import type { DeskConversation } from '$lib/components/DeskBoard.svelte';
   import { taskProjectId, type TaskItem, type TasksCache, type TaskTarget } from '$lib/task';
   import {
@@ -247,10 +248,14 @@
 
   // The Conversations overview: its «te toca» replies wait in band 2, its
   // «caliente» feeds band 3 and its figures the door (one cache with the lens).
+  // Conversations exists for whoever reads them somewhere (ADR-124), the
+  // LensSwitcher's own flag: only an explicit «no» hides the door.
+  const convAccessQuery = createQuery(conversationAccessQueryOptions());
+  let readConversations = $derived($convAccessQuery.data?.read !== false);
   const overviewQuery = createQuery(
     toStore(() => ({
       queryKey: ['conversation-overview', filterIds.projectIds, filterIds.workspaceIds, lineIds] as const,
-      enabled: !scopeUnresolved,
+      enabled: !scopeUnresolved && readConversations,
       queryFn: ({ signal }: { signal: AbortSignal }) => {
         const p = new URLSearchParams(feedParams(filterIds));
         if (lineIds.length > 0) p.set('line_ids', lineIds.join(','));
@@ -258,7 +263,7 @@
       },
     })),
   );
-  let overview = $derived($overviewQuery.data ?? null);
+  let overview = $derived(readConversations ? ($overviewQuery.data ?? null) : null);
   let projectNameById = $derived(new Map(projectIndex.map((p) => [p.id, p.name])));
   let replies = $derived(
     (overview?.due.rows ?? [])
@@ -330,7 +335,7 @@
       $tasksQuery.isPending ||
       $workspacesQuery.isPending ||
       $accessQuery.isPending ||
-      $overviewQuery.isPending,
+      (readConversations && $overviewQuery.isPending),
   );
   let waitingErrored = $derived($conversationsQuery.isError || $tasksQuery.isError);
 
@@ -356,9 +361,9 @@
       new Set(replies.map((r) => r.id)),
     ),
   );
-  let changedErrored = $derived($overviewQuery.isError || $threadsQuery.isError);
+  let changedErrored = $derived((readConversations && $overviewQuery.isError) || $threadsQuery.isError);
   let changedLoading = $derived(
-    !changedErrored && ($overviewQuery.isPending || $threadsQuery.isPending),
+    !changedErrored && ((readConversations && $overviewQuery.isPending) || $threadsQuery.isPending),
   );
   let quietLabel = $derived.by(() => {
     if (!lastVisit) return t('desk.changed_none_first', locale);
@@ -665,7 +670,7 @@
         <div class="slot slot--season">
           <DeskSeason
             planner={{ value: plannerFig, errored: feeds.errored }}
-            conversations={{ value: convFig, errored: $overviewQuery.isError }}
+            conversations={readConversations ? { value: convFig, errored: $overviewQuery.isError } : null}
             money={readMoney ? { value: moneyFig, errored: $invoicesQuery.isError || $bolosQuery.isError } : null}
             {seasonLabel}
             {locale}
