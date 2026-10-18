@@ -1949,7 +1949,7 @@
   "books.err_invoices": "No se han podido leer los documentos.",
   "books.err_expenses": "No se han podido leer los gastos.",
   "planner.view_overview": "Temporada",
-  "planner.season_window": "{from} → {to} · {n} semanas",
+  "planner.season_weeks": "{n} semanas",
   "planner.season_perfs": "funciones",
   "planner.season_perf_one": "función",
   "planner.season_firm": "confirmados",

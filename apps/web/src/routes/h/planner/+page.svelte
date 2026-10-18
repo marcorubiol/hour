@@ -2027,13 +2027,18 @@
       free: stats.free,
     };
   });
-  let seasonWindowLabel = $derived(
-    t('planner.season_window', locale, {
-      from: localeDayMonth(season.from, localeTag),
-      to: localeDayMonth(season.to, localeTag),
-      n: season.weeks.length,
-    }),
+  /* A HORIZON'S TITLE IS ITS HORIZON (ADR-095 §9: the title is the date;
+     diseño B1, uso #15). The Season was titled «Temporada» over a tab that
+     said «Temporada», and the Agenda and the Board were titled with a month
+     they do not end at. The meta keeps what the title does not say. */
+  let seasonTitle = $derived(
+    `${localeDayMonth(season.from, localeTag)} → ${localeDayMonth(season.to, localeTag)}`,
   );
+  let seasonWindowLabel = $derived(t('planner.season_weeks', locale, { n: season.weeks.length }));
+  let horizonTitle = $derived.by(() => {
+    const s = t('planner.agenda_from', locale, { day: localeDayMonth(agendaFromIso, localeTag) });
+    return `${s.charAt(0).toUpperCase()}${s.slice(1)}`;
+  });
 
   // ── Inline decision bands for the agenda book (ADR-080 §4 surfaced at
   // the day) — the SAME derived queue the DecisionBand renders, indexed by
@@ -2989,7 +2994,8 @@
             syncUrl();
           }}
         />
-      {:else if view === 'overview'}<LensTitle text={t('planner.view_overview', locale)} />
+      {:else if view === 'overview'}<LensTitle text={seasonTitle} />
+      {:else if view === 'agenda' || view === 'board'}<LensTitle text={horizonTitle} />
       {:else}<LensTitle text={monthLabel} />{/if}
     {/snippet}
   </LensHeader>
@@ -3124,24 +3130,13 @@
             {t(figOne(seasonFacts.free) ? 'planner.stat_free_one' : 'planner.stat_free', locale)}</span
           >
         {/if}
-        {#if view === 'agenda'}
-          <span class="cal__stat cal__stat--soft"
-            >{t('planner.agenda_from', locale, {
-              day: localeDayMonth(agendaFromIso, localeTag),
-            })}</span
-          >
-        {/if}
+
         <!-- The board names its grain and its horizon: a window that grows
              names where it begins and says NO END — what grows is never
              counted (law: el horizonte del tablero). Lanes from the one
              writer (boardLaneCount); folding is furniture and the meta
              does not chase it. -->
         {#if view === 'board'}
-          <span class="cal__stat cal__stat--soft"
-            >{t('planner.agenda_from', locale, {
-              day: localeDayMonth(agendaFromIso, localeTag),
-            })}</span
-          >
           <span class="cal__stat cal__stat--soft">{t('planner.board_no_end', locale)}</span>
           <span class="cal__stat cal__stat--soft">{t('planner.board_grain', locale)}</span>
           <span class="cal__stat cal__stat--soft"
