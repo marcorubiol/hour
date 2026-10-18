@@ -857,6 +857,7 @@
       max-inline-size: 100%;
     }
     .next-action__date {
+      white-space: nowrap;
       color: var(--text-dark-muted);
       font-family: var(--font-mono);
       font-size: var(--text-xs);
