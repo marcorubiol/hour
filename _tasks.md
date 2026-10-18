@@ -443,6 +443,7 @@
 
 ## Producto — después
 
+- [ ] **Planner: arreglos de la revisión del 18-10** (`build/coordination/review-planner/`, fuera de git). Marco (18-10): «soltado» sale de la fila de la Agenda y la cancelación va a la ficha con confirmación; una fecha de varios días ocupa todos sus días; fuera el «Next» de la cabecera del Planner (lo dice el rail). Tanda 1, los ocho graves; tanda 2, la fricción; móvil y accesibilidad en un pase aparte. Carril en marcha.
 - [ ] **Cada espacio activa o desactiva las tres lentes (Planner, Conversations, Cuentas)**: un admin lo decide en Ajustes, y una lente apagada desaparece de la navegación, de ⌘K y de las puertas de Desk, sin borrar datos. Abierto: si además cada persona puede ocultarse una lente para sí. (drop 16-10, sin estimar)
 - [ ] **Alta de persona: la cuenta que acepta ya es otra persona → fusión explícita que confirma un admin** (Marco, 14-10, ADR-107). Hoy la invitación se acepta y el dossier queda sin enlazar; la fusión reescribe el `person_id` de reparto, compromisos y notas. Plan antes de código.
 
