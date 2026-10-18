@@ -582,7 +582,7 @@ export interface BoloMoney {
 	doc: MoneyInvoiceItem | null;
 	/** What the issued document still lacks: its total less what the bolo collected. */
 	docOpen: number;
-	/** Por cobrar: the issued document's total less what the bolo collected (ADR-117 § 6). */
+	/** Por cobrar: `docOpen`, once the deal is contracted (ADR-117 § 6, ADR-123). */
 	owed: number;
 	/** The issued document's aging, when there is one. */
 	aging: InvoiceAgingState | null;
@@ -616,7 +616,8 @@ export function boloMoney(b: MoneyBolo, ctx: MoneyContext): BoloMoney {
 	const doc = docs.find((d) => d.status !== 'cancelled') ?? null;
 	const issued = doc?.status === 'issued' ? doc : null;
 	const docOpen = issued ? Math.max(0, Number(issued.total) - collected) : 0;
-	const owed = docOpen;
+	// A document of a deal not yet confirmed is a quote, not a debt (ADR-123).
+	const owed = contracted ? docOpen : 0;
 	const aging = issued ? invoiceAging(issued, ctx.termsByPayer, ctx.today) : null;
 	const overdue = owed > 0 && aging?.state === 'past-expected';
 	const daysLate =

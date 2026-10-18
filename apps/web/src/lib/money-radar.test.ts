@@ -129,6 +129,18 @@ describe('boloMoney', () => {
 		expect(m.collect).toBe('partial');
 	});
 
+	it('a document of a deal not yet confirmed is not owed (ADR-123)', () => {
+		const pro = invoice({ id: 'p', bolo: 'b', doc_type: 'proforma', expected_on: '2026-10-01' });
+		for (const status of ['proposed', 'hold_1']) {
+			const m = boloMoney(bolo({ id: 'b', status, next_performed_at: '2031-05-01' }), ctx([pro]));
+			expect(m.owed).toBe(0);
+			expect(m.overdue).toBe(false);
+			expect(m.docOpen).toBe(1000);
+		}
+		const confirmed = boloMoney(bolo({ id: 'b', status: 'confirmed' }), ctx([pro]));
+		expect(confirmed.owed).toBe(1000);
+	});
+
 	it('is overdue against the EXPECTED date, not due_on', () => {
 		// due_on passed, but the payer observably pays at 60 days: not late yet.
 		const inv = invoice({
