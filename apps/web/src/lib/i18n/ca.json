@@ -1174,7 +1174,7 @@
   "conversations.status_dormant": "En pausa",
   "conversations.status_hold": "Hold",
   "conversations.status_in_conversation": "En conversa",
-  "conversations.status_menu": "Canvia l'estat o anota un contacte",
+  "conversations.status_menu": "{status}, canvia l'estat o anota un contacte",
   "conversations.status_recurring": "Habitual",
   "conversations.unexpected_response": "Resposta inesperada",
   "line.actions": "Accions",

@@ -541,7 +541,7 @@
                 <span class={`badge badge--xs ${statusBadgeClass(item.status)}`}>{statusLabel(item.status, locale)}</span>
               {:else}
               <Menu
-                label={t('conversations.status_menu', locale)}
+                label={t('conversations.status_menu', locale, { status: statusLabel(item.status, locale) })}
                 triggerClass={statusBadgeClass(item.status)}
                 direction={i >= visibleItems.length - 2 && i > 2 ? 'up' : 'down'}
               >

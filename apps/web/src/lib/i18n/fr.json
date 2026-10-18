@@ -1143,7 +1143,7 @@
   "conversations.status_dormant": "En sommeil",
   "conversations.status_hold": "Option",
   "conversations.status_in_conversation": "En discussion",
-  "conversations.status_menu": "Changer le statut ou noter un contact",
+  "conversations.status_menu": "{status}, changer le statut ou noter un contact",
   "conversations.status_recurring": "Récurrent",
   "conversations.unexpected_response": "Réponse inattendue",
   "line.actions": "Actions",

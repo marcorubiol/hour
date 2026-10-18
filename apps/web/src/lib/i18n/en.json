@@ -1183,7 +1183,7 @@
   "conversations.status_dormant": "Dormant",
   "conversations.status_hold": "Hold",
   "conversations.status_in_conversation": "In conversation",
-  "conversations.status_menu": "Change status or log contact",
+  "conversations.status_menu": "{status}, change status or log contact",
   "conversations.status_recurring": "Recurring",
   "conversations.unexpected_response": "Unexpected response",
   "line.actions": "Actions",
