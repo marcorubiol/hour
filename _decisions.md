@@ -4269,3 +4269,47 @@ distintas para unas pocas cosas.
    *prix de cession*); CA «caixet»; ES «Load-in»; FR tutea («à toi / à eux») en una app que trata de *vous*;
    «hold» y «opción» mezclados.
 5. Marco ve la lista final por oficio e idioma antes de desplegar.
+
+## [2026-10-18] ADR-129 · El oficio por espacio: lo que el código obligó a decidir al aplicar ADR-128
+
+**Contexto.** ADR-128 pide un ajuste por espacio (escena o música en directo) que cambie unas pocas etiquetas, y
+palabras de oficio neutras para el resto. Al construirlo salieron decisiones que el ADR no tomaba.
+
+**Decisión.**
+1. **Dónde vive.** Columna `workspace.trade` (`stage` | `music`, `NOT NULL DEFAULT 'stage'`, CHECK), no una clave de
+   `settings`: es un dato del espacio que la app lee siempre, como `domain`. Se escribe por `update_workspace`
+   (owner/admin; `''` vuelve a `stage`) y entra en el grant de UPDATE por columnas. Migración
+   `20261018160000_workspace_trade`, aditiva; los espacios con `domain = 'music'` nacen en `music`. Rollback en
+   `build/runbooks/rollback-20261018-workspace-trade.sql`.
+2. **No sustituye a la disciplina.** `domain` (teatro, danza, circo, música…) sigue siendo lo que la portada dice del
+   espacio; su ayuda ya no promete «definir el vocabulario». El oficio es más grueso (danza, circo y teatro hablan
+   igual) y se elige aparte, en Ajustes → Idioma y oficio. Lo cambia un admin; los demás lo ven.
+3. **Cómo habla `t()`.** El diccionario lleva la palabra de escena en la clave y la de música en `clave@music`, al
+   lado. `t()` busca la variante del oficio en contexto y, si no la hay, la clave. Escena es la base, no una variante:
+   un oficio nuevo (comedia) hereda escena y solo escribe lo que cambia. Añadir uno es ampliar el CHECK, la lista
+   `TRADES` y escribir sus variantes. El test de claves exige que una variante nombre un oficio conocido y una clave
+   existente, y que conserve sus `{marcas}`.
+4. **El oficio en contexto es el de la pantalla.** El shell lo fija con los espacios que se ven: el de la URL, o los
+   de lo que está fijado en el ámbito, o todos si el ámbito está vacío. Si no coinciden, escena. Es una runa: al pasar
+   de un espacio de música a uno de escena, las etiquetas ya pintadas cambian.
+5. **Qué cambia con el oficio** (ADR-128 § 3), con las palabras de los dos informes: la lente de venta (Difusión /
+   Difusió / Diffusion / Booking frente a Contratación / Contractació / Booking / Booking), la función (función,
+   funció, représentation, performance frente a concierto, concert, concert, show), quién actúa (reparto,
+   repartiment, distribution, cast frente a formación, formació, musiciens, band), el horario del día (plan de
+   trabajo, pla de treball, planning de la journée, day schedule frente a escaleta, escaleta, y FR y EN iguales en los
+   dos, porque ninguno de los informes da «conducteur» ni «running order» para el horario de un día) y quién compra
+   (programador frente a promotor; FR organisateur, EN promoter).
+6. **Neutras elegidas donde los informes no coinciden.** «Caliente» pasa a **Se mueve** (Es mou, Ça bouge, Moving):
+   Hour mide si hubo movimiento reciente, no el interés, y «con interés» afirmaría lo que no sabe. «Te toca» pasa a la
+   respuesta: **Esperan respuesta** como bloque, columna **Respuesta** con «debemos respuesta» y «esperamos
+   respuesta» (los dos informes lo proponen entre sus opciones; la palabra «turno» desaparece). «Rechazado» pasa a
+   **No esta vez** (FR *Pas cette fois*, que no dice «saison», que es de teatro; EN *Passed*). «En pausa» pasa a
+   **Aparcado**, «Habitual» a **De la casa** (EN *Regular*, FR *Fidèle*), «En conversación» a **Hablando**.
+   «Contactado» se queda: teatro propone «dossier enviado» y música «propuesto», ninguna vale para los dos y
+   «propuesto» choca con el estado del bolo.
+7. **Lo que no se toca aquí:** el nombre del bolo en francés (*cession*; los dos informes proponen *date*, que choca
+   con la fecha del Planner y con el campo fecha) y en inglés (*Deal*, que el teatro británico usa). Queda para Marco.
+   La hoja de ruta pública habla siempre como escena: no hay espacio en contexto y su RPC no devuelve el oficio.
+
+**Consecuencias.** 141 claves cambian de texto en algún idioma, 85 tienen variante de música y 6 son nuevas (el
+ajuste). La lista por idioma, con antes y después, está fuera de git en `build/coordination/wording/lista-final.md`.
