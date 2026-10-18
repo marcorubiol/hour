@@ -1865,6 +1865,8 @@
   "overview.unsubscribed": "désinscriptions",
   "overview.write_these": "Écrire à ces {n}",
   "books.season_sub": "saison {season}",
+  "books.season_word": "saison",
+  "books.season_pick": "Choisir la saison",
   "books.season_span": "{from} à {to}",
   "books.season_empty": "Rien dans la saison {season} pour l'instant.",
   "books.season_previous": "Voir la saison {season}",

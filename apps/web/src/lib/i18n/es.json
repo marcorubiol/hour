@@ -1865,6 +1865,8 @@
   "overview.unsubscribed": "bajas",
   "overview.write_these": "Escribir a estas {n}",
   "books.season_sub": "temporada {season}",
+  "books.season_word": "temporada",
+  "books.season_pick": "Elegir temporada",
   "books.season_span": "{from} a {to}",
   "books.season_empty": "Nada en la temporada {season} todavía.",
   "books.season_previous": "Ver la temporada {season}",

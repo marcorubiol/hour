@@ -1874,6 +1874,8 @@
   "overview.unsubscribed": "unsubscribed",
   "overview.write_these": "Write to these {n}",
   "books.season_sub": "season {season}",
+  "books.season_word": "season",
+  "books.season_pick": "Pick a season",
   "books.season_span": "{from} to {to}",
   "books.season_empty": "Nothing in season {season} yet.",
   "books.season_previous": "See season {season}",

@@ -746,15 +746,24 @@
     {#snippet title()}<LensTitle text={t('lens.money', locale)} />{/snippet}
     {#snippet sub()}
       {#if !noAccess}
-        <span>{t('books.season_sub', locale, { season: seasonLabel(season) })}{#if obraNames.length === 1}&nbsp;· {obraNames[0]}{/if}</span>
-        {#each seasons as s (s)}
-          <button
-            type="button"
-            class="lenshead__frag mny__season"
-            aria-current={s === season ? 'true' : undefined}
-            onclick={() => (pickedSeason = s === currentSeason ? null : s)}
-          >{seasonSpan(s)}</button>
-        {/each}
+        {#if seasons.length > 1}
+          <!-- One way to write a season, the «26/27» of the figure: «sept 26» read as a day. -->
+          <span class="mny__seasons" role="group" aria-label={t('books.season_pick', locale)}>
+            {t('books.season_word', locale)}
+            {#each seasons as s (s)}
+              <button
+                type="button"
+                class="lenshead__frag mny__season"
+                aria-current={s === season ? 'true' : undefined}
+                title={seasonSpan(s)}
+                onclick={() => (pickedSeason = s === currentSeason ? null : s)}
+              >{seasonLabel(s)}</button>
+            {/each}
+          </span>
+        {:else}
+          <span>{t('books.season_sub', locale, { season: seasonLabel(season) })}</span>
+        {/if}
+        {#if obraNames.length === 1}<span>{obraNames[0]}</span>{/if}
       {/if}
     {/snippet}
   </LensHeader>
@@ -1190,7 +1199,10 @@
     .mkeys span { display: inline-flex; align-items: center; gap: var(--space-2xs); }
     .mkey { inline-size: 0.75rem; block-size: 0.5rem; border-radius: 2px; }
     .mny__actions { display: flex; justify-content: flex-end; margin-block-end: calc(-1 * var(--space-m)); }
-    .mny__season { appearance: none; border: 0; background: none; padding: 0; font: inherit; cursor: pointer; }
+    .mny__seasons { display: inline-flex; gap: var(--space-xs); align-items: baseline; }
+    .mny__season { appearance: none; border: 0; background: none; padding: 0; font: inherit; cursor: pointer; text-underline-offset: 0.25em; }
+    .mny__season:hover { color: var(--text-color); }
+    .mny__season[aria-current='true'] { text-decoration: underline; }
     .mny__state { font-size: var(--text-s); color: var(--text-faint); }
     .mny__state--danger { color: var(--danger); }
     .mny__note { font-size: var(--text-xs); color: var(--text-faint); }

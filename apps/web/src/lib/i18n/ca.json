@@ -1865,6 +1865,8 @@
   "overview.unsubscribed": "baixes",
   "overview.write_these": "Escriure a aquestes {n}",
   "books.season_sub": "temporada {season}",
+  "books.season_word": "temporada",
+  "books.season_pick": "Triar temporada",
   "books.season_span": "{from} a {to}",
   "books.season_empty": "Res a la temporada {season} encara.",
   "books.season_previous": "Veure la temporada {season}",
