@@ -392,7 +392,7 @@ export function fmtMoneyCompact(amount: number, locale: Locale = appLocale()): s
 	return numberFormat(locale, 0).format(amount);
 }
 
-/** "14.430 €" — whole amount with the currency's symbol, for prose and doors (Desk). */
+/** "14.430 €": whole amount with the currency's symbol, for prose and doors (Desk). */
 export function fmtCurrency(amount: number, currency: string | null, locale: Locale = appLocale()): string {
 	return numberFormat(locale, 0, currency || 'EUR').format(amount);
 }
@@ -780,7 +780,7 @@ function emptyPosition(currency: string): MoneyPosition {
 }
 
 /**
- * The four figures per currency — never EUR plus USD — the currency that
+ * The four figures per currency, never EUR plus USD, the currency that
  * moves most first. Por cobrar, por facturar
  * and the 30-day inflow ignore the season (a July invoice of last season is
  * still owed); only the season figure is clipped to `season`.
