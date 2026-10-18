@@ -93,13 +93,18 @@
 </section>
 
 <style>
+  /* The figure column belongs to the doors, not to each door: the words
+     start on one vertical whatever the widest figure is, and a reserved
+     minimum keeps them still while the figures land. */
   .doors {
     display: grid;
-    gap: var(--space-s);
+    grid-template-columns: minmax(4.5ch, max-content) minmax(0, 1fr) auto;
+    gap: var(--space-s) 0;
   }
   .door {
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
     grid-template-areas: 'lens lens arrow' 'n txt arrow';
     column-gap: var(--space-m);
     align-items: center;
@@ -127,7 +132,7 @@
   .door__n {
     grid-area: n;
     font-family: var(--font-display);
-    font-size: var(--text-xxl);
+    font-size: var(--stat-lead);
     line-height: 1.1;
     color: var(--heading-color);
     font-variant-numeric: tabular-nums;
@@ -162,18 +167,14 @@
     transform: translateX(3px);
     color: var(--text-muted);
   }
-  /* Phone: a door is one line — figure, words, arrow. */
+  /* Phone: tighter, the lens still named (it is the link's purpose, for the
+     eye and for a screen reader). */
   @media (max-width: 47.999rem) {
     .door {
-      grid-template-areas: 'n txt arrow';
       padding: var(--space-xs) var(--space-s);
     }
-    .door__lens {
-      display: none;
-    }
     .door__n {
-      font-size: var(--text-l);
-      min-inline-size: 3.5rem;
+      font-size: var(--stat-inline);
     }
   }
 </style>
