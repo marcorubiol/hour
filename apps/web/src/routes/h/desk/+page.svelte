@@ -402,13 +402,18 @@
   );
 
   // ── Header: the overdue and what waits, in one sentence ────────────────
+  // What has no truth draws a dash (ADR-096 § 6): loading or failed, the
+  // title claims nothing about what waits.
+  let titleKnown = $derived(!waitingLoading && !waitingErrored);
   let titleRest = $derived(
-    waiting.total === 0
+    !titleKnown
+      ? '—'
+      : waiting.total === 0
       ? t('desk.title_waiting_zero', locale)
       : t(waiting.total === 1 ? 'desk.title_waiting_one' : 'desk.title_waiting_many', locale, { n: waiting.total }),
   );
   let titleOver = $derived(
-    waiting.overdue > 0
+    titleKnown && waiting.overdue > 0
       ? t(waiting.overdue === 1 ? 'desk.title_overdue_one' : 'desk.title_overdue_many', locale, { n: waiting.overdue })
       : null,
   );
