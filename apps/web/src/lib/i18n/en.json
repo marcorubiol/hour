@@ -2391,5 +2391,7 @@
   "record.write_no_email": "the contact has no email",
   "record.write_to_settings": "Settings",
   "record.view_record": "Record",
-  "record.view_thread": "Thread"
+  "record.view_thread": "Thread",
+  "record.missing_step_due_of": "Next step overdue with {who}",
+  "record.verb_open": "open"
 }

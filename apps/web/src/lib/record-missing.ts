@@ -126,6 +126,35 @@ export function conversationMissing(input: ConversationMissingInput, now: Date):
   return out.slice(0, MISSING_MAX);
 }
 
+// ── Persona ────────────────────────────────────────────────────────────────
+
+/** A conversation of this person whose next step's day has come. */
+export interface PersonMissing {
+  kind: 'step_due';
+  conversationId: string;
+  day: string;
+}
+
+export interface PersonMissingConversation {
+  id: string;
+  /** The derived relation (`relationOf`, computed by the Worker). */
+  relation: string;
+  next_action_at: string | null;
+}
+
+/**
+ * What a person's record asks for (ADR-139 p2, flujos § B): their
+ * conversations whose next step is due, the oldest first. A conversation in
+ * «no esta vez» asks for nothing, as in the conversation's own strip.
+ */
+export function personMissing(conversations: readonly PersonMissingConversation[], today: string): PersonMissing[] {
+  return conversations
+    .filter((c) => c.relation !== 'not_now' && c.next_action_at && c.next_action_at.slice(0, 10) <= today)
+    .map((c) => ({ kind: 'step_due' as const, conversationId: c.id, day: c.next_action_at!.slice(0, 10) }))
+    .sort((a, b) => a.day.localeCompare(b.day))
+    .slice(0, MISSING_MAX);
+}
+
 // ── Atajos del siguiente paso ──────────────────────────────────────────────
 
 export type StepShortcut = 'tomorrow' | 'monday' | 'two_weeks';

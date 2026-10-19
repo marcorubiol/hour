@@ -4,6 +4,7 @@ import {
   ROADSHEET_SHARE_DAYS,
   conversationMissing,
   performanceMissing,
+  personMissing,
   stepShortcuts,
   type ConversationMissingInput,
   type PerformanceMissingInput,
@@ -194,6 +195,26 @@ describe('conversationMissing', () => {
         NOW,
       ),
     ).toEqual([]);
+  });
+});
+
+describe('personMissing', () => {
+  const row = (id: string, next: string | null, relation = 'talking') => ({ id, relation, next_action_at: next });
+
+  it('names the conversations whose step is due, oldest first, at most three', () => {
+    const out = personMissing(
+      [row('a', '2026-10-19'), row('b', '2026-10-21'), row('c', '2026-10-01'), row('d', '2026-10-20'), row('e', '2026-10-10'), row('f', null)],
+      TODAY,
+    );
+    expect(out).toEqual([
+      { kind: 'step_due', conversationId: 'c', day: '2026-10-01' },
+      { kind: 'step_due', conversationId: 'e', day: '2026-10-10' },
+      { kind: 'step_due', conversationId: 'a', day: '2026-10-19' },
+    ]);
+  });
+
+  it('«no esta vez» asks for nothing', () => {
+    expect(personMissing([row('a', '2026-10-01', 'not_now')], TODAY)).toEqual([]);
   });
 });
 

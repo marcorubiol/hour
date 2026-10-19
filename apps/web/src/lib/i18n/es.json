@@ -2382,5 +2382,7 @@
   "record.write_no_email": "el contacto no tiene email",
   "record.write_to_settings": "Ajustes",
   "record.view_record": "Registro",
-  "record.view_thread": "Hilo"
+  "record.view_thread": "Hilo",
+  "record.missing_step_due_of": "Siguiente paso vencido con {who}",
+  "record.verb_open": "abrir"
 }

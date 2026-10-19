@@ -2382,5 +2382,7 @@
   "record.write_no_email": "le contact n'a pas d'e-mail",
   "record.write_to_settings": "Réglages",
   "record.view_record": "Registre",
-  "record.view_thread": "Fil"
+  "record.view_thread": "Fil",
+  "record.missing_step_due_of": "Prochaine étape en retard avec {who}",
+  "record.verb_open": "ouvrir"
 }
