@@ -312,8 +312,8 @@
 <style>
   @layer components {
     .ds {
-      --ds-l: 214px;
-      border-block: 1px solid var(--border-color-light);
+      --ds-l: 13.375rem;
+      border-block: var(--line-hairline) solid var(--border-color-light);
     }
     .ds__empty {
       padding: var(--space-l) 0;
@@ -324,8 +324,8 @@
     .ds__hd {
       display: flex;
       align-items: center;
-      padding-block: 7px 6px;
-      border-block-end: 1px solid color-mix(in oklch, var(--border-color-light) 55%, transparent);
+      padding-block: var(--space-xs) var(--space-xs);
+      border-block-end: var(--line-hairline) solid color-mix(in oklch, var(--border-color-light) 55%, transparent);
     }
     .ds__l {
       position: relative;
@@ -334,8 +334,8 @@
       min-inline-size: 0;
       display: flex;
       flex-direction: column;
-      gap: 3px;
-      padding: 8px 14px 8px 2px;
+      gap: var(--space-2xs);
+      padding: var(--space-xs) var(--space-s) var(--space-xs) var(--space-2xs);
     }
     /* The label hosts THE SLIP — sizing only; the card owns its reading. */
     .ds__l :global(.slip) {
@@ -344,8 +344,8 @@
     .ds__l--k {
       display: flex;
       font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.14em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-xl);
       text-transform: uppercase;
       color: var(--text-faint);
     }
@@ -354,8 +354,8 @@
     .ds__rs {
       margin-inline-start: auto;
       font-family: var(--font-mono);
-      font-size: 8.5px;
-      letter-spacing: 0.1em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-l);
       text-transform: uppercase;
       color: var(--text-faint);
       text-decoration: none;
@@ -371,7 +371,7 @@
       display: flex;
       flex-wrap: wrap;
       align-items: baseline;
-      gap: 2px var(--space-s);
+      gap: var(--space-2xs) var(--space-s);
     }
     /* The pair's rule now rides THE SLIP itself (same classes as the
        agenda's rows) — the label draws no second version of it. */
@@ -382,20 +382,20 @@
       block-size: 100%;
     }
     .ds__hd .ds__t {
-      block-size: 13px;
+      block-size: 0.8125rem;
     }
     .ds__gl {
       position: absolute;
       inset-block-start: 0;
       transform: translateX(-50%);
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size: var(--text-2xs);
       color: var(--text-faint);
       font-variant-numeric: tabular-nums;
     }
     .ds__rows {
       position: relative;
-      padding-block: 3px 5px;
+      padding-block: var(--space-2xs) var(--space-xs);
     }
     .ds__grid {
       position: absolute;
@@ -406,7 +406,7 @@
     .ds__g {
       position: absolute;
       inset-block: 0;
-      inline-size: 1px;
+      inline-size: var(--line-hairline);
       background: color-mix(in oklch, var(--border-color-light) 62%, transparent);
     }
     /* Still a hairline — a day boundary is a seam, not a wall. The step up is
@@ -423,17 +423,17 @@
     .ds__now {
       position: absolute;
       inset-block: 0;
-      inline-size: 1px;
+      inline-size: var(--line-hairline);
       background: color-mix(in oklch, var(--text-color) 40%, transparent);
     }
     .ds__now b {
       position: absolute;
       inset-block-start: 2px;
-      inset-inline-start: 6px;
+      inset-inline-start: 0.375rem;
       display: inline-flex;
       overflow: hidden;
       font-family: var(--font-mono);
-      font-size: 8.5px;
+      font-size: var(--text-2xs);
       font-weight: 400;
       color: var(--text-muted);
       white-space: nowrap;
@@ -443,7 +443,7 @@
        into place — its neighbours, keyed unchanged, never move. */
     .ds__nowd {
       font-style: normal;
-      animation: ds-minute 130ms ease-out;
+      animation: ds-minute var(--duration-fast) ease-out;
     }
     @keyframes ds-minute {
       from {
@@ -458,8 +458,8 @@
       position: absolute;
       inset-block-start: -3px;
       inset-inline-start: -2px;
-      inline-size: 5px;
-      block-size: 5px;
+      inline-size: var(--dot-m);
+      block-size: var(--dot-m);
       border-radius: 50%;
       background: var(--text-muted);
     }
@@ -468,20 +468,20 @@
       position: relative;
       display: flex;
       align-items: center;
-      min-block-size: 70px;
+      min-block-size: 4.375rem;
     }
     .ds__r + .ds__r {
-      border-block-start: 1px solid color-mix(in oklch, var(--border-color-light) 38%, transparent);
+      border-block-start: var(--line-hairline) solid color-mix(in oklch, var(--border-color-light) 38%, transparent);
     }
     /* The bar: a rule with a tint, never a box. */
     .ds__b {
       position: absolute;
       inset-block-start: 50%;
-      block-size: 9px;
-      margin-block-start: -4.5px;
-      border-radius: 2px;
+      block-size: 0.5625rem;
+      margin-block-start: calc(-1 * var(--space-xs));
+      border-radius: var(--radius-xs);
       background: color-mix(in oklch, var(--c, var(--text-faint)) 14%, transparent);
-      border: 1px solid color-mix(in oklch, var(--c, var(--text-faint)) 38%, var(--border-color-light));
+      border: var(--line-hairline) solid color-mix(in oklch, var(--c, var(--text-faint)) 38%, var(--border-color-light));
     }
     .ds__r[data-family='hold'] .ds__b,
     .ds__r[data-family='proposed'] .ds__b {
@@ -500,17 +500,17 @@
       inset-block-start: 50%;
       transform: translateY(-50%);
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size: var(--text-2xs);
       font-weight: 400;
       color: var(--text-faint);
       white-space: nowrap;
       font-variant-numeric: tabular-nums;
     }
     .ds__bh--a {
-      inset-inline-end: calc(100% + 6px);
+      inset-inline-end: calc(100% + 0.375rem);
     }
     .ds__bh--b {
-      inset-inline-start: calc(100% + 6px);
+      inset-inline-start: calc(100% + 0.375rem);
     }
     /* The grain lives in styles/certainty.css (`.grain`) — the label opts
        in; the token is defined once for every drawing. */
@@ -525,17 +525,17 @@
       align-items: center;
     }
     .ds__m i {
-      inline-size: 1px;
-      block-size: 15px;
+      inline-size: var(--line-hairline);
+      block-size: 0.9375rem;
       background: color-mix(in oklch, var(--c, var(--text-faint)) 58%, var(--text-faint));
     }
     .ds__m b {
       position: absolute;
-      inset-block-start: calc(50% + 9px);
+      inset-block-start: calc(50% + 0.5625rem);
       inset-inline-start: 50%;
       transform: translateX(-50%);
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size: var(--text-2xs);
       font-weight: 400;
       color: var(--text-faint);
       white-space: nowrap;
@@ -543,15 +543,15 @@
     }
     .ds__m--up b {
       inset-block-start: auto;
-      inset-block-end: calc(50% + 9px);
+      inset-block-end: calc(50% + 0.5625rem);
     }
     .ds__m b em {
       position: absolute;
       inset-inline-start: 100%;
       inset-block-start: 0;
-      margin-inline-start: 6px;
+      margin-inline-start: var(--space-xs);
       font-style: normal;
-      letter-spacing: 0.09em;
+      letter-spacing: var(--tracking-l);
       text-transform: uppercase;
       color: var(--text-faint);
     }
@@ -566,24 +566,24 @@
       inset-inline-start: auto;
       inset-inline-end: 100%;
       margin-inline-start: 0;
-      margin-inline-end: 6px;
+      margin-inline-end: var(--space-xs);
     }
     /* The free moment: a shorter, fainter tick, so five words and a dozen
        ticks still read as five words. */
     .ds__m--free i {
-      block-size: 8px;
+      block-size: var(--dot-l);
       background: color-mix(in oklch, var(--c, var(--text-faint)) 35%, var(--text-faint));
     }
     .ds__m--show i {
-      inline-size: 7px;
-      block-size: 7px;
+      inline-size: var(--dot-l);
+      block-size: var(--dot-l);
       border-radius: 50%;
       background: var(--c, var(--text-color));
-      border: 1px solid var(--card);
+      border: var(--line-hairline) solid var(--card);
     }
     .ds__m--show b {
       color: var(--text-color);
-      font-size: 11px;
+      font-size: var(--text-xs);
     }
     /* AN INSTANT IS DRAWN AS AN INSTANT. When one hour is all the data has, a
        lone ring reads as a bar that failed to draw — the stem says «a point on
@@ -594,16 +594,16 @@
       inset-inline-start: 50%;
       inset-block-start: 50%;
       transform: translate(-50%, -50%);
-      block-size: 34px;
-      border-inline-start: 1px solid color-mix(in oklch, var(--c, var(--text-faint)) 26%, transparent);
+      block-size: 2.125rem;
+      border-inline-start: var(--line-hairline) solid color-mix(in oklch, var(--c, var(--text-faint)) 26%, transparent);
     }
     /* ── The asked-for dates: the day's ledger of the unplaced ───────── */
     .ds__unp {
-      border-block-start: 1px dotted var(--border-color-light);
+      border-block-start: var(--line-hairline) dotted var(--border-color-light);
     }
     .ds__r--unp {
       min-block-size: 0;
-      padding-block: 4px;
+      padding-block: var(--space-xs);
     }
     .ds__t--unp {
       display: flex;
@@ -612,8 +612,8 @@
     .ds__nohour {
       font-style: normal;
       font-family: var(--font-mono);
-      font-size: 8.5px;
-      letter-spacing: 0.12em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-xl);
       text-transform: uppercase;
       color: var(--text-faint);
     }

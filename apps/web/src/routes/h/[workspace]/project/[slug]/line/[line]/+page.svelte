@@ -569,7 +569,7 @@
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       text-transform: lowercase;
-      letter-spacing: 0.04em;
+      letter-spacing: var(--tracking-s);
       color: var(--text-muted);
     }
 
@@ -631,7 +631,7 @@
       gap: var(--space-s);
       padding-block: var(--space-xs);
       padding-inline: var(--space-m);
-      border: 1px solid var(--border-color-light);
+      border: var(--line-hairline) solid var(--border-color-light);
       border-radius: var(--radius-l);
       background: transparent;
       font-size: var(--text-s);
@@ -706,7 +706,7 @@
       align-items: center;
       justify-content: space-between;
       gap: var(--space-s);
-      border-block-end: 1px solid var(--border-color-light);
+      border-block-end: var(--line-hairline) solid var(--border-color-light);
       padding-block-end: var(--space-xs);
     }
     .line-detail__module-head .eyebrow {

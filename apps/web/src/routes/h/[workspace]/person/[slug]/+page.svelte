@@ -635,7 +635,7 @@
       flex-direction: column;
       gap: var(--space-s);
       padding-block-end: var(--space-m);
-      border-block-end: 1px solid var(--border-color-light);
+      border-block-end: var(--line-hairline) solid var(--border-color-light);
     }
 
     /* Masthead typography via base.css h1 defaults. */
@@ -657,7 +657,7 @@
     .person__place {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
-      letter-spacing: 0.04em;
+      letter-spacing: var(--tracking-s);
       color: var(--text-faint);
       align-self: center;
     }
@@ -704,7 +704,7 @@
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       color: var(--text-faint);
-      letter-spacing: 0.04em;
+      letter-spacing: var(--tracking-s);
     }
 
     .person__rows li {
@@ -712,13 +712,13 @@
       gap: var(--space-m);
       align-items: baseline;
       padding-block: var(--space-xs);
-      border-block-end: 1px solid var(--border-color-light);
+      border-block-end: var(--line-hairline) solid var(--border-color-light);
     }
 
     .person__row-kind {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
-      letter-spacing: 0.04em;
+      letter-spacing: var(--tracking-s);
       color: var(--text-faint);
       min-inline-size: 8rem;
     }
@@ -774,7 +774,7 @@
       flex-direction: column;
       gap: var(--space-2xs);
       padding-block: var(--space-s);
-      border-block-end: 1px solid var(--border-color-light);
+      border-block-end: var(--line-hairline) solid var(--border-color-light);
     }
 
     .person__note-meta {
@@ -783,14 +783,14 @@
       gap: var(--space-s);
       font-family: var(--font-mono);
       font-size: var(--text-xs);
-      letter-spacing: 0.04em;
+      letter-spacing: var(--tracking-s);
       color: var(--text-faint);
     }
 
     .person__note-delete {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
-      letter-spacing: 0.04em;
+      letter-spacing: var(--tracking-s);
       color: var(--text-faint);
       background: none;
       border: none;

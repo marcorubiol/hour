@@ -1077,14 +1077,14 @@
       flex-direction: column;
       gap: var(--space-s);
       padding-block-end: var(--space-m);
-      border-block-end: 1px solid var(--border-color-light);
+      border-block-end: var(--line-hairline) solid var(--border-color-light);
     }
 
     .perf__title {
       font-family: var(--font-display);
       font-size: clamp(1.8rem, 3vw, 2.4rem);
       font-weight: 400;
-      letter-spacing: -0.025em;
+      letter-spacing: var(--heading-letter-spacing);
       line-height: 1.05;
       color: var(--text-color);
     }
@@ -1107,7 +1107,7 @@
     .perf__meta-place {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
-      letter-spacing: 0.04em;
+      letter-spacing: var(--tracking-s);
       color: var(--text-faint);
     }
 
@@ -1160,7 +1160,7 @@
       gap: var(--space-s) var(--space-m);
       margin-block-start: var(--space-m);
       padding-block-start: var(--space-m);
-      border-block-start: 1px solid var(--border-color-light);
+      border-block-start: var(--line-hairline) solid var(--border-color-light);
     }
 
     .perf__venue-contacts {
@@ -1180,8 +1180,8 @@
     .perf__contact-remove {
       inline-size: 2rem;
       block-size: 2rem;
-      border: 1px solid var(--border-color-light);
-      border-radius: var(--radius-s, 4px);
+      border: var(--line-hairline) solid var(--border-color-light);
+      border-radius: var(--radius-s, 0.25rem);
       background: none;
       color: var(--text-faint);
       cursor: pointer;
@@ -1236,7 +1236,7 @@
       justify-content: center;
       inline-size: 1.1em;
       block-size: 1.1em;
-      border: 1px solid var(--border-color-dark);
+      border: var(--line-hairline) solid var(--border-color-dark);
       border-radius: var(--radius-s);
       font-size: 0.8em;
       line-height: 1;
@@ -1259,7 +1259,7 @@
       gap: var(--space-m);
       align-items: baseline;
       padding-block: var(--space-xs);
-      border-block-end: 1px solid var(--border-color-light);
+      border-block-end: var(--line-hairline) solid var(--border-color-light);
     }
 
     .perf__person-role,
@@ -1267,7 +1267,7 @@
     .perf__asset-dir {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
-      letter-spacing: 0.04em;
+      letter-spacing: var(--tracking-s);
       color: var(--text-faint);
       min-inline-size: 8rem;
     }

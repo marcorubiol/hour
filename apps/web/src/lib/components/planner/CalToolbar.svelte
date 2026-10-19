@@ -173,13 +173,13 @@
          important fact on it.
          21px is the view band's named scale (window 29 · view 21 · meta 9.5),
          so it belongs to the word that is TRUE, not to all four. */
-      font-size: 15.5px;
+      font-size: var(--text-m);
       font-weight: 400;
       line-height: 1.1;
       color: var(--text-faint);
       transition:
-        color 0.12s,
-        font-size 0.12s;
+        color var(--duration-fast),
+        font-size var(--duration-fast);
     }
     .cal__view:hover {
       color: var(--text-muted);
@@ -188,7 +188,7 @@
        fact already said twice — and a rule under one word in a row of four
        reads as a tab, which is the shape this axis stopped being. */
     .cal__view--on {
-      font-size: 21px;
+      font-size: var(--text-xl);
       color: var(--text-color);
     }
 
@@ -218,8 +218,8 @@
     .cal__dial-by,
     .cal__dial-v {
       font-family: var(--font-mono);
-      font-size: 9.5px;
-      letter-spacing: 0.1em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-l);
       text-transform: uppercase;
       color: var(--text-faint);
     }
@@ -236,9 +236,9 @@
        word in caps stops reading as the same list — it is a qualifier, not a
        title. */
     .cal__dial-v--on {
-      font-size: 10.5px;
+      font-size: var(--text-xs);
       color: var(--text-color);
-      border-block-end: 1px solid var(--text-color);
+      border-block-end: var(--line-hairline) solid var(--text-color);
     }
     /* Toolbar: ‹ month › · today · [projection] · [lanes] · + · ⋯ */
     /* ── THE BAR DOES NOT LIVE IN THE DOCUMENT (2026-08-03) ──────────────
@@ -269,7 +269,7 @@
       position: absolute;
       inset-inline: 0;
       inset-block-end: 0;
-      block-size: 1px;
+      block-size: var(--line-hairline);
       background: var(--border-color-light);
       opacity: 0;
       transition: opacity var(--transition);
@@ -291,21 +291,21 @@
     .cal__add {
       display: inline-flex;
       align-items: center;
-      gap: 5px;
-      block-size: 28px;
-      padding-inline: 11px;
-      border: 1px solid var(--text-color);
+      gap: var(--space-xs);
+      block-size: var(--control-size-xs);
+      padding-inline: var(--space-s);
+      border: var(--line-hairline) solid var(--text-color);
       border-radius: var(--radius);
       background: var(--text-color);
       color: var(--bg);
-      font-size: 13px;
+      font-size: var(--text-s);
       line-height: 1;
       cursor: pointer;
     }
     .cal__add span {
       font-family: var(--font-mono);
-      font-size: 9.5px;
-      letter-spacing: 0.1em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-l);
       text-transform: uppercase;
     }
     .cal__add:hover {
@@ -315,17 +315,17 @@
     /* The kebab lives inside `Menu`, so it is reached through its
        `triggerClass` and scoped by this row rather than styled globally. */
     .cal__toolbar :global(.cal__kebab) {
-      inline-size: 28px;
-      block-size: 28px;
+      inline-size: var(--control-size-xs);
+      block-size: var(--control-size-xs);
       display: inline-flex;
       align-items: center;
       justify-content: center;
       padding: 0;
-      border: 1px solid var(--border-color-light);
+      border: var(--line-hairline) solid var(--border-color-light);
       border-radius: var(--radius);
       background: var(--bg-ultra-light);
       color: var(--text-faint);
-      font-size: 13px;
+      font-size: var(--text-s);
       line-height: 1;
       cursor: pointer;
     }

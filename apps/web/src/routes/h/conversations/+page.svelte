@@ -827,7 +827,7 @@
     .conversations__space-name {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
-      letter-spacing: 0.06em;
+      letter-spacing: var(--tracking-m);
       /* No uppercase: this label is only ever a space name. */
       color: var(--text-faint);
       margin-block-end: var(--space-2xs);

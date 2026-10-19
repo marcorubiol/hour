@@ -128,7 +128,7 @@
      paints background + outer padding). We just need a centred article
      with a sensible reading measure. */
   .set-page {
-    --set-pad: clamp(16px, 1.6vw, 24px);
+    --set-pad: clamp(1rem, 1.6vw, 1.5rem);
 
     color: var(--text-color);
     font-family: var(--font-sans);
@@ -176,7 +176,7 @@
     gap: var(--space-xs);
     margin-block-end: var(--space-s);
     padding-block-end: var(--space-xs);
-    border-block-end: 1px solid var(--border-color-light);
+    border-block-end: var(--line-hairline) solid var(--border-color-light);
   }
   /* Kicker typography via base.css .eyebrow. */
 
@@ -184,7 +184,7 @@
     font-family: var(--font-display);
     font-size: var(--h3);
     font-weight: 400;
-    letter-spacing: -0.015em;
+    letter-spacing: var(--heading-letter-spacing);
     margin: 0;
     color: var(--text-color);
   }
@@ -195,11 +195,11 @@
 
   .set-page :global(.set-row) {
     display: grid;
-    grid-template-columns: minmax(180px, 1fr) minmax(280px, 1.6fr);
+    grid-template-columns: minmax(11.25rem, 1fr) minmax(17.5rem, 1.6fr);
     gap: calc(var(--set-pad) * 1.4);
     align-items: start;
     padding-block: var(--set-pad);
-    border-block-end: 1px solid var(--border-color-light);
+    border-block-end: var(--line-hairline) solid var(--border-color-light);
   }
   .set-page :global(.set-row:last-child) {
     border-block-end: 0;
@@ -245,9 +245,9 @@
   .set-page :global(.set-seg) {
     display: inline-flex;
     background: var(--bg-light);
-    border: 1px solid var(--border-color-light);
+    border: var(--line-hairline) solid var(--border-color-light);
     border-radius: var(--radius);
-    padding: 2px;
+    padding: var(--space-2xs);
   }
   .set-page :global(.set-seg button) {
     appearance: none;
@@ -258,7 +258,7 @@
     color: var(--text-muted);
     padding-block: var(--space-xs);
     padding-inline: var(--space-s);
-    border-radius: 4px;
+    border-radius: var(--radius-s);
     cursor: pointer;
     transition: background var(--transition), color var(--transition);
   }
@@ -276,18 +276,18 @@
     appearance: none;
     border: 0;
     background: var(--border-color-dark);
-    inline-size: 36px;
-    block-size: 20px;
+    inline-size: 2.25rem;
+    block-size: 1.25rem;
     border-radius: var(--radius-circle);
-    padding: 2px;
+    padding: var(--space-2xs);
     cursor: pointer;
     display: inline-flex;
     align-items: center;
     transition: background var(--transition);
   }
   .set-page :global(.set-toggle__dot) {
-    inline-size: 16px;
-    block-size: 16px;
+    inline-size: 1rem;
+    block-size: 1rem;
     border-radius: 50%;
     background: var(--bg-ultra-light);
     box-shadow: var(--box-shadow-1);
@@ -297,6 +297,6 @@
     background: var(--text-color);
   }
   .set-page :global(.set-toggle.is-on .set-toggle__dot) {
-    transform: translateX(16px);
+    transform: translateX(1rem);
   }
 </style>

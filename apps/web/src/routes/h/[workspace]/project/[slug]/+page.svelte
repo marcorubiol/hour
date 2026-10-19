@@ -215,7 +215,7 @@
     flex-direction: column;
     gap: var(--space-s);
     padding-block-end: var(--space-m);
-    border-block-end: 1px solid var(--border-color-light);
+    border-block-end: var(--line-hairline) solid var(--border-color-light);
     position: relative;
   }
 
@@ -230,12 +230,12 @@
   .project__head::before {
     content: '';
     position: absolute;
-    inset-inline-start: -16px;
-    inset-block-start: 8px;
-    inline-size: 3px;
-    block-size: 28px;
+    inset-inline-start: -1rem;
+    inset-block-start: 0.5rem;
+    inline-size: var(--dot-xs);
+    block-size: var(--control-size-xs);
     background: var(--c, var(--text-muted));
-    border-radius: 2px;
+    border-radius: var(--radius-xs);
   }
 
   /* Masthead typography via base.css h1 defaults. */
@@ -267,7 +267,7 @@
   .project__meta-dates {
     font-family: var(--font-mono);
     font-size: var(--text-xs);
-    letter-spacing: 0.04em;
+    letter-spacing: var(--tracking-s);
     color: var(--text-faint);
   }
 
@@ -296,7 +296,7 @@
     flex-direction: column;
     gap: var(--space-xs);
     padding: var(--space-m);
-    border: 1px solid var(--border-color-light);
+    border: var(--line-hairline) solid var(--border-color-light);
     border-radius: var(--radius-l);
     background: var(--bg-light);
   }

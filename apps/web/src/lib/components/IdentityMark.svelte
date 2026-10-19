@@ -130,7 +130,7 @@
   @layer components {
     .mark {
       /* base tile size — override per context by setting --mark */
-      --_m: var(--mark, 18px);
+      --_m: var(--mark, 1.125rem);
       --_c: var(--c, var(--accent-1));
 
       /* Soft tint (ScopeGlyph tile recipe) + forced-legible fg (relative

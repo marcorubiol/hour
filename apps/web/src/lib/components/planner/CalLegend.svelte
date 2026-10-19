@@ -53,21 +53,21 @@
     .marks {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: var(--space-xs);
       margin: 0;
       padding: 0;
     }
     .marks__row {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: var(--space-s);
     }
     .marks__swatch {
       flex: none;
-      inline-size: 22px;
-      block-size: 14px;
+      inline-size: 1.375rem;
+      block-size: 0.875rem;
       border-radius: var(--radius-s);
-      border: 1px solid var(--border-color-light);
+      border: var(--line-hairline) solid var(--border-color-light);
     }
     /* it IS real — clean ground, full ink, no mark at all */
     .marks__swatch--firm {

@@ -702,9 +702,9 @@
 
     .seg {
       display: inline-flex;
-      padding: 2px;
+      padding: var(--space-2xs);
       background: var(--bg-light);
-      border: 1px solid var(--border-color-light);
+      border: var(--line-hairline) solid var(--border-color-light);
       border-radius: var(--radius);
     }
     .seg button {
@@ -856,7 +856,7 @@
       gap: var(--space-xs);
       margin-block: var(--space-s);
       padding-block-start: var(--space-s);
-      border-block-start: 1px solid var(--border-color-light);
+      border-block-start: var(--line-hairline) solid var(--border-color-light);
     }
     .reply__field {
       display: flex;
@@ -874,7 +874,7 @@
       padding: var(--space-2xs) var(--space-xs);
       color: var(--text-color);
       background: var(--bg-light);
-      border: 1px solid var(--border-color-dark);
+      border: var(--line-hairline) solid var(--border-color-dark);
       border-radius: var(--radius-s);
       font: inherit;
     }
@@ -883,7 +883,7 @@
       padding: var(--space-xs) var(--space-s);
       color: var(--text-color);
       background: var(--bg-ultra-light);
-      border: 1px solid var(--border-color-dark);
+      border: var(--line-hairline) solid var(--border-color-dark);
       border-radius: var(--radius-s);
       font: inherit;
       font-size: var(--text-s);
@@ -967,7 +967,7 @@
     }
     .privacy {
       padding-block: var(--space-s);
-      border-block: 1px solid var(--border-color-light);
+      border-block: var(--line-hairline) solid var(--border-color-light);
     }
     .privacy__row {
       display: flex;
@@ -983,9 +983,9 @@
     .toggle {
       display: inline-flex;
       align-items: center;
-      inline-size: 36px;
-      block-size: 20px;
-      padding: 2px;
+      inline-size: 2.25rem;
+      block-size: 1.25rem;
+      padding: var(--space-2xs);
       background: var(--border-color-dark);
       border: 0;
       border-radius: var(--radius-circle);
@@ -993,8 +993,8 @@
       transition: background var(--transition);
     }
     .toggle__dot {
-      inline-size: 16px;
-      block-size: 16px;
+      inline-size: 1rem;
+      block-size: 1rem;
       background: var(--bg-ultra-light);
       border-radius: 50%;
       box-shadow: var(--box-shadow-1);
@@ -1004,7 +1004,7 @@
       background: var(--text-color);
     }
     .toggle.is-on .toggle__dot {
-      transform: translateX(16px);
+      transform: translateX(1rem);
     }
 
     .legend,
@@ -1038,8 +1038,8 @@
       gap: var(--space-2xs);
       padding: var(--space-s) var(--space-m);
       background: var(--bg-ultra-light);
-      border: 1px solid var(--border-color-light);
-      border-inline-start: 2px solid var(--border-color-dark);
+      border: var(--line-hairline) solid var(--border-color-light);
+      border-inline-start: var(--line) solid var(--border-color-dark);
       border-radius: var(--radius);
     }
     .card--in {
@@ -1080,7 +1080,7 @@
       .toggle::before {
         content: '';
         position: absolute;
-        inset: calc((20px - var(--touch-target)) / 2) calc((36px - var(--touch-target)) / 2);
+        inset: calc((1.25rem - var(--touch-target)) / 2) calc((2.25rem - var(--touch-target)) / 2);
       }
     }
   }

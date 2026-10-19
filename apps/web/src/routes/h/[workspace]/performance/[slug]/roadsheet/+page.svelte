@@ -215,7 +215,7 @@
     .rs__roles-label {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
-      letter-spacing: 0.04em;
+      letter-spacing: var(--tracking-s);
       color: var(--text-faint);
     }
 
@@ -233,7 +233,7 @@
       flex-direction: column;
       gap: var(--space-s);
       padding-block-start: var(--space-l);
-      border-block-start: 1px solid var(--border-color-light);
+      border-block-start: var(--line-hairline) solid var(--border-color-light);
     }
 
     /* Sub-eyebrow typography via base.css .eyebrow--sub. */
@@ -251,13 +251,13 @@
       align-items: center;
       gap: var(--space-m);
       padding-block: var(--space-xs);
-      border-block-end: 1px solid var(--border-color-light);
+      border-block-end: var(--line-hairline) solid var(--border-color-light);
     }
 
     .rs__share-role {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
-      letter-spacing: 0.04em;
+      letter-spacing: var(--tracking-s);
       color: var(--text-color);
       min-inline-size: 7rem;
     }

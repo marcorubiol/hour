@@ -51,7 +51,7 @@
 <style>
   .sg {
     /* base size — override per context by setting --glyph on a parent */
-    --_g: var(--glyph, 15px);
+    --_g: var(--glyph, 0.9375rem);
     /* per-shape scales (Marco's optical-rectification knobs) */
     --glyph-space: 0.667; /* circle = 10px @ 15 base */
     --glyph-project: 0.633; /* rhombus = 9.5px @ 15 base */
