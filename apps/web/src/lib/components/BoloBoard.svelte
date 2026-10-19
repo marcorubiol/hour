@@ -6,7 +6,7 @@
    * mira puede leer (ausente no es denegado: lo que no lees no se anuncia).
    * Un mensaje puede decir de qué función habla.
    *
-   * Sin dinero: la cabecera es sala, ciudad y funciones (`bolo_board`).
+   * Sin dinero: la cabecera dice de cuántas funciones es, si son varias (`bolo_board`).
    * Sin realtime (ADR-083 §2): se recarga al volver a la pestaña y cada 30 s
    * mientras se ve. Lo nuevo se marca leído cuando el tablón está a la vista;
    * la raya de «nuevos» se queda donde estaba al abrir la ficha
@@ -25,7 +25,6 @@
   import {
     THREAD_REFRESH_MS,
     boardLayout,
-    boloPlace,
     facetName,
     firstUnreadId,
     messagesByThread,
@@ -113,12 +112,12 @@
 <section id="board" class="board" aria-labelledby="board-title" aria-busy={$boardQuery.isLoading} bind:this={sectionEl}>
   <header class="board__head">
     <BlockHead title={t('threads.board', locale)} id="board-title" concept="board" />
+    <!-- Ni la sala ni «1 función»: la ficha ya dice dónde (su título) y de
+         qué bolo cuelga (sus hechos). Solo cuando el tablón es de varias
+         funciones lo dice, y cuáles (ADR-139 p2). -->
     {#if board?.bolo}
-      <p class="board__bolo">
-        {#if boloPlace(board.bolo)}<span>{boloPlace(board.bolo)}</span>{/if}
-        <span>{perfCount === 1 ? t('threads.one_performance', locale) : t('threads.performances', locale, { n: perfCount })}</span>
-      </p>
       {#if perfCount > 1}
+        <p class="board__bolo">{t('threads.performances', locale, { n: perfCount })}</p>
         <ul class="board__perfs" role="list">
           {#each board.performances as p (p.id)}
             <li>
@@ -202,11 +201,6 @@
       margin: 0;
       color: var(--text-muted);
       font-size: var(--text-s);
-    }
-    .board__bolo > * + *::before {
-      content: '·';
-      margin-inline-end: var(--space-s);
-      color: var(--text-faint);
     }
     .board__perfs {
       display: flex;

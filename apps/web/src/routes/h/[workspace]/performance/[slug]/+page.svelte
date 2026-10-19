@@ -23,21 +23,21 @@
   import Input from '$lib/components/Input.svelte';
   import Textarea from '$lib/components/Textarea.svelte';
   import Menu from '$lib/components/Menu.svelte';
-  import StateBadge from '$lib/components/StateBadge.svelte';
   import ProductionStub from '$lib/components/ProductionStub.svelte';
   import RunningOrder from '$lib/components/RunningOrder.svelte';
   import YNotes from '$lib/components/YNotes.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import type { Json } from '$lib/db-types';
-  import { dayLabel, dayMonth } from '$lib/datetime';
+  import { dayLabel, dayMonth, localDayISO, timeInTz } from '$lib/datetime';
   import { LOCALE_TAG, detectLocale, t } from '$lib/i18n';
   import {
     HOLD_NOTICE_DEFAULT,
     PERFORMANCE_STATUSES,
+    holdDeadlineLabel,
     isHoldStatus,
     isValidHoldNotice,
+    performanceStatusFamily,
     performanceStatusLabel,
-    performanceStatusTone,
     type PerformancePatch,
     type PerformanceStatus,
     READINESS_KEYS,
@@ -59,6 +59,10 @@
   import RecordHead from '$lib/components/RecordHead.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import { spaceCrumb, type Crumb } from '$lib/record-crumbs';
+  import Fold from '$lib/components/Fold.svelte';
+  import MissingBand, { type MissingItem } from '$lib/components/MissingBand.svelte';
+  import { hasJsonContent } from '$lib/components/JsonKV.svelte';
+  import { performanceMissing, type PerformanceMissing } from '$lib/record-missing';
 
   type PersonEmbed = {
     id: string;
@@ -102,6 +106,7 @@
         address: string | null;
         capacity: number | null;
         timezone: string | null;
+        contacts?: Json;
       } | null;
       line: { id: string; slug: string; name: string; kind: string } | null;
       project: { id: string; slug: string; name: string; accent: string | null } | null;
@@ -608,6 +613,132 @@
       (perf?.cast_override.length ?? 0) > 0 ||
       (perf?.crew_assignment.length ?? 0) > 0,
   );
+
+  // ── Hechos y «Falta» (ADR-139 p2 A) ────────────────────────────────────
+  // La hora de la función, en el reloj de la sala (regla de zona horaria).
+  let startTime = $derived(
+    perf?.start_at ? timeInTz(perf.start_at, perf.venue?.timezone ?? workspaceTz ?? viewerTz) : null,
+  );
+
+  // Los enlaces de la hoja de ruta: la misma lectura (y caché) que su página.
+  // Solo los ve quien edita la función; para el resto la respuesta es un
+  // error y «Falta» no pregunta por ellos (null: no lo sabe).
+  const sharesQuery = createQuery(
+    toStore(() => {
+      const k = { ws: workspaceSlug, slug };
+      return {
+        queryKey: ['roadsheet-shares', k] as const,
+        enabled: perf?.status === 'confirmed',
+        retry: false,
+        queryFn: ({ signal }: { signal: AbortSignal }) =>
+          fetchJSON<{ items: unknown[] }>(
+            `/api/performances/${encodeURIComponent(k.slug)}/roadsheet/shares?ws=${encodeURIComponent(k.ws)}`,
+            signal,
+          ),
+      };
+    }),
+  );
+
+  const today = localDayISO();
+  let missing = $derived<PerformanceMissing[]>(
+    perf && bundle
+      ? performanceMissing(
+          {
+            status: perf.status,
+            day: perf.performed_at,
+            hold_notice_days: perf.hold_notice_days,
+            readiness: perf.readiness,
+            roster: performanceRoster(bundle),
+            commitments: perf.commitments,
+            hasBolo: boloReadable ? currentBoloId !== null : null,
+            roadsheetLinks: $sharesQuery.isSuccess ? $sharesQuery.data.items.length : null,
+          },
+          today,
+        )
+      : [],
+  );
+
+  function missingItem(m: PerformanceMissing): MissingItem {
+    switch (m.kind) {
+      case 'hold_deadline':
+        return {
+          id: 'hold_deadline',
+          text: t('record.missing_hold', locale),
+          meta: holdDeadlineLabel(m.day, today, locale, LOCALE_TAG[locale]),
+          verbs: [
+            { label: t('record.verb_confirm', locale), onclick: () => changeStatus('confirmed'), disabled: $patchMutation.isPending },
+            { label: t('record.verb_release', locale), onclick: () => changeStatus('cancelled'), disabled: $patchMutation.isPending },
+          ],
+        };
+      case 'nobody_going':
+        return {
+          id: 'nobody_going',
+          text: t('record.missing_nobody_going', locale),
+          verbs: [{ label: t('record.verb_sign_up', locale), href: '#who-goes' }],
+        };
+      case 'ready': {
+        const word = t(readinessLabelKey(m.key), locale);
+        return {
+          id: `ready_${m.key}`,
+          text: t('record.missing_ready', locale, { item: word }),
+          verbs: [
+            {
+              label: t('record.verb_done', locale),
+              ariaLabel: t('record.verb_done_aria', locale, { item: word }),
+              onclick: () => toggleReady(m.key),
+              disabled: $patchMutation.isPending,
+            },
+          ],
+        };
+      }
+      case 'no_bolo':
+        return {
+          id: 'no_bolo',
+          text: t('record.missing_no_bolo', locale),
+          verbs: showBoloSelect
+            ? [{ label: t('record.verb_pick', locale), onclick: openEdit }]
+            : perf?.project && lensOn('books')
+              ? [{ label: t('perf.bolo_create_link', locale), href: booksHref(perf.project.id, { newBolo: true }) }]
+              : [],
+        };
+      case 'roadsheet_unshared':
+        return {
+          id: 'roadsheet_unshared',
+          text: t('record.missing_roadsheet', locale),
+          verbs: [{ label: t('record.verb_share', locale), href: `/h/${workspaceSlug}/performance/${slug}/roadsheet` }],
+        };
+    }
+  }
+  let missingItems = $derived(missing.map(missingItem));
+
+  // «Detalles»: lo de consulta, plegado. Cerrado, dice lo que guarda.
+  let detailsOpen = $state(false);
+  let hasProduction = $derived(
+    Boolean(
+      perf &&
+        (perf.venue?.address ||
+          perf.venue?.capacity ||
+          perf.venue?.timezone ||
+          (Array.isArray(perf.venue?.contacts) && perf.venue.contacts.length > 0) ||
+          hasJsonContent(perf.logistics) ||
+          hasJsonContent(perf.hospitality) ||
+          hasJsonContent(perf.technical)),
+    ),
+  );
+  let readyCount = $derived(perf ? READINESS_KEYS.filter((k) => isReady(perf!.readiness, k)).length : 0);
+  let detailsKeeps = $derived(
+    perf
+      ? [
+          `${t('perf.readiness', locale)} ${readyCount}/${READINESS_KEYS.length}`,
+          hasProduction ? t('perf.production', locale) : null,
+          perf.date.length > 0 ? `${t('perf.dates', locale)} ${perf.date.length}` : null,
+          perf.conversation?.person || perf.conversation?.organization ? t('perf.programmer', locale) : null,
+          perf.asset_version.length > 0 ? `${t('perf.assets', locale)} ${perf.asset_version.length}` : null,
+        ]
+          .filter(Boolean)
+          .join(' · ')
+      : '',
+  );
 </script>
 
 <svelte:head>
@@ -634,8 +765,15 @@
         >
         <Button variant="secondary" size="xs" onclick={openEdit}>{t('perf.edit_details', locale)}</Button>
       {/snippet}
+      <!-- Los hechos, cada uno su editor (ADR-139 p2): el estado como palabra
+           mono con su menú, el cuándo y el dónde abren los datos, el bolo se
+           elige en sitio. La sala no: es el título. -->
       {#snippet facts()}
-        <Menu label={t('perf.status_menu', locale, { status: performanceStatusLabel(perf!.status, locale) })} triggerClass={`badge badge--xs badge--${performanceStatusTone(perf!.status)}`}>
+        <Menu
+          label={t('perf.status_menu', locale, { status: performanceStatusLabel(perf!.status, locale) })}
+          triggerClass="fact-word"
+          triggerAttrs={{ 'data-family': performanceStatusFamily(perf!.status), 'data-testid': 'perf-status' }}
+        >
           {#snippet trigger()}{performanceStatusLabel(perf!.status, locale)}<span class="status-caret" aria-hidden="true">▾</span>{/snippet}
           {#snippet children({ close })}
             {#each PERFORMANCE_STATUSES as s (s)}
@@ -655,75 +793,79 @@
             {/each}
           {/snippet}
         </Menu>
-        <span>{dayLabel(perf!.performed_at, 'short')}</span>
-        {#if placeLine}<span>{placeLine}</span>{/if}
-        {#if boloReadable && currentBolo && perf!.project}
+        <span
+          ><button type="button" class="fact-act" aria-label={t('record.edit_when', locale)} onclick={openEdit}
+            >{dayLabel(perf!.performed_at, 'short')}</button
+          ></span
+        >
+        {#if startTime}<span class="perf__time">{startTime}</span>{/if}
+        {#if placeLine}
           <span
-            >{#if lensOn('books')}<a class="lenshead__frag" href={booksHref(perf!.project.id, { boloId: currentBolo.id })}>{boloOf(currentBolo, locale)}</a>{:else}{boloOf(currentBolo, locale)}{/if}<ConceptHint
-              concept="bolo"
-            /></span
+            ><button type="button" class="fact-act" aria-label={t('record.edit_where', locale)} onclick={openEdit}
+              >{placeLine}</button
+            ></span
           >
-        {:else if boloReadable && currentBoloId === null}
-          <span>{boloOf(null, locale)}<ConceptHint concept="bolo" /></span>
         {/if}
+        {#if boloReadable && currentBolo && perf!.project}
+          <span class="perf__bolo-fact">
+            {#if showBoloSelect}
+              <Menu label={t('record.bolo_menu', locale, { bolo: boloOf(currentBolo, locale) })} triggerClass="fact-act">
+                {#snippet trigger()}{boloOf(currentBolo, locale)}<span class="status-caret" aria-hidden="true">▾</span>{/snippet}
+                {#snippet children({ close })}
+                  {#each bolosOptions as o (o.value)}
+                    <li role="none">
+                      <button
+                        type="button"
+                        role="menuitem"
+                        class="menu__item{o.value === (currentBoloId ?? '') ? ' menu__item--active' : ''}"
+                        onclick={() => {
+                          close();
+                          const next = boloPatch(currentBoloId, o.value);
+                          if ('bolo_id' in next) $patchMutation.mutate(next);
+                        }}>{o.label}</button
+                      >
+                    </li>
+                  {/each}
+                  {#if lensOn('books')}
+                    <li class="menu-separator" role="separator"></li>
+                    <li role="none">
+                      <a role="menuitem" class="menu__item" href={booksHref(perf!.project!.id, { boloId: currentBolo!.id })}
+                        >{t('record.bolo_in_books', locale)}</a
+                      >
+                    </li>
+                  {/if}
+                {/snippet}
+              </Menu>
+            {:else if lensOn('books')}
+              <a class="lenshead__frag" href={booksHref(perf!.project.id, { boloId: currentBolo.id })}>{boloOf(currentBolo, locale)}</a>
+            {:else}
+              {boloOf(currentBolo, locale)}
+            {/if}
+            <ConceptHint concept="bolo" />
+          </span>
+        {/if}
+      {/snippet}
+      {#snippet band()}
+        <MissingBand items={missingItems} {locale} />
       {/snippet}
     </RecordHead>
 
-    <ProductionStub
-      venue={perf.venue}
-      venueName={perf.venue_name}
-      city={perf.city}
-      country={perf.country}
-      loadInAt={perf.load_in_at}
-      soundcheckAt={perf.soundcheck_at}
-      startAt={perf.start_at}
-      loadoutAt={perf.loadout_at}
-      wrapAt={perf.wrap_at}
-      logistics={perf.logistics}
-      hospitality={perf.hospitality}
-      technical={perf.technical}
-      {viewerTz}
-      fallbackTz={workspaceTz}
-      {locale}
-    >
-      <!-- ADR-090 P3: the same running order as the Planner's day, in place
-           of the fixed five. One way to write an hour in the whole app. -->
-      {#snippet schedule()}
-        <RunningOrder
-          target="performance"
-          id={perf.id}
-          dayIso={perf.performed_at.slice(0, 10)}
-          tz={perf.venue?.timezone ?? workspaceTz ?? viewerTz}
-          {viewerTz}
-          {locale}
-        />
-      {/snippet}
-    </ProductionStub>
-
-    <!-- ADR-084 §3 — the answer to "is it sorted?", which the month card's
-         foot reads. Deliberately separate from the logistics/technical
-         CONTENT above: that is where the detail lives, this is the verdict. -->
-    <section class="perf__section" aria-label={t('perf.readiness', locale)}>
-      <BlockHead title={t('perf.readiness', locale)} />
-      <ul class="perf__ready" role="list">
-        {#each READINESS_KEYS as key (key)}
-          {@const on = isReady(perf.readiness, key)}
-          <li>
-            <Checkbox
-              label={t(readinessLabelKey(key), locale)}
-              checked={on}
-              disabled={$patchMutation.isPending}
-              onchange={() => toggleReady(key)}
-            />
-          </li>
-        {/each}
-      </ul>
-    </section>
-
-    {#if hasTeam}
-      <section class="perf__section" aria-label={t('perf.team', locale)}>
-        <BlockHead title={t('perf.team', locale)} />
-        <ul class="perf__people" role="list">
+    <!-- ADR-103: «quién va», con el reparto al lado. Sube: es lo que se
+         decide (ADR-139 p2); `#who-goes` es donde cae la línea de choques
+         del Día (uso #12) y el «apuntar» de «Falta». -->
+    <section class="perf__section" id="who-goes">
+      <WhoGoes
+        target="performance"
+        id={perf.id}
+        projectId={bundle!.performance.project?.id ?? null}
+        workspaceId={perf.workspace_id}
+        commitments={perf.commitments}
+        roster={performanceRoster(bundle!)}
+        showRoster={false}
+        {locale}
+      />
+      {#if hasTeam}
+        <ul class="perf__people" role="list" aria-label={t('perf.team', locale)}>
           {#each bundle!.cast_members as m (m.id)}
             <li>
               <span class="perf__person-role">{t('perf.role_cast', locale)} · {m.role}</span>
@@ -737,7 +879,7 @@
                 {o.person?.full_name ?? '—'}
                 {#if o.replaces_person}
                   <span class="perf__person-note">
-                    {t('perf.replaces', locale, { name: o.replaces_person.full_name })}{#if o.reason} — {o.reason}{/if}
+                    {t('perf.replaces', locale, { name: o.replaces_person.full_name })}{#if o.reason} · {o.reason}{/if}
                   </span>
                 {/if}
               </span>
@@ -753,25 +895,19 @@
             </li>
           {/each}
         </ul>
-      </section>
-    {/if}
-
-    <!-- ADR-103: «quién va». Next to a roster it only adds people; without
-         one it answers the inference from the project cast. The roster is
-         drawn above, so it is passed to be left out, not drawn twice. -->
-    <!-- `#who-goes`: the Day's clash line lands here (uso #12). -->
-    <section class="perf__section" id="who-goes">
-      <WhoGoes
-        target="performance"
-        id={perf.id}
-        projectId={bundle!.performance.project?.id ?? null}
-        workspaceId={perf.workspace_id}
-        commitments={perf.commitments}
-        roster={performanceRoster(bundle!)}
-        showRoster={false}
-        {locale}
-      />
+      {/if}
     </section>
+
+    <!-- ADR-090 P3: the same running order as the Planner's day, in place
+         of the fixed five. One way to write an hour in the whole app. -->
+    <RunningOrder
+      target="performance"
+      id={perf.id}
+      dayIso={perf.performed_at.slice(0, 10)}
+      tz={perf.venue?.timezone ?? workspaceTz ?? viewerTz}
+      {viewerTz}
+      {locale}
+    />
 
     <!-- ADR-106: el tablón del bolo. Sin bolo dice que no hay; sin dinero
          siempre (la puerta es la función, no Cuentas). -->
@@ -782,52 +918,6 @@
       {locale}
     />
 
-    {#if perf.date.length > 0}
-      <section class="perf__section" aria-label={t('perf.related_dates', locale)}>
-        <BlockHead title={t('perf.dates', locale)} />
-        <ul class="perf__dates" role="list">
-          {#each perf.date as d (d.id)}
-            <li>
-              <span class="perf__date-when">{formatDateRow(d)}</span>
-              <span class="perf__date-kind">{enumWord('perf.date_kind_', d.kind)}</span>
-              <span class="perf__date-title">{d.title ?? ''}</span>
-            </li>
-          {/each}
-        </ul>
-      </section>
-    {/if}
-
-    {#if perf.conversation?.person || perf.conversation?.organization}
-      <section class="perf__section" aria-label={t('perf.programmer', locale)}>
-        <BlockHead title={t('perf.programmer', locale)} />
-        <p class="perf__programmer">
-          {#if perf.conversation.person}
-            <a href={`/h/${workspaceSlug}/person/${perf.conversation.person.slug}`}>
-              {perf.conversation.person.full_name}
-            </a>
-          {/if}
-          {#if perf.conversation.organization?.name || perf.conversation.person?.organization_name}
-            <span class="perf__person-note">{perf.conversation.organization?.name || perf.conversation.person?.organization_name}</span>
-          {/if}
-        </p>
-      </section>
-    {/if}
-
-    {#if perf.asset_version.length > 0}
-      <section class="perf__section" aria-label={t('perf.assets', locale)}>
-        <BlockHead title={t('perf.assets', locale)} />
-        <ul class="perf__assets" role="list">
-          {#each perf.asset_version as a (a.id)}
-            <li>
-              <span class="perf__asset-dir">{enumWord('perf.asset_dir_', a.direction)}</span>
-              <span class="perf__asset-kind">{enumWord('perf.asset_kind_', a.kind)}</span>
-              <span class="perf__person-note">{t('perf.asset_registered', locale)}</span>
-            </li>
-          {/each}
-        </ul>
-      </section>
-    {/if}
-
     <section class="perf__section" aria-label={t('perf.notes', locale)}>
       <BlockHead title={t('perf.notes', locale)} />
       <YNotes
@@ -837,6 +927,90 @@
         {locale}
       />
     </section>
+
+    <!-- Lo de consulta, plegado (ADR-139 p2): la lista entera de la
+         preparación (lo que falta ya sube a «Falta»), la sala por dentro,
+         las fechas, el programador y los materiales. -->
+    <Fold word={t('record.details', locale)} keeps={detailsKeeps} bind:open={detailsOpen} id="details" testid="record-details">
+      <!-- ADR-084 §3 — the answer to "is it sorted?", which the month card's
+           foot reads. -->
+      <section class="perf__section" aria-label={t('perf.readiness', locale)}>
+        <BlockHead title={t('perf.readiness', locale)} level={3} />
+        <ul class="perf__ready" role="list">
+          {#each READINESS_KEYS as key (key)}
+            {@const on = isReady(perf.readiness, key)}
+            <li>
+              <Checkbox
+                label={t(readinessLabelKey(key), locale)}
+                checked={on}
+                disabled={$patchMutation.isPending}
+                onchange={() => toggleReady(key)}
+              />
+            </li>
+          {/each}
+        </ul>
+      </section>
+
+      <ProductionStub
+        venue={perf.venue}
+        venueName={perf.venue_name}
+        city={perf.city}
+        country={perf.country}
+        logistics={perf.logistics}
+        hospitality={perf.hospitality}
+        technical={perf.technical}
+        {viewerTz}
+        fallbackTz={workspaceTz}
+        withSchedule={false}
+        {locale}
+      />
+
+      {#if perf.date.length > 0}
+        <section class="perf__section" aria-label={t('perf.related_dates', locale)}>
+          <BlockHead title={t('perf.dates', locale)} level={3} />
+          <ul class="perf__dates" role="list">
+            {#each perf.date as d (d.id)}
+              <li>
+                <span class="perf__date-when">{formatDateRow(d)}</span>
+                <span class="perf__date-kind">{enumWord('perf.date_kind_', d.kind)}</span>
+                <span class="perf__date-title">{d.title ?? ''}</span>
+              </li>
+            {/each}
+          </ul>
+        </section>
+      {/if}
+
+      {#if perf.conversation?.person || perf.conversation?.organization}
+        <section class="perf__section" aria-label={t('perf.programmer', locale)}>
+          <BlockHead title={t('perf.programmer', locale)} level={3} />
+          <p class="perf__programmer">
+            {#if perf.conversation.person}
+              <a href={`/h/${workspaceSlug}/person/${perf.conversation.person.slug}`}>
+                {perf.conversation.person.full_name}
+              </a>
+            {/if}
+            {#if perf.conversation.organization?.name || perf.conversation.person?.organization_name}
+              <span class="perf__person-note">{perf.conversation.organization?.name || perf.conversation.person?.organization_name}</span>
+            {/if}
+          </p>
+        </section>
+      {/if}
+
+      {#if perf.asset_version.length > 0}
+        <section class="perf__section" aria-label={t('perf.assets', locale)}>
+          <BlockHead title={t('perf.assets', locale)} level={3} />
+          <ul class="perf__assets" role="list">
+            {#each perf.asset_version as a (a.id)}
+              <li>
+                <span class="perf__asset-dir">{enumWord('perf.asset_dir_', a.direction)}</span>
+                <span class="perf__asset-kind">{enumWord('perf.asset_kind_', a.kind)}</span>
+                <span class="perf__person-note">{t('perf.asset_registered', locale)}</span>
+              </li>
+            {/each}
+          </ul>
+        </section>
+      {/if}
+    </Fold>
   {/if}
 </article>
 
@@ -1025,6 +1199,16 @@
 
 <style>
   @layer components {
+    .perf__time {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--mono-letter-spacing);
+    }
+    .perf__bolo-fact {
+      display: inline-flex;
+      align-items: baseline;
+    }
+
     .perf__roadsheet-link {
       display: inline-flex;
       align-items: center;
