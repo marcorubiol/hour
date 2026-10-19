@@ -454,7 +454,6 @@
   "perf.cancel_confirm": "L'annuler",
   "perf.deleted": "Représentation supprimée.",
   "perf.deleted@music": "Concert supprimé.",
-  "perf.linked_to_venue": "Liée au lieu « {name} ».",
   "perf.venue_not_created": "Lieu non créé",
   "perf.bolo_helper_short": "Le contrat avec la salle.",
   "perf.bolo_create_link": "Nouveau contrat dans Comptes →",

@@ -487,7 +487,6 @@
   "perf.cancel_confirm": "Cancel·lar-la",
   "perf.deleted": "Funció esborrada.",
   "perf.deleted@music": "Concert esborrat.",
-  "perf.linked_to_venue": "Vinculada al lloc «{name}».",
   "perf.venue_not_created": "No s'ha creat el lloc",
   "perf.bolo_helper_short": "El tracte amb la sala.",
   "perf.bolo_create_link": "Nou bolo a Comptes →",

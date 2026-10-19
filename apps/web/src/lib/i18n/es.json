@@ -487,7 +487,6 @@
   "perf.cancel_confirm": "Cancelarla",
   "perf.deleted": "Función borrada.",
   "perf.deleted@music": "Concierto borrado.",
-  "perf.linked_to_venue": "Vinculada al lugar «{name}».",
   "perf.venue_not_created": "No se ha creado el lugar",
   "perf.bolo_helper_short": "El trato con la sala.",
   "perf.bolo_create_link": "Nuevo bolo en Cuentas →",

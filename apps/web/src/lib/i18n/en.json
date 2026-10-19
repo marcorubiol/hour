@@ -496,7 +496,6 @@
   "perf.cancel_confirm": "Cancel it",
   "perf.deleted": "Performance deleted.",
   "perf.deleted@music": "Show deleted.",
-  "perf.linked_to_venue": "Linked to venue «{name}».",
   "perf.venue_not_created": "Venue not created",
   "perf.bolo_helper_short": "The deal with the venue.",
   "perf.bolo_create_link": "New deal in Books →",
