@@ -248,14 +248,12 @@
 
   /* Code */
   :where(code, kbd, samp) {
-    font-family:
-      ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-family: var(--font-mono);
     font-size: 0.95em;
   }
 
   :where(pre) {
-    font-family:
-      ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-family: var(--font-mono);
     font-size: var(--text-s);
     background: var(--bg-ultra-light);
     padding: var(--space-m);

@@ -1082,7 +1082,7 @@
 
     .perf__title {
       font-family: var(--font-display);
-      font-size: clamp(1.8rem, 3vw, 2.4rem);
+      font-size: var(--h1);
       font-weight: 400;
       letter-spacing: var(--heading-letter-spacing);
       line-height: 1.05;

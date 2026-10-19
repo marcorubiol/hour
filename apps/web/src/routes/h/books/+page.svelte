@@ -1362,7 +1362,7 @@
     .book th { text-align: start; font-family: var(--font-mono); font-size: var(--text-xs); font-weight: 400; letter-spacing: var(--tracking-m); text-transform: uppercase; color: var(--text-faint); padding: var(--space-2xs) var(--space-xs); border-block-end: var(--line-hairline) solid var(--border-color-light); }
     .book td { padding: var(--space-xs); border-block-end: var(--line-hairline) solid var(--border-color-light); vertical-align: baseline; }
     .book .book__collect { padding-inline-start: var(--space-m); }
-    .book__num { text-align: end !important; font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .book .book__num { text-align: end; font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
     .book__row { scroll-margin-block: var(--space-xl); }
     .book__row:hover, .book__row.is-open { background: color-mix(in oklch, var(--bg-light) 55%, transparent); }
     .book__row[data-overdue] .book__date { color: var(--danger); }

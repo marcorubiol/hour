@@ -252,7 +252,9 @@
       /* The frame fills with the identity mark's own soft tint (same recipe as
          IdentityMark's --_bg), so the pin previews the identity. */
       background: color-mix(in oklch, var(--thumb, var(--accent-1)) 16%, var(--bg-ultra-light));
-      box-shadow:
+      /* The thumb's own drop, under its ring: one shadow in ink, sized to a
+         thumb and not to a card (rule 8d). */
+      box-shadow: /* material */
         0 0 0 var(--line) var(--thumb, var(--accent-1)),
         0 1px 3px color-mix(in oklch, var(--text-color) 28%, transparent);
     }

@@ -190,7 +190,7 @@
     .invitation-card h1 {
       margin: 0;
       font-family: var(--font-display);
-      font-size: clamp(2.3rem, 7vw, 4.6rem);
+      font-size: var(--display-xl);
       font-weight: 400;
       line-height: 0.98;
       letter-spacing: var(--heading-letter-spacing);

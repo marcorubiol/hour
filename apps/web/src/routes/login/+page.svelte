@@ -303,7 +303,7 @@
 
     .login__title {
       font-family: var(--font-display);
-      font-size: clamp(2.2rem, 4vw, 2.8rem);
+      font-size: var(--display-l);
       font-weight: 400;
       letter-spacing: var(--heading-letter-spacing);
       line-height: 1.05;
@@ -438,7 +438,7 @@
 
     .login__quote-text {
       font-family: var(--font-display);
-      font-size: clamp(1.6rem, 2.4vw, 2.1rem);
+      font-size: var(--text-xxl);
       font-weight: 400;
       letter-spacing: var(--heading-letter-spacing);
       line-height: 1.2;

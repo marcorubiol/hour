@@ -97,7 +97,7 @@
         padding: var(--space-s);
         background: var(--bg-ultra-light);
         border: var(--divider);
-        font-family: ui-monospace, SFMono-Regular, monospace;
+        font-family: var(--font-mono);
         font-size: var(--text-s);
       }
     }

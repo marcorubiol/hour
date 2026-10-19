@@ -389,6 +389,10 @@
     --stat-inline: var(--text-l);
     --text-xxl: clamp(1.512rem, 1.3567rem + 0.663vw, 1.9531rem); /* 24.2-31.3 — section title, h2 */
 
+    /* Display — larger than any heading, for the public and pre-session
+       pages only: the login's title and the invite's hero. */
+    --display-l: clamp(2.2rem, 4vw, 2.8rem);
+    --display-xl: clamp(2.3rem, 7vw, 4.6rem);
     --h1: clamp(1.8rem, 1.5rem + 1.5vw, 2.4rem); /* 29-38 — masthead. Retuned 2026-07-12 to the size mastheads actually render (person/performance canonical); the old 32-48 was never consumed — every page rolled its own clamp to undershoot it. */
     --h2: var(--text-xxl);
     --h3: clamp(1.2rem, 1.05rem + 0.7vw, 1.5rem);
