@@ -754,6 +754,7 @@
   :root {
     --record-gap: var(--space-xl); /* between the blocks of a record */
     --record-label-inline: 8rem; /* the mono label column of a record's rows */
+    --record-missing-inline: 20rem; /* below this the «Falta» list drops under its label */
   }
 
   /* ============================================================ */
