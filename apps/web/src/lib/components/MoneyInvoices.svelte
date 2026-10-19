@@ -25,6 +25,8 @@
   import Select from './Select.svelte';
   import StateBadge from './StateBadge.svelte';
   import { addToast } from './Toast.svelte';
+  import { toastCreated } from '$lib/created';
+  import { SaveFlash } from '$lib/save-flash.svelte';
 
   interface Props {
     invoices: MoneyInvoiceItem[];
@@ -93,6 +95,8 @@
     return invoice.status === 'paid' ? ['cancelled'] : EDITABLE_STATUSES;
   }
 
+  const saved = new SaveFlash();
+
   const invoicePatch = createMutation({
     mutationFn: async (input: { id: string; patch: Record<string, unknown> }) => {
       const body = await mutateJSON<{ invoice?: unknown }>(
@@ -103,7 +107,11 @@
       if (!body?.invoice) throw new Error(t('books.unexpected_response', locale));
       return body.invoice;
     },
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['invoices'] }),
+    // In place (ADR-139 p7): the row says «guardado» where it was written.
+    onSuccess: (_body, input) => {
+      saved.show(`${input.id}:${Object.keys(input.patch)[0]}`);
+      void queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    },
     onError: (err) => {
       addToast({
         tone: 'danger',
@@ -157,7 +165,7 @@
       if (!body?.payment) throw new Error(t('books.unexpected_response', locale));
       return body.payment;
     },
-    onSuccess: () => {
+    onSuccess: (payment) => {
       paymentOpen = false;
       paymentInvoice = null;
       void queryClient.invalidateQueries({ queryKey: ['invoices'] });
@@ -165,7 +173,19 @@
       // Collected on the deal cards derives from payments (ADR-087).
       void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
       void queryClient.invalidateQueries({ queryKey: ['line-money-fees'] });
-      addToast({ tone: 'success', message: t('books.payment_recorded', locale) });
+      const id = (payment as { id?: string } | null)?.id;
+      toastCreated({
+        locale,
+        message: t('books.payment_recorded', locale),
+        undo: id
+          ? async () => {
+              await mutateJSON('DELETE', `/api/payments/${id}`);
+              for (const key of ['invoices', 'payments', 'money-bolos', 'line-money-fees']) {
+                void queryClient.invalidateQueries({ queryKey: [key] });
+              }
+            }
+          : undefined,
+      });
     },
     onError: (err) => {
       addToast({
@@ -176,10 +196,20 @@
     },
   });
 
+  /** The amount's own word, under it (ADR-139 p7). */
+  let amountError = $state<string | undefined>();
+  $effect(() => {
+    void pAmount;
+    amountError = undefined;
+  });
+  let paymentFormEl: HTMLFormElement | undefined = $state();
+
+  /** Runs from the form's submit, after the native constraints passed. */
   function submitPayment() {
     const amount = Number(pAmount);
     if (!Number.isFinite(amount) || amount <= 0) {
-      addToast({ tone: 'warning', message: t('books.payment_amount_gt_zero', locale) });
+      amountError = t('books.payment_amount_gt_zero', locale);
+      document.getElementById('pay-amount')?.focus();
       return;
     }
     $createPayment.mutate();
@@ -352,7 +382,11 @@
               <Field id={`due-${invoice.id}`} label={t('books.contractual_due', locale)} group>
                 <span>{invoice.due_on ? dayLabel(invoice.due_on) : t('books.not_set', locale)}</span>
               </Field>
-              <Field id={`expected-${invoice.id}`} label={t('books.expected_collection', locale)}>
+              <Field
+                id={`expected-${invoice.id}`}
+                label={t('books.expected_collection', locale)}
+                saved={saved.is(`${invoice.id}:expected_on`)}
+              >
                 <input
                   id={`expected-${invoice.id}`}
                   type="date"
@@ -371,7 +405,12 @@
             {/if}
 
             <div class="mny-inv__condition">
-              <Field id={`condition-${invoice.id}`} label={t('books.payment_condition', locale)} stack>
+              <Field
+                id={`condition-${invoice.id}`}
+                label={t('books.payment_condition', locale)}
+                stack
+                saved={saved.is(`${invoice.id}:payment_condition`)}
+              >
                 <textarea
                   id={`condition-${invoice.id}`}
                   rows="2"
@@ -455,8 +494,23 @@
       {paymentInvoice.number ?? t('books.invoice', locale)} · {payerName(paymentInvoice)} ·
       {fmtMoney(paymentInvoice.total)} {paymentInvoice.currency}
     </p>
-    <div class="mny-inv__payment-form">
-      <Input label={t('books.amount', locale)} type="number" bind:value={pAmount} required />
+    <form
+      class="mny-inv__payment-form"
+      bind:this={paymentFormEl}
+      onsubmit={(e) => {
+        e.preventDefault();
+        submitPayment();
+      }}
+    >
+      <Input
+        id="pay-amount"
+        label={t('books.amount', locale)}
+        type="number"
+        step="0.01"
+        bind:value={pAmount}
+        required
+        error={amountError}
+      />
       <Input label={t('books.received_on', locale)} type="date" bind:value={pReceivedOn} required />
       <Select
         label={t('books.method', locale)}
@@ -464,12 +518,16 @@
         options={PAYMENT_METHODS.map((method) => ({ value: method, label: paymentMethodLabel(method, locale) }))}
       />
       <Input label={t('books.reference', locale)} bind:value={pReference} placeholder={t('books.optional', locale)} />
-    </div>
-    <Input label={t('books.notes', locale)} bind:value={pNotes} placeholder={t('books.optional', locale)} />
+      <Input label={t('books.notes', locale)} bind:value={pNotes} placeholder={t('books.optional', locale)} />
+      <!-- Hidden submit lets Enter inside an input trigger submit. -->
+      <button type="submit" hidden aria-hidden="true"></button>
+    </form>
   {/if}
   {#snippet actions()}
     <Button variant="quiet" onclick={() => (paymentOpen = false)}>{t('create.cancel', locale)}</Button>
-    <Button onclick={submitPayment} loading={$createPayment.isPending}>{t('books.record', locale)}</Button>
+    <Button onclick={() => paymentFormEl?.requestSubmit()} loading={$createPayment.isPending}
+      >{t('books.record', locale)}</Button
+    >
   {/snippet}
 </Dialog>
 
@@ -641,6 +699,7 @@
     .mny-inv__payment-form {
       display: flex;
       flex-direction: column;
+      gap: var(--field-gap);
       margin-block-start: var(--space-s);
     }
 

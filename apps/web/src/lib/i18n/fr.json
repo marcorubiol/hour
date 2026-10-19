@@ -2384,5 +2384,16 @@
   "record.view_record": "Registre",
   "record.view_thread": "Fil",
   "record.missing_step_due_of": "Prochaine étape en retard avec {who}",
-  "record.verb_open": "ouvrir"
+  "record.verb_open": "ouvrir",
+  "dialog.unsaved": "Des modifications ne sont pas enregistrées.",
+  "dialog.keep_editing": "Continuer",
+  "dialog.discard": "Abandonner",
+  "form.required": "Ce champ est requis.",
+  "form.invalid_email": "Cela ne ressemble pas à une adresse e-mail.",
+  "form.invalid": "Vérifiez cette valeur.",
+  "form.saved": "enregistré",
+  "ui.undo": "Annuler",
+  "ui.undone": "Annulé.",
+  "ui.not_undone": "Impossible d'annuler",
+  "create.added": "Ajouté au planning : {what} · {day}"
 }

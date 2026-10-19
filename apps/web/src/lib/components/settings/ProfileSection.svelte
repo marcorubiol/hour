@@ -13,6 +13,7 @@
   import { t, appLocale } from '$lib/i18n';
   import MailSignature from './MailSignature.svelte';
   import { resetHelp } from '$lib/help-seen.svelte';
+  import { SaveFlash } from '$lib/save-flash.svelte';
 
   const locale = appLocale();
 
@@ -68,11 +69,14 @@
    * this codebase keeps killing on sight. Now it writes, and it writes the
    * field the whole roster chain reads.
    */
+  const saved = new SaveFlash();
+
   const saveName = createMutation({
     mutationFn: (full_name: string) => mutateJSON('PATCH', '/api/me', { full_name }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['me'] });
-      addToast({ tone: 'success', message: t('settings.profile_name_saved', locale) });
+      // In place (ADR-139 p7): «guardado» at the row's end, not a toast.
+      saved.show('name');
     },
     onError: (err) => {
       addToast({
@@ -190,7 +194,7 @@
         <div class="set-row__hint">{t('settings.profile_name_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
-        <Field id="profile-name">
+        <Field id="profile-name" saved={saved.is('name')}>
           <input
             id="profile-name"
             type="text"

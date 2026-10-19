@@ -27,6 +27,7 @@
   import RunningOrder from '$lib/components/RunningOrder.svelte';
   import YNotes from '$lib/components/YNotes.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
+  import { FormErrors } from '$lib/form-errors.svelte';
   import type { Json } from '$lib/db-types';
   import { dayLabel, dayMonth, localDayISO, timeInTz } from '$lib/datetime';
   import { LOCALE_TAG, detectLocale, t } from '$lib/i18n';
@@ -283,20 +284,21 @@
     dialogOpen = true;
   }
 
+  // ADR-139 p7: what is wrong is said under its field, never as a toast.
+  const formErrors = new FormErrors();
+
   function saveEdit() {
-    if (!fDay) {
-      addToast({ tone: 'warning', message: t('perf.needs_date', locale) });
-      return;
-    }
+    formErrors.clear();
+    if (!fDay) formErrors.set('f-day', t('perf.needs_date', locale));
     // Same validation rule as PerformanceForm (isValidHoldNotice — THE
     // technique for this field): the input's min/max/step are hints, not
     // enforcement, and one bad digit must not 400 the whole PATCH and
     // lose every other edit in the dialog. Empty (null) stays valid —
     // "back to the standard default".
     if (showHoldNotice && !isValidHoldNotice(fHoldNotice)) {
-      addToast({ tone: 'warning', message: t('perf.hold_notice_invalid', locale) });
-      return;
+      formErrors.set('f-hold-notice', t('perf.hold_notice_invalid', locale));
     }
+    if (formErrors.any) return void formErrors.focusFirst();
     $patchMutation.mutate({
       performed_at: fDay,
       venue_name: fVenue.trim() || null,
@@ -553,9 +555,10 @@
   });
 
   function saveVenue() {
+    formErrors.clear();
     if (!vName.trim()) {
-      addToast({ tone: 'warning', message: t('venue.needs_name', locale) });
-      return;
+      formErrors.set('v-name', t('venue.needs_name', locale));
+      return void formErrors.focusFirst();
     }
     $venuePatch.mutate();
   }
@@ -1042,8 +1045,8 @@
       message={boloMessage}
     />
   {/if}
-  <div class="perf__form-grid">
-    <Input label={t('perf.date', locale)} type="date" bind:value={fDay} required />
+  <div class="perf__form-grid" oninput={formErrors.onedit}>
+    <Input id="f-day" label={t('perf.date', locale)} type="date" bind:value={fDay} required error={formErrors.of('f-day')} />
     <Input label={t('create.venue', locale)} bind:value={fVenue} placeholder={t('perf.venue_placeholder', locale)} />
     <Input label={t('create.city', locale)} bind:value={fCity} />
     <Input label={t('perf.country', locale)} bind:value={fCountry} placeholder="ES" />
@@ -1054,6 +1057,7 @@
         id="f-hold-notice"
         label={t('perf.hold_notice', locale)}
         helper={fHoldNotice === 0 ? t('perf.hold_notice_none', locale) : undefined}
+        error={formErrors.of('f-hold-notice')}
       >
         <input
           id="f-hold-notice"
@@ -1109,8 +1113,8 @@
 
 <Dialog bind:open={venueEditOpen} title={t('venue.edit_title', locale)} size="m">
   <p class="perf__dialog-hint">{t('venue.edit_hint', locale)}</p>
-  <div class="perf__form-grid">
-    <Input label={t('venue.name', locale)} bind:value={vName} required />
+  <div class="perf__form-grid" oninput={formErrors.onedit}>
+    <Input id="v-name" label={t('venue.name', locale)} bind:value={vName} required error={formErrors.of('v-name')} />
     <Input label={t('create.city', locale)} bind:value={vCity} />
     <Input label={t('perf.country', locale)} bind:value={vCountry} placeholder="ES" />
     <Input label={t('venue.capacity', locale)} type="number" bind:value={vCapacity} />

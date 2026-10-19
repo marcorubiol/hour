@@ -2393,5 +2393,16 @@
   "record.view_record": "Record",
   "record.view_thread": "Thread",
   "record.missing_step_due_of": "Next step overdue with {who}",
-  "record.verb_open": "open"
+  "record.verb_open": "open",
+  "dialog.unsaved": "There are unsaved changes.",
+  "dialog.keep_editing": "Keep editing",
+  "dialog.discard": "Discard",
+  "form.required": "This is needed.",
+  "form.invalid_email": "That doesn't look like an email.",
+  "form.invalid": "Check this value.",
+  "form.saved": "saved",
+  "ui.undo": "Undo",
+  "ui.undone": "Undone.",
+  "ui.not_undone": "Couldn't undo",
+  "create.added": "Added to the plan: {what} · {day}"
 }

@@ -15,6 +15,8 @@
   import { appLocale, t } from '$lib/i18n';
   import { TOGGLE_LENSES, type ToggleLens } from '$lib/lenses.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
+  import SavedMark from '$lib/components/SavedMark.svelte';
+  import { SaveFlash } from '$lib/save-flash.svelte';
 
   interface Props {
     workspaceId: string | undefined;
@@ -35,6 +37,8 @@
     })),
   );
 
+  // In place (ADR-139 p7): the setting says «guardado» beside itself.
+  const saved = new SaveFlash();
   const save = createMutation({
     mutationFn: (lensesOff: ToggleLens[]) =>
       mutateJSON('PUT', `/api/workspaces/${workspaceId}/lenses`, { lenses_off: lensesOff }),
@@ -61,7 +65,7 @@
     const next = new Set(off);
     if (next.has(lens)) next.delete(lens);
     else next.add(lens);
-    $save.mutate(TOGGLE_LENSES.filter((l) => next.has(l)));
+    $save.mutate(TOGGLE_LENSES.filter((l) => next.has(l)), { onSuccess: () => saved.show(lens) });
   }
 </script>
 
@@ -86,6 +90,7 @@
             disabled={!canEdit || !$query.data || $save.isPending}
             onchange={() => toggle(lens)}
           />
+          <SavedMark shown={saved.is(lens)} />
         </div>
       </div>
     {/each}

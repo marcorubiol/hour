@@ -11,6 +11,8 @@
   import { fetchJSON, mutateJSON } from '$lib/api';
   import { appLocale, t } from '$lib/i18n';
   import { addToast } from '$lib/components/Toast.svelte';
+  import SavedMark from '$lib/components/SavedMark.svelte';
+  import { SaveFlash } from '$lib/save-flash.svelte';
 
   interface Props {
     workspaceId: string | undefined;
@@ -31,7 +33,10 @@
     })),
   );
 
+  // In place (ADR-139 p7): the setting says «guardado» beside itself.
+  const saved = new SaveFlash();
   const save = createMutation({
+    onSuccess: () => saved.show(),
     mutationFn: (value: boolean) =>
       mutateJSON('PUT', `/api/workspaces/${workspaceId}/conversation-privacy`, { new_conversations_private: value }),
     onError: (err) =>
@@ -62,6 +67,7 @@
           disabled={!canEdit || $save.isPending}
           onchange={(v) => $save.mutate(v === 'private')}
         />
+        <SavedMark shown={saved.is()} />
         {#if !canEdit && $query.data}
           <span class="set-row__hint">{t('settings.conv_privacy_admin_only', locale)}</span>
         {/if}

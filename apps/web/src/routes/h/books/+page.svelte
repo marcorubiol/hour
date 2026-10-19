@@ -44,6 +44,8 @@
   import Select from '$lib/components/Select.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
+  import { toastCreated } from '$lib/created';
+  import { FormErrors } from '$lib/form-errors.svelte';
   import { dayLabel, localDayISO } from '$lib/datetime';
   import { DASH } from '$lib/glyphs';
   import { categoryLabel, EXPENSE_CATEGORIES, type ExpenseItem } from '$lib/expense';
@@ -523,13 +525,17 @@
     },
     onError: (err) => addToast({ tone: 'danger', title: t('books.fee_not_saved', locale), message: t('books.try_again', locale, { error: err instanceof Error ? err.message : t('perf.unexpected', locale) }) }),
   });
+  // ADR-139 p7: each dialog below checks itself and says what is wrong
+  // under the field, never as a toast; ⌘↵ and Enter submit its form.
+  const formErrors = new FormErrors();
   function saveFee() {
     if (!feeEditing || $feeMutation.isPending) return;
+    formErrors.clear();
     const trimmed = String(fAmount ?? '').trim();
     const amount = trimmed === '' ? null : Number(trimmed);
     if (amount !== null && (Number.isNaN(amount) || amount < 0)) {
-      addToast({ tone: 'warning', message: t('books.fee_invalid', locale) });
-      return;
+      formErrors.set('fee-amount', t('books.fee_invalid', locale));
+      return void formErrors.focusFirst();
     }
     $feeMutation.mutate({ id: feeEditing.id, fee_amount: amount, fee_currency: fCurrency });
   }
@@ -562,7 +568,16 @@
     payCategory = '';
     payReference = '';
     payIdempotencyKey = crypto.randomUUID();
+    formErrors.clear();
     payOpen = true;
+  }
+  function submitPay() {
+    if ($payMutation.isPending) return;
+    formErrors.clear();
+    const amount = Number(String(payAmount).trim());
+    if (!Number.isFinite(amount) || amount <= 0) formErrors.set('pay-amount', t('books.amount_gt_zero', locale));
+    if (formErrors.any) return void formErrors.focusFirst();
+    $payMutation.mutate();
   }
   const payMutation = createMutation({
     mutationFn: async () => {
@@ -581,12 +596,23 @@
       if (!body?.payment) throw new Error(t('books.unexpected_response', locale));
       return body.payment;
     },
-    onSuccess: () => {
+    onSuccess: (payment) => {
       payOpen = false;
       payBolo = null;
       void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
       void queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      addToast({ tone: 'success', message: t(payInvoiceId ? 'books.payment_recorded_doc' : 'books.payment_recorded_fee', locale) });
+      const id = (payment as { id?: string } | null)?.id;
+      toastCreated({
+        locale,
+        message: t(payInvoiceId ? 'books.payment_recorded_doc' : 'books.payment_recorded_fee', locale),
+        undo: id
+          ? async () => {
+              await mutateJSON('DELETE', `/api/payments/${id}`);
+              await queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
+              await queryClient.invalidateQueries({ queryKey: ['invoices'] });
+            }
+          : undefined,
+      });
     },
     onError: (err) => addToast({ tone: 'danger', title: t('books.payment_not_recorded', locale), message: err instanceof Error ? err.message : t('perf.unexpected', locale) }),
   });
@@ -626,6 +652,7 @@
     iExpectedOn = '';
     iPaymentCondition = '';
     iPayerId = '';
+    formErrors.clear();
     invOpen = true;
   }
   function pctOrNull(raw: unknown): number | null {
@@ -652,22 +679,32 @@
       if (!body?.invoice) throw new Error(t('books.unexpected_response', locale));
       return body.invoice;
     },
-    onSuccess: () => {
+    onSuccess: (invoice) => {
       invOpen = false;
       invBolo = null;
       void queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      addToast({ tone: 'success', message: t(invDocType === 'proforma' ? 'books.draft_proforma_created' : 'books.draft_invoice_created', locale) });
+      const id = (invoice as { id?: string } | null)?.id;
+      toastCreated({
+        locale,
+        message: t(invDocType === 'proforma' ? 'books.draft_proforma_created' : 'books.draft_invoice_created', locale),
+        // A draft is discarded with the same DELETE the row's «Descartar» uses.
+        undo: id
+          ? async () => {
+              await mutateJSON('DELETE', `/api/invoices/${id}`);
+              await queryClient.invalidateQueries({ queryKey: ['invoices'] });
+            }
+          : undefined,
+      });
     },
     onError: (err) => addToast({ tone: 'danger', title: t('books.doc_not_created', locale), message: err instanceof Error ? err.message : t('perf.unexpected', locale) }),
   });
   function submitInvoice() {
     if ($createInvoice.isPending) return;
-    for (const p of [pctOrNull(iVat), pctOrNull(iIrpf)]) {
-      if (p !== null && (Number.isNaN(p) || p < 0 || p > 100)) {
-        addToast({ tone: 'warning', message: t('books.vat_irpf_invalid', locale) });
-        return;
-      }
-    }
+    formErrors.clear();
+    const bad = (p: number | null) => p !== null && (Number.isNaN(p) || p < 0 || p > 100);
+    if (bad(pctOrNull(iVat))) formErrors.set('inv-vat', t('books.vat_irpf_invalid', locale));
+    if (bad(pctOrNull(iIrpf))) formErrors.set('inv-irpf', t('books.vat_irpf_invalid', locale));
+    if (formErrors.any) return void formErrors.focusFirst();
     $createInvoice.mutate();
   }
 
@@ -707,7 +744,17 @@
     eIncurredOn = localDayISO();
     eCounterparty = '';
     eAnchor = b ? `bolo:${b.id}` : (expenseAnchorOptions[0]?.value ?? '');
+    formErrors.clear();
     expOpen = true;
+  }
+  function submitExpense() {
+    if ($createExpense.isPending) return;
+    formErrors.clear();
+    const amount = Number(String(eAmount).trim());
+    if (!Number.isFinite(amount) || amount <= 0) formErrors.set('exp-amount', t('books.amount_gt_zero', locale));
+    if (!eAnchor) formErrors.set('exp-anchor', t('books.pick_anchor', locale));
+    if (formErrors.any) return void formErrors.focusFirst();
+    $createExpense.mutate();
   }
   const createExpense = createMutation({
     mutationFn: async () => {
@@ -727,10 +774,20 @@
       if (!body?.expense) throw new Error(t('books.unexpected_response', locale));
       return body.expense;
     },
-    onSuccess: () => {
+    onSuccess: (expense) => {
       expOpen = false;
       void queryClient.invalidateQueries({ queryKey: ['expenses'] });
-      addToast({ tone: 'success', message: t('books.expense_added', locale) });
+      const id = (expense as { id?: string } | null)?.id;
+      toastCreated({
+        locale,
+        message: t('books.expense_added', locale),
+        undo: id
+          ? async () => {
+              await mutateJSON('DELETE', `/api/expenses/${id}`);
+              await queryClient.invalidateQueries({ queryKey: ['expenses'] });
+            }
+          : undefined,
+      });
     },
     onError: (err) => addToast({ tone: 'danger', title: t('books.expense_not_added', locale), message: err instanceof Error ? err.message : t('perf.unexpected', locale) }),
   });
@@ -753,7 +810,18 @@
     dealCity = '';
     dealFee = '';
     dealCurrency = currencies[0] ?? 'EUR';
+    formErrors.clear();
     dealOpen = true;
+  }
+  function submitDeal() {
+    if ($createBolo.isPending) return;
+    formErrors.clear();
+    if (!dealProjectId) formErrors.set('deal-project', t('books.pick_project', locale));
+    const trimmed = String(dealFee).trim();
+    const fee = trimmed === '' ? null : Number(trimmed);
+    if (fee !== null && (Number.isNaN(fee) || fee < 0)) formErrors.set('deal-fee', t('books.fee_invalid_short', locale));
+    if (formErrors.any) return void formErrors.focusFirst();
+    $createBolo.mutate();
   }
   const createBolo = createMutation({
     mutationFn: async () => {
@@ -1214,10 +1282,11 @@
   {#if feeEditing}
     <p class="mny__dialog-who">{[feeEditing.project?.name, [feeEditing.venue_name, feeEditing.city].filter(Boolean).join(', ')].filter(Boolean).join(' · ')}</p>
   {/if}
-  <div class="mny__fee-form">
-    <Input label={t('books.amount', locale)} type="number" bind:value={fAmount} placeholder={t('books.ph_fee_clear', locale)} />
+  <form class="mny__fee-form" novalidate oninput={formErrors.onedit} onsubmit={(e) => { e.preventDefault(); saveFee(); }}>
+    <Input id="fee-amount" label={t('books.amount', locale)} type="number" step="0.01" bind:value={fAmount} placeholder={t('books.ph_fee_clear', locale)} error={formErrors.of('fee-amount')} />
     <Input label={t('books.currency', locale)} bind:value={fCurrency} placeholder="EUR" />
-  </div>
+    <button type="submit" hidden aria-hidden="true"></button>
+  </form>
   {#snippet actions()}
     <Button variant="quiet" onclick={() => (feeOpen = false)}>{t('create.cancel', locale)}</Button>
     <Button onclick={saveFee} loading={$feeMutation.isPending}>{t('blackout.save', locale)}</Button>
@@ -1225,9 +1294,9 @@
 </Dialog>
 
 <Dialog bind:open={payOpen} title={t('books.record_payment', locale)} size="s" description={payBolo ? `${[payBolo.venue_name, payBolo.city].filter(Boolean).join(', ')}` : ''} onclose={() => (payBolo = null)}>
-  <div class="mny__pay-form">
+  <form class="mny__pay-form" novalidate oninput={formErrors.onedit} onsubmit={(e) => { e.preventDefault(); submitPay(); }}>
     <div class="mny__row2">
-      <Input label={t('books.amount_cur', locale, { currency: payBolo?.fee_currency ?? 'EUR' })} type="number" bind:value={payAmount} />
+      <Input id="pay-amount" label={t('books.amount_cur', locale, { currency: payBolo?.fee_currency ?? 'EUR' })} type="number" step="0.01" bind:value={payAmount} error={formErrors.of('pay-amount')} />
       <Input label={t('books.received_on', locale)} type="date" bind:value={payReceivedOn} />
     </div>
     <div class="mny__row2">
@@ -1235,11 +1304,12 @@
       <Input label={t('books.counterparty_payer', locale)} bind:value={payCounterparty} placeholder={t('books.ph_venue', locale)} />
     </div>
     <Input label={t('books.reference_opt', locale)} bind:value={payReference} placeholder={t('books.ph_reference', locale)} />
-  </div>
+    <button type="submit" hidden aria-hidden="true"></button>
+  </form>
   <p class="mny__dialog-note">{t(payInvoiceId ? 'books.pay_note_doc' : 'books.pay_note', locale)}</p>
   {#snippet actions()}
     <Button variant="quiet" onclick={() => (payOpen = false)}>{t('create.cancel', locale)}</Button>
-    <Button onclick={() => !$payMutation.isPending && $payMutation.mutate()} loading={$payMutation.isPending}>{t('books.record', locale)}</Button>
+    <Button onclick={submitPay} loading={$payMutation.isPending}>{t('books.record', locale)}</Button>
   {/snippet}
 </Dialog>
 
@@ -1247,9 +1317,9 @@
   {#if invBolo}
     <p class="mny__dialog-who">{[invBolo.project?.name, [invBolo.venue_name, invBolo.city].filter(Boolean).join(', ')].filter(Boolean).join(' · ')}</p>
     <p class="mny__inv-fee-line">{t('books.fee_subtotal', locale)} <strong>{fmtFee(invBolo.fee_amount, invBolo.fee_currency)}</strong> {t('books.snapshot_note', locale)}</p>
-    <div class="mny__inv-form">
-      <Input label={t('books.vat_pct', locale)} type="number" bind:value={iVat} placeholder={t('books.ph_vat', locale)} />
-      <Input label={t('books.irpf_pct', locale)} type="number" bind:value={iIrpf} placeholder={t('books.ph_irpf', locale)} />
+    <form class="mny__inv-form" novalidate oninput={formErrors.onedit} onsubmit={(e) => { e.preventDefault(); submitInvoice(); }}>
+      <Input id="inv-vat" label={t('books.vat_pct', locale)} type="number" bind:value={iVat} placeholder={t('books.ph_vat', locale)} error={formErrors.of('inv-vat')} />
+      <Input id="inv-irpf" label={t('books.irpf_pct', locale)} type="number" bind:value={iIrpf} placeholder={t('books.ph_irpf', locale)} error={formErrors.of('inv-irpf')} />
       <Input label={t('books.due_on', locale)} type="date" bind:value={iDueOn} />
       <Input label={t('books.expected_collection', locale)} type="date" bind:value={iExpectedOn} />
       <Select
@@ -1262,8 +1332,9 @@
           <option value={payer.id}>{payer.name}{payer.has_fiscal_identity ? '' : ` · ${t('books.payer_no_fiscal', locale)}`}</option>
         {/each}
       </Select>
-    </div>
-    <Input label={t('books.payment_condition', locale)} bind:value={iPaymentCondition} placeholder={t('books.ph_condition', locale)} />
+      <Input label={t('books.payment_condition', locale)} bind:value={iPaymentCondition} placeholder={t('books.ph_condition', locale)} />
+      <button type="submit" hidden aria-hidden="true"></button>
+    </form>
     <p class="mny__inv-total-preview">{t('books.total_label', locale)} <strong>{fmtMoney(invTotal)} {invBolo.fee_currency ?? 'EUR'}</strong></p>
   {/if}
   {#snippet actions()}
@@ -1273,27 +1344,28 @@
 </Dialog>
 
 <Dialog bind:open={dealOpen} title={t('books.new_deal', locale)} size="s" description={t('books.deal_desc', locale)}>
-  <div class="mny__pay-form">
-    <Select label={t('books.project_obra', locale)} bind:value={dealProjectId} options={dealOptions} />
+  <form class="mny__pay-form" novalidate oninput={formErrors.onedit} onchange={formErrors.onedit} onsubmit={(e) => { e.preventDefault(); submitDeal(); }}>
+    <Select id="deal-project" label={t('books.project_obra', locale)} bind:value={dealProjectId} options={dealOptions} error={formErrors.of('deal-project')} />
     <div class="mny__row2">
       <Input label={t('create.venue', locale)} bind:value={dealVenue} placeholder={t('books.ph_venue', locale)} />
       <Input label={t('create.city', locale)} bind:value={dealCity} placeholder={t('books.ph_city', locale)} />
     </div>
     <div class="mny__row2">
-      <Input label={t('books.fee_optional', locale)} type="number" bind:value={dealFee} placeholder={t('books.ph_fee_later', locale)} />
+      <Input id="deal-fee" label={t('books.fee_optional', locale)} type="number" step="0.01" bind:value={dealFee} placeholder={t('books.ph_fee_later', locale)} error={formErrors.of('deal-fee')} />
       <Input label={t('books.currency', locale)} bind:value={dealCurrency} placeholder="EUR" />
     </div>
-  </div>
+    <button type="submit" hidden aria-hidden="true"></button>
+  </form>
   {#snippet actions()}
     <Button variant="quiet" onclick={() => (dealOpen = false)}>{t('create.cancel', locale)}</Button>
-    <Button onclick={() => !$createBolo.isPending && $createBolo.mutate()} loading={$createBolo.isPending}>{t('books.create_deal', locale)}</Button>
+    <Button onclick={submitDeal} loading={$createBolo.isPending}>{t('books.create_deal', locale)}</Button>
   {/snippet}
 </Dialog>
 
 <Dialog bind:open={expOpen} title={t('books.add_expense', locale)} size="s" description={t('books.expense_desc', locale)}>
-  <div class="mny__pay-form">
+  <form class="mny__pay-form" novalidate oninput={formErrors.onedit} onchange={formErrors.onedit} onsubmit={(e) => { e.preventDefault(); submitExpense(); }}>
     <div class="mny__row2">
-      <Input label={t('books.amount', locale)} type="number" bind:value={eAmount} />
+      <Input id="exp-amount" label={t('books.amount', locale)} type="number" step="0.01" bind:value={eAmount} error={formErrors.of('exp-amount')} />
       <Input label={t('books.currency', locale)} bind:value={eCurrency} placeholder="EUR" />
     </div>
     <Input label={t('books.description', locale)} bind:value={eDescription} placeholder={t('books.ph_expense', locale)} />
@@ -1301,12 +1373,13 @@
       <Input label={t('perf.date', locale)} type="date" bind:value={eIncurredOn} />
       <Select label={t('books.category', locale)} bind:value={eCategory} options={EXPENSE_CATEGORIES.map((c) => ({ value: c, label: categoryLabel(c, locale) }))} />
     </div>
-    <Select label={t('books.anchor', locale)} bind:value={eAnchor} options={expenseAnchorOptions} />
+    <Select id="exp-anchor" label={t('books.anchor', locale)} bind:value={eAnchor} options={expenseAnchorOptions} error={formErrors.of('exp-anchor')} />
     <Input label={t('books.counterparty_paid', locale)} bind:value={eCounterparty} placeholder={t('books.ph_counterparty', locale)} />
-  </div>
+    <button type="submit" hidden aria-hidden="true"></button>
+  </form>
   {#snippet actions()}
     <Button variant="quiet" onclick={() => (expOpen = false)}>{t('create.cancel', locale)}</Button>
-    <Button onclick={() => !$createExpense.isPending && $createExpense.mutate()} loading={$createExpense.isPending}>{t('composer.add', locale)}</Button>
+    <Button onclick={submitExpense} loading={$createExpense.isPending}>{t('composer.add', locale)}</Button>
   {/snippet}
 </Dialog>
 
@@ -1456,7 +1529,7 @@
 .mny__dialog-who { font-size: var(--text-s); color: var(--text-muted); }
     .mny__dialog-note { font-size: var(--text-xs); color: var(--text-faint); margin-block-start: var(--space-s); }
     /* The dialogs' fields are rows, one under the other (ADR-139 p4). */
-    .mny__fee-form, .mny__pay-form, .mny__inv-form { display: flex; flex-direction: column; margin-block-start: var(--space-s); }
+    .mny__fee-form, .mny__pay-form, .mny__inv-form { display: flex; flex-direction: column; gap: var(--field-gap); margin-block-start: var(--space-s); }
     .mny__row2 { display: contents; }
     .mny__inv-fee-line { font-size: var(--text-s); color: var(--text-muted); margin-block-start: var(--space-xs); }
     .mny__inv-total-preview { font-size: var(--text-s); margin-block-start: var(--space-s); }

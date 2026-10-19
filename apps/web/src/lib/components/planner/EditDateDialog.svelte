@@ -84,6 +84,24 @@
   let dDirection = $state<TravelDirection>('outbound');
   /** Two-step delete: the first press arms, the second writes. */
   let armed = $state(false);
+  /** The form's own words for what is wrong, under the field (ADR-139 p7). */
+  let errStart = $state<string | undefined>();
+  let errEnd = $state<string | undefined>();
+  $effect(() => {
+    void dDay;
+    void dStartWall;
+    errStart = undefined;
+  });
+  $effect(() => {
+    void dEndDay;
+    void dEndWall;
+    errEnd = undefined;
+  });
+  let formEl: HTMLFormElement | undefined = $state();
+  /** «Quién va», held until «Guardar» like every other field here. */
+  let whoGoes: { commit: () => Promise<void> } | undefined = $state();
+  let whoChanged = $state(false);
+  let committing = $state(false);
 
   let projectId = $derived(date?.project?.id ?? '');
   let workspaceId = $derived(date?.project?.workspace_id ?? '');
@@ -245,13 +263,14 @@
     },
   });
 
-  function submit() {
+  /** Runs from the form's submit, after the native constraints passed. */
+  async function submit() {
     if (!date) return;
     const startsAt = dAllDay
       ? dDay && `${dDay}T00:00:00.000Z`
       : dStartWall && wallClockToInstant(dStartWall, entryTz);
     if (!startsAt) {
-      addToast({ tone: 'warning', message: t('create.pick_start', locale) });
+      errStart = t('create.pick_start', locale);
       return;
     }
     const endsAt = dAllDay
@@ -262,7 +281,7 @@
         ? wallClockToInstant(dEndWall, entryTz)
         : null;
     if (endsAt && endsAt < startsAt) {
-      addToast({ tone: 'warning', message: t('create.end_before_start', locale) });
+      errEnd = t('create.end_before_start', locale);
       return;
     }
 
@@ -287,6 +306,19 @@
       input.destination_city = dCity.trim() || null;
     }
     if (kind === 'other') input.label = dLabel.trim() || null;
+    // ONE save (ADR-139 p7): who goes is written with the rest, not on its
+    // own click, so «Cancelar» takes it back too. A refused word stops here
+    // and WhoGoes says so in place; the dialog stays open.
+    if (whoChanged && whoGoes) {
+      committing = true;
+      try {
+        await whoGoes.commit();
+      } catch {
+        return;
+      } finally {
+        committing = false;
+      }
+    }
     $savePatch.mutate(input);
   }
 
@@ -298,10 +330,16 @@
     $deleteDate.mutate();
   }
 
-  let pending = $derived($savePatch.isPending || $deleteDate.isPending);
+  let pending = $derived($savePatch.isPending || $deleteDate.isPending || committing);
 </script>
 
-<Dialog bind:open title={t('edit.date_title', locale)} size="m" onclose={() => (armed = false)}>
+<Dialog
+  bind:open
+  title={t('edit.date_title', locale)}
+  size="m"
+  dirty={whoChanged}
+  onclose={() => (armed = false)}
+>
   {#if date}
     <div class="edd">
       <Segmented
@@ -318,6 +356,7 @@
 
       <form
         class="edd__form"
+        bind:this={formEl}
         onsubmit={(e) => {
           e.preventDefault();
           submit();
@@ -385,16 +424,17 @@
         />
 
         {#if dAllDay}
-          <Input label={t('create.starts', locale)} type="date" bind:value={dDay} required />
-          <Input label={t('create.ends', locale)} type="date" bind:value={dEndDay} />
+          <Input label={t('create.starts', locale)} type="date" bind:value={dDay} required error={errStart} />
+          <Input label={t('create.ends', locale)} type="date" bind:value={dEndDay} error={errEnd} />
         {:else}
           <Input
             label={t('create.starts', locale)}
             type="datetime-local"
             bind:value={dStartWall}
             required
+            error={errStart}
           />
-          <Input label={t('create.ends', locale)} type="datetime-local" bind:value={dEndWall} />
+          <Input label={t('create.ends', locale)} type="datetime-local" bind:value={dEndWall} error={errEnd} />
         {/if}
         {#if !dAllDay}
           <p class="edd__hint">{timeHint}</p>
@@ -405,8 +445,12 @@
       </form>
 
       {#if date.project}
-        <!-- ADR-103: who goes is its own write, outside the form's save. -->
+        <!-- ADR-103's words, inside this dialog's ONE save (ADR-139 p7):
+             drawn here, written by «Guardar», taken back by «Cancelar». -->
         <WhoGoes
+          bind:this={whoGoes}
+          bind:changed={whoChanged}
+          deferred
           target="date"
           id={date.id}
           projectId={date.project.id}
@@ -428,7 +472,9 @@
   {/snippet}
   {#snippet actions()}
     <Button variant="quiet" onclick={() => (open = false)}>{t('create.cancel', locale)}</Button>
-    <Button onclick={submit} loading={$savePatch.isPending}>{t('edit.save', locale)}</Button>
+    <Button onclick={() => formEl?.requestSubmit()} loading={$savePatch.isPending || committing}
+      >{t('edit.save', locale)}</Button
+    >
   {/snippet}
 </Dialog>
 
@@ -443,7 +489,7 @@
     .edd__form {
       display: flex;
       flex-direction: column;
-      gap: var(--space-xs);
+      gap: var(--field-gap);
     }
 
     .edd__note,

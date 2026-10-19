@@ -2384,5 +2384,16 @@
   "record.view_record": "Registre",
   "record.view_thread": "Fil",
   "record.missing_step_due_of": "Pas següent vençut amb {who}",
-  "record.verb_open": "obrir"
+  "record.verb_open": "obrir",
+  "dialog.unsaved": "Hi ha canvis sense desar.",
+  "dialog.keep_editing": "Continuar editant",
+  "dialog.discard": "Descartar",
+  "form.required": "Falta aquesta dada.",
+  "form.invalid_email": "No sembla un correu.",
+  "form.invalid": "Revisa aquest valor.",
+  "form.saved": "desat",
+  "ui.undo": "Desfer",
+  "ui.undone": "Desfet.",
+  "ui.not_undone": "No s'ha pogut desfer",
+  "create.added": "Afegit al pla: {what} · {day}"
 }

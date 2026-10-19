@@ -64,6 +64,7 @@
   import Segmented from '../Segmented.svelte';
   import Select from '../Select.svelte';
   import { addToast } from '../Toast.svelte';
+  import { toastCreated } from '$lib/created';
   import PerformanceForm, { type CreatedPerformance } from '../PerformanceForm.svelte';
   import BlockDays from '../BlockDays.svelte';
   import { blockDays, blockLimit, BLOCK_MAX_DAYS } from '$lib/block';
@@ -159,6 +160,21 @@
   // the app assumes when you say nothing.
   let dOption = $state(true);
   let dDirection = $state<TravelDirection>('outbound');
+  /** The form's own words for what is wrong, under the field (ADR-139 p7). */
+  let errStart = $state<string | undefined>();
+  let errEnd = $state<string | undefined>();
+  let formEl: HTMLFormElement | undefined = $state();
+  // A word under a field goes as soon as the field changes.
+  $effect(() => {
+    void dDay;
+    void dStartWall;
+    errStart = undefined;
+  });
+  $effect(() => {
+    void dEndDay;
+    void dEndWall;
+    errEnd = undefined;
+  });
 
   const workspacesQuery = createQuery(workspacesQueryOptions());
   const projectsQuery = createQuery(activeProjectsQueryOptions());
@@ -281,6 +297,8 @@
       dOption = true;
       dDirection = 'outbound';
       dAllDay = false;
+      errStart = undefined;
+      errEnd = undefined;
       if (presetProjectId) {
         dProject = presetProjectId;
         dLine = presetLineId ?? '';
@@ -298,9 +316,10 @@
       if (!body?.date) throw new Error('Malformed response');
       return body.date;
     },
-    onSuccess: () => {
+    onSuccess: (row) => {
       open = false;
       invalidateDateFeeds(queryClient);
+      announce([row.id], dayMonthYear(row.starts_at));
     },
     onError: (err) => {
       // Contract § Graceful absence: only invalid-body-class failures on a
@@ -358,9 +377,13 @@
       });
     },
     onSuccess: (body) => {
-      const n = body?.dates?.length ?? 0;
+      const rows = (body?.dates ?? []) as { id: string }[];
       invalidateDateFeeds(queryClient);
-      addToast({ tone: 'success', message: t('block.created', locale, { n: String(n) }) });
+      toastCreated({
+        locale,
+        message: t('block.created', locale, { n: String(rows.length) }),
+        undo: () => undoDates(rows.map((r) => r.id)),
+      });
       dExceptions = [];
       open = false;
     },
@@ -373,6 +396,20 @@
     },
   });
 
+  async function undoDates(ids: string[]) {
+    await Promise.all(ids.map((id) => mutateJSON('DELETE', `/api/dates/${id}`)));
+    invalidateDateFeeds(queryClient);
+  }
+
+  /** ADR-139 p7: an add ends with one notice, and «Deshacer» deletes it. */
+  function announce(ids: string[], day: string) {
+    toastCreated({
+      locale,
+      message: t('create.added', locale, { what: t(TYPE_LABEL_KEYS[type], locale), day }),
+      undo: () => undoDates(ids),
+    });
+  }
+
   function submitSeries() {
     const n = blockDays({
       from: dFrom,
@@ -381,24 +418,15 @@
       exceptions: dExceptions,
     }).length;
     const limit = blockLimit(n);
-    if (limit !== 'ok') {
-      addToast({
-        tone: 'warning',
-        message:
-          limit === 'too_few'
-            ? t('block.too_few', locale)
-            : t('block.too_many', locale, { max: String(BLOCK_MAX_DAYS) }),
-      });
-      return;
-    }
+    // The span panel already says what is wrong, under its own fields.
+    if (limit !== 'ok') return;
     $createSeries.mutate();
   }
 
+  /** Runs from the form's submit, after the native constraints passed. */
   function submitDate() {
-    if (!dProject) {
-      addToast({ tone: 'warning', message: t('create.pick_project', locale) });
-      return;
-    }
+    errStart = undefined;
+    errEnd = undefined;
     if (dMulti) return submitSeries();
     // All-day rows are calendar dates: UTC-anchored midnight keeps
     // starts_at.slice(0,10) equal to the picked day (never tz-shifted).
@@ -406,7 +434,7 @@
       ? dDay && `${dDay}T00:00:00.000Z`
       : dStartWall && wallClockToInstant(dStartWall, entryTz);
     if (!startsAt) {
-      addToast({ tone: 'warning', message: t('create.pick_start', locale) });
+      errStart = t('create.pick_start', locale);
       return;
     }
     const endsAt = dAllDay
@@ -417,7 +445,7 @@
         ? wallClockToInstant(dEndWall, entryTz)
         : null;
     if (endsAt && endsAt < startsAt) {
-      addToast({ tone: 'warning', message: t('create.end_before_start', locale) });
+      errEnd = t('create.end_before_start', locale);
       return;
     }
     const input: Record<string, unknown> = {
@@ -446,9 +474,10 @@
     $createDate.mutate(input);
   }
 
+  /** Both branches submit a FORM, so the constraints speak under their field. */
   function submit() {
     if (type === 'performance') perfForm?.submit();
-    else submitDate();
+    else formEl?.requestSubmit();
   }
 
   let pending = $derived(
@@ -502,6 +531,7 @@
     {:else}
       <form
         class="ced__form"
+        bind:this={formEl}
         onsubmit={(e) => {
           e.preventDefault();
           submitDate();
@@ -590,16 +620,17 @@
           {/if}
         {:else}
           {#if dAllDay}
-            <Input label={t('create.starts', locale)} type="date" bind:value={dDay} required />
-            <Input label={t('create.ends', locale)} type="date" bind:value={dEndDay} />
+            <Input label={t('create.starts', locale)} type="date" bind:value={dDay} required error={errStart} />
+            <Input label={t('create.ends', locale)} type="date" bind:value={dEndDay} error={errEnd} />
           {:else}
             <Input
               label={t('create.starts', locale)}
               type="datetime-local"
               bind:value={dStartWall}
               required
+              error={errStart}
             />
-            <Input label={t('create.ends', locale)} type="datetime-local" bind:value={dEndWall} />
+            <Input label={t('create.ends', locale)} type="datetime-local" bind:value={dEndWall} error={errEnd} />
           {/if}
           {#if !dAllDay}
             <p class="ced__hint">{timeHint}</p>
@@ -648,7 +679,7 @@
     .ced__form {
       display: flex;
       flex-direction: column;
-      gap: var(--space-xs);
+      gap: var(--field-gap);
     }
 
     .ced__hint {

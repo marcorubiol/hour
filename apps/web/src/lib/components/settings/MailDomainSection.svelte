@@ -21,6 +21,8 @@
   import Badge from '$lib/components/Badge.svelte';
   import MailoutTestMode from '$lib/components/MailoutTestMode.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
+  import SavedMark from '$lib/components/SavedMark.svelte';
+  import { SaveFlash } from '$lib/save-flash.svelte';
   import {
     domainState,
     senderAddress,
@@ -138,6 +140,16 @@
     return s.local.trim() !== d.from_local_part || s.name.trim() !== (d.from_name ?? data?.workspace_name ?? '');
   }
 
+  const savedSender = new SaveFlash();
+
+  /** The sender is one value in two fields: it is saved when the caret
+      leaves the pair, not between them. */
+  function commitSender(ev: FocusEvent, d: MailDomainItem) {
+    const group = ev.currentTarget as HTMLElement;
+    if (group.contains(ev.relatedTarget as Node | null)) return;
+    if (senderDirty(d) && !$saveSender.isPending) $saveSender.mutate(d);
+  }
+
   const saveSender = createMutation({
     mutationFn: (d: MailDomainItem) => {
       const s = draftOf(d);
@@ -151,7 +163,8 @@
     onSuccess: (_r, d) => {
       const { [d.id]: _gone, ...rest } = senderDraft;
       senderDraft = rest;
-      addToast({ tone: 'success', message: t('mailout.saved', locale) });
+      // In place, like the rest of Ajustes (ADR-139 p7): «guardado» in its row.
+      savedSender.show(d.id);
     },
     onError: failed,
     onSettled: invalidate,
@@ -295,7 +308,7 @@
       <div class="set-row__label">{t('mailout.sender_label', locale)}</div>
       <div class="set-row__hint">{t('mailout.sender_hint', locale)}</div>
     </div>
-    <div class="set-row__ctrl"><div class="md-sender">
+    <div class="set-row__ctrl"><div class="md-sender" onfocusout={(ev) => commitSender(ev, d)}>
       {#if canManage}
         <Field id={`md-name-${d.id}`}>
           <input
@@ -322,11 +335,7 @@
             {#snippet suffix()}@{d.domain}{/snippet}
           </Field>
         </div>
-        {#if senderDirty(d)}
-          <Button size="s" variant="secondary" disabled={$saveSender.isPending} onclick={() => $saveSender.mutate(d)}>
-            {t('mailout.save', locale)}
-          </Button>
-        {/if}
+        <SavedMark shown={savedSender.is(d.id)} />
       {:else}
         <span class="md-ro">{d.from_name ?? data?.workspace_name ?? ''} &lt;{senderAddress(d.from_local_part, d.domain)}&gt;</span>
       {/if}

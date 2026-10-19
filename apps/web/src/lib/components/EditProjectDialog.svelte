@@ -103,10 +103,20 @@
     },
   });
 
+  /** The name's own word, under the field (ADR-139 p7); the native
+      `required` covers the empty ones, this the blank ones. */
+  let nameError = $state<string | undefined>();
+  $effect(() => {
+    void name;
+    nameError = undefined;
+  });
+  let formEl: HTMLFormElement | undefined = $state();
+
+  /** Runs from the form's submit, after the native constraints passed. */
   function submit(event?: Event) {
     event?.preventDefault();
     if (!name.trim()) {
-      addToast({ tone: 'warning', message: t('project.name_empty', locale) });
+      nameError = t('project.name_empty', locale);
       return;
     }
     $save.mutate();
@@ -114,7 +124,7 @@
 </script>
 
 <Dialog bind:open title={t('project.edit_title', locale)} size="s">
-  <form class="epj__form" onsubmit={submit}>
+  <form class="epj__form" bind:this={formEl} onsubmit={submit}>
     <section class="epj__identity" aria-label={t('project.identity_aria', locale)}>
       <span class="eyebrow">{t('project.identity', locale)}</span>
       <div class="epj__preview">
@@ -157,6 +167,7 @@
       label={t('conversations.col_name', locale)}
       name="project-name"
       bind:value={name}
+      error={nameError}
       required
       autocomplete="off"
       disabled={$save.isPending}
@@ -177,7 +188,7 @@
 
   {#snippet actions()}
     <Button variant="quiet" disabled={$save.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
-    <Button loading={$save.isPending} onclick={submit}>{t('blackout.save', locale)}</Button>
+    <Button loading={$save.isPending} onclick={() => formEl?.requestSubmit()}>{t('blackout.save', locale)}</Button>
   {/snippet}
 </Dialog>
 
@@ -186,7 +197,7 @@
     .epj__form {
       display: flex;
       flex-direction: column;
-      gap: var(--space-xs);
+      gap: var(--field-gap);
     }
 
     .epj__identity {

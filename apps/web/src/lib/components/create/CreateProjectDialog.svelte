@@ -102,15 +102,24 @@
     },
   });
 
+  /** The name's own word, under the field (ADR-139 p7); the native
+      `required` covers the empty ones, this the blank ones. */
+  let nameError = $state<string | undefined>();
+  $effect(() => {
+    void name;
+    nameError = undefined;
+  });
+  let formEl: HTMLFormElement | undefined = $state();
+
+  /** Runs from the form's submit, after the native constraints passed. */
   function submit(event?: Event) {
     event?.preventDefault();
     if (!effectiveWorkspaceId) {
-      addToast({ tone: 'warning', message: t('workspace.pick', locale) });
-      return;
+      return; // the select's `required` says it under the field
     }
     const trimmed = name.trim();
     if (!trimmed) {
-      addToast({ tone: 'warning', message: t('project.name_empty', locale) });
+      nameError = t('project.name_empty', locale);
       return;
     }
     $create.mutate({
@@ -131,7 +140,7 @@
   size="s"
   onclose={reset}
 >
-  <form class="cpj__form" onsubmit={submit}>
+  <form class="cpj__form" bind:this={formEl} onsubmit={submit}>
     {#if workspaceId}
       <Select label={t('workspace.label', locale)} value={workspaceId} options={workspaceOptions} disabled />
     {:else}
@@ -149,6 +158,7 @@
       label={t('conversations.col_name', locale)}
       name="project-name"
       bind:value={name}
+      error={nameError}
       placeholder={t('project.name_ph', locale)}
       required
       autofocus
@@ -174,7 +184,7 @@
 
   {#snippet actions()}
     <Button variant="quiet" disabled={$create.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
-    <Button loading={$create.isPending} onclick={submit}>{t('project.create', locale)}</Button>
+    <Button loading={$create.isPending} onclick={() => formEl?.requestSubmit()}>{t('project.create', locale)}</Button>
   {/snippet}
 </Dialog>
 
@@ -183,7 +193,7 @@
     .cpj__form {
       display: flex;
       flex-direction: column;
-      gap: var(--space-xs);
+      gap: var(--field-gap);
     }
   }
 </style>
