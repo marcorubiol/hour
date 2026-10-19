@@ -149,11 +149,52 @@ export interface PersonMissingConversation {
  * «no esta vez» asks for nothing, as in the conversation's own strip.
  */
 export function personMissing(conversations: readonly PersonMissingConversation[], today: string): PersonMissing[] {
+  return stepsDue(conversations, today).slice(0, MISSING_MAX);
+}
+
+/**
+ * Every conversation whose next step's day has come (today or before), the
+ * oldest first; «no esta vez» asks for nothing. The one rule behind the
+ * person's, the line's and the project's strips, and the line's count.
+ */
+export function stepsDue(conversations: readonly PersonMissingConversation[], today: string): PersonMissing[] {
   return conversations
     .filter((c) => c.relation !== 'not_now' && c.next_action_at && c.next_action_at.slice(0, 10) <= today)
     .map((c) => ({ kind: 'step_due' as const, conversationId: c.id, day: c.next_action_at!.slice(0, 10) }))
-    .sort((a, b) => a.day.localeCompare(b.day))
-    .slice(0, MISSING_MAX);
+    .sort((a, b) => a.day.localeCompare(b.day));
+}
+
+// ── Línea y proyecto ───────────────────────────────────────────────────────
+
+export type LineMissing =
+  | PersonMissing
+  /** The rest of the due steps, said as one count. `atLeast`: the reader holds
+      one page of the conversations, so there may be more than `count`. */
+  | { kind: 'steps_due_more'; count: number; atLeast: boolean };
+
+/**
+ * What a line's (or a project's) record asks for: its conversations whose
+ * next step is due. A line can hold a whole campaign, so past three the
+ * strip names the two oldest and says the rest as one count, instead of
+ * dropping them.
+ *
+ * `total`: how many conversations there are when `conversations` is one page
+ * of them, in the endpoint's order (next step, oldest first). A page whose
+ * last row is not due holds every due one; a page due to its last row may
+ * have more after it, and the count is then a floor, said as such.
+ */
+export function lineMissing(
+  conversations: readonly PersonMissingConversation[],
+  today: string,
+  opts: { total?: number } = {},
+): LineMissing[] {
+  const due = stepsDue(conversations, today);
+  const last = conversations.at(-1);
+  const lastDue = Boolean(last && stepsDue([last], today).length > 0);
+  const complete = opts.total == null || opts.total <= conversations.length || !lastDue;
+  if (due.length <= MISSING_MAX && complete) return due;
+  const named = due.slice(0, MISSING_MAX - 1);
+  return [...named, { kind: 'steps_due_more', count: due.length - named.length, atLeast: !complete }];
 }
 
 // ── Fecha ──────────────────────────────────────────────────────────────────

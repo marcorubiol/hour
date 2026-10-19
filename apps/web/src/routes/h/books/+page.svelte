@@ -892,7 +892,29 @@
   $effect(() => {
     if (targetHandled || !$bolosQuery.isSuccess || !location.hash.startsWith('#bolo-')) return;
     targetHandled = true;
-    focusBolo(location.hash.slice('#bolo-'.length));
+    const id = location.hash.slice('#bolo-'.length);
+    const url = new URL(location.href);
+    const kind = url.searchParams.get('act');
+    if (kind) {
+      url.searchParams.delete('act');
+      replaceState(url, {});
+      pendingAct = { id, kind };
+    }
+    focusBolo(id);
+  });
+  // `&act=<tipo>` (los verbos de «Falta» del vistazo del bolo) abre el diálogo
+  // que resuelve ese «Pide atención», como su botón aquí. Una vez, con los
+  // documentos dentro; si el bolo ya no pide eso, solo queda la tarjeta.
+  let pendingAct = $state<{ id: string; kind: string } | null>(null);
+  $effect(() => {
+    const want = pendingAct;
+    if (!want || loading) return;
+    pendingAct = null;
+    const item = attention.find((a) => a.bolo.id === want.id && a.kind === want.kind);
+    if (!item) return;
+    // Here the verb was already chosen: a late payment is recorded, not chased.
+    if (item.kind === 'overdue') openPay(item.bolo);
+    else act(item);
   });
 </script>
 

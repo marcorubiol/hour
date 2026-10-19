@@ -10,7 +10,7 @@
    * The shape of every record: RecordHead (address, name, facts), «Falta»,
    * then its blocks: the functions, the documents, what came in, what went
    * out. Read only: money is written in Cuentas (ADR-043), so each «Falta»
-   * verb goes there, to the row.
+   * verb goes there, to the row, with its dialog open (`act=`).
    *
    * Reads what Cuentas reads, narrowed to the one project (the money feed
    * takes no id): its bolos, its invoices, the bolo's expenses, and the
@@ -183,7 +183,8 @@
           ? { label: t(ATTENTION_VERB[a.kind], locale).toLowerCase(), href: conversationHref! }
           : {
               label: t(a.kind === 'overdue' ? 'books.record_payment' : ATTENTION_VERB[a.kind], locale).toLowerCase(),
-              href: rowHref,
+              // The row, with the dialog that settles it already open.
+              href: booksHref(projectId, { boloId: id, act: a.kind }),
             },
       ],
     };

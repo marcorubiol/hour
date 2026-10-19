@@ -113,6 +113,12 @@ describe('booksHref', () => {
   test('hasta la tarjeta de un bolo', () => {
     expect(booksHref('p1', { boloId: 'b1' })).toBe('/h/books?scope=p:p1#bolo-b1');
   });
+  test('con el diálogo que resuelve su «Pide atención»', () => {
+    expect(booksHref('p1', { boloId: 'b1', act: 'to_invoice' })).toBe('/h/books?scope=p:p1&act=to_invoice#bolo-b1');
+  });
+  test('sin bolo, `act` no significa nada y no se manda', () => {
+    expect(booksHref('p1', { act: 'to_invoice' })).toBe('/h/books?scope=p:p1');
+  });
 });
 
 describe('boloPatch', () => {

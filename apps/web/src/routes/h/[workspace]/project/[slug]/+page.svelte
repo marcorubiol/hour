@@ -26,10 +26,14 @@
   import { spaceCrumb } from '$lib/record-crumbs';
   import CastPanel from '$lib/components/CastPanel.svelte';
   import ProjectIdentityPopover from '$lib/components/ProjectIdentityPopover.svelte';
-  import RelationshipStub from '$lib/components/RelationshipStub.svelte';
+  import RelationshipStub, { relationStubQueryOptions } from '$lib/components/RelationshipStub.svelte';
+  import MissingBand from '$lib/components/MissingBand.svelte';
+  import { stepsDueBand } from '$lib/steps-due-band';
+  import { lensOn } from '$lib/lenses.svelte';
+  import { toStore } from 'svelte/store';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import YNotes from '$lib/components/YNotes.svelte';
-  import { dayMonthYear } from '$lib/datetime';
+  import { dayMonthYear, localDayISO } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
 
   const locale = appLocale();
@@ -99,6 +103,22 @@
       : [],
   );
 
+  // «Falta» (ADR-139 § 2): the project's conversations whose next step is
+  // due, from the page the conversations block already reads (same query:
+  // no new request). Kept to this project: the slug repeats across spaces.
+  const stubQuery = createQuery(toStore(() => relationStubQueryOptions(projectSlug)));
+  let missingItems = $derived(
+    project
+      ? stepsDueBand(($stubQuery.data?.items ?? []).filter((c) => c.project?.id === project!.id), {
+          today: localDayISO(),
+          total: $stubQuery.data?.total,
+          workspaceSlug,
+          moreHref: lensOn('conversations') ? `/h/conversations?scope=p:${project.id}` : null,
+          locale,
+        })
+      : [],
+  );
+
   function formatDate(iso: string | null): string {
     if (!iso) return '';
     return dayMonthYear(iso);
@@ -124,6 +144,9 @@
           >
         {/if}
       {/if}
+    {/snippet}
+    {#snippet band()}
+      <MissingBand items={missingItems} {locale} />
     {/snippet}
   </RecordHead>
 

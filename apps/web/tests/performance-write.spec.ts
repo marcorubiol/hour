@@ -257,3 +257,37 @@ test.describe('performance write path', () => {
     expect(sweep.remaining).toBe(0);
   });
 });
+
+test.describe('the quick add marks what it made (ADR-139 p7)', () => {
+  test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL / PW_TEST_PASSWORD.');
+
+  test('the new card is drawn fresh and in view on the month; «Undo» takes it away', async ({ page }) => {
+    test.setTimeout(60_000);
+    const title = `E2E fresh ${Date.now()}`;
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    await page.goto('/h/planner?view=month');
+    await waitForLoaded(page);
+    await page.locator('button.cal__add').click();
+    const dialog = page.locator('dialog[open]');
+    await dialog.getByLabel('What', { exact: true }).fill(title);
+    await dialog.locator('[data-chip="type"]').click();
+    await dialog.getByRole('radio', { name: 'Rehearsal', exact: true }).check();
+    await dialog.locator('[data-chip="owner"]').click();
+    await dialog.getByLabel('Project', { exact: true }).selectOption({ label: 'ZZZ e2e collab' });
+    await dialog.locator('[data-chip="when"]').click();
+    await dialog.getByLabel('Day', { exact: true }).fill(today);
+    await dialog.getByRole('button', { name: 'Add', exact: true }).click();
+    await expect(dialog).toBeHidden({ timeout: 10_000 });
+
+    // Today is on the month: the card arrives with the mark, on screen.
+    const fresh = page.locator('.slip[data-fresh]', { hasText: title }).first();
+    await expect(fresh).toBeVisible({ timeout: 10_000 });
+    await expect(fresh).toBeInViewport();
+
+    // The spec owns its row: the notice's «Undo» deletes it (the notice lasts 6 s).
+    await page.locator('.toast').getByRole('button', { name: 'Undo', exact: true }).click();
+    await expect(page.locator('.slip', { hasText: title })).toHaveCount(0, { timeout: 10_000 });
+  });
+});
