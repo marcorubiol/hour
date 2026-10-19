@@ -443,13 +443,11 @@
 
 ## Producto — después
 
-- [ ] **Segundo nivel y calma (ADR-139)**: las cinco fases en main el 20-10 (`dddb8e98`), **sin desplegar ni pasar el E2E**: piezas de formulario y de ficha, un solo modelo de guardado, ficha con hechos/«Falta»/«Detalles», vistazo lateral (fecha, bolo, función, conversación, persona), alta rápida al plan, calma como foco y peso del primer nivel, pulido de Ajustes. Siguen:
+- [ ] **Segundo nivel y calma (ADR-139)**: las cinco fases y sus seguimientos (verbos del bolo, resalte de lo creado, «Falta» de línea y proyecto) en main el 20-10, **sin desplegar ni pasar el E2E**: piezas de formulario y de ficha, un solo modelo de guardado, ficha con hechos/«Falta»/«Detalles», vistazo lateral (fecha, bolo, función, conversación, persona), alta rápida al plan, calma como foco y peso del primer nivel, pulido de Ajustes. Siguen:
   - [ ] Desplegar `dddb8e98` y pasar el E2E contra el desplegado (muchos specs reescritos sin correr).
   - [ ] Marco: decidir — En calma, ¿«Siguiente» del raíl solo lo confirmado? ADR-096 § 5 dice que el raíl no se toca. Recomendación: sí, solo lo confirmado.
   - [ ] Marco: decidir — Ajustes oculta lo que no guardaba nada: Notificaciones (Master View pasa a Perfil), cuatro valores de Privacidad, Facturación, Zona de peligro y el selector de idioma de la app. Recomendación: dejarlo así hasta que cada uno guarde de verdad.
-  - [ ] Los verbos de «Falta» del bolo abren directamente el diálogo de cobro o factura en Cuentas (`#bolo-<id>&act=invoice`).
-  - [ ] La tarjeta recién creada se resalta en el Planner.
-  - [ ] «Falta» de línea (pasos vencidos de sus conversaciones) y de proyecto.
+  - [ ] Bug: el bloque de conversaciones del proyecto filtra por el nombre corto del proyecto, que se repite entre espacios: puede mezclar conversaciones de otro espacio del mismo usuario (carril adr139-followups, 20-10).
   - [ ] Después (ADR-139): la línea que entiende texto en el alta, crear en la celda del Mes, ⌘K que crea función, fecha, tarea y conversación.
   - [ ] Marco: decidir — Logística, acogida y técnica se ven en la ficha de función pero no se escriben en ningún sitio (`JsonKV.svelte`): ¿quitarlas hasta que tengan editor o «+ añadir línea»? Recomendación: «+ añadir línea» con el campo nuevo.
   - [ ] Marco: decidir — El estado de una función ofrece «facturado» y «cobrado», que son del bolo: ¿quitarlos del menú de la función? Recomendación: sí, el dinero vive en el bolo (ADR-087).
