@@ -36,6 +36,7 @@
   import MessageItem from '$lib/components/MessageItem.svelte';
   import ThreadBlock from '$lib/components/ThreadBlock.svelte';
   import OrganizationFiscal from '$lib/components/OrganizationFiscal.svelte';
+  import ConversationAcquaintances from '$lib/components/ConversationAcquaintances.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import {
     eventDirectionLabel,
@@ -430,6 +431,8 @@
         {#if conv.organization}
           <OrganizationFiscal organizationId={conv.organization.id} />
         {/if}
+
+        <ConversationAcquaintances workspaceId={conv.workspace_id} contacts={conv.contacts} {locale} />
 
         {#if conv.can_set_private}
         <div class="privacy">

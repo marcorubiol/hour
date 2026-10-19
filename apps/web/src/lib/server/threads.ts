@@ -75,7 +75,7 @@ export async function loadThreadMessages(
  * su dueño. Quien ya no comparte (o borró su login) queda sin nombre, no sin
  * mensaje.
  */
-async function authorNames(env: SupabaseEnv, jwt: string, ids: (string | null)[]): Promise<Record<string, string>> {
+export async function authorNames(env: SupabaseEnv, jwt: string, ids: (string | null)[]): Promise<Record<string, string>> {
   const authorIds = [...new Set(ids.filter((id): id is string => Boolean(id)))];
   const authors: Record<string, string> = {};
   if (authorIds.length === 0) return authors;

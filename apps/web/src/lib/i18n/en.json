@@ -2187,5 +2187,15 @@
   "desk.door_money_sub": "{amount} overdue",
   "desk.door_money_none": "nothing overdue",
   "desk.door_error": "not available",
-  "desk.calm_folded": "What changed and the season wait outside calm mode"
+  "desk.calm_folded": "What changed and the season wait outside calm mode",
+  "acquaintance.known": "I know them",
+  "acquaintance.known_aria": "I know them: {name}",
+  "acquaintance.share": "Share with the team",
+  "acquaintance.share_aria": "Tell the team I know {name}",
+  "acquaintance.private_hint": "Only you know.",
+  "acquaintance.shared_hint": "The team sees that you know them.",
+  "acquaintance.known_by_one": "Known by {names}",
+  "acquaintance.known_by_many": "Known by {names}",
+  "acquaintance.mine_row": "You know them",
+  "acquaintance.not_saved": "“I know them” was not saved"
 }

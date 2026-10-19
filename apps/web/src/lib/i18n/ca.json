@@ -2178,5 +2178,15 @@
   "desk.door_money_sub": "{amount} vençut",
   "desk.door_money_none": "res vençut",
   "desk.door_error": "no disponible",
-  "desk.calm_folded": "El que ha canviat i la temporada esperen fora del mode calma"
+  "desk.calm_folded": "El que ha canviat i la temporada esperen fora del mode calma",
+  "acquaintance.known": "El conec",
+  "acquaintance.known_aria": "El conec: {name}",
+  "acquaintance.share": "Compartir amb l'equip",
+  "acquaintance.share_aria": "Compartir amb l'equip que conec {name}",
+  "acquaintance.private_hint": "Només ho saps tu.",
+  "acquaintance.shared_hint": "L'equip veu que la coneixes.",
+  "acquaintance.known_by_one": "La coneix {names}",
+  "acquaintance.known_by_many": "La coneixen {names}",
+  "acquaintance.mine_row": "La coneixes",
+  "acquaintance.not_saved": "No s'ha desat «el conec»"
 }

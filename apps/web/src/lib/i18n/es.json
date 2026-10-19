@@ -2178,5 +2178,15 @@
   "desk.door_money_sub": "{amount} vencido",
   "desk.door_money_none": "nada vencido",
   "desk.door_error": "no disponible",
-  "desk.calm_folded": "Lo que ha cambiado y la temporada esperan fuera del modo calma"
+  "desk.calm_folded": "Lo que ha cambiado y la temporada esperan fuera del modo calma",
+  "acquaintance.known": "Lo conozco",
+  "acquaintance.known_aria": "Lo conozco: {name}",
+  "acquaintance.share": "Compartir con el equipo",
+  "acquaintance.share_aria": "Compartir con el equipo que conozco a {name}",
+  "acquaintance.private_hint": "Solo tú lo sabes.",
+  "acquaintance.shared_hint": "El equipo ve que la conoces.",
+  "acquaintance.known_by_one": "La conoce {names}",
+  "acquaintance.known_by_many": "La conocen {names}",
+  "acquaintance.mine_row": "La conoces",
+  "acquaintance.not_saved": "No se ha guardado «lo conozco»"
 }

@@ -2178,5 +2178,15 @@
   "planner.stat_confirmed_one@music": "confirmé",
   "perf.status_menu": "{status}, changer le statut",
   "planner.season_firm@music": "confirmés",
-  "planner.season_unclosed_meta@music": "{n} sur {m} confirmés · {w} semaines"
+  "planner.season_unclosed_meta@music": "{n} sur {m} confirmés · {w} semaines",
+  "acquaintance.known": "Je connais",
+  "acquaintance.known_aria": "Je connais : {name}",
+  "acquaintance.share": "Partager avec l'équipe",
+  "acquaintance.share_aria": "Dire à l'équipe que je connais {name}",
+  "acquaintance.private_hint": "Vous seul le savez.",
+  "acquaintance.shared_hint": "L'équipe voit que vous la connaissez.",
+  "acquaintance.known_by_one": "{names} la connaît",
+  "acquaintance.known_by_many": "{names} la connaissent",
+  "acquaintance.mine_row": "Vous la connaissez",
+  "acquaintance.not_saved": "« Je connais » n'a pas été enregistré"
 }

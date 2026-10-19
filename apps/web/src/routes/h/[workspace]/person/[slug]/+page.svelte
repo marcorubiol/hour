@@ -7,6 +7,7 @@
 
   import { docTitle } from '$lib/doc-title';
   import StateBadge from '$lib/components/StateBadge.svelte';
+  import Acquaintance from '$lib/components/Acquaintance.svelte';
   import { page } from '$app/state';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
@@ -473,6 +474,8 @@
 
     <section class="person__section" aria-label={t('person.notes', locale)}>
       <p class="eyebrow">{t('person.notes', locale)}</p>
+      <!-- «Lo conozco» y «Mi nota»: las dos cosas tuyas sobre esta persona (ADR-138 § 5). -->
+      <Acquaintance workspaceId={contextWorkspaceId} personId={file.person.id} {locale} />
       <div class="person__composer">
         <textarea
           rows="3"
