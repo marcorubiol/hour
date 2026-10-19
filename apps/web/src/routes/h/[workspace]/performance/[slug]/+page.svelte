@@ -17,6 +17,7 @@
   import { retryLoad } from '$lib/load-fail';
   import RecordState from '$lib/components/RecordState.svelte';
   import Button from '$lib/components/Button.svelte';
+  import Checkbox from '$lib/components/Checkbox.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Field from '$lib/components/Field.svelte';
   import Input from '$lib/components/Input.svelte';
@@ -708,17 +709,12 @@
         {#each READINESS_KEYS as key (key)}
           {@const on = isReady(perf.readiness, key)}
           <li>
-            <button
-              type="button"
-              class="perf__ready-item"
-              class:perf__ready-item--on={on}
-              aria-pressed={on}
+            <Checkbox
+              label={t(readinessLabelKey(key), locale)}
+              checked={on}
               disabled={$patchMutation.isPending}
-              onclick={() => toggleReady(key)}
-            >
-              <span class="perf__ready-box" aria-hidden="true">{on ? '✓' : ''}</span>
-              {t(readinessLabelKey(key), locale)}
-            </button>
+              onchange={() => toggleReady(key)}
+            />
           </li>
         {/each}
       </ul>
@@ -1110,45 +1106,6 @@
       margin: 0;
       padding: 0;
       list-style: none;
-    }
-    .perf__ready-item {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-2xs);
-      appearance: none;
-      border: 0;
-      padding: 0;
-      background: none;
-      font: inherit;
-      color: var(--text-muted);
-      cursor: pointer;
-    }
-    .perf__ready-item:disabled {
-      cursor: progress;
-      opacity: 0.6;
-    }
-    .perf__ready-item--on {
-      color: var(--text-color);
-    }
-    .perf__ready-box {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      inline-size: 1.1em;
-      block-size: 1.1em;
-      border: 1px solid var(--border-color-dark);
-      border-radius: var(--radius-s);
-      font-size: 0.8em;
-      line-height: 1;
-    }
-    .perf__ready-item--on .perf__ready-box {
-      border-color: transparent;
-      background: color-mix(in oklch, var(--success, var(--text-color)) 18%, transparent);
-      color: var(--success, var(--text-color));
-    }
-    .perf__ready-item:focus-visible {
-      outline: var(--focus-width) solid var(--focus-color);
-      outline-offset: 2px;
     }
 
 

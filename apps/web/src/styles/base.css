@@ -774,11 +774,16 @@
     display: inline-flex;
     align-items: center;
     gap: var(--space-s);
-    min-block-size: var(--field-size);
     font-size: var(--text-s);
     color: var(--text-color);
     cursor: pointer;
     user-select: none;
+  }
+  /* A finger's target, by padding of the row, never by the box's size. */
+  @media (pointer: coarse) {
+    .check__row {
+      min-block-size: var(--touch-target);
+    }
   }
 
   .check--disabled .check__row {

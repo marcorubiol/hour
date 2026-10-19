@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Checkbox from '../Checkbox.svelte';
   /**
    * «TE ESPERA» — band 2 of the Desk (ADR-117). The short list by weight
    * (`rankWaiting`): at most seven rows, each a verb and its action. «Ver
@@ -113,9 +114,7 @@
 </script>
 
 {#snippet task(item: DeskItem)}
-  <input
-    type="checkbox"
-    class="row__check"
+  <Checkbox
     id="desk-task-{item.taskId}"
     checked={item.taskDone}
     onchange={(e) => item.taskId && ontoggle(item.taskId, (e.currentTarget as HTMLInputElement).checked)}
@@ -324,15 +323,6 @@
   .row--ai .row__subject {
     font-style: italic;
   }
-  .row__check {
-    inline-size: 0.95rem;
-    block-size: 0.95rem;
-    margin: 0;
-    /* A checkbox's baseline is its bottom edge: down to the subject's line. */
-    translate: 0 0.15em;
-    accent-color: var(--primary);
-    cursor: pointer;
-  }
   .row__subject {
     display: flex;
     flex-direction: column;
@@ -404,10 +394,6 @@
   /* A finger's room without moving a pixel: the hit area grows, the line
      does not (subject links, the box, the band's own buttons). */
   @media (pointer: coarse) {
-    .row__check {
-      inline-size: 1.25rem;
-      block-size: 1.25rem;
-    }
     .row__subject :is(a, label) {
       padding-block: var(--space-xs);
       margin-block: calc(-1 * var(--space-xs));

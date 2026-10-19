@@ -1,6 +1,13 @@
 <script lang="ts">
+  /**
+   * The one box (ADR-139 p4): in a dialog, a list, a row. Drawn in em of
+   * its label's size. Without a visible label, `ariaLabel` names it, or an
+   * outside <label for={id}> does (a row whose name is the label).
+   */
   interface Props {
     label?: string;
+    id?: string;
+    ariaLabel?: string;
     name?: string;
     value?: string;
     checked?: boolean;
@@ -13,6 +20,8 @@
 
   let {
     label,
+    id,
+    ariaLabel,
     name,
     value,
     checked = $bindable(false),
@@ -24,7 +33,7 @@
   }: Props = $props();
 
   let inputEl: HTMLInputElement | undefined = $state();
-  let fieldId = $derived(`check-${Math.random().toString(36).slice(2, 8)}`);
+  let fieldId = $derived(id ?? `check-${Math.random().toString(36).slice(2, 8)}`);
   let hasMessage = $derived(Boolean(error || helper));
   let messageId = $derived(`${fieldId}-msg`);
 
@@ -51,6 +60,7 @@
       {value}
       bind:checked
       {disabled}
+      aria-label={ariaLabel}
       aria-invalid={error ? 'true' : undefined}
       aria-describedby={hasMessage ? messageId : undefined}
       {onchange}
