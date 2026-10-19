@@ -7287,6 +7287,7 @@ export type Database = {
         | "duplicate"
         | "cancelled"
         | "unavailable"
+        | "not_now"
       mailout_status:
         | "draft"
         | "review"
@@ -7561,6 +7562,7 @@ export const Constants = {
         "duplicate",
         "cancelled",
         "unavailable",
+        "not_now",
       ],
       mailout_status: [
         "draft",

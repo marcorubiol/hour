@@ -151,7 +151,15 @@
 
   // Vista previa: los que tienen dirección, el que se mira; primero los que
   // salen (o salieron), después los que se quedan fuera.
-  const OUT_STATES: RecipientState[] = ['no_address', 'suppressed', 'no_basis', 'duplicate', 'unavailable', 'cancelled'];
+  const OUT_STATES: RecipientState[] = [
+    'no_address',
+    'suppressed',
+    'no_basis',
+    'not_now',
+    'duplicate',
+    'unavailable',
+    'cancelled',
+  ];
   let previewable = $derived(
     rows
       .filter((x) => x.ctx && x.row.address)

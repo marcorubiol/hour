@@ -1853,6 +1853,7 @@
   "mailout.r_duplicate": "Doublon",
   "mailout.r_unavailable": "Indisponible",
   "mailout.r_cancelled": "Annulé",
+  "mailout.r_not_now": "Pas cette fois",
   "mailout.r_missing_fields": "Champs manquants",
   "mailout.r_queued": "En file d'attente",
   "mailout.r_sent": "Envoyé",
