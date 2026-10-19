@@ -708,6 +708,26 @@
     color: var(--danger-dark);
   }
 
+  /* The same word for a group that is not one field (a set of checkboxes):
+     under the group, in the field's error voice (ADR-139 p7). */
+  .form-error {
+    margin: 0;
+    padding-block: var(--space-2xs) var(--space-xs);
+    font-size: var(--text-xs);
+    color: var(--danger-dark);
+  }
+
+  /* «guardado»: an in-place value says it is kept, at the row's end, in
+     grey, for a moment (p7). The words of a fact, not a toast. */
+  .field__saved {
+    flex: none;
+    align-self: center;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--mono-letter-spacing-loose);
+    color: var(--text-faint);
+  }
+
   .field--stack .field__label {
     flex-basis: 100%;
     padding-block-end: 0;
@@ -1333,6 +1353,14 @@
     gap: var(--space-s);
     margin-inline-end: auto;
     min-inline-size: 0;
+  }
+
+  /* «Hay cambios sin guardar»: the foot's own question (p7), in the
+     dialog's description voice, never an alarm. */
+  .dialog__ask {
+    margin: 0;
+    font-size: var(--text-s);
+    color: var(--text-dark-muted);
   }
 
   .dialog--s {

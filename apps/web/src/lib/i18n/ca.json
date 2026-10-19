@@ -2345,5 +2345,16 @@
   "conversations.one_load_error": "No s'ha pogut carregar aquesta conversa.",
   "mailout.load_error": "No s'ha pogut carregar aquest enviament.",
   "roadsheet.not_found": "Aquest full de ruta no existeix o no el pots veure.",
-  "roadsheet.load_error": "No s'ha pogut carregar el full de ruta."
+  "roadsheet.load_error": "No s'ha pogut carregar el full de ruta.",
+  "dialog.unsaved": "Hi ha canvis sense desar.",
+  "dialog.keep_editing": "Continuar editant",
+  "dialog.discard": "Descartar",
+  "form.required": "Falta aquesta dada.",
+  "form.invalid_email": "No sembla un correu.",
+  "form.invalid": "Revisa aquest valor.",
+  "form.saved": "desat",
+  "ui.undo": "Desfer",
+  "ui.undone": "Desfet.",
+  "ui.not_undone": "No s'ha pogut desfer",
+  "create.added": "Afegit al pla: {what} · {day}"
 }

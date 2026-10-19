@@ -2354,5 +2354,16 @@
   "conversations.one_load_error": "This conversation could not be loaded.",
   "mailout.load_error": "This mailout could not be loaded.",
   "roadsheet.not_found": "This road sheet does not exist or you cannot see it.",
-  "roadsheet.load_error": "The road sheet could not be loaded."
+  "roadsheet.load_error": "The road sheet could not be loaded.",
+  "dialog.unsaved": "There are unsaved changes.",
+  "dialog.keep_editing": "Keep editing",
+  "dialog.discard": "Discard",
+  "form.required": "This is needed.",
+  "form.invalid_email": "That doesn't look like an email.",
+  "form.invalid": "Check this value.",
+  "form.saved": "saved",
+  "ui.undo": "Undo",
+  "ui.undone": "Undone.",
+  "ui.not_undone": "Couldn't undo",
+  "create.added": "Added to the plan: {what} · {day}"
 }

@@ -513,6 +513,7 @@
     --field-line-hover: var(--border-color-dark);
     --field-line-focus: var(--focus-color);
     --field-line-width: var(--border-size);
+    --field-gap: var(--space-xs);   /* between the rows of every form */
 
     /* The box: measured on its label's size (text-s), so box and words
        scale together and a helper under it indents by the same amount.

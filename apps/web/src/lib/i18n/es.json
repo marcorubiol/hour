@@ -2345,5 +2345,16 @@
   "conversations.one_load_error": "No se ha podido cargar esta conversación.",
   "mailout.load_error": "No se ha podido cargar este envío.",
   "roadsheet.not_found": "Esta hoja de ruta no existe o no la puedes ver.",
-  "roadsheet.load_error": "No se ha podido cargar la hoja de ruta."
+  "roadsheet.load_error": "No se ha podido cargar la hoja de ruta.",
+  "dialog.unsaved": "Hay cambios sin guardar.",
+  "dialog.keep_editing": "Seguir editando",
+  "dialog.discard": "Descartar",
+  "form.required": "Falta este dato.",
+  "form.invalid_email": "No parece un email.",
+  "form.invalid": "Revisa este valor.",
+  "form.saved": "guardado",
+  "ui.undo": "Deshacer",
+  "ui.undone": "Deshecho.",
+  "ui.not_undone": "No se ha podido deshacer",
+  "create.added": "Añadido al plan: {what} · {day}"
 }

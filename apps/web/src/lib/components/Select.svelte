@@ -29,6 +29,8 @@
     toolbar?: boolean;
     /** Accessible name when the select has no visible label. */
     ariaLabel?: string;
+    /** In place: «guardado» at the row's end (ADR-139 p7, `SaveFlash`). */
+    saved?: boolean;
     onchange?: (event: Event) => void;
     children?: Snippet;
   }
@@ -47,6 +49,7 @@
     disabled = false,
     toolbar = false,
     ariaLabel,
+    saved = false,
     onchange,
     children,
   }: Props = $props();
@@ -58,7 +61,7 @@
   let messageId = $derived(`${fieldId}-msg`);
 </script>
 
-<Field id={fieldId} {label} {required} {helper} {message} {error} {toolbar}>
+<Field id={fieldId} {label} {required} {helper} {message} {error} {toolbar} {saved}>
   <select
     id={fieldId}
     {name}

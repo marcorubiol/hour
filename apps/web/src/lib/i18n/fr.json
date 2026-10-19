@@ -2345,5 +2345,16 @@
   "conversations.one_load_error": "Impossible de charger cette conversation.",
   "mailout.load_error": "Impossible de charger cet envoi.",
   "roadsheet.not_found": "Cette feuille de route n'existe pas ou vous ne pouvez pas la voir.",
-  "roadsheet.load_error": "Impossible de charger la feuille de route."
+  "roadsheet.load_error": "Impossible de charger la feuille de route.",
+  "dialog.unsaved": "Des modifications ne sont pas enregistrées.",
+  "dialog.keep_editing": "Continuer",
+  "dialog.discard": "Abandonner",
+  "form.required": "Ce champ est requis.",
+  "form.invalid_email": "Cela ne ressemble pas à une adresse e-mail.",
+  "form.invalid": "Vérifiez cette valeur.",
+  "form.saved": "enregistré",
+  "ui.undo": "Annuler",
+  "ui.undone": "Annulé.",
+  "ui.not_undone": "Impossible d'annuler",
+  "create.added": "Ajouté au planning : {what} · {day}"
 }
