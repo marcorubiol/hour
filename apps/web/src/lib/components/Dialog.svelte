@@ -1,5 +1,18 @@
 <script lang="ts">
+  /**
+   * Dialog — the one frame for every add and edit (ADR-139 p4).
+   *
+   * The paper sits one step above the canvas with a hairline, so it never
+   * melts into a dark page. The title is the lens title one step down, in
+   * the same italic (numbers upright, LensTitle). The body scrolls on its
+   * own and the foot stays put; on a phone the paper is a sheet from below.
+   *
+   * The foot has two ends: `actions` on the right (a quiet «Cancelar» and
+   * the one primary), `lead` on the left for the action that is not the
+   * point of the dialog (delete, switch to another form) — always a word.
+   */
   import type { Snippet } from 'svelte';
+  import LensTitle from './LensTitle.svelte';
 
   type Size = 's' | 'm' | 'l';
 
@@ -12,6 +25,7 @@
     onclose?: () => void;
     children?: Snippet;
     actions?: Snippet;
+    lead?: Snippet;
   }
 
   let {
@@ -23,6 +37,7 @@
     onclose,
     children,
     actions,
+    lead,
   }: Props = $props();
 
   let dialogEl: HTMLDialogElement | undefined = $state();
@@ -69,7 +84,7 @@
   <div class="dialog__panel">
     {#if title || description}
       <header class="dialog__header">
-        {#if title}<h2 id={titleId} class="dialog__title">{title}</h2>{/if}
+        {#if title}<h2 id={titleId} class="dialog__title"><LensTitle text={title} /></h2>{/if}
         {#if description}
           <p class="dialog__description">{description}</p>
         {/if}
@@ -80,8 +95,11 @@
       <div class="dialog__body">{@render children()}</div>
     {/if}
 
-    {#if actions}
-      <footer class="dialog__actions">{@render actions()}</footer>
+    {#if actions || lead}
+      <footer class="dialog__actions">
+        {#if lead}<div class="dialog__lead">{@render lead()}</div>{/if}
+        {#if actions}{@render actions()}{/if}
+      </footer>
     {/if}
   </div>
 </dialog>

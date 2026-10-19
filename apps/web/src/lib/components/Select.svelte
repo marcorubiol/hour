@@ -1,5 +1,10 @@
 <script lang="ts">
+  /**
+   * Select — choosing one among MANY (ADR-139 p4): the native list, in a
+   * field row, at the one control height. For a few options, `Segmented`.
+   */
   import type { Snippet } from 'svelte';
+  import Field from './Field.svelte';
 
   export type SelectOption = {
     value: string;
@@ -20,6 +25,10 @@
     error?: string;
     required?: boolean;
     disabled?: boolean;
+    /** A filter bar's boxed control (first level, diseño M9). */
+    toolbar?: boolean;
+    /** Accessible name when the select has no visible label. */
+    ariaLabel?: string;
     onchange?: (event: Event) => void;
     children?: Snippet;
   }
@@ -36,6 +45,8 @@
     error,
     required = false,
     disabled = false,
+    toolbar = false,
+    ariaLabel,
     onchange,
     children,
   }: Props = $props();
@@ -45,48 +56,29 @@
   );
   let hasMessage = $derived(Boolean(error || helper || message));
   let messageId = $derived(`${fieldId}-msg`);
-
-  let wrapperClasses = $derived(
-    ['field', 'field--select', error && 'field--error']
-      .filter(Boolean)
-      .join(' ')
-  );
 </script>
 
-<div class={wrapperClasses}>
-  {#if label}
-    <label for={fieldId}>
-      {label}{#if required}<span aria-hidden="true"> *</span>{/if}
-    </label>
-  {/if}
-
-  <div class="field__control">
-    <select
-      id={fieldId}
-      {name}
-      bind:value
-      {required}
-      {disabled}
-      aria-invalid={error ? 'true' : undefined}
-      aria-describedby={hasMessage ? messageId : undefined}
-      {onchange}
-    >
-      {#if placeholder}
-        <option value="" disabled hidden>{placeholder}</option>
-      {/if}
-      {#if children}
-        {@render children()}
-      {:else if options}
-        {#each options as opt (opt.value)}
-          <option value={opt.value} disabled={opt.disabled}>{opt.label}</option>
-        {/each}
-      {/if}
-    </select>
-  </div>
-
-  {#if hasMessage}
-    <p id={messageId} class="field__msg" role={error ? 'alert' : undefined}>
-      {#if error || helper}{error ?? helper}{:else if message}{@render message()}{/if}
-    </p>
-  {/if}
-</div>
+<Field id={fieldId} {label} {required} {helper} {message} {error} {toolbar}>
+  <select
+    id={fieldId}
+    {name}
+    bind:value
+    {required}
+    {disabled}
+    aria-label={ariaLabel}
+    aria-invalid={error ? 'true' : undefined}
+    aria-describedby={hasMessage ? messageId : undefined}
+    {onchange}
+  >
+    {#if placeholder}
+      <option value="" disabled hidden>{placeholder}</option>
+    {/if}
+    {#if children}
+      {@render children()}
+    {:else if options}
+      {#each options as opt (opt.value)}
+        <option value={opt.value} disabled={opt.disabled}>{opt.label}</option>
+      {/each}
+    {/if}
+  </select>
+</Field>

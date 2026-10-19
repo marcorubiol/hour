@@ -1,15 +1,17 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
 
-  type Variant = 'primary' | 'outline' | 'danger';
-  type Size = 'xs' | 's' | 'm' | 'l';
+  /** The closed set (ADR-139 p4): primary (ink, one per dialog or screen),
+      secondary (a hairline), quiet (a word). Destructive is `tone="warn"`. */
+  type Variant = 'primary' | 'secondary' | 'quiet';
+  /** Two sizes from the first level's scale: s (default) and xs (in a row). */
+  type Size = 'xs' | 's';
 
   interface Props {
     variant?: Variant;
     size?: Size;
-    /** Tone modifier — combinable with any variant. Currently 'warn'
-        repaints text+border to danger; useful for outline buttons that
-        carry destructive secondary actions (Leave, Cancel, Remove). */
+    /** Tone modifier — combinable with any variant. 'warn' repaints the
+        words (and a secondary's hairline) to danger: Delete, Leave, Remove. */
     tone?: 'warn';
     type?: 'button' | 'submit' | 'reset';
     disabled?: boolean;
@@ -24,7 +26,7 @@
 
   let {
     variant = 'primary',
-    size = 'm',
+    size = 's',
     tone,
     type = 'button',
     disabled = false,

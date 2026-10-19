@@ -455,7 +455,7 @@
     --btn-width: max-content;
     --btn-gap: 0.5em;
     --btn-line-height: 1.4;
-    --btn-font-size: var(--text-m);
+    --btn-font-size: var(--text-s); /* the first level's scale (ADR-139 p4), not 16px */
     --btn-font-weight: 500;
     --btn-font-family: inherit;
     --btn-font-style: normal;
@@ -495,6 +495,47 @@
     --field-bg: var(--base);
     --field-radius: var(--radius-s);
     --field-border-color-focus: var(--primary);
+
+    /* ============================================================ */
+    /* FORM PIECES — the closed set of ADR-139 p4                     */
+    /* A field is a ROW, the same to read and to edit: the mono label */
+    /* in a fixed column, the value without a box, one hairline under */
+    /* both. Focus is a soft stroke on that hairline. Every one-line  */
+    /* control (text, date, time, select) has ONE height, so a select */
+    /* beside a date lines up by construction. The toolbar look (a    */
+    /* filter bar's box, diseño M9) keeps --control-size-m.           */
+    /* ============================================================ */
+
+    --field-label-width: 8rem;      /* the key column of Logística in a file */
+    --field-value-min: 10rem;       /* narrower than label + this: label on top */
+    --field-size: max(2.25rem, var(--touch-target));
+    --field-line: var(--border-color-light);
+    --field-line-hover: var(--border-color-dark);
+    --field-line-focus: var(--focus-color);
+    --field-line-width: var(--border-size);
+
+    /* The box: measured on its label's size (text-s), so box and words
+       scale together and a helper under it indents by the same amount.
+       Ink when ticked, like the primary button. */
+    --check-size: calc(1.125 * var(--text-s));
+    --check-fill: var(--text-color);
+    --check-mark: var(--bg);
+
+    /* Segmented (few options): a sunk track, the chosen one raised on
+       paper. No ink fill: choosing a value is not an alarm. */
+    --seg-track: var(--bg-light);
+    --seg-edge: var(--border-color-light);
+    --seg-on: var(--bg-ultra-light);
+    --seg-inset: var(--space-2xs);
+
+    /* The dialog's paper sits one step above the canvas (the Slip's
+       paper), with a hairline, so in the dark it never melts into the
+       page behind. Its title is the lens title one step down. */
+    --dialog-paper: var(--bg-ultra-light);
+    --dialog-edge: var(--border-color-light);
+    --dialog-backdrop: color-mix(in srgb, var(--black) 40%, transparent);
+    --dialog-title-size: var(--text-xl);
+    --dialog-gutter: var(--space-l);  /* air kept between the paper and the window */
 
     /* ============================================================ */
     /* SELECTION                                                      */
@@ -669,6 +710,11 @@
     /* Selection — slate tint with off-white fg */
     --selection-bg: color-mix(in oklch, var(--primary) 35%, transparent);
     --selection-fg: var(--neutral);
+
+    /* Form pieces (ADR-139 p4): the dialog's edge and its veil both step
+       up, or the paper reads as part of the page behind it. */
+    --dialog-edge: var(--border-color-dark);
+    --dialog-backdrop: color-mix(in srgb, var(--black) 64%, transparent);
 
     /* Shadows — black on darker is invisible at low opacity; bump to
        30-50% so elevation reads. */
