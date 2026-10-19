@@ -44,7 +44,7 @@
   import Chip from '$lib/components/Chip.svelte';
   import { tick } from 'svelte';
   import { toStore } from 'svelte/store';
-  import { parseListFilter } from '$lib/conversation-overview';
+  import { NO_LINE, parseListFilter } from '$lib/conversation-overview';
   import ThreadFeed from '$lib/components/ThreadFeed.svelte';
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
@@ -65,6 +65,7 @@
     buildLineIndex,
     buildProjectIndex,
     resolveScope,
+    inScope,
     projectsInScope,
     type NavWorkspace,
     type RawLine,
@@ -165,6 +166,17 @@
   // ── Dashboard filters (ADR-117): in the URL, so a block's link is the filter ──
   let listFilter = $derived(parseListFilter(page.url.searchParams));
   let lineIds = $derived(scope.lines.map((l) => l.id));
+  // How many season bars the overview will likely draw while it loads (ADR-135):
+  // the pinned lines, or every line the scope reaches.
+  let lineHint = $derived(
+    scope.lines.length > 0
+      ? scope.lines.length
+      : lineIndex.filter((l) => inScope(scope, { workspaceId: l.workspaceId, projectId: l.projectId })).length,
+  );
+  function lineLabel(linea: string): string {
+    if (linea === NO_LINE) return t('overview.no_line', locale);
+    return lineIndex.find((l) => l.id === linea)?.name ?? t('overview.unnamed_line', locale);
+  }
   const TEMP_CHIP: Record<string, string> = {
     caliente: 'overview.hot',
     fria: 'overview.cold',
@@ -174,8 +186,14 @@
   };
   /** The chip names the block filter the list wears; a season segment, with its status. */
   function chipLabel(f: typeof listFilter, status: string): string | null {
-    if (f.temporada && status !== 'any') {
-      return `${statusLabel(status as ConversationStatus, locale)} · ${t('overview.this_season', locale).toLowerCase()}`;
+    if (f.temporada && (status !== 'any' || f.linea)) {
+      return [
+        status !== 'any' ? statusLabel(status as ConversationStatus, locale) : null,
+        f.linea ? lineLabel(f.linea) : null,
+        t('overview.this_season', locale).toLowerCase(),
+      ]
+        .filter(Boolean)
+        .join(' · ');
     }
     if (f.turno === 'nuestro') return t('overview.due', locale);
     if (f.turno === 'suyo') return t('overview.turn_theirs_cap', locale);
@@ -189,7 +207,7 @@
     const params = new URLSearchParams(page.url.searchParams);
     // A season segment is status + season: its chip names both, and goes as one.
     if (listFilter.temporada) params.delete('estado');
-    for (const k of ['turno', 'temp', 'temporada', 'envio', 'r']) params.delete(k);
+    for (const k of ['turno', 'temp', 'temporada', 'linea', 'envio', 'r']) params.delete(k);
     const qs = params.toString();
     // The chip goes away with the focus on it: the focus goes to the list.
     void goto(`${page.url.pathname}${qs ? `?${qs}` : ''}`, { noScroll: true, keepFocus: true }).then(() =>
@@ -212,9 +230,14 @@
     if (to?.url.hash === '#lista') listHeading?.focus({ preventScroll: true });
   });
 
-  /** A season segment: that status, in the season (and the pinned lines). */
-  async function filterSeasonStatus(status: ConversationStatus) {
-    await goto(`?temporada=actual&estado=${status}`, { noScroll: true, keepFocus: true });
+  /** A season segment: that status, in the season (and the pinned lines, or its own line). */
+  async function filterSeasonStatus(status: ConversationStatus, linea?: string) {
+    await goto(`?temporada=actual&estado=${status}${linea ? `&linea=${linea}` : ''}`, { noScroll: true, keepFocus: true });
+    await showList();
+  }
+  /** A line's name in the season: that line, every status (ADR-135). */
+  async function filterSeasonLine(linea: string) {
+    await goto(`?temporada=actual&linea=${linea}`, { noScroll: true, keepFocus: true });
     await showList();
   }
 
@@ -558,7 +581,9 @@
       {workspaceSlugById}
       {projectNameById}
       {locale}
+      {lineHint}
       onstatus={filterSeasonStatus}
+      online={filterSeasonLine}
       onwrite={canEdit ? writeTo : undefined}
     />
 

@@ -22,6 +22,8 @@
  *   segunda ronda, en bloque) y las paradas (en conversación, hold: una a una).
  * - **La temporada**: de septiembre a agosto por fecha de función; una
  *   conversación sin funciones es de la temporada en curso (está en difusión).
+ *   Con dos líneas de trabajo o más (contando «sin línea»), una barra por
+ *   línea (ADR-135).
  */
 
 import { CONVERSATION_STATUSES, type ConversationStatus } from './conversation';
@@ -99,6 +101,8 @@ export interface OverviewInput {
   workspace_id: string;
   project_id: string;
   line_id: string | null;
+  /** El nombre de su línea, si la tiene y se puede leer. */
+  line_name?: string | null;
   status: ConversationStatus;
   last_contacted_at: string | null;
   next_action_at: string | null;
@@ -301,6 +305,50 @@ export function countByStatus(rows: readonly Pick<OverviewInput, 'status'>[]): S
   return out;
 }
 
+// ── La temporada por línea (ADR-135) ───────────────────────────────────────
+
+/** El valor de `?linea=` para las conversaciones sin línea. */
+export const NO_LINE = 'sin';
+
+export interface SeasonLine {
+  /** null: las que no tienen línea, juntas («sin línea»). */
+  line_id: string | null;
+  name: string | null;
+  total: number;
+  counts: StatusCounts;
+  answered: number;
+}
+
+/**
+ * La temporada repartida por línea: la de más conversaciones arriba (a igual,
+ * por nombre) y «sin línea» siempre al final, nunca escondida. Con una sola
+ * línea o ninguna no hay reparto (lista vacía): el bloque es una barra.
+ */
+export function seasonByLine(rows: readonly Pick<OverviewInput, 'line_id' | 'line_name' | 'status' | 'last_in'>[]): SeasonLine[] {
+  const by = new Map<string | null, (typeof rows)[number][]>();
+  for (const r of rows) by.set(r.line_id, [...(by.get(r.line_id) ?? []), r]);
+  if (by.size < 2) return [];
+  return [...by.entries()]
+    .map(([line_id, list]) => ({
+      line_id,
+      name: line_id === null ? null : (list.find((r) => r.line_name)?.line_name ?? null),
+      total: list.length,
+      counts: countByStatus(list),
+      answered: list.filter(hasAnswered).length,
+    }))
+    .sort(
+      (a, b) =>
+        Number(a.line_id === null) - Number(b.line_id === null) ||
+        b.total - a.total ||
+        (a.name ?? '').localeCompare(b.name ?? ''),
+    );
+}
+
+/** Las de una línea (`NO_LINE`: las que no tienen). */
+export function lineRows<R extends Pick<OverviewInput, 'line_id'>>(rows: readonly R[], linea: string): R[] {
+  return rows.filter((r) => (linea === NO_LINE ? r.line_id === null : r.line_id === linea));
+}
+
 // ── Los filtros de la lista ────────────────────────────────────────────────
 
 export type TurnFilter = 'nuestro' | 'suyo';
@@ -316,6 +364,8 @@ export interface ListFilter {
   temp?: TempFilter;
   /** Solo las de la temporada en curso (la barra de la temporada filtra con esto). */
   temporada?: boolean;
+  /** Una línea de la temporada (su uuid, o `NO_LINE`): solo con `temporada`. */
+  linea?: string;
   /** Un envío y cuáles de sus destinatarios: las que contestaron, o las que rebotaron. */
   envio?: string;
   r?: MailoutPick;
@@ -326,12 +376,18 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export function parseListFilter(params: URLSearchParams): ListFilter {
   const turno = params.get('turno');
   const temp = params.get('temp');
+  const temporada = params.get('temporada') === 'actual' || undefined;
   return {
     turno: turno === 'nuestro' || turno === 'suyo' ? turno : undefined,
     temp: temp && TEMP_FILTERS.includes(temp) ? (temp as TempFilter) : undefined,
-    temporada: params.get('temporada') === 'actual' || undefined,
+    temporada,
+    linea: temporada ? parseLinea(params.get('linea')) : undefined,
     ...mailoutFilter(params),
   };
+}
+
+export function parseLinea(raw: string | null | undefined): string | undefined {
+  return raw === NO_LINE || (raw && UUID_RE.test(raw)) ? raw : undefined;
 }
 
 function mailoutFilter(params: URLSearchParams): Pick<ListFilter, 'envio' | 'r'> {
@@ -356,6 +412,7 @@ export function applyListFilter<R extends OverviewInput>(
   lineIds: readonly string[] = [],
 ): R[] {
   let out = f.temporada ? seasonRows(rows, currentSeason(now), lineIds) : [...rows];
+  if (f.temporada && f.linea) out = lineRows(out, f.linea);
   if (f.turno === 'nuestro') out = sortDue(out.filter((r) => dueReason(r, now) !== null), now);
   if (f.turno === 'suyo') {
     out = out
@@ -457,6 +514,8 @@ export interface ConversationOverview {
     counts: StatusCounts;
     /** Las que han contestado algo: nos escribieron, o su estado lo implica. */
     answered: number;
+    /** Una por línea, con dos o más (contando «sin línea»); vacía, una sola barra (ADR-135). */
+    lines: SeasonLine[];
   };
   due: Block<DueRow>;
   hot: Block<HotRow>;
@@ -501,6 +560,7 @@ export function buildOverview(
       total: inSeasonRows.length,
       counts: countByStatus(inSeasonRows),
       answered: inSeasonRows.filter(hasAnswered).length,
+      lines: seasonByLine(inSeasonRows),
     },
     due: {
       count: due.length,

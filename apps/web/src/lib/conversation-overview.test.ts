@@ -4,6 +4,7 @@ import {
   COLD_IDLE_DAYS,
   COLD_REPLY_DAYS,
   HOT_DAYS,
+  NO_LINE,
   applyListFilter,
   buildOverview,
   coolingOf,
@@ -18,6 +19,7 @@ import {
   mailoutFigures,
   parseListFilter,
   seasonOf,
+  seasonByLine,
   seasonRows,
   turnOf,
   type OverviewInput,
@@ -251,6 +253,82 @@ describe('filtros de la lista', () => {
   it('temporada y estado se combinan con el resto', () => {
     const rows = [row('a', { performance_days: ['2026-04-01'], ...inbound(1) }), row('b', inbound(2))];
     expect(applyListFilter(rows, { turno: 'nuestro', temporada: true }, NOW).map((r) => r.id)).toEqual(['b']);
+  });
+});
+
+describe('la temporada por línea (ADR-135)', () => {
+  const L1 = '11111111-1111-4111-8111-111111111111';
+  const L2 = '22222222-2222-4222-8222-222222222222';
+  const cat = { line_id: L1, line_name: 'MaMeMi 26-27 Catalunya' };
+  const fr = { line_id: L2, line_name: 'MaMeMi 26-27 France' };
+
+  it('con una sola línea o ninguna no reparte: una barra', () => {
+    expect(seasonByLine([row('a'), row('b')])).toEqual([]);
+    expect(seasonByLine([row('a', cat), row('b', cat)])).toEqual([]);
+  });
+  it('una barra por línea, la mayor arriba, con sus cifras', () => {
+    const lines = seasonByLine([
+      row('a', cat),
+      row('b', { ...fr, status: 'hold' }),
+      row('c', { ...fr, ...inbound(3) }),
+      row('d', { ...fr, status: 'declined' }),
+    ]);
+    expect(lines.map((l) => l.name)).toEqual(['MaMeMi 26-27 France', 'MaMeMi 26-27 Catalunya']);
+    expect(lines[0]).toMatchObject({ line_id: L2, total: 3, answered: 3 });
+    expect(lines[0].counts).toMatchObject({ hold: 1, contacted: 1, declined: 1 });
+    expect(lines[1]).toMatchObject({ line_id: L1, total: 1, answered: 0 });
+  });
+  it('las que no tienen línea van juntas, al final, aunque sean más', () => {
+    const lines = seasonByLine([row('a', cat), row('b'), row('c'), row('d')]);
+    expect(lines.map((l) => [l.line_id, l.total])).toEqual([
+      [L1, 1],
+      [null, 3],
+    ]);
+    expect(lines[1].name).toBeNull();
+  });
+  it('a igual tamaño, por nombre', () => {
+    const lines = seasonByLine([row('a', fr), row('b', cat)]);
+    expect(lines.map((l) => l.line_id)).toEqual([L1, L2]);
+  });
+  it('buildOverview reparte solo lo de la temporada y respeta las líneas fijadas', () => {
+    const rows = [
+      row('a', cat),
+      row('b', fr),
+      row('vieja', { ...fr, performance_days: ['2026-04-01'] }),
+      row('c'),
+    ];
+    const all = buildOverview(rows, NOW);
+    expect(all.season.total).toBe(3);
+    expect(all.season.lines.map((l) => [l.line_id, l.total])).toEqual([
+      [L1, 1],
+      [L2, 1],
+      [null, 1],
+    ]);
+    // Una sola línea fijada: su temporada, una barra.
+    const pinned = buildOverview(rows, NOW, { lineIds: [L1] });
+    expect(pinned.season.total).toBe(1);
+    expect(pinned.season.lines).toEqual([]);
+    // Dos fijadas: las dos, sin «sin línea».
+    expect(buildOverview(rows, NOW, { lineIds: [L1, L2] }).season.lines.map((l) => l.line_id)).toEqual([L1, L2]);
+  });
+  it('?linea= solo vale con la temporada, y filtra la lista por esa línea o por las que no tienen', () => {
+    expect(parseListFilter(new URLSearchParams(`temporada=actual&linea=${L1}`)).linea).toBe(L1);
+    expect(parseListFilter(new URLSearchParams('temporada=actual&linea=sin')).linea).toBe(NO_LINE);
+    expect(parseListFilter(new URLSearchParams('temporada=actual&linea=nope')).linea).toBeUndefined();
+    expect(parseListFilter(new URLSearchParams(`linea=${L1}`)).linea).toBeUndefined();
+    const rows = [row('a', cat), row('b', fr), row('c'), row('vieja', { ...cat, performance_days: ['2026-04-01'] })];
+    expect(applyListFilter(rows, { temporada: true, linea: L1 }, NOW).map((r) => r.id)).toEqual(['a']);
+    expect(applyListFilter(rows, { temporada: true, linea: NO_LINE }, NOW).map((r) => r.id)).toEqual(['c']);
+  });
+  it('el tramo de una línea y su filtro cuentan lo mismo', () => {
+    const rows = [row('a', cat), row('b', { ...cat, status: 'hold' }), row('c', { ...fr, status: 'hold' }), row('d')];
+    const o = buildOverview(rows, NOW);
+    for (const l of o.season.lines) {
+      const linea = l.line_id ?? NO_LINE;
+      expect(applyListFilter(rows, { temporada: true, linea }, NOW)).toHaveLength(l.total);
+      const holds = applyListFilter(rows, { temporada: true, linea }, NOW).filter((r) => r.status === 'hold');
+      expect(holds).toHaveLength(l.counts.hold);
+    }
   });
 });
 
