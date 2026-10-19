@@ -57,13 +57,13 @@ function blocksOf(file: string): Block[] {
 
 const MATERIAL = '__material__';
 
-/** Comments out, the escape marker kept, query preludes blanked (their px
- *  are breakpoints, rule 8a), line count preserved. */
+/** Comments out, the escape marker kept, line count preserved. A query
+ *  prelude stays in: its `max-width: 560px` reads as a declaration and a px
+ *  there is a breakpoint that should be rem (rule 8). */
 function clean(css: string): string {
   return css
     .replace(/\/\*\s*material\s*\*\//g, MATERIAL)
-    .replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' '))
-    .replace(/@(media|container)[^{]*/g, (q) => q.replace(/[^\n]/g, ' '));
+    .replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' '));
 }
 
 interface Finding {

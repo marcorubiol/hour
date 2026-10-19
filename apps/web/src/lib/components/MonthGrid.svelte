@@ -1516,22 +1516,22 @@
     .cal__band:not(.cal__band--away) {
       container: absband / inline-size;
     }
-    @container absband (max-width: 200px) {
+    @container absband (max-width: 12.5rem) {
       .cal__band-s {
         display: none;
       }
     }
-    @container absband (max-width: 110px) {
+    @container absband (max-width: 6.875rem) {
       .cal__band-n {
         display: none;
       }
     }
-    @container tourband (max-width: 418px) {
+    @container tourband (max-width: 26.125rem) {
       .cal__band-dl {
         display: none;
       }
     }
-    @container tourband (max-width: 204px) {
+    @container tourband (max-width: 12.75rem) {
       .cal__band-d {
         display: none;
       }
@@ -1642,19 +1642,19 @@
 
        Por debajo de 153 el nombre se recorta, y ahí ya no queda nada que dar
        sin borrar la identidad de la tanda. */
-    @container (max-width: 391px) {
+    @container (max-width: 24.4375rem) {
       .cal__run-n {
         display: none;
       }
     }
     /* La ciudad es el gloss de la tanda: dice DÓNDE, y el nombre dice QUÉ. */
-    @container (max-width: 265px) {
+    @container (max-width: 16.5625rem) {
       .cal__run-c {
         display: none;
       }
     }
     /* Y al final solo el monograma, que en un glifo dice de quién es. */
-    @container (max-width: 214px) {
+    @container (max-width: 13.375rem) {
       .cal__run-w {
         display: none;
       }

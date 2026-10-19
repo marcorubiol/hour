@@ -1405,7 +1405,7 @@
     .mny__inv-fee-line { font-size: var(--text-s); color: var(--text-muted); margin-block-start: var(--space-xs); }
     .mny__inv-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: var(--space-s) var(--space-m); margin-block: var(--space-s); }
     .mny__inv-total-preview { font-size: var(--text-s); margin-block-start: var(--space-s); }
-    @media (max-width: 760px) {
+    @media (max-width: 47.5rem) {
       .figs__row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .radar { grid-template-columns: 1fr; }
       .att__list { grid-template-columns: minmax(0, 1fr) auto; }

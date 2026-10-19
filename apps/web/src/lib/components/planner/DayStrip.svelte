@@ -620,7 +620,7 @@
 
     /* THE GLOSS FALLS BEFORE THE ASSERTION: on a narrow track the step's NAME
        goes first, and the hour — the assertion — is what stays. */
-    @container (max-width: 560px) {
+    @container (max-width: 35rem) {
       .ds__m b em {
         display: none;
       }

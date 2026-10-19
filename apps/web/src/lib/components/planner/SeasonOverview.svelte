@@ -796,7 +796,7 @@
 
     /* ── Narrow: one column, the queue above the strip (the thumb's job),
        the strip as marks only. Measured on the ELEMENT (ADR-095 §8). ─── */
-    @container season (max-width: 640px) {
+    @container season (max-width: 40rem) {
       .ov__grid {
         grid-template-columns: minmax(0, 1fr);
         grid-template-areas: 'decide' 'strip' 'lists';
@@ -827,7 +827,7 @@
         display: none;
       }
     }
-    @container season (min-width: 641px) and (max-width: 900px) {
+    @container season (min-width: 40.0625rem) and (max-width: 56.25rem) {
       .ov__grid {
         grid-template-columns: minmax(0, 1fr);
         grid-template-areas: 'strip' 'decide' 'lists';

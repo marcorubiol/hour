@@ -660,7 +660,7 @@
     }
     /* Too narrow for a place that can be read: the monogram alone, never
        «Giro…». The title still says everything. */
-    @container (max-width: 60px) {
+    @container (max-width: 3.75rem) {
       .slip[data-placing='compact'] .slip__n,
       .slip[data-placing='compact'] .slip__c {
         display: none;
@@ -798,7 +798,7 @@
     /* A PHONE'S MONTH CELL (≈48px) split a card one word per line and cut the
        next one at the edge (móvil #2). Below this the card is its monogram:
        whose, and that there is something; the day says the rest. */
-    @container (max-width: 72px) {
+    @container (max-width: 4.5rem) {
       .slip[data-placing='cell'] {
         padding: var(--space-2xs);
       }
@@ -808,7 +808,7 @@
         display: none;
       }
     }
-    @container (max-width: 142px) {
+    @container (max-width: 8.875rem) {
       /* THE END HOUR GOES, THE START STAYS — the range is still in the title.
          Half a range is not an assertion, so it is dropped whole rather than
          clipped: `10h–14h` becomes `10h`, never `10h–1…`. */
@@ -816,7 +816,7 @@
         display: none;
       }
     }
-    @container (max-width: 126px) {
+    @container (max-width: 7.875rem) {
       /* a gloss is the FIRST thing to go, and never the hour */
       .slip__tz {
         display: none;

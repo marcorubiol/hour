@@ -656,7 +656,7 @@
       margin-block: var(--space-s);
     }
 
-    @media (max-width: 760px) {
+    @media (max-width: 47.5rem) {
       .mny-inv__row {
         grid-template-columns: 1fr auto;
         gap: var(--space-xs) var(--space-s);
