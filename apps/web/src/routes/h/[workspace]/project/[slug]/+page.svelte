@@ -12,6 +12,7 @@
    * (ADR-024), so slug alone could hit the wrong space's project.
    */
 
+  import ConceptHint from '$lib/components/ConceptHint.svelte';
   import { docTitle } from '$lib/doc-title';
   import { page } from '$app/state';
   import { createQuery } from '@tanstack/svelte-query';
@@ -173,7 +174,7 @@
 
   <section class="project__stubs" aria-label={t('project.pending_sections', locale)}>
     <div class="project__stub">
-      <p class="eyebrow">{t('project.lines', locale)}</p>
+      <p class="eyebrow">{t('project.lines', locale)}<ConceptHint concept="lines" /></p>
       {#if projectLines.length > 0}
         <ul class="project__lines" role="list">
           {#each projectLines as l (l.id)}

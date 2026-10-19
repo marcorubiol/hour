@@ -43,6 +43,7 @@
   import DirectoryPicker from '$lib/components/DirectoryPicker.svelte';
   import WhoGoes from '$lib/components/planner/WhoGoes.svelte';
   import BoloBoard from '$lib/components/BoloBoard.svelte';
+  import ConceptHint from '$lib/components/ConceptHint.svelte';
   import type { Commitment } from '$lib/people';
   import { performanceRoster } from '$lib/planner';
   import Select from '$lib/components/Select.svelte';
@@ -646,9 +647,11 @@
           · {perf.line.name}
         {/if}
         {#if boloReadable && currentBolo && perf.project}
-          · {#if lensOn('books')}<a href={booksHref(perf.project.id, { boloId: currentBolo.id })}>{boloOf(currentBolo, locale)}</a>{:else}{boloOf(currentBolo, locale)}{/if}
+          · {#if lensOn('books')}<a href={booksHref(perf.project.id, { boloId: currentBolo.id })}>{boloOf(currentBolo, locale)}</a>{:else}{boloOf(currentBolo, locale)}{/if}<ConceptHint
+            concept="bolo"
+          />
         {:else if boloReadable && currentBoloId === null}
-          · {boloOf(null, locale)}
+          · {boloOf(null, locale)}<ConceptHint concept="bolo" />
         {/if}
       </p>
       <h1 class="perf__title"><em>{title}</em></h1>
@@ -681,7 +684,9 @@
         {/if}
       </div>
       <p class="perf__roadsheet-link">
-        <a class="link-arrow" href={`/h/${workspaceSlug}/performance/${slug}/roadsheet`}>{t('roadsheet.open', locale)}</a>
+        <a class="link-arrow" href={`/h/${workspaceSlug}/performance/${slug}/roadsheet`}>{t('roadsheet.open', locale)}</a><ConceptHint
+          concept="roadsheet"
+        />
         <Button variant="outline" size="xs" onclick={openEdit}>{t('perf.edit_details', locale)}</Button>
       </p>
     </header>

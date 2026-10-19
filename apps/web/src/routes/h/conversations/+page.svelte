@@ -46,6 +46,8 @@
   import { toStore } from 'svelte/store';
   import { NO_LINE, parseListFilter } from '$lib/conversation-overview';
   import ThreadFeed from '$lib/components/ThreadFeed.svelte';
+  import FirstVisitCard from '$lib/components/FirstVisitCard.svelte';
+  import ConceptHint from '$lib/components/ConceptHint.svelte';
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
@@ -535,7 +537,7 @@
 </svelte:head>
 
 <section class="conversations" aria-busy={busy}>
-  <LensHeader>
+  <LensHeader help={view === 'team' ? 'team' : 'conversations'}>
     {#snippet title()}<LensTitle text={t('lens.conversations', locale)} />{/snippet}
     {#snippet sub()}
       {#if !noAccess}
@@ -552,6 +554,12 @@
       {/if}
     {/snippet}
   </LensHeader>
+
+  {#if view === 'team'}
+    <FirstVisitCard section="team" />
+  {:else}
+    <FirstVisitCard section="conversations" steps={['conv-due', 'conv-season', 'conv-list']} />
+  {/if}
 
   {#if view === 'team'}
     <ThreadFeed
@@ -572,7 +580,7 @@
       onwrite={canEdit ? writeTo : undefined}
     />
 
-    <div class="conversations__list-head" id="lista">
+    <div class="conversations__list-head" id="lista" data-help-step="conv-list">
       <BlockHead title={t('overview.list', locale)} focusable bind:el={listHeading} />
     </div>
     <div class="conversations__controls">
@@ -584,7 +592,10 @@
           bind:value={qRaw}
         />
       </div>
-      <Select label={t('conversations.relation', locale)} options={relationOptions} bind:value={() => relationFilter, setRelation} />
+      <span class="conversations__relation">
+        <Select label={t('conversations.relation', locale)} options={relationOptions} bind:value={() => relationFilter, setRelation} />
+        <ConceptHint concept="relation" />
+      </span>
       {#if filterChip}
         <Chip selected onRemove={clearListFilter} removeLabel={t('overview.clear_filter', locale)}>{filterChip}</Chip>
       {/if}
@@ -738,6 +749,14 @@
       flex-wrap: wrap;
     }
 
+    /* The relation filter and its «i»: the «i» level with the control, not the label. */
+    .conversations__relation {
+      display: inline-flex;
+      align-items: flex-end;
+    }
+    .conversations__relation > :global(.hint) {
+      margin-block-end: calc((var(--control-size-m) - 1.4em) / 2);
+    }
     /* One height for the search, the status and the two buttons (diseño M9). */
     .conversations__controls :global(.field__control),
     .conversations__controls > :global(button) {

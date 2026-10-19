@@ -34,6 +34,11 @@
   import MoneyInvoices from '$lib/components/MoneyInvoices.svelte';
   import LensHeader from '$lib/components/LensHeader.svelte';
   import LensTitle from '$lib/components/LensTitle.svelte';
+  import FirstVisitCard from '$lib/components/FirstVisitCard.svelte';
+  import FirstTimeNote from '$lib/components/FirstTimeNote.svelte';
+  import ConceptHint from '$lib/components/ConceptHint.svelte';
+  import { cardKey, cardVisible } from '$lib/help';
+  import { help } from '$lib/help-seen.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
@@ -250,6 +255,26 @@
   // ── The radar ─────────────────────────────────────────────────────────
   let position = $derived(moneyPosition(bolos, ctx, season));
   let attention = $derived(attentionItems(bolos, ctx));
+
+  // The welcome card's extra line is for whoever can turn Books off (ADR-132):
+  // an admin of one of these spaces. Asked only while the card is up.
+  const lensesAdminQuery = createQuery(
+    toStore(() => {
+      const ids = [...workspaceSlugById.keys()].sort();
+      return {
+        queryKey: ['workspace-lenses-admin', ids] as const,
+        enabled: ids.length > 0 && cardVisible(help, cardKey('books')),
+        queryFn: async ({ signal }: { signal: AbortSignal }) => {
+          const rows = await Promise.all(
+            ids.map((id) =>
+              fetchJSON<{ can_edit: boolean }>(`/api/workspaces/${id}/lenses`, signal).catch(() => ({ can_edit: false })),
+            ),
+          );
+          return rows.some((r) => r.can_edit);
+        },
+      };
+    }),
+  );
   let inflow = $derived(expectedInflow(bolos, ctx, 4));
   const ATTENTION_VISIBLE = 6;
   let attentionAll = $state(false);
@@ -799,7 +824,7 @@
 </svelte:head>
 
 <section class="mny" aria-busy={busy}>
-  <LensHeader>
+  <LensHeader help={noAccess ? undefined : 'books'}>
     {#snippet title()}<LensTitle text={t('lens.money', locale)} />{/snippet}
     {#snippet sub()}
       {#if !noAccess}
@@ -833,6 +858,14 @@
     {/snippet}
   </LensHeader>
 
+  {#if !noAccess}
+    <FirstVisitCard
+      section="books"
+      steps={['books-figs', 'books-att', 'books-ledger']}
+      note={$lensesAdminQuery.data ? t('help.card.books_admin', locale) : null}
+    />
+  {/if}
+
   {#if noAccess}
     <p class="mny__state" data-testid="money-no-access">{t('books.no_access', locale)}</p>
   {:else}
@@ -841,7 +874,7 @@
       {@render failed('books.err_bolos', () => $bolosQuery.refetch())}
     {:else}
       <!-- 1 · Las cuatro cifras, una fila por moneda -->
-      <div class="figs" aria-label={t('books.figures', locale)}>
+      <div class="figs" aria-label={t('books.figures', locale)} data-help-step="books-figs">
         {#if loading}
           <div class="figs__row" aria-hidden="true">
             {#each ['books.fig_owed', 'books.fig_to_invoice', 'books.fig_inflow', 'books.fig_season'] as key (key)}
@@ -856,6 +889,7 @@
             {/if}
             {:else}
             <div class="figs__row" data-currency={pos.currency}>
+              <div class="fig-cell">
               <button type="button" class="fig" data-fig="owed" onclick={() => showLedger('owed')}>
                 <span class="fig__label eyebrow eyebrow--sub">{t('books.fig_owed', locale)}</span>
                 <span class="fig__num stat">{fmtMoneyCompact(pos.owed)}<span class="fig__cur">{pos.currency}</span></span>
@@ -870,16 +904,22 @@
                   {/if}
                 </span>
               </button>
+              <ConceptHint concept="to_collect" />
+              </div>
               <button type="button" class="fig" data-fig="to_invoice" onclick={() => showLedger('to_invoice')}>
                 <span class="fig__label eyebrow eyebrow--sub">{t('books.fig_to_invoice', locale)}</span>
                 <span class="fig__num stat">{fmtMoneyCompact(pos.toInvoice)}<span class="fig__cur">{pos.currency}</span></span>
                 <span class="fig__sub">{pos.toInvoiceCount === 0 ? t('books.fig_to_invoice_none', locale) : t(pos.toInvoiceCount === 1 ? 'books.fig_to_invoice_one' : 'books.fig_to_invoice_many', locale, { n: pos.toInvoiceCount })}</span>
               </button>
+              <div class="fig-cell">
               <div class="fig" data-fig="inflow">
                 <span class="fig__label eyebrow eyebrow--sub">{t('books.fig_inflow', locale)}</span>
                 <span class="fig__num stat">{fmtMoneyCompact(pos.inflow30)}<span class="fig__cur">{pos.currency}</span></span>
                 <span class="fig__sub">{pos.inflow30Count === 0 ? t('books.fig_inflow_none', locale) : t(pos.inflow30Count === 1 ? 'books.fig_inflow_one' : 'books.fig_inflow_many', locale, { n: pos.inflow30Count })}</span>
               </div>
+              <ConceptHint concept="next30" />
+              </div>
+              <div class="fig-cell">
               <button type="button" class="fig" data-fig="season" onclick={() => showLedger('all')}>
                 <span class="fig__label eyebrow eyebrow--sub">{t('books.fig_season', locale)} {seasonLabel(season)}</span>
                 <span class="fig__num stat">{fmtMoneyCompact(pos.collected)}<span class="fig__cur">{pos.currency}</span></span>
@@ -898,9 +938,12 @@
                   <span class="fig__sub">{t('books.fig_holds', locale, { amount: fmtMoneyCompact(pos.holds), n: pos.holdsCount })}</span>
                 {/if}
               </button>
+              <ConceptHint concept="season_books" />
+              </div>
             </div>
             {/if}
           {/each}
+          <FirstTimeNote event="first_payment" when={position.some((p) => p.collected > 0)} />
         {/if}
       </div>
 
@@ -917,7 +960,7 @@
       {:else}
         <div class="radar" aria-busy={loading}>
           <!-- 2 · Pide atención -->
-          <section class="att" aria-label={t('books.attention', locale)}>
+          <section class="att" aria-label={t('books.attention', locale)} data-help-step="books-att">
             <BlockHead title={t('books.attention', locale)} count={loading || invoicesError ? DASH : attention.length}>
               {#if attention.length > ATTENTION_VISIBLE}
                 <button type="button" class="block-head__act" onclick={() => (attentionAll = !attentionAll)}>
@@ -925,6 +968,7 @@
                 </button>
               {/if}
             </BlockHead>
+            <FirstTimeNote event="first_overdue" when={!loading && attention.some((a) => a.kind === 'overdue')} />
             {#if invoicesError}
               {@render failed('books.err_invoices', () => $invoicesQuery.refetch())}
             {:else if loading}
@@ -994,13 +1038,17 @@
       {/if}
 
       <!-- 4 · El libro -->
-      <section class="ledger" id="mny-ledger" aria-label={t('books.ledger', locale)}>
+      <section class="ledger" id="mny-ledger" aria-label={t('books.ledger', locale)} data-help-step="books-ledger">
+        <div class="ledger__tabrow">
         <div class="ledger__tabs" role="tablist" aria-label={t('books.ledger', locale)}>
           <button type="button" role="tab" aria-selected={tab === 'bolos'} onclick={() => (tab = 'bolos')}>{t('books.tab_bolos', locale)}</button>
           {#if anyDocMode}
             <button type="button" role="tab" aria-selected={tab === 'documents'} onclick={() => (tab = 'documents')}>{t('books.documents', locale)}</button>
           {/if}
           <button type="button" role="tab" aria-selected={tab === 'expenses'} onclick={() => (tab = 'expenses')}>{t('books.expenses', locale)}</button>
+        </div>
+        <!-- Outside the tablist (only tabs live there): what a «bolo» is. -->
+        <ConceptHint concept="bolo" />
         </div>
 
         {#if tab === 'bolos'}
@@ -1312,6 +1360,9 @@
       padding: var(--space-s) var(--space-m); border: 1px solid var(--border-color-light);
       border-radius: var(--radius-m); background: var(--bg-ultra-light); min-inline-size: 0;
     }
+    /* A figure and its «i»: the «i» sits in the corner, beside the button, never in it. */
+    .fig-cell { position: relative; display: grid; min-inline-size: 0; }
+    .fig-cell > :global(.hint) { position: absolute; inset-block-start: var(--space-s); inset-inline-end: var(--space-s); margin: 0; }
     button.fig { cursor: pointer; transition: border-color var(--transition); }
     button.fig:hover { border-color: var(--text-faint); }
     .fig__num { display: flex; align-items: baseline; gap: var(--space-2xs); flex-wrap: wrap; }
@@ -1351,7 +1402,8 @@
 
     /* ── 4 · the ledger ── */
     .ledger { display: flex; flex-direction: column; gap: var(--space-s); scroll-margin-block-start: var(--space-l); }
-    .ledger__tabs { display: flex; gap: var(--space-m); border-block-end: 1px solid var(--border-color-light); }
+    .ledger__tabrow { display: flex; align-items: center; gap: var(--space-xs); border-block-end: var(--border-width) solid var(--border-color-light); }
+    .ledger__tabs { display: flex; gap: var(--space-m); }
     .ledger__tabs button { appearance: none; border: 0; background: none; font: inherit; font-size: var(--text-s); color: var(--text-muted); padding: var(--space-xs) 0; border-block-end: 2px solid transparent; margin-block-end: -1px; cursor: pointer; }
     .ledger__tabs button[aria-selected='true'] { color: var(--text-color); border-block-end-color: var(--text-color); }
     .ledger__filters { display: flex; gap: var(--space-xs); flex-wrap: wrap; }

@@ -4,6 +4,7 @@
    * unas pocas palabras de la app (la lente de venta, la función, el reparto,
    * el horario del día, quién compra) para todo el espacio. Lo decide un admin.
    */
+  import ConceptHint from '$lib/components/ConceptHint.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
@@ -51,7 +52,7 @@
   <div class="set-group__body">
     <div class="set-row">
       <div class="set-row__lead">
-        <div class="set-row__label">{t('settings.trade_label', locale)}</div>
+        <div class="set-row__label">{t('settings.trade_label', locale)}<ConceptHint concept="trade" /></div>
         <div class="set-row__hint">{t('settings.trade_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">

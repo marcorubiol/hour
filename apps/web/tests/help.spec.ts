@@ -1,7 +1,7 @@
 /**
  * AYUDA CONTEXTUAL, ENFOQUE A: la tarjeta de bienvenida sale una vez, el «?»
- * la vuelve a abrir, «Enséñame» recorre sus pasos y la «i» abre y cierra con
- * teclado.
+ * la vuelve a abrir, «Enséñame» recorre sus pasos con la frase junto a cada
+ * bloque, y la «i» abre y cierra con teclado y trae sus líneas.
  *
  * Runs in the `playwright` workspace (`?scope=s:playwright`), never muk-cia.
  * What it writes is the fixture login's own `help_seen` row: it empties it at
@@ -16,6 +16,7 @@ const EMAIL = process.env.PW_TEST_EMAIL ?? '';
 const PASSWORD = process.env.PW_TEST_PASSWORD ?? '';
 const DESK = '/h/desk?scope=s:playwright';
 const PLANNER = '/h/planner?scope=s:playwright';
+const CONVERSATIONS = '/h/conversations?scope=s:playwright';
 
 async function resetHelp(page: Page) {
   const status = await page.evaluate(async () => (await fetch('/api/me/help', { method: 'DELETE' })).status);
@@ -106,6 +107,47 @@ test.describe('Contextual help (approach A)', () => {
     await page.reload();
     await waitForLoaded(page);
     await expect(planner).toHaveCount(0);
+  });
+
+  test('«Show me» in Venues sets each step’s words beside its block', async ({ page }) => {
+    await page.goto(CONVERSATIONS);
+    await waitForLoaded(page);
+    const venues = card(page, 'conversations');
+    await expect(venues).toBeVisible();
+
+    await venues.getByRole('button', { name: 'Show me' }).click();
+    const spot = page.getByRole('dialog');
+    await expect(spot).toContainText(/^1\/\d/);
+    const block = page.locator('[data-help-focus]').first();
+    await expect(block).toBeVisible();
+    // Let the smooth scroll settle, then the words sit right under (or over) the block.
+    await expect
+      .poll(async () => {
+        const [b, w] = await Promise.all([block.boundingBox(), spot.boundingBox()]);
+        if (!b || !w) return false;
+        return w.y >= b.y + b.height - 1 || w.y + w.height <= b.y + 1;
+      })
+      .toBe(true);
+
+    await page.keyboard.press('Escape');
+    await expect(spot).toHaveCount(0);
+    await expect(page.locator('[data-help-focus]')).toHaveCount(0);
+    await expect(venues).toHaveCount(0);
+  });
+
+  test('the relation’s «i» names each relation and opens «More»', async ({ page }) => {
+    await page.goto(CONVERSATIONS);
+    await waitForLoaded(page);
+    const hint = page.getByRole('button', { name: 'What is Relation' }).first();
+    const panel = page.locator(`#${await hint.getAttribute('popovertarget')}`);
+    await hint.click();
+    await expect(panel).toBeVisible();
+    await expect(panel).toContainText('Not this time:');
+    await expect(panel).toContainText('Not contacted:');
+    await panel.getByRole('button', { name: 'More' }).click();
+    await expect(panel).toContainText('the higher one wins');
+    await page.keyboard.press('Escape');
+    await expect(panel).toBeHidden();
   });
 
   test('a concept’s «i» opens and closes with the keyboard', async ({ page }) => {

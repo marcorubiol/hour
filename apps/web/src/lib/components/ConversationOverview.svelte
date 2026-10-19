@@ -21,6 +21,7 @@
   import { fetchJSON, mutateJSON } from '$lib/api';
   import { addToast } from '$lib/components/Toast.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
+  import FirstTimeNote from '$lib/components/FirstTimeNote.svelte';
   import Button from '$lib/components/Button.svelte';
   import MailoutFigures from '$lib/components/MailoutFigures.svelte';
   import { dayMonth } from '$lib/datetime';
@@ -286,10 +287,11 @@
 {:else if data && data.total > 0}
   <div class="board" data-testid="conversation-overview">
     <div class="board__col">
-      <section class="block block--due" aria-labelledby="ov-due" data-testid="block-due">
-        <BlockHead id="ov-due" title={t('overview.due', locale)} count={data.due.count}>
+      <section class="block block--due" aria-labelledby="ov-due" data-testid="block-due" data-help-step="conv-due">
+        <BlockHead id="ov-due" concept="due" title={t('overview.due', locale)} count={data.due.count}>
           {#if data.due.count > 0}<a class="block-head__act" href="?turno=nuestro#lista">{t('overview.see_in_list', locale)}</a>{/if}
         </BlockHead>
+        <FirstTimeNote event="first_reply_waiting" when={data.due.count > 0} />
         {#if data.due.count === 0}
           <p class="block__empty">{t('overview.due_empty', locale)}</p>
         {:else}
@@ -335,7 +337,7 @@
       </section>
 
       <section class="block block--hot" aria-labelledby="ov-hot" data-testid="block-hot">
-        <BlockHead id="ov-hot" title={t('overview.hot', locale)} count={data.hot.count}>
+        <BlockHead id="ov-hot" concept="hot" title={t('overview.hot', locale)} count={data.hot.count}>
           {#if data.hot.count > 0}<a class="block-head__act" href="?temp=caliente#lista">{t('overview.see_n', locale, { n: data.hot.count })}</a>{/if}
         </BlockHead>
         {#if data.hot.count === 0}
@@ -365,8 +367,8 @@
     </div>
 
     <div class="board__col">
-      <section class="block block--season" aria-labelledby="ov-season" data-testid="block-season">
-        <BlockHead id="ov-season" title={t('overview.season_of', locale, { season: data.season.label })} count={data.season.total}>
+      <section class="block block--season" aria-labelledby="ov-season" data-testid="block-season" data-help-step="conv-season">
+        <BlockHead id="ov-season" concept="season_sales" title={t('overview.season_of', locale, { season: data.season.label })} count={data.season.total}>
           <span class="block__hint">{t(data.season.lines.length > 0 ? 'overview.season_hint_lines' : 'overview.season_hint', locale)}</span>
         </BlockHead>
         {#if data.season.total === 0}
@@ -407,7 +409,7 @@
       </section>
 
       <section class="block block--cold" aria-labelledby="ov-cold" data-testid="block-cold">
-        <BlockHead id="ov-cold" title={t('overview.cold', locale)} count={data.cold.count}>
+        <BlockHead id="ov-cold" concept="cold" title={t('overview.cold', locale)} count={data.cold.count}>
           {#if data.cold.count > 0}<a class="block-head__act" href="?temp=fria#lista">{t('overview.see_n', locale, { n: data.cold.count })}</a>{/if}
         </BlockHead>
         {#if data.cold.count === 0}

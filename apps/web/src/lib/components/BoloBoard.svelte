@@ -13,6 +13,8 @@
    * (`thread-reading.svelte.ts`, lo mismo que el hilo de una conversación).
    */
 
+  import ConceptHint from '$lib/components/ConceptHint.svelte';
+  import FirstTimeNote from '$lib/components/FirstTimeNote.svelte';
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON } from '$lib/api';
@@ -109,7 +111,7 @@
 
 <section id="board" class="board" aria-labelledby="board-title" aria-busy={$boardQuery.isLoading} bind:this={sectionEl}>
   <header class="board__head">
-    <p class="eyebrow" id="board-title">{t('threads.board', locale)}</p>
+    <span class="block-head__lead"><p class="eyebrow" id="board-title">{t('threads.board', locale)}</p><ConceptHint concept="board" /></span>
     {#if board?.bolo}
       <p class="board__bolo">
         {#if boloPlace(board.bolo)}<span>{boloPlace(board.bolo)}</span>{/if}
@@ -132,6 +134,7 @@
       {/if}
     {/if}
   </header>
+  <FirstTimeNote event="first_board" when={Boolean(board?.bolo)} />
 
   {#if $boardQuery.isLoading}
     <p class="board__state">{t('desk.loading', locale)}</p>

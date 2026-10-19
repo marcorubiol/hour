@@ -6,6 +6,7 @@
    * that says since when (amends ADR-121 § 5); if a source failed it says so,
    * because a silent band would claim «nothing changed».
    */
+  import FirstTimeNote from '$lib/components/FirstTimeNote.svelte';
   import Button from '$lib/components/Button.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import { t, type Locale } from '$lib/i18n';
@@ -84,6 +85,7 @@
   <BlockHead id="desk-changed-h" concept="changed" title={t('desk.changed_since', locale, { when: sinceLabel })}>
     {#if hasThreads}<a class="block-head__act" href="/h/conversations?view=team" data-testid="desk-to-team">{t('conversations.view_team', locale)} →</a>{/if}
   </BlockHead>
+  <FirstTimeNote event="first_team_thread" when={!loading && changes.some((c) => c.kind === 'thread')} />
   {#if loading}
     <ul class="feed" aria-hidden="true">
       {#each [0, 1] as i (i)}

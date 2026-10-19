@@ -22,6 +22,8 @@
   import { docTitle } from '$lib/doc-title';
   import { lensOn } from '$lib/lenses.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
+  import ConceptHint from '$lib/components/ConceptHint.svelte';
+  import FirstTimeNote from '$lib/components/FirstTimeNote.svelte';
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
@@ -318,17 +320,21 @@
           {t('mail.view_thread', locale)}
         </button>
       </div>
+      <ConceptHint concept="reading" />
     </div>
 
     <div class="conv__grid" class:conv__grid--single={reading === 'hilo'}>
       <div class="conv__main">
         {#if reading === 'registro'}
           <div class="block-head">
-            <h2 class="eyebrow eyebrow--sub">{t('mail.outside', locale)} · {events.length}</h2>
+            <span class="block-head__lead"
+              ><h2 class="eyebrow eyebrow--sub">{t('mail.outside', locale)} · {events.length}</h2><ConceptHint concept="outside" /></span
+            >
             <Button size="xs" variant="outline" disabled={!sendable.length || !recipient?.email} onclick={() => startCompose(null)}>
               {t('mail.write', locale)}
             </Button>
           </div>
+          <FirstTimeNote event="first_mail_synced" when={mailboxes.length > 0} />
           {#if composing === 'new'}{@render composer()}{/if}
           {#if $eventsQuery.isLoading}
             <p class="conv__msg">{t('conversations.loading', locale)}</p>
@@ -378,7 +384,7 @@
       <div class="conv__aside">
         <dl class="facts">
           <div>
-            <dt>{t('conversations.relation', locale)}</dt>
+            <dt>{t('conversations.relation', locale)}<ConceptHint concept="relation" /></dt>
             <dd>
               {#if conv.can_edit}
                 <ConversationStatusMenu
@@ -490,7 +496,7 @@
         {/if}
 
         <div class="legend">
-          <p class="eyebrow eyebrow--sub">{t('mail.mailboxes_here', locale)}</p>
+          <p class="eyebrow eyebrow--sub">{t('mail.mailboxes_here', locale)}<ConceptHint concept="mailboxes" /></p>
           {#if mailboxes.length}
             {#each mailboxes as [address, scope] (address)}
               <p class="legend__row">
