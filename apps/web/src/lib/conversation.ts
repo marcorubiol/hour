@@ -13,6 +13,7 @@ import { localDayISO, realIsoDate, realIsoInstant } from './datetime';
 import { t, type Locale } from './i18n';
 import { EVENT_MAIL_SELECT, type EventMailFields } from './mail';
 import { relationOf, type Relation, type RelationInput } from './conversation-relation';
+import { TAGGING_EMBED, tagKeysOf, type TaggingEmbed } from './conversation-tags';
 
 export type ConversationStatus = Enums<'conversation_status'>;
 
@@ -171,6 +172,9 @@ export const ConversationCreateSchema = v.object({
   // optional Line select in the global dialog). The RPC guards project
   // membership of the line.
   line_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
+  // ADR-138 fase 2: the tags it is born with (`set_conversation_tags` after
+  // the create). Absent, it carries none and reads as `sales`.
+  tag_ids: v.optional(v.pipe(v.array(v.pipe(v.string(), v.uuid())), v.maxLength(32))),
 });
 
 /** Why a create body is not acceptable beyond its shape, or null if it is. */
@@ -336,6 +340,8 @@ export interface ConversationItem extends Tables<'conversation'> {
   regular?: boolean | null;
   /** The derived relation, computed by the Worker (`relationOf`, ADR-138 § 4). */
   relation: Relation;
+  /** Its tag keys (ADR-138 § 1); none read as `sales` (`tagKeysOf`). */
+  tags: string[];
 }
 
 /**
@@ -463,6 +469,7 @@ export interface ConversationDbItem extends Tables<'conversation'> {
   last_turn?: ConversationItem['last_turn'];
   last_in?: ConversationItem['last_in'];
   regular?: boolean | null;
+  tagging?: TaggingEmbed;
 }
 
 /** The old status someone set by hand, kept by the E1 migration (ADR-138 § 8.5). */
@@ -494,9 +501,11 @@ export function conversationRelation(item: ConversationDbItem, now: Date = new D
 export function normalizeConversationItem(item: ConversationDbItem, now: Date = new Date()): ConversationItem {
   const contacts = item.contacts ?? [];
   const primary = primaryContactPerson(contacts);
+  const { tagging, ...row } = item;
   return {
-    ...item,
+    ...row,
     relation: conversationRelation(item, now),
+    tags: tagKeysOf(tagging),
     organization: item.organization ?? null,
     contacts: sortContacts(
       contacts.map(({ person, ...row }) => ({
@@ -527,5 +536,6 @@ export const CONVERSATION_SELECT = [
   'regular:conversation_regular',
   'project:project_id(id,slug,name,status)',
   'organization:workspace_organization!conversation_workspace_organization_fkey(id,slug,name,kind,city)',
+  TAGGING_EMBED,
   'contacts:conversation_contact(person_id,role,since,until,is_primary,person:workspace_person!conversation_contact_workspace_person_fkey(person_id,slug,full_name,email,phone,country,city,website,organization:workspace_organization!workspace_person_organization_fkey(name)))',
 ].join(',');

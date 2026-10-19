@@ -1,11 +1,11 @@
-// «De qué se habla» (`?view=threads`, ADR-116) es hoy la vista Equipo de esta
-// lente (`?view=team`, ADR-134). Una carga completa la redirige el hook
+// Las vistas Difusión · Equipo de ADR-134 son hoy chips de etiqueta
+// (ADR-138 § 2): `?view=team`, y el viejo `?view=threads` (ADR-116), van a
+// `?etiqueta=team`. Una carga completa la redirige el hook
 // (`hooks.server.ts`); una navegación dentro de la app, aquí.
 import { redirect } from '@sveltejs/kit';
+import { legacyViewRedirect } from '$lib/conversation-tags';
 
 export function load({ url }) {
-  if (url.searchParams.get('view') !== 'threads') return;
-  const params = new URLSearchParams(url.searchParams);
-  params.set('view', 'team');
-  redirect(301, `/h/conversations?${params}`);
+  const next = legacyViewRedirect(url.searchParams);
+  if (next) redirect(301, `/h/conversations?${next}`);
 }

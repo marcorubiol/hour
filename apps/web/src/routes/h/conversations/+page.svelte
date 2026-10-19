@@ -16,11 +16,20 @@
    * and opens the mailout screen. A mailout belongs to one project, so the
    * bar asks for conversations of a single project.
    *
-   * Two views in the lens header (ADR-134): Difusión (Contratación in music;
-   * the trade word names the view, not the lens) with the conversations with
-   * venues, and Equipo (`?view=team`), what the team says among itself: the
-   * threads the viewer can read (ThreadFeed, `thread_feed`, ADR-116). Same
-   * scope. `?view=threads`, the old «de qué se habla», redirects to Equipo.
+   * A row of chips in the lens header (ADR-138 § 1 y 2, fase 2; it replaces
+   * the two views of ADR-134): Todas · the active tags of the scope in their
+   * order (sales in its trade word, Difusión / Contratación) · Equipo, what
+   * the team says among itself (ThreadFeed, `thread_feed`, ADR-116). One at a
+   * time, in the URL (`?etiqueta=sales|press|…|team`; none is Todas).
+   * `?view=team` and `?view=threads` redirect to `?etiqueta=team`. Without
+   * Converses there is only Equipo. The tag never decides who sees what.
+   *
+   * The panel follows the chip (plan § 3): Difusión is the whole dashboard of
+   * ADR-117 over the `sales` conversations; Todas, Prensa, Coproducción and
+   * the space's own, the common one (te toca); Equipo, the threads. Todas
+   * still lists conversations and threads as two blocks, one under the other
+   * (mixing them in one order is phase 3). Selection and «Escribir a N» only
+   * under Difusión (ADR-138 § 7).
    *
    * Difusión opens on its dashboard (ADR-117, propuesta A): the
    * ConversationOverview blocks above the list. Each block is a filter of the
@@ -42,7 +51,7 @@
   import ConversationTable from '$lib/components/ConversationTable.svelte';
   import ConversationOverview from '$lib/components/ConversationOverview.svelte';
   import Chip from '$lib/components/Chip.svelte';
-  import { tick } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { toStore } from 'svelte/store';
   import { NO_LINE, parseListFilter } from '$lib/conversation-overview';
   import ThreadFeed from '$lib/components/ThreadFeed.svelte';
@@ -56,6 +65,21 @@
   import { appLocale, t } from '$lib/i18n';
   import { organizationNames, organizationsQueryOptions } from '$lib/organizations';
   import { conversationAccessQueryOptions } from '$lib/conversation-access';
+  import {
+    ALL,
+    SALES,
+    addTagKey,
+    canBulkSend,
+    chipHref,
+    lensChip,
+    lensChips,
+    panelHref,
+    panelOf,
+    scopeTags,
+    tagIdIn,
+    tagLabel,
+  } from '$lib/conversation-tags';
+  import { conversationTagsQueryOptions } from '$lib/conversation-tags-query';
   import { usePins } from '$lib/stores/pins.svelte';
   import { spaceName } from '$lib/utils/identity';
   import {
@@ -92,9 +116,12 @@
     toStore(() => organizationsQueryOptions($accessQuery.data?.edit === true)),
   );
 
-  /** The view travels in the URL, so a link says which one it shows. Without
-   *  Converses there is no Difusión to show: the lens is Equipo (ADR-134). */
-  let view = $derived<'sales' | 'team'>(page.url.searchParams.get('view') === 'team' || noAccess ? 'team' : 'sales');
+  /** The chip travels in the URL, so a link says which one it shows. Without
+   *  Converses there is no conversation to show: the lens is Equipo (ADR-134 § 4). */
+  let chip = $derived(lensChip(page.url.searchParams, !noAccess));
+  let panel = $derived(panelOf(chip));
+  // The vocabulary is names, not data; it is asked only by who reads conversations.
+  const tagsQuery = createQuery(toStore(() => conversationTagsQueryOptions($accessQuery.data?.read !== false)));
 
   let workspaces = $derived<NavWorkspace[]>($workspacesQuery.data?.items ?? []);
   let workspaceSlugById = $derived(new Map(workspaces.map((w) => [w.id, w.slug])));
@@ -119,6 +146,14 @@
   let projectIndex = $derived(buildProjectIndex(workspaces, $projectsQuery.data?.items ?? []));
   let lineIndex = $derived(buildLineIndex(workspaces, ($linesQuery.data?.items as RawLine[]) ?? []));
   let scope = $derived(resolveScope(pins.pins, workspaces, lineIndex, projectIndex));
+  // The chips speak for the spaces on screen: the pinned ones, or all (as `workspacesOnScreen`).
+  let scopeWorkspaceIds = $derived(
+    scope.isEmpty
+      ? workspaces.map((w) => w.id)
+      : [...new Set([...scope.workspaceIds, ...scope.projects.map((p) => p.workspaceId), ...scope.lines.map((l) => l.workspaceId)])],
+  );
+  let tagNames = $derived($tagsQuery.data ? scopeTags($tagsQuery.data, scopeWorkspaceIds) : []);
+  let chips = $derived(lensChips(!noAccess, tagNames, locale));
   // Project pins scope directly; a line pin scopes conversations through its
   // project. The endpoint filters by project_ids ∪ workspace_ids.
   let filterIds = $derived({
@@ -227,12 +262,12 @@
 
   /** A season segment: that relation, in the season (and the pinned lines, or its own line). */
   async function filterSeasonRelation(relation: Relation, linea?: string) {
-    await goto(`?temporada=actual&relacion=${relation}${linea ? `&linea=${linea}` : ''}`, { noScroll: true, keepFocus: true });
+    await goto(panelHref(chip, `temporada=actual&relacion=${relation}${linea ? `&linea=${linea}` : ''}`), { noScroll: true, keepFocus: true });
     await showList();
   }
   /** A line's name in the season: that line, every relation (ADR-135). */
   async function filterSeasonLine(linea: string) {
-    await goto(`?temporada=actual&linea=${linea}`, { noScroll: true, keepFocus: true });
+    await goto(panelHref(chip, `temporada=actual&linea=${linea}`), { noScroll: true, keepFocus: true });
     await showList();
   }
 
@@ -240,7 +275,7 @@
   async function writeTo(picks: { id: string; project_id: string }[]) {
     picking = true;
     picked = picks;
-    await goto('?temp=ronda', { noScroll: true, keepFocus: true });
+    await goto(panelHref(chip, 'temp=ronda'), { noScroll: true, keepFocus: true });
     await showList();
   }
   let relationOptions = [
@@ -257,6 +292,7 @@
     workspaceIds: filterIds.workspaceIds,
     q: q || undefined,
     ...listFilter,
+    etiqueta: chip === ALL ? undefined : chip,
     lineIds,
     enabled: !scopeUnresolved,
   });
@@ -279,6 +315,11 @@
   let aOrg = $state('');
   let aNextAt = $state('');
   let aNextNote = $state('');
+  // ADR-138 fase 2: the tag it is born with; the chip's, or Difusión.
+  let aTag = $state(SALES);
+  let tagOptions = $derived(
+    (tagNames.length > 0 ? tagNames : [{ key: SALES, label: null, labels: {} }]).map((x) => ({ value: x.key, label: tagLabel(x, locale) })),
+  );
 
   // The picker offers only the projects of the current scope (drop 11-10):
   // a space offers its projects, a project or line that project, Everything
@@ -351,6 +392,7 @@
     aOrg = '';
     aNextAt = '';
     aNextNote = '';
+    aTag = addTagKey(chip);
     // Pre-select when the scope collapses to
     // a single project — otherwise start empty and let the user pick spaces.
     // A single pinned line also preselects that line for its project.
@@ -367,7 +409,14 @@
     addOpen = true;
   }
 
-  type AddResult = { created: number; existed: number; failed: string[]; joinable: Join[]; personId: string | null };
+  type AddResult = {
+    created: number;
+    existed: number;
+    failed: string[];
+    joinable: Join[];
+    personId: string | null;
+    untagged: number;
+  };
 
   const addMutation = createMutation({
     // One contact, N spaces → N conversations. Sequential, not parallel: the
@@ -385,22 +434,32 @@
         next_action_note: aNextNote.trim() || null,
       };
       let personId: string | null = null;
-      const out: AddResult = { created: 0, existed: 0, failed: [], joinable: [], personId: null };
+      const out: AddResult = { created: 0, existed: 0, failed: [], joinable: [], personId: null, untagged: 0 };
+      const vocab = $tagsQuery.data;
+      const workspaceOf = (id: string) => ($projectsQuery.data?.items ?? []).find((p) => p.id === id)?.workspace_id;
+      /** The chosen tag in that project's space; Difusión if the space does not use it. */
+      const tagIdsFor = (projectId: string): string[] | undefined => {
+        const ws = workspaceOf(projectId);
+        const id = vocab && ws ? (tagIdIn(vocab, ws, aTag) ?? tagIdIn(vocab, ws, SALES)) : null;
+        return id ? [id] : undefined;
+      };
       const projectName = (id: string) =>
         ($projectsQuery.data?.items ?? []).find((p) => p.id === id)?.name ?? t('conversations.conversation', locale);
 
       for (const projectId of targets) {
         const line_id = lineFor[projectId] || null;
+        const tag_ids = tagIdsFor(projectId);
         const body: Record<string, unknown> = personId
-          ? { project_id: projectId, person_id: personId, line_id, ...base }
-          : { project_id: projectId, ...who, line_id, ...base };
+          ? { project_id: projectId, person_id: personId, line_id, tag_ids, ...base }
+          : { project_id: projectId, ...who, line_id, tag_ids, ...base };
         try {
-          const data = await mutateJSON<{ primary_person_id?: string | null }>(
+          const data = await mutateJSON<{ primary_person_id?: string | null; tagged?: boolean }>(
             'POST',
             '/api/conversations',
             body,
           );
           out.created += 1;
+          if (data?.tagged === false || !tag_ids) out.untagged += 1;
           if (!personId && data?.primary_person_id) personId = data.primary_person_id;
         } catch (e) {
           const clash = e instanceof ApiError && e.status === 409 ? e.body?.conversation_id : null;
@@ -451,8 +510,9 @@
         );
       if (r.existed) parts.push(t('conversations.already_in', locale, { n: r.existed }));
       if (r.failed.length) parts.push(t('conversations.failed_n', locale, { n: r.failed.length }));
+      if (r.untagged) parts.push(t('conversations.tag_not_set', locale));
       addToast({
-        tone: r.failed.length ? 'warning' : 'success',
+        tone: r.failed.length || r.untagged ? 'warning' : 'success',
         message: `${parts.join(' · ')}.`,
       });
     },
@@ -500,6 +560,13 @@
     picking = !picking;
     picked = [];
   }
+  // Selection is Difusión's: leaving the chip leaves it.
+  $effect(() => {
+    if (!canBulkSend(chip)) untrack(() => {
+      picking = false;
+      picked = [];
+    });
+  });
 
   const writeMutation = createMutation({
     mutationFn: () =>
@@ -537,37 +604,44 @@
 </svelte:head>
 
 <section class="conversations" aria-busy={busy}>
-  <LensHeader help={view === 'team' ? 'team' : 'conversations'}>
+  <LensHeader help={panel === 'team' ? 'team' : 'conversations'}>
     {#snippet title()}<LensTitle text={t('lens.conversations', locale)} />{/snippet}
     {#snippet sub()}
-      {#if !noAccess}
-        <a class="lenshead__frag" href="/h/conversations" aria-current={view === 'sales' ? 'page' : undefined}
-          >{t('conversations.view_sales', locale)}</a
+      <!-- The chips (ADR-138 § 2): one at a time, each a link that says where you are. -->
+      {#each chips as c (c.chip)}
+        <a
+          class="lenshead__frag"
+          href={chipHref(c.chip, page.url.searchParams)}
+          aria-current={chip === c.chip ? 'page' : undefined}
+          data-chip={c.chip}>{c.label}</a
         >
-      {/if}
-      <a class="lenshead__frag" href="/h/conversations?view=team" aria-current={view === 'team' ? 'page' : undefined}
-        >{t('conversations.view_team', locale)}</a
-      >
-      {#if view === 'sales'}
+      {/each}
+      {#if panel !== 'team'}
         <!-- On a phone the list starts a screen and a half down: a way straight to it (móvil #11). -->
         <a class="lenshead__frag conversations__skip" href="#lista">{t('overview.go_to_list', locale)}</a>
       {/if}
     {/snippet}
   </LensHeader>
 
-  {#if view === 'team'}
+  {#if panel === 'team'}
     <FirstVisitCard section="team" />
-  {:else}
+  {:else if panel === 'sales'}
     <FirstVisitCard section="conversations" steps={['conv-due', 'conv-season', 'conv-list']} />
+  {:else}
+    <FirstVisitCard section="conversations" steps={['conv-due', 'conv-list']} />
   {/if}
 
-  {#if view === 'team'}
+  {#snippet threads()}
     <ThreadFeed
       filters={{ projectIds: filterIds.projectIds, workspaceIds: filterIds.workspaceIds, enabled: !scopeUnresolved }}
       {workspaceSlugById}
       {projectNameById}
       {locale}
     />
+  {/snippet}
+
+  {#if panel === 'team'}
+    {@render threads()}
   {:else}
     <ConversationOverview
       filters={{ projectIds: filterIds.projectIds, workspaceIds: filterIds.workspaceIds, lineIds, enabled: !scopeUnresolved }}
@@ -575,9 +649,11 @@
       {projectNameById}
       {locale}
       {lineHint}
+      {chip}
+      panel={panel === 'sales' ? 'sales' : 'common'}
       onrelation={filterSeasonRelation}
       online={filterSeasonLine}
-      onwrite={canEdit ? writeTo : undefined}
+      onwrite={canEdit && canBulkSend(chip) ? writeTo : undefined}
     />
 
     <div class="conversations__list-head" id="lista" data-help-step="conv-list">
@@ -601,9 +677,11 @@
       {/if}
       {#if canEdit}
         <Button size="s" onclick={openAdd}>{t('conversations.add', locale)}</Button>
-        <Button size="s" variant="outline" onclick={togglePicking}>
-          {picking ? t('mailout.pick_done', locale) : t('mailout.pick', locale)}
-        </Button>
+        {#if canBulkSend(chip)}
+          <Button size="s" variant="outline" onclick={togglePicking}>
+            {picking ? t('mailout.pick_done', locale) : t('mailout.pick', locale)}
+          </Button>
+        {/if}
       {/if}
     </div>
 
@@ -618,7 +696,17 @@
       editable={canEdit}
       selectable={picking}
       bind:selected={picked}
+      {tagNames}
+      hideTag={chip}
     />
+
+    {#if chip === ALL}
+      <!-- Todas, phase 2: the threads as their own block under the conversations (one order is phase 3). -->
+      <div class="conversations__list-head" data-testid="all-threads">
+        <BlockHead title={t('conversations.view_team', locale)} />
+      </div>
+      {@render threads()}
+    {/if}
 
     {#if picking}
       <div class="action-bar" role="region" aria-label={t('mailout.pick_bar', locale)}>
@@ -718,6 +806,9 @@
     <Input label={t('conversations.full_name', locale)} bind:value={aName} />
     <Input label={t('conversations.email', locale)} type="email" bind:value={aEmail} />
     <Input label={t('conversations.phone', locale)} type="tel" bind:value={aPhone} />
+  </div>
+  <div class="conversations__form-grid">
+    <Select label={t('conversations.tag', locale)} options={tagOptions} bind:value={aTag} />
   </div>
   <div class="conversations__form-grid">
     <Input label={t('conversations.col_next_action', locale)} type="date" bind:value={aNextAt} />

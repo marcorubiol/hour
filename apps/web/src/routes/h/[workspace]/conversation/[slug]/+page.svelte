@@ -39,6 +39,7 @@
   import ThreadBlock from '$lib/components/ThreadBlock.svelte';
   import OrganizationFiscal from '$lib/components/OrganizationFiscal.svelte';
   import ConversationAcquaintances from '$lib/components/ConversationAcquaintances.svelte';
+  import ConversationTags from '$lib/components/ConversationTags.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import {
     eventDirectionLabel,
@@ -467,6 +468,9 @@
             </div>
           {/if}
         </dl>
+
+        <!-- Etiquetas (ADR-138, fase 2): de qué va; su propio bloque. -->
+        <ConversationTags conversationId={conv.id} workspaceId={conv.workspace_id} tags={conv.tags} canEdit={conv.can_edit} {locale} />
 
         {#if conv.organization}
           <OrganizationFiscal organizationId={conv.organization.id} />
