@@ -56,25 +56,30 @@ test.describe('performance write path', () => {
     await waitForLoaded(page);
     await expect(page.locator('.cal__grid')).toBeVisible();
 
-    // Create from the header button (ADR-078: unified dialog — pick the
-    // Performance type pill, then the shared PerformanceForm).
-    // The toolbar's writer is `＋ date` since the Planner v3 rework — it says
-    // what it makes, and `Add to planner` survives only on a day cell. Located
-    // by its class, because the label is one glyph and a translated word.
+    // Create from the header button: the quick add (ADR-139 p3 A). The big
+    // line is a performance's venue; each chip opens its block of the
+    // skeleton. The toolbar's writer is `＋ date`, located by its class
+    // because the label is one glyph and a translated word.
     await page.locator('button.cal__add').click();
     const dialog = page.locator('dialog[open]');
     await expect(dialog).toBeVisible();
-    await dialog
-      .getByRole('radiogroup', { name: 'Type' })
-      .getByRole('radio', { name: 'Performance', exact: true })
-      .check();
-    await dialog.getByLabel('Project').selectOption({ label: 'ZZZ e2e collab' });
-    await dialog.getByLabel('Date').fill(day);
-    await dialog.getByLabel('Venue').fill(venue);
-    await dialog.getByLabel('City').fill('Testville');
-    await dialog.getByRole('button', { name: 'Create performance' }).click();
+    await expect(dialog.getByLabel('What', { exact: true }), 'the caret starts in the title').toBeFocused();
+    await dialog.getByLabel('What', { exact: true }).fill(venue);
+    await dialog.locator('[data-chip="type"]').click();
+    await dialog.getByRole('radio', { name: 'Performance', exact: true }).check();
+    await dialog.locator('[data-chip="owner"]').click();
+    await dialog.getByLabel('Project', { exact: true }).selectOption({ label: 'ZZZ e2e collab' });
+    await dialog.locator('[data-chip="when"]').click();
+    await dialog.getByLabel('Day', { exact: true }).fill(day);
+    await dialog.locator('[data-chip="where"]').click();
+    await dialog.getByLabel('City', { exact: true }).fill('Testville');
+    await dialog.getByRole('button', { name: 'Add', exact: true }).click();
 
-    // Creation navigates to the new performance detail.
+    // Adding stays on the Planner (it used to jump to the page); the notice
+    // offers the way there.
+    await expect(dialog).toBeHidden({ timeout: 10_000 });
+    await expect(page).toHaveURL(/\/h\/planner/);
+    await page.locator('.toast').getByRole('button', { name: 'Open', exact: true }).click();
     await page.waitForURL(/\/h\/playwright\/performance\/e2e-venue-/);
     await expect(page.getByRole('heading', { level: 1 })).toContainText(venue);
 

@@ -13,8 +13,11 @@ export function toastCreated(opts: {
   message: string;
   locale: Locale;
   undo?: () => Promise<unknown>;
+  /** «Abrir»: go to what was just made (a performance's page), staying put
+      until asked. */
+  open?: () => void;
 }): number {
-  const { message, locale, undo } = opts;
+  const { message, locale, undo, open } = opts;
   return addToast({
     tone: 'success',
     message,
@@ -35,5 +38,6 @@ export function toastCreated(opts: {
           },
         }
       : undefined,
+    also: open ? { label: t('ui.open', locale), run: open } : undefined,
   });
 }
