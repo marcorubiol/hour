@@ -12,6 +12,8 @@
   import { fetchJSON, mutateJSON } from '$lib/api';
   import { appLocale, t, TRADES, type Trade } from '$lib/i18n';
   import { addToast } from '$lib/components/Toast.svelte';
+  import SavedMark from '$lib/components/SavedMark.svelte';
+  import { SaveFlash } from '$lib/save-flash.svelte';
 
   interface Props {
     workspaceId: string | undefined;
@@ -32,7 +34,10 @@
     })),
   );
 
+  // In place (ADR-139 p7): the setting says «guardado» beside itself.
+  const saved = new SaveFlash();
   const save = createMutation({
+    onSuccess: () => saved.show(),
     mutationFn: (trade: Trade) => mutateJSON('PUT', `/api/workspaces/${workspaceId}/trade`, { trade }),
     onError: (err) =>
       addToast({ tone: 'danger', title: t('mail.action_failed', locale), message: err instanceof Error ? err.message : String(err) }),
@@ -63,6 +68,7 @@
           disabled={!canEdit || $save.isPending}
           onchange={(trade) => $save.mutate(trade)}
         />
+        <SavedMark shown={saved.is()} />
         {#if !canEdit && $query.data}
           <span class="set-row__hint">{t('settings.trade_admin_only', locale)}</span>
         {/if}

@@ -9,6 +9,7 @@
   import { fetchJSON, mutateJSON, ApiError } from '$lib/api';
   import { copyText } from '$lib/clipboard';
   import { addToast } from '$lib/components/Toast.svelte';
+  import { SaveFlash } from '$lib/save-flash.svelte';
   import { session } from '$lib/session.svelte';
   import { t, appLocale } from '$lib/i18n';
   import MailSignature from './MailSignature.svelte';
@@ -135,6 +136,8 @@
     );
   }
 
+  const savedRole = new SaveFlash();
+
   async function changeMemberRole(membershipId: string, role: string) {
     if (!currentWorkspace) return;
     try {
@@ -143,7 +146,8 @@
         role,
       });
       await queryClient.invalidateQueries({ queryKey: ['workspace-access'] });
-      addToast({ tone: 'success', message: t('settings.access_role_updated', locale) });
+      // In place (ADR-139 p7): the row says «guardado», no toast.
+      savedRole.show(membershipId);
     } catch (error) {
       addToast({
         tone: 'danger',
@@ -376,6 +380,7 @@
                 id={`member-role-${member.id}`}
                 ariaLabel={t('settings.access_role_for', locale, { name: member.display_name })}
                 value={member.role}
+                saved={savedRole.is(member.id)}
                 onchange={(event) =>
                   changeMemberRole(member.id, (event.currentTarget as HTMLSelectElement).value)}
               >
