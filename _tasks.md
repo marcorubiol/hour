@@ -443,6 +443,9 @@
 
 ## Producto — después
 
+- [ ] Marco: decidir — **Segundo nivel y calma (revisión 19-10)**: elegir una opción por problema en https://claude.ai/artifact/3mfP91nKLzdU6gva6agkT6 (ficha, panel lateral, alta al plan, lenguaje de formularios, calma, peso). Informes en `build/coordination/review-depth/` (fuera de git). Orden propuesto: piezas base y guardado con borrador; ficha; panel; alta; calma y peso.
+  - [ ] Bug: en Ajustes, «Subir imagen» no hace nada (revisión 19-10, `ux-flujos.md`).
+  - [ ] Pulido: en oscuro el diálogo se funde con la página; desplegable de 40 px junto a campo de 44; pie del diálogo partido en móvil; `--font-size-s` no existe (ficha de persona) (revisión 19-10, `ui-visual.md`).
 - [ ] **Una conversación con etiquetas y tres capas de estado (ADR-138)**: plan validado por Marco el 19-10, entero
   como recomendaba (`build/plans/2026-10-19-conversations-tags.md`). E1 y E2 en producción el 19-10 (CHANGELOG). Fases, cada una se despliega sola:
   - [ ] Desk y el margen del Planner leen como mucho 100 conversaciones y `muk-cia` tiene 152: puede faltar algún paso en los dos (carril E3, 19-10, sin estimar).
