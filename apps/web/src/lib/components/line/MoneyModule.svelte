@@ -18,6 +18,7 @@
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
+  import Field from '../Field.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
   import Menu from '$lib/components/Menu.svelte';
@@ -399,8 +400,7 @@
   <div class="lmm__form-grid">
     <Select label={t('books.category', locale)} bind:value={eCategory} options={categoryOptions} />
     <Input label={t('books.description', locale)} bind:value={eDescription} required />
-    <div class="field">
-      <label for="lmm-exp-amount">{t('books.amount', locale)}<span aria-hidden="true"> *</span></label>
+    <Field id="lmm-exp-amount" label={t('books.amount', locale)} required>
       <input
         id="lmm-exp-amount"
         type="number"
@@ -409,7 +409,7 @@
         bind:value={eAmount}
         required
       />
-    </div>
+    </Field>
     <Input label={t('books.currency', locale)} bind:value={eCurrency} placeholder="EUR" />
     <Input label={t('perf.date', locale)} type="date" bind:value={eDate} />
     <Input label={t('books.notes', locale)} bind:value={eNotes} placeholder={t('books.optional', locale)} />
@@ -525,10 +525,8 @@
     }
 
     .lmm__form-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-      gap: var(--space-s) var(--space-m);
-      margin-block: var(--space-s);
+      display: flex;
+      flex-direction: column;
     }
   }
 </style>

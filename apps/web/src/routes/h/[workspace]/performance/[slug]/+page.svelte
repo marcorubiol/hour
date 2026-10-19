@@ -18,7 +18,9 @@
   import RecordState from '$lib/components/RecordState.svelte';
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
+  import Field from '$lib/components/Field.svelte';
   import Input from '$lib/components/Input.svelte';
+  import Textarea from '$lib/components/Textarea.svelte';
   import Menu from '$lib/components/Menu.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import ProductionStub from '$lib/components/ProductionStub.svelte';
@@ -911,38 +913,33 @@
     {#if showHoldNotice}
       <!-- ADR-080 §2 — discreet, hold-only. Empty = default 30 (the
            placeholder says it), 0 = no notice. -->
-      <div class="field">
-        <label for="f-hold-notice">{t('perf.hold_notice', locale)}</label>
-        <div class="field__control">
-          <input
-            id="f-hold-notice"
-            type="number"
-            min="0"
-            max="365"
-            step="1"
-            inputmode="numeric"
-            bind:value={fHoldNotice}
-            placeholder={String(HOLD_NOTICE_DEFAULT)}
-            aria-describedby={fHoldNotice === 0 ? 'f-hold-notice-msg' : undefined}
-          />
-          <span class="field__suffix">{t('perf.hold_notice_suffix', locale)}</span>
-        </div>
-        {#if fHoldNotice === 0}
-          <p id="f-hold-notice-msg" class="field__msg">{t('perf.hold_notice_none', locale)}</p>
-        {/if}
-      </div>
+      <Field
+        id="f-hold-notice"
+        label={t('perf.hold_notice', locale)}
+        helper={fHoldNotice === 0 ? t('perf.hold_notice_none', locale) : undefined}
+      >
+        <input
+          id="f-hold-notice"
+          type="number"
+          min="0"
+          max="365"
+          step="1"
+          inputmode="numeric"
+          bind:value={fHoldNotice}
+          placeholder={String(HOLD_NOTICE_DEFAULT)}
+          aria-describedby={fHoldNotice === 0 ? 'f-hold-notice-msg' : undefined}
+        />
+        {#snippet suffix()}{t('perf.hold_notice_suffix', locale)}{/snippet}
+      </Field>
     {/if}
   </div>
   <div class="perf__venue-link">
-    <div class="field">
-      <label for="f-venue-entity">{t('perf.linked_venue', locale)}</label>
-      <select id="f-venue-entity" bind:value={fVenueId}>
-        <option value="">{t('perf.linked_venue_none', locale)}</option>
-        {#each venues as vn (vn.id)}
-          <option value={vn.id}>{vn.name}{vn.city ? ` — ${vn.city}` : ''}</option>
-        {/each}
-      </select>
-    </div>
+    <Select id="f-venue-entity" label={t('perf.linked_venue', locale)} bind:value={fVenueId}>
+      <option value="">{t('perf.linked_venue_none', locale)}</option>
+      {#each venues as vn (vn.id)}
+        <option value={vn.id}>{vn.name}{vn.city ? ` — ${vn.city}` : ''}</option>
+      {/each}
+    </Select>
     <Button
       variant="secondary"
       size="s"
@@ -962,12 +959,11 @@
     <DirectoryPicker workspaceId={perf.workspace_id} {locale} onadopt={onDirectoryAdopt} />
     <p class="perf__dialog-hint">{t('directory.hint', locale)}</p>
   {/if}
-  <div class="perf__danger">
-    <Button variant="secondary" tone="warn" size="s" onclick={() => (confirmDeleteOpen = true)}>
+  {#snippet lead()}
+    <Button variant="quiet" tone="warn" onclick={() => (confirmDeleteOpen = true)}>
       {t('perf.delete', locale)}
     </Button>
-    <span class="perf__dialog-hint">{t('perf.delete_hint', locale)}</span>
-  </div>
+  {/snippet}
   {#snippet actions()}
     <Button variant="quiet" onclick={() => (dialogOpen = false)}>{t('create.cancel', locale)}</Button>
     <Button onclick={saveEdit} loading={$patchMutation.isPending}>{t('edit.save', locale)}</Button>
@@ -984,21 +980,18 @@
   </div>
   <div class="perf__form-grid">
     <Input label={t('venue.address', locale)} bind:value={vAddress} placeholder={t('venue.address_placeholder', locale)} />
-    <div class="field">
-      <label for="v-timezone">{t('venue.timezone', locale)}</label>
-      <input
-        id="v-timezone"
-        type="text"
-        list="v-timezone-list"
-        bind:value={vTimezone}
-        placeholder="Europe/Madrid"
-      />
-      <datalist id="v-timezone-list">
-        {#each timezoneOptions as tz (tz)}
-          <option value={tz}></option>
-        {/each}
-      </datalist>
-    </div>
+    <Input
+      id="v-timezone"
+      label={t('venue.timezone', locale)}
+      list="v-timezone-list"
+      bind:value={vTimezone}
+      placeholder="Europe/Madrid"
+    />
+    <datalist id="v-timezone-list">
+      {#each timezoneOptions as tz (tz)}
+        <option value={tz}></option>
+      {/each}
+    </datalist>
   </div>
   <div class="perf__venue-contacts">
     <p class="eyebrow">{t('venue.contacts', locale)}</p>
@@ -1018,9 +1011,8 @@
     {/each}
     <Button variant="secondary" size="xs" onclick={addContactRow}>{t('venue.add_contact', locale)}</Button>
   </div>
-  <div class="field perf__venue-notes">
-    <label for="v-notes">{t('perf.notes', locale)}</label>
-    <textarea id="v-notes" rows="3" bind:value={vNotes}></textarea>
+  <div class="perf__venue-notes">
+    <Textarea id="v-notes" label={t('perf.notes', locale)} rows={3} bind:value={vNotes} />
   </div>
   {#snippet actions()}
     <Button variant="quiet" onclick={() => (venueEditOpen = false)}>{t('create.cancel', locale)}</Button>
@@ -1059,6 +1051,7 @@
     })}
   </p>
   <p class="perf__dialog-hint">{t('perf.delete_no_undo', locale)}</p>
+  <p class="perf__dialog-hint">{t('perf.delete_hint', locale)}</p>
   {#snippet actions()}
     <Button variant="quiet" onclick={() => (confirmDeleteOpen = false)}>{t('perf.keep', locale)}</Button>
     <Button variant="secondary" tone="warn" onclick={() => $deleteMutation.mutate()} loading={$deleteMutation.isPending}>
@@ -1129,18 +1122,10 @@
       color: var(--text-faint);
     }
 
-    .perf__danger > :global(button) {
-      flex: none;
-    }
-
-    .perf__danger .perf__dialog-hint {
-      flex: 1 1 14rem;
-    }
-
+    /* The dialog's fields are rows, one under the other (ADR-139 p4). */
     .perf__form-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-      gap: var(--space-s) var(--space-m);
+      display: flex;
+      flex-direction: column;
       margin-block-start: var(--space-s);
     }
 
@@ -1149,26 +1134,16 @@
     .perf__venue-link {
       display: flex;
       flex-wrap: wrap;
-      align-items: end;
+      align-items: center;
       gap: var(--space-s) var(--space-m);
       margin-block-start: var(--space-s);
     }
-    .perf__venue-link .field {
-      flex: 1 1 14rem;
+    .perf__venue-link > :global(.field) {
+      flex: 1 1 100%;
     }
 
     /* The button keeps its one line; the hint is what wraps (it broke
        «Delete performance…» in two at every width). */
-    .perf__danger {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: var(--space-s) var(--space-m);
-      margin-block-start: var(--space-m);
-      padding-block-start: var(--space-m);
-      border-block-start: 1px solid var(--border-color-light);
-    }
-
     .perf__venue-contacts {
       display: flex;
       flex-direction: column;
@@ -1181,6 +1156,7 @@
       grid-template-columns: 1fr 1fr 1fr 1fr auto;
       gap: var(--space-xs);
       align-items: end;
+      --field-label-width: 100%;
     }
 
     .perf__contact-remove {

@@ -1455,11 +1455,10 @@
 
 .mny__dialog-who { font-size: var(--text-s); color: var(--text-muted); }
     .mny__dialog-note { font-size: var(--text-xs); color: var(--text-faint); margin-block-start: var(--space-s); }
-    .mny__fee-form { display: grid; grid-template-columns: 2fr 1fr; gap: var(--space-m); margin-block-start: var(--space-s); }
-    .mny__pay-form { display: flex; flex-direction: column; gap: var(--space-m); }
-    .mny__row2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-m); }
+    /* The dialogs' fields are rows, one under the other (ADR-139 p4). */
+    .mny__fee-form, .mny__pay-form, .mny__inv-form { display: flex; flex-direction: column; margin-block-start: var(--space-s); }
+    .mny__row2 { display: contents; }
     .mny__inv-fee-line { font-size: var(--text-s); color: var(--text-muted); margin-block-start: var(--space-xs); }
-    .mny__inv-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: var(--space-s) var(--space-m); margin-block: var(--space-s); }
     .mny__inv-total-preview { font-size: var(--text-s); margin-block-start: var(--space-s); }
     @media (max-width: 760px) {
       .figs__row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1487,7 +1486,6 @@
       .mny__expenses li { grid-template-columns: 1fr auto; gap: var(--space-2xs) var(--space-s); }
       .mny__expense-description { grid-column: 1 / -1; }
       .mny__expenses strong { grid-column: 2; grid-row: 1; }
-      .mny__row2, .mny__inv-form, .mny__fee-form { grid-template-columns: 1fr; }
     }
   }
 </style>

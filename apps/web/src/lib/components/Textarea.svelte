@@ -2,7 +2,7 @@
   /**
    * Textarea — a long value in a field row (ADR-139 p4). The label sits on
    * top (a paragraph does not fit the label column) and the text has no
-   * box, like every other value. `maxlength` shows its count as the helper.
+   * box, like every other value. `counter` shows the count against `maxlength`.
    */
   import Field from './Field.svelte';
 
@@ -14,6 +14,8 @@
     placeholder?: string;
     rows?: number;
     maxlength?: number;
+    /** Show «12 / 280» as the helper. */
+    counter?: boolean;
     helper?: string;
     error?: string;
     required?: boolean;
@@ -35,6 +37,7 @@
     placeholder,
     rows = 3,
     maxlength,
+    counter = false,
     helper,
     error,
     required = false,
@@ -50,7 +53,7 @@
   let fieldId = $derived(
     id ?? name ?? `field-${Math.random().toString(36).slice(2, 8)}`
   );
-  let count = $derived(maxlength ? `${(value ?? '').length} / ${maxlength}` : undefined);
+  let count = $derived(counter && maxlength ? `${(value ?? '').length} / ${maxlength}` : undefined);
   let shown = $derived(error ?? helper ?? count);
 </script>
 

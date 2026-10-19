@@ -14,6 +14,7 @@
   import { dayMonthYear, localDayISO } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
+  import Textarea from './Textarea.svelte';
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
@@ -145,16 +146,14 @@
       error={futureDay ? t('conversations.not_future', locale) : undefined}
     />
   </div>
-  <div class="field">
-    <label for="history-body">{t('blackout.note', locale)}</label>
-    <textarea
-      id="history-body"
-      rows="2"
-      maxlength="5000"
-      bind:value={body}
-      placeholder={t('conversations.event_body_ph', locale)}
-    ></textarea>
-  </div>
+  <Textarea
+    id="history-body"
+    label={t('blackout.note', locale)}
+    rows={2}
+    maxlength={5000}
+    bind:value={body}
+    placeholder={t('conversations.event_body_ph', locale)}
+  />
   <div class="history-add__submit">
     <Button type="submit" size="s" disabled={$addMutation.isPending || !day || futureDay}>{t('conversations.record', locale)}</Button>
   </div>
@@ -191,14 +190,13 @@
     .history-add {
       display: flex;
       flex-direction: column;
-      gap: var(--space-s);
+      gap: var(--space-xs);
       padding-block-end: var(--space-m);
       border-block-end: var(--divider);
     }
     .history-add__row {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
-      gap: var(--space-s);
+      display: flex;
+      flex-direction: column;
     }
     .history-add__submit {
       display: flex;

@@ -14,6 +14,7 @@
    * the list is open, Esc closes it. The list is `styles/listbox.css`.
    */
   import { useQueryClient } from '@tanstack/svelte-query';
+  import Field from '$lib/components/Field.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { t, type Locale } from '$lib/i18n';
   import { createPerson, matchPeople, type PersonOption } from '$lib/persons';
@@ -117,9 +118,8 @@
   }
 </script>
 
-<div class="field picker">
-  {#if showLabel}<label for={`${listId}-in`}>{label}</label>{/if}
-  <div class="field__control">
+<div class="picker">
+  <Field id={`${listId}-in`} label={showLabel ? label : undefined}>
     <input
       id={`${listId}-in`}
       role="combobox"
@@ -137,7 +137,7 @@
       onblur={() => setTimeout(() => (open = false), 120)}
       disabled={disabled || creating}
     />
-  </div>
+  </Field>
   {#if open}
     <div class="listbox" role="listbox" id={listId} aria-label={label}>
       {#each rows as row, i (row?.person_id ?? '+')}

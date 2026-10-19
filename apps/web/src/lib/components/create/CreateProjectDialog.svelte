@@ -162,6 +162,7 @@
       label={t('project.description', locale)}
       bind:value={description}
       maxlength={280}
+      counter
       rows={3}
       placeholder={t('project.description_ph', locale)}
       disabled={$create.isPending}

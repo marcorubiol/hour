@@ -13,6 +13,7 @@
   import { toStore } from 'svelte/store';
   import { ApiError, fetchJSON, mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
+  import Textarea from './Textarea.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
@@ -233,18 +234,15 @@
 
     <AccentSwatchPicker bind:accent autoSlug={autoAccentSlug} label={t('workspace.color', locale)} disabled={$save.isPending} />
 
-    <label class="field">
-      <span>{t('project.description', locale)}</span>
-      <textarea
-        class="ews__desc"
-        bind:value={description}
-        maxlength="280"
-        rows="3"
-        placeholder={t('workspace.description_ph', locale)}
-        disabled={$save.isPending}
-      ></textarea>
-      <span class="ews__desc-count">{description.length} / 280</span>
-    </label>
+    <Textarea
+      label={t('project.description', locale)}
+      bind:value={description}
+      maxlength={280}
+      counter
+      rows={3}
+      placeholder={t('workspace.description_ph', locale)}
+      disabled={$save.isPending}
+    />
 
     <button type="submit" hidden aria-hidden="true"></button>
   </form>
@@ -293,18 +291,7 @@
     .ews__form {
       display: flex;
       flex-direction: column;
-      gap: var(--space-m);
-    }
-
-    .ews__desc {
-      resize: vertical;
-      min-block-size: 5em;
-    }
-
-    .ews__desc-count {
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      text-align: end;
+      gap: var(--space-xs);
     }
 
     .ews__address {
@@ -342,7 +329,7 @@
 
     .ews__address-claim {
       display: flex;
-      align-items: flex-end;
+      align-items: center;
       gap: var(--space-s);
     }
 

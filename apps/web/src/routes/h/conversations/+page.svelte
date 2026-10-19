@@ -662,6 +662,7 @@
     <div class="conversations__controls">
       <div class="conversations__search">
         <Input
+          toolbar
           label={t('conversations.search', locale)}
           type="search"
           placeholder={t('conversations.search_ph', locale)}
@@ -669,7 +670,7 @@
         />
       </div>
       <span class="conversations__relation">
-        <Select label={t('conversations.relation', locale)} options={relationOptions} bind:value={() => relationFilter, setRelation} />
+        <Select toolbar label={t('conversations.relation', locale)} options={relationOptions} bind:value={() => relationFilter, setRelation} />
         <ConceptHint concept="relation" />
       </span>
       {#if filterChip}
@@ -748,7 +749,7 @@
 <Dialog bind:open={addOpen} title={t('conversations.add', locale)} size="m">
   <p class="conversations__dialog-hint">{t('conversations.add_hint', locale)}</p>
   <fieldset class="conversations__spaces">
-    <legend class="conversations__field-label">
+    <legend class="eyebrow eyebrow--sub">
       {t('picker.spaces', locale)} <span class="conversations__field-hint">{t('conversations.spaces_hint', locale)}</span>
     </legend>
     {#if projectGroups.length === 0}
@@ -848,8 +849,8 @@
     .conversations__relation > :global(.hint) {
       margin-block-end: calc((var(--control-size-m) - 1.4em) / 2);
     }
-    /* One height for the search, the status and the two buttons (diseño M9). */
-    .conversations__controls :global(.field__control),
+    /* One height for the search, the status and the two buttons (diseño M9):
+       the fields take it from `toolbar`, the buttons from here. */
     .conversations__controls > :global(button) {
       block-size: var(--control-size-m);
     }
@@ -909,13 +910,14 @@
       padding: 0;
       margin-block-start: var(--space-m);
     }
-    .conversations__field-label {
+    .conversations__spaces > legend {
       padding: 0;
-      font-size: var(--text-s);
-      color: var(--text-color);
     }
     .conversations__field-hint {
       color: var(--text-faint);
+      text-transform: none;
+      letter-spacing: normal;
+      font-family: var(--font-sans);
     }
     .conversations__space-groups {
       display: grid;
@@ -930,8 +932,7 @@
     }
     /* Per-project line select — indented under its project checkbox. */
     .conversations__line {
-      margin-inline-start: var(--space-l);
-      max-inline-size: 12rem;
+      margin-inline-start: calc(var(--check-size) + var(--space-s));
     }
 
     .conversations__space-name {
@@ -943,10 +944,11 @@
       margin-block-end: var(--space-2xs);
     }
 
+    /* Rows, one under the other (ADR-139 p4); the groups only keep the
+       order and a breath between them. */
     .conversations__form-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-      gap: var(--space-s) var(--space-m);
+      display: flex;
+      flex-direction: column;
       margin-block-start: var(--space-s);
     }
 
