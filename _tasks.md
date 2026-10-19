@@ -443,8 +443,10 @@
 
 ## Producto — después
 
-- [ ] Marco: decidir — **Segundo nivel y calma (revisión 19-10)**: elegir una opción por problema en https://claude.ai/artifact/3mfP91nKLzdU6gva6agkT6 (ficha, panel lateral, alta al plan, lenguaje de formularios, calma, peso). Informes en `build/coordination/review-depth/` (fuera de git). Orden propuesto: piezas base y guardado con borrador; ficha; panel; alta; calma y peso.
-  - [ ] Bug: en Ajustes, «Subir imagen» no hace nada (revisión 19-10, `ux-flujos.md`).
+- [ ] **Segundo nivel y calma (ADR-139)**: Marco eligió la A en los siete el 19-10. Fases: **1** piezas de formulario (`claude/form-pieces`) y de ficha (`claude/record-pieces`) en carril desde el 19-10, después el modelo de guardado; **2** la ficha (hechos, «Falta», plegado); **3** vistazo lateral; **4** alta al plan; **5** calma y peso. Informes y artifact en `build/coordination/review-depth/`.
+  - [ ] Marco: decidir — Logística, acogida y técnica se ven en la ficha de función pero no se escriben en ningún sitio (`JsonKV.svelte`): ¿quitarlas hasta que tengan editor o «+ añadir línea»? Recomendación: «+ añadir línea» con el campo nuevo.
+  - [ ] Marco: decidir — El estado de una función ofrece «facturado» y «cobrado», que son del bolo: ¿quitarlos del menú de la función? Recomendación: sí, el dinero vive en el bolo (ADR-087).
+  - [ ] Bug: en Ajustes, «Subir imagen» no hace nada (revisión 19-10; en `claude/record-pieces`).
   - [ ] Pulido: en oscuro el diálogo se funde con la página; desplegable de 40 px junto a campo de 44; pie del diálogo partido en móvil; `--font-size-s` no existe (ficha de persona) (revisión 19-10, `ui-visual.md`).
 - [ ] **Una conversación con etiquetas y tres capas de estado (ADR-138)**: plan validado por Marco el 19-10, entero
   como recomendaba (`build/plans/2026-10-19-conversations-tags.md`). E1 y E2 en producción el 19-10 (CHANGELOG). Fases, cada una se despliega sola:
