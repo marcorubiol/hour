@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- Ayuda en el sitio, en Hoy y el Planificador: una «i» junto a cada concepto que lo pide, una tarjeta de bienvenida la primera vez con «?» para volver a verla, y avisos la primera vez que pasa algo. Lo visto se guarda por persona y se puede volver a ver desde Ajustes. Y una conversación en «no esta vez» ya no recibe un envío en bloque, aunque la elijas a mano. (2026-10-19)
 - Una conversación ya no dice «Confirmado»: lo confirmado es una fecha y se ve en sus bolos («14 mar · confirmado»), y la conversación muestra la relación con la sala, deducida del historial (nunca contactada, contactada, en conversación, dormida, habitual). El único estado a mano es «no esta vez», que caduca solo. Y «lo conozco»: una marca tuya sobre un contacto, privada hasta que la compartes (ADR-138). (2026-10-19)
 - Una sola portada: al entrar llegas a **Hoy** (antes Desk), con el saludo y el reloj en su cabecera y la barra de secciones desde el primer momento. Desk se llama Hoy, Avui, Aujourd'hui o Today según el idioma; en inglés la vista de las salas pasa a «Venues» para no confundirse con Books; y en «Te espera» la fecha dice si es cuándo te escribieron o cuándo te toca. (2026-10-19)
 - En el Planner, las flechas y «Ahora» van junto al título que mueven, y las pestañas de vista empiezan siempre en el mismo sitio: la Temporada ya no deja un hueco vacío. (2026-10-19)
