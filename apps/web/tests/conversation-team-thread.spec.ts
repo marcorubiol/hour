@@ -109,7 +109,7 @@ test.describe('el hilo del equipo de una conversación (ADR-106)', () => {
     // En «registro», el hilo del equipo va al lado de lo hablado con fuera.
     const team = page.locator('.conv__aside .inside article.thread');
     await expect(team).toBeVisible({ timeout: 30_000 });
-    await expect(team.locator('.thread__empty')).toBeVisible();
+    await expect(team.locator('.empty-line')).toBeVisible();
     // La línea de audiencia, sin plegar: quien ve esta conversación.
     await expect(team.locator('.thread__audience')).toContainText(/\d/);
 
@@ -152,8 +152,8 @@ test.describe('el hilo del equipo de una conversación (ADR-106)', () => {
       await signIn(page, LIMITED_EMAIL!, LIMITED_PASSWORD!);
       await page.goto(`/h/playwright/conversation/${conversationId}`);
       // La ficha dice que no la encuentra: ni título ni hilo.
-      await expect(page.locator('section.conv .conv__msg')).toBeVisible({ timeout: 30_000 });
-      await expect(page.locator('.conv__title')).toHaveCount(0);
+      await expect(page.locator('section.conv [data-testid="record-state"]')).toBeVisible({ timeout: 30_000 });
+      await expect(page.locator('.record-head')).toHaveCount(0);
       await expect(page.locator('article.thread')).toHaveCount(0);
       await expect(page.getByText(BODY)).toHaveCount(0);
       const res = await page.request.get(`/api/conversations/${conversationId}/thread`);

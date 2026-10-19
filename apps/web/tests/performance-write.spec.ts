@@ -76,7 +76,7 @@ test.describe('performance write path', () => {
 
     // Creation navigates to the new performance detail.
     await page.waitForURL(/\/h\/playwright\/performance\/e2e-venue-/);
-    await expect(page.locator('.perf__title')).toContainText(venue);
+    await expect(page.getByRole('heading', { level: 1 })).toContainText(venue);
 
     // Status: proposed → confirmed via the status menu.
     await page.getByRole('button', { name: 'Change status' }).click();
