@@ -12,7 +12,6 @@
   import { SaveFlash } from '$lib/save-flash.svelte';
   import { session } from '$lib/session.svelte';
   import { t, appLocale } from '$lib/i18n';
-  import MailSignature from './MailSignature.svelte';
   import Button from '$lib/components/Button.svelte';
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
@@ -272,8 +271,11 @@
 </RecordHead>
 
 <section class="set-group">
-  <BlockHead title={t(workspaces.length === 1 ? 'settings.ws_active_one' : 'settings.ws_active_other', locale, { n: workspaces.length })} count={t('settings.ws_my_projects', locale)} />
+  <BlockHead title={t('settings.ws_my_spaces', locale)} count={workspaces.length} />
   <div class="set-group__body">
+    <!-- Only what is true and works: a space's name and how many projects it
+         holds. «Edit role», «Leave», «Create or join» and the people count had
+         no writer behind them; they come back with one. -->
     <div class="set-ws-list">
       {#each workspaces as w (w.id)}
         {@const projectCount = projects.filter((p) => p.workspace_id === w.id).length}
@@ -282,26 +284,12 @@
           <div class="set-ws__name">
             <h3>{spaceName(w.name)}</h3>
           </div>
-          <!-- personal/team label + kind-derived role badges removed
-               (ADR-064): personal/team is not a real distinction, and
-               real per-workspace roles need the (pending) members
-               endpoint — no fabricated badges. -->
-          <div class="set-ws__roles"></div>
           <div class="set-ws__meta">
-            <span>{t('settings.ws_people_unknown', locale)}</span>
-            <span class="sep">·</span>
-            <span>{t(projectCount === 1 ? 'settings.ws_projects_one' : 'settings.ws_projects_other', locale, { n: projectCount })}</span>
-          </div>
-          <div class="set-ws__actions">
-            <button type="button" class="btn--secondary btn--s">{t('settings.ws_edit_role', locale)}</button>
-            <button type="button" class="btn--secondary btn--s is-warn">{t('settings.ws_leave', locale)}</button>
+            {t(projectCount === 1 ? 'settings.ws_projects_one' : 'settings.ws_projects_other', locale, { n: projectCount })}
           </div>
         </div>
       {/each}
     </div>
-    <button type="button" class="set-add">
-      {t('settings.ws_create_join', locale)}
-    </button>
   </div>
 </section>
 
@@ -426,8 +414,6 @@
   </section>
 {/if}
 
-<MailSignature scope="workspace" workspaceId={currentWorkspace?.id} />
-
 {#if aliasRequests.length > 0}
   <section class="set-group">
     <BlockHead
@@ -505,36 +491,13 @@
     max-inline-size: 56ch;
   }
 
-  /* Pseudo-button "+ Add a thing" — dashed outline placeholder for
-     creation affordances. Specific enough to keep local. */
-  .set-add {
-    appearance: none;
-    align-self: flex-start;
-    padding-block: var(--space-s);
-    padding-inline: var(--space-m);
-    border: 1px dashed var(--border-color-dark);
-    border-radius: var(--radius-s);
-    background: transparent;
-    color: var(--text-muted);
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    letter-spacing: 0.04em;
-    cursor: pointer;
-    margin-block-start: var(--space-s);
-    transition: color var(--transition), border-color var(--transition);
-  }
-  .set-add:hover {
-    color: var(--text-color);
-    border-color: var(--text-muted);
-  }
-
   .set-ws-list {
     display: flex;
     flex-direction: column;
   }
   .set-ws {
     display: grid;
-    grid-template-columns: 4px minmax(140px, 1fr) auto auto auto;
+    grid-template-columns: 4px minmax(0, 1fr) auto;
     gap: var(--set-pad);
     align-items: center;
     padding-block: var(--space-m);
@@ -557,34 +520,11 @@
     margin: 0;
     color: var(--text-color);
   }
-  .set-ws__sub {
-    font-size: var(--text-xs);
-    color: var(--text-faint);
-    font-family: var(--font-mono);
-    letter-spacing: 0.04em;
-    margin-block-start: 2px;
-  }
-  .set-ws__roles {
-    display: flex;
-    gap: var(--space-xs);
-    flex-wrap: wrap;
-    max-inline-size: 280px;
-  }
-  /* Role badges via base.css .role-badge (+ .is-mine). */
   .set-ws__meta {
     font-family: var(--font-mono);
     font-size: var(--text-xs);
     color: var(--text-faint);
-    display: flex;
-    gap: var(--space-xs);
     white-space: nowrap;
-  }
-  .set-ws__meta .sep {
-    opacity: 0.5;
-  }
-  .set-ws__actions {
-    display: flex;
-    gap: var(--space-xs);
   }
 
   .set-alias-list {
@@ -738,31 +678,6 @@
   }
   .set-access__role-select { min-inline-size: 8rem; }
 
-  /* On a phone a space's row reads down instead of across: the name, its
-     counts under it, then the two buttons, all beside the one colour rail
-     that now runs the row's whole height. The empty roles cell takes no
-     line. */
-  @media (max-width: 47.999rem) {
-    .set-ws {
-      grid-template-columns: 4px minmax(0, 1fr);
-      grid-auto-flow: row;
-      row-gap: var(--space-xs);
-      align-items: start;
-    }
-    .set-ws__rail {
-      grid-row: 1 / span 4;
-      block-size: 100%;
-    }
-    .set-ws > :not(.set-ws__rail) {
-      grid-column: 2;
-    }
-    .set-ws__roles:empty {
-      display: none;
-    }
-    .set-ws__actions {
-      margin-block-start: var(--space-xs);
-    }
-  }
   @media (max-width: 44rem) {
     .set-access__row {
       grid-template-columns: 8px 1fr auto;

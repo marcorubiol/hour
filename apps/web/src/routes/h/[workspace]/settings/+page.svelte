@@ -7,10 +7,9 @@
    * Active section is driven by the `?section=` query param so the URL
    * is shareable and the sidebar nav stays in sync.
    *
-   * Phase 0 reality: only Profile (full name, email) and Notifications →
-   * Master View are wired. Workspaces/privacy/languages/notifications/
-   * billing/danger are kept as scaffolding for the cases the active backlog
-   * will actually need; the rest was pruned (vapor).
+   * Only controls that keep what you set are drawn. Notifications, Billing
+   * and Danger zone are hidden until they save (see SettingsNav); Master
+   * View, the one real switch of Notifications, lives in Profile.
    *
    * Each section's markup, local state and section-specific styles live in
    * $lib/components/settings/*Section.svelte. This page keeps the section
@@ -23,22 +22,19 @@
   import { createQuery } from '@tanstack/svelte-query';
   import { fetchJSON } from '$lib/api';
   import { t, appLocale } from '$lib/i18n';
-  import { type SectionId } from '$lib/components/SettingsNav.svelte';
+  import { type SectionId, sectionFrom } from '$lib/components/SettingsNav.svelte';
   import ProfileSection from '$lib/components/settings/ProfileSection.svelte';
   import WorkspacesSection from '$lib/components/settings/WorkspacesSection.svelte';
   import PrivacySection from '$lib/components/settings/PrivacySection.svelte';
   import LanguagesSection from '$lib/components/settings/LanguagesSection.svelte';
   import LensesSection from '$lib/components/settings/LensesSection.svelte';
   import MailSection from '$lib/components/settings/MailSection.svelte';
-  import NotificationsSection from '$lib/components/settings/NotificationsSection.svelte';
-  import BillingSection from '$lib/components/settings/BillingSection.svelte';
-  import DangerSection from '$lib/components/settings/DangerSection.svelte';
 
   const locale = appLocale();
 
   let workspaceSlug = $derived(page.params.workspace ?? '');
   let active = $derived<SectionId>(
-    (page.url.searchParams.get('section') as SectionId | null) ?? 'profile',
+    sectionFrom(page.url.searchParams.get('section')),
   );
 
   // ─── workspaces & projects ────────────────────────────────────────────
@@ -108,18 +104,6 @@
 
   {#if active === 'mail'}
     <MailSection workspaceId={currentWorkspace?.id} />
-  {/if}
-
-  {#if active === 'notifications'}
-    <NotificationsSection />
-  {/if}
-
-  {#if active === 'billing'}
-    <BillingSection />
-  {/if}
-
-  {#if active === 'danger'}
-    <DangerSection />
   {/if}
 </article>
 
@@ -196,9 +180,6 @@
     .set-page :global(.set-row__lead) {
       padding-block-start: 0;
     }
-  }
-  .set-page :global(.set-row.is-danger .set-row__label) {
-    color: var(--danger);
   }
   /* A value in a settings row is a field row without its own label
      (ADR-139 p4); one that cannot be edited here is plain text. */

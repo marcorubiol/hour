@@ -3,8 +3,8 @@
    * La firma de correo en un espacio (ADR-099, añadido: la firma es de la
    * persona en cada compañía, no del buzón).
    *
-   * `personal`: «Tu firma en <compañía>», en Perfil. La edita cada uno.
-   * `workspace`: la de la compañía, con su web y su teléfono, en Espacios. La
+   * `personal`: «Tu firma en <compañía>». La edita cada uno.
+   * `workspace`: la de la compañía, con su web y su teléfono. La
    * edita un admin; los demás la ven. Con ella firma el buzón común.
    *
    * Hour siempre propone una con lo que exista; guardada vacía o igual que la

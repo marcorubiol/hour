@@ -17,6 +17,7 @@
   import { appLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
   import MailDomainSection from './MailDomainSection.svelte';
+  import MailSignature from './MailSignature.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import type { MailAccountItem, MailAccountsResponse, MailAccountScope } from '$lib/mail';
 
@@ -180,6 +181,11 @@
     </div>
   </div>
 </section>
+
+<!-- Both signatures live here, beside the mailboxes they sign (yours, then
+     the company's for the shared one): one place, each hint says when it goes. -->
+<MailSignature scope="personal" {workspaceId} />
+<MailSignature scope="workspace" {workspaceId} />
 
 <MailDomainSection {workspaceId} />
 

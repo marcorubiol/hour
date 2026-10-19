@@ -24,6 +24,9 @@
         formatted once for both faces. */
     clockNow: Date;
     clockTime: string;
+    /** In Settings the pulse (Ahora / Siguiente) says nothing about what is
+        on screen: you came to change one thing, not to plan. */
+    inSettings?: boolean;
   }
 
   let {
@@ -33,6 +36,7 @@
     onclose,
     clockNow,
     clockTime,
+    inSettings = false,
   }: Props = $props();
 
   const pins = usePins();
@@ -110,7 +114,9 @@
   <!-- THE PULSE reads the clock's own tick: one timer in the rail, and the
        two can never disagree about what minute it is. It sits ABOVE the
        scopes because it is not filtered by them — see RailPulse. -->
-  <RailPulse now={clockNow} {locale} />
+  {#if !inSettings}
+    <RailPulse now={clockNow} {locale} />
+  {/if}
   <div class="side-sec">
     <div class="side-sec__h">{t('shell.scopes', locale)}</div>
     <button

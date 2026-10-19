@@ -630,6 +630,7 @@
       onclose={() => closeRail({ returnFocus: true })}
       {clockNow}
       {clockTime}
+      {inSettings}
     />
 
     {#if inSettings}
