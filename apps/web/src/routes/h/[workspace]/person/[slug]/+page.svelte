@@ -416,9 +416,9 @@
       <div class="person__section-head">
         <p class="eyebrow">{t('conversations.col_contact', locale)}</p>
         <span class="person__verbs">
-          <Button variant="outline" size="xs" onclick={openEdit}>{t('person.edit', locale)}</Button>
+          <Button variant="secondary" size="xs" onclick={openEdit}>{t('person.edit', locale)}</Button>
           {#if file.can_invite}
-            <Button variant="outline" size="xs" onclick={openInvite}>
+            <Button variant="secondary" size="xs" onclick={openInvite}>
               {t('person.invite', locale, { name: file.person.full_name })}
             </Button>
           {/if}
@@ -447,7 +447,7 @@
     <section class="person__section" aria-label={t('lens.conversations', locale)}>
       <div class="person__section-head">
         <p class="eyebrow">{t('lens.conversations', locale)}</p>
-        <Button variant="outline" size="xs" onclick={() => (addOpen = true)}>
+        <Button variant="secondary" size="xs" onclick={() => (addOpen = true)}>
           {t('person.add_to_project', locale)}
         </Button>
       </div>
@@ -556,7 +556,7 @@
     />
   </div>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (addOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" onclick={() => (addOpen = false)}>{t('create.cancel', locale)}</Button>
     <Button
       onclick={submitAddConversation}
       loading={$addConversation.isPending}
@@ -575,7 +575,7 @@
     <Input label={t('person.field_phone', locale)} type="tel" bind:value={ePhone} />
   </div>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (editOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" onclick={() => (editOpen = false)}>{t('create.cancel', locale)}</Button>
     <Button
       onclick={() => $saveDetails.mutate()}
       loading={$saveDetails.isPending}
@@ -604,7 +604,7 @@
     </div>
   {/if}
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (inviteOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" onclick={() => (inviteOpen = false)}>{t('create.cancel', locale)}</Button>
     {#if inviteUrl}
       <Button onclick={copyInvite}>{t('person.invite_copy', locale)}</Button>
     {:else}

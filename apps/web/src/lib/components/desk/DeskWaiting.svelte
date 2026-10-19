@@ -131,9 +131,9 @@
       >
       <span class="row__when">{whenOf(item)}</span>
       <span class="row__acts">
-        <button type="button" class="row__act btn--outline btn--xs" onclick={() => item.taskId && onaccept(item.taskId)}
+        <button type="button" class="row__act btn--secondary btn--xs" onclick={() => item.taskId && onaccept(item.taskId)}
           >{t('desk.proposal_add', locale)}</button
-        ><button type="button" class="row__act row__act--quiet btn--outline btn--xs" onclick={() => item.taskId && onremove(item.taskId)}
+        ><button type="button" class="row__act row__act--quiet btn--secondary btn--xs" onclick={() => item.taskId && onremove(item.taskId)}
           >{t('desk.proposal_dismiss', locale)}</button
         >
       </span>
@@ -163,12 +163,12 @@
           {@const g = item.going}
           <button
             type="button"
-            class="row__act btn--outline btn--xs"
+            class="row__act btn--secondary btn--xs"
             aria-label={t('desk.going_aria', locale, { subject: item.subject })}
             onclick={() => onanswer(g, 'going')}>{t('pulse.going', locale)}</button
           ><button
             type="button"
-            class="row__act row__act--quiet btn--outline btn--xs"
+            class="row__act row__act--quiet btn--secondary btn--xs"
             aria-label={t('desk.not_going_aria', locale, { subject: item.subject })}
             onclick={() => onanswer(g, 'not_going')}
             >{t('pulse.not_going', locale)}</button
@@ -225,7 +225,7 @@
         </li>{/each}
     </ul>
   {:else if errored}
-    <p class="load-fail" role="alert"><span>{t('desk.error', locale)}</span><Button size="xs" variant="outline" onclick={onretry}>{t('ui.retry', locale)}</Button></p>
+    <p class="load-fail" role="alert"><span>{t('desk.error', locale)}</span><Button size="xs" variant="secondary" onclick={onretry}>{t('ui.retry', locale)}</Button></p>
   {:else if all}
     <div class="timeline">
       {#each feed as bucket (bucket.sortKey)}

@@ -695,7 +695,7 @@
         <a class="link-arrow" href={`/h/${workspaceSlug}/performance/${slug}/roadsheet`}>{t('roadsheet.open', locale)}</a><ConceptHint
           concept="roadsheet"
         />
-        <Button variant="outline" size="xs" onclick={openEdit}>{t('perf.edit_details', locale)}</Button>
+        <Button variant="secondary" size="xs" onclick={openEdit}>{t('perf.edit_details', locale)}</Button>
       </p>
     </header>
 
@@ -944,7 +944,7 @@
       </select>
     </div>
     <Button
-      variant="outline"
+      variant="secondary"
       size="s"
       disabled={!fVenue.trim()}
       loading={$promoteVenue.isPending}
@@ -952,7 +952,7 @@
     >
       {t('perf.save_as_venue', locale)}
     </Button>
-    <Button variant="outline" size="s" disabled={!fVenueId} onclick={openVenueEdit}>
+    <Button variant="secondary" size="s" disabled={!fVenueId} onclick={openVenueEdit}>
       {t('perf.edit_venue', locale)}
     </Button>
   </div>
@@ -963,13 +963,13 @@
     <p class="perf__dialog-hint">{t('directory.hint', locale)}</p>
   {/if}
   <div class="perf__danger">
-    <Button variant="outline" tone="warn" size="s" onclick={() => (confirmDeleteOpen = true)}>
+    <Button variant="secondary" tone="warn" size="s" onclick={() => (confirmDeleteOpen = true)}>
       {t('perf.delete', locale)}
     </Button>
     <span class="perf__dialog-hint">{t('perf.delete_hint', locale)}</span>
   </div>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (dialogOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" onclick={() => (dialogOpen = false)}>{t('create.cancel', locale)}</Button>
     <Button onclick={saveEdit} loading={$patchMutation.isPending}>{t('edit.save', locale)}</Button>
   {/snippet}
 </Dialog>
@@ -1016,14 +1016,14 @@
         >×</button>
       </div>
     {/each}
-    <Button variant="outline" size="xs" onclick={addContactRow}>{t('venue.add_contact', locale)}</Button>
+    <Button variant="secondary" size="xs" onclick={addContactRow}>{t('venue.add_contact', locale)}</Button>
   </div>
   <div class="field perf__venue-notes">
     <label for="v-notes">{t('perf.notes', locale)}</label>
     <textarea id="v-notes" rows="3" bind:value={vNotes}></textarea>
   </div>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (venueEditOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" onclick={() => (venueEditOpen = false)}>{t('create.cancel', locale)}</Button>
     <Button onclick={saveVenue} loading={$venuePatch.isPending}>{t('venue.save', locale)}</Button>
   {/snippet}
 </Dialog>
@@ -1036,9 +1036,10 @@
     })}
   </p>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (confirmCancelOpen = false)}>{t('perf.keep', locale)}</Button>
+    <Button variant="quiet" onclick={() => (confirmCancelOpen = false)}>{t('perf.keep', locale)}</Button>
     <Button
-      variant="danger"
+      variant="secondary"
+      tone="warn"
       onclick={() => {
         confirmCancelOpen = false;
         $patchMutation.mutate({ status: 'cancelled' });
@@ -1059,8 +1060,8 @@
   </p>
   <p class="perf__dialog-hint">{t('perf.delete_no_undo', locale)}</p>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (confirmDeleteOpen = false)}>{t('perf.keep', locale)}</Button>
-    <Button variant="danger" onclick={() => $deleteMutation.mutate()} loading={$deleteMutation.isPending}>
+    <Button variant="quiet" onclick={() => (confirmDeleteOpen = false)}>{t('perf.keep', locale)}</Button>
+    <Button variant="secondary" tone="warn" onclick={() => $deleteMutation.mutate()} loading={$deleteMutation.isPending}>
       {t('edit.delete', locale)}
     </Button>
   {/snippet}

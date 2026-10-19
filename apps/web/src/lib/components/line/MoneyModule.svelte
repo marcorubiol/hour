@@ -342,7 +342,7 @@
   <section class="lmm__section" aria-label={t('books.expenses', locale)}>
     <header class="lmm__section-head">
       <p class="eyebrow eyebrow--sub lmm__sub">{t('books.expenses', locale)}</p>
-      <Button size="xs" variant="outline" onclick={openExpense}>{t('books.add_expense', locale)}</Button>
+      <Button size="xs" variant="secondary" onclick={openExpense}>{t('books.add_expense', locale)}</Button>
     </header>
     {#if expensesError}
       <p class="lmm__state lmm__state--danger">{expensesError}</p>
@@ -373,7 +373,7 @@
                   <Menu
                     label={t('books.expense_actions', locale)}
                     align="end"
-                    triggerClass="btn--outline btn--xs"
+                    triggerClass="btn--secondary btn--xs"
                     items={[
                       {
                         label: t('books.remove', locale),
@@ -415,7 +415,7 @@
     <Input label={t('books.notes', locale)} bind:value={eNotes} placeholder={t('books.optional', locale)} />
   </div>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (expOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" onclick={() => (expOpen = false)}>{t('create.cancel', locale)}</Button>
     <Button onclick={submitExpense} loading={$createExpense.isPending}>{t('composer.add', locale)}</Button>
   {/snippet}
 </Dialog>

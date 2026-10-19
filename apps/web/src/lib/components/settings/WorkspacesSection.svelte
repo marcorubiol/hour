@@ -289,8 +289,8 @@
             <span>{t(projectCount === 1 ? 'settings.ws_projects_one' : 'settings.ws_projects_other', locale, { n: projectCount })}</span>
           </div>
           <div class="set-ws__actions">
-            <button type="button" class="btn--outline btn--s">{t('settings.ws_edit_role', locale)}</button>
-            <button type="button" class="btn--outline btn--s is-warn">{t('settings.ws_leave', locale)}</button>
+            <button type="button" class="btn--secondary btn--s">{t('settings.ws_edit_role', locale)}</button>
+            <button type="button" class="btn--secondary btn--s is-warn">{t('settings.ws_leave', locale)}</button>
           </div>
         </div>
       {/each}
@@ -373,7 +373,7 @@
           <span class="eyebrow">{t('settings.access_ready', locale)}</span>
           <p>{t('settings.access_link_expiry', locale)}</p>
         </div>
-        <button type="button" class="btn--outline btn--s" onclick={copyInviteLink}>
+        <button type="button" class="btn--secondary btn--s" onclick={copyInviteLink}>
           {t('settings.access_copy_link', locale)}
         </button>
       </div>
@@ -408,7 +408,7 @@
           {#if member.role !== 'owner'}
             <button
               type="button"
-              class="btn--outline btn--s is-warn"
+              class="btn--secondary btn--s is-warn"
               onclick={() => revokeAccess(member)}
             >{t('settings.access_revoke', locale)}</button>
           {/if}
@@ -430,7 +430,7 @@
           <span class="set-access__status">{t('settings.access_status_pending', locale)}</span>
           <button
             type="button"
-            class="btn--outline btn--s is-warn"
+            class="btn--secondary btn--s is-warn"
             onclick={() => revokeAccess(invitation)}
           >{t('create.cancel', locale)}</button>
         </div>
@@ -465,7 +465,7 @@
               <div class="set-alias__actions">
                 <button
                   type="button"
-                  class="btn--outline btn--s"
+                  class="btn--secondary btn--s"
                   disabled={$reviewAlias.isPending}
                   onclick={() => $reviewAlias.mutate({ id: r.id, approve: true })}
                 >
@@ -473,7 +473,7 @@
                 </button>
                 <button
                   type="button"
-                  class="btn--outline btn--s is-warn"
+                  class="btn--secondary btn--s is-warn"
                   disabled={$reviewAlias.isPending}
                   onclick={() => $reviewAlias.mutate({ id: r.id, approve: false })}
                 >

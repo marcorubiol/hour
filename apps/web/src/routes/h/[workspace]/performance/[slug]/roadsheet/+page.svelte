@@ -171,12 +171,12 @@
               <span class="rs__share-role">{roleWord(s.role)}</span>
               <span class="rs__share-date">{dayMonthYearTs(s.created_at)}</span>
               <span class="rs__share-actions">
-                <Button size="s" variant="outline" onclick={() => copyShare(s.token)}>
+                <Button size="s" variant="secondary" onclick={() => copyShare(s.token)}>
                   {t('roadsheet.copy_link', locale)}
                 </Button>
                 <Button
                   size="s"
-                  variant="outline"
+                  variant="secondary"
                   tone="warn"
                   loading={$revokeShare.isPending}
                   onclick={() => $revokeShare.mutate(s.id)}

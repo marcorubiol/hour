@@ -123,7 +123,7 @@
 <div class="lcm">
   <div class="lcm__bar">
     {#if canEdit}
-      <Button size="xs" variant="outline" onclick={openAdd}>{t('conversations.add', locale)}</Button>
+      <Button size="xs" variant="secondary" onclick={openAdd}>{t('conversations.add', locale)}</Button>
     {/if}
   </div>
   <ConversationTable {filters} editable={canEdit} personBase={`/h/${workspaceSlug}/person`} conversationHref={(item) => `/h/${workspaceSlug}/conversation/${item.id}`} />
@@ -147,7 +147,7 @@
     <Input label={t('conversations.next_note', locale)} bind:value={aNextNote} />
   </form>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (addOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" onclick={() => (addOpen = false)}>{t('create.cancel', locale)}</Button>
     <Button loading={$addMutation.isPending} onclick={submitAdd}>{t('composer.add', locale)}</Button>
   {/snippet}
 </Dialog>

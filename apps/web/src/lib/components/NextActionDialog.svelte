@@ -53,7 +53,7 @@
     ></textarea>
   </div>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (open = false)}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" onclick={() => (open = false)}>{t('create.cancel', locale)}</Button>
     <Button onclick={save}>{t('blackout.save', locale)}</Button>
   {/snippet}
 </Dialog>

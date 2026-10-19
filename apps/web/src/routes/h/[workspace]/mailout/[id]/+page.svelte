@@ -364,7 +364,7 @@
         />
         {#if d.can_edit && ['queued', 'sending', 'paused', 'review'].includes(m.status)}
           <div class="mo__count-act">
-            <Button size="s" variant="outline" tone="warn" loading={$cancel.isPending} onclick={() => $cancel.mutate()}>
+            <Button size="s" variant="secondary" tone="warn" loading={$cancel.isPending} onclick={() => $cancel.mutate()}>
               {t('mailout.cancel_rest', locale)}
             </Button>
           </div>
@@ -425,13 +425,13 @@
           <h2 class="eyebrow eyebrow--sub">{t('mailout.preview', locale)}</h2>
           {#if previewable.length > 1}
             <div class="mo__pager">
-              <Button size="xs" variant="outline" disabled={previewIndex <= 0} onclick={() => (previewIndex = Math.max(0, previewIndex - 1))}>
+              <Button size="xs" variant="secondary" disabled={previewIndex <= 0} onclick={() => (previewIndex = Math.max(0, previewIndex - 1))}>
                 {t('mailout.prev', locale)}
               </Button>
               <span>{Math.min(previewIndex + 1, previewable.length)} / {previewable.length}</span>
               <Button
                 size="xs"
-                variant="outline"
+                variant="secondary"
                 disabled={previewIndex >= previewable.length - 1}
                 onclick={() => (previewIndex = Math.min(previewable.length - 1, previewIndex + 1))}
               >
@@ -508,7 +508,7 @@
         </p>
         <Button
           size="s"
-          variant="outline"
+          variant="secondary"
           disabled={!domain || !subject.trim() || !body.trim() || !current}
           loading={$sendTest.isPending}
           onclick={() => $sendTest.mutate()}
@@ -530,7 +530,7 @@
     <p>{t('mailout.confirm_body', locale, { n: readyCount, subject, from: fromLine })}</p>
     {#if d.simulated}<p class="mo__hint">{t('mailout.confirm_simulated', locale)}</p>{/if}
     {#snippet actions()}
-      <Button variant="outline" onclick={() => (confirmOpen = false)}>{t('create.cancel', locale)}</Button>
+      <Button variant="quiet" onclick={() => (confirmOpen = false)}>{t('create.cancel', locale)}</Button>
       <Button loading={$send.isPending} onclick={() => $send.mutate()}>{t('mailout.send_to', locale, { n: readyCount })}</Button>
     {/snippet}
   </Dialog>
@@ -543,7 +543,7 @@
       <textarea id="basis-note" rows="2" maxlength="1000" bind:value={basisNote} placeholder={t('mailout.basis_note_ph', locale)}></textarea>
     </div>
     {#snippet actions()}
-      <Button variant="outline" onclick={() => (basisOpen = false)}>{t('create.cancel', locale)}</Button>
+      <Button variant="quiet" onclick={() => (basisOpen = false)}>{t('create.cancel', locale)}</Button>
       <Button
         loading={$saveBasis.isPending}
         disabled={basisKind === 'consent' && !basisNote.trim()}

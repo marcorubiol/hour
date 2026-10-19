@@ -60,7 +60,7 @@
     onCreated={handleCreated}
   />
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (open = false)}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" onclick={() => (open = false)}>{t('create.cancel', locale)}</Button>
     <Button onclick={() => form?.submit()} loading={pending}>{t('create.submit_performance', locale)}</Button>
   {/snippet}
 </Dialog>

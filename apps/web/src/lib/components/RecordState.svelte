@@ -42,7 +42,7 @@
     {:else}
       <p class="load-fail" role="alert">
         <span>{failedText}</span>
-        <Button variant="outline" size="xs" onclick={onretry}>{t('ui.retry', locale)}</Button>
+        <Button variant="secondary" size="xs" onclick={onretry}>{t('ui.retry', locale)}</Button>
       </p>
     {/if}
     {#if back}<p class="record-state__line"><a class="link-arrow" href={back.href}>{back.label}</a></p>{/if}

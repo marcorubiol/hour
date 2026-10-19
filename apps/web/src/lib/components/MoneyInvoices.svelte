@@ -263,13 +263,13 @@
           <span class="mny-inv__actions">
             <button
               type="button"
-              class="btn--outline btn--xs"
+              class="btn--secondary btn--xs"
               aria-expanded={expandedId === invoice.id}
               onclick={() => (expandedId = expandedId === invoice.id ? null : invoice.id)}
             >
               {expandedId === invoice.id ? t('books.close', locale) : t('books.details', locale)}
             </button>
-            <Menu label={t('books.change_status', locale)} triggerClass="btn--outline btn--xs">
+            <Menu label={t('books.change_status', locale)} triggerClass="btn--secondary btn--xs">
               {#snippet trigger()}
                 <StateBadge label={invoiceStatusLabel(invoice.status, locale)} tone={invoiceTone(invoice.status)} />
                 <span aria-hidden="true">▾</span>
@@ -297,7 +297,7 @@
             {#if invoice.status === 'draft'}
               <Button
                 size="xs"
-                variant="outline"
+                variant="secondary"
                 tone="warn"
                 loading={$discardInvoice.isPending}
                 onclick={() => $discardInvoice.mutate(invoice.id)}
@@ -328,7 +328,7 @@
                 {:else if invoice.doc_type === 'factura' && fiscalState === 'stale'}
                   <p class="mny-inv__warn">
                     {t('books.payer_fiscal_stale', locale, { payer: payerName(invoice) })}
-                    <Button size="xs" variant="outline" loading={$invoicePatch.isPending} onclick={() => setPayer(invoice, invoice.payer_organization_id)}>
+                    <Button size="xs" variant="secondary" loading={$invoicePatch.isPending} onclick={() => setPayer(invoice, invoice.payer_organization_id)}>
                       {t('books.payer_fiscal_use', locale)}
                     </Button>
                   </p>
@@ -380,7 +380,7 @@
               ></textarea>
               <Button
                 size="xs"
-                variant="outline"
+                variant="secondary"
                 disabled={!aging.expectedOn}
                 loading={$createFollowUp.isPending}
                 onclick={() => $createFollowUp.mutate(invoice)}
@@ -393,7 +393,7 @@
                 {fmtMoney(invoice.paid_amount)} / {fmtMoney(invoice.total)} {invoice.currency}
               </span>
               {#if invoice.status === 'issued' || invoice.status === 'paid'}
-                <Button size="xs" variant="outline" onclick={() => openPayment(invoice)}>
+                <Button size="xs" variant="secondary" onclick={() => openPayment(invoice)}>
                   {t('books.record_payment', locale)}
                 </Button>
               {/if}
@@ -412,7 +412,7 @@
                     <strong>{fmtMoney(payment.amount)} {invoice.currency}</strong>
                     <Button
                       size="xs"
-                      variant="outline"
+                      variant="secondary"
                       tone="warn"
                       loading={$deletePayment.isPending}
                       onclick={() => $deletePayment.mutate(payment.id)}
@@ -466,7 +466,7 @@
     <Input label={t('books.notes', locale)} bind:value={pNotes} placeholder={t('books.optional', locale)} />
   {/if}
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (paymentOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" onclick={() => (paymentOpen = false)}>{t('create.cancel', locale)}</Button>
     <Button onclick={submitPayment} loading={$createPayment.isPending}>{t('books.record', locale)}</Button>
   {/snippet}
 </Dialog>

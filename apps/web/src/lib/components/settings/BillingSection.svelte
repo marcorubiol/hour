@@ -27,10 +27,10 @@
         <button type="button" class="btn--primary btn--s">
           {t('settings.bill_yearly', locale)}
         </button>
-        <button type="button" class="btn--outline btn--s">
+        <button type="button" class="btn--secondary btn--s">
           {t('settings.bill_upgrade', locale)}
         </button>
-        <button type="button" class="btn--outline btn--s is-warn">{t('settings.bill_cancel_plan', locale)}</button>
+        <button type="button" class="btn--secondary btn--s is-warn">{t('settings.bill_cancel_plan', locale)}</button>
       </div>
     </div>
   </div>
@@ -50,7 +50,7 @@
           <span class="set-card__brand">VISA</span>
           <span>•••• 4242</span>
           <span class="set-row__hint">{t('settings.bill_card_exp', locale, { date: '11/27' })}</span>
-          <button type="button" class="btn--outline btn--s">{t('settings.bill_update', locale)}</button>
+          <button type="button" class="btn--secondary btn--s">{t('settings.bill_update', locale)}</button>
         </div>
       </div>
     </div>
@@ -87,7 +87,7 @@
           <span class="set-invoice__plan">{t('settings.bill_invoice_plan', locale)}</span>
           <span class="set-invoice__amt">€9.00</span>
           <span class="set-invoice__status">{t('settings.bill_paid', locale)}</span>
-          <button type="button" class="btn--outline btn--s">PDF</button>
+          <button type="button" class="btn--secondary btn--s">PDF</button>
         </div>
       {/each}
     </div>

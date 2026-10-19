@@ -134,7 +134,7 @@
           onkeydown={(e) => sendOnModEnter(e, saveEdit)}
         ></textarea>
         <div class="msg__edit-actions">
-          <Button variant="outline" size="xs" onclick={() => (editing = false)}>{t('threads.cancel', locale)}</Button>
+          <Button variant="quiet" size="xs" onclick={() => (editing = false)}>{t('threads.cancel', locale)}</Button>
           <Button type="submit" size="xs" loading={$editMutation.isPending} disabled={!draft.trim()}>
             {t('threads.save', locale)}
           </Button>

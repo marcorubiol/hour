@@ -273,7 +273,7 @@
         <div class="set-row__ctrl">
           <button
             type="button"
-            class="btn--outline btn--s"
+            class="btn--secondary btn--s"
             onclick={clearMasterView}
           >{t('settings.notif_clear_view', locale)}</button>
         </div>

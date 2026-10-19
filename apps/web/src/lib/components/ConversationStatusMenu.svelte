@@ -93,7 +93,7 @@
   <p class="not-now-hint">{t('conversations.not_now_hint', locale)}</p>
   <Input label={t('conversations.not_now_back', locale)} type="date" bind:value={until} />
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (dialogOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" onclick={() => (dialogOpen = false)}>{t('create.cancel', locale)}</Button>
     <Button onclick={save}>{t('blackout.save', locale)}</Button>
   {/snippet}
 </Dialog>

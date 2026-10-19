@@ -160,14 +160,14 @@
                   {#if stored !== null || dirty}
                     <Button
                       size="s"
-                      variant="outline"
+                      variant="secondary"
                       disabled={$save.isPending}
                       onclick={() => (stored === null ? (draft = null) : saveSignature(null))}
                     >
                       {t('mail.signature_back_to_proposal', locale)}
                     </Button>
                   {/if}
-                  <Button size="s" variant="outline" type="submit" disabled={!dirty || $save.isPending}>
+                  <Button size="s" variant="secondary" type="submit" disabled={!dirty || $save.isPending}>
                     {t('mail.signature_save', locale)}
                   </Button>
                 </span>

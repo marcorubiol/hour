@@ -312,7 +312,7 @@
           <span class="md-at">@{d.domain}</span>
         </span>
         {#if senderDirty(d)}
-          <Button size="s" variant="outline" disabled={$saveSender.isPending} onclick={() => $saveSender.mutate(d)}>
+          <Button size="s" variant="secondary" disabled={$saveSender.isPending} onclick={() => $saveSender.mutate(d)}>
             {t('mailout.save', locale)}
           </Button>
         {/if}
@@ -364,7 +364,7 @@
           {t('mailout.check', locale)}
         </Button>
       {/if}
-      <Button size="s" variant="outline" tone="warn" disabled={$remove.isPending} onclick={() => $remove.mutate(d.id)}>
+      <Button size="s" variant="secondary" tone="warn" disabled={$remove.isPending} onclick={() => $remove.mutate(d.id)}>
         {t('mailout.remove', locale)}
       </Button>
     </div>

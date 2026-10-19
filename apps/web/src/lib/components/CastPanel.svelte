@@ -135,7 +135,7 @@
             <span class="cast__name">{m.person?.full_name ?? t('perf.cast_unknown_person', locale)}</span>
             <span class="cast__role">{m.role}</span>
             <Button
-              variant="outline"
+              variant="secondary"
               size="s"
               tone="warn"
               label={t('perf.cast_remove_named', locale, {

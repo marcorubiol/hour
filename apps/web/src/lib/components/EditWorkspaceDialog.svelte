@@ -271,7 +271,7 @@
           disabled={$requestAlias.isPending}
         />
         <Button
-          variant="outline"
+          variant="secondary"
           loading={$requestAlias.isPending}
           disabled={!aliasInput.trim()}
           onclick={submitAlias}
@@ -283,7 +283,7 @@
   </div>
 
   {#snippet actions()}
-    <Button variant="outline" disabled={$save.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" disabled={$save.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
     <Button loading={$save.isPending} onclick={submit}>{t('blackout.save', locale)}</Button>
   {/snippet}
 </Dialog>

@@ -118,14 +118,14 @@
       {#each feedShares as share (share.id)}
         <li class="cal__feed-row">
           <code class="cal__feed-token">…{share.token.slice(-8)}</code>
-          <Button variant="outline" size="xs" onclick={() => copyFeedUrl(share.token, 'https')}>
+          <Button variant="secondary" size="xs" onclick={() => copyFeedUrl(share.token, 'https')}>
             {t('planner.feed_copy_link', locale)}
           </Button>
-          <Button variant="outline" size="xs" onclick={() => copyFeedUrl(share.token, 'webcal')}>
+          <Button variant="secondary" size="xs" onclick={() => copyFeedUrl(share.token, 'webcal')}>
             {t('planner.feed_copy_webcal', locale)}
           </Button>
           <Button
-            variant="outline"
+            variant="secondary"
             tone="warn"
             size="xs"
             loading={$revokeFeed.isPending}
@@ -138,7 +138,7 @@
     </ul>
   {/if}
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (open = false)}>{t('planner.feed_close', locale)}</Button>
+    <Button variant="quiet" onclick={() => (open = false)}>{t('planner.feed_close', locale)}</Button>
     <Button
       onclick={() => $createFeed.mutate()}
       loading={$createFeed.isPending}

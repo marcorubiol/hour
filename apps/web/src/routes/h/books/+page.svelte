@@ -808,7 +808,7 @@
 {#snippet failed(key: string, retry: () => unknown)}
   <p class="load-fail" role="alert">
     <span>{t(key, locale)}</span>
-    <Button size="xs" variant="outline" onclick={() => void retry()}>{t('ui.retry', locale)}</Button>
+    <Button size="xs" variant="secondary" onclick={() => void retry()}>{t('ui.retry', locale)}</Button>
   </p>
 {/snippet}
 
@@ -851,7 +851,7 @@
             {#if obraNames.length === 1}<span>· {obraNames[0]}</span>{/if}
           </span>
           {#if !seasonEmpty}
-            <Button size="xs" variant="outline" onclick={openDeal} disabled={projectIndex.length === 0}>{t('books.new_deal', locale)}</Button>
+            <Button size="xs" variant="secondary" onclick={openDeal} disabled={projectIndex.length === 0}>{t('books.new_deal', locale)}</Button>
           {/if}
         </span>
       {/if}
@@ -953,7 +953,7 @@
           <div class="mny__empty-acts">
             <Button size="xs" onclick={openDeal} disabled={projectIndex.length === 0}>{t('books.new_deal', locale)}</Button>
             {#if previousSeason !== null}
-              <Button size="xs" variant="outline" onclick={() => (pickedSeason = previousSeason)}>{t('books.season_previous', locale, { season: seasonLabel(previousSeason) })}</Button>
+              <Button size="xs" variant="secondary" onclick={() => (pickedSeason = previousSeason)}>{t('books.season_previous', locale, { season: seasonLabel(previousSeason) })}</Button>
             {/if}
           </div>
         </div>
@@ -987,7 +987,7 @@
                       <span class="att__why">{attentionWhy(item)}</span>
                     </span>
                     <span class="att__amt">{item.amount === null ? DASH : fmtMoney(item.amount)}{#if item.amount !== null && multiCurrency}&nbsp;{item.currency}{/if}</span>
-                    <Button size="xs" variant="outline" onclick={() => act(item)}>{t(actionKey(item), locale)}</Button>
+                    <Button size="xs" variant="secondary" onclick={() => act(item)}>{t(actionKey(item), locale)}</Button>
                   </li>
                 {/each}
               </ul>
@@ -1157,11 +1157,11 @@
                             </div>
                             <div class="sheet__acts">
                               {#if m.collect !== 'full'}
-                                <Button size="xs" variant="outline" onclick={() => openPay(b)}>{t('books.record_payment', locale)}</Button>
+                                <Button size="xs" variant="secondary" onclick={() => openPay(b)}>{t('books.record_payment', locale)}</Button>
                               {/if}
-                              <Button size="xs" variant="outline" onclick={() => openExpense(b)}>{t('books.add_expense', locale)}</Button>
+                              <Button size="xs" variant="secondary" onclick={() => openExpense(b)}>{t('books.add_expense', locale)}</Button>
                               {#if mode !== 'off' && !m.doc}
-                                <Button size="xs" variant="outline" onclick={() => openInvoice(b)}>{t(mode === 'interno' ? 'books.create_proforma' : 'books.create_invoice', locale)}</Button>
+                                <Button size="xs" variant="secondary" onclick={() => openInvoice(b)}>{t(mode === 'interno' ? 'books.create_proforma' : 'books.create_invoice', locale)}</Button>
                               {/if}
                             </div>
                           </div>
@@ -1186,7 +1186,7 @@
                 {#each expenseTotals as [currency, amount] (currency)}<span>− {fmtMoney(amount)} {currency}</span>{/each}
               </p>
             {/if}
-            <Button size="xs" variant="outline" onclick={() => openExpense()} disabled={expenseAnchorOptions.length === 0}>{t('books.add_expense', locale)}</Button>
+            <Button size="xs" variant="secondary" onclick={() => openExpense()} disabled={expenseAnchorOptions.length === 0}>{t('books.add_expense', locale)}</Button>
           </div>
           {#if expensesError}
             {@render failed('books.err_expenses', () => $expensesQuery.refetch())}
@@ -1219,7 +1219,7 @@
     <Input label={t('books.currency', locale)} bind:value={fCurrency} placeholder="EUR" />
   </div>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (feeOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" onclick={() => (feeOpen = false)}>{t('create.cancel', locale)}</Button>
     <Button onclick={saveFee} loading={$feeMutation.isPending}>{t('blackout.save', locale)}</Button>
   {/snippet}
 </Dialog>
@@ -1238,7 +1238,7 @@
   </div>
   <p class="mny__dialog-note">{t(payInvoiceId ? 'books.pay_note_doc' : 'books.pay_note', locale)}</p>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (payOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" onclick={() => (payOpen = false)}>{t('create.cancel', locale)}</Button>
     <Button onclick={() => !$payMutation.isPending && $payMutation.mutate()} loading={$payMutation.isPending}>{t('books.record', locale)}</Button>
   {/snippet}
 </Dialog>
@@ -1267,7 +1267,7 @@
     <p class="mny__inv-total-preview">{t('books.total_label', locale)} <strong>{fmtMoney(invTotal)} {invBolo.fee_currency ?? 'EUR'}</strong></p>
   {/if}
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (invOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" onclick={() => (invOpen = false)}>{t('create.cancel', locale)}</Button>
     <Button onclick={submitInvoice} loading={$createInvoice.isPending}>{t('books.create_draft', locale)}</Button>
   {/snippet}
 </Dialog>
@@ -1285,7 +1285,7 @@
     </div>
   </div>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (dealOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" onclick={() => (dealOpen = false)}>{t('create.cancel', locale)}</Button>
     <Button onclick={() => !$createBolo.isPending && $createBolo.mutate()} loading={$createBolo.isPending}>{t('books.create_deal', locale)}</Button>
   {/snippet}
 </Dialog>
@@ -1305,7 +1305,7 @@
     <Input label={t('books.counterparty_paid', locale)} bind:value={eCounterparty} placeholder={t('books.ph_counterparty', locale)} />
   </div>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (expOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" onclick={() => (expOpen = false)}>{t('create.cancel', locale)}</Button>
     <Button onclick={() => !$createExpense.isPending && $createExpense.mutate()} loading={$createExpense.isPending}>{t('composer.add', locale)}</Button>
   {/snippet}
 </Dialog>

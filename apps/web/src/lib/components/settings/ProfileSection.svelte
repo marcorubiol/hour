@@ -216,7 +216,7 @@
         <div class="set-row__hint">{t('help.reset_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
-        <button type="button" class="btn--outline btn--s" disabled={resettingHelp} onclick={showTipsAgain}
+        <button type="button" class="btn--secondary btn--s" disabled={resettingHelp} onclick={showTipsAgain}
           >{t('help.reset', locale)}</button
         >
       </div>
@@ -258,7 +258,7 @@
           <div class="set-row__ctrl">
             <button
               type="button"
-              class={on ? 'btn--outline btn--s' : 'btn--primary btn--s'}
+              class={on ? 'btn--secondary btn--s' : 'btn--primary btn--s'}
               disabled={pendingWorkspace === w.id}
               onclick={() => $shareProfile.mutate({ workspaceId: w.id, on: !on })}
             >

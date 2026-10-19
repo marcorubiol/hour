@@ -350,7 +350,7 @@
             <span class="block-head__lead"
               ><h2 class="eyebrow eyebrow--sub">{t('mail.outside', locale)} · {events.length}</h2><ConceptHint concept="outside" /></span
             >
-            <Button size="xs" variant="outline" disabled={!sendable.length || !recipient?.email} onclick={() => startCompose(null)}>
+            <Button size="xs" variant="secondary" disabled={!sendable.length || !recipient?.email} onclick={() => startCompose(null)}>
               {t('mail.write', locale)}
             </Button>
           </div>
@@ -375,7 +375,7 @@
         {:else}
           <div class="block-head">
             <h2 class="eyebrow eyebrow--sub">{t('mail.thread', locale)} · {events.length}</h2>
-            <Button size="xs" variant="outline" disabled={!sendable.length || !recipient?.email} onclick={() => startCompose(null)}>
+            <Button size="xs" variant="secondary" disabled={!sendable.length || !recipient?.email} onclick={() => startCompose(null)}>
               {t('mail.write', locale)}
             </Button>
           </div>
@@ -611,7 +611,7 @@
             {#if e.body}<p class="mail__text">{e.body}</p>{/if}
             {#if composing !== e.id}
               <div class="mail__actions">
-                <Button size="xs" variant="outline" disabled={!sendable.length || !recipient?.email} onclick={() => startCompose(e)}>
+                <Button size="xs" variant="secondary" disabled={!sendable.length || !recipient?.email} onclick={() => startCompose(e)}>
                   {t('mail.reply', locale)}
                 </Button>
               </div>
@@ -640,7 +640,7 @@
     {#if e.body}<p class="card__text">{e.body}</p>{/if}
     {#if e.kind === 'email' && e.source === 'email' && composing !== e.id}
       <div class="mail__actions">
-        <Button size="xs" variant="outline" disabled={!sendable.length || !recipient?.email} onclick={() => startCompose(e)}>
+        <Button size="xs" variant="secondary" disabled={!sendable.length || !recipient?.email} onclick={() => startCompose(e)}>
           {t('mail.reply', locale)}
         </Button>
       </div>
@@ -678,7 +678,7 @@
     <div class="reply__row">
       <span class="muted">{t('mail.send_hint', locale, { address: sendable.find((a) => a.id === fromAccount)?.address ?? '' })}</span>
       <span class="reply__btns">
-        <Button size="xs" variant="outline" onclick={() => (composing = null)}>{t('mail.discard', locale)}</Button>
+        <Button size="xs" variant="secondary" onclick={() => (composing = null)}>{t('mail.discard', locale)}</Button>
         <Button size="xs" type="submit" disabled={$send.isPending || !fromAccount || !subject.trim() || !body.trim()}>
           {t('mail.send', locale)}
         </Button>

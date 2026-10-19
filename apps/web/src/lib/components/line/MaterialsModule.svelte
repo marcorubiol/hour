@@ -119,7 +119,7 @@
 
 <section class="mat" aria-label={t('line.module_materials', locale)}>
   <header class="mat__head">
-    <Button size="xs" variant="outline" onclick={openCreate}>{t('line.material_register', locale)}</Button>
+    <Button size="xs" variant="secondary" onclick={openCreate}>{t('line.material_register', locale)}</Button>
   </header>
 
   {#if errorMsg}
@@ -163,7 +163,7 @@
                 <Menu
                   label={t('line.material_actions', locale)}
                   align="end"
-                  triggerClass="btn--outline btn--xs"
+                  triggerClass="btn--secondary btn--xs"
                   items={[
                     {
                       label: t('line.remove', locale),
@@ -203,7 +203,7 @@
     />
   </div>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (createOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" onclick={() => (createOpen = false)}>{t('create.cancel', locale)}</Button>
     <Button onclick={submitCreate} loading={$createMaterial.isPending}>{t('line.material_register_short', locale)}</Button>
   {/snippet}
 </Dialog>

@@ -678,7 +678,7 @@
       {#if canEdit}
         <Button size="s" onclick={openAdd}>{t('conversations.add', locale)}</Button>
         {#if canBulkSend(chip)}
-          <Button size="s" variant="outline" onclick={togglePicking}>
+          <Button size="s" variant="secondary" onclick={togglePicking}>
             {picking ? t('mailout.pick_done', locale) : t('mailout.pick', locale)}
           </Button>
         {/if}
@@ -729,8 +729,8 @@
         </p>
         <!-- On a phone the bar is where the thumb is: the page's «all» and the way out live here too. -->
         <span class="action-bar__more">
-          <Button size="s" variant="outline" onclick={() => table?.togglePage()}>{t('mailout.pick_page_short', locale)}</Button>
-          <Button size="s" variant="outline" onclick={togglePicking}>{t('mailout.pick_done', locale)}</Button>
+          <Button size="s" variant="secondary" onclick={() => table?.togglePage()}>{t('mailout.pick_page_short', locale)}</Button>
+          <Button size="s" variant="secondary" onclick={togglePicking}>{t('mailout.pick_done', locale)}</Button>
         </span>
         <Button
           size="s"
@@ -819,7 +819,7 @@
     />
   </div>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (addOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" onclick={() => (addOpen = false)}>{t('create.cancel', locale)}</Button>
     <Button onclick={submitAdd} loading={$addMutation.isPending}>{t('conversations.add', locale)}</Button>
   {/snippet}
 </Dialog>

@@ -105,7 +105,7 @@
     <div class="org-fiscal__head">
       <h3 class="eyebrow eyebrow--sub">{t('fiscal.title', locale)}</h3>
       {#if data?.can_edit && !editing}
-        <Button size="xs" variant="outline" onclick={edit}>
+        <Button size="xs" variant="secondary" onclick={edit}>
           {fiscal ? t('fiscal.edit', locale) : t('fiscal.add', locale)}
         </Button>
       {/if}
@@ -127,7 +127,7 @@
         </div>
         <p class="org-fiscal__hint">{t('fiscal.hint', locale)}</p>
         <div class="org-fiscal__actions">
-          <Button size="xs" variant="outline" onclick={() => (editing = false)}>{t('create.cancel', locale)}</Button>
+          <Button size="xs" variant="quiet" onclick={() => (editing = false)}>{t('create.cancel', locale)}</Button>
           <Button size="xs" type="submit" loading={$save.isPending}>{t('fiscal.save', locale)}</Button>
         </div>
       </form>

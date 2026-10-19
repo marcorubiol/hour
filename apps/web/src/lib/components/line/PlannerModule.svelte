@@ -152,7 +152,7 @@
         <button type="button" class="lcal__navbtn" onclick={nextMonth} aria-label={t('planner.next_month', locale)}>›</button>
       </div>
     {/if}
-    <Button size="xs" variant="outline" onclick={() => openCreate()}>{t('perf.new_title', locale)}</Button>
+    <Button size="xs" variant="secondary" onclick={() => openCreate()}>{t('perf.new_title', locale)}</Button>
   </div>
 
   {#if $perfsQuery.isError}

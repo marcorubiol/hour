@@ -614,7 +614,7 @@
   <!-- Our sentence, not the server's text (diseño M2); the detail stays in Sentry. -->
   <p class="load-fail" role="alert">
     <span>{t('conversations.load_error', locale)}</span>
-    <Button size="xs" variant="outline" onclick={() => void $query.refetch()}>{t('ui.retry', locale)}</Button>
+    <Button size="xs" variant="secondary" onclick={() => void $query.refetch()}>{t('ui.retry', locale)}</Button>
   </p>
 {:else if !loading && items.length === 0}
   {#if importEmptyState && !filters.q && !filters.turno && !filters.temp && !filters.temporada && !filters.envio && !filters.relacion}
@@ -636,14 +636,14 @@
 {#if showPagination}
   <div class="pagination">
     <button
-      class="btn--outline btn--s"
+      class="btn--secondary btn--s"
       onclick={() => (offset = Math.max(0, offset - LIMIT))}
       disabled={offset === 0}
     >
       {t('conversations.prev_page', locale)}
     </button>
     <button
-      class="btn--outline btn--s"
+      class="btn--secondary btn--s"
       onclick={() => (offset = offset + LIMIT)}
       disabled={offset + LIMIT >= total}
     >
@@ -666,7 +666,7 @@
     {/key}
   {/if}
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (historyOpen = false)}>{t('conversations.close', locale)}</Button>
+    <Button variant="quiet" onclick={() => (historyOpen = false)}>{t('conversations.close', locale)}</Button>
   {/snippet}
 </Dialog>
 

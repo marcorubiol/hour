@@ -128,7 +128,7 @@
                 · <em>{t('directory.missing', locale, { date: dateOf(e.last_seen_at) })}</em>{/if}
             </span>
           </span>
-          <Button variant="outline" size="s" loading={adopting === e.id} disabled={adopting !== null} onclick={() => adopt(e)}>
+          <Button variant="secondary" size="s" loading={adopting === e.id} disabled={adopting !== null} onclick={() => adopt(e)}>
             {t('directory.adopt', locale)}
           </Button>
         </li>

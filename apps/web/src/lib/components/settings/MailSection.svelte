@@ -150,7 +150,7 @@
         {:else if personal}
           {@render connection(personal, true)}
         {:else}
-          <Button size="s" variant="outline" disabled={!configured || !workspaceId} onclick={() => connect('personal')}>
+          <Button size="s" variant="secondary" disabled={!configured || !workspaceId} onclick={() => connect('personal')}>
             {t('mail.connect_google', locale)}
           </Button>
           <span class="muted">{t('mail.other_providers_later', locale)}</span>
@@ -176,7 +176,7 @@
             {@render connection(a, canManageShared)}
           {/each}
         {:else if canManageShared}
-          <Button size="s" variant="outline" disabled={!configured || !workspaceId} onclick={() => connect('workspace')}>
+          <Button size="s" variant="secondary" disabled={!configured || !workspaceId} onclick={() => connect('workspace')}>
             {t('mail.connect_google', locale)}
           </Button>
         {:else}
@@ -202,13 +202,13 @@
   {#if manage}
     <div class="conn__actions">
       {#if a.status === 'active'}
-        <Button size="s" variant="outline" disabled={$syncNow.isPending} onclick={() => $syncNow.mutate(a.id)}>
+        <Button size="s" variant="secondary" disabled={$syncNow.isPending} onclick={() => $syncNow.mutate(a.id)}>
           {t('mail.sync_now', locale)}
         </Button>
       {:else}
-        <Button size="s" variant="outline" onclick={() => connect(a.scope)}>{t('mail.reconnect', locale)}</Button>
+        <Button size="s" variant="secondary" onclick={() => connect(a.scope)}>{t('mail.reconnect', locale)}</Button>
       {/if}
-      <Button size="s" variant="outline" tone="warn" disabled={$disconnect.isPending} onclick={() => $disconnect.mutate(a.id)}>
+      <Button size="s" variant="secondary" tone="warn" disabled={$disconnect.isPending} onclick={() => $disconnect.mutate(a.id)}>
         {t('mail.disconnect', locale)}
       </Button>
     </div>
