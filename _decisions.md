@@ -4656,3 +4656,8 @@ producción leído y las alternativas: `build/plans/2026-10-19-conversations-tag
 
 **Re-evaluar cuando** se use una temporada real: si el umbral de 30 días para «dormida» acierta, y si «habitual» por
 temporada anterior encaja con cómo trabaja una sala de verdad.
+
+**Enmienda a ADR-084 § 2 (E3, 2026-10-19).** «Las tareas no salen en el calendario» se lee como «no son eventos de la
+rejilla». El margen de Día y Agenda no es la rejilla: allí salen las tareas con fecha y los próximos pasos de las
+conversaciones, de la misma fuente que «Te espera» (`rankWaiting`), sin ocupar un día ni un hueco; Mes y Temporada
+solo dan un número que abre el Día.
