@@ -31,10 +31,10 @@ aprueba, el sistema ejecuta y deja auditoría. UI manual e IA leen y escriben lo
 fixtures. Sin billing ni self-service. Modelo ya multi-workspace y multi-account. La beta externa espera a cerrar lo
 de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
-## Producción (verificado 2026-10-14, tarde)
+## Producción (verificado 2026-10-19, tarde)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`13889409`**, `dirty:false`, builtAt
-  2026-10-19T09:17Z (ayuda contextual completa: carriles 1 y 2, sobre ADR-138). `main` == prod salvo documentos y tests.
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`8d0bdaba`**, `dirty:false`, builtAt
+  2026-10-19T12:59Z (etiquetas fase 2, chips en Conversaciones; E3, margen del Planner; ADR-138). `main` == prod salvo documentos y tests.
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free, con keepalive diario
   (`.github/workflows/keepalive.yml`) contra la pausa por inactividad. Pasar a Pro antes de la beta, aún no
@@ -42,7 +42,7 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 - **Última migración aplicada: `20261020160000_conversation_tags`** (2026-10-19, run 39236312469; backup 39235636446): etiquetas de conversación fase 1, solo esquema (ADR-138); el Worker aún no lo lee. Antes, `20261020150000_help_seen` con `20261020140000` y `20261020140100`, y `20261020130000_create_conversation_one_signature`, que arregla la sobrecarga que dejó `20261020120000` (crear conversación falló de 07:49 a 08:15). Las migraciones van por `production-migrate.yml`: backup, plan, apply. **Al redefinir una función, copiar la firma de la base viva (`pg_get_functiondef`), no de la última migración que la nombra: otra firma crea una sobrecarga y PostgREST responde 300.**
 - `hour-staging` (ref `slccyknqpgmzhyiyclsq`, `eu-west-1`): reconstruido el 2026-10-13 con el contract de permisos
   (run 38469017859: RLS 309/313, smoke 2/2). Se volverá a pausar sin uso.
-- Últimas suites contra producción: RLS 433/433 (2026-10-19, tras `20261020160000`; `conversation-venue` «sending goes to the primary contact» es intermitente y pasa al repetir) y E2E 112/113 con 1 saltado, por `hour-web.marco-rubiol.workers.dev`.
+- Últimas suites contra producción: RLS 433/433 (2026-10-19, tras `20261020160000`; `conversation-venue` «sending goes to the primary contact» es intermitente y pasa al repetir) y E2E 111/120 contra `8d0bdaba` (2 fallos: un spec atrasado y un día solo con pasos que la Agenda no dibuja, en arreglo; 6 sin correr detrás de ellos; 1 saltado), por `hour-web.marco-rubiol.workers.dev`.
 - Desde el checkout principal (`~/Developer/hour`), nunca desde un worktree: los worktrees no llevan `.env` ni
   `.env.test` (RLS sale saltado, el login del E2E falla).
 - `pnpm --filter web test:rls`: siempre contra producción; carga `.env` + `.env.test` y no mira `.env.local`.
