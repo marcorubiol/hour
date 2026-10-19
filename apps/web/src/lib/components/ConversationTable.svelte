@@ -39,6 +39,7 @@
    * page share one implementation.
    */
 
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { onMount, untrack } from 'svelte';
   import { toStore } from 'svelte/store';
@@ -617,13 +618,15 @@
     <Button size="xs" variant="outline" onclick={() => void $query.refetch()}>{t('ui.retry', locale)}</Button>
   </p>
 {:else if !loading && items.length === 0}
-  {#if importEmptyState && !filters.q && !filters.turno && !filters.temp && !filters.temporada && !filters.envio && !filters.relacion}
+  {@const unfiltered = !filters.q && !filters.turno && !filters.temp && !filters.temporada && !filters.envio && !filters.relacion}
+  {#if importEmptyState && unfiltered}
     <div class="empty-book">
       <p class="empty-book__title">{t('conversations.empty_title', locale)}</p>
       <p>{t('conversations.empty_body', locale)}</p>
     </div>
   {:else}
-    <div class="msg">{t('conversations.no_match', locale)}</div>
+    <!-- «No match» only when something filters; a list that is simply empty says so. -->
+    <EmptyLine text={unfiltered ? t('conversations.none_yet', locale) : t('conversations.no_match', locale)} />
   {/if}
 {/if}
 
@@ -732,11 +735,6 @@
       font-weight: 500;
     }
 
-    .msg {
-      text-align: center;
-      padding-block: var(--space-xxl);
-      color: var(--text-dark-muted);
-    }
     .empty-book {
       padding-block: clamp(var(--space-xl), 8vw, var(--space-3xl));
       padding-inline: var(--space-m);

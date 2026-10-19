@@ -51,7 +51,9 @@
             >{#if c.accent}<span class="record-head__dot" style={`--c: ${c.accent}`} aria-hidden="true"></span>{/if}{c.label}</a
           >
         {:else}
-          <span class="record-head__crumb" aria-current={i === crumbs.length - 1 ? 'page' : undefined}>{c.label}</span>
+          <span class="record-head__crumb" aria-current={i === crumbs.length - 1 ? 'page' : undefined}
+            >{#if c.accent}<span class="record-head__dot" style={`--c: ${c.accent}`} aria-hidden="true"></span>{/if}{c.label}</span
+          >
         {/if}
       {/each}
     </nav>
