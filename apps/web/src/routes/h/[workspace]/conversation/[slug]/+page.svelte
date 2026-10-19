@@ -54,6 +54,7 @@
   import { followUpDue, turnOf } from '$lib/conversation-overview';
   import { relationLabel, relationTone, type ConversationBolo } from '$lib/conversation-relation';
   import { performanceStatusLabel } from '$lib/performance';
+  import { conversationPlannerHref, dayKeyInTz } from '$lib/planner';
   import { firstLine, replySubject, type MailAccountsResponse } from '$lib/mail';
   import { markReadWhenSeen, readAtOpen, scrollWhenNamed } from '$lib/thread-reading.svelte';
   import { THREAD_REFRESH_MS, firstUnreadId, teamTimeline, type ConversationThreadView } from '$lib/threads';
@@ -103,6 +104,15 @@
     })),
   );
   let bolos = $derived($bolosQuery.data?.items ?? []);
+
+  // «Ver en el Planner» (ADR-138 § 6): la conversación no se dibuja en la
+  // rejilla; desde aquí, la Agenda en su primer día con el proyecto fijado.
+  let plannerHref = $derived.by(() => {
+    if (!conv?.project || !lensOn('planner')) return null;
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const days = bolos.flatMap((b) => (b.first_performed_at ? [dayKeyInTz(b.first_performed_at, tz)] : []));
+    return conversationPlannerHref(conv.project.id, days, dayKeyInTz(new Date().toISOString(), tz));
+  });
 
   const eventsQuery = createQuery(
     toStore(() => ({
@@ -465,6 +475,12 @@
                   >
                 {/if}
               </dd>
+            </div>
+          {/if}
+          {#if plannerHref}
+            <div>
+              <dt>{t('lens.planner', locale)}</dt>
+              <dd><a href={plannerHref} data-testid="conversation-planner">{t('conversations.see_in_planner', locale)}</a></dd>
             </div>
           {/if}
         </dl>

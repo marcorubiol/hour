@@ -52,6 +52,7 @@
     buildDeskFeed,
     goingItem,
     laterSummary,
+    overviewReplies,
     rankWaiting,
     GOING_DAYS,
     type DeskConvInput,
@@ -65,7 +66,12 @@
   import { clashesInSeason, seasonWindow } from '$lib/season';
   import { createPlannerEngine } from '$lib/planner-engine.svelte';
   import { seasonAvailabilityQueryOptions } from '$lib/planner-feeds.svelte';
-  import { currentSeason, type OverviewResponse } from '$lib/conversation-overview';
+  import { currentSeason } from '$lib/conversation-overview';
+  import {
+    conversationOverviewQueryOptions,
+    waitingConversationsQueryOptions,
+    waitingTasksQueryOptions,
+  } from '$lib/waiting-feeds';
   import type { ThreadFeedView } from '$lib/threads';
   import { setCommitment } from '$lib/commitments';
   import {
@@ -217,16 +223,9 @@
   );
 
   // ── Band 2 · Te espera ─────────────────────────────────────────────────
-  const conversationsQuery = createQuery({
-    queryKey: ['conversations', 'today'],
-    queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchJSON<{ items: Conversation[] }>('/api/conversations?status=any&limit=100', signal),
-  });
-  const tasksQuery = createQuery({
-    queryKey: ['tasks', 'open'],
-    queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchJSON<{ items: TaskItem[] }>('/api/tasks?status=open&limit=200', signal),
-  });
+  // The reads of «Te espera», shared with the Planner's margin (ADR-138 § 6).
+  const conversationsQuery = createQuery(waitingConversationsQueryOptions());
+  const tasksQuery = createQuery(waitingTasksQueryOptions());
 
   // Money: the Books keys and URLs, so the Desk and Cuentas share one cache.
   // Only an explicit «yes» to read:money opens it: without it, no trace. A
@@ -253,7 +252,7 @@
     })),
   );
 
-  let conversations = $derived<Conversation[]>($conversationsQuery.data?.items ?? []);
+  let conversations = $derived(($conversationsQuery.data?.items ?? []) as Conversation[]);
   let tasks = $derived<TaskItem[]>($tasksQuery.data?.items ?? []);
   let invoices = $derived<MoneyInvoiceItem[]>(readMoney ? ($invoicesQuery.data?.items ?? []) : []);
   let scopedConversations = $derived(conversations.filter((e) => byProject(e.project?.id, e.workspace_id)));
@@ -272,33 +271,11 @@
   // movement and door leave the Desk with it.
   let readConversations = $derived($convAccessQuery.data?.read !== false && lensOn('conversations'));
   const overviewQuery = createQuery(
-    toStore(() => ({
-      queryKey: ['conversation-overview', filterIds.projectIds, filterIds.workspaceIds, lineIds] as const,
-      enabled: !scopeUnresolved && readConversations,
-      queryFn: ({ signal }: { signal: AbortSignal }) => {
-        const p = new URLSearchParams(feedParams(filterIds));
-        if (lineIds.length > 0) p.set('line_ids', lineIds.join(','));
-        return fetchJSON<OverviewResponse>(`/api/conversations/overview?${p}`, signal);
-      },
-    })),
+    toStore(() => conversationOverviewQueryOptions(filterIds, lineIds, !scopeUnresolved && readConversations)),
   );
   let overview = $derived(readConversations ? ($overviewQuery.data ?? null) : null);
   let projectNameById = $derived(new Map(projectIndex.map((p) => [p.id, p.name])));
-  let replies = $derived(
-    (overview?.due.rows ?? [])
-      .filter((r) => r.reason === 'reply')
-      .map((r) => {
-        const ws = workspaceSlugById.get(r.workspace_id);
-        return {
-          id: r.id,
-          title: r.title,
-          projectId: r.project_id,
-          projectName: projectNameById.get(r.project_id) ?? '',
-          at: r.at,
-          href: ws ? `/h/${ws}/conversation/${r.id}` : null,
-        };
-      }),
-  );
+  let replies = $derived(overviewReplies(overview?.due.rows ?? [], workspaceSlugById, projectNameById));
 
   // A document of a deal not yet confirmed is a quote, not a debt (ADR-123):
   // «te espera» leaves it out, as Cuentas and this page's own door do.

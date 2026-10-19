@@ -127,6 +127,16 @@
     statusWord as statusWordIn,
   } from '$lib/planner';
   import { buildPersonScope, castNames } from '$lib/people';
+  import { buildDeskFeed, overviewReplies, rankWaiting, waitingByDay, type DeskItem } from '$lib/desk-feed';
+  import {
+    conversationOverviewQueryOptions,
+    waitingConversationsQueryOptions,
+    waitingTasksQueryOptions,
+  } from '$lib/waiting-feeds';
+  import { conversationAccessQueryOptions } from '$lib/conversation-access';
+  import { lensOn } from '$lib/lenses.svelte';
+  import { taskProjectId } from '$lib/task';
+  import type { StepVM } from '$lib/components/planner/PlannerSteps.svelte';
   import { createPlannerFeeds, primeAgendaWindow } from '$lib/planner-feeds.svelte';
   import { createPlannerEngine } from '$lib/planner-engine.svelte';
   import SeasonOverview, {
@@ -1685,6 +1695,101 @@
       };
     });
   });
+  /* ── THE MARGIN'S NEXT STEPS (ADR-138 § 6) ─────────────────────────────
+     Each lens owns one kind of thing: the Planner owns what is done (bolos
+     and their performances), so a conversation never takes a slot in the
+     grid. What it shows of the others is what helps decide here, with a way
+     back: Day and Agenda carry in their margin the dated next steps of the
+     conversations and the tasks, Month and Season only a number that opens
+     the Day. The source is «Te espera» itself (`rankWaiting`, ADR-121 § 2):
+     the Desk's reads and builder, bounded to the days the view shows. Its
+     tasks and calls only; money is Cuentas', a «voy» is already on its card,
+     and Hour's own proposals wait in the Desk. ── */
+  const stepConvQuery = createQuery(waitingConversationsQueryOptions());
+  const stepTaskQuery = createQuery(waitingTasksQueryOptions());
+  const convAccessQuery = createQuery(conversationAccessQueryOptions());
+  // As in the Desk: only an explicit «no», or a space without the lens (ADR-132), hides them.
+  let readConversations = $derived($convAccessQuery.data?.read !== false && lensOn('conversations'));
+  const stepOverviewQuery = createQuery(
+    toStore(() =>
+      conversationOverviewQueryOptions(
+        filterIds,
+        scope.lines.map((l) => l.id),
+        !scopeUnresolved && readConversations,
+      ),
+    ),
+  );
+  /** The Desk's narrowing: a whole space, or the project. */
+  function stepInScope(projectId: string | null | undefined, workspaceId: string | null | undefined): boolean {
+    if (scope.isEmpty) return true;
+    if (workspaceId && scope.workspaceIds.includes(workspaceId)) return true;
+    return !!projectId && scopedProjectIds.has(projectId);
+  }
+  let stepTasks = $derived(
+    ($stepTaskQuery.data?.items ?? []).filter((tk) => stepInScope(taskProjectId(tk), tk.workspace_id)),
+  );
+  let stepTaskById = $derived(new Map(stepTasks.map((tk) => [tk.id, tk])));
+  let stepFeed = $derived(
+    buildDeskFeed(
+      {
+        conversations: readConversations
+          ? ($stepConvQuery.data?.items ?? []).filter((c) => stepInScope(c.project?.id, c.workspace_id))
+          : [],
+        tasks: stepTasks,
+        replies: readConversations
+          ? overviewReplies($stepOverviewQuery.data?.due.rows ?? [], workspaceSlugById, projectNameById)
+          : [],
+      },
+      now,
+      locale,
+    ),
+  );
+  /** The days the drawing shows: the margin is bounded to them. */
+  let stepWindow = $derived(
+    view === 'day'
+      ? { from: selectedDay, to: selectedDay }
+      : view === 'agenda'
+        ? { from: agendaFromIso, to: agendaToIso }
+        : view === 'overview'
+          ? { from: season.weeks[0][0], to: season.to }
+          : { from: gridFrom, to: gridTo },
+  );
+  let stepRows = $derived(
+    view === 'board'
+      ? []
+      : rankWaiting(stepFeed, now, { window: stepWindow, concerns: ['task', 'conversation'], proposals: false }).rows,
+  );
+  let stepsByDay = $derived(waitingByDay(stepRows, now));
+  let stepCounts = $derived(new Map([...stepsByDay].map(([day, rows]) => [day, rows.length])));
+  let rawProjectById = $derived(new Map(($projectsQuery.data?.items ?? []).map((p) => [p.id, p])));
+  /** Where a step is resolved: its conversation; a task where it hangs, else the Desk. */
+  function stepHref(item: DeskItem): string | null {
+    if (item.href) return item.href;
+    if (item.concern === 'conversation') {
+      const ws = (item.workspaceId && workspaceSlugById.get(item.workspaceId)) || defaultWorkspaceSlug;
+      return item.conversationId && ws ? `/h/${ws}/conversation/${item.conversationId}` : null;
+    }
+    const tk = item.taskId ? stepTaskById.get(item.taskId) : undefined;
+    const ws = tk ? workspaceSlugById.get(tk.workspace_id) : undefined;
+    if (tk?.conversation && ws && lensOn('conversations')) return `/h/${ws}/conversation/${tk.conversation.id}`;
+    if (tk?.performance?.slug && ws) return `/h/${ws}/performance/${tk.performance.slug}`;
+    return '/h/desk';
+  }
+  function stepVM(item: DeskItem): StepVM {
+    const project = item.projectId ? rawProjectById.get(item.projectId) : undefined;
+    return {
+      id: item.id,
+      verb: item.concern === 'task' ? t('desk.concern_task', locale) : t(`desk.verb_${item.verbKey ?? 'look'}`, locale),
+      subject: item.subject,
+      late: item.overdue ? t('desk.due_overdue', locale) : null,
+      href: stepHref(item),
+      project: project
+        ? { name: project.name, slug: project.slug, initials: project.initials ?? null, accent: project.accent ?? null }
+        : null,
+    };
+  }
+  let stepVMsByDay = $derived(new Map([...stepsByDay].map(([day, rows]) => [day, rows.map(stepVM)])));
+
   /** §23's anchor rule, the Day's half: exactly one calendar entry on the
       day pre-fills the anchor; anything else falls to the page's fallback. */
   async function createDayNote(body: string): Promise<boolean> {
@@ -1864,6 +1969,7 @@
           away: seasonBlockDays.get(iso) ?? null,
           clash: seasonClashDays.has(iso),
           decide: seasonDecideDays.has(iso),
+          steps: stepCounts.get(iso) ?? 0,
         };
       }),
     );
@@ -3424,6 +3530,8 @@
       onCreate={createDayNote}
       onDelete={deleteNote}
       next={dayNextVMs}
+      steps={stepVMsByDay.get(selectedDay) ?? []}
+      stepsWord={t('planner.steps', locale)}
       notesWord={t('planner.agenda_notes', locale)}
       nextWord={t('planner.day_next', locale)}
       emptyWord={t('planner.lid_empty', locale)}
@@ -3448,6 +3556,8 @@
       blackouts={blackoutVMs}
       aways={awayVMs}
       {clashesByDay}
+      stepsByDay={stepCounts}
+      stepsLabel={(n) => (n === 1 ? t('planner.steps_one', locale) : t('planner.steps_n', locale, { n }))}
       locale={localeTag}
       dateKindLabel={kindLabel}
       createLabel={(iso) => t('planner.new_on', locale, { day: spokenDay(iso) })}
@@ -3559,6 +3669,8 @@
       onDecideJump={jumpToDecisions}
       onDateOpen={openDate}
       {notesByDay}
+      stepsByDay={stepVMsByDay}
+      stepsLabel={t('planner.steps', locale)}
       onNoteCreate={notesAbsent ? undefined : createNote}
       onNoteDelete={notesAbsent ? undefined : deleteNote}
       noteFallbackLabel={noteFallback.label}
