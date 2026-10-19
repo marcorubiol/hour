@@ -848,7 +848,7 @@
     /* The system's outline button (base.css), a step tighter in the sub line. */
     .desk__add[aria-expanded='true'] {
       --btn-text-color: var(--heading-color);
-      --btn-border-color: var(--neutral-semi-light);
+      --btn-border-color: var(--border-color-hover);
     }
     .desk__composer {
       margin-block-start: calc(-1 * var(--space-s));

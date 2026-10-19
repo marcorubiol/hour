@@ -211,6 +211,13 @@
     --backdrop: color-mix(in srgb, var(--black) 40%, transparent);
     /* Ink on an accent fill (the rail's scope glyph). */
     --accent-fg: var(--white);
+    /* The brand hue where a component uses it on purpose (a feed's dot, the
+       identity panel's apply, the offline page's retry). Everything else
+       reaches the hue through its role: focus, link, check, selection. */
+    --brand: var(--primary);
+    /* Calm mode (the Desk's calm): every lens one contrast step quieter. */
+    --calm-text: var(--text-muted);
+    --calm-border: color-mix(in oklch, var(--neutral) 12%, transparent);
 
     /* ============================================================ */
     /* CONTEXTUAL — absence (Marco, 2026-08-10)                       */

@@ -670,7 +670,7 @@
     position: fixed;
     inset: 0;
     z-index: var(--z-modal);
-    background: color-mix(in oklch, var(--neutral) 28%, transparent);
+    background: color-mix(in oklch, var(--text-color) 28%, transparent);
     backdrop-filter: blur(2px);
     display: flex;
     align-items: flex-start;
@@ -929,7 +929,7 @@
     cursor: pointer;
   }
   .cmdk__apply:hover {
-    background: var(--neutral-semi-dark);
+    background: var(--fill-ink-hover);
   }
 
   .cmdk__foot {

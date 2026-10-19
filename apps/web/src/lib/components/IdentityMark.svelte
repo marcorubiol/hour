@@ -211,7 +211,7 @@
       padding-inline: calc(var(--_m) * 0.22);
       border-start-start-radius: calc(var(--_m) * 0.28);
       border-end-start-radius: calc(var(--_m) * 0.28);
-      background: color-mix(in oklch, var(--neutral) 7%, var(--bg-ultra-light));
+      background: color-mix(in oklch, var(--text-color) 7%, var(--bg-ultra-light));
       color: var(--text-faint);
       font-size: calc(var(--_m) * 0.46);
       font-weight: 500;

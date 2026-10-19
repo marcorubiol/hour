@@ -62,7 +62,7 @@
       background: none;
       border: none;
       padding: 0;
-      color: var(--primary);
+      color: var(--brand);
       text-decoration: underline;
       cursor: pointer;
       font: inherit;

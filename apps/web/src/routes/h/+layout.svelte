@@ -826,8 +826,8 @@
      to muted, dark borders softened. One class for the whole routed surface;
      headings, links and overdue red keep their own tokens. */
   .shell__content--calm {
-    --text-color: var(--text-muted);
-    --border-color-dark: color-mix(in oklch, var(--neutral) 12%, transparent);
+    --text-color: var(--calm-text);
+    --border-color-dark: var(--calm-border);
   }
 
   /* Print: the cap is a screen-reading concern. Documents meant for paper

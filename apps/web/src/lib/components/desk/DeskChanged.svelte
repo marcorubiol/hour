@@ -172,7 +172,7 @@
     inline-size: 0.4rem;
     block-size: 0.4rem;
     border-radius: 50%;
-    background: var(--primary);
+    background: var(--brand);
     transform: translateY(-0.1em);
   }
   .feed__dot--quiet {

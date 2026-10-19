@@ -352,7 +352,7 @@
     inline-size: 100%;
     padding-block: var(--space-xs);
     padding-inline: var(--space-xs);
-    border: var(--line-hairline) solid var(--primary);
+    border: var(--line-hairline) solid var(--field-border-color-focus);
     border-radius: var(--radius-m);
     background: var(--bg-ultra-light);
     font-family: var(--font-sans);

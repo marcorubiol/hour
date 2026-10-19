@@ -247,7 +247,7 @@
       padding: var(--space-xs) var(--space-m);
       border: 0;
       border-radius: var(--radius-s);
-      background: var(--primary);
+      background: var(--brand);
       color: var(--bg-ultra-light);
       cursor: pointer;
     }

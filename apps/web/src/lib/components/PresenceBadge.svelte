@@ -68,7 +68,7 @@
   }
 
   .presence-badge--alone .presence-badge__dot {
-    background: var(--neutral);
+    background: var(--text-color);
     box-shadow: none;
     opacity: 0.55;
   }

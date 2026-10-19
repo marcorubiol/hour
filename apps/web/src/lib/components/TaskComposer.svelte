@@ -495,7 +495,7 @@
       transition: background var(--transition);
     }
     .tc__add:hover:not(:disabled) {
-      background: var(--neutral-semi-dark);
+      background: var(--fill-ink-hover);
     }
     .tc__add:disabled {
       opacity: 0.6;

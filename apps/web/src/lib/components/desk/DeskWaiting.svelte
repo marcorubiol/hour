@@ -304,7 +304,7 @@
     color: var(--danger);
   }
   .row--conversation .row__verb {
-    color: color-mix(in oklch, var(--primary) 60%, var(--text-muted));
+    color: color-mix(in oklch, var(--brand) 60%, var(--text-muted));
   }
   .row--money .row__verb {
     color: color-mix(in oklch, var(--success) 60%, var(--text-muted));
@@ -329,7 +329,7 @@
     margin: 0;
     /* A checkbox's baseline is its bottom edge: down to the subject's line. */
     translate: 0 0.15em;
-    accent-color: var(--primary);
+    accent-color: var(--check-bg);
     cursor: pointer;
   }
   .row__subject {
