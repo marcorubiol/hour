@@ -7,6 +7,8 @@
    * demás lo ven.
    */
   import Switch from '$lib/components/Switch.svelte';
+  import RecordHead from '$lib/components/RecordHead.svelte';
+  import BlockHead from '$lib/components/BlockHead.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
@@ -63,16 +65,12 @@
   }
 </script>
 
-<header class="set-mast">
-  <p class="eyebrow set-mast__kicker">{t('settings.lenses_kicker', locale)}</p>
-  <h1 class="set-mast__title"><em>{t('settings.nav_lenses', locale)}</em></h1>
-  <p class="set-mast__sub">{t('settings.lenses_sub', locale)}</p>
-</header>
+<RecordHead crumbs={[{ label: t('settings.title', locale) }, { label: t('settings.lenses_kicker', locale) }]} title={t('settings.nav_lenses', locale)}>
+  {#snippet facts()}<span>{t('settings.lenses_sub', locale)}</span>{/snippet}
+</RecordHead>
 
 <section class="set-group" data-testid="settings-lenses">
-  <div class="set-group__head">
-    <span class="eyebrow set-group__kicker">{t('settings.lenses_group', locale)}</span>
-  </div>
+  <BlockHead title={t('settings.lenses_group', locale)} />
   <div class="set-group__body">
     {#each TOGGLE_LENSES as lens (lens)}
       <div class="set-row">

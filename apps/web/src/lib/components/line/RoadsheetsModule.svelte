@@ -8,6 +8,7 @@
    * money lives in the Money lens (ADR-043/046).
    */
 
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { createQuery } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON } from '$lib/api';
@@ -68,11 +69,11 @@
 </script>
 
 {#if errorMsg}
-  <p class="rsm__state rsm__state--danger">{errorMsg}</p>
+  <p class="load-fail" role="alert">{errorMsg}</p>
 {:else if loading}
-  <p class="rsm__state">{t('desk.loading', locale)}</p>
+  <EmptyLine text={t('desk.loading', locale)} busy />
 {:else if items.length === 0}
-  <p class="rsm__state">{t('line.roadsheets_empty', locale)}</p>
+  <EmptyLine text={t('line.roadsheets_empty', locale)} />
 {:else}
   <div class="table-wrap">
     <table>
@@ -113,13 +114,6 @@
 
 <style>
   @layer components {
-    .rsm__state {
-      font-size: var(--text-s);
-      color: var(--text-faint);
-    }
-    .rsm__state--danger {
-      color: var(--danger);
-    }
 
     .rsm__cell-date {
       font-family: var(--font-mono);

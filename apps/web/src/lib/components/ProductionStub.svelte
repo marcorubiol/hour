@@ -6,6 +6,8 @@
    * technical) rendered generically via JsonKV.
    */
 
+  import BlockHead from '$lib/components/BlockHead.svelte';
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import type { Snippet } from 'svelte';
   import type { Json } from '$lib/db-types';
   import { appLocale, t, type Locale } from '$lib/i18n';
@@ -120,15 +122,13 @@
 </script>
 
 <section class="production" aria-label={t('perf.production', locale)}>
-  <header class="production__header">
-    <p class="eyebrow">{t('perf.production', locale)}</p>
-  </header>
+  <BlockHead title={t('perf.production', locale)} />
 
   <div class="production__venue">
     {#if venue?.name ?? venueName}
       <strong class="production__venue-name">{venue?.name ?? venueName}</strong>
     {:else}
-      <p class="production__empty">{t('venue.none_yet', locale)}</p>
+      <EmptyLine text={t('venue.none_yet', locale)} />
     {/if}
     {#if placeLine}<span class="production__venue-place">{placeLine}</span>{/if}
     {#if venue?.address}<span class="production__venue-address">{venue.address}</span>{/if}
@@ -194,12 +194,6 @@
       font-size: var(--text-l);
       color: var(--text-color);
       font-weight: 500;
-    }
-
-    .production__empty {
-      margin: 0;
-      font-size: var(--text-s);
-      color: var(--text-faint);
     }
 
     .production__venue-place {

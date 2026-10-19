@@ -5,6 +5,7 @@
    * decide un admin; cada persona cambia después las suyas desde la ficha.
    */
   import Segmented from '$lib/components/Segmented.svelte';
+  import BlockHead from '$lib/components/BlockHead.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
@@ -43,9 +44,7 @@
 </script>
 
 <section class="set-group">
-  <div class="set-group__head">
-    <span class="eyebrow set-group__kicker">{t('settings.conv_privacy_kicker', locale)}</span>
-  </div>
+  <BlockHead title={t('settings.conv_privacy_kicker', locale)} />
   <div class="set-group__body">
     <div class="set-row">
       <div class="set-row__lead">

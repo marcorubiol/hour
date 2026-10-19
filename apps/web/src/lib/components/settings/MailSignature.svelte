@@ -10,6 +10,7 @@
    * Hour siempre propone una con lo que exista; guardada vacía o igual que la
    * propuesta es la propuesta (null), que sigue al día si cambian los datos.
    */
+  import BlockHead from '$lib/components/BlockHead.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
@@ -87,14 +88,12 @@
 
 {#if workspaceId && parts}
   <section class="set-group">
-    <div class="set-group__head">
-      <span class="eyebrow set-group__kicker">{t('mail.signature', locale)}</span>
-      <h2 class="set-group__title">
-        {scope === 'personal'
-          ? t('mail.signature_personal_title', locale, { company })
-          : t('mail.signature_company_title', locale, { company })}
-      </h2>
-    </div>
+    <BlockHead
+      title={t('mail.signature', locale)}
+      count={scope === 'personal'
+        ? t('mail.signature_personal_title', locale, { company })
+        : t('mail.signature_company_title', locale, { company })}
+    />
     <div class="set-group__body">
       {#if scope === 'workspace'}
         <div class="set-row">

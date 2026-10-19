@@ -9,6 +9,7 @@
    * the venue dialog. This module only gathers them in one place.
    */
 
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { createQuery } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON } from '$lib/api';
@@ -100,9 +101,9 @@
 </script>
 
 {#if loading}
-  <p class="ppl__state">{t('desk.loading', locale)}</p>
+  <EmptyLine text={t('desk.loading', locale)} busy />
 {:else if errorMsg}
-  <p class="ppl__state ppl__state--danger">{errorMsg}</p>
+  <p class="load-fail" role="alert">{errorMsg}</p>
 {:else if people}
   <div class="ppl">
     <section class="ppl__section" aria-label={t('line.team_own', locale)}>
@@ -133,7 +134,7 @@
           {/each}
         </ul>
       {:else}
-        <p class="ppl__state">{t('line.team_own_empty', locale)}</p>
+        <EmptyLine text={t('line.team_own_empty', locale)} />
       {/if}
     </section>
 
@@ -181,7 +182,7 @@
           {/each}
         </ul>
       {:else}
-        <p class="ppl__state">{t('line.team_crew_empty', locale)}</p>
+        <EmptyLine text={t('line.team_crew_empty', locale)} />
       {/if}
     </section>
 
@@ -213,7 +214,7 @@
           </div>
         {/each}
       {:else}
-        <p class="ppl__state">{t('line.team_venues_empty', locale)}</p>
+        <EmptyLine text={t('line.team_venues_empty', locale)} />
       {/if}
     </section>
   </div>
@@ -225,14 +226,6 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-l);
-    }
-
-    .ppl__state {
-      font-size: var(--text-s);
-      color: var(--text-faint);
-    }
-    .ppl__state--danger {
-      color: var(--danger);
     }
 
     .ppl__section {

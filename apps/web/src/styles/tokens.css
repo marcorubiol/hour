@@ -506,7 +506,7 @@
     /* filter bar's box, diseño M9) keeps --control-size-m.           */
     /* ============================================================ */
 
-    --field-label-width: 8rem;      /* the key column of Logística in a file */
+    --field-label-width: var(--record-label-inline); /* one label column: a record's rows and a form's */
     --field-value-min: 10rem;       /* narrower than label + this: label on top */
     --field-size: max(2.25rem, var(--touch-target));
     --field-line: var(--border-color-light);
@@ -742,6 +742,18 @@
   ::view-transition-new(root) {
     animation: none;
     mix-blend-mode: normal;
+  }
+
+  /* ============================================================ */
+  /* RECORD — a record's page (RecordHead, EmptyLine), ADR-139 § 4  */
+  /* ============================================================ */
+  /* The record's rhythm and its row's fixed label column: the     */
+  /* mono word on the left of a row (role, kind, date) and of an    */
+  /* empty block's line, so labels and their values align in the    */
+  /* same x down a whole page.                                      */
+  :root {
+    --record-gap: var(--space-xl); /* between the blocks of a record */
+    --record-label-inline: 8rem; /* the mono label column of a record's rows */
   }
 
   /* ============================================================ */

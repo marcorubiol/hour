@@ -31,6 +31,11 @@
   import { ApiError, fetchJSON, mutateJSON } from '$lib/api';
   import { retryLoad } from '$lib/load-fail';
   import RecordState from '$lib/components/RecordState.svelte';
+  import RecordHead from '$lib/components/RecordHead.svelte';
+  import BlockHead from '$lib/components/BlockHead.svelte';
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
+  import { workspacesQueryOptions } from '$lib/nav-queries';
+  import { spaceCrumb, type Crumb } from '$lib/record-crumbs';
   import { dayMonth, dayMonthYear, dayMonthYearTs } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
@@ -293,6 +298,16 @@
 
   // ADR-102: el título es la organización; debajo, el contacto principal.
   let title = $derived((conv && conversationTitle(conv)) || slug);
+
+  // Address: Space › [Project ›] Conversación (the title names who).
+  const wsQuery = createQuery(workspacesQueryOptions());
+  let crumbs = $derived.by<Crumb[]>(() => {
+    const ws = $wsQuery.data?.items.find((w) => w.slug === workspaceSlug);
+    const out: Crumb[] = [spaceCrumb(ws?.name, workspaceSlug)];
+    if (conv?.project) out.push({ label: conv.project.name, href: `/h/${workspaceSlug}/project/${conv.project.slug}/` });
+    out.push({ label: t('conversations.conversation', locale) });
+    return out;
+  });
   /** A quién sale un correo: el contacto principal (`mail_send_authorize`). */
   let recipient = $derived.by(() => {
     const p = conv?.contacts.find((c) => c.is_primary)?.person ?? null;
@@ -306,8 +321,7 @@
 </svelte:head>
 
 {#if $convQuery.isLoading || !conv}
-  <section class="conv">
-    <p class="eyebrow">{t('conversations.conversation', locale)}</p>
+  <section class="record conv">
     <!-- No conversation and no error (a read that never ran) is the same
          answer as a 404: there is nothing here for you. -->
     <RecordState
@@ -321,19 +335,15 @@
     />
   </section>
 {:else}
-  <section class="conv">
-    <header class="conv__mast">
-      <p class="eyebrow">
-        {t('conversations.conversation', locale)}{#if conv.project}&nbsp;· {conv.project.name}{/if}
-      </p>
-      <h1 class="conv__title"><em>{title}</em></h1>
-      <p class="conv__sub">
-        {#if conv.person && conv.person.full_name !== title}<span>{conv.person.full_name}</span>{/if}
-        {#if conv.person?.email}<span>{conv.person.email}</span>{/if}
-        {#if conv.person?.city || conv.organization?.city}<span>{conv.person?.city || conv.organization?.city}</span>{/if}
-        {#if conv.private}<span class="conv__private">{t('mail.private_badge', locale)}</span>{/if}
-      </p>
-    </header>
+  <section class="record conv">
+    <RecordHead {crumbs} {title}>
+      {#snippet facts()}
+        {#if conv!.person && conv!.person.full_name !== title}<span>{conv!.person.full_name}</span>{/if}
+        {#if conv!.person?.email}<span>{conv!.person.email}</span>{/if}
+        {#if conv!.person?.city || conv!.organization?.city}<span>{conv!.person?.city || conv!.organization?.city}</span>{/if}
+        {#if conv!.private}<span class="conv__private">{t('mail.private_badge', locale)}</span>{/if}
+      {/snippet}
+    </RecordHead>
 
     <div class="conv__bar">
       <div class="seg" role="group" aria-label={t('mail.view_label', locale)}>
@@ -350,20 +360,17 @@
     <div class="conv__grid" class:conv__grid--single={reading === 'hilo'}>
       <div class="conv__main">
         {#if reading === 'registro'}
-          <div class="block-head">
-            <span class="block-head__lead"
-              ><h2 class="eyebrow eyebrow--sub">{t('mail.outside', locale)} · {events.length}</h2><ConceptHint concept="outside" /></span
-            >
+          <BlockHead title={t('mail.outside', locale)} count={events.length} concept="outside">
             <Button size="xs" variant="secondary" disabled={!sendable.length || !recipient?.email} onclick={() => startCompose(null)}>
               {t('mail.write', locale)}
             </Button>
-          </div>
+          </BlockHead>
           <FirstTimeNote event="first_mail_synced" when={mailboxes.length > 0} />
           {#if composing === 'new'}{@render composer()}{/if}
           {#if $eventsQuery.isLoading}
-            <p class="conv__msg">{t('conversations.loading', locale)}</p>
+            <EmptyLine text={t('conversations.loading', locale)} busy />
           {:else if events.length === 0}
-            <p class="conv__msg">{t('conversations.history_empty', locale)}</p>
+            <EmptyLine text={t('conversations.history_empty', locale)} />
           {:else}
             <ol class="rec" aria-label={t('conversations.history', locale)}>
               {#each events as e (e.id)}
@@ -377,12 +384,11 @@
             <ConversationHistory conversationId={conv.id} showList={false} />
           </details>
         {:else}
-          <div class="block-head">
-            <h2 class="eyebrow eyebrow--sub">{t('mail.thread', locale)} · {events.length}</h2>
+          <BlockHead title={t('mail.thread', locale)} count={events.length}>
             <Button size="xs" variant="secondary" disabled={!sendable.length || !recipient?.email} onclick={() => startCompose(null)}>
               {t('mail.write', locale)}
             </Button>
-          </div>
+          </BlockHead>
           <ol class="flow" aria-label={t('mail.thread', locale)} bind:this={teamEl}>
             {#each timeline as x (x.kind === 'event' ? x.event.id : x.message.id)}
               {#if x.kind === 'event'}
@@ -502,7 +508,7 @@
         <ConversationTags conversationId={conv.id} workspaceId={conv.workspace_id} tags={conv.tags} canEdit={conv.can_edit} {locale} />
 
         {#if conv.organization}
-          <OrganizationFiscal organizationId={conv.organization.id} />
+          <OrganizationFiscal organizationId={conv.organization.id} level={2} />
         {/if}
 
         <ConversationAcquaintances workspaceId={conv.workspace_id} contacts={conv.contacts} {locale} />
@@ -528,9 +534,9 @@
         </div>
         {/if}
 
-        <div class="legend">
-          <p class="eyebrow eyebrow--sub">{t('mail.mailboxes_here', locale)}<ConceptHint concept="mailboxes" /></p>
-          {#if mailboxes.length}
+        {#if mailboxes.length}
+          <div class="legend">
+            <BlockHead title={t('mail.mailboxes_here', locale)} concept="mailboxes" />
             {#each mailboxes as [address, scope] (address)}
               <p class="legend__row">
                 <span class="mb" class:mb--shared={scope === 'workspace'}>
@@ -539,10 +545,10 @@
                 <span class="muted">{address}</span>
               </p>
             {/each}
-          {:else}
-            <p class="muted">{t('mail.no_mail_yet', locale)}</p>
-          {/if}
-        </div>
+          </div>
+        {:else}
+          <EmptyLine label={t('mail.mailboxes_here', locale)} text={t('mail.no_mail_yet', locale)} />
+        {/if}
 
         {#if reading === 'registro'}
           <div class="inside" bind:this={teamEl}>
@@ -583,7 +589,7 @@
       onchange={refreshTeam}
     />
   {:else if $teamQuery.isError}
-    <p class="muted">{t('threads.team_error', locale)}</p>
+    <EmptyLine text={t('threads.team_error', locale)} />
   {/if}
 {/snippet}
 
@@ -689,44 +695,14 @@
 
 <style>
   @layer components {
+    /* The reading switch sits right under the head, so the record's rhythm
+       tightens here; the two columns below keep their own. */
     .conv {
-      display: flex;
-      flex-direction: column;
       gap: var(--space-m);
-    }
-    .conv__mast {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-xs);
-    }
-    .conv__mast p,
-    .conv__title {
-      margin: 0;
-    }
-    .conv__title em {
-      font-style: italic;
-    }
-    .conv__sub {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: var(--space-xs) var(--space-s);
-      color: var(--text-muted);
-      font-size: var(--text-s);
-    }
-    .conv__sub > * + *::before {
-      content: '·';
-      margin-inline-end: var(--space-s);
-      color: var(--text-faint);
     }
     .conv__private {
       color: var(--heading-color);
       font-weight: 500;
-    }
-    .conv__msg {
-      padding-block: var(--space-m);
-      color: var(--text-dark-muted);
-      font-size: var(--text-s);
     }
     .conv__bar {
       display: flex;
@@ -773,7 +749,6 @@
         gap: var(--space-l);
       }
     }
-
 
     .rec {
       list-style: none;

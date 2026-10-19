@@ -80,7 +80,7 @@
   <title>{docTitle(t('settings.title', locale))}</title>
 </svelte:head>
 
-<article class="set-page">
+<article class="record set-page">
   {#if active === 'profile'}
     <ProfileSection {workspaceSlug} />
   {/if}
@@ -141,52 +141,11 @@
      nothing leaks app-wide. Declarations are verbatim from the pre-split
      page. Section-specific rules live in each *Section.svelte. */
 
-  .set-page :global(.set-mast) {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-xs);
-    margin-block-end: calc(var(--set-pad) * 1.2);
-    padding-block-end: var(--space-m);
-  }
-  .set-page :global(.set-mast__kicker) {
-    margin: 0;
-  }
-  /* Masthead typography via base.css h1 defaults. */
-  .set-page :global(.set-mast__title) {
-    margin: 0;
-  }
-  .set-page :global(.set-mast__title em) {
-    font-style: italic;
-    color: var(--text-color);
-  }
-  .set-page :global(.set-mast__sub) {
-    margin: 0;
-    color: var(--text-muted);
-    font-size: var(--text-m);
-    line-height: 1.55;
-    max-inline-size: 56ch;
-  }
-
+  /* A group is one of the record's blocks: its BlockHead, then its rows. */
   .set-page :global(.set-group) {
-    margin-block-end: calc(var(--set-pad) * 2);
-  }
-  .set-page :global(.set-group__head) {
     display: flex;
     flex-direction: column;
-    gap: var(--space-xs);
-    margin-block-end: var(--space-s);
-    padding-block-end: var(--space-xs);
-    border-block-end: 1px solid var(--border-color-light);
-  }
-  /* Kicker typography via base.css .eyebrow. */
-
-  .set-page :global(.set-group__title) {
-    font-family: var(--font-display);
-    font-size: var(--h3);
-    font-weight: 400;
-    letter-spacing: -0.015em;
-    margin: 0;
-    color: var(--text-color);
+    gap: var(--space-s);
   }
   .set-page :global(.set-group__body) {
     display: flex;

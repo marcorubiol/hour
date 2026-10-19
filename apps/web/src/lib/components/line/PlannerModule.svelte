@@ -16,6 +16,7 @@
    * select needed.
    */
 
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { createQuery } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON } from '$lib/api';
@@ -156,12 +157,12 @@
   </div>
 
   {#if $perfsQuery.isError}
-    <p class="lcal__state lcal__state--danger">{t('line.planner_error', locale)}</p>
+    <p class="load-fail" role="alert">{t('line.planner_error', locale)}</p>
   {:else if $perfsQuery.isPending}
-    <p class="lcal__state">{t('desk.loading', locale)}</p>
+    <EmptyLine text={t('desk.loading', locale)} busy />
   {:else if mode === 'list'}
     {#if upcoming.length === 0}
-      <p class="lcal__state">{t('line.planner_empty', locale)}</p>
+      <EmptyLine text={t('line.planner_empty', locale)} />
     {:else}
       <div class="table-wrap">
         <table>
@@ -305,14 +306,6 @@
       margin: 0;
       font-size: var(--text-xs);
       color: var(--text-faint);
-    }
-    .lcal__state {
-      margin: 0;
-      font-size: var(--text-s);
-      color: var(--text-faint);
-    }
-    .lcal__state--danger {
-      color: var(--danger);
     }
   }
 </style>

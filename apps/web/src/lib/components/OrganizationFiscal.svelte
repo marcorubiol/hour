@@ -8,6 +8,8 @@
    * lets the caller follow up (Books re-sets the payer of a draft so it picks
    * the new data before issuing).
    */
+  import BlockHead from '$lib/components/BlockHead.svelte';
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
@@ -27,9 +29,11 @@
     /** Open the form straight away when there is nothing yet. */
     startEditing?: boolean;
     onsaved?: () => void;
+    /** The head's rank where it sits: a block of the page (2) or inside one (3). */
+    level?: 2 | 3;
   }
 
-  let { organizationId, startEditing = false, onsaved }: Props = $props();
+  let { organizationId, startEditing = false, onsaved, level = 3 }: Props = $props();
 
   const locale = appLocale();
   const queryClient = useQueryClient();
@@ -102,14 +106,20 @@
 
 {#if visible}
   <section class="org-fiscal" aria-label={t('fiscal.title', locale)}>
-    <div class="org-fiscal__head">
-      <h3 class="eyebrow eyebrow--sub">{t('fiscal.title', locale)}</h3>
-      {#if data?.can_edit && !editing}
-        <Button size="xs" variant="secondary" onclick={edit}>
-          {fiscal ? t('fiscal.edit', locale) : t('fiscal.add', locale)}
-        </Button>
-      {/if}
-    </div>
+    {#if !editing && !fiscal}
+      <!-- Nothing on file: the block is one line, with its way in. -->
+      <EmptyLine label={t('fiscal.title', locale)} text={t('fiscal.none', locale)}>
+        {#if data?.can_edit}
+          <button type="button" class="empty-line__act" onclick={edit}>{t('fiscal.add', locale)}</button>
+        {/if}
+      </EmptyLine>
+    {:else}
+      <BlockHead title={t('fiscal.title', locale)} {level}>
+        {#if data?.can_edit && !editing}
+          <button type="button" class="block-head__act" onclick={edit}>{t('fiscal.edit', locale)}</button>
+        {/if}
+      </BlockHead>
+    {/if}
 
     {#if editing}
       <form class="org-fiscal__form" onsubmit={submit}>
@@ -133,8 +143,6 @@
       </form>
     {:else if fiscal}
       <p class="org-fiscal__summary">{receiverFiscalSummary(fiscal)}</p>
-    {:else}
-      <p class="org-fiscal__hint">{t('fiscal.none', locale)}</p>
     {/if}
   </section>
 {/if}
@@ -146,7 +154,7 @@
       flex-direction: column;
       gap: var(--space-xs);
     }
-    .org-fiscal__head,
+
     .org-fiscal__actions {
       display: flex;
       align-items: center;

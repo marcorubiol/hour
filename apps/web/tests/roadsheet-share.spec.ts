@@ -19,7 +19,7 @@ test.describe('public road sheet link', () => {
 
     await page.goto('/h/playwright/performance/zzz-e2e-1/roadsheet');
     await waitForLoaded(page);
-    await expect(page.locator('.rsv__title')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 
     // Pre-clean via API: revoke strays from previously failed runs so the
     // count assertions below are deterministic.
@@ -33,7 +33,7 @@ test.describe('public road sheet link', () => {
     });
     await page.reload();
     await waitForLoaded(page);
-    await expect(page.locator('.rsv__title')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 
     // Create a venue-role link; capture the token from the API response.
     await page.locator('.rs__share-pick select').selectOption('venue');
@@ -58,7 +58,7 @@ test.describe('public road sheet link', () => {
     const anonContext = await browser.newContext({ storageState: { cookies: [], origins: [] } });
     const anonPage = await anonContext.newPage();
     await anonPage.goto(`/public/roadsheet/${share.token}`);
-    await expect(anonPage.locator('.rsv__title')).toBeVisible({ timeout: 15_000 });
+    await expect(anonPage.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 });
     // Venue role: schedule yes, no notes section ever (public roles never
     // see free-text notes by matrix).
     await expect(anonPage.locator('[aria-label="Notes"]')).toHaveCount(0);

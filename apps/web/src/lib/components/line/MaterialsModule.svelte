@@ -7,6 +7,7 @@
    * Content-only component — the line detail shell owns the module frame.
    */
 
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
@@ -123,11 +124,11 @@
   </header>
 
   {#if errorMsg}
-    <p class="mat__state mat__state--danger">{errorMsg}</p>
+    <p class="load-fail" role="alert">{errorMsg}</p>
   {:else if loading}
-    <p class="mat__state">{t('desk.loading', locale)}</p>
+    <EmptyLine text={t('desk.loading', locale)} busy />
   {:else if items.length === 0}
-    <p class="mat__state">{t('line.material_empty', locale)}</p>
+    <EmptyLine text={t('line.material_empty', locale)} />
   {:else}
     <div class="table-wrap">
       <table>
@@ -219,14 +220,6 @@
     .mat__head {
       display: flex;
       justify-content: flex-end;
-    }
-
-    .mat__state {
-      font-size: var(--text-s);
-      color: var(--text-faint);
-    }
-    .mat__state--danger {
-      color: var(--danger);
     }
 
     .mat__cell-direction {
