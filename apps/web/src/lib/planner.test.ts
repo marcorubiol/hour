@@ -22,7 +22,30 @@ import {
   type PlannerEvent,
   type DecisionPerformance,
   statusWord,
+  defaultCreateDay,
 } from './planner';
+
+describe('defaultCreateDay', () => {
+  const today = '2026-10-19';
+  it('a selected day wins (the Day view), even away from today', () => {
+    expect(defaultCreateDay(today, { selected: '2026-11-14' })).toBe('2026-11-14');
+    expect(defaultCreateDay(today, { selected: '2026-11-14', shown: { from: '2026-10-01', to: '2026-10-31' } })).toBe(
+      '2026-11-14',
+    );
+  });
+  it('today, when the view shows it', () => {
+    expect(defaultCreateDay(today, { shown: { from: '2026-10-01', to: '2026-10-31' } })).toBe(today);
+    expect(defaultCreateDay(today, { shown: { from: today, to: today } })).toBe(today);
+  });
+  it('the first day shown, when today is not on screen (reading November)', () => {
+    expect(defaultCreateDay(today, { shown: { from: '2026-11-01', to: '2026-11-30' } })).toBe('2026-11-01');
+    expect(defaultCreateDay(today, { shown: { from: '2026-08-03', to: '2026-08-20' } })).toBe('2026-08-03');
+  });
+  it('today, when nothing is known about the view', () => {
+    expect(defaultCreateDay(today, {})).toBe(today);
+    expect(defaultCreateDay(today, { selected: null, shown: null })).toBe(today);
+  });
+});
 
 describe('plannerDayHref', () => {
   it('names the view and the day', () => {
