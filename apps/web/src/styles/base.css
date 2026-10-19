@@ -1775,6 +1775,13 @@
     outline: var(--focus-width) solid var(--focus-color);
     outline-offset: var(--focus-offset);
   }
+  /* A head with its concept's «i» (ConceptHint): the heading and the «i» stay
+     together at the start, the action keeps the end. */
+  .block-head__lead {
+    display: inline-flex;
+    align-items: center;
+    min-inline-size: 0;
+  }
   /* The figure keeps its case: «7 de 16», «0 de 0 confirmados · 8 semanas». */
   .block-head__n {
     letter-spacing: var(--mono-letter-spacing);
@@ -1908,6 +1915,42 @@
     .lenshead__aside {
       flex-basis: 100%;
     }
+  }
+  /* The section's «?» (it brings its welcome card back) beside the switcher:
+     the same ring as a concept's «i», a step larger, in the sans voice. */
+  .lenshead__tools {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-s);
+  }
+  .lenshead__help {
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+    inline-size: 1.75em;
+    block-size: 1.75em;
+    padding: 0;
+    border: var(--border-width) solid var(--border-color-dark);
+    border-radius: var(--radius-circle);
+    background: none;
+    color: var(--text-muted);
+    font-family: var(--font-sans);
+    font-size: var(--text-s);
+    line-height: 1;
+    cursor: pointer;
+    transition:
+      color var(--transition),
+      border-color var(--transition);
+  }
+  .lenshead__help:hover,
+  .lenshead__help[aria-expanded='true'] {
+    color: var(--text-color);
+    border-color: var(--text-muted);
+  }
+  .lenshead__help::before {
+    content: '';
+    position: absolute;
+    inset: min(0em, calc((1.75em - var(--touch-target)) / 2));
   }
   .lenshead__title {
     margin: 0;

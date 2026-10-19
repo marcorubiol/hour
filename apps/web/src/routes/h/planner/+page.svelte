@@ -39,6 +39,8 @@
   import { goto, pushState, replaceState } from '$app/navigation';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import LensHeader from '$lib/components/LensHeader.svelte';
+  import FirstVisitCard from '$lib/components/FirstVisitCard.svelte';
+  import ConceptHint from '$lib/components/ConceptHint.svelte';
   import LensTitle from '$lib/components/LensTitle.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import MonthGrid from '$lib/components/MonthGrid.svelte';
@@ -2972,7 +2974,7 @@
 </svelte:head>
 
 <section class="cal" aria-busy={busy}>
-  <LensHeader>
+  <LensHeader help="planner">
     {#snippet title()}
       {#if view === 'day'}
         <!-- LA FECHA EN LA QUE ESTÁS ES EL CONTROL (Marco, 2026-08-29).
@@ -3020,6 +3022,13 @@
       {/if}
     {/snippet}
   </LensHeader>
+
+  <!-- The welcome speaks of the Season, so its tour goes there first. -->
+  <FirstVisitCard
+    section="planner"
+    steps={['planner-strip', 'planner-decide', 'planner-lists']}
+    onbeforetour={() => setView('overview')}
+  />
 
 
 
@@ -3093,7 +3102,7 @@
              drawing: the counters beside it do not move — they count the
              window — so the word is what explains why only one is on paper. -->
         {#if calm.on}
-          <span class="cal__stat cal__stat--soft">{t('planner.calm_state', locale)}</span>
+          <span class="cal__stat cal__stat--soft">{t('planner.calm_state', locale)}<ConceptHint concept="calm" /></span>
         {/if}
         <!-- COUNTERS FOLLOW THE GEOMETRY, NOT THE WORD (ADR-095).
              A BOUNDED drawing that announces a range has to count it; a drawing

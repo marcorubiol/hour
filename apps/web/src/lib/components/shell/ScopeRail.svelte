@@ -5,6 +5,7 @@
   import { usePins } from '$lib/stores/pins.svelte';
   import { useScopes, sameSet as scopesSameSet, type Scope } from '$lib/stores/scopes.svelte';
   import RailPulse from './RailPulse.svelte';
+  import ConceptHint from '$lib/components/ConceptHint.svelte';
 
   interface Props {
     /** Applying a scope routes + touches editingBaseTokens, so the action
@@ -89,18 +90,22 @@
       <time class="side-clock__time clock-face" datetime={clockTime}>{clockTime}</time>
       <p class="side-clock__date">{clockDate}</p>
     </a>
-    <button
-      type="button"
-      class="side-calm"
-      class:is-on={calm.on}
-      aria-pressed={calm.on}
-      title={t('desk.calm', locale)}
-      aria-keyshortcuts="C"
-      onclick={() => calm.toggle()}
-    >
-      <!-- The key is a hint for the eye; its name stays «calma», not «calmaC». -->
-      <span>{t('desk.calm', locale)}</span><span class="side-calm__k" aria-hidden="true">C</span>
-    </button>
+    <!-- Calm and its «i» are one thing at the clock's other end. -->
+    <span class="side-calm-row">
+      <button
+        type="button"
+        class="side-calm"
+        class:is-on={calm.on}
+        aria-pressed={calm.on}
+        title={t('desk.calm', locale)}
+        aria-keyshortcuts="C"
+        onclick={() => calm.toggle()}
+      >
+        <!-- The key is a hint for the eye; its name stays «calma», not «calmaC». -->
+        <span>{t('desk.calm', locale)}</span><span class="side-calm__k" aria-hidden="true">C</span>
+      </button>
+      <ConceptHint concept="calm" />
+    </span>
   </div>
   <!-- THE PULSE reads the clock's own tick: one timer in the rail, and the
        two can never disagree about what minute it is. It sits ABOVE the
@@ -250,6 +255,10 @@
       color var(--transition),
       background var(--transition),
       border-color var(--transition);
+  }
+  .side-calm-row {
+    display: inline-flex;
+    align-items: center;
   }
   .side-calm:hover {
     color: var(--text-color);

@@ -205,6 +205,7 @@
   <!-- The region is named by the words alone, not by the count beside them. -->
   <BlockHead
     title={t('desk.band_waiting', locale)}
+    concept="waiting"
     titleId="desk-waits-h"
     focusable
     bind:el={headEl}

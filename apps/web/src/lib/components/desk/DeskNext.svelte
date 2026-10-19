@@ -12,6 +12,8 @@
    */
   import Button from '$lib/components/Button.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
+  import ConceptHint from '$lib/components/ConceptHint.svelte';
+  import FirstTimeNote from '$lib/components/FirstTimeNote.svelte';
   import { useQueryClient } from '@tanstack/svelte-query';
   import { addToast } from '$lib/components/Toast.svelte';
   import { ApiError } from '$lib/api';
@@ -189,7 +191,7 @@
         <div class="card__foot">
           {#if canAnswer}
             <span class="card__ask">
-              {t('desk.next_ask', locale)}
+              {t('desk.next_ask', locale)}<ConceptHint concept="guess" />
               <!-- The same answer as a «¿vas?» row of «Te espera»: the system's button. -->
               <button
                 type="button"
@@ -211,6 +213,7 @@
         </div>
       {/if}
     </div>
+    <FirstTimeNote event="first_going" when={canAnswer} />
     {#if !thenBefore}{@render thenLine()}{/if}
   {/if}
 </section>

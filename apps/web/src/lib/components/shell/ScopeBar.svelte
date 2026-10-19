@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ConceptHint from '$lib/components/ConceptHint.svelte';
   import ScopeGlyph from '$lib/components/ScopeGlyph.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { copyText } from '$lib/clipboard';
@@ -69,7 +70,7 @@
   <div class="scopebar">
     {#if pins.pins.length === 0}
       <span class="scopebar__scope">
-        <span class="scopebar__lead">{t('planner.lanes_scope', locale)}</span>
+        <span class="scopebar__lead">{t('planner.lanes_scope', locale)}<ConceptHint concept="scope" /></span>
         <!-- Names every axis you can narrow by, and it has to name them ALL:
              the line has to earn its place in the sentence, and a person is
              now a fourth thing you can pin. A band that lists two of four
@@ -87,7 +88,7 @@
         >
       </span>
     {:else}
-      <span class="scopebar__lead">{t('planner.lanes_scope', locale)}</span>
+      <span class="scopebar__lead">{t('planner.lanes_scope', locale)}<ConceptHint concept="scope" /></span>
       {#each pins.pins as tok (tok)}
         <span class="tok tok--{tokenKind(tok)}">
           <ScopeGlyph kind={tokenKind(tok)} accent={tokenAccent(tok)} lineKind={tokenLineKind(tok)} />
