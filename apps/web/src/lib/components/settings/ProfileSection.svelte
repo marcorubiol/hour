@@ -1,4 +1,6 @@
 <script lang="ts">
+  import RecordHead from '$lib/components/RecordHead.svelte';
+  import BlockHead from '$lib/components/BlockHead.svelte';
   import { onMount } from 'svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { accentVar } from '$lib/utils/accent';
@@ -155,11 +157,9 @@
   });
 </script>
 
-<header class="set-mast">
-  <p class="eyebrow set-mast__kicker">{t('settings.profile_kicker', locale)}</p>
-  <h1 class="set-mast__title"><em>{t('settings.nav_profile', locale)}</em></h1>
-  <p class="set-mast__sub">{t('settings.profile_sub', locale)}</p>
-</header>
+<RecordHead crumbs={[{ label: t('settings.title', locale) }, { label: t('settings.profile_kicker', locale) }]} title={t('settings.nav_profile', locale)}>
+  {#snippet facts()}<span>{t('settings.profile_sub', locale)}</span>{/snippet}
+</RecordHead>
 
 <section class="set-group">
   <div class="set-group__body">
@@ -176,8 +176,9 @@
           >
             {initials}
           </span>
-          <button type="button" class="btn--primary btn--s">{t('settings.profile_upload', locale)}</button>
-          <span class="set-row__hint">{t('settings.profile_upload_hint', locale)}</span>
+          <!-- No «Upload image»: there is no endpoint that stores an avatar yet
+               (`user_profile.avatar_url` has no writer). The hint says it is a
+               monogram for now; the button comes back with the upload. -->
         </div>
       </div>
     </div>
@@ -227,10 +228,7 @@
 <MailSignature scope="personal" workspaceId={currentWorkspaceId} />
 
 <section class="set-group">
-  <div class="set-group__head">
-    <span class="eyebrow set-group__kicker">{t('settings.profile_identity_kicker', locale)}</span>
-    <h2 class="set-group__title">{t('settings.profile_identity_title', locale)}</h2>
-  </div>
+  <BlockHead title={t('settings.profile_identity_kicker', locale)} count={t('settings.profile_identity_title', locale)} />
   <div class="set-group__body">
     <p class="set-row__hint set-person__lead">
       {t('settings.profile_identity_lead_a', locale)}
