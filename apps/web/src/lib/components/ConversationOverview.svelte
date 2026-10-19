@@ -47,6 +47,7 @@
     type RelationCounts,
     type SeasonLine,
   } from '$lib/conversation-overview';
+  import { ALL, panelHref, type LensChip } from '$lib/conversation-tags';
 
   interface Props {
     filters: { projectIds: string[]; workspaceIds: string[]; lineIds: string[]; enabled: boolean };
@@ -67,9 +68,33 @@
     /** «Escribir a estas»: precarga el modo selección del envío en bloque (ADR-115). */
     /** Absent for whoever cannot edit conversations: no «write to these». */
     onwrite?: (picks: { id: string; project_id: string }[]) => void;
+    /**
+     * ADR-138 fase 2, el dominio es el chip: la etiqueta que acota (`all`,
+     * ninguna) y qué panel se pinta. `sales` es el de Difusión entero;
+     * `common`, solo te toca (sin temperatura, temporada ni envío).
+     */
+    chip?: LensChip;
+    panel?: 'sales' | 'common';
   }
 
-  let { filters, workspaceSlugById, projectNameById, locale, lineHint = 0, onrelation, online, onwrite }: Props = $props();
+  let {
+    filters,
+    workspaceSlugById,
+    projectNameById,
+    locale,
+    lineHint = 0,
+    onrelation,
+    online,
+    onwrite,
+    chip = ALL,
+    panel = 'sales',
+  }: Props = $props();
+
+  let full = $derived(panel === 'sales');
+  /** A block's link is its filter, with the chip: block and list count the same (ADR-118 § 7). */
+  function link(qs: string): string {
+    return panelHref(chip, qs);
+  }
 
   /** Ghost lines while loading: as many as the scope has, at most four. */
   let ghostLines = $derived(lineHint >= 2 ? Math.min(lineHint, 4) : 0);
@@ -87,12 +112,14 @@
     if (f.projectIds.length > 0) p.set('project_ids', f.projectIds.join(','));
     if (f.workspaceIds.length > 0) p.set('workspace_ids', f.workspaceIds.join(','));
     if (f.lineIds.length > 0) p.set('line_ids', f.lineIds.join(','));
+    if (chip !== ALL) p.set('etiqueta', chip);
+    if (!full) p.set('panel', 'common');
     return p.toString();
   }
 
   const query = createQuery(
     toStore(() => ({
-      queryKey: ['conversation-overview', filters.projectIds, filters.workspaceIds, filters.lineIds] as const,
+      queryKey: ['conversation-overview', filters.projectIds, filters.workspaceIds, filters.lineIds, chip, panel] as const,
       enabled: filters.enabled,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         fetchJSON<OverviewResponse>(`/api/conversations/overview?${params(filters)}`, signal),
@@ -235,8 +262,9 @@
   <div class="board" aria-busy="true" aria-label={t('overview.loading', locale)}>
     <div class="board__col">
       <section class="block block--due"><BlockHead title={t('overview.due', locale)} count={DASH} />{@render ghost(5)}</section>
-      <section class="block block--hot"><BlockHead title={t('overview.hot', locale)} count={DASH} />{@render ghost(5)}</section>
+      {#if full}<section class="block block--hot"><BlockHead title={t('overview.hot', locale)} count={DASH} />{@render ghost(5)}</section>{/if}
     </div>
+    {#if full}
     <div class="board__col">
       <section class="block block--season">
         <BlockHead title={t('overview.season_of', locale, { season: currentSeason(new Date()).label })} count={DASH} />
@@ -278,6 +306,7 @@
         <p class="mailout__ghost-figs"><span class="ghost-line">&nbsp;</span></p>
       </section>
     </div>
+    {/if}
   </div>
 {:else if $query.isError}
   <p class="load-fail" role="alert">
@@ -289,7 +318,7 @@
     <div class="board__col">
       <section class="block block--due" aria-labelledby="ov-due" data-testid="block-due" data-help-step="conv-due">
         <BlockHead id="ov-due" concept="due" title={t('overview.due', locale)} count={data.due.count}>
-          {#if data.due.count > 0}<a class="block-head__act" href="?turno=nuestro#lista">{t('overview.see_in_list', locale)}</a>{/if}
+          {#if data.due.count > 0}<a class="block-head__act" href={link('turno=nuestro#lista')}>{t('overview.see_in_list', locale)}</a>{/if}
         </BlockHead>
         <FirstTimeNote event="first_reply_waiting" when={data.due.count > 0} />
         {#if data.due.count === 0}
@@ -336,9 +365,10 @@
         {/if}
       </section>
 
+      {#if full}
       <section class="block block--hot" aria-labelledby="ov-hot" data-testid="block-hot">
         <BlockHead id="ov-hot" concept="hot" title={t('overview.hot', locale)} count={data.hot.count}>
-          {#if data.hot.count > 0}<a class="block-head__act" href="?temp=caliente#lista">{t('overview.see_n', locale, { n: data.hot.count })}</a>{/if}
+          {#if data.hot.count > 0}<a class="block-head__act" href={link('temp=caliente#lista')}>{t('overview.see_n', locale, { n: data.hot.count })}</a>{/if}
         </BlockHead>
         {#if data.hot.count === 0}
           <p class="block__empty">{t('overview.hot_empty', locale)}</p>
@@ -364,8 +394,10 @@
         {/if}
       </section>
 
+      {/if}
     </div>
 
+    {#if full}
     <div class="board__col">
       <section class="block block--season" aria-labelledby="ov-season" data-testid="block-season" data-help-step="conv-season">
         <BlockHead id="ov-season" concept="season_sales" title={t('overview.season_of', locale, { season: data.season.label })} count={data.season.total}>
@@ -410,7 +442,7 @@
 
       <section class="block block--cold" aria-labelledby="ov-cold" data-testid="block-cold">
         <BlockHead id="ov-cold" concept="cold" title={t('overview.cold', locale)} count={data.cold.count}>
-          {#if data.cold.count > 0}<a class="block-head__act" href="?temp=fria#lista">{t('overview.see_n', locale, { n: data.cold.count })}</a>{/if}
+          {#if data.cold.count > 0}<a class="block-head__act" href={link('temp=fria#lista')}>{t('overview.see_n', locale, { n: data.cold.count })}</a>{/if}
         </BlockHead>
         {#if data.cold.count === 0}
           <p class="block__empty">{t('overview.cold_empty', locale)}</p>
@@ -420,9 +452,9 @@
               {#if i === 0 || data.cold.rows[i - 1].group !== row.group}
                 <li class="rows__sep eyebrow eyebrow--sub">
                   {#if row.group === 'stalled'}
-                    <a href="?temp=parada#lista">{t('overview.cold_stalled', locale, { n: data.cold.stalled })}</a>
+                    <a href={link('temp=parada#lista')}>{t('overview.cold_stalled', locale, { n: data.cold.stalled })}</a>
                   {:else}
-                    <a href="?temp=ronda#lista">{t('overview.cold_round', locale, { n: data.cold.round })}</a>
+                    <a href={link('temp=ronda#lista')}>{t('overview.cold_round', locale, { n: data.cold.round })}</a>
                   {/if}
                 </li>
               {/if}
@@ -484,8 +516,8 @@
             {locale}
             figures={[
               { key: 'delivered', n: m.figures.delivered },
-              { key: 'replies', n: m.figures.replies, href: m.figures.replies > 0 ? `?envio=${m.id}&r=respuestas#lista` : null },
-              { key: 'bounced', n: m.figures.bounced, warn: true, href: m.figures.bounced > 0 ? `?envio=${m.id}&r=rebotes#lista` : null },
+              { key: 'replies', n: m.figures.replies, href: m.figures.replies > 0 ? link(`envio=${m.id}&r=respuestas#lista`) : null },
+              { key: 'bounced', n: m.figures.bounced, warn: true, href: m.figures.bounced > 0 ? link(`envio=${m.id}&r=rebotes#lista`) : null },
               { key: 'unsubscribed', n: m.figures.unsubscribed },
               ...(m.figures.complained > 0 ? [{ key: 'complained' as const, n: m.figures.complained, warn: true }] : []),
             ]}
@@ -494,10 +526,11 @@
       {/if}
 
     </div>
-    {#if data.undated > 0}
+    {/if}
+    {#if full && data.undated > 0}
       <!-- No date at all: not cold, not due (we do not know). Counted apart, a quiet line with its filter. -->
       <p class="board__undated" data-testid="overview-undated">
-        <a href="?temp=sin-fecha#lista">{t('overview.undated', locale, { n: data.undated })}</a>
+        <a href={link('temp=sin-fecha#lista')}>{t('overview.undated', locale, { n: data.undated })}</a>
       </p>
     {/if}
   </div>

@@ -23,6 +23,8 @@
     /** A mailout's figure as a filter (ADR-126 § 9). */
     envio?: string;
     r?: MailoutPick;
+    /** The lens chip's tag key (ADR-138, fase 2); untagged rows read as `sales`. */
+    etiqueta?: string;
     /** Hold the query (e.g. while a sidebar selection hasn't resolved). */
     enabled?: boolean;
   }
@@ -62,6 +64,8 @@
     type ConversationPatch,
   } from '$lib/conversation';
   import { relationLabel, relationTone } from '$lib/conversation-relation';
+  import ConversationTagList from '$lib/components/ConversationTagList.svelte';
+  import type { WorkspaceTag } from '$lib/conversation-tags';
 
   interface Props {
     filters: ConversationFilters;
@@ -87,6 +91,10 @@
      * decides per project.
      */
     editable?: boolean;
+    /** The tag vocabulary of the scope: when given, each row shows its tags (ADR-138). */
+    tagNames?: readonly WorkspaceTag[];
+    /** A tag the rows do not repeat: the active chip's. */
+    hideTag?: string;
   }
 
   let {
@@ -100,6 +108,8 @@
     selected = $bindable([]),
     turnColumn = false,
     editable = true,
+    tagNames,
+    hideTag,
   }: Props = $props();
 
   type ConversationsResponse = {
@@ -151,6 +161,7 @@
     const p = new URLSearchParams();
     p.set('status', 'any');
     if (f.relacion) p.set('relacion', f.relacion);
+    if (f.etiqueta) p.set('etiqueta', f.etiqueta);
     if (f.projectSlug) p.set('project_slug', f.projectSlug);
     if (f.projectIds && f.projectIds.length > 0) p.set('project_ids', f.projectIds.join(','));
     if (f.lineId) p.set('line_id', f.lineId);
@@ -527,6 +538,7 @@
                 known={knownAmong($acquaintances.data, item.workspace_id, item.contacts.map((c) => c.person_id))}
                 {locale}
               />
+              {#if tagNames}<ConversationTagList tags={item.tags} known={tagNames} hide={hideTag} {locale} />{/if}
             </td>
             <td
               class="cell--muted"
@@ -771,6 +783,10 @@
     .cell--name {
       font-weight: 500;
       color: var(--heading-color);
+    }
+    /* Its tags (ADR-138) after the name, on the same line while they fit. */
+    .cell--name > :global(.conv-tags) {
+      margin-inline-start: var(--space-xs);
     }
     .cell--name-link {
       color: inherit;
