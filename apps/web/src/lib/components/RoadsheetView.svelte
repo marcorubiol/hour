@@ -206,7 +206,7 @@
       flex-direction: column;
       gap: var(--space-xs);
       padding-block-end: var(--space-m);
-      border-block-end: 1px solid var(--border-color-light);
+      border-block-end: var(--line-hairline) solid var(--border-color-light);
     }
 
     /* Masthead typography via base.css h1 defaults. */
@@ -264,7 +264,7 @@
       gap: var(--space-m);
       align-items: baseline;
       padding-block: var(--space-xs);
-      border-block-end: 1px solid var(--border-color-light);
+      border-block-end: var(--line-hairline) solid var(--border-color-light);
     }
 
     .rsv__role {

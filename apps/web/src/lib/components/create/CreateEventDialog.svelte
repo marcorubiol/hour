@@ -712,7 +712,7 @@
     .ced__seg {
       display: inline-flex;
       align-self: start;
-      border: 1px solid var(--border-color-dark);
+      border: var(--line-hairline) solid var(--border-color-dark);
       border-radius: var(--radius-circle);
       overflow: hidden;
     }

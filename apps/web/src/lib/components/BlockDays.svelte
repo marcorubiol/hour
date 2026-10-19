@@ -145,7 +145,7 @@
     flex-direction: column;
     gap: var(--space-s);
     padding: var(--space-s);
-    border: 1px solid var(--border-color-light);
+    border: var(--line-hairline) solid var(--border-color-light);
     border-radius: var(--radius-m);
     background: var(--bg-light);
   }
@@ -162,7 +162,7 @@
     flex: 1;
     appearance: none;
     padding: var(--space-2xs) 0;
-    border: 1px solid var(--border-color-dark);
+    border: var(--line-hairline) solid var(--border-color-dark);
     border-radius: var(--radius-s);
     background: var(--bg-ultra-light);
     color: var(--text-faint);
@@ -181,12 +181,12 @@
   .bd__cal {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    gap: 2px;
+    gap: var(--space-2xs);
   }
   .bd__cald {
     appearance: none;
     aspect-ratio: 1.1;
-    border: 1px solid transparent;
+    border: var(--line-hairline) solid transparent;
     border-radius: var(--radius-s);
     background: none;
     color: var(--text-faint);
@@ -226,7 +226,7 @@
     gap: var(--space-xs);
     margin: 0;
     padding-block-start: var(--space-xs);
-    border-block-start: 1px solid var(--border-color-light);
+    border-block-start: var(--line-hairline) solid var(--border-color-light);
     font-size: var(--text-xs);
     color: var(--text-muted);
   }

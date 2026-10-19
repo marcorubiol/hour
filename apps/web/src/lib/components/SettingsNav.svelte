@@ -106,12 +106,12 @@
       margin: 0;
       display: flex;
       flex-direction: column;
-      gap: 1px;
+      gap: var(--line-hairline);
     }
 
     .set-nav__item {
       display: grid;
-      grid-template-columns: 18px 1fr;
+      grid-template-columns: 1.125rem 1fr;
       gap: var(--space-s);
       align-items: center;
       padding-block: var(--space-xs);
@@ -129,7 +129,7 @@
     .set-nav__item.is-active {
       background: var(--bg-active);
       color: var(--text-color);
-      box-shadow: inset 2px 0 0 var(--text-color);
+      box-shadow: inset var(--line) 0 0 var(--text-color);
       font-weight: 500;
     }
     .set-nav__item.is-danger {
@@ -137,7 +137,7 @@
     }
     .set-nav__item.is-danger.is-active {
       background: var(--danger-ultra-light);
-      box-shadow: inset 2px 0 0 var(--danger);
+      box-shadow: inset var(--line) 0 0 var(--danger);
     }
     .set-nav__glyph {
       font-family: var(--font-mono);

@@ -101,7 +101,7 @@
 <style>
   @layer components {
     .menu-separator {
-      block-size: 1px;
+      block-size: var(--line-hairline);
       margin-block: var(--space-2xs);
       background: var(--border-color);
     }

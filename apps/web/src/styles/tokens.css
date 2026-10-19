@@ -193,6 +193,24 @@
 
     --border-color-dark: color-mix(in oklch, var(--neutral) 18%, transparent);
     --border-color-light: color-mix(in oklch, var(--neutral) 9%, transparent);
+    /* the border of a control the pointer is on */
+    --border-color-hover: var(--neutral-semi-light);
+
+    /* ============================================================ */
+    /* CONTEXTUAL — fills of a control                                */
+    /* ============================================================ */
+
+    /* Ink fill: the primary button, the pill that is on, the switch that is
+       on. --primary stays for focus, links and selection (ADR-033). */
+    --fill-ink: var(--text-color);
+    --fill-ink-hover: var(--neutral-semi-dark);
+    /* A checked box or radio: the brand hue, with light ink on it. */
+    --check-bg: var(--primary);
+    --check-fg: var(--text-light);
+    /* What a dialog or a phone drawer is drawn over. */
+    --backdrop: color-mix(in srgb, var(--black) 40%, transparent);
+    /* Ink on an accent fill (the rail's scope glyph). */
+    --accent-fg: var(--white);
 
     /* ============================================================ */
     /* CONTEXTUAL — absence (Marco, 2026-08-10)                       */
@@ -507,6 +525,13 @@
       color-mix(in srgb, var(--black) 10%, transparent);
     --box-shadow-3: 0 8px 24px -4px
       color-mix(in srgb, var(--black) 14%, transparent);
+    /* A sheet floating over the page (the invite card). */
+    --box-shadow-4: 0 24px 80px color-mix(in srgb, var(--text-color) 8%, transparent);
+    /* The lift a settled card earns in a cell (the month's confirmed gig):
+       in the text's ink, so it follows the mode. */
+    --box-shadow-lift:
+      0 1px 2px color-mix(in oklch, var(--text-color) 10%, transparent),
+      0 2px 5px color-mix(in oklch, var(--text-color) 6%, transparent);
 
     /* ============================================================ */
     /* TRANSITIONS                                                    */
@@ -515,6 +540,7 @@
     --transition-duration: 0.2s;
     --duration-fast: 0.1s; /* a hover that must not lag: opacity, a colour */
     --duration-slow: 0.3s; /* a thing that arrives: the agenda's end rising */
+    --duration-spin: 0.6s; /* one turn of a spinner */
     --transition-timing: ease;
     --transition-delay: 0s;
     --transition:
@@ -616,6 +642,49 @@
     background: var(--selection-bg);
     color: var(--selection-fg);
   }
+
+  /* Contracts set by a data attribute: contextual variables a component
+     consumes without knowing which hue is behind them. They live here, with
+     the other contextual tokens, so base.css and the components read no hue. */
+  /* Tone contract — component-agnostic. Anything carrying data-tone gets
+     --state-color / --state-border to consume (calendar dots, week items). :where() keeps specificity at
+     zero so components can still override locally. */
+  :where([data-tone="neutral"]) {
+    --state-color: var(--text-muted);
+    --state-border: var(--border-color-dark);
+  }
+  :where([data-tone="info"]) {
+    --state-color: var(--info);
+    --state-border: var(--info);
+  }
+  :where([data-tone="success"]) {
+    --state-color: var(--success);
+    --state-border: var(--success);
+  }
+  :where([data-tone="warning"]) {
+    --state-color: var(--warning);
+    --state-border: var(--warning);
+  }
+  :where([data-tone="danger"]) {
+    --state-color: var(--danger);
+    --state-border: var(--danger);
+  }
+  :where([data-tone="faint"]) {
+    --state-color: var(--text-faint);
+    --state-border: var(--border-color-light);
+  }
+
+  /* The tone of each relation (ADR-138) for what draws one without being a
+     pill (the season bar of Conversations): `--status` is the family, mixed
+     once with one recipe (diseño B6). The pill itself is the one status
+     badge, `StateBadge`, with the tone `relationTone()` gives. */
+  [data-relation='never'] { --status: var(--neutral); }
+  [data-relation='contacted'] { --status: var(--info); }
+  [data-relation='talking'] { --status: var(--warning); }
+  [data-relation='regular'] { --status: var(--primary); }
+  /* Asleep: the neutral, faded, as the faint pill fades it. */
+  [data-relation='dormant'] { --status: color-mix(in oklab, var(--neutral) 45%, transparent); }
+  [data-relation='not_now'] { --status: var(--danger); }
 
   /* ============================================================ */
   /* MODE — dark                                                    */

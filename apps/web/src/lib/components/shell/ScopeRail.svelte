@@ -183,7 +183,7 @@
        the header's wordmark exactly (see .side-clock). */
     padding-block: 0 var(--space-l);
     padding-inline: var(--space-m);
-    border-inline-end: 1px solid var(--border-color-light);
+    border-inline-end: var(--line-hairline) solid var(--border-color-light);
     background: var(--bg-light);
   }
   /* In the flow only where there is room for it. Below 48rem `.drawer`
@@ -230,7 +230,7 @@
     gap: var(--space-xs);
     padding-block: var(--space-2xs);
     padding-inline: var(--space-m);
-    border: 1px solid var(--border-color-dark);
+    border: var(--line-hairline) solid var(--border-color-dark);
     border-radius: var(--radius-circle);
     /* NO FILL WHEN IT IS OFF (Marco, 2026-07-31). The outline alone says
        «available»; a fill on a control that is not doing anything reads as a
@@ -240,9 +240,9 @@
        a micro-label one step under the smallest named step — 9px is the
        Planner's own margin voice, and this is furniture beside a clock. */
     font-family: var(--font-sans);
-    font-size: 9px;
+    font-size: var(--text-2xs);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: var(--tracking-s);
     color: var(--text-muted);
     cursor: pointer;
     white-space: nowrap;
@@ -266,7 +266,7 @@
     justify-content: center;
     inline-size: 1.35em;
     block-size: 1.35em;
-    border: 1px solid currentColor;
+    border: var(--line-hairline) solid currentColor;
     border-radius: var(--radius-s);
     /* The key stays mono even though the label is now sans. */
     font-family: var(--font-mono);
@@ -288,7 +288,7 @@
   .side-sec {
     display: flex;
     flex-direction: column;
-    gap: 1px;
+    gap: var(--line-hairline);
   }
   .side-sec__h {
     font-family: var(--font-mono);
@@ -321,7 +321,7 @@
   .srow.is-on {
     background: var(--bg-ultra-light);
     color: var(--text-color);
-    box-shadow: 0 0 0 1px var(--border-color-dark);
+    box-shadow: 0 0 0 var(--line-hairline) var(--border-color-dark);
   }
   .sglyph {
     inline-size: 1.4rem;
@@ -332,7 +332,7 @@
     place-items: center;
     font-family: var(--font-display);
     font-size: var(--text-xs);
-    color: #fff;
+    color: var(--accent-fg);
   }
   .sglyph--every {
     background: var(--text-color);
@@ -352,7 +352,7 @@
     inline-size: 100%;
     padding-block: var(--space-xs);
     padding-inline: var(--space-xs);
-    border: 1px solid var(--primary);
+    border: var(--line-hairline) solid var(--primary);
     border-radius: var(--radius-m);
     background: var(--bg-ultra-light);
     font-family: var(--font-sans);
@@ -366,7 +366,7 @@
   .side-browse {
     inline-size: 100%;
     background: transparent;
-    border: 1px dashed var(--border-color-dark);
+    border: var(--line-hairline) dashed var(--border-color-dark);
     cursor: pointer;
     padding: var(--space-s);
     border-radius: var(--radius-m);

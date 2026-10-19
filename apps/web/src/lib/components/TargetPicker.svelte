@@ -363,14 +363,14 @@
       z-index: var(--z-dropdown, 50);
       inline-size: min(24rem, 92vw);
       background: var(--bg-ultra-light);
-      border: 1px solid var(--border-color-dark);
+      border: var(--line-hairline) solid var(--border-color-dark);
       border-radius: var(--radius-l);
       box-shadow: var(--box-shadow-3);
       overflow: hidden;
     }
     .tp__search {
       padding: var(--space-xs);
-      border-block-end: 1px solid var(--border-color-light);
+      border-block-end: var(--line-hairline) solid var(--border-color-light);
     }
     .tp__search input {
       inline-size: 100%;
@@ -518,10 +518,10 @@
       gap: var(--space-xs) var(--space-s);
       padding-block: var(--space-xs);
       padding-inline: var(--space-s);
-      border-block-start: 1px solid var(--border-color-light);
+      border-block-start: var(--line-hairline) solid var(--border-color-light);
       font-family: var(--font-mono);
       font-size: var(--text-xs);
-      letter-spacing: 0.04em;
+      letter-spacing: var(--tracking-s);
       color: var(--text-faint);
     }
     .tp__foot > span {

@@ -27,13 +27,13 @@
   .away-line {
     margin: 0;
     font-family: var(--font-mono);
-    font-size: 9px;
-    letter-spacing: 0.06em;
+    font-size: var(--text-2xs);
+    letter-spacing: var(--tracking-m);
     color: var(--away-phrase);
   }
   .away-line__who {
     color: var(--away-subject-line);
-    margin-inline-end: 7px;
+    margin-inline-end: var(--space-xs);
   }
   /* Provisional leans, like every other maybe in this drawing — the
      certainty axis is geometry, and colour only follows it. */

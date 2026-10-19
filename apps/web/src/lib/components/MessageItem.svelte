@@ -178,7 +178,7 @@
     .thread__new::after {
       content: '';
       flex: 1;
-      border-block-start: 1px solid currentColor;
+      border-block-start: var(--line-hairline) solid currentColor;
       opacity: 0.4;
     }
 

@@ -582,7 +582,7 @@
       gap: var(--space-2xs) var(--space-s);
       align-items: baseline;
       padding-block: var(--space-xs);
-      border-block-end: 1px solid var(--border-color-light);
+      border-block-end: var(--line-hairline) solid var(--border-color-light);
       text-decoration: none;
       color: inherit;
       transition: background-color var(--transition);
@@ -698,7 +698,7 @@
 
     .season__bar {
       display: flex;
-      gap: 2px;
+      gap: var(--space-2xs);
       block-size: 0.9rem;
       border-radius: var(--radius-s);
       overflow: hidden;
@@ -708,7 +708,7 @@
     }
     .season__seg {
       flex-basis: 0;
-      min-inline-size: 3px;
+      min-inline-size: var(--dot-xs);
       padding: 0;
       border: 0;
       background: var(--seg);
@@ -747,7 +747,7 @@
       display: inline-block;
       inline-size: 0.6rem;
       block-size: 0.6rem;
-      border-radius: 2px;
+      border-radius: var(--radius-xs);
       background: var(--seg);
     }
     .season__item:hover .season__k {

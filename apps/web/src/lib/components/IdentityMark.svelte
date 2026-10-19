@@ -156,11 +156,11 @@
       border-radius: calc(var(--_m) * 0.28);
       background: var(--_bg);
       color: var(--_fg);
-      box-shadow: 0 0 0 1px var(--_bd) inset;
+      box-shadow: 0 0 0 var(--line-hairline) var(--_bd) inset;
       font-size: calc(var(--_m) * 0.5);
       font-weight: 600;
       line-height: 1;
-      letter-spacing: 0.01em;
+      letter-spacing: var(--tracking-xs);
       font-variant-numeric: tabular-nums;
       white-space: nowrap;
     }
@@ -179,15 +179,15 @@
       --_m: 12px;
     }
     .mark--mini .mark__chip {
-      padding-inline: 3px;
+      padding-inline: var(--space-2xs);
       /* A flatter corner, not just a smaller one: 3 on 12 reads squarer than
          the proportional 3.4, and at this size a rounder tile loses the
          letters to its own curve. */
-      border-radius: 3px;
+      border-radius: var(--radius-xs);
       box-shadow: none;
-      font-size: 8px;
+      font-size: var(--text-2xs);
       font-weight: 500;
-      letter-spacing: 0.02em;
+      letter-spacing: var(--tracking-xs);
     }
 
     /* bare = same silhouette, no glyph. Keep it square (min = block). */
@@ -216,7 +216,7 @@
       font-size: calc(var(--_m) * 0.46);
       font-weight: 500;
       line-height: 1;
-      letter-spacing: 0.04em;
+      letter-spacing: var(--tracking-s);
       white-space: nowrap;
     }
     /* The two cells touch: an address is one object, so no gap between its
@@ -232,11 +232,11 @@
       border-end-start-radius: 0;
     }
     .mark--mini .mark__space {
-      padding-inline: 3px;
-      border-start-start-radius: 3px;
-      border-end-start-radius: 3px;
-      font-size: 7.5px;
-      letter-spacing: 0.03em;
+      padding-inline: var(--space-2xs);
+      border-start-start-radius: var(--radius-xs);
+      border-end-start-radius: var(--radius-xs);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-xs);
     }
     .mark--mini.mark--addr .mark__chip {
       border-start-start-radius: 0;

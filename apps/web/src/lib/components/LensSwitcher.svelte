@@ -92,7 +92,7 @@
   .lensswitch__home {
     min-block-size: var(--touch-target);
     appearance: none;
-    border: 1px solid var(--border-color-dark);
+    border: var(--line-hairline) solid var(--border-color-dark);
     background: var(--bg-ultra-light);
     cursor: pointer;
     font-family: var(--font-sans);
@@ -116,9 +116,9 @@
   .lensswitch {
     display: inline-flex;
     background: var(--bg-ultra-light);
-    border: 1px solid var(--border-color-dark);
+    border: var(--line-hairline) solid var(--border-color-dark);
     border-radius: var(--radius-circle);
-    padding: 2px;
+    padding: var(--space-2xs);
   }
   .lensswitch a {
     min-block-size: var(--touch-target);

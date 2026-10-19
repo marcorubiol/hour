@@ -218,7 +218,7 @@
     flex: 1;
     font-family: var(--font-mono);
     font-size: var(--text-xs);
-    letter-spacing: 0.04em;
+    letter-spacing: var(--tracking-s);
     color: var(--text-faint);
   }
 
@@ -228,7 +228,7 @@
     gap: var(--space-xs);
     flex-wrap: wrap;
     padding-block-start: var(--space-xs);
-    border-block-start: 1px solid var(--border-color-light);
+    border-block-start: var(--line-hairline) solid var(--border-color-light);
   }
 
   /* Both fields are `.field` (base.css), so the person and the role read

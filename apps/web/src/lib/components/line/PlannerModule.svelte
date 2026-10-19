@@ -227,7 +227,7 @@
     }
     .lcal__modes {
       display: inline-flex;
-      border: 1px solid var(--border-color-light);
+      border: var(--line-hairline) solid var(--border-color-light);
       border-radius: var(--radius-circle);
       overflow: hidden;
     }

@@ -195,7 +195,7 @@
       padding: var(--space-xs) var(--space-s);
       color: var(--text-color);
       background: var(--bg-ultra-light);
-      border: 1px solid var(--border-color-dark);
+      border: var(--line-hairline) solid var(--border-color-dark);
       border-radius: var(--radius-s);
       font: inherit;
       font-size: var(--text-s);

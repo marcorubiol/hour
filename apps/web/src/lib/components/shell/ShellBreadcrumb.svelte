@@ -47,7 +47,7 @@
     z-index: calc(var(--z-sticky) - 1);
     background: color-mix(in oklch, var(--bg-light) 92%, transparent);
     backdrop-filter: blur(8px);
-    border-block-end: 1px solid var(--border-color-light);
+    border-block-end: var(--line-hairline) solid var(--border-color-light);
   }
   .shell__address-inner {
     display: flex;

@@ -150,7 +150,7 @@
   .feed__body {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--space-2xs);
     min-inline-size: 0;
     color: var(--text-color);
   }

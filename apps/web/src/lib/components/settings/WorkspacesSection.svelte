@@ -530,13 +530,13 @@
     align-self: flex-start;
     padding-block: var(--space-s);
     padding-inline: var(--space-m);
-    border: 1px dashed var(--border-color-dark);
+    border: var(--line-hairline) dashed var(--border-color-dark);
     border-radius: var(--radius-s);
     background: transparent;
     color: var(--text-muted);
     font-family: var(--font-mono);
     font-size: var(--text-xs);
-    letter-spacing: 0.04em;
+    letter-spacing: var(--tracking-s);
     cursor: pointer;
     margin-block-start: var(--space-s);
     transition: color var(--transition), border-color var(--transition);
@@ -552,26 +552,26 @@
   }
   .set-ws {
     display: grid;
-    grid-template-columns: 4px minmax(140px, 1fr) auto auto auto;
+    grid-template-columns: var(--dot-s) minmax(8.75rem, 1fr) auto auto auto;
     gap: var(--set-pad);
     align-items: center;
     padding-block: var(--space-m);
-    border-block-end: 1px solid var(--border-color-light);
+    border-block-end: var(--line-hairline) solid var(--border-color-light);
   }
   .set-ws:last-child {
     border-block-end: 0;
   }
   .set-ws__rail {
-    inline-size: 4px;
-    block-size: 38px;
+    inline-size: var(--dot-s);
+    block-size: 2.375rem;
     background: var(--c);
-    border-radius: 2px;
+    border-radius: var(--radius-xs);
   }
   .set-ws__name h3 {
     font-family: var(--font-display);
     font-size: var(--text-l);
     font-weight: 500;
-    letter-spacing: -0.01em;
+    letter-spacing: var(--heading-letter-spacing);
     margin: 0;
     color: var(--text-color);
   }
@@ -579,14 +579,14 @@
     font-size: var(--text-xs);
     color: var(--text-faint);
     font-family: var(--font-mono);
-    letter-spacing: 0.04em;
-    margin-block-start: 2px;
+    letter-spacing: var(--tracking-s);
+    margin-block-start: var(--space-2xs);
   }
   .set-ws__roles {
     display: flex;
     gap: var(--space-xs);
     flex-wrap: wrap;
-    max-inline-size: 280px;
+    max-inline-size: 17.5rem;
   }
   /* Role badges via base.css .role-badge (+ .is-mine). */
   .set-ws__meta {
@@ -617,7 +617,7 @@
     justify-content: space-between;
     gap: var(--space-m);
     padding-block: var(--space-s);
-    border-block-end: 1px solid var(--border-color-light);
+    border-block-end: var(--line-hairline) solid var(--border-color-light);
   }
 
   .set-alias__what {
@@ -659,9 +659,9 @@
     --pill-gap: var(--space-xs);
   }
   .set-role-chip__dot {
-    inline-size: 7px;
-    block-size: 7px;
-    border: 1px solid currentColor;
+    inline-size: var(--dot-l);
+    block-size: var(--dot-l);
+    border: var(--line-hairline) solid currentColor;
     border-radius: 50%;
     display: inline-block;
   }
@@ -670,7 +670,7 @@
   }
 
   .set-access {
-    border: 1px solid var(--border-color-dark);
+    border: var(--line-hairline) solid var(--border-color-dark);
     background: var(--bg-light);
   }
   /* A framed panel: its parts meet at their rules, so the group's gap between
@@ -696,7 +696,7 @@
     font-family: var(--font-mono);
     font-size: var(--text-xs);
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: var(--tracking-l);
     color: var(--text-faint);
   }
   /* Wraps by its own width, not the viewport's: it lives in a settings pane
@@ -707,7 +707,7 @@
     gap: var(--space-s);
     align-items: end;
     padding: var(--space-m);
-    border-block: 1px solid var(--border-color-light);
+    border-block: var(--line-hairline) solid var(--border-color-light);
   }
   .set-access__invite label {
     display: grid;
@@ -723,7 +723,7 @@
     gap: var(--space-m);
     margin: var(--space-m);
     padding: var(--space-s) var(--space-m);
-    border-inline-start: 3px solid var(--accent-color);
+    border-inline-start: var(--line-thick) solid var(--accent-color);
     background: var(--bg);
   }
   .set-access__link p {
@@ -734,26 +734,26 @@
   .set-access__ledger { padding-inline: var(--space-m); }
   .set-access__row {
     display: grid;
-    grid-template-columns: 8px minmax(12rem, 1fr) minmax(7rem, auto) 5rem auto;
+    grid-template-columns: var(--dot-l) minmax(12rem, 1fr) minmax(7rem, auto) 5rem auto;
     gap: var(--space-m);
     align-items: center;
     min-block-size: 4.25rem;
-    border-block-end: 1px solid var(--border-color-light);
+    border-block-end: var(--line-hairline) solid var(--border-color-light);
   }
   .set-access__row:last-child { border-block-end: 0; }
   .set-access__mark {
-    inline-size: 6px;
-    block-size: 6px;
+    inline-size: var(--dot-m);
+    block-size: var(--dot-m);
     border-radius: 50%;
     background: var(--success);
   }
   .set-access__row.is-pending .set-access__mark {
     background: transparent;
-    border: 1px solid var(--text-faint);
+    border: var(--line-hairline) solid var(--text-faint);
   }
   .set-access__identity {
     display: grid;
-    gap: 2px;
+    gap: var(--space-2xs);
     min-inline-size: 0;
   }
   .set-access__identity strong {
@@ -775,7 +775,7 @@
      line. */
   @media (max-width: 47.999rem) {
     .set-ws {
-      grid-template-columns: 4px minmax(0, 1fr);
+      grid-template-columns: var(--dot-s) minmax(0, 1fr);
       grid-auto-flow: row;
       row-gap: var(--space-xs);
       align-items: start;
@@ -796,7 +796,7 @@
   }
   @media (max-width: 44rem) {
     .set-access__row {
-      grid-template-columns: 8px 1fr auto;
+      grid-template-columns: var(--dot-l) 1fr auto;
       gap: var(--space-s);
       padding-block: var(--space-s);
     }

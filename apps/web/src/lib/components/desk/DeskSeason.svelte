@@ -119,7 +119,7 @@
     column-gap: var(--space-m);
     align-items: center;
     padding: var(--space-s) var(--space-m);
-    border: 1px solid var(--border-color-light);
+    border: var(--line-hairline) solid var(--border-color-light);
     border-radius: var(--radius-l);
     background: var(--bg-ultra-light);
     color: inherit;

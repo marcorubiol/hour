@@ -37,7 +37,7 @@
       align-items: baseline;
     }
     .hours__row + .hours__row {
-      border-block-start: 1px dotted var(--border-color-light);
+      border-block-start: var(--line-hairline) dotted var(--border-color-light);
     }
     .hours__line,
     .hours__form {
@@ -64,7 +64,7 @@
     }
     button.hours__line:hover .hours__w {
       text-decoration: underline;
-      text-decoration-thickness: 1px;
+      text-decoration-thickness: var(--line-hairline);
       text-underline-offset: 3px;
     }
     /* The hour: the Planner's clock, tabular so the column reads down. */
@@ -78,14 +78,14 @@
       color: var(--text-faint);
     }
     .hours__plus {
-      margin-inline-start: 1px;
+      margin-inline-start: var(--line-hairline);
       font-size: 0.7em;
       color: var(--text-faint);
     }
     .hours__body {
       display: flex;
       flex-direction: column;
-      gap: 1px;
+      gap: var(--line-hairline);
       min-inline-size: 0;
     }
     .hours__w {
@@ -103,8 +103,8 @@
       margin-inline-end: var(--space-2xs);
       font-style: normal;
       font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.14em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-xl);
       text-transform: uppercase;
       color: var(--text-faint);
     }
@@ -127,13 +127,13 @@
     .hours__at--edit {
       display: flex;
       align-items: baseline;
-      gap: 2px;
+      gap: var(--space-2xs);
     }
     .hours__in {
       min-inline-size: 0;
-      padding: 0 0 1px;
+      padding: 0 0 var(--line-hairline);
       border: 0;
-      border-block-end: 1px solid var(--border-color-light);
+      border-block-end: var(--line-hairline) solid var(--border-color-light);
       background: none;
       font: inherit;
       font-size: var(--text-s);
@@ -182,8 +182,8 @@
       background: none;
       cursor: pointer;
       font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.12em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-xl);
       text-transform: uppercase;
       color: var(--text-muted);
       white-space: nowrap;

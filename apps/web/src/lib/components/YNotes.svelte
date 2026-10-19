@@ -186,13 +186,13 @@
       gap: var(--space-xs);
       font-family: var(--font-mono);
       font-size: var(--text-xs);
-      letter-spacing: 0.04em;
+      letter-spacing: var(--tracking-s);
       color: var(--text-faint);
     }
 
     .ynotes__dot {
-      inline-size: 6px;
-      block-size: 6px;
+      inline-size: var(--dot-m);
+      block-size: var(--dot-m);
       border-radius: var(--radius-circle);
       background: var(--text-faint);
       align-self: center;

@@ -57,7 +57,7 @@
     font-family: var(--font-display);
     font-style: italic;
     font-weight: 400;
-    letter-spacing: -0.02em;
+    letter-spacing: var(--heading-letter-spacing);
     line-height: 1;
   }
 
@@ -77,6 +77,6 @@
   a.brand:focus-visible {
     outline: var(--focus-width) solid var(--focus-color);
     outline-offset: 4px;
-    border-radius: 2px;
+    border-radius: var(--radius-xs);
   }
 </style>

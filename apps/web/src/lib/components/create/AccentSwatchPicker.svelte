@@ -181,10 +181,10 @@
 
     .picker > legend.legend--hidden {
       position: absolute;
-      inline-size: 1px;
-      block-size: 1px;
+      inline-size: var(--line-hairline);
+      block-size: var(--line-hairline);
       padding: 0;
-      margin: -1px;
+      margin: calc(-1 * var(--line-hairline));
       overflow: hidden;
       clip-path: inset(50%);
       white-space: nowrap;
@@ -194,7 +194,7 @@
        and a pin hanging beneath it. */
     .track {
       position: relative;
-      block-size: 54px;
+      block-size: 3.375rem;
       cursor: pointer;
       touch-action: none;
     }
@@ -208,10 +208,10 @@
       position: absolute;
       inset-inline: 0;
       inset-block-start: 2px;
-      block-size: 20px;
-      border-radius: 999px;
+      block-size: 1.25rem;
+      border-radius: var(--radius-circle);
       pointer-events: none;
-      box-shadow: 0 0 0 1px var(--border-color-light) inset;
+      box-shadow: 0 0 0 var(--line-hairline) var(--border-color-light) inset;
       /* Pale pastel preview of the hue wheel (high L, low C — see --accent-track-*). */
       background: linear-gradient(
         to right,
@@ -230,11 +230,11 @@
     /* Preset ticks — the 10 standard colours, marked on the pale bar. */
     .track__tick {
       position: absolute;
-      inset-block-start: 6px;
-      block-size: 12px;
-      inline-size: 2px;
+      inset-block-start: 0.375rem;
+      block-size: 0.75rem;
+      inline-size: var(--line);
       transform: translateX(-50%);
-      border-radius: 1px;
+      border-radius: var(--radius-xs);
       pointer-events: none;
       background: color-mix(in oklch, var(--text-color) 18%, transparent);
     }
@@ -244,32 +244,32 @@
        pointing up at its hue. */
     .track__thumb {
       position: absolute;
-      inset-block-start: 28px;
+      inset-block-start: 1.75rem;
       transform: translateX(-50%);
-      padding: 3px;
-      border-radius: 8px;
+      padding: var(--space-2xs);
+      border-radius: var(--radius-l);
       pointer-events: none;
       /* The frame fills with the identity mark's own soft tint (same recipe as
          IdentityMark's --_bg), so the pin previews the identity. */
       background: color-mix(in oklch, var(--thumb, var(--accent-1)) 16%, var(--bg-ultra-light));
       box-shadow:
-        0 0 0 2px var(--thumb, var(--accent-1)),
+        0 0 0 var(--line) var(--thumb, var(--accent-1)),
         0 1px 3px color-mix(in oklch, var(--text-color) 28%, transparent);
     }
     .track__thumb::before {
       content: '';
       position: absolute;
-      inset-block-start: -6px;
+      inset-block-start: -0.375rem;
       inset-inline-start: 50%;
       transform: translateX(-50%);
-      border-inline: 6px solid transparent;
-      border-block-end: 6px solid var(--thumb, var(--accent-1));
+      border-inline: var(--dot-m) solid transparent;
+      border-block-end: var(--dot-m) solid var(--thumb, var(--accent-1));
     }
     .track__chip {
       display: block;
-      inline-size: 16px;
-      block-size: 16px;
-      border-radius: 5px;
+      inline-size: 1rem;
+      block-size: 1rem;
+      border-radius: var(--radius);
       background: var(--thumb, var(--accent-1));
     }
 
@@ -292,10 +292,10 @@
     }
 
     .hint-dot {
-      inline-size: 9px;
-      block-size: 9px;
+      inline-size: 0.5625rem;
+      block-size: 0.5625rem;
       border-radius: var(--radius-50);
-      box-shadow: 0 0 0 1px var(--border-color-light) inset;
+      box-shadow: 0 0 0 var(--line-hairline) var(--border-color-light) inset;
       flex: none;
     }
 

@@ -12,15 +12,15 @@
 @layer components {
   .listbox {
     position: absolute;
-    z-index: 20;
-    inset-block-start: calc(100% + 2px);
+    z-index: var(--z-dropdown);
+    inset-block-start: calc(100% + var(--space-2xs));
     inset-inline-start: 0;
     display: flex;
     flex-direction: column;
     min-inline-size: max(100%, 16rem);
     padding-block: var(--space-2xs);
     background: var(--bg-ultra-light);
-    border: 1px solid var(--border-color-light);
+    border: var(--line-hairline) solid var(--border-color-light);
     border-radius: var(--radius-m);
     box-shadow: var(--box-shadow-2);
   }

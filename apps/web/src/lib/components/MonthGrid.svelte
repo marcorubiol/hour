@@ -1295,12 +1295,12 @@
     }
 
     .cal__grid {
-      --cal-wk-gutter: 66px;
-      --cal-cell-h: 128px;
+      --cal-wk-gutter: 4.125rem;
+      --cal-cell-h: 8rem;
       /* The air between a card and the column rule beside it. One number,
          because the day cell and the run that crosses it have to agree —
          they are siblings of the week grid, not parent and child. */
-      --cal-cell-pad: 5px;
+      --cal-cell-pad: var(--space-xs);
       display: flex;
       flex-direction: column;
       transition: opacity var(--transition);
@@ -1308,13 +1308,13 @@
     .cal__wkh {
       display: grid;
       grid-template-columns: var(--cal-wk-gutter) repeat(7, minmax(0, 1fr));
-      margin-block-start: 12px;
-      border-block-end: 1px solid var(--border-color-light);
+      margin-block-start: var(--space-s);
+      border-block-end: var(--line-hairline) solid var(--border-color-light);
     }
     .cal__wk {
       display: grid;
       grid-template-columns: var(--cal-wk-gutter) minmax(0, 1fr);
-      border-block-end: 1px solid var(--border-color-light);
+      border-block-end: var(--line-hairline) solid var(--border-color-light);
     }
     .cal__wk:last-child {
       border-block-end: 0;
@@ -1324,9 +1324,9 @@
       display: flex;
       flex-direction: column;
       align-items: flex-end;
-      gap: 3px;
-      padding: 9px 9px 10px 0;
-      border-inline-end: 1px solid var(--border-color-light);
+      gap: var(--space-2xs);
+      padding: var(--space-s) var(--space-s) var(--space-s) 0;
+      border-inline-end: var(--line-hairline) solid var(--border-color-light);
       /* The gutter spans the WHOLE week block — the run strip, the days and
          the foot bands are three rows in column 2, and without this the
          gutter would take one of them and the days would fall to column 1. */
@@ -1335,8 +1335,8 @@
     }
     .cal__wkn {
       font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.06em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-m);
       text-transform: uppercase;
       /* One step above the marks it labels: the number is read, the marks are
          seen. */
@@ -1352,11 +1352,11 @@
          2026-07-31); el envoltorio lo resuelve por posición. */
       display: grid;
       grid-template-columns: repeat(7, minmax(0, 1fr));
-      gap: 2px 0;
+      gap: var(--space-2xs) 0;
       /* Aire ARRIBA y ninguno abajo (Marco, 2026-08-30): la banda se separa de
          las cards que la preceden y se apoya en el borde de la semana, que es
          donde acaba el día que mide. */
-      padding: 8px 0 0;
+      padding: var(--space-xs) 0 0;
     }
     /* THE RULE BELONGS TO THE BAND, NOT TO THE ROW. A `border-block-start` on
        the container drew a hairline the full width of the week whenever ANY
@@ -1372,10 +1372,10 @@
          centrado ni alineado (Marco, en pantalla, 2026-08-29). La línea base
          es lo que comparten, y es lo que hay que alinear. */
       align-items: baseline;
-      gap: 9px;
+      gap: var(--space-s);
       min-inline-size: 0;
-      padding: 1px 8px 2px;
-      border-block-start: 1px solid var(--border-color-light);
+      padding: var(--line-hairline) var(--space-xs) var(--space-2xs);
+      border-block-start: var(--line-hairline) solid var(--border-color-light);
       overflow: visible;
       white-space: nowrap;
     }
@@ -1400,7 +1400,7 @@
       flex: none;
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: var(--space-xs);
     }
     /* La palabra y su `?` se inclinan juntas, calcado de `.slip__kind--q`. */
     .cal__band-w--q {
@@ -1408,8 +1408,8 @@
     }
     .cal__band-w {
       font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.06em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-m);
       text-transform: uppercase;
       color: var(--away-word);
     }
@@ -1417,7 +1417,7 @@
        the one field on the band drawn in the body voice. */
     .cal__band-n {
       flex: none;
-      font-size: 11px;
+      font-size: var(--text-xs);
       color: var(--away-subject);
       overflow: hidden;
       text-overflow: ellipsis;
@@ -1426,8 +1426,8 @@
       flex: none;
       font-family: var(--font-mono);
       font-style: normal;
-      font-size: 9px;
-      letter-spacing: 0.1em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-l);
       text-transform: uppercase;
       color: var(--away-phrase);
     }
@@ -1439,20 +1439,20 @@
          ella sola — el suelo es de las palabras. */
       align-self: center;
       flex: 1;
-      min-inline-size: 12px;
+      min-inline-size: 0.75rem;
       position: relative;
       block-size: 0;
-      border-block-start: 1px solid var(--away-rule);
+      border-block-start: var(--line-hairline) solid var(--away-rule);
     }
     .cal__band-r::after {
       content: '';
       position: absolute;
       inset-inline-end: -1px;
       inset-block-start: -2.5px;
-      inline-size: 5px;
-      block-size: 5px;
-      border-block-start: 1px solid var(--away-terminus);
-      border-inline-end: 1px solid var(--away-terminus);
+      inline-size: var(--dot-m);
+      block-size: var(--dot-m);
+      border-block-start: var(--line-hairline) solid var(--away-terminus);
+      border-inline-end: var(--line-hairline) solid var(--away-terminus);
       transform: rotate(45deg);
     }
     /* Runs past the week's edge: no terminus on that side. */
@@ -1474,7 +1474,7 @@
        dedujo. Así que va con regla CONTINUA y en cursiva, y lo que la mantiene
        más callada es la tinta, no el trazo. */
     .cal__band--away .cal__band-n {
-      font-size: 10.5px;
+      font-size: var(--text-xs);
       color: var(--away-phrase);
     }
     .cal__band--away .cal__band-w {
@@ -1577,7 +1577,7 @@
     .cal__num {
       position: relative;
       min-inline-size: 0;
-      padding: 6px 8px 2px;
+      padding: var(--space-xs) var(--space-xs) var(--space-2xs);
     }
 
     /* ── THE RUN · one band, its days' hours under it ─────────────────── */
@@ -1601,11 +1601,11 @@
       /* 1px over, so a run and a card on the day beside it begin at the same
          line — the cell's own top padding is 1px too. 2px under, so the run
          and the first card below it are the 3px apart that two cards are. */
-      margin: 1px var(--cal-cell-pad) 2px;
-      padding: 3px 6px;
+      margin: var(--line-hairline) var(--cal-cell-pad) var(--space-2xs);
+      padding: var(--space-2xs) var(--space-xs);
       background: var(--bg-ultra-light);
-      border: 1px solid color-mix(in oklch, var(--text-color) 15%, var(--border-color-light));
-      border-radius: 3px;
+      border: var(--line-hairline) solid color-mix(in oklch, var(--text-color) 15%, var(--border-color-light));
+      border-radius: var(--radius-xs);
     }
     /* UNA TANDA QUE SIGUE NO SE CIERRA POR ESE LADO (Marco, 2026-08-30).
        La banda se recorta por semana ISO, así que una tanda de diez días son
@@ -1661,7 +1661,7 @@
       margin-inline-start: auto;
       flex: none;
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size: var(--text-2xs);
       letter-spacing: var(--mono-letter-spacing-loose);
       text-transform: uppercase;
       color: var(--text-faint);
@@ -1717,7 +1717,7 @@
         transparent 1px
       );
       background-size: calc((100% + 2px + var(--cal-cell-pad) * 2) / var(--run-cols, 1)) 100%;
-      background-position: calc(-1px - var(--cal-cell-pad)) 0;
+      background-position: calc(-1 * var(--line-hairline) - var(--cal-cell-pad)) 0;
       background-repeat: repeat-x;
     }
     .cal__run-h {
@@ -1725,8 +1725,8 @@
       align-items: center;
       /* The hours sit directly under this line, so the two need a hairline of
          air or the name and its own clock read as one wrapped sentence. */
-      margin-block-end: 3px;
-      gap: 8px;
+      margin-block-end: var(--space-2xs);
+      gap: var(--space-xs);
       min-inline-size: 0;
       white-space: nowrap;
       overflow: hidden;
@@ -1736,24 +1736,24 @@
       flex: none;
       display: inline-flex;
       align-items: center;
-      gap: 5px;
+      gap: var(--space-xs);
     }
     .cal__run-w {
       font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.1em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-l);
       text-transform: uppercase;
       color: var(--text-faint);
     }
     .cal__run-h b {
       font-weight: 400;
-      font-size: 11px;
+      font-size: var(--text-xs);
       color: var(--text-color);
       overflow: hidden;
       text-overflow: ellipsis;
     }
     .cal__run-c {
-      font-size: 9px;
+      font-size: var(--text-2xs);
       color: var(--text-faint);
       white-space: nowrap;
     }
@@ -1764,7 +1764,7 @@
       display: grid;
       align-items: center;
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size: var(--text-2xs);
       line-height: 1.15;
       /* Full ink. These hours are the ONLY thing the band says that its own
          title does not — the whole argument for storing a run as per-day rows
@@ -1774,7 +1774,7 @@
       font-variant-numeric: tabular-nums;
     }
     .cal__run-d {
-      padding: 0 6px 0 0;
+      padding: 0 var(--space-xs) 0 0;
       border: 0;
       background: none;
       font: inherit;
@@ -1830,10 +1830,10 @@
        row into a table chrome the month does not have. One hairline under it
        is the whole of the separation. */
     .cal__weekday {
-      padding: 7px 9px;
+      padding: var(--space-xs) var(--space-s);
       font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.14em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-xl);
       color: var(--text-faint);
       text-transform: uppercase;
     }
@@ -1853,7 +1853,7 @@
          than no affordance: you cannot read what is already there.
          (Marco asked to see this exact case before trusting it. He was
          right to: 2026-07-31, day 9, two gigs and a clash.) */
-      padding: 1px var(--cal-cell-pad) 13px;
+      padding: var(--line-hairline) var(--cal-cell-pad) var(--space-s);
       overflow: hidden;
     }
 
@@ -1876,7 +1876,7 @@
       border: 0;
       background: none;
       font-family: var(--font-mono);
-      font-size: 13px;
+      font-size: var(--text-s);
       line-height: 1;
       /* THE LINE TOKEN, not an ink one — and it is a token, not a bespoke
          mix. `--border-color-dark` is the neutral at 18% alpha: the value
@@ -1889,7 +1889,7 @@
       /* Unseen, NOT unreachable (móvil #2): `visibility: hidden` also took it
          out of the keyboard, so `:focus-visible` below could never fire. */
       opacity: 0;
-      transition: color 0.1s;
+      transition: color var(--duration-fast);
     }
     .cal__num[data-hover] .cal__new,
     .cal__new:focus-visible {
@@ -1908,14 +1908,14 @@
 
     .cal__more {
       align-self: flex-start;
-      margin-block-start: 3px;
+      margin-block-start: var(--space-2xs);
       padding: 0;
       border: 0;
       background: none;
       cursor: pointer;
       font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.08em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-l);
       text-transform: uppercase;
       color: var(--text-faint);
     }
@@ -1968,7 +1968,7 @@
       background: var(--today-wash);
     }
     .cal__day--today .cal__day-num {
-      font-size: 16px;
+      font-size: var(--text-m);
       font-weight: var(--today-weight);
       color: var(--today-ink);
     }
@@ -1978,7 +1978,7 @@
       border: 0;
       background: none;
       font-family: var(--font-mono);
-      font-size: 15px;
+      font-size: var(--text-m);
       line-height: 1;
       color: var(--text-muted);
       font-variant-numeric: tabular-nums;
@@ -1987,8 +1987,8 @@
        on touch it takes a 24px target, around the same number. */
     @media (pointer: coarse) {
       button.cal__day-num {
-        min-inline-size: 24px;
-        min-block-size: 24px;
+        min-inline-size: 1.5rem;
+        min-block-size: 1.5rem;
         text-align: start;
       }
     }
@@ -2000,11 +2000,11 @@
        tinta y un lavado, no un disco. */
     button.cal__day-num {
       cursor: pointer;
-      text-decoration: underline solid transparent 1px;
+      text-decoration: underline solid transparent var(--line-hairline);
       text-underline-offset: 3px;
       transition:
-        color 0.12s,
-        text-decoration-color 0.12s;
+        color var(--duration-fast),
+        text-decoration-color var(--duration-fast);
     }
     button.cal__day-num:hover {
       color: var(--text-color);
@@ -2013,7 +2013,7 @@
     button.cal__day-num:focus-visible {
       outline: var(--focus-width) solid var(--focus-color);
       outline-offset: 2px;
-      border-radius: 2px;
+      border-radius: var(--radius-xs);
     }
 
     /* THREE COLUMNS, so the middle is a TRUE centre: the number holds the
@@ -2025,9 +2025,9 @@
       display: grid;
       grid-template-columns: 1fr auto 1fr;
       align-items: center;
-      gap: 6px;
-      margin-block-end: 4px;
-      min-block-size: 16px;
+      gap: var(--space-xs);
+      margin-block-end: var(--space-xs);
+      min-block-size: 1rem;
     }
     .cal__day-head > :first-child {
       justify-self: start;
@@ -2055,17 +2055,17 @@
        (red is conflict and only conflict; verb-cal is a call to make). */
     .cal__marks {
       display: inline-flex;
-      gap: 3px;
+      gap: var(--space-2xs);
       margin-inline-start: auto;
     }
     .cal__grid :global(.cal__mark) {
       --mark-fg: var(--info);
       flex: none;
-      padding: 0 0 0 1px;
+      padding: 0 0 0 var(--line-hairline);
       border: 0;
       background: none;
       font-family: var(--font-mono);
-      font-size: 12px;
+      font-size: var(--text-s);
       font-weight: 500;
       line-height: 1;
       color: var(--mark-fg);
@@ -2090,7 +2090,7 @@
       all: unset;
       display: inline-flex;
       cursor: pointer;
-      border-radius: calc(var(--mark, 14px) * 0.28);
+      border-radius: calc(var(--mark, 0.875rem) * 0.28);
     }
     .cal__grid :global(.cal__markbtn:focus-visible) {
       outline: var(--focus-width) solid var(--focus-color);
@@ -2098,7 +2098,7 @@
     }
     .cal__markpop {
       position: fixed;
-      z-index: 200;
+      z-index: var(--z-sticky);
     }
 
     /* ── Event chip — the hold grammar (ADR-072 §5): project accent on
@@ -2129,15 +2129,15 @@
       --chip-radius: var(--radius-none);
       /* Flat by default; only the settled gig earns lift (see below). */
       --chip-shadow: none;
-      --mark: 14px;
+      --mark: 0.875rem;
       display: flex;
       flex-direction: column;
-      gap: 1px;
+      gap: var(--line-hairline);
       font-size: var(--text-xs);
       line-height: 1.3;
       padding: var(--space-2xs) var(--space-xs);
       border-radius: var(--chip-radius);
-      border: 1px var(--chip-border-style) var(--chip-border-color);
+      border: var(--line-hairline) var(--chip-border-style) var(--chip-border-color);
       box-shadow: var(--chip-shadow);
       background-color: var(--chip-bg);
       background-image: var(--chip-bg-image);
@@ -2191,9 +2191,9 @@
     /* The chip's foot — hold rank on a gig, kind word on a date. */
     .cal__grid :global(.cal__event-foot),
     .cal__grid :global(.cal__event-kind) {
-      margin-block-start: 1px;
-      padding-block-start: 1px;
-      border-block-start: 1px solid
+      margin-block-start: var(--line-hairline);
+      padding-block-start: var(--line-hairline);
+      border-block-start: var(--line-hairline) solid
         color-mix(in oklch, var(--c, var(--border-color-dark)) 16%, var(--border-color-light));
     }
     .cal__grid :global(.cal__event-foot) {
@@ -2245,22 +2245,20 @@
       cursor: pointer;
     }
     .cal__grid :global(.cal__event-hit:focus-visible) {
-      outline: 2px solid var(--focus-ring, var(--text-color));
+      outline: var(--focus-width) solid var(--focus-ring, var(--text-color));
       outline-offset: -2px;
     }
     /* The monogram keeps its own click through the hit layer. */
     .cal__grid :global(.cal__event--openable .cal__markbtn) {
       position: relative;
-      z-index: 1;
+      z-index: var(--z-raised);
     }
 
     /* The settled gig is the day's anchor: it leads the cell AND lifts off
        it. Lift is earned like the radius — a hold stays flat on the page. */
     .cal__grid :global(.cal__event--perf[data-family='confirmed']) {
       --chip-bg: color-mix(in oklch, var(--c, var(--border-color-dark)) 13%, var(--bg-ultra-light));
-      --chip-shadow:
-        0 1px 2px color-mix(in oklch, var(--text-color) 10%, transparent),
-        0 2px 5px color-mix(in oklch, var(--text-color) 6%, transparent);
+      --chip-shadow: var(--box-shadow-lift);
     }
     /* Lift needs room to land: the cell's 2px gap is thinner than the
        shadow, so whatever follows a lifted gig would sit inside it. Only
@@ -2315,7 +2313,7 @@
     .cal__grid :global(.cal__event[data-family='released'] .cal__event-time),
     .cal__grid :global(.cal__event[data-family='released'] .cal__event-city) {
       text-decoration: line-through;
-      text-decoration-thickness: 1px;
+      text-decoration-thickness: var(--line-hairline);
     }
 
     .cal__grid :global(.cal__event-name) {
@@ -2359,13 +2357,13 @@
     }
     .cal__grid :global(.cal__event--run-first) {
       margin-inline-start: 0;
-      border-inline-start: 1px var(--chip-border-style) var(--chip-border-color);
+      border-inline-start: var(--line-hairline) var(--chip-border-style) var(--chip-border-color);
       border-start-start-radius: var(--chip-radius);
       border-end-start-radius: var(--chip-radius);
     }
     .cal__grid :global(.cal__event--run-last) {
       margin-inline-end: 0;
-      border-inline-end: 1px var(--chip-border-style) var(--chip-border-color);
+      border-inline-end: var(--line-hairline) var(--chip-border-style) var(--chip-border-color);
       border-start-end-radius: var(--chip-radius);
       border-end-end-radius: var(--chip-radius);
     }

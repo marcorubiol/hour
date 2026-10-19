@@ -256,7 +256,7 @@
       font-family: inherit;
       text-align: start;
       background: none;
-      border: 1px solid var(--border-color-light);
+      border: var(--line-hairline) solid var(--border-color-light);
       border-radius: var(--radius);
       cursor: pointer;
       transition: border-color var(--transition), background var(--transition);

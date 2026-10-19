@@ -165,9 +165,9 @@
       gap: var(--space-l);
       padding: var(--space-m);
       background: var(--bg-ultra-light);
-      border: 1px solid var(--border-color-light);
+      border: var(--line-hairline) solid var(--border-color-light);
       border-radius: var(--radius-m);
-      box-shadow: var(--box-shadow-3, 0 8px 24px rgb(0 0 0 / 12%));
+      box-shadow: var(--box-shadow-3);
     }
 
     .iqp__name {
@@ -208,7 +208,7 @@
       inline-size: 100%;
       font: inherit;
       padding: var(--space-2xs) var(--space-xs);
-      border: 1px solid var(--border-color-dark);
+      border: var(--line-hairline) solid var(--border-color-dark);
       border-radius: var(--radius-s);
       background: var(--bg);
       color: var(--text-color);
@@ -263,7 +263,7 @@
       inline-size: 100%;
       block-size: 0;
       border: 0;
-      border-block-start: 1px solid var(--border-color-light);
+      border-block-start: var(--line-hairline) solid var(--border-color-light);
       margin: 0;
     }
 

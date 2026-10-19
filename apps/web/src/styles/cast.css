@@ -10,13 +10,13 @@
 @layer components {
   .cast-line {
     font-family: var(--font-mono);
-    font-size: 9px;
-    letter-spacing: 0.08em;
+    font-size: var(--text-2xs);
+    letter-spacing: var(--tracking-l);
     color: var(--text-muted);
   }
   .cast-line--none {
     color: var(--text-faint);
     text-transform: uppercase;
-    letter-spacing: 0.1em;
+    letter-spacing: var(--tracking-l);
   }
 }

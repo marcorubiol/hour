@@ -94,7 +94,7 @@
     .schedule th {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
-      letter-spacing: 0.04em;
+      letter-spacing: var(--tracking-s);
       color: var(--text-faint);
       font-weight: 400;
       text-align: start;

@@ -703,7 +703,7 @@
       gap: var(--space-s);
     }
     .view-toggle button {
-      border-block-end: 1.5px solid transparent;
+      border-block-end: var(--line-thin) solid transparent;
       padding: 0;
       color: var(--text-faint);
       font-size: var(--text-s);
@@ -914,8 +914,8 @@
       }
       thead {
         position: absolute;
-        inline-size: 1px;
-        block-size: 1px;
+        inline-size: var(--line-hairline);
+        block-size: var(--line-hairline);
         overflow: hidden;
         clip-path: inset(50%);
         white-space: nowrap;
@@ -1033,7 +1033,7 @@
         content: '';
         position: absolute;
         inset: 0;
-        z-index: 1;
+        z-index: var(--z-raised);
         cursor: pointer;
       }
       thead .pick {

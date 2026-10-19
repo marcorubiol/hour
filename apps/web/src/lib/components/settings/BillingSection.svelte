@@ -100,7 +100,7 @@
     grid-template-columns: minmax(0, 1fr) auto;
     gap: var(--space-m);
     padding: var(--space-m);
-    border: 1px solid var(--border-color-light);
+    border: var(--line-hairline) solid var(--border-color-light);
     border-radius: var(--radius);
     background: var(--bg-light);
   }
@@ -115,7 +115,7 @@
     font-family: var(--font-display);
     font-size: var(--text-xxl);
     font-weight: 400;
-    letter-spacing: -0.02em;
+    letter-spacing: var(--heading-letter-spacing);
     margin: 0;
     color: var(--text-color);
   }
@@ -154,10 +154,10 @@
     font-family: var(--font-mono);
     font-size: var(--text-xs);
     font-weight: 700;
-    letter-spacing: 0.1em;
+    letter-spacing: var(--tracking-l);
     background: var(--text-color);
     color: var(--bg);
-    padding-block: 3px;
+    padding-block: var(--space-2xs);
     padding-inline: var(--space-s);
     border-radius: var(--radius-s);
   }
@@ -168,11 +168,11 @@
   }
   .set-invoice {
     display: grid;
-    grid-template-columns: 100px 1fr auto auto auto;
+    grid-template-columns: 6.25rem 1fr auto auto auto;
     gap: var(--space-m);
     align-items: center;
     padding-block: var(--space-s);
-    border-block-end: 1px solid var(--border-color-light);
+    border-block-end: var(--line-hairline) solid var(--border-color-light);
     font-size: var(--text-s);
   }
   .set-invoice:last-child {
@@ -182,7 +182,7 @@
     font-family: var(--font-mono);
     font-size: var(--text-xs);
     color: var(--text-muted);
-    letter-spacing: 0.04em;
+    letter-spacing: var(--tracking-s);
   }
   .set-invoice__plan {
     color: var(--text-color);
@@ -195,11 +195,11 @@
   .set-invoice__status {
     font-family: var(--font-mono);
     font-size: var(--text-xs);
-    letter-spacing: 0.08em;
+    letter-spacing: var(--tracking-l);
     text-transform: uppercase;
     color: var(--success);
-    border: 1px solid currentColor;
-    padding-block: 2px;
+    border: var(--line-hairline) solid currentColor;
+    padding-block: var(--space-2xs);
     padding-inline: var(--space-s);
     border-radius: var(--radius-s);
   }

@@ -249,7 +249,7 @@
       gap: var(--space-2xs) var(--space-m);
       align-items: baseline;
       padding-block: var(--space-xs);
-      border-block-end: 1px solid var(--border-color-light);
+      border-block-end: var(--line-hairline) solid var(--border-color-light);
     }
 
     .ppl__row-main {

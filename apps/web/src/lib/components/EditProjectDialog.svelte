@@ -196,7 +196,7 @@
       flex-direction: column;
       gap: var(--space-s);
       padding: var(--space-s);
-      border: 1px solid var(--border-color-light);
+      border: var(--line-hairline) solid var(--border-color-light);
       border-radius: var(--radius-m);
       background: var(--bg-light);
     }

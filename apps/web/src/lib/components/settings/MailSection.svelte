@@ -222,7 +222,7 @@
       padding: var(--space-s) var(--space-m);
       color: var(--text-dark-muted);
       background: var(--bg-light);
-      border: 1px solid var(--border-color-light);
+      border: var(--line-hairline) solid var(--border-color-light);
       border-radius: var(--radius);
       font-size: var(--text-s);
     }

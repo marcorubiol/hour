@@ -662,7 +662,7 @@
     place-items: center;
     inline-size: 1rem;
     block-size: 1rem;
-    font-size: 0.8rem;
+    font-size: var(--text-s);
     color: var(--text-faint);
   }
 
@@ -679,9 +679,9 @@
   }
 
   .cmdk {
-    inline-size: min(640px, 94vw);
+    inline-size: min(40rem, 94vw);
     background: var(--bg-ultra-light);
-    border: 1px solid var(--border-color-dark);
+    border: var(--line-hairline) solid var(--border-color-dark);
     border-radius: var(--radius-xl);
     box-shadow: var(--box-shadow-3);
     overflow: hidden;
@@ -693,7 +693,7 @@
     gap: var(--space-xs);
     padding-block: var(--space-s);
     padding-inline: var(--space-m);
-    border-block-end: 1px solid var(--border-color-light);
+    border-block-end: var(--line-hairline) solid var(--border-color-light);
     color: var(--text-muted);
   }
   .cmdk__search input {
@@ -714,7 +714,7 @@
     flex: none;
     font-family: var(--font-mono);
     font-size: var(--text-xs);
-    letter-spacing: 0.04em;
+    letter-spacing: var(--tracking-s);
     color: var(--text-faint);
   }
 
@@ -732,7 +732,7 @@
     padding-inline: var(--space-s);
     font-family: var(--font-mono);
     font-size: var(--text-xs);
-    letter-spacing: 0.12em;
+    letter-spacing: var(--tracking-xl);
     text-transform: uppercase;
     color: var(--text-faint);
   }
@@ -761,7 +761,7 @@
     padding-inline: var(--space-s);
     font-family: var(--font-mono);
     font-size: var(--text-xs);
-    letter-spacing: 0.12em;
+    letter-spacing: var(--tracking-xl);
     text-transform: uppercase;
     color: var(--text-faint);
   }
@@ -793,7 +793,7 @@
     inline-size: 3.5rem;
     font-family: var(--font-mono);
     font-size: var(--text-xs);
-    letter-spacing: 0.06em;
+    letter-spacing: var(--tracking-m);
     text-transform: uppercase;
     color: var(--text-faint);
   }
@@ -821,7 +821,7 @@
     background: none;
     font-family: var(--font-mono);
     font-size: var(--text-xs);
-    letter-spacing: 0.04em;
+    letter-spacing: var(--tracking-s);
     color: var(--text-faint);
     cursor: pointer;
     padding-block: var(--space-xs);
@@ -873,7 +873,7 @@
     gap: var(--space-xs);
     padding-block: var(--space-s);
     padding-inline: var(--space-m);
-    border-block-start: 1px solid var(--border-color-light);
+    border-block-start: var(--line-hairline) solid var(--border-color-light);
     background: var(--bg-light);
   }
   .cmdk__staged-lead {
@@ -890,14 +890,14 @@
     color: var(--text-muted);
   }
   .cmdk__tok {
-    --glyph: 11px; /* smaller glyph inside the compact building pills */
+    --glyph: 0.6875rem; /* smaller glyph inside the compact building pills */
     display: inline-flex;
     align-items: center;
     gap: 0.2rem;
-    padding-block: 2px;
+    padding-block: var(--space-2xs);
     padding-inline: var(--space-xs) var(--space-xs);
     border-radius: var(--radius-circle);
-    border: 1px solid var(--border-color-dark);
+    border: var(--line-hairline) solid var(--border-color-dark);
     background: var(--bg-ultra-light);
     font-size: var(--text-s);
     line-height: 1;
@@ -939,10 +939,10 @@
     gap: var(--space-xs) var(--space-s);
     padding-block: var(--space-s);
     padding-inline: var(--space-m);
-    border-block-start: 1px solid var(--border-color-light);
+    border-block-start: var(--line-hairline) solid var(--border-color-light);
     font-family: var(--font-mono);
     font-size: var(--text-xs);
-    letter-spacing: 0.04em;
+    letter-spacing: var(--tracking-s);
     color: var(--text-faint);
   }
   .cmdk__foot > span {
@@ -959,13 +959,13 @@
     gap: var(--space-xs);
   }
   .cmdk__foot-new button {
-    border: 1px dashed var(--border-color-dark);
+    border: var(--line-hairline) dashed var(--border-color-dark);
     border-radius: var(--radius-s);
     background: none;
     color: var(--text-faint);
     font-family: inherit;
     font-size: var(--text-xs);
-    padding-block: 1px;
+    padding-block: var(--line-hairline);
     padding-inline: var(--space-xs);
     cursor: pointer;
   }

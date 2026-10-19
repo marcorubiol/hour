@@ -31,7 +31,7 @@
       block-size: var(--known-mark-size);
       margin-inline-start: var(--space-2xs);
       vertical-align: 0.12em;
-      border: 1px solid var(--text-muted);
+      border: var(--line-hairline) solid var(--text-muted);
       border-radius: 50%;
     }
     .known-mark--mine {

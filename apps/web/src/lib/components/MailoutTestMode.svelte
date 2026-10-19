@@ -22,8 +22,8 @@
     .test-mode {
       padding: var(--space-s) var(--space-m);
       background: var(--bg-light);
-      border: 1px solid var(--border-color-light);
-      border-inline-start: 3px solid var(--warning, var(--border-color-dark));
+      border: var(--line-hairline) solid var(--border-color-light);
+      border-inline-start: var(--line-thick) solid var(--warning, var(--border-color-dark));
       border-radius: var(--radius);
       font-size: var(--text-s);
       line-height: 1.5;
