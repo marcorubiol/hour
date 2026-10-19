@@ -40,6 +40,9 @@
     clash: boolean;
     /** A call between two options that «Por decidir» holds. */
     decide: boolean;
+    /** Next steps that wait on the day (ADR-138 § 6): a number, never a card.
+        The cell is already the door to the Day. */
+    steps?: number;
   };
 
   import type { Slip as SlipVM } from '$lib/month-events';
@@ -273,6 +276,9 @@
                   <Slip slip={sl} placing="compact" kindLabel={() => ''} stateLabel={() => null} />
                 {/each}
                 {#if c.more > 0}<span class="ev__more">+{c.more}</span>{/if}
+                {#if c.steps}<span class="ev__more" data-testid="season-steps"
+                    >{c.steps === 1 ? t('planner.steps_one', locale) : t('planner.steps_n', locale, { n: c.steps })}</span
+                  >{/if}
                 {#if c.slips.length === 0 && c.dateWord}<span class="ev ev--date">{c.dateWord}</span>{/if}
                 {#if c.travel}<span class="d__travel" aria-hidden="true">{c.travel === 'out' ? '↗' : '↙'}</span>{/if}
                 {#if c.clash}<span class="d__clash" title={t('planner.season_key_clash', locale)}></span>{/if}

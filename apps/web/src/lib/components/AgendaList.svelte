@@ -66,6 +66,7 @@
   import { accentVarFor } from '$lib/utils/accent';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
   import Slip from '$lib/components/planner/Slip.svelte';
+  import PlannerSteps, { type StepVM } from '$lib/components/planner/PlannerSteps.svelte';
   import { performanceSlip, dateSlip } from '$lib/month-events';
   import { holdDeadlineLabel, performanceStatusFamily } from '$lib/performance';
   import { appLocale, appLocaleTag, t } from '$lib/i18n';
@@ -143,6 +144,9 @@
     decideCardLabel?: string;
     /** My post-its (ADR-093), keyed by on_day. */
     notesByDay?: Map<string, NoteEvent[]>;
+    /** The next steps that wait on each day (ADR-138 § 6): the margin, never the rows. */
+    stepsByDay?: Map<string, StepVM[]>;
+    stepsLabel?: string;
     /** Absent ⇒ the margin only reads (pre-migration DB hides the writer). */
     onNoteCreate?: (draft: NoteDraft) => Promise<boolean>;
     onNoteDelete?: (id: string) => void;
@@ -235,6 +239,8 @@
     onDayOpen,
     decideCardLabel = t('planner.dec_card', L),
     notesByDay,
+    stepsByDay,
+    stepsLabel = t('planner.steps', L),
     onNoteCreate,
     onNoteDelete,
     noteFallbackLabel = t('planner.note_company', L),
@@ -1053,6 +1059,7 @@
           <!-- A div, not an <aside>: a complementary landmark inside <main> is
                a landmark nobody can reach as one (axe, móvil #12). -->
           <div class="ag__marg">
+            {#if stepsByDay?.get(day)?.length}<PlannerSteps steps={stepsByDay.get(day) ?? []} label={stepsLabel} />{/if}
             {#each marginCards(day) as card (card.key)}
                 <div class="ag__card" data-severity={card.severity}>
                   <p class="ag__card-eyebrow">{decideCardLabel}</p>
