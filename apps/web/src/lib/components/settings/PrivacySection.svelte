@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Segmented from '$lib/components/Segmented.svelte';
+  import Switch from '$lib/components/Switch.svelte';
   import { t, appLocale } from '$lib/i18n';
   import ConversationPrivacyDefault from './ConversationPrivacyDefault.svelte';
 
@@ -32,18 +34,11 @@
         <div class="set-row__hint">{t('settings.priv_tasks_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
-        <div class="set-seg">
-          <button
-            type="button"
-            class={privTasksDefault === 'shared' ? 'is-on' : ''}
-            onclick={() => (privTasksDefault = 'shared')}
-          >{t('settings.priv_shared', locale)}</button>
-          <button
-            type="button"
-            class={privTasksDefault === 'private' ? 'is-on' : ''}
-            onclick={() => (privTasksDefault = 'private')}
-          >{t('settings.priv_private', locale)}</button>
-        </div>
+        <Segmented
+          ariaLabel={t('settings.priv_tasks', locale)}
+          options={[{ value: 'shared', label: t('settings.priv_shared', locale) }, { value: 'private', label: t('settings.priv_private', locale) }]}
+          bind:value={privTasksDefault}
+        />
       </div>
     </div>
 
@@ -53,23 +48,11 @@
         <div class="set-row__hint">{t('settings.priv_money_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
-        <div class="set-seg">
-          <button
-            type="button"
-            class={privMoneyVis === 'me-only' ? 'is-on' : ''}
-            onclick={() => (privMoneyVis = 'me-only')}
-          >{t('settings.priv_only_me', locale)}</button>
-          <button
-            type="button"
-            class={privMoneyVis === 'project' ? 'is-on' : ''}
-            onclick={() => (privMoneyVis = 'project')}
-          >{t('settings.priv_per_project', locale)}</button>
-          <button
-            type="button"
-            class={privMoneyVis === 'all' ? 'is-on' : ''}
-            onclick={() => (privMoneyVis = 'all')}
-          >{t('settings.priv_all_collab', locale)}</button>
-        </div>
+        <Segmented
+          ariaLabel={t('settings.priv_money', locale)}
+          options={[{ value: 'me-only', label: t('settings.priv_only_me', locale) }, { value: 'project', label: t('settings.priv_per_project', locale) }, { value: 'all', label: t('settings.priv_all_collab', locale) }]}
+          bind:value={privMoneyVis}
+        />
       </div>
     </div>
 
@@ -79,17 +62,11 @@
         <div class="set-row__hint">{t('settings.priv_notes_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
-        <button
-          type="button"
-          class={['set-toggle', privNotesPrivate && 'is-on']
-            .filter(Boolean)
-            .join(' ')}
-          aria-label={t('settings.priv_notes', locale)}
-          aria-pressed={privNotesPrivate}
-          onclick={() => (privNotesPrivate = !privNotesPrivate)}
-        >
-          <span class="set-toggle__dot"></span>
-        </button>
+        <Switch
+          checked={privNotesPrivate}
+          label={t('settings.priv_notes', locale)}
+          onchange={() => (privNotesPrivate = !privNotesPrivate)}
+        />
       </div>
     </div>
 
@@ -99,23 +76,11 @@
         <div class="set-row__hint">{t('settings.priv_outreach_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
-        <div class="set-seg">
-          <button
-            type="button"
-            class={privDistribution === 'me-only' ? 'is-on' : ''}
-            onclick={() => (privDistribution = 'me-only')}
-          >{t('settings.priv_only_me', locale)}</button>
-          <button
-            type="button"
-            class={privDistribution === 'distributors' ? 'is-on' : ''}
-            onclick={() => (privDistribution = 'distributors')}
-          >{t('settings.priv_distributors_only', locale)}</button>
-          <button
-            type="button"
-            class={privDistribution === 'all' ? 'is-on' : ''}
-            onclick={() => (privDistribution = 'all')}
-          >{t('settings.priv_everyone', locale)}</button>
-        </div>
+        <Segmented
+          ariaLabel={t('settings.priv_outreach', locale)}
+          options={[{ value: 'me-only', label: t('settings.priv_only_me', locale) }, { value: 'distributors', label: t('settings.priv_distributors_only', locale) }, { value: 'all', label: t('settings.priv_everyone', locale) }]}
+          bind:value={privDistribution}
+        />
       </div>
     </div>
   </div>

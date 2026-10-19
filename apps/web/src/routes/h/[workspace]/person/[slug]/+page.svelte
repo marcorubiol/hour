@@ -685,10 +685,10 @@
       line-height: 1.55;
     }
 
+    /* The dialogs' fields are rows, one under the other (ADR-139 p4). */
     .person__add-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-      gap: var(--space-s) var(--space-m);
+      display: flex;
+      flex-direction: column;
       margin-block-start: var(--space-s);
     }
 

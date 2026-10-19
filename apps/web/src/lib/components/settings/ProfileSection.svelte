@@ -7,6 +7,7 @@
   import { ApiError, mutateJSON } from '$lib/api';
   import { meQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
   import { addToast } from '$lib/components/Toast.svelte';
+  import Field from '$lib/components/Field.svelte';
   import { t, appLocale } from '$lib/i18n';
   import MailSignature from './MailSignature.svelte';
   import { resetHelp } from '$lib/help-seen.svelte';
@@ -188,15 +189,18 @@
         <div class="set-row__hint">{t('settings.profile_name_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
-        <input
-          type="text"
-          bind:value={userName}
-          disabled={$saveName.isPending}
-          onblur={commitName}
-          onkeydown={(e) => {
-            if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
-          }}
-        />
+        <Field id="profile-name">
+          <input
+            id="profile-name"
+            type="text"
+            bind:value={userName}
+            disabled={$saveName.isPending}
+            onblur={commitName}
+            onkeydown={(e) => {
+              if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
+            }}
+          />
+        </Field>
       </div>
     </div>
 
@@ -206,7 +210,8 @@
         <div class="set-row__hint">{t('settings.profile_email_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
-        <input type="email" bind:value={userEmail} readonly />
+        <!-- Not editable here, so it reads as text, not as a field. -->
+        <span class="set-row__value">{userEmail}</span>
       </div>
     </div>
 

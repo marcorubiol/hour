@@ -4,6 +4,7 @@
    * nuevas nacen privadas de quien las crea (por defecto) o compartidas. Lo
    * decide un admin; cada persona cambia después las suyas desde la ficha.
    */
+  import Segmented from '$lib/components/Segmented.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
@@ -52,22 +53,16 @@
         <div class="set-row__hint">{t('settings.conv_privacy_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
-        <div class="set-seg" role="group" aria-label={t('settings.conv_privacy_label', locale)}>
-          <button
-            type="button"
-            class={value ? 'is-on' : ''}
-            aria-pressed={value}
-            disabled={!canEdit || $save.isPending}
-            onclick={() => $save.mutate(true)}
-          >{t('settings.conv_privacy_private', locale)}</button>
-          <button
-            type="button"
-            class={!value ? 'is-on' : ''}
-            aria-pressed={!value}
-            disabled={!canEdit || $save.isPending}
-            onclick={() => $save.mutate(false)}
-          >{t('settings.conv_privacy_shared', locale)}</button>
-        </div>
+        <Segmented
+          ariaLabel={t('settings.conv_privacy_label', locale)}
+          options={[
+            { value: 'private', label: t('settings.conv_privacy_private', locale) },
+            { value: 'shared', label: t('settings.conv_privacy_shared', locale) },
+          ]}
+          value={value ? 'private' : 'shared'}
+          disabled={!canEdit || $save.isPending}
+          onchange={(v) => $save.mutate(v === 'private')}
+        />
         {#if !canEdit && $query.data}
           <span class="set-row__hint">{t('settings.conv_privacy_admin_only', locale)}</span>
         {/if}

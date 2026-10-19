@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Field from '$lib/components/Field.svelte';
   import { session } from '$lib/session.svelte';
   import { t, appLocale } from '$lib/i18n';
 
@@ -60,7 +61,7 @@
         <div class="set-row__hint">{t('settings.bill_email_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
-        <input  type="email" value={userEmail} readonly />
+        <span class="set-row__value">{userEmail}</span>
       </div>
     </div>
     <div class="set-row">
@@ -69,7 +70,9 @@
         <div class="set-row__hint">{t('settings.bill_tax_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
-        <input class="input--short" type="text" value="ES 41XXXXXXX-A" />
+        <Field id="bill-tax-id">
+          <input id="bill-tax-id" type="text" value="ES 41XXXXXXX-A" />
+        </Field>
       </div>
     </div>
   </div>

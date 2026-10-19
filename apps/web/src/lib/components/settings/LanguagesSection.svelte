@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Segmented from '$lib/components/Segmented.svelte';
   import { t, appLocale, LOCALES, type Locale } from '$lib/i18n';
   import WorkspaceTrade from './WorkspaceTrade.svelte';
 
@@ -47,17 +48,11 @@
         <div class="set-row__hint">{t('settings.lang_app_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
-        <div class="set-seg">
-          {#each LOCALES as code (code)}
-            <button
-              type="button"
-              lang={code}
-              class={appLanguage === code ? 'is-on' : ''}
-              aria-pressed={appLanguage === code}
-              onclick={() => (appLanguage = code)}
-            >{NATIVE_NAME[code]}</button>
-          {/each}
-        </div>
+        <Segmented
+          ariaLabel={t('settings.lang_app', locale)}
+          options={LOCALES.map((code) => ({ value: code, label: NATIVE_NAME[code] }))}
+          bind:value={appLanguage}
+        />
       </div>
     </div>
   </div>

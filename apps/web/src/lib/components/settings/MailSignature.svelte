@@ -16,6 +16,7 @@
   import { appLocale, t } from '$lib/i18n';
   import { spaceName } from '$lib/utils/identity';
   import Button from '$lib/components/Button.svelte';
+  import Field from '$lib/components/Field.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { proposedSignature, type MailAccountScope, type SignatureSettings } from '$lib/mail';
 
@@ -102,15 +103,18 @@
             <div class="set-row__hint">{t('mail.company_contact_hint', locale)}</div>
           </div>
           <div class="set-row__ctrl">
-            <input
-              type="url"
-              inputmode="url"
-              maxlength="2048"
-              placeholder="https://"
-              value={parts.company_website ?? ''}
-              disabled={!canEdit || $save.isPending}
-              onblur={(e) => saveContact('website', e.currentTarget.value)}
-            />
+            <Field id="sig-website">
+              <input
+                id="sig-website"
+                type="url"
+                inputmode="url"
+                maxlength="2048"
+                placeholder="https://"
+                value={parts.company_website ?? ''}
+                disabled={!canEdit || $save.isPending}
+                onblur={(e) => saveContact('website', e.currentTarget.value)}
+              />
+            </Field>
           </div>
         </div>
         <div class="set-row">
@@ -118,13 +122,16 @@
             <div class="set-row__label">{t('mail.company_phone', locale)}</div>
           </div>
           <div class="set-row__ctrl">
-            <input
-              type="tel"
-              maxlength="64"
-              value={parts.company_phone ?? ''}
-              disabled={!canEdit || $save.isPending}
-              onblur={(e) => saveContact('phone', e.currentTarget.value)}
-            />
+            <Field id="sig-phone">
+              <input
+                id="sig-phone"
+                type="tel"
+                maxlength="64"
+                value={parts.company_phone ?? ''}
+                disabled={!canEdit || $save.isPending}
+                onblur={(e) => saveContact('phone', e.currentTarget.value)}
+              />
+            </Field>
           </div>
         </div>
       {/if}
@@ -145,13 +152,16 @@
                 saveSignature(shown);
               }}
             >
-              <textarea
-                aria-label={t('mail.signature', locale)}
-                rows="4"
-                maxlength="2000"
-                value={shown}
-                oninput={(ev) => (draft = ev.currentTarget.value)}
-              ></textarea>
+              <Field id="sig-text" stack>
+                <textarea
+                  id="sig-text"
+                  aria-label={t('mail.signature', locale)}
+                  rows="4"
+                  maxlength="2000"
+                  value={shown}
+                  oninput={(ev) => (draft = ev.currentTarget.value)}
+                ></textarea>
+              </Field>
               <div class="sig__row">
                 <span class="sig__state">
                   {stored === null && !dirty ? t('mail.signature_is_proposal', locale) : t('mail.signature_is_own', locale)}
