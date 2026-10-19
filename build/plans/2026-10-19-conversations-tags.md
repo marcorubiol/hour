@@ -115,9 +115,11 @@ La palabra en pantalla de `sales` es la de ADR-134: `conversations.view_sales` c
 Contratación, Difusió, Contractació, Diffusion, Booking). Equipo es `conversations.view_team`. Las demás, claves nuevas
 en los cuatro idiomas; si teatro y música piden palabras distintas, la variante `@music` de ADR-129 § 3.
 
-**El trato pasa a añadido:** `conversation.status` admite NULL (= sin trato) y pierde su DEFAULT. La RPC de crear
-pone `contacted` solo si alguna etiqueta tiene `deal_default` o se pide un trato. Lo que hoy da por hecho que hay
-estado (overview, se enfría, temporada por línea, «sin respuesta», el menú de estado) filtra `status IS NOT NULL`.
+**El trato pasa a añadido.** *Superado por § 8 (Marco, 19-10).* La primera versión de este plan hacía
+`conversation.status` opcional (NULL = sin trato). Con § 8 el trato vive en el bolo y la conversación lleva solo el
+estado de la relación, que tienen todas: una de Prensa es «contactada» o «en conversación» como una sala, y lo que la
+distingue es que no tiene bolos. El «añadido de trato» de una conversación es tener bolos. `deal_default` desaparece
+de `conversation_tag`.
 
 **No leídos de una conversación:** `conversation_read (conversation_id, user_id, last_read_at)`, como `thread_read`.
 Un no leído es un evento entrante (`direction = 'in'`, sin `metadata.auto`, ADR-126 § 3) posterior a la lectura, o un
@@ -155,8 +157,8 @@ No cambia. Es un hilo de Equipo: sale bajo el chip Equipo y en «Todas»; abre l
 
 «Añadir» con la etiqueta Prensa marcada (la del filtro activo, si hay uno). Con quién: una organización (el medio) o,
 si es una periodista independiente, una organización con su nombre, como ya pasa con un programador independiente
-(ADR-102 § 1). Contacto: la persona. Proyecto: el de la obra de la que se habla. **Sin trato**: `status` NULL, así que
-no entra en el panel de venta, ni en «se enfría», ni en la temporada. Sí tiene turno y no leídos: si la periodista
+(ADR-102 § 1). Contacto: la persona. Proyecto: el de la obra de la que se habla. **Sin trato**: sin bolos (§ 8; la
+primera versión decía `status` NULL), así que no entra en el panel de venta, ni en «se enfría», ni en la temporada. Sí tiene turno y no leídos: si la periodista
 contesta, te toca. El buzón sincronizado la trae sola, porque empareja por la dirección del contacto y no mira la
 etiqueta (`mail_contact_addresses`).
 
@@ -281,7 +283,8 @@ Nada se borra ni se reescribe.
 1. **Vocabulario:** crear `conversation_tag` con las cuatro estándar y `workspace_conversation_tag_setting` vacía.
 2. **Etiquetar lo que hay:** cada conversación existente (vivas y borradas, para que revivir una borrada la deje como
    estaba) recibe `sales`. En `muk-cia`, las 155 filas (152 vivas). Todas tienen estado, así que el trato no cambia.
-3. **`status` admite NULL** (`DROP NOT NULL`, `DROP DEFAULT`). Ninguna fila pasa a NULL.
+3. ~~`status` admite NULL~~: superado por § 8. El estado se parte en relación y trato con su propia migración
+   (§ 8.5).
 4. **`conversation_read`:** tabla nueva vacía. Sin backfill: todo empieza leído para todos (si no, las 152 saldrían
    como no leídas el primer día). En la misma migración, una fila por persona con acceso y conversación sería una
    foto de permisos que caduca; mejor «sin fila = leído hasta su `created_at`» en la regla.
@@ -297,9 +300,7 @@ Gate de § 34 (`_notes/tasks-archive.md`): aditiva salvo el `DROP NOT NULL`, que
 **Rollback** (`build/runbooks/rollback-2026102x-conversation-tags.sql`, probado ida y vuelta en local):
 - Borrar `conversation_tagging`, `workspace_conversation_tag_setting`, `conversation_tag`, `conversation_read` y sus
   funciones.
-- `status`: si hay filas con NULL (conversaciones sin trato creadas entre medias), el rollback **aborta** y dice
-  cuántas. Decidir entonces: ponerles `contacted` (vuelven al panel de venta) o borrarlas a mano. Si no hay ninguna,
-  `SET DEFAULT 'contacted'`, `SET NOT NULL`.
+- `status`: con § 8 esta migración ya no lo toca; su rollback va en § 8.5.
 - Lo que el rollback no deshace: las etiquetas propias que un espacio haya creado y sus asignaciones (se pierden con la
   tabla; el backup las tiene).
 
@@ -314,8 +315,8 @@ El Worker de la fase 2 lee las tablas nuevas: la migración va antes del deploy,
 | Las etiquetas de una privada ajena se ven por otro camino | El vocabulario es público al espacio; las asignaciones no | RLS: `conversation_tagging` de una privada ajena da 0 filas; el recuento por etiqueta del panel no la cuenta |
 | Una etiqueta cruza espacios | Etiqueta propia de A puesta en una conversación de B | RLS: `set_conversation_tags` con una etiqueta de otro espacio da 42501; la FK compuesta lo impide en el esquema |
 | Una desactivada sigue saliendo | Desactivar oculta, no borra | Unit: el chip no sale; la conversación conserva la asignación y la recupera al reactivar |
-| `status` NULL rompe lecturas que daban por hecho el estado | Doce ficheros leen `ConversationStatus` | `check` 0/0 con el tipo `ConversationStatus \| null`; unit del overview con filas sin trato (ni se enfrían, ni cuentan en temporada, sí tienen turno); E2E: crear una de Prensa y comprobar que no sale en el panel de Difusión |
-| Un bolo enlazado a una conversación sin trato | `bolo.conversation_id` hoy acepta cualquiera | Guard nuevo: solo una conversación con `status` no NULL. RLS: enlazar un bolo a una de Prensa da error |
+| El cambio de estado rompe lecturas que daban por hecho hold y confirmed | Doce ficheros leen `ConversationStatus` | Ver § 8.6 |
+| ~~Un bolo enlazado a una conversación sin trato~~ | Superado por § 8: tener bolo es tener trato; enlazar un bolo a una de Prensa es legítimo (la convierte en negocio) | |
 | No leídos de 152 conversaciones el primer día | Ruido que esconde lo nuevo | Regla «sin fila = leído hasta su creación»; unit |
 | Coste de la lectura común | ADR-118 midió que el overview no escala más allá de ~1.000 | La RPC nueva sigue el patrón de `thread_feed` (corte materializado por espacio, después la regla) y el `DISTINCT ON` que ADR-118 dejó propuesto. Medir en local con 2.000 conversaciones y 20.000 hilos, como ADR-116 |
 | Desk cuenta distinto que la lente | ADR-118 § 7 | Unit: Desk y la lente leen la misma función de «te toca» |
@@ -332,7 +333,7 @@ Cada fase se despliega sola y deja la app coherente.
 | Fase | Qué | Migración | Carriles |
 |---|---|---|---|
 | 0 | ADR con el modelo y las respuestas a § 7. Enmienda ADR-106 (la lente), ADR-117/118 (el dominio es el chip), ADR-134 (las vistas pasan a chips) | No | Coordinador |
-| 1 | Esquema: vocabulario, `conversation_tagging` con backfill `sales`, `status` admite NULL, guard del bolo, `set_conversation_tags`, `conversation_read` y `mark_conversation_read`. Tests RLS. El Worker no lee nada todavía | Sí, § 34 | 1 |
+| 1 | Esquema: vocabulario, `conversation_tagging` con backfill `sales`, `set_conversation_tags`, `conversation_read` y `mark_conversation_read`. Tests RLS. El Worker no lee nada todavía | Sí, § 34 | 1 |
 | 2 | Pantalla mínima: chips en la cabecera (Todas · Difusión · etiquetas · Equipo) sobre las dos lecturas de hoy; «Añadir» con etiqueta y sin trato; etiquetas en la ficha y en la fila; el panel de Difusión acotado a `sales` con trato y el común para el resto; `?view=team` redirige. «Todas» todavía como dos bloques uno bajo otro (conversaciones y hilos), sin mezclar orden | No | 1 |
 | 3 | Lectura común: RPC `conversation_feed` (mezcla, orden por no leídos y turno, no leídos de conversación), «Todas» en una sola lista, búsqueda en las dos fuentes (organización, contacto, contenedor; el cuerpo de mensajes y eventos, si Marco lo quiere, es otra RPC). Desk: te espera y ha cambiado de todas las etiquetas | Sí, aditiva (la RPC) | 2, uno detrás de otro (base y RPC; pantalla y Desk) |
 | 4 | Etiquetas del espacio en Ajustes: crear, renombrar, desactivar, ordenar (admin) | No (el esquema llega en la 1) | 1 |
@@ -369,7 +370,8 @@ Marco quiere ver antes cómo se siente, la fase 2 sola ya enseña la idea (chips
      la vista recordada (ADR-120 § 2) por confusa.
    - Difusión, como hoy. Ningún cambio de costumbre, pero la idea queda escondida detrás de un clic.
 
-5. **¿El trato depende de la etiqueta?**
+5. ~~¿El trato depende de la etiqueta?~~ **Cerrada por § 8 (Marco, 19-10):** el trato vive en el bolo, así que no
+   depende de la etiqueta ni de la conversación. Se deja el texto original como historia.
    - **No: es un añadido propio de la conversación.** Difusión lo propone al crear; cualquier conversación puede
      tenerlo o no (recomendada). Una coproducción con un teatro puede acabar en bolo; una de Difusión puede ser solo
      un contacto de cortesía. La etiqueta dice de qué va; el trato, si hay negocio.
@@ -387,6 +389,200 @@ Marco quiere ver antes cómo se siente, la fase 2 sola ya enseña la idea (chips
      no necesita saber que por dentro es otra tabla.
    - Aparte, a la derecha de la fila de etiquetas, como «lo de dentro». Más honesto con la diferencia, pero vuelve a
      ser dos vistas.
+
+## 8. Añadido el 19-10: tres capas de estado y la regla entre lentes
+
+Marco validó (vía el coordinador, 19-10) partir el estado en tres capas y fijar una regla del Planner. Esta sección
+manda sobre lo anterior donde chocan; los sitios que cambian están marcados «superado por § 8».
+
+**Caso que lo motiva.** Teatre de la Llum (espacio `testing`) sale «Confirmed» en la conversación, pero lo confirmado
+es una fecha, no la relación. Verificado en producción: la conversación está en `confirmed` y su bolo también.
+
+### 8.1 El trato vive en el bolo
+
+- `bolo.status` ya tiene el ciclo: nace en `proposed`, `hold`, `hold_1..3` o `confirmed`, y se mueve además a
+  `cancelled` y `done` (`20260829140000_bolo_status_lifecycle`, `bolo_status_can_open` y `bolo_status_can_move`;
+  `invoiced` y `paid` no los escribe nadie en un bolo). No hace falta esquema nuevo para el trato.
+- **La conversación pierde `hold`, `confirmed` y `declined` como trato.** Su estado pasa a ser solo el de la
+  relación (§ 8.2).
+- **La ficha de la conversación lista sus bolos** con fecha y estado: «14 mar · confirmado», «oct 27 · 1ª opción». La
+  palabra de cada estado es la del Planner y del oficio (ADR-128: Opción, *hold* en EN), no una nueva.
+- **Choque con el permiso, a decidir (pregunta 8).** `bolo_select` exige `read:money`
+  (`20260722102000_money_v3_bolo`) y ADR-106 § 1 sacó «el estado del trato» de `bolo_board` por ser dinero. Quien
+  lleva la difusión sin Diners no vería entonces el estado de sus bolos en su propia conversación. La propuesta es una
+  RPC acotada, `conversation_bolos(p_conversation_id)`: fecha (primera y última función viva), sala, ciudad y estado,
+  **nunca caché ni pagador**, para quien lee la conversación y tiene `read:performance` en el proyecto. El argumento:
+  el estado de una función (opción, confirmada) ya lo ve cualquiera con acceso al Planner, y el del bolo es el mismo
+  dato a otra altura. Pide enmendar ADR-106 § 1 en ese punto.
+- **El panel de Difusión cambia de fuente.** La temporada por línea (ADR-135) y sus tramos se pintaban con los estados
+  de la conversación; ahora la barra de cada línea cuenta relaciones (§ 8.2) y, aparte, los bolos de esas
+  conversaciones por estado («3 en opción · 2 confirmados»), por la misma RPC sin dinero. La puerta de Conversaciones
+  del Desk («conversaciones en hold», ADR-127 § 7) pasa a «bolos en opción de la temporada». Las dos leen el mismo
+  módulo puro (ADR-118 § 7).
+
+### 8.2 El estado de la relación vive en la conversación
+
+Es de todo el espacio (no personal) y lo tienen todas las conversaciones, de cualquier etiqueta.
+
+| Estado | Clave | Cómo se sabe |
+|---|---|---|
+| Nunca contactada | `never` | Derivado: ningún evento con dirección, sin `first_contacted_at` |
+| Contactada | `contacted` | Derivado: hemos escrito y no han contestado |
+| En conversación | `talking` | Derivado: han contestado (un evento entrante que no es automático, ADR-126 § 3) y hay actividad en los últimos 30 días |
+| Dormida | `dormant` | Derivado: hubo conversación y no hay actividad en más de 30 días (el umbral de «sin actividad» de ADR-117 § 5) |
+| Habitual | `regular` | Derivado: la organización tiene al menos un bolo `done` en una temporada anterior, en cualquier proyecto del espacio |
+| No esta vez | `not_now` | **Manual** (ver abajo) |
+
+- **Derivado gana.** Una conversación no guarda su estado: lo calcula una función sobre el historial, los sellos y los
+  bolos, la misma que usan la lista, el panel, Desk y la RPC de lectura común (§ 6, fase 3). Así no hay dos verdades
+  (la etiqueta que alguien olvidó cambiar y el historial).
+- **Lo que se guarda a mano** es solo lo que el historial no puede saber: `not_now_at` (cuándo dijeron que no) y, opcional,
+  `not_now_until` (cuándo volver a escribir, que es un siguiente paso con fecha). Se borra solo con un evento entrante
+  posterior (han vuelto a hablar) o a mano.
+- **Habitual por organización, no por proyecto.** La conversación es por organización y proyecto (ADR-102 § 3), pero
+  que una sala sea habitual es de la relación con la compañía: si programó la obra anterior, la nueva empieza con una
+  sala habitual. **Suposición** a confirmar con uso: «temporada anterior» es cualquiera antes de la actual
+  (septiembre a agosto, ADR-117 § 3).
+- **Precedencia:** `not_now` vigente > `regular` > `talking` > `dormant` > `contacted` > `never`. Una habitual que
+  calla sigue siendo habitual; su silencio lo dice «se enfría» del panel, no el estado.
+
+**Qué pasa con «declined».** Propuesta: **sobrevive como `not_now`, «no esta vez»** (la palabra de ADR-128 § 1). Por
+qué:
+1. No es un estado del trato: cuando una sala dice que no, casi nunca hay bolo que cancelar. Si hubiera opción, se
+   cancela el bolo y la relación sigue aparte.
+2. No se puede derivar: el «no» va dentro del cuerpo de un correo, y adivinarlo sería inventarlo.
+3. Cambia lo que hace la app: una sala en «no esta vez» no entra en la segunda ronda de un envío ni en «se enfría», y
+   nadie le vuelve a escribir esta temporada por error. Sin el estado, esa información solo vive en la memoria de
+   quien leyó el correo.
+4. Es temporal, no un veredicto: «rechazada» se lee como cerrada para siempre; «no esta vez» deja la puerta abierta y
+   caduca sola con `not_now_until` o con una respuesta nueva.
+
+**Esquema.** `conversation.status` y su enum se sustituyen en expand/contract: expand añade `not_now_at`,
+`not_now_until` y la función `public.conversation_relation(...)` (o `private.`, con envoltorio para la política, según
+lo lea la RPC); el Worker pasa a leer la relación derivada; contract borra `status`, el enum y el trigger
+`conversation_contact_timestamps` en la parte que sellaba por cambio de estado (ADR-098: el sello de contacto lo
+siguen moviendo los eventos). `reply_settled_at` y `next_action_*` no cambian.
+
+**Choque con los 151 «sin fecha de contacto»** (ADR-126 § 8: 151 de 152 en `muk-cia`). Hoy están en `contacted` sin
+evento ni sello, en buena parte por el DEFAULT de la columna. Derivando, saldrían «nunca contactada», que puede ser
+falso si Anouk les escribió fuera de Hour. Pregunta 9.
+
+### 8.3 «Lo conozco» es personal
+
+No es una etiqueta (las etiquetas son de todos) ni un estado de la relación (es de una persona del equipo con un
+contacto, no de la compañía con una sala).
+
+**Dónde vive.** Tabla `person_acquaintance`: `workspace_id`, `person_id`, `user_id`, `shared boolean NOT NULL DEFAULT
+false`, `created_at`, `updated_at`; PK `(workspace_id, person_id, user_id)`; FK compuesta `(workspace_id, person_id)
+-> workspace_person`. Va por el **contacto**, no por la conversación: si Inés deja Pradillo y entra en otra sala,
+quien la conoce la sigue conociendo (ADR-102: las personas cambian de sala). Es la misma clave que usa la nota privada
+(`note.person_id` con `workspace_id`, ADR-093), y en la ficha va junto a ella: «Lo conozco» y «Mi nota» son las dos
+cosas tuyas sobre esa persona.
+
+**RLS.**
+- `person_acquaintance_select`: la fila propia (`user_id = auth.uid()`) siempre que se sea miembro del espacio, como
+  `note_select`; la de otro, solo si `shared` **y** quien llama puede leer ese dossier
+  (`private.workspace_person_readable_by_caller`, ADR-124), **y** el dueño de la fila sigue siendo miembro aceptado.
+  Así hereda la privacidad del directorio: el contacto de una privada ajena no se delata porque alguien diga que lo
+  conoce.
+- Escritura solo por RPC `set_acquaintance(p_workspace_id, p_person_id, p_known, p_shared)`: solo sobre la fila
+  propia, y solo de un dossier que quien llama puede leer. Quitar «lo conozco» borra la fila (es tuya; no hay historia
+  que guardar).
+- La marca nunca abre nada: no da acceso a la conversación, al dossier ni a la sala. Test RLS como el de la etiqueta.
+
+**Pantalla.** En la lista, la fila de una conversación lleva tu marca si conoces a alguno de sus contactos; si la
+compartes, el equipo ve «La conoce Marco» (o «Marco y Anouk») en la ficha y en un tooltip de la fila. Compartir es
+por marca, no global: puedes conocer a diez y compartir dos. Por defecto, sin compartir (pregunta 10).
+
+### 8.4 Regla entre lentes
+
+**Cada lente es dueña de un tipo de cosa; las demás solo muestran de ella lo que ayuda a decidir allí, con un enlace
+de vuelta.** Conversaciones es dueña de las conversaciones y su relación; el Planner, de los bolos y sus funciones (lo
+que se hace); Cuentas, del dinero; Desk no es dueño de nada (ADR-088: el digest).
+
+- **En el Planner** lo que se hace cuelga del bolo y de sus funciones; la conversación no se dibuja en la rejilla.
+- **Día y Agenda** muestran en el margen los próximos pasos con fecha de las conversaciones (`next_action_at`,
+  `not_now_until`) y las tareas, **de la misma fuente que «Te espera»** (`rankWaiting` en `$lib/desk-feed`, ADR-121
+  § 2), acotada a los días que enseña la vista. Cada línea abre su conversación (o la tarea en su sitio).
+- **Mes y Temporada**, como mucho un número discreto por día o por semana («2 pasos»), que abre el Día.
+- **Desde la conversación** se ven sus fechas: la lista de bolos de § 8.1, cada uno abre su función, y un «Ver en el
+  Planner» que abre la Agenda en el primer día con el proyecto fijado. **Suposición:** el ámbito del Planner no admite
+  hoy fijar un bolo ni una conversación (sus fichas son espacio, proyecto, línea y persona, ADR-092); fijar por bolo
+  sería un token nuevo y queda fuera.
+- **Choque con ADR-084 § 2** («las tareas no salen en el calendario, por ahora no»). Se lee como «no son eventos de
+  la rejilla»: el margen no es la rejilla, y la tarea no ocupa un día ni un hueco. Pide una línea en el ADR de la fase 0
+  que lo diga, para que no se lea como una contradicción.
+
+### 8.5 Migración de datos (producción, solo lectura, 2026-10-19)
+
+Regla: una conversación en `hold` o `confirmed` pasa su trato a sus bolos; sin bolo, queda «en conversación». El
+estado de un bolo existente nunca se sobrescribe.
+
+| Espacio | `hold` vivas | `confirmed` vivas | De ellas con bolo | `declined` vivas | Resultado |
+|---|---|---|---|---|---|
+| `muk-cia` (real) | 0 | 0 | 0 | 0 | Las 152 están en `contacted`. No hay nada que mover. `muk-cia` tampoco tiene bolos |
+| `testing` | 1 | 1 | 1 (Teatre de la Llum, bolo ya `confirmed`) | 1 | Llum: el bolo ya dice confirmado; la conversación pasa a relación derivada. La de `hold` sin bolo: en conversación. La `declined`: `not_now` |
+| `playwright` | 4 (+1 borrada) | 4 | 0 | 4 | Fixtures del E2E: las 8 a en conversación, las 4 `declined` a `not_now`. Los specs que las crean se reescriben en la misma fase |
+| `marco-rubiol` | 0 | 0 | 0 | 0 | Nada (sus 17 bolos vivos no cuelgan de ninguna conversación) |
+
+Conteo exacto: `conversation` agrupada por espacio y estado, con `EXISTS` sobre `bolo.conversation_id` vivo, en
+`BEGIN READ ONLY`. De las que no están en `contacted`, ninguna tiene solo `performance.conversation_id` sin bolo.
+
+- **«En conversación» como valor guardado no existe** en el modelo derivado (§ 8.2): lo que la migración hace en
+  realidad es dejar de guardar el estado. Para no perder lo que alguien marcó a mano, el expand copia el valor viejo a
+  `custom_fields.legacy_status` en las filas que no estaban en `contacted` (en producción, 0 en `muk-cia`), y el
+  contract no lo borra.
+- `dormant` y `recurring` viejos se dejan a la derivación; si sale distinto, gana lo derivado y lo viejo queda en
+  `legacy_status`.
+- **Rollback:** el expand es aditivo (columnas y función) y se deshace borrándolas. El contract (borrar `status`) se
+  vuelve desde `legacy_status` más `contacted` para el resto; ADR-105 permite contract sin rollback SQL porque no hay
+  usuarios, pero aquí sí hay datos reales en `muk-cia`, así que el rollback se escribe y se prueba.
+- Gate de § 34: el contract es destructivo y toca la tabla de las 152 reales: **staging e `inspect` obligatorios**.
+
+### 8.6 Riesgos nuevos y pruebas
+
+| Riesgo | Prueba |
+|---|---|
+| El estado de un bolo llega a quien no debe | RLS: `conversation_bolos` nunca devuelve caché ni pagador; sin `read:conversation` o sin `read:performance`, 0 filas; privada ajena, 0 filas |
+| «Lo conozco» delata un contacto de una privada ajena | RLS: fila compartida de un dossier que solo es contacto de una privada ajena: 0 filas para el resto, también para el admin (ADR-124 § 2) |
+| La relación derivada cuenta distinto en lista, panel y Desk | Unit: una sola función pura, con casos de cada estado y de la precedencia |
+| Doce ficheros leen `ConversationStatus` | `check` 0/0 tras cambiar el tipo; un spec E2E por estado derivado en `playwright` |
+| Un «no esta vez» se queda para siempre | Unit: caduca con `not_now_until` y con un evento entrante posterior |
+| El margen del Planner y «Te espera» divergen | Unit: los dos llaman a `rankWaiting` con la ventana como entrada |
+
+### 8.7 Fases nuevas
+
+Se intercalan con las de § 6; ninguna depende de las etiquetas salvo la última.
+
+| Fase | Qué | Migración | Carriles |
+|---|---|---|---|
+| E1 | Expand de estado: `not_now_*`, función de relación, `conversation_bolos`, `legacy_status`. El Worker lee la relación derivada; menú de estado con solo «No esta vez»; la ficha lista sus bolos; el panel de Difusión y la puerta del Desk cambian de fuente | Sí, aditiva | 1 |
+| E2 | «Lo conozco»: tabla, RPC, marca en la ficha junto a la nota y en la fila | Sí, aditiva | 1 (en paralelo con E1: no comparten ficheros salvo la ficha, que va detrás) |
+| E3 | Margen del Planner en Día y Agenda, número en Mes y Temporada, «Ver en el Planner» desde la conversación | No | 1 |
+| E4 | Contract de estado: fuera `status` y su enum | Sí, destructiva, staging | 1, tras usar E1 una semana |
+
+### 8.8 Preguntas nuevas para Marco
+
+8. **¿Quién ve el estado de los bolos desde la conversación?**
+   - **Quien lee la conversación y el Planner del proyecto, sin caché ni pagador** (recomendada). El estado de una
+     función ya es del Planner; el del bolo es el mismo dato. Enmienda ADR-106 § 1 solo en esto.
+   - Solo quien tiene Diners. Coherente con `bolo_select`, pero quien lleva la difusión sin dinero ve conversaciones sin
+     saber si hay algo confirmado.
+
+9. **Las 151 de `muk-cia` sin fecha de contacto: ¿qué relación tienen?**
+   - **«Contactada, sin fecha»: se respeta lo que estaba guardado** (recomendada). La migración les pone un sello de
+     contacto sin día (`first_contacted_at` NULL y una marca `contacted_undated`), y la derivación las cuenta como
+     contactadas. No inventa un contacto ni lo borra.
+   - «Nunca contactada»: lo que dice el historial. Honesto con los datos, pero el DEFAULT de la columna y el trabajo de
+     Anouk fuera de Hour se mezclan y no se pueden separar.
+   - Preguntar a Anouk y fecharlas en bloque antes de migrar. Lo más exacto, y depende de que ella lo tenga.
+
+10. **«Lo conozco»: ¿compartido por defecto?**
+    - **No: cada marca nace privada y se comparte una a una** (recomendada). Es la regla de la nota (ADR-093: siempre
+      privada) y la de las conversaciones nuevas (ADR-100: privadas por defecto); decir a quién conoces es decir algo
+      de ti.
+    - Sí: compartido por defecto, porque el valor está en que el equipo sepa a quién llamar. Más útil el primer día y
+      más fácil de compartir sin querer.
 
 ## Fuera de este plan
 
