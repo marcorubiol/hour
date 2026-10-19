@@ -34,12 +34,12 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 ## Producción (verificado 2026-10-14, tarde)
 
 - Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`279822cf`**, `dirty:false`, builtAt
-  2026-10-18T23:27Z (Conversaciones con Difusión y Equipo, ADR-134). `main` lleva `20261019100000_reserve_books_slug` **sin aplicar** (independiente: reserva `books` como alias; el código no depende).
+  2026-10-18T23:27Z (Conversaciones con Difusión y Equipo, ADR-134). `main` == prod salvo documentos y tests.
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free, con keepalive diario
   (`.github/workflows/keepalive.yml`) contra la pausa por inactividad. Pasar a Pro antes de la beta, aún no
   (`_tasks.md § 9`). Si algo de Supabase falla tras días sin uso, lo primero es `dig <ref>.supabase.co`.
-- **Última migración aplicada: `20261018180000_workspace_lenses`** (2026-10-18, run 39172107865; backup 39171759019, plan 39171938506), con `20261018170000_money_bolos_last_function` (ADR-131, 132). Antes, `20261018160000_workspace_trade`. Las migraciones van por `production-migrate.yml`: backup, plan, apply.
+- **Última migración aplicada: `20261019100000_reserve_books_slug`** (2026-10-19, run 39204094968; backup 39203783815, plan 39204002010): reserva `books` como alias (ADR-134). Antes, `20261018180000_workspace_lenses` (ADR-132). Las migraciones van por `production-migrate.yml`: backup, plan, apply.
 - `hour-staging` (ref `slccyknqpgmzhyiyclsq`, `eu-west-1`): reconstruido el 2026-10-13 con el contract de permisos
   (run 38469017859: RLS 309/313, smoke 2/2). Se volverá a pausar sin uso.
 - Últimas suites contra producción: RLS 401/401 (2026-10-18, `d244ecf4`, en serie); E2E 98/99 con 1 saltado (2026-10-19, `279822cf`, por `hour-web.marco-rubiol.workers.dev`). **Nunca la RLS y el E2E a la vez.** Si el dominio no responde y `workers.dev` sí, es la red local (rango de Cloudflare `188.114.96.0/20`).
