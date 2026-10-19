@@ -130,15 +130,16 @@ describe.skipIf(!envReady())('RLS — ADR-051/052 write-path RPCs', () => {
     const conversation = created.data as ConversationRow;
     expect(conversation.project_id).toBe(projectId);
     expect(conversation.status).toBe('contacted');
-    expect(conversation.first_contacted_at).toBeTruthy();
-    expect(conversation.last_contacted_at).toBeTruthy();
+    // ADR-138: añadir una sala no es escribirle. Nace sin sello de contacto,
+    // salvo una recuperada de una pasada anterior, que conserva los suyos.
+    if (!conversation.first_contacted_at) expect(conversation.last_contacted_at).toBeNull();
 
     try {
       // 2. A genuine status transition stamps last contact while the first
       // contact remains write-once. This is the DB invariant behind both the
       // API status menu and future trusted conversation-event ingress.
       const firstContact = conversation.first_contacted_at;
-      const beforeLast = Date.parse(conversation.last_contacted_at!);
+      const beforeLast = Date.parse(conversation.last_contacted_at ?? '1970-01-01');
       const touched = await pgPatch<ConversationRow>(
         'conversation',
         jwt,
@@ -152,7 +153,9 @@ describe.skipIf(!envReady())('RLS — ADR-051/052 write-path RPCs', () => {
       expect(touched.status).toBe(200);
       expect(touched.rows).toHaveLength(1);
       expect(touched.rows[0].status).toBe('hold');
-      expect(touched.rows[0].first_contacted_at).toBe(firstContact);
+      // El primer contacto se escribe una vez: el que había, o el de este cambio.
+      if (firstContact) expect(touched.rows[0].first_contacted_at).toBe(firstContact);
+      else expect(touched.rows[0].first_contacted_at).toBe(touched.rows[0].last_contacted_at);
       expect(Date.parse(touched.rows[0].last_contacted_at!)).toBeGreaterThanOrEqual(beforeLast);
 
       // 3. Same person × project again → 23505 → 409 (no silent merge).
