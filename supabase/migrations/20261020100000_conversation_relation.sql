@@ -144,7 +144,7 @@ $$;
 -- Los hechos de una conversación legible, y su relación. Se relee la fila por
 -- id: una fila inventada en una llamada directa no dice nada de otra.
 CREATE FUNCTION private.conversation_relation_for(p_conversation_id uuid, p_user_id uuid)
-RETURNS TABLE (relation text, regular boolean)
+RETURNS text
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
@@ -158,10 +158,9 @@ AS $$
            ev.wrote_out OR x.first_contacted_at IS NOT NULL OR x.contacted_undated,
            ev.last_in IS NOT NULL
              OR x.custom_fields->>'legacy_status' IN ('in_conversation', 'hold', 'confirmed'),
-           reg.regular,
+           private.organization_is_regular(x.workspace_id, x.organization_id, current_date),
            current_date
-         ),
-         reg.regular
+         )
   FROM public.conversation x
   CROSS JOIN LATERAL (
     SELECT max(e.occurred_at) FILTER (WHERE e.direction = 'inbound') AS last_in,
@@ -173,9 +172,6 @@ AS $$
       AND e.kind IN ('email', 'message', 'call')
       AND e.metadata->>'auto' IS NULL
   ) ev
-  CROSS JOIN LATERAL (
-    SELECT private.organization_is_regular(x.workspace_id, x.organization_id, current_date) AS regular
-  ) reg
   WHERE x.id = p_conversation_id
     AND private.can_read_conversation(x.id, p_user_id);
 $$;
@@ -192,7 +188,7 @@ STABLE
 SECURITY DEFINER
 SET search_path TO 'public', 'pg_temp'
 AS $$
-  SELECT r.relation FROM private.conversation_relation_for(c.id, auth.uid()) r;
+  SELECT private.conversation_relation_for(c.id, auth.uid());
 $$;
 
 COMMENT ON FUNCTION public.conversation_relation(public.conversation) IS
@@ -207,7 +203,10 @@ STABLE
 SECURITY DEFINER
 SET search_path TO 'public', 'pg_temp'
 AS $$
-  SELECT r.regular FROM private.conversation_relation_for(c.id, auth.uid()) r;
+  SELECT private.organization_is_regular(x.workspace_id, x.organization_id, current_date)
+  FROM public.conversation x
+  WHERE x.id = c.id
+    AND private.can_read_conversation(x.id, auth.uid());
 $$;
 
 COMMENT ON FUNCTION public.conversation_regular(public.conversation) IS
