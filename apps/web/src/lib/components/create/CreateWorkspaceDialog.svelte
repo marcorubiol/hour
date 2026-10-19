@@ -12,6 +12,7 @@
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
+  import Textarea from '$lib/components/Textarea.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import AccentSwatchPicker from './AccentSwatchPicker.svelte';
   import { appLocale, t } from '$lib/i18n';
@@ -111,25 +112,21 @@
 
     <AccentSwatchPicker bind:accent autoSlug={autoAccentSlug} label={t('workspace.color', locale)} disabled={$create.isPending} />
 
-    <label class="field">
-      <span>{t('project.description', locale)}</span>
-      <textarea
-        class="cws__desc"
-        bind:value={description}
-        maxlength="280"
-        rows="3"
-        placeholder={t('workspace.new_description_ph', locale)}
-        disabled={$create.isPending}
-      ></textarea>
-      <span class="cws__desc-count">{description.length} / 280</span>
-    </label>
+    <Textarea
+      label={t('project.description', locale)}
+      bind:value={description}
+      maxlength={280}
+      rows={3}
+      placeholder={t('workspace.new_description_ph', locale)}
+      disabled={$create.isPending}
+    />
 
     <!-- Hidden submit lets Enter inside an input trigger submit. -->
     <button type="submit" hidden aria-hidden="true"></button>
   </form>
 
   {#snippet actions()}
-    <Button variant="outline" disabled={$create.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" disabled={$create.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
     <Button loading={$create.isPending} onclick={submit}>{t('project.create', locale)}</Button>
   {/snippet}
 </Dialog>
@@ -139,18 +136,7 @@
     .cws__form {
       display: flex;
       flex-direction: column;
-      gap: var(--space-m);
-    }
-
-    .cws__desc {
-      resize: vertical;
-      min-block-size: 5em;
-    }
-
-    .cws__desc-count {
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      text-align: end;
+      gap: var(--space-xs);
     }
   }
 </style>

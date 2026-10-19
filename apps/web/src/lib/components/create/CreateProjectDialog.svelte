@@ -13,6 +13,7 @@
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
+  import Textarea from '$lib/components/Textarea.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { spaceName } from '$lib/utils/identity';
@@ -157,25 +158,21 @@
 
     <AccentSwatchPicker bind:accent autoSlug={autoAccentSlug} label={t('project.color', locale)} disabled={$create.isPending} />
 
-    <label class="field">
-      <span>{t('project.description', locale)}</span>
-      <textarea
-        class="cpj__desc"
-        bind:value={description}
-        maxlength="280"
-        rows="3"
-        placeholder={t('project.description_ph', locale)}
-        disabled={$create.isPending}
-      ></textarea>
-      <span class="cpj__desc-count">{description.length} / 280</span>
-    </label>
+    <Textarea
+      label={t('project.description', locale)}
+      bind:value={description}
+      maxlength={280}
+      rows={3}
+      placeholder={t('project.description_ph', locale)}
+      disabled={$create.isPending}
+    />
 
     <!-- Hidden submit lets Enter inside an input trigger submit. -->
     <button type="submit" hidden aria-hidden="true"></button>
   </form>
 
   {#snippet actions()}
-    <Button variant="outline" disabled={$create.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" disabled={$create.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
     <Button loading={$create.isPending} onclick={submit}>{t('project.create', locale)}</Button>
   {/snippet}
 </Dialog>
@@ -185,18 +182,7 @@
     .cpj__form {
       display: flex;
       flex-direction: column;
-      gap: var(--space-m);
-    }
-
-    .cpj__desc {
-      resize: vertical;
-      min-block-size: 5em;
-    }
-
-    .cpj__desc-count {
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      text-align: end;
+      gap: var(--space-xs);
     }
   }
 </style>

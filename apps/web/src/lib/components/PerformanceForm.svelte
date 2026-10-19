@@ -31,6 +31,7 @@
   import { lensOn } from '$lib/lenses.svelte';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
+  import Field from './Field.svelte';
   import Input from './Input.svelte';
   import Select from './Select.svelte';
   import { addToast } from './Toast.svelte';
@@ -426,28 +427,25 @@
   <Select label={t('edit.status', locale)} options={statusOptions} bind:value={cStatus} />
   {#if showHoldNotice}
     <!-- ADR-080 §2 — discreet, hold-only. Empty = default (the placeholder
-         says it), 0 = no notice. Raw .field: the house Input doesn't carry
-         min/max and the native attributes ARE the constraint here. -->
-    <div class="field">
-      <label for="c-hold-notice">{t('perf.hold_notice', locale)}</label>
-      <div class="field__control">
-        <input
-          id="c-hold-notice"
-          type="number"
-          min="0"
-          max="365"
-          step="1"
-          inputmode="numeric"
-          bind:value={cHoldNotice}
-          placeholder={String(HOLD_NOTICE_DEFAULT)}
-          aria-describedby={cHoldNotice === 0 ? 'c-hold-notice-msg' : undefined}
-        />
-        <span class="field__suffix">{t('perf.hold_notice_suffix', locale)}</span>
-      </div>
-      {#if cHoldNotice === 0}
-        <p id="c-hold-notice-msg" class="field__msg">{t('perf.hold_notice_none', locale)}</p>
-      {/if}
-    </div>
+         says it), 0 = no notice. The native min/max ARE the constraint. -->
+    <Field
+      id="c-hold-notice"
+      label={t('perf.hold_notice', locale)}
+      helper={cHoldNotice === 0 ? t('perf.hold_notice_none', locale) : undefined}
+    >
+      <input
+        id="c-hold-notice"
+        type="number"
+        min="0"
+        max="365"
+        step="1"
+        inputmode="numeric"
+        bind:value={cHoldNotice}
+        placeholder={String(HOLD_NOTICE_DEFAULT)}
+        aria-describedby={cHoldNotice === 0 ? 'c-hold-notice-msg' : undefined}
+      />
+      {#snippet suffix()}{t('perf.hold_notice_suffix', locale)}{/snippet}
+    </Field>
   {/if}
   {#if showLineSelect}
     <Select label={t('create.line', locale)} options={lineOptions} bind:value={cLine} />
@@ -461,7 +459,7 @@
     .pform {
       display: flex;
       flex-direction: column;
-      gap: var(--space-s);
+      gap: var(--space-xs);
     }
   }
 </style>

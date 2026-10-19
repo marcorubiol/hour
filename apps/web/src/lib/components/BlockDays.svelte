@@ -89,10 +89,8 @@
 </script>
 
 <div class="bd" style={accent ? `--c: ${accent}` : undefined}>
-  <div class="bd__row2">
-    <Input label={labels.from} type="date" bind:value={from} />
-    <Input label={labels.to} type="date" bind:value={to} />
-  </div>
+  <Input label={labels.from} type="date" bind:value={from} />
+  <Input label={labels.to} type="date" bind:value={to} />
 
   <div class="bd__wd">
     {#each WEEKDAY_ORDER as w, i (w)}
@@ -140,19 +138,12 @@
 </div>
 
 <style>
+  /* Rows, not a sunk panel (ADR-139 p4): the two ends are field rows like
+     the rest of the dialog, the rule and the calendar sit under them. */
   .bd {
     display: flex;
     flex-direction: column;
-    gap: var(--space-s);
-    padding: var(--space-s);
-    border: 1px solid var(--border-color-light);
-    border-radius: var(--radius-m);
-    background: var(--bg-light);
-  }
-  .bd__row2 {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-s);
+    gap: var(--space-xs);
   }
   .bd__wd {
     display: flex;

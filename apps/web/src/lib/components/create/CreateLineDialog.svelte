@@ -160,7 +160,7 @@
 >
   <form class="cln__form" onsubmit={submit} style={`--c: ${accentPreview}`}>
     <fieldset class="cln__templates">
-      <legend>{t('line.template', locale)}</legend>
+      <legend class="eyebrow eyebrow--sub">{t('line.template', locale)}</legend>
       <div class="cln__template-grid" role="radiogroup" aria-label={t('line.template_aria', locale)}>
         {#each LINE_TEMPLATES as tpl (tpl.key)}
           {@const isOn = templateKey === tpl.key}
@@ -210,7 +210,7 @@
   </form>
 
   {#snippet actions()}
-    <Button variant="outline" disabled={$create.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" disabled={$create.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
     <Button loading={$create.isPending} onclick={submit}>{t('project.create', locale)}</Button>
   {/snippet}
 </Dialog>
@@ -220,7 +220,7 @@
     .cln__form {
       display: flex;
       flex-direction: column;
-      gap: var(--space-m);
+      gap: var(--space-xs);
     }
 
     /* Template cards — a radiogroup of bordered cards; the selected one
@@ -237,8 +237,10 @@
 
     .cln__templates > legend {
       padding: 0;
-      font-size: var(--text-s);
-      color: var(--text-color);
+    }
+
+    .cln__templates {
+      margin-block-end: var(--space-s);
     }
 
     .cln__template-grid {

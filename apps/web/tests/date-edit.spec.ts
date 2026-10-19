@@ -222,8 +222,8 @@ test.describe('date edit path (task 15)', () => {
 
     // rehearsal → travel day: the direction segment appears, and the
     // endpoint must accept a direction it previously would have rejected.
-    await dialog.getByRole('button', { name: 'Travel', exact: true }).click();
-    await dialog.getByRole('button', { name: 'Return', exact: true }).click();
+    await dialog.getByRole('radio', { name: 'Travel', exact: true }).check();
+    await dialog.getByRole('radio', { name: 'Return', exact: true }).check();
     await dialog.getByRole('button', { name: 'Save changes' }).click();
     await expect(dialog).toBeHidden({ timeout: 10_000 });
 
@@ -239,7 +239,7 @@ test.describe('date edit path (task 15)', () => {
     await diary.locator('.slip[data-kind="travel_day"]', { hasText: 'Testville' }).first().click();
     const back = page.locator('dialog[open]');
     await expect(back).toBeVisible();
-    await back.getByRole('button', { name: 'Rehearsal', exact: true }).click();
+    await back.getByRole('radio', { name: 'Rehearsal', exact: true }).check();
     await back.getByRole('button', { name: 'Save changes' }).click();
     await expect(back).toBeHidden({ timeout: 10_000 });
 
