@@ -487,6 +487,13 @@
     --focus-width: 2px;
     --focus-offset: 2px;
 
+    /* JUST MADE: the card the quick add drew, said once and let go
+       (ADR-139 p7). The focus colour, a wash and a ring, faded out over
+       `--duration-fresh`; with reduced motion, the ring alone, still. */
+    --fresh-ground: color-mix(in oklch, var(--focus-color) 14%, transparent);
+    --fresh-ring: color-mix(in oklch, var(--focus-color) 45%, transparent);
+    --duration-fresh: 2.4s;
+
     /* ============================================================ */
     /* FIELDS — one skin for every text control                       */
     /* Consumed by both the semantic input defaults (base.css          */

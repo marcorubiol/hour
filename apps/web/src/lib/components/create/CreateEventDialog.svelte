@@ -37,6 +37,7 @@
   import BlockDays from '../BlockDays.svelte';
   import { addToast } from '../Toast.svelte';
   import { toastCreated } from '$lib/created';
+  import { markFresh } from '$lib/fresh.svelte';
   import { dayKeyInTz } from '$lib/planner';
   import { dayMonthYear } from '$lib/datetime';
   import { BLOCK_MAX_DAYS } from '$lib/block';
@@ -432,7 +433,8 @@
   });
 
   // ── Saving ─────────────────────────────────────────────────────────────
-  type Done = { what: string; day: string; undo: () => Promise<unknown>; perf?: CreatedPerformance };
+  /** `made`: the cards this write draws, marked fresh in the Planner. */
+  type Done = { what: string; day: string; undo: () => Promise<unknown>; perf?: CreatedPerformance; made: string[] };
 
   const save = createMutation({
     mutationFn: async (draft: Draft): Promise<Done> => {
@@ -444,21 +446,23 @@
       const day = last > first ? `${dayMonthYear(first)} – ${dayMonthYear(last)}` : dayMonthYear(first);
       if (plan.shape === 'range') {
         const id = await createAvailability(availabilityBody(draft, plan));
-        return { what, day, undo: async () => (id ? undoAvailability(id, queryClient) : undefined) };
+        return { what, day, undo: async () => (id ? undoAvailability(id, queryClient) : undefined), made: [] };
       }
       if (draft.type === 'performance') {
         const { rows, noticeFailed } = await createPerformances(performanceBody(draft, plan), draft.notice);
         if (noticeFailed) addToast({ tone: 'warning', message: t('perf.hold_notice_not_saved', locale) });
-        return { what, day, undo: () => undoPerformances(rows.map((r) => r.id), queryClient), perf: rows[0] };
+        const made = rows.map((r) => r.id);
+        return { what, day, undo: () => undoPerformances(made, queryClient), perf: rows[0], made };
       }
       const ids = await createDates(dateBody(draft, plan));
-      return { what, day, undo: () => undoDates(ids, queryClient) };
+      return { what, day, undo: () => undoDates(ids, queryClient), made: ids };
     },
     onSuccess: (done, draft) => {
       if (draft.type === 'unavailable') void queryClient.invalidateQueries({ queryKey: ['planner-availability'] });
       else if (draft.type === 'performance') void invalidatePerformanceFeeds(queryClient);
       else invalidateDateFeeds(queryClient);
       if (draft.project) rememberProject(draft.project);
+      markFresh(done.made);
       toastCreated({
         locale,
         message: t('create.added', locale, { what: done.what, day: done.day }),
