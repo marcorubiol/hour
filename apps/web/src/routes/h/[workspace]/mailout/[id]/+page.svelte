@@ -31,6 +31,7 @@
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
+  import Textarea from '$lib/components/Textarea.svelte';
   import MailoutTestMode from '$lib/components/MailoutTestMode.svelte';
   import MailoutFigures from '$lib/components/MailoutFigures.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
@@ -364,7 +365,7 @@
         />
         {#if d.can_edit && ['queued', 'sending', 'paused', 'review'].includes(m.status)}
           <div class="mo__count-act">
-            <Button size="s" variant="outline" tone="warn" loading={$cancel.isPending} onclick={() => $cancel.mutate()}>
+            <Button size="s" variant="secondary" tone="warn" loading={$cancel.isPending} onclick={() => $cancel.mutate()}>
               {t('mailout.cancel_rest', locale)}
             </Button>
           </div>
@@ -382,13 +383,18 @@
                 <a class="link-arrow" href={`/h/${workspaceSlug}/settings?section=mail`}>{t('mailout.to_settings', locale)}</a>
               </p>
             {:else}
-              <div class="mo__row mo__row--from">
+              <!-- One domain: it is the address's suffix, in the same row. -->
+              {#snippet atDomain()}@{domain?.domain ?? ''}{/snippet}
+              <div class="mo__row">
                 <Input label={t('mailout.from_name', locale)} bind:value={fromName} oninput={touch} placeholder={d.workspace.name} />
-                <Input label={t('mailout.from_address', locale)} bind:value={localPart} oninput={touch} />
+                <Input
+                  label={t('mailout.from_address', locale)}
+                  bind:value={localPart}
+                  oninput={touch}
+                  suffix={domainOptions.length > 1 ? undefined : atDomain}
+                />
                 {#if domainOptions.length > 1}
                   <Select label={t('mailout.domain_label', locale)} options={domainOptions} bind:value={domainId} onchange={touch} />
-                {:else}
-                  <p class="mo__at">@{domain?.domain ?? ''}</p>
                 {/if}
               </div>
             {/if}
@@ -404,10 +410,7 @@
               <Select label={t('mailout.language', locale)} options={languageOptions} bind:value={language} onchange={touch} />
             </div>
             <Input label={t('mail.subject', locale)} bind:value={subject} oninput={touch} />
-            <div class="field">
-              <label for="mailout-body">{t('mail.body', locale)}</label>
-              <textarea id="mailout-body" rows="10" maxlength="20000" bind:value={body} oninput={touch}></textarea>
-            </div>
+            <Textarea id="mailout-body" label={t('mail.body', locale)} rows={10} maxlength={20000} bind:value={body} oninput={touch} />
             <p class="mo__fields">
               <span>{t('mailout.fields', locale)}</span>
               {#each MERGE_FIELDS as f (f)}
@@ -425,13 +428,13 @@
           <h2 class="eyebrow eyebrow--sub">{t('mailout.preview', locale)}</h2>
           {#if previewable.length > 1}
             <div class="mo__pager">
-              <Button size="xs" variant="outline" disabled={previewIndex <= 0} onclick={() => (previewIndex = Math.max(0, previewIndex - 1))}>
+              <Button size="xs" variant="secondary" disabled={previewIndex <= 0} onclick={() => (previewIndex = Math.max(0, previewIndex - 1))}>
                 {t('mailout.prev', locale)}
               </Button>
               <span>{Math.min(previewIndex + 1, previewable.length)} / {previewable.length}</span>
               <Button
                 size="xs"
-                variant="outline"
+                variant="secondary"
                 disabled={previewIndex >= previewable.length - 1}
                 onclick={() => (previewIndex = Math.min(previewable.length - 1, previewIndex + 1))}
               >
@@ -508,7 +511,7 @@
         </p>
         <Button
           size="s"
-          variant="outline"
+          variant="secondary"
           disabled={!domain || !subject.trim() || !body.trim() || !current}
           loading={$sendTest.isPending}
           onclick={() => $sendTest.mutate()}
@@ -530,7 +533,7 @@
     <p>{t('mailout.confirm_body', locale, { n: readyCount, subject, from: fromLine })}</p>
     {#if d.simulated}<p class="mo__hint">{t('mailout.confirm_simulated', locale)}</p>{/if}
     {#snippet actions()}
-      <Button variant="outline" onclick={() => (confirmOpen = false)}>{t('create.cancel', locale)}</Button>
+      <Button variant="quiet" onclick={() => (confirmOpen = false)}>{t('create.cancel', locale)}</Button>
       <Button loading={$send.isPending} onclick={() => $send.mutate()}>{t('mailout.send_to', locale, { n: readyCount })}</Button>
     {/snippet}
   </Dialog>
@@ -538,12 +541,9 @@
   <Dialog bind:open={basisOpen} title={t('mailout.set_basis', locale)} size="s" onclose={() => (basisFor = null)}>
     {#if basisFor}<p class="mo__hint">{basisFor.address}</p>{/if}
     <Select label={t('mailout.basis', locale)} options={basisOptions} bind:value={basisKind} />
-    <div class="field">
-      <label for="basis-note">{t('mailout.basis_note', locale)}</label>
-      <textarea id="basis-note" rows="2" maxlength="1000" bind:value={basisNote} placeholder={t('mailout.basis_note_ph', locale)}></textarea>
-    </div>
+    <Textarea id="basis-note" label={t('mailout.basis_note', locale)} rows={2} maxlength={1000} bind:value={basisNote} placeholder={t('mailout.basis_note_ph', locale)} />
     {#snippet actions()}
-      <Button variant="outline" onclick={() => (basisOpen = false)}>{t('create.cancel', locale)}</Button>
+      <Button variant="quiet" onclick={() => (basisOpen = false)}>{t('create.cancel', locale)}</Button>
       <Button
         loading={$saveBasis.isPending}
         disabled={basisKind === 'consent' && !basisNote.trim()}
@@ -635,30 +635,12 @@
       gap: var(--space-s);
       padding-block-end: var(--space-m);
     }
+    /* Field rows, one under the other (ADR-139 p4). */
     .mo__row {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-      gap: var(--space-s) var(--space-m);
+      display: flex;
+      flex-direction: column;
     }
-    .mo__row--from {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      align-items: end;
-    }
-    .mo__at {
-      margin: 0;
-      padding-block-end: var(--space-xs);
-      color: var(--text-muted);
-      overflow-wrap: anywhere;
-    }
-    @media (max-width: 46rem) {
-      .mo__row--from {
-        grid-template-columns: minmax(0, 1fr);
-      }
-    }
-    .mo__form textarea {
-      inline-size: 100%;
-      resize: vertical;
-      font: inherit;
+    .mo__form :global(textarea) {
       line-height: 1.5;
     }
     .mo__reply {

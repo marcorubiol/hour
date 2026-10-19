@@ -125,10 +125,10 @@ test.describe('Lenses per space (ADR-132)', () => {
     await page.goto('/h/playwright/settings?section=lenses');
     const group = page.getByTestId('settings-lenses');
     const books = group.getByTestId('lens-toggle-books');
-    await expect(books).toHaveAttribute('aria-pressed', 'false');
-    await expect(group.getByTestId('lens-toggle-planner')).toHaveAttribute('aria-pressed', 'true');
+    await expect(books).toHaveAttribute('aria-checked', 'false');
+    await expect(group.getByTestId('lens-toggle-planner')).toHaveAttribute('aria-checked', 'true');
     await books.click();
-    await expect(books).toHaveAttribute('aria-pressed', 'true');
+    await expect(books).toHaveAttribute('aria-checked', 'true');
 
     await page.goto(`/h/books${SCOPE}`);
     await waitForLoaded(page);

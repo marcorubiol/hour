@@ -6,6 +6,7 @@
    * los datos. Desk no es una lente y no está aquí. Lo decide un admin; los
    * demás lo ven.
    */
+  import Switch from '$lib/components/Switch.svelte';
   import RecordHead from '$lib/components/RecordHead.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
@@ -78,17 +79,13 @@
           <div class="set-row__hint">{t(`settings.lenses_hint_${lens}`, locale)}</div>
         </div>
         <div class="set-row__ctrl">
-          <button
-            type="button"
-            class={['set-toggle', !off.has(lens) && 'is-on'].filter(Boolean).join(' ')}
-            aria-label={t(LABEL[lens], locale)}
-            aria-pressed={!off.has(lens)}
-            data-testid="lens-toggle-{lens}"
+          <Switch
+            checked={!off.has(lens)}
+            label={t(LABEL[lens], locale)}
+            testid="lens-toggle-{lens}"
             disabled={!canEdit || !$query.data || $save.isPending}
-            onclick={() => toggle(lens)}
-          >
-            <span class="set-toggle__dot"></span>
-          </button>
+            onchange={() => toggle(lens)}
+          />
         </div>
       </div>
     {/each}

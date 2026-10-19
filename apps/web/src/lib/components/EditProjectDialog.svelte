@@ -10,6 +10,7 @@
   import { createMutation, useQueryClient } from '@tanstack/svelte-query';
   import { ApiError, mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
+  import Textarea from './Textarea.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
@@ -161,24 +162,21 @@
       disabled={$save.isPending}
     />
 
-    <label class="field">
-      <span>{t('project.description', locale)}</span>
-      <textarea
-        class="epj__desc"
-        bind:value={description}
-        maxlength="280"
-        rows="3"
-        placeholder={t('project.description_ph', locale)}
-        disabled={$save.isPending}
-      ></textarea>
-      <span class="epj__desc-count">{description.length} / 280</span>
-    </label>
+    <Textarea
+      label={t('project.description', locale)}
+      bind:value={description}
+      maxlength={280}
+      counter
+      rows={3}
+      placeholder={t('project.description_ph', locale)}
+      disabled={$save.isPending}
+    />
 
     <button type="submit" hidden aria-hidden="true"></button>
   </form>
 
   {#snippet actions()}
-    <Button variant="outline" disabled={$save.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" disabled={$save.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
     <Button loading={$save.isPending} onclick={submit}>{t('blackout.save', locale)}</Button>
   {/snippet}
 </Dialog>
@@ -188,17 +186,13 @@
     .epj__form {
       display: flex;
       flex-direction: column;
-      gap: var(--space-m);
+      gap: var(--space-xs);
     }
 
     .epj__identity {
       display: flex;
       flex-direction: column;
       gap: var(--space-s);
-      padding: var(--space-s);
-      border: 1px solid var(--border-color-light);
-      border-radius: var(--radius-m);
-      background: var(--bg-light);
     }
 
     .epj__preview {
@@ -211,17 +205,6 @@
       margin: 0;
       font-size: var(--text-xs);
       color: var(--text-muted);
-    }
-
-    .epj__desc {
-      resize: vertical;
-      min-block-size: 5em;
-    }
-
-    .epj__desc-count {
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      text-align: end;
     }
   }
 </style>

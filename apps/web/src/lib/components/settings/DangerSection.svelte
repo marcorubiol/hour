@@ -17,7 +17,7 @@
         <div class="set-row__hint">{t('settings.danger_export_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
-        <button type="button" class="btn--outline btn--s">{t('settings.danger_request_export', locale)}</button>
+        <button type="button" class="btn--secondary btn--s">{t('settings.danger_request_export', locale)}</button>
       </div>
     </div>
     <div class="set-row">
@@ -26,7 +26,7 @@
         <div class="set-row__hint">{t('settings.danger_leave_all_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
-        <button type="button" class="btn--outline btn--s is-warn">{t('settings.danger_leave_all_btn', locale)}</button>
+        <button type="button" class="btn--secondary btn--s is-warn">{t('settings.danger_leave_all_btn', locale)}</button>
       </div>
     </div>
     <div class="set-row is-danger">
@@ -35,7 +35,7 @@
         <div class="set-row__hint">{t('settings.danger_delete_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
-        <button type="button" class="btn--danger btn--s">
+        <button type="button" class="btn--secondary btn--s is-warn">
           {t('settings.danger_delete_btn', locale)}
         </button>
       </div>

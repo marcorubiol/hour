@@ -112,7 +112,7 @@
     <span class="spot__n">{at + 1}/{steps.length}</span>
     {steps[at].text}
   </p>
-  <button type="button" class="btn--outline btn--s" bind:this={nextEl} onclick={next}>
+  <button type="button" class="btn--secondary btn--s" bind:this={nextEl} onclick={next}>
     {at + 1 >= steps.length ? t('help.tour_done', locale) : t('help.tour_next', locale)}
   </button>
 </div>

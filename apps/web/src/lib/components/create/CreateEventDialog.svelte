@@ -61,7 +61,7 @@
   import Checkbox from '../Checkbox.svelte';
   import Dialog from '../Dialog.svelte';
   import Input from '../Input.svelte';
-  import Pill from '../Pill.svelte';
+  import Segmented from '../Segmented.svelte';
   import Select from '../Select.svelte';
   import { addToast } from '../Toast.svelte';
   import PerformanceForm, { type CreatedPerformance } from '../PerformanceForm.svelte';
@@ -458,18 +458,12 @@
 
 <Dialog bind:open title={t('create.title', locale)} size="m">
   <div class="ced">
-    <div class="ced__types" role="group" aria-label={t('create.type_label', locale)}>
-      {#each EVENT_TYPE_KEYS as key (key)}
-        <Pill
-          size="sm"
-          active={type === key}
-          ariaPressed={type === key}
-          onclick={() => setType(key)}
-        >
-          {t(TYPE_LABEL_KEYS[key], locale)}
-        </Pill>
-      {/each}
-    </div>
+    <Segmented
+      ariaLabel={t('create.type_label', locale)}
+      options={EVENT_TYPE_KEYS.map((key) => ({ value: key, label: t(TYPE_LABEL_KEYS[key], locale) }))}
+      value={type}
+      onchange={setType}
+    />
 
     {#if type === 'performance'}
       <!-- ADR-084 §1 — una función también puede durar varios días. Cardinalidad,
@@ -543,10 +537,8 @@
           <!-- A TRIP HAS TWO ENDS (ADR-089), so the one place becomes two:
                where it leaves from, where it goes. The stages in between are
                written in the day view, under the strip. -->
-          <div class="ced__pair">
-            <Input label={t('create.trip_from', locale)} bind:value={dOrigin} autocomplete="off" />
-            <Input label={t('create.trip_to', locale)} bind:value={dCity} autocomplete="off" />
-          </div>
+          <Input label={t('create.trip_from', locale)} bind:value={dOrigin} autocomplete="off" />
+          <Input label={t('create.trip_to', locale)} bind:value={dCity} autocomplete="off" />
         {:else}
           <Input label={t('create.city', locale)} bind:value={dCity} />
         {/if}
@@ -561,22 +553,11 @@
         {/if}
 
         {#if type === 'travel_day'}
-          <div class="ced__field-group" role="group" aria-label={t('create.direction', locale)}>
-            <span class="ced__field-label">{t('create.direction', locale)}</span>
-            <div class="ced__seg">
-              {#each TRAVEL_DIRECTIONS as dir (dir)}
-                <button
-                  type="button"
-                  class="ced__seg-btn"
-                  class:ced__seg-btn--on={dDirection === dir}
-                  aria-pressed={dDirection === dir}
-                  onclick={() => (dDirection = dir)}
-                >
-                  {t(`create.direction_${dir}`, locale)}
-                </button>
-              {/each}
-            </div>
-          </div>
+          <Segmented
+            label={t('create.direction', locale)}
+            options={TRAVEL_DIRECTIONS.map((dir) => ({ value: dir, label: t(`create.direction_${dir}`, locale) }))}
+            bind:value={dDirection}
+          />
         {/if}
 
         <Checkbox label={t('create.all_day', locale)} bind:checked={dAllDay} onchange={toggleAllDay} />
@@ -603,38 +584,33 @@
             }}
           />
           {#if !dAllDay}
-            <div class="ced__times">
-              <Input label={t('create.starts', locale)} type="time" bind:value={dStartTime} />
-              <Input label={t('create.ends', locale)} type="time" bind:value={dEndTime} />
-            </div>
+            <Input label={t('create.starts', locale)} type="time" bind:value={dStartTime} />
+            <Input label={t('create.ends', locale)} type="time" bind:value={dEndTime} />
             <p class="ced__hint">{t('block.times_note', locale)} · {timeHint}</p>
           {/if}
         {:else}
-          <div class="ced__times">
-            {#if dAllDay}
-              <Input label={t('create.starts', locale)} type="date" bind:value={dDay} required />
-              <Input label={t('create.ends', locale)} type="date" bind:value={dEndDay} />
-            {:else}
-              <Input
-                label={t('create.starts', locale)}
-                type="datetime-local"
-                bind:value={dStartWall}
-                required
-              />
-              <Input label={t('create.ends', locale)} type="datetime-local" bind:value={dEndWall} />
-            {/if}
-          </div>
+          {#if dAllDay}
+            <Input label={t('create.starts', locale)} type="date" bind:value={dDay} required />
+            <Input label={t('create.ends', locale)} type="date" bind:value={dEndDay} />
+          {:else}
+            <Input
+              label={t('create.starts', locale)}
+              type="datetime-local"
+              bind:value={dStartWall}
+              required
+            />
+            <Input label={t('create.ends', locale)} type="datetime-local" bind:value={dEndWall} />
+          {/if}
           {#if !dAllDay}
             <p class="ced__hint">{timeHint}</p>
           {/if}
         {/if}
 
-        <div class="ced__option">
-          <Pill size="sm" active={dOption} ariaPressed={dOption} onclick={() => (dOption = !dOption)}>
-            {t('create.option', locale)}
-          </Pill>
-          <span class="ced__hint">{t('create.option_hint', locale)}</span>
-        </div>
+        <Checkbox
+          label={t('create.option', locale)}
+          helper={t('create.option_hint', locale)}
+          bind:checked={dOption}
+        />
 
         <!-- Hidden submit lets Enter inside an input trigger submit. -->
         <button type="submit" hidden aria-hidden="true"></button>
@@ -642,13 +618,15 @@
     {/if}
   </div>
 
-  {#snippet actions()}
+  {#snippet lead()}
     {#if showBlackoutAction}
-      <button type="button" class="ced__blackout" onclick={() => onBlackout?.()}>
+      <Button variant="quiet" onclick={() => onBlackout?.()}>
         {t('create.blackout_action', locale)}
-      </button>
+      </Button>
     {/if}
-    <Button variant="outline" onclick={() => (open = false)}>{t('create.cancel', locale)}</Button>
+  {/snippet}
+  {#snippet actions()}
+    <Button variant="quiet" onclick={() => (open = false)}>{t('create.cancel', locale)}</Button>
     <Button onclick={submit} loading={pending}>
       {type === 'performance'
         ? t('create.submit_performance', locale)
@@ -667,86 +645,15 @@
       gap: var(--space-m);
     }
 
-    .ced__types {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--space-2xs);
-    }
-
     .ced__form {
       display: flex;
       flex-direction: column;
-      gap: var(--space-s);
-    }
-
-    .ced__times,
-    .ced__pair {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
-      gap: var(--space-s);
+      gap: var(--space-xs);
     }
 
     .ced__hint {
       font-size: var(--text-xs);
       color: var(--text-faint);
-    }
-
-    .ced__option {
-      display: flex;
-      align-items: center;
-      gap: var(--space-s);
-    }
-
-    .ced__field-group {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-2xs);
-    }
-
-    .ced__field-label {
-      font-size: var(--text-s);
-      color: var(--text-color);
-    }
-
-    /* Same segmented grammar as the toolbar's projection toggle. */
-    .ced__seg {
-      display: inline-flex;
-      align-self: start;
-      border: 1px solid var(--border-color-dark);
-      border-radius: var(--radius-circle);
-      overflow: hidden;
-    }
-
-    .ced__seg-btn {
-      border: none;
-      background: none;
-      padding: var(--space-2xs) var(--space-m);
-      font-size: var(--text-s);
-      color: var(--text-muted);
-      cursor: pointer;
-      white-space: nowrap;
-      transition: background var(--transition), color var(--transition);
-    }
-
-    .ced__seg-btn--on {
-      background: var(--text-color);
-      color: var(--bg);
-    }
-
-    /* Quiet footer-left switch to the blackout form (ADR-078 §4/§5). */
-    .ced__blackout {
-      margin-inline-end: auto;
-      border: none;
-      background: none;
-      padding: 0;
-      font-size: var(--text-s);
-      color: var(--text-muted);
-      cursor: pointer;
-      transition: color var(--transition);
-    }
-
-    .ced__blackout:hover {
-      color: var(--text-color);
     }
   }
 </style>

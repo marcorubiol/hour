@@ -65,9 +65,9 @@ test.describe('performance write path', () => {
     const dialog = page.locator('dialog[open]');
     await expect(dialog).toBeVisible();
     await dialog
-      .getByRole('group', { name: 'Type' })
-      .getByRole('button', { name: 'Performance', exact: true })
-      .click();
+      .getByRole('radiogroup', { name: 'Type' })
+      .getByRole('radio', { name: 'Performance', exact: true })
+      .check();
     await dialog.getByLabel('Project').selectOption({ label: 'ZZZ e2e collab' });
     await dialog.getByLabel('Date').fill(day);
     await dialog.getByLabel('Venue').fill(venue);

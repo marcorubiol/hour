@@ -17,6 +17,7 @@
   import { dayMonthYearTs } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
+  import Field from '$lib/components/Field.svelte';
   import Badge from '$lib/components/Badge.svelte';
   import MailoutTestMode from '$lib/components/MailoutTestMode.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
@@ -213,17 +214,19 @@
                 <div class="set-row__hint">{t('mailout.domain_hint', locale)}</div>
               </div>
               <div class="set-row__ctrl">
-                <input
-                  id="md-domain"
-                  type="text"
-                  inputmode="url"
-                  autocomplete="off"
-                  spellcheck="false"
-                  maxlength="253"
-                  placeholder="mamemi.cat"
-                  bind:value={domainInput}
-                  disabled={$add.isPending || !data?.configured}
-                />
+                <Field id="md-domain">
+                  <input
+                    id="md-domain"
+                    type="text"
+                    inputmode="url"
+                    autocomplete="off"
+                    spellcheck="false"
+                    maxlength="253"
+                    placeholder="mamemi.cat"
+                    bind:value={domainInput}
+                    disabled={$add.isPending || !data?.configured}
+                  />
+                </Field>
               </div>
             </div>
             <div class="set-row">
@@ -232,28 +235,32 @@
                 <div class="set-row__hint">{t('mailout.sender_hint', locale)}</div>
               </div>
               <div class="set-row__ctrl"><div class="md-sender">
-                <input
-                  id="md-name"
-                  type="text"
-                  maxlength="100"
-                  aria-label={t('mailout.sender_name', locale)}
-                  placeholder={t('mailout.sender_name', locale)}
-                  value={nameShown}
-                  oninput={(e) => (nameInput = e.currentTarget.value)}
-                  disabled={$add.isPending || !data?.configured}
-                />
-                <span class="md-addr">
+                <Field id="md-name">
                   <input
-                    id="md-local"
+                    id="md-name"
                     type="text"
-                    maxlength="64"
-                    autocomplete="off"
-                    spellcheck="false"
-                    bind:value={localInput}
+                    maxlength="100"
+                    aria-label={t('mailout.sender_name', locale)}
+                    placeholder={t('mailout.sender_name', locale)}
+                    value={nameShown}
+                    oninput={(e) => (nameInput = e.currentTarget.value)}
                     disabled={$add.isPending || !data?.configured}
                   />
-                  <span class="md-at">@{domainInput.trim().toLowerCase() || t('mailout.your_domain', locale)}</span>
-                </span>
+                </Field>
+                <div class="md-addr">
+                  <Field id="md-local">
+                    <input
+                      id="md-local"
+                      type="text"
+                      maxlength="64"
+                      autocomplete="off"
+                      spellcheck="false"
+                      bind:value={localInput}
+                      disabled={$add.isPending || !data?.configured}
+                    />
+                    {#snippet suffix()}@{domainInput.trim().toLowerCase() || t('mailout.your_domain', locale)}{/snippet}
+                  </Field>
+                </div>
               </div></div>
             </div>
             <div class="md-actions">
@@ -290,27 +297,33 @@
     </div>
     <div class="set-row__ctrl"><div class="md-sender">
       {#if canManage}
-        <input
-          type="text"
-          maxlength="100"
-          aria-label={t('mailout.sender_name', locale)}
-          value={draftOf(d).name}
-          oninput={(e) => editDraft(d, { name: e.currentTarget.value })}
-        />
-        <span class="md-addr">
+        <Field id={`md-name-${d.id}`}>
           <input
+            id={`md-name-${d.id}`}
             type="text"
-            maxlength="64"
-            aria-label={t('mailout.sender_label', locale)}
-            autocomplete="off"
-            spellcheck="false"
-            value={draftOf(d).local}
-            oninput={(e) => editDraft(d, { local: e.currentTarget.value })}
+            maxlength="100"
+            aria-label={t('mailout.sender_name', locale)}
+            value={draftOf(d).name}
+            oninput={(e) => editDraft(d, { name: e.currentTarget.value })}
           />
-          <span class="md-at">@{d.domain}</span>
-        </span>
+        </Field>
+        <div class="md-addr">
+          <Field id={`md-local-${d.id}`}>
+            <input
+              id={`md-local-${d.id}`}
+              type="text"
+              maxlength="64"
+              aria-label={t('mailout.sender_label', locale)}
+              autocomplete="off"
+              spellcheck="false"
+              value={draftOf(d).local}
+              oninput={(e) => editDraft(d, { local: e.currentTarget.value })}
+            />
+            {#snippet suffix()}@{d.domain}{/snippet}
+          </Field>
+        </div>
         {#if senderDirty(d)}
-          <Button size="s" variant="outline" disabled={$saveSender.isPending} onclick={() => $saveSender.mutate(d)}>
+          <Button size="s" variant="secondary" disabled={$saveSender.isPending} onclick={() => $saveSender.mutate(d)}>
             {t('mailout.save', locale)}
           </Button>
         {/if}
@@ -362,7 +375,7 @@
           {t('mailout.check', locale)}
         </Button>
       {/if}
-      <Button size="s" variant="outline" tone="warn" disabled={$remove.isPending} onclick={() => $remove.mutate(d.id)}>
+      <Button size="s" variant="secondary" tone="warn" disabled={$remove.isPending} onclick={() => $remove.mutate(d.id)}>
         {t('mailout.remove', locale)}
       </Button>
     </div>
@@ -401,29 +414,8 @@
       gap: var(--space-xs);
       inline-size: 100%;
     }
-    .md-sender > :global(*) {
+    .md-sender > :global(button) {
       align-self: flex-start;
-    }
-    .md-sender > input {
-      align-self: stretch;
-    }
-    .md-sender input {
-      inline-size: 100%;
-    }
-    .md-addr {
-      display: flex;
-      align-items: center;
-      gap: var(--space-2xs);
-      min-inline-size: 0;
-    }
-    .md-addr input {
-      flex: 0 1 12ch;
-      min-inline-size: 6ch;
-    }
-    .md-at {
-      color: var(--text-muted);
-      font-size: var(--text-s);
-      overflow-wrap: anywhere;
     }
     .md-ro {
       font-size: var(--text-s);

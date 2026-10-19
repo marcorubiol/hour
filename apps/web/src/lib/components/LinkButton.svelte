@@ -1,8 +1,8 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
 
-  type Variant = 'primary' | 'outline';
-  type Size = 'xs' | 's' | 'm' | 'l';
+  type Variant = 'primary' | 'secondary' | 'quiet';
+  type Size = 'xs' | 's';
 
   interface Props {
     variant?: Variant;
@@ -18,7 +18,7 @@
 
   let {
     variant = 'primary',
-    size = 'm',
+    size = 's',
     href,
     target,
     rel,

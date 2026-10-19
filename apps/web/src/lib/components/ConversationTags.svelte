@@ -87,7 +87,7 @@
       {/each}
     </fieldset>
     <div class="conv-tags-block__acts">
-      <Button size="xs" variant="outline" onclick={() => (editing = false)}>{t('create.cancel', locale)}</Button>
+      <Button size="xs" variant="quiet" onclick={() => (editing = false)}>{t('create.cancel', locale)}</Button>
       <Button size="xs" loading={$save.isPending} onclick={done}>{t('conversations.tags_done', locale)}</Button>
     </div>
   {:else}

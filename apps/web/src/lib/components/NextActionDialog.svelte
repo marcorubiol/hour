@@ -5,6 +5,7 @@
    * `onsave`; the caller owns the write.
    */
   import Button from '$lib/components/Button.svelte';
+  import Textarea from './Textarea.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
   import { t, type Locale } from '$lib/i18n';
@@ -42,18 +43,16 @@
 <Dialog bind:open title={t('conversations.col_next_action', locale)} size="s" {onclose}>
   <p class="next-action-who">{who}</p>
   <Input label={t('perf.date', locale)} type="date" bind:value={formDate} />
-  <div class="field">
-    <label for="next-action-note">{t('blackout.note', locale)}</label>
-    <textarea
-      id="next-action-note"
-      rows="3"
-      maxlength="500"
-      bind:value={formNote}
-      placeholder={t('conversations.next_move_ph', locale)}
-    ></textarea>
-  </div>
+  <Textarea
+    id="next-action-note"
+    label={t('blackout.note', locale)}
+    rows={3}
+    maxlength={500}
+    bind:value={formNote}
+    placeholder={t('conversations.next_move_ph', locale)}
+  />
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (open = false)}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" onclick={() => (open = false)}>{t('create.cancel', locale)}</Button>
     <Button onclick={save}>{t('blackout.save', locale)}</Button>
   {/snippet}
 </Dialog>

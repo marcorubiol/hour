@@ -200,62 +200,15 @@
   .set-page :global(.set-row.is-danger .set-row__label) {
     color: var(--danger);
   }
-
-  .set-page :global(.set-seg) {
-    display: inline-flex;
-    background: var(--bg-light);
-    border: 1px solid var(--border-color-light);
-    border-radius: var(--radius);
-    padding: 2px;
+  /* A value in a settings row is a field row without its own label
+     (ADR-139 p4); one that cannot be edited here is plain text. */
+  .set-page :global(.set-row__ctrl > .field) {
+    flex: 1 1 12rem;
   }
-  .set-page :global(.set-seg button) {
-    appearance: none;
-    background: transparent;
-    border: 0;
-    font: inherit;
-    font-size: var(--text-xs);
-    color: var(--text-muted);
+  .set-page :global(.set-row__value) {
     padding-block: var(--space-xs);
-    padding-inline: var(--space-s);
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background var(--transition), color var(--transition);
-  }
-  .set-page :global(.set-seg button:hover) {
-    color: var(--text-color);
-  }
-  .set-page :global(.set-seg button.is-on) {
-    background: var(--bg-ultra-light);
-    color: var(--text-color);
-    font-weight: 500;
-    box-shadow: var(--box-shadow-1);
-  }
-
-  .set-page :global(.set-toggle) {
-    appearance: none;
-    border: 0;
-    background: var(--border-color-dark);
-    inline-size: 36px;
-    block-size: 20px;
-    border-radius: var(--radius-circle);
-    padding: 2px;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    transition: background var(--transition);
-  }
-  .set-page :global(.set-toggle__dot) {
-    inline-size: 16px;
-    block-size: 16px;
-    border-radius: 50%;
-    background: var(--bg-ultra-light);
-    box-shadow: var(--box-shadow-1);
-    transition: transform var(--transition);
-  }
-  .set-page :global(.set-toggle.is-on) {
-    background: var(--text-color);
-  }
-  .set-page :global(.set-toggle.is-on .set-toggle__dot) {
-    transform: translateX(16px);
+    font-size: var(--text-s);
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
   }
 </style>

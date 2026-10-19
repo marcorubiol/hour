@@ -697,7 +697,7 @@
         <!-- One child, so the sub line's «·» separators stay out of it. -->
         <span class="desk__subrow">
           <span class="desk__date eyebrow eyebrow--sub">{dateWords} · <time datetime={clockTime}>{clockTime}</time></span>
-          <button type="button" class="desk__add btn--outline btn--s" bind:this={addBtn} aria-expanded={composerOpen} onclick={openComposer}
+          <button type="button" class="desk__add btn--secondary btn--s" bind:this={addBtn} aria-expanded={composerOpen} onclick={openComposer}
             >{t('desk.add_task', locale)}</button
           >
         </span>

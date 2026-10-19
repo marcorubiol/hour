@@ -20,6 +20,7 @@
   import Button from '../Button.svelte';
   import Dialog from '../Dialog.svelte';
   import Input from '../Input.svelte';
+  import Segmented from '../Segmented.svelte';
   import Select from '../Select.svelte';
   import { addToast } from '../Toast.svelte';
   import { dayKeyInTz } from '$lib/planner';
@@ -195,26 +196,13 @@
       bind:value={bPerson}
       helper={t('blackout.person_hint', locale)}
     />
-    <div class="cbk__range">
-      <Input label={t('blackout.from', locale)} type="date" bind:value={bFrom} required />
-      <Input label={t('blackout.to', locale)} type="date" bind:value={bTo} required />
-    </div>
-    <div class="cbk__field-group" role="group" aria-label={t('blackout.certainty', locale)}>
-      <span class="cbk__field-label">{t('blackout.certainty', locale)}</span>
-      <div class="cbk__seg">
-        {#each AVAILABILITY_CERTAINTIES as certainty (certainty)}
-          <button
-            type="button"
-            class="cbk__seg-btn"
-            class:cbk__seg-btn--on={bCertainty === certainty}
-            aria-pressed={bCertainty === certainty}
-            onclick={() => (bCertainty = certainty)}
-          >
-            {t(`blackout.certainty_${certainty}`, locale)}
-          </button>
-        {/each}
-      </div>
-    </div>
+    <Input label={t('blackout.from', locale)} type="date" bind:value={bFrom} required />
+    <Input label={t('blackout.to', locale)} type="date" bind:value={bTo} required />
+    <Segmented
+      label={t('blackout.certainty', locale)}
+      options={AVAILABILITY_CERTAINTIES.map((c) => ({ value: c, label: t(`blackout.certainty_${c}`, locale) }))}
+      bind:value={bCertainty}
+    />
     <Input
       label={t('blackout.note', locale)}
       bind:value={bNote}
@@ -224,7 +212,7 @@
     <button type="submit" hidden aria-hidden="true"></button>
   </form>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (open = false)}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" onclick={() => (open = false)}>{t('create.cancel', locale)}</Button>
     <Button onclick={submit} loading={$createBlock.isPending}>{t('blackout.save', locale)}</Button>
   {/snippet}
 </Dialog>
@@ -234,48 +222,7 @@
     .cbk__form {
       display: flex;
       flex-direction: column;
-      gap: var(--space-s);
-    }
-
-    .cbk__range {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
-      gap: var(--space-s);
-    }
-
-    .cbk__field-group {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-2xs);
-    }
-
-    .cbk__field-label {
-      font-size: var(--text-s);
-      color: var(--text-color);
-    }
-
-    .cbk__seg {
-      display: inline-flex;
-      align-self: start;
-      border: 1px solid var(--border-color-dark);
-      border-radius: var(--radius-circle);
-      overflow: hidden;
-    }
-
-    .cbk__seg-btn {
-      border: none;
-      background: none;
-      padding: var(--space-2xs) var(--space-m);
-      font-size: var(--text-s);
-      color: var(--text-muted);
-      cursor: pointer;
-      white-space: nowrap;
-      transition: background var(--transition), color var(--transition);
-    }
-
-    .cbk__seg-btn--on {
-      background: var(--text-color);
-      color: var(--bg);
+      gap: var(--space-xs);
     }
   }
 </style>

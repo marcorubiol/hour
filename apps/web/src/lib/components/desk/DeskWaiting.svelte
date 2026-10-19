@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Checkbox from '../Checkbox.svelte';
   /**
    * «TE ESPERA» — band 2 of the Desk (ADR-117). The short list by weight
    * (`rankWaiting`): at most seven rows, each a verb and its action. «Ver
@@ -113,9 +114,7 @@
 </script>
 
 {#snippet task(item: DeskItem)}
-  <input
-    type="checkbox"
-    class="row__check"
+  <Checkbox
     id="desk-task-{item.taskId}"
     checked={item.taskDone}
     onchange={(e) => item.taskId && ontoggle(item.taskId, (e.currentTarget as HTMLInputElement).checked)}
@@ -131,9 +130,9 @@
       >
       <span class="row__when">{whenOf(item)}</span>
       <span class="row__acts">
-        <button type="button" class="row__act btn--outline btn--xs" onclick={() => item.taskId && onaccept(item.taskId)}
+        <button type="button" class="row__act btn--secondary btn--xs" onclick={() => item.taskId && onaccept(item.taskId)}
           >{t('desk.proposal_add', locale)}</button
-        ><button type="button" class="row__act row__act--quiet btn--outline btn--xs" onclick={() => item.taskId && onremove(item.taskId)}
+        ><button type="button" class="row__act row__act--quiet btn--secondary btn--xs" onclick={() => item.taskId && onremove(item.taskId)}
           >{t('desk.proposal_dismiss', locale)}</button
         >
       </span>
@@ -163,12 +162,12 @@
           {@const g = item.going}
           <button
             type="button"
-            class="row__act btn--outline btn--xs"
+            class="row__act btn--secondary btn--xs"
             aria-label={t('desk.going_aria', locale, { subject: item.subject })}
             onclick={() => onanswer(g, 'going')}>{t('pulse.going', locale)}</button
           ><button
             type="button"
-            class="row__act row__act--quiet btn--outline btn--xs"
+            class="row__act row__act--quiet btn--secondary btn--xs"
             aria-label={t('desk.not_going_aria', locale, { subject: item.subject })}
             onclick={() => onanswer(g, 'not_going')}
             >{t('pulse.not_going', locale)}</button
@@ -225,7 +224,7 @@
         </li>{/each}
     </ul>
   {:else if errored}
-    <p class="load-fail" role="alert"><span>{t('desk.error', locale)}</span><Button size="xs" variant="outline" onclick={onretry}>{t('ui.retry', locale)}</Button></p>
+    <p class="load-fail" role="alert"><span>{t('desk.error', locale)}</span><Button size="xs" variant="secondary" onclick={onretry}>{t('ui.retry', locale)}</Button></p>
   {:else if all}
     <div class="timeline">
       {#each feed as bucket (bucket.sortKey)}
@@ -324,15 +323,6 @@
   .row--ai .row__subject {
     font-style: italic;
   }
-  .row__check {
-    inline-size: 0.95rem;
-    block-size: 0.95rem;
-    margin: 0;
-    /* A checkbox's baseline is its bottom edge: down to the subject's line. */
-    translate: 0 0.15em;
-    accent-color: var(--primary);
-    cursor: pointer;
-  }
   .row__subject {
     display: flex;
     flex-direction: column;
@@ -404,10 +394,6 @@
   /* A finger's room without moving a pixel: the hit area grows, the line
      does not (subject links, the box, the band's own buttons). */
   @media (pointer: coarse) {
-    .row__check {
-      inline-size: 1.25rem;
-      block-size: 1.25rem;
-    }
     .row__subject :is(a, label) {
       padding-block: var(--space-xs);
       margin-block: calc(-1 * var(--space-xs));

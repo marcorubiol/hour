@@ -19,6 +19,7 @@
   import { retryLoad } from '$lib/load-fail';
   import RecordState from '$lib/components/RecordState.svelte';
   import Button from '$lib/components/Button.svelte';
+  import Select from '$lib/components/Select.svelte';
   import { copyText } from '$lib/clipboard';
   import Pill from '$lib/components/Pill.svelte';
   import RoadsheetView from '$lib/components/RoadsheetView.svelte';
@@ -191,12 +192,12 @@
               <span class="rs__share-role">{roleWord(s.role)}</span>
               <span class="rs__share-date">{dayMonthYearTs(s.created_at)}</span>
               <span class="rs__share-actions">
-                <Button size="s" variant="outline" onclick={() => copyShare(s.token)}>
+                <Button size="s" variant="secondary" onclick={() => copyShare(s.token)}>
                   {t('roadsheet.copy_link', locale)}
                 </Button>
                 <Button
                   size="s"
-                  variant="outline"
+                  variant="secondary"
                   tone="warn"
                   loading={$revokeShare.isPending}
                   onclick={() => $revokeShare.mutate(s.id)}
@@ -209,14 +210,13 @@
         </ul>
       {/if}
       <div class="rs__share-create">
-        <label class="rs__share-pick">
-          <span class="eyebrow eyebrow--sub">{t('roadsheet.role', locale)}</span>
-          <select bind:value={shareRole}>
+        <div class="rs__share-pick">
+          <Select id="rs-share-role" label={t('roadsheet.role', locale)} bind:value={shareRole}>
             {#each PUBLIC_ROLES as r (r)}
               <option value={r}>{roleWord(r)}</option>
             {/each}
-          </select>
-        </label>
+          </Select>
+        </div>
         <Button size="s" loading={$createShare.isPending} onclick={() => $createShare.mutate()}>
           {t('roadsheet.create_link', locale)}
         </Button>
@@ -290,9 +290,7 @@
     }
 
     .rs__share-pick {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-2xs);
+      flex: 1 1 16rem;
     }
 
     /* Print: drop the operator chrome, keep the document. The width cap is

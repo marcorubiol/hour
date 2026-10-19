@@ -130,7 +130,7 @@
     {:else if !errored}
       <p class="dband__empty">{quietLabel}</p>
     {/if}
-    {#if errored}<p class="load-fail" role="alert"><span>{t('desk.changed_error', locale)}</span><Button size="xs" variant="outline" onclick={onretry}>{t('ui.retry', locale)}</Button></p>{/if}
+    {#if errored}<p class="load-fail" role="alert"><span>{t('desk.changed_error', locale)}</span><Button size="xs" variant="secondary" onclick={onretry}>{t('ui.retry', locale)}</Button></p>{/if}
   {/if}
 </section>
 

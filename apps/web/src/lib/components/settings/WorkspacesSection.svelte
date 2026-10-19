@@ -12,6 +12,9 @@
   import { session } from '$lib/session.svelte';
   import { t, appLocale } from '$lib/i18n';
   import MailSignature from './MailSignature.svelte';
+  import Button from '$lib/components/Button.svelte';
+  import Input from '$lib/components/Input.svelte';
+  import Select from '$lib/components/Select.svelte';
 
   const locale = appLocale();
 
@@ -286,8 +289,8 @@
             <span>{t(projectCount === 1 ? 'settings.ws_projects_one' : 'settings.ws_projects_other', locale, { n: projectCount })}</span>
           </div>
           <div class="set-ws__actions">
-            <button type="button" class="btn--outline btn--s">{t('settings.ws_edit_role', locale)}</button>
-            <button type="button" class="btn--outline btn--s is-warn">{t('settings.ws_leave', locale)}</button>
+            <button type="button" class="btn--secondary btn--s">{t('settings.ws_edit_role', locale)}</button>
+            <button type="button" class="btn--secondary btn--s is-warn">{t('settings.ws_leave', locale)}</button>
           </div>
         </div>
       {/each}
@@ -309,57 +312,40 @@
     </div>
 
     <div class="set-access__invite">
-      <label>
-        <span class="eyebrow">{t('settings.email', locale)}</span>
-        <input type="email" placeholder="collaborator@example.com" bind:value={inviteEmail} />
-      </label>
-      <label>
-        <span class="eyebrow">{t('settings.access_ws_role', locale)}</span>
-        <select bind:value={inviteRole}>
-          <option value="guest">{t('settings.access_opt_guest', locale)}</option>
-          <option value="viewer">{t('settings.access_opt_viewer', locale)}</option>
-          <option value="member">{t('settings.access_opt_member', locale)}</option>
-          <option value="admin">{t('settings.access_opt_admin', locale)}</option>
-        </select>
-      </label>
-      <label>
-        <span class="eyebrow">{t('settings.access_project', locale)}</span>
-        <select bind:value={inviteProjectId}>
-          <option value="">{t('settings.access_no_project', locale)}</option>
-          {#each currentProjects as project (project.id)}
-            <option value={project.id}>{project.name}</option>
-          {/each}
-        </select>
-      </label>
-      <label>
-        <span class="eyebrow">{t('settings.access_project_role', locale)}</span>
-        <select bind:value={inviteProjectRole} disabled={!inviteProjectId}>
-          <option value="performer">{t('settings.prole_performer', locale)}</option>
-          <option value="viewer">{t('settings.prole_viewer', locale)}</option>
-          <option value="director">{t('settings.prole_director', locale)}</option>
-          <option value="production_manager">{t('settings.prole_production_manager', locale)}</option>
-          <option value="distribution">{t('settings.prole_distribution', locale)}</option>
-        </select>
-      </label>
-      <label>
-        <span class="eyebrow">{t('settings.access_project_preset', locale)}</span>
-        <select bind:value={inviteProjectPreset} disabled={!inviteProjectId}>
-          <option value="minim">{t('preset.minim', locale)}</option>
-          <option value="equip">{t('preset.equip', locale)}</option>
-          <option value="coordinacio">{t('preset.coordinacio', locale)}</option>
-          <option value="direccio">{t('preset.direccio', locale)}</option>
-        </select>
-      </label>
-      <button
-        type="button"
-        class="btn--primary set-access__invite-button"
+      <Input id="invite-email" label={t('settings.email', locale)} type="email" placeholder="collaborator@example.com" bind:value={inviteEmail} />
+      <Select id="invite-role" label={t('settings.access_ws_role', locale)} bind:value={inviteRole}>
+        <option value="guest">{t('settings.access_opt_guest', locale)}</option>
+        <option value="viewer">{t('settings.access_opt_viewer', locale)}</option>
+        <option value="member">{t('settings.access_opt_member', locale)}</option>
+        <option value="admin">{t('settings.access_opt_admin', locale)}</option>
+      </Select>
+      <Select id="invite-project" label={t('settings.access_project', locale)} bind:value={inviteProjectId}>
+        <option value="">{t('settings.access_no_project', locale)}</option>
+        {#each currentProjects as project (project.id)}
+          <option value={project.id}>{project.name}</option>
+        {/each}
+      </Select>
+      <Select id="invite-project-role" label={t('settings.access_project_role', locale)} bind:value={inviteProjectRole} disabled={!inviteProjectId}>
+        <option value="performer">{t('settings.prole_performer', locale)}</option>
+        <option value="viewer">{t('settings.prole_viewer', locale)}</option>
+        <option value="director">{t('settings.prole_director', locale)}</option>
+        <option value="production_manager">{t('settings.prole_production_manager', locale)}</option>
+        <option value="distribution">{t('settings.prole_distribution', locale)}</option>
+      </Select>
+      <Select id="invite-project-preset" label={t('settings.access_project_preset', locale)} bind:value={inviteProjectPreset} disabled={!inviteProjectId}>
+        <option value="minim">{t('preset.minim', locale)}</option>
+        <option value="equip">{t('preset.equip', locale)}</option>
+        <option value="coordinacio">{t('preset.coordinacio', locale)}</option>
+        <option value="direccio">{t('preset.direccio', locale)}</option>
+      </Select>
+      <Button
         disabled={!inviteEmail || $inviteMember.isPending}
         onclick={() => $inviteMember.mutate()}
       >
         {$inviteMember.isPending
           ? t('settings.access_creating', locale)
           : t('settings.access_create_link', locale)}
-      </button>
+      </Button>
     </div>
 
     {#if latestInviteUrl}
@@ -368,7 +354,7 @@
           <span class="eyebrow">{t('settings.access_ready', locale)}</span>
           <p>{t('settings.access_link_expiry', locale)}</p>
         </div>
-        <button type="button" class="btn--outline btn--s" onclick={copyInviteLink}>
+        <button type="button" class="btn--secondary btn--s" onclick={copyInviteLink}>
           {t('settings.access_copy_link', locale)}
         </button>
       </div>
@@ -385,25 +371,26 @@
           {#if member.role === 'owner'}
             <span class="set-access__role">{roleLabel('owner')}</span>
           {:else}
-            <label class="set-access__role-select">
-              <span class="sr-only">{t('settings.access_role_for', locale, { name: member.display_name })}</span>
-              <select
+            <div class="set-access__role-select">
+              <Select
+                id={`member-role-${member.id}`}
+                ariaLabel={t('settings.access_role_for', locale, { name: member.display_name })}
                 value={member.role}
                 onchange={(event) =>
-                  changeMemberRole(member.id, event.currentTarget.value)}
+                  changeMemberRole(member.id, (event.currentTarget as HTMLSelectElement).value)}
               >
                 <option value="admin">{roleLabel('admin')}</option>
                 <option value="member">{roleLabel('member')}</option>
                 <option value="viewer">{roleLabel('viewer')}</option>
                 <option value="guest">{roleLabel('guest')}</option>
-              </select>
-            </label>
+              </Select>
+            </div>
           {/if}
           <span class="set-access__status">{t('settings.access_status_active', locale)}</span>
           {#if member.role !== 'owner'}
             <button
               type="button"
-              class="btn--outline btn--s is-warn"
+              class="btn--secondary btn--s is-warn"
               onclick={() => revokeAccess(member)}
             >{t('settings.access_revoke', locale)}</button>
           {/if}
@@ -425,7 +412,7 @@
           <span class="set-access__status">{t('settings.access_status_pending', locale)}</span>
           <button
             type="button"
-            class="btn--outline btn--s is-warn"
+            class="btn--secondary btn--s is-warn"
             onclick={() => revokeAccess(invitation)}
           >{t('create.cancel', locale)}</button>
         </div>
@@ -458,7 +445,7 @@
               <div class="set-alias__actions">
                 <button
                   type="button"
-                  class="btn--outline btn--s"
+                  class="btn--secondary btn--s"
                   disabled={$reviewAlias.isPending}
                   onclick={() => $reviewAlias.mutate({ id: r.id, approve: true })}
                 >
@@ -466,7 +453,7 @@
                 </button>
                 <button
                   type="button"
-                  class="btn--outline btn--s is-warn"
+                  class="btn--secondary btn--s is-warn"
                   disabled={$reviewAlias.isPending}
                   onclick={() => $reviewAlias.mutate({ id: r.id, approve: false })}
                 >
@@ -682,23 +669,17 @@
     letter-spacing: 0.08em;
     color: var(--text-faint);
   }
-  /* Wraps by its own width, not the viewport's: it lives in a settings pane
-     whose width the rail and the nav decide. */
+  /* Field rows, the verb under them (ADR-139 p4). */
   .set-access__invite {
     display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-s);
-    align-items: end;
+    flex-direction: column;
     padding: var(--space-m);
     border-block-end: 1px solid var(--border-color-light);
   }
-  .set-access__invite label {
-    display: grid;
-    gap: var(--space-xs);
-    flex: 1 1 9rem;
+  .set-access__invite > :global(button) {
+    align-self: flex-end;
+    margin-block-start: var(--space-s);
   }
-  .set-access__invite label:first-child { flex: 1.4 1 14rem; }
-  .set-access__invite-button { white-space: nowrap; }
   .set-access__link {
     display: flex;
     align-items: center;
@@ -750,7 +731,7 @@
     color: var(--text-faint);
     font-size: var(--text-xs);
   }
-  .set-access__role-select select { min-inline-size: 8rem; }
+  .set-access__role-select { min-inline-size: 8rem; }
 
   /* On a phone a space's row reads down instead of across: the name, its
      counts under it, then the two buttons, all beside the one colour rail

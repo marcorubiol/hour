@@ -137,7 +137,7 @@
         </div>
         <p class="org-fiscal__hint">{t('fiscal.hint', locale)}</p>
         <div class="org-fiscal__actions">
-          <Button size="xs" variant="outline" onclick={() => (editing = false)}>{t('create.cancel', locale)}</Button>
+          <Button size="xs" variant="quiet" onclick={() => (editing = false)}>{t('create.cancel', locale)}</Button>
           <Button size="xs" type="submit" loading={$save.isPending}>{t('fiscal.save', locale)}</Button>
         </div>
       </form>
@@ -164,15 +164,13 @@
     .org-fiscal__actions {
       justify-content: flex-end;
     }
+    /* Field rows, one under the other (ADR-139 p4). */
     .org-fiscal__form {
       display: flex;
       flex-direction: column;
-      gap: var(--space-s);
     }
     .org-fiscal__row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-s);
+      display: contents;
     }
     .org-fiscal__summary {
       font-size: var(--text-s);

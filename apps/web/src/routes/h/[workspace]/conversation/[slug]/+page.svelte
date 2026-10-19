@@ -39,6 +39,10 @@
   import { dayMonth, dayMonthYear, dayMonthYearTs } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
+  import Field from '$lib/components/Field.svelte';
+  import Input from '$lib/components/Input.svelte';
+  import Select from '$lib/components/Select.svelte';
+  import Textarea from '$lib/components/Textarea.svelte';
   import ConversationHistory from '$lib/components/ConversationHistory.svelte';
   import ConversationStatusMenu from '$lib/components/ConversationStatusMenu.svelte';
   import NextActionDialog from '$lib/components/NextActionDialog.svelte';
@@ -357,7 +361,7 @@
       <div class="conv__main">
         {#if reading === 'registro'}
           <BlockHead title={t('mail.outside', locale)} count={events.length} concept="outside">
-            <Button size="xs" variant="outline" disabled={!sendable.length || !recipient?.email} onclick={() => startCompose(null)}>
+            <Button size="xs" variant="secondary" disabled={!sendable.length || !recipient?.email} onclick={() => startCompose(null)}>
               {t('mail.write', locale)}
             </Button>
           </BlockHead>
@@ -381,7 +385,7 @@
           </details>
         {:else}
           <BlockHead title={t('mail.thread', locale)} count={events.length}>
-            <Button size="xs" variant="outline" disabled={!sendable.length || !recipient?.email} onclick={() => startCompose(null)}>
+            <Button size="xs" variant="secondary" disabled={!sendable.length || !recipient?.email} onclick={() => startCompose(null)}>
               {t('mail.write', locale)}
             </Button>
           </BlockHead>
@@ -617,7 +621,7 @@
             {#if e.body}<p class="mail__text">{e.body}</p>{/if}
             {#if composing !== e.id}
               <div class="mail__actions">
-                <Button size="xs" variant="outline" disabled={!sendable.length || !recipient?.email} onclick={() => startCompose(e)}>
+                <Button size="xs" variant="secondary" disabled={!sendable.length || !recipient?.email} onclick={() => startCompose(e)}>
                   {t('mail.reply', locale)}
                 </Button>
               </div>
@@ -646,7 +650,7 @@
     {#if e.body}<p class="card__text">{e.body}</p>{/if}
     {#if e.kind === 'email' && e.source === 'email' && composing !== e.id}
       <div class="mail__actions">
-        <Button size="xs" variant="outline" disabled={!sendable.length || !recipient?.email} onclick={() => startCompose(e)}>
+        <Button size="xs" variant="secondary" disabled={!sendable.length || !recipient?.email} onclick={() => startCompose(e)}>
           {t('mail.reply', locale)}
         </Button>
       </div>
@@ -664,27 +668,23 @@
       if (fromAccount && subject.trim() && body.trim()) $send.mutate();
     }}
   >
-    <label class="reply__field">
-      <span>{t('mail.from', locale)}</span>
-      <select bind:value={fromAccount}>
-        {#each sendable as a (a.id)}
-          <option value={a.id}>{accountLabel(a.id)}</option>
-        {/each}
-      </select>
-    </label>
-    <p class="reply__field"><span>{t('mail.to', locale)}</span> {recipient?.full_name} &lt;{recipient?.email}&gt;</p>
-    <label class="reply__field">
-      <span>{t('mail.subject', locale)}</span>
-      <input type="text" maxlength="500" bind:value={subject} required />
-    </label>
-    <textarea rows="5" maxlength="20000" aria-label={t('mail.body', locale)} bind:value={body} required></textarea>
+    <Select id="reply-from" label={t('mail.from', locale)} bind:value={fromAccount}>
+      {#each sendable as a (a.id)}
+        <option value={a.id}>{accountLabel(a.id)}</option>
+      {/each}
+    </Select>
+    <Field id="reply-to" label={t('mail.to', locale)} group>
+      <span class="reply__to">{recipient?.full_name} &lt;{recipient?.email}&gt;</span>
+    </Field>
+    <Input id="reply-subject" label={t('mail.subject', locale)} bind:value={subject} required />
+    <Textarea id="reply-body" rows={5} maxlength={20000} ariaLabel={t('mail.body', locale)} bind:value={body} required />
     {#if fromSignature}
       <p class="reply__sig">-- <br />{fromSignature}</p>
     {/if}
     <div class="reply__row">
       <span class="muted">{t('mail.send_hint', locale, { address: sendable.find((a) => a.id === fromAccount)?.address ?? '' })}</span>
       <span class="reply__btns">
-        <Button size="xs" variant="outline" onclick={() => (composing = null)}>{t('mail.discard', locale)}</Button>
+        <Button size="xs" variant="quiet" onclick={() => (composing = null)}>{t('mail.discard', locale)}</Button>
         <Button size="xs" type="submit" disabled={$send.isPending || !fromAccount || !subject.trim() || !body.trim()}>
           {t('mail.send', locale)}
         </Button>
@@ -835,11 +835,6 @@
     .mail {
       margin-block-start: var(--space-xs);
     }
-    .reply__field > span {
-      display: inline-block;
-      min-inline-size: 3.5rem;
-      color: var(--text-faint);
-    }
     .mail__text {
       margin: var(--space-s) 0 0;
       font-size: var(--text-s);
@@ -868,36 +863,10 @@
       padding-block-start: var(--space-s);
       border-block-start: 1px solid var(--border-color-light);
     }
-    .reply__field {
-      display: flex;
-      align-items: center;
-      gap: var(--space-xs);
-      margin: 0;
-      color: var(--text-muted);
-      font-size: var(--text-xs);
-      overflow-wrap: anywhere;
-    }
-    .reply__field select,
-    .reply__field input {
-      flex: 1;
-      min-inline-size: 0;
-      padding: var(--space-2xs) var(--space-xs);
-      color: var(--text-color);
-      background: var(--bg-light);
-      border: 1px solid var(--border-color-dark);
-      border-radius: var(--radius-s);
-      font: inherit;
-    }
-    .reply textarea {
-      inline-size: 100%;
-      padding: var(--space-xs) var(--space-s);
-      color: var(--text-color);
-      background: var(--bg-ultra-light);
-      border: 1px solid var(--border-color-dark);
-      border-radius: var(--radius-s);
-      font: inherit;
+    .reply__to {
       font-size: var(--text-s);
-      resize: vertical;
+      color: var(--text-muted);
+      overflow-wrap: anywhere;
     }
     .reply__sig {
       margin: 0;

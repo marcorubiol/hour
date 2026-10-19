@@ -3439,7 +3439,7 @@
          The server's text is not copy: the detail stays in Sentry. -->
     <p class="load-fail cal__fail" role="alert">
       <span>{t('planner.load_error', locale)}</span>
-      <Button variant="outline" size="xs" onclick={retryFailed}>{t('ui.retry', locale)}</Button>
+      <Button variant="secondary" size="xs" onclick={retryFailed}>{t('ui.retry', locale)}</Button>
     </p>
   {:else if view === 'overview'}
     <SeasonOverview

@@ -137,7 +137,7 @@
   </BlockHead>
 
   {#if errored}
-    <p class="load-fail" role="alert"><span>{t('desk.next_error', locale)}</span><Button size="xs" variant="outline" onclick={onretry}>{t('ui.retry', locale)}</Button></p>
+    <p class="load-fail" role="alert"><span>{t('desk.next_error', locale)}</span><Button size="xs" variant="secondary" onclick={onretry}>{t('ui.retry', locale)}</Button></p>
   {:else if !settled}
     <!-- The wait holds the lines a card usually draws (eyebrow, the slip's
          head, its name, the running order, the foot) and the line under it,
@@ -195,12 +195,12 @@
               <!-- The same answer as a «¿vas?» row of «Te espera»: the system's button. -->
               <button
                 type="button"
-                class="card__btn btn--outline btn--xs"
+                class="card__btn btn--secondary btn--xs"
                 aria-label={t('desk.going_aria', locale, { subject: slip.name })}
                 onclick={() => answer('going')}>{t('pulse.going', locale)}</button
               ><button
                 type="button"
-                class="card__btn card__btn--quiet btn--outline btn--xs"
+                class="card__btn card__btn--quiet btn--secondary btn--xs"
                 aria-label={t('desk.not_going_aria', locale, { subject: slip.name })}
                 onclick={() => answer('not_going')}>{t('pulse.not_going', locale)}</button
               >
@@ -208,7 +208,7 @@
           {/if}
           <span class="card__links">
             {#if whoHref}<a class="block-head__act" href={whoHref}>{t('commitment.who_goes', locale)} →</a>{/if}
-            {#if roadsheet}<a class="card__rs btn--outline btn--s" href={roadsheet}>{t('desk.roadsheet', locale)} ↗</a>{/if}
+            {#if roadsheet}<a class="card__rs btn--secondary btn--s" href={roadsheet}>{t('desk.roadsheet', locale)} ↗</a>{/if}
           </span>
         </div>
       {/if}

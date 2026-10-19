@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Field from '$lib/components/Field.svelte';
   import RecordHead from '$lib/components/RecordHead.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import { session } from '$lib/session.svelte';
@@ -27,10 +28,10 @@
         <button type="button" class="btn--primary btn--s">
           {t('settings.bill_yearly', locale)}
         </button>
-        <button type="button" class="btn--outline btn--s">
+        <button type="button" class="btn--secondary btn--s">
           {t('settings.bill_upgrade', locale)}
         </button>
-        <button type="button" class="btn--outline btn--s is-warn">{t('settings.bill_cancel_plan', locale)}</button>
+        <button type="button" class="btn--secondary btn--s is-warn">{t('settings.bill_cancel_plan', locale)}</button>
       </div>
     </div>
   </div>
@@ -48,7 +49,7 @@
           <span class="set-card__brand">VISA</span>
           <span>•••• 4242</span>
           <span class="set-row__hint">{t('settings.bill_card_exp', locale, { date: '11/27' })}</span>
-          <button type="button" class="btn--outline btn--s">{t('settings.bill_update', locale)}</button>
+          <button type="button" class="btn--secondary btn--s">{t('settings.bill_update', locale)}</button>
         </div>
       </div>
     </div>
@@ -58,7 +59,7 @@
         <div class="set-row__hint">{t('settings.bill_email_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
-        <input  type="email" value={userEmail} readonly />
+        <span class="set-row__value">{userEmail}</span>
       </div>
     </div>
     <div class="set-row">
@@ -67,7 +68,9 @@
         <div class="set-row__hint">{t('settings.bill_tax_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
-        <input class="input--short" type="text" value="ES 41XXXXXXX-A" />
+        <Field id="bill-tax-id">
+          <input id="bill-tax-id" type="text" value="ES 41XXXXXXX-A" />
+        </Field>
       </div>
     </div>
   </div>
@@ -83,7 +86,7 @@
           <span class="set-invoice__plan">{t('settings.bill_invoice_plan', locale)}</span>
           <span class="set-invoice__amt">€9.00</span>
           <span class="set-invoice__status">{t('settings.bill_paid', locale)}</span>
-          <button type="button" class="btn--outline btn--s">PDF</button>
+          <button type="button" class="btn--secondary btn--s">PDF</button>
         </div>
       {/each}
     </div>

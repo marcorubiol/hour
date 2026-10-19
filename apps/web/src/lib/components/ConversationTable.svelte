@@ -47,6 +47,7 @@
   import { dayMonth, dayMonthYear } from '$lib/datetime';
   import { detectLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
+  import Checkbox from '$lib/components/Checkbox.svelte';
   import ConversationHistory from '$lib/components/ConversationHistory.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import ConversationStatusMenu from '$lib/components/ConversationStatusMenu.svelte';
@@ -490,12 +491,10 @@
         <tr>
           {#if selectable}
             <th class="cell--pick">
-              <input
-                type="checkbox"
-                class="pick"
+              <Checkbox
                 checked={visibleItems.length > 0 && pagePicked === visibleItems.length}
                 indeterminate={pagePicked > 0 && pagePicked < visibleItems.length}
-                aria-label={t('mailout.pick_page', locale)}
+                ariaLabel={t('mailout.pick_page', locale)}
                 onchange={togglePage}
               />
             </th>
@@ -517,15 +516,11 @@
             {#if selectable}
               <td class="cell--pick">
                 <!-- On a phone the label covers the whole card: a tap anywhere picks it (móvil #2). -->
-                <label class="pick-label">
-                  <input
-                    type="checkbox"
-                    class="pick"
-                    checked={selectedIds.has(item.id)}
-                    aria-label={t('mailout.pick_one', locale, { name: organizationOf(item) ?? item.person?.full_name ?? '' })}
-                    onchange={() => togglePick(item)}
-                  />
-                </label>
+                <Checkbox
+                  checked={selectedIds.has(item.id)}
+                  ariaLabel={t('mailout.pick_one', locale, { name: organizationOf(item) ?? item.person?.full_name ?? '' })}
+                  onchange={() => togglePick(item)}
+                />
               </td>
             {/if}
             <!-- ADR-102: the conversation is with the organization; it titles the row and opens the file. -->
@@ -615,7 +610,7 @@
   <!-- Our sentence, not the server's text (diseño M2); the detail stays in Sentry. -->
   <p class="load-fail" role="alert">
     <span>{t('conversations.load_error', locale)}</span>
-    <Button size="xs" variant="outline" onclick={() => void $query.refetch()}>{t('ui.retry', locale)}</Button>
+    <Button size="xs" variant="secondary" onclick={() => void $query.refetch()}>{t('ui.retry', locale)}</Button>
   </p>
 {:else if !loading && items.length === 0}
   {@const unfiltered = !filters.q && !filters.turno && !filters.temp && !filters.temporada && !filters.envio && !filters.relacion}
@@ -639,14 +634,14 @@
 {#if showPagination}
   <div class="pagination">
     <button
-      class="btn--outline btn--s"
+      class="btn--secondary btn--s"
       onclick={() => (offset = Math.max(0, offset - LIMIT))}
       disabled={offset === 0}
     >
       {t('conversations.prev_page', locale)}
     </button>
     <button
-      class="btn--outline btn--s"
+      class="btn--secondary btn--s"
       onclick={() => (offset = offset + LIMIT)}
       disabled={offset + LIMIT >= total}
     >
@@ -669,7 +664,7 @@
     {/key}
   {/if}
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (historyOpen = false)}>{t('conversations.close', locale)}</Button>
+    <Button variant="quiet" onclick={() => (historyOpen = false)}>{t('conversations.close', locale)}</Button>
   {/snippet}
 </Dialog>
 
@@ -857,20 +852,8 @@
       inline-size: 2rem;
       padding-inline-end: 0;
     }
-    .pick {
-      inline-size: 1rem;
-      block-size: 1rem;
-      accent-color: var(--text-color);
-      cursor: pointer;
-    }
     tbody tr.is-picked td {
       background: var(--bg-ultra-light);
-    }
-    @media (pointer: coarse) {
-      .pick {
-        inline-size: 1.5rem;
-        block-size: 1.5rem;
-      }
     }
 
     .next-action {
@@ -1043,14 +1026,14 @@
       .conversation-table--picking tbody tr {
         position: relative;
       }
-      .conversation-table--picking .pick-label::after {
+      .conversation-table--picking tbody .cell--pick :global(.check__row)::after {
         content: '';
         position: absolute;
         inset: 0;
         z-index: 1;
         cursor: pointer;
       }
-      thead .pick {
+      thead .cell--pick :global(.check) {
         visibility: hidden;
       }
       :is(.conversation-table, .contact-table) .cell--name {

@@ -18,6 +18,7 @@
   import { appLocale, t } from '$lib/i18n';
   import Button from './Button.svelte';
   import Dialog from './Dialog.svelte';
+  import Field from './Field.svelte';
   import Input from './Input.svelte';
   import Menu from './Menu.svelte';
   import OrganizationFiscal from './OrganizationFiscal.svelte';
@@ -263,13 +264,13 @@
           <span class="mny-inv__actions">
             <button
               type="button"
-              class="btn--outline btn--xs"
+              class="btn--secondary btn--xs"
               aria-expanded={expandedId === invoice.id}
               onclick={() => (expandedId = expandedId === invoice.id ? null : invoice.id)}
             >
               {expandedId === invoice.id ? t('books.close', locale) : t('books.details', locale)}
             </button>
-            <Menu label={t('books.change_status', locale)} triggerClass="btn--outline btn--xs">
+            <Menu label={t('books.change_status', locale)} triggerClass="btn--secondary btn--xs">
               {#snippet trigger()}
                 <StateBadge label={invoiceStatusLabel(invoice.status, locale)} tone={invoiceTone(invoice.status)} />
                 <span aria-hidden="true">▾</span>
@@ -297,7 +298,7 @@
             {#if invoice.status === 'draft'}
               <Button
                 size="xs"
-                variant="outline"
+                variant="secondary"
                 tone="warn"
                 loading={$discardInvoice.isPending}
                 onclick={() => $discardInvoice.mutate(invoice.id)}
@@ -328,7 +329,7 @@
                 {:else if invoice.doc_type === 'factura' && fiscalState === 'stale'}
                   <p class="mny-inv__warn">
                     {t('books.payer_fiscal_stale', locale, { payer: payerName(invoice) })}
-                    <Button size="xs" variant="outline" loading={$invoicePatch.isPending} onclick={() => setPayer(invoice, invoice.payer_organization_id)}>
+                    <Button size="xs" variant="secondary" loading={$invoicePatch.isPending} onclick={() => setPayer(invoice, invoice.payer_organization_id)}>
                       {t('books.payer_fiscal_use', locale)}
                     </Button>
                   </p>
@@ -342,24 +343,24 @@
                 {/if}
               </div>
             {/if}
+            <!-- The same rows to read and to edit (ADR-139 p4): the two fixed
+                 dates read, the expected one is written in its place. -->
             <div class="mny-inv__dates">
-              <div>
-                <span class="mny-inv__label">{t('books.issued', locale)}</span>
+              <Field id={`issued-${invoice.id}`} label={t('books.issued', locale)} group>
                 <span>{dayLabel(invoice.issued_on)}</span>
-              </div>
-              <div>
-                <span class="mny-inv__label">{t('books.contractual_due', locale)}</span>
+              </Field>
+              <Field id={`due-${invoice.id}`} label={t('books.contractual_due', locale)} group>
                 <span>{invoice.due_on ? dayLabel(invoice.due_on) : t('books.not_set', locale)}</span>
-              </div>
-              <label>
-                <span class="mny-inv__label">{t('books.expected_collection', locale)}</span>
+              </Field>
+              <Field id={`expected-${invoice.id}`} label={t('books.expected_collection', locale)}>
                 <input
+                  id={`expected-${invoice.id}`}
                   type="date"
                   value={invoice.expected_on ?? ''}
                   aria-label={t('books.expected_aria', locale, { number: invoice.number ?? t('books.invoice_lc', locale) })}
                   onchange={(event) => updateExpectedOn(invoice, event)}
                 />
-              </label>
+              </Field>
             </div>
 
             {#if aging.source === 'observed' && observed}
@@ -370,17 +371,18 @@
             {/if}
 
             <div class="mny-inv__condition">
-              <label for={`condition-${invoice.id}`} class="mny-inv__label">{t('books.payment_condition', locale)}</label>
-              <textarea
-                id={`condition-${invoice.id}`}
-                rows="2"
-                placeholder={t('books.ph_condition', locale)}
-                value={invoice.payment_condition ?? ''}
-                onblur={(event) => updateCondition(invoice, event)}
-              ></textarea>
+              <Field id={`condition-${invoice.id}`} label={t('books.payment_condition', locale)} stack>
+                <textarea
+                  id={`condition-${invoice.id}`}
+                  rows="2"
+                  placeholder={t('books.ph_condition', locale)}
+                  value={invoice.payment_condition ?? ''}
+                  onblur={(event) => updateCondition(invoice, event)}
+                ></textarea>
+              </Field>
               <Button
                 size="xs"
-                variant="outline"
+                variant="secondary"
                 disabled={!aging.expectedOn}
                 loading={$createFollowUp.isPending}
                 onclick={() => $createFollowUp.mutate(invoice)}
@@ -393,7 +395,7 @@
                 {fmtMoney(invoice.paid_amount)} / {fmtMoney(invoice.total)} {invoice.currency}
               </span>
               {#if invoice.status === 'issued' || invoice.status === 'paid'}
-                <Button size="xs" variant="outline" onclick={() => openPayment(invoice)}>
+                <Button size="xs" variant="secondary" onclick={() => openPayment(invoice)}>
                   {t('books.record_payment', locale)}
                 </Button>
               {/if}
@@ -412,7 +414,7 @@
                     <strong>{fmtMoney(payment.amount)} {invoice.currency}</strong>
                     <Button
                       size="xs"
-                      variant="outline"
+                      variant="secondary"
                       tone="warn"
                       loading={$deletePayment.isPending}
                       onclick={() => $deletePayment.mutate(payment.id)}
@@ -466,7 +468,7 @@
     <Input label={t('books.notes', locale)} bind:value={pNotes} placeholder={t('books.optional', locale)} />
   {/if}
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (paymentOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" onclick={() => (paymentOpen = false)}>{t('create.cancel', locale)}</Button>
     <Button onclick={submitPayment} loading={$createPayment.isPending}>{t('books.record', locale)}</Button>
   {/snippet}
 </Dialog>
@@ -550,19 +552,9 @@
     }
 
     .mny-inv__dates {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(9rem, 1fr));
-      gap: var(--space-m);
-    }
-    .mny-inv__dates > div,
-    .mny-inv__dates > label {
       display: flex;
       flex-direction: column;
-      gap: var(--space-xxs);
       font-size: var(--text-s);
-    }
-    .mny-inv__dates input {
-      inline-size: 100%;
     }
     .mny-inv__label {
       letter-spacing: 0.07em;
@@ -575,15 +567,12 @@
     }
 
     .mny-inv__condition {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: var(--space-xs) var(--space-m);
-      align-items: end;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
     }
-    .mny-inv__condition label { grid-column: 1 / -1; }
-    .mny-inv__condition textarea {
-      resize: vertical;
-      min-block-size: 4rem;
+    .mny-inv__condition > :global(button) {
+      align-self: flex-end;
     }
 
     .mny-inv__progress-head {
@@ -650,10 +639,9 @@
     .mny-inv__tax dd { margin: 0; font-variant-numeric: tabular-nums; }
 
     .mny-inv__payment-form {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-s) var(--space-m);
-      margin-block: var(--space-s);
+      display: flex;
+      flex-direction: column;
+      margin-block-start: var(--space-s);
     }
 
     @media (max-width: 760px) {
@@ -666,10 +654,7 @@
       .mny-inv__age { grid-column: 1; }
       .mny-inv__total { grid-column: 2; grid-row: 1; }
       .mny-inv__actions { grid-column: 1 / -1; flex-wrap: wrap; }
-      .mny-inv__dates,
-      .mny-inv__tax,
-      .mny-inv__payment-form { grid-template-columns: 1fr; }
-      .mny-inv__condition { grid-template-columns: 1fr; }
+      .mny-inv__tax { grid-template-columns: 1fr; }
       .mny-inv__payments li {
         grid-template-columns: 1fr auto;
       }

@@ -72,7 +72,7 @@
     <p class="welcome__acts">
       <button type="button" class="btn--primary btn--s" onclick={done}>{t('help.got_it', locale)}</button>
       {#if steps.length > 0}
-        <button type="button" class="btn--outline btn--s" onclick={startTour}>{t('help.show_me', locale)}</button>
+        <button type="button" class="btn--secondary btn--s" onclick={startTour}>{t('help.show_me', locale)}</button>
       {/if}
     </p>
   </aside>

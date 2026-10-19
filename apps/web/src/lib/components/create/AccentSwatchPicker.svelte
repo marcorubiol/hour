@@ -114,7 +114,7 @@
 </script>
 
 <fieldset class="picker">
-  <legend class:legend--hidden={hideLegend}>{t('ui.color', locale)}</legend>
+  <legend class="eyebrow eyebrow--sub" class:legend--hidden={hideLegend}>{t('ui.color', locale)}</legend>
 
   <div
     class="track"
@@ -173,10 +173,12 @@
       margin: 0;
     }
 
+    .picker {
+      padding-block: var(--space-xs);
+    }
+
     .picker > legend {
       padding: 0;
-      font-size: var(--text-xs);
-      color: var(--text-dark-muted);
     }
 
     .picker > legend.legend--hidden {

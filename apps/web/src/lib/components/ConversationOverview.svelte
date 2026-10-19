@@ -311,7 +311,7 @@
 {:else if $query.isError}
   <p class="load-fail" role="alert">
     <span>{t('overview.error', locale)}</span>
-    <Button size="xs" variant="outline" onclick={() => void $query.refetch()}>{t('ui.retry', locale)}</Button>
+    <Button size="xs" variant="secondary" onclick={() => void $query.refetch()}>{t('ui.retry', locale)}</Button>
   </p>
 {:else if data && data.total > 0}
   <div class="board" data-testid="conversation-overview">

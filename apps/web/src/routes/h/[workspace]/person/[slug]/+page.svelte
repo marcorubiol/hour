@@ -538,7 +538,7 @@
     />
   </div>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (addOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" onclick={() => (addOpen = false)}>{t('create.cancel', locale)}</Button>
     <Button
       onclick={submitAddConversation}
       loading={$addConversation.isPending}
@@ -557,7 +557,7 @@
     <Input label={t('person.field_phone', locale)} type="tel" bind:value={ePhone} />
   </div>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (editOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" onclick={() => (editOpen = false)}>{t('create.cancel', locale)}</Button>
     <Button
       onclick={() => $saveDetails.mutate()}
       loading={$saveDetails.isPending}
@@ -586,7 +586,7 @@
     </div>
   {/if}
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (inviteOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" onclick={() => (inviteOpen = false)}>{t('create.cancel', locale)}</Button>
     {#if inviteUrl}
       <Button onclick={copyInvite}>{t('person.invite_copy', locale)}</Button>
     {:else}
@@ -624,10 +624,10 @@
       line-height: 1.55;
     }
 
+    /* The dialogs' fields are rows, one under the other (ADR-139 p4). */
     .person__add-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-      gap: var(--space-s) var(--space-m);
+      display: flex;
+      flex-direction: column;
       margin-block-start: var(--space-s);
     }
 
