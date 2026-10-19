@@ -444,12 +444,10 @@
 ## Producto — después
 
 - [ ] **Una conversación con etiquetas y tres capas de estado (ADR-138)**: plan validado por Marco el 19-10, entero
-  como recomendaba (`build/plans/2026-10-19-conversations-tags.md`). Fases, cada una se despliega sola:
-  - [ ] **E1** expand de estado: `not_now_*`, relación derivada, `conversation_bolos`, `legacy_status`; la ficha lista sus bolos; el panel de Difusión y la puerta de Desk cuentan bolos. Migración aditiva. Carril `claude/conv-state`.
-  - [ ] **E2** «lo conozco»: `person_acquaintance`, `set_acquaintance`, la marca en la ficha y en la fila. Migración aditiva. Carril `claude/acquaintance`.
-  - [ ] **E3** margen del Planner en Día y Agenda (fuente de «Te espera»), número en Mes y Temporada, «Ver en el Planner». Sin migración. Tras E1.
-  - [ ] **E4** contract de estado: fuera `conversation.status` y su enum. Destructiva: staging e `inspect`. Tras una semana de E1.
-  - [ ] **Etiquetas 1** esquema (`conversation_tagging`, backfill `sales`, lectura); **2** chips en la cabecera; **3** lectura común (`conversation_feed`, «Todas» en una lista, Desk); **4** etiquetas en Ajustes. La 1 detrás de E1 (las dos tocan `conversation`).
+  como recomendaba (`build/plans/2026-10-19-conversations-tags.md`). E1 y E2 en producción el 19-10 (CHANGELOG). Fases, cada una se despliega sola:
+  - [ ] **E3** margen del Planner en Día y Agenda (fuente de «Te espera»), número en Mes y Temporada, «Ver en el Planner». Sin migración. E1 en producción; espera al carril de limpieza (`claude/cleanup`), que toca los mismos componentes.
+  - [ ] **E4** contract de estado: fuera `conversation.status` y su enum. Destructiva: staging e `inspect`. No antes del 26-10 (E1 en producción el 19-10).
+  - [ ] **Etiquetas 1** esquema (`conversation_tagging`, backfill `sales`, lectura); **2** chips en la cabecera; **3** lectura común (`conversation_feed`, «Todas» en una lista, Desk); **4** etiquetas en Ajustes. La 1 en carril `claude/conv-tags` (19-10, migración `20261020160000`).
 - [x] **Ayuda contextual por capas (enfoque A, Marco 19-10)**: HECHO y en producción el 2026-10-19 (`7fc28e60` carril 1, `13889409` carril 2; migración `20261020150000_help_seen`). Queda la lista de arranque (B) para la beta (`build/coordination/onboarding/investigacion.md`).
 - [ ] **Arreglos de la revisión de Desk, Conversations y Cuentas (18-10)** (`build/coordination/review-{desk,conversations,books}/`, fuera de git). Marco (18-10): el directorio de salas y contactos pide permiso de conversaciones y una sala o contacto que solo existe por una conversación privada hereda su privacidad; un cobro se ata a la factura emitida si la hay y propone lo pendiente con IVA; una proforma de un trato sin confirmar no cuenta en «Por cobrar». Marco (18-10): todo lo recomendado en los diez informes, de todas las gravedades. Privacidad, Cuentas, Conversations y Desk en producción el 2026-10-18; Desk y una pasada de coherencia (títulos de bloque, error y carga iguales) al final.
   - [ ] Bug: la pestaña del navegador dice «Hour — Sign in» con la sesión abierta en el Hall: el título del login se queda puesto al entrar. Cada pantalla pone su propio título («Hour» en el Hall, «Desk · Hour», «Planner · Hour»…). Va en la pasada de coherencia. (drop 18-10, pequeño)
