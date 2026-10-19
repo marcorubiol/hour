@@ -11,7 +11,7 @@
  * Each row carries `last_turn` (its last directional email, message or call),
  * so the list can say whose turn it is (ADR-117). The dashboard filters
  * (`turno=nuestro|suyo`, `temp=caliente|fria|ronda|parada`, `temporada=actual`, with
- * `line_ids` for the season) are derived, not columns: the scope is read and
+ * `line_ids` for the season and `linea` for one of its lines) are derived, not columns: the scope is read and
  * filtered with `$lib/conversation-overview` (the same rules as the blocks),
  * in the block's order, and only the page is read in full.
  *
@@ -33,7 +33,7 @@ import {
 import { PostgrestError, pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import { LAST_TURN_EMBED, loadOverviewRows, mailoutPickIds, setLastTurnEmbed, setScope } from '$lib/server/conversation-overview';
-import { applyListFilter, hasListFilter, type ListFilter } from '$lib/conversation-overview';
+import { applyListFilter, hasListFilter, parseLinea, type ListFilter } from '$lib/conversation-overview';
 
 const QuerySchema = v.object({
   status: v.optional(
@@ -49,6 +49,8 @@ const QuerySchema = v.object({
   turno: v.optional(v.picklist(['nuestro', 'suyo'])),
   temp: v.optional(v.picklist(['caliente', 'fria', 'ronda', 'parada', 'sin-fecha'])),
   temporada: v.optional(v.literal('actual')),
+  // ADR-135: one line of the season (its id, or `sin` for the ones without).
+  linea: v.optional(v.string()),
   // ADR-126 § 9: the recipients of a mailout behind one of its figures.
   envio: v.optional(v.pipe(v.string(), v.uuid())),
   r: v.optional(v.picklist(['respuestas', 'rebotes'])),
@@ -114,7 +116,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       400,
     );
   }
-  const { status, project_slug, project_ids, workspace_ids, line_id, q, season, limit, offset, turno, temp, temporada, line_ids, envio, r } =
+  const { status, project_slug, project_ids, workspace_ids, line_id, q, season, limit, offset, turno, temp, temporada, linea, line_ids, envio, r } =
     parsed.output;
 
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -161,6 +163,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
     turno,
     temp,
     temporada: temporada === 'actual' || undefined,
+    linea: temporada === 'actual' ? parseLinea(linea) : undefined,
     ...(envio && r ? { envio, r } : {}),
   };
   if (hasListFilter(listFilter)) {

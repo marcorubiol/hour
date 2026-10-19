@@ -4514,3 +4514,31 @@ separación en dos lentes, que se construyó y no llegó a integrarse.**
 
 **Enmienda.** ADR-106, «La lente»: siguen siendo dos proyecciones de una lente, ahora con nombre propio (Difusión y
 Equipo). ADR-116 § 6: la proyección va en `?view=team` y los fragmentos se llaman Difusión · Equipo.
+
+## [2026-10-19] ADR-135 · La temporada de Difusión se reparte por línea de trabajo
+
+**Contexto.** Con ~160 salas de MüK Cia en una sola barra, «La temporada» de la vista Difusión (ADR-117, 118, 134)
+no decía cómo iba cada campaña. Marco validó en el Drop (18-10) repartirla por línea («MaMeMi 26-27 Catalunya»…).
+Carril `claude/season-lines`. Sin migración.
+
+**Decisión.**
+1. **Una barra por línea** (`conversation.line_id`, ADR-056/062), con su nombre, sus cifras («40 · 12 con respuesta»)
+   y su leyenda de estados en una sola tira. La de más conversaciones arriba; a igual, por nombre. Cuenta cualquier
+   línea a la que esté atada una conversación, sin mirar su tipo.
+2. **«Sin línea»** agrupa las conversaciones sin línea, va siempre al final y nunca se esconde, aunque sea la mayor.
+3. **Con una línea o ninguna, una barra**, como antes. La regla vive en el módulo puro (`seasonByLine` devuelve vacío
+   con menos de dos grupos), no en la pantalla. Fijar una línea en el ámbito deja su temporada en una barra; fijar dos,
+   dos barras (sin «sin línea», que el ámbito ya deja fuera).
+4. **Filtrar.** Un tramo o un estado de la leyenda de una línea lleva a `?temporada=actual&estado=…&linea=<id>`; el
+   nombre de la línea, a `?temporada=actual&linea=<id>` (todos sus estados). `linea=sin` son las de sin línea. `linea`
+   solo vale junto a `temporada` y pasa por el mismo `applyListFilter` que el bloque, así que tramo y lista cuentan lo
+   mismo. El chip nombra estado, línea y temporada; quitarlo quita los tres.
+5. **El nombre** sale de un embebido `line:line_id(name)` en la lectura del dashboard; si no se puede leer, «Línea sin
+   nombre».
+6. **Carga sin saltos:** la carga dibuja tantas barras como líneas alcanza el ámbito (las fijadas, o todas las de los
+   espacios y proyectos del ámbito; como mucho cuatro). Es una estimación: puede faltar el grupo «sin línea» o sobrar
+   una línea sin nada esta temporada.
+7. **Móvil:** las barras apiladas, una por línea, con el mismo orden; el nombre de la línea llega al tamaño del dedo.
+
+**Re-evaluar cuando** Marco la use una campaña: si la nota global (contestadas / sin respuesta) sobra con las cifras
+por línea, y si con muchas líneas hace falta plegar las pequeñas.

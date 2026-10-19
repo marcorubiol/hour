@@ -10,6 +10,9 @@
    * «Último envío» desaparece si no hay nada (los hilos del equipo son la
    * lente Equipo, ADR-133). Sin
    * conversaciones en el alcance no se pinta nada: la lista enseña su vacío.
+   *
+   * La temporada, con dos líneas o más (contando «sin línea»), es una barra
+   * por línea; con una o ninguna, una sola barra (ADR-135).
    */
 
   import StateBadge from '$lib/components/StateBadge.svelte';
@@ -36,12 +39,15 @@
   import {
     COLD_IDLE_DAYS,
     COLD_REPLY_DAYS,
+    NO_LINE,
     currentSeason,
     type BlockRow,
     type ColdRow,
     type DueRow,
     type HotRow,
     type OverviewResponse,
+    type SeasonLine,
+    type StatusCounts,
   } from '$lib/conversation-overview';
 
   interface Props {
@@ -50,14 +56,25 @@
     /** Names «Escribir a estas» per project when the cooling spans several. */
     projectNameById: Map<string, string>;
     locale: Locale;
-    /** Pulsar un tramo de la temporada: filtra la lista por ese estado en la temporada. */
-    onstatus: (status: ConversationStatus) => void;
+    /**
+     * Cuántas líneas tiene el alcance, para que la carga dibuje tantas barras
+     * como llegarán (una estimación: la temporada puede tener menos o un «sin
+     * línea» de más).
+     */
+    lineHint?: number;
+    /** Pulsar un tramo de la temporada: filtra la lista por ese estado en la temporada (y su línea). */
+    onstatus: (status: ConversationStatus, linea?: string) => void;
+    /** Pulsar el nombre de una línea: la lista, solo esa línea en la temporada. */
+    online: (linea: string) => void;
     /** «Escribir a estas»: precarga el modo selección del envío en bloque (ADR-115). */
     /** Absent for whoever cannot edit conversations: no «write to these». */
     onwrite?: (picks: { id: string; project_id: string }[]) => void;
   }
 
-  let { filters, workspaceSlugById, projectNameById, locale, onstatus, onwrite }: Props = $props();
+  let { filters, workspaceSlugById, projectNameById, locale, lineHint = 0, onstatus, online, onwrite }: Props = $props();
+
+  /** Ghost lines while loading: as many as the scope has, at most four. */
+  let ghostLines = $derived(lineHint >= 2 ? Math.min(lineHint, 4) : 0);
 
   type Pick = { id: string; project_id: string };
   function picksByProject(picks: Pick[]): { projectId: string; picks: Pick[] }[] {
@@ -88,9 +105,6 @@
   let data = $derived($query.data ?? null);
   let pickGroups = $derived(data ? new Set(data.cold.picks.map((p) => p.project_id)).size : 0);
   let loading = $derived($query.isLoading || !filters.enabled);
-  let seasonStatuses = $derived(
-    data ? CONVERSATION_STATUSES.filter((s) => data.season.counts[s] > 0) : [],
-  );
 
   // «No pide respuesta» (ADR-126 § 1): settles that reply, not «now».
   const queryClient = useQueryClient();
@@ -144,8 +158,17 @@
     return kind ? eventKindLabel(kind as ConversationEventKind, locale) : '';
   }
 
-  function seasonAria(d: OverviewResponse): string {
-    return seasonStatuses.map((s) => `${d.season.counts[s]} ${statusLabel(s, locale)}`).join(', ');
+  function present(counts: StatusCounts): ConversationStatus[] {
+    return CONVERSATION_STATUSES.filter((s) => counts[s] > 0);
+  }
+  function countsAria(counts: StatusCounts): string {
+    return present(counts).map((s) => `${counts[s]} ${statusLabel(s, locale)}`).join(', ');
+  }
+  function lineKey(l: SeasonLine): string {
+    return l.line_id ?? NO_LINE;
+  }
+  function lineName(l: SeasonLine): string {
+    return l.line_id === null ? t('overview.no_line', locale) : l.name || t('overview.unnamed_line', locale);
   }
 </script>
 
@@ -163,6 +186,34 @@
 <!-- Loading: the same rows as the real ones (two lines and the time column,
      `&nbsp;` so each bar is exactly a line high) and the typical blocks, so
      the list below does not jump when the overview arrives (diseño A3). -->
+<!-- A season bar and its legend: the whole season, or one line of it (ADR-135). -->
+{#snippet seasonBar(counts: StatusCounts, aria: string, linea?: string)}
+  <!-- A drawing for the pointer; the legend below is the control for the
+       keyboard and the screen reader (móvil #7): one stop per status. -->
+  <div class="season__bar" role="img" aria-label={aria}>
+    {#each present(counts) as s (s)}
+      <button
+        type="button"
+        class="season__seg"
+        data-conv-status={s}
+        style:flex-grow={counts[s]}
+        title={`${statusLabel(s, locale)} · ${counts[s]}`}
+        tabindex="-1"
+        aria-hidden="true"
+        onclick={() => onstatus(s, linea)}
+      ></button>
+    {/each}
+  </div>
+  <div class="season__legend" class:season__legend--run={linea !== undefined}>
+    {#each present(counts) as s (s)}
+      <button type="button" class="season__item" onclick={() => onstatus(s, linea)}>
+        <span class="season__n stat">{counts[s]}</span>
+        <span class="season__k"><i data-conv-status={s}></i>{statusLabel(s, locale)}</span>
+      </button>
+    {/each}
+  </div>
+{/snippet}
+
 {#snippet ghost(n: number)}
   <ol class="rows" aria-hidden="true">
     {#each Array(n) as _, i (i)}
@@ -187,12 +238,31 @@
     <div class="board__col">
       <section class="block block--season">
         <BlockHead title={t('overview.season_of', locale, { season: currentSeason(new Date()).label })} count={DASH} />
-        <div class="season__bar season__bar--ghost"></div>
-        <div class="season__legend" aria-hidden="true">
-          {#each Array(6) as _, i (i)}
-            <span class="season__item"><span class="season__n stat">{DASH}</span><span class="season__k"><span class="ghost-line">&nbsp;</span></span></span>
-          {/each}
-        </div>
+        {#if ghostLines > 0}
+          <ol class="season__lines" aria-hidden="true">
+            {#each Array(ghostLines) as _, i (i)}
+              <li class="season__line">
+                <div class="season__line-head">
+                  <span class="season__line-name"><span class="ghost-line" style:inline-size="{10 - (i % 2) * 2}rem">&nbsp;</span></span>
+                  <span class="season__line-figs"><span class="ghost-line" style:inline-size="5rem">&nbsp;</span></span>
+                </div>
+                <div class="season__bar season__bar--ghost"></div>
+                <div class="season__legend season__legend--run">
+                  {#each Array(3) as _, j (j)}
+                    <span class="season__item"><span class="season__n stat">{DASH}</span><span class="season__k"><span class="ghost-line" style:inline-size="4rem">&nbsp;</span></span></span>
+                  {/each}
+                </div>
+              </li>
+            {/each}
+          </ol>
+        {:else}
+          <div class="season__bar season__bar--ghost"></div>
+          <div class="season__legend" aria-hidden="true">
+            {#each Array(6) as _, i (i)}
+              <span class="season__item"><span class="season__n stat">{DASH}</span><span class="season__k"><span class="ghost-line">&nbsp;</span></span></span>
+            {/each}
+          </div>
+        {/if}
         <p class="season__note" aria-hidden="true"><span class="ghost-line" style:inline-size="60%">&nbsp;</span></p>
       </section>
       <section class="block block--cold">
@@ -296,35 +366,32 @@
     <div class="board__col">
       <section class="block block--season" aria-labelledby="ov-season" data-testid="block-season">
         <BlockHead id="ov-season" title={t('overview.season_of', locale, { season: data.season.label })} count={data.season.total}>
-          <span class="block__hint">{t('overview.season_hint', locale)}</span>
+          <span class="block__hint">{t(data.season.lines.length > 0 ? 'overview.season_hint_lines' : 'overview.season_hint', locale)}</span>
         </BlockHead>
         {#if data.season.total === 0}
           <p class="block__empty">{t('overview.season_empty', locale)}</p>
         {:else}
-          <!-- A drawing for the pointer; the legend below is the control for the
-               keyboard and the screen reader (móvil #7): one stop per status. -->
-          <div class="season__bar" role="img" aria-label={seasonAria(data)}>
-            {#each seasonStatuses as s (s)}
-              <button
-                type="button"
-                class="season__seg"
-                data-conv-status={s}
-                style:flex-grow={data.season.counts[s]}
-                title={`${statusLabel(s, locale)} · ${data.season.counts[s]}`}
-                tabindex="-1"
-                aria-hidden="true"
-                onclick={() => onstatus(s)}
-              ></button>
-            {/each}
-          </div>
-          <div class="season__legend">
-            {#each seasonStatuses as s (s)}
-              <button type="button" class="season__item" onclick={() => onstatus(s)}>
-                <span class="season__n stat">{data.season.counts[s]}</span>
-                <span class="season__k"><i data-conv-status={s}></i>{statusLabel(s, locale)}</span>
-              </button>
-            {/each}
-          </div>
+          {#if data.season.lines.length > 0}
+            <!-- One bar per line, «sin línea» last and never hidden (ADR-135). -->
+            <ol class="season__lines">
+              {#each data.season.lines as l (lineKey(l))}
+                <li class="season__line" data-testid="season-line" data-line={lineKey(l)}>
+                  <div class="season__line-head">
+                    <button
+                      type="button"
+                      class="season__line-name"
+                      aria-label={t('overview.line_open', locale, { line: lineName(l), n: l.total })}
+                      onclick={() => online(lineKey(l))}>{lineName(l)}</button
+                    >
+                    <span class="season__line-figs">{t('overview.line_figures', locale, { total: l.total, answered: l.answered })}</span>
+                  </div>
+                  {@render seasonBar(l.counts, `${lineName(l)}: ${countsAria(l.counts)}`, lineKey(l))}
+                </li>
+              {/each}
+            </ol>
+          {:else}
+            {@render seasonBar(data.season.counts, countsAria(data.season.counts))}
+          {/if}
           <p class="season__note">
             {t('overview.season_note', locale, { answered: data.season.answered, silent: data.season.total - data.season.answered })}
           </p>
@@ -678,6 +745,71 @@
     .season__item:hover .season__k {
       color: var(--text-color);
     }
+    /* Per line (ADR-135): its name and figures, its bar, its legend in one run. */
+    .season__lines {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-m);
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .season__line {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+      min-inline-size: 0;
+    }
+    .season__line-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: var(--space-s);
+      min-inline-size: 0;
+    }
+    .season__line-name {
+      min-inline-size: 0;
+      padding: 0;
+      border: 0;
+      background: none;
+      color: inherit;
+      font: inherit;
+      font-weight: 500;
+      text-align: start;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      cursor: pointer;
+    }
+    button.season__line-name:hover {
+      text-decoration: underline;
+      text-decoration-color: var(--border-color-dark);
+      text-underline-offset: 0.25em;
+    }
+    .season__line-figs {
+      flex-shrink: 0;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+    }
+    .season__line .season__bar {
+      block-size: 0.6rem;
+    }
+    .season__legend--run {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2xs) var(--space-m);
+      margin-block-start: var(--space-2xs);
+    }
+    .season__legend--run .season__item {
+      flex-direction: row;
+      align-items: baseline;
+      gap: var(--space-2xs);
+    }
+    .season__legend--run .season__n {
+      font-size: var(--text-m);
+    }
+
     .season__note {
       margin-block-start: var(--space-xs);
       font-size: var(--text-s);
@@ -746,7 +878,8 @@
 
     /* Touch: the links and the legend reach the finger's size (móvil #8). */
     @media (pointer: coarse) {
-      .season__item {
+      .season__item,
+      .season__line-name {
         min-block-size: var(--touch-target);
       }
     }

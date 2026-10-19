@@ -16,6 +16,8 @@
     /** Only the current season; `lineIds` (pinned lines) narrow it. */
     temporada?: boolean;
     lineIds?: string[];
+    /** One line of the season (ADR-135): its id, or `sin`. */
+    linea?: string;
     /** A mailout's figure as a filter (ADR-126 § 9). */
     envio?: string;
     r?: MailoutPick;
@@ -161,6 +163,7 @@
     if (f.temporada) {
       p.set('temporada', 'actual');
       if (f.lineIds && f.lineIds.length > 0) p.set('line_ids', f.lineIds.join(','));
+      if (f.linea) p.set('linea', f.linea);
     }
     p.set('limit', String(LIMIT));
     p.set('offset', String(o));
