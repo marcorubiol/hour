@@ -4661,3 +4661,34 @@ temporada anterior encaja con cómo trabaja una sala de verdad.
 rejilla». El margen de Día y Agenda no es la rejilla: allí salen las tareas con fecha y los próximos pasos de las
 conversaciones, de la misma fuente que «Te espera» (`rankWaiting`), sin ocupar un día ni un hueco; Mes y Temporada
 solo dan un número que abre el Día.
+
+## [2026-10-19] ADR-139 · El segundo nivel con el lenguaje del primero, y calma como foco
+
+**Contexto.** Marco (chat 19-10): el primer nivel es bonito; al entrar un nivel se vuelve feo y difícil, añadir un
+evento se ve feo y calma no calma. Quiere que usar Hour sea fácil, cómodo y limpio, que lo importante se vea
+enseguida y que den ganas de seguir. Cuatro revisiones (ojos nuevos, lenguaje visual, flujos, calma y densidad) y una
+síntesis con opciones (`build/coordination/review-depth/`, fuera de git; artifact
+https://claude.ai/artifact/3mfP91nKLzdU6gva6agkT6). Marco eligió el 19-10, 23:40, la opción recomendada en los siete.
+
+**Decisión.**
+1. **Dónde se abre (p1, A):** un vistazo lateral sobre la lente para cualquier cosa (fecha y bolo primero, que hoy no
+   tienen dónde mirarse), con «abrir completa» que lleva a una página con la misma forma.
+2. **La ficha (p2, A):** arriba, una línea de hechos editables en su sitio; debajo, una franja «Falta» con 0 a 3 cosas
+   y su verbo; lo vacío en una línea; lo de consulta, plegado en «Detalles».
+3. **Añadir al plan (p3, A):** alta rápida, un título y propiedades como fichas, sobre un esqueleto común Qué · Cuándo
+   · Dónde · Más; un solo control de fecha; deducir antes de preguntar (proyecto, día, destino); quedarse en el Planner
+   con aviso y deshacer. La línea que entiende texto, después.
+4. **Formularios (p4, A):** el campo es una fila sin caja, igual al leer y al editar; juego cerrado: tres botones, dos
+   selectores, una casilla, un vacío, el papel del diálogo y una cabecera de ficha compartida. Es la base de 2 y 3.
+5. **Calma (p5, A):** una composición de foco por lente que oculta, no un gris; nunca apaga controles; se enciende con
+   un trazo suave. El modo normal no cambia.
+6. **Peso (p6, A):** tres capas en todas las pantallas (siempre, a un vistazo, a demanda); el ámbito solo cuando acota;
+   el titular dice el día, no la deuda; el rojo una vez por bloque.
+7. **Guardado (p7, A):** un solo modelo por sitio, en sitio o con botón, nunca mezclado; borrador en el marco del
+   diálogo (Esc o clic fuera no tiran lo escrito); errores junto al campo.
+
+**Orden.** Fase 1 piezas base y guardado (4 y 7); 2 la ficha (función y conversación primero); 3 el vistazo lateral;
+4 el alta; 5 calma y peso. Después, lo que acelera (lenguaje natural, crear en la celda del Mes, ⌘K que crea).
+
+**Re-evaluar cuando** Marco use una semana el segundo nivel nuevo: si el vistazo lateral sustituye de verdad a las
+páginas, y si calma como foco se usa.
