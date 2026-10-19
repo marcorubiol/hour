@@ -2196,5 +2196,15 @@
   "conversations.bolos": "Deals",
   "conversations.bolo_undated": "no date",
   "overview.season_bolos": "Deals: {option} on hold · {firm} confirmed",
-  "overview.line_bolos": "{option} on hold · {firm} confirmed"
+  "overview.line_bolos": "{option} on hold · {firm} confirmed",
+  "acquaintance.known": "I know them",
+  "acquaintance.known_aria": "I know them: {name}",
+  "acquaintance.share": "Share with the team",
+  "acquaintance.share_aria": "Tell the team I know {name}",
+  "acquaintance.private_hint": "Only you know.",
+  "acquaintance.shared_hint": "The team sees that you know them.",
+  "acquaintance.known_by_one": "Known by {names}",
+  "acquaintance.known_by_many": "Known by {names}",
+  "acquaintance.mine_row": "You know them",
+  "acquaintance.not_saved": "“I know them” was not saved"
 }

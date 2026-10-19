@@ -49,6 +49,8 @@
   import ConversationStatusMenu from '$lib/components/ConversationStatusMenu.svelte';
   import NextActionDialog from '$lib/components/NextActionDialog.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
+  import AcquaintanceMark from '$lib/components/AcquaintanceMark.svelte';
+  import { acquaintancesQueryOptions, knownAmong } from '$lib/acquaintance';
   import { followUpDue, turnOf } from '$lib/conversation-overview';
   import {
     groupConversationsByContact,
@@ -185,6 +187,8 @@
   });
 
   const query = createQuery(queryOptions);
+  // «Lo conozco» (ADR-138 § 5): una sola lectura para todas las filas.
+  const acquaintances = createQuery(acquaintancesQueryOptions());
 
   // ── Inline write path (ADR-040) — cache-anchored optimistic updates ────
   const queryClient = useQueryClient();
@@ -519,6 +523,10 @@
               {:else}
                 {organizationOf(item) ?? '—'}
               {/if}
+              <AcquaintanceMark
+                known={knownAmong($acquaintances.data, item.workspace_id, item.contacts.map((c) => c.person_id))}
+                {locale}
+              />
             </td>
             <td
               class="cell--muted"

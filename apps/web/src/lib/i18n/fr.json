@@ -2187,5 +2187,15 @@
   "conversations.bolos": "Contrats",
   "conversations.bolo_undated": "sans date",
   "overview.season_bolos": "Contrats : {option} en option · {firm} confirmés",
-  "overview.line_bolos": "{option} en option · {firm} confirmés"
+  "overview.line_bolos": "{option} en option · {firm} confirmés",
+  "acquaintance.known": "Je connais",
+  "acquaintance.known_aria": "Je connais : {name}",
+  "acquaintance.share": "Partager avec l'équipe",
+  "acquaintance.share_aria": "Dire à l'équipe que je connais {name}",
+  "acquaintance.private_hint": "Vous seul le savez.",
+  "acquaintance.shared_hint": "L'équipe voit que vous la connaissez.",
+  "acquaintance.known_by_one": "{names} la connaît",
+  "acquaintance.known_by_many": "{names} la connaissent",
+  "acquaintance.mine_row": "Vous la connaissez",
+  "acquaintance.not_saved": "« Je connais » n'a pas été enregistré"
 }
