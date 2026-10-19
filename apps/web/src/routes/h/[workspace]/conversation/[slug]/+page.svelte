@@ -30,6 +30,7 @@
   import { dayMonth, dayMonthYear, dayMonthYearTs } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
+  import Switch from '$lib/components/Switch.svelte';
   import ConversationHistory from '$lib/components/ConversationHistory.svelte';
   import ConversationStatusMenu from '$lib/components/ConversationStatusMenu.svelte';
   import NextActionDialog from '$lib/components/NextActionDialog.svelte';
@@ -472,16 +473,12 @@
         <div class="privacy">
           <div class="privacy__row">
             <span class="eyebrow eyebrow--sub">{t('mail.private_label', locale)}</span>
-            <button
-              type="button"
-              class="toggle"
-              class:is-on={conv.private}
-              role="switch"
-              aria-checked={conv.private}
-              aria-label={t('mail.private_label', locale)}
+            <Switch
+              checked={conv.private}
+              label={t('mail.private_label', locale)}
               disabled={$setPrivate.isPending}
-              onclick={togglePrivate}
-            ><span class="toggle__dot"></span></button>
+              onchange={togglePrivate}
+            />
           </div>
           <p class="privacy__hint">
             {conv.private ? t('mail.private_on_hint', locale) : t('mail.private_off_hint', locale)}
@@ -980,32 +977,6 @@
       color: var(--text-faint);
       font-size: var(--text-xs);
     }
-    .toggle {
-      display: inline-flex;
-      align-items: center;
-      inline-size: 2.25rem;
-      block-size: 1.25rem;
-      padding: var(--space-2xs);
-      background: var(--border-color-dark);
-      border: 0;
-      border-radius: var(--radius-circle);
-      cursor: pointer;
-      transition: background var(--transition);
-    }
-    .toggle__dot {
-      inline-size: 1rem;
-      block-size: 1rem;
-      background: var(--bg-ultra-light);
-      border-radius: 50%;
-      box-shadow: var(--box-shadow-1);
-      transition: transform var(--transition);
-    }
-    .toggle.is-on {
-      background: var(--text-color);
-    }
-    .toggle.is-on .toggle__dot {
-      transform: translateX(1rem);
-    }
 
     .legend,
     .inside {
@@ -1073,14 +1044,6 @@
     @media (pointer: coarse) {
       .seg button {
         min-block-size: var(--touch-target);
-      }
-      .toggle {
-        position: relative;
-      }
-      .toggle::before {
-        content: '';
-        position: absolute;
-        inset: calc((1.25rem - var(--touch-target)) / 2) calc((2.25rem - var(--touch-target)) / 2);
       }
     }
   }

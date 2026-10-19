@@ -10,6 +10,7 @@
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import { appLocale, t } from '$lib/i18n';
+  import Switch from '$lib/components/Switch.svelte';
   import { TOGGLE_LENSES, type ToggleLens } from '$lib/lenses.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
 
@@ -80,17 +81,13 @@
           <div class="set-row__hint">{t(`settings.lenses_hint_${lens}`, locale)}</div>
         </div>
         <div class="set-row__ctrl">
-          <button
-            type="button"
-            class={['set-toggle', !off.has(lens) && 'is-on'].filter(Boolean).join(' ')}
-            aria-label={t(LABEL[lens], locale)}
-            aria-pressed={!off.has(lens)}
-            data-testid="lens-toggle-{lens}"
+          <Switch
+            checked={!off.has(lens)}
+            label={t(LABEL[lens], locale)}
+            testid="lens-toggle-{lens}"
             disabled={!canEdit || !$query.data || $save.isPending}
-            onclick={() => toggle(lens)}
-          >
-            <span class="set-toggle__dot"></span>
-          </button>
+            onchange={() => toggle(lens)}
+          />
         </div>
       </div>
     {/each}

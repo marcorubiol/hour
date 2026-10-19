@@ -272,31 +272,4 @@
     box-shadow: var(--box-shadow-1);
   }
 
-  .set-page :global(.set-toggle) {
-    appearance: none;
-    border: 0;
-    background: var(--border-color-dark);
-    inline-size: 2.25rem;
-    block-size: 1.25rem;
-    border-radius: var(--radius-circle);
-    padding: var(--space-2xs);
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    transition: background var(--transition);
-  }
-  .set-page :global(.set-toggle__dot) {
-    inline-size: 1rem;
-    block-size: 1rem;
-    border-radius: 50%;
-    background: var(--bg-ultra-light);
-    box-shadow: var(--box-shadow-1);
-    transition: transform var(--transition);
-  }
-  .set-page :global(.set-toggle.is-on) {
-    background: var(--text-color);
-  }
-  .set-page :global(.set-toggle.is-on .set-toggle__dot) {
-    transform: translateX(1rem);
-  }
 </style>

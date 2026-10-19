@@ -1,5 +1,6 @@
 <script lang="ts">
   import { t, appLocale } from '$lib/i18n';
+  import Switch from '$lib/components/Switch.svelte';
   import ConversationPrivacyDefault from './ConversationPrivacyDefault.svelte';
 
   let { workspaceId }: { workspaceId?: string } = $props();
@@ -79,17 +80,11 @@
         <div class="set-row__hint">{t('settings.priv_notes_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
-        <button
-          type="button"
-          class={['set-toggle', privNotesPrivate && 'is-on']
-            .filter(Boolean)
-            .join(' ')}
-          aria-label={t('settings.priv_notes', locale)}
-          aria-pressed={privNotesPrivate}
-          onclick={() => (privNotesPrivate = !privNotesPrivate)}
-        >
-          <span class="set-toggle__dot"></span>
-        </button>
+        <Switch
+          checked={privNotesPrivate}
+          label={t('settings.priv_notes', locale)}
+          onchange={(next) => (privNotesPrivate = next)}
+        />
       </div>
     </div>
 

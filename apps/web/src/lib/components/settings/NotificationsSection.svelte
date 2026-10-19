@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { session } from '$lib/session.svelte';
   import { t, appLocale } from '$lib/i18n';
+  import Switch from '$lib/components/Switch.svelte';
   import {
     isMasterViewEnabled,
     getMasterViewPath,
@@ -91,15 +92,11 @@
         <div class="set-row__hint">{t('settings.notif_weekly_review_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
-        <button
-          type="button"
-          class={['set-toggle', notifWeeklyReview && 'is-on'].filter(Boolean).join(' ')}
-          aria-label={t('settings.notif_weekly_review', locale)}
-          aria-pressed={notifWeeklyReview}
-          onclick={() => (notifWeeklyReview = !notifWeeklyReview)}
-        >
-          <span class="set-toggle__dot"></span>
-        </button>
+        <Switch
+          checked={notifWeeklyReview}
+          label={t('settings.notif_weekly_review', locale)}
+          onchange={(next) => (notifWeeklyReview = next)}
+        />
       </div>
     </div>
   </div>
@@ -116,15 +113,11 @@
         <div class="set-row__hint">{t('settings.notif_warm_reply_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
-        <button
-          type="button"
-          class={['set-toggle', notifWarmReply && 'is-on'].filter(Boolean).join(' ')}
-          aria-label={t('settings.notif_warm_reply', locale)}
-          aria-pressed={notifWarmReply}
-          onclick={() => (notifWarmReply = !notifWarmReply)}
-        >
-          <span class="set-toggle__dot"></span>
-        </button>
+        <Switch
+          checked={notifWarmReply}
+          label={t('settings.notif_warm_reply', locale)}
+          onchange={(next) => (notifWarmReply = next)}
+        />
       </div>
     </div>
     <div class="set-row">
@@ -133,15 +126,11 @@
         <div class="set-row__hint">{t('settings.notif_money_in_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
-        <button
-          type="button"
-          class={['set-toggle', notifMoneyIn && 'is-on'].filter(Boolean).join(' ')}
-          aria-label={t('settings.notif_money_in', locale)}
-          aria-pressed={notifMoneyIn}
-          onclick={() => (notifMoneyIn = !notifMoneyIn)}
-        >
-          <span class="set-toggle__dot"></span>
-        </button>
+        <Switch
+          checked={notifMoneyIn}
+          label={t('settings.notif_money_in', locale)}
+          onchange={(next) => (notifMoneyIn = next)}
+        />
       </div>
     </div>
     <div class="set-row">
@@ -150,15 +139,11 @@
         <div class="set-row__hint">{t('settings.notif_money_overdue_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
-        <button
-          type="button"
-          class={['set-toggle', notifMoneyOverdue && 'is-on'].filter(Boolean).join(' ')}
-          aria-label={t('settings.notif_money_overdue', locale)}
-          aria-pressed={notifMoneyOverdue}
-          onclick={() => (notifMoneyOverdue = !notifMoneyOverdue)}
-        >
-          <span class="set-toggle__dot"></span>
-        </button>
+        <Switch
+          checked={notifMoneyOverdue}
+          label={t('settings.notif_money_overdue', locale)}
+          onchange={(next) => (notifMoneyOverdue = next)}
+        />
       </div>
     </div>
     <div class="set-row">
@@ -167,15 +152,11 @@
         <div class="set-row__hint">{t('settings.notif_day_of_show_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
-        <button
-          type="button"
-          class={['set-toggle', notifDayOfShow && 'is-on'].filter(Boolean).join(' ')}
-          aria-label={t('settings.notif_day_of_show', locale)}
-          aria-pressed={notifDayOfShow}
-          onclick={() => (notifDayOfShow = !notifDayOfShow)}
-        >
-          <span class="set-toggle__dot"></span>
-        </button>
+        <Switch
+          checked={notifDayOfShow}
+          label={t('settings.notif_day_of_show', locale)}
+          onchange={(next) => (notifDayOfShow = next)}
+        />
       </div>
     </div>
   </div>
@@ -192,15 +173,11 @@
         <div class="set-row__hint">{userEmail || '—'}</div>
       </div>
       <div class="set-row__ctrl">
-        <button
-          type="button"
-          class={['set-toggle', notifEmail && 'is-on'].filter(Boolean).join(' ')}
-          aria-label={t('settings.notif_email_aria', locale)}
-          aria-pressed={notifEmail}
-          onclick={() => (notifEmail = !notifEmail)}
-        >
-          <span class="set-toggle__dot"></span>
-        </button>
+        <Switch
+          checked={notifEmail}
+          label={t('settings.notif_email_aria', locale)}
+          onchange={(next) => (notifEmail = next)}
+        />
       </div>
     </div>
     <div class="set-row">
@@ -209,15 +186,11 @@
         <div class="set-row__hint">{t('settings.notif_push_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
-        <button
-          type="button"
-          class={['set-toggle', notifPush && 'is-on'].filter(Boolean).join(' ')}
-          aria-label={t('settings.notif_push_aria', locale)}
-          aria-pressed={notifPush}
-          onclick={() => (notifPush = !notifPush)}
-        >
-          <span class="set-toggle__dot"></span>
-        </button>
+        <Switch
+          checked={notifPush}
+          label={t('settings.notif_push_aria', locale)}
+          onchange={(next) => (notifPush = next)}
+        />
       </div>
     </div>
     <div class="set-row">
@@ -247,17 +220,11 @@
         <div class="set-row__hint">{t('settings.notif_master_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
-        <button
-          type="button"
-          class={['set-toggle', masterViewEnabled && 'is-on']
-            .filter(Boolean)
-            .join(' ')}
-          aria-label={t('settings.notif_master_aria', locale)}
-          aria-pressed={masterViewEnabled}
-          onclick={() => toggleMasterView(!masterViewEnabled)}
-        >
-          <span class="set-toggle__dot"></span>
-        </button>
+        <Switch
+          checked={masterViewEnabled}
+          label={t('settings.notif_master_aria', locale)}
+          onchange={(next) => toggleMasterView(next)}
+        />
       </div>
     </div>
     {#if masterViewEnabled && masterViewPath}

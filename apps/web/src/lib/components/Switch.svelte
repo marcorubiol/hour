@@ -11,10 +11,12 @@
     checked: boolean;
     label: string;
     disabled?: boolean;
+    /** A hook for the E2E suite, when the switch has no other stable name. */
+    testid?: string;
     onchange: (next: boolean) => void;
   }
 
-  let { checked, label, disabled = false, onchange }: Props = $props();
+  let { checked, label, disabled = false, testid, onchange }: Props = $props();
 </script>
 
 <button
@@ -24,6 +26,7 @@
   role="switch"
   aria-checked={checked}
   aria-label={label}
+  data-testid={testid}
   {disabled}
   onclick={() => onchange(!checked)}
 ><span class="switch__dot"></span></button>
