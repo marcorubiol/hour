@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { waitForLoaded } from './loaded';
+import { openInFull } from './peek';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
@@ -55,6 +56,8 @@ test.describe('conversation with the venue', () => {
     const link = page.locator('main table').getByRole('link', { name: ORG, exact: true });
     await expect(link).toBeVisible({ timeout: 10_000 });
     await link.click();
+    // The vistazo first (ADR-139 p1), then the page.
+    await openInFull(page);
     await expect(page).toHaveURL(/\/conversation\//);
     await expect(page.locator('h1')).toContainText(ORG);
     await page.goto('/h/conversations');

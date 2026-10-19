@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { waitForLoaded } from './loaded';
+import { openInFull } from './peek';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
@@ -26,6 +27,8 @@ test.describe('«lo conozco»', () => {
 
     const contact = row.locator('td').nth(1).getByRole('link');
     await contact.click();
+    // From the lens the person opens in the vistazo (ADR-139 p1); the switch lives on the page.
+    await openInFull(page);
     await page.waitForURL(/\/h\/[^/]+\/person\//);
     await waitForLoaded(page);
 

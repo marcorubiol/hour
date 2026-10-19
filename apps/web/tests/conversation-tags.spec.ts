@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { waitForLoaded } from './loaded';
+import { openInFull } from './peek';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
@@ -86,6 +87,8 @@ test.describe('conversation tags', () => {
 
     // 3. The file shows its tags; whoever edits changes them.
     await all.getByRole('link', { name: ORG, exact: true }).click();
+    // The vistazo first (ADR-139 p1), then the page.
+    await openInFull(page);
     await expect(page).toHaveURL(/\/conversation\//);
     const tags = page.getByTestId('conversation-tags');
     await expect(tags.locator('.tag-chip')).toHaveText(['Press'], { timeout: 15_000 });

@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   MISSING_MAX,
   ROADSHEET_SHARE_DAYS,
+  boloMissing,
   conversationMissing,
+  dateMissing,
   performanceMissing,
   personMissing,
   stepShortcuts,
@@ -10,6 +12,7 @@ import {
   type PerformanceMissingInput,
 } from './record-missing';
 import { addDaysIso } from './planner';
+import { invoicesByBolo, type MoneyBolo } from './money';
 
 // ── Función ────────────────────────────────────────────────────────────────
 
@@ -231,5 +234,86 @@ describe('stepShortcuts', () => {
 
   it('crosses months and years', () => {
     expect(stepShortcuts('2026-12-25')).toEqual({ tomorrow: '2026-12-26', monday: '2026-12-28', two_weeks: '2027-01-08' });
+  });
+});
+
+// ── Fecha ──────────────────────────────────────────────────────────────────
+
+describe('dateMissing', () => {
+  const date = (over: Partial<Parameters<typeof dateMissing>[0]> = {}) => ({
+    kind: 'rehearsal',
+    status: 'confirmed',
+    day: addDaysIso(TODAY, 3),
+    stages: null,
+    ...over,
+  });
+
+  it('a confirmed rehearsal to come asks for nothing', () => {
+    expect(dateMissing(date(), TODAY)).toEqual([]);
+  });
+
+  it('an option to come asks to be confirmed or let go', () => {
+    expect(dateMissing(date({ status: 'tentative' }), TODAY)).toEqual([{ kind: 'date_tentative' }]);
+  });
+
+  it('a trip to come with no stage says nothing tells how to get there', () => {
+    expect(dateMissing(date({ kind: 'travel_day', stages: 0 }), TODAY)).toEqual([{ kind: 'trip_no_stages' }]);
+    expect(dateMissing(date({ kind: 'travel_day', stages: 2 }), TODAY)).toEqual([]);
+  });
+
+  it('stages not read yet are not «no stages»', () => {
+    expect(dateMissing(date({ kind: 'travel_day', stages: null }), TODAY)).toEqual([]);
+  });
+
+  it('a past, cancelled or done date asks for nothing', () => {
+    expect(dateMissing(date({ status: 'tentative', day: addDaysIso(TODAY, -1) }), TODAY)).toEqual([]);
+    expect(dateMissing(date({ status: 'cancelled', kind: 'travel_day', stages: 0 }), TODAY)).toEqual([]);
+    expect(dateMissing(date({ status: 'done', kind: 'travel_day', stages: 0 }), TODAY)).toEqual([]);
+  });
+
+  it('today still counts as to come, read from an instant too', () => {
+    expect(dateMissing(date({ status: 'tentative', day: `${TODAY}T08:00:00Z` }), TODAY)).toEqual([
+      { kind: 'date_tentative' },
+    ]);
+  });
+});
+
+// ── Bolo ───────────────────────────────────────────────────────────────────
+
+describe('boloMissing', () => {
+  const bolo = (over: Partial<MoneyBolo> = {}): MoneyBolo => ({
+    id: 'b',
+    project_id: 'p',
+    line_id: null,
+    conversation_id: null,
+    venue_name: 'Teatre',
+    city: 'Girona',
+    country: 'ES',
+    fee_amount: 1000,
+    fee_currency: 'EUR',
+    status: 'done',
+    collected: 0,
+    function_count: 1,
+    first_performed_at: '2026-09-20T18:00:00Z',
+    last_performed_at: '2026-09-20T18:00:00Z',
+    project: { id: 'p', slug: 'obra', name: 'Obra', accent: null, workspace_id: 'w' },
+    ...over,
+  });
+  const ctx = { invoicesByBolo: invoicesByBolo([]), termsByPayer: new Map(), modeOf: () => 'legal' as const, today: new Date(`${TODAY}T10:00:00Z`) };
+
+  it('says what Cuentas says of it: a function done without an invoice', () => {
+    expect(boloMissing(bolo(), ctx).map((i) => i.kind)).toEqual(['to_invoice']);
+  });
+
+  it('a function done without a fee asks for the fee', () => {
+    expect(boloMissing(bolo({ fee_amount: null }), ctx).map((i) => i.kind)).toEqual(['no_fee']);
+  });
+
+  it('a bolo still to perform asks for nothing', () => {
+    expect(boloMissing(bolo({ status: 'confirmed', first_performed_at: '2026-12-01T19:00:00Z', last_performed_at: '2026-12-01T19:00:00Z' }), ctx)).toEqual([]);
+  });
+
+  it('with invoicing off, nothing to invoice', () => {
+    expect(boloMissing(bolo(), { ...ctx, modeOf: () => 'off' as const })).toEqual([]);
   });
 });

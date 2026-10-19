@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { waitForLoaded } from './loaded';
+import { openInFull } from './peek';
 
 /**
  * Scope ⇄ URL sync (ADR-067) — regression suite.
@@ -112,6 +113,8 @@ test('a scope change on a person opened from Conversations lands back on Convers
 
   // The contact's link (ADR-102: the first link of a row is the organization).
   await page.locator('tbody tr').first().locator('td').nth(1).getByRole('link').click();
+  // The vistazo first (ADR-139 p1), then the page this test is about.
+  await openInFull(page);
   await page.waitForURL(/\/h\/[^/]+\/person\//);
   await waitForLoaded(page);
 

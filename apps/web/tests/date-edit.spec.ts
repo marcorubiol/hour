@@ -111,6 +111,21 @@ async function createFixtureDate(
   );
 }
 
+/**
+ * THE DATE OPENS IN ITS VISTAZO (ADR-139 p1): pressing a date shows it, and
+ * «Edit» there opens the dialog this file is about. The dialog is the
+ * `.dialog` one: the vistazo is a <dialog> of its own, open under it.
+ */
+async function editFromPeek(page: Page) {
+  const peek = page.getByTestId('peek');
+  await expect(peek).toBeVisible();
+  await expect(peek.getByTestId('date-record')).toBeVisible();
+  await peek.getByRole('button', { name: 'Edit', exact: true }).click();
+  const dialog = page.locator('dialog.dialog[open]');
+  await expect(dialog).toBeVisible();
+  return dialog;
+}
+
 /** One date row by id, straight from the feed — the truth after a write. */
 async function readDate(page: Page, id: string, day: string) {
   return page.evaluate(
@@ -168,8 +183,7 @@ test.describe('date edit path (task 15)', () => {
     await expect(chip).toBeVisible();
     await chip.click();
 
-    const dialog = page.locator('dialog[open]');
-    await expect(dialog).toBeVisible();
+    const dialog = await editFromPeek(page);
     await expect(dialog).toContainText('Edit date');
 
     // Save with the time untouched — the roundtrip guard. Change only the
@@ -217,8 +231,7 @@ test.describe('date edit path (task 15)', () => {
     await expect(row).toBeVisible();
     await row.click();
 
-    const dialog = page.locator('dialog[open]');
-    await expect(dialog).toBeVisible();
+    const dialog = await editFromPeek(page);
 
     // rehearsal → travel day: the direction segment appears, and the
     // endpoint must accept a direction it previously would have rejected.
@@ -229,6 +242,9 @@ test.describe('date edit path (task 15)', () => {
 
     const after = await readDate(page, created!.id, day);
     expect(after!.kind).toBe('travel_day');
+    // Esc closes the vistazo and gives the diary back.
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('peek')).toBeHidden();
 
     // Back to a rehearsal — the endpoint clears travel_direction on the
     // way out instead of tripping the DB CHECK (a 400 here means the
@@ -237,8 +253,7 @@ test.describe('date edit path (task 15)', () => {
     // `.first()`, so a pulse slip would not have failed — it would have been
     // CLICKED, and the pulse's slip is a link to the day, not the dialog.
     await diary.locator('.slip[data-kind="travel_day"]', { hasText: 'Testville' }).first().click();
-    const back = page.locator('dialog[open]');
-    await expect(back).toBeVisible();
+    const back = await editFromPeek(page);
     await back.getByRole('radio', { name: 'Rehearsal', exact: true }).check();
     await back.getByRole('button', { name: 'Save changes' }).click();
     await expect(back).toBeHidden({ timeout: 10_000 });
@@ -259,7 +274,7 @@ test.describe('date edit path (task 15)', () => {
       await expect(chip).toBeVisible();
       await chip.click();
 
-      const dialog = page.locator('dialog[open]');
+      const dialog = await editFromPeek(page);
       const del = dialog.getByRole('button', { name: 'Delete', exact: true });
       await del.click();
       // First press only ARMS it — the row must still be there.
@@ -269,6 +284,8 @@ test.describe('date edit path (task 15)', () => {
       await dialog.getByRole('button', { name: 'Delete for good?' }).click();
       await expect(dialog).toBeHidden({ timeout: 10_000 });
       expect(await readDate(page, created.id, day)).toBeNull();
+      // What it was looking at is gone: the vistazo goes with it.
+      await expect(page.getByTestId('peek')).toBeHidden({ timeout: 10_000 });
     }
 
     // Sweep any leftover from a run that died mid-flight. Scoped to the
