@@ -615,10 +615,8 @@
 {:else if !loading && items.length === 0}
   {@const unfiltered = !filters.q && !filters.turno && !filters.temp && !filters.temporada && !filters.envio && !filters.relacion}
   {#if importEmptyState && unfiltered}
-    <div class="empty-book">
-      <p class="empty-book__title">{t('conversations.empty_title', locale)}</p>
-      <p>{t('conversations.empty_body', locale)}</p>
-    </div>
+    <!-- The first-time empty speaks in the same voice as every other one. -->
+    <EmptyLine text={`${t('conversations.empty_title', locale)} ${t('conversations.empty_body', locale)}`} />
   {:else}
     <!-- «No match» only when something filters; a list that is simply empty says so. -->
     <EmptyLine text={unfiltered ? t('conversations.none_yet', locale) : t('conversations.no_match', locale)} />
@@ -728,26 +726,6 @@
       border-block-end-color: var(--text-color);
       color: var(--text-color);
       font-weight: 500;
-    }
-
-    .empty-book {
-      padding-block: clamp(var(--space-xl), 8vw, var(--space-3xl));
-      padding-inline: var(--space-m);
-      text-align: center;
-      border-block-end: var(--divider);
-      color: var(--text-muted);
-    }
-    /* The display italic of the lens titles (`--font-serif` does not exist,
-       so this fell back to a big sans, diseño B10). */
-    .empty-book__title {
-      margin-block-end: var(--space-xs);
-      font-family: var(--font-display);
-      font-style: italic;
-      font-size: var(--text-xl);
-      color: var(--heading-color);
-    }
-    .empty-book p {
-      margin-block-start: 0;
     }
 
     .grouping-note {

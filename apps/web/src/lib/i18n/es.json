@@ -2058,7 +2058,7 @@
   "desk.next_tomorrow": "mañana",
   "desk.next_in_days": "en {n} días",
   "desk.next_empty": "Nada en las próximas dos semanas",
-  "desk.next_far": "Nada en dos semanas · lo siguiente, {day} en {place}",
+  "desk.next_far": "lo siguiente, {day} en {place}",
   "desk.next_then": "Luego",
   "desk.next_before": "Antes",
   "desk.next_ask": "¿Vas?",

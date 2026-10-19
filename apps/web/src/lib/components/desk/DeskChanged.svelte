@@ -9,6 +9,7 @@
   import FirstTimeNote from '$lib/components/FirstTimeNote.svelte';
   import Button from '$lib/components/Button.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { t, type Locale } from '$lib/i18n';
   import { lensOn } from '$lib/lenses.svelte';
   import { feedHref, feedThreadName, feedTitle } from '$lib/threads';
@@ -128,7 +129,7 @@
         {/each}
       </ul>
     {:else if !errored}
-      <p class="dband__empty">{quietLabel}</p>
+      <EmptyLine text={quietLabel} />
     {/if}
     {#if errored}<p class="load-fail" role="alert"><span>{t('desk.changed_error', locale)}</span><Button size="xs" variant="secondary" onclick={onretry}>{t('ui.retry', locale)}</Button></p>{/if}
   {/if}

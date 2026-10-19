@@ -2067,7 +2067,7 @@
   "desk.next_tomorrow": "tomorrow",
   "desk.next_in_days": "in {n} days",
   "desk.next_empty": "Nothing in the next two weeks",
-  "desk.next_far": "Nothing in two weeks · next, {day} in {place}",
+  "desk.next_far": "next, {day} in {place}",
   "desk.next_then": "Then",
   "desk.next_before": "Before",
   "desk.next_ask": "Going?",

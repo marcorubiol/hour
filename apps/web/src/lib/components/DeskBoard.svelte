@@ -23,6 +23,7 @@
    * they are scoped to this file and carry no meaning outside it.
    */
   import TagChip from '$lib/components/TagChip.svelte';
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { accentVar } from '$lib/utils/accent';
   import { conversationVerbKey, dayBucket } from '$lib/desk-feed';
   import { localeWeekdayShort } from '$lib/datetime';
@@ -139,11 +140,11 @@
 
 <div class="agenda-wrap">
   {#if loading}
-    <p class="agenda-empty">{t('desk.loading', locale)}</p>
+    <EmptyLine busy text={t('desk.loading', locale)} />
   {:else if error}
-    <p class="agenda-empty agenda-empty--err">{t('desk.week_error', locale)}</p>
+    <p class="load-fail" role="alert"><span>{t('desk.week_error', locale)}</span></p>
   {:else if grouped.length === 0}
-    <p class="agenda-empty">{t('desk.week_empty', locale)}</p>
+    <EmptyLine text={t('desk.week_empty', locale)} />
   {:else}
     <div class="week">
       {#each grouped as group (group.day)}
@@ -275,17 +276,6 @@
       border-radius: var(--radius-circle);
       background: var(--c, var(--text-faint));
       flex: none;
-    }
-
-    .agenda-empty {
-      color: var(--text-muted);
-      font-style: italic;
-      font-family: var(--font-display);
-      padding-block: var(--space-l);
-      text-align: center;
-    }
-    .agenda-empty--err {
-      color: var(--danger);
     }
 
     .week__more {

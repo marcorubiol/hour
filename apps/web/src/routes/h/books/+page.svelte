@@ -30,6 +30,7 @@
   import { fetchJSON, mutateJSON } from '$lib/api';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import Button from '$lib/components/Button.svelte';
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import Chip from '$lib/components/Chip.svelte';
   import MoneyInvoices from '$lib/components/MoneyInvoices.svelte';
   import LensHeader from '$lib/components/LensHeader.svelte';
@@ -935,7 +936,7 @@
   {/if}
 
   {#if noAccess}
-    <p class="mny__state" data-testid="money-no-access">{t('books.no_access', locale)}</p>
+    <p class="empty-line" data-testid="money-no-access">{t('books.no_access', locale)}</p>
   {:else}
 
     {#if bolosError}
@@ -1017,7 +1018,7 @@
 
       {#if seasonEmpty}
         <div class="mny__empty">
-          <p class="mny__state">{t('books.season_empty', locale, { season: seasonLabel(season) })}</p>
+          <EmptyLine text={t('books.season_empty', locale, { season: seasonLabel(season) })} />
           <div class="mny__empty-acts">
             <Button size="xs" onclick={openDeal} disabled={projectIndex.length === 0}>{t('books.new_deal', locale)}</Button>
             {#if previousSeason !== null}
@@ -1042,7 +1043,7 @@
             {:else if loading}
               {@render ghost(3)}
             {:else if attention.length === 0}
-              <p class="mny__state">{t('books.attention_none', locale)}</p>
+              <EmptyLine text={t('books.attention_none', locale)} />
             {:else}
               <ul class="att__list" role="list">
                 {#each attentionShown as item (item.kind + item.bolo.id)}
@@ -1137,7 +1138,7 @@
             {@render ghost(4)}
           {:else if ledgerRows.length === 0}
             {#if !(seasonEmpty && filter === 'all')}
-              <p class="mny__state">{t(filter === 'all' ? 'books.ledger_empty' : 'books.ledger_empty_filter', locale)}</p>
+              <EmptyLine text={t(filter === 'all' ? 'books.ledger_empty' : 'books.ledger_empty_filter', locale)} />
             {/if}
           {:else}
             <table class="book">
@@ -1259,7 +1260,7 @@
           {#if expensesError}
             {@render failed('books.err_expenses', () => $expensesQuery.refetch())}
           {:else if expenses.length === 0}
-            <p class="mny__state">{t('books.no_expenses_scope', locale)}</p>
+            <EmptyLine text={t('books.no_expenses_scope', locale)} />
           {:else}
             <ul class="mny__expenses" role="list">
               {#each expenses as expense (expense.id)}
@@ -1416,7 +1417,6 @@
     .mny__season { appearance: none; border: 0; background: none; padding: 0; font: inherit; cursor: pointer; text-underline-offset: 0.25em; }
     .mny__season:hover { color: var(--text-color); }
     .mny__season[aria-current='true'] { text-decoration: underline; }
-    .mny__state { font-size: var(--text-s); color: var(--text-faint); }
     .mny__ghost { display: grid; gap: var(--space-xs); font-size: var(--text-s); }
     .mny__note { font-size: var(--text-xs); color: var(--text-faint); }
     .mny__empty { display: flex; flex-direction: column; gap: var(--space-s); align-items: flex-start; }

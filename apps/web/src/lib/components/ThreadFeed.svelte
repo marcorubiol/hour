@@ -14,6 +14,7 @@
   import { fetchJSON } from '$lib/api';
   import ThreadFeedRow from '$lib/components/ThreadFeedRow.svelte';
   import { t, type Locale } from '$lib/i18n';
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import {
     THREAD_REFRESH_MS,
     boloDays,
@@ -70,11 +71,11 @@
 
 <section class="feed" aria-busy={$feedQuery.isLoading} aria-label={t('team.feed_aria', locale)}>
   {#if $feedQuery.isLoading}
-    <p class="feed__msg">{t('conversations.loading', locale)}</p>
+    <EmptyLine busy text={t('conversations.loading', locale)} />
   {:else if $feedQuery.isError}
-    <p class="feed__msg">{t('threads.feed_error', locale)}</p>
+    <EmptyLine text={t('threads.feed_error', locale)} />
   {:else if feed && feed.threads.length === 0}
-    <p class="feed__msg">{t('threads.feed_empty', locale)}</p>
+    <EmptyLine text={t('threads.feed_empty', locale)} />
   {:else if feed}
     <ul class="feed__list">
       {#each feed.threads as th (th.thread_id)}
@@ -89,11 +90,6 @@
 
 <style>
   @layer components {
-    .feed__msg {
-      font-size: var(--text-s);
-      color: var(--text-faint);
-    }
-
     .feed__list {
       list-style: none;
       margin: 0;

@@ -16,6 +16,7 @@
    */
 
   import StateBadge from '$lib/components/StateBadge.svelte';
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
@@ -322,7 +323,7 @@
         </BlockHead>
         <FirstTimeNote event="first_reply_waiting" when={data.due.count > 0} />
         {#if data.due.count === 0}
-          <p class="block__empty">{t('overview.due_empty', locale)}</p>
+          <EmptyLine text={t('overview.due_empty', locale)} />
         {:else}
           <ol class="rows">
             {#each data.due.rows as row, i (row.id)}
@@ -371,7 +372,7 @@
           {#if data.hot.count > 0}<a class="block-head__act" href={link('temp=caliente#lista')}>{t('overview.see_n', locale, { n: data.hot.count })}</a>{/if}
         </BlockHead>
         {#if data.hot.count === 0}
-          <p class="block__empty">{t('overview.hot_empty', locale)}</p>
+          <EmptyLine text={t('overview.hot_empty', locale)} />
         {:else}
           <ol class="rows">
             {#each data.hot.rows as row (row.id)}
@@ -404,7 +405,7 @@
           <span class="block__hint">{t(data.season.lines.length > 0 ? 'overview.season_hint_lines' : 'overview.season_hint', locale)}</span>
         </BlockHead>
         {#if data.season.total === 0}
-          <p class="block__empty">{t('overview.season_empty', locale)}</p>
+          <EmptyLine text={t('overview.season_empty', locale)} />
         {:else}
           {#if data.season.lines.length > 0}
             <!-- One bar per line, «sin línea» last and never hidden (ADR-135). -->
@@ -445,7 +446,7 @@
           {#if data.cold.count > 0}<a class="block-head__act" href={link('temp=fria#lista')}>{t('overview.see_n', locale, { n: data.cold.count })}</a>{/if}
         </BlockHead>
         {#if data.cold.count === 0}
-          <p class="block__empty">{t('overview.cold_empty', locale)}</p>
+          <EmptyLine text={t('overview.cold_empty', locale)} />
         {:else}
           <ol class="rows">
             {#each data.cold.rows as row, i (row.id)}
@@ -568,11 +569,6 @@
     .board__undated a:hover {
       color: var(--text-color);
     }
-    .block__empty {
-      font-size: var(--text-s);
-      color: var(--text-faint);
-    }
-
     .block {
       display: flex;
       flex-direction: column;

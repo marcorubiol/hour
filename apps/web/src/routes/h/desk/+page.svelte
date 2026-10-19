@@ -874,17 +874,8 @@
     .desk :global(.dband > .block-head) {
       margin-block-end: var(--space-s);
     }
-    /* A failure is base.css's `.load-fail`, the one voice of the dashboards. */
-    .desk :global(.dband__empty) {
-      margin: 0;
-      font-family: var(--font-display);
-      font-style: italic;
-      font-size: var(--text-s);
-      color: var(--text-muted);
-    }
-    .desk :global(.dband__empty a) {
-      color: inherit;
-    }
+    /* A failure is base.css's `.load-fail`, the one voice of the dashboards;
+       an empty band is EmptyLine, the one voice of every block. */
 
     /* Phone: one column, in DOM order (1, 2, 4, 3): no `order`, so the tab
        and the screen reader go where the eye goes (móvil #2). */

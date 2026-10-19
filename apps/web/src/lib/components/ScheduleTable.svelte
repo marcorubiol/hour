@@ -23,6 +23,7 @@
    */
 
   import { dualTime } from '$lib/datetime';
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { appLocale, t, type Locale } from '$lib/i18n';
   import { KIND_WORD_KEYS } from '$lib/running-order';
   import type { ScheduleMoment } from '$lib/schedule-slot';
@@ -81,7 +82,7 @@
     </tbody>
   </table>
 {:else}
-  <p class="schedule__empty">{t('perf.no_schedule', locale)}</p>
+  <EmptyLine text={t('perf.no_schedule', locale)} />
 {/if}
 
 <style>
@@ -116,11 +117,6 @@
     .schedule__time-alt {
       margin-inline-start: var(--space-xs);
       font-size: var(--text-xs);
-      color: var(--text-faint);
-    }
-
-    .schedule__empty {
-      font-size: var(--text-s);
       color: var(--text-faint);
     }
   }

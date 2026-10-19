@@ -12,6 +12,7 @@
    */
   import Button from '$lib/components/Button.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import ConceptHint from '$lib/components/ConceptHint.svelte';
   import FirstTimeNote from '$lib/components/FirstTimeNote.svelte';
   import { useQueryClient } from '@tanstack/svelte-query';
@@ -150,16 +151,18 @@
     </div>
     <p class="then" aria-hidden="true"><span class="ghost-line" style:inline-size="35%">&nbsp;</span></p>
   {:else if !next || !slip}
-    <p class="dband__empty">{t('desk.next_empty', locale)}</p>
+    <EmptyLine text={t('desk.next_empty', locale)} />
   {:else if daysTo(next.day) > 14}
-    <!-- Far away is still «the next thing»: the band says which, as the rail does. -->
-    <p class="dband__empty">
+    <!-- Far away is still «the next thing»: the band says which, as the rail
+         does, as the empty line's way out. -->
+    <EmptyLine text={t('desk.next_empty', locale)}>
       <svelte:element
         this={farHref ? 'a' : 'span'}
+        class={farHref ? 'empty-line__act' : undefined}
         href={farHref}
         >{t('desk.next_far', locale, { day: localeDayMonthNear(next.day, today, locale), place: slip.city || slip.name })}{farHref ? ' →' : ''}</svelte:element
       >
-    </p>
+    </EmptyLine>
   {:else}
     {#if thenBefore}{@render thenLine()}{/if}
     <div class="card" data-testid="desk-next">

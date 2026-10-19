@@ -2053,7 +2053,7 @@
   "desk.next_tomorrow": "demain",
   "desk.next_in_days": "dans {n} jours",
   "desk.next_empty": "Rien dans les deux prochaines semaines",
-  "desk.next_far": "Rien dans les deux semaines · ensuite, {day} à {place}",
+  "desk.next_far": "ensuite, {day} à {place}",
   "desk.next_then": "Ensuite",
   "desk.next_before": "Avant",
   "desk.next_ask": "Vous y allez ?",
