@@ -4567,3 +4567,9 @@ es la casa, se llega por el logo). Marco decidió en el chat (19-10). Carril `cl
    título «1 vencida · 2 te esperan» y «Lo siguiente»). Con ella se va `hall-status.ts`. La propuesta de la IA, que
    el Hall reservaba como cuarto estado de la frase (ADR-069), ya vive en «Te espera». Enmienda ADR-121: la cabecera
    de Desk lleva saludo y hora; las bandas no cambian.
+3. **Desk se traduce: Hoy, Avui, Aujourd’hui, Today.** Era la única palabra en inglés de la barra en castellano, y
+   los dos revisores propusieron «Hoy»/«Today» sin hablarse. Se traduce lo que es, como Books (ADR-088 B), y no
+   choca con «Agenda» (ADR-065). Cambia `lens.desk`: la barra, el título de la pestaña (ADR-130 § 5), el nombre
+   accesible del reloj del rail y las frases que nombran la sección (Ajustes de secciones, el recordatorio de
+   Cuentas, la ayuda del módulo de tareas). ⌘K no lista secciones, así que no tiene nada que cambiar. La ruta sigue
+   siendo `/h/desk` y el código sigue diciendo `desk`.

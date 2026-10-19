@@ -234,7 +234,8 @@ back to this doc.
 The nav layer is **one home + three lenses**:
 
 - **Desk** — the home / the "now": what needs me + what's next + tasks (planned or not). Reached by the
-  logo (the rail's clock) and on sign-in: there is no page before it (ADR-137). Revives the ADR-008 name (fits now that tasks return); replaces "Agenda", which reads as
+  logo (the rail's clock) and on sign-in: there is no page before it (ADR-137). Labelled by what it is in
+  each language (Today · Hoy · Avui · Aujourd’hui); the route and the code keep `desk`. Revives the ADR-008 name (fits now that tasks return); replaces "Agenda", which reads as
   "calendar" in ES/CA/FR and blurred with the planning lens.
 - **Planner** — month grid / planning / conflict-detection. A ⌘K lens.
 - **Conversations** — your booking network: persons + conversations. **Not "People"** — the lens holds
