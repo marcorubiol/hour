@@ -13,7 +13,7 @@ import { loadEnvFile } from 'node:process';
  *   - en el móvil, las barras apiladas en una columna, sin scroll lateral.
  *
  * En el espacio `playwright`, en `zzz-e2e-collab`, con dos conversaciones del
- * propio spec (nunca `muk-cia`): una en «ZZZ E2E Main Line» y otra sin línea.
+ * propio spec (nunca `muk-cia`): una en «ZZZ E2E Modules» y otra sin línea.
  * Autolimpiante.
  *
  * Contra un origen desplegado (PW_BASE_URL) o `vite dev` con su Supabase;
@@ -64,7 +64,7 @@ test.describe('la temporada por línea (ADR-135)', () => {
     const line = await h.pgGet<{ id: string }>(
       'line',
       jwt,
-      new URLSearchParams({ name: 'eq.ZZZ E2E Main Line', deleted_at: 'is.null', select: 'id' }),
+      new URLSearchParams({ name: 'eq.ZZZ E2E Modules', deleted_at: 'is.null', select: 'id' }),
     );
     lineId = line.rows[0].id;
     await conversation(IN_LINE, lineId);

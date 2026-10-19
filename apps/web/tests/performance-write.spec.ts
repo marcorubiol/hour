@@ -52,7 +52,7 @@ test.describe('performance write path', () => {
     const day = runDay();
     const venue = `E2E Venue ${Date.now()}`;
 
-    await page.goto('/h/planner'); // ADR-067: lens is space-less
+    await page.goto('/h/planner?view=month'); // ADR-067: lens is space-less; month, the grid
     await waitForLoaded(page);
     await expect(page.locator('.cal__grid')).toBeVisible();
 
@@ -108,7 +108,7 @@ test.describe('performance write path', () => {
     await expect(page.locator('.hours')).toContainText('11h', { timeout: 10_000 });
 
     // The gig shows up on its calendar day.
-    await page.goto('/h/planner'); // ADR-067: lens is space-less
+    await page.goto('/h/planner?view=month'); // ADR-067: lens is space-less; month, the grid
     // Navigate to the right month (2032 — click next until the chip shows,
     // bounded). Cheaper: assert via API that the row exists with the data.
     const raw = await page.evaluate(
