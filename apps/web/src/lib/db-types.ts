@@ -2998,6 +2998,41 @@ export type Database = {
         }
         Relationships: []
       }
+      person_acquaintance: {
+        Row: {
+          created_at: string
+          person_id: string
+          shared: boolean
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          person_id: string
+          shared?: boolean
+          updated_at?: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          person_id?: string
+          shared?: boolean
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "person_acquaintance_workspace_person_fkey"
+            columns: ["workspace_id", "person_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_person"
+            referencedColumns: ["workspace_id", "person_id"]
+          },
+        ]
+      }
       project: {
         Row: {
           accent: string | null
@@ -6507,6 +6542,28 @@ export type Database = {
       revoke_workspace_member: {
         Args: { p_membership_id: string }
         Returns: undefined
+      }
+      set_acquaintance: {
+        Args: {
+          p_known: boolean
+          p_person_id: string
+          p_shared?: boolean
+          p_workspace_id: string
+        }
+        Returns: {
+          created_at: string
+          person_id: string
+          shared: boolean
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "person_acquaintance"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       set_commitment_person: {
         Args: {
