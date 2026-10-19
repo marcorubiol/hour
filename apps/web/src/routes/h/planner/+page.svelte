@@ -85,6 +85,7 @@
   } from '$lib/board-lanes';
   import { awayRest, coversDay } from '$lib/away';
   import CalToolbar from '$lib/components/planner/CalToolbar.svelte';
+  import CalNav from '$lib/components/planner/CalNav.svelte';
   import Button from '$lib/components/Button.svelte';
   import CalLegend from '$lib/components/planner/CalLegend.svelte';
   import DayStrip from '$lib/components/planner/DayStrip.svelte';
@@ -3009,6 +3010,15 @@
       {:else if view === 'agenda' || view === 'board'}<LensTitle text={horizonTitle} />
       {:else}<LensTitle text={monthLabel} />{/if}
     {/snippet}
+    <!-- THE ARROWS GO WITH THE TITLE THEY MOVE (ADR-136): in Day, Agenda,
+         Month and Board the title IS the window. The Season's title is its
+         horizon from today, which does not step, so it has none and nothing
+         is kept for them. -->
+    {#snippet titleAside()}
+      {#if view !== 'overview'}
+        <CalNav {view} {locale} onStepBack={stepBack} onStepNext={stepNext} onNow={goToday} />
+      {/if}
+    {/snippet}
   </LensHeader>
 
 
@@ -3258,9 +3268,6 @@
     calm={calm.on}
     {canBlackout}
     {locale}
-    onStepBack={stepBack}
-    onStepNext={stepNext}
-    onNow={goToday}
     onSetView={setView}
     onSetLaneAxis={setLaneAxis}
     onCreate={() => openCreate()}

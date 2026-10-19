@@ -4542,3 +4542,26 @@ Carril `claude/season-lines`. Sin migración.
 
 **Re-evaluar cuando** Marco la use una campaña: si la nota global (contestadas / sin respuesta) sobra con las cifras
 por línea, y si con muchas líneas hace falta plegar las pequeñas.
+
+## [2026-10-19] ADR-136 · Planner: las flechas y «Ahora» van junto al título; las pestañas empiezan siempre a la izquierda (enmienda ADR-120 § 7, ADR-122 § 12 y la pasada de coherencia)
+
+**Contexto.** Las flechas ‹ › y «Ahora» iban delante de las pestañas de vista. En la Temporada no existen (ADR-120
+§ 7) y su hueco quedaba guardado, invisible e inerte, para que las pestañas no se movieran entre vistas (ADR-122 § 12,
+ADR-123, ADR-130). En la Temporada ese hueco se veía como un vacío a la izquierda de las pestañas y se leía como un
+fallo. Marco (19-10) eligió moverlas junto al título. Carril `claude/planner-arrows`. Sin migración.
+
+**Decisión.**
+1. **Las flechas y «Ahora» van junto al título**, que en Día, Agenda, Mes y Tablero es la ventana que mueven
+   («Octubre 2026», «Lun 20 oct», «Desde 18 oct»). `LensHeader` recupera `titleAside`, fuera del `h1`; el Planner pone
+   ahí `CalNav`. Mismos tamaños que tenían (28 px, 44 px con puntero grueso).
+2. **Las pestañas empiezan siempre a la izquierda, en las cinco vistas, sin hueco reservado.** En la Temporada el
+   título es su horizonte («19 oct → 10 ene») y no lleva flechas: no se dibujan ni se guarda su sitio. Supera la parte
+   de ADR-122 § 12 que guardaba el hueco; la cabecera sigue siendo mueble en sus dos líneas.
+3. **El título no salta**: en escritorio la fila del título mide lo mismo en las cinco vistas (42 px medidos) y las
+   flechas no pasan de la altura del título.
+4. **Móvil:** en una cabecera estrecha (menos de 34rem, medida con una container query sobre la cabecera, no el
+   viewport: ADR-095 § 8) las flechas van siempre en su propia línea bajo el título, con objetivos de 44 px. Así una
+   fecha larga y una corta las dejan en el mismo sitio y el título no se mueve. En la Temporada esa línea no existe.
+5. **Teclado:** el foco sigue el orden visual: título y flechas, luego pestañas. Los atajos no cambian.
+
+**Re-evaluar cuando** Marco lo use en el teléfono: si las flechas debajo del título en el Mes pesan más que al lado.

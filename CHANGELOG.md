@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- En el Planner, las flechas y «Ahora» van junto al título que mueven, y las pestañas de vista empiezan siempre en el mismo sitio: la Temporada ya no deja un hueco vacío. (2026-10-19)
 - En Difusión, «La temporada» se reparte por línea de trabajo: cada línea con su barra de estados y sus cifras, las conversaciones sin línea juntas, y al fijar una línea la temporada es la suya. Cada barra filtra la lista. (2026-10-19)
 - Conversaciones vuelve a ser una sola lente, con dos vistas: **Difusión** (Contratación en música), con las salas, la lista, la ficha y el envío; y **Equipo**, con los hilos del equipo de cada bolo y sala, los nuevos arriba. La dirección vieja de «De qué se habla» lleva a Equipo. (2026-10-19)
 - En Desk, la tarjeta de lo siguiente dice quién va; la puerta del Planner cuenta los choques como la Temporada; y «Ha cambiado» dice los cobros nuevos. (2026-10-19)
