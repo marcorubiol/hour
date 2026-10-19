@@ -1,8 +1,14 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { waitForLoaded } from './loaded';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
+
+/** The record keeps the venue's inside folded under «Details» (ADR-139 p2): open it. */
+async function openDetails(page: Page) {
+  const lid = page.getByTestId('record-details').locator('button.lid');
+  if ((await lid.getAttribute('aria-expanded')) !== 'true') await lid.click();
+}
 
 /**
  * E2E — venue entity linking (ADR-049): promote the typed venue fields to
@@ -108,7 +114,9 @@ test.describe('venue linking', () => {
     await dialog.getByRole('button', { name: 'Save changes', exact: true }).click();
     await expect(dialog).not.toBeVisible({ timeout: 10_000 });
 
-    // The production block shows the venue timezone and the contact.
+    // The production block shows the venue timezone and the contact. It is
+    // reference, so it sits folded under «Details» (ADR-139 p2).
+    await openDetails(page);
     await expect(page.locator('.production__venue-meta')).toContainText(
       'Europe/Paris',
       { timeout: 10_000 },
@@ -120,6 +128,7 @@ test.describe('venue linking', () => {
     // Survives a full reload (server round-trip, not cache).
     await page.reload();
     await waitForLoaded(page);
+    await openDetails(page);
     await expect(page.locator('.production__venue-meta')).toContainText('Europe/Paris');
     await expect(page.locator('.production__contacts')).toContainText('+34 600 000 001');
 

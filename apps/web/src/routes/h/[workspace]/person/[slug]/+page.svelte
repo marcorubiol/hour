@@ -23,7 +23,10 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import { session } from '$lib/session.svelte';
   import { relationLabel, relationTone, type Relation } from '$lib/conversation-relation';
-  import { dayLabel, dayMonthYearTs } from '$lib/datetime';
+  import { dayLabel, dayMonthYearTs, localDayISO } from '$lib/datetime';
+  import MissingBand, { type MissingItem } from '$lib/components/MissingBand.svelte';
+  import { personMissing } from '$lib/record-missing';
+  import { relativeContactDate } from '$lib/conversation';
   import { appLocale, t } from '$lib/i18n';
   import RecordHead from '$lib/components/RecordHead.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
@@ -366,6 +369,22 @@
   let placeLine = $derived(
     file ? [file.person.city, file.person.country].filter(Boolean).join(', ') : '',
   );
+
+  // «Falta» (ADR-139 p2): sus conversaciones con el siguiente paso vencido.
+  let missingItems = $derived.by<MissingItem[]>(() => {
+    if (!file) return [];
+    const byId = new Map(file.conversations.map((c) => [c.id, c]));
+    return personMissing(file.conversations, localDayISO()).map((m) => {
+      const c = byId.get(m.conversationId)!;
+      const who = c.organization?.name ?? c.project?.name ?? '';
+      return {
+        id: `step_${m.conversationId}`,
+        text: who ? t('record.missing_step_due_of', locale, { who }) : t('record.missing_step_due', locale),
+        meta: relativeContactDate(m.day, locale),
+        verbs: [{ label: t('record.verb_open', locale), href: `/h/${workspaceSlug}/conversation/${c.id}` }],
+      };
+    });
+  });
 </script>
 
 <svelte:head>
@@ -388,6 +407,9 @@
         {#if file!.person.title}<span>{file!.person.title}</span>{/if}
         {#if file!.person.organization_name}<span class="person__org">{file!.person.organization_name}</span>{/if}
         {#if placeLine}<span>{placeLine}</span>{/if}
+      {/snippet}
+      {#snippet band()}
+        <MissingBand items={missingItems} {locale} />
       {/snippet}
     </RecordHead>
 

@@ -21,7 +21,6 @@
    */
   import { docTitle } from '$lib/doc-title';
   import { lensOn } from '$lib/lenses.svelte';
-  import StateBadge from '$lib/components/StateBadge.svelte';
   import ConceptHint from '$lib/components/ConceptHint.svelte';
   import FirstTimeNote from '$lib/components/FirstTimeNote.svelte';
   import { page } from '$app/state';
@@ -36,7 +35,7 @@
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { spaceCrumb, type Crumb } from '$lib/record-crumbs';
-  import { dayMonth, dayMonthYear, dayMonthYearTs } from '$lib/datetime';
+  import { dayMonth, dayMonthYear, dayMonthYearTs, localDayISO } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
   import Field from '$lib/components/Field.svelte';
@@ -51,6 +50,11 @@
   import OrganizationFiscal from '$lib/components/OrganizationFiscal.svelte';
   import ConversationAcquaintances from '$lib/components/ConversationAcquaintances.svelte';
   import ConversationTags from '$lib/components/ConversationTags.svelte';
+  import Segmented from '$lib/components/Segmented.svelte';
+  import Switch from '$lib/components/Switch.svelte';
+  import Fold from '$lib/components/Fold.svelte';
+  import MissingBand, { type MissingItem } from '$lib/components/MissingBand.svelte';
+  import { conversationMissing, stepShortcuts, type ConversationMissing, type StepShortcut } from '$lib/record-missing';
   import { addToast } from '$lib/components/Toast.svelte';
   import {
     eventDirectionLabel,
@@ -62,8 +66,8 @@
     type ConversationItem,
     type ConversationPatch,
   } from '$lib/conversation';
-  import { followUpDue, turnOf } from '$lib/conversation-overview';
-  import { relationLabel, relationTone, type ConversationBolo } from '$lib/conversation-relation';
+  import { turnOf } from '$lib/conversation-overview';
+  import { relationLabel, type ConversationBolo } from '$lib/conversation-relation';
   import { performanceStatusLabel } from '$lib/performance';
   import { conversationPlannerHref, dayKeyInTz } from '$lib/planner';
   import { firstLine, replySubject, type MailAccountsResponse } from '$lib/mail';
@@ -286,7 +290,6 @@
   });
   let nextOpen = $state(false);
   let turn = $derived(conv ? turnOf({ ...relationInputOf(conv), reply_settled_at: conv.reply_settled_at }, new Date()) : null);
-  let followUp = $derived(conv ? followUpDue({ ...relationInputOf(conv), next_action_at: conv.next_action_at }, new Date()) : false);
   /** «Anotar contacto…» del menú de estado: abre el apunte de abajo. */
   let logOpen = $state(false);
   let logEl = $state<HTMLElement>();
@@ -314,6 +317,121 @@
     if (p?.email) return { full_name: p.full_name, email: p.email };
     return conv?.person?.email ? { full_name: conv.person.full_name, email: conv.person.email } : null;
   });
+
+  // «Escribir correo» desactivado dice por qué (ADR-139 p2): sin buzón que
+  // envíe, o sin email del contacto. Mientras los buzones se leen, nada.
+  let writeBlocked = $derived<'no_mailbox' | 'no_email' | null>(
+    !$mailQuery.isSuccess ? null : sendable.length === 0 ? 'no_mailbox' : !recipient?.email ? 'no_email' : null,
+  );
+  let canWrite = $derived(sendable.length > 0 && Boolean(recipient?.email));
+
+  /** Responder: al último correo de fuera si lo hay (el compositor cae debajo), si no uno nuevo. */
+  function replyToLast() {
+    if (reading !== 'registro') setReading('registro');
+    const last = events.find((e) => e.direction === 'inbound' && e.kind === 'email' && e.source === 'email') ?? null;
+    startCompose(last);
+  }
+
+  // ── «Falta» y el siguiente paso en sitio (ADR-139 p2 A) ────────────────
+  let missing = $derived<ConversationMissing[]>(
+    conv
+      ? conversationMissing(
+          {
+            ...relationInputOf(conv),
+            reply_settled_at: conv.reply_settled_at,
+            next_action_at: conv.next_action_at,
+            next_action_note: conv.next_action_note,
+          },
+          new Date(),
+        )
+      : [],
+  );
+
+  /** El editor del siguiente paso: atajos de fecha en una línea, bajo los hechos. */
+  let stepOpen = $state(false);
+  let stepEl = $state<HTMLElement>();
+  function openStep() {
+    stepOpen = true;
+    requestAnimationFrame(() => stepEl?.querySelector<HTMLElement>('button')?.focus());
+  }
+  const SHORTCUT_WORDS: Record<StepShortcut, string> = {
+    tomorrow: 'record.step_tomorrow',
+    monday: 'record.step_monday',
+    two_weeks: 'record.step_two_weeks',
+  };
+  let shortcuts = $derived(
+    Object.entries(stepShortcuts(localDayISO())) as [StepShortcut, string][],
+  );
+  function setStepDay(day: string) {
+    $patch.mutate({ next_action_at: day });
+    stepOpen = false;
+  }
+  function clearStep() {
+    $patch.mutate({ next_action_at: null, next_action_note: null });
+    stepOpen = false;
+  }
+  let hasStep = $derived(Boolean(conv?.next_action_at || conv?.next_action_note));
+  let stepText = $derived(
+    conv
+      ? [conv.next_action_note, conv.next_action_at ? dayMonthYear(conv.next_action_at) : null].filter(Boolean).join(' · ')
+      : '',
+  );
+
+  function missingItem(m: ConversationMissing): MissingItem {
+    const edit = conv?.can_edit ?? false;
+    switch (m.kind) {
+      case 'reply':
+        return {
+          id: 'reply',
+          text: t('record.missing_reply', locale),
+          meta: relativeContactDate(m.since, locale),
+          verbs: [
+            ...(canWrite ? [{ label: t('record.verb_write', locale), onclick: replyToLast }] : []),
+            ...(edit
+              ? [
+                  {
+                    label: t('overview.settle', locale),
+                    disabled: $patch.isPending,
+                    onclick: () => $patch.mutate({ reply_settled_at: m.since }),
+                  },
+                ]
+              : []),
+          ],
+        };
+      case 'step_due':
+        return {
+          id: 'step_due',
+          text: t('record.missing_step_due', locale),
+          // El paso ya está en los hechos: aquí, cuánto hace que venció.
+          meta: relativeContactDate(m.day, locale),
+          verbs: edit ? [{ label: t('record.verb_postpone', locale), onclick: openStep }] : [],
+        };
+      case 'step_undated':
+        return {
+          id: 'step_undated',
+          text: t('record.missing_step_undated', locale),
+          verbs: edit ? [{ label: t('record.verb_set_date', locale), onclick: openStep }] : [],
+        };
+      case 'no_step':
+        return {
+          id: 'no_step',
+          text: t('record.missing_no_step', locale),
+          verbs: edit ? [{ label: t('record.verb_add_step', locale), onclick: openStep }] : [],
+        };
+    }
+  }
+  let missingItems = $derived(missing.map(missingItem));
+
+  // «Detalles»: lo de consulta (datos fiscales, «lo conozco», privacidad,
+  // buzones), plegado. Cerrado dice lo que guarda que se sepa sin abrir.
+  let detailsKeeps = $derived(
+    [
+      conv?.private ? t('mail.private_badge', locale) : null,
+      mailboxes.length > 0 ? `${t('mail.mailboxes_here', locale)} ${mailboxes.length}` : null,
+    ]
+      .filter(Boolean)
+      .join(' · '),
+  );
 </script>
 
 <svelte:head>
@@ -337,34 +455,103 @@
 {:else}
   <section class="record conv">
     <RecordHead {crumbs} {title}>
+      <!-- La acción principal y cómo se lee, en la cabecera (ADR-139 p2). -->
+      {#snippet actions()}
+        <span class="conv__reading">
+          <Segmented
+            ariaLabel={t('mail.view_label', locale)}
+            name="conv-reading"
+            options={[
+              { value: 'registro', label: t('record.view_record', locale) },
+              { value: 'hilo', label: t('record.view_thread', locale) },
+            ]}
+            value={reading}
+            onchange={(v) => setReading(v as Reading)}
+          />
+          <ConceptHint concept="reading" />
+        </span>
+        <span class="conv__write">
+          <Button size="xs" variant="secondary" disabled={!canWrite} onclick={() => startCompose(null)}>
+            {t('mail.write', locale)}
+          </Button>
+          {#if writeBlocked}
+            <span class="conv__write-why" data-testid="write-why"
+              >{t(`record.write_${writeBlocked}`, locale)}{#if writeBlocked === 'no_mailbox'}{' · '}<a href={`/h/${workspaceSlug}/settings?section=mail`}>{t('record.write_to_settings', locale)}</a>{/if}</span
+            >
+          {/if}
+        </span>
+      {/snippet}
+      <!-- Los hechos: con quién, el contacto, la relación y el siguiente
+           paso, cada uno en su sitio; en el móvil, antes del historial. -->
       {#snippet facts()}
         {#if conv!.person && conv!.person.full_name !== title}<span>{conv!.person.full_name}</span>{/if}
         {#if conv!.person?.email}<span>{conv!.person.email}</span>{/if}
-        {#if conv!.person?.city || conv!.organization?.city}<span>{conv!.person?.city || conv!.organization?.city}</span>{/if}
         {#if conv!.private}<span class="conv__private">{t('mail.private_badge', locale)}</span>{/if}
+        <span class="conv__relation">
+          {#if conv!.can_edit}
+            <ConversationStatusMenu
+              relation={conv!.relation}
+              notNowUntil={conv!.not_now_until}
+              look="word"
+              {locale}
+              onnotnow={(not_now) => $patch.mutate({ not_now })}
+              onlog={openLog}
+            />
+          {:else}
+            <span class="fact-word">{relationLabel(conv!.relation, locale)}</span>
+          {/if}
+          <ConceptHint concept="relation" />
+        </span>
+        {#if conv!.can_edit}
+          <span
+            ><button
+              type="button"
+              class="fact-act"
+              aria-expanded={stepOpen}
+              aria-label={hasStep ? t('record.step_edit_aria', locale, { step: stepText }) : undefined}
+              data-testid="conversation-next-step"
+              onclick={() => (stepOpen ? (stepOpen = false) : openStep())}
+              >{hasStep ? stepText : t('record.step_none', locale)}</button
+            ></span
+          >
+        {:else if hasStep}
+          <span>{stepText}</span>
+        {/if}
+      {/snippet}
+      {#snippet band()}
+        {#if stepOpen && conv!.can_edit}
+          <div class="conv__step" role="group" aria-label={t('record.step_shortcuts', locale)} bind:this={stepEl}>
+            <span class="eyebrow eyebrow--sub conv__step-label">{t('mail.next_step', locale)}</span>
+            <span class="conv__step-acts">
+              {#each shortcuts as [k, day] (k)}
+                <button
+                  type="button"
+                  class="missing__act"
+                  disabled={$patch.isPending}
+                  aria-label={t('record.step_shortcut_aria', locale, { when: t(SHORTCUT_WORDS[k], locale), date: dayMonth(day) })}
+                  onclick={() => setStepDay(day)}
+                  >{t(SHORTCUT_WORDS[k], locale)}<span class="conv__step-day">{dayMonth(day)}</span></button
+                >
+              {/each}
+              <button type="button" class="missing__act" onclick={() => ((nextOpen = true), (stepOpen = false))}
+                >{t('record.step_other', locale)}</button
+              >
+              {#if hasStep}
+                <button type="button" class="missing__act" disabled={$patch.isPending} onclick={clearStep}
+                  >{t('record.verb_done', locale)}</button
+                >
+              {/if}
+            </span>
+          </div>
+        {/if}
+        <MissingBand items={missingItems} {locale} />
       {/snippet}
     </RecordHead>
-
-    <div class="conv__bar">
-      <div class="seg" role="group" aria-label={t('mail.view_label', locale)}>
-        <button type="button" class:is-on={reading === 'registro'} aria-pressed={reading === 'registro'} onclick={() => setReading('registro')}>
-          {t('mail.view_record', locale)}
-        </button>
-        <button type="button" class:is-on={reading === 'hilo'} aria-pressed={reading === 'hilo'} onclick={() => setReading('hilo')}>
-          {t('mail.view_thread', locale)}
-        </button>
-      </div>
-      <ConceptHint concept="reading" />
-    </div>
 
     <div class="conv__grid" class:conv__grid--single={reading === 'hilo'}>
       <div class="conv__main">
         {#if reading === 'registro'}
-          <BlockHead title={t('mail.outside', locale)} count={events.length} concept="outside">
-            <Button size="xs" variant="secondary" disabled={!sendable.length || !recipient?.email} onclick={() => startCompose(null)}>
-              {t('mail.write', locale)}
-            </Button>
-          </BlockHead>
+          <BlockHead title={t('mail.outside', locale)} count={events.length} concept="outside" />
           <FirstTimeNote event="first_mail_synced" when={mailboxes.length > 0} />
           {#if composing === 'new'}{@render composer()}{/if}
           {#if $eventsQuery.isLoading}
@@ -378,17 +565,12 @@
               {/each}
             </ol>
           {/if}
-          <details class="log" bind:open={logOpen} bind:this={logEl}>
-            <summary>{t('mail.log_other', locale)}</summary>
+          <Fold word={t('mail.log_other', locale)} bind:open={logOpen} bind:el={logEl} testid="conversation-log">
             <p class="muted">{t('mail.log_turn_hint', locale)}</p>
             <ConversationHistory conversationId={conv.id} showList={false} />
-          </details>
+          </Fold>
         {:else}
-          <BlockHead title={t('mail.thread', locale)} count={events.length}>
-            <Button size="xs" variant="secondary" disabled={!sendable.length || !recipient?.email} onclick={() => startCompose(null)}>
-              {t('mail.write', locale)}
-            </Button>
-          </BlockHead>
+          <BlockHead title={t('mail.thread', locale)} count={events.length} />
           <ol class="flow" aria-label={t('mail.thread', locale)} bind:this={teamEl}>
             {#each timeline as x (x.kind === 'event' ? x.event.id : x.message.id)}
               {#if x.kind === 'event'}
@@ -413,22 +595,6 @@
 
       <div class="conv__aside">
         <dl class="facts">
-          <div>
-            <dt>{t('conversations.relation', locale)}<ConceptHint concept="relation" /></dt>
-            <dd>
-              {#if conv.can_edit}
-                <ConversationStatusMenu
-                  relation={conv.relation}
-                  notNowUntil={conv.not_now_until}
-                  {locale}
-                  onnotnow={(not_now) => $patch.mutate({ not_now })}
-                  onlog={openLog}
-                />
-              {:else}
-                <StateBadge label={relationLabel(conv.relation, locale)} tone={relationTone(conv.relation)} />
-              {/if}
-            </dd>
-          </div>
           {#if bolos.length > 0}
             <div data-testid="conversation-bolos">
               <dt>{t('conversations.bolos', locale)}</dt>
@@ -455,45 +621,11 @@
             <dt>{t('mail.last_contact', locale)}</dt>
             <dd>{relativeContactDate(conv.last_contacted_at, locale)}</dd>
           </div>
-          {#if turn || followUp}
+          {#if turn?.side === 'theirs'}
+            <!-- Lo nuestro (te toca) sube a «Falta»; aquí queda cuánto esperamos. -->
             <div>
               <dt>{t('overview.col_turn', locale)}</dt>
-              <dd class="facts__turn" class:facts__turn--ours={turn?.side === 'ours' || (!turn && followUp)}>
-                {#if turn?.side === 'ours'}
-                  {t('overview.turn_ours_cap', locale)} · {relativeContactDate(turn.since, locale)}
-                  {#if conv.can_edit}
-                    <button
-                      type="button"
-                      class="facts__act"
-                      disabled={$patch.isPending}
-                      onclick={() => $patch.mutate({ reply_settled_at: turn!.since })}>{t('overview.settle', locale)}</button
-                    >
-                  {/if}
-                {:else if followUp}
-                  {t('overview.follow_up_cap', locale)} · {dayMonthYear(conv.next_action_at!)}
-                {:else if turn}
-                  {t('overview.turn_theirs_cap', locale)} · {relativeContactDate(turn.since, locale)}
-                {/if}
-              </dd>
-            </div>
-          {/if}
-          {#if conv.next_action_at || conv.next_action_note || conv.can_edit}
-            <div>
-              <dt>{t('mail.next_step', locale)}</dt>
-              <dd>
-                {conv.next_action_note ?? ''}{#if conv.next_action_at}<span class="muted">{conv.next_action_note ? ' · ' : ''}{dayMonthYear(conv.next_action_at)}</span>{/if}
-                {#if conv.can_edit}
-                  <button
-                    type="button"
-                    class="facts__act"
-                    aria-label={conv.next_action_at || conv.next_action_note ? t('conversations.edit_next_action_aria', locale) : undefined}
-                    onclick={() => (nextOpen = true)}
-                    >{conv.next_action_at || conv.next_action_note
-                      ? t('conversations.edit_next_action', locale)
-                      : t('conversations.set_next_action', locale)}</button
-                  >
-                {/if}
-              </dd>
+              <dd>{t('overview.turn_theirs_cap', locale)} · {relativeContactDate(turn.since, locale)}</dd>
             </div>
           {/if}
           {#if plannerHref}
@@ -507,54 +639,54 @@
         <!-- Etiquetas (ADR-138, fase 2): de qué va; su propio bloque. -->
         <ConversationTags conversationId={conv.id} workspaceId={conv.workspace_id} tags={conv.tags} canEdit={conv.can_edit} {locale} />
 
-        {#if conv.organization}
-          <OrganizationFiscal organizationId={conv.organization.id} level={2} />
-        {/if}
-
-        <ConversationAcquaintances workspaceId={conv.workspace_id} contacts={conv.contacts} {locale} />
-
-        {#if conv.can_set_private}
-        <div class="privacy">
-          <div class="privacy__row">
-            <span class="eyebrow eyebrow--sub">{t('mail.private_label', locale)}</span>
-            <button
-              type="button"
-              class="toggle"
-              class:is-on={conv.private}
-              role="switch"
-              aria-checked={conv.private}
-              aria-label={t('mail.private_label', locale)}
-              disabled={$setPrivate.isPending}
-              onclick={togglePrivate}
-            ><span class="toggle__dot"></span></button>
-          </div>
-          <p class="privacy__hint">
-            {conv.private ? t('mail.private_on_hint', locale) : t('mail.private_off_hint', locale)}
-          </p>
-        </div>
-        {/if}
-
-        {#if mailboxes.length}
-          <div class="legend">
-            <BlockHead title={t('mail.mailboxes_here', locale)} concept="mailboxes" />
-            {#each mailboxes as [address, scope] (address)}
-              <p class="legend__row">
-                <span class="mb" class:mb--shared={scope === 'workspace'}>
-                  {scope === 'workspace' ? t('mail.shared_mailbox', locale) : t('mail.personal_mailbox', locale)}
-                </span>
-                <span class="muted">{address}</span>
-              </p>
-            {/each}
-          </div>
-        {:else}
-          <EmptyLine label={t('mail.mailboxes_here', locale)} text={t('mail.no_mail_yet', locale)} />
-        {/if}
-
         {#if reading === 'registro'}
           <div class="inside" bind:this={teamEl}>
             {@render teamThread(true)}
           </div>
         {/if}
+
+        <!-- Lo de consulta, plegado (ADR-139 p2): se toca una vez. -->
+        <Fold word={t('record.details', locale)} keeps={detailsKeeps} id="details" testid="record-details">
+          {#if conv.organization}
+            <OrganizationFiscal organizationId={conv.organization.id} level={3} />
+          {/if}
+
+          <ConversationAcquaintances workspaceId={conv.workspace_id} contacts={conv.contacts} {locale} />
+
+          {#if conv.can_set_private}
+            <div class="privacy">
+              <div class="privacy__row">
+                <span class="eyebrow eyebrow--sub">{t('mail.private_label', locale)}</span>
+                <Switch
+                  checked={conv.private}
+                  label={t('mail.private_label', locale)}
+                  disabled={$setPrivate.isPending}
+                  testid="conversation-private"
+                  onchange={togglePrivate}
+                />
+              </div>
+              <p class="privacy__hint">
+                {conv.private ? t('mail.private_on_hint', locale) : t('mail.private_off_hint', locale)}
+              </p>
+            </div>
+          {/if}
+
+          {#if mailboxes.length}
+            <div class="legend">
+              <BlockHead title={t('mail.mailboxes_here', locale)} concept="mailboxes" level={3} />
+              {#each mailboxes as [address, scope] (address)}
+                <p class="legend__row">
+                  <span class="mb" class:mb--shared={scope === 'workspace'}>
+                    {scope === 'workspace' ? t('mail.shared_mailbox', locale) : t('mail.personal_mailbox', locale)}
+                  </span>
+                  <span class="muted">{address}</span>
+                </p>
+              {/each}
+            </div>
+          {:else}
+            <EmptyLine label={t('mail.mailboxes_here', locale)} text={t('mail.no_mail_yet', locale)} />
+          {/if}
+        </Fold>
       </div>
     </div>
   </section>
@@ -695,46 +827,57 @@
 
 <style>
   @layer components {
-    /* The reading switch sits right under the head, so the record's rhythm
-       tightens here; the two columns below keep their own. */
-    .conv {
-      gap: var(--space-m);
-    }
     .conv__private {
       color: var(--heading-color);
       font-weight: 500;
     }
-    .conv__bar {
-      display: flex;
+    .conv__reading,
+    .conv__write,
+    .conv__relation {
+      display: inline-flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: var(--space-s) var(--space-m);
+      gap: var(--space-xs) var(--space-s);
+    }
+    .conv__reading {
+      flex-wrap: nowrap;
+    }
+    /* Two tools here (how to read, write): on a phone they take a line each. */
+    .conv :global(.lenshead__tools) {
+      flex-wrap: wrap;
+    }
+    .conv__write-why {
+      color: var(--text-faint);
+      font-size: var(--text-xs);
+    }
+    .conv__write-why a {
+      color: var(--text-muted);
     }
 
-    .seg {
+    /* The next step's editor: its name in the record's label column, the
+       days after it, the same row as the «Falta» strip under it. */
+    .conv__step {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: var(--space-2xs) var(--space-s);
+    }
+    .conv__step-label {
+      flex: none;
+      min-inline-size: var(--record-label-inline);
+      margin: 0;
+    }
+    .conv__step-acts {
       display: inline-flex;
-      padding: 2px;
-      background: var(--bg-light);
-      border: 1px solid var(--border-color-light);
-      border-radius: var(--radius);
+      flex-wrap: wrap;
+      gap: var(--space-2xs) var(--space-m);
     }
-    .seg button {
-      appearance: none;
-      padding-block: var(--space-xs);
-      padding-inline: var(--space-s);
-      color: var(--text-muted);
-      background: transparent;
-      border: 0;
-      border-radius: var(--radius-s);
-      font: inherit;
+    .conv__step-day {
+      margin-inline-start: var(--space-xs);
+      font-family: var(--font-mono);
       font-size: var(--text-xs);
-      cursor: pointer;
-    }
-    .seg button.is-on {
-      color: var(--text-color);
-      background: var(--bg-ultra-light);
-      box-shadow: var(--box-shadow-1);
-      font-weight: 500;
+      letter-spacing: var(--mono-letter-spacing);
+      color: var(--text-faint);
     }
 
     .conv__grid {
@@ -846,13 +989,8 @@
       margin-block-start: var(--space-s);
     }
 
-    .log {
+    .conv__main :global(.fold) {
       margin-block-start: var(--space-m);
-      font-size: var(--text-s);
-    }
-    .log summary {
-      color: var(--text-dark-muted);
-      cursor: pointer;
     }
 
     .reply {
@@ -912,9 +1050,6 @@
       margin: 0;
       font-size: var(--text-s);
     }
-    .facts__turn--ours {
-      font-weight: 500;
-    }
     .facts__bolos {
       display: flex;
       flex-direction: column;
@@ -922,27 +1057,6 @@
       margin: 0;
       padding: 0;
       list-style: none;
-    }
-    .facts__act {
-      margin-inline-start: var(--space-xs);
-      padding: 0;
-      border: 0;
-      background: none;
-      color: var(--text-muted);
-      font: inherit;
-      font-size: var(--text-xs);
-      font-weight: 400;
-      text-decoration: underline;
-      text-underline-offset: 0.2em;
-      cursor: pointer;
-    }
-    .facts__act:hover {
-      color: var(--text-color);
-    }
-    @media (pointer: coarse) {
-      .facts__act {
-        min-block-size: var(--touch-target);
-      }
     }
     .privacy {
       padding-block: var(--space-s);
@@ -958,32 +1072,6 @@
       margin: var(--space-xs) 0 0;
       color: var(--text-faint);
       font-size: var(--text-xs);
-    }
-    .toggle {
-      display: inline-flex;
-      align-items: center;
-      inline-size: 36px;
-      block-size: 20px;
-      padding: 2px;
-      background: var(--border-color-dark);
-      border: 0;
-      border-radius: var(--radius-circle);
-      cursor: pointer;
-      transition: background var(--transition);
-    }
-    .toggle__dot {
-      inline-size: 16px;
-      block-size: 16px;
-      background: var(--bg-ultra-light);
-      border-radius: 50%;
-      box-shadow: var(--box-shadow-1);
-      transition: transform var(--transition);
-    }
-    .toggle.is-on {
-      background: var(--text-color);
-    }
-    .toggle.is-on .toggle__dot {
-      transform: translateX(16px);
     }
 
     .legend,
@@ -1047,20 +1135,5 @@
       }
     }
 
-    /* Touch (móvil #8): the reading switch at the finger's size, and the
-       privacy switch with a hit area larger than its 36×20 drawing. */
-    @media (pointer: coarse) {
-      .seg button {
-        min-block-size: var(--touch-target);
-      }
-      .toggle {
-        position: relative;
-      }
-      .toggle::before {
-        content: '';
-        position: absolute;
-        inset: calc((20px - var(--touch-target)) / 2) calc((36px - var(--touch-target)) / 2);
-      }
-    }
   }
 </style>
