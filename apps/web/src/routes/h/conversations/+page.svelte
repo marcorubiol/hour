@@ -3,7 +3,7 @@
    * Conversations lens — Phase 0.3 item 1, v1 (ADR-044). The difusión work
    * surface inside the shell: conversation list filtered by the sidebar
    * selection (ADR-038 union; empty = everything RLS allows), free-text
-   * search over person name/organization, status filter, and the ADR-040
+   * search over person name/organization, relation filter, and the ADR-040
    * inline editors via the shared ConversationTable.
    *
    * "Add conversation" (ADR-051) captures a person + conversation in one step:
@@ -49,13 +49,8 @@
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
-  import {
-    CONVERSATION_STATUSES,
-    conversationWhoBody,
-    statusLabel,
-    type ConversationItem,
-    type ConversationStatus,
-  } from '$lib/conversation';
+  import { conversationWhoBody, type ConversationItem } from '$lib/conversation';
+  import { RELATIONS, relationLabel, type Relation } from '$lib/conversation-relation';
   import { appLocale, t } from '$lib/i18n';
   import { organizationNames, organizationsQueryOptions } from '$lib/organizations';
   import { conversationAccessQueryOptions } from '$lib/conversation-access';
@@ -147,24 +142,22 @@
     return () => clearTimeout(timer);
   });
 
-  // The status travels in the URL too (`?estado=`, ADR-126 § 4): a block's
-  // link carries only its own filter, so following one clears the status and
-  // the list counts what the block counts; a season segment carries both.
-  let statusFilter = $derived.by(() => {
-    const raw = page.url.searchParams.get('estado');
-    return raw && (CONVERSATION_STATUSES as readonly string[]).includes(raw) ? raw : 'any';
-  });
+  // The relation travels in the URL (`?relacion=`, ADR-138; it was the status,
+  // `?estado=`, ADR-126 § 4): a block's link carries only its own filter, so
+  // following one clears the relation and the list counts what the block
+  // counts; a season segment carries both. Derived, like the blocks.
+  let listFilter = $derived(parseListFilter(page.url.searchParams));
+  let relationFilter = $derived<string>(listFilter.relacion ?? 'any');
 
-  function setStatus(next: string) {
+  function setRelation(next: string) {
     const params = new URLSearchParams(page.url.searchParams);
-    if (next === 'any') params.delete('estado');
-    else params.set('estado', next);
+    if (next === 'any') params.delete('relacion');
+    else params.set('relacion', next);
     const qs = params.toString();
     void goto(`${page.url.pathname}${qs ? `?${qs}` : ''}`, { noScroll: true, keepFocus: true, replaceState: true });
   }
 
   // ── Dashboard filters (ADR-117): in the URL, so a block's link is the filter ──
-  let listFilter = $derived(parseListFilter(page.url.searchParams));
   let lineIds = $derived(scope.lines.map((l) => l.id));
   // How many season bars the overview will likely draw while it loads (ADR-135):
   // the pinned lines, or every line the scope reaches.
@@ -184,11 +177,11 @@
     parada: 'overview.cold_stalled_chip',
     'sin-fecha': 'overview.undated_chip',
   };
-  /** The chip names the block filter the list wears; a season segment, with its status. */
-  function chipLabel(f: typeof listFilter, status: string): string | null {
-    if (f.temporada && (status !== 'any' || f.linea)) {
+  /** The chip names the block filter the list wears; a season segment, with its relation. */
+  function chipLabel(f: typeof listFilter): string | null {
+    if (f.temporada && (f.relacion || f.linea)) {
       return [
-        status !== 'any' ? statusLabel(status as ConversationStatus, locale) : null,
+        f.relacion ? relationLabel(f.relacion, locale) : null,
         f.linea ? lineLabel(f.linea) : null,
         t('overview.this_season', locale).toLowerCase(),
       ]
@@ -201,12 +194,12 @@
     if (f.envio && f.r) return t(f.r === 'respuestas' ? 'overview.mailout_replies_chip' : 'overview.mailout_bounced_chip', locale);
     return f.temporada ? t('overview.this_season', locale) : null;
   }
-  let filterChip = $derived(chipLabel(listFilter, statusFilter));
+  let filterChip = $derived(chipLabel(listFilter));
 
   function clearListFilter() {
     const params = new URLSearchParams(page.url.searchParams);
-    // A season segment is status + season: its chip names both, and goes as one.
-    if (listFilter.temporada) params.delete('estado');
+    // A season segment is relation + season: its chip names both, and goes as one.
+    if (listFilter.temporada) params.delete('relacion');
     for (const k of ['turno', 'temp', 'temporada', 'linea', 'envio', 'r']) params.delete(k);
     const qs = params.toString();
     // The chip goes away with the focus on it: the focus goes to the list.
@@ -230,12 +223,12 @@
     if (to?.url.hash === '#lista') listHeading?.focus({ preventScroll: true });
   });
 
-  /** A season segment: that status, in the season (and the pinned lines, or its own line). */
-  async function filterSeasonStatus(status: ConversationStatus, linea?: string) {
-    await goto(`?temporada=actual&estado=${status}${linea ? `&linea=${linea}` : ''}`, { noScroll: true, keepFocus: true });
+  /** A season segment: that relation, in the season (and the pinned lines, or its own line). */
+  async function filterSeasonRelation(relation: Relation, linea?: string) {
+    await goto(`?temporada=actual&relacion=${relation}${linea ? `&linea=${linea}` : ''}`, { noScroll: true, keepFocus: true });
     await showList();
   }
-  /** A line's name in the season: that line, every status (ADR-135). */
+  /** A line's name in the season: that line, every relation (ADR-135). */
   async function filterSeasonLine(linea: string) {
     await goto(`?temporada=actual&linea=${linea}`, { noScroll: true, keepFocus: true });
     await showList();
@@ -248,9 +241,9 @@
     await goto('?temp=ronda', { noScroll: true, keepFocus: true });
     await showList();
   }
-  let statusOptions = [
-    { value: 'any', label: t('conversations.all_statuses', locale) },
-    ...CONVERSATION_STATUSES.map((s) => ({ value: s, label: statusLabel(s, locale) })),
+  let relationOptions = [
+    { value: 'any', label: t('conversations.all_relations', locale) },
+    ...RELATIONS.map((s) => ({ value: s, label: relationLabel(s, locale) })),
   ];
 
   // aria-busy: until the indexes answer, the pins cannot resolve and the
@@ -261,7 +254,6 @@
     projectIds: filterIds.projectIds,
     workspaceIds: filterIds.workspaceIds,
     q: q || undefined,
-    status: statusFilter,
     ...listFilter,
     lineIds,
     enabled: !scopeUnresolved,
@@ -283,7 +275,6 @@
   let aEmail = $state('');
   let aPhone = $state('');
   let aOrg = $state('');
-  let aStatus = $state('contacted');
   let aNextAt = $state('');
   let aNextNote = $state('');
 
@@ -320,10 +311,6 @@
     }
     return byProject;
   });
-  let addStatusOptions = CONVERSATION_STATUSES.map((s) => ({
-    value: s,
-    label: statusLabel(s, locale),
-  }));
 
   function toggleProject(id: string) {
     if (aProjectIds.includes(id)) {
@@ -362,7 +349,6 @@
     aOrg = '';
     aNextAt = '';
     aNextNote = '';
-    aStatus = CONVERSATION_STATUSES[0];
     // Pre-select when the scope collapses to
     // a single project — otherwise start empty and let the user pick spaces.
     // A single pinned line also preselects that line for its project.
@@ -393,7 +379,6 @@
       // ADR-102: the person is optional; the organization alone is enough.
       const who = conversationWhoBody({ name: aName, email: aEmail, phone: aPhone, organization: aOrg }) ?? {};
       const base = {
-        status: aStatus,
         next_action_at: aNextAt || null,
         next_action_note: aNextNote.trim() || null,
       };
@@ -582,7 +567,7 @@
       {projectNameById}
       {locale}
       {lineHint}
-      onstatus={filterSeasonStatus}
+      onrelation={filterSeasonRelation}
       online={filterSeasonLine}
       onwrite={canEdit ? writeTo : undefined}
     />
@@ -599,7 +584,7 @@
           bind:value={qRaw}
         />
       </div>
-      <Select label={t('edit.status', locale)} options={statusOptions} bind:value={() => statusFilter, setStatus} />
+      <Select label={t('conversations.relation', locale)} options={relationOptions} bind:value={() => relationFilter, setRelation} />
       {#if filterChip}
         <Chip selected onRemove={clearListFilter} removeLabel={t('overview.clear_filter', locale)}>{filterChip}</Chip>
       {/if}
@@ -722,7 +707,6 @@
     <Input label={t('conversations.full_name', locale)} bind:value={aName} />
     <Input label={t('conversations.email', locale)} type="email" bind:value={aEmail} />
     <Input label={t('conversations.phone', locale)} type="tel" bind:value={aPhone} />
-    <Select label={t('edit.status', locale)} options={addStatusOptions} bind:value={aStatus} />
   </div>
   <div class="conversations__form-grid">
     <Input label={t('conversations.col_next_action', locale)} type="date" bind:value={aNextAt} />

@@ -10,7 +10,7 @@
  *
  * Each row carries `last_turn` (its last directional email, message or call),
  * so the list can say whose turn it is (ADR-117). The dashboard filters
- * (`turno=nuestro|suyo`, `temp=caliente|fria|ronda|parada`, `temporada=actual`, with
+ * (`turno=nuestro|suyo`, `temp=caliente|fria|ronda|parada`, `temporada=actual`, `relacion=…` (ADR-138), with
  * `line_ids` for the season and `linea` for one of its lines) are derived, not columns: the scope is read and
  * filtered with `$lib/conversation-overview` (the same rules as the blocks),
  * in the block's order, and only the page is read in full.
@@ -32,8 +32,9 @@ import {
 } from '$lib/conversation';
 import { PostgrestError, pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
-import { LAST_TURN_EMBED, loadOverviewRows, mailoutPickIds, setLastTurnEmbed, setScope } from '$lib/server/conversation-overview';
+import { TURN_EMBEDS, loadOverviewRows, mailoutPickIds, setLastTurnEmbed, setScope } from '$lib/server/conversation-overview';
 import { applyListFilter, hasListFilter, parseLinea, type ListFilter } from '$lib/conversation-overview';
+import { RELATIONS } from '$lib/conversation-relation';
 
 const QuerySchema = v.object({
   status: v.optional(
@@ -54,6 +55,8 @@ const QuerySchema = v.object({
   // ADR-126 § 9: the recipients of a mailout behind one of its figures.
   envio: v.optional(v.pipe(v.string(), v.uuid())),
   r: v.optional(v.picklist(['respuestas', 'rebotes'])),
+  // ADR-138: one derived relation.
+  relacion: v.optional(v.picklist(RELATIONS)),
   line_ids: v.optional(v.string()),
   limit: v.optional(
     v.pipe(
@@ -116,7 +119,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       400,
     );
   }
-  const { status, project_slug, project_ids, workspace_ids, line_id, q, season, limit, offset, turno, temp, temporada, linea, line_ids, envio, r } =
+  const { status, project_slug, project_ids, workspace_ids, line_id, q, season, limit, offset, turno, temp, temporada, linea, line_ids, envio, r, relacion } =
     parsed.output;
 
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -132,7 +135,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   // runs over the organization and every contact (ADR-102) through the
   // `conversation_search` RPC, which returns conversation rows: the same
   // embeds, filters and order apply.
-  let select = `${CONVERSATION_SELECT},${LAST_TURN_EMBED}`;
+  let select = `${CONVERSATION_SELECT},${TURN_EMBEDS}`;
   if (project_slug) {
     select = select.replace('project:project_id(', 'project:project_id!inner(');
   }
@@ -160,6 +163,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   setLastTurnEmbed(search);
 
   const listFilter = {
+    relacion,
     turno,
     temp,
     temporada: temporada === 'actual' || undefined,
@@ -169,7 +173,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   if (hasListFilter(listFilter)) {
     // The derived filters only exist for the global lens: project and line
     // modules keep their own params (project_slug, line_id, season).
-    if (project_slug || line_id || season !== 'any') return json({ error: 'invalid_query', hint: 'turno/temp/temporada/envio go with project_ids/workspace_ids only.' }, 400);
+    if (project_slug || line_id || season !== 'any') return json({ error: 'invalid_query', hint: 'turno/temp/temporada/envio/relacion go with project_ids/workspace_ids only.' }, 400);
     try {
       return json(
         await filteredPage(env, jwt, search, {
@@ -204,7 +208,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       offset,
       status,
       season,
-      items: data.map(normalizeConversationItem),
+      items: data.map((r) => normalizeConversationItem(r)),
     });
   } catch (err) {
     return pgErrorResponse(
@@ -264,7 +268,7 @@ async function filteredPage(
     offset: o.offset,
     status: o.status ?? 'any',
     season: 'any',
-    items: items.map(normalizeConversationItem),
+    items: items.map((r) => normalizeConversationItem(r)),
   };
 }
 

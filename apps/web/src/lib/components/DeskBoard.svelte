@@ -1,15 +1,9 @@
 <script lang="ts" module>
-  export type ConversationStatus =
-    | 'contacted'
-    | 'in_conversation'
-    | 'hold'
-    | 'confirmed'
-    | 'declined'
-    | 'dormant'
-    | 'recurring';
+  import type { Relation } from '$lib/conversation-relation';
   export type DeskConversation = {
     id: string;
-    status: ConversationStatus;
+    /** The derived relation (ADR-138 § 4). */
+    relation: Relation;
     next_action_at: string | null;
     next_action_note: string | null;
     custom_fields: Record<string, unknown> | null;
@@ -93,12 +87,12 @@
   // "This week" = overdue + everything due within 7 days (sortKey < 7).
   let allRows = $derived.by<WeekRow[]>(() =>
     conversations
-      .filter((e) => e.status !== 'declined' && e.status !== 'dormant')
+      .filter((e) => e.relation !== 'not_now')
       .filter((e) => e.next_action_at)
       .map((e) => {
         const bucket = railLabel(e.next_action_at!);
         const isOverdue = bucket.sortKey === -1;
-        const verb = t(`desk.verb_${conversationVerbKey(e.status, isOverdue)}`, locale);
+        const verb = t(`desk.verb_${conversationVerbKey(e.relation, isOverdue)}`, locale);
         const tagsRaw = Array.isArray(e.custom_fields?.tags)
           ? (e.custom_fields?.tags as unknown[]).filter((t): t is string => typeof t === 'string')
           : [];

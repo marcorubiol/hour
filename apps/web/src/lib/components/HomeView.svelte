@@ -36,6 +36,7 @@
     allLinesQueryOptions,
   } from '$lib/nav-queries';
   import DeskBoard from '$lib/components/DeskBoard.svelte';
+  import type { Relation } from '$lib/conversation-relation';
   import { detectLocale, t } from '$lib/i18n';
 
   const locale = detectLocale(navigator.language);
@@ -57,17 +58,9 @@
   // Space portada: the edit-space dialog (opened from the masthead pencil).
   let editOpen = $state(false);
 
-  type ConversationStatus =
-    | 'contacted'
-    | 'in_conversation'
-    | 'hold'
-    | 'confirmed'
-    | 'declined'
-    | 'dormant'
-    | 'recurring';
   type Conversation = {
     id: string;
-    status: ConversationStatus;
+    relation: Relation;
     next_action_at: string | null;
     next_action_note: string | null;
     updated_at: string;

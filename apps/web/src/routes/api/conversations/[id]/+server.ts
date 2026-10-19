@@ -2,9 +2,9 @@
  * PATCH /api/conversations/:id
  *
  * Inline write path for the difusión loop (ADR-040): update a
- * conversation's status / next action fields, plus the line relink
+ * conversation's «not this time» (ADR-138) / next action fields, plus the line relink
  * (ADR-056). The body schema is a whitelist — anything outside status,
- * next_action_at, next_action_note, line_id is stripped, so RLS-sensitive
+ * not_now, next_action_at, next_action_note, line_id, reply_settled_at is stripped, so RLS-sensitive
  * columns (workspace_id, project_id, created_by…) can never ride along.
  *
  * Contact is not written here. Since ADR-098 a contact is an event
@@ -25,13 +25,14 @@ import { extractAccessToken } from '$lib/auth';
 import {
   CONVERSATION_SELECT,
   ConversationPatchSchema,
+  conversationPatchColumns,
   normalizeConversationItem,
   type ConversationDbItem,
 } from '$lib/conversation';
 import { pgGet, pgPatch, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import { jwtSubject } from '$lib/server/mail/http';
-import { LAST_TURN_EMBED, setLastTurnEmbed } from '$lib/server/conversation-overview';
+import { TURN_EMBEDS, setLastTurnEmbed } from '$lib/server/conversation-overview';
 
 const IdSchema = v.pipe(v.string(), v.uuid());
 
@@ -66,7 +67,7 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
   }
   const search = new URLSearchParams({
     // The turn (ADR-126 § 5): the file shows it beside the last contact.
-    select: `${CONVERSATION_SELECT},private_to,workspace:workspace_id!inner(slug),${LAST_TURN_EMBED}`,
+    select: `${CONVERSATION_SELECT},private_to,workspace:workspace_id!inner(slug),${TURN_EMBEDS}`,
     deleted_at: 'is.null',
     limit: '1',
   });
@@ -154,7 +155,7 @@ export const PATCH: RequestHandler = async ({ request, params, platform, locals 
     return json(
       {
         error: 'empty_patch',
-        hint: 'Send at least one of: status, next_action_at, next_action_note, line_id.',
+        hint: 'Send at least one of: not_now, next_action_at, next_action_note, line_id, reply_settled_at.',
       },
       400,
     );
@@ -199,9 +200,10 @@ export const PATCH: RequestHandler = async ({ request, params, platform, locals 
     const search = new URLSearchParams();
     search.set('id', `eq.${idParsed.output}`);
     search.set('deleted_at', 'is.null');
-    search.set('select', CONVERSATION_SELECT);
+    search.set('select', `${CONVERSATION_SELECT},${TURN_EMBEDS}`);
+    setLastTurnEmbed(search);
 
-    const { data } = await pgPatch<ConversationDbItem>(env, 'conversation', jwt, patch, {
+    const { data } = await pgPatch<ConversationDbItem>(env, 'conversation', jwt, conversationPatchColumns(patch), {
       search,
     });
     if (data.length === 0) return json({ error: 'not_found' }, 404);

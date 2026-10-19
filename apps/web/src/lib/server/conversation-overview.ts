@@ -22,6 +22,7 @@ import {
   type TurnEvent,
 } from '$lib/conversation-overview';
 import type { ConversationStatus } from '$lib/conversation';
+import type { ConversationBolo } from '$lib/conversation-relation';
 import { defaultProviderKind, type MailoutEnv } from '$lib/server/mailout';
 
 export interface OverviewScope {
@@ -48,6 +49,13 @@ export function setScope(search: URLSearchParams, projectIds: string[], workspac
 /** El último correo, mensaje o llamada con dirección: el que decide el turno. */
 export const LAST_TURN_EMBED = 'last_turn:conversation_event(direction,occurred_at,kind,subject:metadata->>subject)';
 
+/** El último que vino de fuera: si han contestado alguna vez (la relación, ADR-138). */
+export const LAST_IN_EMBED = 'last_in:conversation_event(occurred_at)';
+
+/** Los dos embebidos que leen el turno y la relación, juntos. */
+export const TURN_EMBEDS = `${LAST_TURN_EMBED},${LAST_IN_EMBED}`;
+
+/** Los filtros de `TURN_EMBEDS`: el último con dirección, y el último de fuera. */
 export function setLastTurnEmbed(search: URLSearchParams): void {
   search.set('last_turn.direction', 'not.is.null');
   search.set('last_turn.kind', `in.(${TURN_KINDS.join(',')})`);
@@ -55,15 +63,24 @@ export function setLastTurnEmbed(search: URLSearchParams): void {
   search.set('last_turn.metadata->>auto', 'is.null');
   search.set('last_turn.order', 'occurred_at.desc');
   search.set('last_turn.limit', '1');
+  search.set('last_in.direction', 'eq.inbound');
+  search.set('last_in.kind', `in.(${TURN_KINDS.join(',')})`);
+  search.set('last_in.metadata->>auto', 'is.null');
+  search.set('last_in.order', 'occurred_at.desc');
+  search.set('last_in.limit', '1');
 }
 
+/** Los hechos de la relación (ADR-138): `regular` es el campo calculado, que lee los bolos hechos sin dinero. */
+export const RELATION_SELECT =
+  'not_now_at,not_now_until,first_contacted_at,contacted_undated,legacy_status:custom_fields->>legacy_status,regular:conversation_regular';
+
 const OVERVIEW_SELECT = [
-  'id,workspace_id,project_id,line_id,status,last_contacted_at,next_action_at,next_action_note,reply_settled_at',
+  'id,workspace_id,project_id,line_id,last_contacted_at,next_action_at,next_action_note,reply_settled_at',
+  RELATION_SELECT,
   'organization:workspace_organization!conversation_workspace_organization_fkey(name)',
   'line:line_id(name)',
   'contacts:conversation_contact(person:workspace_person!conversation_contact_workspace_person_fkey(full_name))',
-  LAST_TURN_EMBED,
-  'last_in:conversation_event(occurred_at)',
+  TURN_EMBEDS,
 ].join(',');
 
 interface OverviewDbRow {
@@ -71,7 +88,12 @@ interface OverviewDbRow {
   workspace_id: string;
   project_id: string;
   line_id: string | null;
-  status: ConversationStatus;
+  not_now_at: string | null;
+  not_now_until: string | null;
+  first_contacted_at: string | null;
+  contacted_undated: boolean;
+  legacy_status: string | null;
+  regular: boolean | null;
   last_contacted_at: string | null;
   next_action_at: string | null;
   next_action_note: string | null;
@@ -100,11 +122,6 @@ export async function loadOverviewRows(env: SupabaseEnv, jwt: string, scope: Ove
       setScope(search, scope.projectIds, scope.workspaceIds);
       if (scope.status) search.set('status', `eq.${scope.status}`);
       setLastTurnEmbed(search);
-      search.set('last_in.direction', 'eq.inbound');
-      search.set('last_in.kind', `in.(${TURN_KINDS.join(',')})`);
-      search.set('last_in.metadata->>auto', 'is.null');
-      search.set('last_in.order', 'occurred_at.desc');
-      search.set('last_in.limit', '1');
       search.set('contacts.is_primary', 'eq.true');
       return pgGet<OverviewDbRow>(env, 'conversation', jwt, { search }).then((r) => r.data);
     }),
@@ -125,6 +142,8 @@ export async function loadOverviewRows(env: SupabaseEnv, jwt: string, scope: Ove
     }),
   ]);
 
+  const bolos = await loadConversationBolos(env, jwt, rows.map((r) => r.id));
+
   const days = new Map<string, string[]>();
   for (const p of perfs) {
     const list = days.get(p.conversation_id) ?? [];
@@ -141,7 +160,12 @@ export async function loadOverviewRows(env: SupabaseEnv, jwt: string, scope: Ove
       project_id: r.project_id,
       line_id: r.line_id,
       line_name: r.line?.name ?? null,
-      status: r.status,
+      not_now_at: r.not_now_at,
+      not_now_until: r.not_now_until,
+      first_contacted_at: r.first_contacted_at,
+      contacted_undated: r.contacted_undated,
+      legacy_status: r.legacy_status,
+      regular: r.regular,
       last_contacted_at: r.last_contacted_at,
       next_action_at: r.next_action_at,
       next_action_note: r.next_action_note,
@@ -151,8 +175,32 @@ export async function loadOverviewRows(env: SupabaseEnv, jwt: string, scope: Ove
       last: r.last_turn?.[0] ?? null,
       last_in: r.last_in?.[0] ?? null,
       performance_days: days.get(r.id) ?? [],
+      bolos: bolos.get(r.id) ?? [],
     };
   });
+}
+
+/** Lo que `conversations_bolos` acepta por llamada. */
+const BOLOS_BATCH = 2000;
+
+/**
+ * Los bolos de unas conversaciones (ADR-138 § 3), sin caché ni pagador: la RPC
+ * solo devuelve los de las que quien llama lee y con `read:performance` en el
+ * proyecto. Agrupados por conversación, en orden de fecha.
+ */
+export async function loadConversationBolos(
+  env: SupabaseEnv,
+  jwt: string,
+  ids: readonly string[],
+): Promise<Map<string, ConversationBolo[]>> {
+  const out = new Map<string, ConversationBolo[]>();
+  for (let i = 0; i < ids.length; i += BOLOS_BATCH) {
+    const { data } = await pgPostRpc<ConversationBolo>(env, 'conversations_bolos', jwt, {
+      p_conversation_ids: ids.slice(i, i + BOLOS_BATCH),
+    });
+    for (const b of data) out.set(b.conversation_id, [...(out.get(b.conversation_id) ?? []), b]);
+  }
+  return out;
 }
 
 /** El envío más reciente que salió (o está saliendo) en el alcance, con sus cifras. */

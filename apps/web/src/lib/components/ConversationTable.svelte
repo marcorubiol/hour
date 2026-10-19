@@ -1,6 +1,7 @@
 <script module lang="ts">
   import StateBadge from '$lib/components/StateBadge.svelte';
   import type { MailoutPick, TempFilter } from '$lib/conversation-overview';
+  import type { Relation } from '$lib/conversation-relation';
 
   export interface ConversationFilters {
     projectSlug?: string;
@@ -9,7 +10,8 @@
     workspaceIds?: string[];
     season?: string;
     q?: string;
-    status?: string;
+    /** One relation (ADR-138), derived like the dashboard's filters. */
+    relacion?: Relation;
     /** The dashboard's derived filters (ADR-117): global lens only. */
     turno?: 'nuestro' | 'suyo';
     temp?: TempFilter;
@@ -51,14 +53,13 @@
   import {
     groupConversationsByContact,
     relativeContactDate,
-    statusBadgeClass,
-    statusTone,
-    statusLabel,
+    conversationPatchColumns,
     conversationTitle,
+    relationInputOf,
     type ConversationItem,
     type ConversationPatch,
-    type ConversationStatus,
   } from '$lib/conversation';
+  import { relationLabel, relationTone } from '$lib/conversation-relation';
 
   interface Props {
     filters: ConversationFilters;
@@ -146,7 +147,8 @@
 
   function params(f: ConversationFilters, o: number): string {
     const p = new URLSearchParams();
-    p.set('status', f.status ?? 'any');
+    p.set('status', 'any');
+    if (f.relacion) p.set('relacion', f.relacion);
     if (f.projectSlug) p.set('project_slug', f.projectSlug);
     if (f.projectIds && f.projectIds.length > 0) p.set('project_ids', f.projectIds.join(','));
     if (f.lineId) p.set('line_id', f.lineId);
@@ -211,16 +213,12 @@
           ...data,
           items: data.items.map((it) => {
             if (it.id !== id) return it;
-            const touched = patch.status !== undefined && patch.status !== it.status;
+            // «No esta vez» repaints at once; lifting it waits for the
+            // server, which derives what the relation is again.
             return {
               ...it,
-              ...patch,
-              ...(touched
-                ? {
-                    last_contacted_at: optimisticNow,
-                    first_contacted_at: it.first_contacted_at ?? optimisticNow,
-                  }
-                : {}),
+              ...conversationPatchColumns(patch, new Date(optimisticNow)),
+              ...(patch.not_now ? { relation: 'not_now' as const } : {}),
             };
           }),
         });
@@ -258,9 +256,8 @@
     },
   });
 
-  function changeStatus(item: ConversationItem, status: ConversationStatus) {
-    if (item.status === status) return;
-    $patchMutation.mutate({ id: item.id, patch: { status } });
+  function setNotNow(item: ConversationItem, next: { until: string | null } | null) {
+    $patchMutation.mutate({ id: item.id, patch: { not_now: next } });
   }
 
   // ── History (ADR-098): the timeline and its quick add ──────────────────
@@ -362,11 +359,11 @@
   /** The Turn cell: a reply owed, a follow-up due, or their turn (ADR-117). */
   function turnCell(item: ConversationItem): { tone: 'ours' | 'theirs'; text: string } | null {
     const now = new Date();
-    const turn = turnOf({ status: item.status, last: item.last_turn?.[0] ?? null, reply_settled_at: item.reply_settled_at }, now);
+    const turn = turnOf({ ...relationInputOf(item), reply_settled_at: item.reply_settled_at }, now);
     if (turn?.side === 'ours') {
       return { tone: 'ours', text: `${t('overview.turn_ours_cap', locale)} · ${relativeContactDate(turn.since, locale)}` };
     }
-    if (followUpDue(item, now)) {
+    if (followUpDue({ ...relationInputOf(item), next_action_at: item.next_action_at }, now)) {
       return { tone: 'ours', text: `${t('overview.follow_up_cap', locale)} · ${formatDate(item.next_action_at)}` };
     }
     if (turn) return { tone: 'theirs', text: `${t('overview.turn_theirs_cap', locale)} · ${relativeContactDate(turn.since, locale)}` };
@@ -455,8 +452,8 @@
               {#each group.conversations as conversation (conversation.id)}
                 <button
                   type="button"
-                  class={`project-chip ${statusBadgeClass(conversation.status)}`}
-                  title={`${conversation.project?.name ?? t('conversations.conversation', locale)} · ${statusLabel(conversation.status, locale)}`}
+                  class={`project-chip badge--${relationTone(conversation.relation)}`}
+                  title={`${conversation.project?.name ?? t('conversations.conversation', locale)} · ${relationLabel(conversation.relation, locale)}`}
                   onclick={() => focusConversation(conversation.id)}
                 >{conversation.project?.name ?? t('conversations.conversation', locale)}</button>
               {/each}
@@ -539,13 +536,14 @@
             >
             <td class="cell--status" data-label={t('edit.status', locale)}>
               {#if !editable}
-                <StateBadge label={statusLabel(item.status, locale)} tone={statusTone(item.status)} />
+                <StateBadge label={relationLabel(item.relation, locale)} tone={relationTone(item.relation)} />
               {:else}
               <ConversationStatusMenu
-                status={item.status}
+                relation={item.relation}
+                notNowUntil={item.not_now_until}
                 {locale}
                 direction={i >= visibleItems.length - 2 && i > 2 ? 'up' : 'down'}
-                onchange={(next) => changeStatus(item, next)}
+                onnotnow={(next) => setNotNow(item, next)}
                 onlog={() => openHistory(item)}
               />
               {/if}
@@ -599,7 +597,7 @@
     <Button size="xs" variant="outline" onclick={() => void $query.refetch()}>{t('ui.retry', locale)}</Button>
   </p>
 {:else if !loading && items.length === 0}
-  {#if importEmptyState && !filters.q && !filters.turno && !filters.temp && !filters.temporada && !filters.envio && (!filters.status || filters.status === 'any')}
+  {#if importEmptyState && !filters.q && !filters.turno && !filters.temp && !filters.temporada && !filters.envio && !filters.relacion}
     <div class="empty-book">
       <p class="empty-book__title">{t('conversations.empty_title', locale)}</p>
       <p>{t('conversations.empty_body', locale)}</p>

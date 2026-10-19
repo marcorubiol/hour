@@ -995,18 +995,17 @@
     --badge-opacity: 0.75;
   }
 
-  /* The tone of each conversation status for what draws a status without
-     being a pill (the season bar of Conversations): `--status` is the
-     family, mixed once with one recipe (diseño B6). The pill itself is the
-     one status badge, `StateBadge`, with the tone `statusTone()` gives. */
-  [data-conv-status='contacted'] { --status: var(--info); }
-  [data-conv-status='in_conversation'] { --status: var(--warning); }
-  [data-conv-status='hold'] { --status: var(--neutral); }
-  [data-conv-status='confirmed'] { --status: var(--success); }
-  [data-conv-status='declined'] { --status: var(--danger); }
+  /* The tone of each relation (ADR-138) for what draws one without being a
+     pill (the season bar of Conversations): `--status` is the family, mixed
+     once with one recipe (diseño B6). The pill itself is the one status
+     badge, `StateBadge`, with the tone `relationTone()` gives. */
+  [data-relation='never'] { --status: var(--neutral); }
+  [data-relation='contacted'] { --status: var(--info); }
+  [data-relation='talking'] { --status: var(--warning); }
+  [data-relation='regular'] { --status: var(--primary); }
   /* Asleep: the neutral, faded, as the faint pill fades it. */
-  [data-conv-status='dormant'] { --status: color-mix(in oklab, var(--neutral) 45%, transparent); }
-  [data-conv-status='recurring'] { --status: var(--primary); }
+  [data-relation='dormant'] { --status: color-mix(in oklab, var(--neutral) 45%, transparent); }
+  [data-relation='not_now'] { --status: var(--danger); }
 
   /* Sizes — only xs and m redeclare; s is default. */
   .badge--xs {

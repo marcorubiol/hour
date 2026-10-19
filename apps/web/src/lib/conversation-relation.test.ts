@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   DORMANT_DAYS,
+  RELATIONS,
   countBolos,
   hasAnswered,
   notNowInForce,
+  relationLabel,
   relationOf,
   type RelationInput,
 } from './conversation-relation';
@@ -136,5 +138,13 @@ describe('countBolos', () => {
   it('cuenta en opción y firmes; propuestos y cancelados, no', () => {
     const statuses = ['hold', 'hold_1', 'hold_3', 'confirmed', 'done', 'proposed', 'cancelled'];
     expect(countBolos(statuses.map((status) => ({ status })))).toEqual({ option: 3, firm: 2 });
+  });
+});
+
+describe('palabras de la relación', () => {
+  it('cada relación tiene su palabra en los cuatro idiomas (la clave es una plantilla: el guardián de i18n no la ve)', () => {
+    for (const locale of ['es', 'ca', 'fr', 'en'] as const) {
+      for (const r of RELATIONS) expect(relationLabel(r, locale)).not.toBe(`conversations.relation_${r}`);
+    }
   });
 });

@@ -1,7 +1,8 @@
 /**
- * Conversation domain helpers — single home for the status vocabulary
- * (labels + badge classes) and the inline-PATCH contract shared by the
- * API endpoint and every surface that edits an conversation (ADR-040).
+ * Conversation domain helpers: the inline-PATCH contract shared by the API
+ * endpoint and every surface that edits a conversation (ADR-040). The
+ * relation's vocabulary (labels, tones) lives with it, in
+ * `conversation-relation.ts` (ADR-138); `status` is no longer read.
  *
  * Anti-CRM vocabulary (reset v2): no lead / pipeline / funnel / prospect.
  */
@@ -9,54 +10,14 @@
 import * as v from 'valibot';
 import { Constants, type Enums, type Tables } from './db-types';
 import { localDayISO, realIsoDate, realIsoInstant } from './datetime';
-import { appLocale, t, type Locale } from './i18n';
+import { t, type Locale } from './i18n';
 import { EVENT_MAIL_SELECT, type EventMailFields } from './mail';
-import type { StatusTone } from './performance';
+import { relationOf, type Relation, type RelationInput } from './conversation-relation';
 
 export type ConversationStatus = Enums<'conversation_status'>;
 
-/** All statuses in schema enum order (runtime mirror of the DB enum). */
+/** The old stored status (ADR-138 E4 drops it); only the create still sends its default. */
 export const CONVERSATION_STATUSES = Constants.public.Enums.conversation_status;
-
-/** Dictionary key of each status label (lib/i18n). */
-export const STATUS_KEYS: Record<ConversationStatus, string> = {
-  contacted: 'conversations.status_contacted',
-  in_conversation: 'conversations.status_in_conversation',
-  hold: 'conversations.status_hold',
-  confirmed: 'conversations.status_confirmed',
-  declined: 'conversations.status_declined',
-  dormant: 'conversations.status_dormant',
-  recurring: 'conversations.status_recurring',
-};
-
-/** The status in the viewer's language; an unknown value shows as itself.
-    `locale` defaults to the session's, so callers outside this zone keep working. */
-export function statusLabel(status: string, locale: Locale = appLocale()): string {
-  const key = STATUS_KEYS[status as ConversationStatus];
-  return key ? t(key, locale) : status;
-}
-
-/** The tone of each status on the one status badge (`StateBadge`); the
-    season bar reads the same family through `[data-conv-status]`. */
-const STATUS_TONES: Record<ConversationStatus, StatusTone> = {
-  contacted: 'info',
-  in_conversation: 'warning',
-  hold: 'neutral',
-  confirmed: 'success',
-  declined: 'danger',
-  dormant: 'faint',
-  recurring: 'primary',
-};
-
-export function statusTone(status: string): StatusTone {
-  return STATUS_TONES[status as ConversationStatus] ?? 'neutral';
-}
-
-/** The badge's tone class, for a status drawn by something that is not a
-    `StateBadge` (the status menu's trigger, a contact's project chip). */
-export function statusBadgeClass(status: string): string {
-  return `badge--${statusTone(status)}`;
-}
 
 /**
  * PATCH /api/conversations/:id body. Whitelist of the fields the difusión
@@ -66,7 +27,10 @@ export function statusBadgeClass(status: string): string {
  * timestamptz; Postgres casts) or null to clear.
  */
 export const ConversationPatchSchema = v.object({
-  status: v.optional(v.picklist(CONVERSATION_STATUSES)),
+  // ADR-138: the only relation kept by hand. An object sets it (now, on the
+  // server clock, with an optional day to write again); null lifts it. The
+  // old `status` is no longer written: the relation is derived.
+  not_now: v.optional(v.nullable(v.object({ until: v.optional(v.nullable(realIsoDate)) }))),
   next_action_at: v.optional(v.nullable(realIsoDate)),
   next_action_note: v.optional(
     v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))),
@@ -84,6 +48,17 @@ export const ConversationPatchSchema = v.object({
 });
 
 export type ConversationPatch = v.InferOutput<typeof ConversationPatchSchema>;
+
+/** The columns a patch writes: `not_now` becomes its two stamps. */
+export function conversationPatchColumns(patch: ConversationPatch, now: Date = new Date()): Record<string, unknown> {
+  const { not_now, ...rest } = patch;
+  if (not_now === undefined) return rest;
+  return {
+    ...rest,
+    not_now_at: not_now ? now.toISOString() : null,
+    not_now_until: not_now ? (not_now.until ?? null) : null,
+  };
+}
 
 // ── The history (ADR-098, contract: build/conversation-event-contract.md) ──
 
@@ -355,6 +330,12 @@ export interface ConversationItem extends Tables<'conversation'> {
   contacts: ConversationContact[];
   /** Its last directional email, message or call (GET /api/conversations, ADR-117): whose turn it is. */
   last_turn?: { direction: 'inbound' | 'outbound'; occurred_at: string; kind?: string | null; subject?: string | null }[] | null;
+  /** Its last inbound one: whether they ever answered (ADR-138). */
+  last_in?: { occurred_at: string }[] | null;
+  /** Its organization has a done bolo in an earlier season (`conversation_regular`). */
+  regular?: boolean | null;
+  /** The derived relation, computed by the Worker (`relationOf`, ADR-138 § 4). */
+  relation: Relation;
 }
 
 /**
@@ -479,14 +460,43 @@ export interface ConversationDbItem extends Tables<'conversation'> {
   project: ProjectLite | null;
   organization?: OrganizationLite | null;
   contacts?: ContactDbEmbed[] | null;
+  last_turn?: ConversationItem['last_turn'];
+  last_in?: ConversationItem['last_in'];
+  regular?: boolean | null;
+}
+
+/** The old status someone set by hand, kept by the E1 migration (ADR-138 § 8.5). */
+export function legacyStatus(customFields: unknown): string | null {
+  const v = (customFields as { legacy_status?: unknown } | null)?.legacy_status;
+  return typeof v === 'string' ? v : null;
+}
+
+/** What the relation reads of a conversation row as the endpoints return it (with `last_turn`, `last_in`, `regular`). */
+export function relationInputOf(item: ConversationDbItem | ConversationItem): RelationInput {
+  return {
+    not_now_at: item.not_now_at ?? null,
+    not_now_until: item.not_now_until ?? null,
+    last: item.last_turn?.[0] ?? null,
+    last_in: item.last_in?.[0] ?? null,
+    last_contacted_at: item.last_contacted_at ?? null,
+    first_contacted_at: item.first_contacted_at ?? null,
+    contacted_undated: item.contacted_undated ?? false,
+    legacy_status: legacyStatus(item.custom_fields),
+    regular: item.regular ?? false,
+  };
+}
+
+export function conversationRelation(item: ConversationDbItem, now: Date = new Date()): Relation {
+  return relationOf(relationInputOf(item), now);
 }
 
 /** `person` is the primary contact's dossier; `contacts` keep the four fields they show. */
-export function normalizeConversationItem(item: ConversationDbItem): ConversationItem {
+export function normalizeConversationItem(item: ConversationDbItem, now: Date = new Date()): ConversationItem {
   const contacts = item.contacts ?? [];
   const primary = primaryContactPerson(contacts);
   return {
     ...item,
+    relation: conversationRelation(item, now),
     organization: item.organization ?? null,
     contacts: sortContacts(
       contacts.map(({ person, ...row }) => ({
@@ -514,6 +524,7 @@ export function normalizeConversationItem(item: ConversationDbItem): Conversatio
 /** PostgREST embed clause matching `ConversationItem` — shared by GET + PATCH. */
 export const CONVERSATION_SELECT = [
   '*',
+  'regular:conversation_regular',
   'project:project_id(id,slug,name,status)',
   'organization:workspace_organization!conversation_workspace_organization_fkey(id,slug,name,kind,city)',
   'contacts:conversation_contact(person_id,role,since,until,is_primary,person:workspace_person!conversation_contact_workspace_person_fkey(person_id,slug,full_name,email,phone,country,city,website,organization:workspace_organization!workspace_person_organization_fkey(name)))',

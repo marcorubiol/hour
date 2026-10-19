@@ -6,13 +6,10 @@ import {
   ConversationEventCreateSchema,
   ConversationPatchSchema,
   occurredAtForDay,
-  STATUS_KEYS,
+  conversationPatchColumns,
   groupConversationsByContact,
   normalizeConversationItem,
   relativeContactDate,
-  statusBadgeClass,
-  statusTone,
-  statusLabel,
   type ConversationDbItem,
   type ConversationItem,
 } from './conversation';
@@ -54,10 +51,10 @@ describe('workspace dossier projection', () => {
 });
 
 describe('ConversationPatchSchema', () => {
-  it('accepts a single-field status patch', () => {
-    const r = v.safeParse(ConversationPatchSchema, { status: 'in_conversation' });
+  it('accepts a single-field not_now patch', () => {
+    const r = v.safeParse(ConversationPatchSchema, { not_now: { until: '2027-01-15' } });
     expect(r.success).toBe(true);
-    if (r.success) expect(r.output).toEqual({ status: 'in_conversation' });
+    if (r.success) expect(r.output).toEqual({ not_now: { until: '2027-01-15' } });
   });
 
   it('never carries a contact stamp: contact is an event since ADR-098', () => {
@@ -77,8 +74,8 @@ describe('ConversationPatchSchema', () => {
     if (clear.success) expect(clear.output.next_action_at).toBeNull();
   });
 
-  it('rejects a status outside the enum', () => {
-    const r = v.safeParse(ConversationPatchSchema, { status: 'lead' });
+  it('rejects a timestamped not_now day (date-only contract)', () => {
+    const r = v.safeParse(ConversationPatchSchema, { not_now: { until: '2027-01-15T10:00:00Z' } });
     expect(r.success).toBe(false);
   });
 
@@ -116,13 +113,14 @@ describe('ConversationPatchSchema', () => {
 
   it('strips unknown fields so RLS-sensitive columns cannot ride along', () => {
     const r = v.safeParse(ConversationPatchSchema, {
-      status: 'hold',
+      next_action_note: 'x',
       workspace_id: '11111111-1111-1111-1111-111111111111',
+      not_now_at: '2026-01-01T00:00:00Z',
       deleted_at: '2026-01-01',
     });
     expect(r.success).toBe(true);
     if (r.success) {
-      expect(r.output).toEqual({ status: 'hold' });
+      expect(r.output).toEqual({ next_action_note: 'x' });
       expect('workspace_id' in r.output).toBe(false);
     }
   });
@@ -219,24 +217,27 @@ describe('contact-book projection', () => {
   });
 });
 
-describe('status vocabulary', () => {
-  it('has a label and a badge class for every enum value', () => {
-    for (const s of CONVERSATION_STATUSES) {
-      expect(STATUS_KEYS[s]).toBeTruthy();
-      expect(statusLabel(s, 'en')).not.toBe(STATUS_KEYS[s]);
-      expect(statusBadgeClass(s)).toBe(`badge--${statusTone(s)}`);
-    }
+describe('not_now patch (ADR-138)', () => {
+  const NOW = new Date('2026-10-20T10:00:00Z');
+  it('sets «not this time» now, with or without a day to write again', () => {
+    const p = v.parse(ConversationPatchSchema, { not_now: { until: '2027-01-15' } });
+    expect(conversationPatchColumns(p, NOW)).toEqual({ not_now_at: NOW.toISOString(), not_now_until: '2027-01-15' });
+    expect(conversationPatchColumns(v.parse(ConversationPatchSchema, { not_now: {} }), NOW)).toEqual({
+      not_now_at: NOW.toISOString(),
+      not_now_until: null,
+    });
   });
-
-  it('gives every status but hold a tone of its own, and an unknown one neutral', () => {
-    const tones = CONVERSATION_STATUSES.map(statusTone);
-    expect(new Set(tones).size).toBe(CONVERSATION_STATUSES.length);
-    expect(statusTone('hold')).toBe('neutral');
-    expect(statusTone('mystery')).toBe('neutral');
+  it('lifts it with null, and leaves it alone when absent', () => {
+    expect(conversationPatchColumns(v.parse(ConversationPatchSchema, { not_now: null }), NOW)).toEqual({
+      not_now_at: null,
+      not_now_until: null,
+    });
+    expect(conversationPatchColumns(v.parse(ConversationPatchSchema, { next_action_note: 'x' }), NOW)).toEqual({
+      next_action_note: 'x',
+    });
   });
-
-  it('falls back to the raw value for unknown statuses', () => {
-    expect(statusLabel('mystery', 'en')).toBe('mystery');
+  it('no longer writes the old status', () => {
+    expect(v.parse(ConversationPatchSchema, { status: 'confirmed' })).toEqual({});
   });
 });
 

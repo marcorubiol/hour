@@ -19,7 +19,7 @@
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { session } from '$lib/session.svelte';
-  import { CONVERSATION_STATUSES, statusLabel, statusTone } from '$lib/conversation';
+  import { relationLabel, relationTone, type Relation } from '$lib/conversation-relation';
   import { dayLabel, dayMonthYearTs } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
   import { useBreadcrumb } from '$lib/stores/breadcrumb.svelte';
@@ -51,7 +51,8 @@
     conversations: Array<{
       id: string;
       slug: string;
-      status: string;
+      /** The derived relation (ADR-138 § 4). */
+      relation: Relation;
       next_action_at: string | null;
       next_action_note: string | null;
       project: { id: string; slug: string; name: string; workspace_id: string } | null;
@@ -234,7 +235,6 @@
 
   let addOpen = $state(false);
   let aProject = $state('');
-  let aStatus = $state('contacted');
 
   let projectOptions = $derived.by(() => {
     // Offer only projects without a live conversation for this person.
@@ -243,17 +243,12 @@
       .filter((p) => !taken.has(p.id))
       .map((p) => ({ value: p.id, label: p.name ?? p.slug }));
   });
-  let addStatusOptions = CONVERSATION_STATUSES.map((s) => ({
-    value: s,
-    label: statusLabel(s, locale),
-  }));
 
   const addConversation = createMutation({
     mutationFn: () =>
       mutateJSON<{ conversation: unknown }>('POST', '/api/conversations', {
         project_id: aProject,
         person_id: file!.person.id,
-        status: aStatus,
       }),
     onSuccess: () => {
       addOpen = false;
@@ -453,7 +448,7 @@
         <ul class="person__rows" role="list">
           {#each file.conversations as e (e.id)}
             <li>
-              <StateBadge label={statusLabel(e.status, locale)} tone={statusTone(e.status)} />
+              <StateBadge label={relationLabel(e.relation, locale)} tone={relationTone(e.relation)} />
               <span class="person__row-main">
                 <a class="person__row-link" href={`/h/${workspaceSlug}/conversation/${e.id}`}
                   >{e.project?.name ?? '—'}{#if e.organization} · {e.organization.name}{/if}</a
@@ -550,7 +545,6 @@
       placeholder={projectOptions.length === 0 ? t('person.in_every_project', locale) : undefined}
       required
     />
-    <Select label={t('edit.status', locale)} options={addStatusOptions} bind:value={aStatus} />
   </div>
   {#snippet actions()}
     <Button variant="outline" onclick={() => (addOpen = false)}>{t('create.cancel', locale)}</Button>

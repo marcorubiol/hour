@@ -15,6 +15,8 @@
  * RPC gates the write.
  */
 
+import { conversationRelation, type ConversationDbItem } from '$lib/conversation';
+import { TURN_EMBEDS, setLastTurnEmbed } from '$lib/server/conversation-overview';
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
@@ -87,12 +89,13 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
     // filters; the conversation's own RLS hides someone else's private one.
     const engSearch = new URLSearchParams({
       select:
-        'id,slug,status,next_action_at,next_action_note,last_contacted_at,custom_fields,project:project_id(id,slug,name,workspace_id),organization:workspace_organization!conversation_workspace_organization_fkey(id,slug,name),contact:conversation_contact!inner(role,since,until,is_primary)',
+        `id,slug,next_action_at,next_action_note,last_contacted_at,custom_fields,not_now_at,not_now_until,first_contacted_at,contacted_undated,regular:conversation_regular,project:project_id(id,slug,name,workspace_id),organization:workspace_organization!conversation_workspace_organization_fkey(id,slug,name),contact:conversation_contact!inner(role,since,until,is_primary),${TURN_EMBEDS}`,
       workspace_id: `eq.${workspaceId}`,
       'contact.person_id': `eq.${personId}`,
       deleted_at: 'is.null',
       order: 'updated_at.desc',
     });
+    setLastTurnEmbed(engSearch);
     // ADR-093 — `note` absorbed `person_note`. No visibility filter and no
     // permission gate: RLS already narrows this to the caller's own notes,
     // because a note is always private. The old policy demanded
@@ -120,7 +123,7 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
     });
 
     const [conversations, notes, crew, cast, admin] = await Promise.all([
-      pgGet(env, 'conversation', jwt, { search: engSearch }),
+      pgGet<ConversationDbItem>(env, 'conversation', jwt, { search: engSearch }),
       pgGet(env, 'note', jwt, { search: notesSearch }),
       pgGet(env, 'crew_assignment', jwt, { search: crewSearch }),
       pgGet(env, 'cast_member', jwt, { search: castSearch }),
@@ -135,7 +138,8 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
         id: p.person_id,
         organization_name: p.organization?.name ?? null,
       },
-      conversations: conversations.data,
+      // The relation is derived here, as in every conversation endpoint (ADR-138).
+      conversations: conversations.data.map((c) => ({ ...c, relation: conversationRelation(c) })),
       notes: notes.data,
       crew: crew.data,
       cast: cast.data,

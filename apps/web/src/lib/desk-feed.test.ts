@@ -29,7 +29,7 @@ function actionAt(offset: number): string {
 function conv(id: string, o: Partial<DeskConvInput> = {}): DeskConvInput {
   return {
     id,
-    status: 'contacted',
+    relation: 'contacted',
     next_action_at: null,
     next_action_note: null,
     person: { full_name: 'Anna Prat', organization_name: null, slug: 'anna-prat' },
@@ -115,7 +115,7 @@ describe('buildDeskFeed — fixed within-day order', () => {
   it('a future bucket keeps task → conversation, and no agenda (ADR-117: that is the Planner)', () => {
     const feed = buildDeskFeed(
       {
-        conversations: [conv('c', { status: 'hold', next_action_at: actionAt(3) })],
+        conversations: [conv('c', { relation: 'talking', next_action_at: actionAt(3) })],
         tasks: [task('t', { due_at: actionAt(3) })],
       },
       NOW,
@@ -123,15 +123,15 @@ describe('buildDeskFeed — fixed within-day order', () => {
     );
     const b = feed.find((x) => x.sortKey === 3)!;
     expect(b.runs.map((r) => r.concern)).toEqual(['task', 'conversation']);
-    expect(b.runs[1].items[0]).toMatchObject({ verbKey: 'confirm', subject: 'Anna Prat' });
+    expect(b.runs[1].items[0]).toMatchObject({ verbKey: 'reply', subject: 'Anna Prat' });
   });
 
   it('ADR-102: a conversation is titled by its organization, also without a person', () => {
     const feed = buildDeskFeed(
       {
         conversations: [
-          conv('c', { status: 'hold', next_action_at: actionAt(3), organization: { name: 'Teatro Pradillo' } }),
-          conv('d', { status: 'hold', next_action_at: actionAt(3), person: null, organization: { name: 'Sala Beckett' } }),
+          conv('c', { relation: 'talking', next_action_at: actionAt(3), organization: { name: 'Teatro Pradillo' } }),
+          conv('d', { relation: 'talking', next_action_at: actionAt(3), person: null, organization: { name: 'Sala Beckett' } }),
         ],
         tasks: [],
       },
@@ -234,7 +234,7 @@ describe('buildDeskFeed — tasks, AI, money', () => {
 describe('buildDeskFeed — revive on quiet days', () => {
   it('offers dormant conversations only when no overdue and no show today', () => {
     const quiet = buildDeskFeed(
-      { ...EMPTY, conversations: [conv('d', { status: 'dormant', person: { full_name: 'CC Brugge', organization_name: null, slug: 'cc' } })] },
+      { ...EMPTY, conversations: [conv('d', { relation: 'dormant', person: { full_name: 'CC Brugge', organization_name: null, slug: 'cc' } })] },
       NOW,
       'en',
     );
@@ -248,7 +248,7 @@ describe('buildDeskFeed — revive on quiet days', () => {
     const loud = buildDeskFeed(
       {
         ...EMPTY,
-        conversations: [conv('d', { status: 'dormant' }), conv('o', { next_action_at: actionAt(-1) })],
+        conversations: [conv('d', { relation: 'dormant' }), conv('o', { next_action_at: actionAt(-1) })],
       },
       NOW,
       'en',

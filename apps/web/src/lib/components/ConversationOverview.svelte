@@ -30,12 +30,9 @@
     daysAgoLabel,
     eventKindLabel,
     relativeContactDate,
-    statusTone,
-    statusLabel,
-    CONVERSATION_STATUSES,
     type ConversationEventKind,
-    type ConversationStatus,
   } from '$lib/conversation';
+  import { RELATIONS, relationLabel, relationTone, type BoloCounts, type Relation } from '$lib/conversation-relation';
   import {
     COLD_IDLE_DAYS,
     COLD_REPLY_DAYS,
@@ -46,8 +43,8 @@
     type DueRow,
     type HotRow,
     type OverviewResponse,
+    type RelationCounts,
     type SeasonLine,
-    type StatusCounts,
   } from '$lib/conversation-overview';
 
   interface Props {
@@ -62,8 +59,8 @@
      * línea» de más).
      */
     lineHint?: number;
-    /** Pulsar un tramo de la temporada: filtra la lista por ese estado en la temporada (y su línea). */
-    onstatus: (status: ConversationStatus, linea?: string) => void;
+    /** Pulsar un tramo de la temporada: filtra la lista por esa relación en la temporada (y su línea). */
+    onrelation: (relation: Relation, linea?: string) => void;
     /** Pulsar el nombre de una línea: la lista, solo esa línea en la temporada. */
     online: (linea: string) => void;
     /** «Escribir a estas»: precarga el modo selección del envío en bloque (ADR-115). */
@@ -71,7 +68,7 @@
     onwrite?: (picks: { id: string; project_id: string }[]) => void;
   }
 
-  let { filters, workspaceSlugById, projectNameById, locale, lineHint = 0, onstatus, online, onwrite }: Props = $props();
+  let { filters, workspaceSlugById, projectNameById, locale, lineHint = 0, onrelation, online, onwrite }: Props = $props();
 
   /** Ghost lines while loading: as many as the scope has, at most four. */
   let ghostLines = $derived(lineHint >= 2 ? Math.min(lineHint, 4) : 0);
@@ -144,7 +141,7 @@
   }
   function hotAria(row: HotRow): string {
     const turn = row.turn === 'ours' ? t('overview.turn_ours', locale) : row.turn === 'theirs' ? t('overview.turn_theirs', locale) : '';
-    return [name(row), statusLabel(row.status, locale), relativeContactDate(row.at, locale), turn].filter(Boolean).join(', ');
+    return [name(row), relationLabel(row.relation, locale), relativeContactDate(row.at, locale), turn].filter(Boolean).join(', ');
   }
   /** «parada» for a stalled one that is not waiting on our email; «sin respuesta» otherwise. */
   function coldWord(row: ColdRow): string {
@@ -158,11 +155,15 @@
     return kind ? eventKindLabel(kind as ConversationEventKind, locale) : '';
   }
 
-  function present(counts: StatusCounts): ConversationStatus[] {
-    return CONVERSATION_STATUSES.filter((s) => counts[s] > 0);
+  function present(counts: RelationCounts): Relation[] {
+    return RELATIONS.filter((s) => counts[s] > 0);
   }
-  function countsAria(counts: StatusCounts): string {
-    return present(counts).map((s) => `${counts[s]} ${statusLabel(s, locale)}`).join(', ');
+  function countsAria(counts: RelationCounts): string {
+    return present(counts).map((s) => `${counts[s]} ${relationLabel(s, locale)}`).join(', ');
+  }
+  /** Los bolos en opción y firmes (ADR-138 § 3), o nada si no hay ninguno. */
+  function bolosLine(b: BoloCounts, key: 'overview.season_bolos' | 'overview.line_bolos'): string {
+    return b.option + b.firm > 0 ? t(key, locale, { option: b.option, firm: b.firm }) : '';
   }
   function lineKey(l: SeasonLine): string {
     return l.line_id ?? NO_LINE;
@@ -176,7 +177,7 @@
   <span class="row__who">
     <span class="row__org">{row.title || t('conversations.conversation', locale)}</span>
     {#if badge}
-      <StateBadge label={statusLabel(row.status, locale)} tone={statusTone(row.status)} />
+      <StateBadge label={relationLabel(row.relation, locale)} tone={relationTone(row.relation)} />
     {:else if row.person}
       <span class="row__person">{row.person}</span>
     {/if}
@@ -187,28 +188,28 @@
      `&nbsp;` so each bar is exactly a line high) and the typical blocks, so
      the list below does not jump when the overview arrives (diseño A3). -->
 <!-- A season bar and its legend: the whole season, or one line of it (ADR-135). -->
-{#snippet seasonBar(counts: StatusCounts, aria: string, linea?: string)}
+{#snippet seasonBar(counts: RelationCounts, aria: string, linea?: string)}
   <!-- A drawing for the pointer; the legend below is the control for the
-       keyboard and the screen reader (móvil #7): one stop per status. -->
+       keyboard and the screen reader (móvil #7): one stop per relation. -->
   <div class="season__bar" role="img" aria-label={aria}>
     {#each present(counts) as s (s)}
       <button
         type="button"
         class="season__seg"
-        data-conv-status={s}
+        data-relation={s}
         style:flex-grow={counts[s]}
-        title={`${statusLabel(s, locale)} · ${counts[s]}`}
+        title={`${relationLabel(s, locale)} · ${counts[s]}`}
         tabindex="-1"
         aria-hidden="true"
-        onclick={() => onstatus(s, linea)}
+        onclick={() => onrelation(s, linea)}
       ></button>
     {/each}
   </div>
   <div class="season__legend" class:season__legend--run={linea !== undefined}>
     {#each present(counts) as s (s)}
-      <button type="button" class="season__item" onclick={() => onstatus(s, linea)}>
+      <button type="button" class="season__item" onclick={() => onrelation(s, linea)}>
         <span class="season__n stat">{counts[s]}</span>
-        <span class="season__k"><i data-conv-status={s}></i>{statusLabel(s, locale)}</span>
+        <span class="season__k"><i data-relation={s}></i>{relationLabel(s, locale)}</span>
       </button>
     {/each}
   </div>
@@ -383,7 +384,11 @@
                       aria-label={t('overview.line_open', locale, { line: lineName(l), n: l.total })}
                       onclick={() => online(lineKey(l))}>{lineName(l)}</button
                     >
-                    <span class="season__line-figs">{t('overview.line_figures', locale, { total: l.total, answered: l.answered })}</span>
+                    <span class="season__line-figs"
+                      >{[t('overview.line_figures', locale, { total: l.total, answered: l.answered }), bolosLine(l.bolos, 'overview.line_bolos')]
+                        .filter(Boolean)
+                        .join(' · ')}</span
+                    >
                   </div>
                   {@render seasonBar(l.counts, `${lineName(l)}: ${countsAria(l.counts)}`, lineKey(l))}
                 </li>
@@ -395,6 +400,9 @@
           <p class="season__note">
             {t('overview.season_note', locale, { answered: data.season.answered, silent: data.season.total - data.season.answered })}
           </p>
+          {#if bolosLine(data.season.bolos, 'overview.season_bolos')}
+            <p class="season__note" data-testid="season-bolos">{bolosLine(data.season.bolos, 'overview.season_bolos')}</p>
+          {/if}
         {/if}
       </section>
 
@@ -424,7 +432,7 @@
                       ? row.subject
                         ? t('overview.cold_last_mail', locale, { subject: row.subject })
                         : t('overview.cold_no_reply', locale)
-                      : t('overview.cold_idle', locale, { status: statusLabel(row.status, locale) })}</span
+                      : t('overview.cold_idle', locale, { status: relationLabel(row.relation, locale) })}</span
                   >
                   <span class="row__when"
                     ><strong>{daysAgoLabel(row.days, locale)}</strong

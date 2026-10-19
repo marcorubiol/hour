@@ -19,12 +19,8 @@
   import { writable, derived } from 'svelte/store';
   import { fetchJSON } from '$lib/api';
   import { appLocale, t } from '$lib/i18n';
-  import {
-    statusTone,
-    statusLabel,
-    type ConversationItem,
-    type PersonLite,
-  } from '$lib/conversation';
+  import { type ConversationItem, type PersonLite } from '$lib/conversation';
+  import { relationLabel, relationTone } from '$lib/conversation-relation';
 
   interface Props {
     projectSlug: string;
@@ -107,7 +103,7 @@
               <span class="rel-stub__location">{locationStr(e.person)}</span>
             {/if}
           </div>
-          <StateBadge label={statusLabel(e.status)} tone={statusTone(e.status)} />
+          <StateBadge label={relationLabel(e.relation)} tone={relationTone(e.relation)} />
         </li>
       {/each}
     </ul>

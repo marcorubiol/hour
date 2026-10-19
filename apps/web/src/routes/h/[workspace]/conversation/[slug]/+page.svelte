@@ -27,7 +27,7 @@
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { ApiError, fetchJSON, mutateJSON } from '$lib/api';
-  import { dayMonthYear, dayMonthYearTs } from '$lib/datetime';
+  import { dayMonth, dayMonthYear, dayMonthYearTs } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
   import ConversationHistory from '$lib/components/ConversationHistory.svelte';
@@ -42,13 +42,14 @@
     eventKindLabel,
     conversationTitle,
     relativeContactDate,
-    statusTone,
-    statusLabel,
+    relationInputOf,
     type ConversationEventItem,
     type ConversationItem,
     type ConversationPatch,
   } from '$lib/conversation';
   import { followUpDue, turnOf } from '$lib/conversation-overview';
+  import { relationLabel, relationTone, type ConversationBolo } from '$lib/conversation-relation';
+  import { performanceStatusLabel } from '$lib/performance';
   import { firstLine, replySubject, type MailAccountsResponse } from '$lib/mail';
   import { markReadWhenSeen, readAtOpen, scrollWhenNamed } from '$lib/thread-reading.svelte';
   import { THREAD_REFRESH_MS, firstUnreadId, teamTimeline, type ConversationThreadView } from '$lib/threads';
@@ -86,6 +87,18 @@
     })),
   );
   let conv = $derived($convQuery.data?.item ?? null);
+
+  // Sus bolos (ADR-138 § 3): fecha y estado, sin dinero. Quien no tiene
+  // `read:performance` en el proyecto recibe la lista vacía y no ve la fila.
+  const bolosQuery = createQuery(
+    toStore(() => ({
+      queryKey: ['conversation-bolos', conv?.id ?? ''] as const,
+      enabled: Boolean(conv?.id),
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchJSON<{ items: ConversationBolo[] }>(`/api/conversations/${conv!.id}/bolos`, signal),
+    })),
+  );
+  let bolos = $derived($bolosQuery.data?.items ?? []);
 
   const eventsQuery = createQuery(
     toStore(() => ({
@@ -247,10 +260,8 @@
     },
   });
   let nextOpen = $state(false);
-  let turn = $derived(
-    conv ? turnOf({ status: conv.status, last: conv.last_turn?.[0] ?? null, reply_settled_at: conv.reply_settled_at }, new Date()) : null,
-  );
-  let followUp = $derived(conv ? followUpDue(conv, new Date()) : false);
+  let turn = $derived(conv ? turnOf({ ...relationInputOf(conv), reply_settled_at: conv.reply_settled_at }, new Date()) : null);
+  let followUp = $derived(conv ? followUpDue({ ...relationInputOf(conv), next_action_at: conv.next_action_at }, new Date()) : false);
   /** «Anotar contacto…» del menú de estado: abre el apunte de abajo. */
   let logOpen = $state(false);
   let logEl = $state<HTMLElement>();
@@ -366,20 +377,43 @@
       <div class="conv__aside">
         <dl class="facts">
           <div>
-            <dt>{t('edit.status', locale)}</dt>
+            <dt>{t('conversations.relation', locale)}</dt>
             <dd>
               {#if conv.can_edit}
                 <ConversationStatusMenu
-                  status={conv.status}
+                  relation={conv.relation}
+                  notNowUntil={conv.not_now_until}
                   {locale}
-                  onchange={(status) => $patch.mutate({ status })}
+                  onnotnow={(not_now) => $patch.mutate({ not_now })}
                   onlog={openLog}
                 />
               {:else}
-                <StateBadge label={statusLabel(conv.status, locale)} tone={statusTone(conv.status)} />
+                <StateBadge label={relationLabel(conv.relation, locale)} tone={relationTone(conv.relation)} />
               {/if}
             </dd>
           </div>
+          {#if bolos.length > 0}
+            <div data-testid="conversation-bolos">
+              <dt>{t('conversations.bolos', locale)}</dt>
+              <dd>
+                <ul class="facts__bolos">
+                  {#each bolos as b (b.bolo_id)}
+                    {@const when = b.first_performed_at ? dayMonth(b.first_performed_at) : t('conversations.bolo_undated', locale)}
+                    <li>
+                      {#if b.performance_slug}
+                        <a href={`/h/${workspaceSlug}/performance/${b.performance_slug}`}>{when}</a>
+                      {:else}
+                        {when}
+                      {/if}
+                      · {performanceStatusLabel(b.status, locale)}{#if b.function_count > 1}<span class="muted">
+                          · {t('perf.bolo_functions_other', locale, { n: b.function_count })}</span
+                        >{/if}
+                    </li>
+                  {/each}
+                </ul>
+              </dd>
+            </div>
+          {/if}
           <div>
             <dt>{t('mail.last_contact', locale)}</dt>
             <dd>{relativeContactDate(conv.last_contacted_at, locale)}</dd>
@@ -898,6 +932,14 @@
     }
     .facts__turn--ours {
       font-weight: 500;
+    }
+    .facts__bolos {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+      margin: 0;
+      padding: 0;
+      list-style: none;
     }
     .facts__act {
       margin-inline-start: var(--space-xs);

@@ -18,10 +18,9 @@
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
-  import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { mutateJSON, ApiError } from '$lib/api';
-  import { CONVERSATION_STATUSES, conversationWhoBody, statusLabel } from '$lib/conversation';
+  import { conversationWhoBody } from '$lib/conversation';
   import { organizationNames, organizationsQueryOptions } from '$lib/organizations';
   import { conversationAccessQueryOptions } from '$lib/conversation-access';
   import { toStore } from 'svelte/store';
@@ -61,20 +60,14 @@
   let aName = $state('');
   let aEmail = $state('');
   let aOrg = $state('');
-  let aStatus = $state('contacted');
   let aNextAt = $state('');
   let aNextNote = $state('');
 
-  const statusOptions = CONVERSATION_STATUSES.map((s) => ({
-    value: s,
-    label: statusLabel(s, locale),
-  }));
 
   function openAdd() {
     aName = '';
     aEmail = '';
     aOrg = '';
-    aStatus = 'contacted';
     aNextAt = '';
     aNextNote = '';
     addOpen = true;
@@ -86,7 +79,6 @@
         project_id: line.project_id,
         // ADR-102: the person is optional; the organization alone is enough.
         ...conversationWhoBody({ name: aName, email: aEmail, organization: aOrg }),
-        status: aStatus,
         next_action_at: aNextAt || null,
         next_action_note: aNextNote.trim() || null,
         line_id: line.id,
@@ -151,7 +143,6 @@
     </datalist>
     <Input label={t('conversations.full_name', locale)} bind:value={aName} />
     <Input label={t('conversations.email', locale)} type="email" bind:value={aEmail} />
-    <Select label={t('edit.status', locale)} options={statusOptions} bind:value={aStatus} />
     <Input label={t('conversations.col_next_action', locale)} type="date" bind:value={aNextAt} />
     <Input label={t('conversations.next_note', locale)} bind:value={aNextNote} />
   </form>

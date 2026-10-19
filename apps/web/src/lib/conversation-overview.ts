@@ -10,23 +10,40 @@
  * llama: «hace 2 días» es lo que dice el calendario, no 48 horas.
  *
  * Las reglas (ADR-117 § 5, puntos de partida para ajustar con uso):
+ * Ninguna regla lee `conversation.status`: lee la relación derivada
+ * (`relationOf`, ADR-138 § 4). «No esta vez» saca una conversación de todo
+ * bloque, del turno y de los envíos mientras dura.
+ *
  * - **Te toca**: el último correo, mensaje o llamada con dirección es de fuera
  *   (`inbound`), no le hemos contestado y no se marcó «no pide respuesta»;
- *   detrás, los seguimientos vencidos. Una confirmada no pide respuesta por
- *   correo, solo por seguimiento (ADR-126 § 1).
- * - **Caliente**: en conversación o hold con actividad en 14 días, o cualquier
- *   sala que nos escribió en 14 días.
+ *   detrás, los seguimientos vencidos (ADR-126 § 1).
+ * - **Caliente**: una sala que ha contestado con actividad en 14 días, o
+ *   cualquiera que nos escribió en 14 días.
  * - **Se enfría**: nuestro último correo sin respuesta hace 21 días o más; o
- *   una conversación abierta sin nada en 30; o ninguna fecha. En dos grupos
- *   (ADR-126 § 8): las que no contestaron al envío (contactada, recurrente:
- *   segunda ronda, en bloque) y las paradas (en conversación, hold: una a una).
+ *   una conversación con respuesta sin nada en 30. En dos grupos (ADR-126 § 8):
+ *   las que no contestaron al envío (segunda ronda, en bloque) y las paradas
+ *   (las que contestaron alguna vez: una a una).
  * - **La temporada**: de septiembre a agosto por fecha de función; una
  *   conversación sin funciones es de la temporada en curso (está en difusión).
- *   Con dos líneas de trabajo o más (contando «sin línea»), una barra por
- *   línea (ADR-135).
+ *   Cuenta relaciones y, aparte, los bolos de la temporada en opción y firmes
+ *   (ADR-138 § 3). Con dos líneas de trabajo o más (contando «sin línea»), una
+ *   barra por línea (ADR-135).
  */
 
-import { CONVERSATION_STATUSES, type ConversationStatus } from './conversation';
+import {
+  RELATIONS,
+  countBolos,
+  daysSince,
+  hasAnswered,
+  isRelation,
+  lastActivity,
+  relationOf,
+  type BoloCounts,
+  type Relation,
+  type RelationInput,
+} from './conversation-relation';
+
+export { daysSince, hasAnswered, lastActivity };
 
 /** Caliente: actividad o un correo de ellos en estos días. */
 export const HOT_DAYS = 14;
@@ -62,30 +79,13 @@ export const HOT_ROWS = 6;
 /** Los canales que cuentan para el turno: una nota no es una interacción. */
 export const TURN_KINDS = ['email', 'message', 'call'] as const;
 
-/** Ni te toca ni se enfría: la sala dijo que no, o se dejó dormir a propósito. */
-const CLOSED: ReadonlySet<ConversationStatus> = new Set(['declined', 'dormant']);
 /**
- * Sin turno por correo: las cerradas y la confirmada, cuyo último correo suele
- * ser el «perfecto, quedamos así» que no pide nada. Lo que quede pendiente de
- * una confirmada se apunta como seguimiento (ADR-126 § 1).
+ * Ni te toca, ni tiene turno, ni se enfría: «no esta vez» en vigor. Lo que
+ * quede pendiente de una sala que dijo que no se apunta como fecha de volver.
  */
-const NO_TURN: ReadonlySet<ConversationStatus> = new Set([...CLOSED, 'confirmed']);
-/** Esperamos su respuesta a un correo nuestro (la regla de 21 días). */
-const AWAITING: ReadonlySet<ConversationStatus> = new Set(['contacted', 'in_conversation', 'hold', 'recurring']);
-/**
- * Estados que ya implican una respuesta de la sala: una confirmada o una
- * rechazada no está «sin respuesta», aunque lo hablado no esté en el
- * historial (ADR-126 § 2).
- */
-const ANSWERED: ReadonlySet<ConversationStatus> = new Set(['in_conversation', 'hold', 'confirmed', 'declined', 'recurring']);
-
-/** Ha contestado: nos escribió alguna vez, o su estado ya lo dice. */
-export function hasAnswered(row: Pick<OverviewInput, 'status' | 'last_in'>): boolean {
-  return Boolean(row.last_in) || ANSWERED.has(row.status);
+function closed(row: RelationInput, now: Date): boolean {
+  return relationOf(row, now) === 'not_now';
 }
-
-/** Conversación abierta: la regla de 30 días y la mitad de «caliente». */
-const OPEN: ReadonlySet<ConversationStatus> = new Set(['in_conversation', 'hold']);
 
 /** El último evento con dirección de una conversación (embebido, limit 1). */
 export interface TurnEvent {
@@ -103,8 +103,13 @@ export interface OverviewInput {
   line_id: string | null;
   /** El nombre de su línea, si la tiene y se puede leer. */
   line_name?: string | null;
-  status: ConversationStatus;
+  not_now_at: string | null;
+  not_now_until: string | null;
   last_contacted_at: string | null;
+  first_contacted_at: string | null;
+  contacted_undated: boolean;
+  legacy_status?: string | null;
+  regular?: boolean | null;
   next_action_at: string | null;
   next_action_note: string | null;
   /** La organización, o el contacto si no hay (ADR-102). */
@@ -119,35 +124,16 @@ export interface OverviewInput {
   reply_settled_at?: string | null;
   /** Días (YYYY-MM-DD) de sus funciones vivas, directas o por su bolo. */
   performance_days: string[];
-}
-
-// ── Días ───────────────────────────────────────────────────────────────────
-
-function localMidnight(d: Date): number {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-}
-
-/** Días de calendario desde `iso` hasta hoy (0 = hoy). Una fecha sola (YYYY-MM-DD) se lee como ese día. */
-export function daysSince(iso: string, now: Date): number {
-  const at = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(`${iso}T12:00:00`) : new Date(iso);
-  if (Number.isNaN(at.getTime())) return 0;
-  return Math.round((localMidnight(now) - localMidnight(at)) / 86_400_000);
-}
-
-function latest(...isos: (string | null | undefined)[]): string | null {
-  let out: string | null = null;
-  for (const iso of isos) if (iso && (!out || Date.parse(iso) > Date.parse(out))) out = iso;
-  return out;
-}
-
-/** El último movimiento que se sabe: un evento con dirección o el sello de contacto. */
-export function lastActivity(row: Pick<OverviewInput, 'last' | 'last_in' | 'last_contacted_at'>): string | null {
-  return latest(row.last?.occurred_at, row.last_in?.occurred_at, row.last_contacted_at);
+  /** Sus bolos (`conversations_bolos`): estado y primera función viva, sin dinero. */
+  bolos?: { status: string; first_performed_at: string | null }[];
 }
 
 // ── Turno ──────────────────────────────────────────────────────────────────
 
 export type TurnSide = 'ours' | 'theirs';
+
+/** Lo que el turno lee: la relación (por «no esta vez») y lo atendido. */
+export type TurnRow = RelationInput & Pick<OverviewInput, 'reply_settled_at'>;
 
 export interface Turn {
   side: TurnSide;
@@ -156,15 +142,12 @@ export interface Turn {
 }
 
 /**
- * De quién es el turno: de quien no escribió el último. Una conversación
- * cerrada (rechazada o en pausa) o confirmada no tiene turno, ni una cuyo
- * último correo de fuera se marcó «no pide respuesta».
+ * De quién es el turno: de quien no escribió el último. Una conversación en
+ * «no esta vez» no tiene turno, ni una cuyo último correo de fuera se marcó
+ * «no pide respuesta» (el «perfecto, quedamos así», ADR-126 § 1).
  */
-export function turnOf(
-  row: Pick<OverviewInput, 'status' | 'last' | 'reply_settled_at'>,
-  now: Date,
-): Turn | null {
-  if (!row.last || NO_TURN.has(row.status)) return null;
+export function turnOf(row: TurnRow, now: Date): Turn | null {
+  if (!row.last || closed(row, now)) return null;
   if (row.last.direction === 'inbound' && isSettled(row.last.occurred_at, row.reply_settled_at)) return null;
   return {
     side: row.last.direction === 'inbound' ? 'ours' : 'theirs',
@@ -178,29 +161,26 @@ function isSettled(at: string, settledAt: string | null | undefined): boolean {
   return Boolean(settledAt) && Date.parse(at) <= Date.parse(settledAt!);
 }
 
-/** Un seguimiento apuntado para hoy o antes, en una conversación que no está cerrada. */
-export function followUpDue(row: Pick<OverviewInput, 'status' | 'next_action_at'>, now: Date): boolean {
-  return Boolean(row.next_action_at) && !CLOSED.has(row.status) && daysSince(row.next_action_at!.slice(0, 10), now) >= 0;
+/** Un seguimiento apuntado para hoy o antes, en una conversación que no está en «no esta vez». */
+export function followUpDue(row: RelationInput & Pick<OverviewInput, 'next_action_at'>, now: Date): boolean {
+  return Boolean(row.next_action_at) && !closed(row, now) && daysSince(row.next_action_at!.slice(0, 10), now) >= 0;
 }
 
 export type DueReason = 'reply' | 'follow_up';
 
 /** Por qué te toca, o null: primero una respuesta pendiente, después un seguimiento. */
-export function dueReason(
-  row: Pick<OverviewInput, 'status' | 'last' | 'next_action_at' | 'reply_settled_at'>,
-  now: Date,
-): DueReason | null {
+export function dueReason(row: TurnRow & Pick<OverviewInput, 'next_action_at'>, now: Date): DueReason | null {
   if (turnOf(row, now)?.side === 'ours') return 'reply';
   return followUpDue(row, now) ? 'follow_up' : null;
 }
 
 // ── Temperatura ───────────────────────────────────────────────────────────
 
-export function isHot(row: Pick<OverviewInput, 'status' | 'last' | 'last_in' | 'last_contacted_at'>, now: Date): boolean {
-  if (CLOSED.has(row.status)) return false;
+export function isHot(row: RelationInput, now: Date): boolean {
+  if (closed(row, now)) return false;
   if (row.last_in && daysSince(row.last_in.occurred_at, now) <= HOT_DAYS) return true;
   const activity = lastActivity(row);
-  return OPEN.has(row.status) && activity !== null && daysSince(activity, now) <= HOT_DAYS;
+  return hasAnswered(row) && activity !== null && daysSince(activity, now) <= HOT_DAYS;
 }
 
 export type CoolingReason = 'no_reply' | 'idle';
@@ -213,19 +193,22 @@ export interface Cooling {
   group: CoolingGroup;
 }
 
-const ROUND: ReadonlySet<ConversationStatus> = new Set(['contacted', 'recurring']);
-
 /**
- * Sin fecha de contacto: abierta, sin ningún evento, sin sello de contacto y
- * sin seguimiento apuntado (lo importado de antes del historial). No se enfría
- * ni te toca: no sabemos cuándo se habló. Se cuenta aparte, en una línea del
- * dashboard con su filtro (`?temp=sin-fecha`; ADR-126 § 8, enmienda del
- * coordinador: en `muk-cia` son 151 de 152).
+ * Sin fecha de contacto: se habló (contactada sin fecha, o su estado viejo lo
+ * decía), sin ningún evento, sin sello de contacto y sin seguimiento apuntado
+ * (lo importado de antes del historial). No se enfría ni te toca: no sabemos
+ * cuándo se habló. Se cuenta aparte, en una línea del dashboard con su filtro
+ * (`?temp=sin-fecha`; ADR-126 § 8; en `muk-cia` son 151 de 152). Una que
+ * nunca se contactó no está «sin fecha»: no hay nada que fechar.
  */
-export function isUndated(
-  row: Pick<OverviewInput, 'status' | 'last' | 'last_in' | 'last_contacted_at' | 'next_action_at'>,
-): boolean {
-  return AWAITING.has(row.status) && !row.last && lastActivity(row) === null && !row.next_action_at;
+export function isUndated(row: RelationInput & Pick<OverviewInput, 'next_action_at'>, now: Date): boolean {
+  return (
+    !closed(row, now) &&
+    (row.contacted_undated || hasAnswered(row)) &&
+    !row.last &&
+    lastActivity(row) === null &&
+    !row.next_action_at
+  );
 }
 
 /**
@@ -235,22 +218,20 @@ export function isUndated(
  * historial, ADR-098) cuenta su sello de contacto como nuestro último correo.
  * Sin ninguna fecha no se enfría: no lo sabemos (`undated`, aparte).
  */
-export function coolingOf(
-  row: Pick<OverviewInput, 'status' | 'last' | 'last_in' | 'last_contacted_at' | 'reply_settled_at' | 'next_action_at'>,
-  now: Date,
-): Cooling | null {
-  if (!AWAITING.has(row.status)) return null;
-  const group: CoolingGroup = ROUND.has(row.status) ? 'round' : 'stalled';
+export function coolingOf(row: TurnRow & Pick<OverviewInput, 'next_action_at'>, now: Date): Cooling | null {
+  if (closed(row, now)) return null;
+  const answered = hasAnswered(row);
+  const group: CoolingGroup = answered ? 'stalled' : 'round';
   const turn = turnOf(row, now);
   // Te toca (una respuesta o un seguimiento vencido): es tuya, no se enfría.
   if (turn?.side === 'ours' || followUpDue(row, now)) return null;
   if (turn?.side === 'theirs' && turn.days >= COLD_REPLY_DAYS) return { reason: 'no_reply', days: turn.days, group };
-  if (!row.last && !row.last_in && row.status === 'contacted' && row.last_contacted_at) {
+  if (!row.last && !answered && row.last_contacted_at) {
     const days = daysSince(row.last_contacted_at, now);
     if (days >= COLD_REPLY_DAYS) return { reason: 'no_reply', days, group };
   }
   const activity = lastActivity(row);
-  if (OPEN.has(row.status) && activity) {
+  if (answered && activity) {
     const days = daysSince(activity, now);
     if (days >= COLD_IDLE_DAYS) return { reason: 'idle', days, group };
   }
@@ -297,12 +278,25 @@ export function seasonRows<R extends Pick<OverviewInput, 'performance_days' | 'l
   return rows.filter((r) => inSeason(r, season) && (lines.size === 0 || (r.line_id !== null && lines.has(r.line_id))));
 }
 
-export type StatusCounts = Record<ConversationStatus, number>;
+export type RelationCounts = Record<Relation, number>;
 
-export function countByStatus(rows: readonly Pick<OverviewInput, 'status'>[]): StatusCounts {
-  const out = Object.fromEntries(CONVERSATION_STATUSES.map((s) => [s, 0])) as StatusCounts;
-  for (const r of rows) out[r.status] += 1;
+export function countByRelation(rows: readonly RelationInput[], now: Date): RelationCounts {
+  const out = Object.fromEntries(RELATIONS.map((s) => [s, 0])) as RelationCounts;
+  for (const r of rows) out[relationOf(r, now)] += 1;
   return out;
+}
+
+/**
+ * Los bolos de la temporada de unas conversaciones, en opción y firmes. La
+ * temporada de un bolo es la de su primera función viva (ADR-131); uno sin
+ * funciones todavía es de la temporada en curso, como una conversación.
+ */
+export function seasonBoloCounts(rows: readonly Pick<OverviewInput, 'bolos'>[], season: Season): BoloCounts {
+  return countBolos(
+    rows.flatMap((r) => r.bolos ?? []).filter(
+      (b) => !b.first_performed_at || (b.first_performed_at >= season.start && b.first_performed_at <= season.end),
+    ),
+  );
 }
 
 // ── La temporada por línea (ADR-135) ───────────────────────────────────────
@@ -315,8 +309,9 @@ export interface SeasonLine {
   line_id: string | null;
   name: string | null;
   total: number;
-  counts: StatusCounts;
+  counts: RelationCounts;
   answered: number;
+  bolos: BoloCounts;
 }
 
 /**
@@ -324,7 +319,7 @@ export interface SeasonLine {
  * por nombre) y «sin línea» siempre al final, nunca escondida. Con una sola
  * línea o ninguna no hay reparto (lista vacía): el bloque es una barra.
  */
-export function seasonByLine(rows: readonly Pick<OverviewInput, 'line_id' | 'line_name' | 'status' | 'last_in'>[]): SeasonLine[] {
+export function seasonByLine(rows: readonly OverviewInput[], now: Date, season: Season = currentSeason(now)): SeasonLine[] {
   const by = new Map<string | null, (typeof rows)[number][]>();
   for (const r of rows) by.set(r.line_id, [...(by.get(r.line_id) ?? []), r]);
   if (by.size < 2) return [];
@@ -333,8 +328,9 @@ export function seasonByLine(rows: readonly Pick<OverviewInput, 'line_id' | 'lin
       line_id,
       name: line_id === null ? null : (list.find((r) => r.line_name)?.line_name ?? null),
       total: list.length,
-      counts: countByStatus(list),
+      counts: countByRelation(list, now),
       answered: list.filter(hasAnswered).length,
+      bolos: seasonBoloCounts(list, season),
     }))
     .sort(
       (a, b) =>
@@ -369,6 +365,8 @@ export interface ListFilter {
   /** Un envío y cuáles de sus destinatarios: las que contestaron, o las que rebotaron. */
   envio?: string;
   r?: MailoutPick;
+  /** Una relación (la barra de la temporada filtra con esto, ADR-138). */
+  relacion?: Relation;
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -377,7 +375,9 @@ export function parseListFilter(params: URLSearchParams): ListFilter {
   const turno = params.get('turno');
   const temp = params.get('temp');
   const temporada = params.get('temporada') === 'actual' || undefined;
+  const relacion = params.get('relacion');
   return {
+    relacion: isRelation(relacion) ? relacion : undefined,
     turno: turno === 'nuestro' || turno === 'suyo' ? turno : undefined,
     temp: temp && TEMP_FILTERS.includes(temp) ? (temp as TempFilter) : undefined,
     temporada,
@@ -398,7 +398,7 @@ function mailoutFilter(params: URLSearchParams): Pick<ListFilter, 'envio' | 'r'>
 }
 
 export function hasListFilter(f: ListFilter): boolean {
-  return Boolean(f.turno || f.temp || f.temporada || f.envio);
+  return Boolean(f.turno || f.temp || f.temporada || f.envio || f.relacion);
 }
 
 /**
@@ -413,6 +413,7 @@ export function applyListFilter<R extends OverviewInput>(
 ): R[] {
   let out = f.temporada ? seasonRows(rows, currentSeason(now), lineIds) : [...rows];
   if (f.temporada && f.linea) out = lineRows(out, f.linea);
+  if (f.relacion) out = out.filter((r) => relationOf(r, now) === f.relacion);
   if (f.turno === 'nuestro') out = sortDue(out.filter((r) => dueReason(r, now) !== null), now);
   if (f.turno === 'suyo') {
     out = out
@@ -423,7 +424,7 @@ export function applyListFilter<R extends OverviewInput>(
   if (f.temp === 'fria') out = sortCold(out.filter((r) => coolingOf(r, now) !== null), now);
   if (f.temp === 'ronda') out = sortCold(out.filter((r) => coolingOf(r, now)?.group === 'round'), now);
   if (f.temp === 'parada') out = sortCold(out.filter((r) => coolingOf(r, now)?.group === 'stalled'), now);
-  if (f.temp === 'sin-fecha') out = out.filter(isUndated);
+  if (f.temp === 'sin-fecha') out = out.filter((r) => isUndated(r, now));
   return out;
 }
 
@@ -470,7 +471,7 @@ export interface BlockRow {
   project_id: string;
   title: string;
   person: string | null;
-  status: ConversationStatus;
+  relation: Relation;
 }
 
 export interface DueRow extends BlockRow {
@@ -504,14 +505,16 @@ export interface Block<T> {
 export interface ConversationOverview {
   /** Conversaciones del alcance (todas las no borradas). */
   total: number;
-  /** Las que siguen abiertas: sin las rechazadas ni las que están en pausa. */
+  /** Las que siguen vivas: sin «no esta vez» ni dormidas. */
   live: number;
   season: {
     label: string;
     start: string;
     end: string;
     total: number;
-    counts: StatusCounts;
+    counts: RelationCounts;
+    /** Los bolos de la temporada, en opción y firmes (la puerta del Desk lee `option`). */
+    bolos: BoloCounts;
     /** Las que han contestado algo: nos escribieron, o su estado lo implica. */
     answered: number;
     /** Una por línea, con dos o más (contando «sin línea»); vacía, una sola barra (ADR-135). */
@@ -529,14 +532,14 @@ export interface ConversationOverview {
   undated: number;
 }
 
-function blockRow(r: OverviewInput): BlockRow {
+function blockRow(r: OverviewInput, now: Date): BlockRow {
   return {
     id: r.id,
     workspace_id: r.workspace_id,
     project_id: r.project_id,
     title: r.title,
     person: r.person,
-    status: r.status,
+    relation: relationOf(r, now),
   };
 }
 
@@ -554,13 +557,14 @@ export function buildOverview(
 
   return {
     total: rows.length,
-    live: rows.filter((r) => r.status !== 'declined' && r.status !== 'dormant').length,
+    live: rows.filter((r) => !['not_now', 'dormant'].includes(relationOf(r, now))).length,
     season: {
       ...season,
       total: inSeasonRows.length,
-      counts: countByStatus(inSeasonRows),
+      counts: countByRelation(inSeasonRows, now),
+      bolos: seasonBoloCounts(inSeasonRows, season),
       answered: inSeasonRows.filter(hasAnswered).length,
-      lines: seasonByLine(inSeasonRows),
+      lines: seasonByLine(inSeasonRows, now, season),
     },
     due: {
       count: due.length,
@@ -568,7 +572,7 @@ export function buildOverview(
         const reason = dueReason(r, now)!;
         const at = reason === 'reply' ? r.last!.occurred_at : r.next_action_at!.slice(0, 10);
         return {
-          ...blockRow(r),
+          ...blockRow(r, now),
           reason,
           at,
           days: daysSince(at, now),
@@ -582,7 +586,7 @@ export function buildOverview(
       count: hot.length,
       rows: hot.slice(0, HOT_ROWS).map((r) => {
         const at = lastActivity(r);
-        return { ...blockRow(r), at, days: at ? daysSince(at, now) : null, turn: turnOf(r, now)?.side ?? null };
+        return { ...blockRow(r, now), at, days: at ? daysSince(at, now) : null, turn: turnOf(r, now)?.side ?? null };
       }),
     },
     cold: {
@@ -590,7 +594,7 @@ export function buildOverview(
       rows: coldBlockRows(cold, now).map((r) => {
         const c = coolingOf(r, now)!;
         return {
-          ...blockRow(r),
+          ...blockRow(r, now),
           reason: c.reason,
           days: c.days,
           group: c.group,
@@ -601,7 +605,7 @@ export function buildOverview(
       stalled: cold.filter((r) => coolingOf(r, now)!.group === 'stalled').length,
       picks: cold.filter((r) => coolingOf(r, now)!.group === 'round').map((r) => ({ id: r.id, project_id: r.project_id })),
     },
-    undated: rows.filter(isUndated).length,
+    undated: rows.filter((r) => isUndated(r, now)).length,
   };
 }
 

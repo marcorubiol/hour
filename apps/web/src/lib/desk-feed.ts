@@ -25,6 +25,7 @@
  * is the aging of Cuentas (`invoiceAging`, ADR-117 § 4), not `due_on`.
  */
 
+import type { Relation } from './conversation-relation';
 import { localDayISO } from './datetime';
 import { taskSurfaceState, taskContextLabel, taskProjectId, type TaskItem } from './task';
 import { LOCALE_TAG, t, type Locale } from './i18n';
@@ -45,7 +46,8 @@ export type BucketLabelKey =
 export interface DeskConvInput {
   id: string;
   workspace_id?: string;
-  status: string;
+  /** The derived relation (ADR-138 § 4), computed by the Worker. */
+  relation: Relation;
   next_action_at: string | null;
   next_action_note: string | null;
   person: { full_name: string | null; organization_name: string | null; slug: string | null } | null;
@@ -137,19 +139,18 @@ export interface DeskReplyInput {
   href: string | null;
 }
 
-const VERB_KEYS: Record<string, { upcoming: string; overdue: string }> = {
+const VERB_KEYS: Record<Relation, { upcoming: string; overdue: string }> = {
+  never: { upcoming: 'followup', overdue: 'chase' },
   contacted: { upcoming: 'followup', overdue: 'chase' },
-  in_conversation: { upcoming: 'reply', overdue: 'reply' },
-  hold: { upcoming: 'confirm', overdue: 'confirm' },
-  confirmed: { upcoming: 'prep', overdue: 'prep' },
-  declined: { upcoming: 'note', overdue: 'note' },
+  talking: { upcoming: 'reply', overdue: 'reply' },
+  regular: { upcoming: 'check', overdue: 'check' },
   dormant: { upcoming: 'revive', overdue: 'revive' },
-  recurring: { upcoming: 'check', overdue: 'check' },
+  not_now: { upcoming: 'note', overdue: 'note' },
 };
 
-/** i18n verb key (desk.verb_*) for a conversation's derived call. */
-export function conversationVerbKey(status: string, overdue: boolean): string {
-  return VERB_KEYS[status]?.[overdue ? 'overdue' : 'upcoming'] ?? 'look';
+/** i18n verb key (desk.verb_*) for a conversation's derived call, by its relation. */
+export function conversationVerbKey(relation: string, overdue: boolean): string {
+  return VERB_KEYS[relation as Relation]?.[overdue ? 'overdue' : 'upcoming'] ?? 'look';
 }
 
 // Fixed within-day order of the day list, mirroring the lens nav.
@@ -357,10 +358,10 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
     );
   }
 
-  // ── Conversations (derived calls): next action set, not declined/dormant.
+  // ── Conversations (derived calls): next action set, not in «not this time».
   let hasOverdue = false;
   for (const e of input.conversations) {
-    if (e.status === 'declined' || e.status === 'dormant' || !e.next_action_at || replied.has(e.id)) continue;
+    if (e.relation === 'not_now' || !e.next_action_at || replied.has(e.id)) continue;
     const day = e.next_action_at.slice(0, 10);
     const b = dayBucket(day, now, locale);
     const overdue = b.sortKey === -1;
@@ -375,7 +376,7 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
         subject: convSubject(e, locale),
         projectName: e.project?.name ?? '—',
         projectId: e.project?.id ?? null,
-        verbKey: conversationVerbKey(e.status, overdue),
+        verbKey: conversationVerbKey(e.relation, overdue),
         overdue,
         conversationId: e.id,
         workspaceId: e.workspace_id ?? null,
@@ -386,7 +387,7 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
   // ── Revive (quiet days only): no overdue and no show today → up to two
   //    dormant conversations offered as proposal-toned revive calls (ADR-073).
   if (!hasOverdue && !input.showToday) {
-    const dormant = input.conversations.filter((e) => e.status === 'dormant').slice(0, 2);
+    const dormant = input.conversations.filter((e) => e.relation === 'dormant').slice(0, 2);
     for (const e of dormant) {
       push(
         todayISO,
