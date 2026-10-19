@@ -32,7 +32,6 @@
   import AccountMenu from '$lib/components/shell/AccountMenu.svelte';
   import ScopeBar from '$lib/components/shell/ScopeBar.svelte';
   import ScopeRail from '$lib/components/shell/ScopeRail.svelte';
-  import ShellBreadcrumb from '$lib/components/shell/ShellBreadcrumb.svelte';
   import { isReservedWorkspaceSlug } from '$lib/reserved-slugs';
   import { detectLocale, setTrade, t, tradeOf } from '$lib/i18n';
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
@@ -41,7 +40,6 @@
   import { provideCalm } from '$lib/stores/calm.svelte';
   import { providePins, parsePin, type PinKind } from '$lib/stores/pins.svelte';
   import { provideScopes, sameSet as scopesSameSet, type Scope } from '$lib/stores/scopes.svelte';
-  import { provideBreadcrumb } from '$lib/stores/breadcrumb.svelte';
   import { provideCreation } from '$lib/stores/creation.svelte';
   import CreateWorkspaceDialog from '$lib/components/create/CreateWorkspaceDialog.svelte';
   import CreateProjectDialog from '$lib/components/create/CreateProjectDialog.svelte';
@@ -98,7 +96,6 @@
   const lens = provideLens('desk');
   const pins = providePins();
   const scopes = provideScopes();
-  provideBreadcrumb();
   const creation = provideCreation();
   // Calm lives in the shell (the toggle sits by the clock); the Desk consumes it.
   const calm = provideCalm();
@@ -656,8 +653,6 @@
           {openPaletteAdd}
         />
       {/if}
-
-      <ShellBreadcrumb />
 
       <div class="shell__content" class:shell__content--calm={calm.on}>
         {#if routedLens && routedLens !== 'desk' && !lensOn(routedLens)}

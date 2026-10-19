@@ -74,9 +74,10 @@ test.describe('smoke', () => {
     // conversations through, the count renders. Entities stay space-scoped.
     await page.goto('/h/playwright/project/zzz-difusion/');
     await waitForLoaded(page);
-    const countLabel = page.locator('.rel-stub__count');
+    // The count rides in the block's head: «Conversations · 12» (ADR-139 § 4).
+    const countLabel = page.locator('#rel-stub-title .block-head__n');
     await expect(countLabel).toBeVisible();
-    await expect(countLabel).toContainText(/\d+\s+conversations?/);
+    await expect(countLabel).toHaveText(/^\d+$/);
     expect(await page.locator('.rel-stub__item').count()).toBeGreaterThan(0);
 
     // Calendar month grid (the bare /h/planner opens on the Temporada, ADR-117).

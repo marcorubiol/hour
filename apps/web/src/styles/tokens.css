@@ -699,6 +699,18 @@
   }
 
   /* ============================================================ */
+  /* RECORD — a record's page (RecordHead, EmptyLine), ADR-139 § 4  */
+  /* ============================================================ */
+  /* The record's rhythm and its row's fixed label column: the     */
+  /* mono word on the left of a row (role, kind, date) and of an    */
+  /* empty block's line, so labels and their values align in the    */
+  /* same x down a whole page.                                      */
+  :root {
+    --record-gap: var(--space-xl); /* between the blocks of a record */
+    --record-label-inline: 8rem; /* the mono label column of a record's rows */
+  }
+
+  /* ============================================================ */
   /* THEME — Serif Quiet                                            */
   /* ============================================================ */
   /* Proof-of-concept theme. Demonstrates the data-theme axis with  */

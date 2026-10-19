@@ -30,8 +30,10 @@
   import StateBadge from '$lib/components/StateBadge.svelte';
   import { lineKindGlyph, lineKindLabel } from '$lib/utils/line-kind';
   import { accentVar } from '$lib/utils/accent';
-  import { spaceName } from '$lib/utils/identity';
-  import { useBreadcrumb } from '$lib/stores/breadcrumb.svelte';
+  import RecordHead from '$lib/components/RecordHead.svelte';
+  import BlockHead from '$lib/components/BlockHead.svelte';
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
+  import { spaceCrumb, type Crumb } from '$lib/record-crumbs';
   import { fmtMoneyCompact } from '$lib/money';
   import { dayMonth, dayMonthYear } from '$lib/datetime';
   import {
@@ -66,7 +68,6 @@
   };
 
   const queryClient = useQueryClient();
-  const breadcrumb = useBreadcrumb();
   const locale = appLocale();
 
   let workspaceSlug = $derived(page.params.workspace ?? '');
@@ -80,9 +81,6 @@
   // (ADR-024), so slug alone could resolve another space's project.
   let routeWorkspaceId = $derived(
     $workspacesQuery.data?.items.find((w) => w.slug === workspaceSlug)?.id ?? null,
-  );
-  let activeWorkspaceName = $derived(
-    spaceName($workspacesQuery.data?.items.find((w) => w.slug === workspaceSlug)?.name ?? workspaceSlug),
   );
   let activeProject = $derived(
     routeWorkspaceId
@@ -112,32 +110,12 @@
     $linesQuery.data?.items.find((l) => l.slug === lineParam || l.id === lineParam) ?? null,
   );
 
-  // Publish this line's address to the shell's sticky breadcrumb bar
-  // (space › project › line). Cleared on unmount so home/lens routes show
-  // no bar.
-  $effect(() => {
-    if (activeLine && activeProject) {
-      breadcrumb.set(
-        [
-          {
-            label: activeWorkspaceName,
-            href: `/h/${workspaceSlug}/`,
-            kind: 'space',
-            accent: accentVar(workspaceSlug),
-          },
-          {
-            label: activeProject.name,
-            href: `/h/${workspaceSlug}/project/${projectSlug}/`,
-            kind: 'node',
-          },
-          { label: activeLine.name, kind: 'node' },
-        ],
-      );
-    } else {
-      breadcrumb.clear();
-    }
-    return () => breadcrumb.clear();
-  });
+  // Address: Space › Project › Línea (the title names which).
+  let crumbs = $derived<Crumb[]>([
+    spaceCrumb($workspacesQuery.data?.items.find((w) => w.slug === workspaceSlug)?.name, workspaceSlug),
+    { label: activeProject?.name ?? projectSlug, href: `/h/${workspaceSlug}/project/${projectSlug}/` },
+    { label: t('create.line', locale) },
+  ]);
 
   // ── Module stack ──────────────────────────────────────────────────────
   // Optimistic local override so add/move/remove feel instant; the PATCH
@@ -347,87 +325,61 @@
   <title>{activeLine ? docTitle(activeLine.name, activeProject?.name) : docTitle(t('create.line', locale))}</title>
 </svelte:head>
 
-<article class="line-detail" aria-busy={isLoading}>
+<article class="record line-detail" aria-busy={isLoading}>
   {#if isLoading}
-    <p class="line-detail__state">{t('desk.loading', locale)}</p>
+    <EmptyLine text={t('desk.loading', locale)} busy />
   {:else if isError}
-    <p class="line-detail__state line-detail__state--danger">
-      {t('line.load_error', locale)}
-    </p>
+    <p class="load-fail" role="alert">{t('line.load_error', locale)}</p>
   {:else if notFound}
-    <div class="line-detail__missing">
-      <p class="eyebrow">{t('create.line', locale)}</p>
-      <h1 class="line-detail__missing-title">{lineParam}</h1>
-      <p class="line-detail__state">
-        {activeProject
-          ? t('line.missing_in', locale, { name: activeProject.name })
-          : t('line.missing', locale)}
-      </p>
-      <a
-        class="line-detail__back"
-        href={`/h/${workspaceSlug}/project/${projectSlug}/`}
+    <RecordHead {crumbs} title={lineParam} />
+    <EmptyLine
+      text={activeProject ? t('line.missing_in', locale, { name: activeProject.name }) : t('line.missing', locale)}
+    >
+      <a class="empty-line__act" href={`/h/${workspaceSlug}/project/${projectSlug}/`}
+        >{activeProject ? t('line.back_to', locale, { name: activeProject.name }) : t('line.back_to_project', locale)}</a
       >
-        {activeProject
-          ? t('line.back_to', locale, { name: activeProject.name })
-          : t('line.back_to_project', locale)}
-      </a>
-    </div>
+    </EmptyLine>
   {:else if activeLine}
-    <header class="line-detail__header">
-      <p class="eyebrow">{t('create.line', locale)}</p>
-      <h1 class="line-detail__title"><em>{activeLine.name}</em></h1>
-      <p class="line-detail__meta">
-        <span class="line-detail__kind">
-          {lineKindGlyph(activeLine.kind)} {lineKindLabel(activeLine.kind)}
-        </span>
-        <span class="line-detail__sep">·</span>
-        <StateBadge label={lineStatusLabel(activeLine.status)} tone={LINE_STATUS_TONE[activeLine.status] ?? 'neutral'} />
-        {#if formatDateRange(activeLine.start_date, activeLine.end_date)}
-          <span class="line-detail__sep">·</span>
-          <span class="line-detail__dates">
-            {formatDateRange(activeLine.start_date, activeLine.end_date)}
+    <RecordHead {crumbs} title={activeLine.name}>
+      {#snippet facts()}
+        <span class="line-detail__kind">{lineKindGlyph(activeLine!.kind)} {lineKindLabel(activeLine!.kind)}</span>
+        <StateBadge label={lineStatusLabel(activeLine!.status)} tone={LINE_STATUS_TONE[activeLine!.status] ?? 'neutral'} />
+        {#if formatDateRange(activeLine!.start_date, activeLine!.end_date)}
+          <span>{formatDateRange(activeLine!.start_date, activeLine!.end_date)}</span>
+        {/if}
+      {/snippet}
+    </RecordHead>
+
+    {#if isBooking && $engStatsQuery.data}
+      {@const st = $engStatsQuery.data}
+      <p class="line-detail__stats">
+        <span class="line-detail__stat"><b>{st.total}</b> {t('line.stat_conversations', locale)}</span>
+        <span class="line-detail__stat"><b>{st.holds}</b> {t('line.stat_holds', locale)}</span>
+        <span class="line-detail__stat"><b>{st.confirmed}</b> {t('line.stat_confirmed', locale)}</span>
+        {#if st.overdue > 0}
+          <span class="line-detail__stat line-detail__stat--danger"
+            ><b>{st.overdue}</b> {t('line.stat_overdue', locale)}</span
+          >
+        {/if}
+      </p>
+    {:else if isTour && $perfStatsQuery.data}
+      {@const st = tourStats}
+      <p class="line-detail__stats">
+        {#if st.next}
+          <span class="line-detail__stat">
+            {t('line.stat_next', locale)} <b>{dayMonth(st.next.performed_at)}</b>
+            {st.next.venue?.name ?? st.next.venue_name ?? ''}
           </span>
         {/if}
-        <span class="line-detail__sep">·</span>
-        <a
-          class="line-detail__project-link"
-          href={`/h/${workspaceSlug}/project/${projectSlug}/`}
-        >
-          {t('line.in_project', locale, { name: activeProject?.name ?? projectSlug })}
-        </a>
+        <span class="line-detail__stat"><b>{st.confirmed}</b> {t('line.stat_confirmed', locale)}</span>
+        <span class="line-detail__stat"><b>{st.holds}</b> {t('line.stat_holds', locale)}</span>
+        {#if st.hasFees && st.pipeline > 0}
+          <span class="line-detail__stat"
+            ><b>{fmtMoneyCompact(st.pipeline)}</b> {t('line.stat_in_progress', locale)}</span
+          >
+        {/if}
       </p>
-
-      {#if isBooking && $engStatsQuery.data}
-        {@const st = $engStatsQuery.data}
-        <p class="line-detail__stats">
-          <span class="line-detail__stat"><b>{st.total}</b> {t('line.stat_conversations', locale)}</span>
-          <span class="line-detail__stat"><b>{st.holds}</b> {t('line.stat_holds', locale)}</span>
-          <span class="line-detail__stat"><b>{st.confirmed}</b> {t('line.stat_confirmed', locale)}</span>
-          {#if st.overdue > 0}
-            <span class="line-detail__stat line-detail__stat--danger"
-              ><b>{st.overdue}</b> {t('line.stat_overdue', locale)}</span
-            >
-          {/if}
-        </p>
-      {:else if isTour && $perfStatsQuery.data}
-        {@const st = tourStats}
-        <p class="line-detail__stats">
-          {#if st.next}
-            <span class="line-detail__stat">
-              {t('line.stat_next', locale)} <b>{dayMonth(st.next.performed_at)}</b>
-              {st.next.venue?.name ?? st.next.venue_name ?? ''}
-            </span>
-          {/if}
-          <span class="line-detail__stat"><b>{st.confirmed}</b> {t('line.stat_confirmed', locale)}</span>
-          <span class="line-detail__stat"><b>{st.holds}</b> {t('line.stat_holds', locale)}</span>
-          {#if st.hasFees && st.pipeline > 0}
-            <span class="line-detail__stat"
-              ><b>{fmtMoneyCompact(st.pipeline)}</b> {t('line.stat_in_progress', locale)}</span
-            >
-          {/if}
-        </p>
-      {/if}
-    </header>
+    {/if}
 
     {#if siblings.length > 1}
       <nav class="line-detail__siblings" aria-label={t('line.siblings', locale)}>
@@ -467,8 +419,7 @@
       {#each stack as key (key)}
         {@const Module = REGISTRY[key]}
         <section class="line-detail__module" id={`mod-${key}`}>
-          <header class="line-detail__module-head">
-            <p class="eyebrow">{moduleLabel(key, locale)}</p>
+          <BlockHead title={moduleLabel(key, locale)}>
             <Menu
               direction="down"
               align="end"
@@ -496,7 +447,7 @@
                 </li>
               {/snippet}
             </Menu>
-          </header>
+          </BlockHead>
           <Module line={activeLine} {workspaceSlug} />
         </section>
       {/each}
@@ -531,39 +482,6 @@
 
 <style>
   @layer components {
-    .line-detail {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-l);
-      padding-block: var(--space-l);
-      padding-inline: var(--space-m);
-    }
-
-    .line-detail__header {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-s);
-    }
-
-    /* Masthead — base.css h1 defaults carry family/size/weight/tracking;
-       only the entity-name italic is page concern (shared convention with
-       project/person/performance). */
-    .line-detail__title {
-      margin: 0;
-    }
-    .line-detail__title em {
-      font-style: italic;
-    }
-
-    .line-detail__meta {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: baseline;
-      gap: var(--space-xs);
-      margin: 0;
-      font-size: var(--text-s);
-      color: var(--text-faint);
-    }
 
     .line-detail__kind {
       font-family: var(--font-mono);
@@ -571,25 +489,6 @@
       text-transform: lowercase;
       letter-spacing: 0.04em;
       color: var(--text-muted);
-    }
-
-    .line-detail__sep {
-      color: var(--text-faint);
-    }
-
-    .line-detail__dates {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-    }
-
-    .line-detail__project-link {
-      color: var(--text-muted);
-      text-decoration: none;
-      transition: color var(--transition);
-    }
-    .line-detail__project-link:hover {
-      color: var(--text-color);
     }
 
     .line-detail__stats {
@@ -701,17 +600,6 @@
       scroll-margin-block-start: calc(var(--header-height) + 3rem);
     }
 
-    .line-detail__module-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: var(--space-s);
-      border-block-end: 1px solid var(--border-color-light);
-      padding-block-end: var(--space-xs);
-    }
-    .line-detail__module-head .eyebrow {
-      margin: 0;
-    }
     .line-detail__module-kebab {
       display: inline-flex;
       align-items: center;
@@ -747,38 +635,5 @@
       color: var(--text-faint);
     }
 
-    .line-detail__missing {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-s);
-    }
-
-    .line-detail__missing-title {
-      font-family: var(--font-display);
-      font-size: var(--text-xl);
-      font-weight: 400;
-      margin: 0;
-      color: var(--text-faint);
-    }
-
-    .line-detail__back {
-      align-self: flex-start;
-      color: var(--text-muted);
-      text-decoration: none;
-      font-size: var(--text-s);
-      transition: color var(--transition);
-    }
-    .line-detail__back:hover {
-      color: var(--text-color);
-    }
-
-    .line-detail__state {
-      margin: 0;
-      font-size: var(--text-s);
-      color: var(--text-faint);
-    }
-    .line-detail__state--danger {
-      color: var(--danger);
-    }
   }
 </style>

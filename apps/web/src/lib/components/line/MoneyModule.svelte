@@ -14,6 +14,7 @@
    * here — creation lives in the Money lens / fee editor.
    */
 
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
@@ -258,14 +259,14 @@
   <section class="lmm__section" aria-label={t('books.fees', locale)}>
     <p class="eyebrow eyebrow--sub lmm__sub">{t('books.fees', locale)}</p>
     {#if feesError}
-      <p class="lmm__state lmm__state--danger">{feesError}</p>
+      <p class="load-fail" role="alert">{feesError}</p>
     {:else if $feesQuery.isLoading}
-      <p class="lmm__state">{t('desk.loading', locale)}</p>
+      <EmptyLine text={t('desk.loading', locale)} busy />
     {:else if fees.length === 0}
-      <p class="lmm__state">{t('books.no_deals_line', locale)}</p>
+      <EmptyLine text={t('books.no_deals_line', locale)} />
     {:else}
       {#if allFeesNull}
-        <p class="lmm__state">{t('books.fees_hidden', locale)}</p>
+        <EmptyLine text={t('books.fees_hidden', locale)} />
       {:else}
         <div class="lmm__totals">
           <span class="lmm__total">
@@ -320,11 +321,11 @@
   <section class="lmm__section" aria-label={t('books.invoices', locale)}>
     <p class="eyebrow eyebrow--sub lmm__sub">{t('books.invoices', locale)}</p>
     {#if invoicesError}
-      <p class="lmm__state lmm__state--danger">{invoicesError}</p>
+      <p class="load-fail" role="alert">{invoicesError}</p>
     {:else if $invoicesQuery.isLoading}
-      <p class="lmm__state">{t('desk.loading', locale)}</p>
+      <EmptyLine text={t('desk.loading', locale)} busy />
     {:else if lineInvoices.length === 0}
-      <p class="lmm__state">{t('books.no_invoices_line', locale)}</p>
+      <EmptyLine text={t('books.no_invoices_line', locale)} />
     {:else}
       <ul class="lmm__invoices" role="list">
         {#each lineInvoices as inv (inv.id)}
@@ -345,11 +346,11 @@
       <Button size="xs" variant="outline" onclick={openExpense}>{t('books.add_expense', locale)}</Button>
     </header>
     {#if expensesError}
-      <p class="lmm__state lmm__state--danger">{expensesError}</p>
+      <p class="load-fail" role="alert">{expensesError}</p>
     {:else if $expensesQuery.isLoading}
-      <p class="lmm__state">{t('desk.loading', locale)}</p>
+      <EmptyLine text={t('desk.loading', locale)} busy />
     {:else if expenses.length === 0}
-      <p class="lmm__state">{t('books.no_expenses_line', locale)}</p>
+      <EmptyLine text={t('books.no_expenses_line', locale)} />
     {:else}
       <div class="table-wrap">
         <table>
@@ -443,14 +444,6 @@
 
     /* Sub-eyebrow typography via base.css .eyebrow--sub. */
 
-    .lmm__state {
-      font-size: var(--text-s);
-      color: var(--text-faint);
-    }
-    .lmm__state--danger {
-      color: var(--danger);
-    }
-
     .lmm__totals {
       display: flex;
       align-items: baseline;
@@ -466,7 +459,6 @@
       align-items: baseline;
       gap: var(--space-xs);
     }
-
 
     .lmm__cell-date {
       font-family: var(--font-mono);

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import RecordHead from '$lib/components/RecordHead.svelte';
+  import BlockHead from '$lib/components/BlockHead.svelte';
   import { onMount } from 'svelte';
   import { session } from '$lib/session.svelte';
   import { t, appLocale } from '$lib/i18n';
@@ -48,16 +50,12 @@
   }
 </script>
 
-<header class="set-mast">
-  <p class="eyebrow set-mast__kicker">{t('settings.notif_kicker', locale)}</p>
-  <h1 class="set-mast__title"><em>{t('settings.nav_notifications', locale)}</em></h1>
-  <p class="set-mast__sub">{t('settings.notif_sub', locale)}</p>
-</header>
+<RecordHead crumbs={[{ label: t('settings.title', locale) }, { label: t('settings.notif_kicker', locale) }]} title={t('settings.nav_notifications', locale)}>
+  {#snippet facts()}<span>{t('settings.notif_sub', locale)}</span>{/snippet}
+</RecordHead>
 
 <section class="set-group">
-  <div class="set-group__head">
-    <span class="eyebrow set-group__kicker">{t('settings.notif_digest', locale)}</span>
-  </div>
+  <BlockHead title={t('settings.notif_digest', locale)} />
   <div class="set-group__body">
     <div class="set-row">
       <div class="set-row__lead">
@@ -106,9 +104,7 @@
 </section>
 
 <section class="set-group">
-  <div class="set-group__head">
-    <span class="eyebrow set-group__kicker">{t('settings.notif_priority', locale)}</span>
-  </div>
+  <BlockHead title={t('settings.notif_priority', locale)} />
   <div class="set-group__body">
     <div class="set-row">
       <div class="set-row__lead">
@@ -182,9 +178,7 @@
 </section>
 
 <section class="set-group">
-  <div class="set-group__head">
-    <span class="eyebrow set-group__kicker">{t('settings.notif_channels', locale)}</span>
-  </div>
+  <BlockHead title={t('settings.notif_channels', locale)} />
   <div class="set-group__body">
     <div class="set-row">
       <div class="set-row__lead">
@@ -237,9 +231,7 @@
 </section>
 
 <section class="set-group">
-  <div class="set-group__head">
-    <span class="eyebrow set-group__kicker">{t('settings.notif_browser_memory', locale)}</span>
-  </div>
+  <BlockHead title={t('settings.notif_browser_memory', locale)} />
   <div class="set-group__body">
     <div class="set-row">
       <div class="set-row__lead">

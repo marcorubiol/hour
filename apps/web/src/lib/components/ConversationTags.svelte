@@ -9,6 +9,7 @@
    * de la lente sale.
    */
 
+  import BlockHead from '$lib/components/BlockHead.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
@@ -74,12 +75,11 @@
 </script>
 
 <div class="conv-tags-block" data-testid="conversation-tags">
-  <div class="conv-tags-block__head">
-    <p class="eyebrow eyebrow--sub">{t('conversations.tags', locale)}</p>
+  <BlockHead title={t('conversations.tags', locale)}>
     {#if canEdit && !editing && known.length > 0}
       <button type="button" class="block-head__act" onclick={startEdit}>{t('conversations.tags_edit', locale)}</button>
     {/if}
-  </div>
+  </BlockHead>
   {#if editing}
     <fieldset class="conv-tags-block__pick" aria-label={t('conversations.tags', locale)}>
       {#each known as tag (tag.id)}
@@ -101,14 +101,6 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-xs);
-    }
-    .conv-tags-block p {
-      margin: 0;
-    }
-    .conv-tags-block__head {
-      display: flex;
-      align-items: baseline;
-      gap: var(--space-s);
     }
     .conv-tags-block__pick {
       display: flex;

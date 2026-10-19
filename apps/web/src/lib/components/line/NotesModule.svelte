@@ -15,6 +15,7 @@
    * the server runs, asked up front; on deny we say so instead.
    */
 
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { createQuery } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { env } from '$env/dynamic/public';
@@ -71,23 +72,18 @@
 </script>
 
 {#if $permQuery.isPending}
-  <p class="lnm__state">{t('desk.loading', locale)}</p>
+  <EmptyLine text={t('desk.loading', locale)} busy />
 {:else if $permQuery.isError}
-  <p class="lnm__state">{t('line.notes_perm_error', locale)}</p>
+  <EmptyLine text={t('line.notes_perm_error', locale)} />
 {:else if $permQuery.data === true}
   {#key line.id}
     <YNotes targetTable="line" targetId={line.id} placeholder={t('line.notes_ph', locale)} rows={6} />
   {/key}
 {:else}
-  <p class="lnm__state">{t('line.notes_no_perm', locale)}</p>
+  <EmptyLine text={t('line.notes_no_perm', locale)} />
 {/if}
 
 <style>
   @layer components {
-    .lnm__state {
-      margin: 0;
-      font-size: var(--text-s);
-      color: var(--text-faint);
-    }
   }
 </style>

@@ -5,6 +5,8 @@
    * navegación completa a /api/mail/oauth/google/start; al volver, la página
    * llega con `?mail=finish` y aquí se cierra la conexión con su sesión.
    */
+  import RecordHead from '$lib/components/RecordHead.svelte';
+  import BlockHead from '$lib/components/BlockHead.svelte';
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
@@ -104,20 +106,16 @@
   }
 </script>
 
-<header class="set-mast">
-  <p class="eyebrow set-mast__kicker">{t('mail.kicker', locale)}</p>
-  <h1 class="set-mast__title"><em>{t('settings.nav_mail', locale)}</em></h1>
-  <p class="set-mast__sub">{t('mail.sub', locale)}</p>
-</header>
+<RecordHead crumbs={[{ label: t('settings.title', locale) }, { label: t('mail.kicker', locale) }]} title={t('settings.nav_mail', locale)}>
+  {#snippet facts()}<span>{t('mail.sub', locale)}</span>{/snippet}
+</RecordHead>
 
 {#if !configured}
   <p class="mail-off">{t('mail.not_configured', locale)}</p>
 {/if}
 
 <section class="set-group">
-  <div class="set-group__head">
-    <span class="eyebrow set-group__kicker">{t('mail.reads_kicker', locale)}</span>
-  </div>
+  <BlockHead title={t('mail.reads_kicker', locale)} />
   <div class="reads">
     <div>
       <p class="reads__k">{t('mail.reads_in', locale)}</p>
@@ -135,9 +133,7 @@
 </section>
 
 <section class="set-group">
-  <div class="set-group__head">
-    <span class="eyebrow set-group__kicker">{t('mail.personal_kicker', locale)}</span>
-  </div>
+  <BlockHead title={t('mail.personal_kicker', locale)} />
   <div class="set-group__body">
     <div class="set-row">
       <div class="set-row__lead">
@@ -161,9 +157,7 @@
 </section>
 
 <section class="set-group">
-  <div class="set-group__head">
-    <span class="eyebrow set-group__kicker">{t('mail.shared_kicker', locale)}</span>
-  </div>
+  <BlockHead title={t('mail.shared_kicker', locale)} />
   <div class="set-group__body">
     <div class="set-row">
       <div class="set-row__lead">

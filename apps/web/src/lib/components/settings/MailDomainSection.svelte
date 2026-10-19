@@ -9,6 +9,7 @@
    * sale ningún correo real. Palabras de § 3.3: nunca el nombre del servicio
    * que envía.
    */
+  import BlockHead from '$lib/components/BlockHead.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON, ApiError } from '$lib/api';
@@ -174,10 +175,7 @@
 
 {#if workspaceId}
   <section class="set-group" data-testid="mailout-domain">
-    <div class="set-group__head">
-      <span class="eyebrow set-group__kicker">{t('mailout.domain_kicker', locale)}</span>
-      <h2 class="set-group__title">{t('mailout.domain_title', locale)}</h2>
-    </div>
+    <BlockHead title={t('mailout.domain_kicker', locale)} count={t('mailout.domain_title', locale)} />
     <p class="md-intro">{t('mailout.domain_intro', locale)}</p>
 
     {#if simulated}

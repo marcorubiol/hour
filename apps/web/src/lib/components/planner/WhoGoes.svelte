@@ -15,7 +15,7 @@
   row; anybody else's: `edit:performance`), so a refused write says so here.
 -->
 <script lang="ts">
-  import ConceptHint from '$lib/components/ConceptHint.svelte';
+  import BlockHead from '$lib/components/BlockHead.svelte';
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { ApiError } from '$lib/api';
@@ -131,7 +131,13 @@
 <!-- Somebody can always be added (ADR-107), so the section is always there. -->
 {#if (showRoster && rosterIds.length > 0) || rows.length > 0 || workspaceId}
 <section class="who" aria-label={t('commitment.who_goes', locale)}>
-  <span class="block-head__lead"><h3 class="who__h">{t('commitment.who_goes', locale)}</h3>{#if target === 'performance'}<ConceptHint concept="cast" />{/if}</span>
+  <!-- On a performance's page it is one of the record's blocks (ADR-139 § 4);
+       in a date's dialog, a small head of its own. -->
+  {#if target === 'performance'}
+    <BlockHead title={t('commitment.who_goes', locale)} concept="cast" />
+  {:else}
+    <h3 class="who__h">{t('commitment.who_goes', locale)}</h3>
+  {/if}
   <ul class="who__list">
     {#if showRoster}
       {#each rosterIds as personId (personId)}

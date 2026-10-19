@@ -1,4 +1,6 @@
 <script lang="ts">
+  import RecordHead from '$lib/components/RecordHead.svelte';
+  import BlockHead from '$lib/components/BlockHead.svelte';
   import { toStore } from 'svelte/store';
   import { SvelteSet } from 'svelte/reactivity';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
@@ -258,17 +260,12 @@
   }
 </script>
 
-<header class="set-mast">
-  <p class="eyebrow set-mast__kicker">{t('settings.ws_kicker', locale)}</p>
-  <h1 class="set-mast__title"><em>{t('settings.nav_workspaces', locale)}</em></h1>
-  <p class="set-mast__sub">{t('settings.ws_sub', locale)}</p>
-</header>
+<RecordHead crumbs={[{ label: t('settings.title', locale) }, { label: t('settings.ws_kicker', locale) }]} title={t('settings.nav_workspaces', locale)}>
+  {#snippet facts()}<span>{t('settings.ws_sub', locale)}</span>{/snippet}
+</RecordHead>
 
 <section class="set-group">
-  <div class="set-group__head">
-    <span class="eyebrow set-group__kicker">{t(workspaces.length === 1 ? 'settings.ws_active_one' : 'settings.ws_active_other', locale, { n: workspaces.length })}</span>
-    <h2 class="set-group__title">{t('settings.ws_my_projects', locale)}</h2>
-  </div>
+  <BlockHead title={t(workspaces.length === 1 ? 'settings.ws_active_one' : 'settings.ws_active_other', locale, { n: workspaces.length })} count={t('settings.ws_my_projects', locale)} />
   <div class="set-group__body">
     <div class="set-ws-list">
       {#each workspaces as w (w.id)}
@@ -303,14 +300,12 @@
 
 {#if $accessQuery.isSuccess && currentWorkspace}
   <section class="set-group set-access">
-    <div class="set-group__head set-access__head">
-      <div>
-        <span class="eyebrow set-group__kicker">{t('settings.access_kicker', locale)}</span>
-        <h2 class="set-group__title">{spaceName(currentWorkspace.name)}</h2>
-      </div>
-      <span class="set-access__count"
-        >{t(activeMembers.length === 1 ? 'settings.ws_active_one' : 'settings.ws_active_other', locale, { n: activeMembers.length })}</span
-      >
+    <div class="set-access__head">
+      <BlockHead title={t('settings.access_kicker', locale)} count={spaceName(currentWorkspace.name)}>
+        <span class="set-access__count"
+          >{t(activeMembers.length === 1 ? 'settings.ws_active_one' : 'settings.ws_active_other', locale, { n: activeMembers.length })}</span
+        >
+      </BlockHead>
     </div>
 
     <div class="set-access__invite">
@@ -443,12 +438,10 @@
 
 {#if aliasRequests.length > 0}
   <section class="set-group">
-    <div class="set-group__head">
-      <span class="eyebrow set-group__kicker"
-        >{t(aliasRequests.length === 1 ? 'settings.alias_pending_one' : 'settings.alias_pending_other', locale, { n: aliasRequests.length })}</span
-      >
-      <h2 class="set-group__title">{t('settings.alias_title', locale)}</h2>
-    </div>
+    <BlockHead
+      title={t('settings.alias_title', locale)}
+      count={t(aliasRequests.length === 1 ? 'settings.alias_pending_one' : 'settings.alias_pending_other', locale, { n: aliasRequests.length })}
+    />
     <div class="set-group__body">
       <div class="set-alias-list">
         {#each aliasRequests as r (r.id)}
@@ -489,10 +482,7 @@
 {/if}
 
 <section class="set-group">
-  <div class="set-group__head">
-    <span class="eyebrow set-group__kicker">{t('settings.roles_kicker', locale)}</span>
-    <h2 class="set-group__title">{t('settings.roles_title', locale)}</h2>
-  </div>
+  <BlockHead title={t('settings.roles_kicker', locale)} count={t('settings.roles_title', locale)} />
   <div class="set-group__body">
     <p class="set-prose">
       {t('settings.roles_prose', locale)}
@@ -678,17 +668,10 @@
   .set-group.set-access {
     row-gap: 0;
   }
-  /* The page's generic .set-group__head stacks and rules its head; the access
-     box is a framed panel, so its head reads across (name left, count right),
-     inside the same padding as the invite row, whose top border is the rule. */
-  .set-group.set-access .set-access__head {
-    flex-direction: row;
-    align-items: end;
-    justify-content: space-between;
-    gap: var(--space-m);
-    margin: 0;
-    padding: var(--space-m);
-    border: 0;
+  /* The access box is a framed panel: its head (a BlockHead, whose rule
+     closes it) sits inside the same padding as the invite row below. */
+  .set-access__head {
+    padding: var(--space-m) var(--space-m) 0;
   }
   .set-access__count,
   .set-access__status,
@@ -707,7 +690,7 @@
     gap: var(--space-s);
     align-items: end;
     padding: var(--space-m);
-    border-block: 1px solid var(--border-color-light);
+    border-block-end: 1px solid var(--border-color-light);
   }
   .set-access__invite label {
     display: grid;

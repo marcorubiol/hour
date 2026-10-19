@@ -13,6 +13,8 @@
    * "lead/pipeline/funnel/prospect" anywhere. Status labels are humane.
    */
 
+  import BlockHead from '$lib/components/BlockHead.svelte';
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import { lensOn } from '$lib/lenses.svelte';
   import { createQuery } from '@tanstack/svelte-query';
@@ -71,25 +73,17 @@
   }
 </script>
 
-<section class="rel-stub" aria-labelledby="rel-stub-title" aria-busy={loading}>
-  <header class="rel-stub__header">
-    <div class="rel-stub__head-lead">
-      <p class="eyebrow">{t('lens.conversations', locale)}</p>
-      <h2 class="rel-stub__title" id="rel-stub-title">{t('perf.rel_title', locale)}</h2>
-    </div>
-    {#if !loading && !errored}
-      <span class="rel-stub__count">
-        {t(total === 1 ? 'perf.rel_count_one' : 'perf.rel_count_other', locale, { n: total })}
-      </span>
-    {/if}
-  </header>
+<section class="rel-stub" aria-label={t('lens.conversations', locale)} aria-busy={loading}>
+  {#if !loading && !errored && items.length === 0}
+    <EmptyLine label={t('lens.conversations', locale)} text={t('perf.rel_empty', locale)} />
+  {:else}
+    <BlockHead title={t('lens.conversations', locale)} count={loading || errored ? null : total} id="rel-stub-title" />
+  {/if}
 
   {#if loading}
-    <p class="rel-stub__state">{t('desk.loading', locale)}</p>
+    <EmptyLine text={t('desk.loading', locale)} busy />
   {:else if errored}
-    <p class="rel-stub__state rel-stub__state--danger">{t('perf.rel_error', locale)}</p>
-  {:else if items.length === 0}
-    <p class="rel-stub__state">{t('perf.rel_empty', locale)}</p>
+    <p class="load-fail" role="alert">{t('perf.rel_error', locale)}</p>
   {:else}
     <ul class="rel-stub__list">
       {#each items as e (e.id)}
@@ -123,36 +117,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-s);
-  }
-
-  .rel-stub__header {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--space-s);
-    flex-wrap: wrap;
-  }
-
-  .rel-stub__head-lead {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-xs);
-  }
-
-  .rel-stub__title {
-    font-family: var(--font-display);
-    font-size: var(--text-xl);
-    font-weight: 400;
-    letter-spacing: -0.015em;
-    margin: 0;
-    color: var(--text-color);
-  }
-
-  .rel-stub__count {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    letter-spacing: var(--mono-letter-spacing-loose);
-    color: var(--text-faint);
   }
 
   .rel-stub__list {
@@ -198,17 +162,6 @@
     font-size: var(--text-xs);
     color: var(--text-faint);
     letter-spacing: var(--mono-letter-spacing-loose);
-  }
-
-  .rel-stub__state {
-    margin: 0;
-    padding-block: var(--space-s);
-    font-size: var(--text-s);
-    color: var(--text-faint);
-  }
-
-  .rel-stub__state--danger {
-    color: var(--danger);
   }
 
   .rel-stub__footer {

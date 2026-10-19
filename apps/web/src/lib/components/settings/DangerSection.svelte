@@ -1,14 +1,13 @@
 <script lang="ts">
+  import RecordHead from '$lib/components/RecordHead.svelte';
   import { t, appLocale } from '$lib/i18n';
 
   const locale = appLocale();
 </script>
 
-<header class="set-mast">
-  <p class="eyebrow set-mast__kicker">{t('settings.danger_kicker', locale)}</p>
-  <h1 class="set-mast__title"><em>{t('settings.nav_danger', locale)}</em></h1>
-  <p class="set-mast__sub">{t('settings.danger_sub', locale)}</p>
-</header>
+<RecordHead crumbs={[{ label: t('settings.title', locale) }, { label: t('settings.danger_kicker', locale) }]} title={t('settings.nav_danger', locale)}>
+  {#snippet facts()}<span>{t('settings.danger_sub', locale)}</span>{/snippet}
+</RecordHead>
 
 <section class="set-group">
   <div class="set-group__body">

@@ -25,7 +25,10 @@
   import { relationLabel, relationTone, type Relation } from '$lib/conversation-relation';
   import { dayLabel, dayMonthYearTs } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
-  import { useBreadcrumb } from '$lib/stores/breadcrumb.svelte';
+  import RecordHead from '$lib/components/RecordHead.svelte';
+  import BlockHead from '$lib/components/BlockHead.svelte';
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
+  import { spaceCrumb } from '$lib/record-crumbs';
   import { usePins } from '$lib/stores/pins.svelte';
   import { buildLineIndex, buildProjectIndex, projectsInScope, resolveScope } from '$lib/nav';
   import {
@@ -33,8 +36,6 @@
     allLinesQueryOptions,
     workspacesQueryOptions,
   } from '$lib/nav-queries';
-  import { accentVar } from '$lib/utils/accent';
-  import { spaceName } from '$lib/utils/identity';
   import { safeHref } from '$lib/utils/safe-url';
 
   type PersonFile = {
@@ -121,31 +122,13 @@
   });
   const query = createQuery(queryOptions);
 
-  const breadcrumb = useBreadcrumb();
-  let activeWorkspaceName = $derived(
-    spaceName($workspacesQuery.data?.items.find((w) => w.slug === workspaceSlug)?.name ?? workspaceSlug),
-  );
-
   // A person is cross-cutting (global, appears across projects), not a tree
-  // node — so the address is Space › Person, no pin (persons aren't in the
-  // pin model). The "appears in N projects" lives in the page body.
-  $effect(() => {
-    const p = $query.data?.person;
-    if (p) {
-      breadcrumb.set([
-        {
-          label: activeWorkspaceName,
-          href: `/h/${workspaceSlug}/`,
-          kind: 'space',
-          accent: accentVar(workspaceSlug),
-        },
-        { label: p.full_name, kind: 'node' },
-      ]);
-    } else {
-      breadcrumb.clear();
-    }
-    return () => breadcrumb.clear();
-  });
+  // node, so the address is Space › Persona. The "appears in N projects"
+  // lives in the page body.
+  let crumbs = $derived([
+    spaceCrumb($workspacesQuery.data?.items.find((w) => w.slug === workspaceSlug)?.name, workspaceSlug),
+    { label: t('person.eyebrow', locale) },
+  ]);
 
   let file = $derived($query.data ?? null);
   let loading = $derived($query.isPending);
@@ -389,7 +372,7 @@
   <title>{docTitle(file?.person.full_name ?? slug)}</title>
 </svelte:head>
 
-<article class="person" aria-busy={loading}>
+<article class="record person" aria-busy={loading}>
   {#if loading || ($query.isError && !file)}
     <RecordState
       {loading}
@@ -400,30 +383,28 @@
       {locale}
     />
   {:else if file}
-    <header class="person__head">
-      <p class="eyebrow">{t('person.eyebrow', locale)}</p>
-      <h1 class="person__title"><em>{file.person.full_name}</em></h1>
-      <div class="person__meta">
-        {#if file.person.title}<span>{file.person.title}</span>{/if}
-        {#if file.person.organization_name}
-          <span class="person__org">{file.person.organization_name}</span>
-        {/if}
-        {#if placeLine}<span class="person__place">{placeLine}</span>{/if}
-      </div>
-    </header>
+    <RecordHead {crumbs} title={file.person.full_name}>
+      {#snippet facts()}
+        {#if file!.person.title}<span>{file!.person.title}</span>{/if}
+        {#if file!.person.organization_name}<span class="person__org">{file!.person.organization_name}</span>{/if}
+        {#if placeLine}<span>{placeLine}</span>{/if}
+      {/snippet}
+    </RecordHead>
 
     <section class="person__section" aria-label={t('conversations.col_contact', locale)}>
-      <div class="person__section-head">
-        <p class="eyebrow">{t('conversations.col_contact', locale)}</p>
+      <BlockHead title={t('conversations.col_contact', locale)}>
         <span class="person__verbs">
-          <Button variant="outline" size="xs" onclick={openEdit}>{t('person.edit', locale)}</Button>
+          <button type="button" class="block-head__act" onclick={openEdit}>{t('person.edit', locale)}</button>
           {#if file.can_invite}
-            <Button variant="outline" size="xs" onclick={openInvite}>
-              {t('person.invite', locale, { name: file.person.full_name })}
-            </Button>
+            <button type="button" class="block-head__act" onclick={openInvite}
+              >{t('person.invite', locale, { name: file.person.full_name })}</button
+            >
           {/if}
         </span>
-      </div>
+      </BlockHead>
+      {#if !file.person.email && !file.person.phone && !file.person.website && file.person.languages.length === 0}
+        <EmptyLine text={t('person.no_contact', locale)} />
+      {/if}
       <ul class="person__contact" role="list">
         {#if file.person.email}
           <li><a href={`mailto:${file.person.email}`}>{file.person.email}</a></li>
@@ -445,13 +426,10 @@
     </section>
 
     <section class="person__section" aria-label={t('lens.conversations', locale)}>
-      <div class="person__section-head">
-        <p class="eyebrow">{t('lens.conversations', locale)}</p>
-        <Button variant="outline" size="xs" onclick={() => (addOpen = true)}>
-          {t('person.add_to_project', locale)}
-        </Button>
-      </div>
       {#if file.conversations.length > 0}
+        <BlockHead title={t('lens.conversations', locale)} count={file.conversations.length}>
+          <button type="button" class="block-head__act" onclick={() => (addOpen = true)}>{t('person.add_to_project', locale)}</button>
+        </BlockHead>
         <ul class="person__rows" role="list">
           {#each file.conversations as e (e.id)}
             <li>
@@ -470,11 +448,15 @@
             </li>
           {/each}
         </ul>
+      {:else}
+        <EmptyLine label={t('lens.conversations', locale)} text={t('person.no_conversations', locale)}>
+          <button type="button" class="empty-line__act" onclick={() => (addOpen = true)}>{t('person.add_to_project', locale)}</button>
+        </EmptyLine>
       {/if}
     </section>
 
     <section class="person__section" aria-label={t('person.notes', locale)}>
-      <p class="eyebrow">{t('person.notes', locale)}</p>
+      <BlockHead title={t('person.notes', locale)} />
       <!-- «Lo conozco» y «Mi nota»: las dos cosas tuyas sobre esta persona (ADR-138 § 5). -->
       <Acquaintance workspaceId={contextWorkspaceId} personId={file.person.id} {locale} />
       <div class="person__composer">
@@ -520,7 +502,7 @@
 
     {#if file.cast.length > 0 || file.crew.length > 0}
       <section class="person__section" aria-label={t('person.appearances', locale)}>
-        <p class="eyebrow">{t('person.appearances', locale)}</p>
+        <BlockHead title={t('person.appearances', locale)} />
         <ul class="person__rows" role="list">
           {#each file.cast as c (c.id)}
             <li>
@@ -621,43 +603,7 @@
 
 <style>
   @layer components {
-    .person {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-xl);
-    }
 
-    .person__head {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-s);
-      padding-block-end: var(--space-m);
-      border-block-end: 1px solid var(--border-color-light);
-    }
-
-    /* Masthead typography via base.css h1 defaults. */
-    .person__title {
-      color: var(--text-color);
-    }
-    .person__title em {
-      font-style: italic;
-    }
-
-    .person__meta {
-      display: flex;
-      gap: var(--space-s);
-      flex-wrap: wrap;
-      font-size: var(--text-s);
-      color: var(--text-muted);
-    }
-
-    .person__place {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: 0.04em;
-      color: var(--text-faint);
-      align-self: center;
-    }
 
     .person__section {
       display: flex;
@@ -665,17 +611,10 @@
       gap: var(--space-s);
     }
 
-    .person__section-head {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: var(--space-m);
-    }
-
     .person__verbs {
       display: flex;
       flex-wrap: wrap;
-      gap: var(--space-xs);
+      gap: var(--space-m);
     }
 
     .person__hint {
@@ -717,7 +656,7 @@
       font-size: var(--text-xs);
       letter-spacing: 0.04em;
       color: var(--text-faint);
-      min-inline-size: 8rem;
+      min-inline-size: var(--record-label-inline);
     }
 
     .person__row-main {
@@ -762,7 +701,7 @@
     }
 
     .person__composer-hint {
-      font-size: var(--font-size-s);
+      font-size: var(--text-xs);
       color: var(--text-faint);
     }
 
