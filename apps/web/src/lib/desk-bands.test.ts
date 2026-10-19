@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { changesSince, elapsedSince, goingAsks, paymentNews, plannerDoor, sinceInstant, CHANGED_ROWS } from './desk-bands';
+import { changesSince, elapsedSince, goingAsks, paymentNews, plannerDoor, sinceInstant, todayThings, CHANGED_ROWS } from './desk-bands';
 import type { MoneyBolo } from './money';
 import { buildPersonAttribution, type TeamItem } from './people';
 import type { DateEvent, PerformanceEvent } from './month-events';
@@ -207,5 +207,30 @@ describe('paymentNews — «cobrado», named by its deal', () => {
     );
     const out = changesSince({ threads: [], hot: [], lastMailout: null, payments: news }, '2026-10-15T08:00:00Z', NOW);
     expect(out.map((c) => (c.kind === 'payment' ? c.payment.id : c.kind))).toEqual(['new']);
+  });
+});
+
+describe('todayThings — the title says the day, not the debt (ADR-139 § 6)', () => {
+  const input = (performances: PerformanceEvent[], dates: DateEvent[]) => ({ performances, dates, viewerTz: 'Europe/Madrid' });
+
+  it('names what today is: the confirmed show first, then the confirmed dates', () => {
+    const things = todayThings(
+      input(
+        [perf('show', TODAY), perf('hold', TODAY, { status: 'hold_1' }), perf('tomorrow', '2026-10-16')],
+        [date('trip', TODAY, { kind: 'travel_day', destination_city: 'Girona' }), date('maybe', TODAY, { status: 'tentative' })],
+      ),
+      TODAY,
+    );
+    expect(things).toEqual([
+      { of: 'performance', kind: 'show', label: null, where: 'Manresa' },
+      { of: 'date', kind: 'travel_day', label: null, where: 'Girona' },
+    ]);
+  });
+
+  it('an «other» date names itself; nothing settled is an empty day', () => {
+    expect(todayThings(input([], [date('o', TODAY, { kind: 'other', title: 'Reunió de producció' })]), TODAY)).toEqual([
+      { of: 'date', kind: 'other', label: 'Reunió de producció', where: null },
+    ]);
+    expect(todayThings(input([perf('opt', TODAY, { status: 'proposed' })], []), TODAY)).toEqual([]);
   });
 });

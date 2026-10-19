@@ -811,6 +811,9 @@
     opacity: var(--disabled-opacity);
   }
 
+  /* Heard, not seen: a live announcement (calm switching, ADR-139 § 5) or a
+     native input under its drawn box. */
+  .visually-hidden,
   .check__input {
     position: absolute;
     inline-size: 1px;

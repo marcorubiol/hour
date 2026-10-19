@@ -10,7 +10,11 @@
    *
    * Desktop: two columns, what you act on (1, 2) on the left and what you
    * look at (4, 3) on the right. Phone: one column in the same order as the
-   * DOM, 1, 2, 4, 3, so focus and reading follow what is seen. Calm keeps 1 and 2.
+   * DOM, 1, 2, 4, 3, so focus and reading follow what is seen.
+   *
+   * Calm (ADR-139 § 5, `$lib/calm`) is another composition, not a grey: one
+   * column at a reading measure, 1 and today's rows of 2 (`calmWaiting`);
+   * the overdue in one line that opens it, the rest in one line that leaves.
    * Each band loads and fails on its own; none of them is the page's error.
    *
    * Bands 2–4 follow the scope like every lens; band 1 does not, like the rail
@@ -50,6 +54,7 @@
   import { taskProjectId, type TaskItem, type TasksCache, type TaskTarget } from '$lib/task';
   import {
     buildDeskFeed,
+    calmWaiting,
     goingItem,
     laterSummary,
     overviewReplies,
@@ -58,7 +63,17 @@
     type DeskConvInput,
     type DeskItem,
   } from '$lib/desk-feed';
-  import { changesSince, elapsedSince, goingAsks, paymentNews, plannerDoor, sinceInstant, type RecordedPayment } from '$lib/desk-bands';
+  import {
+    changesSince,
+    elapsedSince,
+    goingAsks,
+    paymentNews,
+    plannerDoor,
+    sinceInstant,
+    todayThings,
+    type RecordedPayment,
+  } from '$lib/desk-bands';
+  import { shows } from '$lib/calm';
   import { daysAgoLabel } from '$lib/conversation';
   import { computePulse } from '$lib/pulse';
   import { createPulseFeeds, pulseSlipContext } from '$lib/pulse-feeds.svelte';
@@ -325,7 +340,8 @@
   );
   let later = $derived(laterSummary(feed));
 
-  let waiting = $derived(rankWaiting(feed, clockNow, { calm: calm.on }));
+  let waiting = $derived(rankWaiting(feed, clockNow));
+  let calmWaits = $derived(calm.on ? calmWaiting(feed, clockNow) : null);
 
   let waitingLoading = $derived(
     $conversationsQuery.isPending ||
@@ -488,22 +504,22 @@
     waitingLoading || $projectsQuery.isPending || $linesQuery.isPending || !feeds.settled,
   );
 
-  // ── Header: the overdue and what waits, in one sentence ────────────────
-  // What has no truth draws a dash (ADR-096 § 6): loading or failed, the
-  // title claims nothing about what waits.
-  let titleKnown = $derived(!waitingLoading && !waitingErrored);
-  let titleRest = $derived(
-    !titleKnown
-      ? '—'
-      : waiting.total === 0
-      ? t('desk.title_waiting_zero', locale)
-      : t(waiting.total === 1 ? 'desk.title_waiting_one' : 'desk.title_waiting_many', locale, { n: waiting.total }),
-  );
-  let titleOver = $derived(
-    titleKnown && waiting.overdue > 0
-      ? t(waiting.overdue === 1 ? 'desk.title_overdue_one' : 'desk.title_overdue_many', locale, { n: waiting.overdue })
-      : null,
-  );
+  // ── Header: the day, not the debt (ADR-139 § 6) ───────────────────────
+  // «Hoy, función en Girona»: what today IS, from the pulse's rows (not
+  // scoped, like band 1). What waits and what is overdue are counted where
+  // they are listed, in the head of «Te espera». What has no truth draws a
+  // dash (ADR-096 § 6): loading or failed, the title claims nothing.
+  const KIND_WORDS = new Set(['show', 'rehearsal', 'residency', 'travel_day', 'press', 'other', 'day_off']);
+  let dayTitle = $derived.by(() => {
+    if (!feeds.settled || feeds.errored) return '—';
+    const things = todayThings({ performances: feeds.performances, dates: feeds.dates, viewerTz }, today);
+    const first = things[0];
+    if (!first) return t('desk.day_none', locale);
+    const what = first.label ?? t(`planner.kind_${KIND_WORDS.has(first.kind) ? first.kind : 'other'}`, locale);
+    const day = first.where ? t('desk.day_one_at', locale, { what, where: first.where }) : t('desk.day_one', locale, { what });
+    const rest = things.length - 1;
+    return rest === 0 ? day : t(rest === 1 ? 'desk.day_and_one' : 'desk.day_and_many', locale, { day, n: rest });
+  });
   // ── The greeting and the clock: what the Hall said before the Desk was the
   //    way in (ADR-137). Only those two: the Hall's next-moment line, day
   //    teaser and status sentence said again what «Lo siguiente» and the
@@ -684,14 +700,12 @@
 
 <svelte:head><title>{docTitle(t('lens.desk', locale))}</title></svelte:head>
 
-<div class="desk" aria-busy={busy}>
+<div class="desk" class:desk--calm={calm.on} aria-busy={busy}>
   <div class="desk__top">
     <p class="desk__hello">{greeting}{firstName ? `, ${firstName}` : ''}</p>
     <LensHeader help="desk">
       {#snippet title()}
-        <LensTitle
-          text={titleOver ? `${titleOver} · ${titleRest}` : titleRest}
-        />
+        <LensTitle text={dayTitle} />
       {/snippet}
       {#snippet sub()}
         <!-- One child, so the sub line's «·» separators stay out of it. -->
@@ -741,7 +755,8 @@
         <DeskWaiting
           {waiting}
           {today}
-          calm={calm.on}
+          calm={calmWaits}
+          onleavecalm={() => calm.set(false)}
           {feed}
           {later}
           loading={waitingLoading}
@@ -760,13 +775,8 @@
       </div>
     </div>
 
-    {#if calm.on}
-      <div class="desk__col">
-        <button type="button" class="desk__calm" onclick={() => calm.set(false)}>
-          {t('desk.calm_folded', locale)} <span aria-hidden="true">→</span>
-        </button>
-      </div>
-    {:else}
+    <!-- What calm folds here is said in «Te espera»'s last line, which leaves calm. -->
+    {#if shows('desk', 'season', calm.on)}
       <div class="desk__col">
         <div class="slot slot--season" data-help-step="desk-more">
           <DeskSeason
@@ -802,7 +812,7 @@
       gap: var(--space-l);
     }
     /* The greeting sits on the title, a step under it: the same display face,
-       quieter, so «2 te esperan» stays the line that speaks. */
+       quieter, so the day («Hoy, función en Girona») stays the line that speaks. */
     .desk__top {
       display: flex;
       flex-direction: column;
@@ -846,20 +856,12 @@
       gap: var(--space-l);
       min-inline-size: 0;
     }
-    .desk__calm {
-      align-self: start;
-      padding: 0;
-      border: 0;
-      background: none;
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing);
-      color: var(--text-faint);
-      cursor: pointer;
-      text-align: start;
-    }
-    .desk__calm:hover {
-      color: var(--text-muted);
+    /* Calm: one column at a reading measure, from the lens's own left edge
+       (the edge never moves between routes, tokens.css `--page-width`). The
+       head keeps the page's width, so the lens switcher does not move. */
+    .desk--calm .desk__grid {
+      grid-template-columns: minmax(0, 1fr);
+      max-inline-size: var(--calm-measure);
     }
 
     /* The chrome every band shares: the eyebrow, its count or door, the

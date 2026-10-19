@@ -100,6 +100,8 @@
   import { t, type Locale } from '$lib/i18n';
   import { isoWeek } from '$lib/planner';
   import BlockHead from '$lib/components/BlockHead.svelte';
+  import CalmLine from '$lib/components/CalmLine.svelte';
+  import { shows } from '$lib/calm';
   import ConceptHint from '$lib/components/ConceptHint.svelte';
   import FirstTimeNote from '$lib/components/FirstTimeNote.svelte';
   import Slip from '$lib/components/planner/Slip.svelte';
@@ -132,6 +134,10 @@
     onWeek: (monday: string) => void;
     onGap: (iso: string) => void;
     onCreate: () => void;
+    /** Calm (ADR-139 § 5, `$lib/calm`): the strip and «Por decidir» stay;
+        the key and the three lists fold into one line that leaves calm. */
+    calm?: boolean;
+    onLeaveCalm?: () => void;
   }
 
   let {
@@ -154,6 +160,8 @@
     onWeek,
     onGap,
     onCreate,
+    calm = false,
+    onLeaveCalm,
   }: Props = $props();
 
   /** Monday-first weekday words — the month's own (diseño B3: one shape
@@ -289,14 +297,16 @@
           </div>
         {/each}
       </div>
-      <p class="strip__key">
-        <span><i class="k k--firm"></i>{t('planner.season_key_firm', locale)}</span>
-        <span><i class="k k--option grain"></i>{t('planner.season_key_option', locale)}<ConceptHint concept="hold" /></span>
-        <span><i class="k k--tour"></i><span class="guess">{t('planner.season_key_tour', locale)}</span><ConceptHint concept="guess" /></span>
-        <span><i class="k k--away"></i>{t('planner.season_key_away', locale)}</span>
-        <span><i class="k k--decide"></i>{t('planner.season_key_decide', locale)}</span>
-        <span><i class="k k--clash"></i>{t('planner.season_key_clash', locale)}</span>
-      </p>
+      {#if shows('planner', 'legend', calm)}
+        <p class="strip__key">
+          <span><i class="k k--firm"></i>{t('planner.season_key_firm', locale)}</span>
+          <span><i class="k k--option grain"></i>{t('planner.season_key_option', locale)}<ConceptHint concept="hold" /></span>
+          <span><i class="k k--tour"></i><span class="guess">{t('planner.season_key_tour', locale)}</span><ConceptHint concept="guess" /></span>
+          <span><i class="k k--away"></i>{t('planner.season_key_away', locale)}</span>
+          <span><i class="k k--decide"></i>{t('planner.season_key_decide', locale)}</span>
+          <span><i class="k k--clash"></i>{t('planner.season_key_clash', locale)}</span>
+        </p>
+      {/if}
       {#if empty}
         <p class="blk__empty">
           {t('planner.season_empty', locale, { n: SEASON_WEEKS })}
@@ -346,6 +356,11 @@
       </section>
     {/if}
 
+    {#if !shows('planner', 'season_lists', calm)}
+      <div class="ov__lists ov__lists--calm">
+        <CalmLine text={t('planner.calm_season_rest', locale)} action={t('calm.see_all', locale)} onclick={() => onLeaveCalm?.()} />
+      </div>
+    {:else}
     <div class="ov__lists" data-help-step="planner-lists">
       <!-- 4 · NOT CLOSED — confirmed, and something is still empty. Facts as
            chips; the trip is a guess and says so in the inference voice. -->
@@ -426,6 +441,7 @@
         {/if}
       </section>
     </div>
+    {/if}
   </div>
 </div>
 
@@ -458,6 +474,9 @@
       gap: var(--space-l);
       grid-template-columns: repeat(3, minmax(0, 1fr));
       align-items: start;
+    }
+    .ov__lists--calm {
+      display: block;
     }
 
     .blk {

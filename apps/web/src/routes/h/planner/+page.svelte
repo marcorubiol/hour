@@ -84,6 +84,7 @@
     type BoardEventIn,
     type BoardGroup,
     type LaneTally,
+    type PlacedEvent,
   } from '$lib/board-lanes';
   import { awayRest, coversDay } from '$lib/away';
   import CalToolbar from '$lib/components/planner/CalToolbar.svelte';
@@ -104,6 +105,7 @@
   import type { CreatedPerformance } from '$lib/components/PerformanceForm.svelte';
   import { usePins } from '$lib/stores/pins.svelte';
   import { useCalm } from '$lib/stores/calm.svelte';
+  import { plannerCalmFacts, shows } from '$lib/calm';
   import { LOCALE_TAG, detectLocale, t } from '$lib/i18n';
   import {
     buildLineIndex,
@@ -411,10 +413,11 @@
      act right underneath teaches that this lens reasons differently from the
      rest of the tool. One grammar for narrowing, everywhere.
 
-     What survives is CALM, and it survives as a WORD, not a switch: it lives
-     in the Desk (global, non-destructive) and the Planner draws
-     `calm · confirmed only` on the facts side of the state line. A filter you
-     cannot see is a filter that lies.
+     What survives is CALM, and it is not a switch here: it lives in the
+     shell (global, non-destructive), and the Planner says what it does in
+     ONE sentence on the facts line («4 confirmed · 3 options wait outside
+     calm», ADR-139 § 5; `$lib/calm` says what it keeps). A filter you cannot
+     see is a filter that lies.
 
      TWO PREDICATES, ON PURPOSE. `vis` is the narrowing axis and governs
      COUNTING; `dvis` adds calm and governs DRAWING. So the counters keep
@@ -700,7 +703,7 @@
   // the "away" stat) — but the conflict engine reads allBlackouts, so a real
   // clash against an unavailability still surfaces.
   let visibleBlackouts = $derived(
-    calm.on
+    !shows('planner', 'blackouts', calm.on)
       ? []
       : allBlackouts.filter((b) => scopeWorkspaceIds === null || scopeWorkspaceIds.has(b.workspace_id)),
   );
@@ -708,10 +711,10 @@
   // `dvis` — the DRAWING predicate: scope, plus calm. Counting uses the
   // scoped rows directly (`vis`), which is why the numbers never move.
   function perfDrawn(p: PerformanceEvent): boolean {
-    return !calm.on || performanceStatusFamily(p.status) === 'confirmed';
+    return shows('planner', 'options', calm.on) || performanceStatusFamily(p.status) === 'confirmed';
   }
   function dateDrawn(d: DateEvent): boolean {
-    return !calm.on || dateStatusFamily(d.status) === 'confirmed';
+    return shows('planner', 'options', calm.on) || dateStatusFamily(d.status) === 'confirmed';
   }
   let shownPerfs = $derived(scopedPerfs.filter(perfDrawn));
   let shownDates = $derived(scopedDates.filter(dateDrawn));
@@ -1042,11 +1045,14 @@
   });
 
   /** Every calendar row as the board consumes it — THE SLIP travels inside
-      (ADR-095: the board renders the app's one card, never a lookalike). */
+      (ADR-095: the board renders the app's one card, never a lookalike).
+      The SCOPED rows, not the drawn ones: the lane tallies count the window,
+      so calm does not thin them (ADR-139 § 5); `boardDrawnCells` drops from
+      the paper what calm does not draw. */
   let boardEvents = $derived.by((): BoardEventIn[] => {
     if (view !== 'board') return [];
     const out: BoardEventIn[] = [];
-    for (const p of shownPerfs) {
+    for (const p of scopedPerfs) {
       const day = perfDayKey(p);
       if (day < agendaFromIso || day > agendaToIso) continue;
       out.push({
@@ -1063,7 +1069,7 @@
         slip: performanceSlip(p, slipCtxPage),
       });
     }
-    for (const d of shownDates) {
+    for (const d of scopedDates) {
       const day = dateDayKey(d, viewerTz);
       if (day < agendaFromIso || day > agendaToIso) continue;
       out.push({
@@ -1110,6 +1116,21 @@
       castByProject: boardCast,
       awayByDay: boardAwayByDay,
     });
+  });
+  /** What the board puts on paper: every placed row outside calm, the
+      confirmed ones in it (the same predicate as every other drawing). */
+  let boardDrawnCells = $derived.by(() => {
+    if (shows('planner', 'options', calm.on)) return boardBase.cells;
+    const out = new Map<string, Map<string, PlacedEvent[]>>();
+    for (const [lane, days] of boardBase.cells) {
+      const kept = new Map<string, PlacedEvent[]>();
+      for (const [day, placed] of days) {
+        const firm = placed.filter((pl) => pl.event.cert === 'confirmed');
+        if (firm.length > 0) kept.set(day, firm);
+      }
+      out.set(lane, kept);
+    }
+    return out;
   });
 
   /* AN ABSENCE BELONGS TO A PERSON, and each axis says so in its own rows:
@@ -1191,7 +1212,7 @@
     if (view !== 'board') return [];
     const active = activeDaySet({
       axis: laneAxis,
-      cells: boardBase.cells,
+      cells: boardDrawnCells,
       prepDays: [],
       awayRuns: boardAwayRuns,
     });
@@ -1672,6 +1693,8 @@
       .filter((p) => {
         if (perfDayKey(p) <= selectedDay) return false;
         const fam = performanceStatusFamily(p.status);
+        // Calm: «Después» is what is settled, like the paper above it.
+        if (!shows('planner', 'options', calm.on)) return fam === 'confirmed';
         return fam === 'confirmed' || fam === 'hold' || fam === 'proposed';
       })
       .sort((a, b) => (a.performed_at < b.performed_at ? -1 : 1))
@@ -3236,15 +3259,32 @@
     <p class="cal__meta cal__meta--window">
       <!-- One empty line box: the caption's own height, whatever it says. -->
       <span class="cal__strut" aria-hidden="true">&#8203;</span>
-        <!-- CALM IS A WORD, ON THE FACTS SIDE (ADR-095 §3). It lives in the
-             Desk — global and non-destructive — and the Planner does not draw
-             its switch: it draws what it DOES. An active filter you cannot see
-             is a filter that lies, and this one hides two thirds of the month.
-             It opens THIS line and not the other one because it is about the
-             drawing: the counters beside it do not move — they count the
-             window — so the word is what explains why only one is on paper. -->
-        {#if calm.on}
-          <span class="cal__stat cal__stat--soft">{t('planner.calm_state', locale)}<ConceptHint concept="calm" /></span>
+        <!-- CALM IS ONE SENTENCE, NOT A WORD MORE (ADR-139 § 5; it was
+             «calma · solo confirmados» in front of the whole census, ADR-095
+             §3). The line still says what calm hides, because a filter you
+             cannot see lies: a bounded window counts what is confirmed and how
+             many options wait outside; a window that grows only says that they
+             do. The way back is on the line. -->
+        {#if !shows('planner', 'census', calm.on)}
+          {@const cf = plannerCalmFacts(view, stats)}
+          {#if cf.confirmed !== null && cf.options !== null}
+            <span class="cal__stat"
+              ><b>{fig(cf.confirmed)}</b>
+              {t(figOne(cf.confirmed) ? 'planner.stat_confirmed_one' : 'planner.stat_confirmed', locale)}</span
+            >
+            {#if figuresKnown && cf.options > 0}
+              <span class="cal__stat cal__stat--soft"
+                >{t(cf.options === 1 ? 'planner.calm_options_one' : 'planner.calm_options_many', locale, {
+                  n: cf.options,
+                })}</span
+              >
+            {/if}
+          {:else}
+            <span class="cal__stat cal__stat--soft">{t('planner.calm_uncounted', locale)}</span>
+          {/if}
+          <button type="button" class="cal__stat empty-line__act" onclick={() => calm.set(false)}
+            >{t('calm.see_all', locale)}&nbsp;<span aria-hidden="true">→</span></button
+          >
         {/if}
         <!-- COUNTERS FOLLOW THE GEOMETRY, NOT THE WORD (ADR-095).
              A BOUNDED drawing that announces a range has to count it; a drawing
@@ -3271,7 +3311,7 @@
              fact (revisión del Planner, 2026-10-18). It used to carry its own
              census under the tabs, lowercase, with «firm» where this line
              said «confirmed». -->
-        {#if view === 'overview'}
+        {#if view === 'overview' && shows('planner', 'census', calm.on)}
           <span class="cal__stat cal__stat--soft">{seasonWindowLabel}</span>
           <span class="cal__stat"
             ><b>{fig(seasonFacts.perfs)}</b>
@@ -3308,7 +3348,7 @@
              counted (law: el horizonte del tablero). Lanes from the one
              writer (boardLaneCount); folding is furniture and the meta
              does not chase it. -->
-        {#if view === 'board'}
+        {#if view === 'board' && shows('planner', 'census', calm.on)}
           <span class="cal__stat cal__stat--soft">{t('planner.board_no_end', locale)}</span>
           <span class="cal__stat cal__stat--soft">{t('planner.board_grain', locale)}</span>
           <span class="cal__stat cal__stat--soft"
@@ -3340,7 +3380,7 @@
              counting — the drawing is the count. The agenda and the board
              have no last day, so they name where they begin and count
              nothing. -->
-        {#if view === 'month'}
+        {#if view === 'month' && shows('planner', 'census', calm.on)}
         <span class="cal__stat"
           ><b>{fig(stats.confirmed)}</b>
           {t(figOne(stats.confirmed) ? 'planner.stat_confirmed_one' : 'planner.stat_confirmed', locale)}</span
@@ -3416,7 +3456,6 @@
     onReadMarks={() => (marksOpen = true)}
     {view}
     {laneAxis}
-    calm={calm.on}
     {canBlackout}
     {locale}
     onSetView={setView}
@@ -3477,6 +3516,8 @@
         setView('agenda');
       }}
       onCreate={() => openCreate()}
+      calm={calm.on}
+      onLeaveCalm={() => calm.set(false)}
     />
   {:else if view === 'day'}
     <!-- A CLASH IS ABOUT WHAT IS *IN* THE DAY, so it goes above the drawing:
@@ -3677,7 +3718,8 @@
                 : '',
               // ONE IS NOT «1 OPTIONS». The month's gutter kept its counts in a
               // tooltip, so nobody had ever read them as a sentence.
-              held
+              // Calm: the options are off the paper, and off the week's sum.
+              held && shows('planner', 'week_options', calm.on)
                 ? `${held} ${t(held === 1 ? 'planner.week_option_one' : 'planner.week_options', locale)}`
                 : '',
               free ? `${free} ${t(free === 1 ? 'planner.week_free_one' : 'planner.week_free', locale)}` : '',
@@ -3722,7 +3764,8 @@
       axis={laneAxis}
       columns={boardWordedColumns}
       groups={boardBase.groups}
-      cells={boardBase.cells}
+      cells={boardDrawnCells}
+      countCells={boardBase.cells}
       awayRuns={boardAwayRuns}
       clashes={boardClashes}
       axisWord={t(`planner.lanes_${laneAxis}`, locale)}
@@ -3751,10 +3794,6 @@
       shut={boardShut}
       {loading}
     />
-    <!-- DEFERRED, said where it costs: the lane tallies count the DRAWN
-         events, so calm (which hides options from the drawing) also thins
-         the counts. The window-counting version needs a drawn-flag through
-         the engine — noted in the review, not smuggled in. -->
   {/if}
 </section>
 

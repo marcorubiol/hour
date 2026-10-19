@@ -357,6 +357,10 @@
        .shell__lenschrome), pages don't re-declare it. */
     --page-width: 77.5rem; /* 1240 — Marco, 2026-07-31. One measure for the
        whole app: it is applied once, in .shell__content, and no route overrides it. */
+    /* Calm's one column (ADR-139 § 5): a reading measure inside the page
+       width, from the same left edge, so turning calm on never moves it.
+       About the width the Desk's left column already had (1.55fr of 1240). */
+    --calm-measure: 45rem;
 
     --sidebar-width: 264px;
     --header-height: 0px;
