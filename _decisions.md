@@ -4579,3 +4579,11 @@ es la casa, se llega por el logo). Marco decidió en el chat (19-10). Carril `cl
    conversaciones. Las demás lenguas no cambian (enmienda ADR-128 § 3 y ADR-134 § 2 solo en inglés). «Booking» se
    queda donde nombra la actividad y no la vista: la plantilla de línea, el módulo de una línea, el permiso
    (`facet.converses`), el buzón compartido y el bloque de privacidad de Ajustes.
+5. **«Te espera»: la fecha dice qué es** (chat 19-10). La columna de la derecha mezclaba cuándo te escribieron (una
+   respuesta: «hace 6 días») y cuándo te toca (el resto: «22 oct», «hoy»). Ahora una respuesta dice «escribió hace
+   6 días» y lo demás «para el 22 oct» o «para hoy»; «vence 25 oct» y «vencido» ya lo decían y se quedan. Una
+   propuesta de Hour sigue sin fecha. En los cuatro idiomas (`desk.when_wrote`, `desk.when_for`,
+   `desk.when_for_today`).
+
+**Re-evaluar cuando** Marco entre en Desk una semana: si el saludo sobra cuando el título ya habla, y si hace falta la
+hora en la cabecera con el reloj del rail al lado.
