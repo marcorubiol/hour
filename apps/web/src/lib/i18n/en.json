@@ -1119,7 +1119,6 @@
   "roadsheet.link_not_revoked": "Link not revoked",
   "roadsheet.link_copied": "Link copied.",
   "roadsheet.link_copy_failed": "Could not copy the road sheet link.",
-  "roadsheet.error_status": "Error {status}",
   "roadsheet.gone_title": "This link is no longer active",
   "roadsheet.gone_body": "Ask whoever sent it for a fresh one.",
   "venue.edit_title": "Edit venue",
@@ -2347,5 +2346,14 @@
   "help.event.first_overdue": "This invoice is past the date you expected payment. Once paid, log it and it leaves this list.",
   "help.event.first_payment": "Payment logged: \"To collect\" goes down and collected grows in the season bar.",
   "help.event.first_board": "Each topic is a thread, seen by whoever has permission for it. Write in the right one.",
-  "help.event.first_mail_synced": "Hour brought this email in from a connected mailbox, because the address belongs to a contact. Whoever sees this conversation sees it."
+  "help.event.first_mail_synced": "Hour brought this email in from a connected mailbox, because the address belongs to a contact. Whoever sees this conversation sees it.",
+  "perf.not_found": "This performance does not exist or you cannot see it.",
+  "perf.load_error": "This performance could not be loaded.",
+  "perf.back_planner": "← Back to the planner",
+  "person.not_found": "This person does not exist or you cannot see them.",
+  "person.load_error": "This person could not be loaded.",
+  "conversations.one_load_error": "This conversation could not be loaded.",
+  "mailout.load_error": "This mailout could not be loaded.",
+  "roadsheet.not_found": "This road sheet does not exist or you cannot see it.",
+  "roadsheet.load_error": "The road sheet could not be loaded."
 }

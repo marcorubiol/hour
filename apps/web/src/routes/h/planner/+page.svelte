@@ -116,6 +116,7 @@
   import {
     addDaysIso,
     addMonths,
+    defaultCreateDay,
     daysCoveredBy,
     dayKeyInTz,
     monthGrid,
@@ -3009,8 +3010,43 @@
     // re-arms it, AFTER this runs, so a toolbar «+ date» never inherits
     // the last cell's project.
     boardPresetProjectId = null;
-    createDate = dayIso ?? todayIso;
+    createDate = dayIso ?? viewCreateDay();
     createOpen = true;
+  }
+
+  /** A door without a day proposes the view's (`defaultCreateDay`). */
+  function viewCreateDay(): string {
+    if (view === 'day') return defaultCreateDay(todayIso, { selected: selectedDay });
+    if (view === 'month') return defaultCreateDay(todayIso, { shown: { from: monthFirst, to: monthLast } });
+    if (view === 'overview') return defaultCreateDay(todayIso, { shown: { from: season.weeks[0][0], to: season.to } });
+    return defaultCreateDay(todayIso, { shown: view === 'agenda' ? agendaShownDays() : boardShownDays() });
+  }
+  /** The agenda's days on screen: the rows (or shut chapters) between the
+      stuck toolbar's underside and the viewport's foot. */
+  function agendaShownDays(): { from: string; to: string } | null {
+    const top = document.querySelector('.cal__toolbar')?.getBoundingClientRect().bottom ?? 0;
+    const days: string[] = [];
+    for (const el of document.querySelectorAll<HTMLElement>('[data-day], [data-month]')) {
+      const r = el.getBoundingClientRect();
+      if (r.bottom > top && r.top < window.innerHeight) days.push(el.dataset.day ?? `${el.dataset.month}-01`);
+    }
+    days.sort();
+    return days.length ? { from: days[0], to: days[days.length - 1] } : null;
+  }
+  /** The board's days on screen: the cells of its first lane between the
+      sticky lane labels and the strip's right edge. */
+  function boardShownDays(): { from: string; to: string } | null {
+    const wrap = document.querySelector<HTMLElement>('.board__wrap');
+    if (!wrap) return null;
+    const box = wrap.getBoundingClientRect();
+    const left = wrap.querySelector('.board__corner')?.getBoundingClientRect().right ?? box.left;
+    const days = new Set<string>();
+    for (const el of wrap.querySelectorAll<HTMLElement>('.board__cell[data-day]')) {
+      const r = el.getBoundingClientRect();
+      if (r.right > left && r.left < box.right && el.dataset.day) days.add(el.dataset.day);
+    }
+    const sorted = [...days].sort();
+    return sorted.length ? { from: sorted[0], to: sorted[sorted.length - 1] } : null;
   }
 
   // ── Editing a date (task 15) — both projections open the same dialog.
@@ -3388,10 +3424,10 @@
     onCreate={() => openCreate()}
     onFeed={openFeed}
     onBlackout={() => {
-      // Direct menu path: no day context — drop any stale preset from a
-      // cancelled day-cell create (the dialog defaults to today). The
-      // create-dialog footer path keeps its day.
-      createDate = null;
+      // Direct menu path: no day of its own — drop any stale preset from a
+      // cancelled day-cell create and propose the view's day, like every
+      // door without one. The create-dialog footer path keeps its day.
+      createDate = viewCreateDay();
       openBlackout();
     }}
   />

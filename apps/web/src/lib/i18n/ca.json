@@ -1110,7 +1110,6 @@
   "roadsheet.link_not_revoked": "No s'ha revocat l'enllaç",
   "roadsheet.link_copied": "Enllaç copiat.",
   "roadsheet.link_copy_failed": "No s'ha pogut copiar l'enllaç del full de ruta.",
-  "roadsheet.error_status": "Error {status}",
   "roadsheet.gone_title": "Aquest enllaç ja no és actiu",
   "roadsheet.gone_body": "Demana'n un de nou a qui te'l va enviar.",
   "venue.edit_title": "Editar lloc",
@@ -2338,5 +2337,14 @@
   "help.event.first_overdue": "Aquesta factura ha passat la data en què esperaves el cobrament. Quan cobris, apunta-ho i surt d’aquí.",
   "help.event.first_payment": "Cobrament apuntat: baixa «Per cobrar» i creix el cobrat a la barra de la temporada.",
   "help.event.first_board": "Cada tema és un fil i el veu qui té permís per a aquell tema. Escriu al que toqui.",
-  "help.event.first_mail_synced": "Aquest correu l’ha portat Hour d’una bústia connectada, perquè l’adreça és d’un contacte. El veu qui veu aquesta conversa."
+  "help.event.first_mail_synced": "Aquest correu l’ha portat Hour d’una bústia connectada, perquè l’adreça és d’un contacte. El veu qui veu aquesta conversa.",
+  "perf.not_found": "Aquesta funció no existeix o no la pots veure.",
+  "perf.load_error": "No s'ha pogut carregar aquesta funció.",
+  "perf.back_planner": "← Torna al planificador",
+  "person.not_found": "Aquesta persona no existeix o no la pots veure.",
+  "person.load_error": "No s'ha pogut carregar aquesta persona.",
+  "conversations.one_load_error": "No s'ha pogut carregar aquesta conversa.",
+  "mailout.load_error": "No s'ha pogut carregar aquest enviament.",
+  "roadsheet.not_found": "Aquest full de ruta no existeix o no el pots veure.",
+  "roadsheet.load_error": "No s'ha pogut carregar el full de ruta."
 }

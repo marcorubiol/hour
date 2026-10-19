@@ -24,7 +24,7 @@
   import MonthGrid from '$lib/components/MonthGrid.svelte';
   import { type DateEvent, type PerformanceEvent, formatMonthLabel } from '$lib/month-events';
   import PerformanceCreateDialog from '$lib/components/PerformanceCreateDialog.svelte';
-  import { addMonths, addDaysIso, monthGrid } from '$lib/planner';
+  import { addMonths, addDaysIso, dayKeyInTz, defaultCreateDay, monthGrid } from '$lib/planner';
   import { performanceStatusLabel, performanceStatusTone } from '$lib/performance';
   import { dayLabel } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
@@ -114,8 +114,18 @@
   let createOpen = $state(false);
   let createDate = $state<string | null>(null);
   function openCreate(isoDate?: string) {
-    createDate = isoDate ?? null;
+    createDate = isoDate ?? viewCreateDay();
     createOpen = true;
+  }
+  /** The button without a day proposes the month on screen's (`defaultCreateDay`);
+      the list shows no window, so there it is today. */
+  function viewCreateDay(): string {
+    const today = dayKeyInTz(new Date().toISOString(), Intl.DateTimeFormat().resolvedOptions().timeZone);
+    if (mode !== 'month') return today;
+    const from = `${ym.year}-${String(ym.month).padStart(2, '0')}-01`;
+    const next = addMonths(ym.year, ym.month, 1);
+    const to = addDaysIso(`${next.year}-${String(next.month).padStart(2, '0')}-01`, -1);
+    return defaultCreateDay(today, { shown: { from, to } });
   }
 </script>
 

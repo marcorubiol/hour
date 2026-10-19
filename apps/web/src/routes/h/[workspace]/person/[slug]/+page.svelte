@@ -16,6 +16,8 @@
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
   import { ApiError } from '$lib/api';
+  import { retryLoad } from '$lib/load-fail';
+  import RecordState from '$lib/components/RecordState.svelte';
   import { copyText } from '$lib/clipboard';
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
@@ -109,7 +111,7 @@
       enabled: Boolean(personSlug && workspaceId),
       // A 404 is the answer (a dossier of someone else's private conversation,
       // or the directory without Converses, ADR-124): no retries.
-      retry: (count: number, err: unknown) => !(err instanceof ApiError && err.status === 404) && count < 3,
+      retry: retryLoad,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         fetchJSON<PersonFile>(
           `/api/persons/${encodeURIComponent(personSlug)}?workspace_id=${encodeURIComponent(workspaceId)}`,
@@ -147,7 +149,6 @@
 
   let file = $derived($query.data ?? null);
   let loading = $derived($query.isPending);
-  let errorMsg = $derived($query.error instanceof Error ? $query.error.message : '');
 
   // ── Note composer ────────────────────────────────────────────────────
   const queryClient = useQueryClient();
@@ -389,10 +390,15 @@
 </svelte:head>
 
 <article class="person" aria-busy={loading}>
-  {#if loading}
-    <p class="person__state">{t('desk.loading', locale)}</p>
-  {:else if errorMsg}
-    <p class="person__state person__state--danger">{errorMsg}</p>
+  {#if loading || ($query.isError && !file)}
+    <RecordState
+      {loading}
+      error={$query.error}
+      missingText={t('person.not_found', locale)}
+      failedText={t('person.load_error', locale)}
+      onretry={() => void $query.refetch()}
+      {locale}
+    />
   {:else if file}
     <header class="person__head">
       <p class="eyebrow">{t('person.eyebrow', locale)}</p>
@@ -619,15 +625,6 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-xl);
-    }
-
-    .person__state {
-      padding-block: var(--space-l);
-      font-size: var(--text-s);
-      color: var(--text-faint);
-    }
-    .person__state--danger {
-      color: var(--danger);
     }
 
     .person__head {

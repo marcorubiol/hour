@@ -1110,7 +1110,6 @@
   "roadsheet.link_not_revoked": "No se ha revocado el enlace",
   "roadsheet.link_copied": "Enlace copiado.",
   "roadsheet.link_copy_failed": "No se ha podido copiar el enlace de la hoja de ruta.",
-  "roadsheet.error_status": "Error {status}",
   "roadsheet.gone_title": "Este enlace ya no está activo",
   "roadsheet.gone_body": "Pide uno nuevo a quien te lo envió.",
   "venue.edit_title": "Editar lugar",
@@ -2338,5 +2337,14 @@
   "help.event.first_overdue": "Esta factura ha pasado la fecha en que esperabas el cobro. Cuando cobres, apúntalo y sale de aquí.",
   "help.event.first_payment": "Cobro apuntado: baja «Por cobrar» y crece lo cobrado en la barra de la temporada.",
   "help.event.first_board": "Cada tema es un hilo y lo ve quien tiene permiso para ese tema. Escribe en el que toque.",
-  "help.event.first_mail_synced": "Este correo lo ha traído Hour de un buzón conectado, porque la dirección es de un contacto. Lo ve quien ve esta conversación."
+  "help.event.first_mail_synced": "Este correo lo ha traído Hour de un buzón conectado, porque la dirección es de un contacto. Lo ve quien ve esta conversación.",
+  "perf.not_found": "Esta función no existe o no la puedes ver.",
+  "perf.load_error": "No se ha podido cargar esta función.",
+  "perf.back_planner": "← Volver al planificador",
+  "person.not_found": "Esta persona no existe o no la puedes ver.",
+  "person.load_error": "No se ha podido cargar esta persona.",
+  "conversations.one_load_error": "No se ha podido cargar esta conversación.",
+  "mailout.load_error": "No se ha podido cargar este envío.",
+  "roadsheet.not_found": "Esta hoja de ruta no existe o no la puedes ver.",
+  "roadsheet.load_error": "No se ha podido cargar la hoja de ruta."
 }
