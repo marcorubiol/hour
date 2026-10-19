@@ -161,7 +161,7 @@
   let dows = $derived(weekdayLabels(localeTag));
 
   let empty = $derived(
-    !loading && weeks.every((w) => w.every((c) => c.past || (c.mark === null && !c.travel))),
+    !loading && weeks.every((w) => w.every((c) => c.past || (c.mark === null && !c.travel && !c.steps))),
   );
 
   function range(from: string, to: string): string {
