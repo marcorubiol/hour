@@ -16,6 +16,8 @@
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
+  import { retryLoad } from '$lib/load-fail';
+  import RecordState from '$lib/components/RecordState.svelte';
   import Button from '$lib/components/Button.svelte';
   import { copyText } from '$lib/clipboard';
   import Pill from '$lib/components/Pill.svelte';
@@ -47,6 +49,7 @@
     const k = { ws: workspaceSlug, slug, role };
     return {
       queryKey: ['roadsheet', k] as const,
+      retry: retryLoad,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         fetchJSON<Response>(
           `/api/performances/${encodeURIComponent(k.slug)}/roadsheet?ws=${encodeURIComponent(k.ws)}&role=${k.role}`,
@@ -60,7 +63,6 @@
   let sheet = $derived($query.data?.roadsheet ?? null);
   let venueTz = $derived($query.data?.venue_timezone ?? null);
   let loading = $derived($query.isPending);
-  let errorMsg = $derived($query.error instanceof Error ? $query.error.message : '');
 
   // ── Public links ─────────────────────────────────────────────────────
   const queryClient = useQueryClient();
@@ -146,10 +148,16 @@
     {/each}
   </nav>
 
-  {#if loading}
-    <p class="rs__state">{t('desk.loading', locale)}</p>
-  {:else if errorMsg}
-    <p class="rs__state rs__state--danger">{errorMsg}</p>
+  {#if loading || ($query.isError && !sheet)}
+    <RecordState
+      {loading}
+      error={$query.error}
+      missingText={t('roadsheet.not_found', locale)}
+      failedText={t('roadsheet.load_error', locale)}
+      onretry={() => void $query.refetch()}
+      back={{ href: `/h/${workspaceSlug}/performance/${slug}`, label: t('roadsheet.back', locale) }}
+      {locale}
+    />
   {:else if sheet}
     <RoadsheetView {sheet} {venueTz} {locale} backHref={`/h/${workspaceSlug}/performance/${slug}`} />
 
@@ -219,14 +227,6 @@
       color: var(--text-faint);
     }
 
-    .rs__state {
-      padding-block: var(--space-l);
-      font-size: var(--text-s);
-      color: var(--text-faint);
-    }
-    .rs__state--danger {
-      color: var(--danger);
-    }
 
     .rs__share {
       display: flex;

@@ -29,6 +29,8 @@
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { ApiError, fetchJSON, mutateJSON } from '$lib/api';
+  import { retryLoad } from '$lib/load-fail';
+  import RecordState from '$lib/components/RecordState.svelte';
   import { dayMonth, dayMonthYear, dayMonthYearTs } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
@@ -81,7 +83,7 @@
       queryKey: ['conversation', workspaceSlug, slug] as const,
       // A 404 is the answer (someone else's private one, or no Converses):
       // retrying only keeps «Loading…» on screen (`permisos.md` § 7).
-      retry: (count: number, err: unknown) => !(err instanceof ApiError && err.status === 404) && count < 3,
+      retry: retryLoad,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         fetchJSON<{ item: Conversation }>(
           UUID.test(slug)
@@ -299,13 +301,20 @@
   <title>{docTitle(title, t('conversations.conversation', locale))}</title>
 </svelte:head>
 
-{#if $convQuery.isLoading}
-  <p class="conv__msg">{t('conversations.loading', locale)}</p>
-{:else if !conv}
+{#if $convQuery.isLoading || !conv}
   <section class="conv">
     <p class="eyebrow">{t('conversations.conversation', locale)}</p>
-    <p class="conv__msg">{t('mail.conv_not_found', locale)}</p>
-    {#if lensOn('conversations')}<p><a class="link-arrow" href="/h/conversations">{t('conversations.back', locale)}</a></p>{/if}
+    <!-- No conversation and no error (a read that never ran) is the same
+         answer as a 404: there is nothing here for you. -->
+    <RecordState
+      loading={$convQuery.isLoading}
+      error={$convQuery.error ?? new ApiError(404, 'Not found')}
+      missingText={t('mail.conv_not_found', locale)}
+      failedText={t('conversations.one_load_error', locale)}
+      onretry={() => void $convQuery.refetch()}
+      back={lensOn('conversations') ? { href: '/h/conversations', label: t('conversations.back', locale) } : null}
+      {locale}
+    />
   </section>
 {:else}
   <section class="conv">

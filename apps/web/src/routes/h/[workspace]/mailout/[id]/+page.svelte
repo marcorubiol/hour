@@ -23,6 +23,8 @@
   import { toStore } from 'svelte/store';
   import { untrack } from 'svelte';
   import { ApiError, fetchJSON, mutateJSON } from '$lib/api';
+  import { retryLoad } from '$lib/load-fail';
+  import RecordState from '$lib/components/RecordState.svelte';
   import { dayMonthYear } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
@@ -59,6 +61,7 @@
   const query = createQuery(
     toStore(() => ({
       queryKey: ['mailout', id] as const,
+      retry: retryLoad,
       queryFn: ({ signal }: { signal: AbortSignal }) => fetchJSON<MailoutDetail>(`/api/mailout/${id}`, signal),
       // Mientras sale, cada 30 s; volver a la pestaña recarga siempre.
       refetchInterval: (q: { state: { data?: MailoutDetail } }) =>
@@ -318,13 +321,18 @@
   <title>{docTitle(m?.subject || t('mailout.title', locale))}</title>
 </svelte:head>
 
-{#if $query.isLoading}
-  <p class="mo__msg">{t('mailout.loading', locale)}</p>
-{:else if !d || !m}
+{#if $query.isLoading || !d || !m}
   <section class="mo">
     <p class="eyebrow">{t('mailout.title', locale)}</p>
-    <p class="mo__msg">{t('mailout.not_found', locale)}</p>
-    {#if lensOn('conversations')}<p><a class="link-arrow" href="/h/conversations">{t('conversations.back', locale)}</a></p>{/if}
+    <RecordState
+      loading={$query.isLoading}
+      error={$query.error ?? new ApiError(404, 'Not found')}
+      missingText={t('mailout.not_found', locale)}
+      failedText={t('mailout.load_error', locale)}
+      onretry={() => void $query.refetch()}
+      back={lensOn('conversations') ? { href: '/h/conversations', label: t('conversations.back', locale) } : null}
+      {locale}
+    />
   </section>
 {:else}
   <section class="mo" data-testid="mailout">

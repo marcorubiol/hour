@@ -11,6 +11,9 @@
   import { createQuery } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import RoadsheetView from '$lib/components/RoadsheetView.svelte';
+  import RecordState from '$lib/components/RecordState.svelte';
+  import { ApiError } from '$lib/api';
+  import { loadFailKind } from '$lib/load-fail';
   import { appLocale, t } from '$lib/i18n';
   import type { Roadsheet } from '$lib/roadsheet';
 
@@ -24,8 +27,9 @@
 
   async function fetchPublic(url: string, signal: AbortSignal): Promise<Response> {
     const res = await fetch(url, { signal });
-    if (res.status === 404) throw new Error('gone');
-    if (!res.ok) throw new Error(t('roadsheet.error_status', locale, { status: res.status }));
+    // No session here, so not fetchJSON; the same ApiError, so the same two
+    // answers (`load-fail.ts`): a revoked link is `missing`, the rest `failed`.
+    if (!res.ok) throw new ApiError(res.status, `Error ${res.status}`);
     return (await res.json()) as Response;
   }
 
@@ -43,12 +47,7 @@
   let sheet = $derived($query.data?.roadsheet ?? null);
   let venueTz = $derived($query.data?.venue_timezone ?? null);
   let loading = $derived($query.isPending);
-  let gone = $derived($query.error instanceof Error && $query.error.message === 'gone');
-  let errorMsg = $derived(
-    $query.error instanceof Error && $query.error.message !== 'gone'
-      ? $query.error.message
-      : '',
-  );
+  let gone = $derived($query.isError && !sheet && loadFailKind($query.error) === 'missing');
 </script>
 
 <svelte:head>
@@ -57,15 +56,20 @@
 </svelte:head>
 
 <main class="prs">
-  {#if loading}
-    <p class="prs__state">{t('desk.loading', locale)}</p>
-  {:else if gone}
+  {#if gone}
     <div class="prs__gone">
       <h1>{t('roadsheet.gone_title', locale)}</h1>
       <p>{t('roadsheet.gone_body', locale)}</p>
     </div>
-  {:else if errorMsg}
-    <p class="prs__state prs__state--danger">{errorMsg}</p>
+  {:else if loading || ($query.isError && !sheet)}
+    <RecordState
+      {loading}
+      error={$query.error}
+      missingText={t('roadsheet.gone_title', locale)}
+      failedText={t('roadsheet.load_error', locale)}
+      onretry={() => void $query.refetch()}
+      {locale}
+    />
   {:else if sheet}
     <RoadsheetView {sheet} {venueTz} {locale} />
   {/if}
@@ -77,15 +81,6 @@
       max-inline-size: 40rem;
       margin-inline: auto;
       padding: var(--space-l) var(--space-m) var(--space-2xl);
-    }
-
-    .prs__state {
-      padding-block: var(--space-l);
-      font-size: var(--text-s);
-      color: var(--text-faint);
-    }
-    .prs__state--danger {
-      color: var(--danger);
     }
 
     .prs__gone {

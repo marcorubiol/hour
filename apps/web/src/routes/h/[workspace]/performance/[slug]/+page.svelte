@@ -14,6 +14,8 @@
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
+  import { retryLoad } from '$lib/load-fail';
+  import RecordState from '$lib/components/RecordState.svelte';
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
@@ -159,6 +161,7 @@
     const k = { ws: workspaceSlug, slug };
     return {
       queryKey: ['performance', k] as const,
+      retry: retryLoad,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         fetchJSON<Bundle>(
           `/api/performances/${encodeURIComponent(k.slug)}?ws=${encodeURIComponent(k.ws)}`,
@@ -572,7 +575,6 @@
   }
 
   let loading = $derived($query.isPending);
-  let errorMsg = $derived($query.error instanceof Error ? $query.error.message : '');
 
   const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -632,10 +634,16 @@
 </svelte:head>
 
 <article class="perf" aria-busy={loading}>
-  {#if loading}
-    <p class="perf__state">{t('desk.loading', locale)}</p>
-  {:else if errorMsg}
-    <p class="perf__state perf__state--danger">{errorMsg}</p>
+  {#if loading || ($query.isError && !perf)}
+    <RecordState
+      {loading}
+      error={$query.error}
+      missingText={t('perf.not_found', locale)}
+      failedText={t('perf.load_error', locale)}
+      onretry={() => void $query.refetch()}
+      back={lensOn('planner') ? { href: '/h/planner', label: t('perf.back_planner', locale) } : null}
+      {locale}
+    />
   {:else if perf}
     <header class="perf__head">
       <p class="eyebrow">
@@ -1068,14 +1076,6 @@
       margin-inline: auto;
     }
 
-    .perf__state {
-      padding-block: var(--space-l);
-      font-size: var(--text-s);
-      color: var(--text-faint);
-    }
-    .perf__state--danger {
-      color: var(--danger);
-    }
 
     .perf__head {
       display: flex;

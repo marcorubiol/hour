@@ -1076,7 +1076,6 @@
   "roadsheet.link_not_revoked": "Lien non révoqué",
   "roadsheet.link_copied": "Lien copié.",
   "roadsheet.link_copy_failed": "Impossible de copier le lien de la feuille de route.",
-  "roadsheet.error_status": "Erreur {status}",
   "roadsheet.gone_title": "Ce lien n'est plus actif",
   "roadsheet.gone_body": "Demandez-en un nouveau à la personne qui vous l'a envoyé.",
   "venue.edit_title": "Modifier le lieu",
@@ -2338,5 +2337,14 @@
   "help.event.first_overdue": "Cette facture a dépassé la date de paiement prévue. Une fois encaissée, notez-le et elle sort d’ici.",
   "help.event.first_payment": "Encaissement noté : « À encaisser » baisse et l’encaissé grandit dans la barre de la saison.",
   "help.event.first_board": "Chaque sujet est un fil, visible par qui a la permission pour ce sujet. Écrivez dans le bon.",
-  "help.event.first_mail_synced": "Hour a récupéré cet e-mail dans une boîte connectée, parce que l’adresse est celle d’un contact. Il est visible par qui voit cette conversation."
+  "help.event.first_mail_synced": "Hour a récupéré cet e-mail dans une boîte connectée, parce que l’adresse est celle d’un contact. Il est visible par qui voit cette conversation.",
+  "perf.not_found": "Cette représentation n'existe pas ou vous ne pouvez pas la voir.",
+  "perf.load_error": "Impossible de charger cette représentation.",
+  "perf.back_planner": "← Retour au planning",
+  "person.not_found": "Cette personne n'existe pas ou vous ne pouvez pas la voir.",
+  "person.load_error": "Impossible de charger cette personne.",
+  "conversations.one_load_error": "Impossible de charger cette conversation.",
+  "mailout.load_error": "Impossible de charger cet envoi.",
+  "roadsheet.not_found": "Cette feuille de route n'existe pas ou vous ne pouvez pas la voir.",
+  "roadsheet.load_error": "Impossible de charger la feuille de route."
 }
