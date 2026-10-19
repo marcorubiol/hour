@@ -60,6 +60,7 @@
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
+  import { toastCreated } from '$lib/created';
   import { conversationWhoBody, type ConversationItem } from '$lib/conversation';
   import { RELATIONS, relationLabel, type Relation } from '$lib/conversation-relation';
   import { appLocale, t } from '$lib/i18n';
@@ -416,6 +417,8 @@
     joinable: Join[];
     personId: string | null;
     untagged: number;
+    /** What «Deshacer» deletes. */
+    ids: string[];
   };
 
   const addMutation = createMutation({
@@ -434,7 +437,7 @@
         next_action_note: aNextNote.trim() || null,
       };
       let personId: string | null = null;
-      const out: AddResult = { created: 0, existed: 0, failed: [], joinable: [], personId: null, untagged: 0 };
+      const out: AddResult = { created: 0, existed: 0, failed: [], joinable: [], personId: null, untagged: 0, ids: [] };
       const vocab = $tagsQuery.data;
       const workspaceOf = (id: string) => ($projectsQuery.data?.items ?? []).find((p) => p.id === id)?.workspace_id;
       /** The chosen tag in that project's space; Difusión if the space does not use it. */
@@ -453,12 +456,13 @@
           ? { project_id: projectId, person_id: personId, line_id, tag_ids, ...base }
           : { project_id: projectId, ...who, line_id, tag_ids, ...base };
         try {
-          const data = await mutateJSON<{ primary_person_id?: string | null; tagged?: boolean }>(
-            'POST',
-            '/api/conversations',
-            body,
-          );
+          const data = await mutateJSON<{
+            conversation?: { id?: string };
+            primary_person_id?: string | null;
+            tagged?: boolean;
+          }>('POST', '/api/conversations', body);
           out.created += 1;
+          if (data?.conversation?.id) out.ids.push(data.conversation.id);
           if (data?.tagged === false || !tag_ids) out.untagged += 1;
           if (!personId && data?.primary_person_id) personId = data.primary_person_id;
         } catch (e) {
@@ -511,9 +515,22 @@
       if (r.existed) parts.push(t('conversations.already_in', locale, { n: r.existed }));
       if (r.failed.length) parts.push(t('conversations.failed_n', locale, { n: r.failed.length }));
       if (r.untagged) parts.push(t('conversations.tag_not_set', locale));
-      addToast({
-        tone: r.failed.length || r.untagged ? 'warning' : 'success',
-        message: `${parts.join(' · ')}.`,
+      const message = `${parts.join(' · ')}.`;
+      if (r.failed.length || r.untagged) {
+        addToast({ tone: 'warning', message });
+        return;
+      }
+      // ADR-139 p7: an add ends with one notice, and «Deshacer» deletes it.
+      const ids = r.ids;
+      toastCreated({
+        locale,
+        message,
+        undo: ids.length
+          ? async () => {
+              await Promise.all(ids.map((id) => mutateJSON('DELETE', `/api/conversations/${id}`)));
+              await queryClient.invalidateQueries({ queryKey: ['conversations'] });
+            }
+          : undefined,
       });
     },
     onError: (err) => {
@@ -586,13 +603,26 @@
     },
   });
 
+  /** What is missing, said under its field (ADR-139 p7), never as a toast. */
+  let errSpaces = $state<string | undefined>();
+  let errWho = $state<string | undefined>();
+  $effect(() => {
+    void aProjectIds.length;
+    errSpaces = undefined;
+  });
+  $effect(() => {
+    void aName;
+    void aOrg;
+    errWho = undefined;
+  });
+  let addFormEl: HTMLFormElement | undefined = $state();
+
+  /** Runs from the form's submit: Enter in any field, ⌘↵ or the button. */
   function submitAdd() {
-    if (aProjectIds.length === 0) {
-      addToast({ tone: 'warning', message: t('conversations.pick_space', locale) });
-      return;
-    }
-    if (!aName.trim() && !aOrg.trim()) {
-      addToast({ tone: 'warning', message: t('conversations.needs_name', locale) });
+    if (aProjectIds.length === 0) errSpaces = t('conversations.pick_space', locale);
+    if (!aName.trim() && !aOrg.trim()) errWho = t('conversations.needs_name', locale);
+    if (errSpaces || errWho) {
+      if (!errSpaces) document.getElementById('conversations-add-org')?.focus();
       return;
     }
     $addMutation.mutate();
@@ -747,6 +777,15 @@
 </section>
 
 <Dialog bind:open={addOpen} title={t('conversations.add', locale)} size="m">
+  <!-- A form, so Enter in any field adds (ADR-139 p7); the errors are its own. -->
+  <form
+    class="conversations__add"
+    bind:this={addFormEl}
+    onsubmit={(e) => {
+      e.preventDefault();
+      submitAdd();
+    }}
+  >
   <p class="conversations__dialog-hint">{t('conversations.add_hint', locale)}</p>
   <fieldset class="conversations__spaces">
     <legend class="eyebrow eyebrow--sub">
@@ -779,6 +818,7 @@
         {/each}
       </div>
     {/if}
+    {#if errSpaces}<p class="form-error" role="alert">{errSpaces}</p>{/if}
   </fieldset>
   {#if aJoin.length > 0}
     <div class="conversations__join" role="status">
@@ -795,8 +835,10 @@
   {/if}
   <div class="conversations__form-grid">
     <Input
+      id="conversations-add-org"
       label={t('conversations.col_organization', locale)}
       bind:value={aOrg}
+      error={errWho}
       placeholder={t('conversations.org_ph', locale)}
       list="conversations-org-list"
       autocomplete="off"
@@ -819,9 +861,14 @@
       placeholder={t('conversations.next_note_ph', locale)}
     />
   </div>
+  <!-- Hidden submit lets Enter inside an input trigger submit. -->
+  <button type="submit" hidden aria-hidden="true"></button>
+  </form>
   {#snippet actions()}
     <Button variant="quiet" onclick={() => (addOpen = false)}>{t('create.cancel', locale)}</Button>
-    <Button onclick={submitAdd} loading={$addMutation.isPending}>{t('conversations.add', locale)}</Button>
+    <Button onclick={() => addFormEl?.requestSubmit()} loading={$addMutation.isPending}
+      >{t('conversations.add', locale)}</Button
+    >
   {/snippet}
 </Dialog>
 
@@ -897,6 +944,10 @@
       border: var(--border);
       border-radius: var(--radius-s);
       font-size: var(--text-s);
+    }
+
+    .conversations__add {
+      display: contents;
     }
 
     .conversations__dialog-hint {

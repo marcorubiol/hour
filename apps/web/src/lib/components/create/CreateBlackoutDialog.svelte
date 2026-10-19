@@ -23,6 +23,8 @@
   import Segmented from '../Segmented.svelte';
   import Select from '../Select.svelte';
   import { addToast } from '../Toast.svelte';
+  import { toastCreated } from '$lib/created';
+  import { dayMonthYear } from '$lib/datetime';
   import { dayKeyInTz } from '$lib/planner';
   import { detectLocale, t } from '$lib/i18n';
   import { teamQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
@@ -144,23 +146,36 @@
         message: err instanceof ApiError ? err.message : t('perf.unexpected', locale),
       });
     },
-    onSuccess: () => {
+    onSuccess: (body, input) => {
       open = false;
+      const id = (body as { block?: { id?: string } } | null)?.block?.id;
+      toastCreated({
+        locale,
+        message: `${t('blackout.title', locale)} · ${dayMonthYear(input.starts_on)} – ${dayMonthYear(input.ends_on)}`,
+        undo: id
+          ? async () => {
+              await mutateJSON('DELETE', `/api/availability/${id}`);
+              await queryClient.invalidateQueries({ queryKey: ['planner-availability'] });
+            }
+          : undefined,
+      });
     },
     onSettled: () => void queryClient.invalidateQueries({ queryKey: ['planner-availability'] }),
   });
 
+  /** The range's own word, under «Hasta» (ADR-139 p7). */
+  let errTo = $state<string | undefined>();
+  $effect(() => {
+    void bFrom;
+    void bTo;
+    errTo = undefined;
+  });
+  let formEl: HTMLFormElement | undefined = $state();
+
+  /** Runs from the form's submit: space and both days are native `required`. */
   function submit() {
-    if (!bWorkspace) {
-      addToast({ tone: 'warning', message: t('blackout.pick_space', locale) });
-      return;
-    }
-    if (!bFrom || !bTo) {
-      addToast({ tone: 'warning', message: t('blackout.pick_range', locale) });
-      return;
-    }
     if (bTo < bFrom) {
-      addToast({ tone: 'warning', message: t('blackout.range_invalid', locale) });
+      errTo = t('blackout.range_invalid', locale);
       return;
     }
     $createBlock.mutate({
@@ -177,6 +192,7 @@
 <Dialog bind:open title={t('blackout.title', locale)} size="s">
   <form
     class="cbk__form"
+    bind:this={formEl}
     onsubmit={(e) => {
       e.preventDefault();
       submit();
@@ -197,7 +213,7 @@
       helper={t('blackout.person_hint', locale)}
     />
     <Input label={t('blackout.from', locale)} type="date" bind:value={bFrom} required />
-    <Input label={t('blackout.to', locale)} type="date" bind:value={bTo} required />
+    <Input label={t('blackout.to', locale)} type="date" bind:value={bTo} required error={errTo} />
     <Segmented
       label={t('blackout.certainty', locale)}
       options={AVAILABILITY_CERTAINTIES.map((c) => ({ value: c, label: t(`blackout.certainty_${c}`, locale) }))}
@@ -213,7 +229,9 @@
   </form>
   {#snippet actions()}
     <Button variant="quiet" onclick={() => (open = false)}>{t('create.cancel', locale)}</Button>
-    <Button onclick={submit} loading={$createBlock.isPending}>{t('blackout.save', locale)}</Button>
+    <Button onclick={() => formEl?.requestSubmit()} loading={$createBlock.isPending}
+      >{t('blackout.save', locale)}</Button
+    >
   {/snippet}
 </Dialog>
 
@@ -222,7 +240,7 @@
     .cbk__form {
       display: flex;
       flex-direction: column;
-      gap: var(--space-xs);
+      gap: var(--field-gap);
     }
   }
 </style>

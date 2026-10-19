@@ -35,6 +35,8 @@
   import Input from './Input.svelte';
   import Select from './Select.svelte';
   import { addToast } from './Toast.svelte';
+  import { toastCreated } from '$lib/created';
+  import { dayMonthYear } from '$lib/datetime';
   import { dayKeyInTz } from '$lib/planner';
   import { detectLocale, t } from '$lib/i18n';
   import { allLinesQueryOptions } from '$lib/nav-queries';
@@ -233,7 +235,8 @@
       }
       return body.performance;
     },
-    onSuccess: (perf) => {
+    onSuccess: (perf, input) => {
+      announce([perf], `${dayMonthYear(input.performed_at)}`);
       cVenue = '';
       cCity = '';
       resetBolo();
@@ -290,7 +293,9 @@
       }
       return rows;
     },
-    onSuccess: (rows) => {
+    onSuccess: (rows, input) => {
+      const span = input.performed_at;
+      announce(rows, `${dayMonthYear(span[0])} – ${dayMonthYear(span[span.length - 1])}`);
       cVenue = '';
       cCity = '';
       resetBolo();
@@ -332,14 +337,42 @@
     return cHoldNotice;
   }
 
+  const PERF_FEEDS = [
+    'planner-performances',
+    'line-performances',
+    'line-money-fees',
+    'money-bolos',
+    'today-performances',
+    'pulse-performances',
+  ] as const;
+
+  /** ADR-139 p7: an add ends with one notice, and «Deshacer» deletes it. */
+  function announce(rows: CreatedPerformance[], day: string) {
+    toastCreated({
+      locale,
+      message: t('create.added', locale, { what: t('create.type_performance', locale), day }),
+      undo: async () => {
+        await Promise.all(rows.map((r) => mutateJSON('DELETE', `/api/performances/${r.id}`)));
+        await Promise.all(PERF_FEEDS.map((k) => queryClient.invalidateQueries({ queryKey: [k] })));
+      },
+    });
+  }
+
   /** La tanda manda: dos días o más resueltos por el anfitrión. */
   let isRun = $derived(Boolean(days && days.length >= 2));
 
+  let formEl: HTMLFormElement | undefined = $state();
+
+  /**
+   * The host's button submits the FORM, so the native constraints (the
+   * project, the day) run and speak under their field (ADR-139 p7), never
+   * as a toast; the form's own submit handler then writes.
+   */
   export function submit() {
-    if (!cProject) {
-      addToast({ tone: 'warning', message: t('create.pick_project', locale) });
-      return;
-    }
+    formEl?.requestSubmit();
+  }
+
+  function save() {
     // UNA TANDA ES OTRA ESCRITURA, no la misma repetida. Con los días ya
     // resueltos por `BlockDays`, dos o más van por la ruta atómica.
     if (days && days.length >= 2) {
@@ -352,10 +385,6 @@
         line_id: cLine || null,
         bolo_id: cBolo || null,
       });
-      return;
-    }
-    if (!cDay) {
-      addToast({ tone: 'warning', message: t('perf.pick_date', locale) });
       return;
     }
     $createPerf.mutate({
@@ -372,9 +401,10 @@
 
 <form
   class="pform"
+  bind:this={formEl}
   onsubmit={(e) => {
     e.preventDefault();
-    submit();
+    save();
   }}
 >
   <Select
@@ -459,7 +489,7 @@
     .pform {
       display: flex;
       flex-direction: column;
-      gap: var(--space-xs);
+      gap: var(--field-gap);
     }
   }
 </style>

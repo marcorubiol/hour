@@ -94,10 +94,18 @@
       }),
   });
 
+  let legalNameError = $state<string | undefined>();
+  $effect(() => {
+    void draft.legal_name;
+    legalNameError = undefined;
+  });
+
   function submit(ev: SubmitEvent) {
     ev.preventDefault();
     if (!draft.legal_name.trim()) {
-      addToast({ tone: 'warning', message: t('fiscal.legal_name_required', locale) });
+      // Said under the field (ADR-139 p7), never as a toast.
+      legalNameError = t('fiscal.legal_name_required', locale);
+      document.getElementById('org-fiscal-legal-name')?.focus();
       return;
     }
     if (!$save.isPending) $save.mutate();
@@ -123,7 +131,13 @@
 
     {#if editing}
       <form class="org-fiscal__form" onsubmit={submit}>
-        <Input label={t('fiscal.legal_name', locale)} bind:value={draft.legal_name} required />
+        <Input
+          id="org-fiscal-legal-name"
+          label={t('fiscal.legal_name', locale)}
+          bind:value={draft.legal_name}
+          required
+          error={legalNameError}
+        />
         <Input label={t('fiscal.tax_id', locale)} bind:value={draft.tax_id} />
         <Input label={t('fiscal.address_line_1', locale)} bind:value={draft.address_line_1} />
         <Input label={t('fiscal.address_line_2', locale)} bind:value={draft.address_line_2} />

@@ -80,11 +80,21 @@
     },
   });
 
+  /** The name's own word, under the field (ADR-139 p7); the native
+      `required` covers the empty ones, this the blank ones. */
+  let nameError = $state<string | undefined>();
+  $effect(() => {
+    void name;
+    nameError = undefined;
+  });
+  let formEl: HTMLFormElement | undefined = $state();
+
+  /** Runs from the form's submit, after the native constraints passed. */
   function submit(event?: Event) {
     event?.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) {
-      addToast({ tone: 'warning', message: t('project.name_empty', locale) });
+      nameError = t('project.name_empty', locale);
       return;
     }
     $create.mutate({ name: trimmed, accent, description });
@@ -98,11 +108,12 @@
   size="s"
   onclose={reset}
 >
-  <form class="cws__form" onsubmit={submit}>
+  <form class="cws__form" bind:this={formEl} onsubmit={submit}>
     <Input
       label={t('conversations.col_name', locale)}
       name="workspace-name"
       bind:value={name}
+      error={nameError}
       placeholder={t('workspace.name_ph', locale)}
       required
       autofocus
@@ -128,7 +139,7 @@
 
   {#snippet actions()}
     <Button variant="quiet" disabled={$create.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
-    <Button loading={$create.isPending} onclick={submit}>{t('project.create', locale)}</Button>
+    <Button loading={$create.isPending} onclick={() => formEl?.requestSubmit()}>{t('project.create', locale)}</Button>
   {/snippet}
 </Dialog>
 
@@ -137,7 +148,7 @@
     .cws__form {
       display: flex;
       flex-direction: column;
-      gap: var(--space-xs);
+      gap: var(--field-gap);
     }
   }
 </style>

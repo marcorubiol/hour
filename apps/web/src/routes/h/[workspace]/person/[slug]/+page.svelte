@@ -21,6 +21,7 @@
   import { copyText } from '$lib/clipboard';
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
+  import { toastCreated } from '$lib/created';
   import { session } from '$lib/session.svelte';
   import { relationLabel, relationTone, type Relation } from '$lib/conversation-relation';
   import { dayLabel, dayMonthYearTs } from '$lib/datetime';
@@ -235,14 +236,25 @@
         project_id: aProject,
         person_id: file!.person.id,
       }),
-    onSuccess: () => {
+    onSuccess: (body) => {
       addOpen = false;
       aProject = '';
       void queryClient.invalidateQueries({
         queryKey: ['person', contextWorkspaceId, slug],
       });
       void queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      addToast({ tone: 'success', message: t('person.added_to_project', locale) });
+      const id = (body?.conversation as { id?: string } | undefined)?.id;
+      toastCreated({
+        locale,
+        message: t('person.added_to_project', locale),
+        undo: id
+          ? async () => {
+              await mutateJSON('DELETE', `/api/conversations/${id}`);
+              await queryClient.invalidateQueries({ queryKey: ['person', contextWorkspaceId, slug] });
+              await queryClient.invalidateQueries({ queryKey: ['conversations'] });
+            }
+          : undefined,
+      });
     },
     onError: (err) => {
       addToast({
@@ -253,9 +265,17 @@
     },
   });
 
+  /** The project's own word, under it (ADR-139 p7). */
+  let projectError = $state<string | undefined>();
+  $effect(() => {
+    void aProject;
+    projectError = undefined;
+  });
+
   function submitAddConversation() {
     if (!aProject) {
-      addToast({ tone: 'warning', message: t('create.pick_project', locale) });
+      projectError = t('create.pick_project', locale);
+      document.getElementById('person-add-project')?.focus();
       return;
     }
     $addConversation.mutate();
@@ -530,9 +550,11 @@
 <Dialog bind:open={addOpen} title={t('person.add_to_project', locale)} size="s">
   <div class="person__add-grid">
     <Select
+      id="person-add-project"
       label={t('create.project', locale)}
       options={projectOptions}
       bind:value={aProject}
+      error={projectError}
       placeholder={projectOptions.length === 0 ? t('person.in_every_project', locale) : undefined}
       required
     />
@@ -628,6 +650,7 @@
     .person__add-grid {
       display: flex;
       flex-direction: column;
+      gap: var(--field-gap);
       margin-block-start: var(--space-s);
     }
 

@@ -120,10 +120,27 @@
     },
   });
 
+  /** The name's own word, under the field (ADR-139 p7); the native
+      `required` covers the empty ones, this the blank ones. */
+  let nameError = $state<string | undefined>();
+  $effect(() => {
+    void name;
+    nameError = undefined;
+  });
+  let formEl: HTMLFormElement | undefined = $state();
+
+  /** Runs from the form's submit, after the native constraints passed. */
   function submit(event?: Event) {
     event?.preventDefault();
     if (!name.trim()) {
-      addToast({ tone: 'warning', message: t('project.name_empty', locale) });
+      nameError = t('project.name_empty', locale);
+      return;
+    }
+    // ONE save (ADR-139 p7): a typed web address is requested by «Guardar»
+    // with the rest, not by a button of its own inside the dialog. A refused
+    // address says why under its field and nothing else is written.
+    if (aliasInput.trim()) {
+      $requestAlias.mutate(undefined, { onSuccess: () => $save.mutate() });
       return;
     }
     $save.mutate();
@@ -141,6 +158,11 @@
   };
 
   let aliasInput = $state('');
+  let aliasError = $state<string | undefined>();
+  $effect(() => {
+    void aliasInput;
+    aliasError = undefined;
+  });
 
   const pendingOptions = toStore(() => ({
     queryKey: ['alias-requests', 'pending', workspace?.id] as const,
@@ -171,7 +193,6 @@
     onSuccess: async () => {
       aliasInput = '';
       await queryClient.invalidateQueries({ queryKey: ['alias-requests'] });
-      addToast({ tone: 'success', message: t('workspace.alias_requested', locale) });
     },
     onError: (err) => {
       const msg =
@@ -184,22 +205,18 @@
               : err instanceof Error
                 ? err.message
                 : t('perf.unexpected', locale);
-      addToast({ tone: 'danger', title: t('workspace.alias_not_requested', locale), message: msg });
+      aliasError = msg;
     },
   });
-
-  function submitAlias() {
-    if (!aliasInput.trim()) return;
-    $requestAlias.mutate();
-  }
 </script>
 
 <Dialog bind:open title={t('workspace.edit_title', locale)} size="s">
-  <form class="ews__form" onsubmit={submit}>
+  <form class="ews__form" bind:this={formEl} onsubmit={submit}>
     <Input
       label={t('conversations.col_name', locale)}
       name="space-name"
       bind:value={name}
+      error={nameError}
       required
       autocomplete="off"
       disabled={$save.isPending}
@@ -265,24 +282,17 @@
           bind:value={aliasInput}
           placeholder={t('workspace.alias_ph', locale)}
           helper={t('workspace.alias_help', locale)}
+          error={aliasError}
           autocomplete="off"
           disabled={$requestAlias.isPending}
         />
-        <Button
-          variant="secondary"
-          loading={$requestAlias.isPending}
-          disabled={!aliasInput.trim()}
-          onclick={submitAlias}
-        >
-          {t('workspace.alias_request', locale)}
-        </Button>
       </div>
     {/if}
   </div>
 
   {#snippet actions()}
     <Button variant="quiet" disabled={$save.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
-    <Button loading={$save.isPending} onclick={submit}>{t('blackout.save', locale)}</Button>
+    <Button loading={$save.isPending || $requestAlias.isPending} onclick={() => formEl?.requestSubmit()}>{t('blackout.save', locale)}</Button>
   {/snippet}
 </Dialog>
 
@@ -291,7 +301,7 @@
     .ews__form {
       display: flex;
       flex-direction: column;
-      gap: var(--space-xs);
+      gap: var(--field-gap);
     }
 
     .ews__address {

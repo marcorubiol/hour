@@ -26,6 +26,8 @@
   import Select from '$lib/components/Select.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
+  import { toastCreated } from '$lib/created';
+  import { FormErrors } from '$lib/form-errors.svelte';
   import { dayLabel, localDayISO } from '$lib/datetime';
   import {
     boloStatusLabel,
@@ -200,9 +202,20 @@
   const createExpense = createMutation({
     mutationFn: (input: ExpensePayload) =>
       mutateJSON<{ expense: unknown }>('POST', '/api/expenses', input),
-    onSuccess: () => {
+    onSuccess: (body, input) => {
       expOpen = false;
       void queryClient.invalidateQueries({ queryKey: ['line-expenses', line.id] });
+      const id = (body as { expense?: { id?: string } } | null)?.expense?.id;
+      toastCreated({
+        locale,
+        message: `${t('books.add_expense', locale)} · ${input.description}`,
+        undo: id
+          ? async () => {
+              await mutateJSON('DELETE', `/api/expenses/${id}`);
+              await queryClient.invalidateQueries({ queryKey: ['line-expenses', line.id] });
+            }
+          : undefined,
+      });
     },
     onError: (err) => {
       addToast({
@@ -213,25 +226,24 @@
     },
   });
 
+  const expErrors = new FormErrors();
+  let expFormEl: HTMLFormElement | undefined = $state();
+
+  /** Runs from the form's submit; what is wrong is said under its field. */
   function submitExpense() {
+    expErrors.clear();
     const description = eDescription.trim();
-    if (!description) {
-      addToast({ tone: 'warning', message: t('books.description_required', locale) });
-      return;
-    }
+    if (!description) expErrors.set('lmm-exp-desc', t('books.description_required', locale));
     // type=number binds a number (or undefined on empty) through Svelte —
     // normalize via String before deciding empty-vs-value.
     const rawAmount = String(eAmount ?? '').trim();
     const amount = Number(rawAmount);
     if (rawAmount === '' || Number.isNaN(amount) || amount <= 0) {
-      addToast({ tone: 'warning', message: t('books.amount_positive', locale) });
-      return;
+      expErrors.set('lmm-exp-amount', t('books.amount_positive', locale));
     }
     const currency = eCurrency.trim().toUpperCase();
-    if (!/^[A-Z]{3}$/.test(currency)) {
-      addToast({ tone: 'warning', message: t('books.currency_code', locale) });
-      return;
-    }
+    if (!/^[A-Z]{3}$/.test(currency)) expErrors.set('lmm-exp-currency', t('books.currency_code', locale));
+    if (expErrors.any) return void expErrors.focusFirst();
     $createExpense.mutate({
       line_id: line.id,
       category: eCategory,
@@ -398,10 +410,26 @@
 </section>
 
 <Dialog bind:open={expOpen} title={t('books.add_expense', locale)} size="m">
-  <div class="lmm__form-grid">
+  <form
+    class="lmm__form-grid"
+    bind:this={expFormEl}
+    novalidate
+    oninput={expErrors.onedit}
+    onchange={expErrors.onedit}
+    onsubmit={(e) => {
+      e.preventDefault();
+      submitExpense();
+    }}
+  >
     <Select label={t('books.category', locale)} bind:value={eCategory} options={categoryOptions} />
-    <Input label={t('books.description', locale)} bind:value={eDescription} required />
-    <Field id="lmm-exp-amount" label={t('books.amount', locale)} required>
+    <Input
+      id="lmm-exp-desc"
+      label={t('books.description', locale)}
+      bind:value={eDescription}
+      required
+      error={expErrors.of('lmm-exp-desc')}
+    />
+    <Field id="lmm-exp-amount" label={t('books.amount', locale)} required error={expErrors.of('lmm-exp-amount')}>
       <input
         id="lmm-exp-amount"
         type="number"
@@ -411,13 +439,23 @@
         required
       />
     </Field>
-    <Input label={t('books.currency', locale)} bind:value={eCurrency} placeholder="EUR" />
+    <Input
+      id="lmm-exp-currency"
+      label={t('books.currency', locale)}
+      bind:value={eCurrency}
+      placeholder="EUR"
+      error={expErrors.of('lmm-exp-currency')}
+    />
     <Input label={t('perf.date', locale)} type="date" bind:value={eDate} />
     <Input label={t('books.notes', locale)} bind:value={eNotes} placeholder={t('books.optional', locale)} />
-  </div>
+    <!-- Hidden submit lets Enter inside an input trigger submit. -->
+    <button type="submit" hidden aria-hidden="true"></button>
+  </form>
   {#snippet actions()}
     <Button variant="quiet" onclick={() => (expOpen = false)}>{t('create.cancel', locale)}</Button>
-    <Button onclick={submitExpense} loading={$createExpense.isPending}>{t('composer.add', locale)}</Button>
+    <Button onclick={() => expFormEl?.requestSubmit()} loading={$createExpense.isPending}
+      >{t('composer.add', locale)}</Button
+    >
   {/snippet}
 </Dialog>
 
@@ -519,6 +557,7 @@
     .lmm__form-grid {
       display: flex;
       flex-direction: column;
+      gap: var(--field-gap);
     }
   }
 </style>

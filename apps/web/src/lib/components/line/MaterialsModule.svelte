@@ -83,12 +83,17 @@
     },
   });
 
+  /** The URL's own word, under it (ADR-139 p7); the kind is native `required`. */
+  let urlError = $state<string | undefined>();
+  $effect(() => {
+    void fUrl;
+    urlError = undefined;
+  });
+  let formEl: HTMLFormElement | undefined = $state();
+
+  /** Runs from the form's submit, after the native constraints passed. */
   function submitCreate() {
     const url = fUrl.trim();
-    if (!fKind) {
-      addToast({ tone: 'warning', message: t('line.material_pick_kind', locale) });
-      return;
-    }
     let valid = false;
     try {
       new URL(url);
@@ -97,7 +102,7 @@
       valid = false;
     }
     if (!valid) {
-      addToast({ tone: 'warning', message: t('line.material_full_url', locale) });
+      urlError = t('line.material_full_url', locale);
       return;
     }
     $createMaterial.mutate({ kind: fKind, url, notes: fNotes.trim() || null });
@@ -188,7 +193,14 @@
   description={t('line.material_dialog_desc', locale)}
   size="s"
 >
-  <div class="mat__form">
+  <form
+    class="mat__form"
+    bind:this={formEl}
+    onsubmit={(e) => {
+      e.preventDefault();
+      submitCreate();
+    }}
+  >
     <Select
       label={t('conversations.event_kind', locale)}
       bind:value={fKind}
@@ -196,16 +208,20 @@
       placeholder={t('line.material_kind_ph', locale)}
       required
     />
-    <Input label="URL" type="url" bind:value={fUrl} placeholder="https://…" required />
+    <Input label="URL" type="url" bind:value={fUrl} placeholder="https://…" required error={urlError} />
     <Input
       label={t('person.notes', locale)}
       bind:value={fNotes}
       placeholder={t('line.material_notes_ph', locale)}
     />
-  </div>
+    <!-- Hidden submit lets Enter inside an input trigger submit. -->
+    <button type="submit" hidden aria-hidden="true"></button>
+  </form>
   {#snippet actions()}
     <Button variant="quiet" onclick={() => (createOpen = false)}>{t('create.cancel', locale)}</Button>
-    <Button onclick={submitCreate} loading={$createMaterial.isPending}>{t('line.material_register_short', locale)}</Button>
+    <Button onclick={() => formEl?.requestSubmit()} loading={$createMaterial.isPending}
+      >{t('line.material_register_short', locale)}</Button
+    >
   {/snippet}
 </Dialog>
 
@@ -267,7 +283,7 @@
     .mat__form {
       display: flex;
       flex-direction: column;
-      gap: var(--space-s);
+      gap: var(--field-gap);
     }
   }
 </style>
