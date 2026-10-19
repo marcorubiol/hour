@@ -9,7 +9,7 @@ import { loadEnvFile } from 'node:process';
  *   - con conversaciones en una línea y otras sin línea, el bloque reparte:
  *     una barra por línea y «sin línea» al final, nunca escondida;
  *   - el nombre de una línea filtra la lista por esa línea en la temporada,
- *     y un estado de su leyenda, por ese estado en esa línea;
+ *     y una relación de su leyenda, por esa relación en esa línea (ADR-138);
  *   - en el móvil, las barras apiladas en una columna, sin scroll lateral.
  *
  * En el espacio `playwright`, en `zzz-e2e-collab`, con dos conversaciones del
@@ -48,7 +48,6 @@ test.describe('la temporada por línea (ADR-135)', () => {
       p_organization_name: name,
       p_full_name: `${name} contacto`,
       p_email: `e2e-lines-${ids.length}-${RUN}@example.test`,
-      p_status: 'hold',
       p_line_id: line,
     });
     expect(conv.status, conv.error).toBe(200);
@@ -89,7 +88,7 @@ test.describe('la temporada por línea (ADR-135)', () => {
     await expect(season.locator(`[data-line="${lineId}"] .season__bar`)).toBeVisible();
   });
 
-  test('el nombre de una línea filtra la lista por ella; un estado, por ese estado en ella', async ({ page }) => {
+  test('el nombre de una línea filtra la lista por ella; una relación, por esa relación en ella', async ({ page }) => {
     test.setTimeout(60_000);
     await page.goto('/h/conversations');
     const season = page.getByTestId('block-season');
@@ -103,9 +102,10 @@ test.describe('la temporada por línea (ADR-135)', () => {
 
     await page.goto('/h/conversations');
     await expect(season).toBeVisible({ timeout: 30_000 });
-    const hold = season.locator('[data-line="sin"] .season__item', { has: page.locator('[data-conv-status="hold"]') });
-    await hold.click();
-    await expect(page).toHaveURL(/estado=hold.*linea=sin|linea=sin.*estado=hold/);
+    // Sin historial: nunca contactadas (la relación se deriva, ADR-138).
+    const never = season.locator('[data-line="sin"] .season__item', { has: page.locator('[data-relation="never"]') });
+    await never.click();
+    await expect(page).toHaveURL(/relacion=never.*linea=sin|linea=sin.*relacion=never/);
     await page.getByRole('searchbox').fill('E2E Línea');
     await expect(page.locator('.conversation-table tbody tr', { hasText: NO_LINE })).toHaveCount(1, { timeout: 30_000 });
     await expect(page.locator('.conversation-table tbody tr', { hasText: IN_LINE })).toHaveCount(0);

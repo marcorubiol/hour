@@ -23,7 +23,8 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
 
 type RawConversation = {
   id: string;
-  status: string;
+  relation: string;
+  not_now_until: string | null;
   first_contacted_at: string | null;
   last_contacted_at: string | null;
   next_action_at: string | null;
@@ -185,7 +186,7 @@ test.describe('conversation inline write', () => {
     fixtureConversationId = null;
   });
 
-  test('status change persists and reverts', async ({ page }) => {
+  test('«not this time» sets with a day to write again, persists and lifts (ADR-138)', async ({ page }) => {
     await openConversations(page);
 
     const original = (await fetchListRaw(page))[0];
@@ -198,50 +199,40 @@ test.describe('conversation inline write', () => {
     try {
       const row = rowByName(page, name!);
       const trigger = row.locator('button[aria-haspopup="menu"]');
+      // Whatever it derives to now (a fresh fixture: «Not contacted»; one
+      // revived from a past run keeps its history), «not this time» wins.
       const originalLabel = (await trigger.innerText()).replace('▾', '').trim();
-      const target = original.status === 'hold' ? 'Parked' : 'Hold';
+      expect(originalLabel).not.toMatch(/^Not this time/);
 
-      // Change status via the badge menu; require the server ack.
+      // The menu offers only «Not this time…»: the relation is derived.
       await trigger.click();
-      await patchOk(page, original.id, () =>
-        page.getByRole('menuitem', { name: target, exact: true }).click(),
-      );
-      await expect(trigger).toContainText(target);
-      await expect(row.locator('.last-contact')).toContainText('today');
-
-      const touched = (await fetchListRaw(page)).find((item) => item.id === original.id);
-      expect(touched?.first_contacted_at).toBeTruthy();
-      expect(Date.parse(touched?.last_contacted_at ?? '')).toBeGreaterThanOrEqual(
-        Date.parse(original.last_contacted_at ?? '1970-01-01T00:00:00Z'),
-      );
+      await expect(page.getByRole('menuitem')).toHaveText(['Not this time…', 'Log contact…']);
+      await page.getByRole('menuitem', { name: 'Not this time…', exact: true }).click();
+      const dialog = page.locator('dialog[open]');
+      await expect(dialog).toBeVisible();
+      await dialog.getByLabel(/Write again on/).fill('2099-01-15');
+      await patchOk(page, original.id, () => dialog.getByRole('button', { name: 'Save' }).click());
+      await expect(trigger).toContainText('Not this time');
 
       // PATCH acked above — reload proves the change survives a fresh fetch.
       await page.reload();
       await page.getByPlaceholder('People or organizations…').fill(name!);
-      await expect(
-        rowByName(page, name!).locator('button[aria-haspopup="menu"]'),
-      ).toContainText(target);
+      const after = rowByName(page, name!).locator('button[aria-haspopup="menu"]');
+      await expect(after).toContainText('Not this time, until');
+      const raw = (await fetchListRaw(page)).find((item) => item.id === original.id);
+      expect(raw?.relation).toBe('not_now');
+      expect(raw?.not_now_until).toBe('2099-01-15');
 
-      // Revert to the original status through the UI (exercises the same
-      // path in the opposite direction).
-      const triggerAfter = rowByName(page, name!).locator(
-        'button[aria-haspopup="menu"]',
-      );
-      await triggerAfter.click();
+      // Lift it through the same menu.
+      await after.click();
       await patchOk(page, original.id, () =>
-        page.getByRole('menuitem', { name: originalLabel, exact: true }).click(),
+        page.getByRole('menuitem', { name: 'Lift «not this time»', exact: true }).click(),
       );
-      await expect(triggerAfter).toContainText(originalLabel);
-
-      await page.reload();
-      await page.getByPlaceholder('People or organizations…').fill(name!);
-      await expect(
-        rowByName(page, name!).locator('button[aria-haspopup="menu"]'),
-      ).toContainText(originalLabel);
+      await expect(after).toHaveText(new RegExp(`^${originalLabel}`));
     } finally {
-      // Safety net: unconditional API restore (no-op when the UI revert
+      // Safety net: unconditional API restore (no-op when the UI lift
       // already ran). Survives a dead page mid-test and CI retries.
-      await restoreConversation(page, original.id, { status: original.status });
+      await restoreConversation(page, original.id, { not_now: null });
     }
   });
 

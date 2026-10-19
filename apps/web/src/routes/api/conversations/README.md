@@ -18,7 +18,8 @@ error).
 
 | param          | default        | meaning                                            |
 |----------------|----------------|----------------------------------------------------|
-| `status`       | `contacted`    | `conversation_status` enum, or `any` to disable      |
+| `status`       | `contacted`    | the old stored status, or `any` (every caller sends `any`; ADR-138 E4 drops it) |
+| `relacion`     | none           | the derived relation (`never`, `contacted`, `talking`, `regular`, `dormant`, `not_now`; ADR-138) |
 | `project_slug` | `mamemi`       | project slug inside the current workspace          |
 | `season`       | `2026-27`      | matches `custom_fields->>season`, or `any`         |
 | `limit`        | `50` (max 100) | page size                                          |
@@ -39,7 +40,7 @@ Invalid values return `400 invalid_query` with per-field issues from Valibot.
   "items": [
     {
       "id": "…uuid…",
-      "status": "contacted",
+      "relation": "contacted",
       "next_action_at": null,
       "person": { "full_name": "…", "organization_name": "…", "country": "ES", "city": "…" },
       "project": { "id": "…", "slug": "mamemi", "name": "MaMeMi", "status": "active" }
@@ -63,10 +64,19 @@ Invalid values return `400 invalid_query` with per-field issues from Valibot.
 
 ## `PATCH /api/conversations/:id`
 
-The inline editor accepts `status`, `next_action_at`, `next_action_note` and
-`line_id`. It never accepts a contact timestamp. A genuine status transition
-updates `last_contacted_at` (database trigger); the database fills
-`first_contacted_at` once and preserves it thereafter.
+The inline editor accepts `not_now` (`{ until? }` sets «not this time» now,
+`null` lifts it; ADR-138), `next_action_at`, `next_action_note`, `line_id` and
+`reply_settled_at`. It no longer writes `status`: every item carries the
+derived `relation`, computed by the Worker (`relationOf`). It never accepts a
+contact timestamp; the database fills `first_contacted_at` once and preserves
+it thereafter.
+
+## `GET /api/conversations/:id/bolos` (ADR-138 § 3)
+
+The bolos of a conversation through `conversation_bolos`: date (first and last
+live function), venue, city and status, never fee nor payer. Whoever cannot
+read the conversation, or has no `read:performance` in its project, gets an
+empty list.
 
 ## `GET` / `POST /api/conversations/:id/events` (ADR-098)
 

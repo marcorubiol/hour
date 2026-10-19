@@ -11,7 +11,7 @@ import { loadEnvFile } from 'node:process';
  *   - una sala contactada a la que escribimos hace 40 días sin respuesta se
  *     enfría en la segunda ronda, y «Escribir a estas» abre el modo selección
  *     con ella ya marcada (ADR-126 § 8: las paradas no van en bloque);
- *   - el chip del filtro lo quita, y un tramo de la temporada filtra por estado;
+ *   - el chip del filtro lo quita, y un tramo de la temporada filtra por relación (ADR-138);
  *   - en el móvil, una sola columna en el orden del documento: lo que pide
  *     acción (esperan respuesta, se mueve) antes que la temporada (ADR-126 § 11).
  *
@@ -44,14 +44,13 @@ test.describe('el dashboard de Conversations (ADR-117)', () => {
   let jwt = '';
   const ids: string[] = [];
 
-  async function conversation(name: string, status = 'in_conversation'): Promise<string> {
+  async function conversation(name: string): Promise<string> {
     const project = await h.pgGet<{ id: string }>('project', jwt, new URLSearchParams({ slug: 'eq.zzz-e2e-collab', select: 'id' }));
     const conv = await h.pgRpc<{ id: string }>('create_conversation', jwt, {
       p_project_id: project.rows[0].id,
       p_organization_name: name,
       p_full_name: `${name} contacto`,
       p_email: `e2e-dash-${ids.length}-${RUN}@example.test`,
-      p_status: status,
     });
     expect(conv.status, conv.error).toBe(200);
     const id = one(conv.data).id;
@@ -79,7 +78,7 @@ test.describe('el dashboard de Conversations (ADR-117)', () => {
     const warm = await conversation(WARM);
     await event(warm, 'outbound', 3, 'Propuesta');
     await event(warm, 'inbound', 0, SUBJECT);
-    const cold = await conversation(COLD, 'contacted');
+    const cold = await conversation(COLD);
     await event(cold, 'outbound', 40, `Propuesta ${RUN}`);
   });
 
@@ -126,13 +125,13 @@ test.describe('el dashboard de Conversations (ADR-117)', () => {
     await expect(page).not.toHaveURL(/temp=/);
   });
 
-  test('un tramo de la temporada filtra la lista por ese estado', async ({ page }) => {
+  test('un tramo de la temporada filtra la lista por esa relación', async ({ page }) => {
     test.setTimeout(60_000);
     await page.goto('/h/conversations');
     const season = page.getByTestId('block-season');
     await expect(season).toBeVisible({ timeout: 30_000 });
     await season.locator('.season__item').first().click();
-    await expect(page).toHaveURL(/temporada=actual/);
+    await expect(page).toHaveURL(/temporada=actual.*relacion=|relacion=.*temporada=actual/);
     await expect(page.locator('.conversation-table tbody tr').first()).toBeVisible({ timeout: 30_000 });
   });
 
