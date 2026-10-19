@@ -15,6 +15,7 @@ import { extractAccessToken } from '$lib/auth';
 import { VENUE_COLS } from '$lib/venue';
 import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
+import { json } from '$lib/server/http';
 
 const AdoptSchema = v.object({
   workspace_id: v.pipe(v.string(), v.uuid()),
@@ -22,13 +23,6 @@ const AdoptSchema = v.object({
 });
 
 const COLS = new Set(VENUE_COLS.split(','));
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  });
-}
 
 export const POST: RequestHandler = async ({ request, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);

@@ -10,16 +10,16 @@ import { extractAccessToken } from '$lib/auth';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import { mailConfigured } from '$lib/server/mail/db';
-import { json, UUID_RE } from '$lib/server/mail/http';
+import { jsonNoStore, UUID_RE } from '$lib/server/http';
 import { effectiveSignature, MAIL_ACCOUNT_SELECT, type MailAccountItem, type SignatureParts } from '$lib/mail';
 
 export const GET: RequestHandler = async ({ request, url, platform, locals }) => {
-  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
   const jwt = extractAccessToken(request);
-  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+  if (!jwt) return jsonNoStore({ error: 'missing_authorization' }, 401);
   const workspaceId = url.searchParams.get('workspace_id') ?? '';
-  if (!UUID_RE.test(workspaceId)) return json({ error: 'invalid_workspace' }, 400);
+  if (!UUID_RE.test(workspaceId)) return jsonNoStore({ error: 'invalid_workspace' }, 400);
 
   try {
     const [accounts, admin, sig] = await Promise.all([
@@ -30,7 +30,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       pgPostRpc<SignatureParts>(env, 'my_mail_signature', jwt, { p_workspace_id: workspaceId }),
     ]);
     const parts = sig.data[0];
-    return json({
+    return jsonNoStore({
       items: accounts.data,
       can_manage_shared: admin.data[0] === true,
       configured: mailConfigured(platform.env),

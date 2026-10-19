@@ -10,25 +10,19 @@
 import type { RequestHandler } from './$types';
 import { ensureFreshSession, type SessionEnv } from '$lib/server/session';
 import { allowRequest, clientIp } from '$lib/server/rate-limit';
+import { jsonNoStore } from '$lib/server/http';
 
 const REFRESH_RULE = { limit: 60, windowSec: 300 };
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
-  });
-}
-
 export const POST: RequestHandler = async ({ request, cookies, platform }) => {
-  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SessionEnv;
 
   if (!(await allowRequest(env.RATE_LIMIT, `refresh:${clientIp(request)}`, REFRESH_RULE))) {
-    return json({ error: 'rate_limited' }, 429);
+    return jsonNoStore({ error: 'rate_limited' }, 429);
   }
 
   const session = await ensureFreshSession(cookies, env);
-  if (!session) return json({ error: 'no_session' }, 401);
-  return json({ user: session.user, expiresAt: session.expiresAt });
+  if (!session) return jsonNoStore({ error: 'no_session' }, 401);
+  return jsonNoStore({ user: session.user, expiresAt: session.expiresAt });
 };

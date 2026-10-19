@@ -44,6 +44,7 @@ import { pgGet, pgPostRpc, PostgrestError, type SupabaseEnv } from '$lib/supabas
 import { COMMITMENTS_EMBED } from '$lib/people';
 import { SCHEDULE_SLOT_EMBED, scheduleOf, type ScheduleMoment, type ScheduleSlotRow } from '$lib/schedule-slot';
 import { pgErrorResponse } from '$lib/server/errors';
+import { json } from '$lib/server/http';
 
 const QuerySchema = v.object({
   project_ids: v.optional(v.string()),
@@ -63,13 +64,6 @@ const QuerySchema = v.object({
     '200',
   ),
 });
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  });
-}
 
 function parseUuidList(raw: string | undefined): string[] {
   if (!raw) return [];

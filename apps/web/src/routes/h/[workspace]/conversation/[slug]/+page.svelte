@@ -27,7 +27,7 @@
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { ApiError, fetchJSON, mutateJSON } from '$lib/api';
-  import { dayMonth, dayMonthYear, dayMonthYearTs } from '$lib/datetime';
+  import { dayMonth, dayMonthYear, dayMonthYearTs, viewerTimeZone } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
   import Switch from '$lib/components/Switch.svelte';
@@ -535,7 +535,7 @@
       authors={team.authors}
       me={team.me}
       newSince={teamSince}
-      tz={Intl.DateTimeFormat().resolvedOptions().timeZone}
+      tz={viewerTimeZone()}
       {list}
       {locale}
       onchange={refreshTeam}

@@ -5,6 +5,7 @@ import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
+import { jsonNoStore } from '$lib/server/http';
 
 const UUID = v.pipe(v.string(), v.uuid());
 const Role = v.picklist(['admin', 'member', 'viewer', 'guest']);
@@ -56,27 +57,17 @@ interface InvitationResult {
   token: string;
 }
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      'content-type': 'application/json; charset=utf-8',
-      'cache-control': 'no-store',
-    },
-  });
-}
-
 function context(request: Request, platform: App.Platform | undefined, id: string | undefined) {
   if (!platform?.env) {
-    return { ok: false, response: json({ error: 'platform_unavailable' }, 500) } as const;
+    return { ok: false, response: jsonNoStore({ error: 'platform_unavailable' }, 500) } as const;
   }
   const jwt = extractAccessToken(request);
   if (!jwt) {
-    return { ok: false, response: json({ error: 'missing_authorization' }, 401) } as const;
+    return { ok: false, response: jsonNoStore({ error: 'missing_authorization' }, 401) } as const;
   }
   const parsedId = v.safeParse(UUID, id ?? '');
   if (!parsedId.success) {
-    return { ok: false, response: json({ error: 'invalid_id' }, 400) } as const;
+    return { ok: false, response: jsonNoStore({ error: 'invalid_id' }, 400) } as const;
   }
   return {
     ok: true,
@@ -108,7 +99,7 @@ export const GET: RequestHandler = async ({ request, params, platform, locals })
     const { data } = await pgPostRpc<AccessRow>(ctx.env, 'list_workspace_access', ctx.jwt, {
       p_workspace_id: ctx.workspaceId,
     });
-    return json({ items: data });
+    return jsonNoStore({ items: data });
   } catch (err) {
     return rpcError(err, 'GET /api/workspaces/[id]/access', locals.requestId);
   }
@@ -118,9 +109,9 @@ export const POST: RequestHandler = async ({ request, params, platform, locals, 
   const ctx = context(request, platform, params.id);
   if (!ctx.ok) return ctx.response;
   const parsed = v.safeParse(InviteBody, await request.json().catch(() => null));
-  if (!parsed.success) return json({ error: 'invalid_body', issues: parsed.issues }, 400);
+  if (!parsed.success) return jsonNoStore({ error: 'invalid_body', issues: parsed.issues }, 400);
   if (Boolean(parsed.output.project_id) !== Boolean(parsed.output.project_role_code)) {
-    return json({ error: 'project_and_role_required_together' }, 400);
+    return jsonNoStore({ error: 'project_and_role_required_together' }, 400);
   }
   try {
     const { data } = parsed.output.person_id
@@ -146,8 +137,8 @@ export const POST: RequestHandler = async ({ request, params, platform, locals, 
           },
         );
     const invitation = data[0];
-    if (!invitation) return json({ error: 'rpc_empty_result' }, 502);
-    return json(
+    if (!invitation) return jsonNoStore({ error: 'rpc_empty_result' }, 502);
+    return jsonNoStore(
       {
         invitation: {
           ...invitation,
@@ -168,7 +159,7 @@ export const PATCH: RequestHandler = async ({ request, params, platform, locals 
   const ctx = context(request, platform, params.id);
   if (!ctx.ok) return ctx.response;
   const parsed = v.safeParse(PatchBody, await request.json().catch(() => null));
-  if (!parsed.success) return json({ error: 'invalid_body', issues: parsed.issues }, 400);
+  if (!parsed.success) return jsonNoStore({ error: 'invalid_body', issues: parsed.issues }, 400);
   try {
     await pgPostRpc(ctx.env, 'update_workspace_member_role', ctx.jwt, {
       p_membership_id: parsed.output.membership_id,
@@ -184,7 +175,7 @@ export const DELETE: RequestHandler = async ({ request, params, platform, locals
   const ctx = context(request, platform, params.id);
   if (!ctx.ok) return ctx.response;
   const parsed = v.safeParse(DeleteBody, await request.json().catch(() => null));
-  if (!parsed.success) return json({ error: 'invalid_body', issues: parsed.issues }, 400);
+  if (!parsed.success) return jsonNoStore({ error: 'invalid_body', issues: parsed.issues }, 400);
   try {
     await pgPostRpc(
       ctx.env,

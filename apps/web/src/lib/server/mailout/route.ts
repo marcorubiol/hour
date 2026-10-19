@@ -9,7 +9,7 @@ import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import { pgGet, pgPostRpc, PostgrestError, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse, type PgErrorMapEntry } from '$lib/server/errors';
-import { json, UUID_RE } from '$lib/server/mail/http';
+import { jsonNoStore, UUID_RE } from '$lib/server/http';
 import {
   MAIL_DOMAIN_SELECT,
   MAILOUT_SELECT,
@@ -43,11 +43,11 @@ export async function mailoutRoute(
   fn: (ctx: MailoutCtx) => Promise<Response>,
 ): Promise<Response> {
   const { request, params, platform, locals } = event;
-  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
   const jwt = extractAccessToken(request);
-  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+  if (!jwt) return jsonNoStore({ error: 'missing_authorization' }, 401);
   const id = params.id ?? '';
-  if (!UUID_RE.test(id)) return json({ error: 'not_found' }, 404);
+  if (!UUID_RE.test(id)) return jsonNoStore({ error: 'not_found' }, 404);
   try {
     return await fn({ env: platform.env as unknown as MailoutEnv, jwt, id, event });
   } catch (err) {
@@ -64,10 +64,10 @@ export async function readBody<S extends v.GenericSchema>(
   try {
     raw = await request.json();
   } catch {
-    return json({ error: 'invalid_body' }, 400);
+    return jsonNoStore({ error: 'invalid_body' }, 400);
   }
   const parsed = v.safeParse(schema, raw);
-  return parsed.success ? parsed.output : json({ error: 'invalid_body' }, 400);
+  return parsed.success ? parsed.output : jsonNoStore({ error: 'invalid_body' }, 400);
 }
 
 /** El mensaje de un RAISE, para distinguir dos 22023 o 42501 de la misma RPC. */

@@ -28,13 +28,7 @@ import {
 } from '$lib/server/performance-bundle';
 import { type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  });
-}
+import { json } from '$lib/server/http';
 
 /** Map the raw DB bundle into the pure projection input. */
 function toProjectionBundle(result: PerformanceBundleResult): PerformanceBundle {

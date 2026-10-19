@@ -31,17 +31,11 @@ import {
 } from '$lib/conversation';
 import { pgGet, pgPatch, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
-import { jwtSubject } from '$lib/server/mail/http';
+import { jwtSubject } from '$lib/server/http';
 import { TURN_EMBEDS, setLastTurnEmbed } from '$lib/server/conversation-overview';
+import { json } from '$lib/server/http';
 
 const IdSchema = v.pipe(v.string(), v.uuid());
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  });
-}
 
 /**
  * GET /api/conversations/:id — una conversación, por id o por slug (la ficha

@@ -39,7 +39,7 @@
     TYPE_LABEL_KEYS,
     type DateTypeKey,
   } from '../create/CreateEventDialog.svelte';
-  import { dayMonthYear, instantToWallClock, wallClockToInstant } from '$lib/datetime';
+  import { dayMonthYear, instantToWallClock, wallClockToInstant, viewerTimeZone } from '$lib/datetime';
   import { detectLocale, t } from '$lib/i18n';
   import { allLinesQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
   import {
@@ -62,7 +62,7 @@
   let { open = $bindable(false), date = null, inSeries = false }: Props = $props();
 
   const locale = detectLocale(navigator.language);
-  const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const viewerTz = viewerTimeZone();
   const queryClient = useQueryClient();
 
   let kind = $state<DateTypeKey>('rehearsal');

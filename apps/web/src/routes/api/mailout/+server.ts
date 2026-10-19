@@ -10,16 +10,16 @@ import type { RequestHandler } from './$types';
 import { extractAccessToken } from '$lib/auth';
 import { pgGet, pgPostRpc } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
-import { json } from '$lib/server/mail/http';
+import { jsonNoStore } from '$lib/server/http';
 import { MAILOUT_PG_CODES, readBody } from '$lib/server/mailout/route';
 import { MailoutCreateSchema, type MailoutItem } from '$lib/mailout';
 import type { MailoutEnv } from '$lib/server/mailout';
 
 export const POST: RequestHandler = async ({ request, platform, locals }) => {
-  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as MailoutEnv;
   const jwt = extractAccessToken(request);
-  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+  if (!jwt) return jsonNoStore({ error: 'missing_authorization' }, 401);
   const body = await readBody(request, MailoutCreateSchema);
   if (body instanceof Response) return body;
   try {
@@ -27,7 +27,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
       search: { select: 'workspace_id,workspace:workspace_id(slug)', id: `eq.${body.project_id}` },
     });
     const p = project.data[0];
-    if (!p?.workspace) return json({ error: 'not_found' }, 404);
+    if (!p?.workspace) return jsonNoStore({ error: 'not_found' }, 404);
     const domains = await pgGet<{ id: string }>(env, 'mail_domain', jwt, {
       search: { select: 'id', workspace_id: `eq.${p.workspace_id}`, verified_at: 'not.is.null', order: 'created_at.asc', limit: '1' },
     });
@@ -36,9 +36,9 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
       p_mail_domain_id: domains.data[0]?.id ?? null,
     });
     const m = created.data[0];
-    if (!m) return json({ error: 'not_found' }, 404);
+    if (!m) return jsonNoStore({ error: 'not_found' }, 404);
     await pgPostRpc(env, 'set_mailout_recipients', jwt, { p_id: m.id, p_conversation_ids: body.conversation_ids });
-    return json({ id: m.id, workspace_slug: p.workspace.slug }, 201);
+    return jsonNoStore({ id: m.id, workspace_slug: p.workspace.slug }, 201);
   } catch (err) {
     return pgErrorResponse(err, { route: 'POST /api/mailout', requestId: locals.requestId }, { codes: MAILOUT_PG_CODES });
   }

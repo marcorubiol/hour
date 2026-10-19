@@ -9,18 +9,12 @@ import { extractAccessToken } from '$lib/auth';
 import type { MoneyPayer } from '$lib/money';
 import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
+import { json } from '$lib/server/http';
 
 const QuerySchema = v.object({
   project_ids: v.optional(v.string()),
   workspace_ids: v.optional(v.string()),
 });
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  });
-}
 
 function parseUuidList(raw: string | undefined): string[] {
   if (!raw) return [];

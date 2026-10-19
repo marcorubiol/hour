@@ -68,7 +68,7 @@
   import BlockDays from '../BlockDays.svelte';
   import { blockDays, blockLimit, BLOCK_MAX_DAYS } from '$lib/block';
   import { dayKeyInTz } from '$lib/planner';
-  import { dayMonthYear, wallClockToInstant } from '$lib/datetime';
+  import { dayMonthYear, wallClockToInstant, viewerTimeZone } from '$lib/datetime';
   import { LOCALE_TAG, detectLocale, t } from '$lib/i18n';
   import { activeProjectsQueryOptions, allLinesQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
   import {
@@ -102,7 +102,7 @@
   }: Props = $props();
 
   const locale = detectLocale(navigator.language);
-  const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const viewerTz = viewerTimeZone();
   const queryClient = useQueryClient();
 
   /** Day-level kinds open in all-day mode; timed kinds with a clock. */

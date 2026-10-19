@@ -61,7 +61,7 @@
   import { agendaChunks, emptyTailMonths, type AgendaDayStats } from '$lib/agenda-chunks';
   import { awayRest, coversDay } from '$lib/away';
   import { SvelteMap } from 'svelte/reactivity';
-  import { dualTime, hourMark, localeDayMonth, localeWeekdayShort } from '$lib/datetime';
+  import { dualTime, hourMark, localeDayMonth, localeWeekdayShort, viewerTimeZone } from '$lib/datetime';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { accentVarFor } from '$lib/utils/accent';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
@@ -202,7 +202,7 @@
     clashesByDay,
     decisionsByDay,
     locale = appLocaleTag(),
-    todayIso = dayKeyInTz(new Date().toISOString(), Intl.DateTimeFormat().resolvedOptions().timeZone),
+    todayIso = dayKeyInTz(new Date().toISOString(), viewerTimeZone()),
     dateKindLabel = (kind: string) => kind.replace(/_/g, ' '),
     viewerTimeLabel = (time: string) => t('planner.viewer_time', L, { time }),
     statusLabel = (status: string) => statusWord(status, L),
@@ -267,7 +267,7 @@
     return onDateOpen ? { type: 'button', onclick: () => onDateOpen(d) } : {};
   }
 
-  const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const viewerTz = viewerTimeZone();
 
   const workspacesQuery = createQuery(workspacesQueryOptions());
   let workspaceSlugById = $derived(

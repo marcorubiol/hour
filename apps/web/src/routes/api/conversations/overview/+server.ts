@@ -17,15 +17,9 @@ import { type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import { loadLastMailout, loadOverviewRows } from '$lib/server/conversation-overview';
 import { buildOverview, type OverviewResponse } from '$lib/conversation-overview';
+import { json } from '$lib/server/http';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  });
-}
 
 function parseIds(raw: string | null): string[] {
   return raw ? [...new Set(raw.split(',').map((x) => x.trim()).filter((x) => UUID.test(x)))] : [];

@@ -11,7 +11,7 @@
 
 import type { RequestHandler } from './$types';
 import { pgPostRpc } from '$lib/supabase';
-import { json } from '$lib/server/mail/http';
+import { jsonNoStore } from '$lib/server/http';
 import { mailoutRoute, pgMessage, previewRows, readMailout } from '$lib/server/mailout/route';
 import { runMailoutQueue } from '$lib/server/mailout/queue';
 import { mailoutMissing, MailoutNotConfiguredError } from '$lib/server/mailout';
@@ -30,11 +30,11 @@ const QUEUE_REFUSALS: [RegExp, string][] = [
 export const POST: RequestHandler = (event) =>
   mailoutRoute(event, 'POST /api/mailout/[id]/send', async ({ env, jwt, id }) => {
     const mailout = await readMailout(env, jwt, id);
-    if (!mailout) return json({ error: 'not_found' }, 404);
+    if (!mailout) return jsonNoStore({ error: 'not_found' }, 404);
     // Sin lo que necesita la cola para este dominio (clave de servicio; con
     // SES, sus claves), no se pone en cola: no saldría nunca.
     const domain = mailout.mail_domain_id ? await readDomain(env, jwt, mailout.mail_domain_id) : null;
-    if (!domain?.verified_at) return json({ error: 'domain_not_verified' }, 409);
+    if (!domain?.verified_at) return jsonNoStore({ error: 'domain_not_verified' }, 409);
     const missingConfig = mailoutMissing(domain.provider, env);
     if (missingConfig.length) return notConfigured(new MailoutNotConfiguredError(missingConfig));
     const { recipients, compose } = await previewRows(env, jwt, id);
@@ -44,7 +44,7 @@ export const POST: RequestHandler = (event) =>
       const c = ctx.get(r.recipient_id);
       return recipientState(r, false) === 'ready' && c && composeMailout(draft, c, '').missing.length > 0;
     }).length;
-    if (missing) return json({ error: 'missing_fields', count: missing }, 409);
+    if (missing) return jsonNoStore({ error: 'missing_fields', count: missing }, 409);
 
     let queued: MailoutItem | undefined;
     try {
@@ -52,7 +52,7 @@ export const POST: RequestHandler = (event) =>
     } catch (err) {
       const message = pgMessage(err);
       const refusal = QUEUE_REFUSALS.find(([re]) => re.test(message));
-      if (refusal) return json({ error: refusal[1] }, 409);
+      if (refusal) return jsonNoStore({ error: refusal[1] }, 409);
       throw err;
     }
     if (queued?.status === 'queued') {
@@ -63,5 +63,5 @@ export const POST: RequestHandler = (event) =>
       });
       event.platform?.ctx?.waitUntil(first);
     }
-    return json({ status: queued?.status ?? 'queued' });
+    return jsonNoStore({ status: queued?.status ?? 'queued' });
   });

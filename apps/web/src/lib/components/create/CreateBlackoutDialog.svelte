@@ -15,6 +15,7 @@
    * POST here is a real error, never the pre-migration 502.
    */
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
+  import { viewerTimeZone } from '$lib/datetime';
   import { toStore } from 'svelte/store';
   import { ApiError, fetchJSON, mutateJSON } from '$lib/api';
   import Button from '../Button.svelte';
@@ -44,7 +45,7 @@
   }: Props = $props();
 
   const locale = detectLocale(navigator.language);
-  const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const viewerTz = viewerTimeZone();
   const queryClient = useQueryClient();
 
   let bWorkspace = $state('');

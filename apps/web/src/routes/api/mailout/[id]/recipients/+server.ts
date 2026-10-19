@@ -6,7 +6,7 @@
 
 import type { RequestHandler } from './$types';
 import { pgPostRpc } from '$lib/supabase';
-import { json } from '$lib/server/mail/http';
+import { jsonNoStore } from '$lib/server/http';
 import { mailoutRoute, readBody } from '$lib/server/mailout/route';
 import { MailoutRecipientsSchema } from '$lib/mailout';
 
@@ -15,5 +15,5 @@ export const PUT: RequestHandler = (event) =>
     const body = await readBody(event.request, MailoutRecipientsSchema);
     if (body instanceof Response) return body;
     await pgPostRpc(env, 'set_mailout_recipients', jwt, { p_id: id, p_conversation_ids: body.conversation_ids });
-    return json({ ok: true });
+    return jsonNoStore({ ok: true });
   });

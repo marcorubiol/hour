@@ -21,7 +21,7 @@
    */
   import { createQuery } from '@tanstack/svelte-query';
   import { addDaysIso, dayKeyInTz, isoWeek, monthGrid, assignBandLanes } from '$lib/planner';
-  import { weekdayLabels, localeMonthShort, localeDayMonth, localeWeekdayShort } from '$lib/datetime';
+  import { weekdayLabels, localeMonthShort, localeDayMonth, localeWeekdayShort, viewerTimeZone } from '$lib/datetime';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
   import { accentVarFor } from '$lib/utils/accent';
   import { workspacesQueryOptions } from '$lib/nav-queries';
@@ -218,7 +218,7 @@
     };
   });
 
-  const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const viewerTz = viewerTimeZone();
   const todayIso = dayKeyInTz(new Date().toISOString(), viewerTz);
 
   /** The state line: released says `let go`, a hold says its rank and its

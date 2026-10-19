@@ -15,7 +15,7 @@ import { extractAccessToken } from '$lib/auth';
 import type { OrganizationFiscalResponse, ReceiverFiscal } from '$lib/fiscal';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
-import { json, UUID_RE } from '$lib/server/mail/http';
+import { jsonNoStore, UUID_RE } from '$lib/server/http';
 
 type OrganizationRow = OrganizationFiscalResponse['organization'] & {
   fiscal: (ReceiverFiscal & { id: string }) | null;
@@ -25,17 +25,17 @@ const FISCAL_SELECT =
   'id,workspace_id,name,fiscal:fiscal_identity!workspace_organization_fiscal_identity_id_fkey(id,legal_name,tax_id,address_line_1,address_line_2,postal_code,city,region,country)';
 
 export const GET: RequestHandler = async ({ request, params, platform, locals }) => {
-  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
   const jwt = extractAccessToken(request);
-  if (!jwt) return json({ error: 'missing_authorization' }, 401);
-  if (!UUID_RE.test(params.id)) return json({ error: 'invalid_id' }, 400);
+  if (!jwt) return jsonNoStore({ error: 'missing_authorization' }, 401);
+  if (!UUID_RE.test(params.id)) return jsonNoStore({ error: 'invalid_id' }, 400);
 
   try {
     const search = new URLSearchParams({ select: FISCAL_SELECT, id: `eq.${params.id}`, deleted_at: 'is.null' });
     const { data } = await pgGet<OrganizationRow>(env, 'workspace_organization', jwt, { search });
     const row = data[0];
-    if (!row) return json({ error: 'not_found' }, 404);
+    if (!row) return jsonNoStore({ error: 'not_found' }, 404);
     const { data: canEdit } = await pgPostRpc<boolean>(env, 'can_edit_workspace_money', jwt, {
       p_workspace_id: row.workspace_id,
     });
@@ -44,7 +44,7 @@ export const GET: RequestHandler = async ({ request, params, platform, locals })
       fiscal: row.fiscal,
       can_edit: canEdit[0] === true,
     };
-    return json(body);
+    return jsonNoStore(body);
   } catch (err) {
     return pgErrorResponse(
       err,
@@ -68,21 +68,21 @@ const PutSchema = v.object({
 });
 
 export const PUT: RequestHandler = async ({ request, params, platform, locals }) => {
-  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
   const jwt = extractAccessToken(request);
-  if (!jwt) return json({ error: 'missing_authorization' }, 401);
-  if (!UUID_RE.test(params.id)) return json({ error: 'invalid_id' }, 400);
+  if (!jwt) return jsonNoStore({ error: 'missing_authorization' }, 401);
+  if (!UUID_RE.test(params.id)) return jsonNoStore({ error: 'invalid_id' }, 400);
 
   let raw: unknown;
   try {
     raw = await request.json();
   } catch {
-    return json({ error: 'invalid_body' }, 400);
+    return jsonNoStore({ error: 'invalid_body' }, 400);
   }
   const parsed = v.safeParse(PutSchema, raw);
   if (!parsed.success) {
-    return json(
+    return jsonNoStore(
       {
         error: 'invalid_body',
         issues: parsed.issues.map((i) => ({ path: i.path?.map((p) => p.key).join('.'), message: i.message })),
@@ -96,8 +96,8 @@ export const PUT: RequestHandler = async ({ request, params, platform, locals })
       p_organization_id: params.id,
       p_fiscal: parsed.output,
     });
-    if (!data[0]) return json({ error: 'save_failed' }, 502);
-    return json({ fiscal: data[0] });
+    if (!data[0]) return jsonNoStore({ error: 'save_failed' }, 502);
+    return jsonNoStore({ fiscal: data[0] });
   } catch (err) {
     return pgErrorResponse(
       err,

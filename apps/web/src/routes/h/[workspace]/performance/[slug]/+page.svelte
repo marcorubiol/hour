@@ -24,7 +24,7 @@
   import YNotes from '$lib/components/YNotes.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import type { Json } from '$lib/db-types';
-  import { dayLabel, dayMonth } from '$lib/datetime';
+  import { dayLabel, dayMonth, viewerTimeZone } from '$lib/datetime';
   import { LOCALE_TAG, detectLocale, t } from '$lib/i18n';
   import {
     HOLD_NOTICE_DEFAULT,
@@ -573,7 +573,7 @@
   let loading = $derived($query.isPending);
   let errorMsg = $derived($query.error instanceof Error ? $query.error.message : '');
 
-  const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const viewerTz = viewerTimeZone();
 
   // Timezone rule (spec § Timezone rule): hours are the VENUE's wall clock,
   // falling back to the home space's when no venue is linked, never silently

@@ -34,7 +34,7 @@
   import { accentVarFor } from '$lib/utils/accent';
   import { spaceName } from '$lib/utils/identity';
   import { detectLocale, LOCALE_TAG, t } from '$lib/i18n';
-  import { localeDayMonth } from '$lib/datetime';
+  import { localeDayMonth, viewerTimeZone } from '$lib/datetime';
   import { addDaysIso, dayKeyInTz, plannerDayHref } from '$lib/planner';
   import { usePins } from '$lib/stores/pins.svelte';
   import { useCalm } from '$lib/stores/calm.svelte';
@@ -87,7 +87,7 @@
   // «Reintentar» on any band: read again exactly what failed, nothing else.
   const retryFailed = () => void queryClient.refetchQueries({ predicate: (q) => q.state.status === 'error' });
   const locale = detectLocale(navigator.language);
-  const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const viewerTz = viewerTimeZone();
 
   // Tick on the minute so buckets roll over at midnight (shell-clock idiom).
   let clockNow = $state(new Date());

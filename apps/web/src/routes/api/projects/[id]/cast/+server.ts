@@ -27,6 +27,7 @@ import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
+import { json } from '$lib/server/http';
 
 const IdSchema = v.pipe(v.string(), v.uuid());
 
@@ -53,13 +54,6 @@ type CandidateRow = {
   full_name: string;
   email: string | null;
 };
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  });
-}
 
 /**
  * Resolve the project and its workspace. Returns null when RLS hides it —

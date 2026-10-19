@@ -1,5 +1,6 @@
 <script module lang="ts">
   import { addToast } from '$lib/components/Toast.svelte';
+  import { viewerTimeZone } from '$lib/datetime';
   import { t, type Locale } from '$lib/i18n';
 
   /** Cmd/Ctrl+Intro envía; Intro solo es un salto de línea (un mensaje puede ser una lista). */
@@ -61,7 +62,7 @@
   let { message: m, author, mine, about, mark, newBefore = false, locale, onchange }: Props = $props();
 
   // Un mensaje es un momento: se dice en la zona de quien lo lee.
-  const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const viewerTz = viewerTimeZone();
   let by = $derived(author || t('threads.someone', locale));
 
   let editing = $state(false);

@@ -144,7 +144,7 @@
   } from '$lib/season';
   import { normalizeLaneAxis, resolveLaneAxis, type LaneAxis } from '$lib/carrils';
   import type { AvailabilityItem } from '$lib/availability';
-  import { localeDayMonth, localeDayMonthNear, localeWeekdayShort, dualTime } from '$lib/datetime';
+  import { localeDayMonth, localeDayMonthNear, localeWeekdayShort, dualTime, viewerTimeZone } from '$lib/datetime';
   import {
     holdDeadlineLabel,
     isHoldStatus,
@@ -181,7 +181,7 @@
   /** The ghost row's word: «nobody is on this» is an answer, not a hole. */
   const noCastWord = t('planner.no_cast', locale);
 
-  const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const viewerTz = viewerTimeZone();
   const now = new Date();
   let ym = $state({ year: now.getFullYear(), month: now.getMonth() + 1 });
   let todayIso = dayKeyInTz(now.toISOString(), viewerTz);

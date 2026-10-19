@@ -19,6 +19,7 @@ import { extractAccessToken } from '$lib/auth';
 import type { Tables } from '$lib/db-types';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
+import { json } from '$lib/server/http';
 
 const QuerySchema = v.object({
   limit: v.optional(
@@ -33,13 +34,6 @@ const QuerySchema = v.object({
     '50',
   ),
 });
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  });
-}
 
 type WorkspaceItem = Pick<
   Tables<'workspace'>,

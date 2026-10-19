@@ -12,31 +12,31 @@ import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
-import { json, UUID_RE } from '$lib/server/mail/http';
+import { jsonNoStore, UUID_RE } from '$lib/server/http';
 import { DOMAIN_PG_CODES, readDomain } from '$lib/server/mailout/http';
 import { MailDomainSenderSchema } from '$lib/mailout';
 
 export const PATCH: RequestHandler = async ({ request, params, platform, locals }) => {
-  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
   const jwt = extractAccessToken(request);
-  if (!jwt) return json({ error: 'missing_authorization' }, 401);
-  if (!UUID_RE.test(params.id)) return json({ error: 'not_found' }, 404);
+  if (!jwt) return jsonNoStore({ error: 'missing_authorization' }, 401);
+  if (!UUID_RE.test(params.id)) return jsonNoStore({ error: 'not_found' }, 404);
   let raw: unknown;
   try {
     raw = await request.json();
   } catch {
-    return json({ error: 'invalid_body' }, 400);
+    return jsonNoStore({ error: 'invalid_body' }, 400);
   }
   const parsed = v.safeParse(MailDomainSenderSchema, raw);
-  if (!parsed.success) return json({ error: 'invalid_body' }, 400);
+  if (!parsed.success) return jsonNoStore({ error: 'invalid_body' }, 400);
   try {
     await pgPostRpc(env, 'set_mail_domain_sender', jwt, {
       p_id: params.id,
       p_from_local_part: parsed.output.from_local_part,
       p_from_name: parsed.output.from_name ?? null,
     });
-    return json({ item: await readDomain(env, jwt, params.id) });
+    return jsonNoStore({ item: await readDomain(env, jwt, params.id) });
   } catch (err) {
     return pgErrorResponse(
       err,
@@ -47,14 +47,14 @@ export const PATCH: RequestHandler = async ({ request, params, platform, locals 
 };
 
 export const DELETE: RequestHandler = async ({ request, params, platform, locals }) => {
-  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
   const jwt = extractAccessToken(request);
-  if (!jwt) return json({ error: 'missing_authorization' }, 401);
-  if (!UUID_RE.test(params.id)) return json({ error: 'not_found' }, 404);
+  if (!jwt) return jsonNoStore({ error: 'missing_authorization' }, 401);
+  if (!UUID_RE.test(params.id)) return jsonNoStore({ error: 'not_found' }, 404);
   try {
     await pgPostRpc(env, 'remove_mail_domain', jwt, { p_id: params.id });
-    return json({ ok: true });
+    return jsonNoStore({ ok: true });
   } catch (err) {
     return pgErrorResponse(
       err,

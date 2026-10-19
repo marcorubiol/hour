@@ -15,7 +15,7 @@ import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
-import { json, UUID_RE } from '$lib/server/mail/http';
+import { jsonNoStore, UUID_RE } from '$lib/server/http';
 import {
   defaultProviderKind,
   mailoutMissing,
@@ -28,12 +28,12 @@ import { DOMAIN_PG_CODES, isAdmin, notConfigured, readDomain } from '$lib/server
 import { MAIL_DOMAIN_SELECT, MailDomainCreateSchema, type MailDomainItem, type MailDomainsResponse } from '$lib/mailout';
 
 export const GET: RequestHandler = async ({ request, url, platform, locals }) => {
-  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as MailoutEnv;
   const jwt = extractAccessToken(request);
-  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+  if (!jwt) return jsonNoStore({ error: 'missing_authorization' }, 401);
   const workspaceId = url.searchParams.get('workspace_id') ?? '';
-  if (!UUID_RE.test(workspaceId)) return json({ error: 'invalid_workspace' }, 400);
+  if (!UUID_RE.test(workspaceId)) return jsonNoStore({ error: 'invalid_workspace' }, 400);
   try {
     const [domains, admin, ws] = await Promise.all([
       pgGet<MailDomainItem>(env, 'mail_domain', jwt, {
@@ -42,9 +42,9 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       isAdmin(env, jwt, workspaceId),
       pgGet<{ name: string }>(env, 'workspace', jwt, { search: { select: 'name', id: `eq.${workspaceId}` } }),
     ]);
-    if (!ws.data[0]) return json({ error: 'not_found' }, 404);
+    if (!ws.data[0]) return jsonNoStore({ error: 'not_found' }, 404);
     const mode = defaultProviderKind(env);
-    return json({
+    return jsonNoStore({
       items: domains.data,
       can_manage: admin,
       mode,
@@ -57,18 +57,18 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
 };
 
 export const POST: RequestHandler = async ({ request, platform, locals }) => {
-  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as MailoutEnv;
   const jwt = extractAccessToken(request);
-  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+  if (!jwt) return jsonNoStore({ error: 'missing_authorization' }, 401);
   let raw: unknown;
   try {
     raw = await request.json();
   } catch {
-    return json({ error: 'invalid_body' }, 400);
+    return jsonNoStore({ error: 'invalid_body' }, 400);
   }
   const parsed = v.safeParse(MailDomainCreateSchema, raw);
-  if (!parsed.success) return json({ error: 'invalid_body' }, 400);
+  if (!parsed.success) return jsonNoStore({ error: 'invalid_body' }, 400);
   const body = parsed.output;
 
   const kind = defaultProviderKind(env);
@@ -85,7 +85,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
       p_from_name: body.from_name ?? null,
     });
     created = res.data[0];
-    if (!created) return json({ error: 'not_found' }, 404);
+    if (!created) return jsonNoStore({ error: 'not_found' }, 404);
     const provider = sendingProvider(kind, env);
     const status = await provider.registerDomain({
       domain: created.domain,
@@ -95,7 +95,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
     });
     await recordDomainStatus(env, created.id, status);
     const fresh = await readDomain(env, jwt, created.id);
-    return json({ item: fresh }, 201);
+    return jsonNoStore({ item: fresh }, 201);
   } catch (err) {
     // El alta en la base sin su identidad en el servicio no sirve: se deshace.
     if (created) {

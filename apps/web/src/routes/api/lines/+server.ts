@@ -30,6 +30,7 @@ import type { Tables } from '$lib/db-types';
 import { LineModulesSchema, type ModuleKey } from '$lib/line-templates';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
+import { json } from '$lib/server/http';
 
 const ALLOWED_STATUSES = ['any', 'open', 'closed', 'archived'] as const;
 
@@ -77,13 +78,6 @@ const QuerySchema = v.object({
     '100',
   ),
 });
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  });
-}
 
 type ProjectLite = {
   id: string;

@@ -5,6 +5,7 @@ import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
+import { jsonNoStore } from '$lib/server/http';
 
 const Body = v.object({ token: v.pipe(v.string(), v.minLength(32), v.maxLength(128)) });
 
@@ -20,27 +21,17 @@ interface InvitationPreview {
   expires_at: string;
 }
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      'content-type': 'application/json; charset=utf-8',
-      'cache-control': 'no-store',
-    },
-  });
-}
-
 async function invoke(
   request: Request,
   platform: App.Platform | undefined,
   functionName: 'preview_workspace_invitation' | 'accept_workspace_invitation',
   requestId: string | undefined,
 ): Promise<Response> {
-  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
   const jwt = extractAccessToken(request);
-  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+  if (!jwt) return jsonNoStore({ error: 'missing_authorization' }, 401);
   const parsed = v.safeParse(Body, await request.json().catch(() => null));
-  if (!parsed.success) return json({ error: 'invalid_body' }, 400);
+  if (!parsed.success) return jsonNoStore({ error: 'invalid_body' }, 400);
 
   try {
     const { data } = await pgPostRpc<InvitationPreview>(
@@ -50,8 +41,8 @@ async function invoke(
       { p_token: parsed.output.token },
     );
     const invitation = data[0];
-    if (!invitation) return json({ error: 'invitation_unavailable' }, 404);
-    return json({ invitation });
+    if (!invitation) return jsonNoStore({ error: 'invitation_unavailable' }, 404);
+    return jsonNoStore({ invitation });
   } catch (err) {
     return pgErrorResponse(
       err,

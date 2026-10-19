@@ -35,6 +35,7 @@ import { pgErrorResponse } from '$lib/server/errors';
 import { TURN_EMBEDS, loadOverviewRows, mailoutPickIds, setLastTurnEmbed, setScope } from '$lib/server/conversation-overview';
 import { applyListFilter, hasListFilter, parseLinea, type ListFilter } from '$lib/conversation-overview';
 import { RELATIONS } from '$lib/conversation-relation';
+import { json } from '$lib/server/http';
 
 const QuerySchema = v.object({
   status: v.optional(
@@ -80,13 +81,6 @@ const QuerySchema = v.object({
     '0',
   ),
 });
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  });
-}
 
 export const GET: RequestHandler = async ({ request, url, platform, locals }) => {
   if (!platform?.env) {

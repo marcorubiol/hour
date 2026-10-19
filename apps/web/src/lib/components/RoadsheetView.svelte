@@ -11,7 +11,7 @@
   import JsonKV, { hasJsonContent } from '$lib/components/JsonKV.svelte';
   import ScheduleTable from '$lib/components/ScheduleTable.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
-  import { dayLabel } from '$lib/datetime';
+  import { dayLabel, viewerTimeZone } from '$lib/datetime';
   import { LOCALE_TAG, appLocale, t, type Locale } from '$lib/i18n';
   import { performanceStatusLabel, performanceStatusTone } from '$lib/performance';
   import type { Roadsheet } from '$lib/roadsheet';
@@ -39,7 +39,7 @@
     return word === key ? value.replace(/_/g, ' ') : word;
   }
 
-  const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const viewerTz = viewerTimeZone();
 </script>
 
 <div class="rsv">

@@ -37,7 +37,7 @@
   import { parseDayQuery } from '$lib/day-query';
   import { dayKeyInTz, plannerDayHref } from '$lib/planner';
   import { lensOn } from '$lib/lenses.svelte';
-  import { localeDayMonth } from '$lib/datetime';
+  import { localeDayMonth, viewerTimeZone } from '$lib/datetime';
   import { detectLocale, LOCALE_TAG, t } from '$lib/i18n';
   import { accentVarFor } from '$lib/utils/accent';
   import { spaceName } from '$lib/utils/identity';
@@ -47,7 +47,7 @@
   // El mismo par que usa el Planner: el locale detectado y su etiqueta BCP-47.
   const locale = detectLocale(navigator.language);
   const localeTag = LOCALE_TAG[locale];
-  const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const viewerTz = viewerTimeZone();
   /** Hoy, en el huso del lector. `parseDayQuery` es puro y lo exige inyectado. */
   let todayIso = $derived(dayKeyInTz(new Date().toISOString(), viewerTz));
 

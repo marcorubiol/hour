@@ -20,15 +20,9 @@ import { pgErrorResponse } from '$lib/server/errors';
 import { decodeJwtPayload } from '$lib/server/session';
 import { authorNames } from '$lib/server/threads';
 import type { Acquaintance, AcquaintanceView } from '$lib/acquaintance';
+import { json } from '$lib/server/http';
 
 const SELECT = 'workspace_id,person_id,user_id,shared';
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  });
-}
 
 const BodySchema = v.object({
   workspace_id: v.pipe(v.string(), v.uuid()),

@@ -22,6 +22,7 @@ import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
+import { json } from '$lib/server/http';
 
 const IdSchema = v.pipe(v.string(), v.uuid());
 
@@ -33,13 +34,6 @@ const PatchSchema = v.object({
   payer_organization_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
   notes: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000)))),
 });
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  });
-}
 
 export const PATCH: RequestHandler = async ({ request, params, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);

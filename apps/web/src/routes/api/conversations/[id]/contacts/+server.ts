@@ -29,7 +29,7 @@ import {
 } from '$lib/conversation';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
-import { json, UUID_RE } from '$lib/server/mail/http';
+import { jsonNoStore, UUID_RE } from '$lib/server/http';
 
 const CODES = {
   '42501': { status: 404, error: 'not_found' },
@@ -51,11 +51,11 @@ async function readBody(request: Request): Promise<unknown> {
 }
 
 export const POST: RequestHandler = async ({ request, params, platform, locals }) => {
-  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
   const jwt = extractAccessToken(request);
-  if (!jwt) return json({ error: 'missing_authorization' }, 401);
-  if (!UUID_RE.test(params.id)) return json({ error: 'invalid_id' }, 400);
+  if (!jwt) return jsonNoStore({ error: 'missing_authorization' }, 401);
+  if (!UUID_RE.test(params.id)) return jsonNoStore({ error: 'invalid_id' }, 400);
 
   const body = await readBody(request);
   const inline = v.safeParse(ContactAddInlineSchema, body);
@@ -68,7 +68,7 @@ export const POST: RequestHandler = async ({ request, params, platform, locals }
         p_phone: inline.output.person.phone ?? null,
         p_role: inline.output.role ?? null,
       });
-      return json({ contact: data[0] ?? null }, 201);
+      return jsonNoStore({ contact: data[0] ?? null }, 201);
     } catch (err) {
       return pgErrorResponse(
         err,
@@ -78,7 +78,7 @@ export const POST: RequestHandler = async ({ request, params, platform, locals }
     }
   }
   const parsed = v.safeParse(ContactSetSchema, body);
-  if (!parsed.success) return json({ error: 'invalid_body' }, 400);
+  if (!parsed.success) return jsonNoStore({ error: 'invalid_body' }, 400);
 
   try {
     const { data: current } = await pgGet<ContactRowLite>(env, 'conversation_contact', jwt, {
@@ -94,7 +94,7 @@ export const POST: RequestHandler = async ({ request, params, platform, locals }
       jwt,
       contactSetArgs(params.id, parsed.output, current[0] ?? null),
     );
-    return json({ contact: data[0] ?? null }, current[0] ? 200 : 201);
+    return jsonNoStore({ contact: data[0] ?? null }, current[0] ? 200 : 201);
   } catch (err) {
     return pgErrorResponse(
       err,
@@ -105,14 +105,14 @@ export const POST: RequestHandler = async ({ request, params, platform, locals }
 };
 
 export const PATCH: RequestHandler = async ({ request, params, platform, locals }) => {
-  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
   const jwt = extractAccessToken(request);
-  if (!jwt) return json({ error: 'missing_authorization' }, 401);
-  if (!UUID_RE.test(params.id)) return json({ error: 'invalid_id' }, 400);
+  if (!jwt) return jsonNoStore({ error: 'missing_authorization' }, 401);
+  if (!UUID_RE.test(params.id)) return jsonNoStore({ error: 'invalid_id' }, 400);
 
   const parsed = v.safeParse(ContactEndSchema, await readBody(request));
-  if (!parsed.success) return json({ error: 'invalid_body' }, 400);
+  if (!parsed.success) return jsonNoStore({ error: 'invalid_body' }, 400);
 
   try {
     const { data } = await pgPostRpc<ContactRowLite>(env, 'end_conversation_contact', jwt, {
@@ -120,7 +120,7 @@ export const PATCH: RequestHandler = async ({ request, params, platform, locals 
       p_person_id: parsed.output.person_id,
       p_until: parsed.output.until ?? null,
     });
-    return json({ contact: data[0] ?? null });
+    return jsonNoStore({ contact: data[0] ?? null });
   } catch (err) {
     return pgErrorResponse(
       err,

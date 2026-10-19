@@ -38,6 +38,7 @@ import { extractAccessToken } from '$lib/auth';
 import { decodeJwtPayload } from '$lib/server/session';
 import { pgGet, pgPatch, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
+import { jsonNoStore } from '$lib/server/http';
 
 type ProfileRow = { person_id: string | null; full_name: string };
 type DossierRow = {
@@ -47,13 +48,6 @@ type DossierRow = {
   profile_sync_enabled: boolean;
   profile_shared_fields: string[];
 };
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
-  });
-}
 
 /**
  * The name a person is known by. It is the ONLY field this endpoint writes,
@@ -73,25 +67,25 @@ const PatchBody = v.object({
 });
 
 export const PATCH: RequestHandler = async ({ request, platform, locals }) => {
-  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
 
   const jwt = extractAccessToken(request);
-  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+  if (!jwt) return jsonNoStore({ error: 'missing_authorization' }, 401);
 
   const claims = decodeJwtPayload(jwt);
   const sub = typeof claims?.sub === 'string' ? claims.sub : null;
-  if (!sub) return json({ error: 'invalid_token' }, 401);
+  if (!sub) return jsonNoStore({ error: 'invalid_token' }, 401);
 
   let raw: unknown;
   try {
     raw = await request.json();
   } catch {
-    return json({ error: 'invalid_body' }, 400);
+    return jsonNoStore({ error: 'invalid_body' }, 400);
   }
   const parsed = v.safeParse(PatchBody, raw);
   if (!parsed.success) {
-    return json(
+    return jsonNoStore(
       {
         error: 'invalid_body',
         issues: parsed.issues.map((i) => ({
@@ -117,7 +111,7 @@ export const PATCH: RequestHandler = async ({ request, platform, locals }) => {
       { full_name: parsed.output.full_name },
       { search },
     );
-    return json({ full_name: data[0]?.full_name ?? parsed.output.full_name });
+    return jsonNoStore({ full_name: data[0]?.full_name ?? parsed.output.full_name });
   } catch (err) {
     return pgErrorResponse(
       err,
@@ -128,15 +122,15 @@ export const PATCH: RequestHandler = async ({ request, platform, locals }) => {
 };
 
 export const GET: RequestHandler = async ({ request, platform, locals }) => {
-  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
 
   const jwt = extractAccessToken(request);
-  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+  if (!jwt) return jsonNoStore({ error: 'missing_authorization' }, 401);
 
   const claims = decodeJwtPayload(jwt);
   const sub = typeof claims?.sub === 'string' ? claims.sub : null;
-  if (!sub) return json({ error: 'invalid_token' }, 401);
+  if (!sub) return jsonNoStore({ error: 'invalid_token' }, 401);
 
   const search = new URLSearchParams();
   search.set('select', 'person_id,full_name');
@@ -148,7 +142,7 @@ export const GET: RequestHandler = async ({ request, platform, locals }) => {
     const personId = data[0]?.person_id ?? null;
     const fullName = data[0]?.full_name ?? '';
     // No person, no dossiers to look for — and no second round trip.
-    if (!personId) return json({ person_id: null, full_name: fullName, dossiers: [] });
+    if (!personId) return jsonNoStore({ person_id: null, full_name: fullName, dossiers: [] });
 
     const dossierSearch = new URLSearchParams();
     dossierSearch.set(
@@ -160,7 +154,7 @@ export const GET: RequestHandler = async ({ request, platform, locals }) => {
     const dossiers = await pgGet<DossierRow>(env, 'workspace_person', jwt, {
       search: dossierSearch,
     });
-    return json({ person_id: personId, full_name: fullName, dossiers: dossiers.data });
+    return jsonNoStore({ person_id: personId, full_name: fullName, dossiers: dossiers.data });
   } catch (err) {
     return pgErrorResponse(
       err,

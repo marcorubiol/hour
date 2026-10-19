@@ -39,6 +39,7 @@ import {
   type PlaceCandidate,
   type PlaceIndex,
 } from '$lib/places';
+import { json } from '$lib/server/http';
 
 const QuerySchema = v.object({
   q: v.pipe(v.string(), v.trim(), v.minLength(2), v.maxLength(80)),
@@ -90,15 +91,8 @@ function asset<T>(name: string, bucket?: Bucket): Promise<T | null> {
   return p as Promise<T | null>;
 }
 
-function json(body: unknown, status = 200, cache = false): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      'content-type': 'application/json; charset=utf-8',
-      ...(cache ? { 'cache-control': 'private, max-age=86400' } : {}),
-    },
-  });
-}
+/** A place lookup without a workspace is public knowledge: a day in the browser's cache. */
+const CACHE_DAY = { 'cache-control': 'private, max-age=86400' };
 
 export const GET: RequestHandler = async ({ request, url, platform }) => {
   const jwt = extractAccessToken(request);
@@ -150,7 +144,7 @@ export const GET: RequestHandler = async ({ request, url, platform }) => {
     const townVenues = await Promise.all(inTown.filter((v) => !seen.has(v.id)).map(asCandidate));
     // Only the gazetteer's answer is cached: a venue created or renamed today
     // must show up today.
-    return json({ places: [...named, ...underTheirTown(places, townVenues, q)] }, 200, !workspace_id);
+    return json({ places: [...named, ...underTheirTown(places, townVenues, q)] }, 200, workspace_id ? undefined : CACHE_DAY);
   } catch {
     return json({ error: 'places_unavailable' }, 503);
   }

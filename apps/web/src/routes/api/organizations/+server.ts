@@ -8,7 +8,7 @@ import type { RequestHandler } from './$types';
 import { extractAccessToken } from '$lib/auth';
 import { pgGet, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
-import { json, UUID_RE } from '$lib/server/mail/http';
+import { jsonNoStore, UUID_RE } from '$lib/server/http';
 
 export interface OrganizationOption {
   id: string;
@@ -17,10 +17,10 @@ export interface OrganizationOption {
 }
 
 export const GET: RequestHandler = async ({ request, url, platform, locals }) => {
-  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
   const jwt = extractAccessToken(request);
-  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+  if (!jwt) return jsonNoStore({ error: 'missing_authorization' }, 401);
 
   const ids = [
     ...new Set(
@@ -39,7 +39,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   if (ids.length) search.set('workspace_id', `in.(${ids.join(',')})`);
   try {
     const { data } = await pgGet<OrganizationOption>(env, 'workspace_organization', jwt, { search });
-    return json({ items: data });
+    return jsonNoStore({ items: data });
   } catch (err) {
     return pgErrorResponse(err, { route: 'GET /api/organizations', requestId: locals.requestId });
   }
