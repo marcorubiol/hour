@@ -916,4 +916,136 @@
     /* Slate warm-light so primary remains the same "brown ink" feeling. */
     --primary: oklch(74% 0.09 50);
   }
+
+  /* ============================================================ */
+  /* THEME — stress (the crash test, never offered in the UI)       */
+  /* ============================================================ */
+  /* Everything exaggerated at once, so that whatever does NOT       */
+  /* change on screen is a value a component still owns. Activate   */
+  /* with `localStorage.hour_theme = 'stress'` (theme-init.js reads */
+  /* it) or `<html data-theme="stress">`. Redefines contextuals and */
+  /* the scales only; a component is never touched. The surfaces   */
+  /* are set explicitly, as dark mode does, because a dark --base  */
+  /* breaks the light-side derivations.                            */
+
+  :root[data-theme="stress"] {
+    color-scheme: dark;
+
+    /* Hues: a green-black canvas, bone ink, an orange brand. */
+    --base: oklch(24% 0.05 160);
+    --neutral: oklch(90% 0.04 95);
+    --primary: oklch(72% 0.19 45);
+    --info: oklch(75% 0.14 220);
+    --success: oklch(78% 0.16 130);
+    --warning: oklch(82% 0.16 85);
+    --danger: oklch(70% 0.2 15);
+
+    --bg: var(--base);
+    --bg-ultra-light: oklch(32% 0.05 160);
+    --bg-light: oklch(28% 0.05 160);
+    --bg-dark: oklch(85% 0.04 95);
+    --bg-ultra-dark: oklch(94% 0.03 95);
+    --bg-hover: oklch(30% 0.06 160);
+    --bg-active: oklch(34% 0.06 160);
+
+    --heading-color: var(--primary);
+    --text-light: oklch(20% 0.04 160);
+    --text-muted: color-mix(in oklab, var(--neutral), var(--base) 18%);
+    --text-faint: color-mix(in oklab, var(--neutral), var(--base) 34%);
+
+    --neutral-ultra-light: color-mix(in oklab, var(--neutral), var(--base) 82%);
+    --neutral-semi-dark: color-mix(in oklch, var(--neutral), white 40%);
+    --neutral-dark: color-mix(in oklch, var(--neutral), white 45%);
+    --neutral-ultra-dark: color-mix(in oklch, var(--neutral), white 55%);
+    --primary-ultra-light: color-mix(in oklab, var(--primary), var(--base) 78%);
+    --primary-dark: color-mix(in oklch, var(--primary), white 30%);
+    --primary-ultra-dark: color-mix(in oklch, var(--primary), white 55%);
+    --info-ultra-light: color-mix(in oklab, var(--info), var(--base) 78%);
+    --info-dark: color-mix(in oklch, var(--info), white 45%);
+    --info-ultra-dark: color-mix(in oklch, var(--info), white 55%);
+    --success-ultra-light: color-mix(in oklab, var(--success), var(--base) 78%);
+    --success-dark: color-mix(in oklch, var(--success), white 45%);
+    --success-ultra-dark: color-mix(in oklch, var(--success), white 55%);
+    --warning-ultra-light: color-mix(in oklab, var(--warning), var(--base) 78%);
+    --warning-dark: color-mix(in oklch, var(--warning), white 45%);
+    --warning-ultra-dark: color-mix(in oklch, var(--warning), white 55%);
+    --danger-ultra-light: color-mix(in oklab, var(--danger), var(--base) 78%);
+    --danger-dark: color-mix(in oklch, var(--danger), white 45%);
+    --danger-ultra-dark: color-mix(in oklch, var(--danger), white 55%);
+
+    --border-color-dark: color-mix(in oklch, var(--primary) 55%, transparent);
+    --border-color-light: color-mix(in oklch, var(--primary) 30%, transparent);
+    --border-color-hover: var(--primary);
+    --backdrop: color-mix(in srgb, var(--primary) 30%, transparent);
+
+    --tag-amber-bg: oklch(34% 0.08 80);  --tag-amber-fg: oklch(88% 0.1 80);
+    --tag-blue-bg: oklch(34% 0.08 240);  --tag-blue-fg: oklch(88% 0.1 240);
+    --tag-teal-bg: oklch(34% 0.08 180);  --tag-teal-fg: oklch(88% 0.1 180);
+    --tag-green-bg: oklch(34% 0.08 150); --tag-green-fg: oklch(88% 0.1 150);
+    --tag-purple-bg: oklch(34% 0.08 300); --tag-purple-fg: oklch(88% 0.1 300);
+    --tag-red-bg: oklch(34% 0.08 20);    --tag-red-fg: oklch(88% 0.1 20);
+    --tag-neutral-bg: oklch(34% 0.03 160); --tag-neutral-fg: var(--text-muted);
+    --accent-custom-l: 75%;
+    --accent-custom-c: 0.16;
+    --selection-bg: color-mix(in oklch, var(--primary) 45%, transparent);
+    --selection-fg: var(--neutral);
+    --box-shadow-1: 0 0 0 var(--line) color-mix(in oklch, var(--primary) 40%, transparent);
+    --box-shadow-2: 0 0 0 var(--line-thick) color-mix(in oklch, var(--primary) 50%, transparent);
+    --box-shadow-3: 0 0 0 var(--line-bar) color-mix(in oklch, var(--primary) 60%, transparent);
+
+    /* Type: every family swapped, the scale a step louder, the micro voice
+       readable, tracking wide. */
+    --font-display: "Impact", "Arial Black", sans-serif;
+    --font-sans: "Georgia", "Times New Roman", serif;
+    --font-mono: "Courier New", Courier, monospace;
+    --text-line-height: 1.8;
+    --heading-line-height: 1.2;
+    --heading-letter-spacing: 0.04em;
+    --text-2xs: 0.75rem;
+    --text-xs: 0.875rem;
+    --text-s: 1rem;
+    --text-m: 1.125rem;
+    --text-l: 1.5rem;
+    --text-xl: 1.875rem;
+    --text-xxl: 2.5rem;
+    --h1: 3.5rem;
+    --h3: 2rem;
+    --display-l: 4rem;
+    --display-xl: 6rem;
+    --tracking-xs: 0.05em;
+    --tracking-s: 0.1em;
+    --tracking-m: 0.15em;
+    --tracking-l: 0.25em;
+    --tracking-xl: 0.35em;
+
+    /* Density: every step of space half again, lines heavy, corners round. */
+    --space-2xs: 0.25rem;
+    --space-xs: 0.625rem;
+    --space-s: 1.125rem;
+    --space-m: 1.75rem;
+    --space-l: 2.75rem;
+    --space-xl: 4rem;
+    --space-xxl: 6rem;
+    --gutter: 3rem;
+    --line-hairline: 2px;
+    --line-thin: 3px;
+    --line: 4px;
+    --line-thick: 6px;
+    --line-bar: 8px;
+    --radius: 18px;
+    --radius-xs: 8px;
+    --radius-s: 12px;
+    --radius-l: 28px;
+    --radius-xl: 36px;
+    --dot-xs: 6px;
+    --dot-s: 8px;
+    --dot-m: 12px;
+    --dot-l: 16px;
+    --control-size-xs: 2.5rem;
+    --control-size-s: 3rem;
+    --control-size-m: 3.5rem;
+    --transition-duration: 0s;
+    --duration-fast: 0s;
+    --duration-slow: 0s;
+  }
 }
