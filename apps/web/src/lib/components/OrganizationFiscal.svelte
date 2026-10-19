@@ -164,15 +164,13 @@
     .org-fiscal__actions {
       justify-content: flex-end;
     }
+    /* Field rows, one under the other (ADR-139 p4). */
     .org-fiscal__form {
       display: flex;
       flex-direction: column;
-      gap: var(--space-s);
     }
     .org-fiscal__row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-s);
+      display: contents;
     }
     .org-fiscal__summary {
       font-size: var(--text-s);
