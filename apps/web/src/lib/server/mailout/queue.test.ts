@@ -222,6 +222,8 @@ describe('estado de cada destinatario en la pantalla', () => {
 
   test('antes de enviar: sin email, excluido, sin base, faltan campos, listo', () => {
     expect(recipientState(row({ address: null }), false)).toBe('no_address');
+    expect(recipientState(row({ skip_reason: 'not_now' }), false)).toBe('not_now');
+    expect(recipientState(row({ skip_reason: 'not_now', basis_kind: null }), true)).toBe('not_now');
     expect(recipientState(row({ suppressed_reason: 'unsubscribe' }), false)).toBe('suppressed');
     expect(recipientState(row({ basis_kind: null }), false)).toBe('no_basis');
     expect(recipientState(row({ basis_withdrawn_at: '2026-10-01' }), false)).toBe('no_basis');
@@ -232,6 +234,7 @@ describe('estado de cada destinatario en la pantalla', () => {
   test('después: la cola, lo enviado y lo saltado con su razón; y los recuentos', () => {
     expect(recipientState(row({ status: 'sending' }), false)).toBe('queued');
     expect(recipientState(row({ status: 'skipped', skip_reason: 'duplicate' }), false)).toBe('duplicate');
+    expect(recipientState(row({ status: 'skipped', skip_reason: 'not_now' }), false)).toBe('not_now');
     expect(recipientState(row({ status: 'delivered' }), false)).toBe('delivered');
     expect(recipientCounts(['delivered', 'delivered', 'bounced'])).toEqual({ delivered: 2, bounced: 1 });
   });

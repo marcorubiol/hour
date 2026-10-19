@@ -113,7 +113,14 @@ export type MailoutRecipientStatus =
   | 'complained'
   | 'skipped'
   | 'failed';
-export type MailoutSkipReason = 'suppressed' | 'no_basis' | 'no_address' | 'duplicate' | 'cancelled' | 'unavailable';
+export type MailoutSkipReason =
+  | 'suppressed'
+  | 'no_basis'
+  | 'no_address'
+  | 'duplicate'
+  | 'cancelled'
+  | 'unavailable'
+  | 'not_now';
 
 export interface MailoutItem {
   id: string;
@@ -146,6 +153,7 @@ export interface MailoutRecipientRow {
   display_name: string | null;
   address_kind: 'contact' | 'organization' | null;
   status: MailoutRecipientStatus;
+  /** En un borrador, `not_now` con `status` pendiente: lo que pasará al poner en cola (ADR-138 § 3). */
   skip_reason: MailoutSkipReason | null;
   basis_kind: 'consent' | 'relationship' | 'generic' | null;
   basis_withdrawn_at: string | null;
@@ -181,6 +189,7 @@ export type RecipientState =
   | 'duplicate'
   | 'unavailable'
   | 'cancelled'
+  | 'not_now'
   | 'missing_fields'
   | 'queued'
   | 'sent'
@@ -193,6 +202,7 @@ export function recipientState(r: MailoutRecipientRow, missing: boolean): Recipi
   switch (r.status) {
     case 'pending':
       if (!r.address) return 'no_address';
+      if (r.skip_reason === 'not_now') return 'not_now';
       if (r.suppressed_reason) return 'suppressed';
       if (!r.basis_kind || r.basis_withdrawn_at) return 'no_basis';
       return missing ? 'missing_fields' : 'ready';

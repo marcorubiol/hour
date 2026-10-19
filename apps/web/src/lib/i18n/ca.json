@@ -1856,6 +1856,7 @@
   "mailout.r_duplicate": "Duplicat",
   "mailout.r_unavailable": "No disponible",
   "mailout.r_cancelled": "Cancel·lat",
+  "mailout.r_not_now": "No aquesta vegada",
   "mailout.r_missing_fields": "Falten camps",
   "mailout.r_queued": "A la cua",
   "mailout.r_sent": "Enviat",
