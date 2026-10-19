@@ -126,7 +126,9 @@ test.describe('el margen del Planner (ADR-138 § 6)', () => {
     const steps = page.getByTestId('planner-steps');
     await expect(steps).toContainText(VENUE, { timeout: 15_000 });
     await steps.getByRole('link', { name: new RegExp(VENUE) }).click();
-    await expect(page).toHaveURL(new RegExp(`/conversation/${convId}`));
+    // It opens in the vistazo over the Day (ADR-139 p1), and the address says which.
+    await expect(page.getByTestId('peek')).toBeVisible({ timeout: 15_000 });
+    await expect(page).toHaveURL(new RegExp(`peek=conversation%2F[^&]+%2F${convId}`));
   });
 
   test('el Mes dice un número en ese día, que abre el Día', async ({ page }) => {

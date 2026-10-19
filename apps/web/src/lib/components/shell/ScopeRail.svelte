@@ -234,7 +234,7 @@
     color: var(--text-color);
   }
   /* Calm toggle — the mode control lives by the clock (spec § Desk · Calm).
-     outline = available / solid = active, so it reads as a control. */
+     outline = available / a firmer stroke = active, so it reads as a control. */
   .side-calm {
     display: inline-flex;
     align-items: center;
@@ -245,7 +245,7 @@
     border-radius: var(--radius-circle);
     /* NO FILL WHEN IT IS OFF (Marco, 2026-07-31). The outline alone says
        «available»; a fill on a control that is not doing anything reads as a
-       state. The solid ground stays for `.is-on`, where it IS the state. */
+       state. `.is-on` takes only the rail's soft selected ground. */
     background: none;
     /* Desk lens button shape (sans, --space-2xs/--space-m, radius-circle) but
        a micro-label one step under the smallest named step — 9px is the
@@ -270,10 +270,17 @@
     color: var(--text-color);
     border-color: var(--text-muted);
   }
+  /* ON IS A SOFT STROKE, NOT A BLACK PILL (ADR-139 § 5): the switch to
+     quiet must not be the loudest mark on the rail. The edge firms up, the
+     word takes ink, and the ground is the rail's own selected scope's
+     (`.srow.is-on`). The mode shows in the page's composition, not here. */
   .side-calm.is-on {
-    background: var(--text-color);
-    border-color: var(--text-color);
-    color: var(--bg);
+    background: var(--bg-ultra-light);
+    border-color: var(--text-muted);
+    color: var(--text-color);
+  }
+  .side-calm.is-on .side-calm__k {
+    opacity: 1;
   }
   .side-calm__k {
     display: inline-flex;

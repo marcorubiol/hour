@@ -84,6 +84,9 @@
   } from '$lib/conversation-tags';
   import { conversationTagsQueryOptions } from '$lib/conversation-tags-query';
   import { usePins } from '$lib/stores/pins.svelte';
+  import { useCalm } from '$lib/stores/calm.svelte';
+  import { shows } from '$lib/calm';
+  import CalmLine from '$lib/components/CalmLine.svelte';
   import { spaceName } from '$lib/utils/identity';
   import {
     buildLineIndex,
@@ -102,6 +105,10 @@
   } from '$lib/nav-queries';
 
   const pins = usePins();
+  // Calm (ADR-139 § 5): «Te toca» and «Añadir conversación»; the rest of the
+  // overview, the list and the threads fold into one line that leaves calm.
+  // The Equipo view is the threads themselves and does not change.
+  const calm = useCalm();
   const locale = appLocale();
 
   const workspacesQuery = createQuery(workspacesQueryOptions());
@@ -644,7 +651,7 @@
   <title>{docTitle(t('lens.conversations', locale))}</title>
 </svelte:head>
 
-<section class="conversations" aria-busy={busy}>
+<section class="conversations" class:conversations--calm={calm.on && panel !== 'team'} aria-busy={busy}>
   <LensHeader help={panel === 'team' ? 'team' : 'conversations'}>
     {#snippet title()}<LensTitle text={t('lens.conversations', locale)} />{/snippet}
     {#snippet sub()}
@@ -657,7 +664,7 @@
           data-chip={c.chip}>{c.label}</a
         >
       {/each}
-      {#if panel !== 'team'}
+      {#if panel !== 'team' && shows('conversations', 'list', calm.on)}
         <!-- On a phone the list starts a screen and a half down: a way straight to it (móvil #11). -->
         <a class="lenshead__frag conversations__skip" href="#lista">{t('overview.go_to_list', locale)}</a>
       {/if}
@@ -691,12 +698,20 @@
       {locale}
       {lineHint}
       {chip}
-      panel={panel === 'sales' ? 'sales' : 'common'}
+      panel={panel === 'sales' && shows('conversations', 'sales', calm.on) ? 'sales' : 'common'}
       onrelation={filterSeasonRelation}
       online={filterSeasonLine}
       onwrite={canEdit && canBulkSend(chip) ? writeTo : undefined}
     />
 
+    {#if !shows('conversations', 'list', calm.on)}
+      <div class="conversations__calm">
+        <CalmLine text={t('conversations.calm_rest', locale)} action={t('calm.see_all', locale)} onclick={() => calm.set(false)} />
+        {#if canEdit && shows('conversations', 'add', calm.on)}
+          <Button size="s" onclick={openAdd}>{t('conversations.add', locale)}</Button>
+        {/if}
+      </div>
+    {:else}
     <div class="conversations__list-head" id="lista" data-help-step="conv-list">
       <BlockHead title={t('overview.list', locale)} focusable bind:el={listHeading} />
     </div>
@@ -748,6 +763,7 @@
         <BlockHead title={t('conversations.view_team', locale)} />
       </div>
       {@render threads()}
+    {/if}
     {/if}
 
     {#if picking}
@@ -896,6 +912,18 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-m);
+    }
+    /* Calm: one column at the reading measure, from the same left edge; the
+       head keeps the page's width, so the lens switcher does not move. */
+    .conversations--calm > :global(:not(.lenshead)) {
+      max-inline-size: var(--calm-measure);
+    }
+    .conversations__calm {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--space-s) var(--space-m);
     }
 
     /* Header is now the shared LensHeader (global .lenshead* classes). */

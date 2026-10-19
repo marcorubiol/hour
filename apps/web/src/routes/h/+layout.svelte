@@ -37,6 +37,7 @@
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
   import { lensesOnFor, lensOn, setLensesOn } from '$lib/lenses.svelte';
   import LensOff from '$lib/components/LensOff.svelte';
+  import PeekHost from '$lib/components/peek/PeekHost.svelte';
   import { provideCalm } from '$lib/stores/calm.svelte';
   import { providePins, parsePin, type PinKind } from '$lib/stores/pins.svelte';
   import { provideScopes, sameSet as scopesSameSet, type Scope } from '$lib/stores/scopes.svelte';
@@ -99,6 +100,15 @@
   const creation = provideCreation();
   // Calm lives in the shell (the toggle sits by the clock); the Desk consumes it.
   const calm = provideCalm();
+  let calmRestored = $state(false);
+  let calmSeen: boolean | null = null;
+  let calmAnnounce = $state('');
+  $effect(() => {
+    const on = calm.on;
+    if (!calmRestored) return;
+    if (calmSeen !== null && calmSeen !== on) calmAnnounce = t(on ? 'calm.announce_on' : 'calm.announce_off', locale);
+    calmSeen = on;
+  });
 
   onMount(() => {
     lens.restoreFromLocalStorage();
@@ -113,6 +123,8 @@
         return;
       calm.toggle();
     };
+    // Announce the switch only once restored: a reload is not a change.
+    calmRestored = true;
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
@@ -655,11 +667,18 @@
         />
       {/if}
 
-      <div class="shell__content" class:shell__content--calm={calm.on}>
+      <!-- CALM IS A COMPOSITION, NOT A GREY (ADR-139 § 5): each lens folds
+           its own blocks ($lib/calm); the content keeps its contrast, and
+           no control ever looks disabled. A screen reader hears the switch. -->
+      <p class="visually-hidden" aria-live="polite">{calmAnnounce}</p>
+      <div class="shell__content">
         {#if routedLens && routedLens !== 'desk' && !lensOn(routedLens)}
           <!-- ADR-132: a lens off in every space on screen, reached by URL. -->
           <LensOff lens={routedLens} workspaces={onScreen} />
         {:else if children}{@render children()}{/if}
+        <!-- ADR-139 p1: the vistazo, over whatever is routed. Inside the
+             content so it wears the same voice (calm included). -->
+        <PeekHost />
       </div>
     </main>
   </div>
@@ -802,9 +821,6 @@
 
   .shell__content {
     flex: 1;
-    /* Re-anchor text color here so Calm's remap (below) cascades to EVERY
-       route's inherited text, not only elements that name var(--text-color).
-       In normal mode this resolves to the same token the body uses. */
     color: var(--text-color);
     /* One shared header→content distance for every route — pages used to
        borrow the (now neutralized) global <section> padding unevenly. */
@@ -816,14 +832,6 @@
     inline-size: 100%;
     max-inline-size: calc(var(--page-width) + var(--shell-gutter) * 2);
     margin-inline: auto;
-  }
-
-  /* Calm mode (Desk · Calm) quiets every lens one contrast step — body text
-     to muted, dark borders softened. One class for the whole routed surface;
-     headings, links and overdue red keep their own tokens. */
-  .shell__content--calm {
-    --text-color: var(--text-muted);
-    --border-color-dark: color-mix(in oklch, var(--neutral) 12%, transparent);
   }
 
   /* Print: the cap is a screen-reading concern. Documents meant for paper

@@ -24,11 +24,10 @@
    *
    * The page owns the feeds, the pins scoping, the conflict/away engines,
    * the i18n and the Feed/ICS dialog (now behind the "⋯" overflow);
-   * MonthGrid and AgendaList render. Creation is the UNIFIED dialog
-   * (ADR-078 §1): every "+" — toolbar and day cells — opens
-   * CreateEventDialog with the day/scope presets; the blackout dialog
-   * hangs off its quiet footer action and the "⋯" overflow, and hides
-   * itself while the availability/team feeds are absent.
+   * MonthGrid and AgendaList render. Creation is the QUICK ADD (ADR-139
+   * p3 A): every "+" — toolbar, day cells, the "⋯" «unavailable» entry —
+   * opens CreateEventDialog with the day/scope presets, and the page stays
+   * where it was when something is added (the notice says it, with undo).
    */
 
   import { docTitle } from '$lib/doc-title';
@@ -84,6 +83,7 @@
     type BoardEventIn,
     type BoardGroup,
     type LaneTally,
+    type PlacedEvent,
   } from '$lib/board-lanes';
   import { awayRest, coversDay } from '$lib/away';
   import CalToolbar from '$lib/components/planner/CalToolbar.svelte';
@@ -99,11 +99,12 @@
   import Dialog from '$lib/components/Dialog.svelte';
   import FeedDialog from '$lib/components/planner/FeedDialog.svelte';
   import CreateEventDialog from '$lib/components/create/CreateEventDialog.svelte';
-  import EditDateDialog from '$lib/components/planner/EditDateDialog.svelte';
-  import CreateBlackoutDialog from '$lib/components/create/CreateBlackoutDialog.svelte';
-  import type { CreatedPerformance } from '$lib/components/PerformanceForm.svelte';
+  import { currentPeek, openPeek } from '$lib/peek.svelte';
+  import type { CreatedPerformance } from '$lib/plan-create';
+  import type { QuickType } from '$lib/quick-add';
   import { usePins } from '$lib/stores/pins.svelte';
   import { useCalm } from '$lib/stores/calm.svelte';
+  import { plannerCalmFacts, shows } from '$lib/calm';
   import { LOCALE_TAG, detectLocale, t } from '$lib/i18n';
   import {
     buildLineIndex,
@@ -411,10 +412,11 @@
      act right underneath teaches that this lens reasons differently from the
      rest of the tool. One grammar for narrowing, everywhere.
 
-     What survives is CALM, and it survives as a WORD, not a switch: it lives
-     in the Desk (global, non-destructive) and the Planner draws
-     `calm · confirmed only` on the facts side of the state line. A filter you
-     cannot see is a filter that lies.
+     What survives is CALM, and it is not a switch here: it lives in the
+     shell (global, non-destructive), and the Planner says what it does in
+     ONE sentence on the facts line («4 confirmed · 3 options wait outside
+     calm», ADR-139 § 5; `$lib/calm` says what it keeps). A filter you cannot
+     see is a filter that lies.
 
      TWO PREDICATES, ON PURPOSE. `vis` is the narrowing axis and governs
      COUNTING; `dvis` adds calm and governs DRAWING. So the counters keep
@@ -641,7 +643,6 @@
      read it without a second rule. Ids of the extra days are `id#day`;
      whatever talks to the server goes through `spanSourceId`. */
   let activeDateRows = $derived(expandDateSpans(sourceDateRows, viewerTz));
-  let sourceDateById = $derived(new Map(sourceDateRows.map((d) => [d.id, d])));
   let activeBlackoutRows = $derived(
     onSeason
       ? ($seasonAvailabilityQuery.data?.items ?? [])
@@ -700,7 +701,7 @@
   // the "away" stat) — but the conflict engine reads allBlackouts, so a real
   // clash against an unavailability still surfaces.
   let visibleBlackouts = $derived(
-    calm.on
+    !shows('planner', 'blackouts', calm.on)
       ? []
       : allBlackouts.filter((b) => scopeWorkspaceIds === null || scopeWorkspaceIds.has(b.workspace_id)),
   );
@@ -708,10 +709,10 @@
   // `dvis` — the DRAWING predicate: scope, plus calm. Counting uses the
   // scoped rows directly (`vis`), which is why the numbers never move.
   function perfDrawn(p: PerformanceEvent): boolean {
-    return !calm.on || performanceStatusFamily(p.status) === 'confirmed';
+    return shows('planner', 'options', calm.on) || performanceStatusFamily(p.status) === 'confirmed';
   }
   function dateDrawn(d: DateEvent): boolean {
-    return !calm.on || dateStatusFamily(d.status) === 'confirmed';
+    return shows('planner', 'options', calm.on) || dateStatusFamily(d.status) === 'confirmed';
   }
   let shownPerfs = $derived(scopedPerfs.filter(perfDrawn));
   let shownDates = $derived(scopedDates.filter(dateDrawn));
@@ -1042,11 +1043,14 @@
   });
 
   /** Every calendar row as the board consumes it — THE SLIP travels inside
-      (ADR-095: the board renders the app's one card, never a lookalike). */
+      (ADR-095: the board renders the app's one card, never a lookalike).
+      The SCOPED rows, not the drawn ones: the lane tallies count the window,
+      so calm does not thin them (ADR-139 § 5); `boardDrawnCells` drops from
+      the paper what calm does not draw. */
   let boardEvents = $derived.by((): BoardEventIn[] => {
     if (view !== 'board') return [];
     const out: BoardEventIn[] = [];
-    for (const p of shownPerfs) {
+    for (const p of scopedPerfs) {
       const day = perfDayKey(p);
       if (day < agendaFromIso || day > agendaToIso) continue;
       out.push({
@@ -1063,7 +1067,7 @@
         slip: performanceSlip(p, slipCtxPage),
       });
     }
-    for (const d of shownDates) {
+    for (const d of scopedDates) {
       const day = dateDayKey(d, viewerTz);
       if (day < agendaFromIso || day > agendaToIso) continue;
       out.push({
@@ -1110,6 +1114,21 @@
       castByProject: boardCast,
       awayByDay: boardAwayByDay,
     });
+  });
+  /** What the board puts on paper: every placed row outside calm, the
+      confirmed ones in it (the same predicate as every other drawing). */
+  let boardDrawnCells = $derived.by(() => {
+    if (shows('planner', 'options', calm.on)) return boardBase.cells;
+    const out = new Map<string, Map<string, PlacedEvent[]>>();
+    for (const [lane, days] of boardBase.cells) {
+      const kept = new Map<string, PlacedEvent[]>();
+      for (const [day, placed] of days) {
+        const firm = placed.filter((pl) => pl.event.cert === 'confirmed');
+        if (firm.length > 0) kept.set(day, firm);
+      }
+      out.set(lane, kept);
+    }
+    return out;
   });
 
   /* AN ABSENCE BELONGS TO A PERSON, and each axis says so in its own rows:
@@ -1191,7 +1210,7 @@
     if (view !== 'board') return [];
     const active = activeDaySet({
       axis: laneAxis,
-      cells: boardBase.cells,
+      cells: boardDrawnCells,
       prepDays: [],
       awayRuns: boardAwayRuns,
     });
@@ -1314,7 +1333,7 @@
     if (d) void jumpToDecisionCard(d.id);
     else jumpToDecisions();
   }
-  /** A date slip has no page of its own — its edit dialog opens here,
+  /** A date slip has no page of its own — its vistazo opens here,
       exactly as it does from the month and the agenda. */
   function openBoardDate(dateId: string) {
     const d = shownDates.find((x) => x.id === dateId);
@@ -1672,6 +1691,8 @@
       .filter((p) => {
         if (perfDayKey(p) <= selectedDay) return false;
         const fam = performanceStatusFamily(p.status);
+        // Calm: «Después» is what is settled, like the paper above it.
+        if (!shows('planner', 'options', calm.on)) return fam === 'confirmed';
         return fam === 'confirmed' || fam === 'hold' || fam === 'proposed';
       })
       .sort((a, b) => (a.performed_at < b.performed_at ? -1 : 1))
@@ -2930,7 +2951,7 @@
         return;
       }
       // A dialog is open: it owns the keyboard until it closes.
-      if (createOpen || editOpen || marksOpen) return;
+      if (createOpen || peekOpen || marksOpen) return;
       // Inside a drawing's days the arrows are not «move the window»: on the
       // month they changed the month under the focused day and dropped the
       // focus on <body> (móvil #3). There they are the drawing's, or nothing.
@@ -2995,6 +3016,8 @@
 
   let createOpen = $state(false);
   let createDate = $state<string | null>(null);
+  /** The type a door opens on (the "⋯" «unavailable»); null = the draft's. */
+  let createType = $state<QuickType | null>(null);
 
   // A single pinned line pre-selects its project — and its line. With no
   // line pins, a single pinned project pre-selects itself.
@@ -3010,6 +3033,7 @@
     // re-arms it, AFTER this runs, so a toolbar «+ date» never inherits
     // the last cell's project.
     boardPresetProjectId = null;
+    createType = null;
     createDate = dayIso ?? viewCreateDay();
     createOpen = true;
   }
@@ -3049,34 +3073,26 @@
     return sorted.length ? { from: sorted[0], to: sorted[sorted.length - 1] } : null;
   }
 
-  // ── Editing a date (task 15) — both projections open the same dialog.
-  // A date has no page of its own (no slug, no road sheet), so the edit
-  // is a dialog over the calendar, exactly where creation happens.
-  let editOpen = $state(false);
-  let editDate = $state<DateEvent | null>(null);
-
-  /** True when other loaded rows share this row's series (ADR-084 §1). */
-  let editInSeries = $derived.by(() => {
-    const sid = editDate?.series_id;
-    if (!sid) return false;
-    return shownDates.filter((d) => d.series_id === sid).length > 1;
-  });
+  // ── Looking at a date (ADR-139 p1) — every drawing opens its vistazo,
+  // over the calendar; «Editar» there opens the edit dialog. A drawn day of
+  // a date of several days stands for the date itself (`spanSourceId`).
+  // While the vistazo is open it owns the keyboard, like a dialog.
+  let peekOpen = $derived(currentPeek() !== null);
 
   function openDate(d: DateEvent) {
-    // A drawn day of a date of several days opens the date itself.
-    editDate = sourceDateById.get(spanSourceId(d.id)) ?? d;
-    editOpen = true;
+    openPeek({ kind: 'date', id: spanSourceId(d.id) });
   }
 
-  async function handleCreated(perf: CreatedPerformance) {
+  /** Adding stays on the Planner (ADR-139 p3); the notice's «Abrir» goes
+      to the new performance's page, only when asked. */
+  async function openCreatedPerformance(perf: CreatedPerformance) {
     const ws = workspaceSlugById.get(perf.workspace_id) ?? defaultWorkspaceSlug;
     if (perf.slug) await goto(`/h/${ws}/performance/${perf.slug}`);
   }
 
-  // ── Blackout dialog (ADR-078 §4/§5) — entry points hide while the
-  // availability or team feed is absent (contract § Graceful absence). ──
-  let blackoutOpen = $state(false);
-
+  // ── Unavailability (ADR-078 §4/§5) is a type of the quick add; it can be
+  // written only while the availability and team feeds answer (contract
+  // § Graceful absence). ──
   let canBlackout = $derived(
     Boolean(
       $availabilityQuery.data &&
@@ -3097,8 +3113,8 @@
   });
 
   function openBlackout() {
-    createOpen = false;
-    blackoutOpen = true;
+    openCreate();
+    createType = 'unavailable';
   }
 
   // ── Calendar feed links (ADR-054) — entry now lives in the "⋯" menu;
@@ -3236,15 +3252,32 @@
     <p class="cal__meta cal__meta--window">
       <!-- One empty line box: the caption's own height, whatever it says. -->
       <span class="cal__strut" aria-hidden="true">&#8203;</span>
-        <!-- CALM IS A WORD, ON THE FACTS SIDE (ADR-095 §3). It lives in the
-             Desk — global and non-destructive — and the Planner does not draw
-             its switch: it draws what it DOES. An active filter you cannot see
-             is a filter that lies, and this one hides two thirds of the month.
-             It opens THIS line and not the other one because it is about the
-             drawing: the counters beside it do not move — they count the
-             window — so the word is what explains why only one is on paper. -->
-        {#if calm.on}
-          <span class="cal__stat cal__stat--soft">{t('planner.calm_state', locale)}<ConceptHint concept="calm" /></span>
+        <!-- CALM IS ONE SENTENCE, NOT A WORD MORE (ADR-139 § 5; it was
+             «calma · solo confirmados» in front of the whole census, ADR-095
+             §3). The line still says what calm hides, because a filter you
+             cannot see lies: a bounded window counts what is confirmed and how
+             many options wait outside; a window that grows only says that they
+             do. The way back is on the line. -->
+        {#if !shows('planner', 'census', calm.on)}
+          {@const cf = plannerCalmFacts(view, stats)}
+          {#if cf.confirmed !== null && cf.options !== null}
+            <span class="cal__stat"
+              ><b>{fig(cf.confirmed)}</b>
+              {t(figOne(cf.confirmed) ? 'planner.stat_confirmed_one' : 'planner.stat_confirmed', locale)}</span
+            >
+            {#if figuresKnown && cf.options > 0}
+              <span class="cal__stat cal__stat--soft"
+                >{t(cf.options === 1 ? 'planner.calm_options_one' : 'planner.calm_options_many', locale, {
+                  n: cf.options,
+                })}</span
+              >
+            {/if}
+          {:else}
+            <span class="cal__stat cal__stat--soft">{t('planner.calm_uncounted', locale)}</span>
+          {/if}
+          <button type="button" class="cal__stat empty-line__act" onclick={() => calm.set(false)}
+            >{t('calm.see_all', locale)}&nbsp;<span aria-hidden="true">→</span></button
+          >
         {/if}
         <!-- COUNTERS FOLLOW THE GEOMETRY, NOT THE WORD (ADR-095).
              A BOUNDED drawing that announces a range has to count it; a drawing
@@ -3271,7 +3304,7 @@
              fact (revisión del Planner, 2026-10-18). It used to carry its own
              census under the tabs, lowercase, with «firm» where this line
              said «confirmed». -->
-        {#if view === 'overview'}
+        {#if view === 'overview' && shows('planner', 'census', calm.on)}
           <span class="cal__stat cal__stat--soft">{seasonWindowLabel}</span>
           <span class="cal__stat"
             ><b>{fig(seasonFacts.perfs)}</b>
@@ -3308,7 +3341,7 @@
              counted (law: el horizonte del tablero). Lanes from the one
              writer (boardLaneCount); folding is furniture and the meta
              does not chase it. -->
-        {#if view === 'board'}
+        {#if view === 'board' && shows('planner', 'census', calm.on)}
           <span class="cal__stat cal__stat--soft">{t('planner.board_no_end', locale)}</span>
           <span class="cal__stat cal__stat--soft">{t('planner.board_grain', locale)}</span>
           <span class="cal__stat cal__stat--soft"
@@ -3340,7 +3373,7 @@
              counting — the drawing is the count. The agenda and the board
              have no last day, so they name where they begin and count
              nothing. -->
-        {#if view === 'month'}
+        {#if view === 'month' && shows('planner', 'census', calm.on)}
         <span class="cal__stat"
           ><b>{fig(stats.confirmed)}</b>
           {t(figOne(stats.confirmed) ? 'planner.stat_confirmed_one' : 'planner.stat_confirmed', locale)}</span
@@ -3416,20 +3449,13 @@
     onReadMarks={() => (marksOpen = true)}
     {view}
     {laneAxis}
-    calm={calm.on}
     {canBlackout}
     {locale}
     onSetView={setView}
     onSetLaneAxis={setLaneAxis}
     onCreate={() => openCreate()}
     onFeed={openFeed}
-    onBlackout={() => {
-      // Direct menu path: no day of its own — drop any stale preset from a
-      // cancelled day-cell create and propose the view's day, like every
-      // door without one. The create-dialog footer path keeps its day.
-      createDate = viewCreateDay();
-      openBlackout();
-    }}
+    onBlackout={openBlackout}
   />
 
 
@@ -3477,6 +3503,8 @@
         setView('agenda');
       }}
       onCreate={() => openCreate()}
+      calm={calm.on}
+      onLeaveCalm={() => calm.set(false)}
     />
   {:else if view === 'day'}
     <!-- A CLASH IS ABOUT WHAT IS *IN* THE DAY, so it goes above the drawing:
@@ -3677,7 +3705,8 @@
                 : '',
               // ONE IS NOT «1 OPTIONS». The month's gutter kept its counts in a
               // tooltip, so nobody had ever read them as a sentence.
-              held
+              // Calm: the options are off the paper, and off the week's sum.
+              held && shows('planner', 'week_options', calm.on)
                 ? `${held} ${t(held === 1 ? 'planner.week_option_one' : 'planner.week_options', locale)}`
                 : '',
               free ? `${free} ${t(free === 1 ? 'planner.week_free_one' : 'planner.week_free', locale)}` : '',
@@ -3722,7 +3751,8 @@
       axis={laneAxis}
       columns={boardWordedColumns}
       groups={boardBase.groups}
-      cells={boardBase.cells}
+      cells={boardDrawnCells}
+      countCells={boardBase.cells}
       awayRuns={boardAwayRuns}
       clashes={boardClashes}
       axisWord={t(`planner.lanes_${laneAxis}`, locale)}
@@ -3751,10 +3781,6 @@
       shut={boardShut}
       {loading}
     />
-    <!-- DEFERRED, said where it costs: the lane tallies count the DRAWN
-         events, so calm (which hides options from the drawing) also thins
-         the counts. The window-counting version needs a drawn-flag through
-         the engine — noted in the review, not smuggled in. -->
   {/if}
 </section>
 
@@ -3763,18 +3789,11 @@
   presetProjectId={boardPresetProjectId ?? presetProjectId}
   {presetLineId}
   presetDate={createDate}
-  showBlackoutAction={canBlackout}
-  onBlackout={openBlackout}
-  onCreatedPerformance={handleCreated}
-/>
-
-<CreateBlackoutDialog
-  bind:open={blackoutOpen}
+  presetType={createType}
   presetWorkspaceId={blackoutPresetWs}
-  presetDate={createDate}
+  canUnavailable={canBlackout}
+  onOpenPerformance={openCreatedPerformance}
 />
-
-<EditDateDialog bind:open={editOpen} date={editDate} inSeries={editInSeries} />
 
 <FeedDialog bind:open={feedOpen} workspaces={$workspacesQuery.data?.items ?? []} />
 
