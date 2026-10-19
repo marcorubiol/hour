@@ -22,6 +22,7 @@
   import { fetchJSON, mutateJSON } from '$lib/api';
   import { addToast } from '$lib/components/Toast.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
+  import { useCalm } from '$lib/stores/calm.svelte';
   import FirstTimeNote from '$lib/components/FirstTimeNote.svelte';
   import Button from '$lib/components/Button.svelte';
   import MailoutFigures from '$lib/components/MailoutFigures.svelte';
@@ -92,6 +93,8 @@
   }: Props = $props();
 
   let full = $derived(panel === 'sales');
+  // The list is not in calm: its door leaves calm first, as Cuentas' do.
+  const calm = useCalm();
   /** A block's link is its filter, with the chip: block and list count the same (ADR-118 § 7). */
   function link(qs: string): string {
     return panelHref(chip, qs);
@@ -319,7 +322,7 @@
     <div class="board__col">
       <section class="block block--due" aria-labelledby="ov-due" data-testid="block-due" data-help-step="conv-due">
         <BlockHead id="ov-due" concept="due" title={t('overview.due', locale)} count={data.due.count}>
-          {#if data.due.count > 0}<a class="block-head__act" href={link('turno=nuestro#lista')}>{t('overview.see_in_list', locale)}</a>{/if}
+          {#if data.due.count > 0}<a class="block-head__act" href={link('turno=nuestro#lista')} onclick={() => calm.set(false)}>{t('overview.see_in_list', locale)}</a>{/if}
         </BlockHead>
         <FirstTimeNote event="first_reply_waiting" when={data.due.count > 0} />
         {#if data.due.count === 0}
