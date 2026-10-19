@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- En el Planner, «+ Fecha» y la tecla N proponen el día que estás mirando, no hoy. Y una ficha que no carga lo dice claro: si no existe o no la puedes ver, o si ha fallado, con «Reintentar». (2026-10-19)
 - Conversaciones abre en **Todas**, con una fila de etiquetas arriba: Difusión (Contratación en música), Prensa, Coproducción, Distribución y Equipo. Cada conversación lleva sus etiquetas, en la ficha y en la fila; al añadir una eliges la suya, y una de Prensa no tiene trato ni entra en la temporada. El panel de venta y el envío en bloque son de Difusión. (2026-10-19)
 - En el Planner, Día y Agenda dicen en el margen los próximos pasos de tus conversaciones y las tareas con fecha, lo mismo que «Te espera» en Hoy; Mes y Temporada dan solo el número, que abre el día. Y desde una conversación, «Ver en el Planificador». (2026-10-19)
 - La ayuda en el sitio llega a Conversaciones, Cuentas, las fichas y Ajustes: sus «i» (la relación con la sala, «lo conozco», el registro de una conversación), las tarjetas de Difusión, Equipo y Cuentas, avisos de primera vez y un «Enséñame» que señala las piezas de la pantalla una a una. (2026-10-19)
