@@ -33,8 +33,8 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
 ## Producción (verificado 2026-10-14, tarde)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`7fc28e60`**, `dirty:false`, builtAt
-  2026-10-19T08:46Z (ayuda contextual carril 1 y «no esta vez» fuera de los envíos, sobre ADR-138 E1 y E2). `main` == prod salvo documentos y tests.
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`13889409`**, `dirty:false`, builtAt
+  2026-10-19T09:17Z (ayuda contextual completa: carriles 1 y 2, sobre ADR-138). `main` == prod salvo documentos y tests.
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free, con keepalive diario
   (`.github/workflows/keepalive.yml`) contra la pausa por inactividad. Pasar a Pro antes de la beta, aún no
@@ -42,7 +42,7 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 - **Última migración aplicada: `20261020150000_help_seen`** (2026-10-19, run 39225129070; backup 39224773286), con `20261020140000` y `20261020140100` («no esta vez» fuera de los envíos). Antes, `20261020130000_create_conversation_one_signature`, que arregla la sobrecarga que dejó `20261020120000` (crear conversación falló de 07:49 a 08:15). Antes, `20261020100000_conversation_relation` y `20261020110000_person_acquaintance` (ADR-138, run 39215156290). Las migraciones van por `production-migrate.yml`: backup, plan, apply. **Al redefinir una función, copiar la firma de la base viva (`pg_get_functiondef`), no de la última migración que la nombra: otra firma crea una sobrecarga y PostgREST responde 300.**
 - `hour-staging` (ref `slccyknqpgmzhyiyclsq`, `eu-west-1`): reconstruido el 2026-10-13 con el contract de permisos
   (run 38469017859: RLS 309/313, smoke 2/2). Se volverá a pausar sin uso.
-- Últimas suites contra producción: RLS 420/420 y E2E 110/111 con 1 saltado (2026-10-19, `7fc28e60`, en serie, por `hour-web.marco-rubiol.workers.dev`).
+- Últimas suites contra producción: RLS 420/420 (2026-10-19, `13889409`, en serie; `conversation-venue` «sending goes to the primary contact» falló una vez y pasa solo al repetirlo) y E2E 112/113 con 1 saltado, por `hour-web.marco-rubiol.workers.dev`.
 - Desde el checkout principal (`~/Developer/hour`), nunca desde un worktree: los worktrees no llevan `.env` ni
   `.env.test` (RLS sale saltado, el login del E2E falla).
 - `pnpm --filter web test:rls`: siempre contra producción; carga `.env` + `.env.test` y no mira `.env.local`.
