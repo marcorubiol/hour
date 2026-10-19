@@ -40,7 +40,7 @@
   <div class="doors">
     {#if planner}
     <a class="door" href="/h/planner" data-testid="door-planner">
-      <span class="door__lens eyebrow eyebrow--sub">{t('lens.planner', locale)}<i>{t('desk.door_planner_window', locale)}</i></span>
+      <span class="door__lens">{t('lens.planner', locale)}<i>{t('desk.door_planner_window', locale)}</i></span>
       {#if planner.errored}
         <span class="door__n stat door__n--na">{DASH}</span><span class="door__txt">{t('desk.door_error', locale)}</span>
       {:else}
@@ -65,7 +65,7 @@
 
     {#if conversations}
       <a class="door" href="/h/conversations" data-testid="door-conversations">
-        <span class="door__lens eyebrow eyebrow--sub">{t('lens.conversations', locale)}<i>{seasonLabel}</i></span>
+        <span class="door__lens">{t('lens.conversations', locale)}<i>{seasonLabel}</i></span>
         {#if conversations.errored}
           <span class="door__n stat door__n--na">{DASH}</span><span class="door__txt">{t('desk.door_error', locale)}</span>
         {:else}
@@ -84,7 +84,7 @@
 
     {#if money}
       <a class="door" href="/h/books" data-testid="door-books">
-        <span class="door__lens eyebrow eyebrow--sub">{t('lens.money', locale)}</span>
+        <span class="door__lens">{t('lens.money', locale)}</span>
         {#if money.errored}
           <span class="door__n stat door__n--na">{DASH}</span><span class="door__txt">{t('desk.door_error', locale)}</span>
         {:else}
@@ -129,10 +129,14 @@
   .door:hover {
     border-color: var(--border-color-dark);
   }
+  /* ONE LABEL PER BLOCK (ADR-139 § 6): «La temporada» is the block's; a
+     door is named by its lens in plain words, the window after it, quieter. */
   .door__lens {
     grid-area: lens;
     display: flex;
     gap: var(--space-s);
+    font-size: var(--text-s);
+    color: var(--text-color);
   }
   .door__n {
     grid-area: n;
@@ -149,14 +153,18 @@
   }
   .door__lens i {
     font-style: normal;
-    text-transform: none;
-    letter-spacing: var(--mono-letter-spacing);
+    color: var(--text-faint);
   }
   .door__txt em {
     font-style: normal;
   }
+  /* THE RED ONCE PER BLOCK: the first door with something hot keeps it;
+     a later one says it in ink. */
   .door__hot {
     color: var(--danger);
+  }
+  .door:has(.door__hot) ~ .door .door__hot {
+    color: var(--text-color);
   }
   .door__arrow {
     grid-area: arrow;

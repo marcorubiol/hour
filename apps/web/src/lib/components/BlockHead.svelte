@@ -18,6 +18,9 @@
     /** The figure (or a short fact) after the title; a dash while loading. */
     count?: string | number | null;
     alert?: boolean;
+    /** A second fact after the figure that asks for attention («3 vencidas»):
+        the block's one red (ADR-139 § 6), so the figure stays in ink. */
+    alertNote?: string | null;
     id?: string;
     /** Names a region by its words alone, without the figure (Desk's bands). */
     titleId?: string;
@@ -36,6 +39,7 @@
     title,
     count = null,
     alert = false,
+    alertNote = null,
     id,
     titleId,
     focusable = false,
@@ -48,7 +52,8 @@
 
 {#snippet words()}
   {#if titleId}<span id={titleId}>{title}</span>{:else}{title}{/if}{#if count !== null && count !== ''}&nbsp;·
-    <span class="block-head__n" class:block-head__n--alert={alert}>{count}</span>{/if}
+    <span class="block-head__n" class:block-head__n--alert={alert}>{count}</span>{/if}{#if alertNote}&nbsp;·
+    <span class="block-head__n block-head__n--alert">{alertNote}</span>{/if}
 {/snippet}
 
 {#snippet heading()}

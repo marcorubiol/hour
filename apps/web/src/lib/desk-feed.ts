@@ -516,7 +516,6 @@ export interface WaitingWindow {
 }
 
 export interface WaitingOptions {
-  calm?: boolean;
   limit?: number;
   /** Bound to these days instead of the Desk's tiers (overdue, today, the week). */
   window?: WaitingWindow;
@@ -541,13 +540,30 @@ export function waitingDay(item: Pick<DeskItem, 'day'>, now: Date): string | nul
  * today, the rest of this week — and the «voy · no voy» of the next two weeks
  * after them; inside a tier, by `weightOf`, then by day. The anytime tail and
  * what lies past this week stay in the day list, except a task already inside
- * its warning, which joins the week. Calm keeps overdue and today.
+ * its warning, which joins the week. Calm reads the same tiers through
+ * `calmWaiting` (ADR-139 § 5).
  *
  * With a `window` (the Planner's margin, ADR-138 § 6) the tiers are the
  * window's days instead: every dated row whose `waitingDay` falls inside it,
  * by day, the overdue first, then by weight. No cut unless `limit` says so.
  */
 export function rankWaiting(feed: readonly DeskBucket[], now: Date, opts: WaitingOptions = {}): Waiting {
+  const kept = rankTiered(feed, now, opts);
+  const limit = opts.limit ?? (opts.window ? Infinity : WAITING_ROWS);
+  return {
+    rows: kept.slice(0, limit).map((x) => x.item),
+    total: kept.length,
+    asking: kept.filter((x) => !x.item.isProposal).length,
+    overdue: kept.filter((x) => x.tier === 0 && !x.item.isProposal).length,
+  };
+}
+
+/** The ranked rows with their tier: 0 overdue, 1 today, 2 this week, 3 a «voy» of next week. */
+function rankTiered(
+  feed: readonly DeskBucket[],
+  now: Date,
+  opts: WaitingOptions,
+): { tier: number; day: string; item: DeskItem }[] {
   const tiered: { tier: number; day: string; item: DeskItem }[] = [];
   const admitted = (item: DeskItem) =>
     (!opts.concerns || opts.concerns.includes(item.concern)) && (opts.proposals !== false || !item.isProposal);
@@ -573,19 +589,43 @@ export function rankWaiting(feed: readonly DeskBucket[], now: Date, opts: Waitin
         if (t !== null) tiered.push({ tier: t, day: item.day ?? '', item });
       }
   }
-  const kept = opts.calm ? tiered.filter((x) => x.tier <= 1) : tiered;
-  kept.sort((a, b) =>
+  tiered.sort((a, b) =>
     opts.window
       ? a.day.localeCompare(b.day) || a.tier - b.tier || weightOf(a.item) - weightOf(b.item)
       : a.tier - b.tier || weightOf(a.item) - weightOf(b.item) || a.day.localeCompare(b.day),
   );
-  const limit = opts.limit ?? (opts.window ? Infinity : WAITING_ROWS);
-  return {
-    rows: kept.slice(0, limit).map((x) => x.item),
-    total: kept.length,
-    asking: kept.filter((x) => !x.item.isProposal).length,
-    overdue: kept.filter((x) => x.tier === 0 && !x.item.isProposal).length,
-  };
+  return tiered;
+}
+
+/** How many of today's rows calm draws; the rest of today joins the line. */
+export const CALM_ROWS = 5;
+
+export interface CalmWaiting {
+  /** Today's rows, by weight, at most `CALM_ROWS`. */
+  today: DeskItem[];
+  /** What is overdue: never listed in calm, said in one line that opens it. */
+  overdue: DeskItem[];
+  /** Everything else «Te espera» holds outside calm: the week, the «voy», today's overflow, Hour's proposals. */
+  more: number;
+}
+
+/**
+ * «Te espera» in calm (ADR-139 § 5, the July spec restored): only today, a
+ * short list; what is overdue is not listed but counted, in one line that
+ * opens it in place; the rest is a number that leaves calm. The tiers and
+ * weights are `rankWaiting`'s, so nothing is decided twice. Hour's own
+ * proposals wait outside: calm is what you have to do today.
+ */
+export function calmWaiting(feed: readonly DeskBucket[], now: Date): CalmWaiting {
+  const today: DeskItem[] = [];
+  const overdue: DeskItem[] = [];
+  let more = 0;
+  for (const { tier, item } of rankTiered(feed, now, {})) {
+    if (!item.isProposal && tier === 0) overdue.push(item);
+    else if (!item.isProposal && tier === 1 && today.length < CALM_ROWS) today.push(item);
+    else more++;
+  }
+  return { today, overdue, more };
 }
 
 /** The margin's rows by the day they wait on (`waitingDay`), in `rankWaiting`'s order. */

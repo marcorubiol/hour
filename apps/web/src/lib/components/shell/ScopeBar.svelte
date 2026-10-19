@@ -67,26 +67,20 @@
 </script>
 
 <div class="shell__lenschrome">
-  <div class="scopebar">
+  <!-- THE BAR EARNS ITS PLACE WHEN IT NARROWS (ADR-139 § 6). Unscoped it
+       says one word, «Todo», and its door, with no box: a band that states
+       «everything» in a frame reads as a filter that is on. The axes you can
+       narrow by are the word's title; the link to «everything» is the lens's
+       own address, so there is nothing to copy. -->
+  <div class="scopebar" class:scopebar--all={pins.pins.length === 0}>
     {#if pins.pins.length === 0}
       <span class="scopebar__scope">
         <span class="scopebar__lead">{t('planner.lanes_scope', locale)}<ConceptHint concept="scope" /></span>
-        <!-- Names every axis you can narrow by, and it has to name them ALL:
-             the line has to earn its place in the sentence, and a person is
-             now a fourth thing you can pin. A band that lists two of four
-             teaches that the other two do not exist. -->
-        <span class="scopebar__all" title={t('shell.everything_all', locale)}
-          >{t('shell.everything_all', locale)}</span
-        >
+        <span class="scopebar__all" title={t('shell.everything_all', locale)}>{t('shell.everything', locale)}</span>
       </span>
       <button type="button" class="scopebar__add" onclick={openPaletteAdd}>
         {t('shell.narrow', locale)}
       </button>
-      <span class="scopebar__right">
-        <button type="button" class="scopebar__save" onclick={copyScopeLink}
-          >⧉ {t('shell.copy_link', locale)}</button
-        >
-      </span>
     {:else}
       <span class="scopebar__lead">{t('planner.lanes_scope', locale)}<ConceptHint concept="scope" /></span>
       {#each pins.pins as tok (tok)}
@@ -165,6 +159,14 @@
        you are looking at, and it sits flush with the sheet below it. */
     border-radius: var(--radius);
     min-block-size: 3rem;
+  }
+  /* Unscoped: a line, not a band. No ground, no frame, no reserved height:
+     the lens's title sits right under it. */
+  .scopebar--all {
+    padding: 0;
+    background: none;
+    border-color: transparent;
+    min-block-size: 0;
   }
   /* The mono micro-label + serif descriptor are one unit: baseline-aligned to
      each other INSIDE this group, then the group is centered as a block by the

@@ -29,6 +29,9 @@
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import BlockHead from '$lib/components/BlockHead.svelte';
+  import CalmLine from '$lib/components/CalmLine.svelte';
+  import { useCalm } from '$lib/stores/calm.svelte';
+  import { shows } from '$lib/calm';
   import Button from '$lib/components/Button.svelte';
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import Chip from '$lib/components/Chip.svelte';
@@ -259,6 +262,11 @@
 
   // ── The radar ─────────────────────────────────────────────────────────
   let position = $derived(moneyPosition(bolos, ctx, season));
+  // Calm (ADR-139 § 5, `$lib/calm`): one figure, what comes in over the next
+  // thirty days in the main currency, and «Pide atención»; the other figures,
+  // the months and the book fold into one line that leaves calm.
+  const calm = useCalm();
+  let shownPosition = $derived(shows('books', 'other_figures', calm.on) ? position : position.slice(0, 1));
   let attention = $derived(attentionItems(bolos, ctx));
 
   // The welcome card's extra line is for whoever can turn Books off (ADR-132):
@@ -407,13 +415,17 @@
     in_progress: 'books.filter_in_progress',
   };
 
+  // The book is not in calm: a door to it (a figure, a row of «Pide
+  // atención») leaves calm first, so it never opens onto nothing.
   async function showLedger(f: LedgerFilter) {
+    calm.set(false);
     filter = f;
     tab = 'bolos';
     await tick();
     document.getElementById('mny-ledger')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   }
   async function showDocument(invoiceId: string) {
+    calm.set(false);
     tab = 'documents';
     focusInvoiceId = invoiceId;
     await tick();
@@ -429,6 +441,7 @@
   function focusBolo(id: string) {
     const target = bolos.find((b) => b.id === id);
     if (!target) return;
+    calm.set(false);
     const s = boloSeason(target, today);
     pickedSeason = s === currentSeason ? null : s;
     filter = 'all';
@@ -901,7 +914,7 @@
   <title>{docTitle(t('lens.money', locale))}</title>
 </svelte:head>
 
-<section class="mny" aria-busy={busy}>
+<section class="mny" class:mny--calm={calm.on} aria-busy={busy}>
   <LensHeader help={noAccess ? undefined : 'books'}>
     {#snippet title()}<LensTitle text={t('lens.money', locale)} />{/snippet}
     {#snippet sub()}
@@ -960,13 +973,14 @@
             {/each}
           </div>
         {:else if !seasonEmpty}
-          {#each position as pos, i (pos.currency)}
+          {#each shownPosition as pos, i (pos.currency)}
             {#if i > 0 && isQuietPosition(pos)}
             {#if pos.sold > 0 || pos.holds > 0}
             <p class="figs__quiet" data-currency={pos.currency}>{t('books.fig_quiet_currency', locale, { amount: fmtMoneyCompact(pos.sold), currency: pos.currency, season: seasonLabel(season) })}{#if pos.holds > 0}{` · ${t('books.fig_holds', locale, { amount: fmtMoneyCompact(pos.holds), n: pos.holdsCount })}`}{/if}</p>
             {/if}
             {:else}
             <div class="figs__row" data-currency={pos.currency}>
+              {#if shows('books', 'other_figures', calm.on)}
               <div class="fig-cell">
               <button type="button" class="fig" data-fig="owed" onclick={() => showLedger('owed')}>
                 <span class="fig__label eyebrow eyebrow--sub">{t('books.fig_owed', locale)}</span>
@@ -989,6 +1003,7 @@
                 <span class="fig__num stat">{fmtMoneyCompact(pos.toInvoice)}<span class="fig__cur">{pos.currency}</span></span>
                 <span class="fig__sub">{pos.toInvoiceCount === 0 ? t('books.fig_to_invoice_none', locale) : t(pos.toInvoiceCount === 1 ? 'books.fig_to_invoice_one' : 'books.fig_to_invoice_many', locale, { n: pos.toInvoiceCount })}</span>
               </button>
+              {/if}
               <div class="fig-cell">
               <div class="fig" data-fig="inflow">
                 <span class="fig__label eyebrow eyebrow--sub">{t('books.fig_inflow', locale)}</span>
@@ -997,6 +1012,7 @@
               </div>
               <ConceptHint concept="next30" />
               </div>
+              {#if shows('books', 'other_figures', calm.on)}
               <div class="fig-cell">
               <button type="button" class="fig" data-fig="season" onclick={() => showLedger('all')}>
                 <span class="fig__label eyebrow eyebrow--sub">{t('books.fig_season', locale)} {seasonLabel(season)}</span>
@@ -1018,6 +1034,7 @@
               </button>
               <ConceptHint concept="season_books" />
               </div>
+              {/if}
             </div>
             {/if}
           {/each}
@@ -1073,6 +1090,7 @@
           </section>
 
           <!-- 3 · Lo que entra -->
+          {#if shows('books', 'inflow_months', calm.on)}
           <section class="inflow" aria-label={t('books.inflow', locale)}>
             <BlockHead title={t('books.inflow', locale)} />
             {#if invoicesError}
@@ -1108,6 +1126,7 @@
               </p>
             {/if}
           </section>
+          {/if}
         </div>
       {/if}
 
@@ -1116,6 +1135,9 @@
       {/if}
 
       <!-- 4 · El libro -->
+      {#if !shows('books', 'ledger', calm.on)}
+        <CalmLine text={t('books.calm_rest', locale)} action={t('calm.see_all', locale)} onclick={() => calm.set(false)} />
+      {:else}
       <section class="ledger" id="mny-ledger" aria-label={t('books.ledger', locale)} data-help-step="books-ledger">
         <div class="ledger__tabrow">
         <div class="ledger__tabs" role="tablist" aria-label={t('books.ledger', locale)}>
@@ -1284,6 +1306,7 @@
           {/if}
         {/if}
       </section>
+      {/if}
     {/if}
   {/if}
 </section>
@@ -1457,6 +1480,9 @@
     /* While the feeds load the radar keeps roughly its height, so the ledger does not jump down. */
     .radar[aria-busy='true'] { min-block-size: 14rem; }
     .radar { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: var(--space-l); align-items: start; }
+    /* Calm: one column at the reading measure, from the same left edge. */
+    .mny--calm > :global(:not(.lenshead)) { max-inline-size: var(--calm-measure); }
+    .mny--calm .radar { grid-template-columns: minmax(0, 1fr); }
     .radar :global(.block-head) { margin-block-end: var(--space-xs); }
     /* One grid for the whole list (rows are subgrids): amounts and buttons
        fall in columns whatever each row's text measures. */
@@ -1469,6 +1495,9 @@
     .att__ctx { font-size: var(--text-s); color: var(--text-muted); }
     .att__why { inline-size: 100%; font-size: var(--text-xs); color: var(--text-muted); }
     .att__row[data-kind='overdue'] .att__why { color: var(--danger); }
+    /* The red once per block (ADR-139 § 6): the first overdue row carries it;
+       the ones under it say how late in ink, the list is already in order. */
+    .att__row[data-kind='overdue'] ~ .att__row[data-kind='overdue'] .att__why { color: var(--text-color); }
     .att__amt { font-family: var(--font-mono); font-size: var(--text-s); font-variant-numeric: tabular-nums; color: var(--text-color); white-space: nowrap; text-align: end; }
     .inflow__overdue { color: var(--danger); }
     .inflow__cur { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); }
