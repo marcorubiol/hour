@@ -18,7 +18,7 @@ export type Lens = 'desk' | 'planner' | 'conversations' | 'books';
 const VALID_LENSES: readonly Lens[] = ['desk', 'planner', 'conversations', 'books'];
 const STORAGE_KEY = 'hour_lens';
 
-export class LensStore {
+class LensStore {
   current = $state<Lens>('desk');
 
   set(next: Lens) {

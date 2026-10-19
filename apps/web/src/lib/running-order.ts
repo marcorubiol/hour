@@ -95,7 +95,7 @@ function nextDay(dayIso: string): string {
  * The hour where the night ends: a clock before it, on a running order that
  * already reaches the afternoon, is the next morning.
  */
-export const NIGHT_ENDS_AT = 6;
+const NIGHT_ENDS_AT = 6;
 
 /**
  * A typed clock on the day being looked at → the instant to store.
@@ -165,7 +165,7 @@ export const KIND_WORD_KEYS: Readonly<Record<string, string>> = {
  * trade's habits (`técnica` for the soundcheck) and the English the road
  * sheet always printed (`load in`, `start`). Recognised, never printed.
  */
-export const KIND_SYNONYMS: ReadonlyArray<readonly [kind: string, word: string]> = [
+const KIND_SYNONYMS: ReadonlyArray<readonly [kind: string, word: string]> = [
   ['load_in', 'load in'],
   ['load_in', 'load-in'],
   ['soundcheck', 'técnica'],

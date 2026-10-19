@@ -37,8 +37,6 @@ export const AvailabilityCreateSchema = v.object({
   note: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500)))),
 });
 
-export type AvailabilityCreate = v.InferOutput<typeof AvailabilityCreateSchema>;
-
 /**
  * PATCH /api/availability/:id body — field edits ride a direct PostgREST
  * PATCH (availability_block_update is member-gated, not claim-bound, and
@@ -52,8 +50,6 @@ export const AvailabilityPatchSchema = v.object({
   certainty: v.optional(v.picklist(AVAILABILITY_CERTAINTIES)),
   note: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500)))),
 });
-
-export type AvailabilityPatch = v.InferOutput<typeof AvailabilityPatchSchema>;
 
 /**
  * Shape the availability endpoints return: the row plus a person embed for

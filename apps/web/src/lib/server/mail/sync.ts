@@ -32,15 +32,15 @@ import { googleAdapter, ProviderAuthError } from './gmail';
 import { matchMessage, oldestFirst, type MailAdapter, type MailMessage } from './provider';
 
 /** Tope de correos que se bajan por buzón y pasada (CPU del Worker). */
-export const MAX_MESSAGES_PER_PASS = 100;
+const MAX_MESSAGES_PER_PASS = 100;
 /** Tope de ids que se listan por pasada (listar es barato: 100 por llamada). */
-export const MAX_IDS_PER_PASS = 1000;
+const MAX_IDS_PER_PASS = 1000;
 /** Lo que se trae de un contacto nuevo. */
-export const BACKFILL_MS = 365 * 24 * 60 * 60 * 1000;
+const BACKFILL_MS = 365 * 24 * 60 * 60 * 1000;
 /** Solape con la pasada anterior: el reloj y la indexación de Gmail no son exactos. */
 const OVERLAP_MS = 60 * 60 * 1000;
 
-export interface SyncDeps {
+interface SyncDeps {
   db: MailDb;
   adapter: (provider: MailAccountRow['provider']) => MailAdapter;
   key: CryptoKey;
@@ -48,7 +48,7 @@ export interface SyncDeps {
   now?: () => number;
 }
 
-export interface SyncResult {
+interface SyncResult {
   accountId: string;
   status: 'active' | 'revoked' | 'error';
   fetched: number;
@@ -204,7 +204,7 @@ export async function syncAccount(deps: SyncDeps, account: MailAccountRow): Prom
 }
 
 /** Las dependencias reales a partir del entorno del Worker. */
-export async function liveSyncDeps(env: MailEnv, fetchFn: typeof fetch = fetch): Promise<SyncDeps | null> {
+async function liveSyncDeps(env: MailEnv, fetchFn: typeof fetch = fetch): Promise<SyncDeps | null> {
   if (!mailConfigured(env)) return null;
   const key = await importMailKey(env.MAIL_TOKEN_KEY);
   const google = googleAdapter(fetchFn, {

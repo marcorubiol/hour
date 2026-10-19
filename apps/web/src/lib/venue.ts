@@ -64,8 +64,6 @@ export const VenuePatchSchema = v.object({
   notes: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000)))),
 });
 
-export type VenuePatch = v.InferOutput<typeof VenuePatchSchema>;
-
 /** Columns the venue endpoints return — superset of the ADR-049 list
  * (adds the 1c-editable address/contacts/notes payload). */
 export const VENUE_COLS =

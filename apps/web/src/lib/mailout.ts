@@ -67,8 +67,8 @@ export function domainState(d: Pick<MailDomainItem, 'verified_at' | 'dkim_status
   return 'pending';
 }
 
-export const DOMAIN_RE = /^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
-export const LOCAL_PART_RE = /^[a-z0-9]([a-z0-9._+-]{0,62}[a-z0-9])?$/;
+const DOMAIN_RE = /^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
+const LOCAL_PART_RE = /^[a-z0-9]([a-z0-9._+-]{0,62}[a-z0-9])?$/;
 
 /** Lo que escribe una persona: sin espacios, en minúsculas, sin `https://` ni barra final. */
 export function normalizeDomain(raw: string): string {
@@ -102,8 +102,8 @@ export const MailDomainSenderSchema = v.object({
 
 // ── Fase 3: el envío (ADR-115) ────────────────────────────────────────────
 
-export type MailoutStatus = 'draft' | 'review' | 'queued' | 'sending' | 'paused' | 'done' | 'cancelled';
-export type MailoutRecipientStatus =
+type MailoutStatus = 'draft' | 'review' | 'queued' | 'sending' | 'paused' | 'done' | 'cancelled';
+type MailoutRecipientStatus =
   | 'pending'
   | 'queued'
   | 'sending'
@@ -113,7 +113,7 @@ export type MailoutRecipientStatus =
   | 'complained'
   | 'skipped'
   | 'failed';
-export type MailoutSkipReason = 'suppressed' | 'no_basis' | 'no_address' | 'duplicate' | 'cancelled' | 'unavailable';
+type MailoutSkipReason = 'suppressed' | 'no_basis' | 'no_address' | 'duplicate' | 'cancelled' | 'unavailable';
 
 export interface MailoutItem {
   id: string;

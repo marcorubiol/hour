@@ -29,7 +29,7 @@ export const MAILOUT_PG_CODES: Record<string, PgErrorMapEntry> = {
   '23505': { status: 409, error: 'conflict' },
 };
 
-export interface MailoutCtx {
+interface MailoutCtx {
   env: MailoutEnv;
   jwt: string;
   id: string;

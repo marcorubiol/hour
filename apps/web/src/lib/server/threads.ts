@@ -27,7 +27,7 @@ import {
 
 const MESSAGE_SELECT = 'id,thread_id,author_id,performance_id,body,created_at,edited_at';
 
-export interface ThreadMessages {
+interface ThreadMessages {
   messages: ThreadMessage[];
   authors: Record<string, string>;
   reads: Record<string, string>;

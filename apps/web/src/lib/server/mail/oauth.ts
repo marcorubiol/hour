@@ -17,11 +17,11 @@ import type { Cookies } from '@sveltejs/kit';
 import { dev } from '$app/environment';
 import { openJson, sealJson } from './crypto';
 
-export const OAUTH_COOKIE = 'hour_mail_oauth';
+const OAUTH_COOKIE = 'hour_mail_oauth';
 const COOKIE_PATH = '/api/mail/oauth';
 const TTL_SEC = 600;
 
-export interface OAuthFlowState {
+interface OAuthFlowState {
   /** state (anti-CSRF) */
   n: string;
   /** PKCE verifier */

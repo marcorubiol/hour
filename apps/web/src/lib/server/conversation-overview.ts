@@ -25,7 +25,7 @@ import type { ConversationStatus } from '$lib/conversation';
 import type { ConversationBolo } from '$lib/conversation-relation';
 import { defaultProviderKind, type MailoutEnv } from '$lib/server/mailout';
 
-export interface OverviewScope {
+interface OverviewScope {
   projectIds: string[];
   workspaceIds: string[];
   /** `GET /api/conversations` puede acotar además por estado. */
@@ -47,10 +47,10 @@ export function setScope(search: URLSearchParams, projectIds: string[], workspac
 }
 
 /** El último correo, mensaje o llamada con dirección: el que decide el turno. */
-export const LAST_TURN_EMBED = 'last_turn:conversation_event(direction,occurred_at,kind,subject:metadata->>subject)';
+const LAST_TURN_EMBED = 'last_turn:conversation_event(direction,occurred_at,kind,subject:metadata->>subject)';
 
 /** El último que vino de fuera: si han contestado alguna vez (la relación, ADR-138). */
-export const LAST_IN_EMBED = 'last_in:conversation_event(occurred_at)';
+const LAST_IN_EMBED = 'last_in:conversation_event(occurred_at)';
 
 /** Los dos embebidos que leen el turno y la relación, juntos. */
 export const TURN_EMBEDS = `${LAST_TURN_EMBED},${LAST_IN_EMBED}`;
@@ -71,7 +71,7 @@ export function setLastTurnEmbed(search: URLSearchParams): void {
 }
 
 /** Los hechos de la relación (ADR-138): `regular` es el campo calculado, que lee los bolos hechos sin dinero. */
-export const RELATION_SELECT =
+const RELATION_SELECT =
   'not_now_at,not_now_until,first_contacted_at,contacted_undated,legacy_status:custom_fields->>legacy_status,regular:conversation_regular';
 
 const OVERVIEW_SELECT = [
@@ -188,7 +188,7 @@ const BOLOS_BATCH = 2000;
  * solo devuelve los de las que quien llama lee y con `read:performance` en el
  * proyecto. Agrupados por conversación, en orden de fecha.
  */
-export async function loadConversationBolos(
+async function loadConversationBolos(
   env: SupabaseEnv,
   jwt: string,
   ids: readonly string[],

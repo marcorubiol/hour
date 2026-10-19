@@ -14,7 +14,7 @@ export const GAP_MIN_NIGHTS = 3;
 /** «Sin cerrar» looks this far ahead: what is close enough to need closing. */
 export const UNCLOSED_WEEKS = 8;
 
-export interface SeasonWindow {
+interface SeasonWindow {
   /** First day the season counts: today. */
   from: string;
   /** Last day drawn and counted: the Sunday of the twelfth row. */
@@ -46,7 +46,7 @@ export function seasonWindow(today: string, weeks = SEASON_WEEKS): SeasonWindow 
   return { from: today, to, days, weeks: rows };
 }
 
-export interface GapWindow {
+interface GapWindow {
   from: string;
   to: string;
   nights: number;
@@ -81,9 +81,9 @@ export function gapWindows(
 }
 
 /** What a confirmed gig can still be missing. `travel` is a guess (see below). */
-export type UnclosedKey = 'time' | 'cast' | (typeof READINESS_KEYS)[number];
+type UnclosedKey = 'time' | 'cast' | (typeof READINESS_KEYS)[number];
 
-export interface UnclosedInput {
+interface UnclosedInput {
   start_at: string | null;
   readiness?: Record<string, boolean> | null;
   /** Roster from `?rosters=1`; null/undefined = the feed did not say. */
@@ -93,7 +93,7 @@ export interface UnclosedInput {
   city: string | null;
 }
 
-export interface UnclosedVerdict {
+interface UnclosedVerdict {
   /** Facts: each one is a field that is empty. */
   missing: UnclosedKey[];
   /** A deduction, never a fact: the gig is away from home and nothing says
@@ -135,7 +135,7 @@ export function unclosed(
   return { missing, travelGuess };
 }
 
-export type CellMark = 'firm' | 'option' | 'date' | null;
+type CellMark = 'firm' | 'option' | 'date' | null;
 
 export interface SeasonCellIn {
   day: string;
@@ -162,7 +162,7 @@ export function cellMark(rows: SeasonCellIn[]): CellMark {
 }
 
 /** What the season overview needs of a conflict ($lib/planner `Conflict`). */
-export interface SeasonConflictIn {
+interface SeasonConflictIn {
   severity: string;
   event_ids: string[];
 }

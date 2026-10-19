@@ -39,7 +39,7 @@ import type { ScheduleMoment, TimeslotFields } from './schedule-slot';
 export const ROADSHEET_ROLES = ['full', 'venue', 'performer', 'tech_manager'] as const;
 export type RoadsheetRole = (typeof ROADSHEET_ROLES)[number];
 
-export type RoadsheetSection =
+type RoadsheetSection =
   | 'schedule'
   | 'venue'
   | 'logistics'
@@ -78,7 +78,7 @@ export interface RoadsheetPerson {
   phone?: string | null;
 }
 
-export interface CrewEntry {
+interface CrewEntry {
   role: string;
   person: RoadsheetPerson | null;
   contact_override?: Json | null;
@@ -93,7 +93,7 @@ export interface CastEntry {
   reason?: string | null;
 }
 
-export interface AssetEntry {
+interface AssetEntry {
   kind: Tables<'asset_version'>['kind'];
   direction: Tables<'asset_version'>['direction'];
   notes: string | null;

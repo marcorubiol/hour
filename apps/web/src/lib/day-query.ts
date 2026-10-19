@@ -64,7 +64,7 @@ function fullYear(raw: string | undefined, fallback: number): number {
   return raw.length === 2 ? 2000 + n : n;
 }
 
-export interface DayQueryOptions {
+interface DayQueryOptions {
   /** Hoy, en ISO, en el huso del lector. Inyectado: nada aquí lee el reloj. */
   today: string;
   /** El locale activo primero; el resto como red, porque la gente escribe

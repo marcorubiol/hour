@@ -13,10 +13,10 @@ import type { InvoicingMode } from './fiscal';
 export type { InvoicingMode };
 
 /** Where a payment or expense is anchored. */
-export type MoneyAnchor = 'gig' | 'line' | 'project';
+type MoneyAnchor = 'gig' | 'line' | 'project';
 
 /** A gig's fee — the anchor of money v3. */
-export interface FeeRow {
+interface FeeRow {
 	id: string;
 	date: string; // display-ready
 	venue: string;
@@ -39,53 +39,7 @@ export interface ExpenseRow {
 	amount: number;
 }
 
-export interface InvoiceDocRow {
-	id: string;
-	number: string;
-	for_text: string;
-	currency: string;
-	subtotal: number;
-	vat_pct: number;
-	irpf_pct: number;
-	issue_date: string;
-	due_date: string;
-	payer_name: string;
-	payer_tax_id: string;
-}
-
-export type FeeStatus = 'unpaid' | 'partial' | 'full';
-
-export function feeStatus(fee: FeeRow): FeeStatus {
-	if (fee.collected <= 0) return 'unpaid';
-	if (fee.collected >= fee.fee) return 'full';
-	return 'partial';
-}
-
-/** What the Record-payment dialog hands back (ADR-086 D3). */
-export interface PaymentDraft {
-	fee_id: string | null;
-	amount: number;
-	currency: string;
-	received_on: string;
-	method: string;
-	anchor: MoneyAnchor;
-	counterparty: string;
-	category: string;
-	reference: string;
-	/** Nullable — a payment usually links to no document. */
-	invoice_id: string | null;
-}
-
-/** What the Add-expense dialog hands back. */
-export interface ExpenseDraft {
-	amount: number;
-	currency: string;
-	description: string;
-	date: string;
-	category: string;
-	anchor: MoneyAnchor;
-	counterparty: string | null;
-}
+type FeeStatus = 'unpaid' | 'partial' | 'full';
 
 const CURRENCY: Record<string, { symbol: string; name: string }> = {
 	EUR: { symbol: '€', name: 'Euro' },
@@ -93,9 +47,3 @@ const CURRENCY: Record<string, { symbol: string; name: string }> = {
 	USD: { symbol: '$', name: 'Dòlar' },
 };
 
-export function currencySymbol(code: string): string {
-	return CURRENCY[code]?.symbol ?? code;
-}
-export function currencyName(code: string): string {
-	return CURRENCY[code]?.name ?? code;
-}

@@ -7,7 +7,7 @@
 
 import { fetchJSON } from './api';
 
-export interface ConversationAccess {
+interface ConversationAccess {
   read: boolean;
   edit: boolean;
 }

@@ -34,7 +34,7 @@ export const realIsoInstant = v.pipe(
   v.check((s) => !Number.isNaN(new Date(s).getTime()), 'Not a valid timestamp'),
 );
 
-export interface DualTime {
+interface DualTime {
   /** Wall time in the primary (venue) zone, HH:mm. */
   primary: string;
   /** ISO day the instant falls on in the primary zone. */

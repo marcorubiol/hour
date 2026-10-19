@@ -20,7 +20,7 @@ export type Trade = (typeof TRADES)[number];
 /** Escena is the default: theatre, dance, circus, puppets, street. */
 export const DEFAULT_TRADE: Trade = 'stage';
 
-export function isTrade(value: unknown): value is Trade {
+function isTrade(value: unknown): value is Trade {
   return typeof value === 'string' && (TRADES as readonly string[]).includes(value);
 }
 

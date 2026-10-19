@@ -27,7 +27,7 @@ export const THREAD_REFRESH_MS = 30_000;
 
 export type AnchorKind = 'bolo' | 'conversation';
 
-export interface BoardBolo {
+interface BoardBolo {
   id: string;
   project_id: string;
   line_id: string | null;
@@ -103,7 +103,7 @@ export interface ConversationThreadView {
   truncated: boolean;
 }
 
-export type AudienceReason =
+type AudienceReason =
   | { kind: 'container'; level: string }
   | { kind: 'facet'; facet_key: string; label: string | null; labels: Record<string, string> }
   | { kind: 'conversation' };
@@ -295,7 +295,7 @@ export function conversationThread(
 }
 
 /** Un paso de la vista «hilo» de una conversación: lo hablado con fuera o un mensaje del equipo. */
-export type TimelineEntry<E> =
+type TimelineEntry<E> =
   | { kind: 'event'; at: string; event: E }
   | { kind: 'message'; at: string; message: ThreadMessage };
 

@@ -67,7 +67,7 @@ export interface MailoutQueueDb {
   recordEvent(payload: Record<string, unknown>): Promise<void>;
 }
 
-export function serviceQueueDb(env: Partial<MailoutEnv>, fetchFn: typeof fetch = fetch): MailoutQueueDb {
+function serviceQueueDb(env: Partial<MailoutEnv>, fetchFn: typeof fetch = fetch): MailoutQueueDb {
   return {
     claim: (limit, mailoutId) =>
       serviceRpc<ClaimedRecipient[]>(env, 'mailout_claim', { p_limit: limit, p_mailout_id: mailoutId ?? null }, fetchFn),
@@ -95,7 +95,7 @@ export function serviceQueueDb(env: Partial<MailoutEnv>, fetchFn: typeof fetch =
  * queda por debajo de las 50 del plan Free de Workers (suposición: no se ha
  * mirado el plan de Hour; con Paid se puede subir).
  */
-export const MAILOUT_BATCH = 10;
+const MAILOUT_BATCH = 10;
 
 const RETRY_MINUTES = [1, 5, 15, 60];
 
@@ -105,14 +105,14 @@ export function retryAt(attempts: number, now: Date = new Date()): string {
   return new Date(now.getTime() + minutes * 60_000).toISOString();
 }
 
-export interface QueueResult {
+interface QueueResult {
   claimed: number;
   sent: number;
   failed: number;
   retried: number;
 }
 
-export interface QueueOptions {
+interface QueueOptions {
   mailoutId?: string;
   limit?: number;
   db?: MailoutQueueDb;

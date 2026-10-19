@@ -269,7 +269,7 @@ describe('whose day it is', () => {
   });
 });
 
-describe('performanceAttribution (the Hall reads the rail rule)', () => {
+describe('performanceAttribution (the Desk reads the rail rule)', () => {
   const row = { project: null, performed_at: '2026-10-17', person_ids: [], commitments: null };
   it('speaks for everyone without an active axis', () => {
     expect(performanceAttribution(row, null)).toBe('explicit');

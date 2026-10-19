@@ -27,7 +27,7 @@ export type Crumb = {
   accent?: string;
 };
 
-export class BreadcrumbStore {
+class BreadcrumbStore {
   crumbs = $state<Crumb[]>([]);
 
   set(crumbs: Crumb[]): void {

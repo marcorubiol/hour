@@ -17,7 +17,7 @@
 const CAPABILITY_PATH = /(\/(?:roadsheet|calendar)\/)[0-9a-f]{16,}/gi;
 const SENSITIVE_QUERY = /([?&](?:token|apikey|sentry_key)=)[^&#\s]+/gi;
 
-export function scrubUrl(url: string): string {
+function scrubUrl(url: string): string {
   return url.replace(CAPABILITY_PATH, '$1[token]').replace(SENSITIVE_QUERY, '$1[redacted]');
 }
 

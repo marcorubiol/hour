@@ -10,7 +10,7 @@
 import { goto } from '$app/navigation';
 import { clearSession } from '$lib/session.svelte';
 
-export function clearAuthAndBounce(): void {
+function clearAuthAndBounce(): void {
   clearSession();
   // Best-effort cookie cleanup — the session is already dead server-side
   // (that's why we're bouncing), but clearing keeps the gates honest.

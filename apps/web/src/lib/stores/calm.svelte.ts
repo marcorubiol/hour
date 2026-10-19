@@ -14,7 +14,7 @@ import { getContext, setContext } from 'svelte';
 
 const STORAGE_KEY = 'hour_calm';
 
-export class CalmStore {
+class CalmStore {
   on = $state(false);
 
   toggle(): void {

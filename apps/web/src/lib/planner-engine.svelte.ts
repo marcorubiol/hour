@@ -30,13 +30,13 @@ import type { DateRow } from '$lib/date';
 import type { DecisionPerfItem } from '$lib/planner-feeds.svelte';
 
 /** The stretch a census counts: first and last ISO day, and every day between. */
-export interface EngineWindow {
+interface EngineWindow {
   first: string;
   last: string;
   days: string[];
 }
 
-export interface PlannerEngineInputs {
+interface PlannerEngineInputs {
   /** Rows after scope + person narrowing — what the engine reasons over. */
   scopedPerfs: () => PerformanceEvent[];
   scopedDates: () => DateEvent[];

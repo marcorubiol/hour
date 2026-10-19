@@ -10,7 +10,7 @@ import { accentVarFor } from './utils/accent';
 import { parsePin } from './stores/pins.svelte';
 
 /** Space discipline (ADR-062) — drives per-archetype vocabulary. */
-export type WorkspaceDomain =
+type WorkspaceDomain =
   | 'theatre'
   | 'dance'
   | 'circus'
@@ -162,7 +162,7 @@ export function lineUrl(line: NavLine): string {
   return `/h/${line.workspaceSlug}/project/${line.projectSlug}/line/${line.slug}`;
 }
 
-export type ResolvedScope = {
+type ResolvedScope = {
   /** workspace ids of pinned spaces */
   workspaceIds: string[];
   /** workspace slugs of pinned spaces */

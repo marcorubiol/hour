@@ -71,7 +71,7 @@ export function decodeJwtClaim(jwt: string, path: string): string | null {
  * because channels only join after the workspace list loads, by which
  * point the session probe has long resolved.
  */
-export interface RealtimeAuth {
+interface RealtimeAuth {
   /** Fresh access token for RLS-bearing requests. Null = no session. */
   getToken: () => Promise<string | null>;
   /** The signed-in user's UUID (presence key). Null while session loads. */

@@ -8,8 +8,6 @@ import * as v from 'valibot';
 import { Constants, type Enums, type Tables } from './db-types';
 import { t, type Locale } from './i18n';
 
-export type ExpenseCategory = Enums<'expense_category'>;
-
 /** All categories in schema enum order (runtime mirror of the DB enum). */
 export const EXPENSE_CATEGORIES = Constants.public.Enums.expense_category;
 
@@ -52,8 +50,6 @@ export const ExpenseCreateSchema = v.object({
   counterparty: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(200)))),
 });
 
-export type ExpenseCreate = v.InferOutput<typeof ExpenseCreateSchema>;
-
 /**
  * PATCH /api/expenses/:id body — field edits ride a direct PostgREST
  * PATCH (expense_update is not claim-bound and the row stays visible);
@@ -68,8 +64,6 @@ export const ExpensePatchSchema = v.object({
   reimbursed: v.optional(v.boolean()),
   notes: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500)))),
 });
-
-export type ExpensePatch = v.InferOutput<typeof ExpensePatchSchema>;
 
 export type ExpenseItem = Pick<
   Tables<'expense'>,

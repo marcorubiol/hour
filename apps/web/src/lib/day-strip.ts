@@ -22,7 +22,7 @@ import type { PerformanceEvent, DateEvent, SlipKind } from './month-events';
 import { dayMoments, type DayMoment, type RunSheetStepKey } from './month-events';
 
 /** A moment on the track: an hour somebody wrote down. */
-export type StripMark = {
+type StripMark = {
   /** Hours since midnight, fractional (14.5 = 14:30). */
   at: number;
   /** The vocabulary word for the step; the caller translates it. `moment`
@@ -46,7 +46,7 @@ export type StripMark = {
 };
 
 /** A stretch of the day. Two sessions with a gap are TWO spans, never one. */
-export type StripSpan = { from: number; to: number };
+type StripSpan = { from: number; to: number };
 
 export type StripThread = {
   id: string;
@@ -151,7 +151,7 @@ export function performanceThread(
 }
 
 /** A trip's stage, as the strip reads it (ADR-089 P2): only its two instants. */
-export type StripStage = { depart_at: string | null; arrive_at: string | null };
+type StripStage = { depart_at: string | null; arrive_at: string | null };
 
 /**
  * A TRIP WITH STAGES DRAWS EACH STAGE (Marco, 2026-10-10): the train is one

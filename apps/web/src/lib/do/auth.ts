@@ -7,27 +7,27 @@
  * proves both auth and membership in one call.
  */
 
-export interface CollabAuthEnv {
+interface CollabAuthEnv {
   PUBLIC_SUPABASE_URL: string;
   PUBLIC_SUPABASE_ANON_KEY: string;
 }
 
-export interface CollabAuthOk {
+interface CollabAuthOk {
   ok: true;
   workspaceId: string;
   userId: string;
   expiresAt: number;
 }
 
-export interface CollabAuthFail {
+interface CollabAuthFail {
   ok: false;
   status: number;
   reason: string;
 }
 
-export type CollabAuthResult = CollabAuthOk | CollabAuthFail;
+type CollabAuthResult = CollabAuthOk | CollabAuthFail;
 
-export type CollabTargetTable = 'performance' | 'project' | 'line' | 'date';
+type CollabTargetTable = 'performance' | 'project' | 'line' | 'date';
 
 /** Permission required to EDIT the collab doc, per target table. Line
  * notes gate on the parent project's meta permission (ADR-056). A day's doc
