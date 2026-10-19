@@ -1,4 +1,6 @@
 <script lang="ts">
+  import RecordHead from '$lib/components/RecordHead.svelte';
+  import BlockHead from '$lib/components/BlockHead.svelte';
   import { session } from '$lib/session.svelte';
   import { t, appLocale } from '$lib/i18n';
 
@@ -7,11 +9,9 @@
   let userEmail = $derived(session.user?.email ?? '');
 </script>
 
-<header class="set-mast">
-  <p class="eyebrow set-mast__kicker">{t('settings.bill_kicker', locale)}</p>
-  <h1 class="set-mast__title"><em>{t('settings.nav_billing', locale)}</em></h1>
-  <p class="set-mast__sub">{t('settings.bill_sub', locale)}</p>
-</header>
+<RecordHead crumbs={[{ label: t('settings.title', locale) }, { label: t('settings.bill_kicker', locale) }]} title={t('settings.nav_billing', locale)}>
+  {#snippet facts()}<span>{t('settings.bill_sub', locale)}</span>{/snippet}
+</RecordHead>
 
 <section class="set-group">
   <div class="set-group__body">
@@ -37,9 +37,7 @@
 </section>
 
 <section class="set-group">
-  <div class="set-group__head">
-    <span class="eyebrow set-group__kicker">{t('settings.bill_payment', locale)}</span>
-  </div>
+  <BlockHead title={t('settings.bill_payment', locale)} />
   <div class="set-group__body">
     <div class="set-row">
       <div class="set-row__lead">
@@ -76,9 +74,7 @@
 </section>
 
 <section class="set-group">
-  <div class="set-group__head">
-    <span class="eyebrow set-group__kicker">{t('settings.bill_history', locale)}</span>
-  </div>
+  <BlockHead title={t('settings.bill_history', locale)} />
   <div class="set-group__body">
     <div class="set-invoices">
       {#each ['2026-04-01', '2026-03-01', '2026-02-01', '2026-01-01'] as d (d)}

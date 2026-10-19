@@ -4,6 +4,7 @@
    * unas pocas palabras de la app (la lente de venta, la función, el reparto,
    * el horario del día, quién compra) para todo el espacio. Lo decide un admin.
    */
+  import BlockHead from '$lib/components/BlockHead.svelte';
   import ConceptHint from '$lib/components/ConceptHint.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
@@ -46,9 +47,7 @@
 </script>
 
 <section class="set-group">
-  <div class="set-group__head">
-    <span class="eyebrow set-group__kicker">{t('settings.trade_kicker', locale)}</span>
-  </div>
+  <BlockHead title={t('settings.trade_kicker', locale)} />
   <div class="set-group__body">
     <div class="set-row">
       <div class="set-row__lead">

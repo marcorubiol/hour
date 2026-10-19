@@ -1,4 +1,6 @@
 <script lang="ts">
+  import RecordHead from '$lib/components/RecordHead.svelte';
+  import BlockHead from '$lib/components/BlockHead.svelte';
   import { t, appLocale } from '$lib/i18n';
   import ConversationPrivacyDefault from './ConversationPrivacyDefault.svelte';
 
@@ -13,18 +15,14 @@
   let privDistribution = $state<'me-only' | 'distributors' | 'all'>('me-only');
 </script>
 
-<header class="set-mast">
-  <p class="eyebrow set-mast__kicker">{t('settings.priv_kicker', locale)}</p>
-  <h1 class="set-mast__title"><em>{t('settings.nav_privacy', locale)}</em></h1>
-  <p class="set-mast__sub">{t('settings.priv_sub', locale)}</p>
-</header>
+<RecordHead crumbs={[{ label: t('settings.title', locale) }, { label: t('settings.priv_kicker', locale) }]} title={t('settings.nav_privacy', locale)}>
+  {#snippet facts()}<span>{t('settings.priv_sub', locale)}</span>{/snippet}
+</RecordHead>
 
 <ConversationPrivacyDefault {workspaceId} />
 
 <section class="set-group">
-  <div class="set-group__head">
-    <span class="eyebrow set-group__kicker">{t('settings.priv_defaults', locale)}</span>
-  </div>
+  <BlockHead title={t('settings.priv_defaults', locale)} />
   <div class="set-group__body">
     <div class="set-row">
       <div class="set-row__lead">
