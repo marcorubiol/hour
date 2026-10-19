@@ -78,7 +78,7 @@ test.describe('la temporada por línea (ADR-135)', () => {
 
   test('una barra por línea, «sin línea» al final', async ({ page }) => {
     test.setTimeout(60_000);
-    await page.goto('/h/conversations');
+    await page.goto('/h/conversations?etiqueta=sales');
     const season = page.getByTestId('block-season');
     await expect(season).toBeVisible({ timeout: 30_000 });
     const lines = season.getByTestId('season-line');
@@ -90,7 +90,7 @@ test.describe('la temporada por línea (ADR-135)', () => {
 
   test('el nombre de una línea filtra la lista por ella; una relación, por esa relación en ella', async ({ page }) => {
     test.setTimeout(60_000);
-    await page.goto('/h/conversations');
+    await page.goto('/h/conversations?etiqueta=sales');
     const season = page.getByTestId('block-season');
     await expect(season).toBeVisible({ timeout: 30_000 });
 
@@ -100,7 +100,7 @@ test.describe('la temporada por línea (ADR-135)', () => {
     await expect(page.locator('.conversation-table tbody tr', { hasText: IN_LINE })).toHaveCount(1, { timeout: 30_000 });
     await expect(page.locator('.conversation-table tbody tr', { hasText: NO_LINE })).toHaveCount(0);
 
-    await page.goto('/h/conversations');
+    await page.goto('/h/conversations?etiqueta=sales');
     await expect(season).toBeVisible({ timeout: 30_000 });
     // Sin historial: nunca contactadas (la relación se deriva, ADR-138).
     const never = season.locator('[data-line="sin"] .season__item', { has: page.locator('[data-relation="never"]') });
@@ -114,7 +114,7 @@ test.describe('la temporada por línea (ADR-135)', () => {
   test('en el móvil, las barras apiladas y sin scroll lateral', async ({ page }) => {
     test.setTimeout(60_000);
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/h/conversations');
+    await page.goto('/h/conversations?etiqueta=sales');
     const lines = page.getByTestId('block-season').getByTestId('season-line');
     await expect(lines.first()).toBeVisible({ timeout: 30_000 });
     const [a, b] = await Promise.all([lines.nth(0).boundingBox(), lines.nth(1).boundingBox()]);

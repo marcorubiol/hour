@@ -140,7 +140,7 @@ test.describe('Conversaciones › Equipo: los hilos del equipo (ADR-116, ADR-134
     test.setTimeout(90_000);
     // La URL vieja de «de qué se habla» lleva a la vista Equipo (ADR-134).
     await page.goto('/h/conversations?view=threads');
-    await page.waitForURL(/\/h\/conversations\?view=team$/);
+    await page.waitForURL(/\/h\/conversations\?etiqueta=team$/);
     await expect(page.getByRole('navigation', { name: 'Sections' }).getByRole('link', { name: 'Conversations' })).toHaveAttribute(
       'aria-current',
       'page',
@@ -154,7 +154,7 @@ test.describe('Conversaciones › Equipo: los hilos del equipo (ADR-116, ADR-134
     const changed = page.getByTestId('desk-changed');
     await expect(changed).toContainText(VENUE, { timeout: 30_000 });
     await changed.getByTestId('desk-to-team').click();
-    await page.waitForURL(/\/h\/conversations\?view=team/);
+    await page.waitForURL(/\/h\/conversations\?etiqueta=team/);
 
     const rows = page.getByTestId('feed-row');
     await expect(rows.first()).toBeVisible({ timeout: 30_000 });
@@ -182,7 +182,7 @@ test.describe('Conversaciones › Equipo: los hilos del equipo (ADR-116, ADR-134
 
     // De vuelta, la fila ya no dice «nuevos».
 
-    await page.goto('/h/conversations?view=team&scope=s:playwright');
+    await page.goto('/h/conversations?etiqueta=team&scope=s:playwright');
     const again = page.getByTestId('feed-row').filter({ hasText: VENUE }).filter({ hasText: NEW_BODY });
     await expect(again).toBeVisible({ timeout: 30_000 });
     await expect(again.locator('.badge--info')).toHaveCount(0);
@@ -190,7 +190,7 @@ test.describe('Conversaciones › Equipo: los hilos del equipo (ADR-116, ADR-134
 
   test('la fila de la conversación abre su hilo del equipo', async ({ page }) => {
     test.setTimeout(60_000);
-    await page.goto('/h/conversations?view=team');
+    await page.goto('/h/conversations?etiqueta=team');
     const row = page.getByTestId('feed-row').filter({ hasText: CONV });
     await expect(row).toBeVisible({ timeout: 30_000 });
     await row.locator('a').click();
@@ -204,7 +204,7 @@ test.describe('Conversaciones › Equipo: los hilos del equipo (ADR-116, ADR-134
     try {
       const page = await context.newPage();
       await signIn(page, LIMITED_EMAIL!, LIMITED_PASSWORD!);
-      await page.goto('/h/conversations?view=team');
+      await page.goto('/h/conversations?etiqueta=team');
       const rows = page.getByTestId('feed-row');
       await expect(rows.filter({ hasText: NEW_BODY })).toHaveCount(1, { timeout: 30_000 });
       await expect(page.getByText(DINERS_BODY)).toHaveCount(0);
