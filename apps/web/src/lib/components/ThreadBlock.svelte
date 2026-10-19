@@ -19,6 +19,8 @@
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import Badge from '$lib/components/Badge.svelte';
+  import BlockHead from '$lib/components/BlockHead.svelte';
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import Button from '$lib/components/Button.svelte';
   import MessageItem, { messageFailed, sendOnModEnter } from '$lib/components/MessageItem.svelte';
   import { t, type Locale } from '$lib/i18n';
@@ -146,17 +148,20 @@
 </script>
 
 <article class="thread" aria-labelledby={headingId} data-facet={thread.facet_key ?? 'general'}>
-  <header class="thread__head">
-    {#if heading === 'eyebrow'}
-      <h3 class="eyebrow eyebrow--sub" id={headingId}>{name}&nbsp;· {thread.message_count}</h3>
-    {:else}
-      <h3 class="thread__name" id={headingId}>{name}</h3>
-      <span class="thread__count">{thread.message_count}</span>
-    {/if}
+  {#snippet unread()}
     {#if thread.unread_count > 0}
       <Badge tone="info" size="xs">{t(thread.unread_count === 1 ? 'threads.unread_one' : 'threads.unread', locale, { n: thread.unread_count })}</Badge>
     {/if}
-  </header>
+  {/snippet}
+  {#if heading === 'eyebrow'}
+    <BlockHead level={3} title={name} count={thread.message_count} id={headingId}>{@render unread()}</BlockHead>
+  {:else}
+    <header class="thread__head">
+      <h3 class="thread__name" id={headingId}>{name}</h3>
+      <span class="thread__count">{thread.message_count}</span>
+      {@render unread()}
+    </header>
+  {/if}
   <!-- La línea de audiencia no se pliega nunca (ADR-083, enmienda §6). -->
   <p class="thread__audience" title={audienceNames || undefined}>
     {#if audience}
@@ -171,7 +176,7 @@
   {#if !list}
     <!-- Los mensajes van mezclados con el registro, fuera de este bloque. -->
   {:else if messages.length === 0}
-    <p class="thread__empty">{t('threads.empty', locale)}</p>
+    <EmptyLine text={t('threads.empty', locale)} />
   {:else}
     <ol class="thread__list">
       {#each messages as m (m.id)}
@@ -246,11 +251,6 @@
     }
 
     .thread__audience,
-    .thread__empty {
-      margin: 0;
-      color: var(--text-faint);
-      font-size: var(--text-xs);
-    }
 
     .thread__list {
       display: flex;

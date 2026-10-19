@@ -53,9 +53,9 @@
   import { lensOn } from '$lib/lenses.svelte';
   import { performanceBoloQueryOptions, projectBolosQueryOptions } from '$lib/bolo-queries';
   import { workspacesQueryOptions } from '$lib/nav-queries';
-  import { accentVar } from '$lib/utils/accent';
-  import { spaceName } from '$lib/utils/identity';
-  import { useBreadcrumb, type Crumb } from '$lib/stores/breadcrumb.svelte';
+  import RecordHead from '$lib/components/RecordHead.svelte';
+  import BlockHead from '$lib/components/BlockHead.svelte';
+  import { spaceCrumb, type Crumb } from '$lib/record-crumbs';
 
   type PersonEmbed = {
     id: string;
@@ -172,10 +172,9 @@
 
   const query = createQuery(queryOptions);
 
-  const breadcrumb = useBreadcrumb();
   const wsQuery = createQuery(workspacesQueryOptions());
   let activeWorkspaceName = $derived(
-    spaceName($wsQuery.data?.items.find((w) => w.slug === workspaceSlug)?.name ?? workspaceSlug),
+    $wsQuery.data?.items.find((w) => w.slug === workspaceSlug)?.name ?? workspaceSlug,
   );
 
   // ── Write path (ADR-043): status menu + details dialog ─────────────────
@@ -348,42 +347,21 @@
     Boolean(perf && isHoldStatus(perf.status) && !bundle?.hold_notice_absent),
   );
 
-  // Address: Space › Project › [Line ›] Performance. The current crumb is the
-  // venue (a performance has no name of its own); the line is included when
-  // the gig belongs to one. No pin — performances aren't in the pin model.
-  $effect(() => {
-    if (perf) {
-      const crumbs: Crumb[] = [
-        {
-          label: activeWorkspaceName,
-          href: `/h/${workspaceSlug}/`,
-          kind: 'space',
-          accent: accentVar(workspaceSlug),
-        },
-      ];
-      if (perf.project) {
-        crumbs.push({
-          label: perf.project.name,
-          href: `/h/${workspaceSlug}/project/${perf.project.slug}/`,
-          kind: 'node',
+  // Address: Space › Project › [Line ›] Función. The title is the venue (a
+  // performance has no name of its own), so the address ends with the kind.
+  let crumbs = $derived.by<Crumb[]>(() => {
+    const out: Crumb[] = [spaceCrumb(activeWorkspaceName, workspaceSlug)];
+    if (perf?.project) {
+      out.push({ label: perf.project.name, href: `/h/${workspaceSlug}/project/${perf.project.slug}/` });
+      if (perf.line) {
+        out.push({
+          label: perf.line.name,
+          href: `/h/${workspaceSlug}/project/${perf.project.slug}/line/${perf.line.slug}`,
         });
-        if (perf.line) {
-          crumbs.push({
-            label: perf.line.name,
-            href: `/h/${workspaceSlug}/project/${perf.project.slug}/line/${perf.line.slug}`,
-            kind: 'node',
-          });
-        }
       }
-      crumbs.push({
-        label: perf.venue?.name ?? perf.venue_name ?? t('perf.label', locale),
-        kind: 'node',
-      });
-      breadcrumb.set(crumbs);
-    } else {
-      breadcrumb.clear();
     }
-    return () => breadcrumb.clear();
+    out.push({ label: t('perf.label', locale) });
+    return out;
   });
 
   // ── Delete (ADR-052) — for gigs created by mistake. A gig that fell
@@ -633,7 +611,7 @@
   <title>{docTitle(title, t('perf.label', locale))}</title>
 </svelte:head>
 
-<article class="perf" aria-busy={loading}>
+<article class="record perf" aria-busy={loading}>
   {#if loading || ($query.isError && !perf)}
     <RecordState
       {loading}
@@ -645,27 +623,17 @@
       {locale}
     />
   {:else if perf}
-    <header class="perf__head">
-      <p class="eyebrow">
-        {t('perf.label', locale)}
-        {#if perf.project}
-          · <a href={`/h/${workspaceSlug}/project/${perf.project.slug}`}>{perf.project.name}</a>
-        {/if}
-        {#if perf.line}
-          · {perf.line.name}
-        {/if}
-        {#if boloReadable && currentBolo && perf.project}
-          · {#if lensOn('books')}<a href={booksHref(perf.project.id, { boloId: currentBolo.id })}>{boloOf(currentBolo, locale)}</a>{:else}{boloOf(currentBolo, locale)}{/if}<ConceptHint
-            concept="bolo"
-          />
-        {:else if boloReadable && currentBoloId === null}
-          · {boloOf(null, locale)}<ConceptHint concept="bolo" />
-        {/if}
-      </p>
-      <h1 class="perf__title"><em>{title}</em></h1>
-      <div class="perf__meta">
-        <Menu label={t('perf.status_menu', locale, { status: performanceStatusLabel(perf.status, locale) })} triggerClass={`badge badge--xs badge--${performanceStatusTone(perf.status)}`}>
-          {#snippet trigger()}{performanceStatusLabel(perf.status, locale)}<span class="status-caret" aria-hidden="true">▾</span>{/snippet}
+    <RecordHead {crumbs} {title}>
+      {#snippet actions()}
+        <span class="perf__roadsheet-link"
+          ><a class="link-arrow" href={`/h/${workspaceSlug}/performance/${slug}/roadsheet`}>{t('roadsheet.open', locale)}</a
+          ><ConceptHint concept="roadsheet" /></span
+        >
+        <Button variant="outline" size="xs" onclick={openEdit}>{t('perf.edit_details', locale)}</Button>
+      {/snippet}
+      {#snippet facts()}
+        <Menu label={t('perf.status_menu', locale, { status: performanceStatusLabel(perf!.status, locale) })} triggerClass={`badge badge--xs badge--${performanceStatusTone(perf!.status)}`}>
+          {#snippet trigger()}{performanceStatusLabel(perf!.status, locale)}<span class="status-caret" aria-hidden="true">▾</span>{/snippet}
           {#snippet children({ close })}
             {#each PERFORMANCE_STATUSES as s (s)}
               <li role="none">
@@ -684,20 +652,19 @@
             {/each}
           {/snippet}
         </Menu>
-        <span class="perf__meta-sep" aria-hidden="true">·</span>
-        <span class="perf__meta-date">{dayLabel(perf.performed_at, 'short')}</span>
-        {#if placeLine}
-          <span class="perf__meta-sep" aria-hidden="true">·</span>
-          <span class="perf__meta-place">{placeLine}</span>
+        <span>{dayLabel(perf!.performed_at, 'short')}</span>
+        {#if placeLine}<span>{placeLine}</span>{/if}
+        {#if boloReadable && currentBolo && perf!.project}
+          <span
+            >{#if lensOn('books')}<a class="lenshead__frag" href={booksHref(perf!.project.id, { boloId: currentBolo.id })}>{boloOf(currentBolo, locale)}</a>{:else}{boloOf(currentBolo, locale)}{/if}<ConceptHint
+              concept="bolo"
+            /></span
+          >
+        {:else if boloReadable && currentBoloId === null}
+          <span>{boloOf(null, locale)}<ConceptHint concept="bolo" /></span>
         {/if}
-      </div>
-      <p class="perf__roadsheet-link">
-        <a class="link-arrow" href={`/h/${workspaceSlug}/performance/${slug}/roadsheet`}>{t('roadsheet.open', locale)}</a><ConceptHint
-          concept="roadsheet"
-        />
-        <Button variant="outline" size="xs" onclick={openEdit}>{t('perf.edit_details', locale)}</Button>
-      </p>
-    </header>
+      {/snippet}
+    </RecordHead>
 
     <ProductionStub
       venue={perf.venue}
@@ -734,7 +701,7 @@
          foot reads. Deliberately separate from the logistics/technical
          CONTENT above: that is where the detail lives, this is the verdict. -->
     <section class="perf__section" aria-label={t('perf.readiness', locale)}>
-      <p class="eyebrow">{t('perf.readiness', locale)}</p>
+      <BlockHead title={t('perf.readiness', locale)} />
       <ul class="perf__ready" role="list">
         {#each READINESS_KEYS as key (key)}
           {@const on = isReady(perf.readiness, key)}
@@ -757,7 +724,7 @@
 
     {#if hasTeam}
       <section class="perf__section" aria-label={t('perf.team', locale)}>
-        <p class="eyebrow">{t('perf.team', locale)}</p>
+        <BlockHead title={t('perf.team', locale)} />
         <ul class="perf__people" role="list">
           {#each bundle!.cast_members as m (m.id)}
             <li>
@@ -819,7 +786,7 @@
 
     {#if perf.date.length > 0}
       <section class="perf__section" aria-label={t('perf.related_dates', locale)}>
-        <p class="eyebrow">{t('perf.dates', locale)}</p>
+        <BlockHead title={t('perf.dates', locale)} />
         <ul class="perf__dates" role="list">
           {#each perf.date as d (d.id)}
             <li>
@@ -834,7 +801,7 @@
 
     {#if perf.conversation?.person || perf.conversation?.organization}
       <section class="perf__section" aria-label={t('perf.programmer', locale)}>
-        <p class="eyebrow">{t('perf.programmer', locale)}</p>
+        <BlockHead title={t('perf.programmer', locale)} />
         <p class="perf__programmer">
           {#if perf.conversation.person}
             <a href={`/h/${workspaceSlug}/person/${perf.conversation.person.slug}`}>
@@ -850,7 +817,7 @@
 
     {#if perf.asset_version.length > 0}
       <section class="perf__section" aria-label={t('perf.assets', locale)}>
-        <p class="eyebrow">{t('perf.assets', locale)}</p>
+        <BlockHead title={t('perf.assets', locale)} />
         <ul class="perf__assets" role="list">
           {#each perf.asset_version as a (a.id)}
             <li>
@@ -864,7 +831,7 @@
     {/if}
 
     <section class="perf__section" aria-label={t('perf.notes', locale)}>
-      <p class="eyebrow">{t('perf.notes', locale)}</p>
+      <BlockHead title={t('perf.notes', locale)} />
       <YNotes
         targetTable="performance"
         targetId={perf.id}
@@ -1068,59 +1035,10 @@
 
 <style>
   @layer components {
-    .perf {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-xl);
-      max-inline-size: 44rem;
-      margin-inline: auto;
-    }
-
-
-    .perf__head {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-s);
-      padding-block-end: var(--space-m);
-      border-block-end: 1px solid var(--border-color-light);
-    }
-
-    .perf__title {
-      font-family: var(--font-display);
-      font-size: clamp(1.8rem, 3vw, 2.4rem);
-      font-weight: 400;
-      letter-spacing: -0.025em;
-      line-height: 1.05;
-      color: var(--text-color);
-    }
-    .perf__title em {
-      font-style: italic;
-    }
-
-    .perf__meta {
-      display: flex;
-      align-items: baseline;
-      gap: var(--space-xs);
-      flex-wrap: wrap;
-    }
-
-    .perf__meta-sep {
-      color: var(--text-faint);
-    }
-
-    .perf__meta-date,
-    .perf__meta-place {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: 0.04em;
-      color: var(--text-faint);
-    }
-
     .perf__roadsheet-link {
-      font-size: var(--text-s);
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      gap: var(--space-m);
+      font-size: var(--text-s);
     }
 
     .perf__dialog-hint {
@@ -1274,7 +1192,7 @@
       font-size: var(--text-xs);
       letter-spacing: 0.04em;
       color: var(--text-faint);
-      min-inline-size: 8rem;
+      min-inline-size: var(--record-label-inline);
     }
 
     .perf__person-name,

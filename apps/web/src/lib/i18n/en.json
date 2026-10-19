@@ -1771,6 +1771,8 @@
   "threads.board_error": "Could not load the board.",
   "threads.truncated": "Only the most recent messages are shown.",
   "threads.no_messages": "no messages",
+  "threads.folded_one": "1 thread with no messages · write in",
+  "threads.folded_other": "{n} threads with no messages · write in",
   "threads.write": "Write",
   "threads.team": "Team",
   "threads.team_only": "Team only",

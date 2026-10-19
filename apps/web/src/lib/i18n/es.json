@@ -1762,6 +1762,8 @@
   "threads.board_error": "No se ha podido cargar el tablón.",
   "threads.truncated": "Solo se muestran los mensajes más recientes.",
   "threads.no_messages": "sin mensajes",
+  "threads.folded_one": "1 hilo sin mensajes · escribir en",
+  "threads.folded_other": "{n} hilos sin mensajes · escribir en",
   "threads.write": "Escribir",
   "threads.team": "Equipo",
   "threads.team_only": "Solo el equipo",

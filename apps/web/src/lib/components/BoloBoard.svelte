@@ -13,7 +13,8 @@
    * (`thread-reading.svelte.ts`, lo mismo que el hilo de una conversación).
    */
 
-  import ConceptHint from '$lib/components/ConceptHint.svelte';
+  import BlockHead from '$lib/components/BlockHead.svelte';
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import FirstTimeNote from '$lib/components/FirstTimeNote.svelte';
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
@@ -111,7 +112,7 @@
 
 <section id="board" class="board" aria-labelledby="board-title" aria-busy={$boardQuery.isLoading} bind:this={sectionEl}>
   <header class="board__head">
-    <span class="block-head__lead"><p class="eyebrow" id="board-title">{t('threads.board', locale)}</p><ConceptHint concept="board" /></span>
+    <BlockHead title={t('threads.board', locale)} id="board-title" concept="board" />
     {#if board?.bolo}
       <p class="board__bolo">
         {#if boloPlace(board.bolo)}<span>{boloPlace(board.bolo)}</span>{/if}
@@ -137,14 +138,14 @@
   <FirstTimeNote event="first_board" when={Boolean(board?.bolo)} />
 
   {#if $boardQuery.isLoading}
-    <p class="board__state">{t('desk.loading', locale)}</p>
+    <EmptyLine text={t('desk.loading', locale)} busy />
   {:else if $boardQuery.isError && !board}
-    <p class="board__state">{t('threads.board_error', locale)}</p>
+    <EmptyLine text={t('threads.board_error', locale)} />
   {:else if board && !board.bolo}
-    <p class="board__state">{t('threads.no_bolo', locale)}</p>
+    <EmptyLine text={t('threads.no_bolo', locale)} />
   {:else if board?.bolo}
     {#if board.truncated}
-      <p class="board__state">{t('threads.truncated', locale)}</p>
+      <EmptyLine text={t('threads.truncated', locale)} />
     {/if}
     {#each layout.open as th (threadKey(th))}
       <ThreadBlock
@@ -163,18 +164,21 @@
       />
     {/each}
     {#if layout.folded.length > 0}
-      <!-- Los hilos sin mensajes, plegados: una línea cada uno. -->
-      <ul class="board__folded" role="list">
-        {#each layout.folded as th (threadKey(th))}
-          <li data-facet={th.facet_key ?? 'general'}>
-            <button type="button" class="board__fold" onclick={() => unfold(th)}>
-              <span class="board__fold-name">{facetName(th, locale)}</span>
-              <span>{t('threads.no_messages', locale)}</span>
-              <span class="board__fold-write">{t('threads.write', locale)}</span>
-            </button>
-          </li>
-        {/each}
-      </ul>
+      <!-- Los hilos sin mensajes, en una sola línea: cada nombre abre el suyo
+           con el compositor enfocado (ADR-139 § 2: lo vacío, una línea). -->
+      <div class="board__folded">
+        <EmptyLine
+          text={layout.folded.length === 1
+            ? t('threads.folded_one', locale)
+            : t('threads.folded_other', locale, { n: layout.folded.length })}
+        >
+          {#each layout.folded as th (threadKey(th))}
+            <button type="button" class="empty-line__act" data-facet={th.facet_key ?? 'general'} onclick={() => unfold(th)}
+              >{facetName(th, locale)}</button
+            >
+          {/each}
+        </EmptyLine>
+      </div>
     {/if}
   {/if}
 </section>
@@ -216,54 +220,6 @@
     .board__perfs .link-arrow {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
-    }
-    .board__folded {
-      display: flex;
-      flex-direction: column;
-      margin: 0;
-      padding: 0;
-      list-style: none;
-      border-block-start: var(--divider-light);
-    }
-    .board__fold {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: baseline;
-      gap: var(--space-xs);
-      inline-size: 100%;
-      padding-block: var(--space-xs);
-      color: var(--text-faint);
-      font-size: var(--text-xs);
-      text-align: start;
-    }
-    .board__fold > * + *::before {
-      content: '·';
-      margin-inline-end: var(--space-xs);
-      color: var(--text-faint);
-    }
-    .board__fold-name {
-      color: var(--heading-color);
-      font-size: var(--text-s);
-      font-weight: 500;
-    }
-    .board__fold-write {
-      color: var(--text-muted);
-      transition: color var(--transition);
-    }
-    @media (hover: hover) and (pointer: fine) {
-      .board__fold:hover .board__fold-write {
-        color: var(--text-color);
-        text-decoration: underline;
-      }
-    }
-    .board__fold:focus-visible {
-      outline: var(--focus-width) solid var(--focus-color);
-      outline-offset: 2px;
-    }
-    .board__state {
-      margin: 0;
-      color: var(--text-faint);
-      font-size: var(--text-s);
     }
   }
 </style>

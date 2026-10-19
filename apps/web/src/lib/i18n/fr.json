@@ -1759,6 +1759,8 @@
   "threads.board_error": "Impossible de charger le tableau.",
   "threads.truncated": "Seuls les messages les plus récents sont affichés.",
   "threads.no_messages": "aucun message",
+  "threads.folded_one": "1 fil sans message · écrire dans",
+  "threads.folded_other": "{n} fils sans message · écrire dans",
   "threads.write": "Écrire",
   "threads.team": "Équipe",
   "threads.team_only": "Équipe seulement",

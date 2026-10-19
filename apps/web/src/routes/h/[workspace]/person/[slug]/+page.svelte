@@ -717,7 +717,7 @@
       font-size: var(--text-xs);
       letter-spacing: 0.04em;
       color: var(--text-faint);
-      min-inline-size: 8rem;
+      min-inline-size: var(--record-label-inline);
     }
 
     .person__row-main {

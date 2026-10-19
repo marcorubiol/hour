@@ -1762,6 +1762,8 @@
   "threads.board_error": "No s’ha pogut carregar el tauler.",
   "threads.truncated": "Només es mostren els missatges més recents.",
   "threads.no_messages": "sense missatges",
+  "threads.folded_one": "1 fil sense missatges · escriure a",
+  "threads.folded_other": "{n} fils sense missatges · escriure a",
   "threads.write": "Escriure",
   "threads.team": "Equip",
   "threads.team_only": "Només l'equip",
