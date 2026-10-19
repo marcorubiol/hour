@@ -7,8 +7,6 @@
   import RailPulse from './RailPulse.svelte';
 
   interface Props {
-    /** The hall greets outside any scope — no row lights up there. */
-    atHome: boolean;
     /** Applying a scope routes + touches editingBaseTokens, so the action
         stays in the /h layout and arrives here as a prop. */
     applyScope: (s: Scope) => void;
@@ -28,7 +26,6 @@
   }
 
   let {
-    atHome,
     applyScope,
     openPaletteFresh,
     open = false,
@@ -88,7 +85,7 @@
          hold: «here, now» is already what it says, and a clock you can press
          to get back to the top of the app is a smaller promise than a logo
          that navigates. -->
-    <a class="side-clock__now" href="/h" aria-label={t('hall.home', locale)}>
+    <a class="side-clock__now" href="/h/desk" aria-label={t('lens.desk', locale)}>
       <time class="side-clock__time clock-face" datetime={clockTime}>{clockTime}</time>
       <p class="side-clock__date">{clockDate}</p>
     </a>
@@ -111,13 +108,10 @@
   <RailPulse now={clockNow} {locale} />
   <div class="side-sec">
     <div class="side-sec__h">{t('shell.scopes', locale)}</div>
-    <!-- The hall greets outside any scope: no row lights up there, not
-         even Everything — highlighting starts once you're on a surface
-         the scope actually filters. -->
     <button
       type="button"
       class="srow srow--every"
-      class:is-on={!atHome && scopesSameSet([], pins.pins)}
+      class:is-on={scopesSameSet([], pins.pins)}
       onclick={() => applyScope(everything)}
     >
       <span class="sglyph sglyph--every" aria-hidden="true">∑</span>
@@ -141,7 +135,7 @@
         <button
           type="button"
           class="srow"
-          class:is-on={!atHome && scopesSameSet(s.tokens, pins.pins)}
+          class:is-on={scopesSameSet(s.tokens, pins.pins)}
           onclick={() => applyScope(s)}
           ondblclick={() => startRename(s)}
           title={t('shell.rename_hint', locale)}
@@ -159,7 +153,7 @@
         <button
           type="button"
           class="srow"
-          class:is-on={!atHome && scopesSameSet(r.tokens, pins.pins)}
+          class:is-on={scopesSameSet(r.tokens, pins.pins)}
           onclick={() => applyScope(r)}
         >
           <span class="srow__name">{r.name}</span>

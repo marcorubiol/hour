@@ -4542,3 +4542,28 @@ Carril `claude/season-lines`. Sin migración.
 
 **Re-evaluar cuando** Marco la use una campaña: si la nota global (contestadas / sin respuesta) sobra con las cifras
 por línea, y si con muchas líneas hace falta plegar las pequeñas.
+
+## [2026-10-19] ADR-137 · Nombres y entrada: se entra en Desk, Desk se traduce, Venues en inglés (enmienda ADR-062, 121, 128 y 134)
+
+**Contexto.** Prueba de nombres del 19-10 con dos perfiles sin contexto (productora de teatro en castellano, tour
+manager británico; `build/coordination/naming/`, fuera de git). Los dos entendieron Desk aparte por sí solo, y los dos
+señalaron lo mismo como lo más confuso: al entrar caían en el Hall (reloj, saludo, «ponme al día») sin la barra de
+secciones, y Desk quedaba un clic más allá. Dos portadas seguidas, contra el modelo (`build/structure-model.md`: Desk
+es la casa, se llega por el logo). Marco decidió en el chat (19-10). Carril `claude/naming-entry`. Sin migración.
+
+**Decisión.**
+1. **Una sola portada: se entra en Desk.** `/h` redirige a `/h/desk` con su query (302: es la puerta de la app, no
+   una ruta renombrada); una carga completa en `hooks.server.ts`, una navegación dentro de la app en
+   `routes/h/+page.ts`, como `/h/money`. El reloj del rail (la puerta a casa) y el login llevan a `/h/desk`
+   directamente; `/h` se queda para lo que ya enlaza allí (marcadores, la vuelta del OAuth del correo). Enmienda
+   ADR-062 § 3: la vista `∑` sin espacio es Desk con «Todo», no otra página.
+2. **Lo que hacía el Hall, dónde queda.** El saludo («Buenos días, Marco») va sobre el título de Desk, un paso por
+   debajo de él, y la hora entra en la línea de la fecha («lunes · 19 oct · 09:41»). El reloj grande ya está en el
+   rail (en el móvil, en la barra de arriba), en todas las pantallas. «Nueva nota» es el «+ Tarea» de Desk (el
+   `?compose=1` del Hall nunca lo leyó nadie). «Ponme al día» desaparece: ya estás. La elección de espacio, «Todo»,
+   los guardados y los recientes viven en el rail, que no cambia; ahora se iluminan también al entrar, porque Desk
+   es una superficie con ámbito. Se borran, porque repetían lo que Desk ya dice: la línea de «dentro de 3 h ·
+   Girona» y el resumen del día (son «Lo siguiente»), y la frase de estado (vencidas, abiertas, función de hoy: el
+   título «1 vencida · 2 te esperan» y «Lo siguiente»). Con ella se va `hall-status.ts`. La propuesta de la IA, que
+   el Hall reservaba como cuarto estado de la frase (ADR-069), ya vive en «Te espera». Enmienda ADR-121: la cabecera
+   de Desk lleva saludo y hora; las bandas no cambian.

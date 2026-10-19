@@ -11,7 +11,7 @@ import { waitForLoaded } from './loaded';
  * bar. The effects now read `location.href` for truth and keep page.url
  * only as the navigation trigger. These three flows pin that behavior:
  * inbound scoped link → clear; the rail-applied scope → clear (the
- * originally failing sequence); and clearing from the hall.
+ * originally failing sequence); and a scoped link to the front door (/h).
  *
  * Fixture-owned data only: the seeded saved scope mixes the `playwright`
  * space token with its own project — never a real user's project ids.
@@ -51,14 +51,13 @@ test('rail-applied saved scope, then Everything, cleans the URL (replaceState st
     [FIXTURE_SPACE_TOKEN, FIXTURE_PROJECT_TOKEN],
   );
 
-  // 1. Land on the hall.
+  // 1. Enter by the front door: /h is the Desk (ADR-137).
   await page.goto('/h');
-  await waitForLoaded(page);
-  await expect(page.getByRole('region', { name: 'Home' })).toBeVisible();
-
-  // 2. Everything → lands on /h/desk, clean.
-  await page.getByRole('button', { name: /Everything/ }).click();
   await page.waitForURL(/\/h\/desk/, { timeout: 10000 });
+  await waitForLoaded(page);
+
+  // 2. Everything → the Desk, clean.
+  await page.getByRole('button', { name: /Everything/ }).click();
 
   // 3. Apply the saved scope from the rail → URL gains ?scope=.
   await page.getByRole('button', { name: /E2E scope/ }).click();
@@ -72,14 +71,14 @@ test('rail-applied saved scope, then Everything, cleans the URL (replaceState st
   expect(page.url()).not.toContain('scope=');
 });
 
-test('Everything from the HALL with a scoped link also lands clean on /h/desk', async ({ page }) => {
+test('a scoped link to the front door keeps its scope on the Desk, and Everything cleans it', async ({ page }) => {
   await page.goto(`/h?scope=${FIXTURE_SPACE_TOKEN}`);
+  // /h forwards with its query (ADR-137): the scope arrives on the Desk.
+  await page.waitForURL(/\/h\/desk\?scope=s:playwright/, { timeout: 10000 });
   await waitForLoaded(page);
-  // Hall greets; the scope applies underneath (no chip on the hall).
-  await expect(page.getByRole('region', { name: 'Home' })).toBeVisible();
+  await expect(page.locator('.tok').first()).toBeVisible();
 
   await page.getByRole('button', { name: /Everything/ }).click();
-  await page.waitForURL(/\/h\/desk/, { timeout: 10000 });
   await expect(page.locator('.tok')).toHaveCount(0, { timeout: 5000 });
 
   expect(page.url()).not.toContain('scope=');

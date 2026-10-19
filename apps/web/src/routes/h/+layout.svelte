@@ -4,8 +4,8 @@
    * rail (Everything + saved scopes + recents) and the ⌘K scope builder —
    * the manual pin UI (card chips, breadcrumb pin, ScopeStrip) died
    * 2026-07-17. Applying a scope from a non-lens surface lands on /h/desk.
-   * The top bar is brand (logo = /h, the hall) · centered ⌘K search ·
-   * account menu.
+   * The top bar is the phone's rail door · centered ⌘K search · account
+   * menu. The rail's clock is the way home: the Desk (ADR-137, /h redirects).
    *
    * Settings stays a "mode" of the shell: when inside /settings a slim
    * <SettingsNav> aside returns, so the settings surface is unaffected.
@@ -242,8 +242,8 @@
   }
 
   /** Off a lens route, a scope change goes to the lens you were working in
-   *  (from the hall, Desk: the catch-up surface). On a lens route it stays
-   *  put: the lens refilters in place. */
+   *  (or Desk, the home). On a lens route it stays put: the lens refilters
+   *  in place. */
   function landOnScopedLens() {
     if (!routedLens) void goto(`/h/${lensOn(lens.current) ? lens.current : 'desk'}`);
   }
@@ -312,10 +312,6 @@
     rt?.dispose();
   });
 
-  // The logo IS the home: /h, the cross-space Desk digest (ADR-065/066) —
-  // not any one workspace's page. Planner/Conversations/Books live at /h/<lens>.
-  const homeHref = '/h';
-
   let inSettings = $derived(/^\/h\/[^/]+\/settings(\b|\/|$)/.test(page.url.pathname));
 
   // Which routed lens (if any) the current URL is showing. ADR-067: lens
@@ -324,24 +320,17 @@
     const m = page.url.pathname.match(/^\/h\/(desk|planner|conversations|books)\/?$/);
     return (m?.[1] as Lens | undefined) ?? null;
   });
-  let atHome = $derived(/^\/h\/?$/.test(page.url.pathname));
-  // Surfaces that carry the scope in the URL: the home + the four lenses.
-  // The scope CHROME (scopebar + view-as) renders only on lens routes —
-  // the hall lands clean, and the revealed digest brings its own
-  // <ScopeStrip>.
-  let scopeSurface = $derived(routedLens !== null || atHome);
+  // Surfaces that carry the scope in the URL: the four lenses, the Desk
+  // (the home, ADR-137) among them.
+  let scopeSurface = $derived(routedLens !== null);
 
   // The lens store holds the lens you are working in. A lens route sets it;
   // an entity page reached from a lens (a person or a conversation opened
   // from Conversations) KEEPS it, so a scope change there lands back on that
-  // lens instead of on Desk (drop 11-10). The hall resets it: it is no lens.
+  // lens instead of on Desk (drop 11-10).
   $effect(() => {
     const current = untrack(() => lens.current);
-    if (routedLens) {
-      if (current !== routedLens) lens.set(routedLens);
-    } else if (atHome && current !== 'desk') {
-      lens.set('desk');
-    }
+    if (routedLens && current !== routedLens) lens.set(routedLens);
   });
 
   // ── Alias resolution, inbound only (ADR-067) ─────────────────────────
@@ -638,7 +627,6 @@
     </header>
 
     <ScopeRail
-      {atHome}
       applyScope={applyScopeFromRail}
       openPaletteFresh={openPaletteFromRail}
       open={railOpen}

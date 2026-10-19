@@ -47,15 +47,12 @@ setup('authenticate', async ({ page }) => {
   await page.locator('input[type=password]').fill(PASSWORD);
   await page.getByRole('button', { name: /sign in/i }).click();
 
-  // ADR-067: sign-in lands on `/h` — the home IS the cross-space Desk digest,
-  // a real page. Note the missing trailing slash: `/\/h\//` does NOT match.
-  await page.waitForURL(/\/h\/?$/);
-  // THE WAY HOME IS THE CLOCK (2026-07-31): the wordmark used to hold this
-  // door and the rail's clock took it, so `Hour — home` stopped existing and
-  // this assertion had been failing since — unrun, because the E2E needs a
-  // deployed origin. Located by the door itself (`a[href="/h"]` wrapping the
-  // clock) rather than by its label, which is translated.
-  await expect(page.locator('a[href="/h"] time')).toBeVisible();
+  // ADR-137: sign-in lands on the Desk, the one front door.
+  await page.waitForURL(/\/h\/desk\/?$/);
+  // THE WAY HOME IS THE CLOCK (2026-07-31), and home is the Desk. Located by
+  // the door itself (`a[href="/h/desk"]` wrapping the clock) rather than by
+  // its label, which is translated.
+  await expect(page.locator('a[href="/h/desk"] time')).toBeVisible();
 
   await page.context().storageState({ path: STORAGE_STATE });
 });

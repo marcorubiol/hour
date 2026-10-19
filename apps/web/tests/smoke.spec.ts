@@ -14,7 +14,7 @@ test.describe('smoke', () => {
    * Happy path across the shell (ADR-065 nav). No top-nav buttons: the logo
    * is Home = Desk; Calendar and Money are reached from ⌘K. Covers the
    * integration points that move data end to end:
-   *   - bare /h/ forwards to the default workspace's Desk
+   *   - bare /h forwards to the Desk, the one front door (ADR-137)
    *   - the shell renders (brand); ⌘K jumps to a real line AND a view
    *   - project detail loads the conversation count through /api/conversations
    *   - Calendar month grid, Conversations table, Money totals all deep-link
@@ -35,18 +35,16 @@ test.describe('smoke', () => {
     // it took 15 s. What this test asserts is that every door opens, not how
     // fast; `slow()` triples the budget and keeps that honest.
     test.slow();
-    // ADR-068: `/h` is the HALL — greeting + the "posa'm al dia" door to
-    // /h/desk. The cross-space digest died; the projects grid lives on the
-    // space portada now. Note the bare path: sign-in lands on `/h`.
+    // ADR-137: ONE FRONT DOOR. `/h` was the Hall, a page before the Desk; it
+    // forwards to the Desk now, with the lens bar on screen from the start.
     await page.goto('/h');
+    await page.waitForURL(/\/h\/desk\/?$/);
     await waitForLoaded(page);
-    // THE WAY HOME IS THE CLOCK (2026-07-31): the wordmark used to hold this
-    // door and the rail's clock took it, so `Hour — home` stopped existing and
-    // this assertion had been failing since — unrun, because the E2E needs a
-    // deployed origin. Located by the door itself (`a[href="/h"]` wrapping the
-    // clock) rather than by its label, which is translated.
-    await expect(page.locator('a[href="/h"] time')).toBeVisible();
-    await expect(page.getByRole('button', { name: /catch me up/i })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: /sections/i })).toBeVisible();
+    // THE WAY HOME IS THE CLOCK (2026-07-31), and home is the Desk. Located by
+    // the door itself (`a[href="/h/desk"]` wrapping the clock) rather than by
+    // its label, which is translated.
+    await expect(page.locator('a[href="/h/desk"] time')).toBeVisible();
 
     // ⌘K is the SCOPE BUILDER (Scope v2), not a lens switcher: it lists
     // spaces / projects / lines from /api/workspaces + /api/projects +

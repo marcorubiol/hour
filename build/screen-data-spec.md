@@ -93,7 +93,11 @@ hand-crafted" is universal across selling profiles).
 
 ## Shell + home
 
-### `/h` — the hall — SETTLED (S1, 2026-07-17)
+### `/h` — the hall — SETTLED (S1, 2026-07-17) · SUPERSEDED by ADR-137 (2026-10-19)
+
+> `/h` forwards to `/h/desk`: one front door. The greeting and the clock moved to the Desk header; the
+> status sentence, the next-moment line and the day teaser were dropped (the Desk title and «Lo siguiente»
+> say the same). What follows is history.
 
 **Is**: entry point after login; sole home (ADR-068); the AI's first voice surface (ADR-069).
 **Decision (review session 1)**: the **status sentence** renders statically with the
