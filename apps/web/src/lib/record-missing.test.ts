@@ -5,9 +5,11 @@ import {
   boloMissing,
   conversationMissing,
   dateMissing,
+  lineMissing,
   performanceMissing,
   personMissing,
   stepShortcuts,
+  stepsDue,
   type ConversationMissingInput,
   type PerformanceMissingInput,
 } from './record-missing';
@@ -218,6 +220,52 @@ describe('personMissing', () => {
 
   it('«no esta vez» asks for nothing', () => {
     expect(personMissing([row('a', '2026-10-01', 'not_now')], TODAY)).toEqual([]);
+  });
+});
+
+describe('lineMissing', () => {
+  const row = (id: string, next: string | null, relation = 'talking') => ({ id, relation, next_action_at: next });
+
+  it('three or fewer due steps are each named, oldest first', () => {
+    expect(lineMissing([row('a', '2026-10-19'), row('b', '2026-10-21'), row('c', '2026-10-20'), row('d', null)], TODAY)).toEqual([
+      { kind: 'step_due', conversationId: 'a', day: '2026-10-19' },
+      { kind: 'step_due', conversationId: 'c', day: '2026-10-20' },
+    ]);
+  });
+
+  it('past three, the two oldest and the rest as one count', () => {
+    const rows = [row('a', '2026-10-19'), row('b', '2026-10-01'), row('c', '2026-10-05'), row('d', '2026-10-10'), row('e', '2026-10-20')];
+    expect(lineMissing(rows, TODAY)).toEqual([
+      { kind: 'step_due', conversationId: 'b', day: '2026-10-01' },
+      { kind: 'step_due', conversationId: 'c', day: '2026-10-05' },
+      { kind: 'steps_due_more', count: 3, atLeast: false },
+    ]);
+  });
+
+  it('a page of more that is due to its last row: the count is a floor', () => {
+    const rows = [row('a', '2026-10-01'), row('b', '2026-10-02'), row('c', '2026-10-03')];
+    expect(lineMissing(rows, TODAY, { total: 3 })).toHaveLength(3);
+    expect(lineMissing(rows, TODAY, { total: 40 })).toEqual([
+      { kind: 'step_due', conversationId: 'a', day: '2026-10-01' },
+      { kind: 'step_due', conversationId: 'b', day: '2026-10-02' },
+      { kind: 'steps_due_more', count: 1, atLeast: true },
+    ]);
+  });
+
+  it('a page of more that reaches a row not due holds every due one', () => {
+    const rows = [row('a', '2026-10-01'), row('b', '2026-10-02'), row('c', '2026-11-03')];
+    expect(lineMissing(rows, TODAY, { total: 40 })).toEqual([
+      { kind: 'step_due', conversationId: 'a', day: '2026-10-01' },
+      { kind: 'step_due', conversationId: 'b', day: '2026-10-02' },
+    ]);
+  });
+
+  it('«no esta vez» and a step still to come ask for nothing', () => {
+    expect(lineMissing([row('a', '2026-10-01', 'not_now'), row('b', '2026-11-01')], TODAY)).toEqual([]);
+  });
+
+  it('the line\'s count is the same rule', () => {
+    expect(stepsDue([row('a', '2026-10-20'), row('b', '2026-10-01', 'not_now'), row('c', '2026-10-21')], TODAY)).toHaveLength(1);
   });
 });
 

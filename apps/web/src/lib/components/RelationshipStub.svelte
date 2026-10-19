@@ -1,3 +1,26 @@
+<script lang="ts" module>
+  import { fetchJSON } from '$lib/api';
+  import type { ConversationItem } from '$lib/conversation';
+
+  export const RELATION_STUB_LIMIT = 10;
+
+  /**
+   * The stub's page of a project's conversations, next step first. The
+   * project page reads the same options for its «Falta» strip: one key, one
+   * request.
+   */
+  export function relationStubQueryOptions(slug: string) {
+    return {
+      queryKey: ['conversations', { project_slug: slug, status: 'any', limit: RELATION_STUB_LIMIT }] as const,
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchJSON<{ total: number; limit: number; items: ConversationItem[] }>(
+          `/api/conversations?project_slug=${encodeURIComponent(slug)}&status=any&limit=${RELATION_STUB_LIMIT}`,
+          signal,
+        ),
+    };
+  }
+</script>
+
 <script lang="ts">
   /**
    * RelationshipStub — Project detail block showing conversations summary
@@ -19,9 +42,8 @@
   import { lensOn } from '$lib/lenses.svelte';
   import { createQuery } from '@tanstack/svelte-query';
   import { writable, derived } from 'svelte/store';
-  import { fetchJSON } from '$lib/api';
   import { appLocale, t } from '$lib/i18n';
-  import { type ConversationItem, type PersonLite } from '$lib/conversation';
+  import { type PersonLite } from '$lib/conversation';
   import { relationLabel, relationTone } from '$lib/conversation-relation';
 
   interface Props {
@@ -43,22 +65,7 @@
     slugStore.set(projectSlug);
   });
 
-  type Response = {
-    total: number;
-    limit: number;
-    items: ConversationItem[];
-  };
-
-  const LIMIT = 10;
-
-  const queryOptions = derived(slugStore, ($slug) => ({
-    queryKey: ['conversations', { project_slug: $slug, status: 'any', limit: LIMIT }] as const,
-    queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchJSON<Response>(
-        `/api/conversations?project_slug=${encodeURIComponent($slug)}&status=any&limit=${LIMIT}`,
-        signal,
-      ),
-  }));
+  const queryOptions = derived(slugStore, ($slug) => relationStubQueryOptions($slug));
 
   const query = createQuery(queryOptions);
 

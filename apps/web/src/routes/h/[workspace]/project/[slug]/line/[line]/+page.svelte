@@ -33,9 +33,12 @@
   import RecordHead from '$lib/components/RecordHead.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import EmptyLine from '$lib/components/EmptyLine.svelte';
+  import MissingBand from '$lib/components/MissingBand.svelte';
+  import { stepsDueBand, type StepsDueRow } from '$lib/steps-due-band';
+  import { stepsDue } from '$lib/record-missing';
   import { spaceCrumb, type Crumb } from '$lib/record-crumbs';
   import { fmtMoneyCompact } from '$lib/money';
-  import { dayMonth, dayMonthYear } from '$lib/datetime';
+  import { dayMonth, dayMonthYear, localDayISO } from '$lib/datetime';
   import {
     MODULE_KEYS,
     moduleDescription,
@@ -190,7 +193,7 @@
   let isBooking = $derived(activeLine !== null && BOOKING_KINDS.has(activeLine.kind));
   let isTour = $derived(activeLine !== null && TOUR_KINDS.has(activeLine.kind));
 
-  type EngStats = { total: number; overdue: number; holds: number; confirmed: number };
+  type EngStats = { total: number; holds: number; confirmed: number; items: StepsDueRow[] };
   const engStatsOptions = toStore(() => {
     const id = activeLine?.id ?? null;
     return {
@@ -199,22 +202,34 @@
       queryFn: async ({ signal }: { signal: AbortSignal }): Promise<EngStats> => {
         const base = `/api/conversations?line_id=${id}`;
         const [all, confirmed, holds] = await Promise.all([
-          fetchJSON<{ total: number; items: { next_action_at: string | null }[] }>(
+          fetchJSON<{ total: number; items: StepsDueRow[] }>(
             `${base}&status=any&limit=100`,
             signal,
           ),
           fetchJSON<{ total: number }>(`${base}&status=confirmed&limit=1`, signal),
           fetchJSON<{ total: number }>(`${base}&status=hold&limit=1`, signal),
         ]);
-        const now = Date.now();
-        const overdue = all.items.filter(
-          (e) => e.next_action_at && new Date(e.next_action_at).getTime() < now,
-        ).length;
-        return { total: all.total, overdue, confirmed: confirmed.total, holds: holds.total };
+        return { total: all.total, confirmed: confirmed.total, holds: holds.total, items: all.items };
       },
     };
   });
   const engStatsQuery = createQuery(engStatsOptions);
+
+  // «Falta» (ADR-139 § 2): the line's conversations whose next step is due,
+  // read from the page the stats already fetch. The «overdue» figure counts
+  // the same rule, so the strip and the figure never disagree.
+  const today = localDayISO();
+  let engRows = $derived($engStatsQuery.data?.items ?? []);
+  let overdue = $derived(stepsDue(engRows, today).length);
+  let missingItems = $derived(
+    stepsDueBand(engRows, {
+      today,
+      total: $engStatsQuery.data?.total,
+      workspaceSlug,
+      moreHref: stack.includes('conversations') ? '#mod-conversations' : null,
+      locale,
+    }),
+  );
 
   type LinePerf = {
     id: string;
@@ -348,6 +363,9 @@
           <span>{formatDateRange(activeLine!.start_date, activeLine!.end_date)}</span>
         {/if}
       {/snippet}
+      {#snippet band()}
+        <MissingBand items={missingItems} {locale} />
+      {/snippet}
     </RecordHead>
 
     {#if isBooking && $engStatsQuery.data}
@@ -356,9 +374,9 @@
         <span class="line-detail__stat"><b>{st.total}</b> {t('line.stat_conversations', locale)}</span>
         <span class="line-detail__stat"><b>{st.holds}</b> {t('line.stat_holds', locale)}</span>
         <span class="line-detail__stat"><b>{st.confirmed}</b> {t('line.stat_confirmed', locale)}</span>
-        {#if st.overdue > 0}
+        {#if overdue > 0}
           <span class="line-detail__stat line-detail__stat--danger"
-            ><b>{st.overdue}</b> {t('line.stat_overdue', locale)}</span
+            ><b>{overdue}</b> {t('line.stat_overdue', locale)}</span
           >
         {/if}
       </p>
