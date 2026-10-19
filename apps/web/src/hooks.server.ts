@@ -8,6 +8,7 @@ import type { Handle, HandleServerError } from '@sveltejs/kit';
 import { dev } from '$app/environment';
 import { PUBLIC_SENTRY_DSN, PUBLIC_SENTRY_ENV } from '$env/static/public';
 import { scrubSentryEvent } from '$lib/sentry-scrub';
+import { legacyViewRedirect } from '$lib/conversation-tags';
 
 /**
  * `initCloudflareSentryHandle` is the Workers-runtime-correct equivalent of
@@ -169,11 +170,12 @@ const legacyVocabRedirects: Handle = async ({ event, resolve }) => {
     return Response.redirect(dest.toString(), 301);
   }
 
-  // «De qué se habla» (?view=threads) is now the Equipo view (ADR-134).
-  if (/^\/h\/conversations\/?$/.test(path) && event.url.searchParams.get('view') === 'threads') {
+  // The views of ADR-134 are chips now (ADR-138 § 2): ?view=team, and the
+  // older «de qué se habla» ?view=threads, go to ?etiqueta=team.
+  const chipped = /^\/h\/conversations\/?$/.test(path) ? legacyViewRedirect(event.url.searchParams) : null;
+  if (chipped) {
     const dest = new URL('/h/conversations', event.url);
-    dest.search = event.url.search;
-    dest.searchParams.set('view', 'team');
+    dest.search = chipped.toString();
     return Response.redirect(dest.toString(), 301);
   }
 

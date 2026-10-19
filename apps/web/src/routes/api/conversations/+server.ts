@@ -35,6 +35,8 @@ import { pgErrorResponse } from '$lib/server/errors';
 import { TURN_EMBEDS, loadOverviewRows, mailoutPickIds, setLastTurnEmbed, setScope } from '$lib/server/conversation-overview';
 import { applyListFilter, hasListFilter, parseLinea, type ListFilter } from '$lib/conversation-overview';
 import { RELATIONS } from '$lib/conversation-relation';
+import { TAG_KEY_RE, filterByChip } from '$lib/conversation-tags';
+import { loadTaggedIds } from '$lib/server/conversation-overview';
 
 const QuerySchema = v.object({
   status: v.optional(
@@ -57,6 +59,8 @@ const QuerySchema = v.object({
   r: v.optional(v.picklist(['respuestas', 'rebotes'])),
   // ADR-138: one derived relation.
   relacion: v.optional(v.picklist(RELATIONS)),
+  // ADR-138 fase 2: el chip de la lente, la clave de una etiqueta (sin ninguna se lee `sales`).
+  etiqueta: v.optional(v.pipe(v.string(), v.regex(TAG_KEY_RE))),
   line_ids: v.optional(v.string()),
   limit: v.optional(
     v.pipe(
@@ -119,7 +123,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       400,
     );
   }
-  const { status, project_slug, project_ids, workspace_ids, line_id, q, season, limit, offset, turno, temp, temporada, linea, line_ids, envio, r, relacion } =
+  const { status, project_slug, project_ids, workspace_ids, line_id, q, season, limit, offset, turno, temp, temporada, linea, line_ids, envio, r, relacion, etiqueta } =
     parsed.output;
 
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -170,10 +174,27 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
     linea: temporada === 'actual' ? parseLinea(linea) : undefined,
     ...(envio && r ? { envio, r } : {}),
   };
-  if (hasListFilter(listFilter)) {
+  if (hasListFilter(listFilter) || etiqueta) {
     // The derived filters only exist for the global lens: project and line
     // modules keep their own params (project_slug, line_id, season).
-    if (project_slug || line_id || season !== 'any') return json({ error: 'invalid_query', hint: 'turno/temp/temporada/envio/relacion go with project_ids/workspace_ids only.' }, 400);
+    if (project_slug || line_id || season !== 'any') return json({ error: 'invalid_query', hint: 'turno/temp/temporada/envio/relacion/etiqueta go with project_ids/workspace_ids only.' }, 400);
+  }
+  if (!hasListFilter(listFilter) && etiqueta) {
+    // A tag alone: the scope's ids with their tags, in the list's order; then
+    // the page in full. Untagged rows read as `sales` (`tagKeysOf`).
+    try {
+      const base = new URLSearchParams(search);
+      base.delete('select');
+      // The turn embeds are not in the light select: their filters go too.
+      for (const k of [...base.keys()]) if (k.startsWith('last_turn.') || k.startsWith('last_in.')) base.delete(k);
+      const matched = filterByChip(await loadTaggedIds(env, jwt, base, qTrim ? 'rpc/conversation_search' : 'conversation'), etiqueta);
+      const ids = matched.slice(offset, offset + limit).map((m) => m.id);
+      return json({ total: matched.length, limit, offset, status, season, items: await readPage(env, jwt, search.get('select')!, ids) });
+    } catch (err) {
+      return pgErrorResponse(err, { route: 'GET /api/conversations', requestId: locals.requestId }, { passUpstream: [401, 403] });
+    }
+  }
+  if (hasListFilter(listFilter)) {
     try {
       return json(
         await filteredPage(env, jwt, search, {
@@ -183,6 +204,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
           status: status === 'any' ? undefined : status,
           q: qTrim,
           filter: listFilter,
+          etiqueta,
           limit,
           offset,
         }),
@@ -235,12 +257,13 @@ async function filteredPage(
     status?: (typeof CONVERSATION_STATUSES)[number];
     q: string;
     filter: ListFilter;
+    etiqueta?: string;
     limit: number;
     offset: number;
   },
 ) {
   const rows = await loadOverviewRows(env, jwt, { projectIds: o.projectIds, workspaceIds: o.workspaceIds, status: o.status });
-  let matched = applyListFilter(rows, o.filter, new Date(), o.lineIds);
+  let matched = applyListFilter(o.etiqueta ? filterByChip(rows, o.etiqueta) : rows, o.filter, new Date(), o.lineIds);
   if (o.filter.envio && o.filter.r) {
     const ids = await mailoutPickIds(env, jwt, o.filter.envio, o.filter.r, rows);
     matched = matched.filter((r) => ids.has(r.id));
@@ -253,23 +276,24 @@ async function filteredPage(
     matched = matched.filter((r) => hits.has(r.id));
   }
   const ids = matched.slice(o.offset, o.offset + o.limit).map((r) => r.id);
-  let items: ConversationDbItem[] = [];
-  if (ids.length > 0) {
-    const search = new URLSearchParams({ select: pageSearch.get('select')!, id: `in.(${ids.join(',')})` });
-    setLastTurnEmbed(search);
-    const order = new Map(ids.map((id, i) => [id, i]));
-    items = (await pgGet<ConversationDbItem>(env, 'conversation', jwt, { search })).data.sort(
-      (a, b) => order.get(a.id)! - order.get(b.id)!,
-    );
-  }
   return {
     total: matched.length,
     limit: o.limit,
     offset: o.offset,
     status: o.status ?? 'any',
     season: 'any',
-    items: items.map((r) => normalizeConversationItem(r)),
+    items: await readPage(env, jwt, pageSearch.get('select')!, ids),
   };
+}
+
+/** The rows of a page (at most `limit` ids) read in full, in the order of `ids`. */
+async function readPage(env: SupabaseEnv, jwt: string, select: string, ids: string[]) {
+  if (ids.length === 0) return [];
+  const search = new URLSearchParams({ select, id: `in.(${ids.join(',')})` });
+  setLastTurnEmbed(search);
+  const order = new Map(ids.map((id, i) => [id, i]));
+  const { data } = await pgGet<ConversationDbItem>(env, 'conversation', jwt, { search });
+  return data.sort((a, b) => order.get(a.id)! - order.get(b.id)!).map((r) => normalizeConversationItem(r));
 }
 
 /**
@@ -338,6 +362,19 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
     });
     const conversation = data[0];
     if (!conversation) return json({ error: 'create_failed' }, 502);
+    // ADR-138 fase 2: its tags. The conversation already exists: a failure
+    // here does not undo it, the answer says so (`tagged: false`).
+    let tagged = true;
+    if (input.tag_ids && input.tag_ids.length > 0) {
+      try {
+        await pgPostRpc(env, 'set_conversation_tags', jwt, {
+          p_conversation_id: conversation.id,
+          p_tag_ids: input.tag_ids,
+        });
+      } catch {
+        tagged = false;
+      }
+    }
     // ADR-102 phase 4: the row no longer names a person. The primary
     // contact's id lets a multi-project capture link the same person again.
     let primaryPersonId: string | null = null;
@@ -347,7 +384,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
       });
       primaryPersonId = primary[0]?.person_id ?? null;
     }
-    return json({ conversation, primary_person_id: primaryPersonId }, 201);
+    return json({ conversation, primary_person_id: primaryPersonId, tagged }, 201);
   } catch (err) {
     const existing = err instanceof PostgrestError && err.code === '23505' ? existingConversationId(err.body) : null;
     if (existing) {
