@@ -102,7 +102,9 @@ test.describe('the rail pulse (ADR-096)', () => {
     expect(href!).toMatch(/^\/h\/(?:[\w-]+\/performance\/[\w-]+|planner\?view=day&d=\d{4}-\d{2}-\d{2})$/);
 
     await slip.first().click();
-    await expect(page).toHaveURL(/\/h\/(?:[\w-]+\/performance\/|planner)/, { timeout: 20_000 });
+    // A performance opens in the vistazo over this lens (ADR-139 p1); a day is the Planner.
+    if (/\/performance\//.test(href!)) await expect(page.getByTestId('peek')).toBeVisible({ timeout: 20_000 });
+    else await expect(page).toHaveURL(/\/h\/planner/, { timeout: 20_000 });
   });
 
   test('IT SPEAKS THE PLANNER’S CLOCK, AND NEVER A RAW KEY', async ({ page }) => {

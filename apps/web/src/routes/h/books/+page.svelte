@@ -101,6 +101,8 @@
   import { activeProjectsQueryOptions, allLinesQueryOptions } from '$lib/nav-queries';
   import { spaceName } from '$lib/utils/identity';
   import { goto, replaceState } from '$app/navigation';
+  import { peekFromLink } from '$lib/peek';
+  import { openPeek } from '$lib/peek.svelte';
   import { tick } from 'svelte';
 
   type WorkspaceLite = { id: string; slug: string; invoicing_mode: InvoicingMode | null };
@@ -336,9 +338,16 @@
     if (item.kind === 'overdue' && conversationHref(item.bolo)) return 'books.att_act_chase';
     return ATTENTION_ACTION[item.kind];
   }
+  /** The conversation opens in its vistazo, over Cuentas (ADR-139 p1). */
+  function chaseIn(href: string) {
+    const here = new URL(location.href);
+    const target = peekFromLink(new URL(href, here), here);
+    if (target) openPeek(target);
+    else void goto(href);
+  }
   function act(item: AttentionItem) {
     const chase = item.kind === 'overdue' ? conversationHref(item.bolo) : null;
-    if (chase) void goto(chase);
+    if (chase) chaseIn(chase);
     else if (item.kind === 'overdue') openPay(item.bolo);
     else if (item.kind === 'to_invoice') openInvoice(item.bolo);
     else if (item.kind === 'no_fee') openFee(item.bolo);

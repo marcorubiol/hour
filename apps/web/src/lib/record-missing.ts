@@ -18,6 +18,7 @@ import { addDaysIso } from './planner';
 import type { Commitment } from './people';
 import { followUpDue, turnOf, type TurnRow } from './conversation-overview';
 import { relationOf } from './conversation-relation';
+import { attentionItems, type AttentionItem, type MoneyBolo, type MoneyContext } from './money';
 
 /** The strip never says more than this (ADR-139 § 2). */
 export const MISSING_MAX = 3;
@@ -153,6 +154,50 @@ export function personMissing(conversations: readonly PersonMissingConversation[
     .map((c) => ({ kind: 'step_due' as const, conversationId: c.id, day: c.next_action_at!.slice(0, 10) }))
     .sort((a, b) => a.day.localeCompare(b.day))
     .slice(0, MISSING_MAX);
+}
+
+// ── Fecha ──────────────────────────────────────────────────────────────────
+
+export type DateMissing =
+  /** Still an option, and still to come: confirm it or let it go. */
+  | { kind: 'date_tentative' }
+  /** A trip still to come with no stage: nothing says how it gets there. */
+  | { kind: 'trip_no_stages' };
+
+export interface DateMissingInput {
+  kind: string;
+  status: string;
+  /** The date's first day, YYYY-MM-DD (or an instant whose date part is it). */
+  day: string;
+  /** How many stages the trip has; null when not read (or not a trip). */
+  stages: number | null;
+}
+
+/**
+ * What a date's vistazo asks for (ADR-139 p1, flujos § 12). A date has no
+ * money, no road sheet and no roster (who goes is inferred from the cast,
+ * ADR-103), so what it can lack is its certainty and, a trip, its stages.
+ * A past or cancelled date asks for nothing.
+ */
+export function dateMissing(input: DateMissingInput, today: string): DateMissing[] {
+  if (input.status === 'cancelled' || input.status === 'done') return [];
+  if (input.day.slice(0, 10) < today) return [];
+  const out: DateMissing[] = [];
+  if (input.status === 'tentative') out.push({ kind: 'date_tentative' });
+  if (input.kind === 'travel_day' && input.stages === 0) out.push({ kind: 'trip_no_stages' });
+  return out.slice(0, MISSING_MAX);
+}
+
+// ── Bolo ───────────────────────────────────────────────────────────────────
+
+/**
+ * What a bolo's vistazo asks for: what Cuentas' «Pide atención» says of it
+ * (`attentionItems`, the one look at a bolo's money), so the vistazo and
+ * the dashboard can never disagree. At most one: Cuentas gives each bolo
+ * one row, the worst.
+ */
+export function boloMissing(bolo: MoneyBolo, ctx: MoneyContext): AttentionItem[] {
+  return attentionItems([bolo], ctx).slice(0, MISSING_MAX);
 }
 
 // ── Atajos del siguiente paso ──────────────────────────────────────────────

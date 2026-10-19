@@ -2083,11 +2083,14 @@
   /* Record — a record's page (ADR-139 § 4): its blocks in one column from
      the lens's own left edge and at the lens's width (both are
      .shell__content's), one rhythm between blocks. A record that keeps two
-     columns (the conversation) draws them inside. */
+     columns (the conversation) draws them inside. The record is measured
+     on itself, not on the window (ADR-095 § 8): the same record is a page
+     and a vistazo of a third of the screen (ADR-139 p1). */
   .record {
     display: flex;
     flex-direction: column;
     gap: var(--record-gap);
+    container: record / inline-size;
   }
 
   /* Record head — RecordHead wears the lens head (.lenshead*: the title row,

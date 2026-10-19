@@ -538,6 +538,11 @@
     --dialog-title-size: var(--text-xl);
     --dialog-gutter: var(--space-l);  /* air kept between the paper and the window */
 
+    /* The vistazo (ADR-139 p1): the dialog's paper as a panel on the right,
+       over a lens that must stay legible, so its veil is lighter. */
+    --peek-inline: 36rem;
+    --peek-backdrop: color-mix(in srgb, var(--black) 16%, transparent);
+
     /* ============================================================ */
     /* SELECTION                                                      */
     /* ============================================================ */
@@ -716,6 +721,7 @@
        up, or the paper reads as part of the page behind it. */
     --dialog-edge: var(--border-color-dark);
     --dialog-backdrop: color-mix(in srgb, var(--black) 64%, transparent);
+    --peek-backdrop: color-mix(in srgb, var(--black) 40%, transparent);
 
     /* Shadows — black on darker is invisible at low opacity; bump to
        30-50% so elevation reads. */

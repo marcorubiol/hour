@@ -37,6 +37,8 @@
   import { detectLocale, LOCALE_TAG, t } from '$lib/i18n';
   import { localeDayMonth } from '$lib/datetime';
   import { addDaysIso, dayKeyInTz, plannerDayHref } from '$lib/planner';
+  import { page } from '$app/state';
+  import { peekHref } from '$lib/peek';
   import { usePins } from '$lib/stores/pins.svelte';
   import { useCalm } from '$lib/stores/calm.svelte';
   import { buildLineIndex, buildProjectIndex, resolveScope, type NavWorkspace, type RawLine } from '$lib/nav';
@@ -305,7 +307,11 @@
         subject: [slip.name, slip.city].filter(Boolean).join(' · '),
         projectId: a.row.project?.id ?? null,
         projectName: a.row.project?.name ?? '',
-        href: slip.href ?? (lensOn('planner') ? plannerDayHref('day', a.day) : null),
+        // A date has no page: its link opens its vistazo over Hoy (ADR-139 p1).
+        href:
+          a.of === 'date'
+            ? peekHref({ kind: 'date', id: a.id }, page.url)
+            : (slip.href ?? (lensOn('planner') ? plannerDayHref('day', a.day) : null)),
       });
     }),
   );

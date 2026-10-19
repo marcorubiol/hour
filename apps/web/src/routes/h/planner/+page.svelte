@@ -98,7 +98,7 @@
   import Dialog from '$lib/components/Dialog.svelte';
   import FeedDialog from '$lib/components/planner/FeedDialog.svelte';
   import CreateEventDialog from '$lib/components/create/CreateEventDialog.svelte';
-  import EditDateDialog from '$lib/components/planner/EditDateDialog.svelte';
+  import { currentPeek, openPeek } from '$lib/peek.svelte';
   import type { CreatedPerformance } from '$lib/plan-create';
   import type { QuickType } from '$lib/quick-add';
   import { usePins } from '$lib/stores/pins.svelte';
@@ -640,7 +640,6 @@
      read it without a second rule. Ids of the extra days are `id#day`;
      whatever talks to the server goes through `spanSourceId`. */
   let activeDateRows = $derived(expandDateSpans(sourceDateRows, viewerTz));
-  let sourceDateById = $derived(new Map(sourceDateRows.map((d) => [d.id, d])));
   let activeBlackoutRows = $derived(
     onSeason
       ? ($seasonAvailabilityQuery.data?.items ?? [])
@@ -1313,7 +1312,7 @@
     if (d) void jumpToDecisionCard(d.id);
     else jumpToDecisions();
   }
-  /** A date slip has no page of its own — its edit dialog opens here,
+  /** A date slip has no page of its own — its vistazo opens here,
       exactly as it does from the month and the agenda. */
   function openBoardDate(dateId: string) {
     const d = shownDates.find((x) => x.id === dateId);
@@ -2929,7 +2928,7 @@
         return;
       }
       // A dialog is open: it owns the keyboard until it closes.
-      if (createOpen || editOpen || marksOpen) return;
+      if (createOpen || peekOpen || marksOpen) return;
       // Inside a drawing's days the arrows are not «move the window»: on the
       // month they changed the month under the focused day and dropped the
       // focus on <body> (móvil #3). There they are the drawing's, or nothing.
@@ -3051,23 +3050,14 @@
     return sorted.length ? { from: sorted[0], to: sorted[sorted.length - 1] } : null;
   }
 
-  // ── Editing a date (task 15) — both projections open the same dialog.
-  // A date has no page of its own (no slug, no road sheet), so the edit
-  // is a dialog over the calendar, exactly where creation happens.
-  let editOpen = $state(false);
-  let editDate = $state<DateEvent | null>(null);
-
-  /** True when other loaded rows share this row's series (ADR-084 §1). */
-  let editInSeries = $derived.by(() => {
-    const sid = editDate?.series_id;
-    if (!sid) return false;
-    return shownDates.filter((d) => d.series_id === sid).length > 1;
-  });
+  // ── Looking at a date (ADR-139 p1) — every drawing opens its vistazo,
+  // over the calendar; «Editar» there opens the edit dialog. A drawn day of
+  // a date of several days stands for the date itself (`spanSourceId`).
+  // While the vistazo is open it owns the keyboard, like a dialog.
+  let peekOpen = $derived(currentPeek() !== null);
 
   function openDate(d: DateEvent) {
-    // A drawn day of a date of several days opens the date itself.
-    editDate = sourceDateById.get(spanSourceId(d.id)) ?? d;
-    editOpen = true;
+    openPeek({ kind: 'date', id: spanSourceId(d.id) });
   }
 
   /** Adding stays on the Planner (ADR-139 p3); the notice's «Abrir» goes
@@ -3765,8 +3755,6 @@
   canUnavailable={canBlackout}
   onOpenPerformance={openCreatedPerformance}
 />
-
-<EditDateDialog bind:open={editOpen} date={editDate} inSeries={editInSeries} />
 
 <FeedDialog bind:open={feedOpen} workspaces={$workspacesQuery.data?.items ?? []} />
 

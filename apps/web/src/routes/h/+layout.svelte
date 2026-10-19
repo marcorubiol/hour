@@ -37,6 +37,7 @@
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
   import { lensesOnFor, lensOn, setLensesOn } from '$lib/lenses.svelte';
   import LensOff from '$lib/components/LensOff.svelte';
+  import PeekHost from '$lib/components/peek/PeekHost.svelte';
   import { provideCalm } from '$lib/stores/calm.svelte';
   import { providePins, parsePin, type PinKind } from '$lib/stores/pins.svelte';
   import { provideScopes, sameSet as scopesSameSet, type Scope } from '$lib/stores/scopes.svelte';
@@ -660,6 +661,9 @@
           <!-- ADR-132: a lens off in every space on screen, reached by URL. -->
           <LensOff lens={routedLens} workspaces={onScreen} />
         {:else if children}{@render children()}{/if}
+        <!-- ADR-139 p1: the vistazo, over whatever is routed. Inside the
+             content so it wears the same voice (calm included). -->
+        <PeekHost />
       </div>
     </main>
   </div>
