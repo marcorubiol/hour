@@ -11,9 +11,9 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import Field from '$lib/components/Field.svelte';
   import { t, appLocale } from '$lib/i18n';
-  import MailSignature from './MailSignature.svelte';
   import { resetHelp } from '$lib/help-seen.svelte';
   import { SaveFlash } from '$lib/save-flash.svelte';
+  import MasterViewSetting from './MasterViewSetting.svelte';
 
   const locale = appLocale();
 
@@ -115,7 +115,6 @@
   }
 
   let myWorkspaces = $derived($workspacesQuery.data?.items ?? []);
-  let currentWorkspaceId = $derived(myWorkspaces.find((w) => w.slug === workspaceSlug)?.id);
   let sharedByWorkspace = $derived(
     new Map(($meQuery.data?.dossiers ?? []).map((d) => [d.workspace_id, d])),
   );
@@ -234,8 +233,6 @@
   </div>
 </section>
 
-<MailSignature scope="personal" workspaceId={currentWorkspaceId} />
-
 <section class="set-group">
   <BlockHead title={t('settings.profile_identity_kicker', locale)} count={t('settings.profile_identity_title', locale)} />
   <div class="set-group__body">
@@ -286,6 +283,8 @@
     {/if}
   </div>
 </section>
+
+<MasterViewSetting />
 
 <!-- LOCATION & TIMEZONE group killed: timezone derives from
      browser automatically, week-starts-on default to Monday is

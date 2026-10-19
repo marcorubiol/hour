@@ -17,6 +17,7 @@
   import { dayLabel } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
   import Button from './Button.svelte';
+  import EmptyLine from './EmptyLine.svelte';
   import Dialog from './Dialog.svelte';
   import Field from './Field.svelte';
   import Input from './Input.svelte';
@@ -275,7 +276,7 @@
 </script>
 
 {#if invoices.length === 0}
-  <p class="mny-inv__empty">{t('books.no_invoices', locale)}</p>
+  <EmptyLine text={t('books.no_invoices', locale)} />
 {:else}
   <ul class="mny__invoices" role="list">
     {#each invoices as invoice (invoice.id)}
@@ -462,7 +463,7 @@
                 {/each}
               </ul>
             {:else}
-              <p class="mny-inv__empty">{t('books.no_payments', locale)}</p>
+              <EmptyLine text={t('books.no_payments', locale)} />
             {/if}
 
             <dl class="mny-inv__tax">
@@ -564,7 +565,6 @@
     .mny-inv__number,
     .mny-inv__label,
     .mny-inv__muted,
-    .mny-inv__empty,
     .mny-inv__provenance {
       color: var(--text-faint);
     }
@@ -619,7 +619,6 @@
       text-transform: uppercase;
     }
     .mny-inv__provenance,
-    .mny-inv__empty,
     .mny-inv__dialog-who {
       font-size: var(--text-xs);
     }

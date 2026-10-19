@@ -59,6 +59,8 @@
   import ConceptHint from '$lib/components/ConceptHint.svelte';
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
+  import Fold from '$lib/components/Fold.svelte';
+  import { localeDayMonth } from '$lib/datetime';
   import { addToast } from '$lib/components/Toast.svelte';
   import { toastCreated } from '$lib/created';
   import { conversationWhoBody, type ConversationItem } from '$lib/conversation';
@@ -321,6 +323,13 @@
   let tagOptions = $derived(
     (tagNames.length > 0 ? tagNames : [{ key: SALES, label: null, labels: {} }]).map((x) => ({ value: x.key, label: tagLabel(x, locale) })),
   );
+  // «Más»: phone, tag and next step, folded; the lid says the tag and the day.
+  let aMoreOpen = $state(false);
+  let addMoreKeeps = $derived(
+    [tagOptions.find((o) => o.value === aTag)?.label, aNextAt ? localeDayMonth(aNextAt, locale) : null]
+      .filter(Boolean)
+      .join(' · '),
+  );
 
   // The picker offers only the projects of the current scope (drop 11-10):
   // a space offers its projects, a project or line that project, Everything
@@ -393,6 +402,7 @@
     aOrg = '';
     aNextAt = '';
     aNextNote = '';
+    aMoreOpen = false;
     aTag = addTagKey(chip);
     // Pre-select when the scope collapses to
     // a single project — otherwise start empty and let the user pick spaces.
@@ -622,7 +632,8 @@
     if (aProjectIds.length === 0) errSpaces = t('conversations.pick_space', locale);
     if (!aName.trim() && !aOrg.trim()) errWho = t('conversations.needs_name', locale);
     if (errSpaces || errWho) {
-      if (!errSpaces) document.getElementById('conversations-add-org')?.focus();
+      // «Who» comes first, so its field takes the focus first.
+      if (errWho) document.getElementById('conversations-add-org')?.focus();
       return;
     }
     $addMutation.mutate();
@@ -786,10 +797,41 @@
       submitAdd();
     }}
   >
-  <p class="conversations__dialog-hint">{t('conversations.add_hint', locale)}</p>
+  <!-- The order is what one has in mind: who, for which production, then the
+       rest folded (ADR-139 p3: deduce before asking; the scope preselects the
+       project). -->
+  <div class="conversations__form-grid">
+    <Input
+      id="conversations-add-org"
+      label={t('conversations.col_organization', locale)}
+      bind:value={aOrg}
+      error={errWho}
+      placeholder={t('conversations.org_ph', locale)}
+      list="conversations-org-list"
+      autocomplete="off"
+    />
+    <datalist id="conversations-org-list">
+      {#each orgSuggestions as name (name)}<option value={name}></option>{/each}
+    </datalist>
+    <Input label={t('conversations.full_name', locale)} bind:value={aName} />
+    <Input label={t('conversations.email', locale)} type="email" bind:value={aEmail} />
+  </div>
+  {#if aJoin.length > 0}
+    <div class="conversations__join" role="status">
+      <p>
+        {t('conversations.org_has_conversation', locale, {
+          org: aOrg.trim() || t('conversations.col_organization', locale),
+          projects: aJoin.map((j) => j.projectName).join(', '),
+        })}
+      </p>
+      <Button size="s" onclick={() => $joinMutation.mutate()} loading={$joinMutation.isPending}>
+        {t('conversations.add_as_contact', locale)}
+      </Button>
+    </div>
+  {/if}
   <fieldset class="conversations__spaces">
     <legend class="eyebrow eyebrow--sub">
-      {t('picker.spaces', locale)} <span class="conversations__field-hint">{t('conversations.spaces_hint', locale)}</span>
+      {t('picker.projects', locale)} <span class="conversations__field-hint">{t('conversations.spaces_hint', locale)}</span>
     </legend>
     {#if projectGroups.length === 0}
       <p class="conversations__field-hint">{t('conversations.no_projects', locale)}</p>
@@ -797,7 +839,8 @@
       <div class="conversations__space-groups">
         {#each projectGroups as g (g.wsId)}
           <div class="conversations__space-group">
-            <p class="conversations__space-name">{g.wsName}</p>
+            <!-- The space only names a group when there is more than one. -->
+            {#if projectGroups.length > 1}<p class="conversations__space-name">{g.wsName}</p>{/if}
             {#each g.projects as p (p.id)}
               <Checkbox
                 label={p.name}
@@ -820,46 +863,21 @@
     {/if}
     {#if errSpaces}<p class="form-error" role="alert">{errSpaces}</p>{/if}
   </fieldset>
-  {#if aJoin.length > 0}
-    <div class="conversations__join" role="status">
-      <p>
-        {t('conversations.org_has_conversation', locale, {
-          org: aOrg.trim() || t('conversations.col_organization', locale),
-          projects: aJoin.map((j) => j.projectName).join(', '),
-        })}
-      </p>
-      <Button size="s" onclick={() => $joinMutation.mutate()} loading={$joinMutation.isPending}>
-        {t('conversations.add_as_contact', locale)}
-      </Button>
-    </div>
-  {/if}
-  <div class="conversations__form-grid">
-    <Input
-      id="conversations-add-org"
-      label={t('conversations.col_organization', locale)}
-      bind:value={aOrg}
-      error={errWho}
-      placeholder={t('conversations.org_ph', locale)}
-      list="conversations-org-list"
-      autocomplete="off"
-    />
-    <datalist id="conversations-org-list">
-      {#each orgSuggestions as name (name)}<option value={name}></option>{/each}
-    </datalist>
-    <Input label={t('conversations.full_name', locale)} bind:value={aName} />
-    <Input label={t('conversations.email', locale)} type="email" bind:value={aEmail} />
-    <Input label={t('conversations.phone', locale)} type="tel" bind:value={aPhone} />
-  </div>
-  <div class="conversations__form-grid">
-    <Select label={t('conversations.tag', locale)} options={tagOptions} bind:value={aTag} />
-  </div>
-  <div class="conversations__form-grid">
-    <Input label={t('conversations.col_next_action', locale)} type="date" bind:value={aNextAt} />
-    <Input
-      label={t('conversations.next_note', locale)}
-      bind:value={aNextNote}
-      placeholder={t('conversations.next_note_ph', locale)}
-    />
+  <!-- Closed, the lid still says what it keeps: the tag, and the next step's
+       day once there is one. -->
+  <div class="conversations__more">
+    <Fold word={t('conversations.add_more', locale)} keeps={addMoreKeeps} bind:open={aMoreOpen}>
+      <div class="conversations__form-grid">
+        <Input label={t('conversations.phone', locale)} type="tel" bind:value={aPhone} />
+        <Select label={t('conversations.tag', locale)} options={tagOptions} bind:value={aTag} />
+        <Input label={t('conversations.col_next_action', locale)} type="date" bind:value={aNextAt} />
+        <Input
+          label={t('conversations.next_note', locale)}
+          bind:value={aNextNote}
+          placeholder={t('conversations.next_note_ph', locale)}
+        />
+      </div>
+    </Fold>
   </div>
   <!-- Hidden submit lets Enter inside an input trigger submit. -->
   <button type="submit" hidden aria-hidden="true"></button>
@@ -950,9 +968,8 @@
       display: contents;
     }
 
-    .conversations__dialog-hint {
-      font-size: var(--text-xs);
-      color: var(--text-faint);
+    .conversations__more {
+      margin-block-start: var(--space-m);
     }
 
     /* Multi-space picker — projects grouped under their space. */

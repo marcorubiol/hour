@@ -18,6 +18,7 @@
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import Field from '$lib/components/Field.svelte';
   import PersonPicker from '$lib/components/PersonPicker.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
@@ -125,9 +126,9 @@
 
 <div class="cast">
   {#if $castQuery.isPending}
-    <p class="cast__quiet">{t('desk.loading', locale)}</p>
+    <EmptyLine busy text={t('desk.loading', locale)} />
   {:else if $castQuery.error}
-    <p class="cast__quiet">{t('perf.cast_load_error', locale)}</p>
+    <EmptyLine text={t('perf.cast_load_error', locale)} />
   {:else}
     {#if cast.length > 0}
       <ul class="cast__list" role="list">
@@ -149,7 +150,7 @@
         {/each}
       </ul>
     {:else}
-      <p class="cast__quiet">{t('perf.cast_empty', locale)}</p>
+      <EmptyLine text={t('perf.cast_empty', locale)} />
     {/if}
 
     <!-- Casting requires a local dossier (cast_member_workspace_person_fkey);
@@ -184,13 +185,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-s);
-  }
-
-  .cast__quiet {
-    margin: 0;
-    font-size: var(--text-s);
-    color: var(--text-muted);
-    line-height: 1.55;
   }
 
   .cast__list {

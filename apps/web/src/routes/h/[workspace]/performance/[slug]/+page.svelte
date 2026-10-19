@@ -266,6 +266,8 @@
   let fCity = $state('');
   let fCountry = $state('');
   let fVenueId = $state('');
+  // «Save as venue» is kept as an intent and done by «Save» (ADR-139 p7).
+  let fSaveAsVenue = $state(false);
   // ADR-080 §2 — hold decision notice; the field only exists in the dialog
   // while the gig's status is hold*. null = empty = standard default.
   let fHoldNotice = $state<number | null>(null);
@@ -279,6 +281,7 @@
     fCity = perf.city ?? '';
     fCountry = perf.country ?? '';
     fVenueId = perf.venue_id ?? '';
+    fSaveAsVenue = false;
     fHoldNotice = perf.hold_notice_days;
     fBolo = currentBoloId ?? '';
     dialogOpen = true;
@@ -287,7 +290,7 @@
   // ADR-139 p7: what is wrong is said under its field, never as a toast.
   const formErrors = new FormErrors();
 
-  function saveEdit() {
+  async function saveEdit() {
     formErrors.clear();
     if (!fDay) formErrors.set('f-day', t('perf.needs_date', locale));
     // Same validation rule as PerformanceForm (isValidHoldNotice — THE
@@ -299,12 +302,22 @@
       formErrors.set('f-hold-notice', t('perf.hold_notice_invalid', locale));
     }
     if (formErrors.any) return void formErrors.focusFirst();
+    // The venue asked for with «Save as venue» is made now, then linked in
+    // the same PATCH; if it cannot be made, nothing else is written either.
+    let venueId = fVenueId || null;
+    if (fSaveAsVenue && !venueId && fVenue.trim()) {
+      try {
+        venueId = (await $promoteVenue.mutateAsync()).id;
+      } catch {
+        return;
+      }
+    }
     $patchMutation.mutate({
       performed_at: fDay,
       venue_name: fVenue.trim() || null,
       city: fCity.trim() || null,
       country: fCountry.trim() || null,
-      venue_id: fVenueId || null,
+      venue_id: venueId,
       // ADR-080 §2 — only while the field is on screen (hold* status);
       // emptied field = null = back to the standard default.
       ...(showHoldNotice ? { hold_notice_days: fHoldNotice } : {}),
@@ -432,8 +445,9 @@
   const venuesQuery = createQuery(venuesOptions);
   let venues = $derived($venuesQuery.data?.items ?? []);
 
-  // Promote the typed venue fields to a venue row and link it. Idempotent
-  // server-side: an existing name+city match returns the existing venue.
+  // Promote the typed venue fields to a venue row, from «Save» only (see
+  // saveEdit). Idempotent server-side: an existing name+city match returns
+  // the existing venue.
   const promoteVenue = createMutation({
     mutationFn: async () => {
       const body = await mutateJSON<{ venue?: VenueLite }>('POST', '/api/venues', {
@@ -447,8 +461,8 @@
     },
     onSuccess: (venue) => {
       fVenueId = venue.id;
+      fSaveAsVenue = false;
       void queryClient.invalidateQueries({ queryKey: ['venues'] });
-      addToast({ tone: 'success', message: t('perf.linked_to_venue', locale, { name: venue.name }) });
     },
     onError: (err) => {
       addToast({
@@ -1081,15 +1095,11 @@
         <option value={vn.id}>{vn.name}{vn.city ? ` — ${vn.city}` : ''}</option>
       {/each}
     </Select>
-    <Button
-      variant="secondary"
-      size="s"
-      disabled={!fVenue.trim()}
-      loading={$promoteVenue.isPending}
-      onclick={() => $promoteVenue.mutate()}
-    >
-      {t('perf.save_as_venue', locale)}
-    </Button>
+    <!-- An intent, not an act (ADR-139 p7): the venue is created and linked
+         by «Save», with everything else, and «Cancel» leaves nothing behind. -->
+    {#if !fVenueId}
+      <Checkbox label={t('perf.save_as_venue', locale)} bind:checked={fSaveAsVenue} disabled={!fVenue.trim()} />
+    {/if}
     <Button variant="secondary" size="s" disabled={!fVenueId} onclick={openVenueEdit}>
       {t('perf.edit_venue', locale)}
     </Button>
@@ -1107,7 +1117,7 @@
   {/snippet}
   {#snippet actions()}
     <Button variant="quiet" onclick={() => (dialogOpen = false)}>{t('create.cancel', locale)}</Button>
-    <Button onclick={saveEdit} loading={$patchMutation.isPending}>{t('edit.save', locale)}</Button>
+    <Button onclick={saveEdit} loading={$patchMutation.isPending || $promoteVenue.isPending}>{t('edit.save', locale)}</Button>
   {/snippet}
 </Dialog>
 

@@ -12,6 +12,7 @@
   import { lensOn } from '$lib/lenses.svelte';
   import Button from '$lib/components/Button.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { localeDayMonth } from '$lib/datetime';
   import { relativeContactDate } from '$lib/conversation';
   import { tick } from 'svelte';
@@ -255,8 +256,8 @@
     </div>
     <button type="button" class="more" onclick={() => showAll(false)}>{t('desk.see_less', locale)}</button>
   {:else if waiting.rows.length === 0}
-    <!-- One voice for an empty band, the one «Lo siguiente» and «Ha cambiado» use. -->
-    <p class="dband__empty">{t('desk.caughtup_l', locale)} <span class="caughtup__s">{t('desk.caughtup_s', locale)}</span></p>
+    <!-- One voice for an empty band (EmptyLine), the one every block uses. -->
+    <EmptyLine text={`${t('desk.caughtup_l', locale)} ${t('desk.caughtup_s', locale)}`} />
     {#if feedCount > waiting.rows.length && !calm}
       <button type="button" class="more" onclick={() => showAll(true)}>{t('desk.see_all', locale)} →</button>
     {/if}
@@ -506,11 +507,6 @@
   }
   .run__rows .row:last-child {
     border-block-end: 0;
-  }
-
-  /* ── Caught up ── */
-  .caughtup__s {
-    color: var(--text-faint);
   }
 
   /* Phone: the action stays on the right, the context drops under the

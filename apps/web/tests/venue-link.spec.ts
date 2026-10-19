@@ -37,22 +37,19 @@ test.describe('venue linking', () => {
     const dialog = page.locator('dialog[open]');
     await dialog.getByLabel('Venue', { exact: true }).fill('ZZZ E2E Venue');
     await dialog.getByLabel('City').fill('Testville');
-    await dialog.getByRole('button', { name: 'Save fields as venue' }).click();
-
-    // The select links to the (possibly pre-existing, idempotent) venue.
-    const select = dialog.locator('#f-venue-entity');
-    await expect(select).not.toHaveValue('', { timeout: 10_000 });
-    const venueId = await select.inputValue();
-
+    // «Save fields as venue» is an intent: nothing is created until «Save».
+    await dialog.getByLabel('Save fields as venue').check({ force: true });
+    await expect(dialog.locator('#f-venue-entity')).toHaveValue('');
     await dialog.getByRole('button', { name: 'Save changes', exact: true }).click();
     await expect(dialog).not.toBeVisible({ timeout: 10_000 });
 
-    // Persists: reopen and the select still points at the venue.
+    // Persists: reopen and the select points at the (possibly pre-existing,
+    // idempotent) venue.
     await page.reload();
     await waitForLoaded(page);
     await page.getByRole('button', { name: 'Edit details' }).click();
     const dialog2 = page.locator('dialog[open]');
-    await expect(dialog2.locator('#f-venue-entity')).toHaveValue(venueId, {
+    await expect(dialog2.locator('#f-venue-entity')).not.toHaveValue('', {
       timeout: 10_000,
     });
 
@@ -78,12 +75,17 @@ test.describe('venue linking', () => {
     await page.goto('/h/playwright/performance/zzz-e2e-1');
     await waitForLoaded(page);
     await page.getByRole('button', { name: 'Edit details' }).click();
-    const dialog = page.locator('dialog[open]').filter({ hasText: 'Edit performance' });
+    let dialog = page.locator('dialog[open]').filter({ hasText: 'Edit performance' });
 
-    // Link the stable fixture venue (idempotent promote from the other test).
+    // Link the stable fixture venue (idempotent promote from the other test):
+    // the intent, then «Save», which creates and links it.
     await dialog.getByLabel('Venue', { exact: true }).fill('ZZZ E2E Venue');
     await dialog.getByLabel('City').fill('Testville');
-    await dialog.getByRole('button', { name: 'Save fields as venue' }).click();
+    await dialog.getByLabel('Save fields as venue').check({ force: true });
+    await dialog.getByRole('button', { name: 'Save changes', exact: true }).click();
+    await expect(dialog).not.toBeVisible({ timeout: 10_000 });
+    await page.getByRole('button', { name: 'Edit details' }).click();
+    dialog = page.locator('dialog[open]').filter({ hasText: 'Edit performance' });
     const select = dialog.locator('#f-venue-entity');
     await expect(select).not.toHaveValue('', { timeout: 10_000 });
 
