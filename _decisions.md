@@ -4573,3 +4573,9 @@ es la casa, se llega por el logo). Marco decidió en el chat (19-10). Carril `cl
    accesible del reloj del rail y las frases que nombran la sección (Ajustes de secciones, el recordatorio de
    Cuentas, la ayuda del módulo de tareas). ⌘K no lista secciones, así que no tiene nada que cambiar. La ruta sigue
    siendo `/h/desk` y el código sigue diciendo `desk`.
+4. **En inglés, la vista de venta de Conversaciones pasa de «Booking» a «Venues»**, en los dos oficios. En la misma
+   barra «Books» y «Booking» se leen casi igual (lo vio el tour manager antes de abrir la app); si uno cambia, la
+   vista y no la sección. Cambia también la cabecera del selector de objetivo de una tarea, que nombra esas mismas
+   conversaciones. Las demás lenguas no cambian (enmienda ADR-128 § 3 y ADR-134 § 2 solo en inglés). «Booking» se
+   queda donde nombra la actividad y no la vista: la plantilla de línea, el módulo de una línea, el permiso
+   (`facet.converses`), el buzón compartido y el bloque de privacidad de Ajustes.
