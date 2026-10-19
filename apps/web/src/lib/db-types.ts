@@ -1457,6 +1457,24 @@ export type Database = {
           },
         ]
       }
+      help_seen: {
+        Row: {
+          seen: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          seen?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          seen?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       invoice: {
         Row: {
           country: string | null
@@ -6254,6 +6272,7 @@ export type Database = {
           unsubscribed: boolean
         }[]
       }
+      mark_help_seen: { Args: { p_key: string }; Returns: Json }
       mark_thread_read: { Args: { p_thread_id: string }; Returns: string }
       my_mail_signature: {
         Args: { p_workspace_id: string }
@@ -6557,6 +6576,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      reset_help_seen: { Args: never; Returns: Json }
       review_workspace_alias: {
         Args: { p_approve: boolean; p_request_id: string }
         Returns: {

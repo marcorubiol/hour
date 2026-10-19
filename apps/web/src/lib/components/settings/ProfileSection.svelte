@@ -9,6 +9,7 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import { t, appLocale } from '$lib/i18n';
   import MailSignature from './MailSignature.svelte';
+  import { resetHelp } from '$lib/help-seen.svelte';
 
   const locale = appLocale();
 
@@ -79,6 +80,25 @@
       });
     },
   });
+
+  // «Volver a ver las ayudas»: the welcome cards and first-time notes come
+  // back, everywhere, for this login (help_seen is per person).
+  let resettingHelp = $state(false);
+  async function showTipsAgain() {
+    resettingHelp = true;
+    try {
+      await resetHelp();
+      addToast({ tone: 'success', message: t('help.reset_done', locale) });
+    } catch (err) {
+      addToast({
+        tone: 'danger',
+        title: t('edit.not_saved', locale),
+        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
+      });
+    } finally {
+      resettingHelp = false;
+    }
+  }
 
   function commitName() {
     const next = userName.trim();
@@ -187,6 +207,18 @@
       </div>
       <div class="set-row__ctrl">
         <input type="email" bind:value={userEmail} readonly />
+      </div>
+    </div>
+
+    <div class="set-row">
+      <div class="set-row__lead">
+        <div class="set-row__label">{t('help.reset', locale)}</div>
+        <div class="set-row__hint">{t('help.reset_hint', locale)}</div>
+      </div>
+      <div class="set-row__ctrl">
+        <button type="button" class="btn--outline btn--s" disabled={resettingHelp} onclick={showTipsAgain}
+          >{t('help.reset', locale)}</button
+        >
       </div>
     </div>
   </div>

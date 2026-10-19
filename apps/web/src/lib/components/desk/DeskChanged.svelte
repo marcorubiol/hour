@@ -81,7 +81,7 @@
 </script>
 
 <section class="dband changed" aria-labelledby="desk-changed-h" aria-busy={loading} data-testid="desk-changed">
-  <BlockHead id="desk-changed-h" title={t('desk.changed_since', locale, { when: sinceLabel })}>
+  <BlockHead id="desk-changed-h" concept="changed" title={t('desk.changed_since', locale, { when: sinceLabel })}>
     {#if hasThreads}<a class="block-head__act" href="/h/conversations?view=team" data-testid="desk-to-team">{t('conversations.view_team', locale)} →</a>{/if}
   </BlockHead>
   {#if loading}

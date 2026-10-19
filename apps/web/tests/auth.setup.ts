@@ -1,5 +1,6 @@
 import { test as setup, expect } from '@playwright/test';
 import { STORAGE_STATE } from '../playwright.config';
+import { HELP_SEEN } from './help-seen';
 
 /**
  * Sign in ONCE for the whole suite and hand the session to every spec.
@@ -53,6 +54,20 @@ setup('authenticate', async ({ page }) => {
   // the door itself (`a[href="/h/desk"]` wrapping the clock) rather than by
   // its label, which is translated.
   await expect(page.locator('a[href="/h/desk"] time')).toBeVisible();
+
+  // THE WELCOME CARDS AND FIRST-TIME NOTES STAY OUT OF EVERY OTHER SPEC:
+  // they add a heading or a line inside the blocks the specs read.
+  // help.spec.ts resets them and owns them. A failure here (an origin
+  // without help_seen) changes nothing.
+  await page.evaluate(async (keys) => {
+    for (const key of keys) {
+      await fetch('/api/me/help', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ key }),
+      }).catch(() => {});
+    }
+  }, HELP_SEEN);
 
   await page.context().storageState({ path: STORAGE_STATE });
 });

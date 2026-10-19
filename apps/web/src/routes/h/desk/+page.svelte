@@ -27,6 +27,7 @@
   import TaskComposer from '$lib/components/TaskComposer.svelte';
   import LensHeader from '$lib/components/LensHeader.svelte';
   import LensTitle from '$lib/components/LensTitle.svelte';
+  import FirstVisitCard from '$lib/components/FirstVisitCard.svelte';
   import DeskNext from '$lib/components/desk/DeskNext.svelte';
   import DeskWaiting from '$lib/components/desk/DeskWaiting.svelte';
   import DeskChanged from '$lib/components/desk/DeskChanged.svelte';
@@ -709,7 +710,7 @@
 <div class="desk" aria-busy={busy}>
   <div class="desk__top">
     <p class="desk__hello">{greeting}{firstName ? `, ${firstName}` : ''}</p>
-    <LensHeader>
+    <LensHeader help="desk">
       {#snippet title()}
         <LensTitle
           text={titleOver ? `${titleOver} · ${titleRest}` : titleRest}
@@ -727,6 +728,8 @@
     </LensHeader>
   </div>
 
+  <FirstVisitCard section="desk" steps={['desk-next', 'desk-waits', 'desk-more']} />
+
   {#if composerOpen}
     <div class="desk__composer" bind:this={composerEl}>
       <TaskComposer
@@ -741,7 +744,7 @@
 
   <div class="desk__grid">
     <div class="desk__col">
-      <div class="slot slot--next">
+      <div class="slot slot--next" data-help-step="desk-next">
         <DeskNext
           next={lead.card}
           then={lead.line}
@@ -757,7 +760,7 @@
           {locale}
         />
       </div>
-      <div class="slot slot--waits">
+      <div class="slot slot--waits" data-help-step="desk-waits">
         <DeskWaiting
           {waiting}
           {today}
@@ -788,7 +791,7 @@
       </div>
     {:else}
       <div class="desk__col">
-        <div class="slot slot--season">
+        <div class="slot slot--season" data-help-step="desk-more">
           <DeskSeason
             planner={lensOn('planner') ? { value: plannerFig, errored: feeds.errored } : null}
             conversations={readConversations ? { value: convFig, errored: $overviewQuery.isError } : null}
@@ -797,7 +800,7 @@
             {locale}
           />
         </div>
-        <div class="slot slot--changed">
+        <div class="slot slot--changed" data-help-step="desk-more">
           <DeskChanged
             {changes}
             loading={changedLoading}

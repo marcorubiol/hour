@@ -97,6 +97,8 @@
   import { t, type Locale } from '$lib/i18n';
   import { isoWeek } from '$lib/planner';
   import BlockHead from '$lib/components/BlockHead.svelte';
+  import ConceptHint from '$lib/components/ConceptHint.svelte';
+  import FirstTimeNote from '$lib/components/FirstTimeNote.svelte';
   import Slip from '$lib/components/planner/Slip.svelte';
   import DecisionBand, {
     type ConcurrenceVM,
@@ -220,7 +222,7 @@
   <div class="ov__grid">
     <!-- 2 · THE STRIP. Drawn from the first frame, empty, so nothing below
          it moves when the rows arrive. -->
-    <section class="blk ov__strip" aria-label={t('planner.season_strip', locale, { n: SEASON_WEEKS })}>
+    <section class="blk ov__strip" data-help-step="planner-strip" aria-label={t('planner.season_strip', locale, { n: SEASON_WEEKS })}>
       <BlockHead title={t('planner.season_strip', locale, { n: SEASON_WEEKS })} />
       <!-- ONE TAB STOP, ARROWS INSIDE (móvil #8, WCAG 2.4.3): 84 days and 12
            weeks were 96 stops between the head and «Por decidir». The strip
@@ -283,8 +285,8 @@
       </div>
       <p class="strip__key">
         <span><i class="k k--firm"></i>{t('planner.season_key_firm', locale)}</span>
-        <span><i class="k k--option grain"></i>{t('planner.season_key_option', locale)}</span>
-        <span class="guess"><i class="k k--tour"></i>{t('planner.season_key_tour', locale)}</span>
+        <span><i class="k k--option grain"></i>{t('planner.season_key_option', locale)}<ConceptHint concept="hold" /></span>
+        <span><i class="k k--tour"></i><span class="guess">{t('planner.season_key_tour', locale)}</span><ConceptHint concept="guess" /></span>
         <span><i class="k k--away"></i>{t('planner.season_key_away', locale)}</span>
         <span><i class="k k--decide"></i>{t('planner.season_key_decide', locale)}</span>
         <span><i class="k k--clash"></i>{t('planner.season_key_clash', locale)}</span>
@@ -301,8 +303,9 @@
          is exercised where you are looking). Then the clashes that are not a
          choice between two holds. -->
     {#if !decisionsAbsent}
-      <section class="blk ov__decide">
-        <BlockHead title={t('planner.season_b_decide', locale)} count={n(decisions.length)} alert={decisions.length > 0} />
+      <section class="blk ov__decide" data-help-step="planner-decide">
+        <BlockHead title={t('planner.season_b_decide', locale)} concept="decide" count={n(decisions.length)} alert={decisions.length > 0} />
+        <FirstTimeNote event="first_hold_due" when={!loading && decisions.some((d) => d.urgent)} />
         {#if loading}
           <p class="blk__empty" aria-hidden="true"><span class="ghost-line" style:inline-size="60%">&nbsp;</span></p>
         {:else if decisions.length === 0 && concurrences.length === 0}
@@ -320,7 +323,8 @@
             id="season-decisions"
           />
         {/if}
-        <BlockHead title={t('planner.season_b_clashes', locale)} count={n(clashes.length)} alert={clashes.length > 0} />
+        <BlockHead title={t('planner.season_b_clashes', locale)} concept="clashes" count={n(clashes.length)} alert={clashes.length > 0} />
+        <FirstTimeNote event="first_clash" when={!loading && clashes.length > 0} />
         {#if loading}
           <p class="blk__empty" aria-hidden="true"><span class="ghost-line" style:inline-size="60%">&nbsp;</span></p>
         {:else if clashes.length === 0}
@@ -336,12 +340,13 @@
       </section>
     {/if}
 
-    <div class="ov__lists">
+    <div class="ov__lists" data-help-step="planner-lists">
       <!-- 4 · NOT CLOSED — confirmed, and something is still empty. Facts as
            chips; the trip is a guess and says so in the inference voice. -->
       <section class="blk">
         <BlockHead
           title={t('planner.season_b_unclosed', locale)}
+          concept="unclosed"
           count={loading
               ? DASH
               : t('planner.season_unclosed_meta', locale, {
@@ -350,6 +355,7 @@
                   w: UNCLOSED_WEEKS,
                 }) + (travelOnly > 0 ? ` · ${t('planner.season_unclosed_guess', locale, { n: travelOnly })}` : '')}
         />
+        <FirstTimeNote event="first_trip_guess" when={!loading && unclosed.some((u) => u.travelGuess)} />
         {#if loading}
           <p class="blk__empty" aria-hidden="true"><span class="ghost-line" style:inline-size="60%">&nbsp;</span></p>
         {:else if unclosed.length === 0}
@@ -370,7 +376,7 @@
 
       <!-- 5 · HOLES — free runs of three nights or more, to sell. -->
       <section class="blk">
-        <BlockHead title={t('planner.season_b_gaps', locale)} count={t('planner.season_gaps_meta', locale, { n: GAP_MIN_NIGHTS })} />
+        <BlockHead title={t('planner.season_b_gaps', locale)} concept="gaps" count={t('planner.season_gaps_meta', locale, { n: GAP_MIN_NIGHTS })} />
         {#if loading}
           <p class="blk__empty" aria-hidden="true"><span class="ghost-line" style:inline-size="60%">&nbsp;</span></p>
         {:else if gaps.length === 0}

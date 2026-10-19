@@ -14,6 +14,9 @@
    */
   import type { Snippet } from 'svelte';
   import LensSwitcher from '$lib/components/LensSwitcher.svelte';
+  import { t, appLocale } from '$lib/i18n';
+  import { cardKey, type HelpSection } from '$lib/help';
+  import { help, toggleCard } from '$lib/help-seen.svelte';
 
   interface Props {
     /** the big display title — whatever the lens wants to say */
@@ -26,8 +29,10 @@
      * heading's name stays the title alone.
      */
     titleAside?: Snippet;
+    /** The section's welcome card (`FirstVisitCard`): its «?» lives here, by the switcher. */
+    help?: HelpSection;
   }
-  let { title, sub, titleAside }: Props = $props();
+  let { title, sub, titleAside, help: section }: Props = $props();
 </script>
 
 <header class="lenshead">
@@ -38,7 +43,21 @@
         <span class="lenshead__aside">{@render titleAside()}</span>
       {/if}
     </div>
-    <LensSwitcher />
+    {#if section}
+      <span class="lenshead__tools">
+        <button
+          type="button"
+          class="lenshead__help"
+          id={`help-${section}`}
+          aria-label={t('help.section_aria', appLocale())}
+          aria-expanded={help.reopened === cardKey(section)}
+          onclick={() => toggleCard(cardKey(section))}><span aria-hidden="true">?</span></button
+        >
+        <LensSwitcher />
+      </span>
+    {:else}
+      <LensSwitcher />
+    {/if}
   </div>
   {#if sub}
     <p class="lenshead__sub">{@render sub()}</p>
