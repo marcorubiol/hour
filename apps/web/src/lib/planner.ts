@@ -738,6 +738,19 @@ export function plannerDayHref(view: 'day' | 'agenda', day: string): string {
 }
 
 /**
+ * «Ver en el Planner» from a conversation (ADR-138 § 6): the Agenda open on
+ * its first day ahead, with its project pinned (`scope=p:<id>`, the uuid
+ * form the shell applies on arrival, as Cuentas does). The first day is the
+ * earliest of `days` from today on; with none ahead, the book opens on today.
+ * The scope is the project: the Planner has no bolo nor conversation pin
+ * (ADR-092).
+ */
+export function conversationPlannerHref(projectId: string, days: readonly string[], todayIso: string): string {
+  const first = days.filter((d) => d >= todayIso).sort()[0];
+  return `/h/planner?view=agenda${first ? `&d=${first}` : ''}&scope=p:${projectId}`;
+}
+
+/**
  * Projection resolution (ADR-117, superseding ADR-078 §10's chain): an
  * explicit `?view=` wins, and anything else opens the season overview — the
  * Planner's portada. No stored preference and no form-factor default: a

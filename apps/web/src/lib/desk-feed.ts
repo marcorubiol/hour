@@ -50,6 +50,8 @@ export interface DeskConvInput {
   relation: Relation;
   next_action_at: string | null;
   next_action_note: string | null;
+  /** YYYY-MM-DD: the day «no esta vez» ends, which is the day to write again (ADR-138 § 4). */
+  not_now_until?: string | null;
   person: { full_name: string | null; organization_name: string | null; slug: string | null } | null;
   /** ADR-102: who the conversation is with; it titles the item when present. */
   organization?: { name: string } | null;
@@ -359,8 +361,28 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
   }
 
   // ── Conversations (derived calls): next action set, not in «not this time».
+  //    A «not this time» with a day to come back is a call on that day
+  //    (ADR-138 § 4): the day it ends is the day to write again.
   let hasOverdue = false;
   for (const e of input.conversations) {
+    if (e.relation === 'not_now' && e.not_now_until && !replied.has(e.id)) {
+      const day = e.not_now_until.slice(0, 10);
+      push(
+        day,
+        'conversation',
+        Date.parse(`${day}T00:00:00Z`),
+        blankItem({
+          id: `back-${e.id}`,
+          concern: 'conversation',
+          subject: convSubject(e, locale),
+          projectName: e.project?.name ?? '—',
+          projectId: e.project?.id ?? null,
+          verbKey: 'followup',
+          conversationId: e.id,
+          workspaceId: e.workspace_id ?? null,
+        }),
+      );
+    }
     if (e.relation === 'not_now' || !e.next_action_at || replied.has(e.id)) continue;
     const day = e.next_action_at.slice(0, 10);
     const b = dayBucket(day, now, locale);
@@ -485,46 +507,138 @@ export interface Waiting {
 }
 
 /**
+ * The days a view shows, for the Planner's margin (ADR-138 § 6): «Te espera»
+ * bounded to them. Both ends inclusive, YYYY-MM-DD.
+ */
+export interface WaitingWindow {
+  from: string;
+  to: string;
+}
+
+export interface WaitingOptions {
+  calm?: boolean;
+  limit?: number;
+  /** Bound to these days instead of the Desk's tiers (overdue, today, the week). */
+  window?: WaitingWindow;
+  /** Only these concerns (the Planner's margin: tasks and conversations). */
+  concerns?: readonly DeskConcern[];
+  /** false leaves Hour's own proposals out (revive, AI tasks). */
+  proposals?: boolean;
+}
+
+/**
+ * Where a row waits: on its day, or today when that day has passed (what is
+ * overdue waits now, never in the past). Null for the anytime tail.
+ */
+export function waitingDay(item: Pick<DeskItem, 'day'>, now: Date): string | null {
+  if (!item.day) return null;
+  const today = localDayISO(now);
+  return item.day < today ? today : item.day;
+}
+
+/**
  * «Te espera» (ADR-117): what to act on, by weight. Tiers by day — overdue,
  * today, the rest of this week — and the «voy · no voy» of the next two weeks
  * after them; inside a tier, by `weightOf`, then by day. The anytime tail and
  * what lies past this week stay in the day list, except a task already inside
  * its warning, which joins the week. Calm keeps overdue and today.
+ *
+ * With a `window` (the Planner's margin, ADR-138 § 6) the tiers are the
+ * window's days instead: every dated row whose `waitingDay` falls inside it,
+ * by day, the overdue first, then by weight. No cut unless `limit` says so.
  */
-export function rankWaiting(
-  feed: readonly DeskBucket[],
-  now: Date,
-  opts: { calm?: boolean; limit?: number } = {},
-): Waiting {
-  const tiered: { tier: number; item: DeskItem }[] = [];
+export function rankWaiting(feed: readonly DeskBucket[], now: Date, opts: WaitingOptions = {}): Waiting {
+  const tiered: { tier: number; day: string; item: DeskItem }[] = [];
+  const admitted = (item: DeskItem) =>
+    (!opts.concerns || opts.concerns.includes(item.concern)) && (opts.proposals !== false || !item.isProposal);
   for (const b of feed) {
     const tier = b.sortKey === -1 ? 0 : b.sortKey === 0 ? 1 : b.sortKey < 98 ? 2 : null;
     for (const r of b.runs)
       for (const item of r.items) {
+        if (!admitted(item)) continue;
+        if (opts.window) {
+          const day = waitingDay(item, now);
+          if (!day || day < opts.window.from || day > opts.window.to) continue;
+          tiered.push({ tier: tier === 0 ? 0 : 1, day, item });
+          continue;
+        }
         if (item.concern === 'going') {
           // A «voy» of the next two weeks rides behind the week, whatever its bucket.
           const k = dayBucket(item.day, now, 'en').sortKey;
-          tiered.push({ tier: k === 0 ? 1 : k < 7 ? 2 : 3, item });
+          tiered.push({ tier: k === 0 ? 1 : k < 7 ? 2 : 3, day: item.day ?? '', item });
           continue;
         }
         // A task inside its warning (`lead_days`) is this week's, whatever its due day.
         const t = tier ?? (item.concern === 'task' && item.dueLabel === 'due' ? 2 : null);
-        if (t !== null) tiered.push({ tier: t, item });
+        if (t !== null) tiered.push({ tier: t, day: item.day ?? '', item });
       }
   }
   const kept = opts.calm ? tiered.filter((x) => x.tier <= 1) : tiered;
-  kept.sort(
-    (a, b) =>
-      a.tier - b.tier ||
-      weightOf(a.item) - weightOf(b.item) ||
-      (a.item.day ?? '').localeCompare(b.item.day ?? ''),
+  kept.sort((a, b) =>
+    opts.window
+      ? a.day.localeCompare(b.day) || a.tier - b.tier || weightOf(a.item) - weightOf(b.item)
+      : a.tier - b.tier || weightOf(a.item) - weightOf(b.item) || a.day.localeCompare(b.day),
   );
+  const limit = opts.limit ?? (opts.window ? Infinity : WAITING_ROWS);
   return {
-    rows: kept.slice(0, opts.limit ?? WAITING_ROWS).map((x) => x.item),
+    rows: kept.slice(0, limit).map((x) => x.item),
     total: kept.length,
     asking: kept.filter((x) => !x.item.isProposal).length,
     overdue: kept.filter((x) => x.tier === 0 && !x.item.isProposal).length,
   };
+}
+
+/** The margin's rows by the day they wait on (`waitingDay`), in `rankWaiting`'s order. */
+export function waitingByDay(rows: readonly DeskItem[], now: Date): Map<string, DeskItem[]> {
+  const out = new Map<string, DeskItem[]>();
+  for (const item of rows) {
+    const day = waitingDay(item, now);
+    if (!day) continue;
+    const list = out.get(day);
+    if (list) list.push(item);
+    else out.set(day, [item]);
+  }
+  return out;
+}
+
+/** «2 pasos»: how many rows wait on each day (Month and Season, ADR-138 § 6). */
+export function waitingCounts(rows: readonly DeskItem[], now: Date): Map<string, number> {
+  return new Map([...waitingByDay(rows, now)].map(([day, items]) => [day, items.length]));
+}
+
+/** The Conversations overview's «te toca» row, as «Te espera» reads it. */
+export interface OverviewReplyRow {
+  id: string;
+  reason: string;
+  title: string;
+  workspace_id: string;
+  project_id: string;
+  at: string;
+}
+
+/**
+ * The replies waiting for us (ADR-126 § 1): the «te toca» rows with reason
+ * `reply`, opening their conversation. One reading for the Desk and the
+ * Planner's margin.
+ */
+export function overviewReplies(
+  rows: readonly OverviewReplyRow[],
+  workspaceSlugById: ReadonlyMap<string, string>,
+  projectNameById: ReadonlyMap<string, string>,
+): DeskReplyInput[] {
+  return rows
+    .filter((r) => r.reason === 'reply')
+    .map((r) => {
+      const ws = workspaceSlugById.get(r.workspace_id);
+      return {
+        id: r.id,
+        title: r.title,
+        projectId: r.project_id,
+        projectName: projectNameById.get(r.project_id) ?? '',
+        at: r.at,
+        href: ws ? `/h/${ws}/conversation/${r.id}` : null,
+      };
+    });
 }
 
 /** A «voy · no voy» row for «Te espera» (the page names it with its slip). */
