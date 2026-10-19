@@ -39,7 +39,7 @@
     DATE_TYPE_KEYS,
     TYPE_LABEL_KEYS,
     type DateTypeKey,
-  } from '../create/CreateEventDialog.svelte';
+  } from '$lib/quick-add';
   import { dayMonthYear, instantToWallClock, wallClockToInstant } from '$lib/datetime';
   import { detectLocale, t } from '$lib/i18n';
   import { allLinesQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';

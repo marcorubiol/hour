@@ -1468,10 +1468,15 @@
     color: inherit;
   }
 
-  /* The one action a toast may carry («Deshacer»): a link-like button. */
-  .toast__action {
-    align-self: flex-start;
+  /* What a toast may carry: «Deshacer», and beside it «Abrir». Link-like
+     buttons in one row. */
+  .toast__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-m);
     margin-block-start: var(--space-2xs);
+  }
+  .toast__action {
     padding: 0;
     background: none;
     border: 0;

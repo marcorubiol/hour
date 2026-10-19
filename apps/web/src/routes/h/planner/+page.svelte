@@ -24,11 +24,10 @@
    *
    * The page owns the feeds, the pins scoping, the conflict/away engines,
    * the i18n and the Feed/ICS dialog (now behind the "⋯" overflow);
-   * MonthGrid and AgendaList render. Creation is the UNIFIED dialog
-   * (ADR-078 §1): every "+" — toolbar and day cells — opens
-   * CreateEventDialog with the day/scope presets; the blackout dialog
-   * hangs off its quiet footer action and the "⋯" overflow, and hides
-   * itself while the availability/team feeds are absent.
+   * MonthGrid and AgendaList render. Creation is the QUICK ADD (ADR-139
+   * p3 A): every "+" — toolbar, day cells, the "⋯" «unavailable» entry —
+   * opens CreateEventDialog with the day/scope presets, and the page stays
+   * where it was when something is added (the notice says it, with undo).
    */
 
   import { docTitle } from '$lib/doc-title';
@@ -100,8 +99,8 @@
   import FeedDialog from '$lib/components/planner/FeedDialog.svelte';
   import CreateEventDialog from '$lib/components/create/CreateEventDialog.svelte';
   import EditDateDialog from '$lib/components/planner/EditDateDialog.svelte';
-  import CreateBlackoutDialog from '$lib/components/create/CreateBlackoutDialog.svelte';
-  import type { CreatedPerformance } from '$lib/components/PerformanceForm.svelte';
+  import type { CreatedPerformance } from '$lib/plan-create';
+  import type { QuickType } from '$lib/quick-add';
   import { usePins } from '$lib/stores/pins.svelte';
   import { useCalm } from '$lib/stores/calm.svelte';
   import { LOCALE_TAG, detectLocale, t } from '$lib/i18n';
@@ -2995,6 +2994,8 @@
 
   let createOpen = $state(false);
   let createDate = $state<string | null>(null);
+  /** The type a door opens on (the "⋯" «unavailable»); null = the draft's. */
+  let createType = $state<QuickType | null>(null);
 
   // A single pinned line pre-selects its project — and its line. With no
   // line pins, a single pinned project pre-selects itself.
@@ -3010,6 +3011,7 @@
     // re-arms it, AFTER this runs, so a toolbar «+ date» never inherits
     // the last cell's project.
     boardPresetProjectId = null;
+    createType = null;
     createDate = dayIso ?? viewCreateDay();
     createOpen = true;
   }
@@ -3068,15 +3070,16 @@
     editOpen = true;
   }
 
-  async function handleCreated(perf: CreatedPerformance) {
+  /** Adding stays on the Planner (ADR-139 p3); the notice's «Abrir» goes
+      to the new performance's page, only when asked. */
+  async function openCreatedPerformance(perf: CreatedPerformance) {
     const ws = workspaceSlugById.get(perf.workspace_id) ?? defaultWorkspaceSlug;
     if (perf.slug) await goto(`/h/${ws}/performance/${perf.slug}`);
   }
 
-  // ── Blackout dialog (ADR-078 §4/§5) — entry points hide while the
-  // availability or team feed is absent (contract § Graceful absence). ──
-  let blackoutOpen = $state(false);
-
+  // ── Unavailability (ADR-078 §4/§5) is a type of the quick add; it can be
+  // written only while the availability and team feeds answer (contract
+  // § Graceful absence). ──
   let canBlackout = $derived(
     Boolean(
       $availabilityQuery.data &&
@@ -3097,8 +3100,8 @@
   });
 
   function openBlackout() {
-    createOpen = false;
-    blackoutOpen = true;
+    openCreate();
+    createType = 'unavailable';
   }
 
   // ── Calendar feed links (ADR-054) — entry now lives in the "⋯" menu;
@@ -3423,13 +3426,7 @@
     onSetLaneAxis={setLaneAxis}
     onCreate={() => openCreate()}
     onFeed={openFeed}
-    onBlackout={() => {
-      // Direct menu path: no day of its own — drop any stale preset from a
-      // cancelled day-cell create and propose the view's day, like every
-      // door without one. The create-dialog footer path keeps its day.
-      createDate = viewCreateDay();
-      openBlackout();
-    }}
+    onBlackout={openBlackout}
   />
 
 
@@ -3763,15 +3760,10 @@
   presetProjectId={boardPresetProjectId ?? presetProjectId}
   {presetLineId}
   presetDate={createDate}
-  showBlackoutAction={canBlackout}
-  onBlackout={openBlackout}
-  onCreatedPerformance={handleCreated}
-/>
-
-<CreateBlackoutDialog
-  bind:open={blackoutOpen}
+  presetType={createType}
   presetWorkspaceId={blackoutPresetWs}
-  presetDate={createDate}
+  canUnavailable={canBlackout}
+  onOpenPerformance={openCreatedPerformance}
 />
 
 <EditDateDialog bind:open={editOpen} date={editDate} inSeries={editInSeries} />

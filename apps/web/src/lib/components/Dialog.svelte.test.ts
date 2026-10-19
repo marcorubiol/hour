@@ -93,6 +93,17 @@ describe('Dialog · the save model', () => {
     expect(await esc(container.querySelector('dialog')!)).toBe(false);
   });
 
+  it('a host that keeps its draft (`keepsDraft`) just closes: nothing to lose', async () => {
+    const { container, getByTestId } = render(DialogHarness, { keepsDraft: true });
+    await settle();
+    await fireEvent.input(document.querySelector('#h-title')!, { target: { value: 'x' } });
+    expect(await esc(container.querySelector('dialog')!)).toBe(true);
+    await fireEvent.click(container.querySelector('dialog')!);
+    await settle();
+    expect(container.querySelector('.dialog__ask')).toBeNull();
+    expect(getByTestId('state').textContent).toBe('closed');
+  });
+
   it('⌘↵ and Ctrl↵ press the primary from any field', async () => {
     const onsave = vi.fn();
     const { container } = render(DialogHarness, { onsave });

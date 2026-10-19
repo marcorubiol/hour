@@ -8,14 +8,15 @@
   interface Props {
     open?: boolean;
     dirty?: boolean;
+    keepsDraft?: boolean;
     onsave?: () => void;
   }
-  let { open = $bindable(true), dirty = false, onsave }: Props = $props();
+  let { open = $bindable(true), dirty = false, keepsDraft = false, onsave }: Props = $props();
   let kind = $state('a');
   let title = $state('');
 </script>
 
-<Dialog bind:open title="Harness" {dirty}>
+<Dialog bind:open title="Harness" {dirty} {keepsDraft}>
   <Segmented ariaLabel="Kind" options={[{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }]} bind:value={kind} />
   <Input id="h-title" label="Title" bind:value={title} />
   {#snippet actions()}

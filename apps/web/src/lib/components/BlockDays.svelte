@@ -11,8 +11,12 @@
    *
    * The days come from a RULE (span + weekday set) with single days punched
    * out, never from enumerating 25 checkboxes.
+   *
+   * THE SPAN IS NOT ASKED HERE (ADR-139 p3): the host's one «Cuándo» control
+   * already holds the day and its «hasta», so this panel only takes them. And
+   * it does not scold before anything is done: the limit is said only once
+   * the host has tried to save (`checked`).
    */
-  import Input from '$lib/components/Input.svelte';
   import { weekdayLabels } from '$lib/datetime';
   import { appLocaleTag } from '$lib/i18n';
   import { addDaysIso } from '$lib/planner';
@@ -27,9 +31,10 @@
     /** Project accent, so the picked days wear the colour they will land in. */
     accent?: string | null;
     locale?: string;
+    /** The host tried to save: now a span over the limit says so. */
+    checked?: boolean;
     labels: {
-      from: string;
-      to: string;
+      weekdays: string;
       pickSpan: string;
       daysUnit: string;
       tooFew: string;
@@ -39,12 +44,13 @@
   }
 
   let {
-    from = $bindable(''),
-    to = $bindable(''),
+    from = '',
+    to = '',
     weekdays = $bindable([0, 1, 2, 3, 4, 5, 6]),
     exceptions = $bindable([]),
     accent = null,
     locale = appLocaleTag(),
+    checked = false,
     labels,
   }: Props = $props();
 
@@ -89,10 +95,7 @@
 </script>
 
 <div class="bd" style={accent ? `--c: ${accent}` : undefined}>
-  <Input label={labels.from} type="date" bind:value={from} />
-  <Input label={labels.to} type="date" bind:value={to} />
-
-  <div class="bd__wd">
+  <div class="bd__wd" role="group" aria-label={labels.weekdays}>
     {#each WEEKDAY_ORDER as w, i (w)}
       <button
         type="button"
@@ -124,12 +127,12 @@
     </div>
   {/if}
 
-  <p class="bd__count" class:bd__count--err={limit !== 'ok'}>
+  <p class="bd__count" class:bd__count--err={checked && limit !== 'ok'}>
     <b>{days.length}</b>
     <span>{labels.daysUnit}</span>
-    {#if limit === 'too_many'}
+    {#if checked && limit === 'too_many'}
       <i>{labels.tooMany}</i>
-    {:else if limit === 'too_few'}
+    {:else if checked && limit === 'too_few'}
       <i>{labels.tooFew}</i>
     {:else if liveExceptions.length > 0}
       <i>{labels.removed(liveExceptions.length)}</i>
@@ -145,26 +148,42 @@
     flex-direction: column;
     gap: var(--space-xs);
   }
+  /* The rule reads like the Segmented it is a cousin of: a day that is IN is
+     raised on paper with its word in ink; a day that is out has no paper and
+     a faint, struck word. Seven «on» days must never read as seven empty
+     fields (review 2026-10-19, hallazgo 4). */
   .bd__wd {
     display: flex;
-    gap: var(--space-2xs);
+    gap: var(--seg-inset);
+    padding: var(--seg-inset);
+    background: var(--seg-track);
+    border: var(--border-size) solid var(--seg-edge);
+    border-radius: var(--radius);
   }
   .bd__wdchip {
     flex: 1;
+    text-align: center;
     appearance: none;
+    min-block-size: var(--touch-target);
     padding: var(--space-2xs) 0;
-    border: 1px solid var(--border-color-dark);
+    border: 0;
     border-radius: var(--radius-s);
-    background: var(--bg-ultra-light);
+    background: transparent;
     color: var(--text-faint);
     font-family: var(--font-mono);
     font-size: var(--text-xs);
+    text-decoration: line-through;
     cursor: pointer;
   }
   .bd__wdchip--on {
-    background: color-mix(in oklch, var(--c, var(--text-color)) 14%, var(--bg-ultra-light));
-    border-color: color-mix(in oklch, var(--c, var(--text-color)) 34%, var(--border-color-light));
+    background: var(--seg-on);
     color: var(--text-color);
+    text-decoration: none;
+    box-shadow: var(--box-shadow-1);
+  }
+  .bd__wdchip:focus-visible {
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: var(--focus-offset);
   }
 
   /* The calendar shows the RESULT of the rule and is only a way to punch a
@@ -176,7 +195,7 @@
   }
   .bd__cald {
     appearance: none;
-    aspect-ratio: 1.1;
+    min-block-size: var(--control-size-s);
     border: 1px solid transparent;
     border-radius: var(--radius-s);
     background: none;

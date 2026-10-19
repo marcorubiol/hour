@@ -19,6 +19,9 @@
    *   discard and never asks. «Written» is read from the fields themselves
    *   (any value that differs from the one the dialog opened with), plus
    *   `dirty` for what is not a field (a list of people changed in place).
+   *   A host that keeps its own draft (`keepsDraft`: «Añadir al plan», whose
+   *   draft comes back on reopen) has nothing to lose, so the frame just
+   *   closes.
    * - ⌘↵ / Ctrl↵ presses the primary button from any field.
    * - The first focus lands on the first field, never on a type pill.
    */
@@ -39,6 +42,10 @@
     closeOnBackdrop?: boolean;
     /** Unsaved work that is not a field value (the frame reads fields itself). */
     dirty?: boolean;
+    /** The host keeps what was written across a close (a draft that comes
+        back on reopen, with its own «Descartar»), so Esc and a click outside
+        simply close: there is nothing to lose, nothing to ask. */
+    keepsDraft?: boolean;
     onclose?: () => void;
     children?: Snippet;
     actions?: Snippet;
@@ -52,6 +59,7 @@
     size = 'm',
     closeOnBackdrop = true,
     dirty = false,
+    keepsDraft = false,
     onclose,
     children,
     actions,
@@ -108,6 +116,7 @@
   });
 
   function hasUnsaved(): boolean {
+    if (keepsDraft) return false;
     if (dirty) return true;
     return touched && Boolean(panelEl) && snapshotControls(panelEl!) !== snapshot;
   }
