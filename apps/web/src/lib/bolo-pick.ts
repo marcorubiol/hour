@@ -114,12 +114,15 @@ export function boloDefault(bolos: readonly BoloLite[]): string {
 /**
  * Cuentas filtrada a un proyecto. `scope=p:<id>` es el enlace con ámbito de
  * siempre (ADR-067, lo aplica el shell); `new_bolo` abre su alta de bolo con
- * ese proyecto puesto; `#bolo-<id>` lleva a la tarjeta de un bolo.
+ * ese proyecto puesto; `#bolo-<id>` lleva a la tarjeta de un bolo, y `act`
+ * (un tipo de «Pide atención») abre allí el diálogo que lo resuelve: cobro,
+ * factura, caché o el documento (ADR-139, verbos de «Falta» del bolo).
  */
 export function booksHref(
   projectId: string,
-  opts: { newBolo?: boolean; boloId?: string } = {},
+  opts: { newBolo?: boolean; boloId?: string; act?: string } = {},
 ): string {
-  const q = `scope=p:${projectId}${opts.newBolo ? `&new_bolo=${projectId}` : ''}`;
+  const act = opts.act && opts.boloId ? `&act=${opts.act}` : '';
+  const q = `scope=p:${projectId}${opts.newBolo ? `&new_bolo=${projectId}` : ''}${act}`;
   return `/h/books?${q}${opts.boloId ? `#bolo-${opts.boloId}` : ''}`;
 }
