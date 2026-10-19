@@ -58,7 +58,7 @@
     type PerformanceEvent,
   } from '$lib/month-events';
   import { assignBandLanes, dayKeyInTz, statusWord } from '$lib/planner';
-  import { agendaChunks, emptyTailMonths, type AgendaDayStats } from '$lib/agenda-chunks';
+  import { agendaChunks, dayMarked, emptyTailMonths, type AgendaDayStats } from '$lib/agenda-chunks';
   import { awayRest, coversDay } from '$lib/away';
   import { SvelteMap } from 'svelte/reactivity';
   import { dualTime, hourMark, localeDayMonth, localeWeekdayShort } from '$lib/datetime';
@@ -394,7 +394,7 @@
   });
 
   /** The day's facts, in the chunker's vocabulary. `free` is a night the
-      trade can sell (no rows); `marked` is a clash or a note — not a
+      trade can sell (no rows); `marked` is a clash, a note or a step — not a
       booking, but reason enough to keep the day's containers open. Away
       bands count for neither: they are about a person, not the calendar. */
   function dayStats(day: string): AgendaDayStats {
@@ -410,8 +410,11 @@
     return {
       free: rows.length === 0,
       sellable: freeNight ? freeNight(day) : rows.length === 0,
-      marked:
-        Boolean(clashesByDay?.get(day)?.length) || Boolean(notesByDay?.get(day)?.length),
+      marked: dayMarked({
+        clashes: clashesByDay?.get(day),
+        notes: notesByDay?.get(day),
+        steps: stepsByDay?.get(day),
+      }),
       firm,
       held,
     };

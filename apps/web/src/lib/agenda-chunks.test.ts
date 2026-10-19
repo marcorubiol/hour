@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   agendaChunks,
+  dayMarked,
   emptyTailMonths,
   type AgendaChunk,
   type AgendaDayStats,
@@ -143,5 +144,23 @@ describe('agendaChunks', () => {
     expect(chunks[0]).toMatchObject({ t: 'month', collapsed: false, free: 30 });
     const noted = chunks.find((c) => c.t === 'week' && c.from <= '2026-06-05' && c.to >= '2026-06-05');
     expect(noted).toMatchObject({ open: true });
+  });
+
+  // Seen after E3 (8d0bdaba): a dated next step on a day with nothing else
+  // folded inside its shut week, so the Agenda never drew it.
+  it('a day with only next steps is marked: its week and month stay open', () => {
+    expect(dayMarked({ steps: [{ id: 's1' }] })).toBe(true);
+    expect(dayMarked({ steps: [], notes: [], clashes: [] })).toBe(false);
+    expect(dayMarked({})).toBe(false);
+    const steps = new Map([['2026-06-17', [{ id: 's1' }]]]);
+    const chunks = agendaChunks({
+      days: span('2026-06-01', '2026-06-30'),
+      todayIso: '2026-03-01',
+      dayStats: (d) => ({ ...QUIET, marked: dayMarked({ steps: steps.get(d) }) }),
+    });
+    expect(chunks[0]).toMatchObject({ t: 'month', collapsed: false, free: 30 });
+    expect(chunks.some((c) => c.t === 'day' && c.day === '2026-06-17')).toBe(true);
+    const others = chunks.filter((c) => c.t === 'week' && !(c.from <= '2026-06-17' && c.to >= '2026-06-17'));
+    expect(others.every((c) => c.t === 'week' && !c.open)).toBe(true);
   });
 });
