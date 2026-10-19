@@ -40,6 +40,7 @@
   import { mutateJSON } from '$lib/api';
   import Avatar from '$lib/components/Avatar.svelte';
   import Button from '$lib/components/Button.svelte';
+  import Dialog from '$lib/components/Dialog.svelte';
   import Menu from '$lib/components/Menu.svelte';
   import { MESSAGE_MAX, messageWhen, type ThreadMessage } from '$lib/threads';
 
@@ -98,8 +99,13 @@
     $editMutation.mutate(text);
   }
 
+  // Deleting asks first, in the app's own dialog (never the browser's).
+  let confirmDelete = $state(false);
   function remove() {
-    if (!window.confirm(t('threads.delete_confirm', locale))) return;
+    confirmDelete = true;
+  }
+  function confirmRemove() {
+    confirmDelete = false;
     $deleteMutation.mutate();
   }
 </script>
@@ -163,6 +169,13 @@
     </Menu>
   {/if}
 </li>
+
+<Dialog bind:open={confirmDelete} size="s" title={t('threads.delete_title', locale)} description={t('threads.delete_confirm', locale)}>
+  {#snippet actions()}
+    <button type="button" class="btn--outline btn--s" onclick={() => (confirmDelete = false)}>{t('ui.cancel', locale)}</button>
+    <button type="button" class="btn--danger btn--s" onclick={confirmRemove}>{t('threads.delete', locale)}</button>
+  {/snippet}
+</Dialog>
 
 <style>
   @layer components {

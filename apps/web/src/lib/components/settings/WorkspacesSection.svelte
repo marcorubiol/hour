@@ -10,6 +10,7 @@
   import { session } from '$lib/session.svelte';
   import { t, appLocale } from '$lib/i18n';
   import MailSignature from './MailSignature.svelte';
+  import Dialog from '$lib/components/Dialog.svelte';
 
   const locale = appLocale();
 
@@ -148,10 +149,19 @@
     }
   }
 
-  async function revokeAccess(item: AccessItem) {
-    if (!currentWorkspace) return;
+  // Revoking asks first, in the app's own dialog: the row waits in `revoking`.
+  let revoking = $state<AccessItem | null>(null);
+  const revokingLabel = $derived(
+    revoking ? (revoking.access_kind === 'member' ? revoking.display_name : revoking.email) : '',
+  );
+  function revokeAccess(item: AccessItem) {
+    revoking = item;
+  }
+  async function confirmRevoke() {
+    const item = revoking;
+    revoking = null;
+    if (!item || !currentWorkspace) return;
     const label = item.access_kind === 'member' ? item.display_name : item.email;
-    if (!window.confirm(t('settings.access_revoke_confirm', locale, { label }))) return;
     try {
       await mutateJSON('DELETE', `/api/workspaces/${currentWorkspace.id}/access`, {
         kind: item.access_kind === 'member' ? 'member' : 'invitation',
@@ -513,6 +523,19 @@
     </div>
   </div>
 </section>
+
+<Dialog
+  open={revoking !== null}
+  onclose={() => (revoking = null)}
+  size="s"
+  title={t('settings.access_revoke_title', locale)}
+  description={t('settings.access_revoke_confirm', locale, { label: revokingLabel })}
+>
+  {#snippet actions()}
+    <button type="button" class="btn--outline btn--s" onclick={() => (revoking = null)}>{t('ui.cancel', locale)}</button>
+    <button type="button" class="btn--danger btn--s" onclick={confirmRevoke}>{t('settings.access_revoke', locale)}</button>
+  {/snippet}
+</Dialog>
 
 <style>
   .set-prose {

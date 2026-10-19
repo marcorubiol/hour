@@ -31,6 +31,7 @@
   import { appLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
   import Switch from '$lib/components/Switch.svelte';
+  import Dialog from '$lib/components/Dialog.svelte';
   import ConversationHistory from '$lib/components/ConversationHistory.svelte';
   import ConversationStatusMenu from '$lib/components/ConversationStatusMenu.svelte';
   import NextActionDialog from '$lib/components/NextActionDialog.svelte';
@@ -222,10 +223,15 @@
 
   // ADR-124: marking a shared one private makes it vanish for the rest of the
   // team, and only you can bring it back, so it asks first. Unmarking does not.
+  let confirmPrivate = $state(false);
   function togglePrivate() {
     if (!conv) return;
-    if (!conv.private && !window.confirm(t('mail.private_confirm', locale))) return;
-    $setPrivate.mutate(!conv.private);
+    if (conv.private) $setPrivate.mutate(false);
+    else confirmPrivate = true;
+  }
+  function confirmMakePrivate() {
+    confirmPrivate = false;
+    $setPrivate.mutate(true);
   }
 
   function what(e: ConversationEventItem): string {
@@ -648,6 +654,13 @@
     </div>
   </form>
 {/snippet}
+
+<Dialog bind:open={confirmPrivate} size="s" title={t('mail.private_title', locale)} description={t('mail.private_confirm', locale)}>
+  {#snippet actions()}
+    <button type="button" class="btn--outline btn--s" onclick={() => (confirmPrivate = false)}>{t('ui.cancel', locale)}</button>
+    <button type="button" class="btn--primary btn--s" onclick={confirmMakePrivate}>{t('mail.private_confirm_btn', locale)}</button>
+  {/snippet}
+</Dialog>
 
 <style>
   @layer components {
