@@ -5,7 +5,7 @@
    * la conversación: marcarla aquí es marcarla en su ficha y en cualquier otra
    * conversación donde esté.
    */
-  import ConceptHint from '$lib/components/ConceptHint.svelte';
+  import BlockHead from '$lib/components/BlockHead.svelte';
   import Acquaintance from '$lib/components/Acquaintance.svelte';
   import type { ConversationContact } from '$lib/conversation';
   import { t, type Locale } from '$lib/i18n';
@@ -24,7 +24,7 @@
 
 {#if current.length > 0}
   <div class="known">
-    <p class="eyebrow eyebrow--sub">{t('acquaintance.known', locale)}<ConceptHint concept="known" /></p>
+    <BlockHead title={t('acquaintance.known', locale)} concept="known" />
     {#each current as c (c.person_id)}
       <Acquaintance {workspaceId} personId={c.person_id} name={c.person!.full_name} {locale} />
     {/each}
@@ -37,9 +37,6 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-xs);
-    }
-    .known p {
-      margin: 0;
     }
   }
 </style>

@@ -154,7 +154,9 @@
     {/if}
   {/snippet}
   {#if heading === 'eyebrow'}
-    <BlockHead level={3} title={name} count={thread.message_count} id={headingId}>{@render unread()}</BlockHead>
+    <!-- In the conversation's column (`list`) the thread is a block of the page;
+         in the mixed flow it sits under the flow's own head. -->
+    <BlockHead level={list ? 2 : 3} title={name} count={thread.message_count} id={headingId}>{@render unread()}</BlockHead>
   {:else}
     <header class="thread__head">
       <h3 class="thread__name" id={headingId}>{name}</h3>
