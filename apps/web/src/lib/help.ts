@@ -20,10 +20,12 @@ export type HelpSeen = Record<string, string>;
 /** La misma regla que `mark_help_seen` (20261020150000_help_seen). */
 export const HELP_KEY = /^(card|event):[a-z][a-z0-9_]{0,47}$/;
 
-/** Las secciones con tarjeta en este carril. */
-export type HelpSection = 'desk' | 'planner';
+/** Las secciones con tarjeta. Ajustes y las fichas no la llevan: nadie entra a
+ *  explorarlas, se llega con una tarea (investigación § 3). */
+export const SECTIONS = ['desk', 'planner', 'conversations', 'team', 'books'] as const;
+export type HelpSection = (typeof SECTIONS)[number];
 
-/** Los conceptos con «i» en este carril (textos.md § 2, prioridad 1). */
+/** Los conceptos con «i» (textos.md § 1 y § 2). */
 export const CONCEPTS = [
   'scope',
   'calm',
@@ -35,19 +37,71 @@ export const CONCEPTS = [
   'clashes',
   'unclosed',
   'gaps',
+  'due',
+  'hot',
+  'cold',
+  'season_sales',
+  'relation',
+  'bolo',
+  'to_collect',
+  'next30',
+  'season_books',
+  'board',
+  'cast',
+  'roadsheet',
+  'lines',
+  'trade',
+  'reading',
+  'outside',
+  'mailboxes',
+  'known',
 ] as const;
 export type HelpConcept = (typeof CONCEPTS)[number];
 
-/** Los avisos de primera vez de este carril (textos.md § 4). */
-export const EVENTS = ['first_going', 'first_clash', 'first_hold_due', 'first_trip_guess'] as const;
+/** Los avisos de primera vez (textos.md § 4). */
+export const EVENTS = [
+  'first_going',
+  'first_clash',
+  'first_hold_due',
+  'first_trip_guess',
+  'first_reply_waiting',
+  'first_team_thread',
+  'first_overdue',
+  'first_payment',
+  'first_board',
+  'first_mail_synced',
+] as const;
 export type HelpEvent = (typeof EVENTS)[number];
 
 export const cardKey = (section: HelpSection): string => `card:${section}`;
 export const eventKey = (event: HelpEvent): string => `event:${event}`;
 
-/** Las claves del diccionario de un concepto: el título del panel y su texto. */
-export function conceptKeys(concept: HelpConcept): { title: string; body: string } {
-  return { title: `help.concept.${concept}`, body: `help.concept.${concept}_body` };
+/**
+ * La relación, en el orden en que manda (ADR-138 § 4): si una conversación
+ * cumple dos, gana la de más arriba. Es el orden de las líneas de su «i».
+ */
+export const RELATION_PRECEDENCE = ['not_now', 'regular', 'talking', 'dormant', 'contacted', 'never'] as const;
+
+export interface ConceptKeys {
+  title: string;
+  body: string;
+  /** Una línea por caso, con su palabra de pantalla delante. */
+  lines?: { label: string; text: string }[];
+  /** Lo que se abre con «Más», para quien quiere el detalle. */
+  more?: string;
+}
+
+/** Las claves del diccionario de un concepto: el título del panel, su texto y, si las tiene, sus líneas. */
+export function conceptKeys(concept: HelpConcept): ConceptKeys {
+  const keys: ConceptKeys = { title: `help.concept.${concept}`, body: `help.concept.${concept}_body` };
+  if (concept === 'relation') {
+    keys.lines = RELATION_PRECEDENCE.map((r) => ({
+      label: `conversations.relation_${r}`,
+      text: `help.concept.relation_${r}`,
+    }));
+    keys.more = 'help.concept.relation_more';
+  }
+  return keys;
 }
 
 export function hasSeen(seen: HelpSeen, key: string): boolean {

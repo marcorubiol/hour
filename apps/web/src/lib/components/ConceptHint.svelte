@@ -27,6 +27,7 @@
   let title = $derived(t(keys.title, locale));
 
   let open = $state(false);
+  let showMore = $state(false);
   let button: HTMLButtonElement | undefined = $state();
   let panel: HTMLElement | undefined = $state();
 
@@ -42,13 +43,17 @@
     const vh = window.innerHeight;
     const left = Math.max(gap, Math.min(b.left, vw - w - gap));
     const below = b.bottom + gap;
-    const top = below + h <= vh - gap || b.top - gap - h < gap ? below : b.top - gap - h;
+    // Below if it fits, else above if it fits, else as low as the screen allows
+    // (a long panel scrolls inside: max-block-size).
+    const top =
+      below + h <= vh - gap ? below : b.top - gap - h >= gap ? b.top - gap - h : Math.max(gap, vh - gap - h);
     panel.style.setProperty('--hint-x', `${left}px`);
     panel.style.setProperty('--hint-y', `${top}px`);
   }
 
   function ontoggle(e: ToggleEvent) {
     open = e.newState === 'open';
+    if (!open) showMore = false;
     if (open) place();
   }
 
@@ -79,7 +84,15 @@
   role="note"
   bind:this={panel}
   {ontoggle}
-  ><strong class="hint__title">{title}</strong> <span class="hint__body">{t(keys.body, locale)}</span></span
+  ><strong class="hint__title">{title}</strong> <span class="hint__body">{t(keys.body, locale)}</span
+  >{#if keys.lines}{#each keys.lines as line (line.label)}<span class="hint__line"
+        ><b>{t(line.label, locale)}:</b> {t(line.text, locale)}</span
+      >{/each}{/if}{#if keys.more}{#if showMore}<span class="hint__line hint__more">{t(keys.more, locale)}</span
+      >{:else}<button type="button" class="hint__toggle" onclick={() => {
+          showMore = true;
+          requestAnimationFrame(place);
+        }}>{t('help.more', locale)}</button
+      >{/if}{/if}</span
 >
 
 <style>
@@ -137,6 +150,8 @@
       box-sizing: border-box;
       inline-size: max-content;
       max-inline-size: min(22rem, calc(100vw - 1rem));
+      max-block-size: calc(100vh - 1rem);
+      overflow-y: auto;
       padding: var(--space-s) var(--space-m);
       border: var(--border);
       border-radius: var(--radius-s);
@@ -155,6 +170,28 @@
     }
     .hint__panel:not(:popover-open) {
       display: none;
+    }
+    .hint__line {
+      display: block;
+      margin-block-start: var(--space-xs);
+    }
+    .hint__line b {
+      color: var(--text-color);
+      font-weight: 600;
+    }
+    .hint__toggle {
+      display: block;
+      margin-block-start: var(--space-xs);
+      padding: 0;
+      border: 0;
+      background: none;
+      color: var(--text-muted);
+      font: inherit;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+    .hint__toggle:hover {
+      color: var(--text-color);
     }
     .hint__title {
       display: block;

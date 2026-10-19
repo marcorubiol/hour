@@ -3,10 +3,13 @@ import ca from './i18n/ca.json';
 import en from './i18n/en.json';
 import es from './i18n/es.json';
 import fr from './i18n/fr.json';
+import { RELATIONS } from './conversation-relation';
 import {
   CONCEPTS,
   EVENTS,
   HELP_KEY,
+  RELATION_PRECEDENCE,
+  SECTIONS,
   cardKey,
   cardVisible,
   conceptKeys,
@@ -21,7 +24,7 @@ const state = (over: Partial<HelpState> = {}): HelpState => ({ seen: {}, ready: 
 
 describe('help keys', () => {
   test('every card and event key passes the rule mark_help_seen applies', () => {
-    for (const k of [cardKey('desk'), cardKey('planner'), ...EVENTS.map(eventKey)]) {
+    for (const k of [...SECTIONS.map(cardKey), ...EVENTS.map(eventKey)]) {
       expect(k).toMatch(HELP_KEY);
     }
   });
@@ -85,23 +88,32 @@ describe('presentSteps', () => {
 describe('help texts', () => {
   const dicts = { ca, en, es, fr } as Record<string, Record<string, string>>;
 
-  test('every concept has its title and text in the four languages', () => {
+  test('every concept has its title, text, lines and «more» in the four languages', () => {
+    const keysOf = (c: (typeof CONCEPTS)[number]) => {
+      const k = conceptKeys(c);
+      return [k.title, k.body, ...(k.lines ?? []).flatMap((l) => [l.label, l.text]), ...(k.more ? [k.more] : [])];
+    };
     for (const [name, dict] of Object.entries(dicts)) {
-      const missing = CONCEPTS.flatMap((c) => Object.values(conceptKeys(c))).filter((k) => !dict[k]);
+      const missing = CONCEPTS.flatMap(keysOf).filter((k) => !dict[k]);
       expect({ [name]: missing }).toEqual({ [name]: [] });
     }
+  });
+
+  test('the relation’s «i» names every relation once, the strongest first', () => {
+    expect([...RELATION_PRECEDENCE].sort()).toEqual([...RELATIONS].sort());
+    expect(RELATION_PRECEDENCE[0]).toBe('not_now');
+    expect(conceptKeys('relation').lines?.map((l) => l.label)).toEqual(
+      RELATION_PRECEDENCE.map((r) => `conversations.relation_${r}`),
+    );
   });
 
   test('every first-time note and card speaks the four languages', () => {
     const keys = [
       ...EVENTS.map((e) => `help.event.${e}`),
-      ...['desk', 'planner'].flatMap((s) => [
-        `help.card.${s}`,
-        `help.card.${s}_body`,
-        `help.card.${s}_step_1`,
-        `help.card.${s}_step_2`,
-        `help.card.${s}_step_3`,
-      ]),
+      ...SECTIONS.flatMap((s) => [`help.card.${s}`, `help.card.${s}_body`]),
+      // «Equipo» has no «Show me»: a list of threads reads by itself.
+      ...SECTIONS.filter((s) => s !== 'team').flatMap((s) => [1, 2, 3].map((n) => `help.card.${s}_step_${n}`)),
+      'help.card.books_admin',
     ];
     for (const [name, dict] of Object.entries(dicts)) {
       expect({ [name]: keys.filter((k) => !dict[k]) }).toEqual({ [name]: [] });
