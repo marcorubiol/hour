@@ -12,6 +12,37 @@
     parallel scale.
   - Contextual tokens derive from base hues so theme switching (light/dark/
     presenter/...) flips by redefining contextuals only.
+
+  THE RULE OF VALUES (cleanup 2026-10-19, build/plans/2026-10-19-cleanup.md;
+  guarded by src/styles/tokens-guard.test.ts, which runs in test:unit):
+  1. Type is never px: font-size from the scale (--text-2xs … --text-xxl,
+     --h1 … --h6, --stat-*) or em of its parent; letter-spacing from
+     --tracking-*; line-height a number.
+  2. Space is never px: padding, margin, gap and box insets from --space-*;
+     a 1-3px gap is --space-2xs, or --line-hairline when it is a line's width.
+  3. Lines by token: border, outline, ring (box-shadow 0 0 0 N) and rule
+     widths from --line-*.
+  4. Radii, drawn marks and controls by token: --radius-*, --dot-*,
+     --control-size-*, --touch-target.
+  5. Durations and curves by token: --transition, --duration-*, --ease-*.
+  6. z-index: what floats over the app takes the scale (--z-dropdown,
+     --z-sticky, --z-modal, --z-toast); a component may stack its own parts
+     with 1-19 inside its own stacking context; 20+ without a token is an
+     error.
+  7. Colour: a component reads contextuals (--text-*, --bg-*,
+     --border-color-*, --heading-color, --link-*, --focus-color, --tone-*,
+     --tag-*, --accent-*, --away-*, --state-*) or the status family (--info,
+     --success, --warning, --danger and their shades). Never --primary*,
+     --neutral*, --base*, --white, --black nor a literal colour. Deriving
+     from a token with color-mix() or oklch(from var(…)) is fine.
+  8. px may stay only in: @media / @container breakpoints (box measures, moved
+     to rem when the component is next touched, not in bulk); 1-3px optical
+     nudges in transform, vertical-align, text-underline-offset,
+     outline-offset and the inset of a drawn pseudo-element; the 0px a calc()
+     needs; the geometry of a drawn pattern (background-size/-position, mask),
+     which is material (certainty.css or the component that draws it).
+  9. One treatment, one home: the first reuse of a drawing extracts it to
+     styles/*.css or a component, and both consume it.
 */
 
 @layer tokens {
@@ -107,6 +138,34 @@
     --text-muted: var(--text-dark-muted);
     --text-faint: var(--neutral-semi-light);
     --heading-color: var(--neutral-ultra-dark);
+
+    /* ============================================================ */
+    /* CONTEXTUAL — tones (the one map of fill + ink + accent per      */
+    /* tone; chips, badges, avatars and toasts consume it, base.css)   */
+    /* ============================================================ */
+
+    --tone-neutral-bg: var(--neutral-ultra-light);
+    --tone-neutral-fg: var(--neutral-ultra-dark);
+    --tone-neutral-accent: var(--neutral-dark);
+    --tone-primary-bg: var(--primary-ultra-light);
+    --tone-primary-fg: var(--primary-ultra-dark);
+    --tone-primary-accent: var(--primary);
+    --tone-info-bg: var(--info-ultra-light);
+    --tone-info-fg: var(--info-ultra-dark);
+    --tone-info-accent: var(--info);
+    --tone-success-bg: var(--success-ultra-light);
+    --tone-success-fg: var(--success-ultra-dark);
+    --tone-success-accent: var(--success);
+    --tone-warning-bg: var(--warning-ultra-light);
+    --tone-warning-fg: var(--warning-ultra-dark);
+    --tone-warning-accent: var(--warning);
+    --tone-danger-bg: var(--danger-ultra-light);
+    --tone-danger-fg: var(--danger-ultra-dark);
+    --tone-danger-accent: var(--danger);
+    /* Faint — what is over (paid, done, asleep): the neutral, faded. */
+    --tone-faint-bg: var(--neutral-ultra-light);
+    --tone-faint-fg: var(--neutral-semi-dark);
+    --tone-faint-accent: var(--neutral);
 
     /* ============================================================ */
     /* CONTEXTUAL — surfaces                                          */
@@ -271,8 +330,17 @@
     --heading-letter-spacing: -0.02em;
 
     --mono-font-family: var(--font-mono);
-    --mono-letter-spacing: 0.02em; /* lowercase mono runs (tag chips, state badges) */
-    --mono-letter-spacing-loose: 0.04em; /* uppercase mono micro-labels (anchor chips, pins, cell dates). .eyebrow keeps its own 0.14em. */
+
+    /* Tracking — one scale for every letter-spacing (rule 1). The values are
+       the ones the components had already settled on; a theme retunes the
+       scale, never a component. */
+    --tracking-xs: 0.02em; /* lowercase mono runs (tag chips, state badges) */
+    --tracking-s: 0.04em; /* uppercase mono micro-labels (anchor chips, pins, cell dates) */
+    --tracking-m: 0.06em; /* table heads, the cast line */
+    --tracking-l: 0.1em; /* the margin voice: lids, verbs, in-cell eyebrows */
+    --tracking-xl: 0.14em; /* .eyebrow — the page/module eyebrow */
+    --mono-letter-spacing: var(--tracking-xs);
+    --mono-letter-spacing-loose: var(--tracking-s);
 
     /* Type scale — modular + fluid. Body (--text-m) is the anchor: 16px @desktop,
        14px @mobile. Each step is a MAJOR THIRD (×1.25) at the desktop max and a
@@ -280,6 +348,10 @@
        To retune: change the anchor/ratios and regenerate all six — keep the ratio
        exact, don't hand-edit individual clamps. (2026-07-19: replaced the bespoke
        hand-tuned scale whose xs→s jump read a touch big.) */
+    /* The margin voice — mono micro-labels inside a cell, a lid, a verb at
+       the edge of a row (9px everywhere the planner drew it). Fixed like
+       --space-2xs, below the fluid steps; a theme redefines it. */
+    --text-2xs: 0.5625rem; /* 9 */
     --text-xs: clamp(0.6076rem, 0.5962rem + 0.049vw, 0.64rem); /* 9.7-10.2 — eyebrows, badges */
     --text-s: clamp(0.7292rem, 0.7042rem + 0.106vw, 0.8rem); /* 11.7-12.8 — dense rows, lens labels, secondary */
     --text-m: clamp(0.875rem, 0.831rem + 0.188vw, 1rem); /* 14-16 — default body (anchor) */
@@ -367,16 +439,25 @@
        sign-out, ThemeToggle, etc.). Fixed (not clamped) so the trailing
        icon column inside menus and rows stays optically aligned across
        viewport sizes. */
+    --control-size-xs: 1.75rem; /* 28px — the planner's arrows and view squares */
     --control-size-s: 2rem; /* 32px — icon action default */
     /* A filter bar's fields and buttons share one height, so their tops
        line up (Conversations review, diseño M9; other bars, coherence pass). */
     --control-size-m: 2.5rem; /* 40px */
+
+    /* Drawn marks — the dot that says «something here», the tick, the
+       square before a word. Geometry of a glyph, not space (rule 4). */
+    --dot-xs: 3px;
+    --dot-s: 4px;
+    --dot-m: 6px;
+    --dot-l: 8px;
 
     /* ============================================================ */
     /* RADIUS — semantic scale (no duplicate aliases)                 */
     /* ============================================================ */
 
     --radius: 6px;
+    --radius-xs: 2px;
     --radius-s: 4px;
     --radius-m: var(--radius);
     --radius-l: 10px;
@@ -389,7 +470,16 @@
     /* BORDERS                                                        */
     /* ============================================================ */
 
-    --border-size: 1px;
+    /* Lines — every drawn width (rule 3): the hairline that separates, the
+       thin line a glyph is drawn with, the rule that underlines a choice,
+       the thick rule of a selection, the bar at the start of a card. */
+    --line-hairline: 1px;
+    --line-thin: 1.5px;
+    --line: 2px;
+    --line-thick: 3px;
+    --line-bar: 4px;
+
+    --border-size: var(--line-hairline);
     --border-width: var(--border-size);
     --border-style: solid;
     --border: var(--border-size) var(--border-style) var(--border-color-dark);
@@ -423,6 +513,8 @@
     /* ============================================================ */
 
     --transition-duration: 0.2s;
+    --duration-fast: 0.1s; /* a hover that must not lag: opacity, a colour */
+    --duration-slow: 0.3s; /* a thing that arrives: the agenda's end rising */
     --transition-timing: ease;
     --transition-delay: 0s;
     --transition:
@@ -480,7 +572,7 @@
     /* ============================================================ */
 
     --focus-color: var(--primary);
-    --focus-width: 2px;
+    --focus-width: var(--line);
     --focus-offset: 2px;
 
     /* ============================================================ */
@@ -513,6 +605,7 @@
     /* Z-INDEX scale                                                  */
     /* ============================================================ */
 
+    --z-raised: 1; /* a part over its sibling, inside the component's own stacking context */
     --z-dropdown: 100;
     --z-sticky: 200;
     --z-modal: 300;
