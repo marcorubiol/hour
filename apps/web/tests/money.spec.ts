@@ -180,7 +180,7 @@ test.describe('Cuentas without read:money', () => {
     await page.locator('input[type=email]').fill(LIMITED_EMAIL!);
     await page.locator('input[type=password]').fill(LIMITED_PASSWORD!);
     await page.getByRole('button', { name: /sign in/i }).click();
-    await page.waitForURL(/\/h\/?$/, { timeout: 60_000 });
+    await page.waitForURL(/\/h\/desk\/?$/, { timeout: 60_000 });
 
     await page.goto('/h/planner');
     await waitForLoaded(page);

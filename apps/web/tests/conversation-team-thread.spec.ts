@@ -39,7 +39,7 @@ async function signIn(page: Page, email: string, password: string) {
   await page.locator('input[type=email]').fill(email);
   await page.locator('input[type=password]').fill(password);
   await page.getByRole('button', { name: /sign in/i }).click();
-  await page.waitForURL(/\/h\/?$/, { timeout: 60_000 });
+  await page.waitForURL(/\/h\/desk\/?$/, { timeout: 60_000 });
 }
 
 test.describe('el hilo del equipo de una conversación (ADR-106)', () => {
