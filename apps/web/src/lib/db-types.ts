@@ -768,6 +768,7 @@ export type Database = {
       }
       conversation: {
         Row: {
+          contacted_undated: boolean
           created_at: string
           created_by: string | null
           custom_fields: Json
@@ -778,6 +779,8 @@ export type Database = {
           line_id: string | null
           next_action_at: string | null
           next_action_note: string | null
+          not_now_at: string | null
+          not_now_until: string | null
           organization_id: string
           previous_slugs: string[]
           private_to: string | null
@@ -789,6 +792,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          contacted_undated?: boolean
           created_at?: string
           created_by?: string | null
           custom_fields?: Json
@@ -799,6 +803,8 @@ export type Database = {
           line_id?: string | null
           next_action_at?: string | null
           next_action_note?: string | null
+          not_now_at?: string | null
+          not_now_until?: string | null
           organization_id: string
           previous_slugs?: string[]
           private_to?: string | null
@@ -810,6 +816,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          contacted_undated?: boolean
           created_at?: string
           created_by?: string | null
           custom_fields?: Json
@@ -820,6 +827,8 @@ export type Database = {
           line_id?: string | null
           next_action_at?: string | null
           next_action_note?: string | null
+          not_now_at?: string | null
+          not_now_until?: string | null
           organization_id?: string
           previous_slugs?: string[]
           private_to?: string | null
@@ -4517,6 +4526,23 @@ export type Database = {
         Returns: string
       }
       conversation_access: { Args: never; Returns: Json }
+      conversation_bolos: {
+        Args: { p_conversation_id: string }
+        Returns: {
+          bolo_id: string
+          city: string | null
+          conversation_id: string
+          country: string | null
+          first_performed_at: string | null
+          function_count: number
+          last_performed_at: string | null
+          line_id: string | null
+          performance_slug: string | null
+          project_id: string
+          status: Database["public"]["Enums"]["performance_status"]
+          venue_name: string | null
+        }[]
+      }
       conversation_for_contact_write: {
         Args: { p_conversation_id: string }
         Returns: {
@@ -4551,9 +4577,18 @@ export type Database = {
         Args: { p_base: string; p_id: string; p_workspace_id: string }
         Returns: string
       }
+      conversation_regular: {
+        Args: { c: Database["public"]["Tables"]["conversation"]["Row"] }
+        Returns: boolean
+      }
+      conversation_relation: {
+        Args: { c: Database["public"]["Tables"]["conversation"]["Row"] }
+        Returns: string
+      }
       conversation_search: {
         Args: { p_q: string }
         Returns: {
+          contacted_undated: boolean
           created_at: string
           created_by: string | null
           custom_fields: Json
@@ -4564,6 +4599,8 @@ export type Database = {
           line_id: string | null
           next_action_at: string | null
           next_action_note: string | null
+          not_now_at: string | null
+          not_now_until: string | null
           organization_id: string
           previous_slugs: string[]
           private_to: string | null
@@ -4580,6 +4617,23 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      conversations_bolos: {
+        Args: { p_conversation_ids: string[] }
+        Returns: {
+          bolo_id: string
+          city: string | null
+          conversation_id: string
+          country: string | null
+          first_performed_at: string | null
+          function_count: number
+          last_performed_at: string | null
+          line_id: string | null
+          performance_slug: string | null
+          project_id: string
+          status: Database["public"]["Enums"]["performance_status"]
+          venue_name: string | null
+        }[]
       }
       create_asset_version: {
         Args: {
