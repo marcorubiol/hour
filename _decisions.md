@@ -4610,3 +4610,49 @@ es la casa, se llega por el logo). Marco decidió en el chat (19-10). Carril `cl
 
 **Re-evaluar cuando** Marco entre en Desk una semana: si el saludo sobra cuando el título ya habla, y si hace falta la
 hora en la cabecera con el reloj del rail al lado.
+
+## [2026-10-19] ADR-138 · Conversaciones con etiquetas y tres capas de estado (enmienda ADR-084, 106, 117, 118, 127 y 134)
+
+**Contexto.** Marco (chat 19-10): todas las conversaciones tienen que funcionar igual (salas, equipo, prensa,
+coproducción) y Difusión o Equipo son etiquetas que filtran. Al mirar Teatre de la Llum vio el segundo problema: la
+conversación decía «Confirmed», pero lo confirmado es una fecha, no la relación. Plan completo, con el estado de
+producción leído y las alternativas: `build/plans/2026-10-19-conversations-tags.md`. Marco validó todo lo recomendado
+(preguntas 1 a 10 del plan).
+
+**Decisión.**
+1. **Modelo (b): dos entidades, una lectura común.** La conversación con fuera y el hilo de equipo siguen siendo dos
+   tablas con sus dos reglas de permisos (ADR-106: «los une la lente», llevado hasta el final). Las conversaciones
+   llevan **varias etiquetas**: las estándar de Hour (Difusión, que en música se llama Contratación, Prensa, Coproducción y
+   Distribución), y cada espacio puede renombrarlas, desactivarlas o crear las suyas. **Equipo** es un chip más en la
+   misma fila, que no se pone ni se quita: lo tienen todos los hilos. **La etiqueta nunca decide permisos.**
+2. **La lente abre en «Todas»**, con una fila de chips que sustituye a las vistas Difusión · Equipo (enmienda ADR-134
+   § 2). `?view=team` redirige a `?etiqueta=team`. «Te espera» deja de ser solo de venta y vale para cualquier
+   conversación. La temperatura, la temporada y el último envío siguen siendo cosa de Difusión (enmienda ADR-117 y
+   118: el dominio es el chip).
+3. **El trato vive en el bolo.** La conversación pierde `hold`, `confirmed` y `declined` como estados del trato. Su
+   ficha lista sus bolos con fecha y estado, a través de una RPC sin caché ni pagador
+   (`conversation_bolos`). Ese estado lo ve quien lee la conversación y tiene `read:performance` en el proyecto
+   (enmienda ADR-106 § 1 solo en esto). El panel de Difusión y la puerta de Conversaciones en Desk cuentan bolos en
+   opción, no conversaciones (enmienda ADR-127 § 7).
+4. **El estado de la relación se deriva y no se guarda:** nunca contactada, contactada, en conversación, dormida (más de
+   30 días sin actividad) o habitual (un bolo hecho en una temporada anterior, por organización). Solo hay uno manual,
+   **«no esta vez»** (`not_now_at`, `not_now_until`), que sustituye a «rechazada». Caduca con una respuesta nueva o en
+   la fecha puesta, y mientras dura saca la conversación de los envíos y de «se enfría». Las conversaciones de
+   `muk-cia` que no tienen fecha de contacto quedan como «contactada, sin fecha»: no se inventa un contacto ni se
+   borra.
+5. **«Lo conozco» es personal y va con la persona de contacto** (`person_acquaintance`), junto a la nota privada
+   (ADR-093). Cada marca nace privada y se comparte una a una. Hereda la privacidad del directorio (ADR-124) y nunca
+   abre acceso a nada.
+6. **Regla entre lentes:** cada lente es dueña de un tipo de cosa y las demás solo muestran de ella lo que ayuda a
+   decidir allí, con un enlace de vuelta. En el Planner, lo que se hace cuelga del bolo y de sus funciones. Día y
+   Agenda muestran en el margen los próximos pasos de las conversaciones y las tareas, de la misma fuente que «Te
+   espera». Mes y Temporada, solo un número. ADR-084 § 2 («las tareas no salen en el calendario») se lee como «no son
+   eventos de la rejilla»: el margen no es la rejilla.
+7. **Envío en bloque a prensa: más adelante**, cuando haga falta de verdad.
+
+**Fases.** Las del plan (§ 6 y § 8.7): E1 (expand de estado), E2 («lo conozco»), E3 (margen del Planner) y E4
+(contract de estado, que es destructivo: pasa por staging y espera a una semana de uso de E1). Para las etiquetas: 1
+(esquema), 2 (chips), 3 (lectura común) y 4 (etiquetas en Ajustes).
+
+**Re-evaluar cuando** se use una temporada real: si el umbral de 30 días para «dormida» acierta, y si «habitual» por
+temporada anterior encaja con cómo trabaja una sala de verdad.
