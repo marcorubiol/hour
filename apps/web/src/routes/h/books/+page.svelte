@@ -1271,15 +1271,11 @@
        they step down, because the mixes go toward --bg-light either way. */
     .mny {
       display: flex; flex-direction: column; gap: var(--space-l);
+      /* The three inks of the money bar, mixed with the ink shares the theme
+         sets (--money-invoiced-ink, --money-open-ink in tokens.css). */
       --money-collected: var(--success);
-      --money-invoiced: color-mix(in oklch, var(--success) 60%, var(--bg-light));
-      --money-open: color-mix(in oklch, var(--text-color) 16%, var(--bg-light));
-    }
-    /* Dark: the track sits at 25 % L, so the two lighter steps need more ink
-       to stay apart from it and from each other (68 · 55 · 42 · 25). */
-    :global(:root[data-mode='dark']) .mny {
-      --money-invoiced: color-mix(in oklch, var(--success) 72%, var(--bg-light));
-      --money-open: color-mix(in oklch, var(--text-color) 30%, var(--bg-light));
+      --money-invoiced: color-mix(in oklch, var(--success) var(--money-invoiced-ink), var(--bg-light));
+      --money-open: color-mix(in oklch, var(--text-color) var(--money-open-ink), var(--bg-light));
     }
     .mbar__seg, .mkey { display: block; background: var(--mbar-tone); }
     .mbar__seg { block-size: 100%; }

@@ -211,6 +211,17 @@
     --backdrop: color-mix(in srgb, var(--black) 40%, transparent);
     /* Ink on an accent fill (the rail's scope glyph). */
     --accent-fg: var(--white);
+    /* The identity monogram (IdentityMark): a soft tint of the accent over a
+       surface, and a forced-legible ink of the same hue at a fixed lightness
+       so contrast holds on every hue. Dark and other themes retune these. */
+    --identity-tint: 16%;
+    --identity-tint-base: var(--bg-ultra-light);
+    --identity-ink-l: 0.42;
+    /* The money bar's two lighter steps (Cuentas): how much ink each mixes
+       into the sunk surface. Dark lifts them: the track sits at 25% L there,
+       so the steps need more ink to stay apart (68 · 55 · 42 · 25). */
+    --money-invoiced-ink: 60%;
+    --money-open-ink: 16%;
     /* The brand hue where a component uses it on purpose (a feed's dot, the
        identity panel's apply, the offline page's retry). Everything else
        reaches the hue through its role: focus, link, check, selection. */
@@ -843,6 +854,13 @@
     --selection-bg: color-mix(in oklch, var(--primary) 35%, transparent);
     --selection-fg: var(--neutral);
 
+    /* Identity monogram: lift the tint off the dark canvas, flip the ink light. */
+    --identity-tint: 24%;
+    --identity-tint-base: var(--bg);
+    --identity-ink-l: 0.9;
+    --money-invoiced-ink: 72%;
+    --money-open-ink: 30%;
+
     /* Shadows — black on darker is invisible at low opacity; bump to
        30-50% so elevation reads. */
     --box-shadow-1: 0 1px 2px 0
@@ -989,6 +1007,9 @@
     --accent-custom-c: 0.16;
     --selection-bg: color-mix(in oklch, var(--primary) 45%, transparent);
     --selection-fg: var(--neutral);
+    --identity-tint: 30%;
+    --identity-tint-base: var(--bg);
+    --identity-ink-l: 0.95;
     --box-shadow-1: 0 0 0 var(--line) color-mix(in oklch, var(--primary) 40%, transparent);
     --box-shadow-2: 0 0 0 var(--line-thick) color-mix(in oklch, var(--primary) 50%, transparent);
     --box-shadow-3: 0 0 0 var(--line-bar) color-mix(in oklch, var(--primary) 60%, transparent);

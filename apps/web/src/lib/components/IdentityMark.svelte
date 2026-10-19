@@ -135,8 +135,8 @@
 
       /* Soft tint (ScopeGlyph tile recipe) + forced-legible fg (relative
          color: same hue, fixed lightness → contrast holds on all 12 hues). */
-      --_bg: color-mix(in oklch, var(--_c) 16%, var(--bg-ultra-light));
-      --_fg: oklch(from var(--_c) 0.42 c h);
+      --_bg: color-mix(in oklch, var(--_c) var(--identity-tint), var(--identity-tint-base));
+      --_fg: oklch(from var(--_c) var(--identity-ink-l) c h);
       --_bd: color-mix(in oklch, var(--_c) 26%, transparent);
 
       display: inline-flex;
@@ -280,11 +280,5 @@
       color: inherit;
       max-block-size: 100%;
     }
-  }
-
-  /* Dark mode: flip the forced fg light and lift the tint off the dark bg. */
-  :global(:root[data-mode='dark']) .mark {
-    --_bg: color-mix(in oklch, var(--_c) 24%, var(--bg));
-    --_fg: oklch(from var(--_c) 0.9 c h);
   }
 </style>

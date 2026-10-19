@@ -188,7 +188,7 @@
        fact already said twice — and a rule under one word in a row of four
        reads as a tab, which is the shape this axis stopped being. */
     .cal__view--on {
-      font-size: var(--text-xl);
+      font-size: var(--text-l);
       color: var(--text-color);
     }
 

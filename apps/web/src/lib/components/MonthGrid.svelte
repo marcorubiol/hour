@@ -1300,7 +1300,9 @@
       /* The air between a card and the column rule beside it. One number,
          because the day cell and the run that crosses it have to agree —
          they are siblings of the week grid, not parent and child. */
-      --cal-cell-pad: var(--space-xs);
+      /* Measured: at 5px the cell keeps a slip above its 142px step (the end
+         hour stays); a step of the space scale crossed it. Exact, in rem. */
+      --cal-cell-pad: 0.3125rem;
       display: flex;
       flex-direction: column;
       transition: opacity var(--transition);
