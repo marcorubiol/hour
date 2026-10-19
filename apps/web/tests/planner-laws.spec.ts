@@ -143,49 +143,86 @@ test.describe('planner laws (ADR-095)', () => {
     ]);
   });
 
-  test('THE WINDOW’S CONTROLS OPEN THE VIEW ROW, and they are the smallest things in it', async ({
+  test('THE WINDOW’S CONTROLS RIDE WITH THE TITLE, and they are the smallest things there', async ({
     page,
   }) => {
-    // Marco's prototype puts `‹ › Now` here, BEFORE the view words — and small.
-    // They only move the window; the words beside them name the drawing, and a
-    // control must not outweigh the thing it operates on.
+    // ADR-136: `‹ › Now` move the window the title names, so they sit beside
+    // it — and small: the title says where you are, they only move it.
     await planner(page, 'month');
-    await expect(page.locator('.cal__toolbar .cal__arw')).toHaveCount(2);
-    await expect(page.locator('.cal__toolbar .cal__now')).toHaveCount(1);
-    // Nothing left up with the title but the title and the lens switcher.
-    await expect(page.locator('.lenshead__aside')).toHaveCount(0);
+    await expect(page.locator('.lenshead__aside .cal__arw')).toHaveCount(2);
+    await expect(page.locator('.lenshead__aside .cal__now')).toHaveCount(1);
+    // Nothing of the window is left in the row of views.
+    await expect(page.locator('.cal__toolbar .cal__arw, .cal__toolbar .cal__now')).toHaveCount(0);
 
     const geom = await page.evaluate(() => {
       const r = (s: string) => document.querySelector(s)?.getBoundingClientRect() ?? null;
+      const title = r('.lenshead__title');
       const arw = r('.cal__arw');
       const now = r('.cal__now');
-      const first = r('.cal__view');
-      const lit = r('.cal__view--on');
       const add = r('.cal__add');
       const keb = r('.cal__kebab');
+      // Focus follows the eye: title and arrows first, then the view words.
+      const focusable = [...document.querySelectorAll<HTMLElement>('.cal button')].filter(
+        (b) => b.offsetParent !== null && b.tabIndex >= 0,
+      );
+      const idx = (sel: string) => focusable.findIndex((b) => b.matches(sel));
       return {
+        titleRight: title?.right ?? -1,
         arwLeft: arw?.left ?? -1,
         nowLeft: now?.left ?? -1,
-        wordLeft: first?.left ?? -1,
         arwH: Math.round(arw?.height ?? -1),
         nowH: Math.round(now?.height ?? -1),
         addH: Math.round(add?.height ?? -1),
         kebH: Math.round(keb?.height ?? -1),
-        litH: Math.round(lit?.height ?? -1),
+        titleH: Math.round(title?.height ?? -1),
+        arwFocus: idx('.cal__arw'),
+        viewFocus: idx('.cal__view'),
       };
     });
-    // Order: arrows, then Now, then the words.
+    // Order: title, arrows, then Now.
+    expect(geom.titleRight).toBeLessThanOrEqual(geom.arwLeft);
     expect(geom.arwLeft).toBeLessThan(geom.nowLeft);
-    expect(geom.nowLeft).toBeLessThan(geom.wordLeft);
-    // ONE ROW, ONE HEIGHT — the four controls agree, and none of them towers
-    // over the lit view word.
+    expect(geom.arwFocus).toBeGreaterThanOrEqual(0);
+    expect(geom.arwFocus, 'the arrows come before the view words in tab order').toBeLessThan(
+      geom.viewFocus,
+    );
+    // ONE HEIGHT for the small controls, and none of them towers over the title.
     expect(geom.arwH).toBe(28);
     expect(geom.addH).toBe(28);
     expect(geom.kebH).toBe(28);
     expect(geom.nowH).toBeLessThanOrEqual(28);
-    expect(geom.arwH, 'a control outgrew the word it operates on').toBeLessThanOrEqual(
-      geom.litH + 6,
+    expect(geom.arwH, 'a control outgrew the title it operates on').toBeLessThanOrEqual(
+      geom.titleH + 6,
     );
+  });
+
+  test('THE VIEW WORDS START AT THE SAME PLACE IN ALL FIVE DRAWINGS, and the title does not jump', async ({
+    page,
+  }) => {
+    // ADR-136: nothing is reserved before the words for a drawing that has no
+    // window. The row starts at the toolbar's own edge, Season included, and
+    // the title (with or without its arrows) keeps its height.
+    const seen: { view: string; gap: number; titleTop: number; rowH: number }[] = [];
+    for (const v of ['overview', 'day', 'agenda', 'month', 'board'] as const) {
+      await planner(page, v);
+      seen.push({
+        view: v,
+        ...(await page.evaluate(() => {
+          const bar = document.querySelector('.cal__toolbar')!.getBoundingClientRect();
+          const word = document.querySelector('.cal__view')!.getBoundingClientRect();
+          const title = document.querySelector('.lenshead__title')!.getBoundingClientRect();
+          const row = document.querySelector('.lenshead__titlerow')!.getBoundingClientRect();
+          return {
+            gap: Math.round(word.left - bar.left),
+            titleTop: Math.round(title.top),
+            rowH: Math.round(row.height),
+          };
+        })),
+      });
+    }
+    for (const s of seen) expect(s.gap, `${s.view}: the view words do not open the row`).toBe(0);
+    expect(new Set(seen.map((s) => s.titleTop)).size, JSON.stringify(seen)).toBe(1);
+    expect(new Set(seen.map((s) => s.rowH)).size, JSON.stringify(seen)).toBe(1);
   });
 
   test('THE DATE IS SAID ONCE', async ({ page }) => {

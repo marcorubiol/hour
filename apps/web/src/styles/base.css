@@ -1872,6 +1872,7 @@
   .lenshead {
     display: flex;
     flex-direction: column;
+    container: lenshead / inline-size;
   }
   .lenshead__titlerow {
     display: flex;
@@ -1882,14 +1883,32 @@
     padding-block-end: var(--space-s);
     border-block-end: 1px solid var(--border-color-light);
   }
-  /* The controls OF the date, beside it — never in the row that changes the
-     drawing (ADR-095). `margin-right: auto` keeps them next to the title
-     instead of drifting to the far edge with the lens switcher. */
+  /* The title and what belongs to it (ADR-136: the Planner's ‹ › Now).
+     Beside the title where the header is wide; in a narrow header (a phone)
+     ALWAYS on their own line under it, so a long date («miércoles, 30 de
+     septiembre») and a short one put the arrows in the same place and
+     nothing overflows. Measured on the header itself, not the viewport
+     (ADR-095 § 8). */
+  .lenshead__lead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2xs) var(--space-s);
+    min-inline-size: 0;
+  }
   .lenshead__aside {
     display: inline-flex;
     align-items: center;
-    gap: var(--space-2xs);
-    margin-inline-end: auto;
+    gap: var(--space-xs);
+  }
+  /* A drawing with no window (the Season) renders nothing here: no gap kept. */
+  .lenshead__aside:empty {
+    display: none;
+  }
+  @container lenshead (max-width: 34rem) {
+    .lenshead__aside {
+      flex-basis: 100%;
+    }
   }
   .lenshead__title {
     margin: 0;

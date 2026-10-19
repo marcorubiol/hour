@@ -1,9 +1,7 @@
-<script module lang="ts">
-</script>
-
 <script lang="ts">
   /**
-   * Planner toolbar — ‹ month › · today · [projection] · [lanes] · + · ⋯,
+   * Planner toolbar — [views] · [lanes] · + · ⋯ (the window's ‹ › Now ride
+   * with the title, CalNav, ADR-136),
    * plus the carrils-only "Agrupa per" row. Pure presentation: the page
    * owns every piece of state (view/lanes, month window, dialog
    * flags) and the URL-sync semantics; this component only renders values
@@ -22,20 +20,6 @@
     /** Blackout entry points hide while availability/team feeds are absent. */
     canBlackout: boolean;
     locale: Locale;
-    /**
-     * THE WINDOW'S THREE CONTROLS, and they live in THIS row — before the
-     * view words, which is where the design puts them.
-     *
-     * They step whatever the drawing's window IS (a month, a day, the
-     * agenda's start), so the page owns the arithmetic and hands down three
-     * verbs. `onNow` moves you to the present in whatever drawing you are in.
-     */
-    /** `shift` = una muesca literal, no un salto a plan. El teclado ya lo dice
-        así (`Shift+← →` en el Planner); esto es el mismo gesto con el ratón,
-        para que no haya que saberse el atajo para llegar a un hueco. */
-    onStepBack: (shift?: boolean) => void;
-    onStepNext: (shift?: boolean) => void;
-    onNow: () => void;
     onSetView: (v: PlannerView) => void;
     onSetLaneAxis: (g: LaneAxis) => void;
     onCreate: () => void;
@@ -55,9 +39,6 @@
     calm,
     canBlackout,
     locale,
-    onStepBack,
-    onStepNext,
-    onNow,
     onSetView,
     onSetLaneAxis,
     onCreate,
@@ -66,19 +47,6 @@
     onBlackout,
   }: Props = $props();
 
-  /* THE ARROWS SAY WHAT THEY DO IN THIS DRAWING (uso #15): in the Day they
-     travel to the next day that HOLDS something, not to tomorrow, and the
-     board pans a screen. «Next month» was the name on all of them. */
-  let stepKeys = $derived(
-    view === 'day'
-      ? { prev: 'planner.prev_planned', next: 'planner.next_planned' }
-      : view === 'board'
-        ? { prev: 'planner.pan_back', next: 'planner.pan_next' }
-        : { prev: 'planner.prev_month', next: 'planner.next_month' },
-  );
-  function stepTitle(key: string): string {
-    return view === 'day' ? `${t(key, locale)} · ${t('planner.step_hint', locale)}` : t(key, locale);
-  }
 </script>
 
 <!-- THE ROW OF VIEWS (ADR-095 § «El encabezado: el título es la fecha»).
@@ -100,49 +68,10 @@
      not three (ADR-094): workspace and project were both «a thing you
      booked», and the scope bar already owns how many of those you see. -->
 <div class="cal__toolbar">
-  <!-- THE WINDOW'S CONTROLS OPEN THE ROW, before the view words.
-
-       They were up with the title, on the argument that a date you can walk
-       through is one object. Marco's own prototype puts them here, and here
-       they are also SMALL — 28px squares and a 12px pill — because the thing
-       they must not do is compete with the words beside them: those name the
-       drawing, these only move the window inside it.
-
-       And the button is `Now`, NOT `Today`. Adjacent to a view called Today,
-       the same word at the same weight seventy pixels apart is two different
-       acts wearing one label — the one defect in this band that can lose
-       somebody their place without telling them why. `Now` moves the window;
-       `Today` names a drawing, like Agenda, Month and Board do. -->
-  <!-- The season is a horizon from today: it has no window to step. Its
-       controls are still LAID OUT, invisible and inert, so the view words sit
-       at the same x in all five drawings — the word you just pressed does not
-       jump 149px (revisión del Planner, 2026-10-18). Same markup, so the gap
-       is exact by construction, not a measured spacer. -->
-  <span
-    class="cal__window"
-    class:cal__window--none={view === 'overview'}
-    inert={view === 'overview'}
-    aria-hidden={view === 'overview' ? 'true' : undefined}
-  >
-  <span class="cal__nav">
-    <button
-      type="button"
-      class="cal__arw"
-      aria-label={t(stepKeys.prev, locale)}
-      title={stepTitle(stepKeys.prev)}
-      onclick={(e) => onStepBack(e.shiftKey)}>‹</button
-    >
-    <button
-      type="button"
-      class="cal__arw"
-      aria-label={t(stepKeys.next, locale)}
-      title={stepTitle(stepKeys.next)}
-      onclick={(e) => onStepNext(e.shiftKey)}>›</button
-    >
-  </span>
-  <button type="button" class="cal__now" onclick={onNow}>{t('planner.now', locale)}</button>
-  <span class="cal__sep" aria-hidden="true"></span>
-  </span>
+  <!-- THE VIEW WORDS OPEN THE ROW, in all five drawings (ADR-136). The
+       window's controls went up beside the title they move, so nothing here
+       is reserved for a drawing that has no window: the Season's row starts
+       where every other row starts. -->
   <div class="cal__views" role="group" aria-label={t('planner.view_label', locale)}>
     {#each VIEW_ORDER as v (v)}
       <button
@@ -203,97 +132,24 @@
 
 <style>
   @layer components {
-    /* ── the window's controls · deliberately the smallest things here ──
-       Sizes verbatim from the prototype: 28px squares, 13px glyph; the pill
-       at 12px with 5/12 padding. The CORNER is ours and one step tighter than
-       the prototype's 8px — `var(--radius)` (6px), the same step the scope bar
-       now takes, so the app has one radius for a small control instead of an
-       imported literal beside a token. The `VIEW` lead word that used to open
-       this row went with them: the nav is what precedes the words in the
-       design, and two labels in that slot is one too many. */
-    .cal__window {
-      display: contents;
-    }
-    .cal__window--none > :global(*) {
-      visibility: hidden;
-    }
-    /* On a phone the row wraps, and the reserve became a whole empty line
-       above the view words: there the Season simply has no controls. The
-       shell's own phone breakpoint. */
     /* A finger's target on touch (móvil #5): 28px squares and 17px words
        were under half of it. */
-    .cal__arw,
-    .cal__now,
     .cal__add,
     .cal__view,
     .cal__dial-v,
     .cal__toolbar :global(.cal__kebab) {
       min-block-size: var(--touch-target);
     }
-    .cal__arw,
     .cal__toolbar :global(.cal__kebab) {
       min-inline-size: var(--touch-target);
     }
     @media (max-width: 47.999rem) {
-      .cal__window--none > :global(*) {
-        display: none;
-      }
-      /* TWO ROWS, NOT THREE (móvil #4): on a phone the content started at
-         y=380 of 812. The words that name the drawing take the first row;
-         the window's controls and the two acts share the second. */
+      /* TWO ROWS, NOT THREE (móvil #4): the words that name the drawing take
+         the first row; the two acts the second. */
       .cal__views {
         order: -1;
         flex-basis: 100%;
       }
-      .cal__sep {
-        display: none;
-      }
-    }
-    .cal__nav {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-    }
-    .cal__arw {
-      inline-size: 28px;
-      block-size: 28px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0;
-      border: 1px solid var(--border-color-light);
-      border-radius: var(--radius);
-      background: var(--bg-ultra-light);
-      color: var(--text-faint);
-      font-size: 13px;
-      line-height: 1;
-      cursor: pointer;
-    }
-    .cal__arw:hover {
-      color: var(--text-color);
-      border-color: var(--text-faint);
-    }
-    .cal__now {
-      padding: 5px 12px;
-      border: 1px solid var(--border-color-light);
-      border-radius: var(--radius-circle);
-      background: var(--bg-ultra-light);
-      color: var(--text-faint);
-      font-family: inherit;
-      font-size: 12px;
-      line-height: 1.1;
-      cursor: pointer;
-    }
-    .cal__now:hover {
-      color: var(--text-color);
-    }
-    /* A hairline, not a gap: the window's controls and the view words are two
-       different acts, and eight pixels of air does not say so. */
-    .cal__sep {
-      inline-size: 1px;
-      block-size: 20px;
-      background: var(--border-color-light);
-      margin-inline: var(--space-2xs);
     }
 
     /* ── BAND 2 · the view, 21px serif, full ink ────────────────────── */
