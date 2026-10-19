@@ -180,21 +180,21 @@ test.describe('Cuentas without read:money', () => {
     await page.locator('input[type=email]').fill(LIMITED_EMAIL!);
     await page.locator('input[type=password]').fill(LIMITED_PASSWORD!);
     await page.getByRole('button', { name: /sign in/i }).click();
-    await page.waitForURL(/\/h\/?$/, { timeout: 60_000 });
+    await page.waitForURL(/\/h\/desk\/?$/, { timeout: 60_000 });
 
     await page.goto('/h/planner');
     await waitForLoaded(page);
     const tabs = page.locator('.lensswitch');
     await expect(tabs.getByRole('link', { name: 'Planner' })).toBeVisible();
     await expect(tabs.getByRole('link', { name: 'Books' })).toHaveCount(0);
-    // ADR-124, ADR-134: without Converses in any project there is no Booking
+    // ADR-124, ADR-134, ADR-137: without Converses in any project there is no Venues
     // view, but the lens stays for its Team view: no add, no import.
     await expect(tabs.getByRole('link', { name: 'Conversations' })).toBeVisible();
     await page.goto('/h/conversations');
     await waitForLoaded(page);
     const views = page.locator('.lenshead__sub');
     await expect(views.getByRole('link', { name: 'Team' })).toHaveAttribute('aria-current', 'page');
-    await expect(views.getByRole('link', { name: 'Booking' })).toHaveCount(0);
+    await expect(views.getByRole('link', { name: 'Venues' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Add conversation' })).toHaveCount(0);
 
     // The Desk follows the same flags: neither door is drawn (ADR-124, ADR-127 § 7).

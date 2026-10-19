@@ -4565,3 +4565,48 @@ fallo. Marco (19-10) eligió moverlas junto al título. Carril `claude/planner-a
 5. **Teclado:** el foco sigue el orden visual: título y flechas, luego pestañas. Los atajos no cambian.
 
 **Re-evaluar cuando** Marco lo use en el teléfono: si las flechas debajo del título en el Mes pesan más que al lado.
+
+## [2026-10-19] ADR-137 · Nombres y entrada: se entra en Desk, Desk se traduce, Venues en inglés (enmienda ADR-062, 121, 128 y 134)
+
+**Contexto.** Prueba de nombres del 19-10 con dos perfiles sin contexto (productora de teatro en castellano, tour
+manager británico; `build/coordination/naming/`, fuera de git). Los dos entendieron Desk aparte por sí solo, y los dos
+señalaron lo mismo como lo más confuso: al entrar caían en el Hall (reloj, saludo, «ponme al día») sin la barra de
+secciones, y Desk quedaba un clic más allá. Dos portadas seguidas, contra el modelo (`build/structure-model.md`: Desk
+es la casa, se llega por el logo). Marco decidió en el chat (19-10). Carril `claude/naming-entry`. Sin migración.
+
+**Decisión.**
+1. **Una sola portada: se entra en Desk.** `/h` redirige a `/h/desk` con su query (302: es la puerta de la app, no
+   una ruta renombrada); una carga completa en `hooks.server.ts`, una navegación dentro de la app en
+   `routes/h/+page.ts`, como `/h/money`. El reloj del rail (la puerta a casa) y el login llevan a `/h/desk`
+   directamente; `/h` se queda para lo que ya enlaza allí (marcadores, la vuelta del OAuth del correo). Enmienda
+   ADR-062 § 3: la vista `∑` sin espacio es Desk con «Todo», no otra página.
+2. **Lo que hacía el Hall, dónde queda.** El saludo («Buenos días, Marco») va sobre el título de Desk, un paso por
+   debajo de él, y la hora entra en la línea de la fecha («lunes · 19 oct · 09:41»). El reloj grande ya está en el
+   rail (en el móvil, en la barra de arriba), en todas las pantallas. «Nueva nota» es el «+ Tarea» de Desk (el
+   `?compose=1` del Hall nunca lo leyó nadie). «Ponme al día» desaparece: ya estás. La elección de espacio, «Todo»,
+   los guardados y los recientes viven en el rail, que no cambia; ahora se iluminan también al entrar, porque Desk
+   es una superficie con ámbito. Se borran, porque repetían lo que Desk ya dice: la línea de «dentro de 3 h ·
+   Girona» y el resumen del día (son «Lo siguiente»), y la frase de estado (vencidas, abiertas, función de hoy: el
+   título «1 vencida · 2 te esperan» y «Lo siguiente»). Con ella se va `hall-status.ts`. La propuesta de la IA, que
+   el Hall reservaba como cuarto estado de la frase (ADR-069), ya vive en «Te espera». Enmienda ADR-121: la cabecera
+   de Desk lleva saludo y hora; las bandas no cambian.
+3. **Desk se traduce: Hoy, Avui, Aujourd’hui, Today.** Era la única palabra en inglés de la barra en castellano, y
+   los dos revisores propusieron «Hoy»/«Today» sin hablarse. Se traduce lo que es, como Books (ADR-088 B), y no
+   choca con «Agenda» (ADR-065). Cambia `lens.desk`: la barra, el título de la pestaña (ADR-130 § 5), el nombre
+   accesible del reloj del rail y las frases que nombran la sección (Ajustes de secciones, el recordatorio de
+   Cuentas, la ayuda del módulo de tareas). ⌘K no lista secciones, así que no tiene nada que cambiar. La ruta sigue
+   siendo `/h/desk` y el código sigue diciendo `desk`.
+4. **En inglés, la vista de venta de Conversaciones pasa de «Booking» a «Venues»**, en los dos oficios. En la misma
+   barra «Books» y «Booking» se leen casi igual (lo vio el tour manager antes de abrir la app); si uno cambia, la
+   vista y no la sección. Cambia también la cabecera del selector de objetivo de una tarea, que nombra esas mismas
+   conversaciones. Las demás lenguas no cambian (enmienda ADR-128 § 3 y ADR-134 § 2 solo en inglés). «Booking» se
+   queda donde nombra la actividad y no la vista: la plantilla de línea, el módulo de una línea, el permiso
+   (`facet.converses`), el buzón compartido y el bloque de privacidad de Ajustes.
+5. **«Te espera»: la fecha dice qué es** (chat 19-10). La columna de la derecha mezclaba cuándo te escribieron (una
+   respuesta: «hace 6 días») y cuándo te toca (el resto: «22 oct», «hoy»). Ahora una respuesta dice «escribió hace
+   6 días» y lo demás «para el 22 oct» o «para hoy»; «vence 25 oct» y «vencido» ya lo decían y se quedan. Una
+   propuesta de Hour sigue sin fecha. En los cuatro idiomas (`desk.when_wrote`, `desk.when_for`,
+   `desk.when_for_today`).
+
+**Re-evaluar cuando** Marco entre en Desk una semana: si el saludo sobra cuando el título ya habla, y si hace falta la
+hora en la cabecera con el reloj del rail al lado.

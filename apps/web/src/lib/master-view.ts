@@ -70,11 +70,11 @@ export function clearMasterViewPath(): void {
 
 /**
  * Where to send the user after a successful sign-in.
- * Falls back to the space-less home (`/h/`) when the feature is off, the
- * saved path is missing, or the saved path turns out to be invalid for any
- * reason — home is the cross-space landing, not any one space.
+ * Falls back to the Desk (`/h/desk`, the home since ADR-137) when the feature
+ * is off, the saved path is missing, or the saved path turns out to be invalid
+ * for any reason — home is the cross-space landing, not any one space.
  */
-export function resolveLoginTarget(fallback: string = '/h/'): string {
+export function resolveLoginTarget(fallback: string = '/h/desk'): string {
   if (!isMasterViewEnabled()) return fallback;
   const saved = getMasterViewPath();
   if (!saved || !isSaveablePath(saved)) return fallback;

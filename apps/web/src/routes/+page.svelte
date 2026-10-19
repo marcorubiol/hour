@@ -6,7 +6,7 @@
   import { ensureSession } from '$lib/session.svelte';
 
   onMount(async () => {
-    // Default landing is the space-less home (/h/). Master View (Phase 0.1
+    // Default landing is the Desk (/h/desk, ADR-137). Master View (Phase 0.1
     // trabajo #11) can override it with the last Project the user visited,
     // if they opted in via /settings.
     const user = await ensureSession();

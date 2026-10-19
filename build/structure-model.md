@@ -58,8 +58,9 @@ Editing always lands on an entity, never on "the view".
 
 **Lens** — a **read / aggregation** surface over **one concern** (a data domain: Planner / Conversations /
 Money). Cross-container, scopeable by pins (all / space / project). Owns **no edit logic** — to change
-something you jump to where the entity is authored. (The home `/h/` is *not* a lens but the cross-concern
-**Desk** digest — see § Read surfaces. ADR-062: "a view, not a container".)
+something you jump to where the entity is authored. (The home is *not* a lens but the cross-concern
+**Desk** digest at `/h/desk`, where `/h` forwards (ADR-137) — see § Read surfaces. ADR-062: "a view, not a
+container".)
 
 **Module** — a **line-level** section. Compositional, chosen by the line's `kind`/template,
 added / removed / reordered. The **edit-in-context** surface of a line. Modules exist *only* at the
@@ -233,7 +234,8 @@ back to this doc.
 The nav layer is **one home + three lenses**:
 
 - **Desk** — the home / the "now": what needs me + what's next + tasks (planned or not). Reached by the
-  logo. Revives the ADR-008 name (fits now that tasks return); replaces "Agenda", which reads as
+  logo (the rail's clock) and on sign-in: there is no page before it (ADR-137). Labelled by what it is in
+  each language (Today · Hoy · Avui · Aujourd’hui); the route and the code keep `desk`. Revives the ADR-008 name (fits now that tasks return); replaces "Agenda", which reads as
   "calendar" in ES/CA/FR and blurred with the planning lens.
 - **Planner** — month grid / planning / conflict-detection. A ⌘K lens.
 - **Conversations** — your booking network: persons + conversations. **Not "People"** — the lens holds
@@ -288,7 +290,8 @@ necessary for light personalization, they are the ceiling — not a card builder
   understood as the entity's editor **hosted** by a read-only lens (option 2), not lens-owned edit logic.
 - **Resolves ADR-057 re-evaluate (a)** ("is project detail a module composition?") → **No.** Project
   detail = its own edit content + its lines + scoped lenses. Modules stay at the line.
-- **Confirms ADR-062** — space = one entity (edit surface #1); `/h` is the Hall and Desk is the cross-space digest.
+- **Confirms ADR-062** — space = one entity (edit surface #1); Desk is the cross-space digest. (`/h` was the Hall
+  until ADR-137; it forwards to the Desk now.)
 - **Closes** — the Archive lens (deleted).
 
 ## Re-evaluate when

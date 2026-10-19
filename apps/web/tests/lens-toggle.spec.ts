@@ -70,7 +70,7 @@ test.describe('Lenses per space (ADR-132)', () => {
     await waitForLoaded(page);
 
     const nav = page.getByRole('navigation', { name: 'Sections' });
-    await expect(nav.getByRole('link', { name: 'Desk' })).toBeVisible();
+    await expect(nav.getByRole('link', { name: 'Today' })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Conversations' })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Planner' })).toHaveCount(0);
     await expect(nav.getByRole('link', { name: 'Books' })).toHaveCount(0);

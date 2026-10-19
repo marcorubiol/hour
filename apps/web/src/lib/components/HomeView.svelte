@@ -5,7 +5,7 @@
    * stats) over the space's next-7-days agenda and its projects grid.
    *
    * This used to double as the cross-space home digest; that surface died
-   * when the hall landed (`/h` greets, the door goes to `/h/desk`) and the
+   * when the hall landed (`/h`, now the Desk itself, ADR-137) and the
    * manual pin UI (card PIN chips, ScopeStrip) was removed — scopes are
    * built in the left rail and ⌘K only. The pins STORE remains the scope
    * engine; this page just no longer grows UI for it.

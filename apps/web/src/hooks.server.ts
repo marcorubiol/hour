@@ -142,6 +142,16 @@ const legacyVocabRedirects: Handle = async ({ event, resolve }) => {
     return Response.redirect(dest.toString(), 301);
   }
 
+  // One front door (ADR-137): /h was the Hall, a page before the Desk. It is
+  // the Desk now; /h stays as the entry everyone already links to (login,
+  // bookmarks, the mail OAuth bounce), query kept. 302, not 301: it is the
+  // app's front door, not a renamed route. Client-side: routes/h/+page.ts.
+  if (/^\/h\/?$/.test(path)) {
+    const dest = new URL('/h/desk', event.url);
+    dest.search = event.url.search;
+    return Response.redirect(dest.toString(), 302);
+  }
+
   // Lens rename (Calendar → Planner): /h/calendar and /h/[ws]/calendar → /h/planner
   // (lenses are space-less since ADR-067; scope rides in ?scope=, preserved).
   if (/^\/h(\/[^/]+)?\/calendar\/?$/.test(path)) {

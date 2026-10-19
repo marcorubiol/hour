@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { docTitle } from './doc-title';
 
 describe('docTitle', () => {
-  it('is «Hour» alone for the Hall', () => {
+  it('is «Hour» alone with nothing to name', () => {
     expect(docTitle()).toBe('Hour');
   });
   it('puts the screen first and joins with a middle dot', () => {

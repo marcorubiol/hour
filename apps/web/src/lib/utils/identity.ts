@@ -87,7 +87,7 @@ export function markText(entity: {
 }
 
 /**
- * The name the app calls the signed-in user by (Hall greeting, account menu).
+ * The name the app calls the signed-in user by (Desk greeting, account menu).
  *
  * `user_profile.full_name` wins: it is the name the person edits in
  * Settings → Profile and the one copied into every dossier. The session's

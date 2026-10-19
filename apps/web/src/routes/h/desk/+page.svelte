@@ -39,7 +39,9 @@
   import { usePins } from '$lib/stores/pins.svelte';
   import { useCalm } from '$lib/stores/calm.svelte';
   import { buildLineIndex, buildProjectIndex, resolveScope, type NavWorkspace, type RawLine } from '$lib/nav';
-  import { workspacesQueryOptions, activeProjectsQueryOptions, allLinesQueryOptions, teamQueryOptions } from '$lib/nav-queries';
+  import { workspacesQueryOptions, activeProjectsQueryOptions, allLinesQueryOptions, teamQueryOptions, meQueryOptions } from '$lib/nav-queries';
+  import { userDisplayName } from '$lib/utils/identity';
+  import { session } from '$lib/session.svelte';
   import { moneyAccessAnyQueryOptions } from '$lib/bolo-queries';
   import { conversationAccessQueryOptions } from '$lib/conversation-access';
   import { lensOn } from '$lib/lenses.svelte';
@@ -524,8 +526,26 @@
       ? t(waiting.overdue === 1 ? 'desk.title_overdue_one' : 'desk.title_overdue_many', locale, { n: waiting.overdue })
       : null,
   );
+  // ── The greeting and the clock: what the Hall said before the Desk was the
+  //    way in (ADR-137). Only those two: the Hall's next-moment line, day
+  //    teaser and status sentence said again what «Lo siguiente» and the
+  //    title already say. Greeting, date and time read the one minute tick.
+  const timeFmt = new Intl.DateTimeFormat(LOCALE_TAG[locale], { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  let clockTime = $derived(timeFmt.format(clockNow));
   let dateWords = $derived(
     `${new Intl.DateTimeFormat(LOCALE_TAG[locale], { weekday: 'long', timeZone: 'UTC' }).format(new Date(`${today}T12:00:00Z`))} · ${localeDayMonth(today, LOCALE_TAG[locale])}`,
+  );
+  let greeting = $derived.by(() => {
+    const h = clockNow.getHours();
+    return t(h < 6 || h >= 21 ? 'desk.greeting_night' : h < 14 ? 'desk.greeting_morning' : 'desk.greeting_afternoon', locale);
+  });
+  // The stored name (user_profile.full_name), held back while /api/me is in
+  // flight so the greeting never flashes the email handle first.
+  const meQuery = createQuery(meQueryOptions());
+  let firstName = $derived(
+    $meQuery.isPending
+      ? ''
+      : (userDisplayName($meQuery.data?.full_name, session.user?.name, session.user?.email).split(/\s+/)[0] ?? ''),
   );
 
   // ── Task + proposal mutations (TaskBoard contract; optimistic toggle). ──
@@ -687,22 +707,25 @@
 <svelte:head><title>{docTitle(t('lens.desk', locale))}</title></svelte:head>
 
 <div class="desk" aria-busy={busy}>
-  <LensHeader>
-    {#snippet title()}
-      <LensTitle
-        text={titleOver ? `${titleOver} · ${titleRest}` : titleRest}
-      />
-    {/snippet}
-    {#snippet sub()}
-      <!-- One child, so the sub line's «·» separators stay out of it. -->
-      <span class="desk__subrow">
-        <span class="desk__date eyebrow eyebrow--sub">{dateWords}</span>
-        <button type="button" class="desk__add btn--outline btn--s" bind:this={addBtn} aria-expanded={composerOpen} onclick={openComposer}
-          >{t('desk.add_task', locale)}</button
-        >
-      </span>
-    {/snippet}
-  </LensHeader>
+  <div class="desk__top">
+    <p class="desk__hello">{greeting}{firstName ? `, ${firstName}` : ''}</p>
+    <LensHeader>
+      {#snippet title()}
+        <LensTitle
+          text={titleOver ? `${titleOver} · ${titleRest}` : titleRest}
+        />
+      {/snippet}
+      {#snippet sub()}
+        <!-- One child, so the sub line's «·» separators stay out of it. -->
+        <span class="desk__subrow">
+          <span class="desk__date eyebrow eyebrow--sub">{dateWords} · <time datetime={clockTime}>{clockTime}</time></span>
+          <button type="button" class="desk__add btn--outline btn--s" bind:this={addBtn} aria-expanded={composerOpen} onclick={openComposer}
+            >{t('desk.add_task', locale)}</button
+          >
+        </span>
+      {/snippet}
+    </LensHeader>
+  </div>
 
   {#if composerOpen}
     <div class="desk__composer" bind:this={composerEl}>
@@ -797,6 +820,23 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-l);
+    }
+    /* The greeting sits on the title, a step under it: the same display face,
+       quieter, so «2 te esperan» stays the line that speaks. */
+    .desk__top {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+    }
+    .desk__hello {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: var(--text-l);
+      line-height: 1.2;
+      color: var(--text-muted);
+    }
+    .desk__date time {
+      font-variant-numeric: tabular-nums;
     }
     .desk__subrow {
       display: flex;

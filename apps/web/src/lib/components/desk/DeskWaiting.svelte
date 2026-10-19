@@ -89,19 +89,25 @@
   /** «2 nov», never «02 nov»; today is «hoy». */
   const day = (iso: string) => (iso === today ? t('desk.next_today', locale) : localeDayMonth(iso, locale));
 
-  /** When, in words: the day label of the row's bucket, or the task's own due. */
+  /** «para el 22 oct», «para hoy»: a date in this column is a deadline unless it says otherwise. */
+  const forDay = (iso: string) =>
+    iso === today ? t('desk.when_for_today', locale) : t('desk.when_for', locale, { day: localeDayMonth(iso, locale) });
+
+  /** When, in words, and which when (chat 19-10): an answer says when they
+      wrote («escribió hace 6 días»), everything else when it is yours
+      («para el 22 oct», «vence 25 oct», «vencido»). */
   function whenOf(i: DeskItem): string {
     if (i.concern === 'task') {
       if (i.dueLabel === 'overdue') return t('desk.due_overdue', locale);
       if (i.dueLabel === 'due' && i.dueDay) return `${t('desk.due_due', locale)} ${day(i.dueDay)}`;
-      return i.dueDay ? day(i.dueDay) : '';
+      return i.dueDay ? forDay(i.dueDay) : '';
     }
-    if (i.repliedAt) return relativeContactDate(i.repliedAt, locale);
+    if (i.repliedAt) return t('desk.when_wrote', locale, { when: relativeContactDate(i.repliedAt, locale) });
     // A proposal (revive) is Hour's suggestion, not a deadline: no date.
     if (i.isProposal) return '';
     if (!i.day) return '';
     if (i.overdue) return t('desk.due_overdue', locale);
-    return day(i.day);
+    return forDay(i.day);
   }
   const subjectHref = (i: DeskItem) => i.href ?? (i.concern === 'conversation' ? conversationHref(i) : null);
 </script>
