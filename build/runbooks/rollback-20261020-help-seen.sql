@@ -1,4 +1,4 @@
--- Rollback de 20261020140000_help_seen (ayuda contextual, enfoque A).
+-- Rollback de 20261020150000_help_seen (ayuda contextual, enfoque A).
 -- Borra las dos RPC y la tabla. Lo que se pierde: qué tarjetas y avisos ha
 -- visto cada persona; vuelven a salir todos una vez. Antes de aplicarlo,
 -- desplegar un Worker que no lea `help_seen` ni llame a `/api/me/help`.

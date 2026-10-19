@@ -13,7 +13,7 @@ import {
 } from './_helpers';
 
 /**
- * Ayuda contextual, enfoque A · lo visto (20261020140000_help_seen).
+ * Ayuda contextual, enfoque A · lo visto (20261020150000_help_seen).
  *
  * Lo que fija este fichero:
  * - cada uno lee su fila y ninguna otra, aunque compartan espacio;
@@ -25,7 +25,7 @@ import {
  * Fixture: el usuario de la suite y el limitado. Al usuario de la suite le
  * deja marcada `card:zzz_rls`; al limitado le vacía lo visto (sus tarjetas
  * vuelven a salir, que es lo que pide un fixture). Va rojo contra un origen
- * sin `20261020140000`.
+ * sin `20261020150000`.
  */
 type Seen = Record<string, string>;
 interface Row {

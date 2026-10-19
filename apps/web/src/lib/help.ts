@@ -17,7 +17,7 @@
 /** `{ "card:planner": "2026-10-20T…" }`: clave vista y cuándo. */
 export type HelpSeen = Record<string, string>;
 
-/** La misma regla que `mark_help_seen` (20261020140000_help_seen). */
+/** La misma regla que `mark_help_seen` (20261020150000_help_seen). */
 export const HELP_KEY = /^(card|event):[a-z][a-z0-9_]{0,47}$/;
 
 /** Las secciones con tarjeta en este carril. */

@@ -6,7 +6,7 @@
  * Runs in the `playwright` workspace (`?scope=s:playwright`), never muk-cia.
  * What it writes is the fixture login's own `help_seen` row: it empties it at
  * the start and leaves every card and note seen at the end, as the auth setup
- * left it. Red against an origin without 20261020140000_help_seen.
+ * left it. Red against an origin without 20261020150000_help_seen.
  */
 import { expect, test, type Page } from '@playwright/test';
 import { waitForLoaded } from './loaded';
