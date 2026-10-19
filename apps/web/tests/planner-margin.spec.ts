@@ -28,7 +28,7 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
 
 const RUN = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 const VENUE = `E2E Margen ${RUN}`;
-const TASK = `ZZZ E2E Margen ${RUN}`;
+const TASK = `ZZZ E2E Tarea margen ${RUN}`;
 
 type Helpers = typeof import('./rls/_helpers');
 const one = <T>(d: T | T[] | null): T => (Array.isArray(d) ? d[0] : d)!;
