@@ -35,12 +35,13 @@
      --success, --warning, --danger and their shades). Never --primary*,
      --neutral*, --base*, --white, --black nor a literal colour. Deriving
      from a token with color-mix() or oklch(from var(…)) is fine.
-  8. px may stay only in: @media / @container breakpoints (box measures, moved
-     to rem when the component is next touched, not in bulk); 1-3px optical
-     nudges in transform, vertical-align, text-underline-offset,
-     outline-offset and the inset of a drawn pseudo-element; the 0px a calc()
-     needs; the geometry of a drawn pattern (background-size/-position, mask),
-     which is material (certainty.css or the component that draws it).
+  8. px may stay only in: 1-4px optical nudges in transform, vertical-align,
+     text-underline-offset, outline-offset and the inset of a drawn
+     pseudo-element; the 0px a calc() needs; the geometry of a drawn pattern
+     (background-size/-position, mask), which is material (certainty.css or
+     the component that draws it). A breakpoint in a media or container
+     query is a measure in rem (Marco, 2026-10-19): the root is 16px, so the
+     cut does not move.
   9. One treatment, one home: the first reuse of a drawing extracts it to
      styles/*.css or a component, and both consume it.
 */
@@ -385,9 +386,10 @@
        exact, don't hand-edit individual clamps. (2026-07-19: replaced the bespoke
        hand-tuned scale whose xs→s jump read a touch big.) */
     /* The margin voice — mono micro-labels inside a cell, a lid, a verb at
-       the edge of a row (9px everywhere the planner drew it). Fixed like
-       --space-2xs, below the fluid steps; a theme redefines it. */
-    --text-2xs: 0.5625rem; /* 9 */
+       the edge of a row. The planner drew it at 9px everywhere; on the scale
+       it runs 8.5 to 9.5 across 375↔1440 like its siblings (Marco, 2026-10-19),
+       and on a phone it takes the same floor as --text-xs. */
+    --text-2xs: clamp(0.5313rem, 0.5092rem + 0.0939vw, 0.5938rem); /* 8.5-9.5 */
     --text-xs: clamp(0.6076rem, 0.5962rem + 0.049vw, 0.64rem); /* 9.7-10.2 — eyebrows, badges */
     --text-s: clamp(0.7292rem, 0.7042rem + 0.106vw, 0.8rem); /* 11.7-12.8 — dense rows, lens labels, secondary */
     --text-m: clamp(0.875rem, 0.831rem + 0.188vw, 1rem); /* 14-16 — default body (anchor) */
@@ -720,8 +722,10 @@
   @media (pointer: coarse) {
     :root {
       --touch-target: 44px;
-      /* A floor for the smallest step on a phone (móvil #10 of the Desk):
-         9.7px is an eyebrow on a desk, a squint in a hand. */
+      /* A floor for the smallest steps on a phone (móvil #10 of the Desk):
+         9.7px is an eyebrow on a desk, a squint in a hand. The margin voice
+         takes the same floor, so on a phone the two smallest steps meet. */
+      --text-2xs: 0.6875rem;
       --text-xs: 0.6875rem;
     }
   }
