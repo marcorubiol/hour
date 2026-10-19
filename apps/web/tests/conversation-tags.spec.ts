@@ -61,6 +61,10 @@ test.describe('conversation tags', () => {
     const dialog = page.locator('dialog[open]');
     await dialog.getByLabel('ZZZ e2e collab').check({ force: true });
     await dialog.getByLabel('Organization').fill(ORG);
+    // The tag lives folded under «More», whose lid already names it.
+    const more = dialog.getByRole('button', { name: /^More/ });
+    await expect(more).toContainText('Press');
+    await more.click();
     await expect(dialog.getByLabel('Tag')).toHaveValue('press');
     await dialog.getByRole('button', { name: 'Add conversation' }).click();
     await expect(dialog).not.toBeVisible({ timeout: 10_000 });
