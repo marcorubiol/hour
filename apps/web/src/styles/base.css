@@ -1765,13 +1765,13 @@
     padding-block-end: var(--space-xs);
     border-block-end: 1px solid var(--border-color-light);
   }
-  .block-head h2 {
+  .block-head :is(h2, h3) {
     margin: 0;
   }
-  .block-head h2:focus {
+  .block-head :is(h2, h3):focus {
     outline: none;
   }
-  .block-head h2:focus-visible {
+  .block-head :is(h2, h3):focus-visible {
     outline: var(--focus-width) solid var(--focus-color);
     outline-offset: var(--focus-offset);
   }
@@ -1790,8 +1790,10 @@
   .block-head__n--alert {
     color: var(--danger);
   }
-  /* The block's action: quiet text at the end of the head line. */
-  .block-head__act {
+  /* The block's action: quiet text at the end of the head line (and at the
+     end of an empty block's line, EmptyLine). */
+  .block-head__act,
+  .empty-line__act {
     appearance: none;
     padding: 0;
     border: 0;
@@ -1803,16 +1805,88 @@
     white-space: nowrap;
     cursor: pointer;
   }
-  .block-head__act:hover {
+  .block-head__act:hover,
+  .empty-line__act:hover {
     color: var(--text-color);
   }
   @media (pointer: coarse) {
-    .block-head__act {
+    .block-head__act,
+    .empty-line__act {
       display: inline-flex;
       align-items: center;
       min-block-size: var(--touch-target);
       margin-block: calc(-0.5 * var(--touch-target) + 0.5em);
     }
+  }
+
+  /* Record — a record's page (ADR-139 § 4): its blocks in one column from
+     the lens's own left edge and at the lens's width (both are
+     .shell__content's), one rhythm between blocks. A record that keeps two
+     columns (the conversation) draws them inside. */
+  .record {
+    display: flex;
+    flex-direction: column;
+    gap: var(--record-gap);
+  }
+
+  /* Record head — RecordHead wears the lens head (.lenshead*: the title row,
+     its rule, the title, the facts line); only the address over it and the
+     band under it are its own. */
+  .record-head__crumbs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-xs);
+    margin-block-end: var(--space-s);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--mono-letter-spacing);
+    color: var(--text-faint);
+  }
+  .record-head__crumb {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    min-inline-size: 0;
+  }
+  a.record-head__crumb {
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color var(--transition);
+  }
+  a.record-head__crumb:hover {
+    color: var(--text-color);
+  }
+  .record-head__dot {
+    inline-size: 0.5rem;
+    block-size: 0.5rem;
+    flex: none;
+    border-radius: var(--radius-circle);
+    background: var(--c, var(--text-faint));
+  }
+  .record-head__sep {
+    color: var(--border-color-dark);
+  }
+  .record-head__band {
+    margin-block-start: var(--space-m);
+  }
+
+  /* Empty line — what a block says when it has nothing (or while it loads):
+     one line in the block's voice, at its left edge, never centred, never a
+     box (EmptyLine, ADR-139 § 4). Labelled, it stands for a whole empty
+     block: the block's name in the record's label column, then the sentence. */
+  .empty-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-2xs) var(--space-s);
+    margin: 0;
+    font-size: var(--text-s);
+    color: var(--text-faint);
+  }
+  .empty-line__label {
+    flex: none;
+    min-inline-size: var(--record-label-inline);
   }
 
   /* Mail card — one email as Hour shows it: a soft box with its From/To
@@ -1869,7 +1943,8 @@
   }
 
   /* Lens header — the ONE shared top block for the four lenses (Desk ·
-     Planner · Conversations · Money). Every lens renders it via LensHeader,
+     Planner · Conversations · Money) and of every record's page, which
+     wears it through RecordHead (ADR-139 § 4). Every lens renders it via LensHeader,
      so they share these exact classes and layout:
        • a big display title on a bordered row, beside the LensSwitcher;
        • below, a small ·-separated line of indications/links (the "sub").

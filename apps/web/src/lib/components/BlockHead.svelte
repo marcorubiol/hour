@@ -1,11 +1,13 @@
 <script lang="ts">
   /**
-   * The head of a dashboard block, one for the four dashboards (Desk,
-   * Planner, Conversations, Cuentas): the sub-eyebrow over a hairline, its
-   * figure after the title («Te toca · 3») and its action at the end of the
-   * line. The italic serif stays for each screen's own title (ADR-130 § 1).
-   * The figure is part of the heading, so a screen reader hears it with the
-   * name; `alert` paints it in danger (something waits for a decision).
+   * The head of a block: the sub-eyebrow over a hairline, its figure after
+   * the title («Te toca · 3») and its action at the end of the line. One for
+   * the four dashboards (Desk, Planner, Conversations, Cuentas) and for every
+   * block of a record's page (ADR-139 § 4). The italic serif stays for each
+   * screen's own title (ADR-130 § 1). The figure is part of the heading, so a
+   * screen reader hears it with the name; `alert` paints it in danger
+   * (something waits for a decision). `level` 3 is a block inside a block
+   * (a thread inside the conversation's column).
    */
   import type { Snippet } from 'svelte';
   import ConceptHint from '$lib/components/ConceptHint.svelte';
@@ -24,11 +26,24 @@
     el?: HTMLElement | null | undefined;
     /** The concept's «i», beside the heading and outside it (its name stays the title). */
     concept?: HelpConcept;
+    /** The heading's rank: 2 for a block of the page, 3 for a block inside one. */
+    level?: 2 | 3;
     /** The action at the end: a `.block-head__act` link or button. */
     children?: Snippet;
   }
 
-  let { title, count = null, alert = false, id, titleId, focusable = false, el = $bindable(), concept, children }: Props = $props();
+  let {
+    title,
+    count = null,
+    alert = false,
+    id,
+    titleId,
+    focusable = false,
+    el = $bindable(),
+    concept,
+    level = 2,
+    children,
+  }: Props = $props();
 </script>
 
 {#snippet words()}
@@ -37,11 +52,13 @@
 {/snippet}
 
 {#snippet heading()}
-  {#if focusable}
-    <h2 class="eyebrow eyebrow--sub" {id} tabindex="-1" bind:this={el}>{@render words()}</h2>
-  {:else}
-    <h2 class="eyebrow eyebrow--sub" {id} bind:this={el}>{@render words()}</h2>
-  {/if}
+  <svelte:element
+    this={`h${level}`}
+    class="eyebrow eyebrow--sub"
+    {id}
+    tabindex={focusable ? -1 : undefined}
+    bind:this={el}>{@render words()}</svelte:element
+  >
 {/snippet}
 
 <div class="block-head">
