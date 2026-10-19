@@ -89,7 +89,7 @@ test.describe('el dashboard de Conversations (ADR-117)', () => {
 
   test('esperan respuesta: el bloque cuenta y su filtro la encuentra con su columna Respuesta', async ({ page }) => {
     test.setTimeout(60_000);
-    await page.goto('/h/conversations');
+    await page.goto('/h/conversations?etiqueta=sales');
     const due = page.getByTestId('block-due');
     await expect(due).toBeVisible({ timeout: 30_000 });
     // The count rides in the block's title: «Esperan respuesta · N».
@@ -106,7 +106,7 @@ test.describe('el dashboard de Conversations (ADR-117)', () => {
 
   test('sin noticias: «Escribir a estas» deja la selección hecha; el chip quita el filtro', async ({ page }) => {
     test.setTimeout(60_000);
-    await page.goto('/h/conversations');
+    await page.goto('/h/conversations?etiqueta=sales');
     const cold = page.getByTestId('block-cold');
     await expect(cold).toBeVisible({ timeout: 30_000 });
     // One «write to these» per project when the cooling spans several: ours is zzz-e2e-collab.
@@ -127,7 +127,7 @@ test.describe('el dashboard de Conversations (ADR-117)', () => {
 
   test('un tramo de la temporada filtra la lista por esa relación', async ({ page }) => {
     test.setTimeout(60_000);
-    await page.goto('/h/conversations');
+    await page.goto('/h/conversations?etiqueta=sales');
     const season = page.getByTestId('block-season');
     await expect(season).toBeVisible({ timeout: 30_000 });
     await season.locator('.season__item').first().click();
@@ -138,7 +138,7 @@ test.describe('el dashboard de Conversations (ADR-117)', () => {
   test('en el móvil, una columna en el orden del documento, «Esperan respuesta» primero', async ({ page }) => {
     test.setTimeout(60_000);
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/h/conversations');
+    await page.goto('/h/conversations?etiqueta=sales');
     const due = page.getByTestId('block-due');
     const season = page.getByTestId('block-season');
     const hot = page.getByTestId('block-hot');
