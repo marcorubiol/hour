@@ -221,11 +221,13 @@
       min-block-size: 100vh;
     }
   }
+  /* The clock takes the rail's whole width and calm sits over its top-right
+     corner, beside the time: the date runs on one line underneath, instead
+     of folding in the column the button left it. One cell, two layers. */
   .side-clock {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--space-s);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
     padding-inline: var(--space-xs);
     /* Same top offset as the header's wordmark, by construction: the
        BrandMark (size m = --text-xl, line-height 1) centers inside the
@@ -233,6 +235,8 @@
     padding-block-start: calc((var(--header-height) - var(--text-xl)) / 2);
   }
   .side-clock__now {
+    grid-area: 1 / 1 / 2 / 3;
+    min-inline-size: 0;
     display: flex;
     flex-direction: column;
     gap: var(--space-xs);
@@ -272,6 +276,9 @@
       border-color var(--transition);
   }
   .side-calm-row {
+    grid-area: 1 / 2;
+    /* Above the clock's link, which runs under it. */
+    position: relative;
     display: inline-flex;
     align-items: center;
   }
@@ -307,8 +314,13 @@
   }
   /* The face itself is `.clock-face` (base.css): the top bar draws the same
      time on a phone, and one face cannot have two type rules. */
+  /* One line, always: a locale whose date outgrows the rail is cut, not
+     folded. */
   .side-clock__date {
     margin: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
     font-family: var(--font-mono);
     font-size: var(--text-xs);
     letter-spacing: var(--mono-letter-spacing-loose);
