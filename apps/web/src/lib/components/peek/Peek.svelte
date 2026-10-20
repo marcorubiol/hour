@@ -95,8 +95,16 @@
     if (open) requestClose();
   }
 
+  /* A click outside the panel closes it. Over the shell's top bar, which
+     the veil leaves clear on a desktop (ADR-140), it also does what it
+     says: the modal made the bar inert, so once the panel is closed the
+     click is handed to the control under it (a section, the search). */
   function handleClick(event: MouseEvent) {
-    if (event.target === dialogEl) requestClose();
+    if (event.target !== dialogEl || !dialogEl) return;
+    dialogEl.close();
+    requestClose();
+    const under = document.elementFromPoint(event.clientX, event.clientY);
+    if (under?.closest('[data-peek-through]')) under.closest<HTMLElement>('a, button')?.click();
   }
 </script>
 
@@ -141,6 +149,25 @@
     }
     .peek::backdrop {
       background: var(--peek-backdrop);
+    }
+    /* A desktop: the panel starts under the top bar, and the veil leaves the
+       bar out (the rail and the page dim, the bar does not): the sections
+       never leave the screen (ADR-140). */
+    @media (min-width: 48rem) {
+      .peek {
+        margin-block-start: var(--header-height);
+        block-size: calc(100dvh - var(--header-height));
+        max-block-size: calc(100dvh - var(--header-height));
+      }
+      /* Two sheets of the same veil: the rail's column, and the page under
+         the bar. The bar's band stays clear but still catches the click
+         (see handleClick). */
+      .peek::backdrop {
+        background:
+          linear-gradient(var(--peek-backdrop), var(--peek-backdrop)) 0 0 / var(--rail-width) 100% no-repeat,
+          linear-gradient(var(--peek-backdrop), var(--peek-backdrop)) var(--rail-width) var(--header-height) / 100% 100%
+            no-repeat;
+      }
     }
     .peek__panel {
       display: flex;

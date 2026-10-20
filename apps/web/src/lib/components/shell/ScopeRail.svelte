@@ -186,7 +186,7 @@
      one-click named scopes (Everything, each space, saved bundles) + the
      recents. Replaces the ADR-057 space rail. */
   .shell__side {
-    inline-size: 15.5rem;
+    inline-size: var(--rail-width);
     display: flex;
     flex-direction: column;
     gap: var(--space-l);

@@ -111,6 +111,9 @@
 
   html {
     scroll-behavior: smooth;
+    /* What the frame takes from the foot of the screen (the phone's bar of
+       sections, ADR-140): a focused field stops above it, not under it. */
+    scroll-padding-block-end: var(--shell-foot);
   }
   html:focus-within {
     scroll-behavior: auto;
@@ -1383,7 +1386,7 @@
      Each .toast--<tone> redeclares --toast-bg / --toast-color / --toast-accent. */
   .toast-region {
     position: fixed;
-    inset-block-end: var(--space-m);
+    inset-block-end: calc(var(--space-m) + var(--shell-foot));
     inset-inline-end: var(--space-m);
     display: flex;
     flex-direction: column;
@@ -2192,7 +2195,7 @@
      end. */
   .action-bar {
     position: sticky;
-    inset-block-end: var(--space-s);
+    inset-block-end: calc(var(--space-s) + var(--shell-foot));
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -2208,7 +2211,7 @@
      (a focused field, the line being typed) stops above it, not under it
      (Conversations review, móvil #5: the mailout body under its bar). */
   :root:has(.action-bar) {
-    scroll-padding-block-end: calc(var(--control-size-m) + 2 * var(--space-s) + var(--space-m));
+    scroll-padding-block-end: calc(var(--control-size-m) + 2 * var(--space-s) + var(--space-m) + var(--shell-foot));
   }
   .action-bar__note {
     margin: 0 auto 0 0;
@@ -2220,7 +2223,8 @@
      Planner · Conversations · Money) and of every record's page, which
      wears it through RecordHead (ADR-139 § 4). Every lens renders it via LensHeader,
      so they share these exact classes and layout:
-       • a big display title on a bordered row, beside the LensSwitcher;
+       • a big display title on a bordered row, its «?» at the end (the
+         section switcher is in the shell's frame, ADR-140);
        • below, a small ·-separated line of indications/links (the "sub").
      Global (not component-scoped) so page-provided title/sub content styles
      identically no matter which lens renders it. */
@@ -2265,7 +2269,7 @@
       flex-basis: 100%;
     }
   }
-  /* The section's «?» (it brings its welcome card back) beside the switcher:
+  /* The section's «?» (it brings its welcome card back) at the row's end:
      the same ring as a concept's «i», a step larger, in the sans voice. */
   .lenshead__tools {
     display: inline-flex;
@@ -2353,9 +2357,8 @@
     margin-inline-end: var(--space-s);
     color: var(--text-faint);
   }
-  /* On a phone the title and the switcher cannot share a row: the switcher
-     alone is wider than the screen's measure. The row wraps, so the switcher
-     drops under the title and the border still closes the block. */
+  /* On a phone a record's actions may not fit beside its title: the row
+     wraps, so they drop under it and the border still closes the block. */
   @media (max-width: 47.999rem) {
     .lenshead__titlerow {
       flex-wrap: wrap;

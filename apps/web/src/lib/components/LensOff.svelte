@@ -3,7 +3,8 @@
    * A lens reached by URL that is off in every space on screen (ADR-132). It
    * says so, and to whom to say it: the names of whoever administers each of
    * those spaces, or, if that is you, the way to Settings. The lens keeps its
-   * header and the switcher, so the way out is where it always is.
+   * header, and the switcher is in the frame (ADR-140), so the way out is
+   * where it always is.
    */
   import { createQueries } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';

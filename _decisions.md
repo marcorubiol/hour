@@ -4697,3 +4697,37 @@ páginas, y si calma como foco se usa.
 solo nombra lo confirmado (la familia `confirmed` con la que el Planner dibuja su papel); una opción, una propuesta o
 una fecha tentativa espera fuera de calma. La regla vive en `lib/calm.ts` (`railNextShows`) y el raíl le pregunta.
 «Ahora» no cambia, y con calma apagada el raíl es el de siempre. Sigue sin filtrar por ámbito.
+
+## [2026-10-20] ADR-140 · Las secciones viven en el marco (enmienda la decisión del 18-07 y ADR-136 § 3)
+
+**Contexto.** Marco (20-10) se pierde al entrar en una ficha: el selector Hoy · Planificador · Conversaciones ·
+Cuentas desaparece, porque desde el 18-07 lo pintaba la cabecera de cada lente (`LensHeader`), junto al título. Y al
+cambiar de lente la cabecera cambiaba de altura y el selector se movía bajo el cursor. Análisis con tres opciones en
+`build/coordination/navigation/analisis.md` (fuera de git); Marco eligió la A. Carril `claude/lens-in-shell`. Sin
+migración ni API.
+
+**Decisión.**
+1. **El selector se monta una vez, en la barra de arriba del shell** (`routes/h/+layout.svelte`), igual en todas las
+   páginas de `/h`. No lo pinta ninguna página, así que no se mueve por construcción. `LensHeader` se queda con el
+   título, `titleAside` (las flechas y «Ahora» del Planner, ADR-136) y el «?»; el saludo y el reloj de Hoy, el ámbito
+   y las vistas siguen en su página, debajo. Enmienda la decisión del 18-07 (selector junto al título).
+2. **En una lente marca esa lente con relleno (`aria-current="page"`); fuera de las lentes (ficha, proyecto, espacio,
+   Ajustes) marca con un trazo suave, sin relleno, la lente de la que vienes** (`hour_lens`), descrita para un lector
+   de pantalla («Vienes de esta sección», `aria-describedby`). La miga sigue diciendo de qué cuelga la cosa; el selector
+   dice en qué sección estás.
+3. **Escritorio: selector a la izquierda, búsqueda a la derecha junto a la cuenta.** La búsqueda encoge primero (sin
+   `⌘K` y luego solo la lupa, por container query); de 48 a 64 rem (tableta con raíl) las pastillas pierden aire y la
+   presencia queda en su punto. Sin solapes de 768 a 1440.
+4. **Móvil (< 48 rem): una barra fija abajo con las cuatro palabras**, en la voz mono, sin iconos, con las mismas
+   marcas (relleno y trazo), sobre `safe-area-inset-bottom`. Lo que ocupa abajo (`--shell-foot`) lo descuentan el
+   contenido, los avisos, la barra de acciones y el foco. El vistazo y los diálogos, a pantalla completa o como hoja
+   desde abajo, la tapan mientras están abiertos.
+5. **El vistazo no tapa la barra en escritorio:** empieza debajo y el velo la deja limpia; un clic en ella cierra el
+   vistazo y hace lo que dice (el modal la vuelve inerte, así que el clic se le entrega al cerrarlo).
+6. Las lentes apagadas por espacio (ADR-132) y Cuentas sin acceso (ADR-117) siguen sin salir.
+
+**Enmienda a ADR-136 § 3.** Sin el selector, la fila del título mide lo que su contenido (43 px medidos a 1440) y
+sigue igual en las cinco vistas.
+
+**Re-evaluar cuando** Marco lo use una semana en el teléfono: si la barra de abajo pesa, o si hace falta un
+«volver» además del trazo.

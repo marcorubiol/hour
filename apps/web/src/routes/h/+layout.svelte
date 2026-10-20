@@ -4,8 +4,10 @@
    * rail (Everything + saved scopes + recents) and the ⌘K scope builder —
    * the manual pin UI (card chips, breadcrumb pin, ScopeStrip) died
    * 2026-07-17. Applying a scope from a non-lens surface lands on /h/desk.
-   * The top bar is the phone's rail door · centered ⌘K search · account
-   * menu. The rail's clock is the way home: the Desk (ADR-137, /h redirects).
+   * The top bar is the sections (LensSwitcher, ADR-140; on a phone the
+   * rail's door instead, and the sections go to a bar at the foot) · the ⌘K
+   * search · the account menu. The rail's clock is the way home: the Desk
+   * (ADR-137, /h redirects).
    *
    * Settings stays a "mode" of the shell: when inside /settings a slim
    * <SettingsNav> aside returns, so the settings surface is unaffected.
@@ -35,8 +37,9 @@
   import { isReservedWorkspaceSlug } from '$lib/reserved-slugs';
   import { detectLocale, setTrade, t, tradeOf } from '$lib/i18n';
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
-  import { lensesOnFor, lensOn, setLensesOn } from '$lib/lenses.svelte';
+  import { lensesOnFor, lensOn, routedLensOf, setLensesOn } from '$lib/lenses.svelte';
   import LensOff from '$lib/components/LensOff.svelte';
+  import LensSwitcher from '$lib/components/LensSwitcher.svelte';
   import PeekHost from '$lib/components/peek/PeekHost.svelte';
   import { provideCalm } from '$lib/stores/calm.svelte';
   import { providePins, parsePin, type PinKind } from '$lib/stores/pins.svelte';
@@ -281,9 +284,10 @@
     editingBaseTokens = [...pins.pins];
   }
 
-  // VIEW AS — the Desk · Calendar · Conversations · Money segmented control
-  // now lives in each lens's own header (LensSwitcher), beside its title, not
-  // in the shell chrome (2026-07-18). The chrome keeps only the scope bar.
+  // THE SECTIONS LIVE IN THE FRAME (ADR-140, amending 2026-07-18, when they
+  // went beside each lens's title): the LensSwitcher is mounted once, in the
+  // top bar, the same on every page of /h, so it cannot move under the
+  // cursor and is never gone. Off a lens it marks the lens you came from.
 
   // Realtime is cross-origin (wss to supabase.co) and can't ride the
   // httpOnly cookie — it authenticates via async suppliers backed by
@@ -325,10 +329,7 @@
 
   // Which routed lens (if any) the current URL is showing. ADR-067: lens
   // routes are space-less — the space segment appears only on entity URLs.
-  let routedLens = $derived.by<Lens | null>(() => {
-    const m = page.url.pathname.match(/^\/h\/(desk|planner|conversations|books)\/?$/);
-    return (m?.[1] as Lens | undefined) ?? null;
-  });
+  let routedLens = $derived<Lens | null>(routedLensOf(page.url.pathname));
   // Surfaces that carry the scope in the URL: the four lenses, the Desk
   // (the home, ADR-137) among them.
   let scopeSurface = $derived(routedLens !== null);
@@ -585,7 +586,7 @@
          search, account, rail and scope stood before the first day. Unseen
          until focused. -->
     <a class="shell__skip" href="#main">{t('shell.skip_to_main', locale)}</a>
-    <header class="shell__top">
+    <header class="shell__top" data-peek-through>
       <!-- THE WORDMARK IS GONE FROM THE BAR (Marco, 2026-07-31). A product
            tells you its name on the way in — the login and the invitation
            still carry it — and after that it is the one thing on screen that
@@ -612,6 +613,9 @@
                the drawer draws it. -->
           <span class="shell__menu-caret" aria-hidden="true">{railOpen ? '▴' : '▾'}</span>
         </button>
+        <!-- The sections (ADR-140). Here on a desktop; on a phone the same
+             nav leaves the bar and is fixed at the foot of the screen. -->
+        <LensSwitcher />
       </div>
 
       <button
@@ -764,14 +768,35 @@
     z-index: var(--z-sticky);
     min-block-size: var(--header-height);
     display: grid;
-    grid-template-columns: 1fr auto 1fr;
+    /* Sections · search · you (ADR-140). The sections keep their whole
+       width and the left edge of the page; the search takes what is left,
+       at the right, beside the account, and gives way first. */
+    grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
     gap: var(--space-m);
     padding-block: var(--space-s);
     padding-inline: var(--shell-gutter);
-    background: color-mix(in oklch, var(--bg) 88%, transparent);
-    backdrop-filter: blur(8px);
     border-block-end: var(--line-hairline) solid var(--border-color-light);
+  }
+  /* Beside the rail the bar's height is --header-height alone, the controls
+     centred in it: the sections with 44px targets (a coarse pointer) still
+     fit inside it, so every sticky offset that reads it stays true. */
+  @media (min-width: 48rem) {
+    .shell__top {
+      padding-block: 0;
+    }
+  }
+  /* The bar's frosted paper lives on a layer of its own: a backdrop-filter
+     on the bar itself would make it the box that `position: fixed` measures
+     from, and on a phone the sections inside it are fixed to the SCREEN's
+     foot, not the bar's. */
+  .shell__top::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: color-mix(in oklch, var(--bg) 88%, transparent);
+    backdrop-filter: blur(8px); /* material */
   }
 
   .shell__left {
@@ -793,12 +818,15 @@
 
   .shell__search {
     grid-column: 2;
-    justify-self: center;
+    justify-self: end;
     display: inline-flex;
     align-items: center;
     gap: var(--space-s);
-    inline-size: min(30rem, 100%);
-    min-inline-size: 14rem;
+    inline-size: min(22rem, 100%);
+    min-inline-size: 0;
+    /* It measures itself: it says what it is while there is room, and
+       keeps the lens alone at the end (container queries below). */
+    container: shellsearch / inline-size;
     padding-block: var(--space-xs);
     padding-inline: var(--space-m) var(--space-s);
     border: var(--line-hairline) solid var(--border-color-dark);
@@ -814,9 +842,43 @@
   }
   .shell__search-label {
     flex: 1;
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     text-align: start;
     font-size: var(--text-s);
     color: var(--text-faint);
+  }
+  @container shellsearch (max-width: 14rem) {
+    .shell__search .kbd {
+      display: none;
+    }
+  }
+  @container shellsearch (max-width: 7rem) {
+    .shell__search-label {
+      display: none;
+    }
+    .shell__search svg {
+      margin-inline: auto;
+    }
+  }
+  /* A tablet with the rail beside it (48–64rem): the sections take most of
+     the bar, so the search is its lens alone and the presence its dot
+     (the count stays for a screen reader and in the dot's tooltip). */
+  @media (min-width: 48rem) and (max-width: 63.999rem) {
+    .shell__top {
+      gap: var(--space-s);
+    }
+    .shell__search {
+      min-inline-size: var(--field-size);
+      padding-inline: 0;
+    }
+    .shell__right :global(.presence-badge__label) {
+      position: absolute;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
   }
 
   .shell__content {
@@ -824,7 +886,9 @@
     color: var(--text-color);
     /* One shared header→content distance for every route — pages used to
        borrow the (now neutralized) global <section> padding unevenly. */
-    padding-block: var(--space-l) var(--space-xxl);
+    /* At the foot, what the frame takes there too (the phone's bar of
+       sections, ADR-140), so the last line is never under it. */
+    padding-block: var(--space-l) calc(var(--space-xxl) + var(--shell-foot));
     padding-inline: var(--shell-gutter);
     /* One measure for every route. Lives here so no page re-declares it.
        border-box puts the padding inside the cap, so the body itself lands

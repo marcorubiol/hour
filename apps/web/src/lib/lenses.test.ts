@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isToggleLens, lensesOnFor, lensOn, setLensesOn, TOGGLE_LENSES } from './lenses.svelte';
+import { isToggleLens, lensesOnFor, lensOn, routedLensOf, setLensesOn, TOGGLE_LENSES } from './lenses.svelte';
 
 describe('lensesOnFor (ADR-132)', () => {
   it('turns every lens on while no workspace has answered', () => {
@@ -38,5 +38,22 @@ describe('lensOn', () => {
   it('knows the three lenses and nothing else', () => {
     expect(TOGGLE_LENSES.every(isToggleLens)).toBe(true);
     expect(isToggleLens('desk')).toBe(false);
+  });
+});
+
+describe('routedLensOf (ADR-140)', () => {
+  it('reads the four lens routes, with or without the slash', () => {
+    expect(routedLensOf('/h/desk')).toBe('desk');
+    expect(routedLensOf('/h/planner/')).toBe('planner');
+    expect(routedLensOf('/h/conversations')).toBe('conversations');
+    expect(routedLensOf('/h/books')).toBe('books');
+  });
+
+  it('is no lens on a record, a space, Settings or the door', () => {
+    expect(routedLensOf('/h')).toBeNull();
+    expect(routedLensOf('/h/muk-cia/')).toBeNull();
+    expect(routedLensOf('/h/muk-cia/performance/x')).toBeNull();
+    expect(routedLensOf('/h/muk-cia/settings')).toBeNull();
+    expect(routedLensOf('/h/muk-cia/planner')).toBeNull();
   });
 });

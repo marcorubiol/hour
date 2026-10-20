@@ -42,3 +42,14 @@ export function setLensesOn(next: ReadonlySet<ToggleLens>): void {
 export function lensOn(lens: Lens): boolean {
   return lens === 'desk' || on.has(lens);
 }
+
+/**
+ * The lens a path shows, if it is one. ADR-067: lens routes are space-less,
+ * the space segment appears only on entity URLs. One reading for the shell
+ * (scope bar, scope in the URL) and the switcher (what it marks), so the two
+ * never disagree on «am I in a section».
+ */
+export function routedLensOf(pathname: string): Lens | null {
+  const m = pathname.match(/^\/h\/(desk|planner|conversations|books)\/?$/);
+  return (m?.[1] as Lens | undefined) ?? null;
+}

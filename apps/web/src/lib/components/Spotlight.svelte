@@ -143,7 +143,7 @@
     /* A block taller than the screen: the words wait at its foot. */
     .spot--docked {
       inset-block-start: auto;
-      inset-block-end: var(--space-m);
+      inset-block-end: calc(var(--space-m) + var(--shell-foot));
       inset-inline: var(--space-m);
       inline-size: auto;
       margin-inline: auto;
