@@ -31,10 +31,10 @@ aprueba, el sistema ejecuta y deja auditoría. UI manual e IA leen y escriben lo
 fixtures. Sin billing ni self-service. Modelo ya multi-workspace y multi-account. La beta externa espera a cerrar lo
 de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
-## Producción (verificado 2026-10-19, tarde)
+## Producción (verificado 2026-10-20)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`2cf78320`**, `dirty:false`, builtAt
-  2026-10-19T21:41Z (+Fecha en el día que miras, fichas que fallan; antes etiquetas fase 2 y E3, ADR-138). `main` == prod salvo documentos y tests.
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`b0bdd0c1`**, `dirty:false`, builtAt
+  2026-10-20T04:40Z (ADR-139 entero: segundo nivel, vistazo lateral, alta rápida, calma como foco). `main` == prod salvo documentos y tests.
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free, con keepalive diario
   (`.github/workflows/keepalive.yml`) contra la pausa por inactividad. Pasar a Pro antes de la beta, aún no
