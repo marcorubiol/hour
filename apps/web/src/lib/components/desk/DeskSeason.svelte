@@ -107,6 +107,7 @@
      minimum (room for «2.400 €» at --stat-lead) keeps them still while the
      figures land. */
   .doors {
+    container: doors / inline-size;
     display: grid;
     grid-template-columns: minmax(5.5rem, max-content) minmax(0, 1fr) auto;
     gap: var(--space-s) 0;
@@ -174,6 +175,23 @@
   .door:hover .door__arrow {
     transform: translateX(3px);
     color: var(--text-muted);
+  }
+  /* A narrow column (the Desk's right one on a tablet): the figure and its
+     words no longer share a row, they stack under the lens's name, so each
+     line keeps its measure instead of folding word by word. The arrow stays
+     on the right edge. A desktop's doors are wider than this and keep the
+     row; so is a phone's, one column the page wide. */
+  @container doors (max-width: 20rem) {
+    .door {
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas: 'lens arrow' 'n arrow' 'txt arrow';
+      row-gap: var(--space-2xs);
+    }
+    .door__lens {
+      flex-wrap: wrap;
+      column-gap: var(--space-s);
+      row-gap: 0;
+    }
   }
   /* Phone: tighter, the lens still named (it is the link's purpose, for the
      eye and for a screen reader). */

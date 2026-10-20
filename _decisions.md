@@ -4739,4 +4739,8 @@ derecho: la caja del selector sigue idéntica en todas las páginas de cada anch
 menú, que abre hacia arriba) y la presencia bajan al pie del raíl, como en Linear, Slack o Notion, pegadas abajo
 aunque el raíl sea más largo que la pantalla; la presencia son puntos (uno por persona, tres como mucho) con el número
 para lector de pantalla y en el tooltip. La búsqueda gana el sitio y conserva el `⌘K` de 1024 en adelante. Móvil
-(< 48 rem) sin cambios: cuenta y presencia arriba, lentes en la barra de abajo.
+(< 48 rem) sin cambios: cuenta y presencia arriba, lentes en la barra de abajo. Hoy va primero y aparte (Marco,
+20-10): un filete fino a la altura de la palabra (`--lens-apart-rule`, con `--lens-apart` de aire a cada lado) lo separa
+de Planificador · Conversaciones · Cuentas, en escritorio y en la barra del móvil, porque es la portada y el resumen
+(ADR-088), no una lente más; filete y no hueco porque en el móvil las celdas ya reparten el ancho y un hueco se
+confunde con su aire. Decorativo (`aria-hidden`): el `nav` sigue con sus cuatro enlaces y el borde derecho no se mueve.
