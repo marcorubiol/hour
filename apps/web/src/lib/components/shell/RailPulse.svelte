@@ -30,8 +30,10 @@
    * you regardless of where you are looking. What it DOES narrow by is the
    * person axis — you — and only on facts (see $lib/pulse § whose day it is).
    *
-   * Calm does not touch it (Marco, 2026-08-10): knowing what comes next is
-   * the opposite of noise.
+   * Calm touches one thing (enmienda a ADR-096 § 5, Marco 2026-10-20): in
+   * calm, NEXT names only what is confirmed, by `$lib/calm` (`railNextShows`),
+   * the same family the Planner's paper keeps. NOW is a fact about the present
+   * and calm leaves it alone. Outside calm, nothing changes.
    */
   import { useQueryClient } from '@tanstack/svelte-query';
   import { dualTime, hourMark, localeDayMonthNear, localeWeekdayShort } from '$lib/datetime';
@@ -43,6 +45,8 @@
   import { computePulse, type PulseWord } from '$lib/pulse';
   import { createPulseFeeds, pulseSlip, pulseSlipContext } from '$lib/pulse-feeds.svelte';
   import Slip from '$lib/components/planner/Slip.svelte';
+  import { railNextShows } from '$lib/calm';
+  import { useCalm } from '$lib/stores/calm.svelte';
 
   interface Props {
     /** The rail's clock, already ticking on the minute — one timer in the
@@ -60,10 +64,17 @@
   // the same rows from the same cache (ADR-117).
   const feeds = createPulseFeeds(() => today);
   let personId = $derived(feeds.personId);
+  const calm = useCalm();
 
   let pulse = $derived(
     computePulse(
-      { performances: feeds.performances, dates: feeds.dates, viewerTz, axis: feeds.axis },
+      {
+        performances: feeds.performances,
+        dates: feeds.dates,
+        viewerTz,
+        axis: feeds.axis,
+        nextKeeps: (ref) => railNextShows(ref.family, calm.on),
+      },
       now,
     ),
   );

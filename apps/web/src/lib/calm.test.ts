@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CALM_FOCUS, plannerCalmFacts, shows, type CalmLens } from './calm';
+import { CALM_FOCUS, plannerCalmFacts, railNextShows, shows, type CalmLens } from './calm';
 
 describe('calm as focus (ADR-139 § 5): what each lens keeps', () => {
   it('outside calm every block of every lens is drawn: the normal mode does not change', () => {
@@ -39,5 +39,12 @@ describe('calm as focus (ADR-139 § 5): what each lens keeps', () => {
     expect(plannerCalmFacts('overview', stats)).toEqual({ confirmed: 4, options: 3 });
     for (const v of ['day', 'agenda', 'board'] as const)
       expect(plannerCalmFacts(v, stats)).toEqual({ confirmed: null, options: null });
+  });
+
+  it('the rail\'s «Siguiente» keeps only what is confirmed in calm, and everything outside it', () => {
+    for (const f of ['confirmed', 'hold', 'proposed', 'released'] as const)
+      expect(railNextShows(f, false), f).toBe(true);
+    expect(railNextShows('confirmed', true)).toBe(true);
+    for (const f of ['hold', 'proposed', 'released'] as const) expect(railNextShows(f, true), f).toBe(false);
   });
 });

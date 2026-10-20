@@ -2136,7 +2136,7 @@
   "calm.see_all": "tout voir",
   "calm.announce_on": "Calme activé : chaque vue ne montre que le jour et ce qui vous revient",
   "calm.announce_off": "Calme désactivé : tout est visible",
-  "help.concept.calm_body": "Une autre façon de regarder, pas un filtre gris. Aujourd’hui : une colonne avec le jour même ; le retard, en une ligne qui l’ouvre. Planning : seulement le confirmé, avec les options comptées. Conversations : seulement ce qui vous revient ; Comptes : ce qui rentre et ce qui demande attention. Rien n’est effacé : ce qu’il cache est dit en une ligne, et un conflit reste visible.",
+  "help.concept.calm_body": "Une autre façon de regarder, pas un filtre gris. Aujourd’hui : une colonne avec le jour même ; le retard, en une ligne qui l’ouvre. Planning : seulement le confirmé, avec les options comptées. Dans la barre latérale, « Ensuite » ne montre que le confirmé. Conversations : seulement ce qui vous revient ; Comptes : ce qui rentre et ce qui demande attention. Rien n’est effacé : ce qu’il cache est dit en une ligne, et un conflit reste visible.",
   "help.concept.guess": "Déduit par Hour",
   "help.concept.guess_body": "Un point d’interrogation ou « déduite » signifie que personne ne l’a saisi : Hour le suppose à partir des villes ou de la distribution. Confirmez ou corrigez, et ce n’est plus une supposition.",
   "help.concept.guess_body@music": "Un point d’interrogation ou « déduite » signifie que personne ne l’a saisi : Hour le suppose à partir des villes ou des musiciens. Confirmez ou corrigez, et ce n’est plus une supposition.",

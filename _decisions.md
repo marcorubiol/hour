@@ -4692,3 +4692,8 @@ https://claude.ai/artifact/3mfP91nKLzdU6gva6agkT6). Marco eligió el 19-10, 23:4
 
 **Re-evaluar cuando** Marco use una semana el segundo nivel nuevo: si el vistazo lateral sustituye de verdad a las
 páginas, y si calma como foco se usa.
+
+**Enmienda a ADR-096 § 5 (Marco, 2026-10-20).** «Calma no lo toca» deja de valer para «Siguiente»: en calma, el raíl
+solo nombra lo confirmado (la familia `confirmed` con la que el Planner dibuja su papel); una opción, una propuesta o
+una fecha tentativa espera fuera de calma. La regla vive en `lib/calm.ts` (`railNextShows`) y el raíl le pregunta.
+«Ahora» no cambia, y con calma apagada el raíl es el de siempre. Sigue sin filtrar por ámbito.

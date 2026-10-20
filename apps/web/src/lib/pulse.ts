@@ -61,6 +61,8 @@ import {
 } from './month-events';
 import type { PersonAttribution, PersonAttributionScope } from './people';
 import { dayKeyInTz } from './planner';
+import { performanceStatusFamily, type StatusFamily } from './performance';
+import { dateStatusFamily } from './date';
 
 /** A moment's name, as vocabulary — the caller owns the words. */
 export type PulseWord =
@@ -91,6 +93,8 @@ export interface PulseRef {
   attribution: PersonAttribution;
   /** Not settled (proposed, tentative, any rank of hold). */
   tentative: boolean;
+  /** The certainty family the Planner draws the row by: what calm asks. */
+  family: StatusFamily;
 }
 
 export interface PulseNow {
@@ -132,6 +136,9 @@ export interface PulseInput {
   /** The person axis, already resolved. Inactive (nobody pinned, or a login
       with no person) means the pulse speaks for the whole company. */
   axis?: PersonAttributionScope | null;
+  /** Which rows NEXT may name. Absent: every row. Calm passes its rule
+      (`railNextShows`, enmienda a ADR-096 § 5); NOW never asks it. */
+  nextKeeps?: (ref: PulseRef) => boolean;
 }
 
 /** A stretch of the day one row occupies. `hard` = the end is a real
@@ -216,6 +223,7 @@ function performanceEntry(
     tz: p.venue?.timezone ?? null,
     attribution,
     tentative: isTentative(p.status),
+    family: performanceStatusFamily(p.status),
   };
 
   // THE SEAM. Five columns today, rows tomorrow; this module never learns
@@ -260,6 +268,7 @@ function dateEntry(d: DateEvent, viewerTz: string, attribution: PersonAttributio
     tz: d.venue?.timezone ?? null,
     attribution,
     tentative: isTentative(d.status),
+    family: dateStatusFamily(d.status),
   };
   const word: PulseWord = { of: 'kind', key: d.kind, label: d.label ?? null };
 
@@ -375,6 +384,7 @@ export function computePulse(input: PulseInput, now: Date): Pulse {
   let next: Entry | null = null;
   let nextKey = Number.POSITIVE_INFINITY;
   for (const entry of entries) {
+    if (input.nextKeeps && !input.nextKeeps(entry.ref)) continue;
     let key: number;
     if (entry.at) {
       key = Date.parse(entry.at);

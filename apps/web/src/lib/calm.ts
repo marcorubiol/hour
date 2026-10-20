@@ -9,6 +9,8 @@
  * it, and the unit test pins it. The normal mode is every block: unchanged.
  */
 
+import type { StatusFamily } from './performance';
+
 export type CalmLens = 'desk' | 'planner' | 'conversations' | 'books';
 
 /** Every block a lens draws in its normal mode, and whether calm keeps it. */
@@ -98,4 +100,17 @@ export function plannerCalmFacts(
 ): PlannerCalmFacts {
   if (view === 'overview' || view === 'month') return { confirmed: stats.confirmed, options: stats.holds };
   return { confirmed: null, options: null };
+}
+
+/**
+ * THE RAIL IN CALM (enmienda a ADR-096 § 5, Marco 2026-10-20). The rail is
+ * not a lens, so it is not in the table: it has one block that calm thins.
+ * «Siguiente» names only what is confirmed; a hold, a proposal or a
+ * tentative date waits outside calm, as it does off the Planner's paper. The
+ * family is the one the Planner already draws by (`performanceStatusFamily`,
+ * `dateStatusFamily`), so the two cannot disagree about what «confirmed» is.
+ * «Ahora» is a fact about the present and calm does not touch it.
+ */
+export function railNextShows(family: StatusFamily, calm: boolean): boolean {
+  return !calm || family === 'confirmed';
 }

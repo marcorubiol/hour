@@ -2136,7 +2136,7 @@
   "calm.see_all": "veure-ho tot",
   "calm.announce_on": "Calma activada: cada lent mostra només el d’avui i el que et toca",
   "calm.announce_off": "Calma desactivada: tot a la vista",
-  "help.concept.calm_body": "Una altra manera de mirar, no un filtre gris. A Avui, una columna amb el d’avui; el que ha vençut, en una línia que l’obre. Al Planificador, només el que està confirmat, amb les opcions comptades. A Converses, només el que et toca; a Comptes, el que entra i el que demana atenció. No esborra res: el que amaga ho diu en una línia, i un xoc es continua veient.",
+  "help.concept.calm_body": "Una altra manera de mirar, no un filtre gris. A Avui, una columna amb el d’avui; el que ha vençut, en una línia que l’obre. Al Planificador, només el que està confirmat, amb les opcions comptades. A la barra lateral, «Següent» només diu el que està confirmat. A Converses, només el que et toca; a Comptes, el que entra i el que demana atenció. No esborra res: el que amaga ho diu en una línia, i un xoc es continua veient.",
   "help.concept.guess": "Ho dedueix Hour",
   "help.concept.guess_body": "Un interrogant o «deduïda» vol dir que ningú no ho ha escrit: Hour ho suposa per les ciutats o pel repartiment. Confirma-ho o corregeix-ho i deixa de ser una suposició.",
   "help.concept.guess_body@music": "Un interrogant o «deduïda» vol dir que ningú no ho ha escrit: Hour ho suposa per les ciutats o per la formació. Confirma-ho o corregeix-ho i deixa de ser una suposició.",
