@@ -20,9 +20,20 @@
     /** Shared with the shell's scope model — the working combo registers in
         Recent before the session dies (see the /h layout). */
     rememberWorkingScope: () => void;
+    /** Where the menu opens from its monogram: down from the phone's top
+        bar, up from the foot of the rail (ADR-140, enmienda del 20-10). */
+    direction?: 'up' | 'down';
+    align?: 'start' | 'end';
   }
 
-  let { workspaceSlug, menuWorkspaceSlug, inSettings, rememberWorkingScope }: Props = $props();
+  let {
+    workspaceSlug,
+    menuWorkspaceSlug,
+    inSettings,
+    rememberWorkingScope,
+    direction = 'down',
+    align = 'end',
+  }: Props = $props();
 
   const theme = useTheme();
   const locale = appLocale();
@@ -69,8 +80,8 @@
 </script>
 
 <Menu
-  direction="down"
-  align="end"
+  {direction}
+  {align}
   label={t('shell.account_menu', locale)}
   triggerClass="kebab"
   onclose={() => (themeStyleExpanded = false)}

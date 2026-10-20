@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick } from 'svelte';
+  import { tick, type Snippet } from 'svelte';
   import { detectLocale, LOCALE_TAG, t } from '$lib/i18n';
   import { useCalm } from '$lib/stores/calm.svelte';
   import { usePins } from '$lib/stores/pins.svelte';
@@ -27,6 +27,11 @@
     /** In Settings the pulse (Ahora / Siguiente) says nothing about what is
         on screen: you came to change one thing, not to plan. */
     inSettings?: boolean;
+    /** You, at the foot of the rail (ADR-140, enmienda del 20-10): the
+        account menu and the presence, as Linear, Slack or Notion put them.
+        The layout owns both, so it hands them in. A phone does not draw it
+        here: there the rail is a drawer, and you stay in the top bar. */
+    me?: Snippet;
   }
 
   let {
@@ -37,6 +42,7 @@
     clockNow,
     clockTime,
     inSettings = false,
+    me,
   }: Props = $props();
 
   const pins = usePins();
@@ -178,6 +184,9 @@
       ⌘K · {t('shell.browse', locale)}
     </button>
   </div>
+  {#if me}
+    <div class="side-me">{@render me()}</div>
+  {/if}
 </aside>
 
 <style>
@@ -401,5 +410,27 @@
   .side-browse:hover {
     color: var(--text-color);
     border-color: var(--text-muted);
+  }
+  /* You, at the very foot. Sticky to the bottom of the screen, so a rail
+     longer than the screen never pushes the account out of reach; it wears
+     the rail's ground to pass over the rows under it. The monogram lands on
+     the same inset as the clock and the rows' own text. */
+  .side-me {
+    display: none;
+  }
+  @media (min-width: 48rem) {
+    .side-me {
+      position: sticky;
+      inset-block-end: 0;
+      display: flex;
+      align-items: center;
+      gap: var(--space-s);
+      padding-block: var(--space-s) var(--space-l);
+      padding-inline: var(--space-2xs);
+      background: var(--bg-light);
+    }
+    .shell__side {
+      padding-block-end: 0;
+    }
   }
 </style>

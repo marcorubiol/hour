@@ -11,15 +11,20 @@
    * When count is null (presence not yet wired — initial render before
    * onMount fires), nothing renders. Once connected, the badge animates
    * in via opacity transition.
+   *
+   * `dots` (the foot of the rail, beside the monogram; ADR-140, enmienda del
+   * 20-10): no words on screen, one dot per person here (three at most). The
+   * number stays for a screen reader and in the tooltip.
    */
 
   import { appLocale, t } from '$lib/i18n';
 
   interface Props {
     count: number | null;
+    variant?: 'label' | 'dots';
   }
 
-  let { count = null }: Props = $props();
+  let { count = null, variant = 'label' }: Props = $props();
 
   const locale = appLocale();
 
@@ -29,11 +34,12 @@
     }),
   );
   let isAlone = $derived(count !== null && count <= 1);
+  let dots = $derived(variant === 'dots' ? Math.min(Math.max(count ?? 0, 1), 3) : 1);
 </script>
 
 {#if count !== null}
   <span
-    class={['presence-badge', isAlone && 'presence-badge--alone']
+    class={['presence-badge', isAlone && 'presence-badge--alone', variant === 'dots' && 'presence-badge--dots']
       .filter(Boolean)
       .join(' ')}
     aria-live="polite"
@@ -41,8 +47,10 @@
       ? t('perf.presence_others', locale, { n: count })
       : t('perf.presence_alone', locale)}
   >
-    <span class="presence-badge__dot" aria-hidden="true"></span>
-    <span class="presence-badge__label">{label}</span>
+    {#each { length: dots } as _, i (i)}
+      <span class="presence-badge__dot" aria-hidden="true"></span>
+    {/each}
+    <span class={variant === 'dots' ? 'visually-hidden' : 'presence-badge__label'}>{label}</span>
   </span>
 {/if}
 
@@ -75,5 +83,13 @@
 
   .presence-badge--alone {
     color: var(--text-dark-muted);
+  }
+
+  /* Beside the monogram: the dots alone, close together, without the ring. */
+  .presence-badge--dots {
+    gap: var(--space-2xs);
+  }
+  .presence-badge--dots .presence-badge__dot {
+    box-shadow: none;
   }
 </style>

@@ -114,6 +114,10 @@
     /* What the frame takes from the foot of the screen (the phone's bar of
        sections, ADR-140): a focused field stops above it, not under it. */
     scroll-padding-block-end: var(--shell-foot);
+    /* The sections sit against the right edge of the bar (ADR-140, enmienda
+       del 20-10): a scrollbar that came and went with the page's length
+       would move them. Where scrollbars take room, the room is always kept. */
+    scrollbar-gutter: stable;
   }
   html:focus-within {
     scroll-behavior: auto;
