@@ -33,8 +33,8 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
 ## Producción (verificado 2026-10-20)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`4ffc6b6e`**, `dirty:false`, builtAt
-  2026-10-20T06:03Z (ADR-139, limpieza con guard de tokens, decisiones del 20-10; E2E 132/135, 3 saltados). `main` == prod salvo documentos y tests.
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`72408355`**, `dirty:false`, builtAt
+  2026-10-20T07:00Z (arreglo de la pantalla en blanco con ámbito guardado; antes ADR-139, limpieza con guard de tokens, decisiones del 20-10; E2E 132/135, 3 saltados). `main` == prod salvo documentos y tests.
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free, con keepalive diario
   (`.github/workflows/keepalive.yml`) contra la pausa por inactividad. Pasar a Pro antes de la beta, aún no
