@@ -14,7 +14,7 @@ import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { importMailKey, pkcePair, randomToken } from '$lib/server/mail/crypto';
 import { mailConfigured } from '$lib/server/mail/db';
 import { googleAuthUrl } from '$lib/server/mail/gmail';
-import { jwtSubject, UUID_RE } from '$lib/server/mail/http';
+import { jwtSubject, UUID_RE } from '$lib/server/http';
 import { FLOW_TTL_MS, safeReturnPath, withQuery, writeFlow } from '$lib/server/mail/oauth';
 
 export const GET: RequestHandler = async ({ request, url, cookies, platform }) => {

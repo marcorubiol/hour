@@ -206,10 +206,10 @@
     }
     /* Who will read it — the one thing to know before writing. */
     .df__aud {
-      margin: 2px 0 0;
+      margin: var(--space-2xs) 0 0;
       font-family: var(--font-mono);
-      font-size: 8.5px;
-      letter-spacing: 0.12em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-xl);
       text-transform: uppercase;
       color: var(--text-faint);
     }
@@ -218,11 +218,11 @@
       padding-block: var(--space-xs);
     }
     .df__note + .df__note {
-      border-block-start: 1px dotted var(--border-color-light);
+      border-block-start: var(--line-hairline) dotted var(--border-color-light);
     }
     .df__note-body {
       margin: 0;
-      padding-inline-end: 16px;
+      padding-inline-end: var(--space-m);
       font-size: var(--text-s);
       line-height: 1.45;
       color: var(--text-color);
@@ -236,12 +236,12 @@
       padding: 0;
       border: 0;
       background: none;
-      font-size: 11px;
+      font-size: var(--text-xs);
       line-height: 1;
       color: var(--text-faint);
       cursor: pointer;
       opacity: 0;
-      transition: opacity 0.1s;
+      transition: opacity var(--duration-fast);
     }
     .df__note:hover .df__note-x,
     .df__note-x:focus-visible {
@@ -263,15 +263,15 @@
       min-inline-size: 0;
     }
     .df__nx + .df__nx {
-      border-block-start: 1px dotted var(--border-color-light);
+      border-block-start: var(--line-hairline) dotted var(--border-color-light);
     }
     .df__nx-meta {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: var(--space-xs);
       font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.1em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-l);
       text-transform: uppercase;
       color: var(--text-faint);
     }
@@ -280,7 +280,7 @@
     }
     .df__nx-n {
       display: block;
-      margin-block-start: 1px;
+      margin-block-start: var(--line-hairline);
       font-family: var(--font-display);
       font-size: var(--text-m);
       color: var(--text-color);
@@ -292,7 +292,7 @@
     }
     a.df__nx:hover .df__nx-n {
       text-decoration: underline;
-      text-decoration-thickness: 1px;
+      text-decoration-thickness: var(--line-hairline);
       text-underline-offset: 3px;
     }
     .df__nx-c {
@@ -302,10 +302,10 @@
     }
     .df__nx-c em {
       font-style: normal;
-      letter-spacing: 0.08em;
-      margin-inline-start: 4px;
+      letter-spacing: var(--tracking-l);
+      margin-inline-start: var(--space-xs);
     }
-    @media (max-width: 640px) {
+    @media (max-width: 40rem) {
       .df {
         grid-template-columns: 1fr;
       }

@@ -97,7 +97,7 @@
       position: absolute;
       inset-block-start: calc(100% + var(--space-2xs));
       inset-inline-start: 0;
-      z-index: 50;
+      z-index: var(--z-dropdown);
     }
   }
 </style>

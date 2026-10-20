@@ -248,14 +248,12 @@
 
   /* Code */
   :where(code, kbd, samp) {
-    font-family:
-      ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-family: var(--font-mono);
     font-size: 0.95em;
   }
 
   :where(pre) {
-    font-family:
-      ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-family: var(--font-mono);
     font-size: var(--text-s);
     background: var(--bg-ultra-light);
     padding: var(--space-m);
@@ -285,7 +283,7 @@
     padding-inline: var(--space-m);
     background: var(--field-bg);
     color: var(--text-color);
-    border: 1px solid var(--border-color-dark);
+    border: var(--line-hairline) solid var(--border-color-dark);
     border-radius: var(--field-radius);
     font-size: var(--text-s);
     line-height: var(--text-line-height);
@@ -352,10 +350,10 @@
 
   /* Input size modifiers — opt-in widths that override the default 100%. */
   .input--short {
-    max-inline-size: 160px;
+    max-inline-size: 10rem;
   }
   .input--tight {
-    inline-size: 80px;
+    inline-size: 5rem;
   }
 
   /* Form layout — :where(form) is too aggressive; use .form when it applies */
@@ -382,7 +380,7 @@
     font-size: var(--text-xs);
     font-weight: 500;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: var(--tracking-m);
     color: var(--text-dark-muted);
   }
 }
@@ -463,8 +461,8 @@
   /* Primary = ink fill (v0.5 editorial). The slate --primary stays
      reserved for focus rings, links, selection — not button fills. */
   .btn--primary {
-    --btn-background: var(--text-color);
-    --btn-background-hover: var(--neutral-semi-dark);
+    --btn-background: var(--fill-ink);
+    --btn-background-hover: var(--fill-ink-hover);
     --btn-text-color: var(--bg);
     --btn-text-color-hover: var(--bg);
     --btn-border-color: var(--btn-background);
@@ -477,7 +475,7 @@
     --btn-text-color: var(--text-dark-muted);
     --btn-text-color-hover: var(--heading-color);
     --btn-border-color: var(--border-color-dark);
-    --btn-border-color-hover: var(--neutral-semi-light);
+    --btn-border-color-hover: var(--border-color-hover);
   }
 
   /* Quiet = the action as a word («Cancelar», «Borrar», «marcar
@@ -523,10 +521,10 @@
     content: "";
     inline-size: 1em;
     block-size: 1em;
-    border: 2px solid currentColor;
+    border: var(--line) solid currentColor;
     border-top-color: transparent;
     border-radius: 50%;
-    animation: btn-spin 0.6s linear infinite;
+    animation: btn-spin var(--duration-spin) linear infinite;
   }
 
   @keyframes btn-spin {
@@ -691,10 +689,10 @@
   .field__spinner {
     inline-size: 1em;
     block-size: 1em;
-    border: 2px solid currentColor;
+    border: var(--line) solid currentColor;
     border-top-color: transparent;
     border-radius: 50%;
-    animation: btn-spin 0.6s linear infinite;
+    animation: btn-spin var(--duration-spin) linear infinite;
   }
 
   .field__msg {
@@ -767,7 +765,7 @@
   }
   @media (hover: hover) and (pointer: fine) {
     .field--toolbar .field__control:hover {
-      border-color: var(--neutral-semi-light);
+      border-color: var(--border-color-hover);
     }
   }
   .field--toolbar .field__control:focus-within {
@@ -816,10 +814,10 @@
   .visually-hidden,
   .check__input {
     position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
+    inline-size: var(--line-hairline);
+    block-size: var(--line-hairline);
     padding: 0;
-    margin: -1px;
+    margin: calc(-1 * var(--line-hairline));
     overflow: hidden;
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
@@ -844,7 +842,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .check__row:hover .check__box {
-      border-color: var(--neutral-semi-light);
+      border-color: var(--border-color-hover);
     }
   }
 
@@ -864,8 +862,8 @@
     content: "";
     inline-size: 0.55em;
     block-size: 0.3em;
-    border-inline-start: 2px solid var(--check-mark);
-    border-block-end: 2px solid var(--check-mark);
+    border-inline-start: var(--line) solid var(--check-mark);
+    border-block-end: var(--line) solid var(--check-mark);
     transform: rotate(-45deg) translate(1px, -1px);
   }
 
@@ -873,7 +871,7 @@
   .check__input[type="checkbox"]:indeterminate + .check__box::after {
     content: "";
     inline-size: 0.6em;
-    block-size: 2px;
+    block-size: var(--line);
     background: var(--check-mark);
   }
 
@@ -1003,34 +1001,34 @@
     border-radius: var(--chip-radius);
     background: var(--chip-background);
     color: var(--chip-color);
-    border: 2px solid var(--chip-border-color);
+    border: var(--line) solid var(--chip-border-color);
     transition: background var(--transition), border-color var(--transition);
   }
 
   /* Tones */
   .chip--neutral {
-    --chip-background: var(--neutral-ultra-light);
-    --chip-color: var(--neutral-ultra-dark);
+    --chip-background: var(--tone-neutral-bg);
+    --chip-color: var(--tone-neutral-fg);
   }
   .chip--primary {
-    --chip-background: var(--primary-ultra-light);
-    --chip-color: var(--primary-ultra-dark);
+    --chip-background: var(--tone-primary-bg);
+    --chip-color: var(--tone-primary-fg);
   }
   .chip--info {
-    --chip-background: var(--info-ultra-light);
-    --chip-color: var(--info-ultra-dark);
+    --chip-background: var(--tone-info-bg);
+    --chip-color: var(--tone-info-fg);
   }
   .chip--success {
-    --chip-background: var(--success-ultra-light);
-    --chip-color: var(--success-ultra-dark);
+    --chip-background: var(--tone-success-bg);
+    --chip-color: var(--tone-success-fg);
   }
   .chip--warning {
-    --chip-background: var(--warning-ultra-light);
-    --chip-color: var(--warning-ultra-dark);
+    --chip-background: var(--tone-warning-bg);
+    --chip-color: var(--tone-warning-fg);
   }
   .chip--danger {
-    --chip-background: var(--danger-ultra-light);
-    --chip-color: var(--danger-ultra-dark);
+    --chip-background: var(--tone-danger-bg);
+    --chip-color: var(--tone-danger-fg);
   }
 
   /* Sizes — only xs and m redeclare; s is default. */
@@ -1144,62 +1142,50 @@
     border-radius: var(--badge-radius);
     background: var(--badge-background);
     color: var(--badge-color);
-    border: 1px solid var(--badge-border-color);
+    border: var(--line-hairline) solid var(--badge-border-color);
     opacity: var(--badge-opacity, 1);
   }
 
   /* Tones — background + text color + accent (saturated, for dots/icons that
      should pop against the muted text). Border is auto-derived. */
   .badge--neutral {
-    --badge-background: var(--neutral-ultra-light);
-    --badge-color: var(--neutral-ultra-dark);
-    --badge-accent: var(--neutral-dark);
+    --badge-background: var(--tone-neutral-bg);
+    --badge-color: var(--tone-neutral-fg);
+    --badge-accent: var(--tone-neutral-accent);
   }
   .badge--primary {
-    --badge-background: var(--primary-ultra-light);
-    --badge-color: var(--primary-ultra-dark);
-    --badge-accent: var(--primary);
+    --badge-background: var(--tone-primary-bg);
+    --badge-color: var(--tone-primary-fg);
+    --badge-accent: var(--tone-primary-accent);
   }
   .badge--info {
-    --badge-background: var(--info-ultra-light);
-    --badge-color: var(--info-ultra-dark);
-    --badge-accent: var(--info);
+    --badge-background: var(--tone-info-bg);
+    --badge-color: var(--tone-info-fg);
+    --badge-accent: var(--tone-info-accent);
   }
   .badge--success {
-    --badge-background: var(--success-ultra-light);
-    --badge-color: var(--success-ultra-dark);
-    --badge-accent: var(--success);
+    --badge-background: var(--tone-success-bg);
+    --badge-color: var(--tone-success-fg);
+    --badge-accent: var(--tone-success-accent);
   }
   .badge--warning {
-    --badge-background: var(--warning-ultra-light);
-    --badge-color: var(--warning-ultra-dark);
-    --badge-accent: var(--warning);
+    --badge-background: var(--tone-warning-bg);
+    --badge-color: var(--tone-warning-fg);
+    --badge-accent: var(--tone-warning-accent);
   }
   .badge--danger {
-    --badge-background: var(--danger-ultra-light);
-    --badge-color: var(--danger-ultra-dark);
-    --badge-accent: var(--danger);
+    --badge-background: var(--tone-danger-bg);
+    --badge-color: var(--tone-danger-fg);
+    --badge-accent: var(--tone-danger-accent);
   }
 
   /* Faint — what is over (paid, done, asleep): the neutral, faded. */
   .badge--faint {
-    --badge-background: var(--neutral-ultra-light);
-    --badge-color: var(--neutral-semi-dark);
-    --badge-accent: var(--neutral);
+    --badge-background: var(--tone-faint-bg);
+    --badge-color: var(--tone-faint-fg);
+    --badge-accent: var(--tone-faint-accent);
     --badge-opacity: 0.75;
   }
-
-  /* The tone of each relation (ADR-138) for what draws one without being a
-     pill (the season bar of Conversations): `--status` is the family, mixed
-     once with one recipe (diseño B6). The pill itself is the one status
-     badge, `StateBadge`, with the tone `relationTone()` gives. */
-  [data-relation='never'] { --status: var(--neutral); }
-  [data-relation='contacted'] { --status: var(--info); }
-  [data-relation='talking'] { --status: var(--warning); }
-  [data-relation='regular'] { --status: var(--primary); }
-  /* Asleep: the neutral, faded, as the faint pill fades it. */
-  [data-relation='dormant'] { --status: color-mix(in oklab, var(--neutral) 45%, transparent); }
-  [data-relation='not_now'] { --status: var(--danger); }
 
   /* Sizes — only xs and m redeclare; s is default. */
   .badge--xs {
@@ -1250,28 +1236,28 @@
   }
 
   .avatar--neutral {
-    --avatar-bg: var(--neutral-ultra-light);
-    --avatar-color: var(--neutral-ultra-dark);
+    --avatar-bg: var(--tone-neutral-bg);
+    --avatar-color: var(--tone-neutral-fg);
   }
   .avatar--primary {
-    --avatar-bg: var(--primary-ultra-light);
-    --avatar-color: var(--primary-ultra-dark);
+    --avatar-bg: var(--tone-primary-bg);
+    --avatar-color: var(--tone-primary-fg);
   }
   .avatar--info {
-    --avatar-bg: var(--info-ultra-light);
-    --avatar-color: var(--info-ultra-dark);
+    --avatar-bg: var(--tone-info-bg);
+    --avatar-color: var(--tone-info-fg);
   }
   .avatar--success {
-    --avatar-bg: var(--success-ultra-light);
-    --avatar-color: var(--success-ultra-dark);
+    --avatar-bg: var(--tone-success-bg);
+    --avatar-color: var(--tone-success-fg);
   }
   .avatar--warning {
-    --avatar-bg: var(--warning-ultra-light);
-    --avatar-color: var(--warning-ultra-dark);
+    --avatar-bg: var(--tone-warning-bg);
+    --avatar-color: var(--tone-warning-fg);
   }
   .avatar--danger {
-    --avatar-bg: var(--danger-ultra-light);
-    --avatar-color: var(--danger-ultra-dark);
+    --avatar-bg: var(--tone-danger-bg);
+    --avatar-color: var(--tone-danger-fg);
   }
 
   /* Dialog skeleton — native <dialog>. The element itself stays transparent
@@ -1425,32 +1411,32 @@
     padding-inline: var(--toast-padding-inline);
     background: var(--toast-bg);
     color: var(--toast-color);
-    border: 1px solid var(--toast-border-color);
-    border-inline-start: 4px solid var(--toast-accent);
+    border: var(--line-hairline) solid var(--toast-border-color);
+    border-inline-start: var(--line-bar) solid var(--toast-accent);
     border-radius: var(--toast-radius);
     box-shadow: var(--box-shadow-2);
     font-size: var(--text-s);
   }
 
   .toast--info {
-    --toast-bg: var(--info-ultra-light);
-    --toast-color: var(--info-ultra-dark);
-    --toast-accent: var(--info);
+    --toast-bg: var(--tone-info-bg);
+    --toast-color: var(--tone-info-fg);
+    --toast-accent: var(--tone-info-accent);
   }
   .toast--success {
-    --toast-bg: var(--success-ultra-light);
-    --toast-color: var(--success-ultra-dark);
-    --toast-accent: var(--success);
+    --toast-bg: var(--tone-success-bg);
+    --toast-color: var(--tone-success-fg);
+    --toast-accent: var(--tone-success-accent);
   }
   .toast--warning {
-    --toast-bg: var(--warning-ultra-light);
-    --toast-color: var(--warning-ultra-dark);
-    --toast-accent: var(--warning);
+    --toast-bg: var(--tone-warning-bg);
+    --toast-color: var(--tone-warning-fg);
+    --toast-accent: var(--tone-warning-accent);
   }
   .toast--danger {
-    --toast-bg: var(--danger-ultra-light);
-    --toast-color: var(--danger-ultra-dark);
-    --toast-accent: var(--danger);
+    --toast-bg: var(--tone-danger-bg);
+    --toast-color: var(--tone-danger-fg);
+    --toast-accent: var(--tone-danger-accent);
   }
 
   .toast__body {
@@ -1535,7 +1521,7 @@
     z-index: var(--z-dropdown);
     padding-block: var(--space-xs);
     padding-inline: var(--space-s);
-    background: var(--neutral-ultra-dark);
+    background: var(--bg-ultra-dark);
     color: var(--text-light);
     font-size: var(--text-xs);
     line-height: 1.3;
@@ -1593,13 +1579,13 @@
     margin: 0;
     padding: var(--space-xs);
     list-style: none;
-    background: var(--base);
+    background: var(--bg);
     border: var(--border);
     border-radius: var(--radius-m);
     box-shadow: var(--box-shadow-2);
     display: flex;
     flex-direction: column;
-    gap: 1px;
+    gap: var(--line-hairline);
   }
 
   .menu--start {
@@ -1666,13 +1652,13 @@
 
   .menu__item--danger:hover,
   .menu__item--danger:focus-visible {
-    background: var(--danger-ultra-light);
-    color: var(--danger-ultra-dark);
+    background: var(--tone-danger-bg);
+    color: var(--tone-danger-fg);
   }
 
   .menu__item--active {
-    background: var(--primary-ultra-light);
-    color: var(--primary-ultra-dark);
+    background: var(--tone-primary-bg);
+    color: var(--tone-primary-fg);
     font-weight: 500;
   }
 
@@ -1702,7 +1688,7 @@
     padding-inline: var(--pill-padding-inline);
     background: var(--pill-background);
     color: var(--pill-color);
-    border: 1px var(--pill-border-style) var(--pill-border-color);
+    border: var(--line-hairline) var(--pill-border-style) var(--pill-border-color);
     border-radius: var(--pill-radius);
     font-family: var(--pill-font-family);
     font-size: var(--pill-font-size);
@@ -1734,9 +1720,9 @@
   }
 
   .pill--on {
-    --pill-background: var(--text-color);
+    --pill-background: var(--fill-ink);
     --pill-color: var(--bg);
-    --pill-border-color: var(--text-color);
+    --pill-border-color: var(--fill-ink);
   }
 
   .pill--sm {
@@ -1763,10 +1749,10 @@
 
   .pill--all::before {
     content: "";
-    inline-size: 7px;
-    block-size: 7px;
+    inline-size: var(--dot-l);
+    block-size: var(--dot-l);
     background: currentColor;
-    border-radius: 2px;
+    border-radius: var(--radius-xs);
     display: inline-block;
   }
 
@@ -1778,7 +1764,7 @@
     --tag-fg: var(--tag-neutral-fg);
 
     display: inline-block;
-    padding-block: 2px;
+    padding-block: var(--space-2xs);
     padding-inline: var(--space-xs);
     background: var(--tag-bg);
     color: var(--tag-fg);
@@ -1821,7 +1807,7 @@
      ownership. Used inside week items + project rows. */
   .role-chip {
     display: inline-block;
-    padding-block: 2px;
+    padding-block: var(--space-2xs);
     padding-inline: var(--space-xs);
     background: var(--bg-hover);
     color: var(--text-muted);
@@ -1829,19 +1815,19 @@
     font-size: var(--text-xs);
     line-height: 1.4;
     border-radius: var(--radius-s);
-    letter-spacing: 0.02em;
+    letter-spacing: var(--tracking-xs);
   }
 
   .role-badge {
     display: inline-block;
-    padding-block: 2px;
+    padding-block: var(--space-2xs);
     padding-inline: var(--space-s);
     background: transparent;
     color: var(--text-muted);
     font-family: var(--font-mono);
     font-size: var(--text-xs);
     line-height: 1.4;
-    border: 1px dashed var(--border-color-dark);
+    border: var(--line-hairline) dashed var(--border-color-dark);
     border-radius: var(--radius-s);
     letter-spacing: var(--mono-letter-spacing);
   }
@@ -1859,34 +1845,6 @@
     margin-inline-start: 0.35em;
     font-size: 0.8em;
     opacity: 0.6;
-  }
-
-  /* Tone contract — component-agnostic. Anything carrying data-tone gets
-     --state-color / --state-border to consume (calendar dots, week items). :where() keeps specificity at
-     zero so components can still override locally. */
-  :where([data-tone="neutral"]) {
-    --state-color: var(--text-muted);
-    --state-border: var(--border-color-dark);
-  }
-  :where([data-tone="info"]) {
-    --state-color: var(--info);
-    --state-border: var(--info);
-  }
-  :where([data-tone="success"]) {
-    --state-color: var(--success);
-    --state-border: var(--success);
-  }
-  :where([data-tone="warning"]) {
-    --state-color: var(--warning);
-    --state-border: var(--warning);
-  }
-  :where([data-tone="danger"]) {
-    --state-color: var(--danger);
-    --state-border: var(--danger);
-  }
-  :where([data-tone="faint"]) {
-    --state-color: var(--text-faint);
-    --state-border: var(--border-color-light);
   }
 
   /* Kebab: the quiet round trigger of a row's own menu (the account row,
@@ -1922,12 +1880,12 @@
      bottom-bevel border so it reads as a key cap. */
   .kbd {
     display: inline-block;
-    padding-block: 1px;
+    padding-block: var(--line-hairline);
     padding-inline: var(--space-xs);
     color: var(--text-muted);
     background: var(--bg-ultra-light);
-    border: 1px solid var(--border-color-dark);
-    border-block-end-width: 1.5px;
+    border: var(--line-hairline) solid var(--border-color-dark);
+    border-block-end-width: var(--line-thin);
     border-radius: var(--radius-s);
     font-family: var(--font-mono);
     font-size: var(--text-xs);
@@ -2016,7 +1974,7 @@
     gap: var(--space-s);
     min-block-size: var(--control-size-s);
     padding-block-end: var(--space-xs);
-    border-block-end: 1px solid var(--border-color-light);
+    border-block-end: var(--line-hairline) solid var(--border-color-light);
   }
   .block-head :is(h2, h3) {
     margin: 0;
@@ -2213,7 +2171,7 @@
     gap: var(--space-2xs);
     padding: var(--space-s) var(--space-m);
     background: var(--bg-ultra-light);
-    border: 1px solid var(--border-color-light);
+    border: var(--line-hairline) solid var(--border-color-light);
     border-radius: var(--radius);
   }
   .mail-card__meta {
@@ -2278,7 +2236,7 @@
     gap: var(--space-m);
     /* the separator lives BETWEEN the title row and the sub */
     padding-block-end: var(--space-s);
-    border-block-end: 1px solid var(--border-color-light);
+    border-block-end: var(--line-hairline) solid var(--border-color-light);
   }
   /* The title and what belongs to it (ADR-136: the Planner's ‹ › Now).
      Beside the title where the header is wide; in a narrow header (a phone)
@@ -2438,7 +2396,7 @@
     gap: var(--space-xs);
     padding-block: var(--space-xs);
     padding-inline: var(--space-s);
-    border: 1px dashed var(--border-color-dark);
+    border: var(--line-hairline) dashed var(--border-color-dark);
     border-radius: var(--radius-s);
     background: transparent;
     color: var(--text-faint);
@@ -2473,7 +2431,7 @@
     font-size: var(--text-l);
     font-weight: 400;
     line-height: 1;
-    letter-spacing: 0.02em;
+    letter-spacing: var(--tracking-xs);
     color: var(--heading-color);
   }
 
@@ -2516,7 +2474,7 @@
       z-index: calc(var(--z-modal) - 1);
       border: 0;
       padding: 0;
-      background: color-mix(in srgb, var(--black) 40%, transparent);
+      background: var(--backdrop);
       cursor: pointer;
     }
   }

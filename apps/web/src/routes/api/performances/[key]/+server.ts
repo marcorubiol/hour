@@ -29,18 +29,12 @@ import {
   withTimeslots,
   type ScheduleSlotRow,
 } from '$lib/schedule-slot';
+import { json } from '$lib/server/http';
 
 /** The two clocks a running order can be typed in: its venue's, else home. */
 const CLOCK_EMBED = 'venue_id,venue:venue_id(timezone)';
 const SCHEDULE_HINT =
   'The running order is written through its collab doc (/api/collab/performance/<id>), not this PATCH.';
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  });
-}
 
 export const GET: RequestHandler = async ({ request, params, url, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);

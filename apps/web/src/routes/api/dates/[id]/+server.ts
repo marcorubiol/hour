@@ -34,15 +34,10 @@ import { pgGet, pgPatch, pgPostRpc, PostgrestError, type SupabaseEnv } from '$li
 import { pgErrorResponse } from '$lib/server/errors';
 import { DATE_BASE_SELECT, DATE_EXTENDED_SELECT } from '$lib/server/date-select';
 import { scheduleOf, type ScheduleSlotRow } from '$lib/schedule-slot';
+import { json } from '$lib/server/http';
 
 const IdSchema = v.pipe(v.string(), v.uuid());
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  });
-}
 
 /**
  * GET /api/dates/:id — ONE date row, as the list reads it (the same select,

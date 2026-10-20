@@ -2,11 +2,11 @@
 
 import type { RequestHandler } from './$types';
 import { pgPostRpc } from '$lib/supabase';
-import { json } from '$lib/server/mail/http';
+import { jsonNoStore } from '$lib/server/http';
 import { mailoutRoute } from '$lib/server/mailout/route';
 
 export const POST: RequestHandler = (event) =>
   mailoutRoute(event, 'POST /api/mailout/[id]/cancel', async ({ env, jwt, id }) => {
     await pgPostRpc(env, 'cancel_mailout', jwt, { p_id: id });
-    return json({ ok: true });
+    return jsonNoStore({ ok: true });
   });

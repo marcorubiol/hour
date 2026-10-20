@@ -153,7 +153,7 @@
     padding-block: var(--space-s);
     padding-inline: var(--space-m);
     background: var(--bg-ultra-light);
-    border: 1px solid var(--border-color-dark);
+    border: var(--line-hairline) solid var(--border-color-dark);
     /* One step down from `--radius-l`. At 10px on a box this wide the corner
        reads as a card floating on the page; the scope bar is a RULE about what
        you are looking at, and it sits flush with the sheet below it. */
@@ -221,7 +221,7 @@
     }
   }
   .tok {
-    --glyph: 11px; /* compact glyph inside the scope-bar pills */
+    --glyph: 0.6875rem; /* compact glyph inside the scope-bar pills */
     display: inline-flex;
     align-items: center;
     gap: 0.15rem;
@@ -230,7 +230,7 @@
     padding-inline: var(--space-xs) var(--space-xs);
     font-size: var(--text-s);
     line-height: 1;
-    border: 1px solid var(--border-color-dark);
+    border: var(--line-hairline) solid var(--border-color-dark);
     background: var(--bg-light);
   }
   /* Kind label + name share a baseline INSIDE this group (so the mono
@@ -277,7 +277,7 @@
     font-family: var(--font-mono);
     font-size: var(--text-xs);
     color: var(--text-faint);
-    border: 1px dashed var(--border-color-dark);
+    border: var(--line-hairline) dashed var(--border-color-dark);
     border-radius: var(--radius-circle);
     padding-block: var(--space-2xs);
     padding-inline: var(--space-s);

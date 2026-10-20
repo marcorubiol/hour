@@ -186,7 +186,7 @@
 <style>
   @layer components {
     .agenda-wrap {
-      border-block-start: 1px solid var(--border-color-light);
+      border-block-start: var(--line-hairline) solid var(--border-color-light);
     }
     .week {
       display: grid;
@@ -195,7 +195,7 @@
     .week__day {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
-      letter-spacing: 0.1em;
+      letter-spacing: var(--tracking-l);
       text-transform: uppercase;
       color: var(--text-faint);
       padding-block: var(--space-s) var(--space-2xs);
@@ -209,7 +209,7 @@
       color: var(--danger);
     }
     .week__rows {
-      border-inline-start: 1px solid var(--border-color-light);
+      border-inline-start: var(--line-hairline) solid var(--border-color-light);
     }
     .week__item {
       position: relative;
@@ -219,7 +219,7 @@
       gap: var(--space-s);
       padding-block: var(--space-xs);
       padding-inline-start: var(--space-l);
-      border-block-end: 1px solid color-mix(in oklch, var(--border-color-light) 55%, transparent);
+      border-block-end: var(--line-hairline) solid color-mix(in oklch, var(--border-color-light) 55%, transparent);
     }
     .week__item::before {
       content: '';
@@ -230,7 +230,7 @@
       block-size: 0.44rem;
       border-radius: var(--radius-circle);
       background: var(--bg);
-      border: 1.5px solid var(--border-color-dark);
+      border: var(--line-thin) solid var(--border-color-dark);
     }
     .week__item--overdue::before {
       background: var(--danger);
@@ -285,7 +285,7 @@
       margin-block-start: var(--space-m);
       padding-block: var(--space-xs);
       padding-inline: var(--space-m);
-      border: 1px dashed var(--border-color-dark);
+      border: var(--line-hairline) dashed var(--border-color-dark);
       border-radius: var(--radius-circle);
       background: transparent;
       font-size: var(--text-xs);

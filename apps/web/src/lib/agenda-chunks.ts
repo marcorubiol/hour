@@ -98,7 +98,7 @@ export type AgendaChunk =
     }
   | { t: 'day'; key: string; day: string };
 
-export interface AgendaChunkInputs {
+interface AgendaChunkInputs {
   /** Ordered ISO days across the whole span. */
   days: string[];
   todayIso: string;

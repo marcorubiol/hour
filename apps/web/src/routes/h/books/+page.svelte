@@ -1447,15 +1447,11 @@
        they step down, because the mixes go toward --bg-light either way. */
     .mny {
       display: flex; flex-direction: column; gap: var(--space-l);
+      /* The three inks of the money bar, mixed with the ink shares the theme
+         sets (--money-invoiced-ink, --money-open-ink in tokens.css). */
       --money-collected: var(--success);
-      --money-invoiced: color-mix(in oklch, var(--success) 60%, var(--bg-light));
-      --money-open: color-mix(in oklch, var(--text-color) 16%, var(--bg-light));
-    }
-    /* Dark: the track sits at 25 % L, so the two lighter steps need more ink
-       to stay apart from it and from each other (68 · 55 · 42 · 25). */
-    :global(:root[data-mode='dark']) .mny {
-      --money-invoiced: color-mix(in oklch, var(--success) 72%, var(--bg-light));
-      --money-open: color-mix(in oklch, var(--text-color) 30%, var(--bg-light));
+      --money-invoiced: color-mix(in oklch, var(--success) var(--money-invoiced-ink), var(--bg-light));
+      --money-open: color-mix(in oklch, var(--text-color) var(--money-open-ink), var(--bg-light));
     }
     .mbar__seg, .mkey { display: block; background: var(--mbar-tone); }
     .mbar__seg { block-size: 100%; }
@@ -1464,7 +1460,7 @@
     [data-tone='open'] { --mbar-tone: var(--money-open); }
     .mkeys { display: flex; flex-wrap: wrap; gap: var(--space-2xs) var(--space-m); font-size: var(--text-xs); color: var(--text-muted); }
     .mkeys span { display: inline-flex; align-items: center; gap: var(--space-2xs); }
-    .mkey { inline-size: 0.75rem; block-size: 0.5rem; border-radius: 2px; }
+    .mkey { inline-size: 0.75rem; block-size: 0.5rem; border-radius: var(--radius-xs); }
     .mny__subrow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-m); inline-size: 100%; }
     .mny__subleft { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-xs) var(--space-s); }
     .mny__seasons { display: inline-flex; gap: var(--space-xs); align-items: baseline; }
@@ -1484,7 +1480,7 @@
     .fig {
       appearance: none; text-align: start; font: inherit; color: inherit;
       display: flex; flex-direction: column; gap: var(--space-2xs);
-      padding: var(--space-s) var(--space-m); border: 1px solid var(--border-color-light);
+      padding: var(--space-s) var(--space-m); border: var(--line-hairline) solid var(--border-color-light);
       border-radius: var(--radius-m); background: var(--bg-ultra-light); min-inline-size: 0;
     }
     /* A figure and its «i»: the «i» sits in the corner, beside the button, never in it. */
@@ -1493,10 +1489,10 @@
     button.fig { cursor: pointer; transition: border-color var(--transition); }
     button.fig:hover { border-color: var(--text-faint); }
     .fig__num { display: flex; align-items: baseline; gap: var(--space-2xs); flex-wrap: wrap; }
-    .fig__cur { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); letter-spacing: 0.04em; }
+    .fig__cur { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); letter-spacing: var(--tracking-s); }
     .fig__sub { font-size: var(--text-xs); color: var(--text-muted); }
     .fig__danger { color: var(--danger); }
-    .fig__bar { display: flex; gap: 2px; block-size: 6px; border-radius: var(--radius-circle); background: var(--bg-light); overflow: hidden; margin-block: var(--space-2xs); }
+    .fig__bar { display: flex; gap: var(--space-2xs); block-size: var(--dot-m); border-radius: var(--radius-circle); background: var(--bg-light); overflow: hidden; margin-block: var(--space-2xs); }
 
     /* ── 2 + 3 · the radar ── */
     /* While the feeds load the radar keeps roughly its height, so the ledger does not jump down. */
@@ -1509,7 +1505,7 @@
     /* One grid for the whole list (rows are subgrids): amounts and buttons
        fall in columns whatever each row's text measures. */
     .att__list { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; column-gap: var(--space-m); }
-    .att__row { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; padding-block: var(--space-xs); border-block-end: 1px solid var(--border-color-light); }
+    .att__row { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; padding-block: var(--space-xs); border-block-end: var(--line-hairline) solid var(--border-color-light); }
     .att__row :global(.btn) { justify-self: stretch; }
     .att__what { min-inline-size: 0; display: flex; flex-wrap: wrap; column-gap: var(--space-2xs); align-items: baseline; }
     .att__who { color: var(--text-color); font-weight: 500; text-decoration: none; }
@@ -1523,13 +1519,13 @@
     .att__amt { font-family: var(--font-mono); font-size: var(--text-s); font-variant-numeric: tabular-nums; color: var(--text-color); white-space: nowrap; text-align: end; }
     .inflow__overdue { color: var(--danger); }
     .inflow__cur { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); }
-    .inflow__list + .inflow__cur, .mny__note + .inflow__cur { margin-block-start: var(--space-s); padding-block-start: var(--space-xs); border-block-start: 1px solid var(--border-color-light); }
+    .inflow__list + .inflow__cur, .mny__note + .inflow__cur { margin-block-start: var(--space-s); padding-block-start: var(--space-xs); border-block-start: var(--line-hairline) solid var(--border-color-light); }
     /* One grid per currency, rows as subgrids: every bar has the same length,
        so the scale is the same in every month. */
     .inflow__list { display: grid; grid-template-columns: 3.5ch minmax(0, 1fr) auto; gap: var(--space-xs) var(--space-s); padding-block: var(--space-2xs); }
     .inflow__row { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; }
     .inflow__month { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); text-transform: lowercase; }
-    .inflow__bar { display: flex; gap: 2px; block-size: 10px; border-radius: var(--radius-s); background: var(--bg-light); overflow: hidden; }
+    .inflow__bar { display: flex; gap: var(--space-2xs); block-size: 0.625rem; border-radius: var(--radius-s); background: var(--bg-light); overflow: hidden; }
     .inflow__amt { font-family: var(--font-mono); font-size: var(--text-xs); font-variant-numeric: tabular-nums; color: var(--text-color); white-space: nowrap; text-align: end; }
     .inflow__con { color: var(--text-faint); }
 
@@ -1537,17 +1533,17 @@
     .ledger { display: flex; flex-direction: column; gap: var(--space-s); scroll-margin-block-start: var(--space-l); }
     .ledger__tabrow { display: flex; align-items: center; gap: var(--space-xs); border-block-end: var(--border-width) solid var(--border-color-light); }
     .ledger__tabs { display: flex; gap: var(--space-m); }
-    .ledger__tabs button { appearance: none; border: 0; background: none; font: inherit; font-size: var(--text-s); color: var(--text-muted); padding: var(--space-xs) 0; border-block-end: 2px solid transparent; margin-block-end: -1px; cursor: pointer; }
+    .ledger__tabs button { appearance: none; border: 0; background: none; font: inherit; font-size: var(--text-s); color: var(--text-muted); padding: var(--space-xs) 0; border-block-end: var(--line) solid transparent; margin-block-end: calc(-1 * var(--line-hairline)); cursor: pointer; }
     .ledger__tabs button[aria-selected='true'] { color: var(--text-color); border-block-end-color: var(--text-color); }
     .ledger__filters { display: flex; gap: var(--space-xs); flex-wrap: wrap; }
     .ledger__filters :global(button) { white-space: nowrap; flex-shrink: 0; }
     .ledger__scope { align-self: center; font-size: var(--text-xs); color: var(--text-muted); }
     .ledger__count { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-faint); margin-inline-start: var(--space-2xs); }
     .book { inline-size: 100%; border-collapse: collapse; font-size: var(--text-s); }
-    .book th { text-align: start; font-family: var(--font-mono); font-size: var(--text-xs); font-weight: 400; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); padding: var(--space-2xs) var(--space-xs); border-block-end: 1px solid var(--border-color-light); }
-    .book td { padding: var(--space-xs); border-block-end: 1px solid var(--border-color-light); vertical-align: baseline; }
+    .book th { text-align: start; font-family: var(--font-mono); font-size: var(--text-xs); font-weight: 400; letter-spacing: var(--tracking-m); text-transform: uppercase; color: var(--text-faint); padding: var(--space-2xs) var(--space-xs); border-block-end: var(--line-hairline) solid var(--border-color-light); }
+    .book td { padding: var(--space-xs); border-block-end: var(--line-hairline) solid var(--border-color-light); vertical-align: baseline; }
     .book .book__collect { padding-inline-start: var(--space-m); }
-    .book__num { text-align: end !important; font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .book .book__num { text-align: end; font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
     .book__row { scroll-margin-block: var(--space-xl); }
     .book__row:hover, .book__row.is-open { background: color-mix(in oklch, var(--bg-light) 55%, transparent); }
     .book__row[data-overdue] .book__date { color: var(--danger); }
@@ -1558,7 +1554,7 @@
     .book__city { font-weight: 400; }
     /* The document is named, not boxed: the row already has two badges' worth of chrome. */
     .book__chip { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); white-space: nowrap; }
-    .book__cur { margin-inline-start: 0.5ch; font-size: var(--text-xs); color: var(--text-muted); letter-spacing: 0.04em; }
+    .book__cur { margin-inline-start: 0.5ch; font-size: var(--text-xs); color: var(--text-muted); letter-spacing: var(--tracking-s); }
     .book__fee { appearance: none; border: 0; background: none; padding: 0; font: inherit; color: var(--text-color); cursor: pointer; }
     .book__fee:hover { text-decoration: underline; }
     .book__group th { padding-block-start: var(--space-m); text-transform: none; letter-spacing: 0; }
@@ -1570,7 +1566,7 @@
     .sheet p { margin: 0; }
     .sheet__num { font-family: var(--font-mono); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
     .sheet__col { display: flex; flex-direction: column; gap: var(--space-2xs); min-inline-size: 0; }
-    .sheet__h { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); }
+    .sheet__h { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: var(--tracking-m); text-transform: uppercase; color: var(--text-faint); }
     .sheet__faint { color: var(--text-muted); font-size: var(--text-xs); }
     .sheet__danger { color: var(--danger); }
     .sheet__a { color: var(--text-color); text-underline-offset: 0.2em; }
@@ -1579,7 +1575,7 @@
 
     .mny__expense-totals { display: flex; flex-wrap: wrap; gap: var(--space-m); font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); }
     .mny__expenses { display: flex; flex-direction: column; }
-    .mny__expenses li { display: grid; grid-template-columns: minmax(8rem, 0.8fr) minmax(12rem, 2fr) minmax(6rem, 0.7fr) auto; gap: var(--space-m); align-items: baseline; padding: var(--space-xs); border-block-end: 1px solid var(--border-color-light); font-size: var(--text-s); }
+    .mny__expenses li { display: grid; grid-template-columns: minmax(8rem, 0.8fr) minmax(12rem, 2fr) minmax(6rem, 0.7fr) auto; gap: var(--space-m); align-items: baseline; padding: var(--space-xs); border-block-end: var(--line-hairline) solid var(--border-color-light); font-size: var(--text-s); }
     .mny__expenses strong { font-family: var(--font-mono); font-size: var(--text-xs); font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--danger); }
     .mny__expense-category { color: var(--text-faint); font-family: var(--font-mono); font-size: var(--text-xs); text-transform: lowercase; }
     .mny__expense-description { color: var(--text-color); }
@@ -1593,7 +1589,7 @@
     .mny__row2 { display: contents; }
     .mny__inv-fee-line { font-size: var(--text-s); color: var(--text-muted); margin-block-start: var(--space-xs); }
     .mny__inv-total-preview { font-size: var(--text-s); margin-block-start: var(--space-s); }
-    @media (max-width: 760px) {
+    @media (max-width: 47.5rem) {
       .figs__row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .radar { grid-template-columns: 1fr; }
       .att__list { grid-template-columns: minmax(0, 1fr) auto; }
@@ -1602,8 +1598,8 @@
       .book thead { display: none; }
       .book, .book tbody { display: block; }
       .book__row {
-        display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px var(--space-s);
-        padding-block: var(--space-xs); border-block-end: 1px solid var(--border-color-light);
+        display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2xs) var(--space-s);
+        padding-block: var(--space-xs); border-block-end: var(--line-hairline) solid var(--border-color-light);
       }
       .book__row td { padding: 0; border: 0; }
       .book__venue { grid-column: 1; grid-row: 1; }

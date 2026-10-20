@@ -63,12 +63,12 @@
     block-size: 0.5rem;
     border-radius: 50%;
     background: var(--success);
-    box-shadow: 0 0 0 3px color-mix(in oklch, var(--success) 25%, transparent);
+    box-shadow: 0 0 0 var(--line-thick) color-mix(in oklch, var(--success) 25%, transparent);
     flex-shrink: 0;
   }
 
   .presence-badge--alone .presence-badge__dot {
-    background: var(--neutral);
+    background: var(--text-color);
     box-shadow: none;
     opacity: 0.55;
   }

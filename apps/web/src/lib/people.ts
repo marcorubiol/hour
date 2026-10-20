@@ -60,7 +60,7 @@ export interface TeamItem {
  */
 export type PersonLink = 'explicit' | 'inferred' | 'unknown';
 
-export interface PeopleOf {
+interface PeopleOf {
   /** Person ids, deduped, in the order the inputs offered them: the facts
       first (roster, then whoever said «voy»), then the inference. */
   personIds: string[];
@@ -156,7 +156,7 @@ export function linkOf(people: PeopleOf, personId: string): PersonLink {
 }
 
 /** The verdict of narrowing a row by a set of pinned people. */
-export type PersonMatch = 'explicit' | 'inferred' | 'no';
+type PersonMatch = 'explicit' | 'inferred' | 'no';
 
 /**
  * The same verdict with the third state kept: `unattributed` is a row that
@@ -300,7 +300,7 @@ export function castNames(personIds: readonly string[] | null | undefined, names
  * `active` is false when nobody is pinned; a caller should skip the whole
  * filter then rather than trust a pass-through.
  */
-export interface PersonScope {
+interface PersonScope {
   active: boolean;
   /**
    * Does this row involve the pinned people, and on what evidence? A

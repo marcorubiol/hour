@@ -19,7 +19,7 @@
 
 import { reinterpretSlots } from '$lib/schedule-slot';
 
-export type ScheduleTarget = 'performance' | 'date';
+type ScheduleTarget = 'performance' | 'date';
 
 interface DocSlot {
   id: string;
@@ -27,7 +27,7 @@ interface DocSlot {
   ends_at: string | null;
 }
 
-export interface HoursMoved {
+interface HoursMoved {
   applied: number;
   skipped: number;
   /** The rows already say it (false: the doc has it, the rows will follow). */

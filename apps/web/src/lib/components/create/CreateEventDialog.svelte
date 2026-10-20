@@ -39,7 +39,7 @@
   import { toastCreated } from '$lib/created';
   import { markFresh } from '$lib/fresh.svelte';
   import { dayKeyInTz } from '$lib/planner';
-  import { dayMonthYear } from '$lib/datetime';
+  import { dayMonthYear, viewerTimeZone } from '$lib/datetime';
   import { BLOCK_MAX_DAYS } from '$lib/block';
   import { appLocale, appLocaleTag, t } from '$lib/i18n';
   import {
@@ -120,7 +120,7 @@
 
   const locale = appLocale();
   const tag = appLocaleTag();
-  const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const viewerTz = viewerTimeZone();
   const queryClient = useQueryClient();
   const uid = $props.id();
   const LAST_PROJECT_KEY = 'hour.quick-add.project';

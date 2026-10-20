@@ -540,7 +540,7 @@
     }
 
     .mny__invoices > li {
-      border-block-end: 1px solid var(--border-color-light);
+      border-block-end: var(--line-hairline) solid var(--border-color-light);
     }
 
     .mny__invoices > li.expanded {
@@ -606,7 +606,7 @@
       flex-direction: column;
       gap: var(--space-m);
       padding: var(--space-m);
-      border-block-start: 1px solid var(--border-color-light);
+      border-block-start: var(--line-hairline) solid var(--border-color-light);
     }
 
     .mny-inv__dates {
@@ -615,7 +615,7 @@
       font-size: var(--text-s);
     }
     .mny-inv__label {
-      letter-spacing: 0.07em;
+      letter-spacing: var(--tracking-m);
       text-transform: uppercase;
     }
     .mny-inv__provenance,
@@ -668,7 +668,7 @@
       gap: var(--space-s);
       align-items: center;
       padding-block: var(--space-xs);
-      border-block-end: 1px solid var(--border-color-light);
+      border-block-end: var(--line-hairline) solid var(--border-color-light);
       font-size: var(--text-xs);
       color: var(--text-muted);
     }
@@ -702,7 +702,7 @@
       margin-block-start: var(--space-s);
     }
 
-    @media (max-width: 760px) {
+    @media (max-width: 47.5rem) {
       .mny-inv__row {
         grid-template-columns: 1fr auto;
         gap: var(--space-xs) var(--space-s);

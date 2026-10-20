@@ -1157,16 +1157,16 @@
   .playground__slips {
     display: flex;
     flex-wrap: wrap;
-    gap: 12px;
+    gap: var(--space-s);
     align-items: flex-start;
-    margin-block: 8px 20px;
+    margin-block: var(--space-xs) var(--space-m);
   }
   /* The host owns `container-type` — that is what lets the CELL decide what a
      slip can afford, exactly as the month grid will. */
   .playground__cell {
     container-type: inline-size;
-    padding: 4px;
-    border: 1px dashed var(--border-color-light);
+    padding: var(--space-xs);
+    border: var(--line-hairline) dashed var(--border-color-light);
     border-radius: var(--radius-s);
   }
 
@@ -1216,24 +1216,24 @@
     }
     .playground__accents {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
       gap: var(--space-s);
     }
     .playground__accent {
       display: grid;
-      grid-template-columns: 4px 1fr;
+      grid-template-columns: var(--dot-s) 1fr;
       gap: var(--space-s);
       align-items: center;
       padding: var(--space-s);
-      border: 1px solid var(--border-color-light);
+      border: var(--line-hairline) solid var(--border-color-light);
       border-radius: var(--radius);
       background: var(--bg-ultra-light);
     }
     .playground__accent-rail {
-      inline-size: 4px;
-      block-size: 28px;
+      inline-size: var(--dot-s);
+      block-size: var(--control-size-xs);
       background: var(--c, var(--text-faint));
-      border-radius: 2px;
+      border-radius: var(--radius-xs);
     }
     .playground__accent-name {
       font-family: var(--font-mono);

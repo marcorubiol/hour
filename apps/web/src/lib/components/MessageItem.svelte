@@ -1,5 +1,6 @@
 <script module lang="ts">
   import { addToast } from '$lib/components/Toast.svelte';
+  import { viewerTimeZone } from '$lib/datetime';
   import { t, type Locale } from '$lib/i18n';
 
   /** Cmd/Ctrl+Intro envía; Intro solo es un salto de línea (un mensaje puede ser una lista). */
@@ -39,6 +40,7 @@
   import { mutateJSON } from '$lib/api';
   import Avatar from '$lib/components/Avatar.svelte';
   import Button from '$lib/components/Button.svelte';
+  import Dialog from '$lib/components/Dialog.svelte';
   import Menu from '$lib/components/Menu.svelte';
   import { MESSAGE_MAX, messageWhen, type ThreadMessage } from '$lib/threads';
 
@@ -61,7 +63,7 @@
   let { message: m, author, mine, about, mark, newBefore = false, locale, onchange }: Props = $props();
 
   // Un mensaje es un momento: se dice en la zona de quien lo lee.
-  const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const viewerTz = viewerTimeZone();
   let by = $derived(author || t('threads.someone', locale));
 
   let editing = $state(false);
@@ -97,8 +99,13 @@
     $editMutation.mutate(text);
   }
 
+  // Deleting asks first, in the app's own dialog (never the browser's).
+  let confirmDelete = $state(false);
   function remove() {
-    if (!window.confirm(t('threads.delete_confirm', locale))) return;
+    confirmDelete = true;
+  }
+  function confirmRemove() {
+    confirmDelete = false;
     $deleteMutation.mutate();
   }
 </script>
@@ -163,6 +170,13 @@
   {/if}
 </li>
 
+<Dialog bind:open={confirmDelete} size="s" title={t('threads.delete_title', locale)} description={t('threads.delete_confirm', locale)}>
+  {#snippet actions()}
+    <Button variant="quiet" onclick={() => (confirmDelete = false)}>{t('create.cancel', locale)}</Button>
+    <Button tone="warn" onclick={confirmRemove}>{t('threads.delete', locale)}</Button>
+  {/snippet}
+</Dialog>
+
 <style>
   @layer components {
     /* La raya de «nuevos»: una línea y su palabra, sin color de alarma. */
@@ -178,7 +192,7 @@
     .thread__new::after {
       content: '';
       flex: 1;
-      border-block-start: 1px solid currentColor;
+      border-block-start: var(--line-hairline) solid currentColor;
       opacity: 0.4;
     }
 

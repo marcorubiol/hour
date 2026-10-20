@@ -130,13 +130,13 @@
   @layer components {
     .mark {
       /* base tile size — override per context by setting --mark */
-      --_m: var(--mark, 18px);
+      --_m: var(--mark, 1.125rem);
       --_c: var(--c, var(--accent-1));
 
       /* Soft tint (ScopeGlyph tile recipe) + forced-legible fg (relative
          color: same hue, fixed lightness → contrast holds on all 12 hues). */
-      --_bg: color-mix(in oklch, var(--_c) 16%, var(--bg-ultra-light));
-      --_fg: oklch(from var(--_c) 0.42 c h);
+      --_bg: color-mix(in oklch, var(--_c) var(--identity-tint), var(--identity-tint-base));
+      --_fg: oklch(from var(--_c) var(--identity-ink-l) c h);
       --_bd: color-mix(in oklch, var(--_c) 26%, transparent);
 
       display: inline-flex;
@@ -156,11 +156,11 @@
       border-radius: calc(var(--_m) * 0.28);
       background: var(--_bg);
       color: var(--_fg);
-      box-shadow: 0 0 0 1px var(--_bd) inset;
+      box-shadow: 0 0 0 var(--line-hairline) var(--_bd) inset;
       font-size: calc(var(--_m) * 0.5);
       font-weight: 600;
       line-height: 1;
-      letter-spacing: 0.01em;
+      letter-spacing: var(--tracking-xs);
       font-variant-numeric: tabular-nums;
       white-space: nowrap;
     }
@@ -179,15 +179,15 @@
       --_m: 12px;
     }
     .mark--mini .mark__chip {
-      padding-inline: 3px;
+      padding-inline: var(--space-2xs);
       /* A flatter corner, not just a smaller one: 3 on 12 reads squarer than
          the proportional 3.4, and at this size a rounder tile loses the
          letters to its own curve. */
-      border-radius: 3px;
+      border-radius: var(--radius-xs);
       box-shadow: none;
-      font-size: 8px;
+      font-size: var(--text-2xs);
       font-weight: 500;
-      letter-spacing: 0.02em;
+      letter-spacing: var(--tracking-xs);
     }
 
     /* bare = same silhouette, no glyph. Keep it square (min = block). */
@@ -211,12 +211,12 @@
       padding-inline: calc(var(--_m) * 0.22);
       border-start-start-radius: calc(var(--_m) * 0.28);
       border-end-start-radius: calc(var(--_m) * 0.28);
-      background: color-mix(in oklch, var(--neutral) 7%, var(--bg-ultra-light));
+      background: color-mix(in oklch, var(--text-color) 7%, var(--bg-ultra-light));
       color: var(--text-faint);
       font-size: calc(var(--_m) * 0.46);
       font-weight: 500;
       line-height: 1;
-      letter-spacing: 0.04em;
+      letter-spacing: var(--tracking-s);
       white-space: nowrap;
     }
     /* The two cells touch: an address is one object, so no gap between its
@@ -232,11 +232,11 @@
       border-end-start-radius: 0;
     }
     .mark--mini .mark__space {
-      padding-inline: 3px;
-      border-start-start-radius: 3px;
-      border-end-start-radius: 3px;
-      font-size: 7.5px;
-      letter-spacing: 0.03em;
+      padding-inline: var(--space-2xs);
+      border-start-start-radius: var(--radius-xs);
+      border-end-start-radius: var(--radius-xs);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-xs);
     }
     .mark--mini.mark--addr .mark__chip {
       border-start-start-radius: 0;
@@ -280,11 +280,5 @@
       color: inherit;
       max-block-size: 100%;
     }
-  }
-
-  /* Dark mode: flip the forced fg light and lift the tint off the dark bg. */
-  :global(:root[data-mode='dark']) .mark {
-    --_bg: color-mix(in oklch, var(--_c) 24%, var(--bg));
-    --_fg: oklch(from var(--_c) 0.9 c h);
   }
 </style>

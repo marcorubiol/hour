@@ -17,6 +17,7 @@ import { extractAccessToken } from '$lib/auth';
 import { ASSET_KINDS, MaterialCreateSchema, type MaterialItem } from '$lib/material';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
+import { json } from '$lib/server/http';
 
 const IdSchema = v.pipe(v.string(), v.uuid());
 
@@ -34,13 +35,6 @@ const QuerySchema = v.object({
     '100',
   ),
 });
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  });
-}
 
 const MATERIAL_SELECT = 'id,kind,direction,url,notes,uploaded_at,uploaded_by';
 

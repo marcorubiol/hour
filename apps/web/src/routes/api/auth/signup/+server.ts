@@ -4,6 +4,7 @@ import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { allowRequest, clientIp } from '$lib/server/rate-limit';
 import { setSessionCookies, signUp, type SessionEnv } from '$lib/server/session';
+import { jsonNoStore } from '$lib/server/http';
 
 const SIGNUP_RULE = { limit: 5, windowSec: 900 };
 const Body = v.object({
@@ -12,21 +13,14 @@ const Body = v.object({
   password: v.pipe(v.string(), v.minLength(10), v.maxLength(200)),
 });
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
-  });
-}
-
 export const POST: RequestHandler = async ({ request, cookies, platform }) => {
-  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SessionEnv;
   if (!(await allowRequest(env.RATE_LIMIT, `signup:${clientIp(request)}`, SIGNUP_RULE))) {
-    return json({ error: 'rate_limited' }, 429);
+    return jsonNoStore({ error: 'rate_limited' }, 429);
   }
   const parsed = v.safeParse(Body, await request.json().catch(() => null));
-  if (!parsed.success) return json({ error: 'invalid_body' }, 400);
+  if (!parsed.success) return jsonNoStore({ error: 'invalid_body' }, 400);
 
   const result = await signUp(
     env,
@@ -35,14 +29,14 @@ export const POST: RequestHandler = async ({ request, cookies, platform }) => {
     parsed.output.full_name,
   );
   if (!result.ok) {
-    return json(
+    return jsonNoStore(
       { error: result.reason === 'invalid_signup' ? 'signup_rejected' : 'auth_unavailable' },
       result.reason === 'invalid_signup' ? 400 : 502,
     );
   }
   if (result.grant) {
     setSessionCookies(cookies, result.grant);
-    return json(
+    return jsonNoStore(
       {
         status: 'signed_in',
         user: result.user
@@ -57,5 +51,5 @@ export const POST: RequestHandler = async ({ request, cookies, platform }) => {
       201,
     );
   }
-  return json({ status: 'confirmation_required' }, 202);
+  return jsonNoStore({ status: 'confirmation_required' }, 202);
 };

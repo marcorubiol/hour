@@ -16,6 +16,7 @@ import { extractAccessToken } from '$lib/auth';
 import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import type { CreatedPerson } from '$lib/persons';
+import { json } from '$lib/server/http';
 
 const BodySchema = v.object({
   workspace_id: v.pipe(v.string(), v.uuid()),
@@ -24,13 +25,6 @@ const BodySchema = v.object({
   phone: v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(60))),
   title: v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(200))),
 });
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  });
-}
 
 export const POST: RequestHandler = async ({ request, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);

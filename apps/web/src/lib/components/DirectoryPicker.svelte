@@ -158,7 +158,7 @@
       list-style: none;
       max-block-size: 16rem;
       overflow-y: auto;
-      border: 1px solid var(--border-color-light);
+      border: var(--line-hairline) solid var(--border-color-light);
       border-radius: var(--radius-m);
     }
     .dir__row {
@@ -169,7 +169,7 @@
       padding: var(--space-2xs) var(--space-xs);
     }
     .dir__row + .dir__row {
-      border-block-start: 1px solid var(--border-color-light);
+      border-block-start: var(--line-hairline) solid var(--border-color-light);
     }
     .dir__what {
       display: flex;

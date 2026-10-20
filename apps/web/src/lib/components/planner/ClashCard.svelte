@@ -58,7 +58,7 @@
       inline-size: 15.5rem;
       max-inline-size: 60vw;
       background: var(--bg-ultra-light);
-      border: 1px solid var(--border-color-dark);
+      border: var(--line-hairline) solid var(--border-color-dark);
       border-radius: var(--radius-l);
       box-shadow: var(--box-shadow-3);
       padding: var(--space-s) var(--space-m);
@@ -98,8 +98,8 @@
       color: var(--text-muted);
     }
     .cal__clashcard-dot {
-      inline-size: 7px;
-      block-size: 7px;
+      inline-size: var(--dot-l);
+      block-size: var(--dot-l);
       border-radius: var(--radius-circle);
       background: var(--c, var(--text-faint));
       flex: none;

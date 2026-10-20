@@ -10,7 +10,7 @@
  * ship as UTC (`Z`).
  */
 
-export type FeedPerformance = {
+type FeedPerformance = {
   id: string;
   slug: string | null;
   performed_at: string;
@@ -34,7 +34,7 @@ export type FeedPerformance = {
   } | null;
 };
 
-export type FeedDate = {
+type FeedDate = {
   id: string;
   kind: string;
   status: string;

@@ -29,7 +29,7 @@
  * re-renders on every pixel of width is a component that thrashes.
  */
 
-export type FitOptions = {
+type FitOptions = {
   /** Called with the element's width on every change, first pass included. */
   onWidth?: (width: number) => void;
 };

@@ -19,7 +19,7 @@ export interface SesEnv {
   SES_REGION?: string;
 }
 
-export const SES_REQUIRED = ['SES_ACCESS_KEY_ID', 'SES_SECRET_ACCESS_KEY', 'SES_REGION'] as const;
+const SES_REQUIRED = ['SES_ACCESS_KEY_ID', 'SES_SECRET_ACCESS_KEY', 'SES_REGION'] as const;
 
 export function sesMissing(env: SesEnv | null | undefined): string[] {
   return SES_REQUIRED.filter((name) => !env?.[name]);

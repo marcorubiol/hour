@@ -759,13 +759,13 @@
       overflow-x: auto;
       overflow-y: clip;
       /* The scrollbar used to sit ON the last row. */
-      padding-block-end: 9px;
+      padding-block-end: var(--space-s);
       scrollbar-width: thin;
     }
     .board {
       display: grid;
       min-inline-size: max-content;
-      border-block-start: 1px solid var(--border-color-light);
+      border-block-start: var(--line-hairline) solid var(--border-color-light);
       position: relative;
     }
 
@@ -778,12 +778,12 @@
     .board__corner {
       /* The measured `--hdy` transform pins (the wrap's overflow makes
          vertical sticky a no-op); sticky stays as inert belt-and-braces. */
-      transform: translateY(var(--hdy, 0px));
+      transform: translateY(var(--hdy, 0));
       position: sticky;
       inset-block-start: 0;
       background: var(--bg);
-      border-block-end: 1px solid var(--border-color-dark);
-      padding: 9px 9px 8px;
+      border-block-end: var(--line-hairline) solid var(--border-color-dark);
+      padding: var(--space-s) var(--space-s) var(--space-xs);
     }
     .board__head {
       position: sticky;
@@ -792,27 +792,27 @@
     .board__corner {
       inset-inline-start: 0;
       z-index: 11;
-      border-inline-end: 1px solid var(--border-color-light);
+      border-inline-end: var(--line-hairline) solid var(--border-color-light);
       font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.06em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-m);
       text-transform: uppercase;
       color: var(--text-faint);
       display: flex;
       align-items: flex-end;
-      padding: 9px 15px 8px;
+      padding: var(--space-s) var(--space-s) var(--space-xs);
     }
     .board__wd {
       display: block;
       font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.06em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-m);
       text-transform: uppercase;
       color: var(--text-faint);
     }
     .board__num {
       display: block;
-      font-size: 15px;
+      font-size: var(--text-m);
       font-weight: 500;
       color: var(--text-muted);
     }
@@ -826,8 +826,8 @@
       display: block;
       font-style: normal;
       font-family: var(--font-mono);
-      font-size: 8px;
-      letter-spacing: 0.12em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-xl);
       text-transform: uppercase;
       color: var(--text-muted);
     }
@@ -835,7 +835,7 @@
       display: block;
       font-family: var(--font-display);
       font-style: italic;
-      font-size: 11.5px;
+      font-size: var(--text-s);
       color: var(--text-muted);
     }
     /* The red '!' rides the day NUMBER — red means conflict and only
@@ -847,12 +847,12 @@
        Marco caught the drift across two screenshots. */
     .board__dmk {
       --dmk-ink: var(--info);
-      margin-inline-start: 3px;
+      margin-inline-start: var(--space-2xs);
       padding: 0;
       border: 0;
       background: none;
       font-family: var(--font-mono);
-      font-size: 11px;
+      font-size: var(--text-xs);
       color: var(--dmk-ink);
       vertical-align: super;
       line-height: 0;
@@ -873,8 +873,8 @@
       position: absolute;
       inset-inline-start: 0;
       inset-block-end: 0;
-      inline-size: 1px;
-      block-size: 7px;
+      inline-size: var(--line-hairline);
+      block-size: var(--dot-l);
       background: color-mix(in oklch, var(--text-color) 30%, transparent);
     }
     .board__head:nth-child(2)::before,
@@ -891,8 +891,8 @@
     }
     .board__gaplab {
       font-family: var(--font-mono);
-      font-size: 8.5px;
-      letter-spacing: 0.04em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-s);
       color: var(--text-faint);
       white-space: nowrap;
     }
@@ -904,11 +904,11 @@
       position: absolute;
       inset-inline: 0;
       inset-block-end: 0;
-      block-size: 3px;
+      block-size: var(--dot-xs);
       background: repeating-linear-gradient(
         90deg,
         color-mix(in oklch, var(--text-color) 20%, transparent) 0 1px,
-        transparent 1px var(--dw, 58px)
+        transparent 1px var(--dw, 3.625rem)
       );
     }
 
@@ -918,14 +918,14 @@
        vertical never breaks). The 18px gutter stays countable: 9px flat,
        1px rule + 8px at a week, 3px double + 6px at a month. */
     .wstart {
-      border-inline-start: 1px solid
+      border-inline-start: var(--line-hairline) solid
         color-mix(in oklch, var(--text-color) 11%, var(--border-color-light));
-      padding-inline-start: 8px;
+      padding-inline-start: var(--space-xs);
     }
     .mstart {
-      border-inline-start: 3px double
+      border-inline-start: var(--line-thick) double
         color-mix(in oklch, var(--text-color) 24%, var(--border-color-light));
-      padding-inline-start: 6px;
+      padding-inline-start: var(--space-xs);
     }
     .gap.wstart,
     .gap.mstart,
@@ -961,7 +961,7 @@
          way. It used to keep a lane's worth of padding, so every group cost
          a band of empty sheet nobody asked for; the air above it is the
          group boundary, and that is all it needs. */
-      padding: 13px 15px 4px;
+      padding: var(--space-s) var(--space-s) var(--space-xs);
       align-self: end;
       text-align: start;
       cursor: pointer;
@@ -973,15 +973,15 @@
          is what gets pinned to the far end. */
       grid-template-columns: minmax(0, 1fr) auto;
       align-items: center;
-      gap: 7px;
+      gap: var(--space-xs);
     }
     /* Mono and spaced, but NOT uppercased: this lid is a space on the scope
        axis, and the space is written lowercase by `spaceName` — a stylesheet
        must not fight the norm. */
     .board__grp-n {
       font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.1em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-l);
       color: var(--text-faint);
     }
     /* A project group is a SUBJECT: its own case, its serif, its monogram
@@ -990,14 +990,14 @@
        rail: the surface says how loud, the mark says what the shape is. */
     .board__grp-l--proj {
       font-family: var(--font-display);
-      font-size: 14px;
+      font-size: var(--text-m);
       letter-spacing: 0;
       text-transform: none;
       color: var(--text-color);
     }
     .board__grp-x {
       font-family: var(--font-mono);
-      font-size: 11px;
+      font-size: var(--text-xs);
       color: var(--text-faint);
     }
     /* THE HEADING'S RULE IS THE ROW'S, AND IT CROSSES EVERYTHING (Marco,
@@ -1008,14 +1008,14 @@
        Shut it also takes its own air, because a closed section is a row of
        a list and still says what it holds (law 11). */
     .board__grpl.shut {
-      padding: 11px 15px;
+      padding: var(--space-s) var(--space-s);
     }
     .board__grp-c {
       display: block;
-      margin-block-start: 4px;
+      margin-block-start: var(--space-xs);
       font-family: var(--font-mono);
-      font-size: 8.5px;
-      letter-spacing: 0.05em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-s);
       text-transform: uppercase;
       color: var(--text-faint);
       line-height: 1.4;
@@ -1031,7 +1031,7 @@
     }
     .board__grpl,
     .board__grpc {
-      border-block-end: 1px solid var(--border-color-light);
+      border-block-end: var(--line-hairline) solid var(--border-color-light);
     }
 
     /* ── the lane · frozen name + tally, then cells ───────────────────── */
@@ -1046,10 +1046,10 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 14px 0 14px 4px;
+      padding: var(--space-s) 0 var(--space-s) var(--space-xs);
       border: 0;
-      border-inline-end: 1px solid var(--border-color-light);
-      border-block-end: 1px solid var(--border-color-light);
+      border-inline-end: var(--line-hairline) solid var(--border-color-light);
+      border-block-end: var(--line-hairline) solid var(--border-color-light);
       background: var(--bg);
       cursor: pointer;
     }
@@ -1060,7 +1060,7 @@
        mark says what the shape is. */
     .board__rail--proj {
       font-family: var(--font-display);
-      font-size: 12.5px;
+      font-size: var(--text-s);
       letter-spacing: 0;
       color: var(--text-muted);
     }
@@ -1073,8 +1073,8 @@
          first letter next to the first lane. */
       transform: rotate(180deg);
       font-family: var(--font-mono);
-      font-size: 8.5px;
-      letter-spacing: 0.14em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-xl);
       color: var(--text-faint);
       white-space: nowrap;
       overflow: hidden;
@@ -1087,13 +1087,13 @@
 
     .board__lab {
       position: sticky;
-      inset-inline-start: 26px;
+      inset-inline-start: 1.625rem;
       z-index: 6;
       background: var(--bg);
-      border-inline-end: 1px solid var(--border-color-light);
-      border-block-end: 1px solid var(--border-color-light);
-      min-block-size: 58px;
-      padding: 14px 15px;
+      border-inline-end: var(--line-hairline) solid var(--border-color-light);
+      border-block-end: var(--line-hairline) solid var(--border-color-light);
+      min-block-size: 3.625rem;
+      padding: var(--space-s) var(--space-s);
       display: flex;
       /* THE TAG HANGS FROM THE NAME, and only an explicit alignment keeps
          it there. Stretch is the default, and it cascades: the mark column
@@ -1102,7 +1102,7 @@
          so on a row as tall as a slip the monogram floated 35px below its
          name, onto the tally's line. Measured 2026-08-09. */
       align-items: flex-start;
-      gap: 7px;
+      gap: var(--space-xs);
       min-inline-size: 0;
     }
     /* The 22px mark slot — the monogram's, kept even when empty so names
@@ -1110,11 +1110,11 @@
     /* Cap height, not the box's top edge: a 14px chip against a 15px serif
        needs three pixels to sit on the line the eye reads the word from. */
     .board__mark {
-      inline-size: 22px;
+      inline-size: 1.375rem;
       flex: none;
       display: inline-flex;
       align-items: flex-start;
-      padding-block-start: 3px;
+      padding-block-start: var(--space-2xs);
     }
     .board__lab-body {
       min-inline-size: 0;
@@ -1122,7 +1122,7 @@
     .board__name {
       display: block;
       font-family: var(--font-display);
-      font-size: 15px;
+      font-size: var(--text-m);
       line-height: 1.2;
       color: var(--text-color);
       overflow-wrap: anywhere;
@@ -1134,10 +1134,10 @@
     }
     .board__tally {
       display: block;
-      margin-block-start: 4px;
+      margin-block-start: var(--space-xs);
       font-family: var(--font-mono);
-      font-size: 8.5px;
-      letter-spacing: 0.05em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-s);
       text-transform: uppercase;
       color: var(--text-faint);
       line-height: 1.4;
@@ -1153,15 +1153,15 @@
        day columns keep their width: the away bands are measured on it. ── */
     @container (max-width: 34rem) {
       .board {
-        --board-lab: 96px;
+        --board-lab: 6rem;
       }
       .board__lab {
-        padding: 10px 6px 10px 8px;
-        gap: 4px;
-        min-block-size: 48px;
+        padding: var(--space-s) var(--space-xs) var(--space-s) var(--space-xs);
+        gap: var(--space-xs);
+        min-block-size: 3rem;
       }
       .board__name {
-        font-size: 12px;
+        font-size: var(--text-s);
         line-height: 1.15;
       }
       .board__tally,
@@ -1169,17 +1169,17 @@
         display: none;
       }
       .board__corner {
-        padding-inline: 8px;
+        padding-inline: var(--space-xs);
       }
     }
     .board__badge {
       font-style: normal;
       font-family: var(--font-mono);
-      font-size: 8.5px;
-      letter-spacing: 0.06em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-m);
       text-transform: uppercase;
       color: var(--text-faint);
-      margin-inline-start: 6px;
+      margin-inline-start: var(--space-xs);
     }
 
     /* ── the cells · NO CAGE: border-bottom only, never a right edge ──── */
@@ -1187,8 +1187,8 @@
       position: relative;
       display: flex;
       flex-direction: column;
-      border-block-end: 1px solid var(--border-color-light);
-      padding: 10px 9px;
+      border-block-end: var(--line-hairline) solid var(--border-color-light);
+      padding: var(--space-s) var(--space-s);
       min-block-size: 0;
       min-inline-size: 0;
     }
@@ -1203,7 +1203,7 @@
       container-type: inline-size;
     }
     .board__slot + .board__slot {
-      margin-block-start: 4px;
+      margin-block-start: var(--space-xs);
     }
     /* Inferred: a weaker CLAIM is not fainter INK — dotted edge, italic
        name, explicitly NO opacity fade (the old .62 put the venue at
@@ -1220,7 +1220,7 @@
        the name lives INSIDE Slip and can only be reached through
        `:global` — one voice, two ways in, not two opinions. */
     .board__slot--inf :global(.slip) {
-      outline: 1px dotted color-mix(in oklch, var(--text-color) 22%, transparent);
+      outline: var(--line-hairline) dotted color-mix(in oklch, var(--text-color) 22%, transparent);
       outline-offset: 2px;
     }
     .board__slot--inf :global(.slip__n) {
@@ -1231,17 +1231,17 @@
     /* ── the empty cell's door ────────────────────────────────────────── */
     .board__add {
       flex: 1;
-      min-block-size: 20px;
+      min-block-size: 1.25rem;
       opacity: 0;
       border: 0;
-      border-block-start: 1px dashed color-mix(in oklch, var(--text-color) 18%, transparent);
+      border-block-start: var(--line-hairline) dashed color-mix(in oklch, var(--text-color) 18%, transparent);
       background: none;
       font-family: var(--font-mono);
-      font-size: 11px;
+      font-size: var(--text-xs);
       color: var(--text-muted);
-      padding: 4px 0 0;
+      padding: var(--space-xs) 0 0;
       cursor: pointer;
-      transition: opacity 0.1s;
+      transition: opacity var(--duration-fast);
     }
     .board__cell:hover .board__add,
     .board__add:focus-visible {
@@ -1267,13 +1267,13 @@
          What overflows is clipped, and the reading order already says what
          to lose first (the terminus is the last thing in the line). */
       overflow: hidden;
-      margin-block-end: 4px;
+      margin-block-end: var(--space-xs);
       display: flex;
       align-items: center;
-      gap: 8px;
-      block-size: 12px;
+      gap: var(--space-xs);
+      block-size: 0.75rem;
       pointer-events: none;
-      padding-inline-start: 9px;
+      padding-inline-start: var(--space-s);
       min-inline-size: 0;
     }
     /* THE KIND WORD NEVER BREAKS. With «away» alone it could not: one word has
@@ -1285,14 +1285,14 @@
       white-space: nowrap;
       font-style: normal;
       font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.1em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-l);
       text-transform: uppercase;
       color: var(--away-word);
     }
     .board__aw-n {
       font-weight: 400;
-      font-size: 11px;
+      font-size: var(--text-xs);
       color: var(--away-subject);
       white-space: nowrap;
       /* THE SUBJECT MAY BE SHORTENED, THE PHRASE MAY NOT. A name cut with an
@@ -1307,41 +1307,41 @@
     .board__aw-u {
       font-style: normal;
       font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.1em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-l);
       text-transform: uppercase;
       color: var(--away-phrase);
       white-space: nowrap;
     }
     .board__aw-r {
       flex: 1;
-      min-inline-size: 14px;
+      min-inline-size: 0.875rem;
       block-size: 0;
-      border-block-start: 1px solid var(--away-rule);
+      border-block-start: var(--line-hairline) solid var(--away-rule);
       position: relative;
     }
     /* The arrowhead is the TERMINUS: only the final segment draws it. */
     .board__aw--end .board__aw-r::after {
       content: '';
       position: absolute;
-      inline-size: 5px;
-      block-size: 5px;
-      border-block-start: 1px solid var(--away-terminus);
-      border-inline-end: 1px solid var(--away-terminus);
+      inline-size: var(--dot-m);
+      block-size: var(--dot-m);
+      border-block-start: var(--line-hairline) solid var(--away-terminus);
+      border-inline-end: var(--line-hairline) solid var(--away-terminus);
       transform: rotate(45deg);
       inset-inline-end: -1px;
-      inset-block-start: -3.5px;
+      inset-block-start: -0.2188rem;
     }
     /* A RESUMED segment ('away Mia ⟶' after a cut) opens with a left arrow. */
     .board__aw--cont::before {
       content: '';
       position: absolute;
       inset-inline-start: 3px;
-      inset-block-start: 3.5px;
-      inline-size: 5px;
-      block-size: 5px;
-      border-block-start: 1px solid var(--away-resume);
-      border-inline-start: 1px solid var(--away-resume);
+      inset-block-start: 0.2188rem;
+      inline-size: var(--dot-m);
+      block-size: var(--dot-m);
+      border-block-start: var(--line-hairline) solid var(--away-resume);
+      border-inline-start: var(--line-hairline) solid var(--away-resume);
       transform: rotate(-45deg);
     }
     /* Tentative: the doubt is the register — quieter text, dotted rule. */
@@ -1359,7 +1359,7 @@
     }
     /* The floor the row reserves under a band's touched week. */
     .board__awsp {
-      block-size: 15px;
+      block-size: 0.9375rem;
       margin-block-start: auto;
       flex: none;
     }
@@ -1377,10 +1377,10 @@
        labels — the line must never print on the date it names. */
     .board__now {
       position: absolute;
-      inset-block-start: var(--nowtop, 0px);
+      inset-block-start: var(--nowtop, 0);
       inset-block-end: 0;
-      inset-inline-start: var(--nowx, -9999px);
-      inline-size: 1px;
+      inset-inline-start: var(--nowx, -624.9375rem);
+      inline-size: var(--line-hairline);
       background: color-mix(in oklch, var(--text-color) 40%, transparent);
       z-index: 9;
       pointer-events: none;
@@ -1390,19 +1390,19 @@
       position: absolute;
       inset-block-start: -2px;
       inset-inline-start: -2px;
-      inline-size: 5px;
-      block-size: 5px;
+      inline-size: var(--dot-m);
+      block-size: var(--dot-m);
       border-radius: 50%;
       background: var(--text-muted);
     }
     .board__now b {
       position: absolute;
       inset-block-start: 2px;
-      inset-inline-start: 6px;
+      inset-inline-start: 0.375rem;
       display: inline-flex;
       overflow: hidden;
       font-family: var(--font-mono);
-      font-size: 8.5px;
+      font-size: var(--text-2xs);
       font-weight: 400;
       color: var(--text-muted);
       white-space: nowrap;
@@ -1411,7 +1411,7 @@
     /* One movement per minute: a changed digit is a NEW cell and rises. */
     .board__nowd {
       font-style: normal;
-      animation: board-minute 130ms ease-out;
+      animation: board-minute var(--duration-fast) ease-out;
     }
     @keyframes board-minute {
       from {
@@ -1423,7 +1423,7 @@
     }
     /* The travelling group label — pinned inside its own group's span. */
     .board__grpl {
-      transform: translateY(var(--gy, 0px));
+      transform: translateY(var(--gy, 0));
     }
   }
 </style>

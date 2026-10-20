@@ -9,7 +9,7 @@
 
 import { MailoutNotConfiguredError } from './provider';
 
-export interface MailoutDbEnv {
+interface MailoutDbEnv {
   PUBLIC_SUPABASE_URL: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
 }
@@ -22,7 +22,7 @@ const SERVICE_RPCS = [
   'mailout_record_failure',
   'mailout_record_event',
 ] as const;
-export type MailoutServiceRpc = (typeof SERVICE_RPCS)[number];
+type MailoutServiceRpc = (typeof SERVICE_RPCS)[number];
 
 export class MailoutDbError extends Error {
   constructor(

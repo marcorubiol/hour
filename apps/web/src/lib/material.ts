@@ -9,8 +9,8 @@ import * as v from 'valibot';
 import { Constants, type Enums, type Tables } from './db-types';
 import { t, type Locale } from './i18n';
 
-export type AssetKind = Enums<'asset_kind'>;
-export type AssetDirection = Enums<'asset_direction'>;
+type AssetKind = Enums<'asset_kind'>;
+type AssetDirection = Enums<'asset_direction'>;
 
 /** All kinds in schema enum order (runtime mirror of the DB enum). */
 export const ASSET_KINDS = Constants.public.Enums.asset_kind;
@@ -64,8 +64,6 @@ export const MaterialCreateSchema = v.object({
   ),
   notes: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500)))),
 });
-
-export type MaterialCreate = v.InferOutput<typeof MaterialCreateSchema>;
 
 export type MaterialItem = Pick<
   Tables<'asset_version'>,

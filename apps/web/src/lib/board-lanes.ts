@@ -704,7 +704,7 @@ export function normalizeAway(
  * So a run yields at most one segment, and the only thing that still ends it
  * is the board's own edge.
  */
-export interface AwaySegment {
+interface AwaySegment {
   laneKey: string;
   run: AwayRun;
   startCol: number;
@@ -862,7 +862,7 @@ export function clashWeight(a: StatusFamily, b: StatusFamily): 'soft' | 'hard' {
   return a === 'confirmed' || b === 'confirmed' ? 'hard' : 'soft';
 }
 
-export interface SlipClashMark {
+interface SlipClashMark {
   clash: 'soft' | 'hard';
   /** Severity is COLOUR (people = red); certainty of collision is STROKE. */
   people: boolean;
@@ -942,7 +942,7 @@ export function clashDayMarks(
 
 /* ══ META ════════════════════════════════════════════════════════════════ */
 
-export interface BoardMetaFacts {
+interface BoardMetaFacts {
   toDecide: number;
   urgent: number;
   fromIso: string;

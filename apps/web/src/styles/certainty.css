@@ -52,7 +52,7 @@
       transparent 1.4px
     );
     background-size: 7px 7px;
-    -webkit-mask-image: linear-gradient(150deg, #000 0 20%, transparent 82%);
-    mask-image: linear-gradient(150deg, #000 0 20%, transparent 82%);
+    -webkit-mask-image: linear-gradient(150deg, black 0 20%, transparent 82%);
+    mask-image: linear-gradient(150deg, black 0 20%, transparent 82%);
   }
 }

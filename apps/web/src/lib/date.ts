@@ -18,14 +18,11 @@ import { Constants, type Enums, type Tables } from './db-types';
 import { realIsoInstant } from './datetime';
 import type { StatusFamily } from './performance';
 
-export type DateKind = Enums<'date_kind'>;
-export type DateStatus = Enums<'date_status'>;
-
-export const DATE_KINDS = Constants.public.Enums.date_kind;
+const DATE_KINDS = Constants.public.Enums.date_kind;
 export const DATE_STATUSES = Constants.public.Enums.date_status;
 
 /** ADR-078 §9: the enum of 4 is never exposed at creation. */
-export const DATE_CREATE_STATUSES = ['tentative', 'confirmed'] as const;
+const DATE_CREATE_STATUSES = ['tentative', 'confirmed'] as const;
 
 /**
  * ADR-072 §4: outbound | return | leg, only on kind='travel_day'. TEXT +
@@ -71,8 +68,6 @@ export const DateCreateSchema = v.object({
   label: v.optional(v.nullable(labelField)),
 });
 
-export type DateCreate = v.InferOutput<typeof DateCreateSchema>;
-
 /**
  * POST /api/dates/series body (ADR-084 §1) — a multi-day block: N days, one
  * series_id, created atomically by the `create_date_series` RPC.
@@ -99,8 +94,6 @@ export const DateSeriesCreateSchema = v.object({
   line_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
   label: v.optional(v.nullable(labelField)),
 });
-
-export type DateSeriesCreate = v.InferOutput<typeof DateSeriesCreateSchema>;
 
 /**
  * PATCH /api/dates/:id body. Whitelist of the operational fields — direct
@@ -132,8 +125,6 @@ export const DatePatchSchema = v.object({
   destination_city: v.optional(v.nullable(placeField)),
   label: v.optional(v.nullable(labelField)),
 });
-
-export type DatePatch = v.InferOutput<typeof DatePatchSchema>;
 
 /**
  * Every cached feed that renders `date` rows. Four keys, because the month

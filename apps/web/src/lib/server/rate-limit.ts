@@ -21,7 +21,7 @@
  * binding in wrangler.jsonc is a deploy step (see runbook).
  */
 
-export interface RateLimitRule {
+interface RateLimitRule {
   /** Max requests admitted per window. */
   limit: number;
   /** Window length in seconds (KV TTL floor is 60). */

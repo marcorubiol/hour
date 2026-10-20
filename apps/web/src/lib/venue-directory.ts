@@ -15,7 +15,7 @@
  * search key is built with; it is passed in so this file imports nothing.
  */
 
-export const VENUE_KINDS = [
+const VENUE_KINDS = [
   'theatre',
   'opera',
   'concert_hall',
@@ -48,9 +48,6 @@ export type DirectoryEntry = {
   status: 'active' | 'missing';
   last_seen_at: string;
 };
-
-/** Salas polivalentes, casas de cultura, ateneos (Marco's word «polivalentes»). */
-export const POLYVALENT_KINDS: readonly VenueKind[] = ['multipurpose', 'cultural_centre'];
 
 /**
  * Words that name a ROLE, never a person. An email is generic only when every
@@ -133,7 +130,7 @@ export function websiteUrl(raw: string | null | undefined): string | null {
 }
 
 /** Great-circle distance in metres. */
-export function distanceM(aLat: number, aLon: number, bLat: number, bLon: number): number {
+function distanceM(aLat: number, aLon: number, bLat: number, bLon: number): number {
   const r = Math.PI / 180;
   const dLat = (bLat - aLat) * r;
   const dLon = (bLon - aLon) * r;
@@ -161,7 +158,7 @@ const GENERIC = new Set([
 ]);
 
 /** The words of a normalised name that can tell two venues apart. */
-export function nameWords(norm: string): string[] {
+function nameWords(norm: string): string[] {
   return norm.split(' ').filter((w) => w && !FILLER.has(w));
 }
 
@@ -183,14 +180,14 @@ export function nameLikeness(a: string, b: string): number {
   return shared / Math.min(wa.size, wb.size);
 }
 
-export type MatchInput = {
+type MatchInput = {
   norm: string;
   city: string;
   lat: number | null;
   lon: number | null;
   qid: string | null;
 };
-export type MatchReason = { by: 'qid' | 'near_name' | 'same_spot' | 'city_name'; distanceM: number | null };
+type MatchReason = { by: 'qid' | 'near_name' | 'same_spot' | 'city_name'; distanceM: number | null };
 
 /**
  * Are two records the same venue? Only for these reasons, in this order:

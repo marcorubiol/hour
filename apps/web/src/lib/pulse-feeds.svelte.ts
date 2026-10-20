@@ -53,7 +53,7 @@ export function createPulseFeeds(today: () => string) {
   const personId = $derived(me.current.data?.person_id ?? null);
   const workspaces = $derived<NavWorkspace[]>(ws.current.data?.items ?? []);
 
-  // Its own key: the hall shares `['today-performances']` without rosters,
+  // Its own key: the Desk shares `['today-performances']` without rosters,
   // and widening that URL would make every surface pay for the axis.
   const perf = fromStore(
     createQuery(

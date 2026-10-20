@@ -23,7 +23,7 @@
 import { getContext, onDestroy, setContext } from 'svelte';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
-export type ResolvedMode = 'light' | 'dark';
+type ResolvedMode = 'light' | 'dark';
 
 const MODE_KEY = 'hour_mode';
 const THEME_KEY = 'hour_theme';
@@ -34,19 +34,19 @@ function systemPrefersDark(): boolean {
 	return matchMedia('(prefers-color-scheme: dark)').matches;
 }
 
-export function readSavedMode(): ThemeMode {
+function readSavedMode(): ThemeMode {
 	if (typeof localStorage === 'undefined') return 'system';
 	const raw = localStorage.getItem(MODE_KEY);
 	if (raw === 'light' || raw === 'dark' || raw === 'system') return raw;
 	return 'system';
 }
 
-export function readSavedTheme(): string {
+function readSavedTheme(): string {
 	if (typeof localStorage === 'undefined') return DEFAULT_THEME;
 	return localStorage.getItem(THEME_KEY) || DEFAULT_THEME;
 }
 
-export function resolveMode(mode: ThemeMode): ResolvedMode {
+function resolveMode(mode: ThemeMode): ResolvedMode {
 	return mode === 'system' ? (systemPrefersDark() ? 'dark' : 'light') : mode;
 }
 
@@ -79,7 +79,7 @@ function startSwap(fn: () => void): void {
 	}
 }
 
-export class ThemeStore {
+class ThemeStore {
 	mode = $state<ThemeMode>('system');
 	theme = $state<string>(DEFAULT_THEME);
 	resolvedMode = $derived<ResolvedMode>(resolveMode(this.mode));

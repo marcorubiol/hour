@@ -383,12 +383,12 @@
       gap: var(--space-l);
       margin-block: var(--space-m) 0;
       padding-block: var(--space-s);
-      border-block: 1px solid var(--border-color-light);
+      border-block: var(--line-hairline) solid var(--border-color-light);
     }
     .space-stat b {
       display: block;
       font-family: var(--font-display);
-      font-size: 1.5rem;
+      font-size: var(--text-xl);
       font-weight: 500;
       line-height: 1.1;
       color: var(--heading-color);
@@ -416,7 +416,7 @@
     }
 
     .pcard {
-      border: 1px solid var(--border-color-light);
+      border: var(--line-hairline) solid var(--border-color-light);
       border-radius: var(--radius-xl);
       background: var(--bg-ultra-light);
       overflow: hidden;
@@ -427,7 +427,7 @@
     /* Every card is this space, so a quiet "Project" tag + the space accent
        as a left rule. */
     .pcard--accent {
-      border-inline-start: 3px solid var(--c, var(--border-color-dark));
+      border-inline-start: var(--line-thick) solid var(--c, var(--border-color-dark));
     }
     .pcard__tag {
       font-family: var(--font-mono);
@@ -471,7 +471,7 @@
     }
 
     .pcard__lines {
-      border-block-start: 1px solid var(--border-color-light);
+      border-block-start: var(--line-hairline) solid var(--border-color-light);
       padding: var(--space-xs);
     }
     .pcard__line {
@@ -527,7 +527,7 @@
       display: flex;
       gap: var(--space-s);
       padding-block-start: var(--space-2xs);
-      border-block-start: 1px solid var(--border-color-light);
+      border-block-start: var(--line-hairline) solid var(--border-color-light);
       margin-block-start: var(--space-2xs);
     }
     /* Creators via the shared .creator class (base.css). */

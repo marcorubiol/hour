@@ -34,7 +34,7 @@ export const realIsoInstant = v.pipe(
   v.check((s) => !Number.isNaN(new Date(s).getTime()), 'Not a valid timestamp'),
 );
 
-export interface DualTime {
+interface DualTime {
   /** Wall time in the primary (venue) zone, HH:mm. */
   primary: string;
   /** ISO day the instant falls on in the primary zone. */
@@ -101,6 +101,12 @@ export function dayMonthYearTs(iso: string, locale: string = appLocaleTag()): st
     month: 'short',
     year: 'numeric',
   });
+}
+
+/** The viewer's IANA time zone, as the browser reports it. One call for the
+ *  sixteen places that used to spell the Intl incantation themselves. */
+export function viewerTimeZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
 /**

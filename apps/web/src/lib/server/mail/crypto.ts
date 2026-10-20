@@ -24,7 +24,7 @@ export function toBase64Url(bytes: Uint8Array): string {
   return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-export function fromBase64Url(s: string): Uint8Array {
+function fromBase64Url(s: string): Uint8Array {
   const b64 = s.replace(/-/g, '+').replace(/_/g, '/');
   const bin = atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4));
   const out = new Uint8Array(bin.length);
@@ -32,7 +32,7 @@ export function fromBase64Url(s: string): Uint8Array {
   return out;
 }
 
-export class MailKeyError extends Error {}
+class MailKeyError extends Error {}
 
 /** Importa la clave; falla claro si no son 32 bytes. */
 export async function importMailKey(keyB64: string | undefined): Promise<CryptoKey> {

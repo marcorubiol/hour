@@ -51,7 +51,7 @@
 <style>
   .sg {
     /* base size — override per context by setting --glyph on a parent */
-    --_g: var(--glyph, 15px);
+    --_g: var(--glyph, 0.9375rem);
     /* per-shape scales (Marco's optical-rectification knobs) */
     --glyph-space: 0.667; /* circle = 10px @ 15 base */
     --glyph-project: 0.633; /* rhombus = 9.5px @ 15 base */
@@ -59,7 +59,7 @@
     /* a solid dot carries more weight than a ring of the same width, so it
        sits below the circle's scale to read as the same size */
     --glyph-person: 0.5; /* dot = 7.5px @ 15 base */
-    --glyph-gap: 2px;
+    --glyph-gap: var(--space-2xs);
 
     flex: none;
     display: inline-flex;
@@ -71,13 +71,13 @@
   .sg__ring {
     inline-size: calc(var(--_g) * var(--glyph-space));
     block-size: calc(var(--_g) * var(--glyph-space));
-    border: 1.5px solid var(--text-faint);
+    border: var(--line-thin) solid var(--text-faint);
     border-radius: var(--radius-circle);
   }
   .sg__diamond {
     inline-size: calc(var(--_g) * var(--glyph-project));
     block-size: calc(var(--_g) * var(--glyph-project));
-    border: 1.5px solid var(--text-faint);
+    border: var(--line-thin) solid var(--text-faint);
     /* radius proportional to size — a fixed 3px turned the small pill
        rhombus into a circle */
     border-radius: calc(var(--_g) * 0.14);
@@ -96,7 +96,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 4px;
+    border-radius: var(--radius-s);
     background: color-mix(in oklch, var(--c) 15%, var(--bg-ultra-light));
     color: var(--c);
     font-size: calc(var(--_g) * 0.62);

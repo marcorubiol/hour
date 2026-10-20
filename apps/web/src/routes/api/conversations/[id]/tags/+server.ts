@@ -13,34 +13,34 @@ import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
-import { json, UUID_RE } from '$lib/server/mail/http';
+import { jsonNoStore, UUID_RE } from '$lib/server/http';
 
 const BodySchema = v.object({
   tag_ids: v.pipe(v.array(v.pipe(v.string(), v.uuid())), v.minLength(1), v.maxLength(32)),
 });
 
 export const PUT: RequestHandler = async ({ request, params, platform, locals }) => {
-  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
   const jwt = extractAccessToken(request);
-  if (!jwt) return json({ error: 'missing_authorization' }, 401);
-  if (!UUID_RE.test(params.id)) return json({ error: 'invalid_id' }, 400);
+  if (!jwt) return jsonNoStore({ error: 'missing_authorization' }, 401);
+  if (!UUID_RE.test(params.id)) return jsonNoStore({ error: 'invalid_id' }, 400);
 
   let raw: unknown;
   try {
     raw = await request.json();
   } catch {
-    return json({ error: 'invalid_body' }, 400);
+    return jsonNoStore({ error: 'invalid_body' }, 400);
   }
   const parsed = v.safeParse(BodySchema, raw);
-  if (!parsed.success) return json({ error: 'invalid_body' }, 400);
+  if (!parsed.success) return jsonNoStore({ error: 'invalid_body' }, 400);
 
   try {
     const { data } = await pgPostRpc<string>(env, 'set_conversation_tags', jwt, {
       p_conversation_id: params.id,
       p_tag_ids: parsed.output.tag_ids,
     });
-    return json({ tag_ids: data });
+    return jsonNoStore({ tag_ids: data });
   } catch (err) {
     return pgErrorResponse(
       err,

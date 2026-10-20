@@ -15,7 +15,7 @@ import { serviceMailDb, type MailEnv } from './db';
 import { googleAdapter } from './gmail';
 import { effectiveSignature, withSignature, type SignatureParts } from '../../mail';
 
-export interface SendRequest {
+interface SendRequest {
   conversationId: string;
   accountId: string;
   subject: string;
@@ -23,7 +23,7 @@ export interface SendRequest {
   replyToEventId?: string | null;
 }
 
-export type SendOutcome =
+type SendOutcome =
   | { ok: true; providerMessageId: string; eventsCreated: number }
   | { ok: false; status: number; error: string };
 

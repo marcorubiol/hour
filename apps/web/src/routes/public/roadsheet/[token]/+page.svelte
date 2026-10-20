@@ -93,7 +93,7 @@
 
     .prs__gone h1 {
       font-family: var(--font-display);
-      font-size: clamp(1.4rem, 3vw, 1.8rem);
+      font-size: var(--text-xxl);
       font-weight: 400;
       color: var(--text-color);
     }

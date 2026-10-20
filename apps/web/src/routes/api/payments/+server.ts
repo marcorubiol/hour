@@ -13,6 +13,7 @@ import { PaymentCreateSchema, type PaymentItem } from '$lib/money';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import { decodeJwtPayload } from '$lib/server/session';
+import { json } from '$lib/server/http';
 
 const QuerySchema = v.object({
   invoice_id: v.optional(v.pipe(v.string(), v.uuid())),
@@ -33,13 +34,6 @@ const QuerySchema = v.object({
     '200',
   ),
 });
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  });
-}
 
 function parseUuidList(raw: string | undefined): string[] {
   if (!raw) return [];

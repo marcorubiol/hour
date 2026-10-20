@@ -19,10 +19,10 @@
 import { proposedSignature, withSignature, displayWebsite } from './mail';
 
 export const MAILOUT_LANGUAGES = ['es', 'ca', 'en', 'fr'] as const;
-export type MailoutLanguage = (typeof MAILOUT_LANGUAGES)[number];
+type MailoutLanguage = (typeof MAILOUT_LANGUAGES)[number];
 
 export const MERGE_FIELDS = ['nombre', 'sala', 'ciudad'] as const;
-export type MergeField = (typeof MERGE_FIELDS)[number];
+type MergeField = (typeof MERGE_FIELDS)[number];
 
 export type MailBasisKind = 'consent' | 'relationship' | 'generic';
 
@@ -43,13 +43,13 @@ export interface ComposeContext {
   privacy_url: string | null;
 }
 
-export interface MailoutDraft {
+interface MailoutDraft {
   subject: string;
   body: string;
   language: string;
 }
 
-export interface ComposedMail {
+interface ComposedMail {
   subject: string;
   text: string;
   html: string;
@@ -137,19 +137,19 @@ export function fieldsUsed(...texts: string[]): MergeField[] {
 }
 
 /** El valor de cada campo para un destinatario; null si no lo tiene. */
-export function mergeValues(ctx: ComposeContext, language: MailoutLanguage): Record<MergeField, string | null> {
+function mergeValues(ctx: ComposeContext, language: MailoutLanguage): Record<MergeField, string | null> {
   const sala = ctx.organization_name?.trim() || null;
   const nombre =
     ctx.address_kind === 'organization' ? (sala ? COPY[language].team(sala) : null) : ctx.contact_first_name?.trim() || null;
   return { nombre, sala, ciudad: ctx.city?.trim() || null };
 }
 
-export function fillFields(text: string, values: Record<MergeField, string | null>): string {
+function fillFields(text: string, values: Record<MergeField, string | null>): string {
   return text.replace(FIELD_RE, (whole, f: MergeField) => values[f] ?? whole);
 }
 
 /** La firma de la compañía: la guardada, o la que propone Hour. */
-export function companySignature(ctx: ComposeContext): string {
+function companySignature(ctx: ComposeContext): string {
   return (
     ctx.company_signature?.trim() ||
     proposedSignature(

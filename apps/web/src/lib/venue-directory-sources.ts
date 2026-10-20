@@ -31,7 +31,7 @@ type Kind =
   | 'other_stage';
 
 /** One record as build.mjs folds it (before its own normalisation and zone lookup). */
-export type SourceRecord = {
+type SourceRecord = {
   source: string;
   source_id: string;
   qid: string | null;
@@ -141,7 +141,7 @@ const EIEL_TYPE_LABEL: Record<string, string> = {
   OT: 'Otros, con uso de teatro o auditorio',
 };
 
-export type EielVerdict = { kind: Kind; designation: string } | { skip: string } | null;
+type EielVerdict = { kind: Kind; designation: string } | { skip: string } | null;
 
 /**
  * Whether an EIEL centre enters the directory, and as what. `uses` are its
@@ -186,7 +186,7 @@ export function eielId(prov: string, mun: string, ent: string, pob: string, orde
 }
 
 /** The rows of an EIEL table: pipe-separated, CRLF, no header. */
-export function eielRows(text: string): string[][] {
+function eielRows(text: string): string[][] {
   return text
     .split(/\r?\n/)
     .filter((l) => l.trim())

@@ -15,7 +15,7 @@
   import type { Crumb } from '$lib/record-crumbs';
   import ScheduleTable from '$lib/components/ScheduleTable.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
-  import { dayLabel } from '$lib/datetime';
+  import { dayLabel, viewerTimeZone } from '$lib/datetime';
   import { LOCALE_TAG, appLocale, t, type Locale } from '$lib/i18n';
   import { performanceStatusLabel, performanceStatusTone } from '$lib/performance';
   import type { Roadsheet } from '$lib/roadsheet';
@@ -48,7 +48,7 @@
     return word === key ? value.replace(/_/g, ' ') : word;
   }
 
-  const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const viewerTz = viewerTimeZone();
 
   let address = $derived<Crumb[]>(
     crumbs ?? [...(sheet.project ? [{ label: sheet.project.name }] : []), { label: t('roadsheet.title', locale) }],
@@ -217,7 +217,7 @@
       gap: var(--space-m);
       align-items: baseline;
       padding-block: var(--space-xs);
-      border-block-end: 1px solid var(--border-color-light);
+      border-block-end: var(--line-hairline) solid var(--border-color-light);
     }
 
     .rsv__role {

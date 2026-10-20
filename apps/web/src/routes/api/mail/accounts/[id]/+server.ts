@@ -14,19 +14,19 @@ import { pgErrorResponse } from '$lib/server/errors';
 import { decryptSecret, importMailKey, refreshTokenAad } from '$lib/server/mail/crypto';
 import { mailConfigured, serviceMailDb } from '$lib/server/mail/db';
 import { googleAdapter } from '$lib/server/mail/gmail';
-import { json, UUID_RE } from '$lib/server/mail/http';
+import { jsonNoStore, UUID_RE } from '$lib/server/http';
 
 export const DELETE: RequestHandler = async ({ request, params, platform, locals }) => {
-  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
   const env = platform.env;
   const supa = env as unknown as SupabaseEnv;
   const jwt = extractAccessToken(request);
-  if (!jwt) return json({ error: 'missing_authorization' }, 401);
-  if (!UUID_RE.test(params.id)) return json({ error: 'invalid_id' }, 400);
+  if (!jwt) return jsonNoStore({ error: 'missing_authorization' }, 401);
+  if (!UUID_RE.test(params.id)) return jsonNoStore({ error: 'invalid_id' }, 400);
 
   try {
     const can = await pgPostRpc<boolean>(supa, 'can_manage_mail_account', jwt, { p_account_id: params.id });
-    if (can.data[0] !== true) return json({ error: 'not_found' }, 404);
+    if (can.data[0] !== true) return jsonNoStore({ error: 'not_found' }, 404);
 
     if (mailConfigured(env)) {
       try {

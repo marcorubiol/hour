@@ -308,8 +308,8 @@
     font-style: italic;
   }
   .set-avatar-pick__big {
-    inline-size: 56px;
-    block-size: 56px;
+    inline-size: 3.5rem;
+    block-size: 3.5rem;
     border-radius: 50%;
     color: var(--bg);
     display: grid;

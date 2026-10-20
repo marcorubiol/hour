@@ -10,7 +10,7 @@
 import type { RequestHandler } from './$types';
 import { extractAccessToken } from '$lib/auth';
 import { pgErrorResponse } from '$lib/server/errors';
-import { json, UUID_RE } from '$lib/server/mail/http';
+import { jsonNoStore, UUID_RE } from '$lib/server/http';
 import {
   mailoutMissing,
   MailoutNotConfiguredError,
@@ -21,14 +21,14 @@ import {
 import { DOMAIN_PG_CODES, isAdmin, notConfigured, readDomain } from '$lib/server/mailout/http';
 
 export const POST: RequestHandler = async ({ request, params, platform, locals }) => {
-  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as MailoutEnv;
   const jwt = extractAccessToken(request);
-  if (!jwt) return json({ error: 'missing_authorization' }, 401);
-  if (!UUID_RE.test(params.id)) return json({ error: 'not_found' }, 404);
+  if (!jwt) return jsonNoStore({ error: 'missing_authorization' }, 401);
+  if (!UUID_RE.test(params.id)) return jsonNoStore({ error: 'not_found' }, 404);
   try {
     const domain = await readDomain(env, jwt, params.id);
-    if (!domain || !(await isAdmin(env, jwt, domain.workspace_id))) return json({ error: 'not_found' }, 404);
+    if (!domain || !(await isAdmin(env, jwt, domain.workspace_id))) return jsonNoStore({ error: 'not_found' }, 404);
     const missing = mailoutMissing(domain.provider, env);
     if (missing.length) return notConfigured(new MailoutNotConfiguredError(missing));
     const status = await sendingProvider(domain.provider, env).checkDomain({
@@ -38,7 +38,7 @@ export const POST: RequestHandler = async ({ request, params, platform, locals }
       configurationSet: domain.configuration_set,
     });
     await recordDomainStatus(env, domain.id, status);
-    return json({ item: await readDomain(env, jwt, domain.id) });
+    return jsonNoStore({ item: await readDomain(env, jwt, domain.id) });
   } catch (err) {
     if (err instanceof MailoutNotConfiguredError) return notConfigured(err);
     return pgErrorResponse(

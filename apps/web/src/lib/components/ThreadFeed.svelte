@@ -10,6 +10,7 @@
    */
 
   import { createQuery } from '@tanstack/svelte-query';
+  import { viewerTimeZone } from '$lib/datetime';
   import { toStore } from 'svelte/store';
   import { fetchJSON } from '$lib/api';
   import ThreadFeedRow from '$lib/components/ThreadFeedRow.svelte';
@@ -33,7 +34,7 @@
 
   let { filters, workspaceSlugById, projectNameById, locale }: Props = $props();
 
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const tz = viewerTimeZone();
 
   function params(f: Props['filters']): string {
     const p = new URLSearchParams();

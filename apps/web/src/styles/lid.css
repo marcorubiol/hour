@@ -19,12 +19,12 @@
     inline-size: 100%;
     padding: 0 0 var(--space-2xs);
     border: 0;
-    border-block-end: 1px solid var(--border-color-light);
+    border-block-end: var(--line-hairline) solid var(--border-color-light);
     background: none;
     cursor: pointer;
     font-family: var(--font-mono);
-    font-size: 9px;
-    letter-spacing: 0.14em;
+    font-size: var(--text-2xs);
+    letter-spacing: var(--tracking-xl);
     text-transform: uppercase;
     color: var(--text-faint);
   }

@@ -31,7 +31,7 @@ export interface Scope {
   tokens: string[];
 }
 
-export interface RecentScope extends Scope {
+interface RecentScope extends Scope {
   /** epoch ms of the last apply — decides evictions, never order */
   lastUsedAt: number;
 }

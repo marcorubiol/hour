@@ -38,9 +38,10 @@
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { spaceCrumb, type Crumb } from '$lib/record-crumbs';
-  import { dayMonth, dayMonthYear, dayMonthYearTs, localDayISO } from '$lib/datetime';
+  import { dayMonth, dayMonthYear, dayMonthYearTs, localDayISO, viewerTimeZone } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
+  import Dialog from '$lib/components/Dialog.svelte';
   import Field from '$lib/components/Field.svelte';
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
@@ -141,7 +142,7 @@
   // rejilla; desde aquí, la Agenda en su primer día con el proyecto fijado.
   let plannerHref = $derived.by(() => {
     if (!conv?.project || !lensOn('planner')) return null;
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const tz = viewerTimeZone();
     const days = bolos.flatMap((b) => (b.first_performed_at ? [dayKeyInTz(b.first_performed_at, tz)] : []));
     return conversationPlannerHref(conv.project.id, days, dayKeyInTz(new Date().toISOString(), tz));
   });
@@ -266,10 +267,15 @@
 
   // ADR-124: marking a shared one private makes it vanish for the rest of the
   // team, and only you can bring it back, so it asks first. Unmarking does not.
+  let confirmPrivate = $state(false);
   function togglePrivate() {
     if (!conv) return;
-    if (!conv.private && !window.confirm(t('mail.private_confirm', locale))) return;
-    $setPrivate.mutate(!conv.private);
+    if (conv.private) $setPrivate.mutate(false);
+    else confirmPrivate = true;
+  }
+  function confirmMakePrivate() {
+    confirmPrivate = false;
+    $setPrivate.mutate(true);
   }
 
   function what(e: ConversationEventItem): string {
@@ -720,6 +726,13 @@
   />
 {/if}
 
+<Dialog bind:open={confirmPrivate} size="s" title={t('mail.private_title', locale)} description={t('mail.private_confirm', locale)}>
+  {#snippet actions()}
+    <Button variant="quiet" onclick={() => (confirmPrivate = false)}>{t('create.cancel', locale)}</Button>
+    <Button onclick={confirmMakePrivate}>{t('mail.private_confirm_btn', locale)}</Button>
+  {/snippet}
+</Dialog>
+
 {#snippet teamThread(list: boolean)}
   {#if team && conv}
     <ThreadBlock
@@ -732,7 +745,7 @@
       authors={team.authors}
       me={team.me}
       newSince={teamSince}
-      tz={Intl.DateTimeFormat().resolvedOptions().timeZone}
+      tz={viewerTimeZone()}
       {list}
       {locale}
       onchange={refreshTeam}
@@ -1018,7 +1031,7 @@
       gap: var(--space-xs);
       margin-block: var(--space-s);
       padding-block-start: var(--space-s);
-      border-block-start: 1px solid var(--border-color-light);
+      border-block-start: var(--line-hairline) solid var(--border-color-light);
     }
     .reply__to {
       font-size: var(--text-s);
@@ -1079,7 +1092,7 @@
     }
     .privacy {
       padding-block: var(--space-s);
-      border-block: 1px solid var(--border-color-light);
+      border-block: var(--line-hairline) solid var(--border-color-light);
     }
     .privacy__row {
       display: flex;
@@ -1124,8 +1137,8 @@
       gap: var(--space-2xs);
       padding: var(--space-s) var(--space-m);
       background: var(--bg-ultra-light);
-      border: 1px solid var(--border-color-light);
-      border-inline-start: 2px solid var(--border-color-dark);
+      border: var(--line-hairline) solid var(--border-color-light);
+      border-inline-start: var(--line) solid var(--border-color-dark);
       border-radius: var(--radius);
     }
     .card--in {

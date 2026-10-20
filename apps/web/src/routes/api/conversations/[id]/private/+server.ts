@@ -13,26 +13,26 @@ import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import { pgPatch, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
-import { json, jwtSubject, UUID_RE } from '$lib/server/mail/http';
+import { jsonNoStore, jwtSubject, UUID_RE } from '$lib/server/http';
 
 const BodySchema = v.object({ private: v.boolean() });
 
 export const PUT: RequestHandler = async ({ request, params, platform, locals }) => {
-  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
   const jwt = extractAccessToken(request);
   const sub = jwt ? jwtSubject(jwt) : null;
-  if (!jwt || !sub) return json({ error: 'missing_authorization' }, 401);
-  if (!UUID_RE.test(params.id)) return json({ error: 'invalid_id' }, 400);
+  if (!jwt || !sub) return jsonNoStore({ error: 'missing_authorization' }, 401);
+  if (!UUID_RE.test(params.id)) return jsonNoStore({ error: 'invalid_id' }, 400);
 
   let raw: unknown;
   try {
     raw = await request.json();
   } catch {
-    return json({ error: 'invalid_body' }, 400);
+    return jsonNoStore({ error: 'invalid_body' }, 400);
   }
   const parsed = v.safeParse(BodySchema, raw);
-  if (!parsed.success) return json({ error: 'invalid_body' }, 400);
+  if (!parsed.success) return jsonNoStore({ error: 'invalid_body' }, 400);
 
   try {
     const { data } = await pgPatch<{ id: string; private_to: string | null }>(
@@ -42,8 +42,8 @@ export const PUT: RequestHandler = async ({ request, params, platform, locals })
       { private_to: parsed.output.private ? sub : null },
       { search: { id: `eq.${params.id}`, select: 'id,private_to' } },
     );
-    if (!data[0]) return json({ error: 'not_found' }, 404);
-    return json({ id: data[0].id, private: data[0].private_to !== null });
+    if (!data[0]) return jsonNoStore({ error: 'not_found' }, 404);
+    return jsonNoStore({ id: data[0].id, private: data[0].private_to !== null });
   } catch (err) {
     return pgErrorResponse(
       err,

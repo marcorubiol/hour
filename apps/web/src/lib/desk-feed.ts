@@ -34,7 +34,7 @@ import { invoiceAging, observedPayerTermsDays, type MoneyInvoiceItem } from './m
 /** `going`: a «voy · no voy» Hour asks about you (ADR-103); only «Te espera» has it. */
 export type DeskConcern = 'task' | 'conversation' | 'money' | 'going';
 
-export type BucketLabelKey =
+type BucketLabelKey =
   | 'overdue'
   | 'today'
   | 'tomorrow'
@@ -114,7 +114,7 @@ export interface DeskBucket {
   runs: DeskRun[];
 }
 
-export interface DeskFeedInput {
+interface DeskFeedInput {
   conversations: DeskConvInput[];
   tasks: TaskItem[];
   /** Only pass when the viewer can see fees; omit/empty to suppress money. */
@@ -131,7 +131,7 @@ export interface DeskFeedInput {
   asks?: DeskItem[];
 }
 
-export interface DeskReplyInput {
+interface DeskReplyInput {
   id: string;
   title: string;
   projectId: string | null;
@@ -198,7 +198,7 @@ export function dayBucket(
  * week, a block per day); everything past it folds into ONE `later` bucket
  * the page draws as a single line (`laterSummary`) that unfolds in place (the
  * Agenda has no tasks nor calls to show).
- * `dayBucket` itself keeps «next week» for the hall rail.
+ * `dayBucket` itself keeps «next week» for the Desk rail.
  */
 function horizonBucket(b: ReturnType<typeof dayBucket>): ReturnType<typeof dayBucket> {
   return b.sortKey >= 7 && b.sortKey < 99 ? { ...b, sortKey: 98, labelKey: 'later', weekday: '' } : b;
@@ -485,7 +485,7 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
 // ── «Te espera»: the short list, by weight ─────────────────────────────
 
 /** How many rows «Te espera» draws; the rest waits behind «Ver todo». */
-export const WAITING_ROWS = 7;
+const WAITING_ROWS = 7;
 /** How far ahead a «voy · no voy» is worth asking. */
 export const GOING_DAYS = 14;
 

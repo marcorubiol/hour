@@ -184,7 +184,6 @@ export function isValidHoldNotice(value: number | null | undefined): boolean {
  * migration. Array order is display order.
  */
 export const READINESS_KEYS = ['hotel', 'technical'] as const;
-
 export type ReadinessKey = (typeof READINESS_KEYS)[number];
 
 /** i18n key for a checklist item's word. */

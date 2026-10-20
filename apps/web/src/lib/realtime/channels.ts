@@ -7,10 +7,10 @@
  * UUIDs (the IDs we pass) never contain `:`.
  */
 
-export type WorkspaceChannel = `workspace:${string}`;
-export type WorkspacePresenceChannel = `workspace:${string}:presence`;
-export type ProjectChannel = `project:${string}`;
-export type ShowChannel = `show:${string}`;
+type WorkspaceChannel = `workspace:${string}`;
+type WorkspacePresenceChannel = `workspace:${string}:presence`;
+type ProjectChannel = `project:${string}`;
+type ShowChannel = `show:${string}`;
 
 export const channelName = {
   /** Broadcast/presence boundary at the workspace level. */

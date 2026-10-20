@@ -93,7 +93,7 @@ export interface PulseRef {
   tentative: boolean;
 }
 
-export interface PulseNow {
+interface PulseNow {
   /** What you are in. Null is the real answer «free», never «unknown». */
   doing: { word: PulseWord; ref: PulseRef } | null;
   /** The next boundary of the day, when there is one and it falls today.
@@ -118,12 +118,12 @@ export interface PulseNext {
   today: boolean;
 }
 
-export interface Pulse {
+interface Pulse {
   now: PulseNow;
   next: PulseNext | null;
 }
 
-export interface PulseInput {
+interface PulseInput {
   performances: readonly PerformanceEvent[];
   dates: readonly DateEvent[];
   /** The viewer's own zone — what «today» means, and the fallback for a
@@ -295,7 +295,7 @@ function dateEntry(d: DateEvent, viewerTz: string, attribution: PersonAttributio
  * passes — the sheet's next moment IS what comes next.
  */
 /** Whose function this is, by the pulse's rule: with an active person axis
-    it asks the axis; without one every function speaks. The Hall reads the
+    it asks the axis; without one every function speaks. The Desk reads the
     same rule, so its greeting and the rail never name different shows. */
 export function performanceAttribution(
   p: Pick<PerformanceEvent, 'project' | 'performed_at' | 'person_ids' | 'commitments'>,

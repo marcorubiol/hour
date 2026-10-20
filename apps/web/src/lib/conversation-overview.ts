@@ -57,10 +57,10 @@ export const BLOCK_ROWS = 5;
  * Sitio guardado en «Te toca» para los seguimientos vencidos: son lo único que
  * apuntaste tú, y diez respuestas no deben esconderlos (ADR-126 § 7).
  */
-export const FOLLOW_UP_ROWS = 2;
+const FOLLOW_UP_ROWS = 2;
 
 /** Las filas de «Se enfría»: las paradas primero, y siempre sitio para la segunda ronda. */
-export function coldBlockRows<R extends OverviewInput>(sorted: readonly R[], now: Date, size = BLOCK_ROWS): R[] {
+function coldBlockRows<R extends OverviewInput>(sorted: readonly R[], now: Date, size = BLOCK_ROWS): R[] {
   const stalled = sorted.filter((r) => coolingOf(r, now)?.group === 'stalled');
   const round = sorted.filter((r) => coolingOf(r, now)?.group === 'round');
   const stalledRows = Math.min(stalled.length, size - Math.min(round.length, FOLLOW_UP_ROWS));
@@ -68,13 +68,13 @@ export function coldBlockRows<R extends OverviewInput>(sorted: readonly R[], now
 }
 
 /** Las filas de «Te toca»: respuestas y, con sitio guardado, seguimientos. */
-export function dueBlockRows<R extends OverviewInput>(sorted: readonly R[], now: Date, size = BLOCK_ROWS): R[] {
+function dueBlockRows<R extends OverviewInput>(sorted: readonly R[], now: Date, size = BLOCK_ROWS): R[] {
   const replies = sorted.filter((r) => dueReason(r, now) === 'reply');
   const followUps = sorted.filter((r) => dueReason(r, now) === 'follow_up');
   const replyRows = Math.min(replies.length, size - Math.min(followUps.length, FOLLOW_UP_ROWS));
   return [...replies.slice(0, replyRows), ...followUps.slice(0, size - replyRows)];
 }
-export const HOT_ROWS = 6;
+const HOT_ROWS = 6;
 
 /** Los canales que cuentan para el turno: una nota no es una interacción. */
 export const TURN_KINDS = ['email', 'message', 'call'] as const;
@@ -132,7 +132,7 @@ export interface OverviewInput {
 
 // ── Turno ──────────────────────────────────────────────────────────────────
 
-export type TurnSide = 'ours' | 'theirs';
+type TurnSide = 'ours' | 'theirs';
 
 /** Lo que el turno lee: la relación (por «no esta vez») y lo atendido. */
 export type TurnRow = RelationInput & Pick<OverviewInput, 'reply_settled_at'>;
@@ -168,7 +168,7 @@ export function followUpDue(row: RelationInput & Pick<OverviewInput, 'next_actio
   return Boolean(row.next_action_at) && !closed(row, now) && daysSince(row.next_action_at!.slice(0, 10), now) >= 0;
 }
 
-export type DueReason = 'reply' | 'follow_up';
+type DueReason = 'reply' | 'follow_up';
 
 /** Por qué te toca, o null: primero una respuesta pendiente, después un seguimiento. */
 export function dueReason(row: TurnRow & Pick<OverviewInput, 'next_action_at'>, now: Date): DueReason | null {
@@ -185,11 +185,11 @@ export function isHot(row: RelationInput, now: Date): boolean {
   return hasAnswered(row) && activity !== null && daysSince(activity, now) <= HOT_DAYS;
 }
 
-export type CoolingReason = 'no_reply' | 'idle';
+type CoolingReason = 'no_reply' | 'idle';
 /** `round`: no contestó al envío, se recupera con otro; `stalled`: se hablaba de algo, una a una. */
-export type CoolingGroup = 'round' | 'stalled';
+type CoolingGroup = 'round' | 'stalled';
 
-export interface Cooling {
+interface Cooling {
   reason: CoolingReason;
   days: number;
   group: CoolingGroup;
@@ -293,7 +293,7 @@ export function countByRelation(rows: readonly RelationInput[], now: Date): Rela
  * temporada de un bolo es la de su primera función viva (ADR-131); uno sin
  * funciones todavía es de la temporada en curso, como una conversación.
  */
-export function seasonBoloCounts(rows: readonly Pick<OverviewInput, 'bolos'>[], season: Season): BoloCounts {
+function seasonBoloCounts(rows: readonly Pick<OverviewInput, 'bolos'>[], season: Season): BoloCounts {
   return countBolos(
     rows.flatMap((r) => r.bolos ?? []).filter(
       (b) => !b.first_performed_at || (b.first_performed_at >= season.start && b.first_performed_at <= season.end),
@@ -343,13 +343,13 @@ export function seasonByLine(rows: readonly OverviewInput[], now: Date, season: 
 }
 
 /** Las de una línea (`NO_LINE`: las que no tienen). */
-export function lineRows<R extends Pick<OverviewInput, 'line_id'>>(rows: readonly R[], linea: string): R[] {
+function lineRows<R extends Pick<OverviewInput, 'line_id'>>(rows: readonly R[], linea: string): R[] {
   return rows.filter((r) => (linea === NO_LINE ? r.line_id === null : r.line_id === linea));
 }
 
 // ── Los filtros de la lista ────────────────────────────────────────────────
 
-export type TurnFilter = 'nuestro' | 'suyo';
+type TurnFilter = 'nuestro' | 'suyo';
 /** `ronda` y `parada`: los dos grupos de «se enfría» (ADR-126 § 8). */
 export type TempFilter = 'caliente' | 'fria' | 'ronda' | 'parada' | 'sin-fecha';
 const TEMP_FILTERS: readonly string[] = ['caliente', 'fria', 'ronda', 'parada', 'sin-fecha'];

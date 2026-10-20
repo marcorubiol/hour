@@ -226,7 +226,7 @@
     display: grid;
     gap: var(--space-xs);
     padding: var(--space-m) var(--space-l);
-    border: 1px solid var(--suggest-edge);
+    border: var(--line-hairline) solid var(--suggest-edge);
     background: var(--suggest-wash);
     border-radius: var(--radius-l);
     /* The answer's room is held before the answer lands. */
@@ -317,7 +317,7 @@
     align-items: baseline;
     margin: var(--space-s) 0 0;
     /* On the card's text edge: its padding plus its 1px border. */
-    padding-inline: calc(var(--space-l) + 1px);
+    padding-inline: calc(var(--space-l) + var(--line-hairline));
     font-size: var(--text-s);
     color: var(--text-muted);
   }
@@ -360,7 +360,7 @@
       min-block-size: 6rem;
     }
     .then {
-      padding-inline: calc(var(--space-m) + 1px);
+      padding-inline: calc(var(--space-m) + var(--line-hairline));
     }
   }
 </style>

@@ -45,7 +45,7 @@ type PersonDbEmbed = Omit<PersonEmbed, 'organization_name'> & {
   organization: { name: string } | null;
 };
 
-export type PerformanceDetail = Omit<
+type PerformanceDetail = Omit<
   Tables<'performance'>,
   'fee_amount' | 'fee_currency' | 'deleted_at' | 'created_by' | 'previous_slugs'
 > &
@@ -110,7 +110,7 @@ export type PerformanceDetail = Omit<
   commitments: Commitment[];
 };
 
-export type CastMemberRow = {
+type CastMemberRow = {
   id: string;
   role: string;
   notes: string | null;

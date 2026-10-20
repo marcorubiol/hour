@@ -53,6 +53,7 @@ import {
   type ScheduleSlotRow,
   type TimeslotField,
 } from '$lib/schedule-slot';
+import { json } from '$lib/server/http';
 
 const ALLOWED_STATUSES = [
   'any',
@@ -90,13 +91,6 @@ const QuerySchema = v.object({
     '100',
   ),
 });
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  });
-}
 
 /** Comma-separated uuid list → deduped valid uuids (invalid dropped). */
 function parseUuidList(raw: string | undefined): string[] {

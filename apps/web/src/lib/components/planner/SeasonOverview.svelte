@@ -509,30 +509,30 @@
     /* ── The strip ──────────────────────────────────────────────────── */
     .strip {
       display: grid;
-      gap: 3px;
+      gap: var(--space-2xs);
     }
     .strip__row {
       display: grid;
       grid-template-columns: 4.2rem repeat(7, minmax(0, 1fr));
-      gap: 3px;
+      gap: var(--space-2xs);
     }
     .strip__dow span {
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size: var(--text-2xs);
       color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 0.08em;
-      padding-inline-start: 4px;
+      letter-spacing: var(--tracking-l);
+      padding-inline-start: var(--space-xs);
     }
     .wk {
       min-block-size: var(--touch-target);
       font-family: var(--font-mono);
-      font-size: 11px;
+      font-size: var(--text-xs);
       color: var(--text-muted);
       text-align: start;
       align-self: center;
       line-height: 1.2;
-      letter-spacing: 0.06em;
+      letter-spacing: var(--tracking-m);
       text-transform: uppercase;
       background: none;
       border: 0;
@@ -540,7 +540,7 @@
       cursor: pointer;
     }
     .wk__w {
-      font-size: 9px;
+      font-size: var(--text-2xs);
     }
     .wk b {
       color: var(--text-color);
@@ -554,17 +554,17 @@
       position: relative;
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: var(--space-2xs);
       align-items: stretch;
       min-height: 3.4rem;
       min-width: 0;
-      padding: 3px 4px 6px;
+      padding: var(--space-2xs) var(--space-xs) var(--space-xs);
       text-align: start;
       font: inherit;
       color: inherit;
       background: color-mix(in oklch, var(--text-color) 3%, transparent);
       border: 0;
-      border-radius: 2px;
+      border-radius: var(--radius-xs);
       cursor: pointer;
       overflow: hidden;
     }
@@ -597,12 +597,12 @@
        week's. 9px stays for what is only a key. */
     .d__n {
       font-family: var(--font-mono);
-      font-size: 11px;
+      font-size: var(--text-xs);
       color: var(--text-muted);
     }
     .d__n i {
       font-style: normal;
-      margin-inline-start: 3px;
+      margin-inline-start: var(--space-2xs);
       color: var(--text-color);
     }
     .d--today {
@@ -615,17 +615,17 @@
     .ev {
       display: flex;
       align-items: center;
-      gap: 3px;
-      font-size: 10.5px;
+      gap: var(--space-2xs);
+      font-size: var(--text-xs);
       line-height: 1.15;
-      border-radius: 2px;
-      padding: 1px 3px;
+      border-radius: var(--radius-xs);
+      padding: var(--line-hairline) var(--space-2xs);
       min-width: 0;
       white-space: nowrap;
     }
     .ev--date {
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size: var(--text-2xs);
       color: var(--text-muted);
       padding-inline: 0;
       overflow: hidden;
@@ -633,22 +633,22 @@
     }
     .ev__more {
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size: var(--text-2xs);
       color: var(--text-muted);
     }
     .d__travel {
       position: absolute;
       inset-block-start: 2px;
-      inset-inline-end: 12px;
-      font-size: 10px;
+      inset-inline-end: 0.75rem;
+      font-size: var(--text-xs);
       color: var(--text-muted);
     }
     .d__clash {
       position: absolute;
-      inset-block-start: 4px;
-      inset-inline-end: 4px;
-      width: 6px;
-      height: 6px;
+      inset-block-start: 0.25rem;
+      inset-inline-end: 0.25rem;
+      width: var(--dot-m);
+      height: var(--dot-m);
       border-radius: 50%;
       background: var(--danger);
     }
@@ -656,21 +656,21 @@
        for what «Choques» counts. */
     .d__decide {
       position: absolute;
-      inset-block-start: 4px;
-      inset-inline-end: 4px;
-      width: 6px;
-      height: 6px;
+      inset-block-start: 0.25rem;
+      inset-inline-end: 0.25rem;
+      width: var(--dot-m);
+      height: var(--dot-m);
       border-radius: 50%;
-      border: 1px solid var(--text-muted);
+      border: var(--line-hairline) solid var(--text-muted);
     }
     .d__decide--beside {
-      inset-inline-end: 12px;
+      inset-inline-end: 0.75rem;
     }
     .d__tour {
       position: absolute;
       inset-inline: 0;
       inset-block-end: 0;
-      height: 3px;
+      height: var(--dot-xs);
       /* Always deduced from two travel legs: the dotted rule is the voice of
          a guess in a box too narrow for italics. */
       background: repeating-linear-gradient(
@@ -682,30 +682,30 @@
     .strip__key {
       display: flex;
       flex-wrap: wrap;
-      gap: 4px 14px;
+      gap: var(--space-xs) var(--space-s);
       font-size: var(--text-xs);
       color: var(--text-muted);
-      margin: 4px 0 0;
+      margin: var(--space-xs) 0 0;
     }
     .k {
       display: inline-block;
-      width: 14px;
-      height: 9px;
+      width: 0.875rem;
+      height: 0.5625rem;
       vertical-align: -1px;
-      margin-inline-end: 4px;
-      border-radius: 2px;
+      margin-inline-end: var(--space-xs);
+      border-radius: var(--radius-xs);
     }
     /* The key draws the slip's own edges and paper (Slip.svelte § certainty). */
     .k--firm {
       background: var(--bg-ultra-light);
-      border: 1px solid color-mix(in oklch, var(--text-color) 15%, var(--border-color-light));
+      border: var(--line-hairline) solid color-mix(in oklch, var(--text-color) 15%, var(--border-color-light));
     }
     .k--option {
       background: var(--bg-ultra-light);
-      border: 1px dashed color-mix(in oklch, var(--text-color) 13%, var(--border-color-light));
+      border: var(--line-hairline) dashed color-mix(in oklch, var(--text-color) 13%, var(--border-color-light));
     }
     .k--tour {
-      height: 3px;
+      height: var(--dot-xs);
       vertical-align: 2px;
       background: repeating-linear-gradient(
         90deg,
@@ -721,15 +721,15 @@
       );
     }
     .k--decide {
-      width: 6px;
-      height: 6px;
+      width: var(--dot-m);
+      height: var(--dot-m);
       border-radius: 50%;
-      border: 1px solid var(--text-muted);
+      border: var(--line-hairline) solid var(--text-muted);
       vertical-align: 1px;
     }
     .k--clash {
-      width: 6px;
-      height: 6px;
+      width: var(--dot-m);
+      height: var(--dot-m);
       border-radius: 50%;
       background: var(--danger);
       vertical-align: 1px;
@@ -741,15 +741,15 @@
       /* Wide enough for the longest short range («24 oct → 25 oct»), and the
          range never wraps: rows of one list keep one height (diseño B7). */
       grid-template-columns: 6.8rem minmax(0, 1fr);
-      gap: 2px var(--space-s);
-      padding-block: 5px;
+      gap: var(--space-2xs) var(--space-s);
+      padding-block: var(--space-xs);
       text-decoration: none;
       color: inherit;
       font: inherit;
       text-align: start;
       background: none;
       border: 0;
-      border-block-end: 1px solid color-mix(in oklch, var(--text-color) 6%, transparent);
+      border-block-end: var(--line-hairline) solid color-mix(in oklch, var(--text-color) 6%, transparent);
       cursor: pointer;
       width: 100%;
     }
@@ -760,9 +760,9 @@
     .row__when {
       white-space: nowrap;
       font-family: var(--font-mono);
-      font-size: 10px;
+      font-size: var(--text-xs);
       color: var(--text-muted);
-      padding-block-start: 2px;
+      padding-block-start: var(--space-2xs);
     }
     .row__what {
       font-family: var(--font-display);
@@ -781,7 +781,7 @@
       font-family: var(--font-sans);
       font-size: var(--text-xs);
       color: var(--text-muted);
-      margin-inline-start: 6px;
+      margin-inline-start: var(--space-xs);
     }
     /* Where a tour came from is its own line, so its «·» never hangs at the
        end of the name's line. */
@@ -792,14 +792,14 @@
     .row__note {
       grid-column: 2;
       font-family: var(--font-mono);
-      font-size: 9.5px;
-      letter-spacing: 0.04em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-s);
       color: var(--text-muted);
     }
     .row__miss {
       grid-column: 2;
       display: flex;
-      gap: 4px;
+      gap: var(--space-xs);
       flex-wrap: wrap;
     }
     /* MUTED BY DEFAULT (diseño B8): «hotel», «técnica» on every row in
@@ -808,12 +808,12 @@
        call to make today. */
     .miss {
       font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.04em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-s);
       color: var(--text-muted);
-      border: 1px solid color-mix(in oklch, var(--text-color) 18%, transparent);
-      border-radius: 2px;
-      padding: 0 4px;
+      border: var(--line-hairline) solid color-mix(in oklch, var(--text-color) 18%, transparent);
+      border-radius: var(--radius-xs);
+      padding: 0 var(--space-xs);
     }
     .row--soon .miss:not(.miss--guess) {
       color: var(--warning-dark);
@@ -827,7 +827,7 @@
 
     /* ── Narrow: one column, the queue above the strip (the thumb's job),
        the strip as marks only. Measured on the ELEMENT (ADR-095 §8). ─── */
-    @container season (max-width: 640px) {
+    @container season (max-width: 40rem) {
       .ov__grid {
         grid-template-columns: minmax(0, 1fr);
         grid-template-areas: 'decide' 'strip' 'lists';
@@ -837,7 +837,7 @@
       }
       .strip__row {
         grid-template-columns: 2.2rem repeat(7, minmax(0, 1fr));
-        gap: 2px;
+        gap: var(--space-2xs);
       }
       .wk b,
       .wk__w {
@@ -845,11 +845,11 @@
       }
       .d {
         min-height: 2.2rem;
-        padding: 2px 2px 5px;
+        padding: var(--space-2xs) var(--space-2xs) var(--space-xs);
       }
       .d :global(.slip) {
         padding: 0;
-        height: 8px;
+        height: var(--dot-l);
       }
       .d :global(.slip > *),
       .ev__more,
@@ -858,7 +858,7 @@
         display: none;
       }
     }
-    @container season (min-width: 641px) and (max-width: 900px) {
+    @container season (min-width: 40.0625rem) and (max-width: 56.25rem) {
       .ov__grid {
         grid-template-columns: minmax(0, 1fr);
         grid-template-areas: 'strip' 'decide' 'lists';

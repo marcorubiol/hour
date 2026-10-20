@@ -16,6 +16,7 @@ import { extractAccessToken } from '$lib/auth';
 import { resolvePerformanceId } from '$lib/server/performance-bundle';
 import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
+import { json } from '$lib/server/http';
 
 const BodySchema = v.object({
   role: v.picklist(['venue', 'performer', 'tech_manager']),
@@ -27,13 +28,6 @@ type ShareRow = {
   role: string;
   created_at: string;
 };
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  });
-}
 
 function mapShare(s: ShareRow) {
   return { id: s.id, token: s.token, role: s.role, created_at: s.created_at };

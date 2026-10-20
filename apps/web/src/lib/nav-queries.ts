@@ -85,7 +85,7 @@ export function teamQueryOptions(workspaceIds: string[], opts?: { enabled?: bool
 }
 
 /** One workspace that holds my dossier — where I exist as a person. */
-export type MyDossier = {
+type MyDossier = {
   workspace_id: string;
   slug: string;
   full_name: string;

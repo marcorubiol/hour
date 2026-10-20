@@ -297,7 +297,7 @@
       padding-block: var(--space-s);
       padding-inline: var(--space-m);
       background: var(--bg-ultra-light);
-      border: 1px solid var(--border-color-dark);
+      border: var(--line-hairline) solid var(--border-color-dark);
       border-radius: var(--radius-l);
       transition: border-color var(--transition);
     }
@@ -360,20 +360,20 @@
       flex-wrap: wrap;
       gap: var(--space-s);
       padding-block-start: var(--space-s);
-      border-block-start: 1px solid var(--border-color-light);
+      border-block-start: var(--line-hairline) solid var(--border-color-light);
     }
 
     .tc__where {
       position: relative;
     }
     .tc__target {
-      --glyph: 12px;
+      --glyph: 0.75rem;
       display: inline-flex;
       align-items: center;
       gap: var(--space-2xs);
       padding-block: var(--space-2xs);
       padding-inline: var(--space-xs);
-      border: 1px solid var(--border-color-dark);
+      border: var(--line-hairline) solid var(--border-color-dark);
       border-radius: var(--radius-circle);
       background: var(--bg-light);
       cursor: pointer;
@@ -426,7 +426,7 @@
       color: var(--text-faint);
     }
     .tc__field input {
-      border: 1px solid var(--border-color-light);
+      border: var(--line-hairline) solid var(--border-color-light);
       border-radius: var(--radius-m);
       background: var(--bg-light);
       padding-block: var(--space-2xs);
@@ -454,7 +454,7 @@
     .tc__note {
       flex: 1 1 12rem;
       min-inline-size: 0;
-      border: 1px solid var(--border-color-light);
+      border: var(--line-hairline) solid var(--border-color-light);
       border-radius: var(--radius-m);
       background: var(--bg-light);
       padding-block: var(--space-2xs);
@@ -464,7 +464,7 @@
       color: var(--text-color);
     }
     .tc__addnote {
-      border: 1px dashed var(--border-color-dark);
+      border: var(--line-hairline) dashed var(--border-color-dark);
       border-radius: var(--radius-circle);
       background: transparent;
       padding-block: var(--space-2xs);
@@ -495,7 +495,7 @@
       transition: background var(--transition);
     }
     .tc__add:hover:not(:disabled) {
-      background: var(--neutral-semi-dark);
+      background: var(--fill-ink-hover);
     }
     .tc__add:disabled {
       opacity: 0.6;

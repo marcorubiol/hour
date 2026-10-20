@@ -332,7 +332,7 @@
     list-style: none;
     margin: 0;
     padding: 0;
-    border-block-start: 1px solid var(--border-color-light);
+    border-block-start: var(--line-hairline) solid var(--border-color-light);
   }
   .row {
     display: grid;
@@ -340,7 +340,7 @@
     grid-template-columns: subgrid;
     align-items: baseline;
     padding-block: var(--space-xs);
-    border-block-end: 1px solid var(--border-color-light);
+    border-block-end: var(--line-hairline) solid var(--border-color-light);
   }
   /* The wait row is a row's own lines in ghost: subject and context. */
   .row--wait {
@@ -355,7 +355,7 @@
   /* NO RED ON THE ROW (ADR-139 § 6): the block says «3 vencidas» once, in
      its head; the row keeps its concern's ink and says «vencido» in words. */
   .row--conversation .row__verb {
-    color: color-mix(in oklch, var(--primary) 60%, var(--text-muted));
+    color: color-mix(in oklch, var(--brand) 60%, var(--text-muted));
   }
   .row--money .row__verb {
     color: color-mix(in oklch, var(--success) 60%, var(--text-muted));
@@ -486,7 +486,7 @@
     gap: var(--space-xs);
     margin-block-start: var(--space-l);
     padding-block-start: var(--space-s);
-    border-block-start: 1px solid var(--border-color-light);
+    border-block-start: var(--line-hairline) solid var(--border-color-light);
   }
   .bucket:first-child {
     margin-block-start: 0;

@@ -242,7 +242,7 @@
     /* Under the field, in the gloss's voice: where it is, or that it is
        not known yet and which clock it reads in meanwhile. */
     .pf__s {
-      padding-block-start: 1px;
+      padding-block-start: var(--line-hairline);
       font-size: var(--text-xs);
       color: var(--text-faint);
       overflow-wrap: anywhere;
@@ -279,7 +279,7 @@
     .pf__credit {
       align-self: end;
       padding: var(--space-2xs) var(--space-xs) 0;
-      font-size: 9px;
+      font-size: var(--text-2xs);
       color: var(--text-faint);
       text-decoration: none;
     }

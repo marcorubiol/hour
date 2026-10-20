@@ -24,6 +24,7 @@
 
 <script lang="ts">
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
+  import { viewerTimeZone } from '$lib/datetime';
   import { lensOn } from '$lib/lenses.svelte';
   import { toStore } from 'svelte/store';
   import { fetchJSON } from '$lib/api';
@@ -96,7 +97,7 @@
   }: Props = $props();
 
   const locale = detectLocale(navigator.language);
-  const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const viewerTz = viewerTimeZone();
   const queryClient = useQueryClient();
 
   let cProject = $state('');

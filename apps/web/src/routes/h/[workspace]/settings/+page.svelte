@@ -112,7 +112,7 @@
      paints background + outer padding). We just need a centred article
      with a sensible reading measure. */
   .set-page {
-    --set-pad: clamp(16px, 1.6vw, 24px);
+    --set-pad: clamp(1rem, 1.6vw, 1.5rem);
 
     color: var(--text-color);
     font-family: var(--font-sans);
@@ -138,11 +138,11 @@
 
   .set-page :global(.set-row) {
     display: grid;
-    grid-template-columns: minmax(180px, 1fr) minmax(280px, 1.6fr);
+    grid-template-columns: minmax(11.25rem, 1fr) minmax(17.5rem, 1.6fr);
     gap: calc(var(--set-pad) * 1.4);
     align-items: start;
     padding-block: var(--set-pad);
-    border-block-end: 1px solid var(--border-color-light);
+    border-block-end: var(--line-hairline) solid var(--border-color-light);
   }
   .set-page :global(.set-row:last-child) {
     border-block-end: 0;

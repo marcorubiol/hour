@@ -10,13 +10,7 @@
 
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { STAGE_SELECT, placeStage, sameOrder, type TravelStageRow } from '$lib/travel-stage';
-
-export function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  });
-}
+import { json } from '$lib/server/http';
 
 export async function stagesOf(env: SupabaseEnv, jwt: string, dateId: string): Promise<TravelStageRow[]> {
   const search = new URLSearchParams();

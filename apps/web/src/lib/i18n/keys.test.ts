@@ -30,7 +30,7 @@ const SRC = join(import.meta.dirname, '..', '..');
 /** Login runs before a session exists, so it never picks a locale — those
     keys live in English only, on purpose (routes/login/+page.svelte). */
 const EN_ONLY = new Set(
-  Object.keys(en).filter((k) => k.startsWith('login.') || k === 'app.name'),
+  Object.keys(en).filter((k) => k.startsWith('login.')),
 );
 
 function sourceFiles(dir: string): string[] {

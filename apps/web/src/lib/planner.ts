@@ -14,7 +14,7 @@ import type { DateRow } from './date';
 import { decideBy, isHoldStatus, performanceStatusFamily } from './performance';
 import { t, type Locale } from './i18n';
 
-export interface PlannerDay {
+interface PlannerDay {
   /** ISO date, YYYY-MM-DD. */
   iso: string;
   /** False for leading/trailing days that pad the first/last week. */
@@ -129,7 +129,7 @@ export function dayKeyInTz(isoTimestamp: string, timeZone: string): string {
  * The raw material of a performance's roster, source-shape agnostic: the
  * project's canonical cast, the gig's cast overrides, the gig's crew.
  */
-export interface RosterParts {
+interface RosterParts {
   /** Person ids of the project's canonical cast (`cast_member`). */
   cast: string[];
   /** Per-gig substitutions (`cast_override`): who comes in, who they replace. */
@@ -165,7 +165,7 @@ export function rosterPersonIds(parts: RosterParts): string[] {
  * so this module stays importable client-side. The real bundle is
  * assignable as-is; extra fields ride along untouched.
  */
-export interface RosterBundle {
+interface RosterBundle {
   performance: {
     cast_override: Array<{
       person: { id: string } | null;
@@ -200,7 +200,7 @@ export function performanceRoster(bundle: RosterBundle): string[] {
   });
 }
 
-export type ConflictSeverity =
+type ConflictSeverity =
   | 'people'
   | 'double'
   | 'possible'
@@ -443,7 +443,7 @@ export interface Decision {
 }
 
 /** A quiet concurrence row (ADR-080 §3) — "es veu, no crida". */
-export interface Concurrence {
+interface Concurrence {
   id: string;
   day: string;
   month: string;
@@ -578,7 +578,7 @@ export function decisionsFor(input: {
 }
 
 /** One derived "fora" day-range (ADR-078 §6). Both ends inclusive. */
-export interface AwayBand {
+interface AwayBand {
   from: string;
   to: string;
   project_id: string;
@@ -622,7 +622,7 @@ export interface AwayBand {
  * (all_day rows), and a string slice keeps the function timezone-free.
  */
 /** A trip deduced from its two legs: the outbound day and its return day. */
-export interface TourTrip {
+interface TourTrip {
   project_id: string;
   line_id: string | null;
   out: string;

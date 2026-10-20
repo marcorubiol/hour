@@ -39,7 +39,7 @@
   import { accentVarFor } from '$lib/utils/accent';
   import { spaceName } from '$lib/utils/identity';
   import { detectLocale, LOCALE_TAG, t } from '$lib/i18n';
-  import { localeDayMonth } from '$lib/datetime';
+  import { localeDayMonth, viewerTimeZone } from '$lib/datetime';
   import { addDaysIso, dayKeyInTz, plannerDayHref } from '$lib/planner';
   import { page } from '$app/state';
   import { peekHref } from '$lib/peek';
@@ -111,7 +111,7 @@
   // «Reintentar» on any band: read again exactly what failed, nothing else.
   const retryFailed = () => void queryClient.refetchQueries({ predicate: (q) => q.state.status === 'error' });
   const locale = detectLocale(navigator.language);
-  const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const viewerTz = viewerTimeZone();
 
   // Tick on the minute so buckets roll over at midnight (shell-clock idiom).
   let clockNow = $state(new Date());
@@ -844,7 +844,7 @@
     /* The system's outline button (base.css), a step tighter in the sub line. */
     .desk__add[aria-expanded='true'] {
       --btn-text-color: var(--heading-color);
-      --btn-border-color: var(--neutral-semi-light);
+      --btn-border-color: var(--border-color-hover);
     }
     .desk__composer {
       margin-block-start: calc(-1 * var(--space-s));

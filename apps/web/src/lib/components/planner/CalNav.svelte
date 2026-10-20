@@ -70,17 +70,17 @@
     }
     .cal__arw {
       min-inline-size: var(--touch-target);
-      inline-size: 28px;
-      block-size: 28px;
+      inline-size: var(--control-size-xs);
+      block-size: var(--control-size-xs);
       display: inline-flex;
       align-items: center;
       justify-content: center;
       padding: 0;
-      border: 1px solid var(--border-color-light);
+      border: var(--line-hairline) solid var(--border-color-light);
       border-radius: var(--radius);
       background: var(--bg-ultra-light);
       color: var(--text-faint);
-      font-size: 13px;
+      font-size: var(--text-s);
       font-style: normal;
       line-height: 1;
       cursor: pointer;
@@ -90,13 +90,13 @@
       border-color: var(--text-faint);
     }
     .cal__now {
-      padding: 5px 12px;
-      border: 1px solid var(--border-color-light);
+      padding: var(--space-xs) var(--space-s);
+      border: var(--line-hairline) solid var(--border-color-light);
       border-radius: var(--radius-circle);
       background: var(--bg-ultra-light);
       color: var(--text-faint);
       font-family: inherit;
-      font-size: 12px;
+      font-size: var(--text-s);
       font-style: normal;
       line-height: 1.1;
       cursor: pointer;

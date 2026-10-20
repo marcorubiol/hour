@@ -15,7 +15,7 @@ import { localDayISO, realIsoDate } from './datetime';
 import { primaryContactPerson } from './conversation';
 import { t, type Locale } from './i18n';
 
-export type TaskStatus = Enums<'task_status'>;
+type TaskStatus = Enums<'task_status'>;
 
 /** Both statuses in schema enum order (runtime mirror of the DB enum). */
 export const TASK_STATUSES = Constants.public.Enums.task_status;
@@ -45,7 +45,7 @@ export const TaskCreateSchema = v.object({
   conversation_id: v.optional(v.pipe(v.string(), v.uuid())),
 });
 
-export type TaskCreate = v.InferOutput<typeof TaskCreateSchema>;
+type TaskCreate = v.InferOutput<typeof TaskCreateSchema>;
 
 /**
  * PATCH /api/tasks/:id body — field edits ride a direct PostgREST PATCH
@@ -70,8 +70,6 @@ export const TaskPatchSchema = v.object({
    */
   origin: v.optional(v.literal('manual')),
 });
-
-export type TaskPatch = v.InferOutput<typeof TaskPatchSchema>;
 
 /**
  * Shape the task endpoints return: the row plus the parent embeds every
@@ -154,7 +152,7 @@ export const TASK_SELECT = [
 
 // ── Surfacing (ADR-070) ─────────────────────────────────────────────────
 
-export type TaskSurfaceStateName =
+type TaskSurfaceStateName =
   | 'dormant'
   | 'anytime'
   | 'open'
@@ -162,7 +160,7 @@ export type TaskSurfaceStateName =
   | 'overdue'
   | 'done';
 
-export interface TaskSurface {
+interface TaskSurface {
   /** The calendar day (YYYY-MM-DD) the task surfaces, or null (anytime). */
   surfacesAt: string | null;
   state: TaskSurfaceStateName;

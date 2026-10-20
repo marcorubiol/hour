@@ -36,7 +36,7 @@ const KEY = Symbol('pins');
 const STORAGE_KEY = 'hour_pins';
 
 export type PinKind = 'space' | 'project' | 'line' | 'person';
-export type ParsedPin = { kind: PinKind; key: string };
+type ParsedPin = { kind: PinKind; key: string };
 
 export function spacePin(workspaceSlug: string): string {
   return `s:${workspaceSlug}`;

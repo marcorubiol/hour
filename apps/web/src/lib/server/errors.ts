@@ -18,6 +18,7 @@
  */
 
 import { PostgrestError } from '$lib/supabase';
+import { json } from '$lib/server/http';
 
 export interface PgErrorMapEntry {
   status: number;
@@ -27,24 +28,17 @@ export interface PgErrorMapEntry {
   hint?: string;
 }
 
-export interface PgErrorContext {
+interface PgErrorContext {
   /** Route + method for the log line, e.g. 'POST /api/venues'. */
   route: string;
   requestId?: string | null;
 }
 
-export interface PgErrorOptions {
+interface PgErrorOptions {
   codes?: Record<string, PgErrorMapEntry>;
   /** Upstream PostgREST statuses passed through verbatim (default [401] —
    * an expired/invalid JWT must surface as 401 so the client refreshes). */
   passUpstream?: number[];
-}
-
-function json(body: unknown, status: number): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  });
 }
 
 export function pgErrorResponse(

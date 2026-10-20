@@ -37,8 +37,6 @@ export const PaymentCreateSchema = v.object({
 	idempotency_key: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
 });
 
-export type PaymentCreate = v.InferOutput<typeof PaymentCreateSchema>;
-
 export interface PaymentItem {
 	id: string;
 	workspace_id: string;
@@ -66,7 +64,7 @@ export interface MoneyPayer {
 }
 
 /** An invoice's payer as the invoice feed embeds it: the organization. */
-export interface InvoicePayer {
+interface InvoicePayer {
 	id: string;
 	slug: string;
 	name: string;
@@ -79,16 +77,16 @@ export interface InvoicePayer {
  * `withhold` (−IRPF), or `exempt` (0 + a legal reason). Spain is just a preset
  * (esTaxLines); France (TVA) plugs in as another preset with no model change.
  */
-export type TaxLineKind = 'add' | 'withhold' | 'exempt';
+type TaxLineKind = 'add' | 'withhold' | 'exempt';
 
-export interface TaxLineInput {
+interface TaxLineInput {
 	label: string;
 	kind: TaxLineKind;
 	rate_pct: number;
 	exempt_reason?: string | null;
 }
 
-export interface InvoiceTaxLine extends TaxLineInput {
+interface InvoiceTaxLine extends TaxLineInput {
 	id: string;
 	base_amount: number;
 	amount: number;
@@ -153,7 +151,7 @@ export interface MoneyInvoiceItem {
 	payments: PaymentItem[];
 }
 
-export interface TermsInvoice {
+interface TermsInvoice {
 	id: string;
 	payer_organization_id: string | null;
 	issued_on: string;
@@ -244,7 +242,7 @@ export function observedPayerTermsDays(
  *  - `missing`: the organization has none yet;
  *  - `no_payer`: the draft has no payer organization.
  */
-export type PayerFiscalState = 'ready' | 'stale' | 'missing' | 'no_payer';
+type PayerFiscalState = 'ready' | 'stale' | 'missing' | 'no_payer';
 
 export function payerFiscalState(
 	invoice: Pick<MoneyInvoiceItem, 'payer_fiscal_identity_id' | 'payer'>,
@@ -254,24 +252,24 @@ export function payerFiscalState(
 	return invoice.payer.fiscal_identity_id ? 'stale' : 'missing';
 }
 
-export type AgingStateName = 'within' | 'approaching' | 'past-expected' | 'paid';
-export type AgingSource = 'explicit' | 'observed' | 'due' | 'default';
+type AgingStateName = 'within' | 'approaching' | 'past-expected' | 'paid';
+type AgingSource = 'explicit' | 'observed' | 'due' | 'default';
 
 /**
  * An issued invoice with no expected date, no due date and no observed terms
  * of its payer is expected this many days after issue (ADR-123): without it,
  * the debt most likely to be forgotten never fell due.
  */
-export const DEFAULT_TERMS_DAYS = 60;
+const DEFAULT_TERMS_DAYS = 60;
 
-export interface AgingInvoice extends TermsInvoice {
+interface AgingInvoice extends TermsInvoice {
 	status: string;
 	due_on: string | null;
 	expected_on: string | null;
 	observed_terms_days?: number | null;
 }
 
-export interface InvoiceAgingState {
+interface InvoiceAgingState {
 	expectedOn: string | null;
 	expectedDays: number | null;
 	daysRunning: number;
@@ -454,9 +452,6 @@ export const BOLO_OPEN_STATUSES = [
 
 export const BOLO_MOVE_STATUSES = [...BOLO_OPEN_STATUSES, 'cancelled', 'done'] as const;
 
-export type BoloOpenStatus = (typeof BOLO_OPEN_STATUSES)[number];
-export type BoloMoveStatus = (typeof BOLO_MOVE_STATUSES)[number];
-
 // ── El radar de cobro de Cuentas (ADR-117) ──────────────────────────────────
 //
 // Todo lo que la lente cuenta sale de aquí, puro y con el reloj inyectado: la
@@ -495,14 +490,14 @@ export interface MoneyBolo {
 export type InvoicingMode = 'off' | 'interno' | 'legal';
 
 /** Statuses that count as sold (ADR-087); holds and proposed are pipeline. */
-export const CONTRACTED_STATUSES = ['confirmed', 'done', 'invoiced', 'paid'] as const;
+const CONTRACTED_STATUSES = ['confirmed', 'done', 'invoiced', 'paid'] as const;
 
 export function isContracted(status: string): boolean {
 	return (CONTRACTED_STATUSES as readonly string[]).includes(status);
 }
 
 /** Pipeline: not yet a deal (proposed, any hold). */
-export function isInProgress(status: string): boolean {
+function isInProgress(status: string): boolean {
 	return status === 'proposed' || status.startsWith('hold');
 }
 
@@ -597,7 +592,7 @@ export function invoiceAging(
 
 // ── Un bolo, mirado una vez ──
 
-export type CollectState = 'full' | 'partial' | 'unpaid' | 'none';
+type CollectState = 'full' | 'partial' | 'unpaid' | 'none';
 
 export interface BoloMoney {
 	currency: string;
@@ -705,7 +700,7 @@ export function boloMoney(b: MoneyBolo, ctx: MoneyContext): BoloMoney {
 
 // ── Registrar un cobro (ADR-123) ──
 
-export interface PaymentProposal {
+interface PaymentProposal {
 	/** The issued document the payment goes against; null = anchored to the bolo. */
 	invoiceId: string | null;
 	/** What is still owed: the document's open amount WITH taxes, else the fee less collected. */
@@ -737,7 +732,7 @@ export function paymentProposal(b: MoneyBolo, m: BoloMoney): PaymentProposal {
 
 // ── Las cuatro cifras, por moneda ──
 
-export interface MoneyPosition {
+interface MoneyPosition {
 	currency: string;
 	/** Por cobrar (all seasons: a debt does not expire with the season). */
 	owed: number;
@@ -861,7 +856,7 @@ export function isQuietPosition(p: MoneyPosition): boolean {
 
 // ── Pide atención ──
 
-export type AttentionKind = 'overdue' | 'to_invoice' | 'draft' | 'fiscal' | 'no_fee';
+type AttentionKind = 'overdue' | 'to_invoice' | 'draft' | 'fiscal' | 'no_fee';
 
 export interface AttentionItem {
 	kind: AttentionKind;
@@ -930,7 +925,7 @@ export function attentionItems(bolos: readonly MoneyBolo[], ctx: MoneyContext): 
 
 // ── Lo que entra ──
 
-export interface InflowMonth {
+interface InflowMonth {
 	/** "2026-10". */
 	month: string;
 	/** Issued, unpaid, expected that month (from today on). */
@@ -939,7 +934,7 @@ export interface InflowMonth {
 	contracted: number;
 }
 
-export interface InflowForecast {
+interface InflowForecast {
 	currency: string;
 	months: InflowMonth[];
 	/** Issued and unpaid with no expected date, no due date and no observed terms: placed at DEFAULT_TERMS_DAYS. */

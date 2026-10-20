@@ -65,12 +65,12 @@ export function conversationPatchColumns(patch: ConversationPatch, now: Date = n
 
 export type ConversationEventKind = Enums<'conversation_event_kind'>;
 export type ConversationEventDirection = Enums<'conversation_event_direction'>;
-export type ConversationEvent = Tables<'conversation_event'>;
+type ConversationEvent = Tables<'conversation_event'>;
 
 export const CONVERSATION_EVENT_KINDS = Constants.public.Enums.conversation_event_kind;
-export const CONVERSATION_EVENT_DIRECTIONS = Constants.public.Enums.conversation_event_direction;
+const CONVERSATION_EVENT_DIRECTIONS = Constants.public.Enums.conversation_event_direction;
 
-export const EVENT_KIND_KEYS: Record<ConversationEventKind, string> = {
+const EVENT_KIND_KEYS: Record<ConversationEventKind, string> = {
   email: 'conversations.kind_email',
   call: 'conversations.kind_call',
   meeting: 'conversations.kind_meeting',
@@ -78,7 +78,7 @@ export const EVENT_KIND_KEYS: Record<ConversationEventKind, string> = {
   note: 'conversations.kind_note',
 };
 
-export const EVENT_DIRECTION_KEYS: Record<ConversationEventDirection, string> = {
+const EVENT_DIRECTION_KEYS: Record<ConversationEventDirection, string> = {
   outbound: 'conversations.dir_outbound',
   inbound: 'conversations.dir_inbound',
 };
@@ -116,7 +116,7 @@ export function occurredAtForDay(day: string, now: Date = new Date()): string | 
 }
 
 /** Columns the timeline reads; the whole envelope stays server-side. */
-export const CONVERSATION_EVENT_SELECT =
+const CONVERSATION_EVENT_SELECT =
   'id,conversation_id,occurred_at,recorded_at,kind,source,direction,body';
 
 export type ConversationEventItem = Pick<
@@ -243,7 +243,7 @@ export const ContactSetSchema = v.object({
   since: v.optional(v.nullable(realIsoDate)),
   is_primary: v.optional(v.boolean()),
 });
-export type ContactSet = v.InferOutput<typeof ContactSetSchema>;
+type ContactSet = v.InferOutput<typeof ContactSetSchema>;
 
 /**
  * POST /api/conversations/:id/contacts with a person who may have no dossier
@@ -258,14 +258,12 @@ export const ContactAddInlineSchema = v.object({
   }),
   role: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(CONTACT_ROLE_MAX)))),
 });
-export type ContactAddInline = v.InferOutput<typeof ContactAddInlineSchema>;
 
 /** PATCH /api/conversations/:id/contacts — close a contact (until, default today). */
 export const ContactEndSchema = v.object({
   person_id: v.pipe(v.string(), v.uuid()),
   until: v.optional(v.nullable(realIsoDate)),
 });
-export type ContactEnd = v.InferOutput<typeof ContactEndSchema>;
 
 export interface ContactRowLite {
   person_id: string;
@@ -294,7 +292,7 @@ export function contactSetArgs(
   };
 }
 
-export type ConversationCreate = v.InferOutput<typeof ConversationCreateSchema>;
+type ConversationCreate = v.InferOutput<typeof ConversationCreateSchema>;
 
 /**
  * Shape the conversation endpoints return: the row plus the person/project
@@ -307,7 +305,7 @@ export type PersonLite = Pick<
 >;
 export type ProjectLite = Pick<Tables<'project'>, 'id' | 'slug' | 'name' | 'status'>;
 
-export type OrganizationLite = Pick<
+type OrganizationLite = Pick<
   Tables<'workspace_organization'>,
   'id' | 'slug' | 'name' | 'kind' | 'city'
 >;
@@ -379,7 +377,7 @@ export function sortContacts(contacts: readonly ConversationContact[]): Conversa
   });
 }
 
-export interface ConversationContactGroup {
+interface ConversationContactGroup {
   /** Person id, or a conversation-scoped fallback for a missing embed. */
   key: string;
   person: PersonLite | null;
@@ -473,7 +471,7 @@ export interface ConversationDbItem extends Tables<'conversation'> {
 }
 
 /** The old status someone set by hand, kept by the E1 migration (ADR-138 § 8.5). */
-export function legacyStatus(customFields: unknown): string | null {
+function legacyStatus(customFields: unknown): string | null {
   const v = (customFields as { legacy_status?: unknown } | null)?.legacy_status;
   return typeof v === 'string' ? v : null;
 }

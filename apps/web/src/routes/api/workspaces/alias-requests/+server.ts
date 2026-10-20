@@ -16,13 +16,7 @@ import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  });
-}
+import { json } from '$lib/server/http';
 
 export type AliasRequestRow = {
   id: string;

@@ -340,7 +340,7 @@
       gap: 0;
       width: 100%;
       min-width: 0;
-      padding: 4px 6px;
+      padding: var(--space-xs) var(--space-xs);
       text-align: left;
       text-decoration: none;
       background: var(--bg-ultra-light);
@@ -350,10 +350,10 @@
          The card then appeared to gain its outline on hover, which reads as
          the hover DRAWING the box rather than darkening it. This is the
          prototype's own value: the ink mixed 15% into the line colour. */
-      border: 1px solid color-mix(in oklch, var(--text-color) 15%, var(--border-color-light));
+      border: var(--line-hairline) solid color-mix(in oklch, var(--text-color) 15%, var(--border-color-light));
       /* 3px, not the 4 of `--radius-s`: «solo un poquito en redondito».
          At the size of a month cell the extra point reads as a chip. */
-      border-radius: 3px;
+      border-radius: var(--radius-xs);
       color: var(--text-color);
     }
     /* JUST MADE: a wash and a ring in the focus colour that fade to the
@@ -375,7 +375,7 @@
       }
     }
     .slip + :global(.slip) {
-      margin-block-start: 3px;
+      margin-block-start: var(--space-2xs);
     }
     /* NO PAPER. Every word keeps its size, its ink and its order; only the
        object it was sitting on goes. `border: 0` and not a transparent edge
@@ -393,7 +393,7 @@
       display: flex;
       align-items: center;
       flex-wrap: wrap;
-      gap: 1px 6px;
+      gap: var(--line-hairline) var(--space-xs);
       width: 100%;
       min-width: 0;
       /* The wrapped head keeps a hairline: two 10px line boxes at 1.05 with
@@ -404,7 +404,7 @@
     .slip__pack {
       display: inline-flex;
       align-items: center;
-      gap: 5px;
+      gap: var(--space-xs);
       flex: none; /* the pack NEVER yields — see the header note */
     }
     .slip__mark {
@@ -413,7 +413,7 @@
       border-radius: var(--radius-s);
     }
     .slip__mark:focus-visible {
-      outline: 1px solid var(--text-muted);
+      outline: var(--line-hairline) solid var(--text-muted);
       outline-offset: 1px;
     }
     /* ONE VOICE FOR THE PACK AND THE CLOCK. The hour sat one ink step above
@@ -424,8 +424,8 @@
        hour before you know what kind of thing it belongs to. */
     .slip__kind {
       font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.1em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-l);
       text-transform: uppercase;
       color: var(--text-muted);
       white-space: nowrap;
@@ -443,7 +443,7 @@
        it is a label on the hour, not a second measurement. */
     .slip__t {
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size: var(--text-2xs);
       color: var(--text-color);
       font-variant-numeric: tabular-nums;
       white-space: nowrap;
@@ -456,11 +456,11 @@
     .slip__pre {
       font-style: normal;
       font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.14em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-xl);
       text-transform: uppercase;
       color: var(--text-faint);
-      margin-inline-end: 4px;
+      margin-inline-end: var(--space-xs);
     }
 
     /* ── state · plain text, never a pill ───────────────────────────────
@@ -468,10 +468,10 @@
        the venue you came there to read. Same words, same place, no box. */
     .slip__state {
       align-self: flex-start;
-      margin-block: 0 1px;
+      margin-block: 0 var(--line-hairline);
       font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.06em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-m);
       text-transform: uppercase;
       color: var(--text-muted);
       /* Without the pill the chip is plain text, so in a narrow cell it has to
@@ -500,7 +500,7 @@
       overflow: hidden;
       text-overflow: ellipsis;
       max-width: 100%;
-      font-size: 11px;
+      font-size: var(--text-xs);
       line-height: 1.22;
       color: var(--text-color);
       /* Last-resort valve only: it fires when a single word cannot fit,
@@ -514,7 +514,7 @@
        place a show and a press call were drawn at the same weight. */
     .slip[data-kind='show'] .slip__n {
       font-family: var(--font-display);
-      font-size: 13px;
+      font-size: var(--text-s);
     }
 
     .slip__c {
@@ -524,24 +524,24 @@
       line-clamp: var(--slip-city-lines, 2);
       overflow: hidden;
       text-overflow: ellipsis;
-      margin-block-start: -1px;
-      font-size: 9px;
+      margin-block-start: calc(-1 * var(--line-hairline));
+      font-size: var(--text-2xs);
       color: var(--text-faint);
       overflow-wrap: anywhere;
       word-break: normal;
     }
     .slip__cc {
       font-style: normal;
-      margin-inline-start: 4px;
-      letter-spacing: 0.06em;
+      margin-inline-start: var(--space-xs);
+      letter-spacing: var(--tracking-m);
       opacity: 0.8;
     }
     .slip__tz {
       display: block;
-      margin-block-start: 2px;
+      margin-block-start: var(--space-2xs);
       font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.05em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-s);
       color: var(--text-faint);
       font-variant-numeric: tabular-nums;
       white-space: nowrap;
@@ -582,8 +582,8 @@
          gets away with `-1px` because its name is 13px in a 76px box; a
          diary row is 16px across a full page and the same leading reads as a
          collision. */
-      row-gap: 2px;
-      padding: 7px 8px;
+      row-gap: var(--space-2xs);
+      padding: var(--space-xs) var(--space-xs);
       border: 0;
       border-radius: 0;
       background: none;
@@ -593,7 +593,7 @@
       grid-row: 1;
       flex-direction: column;
       align-items: flex-start;
-      gap: 2px;
+      gap: var(--space-2xs);
     }
     .slip[data-placing='row'] .slip__state {
       grid-column: 1;
@@ -619,7 +619,7 @@
     .slip[data-placing='row'] .slip__cast {
       grid-column: 2;
       grid-row: 4;
-      margin-block-start: 2px;
+      margin-block-start: var(--space-2xs);
     }
     .slip[data-placing='row'] .slip__acts {
       grid-column: 3;
@@ -629,10 +629,10 @@
     /* A ROW HAS THE WIDTH THE CELL NEVER HAD, so the gig takes the step the
        design gives it here: 16 over 13, where the month says 13 over 11. */
     .slip[data-placing='row'][data-kind='show'] .slip__n {
-      font-size: 16px;
+      font-size: var(--text-m);
     }
     .slip[data-placing='row'] .slip__n {
-      font-size: 13.5px;
+      font-size: var(--text-s);
     }
     .slip__acts {
       display: inline-flex;
@@ -655,8 +655,8 @@
     .slip[data-placing='compact'] {
       flex-direction: row;
       align-items: center;
-      gap: 3px;
-      padding: 1px 3px;
+      gap: var(--space-2xs);
+      padding: var(--line-hairline) var(--space-2xs);
       white-space: nowrap;
     }
     .slip[data-placing='compact'] + :global(.slip) {
@@ -682,18 +682,18 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      font-size: 10.5px;
+      font-size: var(--text-xs);
       line-height: 1.15;
       color: var(--text-color);
     }
     .slip[data-placing='compact'][data-kind='show'] .slip__n,
     .slip[data-placing='compact'][data-kind='show'] .slip__c {
       font-family: var(--font-display);
-      font-size: 10.5px;
+      font-size: var(--text-xs);
     }
     /* Too narrow for a place that can be read: the monogram alone, never
        «Giro…». The title still says everything. */
-    @container (max-width: 60px) {
+    @container (max-width: 3.75rem) {
       .slip[data-placing='compact'] .slip__n,
       .slip[data-placing='compact'] .slip__c {
         display: none;
@@ -756,7 +756,7 @@
     .slip[data-family='released'] .slip__n {
       color: var(--text-faint);
       text-decoration: line-through;
-      text-decoration-thickness: 1px;
+      text-decoration-thickness: var(--line-hairline);
     }
     .slip[data-family='released'] .slip__c,
     .slip[data-family='released'] .slip__t {
@@ -788,7 +788,7 @@
        Colour and width doing one job is one variable too many. */
     .slip[data-clash] {
       --clash-ink: var(--info);
-      border-inline-start: 1.5px dashed
+      border-inline-start: var(--line-thin) dashed
         color-mix(in oklch, var(--clash-ink) 62%, var(--border-color-light));
     }
     .slip[data-clash-people] {
@@ -831,9 +831,9 @@
     /* A PHONE'S MONTH CELL (≈48px) split a card one word per line and cut the
        next one at the edge (móvil #2). Below this the card is its monogram:
        whose, and that there is something; the day says the rest. */
-    @container (max-width: 72px) {
+    @container (max-width: 4.5rem) {
       .slip[data-placing='cell'] {
-        padding: 2px;
+        padding: var(--space-2xs);
       }
       .slip[data-placing='cell'] > :not(.slip__h),
       .slip[data-placing='cell'] .slip__kind,
@@ -841,7 +841,7 @@
         display: none;
       }
     }
-    @container (max-width: 142px) {
+    @container (max-width: 8.875rem) {
       /* THE END HOUR GOES, THE START STAYS — the range is still in the title.
          Half a range is not an assertion, so it is dropped whole rather than
          clipped: `10h–14h` becomes `10h`, never `10h–1…`. */
@@ -849,7 +849,7 @@
         display: none;
       }
     }
-    @container (max-width: 126px) {
+    @container (max-width: 7.875rem) {
       /* a gloss is the FIRST thing to go, and never the hour */
       .slip__tz {
         display: none;
@@ -867,17 +867,17 @@
          would be drawn at the same weight — the family swap would be carrying
          the distinction alone. 12/11 at this width, 13/11 above it. */
       .slip[data-kind='show'] .slip__n {
-        font-size: 12px;
+        font-size: var(--text-s);
         line-height: 1.2;
       }
       /* Row gap tight, COLUMN gap not: the clock now sits immediately after
          the kind word, and 2px there is not separation — `SHOW?18h30` reads
          as one token. Six is a word space. */
       .slip__h {
-        gap: 2px 6px;
+        gap: var(--space-2xs) var(--space-xs);
       }
       .slip {
-        padding: 4px 3px 5px;
+        padding: var(--space-xs) var(--space-2xs) var(--space-xs);
       }
     }
   }

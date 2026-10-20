@@ -14,13 +14,7 @@ import { extractAccessToken } from '$lib/auth';
 import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import { AudienceQuerySchema, type ThreadAudience } from '$lib/threads';
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  });
-}
+import { json } from '$lib/server/http';
 
 export const GET: RequestHandler = async ({ url, request, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);

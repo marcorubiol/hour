@@ -6,7 +6,7 @@
 import * as v from 'valibot';
 
 export type MailAccountScope = 'personal' | 'workspace';
-export type MailAccountStatus = 'active' | 'revoked' | 'error';
+type MailAccountStatus = 'active' | 'revoked' | 'error';
 
 /** Las columnas que `authenticated` puede leer (grant por columnas). */
 export const MAIL_ACCOUNT_SELECT =
@@ -43,8 +43,6 @@ export const MailSendSchema = v.object({
   body: v.pipe(v.string(), v.minLength(1), v.maxLength(20000)),
   reply_to_event_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
 });
-
-export type MailSend = v.InferOutput<typeof MailSendSchema>;
 
 /**
  * Lo que el registro enseña de un correo: sale de `conversation_event.metadata`
@@ -160,4 +158,3 @@ export const SignaturePutSchema = v.variant('scope', [
   }),
 ]);
 
-export type SignaturePut = v.InferOutput<typeof SignaturePutSchema>;

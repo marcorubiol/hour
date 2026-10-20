@@ -310,7 +310,7 @@
       gap: var(--space-xs);
       margin-block-start: var(--space-m);
       padding-block-start: var(--space-m);
-      border-block-start: 1px solid var(--border-color-light);
+      border-block-start: var(--line-hairline) solid var(--border-color-light);
     }
 
     .ews__address-current {

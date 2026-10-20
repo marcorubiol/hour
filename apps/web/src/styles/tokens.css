@@ -12,6 +12,38 @@
     parallel scale.
   - Contextual tokens derive from base hues so theme switching (light/dark/
     presenter/...) flips by redefining contextuals only.
+
+  THE RULE OF VALUES (cleanup 2026-10-19, build/plans/2026-10-19-cleanup.md;
+  guarded by src/styles/tokens-guard.test.ts, which runs in test:unit):
+  1. Type is never px: font-size from the scale (--text-2xs … --text-xxl,
+     --h1 … --h6, --stat-*) or em of its parent; letter-spacing from
+     --tracking-*; line-height a number.
+  2. Space is never px: padding, margin, gap and box insets from --space-*;
+     a 1-3px gap is --space-2xs, or --line-hairline when it is a line's width.
+  3. Lines by token: border, outline, ring (box-shadow 0 0 0 N) and rule
+     widths from --line-*.
+  4. Radii, drawn marks and controls by token: --radius-*, --dot-*,
+     --control-size-*, --touch-target.
+  5. Durations and curves by token: --transition, --duration-*, --ease-*.
+  6. z-index: what floats over the app takes the scale (--z-dropdown,
+     --z-sticky, --z-modal, --z-toast); a component may stack its own parts
+     with 1-19 inside its own stacking context; 20+ without a token is an
+     error.
+  7. Colour: a component reads contextuals (--text-*, --bg-*,
+     --border-color-*, --heading-color, --link-*, --focus-color, --tone-*,
+     --tag-*, --accent-*, --away-*, --state-*) or the status family (--info,
+     --success, --warning, --danger and their shades). Never --primary*,
+     --neutral*, --base*, --white, --black nor a literal colour. Deriving
+     from a token with color-mix() or oklch(from var(…)) is fine.
+  8. px may stay only in: 1-4px optical nudges in transform, vertical-align,
+     text-underline-offset, outline-offset and the inset of a drawn
+     pseudo-element; the 0px a calc() needs; the geometry of a drawn pattern
+     (background-size/-position, mask), which is material (certainty.css or
+     the component that draws it). A breakpoint in a media or container
+     query is a measure in rem (Marco, 2026-10-19): the root is 16px, so the
+     cut does not move.
+  9. One treatment, one home: the first reuse of a drawing extracts it to
+     styles/*.css or a component, and both consume it.
 */
 
 @layer tokens {
@@ -109,6 +141,34 @@
     --heading-color: var(--neutral-ultra-dark);
 
     /* ============================================================ */
+    /* CONTEXTUAL — tones (the one map of fill + ink + accent per      */
+    /* tone; chips, badges, avatars and toasts consume it, base.css)   */
+    /* ============================================================ */
+
+    --tone-neutral-bg: var(--neutral-ultra-light);
+    --tone-neutral-fg: var(--neutral-ultra-dark);
+    --tone-neutral-accent: var(--neutral-dark);
+    --tone-primary-bg: var(--primary-ultra-light);
+    --tone-primary-fg: var(--primary-ultra-dark);
+    --tone-primary-accent: var(--primary);
+    --tone-info-bg: var(--info-ultra-light);
+    --tone-info-fg: var(--info-ultra-dark);
+    --tone-info-accent: var(--info);
+    --tone-success-bg: var(--success-ultra-light);
+    --tone-success-fg: var(--success-ultra-dark);
+    --tone-success-accent: var(--success);
+    --tone-warning-bg: var(--warning-ultra-light);
+    --tone-warning-fg: var(--warning-ultra-dark);
+    --tone-warning-accent: var(--warning);
+    --tone-danger-bg: var(--danger-ultra-light);
+    --tone-danger-fg: var(--danger-ultra-dark);
+    --tone-danger-accent: var(--danger);
+    /* Faint — what is over (paid, done, asleep): the neutral, faded. */
+    --tone-faint-bg: var(--neutral-ultra-light);
+    --tone-faint-fg: var(--neutral-semi-dark);
+    --tone-faint-accent: var(--neutral);
+
+    /* ============================================================ */
     /* CONTEXTUAL — surfaces                                          */
     /* Unified scale. Light side derives from --base (warm cream) to  */
     /* keep the v0.5 editorial look; dark side from --neutral (cool   */
@@ -134,6 +194,36 @@
 
     --border-color-dark: color-mix(in oklch, var(--neutral) 18%, transparent);
     --border-color-light: color-mix(in oklch, var(--neutral) 9%, transparent);
+    /* the border of a control the pointer is on */
+    --border-color-hover: var(--neutral-semi-light);
+
+    /* ============================================================ */
+    /* CONTEXTUAL — fills of a control                                */
+    /* ============================================================ */
+
+    /* Ink fill: the primary button, the pill that is on, the switch that is
+       on. --primary stays for focus, links and selection (ADR-033). */
+    --fill-ink: var(--text-color);
+    --fill-ink-hover: var(--neutral-semi-dark);
+    /* What a dialog or a phone drawer is drawn over. */
+    --backdrop: color-mix(in srgb, var(--black) 40%, transparent);
+    /* Ink on an accent fill (the rail's scope glyph). */
+    --accent-fg: var(--white);
+    /* The identity monogram (IdentityMark): a soft tint of the accent over a
+       surface, and a forced-legible ink of the same hue at a fixed lightness
+       so contrast holds on every hue. Dark and other themes retune these. */
+    --identity-tint: 16%;
+    --identity-tint-base: var(--bg-ultra-light);
+    --identity-ink-l: 0.42;
+    /* The money bar's two lighter steps (Cuentas): how much ink each mixes
+       into the sunk surface. Dark lifts them: the track sits at 25% L there,
+       so the steps need more ink to stay apart (68 · 55 · 42 · 25). */
+    --money-invoiced-ink: 60%;
+    --money-open-ink: 16%;
+    /* The brand hue where a component uses it on purpose (a feed's dot, the
+       identity panel's apply, the offline page's retry). Everything else
+       reaches the hue through its role: focus, link, check, selection. */
+    --brand: var(--primary);
 
     /* ============================================================ */
     /* CONTEXTUAL — absence (Marco, 2026-08-10)                       */
@@ -271,8 +361,17 @@
     --heading-letter-spacing: -0.02em;
 
     --mono-font-family: var(--font-mono);
-    --mono-letter-spacing: 0.02em; /* lowercase mono runs (tag chips, state badges) */
-    --mono-letter-spacing-loose: 0.04em; /* uppercase mono micro-labels (anchor chips, pins, cell dates). .eyebrow keeps its own 0.14em. */
+
+    /* Tracking — one scale for every letter-spacing (rule 1). The values are
+       the ones the components had already settled on; a theme retunes the
+       scale, never a component. */
+    --tracking-xs: 0.02em; /* lowercase mono runs (tag chips, state badges) */
+    --tracking-s: 0.04em; /* uppercase mono micro-labels (anchor chips, pins, cell dates) */
+    --tracking-m: 0.06em; /* table heads, the cast line */
+    --tracking-l: 0.1em; /* the margin voice: lids, verbs, in-cell eyebrows */
+    --tracking-xl: 0.14em; /* .eyebrow — the page/module eyebrow */
+    --mono-letter-spacing: var(--tracking-xs);
+    --mono-letter-spacing-loose: var(--tracking-s);
 
     /* Type scale — modular + fluid. Body (--text-m) is the anchor: 16px @desktop,
        14px @mobile. Each step is a MAJOR THIRD (×1.25) at the desktop max and a
@@ -280,6 +379,11 @@
        To retune: change the anchor/ratios and regenerate all six — keep the ratio
        exact, don't hand-edit individual clamps. (2026-07-19: replaced the bespoke
        hand-tuned scale whose xs→s jump read a touch big.) */
+    /* The margin voice — mono micro-labels inside a cell, a lid, a verb at
+       the edge of a row. The planner drew it at 9px everywhere; on the scale
+       it runs 8.5 to 9.5 across 375↔1440 like its siblings (Marco, 2026-10-19),
+       and on a phone it takes the same floor as --text-xs. */
+    --text-2xs: clamp(0.5313rem, 0.5092rem + 0.0939vw, 0.5938rem); /* 8.5-9.5 */
     --text-xs: clamp(0.6076rem, 0.5962rem + 0.049vw, 0.64rem); /* 9.7-10.2 — eyebrows, badges */
     --text-s: clamp(0.7292rem, 0.7042rem + 0.106vw, 0.8rem); /* 11.7-12.8 — dense rows, lens labels, secondary */
     --text-m: clamp(0.875rem, 0.831rem + 0.188vw, 1rem); /* 14-16 — default body (anchor) */
@@ -292,6 +396,10 @@
     --stat-inline: var(--text-l);
     --text-xxl: clamp(1.512rem, 1.3567rem + 0.663vw, 1.9531rem); /* 24.2-31.3 — section title, h2 */
 
+    /* Display — larger than any heading, for the public and pre-session
+       pages only: the login's title and the invite's hero. */
+    --display-l: clamp(2.2rem, 4vw, 2.8rem);
+    --display-xl: clamp(2.3rem, 7vw, 4.6rem);
     --h1: clamp(1.8rem, 1.5rem + 1.5vw, 2.4rem); /* 29-38 — masthead. Retuned 2026-07-12 to the size mastheads actually render (person/performance canonical); the old 32-48 was never consumed — every page rolled its own clamp to undershoot it. */
     --h2: var(--text-xxl);
     --h3: clamp(1.2rem, 1.05rem + 0.7vw, 1.5rem);
@@ -371,16 +479,25 @@
        sign-out, ThemeToggle, etc.). Fixed (not clamped) so the trailing
        icon column inside menus and rows stays optically aligned across
        viewport sizes. */
+    --control-size-xs: 1.75rem; /* 28px — the planner's arrows and view squares */
     --control-size-s: 2rem; /* 32px — icon action default */
     /* A filter bar's fields and buttons share one height, so their tops
        line up (Conversations review, diseño M9; other bars, coherence pass). */
     --control-size-m: 2.5rem; /* 40px */
+
+    /* Drawn marks — the dot that says «something here», the tick, the
+       square before a word. Geometry of a glyph, not space (rule 4). */
+    --dot-xs: 3px;
+    --dot-s: 4px;
+    --dot-m: 6px;
+    --dot-l: 8px;
 
     /* ============================================================ */
     /* RADIUS — semantic scale (no duplicate aliases)                 */
     /* ============================================================ */
 
     --radius: 6px;
+    --radius-xs: 2px;
     --radius-s: 4px;
     --radius-m: var(--radius);
     --radius-l: 10px;
@@ -393,7 +510,16 @@
     /* BORDERS                                                        */
     /* ============================================================ */
 
-    --border-size: 1px;
+    /* Lines — every drawn width (rule 3): the hairline that separates, the
+       thin line a glyph is drawn with, the rule that underlines a choice,
+       the thick rule of a selection, the bar at the start of a card. */
+    --line-hairline: 1px;
+    --line-thin: 1.5px;
+    --line: 2px;
+    --line-thick: 3px;
+    --line-bar: 4px;
+
+    --border-size: var(--line-hairline);
     --border-width: var(--border-size);
     --border-style: solid;
     --border: var(--border-size) var(--border-style) var(--border-color-dark);
@@ -421,12 +547,22 @@
       color-mix(in srgb, var(--black) 10%, transparent);
     --box-shadow-3: 0 8px 24px -4px
       color-mix(in srgb, var(--black) 14%, transparent);
+    /* A sheet floating over the page (the invite card). */
+    --box-shadow-4: 0 24px 80px color-mix(in srgb, var(--text-color) 8%, transparent);
+    /* The lift a settled card earns in a cell (the month's confirmed gig):
+       in the text's ink, so it follows the mode. */
+    --box-shadow-lift:
+      0 1px 2px color-mix(in oklch, var(--text-color) 10%, transparent),
+      0 2px 5px color-mix(in oklch, var(--text-color) 6%, transparent);
 
     /* ============================================================ */
     /* TRANSITIONS                                                    */
     /* ============================================================ */
 
     --transition-duration: 0.2s;
+    --duration-fast: 0.1s; /* a hover that must not lag: opacity, a colour */
+    --duration-slow: 0.3s; /* a thing that arrives: the agenda's end rising */
+    --duration-spin: 0.6s; /* one turn of a spinner */
     --transition-timing: ease;
     --transition-delay: 0s;
     --transition:
@@ -484,7 +620,7 @@
     /* ============================================================ */
 
     --focus-color: var(--primary);
-    --focus-width: 2px;
+    --focus-width: var(--line);
     --focus-offset: 2px;
 
     /* JUST MADE: the card the quick add drew, said once and let go
@@ -571,6 +707,7 @@
     /* Z-INDEX scale                                                  */
     /* ============================================================ */
 
+    --z-raised: 1; /* a part over its sibling, inside the component's own stacking context */
     --z-dropdown: 100;
     --z-sticky: 200;
     --z-modal: 300;
@@ -581,6 +718,49 @@
     background: var(--selection-bg);
     color: var(--selection-fg);
   }
+
+  /* Contracts set by a data attribute: contextual variables a component
+     consumes without knowing which hue is behind them. They live here, with
+     the other contextual tokens, so base.css and the components read no hue. */
+  /* Tone contract — component-agnostic. Anything carrying data-tone gets
+     --state-color / --state-border to consume (calendar dots, week items). :where() keeps specificity at
+     zero so components can still override locally. */
+  :where([data-tone="neutral"]) {
+    --state-color: var(--text-muted);
+    --state-border: var(--border-color-dark);
+  }
+  :where([data-tone="info"]) {
+    --state-color: var(--info);
+    --state-border: var(--info);
+  }
+  :where([data-tone="success"]) {
+    --state-color: var(--success);
+    --state-border: var(--success);
+  }
+  :where([data-tone="warning"]) {
+    --state-color: var(--warning);
+    --state-border: var(--warning);
+  }
+  :where([data-tone="danger"]) {
+    --state-color: var(--danger);
+    --state-border: var(--danger);
+  }
+  :where([data-tone="faint"]) {
+    --state-color: var(--text-faint);
+    --state-border: var(--border-color-light);
+  }
+
+  /* The tone of each relation (ADR-138) for what draws one without being a
+     pill (the season bar of Conversations): `--status` is the family, mixed
+     once with one recipe (diseño B6). The pill itself is the one status
+     badge, `StateBadge`, with the tone `relationTone()` gives. */
+  [data-relation='never'] { --status: var(--neutral); }
+  [data-relation='contacted'] { --status: var(--info); }
+  [data-relation='talking'] { --status: var(--warning); }
+  [data-relation='regular'] { --status: var(--primary); }
+  /* Asleep: the neutral, faded, as the faint pill fades it. */
+  [data-relation='dormant'] { --status: color-mix(in oklab, var(--neutral) 45%, transparent); }
+  [data-relation='not_now'] { --status: var(--danger); }
 
   /* ============================================================ */
   /* MODE — dark                                                    */
@@ -594,8 +774,10 @@
   @media (pointer: coarse) {
     :root {
       --touch-target: 44px;
-      /* A floor for the smallest step on a phone (móvil #10 of the Desk):
-         9.7px is an eyebrow on a desk, a squint in a hand. */
+      /* A floor for the smallest steps on a phone (móvil #10 of the Desk):
+         9.7px is an eyebrow on a desk, a squint in a hand. The margin voice
+         takes the same floor, so on a phone the two smallest steps meet. */
+      --text-2xs: 0.6875rem;
       --text-xs: 0.6875rem;
     }
   }
@@ -728,6 +910,13 @@
     --selection-bg: color-mix(in oklch, var(--primary) 35%, transparent);
     --selection-fg: var(--neutral);
 
+    /* Identity monogram: lift the tint off the dark canvas, flip the ink light. */
+    --identity-tint: 24%;
+    --identity-tint-base: var(--bg);
+    --identity-ink-l: 0.9;
+    --money-invoiced-ink: 72%;
+    --money-open-ink: 30%;
+
     /* Form pieces (ADR-139 p4): the dialog's edge and its veil both step
        up, or the paper reads as part of the page behind it. */
     --dialog-edge: var(--border-color-dark);
@@ -819,5 +1008,141 @@
 
     /* Slate warm-light so primary remains the same "brown ink" feeling. */
     --primary: oklch(74% 0.09 50);
+  }
+
+  /* ============================================================ */
+  /* THEME — stress (the crash test, never offered in the UI)       */
+  /* ============================================================ */
+  /* Everything exaggerated at once, so that whatever does NOT       */
+  /* change on screen is a value a component still owns. Activate   */
+  /* with `localStorage.hour_theme = 'stress'` (theme-init.js reads */
+  /* it) or `<html data-theme="stress">`. Redefines contextuals and */
+  /* the scales only; a component is never touched. The surfaces   */
+  /* are set explicitly, as dark mode does, because a dark --base  */
+  /* breaks the light-side derivations.                            */
+
+  :root[data-theme="stress"] {
+    color-scheme: dark;
+
+    /* Hues: a green-black canvas, bone ink, an orange brand. */
+    --base: oklch(24% 0.05 160);
+    --neutral: oklch(90% 0.04 95);
+    --primary: oklch(72% 0.19 45);
+    --info: oklch(75% 0.14 220);
+    --success: oklch(78% 0.16 130);
+    --warning: oklch(82% 0.16 85);
+    --danger: oklch(70% 0.2 15);
+
+    --bg: var(--base);
+    --bg-ultra-light: oklch(32% 0.05 160);
+    --bg-light: oklch(28% 0.05 160);
+    --bg-dark: oklch(85% 0.04 95);
+    --bg-ultra-dark: oklch(94% 0.03 95);
+    --bg-hover: oklch(30% 0.06 160);
+    --bg-active: oklch(34% 0.06 160);
+
+    --heading-color: var(--primary);
+    --text-light: oklch(20% 0.04 160);
+    --text-muted: color-mix(in oklab, var(--neutral), var(--base) 18%);
+    --text-faint: color-mix(in oklab, var(--neutral), var(--base) 34%);
+
+    --neutral-ultra-light: color-mix(in oklab, var(--neutral), var(--base) 82%);
+    --neutral-semi-dark: color-mix(in oklch, var(--neutral), white 40%);
+    --neutral-dark: color-mix(in oklch, var(--neutral), white 45%);
+    --neutral-ultra-dark: color-mix(in oklch, var(--neutral), white 55%);
+    --primary-ultra-light: color-mix(in oklab, var(--primary), var(--base) 78%);
+    --primary-dark: color-mix(in oklch, var(--primary), white 30%);
+    --primary-ultra-dark: color-mix(in oklch, var(--primary), white 55%);
+    --info-ultra-light: color-mix(in oklab, var(--info), var(--base) 78%);
+    --info-dark: color-mix(in oklch, var(--info), white 45%);
+    --info-ultra-dark: color-mix(in oklch, var(--info), white 55%);
+    --success-ultra-light: color-mix(in oklab, var(--success), var(--base) 78%);
+    --success-dark: color-mix(in oklch, var(--success), white 45%);
+    --success-ultra-dark: color-mix(in oklch, var(--success), white 55%);
+    --warning-ultra-light: color-mix(in oklab, var(--warning), var(--base) 78%);
+    --warning-dark: color-mix(in oklch, var(--warning), white 45%);
+    --warning-ultra-dark: color-mix(in oklch, var(--warning), white 55%);
+    --danger-ultra-light: color-mix(in oklab, var(--danger), var(--base) 78%);
+    --danger-dark: color-mix(in oklch, var(--danger), white 45%);
+    --danger-ultra-dark: color-mix(in oklch, var(--danger), white 55%);
+
+    --border-color-dark: color-mix(in oklch, var(--primary) 55%, transparent);
+    --border-color-light: color-mix(in oklch, var(--primary) 30%, transparent);
+    --border-color-hover: var(--primary);
+    --backdrop: color-mix(in srgb, var(--primary) 30%, transparent);
+    --dialog-backdrop: var(--backdrop);
+
+    --tag-amber-bg: oklch(34% 0.08 80);  --tag-amber-fg: oklch(88% 0.1 80);
+    --tag-blue-bg: oklch(34% 0.08 240);  --tag-blue-fg: oklch(88% 0.1 240);
+    --tag-teal-bg: oklch(34% 0.08 180);  --tag-teal-fg: oklch(88% 0.1 180);
+    --tag-green-bg: oklch(34% 0.08 150); --tag-green-fg: oklch(88% 0.1 150);
+    --tag-purple-bg: oklch(34% 0.08 300); --tag-purple-fg: oklch(88% 0.1 300);
+    --tag-red-bg: oklch(34% 0.08 20);    --tag-red-fg: oklch(88% 0.1 20);
+    --tag-neutral-bg: oklch(34% 0.03 160); --tag-neutral-fg: var(--text-muted);
+    --accent-custom-l: 75%;
+    --accent-custom-c: 0.16;
+    --selection-bg: color-mix(in oklch, var(--primary) 45%, transparent);
+    --selection-fg: var(--neutral);
+    --identity-tint: 30%;
+    --identity-tint-base: var(--bg);
+    --identity-ink-l: 0.95;
+    --box-shadow-1: 0 0 0 var(--line) color-mix(in oklch, var(--primary) 40%, transparent);
+    --box-shadow-2: 0 0 0 var(--line-thick) color-mix(in oklch, var(--primary) 50%, transparent);
+    --box-shadow-3: 0 0 0 var(--line-bar) color-mix(in oklch, var(--primary) 60%, transparent);
+
+    /* Type: every family swapped, the scale a step louder, the micro voice
+       readable, tracking wide. */
+    --font-display: "Impact", "Arial Black", sans-serif;
+    --font-sans: "Georgia", "Times New Roman", serif;
+    --font-mono: "Courier New", Courier, monospace;
+    --text-line-height: 1.8;
+    --heading-line-height: 1.2;
+    --heading-letter-spacing: 0.04em;
+    --text-2xs: 0.75rem;
+    --text-xs: 0.875rem;
+    --text-s: 1rem;
+    --text-m: 1.125rem;
+    --text-l: 1.5rem;
+    --text-xl: 1.875rem;
+    --text-xxl: 2.5rem;
+    --h1: 3.5rem;
+    --h3: 2rem;
+    --display-l: 4rem;
+    --display-xl: 6rem;
+    --tracking-xs: 0.05em;
+    --tracking-s: 0.1em;
+    --tracking-m: 0.15em;
+    --tracking-l: 0.25em;
+    --tracking-xl: 0.35em;
+
+    /* Density: every step of space half again, lines heavy, corners round. */
+    --space-2xs: 0.25rem;
+    --space-xs: 0.625rem;
+    --space-s: 1.125rem;
+    --space-m: 1.75rem;
+    --space-l: 2.75rem;
+    --space-xl: 4rem;
+    --space-xxl: 6rem;
+    --gutter: 3rem;
+    --line-hairline: 2px;
+    --line-thin: 3px;
+    --line: 4px;
+    --line-thick: 6px;
+    --line-bar: 8px;
+    --radius: 18px;
+    --radius-xs: 8px;
+    --radius-s: 12px;
+    --radius-l: 28px;
+    --radius-xl: 36px;
+    --dot-xs: 6px;
+    --dot-s: 8px;
+    --dot-m: 12px;
+    --dot-l: 16px;
+    --control-size-xs: 2.5rem;
+    --control-size-s: 3rem;
+    --control-size-m: 3.5rem;
+    --transition-duration: 0s;
+    --duration-fast: 0s;
+    --duration-slow: 0s;
   }
 }

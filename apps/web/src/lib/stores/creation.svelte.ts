@@ -11,7 +11,7 @@ import { getContext, setContext } from 'svelte';
 
 const KEY = Symbol('creation');
 
-export class CreationStore {
+class CreationStore {
   lineOpen = $state(false);
   projectOpen = $state(false);
   workspaceOpen = $state(false);

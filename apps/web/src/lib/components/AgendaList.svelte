@@ -61,7 +61,7 @@
   import { agendaChunks, dayMarked, emptyTailMonths, type AgendaDayStats } from '$lib/agenda-chunks';
   import { awayRest, coversDay } from '$lib/away';
   import { SvelteMap } from 'svelte/reactivity';
-  import { dualTime, hourMark, localeDayMonth, localeWeekdayShort } from '$lib/datetime';
+  import { dualTime, hourMark, localeDayMonth, localeWeekdayShort, viewerTimeZone } from '$lib/datetime';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { accentVarFor } from '$lib/utils/accent';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
@@ -206,7 +206,7 @@
     clashesByDay,
     decisionsByDay,
     locale = appLocaleTag(),
-    todayIso = dayKeyInTz(new Date().toISOString(), Intl.DateTimeFormat().resolvedOptions().timeZone),
+    todayIso = dayKeyInTz(new Date().toISOString(), viewerTimeZone()),
     dateKindLabel = (kind: string) => kind.replace(/_/g, ' '),
     viewerTimeLabel = (time: string) => t('planner.viewer_time', L, { time }),
     statusLabel = (status: string) => statusWord(status, L),
@@ -273,7 +273,7 @@
     return onDateOpen ? { type: 'button', onclick: () => onDateOpen(d) } : {};
   }
 
-  const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const viewerTz = viewerTimeZone();
 
   const workspacesQuery = createQuery(workspacesQueryOptions());
   let workspaceSlugById = $derived(
@@ -598,7 +598,7 @@
   let narrow = $state(false);
   let panelOpen = $state(false);
   $effect(() => {
-    const mq = matchMedia('(max-width: 560px)');
+    const mq = matchMedia('(max-width: 35rem)');
     const apply = () => {
       narrow = mq.matches;
       if (!mq.matches) panelOpen = false;
@@ -1216,7 +1216,7 @@
       --ag-margin: 15rem;
       position: relative;
       display: grid;
-      grid-template-columns: 1fr var(--ag-notes-w, 0px);
+      grid-template-columns: 1fr var(--ag-notes-w, 0);
       align-content: start;
       transition: opacity var(--transition);
       /* ONE CONTINUOUS RULE DOWN THE MARGIN, drawn by the diary and not by each
@@ -1262,16 +1262,16 @@
       background: none;
       text-align: center;
       font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.1em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-l);
       text-transform: uppercase;
       color: var(--text-faint);
       cursor: pointer;
       transition:
-        max-block-size 0.3s ease,
-        padding-block 0.3s ease,
-        transform 0.3s ease,
-        opacity 0.25s;
+        max-block-size var(--duration-slow) ease,
+        padding-block var(--duration-slow) ease,
+        transform var(--duration-slow) ease,
+        opacity var(--duration-slow);
     }
     .ag__earlier--in,
     .ag__earlier:focus-visible {
@@ -1307,14 +1307,14 @@
       padding-inline-end: var(--ag-margin);
       text-align: center;
       font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.1em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-l);
       text-transform: uppercase;
       color: var(--text-faint);
       overflow: hidden;
       /* Mounted by an {#if}, so it POPPED. It slides out from beneath the
          row above instead — same motion as the door it often replaces. */
-      animation: ag-endrise 0.3s ease-out;
+      animation: ag-endrise var(--duration-slow) ease-out;
     }
     @keyframes ag-endrise {
       from {
@@ -1345,13 +1345,13 @@
       inline-size: 100%;
       padding: var(--space-s) 0 var(--space-2xs);
       border: 0;
-      border-block-start: 1px solid var(--border-color-light);
+      border-block-start: var(--line-hairline) solid var(--border-color-light);
       background: none;
       text-align: start;
       cursor: pointer;
       font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.1em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-l);
       text-transform: uppercase;
       color: var(--text-faint);
       /* Stops BEFORE the margin's rule: the tally belongs to the days, not
@@ -1410,8 +1410,8 @@
 .ag__monthdiv-t {
       margin-inline-start: auto;
       font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.1em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-l);
       text-transform: uppercase;
       color: var(--text-faint);
       text-align: end;
@@ -1448,7 +1448,7 @@
          that do not — no reserved emptiness. */
       grid-template-columns: 6rem minmax(0, 1fr) var(--ag-margin);
       align-items: start;
-      border-block-end: 1px solid var(--border-color-light);
+      border-block-end: var(--line-hairline) solid var(--border-color-light);
     }
 .ag__day--empty {
       min-block-size: 2.5rem;
@@ -1504,7 +1504,7 @@
       margin-block-start: auto;
     }
 .ag__day:not(.ag__day--empty) .ag__rows {
-      border-inline-start: 1px solid var(--border-color-light);
+      border-inline-start: var(--line-hairline) solid var(--border-color-light);
     }
 .ag__day--empty .ag__rows {
       padding-block: var(--space-xs);
@@ -1535,7 +1535,7 @@
    every view. What belongs to the DIARY is only where it sits: at the foot
    of the day's rows, on the rows' own indent. */
 .ag__away {
-  padding: 3px 8px 1px;
+  padding: var(--space-2xs) var(--space-xs) var(--line-hairline);
 }
 
 button.ag__head {
@@ -1563,7 +1563,7 @@ button.ag__head:hover .ag__num {
    annotating. */
 .ag__card {
   padding-block-start: var(--space-2xs);
-  border-block-start: 1.5px solid var(--info);
+  border-block-start: var(--line-thin) solid var(--info);
 }
 .ag__card[data-severity='people'] {
   border-block-start-color: var(--danger);
@@ -1572,10 +1572,10 @@ button.ag__head:hover .ag__num {
   margin-block-start: var(--space-s);
 }
 .ag__card-eyebrow {
-  margin: 0 0 3px;
+  margin: 0 0 var(--space-2xs);
   font-family: var(--font-mono);
-  font-size: 8.5px;
-  letter-spacing: 0.12em;
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-xl);
   text-transform: uppercase;
   color: var(--info);
 }
@@ -1591,8 +1591,8 @@ button.ag__head:hover .ag__num {
 .ag__card-side {
   display: flex;
   align-items: center;
-  gap: 5px;
-  margin: 0 0 2px;
+  gap: var(--space-xs);
+  margin: 0 0 var(--space-2xs);
   min-inline-size: 0;
 }
 .ag__card-venue {
@@ -1605,7 +1605,7 @@ button.ag__head:hover .ag__num {
 .ag__card-time {
   margin-inline-start: auto;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--text-2xs);
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -1624,7 +1624,7 @@ button.ag__head:hover .ag__num {
 }
 .ag__note-body {
   margin: 0;
-  padding-inline-end: 14px; /* room for the × */
+  padding-inline-end: var(--space-s); /* room for the × */
   font-family: var(--font-display);
   font-style: italic;
   font-size: var(--text-s);
@@ -1640,12 +1640,12 @@ button.ag__head:hover .ag__num {
   padding: 0;
   border: 0;
   background: none;
-  font-size: 11px;
+  font-size: var(--text-xs);
   line-height: 1;
   color: var(--text-faint);
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.1s;
+  transition: opacity var(--duration-fast);
 }
 .ag__note:hover .ag__note-x,
 .ag__note-x:focus-visible {
@@ -1678,13 +1678,13 @@ button.ag__head:hover .ag__num {
    A word when the day answered it, a select when the day asks. */
 .ag__note-anchor,
 .ag__note-anchorword {
-  margin: 2px 0 0;
+  margin: var(--space-2xs) 0 0;
   padding: 0;
   border: 0;
   background: none;
   font-family: var(--font-mono);
-  font-size: 8.5px;
-  letter-spacing: 0.12em;
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-xl);
   text-transform: uppercase;
   color: var(--text-faint);
 }
@@ -1704,12 +1704,12 @@ button.ag__head:hover .ag__num {
   padding: 0;
   border: 0;
   background: none;
-  font-size: 12px;
+  font-size: var(--text-s);
   line-height: 1;
   color: var(--text-faint);
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.1s;
+  transition: opacity var(--duration-fast);
 }
 .ag__day:hover .ag__note-add,
 .ag__note-add:focus-visible {
@@ -1728,13 +1728,13 @@ button.ag__head:hover .ag__num {
   border: 0;
   background: none;
   font-family: var(--font-mono);
-  font-size: 8.5px;
-  letter-spacing: 0.1em;
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-l);
   text-transform: uppercase;
   color: var(--text-faint);
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.1s;
+  transition: opacity var(--duration-fast);
 }
 :global(.slip:hover) .ag__do,
 .ag__do:focus-visible {
@@ -1749,14 +1749,14 @@ button.ag__head:hover .ag__num {
 }
 
 .ag__sentinel {
-      block-size: 1px;
+      block-size: var(--line-hairline);
     }
-@media (max-width: 560px) {
+@media (max-width: 35rem) {
       /* No margin column on a phone (its card falls under the day, below),
          so nothing reserves room for it and no rule runs down through the
          rows: the week band is one line again, number · range · tally. */
       .ag {
-        --ag-margin: 0px;
+        --ag-margin: 0;
         background-image: none;
       }
       /* When the tally is long (two counts and the free nights) it drops

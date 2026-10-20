@@ -17,19 +17,13 @@ import { extractAccessToken } from '$lib/auth';
 import { isUuid } from '$lib/server/performance-bundle';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
+import { json } from '$lib/server/http';
 
 const BodySchema = v.object({
   workspace_id: v.pipe(v.string(), v.uuid()),
   body: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(4000)),
   on_day: v.optional(v.pipe(v.string(), v.isoDate())),
 });
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  });
-}
 
 export const POST: RequestHandler = async ({ request, params, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);

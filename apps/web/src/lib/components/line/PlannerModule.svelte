@@ -27,7 +27,7 @@
   import PerformanceCreateDialog from '$lib/components/PerformanceCreateDialog.svelte';
   import { addMonths, addDaysIso, dayKeyInTz, defaultCreateDay, monthGrid } from '$lib/planner';
   import { performanceStatusLabel, performanceStatusTone } from '$lib/performance';
-  import { dayLabel } from '$lib/datetime';
+  import { dayLabel, viewerTimeZone } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
 
   interface Props {
@@ -121,7 +121,7 @@
   /** The button without a day proposes the month on screen's (`defaultCreateDay`);
       the list shows no window, so there it is today. */
   function viewCreateDay(): string {
-    const today = dayKeyInTz(new Date().toISOString(), Intl.DateTimeFormat().resolvedOptions().timeZone);
+    const today = dayKeyInTz(new Date().toISOString(), viewerTimeZone());
     if (mode !== 'month') return today;
     const from = `${ym.year}-${String(ym.month).padStart(2, '0')}-01`;
     const next = addMonths(ym.year, ym.month, 1);
@@ -238,7 +238,7 @@
     }
     .lcal__modes {
       display: inline-flex;
-      border: 1px solid var(--border-color-light);
+      border: var(--line-hairline) solid var(--border-color-light);
       border-radius: var(--radius-circle);
       overflow: hidden;
     }

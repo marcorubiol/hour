@@ -17,6 +17,7 @@ import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
+import { json } from '$lib/server/http';
 
 const NOTE_SELECT =
   'id,workspace_id,author_id,project_id,line_id,performance_id,date_id,person_id,on_day,body,created_at,updated_at';
@@ -31,13 +32,6 @@ const BodySchema = v.object({
   date_id: v.optional(v.pipe(v.string(), v.uuid())),
   person_id: v.optional(v.pipe(v.string(), v.uuid())),
 });
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  });
-}
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 

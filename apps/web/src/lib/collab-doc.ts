@@ -19,9 +19,9 @@ import { IndexeddbPersistence } from 'y-indexeddb';
 import { getAccessToken } from '$lib/session.svelte';
 
 /** The docs the collab Worker hosts; mirrors `DOC_FIELDS` in apps/collab. */
-export type CollabTable = 'performance' | 'project' | 'line' | 'date';
+type CollabTable = 'performance' | 'project' | 'line' | 'date';
 
-export interface CollabDoc {
+interface CollabDoc {
   doc: Y.Doc;
   provider: YProvider;
   /** Runs once the doc has synced with the server, now if it already has. */

@@ -33,7 +33,7 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import { FormErrors } from '$lib/form-errors.svelte';
   import type { Json } from '$lib/db-types';
-  import { dayLabel, dayMonth, localDayISO, timeInTz } from '$lib/datetime';
+  import { dayLabel, dayMonth, localDayISO, timeInTz, viewerTimeZone } from '$lib/datetime';
   import { LOCALE_TAG, detectLocale, t } from '$lib/i18n';
   import {
     HOLD_NOTICE_DEFAULT,
@@ -590,7 +590,7 @@
 
   let loading = $derived($query.isPending);
 
-  const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const viewerTz = viewerTimeZone();
 
   // Timezone rule (spec § Timezone rule): hours are the VENUE's wall clock,
   // falling back to the home space's when no venue is linked, never silently
@@ -1285,8 +1285,8 @@
     .perf__contact-remove {
       inline-size: 2rem;
       block-size: 2rem;
-      border: 1px solid var(--border-color-light);
-      border-radius: var(--radius-s, 4px);
+      border: var(--line-hairline) solid var(--border-color-light);
+      border-radius: var(--radius-s);
       background: none;
       color: var(--text-faint);
       cursor: pointer;
@@ -1325,7 +1325,7 @@
       gap: var(--space-m);
       align-items: baseline;
       padding-block: var(--space-xs);
-      border-block-end: 1px solid var(--border-color-light);
+      border-block-end: var(--line-hairline) solid var(--border-color-light);
     }
 
     .perf__person-role,
@@ -1333,7 +1333,7 @@
     .perf__asset-dir {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
-      letter-spacing: 0.04em;
+      letter-spacing: var(--tracking-s);
       color: var(--text-faint);
       min-inline-size: var(--record-label-inline);
     }

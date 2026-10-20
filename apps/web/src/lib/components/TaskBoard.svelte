@@ -179,7 +179,7 @@
       align-items: baseline;
       gap: var(--space-s);
       padding-block: var(--space-xs);
-      border-block-end: 1px solid color-mix(in oklch, var(--border-color-light) 55%, transparent);
+      border-block-end: var(--line-hairline) solid color-mix(in oklch, var(--border-color-light) 55%, transparent);
     }
     /* The Checkbox primitive owns the box + label; done-state strikes the
        label through — one targeted :global with a purpose (the primitive
@@ -254,7 +254,7 @@
       margin-block-start: var(--space-s);
       padding-block: var(--space-xs);
       padding-inline: var(--space-m);
-      border: 1px dashed var(--border-color-dark);
+      border: var(--line-hairline) dashed var(--border-color-dark);
       border-radius: var(--radius-circle);
       background: transparent;
       font-size: var(--text-xs);

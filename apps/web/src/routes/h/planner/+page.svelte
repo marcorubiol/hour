@@ -158,7 +158,7 @@
   } from '$lib/season';
   import { normalizeLaneAxis, resolveLaneAxis, type LaneAxis } from '$lib/carrils';
   import type { AvailabilityItem } from '$lib/availability';
-  import { localeDayMonth, localeDayMonthNear, localeWeekdayShort, dualTime } from '$lib/datetime';
+  import { localeDayMonth, localeDayMonthNear, localeWeekdayShort, dualTime, viewerTimeZone } from '$lib/datetime';
   import {
     holdDeadlineLabel,
     isHoldStatus,
@@ -195,7 +195,7 @@
   /** The ghost row's word: «nobody is on this» is an answer, not a hole. */
   const noCastWord = t('planner.no_cast', locale);
 
-  const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const viewerTz = viewerTimeZone();
   const now = new Date();
   let ym = $state({ year: now.getFullYear(), month: now.getMonth() + 1 });
   let todayIso = dayKeyInTz(now.toISOString(), viewerTz);
@@ -3811,9 +3811,9 @@
     color: inherit;
     letter-spacing: inherit;
     cursor: pointer;
-    text-decoration: underline solid transparent 1px;
+    text-decoration: underline solid transparent var(--line-hairline);
     text-underline-offset: 4px;
-    transition: text-decoration-color 0.12s;
+    transition: text-decoration-color var(--duration-fast);
   }
   .cal__daytitle:hover {
     text-decoration-color: currentColor;
@@ -3821,14 +3821,14 @@
   .cal__daytitle:focus-visible {
     outline: var(--focus-width) solid var(--focus-color);
     outline-offset: 3px;
-    border-radius: 2px;
+    border-radius: var(--radius-xs);
   }
   /* En el layout (si no, `showPicker()` no tiene dónde abrirse) y fuera de la
      vista. `display:none` lo mataría; `visibility:hidden` también. */
   .cal__daypick {
     position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
+    inline-size: var(--line-hairline);
+    block-size: var(--line-hairline);
     padding: 0;
     border: 0;
     opacity: 0;
@@ -3848,8 +3848,8 @@
          and `--text-xs` (9.7→10.2 with the viewport) would slide that grid
          between one screen width and another. The reading scale breathes
          because prose should; a report's ruler must not. */
-      --meta-line: 11px; /* the queue — mono read as WORDS, so short tracking */
-      --meta-caption: 9.5px; /* the window — a field you consult, so wide */
+      --meta-line: 0.6875rem; /* the queue — mono read as WORDS, so short tracking */
+      --meta-caption: 0.5938rem; /* the window — a field you consult, so wide */
       --meta-track-line: 0.055em;
       --meta-track-caption: 0.13em;
 
@@ -3901,7 +3901,7 @@
       flex-direction: column;
       gap: var(--space-xs);
       padding-block-end: var(--space-s);
-      border-block-end: 1px solid var(--border-color-light);
+      border-block-end: var(--line-hairline) solid var(--border-color-light);
     }
     .cal__facts .cal__meta {
       margin: 0;
@@ -3964,8 +3964,8 @@
     }
     .cal__stat-chev {
       font-style: normal;
-      margin-inline-start: 5px;
-      font-size: 8px;
+      margin-inline-start: var(--space-xs);
+      font-size: var(--text-2xs);
       vertical-align: 1px;
     }
     .cal__stat--decide {
@@ -3978,7 +3978,7 @@
       border: none;
       padding: 0;
       cursor: pointer;
-      border-block-end: 1px solid color-mix(in oklch, var(--danger) 40%, transparent);
+      border-block-end: var(--line-hairline) solid color-mix(in oklch, var(--danger) 40%, transparent);
       transition: color var(--transition), border-color var(--transition);
     }
     .cal__stat--decide:hover {
@@ -4004,8 +4004,8 @@
     .cal__clashline {
       margin: 0;
       font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.06em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-m);
       color: var(--danger);
     }
 

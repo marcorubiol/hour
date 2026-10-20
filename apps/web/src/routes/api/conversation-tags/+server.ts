@@ -12,14 +12,14 @@ import type { RequestHandler } from './$types';
 import { extractAccessToken } from '$lib/auth';
 import { pgGet, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
-import { json } from '$lib/server/mail/http';
+import { jsonNoStore } from '$lib/server/http';
 import type { TagRow, TagSettingRow, TagVocabulary } from '$lib/conversation-tags';
 
 export const GET: RequestHandler = async ({ request, platform, locals }) => {
-  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
   const jwt = extractAccessToken(request);
-  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+  if (!jwt) return jsonNoStore({ error: 'missing_authorization' }, 401);
 
   try {
     const [tags, settings] = await Promise.all([
@@ -31,7 +31,7 @@ export const GET: RequestHandler = async ({ request, platform, locals }) => {
       }),
     ]);
     const body: TagVocabulary = { tags: tags.data, settings: settings.data };
-    return json(body);
+    return jsonNoStore(body);
   } catch (err) {
     return pgErrorResponse(err, { route: 'GET /api/conversation-tags', requestId: locals.requestId });
   }

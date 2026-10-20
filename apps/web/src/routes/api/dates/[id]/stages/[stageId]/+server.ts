@@ -15,8 +15,9 @@ import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
-import { json, placeAndList, stagesOf } from '$lib/server/travel-stages';
+import { placeAndList, stagesOf } from '$lib/server/travel-stages';
 import { StageInputSchema, stageRpcArgs } from '$lib/travel-stage';
+import { json } from '$lib/server/http';
 
 const Id = v.pipe(v.string(), v.uuid());
 

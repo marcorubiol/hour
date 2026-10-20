@@ -142,12 +142,12 @@ export interface ConversationBolo {
 }
 
 /** En opción: pedido y sin confirmar (la familia `hold` del Planner, ADR-095). */
-export function boloInOption(status: string): boolean {
+function boloInOption(status: string): boolean {
   return status === 'hold' || status.startsWith('hold_');
 }
 
 /** Firme: confirmado o ya hecho. */
-export function boloFirm(status: string): boolean {
+function boloFirm(status: string): boolean {
   return status === 'confirmed' || status === 'done' || status === 'invoiced' || status === 'paid';
 }
 

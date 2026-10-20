@@ -46,6 +46,7 @@ import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
+import { jsonNoStore } from '$lib/server/http';
 
 const UUID = v.pipe(v.string(), v.uuid());
 
@@ -87,13 +88,6 @@ type DossierRow = {
   profile_shared_fields: string[];
 };
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
-  });
-}
-
 async function readBody(request: Request): Promise<unknown | null> {
   try {
     return await request.json();
@@ -103,17 +97,17 @@ async function readBody(request: Request): Promise<unknown | null> {
 }
 
 export const POST: RequestHandler = async ({ request, platform, locals }) => {
-  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
 
   const jwt = extractAccessToken(request);
-  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+  if (!jwt) return jsonNoStore({ error: 'missing_authorization' }, 401);
 
   const raw = await readBody(request);
-  if (raw === null) return json({ error: 'invalid_body' }, 400);
+  if (raw === null) return jsonNoStore({ error: 'invalid_body' }, 400);
   const parsed = v.safeParse(ShareBody, raw);
   if (!parsed.success) {
-    return json(
+    return jsonNoStore(
       {
         error: 'invalid_body',
         issues: parsed.issues.map((i) => ({
@@ -131,7 +125,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
       // Name only unless the caller asked for more — see the header.
       p_fields: parsed.output.fields ?? ['full_name'],
     });
-    return json({ dossier: data[0] ?? null });
+    return jsonNoStore({ dossier: data[0] ?? null });
   } catch (err) {
     return pgErrorResponse(
       err,
@@ -142,16 +136,16 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 };
 
 export const DELETE: RequestHandler = async ({ request, platform, locals }) => {
-  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
 
   const jwt = extractAccessToken(request);
-  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+  if (!jwt) return jsonNoStore({ error: 'missing_authorization' }, 401);
 
   const raw = await readBody(request);
-  if (raw === null) return json({ error: 'invalid_body' }, 400);
+  if (raw === null) return jsonNoStore({ error: 'invalid_body' }, 400);
   const parsed = v.safeParse(StopBody, raw);
-  if (!parsed.success) return json({ error: 'invalid_body' }, 400);
+  if (!parsed.success) return jsonNoStore({ error: 'invalid_body' }, 400);
 
   try {
     await pgPostRpc(env, 'stop_sharing_my_profile_with_workspace', jwt, {

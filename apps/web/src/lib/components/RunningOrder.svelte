@@ -564,12 +564,12 @@
     .ro__grip {
       align-self: center;
       justify-self: end;
-      inline-size: 6px;
-      block-size: 12px;
+      inline-size: var(--dot-m);
+      block-size: 0.75rem;
       background: radial-gradient(circle, var(--text-faint) 1px, transparent 1.2px) 0 0 / 3px 3px;
       opacity: 0;
       cursor: grab;
-      transition: opacity 0.1s;
+      transition: opacity var(--duration-fast);
     }
     .hours__row:hover .ro__grip,
     .hours__line:focus-visible .ro__grip {
@@ -579,13 +579,13 @@
       opacity: 0.4;
     }
     .hours__row.ro__row--drop {
-      border-block-start: 1px solid var(--text-muted);
+      border-block-start: var(--line-hairline) solid var(--text-muted);
     }
     .ro__zone {
       margin: var(--space-2xs) 0 0;
       font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.08em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-l);
       color: var(--text-faint);
     }
     @container (max-width: 30rem) {

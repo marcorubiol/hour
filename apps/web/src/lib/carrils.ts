@@ -98,7 +98,7 @@ export function stackIntervals(
 }
 
 /** A day-level prep fact — one rehearsal/residency date row, bucketed. */
-export interface PrepDay {
+interface PrepDay {
   project_id: string;
   /** YYYY-MM-DD. */
   day: string;
@@ -107,7 +107,7 @@ export interface PrepDay {
 }
 
 /** A merged run of consecutive prep days. Both ends inclusive. */
-export interface PrepRun {
+interface PrepRun {
   project_id: string;
   from: string;
   to: string;

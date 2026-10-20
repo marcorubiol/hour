@@ -191,12 +191,12 @@
   .bd__cal {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    gap: 2px;
+    gap: var(--space-2xs);
   }
   .bd__cald {
     appearance: none;
     min-block-size: var(--control-size-s);
-    border: 1px solid transparent;
+    border: var(--line-hairline) solid transparent;
     border-radius: var(--radius-s);
     background: none;
     color: var(--text-faint);
@@ -236,7 +236,7 @@
     gap: var(--space-xs);
     margin: 0;
     padding-block-start: var(--space-xs);
-    border-block-start: 1px solid var(--border-color-light);
+    border-block-start: var(--line-hairline) solid var(--border-color-light);
     font-size: var(--text-xs);
     color: var(--text-muted);
   }

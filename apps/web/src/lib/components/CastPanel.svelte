@@ -210,7 +210,7 @@
     flex: 1;
     font-family: var(--font-mono);
     font-size: var(--text-xs);
-    letter-spacing: 0.04em;
+    letter-spacing: var(--tracking-s);
     color: var(--text-faint);
   }
 

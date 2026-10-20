@@ -133,7 +133,7 @@
     display: flex;
     flex-direction: column;
     gap: 0;
-    border-block-start: 1px solid var(--border-color-light);
+    border-block-start: var(--line-hairline) solid var(--border-color-light);
   }
 
   .rel-stub__item {
@@ -143,13 +143,13 @@
     gap: var(--space-s);
     padding-block: var(--space-xs);
     padding-inline: 0;
-    border-block-end: 1px solid var(--border-color-light);
+    border-block-end: var(--line-hairline) solid var(--border-color-light);
   }
 
   .rel-stub__main {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--space-2xs);
     min-inline-size: 0;
   }
 

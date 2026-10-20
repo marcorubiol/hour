@@ -189,7 +189,7 @@ export async function primeAgendaWindow(
   });
 }
 
-export interface PlannerFeedInputs {
+interface PlannerFeedInputs {
   /** Active projection — the agenda swaps the grid feeds for its own. */
   view: () => PlannerView;
   /** Month-grid window (first/last visible cell, ISO days). */

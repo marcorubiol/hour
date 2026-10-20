@@ -23,7 +23,7 @@
   import { dateStatusFamily, invalidateDateFeeds } from '$lib/date';
   import { closePeek } from '$lib/peek.svelte';
   import { dateFacts } from '$lib/date-record';
-  import { dayLabel, localDayISO } from '$lib/datetime';
+  import { dayLabel, localDayISO, viewerTimeZone } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { dateMissing, type DateMissing } from '$lib/record-missing';
@@ -49,7 +49,7 @@
 
   const locale = appLocale();
   const queryClient = useQueryClient();
-  const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const viewerTz = viewerTimeZone();
 
   const query = createQuery(
     toStore(() => ({

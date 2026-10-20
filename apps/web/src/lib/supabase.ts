@@ -13,7 +13,7 @@ export interface SupabaseEnv {
   PUBLIC_SUPABASE_ANON_KEY: string;
 }
 
-export interface PostgrestOptions {
+interface PostgrestOptions {
   /** Raw SearchParams to forward to PostgREST (select, filter, order, limit…). */
   search?: URLSearchParams | Record<string, string>;
   /**
@@ -23,7 +23,7 @@ export interface PostgrestOptions {
   exactCount?: boolean;
 }
 
-export interface PostgrestResult<T> {
+interface PostgrestResult<T> {
   data: T[];
   /** Populated only when exactCount was requested. */
   total: number | null;

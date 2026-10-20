@@ -69,7 +69,7 @@ export function todayThings(
 
 // ── Voy · no voy ─────────────────────────────────────────────────────────
 
-export interface GoingAsk {
+interface GoingAsk {
   of: 'performance' | 'date';
   id: string;
   day: string;
@@ -124,9 +124,9 @@ export function goingAsks(
 /** How many lines «Ha cambiado» draws. */
 export const CHANGED_ROWS = 5;
 /** With no visit on file, «since» is this far back. */
-export const FIRST_VISIT_DAYS = 7;
+const FIRST_VISIT_DAYS = 7;
 /** The last send stays news this long after it went out. */
-export const MAILOUT_NEWS_DAYS = 14;
+const MAILOUT_NEWS_DAYS = 14;
 
 export type Change =
   | { kind: 'thread'; at: string; thread: FeedThread }
@@ -144,7 +144,7 @@ export interface RecordedPayment {
 }
 
 /** «Cobrado X»: a payment someone else recorded, named by its deal. */
-export interface PaymentNews {
+interface PaymentNews {
   id: string;
   at: string;
   amount: number;

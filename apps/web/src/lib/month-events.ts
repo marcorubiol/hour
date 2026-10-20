@@ -367,7 +367,7 @@ export type SlipKind =
   | 'day_off'
   | 'other';
 
-export type SlipTime = {
+type SlipTime = {
   /** The venue's wall clock — the hour that is printed. `20h30`, never
       `20:30`: the Planner's clock (see `hourMark`). */
   primary: string;
@@ -605,7 +605,7 @@ export function dateSlip(d: DateEvent, ctx: SlipContext): Slip {
  *  print — the caller translates it. */
 export type RunSheetStepKey = 'load_in' | 'soundcheck' | 'start' | 'loadout' | 'wrap';
 
-export type RunSheetStep = { key: RunSheetStepKey; at: string };
+type RunSheetStep = { key: RunSheetStepKey; at: string };
 
 /** Fixed order, because the five columns carry a CHECK that enforces it. */
 const RUN_SHEET_ORDER: ReadonlyArray<

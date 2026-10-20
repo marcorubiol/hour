@@ -15,7 +15,7 @@
 
 import { addDaysIso } from './planner';
 
-export type BlockRule = {
+type BlockRule = {
   /** ISO day, inclusive. */
   from: string;
   /** ISO day, inclusive. */
@@ -80,7 +80,7 @@ export function blockDays(rule: BlockRule): string[] {
   return out;
 }
 
-export type BlockLimit = 'ok' | 'too_few' | 'too_many';
+type BlockLimit = 'ok' | 'too_few' | 'too_many';
 
 /** Which guardrail, if any, this many days trips. */
 export function blockLimit(count: number): BlockLimit {

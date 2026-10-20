@@ -81,7 +81,7 @@
     font-family: var(--font-mono);
     font-size: 0.95em;
     background: var(--bg-light);
-    padding-block: 1px;
+    padding-block: var(--line-hairline);
     padding-inline: var(--space-xs);
     border-radius: var(--radius-s);
   }

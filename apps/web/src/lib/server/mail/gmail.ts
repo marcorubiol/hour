@@ -19,7 +19,7 @@
 
 import type { MailAdapter, MailMessage, ProviderTokens } from './provider';
 
-export const GOOGLE_SCOPES = [
+const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',
   'https://www.googleapis.com/auth/gmail.send',
 ] as const;
@@ -37,8 +37,8 @@ export class ProviderAuthError extends Error {
     super(message);
   }
 }
-export class CursorExpiredError extends Error {}
-export class ProviderError extends Error {
+class CursorExpiredError extends Error {}
+class ProviderError extends Error {
   constructor(
     public readonly status: number,
     message: string,
@@ -109,7 +109,7 @@ export async function exchangeGoogleCode(
   return { accessToken: j.access_token, refreshToken: j.refresh_token ?? null, scope: j.scope ?? '' };
 }
 
-export async function refreshGoogleToken(
+async function refreshGoogleToken(
   fetchFn: Fetch,
   opts: { clientId: string; clientSecret: string; refreshToken: string },
 ): Promise<string> {
@@ -135,7 +135,7 @@ export async function refreshGoogleToken(
 }
 
 /** Revoca el permiso en Google (al desconectar). Mejor esfuerzo. */
-export async function revokeGoogleToken(fetchFn: Fetch, token: string): Promise<boolean> {
+async function revokeGoogleToken(fetchFn: Fetch, token: string): Promise<boolean> {
   try {
     const res = await fetchFn(REVOKE_URL, {
       method: 'POST',
@@ -231,7 +231,7 @@ function findPart(part: GmailPart | undefined, mime: string): GmailPart | null {
 }
 
 /** Un HTML a texto, lo justo para un registro (sin estilos ni scripts). */
-export function htmlToText(html: string): string {
+function htmlToText(html: string): string {
   return html
     .replace(/<(style|script|head)[^>]*>[\s\S]*?<\/\1>/gi, '')
     .replace(/<br\s*\/?>/gi, '\n')
@@ -320,7 +320,7 @@ export function parseGmailMessage(raw: GmailRawMessage): MailMessage {
 // ── Búsqueda por dirección ────────────────────────────────────────────────
 
 /** Direcciones por consulta: tres términos por dirección, y Gmail corta las largas. */
-export const ADDRESSES_PER_QUERY = 15;
+const ADDRESSES_PER_QUERY = 15;
 
 /**
  * Consultas de Gmail que devuelven SOLO correos con estas direcciones, desde

@@ -22,7 +22,7 @@
 import * as Y from 'yjs';
 import type { ScheduleSlotInput } from './schedule-slot';
 
-export const SCHEDULE_FIELD = 'schedule';
+const SCHEDULE_FIELD = 'schedule';
 
 /** The six keys of a moment's Y.Map. */
 const KEYS = ['id', 'kind', 'label', 'at', 'ends_at', 'notes'] as const;

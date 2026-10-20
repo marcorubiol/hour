@@ -12,7 +12,7 @@
  * lado del proveedor) y `fetchMessage` solo se llama para esos.
  */
 
-export type MailProvider = 'google';
+type MailProvider = 'google';
 
 export interface ProviderTokens {
   accessToken: string;
@@ -43,7 +43,7 @@ export interface MailMessage {
   auto: boolean;
 }
 
-export interface OutgoingMail {
+interface OutgoingMail {
   from: string;
   to: string;
   toName?: string | null;

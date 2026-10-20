@@ -11,26 +11,26 @@ import { extractAccessToken } from '$lib/auth';
 import { pgErrorResponse } from '$lib/server/errors';
 import { mailConfigured } from '$lib/server/mail/db';
 import { ProviderAuthError } from '$lib/server/mail/gmail';
-import { json, jwtSubject } from '$lib/server/mail/http';
+import { jsonNoStore, jwtSubject } from '$lib/server/http';
 import { sendFromConversation } from '$lib/server/mail/send';
 import { MailSendSchema } from '$lib/mail';
 
 export const POST: RequestHandler = async ({ request, url, platform, locals }) => {
-  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
   const env = platform.env;
-  if (!mailConfigured(env)) return json({ error: 'not_configured' }, 503);
+  if (!mailConfigured(env)) return jsonNoStore({ error: 'not_configured' }, 503);
   const jwt = extractAccessToken(request);
   const sub = jwt ? jwtSubject(jwt) : null;
-  if (!jwt || !sub) return json({ error: 'missing_authorization' }, 401);
+  if (!jwt || !sub) return jsonNoStore({ error: 'missing_authorization' }, 401);
 
   let raw: unknown;
   try {
     raw = await request.json();
   } catch {
-    return json({ error: 'invalid_body' }, 400);
+    return jsonNoStore({ error: 'invalid_body' }, 400);
   }
   const parsed = v.safeParse(MailSendSchema, raw);
-  if (!parsed.success) return json({ error: 'invalid_body' }, 400);
+  if (!parsed.success) return jsonNoStore({ error: 'invalid_body' }, 400);
   const b = parsed.output;
 
   try {
@@ -47,10 +47,10 @@ export const POST: RequestHandler = async ({ request, url, platform, locals }) =
       },
       url.hostname,
     );
-    if (!r.ok) return json({ error: r.error }, r.status);
-    return json({ sent: true, events_created: r.eventsCreated }, 201);
+    if (!r.ok) return jsonNoStore({ error: r.error }, r.status);
+    return jsonNoStore({ sent: true, events_created: r.eventsCreated }, 201);
   } catch (err) {
-    if (err instanceof ProviderAuthError) return json({ error: 'mailbox_revoked' }, 409);
+    if (err instanceof ProviderAuthError) return jsonNoStore({ error: 'mailbox_revoked' }, 409);
     return pgErrorResponse(
       err,
       { route: 'POST /api/mail/send', requestId: locals.requestId },

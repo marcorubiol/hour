@@ -13,6 +13,7 @@ import { extractAccessToken } from '$lib/auth';
 import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { BOLO_MOVE_STATUSES } from '$lib/money';
 import { pgErrorResponse } from '$lib/server/errors';
+import { json } from '$lib/server/http';
 
 /**
  * EL CACHÉ Y EL ESTADO SON DOS COSAS, y por eso van por dos RPC.
@@ -33,13 +34,6 @@ const BodySchema = v.object({
 });
 
 const IdSchema = v.pipe(v.string(), v.uuid());
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  });
-}
 
 export const PATCH: RequestHandler = async ({ request, params, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);

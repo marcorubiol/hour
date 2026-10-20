@@ -11,14 +11,14 @@
 
 import type { RequestHandler } from './$types';
 import { pgPostRpc } from '$lib/supabase';
-import { json } from '$lib/server/mail/http';
+import { jsonNoStore } from '$lib/server/http';
 import { loadDetail, mailoutRoute, readBody } from '$lib/server/mailout/route';
 import { MailoutUpdateSchema } from '$lib/mailout';
 
 export const GET: RequestHandler = (event) =>
   mailoutRoute(event, 'GET /api/mailout/[id]', async ({ env, jwt, id }) => {
     const detail = await loadDetail(env, jwt, id);
-    return detail ? json(detail) : json({ error: 'not_found' }, 404);
+    return detail ? jsonNoStore(detail) : jsonNoStore({ error: 'not_found' }, 404);
   });
 
 export const PATCH: RequestHandler = (event) =>
@@ -35,5 +35,5 @@ export const PATCH: RequestHandler = (event) =>
       p_mail_domain_id: body.mail_domain_id,
       p_reply_to_mail_account_id: null,
     });
-    return json({ ok: true });
+    return jsonNoStore({ ok: true });
   });

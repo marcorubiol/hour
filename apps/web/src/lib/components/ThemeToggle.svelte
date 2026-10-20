@@ -108,8 +108,8 @@
      in toolbars at 28px, plain in the account menu at 32px so it aligns
      with the menu rows beside it. */
   .theme-toggle {
-    --toggle-size: 28px;
-    --toggle-border: 1px solid var(--border-color-light);
+    --toggle-size: var(--control-size-xs);
+    --toggle-border: var(--line-hairline) solid var(--border-color-light);
     --toggle-bg: transparent;
     --toggle-bg-hover: var(--bg-hover);
     --toggle-border-hover: var(--border-color-dark);
@@ -131,7 +131,7 @@
   }
 
   .theme-toggle--plain {
-    --toggle-size: 32px;
+    --toggle-size: var(--control-size-s);
     --toggle-border: 0;
     --toggle-bg: transparent;
     --toggle-bg-hover: var(--bg-ultra-light);

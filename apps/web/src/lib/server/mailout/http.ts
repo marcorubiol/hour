@@ -2,7 +2,7 @@
 
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { MAIL_DOMAIN_SELECT, type MailDomainItem } from '$lib/mailout';
-import { json } from '$lib/server/mail/http';
+import { jsonNoStore } from '$lib/server/http';
 import { MailoutNotConfiguredError } from './provider';
 
 /** Lo que dice la base, traducido para la pantalla. 42501 es «no existe». */
@@ -29,5 +29,5 @@ export async function isAdmin(env: SupabaseEnv, jwt: string, workspaceId: string
 
 export function notConfigured(err: MailoutNotConfiguredError): Response {
   console.error(JSON.stringify({ level: 'error', kind: 'mailout_not_configured', missing: err.missing }));
-  return json({ error: 'mailout_not_configured' }, 503);
+  return jsonNoStore({ error: 'mailout_not_configured' }, 503);
 }

@@ -34,7 +34,7 @@
    * the opposite of noise.
    */
   import { useQueryClient } from '@tanstack/svelte-query';
-  import { dualTime, hourMark, localeDayMonthNear, localeWeekdayShort } from '$lib/datetime';
+  import { dualTime, hourMark, localeDayMonthNear, localeWeekdayShort, viewerTimeZone } from '$lib/datetime';
   import { t, type Locale } from '$lib/i18n';
   import type { SlipKind } from '$lib/month-events';
   import type { CommitmentState } from '$lib/people';
@@ -53,7 +53,7 @@
 
   let { now, locale }: Props = $props();
 
-  const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const viewerTz = viewerTimeZone();
   let today = $derived(dayKeyInTz(now.toISOString(), viewerTz));
 
   // The feeds live in $lib/pulse-feeds so the Desk's «lo siguiente» reads

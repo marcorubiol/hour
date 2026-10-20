@@ -23,6 +23,7 @@ import {
   recordFailure,
   underLimit,
 } from '$lib/server/rate-limit';
+import { json } from '$lib/server/http';
 
 const LOGIN_RULE = { limit: 10, windowSec: 300 };
 // Per-account budget: a distributed stuffing tool spreading one victim account
@@ -35,13 +36,6 @@ const BodySchema = v.object({
   email: v.pipe(v.string(), v.trim(), v.minLength(3), v.maxLength(320)),
   password: v.pipe(v.string(), v.minLength(1), v.maxLength(200)),
 });
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  });
-}
 
 export const POST: RequestHandler = async ({ request, cookies, platform }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);

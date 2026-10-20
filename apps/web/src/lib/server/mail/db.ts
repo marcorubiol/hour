@@ -49,7 +49,7 @@ export interface MailAccountRow {
   last_synced_at: string | null;
 }
 
-export interface ContactAddress {
+interface ContactAddress {
   address: string;
   /** Ya se trajeron sus últimos 12 meses en este buzón. */
   backfilled: boolean;
@@ -96,7 +96,7 @@ export interface MailDb {
   ): Promise<void>;
 }
 
-export class MailDbError extends Error {
+class MailDbError extends Error {
   constructor(
     public readonly status: number,
     public readonly body: string,

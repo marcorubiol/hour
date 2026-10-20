@@ -23,7 +23,7 @@ import { dev } from '$app/environment';
 import type { SupabaseEnv } from '$lib/supabase';
 
 export const ACCESS_COOKIE = 'hour_at';
-export const REFRESH_COOKIE = 'hour_rt';
+const REFRESH_COOKIE = 'hour_rt';
 const REFRESH_COOKIE_PATH = '/api/auth';
 const REFRESH_MAX_AGE = 60 * 60 * 24 * 60; // 60 days
 
@@ -46,18 +46,18 @@ interface SupabaseAuthUser {
   user_metadata?: Record<string, unknown>;
 }
 
-export type SignUpResult =
+type SignUpResult =
   | { ok: true; grant: TokenGrant | null; user: SupabaseAuthUser | null }
   | { ok: false; reason: 'invalid_signup' | 'upstream' };
 
-export interface TokenGrant {
+interface TokenGrant {
   access_token: string;
   refresh_token: string;
   expires_in: number;
   user?: SupabaseAuthUser;
 }
 
-export type GrantResult =
+type GrantResult =
   | { ok: true; grant: TokenGrant }
   | { ok: false; reason: 'invalid_grant' | 'upstream' };
 
@@ -88,7 +88,7 @@ function nameFromMetadata(meta: Record<string, unknown> | undefined): string | n
   return null;
 }
 
-export function sessionUserFromClaims(claims: Record<string, unknown>): SessionUser | null {
+function sessionUserFromClaims(claims: Record<string, unknown>): SessionUser | null {
   const sub = claims.sub;
   if (typeof sub !== 'string' || !sub) return null;
   return {
@@ -138,7 +138,7 @@ export function passwordGrant(env: SessionEnv, email: string, password: string):
   return tokenGrant(env, 'password', { email, password });
 }
 
-export function refreshGrant(env: SessionEnv, refreshToken: string): Promise<GrantResult> {
+function refreshGrant(env: SessionEnv, refreshToken: string): Promise<GrantResult> {
   return tokenGrant(env, 'refresh_token', { refresh_token: refreshToken });
 }
 
@@ -221,7 +221,7 @@ export function clearSessionCookies(cookies: Cookies): void {
   cookies.delete(REFRESH_COOKIE, { path: REFRESH_COOKIE_PATH });
 }
 
-export interface FreshSession {
+interface FreshSession {
   jwt: string;
   expiresAt: number; // epoch ms
   user: SessionUser;

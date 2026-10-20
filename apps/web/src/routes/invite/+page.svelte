@@ -175,25 +175,25 @@
       position: relative;
       inline-size: min(100%, 42rem);
       padding: clamp(var(--space-l), 5vw, var(--space-xxl));
-      border: 1px solid var(--border-color-dark);
+      border: var(--line-hairline) solid var(--border-color-dark);
       background: color-mix(in srgb, var(--bg) 94%, transparent);
-      box-shadow: 0 24px 80px color-mix(in srgb, var(--text-color) 8%, transparent);
+      box-shadow: var(--box-shadow-4);
     }
     .invitation-card__rail {
       position: absolute;
       inset-block: -1px;
       inset-inline-start: -1px;
-      inline-size: 5px;
+      inline-size: var(--dot-m);
       background: var(--accent-color);
     }
     .invitation-card__kicker { margin: 0 0 var(--space-m); }
     .invitation-card h1 {
       margin: 0;
       font-family: var(--font-display);
-      font-size: clamp(2.3rem, 7vw, 4.6rem);
+      font-size: var(--display-xl);
       font-weight: 400;
       line-height: 0.98;
-      letter-spacing: -0.04em;
+      letter-spacing: var(--heading-letter-spacing);
       text-wrap: balance;
     }
     .invitation-card h1 em { color: var(--text-muted); font-weight: 400; }
@@ -207,16 +207,16 @@
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       margin: 0 0 var(--space-l);
-      border-block-start: 1px solid var(--border-color-light);
+      border-block-start: var(--line-hairline) solid var(--border-color-light);
     }
     .invitation-card__terms div {
       padding: var(--space-m) var(--space-m) var(--space-m) 0;
-      border-block-end: 1px solid var(--border-color-light);
+      border-block-end: var(--line-hairline) solid var(--border-color-light);
     }
     .invitation-card__terms dt {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
-      letter-spacing: 0.09em;
+      letter-spacing: var(--tracking-l);
       text-transform: uppercase;
       color: var(--text-faint);
     }
@@ -234,7 +234,7 @@
       color: var(--text-faint);
       font-family: var(--font-mono);
       font-size: var(--text-xs);
-      letter-spacing: 0.06em;
+      letter-spacing: var(--tracking-m);
     }
     @media (max-width: 34rem) {
       .invitation-page { background: var(--bg); }

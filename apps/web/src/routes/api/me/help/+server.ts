@@ -17,51 +17,45 @@ import { extractAccessToken } from '$lib/auth';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import { HELP_KEY, type HelpSeen } from '$lib/help';
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
-  });
-}
+import { jsonNoStore } from '$lib/server/http';
 
 const BodySchema = v.object({ key: v.pipe(v.string(), v.regex(HELP_KEY)) });
 
 export const GET: RequestHandler = async ({ request, platform, locals }) => {
-  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
   const jwt = extractAccessToken(request);
-  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+  if (!jwt) return jsonNoStore({ error: 'missing_authorization' }, 401);
 
   try {
     // Sin filtro por user_id: la política ya solo deja ver la fila propia.
     const { data } = await pgGet<{ seen: HelpSeen }>(env, 'help_seen', jwt, {
       search: { select: 'seen', limit: '1' },
     });
-    return json({ seen: data[0]?.seen ?? {} });
+    return jsonNoStore({ seen: data[0]?.seen ?? {} });
   } catch (err) {
     return pgErrorResponse(err, { route: 'GET /api/me/help', requestId: locals.requestId });
   }
 };
 
 export const POST: RequestHandler = async ({ request, platform, locals }) => {
-  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
   const jwt = extractAccessToken(request);
-  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+  if (!jwt) return jsonNoStore({ error: 'missing_authorization' }, 401);
 
   let raw: unknown;
   try {
     raw = await request.json();
   } catch {
-    return json({ error: 'invalid_body' }, 400);
+    return jsonNoStore({ error: 'invalid_body' }, 400);
   }
   const parsed = v.safeParse(BodySchema, raw);
-  if (!parsed.success) return json({ error: 'invalid_body' }, 400);
+  if (!parsed.success) return jsonNoStore({ error: 'invalid_body' }, 400);
 
   try {
     const { data } = await pgPostRpc<HelpSeen>(env, 'mark_help_seen', jwt, { p_key: parsed.output.key });
-    return json({ seen: data[0] ?? {} });
+    return jsonNoStore({ seen: data[0] ?? {} });
   } catch (err) {
     return pgErrorResponse(
       err,
@@ -72,14 +66,14 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 };
 
 export const DELETE: RequestHandler = async ({ request, platform, locals }) => {
-  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
   const jwt = extractAccessToken(request);
-  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+  if (!jwt) return jsonNoStore({ error: 'missing_authorization' }, 401);
 
   try {
     await pgPostRpc(env, 'reset_help_seen', jwt);
-    return json({ seen: {} });
+    return jsonNoStore({ seen: {} });
   } catch (err) {
     return pgErrorResponse(err, { route: 'DELETE /api/me/help', requestId: locals.requestId });
   }

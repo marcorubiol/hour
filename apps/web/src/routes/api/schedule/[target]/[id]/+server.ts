@@ -26,6 +26,7 @@ import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import { RUNNING_ORDER_TARGETS } from '$lib/running-order';
 import type { ScheduleSlotRow } from '$lib/schedule-slot';
+import { json } from '$lib/server/http';
 
 const SLOT_SELECT = 'id,kind,label,at,ends_at,sort,notes';
 
@@ -33,13 +34,6 @@ const ParamsSchema = v.object({
   target: v.picklist(RUNNING_ORDER_TARGETS),
   id: v.pipe(v.string(), v.uuid()),
 });
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  });
-}
 
 /** The parent row, as RLS lets this user see it. Null = not there for them. */
 async function parentOf(

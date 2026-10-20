@@ -34,15 +34,15 @@
 <style>
   @layer components {
     .switch {
-      --switch-w: 36px;
-      --switch-h: 20px;
+      --switch-w: 2.25rem;
+      --switch-h: 1.25rem;
 
       display: inline-flex;
       flex: none;
       align-items: center;
       inline-size: var(--switch-w);
       block-size: var(--switch-h);
-      padding: 2px;
+      padding: var(--space-2xs);
       background: var(--border-color-dark);
       border: 0;
       border-radius: var(--radius-circle);
@@ -54,8 +54,8 @@
       cursor: default;
     }
     .switch__dot {
-      inline-size: calc(var(--switch-h) - 4px);
-      block-size: calc(var(--switch-h) - 4px);
+      inline-size: calc(var(--switch-h) - 0.25rem);
+      block-size: calc(var(--switch-h) - 0.25rem);
       background: var(--bg-ultra-light);
       border-radius: 50%;
       box-shadow: var(--box-shadow-1);

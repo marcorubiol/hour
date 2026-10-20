@@ -22,6 +22,7 @@ import {
 import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import type { Json } from '$lib/db-types';
+import { jsonNoStore } from '$lib/server/http';
 
 const TOKEN = /^[0-9a-f]{40,128}$/i;
 
@@ -46,28 +47,18 @@ type PublicBundle = {
   assets: PerformanceBundle['assets'];
 };
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      'content-type': 'application/json; charset=utf-8',
-      'cache-control': 'no-store',
-    },
-  });
-}
-
 export const GET: RequestHandler = async ({ params, platform, locals }) => {
-  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
 
-  if (!TOKEN.test(params.token)) return json({ error: 'not_found' }, 404);
+  if (!TOKEN.test(params.token)) return jsonNoStore({ error: 'not_found' }, 404);
 
   try {
     const { data } = await pgPostRpc<PublicBundle | null>(env, 'get_public_roadsheet', null, {
       p_token: params.token,
     });
     const b = data[0];
-    if (!b) return json({ error: 'not_found' }, 404);
+    if (!b) return jsonNoStore({ error: 'not_found' }, 404);
 
     const cast: CastEntry[] = [
       ...b.cast.map((m) => ({ role: m.role, person: m.person })),
@@ -89,7 +80,7 @@ export const GET: RequestHandler = async ({ params, platform, locals }) => {
       assets: b.assets,
     };
 
-    return json({
+    return jsonNoStore({
       roadsheet: buildRoadsheet(bundle, b.role),
       venue_timezone: b.venue?.timezone ?? null,
     });

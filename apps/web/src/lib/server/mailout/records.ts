@@ -13,9 +13,9 @@
 import type { DnsRecord } from '$lib/mailout';
 
 export const SUGGESTED_DMARC = 'v=DMARC1; p=none;';
-export const MAIL_FROM_SPF = '"v=spf1 include:amazonses.com ~all"';
+const MAIL_FROM_SPF = '"v=spf1 include:amazonses.com ~all"';
 
-export interface DomainRecordsInput {
+interface DomainRecordsInput {
   domain: string;
   mailFromSubdomain: string;
   region: string;
