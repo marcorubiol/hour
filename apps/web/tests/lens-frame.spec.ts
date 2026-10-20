@@ -37,7 +37,15 @@ function sections(page: Page) {
 /** The switcher's box once the page has settled and the type has loaded. */
 async function boxOf(page: Page, path: string) {
   await page.goto(path);
-  await waitForLoaded(page);
+  // Settings is not a lens or a record and declares no `aria-busy`, so
+  // `waitForLoaded` would wait for a signal it never gives (red on its first
+  // run against production, 2026-10-20). There the page has settled when its
+  // section heading is drawn.
+  if (path.includes('/settings')) {
+    await expect(page.getByRole('main').getByRole('heading', { level: 1 })).toBeVisible();
+  } else {
+    await waitForLoaded(page);
+  }
   await page.evaluate(() => document.fonts.ready);
   const box = await sections(page).boundingBox();
   expect(box, `the sections are drawn on ${path}`).not.toBeNull();
