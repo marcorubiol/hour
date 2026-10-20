@@ -1,23 +1,27 @@
 <script lang="ts">
   /**
-   * LensSwitcher — the Desk · Planner · Conversations · Money segmented
-   * control (ADR-065/067/075). Extracted from the shell chrome so a lens can
-   * host it in its OWN header row, beside its title (the Desk does this; the
-   * design puts the title and the switcher on one line). The active lens is
-   * read from the route so a direct URL visit highlights correctly; picking
-   * one sets the lens store (instant feedback) and the link navigates.
+   * LensSwitcher: Today · Planner · Conversations · Books (ADR-065/067/075),
+   * mounted ONCE, in the shell's frame (ADR-140). The same object on every
+   * page of /h, so it never moves: on a desktop it opens the top bar; on a
+   * phone it is the bar at the foot of the screen, the four words.
    *
-   * Links in a `nav`, not tabs: each one goes to another page (no tabpanel,
-   * no arrow keys), so it can open in a new tab or be long-pressed on a
-   * phone, and the current one says `aria-current="page"` (Desk review,
-   * móvil #7).
+   * What it marks:
+   *   - on a lens, that lens, filled: «you are here» (`aria-current="page"`);
+   *   - anywhere else (a record, a project, Settings), the lens you came from
+   *     (the shell keeps it: `hour_lens`), with a soft stroke and no fill:
+   *     «you came from here». One click goes back to it with its view and its
+   *     scope. A record's crumb still says where the thing HANGS; this says
+   *     which section you are in. Two questions, two places.
+   *
+   * Links in a `nav`, not tabs: each one goes to another page, so it can open
+   * in a new tab or be long-pressed on a phone (Desk review, móvil #7).
    */
   import { createQuery } from '@tanstack/svelte-query';
   import { page } from '$app/state';
   import { useLens, type Lens } from '$lib/stores/lens.svelte';
   import { detectLocale, t } from '$lib/i18n';
   import { moneyAccessAnyQueryOptions } from '$lib/bolo-queries';
-  import { lensOn } from '$lib/lenses.svelte';
+  import { lensOn, routedLensOf } from '$lib/lenses.svelte';
 
   const lens = useLens();
   const locale = detectLocale(navigator.language);
@@ -42,36 +46,45 @@
     ].filter((v) => lensOn(v.id)),
   );
 
-  let active = $derived((page.url.pathname.split('/')[2] ?? 'desk') as Lens);
+  /** The lens on screen, when the page is one. */
+  let active = $derived(routedLensOf(page.url.pathname));
+  /** Off a lens: the one you were working in. */
+  let origin = $derived<Lens | null>(active ? null : lens.current);
 
   const pick = (view: Lens) => lens.set(view);
 </script>
 
-<nav class="lensswitch-wrap" aria-label={t('lens.nav_aria', locale)}>
+<nav class="lensswitch-wrap" aria-label={t('lens.nav_aria', locale)} data-testid="lens-nav">
   <a
     href="/h/desk"
     class="lensswitch__home"
     class:is-on={active === 'desk'}
+    class:is-origin={origin === 'desk'}
     aria-current={active === 'desk' ? 'page' : undefined}
+    aria-describedby={origin === 'desk' ? 'lens-origin-note' : undefined}
     onclick={() => pick('desk')}
   >
-    {t('lens.desk', locale)}
+    <span class="lensswitch__word">{t('lens.desk', locale)}</span>
   </a>
   <div class="lensswitch">
     {#each VIEW_AS as v (v.id)}
       <a
         href="/h/{v.id}"
         aria-current={active === v.id ? 'page' : undefined}
+        aria-describedby={origin === v.id ? 'lens-origin-note' : undefined}
         class:is-on={active === v.id}
+        class:is-origin={origin === v.id}
         class:is-reserved={v.id === 'books' && moneyPending}
         aria-hidden={v.id === 'books' && moneyPending ? 'true' : undefined}
         tabindex={v.id === 'books' && moneyPending ? -1 : undefined}
         onclick={() => pick(v.id)}
       >
-        {v.label}
+        <span class="lensswitch__word">{v.label}</span>
       </a>
     {/each}
   </div>
+  <!-- What the stroke says, for whoever does not see it. -->
+  <span id="lens-origin-note" hidden>{t('lens.origin_note', locale)}</span>
 </nav>
 
 <style>
@@ -87,31 +100,25 @@
   .lensswitch a {
     display: inline-flex;
     align-items: center;
-    text-decoration: none;
-  }
-  .lensswitch__home {
     min-block-size: var(--touch-target);
-    appearance: none;
-    border: var(--line-hairline) solid var(--border-color-dark);
-    background: var(--bg-ultra-light);
-    cursor: pointer;
-    font-family: var(--font-sans);
-    font-size: var(--text-s);
-    color: var(--text-muted);
     padding-block: var(--space-2xs);
     padding-inline: var(--space-m);
     border-radius: var(--radius-circle);
+    font-family: var(--font-sans);
+    font-size: var(--text-s);
+    color: var(--text-muted);
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
     transition:
       background var(--transition),
-      color var(--transition);
+      color var(--transition),
+      border-color var(--transition),
+      box-shadow var(--transition);
   }
-  .lensswitch__home:hover {
-    color: var(--text-color);
-  }
-  .lensswitch__home.is-on {
-    background: var(--text-color);
-    color: var(--bg);
-    border-color: var(--text-color);
+  .lensswitch__home {
+    border: var(--line-hairline) solid var(--border-color-dark);
+    background: var(--bg-ultra-light);
   }
   .lensswitch {
     display: inline-flex;
@@ -121,34 +128,98 @@
     padding: var(--space-2xs);
   }
   .lensswitch a {
-    min-block-size: var(--touch-target);
-    appearance: none;
     border: 0;
     background: transparent;
-    cursor: pointer;
-    font-family: var(--font-sans);
-    font-size: var(--text-s);
-    color: var(--text-muted);
-    padding-block: var(--space-2xs);
-    padding-inline: var(--space-m);
-    border-radius: var(--radius-circle);
-    transition:
-      background var(--transition),
-      color var(--transition);
   }
+  .lensswitch__home:hover,
   .lensswitch a:hover {
     color: var(--text-color);
   }
+  .lensswitch__home.is-on {
+    border-color: var(--text-color);
+  }
+  .lensswitch__home.is-on,
   .lensswitch a.is-on {
     background: var(--text-color);
     color: var(--bg);
   }
-  /* On a phone the four have to fit one measure (390 less the gutters):
-     the pills keep their shape and give up half their side air. */
-  @media (max-width: 47.999rem) {
+  /* «You came from here»: the word in ink and a soft stroke round it, never
+     the fill (the fill is «you are here»). The ring is drawn inside the box,
+     so the mark moves nothing. */
+  .lensswitch__home.is-origin,
+  .lensswitch a.is-origin {
+    color: var(--text-color);
+    box-shadow: inset 0 0 0 var(--line-hairline) var(--lens-origin-stroke);
+  }
+
+  /* A tablet with the rail beside it: the bar is narrower than the four
+     pills with their desktop air, so they give up half of it. */
+  @media (min-width: 48rem) and (max-width: 63.999rem) {
     .lensswitch__home,
     .lensswitch a {
       padding-inline: var(--space-s);
+    }
+  }
+
+  /* A phone: the bar at the foot of the screen (ADR-140). The four words,
+     no icons, in the app's mono voice. Each link is a whole cell of the row
+     (the target); the word inside wears the same marks as on a desktop:
+     filled here, a stroke where you came from. The home pill and the
+     segmented group dissolve into that one row, over the safe area. */
+  @media (max-width: 47.999rem) {
+    .lensswitch-wrap {
+      position: fixed;
+      inset-inline: 0;
+      inset-block-end: 0;
+      z-index: var(--z-sticky);
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      padding-inline: var(--space-2xs);
+      padding-block-end: env(safe-area-inset-bottom);
+      background: var(--bg);
+      border-block-start: var(--line-hairline) solid var(--border-color-light);
+    }
+    .lensswitch {
+      display: contents;
+    }
+    .lensswitch__home,
+    .lensswitch a,
+    .lensswitch__home.is-on,
+    .lensswitch a.is-on,
+    .lensswitch__home.is-origin,
+    .lensswitch a.is-origin {
+      flex: 1 1 auto;
+      justify-content: center;
+      block-size: var(--lensbar-height);
+      min-block-size: 0;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+      color: var(--text-muted);
+    }
+    .lensswitch__word {
+      padding-block: var(--space-2xs);
+      padding-inline: var(--space-xs);
+      border-radius: var(--radius-circle);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--mono-letter-spacing);
+      text-transform: uppercase;
+      transition:
+        background var(--transition),
+        color var(--transition),
+        box-shadow var(--transition);
+    }
+    .is-on .lensswitch__word {
+      background: var(--text-color);
+      color: var(--bg);
+    }
+    .is-origin .lensswitch__word {
+      color: var(--text-color);
+      box-shadow: inset 0 0 0 var(--line-hairline) var(--lens-origin-stroke);
     }
   }
 </style>

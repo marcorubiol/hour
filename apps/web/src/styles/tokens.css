@@ -471,6 +471,9 @@
     --calm-measure: 45rem;
 
     --sidebar-width: 264px;
+    /* The shell's rail (ScopeRail) beside the page on a desktop, border
+       included; the vistazo's veil reads it to leave the top bar clear. */
+    --rail-width: 15.5rem;
     --header-height: 0px;
     --scroll-margin: 0px;
     --offset: calc(var(--scroll-margin) + var(--header-height));
@@ -690,6 +693,15 @@
     --peek-inline: 36rem;
     --peek-backdrop: color-mix(in srgb, var(--black) 16%, transparent);
 
+    /* The sections in the frame (ADR-140). «You came from here» is a soft
+       stroke round the word, never the fill that says «you are here». On a
+       phone the four words are a bar at the foot of the screen: its row,
+       and what it takes from the bottom of every page (0 where there is no
+       bar; the shell sets it on a phone). */
+    --lens-origin-stroke: var(--text-faint);
+    --lensbar-height: 2.75rem;
+    --shell-foot: 0px;
+
     /* ============================================================ */
     /* SELECTION                                                      */
     /* ============================================================ */
@@ -770,6 +782,14 @@
   /*   data-theme → default / presenter / ... (palette + fonts)      */
   /* Activate dark with `<html data-mode="dark">`. Combine with any  */
   /* theme: `<html data-theme="presenter" data-mode="dark">`.        */
+
+  /* On a phone the sections are a bar at the foot of every /h page
+     (LensSwitcher): the page, its toasts and its sticky bars give it room. */
+  @media (max-width: 47.999rem) {
+    :root:has(.lensswitch-wrap) {
+      --shell-foot: calc(var(--lensbar-height) + var(--line-hairline) + env(safe-area-inset-bottom));
+    }
+  }
 
   @media (pointer: coarse) {
     :root {
