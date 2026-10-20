@@ -1308,7 +1308,9 @@
     }
 
     .cal__grid {
-      --cal-wk-gutter: 4.125rem;
+      /* Wide enough for «SEMANA 44» on one line at the fluid margin voice's
+         top step (9.5px) plus the gutter's own air. */
+      --cal-wk-gutter: 4.375rem;
       --cal-cell-h: 8rem;
       /* The air between a card and the column rule beside it. One number,
          because the day cell and the run that crosses it have to agree —
@@ -1353,6 +1355,9 @@
       font-size: var(--text-2xs);
       letter-spacing: var(--tracking-m);
       text-transform: uppercase;
+      /* «Semana 44» is one label: the fluid margin voice must not break it
+         in the gutter. */
+      white-space: nowrap;
       /* One step above the marks it labels: the number is read, the marks are
          seen. */
       color: var(--text-muted);
