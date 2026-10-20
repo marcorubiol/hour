@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import {
   boloDefault,
   booksHref,
+  scopeShowsProject,
   boloLabel,
   boloOf,
   boloOptions, boloPatch, boloPrefill, type BoloLite } from './bolo-pick';
@@ -118,6 +119,37 @@ describe('booksHref', () => {
   });
   test('sin bolo, `act` no significa nada y no se manda', () => {
     expect(booksHref('p1', { act: 'to_invoice' })).toBe('/h/books?scope=p:p1');
+  });
+  // «Abrir en Cuentas» desde un bolo te cambiaba el ámbito de todas las
+  // lentes (2026-10-20): si tu ámbito ya enseña el proyecto, el enlace no lo toca.
+  test('con Todo, el enlace no lleva ámbito y no pisa el tuyo', () => {
+    expect(booksHref('p1', { boloId: 'b1', here: { pins: [], workspaceSlug: 'muk' } })).toBe('/h/books#bolo-b1');
+  });
+  test('con el espacio o el proyecto pinado, tampoco', () => {
+    expect(booksHref('p1', { boloId: 'b1', act: 'draft', here: { pins: ['s:muk'], workspaceSlug: 'muk' } })).toBe(
+      '/h/books?act=draft#bolo-b1',
+    );
+    expect(booksHref('p1', { newBolo: true, here: { pins: ['p:p1', 's:otro'], workspaceSlug: 'muk' } })).toBe(
+      '/h/books?new_bolo=p1',
+    );
+  });
+  test('si tu ámbito no lo enseña, acota al proyecto: si no, la tarjeta no estaría', () => {
+    expect(booksHref('p1', { boloId: 'b1', here: { pins: ['s:otro'], workspaceSlug: 'muk' } })).toBe(
+      '/h/books?scope=p:p1#bolo-b1',
+    );
+  });
+});
+
+describe('scopeShowsProject', () => {
+  test('una persona no acota Cuentas', () => {
+    expect(scopeShowsProject(['pe:x'], 'p1', 'muk')).toBe(true);
+  });
+  test('una línea no basta: el bolo puede ser de otra', () => {
+    expect(scopeShowsProject(['l:l1'], 'p1', 'muk')).toBe(false);
+  });
+  test('sin el espacio del proyecto, solo cuenta el propio proyecto', () => {
+    expect(scopeShowsProject(['s:muk'], 'p1', null)).toBe(false);
+    expect(scopeShowsProject(['p:p1'], 'p1', null)).toBe(true);
   });
 });
 

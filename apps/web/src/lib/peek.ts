@@ -17,6 +17,8 @@
  * (`list_money_bolos` takes no id), and a shared link must be enough.
  */
 
+import { booksHref, type BooksHere } from '$lib/bolo-pick';
+
 export type PeekTarget =
   | { kind: 'date'; id: string }
   | { kind: 'bolo'; projectId: string; id: string }
@@ -91,14 +93,16 @@ export function peekHref(t: PeekTarget, here: URL): string {
 
 /**
  * Where the whole thing lives, «abrir completa». A date has no page (its
- * edit is the dialog); a bolo's home is its row in Cuentas.
+ * edit is the dialog); a bolo's home is its row in Cuentas, and `here` (your
+ * pins, the project's space) keeps that link off your scope when the scope
+ * already shows it (`booksHref`).
  */
-export function fullHref(t: PeekTarget): string | null {
+export function fullHref(t: PeekTarget, here?: BooksHere): string | null {
   switch (t.kind) {
     case 'date':
       return null;
     case 'bolo':
-      return `/h/books?scope=p:${t.projectId}#bolo-${t.id}`;
+      return booksHref(t.projectId, { boloId: t.id, here });
     default:
       return `/h/${t.ws}/${t.kind}/${t.slug}`;
   }
@@ -135,7 +139,9 @@ export function peekFromLink(href: URL, here: URL): PeekTarget | null {
   if (href.pathname.replace(/\/$/, '') === '/h/books' && here.pathname.replace(/\/$/, '') !== '/h/books') {
     const bolo = /^#bolo-(.+)$/.exec(href.hash);
     const scope = /^p:(.+)$/.exec(href.searchParams.get('scope') ?? '');
-    if (bolo && scope) return parsePeek(`bolo/${scope[1]}/${bolo[1]}`);
+    // A link with a verb (`act`: cobrar, facturar…) asks Cuentas to DO it:
+    // it goes there, even from inside the bolo's own peek.
+    if (bolo && scope && !href.searchParams.has('act')) return parsePeek(`bolo/${scope[1]}/${bolo[1]}`);
   }
   return null;
 }
