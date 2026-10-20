@@ -216,6 +216,8 @@ test.describe('conversation inline write', () => {
 
       // PATCH acked above — reload proves the change survives a fresh fetch.
       await page.reload();
+      // Typed before hydration, the search is lost.
+      await waitForLoaded(page);
       await page.getByPlaceholder('People or organizations…').fill(name!);
       const after = rowByName(page, name!).locator('button[aria-haspopup="menu"]');
       await expect(after).toContainText('Not this time, until');
@@ -269,6 +271,8 @@ test.describe('conversation inline write', () => {
       ).toContainText('e2e probe');
 
       await page.reload();
+      // Typed before hydration, the search is lost.
+      await waitForLoaded(page);
       await page.getByPlaceholder('People or organizations…').fill(name!);
       await expect(
         rowByName(page, name!).locator('.next-action__note'),
@@ -342,6 +346,8 @@ test.describe('conversation inline write', () => {
 
     // A fresh fetch: the event and the stamp both survive.
     await page.reload();
+    // Typed before hydration, the search is lost.
+    await waitForLoaded(page);
     await page.getByPlaceholder('People or organizations…').fill(name!);
     const again = rowByName(page, name!);
     await expect(again.locator('.last-contact')).toContainText('today');

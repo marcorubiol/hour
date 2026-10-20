@@ -118,7 +118,7 @@ test.describe('el dashboard de Conversations (ADR-117)', () => {
     await page.getByRole('searchbox').fill(COLD);
     const row = page.locator('.conversation-table tbody tr', { hasText: COLD });
     await expect(row).toHaveCount(1, { timeout: 30_000 });
-    await expect(row.locator('input.pick')).toBeChecked();
+    await expect(row.getByRole('checkbox')).toBeChecked();
     await expect(row.locator('.turn--theirs')).toBeVisible();
 
     await page.locator('.chip--selected button, [class*="chip--"] button').first().click();

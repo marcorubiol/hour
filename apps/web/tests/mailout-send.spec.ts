@@ -98,7 +98,8 @@ test.describe('mailout (simulated)', () => {
       const row = page.locator('tbody tr', { hasText: ORG });
       await expect(row).toHaveCount(1, { timeout: 15_000 });
       await page.getByRole('button', { name: /^(Select|Seleccionar|Sélectionner)$/ }).click();
-      await row.getByRole('checkbox').check();
+      // The painted box sits over the input (Checkbox); a click on it is the user's.
+      await row.getByRole('checkbox').check({ force: true });
       const write = page.getByRole('button', { name: /Write to 1|Escribir a 1|Escriure a 1|Écrire à 1/ });
       await expect(write).toBeEnabled();
       await write.click();

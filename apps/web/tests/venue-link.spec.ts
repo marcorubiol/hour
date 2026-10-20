@@ -11,6 +11,30 @@ async function openDetails(page: Page) {
 }
 
 /**
+ * A run that died mid-test leaves zzz-e2e-1 linked, and a linked gig offers no
+ * «Save fields as venue». Start each test from the unlinked state.
+ */
+async function startUnlinked(page: Page) {
+  await page.goto('/h/playwright/performance/zzz-e2e-1');
+  await waitForLoaded(page);
+  await page.getByRole('button', { name: 'Edit details' }).click();
+  const dialog = page.locator('dialog[open]').filter({ hasText: 'Edit performance' });
+  const select = dialog.locator('#f-venue-entity');
+  // Until the venue list lands the select has no option to show the link with.
+  await expect(select.locator('option', { hasText: 'ZZZ E2E Venue' })).toHaveCount(1, { timeout: 10_000 });
+  if ((await select.inputValue()) !== '') {
+    await select.selectOption('');
+    await dialog.getByRole('button', { name: 'Save changes', exact: true }).click();
+    await expect(dialog).not.toBeVisible({ timeout: 10_000 });
+    await page.reload();
+    await waitForLoaded(page);
+  } else {
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await expect(dialog).not.toBeVisible();
+  }
+}
+
+/**
  * E2E — venue entity linking (ADR-049): promote the typed venue fields to
  * a venue row from the edit dialog, link it, verify it persists, unlink.
  *
@@ -28,8 +52,7 @@ test.describe('venue linking', () => {
   test('promote fields → link persists → unlink', async ({ page }) => {
     test.setTimeout(90_000);
 
-    await page.goto('/h/playwright/performance/zzz-e2e-1');
-    await waitForLoaded(page);
+    await startUnlinked(page);
     await expect(page.getByRole('button', { name: 'Edit details' })).toBeVisible();
 
     // Open the dialog, type a venue trio, promote it.
@@ -72,8 +95,7 @@ test.describe('venue linking', () => {
   }) => {
     test.setTimeout(90_000);
 
-    await page.goto('/h/playwright/performance/zzz-e2e-1');
-    await waitForLoaded(page);
+    await startUnlinked(page);
     await page.getByRole('button', { name: 'Edit details' }).click();
     let dialog = page.locator('dialog[open]').filter({ hasText: 'Edit performance' });
 
@@ -84,6 +106,10 @@ test.describe('venue linking', () => {
     await dialog.getByLabel('Save fields as venue').check({ force: true });
     await dialog.getByRole('button', { name: 'Save changes', exact: true }).click();
     await expect(dialog).not.toBeVisible({ timeout: 10_000 });
+    // The dialog seeds from the cached record, refetched in the background
+    // after Save: reload so it opens on what the server holds.
+    await page.reload();
+    await waitForLoaded(page);
     await page.getByRole('button', { name: 'Edit details' }).click();
     dialog = page.locator('dialog[open]').filter({ hasText: 'Edit performance' });
     const select = dialog.locator('#f-venue-entity');

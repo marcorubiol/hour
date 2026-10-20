@@ -86,7 +86,8 @@ test.describe('Calm — a composition, not a grey (ADR-139 § 5)', () => {
     const meta = page.locator('.cal__meta--window');
     await expect(meta).not.toContainText('calm · confirmed only');
     await expect(meta).toContainText(/confirmed/);
-    await meta.getByRole('button', { name: /^see all/ }).click();
+    // The «·» between stats is the button's own ::before, so it rides in the name.
+    await meta.getByRole('button', { name: /see all/ }).click();
     await expect(page.locator('.side-calm')).toHaveAttribute('aria-pressed', 'false');
   });
 

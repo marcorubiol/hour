@@ -107,7 +107,8 @@ test.describe('tasks — Desk feed + line module', () => {
       page.waitForResponse(
         (r) => /\/api\/tasks\//.test(r.url()) && r.request().method() === 'PATCH',
       ),
-      row.check(),
+      // The painted box sits over the input (Checkbox); a click on it is the user's.
+      row.click({ force: true }),
     ]);
     expect(patched.status()).toBe(200);
     await expect(row).not.toBeVisible({ timeout: 10_000 });
