@@ -443,7 +443,7 @@
 
 ## Producto — después
 
-- [ ] **Segundo nivel y calma (ADR-139)**: las cinco fases y sus seguimientos (verbos del bolo, resalte de lo creado, «Falta» de línea y proyecto) en main el 20-10, **sin desplegar ni pasar el E2E**: piezas de formulario y de ficha, un solo modelo de guardado, ficha con hechos/«Falta»/«Detalles», vistazo lateral (fecha, bolo, función, conversación, persona), alta rápida al plan, calma como foco y peso del primer nivel, pulido de Ajustes. Siguen:
+- [ ] **Segundo nivel y calma (ADR-139)**: las cinco fases y sus seguimientos (verbos del bolo, resalte de lo creado, «Falta» de línea y proyecto) en producción el 20-10 (`b0bdd0c1`): piezas de formulario y de ficha, un solo modelo de guardado, ficha con hechos/«Falta»/«Detalles», vistazo lateral (fecha, bolo, función, conversación, persona), alta rápida al plan, calma como foco y peso del primer nivel, pulido de Ajustes. Siguen:
   - [ ] Pasar el E2E contra `b0bdd0c1` (muchos specs reescritos sin correr; en curso el 20-10).
   - [ ] Marco: decidir — En calma, ¿«Siguiente» del raíl solo lo confirmado? ADR-096 § 5 dice que el raíl no se toca. Recomendación: sí, solo lo confirmado.
   - [ ] Marco: decidir — Ajustes oculta lo que no guardaba nada: Notificaciones (Master View pasa a Perfil), cuatro valores de Privacidad, Facturación, Zona de peligro y el selector de idioma de la app. Recomendación: dejarlo así hasta que cada uno guarde de verdad.
