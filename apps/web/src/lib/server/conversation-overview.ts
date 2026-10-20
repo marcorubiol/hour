@@ -185,6 +185,20 @@ export async function loadOverviewRows(env: SupabaseEnv, jwt: string, scope: Ove
 }
 
 /**
+ * La consulta de una página de `loadTaggedIds`. Las columnas del orden van en el
+ * `select`: sobre `rpc/conversation_search` PostgREST no ordena por una columna
+ * que no devuelve (42703).
+ */
+export function taggedIdsSearch(base: URLSearchParams, offset: number): URLSearchParams {
+  const search = new URLSearchParams(base);
+  search.set('select', `id,next_action_at,updated_at,${TAGGING_EMBED}`);
+  search.set('order', 'next_action_at.asc.nullslast,updated_at.desc,id');
+  search.set('limit', String(PAGE));
+  search.set('offset', String(offset));
+  return search;
+}
+
+/**
  * Lo que la lista sin filtro de bloque necesita para acotar por etiqueta
  * (ADR-138, fase 2): los ids del alcance con sus etiquetas, en el orden de la
  * lista. Ligero: sin turno, bolos ni funciones. La página se lee después entera.
@@ -195,14 +209,9 @@ export async function loadTaggedIds(
   base: URLSearchParams,
   path: 'conversation' | 'rpc/conversation_search',
 ): Promise<{ id: string; tags: string[] }[]> {
-  const rows = await pages((offset) => {
-    const search = new URLSearchParams(base);
-    search.set('select', `id,${TAGGING_EMBED}`);
-    search.set('order', 'next_action_at.asc.nullslast,updated_at.desc,id');
-    search.set('limit', String(PAGE));
-    search.set('offset', String(offset));
-    return pgGet<{ id: string; tagging: TaggingEmbed }>(env, path, jwt, { search }).then((r) => r.data);
-  });
+  const rows = await pages((offset) =>
+    pgGet<{ id: string; tagging: TaggingEmbed }>(env, path, jwt, { search: taggedIdsSearch(base, offset) }).then((r) => r.data),
+  );
   return rows.map((r) => ({ id: r.id, tags: tagKeysOf(r.tagging) }));
 }
 

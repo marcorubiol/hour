@@ -216,6 +216,24 @@
     },
     onSuccess: (body, patch) => {
       dialogOpen = false;
+      // The row the PATCH answers goes into the cache now: reopening «Edit
+      // details» before the refetch lands must not fill the form from the old
+      // row (a «save as venue» would read «None» and unlink it on the next
+      // save). The embeds are not in the answer: the venue's stays only while
+      // the link is the same, and the refetch brings the rest.
+      queryClient.setQueryData<Bundle>(['performance', { ws: workspaceSlug, slug }], (old) => {
+        if (!old) return old;
+        const row = body.performance as Partial<Bundle['performance']>;
+        const venueId = row.venue_id === undefined ? old.performance.venue_id : row.venue_id;
+        return {
+          ...old,
+          performance: {
+            ...old.performance,
+            ...row,
+            venue: old.performance.venue?.id === venueId ? old.performance.venue : null,
+          },
+        };
+      });
       void queryClient.invalidateQueries({ queryKey: ['performance'] });
       void queryClient.invalidateQueries({ queryKey: ['planner-performances'] });
       // Mover una función de bolo cambia el enlace y el recuento de los dos.

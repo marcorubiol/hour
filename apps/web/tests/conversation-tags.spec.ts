@@ -73,9 +73,12 @@ test.describe('conversation tags', () => {
       await dialog.getByRole('button', { name: 'Add conversation' }).click();
       await expect(dialog).not.toBeVisible({ timeout: 10_000 });
 
+      // Searching with a chip on goes through rpc/conversation_search, which
+      // only orders by what it selects (42703 before the fix).
       await search(page);
       const row = page.locator('main table tbody tr', { hasText: ORG });
       await expect(row).toHaveCount(1, { timeout: 15_000 });
+      await expect(page.getByText('The conversations could not be read.')).toHaveCount(0);
       // Under its own chip the row does not repeat the tag.
       await expect(row.locator('.tag-chip')).toHaveCount(0);
 

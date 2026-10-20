@@ -3275,8 +3275,12 @@
           {:else}
             <span class="cal__stat cal__stat--soft">{t('planner.calm_uncounted', locale)}</span>
           {/if}
-          <button type="button" class="cal__stat empty-line__act" onclick={() => calm.set(false)}
-            >{t('calm.see_all', locale)}&nbsp;<span aria-hidden="true">→</span></button
+          <!-- The `·` is the part's ::before: on a wrapper, so it stays out
+               of the button's name. -->
+          <span class="cal__stat"
+            ><button type="button" class="empty-line__act" onclick={() => calm.set(false)}
+              >{t('calm.see_all', locale)}&nbsp;<span aria-hidden="true">→</span></button
+            ></span
           >
         {/if}
         <!-- COUNTERS FOLLOW THE GEOMETRY, NOT THE WORD (ADR-095).
