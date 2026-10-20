@@ -40,6 +40,7 @@
   import PeekHost from '$lib/components/peek/PeekHost.svelte';
   import { provideCalm } from '$lib/stores/calm.svelte';
   import { providePins, parsePin, type PinKind } from '$lib/stores/pins.svelte';
+  import { scopeUrlToWrite } from '$lib/scope-url';
   import { provideScopes, sameSet as scopesSameSet, type Scope } from '$lib/stores/scopes.svelte';
   import { provideCreation } from '$lib/stores/creation.svelte';
   import CreateWorkspaceDialog from '$lib/components/create/CreateWorkspaceDialog.svelte';
@@ -441,6 +442,12 @@
       pins.set(next);
     }
   });
+  // The first afterNavigate fires once SvelteKit's root exists (on a client
+  // load, after the first mount returns): from then on shallow routing works.
+  let routerReady = $state(false);
+  afterNavigate(() => {
+    routerReady = true;
+  });
   $effect(() => {
     if (!scopeSurface) return;
     void page.url; // dependency: lens→lens navigation must re-run this
@@ -453,20 +460,9 @@
       if (toks.some((t) => urlTokenToPin(t) === null)) return;
     }
     const ser = pins.pins.map(pinToUrlToken).join(',');
-    if (ser === (existing ?? '')) return;
-    if (ser) url.searchParams.set('scope', ser);
-    else url.searchParams.delete('scope');
-    // URLSearchParams serializes as form-urlencoded, escaping ':' ',' '/'
-    // (%3A/%2C/%2F) — all legal bare in a query per RFC 3986, and the
-    // parser reads either form identically. Un-escape so the address bar
-    // shows the tokens as designed: ?scope=s:muk-cia,p:muk-cia/mamemi.
-    const qs = url.searchParams
-      .toString()
-      .replace(/%3A/gi, ':')
-      .replace(/%2C/gi, ',')
-      .replace(/%2F/gi, '/');
-    url.search = qs ? `?${qs}` : '';
-    replaceState(url, {});
+    // Never before the router has its root: see `scopeUrlToWrite`.
+    const next = scopeUrlToWrite(url.href, ser, routerReady);
+    if (next) replaceState(next, {});
   });
 
   // ⌘K scope builder — Apply sets the pins and remembers the scope.

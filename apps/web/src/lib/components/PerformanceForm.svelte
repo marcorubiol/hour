@@ -42,7 +42,8 @@
   import { dayMonthYear } from '$lib/datetime';
   import { dayKeyInTz } from '$lib/planner';
   import { detectLocale, t } from '$lib/i18n';
-  import { allLinesQueryOptions } from '$lib/nav-queries';
+  import { allLinesQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
+  import { usePins } from '$lib/stores/pins.svelte';
   import {
     boloDefault,
     boloOptions,
@@ -59,7 +60,7 @@
     type PerformanceSeriesCreate,
   } from '$lib/performance';
 
-  type ProjectLite = { id: string; slug: string; name: string };
+  type ProjectLite = { id: string; slug: string; name: string; workspace_id: string };
 
   interface Props {
     /** Host dialog's open state — presets apply on each open transition. */
@@ -125,6 +126,14 @@
       fetchJSON<{ items: ProjectLite[] }>('/api/projects?status=active', signal),
   });
   const linesQuery = createQuery(allLinesQueryOptions());
+  // «Crear el bolo en Cuentas» leaves your scope alone when it already shows
+  // the project (`booksHref`); it opens another tab, and pins are shared.
+  const pins = usePins();
+  const wsQuery = createQuery(workspacesQueryOptions());
+  let booksHere = $derived.by(() => {
+    const ws = ($projectsQuery.data?.items ?? []).find((p) => p.id === cProject)?.workspace_id;
+    return { pins: pins.pins, workspaceSlug: ($wsQuery.data?.items ?? []).find((w) => w.id === ws)?.slug ?? null };
+  });
 
   let projectOptions = $derived(
     ($projectsQuery.data?.items ?? []).map((p) => ({ value: p.id, label: p.name })),
@@ -322,7 +331,7 @@
     {t('perf.bolo_helper_short', locale)}
     <!-- Otra pestaña: el alta a medio escribir no se pierde (Marco, 2026-10-10). -->
     {#if lensOn('books')}
-      <a href={booksHref(cProject, { newBolo: true })} target="_blank" rel="noopener"
+      <a href={booksHref(cProject, { newBolo: true, here: booksHere })} target="_blank" rel="noopener"
         >{t('perf.bolo_create_link', locale)}</a
       >
     {/if}

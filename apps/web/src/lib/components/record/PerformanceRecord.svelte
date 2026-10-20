@@ -59,6 +59,7 @@
   import { performanceRoster } from '$lib/planner';
   import Select from '$lib/components/Select.svelte';
   import { boloOf, boloOptions, boloPatch, booksHref, type BoloLite } from '$lib/bolo-pick';
+  import { usePins } from '$lib/stores/pins.svelte';
   import { lensOn } from '$lib/lenses.svelte';
   import { performanceBoloQueryOptions, projectBolosQueryOptions } from '$lib/bolo-queries';
   import { workspacesQueryOptions } from '$lib/nav-queries';
@@ -176,6 +177,11 @@
   }
 
   let { workspaceSlug, slug, inPeek = false }: Props = $props();
+  // «Crear el bolo» in Cuentas leaves your scope alone when it already shows
+  // the project. The bolo links keep `scope=p:`: a click peeks the bolo, and
+  // the peek reads its project there (`peekFromLink`).
+  const pins = usePins();
+  let booksHere = $derived({ pins: pins.pins, workspaceSlug });
 
   const queryOptions = toStore(() => {
     const k = { ws: workspaceSlug, slug };
@@ -760,7 +766,7 @@
           verbs: showBoloSelect
             ? [{ label: t('record.verb_pick', locale), onclick: openEdit }]
             : perf?.project && lensOn('books')
-              ? [{ label: t('perf.bolo_create_link', locale), href: booksHref(perf.project.id, { newBolo: true }) }]
+              ? [{ label: t('perf.bolo_create_link', locale), href: booksHref(perf.project.id, { newBolo: true, here: booksHere }) }]
               : [],
         };
       case 'roadsheet_unshared':
@@ -1083,7 +1089,7 @@
   {t('perf.bolo_helper_short', locale)}
   {#if perf?.project && lensOn('books')}
     <!-- Otra pestaña: la edición a medio escribir no se pierde (Marco, 2026-10-10). -->
-    <a href={booksHref(perf.project.id, { newBolo: true })} target="_blank" rel="noopener"
+    <a href={booksHref(perf.project.id, { newBolo: true, here: booksHere })} target="_blank" rel="noopener"
       >{t('perf.bolo_create_link', locale)}</a
     >
   {/if}

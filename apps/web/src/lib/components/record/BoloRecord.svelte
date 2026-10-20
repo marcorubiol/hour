@@ -23,6 +23,7 @@
   import { ApiError, fetchJSON } from '$lib/api';
   import { retryLoad } from '$lib/load-fail';
   import { booksHref } from '$lib/bolo-pick';
+  import { usePins } from '$lib/stores/pins.svelte';
   import { projectBolosQueryOptions } from '$lib/bolo-queries';
   import { dayLabel, localDayISO } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
@@ -59,6 +60,7 @@
   let { projectId, id }: Props = $props();
 
   const locale = appLocale();
+  const pins = usePins();
 
   const bolosQuery = createQuery(toStore(() => ({ ...projectBolosQueryOptions(projectId), retry: retryLoad })));
   // The project feed carries the whole MoneyBolo row; `BoloLite` is its pick.
@@ -146,6 +148,8 @@
     return out;
   });
 
+  // A verb goes to Cuentas; your scope stays when it already shows the bolo.
+  let here = $derived({ pins: pins.pins, workspaceSlug: workspaceSlug || null });
   let rowHref = $derived(booksHref(projectId, { boloId: id }));
   let conversationHref = $derived(
     bolo?.conversation_id && workspaceSlug ? `/h/${workspaceSlug}/conversation/${bolo.conversation_id}` : null,
@@ -184,7 +188,7 @@
           : {
               label: t(a.kind === 'overdue' ? 'books.record_payment' : ATTENTION_VERB[a.kind], locale).toLowerCase(),
               // The row, with the dialog that settles it already open.
-              href: booksHref(projectId, { boloId: id, act: a.kind }),
+              href: booksHref(projectId, { boloId: id, act: a.kind, here }),
             },
       ],
     };

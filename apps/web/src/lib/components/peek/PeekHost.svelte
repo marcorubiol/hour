@@ -17,6 +17,9 @@
    * router (on <html>), which steps aside on a prevented click.
    */
   import { onMount } from 'svelte';
+  import { createQuery } from '@tanstack/svelte-query';
+  import { activeProjectsQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
+  import { usePins } from '$lib/stores/pins.svelte';
   import { fullHref, peekFromLink, peekOpensFrom, formatPeek, type PeekTarget } from '$lib/peek';
   import { closePeek, currentPeek, openPeek } from '$lib/peek.svelte';
   import { appLocale, t } from '$lib/i18n';
@@ -40,10 +43,21 @@
     person: 'peek.kind_person',
   };
 
+  // A bolo's «Abrir en Cuentas» keeps your scope when it already shows the
+  // project (`booksHref`): the shell has both caches warm.
+  const pins = usePins();
+  const projectsQuery = createQuery(activeProjectsQueryOptions());
+  const wsQuery = createQuery(workspacesQueryOptions());
+  function spaceOfProject(projectId: string): string | null {
+    const p = ($projectsQuery.data?.items ?? []).find((x) => x.id === projectId);
+    return (p && ($wsQuery.data?.items ?? []).find((w) => w.id === p.workspace_id)?.slug) || null;
+  }
+
   let label = $derived(target ? t('peek.label', locale, { kind: t(KIND_WORD[target.kind], locale) }) : '');
   let full = $derived.by(() => {
     if (!target) return null;
-    const href = fullHref(target);
+    const here = target.kind === 'bolo' ? { pins: pins.pins, workspaceSlug: spaceOfProject(target.projectId) } : undefined;
+    const href = fullHref(target, here);
     if (!href) return null;
     return { href, label: t(target.kind === 'bolo' ? 'peek.open_books' : 'peek.open_full', locale) };
   });
