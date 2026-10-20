@@ -125,3 +125,38 @@ test('a scope change on a person opened from Conversations lands back on Convers
     'page',
   );
 });
+
+// 2026-10-20 (prod 4ffc6b6e): with a saved scope, a FULL load of a lens with no
+// ?scope= in the address (new tab, reload, the installed app) drew nothing.
+// The shell wrote the saved scope into the URL from its first effect run,
+// inside SvelteKit's first mount, before the router had its root: replaceState
+// threw «reading '$set'» and the app stayed blank. Every lens, both kinds of pin.
+for (const [lens, token] of [
+  ['desk', FIXTURE_SPACE_TOKEN],
+  ['conversations', FIXTURE_PROJECT_TOKEN],
+  ['planner', FIXTURE_SPACE_TOKEN],
+  ['books', FIXTURE_PROJECT_TOKEN],
+] as const) {
+  test(`a saved scope survives a full load of /h/${lens}: it paints, and the URL takes the scope`, async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.addInitScript((pin) => {
+      // Only the first load: the next one must read what the app saved.
+      if (sessionStorage.getItem('e2e-pins-seeded')) return;
+      localStorage.setItem('hour_pins', JSON.stringify([pin]));
+      sessionStorage.setItem('e2e-pins-seeded', '1');
+    }, token);
+
+    await page.goto(`/h/${lens}`);
+    await waitForLoaded(page);
+    await expect(page.locator('.tok').first(), 'the scope bar drew the saved scope').toBeVisible();
+    await expect(page).toHaveURL(/[?&]scope=/);
+
+    // Again with a bare address, as a new tab or the installed app opens it.
+    await page.goto(`/h/${lens}`);
+    await waitForLoaded(page);
+    await expect(page.locator('.tok').first()).toBeVisible();
+    await expect(page).toHaveURL(/[?&]scope=/);
+    expect(errors, 'no page error on a full load with a saved scope').toEqual([]);
+  });
+}
