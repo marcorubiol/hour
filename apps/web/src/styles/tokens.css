@@ -700,6 +700,11 @@
        bar; the shell sets it on a phone). */
     --lens-origin-stroke: var(--text-faint);
     --lensbar-height: 2.75rem;
+    /* Hoy apart (Marco, 20-10): the portada is not a fourth lens, so a
+       hairline stands between it and the three, with this air on each side,
+       on a desktop and in the phone's bar alike. */
+    --lens-apart: var(--space-s);
+    --lens-apart-rule: var(--border-color-dark);
     --shell-foot: 0px;
 
     /* ============================================================ */

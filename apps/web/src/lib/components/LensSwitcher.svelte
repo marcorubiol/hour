@@ -66,6 +66,9 @@
   >
     <span class="lensswitch__word">{t('lens.desk', locale)}</span>
   </a>
+  <!-- Hoy is the portada and the digest (ADR-088), not a fourth lens: a
+       hairline stands it apart. Drawing only; the nav keeps its four links. -->
+  <span class="lensswitch__apart" aria-hidden="true"></span>
   <div class="lensswitch">
     {#each VIEW_AS as v (v.id)}
       <a
@@ -94,7 +97,17 @@
   .lensswitch-wrap {
     display: inline-flex;
     align-items: center;
-    gap: var(--space-s);
+    gap: var(--lens-apart);
+  }
+  /* The rule between Hoy and the three lenses: a hairline the height of the
+     word, centred in the air the wrap's gap gives it on each side. */
+  .lensswitch__apart {
+    flex: none;
+    align-self: center;
+    inline-size: var(--line-hairline);
+    block-size: 1lh;
+    font-size: var(--text-s);
+    background: var(--lens-apart-rule);
   }
   .lensswitch__home,
   .lensswitch a {
@@ -182,6 +195,11 @@
     }
     .lensswitch {
       display: contents;
+    }
+    /* The same rule in the bar: between Hoy's cell and the three, the word's
+       height, no air of its own (each cell already has it). */
+    .lensswitch__apart {
+      font-size: var(--text-xs);
     }
     .lensswitch__home,
     .lensswitch a,
