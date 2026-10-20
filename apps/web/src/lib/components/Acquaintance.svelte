@@ -13,6 +13,7 @@
    * donde ya se sabe de quién); con él dice el nombre (una conversación con
    * varios contactos).
    */
+  import ConceptHint from '$lib/components/ConceptHint.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { mutateJSON } from '$lib/api';
   import {
@@ -83,7 +84,11 @@
 {#if ready}
   <div class="acq">
     <div class="acq__row">
-      <span class={name ? 'acq__name' : 'eyebrow eyebrow--sub'}>{name ?? t('acquaintance.known', locale)}</span>
+      <!-- On a person's page the row is «Lo conozco» itself, and it takes the «i»;
+           in a conversation the group's eyebrow already carries it. -->
+      <span class={name ? 'acq__name' : 'eyebrow eyebrow--sub'}>{name ?? t('acquaintance.known', locale)}{#if !name}<ConceptHint
+            concept="known"
+          />{/if}</span>
       <Switch
         checked={known.mine}
         label={name ? t('acquaintance.known_aria', locale, { name }) : t('acquaintance.known', locale)}

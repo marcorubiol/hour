@@ -13,13 +13,19 @@
 
   import { docTitle } from '$lib/doc-title';
   import { page } from '$app/state';
-  import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
+  import { createMutation, createQuery, keepPreviousData, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
+  import { retryLoad } from '$lib/load-fail';
+  import RecordState from '$lib/components/RecordState.svelte';
   import Button from '$lib/components/Button.svelte';
+  import Select from '$lib/components/Select.svelte';
   import { copyText } from '$lib/clipboard';
   import Pill from '$lib/components/Pill.svelte';
   import RoadsheetView from '$lib/components/RoadsheetView.svelte';
+  import BlockHead from '$lib/components/BlockHead.svelte';
+  import { workspacesQueryOptions } from '$lib/nav-queries';
+  import { spaceCrumb, type Crumb } from '$lib/record-crumbs';
   import { addToast } from '$lib/components/Toast.svelte';
   import { dayMonthYearTs } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
@@ -47,6 +53,9 @@
     const k = { ws: workspaceSlug, slug, role };
     return {
       queryKey: ['roadsheet', k] as const,
+      retry: retryLoad,
+      // Switching the role keeps the sheet on screen until the next one lands.
+      placeholderData: keepPreviousData,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         fetchJSON<Response>(
           `/api/performances/${encodeURIComponent(k.slug)}/roadsheet?ws=${encodeURIComponent(k.ws)}&role=${k.role}`,
@@ -58,9 +67,20 @@
   const query = createQuery(queryOptions);
 
   let sheet = $derived($query.data?.roadsheet ?? null);
+
+  // Address: Space › Project › Función › Hoja de ruta. The performance is a
+  // link: the way back lives in the address, not in a line of its own.
+  const wsQuery = createQuery(workspacesQueryOptions());
+  let crumbs = $derived.by<Crumb[]>(() => {
+    const ws = $wsQuery.data?.items.find((w) => w.slug === workspaceSlug);
+    const out: Crumb[] = [spaceCrumb(ws?.name, workspaceSlug)];
+    if (sheet?.project) out.push({ label: sheet.project.name, href: `/h/${workspaceSlug}/project/${sheet.project.slug}/` });
+    out.push({ label: t('perf.label', locale), href: `/h/${workspaceSlug}/performance/${slug}` });
+    out.push({ label: t('roadsheet.title', locale) });
+    return out;
+  });
   let venueTz = $derived($query.data?.venue_timezone ?? null);
   let loading = $derived($query.isPending);
-  let errorMsg = $derived($query.error instanceof Error ? $query.error.message : '');
 
   // ── Public links ─────────────────────────────────────────────────────
   const queryClient = useQueryClient();
@@ -136,25 +156,34 @@
   <title>{docTitle(sheet?.title, t('roadsheet.title', locale))}</title>
 </svelte:head>
 
-<article class="rs" aria-busy={loading}>
-  <nav class="rs__roles" aria-label={t('roadsheet.preview_as', locale)}>
-    <span class="rs__roles-label">{t('roadsheet.view_as', locale)}</span>
-    {#each ROADSHEET_ROLES as r (r)}
-      <Pill size="sm" active={role === r} onclick={() => (role = r)}>
-        {roleWord(r)}
-      </Pill>
-    {/each}
-  </nav>
+<article class="record rs" aria-busy={loading}>
 
-  {#if loading}
-    <p class="rs__state">{t('desk.loading', locale)}</p>
-  {:else if errorMsg}
-    <p class="rs__state rs__state--danger">{errorMsg}</p>
+  {#if loading || ($query.isError && !sheet)}
+    <RecordState
+      {loading}
+      error={$query.error}
+      missingText={t('roadsheet.not_found', locale)}
+      failedText={t('roadsheet.load_error', locale)}
+      onretry={() => void $query.refetch()}
+      back={{ href: `/h/${workspaceSlug}/performance/${slug}`, label: t('roadsheet.back', locale) }}
+      {locale}
+    />
   {:else if sheet}
-    <RoadsheetView {sheet} {venueTz} {locale} backHref={`/h/${workspaceSlug}/performance/${slug}`} />
+    <RoadsheetView {sheet} {venueTz} {locale} {crumbs}>
+      {#snippet tools()}
+      <nav class="rs__roles" aria-label={t('roadsheet.preview_as', locale)}>
+        <span class="rs__roles-label">{t('roadsheet.view_as', locale)}</span>
+        {#each ROADSHEET_ROLES as r (r)}
+          <Pill size="sm" active={role === r} onclick={() => (role = r)}>
+            {roleWord(r)}
+          </Pill>
+        {/each}
+      </nav>
+      {/snippet}
+    </RoadsheetView>
 
     <section class="rs__share" aria-label={t('roadsheet.public_links', locale)}>
-      <h2 class="eyebrow eyebrow--sub rs__share-title">{t('roadsheet.public_links', locale)}</h2>
+      <BlockHead title={t('roadsheet.public_links', locale)} />
       <p class="rs__share-hint">{t('roadsheet.public_links_hint', locale)}</p>
       {#if shares.length > 0}
         <ul class="rs__share-list" role="list">
@@ -163,12 +192,12 @@
               <span class="rs__share-role">{roleWord(s.role)}</span>
               <span class="rs__share-date">{dayMonthYearTs(s.created_at)}</span>
               <span class="rs__share-actions">
-                <Button size="s" variant="outline" onclick={() => copyShare(s.token)}>
+                <Button size="s" variant="secondary" onclick={() => copyShare(s.token)}>
                   {t('roadsheet.copy_link', locale)}
                 </Button>
                 <Button
                   size="s"
-                  variant="outline"
+                  variant="secondary"
                   tone="warn"
                   loading={$revokeShare.isPending}
                   onclick={() => $revokeShare.mutate(s.id)}
@@ -181,14 +210,13 @@
         </ul>
       {/if}
       <div class="rs__share-create">
-        <label class="rs__share-pick">
-          <span class="eyebrow eyebrow--sub">{t('roadsheet.role', locale)}</span>
-          <select bind:value={shareRole}>
+        <div class="rs__share-pick">
+          <Select id="rs-share-role" label={t('roadsheet.role', locale)} bind:value={shareRole}>
             {#each PUBLIC_ROLES as r (r)}
               <option value={r}>{roleWord(r)}</option>
             {/each}
-          </select>
-        </label>
+          </Select>
+        </div>
         <Button size="s" loading={$createShare.isPending} onclick={() => $createShare.mutate()}>
           {t('roadsheet.create_link', locale)}
         </Button>
@@ -199,11 +227,6 @@
 
 <style>
   @layer components {
-    .rs {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-l);
-    }
 
     .rs__roles {
       display: flex;
@@ -219,27 +242,13 @@
       color: var(--text-faint);
     }
 
-    .rs__state {
-      padding-block: var(--space-l);
-      font-size: var(--text-s);
-      color: var(--text-faint);
-    }
-    .rs__state--danger {
-      color: var(--danger);
-    }
-
     .rs__share {
       display: flex;
       flex-direction: column;
       gap: var(--space-s);
-      padding-block-start: var(--space-l);
-      border-block-start: var(--line-hairline) solid var(--border-color-light);
     }
 
     /* Sub-eyebrow typography via base.css .eyebrow--sub. */
-    .rs__share-title {
-      margin: 0;
-    }
 
     .rs__share-hint {
       font-size: var(--text-xs);
@@ -281,9 +290,7 @@
     }
 
     .rs__share-pick {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-2xs);
+      flex: 1 1 16rem;
     }
 
     /* Print: drop the operator chrome, keep the document. The width cap is

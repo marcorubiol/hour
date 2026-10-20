@@ -19,6 +19,7 @@
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
+  import { toastCreated } from '$lib/created';
   import { mutateJSON, ApiError } from '$lib/api';
   import { conversationWhoBody } from '$lib/conversation';
   import { organizationNames, organizationsQueryOptions } from '$lib/organizations';
@@ -83,11 +84,23 @@
         next_action_note: aNextNote.trim() || null,
         line_id: line.id,
       }),
-    onSuccess: () => {
+    onSuccess: (body) => {
       addOpen = false;
       void queryClient.invalidateQueries({ queryKey: ['conversations'] });
       void queryClient.invalidateQueries({ queryKey: ['organizations'] });
       void queryClient.invalidateQueries({ queryKey: ['line-eng-stats'] });
+      const id = (body as { conversation?: { id?: string } } | null)?.conversation?.id;
+      toastCreated({
+        locale,
+        message: t('conversations.added_one', locale),
+        undo: id
+          ? async () => {
+              await mutateJSON('DELETE', `/api/conversations/${id}`);
+              await queryClient.invalidateQueries({ queryKey: ['conversations'] });
+              await queryClient.invalidateQueries({ queryKey: ['line-eng-stats'] });
+            }
+          : undefined,
+      });
     },
     onError: (err) => {
       if (err instanceof ApiError && err.status === 409) {
@@ -107,13 +120,20 @@
     },
   });
 
+  /** «Who», said under the organization (ADR-139 p7), never as a toast. */
+  let errWho = $state<string | undefined>();
+  $effect(() => {
+    void aName;
+    void aOrg;
+    errWho = undefined;
+  });
+  let addFormEl: HTMLFormElement | undefined = $state();
+
+  /** Runs from the form's submit (Enter, ⌘↵ or the button). */
   function submitAdd() {
     if (!aName.trim() && !aOrg.trim()) {
-      addToast({
-        tone: 'warning',
-        title: t('line.name_required', locale),
-        message: t('line.name_required_msg', locale),
-      });
+      errWho = t('line.name_required_msg', locale);
+      document.getElementById(`${orgListId}-input`)?.focus();
       return;
     }
     $addMutation.mutate();
@@ -123,7 +143,7 @@
 <div class="lcm">
   <div class="lcm__bar">
     {#if canEdit}
-      <Button size="xs" variant="outline" onclick={openAdd}>{t('conversations.add', locale)}</Button>
+      <Button size="xs" variant="secondary" onclick={openAdd}>{t('conversations.add', locale)}</Button>
     {/if}
   </div>
   <ConversationTable {filters} editable={canEdit} personBase={`/h/${workspaceSlug}/person`} conversationHref={(item) => `/h/${workspaceSlug}/conversation/${item.id}`} />
@@ -132,12 +152,20 @@
 <Dialog bind:open={addOpen} title={t('conversations.add', locale)} size="s" onclose={() => (addOpen = false)}>
   <form
     class="lcm__form"
+    bind:this={addFormEl}
     onsubmit={(e) => {
       e.preventDefault();
       submitAdd();
     }}
   >
-    <Input label={t('conversations.col_organization', locale)} bind:value={aOrg} list={orgListId} autocomplete="off" />
+    <Input
+      id={`${orgListId}-input`}
+      label={t('conversations.col_organization', locale)}
+      bind:value={aOrg}
+      error={errWho}
+      list={orgListId}
+      autocomplete="off"
+    />
     <datalist id={orgListId}>
       {#each orgSuggestions as name (name)}<option value={name}></option>{/each}
     </datalist>
@@ -145,10 +173,14 @@
     <Input label={t('conversations.email', locale)} type="email" bind:value={aEmail} />
     <Input label={t('conversations.col_next_action', locale)} type="date" bind:value={aNextAt} />
     <Input label={t('conversations.next_note', locale)} bind:value={aNextNote} />
+    <!-- Hidden submit lets Enter inside an input trigger submit. -->
+    <button type="submit" hidden aria-hidden="true"></button>
   </form>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (addOpen = false)}>{t('create.cancel', locale)}</Button>
-    <Button loading={$addMutation.isPending} onclick={submitAdd}>{t('composer.add', locale)}</Button>
+    <Button variant="quiet" onclick={() => (addOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button loading={$addMutation.isPending} onclick={() => addFormEl?.requestSubmit()}
+      >{t('composer.add', locale)}</Button
+    >
   {/snippet}
 </Dialog>
 
@@ -166,7 +198,7 @@
     .lcm__form {
       display: flex;
       flex-direction: column;
-      gap: var(--space-s);
+      gap: var(--field-gap);
     }
   }
 </style>

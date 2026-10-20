@@ -10,6 +10,8 @@
   import Badge from '../components/Badge.svelte';
   import Avatar from '../components/Avatar.svelte';
   import Select from '../components/Select.svelte';
+  import Segmented from '../components/Segmented.svelte';
+  import Textarea from '../components/Textarea.svelte';
   import Dialog from '../components/Dialog.svelte';
   import Toast, { addToast } from '../components/Toast.svelte';
   import Tooltip from '../components/Tooltip.svelte';
@@ -72,6 +74,11 @@
   ];
 
   // Dialog demo state
+  let formOpen = $state(false);
+  let formType = $state('performance');
+  let formProject = $state('sirena');
+  let formDirection = $state('outbound');
+  let formMulti = $state(false);
   let dialogBasicOpen = $state(false);
   let dialogConfirmOpen = $state(false);
   let dialogLargeOpen = $state(false);
@@ -203,8 +210,8 @@
     <h2 class="h3">Button — variants</h2>
     <div class="playground__row">
       <Button variant="primary">Primary</Button>
-      <Button variant="outline">Outline</Button>
-      <Button variant="danger">Danger</Button>
+      <Button variant="secondary">Secondary</Button>
+      <Button variant="quiet">Quiet</Button>
     </div>
   </section>
 
@@ -215,9 +222,9 @@
       with any variant for destructive secondary actions.
     </p>
     <div class="playground__row">
-      <Button variant="outline" tone="warn">Leave workspace</Button>
-      <Button variant="outline" tone="warn" size="s">Cancel plan</Button>
-      <Button variant="primary" tone="warn">Delete</Button>
+      <Button variant="secondary" tone="warn">Leave workspace</Button>
+      <Button variant="secondary" tone="warn" size="s">Cancel plan</Button>
+      <Button variant="quiet" tone="warn">Delete</Button>
     </div>
   </section>
 
@@ -225,15 +232,11 @@
     <h2 class="h3">Button — sizes</h2>
     <div class="playground__row">
       <Button size="xs">XS</Button>
-      <Button size="s">S</Button>
-      <Button size="m">M (default)</Button>
-      <Button size="l">L</Button>
+      <Button size="s">S (default)</Button>
     </div>
     <div class="playground__row">
-      <Button variant="outline" size="xs">XS</Button>
-      <Button variant="outline" size="s">S</Button>
-      <Button variant="outline" size="m">M</Button>
-      <Button variant="outline" size="l">L</Button>
+      <Button variant="secondary" size="xs">XS</Button>
+      <Button variant="secondary" size="s">S</Button>
     </div>
   </section>
 
@@ -243,8 +246,8 @@
       <Button>Default</Button>
       <Button disabled>Disabled</Button>
       <Button loading>Loading</Button>
-      <Button variant="outline" disabled>Disabled outline</Button>
-      <Button variant="outline" loading>Loading outline</Button>
+      <Button variant="secondary" disabled>Disabled outline</Button>
+      <Button variant="secondary" loading>Loading outline</Button>
     </div>
   </section>
 
@@ -259,11 +262,11 @@
         Continue
         {#snippet tail()}<span aria-hidden="true">→</span>{/snippet}
       </Button>
-      <Button variant="outline">
+      <Button variant="secondary">
         {#snippet lead()}<span aria-hidden="true">+</span>{/snippet}
         Add item
       </Button>
-      <Button variant="outline">
+      <Button variant="secondary">
         Filter
         {#snippet tail()}<span aria-hidden="true">▾</span>{/snippet}
       </Button>
@@ -274,7 +277,7 @@
     <h2 class="h3">Button — interactive</h2>
     <div class="playground__row">
       <Button onclick={() => counter++}>Click ({counter})</Button>
-      <Button variant="outline" onclick={() => (counter = 0)}>Reset</Button>
+      <Button variant="secondary" onclick={() => (counter = 0)}>Reset</Button>
       <Button loading={asyncLoading} onclick={fakeAsync}>
         Async (1.2s)
       </Button>
@@ -285,7 +288,7 @@
     <h2 class="h3">LinkButton</h2>
     <div class="playground__row">
       <LinkButton href="/login">Internal</LinkButton>
-      <LinkButton href="https://astro.build" target="_blank" variant="outline">
+      <LinkButton href="https://astro.build" target="_blank" variant="secondary">
         External
         {#snippet tail()}<span aria-hidden="true">↗</span>{/snippet}
       </LinkButton>
@@ -412,7 +415,7 @@
         Try submit
       </Button>
       <Button
-        variant="outline"
+        variant="secondary"
         size="s"
         onclick={() => {
           termsSubmitAttempted = false;
@@ -584,7 +587,7 @@
       {/each}
       {#if tags.length === 0}
         <Button
-          variant="outline"
+          variant="secondary"
           size="s"
           onclick={() => (tags = ['draft', 'urgent', '2026-27'])}
         >
@@ -714,10 +717,10 @@
     </p>
     <div class="playground__row">
       <Button onclick={() => (dialogBasicOpen = true)}>Open basic</Button>
-      <Button variant="outline" onclick={() => (dialogConfirmOpen = true)}>
+      <Button variant="secondary" onclick={() => (dialogConfirmOpen = true)}>
         Confirm action
       </Button>
-      <Button variant="outline" onclick={() => (dialogLargeOpen = true)}>
+      <Button variant="secondary" onclick={() => (dialogLargeOpen = true)}>
         Large
       </Button>
     </div>
@@ -734,7 +737,7 @@
       contacts before sending the contract.
     </p>
     {#snippet actions()}
-      <Button variant="outline" size="s" onclick={() => (dialogBasicOpen = false)}>
+      <Button variant="secondary" size="s" onclick={() => (dialogBasicOpen = false)}>
         Close
       </Button>
     {/snippet}
@@ -753,7 +756,7 @@
     </p>
     {#snippet actions()}
       <Button
-        variant="outline"
+        variant="secondary"
         size="s"
         onclick={() => {
           dialogConfirmOpen = false;
@@ -785,9 +788,70 @@
       the rest of the page stays still.
     </p>
     {#snippet actions()}
-      <Button variant="outline" size="s" onclick={() => (dialogLargeOpen = false)}>
+      <Button variant="secondary" size="s" onclick={() => (dialogLargeOpen = false)}>
         Done
       </Button>
+    {/snippet}
+  </Dialog>
+
+  <section class="playground__section">
+    <h2 class="h3">Form pieces — the closed set (ADR-139 p4)</h2>
+    <p class="text--s text--dark-muted">
+      A field is a row: mono label, value without a box, one hairline. Three
+      buttons, two selectors, one box, the dialog's paper.
+    </p>
+    <div class="playground__row">
+      <Button onclick={() => (formOpen = true)}>Open «Add to plan»</Button>
+    </div>
+  </section>
+
+  <Dialog bind:open={formOpen} title="Add to plan" size="m">
+    <Segmented
+      ariaLabel="Type"
+      options={[
+        { value: 'performance', label: 'Performance' },
+        { value: 'rehearsal', label: 'Rehearsal' },
+        { value: 'travel', label: 'Travel' },
+        { value: 'off', label: 'Day off' },
+        { value: 'residency', label: 'Residency' },
+        { value: 'press', label: 'Press' },
+        { value: 'other', label: 'Other' },
+      ]}
+      bind:value={formType}
+    />
+    <Select
+      label="Project"
+      options={[
+        { value: 'sirena', label: 'Sirena' },
+        { value: 'obra', label: 'Obra de prueba' },
+      ]}
+      bind:value={formProject}
+    />
+    <Input label="Title" placeholder="Optional" />
+    <Input label="Venue" value="Teatre Municipal de Girona" />
+    <Input label="Date" type="date" value="2026-11-14" />
+    <Input label="Starts" type="time" value="20:00" />
+    <Segmented
+      label="Direction"
+      options={[
+        { value: 'outbound', label: 'Outbound' },
+        { value: 'return', label: 'Return' },
+        { value: 'leg', label: 'Leg' },
+      ]}
+      bind:value={formDirection}
+    />
+    <Input label="Hold notice" type="number" value="30" error="Between 0 and 365.">
+      {#snippet suffix()}days before{/snippet}
+    </Input>
+    <Checkbox label="Several days" bind:checked={formMulti} />
+    <Checkbox label="Option" helper="Not confirmed yet: it stays light on the calendar." />
+    <Textarea label="Notes" placeholder="Anything the team should know" maxlength={280} />
+    {#snippet lead()}
+      <Button variant="quiet">Mark unavailability →</Button>
+    {/snippet}
+    {#snippet actions()}
+      <Button variant="quiet" onclick={() => (formOpen = false)}>Cancel</Button>
+      <Button onclick={() => (formOpen = false)}>Create performance</Button>
     {/snippet}
   </Dialog>
 
@@ -800,7 +864,7 @@
     <div class="playground__row">
       <Button
         size="s"
-        variant="outline"
+        variant="secondary"
         onclick={() =>
           addToast({ tone: 'info', title: 'Heads up', message: 'New version available.' })}
       >
@@ -808,7 +872,7 @@
       </Button>
       <Button
         size="s"
-        variant="outline"
+        variant="secondary"
         onclick={() =>
           addToast({ tone: 'success', title: 'Saved', message: 'Conversation updated.' })}
       >
@@ -816,7 +880,7 @@
       </Button>
       <Button
         size="s"
-        variant="outline"
+        variant="secondary"
         onclick={() =>
           addToast({ tone: 'warning', title: 'Slow response', message: 'Worker took >2s.' })}
       >
@@ -824,7 +888,7 @@
       </Button>
       <Button
         size="s"
-        variant="outline"
+        variant="secondary"
         onclick={() =>
           addToast({ tone: 'danger', title: 'Error', message: 'Could not save: 500.' })}
       >
@@ -832,7 +896,7 @@
       </Button>
       <Button
         size="s"
-        variant="outline"
+        variant="secondary"
         onclick={() =>
           addToast({ tone: 'info', message: 'Sticky message — manual dismiss.', duration: 0 })}
       >
@@ -848,19 +912,19 @@
     </p>
     <div class="playground__row" style="padding-block: var(--space-l)">
       <Tooltip text="Above the trigger" position="top">
-        <Button variant="outline" size="s">Top</Button>
+        <Button variant="secondary" size="s">Top</Button>
       </Tooltip>
       <Tooltip text="To the right" position="right">
-        <Button variant="outline" size="s">Right</Button>
+        <Button variant="secondary" size="s">Right</Button>
       </Tooltip>
       <Tooltip text="Below the trigger" position="bottom">
-        <Button variant="outline" size="s">Bottom</Button>
+        <Button variant="secondary" size="s">Bottom</Button>
       </Tooltip>
       <Tooltip text="To the left" position="left">
-        <Button variant="outline" size="s">Left</Button>
+        <Button variant="secondary" size="s">Left</Button>
       </Tooltip>
       <Tooltip text="No delay" position="top" delay={0}>
-        <Button variant="outline" size="s">Instant</Button>
+        <Button variant="secondary" size="s">Instant</Button>
       </Tooltip>
     </div>
   </section>

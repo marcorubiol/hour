@@ -7,10 +7,9 @@
    * Active section is driven by the `?section=` query param so the URL
    * is shareable and the sidebar nav stays in sync.
    *
-   * Phase 0 reality: only Profile (full name, email) and Notifications →
-   * Master View are wired. Workspaces/privacy/languages/notifications/
-   * billing/danger are kept as scaffolding for the cases the active backlog
-   * will actually need; the rest was pruned (vapor).
+   * Only controls that keep what you set are drawn. Notifications, Billing
+   * and Danger zone are hidden until they save (see SettingsNav); Master
+   * View, the one real switch of Notifications, lives in Profile.
    *
    * Each section's markup, local state and section-specific styles live in
    * $lib/components/settings/*Section.svelte. This page keeps the section
@@ -23,22 +22,19 @@
   import { createQuery } from '@tanstack/svelte-query';
   import { fetchJSON } from '$lib/api';
   import { t, appLocale } from '$lib/i18n';
-  import { type SectionId } from '$lib/components/SettingsNav.svelte';
+  import { type SectionId, sectionFrom } from '$lib/components/SettingsNav.svelte';
   import ProfileSection from '$lib/components/settings/ProfileSection.svelte';
   import WorkspacesSection from '$lib/components/settings/WorkspacesSection.svelte';
   import PrivacySection from '$lib/components/settings/PrivacySection.svelte';
   import LanguagesSection from '$lib/components/settings/LanguagesSection.svelte';
   import LensesSection from '$lib/components/settings/LensesSection.svelte';
   import MailSection from '$lib/components/settings/MailSection.svelte';
-  import NotificationsSection from '$lib/components/settings/NotificationsSection.svelte';
-  import BillingSection from '$lib/components/settings/BillingSection.svelte';
-  import DangerSection from '$lib/components/settings/DangerSection.svelte';
 
   const locale = appLocale();
 
   let workspaceSlug = $derived(page.params.workspace ?? '');
   let active = $derived<SectionId>(
-    (page.url.searchParams.get('section') as SectionId | null) ?? 'profile',
+    sectionFrom(page.url.searchParams.get('section')),
   );
 
   // ─── workspaces & projects ────────────────────────────────────────────
@@ -80,7 +76,7 @@
   <title>{docTitle(t('settings.title', locale))}</title>
 </svelte:head>
 
-<article class="set-page">
+<article class="record set-page">
   {#if active === 'profile'}
     <ProfileSection {workspaceSlug} />
   {/if}
@@ -109,18 +105,6 @@
   {#if active === 'mail'}
     <MailSection workspaceId={currentWorkspace?.id} />
   {/if}
-
-  {#if active === 'notifications'}
-    <NotificationsSection />
-  {/if}
-
-  {#if active === 'billing'}
-    <BillingSection />
-  {/if}
-
-  {#if active === 'danger'}
-    <DangerSection />
-  {/if}
 </article>
 
 <style>
@@ -141,52 +125,11 @@
      nothing leaks app-wide. Declarations are verbatim from the pre-split
      page. Section-specific rules live in each *Section.svelte. */
 
-  .set-page :global(.set-mast) {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-xs);
-    margin-block-end: calc(var(--set-pad) * 1.2);
-    padding-block-end: var(--space-m);
-  }
-  .set-page :global(.set-mast__kicker) {
-    margin: 0;
-  }
-  /* Masthead typography via base.css h1 defaults. */
-  .set-page :global(.set-mast__title) {
-    margin: 0;
-  }
-  .set-page :global(.set-mast__title em) {
-    font-style: italic;
-    color: var(--text-color);
-  }
-  .set-page :global(.set-mast__sub) {
-    margin: 0;
-    color: var(--text-muted);
-    font-size: var(--text-m);
-    line-height: 1.55;
-    max-inline-size: 56ch;
-  }
-
+  /* A group is one of the record's blocks: its BlockHead, then its rows. */
   .set-page :global(.set-group) {
-    margin-block-end: calc(var(--set-pad) * 2);
-  }
-  .set-page :global(.set-group__head) {
     display: flex;
     flex-direction: column;
-    gap: var(--space-xs);
-    margin-block-end: var(--space-s);
-    padding-block-end: var(--space-xs);
-    border-block-end: var(--line-hairline) solid var(--border-color-light);
-  }
-  /* Kicker typography via base.css .eyebrow. */
-
-  .set-page :global(.set-group__title) {
-    font-family: var(--font-display);
-    font-size: var(--h3);
-    font-weight: 400;
-    letter-spacing: var(--heading-letter-spacing);
-    margin: 0;
-    color: var(--text-color);
+    gap: var(--space-s);
   }
   .set-page :global(.set-group__body) {
     display: flex;
@@ -238,38 +181,15 @@
       padding-block-start: 0;
     }
   }
-  .set-page :global(.set-row.is-danger .set-row__label) {
-    color: var(--danger);
+  /* A value in a settings row is a field row without its own label
+     (ADR-139 p4); one that cannot be edited here is plain text. */
+  .set-page :global(.set-row__ctrl > .field) {
+    flex: 1 1 12rem;
   }
-
-  .set-page :global(.set-seg) {
-    display: inline-flex;
-    background: var(--bg-light);
-    border: var(--line-hairline) solid var(--border-color-light);
-    border-radius: var(--radius);
-    padding: var(--space-2xs);
-  }
-  .set-page :global(.set-seg button) {
-    appearance: none;
-    background: transparent;
-    border: 0;
-    font: inherit;
-    font-size: var(--text-xs);
-    color: var(--text-muted);
+  .set-page :global(.set-row__value) {
     padding-block: var(--space-xs);
-    padding-inline: var(--space-s);
-    border-radius: var(--radius-s);
-    cursor: pointer;
-    transition: background var(--transition), color var(--transition);
+    font-size: var(--text-s);
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
   }
-  .set-page :global(.set-seg button:hover) {
-    color: var(--text-color);
-  }
-  .set-page :global(.set-seg button.is-on) {
-    background: var(--bg-ultra-light);
-    color: var(--text-color);
-    font-weight: 500;
-    box-shadow: var(--box-shadow-1);
-  }
-
 </style>

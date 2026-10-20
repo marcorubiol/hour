@@ -13,7 +13,7 @@ import { loadEnvFile } from 'node:process';
  *   - en el móvil, las barras apiladas en una columna, sin scroll lateral.
  *
  * En el espacio `playwright`, en `zzz-e2e-collab`, con dos conversaciones del
- * propio spec (nunca `muk-cia`): una en «ZZZ E2E Main Line» y otra sin línea.
+ * propio spec (nunca `muk-cia`): una en «ZZZ E2E Modules» y otra sin línea.
  * Autolimpiante.
  *
  * Contra un origen desplegado (PW_BASE_URL) o `vite dev` con su Supabase;
@@ -64,7 +64,7 @@ test.describe('la temporada por línea (ADR-135)', () => {
     const line = await h.pgGet<{ id: string }>(
       'line',
       jwt,
-      new URLSearchParams({ name: 'eq.ZZZ E2E Main Line', deleted_at: 'is.null', select: 'id' }),
+      new URLSearchParams({ name: 'eq.ZZZ E2E Modules', deleted_at: 'is.null', select: 'id' }),
     );
     lineId = line.rows[0].id;
     await conversation(IN_LINE, lineId);
@@ -78,7 +78,7 @@ test.describe('la temporada por línea (ADR-135)', () => {
 
   test('una barra por línea, «sin línea» al final', async ({ page }) => {
     test.setTimeout(60_000);
-    await page.goto('/h/conversations');
+    await page.goto('/h/conversations?etiqueta=sales');
     const season = page.getByTestId('block-season');
     await expect(season).toBeVisible({ timeout: 30_000 });
     const lines = season.getByTestId('season-line');
@@ -90,7 +90,7 @@ test.describe('la temporada por línea (ADR-135)', () => {
 
   test('el nombre de una línea filtra la lista por ella; una relación, por esa relación en ella', async ({ page }) => {
     test.setTimeout(60_000);
-    await page.goto('/h/conversations');
+    await page.goto('/h/conversations?etiqueta=sales');
     const season = page.getByTestId('block-season');
     await expect(season).toBeVisible({ timeout: 30_000 });
 
@@ -100,7 +100,7 @@ test.describe('la temporada por línea (ADR-135)', () => {
     await expect(page.locator('.conversation-table tbody tr', { hasText: IN_LINE })).toHaveCount(1, { timeout: 30_000 });
     await expect(page.locator('.conversation-table tbody tr', { hasText: NO_LINE })).toHaveCount(0);
 
-    await page.goto('/h/conversations');
+    await page.goto('/h/conversations?etiqueta=sales');
     await expect(season).toBeVisible({ timeout: 30_000 });
     // Sin historial: nunca contactadas (la relación se deriva, ADR-138).
     const never = season.locator('[data-line="sin"] .season__item', { has: page.locator('[data-relation="never"]') });
@@ -114,7 +114,7 @@ test.describe('la temporada por línea (ADR-135)', () => {
   test('en el móvil, las barras apiladas y sin scroll lateral', async ({ page }) => {
     test.setTimeout(60_000);
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/h/conversations');
+    await page.goto('/h/conversations?etiqueta=sales');
     const lines = page.getByTestId('block-season').getByTestId('season-line');
     await expect(lines.first()).toBeVisible({ timeout: 30_000 });
     const [a, b] = await Promise.all([lines.nth(0).boundingBox(), lines.nth(1).boundingBox()]);

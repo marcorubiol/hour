@@ -26,9 +26,12 @@
     /** «Log contact…»: absent, the menu offers only the relation. */
     onlog?: () => void;
     direction?: 'up' | 'down';
+    /** `badge` in a list's row; `word` in a record's facts line, a mono word
+        and not a pill (ADR-139 p2): one menu, two placings. */
+    look?: 'badge' | 'word';
   }
 
-  let { relation, notNowUntil = null, locale, onnotnow, onlog, direction = 'down' }: Props = $props();
+  let { relation, notNowUntil = null, locale, onnotnow, onlog, direction = 'down', look = 'badge' }: Props = $props();
 
   let dialogOpen = $state(false);
   let until = $state('');
@@ -51,7 +54,7 @@
 
 <Menu
   label={t('conversations.status_menu', locale, { status: label })}
-  triggerClass={`badge badge--xs badge--${relationTone(relation)}`}
+  triggerClass={look === 'word' ? 'fact-word' : `badge badge--xs badge--${relationTone(relation)}`}
   {direction}
 >
   {#snippet trigger()}
@@ -93,7 +96,7 @@
   <p class="not-now-hint">{t('conversations.not_now_hint', locale)}</p>
   <Input label={t('conversations.not_now_back', locale)} type="date" bind:value={until} />
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (dialogOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" onclick={() => (dialogOpen = false)}>{t('create.cancel', locale)}</Button>
     <Button onclick={save}>{t('blackout.save', locale)}</Button>
   {/snippet}
 </Dialog>

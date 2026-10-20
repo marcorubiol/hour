@@ -40,6 +40,9 @@
     clash: boolean;
     /** A call between two options that «Por decidir» holds. */
     decide: boolean;
+    /** Next steps that wait on the day (ADR-138 § 6): a number, never a card.
+        The cell is already the door to the Day. */
+    steps?: number;
   };
 
   import type { Slip as SlipVM } from '$lib/month-events';
@@ -97,6 +100,10 @@
   import { t, type Locale } from '$lib/i18n';
   import { isoWeek } from '$lib/planner';
   import BlockHead from '$lib/components/BlockHead.svelte';
+  import CalmLine from '$lib/components/CalmLine.svelte';
+  import { shows } from '$lib/calm';
+  import ConceptHint from '$lib/components/ConceptHint.svelte';
+  import FirstTimeNote from '$lib/components/FirstTimeNote.svelte';
   import Slip from '$lib/components/planner/Slip.svelte';
   import DecisionBand, {
     type ConcurrenceVM,
@@ -127,6 +134,10 @@
     onWeek: (monday: string) => void;
     onGap: (iso: string) => void;
     onCreate: () => void;
+    /** Calm (ADR-139 § 5, `$lib/calm`): the strip and «Por decidir» stay;
+        the key and the three lists fold into one line that leaves calm. */
+    calm?: boolean;
+    onLeaveCalm?: () => void;
   }
 
   let {
@@ -149,6 +160,8 @@
     onWeek,
     onGap,
     onCreate,
+    calm = false,
+    onLeaveCalm,
   }: Props = $props();
 
   /** Monday-first weekday words — the month's own (diseño B3: one shape
@@ -156,7 +169,7 @@
   let dows = $derived(weekdayLabels(localeTag));
 
   let empty = $derived(
-    !loading && weeks.every((w) => w.every((c) => c.past || (c.mark === null && !c.travel))),
+    !loading && weeks.every((w) => w.every((c) => c.past || (c.mark === null && !c.travel && !c.steps))),
   );
 
   function range(from: string, to: string): string {
@@ -220,7 +233,7 @@
   <div class="ov__grid">
     <!-- 2 · THE STRIP. Drawn from the first frame, empty, so nothing below
          it moves when the rows arrive. -->
-    <section class="blk ov__strip" aria-label={t('planner.season_strip', locale, { n: SEASON_WEEKS })}>
+    <section class="blk ov__strip" data-help-step="planner-strip" aria-label={t('planner.season_strip', locale, { n: SEASON_WEEKS })}>
       <BlockHead title={t('planner.season_strip', locale, { n: SEASON_WEEKS })} />
       <!-- ONE TAB STOP, ARROWS INSIDE (móvil #8, WCAG 2.4.3): 84 days and 12
            weeks were 96 stops between the head and «Por decidir». The strip
@@ -271,6 +284,9 @@
                   <Slip slip={sl} placing="compact" kindLabel={() => ''} stateLabel={() => null} />
                 {/each}
                 {#if c.more > 0}<span class="ev__more">+{c.more}</span>{/if}
+                {#if c.steps}<span class="ev__more" data-testid="season-steps"
+                    >{c.steps === 1 ? t('planner.steps_one', locale) : t('planner.steps_n', locale, { n: c.steps })}</span
+                  >{/if}
                 {#if c.slips.length === 0 && c.dateWord}<span class="ev ev--date">{c.dateWord}</span>{/if}
                 {#if c.travel}<span class="d__travel" aria-hidden="true">{c.travel === 'out' ? '↗' : '↙'}</span>{/if}
                 {#if c.clash}<span class="d__clash" title={t('planner.season_key_clash', locale)}></span>{/if}
@@ -281,14 +297,16 @@
           </div>
         {/each}
       </div>
-      <p class="strip__key">
-        <span><i class="k k--firm"></i>{t('planner.season_key_firm', locale)}</span>
-        <span><i class="k k--option grain"></i>{t('planner.season_key_option', locale)}</span>
-        <span class="guess"><i class="k k--tour"></i>{t('planner.season_key_tour', locale)}</span>
-        <span><i class="k k--away"></i>{t('planner.season_key_away', locale)}</span>
-        <span><i class="k k--decide"></i>{t('planner.season_key_decide', locale)}</span>
-        <span><i class="k k--clash"></i>{t('planner.season_key_clash', locale)}</span>
-      </p>
+      {#if shows('planner', 'legend', calm)}
+        <p class="strip__key">
+          <span><i class="k k--firm"></i>{t('planner.season_key_firm', locale)}</span>
+          <span><i class="k k--option grain"></i>{t('planner.season_key_option', locale)}<ConceptHint concept="hold" /></span>
+          <span><i class="k k--tour"></i><span class="guess">{t('planner.season_key_tour', locale)}</span><ConceptHint concept="guess" /></span>
+          <span><i class="k k--away"></i>{t('planner.season_key_away', locale)}</span>
+          <span><i class="k k--decide"></i>{t('planner.season_key_decide', locale)}</span>
+          <span><i class="k k--clash"></i>{t('planner.season_key_clash', locale)}</span>
+        </p>
+      {/if}
       {#if empty}
         <p class="blk__empty">
           {t('planner.season_empty', locale, { n: SEASON_WEEKS })}
@@ -301,8 +319,9 @@
          is exercised where you are looking). Then the clashes that are not a
          choice between two holds. -->
     {#if !decisionsAbsent}
-      <section class="blk ov__decide">
-        <BlockHead title={t('planner.season_b_decide', locale)} count={n(decisions.length)} alert={decisions.length > 0} />
+      <section class="blk ov__decide" data-help-step="planner-decide">
+        <BlockHead title={t('planner.season_b_decide', locale)} concept="decide" count={n(decisions.length)} alert={decisions.length > 0} />
+        <FirstTimeNote event="first_hold_due" when={!loading && decisions.some((d) => d.urgent)} />
         {#if loading}
           <p class="blk__empty" aria-hidden="true"><span class="ghost-line" style:inline-size="60%">&nbsp;</span></p>
         {:else if decisions.length === 0 && concurrences.length === 0}
@@ -320,7 +339,8 @@
             id="season-decisions"
           />
         {/if}
-        <BlockHead title={t('planner.season_b_clashes', locale)} count={n(clashes.length)} alert={clashes.length > 0} />
+        <BlockHead title={t('planner.season_b_clashes', locale)} concept="clashes" count={n(clashes.length)} alert={clashes.length > 0} />
+        <FirstTimeNote event="first_clash" when={!loading && clashes.length > 0} />
         {#if loading}
           <p class="blk__empty" aria-hidden="true"><span class="ghost-line" style:inline-size="60%">&nbsp;</span></p>
         {:else if clashes.length === 0}
@@ -336,12 +356,18 @@
       </section>
     {/if}
 
-    <div class="ov__lists">
+    {#if !shows('planner', 'season_lists', calm)}
+      <div class="ov__lists ov__lists--calm">
+        <CalmLine text={t('planner.calm_season_rest', locale)} action={t('calm.see_all', locale)} onclick={() => onLeaveCalm?.()} />
+      </div>
+    {:else}
+    <div class="ov__lists" data-help-step="planner-lists">
       <!-- 4 · NOT CLOSED — confirmed, and something is still empty. Facts as
            chips; the trip is a guess and says so in the inference voice. -->
       <section class="blk">
         <BlockHead
           title={t('planner.season_b_unclosed', locale)}
+          concept="unclosed"
           count={loading
               ? DASH
               : t('planner.season_unclosed_meta', locale, {
@@ -350,6 +376,7 @@
                   w: UNCLOSED_WEEKS,
                 }) + (travelOnly > 0 ? ` · ${t('planner.season_unclosed_guess', locale, { n: travelOnly })}` : '')}
         />
+        <FirstTimeNote event="first_trip_guess" when={!loading && unclosed.some((u) => u.travelGuess)} />
         {#if loading}
           <p class="blk__empty" aria-hidden="true"><span class="ghost-line" style:inline-size="60%">&nbsp;</span></p>
         {:else if unclosed.length === 0}
@@ -370,7 +397,7 @@
 
       <!-- 5 · HOLES — free runs of three nights or more, to sell. -->
       <section class="blk">
-        <BlockHead title={t('planner.season_b_gaps', locale)} count={t('planner.season_gaps_meta', locale, { n: GAP_MIN_NIGHTS })} />
+        <BlockHead title={t('planner.season_b_gaps', locale)} concept="gaps" count={t('planner.season_gaps_meta', locale, { n: GAP_MIN_NIGHTS })} />
         {#if loading}
           <p class="blk__empty" aria-hidden="true"><span class="ghost-line" style:inline-size="60%">&nbsp;</span></p>
         {:else if gaps.length === 0}
@@ -414,6 +441,7 @@
         {/if}
       </section>
     </div>
+    {/if}
   </div>
 </div>
 
@@ -446,6 +474,9 @@
       gap: var(--space-l);
       grid-template-columns: repeat(3, minmax(0, 1fr));
       align-items: start;
+    }
+    .ov__lists--calm {
+      display: block;
     }
 
     .blk {

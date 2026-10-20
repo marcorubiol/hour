@@ -40,7 +40,7 @@
     </p>
     {#if done !== 'resubscribed'}
       <form method="POST">
-        <button type="submit" class="btn--primary btn--m">{t('unsub.confirm', locale)}</button>
+        <button type="submit" class="btn--primary btn--s">{t('unsub.confirm', locale)}</button>
       </form>
     {/if}
   {/if}

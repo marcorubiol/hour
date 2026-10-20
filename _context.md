@@ -31,18 +31,18 @@ aprueba, el sistema ejecuta y deja auditoría. UI manual e IA leen y escriben lo
 fixtures. Sin billing ni self-service. Modelo ya multi-workspace y multi-account. La beta externa espera a cerrar lo
 de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
-## Producción (verificado 2026-10-14, tarde)
+## Producción (verificado 2026-10-20)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`9a3350c6`**, `dirty:false`, builtAt
-  2026-10-19T06:27Z (se entra por Hoy, Desk traducido, Venues en inglés, ADR-137). `main` == prod salvo documentos y tests.
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`b0bdd0c1`**, `dirty:false`, builtAt
+  2026-10-20T04:40Z (ADR-139 entero: segundo nivel, vistazo lateral, alta rápida, calma como foco). `main` == prod salvo documentos y tests.
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free, con keepalive diario
   (`.github/workflows/keepalive.yml`) contra la pausa por inactividad. Pasar a Pro antes de la beta, aún no
   (`_tasks.md § 9`). Si algo de Supabase falla tras días sin uso, lo primero es `dig <ref>.supabase.co`.
-- **Última migración aplicada: `20261019100000_reserve_books_slug`** (2026-10-19, run 39204094968; backup 39203783815, plan 39204002010): reserva `books` como alias (ADR-134). Antes, `20261018180000_workspace_lenses` (ADR-132). Las migraciones van por `production-migrate.yml`: backup, plan, apply.
+- **Última migración aplicada: `20261020160000_conversation_tags`** (2026-10-19, run 39236312469; backup 39235636446): etiquetas de conversación fase 1, solo esquema (ADR-138); el Worker aún no lo lee. Antes, `20261020150000_help_seen` con `20261020140000` y `20261020140100`, y `20261020130000_create_conversation_one_signature`, que arregla la sobrecarga que dejó `20261020120000` (crear conversación falló de 07:49 a 08:15). Las migraciones van por `production-migrate.yml`: backup, plan, apply. **Al redefinir una función, copiar la firma de la base viva (`pg_get_functiondef`), no de la última migración que la nombra: otra firma crea una sobrecarga y PostgREST responde 300.**
 - `hour-staging` (ref `slccyknqpgmzhyiyclsq`, `eu-west-1`): reconstruido el 2026-10-13 con el contract de permisos
   (run 38469017859: RLS 309/313, smoke 2/2). Se volverá a pausar sin uso.
-- Últimas suites contra producción: RLS 401/401 (2026-10-18, `d244ecf4`, en serie); E2E 99/100 con 1 saltado (2026-10-19, `9a3350c6`, por `hour-web.marco-rubiol.workers.dev`). **Nunca la RLS y el E2E a la vez.** Si el dominio no responde y `workers.dev` sí, es la red local (rango de Cloudflare `188.114.96.0/20`).
+- Últimas suites contra producción: RLS 433/433 (2026-10-19, tras `20261020160000`; `conversation-venue` «sending goes to the primary contact» es intermitente y pasa al repetir) y E2E 118/120 contra `2cf78320` (1 saltado; `conversation-team-thread` «privada del admin» falló una vez y pasa al repetir), por `hour-web.marco-rubiol.workers.dev`.
 - Desde el checkout principal (`~/Developer/hour`), nunca desde un worktree: los worktrees no llevan `.env` ni
   `.env.test` (RLS sale saltado, el login del E2E falla).
 - `pnpm --filter web test:rls`: siempre contra producción; carga `.env` + `.env.test` y no mira `.env.local`.

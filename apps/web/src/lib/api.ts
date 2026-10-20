@@ -39,17 +39,20 @@ export async function fetchJSON<T>(url: string, signal?: AbortSignal): Promise<T
   if (res.status === 401 && (await tryRefresh())) {
     res = await fetch(url, { signal });
   }
+  // Every failure is an ApiError (an Error with the same message as before)
+  // so a reader can tell «not there for you» from «broke» by `.status`
+  // (`load-fail.ts`). A network failure stays fetch's own TypeError.
   if (res.status === 401) {
     clearAuthAndBounce();
-    throw new Error('Unauthorized');
+    throw new ApiError(401, 'Unauthorized');
   }
-  if (res.status === 404) throw new Error('Not found');
+  if (res.status === 404) throw new ApiError(404, 'Not found');
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as {
       detail?: string;
       error?: string;
     };
-    throw new Error(body.detail || body.error || `Error ${res.status}`);
+    throw new ApiError(res.status, body.detail || body.error || `Error ${res.status}`, body);
   }
   return (await res.json()) as T;
 }

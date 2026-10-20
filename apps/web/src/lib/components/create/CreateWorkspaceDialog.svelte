@@ -12,6 +12,7 @@
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
+  import Textarea from '$lib/components/Textarea.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import AccentSwatchPicker from './AccentSwatchPicker.svelte';
   import { appLocale, t } from '$lib/i18n';
@@ -79,11 +80,21 @@
     },
   });
 
+  /** The name's own word, under the field (ADR-139 p7); the native
+      `required` covers the empty ones, this the blank ones. */
+  let nameError = $state<string | undefined>();
+  $effect(() => {
+    void name;
+    nameError = undefined;
+  });
+  let formEl: HTMLFormElement | undefined = $state();
+
+  /** Runs from the form's submit, after the native constraints passed. */
   function submit(event?: Event) {
     event?.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) {
-      addToast({ tone: 'warning', message: t('project.name_empty', locale) });
+      nameError = t('project.name_empty', locale);
       return;
     }
     $create.mutate({ name: trimmed, accent, description });
@@ -97,11 +108,12 @@
   size="s"
   onclose={reset}
 >
-  <form class="cws__form" onsubmit={submit}>
+  <form class="cws__form" bind:this={formEl} onsubmit={submit}>
     <Input
       label={t('conversations.col_name', locale)}
       name="workspace-name"
       bind:value={name}
+      error={nameError}
       placeholder={t('workspace.name_ph', locale)}
       required
       autofocus
@@ -111,26 +123,23 @@
 
     <AccentSwatchPicker bind:accent autoSlug={autoAccentSlug} label={t('workspace.color', locale)} disabled={$create.isPending} />
 
-    <label class="field">
-      <span>{t('project.description', locale)}</span>
-      <textarea
-        class="cws__desc"
-        bind:value={description}
-        maxlength="280"
-        rows="3"
-        placeholder={t('workspace.new_description_ph', locale)}
-        disabled={$create.isPending}
-      ></textarea>
-      <span class="cws__desc-count">{description.length} / 280</span>
-    </label>
+    <Textarea
+      label={t('project.description', locale)}
+      bind:value={description}
+      maxlength={280}
+      counter
+      rows={3}
+      placeholder={t('workspace.new_description_ph', locale)}
+      disabled={$create.isPending}
+    />
 
     <!-- Hidden submit lets Enter inside an input trigger submit. -->
     <button type="submit" hidden aria-hidden="true"></button>
   </form>
 
   {#snippet actions()}
-    <Button variant="outline" disabled={$create.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
-    <Button loading={$create.isPending} onclick={submit}>{t('project.create', locale)}</Button>
+    <Button variant="quiet" disabled={$create.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
+    <Button loading={$create.isPending} onclick={() => formEl?.requestSubmit()}>{t('project.create', locale)}</Button>
   {/snippet}
 </Dialog>
 
@@ -139,18 +148,7 @@
     .cws__form {
       display: flex;
       flex-direction: column;
-      gap: var(--space-m);
-    }
-
-    .cws__desc {
-      resize: vertical;
-      min-block-size: 5em;
-    }
-
-    .cws__desc-count {
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      text-align: end;
+      gap: var(--field-gap);
     }
   }
 </style>

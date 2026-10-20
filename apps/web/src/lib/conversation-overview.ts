@@ -126,6 +126,8 @@ export interface OverviewInput {
   performance_days: string[];
   /** Sus bolos (`conversations_bolos`): estado y primera función viva, sin dinero. */
   bolos?: { status: string; first_performed_at: string | null }[];
+  /** Sus etiquetas (ADR-138 § 1); sin ninguna, `sales`. */
+  tags?: string[];
 }
 
 // ── Turno ──────────────────────────────────────────────────────────────────
@@ -133,7 +135,7 @@ export interface OverviewInput {
 type TurnSide = 'ours' | 'theirs';
 
 /** Lo que el turno lee: la relación (por «no esta vez») y lo atendido. */
-type TurnRow = RelationInput & Pick<OverviewInput, 'reply_settled_at'>;
+export type TurnRow = RelationInput & Pick<OverviewInput, 'reply_settled_at'>;
 
 export interface Turn {
   side: TurnSide;

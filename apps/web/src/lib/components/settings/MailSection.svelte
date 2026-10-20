@@ -5,6 +5,8 @@
    * navegación completa a /api/mail/oauth/google/start; al volver, la página
    * llega con `?mail=finish` y aquí se cierra la conexión con su sesión.
    */
+  import RecordHead from '$lib/components/RecordHead.svelte';
+  import BlockHead from '$lib/components/BlockHead.svelte';
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
@@ -15,6 +17,7 @@
   import { appLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
   import MailDomainSection from './MailDomainSection.svelte';
+  import MailSignature from './MailSignature.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import type { MailAccountItem, MailAccountsResponse, MailAccountScope } from '$lib/mail';
 
@@ -104,20 +107,16 @@
   }
 </script>
 
-<header class="set-mast">
-  <p class="eyebrow set-mast__kicker">{t('mail.kicker', locale)}</p>
-  <h1 class="set-mast__title"><em>{t('settings.nav_mail', locale)}</em></h1>
-  <p class="set-mast__sub">{t('mail.sub', locale)}</p>
-</header>
+<RecordHead crumbs={[{ label: t('settings.title', locale) }, { label: t('mail.kicker', locale) }]} title={t('settings.nav_mail', locale)}>
+  {#snippet facts()}<span>{t('mail.sub', locale)}</span>{/snippet}
+</RecordHead>
 
 {#if !configured}
   <p class="mail-off">{t('mail.not_configured', locale)}</p>
 {/if}
 
 <section class="set-group">
-  <div class="set-group__head">
-    <span class="eyebrow set-group__kicker">{t('mail.reads_kicker', locale)}</span>
-  </div>
+  <BlockHead title={t('mail.reads_kicker', locale)} />
   <div class="reads">
     <div>
       <p class="reads__k">{t('mail.reads_in', locale)}</p>
@@ -135,9 +134,7 @@
 </section>
 
 <section class="set-group">
-  <div class="set-group__head">
-    <span class="eyebrow set-group__kicker">{t('mail.personal_kicker', locale)}</span>
-  </div>
+  <BlockHead title={t('mail.personal_kicker', locale)} />
   <div class="set-group__body">
     <div class="set-row">
       <div class="set-row__lead">
@@ -150,7 +147,7 @@
         {:else if personal}
           {@render connection(personal, true)}
         {:else}
-          <Button size="s" variant="outline" disabled={!configured || !workspaceId} onclick={() => connect('personal')}>
+          <Button size="s" variant="secondary" disabled={!configured || !workspaceId} onclick={() => connect('personal')}>
             {t('mail.connect_google', locale)}
           </Button>
           <span class="muted">{t('mail.other_providers_later', locale)}</span>
@@ -161,9 +158,7 @@
 </section>
 
 <section class="set-group">
-  <div class="set-group__head">
-    <span class="eyebrow set-group__kicker">{t('mail.shared_kicker', locale)}</span>
-  </div>
+  <BlockHead title={t('mail.shared_kicker', locale)} />
   <div class="set-group__body">
     <div class="set-row">
       <div class="set-row__lead">
@@ -176,7 +171,7 @@
             {@render connection(a, canManageShared)}
           {/each}
         {:else if canManageShared}
-          <Button size="s" variant="outline" disabled={!configured || !workspaceId} onclick={() => connect('workspace')}>
+          <Button size="s" variant="secondary" disabled={!configured || !workspaceId} onclick={() => connect('workspace')}>
             {t('mail.connect_google', locale)}
           </Button>
         {:else}
@@ -186,6 +181,11 @@
     </div>
   </div>
 </section>
+
+<!-- Both signatures live here, beside the mailboxes they sign (yours, then
+     the company's for the shared one): one place, each hint says when it goes. -->
+<MailSignature scope="personal" {workspaceId} />
+<MailSignature scope="workspace" {workspaceId} />
 
 <MailDomainSection {workspaceId} />
 
@@ -202,13 +202,13 @@
   {#if manage}
     <div class="conn__actions">
       {#if a.status === 'active'}
-        <Button size="s" variant="outline" disabled={$syncNow.isPending} onclick={() => $syncNow.mutate(a.id)}>
+        <Button size="s" variant="secondary" disabled={$syncNow.isPending} onclick={() => $syncNow.mutate(a.id)}>
           {t('mail.sync_now', locale)}
         </Button>
       {:else}
-        <Button size="s" variant="outline" onclick={() => connect(a.scope)}>{t('mail.reconnect', locale)}</Button>
+        <Button size="s" variant="secondary" onclick={() => connect(a.scope)}>{t('mail.reconnect', locale)}</Button>
       {/if}
-      <Button size="s" variant="outline" tone="warn" disabled={$disconnect.isPending} onclick={() => $disconnect.mutate(a.id)}>
+      <Button size="s" variant="secondary" tone="warn" disabled={$disconnect.isPending} onclick={() => $disconnect.mutate(a.id)}>
         {t('mail.disconnect', locale)}
       </Button>
     </div>

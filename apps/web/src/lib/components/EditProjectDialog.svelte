@@ -10,6 +10,7 @@
   import { createMutation, useQueryClient } from '@tanstack/svelte-query';
   import { ApiError, mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
+  import Textarea from './Textarea.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
@@ -102,10 +103,20 @@
     },
   });
 
+  /** The name's own word, under the field (ADR-139 p7); the native
+      `required` covers the empty ones, this the blank ones. */
+  let nameError = $state<string | undefined>();
+  $effect(() => {
+    void name;
+    nameError = undefined;
+  });
+  let formEl: HTMLFormElement | undefined = $state();
+
+  /** Runs from the form's submit, after the native constraints passed. */
   function submit(event?: Event) {
     event?.preventDefault();
     if (!name.trim()) {
-      addToast({ tone: 'warning', message: t('project.name_empty', locale) });
+      nameError = t('project.name_empty', locale);
       return;
     }
     $save.mutate();
@@ -113,7 +124,7 @@
 </script>
 
 <Dialog bind:open title={t('project.edit_title', locale)} size="s">
-  <form class="epj__form" onsubmit={submit}>
+  <form class="epj__form" bind:this={formEl} onsubmit={submit}>
     <section class="epj__identity" aria-label={t('project.identity_aria', locale)}>
       <span class="eyebrow">{t('project.identity', locale)}</span>
       <div class="epj__preview">
@@ -156,30 +167,28 @@
       label={t('conversations.col_name', locale)}
       name="project-name"
       bind:value={name}
+      error={nameError}
       required
       autocomplete="off"
       disabled={$save.isPending}
     />
 
-    <label class="field">
-      <span>{t('project.description', locale)}</span>
-      <textarea
-        class="epj__desc"
-        bind:value={description}
-        maxlength="280"
-        rows="3"
-        placeholder={t('project.description_ph', locale)}
-        disabled={$save.isPending}
-      ></textarea>
-      <span class="epj__desc-count">{description.length} / 280</span>
-    </label>
+    <Textarea
+      label={t('project.description', locale)}
+      bind:value={description}
+      maxlength={280}
+      counter
+      rows={3}
+      placeholder={t('project.description_ph', locale)}
+      disabled={$save.isPending}
+    />
 
     <button type="submit" hidden aria-hidden="true"></button>
   </form>
 
   {#snippet actions()}
-    <Button variant="outline" disabled={$save.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
-    <Button loading={$save.isPending} onclick={submit}>{t('blackout.save', locale)}</Button>
+    <Button variant="quiet" disabled={$save.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
+    <Button loading={$save.isPending} onclick={() => formEl?.requestSubmit()}>{t('blackout.save', locale)}</Button>
   {/snippet}
 </Dialog>
 
@@ -188,17 +197,13 @@
     .epj__form {
       display: flex;
       flex-direction: column;
-      gap: var(--space-m);
+      gap: var(--field-gap);
     }
 
     .epj__identity {
       display: flex;
       flex-direction: column;
       gap: var(--space-s);
-      padding: var(--space-s);
-      border: var(--line-hairline) solid var(--border-color-light);
-      border-radius: var(--radius-m);
-      background: var(--bg-light);
     }
 
     .epj__preview {
@@ -211,17 +216,6 @@
       margin: 0;
       font-size: var(--text-xs);
       color: var(--text-muted);
-    }
-
-    .epj__desc {
-      resize: vertical;
-      min-block-size: 5em;
-    }
-
-    .epj__desc-count {
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      text-align: end;
     }
   }
 </style>

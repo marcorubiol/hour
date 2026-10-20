@@ -30,11 +30,59 @@ import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import { DatePatchSchema, type DateRow } from '$lib/date';
-import { pgGet, pgPatch, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
+import { pgGet, pgPatch, pgPostRpc, PostgrestError, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
+import { DATE_BASE_SELECT, DATE_EXTENDED_SELECT } from '$lib/server/date-select';
+import { scheduleOf, type ScheduleSlotRow } from '$lib/schedule-slot';
 import { json } from '$lib/server/http';
 
 const IdSchema = v.pipe(v.string(), v.uuid());
+
+
+/**
+ * GET /api/dates/:id — ONE date row, as the list reads it (the same select,
+ * `$lib/server/date-select`), for the vistazo of a date (ADR-139 p1): a
+ * shared link names the row by id and nothing else. RLS decides: a row the
+ * reader cannot see is a 404, like one that never existed.
+ */
+export const GET: RequestHandler = async ({ request, params, platform, locals }) => {
+  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  const env = platform.env as unknown as SupabaseEnv;
+
+  const jwt = extractAccessToken(request);
+  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+
+  const idParsed = v.safeParse(IdSchema, params.id);
+  if (!idParsed.success) return json({ error: 'invalid_id' }, 400);
+
+  const search = new URLSearchParams();
+  search.set('select', DATE_EXTENDED_SELECT.join(','));
+  search.set('id', `eq.${idParsed.output}`);
+  search.set('deleted_at', 'is.null');
+  search.set('limit', '1');
+  try {
+    let rows: Array<Record<string, unknown> & { schedule_slot?: ScheduleSlotRow[] }>;
+    try {
+      rows = (await pgGet<Record<string, unknown> & { schedule_slot?: ScheduleSlotRow[] }>(env, 'date', jwt, { search })).data;
+    } catch (err) {
+      // Same graceful absence as the list: a database without the ADR-078
+      // columns still answers with the legacy ones.
+      if (!(err instanceof PostgrestError && err.code === '42703')) throw err;
+      search.set('select', DATE_BASE_SELECT.join(','));
+      rows = (await pgGet<Record<string, unknown>>(env, 'date', jwt, { search })).data;
+    }
+    const found = rows[0];
+    if (!found) return json({ error: 'not_found' }, 404);
+    const { schedule_slot, ...row } = found;
+    return json({ item: { ...row, schedule: scheduleOf(schedule_slot) } });
+  } catch (err) {
+    return pgErrorResponse(
+      err,
+      { route: 'GET /api/dates/:id', requestId: locals.requestId },
+      { passUpstream: [401, 403] },
+    );
+  }
+};
 
 export const PATCH: RequestHandler = async ({ request, params, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);

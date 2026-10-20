@@ -19,11 +19,7 @@
    * The create RPC returns the full row — this is the slice consumers
    * need (workspace_id resolves the navigation target's slug).
    */
-  export type CreatedPerformance = {
-    id: string;
-    slug: string | null;
-    workspace_id: string;
-  };
+  export type { CreatedPerformance } from '$lib/plan-create';
 </script>
 
 <script lang="ts">
@@ -31,10 +27,19 @@
   import { viewerTimeZone } from '$lib/datetime';
   import { lensOn } from '$lib/lenses.svelte';
   import { toStore } from 'svelte/store';
-  import { fetchJSON, mutateJSON } from '$lib/api';
+  import { fetchJSON } from '$lib/api';
+  import Field from './Field.svelte';
   import Input from './Input.svelte';
   import Select from './Select.svelte';
   import { addToast } from './Toast.svelte';
+  import { toastCreated } from '$lib/created';
+  import {
+    createPerformances,
+    invalidatePerformanceFeeds,
+    undoPerformances,
+    type CreatedPerformance,
+  } from '$lib/plan-create';
+  import { dayMonthYear } from '$lib/datetime';
   import { dayKeyInTz } from '$lib/planner';
   import { detectLocale, t } from '$lib/i18n';
   import { allLinesQueryOptions } from '$lib/nav-queries';
@@ -50,7 +55,6 @@
     HOLD_NOTICE_DEFAULT,
     PERFORMANCE_CREATE_STATUSES,
     isHoldStatus,
-    isValidHoldNotice,
     type PerformanceCreate,
     type PerformanceSeriesCreate,
   } from '$lib/performance';
@@ -209,98 +213,30 @@
     wasOpen = open;
   });
 
-  const createPerf = createMutation({
-    mutationFn: async (input: PerformanceCreate) => {
-      const body = await mutateJSON<{ performance: CreatedPerformance }>(
-        'POST',
-        '/api/performances',
-        input,
-      );
-      if (!body?.performance) throw new Error(t('perf.malformed_response', locale));
-      // ADR-080 §2 — the create RPC doesn't know hold_notice_days, so a
-      // typed notice rides a follow-up PATCH (the column is PATCH-whitelist
-      // only; minimal path chosen over widening the RPC). A PATCH failure
-      // must not undo a created gig — surface it, keep the create a success.
-      const notice = holdNoticeToSend(input.status);
-      if (notice !== undefined) {
-        try {
-          await mutateJSON('PATCH', `/api/performances/${body.performance.id}`, {
-            hold_notice_days: notice,
-          });
-        } catch {
-          addToast({ tone: 'warning', message: t('perf.hold_notice_not_saved', locale) });
-        }
-      }
-      return body.performance;
-    },
-    onSuccess: (perf) => {
-      cVenue = '';
-      cCity = '';
-      resetBolo();
-      cHoldNotice = null;
-      void queryClient.invalidateQueries({ queryKey: ['planner-performances'] });
-      void queryClient.invalidateQueries({ queryKey: ['line-performances'] });
-      void queryClient.invalidateQueries({ queryKey: ['line-money-fees'] });
-      void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
-      void queryClient.invalidateQueries({ queryKey: ['today-performances'] });
-      void queryClient.invalidateQueries({ queryKey: ['pulse-performances'] });
-      onCreated?.(perf);
-    },
-    onError: (err) => {
-      addToast({
-        tone: 'danger',
-        title: t('create.not_created', locale),
-        message: t('perf.try_again', locale, {
-          error: err instanceof Error ? err.message : t('perf.unexpected', locale),
-        }),
-      });
-    },
-  });
-
   /**
-   * ADR-084 §1 — la tanda es UNA escritura atómica de N filas con una serie.
-   *
-   * Ruta aparte y no un bucle sobre la de arriba, por la misma razón que el
-   * endpoint existe: una tanda a medio crear es indistinguible, más tarde, de
-   * una que alguien dejó incompleta a propósito.
+   * ONE mutation for one gig or a run (ADR-084 §1): the write, the hold-notice
+   * follow-up and what «Deshacer» deletes live in `plan-create`, shared with
+   * the planner's quick add.
    */
-  const createPerfSeries = createMutation({
-    mutationFn: async (input: PerformanceSeriesCreate) => {
-      const body = await mutateJSON<{ performances: CreatedPerformance[] }>(
-        'POST',
-        '/api/performances/series',
-        input,
-      );
-      const rows = body?.performances ?? [];
-      if (rows.length === 0) throw new Error(t('perf.malformed_response', locale));
-      // El aviso de hold viaja por PATCH igual que en la ruta de una sola
-      // (la RPC no conoce la columna). Una por fila, y un fallo NO deshace la
-      // tanda: se avisa y se sigue, misma tolerancia que arriba.
-      const notice = holdNoticeToSend(input.status);
-      if (notice !== undefined) {
-        try {
-          await Promise.all(
-            rows.map((r) =>
-              mutateJSON('PATCH', `/api/performances/${r.id}`, { hold_notice_days: notice }),
-            ),
-          );
-        } catch {
-          addToast({ tone: 'warning', message: t('perf.hold_notice_not_saved', locale) });
-        }
-      }
-      return rows;
-    },
-    onSuccess: (rows) => {
+  const createPerf = createMutation({
+    mutationFn: (input: PerformanceCreate | PerformanceSeriesCreate) => createPerformances(input, cHoldNotice),
+    onSuccess: ({ rows, noticeFailed }, input) => {
+      if (noticeFailed) addToast({ tone: 'warning', message: t('perf.hold_notice_not_saved', locale) });
+      const span = Array.isArray(input.performed_at) ? input.performed_at : [input.performed_at];
+      const day =
+        span.length > 1
+          ? `${dayMonthYear(span[0])} – ${dayMonthYear(span[span.length - 1])}`
+          : dayMonthYear(span[0]);
+      toastCreated({
+        locale,
+        message: t('create.added', locale, { what: t('create.type_performance', locale), day }),
+        undo: () => undoPerformances(rows.map((r) => r.id), queryClient),
+      });
       cVenue = '';
       cCity = '';
       resetBolo();
       cHoldNotice = null;
-      void queryClient.invalidateQueries({ queryKey: ['planner-performances'] });
-      void queryClient.invalidateQueries({ queryKey: ['line-performances'] });
-      void queryClient.invalidateQueries({ queryKey: ['line-money-fees'] });
-      void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
-      void queryClient.invalidateQueries({ queryKey: ['today-performances'] });
-      void queryClient.invalidateQueries({ queryKey: ['pulse-performances'] });
+      void invalidatePerformanceFeeds(queryClient);
       // El anfitrión cierra con la primera, que es la que abre la tanda.
       onCreated?.(rows[0]);
     },
@@ -318,32 +254,28 @@
   // The host's footer button reads pending through the bindable — a store
   // value can't cross the instance boundary reactively any other way.
   $effect(() => {
-    pending = $createPerf.isPending || $createPerfSeries.isPending;
+    pending = $createPerf.isPending;
   });
-
-  /**
-   * The notice to send after create, or undefined for "nothing to send" —
-   * only a hold* status carries one, and an empty field means "standard
-   * default", which is exactly what NULL (the column's birth value) says.
-   */
-  function holdNoticeToSend(status: string | undefined): number | undefined {
-    if (!status || !isHoldStatus(status)) return undefined;
-    if (cHoldNotice == null || !isValidHoldNotice(cHoldNotice)) return undefined;
-    return cHoldNotice;
-  }
 
   /** La tanda manda: dos días o más resueltos por el anfitrión. */
   let isRun = $derived(Boolean(days && days.length >= 2));
 
+  let formEl: HTMLFormElement | undefined = $state();
+
+  /**
+   * The host's button submits the FORM, so the native constraints (the
+   * project, the day) run and speak under their field (ADR-139 p7), never
+   * as a toast; the form's own submit handler then writes.
+   */
   export function submit() {
-    if (!cProject) {
-      addToast({ tone: 'warning', message: t('create.pick_project', locale) });
-      return;
-    }
+    formEl?.requestSubmit();
+  }
+
+  function save() {
     // UNA TANDA ES OTRA ESCRITURA, no la misma repetida. Con los días ya
     // resueltos por `BlockDays`, dos o más van por la ruta atómica.
     if (days && days.length >= 2) {
-      $createPerfSeries.mutate({
+      $createPerf.mutate({
         project_id: cProject,
         performed_at: days,
         venue_name: cVenue.trim() || null,
@@ -352,10 +284,6 @@
         line_id: cLine || null,
         bolo_id: cBolo || null,
       });
-      return;
-    }
-    if (!cDay) {
-      addToast({ tone: 'warning', message: t('perf.pick_date', locale) });
       return;
     }
     $createPerf.mutate({
@@ -372,9 +300,10 @@
 
 <form
   class="pform"
+  bind:this={formEl}
   onsubmit={(e) => {
     e.preventDefault();
-    submit();
+    save();
   }}
 >
   <Select
@@ -427,28 +356,25 @@
   <Select label={t('edit.status', locale)} options={statusOptions} bind:value={cStatus} />
   {#if showHoldNotice}
     <!-- ADR-080 §2 — discreet, hold-only. Empty = default (the placeholder
-         says it), 0 = no notice. Raw .field: the house Input doesn't carry
-         min/max and the native attributes ARE the constraint here. -->
-    <div class="field">
-      <label for="c-hold-notice">{t('perf.hold_notice', locale)}</label>
-      <div class="field__control">
-        <input
-          id="c-hold-notice"
-          type="number"
-          min="0"
-          max="365"
-          step="1"
-          inputmode="numeric"
-          bind:value={cHoldNotice}
-          placeholder={String(HOLD_NOTICE_DEFAULT)}
-          aria-describedby={cHoldNotice === 0 ? 'c-hold-notice-msg' : undefined}
-        />
-        <span class="field__suffix">{t('perf.hold_notice_suffix', locale)}</span>
-      </div>
-      {#if cHoldNotice === 0}
-        <p id="c-hold-notice-msg" class="field__msg">{t('perf.hold_notice_none', locale)}</p>
-      {/if}
-    </div>
+         says it), 0 = no notice. The native min/max ARE the constraint. -->
+    <Field
+      id="c-hold-notice"
+      label={t('perf.hold_notice', locale)}
+      helper={cHoldNotice === 0 ? t('perf.hold_notice_none', locale) : undefined}
+    >
+      <input
+        id="c-hold-notice"
+        type="number"
+        min="0"
+        max="365"
+        step="1"
+        inputmode="numeric"
+        bind:value={cHoldNotice}
+        placeholder={String(HOLD_NOTICE_DEFAULT)}
+        aria-describedby={cHoldNotice === 0 ? 'c-hold-notice-msg' : undefined}
+      />
+      {#snippet suffix()}{t('perf.hold_notice_suffix', locale)}{/snippet}
+    </Field>
   {/if}
   {#if showLineSelect}
     <Select label={t('create.line', locale)} options={lineOptions} bind:value={cLine} />
@@ -462,7 +388,7 @@
     .pform {
       display: flex;
       flex-direction: column;
-      gap: var(--space-s);
+      gap: var(--field-gap);
     }
   }
 </style>

@@ -6,13 +6,16 @@
    * mira puede leer (ausente no es denegado: lo que no lees no se anuncia).
    * Un mensaje puede decir de qué función habla.
    *
-   * Sin dinero: la cabecera es sala, ciudad y funciones (`bolo_board`).
+   * Sin dinero: la cabecera dice de cuántas funciones es, si son varias (`bolo_board`).
    * Sin realtime (ADR-083 §2): se recarga al volver a la pestaña y cada 30 s
    * mientras se ve. Lo nuevo se marca leído cuando el tablón está a la vista;
    * la raya de «nuevos» se queda donde estaba al abrir la ficha
    * (`thread-reading.svelte.ts`, lo mismo que el hilo de una conversación).
    */
 
+  import BlockHead from '$lib/components/BlockHead.svelte';
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
+  import FirstTimeNote from '$lib/components/FirstTimeNote.svelte';
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON } from '$lib/api';
@@ -22,7 +25,6 @@
   import {
     THREAD_REFRESH_MS,
     boardLayout,
-    boloPlace,
     facetName,
     firstUnreadId,
     messagesByThread,
@@ -109,13 +111,13 @@
 
 <section id="board" class="board" aria-labelledby="board-title" aria-busy={$boardQuery.isLoading} bind:this={sectionEl}>
   <header class="board__head">
-    <p class="eyebrow" id="board-title">{t('threads.board', locale)}</p>
+    <BlockHead title={t('threads.board', locale)} id="board-title" concept="board" />
+    <!-- Ni la sala ni «1 función»: la ficha ya dice dónde (su título) y de
+         qué bolo cuelga (sus hechos). Solo cuando el tablón es de varias
+         funciones lo dice, y cuáles (ADR-139 p2). -->
     {#if board?.bolo}
-      <p class="board__bolo">
-        {#if boloPlace(board.bolo)}<span>{boloPlace(board.bolo)}</span>{/if}
-        <span>{perfCount === 1 ? t('threads.one_performance', locale) : t('threads.performances', locale, { n: perfCount })}</span>
-      </p>
       {#if perfCount > 1}
+        <p class="board__bolo">{t('threads.performances', locale, { n: perfCount })}</p>
         <ul class="board__perfs" role="list">
           {#each board.performances as p (p.id)}
             <li>
@@ -132,16 +134,17 @@
       {/if}
     {/if}
   </header>
+  <FirstTimeNote event="first_board" when={Boolean(board?.bolo)} />
 
   {#if $boardQuery.isLoading}
-    <p class="board__state">{t('desk.loading', locale)}</p>
+    <EmptyLine text={t('desk.loading', locale)} busy />
   {:else if $boardQuery.isError && !board}
-    <p class="board__state">{t('threads.board_error', locale)}</p>
+    <EmptyLine text={t('threads.board_error', locale)} />
   {:else if board && !board.bolo}
-    <p class="board__state">{t('threads.no_bolo', locale)}</p>
+    <EmptyLine text={t('threads.no_bolo', locale)} />
   {:else if board?.bolo}
     {#if board.truncated}
-      <p class="board__state">{t('threads.truncated', locale)}</p>
+      <EmptyLine text={t('threads.truncated', locale)} />
     {/if}
     {#each layout.open as th (threadKey(th))}
       <ThreadBlock
@@ -160,18 +163,21 @@
       />
     {/each}
     {#if layout.folded.length > 0}
-      <!-- Los hilos sin mensajes, plegados: una línea cada uno. -->
-      <ul class="board__folded" role="list">
-        {#each layout.folded as th (threadKey(th))}
-          <li data-facet={th.facet_key ?? 'general'}>
-            <button type="button" class="board__fold" onclick={() => unfold(th)}>
-              <span class="board__fold-name">{facetName(th, locale)}</span>
-              <span>{t('threads.no_messages', locale)}</span>
-              <span class="board__fold-write">{t('threads.write', locale)}</span>
-            </button>
-          </li>
-        {/each}
-      </ul>
+      <!-- Los hilos sin mensajes, en una sola línea: cada nombre abre el suyo
+           con el compositor enfocado (ADR-139 § 2: lo vacío, una línea). -->
+      <div class="board__folded">
+        <EmptyLine
+          text={layout.folded.length === 1
+            ? t('threads.folded_one', locale)
+            : t('threads.folded_other', locale, { n: layout.folded.length })}
+        >
+          {#each layout.folded as th (threadKey(th))}
+            <button type="button" class="empty-line__act" data-facet={th.facet_key ?? 'general'} onclick={() => unfold(th)}
+              >{facetName(th, locale)}</button
+            >
+          {/each}
+        </EmptyLine>
+      </div>
     {/if}
   {/if}
 </section>
@@ -196,11 +202,6 @@
       color: var(--text-muted);
       font-size: var(--text-s);
     }
-    .board__bolo > * + *::before {
-      content: '·';
-      margin-inline-end: var(--space-s);
-      color: var(--text-faint);
-    }
     .board__perfs {
       display: flex;
       flex-wrap: wrap;
@@ -213,54 +214,6 @@
     .board__perfs .link-arrow {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
-    }
-    .board__folded {
-      display: flex;
-      flex-direction: column;
-      margin: 0;
-      padding: 0;
-      list-style: none;
-      border-block-start: var(--divider-light);
-    }
-    .board__fold {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: baseline;
-      gap: var(--space-xs);
-      inline-size: 100%;
-      padding-block: var(--space-xs);
-      color: var(--text-faint);
-      font-size: var(--text-xs);
-      text-align: start;
-    }
-    .board__fold > * + *::before {
-      content: '·';
-      margin-inline-end: var(--space-xs);
-      color: var(--text-faint);
-    }
-    .board__fold-name {
-      color: var(--heading-color);
-      font-size: var(--text-s);
-      font-weight: 500;
-    }
-    .board__fold-write {
-      color: var(--text-muted);
-      transition: color var(--transition);
-    }
-    @media (hover: hover) and (pointer: fine) {
-      .board__fold:hover .board__fold-write {
-        color: var(--text-color);
-        text-decoration: underline;
-      }
-    }
-    .board__fold:focus-visible {
-      outline: var(--focus-width) solid var(--focus-color);
-      outline-offset: 2px;
-    }
-    .board__state {
-      margin: 0;
-      color: var(--text-faint);
-      font-size: var(--text-s);
     }
   }
 </style>

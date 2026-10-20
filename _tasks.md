@@ -443,14 +443,22 @@
 
 ## Producto — después
 
+- [ ] **Segundo nivel y calma (ADR-139)**: las cinco fases y sus seguimientos (verbos del bolo, resalte de lo creado, «Falta» de línea y proyecto) en producción el 20-10 (`b0bdd0c1`): piezas de formulario y de ficha, un solo modelo de guardado, ficha con hechos/«Falta»/«Detalles», vistazo lateral (fecha, bolo, función, conversación, persona), alta rápida al plan, calma como foco y peso del primer nivel, pulido de Ajustes. Siguen:
+  - [ ] Pasar el E2E contra `b0bdd0c1` (muchos specs reescritos sin correr; en curso el 20-10).
+  - [ ] En calma, «Siguiente» del raíl solo lo confirmado (Marco, 20-10; enmienda ADR-096 § 5).
+  - [ ] Integrar `claude/cleanup` (9c732e06) en main con su guard de tokens (Marco, 20-10).
+  - [ ] Bug: el bloque de conversaciones del proyecto filtra por el nombre corto del proyecto, que se repite entre espacios: puede mezclar conversaciones de otro espacio del mismo usuario (carril adr139-followups, 20-10).
+  - [ ] Después (ADR-139): la línea que entiende texto en el alta, crear en la celda del Mes, ⌘K que crea función, fecha, tarea y conversación.
+  - [ ] Logística, acogida y técnica de la función: «+ añadir línea» con el campo nuevo (Marco, 20-10).
+  - [ ] Fuera «facturado» y «cobrado» del estado de una función: el dinero vive en el bolo (Marco, 20-10, ADR-087).
+  - [ ] Bug: en Ajustes, «Subir imagen» no hace nada (revisión 19-10; en `claude/record-pieces`).
+  - [ ] Pulido: en oscuro el diálogo se funde con la página; desplegable de 40 px junto a campo de 44; pie del diálogo partido en móvil; `--font-size-s` no existe (ficha de persona) (revisión 19-10, `ui-visual.md`).
 - [ ] **Una conversación con etiquetas y tres capas de estado (ADR-138)**: plan validado por Marco el 19-10, entero
-  como recomendaba (`build/plans/2026-10-19-conversations-tags.md`). Fases, cada una se despliega sola:
-  - [ ] **E1** expand de estado: `not_now_*`, relación derivada, `conversation_bolos`, `legacy_status`; la ficha lista sus bolos; el panel de Difusión y la puerta de Desk cuentan bolos. Migración aditiva. Carril `claude/conv-state`.
-  - [ ] **E2** «lo conozco»: `person_acquaintance`, `set_acquaintance`, la marca en la ficha y en la fila. Migración aditiva. Carril `claude/acquaintance`.
-  - [ ] **E3** margen del Planner en Día y Agenda (fuente de «Te espera»), número en Mes y Temporada, «Ver en el Planner». Sin migración. Tras E1.
-  - [ ] **E4** contract de estado: fuera `conversation.status` y su enum. Destructiva: staging e `inspect`. Tras una semana de E1.
-  - [ ] **Etiquetas 1** esquema (`conversation_tagging`, backfill `sales`, lectura); **2** chips en la cabecera; **3** lectura común (`conversation_feed`, «Todas» en una lista, Desk); **4** etiquetas en Ajustes. La 1 detrás de E1 (las dos tocan `conversation`).
-- [ ] **Ayuda contextual por capas (enfoque A, Marco 19-10)**: una «i» por concepto, una tarjeta de bienvenida por sección con «?» para volver y un «Enséñame» de 3 pasos opcional, avisos de primera vez; lo visto se guarda por persona (migración pequeña). 2 carriles. Antes: Marco valida la lista de conceptos y los textos en cuatro idiomas (en preparación, `build/coordination/onboarding/textos.md`). Investigación en `build/coordination/onboarding/investigacion.md`; la lista de arranque (B) queda para la beta.
+  como recomendaba (`build/plans/2026-10-19-conversations-tags.md`). E1 y E2 en producción el 19-10 (CHANGELOG). Fases, cada una se despliega sola:
+  - [ ] Desk y el margen del Planner leen como mucho 100 conversaciones y `muk-cia` tiene 152: puede faltar algún paso en los dos (carril E3, 19-10, sin estimar).
+  - [ ] **E4** contract de estado: fuera `conversation.status` y su enum. Destructiva: staging e `inspect`. No antes del 26-10 (E1 en producción el 19-10).
+  - [ ] **Etiquetas 1** (esquema) en producción el 19-10 (`20261020160000`); **2** chips en producción el 19-10; siguen **3** lectura común (`conversation_feed`, «Todas» en una lista, Desk); **4** etiquetas en Ajustes. La 2 hace que `create_conversation` reciba etiquetas y repite el relleno `sales` para las creadas desde el 19-10; la 3 compara «leído» con cuándo entró cada evento (la 1 marca hasta `now()`); borrar etiquetas propias, en la 4.
+- [x] **Ayuda contextual por capas (enfoque A, Marco 19-10)**: HECHO y en producción el 2026-10-19 (`7fc28e60` carril 1, `13889409` carril 2; migración `20261020150000_help_seen`). Queda la lista de arranque (B) para la beta (`build/coordination/onboarding/investigacion.md`).
 - [ ] **Arreglos de la revisión de Desk, Conversations y Cuentas (18-10)** (`build/coordination/review-{desk,conversations,books}/`, fuera de git). Marco (18-10): el directorio de salas y contactos pide permiso de conversaciones y una sala o contacto que solo existe por una conversación privada hereda su privacidad; un cobro se ata a la factura emitida si la hay y propone lo pendiente con IVA; una proforma de un trato sin confirmar no cuenta en «Por cobrar». Marco (18-10): todo lo recomendado en los diez informes, de todas las gravedades. Privacidad, Cuentas, Conversations y Desk en producción el 2026-10-18; Desk y una pasada de coherencia (títulos de bloque, error y carga iguales) al final.
   - [ ] Bug: la pestaña del navegador dice «Hour — Sign in» con la sesión abierta en el Hall: el título del login se queda puesto al entrar. Cada pantalla pone su propio título («Hour» en el Hall, «Desk · Hour», «Planner · Hour»…). Va en la pasada de coherencia. (drop 18-10, pequeño)
   - [ ] En Desk, «Ha cambiado» no desaparece cuando no hay nada: se queda con una línea («Nada nuevo desde tu última visita, hace 3 h»), y si falla lo dice. Enmienda ADR-121, que la ocultaba vacía. (drop 18-10)

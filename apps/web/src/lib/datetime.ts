@@ -103,18 +103,18 @@ export function dayMonthYearTs(iso: string, locale: string = appLocaleTag()): st
   });
 }
 
-/**
- * The viewer's calendar day for `now`, as YYYY-MM-DD. VIEWER-zone by
- * design: "today" for date-input seeds and calendar-day comparisons follows
- * the viewer's clock — a UTC read (toISOString) is a day off around
- * midnight for anyone off the meridian.
- */
 /** The viewer's IANA time zone, as the browser reports it. One call for the
  *  sixteen places that used to spell the Intl incantation themselves. */
 export function viewerTimeZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
+/**
+ * The viewer's calendar day for `now`, as YYYY-MM-DD. VIEWER-zone by
+ * design: "today" for date-input seeds and calendar-day comparisons follows
+ * the viewer's clock — a UTC read (toISOString) is a day off around
+ * midnight for anyone off the meridian.
+ */
 export function localDayISO(now: Date = new Date()): string {
   const m = String(now.getMonth() + 1).padStart(2, '0');
   const d = String(now.getDate()).padStart(2, '0');

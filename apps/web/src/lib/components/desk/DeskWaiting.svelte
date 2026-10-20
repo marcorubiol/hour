@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Checkbox from '../Checkbox.svelte';
   /**
    * «TE ESPERA» — band 2 of the Desk (ADR-117). The short list by weight
    * (`rankWaiting`): at most seven rows, each a verb and its action. «Ver
@@ -7,22 +8,31 @@
    *
    * One list at a time, never both: a task drawn twice is two checkboxes
    * with one name.
+   *
+   * The red is the block's, once (ADR-139 § 6): «3 vencidas» in the head;
+   * a row says «vencido» in its own ink. In calm (`calm`, `calmWaiting`)
+   * the band is today only; the overdue is one line that opens it here,
+   * and the rest one line that leaves calm.
    */
+  import CalmLine from '$lib/components/CalmLine.svelte';
   import { lensOn } from '$lib/lenses.svelte';
   import Button from '$lib/components/Button.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { localeDayMonth } from '$lib/datetime';
   import { relativeContactDate } from '$lib/conversation';
   import { tick } from 'svelte';
   import { t, type Locale } from '$lib/i18n';
-  import type { DeskBucket, DeskConcern, DeskItem, DeskRun, Waiting } from '$lib/desk-feed';
+  import type { CalmWaiting, DeskBucket, DeskConcern, DeskItem, DeskRun, Waiting } from '$lib/desk-feed';
 
   interface Props {
     waiting: Waiting;
     /** The viewer's day (YYYY-MM-DD). */
     today: string;
-    /** Calm keeps overdue and today: what it folds is not offered back here. */
-    calm?: boolean;
+    /** Calm's reading of the same feed (`calmWaiting`); null outside calm. */
+    calm?: CalmWaiting | null;
+    /** The last line's door: leaves calm, where the rest waits. */
+    onleavecalm?: () => void;
     feed: DeskBucket[];
     later: { count: number; from: string; until: string } | null;
     loading: boolean;
@@ -45,7 +55,8 @@
   let {
     waiting,
     today,
-    calm = false,
+    calm = null,
+    onleavecalm,
     feed,
     later,
     loading,
@@ -72,6 +83,16 @@
     headEl?.focus();
   }
   let laterOpen = $state(false);
+  /** Calm's overdue line, opened in place. */
+  let overdueOpen = $state(false);
+  const overdueWord = (n: number) => t(n === 1 ? 'desk.title_overdue_one' : 'desk.title_overdue_many', locale, { n });
+  let calmRest = $derived(
+    calm
+      ? t(calm.more === 0 ? 'desk.calm_rest_zero' : calm.more === 1 ? 'desk.calm_rest_one' : 'desk.calm_rest_many', locale, {
+          n: calm.more,
+        })
+      : '',
+  );
   let feedCount = $derived(feed.reduce((n, b) => n + b.runs.reduce((m, r) => m + r.items.length, 0), 0));
 
   // A lens the space does not use (ADR-132) is no destination.
@@ -113,9 +134,7 @@
 </script>
 
 {#snippet task(item: DeskItem)}
-  <input
-    type="checkbox"
-    class="row__check"
+  <Checkbox
     id="desk-task-{item.taskId}"
     checked={item.taskDone}
     onchange={(e) => item.taskId && ontoggle(item.taskId, (e.currentTarget as HTMLInputElement).checked)}
@@ -131,9 +150,9 @@
       >
       <span class="row__when">{whenOf(item)}</span>
       <span class="row__acts">
-        <button type="button" class="row__act btn--outline btn--xs" onclick={() => item.taskId && onaccept(item.taskId)}
+        <button type="button" class="row__act btn--secondary btn--xs" onclick={() => item.taskId && onaccept(item.taskId)}
           >{t('desk.proposal_add', locale)}</button
-        ><button type="button" class="row__act row__act--quiet btn--outline btn--xs" onclick={() => item.taskId && onremove(item.taskId)}
+        ><button type="button" class="row__act row__act--quiet btn--secondary btn--xs" onclick={() => item.taskId && onremove(item.taskId)}
           >{t('desk.proposal_dismiss', locale)}</button
         >
       </span>
@@ -163,12 +182,12 @@
           {@const g = item.going}
           <button
             type="button"
-            class="row__act btn--outline btn--xs"
+            class="row__act btn--secondary btn--xs"
             aria-label={t('desk.going_aria', locale, { subject: item.subject })}
             onclick={() => onanswer(g, 'going')}>{t('pulse.going', locale)}</button
           ><button
             type="button"
-            class="row__act row__act--quiet btn--outline btn--xs"
+            class="row__act row__act--quiet btn--secondary btn--xs"
             aria-label={t('desk.not_going_aria', locale, { subject: item.subject })}
             onclick={() => onanswer(g, 'not_going')}
             >{t('pulse.not_going', locale)}</button
@@ -205,12 +224,18 @@
   <!-- The region is named by the words alone, not by the count beside them. -->
   <BlockHead
     title={t('desk.band_waiting', locale)}
+    concept="waiting"
     titleId="desk-waits-h"
     focusable
     bind:el={headEl}
-    count={!loading && !errored && waiting.total > waiting.rows.length && !all
-      ? t('desk.waiting_count', locale, { shown: waiting.rows.length, total: waiting.total })
-      : null}
+    count={loading || errored
+      ? null
+      : calm
+        ? calm.today.length || null
+        : waiting.total > waiting.rows.length && !all
+          ? t('desk.waiting_count', locale, { shown: waiting.rows.length, total: waiting.total })
+          : null}
+    alertNote={!loading && !errored && !calm && waiting.overdue > 0 ? overdueWord(waiting.overdue) : null}
   />
 
   {#if loading}
@@ -224,7 +249,34 @@
         </li>{/each}
     </ul>
   {:else if errored}
-    <p class="load-fail" role="alert"><span>{t('desk.error', locale)}</span><Button size="xs" variant="outline" onclick={onretry}>{t('ui.retry', locale)}</Button></p>
+    <p class="load-fail" role="alert"><span>{t('desk.error', locale)}</span><Button size="xs" variant="secondary" onclick={onretry}>{t('ui.retry', locale)}</Button></p>
+  {:else if calm}
+    <!-- CALM: today, then one line for the overdue (it opens here), then one
+         for everything else (it leaves calm). Nothing is denied. -->
+    {#if calm.today.length > 0}
+      <ul class="list">
+        {#each calm.today as item (item.id)}{@render row(item)}{/each}
+      </ul>
+    {:else if calm.overdue.length === 0}
+      <EmptyLine text={`${t('desk.caughtup_l', locale)} ${t('desk.caughtup_s', locale)}`} />
+    {:else}
+      <EmptyLine text={t('desk.calm_today_none', locale)} />
+    {/if}
+    {#if calm.overdue.length > 0}
+      <CalmLine
+        lead={overdueWord(calm.overdue.length)}
+        action={t(overdueOpen ? 'desk.calm_overdue_hide' : 'desk.calm_overdue_see', locale)}
+        expanded={overdueOpen}
+        controls="desk-calm-overdue"
+        onclick={() => (overdueOpen = !overdueOpen)}
+      />
+      {#if overdueOpen}
+        <ul class="list" id="desk-calm-overdue">
+          {#each calm.overdue as item (item.id)}{@render row(item)}{/each}
+        </ul>
+      {/if}
+    {/if}
+    <CalmLine text={calmRest} action={t('calm.see_all', locale)} onclick={() => onleavecalm?.()} />
   {:else if all}
     <div class="timeline">
       {#each feed as bucket (bucket.sortKey)}
@@ -255,16 +307,16 @@
     </div>
     <button type="button" class="more" onclick={() => showAll(false)}>{t('desk.see_less', locale)}</button>
   {:else if waiting.rows.length === 0}
-    <!-- One voice for an empty band, the one «Lo siguiente» and «Ha cambiado» use. -->
-    <p class="dband__empty">{t('desk.caughtup_l', locale)} <span class="caughtup__s">{t('desk.caughtup_s', locale)}</span></p>
-    {#if feedCount > waiting.rows.length && !calm}
+    <!-- One voice for an empty band (EmptyLine), the one every block uses. -->
+    <EmptyLine text={`${t('desk.caughtup_l', locale)} ${t('desk.caughtup_s', locale)}`} />
+    {#if feedCount > waiting.rows.length}
       <button type="button" class="more" onclick={() => showAll(true)}>{t('desk.see_all', locale)} →</button>
     {/if}
   {:else}
     <ul class="list">
       {#each waiting.rows as item (item.id)}{@render row(item)}{/each}
     </ul>
-    {#if feedCount > waiting.rows.length && !calm}
+    {#if feedCount > waiting.rows.length}
       <button type="button" class="more" onclick={() => showAll(true)}>{t('desk.see_all', locale)} →</button>
     {/if}
   {/if}
@@ -300,18 +352,13 @@
     color: var(--text-faint);
     text-transform: lowercase;
   }
-  .row--over .row__verb {
-    color: var(--danger);
-  }
+  /* NO RED ON THE ROW (ADR-139 § 6): the block says «3 vencidas» once, in
+     its head; the row keeps its concern's ink and says «vencido» in words. */
   .row--conversation .row__verb {
     color: color-mix(in oklch, var(--brand) 60%, var(--text-muted));
   }
   .row--money .row__verb {
     color: color-mix(in oklch, var(--success) 60%, var(--text-muted));
-  }
-  .row--over.row--money .row__verb,
-  .row--over.row--conversation .row__verb {
-    color: var(--danger);
   }
   .row--going .row__verb,
   .row--ai .row__verb,
@@ -322,15 +369,6 @@
   .row--proposal .row__subject,
   .row--ai .row__subject {
     font-style: italic;
-  }
-  .row__check {
-    inline-size: 0.95rem;
-    block-size: 0.95rem;
-    margin: 0;
-    /* A checkbox's baseline is its bottom edge: down to the subject's line. */
-    translate: 0 0.15em;
-    accent-color: var(--check-bg);
-    cursor: pointer;
   }
   .row__subject {
     display: flex;
@@ -367,9 +405,9 @@
     color: var(--text-muted);
     white-space: nowrap;
   }
-  /* After the base rule, so the overdue date is red (it lost the cascade). */
+  /* The overdue date is the row's strongest word, in ink, not in red. */
   .row__when--over {
-    color: var(--danger);
+    color: var(--text-color);
   }
   .row__acts {
     display: inline-flex;
@@ -403,10 +441,6 @@
   /* A finger's room without moving a pixel: the hit area grows, the line
      does not (subject links, the box, the band's own buttons). */
   @media (pointer: coarse) {
-    .row__check {
-      inline-size: 1.25rem;
-      block-size: 1.25rem;
-    }
     .row__subject :is(a, label) {
       padding-block: var(--space-xs);
       margin-block: calc(-1 * var(--space-xs));
@@ -519,11 +553,6 @@
   }
   .run__rows .row:last-child {
     border-block-end: 0;
-  }
-
-  /* ── Caught up ── */
-  .caughtup__s {
-    color: var(--text-faint);
   }
 
   /* Phone: the action stays on the right, the context drops under the

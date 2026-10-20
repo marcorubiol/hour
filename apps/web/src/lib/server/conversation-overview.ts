@@ -22,6 +22,7 @@ import {
   type TurnEvent,
 } from '$lib/conversation-overview';
 import type { ConversationStatus } from '$lib/conversation';
+import { TAGGING_EMBED, tagKeysOf, type TaggingEmbed } from '$lib/conversation-tags';
 import type { ConversationBolo } from '$lib/conversation-relation';
 import { defaultProviderKind, type MailoutEnv } from '$lib/server/mailout';
 
@@ -80,6 +81,7 @@ const OVERVIEW_SELECT = [
   'organization:workspace_organization!conversation_workspace_organization_fkey(name)',
   'line:line_id(name)',
   'contacts:conversation_contact(person:workspace_person!conversation_contact_workspace_person_fkey(full_name))',
+  TAGGING_EMBED,
   TURN_EMBEDS,
 ].join(',');
 
@@ -103,6 +105,7 @@ interface OverviewDbRow {
   contacts: { person: { full_name: string } | null }[] | null;
   last_turn: TurnEvent[] | null;
   last_in: { occurred_at: string }[] | null;
+  tagging: TaggingEmbed;
 }
 
 async function pages<T>(read: (offset: number) => Promise<T[]>): Promise<T[]> {
@@ -176,8 +179,31 @@ export async function loadOverviewRows(env: SupabaseEnv, jwt: string, scope: Ove
       last_in: r.last_in?.[0] ?? null,
       performance_days: days.get(r.id) ?? [],
       bolos: bolos.get(r.id) ?? [],
+      tags: tagKeysOf(r.tagging),
     };
   });
+}
+
+/**
+ * Lo que la lista sin filtro de bloque necesita para acotar por etiqueta
+ * (ADR-138, fase 2): los ids del alcance con sus etiquetas, en el orden de la
+ * lista. Ligero: sin turno, bolos ni funciones. La página se lee después entera.
+ */
+export async function loadTaggedIds(
+  env: SupabaseEnv,
+  jwt: string,
+  base: URLSearchParams,
+  path: 'conversation' | 'rpc/conversation_search',
+): Promise<{ id: string; tags: string[] }[]> {
+  const rows = await pages((offset) => {
+    const search = new URLSearchParams(base);
+    search.set('select', `id,${TAGGING_EMBED}`);
+    search.set('order', 'next_action_at.asc.nullslast,updated_at.desc,id');
+    search.set('limit', String(PAGE));
+    search.set('offset', String(offset));
+    return pgGet<{ id: string; tagging: TaggingEmbed }>(env, path, jwt, { search }).then((r) => r.data);
+  });
+  return rows.map((r) => ({ id: r.id, tags: tagKeysOf(r.tagging) }));
 }
 
 /** Lo que `conversations_bolos` acepta por llamada. */

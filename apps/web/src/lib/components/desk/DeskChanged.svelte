@@ -6,8 +6,10 @@
    * that says since when (amends ADR-121 § 5); if a source failed it says so,
    * because a silent band would claim «nothing changed».
    */
+  import FirstTimeNote from '$lib/components/FirstTimeNote.svelte';
   import Button from '$lib/components/Button.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { t, type Locale } from '$lib/i18n';
   import { lensOn } from '$lib/lenses.svelte';
   import { feedHref, feedThreadName, feedTitle } from '$lib/threads';
@@ -81,9 +83,10 @@
 </script>
 
 <section class="dband changed" aria-labelledby="desk-changed-h" aria-busy={loading} data-testid="desk-changed">
-  <BlockHead id="desk-changed-h" title={t('desk.changed_since', locale, { when: sinceLabel })}>
-    {#if hasThreads}<a class="block-head__act" href="/h/conversations?view=team" data-testid="desk-to-team">{t('conversations.view_team', locale)} →</a>{/if}
+  <BlockHead id="desk-changed-h" concept="changed" title={t('desk.changed_since', locale, { when: sinceLabel })}>
+    {#if hasThreads}<a class="block-head__act" href="/h/conversations?etiqueta=team" data-testid="desk-to-team">{t('conversations.view_team', locale)} →</a>{/if}
   </BlockHead>
+  <FirstTimeNote event="first_team_thread" when={!loading && changes.some((c) => c.kind === 'thread')} />
   {#if loading}
     <ul class="feed" aria-hidden="true">
       {#each [0, 1] as i (i)}
@@ -126,9 +129,9 @@
         {/each}
       </ul>
     {:else if !errored}
-      <p class="dband__empty">{quietLabel}</p>
+      <EmptyLine text={quietLabel} />
     {/if}
-    {#if errored}<p class="load-fail" role="alert"><span>{t('desk.changed_error', locale)}</span><Button size="xs" variant="outline" onclick={onretry}>{t('ui.retry', locale)}</Button></p>{/if}
+    {#if errored}<p class="load-fail" role="alert"><span>{t('desk.changed_error', locale)}</span><Button size="xs" variant="secondary" onclick={onretry}>{t('ui.retry', locale)}</Button></p>{/if}
   {/if}
 </section>
 

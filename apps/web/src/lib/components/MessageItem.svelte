@@ -141,7 +141,7 @@
           onkeydown={(e) => sendOnModEnter(e, saveEdit)}
         ></textarea>
         <div class="msg__edit-actions">
-          <Button variant="outline" size="xs" onclick={() => (editing = false)}>{t('threads.cancel', locale)}</Button>
+          <Button variant="quiet" size="xs" onclick={() => (editing = false)}>{t('threads.cancel', locale)}</Button>
           <Button type="submit" size="xs" loading={$editMutation.isPending} disabled={!draft.trim()}>
             {t('threads.save', locale)}
           </Button>
@@ -172,8 +172,8 @@
 
 <Dialog bind:open={confirmDelete} size="s" title={t('threads.delete_title', locale)} description={t('threads.delete_confirm', locale)}>
   {#snippet actions()}
-    <button type="button" class="btn--outline btn--s" onclick={() => (confirmDelete = false)}>{t('ui.cancel', locale)}</button>
-    <button type="button" class="btn--danger btn--s" onclick={confirmRemove}>{t('threads.delete', locale)}</button>
+    <Button variant="quiet" onclick={() => (confirmDelete = false)}>{t('create.cancel', locale)}</Button>
+    <Button tone="warn" onclick={confirmRemove}>{t('threads.delete', locale)}</Button>
   {/snippet}
 </Dialog>
 

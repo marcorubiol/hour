@@ -4,8 +4,14 @@
    * trabajo #5): venue, schedule (5 timeslots, dual-timezone per
    * D-PRE-10), and the three jsonb summaries (logistics / hospitality /
    * technical) rendered generically via JsonKV.
+   *
+   * The venue's NAME is not drawn: the record's title already is the venue
+   * (ADR-139 p2, «la sala sale tres veces»). What is left is what the title
+   * does not say: where it is, how to reach it, who to call.
    */
 
+  import BlockHead from '$lib/components/BlockHead.svelte';
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import type { Snippet } from 'svelte';
   import type { Json } from '$lib/db-types';
   import { appLocale, t, type Locale } from '$lib/i18n';
@@ -58,6 +64,9 @@
      * to the read-only five (the playground).
      */
     schedule?: Snippet;
+    /** False where the host draws the running order elsewhere (the record
+        puts the day's plan above its details): no schedule here at all. */
+    withSchedule?: boolean;
     /** The reader's language; defaults to the session's. */
     locale?: Locale;
   }
@@ -78,6 +87,7 @@
     viewerTz,
     fallbackTz = null,
     schedule,
+    withSchedule = true,
     locale = appLocale(),
   }: Props = $props();
 
@@ -104,10 +114,6 @@
     return rows;
   });
 
-  let placeLine = $derived(
-    [venue?.city ?? city, venue?.country ?? country].filter(Boolean).join(', '),
-  );
-
   let jsonSections = $derived(
     (
       [
@@ -120,17 +126,12 @@
 </script>
 
 <section class="production" aria-label={t('perf.production', locale)}>
-  <header class="production__header">
-    <p class="eyebrow">{t('perf.production', locale)}</p>
-  </header>
+  <BlockHead title={t('perf.production', locale)} />
 
   <div class="production__venue">
-    {#if venue?.name ?? venueName}
-      <strong class="production__venue-name">{venue?.name ?? venueName}</strong>
-    {:else}
-      <p class="production__empty">{t('venue.none_yet', locale)}</p>
+    {#if !(venue?.name ?? venueName)}
+      <EmptyLine text={t('venue.none_yet', locale)} />
     {/if}
-    {#if placeLine}<span class="production__venue-place">{placeLine}</span>{/if}
     {#if venue?.address}<span class="production__venue-address">{venue.address}</span>{/if}
     <span class="production__venue-meta">
       {#if venue?.capacity}{t('venue.capacity_short', locale, { n: venue.capacity })}{/if}
@@ -151,7 +152,9 @@
     {/if}
   </div>
 
-  {#if schedule}
+  {#if !withSchedule}
+    <!-- the host draws the running order -->
+  {:else if schedule}
     {@render schedule()}
   {:else}
   <ScheduleTable
@@ -169,10 +172,10 @@
   {/if}
 
   {#each jsonSections as [label, value] (label)}
-    <details class="production__section" open>
-      <summary>{label}</summary>
+    <div class="production__section">
+      <BlockHead title={label} level={3} />
       <JsonKV {value} />
-    </details>
+    </div>
   {/each}
 </section>
 
@@ -188,23 +191,6 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-2xs);
-    }
-
-    .production__venue-name {
-      font-size: var(--text-l);
-      color: var(--text-color);
-      font-weight: 500;
-    }
-
-    .production__empty {
-      margin: 0;
-      font-size: var(--text-s);
-      color: var(--text-faint);
-    }
-
-    .production__venue-place {
-      font-size: var(--text-s);
-      color: var(--text-muted);
     }
 
     .production__venue-address {
@@ -245,11 +231,10 @@
       color: var(--text-faint);
     }
 
-    .production__section summary {
-      cursor: pointer;
-      font-size: var(--text-s);
-      color: var(--text-muted);
-      margin-block-end: var(--space-xs);
+    .production__section {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
     }
   }
 </style>

@@ -1,6 +1,5 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { onMount } from 'svelte';
   import Avatar from '$lib/components/Avatar.svelte';
   import Menu from '$lib/components/Menu.svelte';
   import ThemeToggle from '$lib/components/ThemeToggle.svelte';
@@ -14,7 +13,7 @@
   interface Props {
     /** Current URL's workspace segment — Avatar-name fallback of last resort. */
     workspaceSlug: string;
-    /** Workspace the settings/notifications links point at (URL's, else the
+    /** Workspace the settings link points at (URL's, else the
         user's first workspace). */
     menuWorkspaceSlug: string;
     inSettings: boolean;
@@ -51,24 +50,9 @@
     themeStyles.find((s) => s.id === activeThemeStyleId) ?? themeStyles[0],
   );
 
-  // Do Not Disturb — quick toggle in the account menu.
-  const DND_KEY = 'hour_dnd';
-  let dnd = $state(false);
-  onMount(() => {
-    try {
-      dnd = localStorage.getItem(DND_KEY) === '1';
-    } catch {
-      /* storage disabled */
-    }
-  });
-  function toggleDnd() {
-    dnd = !dnd;
-    try {
-      localStorage.setItem(DND_KEY, dnd ? '1' : '0');
-    } catch {
-      /* ignore */
-    }
-  }
+  // No «Notifications» row and no do-not-disturb bell: Hour sends no
+  // notification yet, so both pointed at controls that kept nothing. They
+  // come back with the first notification that is real.
 
   async function logout() {
     rememberWorkingScope();
@@ -132,36 +116,6 @@
       >
         {inSettings ? t('shell.dashboard', locale) : t('shell.all_settings', locale)}
       </a>
-    </li>
-    <li role="none" class="settings-row">
-      <a
-        role="menuitem"
-        href={`/h/${menuWorkspaceSlug}/settings?section=notifications`}
-        class="menu__item settings-row__link"
-        tabindex="0"
-        onclick={() => close(false)}
-      >
-        {t('shell.notifications', locale)}
-      </a>
-      <button
-        type="button"
-        class="settings-row__action settings-row__action--toggle"
-        class:is-muted={dnd}
-        aria-label={dnd ? t('shell.notif_muted_aria', locale) : t('shell.notif_on_aria', locale)}
-        aria-pressed={dnd}
-        title={dnd ? t('shell.notif_muted', locale) : t('shell.notif_on', locale)}
-        onclick={toggleDnd}
-      >
-        <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M4 11 C 4 9.8 4.5 9.3 4.5 8 C 4.5 5.8 6 4 8 4 C 10 4 11.5 5.8 11.5 8 C 11.5 9.3 12 9.8 12 11 Z" />
-          <path d="M3.5 11 H 12.5" />
-          <path d="M7 13 C 7.2 13.6 7.5 14 8 14 C 8.5 14 8.8 13.6 9 13" />
-          <path d="M8 2.5 V 4" />
-          {#if dnd}
-            <path d="M2.5 2.5 L 13.5 13.5" />
-          {/if}
-        </svg>
-      </button>
     </li>
     <li role="none" class="theme-accordion">
       <div class="theme-accordion__header">
@@ -270,46 +224,6 @@
     flex-direction: column;
     gap: var(--line-hairline);
   }
-  :global(.settings-row) {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--line-hairline);
-  }
-  :global(.settings-row__link) {
-    flex: 1;
-  }
-  :global(.settings-row__action) {
-    --action-color: var(--text-faint);
-    --action-color-hover: var(--text-color);
-    --action-bg-hover: var(--bg-light);
-
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    inline-size: var(--control-size-s);
-    block-size: var(--control-size-s);
-    background: transparent;
-    border: 0;
-    border-radius: var(--radius-s);
-    color: var(--action-color);
-    cursor: pointer;
-    transition: background var(--transition), color var(--transition);
-  }
-  :global(.settings-row__action:hover) {
-    background: var(--action-bg-hover);
-    color: var(--action-color-hover);
-  }
-  :global(.settings-row__action:focus-visible) {
-    outline: var(--focus-width) solid var(--focus-color);
-    outline-offset: -1px;
-  }
-  :global(.settings-row__action--toggle) {
-    --action-color: var(--text-color);
-  }
-  :global(.settings-row__action--toggle.is-muted) {
-    --action-color: var(--text-faint);
-  }
-
   :global(.theme-accordion__header) {
     display: flex;
     align-items: flex-start;

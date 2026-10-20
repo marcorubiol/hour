@@ -4,11 +4,16 @@
    * unas pocas palabras de la app (la lente de venta, la función, el reparto,
    * el horario del día, quién compra) para todo el espacio. Lo decide un admin.
    */
+  import Segmented from '$lib/components/Segmented.svelte';
+  import BlockHead from '$lib/components/BlockHead.svelte';
+  import ConceptHint from '$lib/components/ConceptHint.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import { appLocale, t, TRADES, type Trade } from '$lib/i18n';
   import { addToast } from '$lib/components/Toast.svelte';
+  import SavedMark from '$lib/components/SavedMark.svelte';
+  import { SaveFlash } from '$lib/save-flash.svelte';
 
   interface Props {
     workspaceId: string | undefined;
@@ -29,7 +34,10 @@
     })),
   );
 
+  // In place (ADR-139 p7): the setting says «guardado» beside itself.
+  const saved = new SaveFlash();
   const save = createMutation({
+    onSuccess: () => saved.show(),
     mutationFn: (trade: Trade) => mutateJSON('PUT', `/api/workspaces/${workspaceId}/trade`, { trade }),
     onError: (err) =>
       addToast({ tone: 'danger', title: t('mail.action_failed', locale), message: err instanceof Error ? err.message : String(err) }),
@@ -45,27 +53,22 @@
 </script>
 
 <section class="set-group">
-  <div class="set-group__head">
-    <span class="eyebrow set-group__kicker">{t('settings.trade_kicker', locale)}</span>
-  </div>
+  <BlockHead title={t('settings.trade_kicker', locale)} />
   <div class="set-group__body">
     <div class="set-row">
       <div class="set-row__lead">
-        <div class="set-row__label">{t('settings.trade_label', locale)}</div>
+        <div class="set-row__label">{t('settings.trade_label', locale)}<ConceptHint concept="trade" /></div>
         <div class="set-row__hint">{t('settings.trade_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
-        <div class="set-seg" role="group" aria-label={t('settings.trade_label', locale)}>
-          {#each TRADES as trade (trade)}
-            <button
-              type="button"
-              class={value === trade ? 'is-on' : ''}
-              aria-pressed={value === trade}
-              disabled={!canEdit || $save.isPending}
-              onclick={() => $save.mutate(trade)}
-            >{t(`settings.trade_${trade}`, locale)}</button>
-          {/each}
-        </div>
+        <Segmented
+          ariaLabel={t('settings.trade_label', locale)}
+          options={TRADES.map((trade) => ({ value: trade, label: t(`settings.trade_${trade}`, locale) }))}
+          {value}
+          disabled={!canEdit || $save.isPending}
+          onchange={(trade) => $save.mutate(trade)}
+        />
+        <SavedMark shown={saved.is()} />
         {#if !canEdit && $query.data}
           <span class="set-row__hint">{t('settings.trade_admin_only', locale)}</span>
         {/if}

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import RecordHead from '$lib/components/RecordHead.svelte';
+  import BlockHead from '$lib/components/BlockHead.svelte';
   import { toStore } from 'svelte/store';
   import { SvelteSet } from 'svelte/reactivity';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
@@ -7,9 +9,12 @@
   import { fetchJSON, mutateJSON, ApiError } from '$lib/api';
   import { copyText } from '$lib/clipboard';
   import { addToast } from '$lib/components/Toast.svelte';
+  import { SaveFlash } from '$lib/save-flash.svelte';
   import { session } from '$lib/session.svelte';
   import { t, appLocale } from '$lib/i18n';
-  import MailSignature from './MailSignature.svelte';
+  import Button from '$lib/components/Button.svelte';
+  import Input from '$lib/components/Input.svelte';
+  import Select from '$lib/components/Select.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
 
   const locale = appLocale();
@@ -131,6 +136,8 @@
     );
   }
 
+  const savedRole = new SaveFlash();
+
   async function changeMemberRole(membershipId: string, role: string) {
     if (!currentWorkspace) return;
     try {
@@ -139,7 +146,8 @@
         role,
       });
       await queryClient.invalidateQueries({ queryKey: ['workspace-access'] });
-      addToast({ tone: 'success', message: t('settings.access_role_updated', locale) });
+      // In place (ADR-139 p7): the row says «guardado», no toast.
+      savedRole.show(membershipId);
     } catch (error) {
       addToast({
         tone: 'danger',
@@ -268,18 +276,16 @@
   }
 </script>
 
-<header class="set-mast">
-  <p class="eyebrow set-mast__kicker">{t('settings.ws_kicker', locale)}</p>
-  <h1 class="set-mast__title"><em>{t('settings.nav_workspaces', locale)}</em></h1>
-  <p class="set-mast__sub">{t('settings.ws_sub', locale)}</p>
-</header>
+<RecordHead crumbs={[{ label: t('settings.title', locale) }, { label: t('settings.ws_kicker', locale) }]} title={t('settings.nav_workspaces', locale)}>
+  {#snippet facts()}<span>{t('settings.ws_sub', locale)}</span>{/snippet}
+</RecordHead>
 
 <section class="set-group">
-  <div class="set-group__head">
-    <span class="eyebrow set-group__kicker">{t(workspaces.length === 1 ? 'settings.ws_active_one' : 'settings.ws_active_other', locale, { n: workspaces.length })}</span>
-    <h2 class="set-group__title">{t('settings.ws_my_projects', locale)}</h2>
-  </div>
+  <BlockHead title={t('settings.ws_my_spaces', locale)} count={workspaces.length} />
   <div class="set-group__body">
+    <!-- Only what is true and works: a space's name and how many projects it
+         holds. «Edit role», «Leave», «Create or join» and the people count had
+         no writer behind them; they come back with one. -->
     <div class="set-ws-list">
       {#each workspaces as w (w.id)}
         {@const projectCount = projects.filter((p) => p.workspace_id === w.id).length}
@@ -288,93 +294,60 @@
           <div class="set-ws__name">
             <h3>{spaceName(w.name)}</h3>
           </div>
-          <!-- personal/team label + kind-derived role badges removed
-               (ADR-064): personal/team is not a real distinction, and
-               real per-workspace roles need the (pending) members
-               endpoint — no fabricated badges. -->
-          <div class="set-ws__roles"></div>
           <div class="set-ws__meta">
-            <span>{t('settings.ws_people_unknown', locale)}</span>
-            <span class="sep">·</span>
-            <span>{t(projectCount === 1 ? 'settings.ws_projects_one' : 'settings.ws_projects_other', locale, { n: projectCount })}</span>
-          </div>
-          <div class="set-ws__actions">
-            <button type="button" class="btn--outline btn--s">{t('settings.ws_edit_role', locale)}</button>
-            <button type="button" class="btn--outline btn--s is-warn">{t('settings.ws_leave', locale)}</button>
+            {t(projectCount === 1 ? 'settings.ws_projects_one' : 'settings.ws_projects_other', locale, { n: projectCount })}
           </div>
         </div>
       {/each}
     </div>
-    <button type="button" class="set-add">
-      {t('settings.ws_create_join', locale)}
-    </button>
   </div>
 </section>
 
 {#if $accessQuery.isSuccess && currentWorkspace}
   <section class="set-group set-access">
-    <div class="set-group__head set-access__head">
-      <div>
-        <span class="eyebrow set-group__kicker">{t('settings.access_kicker', locale)}</span>
-        <h2 class="set-group__title">{spaceName(currentWorkspace.name)}</h2>
-      </div>
-      <span class="set-access__count"
-        >{t(activeMembers.length === 1 ? 'settings.ws_active_one' : 'settings.ws_active_other', locale, { n: activeMembers.length })}</span
-      >
+    <div class="set-access__head">
+      <BlockHead title={t('settings.access_kicker', locale)} count={spaceName(currentWorkspace.name)}>
+        <span class="set-access__count"
+          >{t(activeMembers.length === 1 ? 'settings.ws_active_one' : 'settings.ws_active_other', locale, { n: activeMembers.length })}</span
+        >
+      </BlockHead>
     </div>
 
     <div class="set-access__invite">
-      <label>
-        <span class="eyebrow">{t('settings.email', locale)}</span>
-        <input type="email" placeholder="collaborator@example.com" bind:value={inviteEmail} />
-      </label>
-      <label>
-        <span class="eyebrow">{t('settings.access_ws_role', locale)}</span>
-        <select bind:value={inviteRole}>
-          <option value="guest">{t('settings.access_opt_guest', locale)}</option>
-          <option value="viewer">{t('settings.access_opt_viewer', locale)}</option>
-          <option value="member">{t('settings.access_opt_member', locale)}</option>
-          <option value="admin">{t('settings.access_opt_admin', locale)}</option>
-        </select>
-      </label>
-      <label>
-        <span class="eyebrow">{t('settings.access_project', locale)}</span>
-        <select bind:value={inviteProjectId}>
-          <option value="">{t('settings.access_no_project', locale)}</option>
-          {#each currentProjects as project (project.id)}
-            <option value={project.id}>{project.name}</option>
-          {/each}
-        </select>
-      </label>
-      <label>
-        <span class="eyebrow">{t('settings.access_project_role', locale)}</span>
-        <select bind:value={inviteProjectRole} disabled={!inviteProjectId}>
-          <option value="performer">{t('settings.prole_performer', locale)}</option>
-          <option value="viewer">{t('settings.prole_viewer', locale)}</option>
-          <option value="director">{t('settings.prole_director', locale)}</option>
-          <option value="production_manager">{t('settings.prole_production_manager', locale)}</option>
-          <option value="distribution">{t('settings.prole_distribution', locale)}</option>
-        </select>
-      </label>
-      <label>
-        <span class="eyebrow">{t('settings.access_project_preset', locale)}</span>
-        <select bind:value={inviteProjectPreset} disabled={!inviteProjectId}>
-          <option value="minim">{t('preset.minim', locale)}</option>
-          <option value="equip">{t('preset.equip', locale)}</option>
-          <option value="coordinacio">{t('preset.coordinacio', locale)}</option>
-          <option value="direccio">{t('preset.direccio', locale)}</option>
-        </select>
-      </label>
-      <button
-        type="button"
-        class="btn--primary set-access__invite-button"
+      <Input id="invite-email" label={t('settings.email', locale)} type="email" placeholder="collaborator@example.com" bind:value={inviteEmail} />
+      <Select id="invite-role" label={t('settings.access_ws_role', locale)} bind:value={inviteRole}>
+        <option value="guest">{t('settings.access_opt_guest', locale)}</option>
+        <option value="viewer">{t('settings.access_opt_viewer', locale)}</option>
+        <option value="member">{t('settings.access_opt_member', locale)}</option>
+        <option value="admin">{t('settings.access_opt_admin', locale)}</option>
+      </Select>
+      <Select id="invite-project" label={t('settings.access_project', locale)} bind:value={inviteProjectId}>
+        <option value="">{t('settings.access_no_project', locale)}</option>
+        {#each currentProjects as project (project.id)}
+          <option value={project.id}>{project.name}</option>
+        {/each}
+      </Select>
+      <Select id="invite-project-role" label={t('settings.access_project_role', locale)} bind:value={inviteProjectRole} disabled={!inviteProjectId}>
+        <option value="performer">{t('settings.prole_performer', locale)}</option>
+        <option value="viewer">{t('settings.prole_viewer', locale)}</option>
+        <option value="director">{t('settings.prole_director', locale)}</option>
+        <option value="production_manager">{t('settings.prole_production_manager', locale)}</option>
+        <option value="distribution">{t('settings.prole_distribution', locale)}</option>
+      </Select>
+      <Select id="invite-project-preset" label={t('settings.access_project_preset', locale)} bind:value={inviteProjectPreset} disabled={!inviteProjectId}>
+        <option value="minim">{t('preset.minim', locale)}</option>
+        <option value="equip">{t('preset.equip', locale)}</option>
+        <option value="coordinacio">{t('preset.coordinacio', locale)}</option>
+        <option value="direccio">{t('preset.direccio', locale)}</option>
+      </Select>
+      <Button
         disabled={!inviteEmail || $inviteMember.isPending}
         onclick={() => $inviteMember.mutate()}
       >
         {$inviteMember.isPending
           ? t('settings.access_creating', locale)
           : t('settings.access_create_link', locale)}
-      </button>
+      </Button>
     </div>
 
     {#if latestInviteUrl}
@@ -383,7 +356,7 @@
           <span class="eyebrow">{t('settings.access_ready', locale)}</span>
           <p>{t('settings.access_link_expiry', locale)}</p>
         </div>
-        <button type="button" class="btn--outline btn--s" onclick={copyInviteLink}>
+        <button type="button" class="btn--secondary btn--s" onclick={copyInviteLink}>
           {t('settings.access_copy_link', locale)}
         </button>
       </div>
@@ -400,25 +373,27 @@
           {#if member.role === 'owner'}
             <span class="set-access__role">{roleLabel('owner')}</span>
           {:else}
-            <label class="set-access__role-select">
-              <span class="sr-only">{t('settings.access_role_for', locale, { name: member.display_name })}</span>
-              <select
+            <div class="set-access__role-select">
+              <Select
+                id={`member-role-${member.id}`}
+                ariaLabel={t('settings.access_role_for', locale, { name: member.display_name })}
                 value={member.role}
+                saved={savedRole.is(member.id)}
                 onchange={(event) =>
-                  changeMemberRole(member.id, event.currentTarget.value)}
+                  changeMemberRole(member.id, (event.currentTarget as HTMLSelectElement).value)}
               >
                 <option value="admin">{roleLabel('admin')}</option>
                 <option value="member">{roleLabel('member')}</option>
                 <option value="viewer">{roleLabel('viewer')}</option>
                 <option value="guest">{roleLabel('guest')}</option>
-              </select>
-            </label>
+              </Select>
+            </div>
           {/if}
           <span class="set-access__status">{t('settings.access_status_active', locale)}</span>
           {#if member.role !== 'owner'}
             <button
               type="button"
-              class="btn--outline btn--s is-warn"
+              class="btn--secondary btn--s is-warn"
               onclick={() => revokeAccess(member)}
             >{t('settings.access_revoke', locale)}</button>
           {/if}
@@ -440,7 +415,7 @@
           <span class="set-access__status">{t('settings.access_status_pending', locale)}</span>
           <button
             type="button"
-            class="btn--outline btn--s is-warn"
+            class="btn--secondary btn--s is-warn"
             onclick={() => revokeAccess(invitation)}
           >{t('create.cancel', locale)}</button>
         </div>
@@ -449,16 +424,12 @@
   </section>
 {/if}
 
-<MailSignature scope="workspace" workspaceId={currentWorkspace?.id} />
-
 {#if aliasRequests.length > 0}
   <section class="set-group">
-    <div class="set-group__head">
-      <span class="eyebrow set-group__kicker"
-        >{t(aliasRequests.length === 1 ? 'settings.alias_pending_one' : 'settings.alias_pending_other', locale, { n: aliasRequests.length })}</span
-      >
-      <h2 class="set-group__title">{t('settings.alias_title', locale)}</h2>
-    </div>
+    <BlockHead
+      title={t('settings.alias_title', locale)}
+      count={t(aliasRequests.length === 1 ? 'settings.alias_pending_one' : 'settings.alias_pending_other', locale, { n: aliasRequests.length })}
+    />
     <div class="set-group__body">
       <div class="set-alias-list">
         {#each aliasRequests as r (r.id)}
@@ -475,7 +446,7 @@
               <div class="set-alias__actions">
                 <button
                   type="button"
-                  class="btn--outline btn--s"
+                  class="btn--secondary btn--s"
                   disabled={$reviewAlias.isPending}
                   onclick={() => $reviewAlias.mutate({ id: r.id, approve: true })}
                 >
@@ -483,7 +454,7 @@
                 </button>
                 <button
                   type="button"
-                  class="btn--outline btn--s is-warn"
+                  class="btn--secondary btn--s is-warn"
                   disabled={$reviewAlias.isPending}
                   onclick={() => $reviewAlias.mutate({ id: r.id, approve: false })}
                 >
@@ -499,10 +470,7 @@
 {/if}
 
 <section class="set-group">
-  <div class="set-group__head">
-    <span class="eyebrow set-group__kicker">{t('settings.roles_kicker', locale)}</span>
-    <h2 class="set-group__title">{t('settings.roles_title', locale)}</h2>
-  </div>
+  <BlockHead title={t('settings.roles_kicker', locale)} count={t('settings.roles_title', locale)} />
   <div class="set-group__body">
     <p class="set-prose">
       {t('settings.roles_prose', locale)}
@@ -532,8 +500,8 @@
   description={t('settings.access_revoke_confirm', locale, { label: revokingLabel })}
 >
   {#snippet actions()}
-    <button type="button" class="btn--outline btn--s" onclick={() => (revoking = null)}>{t('ui.cancel', locale)}</button>
-    <button type="button" class="btn--danger btn--s" onclick={confirmRevoke}>{t('settings.access_revoke', locale)}</button>
+    <Button variant="quiet" onclick={() => (revoking = null)}>{t('create.cancel', locale)}</Button>
+    <Button tone="warn" onclick={confirmRevoke}>{t('settings.access_revoke', locale)}</Button>
   {/snippet}
 </Dialog>
 
@@ -546,36 +514,13 @@
     max-inline-size: 56ch;
   }
 
-  /* Pseudo-button "+ Add a thing" — dashed outline placeholder for
-     creation affordances. Specific enough to keep local. */
-  .set-add {
-    appearance: none;
-    align-self: flex-start;
-    padding-block: var(--space-s);
-    padding-inline: var(--space-m);
-    border: var(--line-hairline) dashed var(--border-color-dark);
-    border-radius: var(--radius-s);
-    background: transparent;
-    color: var(--text-muted);
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    letter-spacing: var(--tracking-s);
-    cursor: pointer;
-    margin-block-start: var(--space-s);
-    transition: color var(--transition), border-color var(--transition);
-  }
-  .set-add:hover {
-    color: var(--text-color);
-    border-color: var(--text-muted);
-  }
-
   .set-ws-list {
     display: flex;
     flex-direction: column;
   }
   .set-ws {
     display: grid;
-    grid-template-columns: var(--dot-s) minmax(8.75rem, 1fr) auto auto auto;
+    grid-template-columns: var(--dot-s) minmax(0, 1fr) auto;
     gap: var(--set-pad);
     align-items: center;
     padding-block: var(--space-m);
@@ -598,34 +543,11 @@
     margin: 0;
     color: var(--text-color);
   }
-  .set-ws__sub {
-    font-size: var(--text-xs);
-    color: var(--text-faint);
-    font-family: var(--font-mono);
-    letter-spacing: var(--tracking-s);
-    margin-block-start: var(--space-2xs);
-  }
-  .set-ws__roles {
-    display: flex;
-    gap: var(--space-xs);
-    flex-wrap: wrap;
-    max-inline-size: 17.5rem;
-  }
-  /* Role badges via base.css .role-badge (+ .is-mine). */
   .set-ws__meta {
     font-family: var(--font-mono);
     font-size: var(--text-xs);
     color: var(--text-faint);
-    display: flex;
-    gap: var(--space-xs);
     white-space: nowrap;
-  }
-  .set-ws__meta .sep {
-    opacity: 0.5;
-  }
-  .set-ws__actions {
-    display: flex;
-    gap: var(--space-xs);
   }
 
   .set-alias-list {
@@ -701,17 +623,10 @@
   .set-group.set-access {
     row-gap: 0;
   }
-  /* The page's generic .set-group__head stacks and rules its head; the access
-     box is a framed panel, so its head reads across (name left, count right),
-     inside the same padding as the invite row, whose top border is the rule. */
-  .set-group.set-access .set-access__head {
-    flex-direction: row;
-    align-items: end;
-    justify-content: space-between;
-    gap: var(--space-m);
-    margin: 0;
-    padding: var(--space-m);
-    border: 0;
+  /* The access box is a framed panel: its head (a BlockHead, whose rule
+     closes it) sits inside the same padding as the invite row below. */
+  .set-access__head {
+    padding: var(--space-m) var(--space-m) 0;
   }
   .set-access__count,
   .set-access__status,
@@ -722,23 +637,17 @@
     letter-spacing: var(--tracking-l);
     color: var(--text-faint);
   }
-  /* Wraps by its own width, not the viewport's: it lives in a settings pane
-     whose width the rail and the nav decide. */
+  /* Field rows, the verb under them (ADR-139 p4). */
   .set-access__invite {
     display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-s);
-    align-items: end;
+    flex-direction: column;
     padding: var(--space-m);
-    border-block: var(--line-hairline) solid var(--border-color-light);
+    border-block-end: var(--line-hairline) solid var(--border-color-light);
   }
-  .set-access__invite label {
-    display: grid;
-    gap: var(--space-xs);
-    flex: 1 1 9rem;
+  .set-access__invite > :global(button) {
+    align-self: flex-end;
+    margin-block-start: var(--space-s);
   }
-  .set-access__invite label:first-child { flex: 1.4 1 14rem; }
-  .set-access__invite-button { white-space: nowrap; }
   .set-access__link {
     display: flex;
     align-items: center;
@@ -790,33 +699,8 @@
     color: var(--text-faint);
     font-size: var(--text-xs);
   }
-  .set-access__role-select select { min-inline-size: 8rem; }
+  .set-access__role-select { min-inline-size: 8rem; }
 
-  /* On a phone a space's row reads down instead of across: the name, its
-     counts under it, then the two buttons, all beside the one colour rail
-     that now runs the row's whole height. The empty roles cell takes no
-     line. */
-  @media (max-width: 47.999rem) {
-    .set-ws {
-      grid-template-columns: var(--dot-s) minmax(0, 1fr);
-      grid-auto-flow: row;
-      row-gap: var(--space-xs);
-      align-items: start;
-    }
-    .set-ws__rail {
-      grid-row: 1 / span 4;
-      block-size: 100%;
-    }
-    .set-ws > :not(.set-ws__rail) {
-      grid-column: 2;
-    }
-    .set-ws__roles:empty {
-      display: none;
-    }
-    .set-ws__actions {
-      margin-block-start: var(--space-xs);
-    }
-  }
   @media (max-width: 44rem) {
     .set-access__row {
       grid-template-columns: var(--dot-l) 1fr auto;

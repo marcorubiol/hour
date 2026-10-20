@@ -33,7 +33,7 @@
     align = 'start',
     direction = 'down',
     label = t('ui.open_menu', appLocale()),
-    triggerClass = 'btn--outline btn--s',
+    triggerClass = 'btn--secondary btn--s',
     triggerAttrs = {},
     trigger,
     children,

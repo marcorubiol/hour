@@ -66,11 +66,11 @@
         1. Captured client error (Sentry.captureException)
       </button>
 
-      <button class="btn--outline" onclick={throwUncaughtClientError}>
+      <button class="btn--secondary" onclick={throwUncaughtClientError}>
         2. Uncaught client error (handleError path)
       </button>
 
-      <button class="btn--outline" onclick={hitServerError}>
+      <button class="btn--secondary" onclick={hitServerError}>
         3. Server error (+server.ts throws)
       </button>
     </div>

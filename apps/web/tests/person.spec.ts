@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { waitForLoaded } from './loaded';
+import { openInFull } from './peek';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
@@ -39,6 +40,8 @@ test.describe('person file', () => {
     const firstName = page.locator('tbody tr').first().locator('td').nth(1).getByRole('link');
     const personName = (await firstName.innerText()).trim();
     await firstName.click();
+    // The vistazo first (ADR-139 p1), then the page.
+    await openInFull(page);
     await page.waitForURL(/\/h\/[^/]+\/person\//);
     await expect(page.getByRole('heading', { name: personName, level: 1 })).toBeVisible();
     // The heading is the person page's own, so the list's settled root is

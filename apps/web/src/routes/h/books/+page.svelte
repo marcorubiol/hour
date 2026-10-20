@@ -29,16 +29,27 @@
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import BlockHead from '$lib/components/BlockHead.svelte';
+  import CalmLine from '$lib/components/CalmLine.svelte';
+  import { useCalm } from '$lib/stores/calm.svelte';
+  import { shows } from '$lib/calm';
   import Button from '$lib/components/Button.svelte';
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import Chip from '$lib/components/Chip.svelte';
   import MoneyInvoices from '$lib/components/MoneyInvoices.svelte';
   import LensHeader from '$lib/components/LensHeader.svelte';
   import LensTitle from '$lib/components/LensTitle.svelte';
+  import FirstVisitCard from '$lib/components/FirstVisitCard.svelte';
+  import FirstTimeNote from '$lib/components/FirstTimeNote.svelte';
+  import ConceptHint from '$lib/components/ConceptHint.svelte';
+  import { cardKey, cardVisible } from '$lib/help';
+  import { help } from '$lib/help-seen.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
+  import { toastCreated } from '$lib/created';
+  import { FormErrors } from '$lib/form-errors.svelte';
   import { dayLabel, localDayISO } from '$lib/datetime';
   import { DASH } from '$lib/glyphs';
   import { categoryLabel, EXPENSE_CATEGORIES, type ExpenseItem } from '$lib/expense';
@@ -93,6 +104,8 @@
   import { activeProjectsQueryOptions, allLinesQueryOptions } from '$lib/nav-queries';
   import { spaceName } from '$lib/utils/identity';
   import { goto, replaceState } from '$app/navigation';
+  import { peekFromLink } from '$lib/peek';
+  import { openPeek } from '$lib/peek.svelte';
   import { tick } from 'svelte';
 
   type WorkspaceLite = { id: string; slug: string; invoicing_mode: InvoicingMode | null };
@@ -249,7 +262,32 @@
 
   // ── The radar ─────────────────────────────────────────────────────────
   let position = $derived(moneyPosition(bolos, ctx, season));
+  // Calm (ADR-139 § 5, `$lib/calm`): one figure, what comes in over the next
+  // thirty days in the main currency, and «Pide atención»; the other figures,
+  // the months and the book fold into one line that leaves calm.
+  const calm = useCalm();
+  let shownPosition = $derived(shows('books', 'other_figures', calm.on) ? position : position.slice(0, 1));
   let attention = $derived(attentionItems(bolos, ctx));
+
+  // The welcome card's extra line is for whoever can turn Books off (ADR-132):
+  // an admin of one of these spaces. Asked only while the card is up.
+  const lensesAdminQuery = createQuery(
+    toStore(() => {
+      const ids = [...workspaceSlugById.keys()].sort();
+      return {
+        queryKey: ['workspace-lenses-admin', ids] as const,
+        enabled: ids.length > 0 && cardVisible(help, cardKey('books')),
+        queryFn: async ({ signal }: { signal: AbortSignal }) => {
+          const rows = await Promise.all(
+            ids.map((id) =>
+              fetchJSON<{ can_edit: boolean }>(`/api/workspaces/${id}/lenses`, signal).catch(() => ({ can_edit: false })),
+            ),
+          );
+          return rows.some((r) => r.can_edit);
+        },
+      };
+    }),
+  );
   let inflow = $derived(expectedInflow(bolos, ctx, 4));
   const ATTENTION_VISIBLE = 6;
   let attentionAll = $state(false);
@@ -308,9 +346,16 @@
     if (item.kind === 'overdue' && conversationHref(item.bolo)) return 'books.att_act_chase';
     return ATTENTION_ACTION[item.kind];
   }
+  /** The conversation opens in its vistazo, over Cuentas (ADR-139 p1). */
+  function chaseIn(href: string) {
+    const here = new URL(location.href);
+    const target = peekFromLink(new URL(href, here), here);
+    if (target) openPeek(target);
+    else void goto(href);
+  }
   function act(item: AttentionItem) {
     const chase = item.kind === 'overdue' ? conversationHref(item.bolo) : null;
-    if (chase) void goto(chase);
+    if (chase) chaseIn(chase);
     else if (item.kind === 'overdue') openPay(item.bolo);
     else if (item.kind === 'to_invoice') openInvoice(item.bolo);
     else if (item.kind === 'no_fee') openFee(item.bolo);
@@ -370,13 +415,17 @@
     in_progress: 'books.filter_in_progress',
   };
 
+  // The book is not in calm: a door to it (a figure, a row of «Pide
+  // atención») leaves calm first, so it never opens onto nothing.
   async function showLedger(f: LedgerFilter) {
+    calm.set(false);
     filter = f;
     tab = 'bolos';
     await tick();
     document.getElementById('mny-ledger')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   }
   async function showDocument(invoiceId: string) {
+    calm.set(false);
     tab = 'documents';
     focusInvoiceId = invoiceId;
     await tick();
@@ -392,6 +441,7 @@
   function focusBolo(id: string) {
     const target = bolos.find((b) => b.id === id);
     if (!target) return;
+    calm.set(false);
     const s = boloSeason(target, today);
     pickedSeason = s === currentSeason ? null : s;
     filter = 'all';
@@ -498,13 +548,17 @@
     },
     onError: (err) => addToast({ tone: 'danger', title: t('books.fee_not_saved', locale), message: t('books.try_again', locale, { error: err instanceof Error ? err.message : t('perf.unexpected', locale) }) }),
   });
+  // ADR-139 p7: each dialog below checks itself and says what is wrong
+  // under the field, never as a toast; ⌘↵ and Enter submit its form.
+  const formErrors = new FormErrors();
   function saveFee() {
     if (!feeEditing || $feeMutation.isPending) return;
+    formErrors.clear();
     const trimmed = String(fAmount ?? '').trim();
     const amount = trimmed === '' ? null : Number(trimmed);
     if (amount !== null && (Number.isNaN(amount) || amount < 0)) {
-      addToast({ tone: 'warning', message: t('books.fee_invalid', locale) });
-      return;
+      formErrors.set('fee-amount', t('books.fee_invalid', locale));
+      return void formErrors.focusFirst();
     }
     $feeMutation.mutate({ id: feeEditing.id, fee_amount: amount, fee_currency: fCurrency });
   }
@@ -537,7 +591,16 @@
     payCategory = '';
     payReference = '';
     payIdempotencyKey = crypto.randomUUID();
+    formErrors.clear();
     payOpen = true;
+  }
+  function submitPay() {
+    if ($payMutation.isPending) return;
+    formErrors.clear();
+    const amount = Number(String(payAmount).trim());
+    if (!Number.isFinite(amount) || amount <= 0) formErrors.set('pay-amount', t('books.amount_gt_zero', locale));
+    if (formErrors.any) return void formErrors.focusFirst();
+    $payMutation.mutate();
   }
   const payMutation = createMutation({
     mutationFn: async () => {
@@ -556,12 +619,23 @@
       if (!body?.payment) throw new Error(t('books.unexpected_response', locale));
       return body.payment;
     },
-    onSuccess: () => {
+    onSuccess: (payment) => {
       payOpen = false;
       payBolo = null;
       void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
       void queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      addToast({ tone: 'success', message: t(payInvoiceId ? 'books.payment_recorded_doc' : 'books.payment_recorded_fee', locale) });
+      const id = (payment as { id?: string } | null)?.id;
+      toastCreated({
+        locale,
+        message: t(payInvoiceId ? 'books.payment_recorded_doc' : 'books.payment_recorded_fee', locale),
+        undo: id
+          ? async () => {
+              await mutateJSON('DELETE', `/api/payments/${id}`);
+              await queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
+              await queryClient.invalidateQueries({ queryKey: ['invoices'] });
+            }
+          : undefined,
+      });
     },
     onError: (err) => addToast({ tone: 'danger', title: t('books.payment_not_recorded', locale), message: err instanceof Error ? err.message : t('perf.unexpected', locale) }),
   });
@@ -601,6 +675,7 @@
     iExpectedOn = '';
     iPaymentCondition = '';
     iPayerId = '';
+    formErrors.clear();
     invOpen = true;
   }
   function pctOrNull(raw: unknown): number | null {
@@ -627,22 +702,32 @@
       if (!body?.invoice) throw new Error(t('books.unexpected_response', locale));
       return body.invoice;
     },
-    onSuccess: () => {
+    onSuccess: (invoice) => {
       invOpen = false;
       invBolo = null;
       void queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      addToast({ tone: 'success', message: t(invDocType === 'proforma' ? 'books.draft_proforma_created' : 'books.draft_invoice_created', locale) });
+      const id = (invoice as { id?: string } | null)?.id;
+      toastCreated({
+        locale,
+        message: t(invDocType === 'proforma' ? 'books.draft_proforma_created' : 'books.draft_invoice_created', locale),
+        // A draft is discarded with the same DELETE the row's «Descartar» uses.
+        undo: id
+          ? async () => {
+              await mutateJSON('DELETE', `/api/invoices/${id}`);
+              await queryClient.invalidateQueries({ queryKey: ['invoices'] });
+            }
+          : undefined,
+      });
     },
     onError: (err) => addToast({ tone: 'danger', title: t('books.doc_not_created', locale), message: err instanceof Error ? err.message : t('perf.unexpected', locale) }),
   });
   function submitInvoice() {
     if ($createInvoice.isPending) return;
-    for (const p of [pctOrNull(iVat), pctOrNull(iIrpf)]) {
-      if (p !== null && (Number.isNaN(p) || p < 0 || p > 100)) {
-        addToast({ tone: 'warning', message: t('books.vat_irpf_invalid', locale) });
-        return;
-      }
-    }
+    formErrors.clear();
+    const bad = (p: number | null) => p !== null && (Number.isNaN(p) || p < 0 || p > 100);
+    if (bad(pctOrNull(iVat))) formErrors.set('inv-vat', t('books.vat_irpf_invalid', locale));
+    if (bad(pctOrNull(iIrpf))) formErrors.set('inv-irpf', t('books.vat_irpf_invalid', locale));
+    if (formErrors.any) return void formErrors.focusFirst();
     $createInvoice.mutate();
   }
 
@@ -682,7 +767,17 @@
     eIncurredOn = localDayISO();
     eCounterparty = '';
     eAnchor = b ? `bolo:${b.id}` : (expenseAnchorOptions[0]?.value ?? '');
+    formErrors.clear();
     expOpen = true;
+  }
+  function submitExpense() {
+    if ($createExpense.isPending) return;
+    formErrors.clear();
+    const amount = Number(String(eAmount).trim());
+    if (!Number.isFinite(amount) || amount <= 0) formErrors.set('exp-amount', t('books.amount_gt_zero', locale));
+    if (!eAnchor) formErrors.set('exp-anchor', t('books.pick_anchor', locale));
+    if (formErrors.any) return void formErrors.focusFirst();
+    $createExpense.mutate();
   }
   const createExpense = createMutation({
     mutationFn: async () => {
@@ -702,10 +797,20 @@
       if (!body?.expense) throw new Error(t('books.unexpected_response', locale));
       return body.expense;
     },
-    onSuccess: () => {
+    onSuccess: (expense) => {
       expOpen = false;
       void queryClient.invalidateQueries({ queryKey: ['expenses'] });
-      addToast({ tone: 'success', message: t('books.expense_added', locale) });
+      const id = (expense as { id?: string } | null)?.id;
+      toastCreated({
+        locale,
+        message: t('books.expense_added', locale),
+        undo: id
+          ? async () => {
+              await mutateJSON('DELETE', `/api/expenses/${id}`);
+              await queryClient.invalidateQueries({ queryKey: ['expenses'] });
+            }
+          : undefined,
+      });
     },
     onError: (err) => addToast({ tone: 'danger', title: t('books.expense_not_added', locale), message: err instanceof Error ? err.message : t('perf.unexpected', locale) }),
   });
@@ -728,7 +833,18 @@
     dealCity = '';
     dealFee = '';
     dealCurrency = currencies[0] ?? 'EUR';
+    formErrors.clear();
     dealOpen = true;
+  }
+  function submitDeal() {
+    if ($createBolo.isPending) return;
+    formErrors.clear();
+    if (!dealProjectId) formErrors.set('deal-project', t('books.pick_project', locale));
+    const trimmed = String(dealFee).trim();
+    const fee = trimmed === '' ? null : Number(trimmed);
+    if (fee !== null && (Number.isNaN(fee) || fee < 0)) formErrors.set('deal-fee', t('books.fee_invalid_short', locale));
+    if (formErrors.any) return void formErrors.focusFirst();
+    $createBolo.mutate();
   }
   const createBolo = createMutation({
     mutationFn: async () => {
@@ -776,14 +892,36 @@
   $effect(() => {
     if (targetHandled || !$bolosQuery.isSuccess || !location.hash.startsWith('#bolo-')) return;
     targetHandled = true;
-    focusBolo(location.hash.slice('#bolo-'.length));
+    const id = location.hash.slice('#bolo-'.length);
+    const url = new URL(location.href);
+    const kind = url.searchParams.get('act');
+    if (kind) {
+      url.searchParams.delete('act');
+      replaceState(url, {});
+      pendingAct = { id, kind };
+    }
+    focusBolo(id);
+  });
+  // `&act=<tipo>` (los verbos de «Falta» del vistazo del bolo) abre el diálogo
+  // que resuelve ese «Pide atención», como su botón aquí. Una vez, con los
+  // documentos dentro; si el bolo ya no pide eso, solo queda la tarjeta.
+  let pendingAct = $state<{ id: string; kind: string } | null>(null);
+  $effect(() => {
+    const want = pendingAct;
+    if (!want || loading) return;
+    pendingAct = null;
+    const item = attention.find((a) => a.bolo.id === want.id && a.kind === want.kind);
+    if (!item) return;
+    // Here the verb was already chosen: a late payment is recorded, not chased.
+    if (item.kind === 'overdue') openPay(item.bolo);
+    else act(item);
   });
 </script>
 
 {#snippet failed(key: string, retry: () => unknown)}
   <p class="load-fail" role="alert">
     <span>{t(key, locale)}</span>
-    <Button size="xs" variant="outline" onclick={() => void retry()}>{t('ui.retry', locale)}</Button>
+    <Button size="xs" variant="secondary" onclick={() => void retry()}>{t('ui.retry', locale)}</Button>
   </p>
 {/snippet}
 
@@ -798,8 +936,8 @@
   <title>{docTitle(t('lens.money', locale))}</title>
 </svelte:head>
 
-<section class="mny" aria-busy={busy}>
-  <LensHeader>
+<section class="mny" class:mny--calm={calm.on} aria-busy={busy}>
+  <LensHeader help={noAccess ? undefined : 'books'}>
     {#snippet title()}<LensTitle text={t('lens.money', locale)} />{/snippet}
     {#snippet sub()}
       {#if !noAccess}
@@ -826,22 +964,30 @@
             {#if obraNames.length === 1}<span>· {obraNames[0]}</span>{/if}
           </span>
           {#if !seasonEmpty}
-            <Button size="xs" variant="outline" onclick={openDeal} disabled={projectIndex.length === 0}>{t('books.new_deal', locale)}</Button>
+            <Button size="xs" variant="secondary" onclick={openDeal} disabled={projectIndex.length === 0}>{t('books.new_deal', locale)}</Button>
           {/if}
         </span>
       {/if}
     {/snippet}
   </LensHeader>
 
+  {#if !noAccess}
+    <FirstVisitCard
+      section="books"
+      steps={['books-figs', 'books-att', 'books-ledger']}
+      note={$lensesAdminQuery.data ? t('help.card.books_admin', locale) : null}
+    />
+  {/if}
+
   {#if noAccess}
-    <p class="mny__state" data-testid="money-no-access">{t('books.no_access', locale)}</p>
+    <p class="empty-line" data-testid="money-no-access">{t('books.no_access', locale)}</p>
   {:else}
 
     {#if bolosError}
       {@render failed('books.err_bolos', () => $bolosQuery.refetch())}
     {:else}
       <!-- 1 · Las cuatro cifras, una fila por moneda -->
-      <div class="figs" aria-label={t('books.figures', locale)}>
+      <div class="figs" aria-label={t('books.figures', locale)} data-help-step="books-figs">
         {#if loading}
           <div class="figs__row" aria-hidden="true">
             {#each ['books.fig_owed', 'books.fig_to_invoice', 'books.fig_inflow', 'books.fig_season'] as key (key)}
@@ -849,13 +995,15 @@
             {/each}
           </div>
         {:else if !seasonEmpty}
-          {#each position as pos, i (pos.currency)}
+          {#each shownPosition as pos, i (pos.currency)}
             {#if i > 0 && isQuietPosition(pos)}
             {#if pos.sold > 0 || pos.holds > 0}
             <p class="figs__quiet" data-currency={pos.currency}>{t('books.fig_quiet_currency', locale, { amount: fmtMoneyCompact(pos.sold), currency: pos.currency, season: seasonLabel(season) })}{#if pos.holds > 0}{` · ${t('books.fig_holds', locale, { amount: fmtMoneyCompact(pos.holds), n: pos.holdsCount })}`}{/if}</p>
             {/if}
             {:else}
             <div class="figs__row" data-currency={pos.currency}>
+              {#if shows('books', 'other_figures', calm.on)}
+              <div class="fig-cell">
               <button type="button" class="fig" data-fig="owed" onclick={() => showLedger('owed')}>
                 <span class="fig__label eyebrow eyebrow--sub">{t('books.fig_owed', locale)}</span>
                 <span class="fig__num stat">{fmtMoneyCompact(pos.owed)}<span class="fig__cur">{pos.currency}</span></span>
@@ -870,16 +1018,24 @@
                   {/if}
                 </span>
               </button>
+              <ConceptHint concept="to_collect" />
+              </div>
               <button type="button" class="fig" data-fig="to_invoice" onclick={() => showLedger('to_invoice')}>
                 <span class="fig__label eyebrow eyebrow--sub">{t('books.fig_to_invoice', locale)}</span>
                 <span class="fig__num stat">{fmtMoneyCompact(pos.toInvoice)}<span class="fig__cur">{pos.currency}</span></span>
                 <span class="fig__sub">{pos.toInvoiceCount === 0 ? t('books.fig_to_invoice_none', locale) : t(pos.toInvoiceCount === 1 ? 'books.fig_to_invoice_one' : 'books.fig_to_invoice_many', locale, { n: pos.toInvoiceCount })}</span>
               </button>
+              {/if}
+              <div class="fig-cell">
               <div class="fig" data-fig="inflow">
                 <span class="fig__label eyebrow eyebrow--sub">{t('books.fig_inflow', locale)}</span>
                 <span class="fig__num stat">{fmtMoneyCompact(pos.inflow30)}<span class="fig__cur">{pos.currency}</span></span>
                 <span class="fig__sub">{pos.inflow30Count === 0 ? t('books.fig_inflow_none', locale) : t(pos.inflow30Count === 1 ? 'books.fig_inflow_one' : 'books.fig_inflow_many', locale, { n: pos.inflow30Count })}</span>
               </div>
+              <ConceptHint concept="next30" />
+              </div>
+              {#if shows('books', 'other_figures', calm.on)}
+              <div class="fig-cell">
               <button type="button" class="fig" data-fig="season" onclick={() => showLedger('all')}>
                 <span class="fig__label eyebrow eyebrow--sub">{t('books.fig_season', locale)} {seasonLabel(season)}</span>
                 <span class="fig__num stat">{fmtMoneyCompact(pos.collected)}<span class="fig__cur">{pos.currency}</span></span>
@@ -898,26 +1054,30 @@
                   <span class="fig__sub">{t('books.fig_holds', locale, { amount: fmtMoneyCompact(pos.holds), n: pos.holdsCount })}</span>
                 {/if}
               </button>
+              <ConceptHint concept="season_books" />
+              </div>
+              {/if}
             </div>
             {/if}
           {/each}
+          <FirstTimeNote event="first_payment" when={position.some((p) => p.collected > 0)} />
         {/if}
       </div>
 
       {#if seasonEmpty}
         <div class="mny__empty">
-          <p class="mny__state">{t('books.season_empty', locale, { season: seasonLabel(season) })}</p>
+          <EmptyLine text={t('books.season_empty', locale, { season: seasonLabel(season) })} />
           <div class="mny__empty-acts">
             <Button size="xs" onclick={openDeal} disabled={projectIndex.length === 0}>{t('books.new_deal', locale)}</Button>
             {#if previousSeason !== null}
-              <Button size="xs" variant="outline" onclick={() => (pickedSeason = previousSeason)}>{t('books.season_previous', locale, { season: seasonLabel(previousSeason) })}</Button>
+              <Button size="xs" variant="secondary" onclick={() => (pickedSeason = previousSeason)}>{t('books.season_previous', locale, { season: seasonLabel(previousSeason) })}</Button>
             {/if}
           </div>
         </div>
       {:else}
         <div class="radar" aria-busy={loading}>
           <!-- 2 · Pide atención -->
-          <section class="att" aria-label={t('books.attention', locale)}>
+          <section class="att" aria-label={t('books.attention', locale)} data-help-step="books-att">
             <BlockHead title={t('books.attention', locale)} count={loading || invoicesError ? DASH : attention.length}>
               {#if attention.length > ATTENTION_VISIBLE}
                 <button type="button" class="block-head__act" onclick={() => (attentionAll = !attentionAll)}>
@@ -925,12 +1085,13 @@
                 </button>
               {/if}
             </BlockHead>
+            <FirstTimeNote event="first_overdue" when={!loading && attention.some((a) => a.kind === 'overdue')} />
             {#if invoicesError}
               {@render failed('books.err_invoices', () => $invoicesQuery.refetch())}
             {:else if loading}
               {@render ghost(3)}
             {:else if attention.length === 0}
-              <p class="mny__state">{t('books.attention_none', locale)}</p>
+              <EmptyLine text={t('books.attention_none', locale)} />
             {:else}
               <ul class="att__list" role="list">
                 {#each attentionShown as item (item.kind + item.bolo.id)}
@@ -943,7 +1104,7 @@
                       <span class="att__why">{attentionWhy(item)}</span>
                     </span>
                     <span class="att__amt">{item.amount === null ? DASH : fmtMoney(item.amount)}{#if item.amount !== null && multiCurrency}&nbsp;{item.currency}{/if}</span>
-                    <Button size="xs" variant="outline" onclick={() => act(item)}>{t(actionKey(item), locale)}</Button>
+                    <Button size="xs" variant="secondary" onclick={() => act(item)}>{t(actionKey(item), locale)}</Button>
                   </li>
                 {/each}
               </ul>
@@ -951,6 +1112,7 @@
           </section>
 
           <!-- 3 · Lo que entra -->
+          {#if shows('books', 'inflow_months', calm.on)}
           <section class="inflow" aria-label={t('books.inflow', locale)}>
             <BlockHead title={t('books.inflow', locale)} />
             {#if invoicesError}
@@ -986,6 +1148,7 @@
               </p>
             {/if}
           </section>
+          {/if}
         </div>
       {/if}
 
@@ -994,13 +1157,20 @@
       {/if}
 
       <!-- 4 · El libro -->
-      <section class="ledger" id="mny-ledger" aria-label={t('books.ledger', locale)}>
+      {#if !shows('books', 'ledger', calm.on)}
+        <CalmLine text={t('books.calm_rest', locale)} action={t('calm.see_all', locale)} onclick={() => calm.set(false)} />
+      {:else}
+      <section class="ledger" id="mny-ledger" aria-label={t('books.ledger', locale)} data-help-step="books-ledger">
+        <div class="ledger__tabrow">
         <div class="ledger__tabs" role="tablist" aria-label={t('books.ledger', locale)}>
           <button type="button" role="tab" aria-selected={tab === 'bolos'} onclick={() => (tab = 'bolos')}>{t('books.tab_bolos', locale)}</button>
           {#if anyDocMode}
             <button type="button" role="tab" aria-selected={tab === 'documents'} onclick={() => (tab = 'documents')}>{t('books.documents', locale)}</button>
           {/if}
           <button type="button" role="tab" aria-selected={tab === 'expenses'} onclick={() => (tab = 'expenses')}>{t('books.expenses', locale)}</button>
+        </div>
+        <!-- Outside the tablist (only tabs live there): what a «bolo» is. -->
+        <ConceptHint concept="bolo" />
         </div>
 
         {#if tab === 'bolos'}
@@ -1021,7 +1191,7 @@
             {@render ghost(4)}
           {:else if ledgerRows.length === 0}
             {#if !(seasonEmpty && filter === 'all')}
-              <p class="mny__state">{t(filter === 'all' ? 'books.ledger_empty' : 'books.ledger_empty_filter', locale)}</p>
+              <EmptyLine text={t(filter === 'all' ? 'books.ledger_empty' : 'books.ledger_empty_filter', locale)} />
             {/if}
           {:else}
             <table class="book">
@@ -1109,11 +1279,11 @@
                             </div>
                             <div class="sheet__acts">
                               {#if m.collect !== 'full'}
-                                <Button size="xs" variant="outline" onclick={() => openPay(b)}>{t('books.record_payment', locale)}</Button>
+                                <Button size="xs" variant="secondary" onclick={() => openPay(b)}>{t('books.record_payment', locale)}</Button>
                               {/if}
-                              <Button size="xs" variant="outline" onclick={() => openExpense(b)}>{t('books.add_expense', locale)}</Button>
+                              <Button size="xs" variant="secondary" onclick={() => openExpense(b)}>{t('books.add_expense', locale)}</Button>
                               {#if mode !== 'off' && !m.doc}
-                                <Button size="xs" variant="outline" onclick={() => openInvoice(b)}>{t(mode === 'interno' ? 'books.create_proforma' : 'books.create_invoice', locale)}</Button>
+                                <Button size="xs" variant="secondary" onclick={() => openInvoice(b)}>{t(mode === 'interno' ? 'books.create_proforma' : 'books.create_invoice', locale)}</Button>
                               {/if}
                             </div>
                           </div>
@@ -1138,12 +1308,12 @@
                 {#each expenseTotals as [currency, amount] (currency)}<span>− {fmtMoney(amount)} {currency}</span>{/each}
               </p>
             {/if}
-            <Button size="xs" variant="outline" onclick={() => openExpense()} disabled={expenseAnchorOptions.length === 0}>{t('books.add_expense', locale)}</Button>
+            <Button size="xs" variant="secondary" onclick={() => openExpense()} disabled={expenseAnchorOptions.length === 0}>{t('books.add_expense', locale)}</Button>
           </div>
           {#if expensesError}
             {@render failed('books.err_expenses', () => $expensesQuery.refetch())}
           {:else if expenses.length === 0}
-            <p class="mny__state">{t('books.no_expenses_scope', locale)}</p>
+            <EmptyLine text={t('books.no_expenses_scope', locale)} />
           {:else}
             <ul class="mny__expenses" role="list">
               {#each expenses as expense (expense.id)}
@@ -1158,6 +1328,7 @@
           {/if}
         {/if}
       </section>
+      {/if}
     {/if}
   {/if}
 </section>
@@ -1166,20 +1337,21 @@
   {#if feeEditing}
     <p class="mny__dialog-who">{[feeEditing.project?.name, [feeEditing.venue_name, feeEditing.city].filter(Boolean).join(', ')].filter(Boolean).join(' · ')}</p>
   {/if}
-  <div class="mny__fee-form">
-    <Input label={t('books.amount', locale)} type="number" bind:value={fAmount} placeholder={t('books.ph_fee_clear', locale)} />
+  <form class="mny__fee-form" novalidate oninput={formErrors.onedit} onsubmit={(e) => { e.preventDefault(); saveFee(); }}>
+    <Input id="fee-amount" label={t('books.amount', locale)} type="number" step="0.01" bind:value={fAmount} placeholder={t('books.ph_fee_clear', locale)} error={formErrors.of('fee-amount')} />
     <Input label={t('books.currency', locale)} bind:value={fCurrency} placeholder="EUR" />
-  </div>
+    <button type="submit" hidden aria-hidden="true"></button>
+  </form>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (feeOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" onclick={() => (feeOpen = false)}>{t('create.cancel', locale)}</Button>
     <Button onclick={saveFee} loading={$feeMutation.isPending}>{t('blackout.save', locale)}</Button>
   {/snippet}
 </Dialog>
 
 <Dialog bind:open={payOpen} title={t('books.record_payment', locale)} size="s" description={payBolo ? `${[payBolo.venue_name, payBolo.city].filter(Boolean).join(', ')}` : ''} onclose={() => (payBolo = null)}>
-  <div class="mny__pay-form">
+  <form class="mny__pay-form" novalidate oninput={formErrors.onedit} onsubmit={(e) => { e.preventDefault(); submitPay(); }}>
     <div class="mny__row2">
-      <Input label={t('books.amount_cur', locale, { currency: payBolo?.fee_currency ?? 'EUR' })} type="number" bind:value={payAmount} />
+      <Input id="pay-amount" label={t('books.amount_cur', locale, { currency: payBolo?.fee_currency ?? 'EUR' })} type="number" step="0.01" bind:value={payAmount} error={formErrors.of('pay-amount')} />
       <Input label={t('books.received_on', locale)} type="date" bind:value={payReceivedOn} />
     </div>
     <div class="mny__row2">
@@ -1187,11 +1359,12 @@
       <Input label={t('books.counterparty_payer', locale)} bind:value={payCounterparty} placeholder={t('books.ph_venue', locale)} />
     </div>
     <Input label={t('books.reference_opt', locale)} bind:value={payReference} placeholder={t('books.ph_reference', locale)} />
-  </div>
+    <button type="submit" hidden aria-hidden="true"></button>
+  </form>
   <p class="mny__dialog-note">{t(payInvoiceId ? 'books.pay_note_doc' : 'books.pay_note', locale)}</p>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (payOpen = false)}>{t('create.cancel', locale)}</Button>
-    <Button onclick={() => !$payMutation.isPending && $payMutation.mutate()} loading={$payMutation.isPending}>{t('books.record', locale)}</Button>
+    <Button variant="quiet" onclick={() => (payOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button onclick={submitPay} loading={$payMutation.isPending}>{t('books.record', locale)}</Button>
   {/snippet}
 </Dialog>
 
@@ -1199,9 +1372,9 @@
   {#if invBolo}
     <p class="mny__dialog-who">{[invBolo.project?.name, [invBolo.venue_name, invBolo.city].filter(Boolean).join(', ')].filter(Boolean).join(' · ')}</p>
     <p class="mny__inv-fee-line">{t('books.fee_subtotal', locale)} <strong>{fmtFee(invBolo.fee_amount, invBolo.fee_currency)}</strong> {t('books.snapshot_note', locale)}</p>
-    <div class="mny__inv-form">
-      <Input label={t('books.vat_pct', locale)} type="number" bind:value={iVat} placeholder={t('books.ph_vat', locale)} />
-      <Input label={t('books.irpf_pct', locale)} type="number" bind:value={iIrpf} placeholder={t('books.ph_irpf', locale)} />
+    <form class="mny__inv-form" novalidate oninput={formErrors.onedit} onsubmit={(e) => { e.preventDefault(); submitInvoice(); }}>
+      <Input id="inv-vat" label={t('books.vat_pct', locale)} type="number" bind:value={iVat} placeholder={t('books.ph_vat', locale)} error={formErrors.of('inv-vat')} />
+      <Input id="inv-irpf" label={t('books.irpf_pct', locale)} type="number" bind:value={iIrpf} placeholder={t('books.ph_irpf', locale)} error={formErrors.of('inv-irpf')} />
       <Input label={t('books.due_on', locale)} type="date" bind:value={iDueOn} />
       <Input label={t('books.expected_collection', locale)} type="date" bind:value={iExpectedOn} />
       <Select
@@ -1214,38 +1387,40 @@
           <option value={payer.id}>{payer.name}{payer.has_fiscal_identity ? '' : ` · ${t('books.payer_no_fiscal', locale)}`}</option>
         {/each}
       </Select>
-    </div>
-    <Input label={t('books.payment_condition', locale)} bind:value={iPaymentCondition} placeholder={t('books.ph_condition', locale)} />
+      <Input label={t('books.payment_condition', locale)} bind:value={iPaymentCondition} placeholder={t('books.ph_condition', locale)} />
+      <button type="submit" hidden aria-hidden="true"></button>
+    </form>
     <p class="mny__inv-total-preview">{t('books.total_label', locale)} <strong>{fmtMoney(invTotal)} {invBolo.fee_currency ?? 'EUR'}</strong></p>
   {/if}
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (invOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" onclick={() => (invOpen = false)}>{t('create.cancel', locale)}</Button>
     <Button onclick={submitInvoice} loading={$createInvoice.isPending}>{t('books.create_draft', locale)}</Button>
   {/snippet}
 </Dialog>
 
 <Dialog bind:open={dealOpen} title={t('books.new_deal', locale)} size="s" description={t('books.deal_desc', locale)}>
-  <div class="mny__pay-form">
-    <Select label={t('books.project_obra', locale)} bind:value={dealProjectId} options={dealOptions} />
+  <form class="mny__pay-form" novalidate oninput={formErrors.onedit} onchange={formErrors.onedit} onsubmit={(e) => { e.preventDefault(); submitDeal(); }}>
+    <Select id="deal-project" label={t('books.project_obra', locale)} bind:value={dealProjectId} options={dealOptions} error={formErrors.of('deal-project')} />
     <div class="mny__row2">
       <Input label={t('create.venue', locale)} bind:value={dealVenue} placeholder={t('books.ph_venue', locale)} />
       <Input label={t('create.city', locale)} bind:value={dealCity} placeholder={t('books.ph_city', locale)} />
     </div>
     <div class="mny__row2">
-      <Input label={t('books.fee_optional', locale)} type="number" bind:value={dealFee} placeholder={t('books.ph_fee_later', locale)} />
+      <Input id="deal-fee" label={t('books.fee_optional', locale)} type="number" step="0.01" bind:value={dealFee} placeholder={t('books.ph_fee_later', locale)} error={formErrors.of('deal-fee')} />
       <Input label={t('books.currency', locale)} bind:value={dealCurrency} placeholder="EUR" />
     </div>
-  </div>
+    <button type="submit" hidden aria-hidden="true"></button>
+  </form>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (dealOpen = false)}>{t('create.cancel', locale)}</Button>
-    <Button onclick={() => !$createBolo.isPending && $createBolo.mutate()} loading={$createBolo.isPending}>{t('books.create_deal', locale)}</Button>
+    <Button variant="quiet" onclick={() => (dealOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button onclick={submitDeal} loading={$createBolo.isPending}>{t('books.create_deal', locale)}</Button>
   {/snippet}
 </Dialog>
 
 <Dialog bind:open={expOpen} title={t('books.add_expense', locale)} size="s" description={t('books.expense_desc', locale)}>
-  <div class="mny__pay-form">
+  <form class="mny__pay-form" novalidate oninput={formErrors.onedit} onchange={formErrors.onedit} onsubmit={(e) => { e.preventDefault(); submitExpense(); }}>
     <div class="mny__row2">
-      <Input label={t('books.amount', locale)} type="number" bind:value={eAmount} />
+      <Input id="exp-amount" label={t('books.amount', locale)} type="number" step="0.01" bind:value={eAmount} error={formErrors.of('exp-amount')} />
       <Input label={t('books.currency', locale)} bind:value={eCurrency} placeholder="EUR" />
     </div>
     <Input label={t('books.description', locale)} bind:value={eDescription} placeholder={t('books.ph_expense', locale)} />
@@ -1253,12 +1428,13 @@
       <Input label={t('perf.date', locale)} type="date" bind:value={eIncurredOn} />
       <Select label={t('books.category', locale)} bind:value={eCategory} options={EXPENSE_CATEGORIES.map((c) => ({ value: c, label: categoryLabel(c, locale) }))} />
     </div>
-    <Select label={t('books.anchor', locale)} bind:value={eAnchor} options={expenseAnchorOptions} />
+    <Select id="exp-anchor" label={t('books.anchor', locale)} bind:value={eAnchor} options={expenseAnchorOptions} error={formErrors.of('exp-anchor')} />
     <Input label={t('books.counterparty_paid', locale)} bind:value={eCounterparty} placeholder={t('books.ph_counterparty', locale)} />
-  </div>
+    <button type="submit" hidden aria-hidden="true"></button>
+  </form>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (expOpen = false)}>{t('create.cancel', locale)}</Button>
-    <Button onclick={() => !$createExpense.isPending && $createExpense.mutate()} loading={$createExpense.isPending}>{t('composer.add', locale)}</Button>
+    <Button variant="quiet" onclick={() => (expOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button onclick={submitExpense} loading={$createExpense.isPending}>{t('composer.add', locale)}</Button>
   {/snippet}
 </Dialog>
 
@@ -1291,7 +1467,6 @@
     .mny__season { appearance: none; border: 0; background: none; padding: 0; font: inherit; cursor: pointer; text-underline-offset: 0.25em; }
     .mny__season:hover { color: var(--text-color); }
     .mny__season[aria-current='true'] { text-decoration: underline; }
-    .mny__state { font-size: var(--text-s); color: var(--text-faint); }
     .mny__ghost { display: grid; gap: var(--space-xs); font-size: var(--text-s); }
     .mny__note { font-size: var(--text-xs); color: var(--text-faint); }
     .mny__empty { display: flex; flex-direction: column; gap: var(--space-s); align-items: flex-start; }
@@ -1308,6 +1483,9 @@
       padding: var(--space-s) var(--space-m); border: var(--line-hairline) solid var(--border-color-light);
       border-radius: var(--radius-m); background: var(--bg-ultra-light); min-inline-size: 0;
     }
+    /* A figure and its «i»: the «i» sits in the corner, beside the button, never in it. */
+    .fig-cell { position: relative; display: grid; min-inline-size: 0; }
+    .fig-cell > :global(.hint) { position: absolute; inset-block-start: var(--space-s); inset-inline-end: var(--space-s); margin: 0; }
     button.fig { cursor: pointer; transition: border-color var(--transition); }
     button.fig:hover { border-color: var(--text-faint); }
     .fig__num { display: flex; align-items: baseline; gap: var(--space-2xs); flex-wrap: wrap; }
@@ -1320,6 +1498,9 @@
     /* While the feeds load the radar keeps roughly its height, so the ledger does not jump down. */
     .radar[aria-busy='true'] { min-block-size: 14rem; }
     .radar { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: var(--space-l); align-items: start; }
+    /* Calm: one column at the reading measure, from the same left edge. */
+    .mny--calm > :global(:not(.lenshead)) { max-inline-size: var(--calm-measure); }
+    .mny--calm .radar { grid-template-columns: minmax(0, 1fr); }
     .radar :global(.block-head) { margin-block-end: var(--space-xs); }
     /* One grid for the whole list (rows are subgrids): amounts and buttons
        fall in columns whatever each row's text measures. */
@@ -1332,6 +1513,9 @@
     .att__ctx { font-size: var(--text-s); color: var(--text-muted); }
     .att__why { inline-size: 100%; font-size: var(--text-xs); color: var(--text-muted); }
     .att__row[data-kind='overdue'] .att__why { color: var(--danger); }
+    /* The red once per block (ADR-139 § 6): the first overdue row carries it;
+       the ones under it say how late in ink, the list is already in order. */
+    .att__row[data-kind='overdue'] ~ .att__row[data-kind='overdue'] .att__why { color: var(--text-color); }
     .att__amt { font-family: var(--font-mono); font-size: var(--text-s); font-variant-numeric: tabular-nums; color: var(--text-color); white-space: nowrap; text-align: end; }
     .inflow__overdue { color: var(--danger); }
     .inflow__cur { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); }
@@ -1347,7 +1531,8 @@
 
     /* ── 4 · the ledger ── */
     .ledger { display: flex; flex-direction: column; gap: var(--space-s); scroll-margin-block-start: var(--space-l); }
-    .ledger__tabs { display: flex; gap: var(--space-m); border-block-end: var(--line-hairline) solid var(--border-color-light); }
+    .ledger__tabrow { display: flex; align-items: center; gap: var(--space-xs); border-block-end: var(--border-width) solid var(--border-color-light); }
+    .ledger__tabs { display: flex; gap: var(--space-m); }
     .ledger__tabs button { appearance: none; border: 0; background: none; font: inherit; font-size: var(--text-s); color: var(--text-muted); padding: var(--space-xs) 0; border-block-end: var(--line) solid transparent; margin-block-end: calc(-1 * var(--line-hairline)); cursor: pointer; }
     .ledger__tabs button[aria-selected='true'] { color: var(--text-color); border-block-end-color: var(--text-color); }
     .ledger__filters { display: flex; gap: var(--space-xs); flex-wrap: wrap; }
@@ -1399,11 +1584,10 @@
 
 .mny__dialog-who { font-size: var(--text-s); color: var(--text-muted); }
     .mny__dialog-note { font-size: var(--text-xs); color: var(--text-faint); margin-block-start: var(--space-s); }
-    .mny__fee-form { display: grid; grid-template-columns: 2fr 1fr; gap: var(--space-m); margin-block-start: var(--space-s); }
-    .mny__pay-form { display: flex; flex-direction: column; gap: var(--space-m); }
-    .mny__row2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-m); }
+    /* The dialogs' fields are rows, one under the other (ADR-139 p4). */
+    .mny__fee-form, .mny__pay-form, .mny__inv-form { display: flex; flex-direction: column; gap: var(--field-gap); margin-block-start: var(--space-s); }
+    .mny__row2 { display: contents; }
     .mny__inv-fee-line { font-size: var(--text-s); color: var(--text-muted); margin-block-start: var(--space-xs); }
-    .mny__inv-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: var(--space-s) var(--space-m); margin-block: var(--space-s); }
     .mny__inv-total-preview { font-size: var(--text-s); margin-block-start: var(--space-s); }
     @media (max-width: 47.5rem) {
       .figs__row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1431,7 +1615,6 @@
       .mny__expenses li { grid-template-columns: 1fr auto; gap: var(--space-2xs) var(--space-s); }
       .mny__expense-description { grid-column: 1 / -1; }
       .mny__expenses strong { grid-column: 2; grid-row: 1; }
-      .mny__row2, .mny__inv-form, .mny__fee-form { grid-template-columns: 1fr; }
     }
   }
 </style>

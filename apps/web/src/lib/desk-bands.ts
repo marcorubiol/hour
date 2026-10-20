@@ -11,11 +11,61 @@
 import { addDaysIso } from './planner';
 import { dateDayKey, perfDayKey, type DateEvent, type PerformanceEvent } from './month-events';
 import type { PersonAttributionScope } from './people';
+import { performanceStatusFamily } from './performance';
+import { dateStatusFamily } from './date';
 import type { HotRow, LastMailout } from './conversation-overview';
 import type { FeedThread } from './threads';
 import type { MoneyBolo, MoneyInvoiceItem } from './money';
 
 const DAY_MS = 86_400_000;
+
+// ── The title: the day, not the debt (ADR-139 § 6) ──────────────────────
+
+/** One thing on today's plan, as the title names it: what, and where. */
+export interface TodayThing {
+  of: 'performance' | 'date';
+  /** A `planner.kind_*` key's tail (`show`, `rehearsal`, `travel_day`…). */
+  kind: string;
+  /** A free-text name the kind word cannot give (an `other` date). */
+  label: string | null;
+  where: string | null;
+}
+
+/**
+ * What today holds that is settled, for the Desk's title («Hoy, función en
+ * Girona»): confirmed performances first (the show is the day), then the
+ * confirmed dates, in their order. An option is not what the day IS, so it
+ * stays in «Lo siguiente», where it says it is one. The rows are the pulse's
+ * (not scoped, like band 1 and the rail).
+ */
+export function todayThings(
+  input: { performances: readonly PerformanceEvent[]; dates: readonly DateEvent[]; viewerTz: string },
+  today: string,
+): TodayThing[] {
+  const perfs = input.performances
+    .filter((p) => perfDayKey(p) === today && performanceStatusFamily(p.status) === 'confirmed')
+    .sort((a, b) => (a.start_at ?? a.performed_at).localeCompare(b.start_at ?? b.performed_at))
+    .map(
+      (p): TodayThing => ({
+        of: 'performance',
+        kind: 'show',
+        label: null,
+        where: p.venue?.city ?? p.city ?? p.venue?.name ?? p.venue_name ?? null,
+      }),
+    );
+  const dates = input.dates
+    .filter((d) => dateDayKey(d, input.viewerTz) === today && dateStatusFamily(d.status) === 'confirmed')
+    .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
+    .map(
+      (d): TodayThing => ({
+        of: 'date',
+        kind: d.kind || 'other',
+        label: d.kind === 'other' || !d.kind ? (d.title ?? d.label ?? null) : null,
+        where: d.kind === 'travel_day' ? (d.destination_city ?? d.city ?? null) : (d.city ?? d.venue_name ?? null),
+      }),
+    );
+  return [...perfs, ...dates];
+}
 
 // ── Voy · no voy ─────────────────────────────────────────────────────────
 

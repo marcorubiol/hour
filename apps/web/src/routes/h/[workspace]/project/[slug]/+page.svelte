@@ -20,15 +20,20 @@
     activeProjectsQueryOptions,
     allLinesQueryOptions,
   } from '$lib/nav-queries';
-  import { accentVar, accentVarFor } from '$lib/utils/accent';
-  import { spaceName } from '$lib/utils/identity';
-  import { useBreadcrumb } from '$lib/stores/breadcrumb.svelte';
+  import RecordHead from '$lib/components/RecordHead.svelte';
+  import BlockHead from '$lib/components/BlockHead.svelte';
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
+  import { spaceCrumb } from '$lib/record-crumbs';
   import CastPanel from '$lib/components/CastPanel.svelte';
   import ProjectIdentityPopover from '$lib/components/ProjectIdentityPopover.svelte';
-  import RelationshipStub from '$lib/components/RelationshipStub.svelte';
+  import RelationshipStub, { relationStubQueryOptions } from '$lib/components/RelationshipStub.svelte';
+  import MissingBand from '$lib/components/MissingBand.svelte';
+  import { stepsDueBand } from '$lib/steps-due-band';
+  import { lensOn } from '$lib/lenses.svelte';
+  import { toStore } from 'svelte/store';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import YNotes from '$lib/components/YNotes.svelte';
-  import { dayMonthYear } from '$lib/datetime';
+  import { dayMonthYear, localDayISO } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
 
   const locale = appLocale();
@@ -47,16 +52,11 @@
   // Lines of this project — shares the ['lines','all'] cache the shell warms.
   const linesQuery = createQuery(allLinesQueryOptions());
 
-  const breadcrumb = useBreadcrumb();
-
   let workspaceSlug = $derived(page.params.workspace ?? '');
   let projectSlug = $derived(page.params.slug ?? '');
 
   let workspaceId = $derived(
     $workspacesQuery.data?.items.find((w) => w.slug === workspaceSlug)?.id ?? null,
-  );
-  let activeWorkspaceName = $derived(
-    spaceName($workspacesQuery.data?.items.find((w) => w.slug === workspaceSlug)?.name ?? workspaceSlug),
   );
   let project = $derived(
     workspaceId
@@ -66,26 +66,11 @@
       : null,
   );
 
-  // Publish this project's address (space › project) to the shell
-  // breadcrumb bar. Cleared on unmount.
-  $effect(() => {
-    if (project) {
-      breadcrumb.set(
-        [
-          {
-            label: activeWorkspaceName,
-            href: `/h/${workspaceSlug}/`,
-            kind: 'space',
-            accent: accentVar(workspaceSlug),
-          },
-          { label: project.name, kind: 'node' },
-        ],
-      );
-    } else {
-      breadcrumb.clear();
-    }
-    return () => breadcrumb.clear();
-  });
+  // Address: Space › Proyecto (the title names which).
+  let crumbs = $derived([
+    spaceCrumb($workspacesQuery.data?.items.find((w) => w.slug === workspaceSlug)?.name, workspaceSlug),
+    { label: t('create.project', locale) },
+  ]);
 
   let displayName = $derived(project?.name ?? projectSlug);
   let projectLoading = $derived(
@@ -118,6 +103,22 @@
       : [],
   );
 
+  // «Falta» (ADR-139 § 2): the project's conversations whose next step is
+  // due, from the page the conversations block already reads (same query:
+  // no new request). Kept to this project: the slug repeats across spaces.
+  const stubQuery = createQuery(toStore(() => relationStubQueryOptions(projectSlug)));
+  let missingItems = $derived(
+    project
+      ? stepsDueBand(($stubQuery.data?.items ?? []).filter((c) => c.project?.id === project!.id), {
+          today: localDayISO(),
+          total: $stubQuery.data?.total,
+          workspaceSlug,
+          moreHref: lensOn('conversations') ? `/h/conversations?scope=p:${project.id}` : null,
+          locale,
+        })
+      : [],
+  );
+
   function formatDate(iso: string | null): string {
     if (!iso) return '';
     return dayMonthYear(iso);
@@ -128,41 +129,32 @@
   <title>{docTitle(displayName)}</title>
 </svelte:head>
 
-<article class="project" aria-busy={projectLoading} style={`--c: ${project ? accentVarFor(project) : accentVar(projectSlug)}`}>
-  <header class="project__head">
-    <div class="project__kicker">
+<article class="record project" aria-busy={projectLoading}>
+  <RecordHead {crumbs} title={projectLoading ? '…' : displayName}>
+    {#snippet mark()}
+      {#if project}<ProjectIdentityPopover {project} {siblings} size="30px" />{/if}
+    {/snippet}
+    {#snippet facts()}
       {#if project}
-        <ProjectIdentityPopover {project} {siblings} size="30px" />
-      {/if}
-      <p class="eyebrow">{t('create.project', locale)}</p>
-    </div>
-    <h1 class="project__title">
-      {#if projectLoading}
-        <span class="project__title-skeleton" aria-hidden="true">…</span>
-      {:else}
-        <em>{displayName}</em>
-      {/if}
-    </h1>
-    {#if project}
-      <div class="project__meta">
         <StateBadge label={projectStatusLabel(project.status)} tone={statusTone} />
         {#if project.starts_on || project.ends_on}
-          <span class="project__meta-sep" aria-hidden="true">·</span>
-          <span class="project__meta-dates">
-            {#if project.starts_on}{formatDate(project.starts_on)}{/if}
-            {#if project.starts_on && project.ends_on} → {/if}
-            {#if project.ends_on}{formatDate(project.ends_on)}{/if}
-          </span>
+          <span
+            >{#if project.starts_on}{formatDate(project.starts_on)}{/if}{#if project.starts_on && project.ends_on}
+              → {/if}{#if project.ends_on}{formatDate(project.ends_on)}{/if}</span
+          >
         {/if}
-      </div>
-    {/if}
-  </header>
+      {/if}
+    {/snippet}
+    {#snippet band()}
+      <MissingBand items={missingItems} {locale} />
+    {/snippet}
+  </RecordHead>
 
   <RelationshipStub projectSlug={projectSlug} />
 
   {#if project}
     <section class="project__notes" aria-label={t('person.notes', locale)}>
-      <p class="eyebrow">{t('person.notes', locale)}</p>
+      <BlockHead title={t('person.notes', locale)} />
       <YNotes
         targetTable="project"
         targetId={project.id}
@@ -171,107 +163,36 @@
     </section>
   {/if}
 
-  <section class="project__stubs" aria-label={t('project.pending_sections', locale)}>
-    <div class="project__stub">
-      <p class="eyebrow">{t('project.lines', locale)}</p>
-      {#if projectLines.length > 0}
-        <ul class="project__lines" role="list">
-          {#each projectLines as l (l.id)}
-            <li>
-              <a class="link-arrow" href={`/h/${workspaceSlug}/project/${projectSlug}/line/${l.slug ?? l.id}`}>
-                {l.name} →
-              </a>
-            </li>
-          {/each}
-        </ul>
-      {:else}
-        <p class="project__stub-body">{t('project.no_lines', locale)}</p>
-      {/if}
-    </div>
-    <div class="project__stub">
-      <p class="eyebrow">{t('project.assets', locale)}</p>
-      <p class="project__stub-body">{t('project.assets_body', locale)}</p>
-    </div>
-    <div class="project__stub">
-      <p class="eyebrow">{t('project.cast', locale)}</p>
-      {#if project}
-        <CastPanel projectId={project.id} />
-      {:else}
-        <p class="project__stub-body">…</p>
-      {/if}
-    </div>
+  <section class="project__block" aria-label={t('project.lines', locale)}>
+    {#if projectLines.length > 0}
+      <BlockHead title={t('project.lines', locale)} count={projectLines.length} concept="lines" />
+      <ul class="project__lines" role="list">
+        {#each projectLines as l (l.id)}
+          <li>
+            <a class="link-arrow" href={`/h/${workspaceSlug}/project/${projectSlug}/line/${l.slug ?? l.id}`}>
+              {l.name} →
+            </a>
+          </li>
+        {/each}
+      </ul>
+    {:else}
+      <EmptyLine label={t('project.lines', locale)} text={t('project.no_lines', locale)} />
+    {/if}
   </section>
+
+  <EmptyLine label={t('project.assets', locale)} text={t('project.assets_body', locale)} />
+
+  {#if project}
+    <section class="project__block" aria-label={t('project.cast', locale)}>
+      <BlockHead title={t('project.cast', locale)} />
+      <CastPanel projectId={project.id} />
+    </section>
+  {/if}
 </article>
 
 <style>
-  .project {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-xl);
-  }
-
-  .project__head {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-s);
-    padding-block-end: var(--space-m);
-    border-block-end: var(--line-hairline) solid var(--border-color-light);
-    position: relative;
-  }
-
-  .project__kicker {
-    display: flex;
-    align-items: center;
-    gap: var(--space-xs);
-  }
-
-  /* Project accent — a thin vertical rail to the left of the title block,
-     same vocab as Plaza project rows. Visible only above the meta line. */
-  .project__head::before {
-    content: '';
-    position: absolute;
-    inset-inline-start: -1rem;
-    inset-block-start: 0.5rem;
-    inline-size: var(--dot-xs);
-    block-size: var(--control-size-xs);
-    background: var(--c, var(--text-muted));
-    border-radius: var(--radius-xs);
-  }
-
-  /* Masthead typography via base.css h1 defaults. */
-  .project__title {
-    margin: 0;
-    color: var(--text-color);
-  }
-  .project__title em {
-    font-style: italic;
-    color: var(--text-color);
-  }
-
-  .project__title-skeleton {
-    color: var(--text-faint);
-  }
-
-  .project__meta {
-    display: flex;
-    align-items: baseline;
-    gap: var(--space-xs);
-    flex-wrap: wrap;
-    margin-block-start: var(--space-xs);
-  }
-
-  .project__meta-sep {
-    color: var(--text-faint);
-  }
-
-  .project__meta-dates {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    letter-spacing: var(--tracking-s);
-    color: var(--text-faint);
-  }
-
-  .project__notes {
+  .project__notes,
+  .project__block {
     display: flex;
     flex-direction: column;
     gap: var(--space-s);
@@ -283,28 +204,5 @@
     gap: var(--space-xs);
     margin: 0;
     padding: 0;
-  }
-
-  .project__stubs {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-    gap: var(--space-m);
-  }
-
-  .project__stub {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-xs);
-    padding: var(--space-m);
-    border: var(--line-hairline) solid var(--border-color-light);
-    border-radius: var(--radius-l);
-    background: var(--bg-light);
-  }
-
-  .project__stub-body {
-    margin: 0;
-    font-size: var(--text-s);
-    color: var(--text-muted);
-    line-height: 1.55;
   }
 </style>

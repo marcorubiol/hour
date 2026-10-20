@@ -13,6 +13,7 @@
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
+  import Textarea from '$lib/components/Textarea.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { spaceName } from '$lib/utils/identity';
@@ -101,15 +102,24 @@
     },
   });
 
+  /** The name's own word, under the field (ADR-139 p7); the native
+      `required` covers the empty ones, this the blank ones. */
+  let nameError = $state<string | undefined>();
+  $effect(() => {
+    void name;
+    nameError = undefined;
+  });
+  let formEl: HTMLFormElement | undefined = $state();
+
+  /** Runs from the form's submit, after the native constraints passed. */
   function submit(event?: Event) {
     event?.preventDefault();
     if (!effectiveWorkspaceId) {
-      addToast({ tone: 'warning', message: t('workspace.pick', locale) });
-      return;
+      return; // the select's `required` says it under the field
     }
     const trimmed = name.trim();
     if (!trimmed) {
-      addToast({ tone: 'warning', message: t('project.name_empty', locale) });
+      nameError = t('project.name_empty', locale);
       return;
     }
     $create.mutate({
@@ -130,7 +140,7 @@
   size="s"
   onclose={reset}
 >
-  <form class="cpj__form" onsubmit={submit}>
+  <form class="cpj__form" bind:this={formEl} onsubmit={submit}>
     {#if workspaceId}
       <Select label={t('workspace.label', locale)} value={workspaceId} options={workspaceOptions} disabled />
     {:else}
@@ -148,6 +158,7 @@
       label={t('conversations.col_name', locale)}
       name="project-name"
       bind:value={name}
+      error={nameError}
       placeholder={t('project.name_ph', locale)}
       required
       autofocus
@@ -157,26 +168,23 @@
 
     <AccentSwatchPicker bind:accent autoSlug={autoAccentSlug} label={t('project.color', locale)} disabled={$create.isPending} />
 
-    <label class="field">
-      <span>{t('project.description', locale)}</span>
-      <textarea
-        class="cpj__desc"
-        bind:value={description}
-        maxlength="280"
-        rows="3"
-        placeholder={t('project.description_ph', locale)}
-        disabled={$create.isPending}
-      ></textarea>
-      <span class="cpj__desc-count">{description.length} / 280</span>
-    </label>
+    <Textarea
+      label={t('project.description', locale)}
+      bind:value={description}
+      maxlength={280}
+      counter
+      rows={3}
+      placeholder={t('project.description_ph', locale)}
+      disabled={$create.isPending}
+    />
 
     <!-- Hidden submit lets Enter inside an input trigger submit. -->
     <button type="submit" hidden aria-hidden="true"></button>
   </form>
 
   {#snippet actions()}
-    <Button variant="outline" disabled={$create.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
-    <Button loading={$create.isPending} onclick={submit}>{t('project.create', locale)}</Button>
+    <Button variant="quiet" disabled={$create.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
+    <Button loading={$create.isPending} onclick={() => formEl?.requestSubmit()}>{t('project.create', locale)}</Button>
   {/snippet}
 </Dialog>
 
@@ -185,18 +193,7 @@
     .cpj__form {
       display: flex;
       flex-direction: column;
-      gap: var(--space-m);
-    }
-
-    .cpj__desc {
-      resize: vertical;
-      min-block-size: 5em;
-    }
-
-    .cpj__desc-count {
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      text-align: end;
+      gap: var(--field-gap);
     }
   }
 </style>

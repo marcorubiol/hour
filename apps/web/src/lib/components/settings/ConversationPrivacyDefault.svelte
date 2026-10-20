@@ -4,11 +4,15 @@
    * nuevas nacen privadas de quien las crea (por defecto) o compartidas. Lo
    * decide un admin; cada persona cambia después las suyas desde la ficha.
    */
+  import Segmented from '$lib/components/Segmented.svelte';
+  import BlockHead from '$lib/components/BlockHead.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import { appLocale, t } from '$lib/i18n';
   import { addToast } from '$lib/components/Toast.svelte';
+  import SavedMark from '$lib/components/SavedMark.svelte';
+  import { SaveFlash } from '$lib/save-flash.svelte';
 
   interface Props {
     workspaceId: string | undefined;
@@ -29,7 +33,10 @@
     })),
   );
 
+  // In place (ADR-139 p7): the setting says «guardado» beside itself.
+  const saved = new SaveFlash();
   const save = createMutation({
+    onSuccess: () => saved.show(),
     mutationFn: (value: boolean) =>
       mutateJSON('PUT', `/api/workspaces/${workspaceId}/conversation-privacy`, { new_conversations_private: value }),
     onError: (err) =>
@@ -42,9 +49,7 @@
 </script>
 
 <section class="set-group">
-  <div class="set-group__head">
-    <span class="eyebrow set-group__kicker">{t('settings.conv_privacy_kicker', locale)}</span>
-  </div>
+  <BlockHead title={t('settings.conv_privacy_kicker', locale)} />
   <div class="set-group__body">
     <div class="set-row">
       <div class="set-row__lead">
@@ -52,22 +57,17 @@
         <div class="set-row__hint">{t('settings.conv_privacy_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
-        <div class="set-seg" role="group" aria-label={t('settings.conv_privacy_label', locale)}>
-          <button
-            type="button"
-            class={value ? 'is-on' : ''}
-            aria-pressed={value}
-            disabled={!canEdit || $save.isPending}
-            onclick={() => $save.mutate(true)}
-          >{t('settings.conv_privacy_private', locale)}</button>
-          <button
-            type="button"
-            class={!value ? 'is-on' : ''}
-            aria-pressed={!value}
-            disabled={!canEdit || $save.isPending}
-            onclick={() => $save.mutate(false)}
-          >{t('settings.conv_privacy_shared', locale)}</button>
-        </div>
+        <Segmented
+          ariaLabel={t('settings.conv_privacy_label', locale)}
+          options={[
+            { value: 'private', label: t('settings.conv_privacy_private', locale) },
+            { value: 'shared', label: t('settings.conv_privacy_shared', locale) },
+          ]}
+          value={value ? 'private' : 'shared'}
+          disabled={!canEdit || $save.isPending}
+          onchange={(v) => $save.mutate(v === 'private')}
+        />
+        <SavedMark shown={saved.is()} />
         {#if !canEdit && $query.data}
           <span class="set-row__hint">{t('settings.conv_privacy_admin_only', locale)}</span>
         {/if}

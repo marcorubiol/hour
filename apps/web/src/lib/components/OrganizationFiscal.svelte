@@ -8,6 +8,8 @@
    * lets the caller follow up (Books re-sets the payer of a draft so it picks
    * the new data before issuing).
    */
+  import BlockHead from '$lib/components/BlockHead.svelte';
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
@@ -27,9 +29,11 @@
     /** Open the form straight away when there is nothing yet. */
     startEditing?: boolean;
     onsaved?: () => void;
+    /** The head's rank where it sits: a block of the page (2) or inside one (3). */
+    level?: 2 | 3;
   }
 
-  let { organizationId, startEditing = false, onsaved }: Props = $props();
+  let { organizationId, startEditing = false, onsaved, level = 3 }: Props = $props();
 
   const locale = appLocale();
   const queryClient = useQueryClient();
@@ -90,10 +94,18 @@
       }),
   });
 
+  let legalNameError = $state<string | undefined>();
+  $effect(() => {
+    void draft.legal_name;
+    legalNameError = undefined;
+  });
+
   function submit(ev: SubmitEvent) {
     ev.preventDefault();
     if (!draft.legal_name.trim()) {
-      addToast({ tone: 'warning', message: t('fiscal.legal_name_required', locale) });
+      // Said under the field (ADR-139 p7), never as a toast.
+      legalNameError = t('fiscal.legal_name_required', locale);
+      document.getElementById('org-fiscal-legal-name')?.focus();
       return;
     }
     if (!$save.isPending) $save.mutate();
@@ -102,18 +114,30 @@
 
 {#if visible}
   <section class="org-fiscal" aria-label={t('fiscal.title', locale)}>
-    <div class="org-fiscal__head">
-      <h3 class="eyebrow eyebrow--sub">{t('fiscal.title', locale)}</h3>
-      {#if data?.can_edit && !editing}
-        <Button size="xs" variant="outline" onclick={edit}>
-          {fiscal ? t('fiscal.edit', locale) : t('fiscal.add', locale)}
-        </Button>
-      {/if}
-    </div>
+    {#if !editing && !fiscal}
+      <!-- Nothing on file: the block is one line, with its way in. -->
+      <EmptyLine label={t('fiscal.title', locale)} text={t('fiscal.none', locale)}>
+        {#if data?.can_edit}
+          <button type="button" class="empty-line__act" onclick={edit}>{t('fiscal.add', locale)}</button>
+        {/if}
+      </EmptyLine>
+    {:else}
+      <BlockHead title={t('fiscal.title', locale)} {level}>
+        {#if data?.can_edit && !editing}
+          <button type="button" class="block-head__act" onclick={edit}>{t('fiscal.edit', locale)}</button>
+        {/if}
+      </BlockHead>
+    {/if}
 
     {#if editing}
       <form class="org-fiscal__form" onsubmit={submit}>
-        <Input label={t('fiscal.legal_name', locale)} bind:value={draft.legal_name} required />
+        <Input
+          id="org-fiscal-legal-name"
+          label={t('fiscal.legal_name', locale)}
+          bind:value={draft.legal_name}
+          required
+          error={legalNameError}
+        />
         <Input label={t('fiscal.tax_id', locale)} bind:value={draft.tax_id} />
         <Input label={t('fiscal.address_line_1', locale)} bind:value={draft.address_line_1} />
         <Input label={t('fiscal.address_line_2', locale)} bind:value={draft.address_line_2} />
@@ -127,14 +151,12 @@
         </div>
         <p class="org-fiscal__hint">{t('fiscal.hint', locale)}</p>
         <div class="org-fiscal__actions">
-          <Button size="xs" variant="outline" onclick={() => (editing = false)}>{t('create.cancel', locale)}</Button>
+          <Button size="xs" variant="quiet" onclick={() => (editing = false)}>{t('create.cancel', locale)}</Button>
           <Button size="xs" type="submit" loading={$save.isPending}>{t('fiscal.save', locale)}</Button>
         </div>
       </form>
     {:else if fiscal}
       <p class="org-fiscal__summary">{receiverFiscalSummary(fiscal)}</p>
-    {:else}
-      <p class="org-fiscal__hint">{t('fiscal.none', locale)}</p>
     {/if}
   </section>
 {/if}
@@ -146,7 +168,7 @@
       flex-direction: column;
       gap: var(--space-xs);
     }
-    .org-fiscal__head,
+
     .org-fiscal__actions {
       display: flex;
       align-items: center;
@@ -156,15 +178,13 @@
     .org-fiscal__actions {
       justify-content: flex-end;
     }
+    /* Field rows, one under the other (ADR-139 p4). */
     .org-fiscal__form {
       display: flex;
       flex-direction: column;
-      gap: var(--space-s);
     }
     .org-fiscal__row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-s);
+      display: contents;
     }
     .org-fiscal__summary {
       font-size: var(--text-s);

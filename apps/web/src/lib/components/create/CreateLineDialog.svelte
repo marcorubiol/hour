@@ -130,15 +130,24 @@
     },
   });
 
+  /** The name's own word, under the field (ADR-139 p7); the native
+      `required` covers the empty ones, this the blank ones. */
+  let nameError = $state<string | undefined>();
+  $effect(() => {
+    void name;
+    nameError = undefined;
+  });
+  let formEl: HTMLFormElement | undefined = $state();
+
+  /** Runs from the form's submit, after the native constraints passed. */
   function submit(event?: Event) {
     event?.preventDefault();
     if (!effectiveProjectId) {
-      addToast({ tone: 'warning', message: t('create.pick_project', locale) });
-      return;
+      return; // the select's `required` says it under the field
     }
     const trimmed = name.trim();
     if (!trimmed) {
-      addToast({ tone: 'warning', message: t('project.name_empty', locale) });
+      nameError = t('project.name_empty', locale);
       return;
     }
     $create.mutate({
@@ -158,9 +167,9 @@
   size="m"
   onclose={reset}
 >
-  <form class="cln__form" onsubmit={submit} style={`--c: ${accentPreview}`}>
+  <form class="cln__form" bind:this={formEl} onsubmit={submit} style={`--c: ${accentPreview}`}>
     <fieldset class="cln__templates">
-      <legend>{t('line.template', locale)}</legend>
+      <legend class="eyebrow eyebrow--sub">{t('line.template', locale)}</legend>
       <div class="cln__template-grid" role="radiogroup" aria-label={t('line.template_aria', locale)}>
         {#each LINE_TEMPLATES as tpl (tpl.key)}
           {@const isOn = templateKey === tpl.key}
@@ -197,6 +206,7 @@
       label={t('conversations.col_name', locale)}
       name="line-name"
       bind:value={name}
+      error={nameError}
       placeholder={t('line.name_ph', locale, { example: nameSuggestion })}
       required
       autocomplete="off"
@@ -210,8 +220,8 @@
   </form>
 
   {#snippet actions()}
-    <Button variant="outline" disabled={$create.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
-    <Button loading={$create.isPending} onclick={submit}>{t('project.create', locale)}</Button>
+    <Button variant="quiet" disabled={$create.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
+    <Button loading={$create.isPending} onclick={() => formEl?.requestSubmit()}>{t('project.create', locale)}</Button>
   {/snippet}
 </Dialog>
 
@@ -220,7 +230,7 @@
     .cln__form {
       display: flex;
       flex-direction: column;
-      gap: var(--space-m);
+      gap: var(--field-gap);
     }
 
     /* Template cards — a radiogroup of bordered cards; the selected one
@@ -237,8 +247,10 @@
 
     .cln__templates > legend {
       padding: 0;
-      font-size: var(--text-s);
-      color: var(--text-color);
+    }
+
+    .cln__templates {
+      margin-block-end: var(--space-s);
     }
 
     .cln__template-grid {

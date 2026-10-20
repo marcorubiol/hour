@@ -16,6 +16,7 @@
    * select needed.
    */
 
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { createQuery } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON } from '$lib/api';
@@ -24,9 +25,9 @@
   import MonthGrid from '$lib/components/MonthGrid.svelte';
   import { type DateEvent, type PerformanceEvent, formatMonthLabel } from '$lib/month-events';
   import PerformanceCreateDialog from '$lib/components/PerformanceCreateDialog.svelte';
-  import { addMonths, addDaysIso, monthGrid } from '$lib/planner';
+  import { addMonths, addDaysIso, dayKeyInTz, defaultCreateDay, monthGrid } from '$lib/planner';
   import { performanceStatusLabel, performanceStatusTone } from '$lib/performance';
-  import { dayLabel } from '$lib/datetime';
+  import { dayLabel, viewerTimeZone } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
 
   interface Props {
@@ -114,8 +115,18 @@
   let createOpen = $state(false);
   let createDate = $state<string | null>(null);
   function openCreate(isoDate?: string) {
-    createDate = isoDate ?? null;
+    createDate = isoDate ?? viewCreateDay();
     createOpen = true;
+  }
+  /** The button without a day proposes the month on screen's (`defaultCreateDay`);
+      the list shows no window, so there it is today. */
+  function viewCreateDay(): string {
+    const today = dayKeyInTz(new Date().toISOString(), viewerTimeZone());
+    if (mode !== 'month') return today;
+    const from = `${ym.year}-${String(ym.month).padStart(2, '0')}-01`;
+    const next = addMonths(ym.year, ym.month, 1);
+    const to = addDaysIso(`${next.year}-${String(next.month).padStart(2, '0')}-01`, -1);
+    return defaultCreateDay(today, { shown: { from, to } });
   }
 </script>
 
@@ -142,16 +153,16 @@
         <button type="button" class="lcal__navbtn" onclick={nextMonth} aria-label={t('planner.next_month', locale)}>›</button>
       </div>
     {/if}
-    <Button size="xs" variant="outline" onclick={() => openCreate()}>{t('perf.new_title', locale)}</Button>
+    <Button size="xs" variant="secondary" onclick={() => openCreate()}>{t('perf.new_title', locale)}</Button>
   </div>
 
   {#if $perfsQuery.isError}
-    <p class="lcal__state lcal__state--danger">{t('line.planner_error', locale)}</p>
+    <p class="load-fail" role="alert">{t('line.planner_error', locale)}</p>
   {:else if $perfsQuery.isPending}
-    <p class="lcal__state">{t('desk.loading', locale)}</p>
+    <EmptyLine text={t('desk.loading', locale)} busy />
   {:else if mode === 'list'}
     {#if upcoming.length === 0}
-      <p class="lcal__state">{t('line.planner_empty', locale)}</p>
+      <EmptyLine text={t('line.planner_empty', locale)} />
     {:else}
       <div class="table-wrap">
         <table>
@@ -295,14 +306,6 @@
       margin: 0;
       font-size: var(--text-xs);
       color: var(--text-faint);
-    }
-    .lcal__state {
-      margin: 0;
-      font-size: var(--text-s);
-      color: var(--text-faint);
-    }
-    .lcal__state--danger {
-      color: var(--danger);
     }
   }
 </style>

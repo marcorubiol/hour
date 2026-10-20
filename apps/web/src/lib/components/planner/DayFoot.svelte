@@ -36,6 +36,7 @@
   import { appLocale, t } from '$lib/i18n';
   import { accentVarFor } from '$lib/utils/accent';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
+  import PlannerSteps, { type StepVM } from '$lib/components/planner/PlannerSteps.svelte';
 
   interface Props {
     notes: NoteEvent[];
@@ -44,6 +45,9 @@
     onCreate: (body: string) => Promise<boolean>;
     onDelete: (id: string) => void;
     next: DayNextVM[];
+    /** The next steps that wait on this day (ADR-138 § 6); none, no lid. */
+    steps?: StepVM[];
+    stepsWord?: string;
     notesWord?: string;
     nextWord?: string;
     emptyWord?: string;
@@ -58,6 +62,8 @@
     onCreate,
     onDelete,
     next,
+    steps = [],
+    stepsWord = t('planner.steps', appLocale()),
     notesWord = t('planner.agenda_notes', appLocale()),
     nextWord = t('planner.day_next', appLocale()),
     emptyWord = t('planner.lid_empty', appLocale()),
@@ -68,6 +74,7 @@
 
   let notesOpen = $state(true);
   let nextOpen = $state(true);
+  let stepsOpen = $state(true);
   let draft = $state('');
   let pending = $state(false);
 
@@ -120,6 +127,13 @@
   </section>
 
   <section class="df__col df__col--next">
+    {#if steps.length > 0}
+      <button type="button" class="lid" aria-expanded={stepsOpen} onclick={() => (stepsOpen = !stepsOpen)}>
+        <span class="lid__w">{stepsWord}</span>
+        <span class="lid__n">{steps.length} {stepsOpen ? '−' : '+'}</span>
+      </button>
+      {#if stepsOpen}<PlannerSteps {steps} label={stepsWord} />{/if}
+    {/if}
     <button type="button" class="lid" aria-expanded={nextOpen} onclick={() => (nextOpen = !nextOpen)}>
       <span class="lid__w">{nextWord}</span>
       <span class="lid__n">{next.length === 0 ? emptyWord : next[0].day} {nextOpen ? '−' : '+'}</span>
@@ -235,6 +249,10 @@
     }
     .df__note-x:hover {
       color: var(--text-color);
+    }
+    /* A folded «pasos» lid above «después»: two lids, not one thick rule. */
+    .lid + .lid {
+      margin-block-start: var(--space-s);
     }
     /* ── Next · the days after this one, briefly ─────────────────────── */
     .df__nx {

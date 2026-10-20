@@ -112,10 +112,15 @@ test.describe('line detail — module composition', () => {
     const dialog = page.locator('dialog[open]');
     await dialog.getByLabel('Full name').fill(CONTACT_NAME);
     await dialog.getByLabel('Email').fill(CONTACT_EMAIL);
+    // A next step long past: the line's «Falta» names it (ADR-139 § 2).
+    await dialog.getByLabel('Next action', { exact: true }).fill('2020-01-06');
     await dialog.getByRole('button', { name: /^add$/i }).click();
     await expect(dialog).not.toBeVisible({ timeout: 10_000 });
 
     await expect(page.locator('#mod-conversations')).toContainText(CONTACT_NAME, { timeout: 10_000 });
+    const missing = page.getByTestId('record-missing');
+    await expect(missing).toContainText('Next step overdue', { timeout: 10_000 });
+    await expect(missing.getByRole('link', { name: 'open' }).first()).toHaveAttribute('href', /\/h\/playwright\/conversation\//);
 
     // Verify the line assignment through the API, then self-clean.
     const check = await page.evaluate(async ({ email, lineId }) => {

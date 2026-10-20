@@ -8,13 +8,13 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  * ADR-084 §1 — crear una función que dura VARIOS DÍAS, desde la pantalla.
  *
  * La tubería (RPC + endpoint) la fija `tests/rls/performance-series.test.ts`.
- * Lo que no tenía guardián es la puerta: que el alta de función ofrezca el
- * conmutador, que `BlockDays` resuelva el tramo, y que al enviar salga UNA
- * tanda y no N funciones sueltas.
+ * Lo que no tenía guardián es la puerta: que el alta rápida haga de un día
+ * con «+ hasta» una tanda, y que al enviar salga UNA tanda y no N funciones
+ * sueltas.
  *
- * Y fija la decisión de pantalla que va con ello: **con la tanda puesta el
- * campo «Date» desaparece**. El tramo ya dice cuándo, y dejar los dos sería
- * preguntar dos veces lo mismo con dos respuestas posibles.
+ * Y fija la decisión de pantalla que va con ello (ADR-139 p3): **un solo
+ * control de fecha**. El día y su «hasta», nunca un segundo «Date»: dejar dos
+ * sería preguntar dos veces lo mismo con dos respuestas posibles.
  *
  * Todo en el workspace `playwright`, sobre el proyecto de fixtures, con días
  * de 2031 que no chocan con nada. Autolimpiante (ADR-052).
@@ -60,7 +60,7 @@ test.describe('a performance that lasts several days (ADR-084 §1)', () => {
     await page.close();
   });
 
-  test('THE SPAN REPLACES THE DAY, and one run comes out — not N loose gigs', async ({ page }) => {
+  test('ONE DATE CONTROL, and one run comes out — not N loose gigs', async ({ page }) => {
     test.setTimeout(90_000);
     await page.goto(`/h/planner?view=month&scope=${FIXTURE_SPACE_TOKEN}`);
     await waitForLoaded(page);
@@ -69,24 +69,24 @@ test.describe('a performance that lasts several days (ADR-084 §1)', () => {
     const dlg = page.locator('dialog[open]');
     await expect(dlg).toBeVisible();
 
-    // El alta abre en «performance»; el campo de un solo día está ahí.
-    await expect(dlg.getByLabel('Date'), 'a single gig asks for its day').toHaveCount(1);
+    // El alta abre en «performance»: la línea grande es la sala.
+    await dlg.locator('.qa__title').fill(venue);
 
-    await dlg.getByText(/several days|varios días|diversos dies/i).first().click();
-    const dates = dlg.locator('input[type="date"]');
-    // BlockDays va ANTES del formulario en el DOM: sus dos campos son los
-    // primeros. (Apuntar por posición desde el final cogía el «Date».)
+    // Por id y no por etiqueta: el nombre visible del proyecto no es un
+    // contrato. El bloque de la ficha «proyecto» tiene un solo desplegable.
+    await dlg.locator('[data-chip="owner"]').click();
+    await dlg.locator('.qa__panel select').first().selectOption(FIXTURE_PROJECT_ID);
+
+    // UN SOLO CONTROL DE FECHA (ADR-139 p3): el día, y «+ hasta» lo hace tanda.
+    await dlg.locator('[data-chip="when"]').click();
+    const dates = dlg.locator('.qa__panel input[type="date"]');
+    await expect(dates, 'one day, asked once').toHaveCount(1);
     await dates.nth(0).fill(FROM);
+    await dlg.getByRole('button', { name: /^\+ (until|hasta|fins|jusqu)/i }).click();
+    await expect(dates, 'the day and its «until», never a second «Date»').toHaveCount(2);
     await dates.nth(1).fill(TO);
 
-    // LA LEY DE PANTALLA: con el tramo puesto, el día suelto se va.
-    await expect(dlg.getByLabel('Date'), 'the span replaces the day').toHaveCount(0);
-
-    // Por id y no por etiqueta: `selectOption` no acepta regex en `label`, y
-    // el nombre visible del proyecto no es un contrato.
-    await dlg.getByLabel(/project/i).selectOption(FIXTURE_PROJECT_ID);
-    await dlg.getByLabel('Venue').fill(venue);
-    await dlg.getByRole('button', { name: /create performance/i }).click();
+    await dlg.getByRole('button', { name: /^(add|añadir|afegeix|ajouter)$/i }).click();
     await expect(dlg).toBeHidden({ timeout: 20_000 });
 
     // La mitad que la pantalla no puede afirmar: UNA serie, no tres sueltas.

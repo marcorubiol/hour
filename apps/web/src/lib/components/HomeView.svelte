@@ -42,7 +42,9 @@
   const locale = detectLocale(navigator.language);
   import { accentVar } from '$lib/utils/accent';
   import { spaceName } from '$lib/utils/identity';
-  import { useBreadcrumb } from '$lib/stores/breadcrumb.svelte';
+  import RecordHead from '$lib/components/RecordHead.svelte';
+  import BlockHead from '$lib/components/BlockHead.svelte';
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import EditWorkspaceDialog from '$lib/components/EditWorkspaceDialog.svelte';
   import { goto } from '$app/navigation';
 
@@ -53,7 +55,6 @@
   let { workspaceSlug = '' }: Props = $props();
 
   const creation = useCreation();
-  const breadcrumb = useBreadcrumb();
 
   // Space portada: the edit-space dialog (opened from the masthead pencil).
   let editOpen = $state(false);
@@ -237,20 +238,11 @@
     return [discipline, ws.city].filter(Boolean).join(' · ');
   });
 
-  // The portada publishes its address (● space name) to the shell
-  // breadcrumb bar.
-  $effect(() => {
-    if (!currentWorkspace) return;
-    breadcrumb.set([
-      {
-        label: spaceName(currentWorkspace.name),
-        href: `/h/${currentWorkspace.slug}/`,
-        kind: 'space',
-        accent: accentVar(currentWorkspace.slug),
-      },
-    ]);
-    return () => breadcrumb.clear();
-  });
+  // The space is the root of its records: its address is the kind alone,
+  // with the space's dot (RecordHead).
+  let crumbs = $derived(
+    currentWorkspace ? [{ label: t('workspace.label', locale), accent: accentVar(currentWorkspace.slug) }] : [],
+  );
 
   function openLine(line: NavLine) {
     void goto(lineUrl(line));
@@ -263,31 +255,27 @@
      padding-block + a space-l flex gap between children); the vertical rhythm
      here is controlled by each element's own margin. Width: .shell__content. -->
 <div class="home">
-  <header class="space-head">
-      {#if currentWorkspace}
-        {#if spaceKicker}
-          <div class="space-head__kick">
-            <span class="space-head__dot" style={`--c: ${accentVar(currentWorkspace.slug)}`} aria-hidden="true"></span>
-            {spaceKicker}
-          </div>
-        {/if}
-        <div class="space-head__namerow">
-          <h1 class="space-head__name">{spaceName(currentWorkspace.name)}</h1>
-          <button
-            type="button"
-            class="space-head__edit"
-            onclick={() => (editOpen = true)}
-            title={t('hall.edit_space', locale)}
-            aria-label={t('hall.edit_space', locale)}
-          >
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
-          </button>
-        </div>
-        {#if currentWorkspace.description}
-          <p class="space-head__about">{currentWorkspace.description}</p>
-        {/if}
-      {/if}
-  </header>
+  {#if currentWorkspace}
+    <RecordHead {crumbs} title={spaceName(currentWorkspace.name)}>
+      {#snippet actions()}
+        <button
+          type="button"
+          class="space-head__edit"
+          onclick={() => (editOpen = true)}
+          title={t('hall.edit_space', locale)}
+          aria-label={t('hall.edit_space', locale)}
+        >
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+        </button>
+      {/snippet}
+      {#snippet facts()}
+        {#if spaceKicker}<span>{spaceKicker}</span>{/if}
+      {/snippet}
+    </RecordHead>
+    {#if currentWorkspace.description}
+      <p class="space-head__about">{currentWorkspace.description}</p>
+    {/if}
+  {/if}
   {#if spaceStats}
     <div class="space-stats">
       <div class="space-stat"><b>{spaceStats.projects}</b><span>{t('hall.stat_projects', locale)}</span></div>
@@ -300,7 +288,7 @@
     <EditWorkspaceDialog bind:open={editOpen} workspace={currentWorkspace} />
   {/if}
 
-  <div class="home__toolbar"><span class="eyebrow">{t('hall.next7', locale)}</span></div>
+  <div class="home__toolbar"><BlockHead title={t('hall.next7', locale)} /></div>
   <DeskBoard
     conversations={scopedConversations}
     {workspaceSlug}
@@ -312,12 +300,7 @@
   />
 
   {#if visibleProjects.length > 0 || projectsSettled}
-    <div class="home__projects-head">
-      <span class="eyebrow">{t('hall.projects', locale)}</span>
-      {#if currentWorkspace}
-        <span class="home__projects-hint">{t('hall.projects_hint', locale, { name: spaceName(currentWorkspace.name) })}</span>
-      {/if}
-    </div>
+    <div class="home__projects-head"><BlockHead title={t('hall.projects', locale)} /></div>
     <div class="home__projects">
       {#each visibleProjects as unit (unit.id)}
         <article class="pcard pcard--accent" style={`--c: ${unit.accent}`}>
@@ -335,7 +318,7 @@
                 <span class="pcard__go" aria-hidden="true">→</span>
               </button>
             {:else}
-              <p class="pcard__empty">{t('hall.no_lines', locale)}</p>
+              <EmptyLine text={t('hall.no_lines', locale)} />
             {/each}
             <div class="pcard__new">
               <button
@@ -364,37 +347,6 @@
 <style>
   @layer components {
     /* ── space portada masthead ── */
-    .space-head {
-      margin-block-end: var(--space-s);
-    }
-    .space-head__kick {
-      display: flex;
-      align-items: center;
-      gap: var(--space-s);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing-loose);
-      text-transform: uppercase;
-      color: var(--text-muted);
-    }
-    .space-head__dot {
-      inline-size: 0.5rem;
-      block-size: 0.5rem;
-      flex: none;
-      border-radius: var(--radius-circle);
-      background: var(--c, var(--text-faint));
-    }
-    .space-head__namerow {
-      display: flex;
-      align-items: center;
-      gap: var(--space-s);
-      margin-block-start: var(--space-2xs);
-    }
-    /* .space-head__name is an <h1> → base.css display size; just reset here. */
-    .space-head__name {
-      margin: 0;
-      color: var(--heading-color);
-    }
     .space-head__edit {
       display: inline-grid;
       place-items: center;
@@ -455,17 +407,7 @@
 
     /* ── projects grid ── */
     .home__projects-head {
-      display: flex;
-      align-items: baseline;
-      gap: var(--space-s);
-      flex-wrap: wrap;
       margin-block: var(--space-l) var(--space-s);
-    }
-    .home__projects-hint {
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      font-style: italic;
-      font-family: var(--font-display);
     }
     .home__projects {
       display: grid;
@@ -578,12 +520,6 @@
     }
     .pcard__line:hover .pcard__go {
       opacity: 1;
-    }
-    .pcard__empty {
-      margin: 0;
-      padding: var(--space-s);
-      font-size: var(--text-s);
-      color: var(--text-faint);
     }
 
     /* Creation affordances (ADR-056) — quiet by design. */

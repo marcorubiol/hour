@@ -150,7 +150,7 @@
     {:else}
       <h1>{t('invite.unavailable_a', locale)} <em>{t('invite.unavailable_b', locale)}</em></h1>
       <p class="invitation-card__lede">{errorMessage}</p>
-      <a class="btn--outline invitation-card__accept" href="/login">{t('invite.return', locale)}</a>
+      <a class="btn--secondary invitation-card__accept" href="/login">{t('invite.return', locale)}</a>
     {/if}
   </section>
 

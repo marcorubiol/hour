@@ -132,7 +132,7 @@ function daysBetween(from: string, to: string): number {
 }
 
 /** How far a weekday still reads as «this one coming»: six days ahead. */
-const DEADLINE_WEEKDAY_DAYS = 6;
+export const DEADLINE_WEEKDAY_DAYS = 6;
 
 /**
  * A hold's deadline, said so it cannot be misread (Marco, 2026-10-18).
@@ -184,6 +184,7 @@ export function isValidHoldNotice(value: number | null | undefined): boolean {
  * migration. Array order is display order.
  */
 export const READINESS_KEYS = ['hotel', 'technical'] as const;
+export type ReadinessKey = (typeof READINESS_KEYS)[number];
 
 /** i18n key for a checklist item's word. */
 export function readinessLabelKey(key: string): string {

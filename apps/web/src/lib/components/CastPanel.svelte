@@ -18,6 +18,8 @@
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
+  import Field from '$lib/components/Field.svelte';
   import PersonPicker from '$lib/components/PersonPicker.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { appLocale, t } from '$lib/i18n';
@@ -124,9 +126,9 @@
 
 <div class="cast">
   {#if $castQuery.isPending}
-    <p class="cast__quiet">{t('desk.loading', locale)}</p>
+    <EmptyLine busy text={t('desk.loading', locale)} />
   {:else if $castQuery.error}
-    <p class="cast__quiet">{t('perf.cast_load_error', locale)}</p>
+    <EmptyLine text={t('perf.cast_load_error', locale)} />
   {:else}
     {#if cast.length > 0}
       <ul class="cast__list" role="list">
@@ -135,7 +137,7 @@
             <span class="cast__name">{m.person?.full_name ?? t('perf.cast_unknown_person', locale)}</span>
             <span class="cast__role">{m.role}</span>
             <Button
-              variant="outline"
+              variant="secondary"
               size="s"
               tone="warn"
               label={t('perf.cast_remove_named', locale, {
@@ -148,7 +150,7 @@
         {/each}
       </ul>
     {:else}
-      <p class="cast__quiet">{t('perf.cast_empty', locale)}</p>
+      <EmptyLine text={t('perf.cast_empty', locale)} />
     {/if}
 
     <!-- Casting requires a local dossier (cast_member_workspace_person_fkey);
@@ -163,17 +165,14 @@
         bind:text={personText}
         onpick={(p) => (picked = { id: p.person_id, name: p.full_name })}
       />
-      <div class="field cast__field">
-        <label for={`cast-role-${projectId}`}>{t('perf.cast_role', locale)}</label>
-        <div class="field__control">
-          <input
-            id={`cast-role-${projectId}`}
-            bind:value={role}
-            placeholder={t('perf.cast_role_placeholder', locale)}
-            maxlength="120"
-          />
-        </div>
-      </div>
+      <Field id={`cast-role-${projectId}`} label={t('perf.cast_role', locale)}>
+        <input
+          id={`cast-role-${projectId}`}
+          bind:value={role}
+          placeholder={t('perf.cast_role_placeholder', locale)}
+          maxlength="120"
+        />
+      </Field>
       <Button type="submit" size="s" disabled={!canAdd} loading={$addMutation.isPending}>
         {t('composer.add', locale)}
       </Button>
@@ -186,13 +185,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-s);
-  }
-
-  .cast__quiet {
-    margin: 0;
-    font-size: var(--text-s);
-    color: var(--text-muted);
-    line-height: 1.55;
   }
 
   .cast__list {
@@ -222,19 +214,17 @@
     color: var(--text-faint);
   }
 
+  /* Two field rows and the verb under them (ADR-139 p4). */
   .cast__add {
     display: flex;
-    align-items: flex-end;
+    flex-direction: column;
     gap: var(--space-xs);
-    flex-wrap: wrap;
     padding-block-start: var(--space-xs);
-    border-block-start: var(--line-hairline) solid var(--border-color-light);
+  }
+  .cast__add > :global(button) {
+    align-self: flex-end;
   }
 
   /* Both fields are `.field` (base.css), so the person and the role read
      as one form; here only how they share the row. */
-  .cast__add > :global(*:not(button)) {
-    flex: 1;
-    min-inline-size: 8rem;
-  }
 </style>

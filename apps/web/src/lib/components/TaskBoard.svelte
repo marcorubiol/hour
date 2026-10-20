@@ -10,6 +10,7 @@
    * invalidate the ['tasks'] and ['line-tasks'] prefixes (the Desk feed
    * and the module read the same rows through different keys).
    */
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { createMutation, useQueryClient } from '@tanstack/svelte-query';
   import { mutateJSON, ApiError } from '$lib/api';
   import { addToast } from '$lib/components/Toast.svelte';
@@ -111,11 +112,11 @@
 
 <div class="taskboard">
   {#if loading}
-    <p class="taskboard__empty">{t('desk.loading', locale)}</p>
+    <EmptyLine text={t('desk.loading', locale)} busy />
   {:else if error}
-    <p class="taskboard__empty taskboard__empty--err">{t('desk.tasks_error', locale)}</p>
+    <p class="load-fail" role="alert">{t('desk.tasks_error', locale)}</p>
   {:else if rows.length === 0}
-    <p class="taskboard__empty">{emptyText}</p>
+    {#if emptyText}<EmptyLine text={emptyText} />{/if}
   {:else}
     <ul class="taskboard__list">
       {#each rows as task (task.id)}
@@ -243,18 +244,6 @@
       opacity: 1;
     }
     .taskrow__remove:hover {
-      color: var(--danger);
-    }
-
-    .taskboard__empty {
-      margin: 0;
-      color: var(--text-muted);
-      font-style: italic;
-      font-family: var(--font-display);
-      padding-block: var(--space-m);
-      text-align: center;
-    }
-    .taskboard__empty--err {
       color: var(--danger);
     }
 

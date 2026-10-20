@@ -70,6 +70,25 @@ export function addDaysIso(iso: string, delta: number): string {
 }
 
 /**
+ * THE DAY A «+» WITHOUT A DAY OF ITS OWN PROPOSES. A cell's «+» knows its
+ * day; the toolbar's «+ date», the `N` key, the season's and the day's «+»
+ * do not, and they used to fall back to today, so whoever was reading
+ * November and added «the one on the 14th» could save without looking and
+ * land in October. One rule for every such door: the day the view has
+ * selected (the Day view's day); else today when the view shows it; else the
+ * first day the view shows. With nothing known about the view, today.
+ */
+export function defaultCreateDay(
+  todayIso: string,
+  view: { selected?: string | null; shown?: { from: string; to: string } | null },
+): string {
+  if (view.selected) return view.selected;
+  const shown = view.shown;
+  if (!shown || (todayIso >= shown.from && todayIso <= shown.to)) return todayIso;
+  return shown.from;
+}
+
+/**
  * ISO-8601 week number (ADR-095 §1). The Month view's grain is a WEEK, and
  * `weeks 27 → 31` in the header is the one thing that says so without
  * announcing it — the range proves what a row is.
@@ -735,6 +754,19 @@ export function normalizePlannerView(v: string | null | undefined): PlannerView 
  */
 export function plannerDayHref(view: 'day' | 'agenda', day: string): string {
   return `/h/planner?view=${view}&d=${day}`;
+}
+
+/**
+ * «Ver en el Planner» from a conversation (ADR-138 § 6): the Agenda open on
+ * its first day ahead, with its project pinned (`scope=p:<id>`, the uuid
+ * form the shell applies on arrival, as Cuentas does). The first day is the
+ * earliest of `days` from today on; with none ahead, the book opens on today.
+ * The scope is the project: the Planner has no bolo nor conversation pin
+ * (ADR-092).
+ */
+export function conversationPlannerHref(projectId: string, days: readonly string[], todayIso: string): string {
+  const first = days.filter((d) => d >= todayIso).sort()[0];
+  return `/h/planner?view=agenda${first ? `&d=${first}` : ''}&scope=p:${projectId}`;
 }
 
 /**

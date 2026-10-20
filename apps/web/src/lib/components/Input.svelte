@@ -1,6 +1,8 @@
 <script lang="ts">
+  /** A one-line value in a field row (ADR-139 p4); `toolbar` for a filter bar. */
   import type { Snippet } from 'svelte';
   import type { HTMLInputAttributes } from 'svelte/elements';
+  import Field from './Field.svelte';
 
   type InputType =
     | 'text'
@@ -34,6 +36,11 @@
     onchange?: (event: Event) => void;
     prefix?: Snippet;
     suffix?: Snippet;
+    /** A filter bar's boxed control (first level, diseño M9). */
+    toolbar?: boolean;
+    min?: string | number;
+    max?: string | number;
+    step?: string | number;
   }
 
   let {
@@ -55,6 +62,10 @@
     onchange,
     prefix,
     suffix,
+    toolbar = false,
+    min,
+    max,
+    step,
   }: Props = $props();
 
   let fieldId = $derived(
@@ -63,54 +74,27 @@
   let isDisabled = $derived(disabled || loading);
   let hasMessage = $derived(Boolean(error || helper));
   let messageId = $derived(`${fieldId}-msg`);
-
-  let wrapperClasses = $derived(
-    ['field', error && 'field--error', loading && 'field--loading']
-      .filter(Boolean)
-      .join(' ')
-  );
 </script>
 
-<div class={wrapperClasses}>
-  {#if label}
-    <label for={fieldId}>
-      {label}{#if required}<span aria-hidden="true"> *</span>{/if}
-    </label>
-  {/if}
-
-  <div class="field__control">
-    {#if prefix}<span class="field__prefix">{@render prefix()}</span>{/if}
-
-    <!-- svelte-ignore a11y_autofocus -->
-    <input
-      id={fieldId}
-      {name}
-      {type}
-      bind:value
-      {placeholder}
-      {required}
-      disabled={isDisabled}
-      {autocomplete}
-      {list}
-      {autofocus}
-      aria-invalid={error ? 'true' : undefined}
-      aria-describedby={hasMessage ? messageId : undefined}
-      {oninput}
-      {onchange}
-    />
-
-    {#if loading}
-      <span class="field__suffix field__suffix--spinner" aria-hidden="true">
-        <span class="field__spinner"></span>
-      </span>
-    {:else if suffix}
-      <span class="field__suffix">{@render suffix()}</span>
-    {/if}
-  </div>
-
-  {#if hasMessage}
-    <p id={messageId} class="field__msg" role={error ? 'alert' : undefined}>
-      {error ?? helper}
-    </p>
-  {/if}
-</div>
+<Field id={fieldId} {label} {required} {helper} {error} {loading} {toolbar} {prefix} {suffix}>
+  <!-- svelte-ignore a11y_autofocus -->
+  <input
+    id={fieldId}
+    {name}
+    {type}
+    bind:value
+    {placeholder}
+    {required}
+    disabled={isDisabled}
+    {autocomplete}
+    {list}
+    {autofocus}
+    {min}
+    {max}
+    {step}
+    aria-invalid={error ? 'true' : undefined}
+    aria-describedby={hasMessage ? messageId : undefined}
+    {oninput}
+    {onchange}
+  />
+</Field>

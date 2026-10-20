@@ -12,6 +12,9 @@
    */
   import Button from '$lib/components/Button.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
+  import ConceptHint from '$lib/components/ConceptHint.svelte';
+  import FirstTimeNote from '$lib/components/FirstTimeNote.svelte';
   import { useQueryClient } from '@tanstack/svelte-query';
   import { addToast } from '$lib/components/Toast.svelte';
   import { ApiError } from '$lib/api';
@@ -135,7 +138,7 @@
   </BlockHead>
 
   {#if errored}
-    <p class="load-fail" role="alert"><span>{t('desk.next_error', locale)}</span><Button size="xs" variant="outline" onclick={onretry}>{t('ui.retry', locale)}</Button></p>
+    <p class="load-fail" role="alert"><span>{t('desk.next_error', locale)}</span><Button size="xs" variant="secondary" onclick={onretry}>{t('ui.retry', locale)}</Button></p>
   {:else if !settled}
     <!-- The wait holds the lines a card usually draws (eyebrow, the slip's
          head, its name, the running order, the foot) and the line under it,
@@ -148,16 +151,18 @@
     </div>
     <p class="then" aria-hidden="true"><span class="ghost-line" style:inline-size="35%">&nbsp;</span></p>
   {:else if !next || !slip}
-    <p class="dband__empty">{t('desk.next_empty', locale)}</p>
+    <EmptyLine text={t('desk.next_empty', locale)} />
   {:else if daysTo(next.day) > 14}
-    <!-- Far away is still «the next thing»: the band says which, as the rail does. -->
-    <p class="dband__empty">
+    <!-- Far away is still «the next thing»: the band says which, as the rail
+         does, as the empty line's way out. -->
+    <EmptyLine text={t('desk.next_empty', locale)}>
       <svelte:element
         this={farHref ? 'a' : 'span'}
+        class={farHref ? 'empty-line__act' : undefined}
         href={farHref}
         >{t('desk.next_far', locale, { day: localeDayMonthNear(next.day, today, locale), place: slip.city || slip.name })}{farHref ? ' →' : ''}</svelte:element
       >
-    </p>
+    </EmptyLine>
   {:else}
     {#if thenBefore}{@render thenLine()}{/if}
     <div class="card" data-testid="desk-next">
@@ -189,16 +194,16 @@
         <div class="card__foot">
           {#if canAnswer}
             <span class="card__ask">
-              {t('desk.next_ask', locale)}
+              {t('desk.next_ask', locale)}<ConceptHint concept="guess" />
               <!-- The same answer as a «¿vas?» row of «Te espera»: the system's button. -->
               <button
                 type="button"
-                class="card__btn btn--outline btn--xs"
+                class="card__btn btn--secondary btn--xs"
                 aria-label={t('desk.going_aria', locale, { subject: slip.name })}
                 onclick={() => answer('going')}>{t('pulse.going', locale)}</button
               ><button
                 type="button"
-                class="card__btn card__btn--quiet btn--outline btn--xs"
+                class="card__btn card__btn--quiet btn--secondary btn--xs"
                 aria-label={t('desk.not_going_aria', locale, { subject: slip.name })}
                 onclick={() => answer('not_going')}>{t('pulse.not_going', locale)}</button
               >
@@ -206,11 +211,12 @@
           {/if}
           <span class="card__links">
             {#if whoHref}<a class="block-head__act" href={whoHref}>{t('commitment.who_goes', locale)} →</a>{/if}
-            {#if roadsheet}<a class="card__rs btn--outline btn--s" href={roadsheet}>{t('desk.roadsheet', locale)} ↗</a>{/if}
+            {#if roadsheet}<a class="card__rs btn--secondary btn--s" href={roadsheet}>{t('desk.roadsheet', locale)} ↗</a>{/if}
           </span>
         </div>
       {/if}
     </div>
+    <FirstTimeNote event="first_going" when={canAnswer} />
     {#if !thenBefore}{@render thenLine()}{/if}
   {/if}
 </section>

@@ -10,10 +10,7 @@
     | 'privacy'
     | 'languages'
     | 'lenses'
-    | 'mail'
-    | 'notifications'
-    | 'billing'
-    | 'danger';
+    | 'mail';
 
   type Section = {
     id: SectionId;
@@ -30,10 +27,15 @@
     { id: 'languages', labelKey: 'settings.nav_languages', glyph: '¶' },
     { id: 'lenses', labelKey: 'settings.nav_lenses', glyph: '◫' },
     { id: 'mail', labelKey: 'settings.nav_mail', glyph: '@' },
-    { id: 'notifications', labelKey: 'settings.nav_notifications', glyph: '◉' },
-    { id: 'billing', labelKey: 'settings.nav_billing', glyph: '€' },
-    { id: 'danger', labelKey: 'settings.nav_danger', glyph: '⚠', danger: true },
+    // Notifications, Billing and Danger zone are hidden: every control in
+    // them kept nothing (a mocked card, switches with no writer, buttons
+    // with no handler). Each comes back with the first control that saves.
   ];
+
+  /** A `?section=` that is not (or no longer) a section lands on Profile. */
+  export function sectionFrom(param: string | null): SectionId {
+    return SECTIONS.some((s) => s.id === param) ? (param as SectionId) : 'profile';
+  }
 </script>
 
 <script lang="ts">
@@ -54,7 +56,7 @@
 
   let workspaceSlug = $derived(page.params.workspace ?? '');
   let active = $derived<SectionId>(
-    (page.url.searchParams.get('section') as SectionId | null) ?? 'profile',
+    sectionFrom(page.url.searchParams.get('section')),
   );
 
   function hrefFor(id: SectionId): string {

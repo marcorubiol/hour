@@ -141,6 +141,23 @@ test.describe('Cuentas', () => {
     await expect(page.locator(`#bolo-sheet-${boloId}`)).toBeVisible();
   });
 
+  test('a «Falta» verb from the bolo vistazo lands with its dialog open (`act=`)', async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.goto('/h/books');
+    await waitForLoaded(page);
+    // Confirmed with no fee: «Pide atención» says «no fee», and its verb is the fee dialog.
+    const { boloId } = await ownBolo(page, FEE, null);
+
+    await page.goto(`/h/books?act=no_fee#bolo-${boloId}`);
+    await waitForLoaded(page);
+    const dialog = page.locator('dialog[open]');
+    await expect(dialog.getByLabel('Amount')).toBeVisible();
+    // Once: the parameter leaves the URL, so a reload does not reopen it.
+    await expect(page).not.toHaveURL(/act=/);
+    await expect(page).toHaveURL(new RegExp(`#bolo-${boloId}$`));
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+  });
+
   test('fee set → persists across a reload → clear', async ({ page }) => {
     test.setTimeout(60_000);
     await page.goto('/h/books');

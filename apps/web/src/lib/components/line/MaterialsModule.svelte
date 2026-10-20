@@ -7,6 +7,7 @@
    * Content-only component — the line detail shell owns the module frame.
    */
 
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
@@ -82,12 +83,17 @@
     },
   });
 
+  /** The URL's own word, under it (ADR-139 p7); the kind is native `required`. */
+  let urlError = $state<string | undefined>();
+  $effect(() => {
+    void fUrl;
+    urlError = undefined;
+  });
+  let formEl: HTMLFormElement | undefined = $state();
+
+  /** Runs from the form's submit, after the native constraints passed. */
   function submitCreate() {
     const url = fUrl.trim();
-    if (!fKind) {
-      addToast({ tone: 'warning', message: t('line.material_pick_kind', locale) });
-      return;
-    }
     let valid = false;
     try {
       new URL(url);
@@ -96,7 +102,7 @@
       valid = false;
     }
     if (!valid) {
-      addToast({ tone: 'warning', message: t('line.material_full_url', locale) });
+      urlError = t('line.material_full_url', locale);
       return;
     }
     $createMaterial.mutate({ kind: fKind, url, notes: fNotes.trim() || null });
@@ -119,15 +125,15 @@
 
 <section class="mat" aria-label={t('line.module_materials', locale)}>
   <header class="mat__head">
-    <Button size="xs" variant="outline" onclick={openCreate}>{t('line.material_register', locale)}</Button>
+    <Button size="xs" variant="secondary" onclick={openCreate}>{t('line.material_register', locale)}</Button>
   </header>
 
   {#if errorMsg}
-    <p class="mat__state mat__state--danger">{errorMsg}</p>
+    <p class="load-fail" role="alert">{errorMsg}</p>
   {:else if loading}
-    <p class="mat__state">{t('desk.loading', locale)}</p>
+    <EmptyLine text={t('desk.loading', locale)} busy />
   {:else if items.length === 0}
-    <p class="mat__state">{t('line.material_empty', locale)}</p>
+    <EmptyLine text={t('line.material_empty', locale)} />
   {:else}
     <div class="table-wrap">
       <table>
@@ -163,7 +169,7 @@
                 <Menu
                   label={t('line.material_actions', locale)}
                   align="end"
-                  triggerClass="btn--outline btn--xs"
+                  triggerClass="btn--secondary btn--xs"
                   items={[
                     {
                       label: t('line.remove', locale),
@@ -187,7 +193,14 @@
   description={t('line.material_dialog_desc', locale)}
   size="s"
 >
-  <div class="mat__form">
+  <form
+    class="mat__form"
+    bind:this={formEl}
+    onsubmit={(e) => {
+      e.preventDefault();
+      submitCreate();
+    }}
+  >
     <Select
       label={t('conversations.event_kind', locale)}
       bind:value={fKind}
@@ -195,16 +208,20 @@
       placeholder={t('line.material_kind_ph', locale)}
       required
     />
-    <Input label="URL" type="url" bind:value={fUrl} placeholder="https://…" required />
+    <Input label="URL" type="url" bind:value={fUrl} placeholder="https://…" required error={urlError} />
     <Input
       label={t('person.notes', locale)}
       bind:value={fNotes}
       placeholder={t('line.material_notes_ph', locale)}
     />
-  </div>
+    <!-- Hidden submit lets Enter inside an input trigger submit. -->
+    <button type="submit" hidden aria-hidden="true"></button>
+  </form>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (createOpen = false)}>{t('create.cancel', locale)}</Button>
-    <Button onclick={submitCreate} loading={$createMaterial.isPending}>{t('line.material_register_short', locale)}</Button>
+    <Button variant="quiet" onclick={() => (createOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button onclick={() => formEl?.requestSubmit()} loading={$createMaterial.isPending}
+      >{t('line.material_register_short', locale)}</Button
+    >
   {/snippet}
 </Dialog>
 
@@ -219,14 +236,6 @@
     .mat__head {
       display: flex;
       justify-content: flex-end;
-    }
-
-    .mat__state {
-      font-size: var(--text-s);
-      color: var(--text-faint);
-    }
-    .mat__state--danger {
-      color: var(--danger);
     }
 
     .mat__cell-direction {
@@ -274,7 +283,7 @@
     .mat__form {
       display: flex;
       flex-direction: column;
-      gap: var(--space-s);
+      gap: var(--field-gap);
     }
   }
 </style>

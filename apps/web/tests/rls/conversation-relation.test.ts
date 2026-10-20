@@ -214,19 +214,26 @@ describe.skipIf(!envReady() || !limitedEnvReady())('conversation_bolos and «not
   });
 
   test('«not this time» is written by its column grant and the derived relation says it', async () => {
-    const select = new URLSearchParams({ id: `eq.${shared}`, select: 'id,not_now_until,relation:conversation_relation' });
-    const set = await pgPatch<{ relation: string; not_now_until: string | null }>(
-      'conversation',
-      admin,
-      { not_now_at: new Date().toISOString(), not_now_until: '2099-01-01' },
-      select,
-    );
-    expect(set.status).toBe(200);
-    expect(set.rows[0]).toMatchObject({ relation: 'not_now', not_now_until: '2099-01-01' });
-
-    const lifted = await pgPatch<{ relation: string }>('conversation', admin, { not_now_at: null, not_now_until: null }, select);
-    expect(lifted.status).toBe(200);
-    expect(lifted.rows[0]?.relation).not.toBe('not_now');
+    // La relación se relee por id: en la respuesta del PATCH ve la fila de
+    // antes. Se escribe y se vuelve a leer, como hace la pantalla.
+    const read = async () =>
+      (
+        await pgGet<{ relation: string; not_now_until: string | null }>(
+          'conversation',
+          admin,
+          new URLSearchParams({ id: `eq.${shared}`, select: 'id,not_now_until,relation:conversation_relation' }),
+        )
+      ).rows[0];
+    const only = new URLSearchParams({ id: `eq.${shared}` });
+    try {
+      const set = await pgPatch('conversation', admin, { not_now_at: new Date().toISOString(), not_now_until: '2099-01-01' }, only);
+      expect(set.status).toBe(200);
+      expect(await read()).toMatchObject({ relation: 'not_now', not_now_until: '2099-01-01' });
+    } finally {
+      const lifted = await pgPatch('conversation', admin, { not_now_at: null, not_now_until: null }, only);
+      expect(lifted.status).toBe(200);
+    }
+    expect((await read())?.relation).not.toBe('not_now');
   });
 
   test('a day to write again needs «not this time»', async () => {

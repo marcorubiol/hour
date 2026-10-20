@@ -442,12 +442,21 @@
     }
   }
 
-  [class*="btn--"]:where(:not(.btn--none)):disabled {
-    opacity: var(--disabled-opacity);
+  /* Disabled reads as faint words, never as a grey slab louder than what
+     is live (F13). A loading button is disabled too, but keeps its look. */
+  [class*="btn--"]:where(:not(.btn--none)):disabled:not(.btn--loading) {
+    --btn-background: transparent;
+    --btn-background-hover: transparent;
+    --btn-text-color: var(--text-faint);
+    --btn-text-color-hover: var(--text-faint);
+    --btn-border-color: var(--border-color-light);
+    --btn-border-color-hover: var(--border-color-light);
     cursor: not-allowed;
   }
 
-  /* Button variants — only CSS variable redeclarations */
+  /* Button variants — only CSS variable redeclarations. The closed set
+     (ADR-139 p4): primary (ink, one per dialog or screen), secondary (a
+     hairline), quiet (a word). Destructive is a tone, not a fourth button. */
 
   /* Primary = ink fill (v0.5 editorial). The slate --primary stays
      reserved for focus rings, links, selection — not button fills. */
@@ -460,23 +469,26 @@
     --btn-border-color-hover: var(--btn-background-hover);
   }
 
-  /* Danger = red fill for destructive actions (Delete account, etc.). */
-  .btn--danger {
-    --btn-background: var(--danger);
-    --btn-background-hover: var(--danger-hover);
-    --btn-text-color: var(--bg);
-    --btn-text-color-hover: var(--bg);
-    --btn-border-color: var(--btn-background);
-    --btn-border-color-hover: var(--btn-background-hover);
-  }
-
-  .btn--outline {
+  .btn--secondary {
     --btn-background: transparent;
     --btn-background-hover: var(--bg-ultra-light);
     --btn-text-color: var(--text-dark-muted);
     --btn-text-color-hover: var(--heading-color);
     --btn-border-color: var(--border-color-dark);
     --btn-border-color-hover: var(--border-color-hover);
+  }
+
+  /* Quiet = the action as a word («Cancelar», «Borrar», «marcar
+     indisponibilidad →»): no box, the padding kept so its hit area and its
+     baseline match the buttons beside it. */
+  .btn--quiet {
+    --btn-background: transparent;
+    --btn-background-hover: transparent;
+    --btn-text-color: var(--text-muted);
+    --btn-text-color-hover: var(--text-color);
+    --btn-border-color: transparent;
+    --btn-border-color-hover: transparent;
+    --btn-padding-inline: 0.25em;
   }
 
   /* Warn = combinable tone modifier. Repaints text + border to danger,
@@ -487,6 +499,10 @@
     --btn-text-color-hover: var(--danger-dark);
     --btn-border-color: var(--danger-light);
     --btn-border-color-hover: var(--danger);
+  }
+  .btn--quiet.is-warn {
+    --btn-border-color: transparent;
+    --btn-border-color-hover: transparent;
   }
 
   /* Loading: hide content, overlay spinner. Skeleton, not a variant. */
@@ -523,124 +539,151 @@
     align-items: center;
   }
 
-  /* Size modifiers (combinable) */
+  /* Two sizes, both from the first level's scale: s (the default, a
+     dialog's foot, a block's one button) and xs (inside a row). */
   .btn--xs {
     --btn-font-size: var(--text-xs);
   }
   .btn--s {
     --btn-font-size: var(--text-s);
   }
-  .btn--m {
-    --btn-font-size: var(--text-m);
-  }
-  .btn--l {
-    --btn-font-size: var(--text-l);
-  }
 
-  /* Field skeleton — wraps label + input + helper/error.
-     The control wrapper carries the border so prefix/suffix sit inside it.
-     Input inside .field__control sheds its own border (cascade-friendly). */
+  /* Field skeleton (ADR-139 p4) — the field is a ROW, the same to read and
+     to edit: the mono label in a fixed column, the value without a box,
+     one hairline under both that darkens on hover and takes the focus
+     colour while editing. Too narrow for label + value (and always on a
+     phone) the label goes on top: flex-wrap does it, no breakpoint per
+     dialog. Every one-line control has ONE height (--field-size), so a
+     select beside a date lines up by construction.
+     `.field--stack`: label always on top (a textarea, a long value).
+     `.field--toolbar`: a filter bar's control, boxed at --control-size-m
+     beside its buttons (diseño M9). */
   .field {
     display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: var(--space-s);
+    border-block-end: var(--field-line-width) solid var(--field-line);
+    transition:
+      border-color var(--transition), box-shadow var(--transition);
+  }
+
+  .field__label {
+    flex: 0 0 var(--field-label-width);
+    padding-block: var(--space-xs);
+    overflow-wrap: anywhere;
+  }
+
+  .field__value {
+    display: flex;
     flex-direction: column;
-    gap: var(--space-xs);
+    flex: 1 1 var(--field-value-min);
+    min-inline-size: 0;
   }
 
   .field__control {
     display: flex;
-    align-items: stretch;
-    background: var(--field-bg);
-    border: var(--border);
-    border-radius: var(--field-radius);
-    transition: border-color var(--transition);
-    overflow: hidden;
+    align-items: center;
+    gap: var(--space-xs);
+    min-block-size: var(--field-size);
   }
 
   @media (hover: hover) and (pointer: fine) {
-    .field__control:hover {
-      border-color: var(--border-color-hover);
+    .field:hover {
+      border-block-end-color: var(--field-line-hover);
     }
   }
 
-  .field__control:focus-within {
-    border-color: var(--field-border-color-focus);
-    outline: var(--focus-width) solid var(--focus-color);
-    outline-offset: 1px;
+  .field:focus-within {
+    border-block-end-color: var(--field-line-focus);
+    box-shadow: 0 var(--field-line-width) 0 var(--field-line-focus);
   }
 
-  .field--error .field__control {
-    border-color: var(--danger);
+  .field--error,
+  .field--error:focus-within {
+    border-block-end-color: var(--danger);
   }
-
-  .field--error .field__control:focus-within {
-    outline-color: var(--danger);
+  .field--error:focus-within {
+    box-shadow: 0 var(--field-line-width) 0 var(--danger);
   }
 
   .field--loading .field__control {
-    opacity: 0.7;
-  }
-
-  /* Disabled — wrapper picks up the state from the direct child control via
-     :has(> :disabled). Direct child only, so a <select> with internal
-     <option disabled> entries doesn't drag the wrapper into disabled style. */
-  .field__control:has(> :disabled) {
-    background: var(--bg-ultra-light);
-    border-color: var(--border-color-dark);
     opacity: var(--disabled-opacity);
+  }
+
+  /* Disabled — the row picks up the state from its direct control via
+     :has(> :disabled). Direct child only, so a <select> with internal
+     <option disabled> entries doesn't drag the row into disabled style. */
+  .field:has(.field__control > :disabled) {
+    opacity: var(--disabled-opacity);
+  }
+  .field__control > :disabled {
     cursor: not-allowed;
   }
 
-  .field__control:has(> :disabled) > * {
-    cursor: not-allowed;
-  }
-
-  .field__control > input,
-  .field__control > select {
-    border: none;
-    border-radius: 0;
-    outline: none;
-    background: transparent;
+  /* The control sheds the box of the semantic default: no border, no
+     paper, no ring of its own — the row's hairline is its edge. */
+  .field__control > :is(input, select, textarea) {
     flex: 1;
     min-inline-size: 0;
-  }
-
-  .field__control > input:hover,
-  .field__control > input:focus,
-  .field__control > input:focus-visible,
-  .field__control > select:hover,
-  .field__control > select:focus,
-  .field__control > select:focus-visible {
-    border: none;
-    outline: none;
+    padding-inline: 0;
     background: transparent;
+    border: 0;
+    border-radius: 0;
+    outline: none;
+    font-size: var(--text-s);
+    color: var(--text-color);
   }
-
-  /* Native select keeps its chevron via appearance: auto (default).
-     Padding is inherited from the global :where(...select) rule. */
-  .field--select .field__control {
-    overflow: visible; /* allow native dropdown shadow if any */
+  .field__control > :is(input, select) {
+    block-size: var(--field-size);
+    padding-block: 0;
+  }
+  .field__control > textarea {
+    padding-block: var(--space-xs);
+    resize: vertical;
+  }
+  .field__control > :is(input, select, textarea):is(:hover, :focus, :focus-visible) {
+    border: 0;
+    outline: none;
+    background-color: transparent;
+  }
+  /* The native list without its bezel, so its text starts on the same x as
+     every other value; the chevron is drawn (two half-squares). */
+  .field__control > select {
+    appearance: none;
+    padding-inline-end: 1.25em;
+    cursor: pointer;
+    background-image: /* material */
+      linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+      linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+    background-position:
+      calc(100% - 0.8em) 55%,
+      calc(100% - 0.4em) 55%;
+    background-size: 0.4em 0.4em;
+    background-repeat: no-repeat;
+  }
+  .field__control > input::-webkit-datetime-edit,
+  .field__control > input::-webkit-datetime-edit-fields-wrapper {
+    padding: 0;
+  }
+  /* A number is a number, not a spinner (F17): the native medium stays,
+     its chrome goes. */
+  .field__control > input[type="number"] {
+    appearance: textfield;
+  }
+  .field__control > input[type="number"]::-webkit-inner-spin-button,
+  .field__control > input[type="number"]::-webkit-outer-spin-button {
+    appearance: none;
+    margin: 0;
   }
 
   .field__prefix,
   .field__suffix {
     display: inline-flex;
     align-items: center;
-    padding-inline: var(--space-s);
-    color: var(--text-dark-muted);
-    background: transparent;
+    color: var(--text-muted);
+    font-size: var(--text-s);
     white-space: nowrap;
-  }
-
-  .field__prefix {
-    border-inline-end: var(--divider);
-  }
-
-  .field__suffix {
-    border-inline-start: var(--divider);
-  }
-
-  .field__suffix--spinner {
-    border-inline-start: none;
   }
 
   .field__spinner {
@@ -653,19 +696,91 @@
   }
 
   .field__msg {
-    font-size: var(--text-xs);
-    color: var(--text-dark-muted);
-    min-block-size: var(--text-xs);
     margin: 0;
+    padding-block-end: var(--space-xs);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
   }
 
   .field--error .field__msg {
     color: var(--danger-dark);
   }
 
-  /* Check skeleton — shared by checkbox and radio.
+  /* The same word for a group that is not one field (a set of checkboxes):
+     under the group, in the field's error voice (ADR-139 p7). */
+  .form-error {
+    margin: 0;
+    padding-block: var(--space-2xs) var(--space-xs);
+    font-size: var(--text-xs);
+    color: var(--danger-dark);
+  }
+
+  /* «guardado»: an in-place value says it is kept, at the row's end, in
+     grey, for a moment (p7). The words of a fact, not a toast. */
+  .field__saved {
+    flex: none;
+    align-self: center;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--mono-letter-spacing-loose);
+    color: var(--text-faint);
+  }
+
+  .field--stack .field__label {
+    flex-basis: 100%;
+    padding-block-end: 0;
+  }
+
+  @media (max-width: 47.999rem) {
+    .field .field__label {
+      flex-basis: 100%;
+      padding-block-end: 0;
+    }
+  }
+
+  /* Toolbar: the filter bar's control (first level). Label on top, the
+     control a box at the bar's height. */
+  .field--toolbar {
+    row-gap: var(--space-xs);
+    border-block-end: 0;
+  }
+  .field--toolbar:focus-within {
+    box-shadow: none;
+  }
+  .field--toolbar .field__label {
+    flex-basis: 100%;
+    padding-block: 0;
+  }
+  .field--toolbar .field__control {
+    block-size: var(--control-size-m);
+    min-block-size: 0;
+    padding-inline: var(--space-m);
+    background: var(--field-bg);
+    border: var(--border);
+    border-radius: var(--field-radius);
+    transition: border-color var(--transition);
+  }
+  .field--toolbar .field__control > :is(input, select) {
+    block-size: 100%;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .field--toolbar .field__control:hover {
+      border-color: var(--border-color-hover);
+    }
+  }
+  .field--toolbar .field__control:focus-within {
+    border-color: var(--field-border-color-focus);
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: 1px;
+  }
+  .field--toolbar.field--error .field__control {
+    border-color: var(--danger);
+  }
+
+  /* Check skeleton — the ONE box (ADR-139 p4): checkbox and radio.
      Native input is visually hidden but stays in DOM (focus + a11y).
-     The .check__box is what's drawn; modifier .check--radio rounds it. */
+     The .check__box is drawn in em of its own label (--text-s), so box
+     and words are one size; modifier .check--radio rounds it. */
   .check {
     display: flex;
     flex-direction: column;
@@ -677,8 +792,16 @@
     display: inline-flex;
     align-items: center;
     gap: var(--space-s);
+    font-size: var(--text-s);
+    color: var(--text-color);
     cursor: pointer;
     user-select: none;
+  }
+  /* A finger's target, by padding of the row, never by the box's size. */
+  @media (pointer: coarse) {
+    .check__row {
+      min-block-size: var(--touch-target);
+    }
   }
 
   .check--disabled .check__row {
@@ -686,6 +809,9 @@
     opacity: var(--disabled-opacity);
   }
 
+  /* Heard, not seen: a live announcement (calm switching, ADR-139 § 5) or a
+     native input under its drawn box. */
+  .visually-hidden,
   .check__input {
     position: absolute;
     inline-size: var(--line-hairline);
@@ -700,11 +826,11 @@
 
   .check__box {
     flex-shrink: 0;
-    inline-size: 1.125em;
-    block-size: 1.125em;
-    border: var(--border);
+    inline-size: var(--check-size);
+    block-size: var(--check-size);
+    border: var(--border-size) solid var(--field-line-hover);
     border-radius: var(--radius-s);
-    background: var(--bg);
+    background: transparent;
     display: grid;
     place-items: center;
     transition: background var(--transition), border-color var(--transition);
@@ -714,8 +840,10 @@
     border-radius: 50%;
   }
 
-  .check__row:hover .check__box {
-    border-color: var(--border-color-hover);
+  @media (hover: hover) and (pointer: fine) {
+    .check__row:hover .check__box {
+      border-color: var(--border-color-hover);
+    }
   }
 
   .check__input:focus-visible + .check__box {
@@ -723,9 +851,10 @@
     outline-offset: 2px;
   }
 
-  .check__input:checked + .check__box {
-    background: var(--check-bg);
-    border-color: var(--check-bg);
+  .check__input:checked + .check__box,
+  .check__input[type="checkbox"]:indeterminate + .check__box {
+    background: var(--check-fill);
+    border-color: var(--check-fill);
   }
 
   /* Tick mark for checkbox (drawn with two borders rotated) */
@@ -733,21 +862,17 @@
     content: "";
     inline-size: 0.55em;
     block-size: 0.3em;
-    border-inline-start: var(--line) solid var(--check-fg);
-    border-block-end: var(--line) solid var(--check-fg);
+    border-inline-start: var(--line) solid var(--check-mark);
+    border-block-end: var(--line) solid var(--check-mark);
     transform: rotate(-45deg) translate(1px, -1px);
   }
 
   /* Indeterminate dash */
-  .check__input[type="checkbox"]:indeterminate + .check__box {
-    background: var(--check-bg);
-    border-color: var(--check-bg);
-  }
   .check__input[type="checkbox"]:indeterminate + .check__box::after {
     content: "";
     inline-size: 0.6em;
     block-size: var(--line);
-    background: var(--check-fg);
+    background: var(--check-mark);
   }
 
   /* Dot for radio */
@@ -756,7 +881,7 @@
     inline-size: 0.5em;
     block-size: 0.5em;
     border-radius: 50%;
-    background: var(--check-fg);
+    background: var(--check-mark);
   }
 
   .check--error .check__box {
@@ -764,19 +889,88 @@
   }
 
   .check__label {
-    font-size: var(--text-m);
-    color: var(--text-color);
+    color: inherit;
   }
 
   .check__msg {
     font-size: var(--text-xs);
-    color: var(--text-dark-muted);
+    color: var(--text-muted);
     margin: 0;
-    margin-inline-start: calc(1.125em + var(--space-s));
+    margin-inline-start: calc(var(--check-size) + var(--space-s));
   }
 
   .check--error .check__msg {
     color: var(--danger-dark);
+  }
+
+  /* Segmented (ADR-139 p4) — choosing ONE value among a few (type,
+     direction, certainty, a setting). Native radios underneath: one Tab
+     stop, arrows move, the group is named. A sunk track and the chosen
+     word raised on paper; never an ink fill. For many options, a Select. */
+  .seg {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-self: start;
+    gap: var(--seg-inset);
+    padding: var(--seg-inset);
+    background: var(--seg-track);
+    border: var(--border-size) solid var(--seg-edge);
+    border-radius: var(--radius);
+  }
+
+  .seg__opt {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--touch-target);
+    padding-block: var(--space-2xs);
+    padding-inline: var(--space-s);
+    border-radius: var(--radius-s);
+    font-size: var(--text-s);
+    color: var(--text-muted);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    transition: background var(--transition), color var(--transition);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .seg__opt:hover {
+      color: var(--text-color);
+    }
+  }
+
+  .seg__opt:has(.seg__input:checked) {
+    background: var(--seg-on);
+    color: var(--text-color);
+    box-shadow: var(--box-shadow-1);
+  }
+
+  .seg__opt:has(.seg__input:focus-visible) {
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: 1px;
+  }
+
+  .seg__opt:has(.seg__input:disabled) {
+    opacity: var(--disabled-opacity);
+    cursor: not-allowed;
+  }
+
+  /* The native radio covers its word, invisible: the hit area is the
+     option's, and a click lands on the radio itself. */
+  .seg__input {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    opacity: 0;
+    cursor: inherit;
+  }
+
+  /* In a field row the track sits on the value column, centred on the
+     row's height like any other control. */
+  .field__control > .seg {
+    align-self: center;
+    margin-block: var(--space-2xs);
   }
 
   /* Chip skeleton — INTERACTIVE pills (filter pills, removable tags, multi-select).
@@ -1069,7 +1263,9 @@
   /* Dialog skeleton — native <dialog>. The element itself stays transparent
      and only acts as the centered container that captures backdrop clicks
      (e.target === dialog when the click lands on the ::backdrop). The
-     visible surface is .dialog__panel. Modifiers redeclare --dialog-* vars. */
+     visible surface is .dialog__panel: paper one step above the canvas,
+     a hairline, its own scroll, a foot that stays (ADR-139 p4). Modifiers
+     redeclare --dialog-* vars. */
   .dialog {
     --dialog-max-width: 32rem;
     --dialog-radius: var(--radius-l);
@@ -1082,10 +1278,11 @@
     color: inherit;
     max-inline-size: 100%;
     max-block-size: 100%;
+    overflow: visible;
   }
 
   .dialog::backdrop {
-    background: var(--backdrop);
+    background: var(--dialog-backdrop);
   }
 
   .dialog__panel {
@@ -1093,9 +1290,13 @@
     flex-direction: column;
     gap: var(--space-m);
     inline-size: min(90vw, var(--dialog-max-width));
+    max-block-size: calc(100dvh - 2 * var(--dialog-gutter));
+    overflow-y: auto;
+    overscroll-behavior: contain;
     padding: var(--dialog-padding);
-    background: var(--bg);
+    background: var(--dialog-paper);
     color: var(--text-color);
+    border: var(--border-size) solid var(--dialog-edge);
     border-radius: var(--dialog-radius);
     box-shadow: var(--box-shadow-3);
   }
@@ -1104,10 +1305,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-xs);
-  }
-
-  .dialog__title {
-    font-size: var(--h3);
   }
 
   .dialog__description {
@@ -1119,13 +1316,40 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-s);
+    font-size: var(--text-s);
   }
 
+  /* The foot never breaks into two lines and never scrolls away: it sticks
+     to the bottom of the paper, over the paper's own bottom padding. */
   .dialog__actions {
+    position: sticky;
+    inset-block-end: calc(-1 * var(--dialog-padding));
+    z-index: 1;
     display: flex;
+    flex-wrap: nowrap;
     justify-content: flex-end;
+    align-items: center;
     gap: var(--space-s);
-    flex-wrap: wrap;
+    margin-block-end: calc(-1 * var(--dialog-padding));
+    padding-block: var(--space-s) var(--dialog-padding);
+    background: var(--dialog-paper);
+  }
+
+  /* The action that is not the point of the dialog: a word, on the left. */
+  .dialog__lead {
+    display: flex;
+    align-items: center;
+    gap: var(--space-s);
+    margin-inline-end: auto;
+    min-inline-size: 0;
+  }
+
+  /* «Hay cambios sin guardar»: the foot's own question (p7), in the
+     dialog's description voice, never an alarm. */
+  .dialog__ask {
+    margin: 0;
+    font-size: var(--text-s);
+    color: var(--text-dark-muted);
   }
 
   .dialog--s {
@@ -1133,6 +1357,26 @@
   }
   .dialog--l {
     --dialog-max-width: 48rem;
+  }
+
+  /* A phone: the paper is a sheet from below, the whole width, the foot
+     clear of the home indicator. */
+  @media (max-width: 47.999rem) {
+    .dialog {
+      margin-block-end: 0;
+      margin-inline: 0;
+      inline-size: 100%;
+    }
+    .dialog__panel {
+      inline-size: 100%;
+      max-block-size: calc(100dvh - var(--dialog-gutter));
+      border-block-end: 0;
+      border-end-start-radius: 0;
+      border-end-end-radius: 0;
+    }
+    .dialog__actions {
+      padding-block-end: max(var(--dialog-padding), env(safe-area-inset-bottom));
+    }
   }
 
   /* Toast skeleton — fixed region in the bottom-right with a vertical stack.
@@ -1213,10 +1457,15 @@
     color: inherit;
   }
 
-  /* The one action a toast may carry («Deshacer»): a link-like button. */
-  .toast__action {
-    align-self: flex-start;
+  /* What a toast may carry: «Deshacer», and beside it «Abrir». Link-like
+     buttons in one row. */
+  .toast__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-m);
     margin-block-start: var(--space-2xs);
+  }
+  .toast__action {
     padding: 0;
     background: none;
     border: 0;
@@ -1648,7 +1897,10 @@
      Two tiers: page/module eyebrow (0.14em tracking) and the sub-eyebrow
      for subsections inside a module (FEES, CREW…) at 0.08em. Contract
      variables so modifiers stay variable-only. */
-  .eyebrow {
+  /* The field label (ADR-139 p4) speaks with the sub-eyebrow: one voice
+     for the label of a datum, in a form and in a file. */
+  .eyebrow,
+  .field__label {
     --eyebrow-tracking: 0.14em;
     --eyebrow-color: var(--text-faint);
 
@@ -1662,7 +1914,8 @@
     line-height: 1.4;
   }
 
-  .eyebrow--sub {
+  .eyebrow--sub,
+  .field__label {
     --eyebrow-tracking: 0.08em;
   }
 
@@ -1723,15 +1976,22 @@
     padding-block-end: var(--space-xs);
     border-block-end: var(--line-hairline) solid var(--border-color-light);
   }
-  .block-head h2 {
+  .block-head :is(h2, h3) {
     margin: 0;
   }
-  .block-head h2:focus {
+  .block-head :is(h2, h3):focus {
     outline: none;
   }
-  .block-head h2:focus-visible {
+  .block-head :is(h2, h3):focus-visible {
     outline: var(--focus-width) solid var(--focus-color);
     outline-offset: var(--focus-offset);
+  }
+  /* A head with its concept's «i» (ConceptHint): the heading and the «i» stay
+     together at the start, the action keeps the end. */
+  .block-head__lead {
+    display: inline-flex;
+    align-items: center;
+    min-inline-size: 0;
   }
   /* The figure keeps its case: «7 de 16», «0 de 0 confirmados · 8 semanas». */
   .block-head__n {
@@ -1741,8 +2001,12 @@
   .block-head__n--alert {
     color: var(--danger);
   }
-  /* The block's action: quiet text at the end of the head line. */
-  .block-head__act {
+  /* The block's action: quiet text at the end of the head line (and at the
+     end of an empty block's line, EmptyLine). */
+  .block-head__act,
+  .empty-line__act,
+  .missing__act,
+  .fact-act {
     appearance: none;
     padding: 0;
     border: 0;
@@ -1754,16 +2018,149 @@
     white-space: nowrap;
     cursor: pointer;
   }
-  .block-head__act:hover {
+  .block-head__act:hover,
+  .empty-line__act:hover,
+  .missing__act:hover,
+  .fact-act:hover {
     color: var(--text-color);
   }
+  .missing__act:disabled,
+  .fact-act:disabled {
+    color: var(--text-faint);
+    cursor: default;
+  }
   @media (pointer: coarse) {
-    .block-head__act {
+    .block-head__act,
+    .empty-line__act,
+    .missing__act,
+    .fact-act {
       display: inline-flex;
       align-items: center;
       min-block-size: var(--touch-target);
       margin-block: calc(-0.5 * var(--touch-target) + 0.5em);
     }
+  }
+
+  /* Record — a record's page (ADR-139 § 4): its blocks in one column from
+     the lens's own left edge and at the lens's width (both are
+     .shell__content's), one rhythm between blocks. A record that keeps two
+     columns (the conversation) draws them inside. The record is measured
+     on itself, not on the window (ADR-095 § 8): the same record is a page
+     and a vistazo of a third of the screen (ADR-139 p1). */
+  .record {
+    display: flex;
+    flex-direction: column;
+    gap: var(--record-gap);
+    container: record / inline-size;
+  }
+
+  /* Record head — RecordHead wears the lens head (.lenshead*: the title row,
+     its rule, the title, the facts line); only the address over it and the
+     band under it are its own. */
+  .record-head__crumbs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-xs);
+    margin-block-end: var(--space-s);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--mono-letter-spacing);
+    color: var(--text-faint);
+  }
+  .record-head__crumb {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    min-inline-size: 0;
+  }
+  a.record-head__crumb {
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color var(--transition);
+  }
+  a.record-head__crumb:hover {
+    color: var(--text-color);
+  }
+  .record-head__dot {
+    inline-size: 0.5rem;
+    block-size: 0.5rem;
+    flex: none;
+    border-radius: var(--radius-circle);
+    background: var(--c, var(--text-faint));
+  }
+  .record-head__sep {
+    color: var(--border-color-dark);
+  }
+  .record-head__band {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-s);
+    margin-block-start: var(--space-m);
+  }
+
+  /* Facts — the line under a record's title, each fact its own editor
+     (ADR-139 § 2). A fact that opens its editor is a word in the line's own
+     voice with a dotted rule under it (it can be changed, it is not a link);
+     the state is a mono word with its caret, never a coloured pill: firm is
+     the normal case and says nothing louder (ADR-139 p2, ui-visual F12). A
+     hold leans and a released one is struck, the certainty grammar's two
+     marks (certainty.css), without its colour. */
+  .fact-act {
+    font-size: inherit;
+    text-decoration: underline dotted var(--border-color-dark);
+    text-underline-offset: 0.25em;
+  }
+  .fact-word {
+    display: inline-flex;
+    align-items: baseline;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--mono-letter-spacing);
+    color: var(--text-dark-muted);
+    cursor: pointer;
+    transition: color var(--transition);
+  }
+  button.fact-word:hover,
+  .fact-word[aria-expanded='true'] {
+    color: var(--text-color);
+  }
+  span.fact-word {
+    cursor: default;
+  }
+  .fact-word[data-family='hold'],
+  .fact-word[data-family='proposed'] {
+    font-style: italic;
+  }
+  .fact-word[data-family='released'] {
+    text-decoration: line-through;
+  }
+  @media (pointer: coarse) {
+    .fact-word {
+      min-block-size: var(--touch-target);
+      align-items: center;
+    }
+  }
+
+  /* Empty line — what a block says when it has nothing (or while it loads):
+     one line in the block's voice, at its left edge, never centred, never a
+     box (EmptyLine, ADR-139 § 4). Labelled, it stands for a whole empty
+     block: the block's name in the record's label column, then the sentence. */
+  .empty-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-2xs) var(--space-s);
+    margin: 0;
+    font-size: var(--text-s);
+    color: var(--text-faint);
+  }
+  .empty-line__label {
+    flex: none;
+    min-inline-size: var(--record-label-inline);
   }
 
   /* Mail card — one email as Hour shows it: a soft box with its From/To
@@ -1820,7 +2217,8 @@
   }
 
   /* Lens header — the ONE shared top block for the four lenses (Desk ·
-     Planner · Conversations · Money). Every lens renders it via LensHeader,
+     Planner · Conversations · Money) and of every record's page, which
+     wears it through RecordHead (ADR-139 § 4). Every lens renders it via LensHeader,
      so they share these exact classes and layout:
        • a big display title on a bordered row, beside the LensSwitcher;
        • below, a small ·-separated line of indications/links (the "sub").
@@ -1867,7 +2265,46 @@
       flex-basis: 100%;
     }
   }
-  .lenshead__title {
+  /* The section's «?» (it brings its welcome card back) beside the switcher:
+     the same ring as a concept's «i», a step larger, in the sans voice. */
+  .lenshead__tools {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-s);
+  }
+  .lenshead__help {
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+    inline-size: 1.75em;
+    block-size: 1.75em;
+    padding: 0;
+    border: var(--border-width) solid var(--border-color-dark);
+    border-radius: var(--radius-circle);
+    background: none;
+    color: var(--text-muted);
+    font-family: var(--font-sans);
+    font-size: var(--text-s);
+    line-height: 1;
+    cursor: pointer;
+    transition:
+      color var(--transition),
+      border-color var(--transition);
+  }
+  .lenshead__help:hover,
+  .lenshead__help[aria-expanded='true'] {
+    color: var(--text-color);
+    border-color: var(--text-muted);
+  }
+  .lenshead__help::before {
+    content: '';
+    position: absolute;
+    inset: min(0em, calc((1.75em - var(--touch-target)) / 2));
+  }
+  /* The title voice: the lens title, and a dialog's title one step down
+     (ADR-139 p4) — one rule, so the two never drift. */
+  .lenshead__title,
+  .dialog__title {
     margin: 0;
     font-family: var(--font-display);
     font-size: var(--text-xxl);
@@ -1877,6 +2314,10 @@
     color: var(--heading-color);
     /* Title rule (all four lenses): letters italic… */
     font-style: italic;
+  }
+  .dialog__title {
+    font-size: var(--dialog-title-size);
+    line-height: 1.15;
   }
   /* …numbers upright. LensTitle wraps digit runs in .lenshead__num. */
   .lenshead__num {

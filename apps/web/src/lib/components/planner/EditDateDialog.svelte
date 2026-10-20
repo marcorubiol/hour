@@ -30,7 +30,8 @@
   import Checkbox from '../Checkbox.svelte';
   import Dialog from '../Dialog.svelte';
   import Input from '../Input.svelte';
-  import Pill from '../Pill.svelte';
+  import Field from '../Field.svelte';
+  import Segmented from '../Segmented.svelte';
   import Select from '../Select.svelte';
   import WhoGoes from './WhoGoes.svelte';
   import { addToast } from '../Toast.svelte';
@@ -38,7 +39,7 @@
     DATE_TYPE_KEYS,
     TYPE_LABEL_KEYS,
     type DateTypeKey,
-  } from '../create/CreateEventDialog.svelte';
+  } from '$lib/quick-add';
   import { dayMonthYear, instantToWallClock, wallClockToInstant, viewerTimeZone } from '$lib/datetime';
   import { detectLocale, t } from '$lib/i18n';
   import { allLinesQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
@@ -83,6 +84,24 @@
   let dDirection = $state<TravelDirection>('outbound');
   /** Two-step delete: the first press arms, the second writes. */
   let armed = $state(false);
+  /** The form's own words for what is wrong, under the field (ADR-139 p7). */
+  let errStart = $state<string | undefined>();
+  let errEnd = $state<string | undefined>();
+  $effect(() => {
+    void dDay;
+    void dStartWall;
+    errStart = undefined;
+  });
+  $effect(() => {
+    void dEndDay;
+    void dEndWall;
+    errEnd = undefined;
+  });
+  let formEl: HTMLFormElement | undefined = $state();
+  /** «Quién va», held until «Guardar» like every other field here. */
+  let whoGoes: { commit: () => Promise<void> } | undefined = $state();
+  let whoChanged = $state(false);
+  let committing = $state(false);
 
   let projectId = $derived(date?.project?.id ?? '');
   let workspaceId = $derived(date?.project?.workspace_id ?? '');
@@ -244,13 +263,14 @@
     },
   });
 
-  function submit() {
+  /** Runs from the form's submit, after the native constraints passed. */
+  async function submit() {
     if (!date) return;
     const startsAt = dAllDay
       ? dDay && `${dDay}T00:00:00.000Z`
       : dStartWall && wallClockToInstant(dStartWall, entryTz);
     if (!startsAt) {
-      addToast({ tone: 'warning', message: t('create.pick_start', locale) });
+      errStart = t('create.pick_start', locale);
       return;
     }
     const endsAt = dAllDay
@@ -261,7 +281,7 @@
         ? wallClockToInstant(dEndWall, entryTz)
         : null;
     if (endsAt && endsAt < startsAt) {
-      addToast({ tone: 'warning', message: t('create.end_before_start', locale) });
+      errEnd = t('create.end_before_start', locale);
       return;
     }
 
@@ -286,6 +306,19 @@
       input.destination_city = dCity.trim() || null;
     }
     if (kind === 'other') input.label = dLabel.trim() || null;
+    // ONE save (ADR-139 p7): who goes is written with the rest, not on its
+    // own click, so «Cancelar» takes it back too. A refused word stops here
+    // and WhoGoes says so in place; the dialog stays open.
+    if (whoChanged && whoGoes) {
+      committing = true;
+      try {
+        await whoGoes.commit();
+      } catch {
+        return;
+      } finally {
+        committing = false;
+      }
+    }
     $savePatch.mutate(input);
   }
 
@@ -297,24 +330,23 @@
     $deleteDate.mutate();
   }
 
-  let pending = $derived($savePatch.isPending || $deleteDate.isPending);
+  let pending = $derived($savePatch.isPending || $deleteDate.isPending || committing);
 </script>
 
-<Dialog bind:open title={t('edit.date_title', locale)} size="m" onclose={() => (armed = false)}>
+<Dialog
+  bind:open
+  title={t('edit.date_title', locale)}
+  size="m"
+  dirty={whoChanged}
+  onclose={() => (armed = false)}
+>
   {#if date}
     <div class="edd">
-      <div class="edd__types" role="group" aria-label={t('create.type_label', locale)}>
-        {#each DATE_TYPE_KEYS as key (key)}
-          <Pill
-            size="sm"
-            active={kind === key}
-            ariaPressed={kind === key}
-            onclick={() => (kind = key)}
-          >
-            {t(TYPE_LABEL_KEYS[key], locale)}
-          </Pill>
-        {/each}
-      </div>
+      <Segmented
+        ariaLabel={t('create.type_label', locale)}
+        options={DATE_TYPE_KEYS.map((key) => ({ value: key, label: t(TYPE_LABEL_KEYS[key], locale) }))}
+        bind:value={kind}
+      />
 
       {#if inSeries}
         <!-- A block is N rows sharing a key, never one spanning row: say
@@ -324,6 +356,7 @@
 
       <form
         class="edd__form"
+        bind:this={formEl}
         onsubmit={(e) => {
           e.preventDefault();
           submit();
@@ -331,9 +364,9 @@
       >
         <!-- The project is FIXED: the endpoint refuses a rescope, so the
              form states the scope instead of offering to change it. -->
-        <p class="edd__scope">
-          {t('create.project', locale)}: <b>{date.project?.name ?? '—'}</b>
-        </p>
+        <Field id="edd-project" label={t('create.project', locale)} group>
+          <span>{date.project?.name ?? '—'}</span>
+        </Field>
 
         <Select label={t('edit.status', locale)} options={statusOptions} bind:value={status} />
 
@@ -356,10 +389,8 @@
           <!-- A TRIP HAS TWO ENDS (ADR-089), so the one place becomes two:
                where it leaves from, where it goes. The stages in between are
                written in the day view, under the strip. -->
-          <div class="edd__pair">
-            <Input label={t('create.trip_from', locale)} bind:value={dOrigin} autocomplete="off" />
-            <Input label={t('create.trip_to', locale)} bind:value={dCity} autocomplete="off" />
-          </div>
+          <Input label={t('create.trip_from', locale)} bind:value={dOrigin} autocomplete="off" />
+          <Input label={t('create.trip_to', locale)} bind:value={dCity} autocomplete="off" />
         {:else}
           <Input label={t('create.city', locale)} bind:value={dCity} />
         {/if}
@@ -379,22 +410,11 @@
         {/if}
 
         {#if kind === 'travel_day'}
-          <div class="edd__field-group" role="group" aria-label={t('create.direction', locale)}>
-            <span class="edd__field-label">{t('create.direction', locale)}</span>
-            <div class="edd__seg">
-              {#each TRAVEL_DIRECTIONS as dir (dir)}
-                <button
-                  type="button"
-                  class="edd__seg-btn"
-                  class:edd__seg-btn--on={dDirection === dir}
-                  aria-pressed={dDirection === dir}
-                  onclick={() => (dDirection = dir)}
-                >
-                  {t(`create.direction_${dir}`, locale)}
-                </button>
-              {/each}
-            </div>
-          </div>
+          <Segmented
+            label={t('create.direction', locale)}
+            options={TRAVEL_DIRECTIONS.map((dir) => ({ value: dir, label: t(`create.direction_${dir}`, locale) }))}
+            bind:value={dDirection}
+          />
         {/if}
 
         <Checkbox
@@ -403,20 +423,19 @@
           onchange={toggleAllDay}
         />
 
-        <div class="edd__times">
-          {#if dAllDay}
-            <Input label={t('create.starts', locale)} type="date" bind:value={dDay} required />
-            <Input label={t('create.ends', locale)} type="date" bind:value={dEndDay} />
-          {:else}
-            <Input
-              label={t('create.starts', locale)}
-              type="datetime-local"
-              bind:value={dStartWall}
-              required
-            />
-            <Input label={t('create.ends', locale)} type="datetime-local" bind:value={dEndWall} />
-          {/if}
-        </div>
+        {#if dAllDay}
+          <Input label={t('create.starts', locale)} type="date" bind:value={dDay} required error={errStart} />
+          <Input label={t('create.ends', locale)} type="date" bind:value={dEndDay} error={errEnd} />
+        {:else}
+          <Input
+            label={t('create.starts', locale)}
+            type="datetime-local"
+            bind:value={dStartWall}
+            required
+            error={errStart}
+          />
+          <Input label={t('create.ends', locale)} type="datetime-local" bind:value={dEndWall} error={errEnd} />
+        {/if}
         {#if !dAllDay}
           <p class="edd__hint">{timeHint}</p>
         {/if}
@@ -426,8 +445,12 @@
       </form>
 
       {#if date.project}
-        <!-- ADR-103: who goes is its own write, outside the form's save. -->
+        <!-- ADR-103's words, inside this dialog's ONE save (ADR-139 p7):
+             drawn here, written by «Guardar», taken back by «Cancelar». -->
         <WhoGoes
+          bind:this={whoGoes}
+          bind:changed={whoChanged}
+          deferred
           target="date"
           id={date.id}
           projectId={date.project.id}
@@ -439,18 +462,19 @@
     </div>
   {/if}
 
-  {#snippet actions()}
-    <button
-      type="button"
-      class="edd__delete"
-      class:edd__delete--armed={armed}
-      disabled={pending}
-      onclick={pressDelete}
-    >
+  <!-- Destructive, quiet until armed. Two presses instead of a
+       window.confirm: the dialog is already a modal, and stacking a second
+       one over it is how a misclick gets confirmed by reflex. -->
+  {#snippet lead()}
+    <Button variant="quiet" tone={armed ? 'warn' : undefined} disabled={pending} onclick={pressDelete}>
       {armed ? t('edit.delete_confirm', locale) : t('edit.delete', locale)}
-    </button>
-    <Button variant="outline" onclick={() => (open = false)}>{t('create.cancel', locale)}</Button>
-    <Button onclick={submit} loading={$savePatch.isPending}>{t('edit.save', locale)}</Button>
+    </Button>
+  {/snippet}
+  {#snippet actions()}
+    <Button variant="quiet" onclick={() => (open = false)}>{t('create.cancel', locale)}</Button>
+    <Button onclick={() => formEl?.requestSubmit()} loading={$savePatch.isPending || committing}
+      >{t('edit.save', locale)}</Button
+    >
   {/snippet}
 </Dialog>
 
@@ -462,100 +486,16 @@
       gap: var(--space-m);
     }
 
-    .edd__types {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--space-2xs);
-    }
-
     .edd__form {
       display: flex;
       flex-direction: column;
-      gap: var(--space-s);
+      gap: var(--field-gap);
     }
 
-    .edd__scope,
     .edd__note,
     .edd__hint {
       font-size: var(--text-xs);
       color: var(--text-faint);
-    }
-
-    .edd__scope b {
-      font-weight: 500;
-      color: var(--text-muted);
-    }
-
-    .edd__times,
-    .edd__pair {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
-      gap: var(--space-s);
-    }
-
-    .edd__field-group {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-2xs);
-    }
-
-    .edd__field-label {
-      font-size: var(--text-s);
-      color: var(--text-color);
-    }
-
-    /* Same segmented grammar as the create dialog and the toolbar toggle. */
-    .edd__seg {
-      display: inline-flex;
-      align-self: start;
-      border: var(--line-hairline) solid var(--border-color-dark);
-      border-radius: var(--radius-circle);
-      overflow: hidden;
-    }
-
-    .edd__seg-btn {
-      border: none;
-      background: none;
-      padding: var(--space-2xs) var(--space-m);
-      font-size: var(--text-s);
-      color: var(--text-muted);
-      cursor: pointer;
-      white-space: nowrap;
-      transition: background var(--transition), color var(--transition);
-    }
-
-    .edd__seg-btn--on {
-      background: var(--text-color);
-      color: var(--bg);
-    }
-
-    /* Destructive action, quiet until armed — the footer-left slot the
-       create dialog uses for its blackout switch. Two presses instead of
-       a window.confirm: the dialog is already a modal, and stacking a
-       second one over it is how a misclick gets confirmed by reflex. */
-    .edd__delete {
-      margin-inline-end: auto;
-      border: none;
-      background: none;
-      padding: 0;
-      font-size: var(--text-s);
-      color: var(--text-muted);
-      cursor: pointer;
-      transition: color var(--transition);
-    }
-
-    .edd__delete:hover,
-    .edd__delete--armed {
-      color: var(--danger);
-    }
-
-    .edd__delete--armed {
-      font-weight: 500;
-    }
-
-    .edd__delete:disabled {
-      cursor: default;
-      opacity: 0.5;
     }
   }
 </style>

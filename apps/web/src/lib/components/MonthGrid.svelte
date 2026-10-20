@@ -83,6 +83,10 @@
     aways?: AwayBandVM[];
     /** Conflicts per ISO day — the day marks + clash-card popovers. */
     clashesByDay?: Map<string, ClashVM[]>;
+    /** How many next steps wait on each day (ADR-138 § 6): a number that
+        opens the Day, never a card on the sheet. */
+    stepsByDay?: Map<string, number>;
+    stepsLabel?: (n: number) => string;
     /** BCP47/locale tag for weekday + month labels. */
     locale?: string;
     /** i18n hooks — the page passes t()-backed fns; defaults follow the session language. */
@@ -145,6 +149,8 @@
     blackouts = [],
     aways = [],
     clashesByDay,
+    stepsByDay,
+    stepsLabel = (n: number) => (n === 1 ? t('planner.steps_one', L) : t('planner.steps_n', L, { n })),
     locale = appLocaleTag(),
     dateKindLabel = (kind: string) => kind.replace(/_/g, ' '),
     createLabel = (iso: string) => t('planner.new_on', L, { day: `${localeWeekdayShort(iso, appLocaleTag())} ${localeDayMonth(iso, appLocaleTag())}` }),
@@ -1189,6 +1195,13 @@
         {#if overflow > 0}
           <button type="button" class="cal__more" onclick={() => onDayCreate?.(day.iso)}
             >+{overflow} {moreLabel}</button
+          >
+        {/if}
+        <!-- The steps of the day are the margin's, not the sheet's: one quiet
+             number in the door's own voice, and the door is the Day. -->
+        {#if day.inMonth && onDayOpen && stepsByDay?.get(day.iso)}
+          <button type="button" class="cal__more" data-testid="month-steps" data-day={day.iso} onclick={() => onDayOpen?.(day.iso)}
+            >{stepsLabel(stepsByDay.get(day.iso) ?? 0)}</button
           >
         {/if}
 

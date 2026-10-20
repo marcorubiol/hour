@@ -1009,6 +1009,115 @@ export type Database = {
           },
         ]
       }
+      conversation_read: {
+        Row: {
+          conversation_id: string
+          last_read_at: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          last_read_at?: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          last_read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_read_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversation"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_tag: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          key: string
+          label: string | null
+          labels: Json
+          sort: number
+          updated_at: string
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          key: string
+          label?: string | null
+          labels?: Json
+          sort?: number
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          key?: string
+          label?: string | null
+          labels?: Json
+          sort?: number
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_tag_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_tagging: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          created_by: string | null
+          tag_id: string
+          workspace_id: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          created_by?: string | null
+          tag_id: string
+          workspace_id: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          created_by?: string | null
+          tag_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_tagging_conversation_fk"
+            columns: ["conversation_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "conversation"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "conversation_tagging_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_tag"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crew_assignment: {
         Row: {
           contact_override: Json
@@ -1456,6 +1565,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      help_seen: {
+        Row: {
+          seen: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          seen?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          seen?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       invoice: {
         Row: {
@@ -4009,6 +4136,51 @@ export type Database = {
           },
         ]
       }
+      workspace_conversation_tag_setting: {
+        Row: {
+          active: boolean
+          label: string | null
+          labels: Json
+          sort: number | null
+          tag_id: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          active?: boolean
+          label?: string | null
+          labels?: Json
+          sort?: number | null
+          tag_id: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          active?: boolean
+          label?: string | null
+          labels?: Json
+          sort?: number | null
+          tag_id?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_conversation_tag_setting_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_tag"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_conversation_tag_setting_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_facet_setting: {
         Row: {
           active: boolean
@@ -6254,6 +6426,11 @@ export type Database = {
           unsubscribed: boolean
         }[]
       }
+      mark_conversation_read: {
+        Args: { p_conversation_id: string }
+        Returns: string
+      }
+      mark_help_seen: { Args: { p_key: string }; Returns: Json }
       mark_thread_read: { Args: { p_thread_id: string }; Returns: string }
       my_mail_signature: {
         Args: { p_workspace_id: string }
@@ -6557,6 +6734,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      reset_help_seen: { Args: never; Returns: Json }
       review_workspace_alias: {
         Args: { p_approve: boolean; p_request_id: string }
         Returns: {
@@ -6672,6 +6850,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      set_conversation_tags: {
+        Args: { p_conversation_id: string; p_tag_ids: string[] }
+        Returns: string[]
       }
       set_mail_basis: {
         Args: {
@@ -7287,6 +7469,7 @@ export type Database = {
         | "duplicate"
         | "cancelled"
         | "unavailable"
+        | "not_now"
       mailout_status:
         | "draft"
         | "review"
@@ -7561,6 +7744,7 @@ export const Constants = {
         "duplicate",
         "cancelled",
         "unavailable",
+        "not_now",
       ],
       mailout_status: [
         "draft",

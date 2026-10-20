@@ -14,16 +14,20 @@
    * here — creation lives in the Money lens / fee editor.
    */
 
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
+  import Field from '../Field.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
   import Menu from '$lib/components/Menu.svelte';
   import Select from '$lib/components/Select.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
+  import { toastCreated } from '$lib/created';
+  import { FormErrors } from '$lib/form-errors.svelte';
   import { dayLabel, localDayISO } from '$lib/datetime';
   import {
     boloStatusLabel,
@@ -198,9 +202,20 @@
   const createExpense = createMutation({
     mutationFn: (input: ExpensePayload) =>
       mutateJSON<{ expense: unknown }>('POST', '/api/expenses', input),
-    onSuccess: () => {
+    onSuccess: (body, input) => {
       expOpen = false;
       void queryClient.invalidateQueries({ queryKey: ['line-expenses', line.id] });
+      const id = (body as { expense?: { id?: string } } | null)?.expense?.id;
+      toastCreated({
+        locale,
+        message: `${t('books.add_expense', locale)} · ${input.description}`,
+        undo: id
+          ? async () => {
+              await mutateJSON('DELETE', `/api/expenses/${id}`);
+              await queryClient.invalidateQueries({ queryKey: ['line-expenses', line.id] });
+            }
+          : undefined,
+      });
     },
     onError: (err) => {
       addToast({
@@ -211,25 +226,24 @@
     },
   });
 
+  const expErrors = new FormErrors();
+  let expFormEl: HTMLFormElement | undefined = $state();
+
+  /** Runs from the form's submit; what is wrong is said under its field. */
   function submitExpense() {
+    expErrors.clear();
     const description = eDescription.trim();
-    if (!description) {
-      addToast({ tone: 'warning', message: t('books.description_required', locale) });
-      return;
-    }
+    if (!description) expErrors.set('lmm-exp-desc', t('books.description_required', locale));
     // type=number binds a number (or undefined on empty) through Svelte —
     // normalize via String before deciding empty-vs-value.
     const rawAmount = String(eAmount ?? '').trim();
     const amount = Number(rawAmount);
     if (rawAmount === '' || Number.isNaN(amount) || amount <= 0) {
-      addToast({ tone: 'warning', message: t('books.amount_positive', locale) });
-      return;
+      expErrors.set('lmm-exp-amount', t('books.amount_positive', locale));
     }
     const currency = eCurrency.trim().toUpperCase();
-    if (!/^[A-Z]{3}$/.test(currency)) {
-      addToast({ tone: 'warning', message: t('books.currency_code', locale) });
-      return;
-    }
+    if (!/^[A-Z]{3}$/.test(currency)) expErrors.set('lmm-exp-currency', t('books.currency_code', locale));
+    if (expErrors.any) return void expErrors.focusFirst();
     $createExpense.mutate({
       line_id: line.id,
       category: eCategory,
@@ -258,14 +272,14 @@
   <section class="lmm__section" aria-label={t('books.fees', locale)}>
     <p class="eyebrow eyebrow--sub lmm__sub">{t('books.fees', locale)}</p>
     {#if feesError}
-      <p class="lmm__state lmm__state--danger">{feesError}</p>
+      <p class="load-fail" role="alert">{feesError}</p>
     {:else if $feesQuery.isLoading}
-      <p class="lmm__state">{t('desk.loading', locale)}</p>
+      <EmptyLine text={t('desk.loading', locale)} busy />
     {:else if fees.length === 0}
-      <p class="lmm__state">{t('books.no_deals_line', locale)}</p>
+      <EmptyLine text={t('books.no_deals_line', locale)} />
     {:else}
       {#if allFeesNull}
-        <p class="lmm__state">{t('books.fees_hidden', locale)}</p>
+        <EmptyLine text={t('books.fees_hidden', locale)} />
       {:else}
         <div class="lmm__totals">
           <span class="lmm__total">
@@ -320,11 +334,11 @@
   <section class="lmm__section" aria-label={t('books.invoices', locale)}>
     <p class="eyebrow eyebrow--sub lmm__sub">{t('books.invoices', locale)}</p>
     {#if invoicesError}
-      <p class="lmm__state lmm__state--danger">{invoicesError}</p>
+      <p class="load-fail" role="alert">{invoicesError}</p>
     {:else if $invoicesQuery.isLoading}
-      <p class="lmm__state">{t('desk.loading', locale)}</p>
+      <EmptyLine text={t('desk.loading', locale)} busy />
     {:else if lineInvoices.length === 0}
-      <p class="lmm__state">{t('books.no_invoices_line', locale)}</p>
+      <EmptyLine text={t('books.no_invoices_line', locale)} />
     {:else}
       <ul class="lmm__invoices" role="list">
         {#each lineInvoices as inv (inv.id)}
@@ -342,14 +356,14 @@
   <section class="lmm__section" aria-label={t('books.expenses', locale)}>
     <header class="lmm__section-head">
       <p class="eyebrow eyebrow--sub lmm__sub">{t('books.expenses', locale)}</p>
-      <Button size="xs" variant="outline" onclick={openExpense}>{t('books.add_expense', locale)}</Button>
+      <Button size="xs" variant="secondary" onclick={openExpense}>{t('books.add_expense', locale)}</Button>
     </header>
     {#if expensesError}
-      <p class="lmm__state lmm__state--danger">{expensesError}</p>
+      <p class="load-fail" role="alert">{expensesError}</p>
     {:else if $expensesQuery.isLoading}
-      <p class="lmm__state">{t('desk.loading', locale)}</p>
+      <EmptyLine text={t('desk.loading', locale)} busy />
     {:else if expenses.length === 0}
-      <p class="lmm__state">{t('books.no_expenses_line', locale)}</p>
+      <EmptyLine text={t('books.no_expenses_line', locale)} />
     {:else}
       <div class="table-wrap">
         <table>
@@ -373,7 +387,7 @@
                   <Menu
                     label={t('books.expense_actions', locale)}
                     align="end"
-                    triggerClass="btn--outline btn--xs"
+                    triggerClass="btn--secondary btn--xs"
                     items={[
                       {
                         label: t('books.remove', locale),
@@ -396,11 +410,26 @@
 </section>
 
 <Dialog bind:open={expOpen} title={t('books.add_expense', locale)} size="m">
-  <div class="lmm__form-grid">
+  <form
+    class="lmm__form-grid"
+    bind:this={expFormEl}
+    novalidate
+    oninput={expErrors.onedit}
+    onchange={expErrors.onedit}
+    onsubmit={(e) => {
+      e.preventDefault();
+      submitExpense();
+    }}
+  >
     <Select label={t('books.category', locale)} bind:value={eCategory} options={categoryOptions} />
-    <Input label={t('books.description', locale)} bind:value={eDescription} required />
-    <div class="field">
-      <label for="lmm-exp-amount">{t('books.amount', locale)}<span aria-hidden="true"> *</span></label>
+    <Input
+      id="lmm-exp-desc"
+      label={t('books.description', locale)}
+      bind:value={eDescription}
+      required
+      error={expErrors.of('lmm-exp-desc')}
+    />
+    <Field id="lmm-exp-amount" label={t('books.amount', locale)} required error={expErrors.of('lmm-exp-amount')}>
       <input
         id="lmm-exp-amount"
         type="number"
@@ -409,14 +438,24 @@
         bind:value={eAmount}
         required
       />
-    </div>
-    <Input label={t('books.currency', locale)} bind:value={eCurrency} placeholder="EUR" />
+    </Field>
+    <Input
+      id="lmm-exp-currency"
+      label={t('books.currency', locale)}
+      bind:value={eCurrency}
+      placeholder="EUR"
+      error={expErrors.of('lmm-exp-currency')}
+    />
     <Input label={t('perf.date', locale)} type="date" bind:value={eDate} />
     <Input label={t('books.notes', locale)} bind:value={eNotes} placeholder={t('books.optional', locale)} />
-  </div>
+    <!-- Hidden submit lets Enter inside an input trigger submit. -->
+    <button type="submit" hidden aria-hidden="true"></button>
+  </form>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (expOpen = false)}>{t('create.cancel', locale)}</Button>
-    <Button onclick={submitExpense} loading={$createExpense.isPending}>{t('composer.add', locale)}</Button>
+    <Button variant="quiet" onclick={() => (expOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button onclick={() => expFormEl?.requestSubmit()} loading={$createExpense.isPending}
+      >{t('composer.add', locale)}</Button
+    >
   {/snippet}
 </Dialog>
 
@@ -443,14 +482,6 @@
 
     /* Sub-eyebrow typography via base.css .eyebrow--sub. */
 
-    .lmm__state {
-      font-size: var(--text-s);
-      color: var(--text-faint);
-    }
-    .lmm__state--danger {
-      color: var(--danger);
-    }
-
     .lmm__totals {
       display: flex;
       align-items: baseline;
@@ -466,7 +497,6 @@
       align-items: baseline;
       gap: var(--space-xs);
     }
-
 
     .lmm__cell-date {
       font-family: var(--font-mono);
@@ -525,10 +555,9 @@
     }
 
     .lmm__form-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-      gap: var(--space-s) var(--space-m);
-      margin-block: var(--space-s);
+      display: flex;
+      flex-direction: column;
+      gap: var(--field-gap);
     }
   }
 </style>

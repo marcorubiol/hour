@@ -23,6 +23,8 @@
     /** A mailout's figure as a filter (ADR-126 § 9). */
     envio?: string;
     r?: MailoutPick;
+    /** The lens chip's tag key (ADR-138, fase 2); untagged rows read as `sales`. */
+    etiqueta?: string;
     /** Hold the query (e.g. while a sidebar selection hasn't resolved). */
     enabled?: boolean;
   }
@@ -37,6 +39,7 @@
    * page share one implementation.
    */
 
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { onMount, untrack } from 'svelte';
   import { toStore } from 'svelte/store';
@@ -44,6 +47,7 @@
   import { dayMonth, dayMonthYear } from '$lib/datetime';
   import { detectLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
+  import Checkbox from '$lib/components/Checkbox.svelte';
   import ConversationHistory from '$lib/components/ConversationHistory.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import ConversationStatusMenu from '$lib/components/ConversationStatusMenu.svelte';
@@ -62,6 +66,8 @@
     type ConversationPatch,
   } from '$lib/conversation';
   import { relationLabel, relationTone } from '$lib/conversation-relation';
+  import ConversationTagList from '$lib/components/ConversationTagList.svelte';
+  import type { WorkspaceTag } from '$lib/conversation-tags';
 
   interface Props {
     filters: ConversationFilters;
@@ -87,6 +93,10 @@
      * decides per project.
      */
     editable?: boolean;
+    /** The tag vocabulary of the scope: when given, each row shows its tags (ADR-138). */
+    tagNames?: readonly WorkspaceTag[];
+    /** A tag the rows do not repeat: the active chip's. */
+    hideTag?: string;
   }
 
   let {
@@ -100,6 +110,8 @@
     selected = $bindable([]),
     turnColumn = false,
     editable = true,
+    tagNames,
+    hideTag,
   }: Props = $props();
 
   type ConversationsResponse = {
@@ -151,6 +163,7 @@
     const p = new URLSearchParams();
     p.set('status', 'any');
     if (f.relacion) p.set('relacion', f.relacion);
+    if (f.etiqueta) p.set('etiqueta', f.etiqueta);
     if (f.projectSlug) p.set('project_slug', f.projectSlug);
     if (f.projectIds && f.projectIds.length > 0) p.set('project_ids', f.projectIds.join(','));
     if (f.lineId) p.set('line_id', f.lineId);
@@ -478,12 +491,10 @@
         <tr>
           {#if selectable}
             <th class="cell--pick">
-              <input
-                type="checkbox"
-                class="pick"
+              <Checkbox
                 checked={visibleItems.length > 0 && pagePicked === visibleItems.length}
                 indeterminate={pagePicked > 0 && pagePicked < visibleItems.length}
-                aria-label={t('mailout.pick_page', locale)}
+                ariaLabel={t('mailout.pick_page', locale)}
                 onchange={togglePage}
               />
             </th>
@@ -505,15 +516,11 @@
             {#if selectable}
               <td class="cell--pick">
                 <!-- On a phone the label covers the whole card: a tap anywhere picks it (móvil #2). -->
-                <label class="pick-label">
-                  <input
-                    type="checkbox"
-                    class="pick"
-                    checked={selectedIds.has(item.id)}
-                    aria-label={t('mailout.pick_one', locale, { name: organizationOf(item) ?? item.person?.full_name ?? '' })}
-                    onchange={() => togglePick(item)}
-                  />
-                </label>
+                <Checkbox
+                  checked={selectedIds.has(item.id)}
+                  ariaLabel={t('mailout.pick_one', locale, { name: organizationOf(item) ?? item.person?.full_name ?? '' })}
+                  onchange={() => togglePick(item)}
+                />
               </td>
             {/if}
             <!-- ADR-102: the conversation is with the organization; it titles the row and opens the file. -->
@@ -527,6 +534,7 @@
                 known={knownAmong($acquaintances.data, item.workspace_id, item.contacts.map((c) => c.person_id))}
                 {locale}
               />
+              {#if tagNames}<ConversationTagList tags={item.tags} known={tagNames} hide={hideTag} {locale} />{/if}
             </td>
             <td
               class="cell--muted"
@@ -602,16 +610,16 @@
   <!-- Our sentence, not the server's text (diseño M2); the detail stays in Sentry. -->
   <p class="load-fail" role="alert">
     <span>{t('conversations.load_error', locale)}</span>
-    <Button size="xs" variant="outline" onclick={() => void $query.refetch()}>{t('ui.retry', locale)}</Button>
+    <Button size="xs" variant="secondary" onclick={() => void $query.refetch()}>{t('ui.retry', locale)}</Button>
   </p>
 {:else if !loading && items.length === 0}
-  {#if importEmptyState && !filters.q && !filters.turno && !filters.temp && !filters.temporada && !filters.envio && !filters.relacion}
-    <div class="empty-book">
-      <p class="empty-book__title">{t('conversations.empty_title', locale)}</p>
-      <p>{t('conversations.empty_body', locale)}</p>
-    </div>
+  {@const unfiltered = !filters.q && !filters.turno && !filters.temp && !filters.temporada && !filters.envio && !filters.relacion}
+  {#if importEmptyState && unfiltered}
+    <!-- The first-time empty speaks in the same voice as every other one. -->
+    <EmptyLine text={`${t('conversations.empty_title', locale)} ${t('conversations.empty_body', locale)}`} />
   {:else}
-    <div class="msg">{t('conversations.no_match', locale)}</div>
+    <!-- «No match» only when something filters; a list that is simply empty says so. -->
+    <EmptyLine text={unfiltered ? t('conversations.none_yet', locale) : t('conversations.no_match', locale)} />
   {/if}
 {/if}
 
@@ -624,14 +632,14 @@
 {#if showPagination}
   <div class="pagination">
     <button
-      class="btn--outline btn--s"
+      class="btn--secondary btn--s"
       onclick={() => (offset = Math.max(0, offset - LIMIT))}
       disabled={offset === 0}
     >
       {t('conversations.prev_page', locale)}
     </button>
     <button
-      class="btn--outline btn--s"
+      class="btn--secondary btn--s"
       onclick={() => (offset = offset + LIMIT)}
       disabled={offset + LIMIT >= total}
     >
@@ -654,7 +662,7 @@
     {/key}
   {/if}
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (historyOpen = false)}>{t('conversations.close', locale)}</Button>
+    <Button variant="quiet" onclick={() => (historyOpen = false)}>{t('conversations.close', locale)}</Button>
   {/snippet}
 </Dialog>
 
@@ -720,31 +728,6 @@
       font-weight: 500;
     }
 
-    .msg {
-      text-align: center;
-      padding-block: var(--space-xxl);
-      color: var(--text-dark-muted);
-    }
-    .empty-book {
-      padding-block: clamp(var(--space-xl), 8vw, var(--space-3xl));
-      padding-inline: var(--space-m);
-      text-align: center;
-      border-block-end: var(--divider);
-      color: var(--text-muted);
-    }
-    /* The display italic of the lens titles (`--font-serif` does not exist,
-       so this fell back to a big sans, diseño B10). */
-    .empty-book__title {
-      margin-block-end: var(--space-xs);
-      font-family: var(--font-display);
-      font-style: italic;
-      font-size: var(--text-xl);
-      color: var(--heading-color);
-    }
-    .empty-book p {
-      margin-block-start: 0;
-    }
-
     .grouping-note {
       padding-block-start: var(--space-xs);
       color: var(--text-faint);
@@ -771,6 +754,10 @@
     .cell--name {
       font-weight: 500;
       color: var(--heading-color);
+    }
+    /* Its tags (ADR-138) after the name, on the same line while they fit. */
+    .cell--name > :global(.conv-tags) {
+      margin-inline-start: var(--space-xs);
     }
     .cell--name-link {
       color: inherit;
@@ -843,20 +830,8 @@
       inline-size: 2rem;
       padding-inline-end: 0;
     }
-    .pick {
-      inline-size: 1rem;
-      block-size: 1rem;
-      accent-color: var(--text-color);
-      cursor: pointer;
-    }
     tbody tr.is-picked td {
       background: var(--bg-ultra-light);
-    }
-    @media (pointer: coarse) {
-      .pick {
-        inline-size: 1.5rem;
-        block-size: 1.5rem;
-      }
     }
 
     .next-action {
@@ -1029,14 +1004,14 @@
       .conversation-table--picking tbody tr {
         position: relative;
       }
-      .conversation-table--picking .pick-label::after {
+      .conversation-table--picking tbody .cell--pick :global(.check__row)::after {
         content: '';
         position: absolute;
         inset: 0;
         z-index: var(--z-raised);
         cursor: pointer;
       }
-      thead .pick {
+      thead .cell--pick :global(.check) {
         visibility: hidden;
       }
       :is(.conversation-table, .contact-table) .cell--name {

@@ -16,7 +16,6 @@
   interface Props {
     view: PlannerView;
     laneAxis: LaneAxis;
-    calm: boolean;
     /** Blackout entry points hide while availability/team feeds are absent. */
     canBlackout: boolean;
     locale: Locale;
@@ -36,7 +35,6 @@
   let {
     view,
     laneAxis,
-    calm,
     canBlackout,
     locale,
     onSetView,

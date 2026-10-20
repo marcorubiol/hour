@@ -74,6 +74,9 @@
     groups: BoardGroup[];
     /** laneKey → isoDay → placed events, from the engine's `laneEvents`. */
     cells: ReadonlyMap<string, ReadonlyMap<string, readonly PlacedEvent[]>>;
+    /** What the tallies count, when it is more than what is drawn (calm
+        draws the confirmed, the tallies count the window). Defaults to `cells`. */
+    countCells?: ReadonlyMap<string, ReadonlyMap<string, readonly PlacedEvent[]>>;
     /** Normalised absence runs — both record shapes already one fact. */
     awayRuns: AwayRun[];
     /** The day's clashes, resolved to their ISO day by the page. */
@@ -147,6 +150,7 @@
     columns,
     groups,
     cells,
+    countCells,
     awayRuns,
     clashes,
     axisWord,
@@ -214,7 +218,7 @@
     const m = new Map<string, LaneTally>();
     for (const g of groups) {
       for (const l of g.lanes) {
-        const placed = [...(cells.get(l.key)?.values() ?? [])].flat();
+        const placed = [...((countCells ?? cells).get(l.key)?.values() ?? [])].flat();
         m.set(l.key, {
           ...laneTally({ placed, ghost: l.kind === 'ghost', touched: touched.has(l.key) }),
         });

@@ -57,7 +57,7 @@ test.describe('mailout (simulated)', () => {
   test('select → write → basis → preview → test → send → delivered → record', async ({ page }) => {
     test.setTimeout(120_000);
 
-    await page.goto('/h/conversations');
+    await page.goto('/h/conversations?etiqueta=sales');
     await waitForLoaded(page);
 
     // ── Lo que pone el spec: dominio verificado y una conversación suya ──

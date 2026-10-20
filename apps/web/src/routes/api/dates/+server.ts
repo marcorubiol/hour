@@ -41,8 +41,8 @@ import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import { DateCreateSchema, type DateRow } from '$lib/date';
 import { pgGet, pgPostRpc, PostgrestError, type SupabaseEnv } from '$lib/supabase';
-import { COMMITMENTS_EMBED } from '$lib/people';
-import { SCHEDULE_SLOT_EMBED, scheduleOf, type ScheduleMoment, type ScheduleSlotRow } from '$lib/schedule-slot';
+import { DATE_BASE_SELECT, DATE_EXTENDED_SELECT } from '$lib/server/date-select';
+import { scheduleOf, type ScheduleMoment, type ScheduleSlotRow } from '$lib/schedule-slot';
 import { pgErrorResponse } from '$lib/server/errors';
 import { json } from '$lib/server/http';
 
@@ -148,28 +148,8 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   // Extended select first (ADR-078 cascade columns + the Altres label);
   // the catch below retries with the legacy columns while the migrations
   // aren't applied (42703 undefined column — graceful absence).
-  const BASE_SELECT = [
-    'id,kind,status,title,starts_at,ends_at,all_day,venue_name,city,country',
-    'project_id,performance_id',
-    'project:project_id(id,slug,name,accent,initials,workspace_id)',
-    'venue:venue_id(timezone)',
-  ];
-  const EXTENDED_SELECT = [
-    ...BASE_SELECT,
-    'line_id,travel_direction',
-    // ADR-089 — a trip's two ends. The card reads origin → destination.
-    'origin_city,destination_city',
-    // ADR-084 §1 — the multi-day block's grouping key. The planner joins
-    // consecutive rows of one series into a band; NULL = a standalone date.
-    'series_id',
-    'label:custom_fields->>label',
-    // ADR-090 P3 — the running order, so the day strip can draw a
-    // rehearsal's moments as it draws a gig's.
-    SCHEDULE_SLOT_EMBED,
-    // ADR-103 — each person's «voy / no voy»; without it who goes is inferred.
-    COMMITMENTS_EMBED,
-  ];
-  search.set('select', EXTENDED_SELECT.join(','));
+  // The columns live in `$lib/server/date-select`, shared with GET /:id.
+  search.set('select', DATE_EXTENDED_SELECT.join(','));
 
   if (projectIds.length > 0 && workspaceIds.length > 0) {
     search.set(
@@ -204,7 +184,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
     // with the legacy select — the calendar keeps working, the new fields
     // are simply absent (contract § Graceful absence).
     if (err instanceof PostgrestError && err.code === '42703') {
-      search.set('select', BASE_SELECT.join(','));
+      search.set('select', DATE_BASE_SELECT.join(','));
       try {
         const { data } = await pgGet<DateItem>(env, 'date', jwt, { search });
         return json({ items: data });

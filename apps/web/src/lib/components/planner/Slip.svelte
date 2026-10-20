@@ -38,6 +38,7 @@
   import type { Slip, SlipKind } from '$lib/month-events';
   import type { ProjectLite } from '$lib/month-events';
   import { appLocale, t } from '$lib/i18n';
+  import { freshMounted, isFresh } from '$lib/fresh.svelte';
 
   /** `to` / `from`, the margin voice, in the session's language. */
   const L = appLocale();
@@ -163,7 +164,15 @@
     noCastWord = '',
   }: Props = $props();
 
-  let state = $derived(stateLabel(slip));
+  // Just made by the quick add (`$lib/fresh`): drawn fresh once, and brought
+  // into view when no copy of it is on screen.
+  let el = $state<HTMLElement>();
+  let fresh = $derived(isFresh(slip.id));
+  $effect(() => {
+    if (fresh && el) return freshMounted(slip.id, el);
+  });
+
+  let stateWord = $derived(stateLabel(slip));
   /* The grain is the doubt's MATERIAL, laid on paper: a bare slip has no
      paper, so it keeps the doubt in its words (italic, «?») and leaves no
      dotted patch that covers the name and stops short of the date beside it
@@ -229,8 +238,8 @@
     {/if}
   </span>
 
-  {#if state}
-    <span class="slip__state" class:slip__state--due={stateUrgent}>{state}</span>
+  {#if stateWord}
+    <span class="slip__state" class:slip__state--due={stateUrgent}>{stateWord}</span>
   {/if}
 
   <!-- A travel day's place is ambiguous on its own — «London» is a departure
@@ -281,8 +290,10 @@
     data-size={size === 'l' ? 'l' : undefined}
     data-clash={clash === 'none' ? undefined : clash}
     data-clash-people={clash !== 'none' && clashPeople ? '' : undefined}
+    data-fresh={fresh ? '' : undefined}
     style={slip.project ? `--c: ${accentVarFor(slip.project)}` : undefined}
     href={slip.href}
+    bind:this={el}
     title={slip.title}>{@render body()}</a
   >
 {:else if onOpen}
@@ -296,8 +307,10 @@
     data-size={size === 'l' ? 'l' : undefined}
     data-clash={clash === 'none' ? undefined : clash}
     data-clash-people={clash !== 'none' && clashPeople ? '' : undefined}
+    data-fresh={fresh ? '' : undefined}
     style={slip.project ? `--c: ${accentVarFor(slip.project)}` : undefined}
     title={slip.title}
+    bind:this={el}
     onclick={onOpen}>{@render body()}</button
   >
 {:else}
@@ -310,7 +323,9 @@
     data-size={size === 'l' ? 'l' : undefined}
     data-clash={clash === 'none' ? undefined : clash}
     data-clash-people={clash !== 'none' && clashPeople ? '' : undefined}
+    data-fresh={fresh ? '' : undefined}
     style={slip.project ? `--c: ${accentVarFor(slip.project)}` : undefined}
+    bind:this={el}
     title={slip.title}>{@render body()}</span
   >
 {/if}
@@ -340,6 +355,24 @@
          At the size of a month cell the extra point reads as a chip. */
       border-radius: var(--radius-xs);
       color: var(--text-color);
+    }
+    /* JUST MADE: a wash and a ring in the focus colour that fade to the
+       card's own ground, once. Without motion, the ring alone, still, for
+       as long as the mark lasts (`$lib/fresh`). */
+    .slip[data-fresh] {
+      animation: slip-fresh var(--duration-fresh) var(--ease-gentle);
+    }
+    @keyframes slip-fresh {
+      from {
+        background-color: var(--fresh-ground);
+        box-shadow: inset 0 0 0 var(--focus-width) var(--fresh-ring);
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .slip[data-fresh] {
+        animation: none;
+        box-shadow: inset 0 0 0 var(--focus-width) var(--fresh-ring);
+      }
     }
     .slip + :global(.slip) {
       margin-block-start: var(--space-2xs);

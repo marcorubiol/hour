@@ -78,9 +78,13 @@ test.describe('sending domain (simulated)', () => {
     await expect(row).toContainText(domain);
     const local = section.locator('.md-addr input').first();
     await local.fill('gira');
-    const save = section.getByRole('button', { name: /^(Save|Guardar|Desar|Enregistrer)$/ });
-    await save.click();
-    await expect(save, 'guardado: el botón se va').toHaveCount(0, { timeout: 15_000 });
+    // En sitio (ADR-139 p7): se guarda al salir del par nombre + dirección,
+    // y la fila lo dice con «guardado».
+    await local.blur();
+    await expect(section.locator('.md-sender [role="status"]'), 'guardado en su fila').toHaveText(
+      /saved|guardado|desat|enregistré/,
+      { timeout: 15_000 },
+    );
     await page.reload();
     await expect(page.getByTestId('mailout-domain').locator('.md-addr input').first()).toHaveValue('gira', {
       timeout: 15_000,

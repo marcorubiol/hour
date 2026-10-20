@@ -5,6 +5,7 @@
   import { usePins } from '$lib/stores/pins.svelte';
   import { useScopes, sameSet as scopesSameSet, type Scope } from '$lib/stores/scopes.svelte';
   import RailPulse from './RailPulse.svelte';
+  import ConceptHint from '$lib/components/ConceptHint.svelte';
 
   interface Props {
     /** Applying a scope routes + touches editingBaseTokens, so the action
@@ -23,6 +24,9 @@
         formatted once for both faces. */
     clockNow: Date;
     clockTime: string;
+    /** In Settings the pulse (Ahora / Siguiente) says nothing about what is
+        on screen: you came to change one thing, not to plan. */
+    inSettings?: boolean;
   }
 
   let {
@@ -32,6 +36,7 @@
     onclose,
     clockNow,
     clockTime,
+    inSettings = false,
   }: Props = $props();
 
   const pins = usePins();
@@ -89,23 +94,29 @@
       <time class="side-clock__time clock-face" datetime={clockTime}>{clockTime}</time>
       <p class="side-clock__date">{clockDate}</p>
     </a>
-    <button
-      type="button"
-      class="side-calm"
-      class:is-on={calm.on}
-      aria-pressed={calm.on}
-      title={t('desk.calm', locale)}
-      aria-keyshortcuts="C"
-      onclick={() => calm.toggle()}
-    >
-      <!-- The key is a hint for the eye; its name stays «calma», not «calmaC». -->
-      <span>{t('desk.calm', locale)}</span><span class="side-calm__k" aria-hidden="true">C</span>
-    </button>
+    <!-- Calm and its «i» are one thing at the clock's other end. -->
+    <span class="side-calm-row">
+      <button
+        type="button"
+        class="side-calm"
+        class:is-on={calm.on}
+        aria-pressed={calm.on}
+        title={t('desk.calm', locale)}
+        aria-keyshortcuts="C"
+        onclick={() => calm.toggle()}
+      >
+        <!-- The key is a hint for the eye; its name stays «calma», not «calmaC». -->
+        <span>{t('desk.calm', locale)}</span><span class="side-calm__k" aria-hidden="true">C</span>
+      </button>
+      <ConceptHint concept="calm" />
+    </span>
   </div>
   <!-- THE PULSE reads the clock's own tick: one timer in the rail, and the
        two can never disagree about what minute it is. It sits ABOVE the
        scopes because it is not filtered by them — see RailPulse. -->
-  <RailPulse now={clockNow} {locale} />
+  {#if !inSettings}
+    <RailPulse now={clockNow} {locale} />
+  {/if}
   <div class="side-sec">
     <div class="side-sec__h">{t('shell.scopes', locale)}</div>
     <button
@@ -223,7 +234,7 @@
     color: var(--text-color);
   }
   /* Calm toggle — the mode control lives by the clock (spec § Desk · Calm).
-     outline = available / solid = active, so it reads as a control. */
+     outline = available / a firmer stroke = active, so it reads as a control. */
   .side-calm {
     display: inline-flex;
     align-items: center;
@@ -234,7 +245,7 @@
     border-radius: var(--radius-circle);
     /* NO FILL WHEN IT IS OFF (Marco, 2026-07-31). The outline alone says
        «available»; a fill on a control that is not doing anything reads as a
-       state. The solid ground stays for `.is-on`, where it IS the state. */
+       state. `.is-on` takes only the rail's soft selected ground. */
     background: none;
     /* Desk lens button shape (sans, --space-2xs/--space-m, radius-circle) but
        a micro-label one step under the smallest named step — 9px is the
@@ -251,14 +262,25 @@
       background var(--transition),
       border-color var(--transition);
   }
+  .side-calm-row {
+    display: inline-flex;
+    align-items: center;
+  }
   .side-calm:hover {
     color: var(--text-color);
     border-color: var(--text-muted);
   }
+  /* ON IS A SOFT STROKE, NOT A BLACK PILL (ADR-139 § 5): the switch to
+     quiet must not be the loudest mark on the rail. The edge firms up, the
+     word takes ink, and the ground is the rail's own selected scope's
+     (`.srow.is-on`). The mode shows in the page's composition, not here. */
   .side-calm.is-on {
-    background: var(--text-color);
-    border-color: var(--text-color);
-    color: var(--bg);
+    background: var(--bg-ultra-light);
+    border-color: var(--text-muted);
+    color: var(--text-color);
+  }
+  .side-calm.is-on .side-calm__k {
+    opacity: 1;
   }
   .side-calm__k {
     display: inline-flex;

@@ -13,6 +13,7 @@
   import { toStore } from 'svelte/store';
   import { ApiError, fetchJSON, mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
+  import Textarea from './Textarea.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
@@ -119,10 +120,27 @@
     },
   });
 
+  /** The name's own word, under the field (ADR-139 p7); the native
+      `required` covers the empty ones, this the blank ones. */
+  let nameError = $state<string | undefined>();
+  $effect(() => {
+    void name;
+    nameError = undefined;
+  });
+  let formEl: HTMLFormElement | undefined = $state();
+
+  /** Runs from the form's submit, after the native constraints passed. */
   function submit(event?: Event) {
     event?.preventDefault();
     if (!name.trim()) {
-      addToast({ tone: 'warning', message: t('project.name_empty', locale) });
+      nameError = t('project.name_empty', locale);
+      return;
+    }
+    // ONE save (ADR-139 p7): a typed web address is requested by «Guardar»
+    // with the rest, not by a button of its own inside the dialog. A refused
+    // address says why under its field and nothing else is written.
+    if (aliasInput.trim()) {
+      $requestAlias.mutate(undefined, { onSuccess: () => $save.mutate() });
       return;
     }
     $save.mutate();
@@ -140,6 +158,11 @@
   };
 
   let aliasInput = $state('');
+  let aliasError = $state<string | undefined>();
+  $effect(() => {
+    void aliasInput;
+    aliasError = undefined;
+  });
 
   const pendingOptions = toStore(() => ({
     queryKey: ['alias-requests', 'pending', workspace?.id] as const,
@@ -170,7 +193,6 @@
     onSuccess: async () => {
       aliasInput = '';
       await queryClient.invalidateQueries({ queryKey: ['alias-requests'] });
-      addToast({ tone: 'success', message: t('workspace.alias_requested', locale) });
     },
     onError: (err) => {
       const msg =
@@ -183,22 +205,18 @@
               : err instanceof Error
                 ? err.message
                 : t('perf.unexpected', locale);
-      addToast({ tone: 'danger', title: t('workspace.alias_not_requested', locale), message: msg });
+      aliasError = msg;
     },
   });
-
-  function submitAlias() {
-    if (!aliasInput.trim()) return;
-    $requestAlias.mutate();
-  }
 </script>
 
 <Dialog bind:open title={t('workspace.edit_title', locale)} size="s">
-  <form class="ews__form" onsubmit={submit}>
+  <form class="ews__form" bind:this={formEl} onsubmit={submit}>
     <Input
       label={t('conversations.col_name', locale)}
       name="space-name"
       bind:value={name}
+      error={nameError}
       required
       autocomplete="off"
       disabled={$save.isPending}
@@ -233,18 +251,15 @@
 
     <AccentSwatchPicker bind:accent autoSlug={autoAccentSlug} label={t('workspace.color', locale)} disabled={$save.isPending} />
 
-    <label class="field">
-      <span>{t('project.description', locale)}</span>
-      <textarea
-        class="ews__desc"
-        bind:value={description}
-        maxlength="280"
-        rows="3"
-        placeholder={t('workspace.description_ph', locale)}
-        disabled={$save.isPending}
-      ></textarea>
-      <span class="ews__desc-count">{description.length} / 280</span>
-    </label>
+    <Textarea
+      label={t('project.description', locale)}
+      bind:value={description}
+      maxlength={280}
+      counter
+      rows={3}
+      placeholder={t('workspace.description_ph', locale)}
+      disabled={$save.isPending}
+    />
 
     <button type="submit" hidden aria-hidden="true"></button>
   </form>
@@ -267,24 +282,17 @@
           bind:value={aliasInput}
           placeholder={t('workspace.alias_ph', locale)}
           helper={t('workspace.alias_help', locale)}
+          error={aliasError}
           autocomplete="off"
           disabled={$requestAlias.isPending}
         />
-        <Button
-          variant="outline"
-          loading={$requestAlias.isPending}
-          disabled={!aliasInput.trim()}
-          onclick={submitAlias}
-        >
-          {t('workspace.alias_request', locale)}
-        </Button>
       </div>
     {/if}
   </div>
 
   {#snippet actions()}
-    <Button variant="outline" disabled={$save.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
-    <Button loading={$save.isPending} onclick={submit}>{t('blackout.save', locale)}</Button>
+    <Button variant="quiet" disabled={$save.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
+    <Button loading={$save.isPending || $requestAlias.isPending} onclick={() => formEl?.requestSubmit()}>{t('blackout.save', locale)}</Button>
   {/snippet}
 </Dialog>
 
@@ -293,18 +301,7 @@
     .ews__form {
       display: flex;
       flex-direction: column;
-      gap: var(--space-m);
-    }
-
-    .ews__desc {
-      resize: vertical;
-      min-block-size: 5em;
-    }
-
-    .ews__desc-count {
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      text-align: end;
+      gap: var(--field-gap);
     }
 
     .ews__address {
@@ -342,7 +339,7 @@
 
     .ews__address-claim {
       display: flex;
-      align-items: flex-end;
+      align-items: center;
       gap: var(--space-s);
     }
 

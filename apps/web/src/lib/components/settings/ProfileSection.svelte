@@ -1,4 +1,6 @@
 <script lang="ts">
+  import RecordHead from '$lib/components/RecordHead.svelte';
+  import BlockHead from '$lib/components/BlockHead.svelte';
   import { onMount } from 'svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { accentVar } from '$lib/utils/accent';
@@ -7,8 +9,11 @@
   import { ApiError, mutateJSON } from '$lib/api';
   import { meQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
   import { addToast } from '$lib/components/Toast.svelte';
+  import Field from '$lib/components/Field.svelte';
   import { t, appLocale } from '$lib/i18n';
-  import MailSignature from './MailSignature.svelte';
+  import { resetHelp } from '$lib/help-seen.svelte';
+  import { SaveFlash } from '$lib/save-flash.svelte';
+  import MasterViewSetting from './MasterViewSetting.svelte';
 
   const locale = appLocale();
 
@@ -64,11 +69,14 @@
    * this codebase keeps killing on sight. Now it writes, and it writes the
    * field the whole roster chain reads.
    */
+  const saved = new SaveFlash();
+
   const saveName = createMutation({
     mutationFn: (full_name: string) => mutateJSON('PATCH', '/api/me', { full_name }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['me'] });
-      addToast({ tone: 'success', message: t('settings.profile_name_saved', locale) });
+      // In place (ADR-139 p7): «guardado» at the row's end, not a toast.
+      saved.show('name');
     },
     onError: (err) => {
       addToast({
@@ -80,6 +88,25 @@
     },
   });
 
+  // «Volver a ver las ayudas»: the welcome cards and first-time notes come
+  // back, everywhere, for this login (help_seen is per person).
+  let resettingHelp = $state(false);
+  async function showTipsAgain() {
+    resettingHelp = true;
+    try {
+      await resetHelp();
+      addToast({ tone: 'success', message: t('help.reset_done', locale) });
+    } catch (err) {
+      addToast({
+        tone: 'danger',
+        title: t('edit.not_saved', locale),
+        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
+      });
+    } finally {
+      resettingHelp = false;
+    }
+  }
+
   function commitName() {
     const next = userName.trim();
     // Nothing typed, or nothing changed — never a write for a focus event.
@@ -88,7 +115,6 @@
   }
 
   let myWorkspaces = $derived($workspacesQuery.data?.items ?? []);
-  let currentWorkspaceId = $derived(myWorkspaces.find((w) => w.slug === workspaceSlug)?.id);
   let sharedByWorkspace = $derived(
     new Map(($meQuery.data?.dossiers ?? []).map((d) => [d.workspace_id, d])),
   );
@@ -135,11 +161,9 @@
   });
 </script>
 
-<header class="set-mast">
-  <p class="eyebrow set-mast__kicker">{t('settings.profile_kicker', locale)}</p>
-  <h1 class="set-mast__title"><em>{t('settings.nav_profile', locale)}</em></h1>
-  <p class="set-mast__sub">{t('settings.profile_sub', locale)}</p>
-</header>
+<RecordHead crumbs={[{ label: t('settings.title', locale) }, { label: t('settings.profile_kicker', locale) }]} title={t('settings.nav_profile', locale)}>
+  {#snippet facts()}<span>{t('settings.profile_sub', locale)}</span>{/snippet}
+</RecordHead>
 
 <section class="set-group">
   <div class="set-group__body">
@@ -156,8 +180,9 @@
           >
             {initials}
           </span>
-          <button type="button" class="btn--primary btn--s">{t('settings.profile_upload', locale)}</button>
-          <span class="set-row__hint">{t('settings.profile_upload_hint', locale)}</span>
+          <!-- No «Upload image»: there is no endpoint that stores an avatar yet
+               (`user_profile.avatar_url` has no writer). The hint says it is a
+               monogram for now; the button comes back with the upload. -->
         </div>
       </div>
     </div>
@@ -168,15 +193,18 @@
         <div class="set-row__hint">{t('settings.profile_name_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
-        <input
-          type="text"
-          bind:value={userName}
-          disabled={$saveName.isPending}
-          onblur={commitName}
-          onkeydown={(e) => {
-            if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
-          }}
-        />
+        <Field id="profile-name" saved={saved.is('name')}>
+          <input
+            id="profile-name"
+            type="text"
+            bind:value={userName}
+            disabled={$saveName.isPending}
+            onblur={commitName}
+            onkeydown={(e) => {
+              if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
+            }}
+          />
+        </Field>
       </div>
     </div>
 
@@ -186,19 +214,27 @@
         <div class="set-row__hint">{t('settings.profile_email_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
-        <input type="email" bind:value={userEmail} readonly />
+        <!-- Not editable here, so it reads as text, not as a field. -->
+        <span class="set-row__value">{userEmail}</span>
+      </div>
+    </div>
+
+    <div class="set-row">
+      <div class="set-row__lead">
+        <div class="set-row__label">{t('help.reset', locale)}</div>
+        <div class="set-row__hint">{t('help.reset_hint', locale)}</div>
+      </div>
+      <div class="set-row__ctrl">
+        <button type="button" class="btn--secondary btn--s" disabled={resettingHelp} onclick={showTipsAgain}
+          >{t('help.reset', locale)}</button
+        >
       </div>
     </div>
   </div>
 </section>
 
-<MailSignature scope="personal" workspaceId={currentWorkspaceId} />
-
 <section class="set-group">
-  <div class="set-group__head">
-    <span class="eyebrow set-group__kicker">{t('settings.profile_identity_kicker', locale)}</span>
-    <h2 class="set-group__title">{t('settings.profile_identity_title', locale)}</h2>
-  </div>
+  <BlockHead title={t('settings.profile_identity_kicker', locale)} count={t('settings.profile_identity_title', locale)} />
   <div class="set-group__body">
     <p class="set-row__hint set-person__lead">
       {t('settings.profile_identity_lead_a', locale)}
@@ -226,7 +262,7 @@
           <div class="set-row__ctrl">
             <button
               type="button"
-              class={on ? 'btn--outline btn--s' : 'btn--primary btn--s'}
+              class={on ? 'btn--secondary btn--s' : 'btn--primary btn--s'}
               disabled={pendingWorkspace === w.id}
               onclick={() => $shareProfile.mutate({ workspaceId: w.id, on: !on })}
             >
@@ -247,6 +283,8 @@
     {/if}
   </div>
 </section>
+
+<MasterViewSetting />
 
 <!-- LOCATION & TIMEZONE group killed: timezone derives from
      browser automatically, week-starts-on default to Monday is

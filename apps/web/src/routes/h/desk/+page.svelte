@@ -10,7 +10,11 @@
    *
    * Desktop: two columns, what you act on (1, 2) on the left and what you
    * look at (4, 3) on the right. Phone: one column in the same order as the
-   * DOM, 1, 2, 4, 3, so focus and reading follow what is seen. Calm keeps 1 and 2.
+   * DOM, 1, 2, 4, 3, so focus and reading follow what is seen.
+   *
+   * Calm (ADR-139 § 5, `$lib/calm`) is another composition, not a grey: one
+   * column at a reading measure, 1 and today's rows of 2 (`calmWaiting`);
+   * the overdue in one line that opens it, the rest in one line that leaves.
    * Each band loads and fails on its own; none of them is the page's error.
    *
    * Bands 2–4 follow the scope like every lens; band 1 does not, like the rail
@@ -27,6 +31,7 @@
   import TaskComposer from '$lib/components/TaskComposer.svelte';
   import LensHeader from '$lib/components/LensHeader.svelte';
   import LensTitle from '$lib/components/LensTitle.svelte';
+  import FirstVisitCard from '$lib/components/FirstVisitCard.svelte';
   import DeskNext from '$lib/components/desk/DeskNext.svelte';
   import DeskWaiting from '$lib/components/desk/DeskWaiting.svelte';
   import DeskChanged from '$lib/components/desk/DeskChanged.svelte';
@@ -36,6 +41,8 @@
   import { detectLocale, LOCALE_TAG, t } from '$lib/i18n';
   import { localeDayMonth, viewerTimeZone } from '$lib/datetime';
   import { addDaysIso, dayKeyInTz, plannerDayHref } from '$lib/planner';
+  import { page } from '$app/state';
+  import { peekHref } from '$lib/peek';
   import { usePins } from '$lib/stores/pins.svelte';
   import { useCalm } from '$lib/stores/calm.svelte';
   import { buildLineIndex, buildProjectIndex, resolveScope, type NavWorkspace, type RawLine } from '$lib/nav';
@@ -49,14 +56,26 @@
   import { taskProjectId, type TaskItem, type TasksCache, type TaskTarget } from '$lib/task';
   import {
     buildDeskFeed,
+    calmWaiting,
     goingItem,
     laterSummary,
+    overviewReplies,
     rankWaiting,
     GOING_DAYS,
     type DeskConvInput,
     type DeskItem,
   } from '$lib/desk-feed';
-  import { changesSince, elapsedSince, goingAsks, paymentNews, plannerDoor, sinceInstant, type RecordedPayment } from '$lib/desk-bands';
+  import {
+    changesSince,
+    elapsedSince,
+    goingAsks,
+    paymentNews,
+    plannerDoor,
+    sinceInstant,
+    todayThings,
+    type RecordedPayment,
+  } from '$lib/desk-bands';
+  import { shows } from '$lib/calm';
   import { daysAgoLabel } from '$lib/conversation';
   import { computePulse } from '$lib/pulse';
   import { createPulseFeeds, pulseSlipContext } from '$lib/pulse-feeds.svelte';
@@ -64,7 +83,12 @@
   import { clashesInSeason, seasonWindow } from '$lib/season';
   import { createPlannerEngine } from '$lib/planner-engine.svelte';
   import { seasonAvailabilityQueryOptions } from '$lib/planner-feeds.svelte';
-  import { currentSeason, type OverviewResponse } from '$lib/conversation-overview';
+  import { currentSeason } from '$lib/conversation-overview';
+  import {
+    conversationOverviewQueryOptions,
+    waitingConversationsQueryOptions,
+    waitingTasksQueryOptions,
+  } from '$lib/waiting-feeds';
   import type { ThreadFeedView } from '$lib/threads';
   import { setCommitment } from '$lib/commitments';
   import {
@@ -216,16 +240,9 @@
   );
 
   // ── Band 2 · Te espera ─────────────────────────────────────────────────
-  const conversationsQuery = createQuery({
-    queryKey: ['conversations', 'today'],
-    queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchJSON<{ items: Conversation[] }>('/api/conversations?status=any&limit=100', signal),
-  });
-  const tasksQuery = createQuery({
-    queryKey: ['tasks', 'open'],
-    queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchJSON<{ items: TaskItem[] }>('/api/tasks?status=open&limit=200', signal),
-  });
+  // The reads of «Te espera», shared with the Planner's margin (ADR-138 § 6).
+  const conversationsQuery = createQuery(waitingConversationsQueryOptions());
+  const tasksQuery = createQuery(waitingTasksQueryOptions());
 
   // Money: the Books keys and URLs, so the Desk and Cuentas share one cache.
   // Only an explicit «yes» to read:money opens it: without it, no trace. A
@@ -252,7 +269,7 @@
     })),
   );
 
-  let conversations = $derived<Conversation[]>($conversationsQuery.data?.items ?? []);
+  let conversations = $derived(($conversationsQuery.data?.items ?? []) as Conversation[]);
   let tasks = $derived<TaskItem[]>($tasksQuery.data?.items ?? []);
   let invoices = $derived<MoneyInvoiceItem[]>(readMoney ? ($invoicesQuery.data?.items ?? []) : []);
   let scopedConversations = $derived(conversations.filter((e) => byProject(e.project?.id, e.workspace_id)));
@@ -271,33 +288,11 @@
   // movement and door leave the Desk with it.
   let readConversations = $derived($convAccessQuery.data?.read !== false && lensOn('conversations'));
   const overviewQuery = createQuery(
-    toStore(() => ({
-      queryKey: ['conversation-overview', filterIds.projectIds, filterIds.workspaceIds, lineIds] as const,
-      enabled: !scopeUnresolved && readConversations,
-      queryFn: ({ signal }: { signal: AbortSignal }) => {
-        const p = new URLSearchParams(feedParams(filterIds));
-        if (lineIds.length > 0) p.set('line_ids', lineIds.join(','));
-        return fetchJSON<OverviewResponse>(`/api/conversations/overview?${p}`, signal);
-      },
-    })),
+    toStore(() => conversationOverviewQueryOptions(filterIds, lineIds, !scopeUnresolved && readConversations)),
   );
   let overview = $derived(readConversations ? ($overviewQuery.data ?? null) : null);
   let projectNameById = $derived(new Map(projectIndex.map((p) => [p.id, p.name])));
-  let replies = $derived(
-    (overview?.due.rows ?? [])
-      .filter((r) => r.reason === 'reply')
-      .map((r) => {
-        const ws = workspaceSlugById.get(r.workspace_id);
-        return {
-          id: r.id,
-          title: r.title,
-          projectId: r.project_id,
-          projectName: projectNameById.get(r.project_id) ?? '',
-          at: r.at,
-          href: ws ? `/h/${ws}/conversation/${r.id}` : null,
-        };
-      }),
-  );
+  let replies = $derived(overviewReplies(overview?.due.rows ?? [], workspaceSlugById, projectNameById));
 
   // A document of a deal not yet confirmed is a quote, not a debt (ADR-123):
   // «te espera» leaves it out, as Cuentas and this page's own door do.
@@ -327,7 +322,11 @@
         subject: [slip.name, slip.city].filter(Boolean).join(' · '),
         projectId: a.row.project?.id ?? null,
         projectName: a.row.project?.name ?? '',
-        href: slip.href ?? (lensOn('planner') ? plannerDayHref('day', a.day) : null),
+        // A date has no page: its link opens its vistazo over Hoy (ADR-139 p1).
+        href:
+          a.of === 'date'
+            ? peekHref({ kind: 'date', id: a.id }, page.url)
+            : (slip.href ?? (lensOn('planner') ? plannerDayHref('day', a.day) : null)),
       });
     }),
   );
@@ -347,7 +346,8 @@
   );
   let later = $derived(laterSummary(feed));
 
-  let waiting = $derived(rankWaiting(feed, clockNow, { calm: calm.on }));
+  let waiting = $derived(rankWaiting(feed, clockNow));
+  let calmWaits = $derived(calm.on ? calmWaiting(feed, clockNow) : null);
 
   let waitingLoading = $derived(
     $conversationsQuery.isPending ||
@@ -510,22 +510,22 @@
     waitingLoading || $projectsQuery.isPending || $linesQuery.isPending || !feeds.settled,
   );
 
-  // ── Header: the overdue and what waits, in one sentence ────────────────
-  // What has no truth draws a dash (ADR-096 § 6): loading or failed, the
-  // title claims nothing about what waits.
-  let titleKnown = $derived(!waitingLoading && !waitingErrored);
-  let titleRest = $derived(
-    !titleKnown
-      ? '—'
-      : waiting.total === 0
-      ? t('desk.title_waiting_zero', locale)
-      : t(waiting.total === 1 ? 'desk.title_waiting_one' : 'desk.title_waiting_many', locale, { n: waiting.total }),
-  );
-  let titleOver = $derived(
-    titleKnown && waiting.overdue > 0
-      ? t(waiting.overdue === 1 ? 'desk.title_overdue_one' : 'desk.title_overdue_many', locale, { n: waiting.overdue })
-      : null,
-  );
+  // ── Header: the day, not the debt (ADR-139 § 6) ───────────────────────
+  // «Hoy, función en Girona»: what today IS, from the pulse's rows (not
+  // scoped, like band 1). What waits and what is overdue are counted where
+  // they are listed, in the head of «Te espera». What has no truth draws a
+  // dash (ADR-096 § 6): loading or failed, the title claims nothing.
+  const KIND_WORDS = new Set(['show', 'rehearsal', 'residency', 'travel_day', 'press', 'other', 'day_off']);
+  let dayTitle = $derived.by(() => {
+    if (!feeds.settled || feeds.errored) return '—';
+    const things = todayThings({ performances: feeds.performances, dates: feeds.dates, viewerTz }, today);
+    const first = things[0];
+    if (!first) return t('desk.day_none', locale);
+    const what = first.label ?? t(`planner.kind_${KIND_WORDS.has(first.kind) ? first.kind : 'other'}`, locale);
+    const day = first.where ? t('desk.day_one_at', locale, { what, where: first.where }) : t('desk.day_one', locale, { what });
+    const rest = things.length - 1;
+    return rest === 0 ? day : t(rest === 1 ? 'desk.day_and_one' : 'desk.day_and_many', locale, { day, n: rest });
+  });
   // ── The greeting and the clock: what the Hall said before the Desk was the
   //    way in (ADR-137). Only those two: the Hall's next-moment line, day
   //    teaser and status sentence said again what «Lo siguiente» and the
@@ -706,26 +706,26 @@
 
 <svelte:head><title>{docTitle(t('lens.desk', locale))}</title></svelte:head>
 
-<div class="desk" aria-busy={busy}>
+<div class="desk" class:desk--calm={calm.on} aria-busy={busy}>
   <div class="desk__top">
     <p class="desk__hello">{greeting}{firstName ? `, ${firstName}` : ''}</p>
-    <LensHeader>
+    <LensHeader help="desk">
       {#snippet title()}
-        <LensTitle
-          text={titleOver ? `${titleOver} · ${titleRest}` : titleRest}
-        />
+        <LensTitle text={dayTitle} />
       {/snippet}
       {#snippet sub()}
         <!-- One child, so the sub line's «·» separators stay out of it. -->
         <span class="desk__subrow">
           <span class="desk__date eyebrow eyebrow--sub">{dateWords} · <time datetime={clockTime}>{clockTime}</time></span>
-          <button type="button" class="desk__add btn--outline btn--s" bind:this={addBtn} aria-expanded={composerOpen} onclick={openComposer}
+          <button type="button" class="desk__add btn--secondary btn--s" bind:this={addBtn} aria-expanded={composerOpen} onclick={openComposer}
             >{t('desk.add_task', locale)}</button
           >
         </span>
       {/snippet}
     </LensHeader>
   </div>
+
+  <FirstVisitCard section="desk" steps={['desk-next', 'desk-waits', 'desk-more']} />
 
   {#if composerOpen}
     <div class="desk__composer" bind:this={composerEl}>
@@ -741,7 +741,7 @@
 
   <div class="desk__grid">
     <div class="desk__col">
-      <div class="slot slot--next">
+      <div class="slot slot--next" data-help-step="desk-next">
         <DeskNext
           next={lead.card}
           then={lead.line}
@@ -757,11 +757,12 @@
           {locale}
         />
       </div>
-      <div class="slot slot--waits">
+      <div class="slot slot--waits" data-help-step="desk-waits">
         <DeskWaiting
           {waiting}
           {today}
-          calm={calm.on}
+          calm={calmWaits}
+          onleavecalm={() => calm.set(false)}
           {feed}
           {later}
           loading={waitingLoading}
@@ -780,15 +781,10 @@
       </div>
     </div>
 
-    {#if calm.on}
+    <!-- What calm folds here is said in «Te espera»'s last line, which leaves calm. -->
+    {#if shows('desk', 'season', calm.on)}
       <div class="desk__col">
-        <button type="button" class="desk__calm" onclick={() => calm.set(false)}>
-          {t('desk.calm_folded', locale)} <span aria-hidden="true">→</span>
-        </button>
-      </div>
-    {:else}
-      <div class="desk__col">
-        <div class="slot slot--season">
+        <div class="slot slot--season" data-help-step="desk-more">
           <DeskSeason
             planner={lensOn('planner') ? { value: plannerFig, errored: feeds.errored } : null}
             conversations={readConversations ? { value: convFig, errored: $overviewQuery.isError } : null}
@@ -797,7 +793,7 @@
             {locale}
           />
         </div>
-        <div class="slot slot--changed">
+        <div class="slot slot--changed" data-help-step="desk-more">
           <DeskChanged
             {changes}
             loading={changedLoading}
@@ -822,7 +818,7 @@
       gap: var(--space-l);
     }
     /* The greeting sits on the title, a step under it: the same display face,
-       quieter, so «2 te esperan» stays the line that speaks. */
+       quieter, so the day («Hoy, función en Girona») stays the line that speaks. */
     .desk__top {
       display: flex;
       flex-direction: column;
@@ -866,20 +862,12 @@
       gap: var(--space-l);
       min-inline-size: 0;
     }
-    .desk__calm {
-      align-self: start;
-      padding: 0;
-      border: 0;
-      background: none;
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing);
-      color: var(--text-faint);
-      cursor: pointer;
-      text-align: start;
-    }
-    .desk__calm:hover {
-      color: var(--text-muted);
+    /* Calm: one column at a reading measure, from the lens's own left edge
+       (the edge never moves between routes, tokens.css `--page-width`). The
+       head keeps the page's width, so the lens switcher does not move. */
+    .desk--calm .desk__grid {
+      grid-template-columns: minmax(0, 1fr);
+      max-inline-size: var(--calm-measure);
     }
 
     /* The chrome every band shares: the eyebrow, its count or door, the
@@ -894,17 +882,8 @@
     .desk :global(.dband > .block-head) {
       margin-block-end: var(--space-s);
     }
-    /* A failure is base.css's `.load-fail`, the one voice of the dashboards. */
-    .desk :global(.dband__empty) {
-      margin: 0;
-      font-family: var(--font-display);
-      font-style: italic;
-      font-size: var(--text-s);
-      color: var(--text-muted);
-    }
-    .desk :global(.dband__empty a) {
-      color: inherit;
-    }
+    /* A failure is base.css's `.load-fail`, the one voice of the dashboards;
+       an empty band is EmptyLine, the one voice of every block. */
 
     /* Phone: one column, in DOM order (1, 2, 4, 3): no `order`, so the tab
        and the screen reader go where the eye goes (móvil #2). */

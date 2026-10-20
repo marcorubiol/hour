@@ -106,7 +106,7 @@
   /* Skeleton declares the variable contract; modifiers redeclare vars only.
      `--toggle-size` lets each variant fit its surrounding rhythm — boxed
      in toolbars at 28px, plain in the account menu at 32px so it aligns
-     with sibling icon-action buttons (.settings-row__action). */
+     with the menu rows beside it. */
   .theme-toggle {
     --toggle-size: var(--control-size-xs);
     --toggle-border: var(--line-hairline) solid var(--border-color-light);

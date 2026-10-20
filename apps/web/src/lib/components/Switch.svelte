@@ -11,7 +11,7 @@
     checked: boolean;
     label: string;
     disabled?: boolean;
-    /** A hook for the E2E suite, when the switch has no other stable name. */
+    /** A test hook (`data-testid`), for a switch the specs name by its row. */
     testid?: string;
     onchange: (next: boolean) => void;
   }

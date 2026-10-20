@@ -47,14 +47,29 @@ export type AgendaDayStats = {
    * what is quiet; this only decides what is sold. Defaults to `free`.
    */
   sellable?: boolean;
-  /** Something non-calendar marks it (a clash, a note) — it keeps its
-      containers from auto-collapsing, or the reader's own writing hides. */
+  /** Something non-calendar marks it (a clash, a note, a next step) — it
+      keeps its containers from auto-collapsing, or the reader's own
+      writing hides. See `dayMarked`. */
   marked: boolean;
   /** Confirmed performances. */
   firm: number;
   /** Holds + proposals. */
   held: number;
 };
+
+/**
+ * Whether the margin holds anything for the day: a clash, a note or a next
+ * step (ADR-138 § 6). One answer for every caller, so a day with only a step
+ * cannot fold away inside a shut week the way it did after E3 — the step
+ * lives in the margin, and the margin has to be drawn to be read.
+ */
+export function dayMarked(margin: {
+  clashes?: readonly unknown[];
+  notes?: readonly unknown[];
+  steps?: readonly unknown[];
+}): boolean {
+  return Boolean(margin.clashes?.length || margin.notes?.length || margin.steps?.length);
+}
 
 export type AgendaChunk =
   | {

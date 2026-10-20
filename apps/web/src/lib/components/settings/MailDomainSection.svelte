@@ -9,6 +9,7 @@
    * sale ningún correo real. Palabras de § 3.3: nunca el nombre del servicio
    * que envía.
    */
+  import BlockHead from '$lib/components/BlockHead.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON, ApiError } from '$lib/api';
@@ -16,9 +17,12 @@
   import { dayMonthYearTs } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
+  import Field from '$lib/components/Field.svelte';
   import Badge from '$lib/components/Badge.svelte';
   import MailoutTestMode from '$lib/components/MailoutTestMode.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
+  import SavedMark from '$lib/components/SavedMark.svelte';
+  import { SaveFlash } from '$lib/save-flash.svelte';
   import {
     domainState,
     senderAddress,
@@ -136,6 +140,16 @@
     return s.local.trim() !== d.from_local_part || s.name.trim() !== (d.from_name ?? data?.workspace_name ?? '');
   }
 
+  const savedSender = new SaveFlash();
+
+  /** The sender is one value in two fields: it is saved when the caret
+      leaves the pair, not between them. */
+  function commitSender(ev: FocusEvent, d: MailDomainItem) {
+    const group = ev.currentTarget as HTMLElement;
+    if (group.contains(ev.relatedTarget as Node | null)) return;
+    if (senderDirty(d) && !$saveSender.isPending) $saveSender.mutate(d);
+  }
+
   const saveSender = createMutation({
     mutationFn: (d: MailDomainItem) => {
       const s = draftOf(d);
@@ -149,7 +163,8 @@
     onSuccess: (_r, d) => {
       const { [d.id]: _gone, ...rest } = senderDraft;
       senderDraft = rest;
-      addToast({ tone: 'success', message: t('mailout.saved', locale) });
+      // In place, like the rest of Ajustes (ADR-139 p7): «guardado» in its row.
+      savedSender.show(d.id);
     },
     onError: failed,
     onSettled: invalidate,
@@ -174,10 +189,7 @@
 
 {#if workspaceId}
   <section class="set-group" data-testid="mailout-domain">
-    <div class="set-group__head">
-      <span class="eyebrow set-group__kicker">{t('mailout.domain_kicker', locale)}</span>
-      <h2 class="set-group__title">{t('mailout.domain_title', locale)}</h2>
-    </div>
+    <BlockHead title={t('mailout.domain_kicker', locale)} count={t('mailout.domain_title', locale)} />
     <p class="md-intro">{t('mailout.domain_intro', locale)}</p>
 
     {#if simulated}
@@ -215,17 +227,19 @@
                 <div class="set-row__hint">{t('mailout.domain_hint', locale)}</div>
               </div>
               <div class="set-row__ctrl">
-                <input
-                  id="md-domain"
-                  type="text"
-                  inputmode="url"
-                  autocomplete="off"
-                  spellcheck="false"
-                  maxlength="253"
-                  placeholder="mamemi.cat"
-                  bind:value={domainInput}
-                  disabled={$add.isPending || !data?.configured}
-                />
+                <Field id="md-domain">
+                  <input
+                    id="md-domain"
+                    type="text"
+                    inputmode="url"
+                    autocomplete="off"
+                    spellcheck="false"
+                    maxlength="253"
+                    placeholder="mamemi.cat"
+                    bind:value={domainInput}
+                    disabled={$add.isPending || !data?.configured}
+                  />
+                </Field>
               </div>
             </div>
             <div class="set-row">
@@ -234,28 +248,32 @@
                 <div class="set-row__hint">{t('mailout.sender_hint', locale)}</div>
               </div>
               <div class="set-row__ctrl"><div class="md-sender">
-                <input
-                  id="md-name"
-                  type="text"
-                  maxlength="100"
-                  aria-label={t('mailout.sender_name', locale)}
-                  placeholder={t('mailout.sender_name', locale)}
-                  value={nameShown}
-                  oninput={(e) => (nameInput = e.currentTarget.value)}
-                  disabled={$add.isPending || !data?.configured}
-                />
-                <span class="md-addr">
+                <Field id="md-name">
                   <input
-                    id="md-local"
+                    id="md-name"
                     type="text"
-                    maxlength="64"
-                    autocomplete="off"
-                    spellcheck="false"
-                    bind:value={localInput}
+                    maxlength="100"
+                    aria-label={t('mailout.sender_name', locale)}
+                    placeholder={t('mailout.sender_name', locale)}
+                    value={nameShown}
+                    oninput={(e) => (nameInput = e.currentTarget.value)}
                     disabled={$add.isPending || !data?.configured}
                   />
-                  <span class="md-at">@{domainInput.trim().toLowerCase() || t('mailout.your_domain', locale)}</span>
-                </span>
+                </Field>
+                <div class="md-addr">
+                  <Field id="md-local">
+                    <input
+                      id="md-local"
+                      type="text"
+                      maxlength="64"
+                      autocomplete="off"
+                      spellcheck="false"
+                      bind:value={localInput}
+                      disabled={$add.isPending || !data?.configured}
+                    />
+                    {#snippet suffix()}@{domainInput.trim().toLowerCase() || t('mailout.your_domain', locale)}{/snippet}
+                  </Field>
+                </div>
               </div></div>
             </div>
             <div class="md-actions">
@@ -290,32 +308,34 @@
       <div class="set-row__label">{t('mailout.sender_label', locale)}</div>
       <div class="set-row__hint">{t('mailout.sender_hint', locale)}</div>
     </div>
-    <div class="set-row__ctrl"><div class="md-sender">
+    <div class="set-row__ctrl"><div class="md-sender" onfocusout={(ev) => commitSender(ev, d)}>
       {#if canManage}
-        <input
-          type="text"
-          maxlength="100"
-          aria-label={t('mailout.sender_name', locale)}
-          value={draftOf(d).name}
-          oninput={(e) => editDraft(d, { name: e.currentTarget.value })}
-        />
-        <span class="md-addr">
+        <Field id={`md-name-${d.id}`}>
           <input
+            id={`md-name-${d.id}`}
             type="text"
-            maxlength="64"
-            aria-label={t('mailout.sender_label', locale)}
-            autocomplete="off"
-            spellcheck="false"
-            value={draftOf(d).local}
-            oninput={(e) => editDraft(d, { local: e.currentTarget.value })}
+            maxlength="100"
+            aria-label={t('mailout.sender_name', locale)}
+            value={draftOf(d).name}
+            oninput={(e) => editDraft(d, { name: e.currentTarget.value })}
           />
-          <span class="md-at">@{d.domain}</span>
-        </span>
-        {#if senderDirty(d)}
-          <Button size="s" variant="outline" disabled={$saveSender.isPending} onclick={() => $saveSender.mutate(d)}>
-            {t('mailout.save', locale)}
-          </Button>
-        {/if}
+        </Field>
+        <div class="md-addr">
+          <Field id={`md-local-${d.id}`}>
+            <input
+              id={`md-local-${d.id}`}
+              type="text"
+              maxlength="64"
+              aria-label={t('mailout.sender_label', locale)}
+              autocomplete="off"
+              spellcheck="false"
+              value={draftOf(d).local}
+              oninput={(e) => editDraft(d, { local: e.currentTarget.value })}
+            />
+            {#snippet suffix()}@{d.domain}{/snippet}
+          </Field>
+        </div>
+        <SavedMark shown={savedSender.is(d.id)} />
       {:else}
         <span class="md-ro">{d.from_name ?? data?.workspace_name ?? ''} &lt;{senderAddress(d.from_local_part, d.domain)}&gt;</span>
       {/if}
@@ -364,7 +384,7 @@
           {t('mailout.check', locale)}
         </Button>
       {/if}
-      <Button size="s" variant="outline" tone="warn" disabled={$remove.isPending} onclick={() => $remove.mutate(d.id)}>
+      <Button size="s" variant="secondary" tone="warn" disabled={$remove.isPending} onclick={() => $remove.mutate(d.id)}>
         {t('mailout.remove', locale)}
       </Button>
     </div>
@@ -403,29 +423,8 @@
       gap: var(--space-xs);
       inline-size: 100%;
     }
-    .md-sender > :global(*) {
+    .md-sender > :global(button) {
       align-self: flex-start;
-    }
-    .md-sender > input {
-      align-self: stretch;
-    }
-    .md-sender input {
-      inline-size: 100%;
-    }
-    .md-addr {
-      display: flex;
-      align-items: center;
-      gap: var(--space-2xs);
-      min-inline-size: 0;
-    }
-    .md-addr input {
-      flex: 0 1 12ch;
-      min-inline-size: 6ch;
-    }
-    .md-at {
-      color: var(--text-muted);
-      font-size: var(--text-s);
-      overflow-wrap: anywhere;
     }
     .md-ro {
       font-size: var(--text-s);

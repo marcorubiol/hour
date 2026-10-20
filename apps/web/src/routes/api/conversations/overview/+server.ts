@@ -8,6 +8,11 @@
  * ninguno, todo) y `line_ids` (las líneas fijadas en la barra: acotan la
  * temporada, ADR-117 § 3).
  *
+ * ADR-138 fase 2, el dominio es el chip: `etiqueta=<clave>` acota a las
+ * conversaciones con esa etiqueta (sin ninguna se lee `sales`), y `panel=common`
+ * dice que la pantalla solo pinta el panel común (te toca): no se lee el
+ * último envío, que es de Difusión. Sin `etiqueta`, todas, como el Desk.
+ *
  * Auth: Bearer JWT (o la cookie de sesión). Todo con la RLS de quien llama.
  */
 
@@ -18,6 +23,7 @@ import { pgErrorResponse } from '$lib/server/errors';
 import { loadLastMailout, loadOverviewRows } from '$lib/server/conversation-overview';
 import { buildOverview, type OverviewResponse } from '$lib/conversation-overview';
 import { json } from '$lib/server/http';
+import { TAG_KEY_RE, filterByChip } from '$lib/conversation-tags';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -37,12 +43,16 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
     workspaceIds: parseIds(url.searchParams.get('workspace_ids')),
   };
   const lineIds = parseIds(url.searchParams.get('line_ids'));
+  const etiqueta = url.searchParams.get('etiqueta');
+  if (etiqueta !== null && !TAG_KEY_RE.test(etiqueta)) return json({ error: 'invalid_query' }, 400);
+  const common = url.searchParams.get('panel') === 'common';
 
   try {
-    const rows = await loadOverviewRows(env, jwt, scope);
+    const all = await loadOverviewRows(env, jwt, scope);
+    const rows = etiqueta ? filterByChip(all, etiqueta) : all;
     const body: OverviewResponse = {
       ...buildOverview(rows, new Date(), { lineIds }),
-      last_mailout: await loadLastMailout(env, jwt, scope, rows),
+      last_mailout: common ? null : await loadLastMailout(env, jwt, scope, all),
     };
     return json(body);
   } catch (err) {

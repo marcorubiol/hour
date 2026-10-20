@@ -13,8 +13,15 @@
   The list is optional: with no words, the inference is the whole answer, as
   it was before. The RPC is the gate (your own word: being able to read the
   row; anybody else's: `edit:performance`), so a refused write says so here.
+
+  Two save models, one per place (ADR-139 p7): on a record page each word is
+  written at once (in place); inside a dialog (`deferred`) the words are
+  only drawn, and the dialog's «Guardar» writes them with `commit()`, so
+  «Cancelar» takes them back like any other field. `changed` tells the
+  dialog there is something unsaved.
 -->
 <script lang="ts">
+  import BlockHead from '$lib/components/BlockHead.svelte';
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { ApiError } from '$lib/api';
@@ -35,6 +42,10 @@
     /** False where the page already draws the roster (the performance's
         team section): it is still read, to leave those people out. */
     showRoster?: boolean;
+    /** Inside a dialog: hold the words until the dialog saves (`commit`). */
+    deferred?: boolean;
+    /** Bindable: words drawn but not written yet (deferred only). */
+    changed?: boolean;
     locale: Locale;
   }
 
@@ -46,6 +57,8 @@
     commitments,
     roster = null,
     showRoster = true,
+    deferred = false,
+    changed = $bindable(false),
     locale,
   }: Props = $props();
 
@@ -55,9 +68,15 @@
   /** The words as this sheet last saw them: the feed row is a snapshot the
       dialog holds, so a write updates the copy here instead of waiting for it. */
   let words = $state<Commitment[]>([]);
+  /** Deferred: the words drawn but not yet written, by person. */
+  let pending = $state(new Map<string, CommitmentState | null>());
   $effect.pre(() => {
     void id;
     words = [...(commitments ?? [])];
+    pending = new Map();
+  });
+  $effect(() => {
+    changed = pending.size > 0;
   });
 
   let names = $derived(
@@ -107,15 +126,47 @@
   let addText = $state('');
   let refused = $state(false);
 
+  function draw(personId: string, state: CommitmentState | null) {
+    words =
+      state === null
+        ? words.filter((w) => w.person_id !== personId)
+        : [...words.filter((w) => w.person_id !== personId), { person_id: personId, state }];
+  }
+
+  /**
+   * Write what a deferred list holds. Throws on a refused write, so the
+   * dialog keeps itself open and says so; the words written before it stay.
+   */
+  export async function commit(): Promise<void> {
+    refused = false;
+    for (const [personId, state] of pending) {
+      try {
+        await setCommitment(queryClient, target, id, personId, state);
+      } catch (err) {
+        if (err instanceof ApiError) refused = true;
+        throw err;
+      }
+      pending.delete(personId);
+      pending = new Map(pending);
+    }
+    void queryClient.invalidateQueries({ queryKey: ['planner-team'] });
+  }
+
   async function answer(personId: string, state: CommitmentState | null) {
+    if (deferred) {
+      const saved = (commitments ?? []).find((w) => w.person_id === personId)?.state ?? null;
+      const next = new Map(pending);
+      if (state === saved) next.delete(personId);
+      else next.set(personId, state);
+      pending = next;
+      draw(personId, state);
+      return;
+    }
     busy = personId;
     refused = false;
     try {
       await setCommitment(queryClient, target, id, personId, state);
-      words =
-        state === null
-          ? words.filter((w) => w.person_id !== personId)
-          : [...words.filter((w) => w.person_id !== personId), { person_id: personId, state }];
+      draw(personId, state);
     } catch (err) {
       if (err instanceof ApiError) refused = true;
       else throw err;
@@ -124,13 +175,22 @@
     }
   }
 
-  const nameOf = (personId: string) => names.get(personId) ?? '—';
+  /** Names picked here: a person created in the picker is on no team feed
+      until their «voy» is written (deferred: until the dialog saves). */
+  let picked = $state(new Map<string, string>());
+  const nameOf = (personId: string) => names.get(personId) ?? picked.get(personId) ?? '—';
 </script>
 
 <!-- Somebody can always be added (ADR-107), so the section is always there. -->
 {#if (showRoster && rosterIds.length > 0) || rows.length > 0 || workspaceId}
 <section class="who" aria-label={t('commitment.who_goes', locale)}>
-  <h3 class="who__h">{t('commitment.who_goes', locale)}</h3>
+  <!-- On a performance's page it is one of the record's blocks (ADR-139 § 4);
+       in a date's dialog, a small head of its own. -->
+  {#if target === 'performance'}
+    <BlockHead title={t('commitment.who_goes', locale)} concept="cast" />
+  {:else}
+    <h3 class="who__h">{t('commitment.who_goes', locale)}</h3>
+  {/if}
   <ul class="who__list">
     {#if showRoster}
       {#each rosterIds as personId (personId)}
@@ -192,10 +252,11 @@
       bind:text={addText}
       onpick={async (p) => {
         addText = '';
+        picked = new Map(picked).set(p.person_id, p.full_name);
         await answer(p.person_id, 'going');
         // A new person is on the team from their «voy» on: the feed that
         // names them is refetched (GET /api/team counts going words).
-        if (!names.has(p.person_id)) {
+        if (!deferred && !names.has(p.person_id)) {
           void queryClient.invalidateQueries({ queryKey: ['planner-team'] });
         }
       }}
