@@ -4,9 +4,11 @@
    * rail (Everything + saved scopes + recents) and the ⌘K scope builder —
    * the manual pin UI (card chips, breadcrumb pin, ScopeStrip) died
    * 2026-07-17. Applying a scope from a non-lens surface lands on /h/desk.
-   * The top bar is the sections (LensSwitcher, ADR-140; on a phone the
-   * rail's door instead, and the sections go to a bar at the foot) · the ⌘K
-   * search · the account menu. The rail's clock is the way home: the Desk
+   * The top bar is the ⌘K search · the sections (LensSwitcher, ADR-140,
+   * against the right edge since the 20-10 amendment). The account menu and
+   * the presence live at the foot of the rail; on a phone the bar is the
+   * rail's door · the search · the account, and the sections go to a bar
+   * at the foot. The rail's clock is the way home: the Desk
    * (ADR-137, /h redirects).
    *
    * Settings stays a "mode" of the shell: when inside /settings a slim
@@ -609,9 +611,6 @@
                the drawer draws it. -->
           <span class="shell__menu-caret" aria-hidden="true">{railOpen ? '▴' : '▾'}</span>
         </button>
-        <!-- The sections (ADR-140). Here on a desktop; on a phone the same
-             nav leaves the bar and is fixed at the foot of the screen. -->
-        <LensSwitcher />
       </div>
 
       <button
@@ -628,6 +627,15 @@
         <kbd class="kbd">⌘K</kbd>
       </button>
 
+      <!-- The sections (ADR-140), against the right edge of the page since
+           the 20-10 amendment. On a phone the same nav leaves the bar and is
+           fixed at the foot of the screen. -->
+      <div class="shell__lenses">
+        <LensSwitcher />
+      </div>
+
+      <!-- You, in the top bar only on a phone: beside the rail you live at
+           its foot (the `me` snippet below). Never both on screen. -->
       <div class="shell__right">
         <PresenceBadge count={networkPresence?.count ?? null} />
 
@@ -643,7 +651,19 @@
       {clockNow}
       {clockTime}
       {inSettings}
-    />
+    >
+      {#snippet me()}
+        <AccountMenu
+          {workspaceSlug}
+          {menuWorkspaceSlug}
+          {inSettings}
+          {rememberWorkingScope}
+          direction="up"
+          align="start"
+        />
+        <PresenceBadge count={networkPresence?.count ?? null} variant="dots" />
+      {/snippet}
+    </ScopeRail>
 
     {#if inSettings}
       <aside class="shell__settings-nav">
@@ -764,10 +784,12 @@
     z-index: var(--z-sticky);
     min-block-size: var(--header-height);
     display: grid;
-    /* Sections · search · you (ADR-140). The sections keep their whole
-       width and the left edge of the page; the search takes what is left,
-       at the right, beside the account, and gives way first. */
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    /* Search · sections (ADR-140, enmienda del 20-10). The search opens the
+       bar on the page's left edge and gives way first; the sections keep
+       their whole width against the right edge, so their box is the same on
+       every page. You live at the foot of the rail. */
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'search lenses';
     align-items: center;
     gap: var(--space-m);
     padding-block: var(--space-s);
@@ -795,30 +817,37 @@
     backdrop-filter: blur(8px); /* material */
   }
 
+  /* The door and you: a phone's only (see the media query below). */
   .shell__left {
-    grid-column: 1;
+    grid-area: door;
     justify-self: start;
-    display: inline-flex;
+    display: none;
     align-items: center;
     min-inline-size: 0;
   }
   .shell__right {
-    grid-column: 3;
+    grid-area: me;
     justify-self: end;
-    display: inline-flex;
+    display: none;
     align-items: center;
     gap: var(--space-s);
+    min-inline-size: 0;
+  }
+  .shell__lenses {
+    grid-area: lenses;
+    justify-self: end;
+    display: flex;
     min-inline-size: 0;
   }
 
 
   .shell__search {
-    grid-column: 2;
-    justify-self: end;
+    grid-area: search;
+    justify-self: start;
     display: inline-flex;
     align-items: center;
     gap: var(--space-s);
-    inline-size: min(22rem, 100%);
+    inline-size: min(24rem, 100%);
     min-inline-size: 0;
     /* It measures itself: it says what it is while there is room, and
        keeps the lens alone at the end (container queries below). */
@@ -860,20 +889,13 @@
     }
   }
   /* A tablet with the rail beside it (48–64rem): the sections take most of
-     the bar, so the search is its lens alone and the presence its dot
-     (the count stays for a screen reader and in the dot's tooltip). */
+     the bar, so the search keeps what is left, never less than its lens. */
   @media (min-width: 48rem) and (max-width: 63.999rem) {
     .shell__top {
       gap: var(--space-s);
     }
     .shell__search {
       min-inline-size: var(--field-size);
-      padding-inline: 0;
-    }
-    .shell__right :global(.presence-badge__label) {
-      position: absolute;
-      clip-path: inset(50%);
-      white-space: nowrap;
     }
   }
 
@@ -939,12 +961,22 @@
     .shell__top {
       grid-column: 1 / -1;
       grid-template-columns: auto minmax(0, 1fr) auto;
+      grid-template-areas: 'door search me';
       gap: var(--space-s);
     }
     /* The door's cell takes the bar's whole height, so the face can be
        placed from the top of the screen exactly as the drawer places it. */
     .shell__left {
+      display: inline-flex;
       align-self: stretch;
+    }
+    .shell__right {
+      display: inline-flex;
+    }
+    /* The sections are fixed to the foot of the screen (LensSwitcher): no
+       cell of their own in the bar. */
+    .shell__lenses {
+      display: contents;
     }
     .shell__menu {
       display: flex;

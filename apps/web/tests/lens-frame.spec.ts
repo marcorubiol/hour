@@ -8,9 +8,12 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  * E2E: THE SECTIONS LIVE IN THE FRAME (ADR-140), READ ONLY. Every POST,
  * PATCH, PUT and DELETE to `/api/` is refused before it leaves the browser.
  *
- *   - the switcher is ONE box in the top bar: the same x, y and height on
- *     the four lenses, on every view of the Planner, on a record and on
- *     Settings. It cannot move under the cursor because no page draws it;
+ *   - the switcher is ONE box in the top bar, against its right edge (the
+ *     20-10 amendment): the same right edge, y and height on the four
+ *     lenses, on every view of the Planner, on a record and on Settings. It
+ *     cannot move under the cursor because no page draws it;
+ *   - you (the account menu) live at the foot of the rail beside it, and in
+ *     the top bar only on a phone, where the rail is a drawer;
  *   - off a lens it marks the lens you came from, and says so to a reader,
  *     without claiming to be the page;
  *   - on a phone (390) it is a bar at the foot of the screen, and the end of
@@ -88,13 +91,45 @@ test.describe('the sections in the frame (ADR-140)', () => {
     const record = await aRecord(page);
     if (record) paths.push(record);
 
+    // Anchored right: the right edge lands on the page's gutter.
+    const vw = await page.evaluate(() => document.documentElement.clientWidth);
+    expect(first.x + first.width).toBeLessThan(vw);
+    expect(first.x).toBeGreaterThan(vw / 2);
+
     for (const path of paths) {
       const box = await boxOf(page, path);
-      expect.soft(box.x, `x on ${path}`).toBeCloseTo(first.x, 1);
+      expect.soft(box.x + box.width, `right edge on ${path}`).toBeCloseTo(first.x + first.width, 1);
       expect.soft(box.y, `y on ${path}`).toBeCloseTo(first.y, 1);
       expect.soft(box.height, `height on ${path}`).toBeCloseTo(first.height, 1);
     }
     if (!record) test.info().annotations.push({ type: 'skip', description: 'no performance in the fixture space' });
+  });
+
+  test('you live at the foot of the rail; on a phone, in the top bar', async ({ page }) => {
+    await readOnly(page);
+    const account = () => page.getByRole('button', { name: 'Open account menu' });
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`/h/desk${SCOPE}`);
+    await waitForLoaded(page);
+    // One account on screen, inside the rail, near its foot; none in the bar.
+    await expect(account()).toHaveCount(1);
+    await expect(page.locator('#shell-rail').getByRole('button', { name: 'Open account menu' })).toBeVisible();
+    await expect(page.locator('header').getByRole('button', { name: 'Open account menu' })).toHaveCount(0);
+    const rail = (await page.locator('#shell-rail').boundingBox())!;
+    const me = (await account().boundingBox())!;
+    expect(me.x + me.width).toBeLessThanOrEqual(rail.x + rail.width);
+    expect(me.y + me.height, 'at the foot of the screen').toBeGreaterThan(900 - 100);
+    await account().click();
+    await expect(page.getByRole('menuitem', { name: 'All settings' })).toBeVisible();
+    await page.keyboard.press('Escape');
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.reload();
+    await waitForLoaded(page);
+    await expect(account()).toHaveCount(1);
+    await expect(page.locator('header').getByRole('button', { name: 'Open account menu' })).toBeVisible();
+    expect((await account().boundingBox())!.y).toBeLessThan(60);
   });
 
   test('off a lens, it marks the lens you came from, and says so', async ({ page }) => {
