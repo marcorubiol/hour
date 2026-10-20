@@ -446,7 +446,6 @@
 - [ ] **Segundo nivel y calma (ADR-139)**: las cinco fases y sus seguimientos (verbos del bolo, resalte de lo creado, «Falta» de línea y proyecto) en producción el 20-10 (`b0bdd0c1`): piezas de formulario y de ficha, un solo modelo de guardado, ficha con hechos/«Falta»/«Detalles», vistazo lateral (fecha, bolo, función, conversación, persona), alta rápida al plan, calma como foco y peso del primer nivel, pulido de Ajustes. Siguen:
   - [ ] Los specs E2E borran sus conversaciones y fechas pero no las organizaciones ni personas que crean: `playwright` lleva 186 organizaciones y 150 personas `E2E*` y crece unas 12 por pasada. Limpiarlas en `afterAll` (20-10).
   - [ ] Bug: Ajustes desborda en horizontal a 768 y 900 px (filas `set-row__ctrl`) (carril lens-in-shell, 20-10).
-  - [ ] Pulido: la fecha del reloj del raíl se parte en dos líneas a 1440 y 1024; las tarjetas de «La temporada» de Hoy van apretadas a 768 (carril bar-swap, 20-10).
   - [ ] Bug: el bloque de conversaciones del proyecto filtra por el nombre corto del proyecto, que se repite entre espacios: puede mezclar conversaciones de otro espacio del mismo usuario (carril adr139-followups, 20-10).
   - [ ] Después (ADR-139): la línea que entiende texto en el alta, crear en la celda del Mes, ⌘K que crea función, fecha, tarea y conversación.
   - [ ] Bug: en Ajustes, «Subir imagen» no hace nada (revisión 19-10; en `claude/record-pieces`).
