@@ -29,6 +29,8 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  */
 
 const SPACE = 's:playwright';
+/** The fixture project of the `playwright` space (the one date-edit and note-margin write into). */
+const DIARY_PROJECT_ID = '019f21d2-7482-77e6-9ad9-27d881cff305';
 
 async function planner(page: Page, view: string, extra = '') {
   await page.goto(`/h/planner?view=${view}&scope=${SPACE}${extra}`);
@@ -546,6 +548,41 @@ test.describe('the diary', () => {
     // `scroll-behavior: smooth`, so the anchoring correction ANIMATED, never
     // landed before the next prepend measured, and the reader stayed pinned
     // at the top with the sentinel permanently in view.
+    //
+    // THE PAST IS THE SPEC'S OWN. The law needs something behind today to
+    // pull, and it used to borrow whatever the space happened to hold: on
+    // 2026-10-20 `playwright` had nothing before 2031, the pull answered
+    // «nothing further back» (honestly) and this went red as a lie about the
+    // app. So it plants one date 20 days back (always within the two months
+    // the gesture may fetch) and takes it away after.
+    const past = new Date(Date.now() - 20 * 86_400_000).toLocaleDateString('en-CA', {
+      timeZone: 'Europe/Madrid',
+    });
+    const made = await page.request.post('/api/dates', {
+      data: {
+        project_id: DIARY_PROJECT_ID,
+        kind: 'rehearsal',
+        starts_at: `${past}T09:00:00.000Z`,
+        ends_at: null,
+        all_day: false,
+        title: 'E2E Diary past',
+        venue_name: null,
+        city: null,
+        status: 'tentative',
+        line_id: null,
+        performance_id: null,
+      },
+    });
+    expect(made.status(), 'the past could not be planted').toBe(201);
+    const pastId = ((await made.json()) as { date: { id: string } }).date.id;
+    try {
+      await growsOneMonth(page);
+    } finally {
+      await page.request.delete(`/api/dates/${pastId}`);
+    }
+  });
+
+  async function growsOneMonth(page: Page) {
     await planner(page, 'agenda');
     const days = () =>
       page.evaluate(() =>
@@ -587,7 +624,7 @@ test.describe('the diary', () => {
     // …and the reader was pinned to their row rather than thrown backwards.
     const y = await page.evaluate(() => Math.round(window.scrollY));
     expect(y, 'the prepend was not anchored').toBeGreaterThan(0);
-  });
+  }
 
   test('`NOW` LANDS ON TODAY', async ({ page }) => {
     // A long smooth journey across a diary that is loading while it runs can
