@@ -13,6 +13,7 @@ import { addDaysIso } from './planner';
 import { Constants, type Enums } from './db-types';
 import { localeDayMonth, localeWeekdayShort, realIsoDate } from './datetime';
 import { t, type Locale } from './i18n';
+import { KV_KEY_MAX, KV_LINES_MAX, KV_VALUE_MAX } from './kv-lines';
 
 export type PerformanceStatus = Enums<'performance_status'>;
 
@@ -269,6 +270,27 @@ const isoDateField = realIsoDate;
 
 const countryField = v.pipe(v.string(), v.regex(/^[A-Za-z]{2}$/, 'ISO 3166 alpha-2'));
 
+/** One of the three production jsonb columns, as `$lib/kv-lines` writes it. */
+const kvColumn = v.pipe(
+  // `v.record` lets an array through as an object of indices: a list is not lines.
+  v.custom<Record<string, unknown>>(
+    (x) => typeof x === 'object' && x !== null && !Array.isArray(x),
+    'an object of lines',
+  ),
+  v.record(
+    v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(KV_KEY_MAX)),
+    v.union([
+      v.pipe(v.string(), v.maxLength(KV_VALUE_MAX)),
+      v.number(),
+      v.boolean(),
+      v.null(),
+      v.array(v.unknown()),
+      v.record(v.string(), v.unknown()),
+    ]),
+  ),
+  v.check((o) => Object.keys(o).length <= KV_LINES_MAX, `at most ${KV_LINES_MAX} lines`),
+);
+
 /**
  * POST /api/performances body (ADR-043). Creation goes through the
  * `create_performance` RPC — claim-independent, permission-gated
@@ -375,6 +397,14 @@ export const PerformancePatchSchema = v.object({
   // it silently persist, which is how a jsonb column rots into a junk
   // drawer. Adding an item = adding it to READINESS_KEYS, still no migration.
   readiness: v.optional(v.record(v.picklist([...READINESS_KEYS]), v.boolean())),
+  // Logística, acogida y técnica, escritas línea a línea en «Detalles»
+  // (Marco, 2026-10-20; `$lib/kv-lines`). The shape stays open (ADR-023):
+  // a flat object of words, plus whatever nested value is already there,
+  // which travels back untouched. `authenticated` already UPDATEs these
+  // three columns; the whitelist is what was missing.
+  logistics: v.optional(kvColumn),
+  hospitality: v.optional(kvColumn),
+  technical: v.optional(kvColumn),
 });
 
 export type PerformancePatch = v.InferOutput<typeof PerformancePatchSchema>;

@@ -206,6 +206,21 @@ describe('decideBy (ADR-080 §2)', () => {
   });
 });
 
+describe('PerformancePatchSchema: logistics, hospitality, technical (Marco, 2026-10-20)', () => {
+  it('takes a flat object of words, and a nested value already there', () => {
+    const r = v.safeParse(PerformancePatchSchema, {
+      logistics: { parking: 'sí', plazas: 2, rider: { luz: 'dmx' } },
+    });
+    expect(r.success).toBe(true);
+    expect(v.safeParse(PerformancePatchSchema, { technical: {} }).success).toBe(true);
+  });
+  it('refuses a list, an empty key and a key too long', () => {
+    expect(v.safeParse(PerformancePatchSchema, { hospitality: ['a'] }).success).toBe(false);
+    expect(v.safeParse(PerformancePatchSchema, { hospitality: { ' ': 'x' } }).success).toBe(false);
+    expect(v.safeParse(PerformancePatchSchema, { hospitality: { ['k'.repeat(81)]: 'x' } }).success).toBe(false);
+  });
+});
+
 describe('PERFORMANCE_MENU_STATUSES (Marco, 2026-10-20)', () => {
   it('offers every status but invoiced and paid, which belong to the bolo', () => {
     expect(PERFORMANCE_MENU_STATUSES).not.toContain('invoiced');

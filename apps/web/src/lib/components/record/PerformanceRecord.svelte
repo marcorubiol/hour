@@ -33,6 +33,7 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import { FormErrors } from '$lib/form-errors.svelte';
   import type { Json } from '$lib/db-types';
+  import type { KVObject } from '$lib/kv-lines';
   import { dayLabel, dayMonth, localDayISO, timeInTz } from '$lib/datetime';
   import { LOCALE_TAG, detectLocale, t } from '$lib/i18n';
   import {
@@ -253,6 +254,21 @@
     if (!perf) return;
     const current = (perf.readiness ?? {}) as Record<string, boolean>;
     $patchMutation.mutate({ readiness: { ...current, [key]: !current[key] } });
+  }
+
+  /**
+   * Logística, acogida y técnica, línea a línea (Marco, 2026-10-20): the
+   * same PATCH, without the generic mutation's toast. These save in place,
+   * so «guardado» and a failure are said on the row (`JsonKVEdit`), never in
+   * a corner (ADR-139 p7).
+   */
+  async function saveJson(field: 'logistics' | 'hospitality' | 'technical', next: KVObject) {
+    await mutateJSON(
+      'PATCH',
+      `/api/performances/${encodeURIComponent(slug)}?ws=${encodeURIComponent(workspaceSlug)}`,
+      { [field]: next } satisfies PerformancePatch,
+    );
+    void queryClient.invalidateQueries({ queryKey: ['performance'] });
   }
 
   /* CANCELAR SE CONFIRMA (Marco, 2026-10-18). Es la única puerta para
@@ -993,6 +1009,7 @@
         fallbackTz={workspaceTz}
         withSchedule={false}
         {locale}
+        {saveJson}
       />
 
       {#if perf.date.length > 0}
