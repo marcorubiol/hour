@@ -4731,3 +4731,12 @@ sigue igual en las cinco vistas.
 
 **Re-evaluar cuando** Marco lo use una semana en el teléfono: si la barra de abajo pesa, o si hace falta un
 «volver» además del trazo.
+
+**Enmienda a ADR-140 § 3 (Marco, 2026-10-20).** «El selector de lentes a la izquierda es contraintuitivo.» En
+escritorio la barra es búsqueda a la izquierda, en el borde de la página, y lentes a la derecha, pegadas al borde
+derecho: la caja del selector sigue idéntica en todas las páginas de cada ancho, ahora anclada a la derecha
+(`scrollbar-gutter: stable` en `html`, para que una barra de desplazamiento no la mueva). La cuenta (el monograma y su
+menú, que abre hacia arriba) y la presencia bajan al pie del raíl, como en Linear, Slack o Notion, pegadas abajo
+aunque el raíl sea más largo que la pantalla; la presencia son puntos (uno por persona, tres como mucho) con el número
+para lector de pantalla y en el tooltip. La búsqueda gana el sitio y conserva el `⌘K` de 1024 en adelante. Móvil
+(< 48 rem) sin cambios: cuenta y presencia arriba, lentes en la barra de abajo.
