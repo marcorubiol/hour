@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- La barra de arriba pone la búsqueda a la izquierda y las secciones a la derecha; tu cuenta y quién está conectado pasan al pie de la barra lateral. (2026-10-20)
 - Hoy · Planificador · Conversaciones · Cuentas viven en la barra de arriba y no se mueven nunca, también dentro de una ficha o en Ajustes, donde un trazo suave marca de qué sección vienes. En el móvil van en una barra abajo. (2026-10-20)
 - Recargar una sección, abrirla en otra pestaña o arrancar la app instalada con un ámbito guardado ya no deja la pantalla en blanco. «Abrir en Cuentas» desde un bolo ya no te cambia el ámbito cuando el tuyo ya lo enseña. (2026-10-20)
 - La logística, la acogida y la técnica de una función ya se escriben desde su ficha, línea a línea. En calma, «Siguiente» de la barra lateral solo dice lo confirmado. El estado de una función ya no ofrece «facturado» ni «cobrado», que son del bolo. Buscar en Conversaciones con una etiqueta elegida vuelve a funcionar. (2026-10-20)
