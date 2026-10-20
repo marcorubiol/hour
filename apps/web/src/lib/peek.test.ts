@@ -91,7 +91,15 @@ describe('fullHref', () => {
     expect(fullHref({ kind: 'conversation', ws: 'muk-cia', slug: 'c' })).toBe('/h/muk-cia/conversation/c');
     expect(fullHref({ kind: 'person', ws: 'muk-cia', slug: 'p' })).toBe('/h/muk-cia/person/p');
     expect(fullHref({ kind: 'bolo', projectId: PROJECT, id: BOLO })).toBe(`/h/books?scope=p:${PROJECT}#bolo-${BOLO}`);
+    // Con tu ámbito a mano, si ya enseña el proyecto, no lo pisa.
+    expect(fullHref({ kind: 'bolo', projectId: PROJECT, id: BOLO }, { pins: [], workspaceSlug: 'muk-cia' })).toBe(
+      `/h/books#bolo-${BOLO}`,
+    );
     expect(fullHref({ kind: 'date', id: DATE })).toBeNull();
+  });
+
+  it('a Cuentas link with a verb (`act`) goes to Cuentas, even from the bolo peek', () => {
+    expect(peekFromLink(url(`/h/books?scope=p:${PROJECT}&act=draft#bolo-${BOLO}`), url('/h/planner'))).toBeNull();
   });
 
   it("a bolo's full link is read back as the same bolo from outside Cuentas", () => {

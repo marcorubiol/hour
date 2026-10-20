@@ -19,6 +19,7 @@
  */
 
 import { t, type Locale } from '$lib/i18n';
+import { parsePin } from '$lib/stores/pins.svelte';
 
 /** Lo que el selector necesita de una fila de `GET /api/money/bolos`. */
 export type BoloLite = {
@@ -112,17 +113,51 @@ export function boloDefault(bolos: readonly BoloLite[]): string {
 }
 
 /**
- * Cuentas filtrada a un proyecto. `scope=p:<id>` es el enlace con ámbito de
- * siempre (ADR-067, lo aplica el shell); `new_bolo` abre su alta de bolo con
- * ese proyecto puesto; `#bolo-<id>` lleva a la tarjeta de un bolo, y `act`
- * (un tipo de «Pide atención») abre allí el diálogo que lo resuelve: cobro,
- * factura, caché o el documento (ADR-139, verbos de «Falta» del bolo).
+ * Si el ámbito de ahora ya enseña los bolos de un proyecto en Cuentas: sin
+ * contenedor pinado (Todo; una persona no acota Cuentas, ADR-092 § 2), el
+ * propio proyecto, o su espacio. Una línea del proyecto no basta: el bolo
+ * puede ser de otra línea.
  */
+export function scopeShowsProject(
+  pins: readonly string[],
+  projectId: string,
+  workspaceSlug: string | null,
+): boolean {
+  const containers = pins.map(parsePin).filter((p) => p.kind !== 'person');
+  if (containers.length === 0) return true;
+  return containers.some(
+    (p) => (p.kind === 'project' && p.key === projectId) || (p.kind === 'space' && !!workspaceSlug && p.key === workspaceSlug),
+  );
+}
+
+/**
+ * Cuentas en un proyecto. `scope=p:<id>` es el enlace con ámbito de siempre
+ * (ADR-067, lo aplica el shell y se queda como tu ámbito en todas las
+ * lentes), así que solo va cuando hace falta: con `here` (tus pines y el
+ * espacio del proyecto), si tu ámbito ya enseña el proyecto el enlace no lo
+ * toca, y abrir un bolo desde su vistazo no te cambia el ámbito del resto
+ * (2026-10-20). Si no lo enseña, el enlace lo acota al proyecto, porque si
+ * no la tarjeta no estaría. `new_bolo` abre su alta de bolo con ese proyecto
+ * puesto; `#bolo-<id>` lleva a la tarjeta de un bolo, y `act` (un tipo de
+ * «Pide atención») abre allí el diálogo que lo resuelve: cobro, factura,
+ * caché o el documento (ADR-139, verbos de «Falta» del bolo).
+ */
+/** Where a link to Cuentas is drawn from: your pins and the project's space. */
+export type BooksHere = { pins: readonly string[]; workspaceSlug: string | null };
+
 export function booksHref(
   projectId: string,
-  opts: { newBolo?: boolean; boloId?: string; act?: string } = {},
+  opts: {
+    newBolo?: boolean;
+    boloId?: string;
+    act?: string;
+    here?: BooksHere;
+  } = {},
 ): string {
-  const act = opts.act && opts.boloId ? `&act=${opts.act}` : '';
-  const q = `scope=p:${projectId}${opts.newBolo ? `&new_bolo=${projectId}` : ''}${act}`;
-  return `/h/books?${q}${opts.boloId ? `#bolo-${opts.boloId}` : ''}`;
+  const params: string[] = [];
+  if (!opts.here || !scopeShowsProject(opts.here.pins, projectId, opts.here.workspaceSlug)) params.push(`scope=p:${projectId}`);
+  if (opts.newBolo) params.push(`new_bolo=${projectId}`);
+  if (opts.act && opts.boloId) params.push(`act=${opts.act}`);
+  const q = params.length ? `?${params.join('&')}` : '';
+  return `/h/books${q}${opts.boloId ? `#bolo-${opts.boloId}` : ''}`;
 }
