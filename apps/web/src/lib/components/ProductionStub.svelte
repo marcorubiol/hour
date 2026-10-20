@@ -16,6 +16,8 @@
   import type { Json } from '$lib/db-types';
   import { appLocale, t, type Locale } from '$lib/i18n';
   import JsonKV, { hasJsonContent } from './JsonKV.svelte';
+  import JsonKVEdit from './JsonKVEdit.svelte';
+  import type { KVObject } from '$lib/kv-lines';
   import ScheduleTable from './ScheduleTable.svelte';
 
   interface VenueContact {
@@ -69,7 +71,15 @@
     withSchedule?: boolean;
     /** The reader's language; defaults to the session's. */
     locale?: Locale;
+    /**
+     * Where the three columns are written (the record, Marco 2026-10-20):
+     * with it, each is drawn even when empty, a line at a time
+     * (`JsonKVEdit`). Without it, only what has content, read-only.
+     */
+    saveJson?: (field: JsonField, next: KVObject) => Promise<void>;
   }
+
+  type JsonField = 'logistics' | 'hospitality' | 'technical';
 
   let {
     venue,
@@ -89,6 +99,7 @@
     schedule,
     withSchedule = true,
     locale = appLocale(),
+    saveJson,
   }: Props = $props();
 
   // The venue meta line shows only the venue's OWN timezone; the schedule
@@ -114,15 +125,14 @@
     return rows;
   });
 
-  let jsonSections = $derived(
-    (
-      [
-        [t('perf.logistics', locale), logistics],
-        [t('perf.hospitality', locale), hospitality],
-        [t('perf.technical', locale), technical],
-      ] as const
-    ).filter(([, v]) => hasJsonContent(v)),
+  let jsonColumns = $derived(
+    [
+      ['logistics', t('perf.logistics', locale), logistics],
+      ['hospitality', t('perf.hospitality', locale), hospitality],
+      ['technical', t('perf.technical', locale), technical],
+    ] as const,
   );
+  let jsonSections = $derived(jsonColumns.filter(([, , v]) => hasJsonContent(v)));
 </script>
 
 <section class="production" aria-label={t('perf.production', locale)}>
@@ -171,12 +181,18 @@
   />
   {/if}
 
-  {#each jsonSections as [label, value] (label)}
-    <div class="production__section">
-      <BlockHead title={label} level={3} />
-      <JsonKV {value} />
-    </div>
-  {/each}
+  {#if saveJson}
+    {#each jsonColumns as [field, label, value] (field)}
+      <JsonKVEdit title={label} {value} idBase="perf-{field}" save={(next) => saveJson(field, next)} {locale} />
+    {/each}
+  {:else}
+    {#each jsonSections as [field, label, value] (field)}
+      <div class="production__section">
+        <BlockHead title={label} level={3} />
+        <JsonKV {value} />
+      </div>
+    {/each}
+  {/if}
 </section>
 
 <style>

@@ -12,6 +12,7 @@
 
 import { describe, expect, it, test } from 'vitest';
 import { computePulse, performanceAttribution } from './pulse';
+import { railNextShows } from './calm';
 import { buildPersonAttribution } from './people';
 import type { DateEvent, PerformanceEvent } from './month-events';
 
@@ -277,5 +278,35 @@ describe('performanceAttribution (the Desk reads the rail rule)', () => {
   });
   it('asks the axis when it is active', () => {
     expect(performanceAttribution(row, { active: true, attribute: () => 'no' })).toBe('no');
+  });
+});
+
+describe('next in calm (enmienda a ADR-096 § 5)', () => {
+  const hold = perf({ id: 'h1', status: 'hold_1', start_at: `${DAY}T16:00:00Z` });
+  const gig = perf({ id: 'g1', status: 'confirmed', start_at: `${DAY}T18:00:00Z` });
+  const maybe = date({ id: 'd2', status: 'tentative', starts_at: `${DAY}T15:00:00Z` });
+  const input = (calm: boolean) => ({
+    performances: [hold, gig],
+    dates: [maybe],
+    viewerTz: TZ,
+    nextKeeps: (ref: { family: Parameters<typeof railNextShows>[0] }) => railNextShows(ref.family, calm),
+  });
+
+  test('outside calm the nearest row is next, whatever its certainty', () => {
+    expect(pulse(input(false), at('10:00:00')).next?.ref.id).toBe('d2');
+  });
+
+  test('in calm next skips the hold and the tentative date for the confirmed one', () => {
+    expect(pulse(input(true), at('10:00:00')).next?.ref.id).toBe('g1');
+  });
+
+  test('in calm, nothing confirmed ahead is a dash, not an option', () => {
+    const only = { ...input(true), performances: [hold] , dates: [] };
+    expect(pulse(only, at('10:00:00')).next).toBeNull();
+  });
+
+  test('calm does not touch now: an option you are in is still what you are doing', () => {
+    const inside = pulse({ ...input(true), dates: [] }, at('16:30:00'));
+    expect(inside.now.doing?.ref.id).toBe('h1');
   });
 });
