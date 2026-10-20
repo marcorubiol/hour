@@ -7,6 +7,7 @@ import {
   HOLD_NOTICE_DEFAULT,
   PERFORMANCE_CREATE_STATUSES,
   PERFORMANCE_STATUSES,
+  PERFORMANCE_MENU_STATUSES,
   PerformanceCreateSchema,
   PerformancePatchSchema,
   PerformanceSeriesCreateSchema,
@@ -202,6 +203,18 @@ describe('decideBy (ADR-080 §2)', () => {
   it('accepts a full instant and crosses month/year boundaries', () => {
     expect(decideBy('2031-08-15T20:30:00.000Z', 15)).toBe('2031-07-31');
     expect(decideBy('2031-01-10', 30)).toBe('2030-12-11');
+  });
+});
+
+describe('PERFORMANCE_MENU_STATUSES (Marco, 2026-10-20)', () => {
+  it('offers every status but invoiced and paid, which belong to the bolo', () => {
+    expect(PERFORMANCE_MENU_STATUSES).not.toContain('invoiced');
+    expect(PERFORMANCE_MENU_STATUSES).not.toContain('paid');
+    expect(PERFORMANCE_MENU_STATUSES.length).toBe(PERFORMANCE_STATUSES.length - 2);
+  });
+  it('a function that already has one still reads it with its word', () => {
+    expect(performanceStatusLabel('invoiced', 'es')).toBe(es['perf.status_invoiced']);
+    expect(performanceStatusLabel('paid', 'ca')).toBe(ca['perf.status_paid']);
   });
 });
 

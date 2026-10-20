@@ -32,6 +32,17 @@ export const PERFORMANCE_CREATE_STATUSES = [
   'confirmed',
 ] as const;
 
+/**
+ * Lo que ofrece el menú de estado de la ficha (Marco, 2026-10-20): todo el
+ * enum menos «facturado» y «cobrado», que son del bolo (ADR-087: el dinero
+ * vive en el bolo). El enum de base de datos no cambia: una función que ya
+ * los tenga los sigue leyendo con su palabra (`performanceStatusLabel`), y el
+ * menú no los ofrece.
+ */
+export const PERFORMANCE_MENU_STATUSES = PERFORMANCE_STATUSES.filter(
+  (s): s is Exclude<PerformanceStatus, 'invoiced' | 'paid'> => s !== 'invoiced' && s !== 'paid',
+);
+
 /** The tones of the one status badge (`StateBadge`, base.css `.badge--*`). */
 export type StatusTone = 'neutral' | 'primary' | 'info' | 'success' | 'warning' | 'danger' | 'faint';
 

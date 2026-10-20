@@ -37,7 +37,7 @@
   import { LOCALE_TAG, detectLocale, t } from '$lib/i18n';
   import {
     HOLD_NOTICE_DEFAULT,
-    PERFORMANCE_STATUSES,
+    PERFORMANCE_MENU_STATUSES,
     holdDeadlineLabel,
     isHoldStatus,
     isValidHoldNotice,
@@ -804,7 +804,9 @@
         >
           {#snippet trigger()}{performanceStatusLabel(perf!.status, locale)}<span class="status-caret" aria-hidden="true">▾</span>{/snippet}
           {#snippet children({ close })}
-            {#each PERFORMANCE_STATUSES as s (s)}
+            <!-- «Facturado» y «cobrado» son del bolo: se leen en el trigger si
+                 la función ya los tiene, no se ofrecen (Marco, 2026-10-20). -->
+            {#each PERFORMANCE_MENU_STATUSES as s (s)}
               <li role="none">
                 <button
                   type="button"
