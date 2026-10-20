@@ -445,12 +445,12 @@
 
 - [ ] **Segundo nivel y calma (ADR-139)**: las cinco fases y sus seguimientos (verbos del bolo, resalte de lo creado, «Falta» de línea y proyecto) en producción el 20-10 (`b0bdd0c1`): piezas de formulario y de ficha, un solo modelo de guardado, ficha con hechos/«Falta»/«Detalles», vistazo lateral (fecha, bolo, función, conversación, persona), alta rápida al plan, calma como foco y peso del primer nivel, pulido de Ajustes. Siguen:
   - [ ] Pasar el E2E contra `b0bdd0c1` (muchos specs reescritos sin correr; en curso el 20-10).
-  - [ ] Marco: decidir — En calma, ¿«Siguiente» del raíl solo lo confirmado? ADR-096 § 5 dice que el raíl no se toca. Recomendación: sí, solo lo confirmado.
-  - [ ] Marco: decidir — Ajustes oculta lo que no guardaba nada: Notificaciones (Master View pasa a Perfil), cuatro valores de Privacidad, Facturación, Zona de peligro y el selector de idioma de la app. Recomendación: dejarlo así hasta que cada uno guarde de verdad.
+  - [ ] En calma, «Siguiente» del raíl solo lo confirmado (Marco, 20-10; enmienda ADR-096 § 5).
+  - [ ] Integrar `claude/cleanup` (9c732e06) en main con su guard de tokens (Marco, 20-10).
   - [ ] Bug: el bloque de conversaciones del proyecto filtra por el nombre corto del proyecto, que se repite entre espacios: puede mezclar conversaciones de otro espacio del mismo usuario (carril adr139-followups, 20-10).
   - [ ] Después (ADR-139): la línea que entiende texto en el alta, crear en la celda del Mes, ⌘K que crea función, fecha, tarea y conversación.
-  - [ ] Marco: decidir — Logística, acogida y técnica se ven en la ficha de función pero no se escriben en ningún sitio (`JsonKV.svelte`): ¿quitarlas hasta que tengan editor o «+ añadir línea»? Recomendación: «+ añadir línea» con el campo nuevo.
-  - [ ] Marco: decidir — El estado de una función ofrece «facturado» y «cobrado», que son del bolo: ¿quitarlos del menú de la función? Recomendación: sí, el dinero vive en el bolo (ADR-087).
+  - [ ] Logística, acogida y técnica de la función: «+ añadir línea» con el campo nuevo (Marco, 20-10).
+  - [ ] Fuera «facturado» y «cobrado» del estado de una función: el dinero vive en el bolo (Marco, 20-10, ADR-087).
   - [ ] Bug: en Ajustes, «Subir imagen» no hace nada (revisión 19-10; en `claude/record-pieces`).
   - [ ] Pulido: en oscuro el diálogo se funde con la página; desplegable de 40 px junto a campo de 44; pie del diálogo partido en móvil; `--font-size-s` no existe (ficha de persona) (revisión 19-10, `ui-visual.md`).
 - [ ] **Una conversación con etiquetas y tres capas de estado (ADR-138)**: plan validado por Marco el 19-10, entero
