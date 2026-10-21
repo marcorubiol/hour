@@ -503,8 +503,9 @@
       color: var(--text-faint);
       font-size: var(--text-xs);
     }
-    /* En el móvil la tabla pasa a fichas: tipo arriba, nombre y valor debajo. */
-    @media (max-width: 47.999rem) {
+    /* En una columna estrecha (el móvil, o 768 y 900 con el raíl y el menú de
+       Ajustes) la tabla pasa a fichas: tipo arriba, nombre y valor debajo. */
+    @container set-page (width < 31rem) {
       .md-table {
         grid-template-columns: minmax(0, 1fr);
       }
