@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- Cada espacio tiene sus etiquetas de conversación en Ajustes: renombrar las de Hour, apagarlas, ordenarlas y crear las propias. Desde ⌘K se crea una función, una fecha, una tarea o una conversación escribiendo lo que es («ensayo Mercat»), en cualquier pantalla. Y en el Mes, el «+» de cada día, un doble clic en su hueco o una pulsación larga abren el alta en ese día. (2026-10-21)
 - En una pantalla mediana o en el móvil, las secciones de Ajustes se eligen en un desplegable arriba y la página usa todo el ancho. Y en un espacio sin conversaciones, «Todas» vuelve a invitar a traer tu agenda. (2026-10-21)
 - En Conversaciones, «Todas» es una sola lista con las conversaciones y los hilos del equipo juntos: lo no leído y lo que te toca, arriba. La búsqueda mira en las dos. Abrir una conversación la marca leída, y Hoy nombra la etiqueta de lo que te espera cuando no es Difusión. El bloque de conversaciones de un proyecto ya no mezcla las de otro espacio, y Ajustes no se sale de lado en una pantalla mediana. (2026-10-21)
 - Hoy va primero y aparte de las tres secciones, con un filete fino. La fecha del reloj de la barra lateral cabe en una línea, y en una pantalla mediana Hoy pasa a una columna para que nada quede apretado. (2026-10-20)

@@ -33,8 +33,8 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
 ## Producción (verificado 2026-10-20)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`ed0aa254`**, `dirty:false`, builtAt
-  2026-10-21T19:20Z (Ajustes con desplegable bajo 1024; «Trae tu agenda» en Todas; etiquetas fase 3: «Todas» en una lista con `conversation_feed`; conversaciones del proyecto por id; Ajustes sin scroll lateral; antes Hoy aparte en el selector; búsqueda a la izquierda, lentes a la derecha y cuenta al raíl; selector de lentes en el marco, ADR-140; pantalla en blanco arreglada; antes ADR-139, limpieza con guard de tokens, decisiones del 20-10; E2E 132/135, 3 saltados). `main` == prod salvo documentos y tests.
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`b739bf26`**, `dirty:false`, builtAt
+  2026-10-21T21:30Z (etiquetas del espacio en Ajustes, ⌘K que crea, crear desde la celda del Mes; Ajustes con desplegable bajo 1024; «Trae tu agenda» en Todas; etiquetas fase 3: «Todas» en una lista con `conversation_feed`; conversaciones del proyecto por id; Ajustes sin scroll lateral; antes Hoy aparte en el selector; búsqueda a la izquierda, lentes a la derecha y cuenta al raíl; selector de lentes en el marco, ADR-140; pantalla en blanco arreglada; antes ADR-139, limpieza con guard de tokens, decisiones del 20-10; E2E 132/135, 3 saltados). `main` == prod salvo documentos y tests.
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free, con keepalive diario
   (`.github/workflows/keepalive.yml`) contra la pausa por inactividad. Pasar a Pro antes de la beta, aún no
