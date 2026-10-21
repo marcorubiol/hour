@@ -554,6 +554,7 @@
   "pulse.call": "convocation",
   "settings.title": "Paramètres",
   "settings.nav_aria": "Sections des paramètres",
+  "settings.section_label": "Section",
   "settings.nav_profile": "Profil",
   "settings.nav_workspaces": "Espaces et rôles",
   "settings.nav_privacy": "Visibilité et confidentialité",

@@ -587,6 +587,7 @@
   "pulse.call": "call",
   "settings.title": "Configuració",
   "settings.nav_aria": "Seccions dels ajustos",
+  "settings.section_label": "Secció",
   "settings.nav_profile": "Perfil",
   "settings.nav_workspaces": "Espais i rols",
   "settings.nav_privacy": "Visibilitat i privadesa",

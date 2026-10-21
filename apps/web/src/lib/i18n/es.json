@@ -587,6 +587,7 @@
   "pulse.call": "call",
   "settings.title": "Ajustes",
   "settings.nav_aria": "Secciones de ajustes",
+  "settings.section_label": "Sección",
   "settings.nav_profile": "Perfil",
   "settings.nav_workspaces": "Espacios y roles",
   "settings.nav_privacy": "Visibilidad y privacidad",

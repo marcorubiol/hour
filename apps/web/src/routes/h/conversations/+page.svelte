@@ -760,6 +760,7 @@
         {projectNameById}
         {tagNames}
         {locale}
+        importEmptyState={canEdit}
       />
     {:else}
       <ConversationTable

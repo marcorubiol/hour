@@ -595,6 +595,7 @@
   "pulse.call": "call",
   "settings.title": "Settings",
   "settings.nav_aria": "Settings sections",
+  "settings.section_label": "Section",
   "settings.nav_profile": "Profile",
   "settings.nav_workspaces": "Workspaces & roles",
   "settings.nav_privacy": "Visibility & privacy",

@@ -1,8 +1,9 @@
 <script lang="ts">
   /**
    * Settings — scoped by the workspace segment. The global shell detects
-   * this route and exposes <SettingsNav />; this page renders the active
-   * section panel in the main column.
+   * this route and exposes <SettingsNav /> from 1024 up; under it this page
+   * draws the same sections as a dropdown at its top (SettingsSectionSelect).
+   * The page renders the active section panel in the main column.
    *
    * Active section is driven by the `?section=` query param so the URL
    * is shareable and the sidebar nav stays in sync.
@@ -29,6 +30,7 @@
   import LanguagesSection from '$lib/components/settings/LanguagesSection.svelte';
   import LensesSection from '$lib/components/settings/LensesSection.svelte';
   import MailSection from '$lib/components/settings/MailSection.svelte';
+  import SettingsSectionSelect from '$lib/components/SettingsSectionSelect.svelte';
 
   const locale = appLocale();
 
@@ -77,6 +79,8 @@
 </svelte:head>
 
 <article class="record set-page">
+  <SettingsSectionSelect />
+
   {#if active === 'profile'}
     <ProfileSection {workspaceSlug} />
   {/if}
@@ -114,9 +118,9 @@
   .set-page {
     --set-pad: clamp(1rem, 1.6vw, 1.5rem);
 
-    /* Its rows answer to the column they get, not to the viewport: from 768
-       up the rail and the settings nav leave the page well under the two
-       columns' 180 + 280 (a 208px column at 768). */
+    /* Its rows answer to the column they get, not to the viewport: the rail
+       (and, from 1024 up, the settings nav) take their share first, so the
+       page can be under the two columns' 180 + 280 at any window. */
     container: set-page / inline-size;
 
     color: var(--text-color);

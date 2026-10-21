@@ -41,7 +41,9 @@
 <script lang="ts">
   /**
    * SettingsNav — sidebar nav for Settings. Renders in place of <Plaza />
-   * when the user is in /h/[ws]/settings/.
+   * when the user is in /h/[ws]/settings/, from 1024 up; under it the shell
+   * hides it and the page shows the same sections as a dropdown
+   * (SettingsSectionSelect).
    *
    * Active section is driven by the `?section=` query param so the URL
    * is shareable, survives refresh, and the nav state stays in sync
@@ -152,17 +154,6 @@
     }
     .set-nav__item.is-danger .set-nav__glyph {
       color: var(--danger);
-    }
-
-    /* On a phone the shell lays the nav as a band above the page (layout
-       § settings nav). The items keep their own face; only the list turns
-       from a column into lines that wrap, so all seven stay in view with
-       no sideways scroll. Each item is as wide as its words. */
-    @media (max-width: 47.999rem) {
-      .set-nav__list {
-        flex-direction: row;
-        flex-wrap: wrap;
-      }
     }
   }
 </style>
