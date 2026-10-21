@@ -701,7 +701,9 @@
   }
   .set-access__role-select { min-inline-size: 8rem; }
 
-  @media (max-width: 44rem) {
+  /* By the page's column (`set-page`, the settings page), not the viewport:
+     the rail and the settings nav take most of a 768 or 900 screen. */
+  @container set-page (width < 40rem) {
     .set-access__row {
       grid-template-columns: var(--dot-l) 1fr auto;
       gap: var(--space-s);
@@ -711,5 +713,11 @@
     .set-access__role-select { grid-column: 2; }
     .set-access__status { display: none; }
     .set-access__row > button { grid-column: 3; grid-row: 1 / span 2; }
+  }
+  /* Narrower still, the role and the verb stack under the name. */
+  @container set-page (width < 22rem) {
+    .set-access__row { grid-template-columns: var(--dot-l) minmax(0, 1fr); }
+    .set-access__role-select { min-inline-size: 0; }
+    .set-access__row > button { grid-column: 2; grid-row: auto; justify-self: start; }
   }
 </style>

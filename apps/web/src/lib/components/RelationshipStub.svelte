@@ -1,26 +1,3 @@
-<script lang="ts" module>
-  import { fetchJSON } from '$lib/api';
-  import type { ConversationItem } from '$lib/conversation';
-
-  export const RELATION_STUB_LIMIT = 10;
-
-  /**
-   * The stub's page of a project's conversations, next step first. The
-   * project page reads the same options for its «Falta» strip: one key, one
-   * request.
-   */
-  export function relationStubQueryOptions(slug: string) {
-    return {
-      queryKey: ['conversations', { project_slug: slug, status: 'any', limit: RELATION_STUB_LIMIT }] as const,
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
-        fetchJSON<{ total: number; limit: number; items: ConversationItem[] }>(
-          `/api/conversations?project_slug=${encodeURIComponent(slug)}&status=any&limit=${RELATION_STUB_LIMIT}`,
-          signal,
-        ),
-    };
-  }
-</script>
-
 <script lang="ts">
   /**
    * RelationshipStub — Project detail block showing conversations summary
@@ -41,33 +18,24 @@
   import StateBadge from '$lib/components/StateBadge.svelte';
   import { lensOn } from '$lib/lenses.svelte';
   import { createQuery } from '@tanstack/svelte-query';
-  import { writable, derived } from 'svelte/store';
+  import { toStore } from 'svelte/store';
   import { appLocale, t } from '$lib/i18n';
   import { type PersonLite } from '$lib/conversation';
   import { relationLabel, relationTone } from '$lib/conversation-relation';
+  import { relationStubQueryOptions } from '$lib/relation-stub';
 
   interface Props {
-    projectSlug: string;
+    /** The resolved project's id; null while the page resolves it. */
+    projectId: string | null;
   }
 
-  let { projectSlug }: Props = $props();
+  let { projectId }: Props = $props();
 
   const locale = appLocale();
 
-  // Mirror the rune-prop into a legacy store so `createQuery` (which
-  // accepts StoreOrVal<options>) re-runs when the slug changes via
-  // SvelteKit navigation (same component instance, new params). The
-  // synchronous read on init is intentional — the $effect below keeps it
-  // in sync on every prop change, which is the actual reactive contract.
-  // svelte-ignore state_referenced_locally
-  const slugStore = writable(projectSlug);
-  $effect(() => {
-    slugStore.set(projectSlug);
-  });
-
-  const queryOptions = derived(slugStore, ($slug) => relationStubQueryOptions($slug));
-
-  const query = createQuery(queryOptions);
+  // By id, not slug: a slug repeats across spaces (ADR-024). `toStore`
+  // re-runs the query when navigation changes the project.
+  const query = createQuery(toStore(() => relationStubQueryOptions(projectId)));
 
   let items = $derived($query.data?.items ?? []);
   let total = $derived($query.data?.total ?? 0);
@@ -111,7 +79,7 @@
 
     {#if total > items.length && lensOn('conversations')}
       <footer class="rel-stub__footer">
-        <a class="link-arrow" href="/h/conversations">
+        <a class="link-arrow" href={projectId ? `/h/conversations?scope=p:${projectId}` : '/h/conversations'}>
           {t('perf.rel_view_all', locale, { n: total })}
         </a>
       </footer>

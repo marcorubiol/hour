@@ -114,6 +114,11 @@
   .set-page {
     --set-pad: clamp(1rem, 1.6vw, 1.5rem);
 
+    /* Its rows answer to the column they get, not to the viewport: from 768
+       up the rail and the settings nav leave the page well under the two
+       columns' 180 + 280 (a 208px column at 768). */
+    container: set-page / inline-size;
+
     color: var(--text-color);
     font-family: var(--font-sans);
   }
@@ -169,10 +174,10 @@
     align-items: center;
     gap: var(--space-s);
   }
-  /* On a phone the two columns (180 + 280 at least) cannot sit side by
-     side in 358px: the control drops under its label, the hint keeps its
-     place between them. */
-  @media (max-width: 47.999rem) {
+  /* When the two columns (180 + 280 and the gap, 31rem) do not fit the
+     page, the control drops under its label, the hint keeps its place
+     between them. */
+  @container set-page (width < 31rem) {
     .set-page :global(.set-row) {
       grid-template-columns: minmax(0, 1fr);
       gap: var(--space-s);
