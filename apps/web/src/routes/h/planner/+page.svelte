@@ -26,7 +26,8 @@
    * the i18n and the Feed/ICS dialog (now behind the "⋯" overflow);
    * MonthGrid and AgendaList render. Creation is the QUICK ADD (ADR-139
    * p3 A): every "+" — toolbar, day cells, the "⋯" «unavailable» entry —
-   * opens CreateEventDialog with the day/scope presets, and the page stays
+   * opens the shell's one CreateEventDialog (creation store) with the day,
+   * and the page stays
    * where it was when something is added (the notice says it, with undo).
    */
 
@@ -98,11 +99,9 @@
   import { ORDERED_DATE_KINDS, type RunningOrderTarget } from '$lib/running-order';
   import Dialog from '$lib/components/Dialog.svelte';
   import FeedDialog from '$lib/components/planner/FeedDialog.svelte';
-  import CreateEventDialog from '$lib/components/create/CreateEventDialog.svelte';
   import { currentPeek, openPeek } from '$lib/peek.svelte';
-  import type { CreatedPerformance } from '$lib/plan-create';
-  import type { QuickType } from '$lib/quick-add';
   import { usePins } from '$lib/stores/pins.svelte';
+  import { useCreation } from '$lib/stores/creation.svelte';
   import { useCalm } from '$lib/stores/calm.svelte';
   import { plannerCalmFacts, shows } from '$lib/calm';
   import { LOCALE_TAG, detectLocale, t } from '$lib/i18n';
@@ -1321,10 +1320,8 @@
       is chosen twice (law 28). The person axis passes null: the dialog
       asks (ADR-094 §3b). `openCreate` clears the preset first, so the
       toolbar's own «+ date» never inherits a stale lane. */
-  let boardPresetProjectId = $state<string | null>(null);
   function openBoardCreate(iso: string, projectId: string | null) {
-    openCreate(iso);
-    boardPresetProjectId = projectId;
+    creation.openEvent({ date: iso, projectId });
   }
   /** The head's '!' lands on that day's decision card — the same door the
       old connectors used (jumpToDecisionCard), the band as fallback. */
@@ -2951,7 +2948,7 @@
         return;
       }
       // A dialog is open: it owns the keyboard until it closes.
-      if (createOpen || peekOpen || marksOpen) return;
+      if (creation.eventOpen || peekOpen || marksOpen) return;
       // Inside a drawing's days the arrows are not «move the window»: on the
       // month they changed the month under the focused day and dropped the
       // focus on <body> (móvil #3). There they are the drawing's, or nothing.
@@ -3014,28 +3011,23 @@
     void queryClient.refetchQueries({ predicate: (q) => q.state.status === 'error' });
   }
 
-  let createOpen = $state(false);
-  let createDate = $state<string | null>(null);
-  /** The type a door opens on (the "⋯" «unavailable»); null = the draft's. */
-  let createType = $state<QuickType | null>(null);
-
-  // A single pinned line pre-selects its project — and its line. With no
-  // line pins, a single pinned project pre-selects itself.
-  let presetProjectId = $derived.by(() => {
-    if (scope.lines.length === 1) return scope.lines[0].projectId;
-    if (scope.lines.length === 0 && scope.projects.length === 1) return scope.projects[0].id;
-    return null;
-  });
-  let presetLineId = $derived(scope.lines.length === 1 ? scope.lines[0].id : null);
+  // The quick add is the shell's one dialog (creation store, ADR-056): ⌘K
+  // opens the same one, with the same draft. Each door here says only what
+  // it knows (a day, a lane's project, a type); the scope's project and line
+  // are the shell's. While the Planner is on screen it lends the shell its
+  // view's day, so a door without one (⌘K included) proposes it.
+  const creation = useCreation();
+  $effect(() =>
+    creation.hostEvents({
+      day: viewCreateDay,
+      get canUnavailable() {
+        return canBlackout;
+      },
+    }),
+  );
 
   function openCreate(dayIso?: string) {
-    // Every door resets the board's lane preset — only openBoardCreate
-    // re-arms it, AFTER this runs, so a toolbar «+ date» never inherits
-    // the last cell's project.
-    boardPresetProjectId = null;
-    createType = null;
-    createDate = dayIso ?? viewCreateDay();
-    createOpen = true;
+    creation.openEvent({ date: dayIso ?? viewCreateDay() });
   }
 
   /** A door without a day proposes the view's (`defaultCreateDay`). */
@@ -3083,13 +3075,6 @@
     openPeek({ kind: 'date', id: spanSourceId(d.id) });
   }
 
-  /** Adding stays on the Planner (ADR-139 p3); the notice's «Abrir» goes
-      to the new performance's page, only when asked. */
-  async function openCreatedPerformance(perf: CreatedPerformance) {
-    const ws = workspaceSlugById.get(perf.workspace_id) ?? defaultWorkspaceSlug;
-    if (perf.slug) await goto(`/h/${ws}/performance/${perf.slug}`);
-  }
-
   // ── Unavailability (ADR-078 §4/§5) is a type of the quick add; it can be
   // written only while the availability and team feeds answer (contract
   // § Graceful absence). ──
@@ -3101,20 +3086,10 @@
         !$teamQuery.data.absent,
     ),
   );
-  // Preset the space when the pinned scope collapses to one workspace (or
-  // only one exists) — the select stays for every other case. ONE
-  // workspace always: a blackout never fans out.
-  let blackoutPresetWs = $derived.by(() => {
-    if (scopeWorkspaceIds !== null && scopeWorkspaceIds.size === 1) {
-      return [...scopeWorkspaceIds][0];
-    }
-    const all = $workspacesQuery.data?.items ?? [];
-    return all.length === 1 ? all[0].id : null;
-  });
-
+  // The space of an unavailability (the scope's one, or the only one) is
+  // the shell's too (`scopeCreatePresets`): a blackout never fans out.
   function openBlackout() {
-    openCreate();
-    createType = 'unavailable';
+    creation.openEvent({ date: viewCreateDay(), type: 'unavailable' });
   }
 
   // ── Calendar feed links (ADR-054) — entry now lives in the "⋯" menu;
@@ -3788,16 +3763,6 @@
   {/if}
 </section>
 
-<CreateEventDialog
-  bind:open={createOpen}
-  presetProjectId={boardPresetProjectId ?? presetProjectId}
-  {presetLineId}
-  presetDate={createDate}
-  presetType={createType}
-  presetWorkspaceId={blackoutPresetWs}
-  canUnavailable={canBlackout}
-  onOpenPerformance={openCreatedPerformance}
-/>
 
 <FeedDialog bind:open={feedOpen} workspaces={$workspacesQuery.data?.items ?? []} />
 
