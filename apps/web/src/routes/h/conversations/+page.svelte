@@ -168,6 +168,12 @@
   // Debounced search — the raw input updates instantly, the query key
   // only after the pause.
   let qRaw = $state('');
+  // `?q=` lleva una búsqueda hecha en otro sitio: una organización del ⌘K con
+  // varias conversaciones (o ninguna) abre la lente buscando su nombre.
+  $effect(() => {
+    const fromUrl = page.url.searchParams.get('q');
+    if (fromUrl !== null) qRaw = fromUrl;
+  });
   let q = $state('');
   $effect(() => {
     const next = qRaw;

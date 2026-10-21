@@ -48,6 +48,7 @@
   import { conversationAccessQueryOptions } from '$lib/conversation-access';
   import { planAccessQueryOptions } from '$lib/plan-create';
   import { CREATE_LABEL_KEYS, paletteCreates, type PaletteCreate } from '$lib/palette-create';
+  import { paletteFindRows, paletteSearchQueryOptions, paletteSearchTerm } from '$lib/palette-search';
 
   // El mismo par que usa el Planner: el locale detectado y su etiqueta BCP-47.
   const locale = detectLocale(navigator.language);
@@ -102,7 +103,10 @@
    *
    * It is the TEAM (cast ∪ crew), never the contact book: a workspace's
    * person table holds hundreds of programmers who are not "us", and putting
-   * them in this list would bury the eight people who carry the work.
+   * them in this list would bury the eight people who carry the work. The
+   * contact book is SEARCHED all the same, in its own group of rows that open
+   * and never pin (`$lib/palette-search`): a space with contacts and no cast
+   * used to answer «nobody yet», which read as the search being broken.
    *
    * NOT gated on `open`, and that was a real bug rather than a preference:
    * gating it meant the fetch STARTED when the palette opened, and this is a
@@ -150,6 +154,36 @@
   });
 
   let query = $state('');
+
+  /**
+   * Contactos, organizaciones y conversaciones (`$lib/palette-search`): se
+   * buscan en el servidor con una pausa corta, y mientras llega la respuesta
+   * se quedan las filas de la anterior en vez de parpadear a vacío.
+   */
+  let searchTerm = $state('');
+  $effect(() => {
+    const next = paletteSearchTerm(query);
+    const timer = setTimeout(() => (searchTerm = next), 150);
+    return () => clearTimeout(timer);
+  });
+  const findQuery = createQuery(
+    toStore(() => ({
+      ...paletteSearchQueryOptions(searchTerm, workspaces.map((w) => w.id)),
+      enabled: open && searchTerm.length >= 2 && workspaces.length > 0,
+      placeholderData: (prev: unknown) => prev as never,
+    })),
+  );
+  let finds = $derived(
+    paletteFindRows(paletteSearchTerm(query) ? $findQuery.data : undefined, {
+      teamPersonIds: new Set(people.map((p) => p.person_id)),
+      workspaces,
+      spaceLabel: spaceName,
+    }),
+  );
+  /** Aún buscando lo que se acaba de escribir: no es lo mismo que «nada». */
+  let finding = $derived(
+    !!paletteSearchTerm(query) && (searchTerm !== paletteSearchTerm(query) || $findQuery.isFetching),
+  );
   /** null = top-level (spaces); `s:<slug>` = that space's projects;
       `p:<id>` = that project's lines. */
   let drill = $state<string | null>(null);
@@ -164,7 +198,10 @@
    * te lleva— y porque el ⌘K ya es la única puerta de navegación que esta app
    * tiene: inventarle otra ventana para escribir una fecha sería la segunda.
    */
-  type Kind = 'space' | 'project' | 'line' | 'person' | 'day' | 'create';
+  type Kind = 'space' | 'project' | 'line' | 'person' | 'contact' | 'organization' | 'conversation' | 'day' | 'create';
+  /** Las filas que se abren y no se fijan: un día, un «crear» y lo que busca
+      `palette-search`. Ninguna entra en el ámbito. */
+  const GOES = new Set<Kind>(['day', 'create', 'contact', 'organization', 'conversation']);
   interface Row {
     token: string;
     kind: Kind;
@@ -175,6 +212,8 @@
     lineKind?: string;
     /** for a «crear» row: what it opens */
     create?: PaletteCreate;
+    /** for a found row (contact, organization, conversation): where it goes */
+    href?: string;
   }
   interface Group {
     key: Kind;
@@ -192,6 +231,9 @@
     project: 'picker.kind_project',
     line: 'picker.kind_line',
     person: 'planner.board_person_one',
+    contact: 'palette.kind_contact',
+    organization: 'palette.kind_organization',
+    conversation: 'picker.kind_conversation',
     day: 'palette.kind_day',
   };
 
@@ -322,8 +364,13 @@
       // An empty People group has three different meanings and they must not
       // look alike: still fetching · the feed could not be read · nobody
       // matches. Only the last one is silence.
+      const found = (rows: typeof finds.contacts): Row[] =>
+        rows.map((f) => ({ token: f.token, kind: f.kind, name: f.name, path: f.path, drill: null, href: f.href }));
+      const contacts = found(finds.contacts);
+      // The team is empty but a contact matched: «nobody yet» would read as
+      // the search failing, which is the bug this group exists to fix.
       const peopleNote =
-        persons.length > 0
+        persons.length > 0 || contacts.length > 0
           ? undefined
           : $teamQuery.isLoading
             ? t('palette.team_loading', locale)
@@ -338,7 +385,16 @@
           { key: 'project', header: t('picker.projects', locale), rows: projects },
           { key: 'line', header: t('picker.lines', locale), rows: lines },
           // Last, because it is the axis that is not a level of the others.
-          { key: 'person', header: t('palette.people', locale), rows: persons, note: peopleNote },
+          { key: 'person', header: t('palette.team', locale), rows: persons, note: peopleNote },
+          // What is found and opened, never pinned (`$lib/palette-search`).
+          {
+            key: 'contact',
+            header: t('palette.contacts', locale),
+            rows: contacts,
+            note: contacts.length === 0 && finding ? t('palette.searching', locale) : undefined,
+          },
+          { key: 'organization', header: t('palette.organizations', locale), rows: found(finds.organizations) },
+          { key: 'conversation', header: t('palette.conversations', locale), rows: found(finds.conversations) },
           { key: 'day', header: t('palette.day', locale), rows: dayRows },
           // The last: what you can make, after what already exists.
           { key: 'create', header: t('palette.create', locale), rows: createRows },
@@ -371,7 +427,7 @@
         },
         {
           key: 'person',
-          header: t('palette.people', locale),
+          header: t('palette.team', locale),
           rows: people.filter((p) => p.projectIds.includes(key)).map((p) => personRow(p, '')),
         },
       ] as Group[]
@@ -397,6 +453,11 @@
 
   function openRow(r: Row) {
     if (r.kind === 'create') return runCreate(r);
+    if (r.href) {
+      void goto(r.href);
+      open = false;
+      return;
+    }
     // Antes de `parsePin`: `d:` no es un pin y su gramática no lo conoce.
     if (r.kind === 'day') {
       void goto(plannerDayHref('day', r.path));
@@ -549,9 +610,9 @@
         // ⇧↵ → apply the built scope (advanced; the Apply button is the
         // discoverable path, ⌘↵ being reserved for "open")
         apply();
-      } else if (flatRows[cur]?.kind === 'create') {
-        // ↵ on a «crear» row makes it; there is nothing to stage
-        runCreate(flatRows[cur]);
+      } else if (flatRows[cur] && GOES.has(flatRows[cur].kind)) {
+        // ↵ on a row that cannot be staged does the one thing it does
+        openRow(flatRows[cur]);
       } else if (flatRows[cur]) {
         // ↵ → add / remove from the scope
         toggleStage(flatRows[cur].token);
@@ -629,7 +690,7 @@
                 role="option"
                 aria-selected={gi === cur}
                 onmouseenter={() => (cur = gi)}
-                onclick={() => (r.kind === 'day' || r.kind === 'create' ? openRow(r) : toggleStage(r.token))}
+                onclick={() => (GOES.has(r.kind) ? openRow(r) : toggleStage(r.token))}
               >
                 {#if r.kind === 'create'}
                   <span class="cmdk__dayglyph" aria-hidden="true">+</span>
@@ -638,8 +699,10 @@
                        (ver `Kind`). Añadirle un caso sería estirar su
                        significado para un solo llamador. -->
                   <span class="cmdk__dayglyph" aria-hidden="true">◷</span>
+                {:else if r.kind === 'organization' || r.kind === 'conversation'}
+                  <span class="cmdk__dayglyph" aria-hidden="true">{r.kind === 'organization' ? '⌂' : '⇄'}</span>
                 {:else}
-                  <ScopeGlyph kind={r.kind} accent={accentFor(r.token)} lineKind={r.lineKind ?? ''} />
+                  <ScopeGlyph kind={r.kind === 'contact' ? 'person' : r.kind} accent={r.kind === 'contact' ? 'var(--text-faint)' : accentFor(r.token)} lineKind={r.lineKind ?? ''} />
                 {/if}
                 {#if r.kind !== 'create'}
                   <span class="cmdk__kind">{r.kind === 'line' ? lineKindLabel(r.lineKind ?? '', locale) : t(KIND_KEY[r.kind], locale)}</span>
@@ -649,7 +712,7 @@
                 </span>
                 {#if isStaged(r.token)}<span class="cmdk__added">✓ {t('palette.added', locale)}</span>{/if}
               </button>
-              {#if r.kind !== 'day' && r.kind !== 'create'}
+              {#if !GOES.has(r.kind)}
                 <button type="button" class="cmdk__open" onclick={() => openRow(r)}>
                   {t('palette.open', locale)} <span aria-hidden="true">↗</span>
                 </button>
@@ -842,7 +905,8 @@
   }
   .cmdk__kind {
     flex: none;
-    inline-size: 3.5rem;
+    /* «organización» / «organisation» is the longest word the column says. */
+    inline-size: 5.75rem;
     font-family: var(--font-mono);
     font-size: var(--text-xs);
     letter-spacing: var(--tracking-m);
