@@ -753,9 +753,19 @@
     min-block-size: 100vh;
     background: var(--bg);
   }
-  /* Settings mode slots its own rail between the scopes rail and main. */
-  .shell--settings {
-    grid-template-columns: auto auto 1fr;
+  /* Settings mode slots its own rail between the scopes rail and main, from
+     1024 up. Under it the rail and that nav left the page a narrow column
+     (208px at 768): the sections become a dropdown at the top of the page
+     instead (SettingsSectionSelect), and the shell keeps its two columns. */
+  @media (min-width: 64rem) {
+    .shell--settings {
+      grid-template-columns: auto auto 1fr;
+    }
+  }
+  @media (max-width: 63.999rem) {
+    .shell__settings-nav {
+      display: none;
+    }
   }
 
   .shell__settings-nav {
@@ -948,11 +958,8 @@
   @media (max-width: 47.999rem) {
     /* One column: the rail is a drawer now (ScopeRail + base.css § Drawer),
        out of the flow, so the bar and the page take the whole width. */
-    .shell,
-    .shell--settings {
-      grid-template-columns: minmax(0, 1fr);
-    }
     .shell {
+      grid-template-columns: minmax(0, 1fr);
       --shell-gutter: var(--space-m);
     }
     /* Door · search · you. The search takes what is left instead of
@@ -999,24 +1006,6 @@
     }
     .shell__search .kbd {
       display: none;
-    }
-    /* Settings keeps its nav on a phone: no longer a column beside the
-       page but a band above it, its own row between the bar and the page,
-       so the sections are one tap away and the scroll is the page's. The
-       inline padding gives back what each item pads inside itself, so the
-       labels land on the gutter the page's text starts on. */
-    .shell--settings {
-      grid-template-rows: auto auto 1fr;
-    }
-    .shell__settings-nav {
-      position: static;
-      inline-size: auto;
-      block-size: auto;
-      align-self: stretch;
-      overflow: visible;
-      border-inline-end: 0;
-      border-block-end: var(--line-hairline) solid var(--border-color-light);
-      padding-inline: calc(var(--shell-gutter) - var(--space-s));
     }
   }
 </style>
