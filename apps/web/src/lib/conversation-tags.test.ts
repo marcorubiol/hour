@@ -18,6 +18,14 @@ import {
   tagKeysOf,
   tagLabel,
   workspaceTags,
+  RESERVED_TAG_KEYS,
+  TAG_KEY_RE,
+  moveTag,
+  newTagProblem,
+  nextSort,
+  settingsTags,
+  sortsOf,
+  tagKeyFromLabel,
   type TagVocabulary,
 } from './conversation-tags';
 
@@ -173,5 +181,69 @@ describe('links', () => {
   it('a block of the panel carries the chip', () => {
     expect(panelHref(SALES, 'turno=nuestro#lista')).toBe('?etiqueta=sales&turno=nuestro#lista');
     expect(panelHref(ALL, 'turno=nuestro#lista')).toBe('?turno=nuestro#lista');
+  });
+});
+
+describe('the settings of a space (ADR-138 fase 4)', () => {
+  it('derives the key from the name', () => {
+    expect(tagKeyFromLabel('Coproducción')).toBe('coproduccion');
+    expect(tagKeyFromLabel('  Festivals d’estiu 2027 ')).toBe('festivals_d_estiu_2027');
+    expect(tagKeyFromLabel('2027 giras')).toBe('t_2027_giras');
+    expect(tagKeyFromLabel('ZZZ E2E tag')).toBe('zzz_e2e_tag');
+    expect(tagKeyFromLabel('a'.repeat(40))).toHaveLength(32);
+    expect(tagKeyFromLabel('ab' + ' '.repeat(29) + 'cd')).toBe('ab_cd');
+    expect(tagKeyFromLabel('x')).toBeNull();
+    expect(tagKeyFromLabel('—')).toBeNull();
+  });
+
+  it('refuses all and team, a key the space already uses (standard too) and an empty name', () => {
+    const taken = ['sales', 'press', 'giras'];
+    expect(newTagProblem('All', taken)).toBe('reserved');
+    expect(newTagProblem('TEAM', taken)).toBe('reserved');
+    expect(newTagProblem(' Team ', taken)).toBe('reserved');
+    expect(newTagProblem('Teams', taken)).toBeNull();
+    expect(newTagProblem('Press', taken)).toBe('taken');
+    expect(newTagProblem('Giras', taken)).toBe('taken');
+    expect(newTagProblem('   ', taken)).toBe('invalid');
+    expect(newTagProblem('x'.repeat(61), taken)).toBe('invalid');
+    expect(newTagProblem('Festivales', taken)).toBeNull();
+    for (const k of RESERVED_TAG_KEYS) expect(TAG_KEY_RE.test(k)).toBe(true);
+  });
+
+  it('lists active and inactive tags in the order of the space', () => {
+    const v: TagVocabulary = {
+      tags: [
+        { id: 't-sales', workspace_id: null, key: 'sales', label: null, labels: {}, sort: 10 },
+        { id: 't-press', workspace_id: null, key: 'press', label: null, labels: {}, sort: 20 },
+        { id: 't-own', workspace_id: WS_A, key: 'giras', label: 'Giras', labels: {}, sort: 50 },
+        { id: 't-other', workspace_id: WS_B, key: 'otra', label: 'Otra', labels: {}, sort: 5 },
+      ],
+      settings: [
+        { workspace_id: WS_A, tag_id: 't-press', label: 'Medios', labels: {}, active: false, sort: 5 },
+        { workspace_id: WS_B, tag_id: 't-sales', label: null, labels: {}, active: false, sort: null },
+      ],
+    };
+    const list = settingsTags(v, WS_A);
+    expect(list.map((x) => [x.key, x.active, x.standard, x.label])).toEqual([
+      ['press', false, true, 'Medios'],
+      ['sales', true, true, null],
+      ['giras', true, false, 'Giras'],
+    ]);
+    // The lens sees only the active ones, in the same order.
+    expect(workspaceTags(v, WS_A).map((x) => x.key)).toEqual(['sales', 'giras']);
+    expect(nextSort(list)).toBe(60);
+  });
+
+  it('moves a tag one place and saves the order ten by ten', () => {
+    const ids = ['a', 'b', 'c'];
+    expect(moveTag(ids, 'b', -1)).toEqual(['b', 'a', 'c']);
+    expect(moveTag(ids, 'b', 1)).toEqual(['a', 'c', 'b']);
+    expect(moveTag(ids, 'a', -1)).toEqual(ids);
+    expect(moveTag(ids, 'c', 1)).toEqual(ids);
+    expect(moveTag(ids, 'z', 1)).toEqual(ids);
+    expect(sortsOf(['c', 'a'])).toEqual([
+      { id: 'c', sort: 10 },
+      { id: 'a', sort: 20 },
+    ]);
   });
 });

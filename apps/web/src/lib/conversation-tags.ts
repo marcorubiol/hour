@@ -249,3 +249,103 @@ export function lensChips(canRead: boolean, tags: readonly WorkspaceTag[], local
     team,
   ];
 }
+
+// ── Ajustes del espacio (ADR-138, fase 4) ──────────────────────────────────
+
+/**
+ * Claves que una etiqueta propia no puede llevar: son chips de la fila (Todas,
+ * Equipo), y `?etiqueta=team` dejaría de filtrar por la etiqueta. El CHECK de
+ * la base no las prohíbe; lo hacen la pantalla y el endpoint.
+ */
+export const RESERVED_TAG_KEYS: readonly string[] = [ALL, TEAM];
+
+/** El largo del nombre: el CHECK de `conversation_tag.label`. */
+export const TAG_LABEL_MAX = 60;
+
+/**
+ * La clave de una etiqueta propia, derivada de su nombre: sin acentos, en
+ * minúsculas, lo que no es letra ni cifra pasa a `_`, 32 como mucho. Si no
+ * empieza por letra, `t_` delante. Null si no queda una clave válida.
+ */
+export function tagKeyFromLabel(label: string): string | null {
+  let key = label
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  if (!key) return null;
+  if (!/^[a-z]/.test(key)) key = `t_${key}`;
+  key = key.slice(0, 32).replace(/_+$/, '');
+  return TAG_KEY_RE.test(key) ? key : null;
+}
+
+export type TagKeyProblem = 'invalid' | 'reserved' | 'taken';
+
+/**
+ * Por qué un nombre no sirve para una etiqueta nueva, o null si sirve. `taken`
+ * son las claves que el espacio ya usa, estándar incluidas: una propia `press`
+ * se confundiría con Prensa en los chips, que van por clave.
+ */
+export function newTagProblem(label: string, taken: Iterable<string>): TagKeyProblem | null {
+  const name = label.trim();
+  if (!name || name.length > TAG_LABEL_MAX) return 'invalid';
+  const key = tagKeyFromLabel(name);
+  if (!key) return 'invalid';
+  if (RESERVED_TAG_KEYS.includes(key)) return 'reserved';
+  if (new Set(taken).has(key)) return 'taken';
+  return null;
+}
+
+/** Una etiqueta como la configura su espacio, activa o no. */
+export interface SettingsTag {
+  id: string;
+  key: string;
+  /** Estándar de Hour (se renombra en el espacio) o propia (lleva su nombre). */
+  standard: boolean;
+  /** El nombre del espacio: el renombre de una estándar, o el de una propia. */
+  label: string | null;
+  labels: Record<string, string>;
+  active: boolean;
+  sort: number;
+}
+
+/** Todas las etiquetas de un espacio para Ajustes, activas y no, en su orden. */
+export function settingsTags(vocab: TagVocabulary, workspaceId: string): SettingsTag[] {
+  const setting = new Map(vocab.settings.filter((s) => s.workspace_id === workspaceId).map((s) => [s.tag_id, s]));
+  return vocab.tags
+    .filter((tag) => tag.workspace_id === null || tag.workspace_id === workspaceId)
+    .map((tag) => {
+      const s = setting.get(tag.id);
+      return {
+        id: tag.id,
+        key: tag.key,
+        standard: tag.workspace_id === null,
+        label: s?.label ?? tag.label,
+        labels: { ...(tag.labels ?? {}), ...(s?.labels ?? {}) },
+        active: s?.active !== false,
+        sort: s?.sort ?? tag.sort,
+      };
+    })
+    .sort((a, b) => a.sort - b.sort || a.key.localeCompare(b.key));
+}
+
+/** El orden tras mover una etiqueta un puesto (`-1` sube, `1` baja). */
+export function moveTag(ids: readonly string[], id: string, step: -1 | 1): string[] {
+  const from = ids.indexOf(id);
+  const to = from + step;
+  if (from === -1 || to < 0 || to >= ids.length) return [...ids];
+  const next = [...ids];
+  [next[from], next[to]] = [next[to], next[from]];
+  return next;
+}
+
+/** El `sort` que guarda un orden: de diez en diez. */
+export function sortsOf(ids: readonly string[]): { id: string; sort: number }[] {
+  return ids.map((id, i) => ({ id, sort: (i + 1) * 10 }));
+}
+
+/** El `sort` de una etiqueta nueva: al final. */
+export function nextSort(tags: readonly Pick<SettingsTag, 'sort'>[]): number {
+  return tags.reduce((max, tag) => Math.max(max, tag.sort), 0) + 10;
+}
