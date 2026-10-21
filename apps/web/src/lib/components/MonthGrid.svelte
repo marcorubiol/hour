@@ -20,8 +20,10 @@
    * this file to fork from the first.
    */
   import { createQuery } from '@tanstack/svelte-query';
+  import type { Attachment } from 'svelte/attachments';
+  import { isFreeSpace, longPress } from '$lib/cell-create';
   import { addDaysIso, dayKeyInTz, isoWeek, monthGrid, assignBandLanes } from '$lib/planner';
-  import { weekdayLabels, localeMonthShort, localeDayMonth, localeWeekdayShort, viewerTimeZone } from '$lib/datetime';
+  import { dayMonthLong, weekdayLabels, localeMonthShort, localeDayMonth, localeWeekdayShort, viewerTimeZone } from '$lib/datetime';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
   import { accentVarFor } from '$lib/utils/accent';
   import { workspacesQueryOptions } from '$lib/nav-queries';
@@ -153,7 +155,7 @@
     stepsLabel = (n: number) => (n === 1 ? t('planner.steps_one', L) : t('planner.steps_n', L, { n })),
     locale = appLocaleTag(),
     dateKindLabel = (kind: string) => kind.replace(/_/g, ' '),
-    createLabel = (iso: string) => t('planner.new_on', L, { day: `${localeWeekdayShort(iso, appLocaleTag())} ${localeDayMonth(iso, appLocaleTag())}` }),
+    createLabel = (iso: string) => t('planner.new_on', L, { day: dayMonthLong(iso, appLocaleTag()) }),
     openDayLabel = (iso: string) => t('planner.open_day', L, { day: `${localeWeekdayShort(iso, appLocaleTag())} ${localeDayMonth(iso, appLocaleTag())}` }),
     runUntilLabel = (iso: string, n: number) =>
       `${t('planner.band_until', L, { day: iso })} · ${n} ${t('block.days_unit', L)}`,
@@ -948,6 +950,29 @@
      lighting the other six. One string, set by both halves. */
   let hoverDay = $state<string | null>(null);
 
+  /* CREAR EN EL HUECO (ADR-139, después). El clic suelto sigue sin abrir nada;
+     el doble clic y la pulsación larga en el hueco libre de un día de esta
+     hoja van a la misma puerta que su «+» (`$lib/cell-create`). Las dos
+     mitades de la celda —la fila del número y el contenido— responden igual,
+     como ya comparten el hover. */
+  type GridDay = { iso: string; inMonth: boolean };
+  function createHere(e: MouseEvent, day: GridDay) {
+    if (!day.inMonth || !onDayCreate || !isFreeSpace(e.target, e.currentTarget as Element)) return;
+    window.getSelection()?.removeAllRanges();
+    onDayCreate(day.iso);
+  }
+  /** The second press of a double click would select the nearest word. */
+  function keepSelection(e: MouseEvent, day: GridDay) {
+    if (day.inMonth && onDayCreate && e.detail > 1 && isFreeSpace(e.target, e.currentTarget as Element)) {
+      e.preventDefault();
+    }
+  }
+  function cellPress(day: GridDay): Attachment<HTMLElement> | undefined {
+    if (!day.inMonth || !onDayCreate) return undefined;
+    const create = onDayCreate;
+    return longPress(() => create(day.iso));
+  }
+
   // ── Clash-card popover — one open at a time, keyed day:index. ──────────
   let openClash = $state<string | null>(null);
   let gridEl: HTMLElement | undefined = $state();
@@ -983,7 +1008,9 @@
      An affordance that fires on «you did not hit anything» is not an
      affordance, it is a tripwire.
      The invitation is now ONE explicit control, in the cell's header, and it
-     is the only thing that opens the dialog. -->
+     is the only thing a single click opens the dialog with. The deliberate
+     gestures (a double click or a long press on the free space, `N` on a
+     focused day) reach the same door: none of them can happen by accident. -->
 <div
   class="cal__grid"
   class:cal__grid--loading={loading}
@@ -1034,8 +1061,12 @@
             class:cal__day--today={day.iso === todayIso}
             data-hover={hoverDay === day.iso ? '' : undefined}
             style="grid-row: 1; grid-column: {di + 1}"
+            data-day={day.inMonth ? day.iso : undefined}
             onmouseenter={() => (hoverDay = day.iso)}
             onmouseleave={() => (hoverDay = hoverDay === day.iso ? null : hoverDay)}
+            onmousedown={(e) => keepSelection(e, day)}
+            ondblclick={(e) => createHere(e, day)}
+            {@attach cellPress(day)}
             role="presentation"
           >
             <span class="cal__day-head">
@@ -1172,8 +1203,12 @@
         class:cal__day--out={!day.inMonth}
         class:cal__day--today={day.iso === todayIso}
         style="grid-row: {runRows + 2} / {runLanes + 3}; grid-column: {di + 1}"
+        data-day={day.inMonth ? day.iso : undefined}
         onmouseenter={() => (hoverDay = day.iso)}
         onmouseleave={() => (hoverDay = hoverDay === day.iso ? null : hoverDay)}
+        onmousedown={(e) => keepSelection(e, day)}
+        ondblclick={(e) => createHere(e, day)}
+        {@attach cellPress(day)}
         role="presentation"
       >
         <!-- Three, then a door. The cap is what lets a quiet week look short:
@@ -1912,11 +1947,13 @@
       transition: color var(--duration-fast);
     }
     .cal__num[data-hover] .cal__new,
+    .cal__num:focus-within .cal__new,
     .cal__new:focus-visible {
       opacity: 1;
     }
     /* A finger has no hover: an invisible target is a tripwire there. On
-       touch a day is made from the Day view or «+ date». */
+       touch a day is made by a long press on its free space
+       (`$lib/cell-create`), or from the Day view or «+ date». */
     @media (pointer: coarse) {
       .cal__new {
         display: none;

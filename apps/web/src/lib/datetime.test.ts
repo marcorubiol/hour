@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  dayMonthLong,
   dualTime,
   hourMark,
   instantToWallClock,
@@ -166,5 +167,15 @@ describe('localeDayMonthNear', () => {
   it('the year once it is further than that', () => {
     expect(localeDayMonthNear('2027-10-18', today, 'es-ES')).toBe('18 oct 2027');
     expect(localeDayMonthNear('2031-01-15', today, 'es-ES')).toBe('15 ene 2031');
+  });
+});
+
+describe('dayMonthLong — the day as a control says it', () => {
+  it('says the day and the whole month, in each language, never shifted by a zone', () => {
+    expect(dayMonthLong('2026-11-14', 'es-ES')).toBe('14 de noviembre');
+    expect(dayMonthLong('2026-11-14', 'ca-ES')).toBe('14 de novembre');
+    expect(dayMonthLong('2026-11-14', 'en-GB')).toBe('14 November');
+    expect(dayMonthLong('2026-11-14', 'fr-FR')).toBe('14 novembre');
+    expect(dayMonthLong('2026-11-01T23:30:00Z', 'es-ES')).toBe('1 de noviembre');
   });
 });
