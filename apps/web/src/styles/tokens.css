@@ -665,6 +665,14 @@
     --field-line-width: var(--border-size);
     --field-gap: var(--space-xs);   /* between the rows of every form */
 
+    /* What a line that reads text recognised (the quick add's title,
+       ADR-139 § 3): a soft underline in the focus hue, never a fill. A word
+       read but not kept (an hour in a type without hours) is dotted, faint. */
+    --said-mark: color-mix(in oklch, var(--focus-color) 45%, transparent);
+    --said-mark-unused: var(--border-color-dark);
+    --said-mark-width: var(--line-thin);
+    --said-mark-offset: 0.3em;
+
     /* The box: measured on its label's size (text-s), so box and words
        scale together and a helper under it indents by the same amount.
        Ink when ticked, like the primary button. */

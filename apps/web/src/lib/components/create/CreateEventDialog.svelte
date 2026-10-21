@@ -15,6 +15,12 @@
    * el viaje busca su función cercana para el destino y la dirección, y la
    * indisponibilidad propone a quien la marca. Lo deducido solo llena lo vacío.
    *
+   * LA LÍNEA ENTIENDE TEXTO (ADR-139 § 3, `quick-line`): «ensayo jue 10-14
+   * Mercat» rellena tipo, día, hora y lugar mientras se escribe; lo leído se
+   * subraya suave en el título y se anuncia, sin mover el foco; lo que no se
+   * reconoce es el título. Una ficha corregida a mano ya no la toca el texto
+   * (`touched`), y borrar la palabra devuelve lo que había (`lineBase`).
+   *
    * GUARDAR (p7): nada se escribe hasta «Añadir» (o ⌘↵, o Enter en el título).
    * Al crear, el diálogo se cierra y te quedas en el Planner, con un aviso que
    * deja deshacer (y abrir la ficha de una función). Cerrar no tira lo escrito:
@@ -87,7 +93,18 @@
     type Draft,
     type NearPerformance,
     type QuickType,
+    type When,
   } from '$lib/quick-add';
+  import {
+    NO_HAND,
+    applyLine,
+    lineSummary,
+    parseLine,
+    type KnownPlace,
+    type LineBase,
+    type LineHand,
+    type LineParse,
+  } from '$lib/quick-line';
 
   interface Props {
     open?: boolean;
@@ -132,8 +149,13 @@
 
   /** THE DRAFT: one object, kept across a close (ADR-139 p7, «aquí sí»). */
   let d = $state<Draft>(freshDraft(todayIso()));
-  /** What the person set by hand, so a deduction never overwrites it. */
-  let touched = $state({ day: false, direction: false, person: false });
+  /** What the person set by hand, so a deduction (the text's included)
+      never overwrites it. */
+  const handFresh = () => ({ ...NO_HAND, person: false });
+  let touched = $state(handFresh());
+  /** What each chip held before the text wrote it (`applyLine`): deleting
+      the word gives it back. Plain on purpose: the line's effect writes it. */
+  let lineBase: LineBase = {};
   /** A deduction runs once per what it reads. */
   let seeded = $state({ bolo: '', trip: '', person: '' });
 
@@ -187,13 +209,14 @@
     ...teamOfSpace.map((m) => ({ value: m.person_id, label: m.full_name })),
   ]);
 
-  // The project's performances: a trip's destination, a date's link.
+  // The project's performances: a trip's destination, a date's link, and
+  // the venues and cities the line recognises.
   const nearQuery = createQuery(
     toStore(() => {
       const id = d.project;
       return {
         queryKey: ['project-performances', id] as const,
-        enabled: open && Boolean(id) && d.type !== 'performance' && d.type !== 'unavailable',
+        enabled: open && Boolean(id) && d.type !== 'unavailable',
         queryFn: ({ signal }: { signal: AbortSignal }) =>
           fetchJSON<{ items: NearPerformance[] }>(`/api/performances?project_ids=${id}&status=any&limit=200`, signal),
       };
@@ -258,7 +281,8 @@
     if (open && !wasOpen) {
       if (!(typed && draftWritten(d))) {
         d = freshDraft(presetDate ?? todayIso(), presetType ?? 'performance');
-        touched = { day: false, direction: false, person: false };
+        touched = handFresh();
+        lineBase = {};
         seeded = { bolo: '', trip: '', person: '' };
         typed = false;
       } else {
@@ -274,7 +298,7 @@
       // What was typed to ask for this is written, not deduced: it wins, and
       // it is a draft from now on.
       if (presetTitle?.trim()) {
-        d.title = presetTitle.trim();
+        d.said = presetTitle.trim();
         typed = true;
       }
       panel = null;
@@ -322,11 +346,13 @@
   });
 
   function pickBolo(id: string) {
+    // The venue goes into the line, where a performance's venue is written;
+    // the line reads it back as the title.
     const filled = boloPrefill(
       bolos.find((b) => b.id === id),
-      { venue: d.title, city: d.city },
+      { venue: d.said, city: d.city },
     );
-    d.title = filled.venue;
+    d.said = filled.venue;
     d.city = filled.city;
   }
 
@@ -361,6 +387,99 @@
     const p = nearPerfs.find((x) => x.id === id);
     if (p?.city && !d.city.trim()) d.city = p.city;
   }
+
+  // ── The line reads text (ADR-139 § 3, `quick-line`) ─────────────────────
+  /** The venues and cities already loaded here: the project's performances
+      and its bolos. Nothing is fetched for the line. */
+  let knownPlaces = $derived.by<KnownPlace[]>(() => {
+    const seen = new Set<string>();
+    const out: KnownPlace[] = [];
+    for (const p of [...nearPerfs, ...bolos]) {
+      const key = `${p.venue_name ?? ''}|${p.city ?? ''}`;
+      if ((!p.venue_name && !p.city) || seen.has(key)) continue;
+      seen.add(key);
+      out.push({ venue: p.venue_name, city: p.city });
+    }
+    return out;
+  });
+
+  /** The last reading, with the text it read (the marks are positions). */
+  let reading = $state<{ text: string; p: LineParse } | null>(null);
+
+  /** Only what changed: a whole new draft each keystroke would re-run
+      everything that reads it. A new type is a new draft (`switchType`). */
+  function patchDraft(next: Draft) {
+    if (next.type !== d.type) {
+      d = next;
+      return;
+    }
+    const top = d as unknown as Record<string, unknown>;
+    for (const [k, v] of Object.entries(next)) {
+      if (k !== 'when' && top[k] !== v) top[k] = v;
+    }
+    const when = d.when as unknown as Record<string, unknown>;
+    for (const k of ['day', 'until', 'until_on', 'timed', 'start', 'end'] as const satisfies readonly (keyof When)[]) {
+      if (when[k] !== next.when[k]) when[k] = next.when[k];
+    }
+  }
+
+  $effect(() => {
+    if (!open) return;
+    const said = d.said;
+    const places = knownPlaces;
+    const hand: LineHand = {
+      type: touched.type,
+      day: touched.day,
+      time: touched.time,
+      venue: touched.venue,
+      city: touched.city,
+      origin: touched.origin,
+      direction: touched.direction,
+    };
+    const allowUnavailable = canUnavailable;
+    untrack(() => {
+      const read = (keepType: boolean) =>
+        parseLine(said, {
+          now: new Date(),
+          tz: viewerTz,
+          type: hand.type ? d.type : (lineBase.type ?? d.type),
+          places,
+          keep: { type: keepType, place: hand.venue || hand.city || hand.origin },
+        });
+      let p = read(hand.type);
+      // A type that cannot be picked here is not read either: its words stay.
+      if (p.type === 'unavailable' && !allowUnavailable) p = read(true);
+      reading = { text: said, p };
+      const r = applyLine($state.snapshot(d) as Draft, p, hand, lineBase);
+      lineBase = r.base;
+      patchDraft(r.draft);
+    });
+  });
+
+  /** The title cut into plain and recognised pieces, for the marks. */
+  let saidPieces = $derived.by(() => {
+    const text = d.said;
+    if (!reading || reading.text !== text) return [{ text, kind: null }];
+    const out: Array<{ text: string; kind: string | null }> = [];
+    let at = 0;
+    for (const m of reading.p.marks) {
+      if (m.from > at) out.push({ text: text.slice(at, m.from), kind: null });
+      out.push({ text: text.slice(m.from, m.to), kind: m.kind });
+      at = m.to;
+    }
+    if (at < text.length) out.push({ text: text.slice(at), kind: null });
+    return out;
+  });
+  let saidEl: HTMLDivElement | undefined = $state();
+  let titleEl: HTMLInputElement | undefined = $state();
+  /** The marks scroll with the text when it is longer than the line. */
+  function syncSaid() {
+    if (saidEl && titleEl) saidEl.scrollLeft = titleEl.scrollLeft;
+  }
+  $effect(() => {
+    void saidPieces;
+    void tick().then(syncSaid);
+  });
 
   // ── The chips ──────────────────────────────────────────────────────────
   let typeLabel = $derived(t(TYPE_LABEL_KEYS[d.type], locale));
@@ -406,21 +525,49 @@
   }
 
   function setType(next: QuickType) {
+    touched.type = true;
     d = switchType(d, next);
     errors = {};
   }
 
   // ── Cuándo ─────────────────────────────────────────────────────────────
   function addHours() {
+    touched.time = true;
     d.when.timed = true;
   }
   function addUntil() {
+    touched.day = true;
     d.when.until_on = true;
   }
   function addRepeat() {
+    touched.day = true;
     d.when.until_on = true;
     d.when.repeat = true;
   }
+
+  // What the line understood, said once the typing settles: the chips'
+  // own words, so the ear hears what the eye sees. The focus stays put.
+  let understood = $derived.by(() => {
+    const kinds = new Set(reading && reading.text === d.said ? reading.p.marks.map((m) => m.kind) : []);
+    if (kinds.size === 0) return '';
+    const what = lineSummary([
+      kinds.has('type') ? typeLabel : null,
+      kinds.has('when') || kinds.has('time') ? whenText : null,
+      kinds.has('where') ? whereText : null,
+    ]);
+    return what ? t('qa.understood', locale, { what }) : '';
+  });
+  let unusedNote = $derived(
+    reading && reading.text === d.said && reading.p.unused.length
+      ? t('qa.unused_hours', locale, { hours: reading.p.unused.join(', ') })
+      : '',
+  );
+  let announced = $state('');
+  $effect(() => {
+    const say = [understood, unusedNote].filter(Boolean).join(' ');
+    const id = setTimeout(() => (announced = say), 700);
+    return () => clearTimeout(id);
+  });
   // A word under a field goes as soon as its field changes.
   $effect(() => {
     void d.when.day;
@@ -480,7 +627,8 @@
       });
       d = afterCreate(d);
       typed = false;
-      touched = { day: true, direction: false, person: touched.person };
+      touched = { ...handFresh(), day: true, person: touched.person };
+      lineBase = {};
       seeded = { bolo: '', trip: '', person: seeded.person };
       open = false;
     },
@@ -526,7 +674,8 @@
       d.project = presetProjectId;
       d.line = presetLineId ?? '';
     }
-    touched = { day: false, direction: false, person: false };
+    touched = handFresh();
+    lineBase = {};
     seeded = { bolo: '', trip: '', person: '' };
     typed = false;
     panel = null;
@@ -565,18 +714,36 @@
       void submit();
     }}
   >
-    <!-- QUÉ: one line of free text. What it writes depends on the type
-         (`skeletonFor().title`); a line that reads «ensayo jue 10-14 Mercat»
-         will later split it into the chips below. -->
-    <input
-      id="{uid}-title"
-      class="qa__title"
-      type="text"
-      autocomplete="off"
-      aria-label={t('qa.what', locale)}
-      placeholder={titlePlaceholder}
-      bind:value={d.title}
-    />
+    <!-- QUÉ: one line of free text that reads what it can (`quick-line`):
+         «ensayo jue 10-14 Mercat» fills the chips below, and what it does not
+         recognise is the title (`skeletonFor().title`). The marks are drawn
+         by a twin under the input, letter for letter, never in it. -->
+    <div class="qa__line">
+      <div class="qa__said" aria-hidden="true" bind:this={saidEl}>
+        {#each saidPieces as piece, i (i)}{#if piece.kind}<span
+              class="qa__mark"
+              class:qa__mark--unused={piece.kind === 'unused'}
+              data-mark={piece.kind}>{piece.text}</span
+            >{:else}{piece.text}{/if}{/each}
+      </div>
+      <input
+        id="{uid}-title"
+        class="qa__title"
+        type="text"
+        autocomplete="off"
+        spellcheck="false"
+        aria-label={t('qa.what', locale)}
+        aria-describedby="{uid}-line-hint"
+        placeholder={titlePlaceholder}
+        bind:value={d.said}
+        bind:this={titleEl}
+        onscroll={syncSaid}
+        onkeyup={syncSaid}
+        onselect={syncSaid}
+      />
+    </div>
+    <p id="{uid}-line-hint" class="visually-hidden">{t('qa.line_hint', locale)}</p>
+    <p class="visually-hidden" aria-live="polite">{announced}</p>
 
     <div class="qa__chips">
       <button
@@ -651,6 +818,10 @@
       {/if}
     </div>
 
+    {#if unusedNote}
+      <p class="qa__note">{unusedNote}</p>
+    {/if}
+
     {#if panel}
       <div class="qa__panel" id={panelId} role="group" aria-labelledby={chipId(panel)} bind:this={panelEl}>
         {#if panel === 'type'}
@@ -711,12 +882,24 @@
                 type="time"
                 aria-label={t('qa.start', locale)}
                 bind:value={d.when.start}
+                onchange={() => (touched.time = true)}
               />
               <span class="qa__dash" aria-hidden="true">–</span>
-              <input id="{uid}-end" type="time" aria-label={t('qa.end', locale)} bind:value={d.when.end} />
+              <input
+                id="{uid}-end"
+                type="time"
+                aria-label={t('qa.end', locale)}
+                bind:value={d.when.end}
+                onchange={() => (touched.time = true)}
+              />
               {#snippet suffix()}
-                <button type="button" class="btn--quiet btn--xs" onclick={() => (d.when.timed = false)}
-                  >{t('qa.remove_hours', locale)}</button
+                <button
+                  type="button"
+                  class="btn--quiet btn--xs"
+                  onclick={() => {
+                    touched.time = true;
+                    d.when.timed = false;
+                  }}>{t('qa.remove_hours', locale)}</button
                 >
               {/snippet}
             </Field>
@@ -728,6 +911,7 @@
               bind:value={d.when.until}
               min={d.when.day}
               error={errors.until}
+              onchange={() => (touched.day = true)}
             />
           {/if}
           {#if d.when.repeat && sk.when.repeat && d.when.until_on}
@@ -760,6 +944,7 @@
                 type="button"
                 class="btn--quiet btn--xs"
                 onclick={() => {
+                  touched.day = true;
                   d.when.until_on = false;
                   d.when.until = '';
                   d.when.repeat = false;
@@ -781,12 +966,18 @@
           </div>
         {:else if panel === 'where'}
           {#if sk.where === 'trip'}
-            <Input label={t('create.trip_from', locale)} bind:value={d.origin} autocomplete="off" />
+            <Input
+              label={t('create.trip_from', locale)}
+              bind:value={d.origin}
+              autocomplete="off"
+              oninput={() => (touched.origin = true)}
+            />
             <Input
               label={t('create.trip_to', locale)}
               bind:value={d.city}
               autocomplete="off"
               helper={tripHint || undefined}
+              oninput={() => (touched.city = true)}
             />
             <Segmented
               label={t('create.direction', locale)}
@@ -796,7 +987,7 @@
             />
           {:else}
             {#if sk.where === 'place'}
-              <Input label={t('create.venue', locale)} bind:value={d.venue} />
+              <Input label={t('create.venue', locale)} bind:value={d.venue} oninput={() => (touched.venue = true)} />
             {/if}
             {#if showBolo}
               <Select
@@ -807,7 +998,7 @@
                 onchange={(e) => pickBolo((e.currentTarget as HTMLSelectElement).value)}
               />
             {/if}
-            <Input label={t('create.city', locale)} bind:value={d.city} />
+            <Input label={t('create.city', locale)} bind:value={d.city} oninput={() => (touched.city = true)} />
           {/if}
         {:else if panel === 'more'}
           {#if sk.more.rank && d.certainty === 'option'}
@@ -879,18 +1070,58 @@
     }
 
     /* QUÉ: the big line without a box. One hairline under it, the field's,
-       that takes the focus colour while typing. */
-    .qa__title {
+       that takes the focus colour while typing. Its twin (`.qa__said`)
+       sits in the same cell, under it, with the same box and type, so a
+       mark lands under its letters by construction. */
+    .qa__line {
+      display: grid;
+    }
+    .qa__line > * {
+      grid-area: 1 / 1;
+    }
+    .qa__title,
+    .qa__said {
       inline-size: 100%;
+      min-inline-size: 0;
       padding-block: var(--space-xs);
       padding-inline: 0;
       border: 0;
-      border-block-end: var(--field-line-width) solid var(--field-line);
+      border-block-end: var(--field-line-width) solid transparent;
       border-radius: 0;
+      font: inherit;
+      font-size: var(--text-l);
+      line-height: var(--text-line-height);
+      letter-spacing: normal;
+    }
+    .qa__title {
+      border-block-end-color: var(--field-line);
       background: transparent;
       color: var(--heading-color);
-      font-size: var(--text-l);
       outline: none;
+    }
+    /* The twin draws only the marks: its letters are see-through. */
+    .qa__said {
+      overflow: hidden;
+      white-space: pre;
+      color: transparent;
+      pointer-events: none;
+      user-select: none;
+    }
+    .qa__mark {
+      text-decoration-line: underline;
+      text-decoration-color: var(--said-mark);
+      text-decoration-thickness: var(--said-mark-width);
+      text-underline-offset: var(--said-mark-offset);
+      text-decoration-skip-ink: none;
+    }
+    .qa__mark--unused {
+      text-decoration-style: dotted;
+      text-decoration-color: var(--said-mark-unused);
+    }
+    .qa__note {
+      margin: 0;
+      font-size: var(--text-xs);
+      color: var(--text-faint);
     }
     .qa__title::placeholder {
       color: var(--text-faint);
