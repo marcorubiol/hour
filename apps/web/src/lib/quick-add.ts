@@ -11,9 +11,8 @@
  * tanda (`planWhen`).
  *
  * La línea del título es UNA línea de texto libre cuyo destino depende del tipo
- * (`skeletonFor(type).title`). Es la costura donde, más adelante, una línea que
- * entienda texto («ensayo jue 10-14 Mercat») repartirá lo que lee en las fichas;
- * hoy solo escribe su campo.
+ * (`skeletonFor(type).title`). Entiende texto (`quick-line`): «ensayo jue
+ * 10-14 Mercat» reparte lo que lee en las fichas y deja el resto de título.
  */
 
 import { blockDays, blockLimit } from './block';
@@ -383,6 +382,10 @@ export function availabilityCertainty(c: Certainty): 'tentative' | 'unavailable'
 
 export type Draft = {
   type: QuickType;
+  /** La línea tal como se escribe (`quick-line`): de ella salen el título y
+      lo que se reconoce. */
+  said: string;
+  /** Lo que la línea no reconoció: lo que se guarda como título. */
   title: string;
   project: string;
   line: string;
@@ -405,6 +408,7 @@ export function freshDraft(day: string, type: QuickType = 'performance'): Draft 
   const sk = skeletonFor(type);
   return {
     type,
+    said: '',
     title: '',
     project: '',
     line: '',
@@ -440,7 +444,7 @@ export function freshDraft(day: string, type: QuickType = 'performance'): Draft 
  * no lo tira: vuelve al reabrir, con «Descartar» a la vista.
  */
 export function draftWritten(d: Draft): boolean {
-  const text = [d.title, d.venue, d.city, d.origin, d.label].some((s) => s.trim() !== '');
+  const text = [d.said, d.title, d.venue, d.city, d.origin, d.label].some((s) => s.trim() !== '');
   return text || Boolean(d.when.until_on && d.when.until) || d.when.repeat;
 }
 
