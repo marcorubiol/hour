@@ -77,6 +77,19 @@ export function dayMonth(iso: string, locale: string = appLocaleTag()): string {
 }
 
 /**
+ * "14 de noviembre" / "14 November" — the day as it is SAID, for a control's
+ * spoken name (a cell's «+»: «Añadir el 14 de noviembre»). Same UTC-anchored
+ * contract as dayLabel.
+ */
+export function dayMonthLong(iso: string, locale: string = appLocaleTag()): string {
+  return new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString(locale, {
+    day: 'numeric',
+    month: 'long',
+    timeZone: 'UTC',
+  });
+}
+
+/**
  * "09 Jul 2026" — no weekday. Same UTC-anchored contract as dayLabel.
  */
 export function dayMonthYear(iso: string, locale: string = appLocaleTag()): string {

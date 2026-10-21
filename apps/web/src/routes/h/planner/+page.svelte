@@ -157,7 +157,7 @@
   } from '$lib/season';
   import { normalizeLaneAxis, resolveLaneAxis, type LaneAxis } from '$lib/carrils';
   import type { AvailabilityItem } from '$lib/availability';
-  import { localeDayMonth, localeDayMonthNear, localeWeekdayShort, dualTime, viewerTimeZone } from '$lib/datetime';
+  import { dayMonthLong, localeDayMonth, localeDayMonthNear, localeWeekdayShort, dualTime, viewerTimeZone } from '$lib/datetime';
   import {
     holdDeadlineLabel,
     isHoldStatus,
@@ -169,6 +169,7 @@
   import { dateStatusFamily } from '$lib/date';
   import { accentVarFor } from '$lib/utils/accent';
   import { spaceName } from '$lib/utils/identity';
+  import { focusedDay } from '$lib/cell-create';
 
   type WorkspaceLite = { id: string; slug: string; name: string };
 
@@ -2995,8 +2996,11 @@
           return;
         case 'n':
         case 'N':
+          // A focused day is the day you mean (`$lib/cell-create`): the
+          // month's cell, the season's square, the agenda's row, the
+          // board's cell. With none, the view's day, as every other door.
           e.preventDefault();
-          openCreate();
+          openCreate(focusedDay(el) ?? undefined);
           return;
       }
     };
@@ -3603,7 +3607,7 @@
       stepsLabel={(n) => (n === 1 ? t('planner.steps_one', locale) : t('planner.steps_n', locale, { n }))}
       locale={localeTag}
       dateKindLabel={kindLabel}
-      createLabel={(iso) => t('planner.new_on', locale, { day: spokenDay(iso) })}
+      createLabel={(iso) => t('planner.new_on', locale, { day: dayMonthLong(iso, localeTag) })}
       openDayLabel={(iso) => t('planner.open_day', locale, { day: spokenDay(iso) })}
       runUntilLabel={(iso, n) =>
         `${t('planner.band_until', locale, { day: localeDayMonth(iso, localeTag) })} · ${n} ${t('block.days_unit', locale)}`}
@@ -3747,7 +3751,7 @@
       tourWord={t('planner.band_tour', locale)}
       untilLabel={(iso) => t('planner.band_until', locale, { day: localeDayMonth(iso, localeTag) })}
       emptyLabel={t('planner.empty_month', locale)}
-      createLabel={(iso) => t('planner.new_on', locale, { day: spokenDay(iso) })}
+      createLabel={(iso) => t('planner.new_on', locale, { day: dayMonthLong(iso, localeTag) })}
       clashDayLabel={(iso) => t('planner.conn_jump', locale, { day: Number(iso.slice(8, 10)) })}
       kindLabel={(k) => kindLabel(k)}
       stateLabel={boardSlipState}
