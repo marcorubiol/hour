@@ -20,7 +20,7 @@ test.describe('«lo conozco»', () => {
   test('person file → I know them → share → the row says so → unmark', async ({ page }) => {
     test.setTimeout(60_000);
 
-    await page.goto('/h/conversations?scope=s:playwright');
+    await page.goto('/h/conversations?etiqueta=sales&scope=s:playwright');
     await waitForLoaded(page);
     const row = page.locator('tbody tr').first();
     await expect(row).toBeVisible();

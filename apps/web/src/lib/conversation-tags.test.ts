@@ -9,6 +9,7 @@ import {
   filterByChip,
   lensChip,
   lensChips,
+  otherTagsName,
   legacyViewRedirect,
   panelHref,
   panelOf,
@@ -130,6 +131,16 @@ describe('what a conversation carries', () => {
     expect(filterByChip(rows, 'press').map((r) => r.id)).toEqual(['2']);
     expect(filterByChip(rows, 'coproduction').map((r) => r.id)).toEqual(['3']);
     expect(filterByChip(rows, ALL)).toHaveLength(4);
+  });
+});
+
+describe('naming a row’s tags off the lens (Desk, ADR-138 fase 3)', () => {
+  it('only Difusión (or none) says nothing; otherwise all of them, in the scope’s order', () => {
+    const known = scopeTags(vocab, [WS_A]);
+    expect(otherTagsName([], known, 'en')).toBeNull();
+    expect(otherTagsName([SALES], known, 'en')).toBeNull();
+    expect(otherTagsName(['press'], known, 'en')).toBe('Press');
+    expect(otherTagsName(['press', 'festivals', SALES], known, 'es')).toBe('Difusión · Festivales · Prensa');
   });
 });
 

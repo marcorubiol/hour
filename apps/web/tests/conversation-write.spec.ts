@@ -34,7 +34,7 @@ type RawConversation = {
 
 /** Session comes from the shared storageState (tests/auth.setup.ts). */
 async function openConversations(page: Page, searchName?: string) {
-  await page.goto('/h/conversations'); // ADR-067: lens is space-less + cross-space
+  await page.goto('/h/conversations?etiqueta=sales'); // ADR-067: lens is space-less + cross-space; the table is a chip's (ADR-138 fase 3)
   await waitForLoaded(page);
   if (searchName) {
     // The lens is pins-scoped (unscoped = everything RLS allows) — narrow

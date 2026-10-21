@@ -63,6 +63,40 @@ export function markReadWhenSeen(options: {
 }
 
 /**
+ * Abrir una conversación la deja leída (ADR-138, fase 3): sus entrantes dejan
+ * de contar como no leídos en la lista (`mark_conversation_read`). Una marca
+ * por visita y novedad (la conversación y su último evento), con la pestaña
+ * visible; al acabar, `onmarked` para que la lista recargue. El hilo del
+ * equipo se lee aparte, cuando se ve (`markReadWhenSeen`).
+ */
+export function markConversationReadOnOpen(options: {
+  conversationId: () => string | null | undefined;
+  /** Lo último que hay en su registro: cambia cuando entra algo mientras está abierta. */
+  latest: () => string;
+  onmarked: (conversationId: string) => void;
+}): void {
+  const marked = new Set<string>();
+  let visible = $state(typeof document === 'undefined' ? false : document.visibilityState === 'visible');
+
+  $effect(() => {
+    const onChange = () => (visible = document.visibilityState === 'visible');
+    document.addEventListener('visibilitychange', onChange);
+    return () => document.removeEventListener('visibilitychange', onChange);
+  });
+
+  $effect(() => {
+    const id = options.conversationId();
+    const key = `${id}@${options.latest()}`;
+    if (!id || !visible || marked.has(key)) return;
+    marked.add(key);
+    void mutateJSON('POST', `/api/conversations/${id}/read`).then(
+      () => options.onmarked(id),
+      () => marked.delete(key),
+    );
+  });
+}
+
+/**
  * Una ficha abierta desde «de qué se habla» lleva el nombre de su hilo en la
  * dirección (`#board`, `#team`, `feedHref`): cuando el hilo aparece, baja
  * hasta él, una vez por visita. El navegador no puede hacerlo solo porque el

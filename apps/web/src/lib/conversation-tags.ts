@@ -213,6 +213,23 @@ export function keyLabel(key: string, known: readonly WorkspaceTag[], locale: Lo
   return tag ? tagLabel(tag, locale) : tagLabel({ key, label: null, labels: {} }, locale);
 }
 
+/**
+ * Las etiquetas de una fila fuera de la lente (Desk, ADR-138 fase 3): null si
+ * es solo Difusión (lo de siempre, no hace falta decirlo); si no, todas por su
+ * nombre, en el orden del alcance.
+ */
+export function otherTagsName(keys: readonly string[], known: readonly WorkspaceTag[], locale: Locale): string | null {
+  if (keys.every((k) => k === SALES)) return null;
+  const order = (k: string) => {
+    const i = known.findIndex((x) => x.key === k);
+    return i === -1 ? known.length : i;
+  };
+  return [...new Set(keys)]
+    .sort((a, b) => order(a) - order(b) || a.localeCompare(b))
+    .map((k) => keyLabel(k, known, locale))
+    .join(' · ');
+}
+
 /** Un chip de la fila: su valor y su nombre. */
 export interface ChipOption {
   chip: LensChip;

@@ -27,7 +27,7 @@ test.describe('person file', () => {
     // ADR-067: the Conversations lens is space-less and cross-space, so it is
     // scoped here to the fixture space: this spec WRITES a note on whoever is
     // first, and until § 31 (2026-10) that was a real MüK Cia contact.
-    await page.goto('/h/conversations?scope=s:playwright');
+    await page.goto('/h/conversations?etiqueta=sales&scope=s:playwright');
     await waitForLoaded(page);
     await expect(page.locator('tbody tr').first()).toBeVisible();
 

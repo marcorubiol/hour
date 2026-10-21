@@ -15,6 +15,7 @@
   import { DASH } from '$lib/glyphs';
   import { t, type Locale } from '$lib/i18n';
   import type { PlannerDoor } from '$lib/desk-bands';
+  import { SALES, chipHref } from '$lib/conversation-tags';
 
   type Door<T> = { value: T | null; errored: boolean };
 
@@ -64,7 +65,9 @@
     {/if}
 
     {#if conversations}
-      <a class="door" href="/h/conversations" data-testid="door-conversations">
+      <!-- Its figure is Difusión's (bolos en opción, ADR-138 § 3): the door opens
+           that chip, so the door and the lens count the same (ADR-118 § 7). -->
+      <a class="door" href={chipHref(SALES, new URLSearchParams())} data-testid="door-conversations">
         <span class="door__lens">{t('lens.conversations', locale)}<i>{seasonLabel}</i></span>
         {#if conversations.errored}
           <span class="door__n stat door__n--na">{DASH}</span><span class="door__txt">{t('desk.door_error', locale)}</span>

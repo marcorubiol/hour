@@ -153,8 +153,11 @@ test.describe('Conversaciones › Equipo: los hilos del equipo (ADR-116, ADR-134
     await page.goto('/h/desk?scope=s:playwright');
     const changed = page.getByTestId('desk-changed');
     await expect(changed).toContainText(VENUE, { timeout: 30_000 });
-    await changed.getByTestId('desk-to-team').click();
-    await page.waitForURL(/\/h\/conversations\?etiqueta=team/);
+    // Su enlace lleva a la lente en el chip que comparten sus novedades
+    // (ADR-138 fase 3): Equipo si solo hay hilos, Todas si hay de todo.
+    const toLens = changed.getByTestId('desk-to-conversations');
+    await expect(toLens).toHaveAttribute('href', /^\/h\/conversations(\?etiqueta=team)?$/);
+    await page.goto('/h/conversations?etiqueta=team');
 
     const rows = page.getByTestId('feed-row');
     await expect(rows.first()).toBeVisible({ timeout: 30_000 });

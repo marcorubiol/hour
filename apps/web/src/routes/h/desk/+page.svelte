@@ -51,6 +51,8 @@
   import { session } from '$lib/session.svelte';
   import { moneyAccessAnyQueryOptions } from '$lib/bolo-queries';
   import { conversationAccessQueryOptions } from '$lib/conversation-access';
+  import { otherTagsName, scopeTags } from '$lib/conversation-tags';
+  import { conversationTagsQueryOptions } from '$lib/conversation-tags-query';
   import { lensOn } from '$lib/lenses.svelte';
   import type { DeskConversation } from '$lib/components/DeskBoard.svelte';
   import { taskProjectId, type TaskItem, type TasksCache, type TaskTarget } from '$lib/task';
@@ -292,7 +294,23 @@
   );
   let overview = $derived(readConversations ? ($overviewQuery.data ?? null) : null);
   let projectNameById = $derived(new Map(projectIndex.map((p) => [p.id, p.name])));
-  let replies = $derived(overviewReplies(overview?.due.rows ?? [], workspaceSlugById, projectNameById));
+  // A reply from the press waits as one from a venue (ADR-138 fase 3); the
+  // row says its tag when it is not Difusión.
+  const tagsQuery = createQuery(toStore(() => conversationTagsQueryOptions(readConversations)));
+  let tagNames = $derived(
+    $tagsQuery.data
+      ? scopeTags(
+          $tagsQuery.data,
+          // The spaces on screen, as the lens's chips speak for them.
+          scope.isEmpty
+            ? workspaces.map((w) => w.id)
+            : [...new Set([...scope.workspaceIds, ...scope.projects.map((p) => p.workspaceId), ...scope.lines.map((l) => l.workspaceId)])],
+        )
+      : [],
+  );
+  let replies = $derived(
+    overviewReplies(overview?.due.rows ?? [], workspaceSlugById, projectNameById, (keys) => otherTagsName(keys, tagNames, locale)),
+  );
 
   // A document of a deal not yet confirmed is a quote, not a debt (ADR-123):
   // «te espera» leaves it out, as Cuentas and this page's own door do.
@@ -696,7 +714,7 @@
   let spaceNameByProjectId = $derived(new Map(projectIndex.map((p) => [p.id, spaceName(p.workspaceName)])));
   const contextPath = (i: DeskItem) => {
     const space = scope.isEmpty && i.projectId ? spaceNameByProjectId.get(i.projectId) : null;
-    return [space, i.projectName, i.lineName].filter((x) => x && x !== '—').join(' · ');
+    return [space, i.projectName, i.lineName, i.tagName].filter((x) => x && x !== '—').join(' · ');
   };
   const conversationHref = (i: DeskItem) => {
     const ws = (i.workspaceId && workspaceSlugById.get(i.workspaceId)) || workspaceSlug;
@@ -802,6 +820,7 @@
             {quietLabel}
             {sinceLabel}
             {workspaceSlugById}
+            {tagNames}
             {locale}
           />
         </div>

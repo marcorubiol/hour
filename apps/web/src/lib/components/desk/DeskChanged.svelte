@@ -13,7 +13,8 @@
   import { t, type Locale } from '$lib/i18n';
   import { lensOn } from '$lib/lenses.svelte';
   import { feedHref, feedThreadName, feedTitle } from '$lib/threads';
-  import type { Change } from '$lib/desk-bands';
+  import { changedLensChip, type Change } from '$lib/desk-bands';
+  import { ALL, TEAM, chipHref, keyLabel, otherTagsName, type WorkspaceTag } from '$lib/conversation-tags';
   import { fmtCurrency } from '$lib/money';
   import MailoutFigures from '$lib/components/MailoutFigures.svelte';
 
@@ -28,14 +29,25 @@
     /** The instant «since» means, already formatted for the eyebrow. */
     sinceLabel: string;
     workspaceSlugById: Map<string, string>;
+    /** The tags of the scope, to name a reply's when it is not Difusión (ADR-138). */
+    tagNames?: readonly WorkspaceTag[];
     locale: Locale;
   }
 
-  let { changes, loading, errored, onretry, quietLabel, sinceLabel, workspaceSlugById, locale }: Props = $props();
+  let { changes, loading, errored, onretry, quietLabel, sinceLabel, workspaceSlugById, tagNames = [], locale }: Props = $props();
 
-  // What the team said lives in the Equipo view of Conversations (ADR-134):
-  // with a thread in the band, the way to all of them.
-  let hasThreads = $derived(lensOn('conversations') && changes.some((c) => c.kind === 'thread'));
+  // The way into Conversations, on the chip the band's news share (ADR-138
+  // fase 3): threads only, Equipo; replies under one tag, that tag; a mix, Todas.
+  let lensChip = $derived(lensOn('conversations') ? changedLensChip(changes) : null);
+  let lensLabel = $derived(
+    lensChip === null
+      ? ''
+      : lensChip === TEAM
+        ? t('conversations.view_team', locale)
+        : lensChip === ALL
+          ? t('lens.conversations', locale)
+          : keyLabel(lensChip, tagNames, locale),
+  );
 
   function line(c: Change): { text: string; kind: string; href: string | null } {
     if (c.kind === 'thread') {
@@ -68,7 +80,7 @@
       const ws = workspaceSlugById.get(c.row.workspace_id);
       return {
         text: t('desk.changed_reply', locale, { name: c.row.title }),
-        kind: t('desk.changed_kind_reply', locale),
+        kind: [t('desk.changed_kind_reply', locale), otherTagsName(c.row.tags, tagNames, locale)].filter(Boolean).join(' · '),
         href: ws ? `/h/${ws}/conversation/${c.row.id}` : null,
       };
     }
@@ -84,7 +96,7 @@
 
 <section class="dband changed" aria-labelledby="desk-changed-h" aria-busy={loading} data-testid="desk-changed">
   <BlockHead id="desk-changed-h" concept="changed" title={t('desk.changed_since', locale, { when: sinceLabel })}>
-    {#if hasThreads}<a class="block-head__act" href="/h/conversations?etiqueta=team" data-testid="desk-to-team">{t('conversations.view_team', locale)} →</a>{/if}
+    {#if lensChip !== null}<a class="block-head__act" href={chipHref(lensChip, new URLSearchParams())} data-testid="desk-to-conversations" data-chip={lensChip}>{lensLabel} →</a>{/if}
   </BlockHead>
   <FirstTimeNote event="first_team_thread" when={!loading && changes.some((c) => c.kind === 'thread')} />
   {#if loading}

@@ -107,7 +107,7 @@ test('Conversations is a scoped lens and copies its canonical scoped URL', async
 test('a scope change on a person opened from Conversations lands back on Conversations', async ({ page }) => {
   // Drop 11-10: off a lens route a scope click went to Desk, so leaving the
   // list for a person and changing the scope threw you out of Conversations.
-  await page.goto(`/h/conversations?scope=${FIXTURE_SPACE_TOKEN}`);
+  await page.goto(`/h/conversations?etiqueta=sales&scope=${FIXTURE_SPACE_TOKEN}`);
   await waitForLoaded(page);
   await expect(page.locator('tbody tr').first()).toBeVisible();
 

@@ -32,7 +32,7 @@ test.describe('conversation with the venue', () => {
   test('create by organization, 409 names it, search, contacts, person file', async ({ page }) => {
     test.setTimeout(120_000);
 
-    await page.goto('/h/conversations');
+    await page.goto('/h/conversations?etiqueta=sales');
     await waitForLoaded(page);
 
     const sweep = () =>

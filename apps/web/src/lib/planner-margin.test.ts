@@ -176,8 +176,14 @@ describe('overviewReplies — the «te toca» rows, one reading for Desk and Pla
       { id: 'c2', reason: 'follow_up', title: 'Otra', workspace_id: 'w1', project_id: 'p1', at: actionAt(0) },
     ];
     expect(overviewReplies(rows, new Map([['w1', 'muk']]), new Map([['p1', 'MaMeMi']]))).toEqual([
-      { id: 'c1', title: 'Sala', projectId: 'p1', projectName: 'MaMeMi', at: actionAt(0), href: '/h/muk/conversation/c1' },
+      { id: 'c1', title: 'Sala', projectId: 'p1', projectName: 'MaMeMi', at: actionAt(0), href: '/h/muk/conversation/c1', tagName: null },
     ]);
+  });
+
+  it('names its tags when the page asks (ADR-138 fase 3: a reply from the press waits too)', () => {
+    const rows = [{ id: 'c1', reason: 'reply', title: 'El Diari', workspace_id: 'w1', project_id: 'p1', at: actionAt(0), tags: ['press'] }];
+    const named = overviewReplies(rows, new Map([['w1', 'muk']]), new Map([['p1', 'MaMeMi']]), (keys) => keys.join('+'));
+    expect(named[0].tagName).toBe('press');
   });
 });
 

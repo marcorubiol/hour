@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { changesSince, elapsedSince, goingAsks, paymentNews, plannerDoor, sinceInstant, todayThings, CHANGED_ROWS } from './desk-bands';
+import { changedLensChip, changesSince, elapsedSince, goingAsks, paymentNews, plannerDoor, sinceInstant, todayThings, CHANGED_ROWS } from './desk-bands';
 import type { MoneyBolo } from './money';
 import { buildPersonAttribution, type TeamItem } from './people';
 import type { DateEvent, PerformanceEvent } from './month-events';
 import type { HotRow, LastMailout } from './conversation-overview';
 import type { FeedThread } from './threads';
+import type { Change } from './desk-bands';
 
 const NOW = new Date('2026-10-15T10:00:00Z');
 const TODAY = '2026-10-15';
@@ -113,6 +114,19 @@ describe('changesSince — «Ha cambiado»', () => {
     expect(changesSince({ threads: [], hot: [], lastMailout: m('2026-09-20T10:00:00Z') }, since, NOW)).toHaveLength(0);
     // A send that reached nobody is not news.
     expect(changesSince({ threads: [], hot: [], lastMailout: m('2026-10-05T10:00:00Z', 0) }, since, NOW)).toHaveLength(0);
+  });
+
+  it('the way into Conversations goes to the chip the news share (ADR-138 fase 3)', () => {
+    const reply = (id: string, tags: string[]): Change => ({ kind: 'reply', at: since, row: { ...hot(id, since, 'ours'), tags } });
+    const th: Change = { kind: 'thread', at: since, thread: thread('t', since, 1) };
+    expect(changedLensChip([])).toBeNull();
+    expect(changedLensChip([th])).toBe('team');
+    expect(changedLensChip([reply('a', ['press']), reply('b', ['press'])])).toBe('press');
+    // No tag is Difusión.
+    expect(changedLensChip([reply('a', []), reply('b', ['sales'])])).toBe('sales');
+    expect(changedLensChip([reply('a', ['press']), reply('b', ['sales'])])).toBe('all');
+    expect(changedLensChip([reply('a', ['press', 'sales'])])).toBe('all');
+    expect(changedLensChip([th, reply('a', ['press'])])).toBe('all');
   });
 
   it('at most five lines', () => {
