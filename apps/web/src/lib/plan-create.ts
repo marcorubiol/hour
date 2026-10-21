@@ -9,7 +9,7 @@
  * (/series), /api/availability. No migration behind any of this.
  */
 
-import { mutateJSON } from './api';
+import { fetchJSON, mutateJSON } from './api';
 import { invalidateDateFeeds } from './date';
 import type { PerformanceCreate, PerformanceSeriesCreate } from './performance';
 import { isHoldStatus, isValidHoldNotice } from './performance';
@@ -19,6 +19,21 @@ type Client = {
 };
 
 export type CreatedPerformance = { id: string; slug: string | null; workspace_id: string };
+
+/**
+ * ¿Escribe en el plan en ALGÚN proyecto? (`edit:performance`, la regla de
+ * funciones y fechas). La puerta de «Nueva función / fecha» en ⌘K. Solo un
+ * «no» explícito esconde: mientras no responde, o si falla, se ofrece (la
+ * escritura sigue gateada por la RPC).
+ */
+export function planAccessQueryOptions() {
+  return {
+    queryKey: ['plan-access'] as const,
+    retry: false,
+    staleTime: 5 * 60_000,
+    queryFn: ({ signal }: { signal: AbortSignal }) => fetchJSON<{ edit: boolean }>('/api/performances/access', signal),
+  };
+}
 
 /** Every feed that draws a performance. */
 export const PERF_FEEDS = [

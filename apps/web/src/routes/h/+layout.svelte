@@ -51,9 +51,15 @@
   import CreateWorkspaceDialog from '$lib/components/create/CreateWorkspaceDialog.svelte';
   import CreateProjectDialog from '$lib/components/create/CreateProjectDialog.svelte';
   import CreateLineDialog from '$lib/components/create/CreateLineDialog.svelte';
+  import CreateEventDialog from '$lib/components/create/CreateEventDialog.svelte';
+  import CreateTaskDialog from '$lib/components/create/CreateTaskDialog.svelte';
+  import CreateConversationDialog from '$lib/components/create/CreateConversationDialog.svelte';
+  import { createEventType, scopeCreatePresets, scopeTaskTarget, type PaletteCreate } from '$lib/palette-create';
+  import type { CreatedPerformance } from '$lib/plan-create';
   import {
     buildLineIndex,
     buildProjectIndex,
+    resolveScope,
     workspacesOnScreen,
     type NavWorkspace,
     type RawLine,
@@ -504,6 +510,24 @@
     else creation.openWorkspace();
   }
 
+  // ── What goes into the containers (ADR-139 «después»): ⌘K opens the
+  //    shell's one quick add, task and conversation dialogs; whatever the
+  //    door does not say comes from the pinned scope. ──
+  let createScope = $derived(resolveScope(pins.pins, wsItems, lineIndex, projectIndex));
+  let createPresets = $derived(scopeCreatePresets(createScope, wsItems.map((w) => w.id)));
+  let taskTarget = $derived(scopeTaskTarget(createScope, wsItems));
+  function onCreate(c: PaletteCreate) {
+    if (c.kind === 'task') creation.openTask({ title: c.title });
+    else if (c.kind === 'conversation') creation.openConversation({ who: c.title });
+    else creation.openEvent({ type: createEventType(c.kind), title: c.title });
+  }
+  /** Adding stays where you are (ADR-139 p3); the notice's «Abrir» goes to
+      the new performance's page, only when asked. */
+  async function openCreatedPerformance(perf: CreatedPerformance) {
+    const ws = wsItems.find((w) => w.id === perf.workspace_id)?.slug ?? defaultWorkspaceSlug;
+    if (perf.slug) await goto(`/h/${ws}/performance/${perf.slug}`);
+  }
+
   // ── The rail on a phone (base.css § Drawer) ──────────────────────────
   // Below 48rem the rail cannot sit beside the page — it alone is 248px of
   // a 390px screen — so it leaves the flow and the top bar's empty left
@@ -703,7 +727,7 @@
     </main>
   </div>
 
-  <CommandPalette bind:open={paletteOpen} initialTokens={paletteSeed} {onApplyScope} {onPickAction} />
+  <CommandPalette bind:open={paletteOpen} initialTokens={paletteSeed} {onApplyScope} {onPickAction} {onCreate} />
 
   <CreateWorkspaceDialog bind:open={creation.workspaceOpen} />
   <CreateProjectDialog bind:open={creation.projectOpen} workspaceId={creation.projectWorkspaceId} />
@@ -711,6 +735,25 @@
     bind:open={creation.lineOpen}
     workspaceId={creation.lineWorkspaceId}
     projectId={creation.lineProjectId}
+  />
+  <CreateEventDialog
+    bind:open={creation.eventOpen}
+    presetProjectId={creation.event.projectId ?? createPresets.projectId}
+    presetLineId={creation.event.projectId && creation.event.projectId !== createPresets.projectId
+      ? null
+      : createPresets.lineId}
+    presetDate={creation.event.date ?? null}
+    presetType={creation.event.type ?? null}
+    presetTitle={creation.event.title ?? null}
+    presetWorkspaceId={createPresets.workspaceId}
+    canUnavailable={creation.eventHost?.canUnavailable ?? true}
+    onOpenPerformance={openCreatedPerformance}
+  />
+  <CreateTaskDialog bind:open={creation.taskOpen} target={taskTarget} title={creation.taskTitle} />
+  <CreateConversationDialog
+    bind:open={creation.conversationOpen}
+    who={creation.conversationWho}
+    tag={creation.conversationTag}
   />
 {/if}
 

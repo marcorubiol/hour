@@ -98,6 +98,8 @@
     presetLineId?: string | null;
     /** Open on this type (the toolbar's «unavailable» door). */
     presetType?: QuickType | null;
+    /** Typed in ⌘K: it is the title, over a leftover draft's. */
+    presetTitle?: string | null;
     /** The pinned scope's one space, for an unavailability. */
     presetWorkspaceId?: string | null;
     /** The availability and team feeds answer: an unavailability can be
@@ -113,6 +115,7 @@
     presetProjectId = null,
     presetLineId = null,
     presetType = null,
+    presetTitle = null,
     presetWorkspaceId = null,
     canUnavailable = true,
     onOpenPerformance,
@@ -267,6 +270,12 @@
       if (presetProjectId) {
         d.project = presetProjectId;
         d.line = presetLineId ?? '';
+      }
+      // What was typed to ask for this is written, not deduced: it wins, and
+      // it is a draft from now on.
+      if (presetTitle?.trim()) {
+        d.title = presetTitle.trim();
+        typed = true;
       }
       panel = null;
       checked = false;
