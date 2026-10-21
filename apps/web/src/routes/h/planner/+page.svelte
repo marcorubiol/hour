@@ -3898,6 +3898,15 @@
     .cal__meta :global(.cal__stat) {
       white-space: nowrap;
     }
+    /* A soft part is a PHRASE («solo lo confirmado; las opciones esperan fuera
+       de calma»), not a figure and its word: at 390 it is wider than the line,
+       and kept whole it pushed the page sideways. It still takes a line of its
+       own first (the flex wrap); only a phrase longer than the line breaks. */
+    .cal__meta :global(.cal__stat--soft) {
+      white-space: normal;
+      min-inline-size: 0;
+      overflow-wrap: anywhere;
+    }
     /* Each part is its own nowrap unit, and the `·` is inserted BETWEEN them —
        so a part that drops (no trips, no urgent) takes its separator with it. */
     .cal__meta :global(.cal__stat + .cal__stat)::before {
