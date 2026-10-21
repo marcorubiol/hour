@@ -446,9 +446,8 @@
 ## Producto — después
 
 - [ ] **Segundo nivel y calma (ADR-139)**: las cinco fases y sus seguimientos (verbos del bolo, resalte de lo creado, «Falta» de línea y proyecto) en producción el 20-10 (`b0bdd0c1`): piezas de formulario y de ficha, un solo modelo de guardado, ficha con hechos/«Falta»/«Detalles», vistazo lateral (fecha, bolo, función, conversación, persona), alta rápida al plan, calma como foco y peso del primer nivel, pulido de Ajustes. Siguen:
-  - [ ] Los specs E2E no pueden borrar las organizaciones ni personas que crean: no hay borrado por API ni política de DELETE. Pide un endpoint de borrado lógico de organización y persona; el 21-10 se ocultaron con borrado lógico 204 organizaciones y 164 personas `E2E*` de `playwright` (`deleted_at = 2026-10-21 18:30:00+00`; deshacer: poner `deleted_at = null` donde valga ese instante); siguen acumulándose unas 12 por pasada.
-  - [ ] Después (ADR-139): la línea que entiende texto en el alta (crear en la celda del Mes y ⌘K que crea, en main el 21-10).
-  - [ ] Bug: en el Mes, «+N más» de una celda llena abre el alta en vez del Día (desde julio; carril month-create, 21-10).
+  - [ ] Los specs E2E no pueden borrar las organizaciones ni personas que crean: borrado lógico por API escrito el 22-10 (endpoints, `tests/forget.ts` en seis specs) detrás de la migración `20261021200000_delete_organization_person`, sin aplicar.
+  - [ ] Marco: decidir — OK a aplicar `20261021200000_delete_organization_person` (dos RPC aditivas de borrado lógico de organización y persona; 409 si algo vivo las usa). Duda abierta: un destinatario de envío no impide borrar a la persona.
   - [ ] La base no prohíbe las claves `all` y `team` en `conversation_tag` (solo la pantalla y el endpoint): migración de una línea `CHECK (key NOT IN ('all','team'))`, con OK de Marco.
   - [ ] Bug: en Ajustes, «Subir imagen» no hace nada (revisión 19-10; en `claude/record-pieces`).
   - [ ] Pulido: en oscuro el diálogo se funde con la página; desplegable de 40 px junto a campo de 44; pie del diálogo partido en móvil; `--font-size-s` no existe (ficha de persona) (revisión 19-10, `ui-visual.md`).
