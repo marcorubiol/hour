@@ -20,6 +20,8 @@ const SCOPE = 's:playwright';
 const FIXTURE_PROJECT_ID = '019f21d2-7482-77e6-9ad9-27d881cff305';
 const MONTH = '2031-06';
 const DAY = '2031-06-11';
+/** A day filled past the cell's cap of three, for the «+N más» door. */
+const FULL_DAY = '2031-06-18';
 const MARK = 'E2E Month cell';
 
 type Perf = { id: string; venue_name: string | null; performed_at: string };
@@ -57,12 +59,12 @@ test.describe('Month — create on the cell’s day (ADR-139, después)', () => 
     const page = await browser.newPage();
     await page.goto('/h/desk');
     const left = await page.evaluate(
-      async ({ mark, day }) => {
-        const r = await fetch(`/api/performances?status=any&from=${day}&to=${day}&limit=200`);
+      async ({ mark, day, last }) => {
+        const r = await fetch(`/api/performances?status=any&from=${day}&to=${last}&limit=200`);
         const j = (await r.json()) as { items?: { id: string; venue_name: string | null }[] };
         return (j.items ?? []).filter((p) => p.venue_name?.startsWith(mark)).map((p) => p.id);
       },
-      { mark: MARK, day: DAY },
+      { mark: MARK, day: DAY, last: FULL_DAY },
     );
     for (const id of left) {
       await page.evaluate((i) => fetch(`/api/performances/${i}`, { method: 'DELETE' }), id);
@@ -116,5 +118,30 @@ test.describe('Month — create on the cell’s day (ADR-139, después)', () => 
     await page.keyboard.press('n');
     await expectDialogOn(page, DAY);
     await page.keyboard.press('Escape');
+  });
+
+  test('«+N more» on a full cell opens that Day, not the quick add', async ({ page }) => {
+    test.setTimeout(90_000);
+    await page.goto('/h/desk');
+    const stamp = Date.now();
+    await page.evaluate(
+      async ({ project, day, base }) => {
+        for (let i = 1; i <= 5; i++) {
+          const r = await fetch('/api/performances', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ project_id: project, performed_at: day, venue_name: `${base} ${i}` }),
+          });
+          if (!r.ok) throw new Error(`create performance ${r.status}`);
+        }
+      },
+      { project: FIXTURE_PROJECT_ID, day: FULL_DAY, base: `${MARK} full ${stamp}` },
+    );
+    await openMonth(page);
+    const more = page.locator(`.cal__day[data-day="${FULL_DAY}"] [data-testid="month-more"]`);
+    await expect(more).toBeVisible({ timeout: 15_000 });
+    await more.click();
+    await expect(page.locator('dialog[open]')).toHaveCount(0);
+    await expect(page).toHaveURL(new RegExp(`view=day.*d=${FULL_DAY}|d=${FULL_DAY}.*view=day`));
   });
 });

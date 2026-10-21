@@ -1228,8 +1228,14 @@
           />
         {/each}
         {#if overflow > 0}
-          <button type="button" class="cal__more" onclick={() => onDayCreate?.(day.iso)}
-            >+{overflow} {moreLabel}</button
+          <!-- The door is the Day, like the steps' below: the rest of a full
+               cell is read there, not added to (it opened the quick add). -->
+          <button
+            type="button"
+            class="cal__more"
+            data-testid="month-more"
+            disabled={!onDayOpen}
+            onclick={() => onDayOpen?.(day.iso)}>+{overflow} {moreLabel}</button
           >
         {/if}
         <!-- The steps of the day are the margin's, not the sheet's: one quiet
@@ -1978,6 +1984,10 @@
     }
     .cal__more:hover {
       color: var(--text-muted);
+    }
+    .cal__more:disabled {
+      cursor: default;
+      color: var(--text-faint);
     }
     /* A DAY OUTSIDE THE MONTH KEEPS ITS NUMBER, ATTENUATED — Marco,
        2026-08-01, and it reverses a law of the design that this file carried
