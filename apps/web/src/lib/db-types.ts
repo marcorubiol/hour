@@ -4750,6 +4750,16 @@ export type Database = {
           venue_name: string | null
         }[]
       }
+      conversation_feed: {
+        Args: {
+          p_limit?: number
+          p_project_ids?: string[]
+          p_q?: string
+          p_tag?: string
+          p_workspace_ids?: string[]
+        }
+        Returns: Json
+      }
       conversation_for_contact_write: {
         Args: { p_conversation_id: string }
         Returns: {
