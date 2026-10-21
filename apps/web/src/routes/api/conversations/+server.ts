@@ -44,7 +44,6 @@ const QuerySchema = v.object({
     v.union([v.literal('any'), v.picklist(CONVERSATION_STATUSES)]),
     'contacted',
   ),
-  project_slug: v.optional(v.pipe(v.string(), v.minLength(1))),
   project_ids: v.optional(v.string()),
   workspace_ids: v.optional(v.string()),
   line_id: v.optional(v.pipe(v.string(), v.uuid())),
@@ -117,7 +116,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       400,
     );
   }
-  const { status, project_slug, project_ids, workspace_ids, line_id, q, season, limit, offset, turno, temp, temporada, linea, line_ids, envio, r, relacion, etiqueta } =
+  const { status, project_ids, workspace_ids, line_id, q, season, limit, offset, turno, temp, temporada, linea, line_ids, envio, r, relacion, etiqueta } =
     parsed.output;
 
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -129,19 +128,15 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   const workspaceIds = parseIds(workspace_ids);
 
   const search = new URLSearchParams();
-  // !inner join on project when filtering by its slug. The free-text search
+  // A project is filtered by id (`project_ids`), never by slug: a slug only
+  // names a project inside its workspace (ADR-024). The free-text search
   // runs over the organization and every contact (ADR-102) through the
   // `conversation_search` RPC, which returns conversation rows: the same
   // embeds, filters and order apply.
-  let select = `${CONVERSATION_SELECT},${TURN_EMBEDS}`;
-  if (project_slug) {
-    select = select.replace('project:project_id(', 'project:project_id!inner(');
-  }
-  search.set('select', select);
+  search.set('select', `${CONVERSATION_SELECT},${TURN_EMBEDS}`);
   const qTrim = q?.trim() ?? '';
   if (qTrim) search.set('p_q', qTrim);
 
-  if (project_slug) search.set('project.slug', `eq.${project_slug}`);
   if (projectIds.length > 0 && workspaceIds.length > 0) {
     search.set(
       'or',
@@ -170,8 +165,8 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   };
   if (hasListFilter(listFilter) || etiqueta) {
     // The derived filters only exist for the global lens: project and line
-    // modules keep their own params (project_slug, line_id, season).
-    if (project_slug || line_id || season !== 'any') return json({ error: 'invalid_query', hint: 'turno/temp/temporada/envio/relacion/etiqueta go with project_ids/workspace_ids only.' }, 400);
+    // modules keep their own params (line_id, season).
+    if (line_id || season !== 'any') return json({ error: 'invalid_query', hint: 'turno/temp/temporada/envio/relacion/etiqueta go with project_ids/workspace_ids only.' }, 400);
   }
   if (!hasListFilter(listFilter) && etiqueta) {
     // A tag alone: the scope's ids with their tags, in the list's order; then

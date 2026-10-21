@@ -4,7 +4,6 @@
   import type { Relation } from '$lib/conversation-relation';
 
   export interface ConversationFilters {
-    projectSlug?: string;
     projectIds?: string[];
     lineId?: string;
     workspaceIds?: string[];
@@ -164,7 +163,6 @@
     p.set('status', 'any');
     if (f.relacion) p.set('relacion', f.relacion);
     if (f.etiqueta) p.set('etiqueta', f.etiqueta);
-    if (f.projectSlug) p.set('project_slug', f.projectSlug);
     if (f.projectIds && f.projectIds.length > 0) p.set('project_ids', f.projectIds.join(','));
     if (f.lineId) p.set('line_id', f.lineId);
     if (f.workspaceIds && f.workspaceIds.length > 0)
