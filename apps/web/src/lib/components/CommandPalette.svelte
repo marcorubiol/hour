@@ -905,7 +905,8 @@
   }
   .cmdk__kind {
     flex: none;
-    inline-size: 3.5rem;
+    /* «organización» / «organisation» is the longest word the column says. */
+    inline-size: 5.75rem;
     font-family: var(--font-mono);
     font-size: var(--text-xs);
     letter-spacing: var(--tracking-m);
