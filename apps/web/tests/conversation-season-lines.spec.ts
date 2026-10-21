@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { existsSync } from 'node:fs';
 import { loadEnvFile } from 'node:process';
+import { forgetConversationsRpc } from './forget';
 
 /**
  * ADR-135: la temporada de Difusión, una barra por línea.
@@ -73,7 +74,7 @@ test.describe('la temporada por línea (ADR-135)', () => {
 
   test.afterAll(async () => {
     if (!h) return;
-    for (const id of ids) await h.pgRpc('delete_conversation', jwt, { p_conversation_id: id });
+    await forgetConversationsRpc(h, jwt, ids);
   });
 
   test('una barra por línea, «sin línea» al final', async ({ page }) => {

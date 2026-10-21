@@ -1,5 +1,6 @@
 import { test, expect, request as pwRequest, type Page } from '@playwright/test';
 import { waitForLoaded } from './loaded';
+import { forgetConversations } from './forget';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
@@ -181,7 +182,7 @@ test.describe('mailout (simulated)', () => {
       await page.goto('/u/' + '0'.repeat(48));
       await expect(page.getByRole('main')).toContainText(/not valid|no es válido|no és vàlid|n'est pas valide/);
     } finally {
-      await api(page, 'DELETE', `/api/conversations/${conversationId}`);
+      await forgetConversations(page, [conversationId]);
       if (ownDomain && domainId) await api(page, 'DELETE', `/api/mailout/domains/${domainId}`);
       if (SB_URL && SERVICE_KEY) {
         const addr = encodeURIComponent(`"${ADDRESS}"`);

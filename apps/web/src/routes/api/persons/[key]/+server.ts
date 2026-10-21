@@ -11,6 +11,11 @@
  * title } via `update_workspace_person` (ADR-107): what the quick add left
  * for later. Every field travels; an empty one clears it (not the name).
  *
+ * DELETE /api/persons/:person_id?workspace_id=:workspace — soft-delete the
+ * dossier via `delete_workspace_person` (ADR-048: never by a client PATCH).
+ * The global `person` stays. Refused (409) while something live uses it: a
+ * conversation, cast, crew, an override, an availability, or a login.
+ *
  * Auth: Bearer JWT required. RLS (`can_see_person`) decides visibility; the
  * RPC gates the write.
  */
@@ -188,6 +193,37 @@ export const PATCH: RequestHandler = async ({ request, params, platform, locals 
           '22023': { status: 400, error: 'invalid_input' },
           '23505': { status: 409, error: 'email_taken' },
           '42501': { status: 403, error: 'forbidden' },
+        },
+      },
+    );
+  }
+};
+
+export const DELETE: RequestHandler = async ({ request, params, url, platform, locals }) => {
+  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  const env = platform.env as unknown as SupabaseEnv;
+
+  const jwt = extractAccessToken(request);
+  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+  if (!isUuid(params.key)) return json({ error: 'invalid_id' }, 400);
+
+  const query = v.safeParse(QuerySchema, Object.fromEntries(url.searchParams.entries()));
+  if (!query.success) return json({ error: 'invalid_query', hint: 'workspace_id is required.' }, 400);
+
+  try {
+    await pgPostRpc(env, 'delete_workspace_person', jwt, {
+      p_workspace_id: query.output.workspace_id,
+      p_person_id: params.key,
+    });
+    return new Response(null, { status: 204 });
+  } catch (err) {
+    return pgErrorResponse(
+      err,
+      { route: 'DELETE /api/persons/[key]', requestId: locals.requestId },
+      {
+        codes: {
+          '42501': { status: 404, error: 'not_found' },
+          '23503': { status: 409, error: 'person_in_use', hint: 'Delete what uses this person first.' },
         },
       },
     );

@@ -102,6 +102,28 @@ describe('MonthGrid — crear en el día de la celda', () => {
     });
   });
 
+  it('«+N más» on a full cell opens the Day, not the quick add', async () => {
+    const dates = [1, 2, 3, 4, 5].map((i) => ({
+      id: `d${i}`,
+      kind: 'rehearsal',
+      status: 'confirmed',
+      title: `Ensayo ${i}`,
+      starts_at: `${DAY}T0${i}:00:00Z`,
+      ends_at: `${DAY}T0${i}:30:00Z`,
+      all_day: false,
+      venue_name: null,
+      city: null,
+      project: null,
+      venue: null,
+    }));
+    const { container, onDayCreate, onDayOpen } = mount({ dates });
+    const more = container.querySelector<HTMLButtonElement>('.cal__day[data-day="' + DAY + '"] [data-testid="month-more"]')!;
+    expect(more.textContent).toMatch(/^\+\d+ /);
+    await fireEvent.click(more);
+    expect(onDayOpen).toHaveBeenCalledExactlyOnceWith(DAY);
+    expect(onDayCreate).not.toHaveBeenCalled();
+  });
+
   it('without a door there is no gesture: no «+», and a double click does nothing', async () => {
     const { container, cellOf } = mount({ onDayCreate: undefined });
     expect(container.querySelector('.cal__new')).toBeNull();

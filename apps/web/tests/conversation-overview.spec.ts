@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { existsSync } from 'node:fs';
 import { loadEnvFile } from 'node:process';
+import { forgetConversationsRpc } from './forget';
 
 /**
  * ADR-117: «con quién hablas» abre con su dashboard.
@@ -84,7 +85,7 @@ test.describe('el dashboard de Conversations (ADR-117)', () => {
 
   test.afterAll(async () => {
     if (!h) return;
-    for (const id of ids) await h.pgRpc('delete_conversation', jwt, { p_conversation_id: id });
+    await forgetConversationsRpc(h, jwt, ids);
   });
 
   test('esperan respuesta: el bloque cuenta y su filtro la encuentra con su columna Respuesta', async ({ page }) => {
