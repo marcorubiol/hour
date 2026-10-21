@@ -15,6 +15,7 @@ import { performanceStatusFamily } from './performance';
 import { dateStatusFamily } from './date';
 import type { HotRow, LastMailout } from './conversation-overview';
 import type { FeedThread } from './threads';
+import { ALL, SALES, TEAM } from './conversation-tags';
 import type { MoneyBolo, MoneyInvoiceItem } from './money';
 
 const DAY_MS = 86_400_000;
@@ -246,6 +247,26 @@ export function changesSince(
     if (Date.parse(p.at) > after) out.push({ kind: 'payment', at: p.at, payment: p });
   }
   return out.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, CHANGED_ROWS);
+}
+
+/**
+ * Where the band's way into Conversations goes (ADR-138 fase 3; it was always
+ * Equipo, ADR-134 § 7): the chip its conversation news share. Only threads,
+ * Equipo; only replies under one tag, that tag (none is Difusión); a mix,
+ * Todas. Null when nothing in the band is a conversation or a thread.
+ */
+export function changedLensChip(changes: readonly Change[]): string | null {
+  const threads = changes.some((c) => c.kind === 'thread');
+  const tags = new Set<string>();
+  for (const c of changes) {
+    if (c.kind !== 'reply') continue;
+    const keys = c.row.tags.length > 0 ? [...new Set(c.row.tags)] : [SALES];
+    tags.add(keys.length === 1 ? keys[0] : ALL);
+  }
+  if (!threads && tags.size === 0) return null;
+  if (tags.size === 0) return TEAM;
+  if (threads || tags.size > 1) return ALL;
+  return [...tags][0];
 }
 
 // ── La temporada: la puerta del Planner ─────────────────────────────────

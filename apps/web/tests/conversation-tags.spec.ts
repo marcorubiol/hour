@@ -11,7 +11,7 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  * 1. La fila de chips: Todas · Venues · Press · … · Team; Press activo por la
  *    URL, sin «Select» (el envío en bloque es de Difusión) ni temporada.
  * 2. «Añadir» bajo Press nace con Press: sale en Press, no en Venues, y en
- *    Todas con su etiqueta en la fila; debajo, el bloque de los hilos.
+ *    Todas (una sola lista desde la fase 3) con su etiqueta en la fila.
  * 3. La ficha enseña sus etiquetas y quien edita las cambia: con Venues
  *    también, sale en Venues, que sí ofrece «Select».
  * 4. `?view=team` lleva a `?etiqueta=team`.
@@ -90,13 +90,16 @@ test.describe('conversation tags', () => {
       await page.locator('.lenshead__sub [data-chip="all"]').click();
       await waitForLoaded(page);
       await search(page);
-      const all = page.locator('main table tbody tr', { hasText: ORG });
+      // Todas is one list since phase 3 (conversations and threads, one order),
+      // and its search reads both sources.
+      const all = page.getByTestId('conversation-feed').getByTestId('feed-row').filter({ hasText: ORG });
       await expect(all).toHaveCount(1, { timeout: 15_000 });
-      await expect(all.locator('.tag-chip')).toHaveText(['Press']);
-      await expect(page.getByTestId('all-threads')).toBeVisible();
+      await expect(all).toHaveAttribute('data-kind', 'conversation');
+      await expect(all.locator('.feed__name')).toHaveText('Press');
+      await expect(page.getByTestId('all-threads')).toHaveCount(0);
 
       // 3. The file shows its tags; whoever edits changes them.
-      await all.getByRole('link', { name: ORG, exact: true }).click();
+      await all.getByRole('link').click();
       // The vistazo first (ADR-139 p1), then the page.
       await openInFull(page);
       await expect(page).toHaveURL(/\/conversation\//);

@@ -27,9 +27,10 @@
    * The panel follows the chip (plan § 3): Difusión is the whole dashboard of
    * ADR-117 over the `sales` conversations; Todas, Prensa, Coproducción and
    * the space's own, the common one (te toca); Equipo, the threads. Todas
-   * still lists conversations and threads as two blocks, one under the other
-   * (mixing them in one order is phase 3). Selection and «Escribir a N» only
-   * under Difusión (ADR-138 § 7).
+   * lists conversations and threads in one order (phase 3, ConversationFeed
+   * over `conversation_feed`: new first, then te toca, then the latest), and
+   * the search reads both; a block filter turns it back into the table.
+   * Selection and «Escribir a N» only under Difusión (ADR-138 § 7).
    *
    * Difusión opens on its dashboard (ADR-117, propuesta A): the
    * ConversationOverview blocks above the list. Each block is a filter of the
@@ -55,6 +56,7 @@
   import { toStore } from 'svelte/store';
   import { NO_LINE, parseListFilter } from '$lib/conversation-overview';
   import ThreadFeed from '$lib/components/ThreadFeed.svelte';
+  import ConversationFeed from '$lib/components/ConversationFeed.svelte';
   import FirstVisitCard from '$lib/components/FirstVisitCard.svelte';
   import ConceptHint from '$lib/components/ConceptHint.svelte';
   import Input from '$lib/components/Input.svelte';
@@ -242,6 +244,13 @@
     return f.temporada ? t('overview.this_season', locale) : null;
   }
   let filterChip = $derived(chipLabel(listFilter));
+  /**
+   * Todas without a block filter is the common list (fase 3): conversations
+   * and threads in one order (`conversation_feed`). A block filter (te toca,
+   * a relation, the season…) is about conversations: the table, as under any
+   * other chip.
+   */
+  let mixed = $derived(chip === ALL && !filterChip && relationFilter === 'any');
 
   function clearListFilter() {
     const params = new URLSearchParams(page.url.searchParams);
@@ -742,27 +751,31 @@
       {/if}
     </div>
 
-    <ConversationTable
-      bind:this={table}
-      {filters}
-      {personHref}
-      {conversationHref}
-      groupable
-      turnColumn
-      importEmptyState={canEdit}
-      editable={canEdit}
-      selectable={picking}
-      bind:selected={picked}
-      {tagNames}
-      hideTag={chip}
-    />
-
-    {#if chip === ALL}
-      <!-- Todas, phase 2: the threads as their own block under the conversations (one order is phase 3). -->
-      <div class="conversations__list-head" data-testid="all-threads">
-        <BlockHead title={t('conversations.view_team', locale)} />
-      </div>
-      {@render threads()}
+    {#if mixed}
+      <!-- Todas (fase 3): conversations and threads in one list, one order. -->
+      <ConversationFeed
+        filters={{ projectIds: filterIds.projectIds, workspaceIds: filterIds.workspaceIds, enabled: !scopeUnresolved }}
+        {q}
+        {workspaceSlugById}
+        {projectNameById}
+        {tagNames}
+        {locale}
+      />
+    {:else}
+      <ConversationTable
+        bind:this={table}
+        {filters}
+        {personHref}
+        {conversationHref}
+        groupable
+        turnColumn
+        importEmptyState={canEdit}
+        editable={canEdit}
+        selectable={picking}
+        bind:selected={picked}
+        {tagNames}
+        hideTag={chip}
+      />
     {/if}
     {/if}
 

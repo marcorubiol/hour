@@ -75,7 +75,8 @@
   import { performanceStatusLabel } from '$lib/performance';
   import { conversationPlannerHref, dayKeyInTz } from '$lib/planner';
   import { firstLine, replySubject, type MailAccountsResponse } from '$lib/mail';
-  import { markReadWhenSeen, readAtOpen, scrollWhenNamed } from '$lib/thread-reading.svelte';
+  import { markConversationReadOnOpen, markReadWhenSeen, readAtOpen, scrollWhenNamed } from '$lib/thread-reading.svelte';
+  import { markConversationRead, type ConversationFeedView } from '$lib/conversation-feed';
   import { THREAD_REFRESH_MS, firstUnreadId, teamTimeline, type ConversationThreadView } from '$lib/threads';
 
   const locale = appLocale();
@@ -157,6 +158,19 @@
   );
   let events = $derived($eventsQuery.data?.items ?? []);
   let oldestFirst = $derived([...events].reverse());
+
+  // Abrirla la deja leída (ADR-138, fase 3): la lista común deja de contar sus
+  // entrantes; la fila se apaga sin esperar a la recarga.
+  markConversationReadOnOpen({
+    conversationId: () => ($eventsQuery.isSuccess ? conv?.id : null),
+    latest: () => events[0]?.id ?? '',
+    onmarked: (id) => {
+      queryClient.setQueriesData<ConversationFeedView>({ queryKey: ['conversation-feed'] }, (view) =>
+        view ? markConversationRead(view, id) : view,
+      );
+      void queryClient.invalidateQueries({ queryKey: ['conversation-feed'] });
+    },
+  });
 
   const mailQuery = createQuery(
     toStore(() => ({

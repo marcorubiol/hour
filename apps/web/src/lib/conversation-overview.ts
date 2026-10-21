@@ -474,6 +474,8 @@ export interface BlockRow {
   title: string;
   person: string | null;
   relation: Relation;
+  /** Sus etiquetas (ADR-138); vacío se lee Difusión. Desk las nombra si no es solo Difusión. */
+  tags: string[];
 }
 
 export interface DueRow extends BlockRow {
@@ -542,6 +544,7 @@ function blockRow(r: OverviewInput, now: Date): BlockRow {
     title: r.title,
     person: r.person,
     relation: relationOf(r, now),
+    tags: r.tags ?? [],
   };
 }
 

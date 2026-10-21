@@ -87,7 +87,7 @@ test.describe('smoke', () => {
     expect(await page.locator('.cal__weekday').count()).toBe(7);
 
     // Conversations.
-    await page.goto('/h/conversations');
+    await page.goto('/h/conversations?etiqueta=sales');
     await waitForLoaded(page);
     await expect(page.locator('.status-bar__count')).toContainText(/\d+ conversations/);
     expect(await page.locator('tbody tr').count()).toBeGreaterThan(0);

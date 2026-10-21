@@ -34,7 +34,7 @@ test.describe('the vistazo (ADR-139 p1)', () => {
   test('a conversation opens over the lens, by address, and closes back to it', async ({ page }) => {
     test.setTimeout(60_000);
     await readOnly(page);
-    await page.goto('/h/conversations?scope=s:playwright');
+    await page.goto('/h/conversations?etiqueta=sales&scope=s:playwright');
     await waitForLoaded(page);
     const link = page.locator('main table tbody tr').first().locator('td').first().getByRole('link').first();
     if ((await link.count()) === 0) test.skip(true, 'no conversation in the fixture space');
@@ -62,7 +62,7 @@ test.describe('the vistazo (ADR-139 p1)', () => {
   test('Back after closing opens it again, and «Open in full» goes to the page', async ({ page }) => {
     test.setTimeout(60_000);
     await readOnly(page);
-    await page.goto('/h/conversations?scope=s:playwright');
+    await page.goto('/h/conversations?etiqueta=sales&scope=s:playwright');
     await waitForLoaded(page);
     const link = page.locator('main table tbody tr').first().locator('td').first().getByRole('link').first();
     if ((await link.count()) === 0) test.skip(true, 'no conversation in the fixture space');

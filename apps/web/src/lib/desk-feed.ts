@@ -98,6 +98,8 @@ export interface DeskItem {
   going: { of: 'performance' | 'date'; id: string } | null;
   /** A reply row: when they wrote (its «when» is how long ago). */
   repliedAt: string | null;
+  /** A conversation's tags when they are not Difusión (ADR-138 fase 3): the row says what it is about. */
+  tagName: string | null;
 }
 
 export interface DeskRun {
@@ -139,6 +141,8 @@ interface DeskReplyInput {
   /** Their message: when they wrote. */
   at: string;
   href: string | null;
+  /** Its tags, named, when they are not only Difusión. */
+  tagName?: string | null;
 }
 
 const VERB_KEYS: Record<Relation, { upcoming: string; overdue: string }> = {
@@ -255,6 +259,7 @@ function blankItem(over: Partial<DeskItem> & Pick<DeskItem, 'id' | 'concern' | '
     day: null,
     going: null,
     repliedAt: null,
+    tagName: null,
     ...over,
   };
 }
@@ -356,6 +361,7 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
         verbKey: 'reply',
         href: r.href,
         repliedAt: r.at,
+        tagName: r.tagName ?? null,
       }),
     );
   }
@@ -654,6 +660,8 @@ export interface OverviewReplyRow {
   workspace_id: string;
   project_id: string;
   at: string;
+  /** Its tag keys (ADR-138); empty or only `sales` is Difusión. */
+  tags?: readonly string[];
 }
 
 /**
@@ -665,6 +673,8 @@ export function overviewReplies(
   rows: readonly OverviewReplyRow[],
   workspaceSlugById: ReadonlyMap<string, string>,
   projectNameById: ReadonlyMap<string, string>,
+  /** Names a row's tags when they are not only Difusión (`otherTagsName`); omitted, no tag. */
+  tagName: (keys: readonly string[]) => string | null = () => null,
 ): DeskReplyInput[] {
   return rows
     .filter((r) => r.reason === 'reply')
@@ -677,6 +687,7 @@ export function overviewReplies(
         projectName: projectNameById.get(r.project_id) ?? '',
         at: r.at,
         href: ws ? `/h/${ws}/conversation/${r.id}` : null,
+        tagName: tagName(r.tags ?? []),
       };
     });
 }
