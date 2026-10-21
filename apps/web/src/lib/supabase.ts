@@ -143,6 +143,31 @@ export async function pgPatch<T = unknown>(
 }
 
 /**
+ * INSERT one row into a PostgREST resource with the caller's JWT, for a table
+ * whose write path is a direct RLS-gated insert with a column grant (not an
+ * RPC). Asks for `return=representation`; `options.search` may carry a
+ * `select` for the returned shape.
+ */
+export async function pgInsert<T = unknown>(
+  env: SupabaseEnv,
+  path: string,
+  jwt: string | null,
+  row: Record<string, unknown>,
+  options: PostgrestOptions = {},
+): Promise<PostgrestResult<T>> {
+  const url = resourceUrl(env, path, options.search);
+  const res = await fetch(url.toString(), {
+    method: 'POST',
+    headers: { ...baseHeaders(env, jwt), 'content-type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify(row),
+  });
+  const body = await res.text();
+  if (!res.ok) throw new PostgrestError(res.status, body);
+  const data = body ? (JSON.parse(body) as T[]) : [];
+  return { data, total: null, status: res.status };
+}
+
+/**
  * Call a Postgres function (RPC) via PostgREST. Pass named arguments as an
  * object — PostgREST matches them to the function's parameter names.
  * Returns the rows the function yields (a single-row scalar function comes

@@ -24,6 +24,9 @@
   let shown = $derived(
     tags
       .filter((k) => k !== hide)
+      // An inactive tag stays on the conversation but is not shown (ADR-138
+      // fase 4): `known` holds only the active ones, once it has loaded.
+      .filter((k) => known.length === 0 || known.some((x) => x.key === k))
       .map((k) => ({ key: k, order: known.findIndex((x) => x.key === k) }))
       .sort((a, b) => (a.order === -1 ? Infinity : a.order) - (b.order === -1 ? Infinity : b.order) || a.key.localeCompare(b.key)),
   );

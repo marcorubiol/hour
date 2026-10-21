@@ -10,6 +10,7 @@
     | 'privacy'
     | 'languages'
     | 'lenses'
+    | 'tags'
     | 'mail';
 
   type Section = {
@@ -26,6 +27,7 @@
     { id: 'privacy', labelKey: 'settings.nav_privacy', glyph: '◌' },
     { id: 'languages', labelKey: 'settings.nav_languages', glyph: '¶' },
     { id: 'lenses', labelKey: 'settings.nav_lenses', glyph: '◫' },
+    { id: 'tags', labelKey: 'settings.nav_tags', glyph: '#' },
     { id: 'mail', labelKey: 'settings.nav_mail', glyph: '@' },
     // Notifications, Billing and Danger zone are hidden: every control in
     // them kept nothing (a mocked card, switches with no writer, buttons
