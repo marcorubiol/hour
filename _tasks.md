@@ -444,7 +444,7 @@
 ## Producto — después
 
 - [ ] **Segundo nivel y calma (ADR-139)**: las cinco fases y sus seguimientos (verbos del bolo, resalte de lo creado, «Falta» de línea y proyecto) en producción el 20-10 (`b0bdd0c1`): piezas de formulario y de ficha, un solo modelo de guardado, ficha con hechos/«Falta»/«Detalles», vistazo lateral (fecha, bolo, función, conversación, persona), alta rápida al plan, calma como foco y peso del primer nivel, pulido de Ajustes. Siguen:
-  - [ ] Los specs E2E no pueden borrar las organizaciones ni personas que crean: no hay borrado por API ni política de DELETE. Pide un endpoint de borrado lógico de organización y persona; mientras, `playwright` acumula (196 y 157 el 21-10).
+  - [ ] Los specs E2E no pueden borrar las organizaciones ni personas que crean: no hay borrado por API ni política de DELETE. Pide un endpoint de borrado lógico de organización y persona; el 21-10 se ocultaron con borrado lógico 204 organizaciones y 164 personas `E2E*` de `playwright` (`deleted_at = 2026-10-21 18:30:00+00`; deshacer: poner `deleted_at = null` donde valga ese instante); siguen acumulándose unas 12 por pasada.
   - [ ] Después (ADR-139): la línea que entiende texto en el alta, crear en la celda del Mes, ⌘K que crea función, fecha, tarea y conversación.
   - [ ] Bug: en Ajustes, «Subir imagen» no hace nada (revisión 19-10; en `claude/record-pieces`).
   - [ ] Pulido: en oscuro el diálogo se funde con la página; desplegable de 40 px junto a campo de 44; pie del diálogo partido en móvil; `--font-size-s` no existe (ficha de persona) (revisión 19-10, `ui-visual.md`).
