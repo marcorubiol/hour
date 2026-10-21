@@ -39,6 +39,7 @@
    */
 
   import EmptyLine from '$lib/components/EmptyLine.svelte';
+  import ConversationsImportEmpty from '$lib/components/ConversationsImportEmpty.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { onMount, untrack } from 'svelte';
   import { toStore } from 'svelte/store';
@@ -613,8 +614,7 @@
 {:else if !loading && items.length === 0}
   {@const unfiltered = !filters.q && !filters.turno && !filters.temp && !filters.temporada && !filters.envio && !filters.relacion}
   {#if importEmptyState && unfiltered}
-    <!-- The first-time empty speaks in the same voice as every other one. -->
-    <EmptyLine text={`${t('conversations.empty_title', locale)} ${t('conversations.empty_body', locale)}`} />
+    <ConversationsImportEmpty {locale} />
   {:else}
     <!-- «No match» only when something filters; a list that is simply empty says so. -->
     <EmptyLine text={unfiltered ? t('conversations.none_yet', locale) : t('conversations.no_match', locale)} />

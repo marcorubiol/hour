@@ -17,6 +17,7 @@
   import FeedLine from '$lib/components/FeedLine.svelte';
   import ThreadFeedRow from '$lib/components/ThreadFeedRow.svelte';
   import EmptyLine from '$lib/components/EmptyLine.svelte';
+  import ConversationsImportEmpty from '$lib/components/ConversationsImportEmpty.svelte';
   import Button from '$lib/components/Button.svelte';
   import { viewerTimeZone } from '$lib/datetime';
   import { t, type Locale } from '$lib/i18n';
@@ -34,9 +35,11 @@
     /** Las etiquetas del alcance, para nombrar las de cada fila. */
     tagNames: readonly WorkspaceTag[];
     locale: Locale;
+    /** Who can add one: an empty scope says «Trae tu agenda» instead of «nothing yet». */
+    importEmptyState?: boolean;
   }
 
-  let { filters, q, workspaceSlugById, projectNameById, tagNames, locale }: Props = $props();
+  let { filters, q, workspaceSlugById, projectNameById, tagNames, locale, importEmptyState = false }: Props = $props();
 
   const tz = viewerTimeZone();
   const PAGE = 100;
@@ -117,7 +120,12 @@
   {:else if $feedQuery.isError}
     <EmptyLine text={t('conversations.feed_error', locale)} />
   {:else if feed && feed.items.length === 0}
-    <EmptyLine text={t(q ? 'conversations.feed_no_match' : 'conversations.feed_empty', locale)} />
+    {#if importEmptyState && !q}
+      <!-- The scope has nothing at all: the first-time empty, as the table says it. -->
+      <ConversationsImportEmpty {locale} />
+    {:else}
+      <EmptyLine text={t(q ? 'conversations.feed_no_match' : 'conversations.feed_empty', locale)} />
+    {/if}
   {:else if feed}
     <ul class="cfeed__list">
       {#each feed.items as row (feedKey(row))}
