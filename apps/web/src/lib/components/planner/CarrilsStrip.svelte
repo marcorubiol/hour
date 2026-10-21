@@ -185,8 +185,29 @@
       word, and — next step — the hour line), never extra room. The two
       numbers come from the engine, because the absence band has to know how
       much room a span is before it decides what it can say. */
+  /**
+   * THE MEASURED WIDTHS ARE THE FLOOR, NOT THE BOARD (2026-10-22). A board
+   * with few columns (today and one fold, say) drew 370px and left two
+   * thirds of a 1440 page blank, while every other Planner view takes the
+   * page. Each column is now `minmax(w, w·fr)`: the spare width is shared in
+   * proportion to the measured widths, so today stays equal to any day and a
+   * fold stays a fold; with more columns than room, the floors hold and the
+   * strip scrolls inside itself as before. The frozen labels never grow.
+   *
+   * The floor is also the board's own minimum (`boardMin`), in place of
+   * `max-content`: with flexible tracks, max-content would let a long slip
+   * name inflate every column at once.
+   */
   let gridTemplate = $derived(
-    `26px var(--board-lab, 168px) ${columns.map((c) => `${c.kind === 'gap' ? COL_PX.gap : COL_PX.day}px`).join(' ')}`,
+    `26px var(--board-lab, 168px) ${columns
+      .map((c) => {
+        const w = c.kind === 'gap' ? COL_PX.gap : COL_PX.day;
+        return `minmax(${w}px, ${w}fr)`;
+      })
+      .join(' ')}`,
+  );
+  let boardMin = $derived(
+    `calc(26px + var(--board-lab, 168px) + ${columns.reduce((s, c) => s + (c.kind === 'gap' ? COL_PX.gap : COL_PX.day), 0)}px)`,
   );
 
   /* ── the engine's facts, worded below, never re-derived ───────────── */
@@ -292,7 +313,10 @@
     return hit;
   }
   /** The fold's ruler step, or null when a day stops being a mark (law 15:
-      under 6px a measure becomes a texture, and a texture is not drawn). */
+      under 6px a measure becomes a texture, and a texture is not drawn).
+      Asked at the fold's FLOOR width; the ruler itself is drawn as a share
+      of the column (`--dw: 100% / span`), because the column may now be
+      wider than its floor and a px step would add days that are not there. */
   function foldStep(col: BoardColumn): number | null {
     const ticks = foldTicks(col.span, 58);
     return ticks.length > 1 ? ticks[1] : null;
@@ -470,7 +494,7 @@
 {:else}
   <!-- The strip scrolls sideways INSIDE itself; the page never does. -->
   <div class="board__wrap" bind:this={wrapEl}>
-    <div class="board" bind:this={boardEl} style="grid-template-columns: {gridTemplate}">
+    <div class="board" bind:this={boardEl} style="grid-template-columns: {gridTemplate}; min-inline-size: {boardMin}">
       <!-- ══ ROW 1 · the date axis ══════════════════════════════════════
            Mono weekday over serif number. TODAY is the word and full ink —
            EQUAL width, NO fill (Marco's ruling 2): its three marks are ink,
@@ -486,7 +510,7 @@
           class:today={col.today}
           class:wstart={col.wstart}
           class:mstart={col.mstart}
-          style={col.kind === 'gap' && foldStep(col) !== null ? `--dw: ${foldStep(col)}px` : undefined}
+          style={col.kind === 'gap' && foldStep(col) !== null ? `--dw: calc(100% / ${col.span})` : undefined}
         >
           {#if col.monthStartName}<i class="board__mo">{monthWord(col.from)}</i>{/if}
           {#if col.kind === 'gap'}
@@ -764,7 +788,7 @@
     }
     .board {
       display: grid;
-      min-inline-size: max-content;
+      /* min-inline-size: the columns' floor, set inline (`boardMin`). */
       border-block-start: var(--line-hairline) solid var(--border-color-light);
       position: relative;
     }
@@ -898,7 +922,7 @@
     }
     /* The folded run's ruler: one 1px fillet per swallowed day at `--dw`,
        only while a day can still be a mark (the engine's foldTicks said
-       so — below 6px no `--dw` is set and one tick per 58px remains). */
+       so — below 6px no `--dw` is set and only the opening tick remains). */
     .board__head.gap::after {
       content: '';
       position: absolute;
@@ -908,7 +932,7 @@
       background: repeating-linear-gradient(
         90deg,
         color-mix(in oklch, var(--text-color) 20%, transparent) 0 1px,
-        transparent 1px var(--dw, 3.625rem)
+        transparent 1px var(--dw, 100%)
       );
     }
 
