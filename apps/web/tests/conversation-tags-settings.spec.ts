@@ -31,6 +31,14 @@ async function setActive(page: Page, on: boolean) {
   }
 }
 
+/**
+ * Ajustes no tiene raíz `aria-busy` (waitForLoaded): se espera a la sección,
+ * con una etiqueta de Hour ya dibujada.
+ */
+async function settingsLoaded(page: Page) {
+  await expect(page.locator('[data-testid="settings-tags"] [data-tag="sales"]')).toBeVisible({ timeout: 15_000 });
+}
+
 /** To the lens through the frame's selector: a client navigation, no reload. */
 async function chipsOfTheLens(page: Page) {
   await page.getByRole('navigation', { name: 'Sections' }).getByRole('link', { name: 'Conversations', exact: true }).click();
@@ -45,9 +53,8 @@ test.describe('conversation tags in settings', () => {
   test('create (not «Team»), on in the chips without reload, rename, order, off', async ({ page }) => {
     test.setTimeout(120_000);
     await page.goto(SETTINGS);
-    await waitForLoaded(page);
+    await settingsLoaded(page);
     const section = page.getByTestId('settings-tags');
-    await expect(section.locator('[data-tag="sales"]')).toBeVisible();
 
     try {
       // 1. A reserved key is refused under its field, and nothing is created.
@@ -78,7 +85,7 @@ test.describe('conversation tags in settings', () => {
       await expect(page.locator(`.lenshead__sub [data-chip="${KEY}"]`)).toBeVisible();
       await expect(chips.last()).toHaveAttribute('data-chip', 'team');
       await page.goBack();
-      await waitForLoaded(page);
+      await settingsLoaded(page);
 
       // Renamed in place, «saved» in its row; and back.
       const input = row(page).locator('input[type="text"]');
@@ -109,7 +116,7 @@ test.describe('conversation tags in settings', () => {
     } finally {
       // Whatever happened, it ends off and with its name.
       await page.goto(SETTINGS);
-      await waitForLoaded(page);
+      await settingsLoaded(page);
       if ((await row(page).count()) > 0) {
         const input = row(page).locator('input[type="text"]');
         if ((await input.inputValue()) !== NAME) {
