@@ -12,7 +12,9 @@
    * spaces, so space stays a normal filter character); ⌘↵ opens the highlighted
    * entity's page; ⇧↵ applies the built scope (advanced — the Apply button is
    * the discoverable path). Creation (new space/project/line) stays reachable
-   * from the footer. Installs the global ⌘K / Escape shortcut; the shell also
+   * from the footer; what goes INTO them (a performance, a date, a task, a
+   * conversation) is found by typing (`paletteCreates`, ADR-139 «después»):
+   * its rows open the shell's dialogs, with the typed text as the title. Installs the global ⌘K / Escape shortcut; the shell also
    * opens it from the top-bar search and the sidebar "browse & combine" button.
    */
 
@@ -43,6 +45,9 @@
   import { spaceName } from '$lib/utils/identity';
   import { lineKindLabel } from '$lib/utils/line-kind';
   import ScopeGlyph from '$lib/components/ScopeGlyph.svelte';
+  import { conversationAccessQueryOptions } from '$lib/conversation-access';
+  import { planAccessQueryOptions } from '$lib/plan-create';
+  import { CREATE_LABEL_KEYS, paletteCreates, type PaletteCreate } from '$lib/palette-create';
 
   // El mismo par que usa el Planner: el locale detectado y su etiqueta BCP-47.
   const locale = detectLocale(navigator.language);
@@ -59,13 +64,28 @@
     initialTokens?: string[];
     onApplyScope: (tokens: string[]) => void;
     onPickAction: (action: CreateAction) => void;
+    /** A «crear» row: the shell opens its dialog. */
+    onCreate: (create: PaletteCreate) => void;
   }
   let {
     open = $bindable(),
     initialTokens = [],
     onApplyScope,
     onPickAction,
+    onCreate,
   }: Props = $props();
+
+  /**
+   * Who may make what. Asked when the palette opens, and only an explicit
+   * «no» hides (as the lenses do): while it answers the rows are there, and
+   * the write is gated by its RPC anyway.
+   */
+  const planAccessQuery = createQuery(toStore(() => ({ ...planAccessQueryOptions(), enabled: open })));
+  const convAccessQuery = createQuery(toStore(() => ({ ...conversationAccessQueryOptions(), enabled: open })));
+  let can = $derived({
+    plan: lensOn('planner') && $planAccessQuery.data?.edit !== false,
+    converse: lensOn('conversations') && $convAccessQuery.data?.edit !== false,
+  });
 
   const workspacesQuery = createQuery(workspacesQueryOptions());
   const projectsQuery = createQuery(activeProjectsQueryOptions());
@@ -144,7 +164,7 @@
    * te lleva— y porque el ⌘K ya es la única puerta de navegación que esta app
    * tiene: inventarle otra ventana para escribir una fecha sería la segunda.
    */
-  type Kind = 'space' | 'project' | 'line' | 'person' | 'day';
+  type Kind = 'space' | 'project' | 'line' | 'person' | 'day' | 'create';
   interface Row {
     token: string;
     kind: Kind;
@@ -153,6 +173,8 @@
     drill: string | null;
     /** for lines: the raw kind (tour/season/…) driving its glyph + label */
     lineKind?: string;
+    /** for a «crear» row: what it opens */
+    create?: PaletteCreate;
   }
   interface Group {
     key: Kind;
@@ -163,8 +185,9 @@
     note?: string;
   }
 
-  /** The row's small kind word, in the session's language. */
-  const KIND_KEY: Record<Kind, string> = {
+  /** The row's small kind word, in the session's language. A «crear» row
+      has none: its name already says «nueva …». */
+  const KIND_KEY: Record<Exclude<Kind, 'create'>, string> = {
     space: 'picker.kind_space',
     project: 'picker.kind_project',
     line: 'picker.kind_line',
@@ -283,6 +306,16 @@
             },
           ]
         : [];
+      // Lo que se puede crear con lo escrito; una fecha escrita es un destino,
+      // no un título.
+      const createRows: Row[] = (parsedDay ? [] : paletteCreates(query, can)).map((c) => ({
+        token: `c:${c.kind}`,
+        kind: 'create',
+        name: t(CREATE_LABEL_KEYS[c.kind], locale),
+        path: c.title ? `«${c.title}»` : '',
+        drill: null,
+        create: c,
+      }));
       const persons = people
         .filter((p) => fold(p.full_name).includes(nq) || p.slug.includes(q))
         .map((p) => personRow(p, spaceName(p.workspaceName)));
@@ -307,6 +340,8 @@
           // Last, because it is the axis that is not a level of the others.
           { key: 'person', header: t('palette.people', locale), rows: persons, note: peopleNote },
           { key: 'day', header: t('palette.day', locale), rows: dayRows },
+          // The last: what you can make, after what already exists.
+          { key: 'create', header: t('palette.create', locale), rows: createRows },
         ] as Group[]
       ).filter((g) => g.rows.length > 0 || g.note);
     }
@@ -352,7 +387,16 @@
     });
   });
 
+  /** A «crear» row does one thing, whatever the key: the palette gives way
+      to the dialog. */
+  function runCreate(r: Row) {
+    if (!r.create) return;
+    open = false;
+    onCreate(r.create);
+  }
+
   function openRow(r: Row) {
+    if (r.kind === 'create') return runCreate(r);
     // Antes de `parsePin`: `d:` no es un pin y su gramática no lo conoce.
     if (r.kind === 'day') {
       void goto(plannerDayHref('day', r.path));
@@ -505,6 +549,9 @@
         // ⇧↵ → apply the built scope (advanced; the Apply button is the
         // discoverable path, ⌘↵ being reserved for "open")
         apply();
+      } else if (flatRows[cur]?.kind === 'create') {
+        // ↵ on a «crear» row makes it; there is nothing to stage
+        runCreate(flatRows[cur]);
       } else if (flatRows[cur]) {
         // ↵ → add / remove from the scope
         toggleStage(flatRows[cur].token);
@@ -582,9 +629,11 @@
                 role="option"
                 aria-selected={gi === cur}
                 onmouseenter={() => (cur = gi)}
-                onclick={() => (r.kind === 'day' ? openRow(r) : toggleStage(r.token))}
+                onclick={() => (r.kind === 'day' || r.kind === 'create' ? openRow(r) : toggleStage(r.token))}
               >
-                {#if r.kind === 'day'}
+                {#if r.kind === 'create'}
+                  <span class="cmdk__dayglyph" aria-hidden="true">+</span>
+                {:else if r.kind === 'day'}
                   <!-- No es `ScopeGlyph`: eso dibuja SCOPES, y un día no lo es
                        (ver `Kind`). Añadirle un caso sería estirar su
                        significado para un solo llamador. -->
@@ -592,13 +641,15 @@
                 {:else}
                   <ScopeGlyph kind={r.kind} accent={accentFor(r.token)} lineKind={r.lineKind ?? ''} />
                 {/if}
-                <span class="cmdk__kind">{r.kind === 'line' ? lineKindLabel(r.lineKind ?? '', locale) : t(KIND_KEY[r.kind], locale)}</span>
+                {#if r.kind !== 'create'}
+                  <span class="cmdk__kind">{r.kind === 'line' ? lineKindLabel(r.lineKind ?? '', locale) : t(KIND_KEY[r.kind], locale)}</span>
+                {/if}
                 <span class="cmdk__name">
-                  {r.name}{#if r.path}<span class="cmdk__path"> · {r.path}</span>{/if}
+                  {r.name}{#if r.kind === 'create' && r.path}<span class="cmdk__path">&nbsp;{r.path}</span>{:else if r.path}<span class="cmdk__path"> · {r.path}</span>{/if}
                 </span>
                 {#if isStaged(r.token)}<span class="cmdk__added">✓ {t('palette.added', locale)}</span>{/if}
               </button>
-              {#if r.kind !== 'day'}
+              {#if r.kind !== 'day' && r.kind !== 'create'}
                 <button type="button" class="cmdk__open" onclick={() => openRow(r)}>
                   {t('palette.open', locale)} <span aria-hidden="true">↗</span>
                 </button>
@@ -655,8 +706,9 @@
 {/if}
 
 <style>
-  /* El glifo del día: mismo hueco y mismo peso que `ScopeGlyph`, para que la
-     fila no se descuadre; distinto símbolo, porque no es un scope. */
+  /* El glifo del día (y el «+» de crear): mismo hueco y mismo peso que
+     `ScopeGlyph`, para que la fila no se descuadre; distinto símbolo, porque
+     no es un scope. */
   .cmdk__dayglyph {
     display: inline-grid;
     place-items: center;

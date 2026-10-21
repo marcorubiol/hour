@@ -18,6 +18,7 @@
    * loaded, extra query keys to invalidate, and an onCreated hook.
    */
   import { createMutation, useQueryClient } from '@tanstack/svelte-query';
+  import { untrack } from 'svelte';
   import { mutateJSON, ApiError } from '$lib/api';
   import { addToast } from '$lib/components/Toast.svelte';
   import ScopeGlyph from '$lib/components/ScopeGlyph.svelte';
@@ -45,6 +46,8 @@
     invalidateKeys?: readonly (readonly unknown[])[];
     /** host hook after a create (e.g. the Desk out-of-scope toast) */
     onCreated?: (task: TaskItem) => void;
+    /** The title it opens with (typed in ⌘K); read once, at mount. */
+    presetTitle?: string;
   }
   let {
     locale,
@@ -54,6 +57,7 @@
     conversations = [],
     invalidateKeys = [],
     onCreated,
+    presetTitle = '',
   }: Props = $props();
 
   const queryClient = useQueryClient();
@@ -70,7 +74,7 @@
   }
 
   // Composer fields.
-  let title = $state('');
+  let title = $state(untrack(() => presetTitle));
   let note = $state('');
   let due = $state('');
   let from = $state('');
