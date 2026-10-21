@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { existsSync } from 'node:fs';
 import { loadEnvFile } from 'node:process';
+import { forgetConversationsRpc } from './forget';
 
 /**
  * ADR-106, fase 3: el hilo del equipo en la ficha de la conversación.
@@ -95,7 +96,7 @@ test.describe('el hilo del equipo de una conversación (ADR-106)', () => {
   test.afterAll(async () => {
     if (!h) return;
     if (messageId) await h.pgRpc('delete_message', limitedJwt, { p_message_id: messageId });
-    if (conversationId) await h.pgRpc('delete_conversation', adminJwt, { p_conversation_id: conversationId });
+    if (conversationId) await forgetConversationsRpc(h, adminJwt, [conversationId]);
     if (snapshot) await h.restoreProjectAccess(adminJwt, projectId, limitedId, snapshot);
   });
 

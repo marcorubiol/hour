@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { existsSync } from 'node:fs';
 import { loadEnvFile } from 'node:process';
+import { forgetConversationsRpc } from './forget';
 
 /**
  * ADR-106, fase 4 (ADR-116): «de qué se habla», hoy la vista Equipo de Conversaciones (ADR-134).
@@ -132,7 +133,7 @@ test.describe('Conversaciones › Equipo: los hilos del equipo (ADR-116, ADR-134
     for (const m of messages) await h.pgRpc('delete_message', m.jwt(), { p_message_id: m.id });
     if (perf.id) await h.pgRpc('delete_performance', adminJwt, { p_performance_id: perf.id });
     if (boloId) await h.pgRpc('delete_bolo', adminJwt, { p_bolo_id: boloId });
-    if (conversationId) await h.pgRpc('delete_conversation', adminJwt, { p_conversation_id: conversationId });
+    if (conversationId) await forgetConversationsRpc(h, adminJwt, [conversationId]);
     if (snapshot) await h.restoreProjectAccess(adminJwt, projectId, limitedId, snapshot);
   });
 

@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { existsSync } from 'node:fs';
 import { loadEnvFile } from 'node:process';
 import { waitForLoaded } from './loaded';
+import { forgetConversationsRpc } from './forget';
 
 /**
  * ADR-138 § 6, the Planner's margin (plan § 8.4, phase E3).
@@ -96,7 +97,7 @@ test.describe('el margen del Planner (ADR-138 § 6)', () => {
 
   test.afterAll(async () => {
     if (!h) return;
-    if (convId) await h.pgRpc('delete_conversation', jwt, { p_conversation_id: convId });
+    if (convId) await forgetConversationsRpc(h, jwt, [convId]);
     if (taskId) await h.pgRpc('delete_task', jwt, { p_task_id: taskId });
   });
 

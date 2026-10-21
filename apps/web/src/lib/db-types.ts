@@ -5811,6 +5811,14 @@ export type Database = {
       delete_schedule_slot: { Args: { p_slot_id: string }; Returns: undefined }
       delete_task: { Args: { p_task_id: string }; Returns: undefined }
       delete_travel_stage: { Args: { p_stage_id: string }; Returns: undefined }
+      delete_workspace_organization: {
+        Args: { p_organization_id: string }
+        Returns: undefined
+      }
+      delete_workspace_person: {
+        Args: { p_person_id: string; p_workspace_id: string }
+        Returns: undefined
+      }
       disconnect_mail_account: {
         Args: { p_account_id: string }
         Returns: undefined
