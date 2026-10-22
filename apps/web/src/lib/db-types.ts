@@ -6683,11 +6683,14 @@ export type Database = {
       preview_workspace_invitation: {
         Args: { p_token: string }
         Returns: {
+          bolo_access_last_day: string
           bolo_id: string
           bolo_label: string
+          bolo_preset: string
           email: string
           expires_at: string
           landing_performance_id: string
+          landing_performed_at: string
           project_id: string
           project_name: string
           project_role_code: string

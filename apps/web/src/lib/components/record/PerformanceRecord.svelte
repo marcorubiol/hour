@@ -62,7 +62,8 @@
   import { usePins } from '$lib/stores/pins.svelte';
   import { lensOn } from '$lib/lenses.svelte';
   import { performanceBoloQueryOptions, projectBolosQueryOptions } from '$lib/bolo-queries';
-  import { workspacesQueryOptions } from '$lib/nav-queries';
+  import { teamQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
+  import { goingPersonIds, type GoingPerson } from '$lib/bolo-access';
   import RecordHead from '$lib/components/RecordHead.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import { spaceCrumb, type Crumb } from '$lib/record-crumbs';
@@ -676,6 +677,25 @@
     return word === key ? value.replace(/_/g, ' ') : word;
   }
 
+  // Comms carril 2, fase 2: quién va (reparto y «voy»), con nombre, para
+  // que el acceso del bolo proponga invitar a quien va y no lo ve. Los
+  // nombres, del propio bundle y del equipo (la misma consulta que «quién va»).
+  const goingTeamQuery = createQuery(
+    toStore(() => teamQueryOptions(perf?.workspace_id ? [perf.workspace_id] : [])),
+  );
+  let goingPeople = $derived.by<GoingPerson[]>(() => {
+    if (!bundle || !perf) return [];
+    const names = new Map<string, string>();
+    for (const m of $goingTeamQuery.data?.items ?? []) names.set(m.person_id, m.full_name);
+    for (const c of bundle.cast_members) if (c.person) names.set(c.person.id, c.person.full_name);
+    for (const o of perf.cast_override) if (o.person) names.set(o.person.id, o.person.full_name);
+    for (const c of perf.crew_assignment) if (c.person) names.set(c.person.id, c.person.full_name);
+    return goingPersonIds(performanceRoster(bundle), perf.commitments).flatMap((id) => {
+      const name = names.get(id);
+      return name ? [{ person_id: id, name }] : [];
+    });
+  });
+
   let hasTeam = $derived(
     (bundle?.cast_members.length ?? 0) > 0 ||
       (perf?.cast_override.length ?? 0) > 0 ||
@@ -985,6 +1005,8 @@
       performanceId={perf.id}
       {workspaceSlug}
       tz={perf.venue?.timezone ?? workspaceTz ?? viewerTz}
+      workspaceTz={workspaceTz ?? viewerTz}
+      going={goingPeople}
       {locale}
     />
 

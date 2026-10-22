@@ -20,6 +20,8 @@
   import { toStore } from 'svelte/store';
   import { fetchJSON } from '$lib/api';
   import ThreadBlock from '$lib/components/ThreadBlock.svelte';
+  import BoloAccess from '$lib/components/BoloAccess.svelte';
+  import type { GoingPerson } from '$lib/bolo-access';
   import { t, type Locale } from '$lib/i18n';
   import { markReadWhenSeen, readAtOpen, scrollWhenNamed } from '$lib/thread-reading.svelte';
   import {
@@ -39,10 +41,15 @@
     workspaceSlug: string;
     /** La zona de la sala (o la del espacio): la hora de cada función. */
     tz: string;
+    /** La zona del espacio: el día en que acaba un acceso al bolo. */
+    workspaceTz?: string;
+    /** Quién va a esta función (reparto y «voy»): el acceso propone invitar
+        a quien va y no lo ve (comms carril 2, fase 2). */
+    going?: readonly GoingPerson[];
     locale: Locale;
   }
 
-  let { performanceId, workspaceSlug, tz, locale }: Props = $props();
+  let { performanceId, workspaceSlug, tz, workspaceTz, going = [], locale }: Props = $props();
 
   const queryClient = useQueryClient();
   let queryKey = $derived(['bolo-board', performanceId] as const);
@@ -132,6 +139,9 @@
           {/each}
         </ul>
       {/if}
+    {/if}
+    {#if board?.bolo}
+      <BoloAccess boloId={board.bolo.id} {going} tz={workspaceTz ?? tz} {locale} />
     {/if}
   </header>
   <FirstTimeNote event="first_board" when={Boolean(board?.bolo)} />

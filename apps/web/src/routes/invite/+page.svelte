@@ -2,10 +2,11 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import BrandMark from '$lib/components/BrandMark.svelte';
-  import { ApiError, mutateJSON } from '$lib/api';
+  import { ApiError, fetchJSON, mutateJSON } from '$lib/api';
   import { ensureSession } from '$lib/session.svelte';
   import { spaceName } from '$lib/utils/identity';
   import { appLocale, appLocaleTag, t } from '$lib/i18n';
+  import { dayMonthLong } from '$lib/datetime';
 
   const locale = appLocale();
   const MEMBERSHIP_ROLES = new Set(['owner', 'admin', 'member', 'viewer', 'guest']);
@@ -20,13 +21,26 @@
     project_name: string | null;
     project_role_code: string | null;
     expires_at: string;
+    /** Invitación de bolo (20261022100000): sala · ciudad, nunca dinero. */
+    bolo_id?: string | null;
+    bolo_label?: string | null;
+    /** La función donde aterriza: la próxima viva, o la última si ya pasaron. */
+    landing_performance_id?: string | null;
+    /** 20261022150100: el día de esa función, el paquete y el último día de acceso. */
+    landing_performed_at?: string | null;
+    bolo_preset?: 'minim' | 'equip' | null;
+    bolo_access_last_day?: string | null;
   };
+
+  type LandingPerformance = { performance: { slug: string | null; performed_at: string } };
 
   let token = $state('');
   let invitation = $state<Invitation | null>(null);
   let loading = $state(true);
   let accepting = $state(false);
   let errorMessage = $state('');
+  let landing = $state<LandingPerformance['performance'] | null>(null);
+  let isBolo = $derived(Boolean(invitation?.bolo_id));
 
   function roleLabel(role: string): string {
     if (MEMBERSHIP_ROLES.has(role)) return t(`invite.role_${role}`, locale);
@@ -67,6 +81,24 @@
     }
   });
 
+  /**
+   * Una invitación de bolo aterriza en su función, en el tablón: antes de
+   * aceptar no se puede leer (por eso la vista previa solo da el id), y
+   * después la ficha se lee por la cadena. Si no se encuentra, el espacio.
+   */
+  async function landingHref(workspaceSlug: string): Promise<string> {
+    const id = invitation?.landing_performance_id;
+    if (!id) return `/h/${workspaceSlug}`;
+    try {
+      const found = await fetchJSON<LandingPerformance>(`/api/performances/${encodeURIComponent(id)}`);
+      landing = found?.performance ?? null;
+      if (landing?.slug) return `/h/${workspaceSlug}/performance/${encodeURIComponent(landing.slug)}#board`;
+    } catch {
+      // Sin la ficha, el espacio: la invitación ya está aceptada.
+    }
+    return `/h/${workspaceSlug}`;
+  }
+
   async function acceptInvitation() {
     if (!invitation || accepting) return;
     accepting = true;
@@ -80,7 +112,7 @@
       const accepted = response?.invitation;
       if (!accepted) throw new Error(t('invite.err_no_workspace', locale));
       history.replaceState(null, '', '/invite');
-      await goto(`/h/${accepted.workspace_slug}`, { replaceState: true });
+      await goto(await landingHref(accepted.workspace_slug), { replaceState: true });
     } catch (error) {
       errorMessage =
         error instanceof ApiError && error.status === 404
@@ -118,6 +150,34 @@
           <dt>{t('invite.workspace_role', locale)}</dt>
           <dd>{roleLabel(invitation.role)}</dd>
         </div>
+        {#if isBolo}
+          <div>
+            <dt>{t('invite.assigned_bolo', locale)}</dt>
+            <dd>{invitation.bolo_label ?? t('invite.bolo_unnamed', locale)}</dd>
+          </div>
+          <div>
+            <dt>{t('invite.bolo_landing', locale)}</dt>
+            <dd>
+              {invitation.landing_performed_at
+                ? t('invite.bolo_landing_day', locale, { day: dayMonthLong(invitation.landing_performed_at, appLocaleTag()) })
+                : t('invite.bolo_landing_space', locale)}
+            </dd>
+          </div>
+          {#if invitation.bolo_preset}
+            <div>
+              <dt>{t('bolo_access.field_preset', locale)}</dt>
+              <dd>{t(`bolo_access.preset_${invitation.bolo_preset}`, locale)}</dd>
+            </div>
+          {/if}
+          <div>
+            <dt>{t('invite.bolo_access_until', locale)}</dt>
+            <dd>
+              {invitation.bolo_access_last_day
+                ? dayMonthLong(invitation.bolo_access_last_day, appLocaleTag())
+                : t('invite.bolo_access_open', locale)}
+            </dd>
+          </div>
+        {/if}
         {#if invitation.project_name}
           <div>
             <dt>{t('invite.assigned_project', locale)}</dt>
@@ -129,7 +189,7 @@
           </div>
         {/if}
         <div>
-          <dt>{t('invite.valid_until', locale)}</dt>
+          <dt>{isBolo ? t('invite.link_valid_until', locale) : t('invite.valid_until', locale)}</dt>
           <dd>{new Date(invitation.expires_at).toLocaleDateString(appLocaleTag())}</dd>
         </div>
       </dl>
@@ -145,7 +205,7 @@
         <span aria-hidden="true">→</span>
       </button>
       <p class="invitation-card__fineprint">
-        {t('invite.fineprint', locale)}
+        {isBolo ? t('invite.fineprint_bolo', locale) : t('invite.fineprint', locale)}
       </p>
     {:else}
       <h1>{t('invite.unavailable_a', locale)} <em>{t('invite.unavailable_b', locale)}</em></h1>

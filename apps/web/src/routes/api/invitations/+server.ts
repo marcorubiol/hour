@@ -19,6 +19,13 @@ interface InvitationPreview {
   project_name: string | null;
   project_role_code: string | null;
   expires_at: string;
+  /** Invitación de bolo (20261022100000 y 20261022150100); la fila pasa tal cual. */
+  bolo_id?: string | null;
+  bolo_label?: string | null;
+  landing_performance_id?: string | null;
+  landing_performed_at?: string | null;
+  bolo_preset?: 'minim' | 'equip' | null;
+  bolo_access_last_day?: string | null;
 }
 
 async function invoke(
