@@ -48,6 +48,7 @@ interface Access {
   members: {
     membership_id: string;
     user_id: string;
+    person_id?: string | null;
     preset: string | null;
     ends_at: string | null;
     expires_with_bolo: boolean;
@@ -238,6 +239,12 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: el equipo de una noche 
       );
       expect(preview.status, preview.error).toBe(200);
       expect(one(preview.data)).toMatchObject({ bolo_id: boloA, landing_performance_id: perfA1, role: 'guest', project_id: null });
+      // 20261022150100: la página de aceptar dice el día de la función y el último día de acceso.
+      expect(one(preview.data)).toMatchObject({
+        landing_performed_at: '2027-04-10',
+        bolo_preset: 'equip',
+        bolo_access_last_day: '2027-04-12',
+      });
 
       const accepted = await pgRpc<{ role: string }[]>('accept_workspace_invitation', limitedJwt, { p_token: inv.token });
       expect(accepted.status, accepted.error).toBe(200);
@@ -306,6 +313,34 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: el equipo de una noche 
     expect(bad.status).toBe(400);
     const missing = await pgRpc('create_bolo_invitation', adminJwt, { p_bolo_id: NOWHERE, p_email: 'a@example.test' });
     expect(missing.status).toBe(403);
+  });
+
+  // 20261022150100: lo que la pantalla de acceso lee además.
+  test('bolo_access dice quién lee el tablón y quién puede ampliar la fecha', async () => {
+    const admin = await pgRpc<Access & { can_extend: boolean; readers: string[] }>('bolo_access', adminJwt, {
+      p_bolo_id: boloA,
+    });
+    expect(admin.status, admin.error).toBe(200);
+    expect(admin.data!.can_extend).toBe(true);
+    expect(Array.isArray(admin.data!.readers)).toBe(true);
+
+    await grant(boloA, 'minim');
+    try {
+      const mine = await pgRpc<Access & { can_extend: boolean; readers: string[] }>('bolo_access', limitedJwt, {
+        p_bolo_id: boloA,
+      });
+      expect(mine.status, mine.error).toBe(200);
+      // Con Mínim en el bolo invita (Mínim) pero no mueve fechas.
+      expect(mine.data!.can_extend).toBe(false);
+      expect(Array.isArray(mine.data!.readers)).toBe(true);
+      const me = mine.data!.members.find((m) => m.user_id === limitedUserId)!;
+      expect(me).toHaveProperty('person_id');
+      // Lo que lee el admin incluye a quien acaba de entrar, si su cuenta es una persona.
+      const after = await pgRpc<{ readers: string[] }>('bolo_access', adminJwt, { p_bolo_id: boloA });
+      if (me.person_id) expect(after.data!.readers).toContain(me.person_id);
+    } finally {
+      await revokeBoloMemberships();
+    }
   });
 
   test('membership_facet lleva id', async () => {
