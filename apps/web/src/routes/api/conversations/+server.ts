@@ -54,6 +54,7 @@ import { ORDERS, sortByOrder, type Orden } from '$lib/conversation-order';
 import { RELATIONS } from '$lib/conversation-relation';
 import { json } from '$lib/server/http';
 import { TAG_KEY_RE, filterByChip } from '$lib/conversation-tags';
+import { MATCHING_MAX } from '$lib/conversation-bulk';
 
 const QuerySchema = v.object({
   status: v.optional(
@@ -81,6 +82,9 @@ const QuerySchema = v.object({
   // Plan de la lista § 4: the lens's order.
   orden: v.optional(v.picklist(ORDERS)),
   line_ids: v.optional(v.string()),
+  // «Seleccionar las N que coinciden» (plan de la lista § 6.2): the ids of the
+  // whole filter, in its order, without reading the rows (at most MATCHING_MAX).
+  ids_only: v.optional(v.literal('1')),
   limit: v.optional(
     v.pipe(
       v.string(),
@@ -135,8 +139,9 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       400,
     );
   }
-  const { status, project_ids, workspace_ids, line_id, q, season, limit, offset, turno, temp, temporada, linea, line_ids, envio, r, relacion, etiqueta, orden } =
+  const { status, project_ids, workspace_ids, line_id, q, season, limit, offset, turno, temp, temporada, linea, line_ids, envio, r, relacion, etiqueta, orden, ids_only } =
     parsed.output;
+  const idsOnly = ids_only === '1';
 
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const parseIds = (raw?: string) =>
@@ -195,6 +200,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
           orden: orden ?? 'pide',
           limit,
           offset,
+          idsOnly,
         }),
       );
     } catch (err) {
@@ -203,6 +209,20 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   }
 
   search.set('order', 'next_action_at.asc.nullslast,updated_at.desc');
+  if (idsOnly) {
+    search.set('select', 'id,project_id');
+    for (const k of [...search.keys()]) if (k.startsWith('last_turn.') || k.startsWith('last_in.')) search.delete(k);
+    search.set('limit', String(MATCHING_MAX));
+    try {
+      const { data, total } = await pgGet<{ id: string; project_id: string }>(env, qTrim ? 'rpc/conversation_search' : 'conversation', jwt, {
+        search,
+        exactCount: true,
+      });
+      return json({ total: total ?? data.length, items: data.map((r) => ({ id: r.id, project_id: r.project_id })) });
+    } catch (err) {
+      return pgErrorResponse(err, { route: 'GET /api/conversations', requestId: locals.requestId }, { passUpstream: [401, 403] });
+    }
+  }
   search.set('limit', String(limit));
   search.set('offset', String(offset));
 
@@ -254,6 +274,7 @@ async function lensPage(
     orden: Orden;
     limit: number;
     offset: number;
+    idsOnly?: boolean;
   },
 ) {
   const now = new Date();
@@ -261,12 +282,14 @@ async function lensPage(
   const scope = { projectIds: o.projectIds, workspaceIds: o.workspaceIds };
   const feed = await loadFeedConversations(env, jwt, { ...scope, tag: o.etiqueta ?? null, q: o.q || null }, now);
   const unread = new Map(feed.rows.map((r) => [r.id, r.unread_count]));
+  const projectOf = new Map(feed.rows.map((r) => [r.id, r.project_id]));
   const byBlock = Boolean(f.turno || f.temp);
   const needScope = Boolean(f.relacion || f.temporada || f.turno || f.temp || o.status) || feed.more;
 
   let ids: string[];
   if (needScope) {
     const rows = await loadOverviewRows(env, jwt, { ...scope, status: o.status });
+    for (const r of rows) projectOf.set(r.id, r.project_id);
     let matched = applyListFilter(o.etiqueta ? filterByChip(rows, o.etiqueta) : rows, f, now, o.lineIds);
     if (f.envio && f.r) {
       const picked = await mailoutPickIds(env, jwt, f.envio, f.r, rows);
@@ -301,6 +324,9 @@ async function lensPage(
     ids = sortByOrder(rows.map(feedOrderKey), o.orden).map((k) => k.id);
   }
 
+  if (o.idsOnly) {
+    return { total: ids.length, items: ids.slice(0, MATCHING_MAX).map((id) => ({ id, project_id: projectOf.get(id)! })) };
+  }
   const items = await readPage(env, jwt, select, ids.slice(o.offset, o.offset + o.limit));
   return {
     total: ids.length,

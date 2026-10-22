@@ -8,9 +8,7 @@
    * trigger's name starts with the relation: a screen reader hears «In talks,
    * change…», not only the action.
    */
-  import Button from '$lib/components/Button.svelte';
-  import Dialog from '$lib/components/Dialog.svelte';
-  import Input from '$lib/components/Input.svelte';
+  import NotNowDialog from '$lib/components/NotNowDialog.svelte';
   import Menu from '$lib/components/Menu.svelte';
   import { dayMonth } from '$lib/datetime';
   import { t, type Locale } from '$lib/i18n';
@@ -34,7 +32,6 @@
   let { relation, notNowUntil = null, locale, onnotnow, onlog, direction = 'down', look = 'badge' }: Props = $props();
 
   let dialogOpen = $state(false);
-  let until = $state('');
 
   let label = $derived(
     relation === 'not_now' && notNowUntil
@@ -43,12 +40,7 @@
   );
 
   function openDialog() {
-    until = '';
     dialogOpen = true;
-  }
-  function save() {
-    onnotnow({ until: until || null });
-    dialogOpen = false;
   }
 </script>
 
@@ -92,14 +84,7 @@
   {/snippet}
 </Menu>
 
-<Dialog bind:open={dialogOpen} title={t('conversations.relation_not_now', locale)} size="s">
-  <p class="not-now-hint">{t('conversations.not_now_hint', locale)}</p>
-  <Input label={t('conversations.not_now_back', locale)} type="date" bind:value={until} />
-  {#snippet actions()}
-    <Button variant="quiet" onclick={() => (dialogOpen = false)}>{t('create.cancel', locale)}</Button>
-    <Button onclick={save}>{t('blackout.save', locale)}</Button>
-  {/snippet}
-</Dialog>
+<NotNowDialog bind:open={dialogOpen} {locale} onsave={(until) => onnotnow({ until })} />
 
 <style>
   @layer components {
@@ -107,10 +92,6 @@
       block-size: var(--line-hairline);
       margin-block: var(--space-2xs);
       background: var(--border-color);
-    }
-    .not-now-hint {
-      font-size: var(--text-s);
-      color: var(--text-muted);
     }
   }
 </style>
