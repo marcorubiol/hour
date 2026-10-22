@@ -16,6 +16,7 @@
 import { dueReason, turnOf, type TurnEvent } from './conversation-overview';
 import { comparePide, type OrderKey } from './conversation-order';
 import type { FeedThread } from './threads';
+import type { Relation } from './conversation-relation';
 
 /** Una conversación de la lista: con quién, etiquetas, no leídos y lo que lee el turno. */
 export interface FeedConversation {
@@ -29,6 +30,12 @@ export interface FeedConversation {
   title: string | null;
   /** El contacto principal, si no es el título. */
   person: string | null;
+  /** Su papel en la conversación (`conversation_contact.role`); desde 20261022200000. */
+  contact_role?: string | null;
+  /** La ciudad del contacto, si no la de la organización; desde 20261022200000. */
+  city?: string | null;
+  /** La relación derivada (`private.relation_of`, la de `relationOf`); desde 20261022200000. */
+  relation?: Relation;
   /** Sus claves; vacío se lee Difusión (`tagKeysOf`). */
   tags: string[];
   /** Registro + su hilo del equipo. */

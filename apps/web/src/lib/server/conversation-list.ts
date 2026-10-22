@@ -1,52 +1,81 @@
 /**
  * Las lecturas de la lista de Conversaciones (plan `build/plans/2026-10-22-
- * conversations-list.md`, fase 1, sin migración):
+ * conversations-list.md`):
  *
- *   · el orden y los no leídos salen de `conversation_feed`, la misma RPC que
- *     «Todas» (una regla para toda la lente, § 4), con la etiqueta del chip y la
- *     búsqueda. La RPC da como mucho 500 filas: si hay más, quien llama lee el
- *     alcance entero con `loadOverviewRows` y ordena con las mismas claves;
+ *   · la página sale de `conversation_feed` en modo lista (fase 3, migración
+ *     20261022200000): alcance, etiqueta del chip, búsqueda, filtros (relación,
+ *     línea, temporada, turno, temperatura, envío), orden (§ 4; los filtros de
+ *     bloque en el de su bloque), total y ventana, en una llamada. Las reglas
+ *     son las de `$lib/conversation-overview` escritas en SQL; el test RLS
+ *     `conversation-feed-list.test.ts` compara cada filtro con la lectura del
+ *     panel (`loadOverviewRows`), que queda solo para el panel;
  *   · lo que la fila enseña además (§ 3 y § 8): sus bolos sin dinero
  *     (`conversations_bolos`, solo con `read:performance`) y el último envío que
  *     recibió, una lectura por página, no por fila.
  */
 
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
-import { conversationView, type ConversationFeedResponse, type FeedConversationView } from '$lib/conversation-feed';
+import type { FeedConversation } from '$lib/conversation-feed';
 import type { ConversationBolo } from '$lib/conversation-relation';
-import type { RowMailout } from '$lib/conversation-overview';
+import type { ListFilter, RowMailout } from '$lib/conversation-overview';
+import type { Orden } from '$lib/conversation-order';
+import type { ConversationStatus } from '$lib/conversation';
 import { loadConversationBolos } from '$lib/server/conversation-overview';
 
-/** Lo que la RPC devuelve por llamada. */
-export const FEED_MAX = 500;
-
-export interface FeedOrderQuery {
+export interface ListPageQuery {
   projectIds: string[];
   workspaceIds: string[];
-  /** La clave del chip; sin ella, todas (los hilos se descartan). */
+  /** La clave del chip; sin ella, todas las conversaciones (sin hilos). */
   tag: string | null;
   q: string | null;
+  status?: ConversationStatus;
+  filter: ListFilter;
+  /** Las líneas fijadas en la barra: con `filter.temporada`, solo esas. */
+  lineIds: string[];
+  orden: Orden;
+  limit: number;
+  offset: number;
+  /** «Seleccionar las N que coinciden»: solo ids, hasta `MATCHING_MAX`. */
+  idsOnly?: boolean;
 }
 
-/** Las conversaciones del alcance en el orden de la RPC, con su turno y sus no leídos. */
-export async function loadFeedConversations(
-  env: SupabaseEnv,
-  jwt: string,
-  query: FeedOrderQuery,
-  now: Date,
-): Promise<{ rows: FeedConversationView[]; more: boolean }> {
-  const { data } = await pgPostRpc<ConversationFeedResponse>(env, 'conversation_feed', jwt, {
+/** Lo que la RPC devuelve en modo lista; con `idsOnly`, cada fila es solo `id` y `project_id`. */
+export interface ListPage {
+  total: number;
+  more: boolean;
+  items: (Pick<FeedConversation, 'id' | 'project_id'> & Partial<FeedConversation>)[];
+}
+
+/** Los parámetros de `conversation_feed` en modo lista; lo que no se pide no viaja. */
+export function listPageArgs(query: ListPageQuery): Record<string, unknown> {
+  const f = query.filter;
+  const args: Record<string, unknown> = {
     p_project_ids: query.projectIds.length > 0 ? query.projectIds : null,
     p_workspace_ids: query.workspaceIds.length > 0 ? query.workspaceIds : null,
     p_tag: query.tag,
     p_q: query.q,
-    p_limit: FEED_MAX,
-  });
-  const res = data[0] ?? { items: [], more: false };
-  return {
-    rows: res.items.flatMap((r) => (r.kind === 'conversation' ? [conversationView(r, now)] : [])),
-    more: res.more,
+    p_list: true,
+    p_order: query.orden,
+    p_limit: query.limit,
+    p_offset: query.offset,
+    p_status: query.status ?? null,
+    p_relation: f.relacion ?? null,
+    p_line: f.linea ?? null,
+    p_season: Boolean(f.temporada),
+    p_season_line_ids: f.temporada && query.lineIds.length > 0 ? query.lineIds : null,
+    p_turn: f.turno ?? null,
+    p_temp: f.temp ?? null,
+    p_mailout_id: f.envio ?? null,
+    p_mailout_pick: f.envio ? (f.r ?? 'todos') : null,
+    p_ids_only: Boolean(query.idsOnly),
   };
+  return Object.fromEntries(Object.entries(args).filter(([, v]) => v !== null && v !== false));
+}
+
+/** Una página de la lista (o sus ids) en una llamada. */
+export async function loadListPage(env: SupabaseEnv, jwt: string, query: ListPageQuery): Promise<ListPage> {
+  const { data } = await pgPostRpc<ListPage>(env, 'conversation_feed', jwt, listPageArgs(query));
+  return data[0] ?? { total: 0, more: false, items: [] };
 }
 
 /** Los estados de una destinataria a la que el envío le salió. */
