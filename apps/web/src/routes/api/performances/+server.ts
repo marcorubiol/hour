@@ -124,6 +124,7 @@ type PerformanceItem = {
   venue_name: string | null;
   city: string | null;
   country: string | null;
+  workspace_id: string;
   project_id: string;
   line_id: string | null;
   conversation_id: string | null;
@@ -192,7 +193,10 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
     'select',
     [
       'id,slug,performed_at,status,venue_id,venue_name,city,country',
-      'project_id,line_id,conversation_id',
+      // The row's own space: the project embed is null for whoever reads the
+      // performance through a bolo (a guest, ADR-100 § 1, plan 2026-10-22
+      // § 3.4), and the slip, the scope and the clock still need its space.
+      'workspace_id,project_id,line_id,conversation_id',
       // ADR-084 §1 — sin esto el mes no puede saber que tres noches son una
       // tanda. NO es dinero: es una etiqueta de agrupación, así que no toca la
       // frontera de `read:money` (a diferencia de `bolo_id`, que sigue fuera).

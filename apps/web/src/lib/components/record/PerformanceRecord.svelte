@@ -67,6 +67,7 @@
   import RecordHead from '$lib/components/RecordHead.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import { spaceCrumb, type Crumb } from '$lib/record-crumbs';
+  import { isGuestIn } from '$lib/workspace-role';
   import Fold from '$lib/components/Fold.svelte';
   import MissingBand, { type MissingItem } from '$lib/components/MissingBand.svelte';
   import { hasJsonContent } from '$lib/components/JsonKV.svelte';
@@ -380,6 +381,21 @@
   let bundle = $derived($query.data ?? null);
   let perf = $derived(bundle?.performance ?? null);
 
+  // WHO WRITES HERE (`edit:performance` on the project): the running order's
+  // own answer (`/api/schedule`), under its key, so the two share one
+  // request. Only an explicit «no» takes the doors away (as the lenses and
+  // access do): a guest of a bolo reads the performance, its board and its
+  // road sheet, and is offered no editor that would answer 403.
+  const editQuery = createQuery(
+    toStore(() => ({
+      queryKey: ['schedule', 'performance', perf?.id ?? ''] as const,
+      enabled: Boolean(perf?.id),
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchJSON<{ slots: unknown[]; can_edit: boolean }>(`/api/schedule/performance/${perf!.id}`, signal),
+    })),
+  );
+  let canEdit = $derived($editQuery.data?.can_edit !== false);
+
   // ADR-087 · § 36 — DE QUÉ BOLO CUELGA. `bolo_id` no viaja en el bundle (es
   // dinero, fuera del SELECT por columnas), así que se lee aparte por la
   // puerta de `read:money`. Sin fila, la ficha no dice nada del trato ni
@@ -424,7 +440,12 @@
   // Address: Space › Project › [Line ›] Función. The title is the venue (a
   // performance has no name of its own), so the address ends with the kind.
   let crumbs = $derived.by<Crumb[]>(() => {
-    const out: Crumb[] = [spaceCrumb(activeWorkspaceName, workspaceSlug)];
+    // A guest of the space (here through a bolo) has no portada of it to go
+    // back to: the space is named, not linked.
+    const space = spaceCrumb(activeWorkspaceName, workspaceSlug);
+    const out: Crumb[] = [
+      isGuestIn($wsQuery.data?.items.find((w) => w.slug === workspaceSlug)) ? { ...space, href: undefined } : space,
+    ];
     if (perf?.project) {
       out.push({ label: perf.project.name, href: `/h/${workspaceSlug}/project/${perf.project.slug}/` });
       if (perf.line) {
@@ -851,50 +872,64 @@
           ><a class="link-arrow" href={`/h/${workspaceSlug}/performance/${slug}/roadsheet`}>{t('roadsheet.open', locale)}</a
           ><ConceptHint concept="roadsheet" /></span
         >
-        <Button variant="secondary" size="xs" onclick={openEdit}>{t('perf.edit_details', locale)}</Button>
+        {#if canEdit}<Button variant="secondary" size="xs" onclick={openEdit}>{t('perf.edit_details', locale)}</Button>{/if}
       {/snippet}
       <!-- Los hechos, cada uno su editor (ADR-139 p2): el estado como palabra
            mono con su menú, el cuándo y el dónde abren los datos, el bolo se
            elige en sitio. La sala no: es el título. -->
       {#snippet facts()}
-        <Menu
-          label={t('perf.status_menu', locale, { status: performanceStatusLabel(perf!.status, locale) })}
-          triggerClass="fact-word"
-          triggerAttrs={{ 'data-family': performanceStatusFamily(perf!.status), 'data-testid': 'perf-status' }}
-        >
-          {#snippet trigger()}{performanceStatusLabel(perf!.status, locale)}<span class="status-caret" aria-hidden="true">▾</span>{/snippet}
-          {#snippet children({ close })}
-            <!-- «Facturado» y «cobrado» son del bolo: se leen en el trigger si
-                 la función ya los tiene, no se ofrecen (Marco, 2026-10-20). -->
-            {#each PERFORMANCE_MENU_STATUSES as s (s)}
-              <li role="none">
-                <button
-                  type="button"
-                  role="menuitem"
-                  class="menu__item{s === perf!.status ? ' menu__item--active' : ''}"
-                  onclick={() => {
-                    close();
-                    changeStatus(s);
-                  }}
-                >
-                  {performanceStatusLabel(s, locale)}
-                </button>
-              </li>
-            {/each}
-          {/snippet}
-        </Menu>
-        <span
-          ><button type="button" class="fact-act" aria-label={t('record.edit_when', locale)} onclick={openEdit}
-            >{dayLabel(perf!.performed_at, 'short')}</button
-          ></span
-        >
-        {#if startTime}<span class="perf__time">{startTime}</span>{/if}
-        {#if placeLine}
+        {#if canEdit}
+          <Menu
+            label={t('perf.status_menu', locale, { status: performanceStatusLabel(perf!.status, locale) })}
+            triggerClass="fact-word"
+            triggerAttrs={{ 'data-family': performanceStatusFamily(perf!.status), 'data-testid': 'perf-status' }}
+          >
+            {#snippet trigger()}{performanceStatusLabel(perf!.status, locale)}<span class="status-caret" aria-hidden="true">▾</span>{/snippet}
+            {#snippet children({ close })}
+              <!-- «Facturado» y «cobrado» son del bolo: se leen en el trigger si
+                   la función ya los tiene, no se ofrecen (Marco, 2026-10-20). -->
+              {#each PERFORMANCE_MENU_STATUSES as s (s)}
+                <li role="none">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    class="menu__item{s === perf!.status ? ' menu__item--active' : ''}"
+                    onclick={() => {
+                      close();
+                      changeStatus(s);
+                    }}
+                  >
+                    {performanceStatusLabel(s, locale)}
+                  </button>
+                </li>
+              {/each}
+            {/snippet}
+          </Menu>
+        {:else}
+          <span class="fact-word" data-family={performanceStatusFamily(perf!.status)} data-testid="perf-status"
+            >{performanceStatusLabel(perf!.status, locale)}</span
+          >
+        {/if}
+        {#if canEdit}
           <span
-            ><button type="button" class="fact-act" aria-label={t('record.edit_where', locale)} onclick={openEdit}
-              >{placeLine}</button
+            ><button type="button" class="fact-act" aria-label={t('record.edit_when', locale)} onclick={openEdit}
+              >{dayLabel(perf!.performed_at, 'short')}</button
             ></span
           >
+        {:else}
+          <span>{dayLabel(perf!.performed_at, 'short')}</span>
+        {/if}
+        {#if startTime}<span class="perf__time">{startTime}</span>{/if}
+        {#if placeLine}
+          {#if canEdit}
+            <span
+              ><button type="button" class="fact-act" aria-label={t('record.edit_where', locale)} onclick={openEdit}
+                >{placeLine}</button
+              ></span
+            >
+          {:else}
+            <span>{placeLine}</span>
+          {/if}
         {/if}
         {#if boloReadable && currentBolo && perf!.project}
           <span class="perf__bolo-fact">
@@ -936,57 +971,63 @@
         {/if}
       {/snippet}
       {#snippet band()}
-        <MissingBand items={missingItems} {locale} />
+        <!-- «Falta» is a list of what to do here: only for whoever can. -->
+        <MissingBand items={canEdit ? missingItems : []} {locale} />
       {/snippet}
     </RecordHead>
 
     <!-- ADR-103: «quién va», con el reparto al lado. Sube: es lo que se
          decide (ADR-139 p2); `#who-goes` es donde cae la línea de choques
          del Día (uso #12) y el «apuntar» de «Falta». -->
-    <section class="perf__section" id="who-goes">
-      <WhoGoes
-        target="performance"
-        id={perf.id}
-        projectId={bundle!.performance.project?.id ?? null}
-        workspaceId={perf.workspace_id}
-        commitments={perf.commitments}
-        roster={performanceRoster(bundle!)}
-        showRoster={false}
-        {locale}
-      />
-      {#if hasTeam}
-        <ul class="perf__people" role="list" aria-label={t('perf.team', locale)}>
-          {#each bundle!.cast_members as m (m.id)}
-            <li>
-              <span class="perf__person-role">{t('perf.role_cast', locale)} · {m.role}</span>
-              <span class="perf__person-name">{m.person?.full_name ?? '—'}</span>
-            </li>
-          {/each}
-          {#each perf.cast_override as o (o.id)}
-            <li>
-              <span class="perf__person-role">{t('perf.role_cast', locale)} · {o.role}</span>
-              <span class="perf__person-name">
-                {o.person?.full_name ?? '—'}
-                {#if o.replaces_person}
-                  <span class="perf__person-note">
-                    {t('perf.replaces', locale, { name: o.replaces_person.full_name })}{#if o.reason} · {o.reason}{/if}
-                  </span>
-                {/if}
-              </span>
-            </li>
-          {/each}
-          {#each perf.crew_assignment as c (c.id)}
-            <li>
-              <span class="perf__person-role">{t('perf.role_crew', locale)} · {c.role}</span>
-              <span class="perf__person-name">
-                {c.person?.full_name ?? '—'}
-                {#if c.notes}<span class="perf__person-note">{c.notes}</span>{/if}
-              </span>
-            </li>
-          {/each}
-        </ul>
-      {/if}
-    </section>
+    <!-- Read-only and empty (a guest of a bolo, nobody said anything yet):
+         nothing to read and nothing to do, so no block. -->
+    {#if canEdit || hasTeam || (perf.commitments?.length ?? 0) > 0}
+      <section class="perf__section" id="who-goes">
+        <WhoGoes
+          target="performance"
+          id={perf.id}
+          projectId={bundle!.performance.project?.id ?? null}
+          workspaceId={perf.workspace_id}
+          commitments={perf.commitments}
+          roster={performanceRoster(bundle!)}
+          showRoster={false}
+          editable={canEdit}
+          {locale}
+        />
+        {#if hasTeam}
+          <ul class="perf__people" role="list" aria-label={t('perf.team', locale)}>
+            {#each bundle!.cast_members as m (m.id)}
+              <li>
+                <span class="perf__person-role">{t('perf.role_cast', locale)} · {m.role}</span>
+                <span class="perf__person-name">{m.person?.full_name ?? '—'}</span>
+              </li>
+            {/each}
+            {#each perf.cast_override as o (o.id)}
+              <li>
+                <span class="perf__person-role">{t('perf.role_cast', locale)} · {o.role}</span>
+                <span class="perf__person-name">
+                  {o.person?.full_name ?? '—'}
+                  {#if o.replaces_person}
+                    <span class="perf__person-note">
+                      {t('perf.replaces', locale, { name: o.replaces_person.full_name })}{#if o.reason} · {o.reason}{/if}
+                    </span>
+                  {/if}
+                </span>
+              </li>
+            {/each}
+            {#each perf.crew_assignment as c (c.id)}
+              <li>
+                <span class="perf__person-role">{t('perf.role_crew', locale)} · {c.role}</span>
+                <span class="perf__person-name">
+                  {c.person?.full_name ?? '—'}
+                  {#if c.notes}<span class="perf__person-note">{c.notes}</span>{/if}
+                </span>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </section>
+    {/if}
 
     <!-- ADR-090 P3: the same running order as the Planner's day, in place
          of the fixed five. One way to write an hour in the whole app. -->
@@ -1010,15 +1051,21 @@
       {locale}
     />
 
-    <section class="perf__section" aria-label={t('perf.notes', locale)}>
-      <BlockHead title={t('perf.notes', locale)} />
-      <YNotes
-        targetTable="performance"
-        targetId={perf.id}
-        placeholder={t('perf.notes_placeholder', locale)}
-        {locale}
-      />
-    </section>
+    <!-- The notes are a live doc only an editor opens (`lib/do/auth.ts`,
+         `edit:performance`): whoever cannot write them cannot read them
+         either, so they are not drawn (a guest of a bolo: their board is
+         the place to talk). -->
+    {#if canEdit}
+      <section class="perf__section" aria-label={t('perf.notes', locale)}>
+        <BlockHead title={t('perf.notes', locale)} />
+        <YNotes
+          targetTable="performance"
+          targetId={perf.id}
+          placeholder={t('perf.notes_placeholder', locale)}
+          {locale}
+        />
+      </section>
+    {/if}
 
     <!-- Lo de consulta, plegado (ADR-139 p2): la lista entera de la
          preparación (lo que falta ya sube a «Falta»), la sala por dentro,
@@ -1035,7 +1082,7 @@
               <Checkbox
                 label={t(readinessLabelKey(key), locale)}
                 checked={on}
-                disabled={$patchMutation.isPending}
+                disabled={!canEdit || $patchMutation.isPending}
                 onchange={() => toggleReady(key)}
               />
             </li>
@@ -1055,7 +1102,7 @@
         fallbackTz={workspaceTz}
         withSchedule={false}
         {locale}
-        {saveJson}
+        saveJson={canEdit ? saveJson : undefined}
       />
 
       {#if perf.date.length > 0}

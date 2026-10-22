@@ -23,7 +23,8 @@
   import { createQuery } from '@tanstack/svelte-query';
   import { fetchJSON } from '$lib/api';
   import { t, appLocale } from '$lib/i18n';
-  import { type SectionId, sectionFrom } from '$lib/components/SettingsNav.svelte';
+  import { type SectionId, offeredSections, sectionFrom } from '$lib/components/SettingsNav.svelte';
+  import type { NavWorkspace } from '$lib/nav';
   import ProfileSection from '$lib/components/settings/ProfileSection.svelte';
   import WorkspacesSection from '$lib/components/settings/WorkspacesSection.svelte';
   import PrivacySection from '$lib/components/settings/PrivacySection.svelte';
@@ -36,9 +37,6 @@
   const locale = appLocale();
 
   let workspaceSlug = $derived(page.params.workspace ?? '');
-  let active = $derived<SectionId>(
-    sectionFrom(page.url.searchParams.get('section')),
-  );
 
   // ─── workspaces & projects ────────────────────────────────────────────
   type Workspace = {
@@ -46,6 +44,7 @@
     slug: string;
     name: string;
     kind: 'personal' | 'team';
+    my_role?: NavWorkspace['my_role'];
   };
   type Project = {
     id: string;
@@ -70,6 +69,11 @@
   let workspaces = $derived($workspacesQuery.data?.items ?? []);
   let projects = $derived($projectsQuery.data?.items ?? []);
   let currentWorkspace = $derived(workspaces.find((workspace) => workspace.slug === workspaceSlug));
+  // A guest of this space (a bolo invitation) is offered only their
+  // profile; any other `?section=` lands there.
+  let active = $derived<SectionId>(
+    sectionFrom(page.url.searchParams.get('section'), offeredSections(currentWorkspace)),
+  );
   let currentProjects = $derived(
     projects.filter((project) => project.workspace_id === currentWorkspace?.id),
   );

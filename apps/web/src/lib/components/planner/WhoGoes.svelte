@@ -44,6 +44,10 @@
     showRoster?: boolean;
     /** Inside a dialog: hold the words until the dialog saves (`commit`). */
     deferred?: boolean;
+    /** False for whoever cannot write the plan here (`edit:performance`; a
+        guest of a bolo): the list is read, nobody is added and no word is
+        changed, so no button answers «refused». */
+    editable?: boolean;
     /** Bindable: words drawn but not written yet (deferred only). */
     changed?: boolean;
     locale: Locale;
@@ -58,6 +62,7 @@
     roster = null,
     showRoster = true,
     deferred = false,
+    editable = true,
     changed = $bindable(false),
     locale,
   }: Props = $props();
@@ -182,7 +187,7 @@
 </script>
 
 <!-- Somebody can always be added (ADR-107), so the section is always there. -->
-{#if (showRoster && rosterIds.length > 0) || rows.length > 0 || workspaceId}
+{#if (showRoster && rosterIds.length > 0) || rows.length > 0 || (editable && workspaceId)}
 <section class="who" aria-label={t('commitment.who_goes', locale)}>
   <!-- On a performance's page it is one of the record's blocks (ADR-139 § 4);
        in a date's dialog, a small head of its own. -->
@@ -207,6 +212,7 @@
         {#if row.word === null}
           <span class="who__state">{t('commitment.inferred', locale)}</span>
         {/if}
+        {#if editable}
         <span class="who__acts">
           {#if row.word !== 'going'}
             <button
@@ -234,12 +240,14 @@
             >
           {/if}
         </span>
+        {/if}
       </li>
     {/each}
   </ul>
 
   <!-- «+ Voy»: somebody of the team, or a name that is nobody yet, created
        right here (ADR-107) and answered «voy». -->
+  {#if editable}
   <div class="who__add">
     <PersonPicker
       options={addable}
@@ -262,6 +270,7 @@
       }}
     />
   </div>
+  {/if}
 
   {#if refused}
     <p class="who__err" role="alert">{t('commitment.refused', locale)}</p>

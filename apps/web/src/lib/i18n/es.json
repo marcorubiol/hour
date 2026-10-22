@@ -295,6 +295,8 @@
   "desk.anchor_loadout": "desmontaje",
   "desk.anchor_wrap": "fin",
   "desk.roadsheet": "Hoja de ruta",
+  "desk.next_board": "Tablón · {n} nuevos",
+  "desk.next_board_one": "Tablón · 1 nuevo",
   "desk.due_overdue": "vencido",
   "desk.due_due": "vence",
   "desk.when_wrote": "escribió {when}",

@@ -133,7 +133,8 @@
     onDay: (iso: string) => void;
     onWeek: (monday: string) => void;
     onGap: (iso: string) => void;
-    onCreate: () => void;
+    /** Absent: whoever looks cannot write the plan. */
+    onCreate?: () => void;
     /** Calm (ADR-139 § 5, `$lib/calm`): the strip and «Por decidir» stay;
         the key and the three lists fold into one line that leaves calm. */
     calm?: boolean;
@@ -310,7 +311,7 @@
       {#if empty}
         <p class="blk__empty">
           {t('planner.season_empty', locale, { n: SEASON_WEEKS })}
-          <button type="button" class="ov__add" onclick={onCreate}>＋ {t('planner.date_word', locale)}</button>
+          {#if onCreate}<button type="button" class="ov__add" onclick={onCreate}>＋ {t('planner.date_word', locale)}</button>{/if}
         </p>
       {/if}
     </section>

@@ -12,7 +12,7 @@ import { buildLineIndex, buildProjectIndex, resolveScope, type NavWorkspace, typ
 import { t } from './i18n';
 import { QUICK_MORE, QUICK_PRIMARY } from './quick-add';
 
-const ALL: CreateCan = { plan: true, converse: true };
+const ALL: CreateCan = { plan: true, converse: true, task: true };
 const kinds = (q: string, can: CreateCan = ALL) => paletteCreates(q, can).map((c) => c.kind);
 
 describe('paletteCreates: what typing finds', () => {
@@ -67,20 +67,26 @@ describe('paletteCreates: what typing finds', () => {
 
 describe('paletteCreates: never what the person cannot make', () => {
   it('without editing the plan, no performance and no date', () => {
-    const can = { plan: false, converse: true };
+    const can = { plan: false, converse: true, task: true };
     expect(kinds('nueva', can)).toEqual(['task', 'conversation']);
     expect(kinds('ensayo', can)).toEqual([]);
     expect(kinds('Mercat', can)).toEqual(['task', 'conversation']);
   });
 
   it('without Converses, no conversation', () => {
-    const can = { plan: true, converse: false };
+    const can = { plan: true, converse: false, task: true };
     expect(kinds('nueva', can)).toEqual(['performance', 'date', 'task']);
     expect(kinds('conversa', can)).toEqual([]);
   });
 
-  it('a task is always there', () => {
-    expect(kinds('tasca', { plan: false, converse: false })).toEqual(['task']);
+  it('a task wherever a space on screen takes one', () => {
+    expect(kinds('tasca', { plan: false, converse: false, task: true })).toEqual(['task']);
+  });
+
+  it('a guest of a bolo, with nothing of their own on screen, is offered nothing', () => {
+    const guest = { plan: false, converse: false, task: false };
+    expect(kinds('tasca comprar', guest)).toEqual([]);
+    expect(kinds('Mercat', guest)).toEqual([]);
   });
 });
 

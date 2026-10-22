@@ -47,6 +47,7 @@
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import EditWorkspaceDialog from '$lib/components/EditWorkspaceDialog.svelte';
   import { goto } from '$app/navigation';
+  import { isGuestIn, writesSpaceIn } from '$lib/workspace-role';
 
   interface Props {
     /** The space this portada is about (the /h/[slug]/ segment). */
@@ -99,6 +100,10 @@
   let currentWorkspace = $derived(
     workspaces.find((w) => w.slug === workspaceSlug) ?? null,
   );
+  // A guest of this space (a bolo invitation) edits nothing of it and makes
+  // no project here (`$lib/workspace-role`): neither door is drawn.
+  let guestHere = $derived(isGuestIn(currentWorkspace));
+  let makesProjects = $derived(currentWorkspace ? writesSpaceIn(currentWorkspace) : true);
   let projectIndex = $derived(buildProjectIndex(workspaces, $projectsQuery.data?.items ?? []));
   let lineIndex = $derived(buildLineIndex(workspaces, ($linesQuery.data?.items as RawLine[]) ?? []));
   let conversations = $derived<Conversation[]>($conversationsQuery.data?.items ?? []);
@@ -258,6 +263,7 @@
   {#if currentWorkspace}
     <RecordHead {crumbs} title={spaceName(currentWorkspace.name)}>
       {#snippet actions()}
+        {#if !guestHere}
         <button
           type="button"
           class="space-head__edit"
@@ -267,6 +273,7 @@
         >
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
         </button>
+        {/if}
       {/snippet}
       {#snippet facts()}
         {#if spaceKicker}<span>{spaceKicker}</span>{/if}
@@ -330,16 +337,18 @@
           </div>
         </article>
       {/each}
-      <button
-        type="button"
-        class="pcard pcard--ghost"
-        onclick={() =>
-          creation.openProject(
-            currentWorkspace ? { workspaceId: currentWorkspace.id } : undefined,
-          )}
-      >
-        {t('hall.new_project', locale)}
-      </button>
+      {#if makesProjects}
+        <button
+          type="button"
+          class="pcard pcard--ghost"
+          onclick={() =>
+            creation.openProject(
+              currentWorkspace ? { workspaceId: currentWorkspace.id } : undefined,
+            )}
+        >
+          {t('hall.new_project', locale)}
+        </button>
+      {/if}
     </div>
   {/if}
 </div>

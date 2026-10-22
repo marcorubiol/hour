@@ -13,8 +13,9 @@
  *
  * WHO. Never what the person cannot make: without editing the plan (the
  * Planner off, or no `edit:performance` anywhere) neither a performance nor
- * a date; without Converses (or the lens off) no conversation. A task is a
- * workspace member's, always.
+ * a date; without Converses (or the lens off) no conversation; a task only
+ * where some space on screen takes one (a guest of a bolo writes none,
+ * `$lib/workspace-role`).
  */
 
 import { accentVarFor } from '$lib/utils/accent';
@@ -46,6 +47,8 @@ export interface CreateCan {
   plan: boolean;
   /** The selling lens is on and the person edits conversations somewhere. */
   converse: boolean;
+  /** Some space on screen takes a task from the person (not a guest's). */
+  task: boolean;
 }
 
 /** The four offered for a bare verb or free text, in this order. */
@@ -114,7 +117,7 @@ function kindsNamed(typed: string): CreateKind[] {
 }
 
 export function allowed(kind: CreateKind, can: CreateCan): boolean {
-  if (kind === 'task') return true;
+  if (kind === 'task') return can.task;
   if (kind === 'conversation') return can.converse;
   return can.plan;
 }

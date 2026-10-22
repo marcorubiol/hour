@@ -67,6 +67,11 @@
     onPickAction: (action: CreateAction) => void;
     /** A «crear» row: the shell opens its dialog. */
     onCreate: (create: PaletteCreate) => void;
+    /** What the spaces on screen take from the person (`$lib/workspace-role`):
+        a guest of a bolo makes no task, no project and no line there. */
+    canTask?: boolean;
+    canProject?: boolean;
+    canLine?: boolean;
   }
   let {
     open = $bindable(),
@@ -74,6 +79,9 @@
     onApplyScope,
     onPickAction,
     onCreate,
+    canTask = true,
+    canProject = true,
+    canLine = true,
   }: Props = $props();
 
   /**
@@ -86,6 +94,7 @@
   let can = $derived({
     plan: lensOn('planner') && $planAccessQuery.data?.edit !== false,
     converse: lensOn('conversations') && $convAccessQuery.data?.edit !== false,
+    task: canTask,
   });
 
   const workspacesQuery = createQuery(workspacesQueryOptions());
@@ -760,8 +769,8 @@
         <span class="cmdk__foot-new">
           {t('palette.new', locale)}
           <button type="button" onclick={() => onPickAction('new-space')}>{t('picker.kind_space', locale)}</button>
-          <button type="button" onclick={() => onPickAction('new-project')}>{t('picker.kind_project', locale)}</button>
-          <button type="button" onclick={() => onPickAction('new-line')}>{t('picker.kind_line', locale)}</button>
+          {#if canProject}<button type="button" onclick={() => onPickAction('new-project')}>{t('picker.kind_project', locale)}</button>{/if}
+          {#if canLine}<button type="button" onclick={() => onPickAction('new-line')}>{t('picker.kind_line', locale)}</button>{/if}
         </span>
       </div>
     </div>

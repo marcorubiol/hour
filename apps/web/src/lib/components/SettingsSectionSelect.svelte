@@ -10,13 +10,19 @@
   import { page } from '$app/state';
   import { t, appLocale } from '$lib/i18n';
   import Select from './Select.svelte';
-  import { SECTIONS, sectionFrom } from './SettingsNav.svelte';
+  import { createQuery } from '@tanstack/svelte-query';
+  import { workspacesQueryOptions } from '$lib/nav-queries';
+  import { offeredSections, sectionFrom } from './SettingsNav.svelte';
 
   const locale = appLocale();
 
   let workspaceSlug = $derived(page.params.workspace ?? '');
-  let active = $derived(sectionFrom(page.url.searchParams.get('section')));
-  let options = $derived(SECTIONS.map((s) => ({ value: s.id, label: t(s.labelKey, locale) })));
+  const workspacesQuery = createQuery(workspacesQueryOptions());
+  let offered = $derived(
+    offeredSections($workspacesQuery.data?.items.find((w) => w.slug === workspaceSlug)),
+  );
+  let active = $derived(sectionFrom(page.url.searchParams.get('section'), offered));
+  let options = $derived(offered.map((s) => ({ value: s.id, label: t(s.labelKey, locale) })));
 
   function choose(event: Event) {
     const id = (event.currentTarget as HTMLSelectElement).value;

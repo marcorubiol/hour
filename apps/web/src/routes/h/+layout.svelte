@@ -67,6 +67,7 @@
   import { activeProjectsQueryOptions, allLinesQueryOptions, teamQueryOptions } from '$lib/nav-queries';
   import { accentVarFor } from '$lib/utils/accent';
   import { spaceName } from '$lib/utils/identity';
+  import { homeWorkspace, spaceWriteWorkspaces, taskWorkspaces } from '$lib/workspace-role';
   import { saveMasterViewPath } from '$lib/master-view';
   import {
     provideNetworkPresence,
@@ -155,7 +156,11 @@
   });
 
   let defaultWorkspaceSlug = $derived($workspacesQuery.data?.items[0]?.slug ?? '');
-  let menuWorkspaceSlug = $derived(workspaceSlug || defaultWorkspaceSlug);
+  // Settings without a space in the URL: the person's own space, never one
+  // they are a guest of (a bolo invitation), where there is nothing of theirs.
+  let menuWorkspaceSlug = $derived(
+    workspaceSlug || homeWorkspace(($workspacesQuery.data?.items ?? []) as NavWorkspace[])?.slug || '',
+  );
 
   // ── Scope model (pins → resolved scope) for the scope bar + sidebar ──
   const projectsQuery = createQuery(activeProjectsQueryOptions());
@@ -539,7 +544,12 @@
   //    door does not say comes from the pinned scope. ──
   let createScope = $derived(resolveScope(pins.pins, wsItems, lineIndex, projectIndex));
   let createPresets = $derived(scopeCreatePresets(createScope, wsItems.map((w) => w.id)));
-  let taskTarget = $derived(scopeTaskTarget(createScope, wsItems));
+  let taskTarget = $derived(scopeTaskTarget(createScope, taskWorkspaces(onScreen)));
+  // What the spaces take from the person (`$lib/workspace-role`): a guest of a
+  // bolo makes no task, project or line in the company's space.
+  let canTask = $derived(taskWorkspaces(onScreen).length > 0);
+  let canProject = $derived(spaceWriteWorkspaces(wsItems).length > 0);
+  let canLine = $derived(projectIndex.length > 0);
   function onCreate(c: PaletteCreate) {
     if (c.kind === 'task') creation.openTask({ title: c.title });
     else if (c.kind === 'conversation') creation.openConversation({ who: c.title });
@@ -751,7 +761,16 @@
     </main>
   </div>
 
-  <CommandPalette bind:open={paletteOpen} initialTokens={paletteSeed} {onApplyScope} {onPickAction} {onCreate} />
+  <CommandPalette
+    bind:open={paletteOpen}
+    initialTokens={paletteSeed}
+    {onApplyScope}
+    {onPickAction}
+    {onCreate}
+    {canTask}
+    {canProject}
+    {canLine}
+  />
 
   <CreateWorkspaceDialog bind:open={creation.workspaceOpen} />
   <CreateProjectDialog bind:open={creation.projectOpen} workspaceId={creation.projectWorkspaceId} />

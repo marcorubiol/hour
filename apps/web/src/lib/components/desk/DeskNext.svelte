@@ -43,6 +43,8 @@
     today: string;
     viewerTz: string;
     personId: string | null;
+    /** New messages on the card's board (a performance's bolo), 0 without. */
+    boardNew?: number;
     slipCtx: SlipContext;
     /** The roster's names, as the Day draws them ($lib/people `castNames`);
         null while the names are loading, so «sin reparto» never flashes. */
@@ -50,7 +52,7 @@
     locale: Locale;
   }
 
-  let { next, then, thenBefore = false, settled, errored, onretry, today, viewerTz, personId, slipCtx, personNames, locale }: Props = $props();
+  let { next, then, thenBefore = false, settled, errored, onretry, today, viewerTz, personId, boardNew = 0, slipCtx, personNames, locale }: Props = $props();
 
   const kindLabel = (kind: SlipKind) => t(`planner.kind_${kind}`, locale);
   const queryClient = useQueryClient();
@@ -89,7 +91,14 @@
       ? castNames((next.ref.row as PerformanceEvent).person_ids, personNames)
       : null,
   );
-  let whoHref = $derived(next?.ref.of === 'performance' && slip?.href ? `${slip.href}#who-goes` : null);
+  // Without its project (read through a bolo: a guest) nobody here edits
+  // «quién va», and the record draws no list to land on.
+  let whoHref = $derived(
+    next?.ref.of === 'performance' && slip?.href && next.ref.row.project ? `${slip.href}#who-goes` : null,
+  );
+  /* «Tablón · 3 nuevos» (plan 2026-10-22 § 3.3): only when it has news, and
+     straight to the board (`#board`). */
+  let boardHref = $derived(next?.ref.of === 'performance' && slip?.href && boardNew > 0 ? `${slip.href}#board` : null);
   let guess = $derived(next ? next.ref.attribution !== 'explicit' : false);
 
   // ADR-103: only an inferred row asks; an unattributed one is the company's day.
@@ -190,7 +199,7 @@
           {#each moments as m, i (i)}<span><span class="card__k">{m.label}</span> {m.at}</span>{/each}
         </div>
       {/if}
-      {#if canAnswer || roadsheet || whoHref}
+      {#if canAnswer || roadsheet || whoHref || boardHref}
         <div class="card__foot">
           {#if canAnswer}
             <span class="card__ask">
@@ -210,6 +219,9 @@
             </span>
           {/if}
           <span class="card__links">
+            {#if boardHref}<a class="block-head__act" href={boardHref} data-testid="desk-next-board"
+                >{boardNew === 1 ? t('desk.next_board_one', locale) : t('desk.next_board', locale, { n: boardNew })} →</a
+              >{/if}
             {#if whoHref}<a class="block-head__act" href={whoHref}>{t('commitment.who_goes', locale)} →</a>{/if}
             {#if roadsheet}<a class="card__rs btn--secondary btn--s" href={roadsheet}>{t('desk.roadsheet', locale)} ↗</a>{/if}
           </span>

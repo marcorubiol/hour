@@ -20,6 +20,8 @@ import type { Tables } from '$lib/db-types';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import { json } from '$lib/server/http';
+import { decodeJwtPayload } from '$lib/server/session';
+import { withMyRole, type OwnMembership } from '$lib/workspace-role';
 
 const QuerySchema = v.object({
   limit: v.optional(
@@ -165,9 +167,25 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   search.set('order', 'created_at.asc');
   search.set('limit', String(limit));
 
+  // The caller's role in each (`my_role`, $lib/workspace-role): their own
+  // workspace rows, which `membership_select` lets them read. No migration:
+  // the frame needs the role, never anyone else's.
+  const own = new URLSearchParams({
+    select: 'workspace_id,workspace_role',
+    level: 'eq.workspace',
+    accepted_at: 'not.is.null',
+  });
+  const sub = decodeJwtPayload(jwt)?.sub;
+  if (typeof sub === 'string') own.set('user_id', `eq.${sub}`);
+
   try {
-    const { data } = await pgGet<WorkspaceItem>(env, 'workspace', jwt, { search });
-    return json({ items: data });
+    const [{ data }, { data: memberships }] = await Promise.all([
+      pgGet<WorkspaceItem>(env, 'workspace', jwt, { search }),
+      typeof sub === 'string'
+        ? pgGet<OwnMembership>(env, 'membership', jwt, { search: own })
+        : Promise.resolve({ data: [] as OwnMembership[] }),
+    ]);
+    return json({ items: withMyRole(data, memberships) });
   } catch (err) {
     return pgErrorResponse(
       err,

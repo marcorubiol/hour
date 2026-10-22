@@ -369,6 +369,15 @@ export interface ThreadFeedView {
 }
 
 /**
+ * Los nuevos del tablón entero, para «Lo siguiente» de Hoy (plan 2026-10-22
+ * § 3.3): la suma de los hilos que el que mira lee, con la misma regla de
+ * «nuevo» que `bolo_board` (los suyos no cuentan). Sin bolo, 0.
+ */
+export function boardUnread(view: Pick<BoloBoard, 'threads'> | null | undefined): number {
+  return (view?.threads ?? []).reduce((n, th) => n + Math.max(0, th.unread_count || 0), 0);
+}
+
+/**
  * La ficha que abre una fila: la función con su tablón (`#board`), o la
  * conversación con su hilo del equipo (`#team`). Un bolo sin funciones vivas
  * no tiene dónde abrirse: null, y la fila no es enlace.
