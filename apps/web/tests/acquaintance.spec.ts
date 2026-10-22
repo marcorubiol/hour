@@ -22,10 +22,10 @@ test.describe('«lo conozco»', () => {
 
     await page.goto('/h/conversations?etiqueta=sales&scope=s:playwright');
     await waitForLoaded(page);
-    const row = page.locator('tbody tr').first();
+    const row = page.locator('[data-testid="conversation-row"]').first();
     await expect(row).toBeVisible();
 
-    const contact = row.locator('td').nth(1).getByRole('link');
+    const contact = row.locator('a.crow-contact');
     await contact.click();
     // From the lens the person opens in the vistazo (ADR-139 p1); the switch lives on the page.
     await openInFull(page);

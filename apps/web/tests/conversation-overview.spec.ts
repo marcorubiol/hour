@@ -99,10 +99,10 @@ test.describe('el dashboard de Conversations (ADR-117)', () => {
     await due.getByRole('link', { name: /lista|list|llista|liste/i }).click();
     await expect(page).toHaveURL(/turno=nuestro/);
     await page.getByRole('searchbox').fill(WARM);
-    const row = page.locator('.conversation-table tbody tr', { hasText: WARM });
+    const row = page.locator('[data-testid="conversation-row"]', { hasText: WARM });
     await expect(row).toHaveCount(1, { timeout: 30_000 });
-    await expect(row.locator('.turn--ours')).toBeVisible();
-    await expect(page.locator('.conversation-table tbody tr', { hasText: COLD })).toHaveCount(0);
+    await expect(row.locator('.crow[data-tone="ours"], .crow[data-tone="late"]')).toBeVisible();
+    await expect(page.locator('[data-testid="conversation-row"]', { hasText: COLD })).toHaveCount(0);
   });
 
   test('sin noticias: «Escribir a estas» deja la selección hecha; el chip quita el filtro', async ({ page }) => {
@@ -117,10 +117,10 @@ test.describe('el dashboard de Conversations (ADR-117)', () => {
     await expect(page).toHaveURL(/temp=ronda/);
     await expect(page.locator('.action-bar')).toBeVisible();
     await page.getByRole('searchbox').fill(COLD);
-    const row = page.locator('.conversation-table tbody tr', { hasText: COLD });
+    const row = page.locator('[data-testid="conversation-row"]', { hasText: COLD });
     await expect(row).toHaveCount(1, { timeout: 30_000 });
     await expect(row.getByRole('checkbox')).toBeChecked();
-    await expect(row.locator('.turn--theirs')).toBeVisible();
+    await expect(row.locator('.crow[data-tone="theirs"]')).toBeVisible();
 
     await page.locator('.chip--selected button, [class*="chip--"] button').first().click();
     await expect(page).not.toHaveURL(/temp=/);
@@ -133,7 +133,7 @@ test.describe('el dashboard de Conversations (ADR-117)', () => {
     await expect(season).toBeVisible({ timeout: 30_000 });
     await season.locator('.season__item').first().click();
     await expect(page).toHaveURL(/temporada=actual.*relacion=|relacion=.*temporada=actual/);
-    await expect(page.locator('.conversation-table tbody tr').first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('[data-testid="conversation-row"]').first()).toBeVisible({ timeout: 30_000 });
   });
 
   test('en el móvil, una columna en el orden del documento, «Esperan respuesta» primero', async ({ page }) => {

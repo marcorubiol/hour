@@ -98,8 +98,8 @@ test.describe('la temporada por línea (ADR-135)', () => {
     await season.locator(`[data-line="${lineId}"] .season__line-name`).click();
     await expect(page).toHaveURL(new RegExp(`temporada=actual.*linea=${lineId}`));
     await page.getByRole('searchbox').fill('E2E Línea');
-    await expect(page.locator('.conversation-table tbody tr', { hasText: IN_LINE })).toHaveCount(1, { timeout: 30_000 });
-    await expect(page.locator('.conversation-table tbody tr', { hasText: NO_LINE })).toHaveCount(0);
+    await expect(page.locator('[data-testid="conversation-row"]', { hasText: IN_LINE })).toHaveCount(1, { timeout: 30_000 });
+    await expect(page.locator('[data-testid="conversation-row"]', { hasText: NO_LINE })).toHaveCount(0);
 
     await page.goto('/h/conversations?etiqueta=sales');
     await expect(season).toBeVisible({ timeout: 30_000 });
@@ -108,8 +108,8 @@ test.describe('la temporada por línea (ADR-135)', () => {
     await never.click();
     await expect(page).toHaveURL(/relacion=never.*linea=sin|linea=sin.*relacion=never/);
     await page.getByRole('searchbox').fill('E2E Línea');
-    await expect(page.locator('.conversation-table tbody tr', { hasText: NO_LINE })).toHaveCount(1, { timeout: 30_000 });
-    await expect(page.locator('.conversation-table tbody tr', { hasText: IN_LINE })).toHaveCount(0);
+    await expect(page.locator('[data-testid="conversation-row"]', { hasText: NO_LINE })).toHaveCount(1, { timeout: 30_000 });
+    await expect(page.locator('[data-testid="conversation-row"]', { hasText: IN_LINE })).toHaveCount(0);
   });
 
   test('en el móvil, las barras apiladas y sin scroll lateral', async ({ page }) => {

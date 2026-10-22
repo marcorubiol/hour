@@ -12,7 +12,8 @@ import { Constants, type Enums, type Tables } from './db-types';
 import { localDayISO, realIsoDate, realIsoInstant } from './datetime';
 import { t, type Locale } from './i18n';
 import { EVENT_MAIL_SELECT, type EventMailFields } from './mail';
-import { relationOf, type Relation, type RelationInput } from './conversation-relation';
+import { relationOf, type ConversationBolo, type Relation, type RelationInput } from './conversation-relation';
+import type { RowMailout } from './conversation-overview';
 import { TAGGING_EMBED, tagKeysOf, type TaggingEmbed } from './conversation-tags';
 
 export type ConversationStatus = Enums<'conversation_status'>;
@@ -340,6 +341,12 @@ export interface ConversationItem extends Tables<'conversation'> {
   relation: Relation;
   /** Its tag keys (ADR-138 § 1); none read as `sales` (`tagKeysOf`). */
   tags: string[];
+  /** New for the caller (`conversation_feed`); absent where the list does not read it. */
+  unread_count?: number;
+  /** Its bolos without money (ADR-138 § 3); absent without `read:performance` or when unread. */
+  bolos?: ConversationBolo[];
+  /** The last mailout it received (plan de la lista § 3). */
+  last_mailout?: RowMailout | null;
 }
 
 /**
@@ -375,53 +382,6 @@ export function sortContacts(contacts: readonly ConversationContact[]): Conversa
     if (a.until && b.until && a.until !== b.until) return a.until < b.until ? 1 : -1;
     return (a.person?.full_name ?? '').localeCompare(b.person?.full_name ?? '');
   });
-}
-
-interface ConversationContactGroup {
-  /** Person id, or a conversation-scoped fallback for a missing embed. */
-  key: string;
-  person: PersonLite | null;
-  conversations: ConversationItem[];
-  /** Latest valid contact instant across the loaded conversations. */
-  last_contacted_at: string | null;
-}
-
-/**
- * Client-side projection used by the contact-book view. It intentionally
- * groups only the loaded page: pagination remains a server concern and the
- * UI states that boundary whenever more rows exist.
- */
-export function groupConversationsByContact(
-  items: readonly ConversationItem[],
-): ConversationContactGroup[] {
-  const groups = new Map<string, ConversationContactGroup>();
-
-  for (const item of items) {
-    const key = item.person?.id ?? `conversation:${item.id}`;
-    let group = groups.get(key);
-    if (!group) {
-      group = {
-        key,
-        person: item.person,
-        conversations: [],
-        last_contacted_at: null,
-      };
-      groups.set(key, group);
-    }
-    group.conversations.push(item);
-
-    const nextMs = item.last_contacted_at
-      ? Date.parse(item.last_contacted_at)
-      : Number.NaN;
-    const currentMs = group.last_contacted_at
-      ? Date.parse(group.last_contacted_at)
-      : Number.NaN;
-    if (!Number.isNaN(nextMs) && (Number.isNaN(currentMs) || nextMs > currentMs)) {
-      group.last_contacted_at = item.last_contacted_at;
-    }
-  }
-
-  return [...groups.values()];
 }
 
 /**

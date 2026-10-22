@@ -13,10 +13,13 @@ import {
   daysSince,
   dueReason,
   followUpDue,
+  hasListFilter,
   inSeason,
   isHot,
   isUndated,
   mailoutFigures,
+  mailoutPicks,
+  overviewOrderKey,
   parseListFilter,
   seasonOf,
   seasonByLine,
@@ -234,11 +237,15 @@ describe('filtros de la lista', () => {
       turno: 'nuestro',
       temp: 'fria',
       temporada: true,
+      linea: undefined,
     });
     const id = '01a14f54-6096-7361-9932-a9e3837f466d';
     expect(parseListFilter(new URLSearchParams(`envio=${id}&r=rebotes`))).toMatchObject({ envio: id, r: 'rebotes' });
     expect(parseListFilter(new URLSearchParams('envio=nope&r=rebotes')).envio).toBeUndefined();
-    expect(parseListFilter(new URLSearchParams(`envio=${id}&r=todo`)).envio).toBeUndefined();
+    // Una cifra que no existe, o ninguna: todas las que lo recibieron (plan de la lista § 5).
+    expect(parseListFilter(new URLSearchParams(`envio=${id}&r=todo`))).toMatchObject({ envio: id, r: 'todos' });
+    expect(parseListFilter(new URLSearchParams(`envio=${id}`))).toMatchObject({ envio: id, r: 'todos' });
+    expect(parseListFilter(new URLSearchParams(`envio=${id}&r=sin-respuesta`)).r).toBe('sin-respuesta');
     expect(parseListFilter(new URLSearchParams('relacion=confirmed')).relacion).toBeUndefined();
     expect(parseListFilter(new URLSearchParams('relacion=not_now')).relacion).toBe('not_now');
     expect(parseListFilter(new URLSearchParams('turno=x&temp=tibia'))).toEqual({
@@ -246,6 +253,7 @@ describe('filtros de la lista', () => {
       turno: undefined,
       temp: undefined,
       temporada: undefined,
+      linea: undefined,
     });
   });
   it('te toca: respuestas, la más reciente arriba; después seguimientos, el más vencido primero', () => {
@@ -342,14 +350,17 @@ describe('la temporada por línea (ADR-135)', () => {
     // Dos fijadas: las dos, sin «sin línea».
     expect(buildOverview(rows, NOW, { lineIds: [L1, L2] }).season.lines.map((l) => l.line_id)).toEqual([L1, L2]);
   });
-  it('?linea= solo vale con la temporada, y filtra la lista por esa línea o por las que no tienen', () => {
+  it('?linea= filtra la lista por esa línea o por las que no tienen, con la temporada o sola', () => {
     expect(parseListFilter(new URLSearchParams(`temporada=actual&linea=${L1}`)).linea).toBe(L1);
     expect(parseListFilter(new URLSearchParams('temporada=actual&linea=sin')).linea).toBe(NO_LINE);
     expect(parseListFilter(new URLSearchParams('temporada=actual&linea=nope')).linea).toBeUndefined();
-    expect(parseListFilter(new URLSearchParams(`linea=${L1}`)).linea).toBeUndefined();
+    expect(parseListFilter(new URLSearchParams(`linea=${L1}`)).linea).toBe(L1);
     const rows = [row('a', cat), row('b', fr), row('c'), row('vieja', { ...cat, performance_days: ['2026-04-01'] })];
     expect(applyListFilter(rows, { temporada: true, linea: L1 }, NOW).map((r) => r.id)).toEqual(['a']);
     expect(applyListFilter(rows, { temporada: true, linea: NO_LINE }, NOW).map((r) => r.id)).toEqual(['c']);
+    // Sola: la línea entera, de cualquier temporada.
+    expect(applyListFilter(rows, { linea: L1 }, NOW).map((r) => r.id)).toEqual(['a', 'vieja']);
+    expect(hasListFilter({ linea: L1 })).toBe(true);
   });
   it('el tramo de una línea y su filtro cuentan lo mismo', () => {
     const rows = [row('a', cat), row('b', { ...cat, ...inbound(2) }), row('c', { ...fr, ...inbound(4) }), row('d')];
@@ -445,5 +456,36 @@ describe('mailoutFigures', () => {
       lastIn,
     );
     expect(f).toEqual({ recipients: 6, sent: 5, delivered: 4, bounced: 1, complained: 1, unsubscribed: 1, replies: 1 });
+  });
+});
+
+describe('mailoutPicks (la tanda de un envío)', () => {
+  const queued = ago(10);
+  const lastIn = new Map([['c1', ago(5)]]);
+  const rs = [
+    { conversation_id: 'c1', status: 'delivered', sent_at: ago(10, 10) },
+    { conversation_id: 'c2', status: 'delivered', sent_at: ago(10, 10) },
+    { conversation_id: 'c3', status: 'bounced', sent_at: ago(10, 10) },
+    { conversation_id: 'c4', status: 'skipped' },
+  ];
+  const pick = (p: Parameters<typeof mailoutPicks>[1]) =>
+    rs.filter((r) => mailoutPicks(r, p, queued, lastIn)).map((r) => r.conversation_id);
+  it('recibieron: a quien le salió; contestaron; sin respuesta, sin los rebotes; rebotes', () => {
+    expect(pick('todos')).toEqual(['c1', 'c2', 'c3']);
+    expect(pick('respuestas')).toEqual(['c1']);
+    expect(pick('sin-respuesta')).toEqual(['c2']);
+    expect(pick('rebotes')).toEqual(['c3']);
+  });
+  it('contestaron y sin respuesta cuentan lo que la cifra de respuestas', () => {
+    const f = mailoutFigures(rs, queued, lastIn);
+    expect(pick('respuestas')).toHaveLength(f.replies);
+    expect(pick('respuestas').length + pick('sin-respuesta').length + pick('rebotes').length).toBe(f.sent);
+  });
+});
+
+describe('overviewOrderKey', () => {
+  it('una respuesta pendiente ordena por su llegada; un seguimiento, por su día', () => {
+    expect(overviewOrderKey(row('r', inbound(2)), NOW)).toMatchObject({ due: 'reply', dueAt: ago(2), unread: 0 });
+    expect(overviewOrderKey(row('s', { next_action_at: day(-1) }), NOW, 3)).toMatchObject({ due: 'follow_up', dueAt: day(-1), unread: 3 });
   });
 });

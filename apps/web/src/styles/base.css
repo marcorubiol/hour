@@ -2193,6 +2193,31 @@
     color: var(--text-faint);
   }
 
+  /* The list of ConversationRow (plan de la lista § 3): the lens's table,
+     «Todas» and the team's threads. The list is the rows' container, so a
+     row's layout follows the list's width, not the window's. Its columns are
+     the list's: a list with relations or bolos sets their tracks. */
+  .crow-list {
+    --crow-turn: var(--crow-turn-size);
+    --crow-end: var(--crow-end-size);
+    container-type: inline-size;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-block-start: var(--border);
+  }
+  .crow-list > li {
+    border-block-end: var(--border);
+  }
+  .crow-list--relation {
+    --crow-relation: var(--crow-relation-size);
+    --crow-state: var(--crow-relation-size);
+  }
+  .crow-list--bolos {
+    --crow-bolos: var(--crow-bolos-size);
+    --crow-state: calc(var(--crow-relation-size) + var(--crow-bolos-size));
+  }
+
   /* Action bar — the floating bar at the foot of a work surface while a
      choice is open: «Escribir a N» over the selection in Conversations,
      «Enviar a N» on the mailout screen. A note at the start, actions at the

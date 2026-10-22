@@ -76,7 +76,7 @@ test.describe('conversation tags', () => {
       // Searching with a chip on goes through rpc/conversation_search, which
       // only orders by what it selects (42703 before the fix).
       await search(page);
-      const row = page.locator('main table tbody tr', { hasText: ORG });
+      const row = page.locator('main [data-testid="conversation-row"]', { hasText: ORG });
       await expect(row).toHaveCount(1, { timeout: 15_000 });
       await expect(page.getByText('The conversations could not be read.')).toHaveCount(0);
       // Under its own chip the row does not repeat the tag.
@@ -85,7 +85,7 @@ test.describe('conversation tags', () => {
       await page.locator('.lenshead__sub [data-chip="sales"]').click();
       await waitForLoaded(page);
       await search(page);
-      await expect(page.locator('main table tbody tr', { hasText: ORG })).toHaveCount(0, { timeout: 15_000 });
+      await expect(page.locator('main [data-testid="conversation-row"]', { hasText: ORG })).toHaveCount(0, { timeout: 15_000 });
 
       await page.locator('.lenshead__sub [data-chip="all"]').click();
       await waitForLoaded(page);
@@ -113,7 +113,7 @@ test.describe('conversation tags', () => {
       await page.goto(`${LENS}&etiqueta=sales`);
       await waitForLoaded(page);
       await search(page);
-      await expect(page.locator('main table tbody tr', { hasText: ORG })).toHaveCount(1, { timeout: 15_000 });
+      await expect(page.locator('main [data-testid="conversation-row"]', { hasText: ORG })).toHaveCount(1, { timeout: 15_000 });
       await expect(page.getByRole('button', { name: /^Select$/ })).toBeVisible();
     } finally {
       await sweep(page);

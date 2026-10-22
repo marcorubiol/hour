@@ -96,7 +96,7 @@ test.describe('mailout (simulated)', () => {
       await page.reload();
       await waitForLoaded(page);
       await page.getByRole('searchbox').fill(ORG);
-      const row = page.locator('tbody tr', { hasText: ORG });
+      const row = page.locator('[data-testid="conversation-row"]', { hasText: ORG });
       await expect(row).toHaveCount(1, { timeout: 15_000 });
       await page.getByRole('button', { name: /^(Select|Seleccionar|Sélectionner)$/ }).click();
       // The painted box sits over the input (Checkbox); a click on it is the user's.

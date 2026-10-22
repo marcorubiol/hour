@@ -9,6 +9,7 @@
 import type { RequestHandler } from './$types';
 import { extractAccessToken } from '$lib/auth';
 import { pgGet, pgPostRpc } from '$lib/supabase';
+import { setScope } from '$lib/server/conversation-overview';
 import { pgErrorResponse } from '$lib/server/errors';
 import { jsonNoStore } from '$lib/server/http';
 import { MAILOUT_PG_CODES, readBody } from '$lib/server/mailout/route';
@@ -43,3 +44,44 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
     return pgErrorResponse(err, { route: 'POST /api/mailout', requestId: locals.requestId }, { codes: MAILOUT_PG_CODES });
   }
 };
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * GET /api/mailout?project_ids=&workspace_ids= → { items }: los envíos que
+ * salieron en el alcance (los 10 últimos), para el filtro Envío de la lista
+ * (plan de la lista § 5). Lo que lee quien llama (`mailout_select`): un envío
+ * cuyos destinatarios son todos privadas ajenas no sale.
+ */
+export const GET: RequestHandler = async ({ request, url, platform, locals }) => {
+  if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
+  const env = platform.env as unknown as MailoutEnv;
+  const jwt = extractAccessToken(request);
+  if (!jwt) return jsonNoStore({ error: 'missing_authorization' }, 401);
+  const ids = (key: string) =>
+    (url.searchParams.get(key) ?? '')
+      .split(',')
+      .map((x) => x.trim())
+      .filter((x) => UUID.test(x));
+  const search = new URLSearchParams({
+    select: 'id,project_id,subject,queued_at',
+    status: 'in.(queued,sending,paused,done)',
+    order: 'queued_at.desc.nullslast',
+    limit: '10',
+  });
+  setScope(search, ids('project_ids'), ids('workspace_ids'));
+  try {
+    const { data } = await pgGet<MailoutOption>(env, 'mailout', jwt, { search });
+    return jsonNoStore({ items: data });
+  } catch (err) {
+    return pgErrorResponse(err, { route: 'GET /api/mailout', requestId: locals.requestId });
+  }
+};
+
+/** Un envío del filtro (`MailoutOption` en la pantalla). */
+interface MailoutOption {
+  id: string;
+  project_id: string;
+  subject: string | null;
+  queued_at: string | null;
+}

@@ -90,6 +90,6 @@ test.describe('smoke', () => {
     await page.goto('/h/conversations?etiqueta=sales');
     await waitForLoaded(page);
     await expect(page.locator('.status-bar__count')).toContainText(/\d+ conversations/);
-    expect(await page.locator('tbody tr').count()).toBeGreaterThan(0);
+    expect(await page.locator('[data-testid="conversation-row"]').count()).toBeGreaterThan(0);
   });
 });

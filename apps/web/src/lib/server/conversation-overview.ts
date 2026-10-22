@@ -14,7 +14,7 @@ import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import {
   TURN_KINDS,
   mailoutFigures,
-  mailoutReplied,
+  mailoutPicks,
   type MailoutPick,
   type LastMailout,
   type MailoutRecipientLite,
@@ -223,7 +223,7 @@ const BOLOS_BATCH = 2000;
  * solo devuelve los de las que quien llama lee y con `read:performance` en el
  * proyecto. Agrupados por conversación, en orden de fecha.
  */
-async function loadConversationBolos(
+export async function loadConversationBolos(
   env: SupabaseEnv,
   jwt: string,
   ids: readonly string[],
@@ -292,21 +292,22 @@ async function withSentAt(env: SupabaseEnv, jwt: string, mailoutId: string, reci
   return recipients.map((r) => ({ ...r, sent_at: sentById.get(r.recipient_id) ?? null }));
 }
 
-function lastInMap(rows: readonly OverviewInput[]): Map<string, string> {
+export function lastInMap(rows: readonly Pick<OverviewInput, 'id' | 'last_in'>[]): Map<string, string> {
   return new Map(rows.filter((r) => r.last_in).map((r) => [r.id, r.last_in!.occurred_at]));
 }
 
 /**
- * The conversations behind a figure of a mailout (ADR-126 § 9): those that
- * replied, or those that bounced. Same rule as the figure, so «22 replies»
- * lists 22. Only recipients the caller can read (`mailout_preview`).
+ * The conversations behind a figure of a mailout (ADR-126 § 9), or one of its
+ * batches (plan de la lista § 5): those that received it, replied, did not
+ * reply, or bounced. Same rule as the figure, so «22 replies» lists 22. Only
+ * recipients the caller can read (`mailout_preview`).
  */
 export async function mailoutPickIds(
   env: SupabaseEnv,
   jwt: string,
   mailoutId: string,
   pick: MailoutPick,
-  rows: readonly OverviewInput[],
+  rows: readonly Pick<OverviewInput, 'id' | 'last_in'>[],
 ): Promise<Set<string>> {
   const [preview, mailout] = await Promise.all([
     pgPostRpc<PreviewRecipient>(env, 'mailout_preview', jwt, { p_id: mailoutId }),
@@ -317,7 +318,7 @@ export async function mailoutPickIds(
   const lastIn = lastInMap(rows);
   return new Set(
     recipients
-      .filter((r) => (pick === 'rebotes' ? r.status === 'bounced' : mailoutReplied(r, queuedAt, lastIn)))
+      .filter((r) => mailoutPicks(r, pick, queuedAt, lastIn))
       .map((r) => r.conversation_id),
   );
 }
