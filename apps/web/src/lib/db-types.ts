@@ -2550,6 +2550,8 @@ export type Database = {
           can_edit_meta: boolean
           container_verb: Database["public"]["Enums"]["access_verb"] | null
           created_at: string
+          expires_at: string | null
+          expires_with_bolo: boolean
           id: string
           invited_by: string | null
           level: Database["public"]["Enums"]["container_level"]
@@ -2570,6 +2572,8 @@ export type Database = {
           can_edit_meta?: boolean
           container_verb?: Database["public"]["Enums"]["access_verb"] | null
           created_at?: string
+          expires_at?: string | null
+          expires_with_bolo?: boolean
           id?: string
           invited_by?: string | null
           level: Database["public"]["Enums"]["container_level"]
@@ -2590,6 +2594,8 @@ export type Database = {
           can_edit_meta?: boolean
           container_verb?: Database["public"]["Enums"]["access_verb"] | null
           created_at?: string
+          expires_at?: string | null
+          expires_with_bolo?: boolean
           id?: string
           invited_by?: string | null
           level?: Database["public"]["Enums"]["container_level"]
@@ -2654,6 +2660,7 @@ export type Database = {
           created_at: string
           facet_id: string
           granted_by: string | null
+          id: string
           membership_id: string
           source: string
           verb: Database["public"]["Enums"]["access_verb"]
@@ -2662,6 +2669,7 @@ export type Database = {
           created_at?: string
           facet_id: string
           granted_by?: string | null
+          id?: string
           membership_id: string
           source: string
           verb: Database["public"]["Enums"]["access_verb"]
@@ -2670,6 +2678,7 @@ export type Database = {
           created_at?: string
           facet_id?: string
           granted_by?: string | null
+          id?: string
           membership_id?: string
           source?: string
           verb?: Database["public"]["Enums"]["access_verb"]
@@ -4230,6 +4239,8 @@ export type Database = {
         Row: {
           accepted_at: string | null
           accepted_by: string | null
+          bolo_id: string | null
+          bolo_preset: string | null
           created_at: string
           email: string
           expires_at: string
@@ -4247,6 +4258,8 @@ export type Database = {
         Insert: {
           accepted_at?: string | null
           accepted_by?: string | null
+          bolo_id?: string | null
+          bolo_preset?: string | null
           created_at?: string
           email: string
           expires_at: string
@@ -4264,6 +4277,8 @@ export type Database = {
         Update: {
           accepted_at?: string | null
           accepted_by?: string | null
+          bolo_id?: string | null
+          bolo_preset?: string | null
           created_at?: string
           email?: string
           expires_at?: string
@@ -4279,6 +4294,20 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "workspace_invitation_bolo_id_fkey"
+            columns: ["bolo_id"]
+            isOneToOne: false
+            referencedRelation: "bolo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_invitation_bolo_preset_fkey"
+            columns: ["bolo_preset"]
+            isOneToOne: false
+            referencedRelation: "access_preset"
+            referencedColumns: ["key"]
+          },
           {
             foreignKeyName: "workspace_invitation_project_id_fkey"
             columns: ["project_id"]
@@ -4659,6 +4688,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      bolo_access: { Args: { p_bolo_id: string }; Returns: Json }
       bolo_board: { Args: { p_performance_id: string }; Returns: Json }
       bolo_status_can_move: {
         Args: { p_status: Database["public"]["Enums"]["performance_status"] }
@@ -5721,6 +5751,22 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_bolo_invitation: {
+        Args: {
+          p_bolo_id: string
+          p_email: string
+          p_person_id?: string
+          p_preset?: string
+        }
+        Returns: {
+          bolo_id: string
+          bolo_preset: string
+          email: string
+          expires_at: string
+          id: string
+          token: string
+        }[]
+      }
       create_workspace_invitation: {
         Args: {
           p_email: string
@@ -6501,8 +6547,11 @@ export type Database = {
       preview_workspace_invitation: {
         Args: { p_token: string }
         Returns: {
+          bolo_id: string
+          bolo_label: string
           email: string
           expires_at: string
+          landing_performance_id: string
           project_id: string
           project_name: string
           project_role_code: string
@@ -6967,6 +7016,10 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      set_membership_expiry: {
+        Args: { p_expires_at: string; p_membership_id: string }
+        Returns: undefined
       }
       set_membership_facet: {
         Args: {
