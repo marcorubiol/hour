@@ -13,18 +13,25 @@
  * probó en SQL contra la Supabase local, dentro de una transacción con
  * ROLLBACK, el 2026-10-22.
  *
+ * Fase 3 (`20261022180000_person_merge_notices`): `list_unmerged_invitations`
+ * solo para el admin, una fila por pareja; `resolve_merged_persons` sigue una
+ * fusión viva, olvida una deshecha y no responde a quien no ve la ficha que
+ * se quedó.
+ *
  * Todo en `playwright`, sobre `zzz-e2e-collab`, y lo que crea lo borra.
  */
 
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import {
   envReady,
+  externalEnvReady,
   limitedEnvReady,
   login,
   pgGet,
   pgPatch,
   pgRpc,
   requireEnv,
+  requireExternalEnv,
   requireLimitedEnv,
 } from './_helpers';
 
@@ -231,5 +238,74 @@ describe.skipIf(!envReady())('RLS — person merge', () => {
     const again = await pgRpc('undo_person_merge', jwt, { p_merge_id: m.data!.merge_id });
     expect(again.status).toBe(400);
     expect(again.error).toContain('22023');
+  });
+
+  // ── Fase 3 (`20261022180000_person_merge_notices`) ─────────────────────
+
+  test('the unmerged invitations are the admin\'s, and name an account that is someone else', async () => {
+    // Las 40 invitaciones de `playwright` aceptadas por el usuario del E2E,
+    // que ya era otra persona, son la fixture (plan § 1.4).
+    const r = await pgRpc<
+      Array<{ invitation_id: string; drop_person_id: string; keep_person_id: string; drop_slug: string }>
+    >('list_unmerged_invitations', jwt, { p_workspace_id: workspaceId });
+    expect(r.status, r.error).toBe(200);
+    const rows = r.data ?? [];
+    for (const row of rows) {
+      expect(row.keep_person_id).not.toBe(row.drop_person_id);
+      expect(await live(row.drop_person_id)).toBe(true);
+    }
+    // Una fila por pareja.
+    const pairs = rows.map((x) => `${x.drop_person_id}:${x.keep_person_id}`);
+    expect(new Set(pairs).size).toBe(pairs.length);
+  });
+
+  test.skipIf(!limitedEnvReady())('a member who is not admin cannot list the unmerged invitations', async () => {
+    const lim = requireLimitedEnv();
+    const limitedJwt = await login(lim.email, lim.password);
+    const r = await pgRpc('list_unmerged_invitations', limitedJwt, { p_workspace_id: workspaceId });
+    expect(r.status).toBe(403);
+    expect(r.error).toContain('42501');
+  });
+
+  test('a merged id resolves to the file that stayed, and an undone one to nothing', async () => {
+    const keep = await dossier(`Zzz Merge Pin Keep ${tail()}`);
+    const drop = await dossier(`Zzz Merge Pin Drop ${tail()}`);
+    const resolve = () =>
+      pgRpc<Array<{ person_id: string; merged_into: string }>>('resolve_merged_persons', jwt, {
+        p_person_ids: [drop.person_id, keep.person_id, crypto.randomUUID()],
+      });
+
+    const before = await resolve();
+    expect(before.status, before.error).toBe(200);
+    expect(before.data ?? []).toHaveLength(0);
+
+    const m = await merge(keep.person_id, drop.person_id);
+    expect(m.status, m.error).toBe(200);
+    const after = await resolve();
+    expect(after.data).toEqual([{ person_id: drop.person_id, merged_into: keep.person_id }]);
+
+    const undo = await pgRpc('undo_person_merge', jwt, { p_merge_id: m.data!.merge_id });
+    expect(undo.status, undo.error).toBe(200);
+    expect((await resolve()).data ?? []).toHaveLength(0);
+  });
+
+  test.skipIf(!externalEnvReady())('a guest who cannot read the file that stayed resolves nothing', async () => {
+    const ext = requireExternalEnv();
+    const guestJwt = await login(ext.email, ext.password);
+    const keep = await dossier(`Zzz Merge Pin Out Keep ${tail()}`);
+    const drop = await dossier(`Zzz Merge Pin Out Drop ${tail()}`);
+    const m = await merge(keep.person_id, drop.person_id);
+    expect(m.status, m.error).toBe(200);
+    try {
+      const r = await pgRpc<Array<{ person_id: string }>>('resolve_merged_persons', guestJwt, {
+        p_person_ids: [drop.person_id],
+      });
+      // Un guest no lee el directorio del espacio
+      // (`workspace_person_readable_by_caller`): no sabe en qué se fusionó.
+      expect(r.status, r.error).toBe(200);
+      expect(r.data ?? []).toHaveLength(0);
+    } finally {
+      await pgRpc('undo_person_merge', jwt, { p_merge_id: m.data!.merge_id });
+    }
   });
 });

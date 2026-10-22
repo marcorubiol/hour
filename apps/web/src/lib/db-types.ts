@@ -6239,6 +6239,20 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      list_unmerged_invitations: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          accepted_at: string
+          drop_name: string
+          drop_person_id: string
+          drop_slug: string
+          email: string
+          invitation_id: string
+          keep_name: string
+          keep_person_id: string
+          keep_slug: string
+        }[]
+      }
       list_workspace_access: {
         Args: { p_workspace_id: string }
         Returns: {
@@ -6941,6 +6955,13 @@ export type Database = {
         }
       }
       reset_help_seen: { Args: never; Returns: Json }
+      resolve_merged_persons: {
+        Args: { p_person_ids: string[] }
+        Returns: {
+          merged_into: string
+          person_id: string
+        }[]
+      }
       review_workspace_alias: {
         Args: { p_approve: boolean; p_request_id: string }
         Returns: {

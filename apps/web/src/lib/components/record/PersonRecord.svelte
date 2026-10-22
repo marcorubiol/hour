@@ -46,7 +46,8 @@
   import { goto } from '$app/navigation';
   import { openPeek } from '$lib/peek.svelte';
   import PersonMergeDialog, { type MergeResult } from '$lib/components/PersonMergeDialog.svelte';
-  import { undoOpen, type PersonMergeLine } from '$lib/person-merge';
+  import { useScopes } from '$lib/stores/scopes.svelte';
+  import { undoOpen, type PersonMergeLine, type UnmergedPair } from '$lib/person-merge';
 
   type PersonFile = {
     person: {
@@ -105,6 +106,9 @@
     can_merge?: boolean;
     /** The merges this file absorbed, not undone (admin only). */
     merges?: PersonMergeLine[];
+    /** An invitation accepted by an account that was already someone else,
+        not merged yet (plan 2026-10-22 § 6.1; admin only). */
+    unmerged?: UnmergedPair | null;
   };
 
   const locale = appLocale();
@@ -226,6 +230,7 @@
   // The picker offers only the projects of the current scope (drop 11-10),
   // resolved the same way the lenses resolve it.
   const pins = usePins();
+  const scopes = useScopes();
   const projectsQuery = createQuery(activeProjectsQueryOptions());
   const linesQuery = createQuery(allLinesQueryOptions());
   let scope = $derived.by(() => {
@@ -404,6 +409,15 @@
 
   // ── Merge with another file (plan 2026-10-22, phase 2) ──────────────
   let mergeOpen = $state(false);
+  // «Fusionar con…» opens on an empty picker; «Unir» (phase 3) on the other
+  // file of the invitation, already chosen.
+  let mergeOther = $state<{ person_id: string; full_name: string } | null>(null);
+  let mergeInvitation = $state<string | null>(null);
+  function openMerge(pair: UnmergedPair | null = null) {
+    mergeOther = pair?.other ?? null;
+    mergeInvitation = pair?.invitation_id ?? null;
+    mergeOpen = true;
+  }
 
   /** Everything that lists people, after a merge or its undo. */
   async function refreshPeople() {
@@ -460,6 +474,10 @@
 
   async function onMerged(m: MergeResult) {
     await refreshPeople();
+    // A pin on the file that went pins the one that stayed (§ 6.2).
+    const moved = new Map([[m.drop_person_id, m.keep_person_id]]);
+    pins.rewritePersons(moved);
+    scopes.rewritePersons(moved);
     if (m.keep_slug) showPerson(m.keep_slug);
     addToast({
       tone: 'success',
@@ -480,11 +498,32 @@
     file ? [file.person.city, file.person.country].filter(Boolean).join(', ') : '',
   );
 
-  // «Falta» (ADR-139 p2): sus conversaciones con el siguiente paso vencido.
+  // «Falta» (ADR-139 p2): an invitation accepted by an account that was
+  // already someone else (the admin's, plan 2026-10-22 § 6.1), then its
+  // conversations with the next step overdue.
   let missingItems = $derived.by<MissingItem[]>(() => {
     if (!file) return [];
     const byId = new Map(file.conversations.map((c) => [c.id, c]));
-    return personMissing(file.conversations, localDayISO()).map((m) => {
+    const pair = file.unmerged ?? null;
+    const unmerged: MissingItem[] = pair
+      ? [
+          {
+            id: 'unmerged_invitation',
+            text:
+              pair.invited.person_id === file.person.id
+                ? t('person.unmerged_invited', locale, { email: pair.email })
+                : t('person.unmerged_account', locale, { name: pair.invited.full_name }),
+            verbs: [
+              {
+                label: t('person.unmerged_verb', locale),
+                ariaLabel: t('person.unmerged_verb_full', locale, { name: pair.other.full_name }),
+                onclick: () => openMerge(pair),
+              },
+            ],
+          },
+        ]
+      : [];
+    return [...unmerged, ...personMissing(file.conversations, localDayISO()).map((m) => {
       const c = byId.get(m.conversationId)!;
       const who = c.organization?.name ?? c.project?.name ?? '';
       return {
@@ -493,7 +532,7 @@
         meta: relativeContactDate(m.day, locale),
         verbs: [{ label: t('record.verb_open', locale), href: `/h/${workspaceSlug}/conversation/${c.id}` }],
       };
-    });
+    })];
   });
 </script>
 
@@ -533,7 +572,7 @@
             >
           {/if}
           {#if file.can_merge}
-            <button type="button" class="block-head__act" onclick={() => (mergeOpen = true)}
+            <button type="button" class="block-head__act" onclick={() => openMerge()}
               >{t('person.merge', locale)}</button
             >
           {/if}
@@ -679,6 +718,8 @@
     bind:open={mergeOpen}
     workspaceId={contextWorkspaceId}
     person={{ id: file.person.id, full_name: file.person.full_name }}
+    other={mergeOther}
+    invitationId={mergeInvitation}
     {locale}
     onmerged={onMerged}
   />

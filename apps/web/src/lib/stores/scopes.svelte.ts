@@ -20,6 +20,7 @@
  */
 
 import { getContext, setContext } from 'svelte';
+import { personIdsInTokens, rewritePersonTokens } from '$lib/person-merge';
 
 const KEY = Symbol('scopes');
 const STORAGE_KEY = 'hour_scopes';
@@ -104,6 +105,25 @@ export class ScopesStore {
     }
     this.recent = [{ name, tokens: [...tokens], lastUsedAt: Date.now() }, ...next];
     this.persist();
+  }
+
+  /** A person merged into another file: saved and recent scopes that pinned
+   *  her pin the file that stayed (person merge, plan 2026-10-22 § 6.2). */
+  rewritePersons(into: ReadonlyMap<string, string>): void {
+    let changed = false;
+    for (const s of [...this.saved, ...this.recent]) {
+      const next = rewritePersonTokens(s.tokens, into);
+      if (next) {
+        s.tokens = next;
+        changed = true;
+      }
+    }
+    if (changed) this.persist();
+  }
+
+  /** Every person id pinned anywhere in a saved or recent scope. */
+  personIds(): string[] {
+    return [...this.saved, ...this.recent].flatMap((s) => personIdsInTokens(s.tokens));
   }
 
   restoreFromLocalStorage(): void {

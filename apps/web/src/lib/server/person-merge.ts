@@ -13,3 +13,11 @@ export function refusalResponse(err: unknown): Response | null {
   }
   return json({ error: mergeRefusal(message) }, 400);
 }
+
+/**
+ * La RPC aún no existe en esta base (migración de la fase 3 sin aplicar):
+ * la pantalla sigue sin el aviso en vez de romperse.
+ */
+export function isMissingFunction(err: unknown): boolean {
+  return err instanceof PostgrestError && (err.code === 'PGRST202' || err.code === '42883');
+}

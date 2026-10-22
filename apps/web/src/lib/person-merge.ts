@@ -171,3 +171,92 @@ export interface PersonMergeLine {
   drop_name: string | null;
   merged_at: string;
 }
+
+// ── Fase 3: el aviso de la invitación sin unir, Ajustes y los pins ─────
+
+/**
+ * Una invitación aceptada por una cuenta que ya era otra persona, con su
+ * dossier aún sin unir (`list_unmerged_invitations`, solo el admin). `drop`
+ * es el dossier de la invitación; `keep`, la persona de la cuenta, que
+ * puede no tener ficha en el espacio (`keep_slug` NULL).
+ */
+export interface UnmergedInvitation {
+  invitation_id: string;
+  email: string;
+  accepted_at: string;
+  drop_person_id: string;
+  drop_slug: string;
+  drop_name: string;
+  keep_person_id: string;
+  keep_slug: string | null;
+  keep_name: string;
+}
+
+/** La pareja vista desde una ficha: con quién unirla y por qué invitación. */
+export interface UnmergedPair {
+  invitation_id: string;
+  email: string;
+  /** La ficha de la invitación (la que se aceptó con otra cuenta). */
+  invited: { person_id: string; full_name: string };
+  /** La otra persona de la pareja, para preseleccionar el diálogo. */
+  other: { person_id: string; full_name: string };
+}
+
+/** La invitación sin unir que toca a esta ficha, sea la de la invitación o la de la cuenta. */
+export function unmergedFor(personId: string, list: readonly UnmergedInvitation[]): UnmergedPair | null {
+  const hit = list.find((u) => u.drop_person_id === personId || u.keep_person_id === personId);
+  if (!hit) return null;
+  const invited = { person_id: hit.drop_person_id, full_name: hit.drop_name };
+  const account = { person_id: hit.keep_person_id, full_name: hit.keep_name };
+  return {
+    invitation_id: hit.invitation_id,
+    email: hit.email,
+    invited,
+    other: hit.drop_person_id === personId ? account : invited,
+  };
+}
+
+/** Una fusión reciente del espacio, para Ajustes (`person_merge`, la lee el admin). */
+export interface RecentMerge {
+  id: string;
+  merged_at: string;
+  keep_person_id: string;
+  drop_name: string | null;
+  /** La ficha que se quedó, si sigue viva. */
+  keep_name: string | null;
+  keep_slug: string | null;
+}
+
+/** Los ids de persona de unos tokens de pin (`pe:<id>`). */
+export function personIdsInTokens(tokens: readonly string[]): string[] {
+  return tokens.filter((t) => t.startsWith('pe:')).map((t) => t.slice(3));
+}
+
+/**
+ * Un pin `pe:<drop>` pasa a la ficha que se quedó (`resolve_merged_persons`).
+ * Sin duplicados: si `keep` ya estaba fijada, el pin viejo se va. NULL si no
+ * cambia nada, para no escribir el navegador en balde.
+ */
+export function rewritePersonTokens(
+  tokens: readonly string[],
+  into: ReadonlyMap<string, string>,
+): string[] | null {
+  let changed = false;
+  const out: string[] = [];
+  for (const tok of tokens) {
+    let next = tok;
+    if (tok.startsWith('pe:')) {
+      const keep = into.get(tok.slice(3));
+      if (keep) {
+        next = `pe:${keep}`;
+        changed = true;
+      }
+    }
+    if (out.includes(next)) {
+      changed = true;
+      continue;
+    }
+    out.push(next);
+  }
+  return changed ? out : null;
+}
