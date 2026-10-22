@@ -31,6 +31,7 @@
   import LanguagesSection from '$lib/components/settings/LanguagesSection.svelte';
   import LensesSection from '$lib/components/settings/LensesSection.svelte';
   import ConversationTagsSection from '$lib/components/settings/ConversationTagsSection.svelte';
+  import FacetsSection from '$lib/components/settings/FacetsSection.svelte';
   import MailSection from '$lib/components/settings/MailSection.svelte';
   import SettingsSectionSelect from '$lib/components/SettingsSectionSelect.svelte';
 
@@ -108,6 +109,10 @@
 
   {#if active === 'tags'}
     <ConversationTagsSection workspaceId={currentWorkspace?.id} />
+  {/if}
+
+  {#if active === 'facets'}
+    <FacetsSection workspaceId={currentWorkspace?.id} />
   {/if}
 
   <!-- "Connections" section killed: 7 providers (Fastmail, Holded,
