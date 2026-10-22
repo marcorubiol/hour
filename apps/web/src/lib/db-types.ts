@@ -3169,6 +3169,121 @@ export type Database = {
           },
         ]
       }
+      person_merge: {
+        Row: {
+          drop_dossier_before: Json
+          drop_person_id: string
+          id: string
+          invitation_id: string | null
+          keep_dossier_before: Json | null
+          keep_person_id: string
+          linked_user_id: string | null
+          merged_at: string
+          merged_by: string | null
+          reason: string
+          undone_at: string | null
+          undone_by: string | null
+          workspace_id: string
+        }
+        Insert: {
+          drop_dossier_before: Json
+          drop_person_id: string
+          id?: string
+          invitation_id?: string | null
+          keep_dossier_before?: Json | null
+          keep_person_id: string
+          linked_user_id?: string | null
+          merged_at?: string
+          merged_by?: string | null
+          reason: string
+          undone_at?: string | null
+          undone_by?: string | null
+          workspace_id: string
+        }
+        Update: {
+          drop_dossier_before?: Json
+          drop_person_id?: string
+          id?: string
+          invitation_id?: string | null
+          keep_dossier_before?: Json | null
+          keep_person_id?: string
+          linked_user_id?: string | null
+          merged_at?: string
+          merged_by?: string | null
+          reason?: string
+          undone_at?: string | null
+          undone_by?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "person_merge_drop_person_id_fkey"
+            columns: ["drop_person_id"]
+            isOneToOne: false
+            referencedRelation: "person"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "person_merge_invitation_id_fkey"
+            columns: ["invitation_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_invitation"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "person_merge_keep_person_id_fkey"
+            columns: ["keep_person_id"]
+            isOneToOne: false
+            referencedRelation: "person"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "person_merge_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      person_merge_row: {
+        Row: {
+          action: string
+          column_name: string
+          id: number
+          merge_id: string
+          row_before: Json | null
+          row_id: string | null
+          table_name: string
+        }
+        Insert: {
+          action: string
+          column_name?: string
+          id?: never
+          merge_id: string
+          row_before?: Json | null
+          row_id?: string | null
+          table_name: string
+        }
+        Update: {
+          action?: string
+          column_name?: string
+          id?: never
+          merge_id?: string
+          row_before?: Json | null
+          row_id?: string | null
+          table_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "person_merge_row_merge_id_fkey"
+            columns: ["merge_id"]
+            isOneToOne: false
+            referencedRelation: "person_merge"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project: {
         Row: {
           accent: string | null
@@ -4404,6 +4519,7 @@ export type Database = {
           organization_id: string | null
           person_id: string
           phone: string | null
+          previous_slugs: string[]
           profile_shared_at: string | null
           profile_shared_fields: string[]
           profile_sync_enabled: boolean
@@ -4429,6 +4545,7 @@ export type Database = {
           organization_id?: string | null
           person_id: string
           phone?: string | null
+          previous_slugs?: string[]
           profile_shared_at?: string | null
           profile_shared_fields?: string[]
           profile_sync_enabled?: boolean
@@ -4454,6 +4571,7 @@ export type Database = {
           organization_id?: string | null
           person_id?: string
           phone?: string | null
+          previous_slugs?: string[]
           profile_shared_at?: string | null
           profile_shared_fields?: string[]
           profile_sync_enabled?: boolean
@@ -6450,6 +6568,16 @@ export type Database = {
       }
       mark_help_seen: { Args: { p_key: string }; Returns: Json }
       mark_thread_read: { Args: { p_thread_id: string }; Returns: string }
+      merge_workspace_person: {
+        Args: {
+          p_drop_person_id: string
+          p_fields?: Json
+          p_invitation_id?: string
+          p_keep_person_id: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
       my_mail_signature: {
         Args: { p_workspace_id: string }
         Returns: {
@@ -6497,6 +6625,14 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      preview_person_merge: {
+        Args: {
+          p_drop_person_id: string
+          p_keep_person_id: string
+          p_workspace_id: string
+        }
+        Returns: Json
       }
       preview_workspace_invitation: {
         Args: { p_token: string }
@@ -7079,6 +7215,7 @@ export type Database = {
         Returns: string
       }
       travel_stage_zone: { Args: { p_tz: string }; Returns: string }
+      undo_person_merge: { Args: { p_merge_id: string }; Returns: Json }
       update_bolo_fee: {
         Args: {
           p_bolo_id: string
