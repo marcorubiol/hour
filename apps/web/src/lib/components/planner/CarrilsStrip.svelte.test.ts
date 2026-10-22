@@ -233,6 +233,31 @@ describe('CarrilsStrip — the board grid', () => {
     expect(p.onDayCreate).toHaveBeenCalledWith(TODAY, 'p2');
   });
 
+  it("a guest's lane wears its venue or «your deal», and its empty cells offer no door", () => {
+    const base = laneEvents({
+      axis: 'scope',
+      groups: [],
+      events: [
+        {
+          ...events[0],
+          id: 'g1',
+          project_id: null,
+          guest: { workspace_id: workspaces[0].id, venue_key: '', venue_name: null },
+        },
+      ],
+      castByProject: new Map(),
+      awayByDay: new Map(),
+      spaces: workspaces,
+    });
+    const lane = base.groups[0].lanes[0];
+    const { container } = render(
+      CarrilsStrip,
+      props({ groups: base.groups, cells: base.cells, awayRuns: [], clashes: [], guestWord: 'Your deal' }),
+    );
+    expect(container.querySelector('.board__lab .board__name')?.textContent).toBe('Your deal');
+    expect(container.querySelector(`.board__cell[data-lane="${lane.key}"] .board__add`)).toBeNull();
+  });
+
   it('the weekend is an attribute on every cell — and no wash class exists to read it', () => {
     const { container } = render(CarrilsStrip, props());
     // 11 and 18 July 2026 are Saturdays; the fact is stamped even on cells

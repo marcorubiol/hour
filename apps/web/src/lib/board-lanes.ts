@@ -63,7 +63,7 @@ export type BoardAxis = LaneAxis;
 
 export interface BoardLaneRef {
   key: string;
-  kind: 'project' | 'person' | 'ghost' | 'nocast';
+  kind: 'project' | 'person' | 'ghost' | 'nocast' | 'guest';
   id: string | null;
   name: string;
   accent: string | null;
@@ -102,6 +102,12 @@ function personLaneKey(projectId: string, personId: string): string {
 }
 function ghostLaneKey(projectId: string): string {
   return `ghost:${projectId}`;
+}
+function guestLaneKey(workspaceId: string, venue: string): string {
+  return `guest:${workspaceId}:${venue}`;
+}
+function spaceGroupKey(workspaceId: string): string {
+  return `space:${workspaceId}`;
 }
 
 /**
@@ -144,7 +150,7 @@ export function scopeGroups(input: {
       });
     }
     if (lanes.length > 0) {
-      groups.push({ key: `space:${ws.id}`, kind: 'workspace', id: ws.id, name: ws.name, lanes });
+      groups.push({ key: spaceGroupKey(ws.id), kind: 'workspace', id: ws.id, name: ws.name, lanes });
     }
   }
   return groups;
@@ -244,6 +250,10 @@ export interface BoardEventIn {
   commitments?: readonly Commitment[] | null;
   /** Gig identity, with the venue name as fallback — see `laneTally`. */
   venue_id?: string | null;
+  /** A row read through a bolo membership, without its project (a guest,
+      ADR-100 § 1): the space it lives in and the venue that names its lane.
+      Null or absent for every row whose project is read. */
+  guest?: { workspace_id: string; venue_key: string; venue_name: string | null } | null;
   slip: Slip;
 }
 
@@ -280,11 +290,13 @@ export function laneEvents(input: {
   events: readonly BoardEventIn[];
   castByProject: ReadonlyMap<string, readonly string[]>;
   awayByDay: ReadonlyMap<string, ReadonlySet<string>>;
+  /** The spaces in the app's order, for the band a guest lane is born in. */
+  spaces?: readonly { id: string; name: string }[];
 }): {
   groups: BoardGroup[];
   cells: ReadonlyMap<string, ReadonlyMap<string, readonly PlacedEvent[]>>;
 } {
-  const groups = input.groups.map((g) => ({ ...g, lanes: [...g.lanes] }));
+  let groups = input.groups.map((g) => ({ ...g, lanes: [...g.lanes] }));
   const laneKeys = new Set<string>();
   for (const g of groups) for (const l of g.lanes) laneKeys.add(l.key);
 
@@ -303,6 +315,70 @@ export function laneEvents(input: {
     list.push({ event, link });
   };
 
+  /* A GUEST'S ROWS (ADR-100 § 1, comms carril 2): a bolo membership reads
+     its performances but not their project, so no project lane can hold
+     them. They get a lane of their own per venue, in their space's band,
+     on both axes — the same row the reader was invited to, never a project
+     they cannot open. Born here like nocast: placement and lane-birth stay
+     one writer. A row whose project is read never takes this path. */
+  const spaceOrder = new Map((input.spaces ?? []).map((w, i) => [w.id, i] as const));
+  const bornGroups: typeof groups = [];
+  for (const e of input.events) {
+    if (e.project_id || !e.guest) continue;
+    const { workspace_id: ws, venue_key, venue_name } = e.guest;
+    const laneKey = guestLaneKey(ws, venue_key);
+    if (!laneKeys.has(laneKey)) {
+      let group = groups.find((g) => g.kind === 'workspace' && g.id === ws);
+      if (!group) {
+        group = {
+          key: spaceGroupKey(ws),
+          kind: 'workspace',
+          id: ws,
+          name: input.spaces?.find((w) => w.id === ws)?.name ?? '',
+          lanes: [],
+        };
+        groups.push(group);
+        bornGroups.push(group);
+      }
+      group.lanes.push({
+        key: laneKey,
+        kind: 'guest',
+        id: null,
+        // The venue's name; empty = the page words it («Your bolo»).
+        name: venue_name ?? '',
+        accent: null,
+        initials: null,
+        shared: false,
+      });
+      laneKeys.add(laneKey);
+    }
+    place(laneKey, e.day, e, 'explicit');
+  }
+  // Guest lanes after the project lanes of their band, by name (law 7: the
+  // order never depends on which row arrived first).
+  for (const g of groups) {
+    if (!g.lanes.some((l) => l.kind === 'guest')) continue;
+    const own = g.lanes.filter((l) => l.kind !== 'guest');
+    const guest = g.lanes
+      .filter((l) => l.kind === 'guest')
+      .sort((a, b) => a.name.localeCompare(b.name) || a.key.localeCompare(b.key));
+    g.lanes = [...own, ...guest];
+  }
+  if (bornGroups.length > 0) {
+    const at = (g: { id: string }) => spaceOrder.get(g.id) ?? Number.MAX_SAFE_INTEGER;
+    if (input.axis === 'scope') {
+      // Every band is a space here: the born one takes its place in the app's order.
+      groups = groups
+        .map((g, i) => ({ g, i }))
+        .sort((a, b) => at(a.g) - at(b.g) || a.i - b.i)
+        .map(({ g }) => g);
+    } else {
+      // Project bands first, as the person axis draws them; the spaces after.
+      const born = new Set(bornGroups);
+      groups = [...groups.filter((g) => !born.has(g)), ...bornGroups.sort((a, b) => at(a) - at(b))];
+    }
+  }
+
   if (input.axis === 'scope') {
     for (const e of input.events) {
       if (!e.project_id) continue;
@@ -313,7 +389,7 @@ export function laneEvents(input: {
   }
 
   const groupByProject = new Map<string, (typeof groups)[number]>();
-  for (const g of groups) groupByProject.set(g.id, g);
+  for (const g of groups) if (g.kind === 'project') groupByProject.set(g.id, g);
 
   for (const e of input.events) {
     if (!e.project_id) continue;

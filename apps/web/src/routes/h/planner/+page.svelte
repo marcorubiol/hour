@@ -1051,6 +1051,16 @@
       The SCOPED rows, not the drawn ones: the lane tallies count the window,
       so calm does not thin them (ADR-139 § 5); `boardDrawnCells` drops from
       the paper what calm does not draw. */
+  /** A performance read through a bolo, without its project (a guest): its
+      own lane, named by the venue (ADR-100 § 1). Null when the project is read. */
+  function boardGuestOf(p: PerformanceEvent): BoardEventIn['guest'] {
+    if (p.project) return null;
+    const ws = perfWorkspaceId(p);
+    if (!ws) return null;
+    const name = p.venue?.name ?? p.venue_name ?? null;
+    return { workspace_id: ws, venue_key: p.venue?.id ?? name ?? '', venue_name: name };
+  }
+
   let boardEvents = $derived.by((): BoardEventIn[] => {
     if (view !== 'board') return [];
     const out: BoardEventIn[] = [];
@@ -1068,6 +1078,7 @@
         // This feed carries no venue id, so the tally's gig identity falls
         // back to the slip's name — the engine's own documented fallback.
         venue_id: null,
+        guest: boardGuestOf(p),
         slip: performanceSlip(p, slipCtxPage),
       });
     }
@@ -1117,6 +1128,7 @@
       events: boardEvents,
       castByProject: boardCast,
       awayByDay: boardAwayByDay,
+      spaces: ($workspacesQuery.data?.items ?? []).map((w) => ({ id: w.id, name: w.name })),
     });
   });
   /** What the board puts on paper: every placed row outside calm, the
@@ -3764,6 +3776,7 @@
       sharedWord={t('planner.board_shared', locale)}
       teamWord={t('planner.board_team', locale)}
       noCastWord={t('planner.no_cast', locale)}
+      guestWord={t('planner.board_guest', locale)}
       awayWord={t('planner.band_away', locale)}
       tourWord={t('planner.band_tour', locale)}
       untilLabel={(iso) => t('planner.band_until', locale, { day: localeDayMonth(iso, localeTag) })}
