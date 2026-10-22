@@ -4857,3 +4857,56 @@ lo lee.
 **Re-evaluar cuando** haya bolos en `muk-cia` y un técnico de verdad entre por una invitación: si el «día después de la
 última función» es corto o largo, si invitar con Equip desde un invitado se usa o molesta, y si hace falta el correo
 de invitación.
+
+## [2026-10-22] ADR-143 · Fusión de persona: dos dossiers del mismo espacio en uno, solo admin, deshacer 30 días (enmienda ADR-107)
+
+**Contexto.** ADR-107 dejó un caso abierto: la cuenta que acepta una invitación ya es otra persona, y el dossier de la
+invitación queda sin enlazar, dos `person_id` para el mismo ser humano. Marco decidió el 14-10 que se resolviera con
+una fusión explícita que confirma un admin. Plan con el estado de producción y las alternativas:
+`build/plans/2026-10-22-person-merge.md`. Marco aprobó el 22-10 las seis recomendadas de su § 11 («apruebo todo»). Las
+tres fases están en producción el 22-10: esquema y RPC (`20261022130000_person_merge`), la pantalla de fusión
+(`4a8639b8`) y el aviso (`20261022180000_person_merge_notices`, `190d5ff0`).
+
+**Decisión.**
+1. **Se fusiona el dossier dentro de un espacio**, no la persona global ni un alias. Dos dossiers del mismo espacio,
+   uno se queda (`keep`) y otro desaparece (`drop`): cada fila de ese espacio que apunta a `drop` pasa a `keep`
+   (reparto, cambios de reparto, equipo técnico, disponibilidad, «voy», contactos de conversación, «lo conozco», notas,
+   invitaciones, destinatarios de envío); `drop` se borra en blando con `merged_into`, su slug pasa a
+   `keep.previous_slugs` y sigue abriendo la ficha, y la persona global no se toca. Otros espacios no cambian. Un choque
+   de unicidad deja una sola fila (`retired`, o `merged` en la que absorbe, con su antes guardado). Si `keep` es la cuenta de
+   alguien del espacio sin dossier en él, el dossier se crea con los datos de `drop`.
+2. **Solo el admin del espacio** fusiona y deshace (`is_workspace_admin`), no quien puede crear dossiers: la fusión
+   mueve notas ajenas y contactos de conversaciones. La persona fusionada no confirma. La persona de una cuenta siempre
+   se queda: si `drop` tiene cuenta y `keep` no, se intercambian solos; si las dos tienen cuenta, se rechaza (22023).
+   Un dossier que el admin no puede leer no se fusiona (42501, el mismo error que uno que no existe).
+3. **La vista previa enseña lo que el admin ve, y lo que no ve se mueve sin contarse.** `preview_person_merge` es
+   SECURITY INVOKER (cambio sobre el plan, que la hacía DEFINER): sus recuentos son exactamente lo que la RLS deja leer
+   a quien llama (ADR-099 § 4), y las notas, solo las suyas. Notas privadas ajenas, «lo conozco» sin compartir y
+   contactos de conversaciones privadas ajenas pasan a `keep` igual. La lista de lo movido (`person_merge_row`) no tiene
+   grant a nadie, tampoco al admin, y nunca guarda el cuerpo de una nota. El guard de `note` deja cambiar `person_id`
+   solo dentro de una fusión en curso y fuera de los roles de PostgREST.
+4. **El admin elige nombre, email y teléfono** donde las dos fichas tienen valor; los campos vacíos de `keep` toman los
+   de `drop`. Un dossier lleva un solo email: la confirmación dice que el otro «deja de traer correo a Hour». Varios
+   emails por dossier, si hace falta, es otra tarea.
+5. **Deshacer dura 30 días y se hace una vez** (`undo_person_merge`): revive `drop`, devuelve `keep` a como estaba y
+   cada fila a su sitio. Lo creado sobre `keep` después se queda en `keep` y lo que se borró después se salta (la
+   pantalla dice cuántas). Una fusión deshecha no se rehace: se fusiona otra vez. Si `keep` se fusionó después en otra,
+   hay que deshacer esa antes. Tras fusionar, el aviso lleva «Deshacer»; la ficha que se queda dice «Fusionada con X el
+   día · Deshacer la fusión» mientras quepa el plazo.
+6. **El aviso de una invitación aceptada sin unir** sale en la ficha del dossier (la franja «Falta», ADR-139 § 2,
+   «Unir con X») y en Ajustes › Equipo («Sin unir», junto a «Fusiones recientes» con su «Deshacer»), de la misma lectura
+   (`list_unmerged_invitations`, solo admin), deducida sin columna nueva. No va a Hoy: no corre prisa y nada se rompe
+   mientras no se une. «Unir» abre la fusión con las dos fichas ya elegidas.
+7. **Una fusión deshecha no vuelve a avisar** (decisión del coordinador): `list_unmerged_invitations` deja fuera la
+   invitación o la pareja que ya se fusionó una vez, aunque se deshiciera. Deshacer dice «no es la misma», y el aviso no
+   insiste.
+8. **Los pins del Planner siguen a la ficha que se queda:** un `pe:<drop>` guardado en el navegador se cambia por
+   `pe:<keep>` al leerlo (`resolve_merged_persons`, que sigue la cadena hasta 8 saltos y solo resuelve hacia fichas que
+   quien llama ya ve).
+
+**Enmienda a ADR-107, «Caso abierto».** Queda resuelto así: aceptar la invitación sigue sin fusionar sola; el admin ve
+el aviso y une con esta fusión. «Sin reescribir historial» deja de valer en ese caso: la fusión sí reescribe el
+`person_id` de las filas del espacio, y `audit_log` conserva lo que pasó.
+
+**Re-evaluar cuando** la primera persona real entre en dos espacios (Anouk en `muk-cia` y en el suyo): si el aviso en
+la ficha y en Ajustes basta, si 30 días es el plazo, y si perder el segundo email pide varios emails por dossier.
