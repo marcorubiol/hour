@@ -2225,6 +2225,8 @@
   .action-bar {
     position: sticky;
     inset-block-end: calc(var(--space-s) + var(--shell-foot));
+    /* Over the rows it floats on: a row lifts its controls with --z-raised. */
+    z-index: var(--z-sticky);
     display: flex;
     flex-wrap: wrap;
     align-items: center;

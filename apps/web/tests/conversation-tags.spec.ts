@@ -9,7 +9,8 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  * E2E · etiquetas de conversación, fase 2 (ADR-138 § 1 y 2).
  *
  * 1. La fila de chips: Todas · Venues · Press · … · Team; Press activo por la
- *    URL, sin «Select» (el envío en bloque es de Difusión) ni temporada.
+ *    URL, con «Select» (las acciones en bloque son de todas, plan de la lista
+ *    § 6.2) y sin «Write to N» (el envío es de Difusión) ni temporada.
  * 2. «Añadir» bajo Press nace con Press: sale en Press, no en Venues, y en
  *    Todas (una sola lista desde la fase 3) con su etiqueta en la fila.
  * 3. La ficha enseña sus etiquetas y quien edita las cambia: con Venues
@@ -51,13 +52,17 @@ test.describe('conversation tags', () => {
     // A red here must not leave its org-only row on top of the list: other
     // specs read the first row of Conversations and expect a contact.
     try {
-      // 1. The chips, Press active; no bulk send and no season outside Difusión.
+      // 1. The chips, Press active; selection, but no bulk send and no season outside Difusión.
       const chips = page.locator('.lenshead__sub [data-chip]');
       await expect(chips.first()).toHaveAttribute('data-chip', 'all');
       await expect(chips.last()).toHaveAttribute('data-chip', 'team');
       await expect(page.locator('.lenshead__sub [data-chip="sales"]')).toHaveText('Venues');
       await expect(page.locator('.lenshead__sub [data-chip="press"]')).toHaveAttribute('aria-current', 'page');
-      await expect(page.getByRole('button', { name: /^Select$/ })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: /^Select$/ })).toBeVisible();
+      await page.getByRole('button', { name: /^Select$/ }).click();
+      await expect(page.getByRole('toolbar', { name: 'Actions on the selection' })).toBeVisible();
+      await expect(page.getByRole('button', { name: /^Write to/ })).toHaveCount(0);
+      await page.getByRole('button', { name: 'Stop selecting' }).first().click();
       await expect(page.getByTestId('block-season')).toHaveCount(0);
 
       // 2. Added under Press, it is born with Press.

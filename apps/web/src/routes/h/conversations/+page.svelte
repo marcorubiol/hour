@@ -11,10 +11,16 @@
    * find-or-creates the person on email, so re-typing a known email links
    * the existing file instead of duplicating it.
    *
-   * Selection mode (envío en bloque, plan § 10): checkboxes over the filtered
-   * list and a bar «Escribir a N», which creates the draft (POST /api/mailout)
-   * and opens the mailout screen. A mailout belongs to one project, so the
-   * bar asks for conversations of a single project.
+   * Selection mode (plan de la lista § 6.2, fase 2): checkboxes over the
+   * filtered list, under every chip but Equipo, and a bar with what is done
+   * ten at a time: «No esta vez», «Etiquetar» (put or take one tag), «Siguiente
+   * paso» and «No pide respuesta», through `POST /api/conversations/bulk`
+   * (each row with the caller's permissions; the toast says how many and
+   * offers «Deshacer»). Under Difusión also «Escribir a N», which creates the
+   * draft (POST /api/mailout) and opens the mailout screen; a mailout belongs
+   * to one project. With the page all picked, «Seleccionar las N que
+   * coinciden» picks the whole filter. Keyboard in the list: arrows, Enter,
+   * `x` picks, Esc leaves.
    *
    * A row of chips in the lens header (ADR-138 § 1 y 2, fase 2; it replaces
    * the two views of ADR-134): Todas · the active tags of the scope in their
@@ -62,6 +68,21 @@
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
+  import Menu from '$lib/components/Menu.svelte';
+  import NextActionDialog from '$lib/components/NextActionDialog.svelte';
+  import NotNowDialog from '$lib/components/NotNowDialog.svelte';
+  import { useQueryClient } from '@tanstack/svelte-query';
+  import {
+    MATCHING_MAX,
+    bulkBodies,
+    bulkDoneTitle,
+    bulkFailedLine,
+    restoreBodies,
+    runBulk,
+    type BulkArgs,
+    type BulkRequest,
+    type BulkResult,
+  } from '$lib/conversation-bulk';
   import type { ConversationItem } from '$lib/conversation';
   import { RELATIONS, relationLabel, type Relation } from '$lib/conversation-relation';
   import { appLocale, t } from '$lib/i18n';
@@ -76,6 +97,7 @@
     panelHref,
     panelOf,
     scopeTags,
+    tagLabel,
   } from '$lib/conversation-tags';
   import { conversationTagsQueryOptions } from '$lib/conversation-tags-query';
   import { usePins } from '$lib/stores/pins.svelte';
@@ -169,6 +191,8 @@
 
   // Debounced search — the raw input updates instantly, the query key
   // only after the pause.
+  // Selection mode (below): declared first, the common list gives way to it.
+  let picking = $state(false);
   let qRaw = $state('');
   // `?q=` lleva una búsqueda hecha en otro sitio: una organización del ⌘K con
   // varias conversaciones (o ninguna) abre la lente buscando su nombre.
@@ -319,7 +343,7 @@
    * a relation, the season…) is about conversations: the table, as under any
    * other chip.
    */
-  let mixed = $derived(chip === ALL && !hasListFilter(listFilter) && orden === DEFAULT_ORDER);
+  let mixed = $derived(chip === ALL && !hasListFilter(listFilter) && orden === DEFAULT_ORDER && !picking);
 
   function clearListFilter() {
     const params = new URLSearchParams(page.url.searchParams);
@@ -393,8 +417,7 @@
     creation.openConversation({ tag: addTagKey(chip) });
   }
 
-  // ── Selection → mailout (plan § 10) ───────────────────────────────────
-  let picking = $state(false);
+  // ── Selection (plan § 10; plan de la lista § 6.2) ─────────────────────
   let table = $state<ReturnType<typeof ConversationTable>>();
   let picked = $state<Pick<ConversationItem, 'id' | 'project_id'>[]>([]);
   let pickedProjects = $derived([...new Set(picked.map((c) => c.project_id))]);
@@ -403,13 +426,100 @@
     picking = !picking;
     picked = [];
   }
-  // Selection is Difusión's: leaving the chip leaves it.
+  /** Esc, or «Dejar de seleccionar»: the focus goes back to the list's title. */
+  function leavePicking() {
+    picking = false;
+    picked = [];
+    void tick().then(() => listHeading?.focus({ preventScroll: true }));
+  }
+  // Equipo has no conversations to pick: going there leaves the selection.
   $effect(() => {
-    if (!canBulkSend(chip)) untrack(() => {
+    if (panel === 'team') untrack(() => {
       picking = false;
       picked = [];
     });
   });
+
+  // What the bar needs of the page on screen (ConversationTable's `onpage`).
+  let listPage = $state({ total: 0, size: 0, full: false });
+  let matchCount = $derived(Math.min(listPage.total, MATCHING_MAX));
+  // «Seleccionar las N que coinciden»: the page is all picked and the filter has more.
+  let offerMatching = $derived(listPage.full && listPage.total > listPage.size && picked.length < matchCount);
+  let matchingBusy = $state(false);
+  async function pickMatching() {
+    if (!table) return;
+    matchingBusy = true;
+    try {
+      await table.pickMatching();
+    } catch {
+      addToast({ tone: 'danger', message: t('conversations.load_error', locale) });
+    } finally {
+      matchingBusy = false;
+    }
+  }
+
+  // ── Bulk actions (plan de la lista § 6.2): one endpoint, in chunks ─────
+  const queryClient = useQueryClient();
+  let bulkBusy = $state(false);
+  let notNowOpen = $state(false);
+  let nextOpen = $state(false);
+  let pickedWho = $derived(t(picked.length === 1 ? 'mailout.picked_one' : 'mailout.picked_other', locale, { n: picked.length }));
+
+  function postBulk(body: BulkRequest): Promise<BulkResult> {
+    return mutateJSON<BulkResult>('POST', '/api/conversations/bulk', body).then((r) => {
+      if (!r) throw new Error(t('conversations.unexpected_response', locale));
+      return r;
+    });
+  }
+
+  function refreshLists() {
+    for (const key of ['conversations', 'conversation-overview', 'conversation-feed', 'line-eng-stats', 'conversation']) {
+      void queryClient.invalidateQueries({ queryKey: [key] });
+    }
+  }
+
+  async function undoBulk(result: BulkResult) {
+    const back = await runBulk(restoreBodies(result.undo), postBulk);
+    refreshLists();
+    if (back.failed.length === 0) addToast({ tone: 'success', message: t('ui.undone', locale) });
+    else addToast({ tone: 'danger', title: t('ui.not_undone', locale), message: bulkFailedLine(back, locale) ?? '' });
+  }
+
+  async function bulk(args: BulkArgs) {
+    if (picked.length === 0 || bulkBusy) return;
+    bulkBusy = true;
+    try {
+      const result = await runBulk(bulkBodies(args, picked.map((p) => p.id)), postBulk);
+      refreshLists();
+      const failed = bulkFailedLine(result, locale);
+      if (result.done.length === 0) {
+        addToast({ tone: 'danger', title: t('conversations.change_not_saved', locale), message: failed ?? '' });
+        return;
+      }
+      addToast({
+        tone: failed ? 'warning' : 'success',
+        title: bulkDoneTitle(args.action, result.done.length, locale),
+        message: failed ?? '',
+        // Time to read it and reach «Deshacer».
+        duration: 8000,
+        ...(result.undo.length > 0 ? { action: { label: t('ui.undo', locale), run: () => void undoBulk(result) } } : {}),
+      });
+    } finally {
+      bulkBusy = false;
+    }
+  }
+
+  /** «Etiquetar»: put or take one tag of the scope, the rest untouched. */
+  let tagActions = $derived([
+    ...tagNames.map((tag) => ({
+      label: t('bulk.tag_add', locale, { tag: tagLabel(tag, locale) }),
+      onclick: () => void bulk({ action: 'tag', key: tag.key, op: 'add' }),
+    })),
+    ...tagNames.map((tag) => ({
+      label: t('bulk.tag_remove', locale, { tag: tagLabel(tag, locale) }),
+      onclick: () => void bulk({ action: 'tag', key: tag.key, op: 'remove' }),
+    })),
+  ]);
 
   const writeMutation = createMutation({
     mutationFn: () =>
@@ -528,11 +638,9 @@
       {/if}
       {#if canEdit}
         <Button size="s" onclick={openAdd}>{t('conversations.add', locale)}</Button>
-        {#if canBulkSend(chip)}
-          <Button size="s" variant="secondary" onclick={togglePicking}>
-            {picking ? t('mailout.pick_done', locale) : t('mailout.pick', locale)}
-          </Button>
-        {/if}
+        <Button size="s" variant="secondary" onclick={togglePicking}>
+          {picking ? t('mailout.pick_done', locale) : t('mailout.pick', locale)}
+        </Button>
       {/if}
     </div>
 
@@ -562,16 +670,38 @@
         bind:selected={picked}
         {tagNames}
         hideTag={chip}
+        onpage={(p) => (listPage = p)}
+        onexit={leavePicking}
       />
     {/if}
     {/if}
 
     {#if picking}
-      <div class="action-bar" role="region" aria-label={t('mailout.pick_bar', locale)}>
+      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+      <div
+        class="action-bar"
+        role="region"
+        aria-label={t('mailout.pick_bar', locale)}
+        onkeydown={(e) => {
+          if (e.key === 'Escape' && !(e.target as HTMLElement).closest('[role="menu"]')) {
+            e.preventDefault();
+            leavePicking();
+          }
+        }}
+      >
         <!-- Picking and unpicking is announced (móvil #2). -->
         <p class="action-bar__note" aria-live="polite">
-          {#if pickedProjects.length > 1}
+          {#if canBulkSend(chip) && pickedProjects.length > 1}
             {t('mailout.one_project', locale)}
+          {:else}
+            {pickedWho}
+          {/if}
+          {#if offerMatching}
+            <button type="button" class="action-bar__keep" disabled={matchingBusy} onclick={pickMatching}
+              >{t('bulk.pick_matching', locale, { n: matchCount })}</button
+            >
+          {/if}
+          {#if canBulkSend(chip) && pickedProjects.length > 1}
             <!-- The way out in one click (uso #6): keep one project's picks. -->
             {#each pickedProjects as pid (pid)}
               <button type="button" class="action-bar__keep" onclick={() => (picked = picked.filter((c) => c.project_id === pid))}
@@ -581,24 +711,51 @@
                 })}</button
               >
             {/each}
-          {:else}
-            {t(picked.length === 1 ? 'mailout.picked_one' : 'mailout.picked_other', locale, { n: picked.length })}
           {/if}
         </p>
         <!-- On a phone the bar is where the thumb is: the page's «all» and the way out live here too. -->
         <span class="action-bar__more">
           <Button size="s" variant="secondary" onclick={() => table?.togglePage()}>{t('mailout.pick_page_short', locale)}</Button>
-          <Button size="s" variant="secondary" onclick={togglePicking}>{t('mailout.pick_done', locale)}</Button>
+          <Button size="s" variant="secondary" onclick={leavePicking}>{t('mailout.pick_done', locale)}</Button>
         </span>
-        <Button
-          size="s"
-          disabled={picked.length === 0 || pickedProjects.length !== 1}
-          loading={$writeMutation.isPending}
-          onclick={() => $writeMutation.mutate()}
-        >
-          {t('mailout.write_to', locale, { n: picked.length })}
-        </Button>
+        <div class="action-bar__acts" role="toolbar" aria-label={t('bulk.actions', locale)}>
+          <Button size="s" variant="secondary" disabled={picked.length === 0 || bulkBusy} onclick={() => (notNowOpen = true)}
+            >{t('conversations.relation_not_now', locale)}</Button
+          >
+          {#if tagActions.length > 0 && picked.length > 0 && !bulkBusy}
+            <Menu items={tagActions} direction="up" align="end" label={t('bulk.tag', locale)}>
+              {#snippet trigger()}{t('bulk.tag', locale)}<span class="action-bar__caret" aria-hidden="true">▾</span>{/snippet}
+            </Menu>
+          {:else if tagActions.length > 0}
+            <Button size="s" variant="secondary" disabled>{t('bulk.tag', locale)}</Button>
+          {/if}
+          <Button size="s" variant="secondary" disabled={picked.length === 0 || bulkBusy} onclick={() => (nextOpen = true)}
+            >{t('conversations.col_next_action', locale)}</Button
+          >
+          <Button size="s" variant="secondary" disabled={picked.length === 0 || bulkBusy} onclick={() => void bulk({ action: 'settle' })}
+            >{t('overview.settle', locale)}</Button
+          >
+          {#if canBulkSend(chip)}
+            <Button
+              size="s"
+              disabled={picked.length === 0 || pickedProjects.length !== 1}
+              loading={$writeMutation.isPending}
+              onclick={() => $writeMutation.mutate()}
+            >
+              {t('mailout.write_to', locale, { n: picked.length })}
+            </Button>
+          {/if}
+        </div>
       </div>
+      <NotNowDialog bind:open={notNowOpen} {locale} who={pickedWho} onsave={(until) => void bulk({ action: 'not_now', until })} />
+      <NextActionDialog
+        bind:open={nextOpen}
+        who={pickedWho}
+        date=""
+        note=""
+        {locale}
+        onsave={(next) => void bulk({ action: 'next_step', ...next })}
+      />
     {/if}
   {/if}
 </section>
@@ -650,9 +807,15 @@
       scroll-margin-block-start: var(--space-l);
       margin-block-start: var(--space-m);
     }
-    .action-bar__more {
+    .action-bar__more,
+    .action-bar__acts {
       display: flex;
+      flex-wrap: wrap;
+      align-items: center;
       gap: var(--space-xs);
+    }
+    .action-bar__caret {
+      margin-inline-start: var(--space-2xs);
     }
     .action-bar__keep {
       margin-inline-start: var(--space-s);

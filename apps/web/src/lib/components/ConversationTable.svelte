@@ -104,6 +104,10 @@
     projectName?: (id: string) => string | null;
     /** The line's name, when the scope has several. */
     lineName?: (id: string) => string | null;
+    /** What the selection bar needs of the page: how many match, and whether the page is all picked. */
+    onpage?: (page: { total: number; size: number; full: boolean }) => void;
+    /** Esc in the list while picking: leave the selection (plan § 6.1). */
+    onexit?: () => void;
   }
 
   let {
@@ -120,6 +124,8 @@
     bolosColumn = false,
     projectName,
     lineName,
+    onpage,
+    onexit,
   }: Props = $props();
 
   type ConversationsResponse = {
@@ -387,6 +393,62 @@
         : [...selected, ...items.filter((i) => !selectedIds.has(i.id))];
   }
 
+  $effect(() => {
+    onpage?.({ total, size: items.length, full: items.length > 0 && pagePicked === items.length });
+  });
+
+  /**
+   * «Seleccionar las N que coinciden» (plan § 6.2): the ids of the whole
+   * filter, without reading the rows. The selection keeps ids, not the filter:
+   * a filter changed afterwards does not widen it.
+   */
+  export async function pickMatching(): Promise<number> {
+    const res = await fetchJSON<{ total: number; items: Pick<ConversationItem, 'id' | 'project_id'>[] }>(
+      `/api/conversations?${params(filters, 0)}&ids_only=1`,
+    );
+    const have = new Set(selected.map((s) => s.id));
+    selected = [...selected, ...res.items.filter((i) => !have.has(i.id))];
+    return res.items.length;
+  }
+
+  // ── Keyboard (plan § 6.1): arrows move between rows, Enter opens (the
+  //    row's link), `x` picks while picking, Esc leaves the selection. ──
+  let listEl = $state<HTMLUListElement>();
+
+  /** The row's own stop: its checkbox while picking, else its title link. */
+  function rowStop(li: Element): HTMLElement | null {
+    return li.querySelector<HTMLElement>(selectable ? '.crow__pick input' : '.crow__title[href]') ??
+      li.querySelector<HTMLElement>('.crow__title[href]');
+  }
+
+  function onListKey(e: KeyboardEvent) {
+    if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
+    const target = e.target as HTMLElement;
+    // A menu, a field or a dialog keeps its own keys.
+    if (target.closest('[role="menu"], [role="dialog"], input:not([type="checkbox"]), textarea, select')) return;
+    const li = target.closest('li[data-testid="conversation-row"]');
+    if (!li || !listEl) return;
+    const rowsEls = [...listEl.querySelectorAll(':scope > li')];
+    const at = rowsEls.indexOf(li);
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      const to = rowsEls[at + (e.key === 'ArrowDown' ? 1 : -1)];
+      const stop = to ? rowStop(to) : null;
+      if (stop) {
+        e.preventDefault();
+        stop.focus();
+      }
+    } else if (e.key === 'x' && selectable) {
+      const item = items[at];
+      if (item) {
+        e.preventDefault();
+        togglePick(item);
+      }
+    } else if (e.key === 'Escape' && selectable && onexit) {
+      e.preventDefault();
+      onexit();
+    }
+  }
+
   let showPagination = $derived(total > LIMIT);
   let rangeEnd = $derived(Math.min(offset + LIMIT, total));
 </script>
@@ -414,7 +476,16 @@
   {/if}
 </div>
 
-<ul class="crow-list crow-list--relation" class:crow-list--bolos={withBolos} aria-busy={busy} data-testid="conversation-list">
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+<ul
+  bind:this={listEl}
+  class="crow-list crow-list--relation"
+  class:crow-list--bolos={withBolos}
+  aria-busy={busy}
+  aria-keyshortcuts={selectable ? 'ArrowUp ArrowDown x Escape' : 'ArrowUp ArrowDown'}
+  data-testid="conversation-list"
+  onkeydown={onListKey}
+>
   {#each rows as r, i (r.item.id)}
     {@const item = r.item}
     {@const picked = selectable && selectedIds.has(item.id)}
