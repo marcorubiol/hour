@@ -78,29 +78,13 @@
   {:else if feed && feed.threads.length === 0}
     <EmptyLine text={t('threads.feed_empty', locale)} />
   {:else if feed}
-    <ul class="feed__list">
+    <ul class="crow-list">
       {#each feed.threads as th (th.thread_id)}
         {@const href = feedHref(th, workspaceSlugById.get(th.workspace_id))}
-        <li class="feed__row" data-testid="feed-row">
+        <li data-testid="feed-row">
           <ThreadFeedRow {th} {href} author={author(feed, th)} where={where(th)} {locale} {tz} />
         </li>
       {/each}
     </ul>
   {/if}
 </section>
-
-<style>
-  @layer components {
-    .feed__list {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      border-block-start: var(--border);
-    }
-
-    .feed__row {
-      border-block-end: var(--border);
-    }
-
-  }
-</style>

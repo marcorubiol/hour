@@ -42,7 +42,7 @@
   import { createMutation, createQuery } from '@tanstack/svelte-query';
   import { afterNavigate, goto } from '$app/navigation';
   import { page } from '$app/state';
-  import { mutateJSON } from '$lib/api';
+  import { fetchJSON, mutateJSON } from '$lib/api';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import Button from '$lib/components/Button.svelte';
   import LensHeader from '$lib/components/LensHeader.svelte';
@@ -52,7 +52,9 @@
   import Chip from '$lib/components/Chip.svelte';
   import { tick, untrack } from 'svelte';
   import { toStore } from 'svelte/store';
-  import { NO_LINE, parseListFilter } from '$lib/conversation-overview';
+  import { MAILOUT_PICKS, NO_LINE, hasListFilter, parseListFilter, type MailoutPick } from '$lib/conversation-overview';
+  import { DEFAULT_ORDER, ORDERS, parseOrden, type Orden } from '$lib/conversation-order';
+  import { dayMonth } from '$lib/datetime';
   import ThreadFeed from '$lib/components/ThreadFeed.svelte';
   import ConversationFeed from '$lib/components/ConversationFeed.svelte';
   import FirstVisitCard from '$lib/components/FirstVisitCard.svelte';
@@ -190,13 +192,55 @@
   let listFilter = $derived(parseListFilter(page.url.searchParams));
   let relationFilter = $derived<string>(listFilter.relacion ?? 'any');
 
-  function setRelation(next: string) {
+  /** A filter of the list's row (plan de la lista § 5): one URL param; its «any» clears it. */
+  function setParams(next: Record<string, string | null>) {
     const params = new URLSearchParams(page.url.searchParams);
-    if (next === 'any') params.delete('relacion');
-    else params.set('relacion', next);
+    for (const [k, v] of Object.entries(next)) {
+      if (v === null) params.delete(k);
+      else params.set(k, v);
+    }
     const qs = params.toString();
     void goto(`${page.url.pathname}${qs ? `?${qs}` : ''}`, { noScroll: true, keepFocus: true, replaceState: true });
   }
+  function setRelation(next: string) {
+    setParams({ relacion: next === 'any' ? null : next });
+  }
+
+  // The order (plan § 4): in the URL, never remembered by the browser (ADR-120 § 2).
+  let orden = $derived<Orden>(parseOrden(page.url.searchParams.get('orden')));
+  function setOrden(next: string) {
+    setParams({ orden: next === DEFAULT_ORDER ? null : next });
+  }
+  const ORDER_WORD: Record<Orden, string> = {
+    pide: 'conversations.order_pide',
+    movimiento: 'conversations.order_movimiento',
+    paso: 'conversations.order_paso',
+    nombre: 'conversations.order_nombre',
+  };
+  let orderOptions = ORDERS.map((o) => ({ value: o, label: t(ORDER_WORD[o], locale) }));
+
+  // The line (plan § 5): alone now, not only with the season.
+  let lineFilter = $derived(listFilter.linea ?? 'any');
+  function setLine(next: string) {
+    setParams({ linea: next === 'any' ? null : next });
+  }
+
+  // The mailout batch (plan § 5): one of the scope's last ten, and who of it.
+  let mailoutFilter = $derived(listFilter.envio ?? 'none');
+  let mailoutPick = $derived<MailoutPick>(listFilter.r ?? 'todos');
+  function setMailout(next: string) {
+    setParams(next === 'none' ? { envio: null, r: null } : { envio: next, r: null });
+  }
+  function setMailoutPick(next: string) {
+    setParams({ r: next === 'todos' ? null : next });
+  }
+  const PICK_WORD: Record<MailoutPick, string> = {
+    todos: 'conversations.mailout_pick_all',
+    respuestas: 'conversations.mailout_pick_replied',
+    'sin-respuesta': 'conversations.mailout_pick_silent',
+    rebotes: 'conversations.mailout_pick_bounced',
+  };
+  let mailoutPickOptions = MAILOUT_PICKS.map((p) => ({ value: p, label: t(PICK_WORD[p], locale) }));
 
   // ── Dashboard filters (ADR-117): in the URL, so a block's link is the filter ──
   let lineIds = $derived(scope.lines.map((l) => l.id));
@@ -211,6 +255,40 @@
     if (linea === NO_LINE) return t('overview.no_line', locale);
     return lineIndex.find((l) => l.id === linea)?.name ?? t('overview.unnamed_line', locale);
   }
+  /** The lines of the scope, for the Línea filter and the rows' meta. */
+  let scopeLines = $derived(lineIndex.filter((l) => inScope(scope, { workspaceId: l.workspaceId, projectId: l.projectId, lineId: l.id })));
+  let lineOptions = $derived([
+    { value: 'any', label: t('conversations.all_lines', locale) },
+    ...scopeLines.map((l) => ({ value: l.id, label: l.name })),
+    { value: NO_LINE, label: t('overview.no_line', locale) },
+  ]);
+  let scopeProjectCount = $derived(projectIndex.filter((p) => inScope(scope, { workspaceId: p.workspaceId, projectId: p.id })).length);
+  let lineNameById = $derived(new Map(lineIndex.map((l) => [l.id, l.name])));
+
+  const mailoutsQuery = createQuery(
+    toStore(() => ({
+      queryKey: ['mailout-options', filterIds.projectIds, filterIds.workspaceIds] as const,
+      enabled: !scopeUnresolved && !noAccess && canBulkSend(chip),
+      queryFn: ({ signal }: { signal: AbortSignal }) => {
+        const p = new URLSearchParams();
+        if (filterIds.projectIds.length > 0) p.set('project_ids', filterIds.projectIds.join(','));
+        if (filterIds.workspaceIds.length > 0) p.set('workspace_ids', filterIds.workspaceIds.join(','));
+        return fetchJSON<{ items: { id: string; subject: string | null; queued_at: string | null }[] }>(`/api/mailout?${p}`, signal);
+      },
+    })),
+  );
+  let mailoutOptions = $derived([
+    { value: 'none', label: t('conversations.no_mailout', locale) },
+    ...($mailoutsQuery.data?.items ?? []).map((m) => ({
+      value: m.id,
+      label: [m.queued_at ? dayMonth(m.queued_at) : null, m.subject || t('overview.no_subject', locale)].filter(Boolean).join(' · '),
+    })),
+    // A mailout from the panel's link that is not among the ten still names itself.
+    ...(listFilter.envio && !($mailoutsQuery.data?.items ?? []).some((m) => m.id === listFilter.envio)
+      ? [{ value: listFilter.envio, label: t('overview.last_mailout', locale) }]
+      : []),
+  ]);
+
   const TEMP_CHIP: Record<string, string> = {
     caliente: 'overview.hot',
     fria: 'overview.cold',
@@ -232,7 +310,6 @@
     if (f.turno === 'nuestro') return t('overview.due', locale);
     if (f.turno === 'suyo') return t('overview.turn_theirs_cap', locale);
     if (f.temp) return t(TEMP_CHIP[f.temp], locale);
-    if (f.envio && f.r) return t(f.r === 'respuestas' ? 'overview.mailout_replies_chip' : 'overview.mailout_bounced_chip', locale);
     return f.temporada ? t('overview.this_season', locale) : null;
   }
   let filterChip = $derived(chipLabel(listFilter));
@@ -242,7 +319,7 @@
    * a relation, the season…) is about conversations: the table, as under any
    * other chip.
    */
-  let mixed = $derived(chip === ALL && !filterChip && relationFilter === 'any');
+  let mixed = $derived(chip === ALL && !hasListFilter(listFilter) && orden === DEFAULT_ORDER);
 
   function clearListFilter() {
     const params = new URLSearchParams(page.url.searchParams);
@@ -304,6 +381,7 @@
     q: q || undefined,
     ...listFilter,
     etiqueta: chip === ALL ? undefined : chip,
+    orden,
     lineIds,
     enabled: !scopeUnresolved,
   });
@@ -435,6 +513,16 @@
         <Select toolbar label={t('conversations.relation', locale)} options={relationOptions} bind:value={() => relationFilter, setRelation} />
         <ConceptHint concept="relation" />
       </span>
+      {#if scopeLines.length > 0}
+        <Select toolbar label={t('conversations.line', locale)} options={lineOptions} bind:value={() => lineFilter, setLine} />
+      {/if}
+      {#if canBulkSend(chip) && (mailoutOptions.length > 1 || listFilter.envio)}
+        <Select toolbar label={t('conversations.mailout', locale)} options={mailoutOptions} bind:value={() => mailoutFilter, setMailout} />
+        {#if listFilter.envio}
+          <Select toolbar label={t('conversations.mailout_who', locale)} options={mailoutPickOptions} bind:value={() => mailoutPick, setMailoutPick} />
+        {/if}
+      {/if}
+      <Select toolbar label={t('conversations.order', locale)} options={orderOptions} bind:value={() => orden, setOrden} />
       {#if filterChip}
         <Chip selected onRemove={clearListFilter} removeLabel={t('overview.clear_filter', locale)}>{filterChip}</Chip>
       {/if}
@@ -465,9 +553,10 @@
         {filters}
         {personHref}
         {conversationHref}
-        groupable
-        turnColumn
         importEmptyState={canEdit}
+        bolosColumn={panel === 'sales'}
+        projectName={scopeProjectCount > 1 ? (id) => projectNameById.get(id) ?? null : undefined}
+        lineName={panel === 'sales' && scopeLines.length > 1 ? (id) => lineNameById.get(id) ?? null : undefined}
         editable={canEdit}
         selectable={picking}
         bind:selected={picked}

@@ -27,6 +27,7 @@
   import Button from '$lib/components/Button.svelte';
   import MailoutFigures from '$lib/components/MailoutFigures.svelte';
   import { dayMonth } from '$lib/datetime';
+  import { LATE_DAYS } from '$lib/conversation-row';
   import { DASH } from '$lib/glyphs';
   import { t, type Locale } from '$lib/i18n';
   import {
@@ -334,16 +335,9 @@
               {#if i === firstFollowUp}
                 <li class="rows__sep eyebrow eyebrow--sub">{t('overview.follow_ups', locale)}</li>
               {/if}
-              <!-- On a phone the block keeps three: two replies and a follow-up when there are both. -->
-              <li
-                class="rows__item"
-                class:rows__more={firstFollowUp === -1 || firstFollowUp === 0
-                  ? i >= 3
-                  : i < firstFollowUp
-                    ? i >= Math.min(2, firstFollowUp)
-                    : i > firstFollowUp}
-              >
-                <a class="row" class:row--late={row.days >= 7} href={href(row)} aria-label={dueAria(row)}>
+              <!-- On a phone the block keeps its first row (the CSS below). -->
+              <li class="rows__item">
+                <a class="row" class:row--late={row.days >= LATE_DAYS} href={href(row)} aria-label={dueAria(row)}>
                   {@render who(row)}
                   {#if row.reason === 'reply'}
                     <span class="row__what"><b>{row.subject || kindLabel(row.kind)}</b></span>
@@ -890,8 +884,15 @@
       .board {
         grid-template-columns: minmax(0, 1fr);
       }
-      .block:not(.block--due) .rows > li:nth-child(n + 4),
-      .rows__more {
+      /* Folded to its first line per block (plan de la lista § 3.3, móvil
+         11): the list starts in the first screen. Each block keeps its head
+         and its link «see N»; the rest is in the list itself. */
+      .rows > li.rows__sep,
+      .rows > li:not(.rows__sep) ~ li,
+      .season__lines > li ~ li,
+      .season__note,
+      .block__foot .block__hint,
+      .block--mailout > :global(:not(.block-head, .mailout__subject)) {
         display: none;
       }
       .block__foot :global(button) {

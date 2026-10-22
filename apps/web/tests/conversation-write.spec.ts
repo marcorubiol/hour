@@ -41,11 +41,11 @@ async function openConversations(page: Page, searchName?: string) {
     // to the target person server-side so the row is on the first page.
     await page.getByPlaceholder('People or organizations…').fill(searchName);
   }
-  await expect(page.locator('tbody tr').first()).toBeVisible();
+  await expect(page.locator('[data-testid="conversation-row"]').first()).toBeVisible();
 }
 
 function rowByName(page: Page, name: string) {
-  return page.locator('tbody tr', { hasText: name }).first();
+  return page.locator('[data-testid="conversation-row"]', { hasText: name }).first();
 }
 
 /** First page of the difusión list (same rows the lens can reach), raw values. */
@@ -257,7 +257,7 @@ test.describe('conversation inline write', () => {
       // Set a probe date + note through the dialog. The probe date is far
       // in the past on purpose: the list sorts next_action_at ASC, so the
       // row stays on page 1 where the assertions can still find it.
-      await rowByName(page, name!).locator('button.next-action').click();
+      await rowByName(page, name!).locator('button.crow-next').click();
       const dialog = page.locator('dialog[open]');
       await expect(dialog).toBeVisible();
       await dialog.getByLabel('Date').fill('2020-01-01');
@@ -267,7 +267,7 @@ test.describe('conversation inline write', () => {
       );
 
       await expect(
-        rowByName(page, name!).locator('.next-action__note'),
+        rowByName(page, name!).locator('.crow-next__note'),
       ).toContainText('e2e probe');
 
       await page.reload();
@@ -275,7 +275,7 @@ test.describe('conversation inline write', () => {
       await waitForLoaded(page);
       await page.getByPlaceholder('People or organizations…').fill(name!);
       await expect(
-        rowByName(page, name!).locator('.next-action__note'),
+        rowByName(page, name!).locator('.crow-next__note'),
       ).toContainText('e2e probe');
     } finally {
       await restoreConversation(page, original.id, restorePatch);
@@ -342,7 +342,7 @@ test.describe('conversation inline write', () => {
     await expect(first).toContainText(mark);
 
     await dialog.getByRole('button', { name: 'Close' }).click();
-    await expect(row.locator('.last-contact')).toContainText('today');
+    await expect(row.locator('.crow-when')).toContainText('today');
 
     // A fresh fetch: the event and the stamp both survive.
     await page.reload();
@@ -350,42 +350,10 @@ test.describe('conversation inline write', () => {
     await waitForLoaded(page);
     await page.getByPlaceholder('People or organizations…').fill(name!);
     const again = rowByName(page, name!);
-    await expect(again.locator('.last-contact')).toContainText('today');
-    await again.locator('.last-contact__open').click();
+    await expect(again.locator('.crow-when')).toContainText('today');
+    await again.locator('.crow-when').click();
     await expect(
       page.locator('dialog[open]').getByRole('list', { name: 'History' }),
     ).toContainText(mark);
-  });
-
-  test('contact grouping persists and a project chip focuses its conversation', async ({
-    page,
-  }) => {
-    await openConversations(page);
-    const conversationCount = await page.locator('.conversation-table tbody tr').count();
-
-    await page.getByRole('button', { name: 'By contact', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'By contact', exact: true })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
-    await expect(page.locator('.contact-table tbody tr').first()).toBeVisible();
-    expect(await page.locator('.contact-table tbody tr').count()).toBeLessThanOrEqual(
-      conversationCount,
-    );
-    expect(
-      await page.evaluate(() => localStorage.getItem('hour:conversations:view')),
-    ).toBe('contact');
-
-    await page.reload();
-    await waitForLoaded(page);
-    await expect(page.getByRole('button', { name: 'By contact', exact: true })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
-    await page.locator('.project-chip').first().click();
-    await expect(page.locator('.conversation-table tbody tr')).toHaveCount(1);
-    await expect(page.getByRole('button', { name: 'Show all loaded' })).toBeVisible();
-    await page.getByRole('button', { name: 'Show all loaded' }).click();
-    expect(await page.locator('.conversation-table tbody tr').count()).toBeGreaterThan(0);
   });
 });

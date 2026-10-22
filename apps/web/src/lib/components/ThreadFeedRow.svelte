@@ -2,10 +2,10 @@
   /**
    * One thread as «De qué se habla» draws it (ADR-116): its name in mono, the
    * title, «N new», the time; where, and the last message under it. The row
-   * itself is FeedLine, the one a conversation of the common list draws too
-   * (ADR-138 fase 3).
+   * itself is ConversationRow, the one every conversation of the lens draws
+   * too (plan de la lista § 3): its name takes the turn's column.
    */
-  import FeedLine from '$lib/components/FeedLine.svelte';
+  import ConversationRow from '$lib/components/ConversationRow.svelte';
   import { t, type Locale } from '$lib/i18n';
   import { feedThreadName, feedTitle, messageWhen, type FeedThread } from '$lib/threads';
 
@@ -15,18 +15,16 @@
     author: string;
     /** Project and deal; the block leaves it out. */
     where?: string;
-    /** The dashboard's row rhythm: no inline padding, the board's block padding. */
-    dense?: boolean;
     locale: Locale;
     tz: string;
   }
 
-  let { th, href, author, where, dense = false, locale, tz }: Props = $props();
+  let { th, href, author, where, locale, tz }: Props = $props();
 </script>
 
-<FeedLine
+<ConversationRow
   {href}
-  name={feedThreadName(th, locale)}
+  turn={feedThreadName(th, locale)}
   title={feedTitle(th)}
   unread={th.unread_count > 0 ? t(th.unread_count === 1 ? 'threads.unread_one' : 'threads.unread', locale, { n: th.unread_count }) : null}
   at={th.last_message_at}
@@ -34,5 +32,4 @@
   {where}
   lead={author}
   last={th.last_message.body}
-  {dense}
 />

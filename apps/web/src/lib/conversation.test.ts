@@ -7,7 +7,6 @@ import {
   ConversationPatchSchema,
   occurredAtForDay,
   conversationPatchColumns,
-  groupConversationsByContact,
   normalizeConversationItem,
   relativeContactDate,
   type ConversationDbItem,
@@ -143,63 +142,7 @@ describe('ConversationPatchSchema', () => {
   });
 });
 
-describe('contact-book projection', () => {
-  function item(
-    id: string,
-    personId: string | null,
-    lastContact: string | null,
-    projectName: string,
-  ): ConversationItem {
-    return {
-      id,
-      last_contacted_at: lastContact,
-      person: personId
-        ? {
-            id: personId,
-            slug: `person-${personId}`,
-            full_name: `Person ${personId}`,
-            email: null,
-            organization_name: 'Teatre X',
-            country: 'FR',
-            city: 'Lyon',
-            website: null,
-          }
-        : null,
-      project: {
-        id: `project-${id}`,
-        slug: `project-${id}`,
-        name: projectName,
-        status: 'active',
-      },
-    } as unknown as ConversationItem;
-  }
-
-  it('keeps first-seen contact order and takes the latest valid contact', () => {
-    const groups = groupConversationsByContact([
-      item('a', 'p1', '2026-01-03T10:00:00Z', 'North'),
-      item('b', 'p2', null, 'South'),
-      item('c', 'p1', '2026-06-12T10:00:00Z', 'East'),
-      item('d', 'p1', 'not-a-date', 'West'),
-    ]);
-
-    expect(groups.map((group) => group.key)).toEqual(['p1', 'p2']);
-    expect(groups[0].conversations.map((conversation) => conversation.id)).toEqual([
-      'a',
-      'c',
-      'd',
-    ]);
-    expect(groups[0].last_contacted_at).toBe('2026-06-12T10:00:00Z');
-    expect(groups[1].last_contacted_at).toBeNull();
-  });
-
-  it('does not merge missing-person rows into one anonymous contact', () => {
-    const groups = groupConversationsByContact([
-      item('a', null, null, 'North'),
-      item('b', null, null, 'South'),
-    ]);
-    expect(groups.map((group) => group.key)).toEqual(['conversation:a', 'conversation:b']);
-  });
-
+describe('relativeContactDate', () => {
   it('formats contact age coarsely and calmly', () => {
     const now = Date.parse('2026-07-20T12:00:00Z');
     expect(relativeContactDate(null, 'en', now)).toBe('—');

@@ -42,6 +42,7 @@ import {
   type Relation,
   type RelationInput,
 } from './conversation-relation';
+import type { OrderKey } from './conversation-order';
 
 export { daysSince, hasAnswered, lastActivity };
 
@@ -354,15 +355,20 @@ type TurnFilter = 'nuestro' | 'suyo';
 export type TempFilter = 'caliente' | 'fria' | 'ronda' | 'parada' | 'sin-fecha';
 const TEMP_FILTERS: readonly string[] = ['caliente', 'fria', 'ronda', 'parada', 'sin-fecha'];
 
-/** Las cifras del último envío que llevan a alguien (ADR-126 § 9). */
-export type MailoutPick = 'respuestas' | 'rebotes';
+/**
+ * Quiénes de un envío: las cifras del último que llevan a alguien (ADR-126 § 9)
+ * y la tanda del filtro Envío (plan de la lista § 5): todas las que lo
+ * recibieron, las que contestaron, las que no, las que rebotaron.
+ */
+export const MAILOUT_PICKS = ['todos', 'respuestas', 'sin-respuesta', 'rebotes'] as const;
+export type MailoutPick = (typeof MAILOUT_PICKS)[number];
 
 export interface ListFilter {
   turno?: TurnFilter;
   temp?: TempFilter;
   /** Solo las de la temporada en curso (la barra de la temporada filtra con esto). */
   temporada?: boolean;
-  /** Una línea de la temporada (su uuid, o `NO_LINE`): solo con `temporada`. */
+  /** Una línea (su uuid, o `NO_LINE`); con `temporada`, una línea de la temporada. */
   linea?: string;
   /** Un envío y cuáles de sus destinatarios: las que contestaron, o las que rebotaron. */
   envio?: string;
@@ -383,7 +389,7 @@ export function parseListFilter(params: URLSearchParams): ListFilter {
     turno: turno === 'nuestro' || turno === 'suyo' ? turno : undefined,
     temp: temp && TEMP_FILTERS.includes(temp) ? (temp as TempFilter) : undefined,
     temporada,
-    linea: temporada ? parseLinea(params.get('linea')) : undefined,
+    linea: parseLinea(params.get('linea')),
     ...mailoutFilter(params),
   };
 }
@@ -395,12 +401,13 @@ export function parseLinea(raw: string | null | undefined): string | undefined {
 function mailoutFilter(params: URLSearchParams): Pick<ListFilter, 'envio' | 'r'> {
   const envio = params.get('envio');
   const r = params.get('r');
-  if (!envio || !UUID_RE.test(envio) || (r !== 'respuestas' && r !== 'rebotes')) return {};
-  return { envio, r };
+  if (!envio || !UUID_RE.test(envio)) return {};
+  // Un envío sin cifra son todas las que lo recibieron.
+  return { envio, r: (MAILOUT_PICKS as readonly string[]).includes(r ?? '') ? (r as MailoutPick) : 'todos' };
 }
 
 export function hasListFilter(f: ListFilter): boolean {
-  return Boolean(f.turno || f.temp || f.temporada || f.envio || f.relacion);
+  return Boolean(f.turno || f.temp || f.temporada || f.envio || f.relacion || f.linea);
 }
 
 /**
@@ -414,7 +421,7 @@ export function applyListFilter<R extends OverviewInput>(
   lineIds: readonly string[] = [],
 ): R[] {
   let out = f.temporada ? seasonRows(rows, currentSeason(now), lineIds) : [...rows];
-  if (f.temporada && f.linea) out = lineRows(out, f.linea);
+  if (f.linea) out = lineRows(out, f.linea);
   if (f.relacion) out = out.filter((r) => relationOf(r, now) === f.relacion);
   if (f.turno === 'nuestro') out = sortDue(out.filter((r) => dueReason(r, now) !== null), now);
   if (f.turno === 'suyo') {
@@ -462,6 +469,24 @@ function sortCold<R extends OverviewInput>(rows: R[], now: Date): R[] {
     const [gb, db] = key(b);
     return ga - gb || da - db;
   });
+}
+
+/**
+ * Lo que el orden de la lista lee de una fila del panel
+ * (`$lib/conversation-order`). Los no leídos no están aquí: los da
+ * `conversation_feed`, y quien llama los pone.
+ */
+export function overviewOrderKey(r: OverviewInput, now: Date, unread = 0): OrderKey {
+  const due = dueReason(r, now);
+  return {
+    id: r.id,
+    unread,
+    due,
+    dueAt: due === 'reply' ? (r.last?.occurred_at ?? null) : due === 'follow_up' ? r.next_action_at : null,
+    lastAt: lastActivity(r),
+    title: r.title,
+    nextActionAt: r.next_action_at,
+  };
 }
 
 // ── Los bloques ────────────────────────────────────────────────────────────
@@ -636,6 +661,22 @@ export interface MailoutFigures {
 
 const LEFT = new Set(['sent', 'delivered', 'bounced', 'complained']);
 
+/**
+ * Si una destinataria entra en la tanda pedida. `todos`: le salió el envío;
+ * `sin-respuesta`: le salió, no rebotó y no ha contestado.
+ */
+export function mailoutPicks(
+  r: MailoutRecipientLite,
+  pick: MailoutPick,
+  queuedAt: string | null,
+  lastInByConversation: ReadonlyMap<string, string>,
+): boolean {
+  if (pick === 'rebotes') return r.status === 'bounced';
+  if (pick === 'todos') return LEFT.has(r.status);
+  const replied = mailoutReplied(r, queuedAt, lastInByConversation);
+  return pick === 'respuestas' ? replied : LEFT.has(r.status) && r.status !== 'bounced' && !replied;
+}
+
 /** Contestó a este envío: salió, y su último correo de fuera es posterior. */
 export function mailoutReplied(
   r: MailoutRecipientLite,
@@ -671,6 +712,22 @@ export function mailoutFigures(
     if (mailoutReplied(r, queuedAt, lastInByConversation)) out.replies += 1;
   }
   return out;
+}
+
+/** El último envío que recibió una conversación (la fila de la lista, plan § 3). */
+export interface RowMailout {
+  mailout_id: string;
+  /** Cuándo le salió (o cuándo se puso en cola). */
+  at: string | null;
+  /** Su estado de destinataria. */
+  status: string;
+}
+
+/** Qué pasó con ese envío: contestó, sigue sin respuesta o rebotó. */
+export function mailoutOutcome(m: RowMailout, lastIn: string | null): 'replied' | 'silent' | 'bounced' {
+  if (m.status === 'bounced') return 'bounced';
+  const lastInMap = new Map(lastIn ? [['c', lastIn]] : []);
+  return mailoutReplied({ conversation_id: 'c', status: m.status, sent_at: m.at }, m.at, lastInMap) ? 'replied' : 'silent';
 }
 
 /** El último envío del alcance, como lo devuelve el dashboard. */

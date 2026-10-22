@@ -109,10 +109,10 @@ test('a scope change on a person opened from Conversations lands back on Convers
   // list for a person and changing the scope threw you out of Conversations.
   await page.goto(`/h/conversations?etiqueta=sales&scope=${FIXTURE_SPACE_TOKEN}`);
   await waitForLoaded(page);
-  await expect(page.locator('tbody tr').first()).toBeVisible();
+  await expect(page.locator('[data-testid="conversation-row"]').first()).toBeVisible();
 
   // The contact's link (ADR-102: the first link of a row is the organization).
-  await page.locator('tbody tr').first().locator('td').nth(1).getByRole('link').click();
+  await page.locator('[data-testid="conversation-row"]').first().locator('a.crow-contact').click();
   // The vistazo first (ADR-139 p1), then the page this test is about.
   await openInFull(page);
   await page.waitForURL(/\/h\/[^/]+\/person\//);

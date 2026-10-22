@@ -14,6 +14,7 @@
  */
 
 import { dueReason, turnOf, type TurnEvent } from './conversation-overview';
+import { comparePide, type OrderKey } from './conversation-order';
 import type { FeedThread } from './threads';
 
 /** Una conversación de la lista: con quién, etiquetas, no leídos y lo que lee el turno. */
@@ -85,7 +86,7 @@ export interface ConversationFeedView {
  * (`closed` = `notNowInForce`, que la relación mira lo primero), así que el
  * resto de hechos de la relación no hacen falta aquí.
  */
-function turnRow(r: FeedConversation) {
+export function feedTurnRow(r: FeedConversation) {
   return {
     not_now_at: r.not_now_at,
     not_now_until: r.not_now_until,
@@ -101,7 +102,7 @@ function turnRow(r: FeedConversation) {
 
 /** El turno de una conversación de la lista, con la regla del panel. */
 export function conversationView(r: FeedConversation, now: Date): FeedConversationView {
-  const row = turnRow(r);
+  const row = feedTurnRow(r);
   return { ...r, turn: turnOf(row, now)?.side ?? null, due: dueReason(row, now) };
 }
 
@@ -115,27 +116,30 @@ export function feedKey(r: Pick<FeedConversation, 'kind' | 'id'> | Pick<FeedThre
   return r.kind === 'conversation' ? `c:${r.id}` : `t:${r.thread_id}`;
 }
 
-function lastOf(r: FeedRowView): string {
-  return r.kind === 'conversation' ? (r.last_at ?? r.created_at) : r.last_message_at;
-}
-
-function idOf(r: FeedRowView): string {
-  return r.kind === 'conversation' ? r.id : r.thread_id;
+/** Lo que el orden lee de una fila (`$lib/conversation-order`): un hilo no tiene turno. */
+export function feedOrderKey(r: FeedRowView): OrderKey {
+  if (r.kind === 'thread') {
+    return { id: r.thread_id, unread: r.unread_count, due: null, dueAt: null, lastAt: r.last_message_at, title: '', nextActionAt: null };
+  }
+  return {
+    id: r.id,
+    unread: r.unread_count,
+    due: r.due,
+    dueAt: r.due === 'reply' ? (r.last?.occurred_at ?? null) : r.due === 'follow_up' ? r.next_action_at : null,
+    lastAt: r.last_at ?? r.created_at,
+    title: r.title ?? '',
+    nextActionAt: r.next_action_at,
+  };
 }
 
 /**
- * El orden de la lista (plan § 3): lo que tiene no leídos arriba; después lo
- * que te toca (respuestas y seguimientos vencidos); después lo último. Un hilo
- * no tiene turno. A igualdad, por id, para que la lista no baile.
+ * El orden de la lista (plan de la lista § 4, «lo que pide»): lo que tiene no
+ * leídos arriba; después lo que te toca (respuestas, la más reciente arriba;
+ * después seguimientos, el más vencido primero); después lo último. A
+ * igualdad, por id, para que la lista no baile. La misma regla que la tabla.
  */
 export function compareFeed(a: FeedRowView, b: FeedRowView): number {
-  const unread = Number(b.unread_count > 0) - Number(a.unread_count > 0);
-  if (unread) return unread;
-  const due = Number(b.kind === 'conversation' && b.due !== null) - Number(a.kind === 'conversation' && a.due !== null);
-  if (due) return due;
-  const last = Date.parse(lastOf(b)) - Date.parse(lastOf(a));
-  if (last) return last;
-  return idOf(a).localeCompare(idOf(b));
+  return comparePide(feedOrderKey(a), feedOrderKey(b));
 }
 
 export function sortFeed(rows: readonly FeedRowView[]): FeedRowView[] {

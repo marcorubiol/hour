@@ -14,15 +14,17 @@
   import { createQuery, keepPreviousData } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON } from '$lib/api';
-  import FeedLine from '$lib/components/FeedLine.svelte';
+  import ConversationRow from '$lib/components/ConversationRow.svelte';
+  import ConversationTagList from '$lib/components/ConversationTagList.svelte';
   import ThreadFeedRow from '$lib/components/ThreadFeedRow.svelte';
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import ConversationsImportEmpty from '$lib/components/ConversationsImportEmpty.svelte';
   import Button from '$lib/components/Button.svelte';
   import { viewerTimeZone } from '$lib/datetime';
   import { t, type Locale } from '$lib/i18n';
-  import { SALES, keyLabel, type WorkspaceTag } from '$lib/conversation-tags';
-  import { feedKey, type ConversationFeedView, type FeedConversationView, type FeedThreadRow } from '$lib/conversation-feed';
+  import { SALES, type WorkspaceTag } from '$lib/conversation-tags';
+  import { rowTurn } from '$lib/conversation-row';
+  import { feedKey, feedTurnRow, type ConversationFeedView, type FeedConversationView, type FeedThreadRow } from '$lib/conversation-feed';
   import { THREAD_REFRESH_MS, boloDays, feedHref, messageWhen } from '$lib/threads';
 
   interface Props {
@@ -88,12 +90,6 @@
     return parts.filter(Boolean).join(' · ');
   }
 
-  /** Sus etiquetas, por su nombre en el alcance; sin ninguna, Difusión. */
-  function tagsOf(c: FeedConversationView): string {
-    const keys = c.tags.length > 0 ? c.tags : [SALES];
-    return keys.map((k) => keyLabel(k, tagNames, locale)).join(' · ');
-  }
-
   /** La ficha; si lo nuevo es solo del hilo del equipo, abre en el hilo. */
   function conversationHref(c: FeedConversationView): string | null {
     const ws = workspaceSlugById.get(c.workspace_id);
@@ -101,12 +97,9 @@
     return `/h/${ws}/conversation/${c.id}${c.thread_unread > 0 && c.event_unread === 0 ? '#team' : ''}`;
   }
 
-  /** De quién es el turno, con la palabra del panel (ADR-126 § 1). */
-  function turnLead(c: FeedConversationView): string | null {
-    if (c.due === 'reply') return t('overview.turn_ours_cap', locale);
-    if (c.due === 'follow_up') return t('overview.follow_up_cap', locale);
-    if (c.turn === 'theirs') return t('overview.turn_theirs_cap', locale);
-    return null;
+  /** De quién es el turno, con la palabra y el tono de la tabla (ADR-126 § 1). */
+  function turnOf(c: FeedConversationView) {
+    return rowTurn({ ...feedTurnRow(c), next_action_at: c.next_action_at }, new Date(), locale);
   }
 
   function unreadLabel(n: number): string | null {
@@ -127,21 +120,26 @@
       <EmptyLine text={t(q ? 'conversations.feed_no_match' : 'conversations.feed_empty', locale)} />
     {/if}
   {:else if feed}
-    <ul class="cfeed__list">
+    <ul class="crow-list">
       {#each feed.items as row (feedKey(row))}
-        <li class="cfeed__row" data-testid="feed-row" data-kind={row.kind}>
+        <li data-testid="feed-row" data-kind={row.kind}>
           {#if row.kind === 'conversation'}
-            <FeedLine
+            {@const turn = turnOf(row)}
+            <ConversationRow
               href={conversationHref(row)}
-              name={tagsOf(row)}
+              turn={turn?.word}
+              since={turn?.since}
+              tone={turn?.tone}
               title={row.title ?? '—'}
               unread={unreadLabel(row.unread_count)}
               at={row.last_at}
               when={row.last_at ? messageWhen(row.last_at, locale, tz) : ''}
-              where={[projectNameById.get(row.project_id), row.person].filter(Boolean).join(' · ')}
-              lead={turnLead(row)}
+              where={[row.person, projectNameById.get(row.project_id)].filter(Boolean).join(' · ')}
+              lead={row.due !== 'follow_up' && row.last?.direction === 'outbound' ? t('threads.you', locale) : null}
               last={row.due === 'follow_up' ? row.next_action_note : (row.last?.subject ?? null)}
-            />
+            >
+              {#snippet titleAside()}<ConversationTagList tags={row.tags.length > 0 ? row.tags : [SALES]} known={tagNames} {locale} />{/snippet}
+            </ConversationRow>
           {:else}
             <ThreadFeedRow
               th={row}
@@ -167,17 +165,6 @@
 
 <style>
   @layer components {
-    .cfeed__list {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      border-block-start: var(--border);
-    }
-
-    .cfeed__row {
-      border-block-end: var(--border);
-    }
-
     .cfeed__more {
       margin-block-start: var(--space-s);
     }

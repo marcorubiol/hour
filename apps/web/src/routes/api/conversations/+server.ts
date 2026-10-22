@@ -1,19 +1,24 @@
 /**
  * GET /api/conversations
  *
- * Lists conversations in the current workspace, with the linked person and
- * project embedded. RLS + the `current_workspace_id` claim decide visibility —
- * this endpoint is a thin PostgREST wrapper, no RPC needed.
- *
- * Anti-CRM vocabulary (reset v2 enum, 2026-04-19): status defaults to
- * `contacted`. Pass `status=any` to disable status filtering.
+ * Lists conversations, with the linked person and project embedded. RLS
+ * decides visibility.
  *
  * Each row carries `last_turn` (its last directional email, message or call),
- * so the list can say whose turn it is (ADR-117). The dashboard filters
- * (`turno=nuestro|suyo`, `temp=caliente|fria|ronda|parada`, `temporada=actual`, `relacion=…` (ADR-138), with
- * `line_ids` for the season and `linea` for one of its lines) are derived, not columns: the scope is read and
- * filtered with `$lib/conversation-overview` (the same rules as the blocks),
- * in the block's order, and only the page is read in full.
+ * so the list can say whose turn it is (ADR-117), and, for the page only, its
+ * bolos without money (`conversations_bolos`, ADR-138 § 3) and the last
+ * mailout it received (plan de la lista § 3).
+ *
+ * Two paths:
+ *   · plain (a project or line module: `line_id`, `season`, or nothing that
+ *     derives): PostgREST, ordered by next step, as before;
+ *   · the lens (`orden`, `etiqueta` or any derived filter: `turno`, `temp`,
+ *     `temporada`, `relacion`, `linea`, `envio`+`r`): the scope is filtered with
+ *     `$lib/conversation-overview` (the same rules as the blocks), ordered by
+ *     `orden` (`$lib/conversation-order`; the block filters te toca and
+ *     temperatura keep their block's order, ADR-118 § 7) with the unread counts
+ *     of `conversation_feed` (the order of «Todas», plan § 4), and only the
+ *     page is read in full.
  *
  * Auth: Bearer JWT required. RLS denies anon.
  */
@@ -29,15 +34,26 @@ import {
   existingConversationId,
   normalizeConversationItem,
   type ConversationDbItem,
+  type ConversationItem,
 } from '$lib/conversation';
 import { PostgrestError, pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import { TURN_EMBEDS, loadOverviewRows, mailoutPickIds, setLastTurnEmbed, setScope } from '$lib/server/conversation-overview';
-import { applyListFilter, hasListFilter, parseLinea, type ListFilter } from '$lib/conversation-overview';
+import { loadFeedConversations, loadRowExtras } from '$lib/server/conversation-list';
+import {
+  MAILOUT_PICKS,
+  NO_LINE,
+  applyListFilter,
+  hasListFilter,
+  overviewOrderKey,
+  parseLinea,
+  type ListFilter,
+} from '$lib/conversation-overview';
+import { feedOrderKey } from '$lib/conversation-feed';
+import { ORDERS, sortByOrder, type Orden } from '$lib/conversation-order';
 import { RELATIONS } from '$lib/conversation-relation';
 import { json } from '$lib/server/http';
 import { TAG_KEY_RE, filterByChip } from '$lib/conversation-tags';
-import { loadTaggedIds } from '$lib/server/conversation-overview';
 
 const QuerySchema = v.object({
   status: v.optional(
@@ -52,15 +68,18 @@ const QuerySchema = v.object({
   turno: v.optional(v.picklist(['nuestro', 'suyo'])),
   temp: v.optional(v.picklist(['caliente', 'fria', 'ronda', 'parada', 'sin-fecha'])),
   temporada: v.optional(v.literal('actual')),
-  // ADR-135: one line of the season (its id, or `sin` for the ones without).
+  // ADR-135: one line (its id, or `sin` for the ones without); with
+  // `temporada`, one line of the season. Alone since the list's filter row.
   linea: v.optional(v.string()),
-  // ADR-126 § 9: the recipients of a mailout behind one of its figures.
+  // ADR-126 § 9 and the list's Envío filter: the recipients of a mailout.
   envio: v.optional(v.pipe(v.string(), v.uuid())),
-  r: v.optional(v.picklist(['respuestas', 'rebotes'])),
+  r: v.optional(v.picklist(MAILOUT_PICKS)),
   // ADR-138: one derived relation.
   relacion: v.optional(v.picklist(RELATIONS)),
   // ADR-138 fase 2: el chip de la lente, la clave de una etiqueta (sin ninguna se lee `sales`).
   etiqueta: v.optional(v.pipe(v.string(), v.regex(TAG_KEY_RE))),
+  // Plan de la lista § 4: the lens's order.
+  orden: v.optional(v.picklist(ORDERS)),
   line_ids: v.optional(v.string()),
   limit: v.optional(
     v.pipe(
@@ -116,7 +135,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       400,
     );
   }
-  const { status, project_ids, workspace_ids, line_id, q, season, limit, offset, turno, temp, temporada, linea, line_ids, envio, r, relacion, etiqueta } =
+  const { status, project_ids, workspace_ids, line_id, q, season, limit, offset, turno, temp, temporada, linea, line_ids, envio, r, relacion, etiqueta, orden } =
     parsed.output;
 
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -137,16 +156,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   const qTrim = q?.trim() ?? '';
   if (qTrim) search.set('p_q', qTrim);
 
-  if (projectIds.length > 0 && workspaceIds.length > 0) {
-    search.set(
-      'or',
-      `(project_id.in.(${projectIds.join(',')}),workspace_id.in.(${workspaceIds.join(',')}))`,
-    );
-  } else if (projectIds.length > 0) {
-    search.set('project_id', `in.(${projectIds.join(',')})`);
-  } else if (workspaceIds.length > 0) {
-    search.set('workspace_id', `in.(${workspaceIds.join(',')})`);
-  }
+  setScope(search, projectIds, workspaceIds);
   if (line_id) search.set('line_id', `eq.${line_id}`);
   search.set('deleted_at', 'is.null');
 
@@ -155,38 +165,26 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
 
   setLastTurnEmbed(search);
 
-  const listFilter = {
+  const listFilter: ListFilter = {
     relacion,
     turno,
     temp,
     temporada: temporada === 'actual' || undefined,
-    linea: temporada === 'actual' ? parseLinea(linea) : undefined,
-    ...(envio && r ? { envio, r } : {}),
+    linea: parseLinea(linea),
+    ...(envio ? { envio, r: r ?? 'todos' } : {}),
   };
-  if (hasListFilter(listFilter) || etiqueta) {
+  if (hasListFilter(listFilter) || etiqueta || orden) {
     // The derived filters only exist for the global lens: project and line
     // modules keep their own params (line_id, season).
-    if (line_id || season !== 'any') return json({ error: 'invalid_query', hint: 'turno/temp/temporada/envio/relacion/etiqueta go with project_ids/workspace_ids only.' }, 400);
-  }
-  if (!hasListFilter(listFilter) && etiqueta) {
-    // A tag alone: the scope's ids with their tags, in the list's order; then
-    // the page in full. Untagged rows read as `sales` (`tagKeysOf`).
-    try {
-      const base = new URLSearchParams(search);
-      base.delete('select');
-      // The turn embeds are not in the light select: their filters go too.
-      for (const k of [...base.keys()]) if (k.startsWith('last_turn.') || k.startsWith('last_in.')) base.delete(k);
-      const matched = filterByChip(await loadTaggedIds(env, jwt, base, qTrim ? 'rpc/conversation_search' : 'conversation'), etiqueta);
-      const ids = matched.slice(offset, offset + limit).map((m) => m.id);
-      return json({ total: matched.length, limit, offset, status, season, items: await readPage(env, jwt, search.get('select')!, ids) });
-    } catch (err) {
-      return pgErrorResponse(err, { route: 'GET /api/conversations', requestId: locals.requestId }, { passUpstream: [401, 403] });
+    if (line_id || season !== 'any') {
+      return json(
+        { error: 'invalid_query', hint: 'turno/temp/temporada/linea/envio/relacion/etiqueta/orden go with project_ids/workspace_ids only.' },
+        400,
+      );
     }
-  }
-  if (hasListFilter(listFilter)) {
     try {
       return json(
-        await filteredPage(env, jwt, search, {
+        await lensPage(env, jwt, search.get('select')!, {
           projectIds,
           workspaceIds,
           lineIds: parseIds(line_ids),
@@ -194,6 +192,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
           q: qTrim,
           filter: listFilter,
           etiqueta,
+          orden: orden ?? 'pide',
           limit,
           offset,
         }),
@@ -219,7 +218,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       offset,
       status,
       season,
-      items: data.map((r) => normalizeConversationItem(r)),
+      items: await withExtras(env, jwt, data.map((r) => normalizeConversationItem(r))),
     });
   } catch (err) {
     return pgErrorResponse(
@@ -231,14 +230,19 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
 };
 
 /**
- * A page of a derived filter: the scope's rows filtered and ordered by the
- * dashboard rules, then the page's rows read in full (at most `limit` ids).
- * A search narrows the set through the same RPC as the plain list.
+ * A page of the lens: the scope's ids filtered and ordered, then the page's
+ * rows read in full (at most `limit` ids).
+ *
+ * The order and the unread counts come from `conversation_feed`, with the
+ * chip's tag and the search. The scope is read whole (`loadOverviewRows`) only
+ * when a filter needs what the feed does not say (relation, season, turn,
+ * temperature) or when the feed was cut at its 500 rows; then the rows outside
+ * the feed order with the same keys, without unread.
  */
-async function filteredPage(
+async function lensPage(
   env: SupabaseEnv,
   jwt: string,
-  pageSearch: URLSearchParams,
+  select: string,
   o: {
     projectIds: string[];
     workspaceIds: string[];
@@ -247,31 +251,65 @@ async function filteredPage(
     q: string;
     filter: ListFilter;
     etiqueta?: string;
+    orden: Orden;
     limit: number;
     offset: number;
   },
 ) {
-  const rows = await loadOverviewRows(env, jwt, { projectIds: o.projectIds, workspaceIds: o.workspaceIds, status: o.status });
-  let matched = applyListFilter(o.etiqueta ? filterByChip(rows, o.etiqueta) : rows, o.filter, new Date(), o.lineIds);
-  if (o.filter.envio && o.filter.r) {
-    const ids = await mailoutPickIds(env, jwt, o.filter.envio, o.filter.r, rows);
-    matched = matched.filter((r) => ids.has(r.id));
+  const now = new Date();
+  const f = o.filter;
+  const scope = { projectIds: o.projectIds, workspaceIds: o.workspaceIds };
+  const feed = await loadFeedConversations(env, jwt, { ...scope, tag: o.etiqueta ?? null, q: o.q || null }, now);
+  const unread = new Map(feed.rows.map((r) => [r.id, r.unread_count]));
+  const byBlock = Boolean(f.turno || f.temp);
+  const needScope = Boolean(f.relacion || f.temporada || f.turno || f.temp || o.status) || feed.more;
+
+  let ids: string[];
+  if (needScope) {
+    const rows = await loadOverviewRows(env, jwt, { ...scope, status: o.status });
+    let matched = applyListFilter(o.etiqueta ? filterByChip(rows, o.etiqueta) : rows, f, now, o.lineIds);
+    if (f.envio && f.r) {
+      const picked = await mailoutPickIds(env, jwt, f.envio, f.r, rows);
+      matched = matched.filter((r) => picked.has(r.id));
+    }
+    if (o.q) {
+      // The feed's search, unless it was cut: then the search RPC, as before.
+      let hits: Set<string>;
+      if (!feed.more) hits = new Set(feed.rows.map((r) => r.id));
+      else {
+        const search = new URLSearchParams({ select: 'id', p_q: o.q, deleted_at: 'is.null', limit: '5000' });
+        setScope(search, o.projectIds, o.workspaceIds);
+        hits = new Set((await pgGet<{ id: string }>(env, 'rpc/conversation_search', jwt, { search })).data.map((r) => r.id));
+      }
+      matched = matched.filter((r) => hits.has(r.id));
+    }
+    if (byBlock) ids = matched.map((r) => r.id);
+    else {
+      const fromFeed = new Map(feed.rows.map((r) => [r.id, feedOrderKey(r)]));
+      ids = sortByOrder(
+        matched.map((r) => fromFeed.get(r.id) ?? overviewOrderKey(r, now)),
+        o.orden,
+      ).map((k) => k.id);
+    }
+  } else {
+    let rows = feed.rows;
+    if (f.linea) rows = rows.filter((r) => (f.linea === NO_LINE ? r.line_id === null : r.line_id === f.linea));
+    if (f.envio && f.r) {
+      const picked = await mailoutPickIds(env, jwt, f.envio, f.r, rows);
+      rows = rows.filter((r) => picked.has(r.id));
+    }
+    ids = sortByOrder(rows.map(feedOrderKey), o.orden).map((k) => k.id);
   }
-  if (o.q) {
-    const search = new URLSearchParams({ select: 'id', p_q: o.q, deleted_at: 'is.null', limit: '5000' });
-    setScope(search, o.projectIds, o.workspaceIds);
-    const { data } = await pgGet<{ id: string }>(env, 'rpc/conversation_search', jwt, { search });
-    const hits = new Set(data.map((r) => r.id));
-    matched = matched.filter((r) => hits.has(r.id));
-  }
-  const ids = matched.slice(o.offset, o.offset + o.limit).map((r) => r.id);
+
+  const items = await readPage(env, jwt, select, ids.slice(o.offset, o.offset + o.limit));
   return {
-    total: matched.length,
+    total: ids.length,
     limit: o.limit,
     offset: o.offset,
     status: o.status ?? 'any',
     season: 'any',
-    items: await readPage(env, jwt, pageSearch.get('select')!, ids),
+    orden: o.orden,
+    items: await withExtras(env, jwt, items.map((it) => ({ ...it, unread_count: unread.get(it.id) ?? 0 }))),
   };
 }
 
@@ -283,6 +321,16 @@ async function readPage(env: SupabaseEnv, jwt: string, select: string, ids: stri
   const order = new Map(ids.map((id, i) => [id, i]));
   const { data } = await pgGet<ConversationDbItem>(env, 'conversation', jwt, { search });
   return data.sort((a, b) => order.get(a.id)! - order.get(b.id)!).map((r) => normalizeConversationItem(r));
+}
+
+/** The page's bolos and last mailout, one read each (plan de la lista § 8). */
+async function withExtras(env: SupabaseEnv, jwt: string, items: ConversationItem[]): Promise<ConversationItem[]> {
+  const { bolos, mailouts } = await loadRowExtras(env, jwt, items.map((i) => i.id));
+  return items.map((it) => ({
+    ...it,
+    ...(bolos ? { bolos: bolos.get(it.id) ?? [] } : {}),
+    last_mailout: mailouts.get(it.id) ?? null,
+  }));
 }
 
 /**

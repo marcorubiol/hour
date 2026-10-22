@@ -29,7 +29,7 @@ test.describe('person file', () => {
     // first, and until § 31 (2026-10) that was a real MüK Cia contact.
     await page.goto('/h/conversations?etiqueta=sales&scope=s:playwright');
     await waitForLoaded(page);
-    await expect(page.locator('tbody tr').first()).toBeVisible();
+    await expect(page.locator('[data-testid="conversation-row"]').first()).toBeVisible();
 
     // Into the person file via the contact's linked name (ADR-102: the first
     // link of a row is the organization, which opens the conversation). The
@@ -37,7 +37,7 @@ test.describe('person file', () => {
     // `person` is a global entity resolved by RLS, so any accessible segment
     // renders it (verified: the same person opened under two spaces). Don't
     // pin the URL to one space.
-    const firstName = page.locator('tbody tr').first().locator('td').nth(1).getByRole('link');
+    const firstName = page.locator('[data-testid="conversation-row"]').first().locator('a.crow-contact');
     const personName = (await firstName.innerText()).trim();
     await firstName.click();
     // The vistazo first (ADR-139 p1), then the page.

@@ -469,6 +469,14 @@
        width, from the same left edge, so turning calm on never moves it.
        About the width the Desk's left column already had (1.55fr of 1240). */
     --calm-measure: 45rem;
+    /* The columns of a ConversationRow list (plan de la lista § 3): the turn's
+       mono word («ESPERAMOS RESPUESTA»; the French one wraps), the
+       relation's pill, the nearest bolo («1ª opción · 14 mar +1») and the
+       time with the next step at the end. */
+    --crow-turn-size: 15ch;
+    --crow-relation-size: 10rem;
+    --crow-bolos-size: 11rem;
+    --crow-end-size: 9rem;
 
     --sidebar-width: 264px;
     /* The shell's rail (ScopeRail) beside the page on a desktop, border
