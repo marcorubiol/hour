@@ -6,8 +6,9 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
 /**
  * E2E · facetas del espacio en Ajustes (comms carril 2, fase 4).
  *
- * 1. Las de Hour salen con dónde existen, y «Technical» como nombre nuevo no
- *    se crea: su clave es la de una estándar.
+ * 1. Las de Hour salen con dónde existen, y «Tècnica» como nombre nuevo no
+ *    se crea: su clave es `tecnica`, la de una estándar. («Technical» daría
+ *    `technical`, que sí se crearía: la clave sale del nombre, no del idioma.)
  * 2. `zzz_e2e_facet` («ZZZ E2E facet»): se crea la primera vez con el nivel
  *    bolo y después se reutiliza (no hay DELETE de facetas). Se marca y se
  *    desmarca un nivel con «saved»; se renombra en sitio y vuelve.
@@ -49,7 +50,7 @@ test.describe('workspace facets in settings', () => {
 
       // 1. A standard key is refused under its field.
       const name = page.locator('#facet-new');
-      await name.fill('Technical');
+      await name.fill('Tècnica');
       await section(page).getByRole('button', { name: 'Create' }).click();
       await expect(section(page).getByRole('alert')).toContainText('tecnica');
       await name.fill('');
@@ -66,10 +67,10 @@ test.describe('workspace facets in settings', () => {
 
       // A level ticked and unticked, «saved» beside it.
       const line = row(page).getByLabel('line', { exact: true });
-      await line.check();
+      await line.check({ force: true });
       await expect(row(page).locator('.facetset__levels')).toContainText('saved');
       await expect(row(page).locator('.set-row__hint')).toContainText('line');
-      await line.uncheck();
+      await line.uncheck({ force: true });
       await expect(row(page).locator('.set-row__hint')).not.toContainText('line');
 
       // Renamed in place, and back.
