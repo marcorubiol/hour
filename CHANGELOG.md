@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- La lista de Conversaciones es una sola fila de dos líneas en todos los chips: a quién le toca, la sala, sus bolos y cuándo; y debajo el contacto, lo último que se dijo y el próximo paso. Se puede ordenar por lo que pide, por lo último, por el próximo paso o por nombre, y filtrar por línea o por un envío. En el móvil, el panel de Difusión va plegado y la lista empieza en la primera pantalla. (2026-10-22)
 - Al añadir algo al plan basta con escribirlo: «ensayo jue 10-14 Mercat» pone el tipo, el día, la hora y el lugar, en los cuatro idiomas, y lo que corriges a mano manda. ⌘K encuentra también contactos, organizaciones y conversaciones. En el Mes, «+N más» abre el día; el Tablero usa todo el ancho; y en Difusión los textos de quién espera respuesta ya no se pisan. (2026-10-22)
 - Cada espacio tiene sus etiquetas de conversación en Ajustes: renombrar las de Hour, apagarlas, ordenarlas y crear las propias. Desde ⌘K se crea una función, una fecha, una tarea o una conversación escribiendo lo que es («ensayo Mercat»), en cualquier pantalla. Y en el Mes, el «+» de cada día, un doble clic en su hueco o una pulsación larga abren el alta en ese día. (2026-10-21)
 - En una pantalla mediana o en el móvil, las secciones de Ajustes se eligen en un desplegable arriba y la página usa todo el ancho. Y en un espacio sin conversaciones, «Todas» vuelve a invitar a traer tu agenda. (2026-10-21)
