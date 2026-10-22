@@ -68,6 +68,9 @@ test.describe('bulk actions on the selection', () => {
   });
 
   const rows = (page: Page) => page.locator('main [data-testid="conversation-row"]', { hasText: NAME });
+  // By the relation pill's name: each editable row also mounts the closed «Not this time»
+  // dialog, whose title `hasText` would read in every row.
+  const notNow = (page: Page) => rows(page).filter({ has: page.getByRole('button', { name: /^Not this time/ }) });
 
   async function open(page: Page, chip = LENS) {
     await page.goto(chip);
@@ -104,11 +107,11 @@ test.describe('bulk actions on the selection', () => {
     await dialog.getByRole('button', { name: 'Save' }).click();
     const toast = page.locator('.toast-region').getByText('2 set to «not this time»');
     await expect(toast).toBeVisible({ timeout: 20_000 });
-    await expect(rows(page).filter({ hasText: 'Not this time' })).toHaveCount(2, { timeout: 20_000 });
+    await expect(notNow(page)).toHaveCount(2, { timeout: 20_000 });
 
     await page.locator('.toast-region').getByRole('button', { name: 'Undo' }).click();
     await expect(page.locator('.toast-region').getByText('Undone.')).toBeVisible({ timeout: 20_000 });
-    await expect(rows(page).filter({ hasText: 'Not this time' })).toHaveCount(0, { timeout: 20_000 });
+    await expect(notNow(page)).toHaveCount(0, { timeout: 20_000 });
 
     // Esc in the list leaves the selection.
     await rows(page).nth(0).getByRole('checkbox').focus();
