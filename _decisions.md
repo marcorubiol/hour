@@ -4748,3 +4748,53 @@ confunde con su aire. Decorativo (`aria-hidden`): el `nav` sigue con sus cuatro 
 **Enmienda a ADR-135 (2026-10-22).** En el móvil, el panel de Difusión va plegado a la primera línea de cada bloque
 (plan de la lista de Conversaciones § 3.3), así que la barra de las conversaciones sin línea queda dentro del pliegue
 como las demás. En escritorio sigue sin ocultarse nunca. Marco: «lo que recomiendes».
+
+## [2026-10-22] ADR-141 · La lista de Conversaciones: una fila, un orden, filtros y acciones en bloque (enmienda ADR-118, 134 y 138)
+
+**Contexto.** Drop del 13-10: la lista no decía el estado real del trato, ni lo último, ni el contacto de verdad, y
+cambiaba de forma al cambiar de chip (feed en «Todas», tabla de siete columnas en los demás, ordenada por próximo
+paso). Plan con el estado del árbol y las alternativas: `build/plans/2026-10-22-conversations-list.md`. Marco aprobó
+el 22-10 todas las recomendadas de su § 11 («apruebo todo»). Las fases 1 y 2 están en producción desde el 22-10 sin
+migración (`1fc71c81`, `bafa5a26`).
+
+**Decisión.**
+1. **Una fila de dos líneas en todos los chips** (`ConversationRow`, que sustituye a `FeedLine` y usan la lista, el
+   feed y los hilos del equipo). Primera línea para decidir: turno en mono (`TE TOCA`, `SEGUIMIENTO`, `LES TOCA`, o la
+   faceta en un hilo), la sala con sus no leídos y «lo conozco», la relación derivada y, si hay, el bolo vivo más
+   cercano con su primera fecha y «+N»; a la derecha, cuándo fue lo último. Segunda línea para recordar: el contacto
+   principal con su papel (sin repetir el nombre de la sala), ciudad, proyecto y línea si el alcance tiene varios, lo
+   último que se dijo (quién y qué) o el último envío que recibió, y el próximo paso. Lo vacío no se pinta. En tableta
+   el bolo pasa a la línea de meta; en el móvil la fila es una tarjeta de líneas, sin `table`. Una sola densidad. Sale
+   el conmutador «Por conversación · Por contacto» y su `localStorage`: agrupar por persona es cosa de la ficha de la
+   persona. Enmienda ADR-134 § 2 y ADR-138 § 2 en la forma: las vistas y los chips filtran, la fila es la misma.
+2. **Un orden por defecto para toda la lente, «lo que pide»:** no leídos, después te toca (las respuestas, la más
+   reciente arriba; después los seguimientos, el más vencido primero), después lo último que se movió. Difusión deja
+   de ordenar por próximo paso. Un menú «Orden» en la URL, `?orden=pide|movimiento|paso|nombre`, sin orden guardado en
+   el navegador (`$lib/conversation-order.ts`). Los filtros de bloque (te toca, caliente, se enfría, un tramo de la
+   temporada) siguen ordenando como su bloque. Enmienda ADR-118 en el orden de la lista; su § 7 (bloque y lista cuentan
+   igual) no cambia.
+3. **Filtros, todos en la URL:** etiqueta y relación, como antes; **línea** (`?linea=`) vale sola, sin
+   `temporada=actual`; **envío** (`?envio=&r=`) con `todos` (recibieron, el valor por defecto), `respuestas`,
+   `sin-respuesta` y `rebotes`, la misma regla que la cifra del envío (`MAILOUT_PICKS`). Sin vistas guardadas: la URL es
+   la vista y se comparte copiándola.
+4. **Acciones en bloque** sobre la selección, además de «Escribir a N» (que sigue siendo de venta y de un proyecto):
+   «no esta vez» (con «hasta» opcional), etiquetar (poner o quitar una sin tocar las otras), siguiente paso (misma fecha
+   y nota) y «no pide respuesta». Valen con cualquier chip de fuera, no con hilos del equipo. Por
+   `POST /api/conversations/bulk`, con el JWT de quien llama y sin `service_role` ni RPC nueva: la RLS decide cada
+   conversación y lo que no se puede tocar vuelve como fallo de esa fila. La pantalla parte la selección en trozos de
+   20 (`BULK_MAX`, cuatro a la vez), no en peticiones de 500 como decía el plan: una petición del Worker no pasa de
+   unas 50 subpeticiones y etiquetar es una RPC por conversación. Cada respuesta trae su `undo` y el aviso ofrece
+   «Deshacer», que reaplica el valor anterior solo de las hechas. «Seleccionar las N que coinciden» marca todas las del
+   filtro (`?ids_only=1`, como mucho 1.000, el tope de la lectura derivada); la barra guarda ids, no el filtro.
+5. **Teclado en la lista:** flechas arriba y abajo, Intro abre el vistazo, `x` marca en modo selección y Esc sale.
+6. **En el móvil el panel de Difusión va plegado** a la primera línea de cada bloque y la lista empieza en la primera
+   pantalla (enmienda a ADR-135 del mismo día).
+7. **«Quién la lleva» queda fuera.** No hay columna en `conversation`; con dos personas, quién la creó y la privacidad
+   ya lo dicen. Se decide al abrir la beta, con equipos de verdad (sería `lead_user_id`, aditiva, que nunca da acceso).
+8. **Pendiente, fase 3 del plan:** que la lista lea una sola fuente, `conversation_feed`, con relación, contacto,
+   ciudad y los filtros de relación, línea y envío; la ruta derivada del Worker se queda para el panel. Migración
+   aditiva por el gate de § 34, copiando la firma viva de la función.
+
+**Re-evaluar cuando** se lleve una temporada de difusión con la lista nueva: si «lo que pide» esconde los seguimientos
+detrás de muchas respuestas (el umbral del plan § 10), si falta una vista compacta de una línea, y si con más de dos
+personas en la difusión hace falta «quién la lleva».
