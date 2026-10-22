@@ -4744,3 +4744,7 @@ para lector de pantalla y en el tooltip. La búsqueda gana el sitio y conserva e
 de Planificador · Conversaciones · Cuentas, en escritorio y en la barra del móvil, porque es la portada y el resumen
 (ADR-088), no una lente más; filete y no hueco porque en el móvil las celdas ya reparten el ancho y un hueco se
 confunde con su aire. Decorativo (`aria-hidden`): el `nav` sigue con sus cuatro enlaces y el borde derecho no se mueve.
+
+**Enmienda a ADR-135 (2026-10-22).** En el móvil, el panel de Difusión va plegado a la primera línea de cada bloque
+(plan de la lista de Conversaciones § 3.3), así que la barra de las conversaciones sin línea queda dentro del pliegue
+como las demás. En escritorio sigue sin ocultarse nunca. Marco: «lo que recomiendes».
