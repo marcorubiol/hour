@@ -4798,3 +4798,62 @@ migración (`1fc71c81`, `bafa5a26`).
 **Re-evaluar cuando** se lleve una temporada de difusión con la lista nueva: si «lo que pide» esconde los seguimientos
 detrás de muchas respuestas (el umbral del plan § 10), si falta una vista compacta de una línea, y si con más de dos
 personas en la difusión hace falta «quién la lleva».
+
+## [2026-10-22] ADR-142 · Invitar a un bolo: el equipo de una noche en el tablón (comms, carril 2; enmienda ADR-099 y ADR-100 § 1)
+
+**Contexto.** El primer corte de hilos con facetas (ADR-099, ADR-106) está en producción, pero un técnico de una noche
+no tenía cómo entrar en el tablón de su bolo sin entrar en el proyecto entero, y una membresía de bolo no dejaba leer
+la ficha de sus funciones: el tablón era inalcanzable. Plan con las alternativas:
+`build/plans/2026-10-22-comms-threads-facets.md`. Marco aprobó el 22-10 las cuatro recomendadas de su § 7 («apruebo
+todo»). Las tres fases de construcción están en producción el 22-10: esquema (`20261022100000_bolo_membership`),
+pantalla de acceso (`20261022150000_guest_no_task_availability_writes`, `20261022150100_bolo_access_for_screen`) y el
+marco de `/h` para un guest (`37383873`, sin migración).
+
+**Decisión.**
+1. **Se invita al bolo con paquete, y «quién va» lo propone, no lo da** (alternativa a del plan). Una invitación de
+   bolo (`workspace_invitation.bolo_id`, `bolo_preset`) no lleva proyecto, deja a la persona como `guest` del espacio y
+   le da una membresía de bolo con **Mínim** (solo el General) o **Equip** (el tablón con Técnica, Logística, Comidas y
+   Hoja de ruta). Coordinació y Direcció no existen a nivel de bolo. Bajo el tablón de la función, «Acceso al bolo» dice
+   quién entra por el bolo, qué invitaciones esperan y quién va a una función sin leer el tablón («Pau va y no lo ve ·
+   Invitar»); nunca se da acceso porque alguien va (ADR-103). Quitar del bolo (`revoke_membership`) y revocar una
+   invitación los hace quien podría haberla dado o el admin.
+2. **Caduca sola**: con `expires_with_bolo`, la membresía deja de valer al acabar el día siguiente a la última función
+   viva del bolo, en la zona del espacio, calculado cada vez (si el bolo se mueve, el acceso se mueve con él); sin
+   funciones con fecha no caduca hasta que se quite. «Cambiar la fecha» (`set_membership_expiry`) pone un último día a
+   mano o ninguno, y entonces deja de seguir al bolo; solo lo hace quien está por encima del bolo (proyecto o línea) o
+   el admin, no otro invitado. La caducidad se aplica en `private.chain_memberships`, el embudo de toda lectura por la
+   cadena: una membresía caducada no da nada. El enlace de la invitación caduca a los 7 días y solo lo acepta su correo.
+3. **La membresía de bolo lee sus funciones por la cadena, sin dinero.** `performance_select` suma
+   `private.model_container_verb_at` (línea, bolo, función), lo que ya decía ADR-100 § 1 («ver la producción es el
+   acceso al contenedor»), aplicado donde la cadena se quedaba corta. La función no lleva dinero (ADR-087),
+   `performance.bolo_id` sigue fuera del grant por columnas y `bolo_select` sigue en `read:money`. `venue_select` suma
+   solo la sala de esas funciones, nunca el directorio (ADR-124). La migración fotografió lo que leía cada membresía real
+   antes y después y abortaba si cambiaba.
+4. **Un guest no escribe tareas ni disponibilidad del espacio**, ni las suyas: no las lee (ADR-104) y ninguna pantalla
+   suya las enseña. `task_insert/update`, `availability_block_insert/update` y sus cuatro RPC pasan de
+   `is_workspace_member` a `is_workspace_internal_member`; `venue_insert/update`, igual. Para owner, admin, member y
+   viewer no cambia nada. Cierra el hueco de la fase 1: un UPDATE ciego por PostgREST dejaba al técnico reescribir
+   tareas que no veía.
+5. **El marco de `/h` para un guest** (`$lib/workspace-role.ts`): «guest» es por espacio, no por persona (al darse de
+   alta tiene su propio espacio). Cada puerta (crear proyecto, tarea, disponibilidad, feed de calendario, plan, ⌘K que
+   crea) sale solo donde su rol escribe y apunta a ese espacio; Ajustes abre en su espacio propio y, en el de la
+   compañía, solo enseña su perfil. Su función sale en el Planner y en Hoy, se ubica por el `workspace_id` de la propia
+   función (el proyecto no le llega) y su ficha es de solo lectura. La pantalla nunca decide datos: solo evita ofrecer
+   una puerta que daría 403.
+6. **Hoy dice «Tablón · N nuevos»** en «Lo siguiente» cuando el tablón de esa función tiene nuevos, a cualquiera que lo
+   lea, y abre la ficha en `#board`. Sin avisos ni correo.
+7. **La regla del techo vale también para invitar al bolo** (ADR-085 § 10, ADR-100 § 3, ADR-104): crea la invitación
+   (`create_bolo_invitation`) quien puede dar ese paquete en ese bolo, no solo el admin, y aceptarla vuelve a comprobar
+   el techo de quien invitó. Así, **quien tiene Equip en el bolo, invitado incluido, puede invitar a otros con Equip.**
+   Se acepta: es el mismo techo que en proyecto, y lo que da nunca pasa de lo que tiene.
+8. **Hour no envía todavía el correo de invitación**, tampoco en las de espacio: crear la invitación deja un enlace
+   para copiar y mandar a mano. Los avisos por correo quedan fuera de este corte.
+9. **Lo siguiente es Facetas del espacio en Ajustes** (plan § 3.5, fase 4), por delante de los hilos de proyecto y
+   línea y de los avisos por correo.
+
+**Sabido y abierto:** el Tablero del Planner no enseña la función de un guest, porque agrupa por proyecto y el guest no
+lo lee.
+
+**Re-evaluar cuando** haya bolos en `muk-cia` y un técnico de verdad entre por una invitación: si el «día después de la
+última función» es corto o largo, si invitar con Equip desde un invitado se usa o molesta, y si hace falta el correo
+de invitación.
