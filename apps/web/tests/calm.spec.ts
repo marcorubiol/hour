@@ -109,9 +109,11 @@ test.describe('Calm — a composition, not a grey (ADR-139 § 5)', () => {
 
   test('switching calm is heard, not only seen', async ({ page }) => {
     await open(page, '/h/desk', false);
+    // El de calma, no el del alta rápida (⌘K), que también vive en la página.
+    const announce = page.locator('[aria-live="polite"].visually-hidden').filter({ hasText: /^Calm (on|off)/ });
     await page.locator('body').press('c');
-    await expect(page.locator('[aria-live="polite"].visually-hidden')).toHaveText(/^Calm on/);
+    await expect(announce).toHaveText(/^Calm on/);
     await page.locator('body').press('c');
-    await expect(page.locator('[aria-live="polite"].visually-hidden')).toHaveText(/^Calm off/);
+    await expect(announce).toHaveText(/^Calm off/);
   });
 });

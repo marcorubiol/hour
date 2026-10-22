@@ -500,8 +500,10 @@ describe.skipIf(!envReady())('RLS: hilos con facetas (ADR-106)', () => {
       expect(res.data!.performances.map((p) => p.id).sort()).toEqual([perfA, perfB].sort());
       expect(res.data!.threads.map((t) => t.facet_key)).toEqual([null]);
       const raw = JSON.stringify(res.data);
-      expect(raw).not.toContain('1234');
-      expect(raw).not.toContain('fee');
+      // Ni el importe como valor ni una clave de dinero; un uuid puede llevar
+      // «fee» o «1234» por azar, así que se mira la forma JSON, no la subcadena.
+      expect(raw).not.toMatch(/:"?1234(\.0+)?"?[,}]/);
+      expect(raw).not.toMatch(/"fee[_a-z]*":/);
       // Por la API el bolo sigue siendo dinero.
       expect((await pgGet('bolo', limitedJwt, new URLSearchParams({ id: `eq.${boloId}`, select: 'id' }))).rows).toHaveLength(0);
     });
