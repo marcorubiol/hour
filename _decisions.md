@@ -4748,3 +4748,165 @@ confunde con su aire. Decorativo (`aria-hidden`): el `nav` sigue con sus cuatro 
 **Enmienda a ADR-135 (2026-10-22).** En el móvil, el panel de Difusión va plegado a la primera línea de cada bloque
 (plan de la lista de Conversaciones § 3.3), así que la barra de las conversaciones sin línea queda dentro del pliegue
 como las demás. En escritorio sigue sin ocultarse nunca. Marco: «lo que recomiendes».
+
+## [2026-10-22] ADR-141 · La lista de Conversaciones: una fila, un orden, filtros y acciones en bloque (enmienda ADR-118, 134 y 138)
+
+**Contexto.** Drop del 13-10: la lista no decía el estado real del trato, ni lo último, ni el contacto de verdad, y
+cambiaba de forma al cambiar de chip (feed en «Todas», tabla de siete columnas en los demás, ordenada por próximo
+paso). Plan con el estado del árbol y las alternativas: `build/plans/2026-10-22-conversations-list.md`. Marco aprobó
+el 22-10 todas las recomendadas de su § 11 («apruebo todo»). Las fases 1 y 2 están en producción desde el 22-10 sin
+migración (`1fc71c81`, `bafa5a26`).
+
+**Decisión.**
+1. **Una fila de dos líneas en todos los chips** (`ConversationRow`, que sustituye a `FeedLine` y usan la lista, el
+   feed y los hilos del equipo). Primera línea para decidir: turno en mono (`TE TOCA`, `SEGUIMIENTO`, `LES TOCA`, o la
+   faceta en un hilo), la sala con sus no leídos y «lo conozco», la relación derivada y, si hay, el bolo vivo más
+   cercano con su primera fecha y «+N»; a la derecha, cuándo fue lo último. Segunda línea para recordar: el contacto
+   principal con su papel (sin repetir el nombre de la sala), ciudad, proyecto y línea si el alcance tiene varios, lo
+   último que se dijo (quién y qué) o el último envío que recibió, y el próximo paso. Lo vacío no se pinta. En tableta
+   el bolo pasa a la línea de meta; en el móvil la fila es una tarjeta de líneas, sin `table`. Una sola densidad. Sale
+   el conmutador «Por conversación · Por contacto» y su `localStorage`: agrupar por persona es cosa de la ficha de la
+   persona. Enmienda ADR-134 § 2 y ADR-138 § 2 en la forma: las vistas y los chips filtran, la fila es la misma.
+2. **Un orden por defecto para toda la lente, «lo que pide»:** no leídos, después te toca (las respuestas, la más
+   reciente arriba; después los seguimientos, el más vencido primero), después lo último que se movió. Difusión deja
+   de ordenar por próximo paso. Un menú «Orden» en la URL, `?orden=pide|movimiento|paso|nombre`, sin orden guardado en
+   el navegador (`$lib/conversation-order.ts`). Los filtros de bloque (te toca, caliente, se enfría, un tramo de la
+   temporada) siguen ordenando como su bloque. Enmienda ADR-118 en el orden de la lista; su § 7 (bloque y lista cuentan
+   igual) no cambia.
+3. **Filtros, todos en la URL:** etiqueta y relación, como antes; **línea** (`?linea=`) vale sola, sin
+   `temporada=actual`; **envío** (`?envio=&r=`) con `todos` (recibieron, el valor por defecto), `respuestas`,
+   `sin-respuesta` y `rebotes`, la misma regla que la cifra del envío (`MAILOUT_PICKS`). Sin vistas guardadas: la URL es
+   la vista y se comparte copiándola.
+4. **Acciones en bloque** sobre la selección, además de «Escribir a N» (que sigue siendo de venta y de un proyecto):
+   «no esta vez» (con «hasta» opcional), etiquetar (poner o quitar una sin tocar las otras), siguiente paso (misma fecha
+   y nota) y «no pide respuesta». Valen con cualquier chip de fuera, no con hilos del equipo. Por
+   `POST /api/conversations/bulk`, con el JWT de quien llama y sin `service_role` ni RPC nueva: la RLS decide cada
+   conversación y lo que no se puede tocar vuelve como fallo de esa fila. La pantalla parte la selección en trozos de
+   20 (`BULK_MAX`, cuatro a la vez), no en peticiones de 500 como decía el plan: una petición del Worker no pasa de
+   unas 50 subpeticiones y etiquetar es una RPC por conversación. Cada respuesta trae su `undo` y el aviso ofrece
+   «Deshacer», que reaplica el valor anterior solo de las hechas. «Seleccionar las N que coinciden» marca todas las del
+   filtro (`?ids_only=1`, como mucho 1.000, el tope de la lectura derivada); la barra guarda ids, no el filtro.
+5. **Teclado en la lista:** flechas arriba y abajo, Intro abre el vistazo, `x` marca en modo selección y Esc sale.
+6. **En el móvil el panel de Difusión va plegado** a la primera línea de cada bloque y la lista empieza en la primera
+   pantalla (enmienda a ADR-135 del mismo día).
+7. **«Quién la lleva» queda fuera.** No hay columna en `conversation`; con dos personas, quién la creó y la privacidad
+   ya lo dicen. Se decide al abrir la beta, con equipos de verdad (sería `lead_user_id`, aditiva, que nunca da acceso).
+8. **Pendiente, fase 3 del plan:** que la lista lea una sola fuente, `conversation_feed`, con relación, contacto,
+   ciudad y los filtros de relación, línea y envío; la ruta derivada del Worker se queda para el panel. Migración
+   aditiva por el gate de § 34, copiando la firma viva de la función.
+
+**Re-evaluar cuando** se lleve una temporada de difusión con la lista nueva: si «lo que pide» esconde los seguimientos
+detrás de muchas respuestas (el umbral del plan § 10), si falta una vista compacta de una línea, y si con más de dos
+personas en la difusión hace falta «quién la lleva».
+
+## [2026-10-22] ADR-142 · Invitar a un bolo: el equipo de una noche en el tablón (comms, carril 2; enmienda ADR-099 y ADR-100 § 1)
+
+**Contexto.** El primer corte de hilos con facetas (ADR-099, ADR-106) está en producción, pero un técnico de una noche
+no tenía cómo entrar en el tablón de su bolo sin entrar en el proyecto entero, y una membresía de bolo no dejaba leer
+la ficha de sus funciones: el tablón era inalcanzable. Plan con las alternativas:
+`build/plans/2026-10-22-comms-threads-facets.md`. Marco aprobó el 22-10 las cuatro recomendadas de su § 7 («apruebo
+todo»). Las tres fases de construcción están en producción el 22-10: esquema (`20261022100000_bolo_membership`),
+pantalla de acceso (`20261022150000_guest_no_task_availability_writes`, `20261022150100_bolo_access_for_screen`) y el
+marco de `/h` para un guest (`37383873`, sin migración).
+
+**Decisión.**
+1. **Se invita al bolo con paquete, y «quién va» lo propone, no lo da** (alternativa a del plan). Una invitación de
+   bolo (`workspace_invitation.bolo_id`, `bolo_preset`) no lleva proyecto, deja a la persona como `guest` del espacio y
+   le da una membresía de bolo con **Mínim** (solo el General) o **Equip** (el tablón con Técnica, Logística, Comidas y
+   Hoja de ruta). Coordinació y Direcció no existen a nivel de bolo. Bajo el tablón de la función, «Acceso al bolo» dice
+   quién entra por el bolo, qué invitaciones esperan y quién va a una función sin leer el tablón («Pau va y no lo ve ·
+   Invitar»); nunca se da acceso porque alguien va (ADR-103). Quitar del bolo (`revoke_membership`) y revocar una
+   invitación los hace quien podría haberla dado o el admin.
+2. **Caduca sola**: con `expires_with_bolo`, la membresía deja de valer al acabar el día siguiente a la última función
+   viva del bolo, en la zona del espacio, calculado cada vez (si el bolo se mueve, el acceso se mueve con él); sin
+   funciones con fecha no caduca hasta que se quite. «Cambiar la fecha» (`set_membership_expiry`) pone un último día a
+   mano o ninguno, y entonces deja de seguir al bolo; solo lo hace quien está por encima del bolo (proyecto o línea) o
+   el admin, no otro invitado. La caducidad se aplica en `private.chain_memberships`, el embudo de toda lectura por la
+   cadena: una membresía caducada no da nada. El enlace de la invitación caduca a los 7 días y solo lo acepta su correo.
+3. **La membresía de bolo lee sus funciones por la cadena, sin dinero.** `performance_select` suma
+   `private.model_container_verb_at` (línea, bolo, función), lo que ya decía ADR-100 § 1 («ver la producción es el
+   acceso al contenedor»), aplicado donde la cadena se quedaba corta. La función no lleva dinero (ADR-087),
+   `performance.bolo_id` sigue fuera del grant por columnas y `bolo_select` sigue en `read:money`. `venue_select` suma
+   solo la sala de esas funciones, nunca el directorio (ADR-124). La migración fotografió lo que leía cada membresía real
+   antes y después y abortaba si cambiaba.
+4. **Un guest no escribe tareas ni disponibilidad del espacio**, ni las suyas: no las lee (ADR-104) y ninguna pantalla
+   suya las enseña. `task_insert/update`, `availability_block_insert/update` y sus cuatro RPC pasan de
+   `is_workspace_member` a `is_workspace_internal_member`; `venue_insert/update`, igual. Para owner, admin, member y
+   viewer no cambia nada. Cierra el hueco de la fase 1: un UPDATE ciego por PostgREST dejaba al técnico reescribir
+   tareas que no veía.
+5. **El marco de `/h` para un guest** (`$lib/workspace-role.ts`): «guest» es por espacio, no por persona (al darse de
+   alta tiene su propio espacio). Cada puerta (crear proyecto, tarea, disponibilidad, feed de calendario, plan, ⌘K que
+   crea) sale solo donde su rol escribe y apunta a ese espacio; Ajustes abre en su espacio propio y, en el de la
+   compañía, solo enseña su perfil. Su función sale en el Planner y en Hoy, se ubica por el `workspace_id` de la propia
+   función (el proyecto no le llega) y su ficha es de solo lectura. La pantalla nunca decide datos: solo evita ofrecer
+   una puerta que daría 403.
+6. **Hoy dice «Tablón · N nuevos»** en «Lo siguiente» cuando el tablón de esa función tiene nuevos, a cualquiera que lo
+   lea, y abre la ficha en `#board`. Sin avisos ni correo.
+7. **La regla del techo vale también para invitar al bolo** (ADR-085 § 10, ADR-100 § 3, ADR-104): crea la invitación
+   (`create_bolo_invitation`) quien puede dar ese paquete en ese bolo, no solo el admin, y aceptarla vuelve a comprobar
+   el techo de quien invitó. Así, **quien tiene Equip en el bolo, invitado incluido, puede invitar a otros con Equip.**
+   Se acepta: es el mismo techo que en proyecto, y lo que da nunca pasa de lo que tiene.
+8. **Hour no envía todavía el correo de invitación**, tampoco en las de espacio: crear la invitación deja un enlace
+   para copiar y mandar a mano. Los avisos por correo quedan fuera de este corte.
+9. **Lo siguiente es Facetas del espacio en Ajustes** (plan § 3.5, fase 4), por delante de los hilos de proyecto y
+   línea y de los avisos por correo.
+
+**Sabido y abierto:** el Tablero del Planner no enseña la función de un guest, porque agrupa por proyecto y el guest no
+lo lee.
+
+**Re-evaluar cuando** haya bolos en `muk-cia` y un técnico de verdad entre por una invitación: si el «día después de la
+última función» es corto o largo, si invitar con Equip desde un invitado se usa o molesta, y si hace falta el correo
+de invitación.
+
+## [2026-10-22] ADR-143 · Fusión de persona: dos dossiers del mismo espacio en uno, solo admin, deshacer 30 días (enmienda ADR-107)
+
+**Contexto.** ADR-107 dejó un caso abierto: la cuenta que acepta una invitación ya es otra persona, y el dossier de la
+invitación queda sin enlazar, dos `person_id` para el mismo ser humano. Marco decidió el 14-10 que se resolviera con
+una fusión explícita que confirma un admin. Plan con el estado de producción y las alternativas:
+`build/plans/2026-10-22-person-merge.md`. Marco aprobó el 22-10 las seis recomendadas de su § 11 («apruebo todo»). Las
+tres fases están en producción el 22-10: esquema y RPC (`20261022130000_person_merge`), la pantalla de fusión
+(`4a8639b8`) y el aviso (`20261022180000_person_merge_notices`, `190d5ff0`).
+
+**Decisión.**
+1. **Se fusiona el dossier dentro de un espacio**, no la persona global ni un alias. Dos dossiers del mismo espacio,
+   uno se queda (`keep`) y otro desaparece (`drop`): cada fila de ese espacio que apunta a `drop` pasa a `keep`
+   (reparto, cambios de reparto, equipo técnico, disponibilidad, «voy», contactos de conversación, «lo conozco», notas,
+   invitaciones, destinatarios de envío); `drop` se borra en blando con `merged_into`, su slug pasa a
+   `keep.previous_slugs` y sigue abriendo la ficha, y la persona global no se toca. Otros espacios no cambian. Un choque
+   de unicidad deja una sola fila (`retired`, o `merged` en la que absorbe, con su antes guardado). Si `keep` es la cuenta de
+   alguien del espacio sin dossier en él, el dossier se crea con los datos de `drop`.
+2. **Solo el admin del espacio** fusiona y deshace (`is_workspace_admin`), no quien puede crear dossiers: la fusión
+   mueve notas ajenas y contactos de conversaciones. La persona fusionada no confirma. La persona de una cuenta siempre
+   se queda: si `drop` tiene cuenta y `keep` no, se intercambian solos; si las dos tienen cuenta, se rechaza (22023).
+   Un dossier que el admin no puede leer no se fusiona (42501, el mismo error que uno que no existe).
+3. **La vista previa enseña lo que el admin ve, y lo que no ve se mueve sin contarse.** `preview_person_merge` es
+   SECURITY INVOKER (cambio sobre el plan, que la hacía DEFINER): sus recuentos son exactamente lo que la RLS deja leer
+   a quien llama (ADR-099 § 4), y las notas, solo las suyas. Notas privadas ajenas, «lo conozco» sin compartir y
+   contactos de conversaciones privadas ajenas pasan a `keep` igual. La lista de lo movido (`person_merge_row`) no tiene
+   grant a nadie, tampoco al admin, y nunca guarda el cuerpo de una nota. El guard de `note` deja cambiar `person_id`
+   solo dentro de una fusión en curso y fuera de los roles de PostgREST.
+4. **El admin elige nombre, email y teléfono** donde las dos fichas tienen valor; los campos vacíos de `keep` toman los
+   de `drop`. Un dossier lleva un solo email: la confirmación dice que el otro «deja de traer correo a Hour». Varios
+   emails por dossier, si hace falta, es otra tarea.
+5. **Deshacer dura 30 días y se hace una vez** (`undo_person_merge`): revive `drop`, devuelve `keep` a como estaba y
+   cada fila a su sitio. Lo creado sobre `keep` después se queda en `keep` y lo que se borró después se salta (la
+   pantalla dice cuántas). Una fusión deshecha no se rehace: se fusiona otra vez. Si `keep` se fusionó después en otra,
+   hay que deshacer esa antes. Tras fusionar, el aviso lleva «Deshacer»; la ficha que se queda dice «Fusionada con X el
+   día · Deshacer la fusión» mientras quepa el plazo.
+6. **El aviso de una invitación aceptada sin unir** sale en la ficha del dossier (la franja «Falta», ADR-139 § 2,
+   «Unir con X») y en Ajustes › Equipo («Sin unir», junto a «Fusiones recientes» con su «Deshacer»), de la misma lectura
+   (`list_unmerged_invitations`, solo admin), deducida sin columna nueva. No va a Hoy: no corre prisa y nada se rompe
+   mientras no se une. «Unir» abre la fusión con las dos fichas ya elegidas.
+7. **Una fusión deshecha no vuelve a avisar** (decisión del coordinador): `list_unmerged_invitations` deja fuera la
+   invitación o la pareja que ya se fusionó una vez, aunque se deshiciera. Deshacer dice «no es la misma», y el aviso no
+   insiste.
+8. **Los pins del Planner siguen a la ficha que se queda:** un `pe:<drop>` guardado en el navegador se cambia por
+   `pe:<keep>` al leerlo (`resolve_merged_persons`, que sigue la cadena hasta 8 saltos y solo resuelve hacia fichas que
+   quien llama ya ve).
+
+**Enmienda a ADR-107, «Caso abierto».** Queda resuelto así: aceptar la invitación sigue sin fusionar sola; el admin ve
+el aviso y une con esta fusión. «Sin reescribir historial» deja de valer en ese caso: la fusión sí reescribe el
+`person_id` de las filas del espacio, y `audit_log` conserva lo que pasó.
+
+**Re-evaluar cuando** la primera persona real entre en dos espacios (Anouk en `muk-cia` y en el suyo): si el aviso en
+la ficha y en Ajustes basta, si 30 días es el plazo, y si perder el segundo email pide varios emails por dossier.
