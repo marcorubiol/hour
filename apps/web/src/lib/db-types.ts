@@ -4900,10 +4900,23 @@ export type Database = {
       }
       conversation_feed: {
         Args: {
+          p_ids_only?: boolean
           p_limit?: number
+          p_line?: string
+          p_list?: boolean
+          p_mailout_id?: string
+          p_mailout_pick?: string
+          p_offset?: number
+          p_order?: string
           p_project_ids?: string[]
           p_q?: string
+          p_relation?: string
+          p_season?: boolean
+          p_season_line_ids?: string[]
+          p_status?: string
           p_tag?: string
+          p_temp?: string
+          p_turn?: string
           p_workspace_ids?: string[]
         }
         Returns: Json

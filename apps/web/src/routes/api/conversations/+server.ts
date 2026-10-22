@@ -13,12 +13,12 @@
  *   · plain (a project or line module: `line_id`, `season`, or nothing that
  *     derives): PostgREST, ordered by next step, as before;
  *   · the lens (`orden`, `etiqueta` or any derived filter: `turno`, `temp`,
- *     `temporada`, `relacion`, `linea`, `envio`+`r`): the scope is filtered with
- *     `$lib/conversation-overview` (the same rules as the blocks), ordered by
- *     `orden` (`$lib/conversation-order`; the block filters te toca and
- *     temperatura keep their block's order, ADR-118 § 7) with the unread counts
- *     of `conversation_feed` (the order of «Todas», plan § 4), and only the
- *     page is read in full.
+ *     `temporada`, `relacion`, `linea`, `envio`+`r`): one source,
+ *     `conversation_feed` in list mode (plan de la lista, fase 3), filters with
+ *     the rules of `$lib/conversation-overview` written in SQL, orders by
+ *     `orden` (the block filters te toca and temperatura keep their block's
+ *     order, ADR-118 § 7), counts and cuts the page; only the page is read in
+ *     full. The Worker's derived read (`loadOverviewRows`) is the panel's.
  *
  * Auth: Bearer JWT required. RLS denies anon.
  */
@@ -38,22 +38,13 @@ import {
 } from '$lib/conversation';
 import { PostgrestError, pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
-import { TURN_EMBEDS, loadOverviewRows, mailoutPickIds, setLastTurnEmbed, setScope } from '$lib/server/conversation-overview';
-import { loadFeedConversations, loadRowExtras } from '$lib/server/conversation-list';
-import {
-  MAILOUT_PICKS,
-  NO_LINE,
-  applyListFilter,
-  hasListFilter,
-  overviewOrderKey,
-  parseLinea,
-  type ListFilter,
-} from '$lib/conversation-overview';
-import { feedOrderKey } from '$lib/conversation-feed';
-import { ORDERS, sortByOrder, type Orden } from '$lib/conversation-order';
+import { TURN_EMBEDS, setLastTurnEmbed, setScope } from '$lib/server/conversation-overview';
+import { loadListPage, loadRowExtras } from '$lib/server/conversation-list';
+import { MAILOUT_PICKS, hasListFilter, parseLinea, type ListFilter } from '$lib/conversation-overview';
+import { ORDERS, type Orden } from '$lib/conversation-order';
 import { RELATIONS } from '$lib/conversation-relation';
 import { json } from '$lib/server/http';
-import { TAG_KEY_RE, filterByChip } from '$lib/conversation-tags';
+import { TAG_KEY_RE } from '$lib/conversation-tags';
 import { MATCHING_MAX } from '$lib/conversation-bulk';
 
 const QuerySchema = v.object({
@@ -250,14 +241,10 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
 };
 
 /**
- * A page of the lens: the scope's ids filtered and ordered, then the page's
- * rows read in full (at most `limit` ids).
- *
- * The order and the unread counts come from `conversation_feed`, with the
- * chip's tag and the search. The scope is read whole (`loadOverviewRows`) only
- * when a filter needs what the feed does not say (relation, season, turn,
- * temperature) or when the feed was cut at its 500 rows; then the rows outside
- * the feed order with the same keys, without unread.
+ * A page of the lens: `conversation_feed` in list mode filters, orders, counts
+ * and cuts the window in one call (plan de la lista, fase 3); then the page's
+ * rows are read in full (at most `limit` ids, RLS again) in the RPC's order.
+ * The scope is no longer read here: `loadOverviewRows` is the panel's.
  */
 async function lensPage(
   env: SupabaseEnv,
@@ -277,59 +264,26 @@ async function lensPage(
     idsOnly?: boolean;
   },
 ) {
-  const now = new Date();
-  const f = o.filter;
-  const scope = { projectIds: o.projectIds, workspaceIds: o.workspaceIds };
-  const feed = await loadFeedConversations(env, jwt, { ...scope, tag: o.etiqueta ?? null, q: o.q || null }, now);
-  const unread = new Map(feed.rows.map((r) => [r.id, r.unread_count]));
-  const projectOf = new Map(feed.rows.map((r) => [r.id, r.project_id]));
-  const byBlock = Boolean(f.turno || f.temp);
-  const needScope = Boolean(f.relacion || f.temporada || f.turno || f.temp || o.status) || feed.more;
-
-  let ids: string[];
-  if (needScope) {
-    const rows = await loadOverviewRows(env, jwt, { ...scope, status: o.status });
-    for (const r of rows) projectOf.set(r.id, r.project_id);
-    let matched = applyListFilter(o.etiqueta ? filterByChip(rows, o.etiqueta) : rows, f, now, o.lineIds);
-    if (f.envio && f.r) {
-      const picked = await mailoutPickIds(env, jwt, f.envio, f.r, rows);
-      matched = matched.filter((r) => picked.has(r.id));
-    }
-    if (o.q) {
-      // The feed's search, unless it was cut: then the search RPC, as before.
-      let hits: Set<string>;
-      if (!feed.more) hits = new Set(feed.rows.map((r) => r.id));
-      else {
-        const search = new URLSearchParams({ select: 'id', p_q: o.q, deleted_at: 'is.null', limit: '5000' });
-        setScope(search, o.projectIds, o.workspaceIds);
-        hits = new Set((await pgGet<{ id: string }>(env, 'rpc/conversation_search', jwt, { search })).data.map((r) => r.id));
-      }
-      matched = matched.filter((r) => hits.has(r.id));
-    }
-    if (byBlock) ids = matched.map((r) => r.id);
-    else {
-      const fromFeed = new Map(feed.rows.map((r) => [r.id, feedOrderKey(r)]));
-      ids = sortByOrder(
-        matched.map((r) => fromFeed.get(r.id) ?? overviewOrderKey(r, now)),
-        o.orden,
-      ).map((k) => k.id);
-    }
-  } else {
-    let rows = feed.rows;
-    if (f.linea) rows = rows.filter((r) => (f.linea === NO_LINE ? r.line_id === null : r.line_id === f.linea));
-    if (f.envio && f.r) {
-      const picked = await mailoutPickIds(env, jwt, f.envio, f.r, rows);
-      rows = rows.filter((r) => picked.has(r.id));
-    }
-    ids = sortByOrder(rows.map(feedOrderKey), o.orden).map((k) => k.id);
-  }
-
+  const page = await loadListPage(env, jwt, {
+    projectIds: o.projectIds,
+    workspaceIds: o.workspaceIds,
+    tag: o.etiqueta ?? null,
+    q: o.q || null,
+    status: o.status,
+    filter: o.filter,
+    lineIds: o.lineIds,
+    orden: o.orden,
+    limit: o.limit,
+    offset: o.offset,
+    idsOnly: o.idsOnly,
+  });
   if (o.idsOnly) {
-    return { total: ids.length, items: ids.slice(0, MATCHING_MAX).map((id) => ({ id, project_id: projectOf.get(id)! })) };
+    return { total: page.total, items: page.items.slice(0, MATCHING_MAX).map((r) => ({ id: r.id, project_id: r.project_id })) };
   }
-  const items = await readPage(env, jwt, select, ids.slice(o.offset, o.offset + o.limit));
+  const unread = new Map(page.items.map((r) => [r.id, r.unread_count ?? 0]));
+  const items = await readPage(env, jwt, select, page.items.map((r) => r.id));
   return {
-    total: ids.length,
+    total: page.total,
     limit: o.limit,
     offset: o.offset,
     status: o.status ?? 'any',
