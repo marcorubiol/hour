@@ -202,3 +202,26 @@ export async function pgPostRpc<T = unknown>(
 
   return { data, total: null, status: res.status };
 }
+
+/**
+ * DELETE rows of a PostgREST resource with the caller's JWT, for a table
+ * whose write path is a direct RLS-gated delete (not an RPC). `options.search`
+ * must carry the row filter. Asks for `return=representation`: an empty
+ * `data` means no row matched (missing, or RLS denied).
+ */
+export async function pgDelete<T = unknown>(
+  env: SupabaseEnv,
+  path: string,
+  jwt: string | null,
+  options: PostgrestOptions = {},
+): Promise<PostgrestResult<T>> {
+  const url = resourceUrl(env, path, options.search);
+  const res = await fetch(url.toString(), {
+    method: 'DELETE',
+    headers: { ...baseHeaders(env, jwt), Prefer: 'return=representation' },
+  });
+  const body = await res.text();
+  if (!res.ok) throw new PostgrestError(res.status, body);
+  const data = body ? (JSON.parse(body) as T[]) : [];
+  return { data, total: null, status: res.status };
+}

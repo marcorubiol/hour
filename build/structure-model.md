@@ -85,22 +85,24 @@ code (moving one has to be an `UPDATE`, never a migration):
 | Converses    |   ●   |    ●    |  ●   |  —   |      —      |
 | Materials    |   —   |    ●    |  ●   |  ●   |      —      |
 | Tècnica      |   —   |    ●    |  ●   |  ●   |      —      |
-| Logística    |   —   |    —    |  ●   |  ●   |      —      |
-| Full de ruta |   —   |    —    |  —   |  ●   |      ●      |
-| Comidas      |   —   |    —    |  —   |  ●   |      ●      |
+| Logística    |   —   |    ●    |  ●   |  ●   |      —      |
+| Full de ruta |   —   |    ●    |  —   |  ●   |      ●      |
+| Comidas      |   —   |    ●    |  —   |  ●   |      ●      |
 | Diners       |   ●   |    ●    |  ●   |  ●   |      —      |
 
 Corrected 2026-10-11 (ADR-100 §5, ADR-099 añadido): the fourth column is the bolo; Full de
 ruta exists also at the performance; **Comidas** is a standard facet, at the bolo and at each
 performance (Marco, 2026-10-11). The table lives in `facet_level`
-(`20261011100000_permissions_facets_expand`).
+(`20261011100000_permissions_facets_expand`). Logística, Full de ruta and Comidas also exist at
+the project (ADR-106 § 2; table checked against the live `facet_level`, 2026-10-22).
 
 **Facets are configurable per space** (ADR-099 añadido): Hour seeds the standard ones,
 translated by key (`facet.<key>` in the four locales); each space can rename or deactivate
 them and create its own, named by the space with optional translations. Deactivating hides a
 facet from threads and the UI; it does not change who reads the data a facet gates. The access
 presets (Mínim · Equip · Coordinació · Direcció, ADR-100 §6) expand over the standard facets
-only; a space's own facets are granted by hand.
+only; a space's own facets are granted by hand. The screen is Settings › Facets (comms carril 2,
+phase 4): the vocabulary, what each preset gives, and the per-person adjustments.
 
 `General` is **not** a facet: it is membership in the container. Its thread always exists and
 its audience is exactly the container's members — so it can never be a permission row.

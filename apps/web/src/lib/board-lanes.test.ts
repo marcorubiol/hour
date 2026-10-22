@@ -295,6 +295,90 @@ describe('laneEvents on the person axis', () => {
   });
 });
 
+describe('laneEvents for a guest of a bolo (ADR-100 § 1)', () => {
+  const guest = (id: string, day: string, venue: string | null, ws = 'demo') =>
+    ({
+      ...mkEvent({ id, day, project_id: null }),
+      guest: { workspace_id: ws, venue_key: venue ?? '', venue_name: venue },
+    }) satisfies BoardEventIn;
+
+  it('a performance read without its project gets a lane of its own, named by its venue', () => {
+    const groups = scopeGroups({ scopeProjectIds: null, workspaces: WORKSPACES, projects: PROJECTS.slice(0, 2) });
+    const out = laneEvents({
+      axis: 'scope',
+      groups,
+      events: [guest('g1', '2026-07-18', 'Teatre Lliure'), guest('g2', '2026-07-19', 'Teatre Lliure')],
+      castByProject: NO_CAST,
+      awayByDay: NO_AWAY,
+      spaces: WORKSPACES,
+    });
+    // The space's band is born in the app's order, after MüK.
+    expect(out.groups.map((g) => g.key)).toEqual(['space:muk', 'space:demo']);
+    const lane = out.groups[1].lanes[0];
+    expect(lane).toMatchObject({ kind: 'guest', name: 'Teatre Lliure', id: null });
+    expect(out.cells.get(lane.key)?.get('2026-07-18')?.map((p) => p.event.id)).toEqual(['g1']);
+    expect(out.cells.get(lane.key)?.get('2026-07-19')?.[0].link).toBe('explicit');
+  });
+
+  it('in a band that already has project lanes, the guest lanes come after them, by name', () => {
+    const groups = scopeGroups({ scopeProjectIds: null, workspaces: WORKSPACES, projects: PROJECTS });
+    const out = laneEvents({
+      axis: 'scope',
+      groups,
+      events: [guest('g1', '2026-07-18', 'Zona'), guest('g2', '2026-07-19', 'Atrium')],
+      castByProject: NO_CAST,
+      awayByDay: NO_AWAY,
+      spaces: WORKSPACES,
+    });
+    expect(out.groups.find((g) => g.id === 'demo')?.lanes.map((l) => [l.kind, l.name])).toEqual([
+      ['project', 'Zimmer'],
+      ['guest', 'Atrium'],
+      ['guest', 'Zona'],
+    ]);
+  });
+
+  it('without a venue the lane has no name — the page words it', () => {
+    const out = laneEvents({
+      axis: 'scope',
+      groups: [],
+      events: [guest('g1', '2026-07-18', null)],
+      castByProject: NO_CAST,
+      awayByDay: NO_AWAY,
+      spaces: WORKSPACES,
+    });
+    expect(out.groups[0].lanes[0]).toMatchObject({ kind: 'guest', name: '' });
+  });
+
+  it('on the person axis the guest band follows the project bands', () => {
+    const groups = personGroups({
+      projects: [PROJECTS[0]],
+      visibleProjectIds: new Set(['tres']),
+      team: TEAM,
+      personNames: new Map(),
+      sharedPersonIds: new Set(),
+    });
+    const out = laneEvents({
+      axis: 'person',
+      groups,
+      events: [guest('g1', '2026-07-18', 'Teatre Lliure')],
+      castByProject: new Map([['tres', ['mia', 'joan']]]),
+      awayByDay: NO_AWAY,
+      spaces: WORKSPACES,
+    });
+    expect(out.groups.map((g) => g.key)).toEqual(['project:tres', 'space:demo']);
+    expect(out.groups[1].lanes.map((l) => l.kind)).toEqual(['guest']);
+  });
+
+  it('nothing changes for whoever reads the project: the row stays in its project lane', () => {
+    const groups = scopeGroups({ scopeProjectIds: null, workspaces: WORKSPACES, projects: PROJECTS });
+    const row = { ...mkEvent({ id: 'e1', day: '2026-07-18' }), guest: null };
+    const out = laneEvents({ axis: 'scope', groups, events: [row], castByProject: NO_CAST, awayByDay: NO_AWAY, spaces: WORKSPACES });
+    expect(out.groups).toEqual(groups);
+    expect(out.cells.get('project:tres')?.get('2026-07-18')?.map((p) => p.event.id)).toEqual(['e1']);
+    expect([...out.cells.keys()]).toEqual(['project:tres']);
+  });
+});
+
 /* ── Tallies & the three silences ───────────────────────────────────────── */
 
 describe('laneTally (law 9)', () => {

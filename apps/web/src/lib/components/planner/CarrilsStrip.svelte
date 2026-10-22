@@ -103,6 +103,8 @@
     teamWord: string;
     /** The nocast lane's suffix — «{project} · no cast». */
     noCastWord: string;
+    /** A guest lane without a venue name — «Your bolo» (the engine leaves it empty). */
+    guestWord?: string;
     /** The absence band's kind word ('away'). */
     awayWord: string;
     /** A derived tour's kind word ('on tour'). An absence is a fact somebody
@@ -163,6 +165,7 @@
     sharedWord,
     teamWord,
     noCastWord,
+    guestWord = '',
     awayWord,
     tourWord = t('planner.band_tour', appLocale()),
     untilLabel,
@@ -325,6 +328,7 @@
   function laneName(lane: BoardLaneRef): string {
     if (lane.kind === 'ghost') return teamWord;
     if (lane.kind === 'nocast') return `${lane.name} · ${noCastWord}`;
+    if (lane.kind === 'guest') return lane.name || guestWord;
     return lane.name;
   }
   function toggle(key: string) {
@@ -711,9 +715,11 @@
                     />
                   </span>
                 {/each}
-                {#if onDayCreate && placed.length === 0 && (col.kind === 'day' || col.span === 1)}
+                {#if onDayCreate && lane.kind !== 'guest' && placed.length === 0 && (col.kind === 'day' || col.span === 1)}
                   <!-- The empty cell IS the door: day and lane are already
-                       known, so nothing is chosen twice. The person axis
+                       known, so nothing is chosen twice. A guest lane has no
+                       door: it is a bolo the reader was invited to, not a
+                       project they plan in. The person axis
                        passes no project — the dialog asks (ADR-094 §3b:
                        never the prototype's silent group default). -->
                   <button
