@@ -310,8 +310,9 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: el equipo de una noche 
 
   test('membership_facet lleva id', async () => {
     const res = await pgGet<{ id: string }>('membership_facet', adminJwt, new URLSearchParams({ select: 'id', limit: '1' }));
+    // 200 ya prueba la columna (PostgREST da 400 a una que no existe); la tabla puede estar vacía.
     expect(res.status).toBe(200);
-    expect(res.rows[0]?.id).toMatch(/^[0-9a-f-]{36}$/);
+    for (const row of res.rows) expect(row.id).toMatch(/^[0-9a-f-]{36}$/);
   });
 
   test('anon no llama a nada nuevo', async () => {
