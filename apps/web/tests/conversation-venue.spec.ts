@@ -53,7 +53,7 @@ test.describe('conversation with the venue', () => {
     await dialog.getByRole('button', { name: 'Add conversation' }).click();
     await expect(dialog).not.toBeVisible({ timeout: 10_000 });
     await page.getByPlaceholder('People or organizations…').fill(ORG);
-    const link = page.locator('main table').getByRole('link', { name: ORG, exact: true });
+    const link = page.locator('main [data-testid="conversation-row"]').getByRole('link', { name: ORG, exact: true });
     await expect(link).toBeVisible({ timeout: 10_000 });
     await link.click();
     // The vistazo first (ADR-139 p1), then the page.

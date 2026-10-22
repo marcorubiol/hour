@@ -112,15 +112,18 @@ test.describe('la temporada por línea (ADR-135)', () => {
     await expect(page.locator('[data-testid="conversation-row"]', { hasText: IN_LINE })).toHaveCount(0);
   });
 
-  test('en el móvil, las barras apiladas y sin scroll lateral', async ({ page }) => {
+  test('en el móvil, la temporada se pliega a su primera barra y sin scroll lateral', async ({ page }) => {
     test.setTimeout(60_000);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/h/conversations?etiqueta=sales');
+    // Plan de la lista § 3.3 (móvil 11): cada bloque guarda su primera línea
+    // para que la lista empiece en la primera pantalla; el resto, en la lista.
     const lines = page.getByTestId('block-season').getByTestId('season-line');
     await expect(lines.first()).toBeVisible({ timeout: 30_000 });
-    const [a, b] = await Promise.all([lines.nth(0).boundingBox(), lines.nth(1).boundingBox()]);
-    expect(Math.abs(a!.x - b!.x)).toBeLessThan(2);
-    expect(a!.y + a!.height).toBeLessThanOrEqual(b!.y);
+    expect(await lines.count()).toBeGreaterThanOrEqual(2);
+    await expect(lines.nth(1)).toBeHidden();
+    const a = await lines.first().boundingBox();
+    expect(a!.x + a!.width).toBeLessThanOrEqual(390);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 });

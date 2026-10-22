@@ -95,7 +95,8 @@ test.describe('conversation tags', () => {
       const all = page.getByTestId('conversation-feed').getByTestId('feed-row').filter({ hasText: ORG });
       await expect(all).toHaveCount(1, { timeout: 15_000 });
       await expect(all).toHaveAttribute('data-kind', 'conversation');
-      await expect(all.locator('.feed__name')).toHaveText('Press');
+      // Its tags ride after the title, in the same row as the list's (ConversationRow).
+      await expect(all.locator('.conv-tags')).toHaveText('Press');
       await expect(page.getByTestId('all-threads')).toHaveCount(0);
 
       // 3. The file shows its tags; whoever edits changes them.
