@@ -16,6 +16,7 @@
   import Textarea from '$lib/components/Textarea.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { workspacesQueryOptions } from '$lib/nav-queries';
+  import { spaceWriteWorkspaces } from '$lib/workspace-role';
   import { spaceName } from '$lib/utils/identity';
   import { appLocale, t } from '$lib/i18n';
   import AccentSwatchPicker from './AccentSwatchPicker.svelte';
@@ -39,7 +40,9 @@
   let accent = $state<string | null>(null); // null = auto (hash of slug)
   let description = $state('');
 
-  let workspaces = $derived($workspacesQ.data?.items ?? []);
+  // Only the spaces that take a project from the person: never one they are
+  // a guest of (`$lib/workspace-role`), where `create_project` says no.
+  let workspaces = $derived(spaceWriteWorkspaces($workspacesQ.data?.items ?? []));
   // <option> text: a stylesheet cannot be trusted here, so the writer runs
   // where the labels are built.
   let workspaceOptions = $derived(workspaces.map((w) => ({ value: w.id, label: spaceName(w.name) })));

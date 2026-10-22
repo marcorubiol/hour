@@ -45,7 +45,7 @@
   import { peekHref } from '$lib/peek';
   import { usePins } from '$lib/stores/pins.svelte';
   import { useCalm } from '$lib/stores/calm.svelte';
-  import { buildLineIndex, buildProjectIndex, resolveScope, type NavWorkspace, type RawLine } from '$lib/nav';
+  import { buildLineIndex, buildProjectIndex, resolveScope, workspacesOnScreen, type NavWorkspace, type RawLine } from '$lib/nav';
   import { workspacesQueryOptions, activeProjectsQueryOptions, allLinesQueryOptions, teamQueryOptions, meQueryOptions } from '$lib/nav-queries';
   import { userDisplayName } from '$lib/utils/identity';
   import { session } from '$lib/session.svelte';
@@ -54,6 +54,7 @@
   import { otherTagsName, scopeTags } from '$lib/conversation-tags';
   import { conversationTagsQueryOptions } from '$lib/conversation-tags-query';
   import { lensOn } from '$lib/lenses.svelte';
+  import { taskWorkspaces } from '$lib/workspace-role';
   import type { DeskConversation } from '$lib/components/DeskBoard.svelte';
   import { taskProjectId, type TaskItem, type TasksCache, type TaskTarget } from '$lib/task';
   import {
@@ -81,7 +82,7 @@
   import { daysAgoLabel } from '$lib/conversation';
   import { computePulse } from '$lib/pulse';
   import { createPulseFeeds, pulseSlipContext } from '$lib/pulse-feeds.svelte';
-  import { dateSlip, perfDayKey, performanceSlip, type DateEvent, type PerformanceEvent, type SlipKind } from '$lib/month-events';
+  import { dateSlip, perfDayKey, performanceSlip, perfWorkspaceId, type DateEvent, type PerformanceEvent, type SlipKind } from '$lib/month-events';
   import { clashesInSeason, seasonWindow } from '$lib/season';
   import { createPlannerEngine } from '$lib/planner-engine.svelte';
   import { seasonAvailabilityQueryOptions } from '$lib/planner-feeds.svelte';
@@ -91,7 +92,7 @@
     waitingConversationsQueryOptions,
     waitingTasksQueryOptions,
   } from '$lib/waiting-feeds';
-  import type { ThreadFeedView } from '$lib/threads';
+  import { boardUnread, type BoardView, type ThreadFeedView } from '$lib/threads';
   import { setCommitment } from '$lib/commitments';
   import {
     invoicesByBolo,
@@ -241,6 +242,20 @@
     $teamQuery.isSuccess ? new Map(($teamQuery.data?.items ?? []).map((m) => [m.person_id, m.full_name])) : null,
   );
 
+  // «Tablón · N nuevos» (plan 2026-10-22 § 3.3): the next performance's
+  // board, under the record's own key, so opening it costs nothing more.
+  // The signal that was missing on the day of the show; no mail, no push.
+  let nextPerformanceId = $derived(lead.card?.ref.of === 'performance' ? lead.card.ref.id : '');
+  const nextBoardQuery = createQuery(
+    toStore(() => ({
+      queryKey: ['bolo-board', nextPerformanceId] as const,
+      enabled: Boolean(nextPerformanceId),
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchJSON<BoardView>(`/api/boards/${nextPerformanceId}`, signal),
+    })),
+  );
+  let nextBoardNew = $derived(nextPerformanceId ? boardUnread($nextBoardQuery.data) : 0);
+
   // ── Band 2 · Te espera ─────────────────────────────────────────────────
   // The reads of «Te espera», shared with the Planner's margin (ADR-138 § 6).
   const conversationsQuery = createQuery(waitingConversationsQueryOptions());
@@ -278,7 +293,7 @@
   let scopedTasks = $derived(
     tasks.filter((tk) => !removing.has(tk.id) && byProject(taskProjectId(tk), tk.workspace_id)),
   );
-  let scopedPerfs = $derived(feeds.performances.filter((p) => byProject(p.project?.id, p.project?.workspace_id)));
+  let scopedPerfs = $derived(feeds.performances.filter((p) => byProject(p.project?.id, perfWorkspaceId(p) ?? undefined)));
   let scopedDates = $derived(feeds.dates.filter((d) => byProject(d.project?.id, d.project?.workspace_id)));
 
   // The Conversations overview: its «te toca» replies wait in band 2, its
@@ -671,9 +686,18 @@
     await tick();
     composerEl?.querySelector<HTMLElement>('input, textarea')?.focus();
   }
-  let defaultWsId = $derived(scope.workspaceIds.length === 1 ? scope.workspaceIds[0] : (workspaces[0]?.id ?? ''));
+  // A task is written where the person may write one (`$lib/workspace-role`):
+  // never into a space they are a guest of (a bolo invitation), which would
+  // answer 403. Among the spaces on screen (the scope's, or all of them);
+  // with none, the button is not drawn.
+  let taskSpaces = $derived(taskWorkspaces(workspacesOnScreen('', pins.pins, workspaces, lineIndex, projectIndex)));
+  let defaultWsId = $derived(
+    scope.workspaceIds.length === 1 && taskSpaces.some((w) => w.id === scope.workspaceIds[0])
+      ? scope.workspaceIds[0]
+      : (taskSpaces[0]?.id ?? ''),
+  );
   let composerTarget = $derived.by<TaskTarget>(() => {
-    const ws = workspaces.find((w) => w.id === defaultWsId) ?? workspaces[0];
+    const ws = taskSpaces.find((w) => w.id === defaultWsId) ?? taskSpaces[0];
     return ws
       ? { kind: 'space', id: ws.id, name: spaceName(ws.name), accent: accentVarFor(ws) }
       : { kind: 'space', id: '', name: '', accent: 'var(--text-faint)' };
@@ -735,9 +759,11 @@
         <!-- One child, so the sub line's «·» separators stay out of it. -->
         <span class="desk__subrow">
           <span class="desk__date eyebrow eyebrow--sub">{dateWords} · <time datetime={clockTime}>{clockTime}</time></span>
-          <button type="button" class="desk__add btn--secondary btn--s" bind:this={addBtn} aria-expanded={composerOpen} onclick={openComposer}
-            >{t('desk.add_task', locale)}</button
-          >
+          {#if taskSpaces.length > 0}
+            <button type="button" class="desk__add btn--secondary btn--s" bind:this={addBtn} aria-expanded={composerOpen} onclick={openComposer}
+              >{t('desk.add_task', locale)}</button
+            >
+          {/if}
         </span>
       {/snippet}
     </LensHeader>
@@ -745,7 +771,7 @@
 
   <FirstVisitCard section="desk" steps={['desk-next', 'desk-waits', 'desk-more']} />
 
-  {#if composerOpen}
+  {#if composerOpen && taskSpaces.length > 0}
     <div class="desk__composer" bind:this={composerEl}>
       <TaskComposer
         {locale}
@@ -770,6 +796,7 @@
           {today}
           {viewerTz}
           personId={feeds.personId}
+          boardNew={nextBoardNew}
           {slipCtx}
           {personNames}
           {locale}

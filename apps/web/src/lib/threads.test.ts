@@ -5,6 +5,7 @@ import {
   MessageCreateSchema,
   audienceLine,
   boardLayout,
+  boardUnread,
   boloDays,
   boloPlace,
   conversationThread,
@@ -322,5 +323,26 @@ describe('«de qué se habla» (ADR-116)', () => {
     expect(boloDays('2026-11-14', '2026-11-15', 'es')).toBe('14 → 15 nov');
     expect(boloDays('2026-04-30', '2026-05-02', 'es')).toBe('30 abr → 2 may');
     expect(boloDays(null, null, 'es')).toBe('');
+  });
+});
+
+describe('boardUnread: the board\'s news for «Lo siguiente»', () => {
+  const th = (unread_count: number) => ({
+    thread_id: null,
+    facet_id: null,
+    facet_key: null,
+    label: null,
+    labels: {},
+    message_count: unread_count,
+    unread_count,
+    last_message_at: null,
+  });
+  test('adds the threads the viewer reads', () => {
+    expect(boardUnread({ threads: [th(2), th(0), th(1)] })).toBe(3);
+  });
+  test('no board, no bolo, nothing new: 0', () => {
+    expect(boardUnread(null)).toBe(0);
+    expect(boardUnread(undefined)).toBe(0);
+    expect(boardUnread({ threads: [] })).toBe(0);
   });
 });

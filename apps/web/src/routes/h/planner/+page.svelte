@@ -58,6 +58,7 @@
     type NoteEvent,
     type PerformanceEvent,
     performanceSlip,
+    perfWorkspaceId,
     dateSlip,
     type Slip as SlipVM,
   } from '$lib/month-events';
@@ -109,6 +110,7 @@
     buildLineIndex,
     buildProjectIndex,
     resolveScope,
+    workspacesOnScreen,
     type NavWorkspace,
     type RawLine,
   } from '$lib/nav';
@@ -170,8 +172,10 @@
   import { accentVarFor } from '$lib/utils/accent';
   import { spaceName } from '$lib/utils/identity';
   import { focusedDay } from '$lib/cell-create';
+  import { planAccessQueryOptions } from '$lib/plan-create';
+  import { isGuestIn, spaceWriteWorkspaces } from '$lib/workspace-role';
 
-  type WorkspaceLite = { id: string; slug: string; name: string };
+  type WorkspaceLite = { id: string; slug: string; name: string; my_role?: NavWorkspace['my_role'] };
 
   const pins = usePins();
   const calm = useCalm();
@@ -594,7 +598,7 @@
   let scopedProjectIds = $derived(new Set(scope.projectIds));
   function perfInScope(p: PerformanceEvent): boolean {
     if (scope.isEmpty) return true;
-    const ws = p.project?.workspace_id;
+    const ws = perfWorkspaceId(p);
     if (ws && scope.workspaceIds.includes(ws)) return true;
     if (p.project && directProjectIds.has(p.project.id)) return true;
     if (p.line_id && scope.lineIds.includes(p.line_id)) return true;
@@ -1402,7 +1406,7 @@
       if (perfDayKey(p) !== selectedDay) continue;
       const sl = performanceSlip(p, slipCtxPage);
       const t = performanceThread(p, viewerTz, sl.name, sl.city, sl.cert);
-      const ws = p.project ? workspaceSlugById.get(p.project.workspace_id) : undefined;
+      const ws = workspaceSlugById.get(perfWorkspaceId(p) ?? '');
       const cl = dayClashOf(p.id, performanceStatusFamily(p.status) === 'confirmed');
       const shared = {
         project: p.project,
@@ -1489,7 +1493,7 @@
         target: 'performance',
         id: p.id,
         name: performanceSlip(p, slipCtxPage).name,
-        tz: clockOf(p.venue?.timezone, p.project?.workspace_id),
+        tz: clockOf(p.venue?.timezone, perfWorkspaceId(p) ?? undefined),
         from: p.start_at ?? p.performed_at,
       });
     }
@@ -1636,7 +1640,7 @@
           ? []
           : c.event_ids.flatMap((id) => {
               const p = shownPerfs.find((x) => x.id === id);
-              const ws = p?.project ? workspaceSlugById.get(p.project.workspace_id) : undefined;
+              const ws = p ? workspaceSlugById.get(perfWorkspaceId(p) ?? '') : undefined;
               return p?.slug && ws
                 ? [{ href: `/h/${ws}/performance/${p.slug}#who-goes`, name: performanceSlip(p, slipCtxPage).name }]
                 : [];
@@ -1699,7 +1703,7 @@
       const sl = performanceSlip(p, slipCtxPage);
       const fam = performanceStatusFamily(p.status);
       const held = fam !== 'confirmed';
-      const ws = p.project ? workspaceSlugById.get(p.project.workspace_id) : undefined;
+      const ws = workspaceSlugById.get(perfWorkspaceId(p) ?? '');
       return {
         id: p.id,
         day: localeDayMonth(perfDayKey(p), localeTag),
@@ -2029,12 +2033,12 @@
           city: p.venue?.city ?? p.city,
         },
         {
-          home: p.project ? (workspaceCityById.get(p.project.workspace_id) ?? null) : null,
+          home: workspaceCityById.get(perfWorkspaceId(p) ?? '') ?? null,
           travelCovered,
         },
       );
       if (v.missing.length === 0 && !v.travelGuess) continue;
-      const ws = p.project ? workspaceSlugById.get(p.project.workspace_id) : null;
+      const ws = workspaceSlugById.get(perfWorkspaceId(p) ?? '') ?? null;
       out.push({
         id: p.id,
         day,
@@ -2999,6 +3003,7 @@
           // A focused day is the day you mean (`$lib/cell-create`): the
           // month's cell, the season's square, the agenda's row, the
           // board's cell. With none, the view's day, as every other door.
+          if (!canPlan) return;
           e.preventDefault();
           openCreate(focusedDay(el) ?? undefined);
           return;
@@ -3033,6 +3038,11 @@
   function openCreate(dayIso?: string) {
     creation.openEvent({ date: dayIso ?? viewCreateDay() });
   }
+  /** Writes the plan somewhere (`edit:performance`). Only an explicit «no»
+      takes the doors away, as in ⌘K: a guest of a bolo reads their
+      performances here and makes none (comms carril 2, fase 3). */
+  const planAccessQuery = createQuery(planAccessQueryOptions());
+  let canPlan = $derived($planAccessQuery.data?.edit !== false);
 
   /** A door without a day proposes the view's (`defaultCreateDay`). */
   function viewCreateDay(): string {
@@ -3082,14 +3092,21 @@
   // ── Unavailability (ADR-078 §4/§5) is a type of the quick add; it can be
   // written only while the availability and team feeds answer (contract
   // § Graceful absence). ──
+  /** Every space on screen is one the person is a guest of (a bolo
+      invitation): no availability, no calendar feed of theirs to make. */
+  let onlyGuest = $derived.by(() => {
+    const shown = workspacesOnScreen('', pins.pins, ($workspacesQuery.data?.items ?? []) as NavWorkspace[], lineIndex, projectIndex);
+    return shown.length > 0 && shown.every((w) => isGuestIn(w));
+  });
   let canBlackout = $derived(
     Boolean(
       $availabilityQuery.data &&
         !$availabilityQuery.data.absent &&
         $teamQuery.data &&
         !$teamQuery.data.absent,
-    ),
+    ) && !onlyGuest,
   );
+  let feedWorkspaces = $derived(spaceWriteWorkspaces($workspacesQuery.data?.items ?? []));
   // The space of an unavailability (the scope's one, or the only one) is
   // the shell's too (`scopeCreatePresets`): a blackout never fans out.
   function openBlackout() {
@@ -3436,8 +3453,8 @@
     {locale}
     onSetView={setView}
     onSetLaneAxis={setLaneAxis}
-    onCreate={() => openCreate()}
-    onFeed={openFeed}
+    onCreate={canPlan ? () => openCreate() : undefined}
+    onFeed={feedWorkspaces.length > 0 ? openFeed : undefined}
     onBlackout={openBlackout}
   />
 
@@ -3485,7 +3502,7 @@
         }
         setView('agenda');
       }}
-      onCreate={() => openCreate()}
+      onCreate={canPlan ? () => openCreate() : undefined}
       calm={calm.on}
       onLeaveCalm={() => calm.set(false)}
     />
@@ -3594,7 +3611,7 @@
       dates={shownDates}
       workspaceSlug={defaultWorkspaceSlug}
       {loading}
-      onDayCreate={(iso) => openCreate(iso)}
+      onDayCreate={canPlan ? (iso) => openCreate(iso) : undefined}
       onDateOpen={openDate}
       onDayOpen={(iso) => {
         dayIso = iso;
@@ -3756,7 +3773,7 @@
       kindLabel={(k) => kindLabel(k)}
       stateLabel={boardSlipState}
       stateUrgent={(sl) => Boolean(sl.hold?.expires && sl.hold.expires <= todayIso)}
-      onDayCreate={openBoardCreate}
+      onDayCreate={canPlan ? openBoardCreate : undefined}
       onClashDay={openClashDay}
       onDateOpen={openBoardDate}
       nowMinutes={boardNowMinutes}
@@ -3768,7 +3785,7 @@
 </section>
 
 
-<FeedDialog bind:open={feedOpen} workspaces={$workspacesQuery.data?.items ?? []} />
+<FeedDialog bind:open={feedOpen} workspaces={feedWorkspaces} />
 
 <style>
   /* EL TÍTULO DEL DÍA ES UNA PUERTA, y no debe parecer otra cosa que el

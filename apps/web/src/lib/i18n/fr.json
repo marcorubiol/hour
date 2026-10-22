@@ -262,6 +262,8 @@
   "desk.anchor_loadout": "démontage",
   "desk.anchor_wrap": "fin",
   "desk.roadsheet": "Feuille de route",
+  "desk.next_board": "Tableau · {n} nouveaux",
+  "desk.next_board_one": "Tableau · 1 nouveau",
   "desk.due_overdue": "en retard",
   "desk.due_due": "échéance",
   "desk.when_wrote": "a écrit {when}",

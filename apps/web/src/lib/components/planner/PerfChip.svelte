@@ -10,7 +10,7 @@
   import { accentVarFor } from '$lib/utils/accent';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
   import { isReady, performanceStatusFamily } from '$lib/performance';
-  import { perfInstant, type PerformanceEvent, type ProjectLite } from '$lib/month-events';
+  import { perfInstant, perfWorkspaceId, type PerformanceEvent, type ProjectLite } from '$lib/month-events';
   import { appLocale, t } from '$lib/i18n';
   import { statusWord } from '$lib/planner';
 
@@ -44,8 +44,8 @@
   }: Props = $props();
 
   function perfHref(p: PerformanceEvent): string | null {
-    if (!p.slug || !p.project) return null;
-    const ws = workspaceSlugById.get(p.project.workspace_id) ?? workspaceSlug;
+    if (!p.slug) return null;
+    const ws = workspaceSlugById.get(perfWorkspaceId(p) ?? '') ?? workspaceSlug;
     return `/h/${ws}/performance/${p.slug}`;
   }
 
@@ -61,7 +61,7 @@
   // viewer's day (dateDayKey), and a chip must not show a wall time from a
   // zone other than the one that placed it in its cell.
   function perfTz(p: PerformanceEvent): string | null {
-    return p.venue?.timezone ?? workspaceTzById.get(p.project?.workspace_id ?? '') ?? null;
+    return p.venue?.timezone ?? workspaceTzById.get(perfWorkspaceId(p) ?? '') ?? null;
   }
   function perfTime(p: PerformanceEvent): { primary: string; secondary: string | null } | null {
     const at = perfInstant(p);
@@ -107,7 +107,7 @@
    * that later switches to `prioritized` gets its ranks back untouched.
    */
   function footStatus(p: PerformanceEvent): string {
-    const mode = workspaceModeById.get(p.project?.workspace_id ?? '') ?? 'simple';
+    const mode = workspaceModeById.get(perfWorkspaceId(p) ?? '') ?? 'simple';
     if (mode === 'prioritized') return p.status;
     return p.status.startsWith('hold') ? 'hold' : p.status;
   }

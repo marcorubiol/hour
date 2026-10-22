@@ -303,6 +303,8 @@
   "desk.anchor_loadout": "load-out",
   "desk.anchor_wrap": "wrap",
   "desk.roadsheet": "Road sheet",
+  "desk.next_board": "Board · {n} new",
+  "desk.next_board_one": "Board · 1 new",
   "desk.due_overdue": "overdue",
   "desk.due_due": "due",
   "desk.when_wrote": "wrote {when}",

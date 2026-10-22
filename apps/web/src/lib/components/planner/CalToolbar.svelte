@@ -21,8 +21,10 @@
     locale: Locale;
     onSetView: (v: PlannerView) => void;
     onSetLaneAxis: (g: LaneAxis) => void;
-    onCreate: () => void;
-    onFeed: () => void;
+    /** Absent: whoever looks cannot write the plan (`/api/performances/access`). */
+    onCreate?: () => void;
+    /** Absent: no space on screen publishes a calendar feed for them. */
+    onFeed?: () => void;
     /** «reading the marks» — the grammar key, one door for all four views. */
     onReadMarks: () => void;
     onBlackout: () => void;
@@ -104,16 +106,18 @@
        one glyph that could mean anything the app can create — and it sits at
        the row's own height, because a control that outgrows its band starts
        announcing itself instead of waiting to be used. -->
-  <button type="button" class="cal__add" onclick={onCreate}
-    >＋ <span>{t('planner.date_word', locale)}</span></button
-  >
+  {#if onCreate}
+    <button type="button" class="cal__add" onclick={onCreate}
+      >＋ <span>{t('planner.date_word', locale)}</span></button
+    >
+  {/if}
   <Menu
     align="end"
     triggerClass="cal__kebab"
     label={t('planner.more', locale)}
     items={[
       { label: t('planner.read_marks', locale), onclick: onReadMarks },
-      { label: t('planner.feed', locale), onclick: onFeed },
+      ...(onFeed ? [{ label: t('planner.feed', locale), onclick: onFeed }] : []),
       ...(canBlackout
         ? [
             {

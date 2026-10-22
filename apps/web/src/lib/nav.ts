@@ -49,6 +49,10 @@ export type NavWorkspace = {
   /** IANA home timezone — the timeslot-entry fallback when a gig has no
       linked venue (timezone rule, spec § Timezone rule). */
   timezone?: string;
+  /** The caller's role in this workspace (`$lib/workspace-role`): a `guest`
+      is here through a bolo or a project only, and the frame offers them
+      no door of the space's own. Absent reads as able. */
+  my_role?: 'owner' | 'admin' | 'member' | 'viewer' | 'guest' | null;
 };
 
 /** Row shape of GET /api/projects — the shared ['projects', …] cache. */

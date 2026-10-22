@@ -1,4 +1,7 @@
 <script module lang="ts">
+  import type { NavWorkspace } from '$lib/nav';
+  import { settingsSectionsFor } from '$lib/workspace-role';
+
   /**
    * Types and section catalog live in module scope so they can be
    * imported by the settings page (`import type { SectionId }`). Svelte
@@ -34,9 +37,22 @@
     // with no handler). Each comes back with the first control that saves.
   ];
 
-  /** A `?section=` that is not (or no longer) a section lands on Profile. */
-  export function sectionFrom(param: string | null): SectionId {
-    return SECTIONS.some((s) => s.id === param) ? (param as SectionId) : 'profile';
+  /** What is the person's own in any space, whatever their role in it. */
+  export const PERSONAL_SECTIONS: readonly SectionId[] = ['profile'];
+
+  /**
+   * The sections the space in the URL offers whoever looks: all of them,
+   * except in a space they are a guest of (a bolo invitation), where only
+   * their profile is theirs (`$lib/workspace-role`).
+   */
+  export function offeredSections(workspace: Pick<NavWorkspace, 'my_role'> | null | undefined): Section[] {
+    const ids = settingsSectionsFor(workspace, SECTIONS.map((s) => s.id), PERSONAL_SECTIONS);
+    return SECTIONS.filter((s) => ids.includes(s.id));
+  }
+
+  /** A `?section=` that is not (or no longer) a section, or not one this space offers, lands on Profile. */
+  export function sectionFrom(param: string | null, offered: readonly Section[] = SECTIONS): SectionId {
+    return offered.some((s) => s.id === param) ? (param as SectionId) : 'profile';
   }
 </script>
 
@@ -54,13 +70,19 @@
    */
 
   import { page } from '$app/state';
+  import { createQuery } from '@tanstack/svelte-query';
   import { t, appLocale } from '$lib/i18n';
+  import { workspacesQueryOptions } from '$lib/nav-queries';
 
   const locale = appLocale();
 
   let workspaceSlug = $derived(page.params.workspace ?? '');
+  const workspacesQuery = createQuery(workspacesQueryOptions());
+  let offered = $derived(
+    offeredSections($workspacesQuery.data?.items.find((w) => w.slug === workspaceSlug)),
+  );
   let active = $derived<SectionId>(
-    sectionFrom(page.url.searchParams.get('section')),
+    sectionFrom(page.url.searchParams.get('section'), offered),
   );
 
   function hrefFor(id: SectionId): string {
@@ -72,7 +94,7 @@
   <p class="eyebrow set-nav__eyebrow">{t('settings.title', locale)}</p>
 
   <ul class="set-nav__list" role="list">
-    {#each SECTIONS as s (s.id)}
+    {#each offered as s (s.id)}
       <li>
         <a
           href={hrefFor(s.id)}

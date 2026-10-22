@@ -12,6 +12,7 @@ import {
   runSheetSteps,
   perfInstant,
   performanceSlip,
+  perfWorkspaceId,
   dateSlip,
   dateSpanDays,
   expandDateSpans,
@@ -225,6 +226,19 @@ describe('performanceSlip', () => {
   test('href resolves through the workspace slug map, and is null without a slug', () => {
     expect(performanceSlip(gig(), CTX).href).toBe('/h/muk-cia/performance/terrassa-18');
     expect(performanceSlip(gig({ slug: null }), CTX).href).toBeNull();
+  });
+
+  test('read through a bolo (no project): the row says the space, and the slip still opens', () => {
+    // A guest of a bolo reads the performance and not its project (RLS).
+    const guest = gig({ project: null, workspace_id: 'ws1' });
+    expect(perfWorkspaceId(guest)).toBe('ws1');
+    expect(performanceSlip(guest, CTX).href).toBe('/h/muk-cia/performance/terrassa-18');
+    // Neither the project nor the row: nowhere to go.
+    expect(performanceSlip(gig({ project: null, workspace_id: null }), CTX).href).toBeNull();
+  });
+
+  test('the project, when there is one, says the space', () => {
+    expect(perfWorkspaceId(gig({ workspace_id: 'other' }))).toBe('ws1');
   });
 });
 

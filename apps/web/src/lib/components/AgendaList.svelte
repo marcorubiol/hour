@@ -67,7 +67,7 @@
   import IdentityMark from '$lib/components/IdentityMark.svelte';
   import Slip from '$lib/components/planner/Slip.svelte';
   import PlannerSteps, { type StepVM } from '$lib/components/planner/PlannerSteps.svelte';
-  import { performanceSlip, dateSlip } from '$lib/month-events';
+  import { performanceSlip, dateSlip, perfWorkspaceId } from '$lib/month-events';
   import { holdDeadlineLabel, performanceStatusFamily } from '$lib/performance';
   import { appLocale, appLocaleTag, t } from '$lib/i18n';
   import { dateStatusFamily } from '$lib/date';
@@ -480,7 +480,7 @@
 
   // ── Time rendering (timezone rule — same as MonthGrid) ────────────────
   function perfTz(p: PerformanceEvent): string | null {
-    return p.venue?.timezone ?? workspaceTzById.get(p.project?.workspace_id ?? '') ?? null;
+    return p.venue?.timezone ?? workspaceTzById.get(perfWorkspaceId(p) ?? '') ?? null;
   }
   function perfInstant(p: PerformanceEvent): string | null {
     return p.load_in_at ?? p.start_at;
@@ -508,8 +508,8 @@
   }
 
   function perfHref(p: PerformanceEvent): string | null {
-    if (!p.slug || !p.project) return null;
-    const ws = workspaceSlugById.get(p.project.workspace_id) ?? workspaceSlug;
+    if (!p.slug) return null;
+    const ws = workspaceSlugById.get(perfWorkspaceId(p) ?? '') ?? workspaceSlug;
     return `/h/${ws}/performance/${p.slug}`;
   }
   function perfName(p: PerformanceEvent): string {

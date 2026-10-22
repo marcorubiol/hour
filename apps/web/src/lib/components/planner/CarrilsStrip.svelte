@@ -121,8 +121,9 @@
 
     /* ── gestures ───────────────────────────────────────────────────── */
     /** The empty cell is the door: day + the lane's project (null on the
-        person axis — the dialog asks, ADR-094 §3b). */
-    onDayCreate: (iso: string, projectId: string | null) => void;
+        person axis — the dialog asks, ADR-094 §3b). Absent: whoever looks
+        cannot write the plan, and the cell is no door. */
+    onDayCreate?: (iso: string, projectId: string | null) => void;
     /** The head's red '!' — the page opens the decision at that day. */
     onClashDay: (iso: string) => void;
     /** A date slip has no page of its own; its edit dialog opens here. */
@@ -710,7 +711,7 @@
                     />
                   </span>
                 {/each}
-                {#if placed.length === 0 && (col.kind === 'day' || col.span === 1)}
+                {#if onDayCreate && placed.length === 0 && (col.kind === 'day' || col.span === 1)}
                   <!-- The empty cell IS the door: day and lane are already
                        known, so nothing is chosen twice. The person axis
                        passes no project — the dialog asks (ADR-094 §3b:

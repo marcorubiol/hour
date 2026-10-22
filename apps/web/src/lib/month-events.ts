@@ -48,6 +48,10 @@ export type PerformanceEvent = {
   country: string | null;
   line_id: string | null;
   project: ProjectLite | null;
+  /** The row's space (`/api/performances` selects it). Read through
+      `perfWorkspaceId`: the project may be null for whoever reads the
+      performance through a bolo membership (a guest, ADR-100 § 1). */
+  workspace_id?: string | null;
   venue: {
     /** Present on the planner feeds (`/api/performances` selects it). */
     id?: string;
@@ -488,13 +492,22 @@ function clock(t: string | null): string | null {
   return t ? hourMark(t) : null;
 }
 
+/**
+ * The space a performance lives in: its project's, else its own row's. A
+ * guest of a bolo reads the performance and not its project (RLS), so the
+ * embed is null and only the row says where it is.
+ */
+export function perfWorkspaceId(p: Pick<PerformanceEvent, 'project' | 'workspace_id'>): string | null {
+  return p.project?.workspace_id ?? p.workspace_id ?? null;
+}
+
 export function performanceSlip(p: PerformanceEvent, ctx: SlipContext): Slip {
   const name =
     p.venue?.name ?? p.venue_name ?? p.city ?? p.project?.name ?? ctx.fallbackName ?? 'Performance';
   const at = perfInstant(p);
   // A venue-less gig falls back to its home space's zone — the one its times
   // were entered in — never silently the browser's.
-  const tz = p.venue?.timezone ?? ctx.workspaceTzById.get(p.project?.workspace_id ?? '') ?? null;
+  const tz = p.venue?.timezone ?? ctx.workspaceTzById.get(perfWorkspaceId(p) ?? '') ?? null;
   const dual = at ? ctx.dualTime(at, tz, ctx.viewerTz) : null;
   // A gig is ONE instant on the sheet — the working time. Its running order
   // (load-in, soundcheck, wrap) is the Day's business, through runSheetSteps.
@@ -506,12 +519,12 @@ export function performanceSlip(p: PerformanceEvent, ctx: SlipContext): Slip {
         loadIn: Boolean(p.load_in_at) && at === p.load_in_at,
       }
     : null;
-  const ws = ctx.workspaceSlugById.get(p.project?.workspace_id ?? '') ?? ctx.workspaceSlug;
+  const ws = ctx.workspaceSlugById.get(perfWorkspaceId(p) ?? '') ?? ctx.workspaceSlug;
   const cc = p.venue?.country ?? p.country ?? null;
   const base = `${name} — ${statusWordOf(p.status, ctx)}`;
   const cert = performanceStatusFamily(p.status);
   // The rank only means something where the convention is a priority queue.
-  const mode = ctx.workspaceModeById?.get(p.project?.workspace_id ?? '') ?? 'simple';
+  const mode = ctx.workspaceModeById?.get(perfWorkspaceId(p) ?? '') ?? 'simple';
   const rankMatch = mode === 'prioritized' ? p.status.match(/^hold_([123])$/) : null;
   return {
     id: p.id,
@@ -531,7 +544,7 @@ export function performanceSlip(p: PerformanceEvent, ctx: SlipContext): Slip {
     country: cc ? cc.toUpperCase() : null,
     time,
     project: p.project,
-    href: p.slug && p.project ? `/h/${ws}/performance/${p.slug}` : null,
+    href: p.slug && perfWorkspaceId(p) ? `/h/${ws}/performance/${p.slug}` : null,
     title: time
       ? time.secondary
         ? `${base} · ${time.primary} (${ctx.viewerTimeLabel ? ctx.viewerTimeLabel(time.secondary) : `${time.secondary} yours`})`
