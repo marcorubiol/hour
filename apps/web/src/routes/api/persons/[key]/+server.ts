@@ -29,6 +29,7 @@ import { isUuid } from '$lib/server/performance-bundle';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import { json } from '$lib/server/http';
+import type { PersonMergeLine } from '$lib/person-merge';
 
 const QuerySchema = v.object({
   workspace_id: v.pipe(v.string(), v.uuid()),
@@ -76,9 +77,17 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
     personSearch.set(isUuid(key) ? 'person_id' : 'slug', `eq.${key}`);
     personSearch.set('deleted_at', 'is.null');
     personSearch.set('limit', '1');
-    const person = await pgGet<WorkspacePersonRow>(env, 'workspace_person', jwt, {
+    let person = await pgGet<WorkspacePersonRow>(env, 'workspace_person', jwt, {
       search: personSearch,
     });
+    // The slug of a dossier merged into this one still opens it
+    // (`previous_slugs`, person merge phase 2); a live slug always wins.
+    if (person.data.length === 0 && !isUuid(key) && /^[a-z0-9-]+$/.test(key)) {
+      const previous = new URLSearchParams(personSearch);
+      previous.delete('slug');
+      previous.set('previous_slugs', `cs.{${key}}`);
+      person = await pgGet<WorkspacePersonRow>(env, 'workspace_person', jwt, { search: previous });
+    }
     if (person.data.length === 0) return json({ error: 'not_found' }, 404);
     const p = person.data[0];
     const personId = p.person_id;
@@ -121,7 +130,18 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
       deleted_at: 'is.null',
     });
 
-    const [conversations, notes, crew, cast, admin] = await Promise.all([
+    // The merges this file absorbed and can still undo (`person_merge`:
+    // RLS shows it to the space's admin only; anyone else reads none).
+    const mergesSearch = new URLSearchParams({
+      select: 'id,merged_at,drop_name:drop_dossier_before->>full_name',
+      workspace_id: `eq.${workspaceId}`,
+      keep_person_id: `eq.${personId}`,
+      undone_at: 'is.null',
+      order: 'merged_at.desc',
+      limit: '5',
+    });
+
+    const [conversations, notes, crew, cast, admin, merges] = await Promise.all([
       pgGet<ConversationDbItem>(env, 'conversation', jwt, { search: engSearch }),
       pgGet(env, 'note', jwt, { search: notesSearch }),
       pgGet(env, 'crew_assignment', jwt, { search: crewSearch }),
@@ -129,6 +149,7 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
       // «Invitar a X» (ADR-107) is an admin's verb: the file only offers it
       // to whoever `invite_workspace_person` would let through.
       pgPostRpc<boolean>(env, 'is_workspace_admin', jwt, { ws_id: workspaceId }),
+      pgGet<PersonMergeLine>(env, 'person_merge', jwt, { search: mergesSearch }),
     ]);
 
     return json({
@@ -143,6 +164,9 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
       crew: crew.data,
       cast: cast.data,
       can_invite: admin.data[0] === true,
+      // «Fusionar con…» is the same admin's verb (plan 2026-10-22 § 5).
+      can_merge: admin.data[0] === true,
+      merges: merges.data,
     });
   } catch (err) {
     return pgErrorResponse(
