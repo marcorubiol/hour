@@ -88,12 +88,14 @@ test.describe('person merge from an invitation', () => {
       await dlg.getByRole('button', { name: 'Merge', exact: true }).click();
       await expect(page.locator('dialog[open]')).toHaveCount(0);
       await expect(page.getByText('Files merged.')).toBeVisible();
-      await expect(page.getByTestId('person-merged')).toContainText(`Merged with ${name}`);
+      // A file can carry earlier merges: the line of this one, by its name.
+      await expect(page.getByTestId('person-merged').filter({ hasText: `Merged with ${name}` })).toHaveCount(1);
       await expect(page.locator('[data-missing="unmerged_invitation"]')).toHaveCount(0);
 
       // ── Settings: the recent merge, and its undo ─────────────────────
+      // Settings carries no aria-busy root, so waitForLoaded would wait
+      // forever: the row's own expect is the wait.
       await page.goto(`/h/${WORKSPACE}/settings?section=workspaces`);
-      await waitForLoaded(page);
       const recent = page.getByTestId('settings-recent-merge').filter({ hasText: name });
       await expect(recent).toHaveCount(1);
       await expect(page.getByTestId('settings-unmerged').filter({ hasText: name })).toHaveCount(0);
@@ -108,8 +110,18 @@ test.describe('person merge from an invitation', () => {
       await expect(page.getByRole('heading', { name, level: 1 })).toBeVisible();
       await expect(page.locator('[data-missing="unmerged_invitation"]')).toHaveCount(0);
     } finally {
+      // A run that stops after «Merge» leaves the merge live on the E2E
+      // account's file, and the next run reads two lines: undo this one, and
+      // any earlier E2E Unmerged left behind, before deleting the file.
       await page.evaluate(
         async ({ wsId, id }) => {
+          const r = await fetch(`/api/workspaces/${wsId}/person-merges`);
+          if (r.ok) {
+            const { recent } = (await r.json()) as { recent: Array<{ id: string; drop_name: string | null }> };
+            for (const m of recent.filter((m) => m.drop_name?.startsWith('E2E Unmerged '))) {
+              await fetch(`/api/person-merges/${m.id}`, { method: 'DELETE' });
+            }
+          }
           await fetch(`/api/persons/${id}?workspace_id=${wsId}`, { method: 'DELETE' });
         },
         { wsId, id: dossier.person_id },
