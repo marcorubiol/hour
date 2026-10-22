@@ -8,6 +8,22 @@
 -- dos: solo usa los cinco parámetros de siempre.
 -- Probado ida y vuelta en local el 2026-10-22 (migración, rollback, migración,
 -- dentro de una transacción con ROLLBACK; tras el rollback el md5 coincide).
+--
+-- Coste medido en local el 2026-10-22 (Supabase local, 2.024 conversaciones
+-- legibles por el owner en un proyecto, 1.000 eventos de salida, 667 de entrada,
+-- 1.000 destinatarias de un envío), mejor de cinco:
+--   feed de Todas, 100 / 500 (sin cambio)        ~77 / ~379 ms
+--   lista, cualquier página de 50, sin filtro     ~730 ms (total 2.024)
+--   lista, relación / te toca / se enfría         ~210 / ~230 / ~140 ms
+--   lista, temporada                              ~610 ms
+--   lista, envío sin respuesta                    ~200 ms
+--   lista, ids de las que coinciden (1.000)       ~760 ms
+-- El coste va con las filas que pasan los filtros: la regla de lectura
+-- (`can_read_conversation`, ~0,35 ms por fila, casi todo `has_permission`) corre
+-- en todas para contar el total. Paridad en local: los 28 casos (cuatro
+-- órdenes, seis relaciones, turno, temperatura, temporada, línea, envío,
+-- estado) dan las mismas filas en el mismo orden que `applyListFilter` y
+-- `sortByOrder` sobre los mismos hechos; el feed de Todas da lo mismo que antes.
 
 BEGIN;
 
