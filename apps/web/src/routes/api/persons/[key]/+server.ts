@@ -29,7 +29,7 @@ import { isUuid } from '$lib/server/performance-bundle';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import { json } from '$lib/server/http';
-import type { PersonMergeLine } from '$lib/person-merge';
+import { unmergedFor, type PersonMergeLine, type UnmergedInvitation } from '$lib/person-merge';
 
 const QuerySchema = v.object({
   workspace_id: v.pipe(v.string(), v.uuid()),
@@ -141,7 +141,7 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
       limit: '5',
     });
 
-    const [conversations, notes, crew, cast, admin, merges] = await Promise.all([
+    const [conversations, notes, crew, cast, admin, merges, unmerged] = await Promise.all([
       pgGet<ConversationDbItem>(env, 'conversation', jwt, { search: engSearch }),
       pgGet(env, 'note', jwt, { search: notesSearch }),
       pgGet(env, 'crew_assignment', jwt, { search: crewSearch }),
@@ -150,6 +150,13 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
       // to whoever `invite_workspace_person` would let through.
       pgPostRpc<boolean>(env, 'is_workspace_admin', jwt, { ws_id: workspaceId }),
       pgGet<PersonMergeLine>(env, 'person_merge', jwt, { search: mergesSearch }),
+      // An invitation accepted by an account that was already someone else
+      // (plan 2026-10-22 § 6.1): the admin's «Falta». A notice, never a
+      // reason for the file to fail: anyone else (42501) or a base without
+      // the phase 3 migration reads none.
+      pgPostRpc<UnmergedInvitation>(env, 'list_unmerged_invitations', jwt, { p_workspace_id: workspaceId }).catch(
+        () => ({ data: [] as UnmergedInvitation[] }),
+      ),
     ]);
 
     return json({
@@ -167,6 +174,7 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
       // «Fusionar con…» is the same admin's verb (plan 2026-10-22 § 5).
       can_merge: admin.data[0] === true,
       merges: merges.data,
+      unmerged: admin.data[0] === true ? unmergedFor(personId, unmerged.data) : null,
     });
   } catch (err) {
     return pgErrorResponse(

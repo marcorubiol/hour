@@ -7,11 +7,15 @@ import {
   hasConflicts,
   lostEmail,
   mergeRefusal,
+  personIdsInTokens,
+  rewritePersonTokens,
+  unmergedFor,
   resultingValue,
   shouldFlip,
   undoOpen,
   type MergeDossier,
   type MergePreview,
+  type UnmergedInvitation,
 } from './person-merge';
 
 const dossier = (over: Partial<MergeDossier> = {}): MergeDossier => ({
@@ -146,5 +150,63 @@ describe('refusals', () => {
     expect(mergeRefusal('merge is older than 30 days')).toBe('undo_expired');
     expect(mergeRefusal('undo the later merge first')).toBe('later_merge');
     expect(mergeRefusal(null)).toBe('invalid_input');
+  });
+});
+
+describe('the invitation not joined yet (phase 3)', () => {
+  const row: UnmergedInvitation = {
+    invitation_id: 'inv',
+    email: 'ines@sala.example',
+    accepted_at: '2026-10-22T10:00:00Z',
+    drop_person_id: 'drop',
+    drop_slug: 'ines-ortega',
+    drop_name: 'Inés Ortega',
+    keep_person_id: 'keep',
+    keep_slug: null,
+    keep_name: 'Inés (cuenta)',
+  };
+
+  test('from the invited file, the other is the account', () => {
+    const pair = unmergedFor('drop', [row]);
+    expect(pair).toEqual({
+      invitation_id: 'inv',
+      email: 'ines@sala.example',
+      invited: { person_id: 'drop', full_name: 'Inés Ortega' },
+      other: { person_id: 'keep', full_name: 'Inés (cuenta)' },
+    });
+  });
+
+  test('from the account\'s file, the other is the invited file', () => {
+    expect(unmergedFor('keep', [row])?.other).toEqual({ person_id: 'drop', full_name: 'Inés Ortega' });
+  });
+
+  test('a file outside the pair has nothing missing', () => {
+    expect(unmergedFor('someone', [row])).toBeNull();
+    expect(unmergedFor('drop', [])).toBeNull();
+  });
+});
+
+describe('pins of a merged person (phase 3)', () => {
+  const into = new Map([['drop', 'keep']]);
+
+  test('only person tokens are read', () => {
+    expect(personIdsInTokens(['s:muk', 'pe:a', 'p:x', 'pe:b'])).toEqual(['a', 'b']);
+  });
+
+  test('a pin on the file that went pins the one that stayed, in place', () => {
+    expect(rewritePersonTokens(['s:muk', 'pe:drop', 'p:x'], into)).toEqual(['s:muk', 'pe:keep', 'p:x']);
+  });
+
+  test('two pins on the same person become one', () => {
+    expect(rewritePersonTokens(['pe:keep', 'pe:drop'], into)).toEqual(['pe:keep']);
+  });
+
+  test('nothing to move says so (null): the browser is not written', () => {
+    expect(rewritePersonTokens(['pe:other', 's:muk'], into)).toBeNull();
+    expect(rewritePersonTokens([], into)).toBeNull();
+  });
+
+  test('a project pin with the same id is not a person pin', () => {
+    expect(rewritePersonTokens(['p:drop'], into)).toBeNull();
   });
 });

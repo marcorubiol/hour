@@ -31,6 +31,7 @@
  */
 
 import { getContext, setContext } from 'svelte';
+import { rewritePersonTokens } from '$lib/person-merge';
 
 const KEY = Symbol('pins');
 const STORAGE_KEY = 'hour_pins';
@@ -111,6 +112,13 @@ export class PinsStore {
     return this.pins
       .filter((p) => p.startsWith('l:'))
       .map((p) => p.slice(2));
+  }
+
+  /** A pinned person merged into another file now pins that file (person
+   *  merge, plan 2026-10-22 § 6.2): `into` maps drop → keep. */
+  rewritePersons(into: ReadonlyMap<string, string>): void {
+    const next = rewritePersonTokens(this.pins, into);
+    if (next) this.set(next);
   }
 
   /** Person ids of the pinned people — the axis that is not a container. */

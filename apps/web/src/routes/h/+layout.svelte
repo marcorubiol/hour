@@ -192,6 +192,30 @@
     new Map(($teamQuery.data?.items ?? []).map((p) => [p.person_id, p.full_name])),
   );
 
+  // A pinned person whose file was merged into another (plan 2026-10-22
+  // § 6.2) would pin nobody: the pin lives in this browser, so it is
+  // rewritten here, in the pins and in every saved or recent scope. Asked
+  // once per set of pinned people; the rewrite changes the set, and the
+  // second ask finds nothing to move.
+  let askedPersonIds = '';
+  $effect(() => {
+    if (!authChecked) return;
+    const ids = [...new Set([...pins.personIds(), ...scopes.personIds()])].sort().join(',');
+    if (!ids || ids === askedPersonIds) return;
+    askedPersonIds = ids;
+    fetchJSON<{ into: Record<string, string> }>(`/api/person-merges/resolve?ids=${ids}`)
+      .then(({ into }) => {
+        const map = new Map(Object.entries(into ?? {}));
+        if (map.size === 0) return;
+        pins.rewritePersons(map);
+        scopes.rewritePersons(map);
+      })
+      .catch(() => {
+        // A pin that keeps pointing at a merged file is the state before
+        // this existed: the chip says «persona», nothing breaks.
+      });
+  });
+
   function tokenLabel(tok: string): string {
     const { kind, key } = parsePin(tok);
     // The one chokepoint for a space name in the shell: the scope pill, its ×
