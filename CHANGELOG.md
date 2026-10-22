@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- Al añadir algo al plan basta con escribirlo: «ensayo jue 10-14 Mercat» pone el tipo, el día, la hora y el lugar, en los cuatro idiomas, y lo que corriges a mano manda. ⌘K encuentra también contactos, organizaciones y conversaciones. En el Mes, «+N más» abre el día; el Tablero usa todo el ancho; y en Difusión los textos de quién espera respuesta ya no se pisan. (2026-10-22)
 - Cada espacio tiene sus etiquetas de conversación en Ajustes: renombrar las de Hour, apagarlas, ordenarlas y crear las propias. Desde ⌘K se crea una función, una fecha, una tarea o una conversación escribiendo lo que es («ensayo Mercat»), en cualquier pantalla. Y en el Mes, el «+» de cada día, un doble clic en su hueco o una pulsación larga abren el alta en ese día. (2026-10-21)
 - En una pantalla mediana o en el móvil, las secciones de Ajustes se eligen en un desplegable arriba y la página usa todo el ancho. Y en un espacio sin conversaciones, «Todas» vuelve a invitar a traer tu agenda. (2026-10-21)
 - En Conversaciones, «Todas» es una sola lista con las conversaciones y los hilos del equipo juntos: lo no leído y lo que te toca, arriba. La búsqueda mira en las dos. Abrir una conversación la marca leída, y Hoy nombra la etiqueta de lo que te espera cuando no es Difusión. El bloque de conversaciones de un proyecto ya no mezcla las de otro espacio, y Ajustes no se sale de lado en una pantalla mediana. (2026-10-21)
