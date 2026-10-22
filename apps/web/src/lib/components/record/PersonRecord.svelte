@@ -23,7 +23,7 @@
   import { copyText } from '$lib/clipboard';
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
-  import { toastCreated } from '$lib/created';
+  import { CREATED_TOAST_MS, toastCreated } from '$lib/created';
   import { session } from '$lib/session.svelte';
   import { relationLabel, relationTone, type Relation } from '$lib/conversation-relation';
   import { dayLabel, dayMonthYearTs, localDayISO } from '$lib/datetime';
@@ -43,6 +43,10 @@
     workspacesQueryOptions,
   } from '$lib/nav-queries';
   import { safeHref } from '$lib/utils/safe-url';
+  import { goto } from '$app/navigation';
+  import { openPeek } from '$lib/peek.svelte';
+  import PersonMergeDialog, { type MergeResult } from '$lib/components/PersonMergeDialog.svelte';
+  import { undoOpen, type PersonMergeLine } from '$lib/person-merge';
 
   type PersonFile = {
     person: {
@@ -97,6 +101,10 @@
     }>;
     /** Only an admin of the space invites (ADR-107). */
     can_invite?: boolean;
+    /** And merges two files of the same person (plan 2026-10-22). */
+    can_merge?: boolean;
+    /** The merges this file absorbed, not undone (admin only). */
+    merges?: PersonMergeLine[];
   };
 
   const locale = appLocale();
@@ -394,6 +402,80 @@
     );
   }
 
+  // ── Merge with another file (plan 2026-10-22, phase 2) ──────────────
+  let mergeOpen = $state(false);
+
+  /** Everything that lists people, after a merge or its undo. */
+  async function refreshPeople() {
+    await Promise.all(
+      [['person'], ['planner-team'], ['project-cast'], ['conversations']].map((queryKey) =>
+        queryClient.invalidateQueries({ queryKey }),
+      ),
+    );
+  }
+
+  /** Where a person's file opens: the page, or the vistazo it was in. */
+  function showPerson(personSlug: string) {
+    if (personSlug === slug) return;
+    if (inPeek) openPeek({ kind: 'person', ws: workspaceSlug, slug: personSlug });
+    else void goto(`/h/${workspaceSlug}/person/${encodeURIComponent(personSlug)}`, { replaceState: true });
+  }
+
+  async function undoMerge(mergeId: string, name: string) {
+    try {
+      const body = await mutateJSON<{ undo: { skipped?: number; drop_slug: string | null } }>(
+        'DELETE',
+        `/api/person-merges/${mergeId}`,
+      );
+      await refreshPeople();
+      // A file the merge created (an account with no file here) goes with
+      // the undo: then the one that came back is where you are.
+      if (body?.undo.drop_slug && $query.isError) showPerson(body.undo.drop_slug);
+      const skipped = body?.undo.skipped ?? 0;
+      addToast({
+        tone: 'info',
+        message: t('person.merge_undone', locale, { name }),
+        ...(skipped > 0 ? { title: t('person.merge_undone_skipped', locale, { n: skipped }) } : {}),
+      });
+    } catch (err) {
+      const code = err instanceof ApiError ? String(err.body?.error ?? '') : '';
+      addToast({
+        tone: 'danger',
+        title: t('person.merge_undo_failed', locale),
+        message:
+          code === 'undo_expired'
+            ? t('person.merge_err_expired', locale)
+            : code === 'already_undone'
+              ? t('person.merge_err_undone', locale)
+              : code === 'later_merge'
+                ? t('person.merge_err_later', locale)
+                : err instanceof ApiError && err.status === 404
+                  ? t('person.merge_err_not_found', locale)
+                  : err instanceof Error
+                    ? err.message
+                    : t('perf.unexpected', locale),
+      });
+    }
+  }
+
+  async function onMerged(m: MergeResult) {
+    await refreshPeople();
+    if (m.keep_slug) showPerson(m.keep_slug);
+    addToast({
+      tone: 'success',
+      message: t('person.merge_done', locale),
+      duration: CREATED_TOAST_MS,
+      action: { label: t('ui.undo', locale), run: () => void undoMerge(m.merge_id, m.drop_name) },
+    });
+  }
+
+  // The slug of a file merged into this one opens this one (`previous_slugs`):
+  // the address says where you are.
+  $effect(() => {
+    const now = file?.person.slug;
+    if (now && now !== slug && !inPeek) showPerson(now);
+  });
+
   let placeLine = $derived(
     file ? [file.person.city, file.person.country].filter(Boolean).join(', ') : '',
   );
@@ -450,6 +532,11 @@
               >{t('person.invite', locale, { name: file.person.full_name })}</button
             >
           {/if}
+          {#if file.can_merge}
+            <button type="button" class="block-head__act" onclick={() => (mergeOpen = true)}
+              >{t('person.merge', locale)}</button
+            >
+          {/if}
         </span>
       </BlockHead>
       {#if !file.person.email && !file.person.phone && !file.person.website && file.person.languages.length === 0}
@@ -473,6 +560,16 @@
           <li class="person__langs">{file.person.languages.join(' · ')}</li>
         {/if}
       </ul>
+      {#each file.merges ?? [] as m (m.id)}
+        <p class="person__merged" data-testid="person-merged">
+          {t('person.merge_line', locale, { name: m.drop_name ?? '—', date: dayMonthYearTs(m.merged_at) })}
+          {#if undoOpen(m.merged_at)}
+            <button type="button" class="person__merged-undo" onclick={() => undoMerge(m.id, m.drop_name ?? '')}
+              >{t('person.merge_line_undo', locale)}</button
+            >
+          {/if}
+        </p>
+      {/each}
     </section>
 
     <section class="person__section" aria-label={t('lens.conversations', locale)}>
@@ -576,6 +673,16 @@
     {/if}
   {/if}
 </article>
+
+{#if file?.can_merge}
+  <PersonMergeDialog
+    bind:open={mergeOpen}
+    workspaceId={contextWorkspaceId}
+    person={{ id: file.person.id, full_name: file.person.full_name }}
+    {locale}
+    onmerged={onMerged}
+  />
+{/if}
 
 <Dialog bind:open={addOpen} title={t('person.add_to_project', locale)} size="s">
   <div class="person__add-grid">
@@ -790,6 +897,35 @@
     }
     .person__note-delete:hover {
       color: var(--danger);
+    }
+
+    /* A merge this file absorbed: a quiet fact, with its way back for 30 days. */
+    .person__merged {
+      margin: 0;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: var(--space-s);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--tracking-s);
+      color: var(--text-faint);
+    }
+
+    .person__merged-undo {
+      font: inherit;
+      letter-spacing: inherit;
+      color: var(--text-muted);
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 0.2em;
+    }
+    .person__merged-undo:hover,
+    .person__merged-undo:focus-visible {
+      color: var(--text-color);
     }
 
     .person__note-body {

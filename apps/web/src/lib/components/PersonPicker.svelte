@@ -13,6 +13,7 @@
    * A combobox by the ARIA pattern, like PlaceField: ↑↓ move, ↵ picks while
    * the list is open, Esc closes it. The list is `styles/listbox.css`.
    */
+  import { untrack } from 'svelte';
   import { useQueryClient } from '@tanstack/svelte-query';
   import Field from '$lib/components/Field.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
@@ -32,6 +33,10 @@
     showLabel?: boolean;
     /** The text in the field; the host clears it after using a pick. */
     text?: string;
+    /** Offer «Añadir "nombre"» for a name that is nobody yet (default). A
+        host that only chooses among existing people (merging two files)
+        turns it off. */
+    canCreate?: boolean;
     /** A person was chosen or created. */
     onpick: (person: PersonOption) => void;
   }
@@ -45,6 +50,7 @@
     disabled = false,
     showLabel = true,
     text = $bindable(''),
+    canCreate = true,
     onpick,
   }: Props = $props();
 
@@ -61,12 +67,22 @@
   let found = $derived(matchPeople(options, text));
   let shown = $derived(found.matches.slice(0, SHOWN));
   /** The rows of the list: the matches, then «Añadir» when it applies. */
-  let rows = $derived<Array<PersonOption | null>>(found.canAdd ? [...shown, null] : shown);
+  let rows = $derived<Array<PersonOption | null>>(found.canAdd && canCreate ? [...shown, null] : shown);
 
   function openList() {
     cur = 0;
     open = rows.length > 0;
   }
+
+  // Options that arrive after the typing (a host that searches the server)
+  // open the list for the field that is still being typed in.
+  let inputEl: HTMLInputElement | undefined = $state();
+  $effect(() => {
+    void options;
+    untrack(() => {
+      if (inputEl && document.activeElement === inputEl && text.trim()) openList();
+    });
+  });
 
   async function choose(row: PersonOption | null) {
     open = false;
@@ -130,6 +146,7 @@
       aria-activedescendant={open ? `${listId}-${cur}` : undefined}
       {placeholder}
       autocomplete="off"
+      bind:this={inputEl}
       bind:value={text}
       oninput={openList}
       onfocus={openList}
