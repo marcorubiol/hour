@@ -19,7 +19,6 @@ import { envReady, login, pgGet, pgPatch, requireEnv } from './_helpers';
 
 type ConversationRow = {
   id: string;
-  status: string;
   next_action_note: string | null;
 };
 
@@ -68,7 +67,7 @@ describe.skipIf(!envReady())('RLS — conversation write path', () => {
       'conversation',
       jwt,
       new URLSearchParams({
-        select: 'id,status,next_action_note,workspace!inner(slug),project!inner(slug)',
+        select: 'id,next_action_note,workspace!inner(slug),project!inner(slug)',
         'workspace.slug': 'eq.playwright',
         'project.slug': 'eq.zzz-difusion',
         deleted_at: 'is.null',
@@ -84,11 +83,11 @@ describe.skipIf(!envReady())('RLS — conversation write path', () => {
     const { status, rows } = await pgPatch<ConversationRow>(
       'conversation',
       jwt,
-      { status: row.status, next_action_note: row.next_action_note },
+      { next_action_note: row.next_action_note },
       new URLSearchParams({
         id: `eq.${row.id}`,
         deleted_at: 'is.null',
-        select: 'id,status,next_action_note',
+        select: 'id,next_action_note',
       }),
     );
     expect(status).toBe(200);
