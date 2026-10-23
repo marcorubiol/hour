@@ -36,7 +36,7 @@ test.describe('contact capture', () => {
     // filter by the fixture email.)
     await page.evaluate(async ({ name, email }) => {
       const list = await fetch(
-        `/api/conversations?status=any&q=${encodeURIComponent(name)}`,
+        `/api/conversations?q=${encodeURIComponent(name)}`,
       );
       const items = (
         (await list.json()) as {
@@ -78,7 +78,7 @@ test.describe('contact capture', () => {
 
         // Locate the created conversation (project + person embedded).
         const list = await fetch(
-          `/api/conversations?status=any&q=${encodeURIComponent(name)}`,
+          `/api/conversations?q=${encodeURIComponent(name)}`,
           { headers },
         );
         const items = (
@@ -105,7 +105,7 @@ test.describe('contact capture', () => {
         });
 
         const after = await fetch(
-          `/api/conversations?status=any&q=${encodeURIComponent(name)}`,
+          `/api/conversations?q=${encodeURIComponent(name)}`,
           { headers },
         );
         const remaining = (

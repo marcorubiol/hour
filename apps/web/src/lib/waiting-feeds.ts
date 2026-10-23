@@ -15,7 +15,7 @@ export function waitingConversationsQueryOptions() {
   return {
     queryKey: ['conversations', 'today'] as const,
     queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchJSON<{ items: (DeskConvInput & { workspace_id: string })[] }>('/api/conversations?status=any&limit=100', signal),
+      fetchJSON<{ items: (DeskConvInput & { workspace_id: string })[] }>('/api/conversations?limit=100', signal),
   };
 }
 

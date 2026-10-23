@@ -87,7 +87,7 @@ let fixtureConversationId: string | null = null;
 
 async function fetchListRaw(page: Page): Promise<RawConversation[]> {
   return await page.evaluate(async (id) => {
-    const res = await fetch(`/api/conversations?status=any&limit=100&q=${'ZZZ E2E write'}`);
+    const res = await fetch(`/api/conversations?limit=100&q=${'ZZZ E2E write'}`);
     const data = (await res.json()) as { items: RawConversation[] };
     const mine = data.items.filter((c) => c.id === id);
     if (mine.length === 0) throw new Error('the fixture conversation is not in the list');
@@ -166,7 +166,7 @@ test.describe('conversation inline write', () => {
       // conversation resurrects rather than duplicating (same rule
       // `conversation-create.spec.ts` relies on), so reuse it.
       const found = (await fetch(
-        `/api/conversations?status=any&limit=100&q=${encodeURIComponent('ZZZ E2E write fixture')}`,
+        `/api/conversations?limit=100&q=${encodeURIComponent('ZZZ E2E write fixture')}`,
       ).then((r) => r.json())) as { items: Array<{ id: string }> };
       if (found.items?.[0]?.id) return found.items[0].id;
       throw new Error(`could not create or find the fixture (${res.status})`);

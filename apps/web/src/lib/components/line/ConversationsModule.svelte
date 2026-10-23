@@ -54,7 +54,7 @@
   let orgSuggestions = $derived(organizationNames($organizationsQuery.data?.items ?? [], [line.workspace_id]));
   const orgListId = `lcm-org-list-${Math.random().toString(36).slice(2, 8)}`;
 
-  let filters = $derived({ lineId: line.id, status: 'any' as const });
+  let filters = $derived({ lineId: line.id });
 
   // ── Add conversation (line-scoped) ────────────────────────────────────
   let addOpen = $state(false);

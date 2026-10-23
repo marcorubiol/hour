@@ -19,7 +19,6 @@ import { envReady, login, pgGet, pgPatch, pgRpc, requireEnv } from './_helpers';
 type ConversationRow = {
   id: string;
   slug: string;
-  status: string;
   person_id: string;
   project_id: string;
   workspace_id: string;
@@ -123,40 +122,36 @@ describe.skipIf(!envReady())('RLS — ADR-051/052 write-path RPCs', () => {
       p_full_name: FIXTURE_NAME,
       p_email: FIXTURE_EMAIL,
       p_organization_name: `RLS run ${RUN_TAG}`,
-      p_status: 'contacted',
     });
     expect(created.status).toBe(200);
     expect(created.data).not.toBeNull();
     const conversation = created.data as ConversationRow;
     expect(conversation.project_id).toBe(projectId);
-    expect(conversation.status).toBe('contacted');
     // ADR-138: añadir una sala no es escribirle. Nace sin sello de contacto,
     // salvo una recuperada de una pasada anterior, que conserva los suyos.
     if (!conversation.first_contacted_at) expect(conversation.last_contacted_at).toBeNull();
 
     try {
-      // 2. A genuine status transition stamps last contact while the first
-      // contact remains write-once. This is the DB invariant behind both the
-      // API status menu and future trusted conversation-event ingress.
+      // 2. Stamping a contact sets last contact while the first contact
+      // remains write-once (the trigger; ADR-138 E4: no status any more).
       const firstContact = conversation.first_contacted_at;
-      const beforeLast = Date.parse(conversation.last_contacted_at ?? '1970-01-01');
+      const stamp = new Date().toISOString();
       const touched = await pgPatch<ConversationRow>(
         'conversation',
         jwt,
-        { status: 'hold' },
+        { last_contacted_at: stamp },
         new URLSearchParams({
           id: `eq.${conversation.id}`,
           deleted_at: 'is.null',
-          select: 'id,status,first_contacted_at,last_contacted_at',
+          select: 'id,first_contacted_at,last_contacted_at',
         }),
       );
       expect(touched.status).toBe(200);
       expect(touched.rows).toHaveLength(1);
-      expect(touched.rows[0].status).toBe('hold');
-      // El primer contacto se escribe una vez: el que había, o el de este cambio.
+      expect(Date.parse(touched.rows[0].last_contacted_at!)).toBe(Date.parse(stamp));
+      // El primer contacto se escribe una vez: el que había, o este.
       if (firstContact) expect(touched.rows[0].first_contacted_at).toBe(firstContact);
       else expect(touched.rows[0].first_contacted_at).toBe(touched.rows[0].last_contacted_at);
-      expect(Date.parse(touched.rows[0].last_contacted_at!)).toBeGreaterThanOrEqual(beforeLast);
 
       // 3. Same person × project again → 23505 → 409 (no silent merge).
       const dup = await pgRpc('create_conversation', jwt, {
@@ -190,12 +185,10 @@ describe.skipIf(!envReady())('RLS — ADR-051/052 write-path RPCs', () => {
         p_project_id: projectId,
         p_full_name: FIXTURE_NAME,
         p_email: FIXTURE_EMAIL,
-        p_status: 'in_conversation',
       });
       expect(again.status).toBe(200);
       const resurrected = again.data as ConversationRow;
       expect(resurrected.id).toBe(conversation.id);
-      expect(resurrected.status).toBe('in_conversation');
     } finally {
       // 6. Always leave the live surface clean.
       await pgRpc('delete_conversation', jwt, { p_conversation_id: conversation.id });

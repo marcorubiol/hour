@@ -12,7 +12,7 @@ export const RELATION_STUB_LIMIT = 10;
  */
 export function relationStubQueryOptions(projectId: string | null) {
   return {
-    queryKey: ['conversations', { project_ids: projectId, status: 'any', limit: RELATION_STUB_LIMIT }] as const,
+    queryKey: ['conversations', { project_ids: projectId, limit: RELATION_STUB_LIMIT }] as const,
     queryFn: ({ signal }: { signal: AbortSignal }) =>
       fetchJSON<{ total: number; limit: number; items: ConversationItem[] }>(relationStubUrl(projectId!), signal),
     enabled: projectId !== null,
@@ -20,6 +20,6 @@ export function relationStubQueryOptions(projectId: string | null) {
 }
 
 export function relationStubUrl(projectId: string): string {
-  const p = new URLSearchParams({ project_ids: projectId, status: 'any', limit: String(RELATION_STUB_LIMIT) });
+  const p = new URLSearchParams({ project_ids: projectId, limit: String(RELATION_STUB_LIMIT) });
   return `/api/conversations?${p}`;
 }

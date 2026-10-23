@@ -319,7 +319,7 @@ describe.skipIf(!envReady())('conversation with the venue (ADR-102, fase 2)', ()
     expect(theirs.organization_id).toBe(await orgId(ORG_E2));
     await pgRpc('delete_conversation', jwt, { p_conversation_id: theirs.id });
 
-    const again = await create({ p_full_name: P5.name, p_email: P5.email, p_status: 'in_conversation' });
+    const again = await create({ p_full_name: P5.name, p_email: P5.email });
     expect(again.status, again.error).toBe(200);
     made.add(one(again.data)!.id);
     expect(one(again.data)!.id).toBe(theirs.id);

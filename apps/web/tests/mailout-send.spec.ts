@@ -86,7 +86,6 @@ test.describe('mailout (simulated)', () => {
     const created = await api<{ conversation: { id: string } }>(page, 'POST', '/api/conversations', {
       project_id: projectId,
       person: { full_name: `Laia Envío ${RUN}`, email: ADDRESS, organization_name: ORG },
-      status: 'contacted',
     });
     expect(created.status, JSON.stringify(created.data)).toBe(201);
     const conversationId = created.data.conversation.id;

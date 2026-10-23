@@ -153,7 +153,6 @@
 
   function params(f: ConversationFilters, o: number): string {
     const p = new URLSearchParams();
-    p.set('status', 'any');
     if (f.relacion) p.set('relacion', f.relacion);
     if (f.etiqueta) p.set('etiqueta', f.etiqueta);
     if (f.orden) p.set('orden', f.orden);

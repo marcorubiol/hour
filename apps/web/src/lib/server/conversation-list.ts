@@ -19,7 +19,6 @@ import type { FeedConversation } from '$lib/conversation-feed';
 import type { ConversationBolo } from '$lib/conversation-relation';
 import type { ListFilter, RowMailout } from '$lib/conversation-overview';
 import type { Orden } from '$lib/conversation-order';
-import type { ConversationStatus } from '$lib/conversation';
 import { loadConversationBolos } from '$lib/server/conversation-overview';
 
 export interface ListPageQuery {
@@ -28,7 +27,6 @@ export interface ListPageQuery {
   /** La clave del chip; sin ella, todas las conversaciones (sin hilos). */
   tag: string | null;
   q: string | null;
-  status?: ConversationStatus;
   filter: ListFilter;
   /** Las líneas fijadas en la barra: con `filter.temporada`, solo esas. */
   lineIds: string[];
@@ -58,7 +56,6 @@ export function listPageArgs(query: ListPageQuery): Record<string, unknown> {
     p_order: query.orden,
     p_limit: query.limit,
     p_offset: query.offset,
-    p_status: query.status ?? null,
     p_relation: f.relacion ?? null,
     p_line: f.linea ?? null,
     p_season: Boolean(f.temporada),

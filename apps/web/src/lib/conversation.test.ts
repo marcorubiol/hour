@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as v from 'valibot';
 import {
-  CONVERSATION_STATUSES,
   ConversationCreateSchema,
   ConversationEventCreateSchema,
   ConversationPatchSchema,
@@ -188,14 +187,13 @@ describe('ConversationCreateSchema', () => {
   const PROJECT = '11111111-1111-1111-1111-111111111111';
   const PERSON = '22222222-2222-2222-2222-222222222222';
 
-  it('accepts the existing-person shape and defaults status to contacted', () => {
+  it('accepts the existing-person shape', () => {
     const r = v.safeParse(ConversationCreateSchema, {
       project_id: PROJECT,
       person_id: PERSON,
     });
     expect(r.success).toBe(true);
     if (r.success) {
-      expect(r.output.status).toBe('contacted');
       expect(r.output.person).toBeUndefined();
     }
   });
@@ -208,13 +206,11 @@ describe('ConversationCreateSchema', () => {
         email: 'jordi@teatre.cat',
         organization_name: 'Teatre X',
       },
-      status: 'in_conversation',
       next_action_at: '2026-09-15',
     });
     expect(r.success).toBe(true);
     if (r.success) {
       expect(r.output.person?.full_name).toBe('Jordi Programador');
-      expect(r.output.status).toBe('in_conversation');
     }
   });
 
