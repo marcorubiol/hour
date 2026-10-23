@@ -23,7 +23,13 @@
          same. Source: static/theme-init.js. -->
     <script src="%sveltekit.assets%/theme-init.js"></script>
     <link rel="icon" type="image/svg+xml" href="%sveltekit.assets%/icon.svg" />
-    <link rel="apple-touch-icon" href="%sveltekit.assets%/icon.svg" />
+    <!-- iOS ignores SVG touch icons and the manifest icons: without this PNG
+         (opaque, 180×180) «Añadir a pantalla de inicio» uses a screenshot.
+         Rendered from icon.svg; regenerate the PNGs if the mark changes. -->
+    <link rel="apple-touch-icon" href="%sveltekit.assets%/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Hour" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
