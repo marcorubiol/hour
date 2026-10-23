@@ -130,6 +130,7 @@
 ## Decisiones con coste o autoridad externa
 
 - [ ] Marco: hacer — **Recorrer la app él mismo antes de invitar a Anouk** (Marco, 10-10); después, pasar su email para invitarla a `muk-cia`.
+- [ ] Marco: decidir (23-11) — **Planner: ¿sobran vistas?** Cinco (Temporada, Día, Agenda, Mes, Tablero). Se dejan las cinco un mes de uso real y se decide entonces con qué vista abre cada uno (drop 19-10, chat 23-10: opción A). Las otras: quitar Día como pestaña y abrirlo al pulsar un día en Agenda o Mes; o recortar a Temporada, Mes y Tablero. No hay medición instrumentada: se decide por el uso de Marco y Anouk.
 9. [ ] **Pasar `hour-phase0` a Supabase Pro (25 $/mes) antes de la beta; después el coordinador activa HIBP y corre el advisor.** Marco, 2026-10-10: Pro antes de la beta, pero **aún no**; sigue en Free con el keepalive diario. El proyecto está en plan
    Free y la función requiere Pro. Marco debe decidir el upgrade; después activar
    `password_hibp_enabled` y volver a ejecutar el advisor. **Ojo: el upgrade que
