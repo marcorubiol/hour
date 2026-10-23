@@ -19,7 +19,9 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import { ApiError } from '$lib/api';
   import { dualTime, hourMark, localeDayMonth, localeDayMonthNear, localeWeekdayShort } from '$lib/datetime';
-  import { t, type Locale } from '$lib/i18n';
+  import { LOCALE_TAG, t, type Locale } from '$lib/i18n';
+  import { holdDeadlineLabel } from '$lib/performance';
+  import { statusWord } from '$lib/planner';
   import { dayMoments, type SlipContext, type SlipKind } from '$lib/month-events';
   import { setCommitment } from '$lib/commitments';
   import { plannerDayHref } from '$lib/planner';
@@ -55,6 +57,13 @@
   let { next, then, thenBefore = false, settled, errored, onretry, today, viewerTz, personId, boardNew = 0, slipCtx, personNames, locale }: Props = $props();
 
   const kindLabel = (kind: SlipKind) => t(`planner.kind_${kind}`, locale);
+  /* A hold says what it is in the house word («1.ª opción · vence lun»), as
+     the month and the diary do: the card has the room the rail does not. */
+  function stateLabel(sl: NonNullable<typeof slip>): string | null {
+    if (sl.cert !== 'hold' || !sl.hold) return null;
+    const rank = statusWord(sl.hold.rank ? `hold_${sl.hold.rank}` : 'hold', locale);
+    return sl.hold.expires ? `${rank} · ${holdDeadlineLabel(sl.hold.expires, today, locale, LOCALE_TAG[locale], true)}` : rank;
+  }
   const queryClient = useQueryClient();
 
   let slip = $derived(next ? pulseSlip(next.ref, next.day, slipCtx) : null);
@@ -184,7 +193,8 @@
         <Slip
           {slip}
           {kindLabel}
-          stateLabel={() => null}
+          {stateLabel}
+          stateUrgent={Boolean(slip.hold?.expires && slip.hold.expires <= today)}
           showCountry
           ground="bare"
           placing="cell"
