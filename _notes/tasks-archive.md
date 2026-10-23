@@ -173,3 +173,13 @@ quedó en el roundtrip del caché.
 
 - **Bloque 1, gate operativo:** restore drill desde R2 en 203 s, con login, conteos, RLS y ruta crítica verificados
   ([run 29761775037](https://github.com/marcorubiol/hour/actions/runs/29761775037)).
+
+## Cerrado el 2026-10-23 (limpieza de la cola)
+
+- **Rediseño de la lista de Conversations** (ADR-141): las tres fases en producción el 22-10. «Quién la lleva» quedó fuera
+  por recomendación: no hay dato en `conversation`; si se quiere, el plan (`build/plans/2026-10-22-conversations-list.md`,
+  pregunta 5) propone `conversation.lead_user_id`, aditiva.
+- **Fusión de persona** (ADR-143): RPC, pantalla y aviso al aceptar una invitación en producción el 22-10.
+- **Etiquetas 1 a 4** y **facetas configurables en Ajustes**: en producción del 19 al 22-10.
+- **Borrado lógico de organización y persona por API** para los specs: migración `20261021200000` aplicada el 22-10.
+- **«Subir imagen» en Ajustes**: quitado (`def880c6`), no hay dónde guardar un avatar.
