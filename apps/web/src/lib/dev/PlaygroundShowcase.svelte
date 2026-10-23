@@ -165,6 +165,28 @@
       {/each}
     </div>
 
+    <h2 class="h3">Slip — bare, on a card that is not its own (Desk «next up», the rail)</h2>
+    <p class="text--s text--dark-muted">
+      No paper of its own: the doubt stays in the words, the ground is the card's.
+    </p>
+    <div class="playground__slips">
+      {#each ['confirmed', 'hold', 'proposed'] as const as cert (cert)}
+        <div class="playground__cell playground__cell--wash" style="inline-size: 320px" data-testid="bare-{cert}">
+          <Slip
+            slip={mkSlip({ cert, name: 'Sala Apolo', city: 'Barcelona', country: 'ES' })}
+            kindLabel={SLIP_KIND}
+            stateLabel={SLIP_STATE}
+            showCountry
+            ground="bare"
+            size="l"
+            guess={cert !== 'confirmed'}
+            cast={[]}
+            noCastWord="no cast"
+          />
+        </div>
+      {/each}
+    </div>
+
     <h2 class="h3">Slip — the cell decides what it can afford</h2>
     <p class="text--s text--dark-muted">
       Measured, never declared: 143px (sidebar closed) keeps the second clock,
@@ -1168,6 +1190,11 @@
     padding: var(--space-xs);
     border: var(--line-hairline) dashed var(--border-color-light);
     border-radius: var(--radius-s);
+  }
+  .playground__cell--wash {
+    border-style: solid;
+    border-color: var(--suggest-edge);
+    background: var(--suggest-wash);
   }
 
   @layer components {

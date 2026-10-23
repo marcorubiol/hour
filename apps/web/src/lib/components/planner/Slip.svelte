@@ -720,9 +720,15 @@
        a ground of its own and the grain lies on that ground. In the diary it
        is a LINE ON THE PAGE — there is no card, so the paper is the ground
        and a white fill turns the row into a floating box the design does not
-       have. Marco caught it in the diary and, correctly, only there. */
+       have. Marco caught it in the diary and, correctly, only there.
+       A BARE slip is the same case: it sits on someone else's card (the
+       Desk's «lo siguiente», the rail), and this rule, later and as specific
+       as `[data-ground='bare']`, used to put the white back as a hard
+       rectangle on the card's wash (Marco, 2026-10-23). */
     .slip[data-placing='row'][data-family='hold'],
-    .slip[data-placing='row'][data-family='proposed'] {
+    .slip[data-placing='row'][data-family='proposed'],
+    .slip[data-ground='bare'][data-family='hold'],
+    .slip[data-ground='bare'][data-family='proposed'] {
       background: none;
     }
     /* The grain itself lives in styles/certainty.css (`.grain`) — one
