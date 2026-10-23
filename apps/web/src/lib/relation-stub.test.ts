@@ -9,7 +9,7 @@ describe('relationStubQueryOptions: el bloque de conversaciones del proyecto', (
     expect(url.pathname).toBe('/api/conversations');
     expect(url.searchParams.get('project_ids')).toBe(ID);
     expect(url.searchParams.has('project_slug')).toBe(false);
-    expect(url.searchParams.get('status')).toBe('any');
+    expect(url.searchParams.has('status')).toBe(false);
     expect(url.searchParams.get('limit')).toBe(String(RELATION_STUB_LIMIT));
   });
 

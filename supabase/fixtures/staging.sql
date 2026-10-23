@@ -225,7 +225,7 @@ where wp.workspace_id = '20000000-0000-4000-8000-000000000002'
   and wp.person_id = md5('hour-staging-person-' || n)::uuid;
 
 insert into public.conversation (
-  id, workspace_id, project_id, organization_id, status, next_action_note,
+  id, workspace_id, project_id, organization_id, next_action_note,
   created_by, slug, line_id
 )
 select
@@ -233,14 +233,13 @@ select
   '20000000-0000-4000-8000-000000000002',
   '30000000-0000-4000-8000-000000000003',
   md5('hour-staging-organization-' || n)::uuid,
-  'contacted',
   'Synthetic staging fixture',
   (select id from auth.users where email = 'playwright@hour.test'),
   'synthetic-conversation-' || lpad(n::text, 3, '0'),
   '40000000-0000-4000-8000-000000000003'
 from generate_series(1, 154) as n
 on conflict (id) do update
-set status = excluded.status, organization_id = excluded.organization_id,
+set organization_id = excluded.organization_id,
     line_id = excluded.line_id, updated_at = now(), deleted_at = null;
 
 insert into public.conversation_contact (workspace_id, conversation_id, person_id, is_primary, created_by)

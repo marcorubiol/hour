@@ -583,25 +583,25 @@ INSERT INTO public.cast_override (id, workspace_id, performance_id, person_id, r
 ON CONFLICT (id) DO UPDATE SET role = EXCLUDED.role, reason = EXCLUDED.reason;
 
 -- ---------------------------------------------------------------------------
--- 11 · Conversations — the seven statuses, with last contact and next action
+-- 11 · Conversations — with last contact and next action (the relation is derived, ADR-138)
 --      spread across overdue, today and future.
 -- ---------------------------------------------------------------------------
 --      ADR-102: each is with an organization; the person is its primary
 --      contact, with the role.
 INSERT INTO public.conversation
-  (id, workspace_id, project_id, organization_id, slug, status, first_contacted_at, last_contacted_at, next_action_at, next_action_note, line_id, created_by)
+  (id, workspace_id, project_id, organization_id, slug, first_contacted_at, last_contacted_at, next_action_at, next_action_note, line_id, created_by)
 VALUES
-  ('9d9d0001-0000-4000-8000-000000000001', :'ws', :'mm', '14140001-0000-4000-8000-000000000001', 'marta-puig-mamemi',   'confirmed',       :t0 - 90 + time '10:00', :t0 + time '09:30',      :t0 + 14 + time '10:00', 'Enviar road sheet i fitxa tècnica.', '22220002-0000-4000-8000-000000000002', :'by'),
-  ('9d9d0002-0000-4000-8000-000000000002', :'ws', :'uo', '14140002-0000-4000-8000-000000000002', 'helder-costa-orbita', 'in_conversation', :t0 - 60 + time '11:00', :t0 - 5 + time '17:00',  :t0 + 2 + time '10:00',  'Confirmar dietes i hotel per la gira.', '22220004-0000-4000-8000-000000000004', :'by'),
-  ('9d9d0003-0000-4000-8000-000000000003', :'ws', :'mm', '14140007-0000-4000-8000-000000000007', 'claire-villette',     'hold',            :t0 - 120 + time '09:00',:t0 - 20 + time '12:00', :t0 - 3 + time '10:00',  'Fa tres dies que havia de respondre.', '22220001-0000-4000-8000-000000000001', :'by'),
-  ('9d9d0004-0000-4000-8000-000000000004', :'ws', :'uo', '14140008-0000-4000-8000-000000000008', 'gio-india',           'contacted',       :t0 - 8 + time '16:00',  :t0 - 8 + time '16:00',  :t0 + 7 + time '10:00',  'Segona trucada si no respon.', NULL, :'by'),
-  ('9d9d0005-0000-4000-8000-000000000005', :'ws', :'uo', '14140009-0000-4000-8000-000000000009', 'sam-oto',             'confirmed',       :t0 - 150 + time '10:00',:t0 - 30 + time '10:00', NULL, NULL, '22220003-0000-4000-8000-000000000003', :'by'),
-  ('9d9d0006-0000-4000-8000-000000000006', :'ws', :'mm', '14140010-0000-4000-8000-000000000010', 'ana-azkuna',          'declined',        :t0 - 200 + time '10:00',:t0 - 45 + time '10:00', NULL, 'Aquesta temporada no hi ha pressupost.', NULL, :'by'),
-  ('9d9d0007-0000-4000-8000-000000000007', :'ws', :'uo', '14140003-0000-4000-8000-000000000003', 'lucia-cervantino',    'recurring',       :t0 - 400 + time '10:00',:t0 - 12 + time '18:00', :t0 + 30 + time '10:00', 'Tancar contracte del FIC.', '22220005-0000-4000-8000-000000000005', :'by'),
-  ('9d9d0008-0000-4000-8000-000000000008', :'ws', :'ze', '14140001-0000-4000-8000-000000000001', 'marta-puig-zoo',      'dormant',         :t0 - 300 + time '10:00',:t0 - 180 + time '10:00',NULL, 'Reprendre quan hi hagi vídeo de l''estrena.', NULL, :'by')
+  ('9d9d0001-0000-4000-8000-000000000001', :'ws', :'mm', '14140001-0000-4000-8000-000000000001', 'marta-puig-mamemi',   :t0 - 90 + time '10:00', :t0 + time '09:30',      :t0 + 14 + time '10:00', 'Enviar road sheet i fitxa tècnica.', '22220002-0000-4000-8000-000000000002', :'by'),
+  ('9d9d0002-0000-4000-8000-000000000002', :'ws', :'uo', '14140002-0000-4000-8000-000000000002', 'helder-costa-orbita', :t0 - 60 + time '11:00', :t0 - 5 + time '17:00',  :t0 + 2 + time '10:00',  'Confirmar dietes i hotel per la gira.', '22220004-0000-4000-8000-000000000004', :'by'),
+  ('9d9d0003-0000-4000-8000-000000000003', :'ws', :'mm', '14140007-0000-4000-8000-000000000007', 'claire-villette',     :t0 - 120 + time '09:00',:t0 - 20 + time '12:00', :t0 - 3 + time '10:00',  'Fa tres dies que havia de respondre.', '22220001-0000-4000-8000-000000000001', :'by'),
+  ('9d9d0004-0000-4000-8000-000000000004', :'ws', :'uo', '14140008-0000-4000-8000-000000000008', 'gio-india',           :t0 - 8 + time '16:00',  :t0 - 8 + time '16:00',  :t0 + 7 + time '10:00',  'Segona trucada si no respon.', NULL, :'by'),
+  ('9d9d0005-0000-4000-8000-000000000005', :'ws', :'uo', '14140009-0000-4000-8000-000000000009', 'sam-oto',             :t0 - 150 + time '10:00',:t0 - 30 + time '10:00', NULL, NULL, '22220003-0000-4000-8000-000000000003', :'by'),
+  ('9d9d0006-0000-4000-8000-000000000006', :'ws', :'mm', '14140010-0000-4000-8000-000000000010', 'ana-azkuna',          :t0 - 200 + time '10:00',:t0 - 45 + time '10:00', NULL, 'Aquesta temporada no hi ha pressupost.', NULL, :'by'),
+  ('9d9d0007-0000-4000-8000-000000000007', :'ws', :'uo', '14140003-0000-4000-8000-000000000003', 'lucia-cervantino',    :t0 - 400 + time '10:00',:t0 - 12 + time '18:00', :t0 + 30 + time '10:00', 'Tancar contracte del FIC.', '22220005-0000-4000-8000-000000000005', :'by'),
+  ('9d9d0008-0000-4000-8000-000000000008', :'ws', :'ze', '14140001-0000-4000-8000-000000000001', 'marta-puig-zoo',      :t0 - 300 + time '10:00',:t0 - 180 + time '10:00',NULL, 'Reprendre quan hi hagi vídeo de l''estrena.', NULL, :'by')
 ON CONFLICT (id) DO UPDATE SET
   organization_id = EXCLUDED.organization_id,
-  status = EXCLUDED.status, last_contacted_at = EXCLUDED.last_contacted_at,
+  last_contacted_at = EXCLUDED.last_contacted_at,
   next_action_at = EXCLUDED.next_action_at, next_action_note = EXCLUDED.next_action_note;
 
 INSERT INTO public.conversation_contact (workspace_id, conversation_id, person_id, role, is_primary, created_by) VALUES

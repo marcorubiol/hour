@@ -37,7 +37,7 @@ test.describe('conversation with the venue', () => {
 
     const sweep = () =>
       page.evaluate(async (org) => {
-        const list = await fetch(`/api/conversations?status=any&q=${encodeURIComponent(org)}`);
+        const list = await fetch(`/api/conversations?q=${encodeURIComponent(org)}`);
         const items = ((await list.json()) as { items: Array<{ id: string; organization: { name: string } | null }> }).items;
         for (const i of items.filter((x) => x.organization?.name === org)) {
           await fetch(`/api/conversations/${i.id}`, { method: 'DELETE' });
@@ -89,7 +89,7 @@ test.describe('conversation with the venue', () => {
       async ({ org, contact }) => {
         const json = { 'content-type': 'application/json' };
         const find = async (q: string) =>
-          ((await (await fetch(`/api/conversations?status=any&q=${encodeURIComponent(q)}`)).json()) as {
+          ((await (await fetch(`/api/conversations?q=${encodeURIComponent(q)}`)).json()) as {
             items: Array<{
               id: string;
               project_id: string;

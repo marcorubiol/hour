@@ -2,7 +2,7 @@
  * Conversation domain helpers: the inline-PATCH contract shared by the API
  * endpoint and every surface that edits a conversation (ADR-040). The
  * relation's vocabulary (labels, tones) lives with it, in
- * `conversation-relation.ts` (ADR-138); `status` is no longer read.
+ * `conversation-relation.ts` (ADR-138); the old stored status is gone (E4).
  *
  * Anti-CRM vocabulary (reset v2): no lead / pipeline / funnel / prospect.
  */
@@ -15,11 +15,6 @@ import { EVENT_MAIL_SELECT, type EventMailFields } from './mail';
 import { relationOf, type ConversationBolo, type Relation, type RelationInput } from './conversation-relation';
 import type { RowMailout } from './conversation-overview';
 import { TAGGING_EMBED, tagKeysOf, type TaggingEmbed } from './conversation-tags';
-
-export type ConversationStatus = Enums<'conversation_status'>;
-
-/** The old stored status (ADR-138 E4 drops it); only the create still sends its default. */
-export const CONVERSATION_STATUSES = Constants.public.Enums.conversation_status;
 
 /**
  * PATCH /api/conversations/:id body. Whitelist of the fields the difusión
@@ -165,7 +160,6 @@ export const ConversationCreateSchema = v.object({
       title: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(120)))),
     }),
   ),
-  status: v.optional(v.picklist(CONVERSATION_STATUSES), 'contacted'),
   role: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(CONTACT_ROLE_MAX)))),
   next_action_at: v.optional(v.nullable(realIsoDate)),
   next_action_note: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500)))),

@@ -20,7 +20,6 @@ import {
   type OverviewInput,
   type TurnEvent,
 } from '$lib/conversation-overview';
-import type { ConversationStatus } from '$lib/conversation';
 import { TAGGING_EMBED, tagKeysOf, type TaggingEmbed } from '$lib/conversation-tags';
 import type { ConversationBolo } from '$lib/conversation-relation';
 import { defaultProviderKind, type MailoutEnv } from '$lib/server/mailout';
@@ -28,8 +27,6 @@ import { defaultProviderKind, type MailoutEnv } from '$lib/server/mailout';
 interface OverviewScope {
   projectIds: string[];
   workspaceIds: string[];
-  /** `GET /api/conversations` puede acotar además por estado. */
-  status?: ConversationStatus;
 }
 
 /** Lo que devuelve PostgREST hasta `max_rows` (config.toml); se pide por páginas. */
@@ -122,7 +119,6 @@ export async function loadOverviewRows(env: SupabaseEnv, jwt: string, scope: Ove
     pages((offset) => {
       const search = new URLSearchParams({ select: OVERVIEW_SELECT, deleted_at: 'is.null', order: 'id', limit: String(PAGE), offset: String(offset) });
       setScope(search, scope.projectIds, scope.workspaceIds);
-      if (scope.status) search.set('status', `eq.${scope.status}`);
       setLastTurnEmbed(search);
       search.set('contacts.is_primary', 'eq.true');
       return pgGet<OverviewDbRow>(env, 'conversation', jwt, { search }).then((r) => r.data);

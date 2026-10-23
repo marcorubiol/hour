@@ -787,7 +787,6 @@ export type Database = {
           project_id: string
           reply_settled_at: string | null
           slug: string
-          status: Database["public"]["Enums"]["conversation_status"]
           updated_at: string
           workspace_id: string
         }
@@ -811,7 +810,6 @@ export type Database = {
           project_id: string
           reply_settled_at?: string | null
           slug: string
-          status?: Database["public"]["Enums"]["conversation_status"]
           updated_at?: string
           workspace_id: string
         }
@@ -835,7 +833,6 @@ export type Database = {
           project_id?: string
           reply_settled_at?: string | null
           slug?: string
-          status?: Database["public"]["Enums"]["conversation_status"]
           updated_at?: string
           workspace_id?: string
         }
@@ -4913,7 +4910,6 @@ export type Database = {
           p_relation?: string
           p_season?: boolean
           p_season_line_ids?: string[]
-          p_status?: string
           p_tag?: string
           p_temp?: string
           p_turn?: string
@@ -4940,7 +4936,6 @@ export type Database = {
           project_id: string
           reply_settled_at: string | null
           slug: string
-          status: Database["public"]["Enums"]["conversation_status"]
           updated_at: string
           workspace_id: string
         }
@@ -4985,7 +4980,6 @@ export type Database = {
           project_id: string
           reply_settled_at: string | null
           slug: string
-          status: Database["public"]["Enums"]["conversation_status"]
           updated_at: string
           workspace_id: string
         }[]
@@ -5142,7 +5136,6 @@ export type Database = {
           p_phone?: string
           p_project_id: string
           p_role?: string
-          p_status?: Database["public"]["Enums"]["conversation_status"]
           p_title?: string
         }
         Returns: {
@@ -5162,7 +5155,6 @@ export type Database = {
           project_id: string
           reply_settled_at: string | null
           slug: string
-          status: Database["public"]["Enums"]["conversation_status"]
           updated_at: string
           workspace_id: string
         }
@@ -7645,14 +7637,6 @@ export type Database = {
         | "whatsapp"
         | "import"
         | "integration"
-      conversation_status:
-        | "contacted"
-        | "in_conversation"
-        | "hold"
-        | "confirmed"
-        | "declined"
-        | "dormant"
-        | "recurring"
       date_kind:
         | "rehearsal"
         | "residency"
@@ -7913,15 +7897,6 @@ export const Constants = {
         "whatsapp",
         "import",
         "integration",
-      ],
-      conversation_status: [
-        "contacted",
-        "in_conversation",
-        "hold",
-        "confirmed",
-        "declined",
-        "dormant",
-        "recurring",
       ],
       date_kind: [
         "rehearsal",

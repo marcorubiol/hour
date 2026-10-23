@@ -98,7 +98,7 @@ test.describe('line detail — module composition', () => {
 
     // Crash recovery: soft-delete a leftover fixture conversation.
     await page.evaluate(async ({ email, lineId }) => {
-      const list = await fetch(`/api/conversations?status=any&line_id=${lineId}`);
+      const list = await fetch(`/api/conversations?line_id=${lineId}`);
       const items = (
         (await list.json()) as { items: { id: string; person: { email: string | null } | null }[] }
       ).items.filter((i) => i.person?.email === email);
@@ -124,7 +124,7 @@ test.describe('line detail — module composition', () => {
 
     // Verify the line assignment through the API, then self-clean.
     const check = await page.evaluate(async ({ email, lineId }) => {
-      const list = await fetch(`/api/conversations?status=any&line_id=${lineId}`);
+      const list = await fetch(`/api/conversations?line_id=${lineId}`);
       const items = (
         (await list.json()) as {
           items: { id: string; line_id: string | null; person: { email: string | null } | null }[];

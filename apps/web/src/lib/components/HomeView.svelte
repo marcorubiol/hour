@@ -85,7 +85,7 @@
   const conversationsQuery = createQuery({
     queryKey: ['conversations', 'today'],
     queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchJSON<{ items: Conversation[] }>('/api/conversations?status=any&limit=100', signal),
+      fetchJSON<{ items: Conversation[] }>('/api/conversations?limit=100', signal),
   });
   const performancesQuery = createQuery({
     queryKey: ['today-performances'],
@@ -120,7 +120,7 @@
         const entries = await Promise.all(
           ids.map(async (id) => {
             const r = await fetchJSON<{ total: number }>(
-              `/api/conversations?project_ids=${id}&status=any&limit=1`,
+              `/api/conversations?project_ids=${id}&limit=1`,
               signal,
             );
             return [id, r.total] as const;

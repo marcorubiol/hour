@@ -98,10 +98,10 @@ where w.slug = 'playwright' and w.deleted_at is null
   and wp.workspace_id = w.id
   and wp.person_id = md5('hour-playwright-difusion-person-' || n)::uuid;
 
--- Statuses cycle so the lens shows more than one state; values are reset on
--- every load, so a spec that writes one of these rows is undone here.
+-- Values are reset on every load, so a spec that writes one of these rows is
+-- undone here. The relation is derived from the history (ADR-138).
 insert into public.conversation (
-  id, workspace_id, project_id, organization_id, status, next_action_note,
+  id, workspace_id, project_id, organization_id, next_action_note,
   custom_fields, created_by, slug, line_id
 )
 select
@@ -109,7 +109,6 @@ select
   w.id,
   md5('hour-playwright-difusion-project')::uuid,
   md5('hour-playwright-difusion-organization-' || n)::uuid,
-  (array['contacted', 'in_conversation', 'hold', 'confirmed', 'declined', 'dormant'])[1 + (n - 1) % 6]::public.conversation_status,
   'Synthetic difusión fixture',
   '{"season": "2026-27"}'::jsonb,
   (select id from auth.users where email = 'playwright@hour.test'),
@@ -119,7 +118,7 @@ from generate_series(1, 24) as n
 cross join public.workspace w
 where w.slug = 'playwright' and w.deleted_at is null
 on conflict (id) do update
-set status = excluded.status, next_action_note = excluded.next_action_note,
+set next_action_note = excluded.next_action_note,
     organization_id = excluded.organization_id,
     custom_fields = excluded.custom_fields, line_id = excluded.line_id,
     updated_at = now(), deleted_at = null;

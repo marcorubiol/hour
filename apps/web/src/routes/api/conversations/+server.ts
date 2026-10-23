@@ -28,7 +28,6 @@ import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import {
   CONVERSATION_SELECT,
-  CONVERSATION_STATUSES,
   ConversationCreateSchema,
   conversationCreateProblem,
   existingConversationId,
@@ -48,10 +47,6 @@ import { TAG_KEY_RE } from '$lib/conversation-tags';
 import { MATCHING_MAX } from '$lib/conversation-bulk';
 
 const QuerySchema = v.object({
-  status: v.optional(
-    v.union([v.literal('any'), v.picklist(CONVERSATION_STATUSES)]),
-    'contacted',
-  ),
   project_ids: v.optional(v.string()),
   workspace_ids: v.optional(v.string()),
   line_id: v.optional(v.pipe(v.string(), v.uuid())),
@@ -130,7 +125,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       400,
     );
   }
-  const { status, project_ids, workspace_ids, line_id, q, season, limit, offset, turno, temp, temporada, linea, line_ids, envio, r, relacion, etiqueta, orden, ids_only } =
+  const { project_ids, workspace_ids, line_id, q, season, limit, offset, turno, temp, temporada, linea, line_ids, envio, r, relacion, etiqueta, orden, ids_only } =
     parsed.output;
   const idsOnly = ids_only === '1';
 
@@ -156,7 +151,6 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   if (line_id) search.set('line_id', `eq.${line_id}`);
   search.set('deleted_at', 'is.null');
 
-  if (status !== 'any') search.set('status', `eq.${status}`);
   if (season !== 'any') search.set('custom_fields->>season', `eq.${season}`);
 
   setLastTurnEmbed(search);
@@ -184,7 +178,6 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
           projectIds,
           workspaceIds,
           lineIds: parseIds(line_ids),
-          status: status === 'any' ? undefined : status,
           q: qTrim,
           filter: listFilter,
           etiqueta,
@@ -227,7 +220,6 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       total: total ?? data.length,
       limit,
       offset,
-      status,
       season,
       items: await withExtras(env, jwt, data.map((r) => normalizeConversationItem(r))),
     });
@@ -254,7 +246,6 @@ async function lensPage(
     projectIds: string[];
     workspaceIds: string[];
     lineIds: string[];
-    status?: (typeof CONVERSATION_STATUSES)[number];
     q: string;
     filter: ListFilter;
     etiqueta?: string;
@@ -269,7 +260,6 @@ async function lensPage(
     workspaceIds: o.workspaceIds,
     tag: o.etiqueta ?? null,
     q: o.q || null,
-    status: o.status,
     filter: o.filter,
     lineIds: o.lineIds,
     orden: o.orden,
@@ -286,7 +276,6 @@ async function lensPage(
     total: page.total,
     limit: o.limit,
     offset: o.offset,
-    status: o.status ?? 'any',
     season: 'any',
     orden: o.orden,
     items: await withExtras(env, jwt, items.map((it) => ({ ...it, unread_count: unread.get(it.id) ?? 0 }))),
@@ -371,7 +360,6 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
       p_organization_id: input.organization_id ?? null,
       p_organization_name: input.organization?.name ?? input.person?.organization_name ?? null,
       p_title: input.person?.title ?? null,
-      p_status: input.status,
       p_role: input.role ?? null,
       p_next_action_at: input.next_action_at ?? null,
       p_next_action_note: input.next_action_note ?? null,

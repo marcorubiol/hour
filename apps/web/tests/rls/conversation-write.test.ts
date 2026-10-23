@@ -104,7 +104,7 @@ describe.skipIf(!envReady())('RLS — conversation write path', () => {
     const { rows } = await pgPatch<ConversationRow>(
       'conversation',
       jwt,
-      { status: 'declined' },
+      { next_action_note: 'never lands' },
       new URLSearchParams({ id: `eq.${RANDOM_UUID}`, deleted_at: 'is.null' }),
     );
     expect(rows).toHaveLength(0);
