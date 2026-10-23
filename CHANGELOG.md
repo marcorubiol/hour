@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- Por dentro, el estado viejo de las conversaciones desaparece de la base: lo que se ve ya salía de la relación con la sala, de «no esta vez» y de los bolos. En el módulo de conversaciones de una línea salen todas, no solo las contactadas. (2026-10-23, `dad37380`)
 - El admin del espacio ajusta las facetas en Ajustes: renombrar, apagar, ordenar y crear las propias, ver qué da cada paquete y afinar a mano qué ve o edita cada persona. Quien entra por un bolo ve su función también en el Tablero. Y la lista de Conversaciones se lee de una sola vez, con el mismo orden y filtros, sin límite de 500. (2026-10-22)
 - Quien entra por un bolo ve Hour a su medida: aterriza en su función con el tablón, ve sus funciones en el Planner y en Hoy, y no se le ofrece nada que no pueda hacer. Cuando alguien acepta una invitación con una cuenta que ya es otra persona del espacio, el admin lo ve en la ficha con «unir», y en Ajustes tiene las fichas sin unir y las fusiones recientes con «Deshacer». (2026-10-22)
 - En Conversaciones puedes seleccionar varias y, de una vez, ponerlas en «no esta vez», etiquetarlas, darles siguiente paso o marcar que no piden respuesta, con «Deshacer»; y moverte por la lista con el teclado. Dos fichas de la misma persona se fusionan desde su ficha, eligiendo qué datos quedan, con 30 días para deshacerlo. Y bajo el tablón de una función ves quién entra por el bolo, a quién invitar y hasta cuándo dura su acceso. (2026-10-22)
