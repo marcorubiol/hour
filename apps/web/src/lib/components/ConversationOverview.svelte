@@ -51,6 +51,7 @@
     type SeasonLine,
   } from '$lib/conversation-overview';
   import { ALL, panelHref, type LensChip } from '$lib/conversation-tags';
+  import { lastMailoutQueryOptions } from '$lib/waiting-feeds';
 
   interface Props {
     filters: { projectIds: string[]; workspaceIds: string[]; lineIds: string[]; enabled: boolean };
@@ -118,7 +119,6 @@
     if (f.workspaceIds.length > 0) p.set('workspace_ids', f.workspaceIds.join(','));
     if (f.lineIds.length > 0) p.set('line_ids', f.lineIds.join(','));
     if (chip !== ALL) p.set('etiqueta', chip);
-    if (!full) p.set('panel', 'common');
     return p.toString();
   }
 
@@ -131,6 +131,15 @@
       placeholderData: (prev: OverviewResponse | undefined) => prev,
     })),
   );
+
+  // The last mailout is Difusión's alone, and its own read (2026-10-24): the
+  // panel draws without it; its block keeps a ghost until it arrives.
+  const mailoutQuery = createQuery(toStore(() => lastMailoutQueryOptions(filters, filters.enabled && full)));
+  // Subscribed now, not when its block first draws (after the panel): a query
+  // nobody subscribes to does not fetch, and it would start a panel late.
+  void $mailoutQuery;
+  let lastMailout = $derived($mailoutQuery.data?.last_mailout ?? null);
+  let mailoutLoading = $derived($mailoutQuery.isPending);
 
   let data = $derived($query.data ?? null);
   let pickGroups = $derived(data ? new Set(data.cold.picks.map((p) => p.project_id)).size : 0);
@@ -262,6 +271,16 @@
   </ol>
 {/snippet}
 
+{#snippet mailoutGhost(busy: boolean)}
+  <!-- Inside the loading board the board is busy; after it, the block alone is. -->
+  <section class="block block--mailout" aria-hidden="true" aria-busy={busy || undefined}>
+    <BlockHead title={t('overview.last_mailout', locale)} />
+    <p class="mailout__subject"><span class="ghost-line" style:inline-size="50%">&nbsp;</span></p>
+    <p class="mailout__meta"><span class="ghost-line" style:inline-size="70%">&nbsp;</span></p>
+    <p class="mailout__ghost-figs"><span class="ghost-line">&nbsp;</span></p>
+  </section>
+{/snippet}
+
 <div class="overview">
 {#if loading}
   <div class="board" aria-busy="true" aria-label={t('overview.loading', locale)}>
@@ -304,12 +323,7 @@
         <BlockHead title={t('overview.cold', locale)} count={DASH} />
         {@render ghost(5)}
       </section>
-      <section class="block block--mailout" aria-hidden="true">
-        <BlockHead title={t('overview.last_mailout', locale)} />
-        <p class="mailout__subject"><span class="ghost-line" style:inline-size="50%">&nbsp;</span></p>
-        <p class="mailout__meta"><span class="ghost-line" style:inline-size="70%">&nbsp;</span></p>
-        <p class="mailout__ghost-figs"><span class="ghost-line">&nbsp;</span></p>
-      </section>
+      {@render mailoutGhost(false)}
     </div>
     {/if}
   </div>
@@ -492,8 +506,10 @@
         {/if}
       </section>
 
-      {#if data.last_mailout}
-        {@const m = data.last_mailout}
+      {#if full && mailoutLoading}
+        {@render mailoutGhost(true)}
+      {:else if full && lastMailout}
+        {@const m = lastMailout}
         {@const ws = workspaceSlugById.get(m.workspace_id)}
         <section class="block block--mailout" aria-labelledby="ov-mail" data-testid="block-mailout">
           <BlockHead id="ov-mail" title={t('overview.last_mailout', locale)}>

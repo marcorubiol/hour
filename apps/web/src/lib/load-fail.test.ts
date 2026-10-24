@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
-vi.mock('$lib/session.svelte', () => ({ clearSession: vi.fn() }));
+vi.mock('$lib/session.svelte', () => ({
+  clearSession: vi.fn(),
+  sessionReady: vi.fn(async () => {}),
+  recoverSession: vi.fn(async () => false),
+}));
 
 const { ApiError } = await import('$lib/api');
 const { loadFailKind, retryLoad } = await import('./load-fail');

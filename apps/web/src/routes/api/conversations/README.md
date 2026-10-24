@@ -24,6 +24,7 @@ error).
 | `season`       | `2026-27`      | matches `custom_fields->>season`, or `any`         |
 | `limit`        | `50` (max 100) | page size                                          |
 | `offset`       | `0`            | pagination                                         |
+| `lean`         | none           | `1`: the rows only (no `total`, no bolos, no `last_mailout`), what «Te espera» reads; plain path only |
 
 Invalid values return `400 invalid_query` with per-field issues from Valibot.
 
