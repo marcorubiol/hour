@@ -360,6 +360,15 @@
     --heading-text-wrap: balance;
     --heading-letter-spacing: -0.02em;
 
+    /* The display title (a lens's, a record's, a dialog's): the serif at its
+       largest. One line keeps the 1em box it always had (the title row does
+       not move); a title that wraps gets this pitch between its lines, which
+       a display serif needs: at 1 the second line's caps touch the first
+       line's descenders. The trim gives back the extra half-leading above
+       and below, so only the space BETWEEN lines grows. */
+    --display-line-height: 1.15;
+    --display-line-trim: calc((1 - var(--display-line-height)) / 2 * 1em);
+
     --mono-font-family: var(--font-mono);
 
     /* Tracking — one scale for every letter-spacing (rule 1). The values are

@@ -2328,6 +2328,17 @@
     align-items: center;
     gap: var(--space-s);
   }
+  /* A lens's «?» stays at the end of the title's FIRST line: the row never
+     wraps (the title wraps inside its column), and the «?» stands in a box
+     one title line tall, centred in it as on a one-line row. Without this, a
+     two-line title on a phone sent the «?» alone to a line of its own, and
+     the Planner's arrows pulled it down between the title and themselves. */
+  .lenshead__tools--help {
+    flex-shrink: 0;
+    align-self: flex-start;
+    block-size: 1em;
+    font-size: var(--text-xxl);
+  }
   .lenshead__help {
     position: relative;
     display: inline-grid;
@@ -2365,15 +2376,20 @@
     font-family: var(--font-display);
     font-size: var(--text-xxl);
     font-weight: 400;
-    line-height: 1;
+    line-height: var(--display-line-height);
     letter-spacing: normal;
     color: var(--heading-color);
     /* Title rule (all four lenses): letters italic… */
     font-style: italic;
   }
+  /* In a title row a line is 1em tall, as it always was: the trim takes the
+     leading off the outer edges, so a wrapped title opens only between its
+     lines. A dialog's title keeps its full box (it sits over its body). */
+  .lenshead__title {
+    margin-block: var(--display-line-trim);
+  }
   .dialog__title {
     font-size: var(--dialog-title-size);
-    line-height: 1.15;
   }
   /* …numbers upright. LensTitle wraps digit runs in .lenshead__num. */
   .lenshead__num {
@@ -2415,6 +2431,9 @@
     .lenshead__titlerow {
       flex-wrap: wrap;
       row-gap: var(--space-s);
+    }
+    .lenshead__titlerow:has(> .lenshead__tools--help) {
+      flex-wrap: nowrap;
     }
   }
   /* temporary placeholder sub — an obvious stand-in for a lens still being
