@@ -322,16 +322,21 @@ test.describe('planner laws (ADR-095)', () => {
     await expect(page.locator('.cal__view')).toHaveCount(5);
   });
 
-  test('THE FOUR VIEWS SURVIVE A RELOAD — the state is in the URL', async ({ page }) => {
-    for (const view of ['overview', 'day', 'month', 'agenda', 'board']) {
+  /* ONE TEST PER VIEW. The five used to share one test: ten full loads of the
+     Planner in one 30 s budget. Against production a load settles in 2–3 s
+     (measured 2026-10-24: 27.5 s for the ten, alone), so the law went red
+     whenever the network was a little slower, at whichever load the budget
+     ran out on. Each view is its own claim and gets its own budget. */
+  for (const view of ['overview', 'day', 'month', 'agenda', 'board']) {
+    test(`THE VIEWS SURVIVE A RELOAD — the state is in the URL (${view})`, async ({ page }) => {
       await planner(page, view);
       await page.reload();
       // Asked once the reloaded lens has mounted and settled: anything that
       // would rewrite the URL on the way in has run by then.
       await waitForLoaded(page);
       expect(page.url(), `${view} did not survive the reload`).toContain(`view=${view}`);
-    }
-  });
+    });
+  }
 
   test('A LEGACY LINK STILL OPENS — carrils/espai are translated, once', async ({ page }) => {
     // A link somebody sent last month is not a bug.
