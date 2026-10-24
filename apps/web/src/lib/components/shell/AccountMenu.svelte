@@ -74,7 +74,8 @@
     } catch {
       /* offline logout still clears local state */
     }
-    clearSession();
+    // Wipes the device cache too (ADR-144): nothing of this user stays.
+    await clearSession();
     goto('/login', { replaceState: true });
   }
 </script>

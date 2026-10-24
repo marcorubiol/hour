@@ -76,8 +76,16 @@
     type RealtimeHandle,
   } from '$lib/realtime';
   import { fetchJSON } from '$lib/api';
-  import { ensureSession, getAccessToken, session } from '$lib/session.svelte';
-  import { createQuery } from '@tanstack/svelte-query';
+  import {
+    adoptCachedUser,
+    clearSession,
+    ensureSession,
+    getAccessToken,
+    probeOutcome,
+    session,
+  } from '$lib/session.svelte';
+  import { startQueryCache, wipeQueryCache } from '$lib/offline';
+  import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 
   interface Props {
     children?: Snippet;
@@ -95,13 +103,42 @@
     if (blocked) goto('/', { replaceState: true });
   });
 
+  // The device cache (ADR-144): hydrate the last-known answers before any
+  // lens mounts, and keep writing them back while this frame lives. Started
+  // here, at init, so the IndexedDB read runs alongside the session probe.
+  const deviceCache = startQueryCache(useQueryClient(), () => session.user);
+  onDestroy(deviceCache.stop);
+
   let authChecked = $state(false);
   onMount(async () => {
     // Session lives in httpOnly cookies (Phase 0.9) — only the server can
     // answer "am I signed in". ensureSession() also transparently refreshes
     // an expired access token, so a returning tab lands signed-in.
-    if (!(await ensureSession())) {
+    const probe = ensureSession();
+    // With a device cache the frame paints now, with its user and data; the
+    // probe settles behind it. Without one, it waits for the probe as before.
+    const cachedUser = await deviceCache.restored;
+    if (cachedUser) {
+      adoptCachedUser(cachedUser);
+      authChecked = true;
+    }
+    const user = await probe;
+    if (!user) {
+      // No answer is not a refusal: offline, keep showing the last-known.
+      if (cachedUser && probeOutcome() === 'unreachable') {
+        adoptCachedUser(cachedUser);
+        return;
+      }
+      authChecked = false;
+      await clearSession();
       goto('/login', { replaceState: true });
+      return;
+    }
+    // A cache written for someone else (cannot happen through the login,
+    // which claims it): drop it and start this open again from the network.
+    if (cachedUser && cachedUser.sub !== user.sub) {
+      await wipeQueryCache();
+      location.replace(location.href);
       return;
     }
     authChecked = true;

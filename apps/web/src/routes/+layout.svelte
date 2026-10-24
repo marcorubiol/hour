@@ -4,7 +4,7 @@
   import { browser } from '$app/environment';
   import { onMount, type Snippet } from 'svelte';
   import Toast from '$lib/components/Toast.svelte';
-  import { prewarmDB, registerServiceWorker } from '$lib/offline';
+  import { bindQueryCache, prewarmDB, registerServiceWorker } from '$lib/offline';
   import { provideTheme } from '$lib/theme.svelte';
 
   interface Props {
@@ -25,6 +25,12 @@
       queries: {
         enabled: browser,
         staleTime: 30_000,
+        // The device cache (ADR-144) writes back what is in memory; a query
+        // collected after the default 5 minutes unobserved would be dropped
+        // from it, and the next open of that lens would start blank. A day
+        // outlives any session on a phone; the record's own age limit is
+        // MAX_AGE_MS in $lib/offline/query-cache.
+        gcTime: 24 * 3_600_000,
         // notifyOnChangeProps: 'all' is a correctness setting here, not a perf
         // knob. TanStack's default tracked-props optimisation notifies an
         // observer ONLY when a prop the consumer actually read changes. Our
@@ -43,6 +49,9 @@
       },
     },
   });
+
+  // A wipe (logout, refused session, another user) clears this client too.
+  if (browser) bindQueryCache(queryClient);
 
   // Offline scaffold — register SW + open the IndexedDB schema. Both are
   // idempotent and browser-only; helpers have their own guards (Playwright,

@@ -199,3 +199,35 @@ describe('fetchJSON and the renewal', () => {
     expect(goto).toHaveBeenCalledWith('/login', { replaceState: true });
   });
 });
+
+describe('probe outcome (device cache, ADR-144)', () => {
+  test('a 401 is a refusal; no answer is not', async () => {
+    route(() => json({ error: 'no_session' }, { status: 401 }));
+    let s = await load();
+    await s.ensureSession();
+    expect(s.probeOutcome()).toBe('denied');
+
+    route(() => {
+      throw new TypeError('Failed to fetch');
+    });
+    s = await load();
+    await s.ensureSession();
+    expect(s.probeOutcome()).toBe('unreachable');
+
+    route(() => json({ error: 'rate_limited' }, { status: 429 }));
+    s = await load();
+    await s.ensureSession();
+    expect(s.probeOutcome()).toBe('unreachable');
+  });
+
+  test('the cached user paints only until the server names one', async () => {
+    route(() => json({ user, expiresAt: Date.now() + HOUR }));
+    const s = await load();
+    s.adoptCachedUser({ sub: 'cached', email: null, name: null });
+    expect(s.session.user?.sub).toBe('cached');
+    await s.ensureSession();
+    expect(s.session.user?.sub).toBe('u1');
+    s.adoptCachedUser({ sub: 'cached', email: null, name: null });
+    expect(s.session.user?.sub).toBe('u1');
+  });
+});

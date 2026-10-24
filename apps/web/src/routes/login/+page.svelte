@@ -90,7 +90,8 @@
         submitting = false;
         return;
       }
-      setSessionUser(data.user ?? null);
+      // A device cache of someone else goes before anything paints (ADR-144).
+      await setSessionUser(data.user ?? null);
 
       goto(nextPath, { replaceState: true });
     } catch (err) {

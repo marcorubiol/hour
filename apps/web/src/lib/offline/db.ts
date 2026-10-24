@@ -1,11 +1,9 @@
 /**
- * Offline scaffold — IndexedDB schema for read cache + write queue (D-PRE-08).
+ * Offline — the IndexedDB schema: the query cache kept on the device
+ * (ADR-144, `query-cache.ts`) + the write queue (D-PRE-08).
  *
- * Phase 0.0: schema and surface only. Nothing reads/writes through here yet
- * — pages still fetch directly via TanStack Query, and we have no UI
- * mutations to enqueue. The wiring lands in Phase 0.2 when Plaza/Desk start
- * mutating conversation state and a network drop should buffer instead of
- * losing the change.
+ * The write queue is still schema only: no mutation is enqueued yet. It lands
+ * when a network drop should buffer a change instead of losing it.
  *
  * Schema versioning (when adding/changing stores in the future):
  *   1. Bump `DB_VERSION`.
@@ -16,18 +14,13 @@
  */
 
 import { type DBSchema, type IDBPDatabase, openDB } from 'idb';
+import type { PersistedQueryCache, QueryCacheStore } from './query-cache';
 
 export const DB_NAME = 'hour-offline';
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
-export interface CachedRead {
-  /** URL the response was fetched from — used as primary key. */
-  url: string;
-  /** Parsed JSON payload. Stored as-is; consumer is responsible for shape. */
-  data: unknown;
-  /** Wall-clock millis at fetch time. Caller decides freshness policy. */
-  fetchedAt: number;
-}
+/** The one key of `query_cache`: a device holds one user's cache. */
+const QUERY_CACHE_KEY = 'query-client';
 
 export type WriteQueueMethod = 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 
@@ -52,10 +45,9 @@ export interface QueuedWrite {
 }
 
 interface HourOfflineDB extends DBSchema {
-  read_cache: {
+  query_cache: {
     key: string;
-    value: CachedRead;
-    indexes: { 'by-fetchedAt': number };
+    value: PersistedQueryCache;
   };
   write_queue: {
     key: number;
@@ -87,39 +79,42 @@ export function getDB(): Promise<IDBPDatabase<HourOfflineDB>> {
   if (!dbPromise) {
     dbPromise = openDB<HourOfflineDB>(DB_NAME, DB_VERSION, {
       upgrade(db, oldVersion) {
-        // Initial schema (v1).
+        // Initial schema (v1). Its `read_cache` (per-URL reads) was never
+        // written to; v2 replaces it with `query_cache`.
         if (oldVersion < 1) {
-          const reads = db.createObjectStore('read_cache', { keyPath: 'url' });
-          reads.createIndex('by-fetchedAt', 'fetchedAt');
-
           const writes = db.createObjectStore('write_queue', {
             keyPath: 'id',
             autoIncrement: true,
           });
           writes.createIndex('by-queuedAt', 'queuedAt');
         }
-        // Future: `if (oldVersion < 2) { ... }` etc.
+        // v2: the query cache kept on the device (ADR-144), one record.
+        if (oldVersion < 2) {
+          // The v1 store is not in the v2 type: name it untyped to drop it.
+          const names = db.objectStoreNames as DOMStringList;
+          if (names.contains('read_cache')) (db as unknown as IDBDatabase).deleteObjectStore('read_cache');
+          db.createObjectStore('query_cache');
+        }
+        // Future: `if (oldVersion < 3) { ... }` etc.
       },
     });
   }
   return dbPromise;
 }
 
-// ── Read cache helpers ──────────────────────────────────────────────────
+// ── Query cache ─────────────────────────────────────────────────────────
 
-export async function cacheRead(url: string, data: unknown): Promise<void> {
-  const db = await getDB();
-  await db.put('read_cache', { url, data, fetchedAt: Date.now() });
-}
-
-export async function getCachedRead(url: string): Promise<CachedRead | undefined> {
-  const db = await getDB();
-  return db.get('read_cache', url);
-}
-
-export async function clearReadCache(): Promise<void> {
-  const db = await getDB();
-  await db.clear('read_cache');
+/** The device store behind `query-cache.ts`. */
+export function idbQueryCacheStore(): QueryCacheStore {
+  return {
+    get: async () => (await getDB()).get('query_cache', QUERY_CACHE_KEY),
+    set: async (record) => {
+      await (await getDB()).put('query_cache', record, QUERY_CACHE_KEY);
+    },
+    clear: async () => {
+      await (await getDB()).clear('query_cache');
+    },
+  };
 }
 
 // ── Write queue helpers ─────────────────────────────────────────────────
