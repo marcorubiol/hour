@@ -277,7 +277,11 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto(DESK);
     await waitForLoaded(page);
-    const top = async (sel: string) => (await page.locator(sel).first().boundingBox())?.y ?? -1;
+    // boundingBox() waits for the element: a band that is not drawn must answer at once.
+    const top = async (sel: string) => {
+      const el = page.locator(sel).first();
+      return (await el.count()) ? ((await el.boundingBox())?.y ?? -1) : -1;
+    };
     // A band with nothing in it is not drawn (ADR-145 § 1): the order holds
     // among the bands that are there.
     const order = (

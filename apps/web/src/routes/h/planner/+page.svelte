@@ -2240,7 +2240,7 @@
     prepending = true;
     // The anchor may be a SHUT chapter's head (no day rows exist there) —
     // `agendaPlaceEl` pins whichever element the place actually draws.
-    const anchor = visibleAgendaDay();
+    const anchor = visibleAgendaDay(true);
     const was = anchor ? (agendaPlaceEl(anchor)?.getBoundingClientRect().top ?? null) : null;
     mutate();
     await tick();
@@ -2910,12 +2910,23 @@
    * shut chapters (null → fell back to today → ‹ › teleported the reader
    * to the present instead of stepping from where they stood).
    */
-  function visibleAgendaDay(): string | null {
+  function visibleAgendaDay(preferDay = false): string | null {
     // The reading edge is the STUCK toolbar's underside, not the viewport's
     // 0: a row can sit behind the chrome with bottom > 0, and taking it as
     // "where the reader is" makes the next ‹ › step a no-op.
     const bar = document.querySelector('.cal__toolbar');
     const edge = bar ? bar.getBoundingClientRect().bottom : 0;
+    // A DAY ON SCREEN BEATS ITS CHAPTER HEAD. A pull that brings in earlier
+    // days of the month already open inserts them under that month's head:
+    // anchored to the head, the reader's own row was pushed down by every
+    // day that arrived. The head is the place only when no day row shows.
+    // Only the anchoring asks for it: the ‹ › step wants the true top place.
+    if (preferDay) {
+      for (const el of document.querySelectorAll<HTMLElement>('[data-day]')) {
+        const r = el.getBoundingClientRect();
+        if (r.bottom > edge && r.top < window.innerHeight) return el.dataset.day ?? null;
+      }
+    }
     for (const el of document.querySelectorAll<HTMLElement>('[data-day], [data-month]')) {
       if (el.getBoundingClientRect().bottom > edge) {
         return el.dataset.day ?? `${el.dataset.month}-01`;

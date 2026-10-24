@@ -82,8 +82,13 @@ test.describe('the season (ADR-117)', () => {
   test('ON A PHONE, WHAT TO DECIDE COMES BEFORE THE STRIP', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await open(page);
-    const decide = await page.locator('.ov__decide').boundingBox();
-    const strip = await page.locator('.ov__strip').boundingBox();
+    // boundingBox() waits for the element: a block that is not drawn must answer at once.
+    const box = async (sel: string) => {
+      const el = page.locator(sel).first();
+      return (await el.count()) ? el.boundingBox() : null;
+    };
+    const decide = await box('.ov__decide');
+    const strip = await box('.ov__strip');
     // At zero the block is not drawn (ADR-145 § 1), and an absent feed draws nothing either.
     test.skip(!decide, 'nothing to decide here');
     expect(decide!.y).toBeLessThan(strip!.y);

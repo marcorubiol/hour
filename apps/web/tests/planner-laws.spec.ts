@@ -588,6 +588,12 @@ test.describe('the diary', () => {
   });
 
   async function growsOneMonth(page: Page) {
+    // Anchoring only exists when the diary is taller than the window. The
+    // fixture space has a near-empty today, and since ADR-145 drew fewer
+    // blocks above the diary the page stopped overflowing a 720 px window:
+    // nothing to scroll, nothing to anchor, `scrollY` 0 by geometry, not by
+    // the app. A short window keeps the law about the app.
+    await page.setViewportSize({ width: 1280, height: 360 });
     await planner(page, 'agenda');
     const days = () =>
       page.evaluate(() =>
@@ -616,7 +622,7 @@ test.describe('the diary', () => {
     const door = page.locator('.ag__earlier');
     await expect(door, 'the diary has no door to the past').toHaveCount(1);
     await lookAheadAnswered(page);
-    await page.mouse.move(800, 500);
+    await page.mouse.move(640, 240); // inside the 360 px window
     await page.mouse.wheel(0, -600);
     await expect(door, 'the pull was never answered').toHaveCount(0, { timeout: 0 });
 
