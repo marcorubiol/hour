@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- Planner, Cuentas y Hoy más ligeros: el Planner sin la tira de cifras repetida y con «+ Fecha» en la fila de vistas en el móvil; Cuentas con cifras sin cajas, en «0 €» y sin frase cuando están a cero; Hoy sin la línea de fecha ni el enlace repetido al Planificador, y el saludo junto al titular (ADR-145, fase 2). (2026-10-24, `783911ca`)
 - Las cuatro portadas pesan menos: un bloque sin nada ya no se pinta, las «i» de las cabeceras se reúnen en el «?» de cada pantalla, las mayúsculas de máquina quedan solo para los títulos de bloque y, en el móvil, el texto crece y el ámbito sube a la fila del título (ADR-145). En Difusión, en el móvil, los filtros van en una hoja y cada conversación ocupa dos renglones. Un cambio guardado en Conversaciones ya no lo pisa una lectura anterior, y entrar no falla si pulsas antes de que cargue la página. (2026-10-24, `7da9de0c`)
 - En el móvil, un título largo en dos líneas respira y el «?» se queda a su lado en vez de bajar solo a otra línea. (2026-10-24, `5bb44fb1`)
 - Hour abre al instante con lo último que viste y lo pone al día detrás, también en el iPhone. Los datos se guardan en tu dispositivo y se borran al cerrar sesión o al entrar otra persona (ADR-144). (2026-10-24, `e7fb2bab`)
