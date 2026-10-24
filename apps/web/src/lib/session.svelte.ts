@@ -18,9 +18,16 @@
  * until its own expiry, as the realtime socket already kept it; a 401 joins
  * the renewal already in flight instead of starting one; and once the
  * server has said when the access cookie dies, a request after that renews
- * first instead of collecting three 401s. Nothing is stored in the browser:
- * all of this is module memory, gone with the tab.
+ * first instead of collecting three 401s. Nothing of the renewal is stored
+ * in the browser: tokens and expiries are module memory, gone with the tab.
+ *
+ * The user (not secret: what the probe returns) does outlive the tab, inside
+ * the device query cache (ADR-144): the /h frame paints with it while the
+ * probe is on the wire (`adoptCachedUser`), and the probe has the last word
+ * (`probeOutcome`). Every way out of a session wipes that cache with it.
  */
+
+import { claimQueryCache, wipeQueryCache } from '$lib/offline/query-cache';
 
 export interface SessionUser {
   sub: string;
@@ -39,6 +46,14 @@ const RENEW_BEFORE_MS = 5_000;
 const TOKEN_MIN_LIFE_MS = 60_000;
 
 let probe: Promise<SessionUser | null> | null = null;
+/**
+ * What the last probe said: `denied` is the server refusing the session (a
+ * 401 it could not renew); `unreachable` is no answer (offline, 5xx, rate
+ * limit), which says nothing about the session.
+ */
+let outcome: 'ok' | 'denied' | 'unreachable' | null = null;
+/** The frame painted from the device cache: its reads are refreshes, and wait for the probe. */
+let paintedFromCache = false;
 /** The boot probe while it is on the wire (it renews a stale cookie itself). */
 let probing: Promise<SessionUser | null> | null = null;
 let refreshing: Promise<boolean> | null = null;
@@ -75,12 +90,15 @@ async function fetchSession(): Promise<SessionUser | null> {
     if (res.ok) {
       const body = (await res.json()) as { user: SessionUser | null; expiresAt?: number };
       session.user = body.user;
+      outcome = body.user ? 'ok' : 'denied';
       noteExpiry(res, body.expiresAt);
     } else {
       session.user = null;
+      outcome = res.status === 401 ? 'denied' : 'unreachable';
     }
   } catch {
     session.user = null;
+    outcome = 'unreachable';
   } finally {
     session.ready = true;
   }
@@ -100,21 +118,44 @@ export function ensureSession(): Promise<SessionUser | null> {
   return probe;
 }
 
-/** Login just returned the user — seed the store without a second probe. */
-export function setSessionUser(user: SessionUser | null): void {
+/** What the last boot probe said; null before one has answered. */
+export function probeOutcome(): 'ok' | 'denied' | 'unreachable' | null {
+  return outcome;
+}
+
+/**
+ * The device cache's user, to paint the frame before the probe answers. Never
+ * over a user the server has vouched for; the probe overwrites it when it lands.
+ */
+export function adoptCachedUser(user: SessionUser): void {
+  session.user ??= user;
+  paintedFromCache = true;
+}
+
+/**
+ * Login just returned the user: seed the store without a second probe. The
+ * device cache stays only if it is this user's: await before showing data.
+ */
+export function setSessionUser(user: SessionUser | null): Promise<void> {
   forgetRenewal();
   session.user = user;
   session.ready = true;
   probe = Promise.resolve(user);
+  outcome = user ? 'ok' : 'denied';
   // The login response set the cookies a moment ago.
   if (user) confirmedAt = Date.now();
+  return claimQueryCache(user);
 }
 
-export function clearSession(): void {
+/** The session is over (logout, or refused): it takes the device cache with it. */
+export function clearSession(): Promise<void> {
   forgetRenewal();
   session.user = null;
   session.ready = true;
   probe = null;
+  outcome = null;
+  paintedFromCache = false;
+  return wipeQueryCache();
 }
 
 /**
@@ -150,8 +191,15 @@ export function refreshSession(): Promise<boolean> {
  * access cookie is known to be dead. Does not wait for the boot probe: on a
  * live session that would put a round trip before every first read; a read
  * that loses the race gets a 401 and joins the probe (`recoverSession`).
+ * Except when the frame painted from the device cache (ADR-144): the screen
+ * already shows data, so a read waits the probe's round trip instead of
+ * collecting a 401 each on the first open after the hour.
  */
 export async function sessionReady(): Promise<void> {
+  if (paintedFromCache && probing) {
+    await probing;
+    return;
+  }
   if (refreshing) {
     await refreshing;
     return;

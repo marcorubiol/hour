@@ -199,3 +199,49 @@ describe('fetchJSON and the renewal', () => {
     expect(goto).toHaveBeenCalledWith('/login', { replaceState: true });
   });
 });
+
+describe('probe outcome (device cache, ADR-144)', () => {
+  test('a 401 is a refusal; no answer is not', async () => {
+    route(() => json({ error: 'no_session' }, { status: 401 }));
+    let s = await load();
+    await s.ensureSession();
+    expect(s.probeOutcome()).toBe('denied');
+
+    route(() => {
+      throw new TypeError('Failed to fetch');
+    });
+    s = await load();
+    await s.ensureSession();
+    expect(s.probeOutcome()).toBe('unreachable');
+
+    route(() => json({ error: 'rate_limited' }, { status: 429 }));
+    s = await load();
+    await s.ensureSession();
+    expect(s.probeOutcome()).toBe('unreachable');
+  });
+
+  test('the cached user paints only until the server names one', async () => {
+    route(() => json({ user, expiresAt: Date.now() + HOUR }));
+    const s = await load();
+    s.adoptCachedUser({ sub: 'cached', email: null, name: null });
+    expect(s.session.user?.sub).toBe('cached');
+    await s.ensureSession();
+    expect(s.session.user?.sub).toBe('u1');
+    s.adoptCachedUser({ sub: 'cached', email: null, name: null });
+    expect(s.session.user?.sub).toBe('u1');
+  });
+
+  test('painted from the cache, a read waits for the probe instead of collecting a 401', async () => {
+    const probe = deferred<Response>();
+    route((url) => (url.endsWith('/api/auth/session') ? probe.promise : json({ ok: true })));
+    const s = await load();
+    void s.ensureSession();
+    s.adoptCachedUser({ sub: 'u1', email: null, name: null });
+    const read = s.fetchJSON('/api/thing');
+    await Promise.resolve();
+    expect(count('/api/thing')).toBe(0);
+    probe.resolve(json({ user, expiresAt: Date.now() + HOUR }));
+    await read;
+    expect(count('/api/thing')).toBe(1);
+  });
+});
