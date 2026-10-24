@@ -1044,14 +1044,19 @@
   @media (max-width: 47.999rem) {
     /* One column: the rail is a drawer now (ScopeRail + base.css § Drawer),
        out of the flow, so the bar and the page take the whole width. */
+    /* The gutter stays the desktop's --space-l, fluid down to 20px: the
+       phone's own 14px (--space-m) left the page pressed against the glass
+       while its controls were 44px slabs (Marco, 24-10). */
     .shell {
       grid-template-columns: minmax(0, 1fr);
-      --shell-gutter: var(--space-m);
     }
     /* Door · search · you. The search takes what is left instead of
        floating as a lone icon, and says what it is until it runs out of
-       room. ⌘K is a keyboard's promise; a phone has none. */
+       room. ⌘K is a keyboard's promise; a phone has none. Installed to the
+       home screen with viewport-fit=cover, the status bar's inset is the
+       bar's (zero under the default status bar style). */
     .shell__top {
+      padding-block-start: max(var(--space-s), env(safe-area-inset-top));
       grid-column: 1 / -1;
       grid-template-columns: auto minmax(0, 1fr) auto;
       grid-template-areas: 'door search me';

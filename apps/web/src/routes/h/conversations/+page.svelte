@@ -848,13 +848,7 @@
         display: inline-flex;
       }
     }
-    /* Touch: the two views and the skip link at the finger's size (móvil #8). */
-    @media (pointer: coarse) {
-      .conversations :global(.lenshead__frag) {
-        display: inline-flex;
-        align-items: center;
-        min-block-size: var(--touch-target);
-      }
-    }
+    /* Touch: the chips and the skip link reach the finger's size through
+       base.css (`.lenshead__frag` takes the target without growing the line). */
   }
 </style>

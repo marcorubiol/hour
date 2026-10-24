@@ -716,6 +716,10 @@
        bar; the shell sets it on a phone). */
     --lens-origin-stroke: var(--text-faint);
     --lensbar-height: 2.75rem;
+    /* Under the row, the screen's own foot: the home indicator's inset when
+       the app is installed (viewport-fit=cover makes env() real), never
+       less than a breath, so the words do not sit on the glass's edge. */
+    --lensbar-foot: max(var(--space-xs), env(safe-area-inset-bottom));
     /* Hoy apart (Marco, 20-10): the portada is not a fourth lens, so a
        hairline stands between it and the three, with this air on each side,
        on a desktop and in the phone's bar alike. */
@@ -808,7 +812,7 @@
      (LensSwitcher): the page, its toasts and its sticky bars give it room. */
   @media (max-width: 47.999rem) {
     :root:has(.lensswitch-wrap) {
-      --shell-foot: calc(var(--lensbar-height) + var(--line-hairline) + env(safe-area-inset-bottom));
+      --shell-foot: calc(var(--lensbar-height) + var(--line-hairline) + var(--lensbar-foot));
     }
   }
 

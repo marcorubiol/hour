@@ -188,8 +188,8 @@
       display: flex;
       align-items: stretch;
       gap: 0;
-      padding-inline: var(--space-2xs);
-      padding-block-end: env(safe-area-inset-bottom);
+      padding-block-end: var(--lensbar-foot);
+      padding-inline: max(var(--space-2xs), env(safe-area-inset-left)) max(var(--space-2xs), env(safe-area-inset-right));
       background: var(--bg);
       border-block-start: var(--line-hairline) solid var(--border-color-light);
     }

@@ -45,31 +45,27 @@
      their place without telling them why. -->
 <button
   type="button"
-  class="cal__arw"
+  class="cal__arw hit"
   aria-label={t(stepKeys.prev, locale)}
   title={stepTitle(stepKeys.prev)}
   onclick={(e) => onStepBack(e.shiftKey)}>‹</button
 >
 <button
   type="button"
-  class="cal__arw"
+  class="cal__arw hit"
   aria-label={t(stepKeys.next, locale)}
   title={stepTitle(stepKeys.next)}
   onclick={(e) => onStepNext(e.shiftKey)}>›</button
 >
-<button type="button" class="cal__now" onclick={onNow}>{t('planner.now', locale)}</button>
+<button type="button" class="cal__now hit" onclick={onNow}>{t('planner.now', locale)}</button>
 
 <style>
   @layer components {
     /* Sizes verbatim from the prototype: 28px squares, 13px glyph; the pill
        at 12px with 5/12 padding, `var(--radius)` for the squares. On a coarse
-       pointer, a finger's target (móvil #5). */
-    .cal__arw,
-    .cal__now {
-      min-block-size: var(--touch-target);
-    }
+       pointer, a finger's target (móvil #5) that reaches past the square
+       without growing it (`.hit`, base.css). */
     .cal__arw {
-      min-inline-size: var(--touch-target);
       inline-size: var(--control-size-xs);
       block-size: var(--control-size-xs);
       display: inline-flex;
