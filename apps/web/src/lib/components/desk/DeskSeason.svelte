@@ -113,8 +113,10 @@
     container: doors / inline-size;
     display: grid;
     grid-template-columns: minmax(5.5rem, max-content) minmax(0, 1fr) auto;
-    gap: var(--space-s) 0;
   }
+  /* A DOOR IS A ROW, NOT AN OBJECT (ADR-145, fase 2): no box, no ground; a
+     hairline between two doors, none under the last (the block's head draws
+     the one above the first). */
   .door {
     display: grid;
     grid-column: 1 / -1;
@@ -122,16 +124,16 @@
     grid-template-areas: 'lens lens arrow' 'n txt arrow';
     column-gap: var(--space-m);
     align-items: center;
-    padding: var(--space-s) var(--space-m);
-    border: var(--line-hairline) solid var(--border-color-light);
-    border-radius: var(--radius-l);
-    background: var(--bg-ultra-light);
+    padding-block: var(--space-s);
     color: inherit;
     text-decoration: none;
-    transition: border-color var(--transition);
   }
-  .door:hover {
-    border-color: var(--border-color-dark);
+  .door + .door {
+    border-block-start: var(--line-hairline) solid var(--border-color-light);
+  }
+  .door:hover .door__lens {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
   }
   /* ONE LABEL PER BLOCK (ADR-139 § 6): «La temporada» is the block's; a
      door is named by its lens in plain words, the window after it, quieter. */
@@ -203,7 +205,7 @@
       grid-template-columns: minmax(4.5rem, max-content) minmax(0, 1fr) auto;
     }
     .door {
-      padding: var(--space-xs) var(--space-s);
+      padding-block: var(--space-xs);
     }
     .door__n {
       font-size: var(--stat-inline);

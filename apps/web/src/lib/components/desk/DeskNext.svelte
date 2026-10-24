@@ -151,9 +151,9 @@
 {/snippet}
 
 <section class="dband next" aria-labelledby="desk-next-h">
-  <BlockHead title={t('desk.band_next', locale)} titleId="desk-next-h">
-    {#if lensOn('planner')}<a class="block-head__act" href="/h/planner">{t('lens.planner', locale)} →</a>{/if}
-  </BlockHead>
+  <!-- No «Planificador →» here (ADR-145, fase 2): the bar of sections already
+       goes there, and the day below opens the Planner on itself. -->
+  <BlockHead title={t('desk.band_next', locale)} titleId="desk-next-h" />
 
   {#if errored}
     <p class="load-fail" role="alert"><span>{t('desk.next_error', locale)}</span><Button size="xs" variant="secondary" onclick={onretry}>{t('ui.retry', locale)}</Button></p>

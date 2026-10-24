@@ -39,7 +39,7 @@
   import { accentVarFor } from '$lib/utils/accent';
   import { spaceName } from '$lib/utils/identity';
   import { detectLocale, LOCALE_TAG, t } from '$lib/i18n';
-  import { localeDayMonth, viewerTimeZone } from '$lib/datetime';
+  import { viewerTimeZone } from '$lib/datetime';
   import { addDaysIso, dayKeyInTz, plannerDayHref } from '$lib/planner';
   import { page } from '$app/state';
   import { peekHref } from '$lib/peek';
@@ -605,15 +605,9 @@
     const rest = things.length - 1;
     return rest === 0 ? day : t(rest === 1 ? 'desk.day_and_one' : 'desk.day_and_many', locale, { day, n: rest });
   });
-  // ── The greeting and the clock: what the Hall said before the Desk was the
-  //    way in (ADR-137). Only those two: the Hall's next-moment line, day
-  //    teaser and status sentence said again what «Lo siguiente» and the
-  //    title already say. Greeting, date and time read the one minute tick.
-  const timeFmt = new Intl.DateTimeFormat(LOCALE_TAG[locale], { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
-  let clockTime = $derived(timeFmt.format(clockNow));
-  let dateWords = $derived(
-    `${new Intl.DateTimeFormat(LOCALE_TAG[locale], { weekday: 'long', timeZone: 'UTC' }).format(new Date(`${today}T12:00:00Z`))} · ${localeDayMonth(today, LOCALE_TAG[locale])}`,
-  );
+  // ── The greeting: what the Hall said before the Desk was the way in
+  //    (ADR-137). The date and time it also said are the bar's clock
+  //    (ADR-145, fase 2). It reads the one minute tick.
   let greeting = $derived.by(() => {
     const h = clockNow.getHours();
     return t(h < 6 || h >= 21 ? 'desk.greeting_night' : h < 14 ? 'desk.greeting_morning' : 'desk.greeting_afternoon', locale);
@@ -795,25 +789,23 @@
 <svelte:head><title>{docTitle(t('lens.desk', locale))}</title></svelte:head>
 
 <div class="desk" class:desk--calm={calm.on} aria-busy={busy}>
-  <div class="desk__top">
-    <p class="desk__hello">{greeting}{firstName ? `, ${firstName}` : ''}</p>
-    <LensHeader help="desk">
-      {#snippet title()}
-        <LensTitle text={dayTitle} />
-      {/snippet}
-      {#snippet sub()}
-        <!-- One child, so the sub line's «·» separators stay out of it. -->
-        <span class="desk__subrow">
-          <span class="desk__date eyebrow eyebrow--sub">{dateWords} · <time datetime={clockTime}>{clockTime}</time></span>
-          {#if taskSpaces.length > 0}
-            <button type="button" class="desk__add btn--secondary btn--s" bind:this={addBtn} aria-expanded={composerOpen} onclick={openComposer}
-              >{t('desk.add_task', locale)}</button
-            >
-          {/if}
-        </span>
-      {/snippet}
-    </LensHeader>
-  </div>
+  <!-- GREETING AND DAY ARE ONE LINE (ADR-145, fase 2): one idea in one face,
+       the greeting an ink quieter than the day. They were two serif styles on
+       two lines, over a date and time the clock in the bar already says. -->
+  {#snippet title()}
+    <span class="desk__hello">{greeting}{firstName ? `, ${firstName}` : ''}.</span>
+    <span class="desk__day"><LensTitle text={dayTitle} /></span>
+  {/snippet}
+  <!-- One child, so the sub line's «·» separators stay out of it. Without a
+       space to write a task in, there is no sub line at all. -->
+  {#snippet addTask()}
+    <span class="desk__subrow">
+      <button type="button" class="desk__add btn--secondary btn--s" bind:this={addBtn} aria-expanded={composerOpen} onclick={openComposer}
+        >{t('desk.add_task', locale)}</button
+      >
+    </span>
+  {/snippet}
+  <LensHeader help="desk" {title} sub={taskSpaces.length > 0 ? addTask : undefined} />
 
   <FirstVisitCard section="desk" steps={['desk-next', 'desk-waits', 'desk-more']} />
 
@@ -916,27 +908,15 @@
       flex-direction: column;
       gap: var(--space-l);
     }
-    /* The greeting sits on the title, a step under it: the same display face,
-       quieter, so the day («Hoy, función en Girona») stays the line that speaks. */
-    .desk__top {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-2xs);
-    }
+    /* The greeting opens the title, in its face and size, an ink quieter, so
+       the day («Hoy, función en Girona») stays the part that speaks. */
     .desk__hello {
-      margin: 0;
-      font-family: var(--font-display);
-      font-size: var(--text-l);
-      line-height: 1.2;
       color: var(--text-muted);
-    }
-    .desk__date time {
-      font-variant-numeric: tabular-nums;
     }
     .desk__subrow {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: flex-end;
       gap: var(--space-m);
       inline-size: 100%;
     }

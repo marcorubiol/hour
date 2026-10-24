@@ -5058,3 +5058,44 @@ la leyenda, el ámbito y Cuentas; quitar `SECTION_CONCEPTS` y el `details` de `F
 
 **Re-evaluar cuando** los carriles de cada pantalla estén dentro: contar otra vez los estilos por pantalla, y si con
 calma y sin calma el vacío de Hoy en una línea se entiende.
+
+**Fase 2: las pantallas (2026-10-24, carril `claude/density-screens`; puntos 5, 9 y 10 de la revisión).**
+1. **Planner** (escritorio y móvil). Sale la tira de cifras de la Temporada («12 semanas · 0 funciones · ... · 79
+   noches libres»): el título ya dice el horizonte y cada cifra es un bloque de debajo. Sin ella, en la Temporada el
+   bloque de las dos líneas (cola y ventana) no se pinta salvo que calma o un reparto deducido tengan algo que decir;
+   en Día, Agenda, Mes y Tablero sigue entero. Sus dos tamaños pasan a la escala (`--text-xs` y `--text-2xs`, antes 11
+   y 9,5 px fijos). En una columna, sin nada que decidir, la rejilla ya no reserva la fila vacía de «Por decidir».
+   **Solo móvil:** «＋» y «⋯» van en la fila de las vistas; las cinco palabras, «＋ FECHA» y «⋯» medían 373 px en una
+   fila de 349, así que en el teléfono el botón queda en el cuadrado de «⋯» con su «＋» y la palabra «fecha» es su
+   nombre, oído y no dibujado, y las vistas se acercan a `--space-s`. El tablero pone su dial debajo.
+2. **Cuentas** (escritorio y móvil). Las cuatro cifras sin caja (etiqueta, cifra y, si hay, su frase); la moneda la
+   escribe el idioma («0 €», `fmtCurrency`), no «EUR»; sin frase bajo un cero (por cobrar, por facturar y entra en 30
+   días sin nada; la temporada sin vendido pierde frase, barra y leyenda). Un solo selector de temporada, el `select`
+   nativo con el aspecto de la línea («temporada 26-27 ▾»), en vez de todas en fila y la obra detrás. «Lo que entra»
+   ya no se pintaba vacío (§ 1). La rejilla 2×2 sigue solo en el móvil. **Solo móvil:** el importe de una fila del
+   libro y de «Pide atención» pasa de mono a 14 a la letra del cuerpo con cifras tabulares (con la escala del § 4 pesaba
+   más que la sala); la fecha sigue en mono a 11.
+3. **Hoy** (escritorio y móvil). Fuera la línea fecha · hora (la dice el reloj de la barra) y «Planificador →» de Lo
+   siguiente (la barra de secciones ya va ahí). Saludo y titular en una sola línea y un estilo, el saludo una tinta
+   más clara («Buenas noches, Marco. Hoy no hay nada en el plan»); «+ Tarea» queda solo en la línea de debajo, y sin
+   espacio donde escribir no hay línea. Las tres puertas de La temporada sin caja: filas con una raya entre ellas.
+4. **Fuera de escala.** El triángulo de los estados (`.status-caret`, base.css) pasa de `0.8em` (8,8 px en cada fila
+   de Difusión) a `--text-2xs`: en el móvil coincide con su insignia. Es una pieza compartida (tabla de
+   conversaciones, ficha de función, temporada de Cuentas); solo cambia su tamaño.
+
+**Medido** (mismo método que la fase 1: usuario E2E, antes en producción `7da9de0c`, después en `vite dev` contra la
+Supabase de producción; `build/coordination/density-review/screens/`, fuera de git). Alto a 390: Hoy 844 → 844,
+Planner 1207 → 1066, Difusión 2303 → 2303, Cuentas 981 → 896; a 1440: Planner 1269 → 1202, el resto en el alto de la
+ventana. Estilos de texto en móvil: Hoy 6 → 6, Planner 14 → 13, Difusión 11 → 10, Cuentas 11 → 10; en escritorio
+Hoy 10 → 9, Planner 15 → 14, Difusión 14 → 14, Cuentas 13 → 14 (el triángulo del selector). El objetivo de siete
+solo lo cumple Hoy. Lo que queda por encima es de piezas que este carril no toca: en el Planner la rejilla (días de
+la semana en mono mayúsculas frente a los números, el hoy en negrita, las cifras del título rectas) y la leyenda
+bajo ella (fuera del diálogo «Leer las marcas» faltan gira, fuera y por decidir); en Cuentas las etiquetas y cifras
+de `Chip`; en Difusión, sus filas.
+
+**Cómo se revierte.** 1: devolver el bloque `{#if view === 'overview' ...}` de la línea de ventana y quitar
+`factsDrawn` (`routes/h/planner/+page.svelte`), y la regla móvil de `CalToolbar` y `.ov__grid:not(:has(...))` de
+`SeasonOverview`. 2 y 3: los `{#if}` y estilos de `routes/h/books/+page.svelte`, `routes/h/desk/+page.svelte`,
+`DeskNext` y `DeskSeason`; las claves de i18n borradas (`books.season_word`, `books.fig_*_none`,
+`planner.season_weeks`, `season_perf(s)`, `season_to_decide`, `season_unclosed`) están en la historia de git. 4: el
+`font-size` de `.status-caret`.

@@ -203,9 +203,11 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
     test.setTimeout(60_000);
     await page.goto('/h/planner?scope=s:playwright&view=overview');
     await waitForLoaded(page);
-    const stat = page.locator('.cal__stat', { hasText: /clash/ }).first();
-    await expect(stat.locator('b')).toHaveText(/^\d+$/, { timeout: 15_000 });
-    const n = Number(await stat.locator('b').innerText());
+    // The Season counts its clashes in its «Clashes» block, drawn only with
+    // something in it (ADR-145 § 1; the census line is gone, fase 2).
+    await expect(page.locator('.ov__strip')).toBeVisible({ timeout: 15_000 });
+    const head = page.locator('.ov .block-head', { hasText: /^Clashes/ });
+    const n = (await head.count()) > 0 ? Number(await head.locator('.block-head__n').innerText()) : 0;
 
     await page.goto(DESK);
     await waitForLoaded(page);

@@ -849,5 +849,12 @@
         grid-template-areas: 'strip' 'decide' 'lists';
       }
     }
+    /* In one column, nothing to decide is no row at all: the empty «decide»
+       track still cost a gap over the strip (ADR-145 § 1, fase 2). */
+    @container season (max-width: 56.25rem) {
+      .ov__grid:not(:has(> .ov__decide)) {
+        grid-template-areas: 'strip' 'lists';
+      }
+    }
   }
 </style>
