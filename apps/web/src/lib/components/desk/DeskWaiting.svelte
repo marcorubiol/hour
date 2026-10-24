@@ -224,7 +224,6 @@
   <!-- The region is named by the words alone, not by the count beside them. -->
   <BlockHead
     title={t('desk.band_waiting', locale)}
-    concept="waiting"
     titleId="desk-waits-h"
     focusable
     bind:el={headEl}
@@ -307,8 +306,9 @@
     </div>
     <button type="button" class="more" onclick={() => showAll(false)}>{t('desk.see_less', locale)}</button>
   {:else if waiting.rows.length === 0}
-    <!-- One voice for an empty band (EmptyLine), the one every block uses. -->
-    <EmptyLine text={`${t('desk.caughtup_l', locale)} ${t('desk.caughtup_s', locale)}`} />
+    <!-- Nothing this week, something later: the band is drawn only for its
+         door (ADR-145 § 1; with nothing at all the Desk does not draw it). -->
+    <EmptyLine text={t('desk.all_quiet', locale)} />
     {#if feedCount > waiting.rows.length}
       <button type="button" class="more" onclick={() => showAll(true)}>{t('desk.see_all', locale)} →</button>
     {/if}

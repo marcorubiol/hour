@@ -45,6 +45,7 @@
   import PeekHost from '$lib/components/peek/PeekHost.svelte';
   import { provideCalm } from '$lib/stores/calm.svelte';
   import { providePins, parsePin, type PinKind } from '$lib/stores/pins.svelte';
+  import { provideScopeDoor } from '$lib/scope-door';
   import { scopeUrlToWrite } from '$lib/scope-url';
   import { provideScopes, sameSet as scopesSameSet, type Scope } from '$lib/stores/scopes.svelte';
   import { provideCreation } from '$lib/stores/creation.svelte';
@@ -146,6 +147,8 @@
 
   const lens = provideLens('desk');
   const pins = providePins();
+  // The lens head's scope door on a phone (ADR-145 § 5) opens the same palette.
+  provideScopeDoor(() => openPaletteAdd());
   const scopes = provideScopes();
   const creation = provideCreation();
   // Calm lives in the shell (the toggle sits by the clock); the Desk consumes it.

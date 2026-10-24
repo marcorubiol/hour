@@ -83,7 +83,8 @@ test.describe('the season (ADR-117)', () => {
     await open(page);
     const decide = await page.locator('.ov__decide').boundingBox();
     const strip = await page.locator('.ov__strip').boundingBox();
-    test.skip(!decide, 'the decisions feed is absent here');
+    // At zero the block is not drawn (ADR-145 § 1), and an absent feed draws nothing either.
+    test.skip(!decide, 'nothing to decide here');
     expect(decide!.y).toBeLessThan(strip!.y);
     // No horizontal scroll at phone width.
     const overflow = await page.evaluate(

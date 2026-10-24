@@ -838,6 +838,22 @@
     }
   }
 
+  /* THE PHONE'S TYPE SCALE (ADR-145 § 4). Under 48 rem the content reads at
+     the body size and the labels at 11: a row's text (`--text-s`) takes the
+     body step (`--text-m`, 14) and the two smallest steps meet at 11, so on
+     a phone the scale is label · body · l · xl · xxl and a screen stays
+     within about seven styles. Before, content sat at 11.7, a hair over its
+     labels, and nothing led. The desktop scale does not move: from 48 rem up
+     `--text-s` is 12.8 and the step to the label is already there. To go
+     back, delete this block. */
+  @media (max-width: 47.999rem) {
+    :root {
+      --text-2xs: 0.6875rem;
+      --text-xs: 0.6875rem;
+      --text-s: var(--text-m);
+    }
+  }
+
   :root[data-mode="dark"] {
     color-scheme: dark;
 

@@ -48,11 +48,19 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
     await waitForLoaded(page);
     const main = page.getByRole('main');
     await expect(main.getByRole('heading', { name: /^Next up/ })).toBeVisible();
-    await expect(main.getByRole('heading', { name: /^Waiting for you/ })).toBeVisible();
     await expect(main.getByRole('heading', { name: /^The season/ })).toBeVisible();
-    // «What changed» never disappears (ADR-127 § 4): a line when there is nothing.
-    await expect(page.getByTestId('desk-changed')).toBeVisible();
-    await expect(page.getByTestId('desk-changed')).toContainText(/Since|Nothing new|\d/);
+    // A band with nothing in it is not drawn (ADR-145 § 1, amends ADR-127 § 4):
+    // «Waiting for you» and «What changed» are there with something in them,
+    // and with both quiet Hoy says so once.
+    const waits = main.getByRole('heading', { name: /^Waiting for you/ });
+    const changed = page.getByTestId('desk-changed');
+    const quiet = main.getByText('All caught up.', { exact: true });
+    await expect(waits.or(changed).or(quiet).first()).toBeVisible();
+    if ((await changed.count()) > 0) await expect(changed).not.toContainText(/Nothing new/);
+    if ((await quiet.count()) > 0) {
+      await expect(waits).toHaveCount(0);
+      await expect(changed).toHaveCount(0);
+    }
     await expect(page.getByTestId('door-planner')).toHaveAttribute('href', '/h/planner');
     await expect(page.getByTestId('door-conversations')).toHaveAttribute('href', '/h/conversations?etiqueta=sales');
 
@@ -268,14 +276,13 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
     await page.goto(DESK);
     await waitForLoaded(page);
     const top = async (sel: string) => (await page.locator(sel).first().boundingBox())?.y ?? -1;
-    const next = await top('section.next');
-    const waits = await top('section.waits');
-    const season = await top('section.season');
-    expect(next).toBeGreaterThan(0);
-    expect(waits).toBeGreaterThan(next);
-    expect(season).toBeGreaterThan(waits);
-    const changed = await top('section.changed');
-    expect(changed).toBeGreaterThan(season);
+    // A band with nothing in it is not drawn (ADR-145 § 1): the order holds
+    // among the bands that are there.
+    const order = (
+      await Promise.all(['section.next', 'section.waits', 'section.season', 'section.changed'].map(top))
+    ).filter((y) => y >= 0);
+    expect(order[0]).toBeGreaterThan(0);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);
   });

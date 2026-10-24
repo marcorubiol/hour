@@ -34,13 +34,13 @@
   import { shows } from '$lib/calm';
   import Button from '$lib/components/Button.svelte';
   import EmptyLine from '$lib/components/EmptyLine.svelte';
+  import { blockDrawn } from '$lib/dashboard-blocks';
   import Chip from '$lib/components/Chip.svelte';
   import MoneyInvoices from '$lib/components/MoneyInvoices.svelte';
   import LensHeader from '$lib/components/LensHeader.svelte';
   import LensTitle from '$lib/components/LensTitle.svelte';
   import FirstVisitCard from '$lib/components/FirstVisitCard.svelte';
   import FirstTimeNote from '$lib/components/FirstTimeNote.svelte';
-  import ConceptHint from '$lib/components/ConceptHint.svelte';
   import { cardKey, cardVisible } from '$lib/help';
   import { help } from '$lib/help-seen.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
@@ -508,6 +508,17 @@
   // the server's text is for the logs, not for the reader.
   let bolosError = $derived($bolosQuery.isError);
   let invoicesError = $derived($invoicesQuery.isError);
+  // «Lo que entra» with nothing coming is a legend without a chart: it is not
+  // drawn (ADR-145 § 1).
+  let drawInflow = $derived(
+    blockDrawn({
+      count:
+        inflow.filter((f) => f.undated > 0 || f.months.some((m) => m.expected + m.contracted > 0)).length +
+        position.filter((p) => p.overdue > 0).length,
+      loading,
+      errored: invoicesError,
+    }),
+  );
   let expensesError = $derived($expensesQuery.isError);
   let currencies = $derived([...new Set(bolos.map((b) => b.fee_currency ?? 'EUR'))].sort());
   /** With more than one currency every amount carries its code: a column of numbers invites summing. */
@@ -1003,7 +1014,6 @@
             {:else}
             <div class="figs__row" data-currency={pos.currency}>
               {#if shows('books', 'other_figures', calm.on)}
-              <div class="fig-cell">
               <button type="button" class="fig" data-fig="owed" onclick={() => showLedger('owed')}>
                 <span class="fig__label eyebrow eyebrow--sub">{t('books.fig_owed', locale)}</span>
                 <span class="fig__num stat">{fmtMoneyCompact(pos.owed)}<span class="fig__cur">{pos.currency}</span></span>
@@ -1018,24 +1028,18 @@
                   {/if}
                 </span>
               </button>
-              <ConceptHint concept="to_collect" />
-              </div>
               <button type="button" class="fig" data-fig="to_invoice" onclick={() => showLedger('to_invoice')}>
                 <span class="fig__label eyebrow eyebrow--sub">{t('books.fig_to_invoice', locale)}</span>
                 <span class="fig__num stat">{fmtMoneyCompact(pos.toInvoice)}<span class="fig__cur">{pos.currency}</span></span>
                 <span class="fig__sub">{pos.toInvoiceCount === 0 ? t('books.fig_to_invoice_none', locale) : t(pos.toInvoiceCount === 1 ? 'books.fig_to_invoice_one' : 'books.fig_to_invoice_many', locale, { n: pos.toInvoiceCount })}</span>
               </button>
               {/if}
-              <div class="fig-cell">
               <div class="fig" data-fig="inflow">
                 <span class="fig__label eyebrow eyebrow--sub">{t('books.fig_inflow', locale)}</span>
                 <span class="fig__num stat">{fmtMoneyCompact(pos.inflow30)}<span class="fig__cur">{pos.currency}</span></span>
                 <span class="fig__sub">{pos.inflow30Count === 0 ? t('books.fig_inflow_none', locale) : t(pos.inflow30Count === 1 ? 'books.fig_inflow_one' : 'books.fig_inflow_many', locale, { n: pos.inflow30Count })}</span>
               </div>
-              <ConceptHint concept="next30" />
-              </div>
               {#if shows('books', 'other_figures', calm.on)}
-              <div class="fig-cell">
               <button type="button" class="fig" data-fig="season" onclick={() => showLedger('all')}>
                 <span class="fig__label eyebrow eyebrow--sub">{t('books.fig_season', locale)} {seasonLabel(season)}</span>
                 <span class="fig__num stat">{fmtMoneyCompact(pos.collected)}<span class="fig__cur">{pos.currency}</span></span>
@@ -1054,8 +1058,6 @@
                   <span class="fig__sub">{t('books.fig_holds', locale, { amount: fmtMoneyCompact(pos.holds), n: pos.holdsCount })}</span>
                 {/if}
               </button>
-              <ConceptHint concept="season_books" />
-              </div>
               {/if}
             </div>
             {/if}
@@ -1112,7 +1114,7 @@
           </section>
 
           <!-- 3 · Lo que entra -->
-          {#if shows('books', 'inflow_months', calm.on)}
+          {#if shows('books', 'inflow_months', calm.on) && drawInflow}
           <section class="inflow" aria-label={t('books.inflow', locale)}>
             <BlockHead title={t('books.inflow', locale)} />
             {#if invoicesError}
@@ -1169,8 +1171,6 @@
           {/if}
           <button type="button" role="tab" aria-selected={tab === 'expenses'} onclick={() => (tab = 'expenses')}>{t('books.expenses', locale)}</button>
         </div>
-        <!-- Outside the tablist (only tabs live there): what a «bolo» is. -->
-        <ConceptHint concept="bolo" />
         </div>
 
         {#if tab === 'bolos'}
@@ -1463,6 +1463,8 @@
     .mkey { inline-size: 0.75rem; block-size: 0.5rem; border-radius: var(--radius-xs); }
     .mny__subrow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-m); inline-size: 100%; }
     .mny__subleft { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-xs) var(--space-s); }
+    /* The deal button keeps its one line beside a season list that wraps (the phone scale, ADR-145 § 4). */
+    .mny__subrow > :global([class*="btn--"]) { flex: none; white-space: nowrap; }
     .mny__seasons { display: inline-flex; gap: var(--space-xs); align-items: baseline; }
     .mny__season { appearance: none; border: 0; background: none; padding: 0; font: inherit; cursor: pointer; text-underline-offset: 0.25em; }
     .mny__season:hover { color: var(--text-color); }
@@ -1484,12 +1486,11 @@
       border-radius: var(--radius-m); background: var(--bg-ultra-light); min-inline-size: 0;
     }
     /* A figure and its «i»: the «i» sits in the corner, beside the button, never in it. */
-    .fig-cell { position: relative; display: grid; min-inline-size: 0; }
-    .fig-cell > :global(.hint) { position: absolute; inset-block-start: var(--space-s); inset-inline-end: var(--space-s); margin: 0; }
     button.fig { cursor: pointer; transition: border-color var(--transition); }
     button.fig:hover { border-color: var(--text-faint); }
     .fig__num { display: flex; align-items: baseline; gap: var(--space-2xs); flex-wrap: wrap; }
-    .fig__cur { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); letter-spacing: var(--tracking-s); }
+    /* The unit beside the figure speaks in the body face, not the mono of a head (ADR-145 § 3). */
+    .fig__cur { font-family: var(--font-sans); font-size: var(--text-xs); color: var(--text-muted); }
     .fig__sub { font-size: var(--text-xs); color: var(--text-muted); }
     .fig__danger { color: var(--danger); }
     .fig__bar { display: flex; gap: var(--space-2xs); block-size: var(--dot-m); border-radius: var(--radius-circle); background: var(--bg-light); overflow: hidden; margin-block: var(--space-2xs); }

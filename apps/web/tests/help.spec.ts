@@ -1,7 +1,8 @@
 /**
  * AYUDA CONTEXTUAL, ENFOQUE A: la tarjeta de bienvenida sale una vez, el «?»
  * la vuelve a abrir, «Enséñame» recorre sus pasos con la frase junto a cada
- * bloque, y la «i» abre y cierra con teclado y trae sus líneas.
+ * bloque, el «?» trae lo que decía la «i» de cada cabecera (ADR-145 § 2) y
+ * la «i» que queda abre y cierra y trae sus líneas.
  *
  * Runs in the `playwright` workspace (`?scope=s:playwright`), never muk-cia.
  * What it writes is the fixture login's own `help_seen` row: it empties it at
@@ -65,7 +66,7 @@ test.describe('Contextual help (approach A)', () => {
     await page.reload();
     await waitForLoaded(page);
     // Settled: the dashboard is drawn and the card did not come back.
-    await expect(page.getByRole('main').getByRole('heading', { name: /^Waiting for you/ })).toBeVisible();
+    await expect(page.getByRole('main').getByRole('heading', { level: 1 })).toBeVisible();
     await expect(desk).toHaveCount(0);
   });
 
@@ -150,30 +151,23 @@ test.describe('Contextual help (approach A)', () => {
     await expect(panel).toBeHidden();
   });
 
-  test('a concept’s «i» opens and closes with the keyboard', async ({ page }) => {
+  test('the «?» gathers what each block is, open, and the heads keep no «i»', async ({ page }) => {
     await page.goto(DESK);
     await waitForLoaded(page);
+    // The four lenses carry no «i» in their heads (ADR-145 § 2).
+    await expect(page.getByRole('main').locator('.block-head .hint')).toHaveCount(0);
 
-    const hint = page.getByRole('button', { name: 'What is Waiting for you' });
-    const panel = page.locator(`#${await hint.getAttribute('popovertarget')}`);
-    await expect(hint).toHaveAttribute('aria-expanded', 'false');
-    await expect(panel).toBeHidden();
-
-    await hint.focus();
+    const ask = page.getByRole('button', { name: 'About this section' });
+    await ask.focus();
     await page.keyboard.press('Enter');
-    await expect(hint).toHaveAttribute('aria-expanded', 'true');
-    await expect(panel).toBeVisible();
-    await expect(panel).toContainText('14 days');
+    const desk = card(page, 'desk');
+    const terms = desk.getByTestId('help-terms');
+    await expect(terms).toHaveAttribute('open', '');
+    await expect(terms).toContainText('Waiting for you');
+    await expect(terms).toContainText('14 days');
+    await expect(terms).toContainText('Scope');
 
-    await page.keyboard.press('Escape');
-    await expect(hint).toHaveAttribute('aria-expanded', 'false');
-    await expect(panel).toBeHidden();
-    await expect(hint).toBeFocused();
-
-    // Space opens it too, and a second press closes it: a toggle, like a tap.
-    await page.keyboard.press('Space');
-    await expect(panel).toBeVisible();
-    await page.keyboard.press('Space');
-    await expect(panel).toBeHidden();
+    await desk.getByRole('button', { name: 'Got it' }).click();
+    await expect(desk).toHaveCount(0);
   });
 });

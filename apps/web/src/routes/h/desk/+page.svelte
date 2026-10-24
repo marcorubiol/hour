@@ -81,6 +81,8 @@
     type RecordedPayment,
   } from '$lib/desk-bands';
   import { shows } from '$lib/calm';
+  import { blockDrawn, screenQuiet } from '$lib/dashboard-blocks';
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { daysAgoLabel } from '$lib/conversation';
   import { computePulse } from '$lib/pulse';
   import { createPulseFeeds, pulseSlipContext } from '$lib/pulse-feeds.svelte';
@@ -485,6 +487,18 @@
       hasChanges: changes.length > 0,
     });
   });
+  // A band with nothing in it is not drawn (ADR-145 § 1). «Te espera» is
+  // there while anything waits (its «Ver todo» opens the rest of the feed);
+  // calm draws its own lines. With both bands quiet, Hoy says so once.
+  let waitsState = $derived({
+    count: feed.reduce((n, b) => n + b.runs.reduce((m, r) => m + r.items.length, 0), 0),
+    loading: waitingLoading,
+    errored: waitingErrored,
+  });
+  let changedState = $derived({ count: changes.length, loading: changedLoading, errored: changedErrored });
+  let drawWaits = $derived(calm.on || blockDrawn(waitsState));
+  let drawChanged = $derived(blockDrawn(changedState));
+  let deskQuiet = $derived(!calm.on && screenQuiet([waitsState, changedState]));
   let quietLabel = $derived.by(() => {
     if (!lastVisit) return t('desk.changed_none_first', locale);
     const e = elapsedSince(since, clockNow);
@@ -834,6 +848,10 @@
           {locale}
         />
       </div>
+      {#if deskQuiet}
+        <EmptyLine text={t('desk.all_quiet', locale)} />
+      {/if}
+      {#if drawWaits}
       <div class="slot slot--waits" data-help-step="desk-waits">
         <DeskWaiting
           {waiting}
@@ -856,6 +874,7 @@
           onanswer={answerGoing}
         />
       </div>
+      {/if}
     </div>
 
     <!-- What calm folds here is said in «Te espera»'s last line, which leaves calm. -->
@@ -870,6 +889,7 @@
             {locale}
           />
         </div>
+        {#if drawChanged}
         <div class="slot slot--changed" data-help-step="desk-more">
           <DeskChanged
             {changes}
@@ -883,6 +903,7 @@
             {locale}
           />
         </div>
+        {/if}
       </div>
     {/if}
   </div>

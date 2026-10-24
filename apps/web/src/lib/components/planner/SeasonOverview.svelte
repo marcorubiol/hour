@@ -102,7 +102,7 @@
   import BlockHead from '$lib/components/BlockHead.svelte';
   import CalmLine from '$lib/components/CalmLine.svelte';
   import { shows } from '$lib/calm';
-  import ConceptHint from '$lib/components/ConceptHint.svelte';
+  import { blockDrawn } from '$lib/dashboard-blocks';
   import FirstTimeNote from '$lib/components/FirstTimeNote.svelte';
   import Slip from '$lib/components/planner/Slip.svelte';
   import DecisionBand, {
@@ -185,6 +185,13 @@
   /** Rows that are on the list only for the trip guess: they do not count as
       «sin cerrar», and the head says so instead of the list disagreeing with
       it (uso #14: «2 de 6» over four rows). */
+  // A block with nothing in it is not drawn (ADR-145 § 1): no head, no
+  // «Nada por decidir.». Huecos has its nights whenever the season is free.
+  let drawDecide = $derived(blockDrawn({ count: decisions.length + concurrences.length, loading }));
+  let drawClashes = $derived(blockDrawn({ count: clashes.length, loading }));
+  let drawUnclosed = $derived(blockDrawn({ count: unclosed.length, loading }));
+  let drawGaps = $derived(blockDrawn({ count: gaps.length, loading }));
+  let drawAway = $derived(blockDrawn({ count: away.length, loading }));
   let travelOnly = $derived(unclosed.filter((u) => u.missing.length === 0 && u.travelGuess).length);
   /** The strip's one tab stop: row:col, col 0 is the week's label. Starts on
       today (or the first day when today is not drawn). */
@@ -301,8 +308,8 @@
       {#if shows('planner', 'legend', calm)}
         <p class="strip__key">
           <span><i class="k k--firm"></i>{t('planner.season_key_firm', locale)}</span>
-          <span><i class="k k--option grain"></i>{t('planner.season_key_option', locale)}<ConceptHint concept="hold" /></span>
-          <span><i class="k k--tour"></i><span class="guess">{t('planner.season_key_tour', locale)}</span><ConceptHint concept="guess" /></span>
+          <span><i class="k k--option grain"></i>{t('planner.season_key_option', locale)}</span>
+          <span><i class="k k--tour"></i><span class="guess">{t('planner.season_key_tour', locale)}</span></span>
           <span><i class="k k--away"></i>{t('planner.season_key_away', locale)}</span>
           <span><i class="k k--decide"></i>{t('planner.season_key_decide', locale)}</span>
           <span><i class="k k--clash"></i>{t('planner.season_key_clash', locale)}</span>
@@ -319,15 +326,11 @@
     <!-- 3 · TO DECIDE — the queue OPEN, deciding in place (ADR-095 §6: an act
          is exercised where you are looking). Then the clashes that are not a
          choice between two holds. -->
-    {#if !decisionsAbsent}
+    {#if !decisionsAbsent && (drawDecide || drawClashes)}
       <section class="blk ov__decide" data-help-step="planner-decide">
-        <BlockHead title={t('planner.season_b_decide', locale)} concept="decide" count={n(decisions.length)} alert={decisions.length > 0} />
-        <FirstTimeNote event="first_hold_due" when={!loading && decisions.some((d) => d.urgent)} />
-        {#if loading}
-          <p class="blk__empty" aria-hidden="true"><span class="ghost-line" style:inline-size="60%">&nbsp;</span></p>
-        {:else if decisions.length === 0 && concurrences.length === 0}
-          <p class="blk__empty">{t('planner.season_none_decide', locale)}</p>
-        {:else}
+        {#if drawDecide}
+          <BlockHead title={t('planner.season_b_decide', locale)} count={n(decisions.length)} alert={decisions.length > 0} />
+          <FirstTimeNote event="first_hold_due" when={decisions.some((d) => d.urgent)} />
           <DecisionBand
             {decisions}
             {concurrences}
@@ -340,13 +343,9 @@
             id="season-decisions"
           />
         {/if}
-        <BlockHead title={t('planner.season_b_clashes', locale)} concept="clashes" count={n(clashes.length)} alert={clashes.length > 0} />
-        <FirstTimeNote event="first_clash" when={!loading && clashes.length > 0} />
-        {#if loading}
-          <p class="blk__empty" aria-hidden="true"><span class="ghost-line" style:inline-size="60%">&nbsp;</span></p>
-        {:else if clashes.length === 0}
-          <p class="blk__empty">{t('planner.season_none_clashes', locale)}</p>
-        {:else}
+        {#if drawClashes}
+          <BlockHead title={t('planner.season_b_clashes', locale)} count={n(clashes.length)} alert={clashes.length > 0} />
+          <FirstTimeNote event="first_clash" when={clashes.length > 0} />
           {#each clashes as c (c.key)}
             <button type="button" class="row" onclick={() => onDay(c.day)}>
               <span class="row__when">{day(c.day)}</span>
@@ -361,86 +360,71 @@
       <div class="ov__lists ov__lists--calm">
         <CalmLine text={t('planner.calm_season_rest', locale)} action={t('calm.see_all', locale)} onclick={() => onLeaveCalm?.()} />
       </div>
-    {:else}
+    {:else if drawUnclosed || drawGaps || drawAway}
     <div class="ov__lists" data-help-step="planner-lists">
       <!-- 4 · NOT CLOSED — confirmed, and something is still empty. Facts as
            chips; the trip is a guess and says so in the inference voice. -->
+      {#if drawUnclosed}
       <section class="blk">
         <BlockHead
           title={t('planner.season_b_unclosed', locale)}
-          concept="unclosed"
-          count={loading
-              ? DASH
-              : t('planner.season_unclosed_meta', locale, {
-                  n: facts.unclosed,
-                  m: firmAhead,
-                  w: UNCLOSED_WEEKS,
-                }) + (travelOnly > 0 ? ` · ${t('planner.season_unclosed_guess', locale, { n: travelOnly })}` : '')}
+          count={t('planner.season_unclosed_meta', locale, {
+            n: facts.unclosed,
+            m: firmAhead,
+            w: UNCLOSED_WEEKS,
+          }) + (travelOnly > 0 ? ` · ${t('planner.season_unclosed_guess', locale, { n: travelOnly })}` : '')}
         />
-        <FirstTimeNote event="first_trip_guess" when={!loading && unclosed.some((u) => u.travelGuess)} />
-        {#if loading}
-          <p class="blk__empty" aria-hidden="true"><span class="ghost-line" style:inline-size="60%">&nbsp;</span></p>
-        {:else if unclosed.length === 0}
-          <p class="blk__empty">{t('planner.season_none_unclosed', locale, { n: UNCLOSED_WEEKS })}</p>
-        {:else}
-          {#each unclosed as u (u.id)}
-            <a class="row" class:row--soon={u.soon} href={u.href ?? undefined} data-perf={u.id}>
-              <span class="row__when">{day(u.day)}</span>
-              <span class="row__what">{u.venue}{#if u.city}<small>{u.city}</small>{/if}</span>
-              <span class="row__miss">
-                {#each u.missing as m (m)}<span class="miss">{t(m, locale)}</span>{/each}
-                {#if u.travelGuess}<span class="miss miss--guess guess">{t('planner.season_miss_travel', locale)}</span>{/if}
-              </span>
-            </a>
-          {/each}
-        {/if}
+        <FirstTimeNote event="first_trip_guess" when={unclosed.some((u) => u.travelGuess)} />
+        {#each unclosed as u (u.id)}
+          <a class="row" class:row--soon={u.soon} href={u.href ?? undefined} data-perf={u.id}>
+            <span class="row__when">{day(u.day)}</span>
+            <span class="row__what">{u.venue}{#if u.city}<small>{u.city}</small>{/if}</span>
+            <span class="row__miss">
+              {#each u.missing as m (m)}<span class="miss">{t(m, locale)}</span>{/each}
+              {#if u.travelGuess}<span class="miss miss--guess guess">{t('planner.season_miss_travel', locale)}</span>{/if}
+            </span>
+          </a>
+        {/each}
       </section>
+      {/if}
 
       <!-- 5 · HOLES — free runs of three nights or more, to sell. -->
+      {#if drawGaps}
       <section class="blk">
-        <BlockHead title={t('planner.season_b_gaps', locale)} concept="gaps" count={t('planner.season_gaps_meta', locale, { n: GAP_MIN_NIGHTS })} />
-        {#if loading}
-          <p class="blk__empty" aria-hidden="true"><span class="ghost-line" style:inline-size="60%">&nbsp;</span></p>
-        {:else if gaps.length === 0}
-          <p class="blk__empty">{t('planner.season_none_gaps', locale, { n: GAP_MIN_NIGHTS })}</p>
-        {:else}
-          {#each gaps as g (g.from)}
-            <button type="button" class="row" onclick={() => onGap(g.from)}>
-              <span class="row__when">{range(g.from, g.to)}</span>
-              <span class="row__what">{t('planner.season_nights', locale, { n: g.nights })}</span>
-              {#each g.away as a (a.key)}
-                <span class="row__note" class:guess={a.tentative}
-                  >{t(a.tentative ? 'planner.season_gap_away_t' : 'planner.season_gap_away', locale, {
-                    who: a.who,
-                    when: range(a.from, a.to),
-                  })}</span
-                >
-              {/each}
-            </button>
-          {/each}
-        {/if}
+        <BlockHead title={t('planner.season_b_gaps', locale)} count={t('planner.season_gaps_meta', locale, { n: GAP_MIN_NIGHTS })} />
+        {#each gaps as g (g.from)}
+          <button type="button" class="row" onclick={() => onGap(g.from)}>
+            <span class="row__when">{range(g.from, g.to)}</span>
+            <span class="row__what">{t('planner.season_nights', locale, { n: g.nights })}</span>
+            {#each g.away as a (a.key)}
+              <span class="row__note" class:guess={a.tentative}
+                >{t(a.tentative ? 'planner.season_gap_away_t' : 'planner.season_gap_away', locale, {
+                  who: a.who,
+                  when: range(a.from, a.to),
+                })}</span
+              >
+            {/each}
+          </button>
+        {/each}
       </section>
+      {/if}
 
       <!-- 6 · OUT — absences and tours that touch the twelve weeks. -->
+      {#if drawAway}
       <section class="blk">
         <BlockHead title={t('planner.season_b_away', locale)} />
-        {#if loading}
-          <p class="blk__empty" aria-hidden="true"><span class="ghost-line" style:inline-size="60%">&nbsp;</span></p>
-        {:else if away.length === 0}
-          <p class="blk__empty">{t('planner.season_none_away', locale)}</p>
-        {:else}
-          {#each away as a (a.key)}
-            <button type="button" class="row" onclick={() => onDay(a.from)}>
-              <span class="row__when">{range(a.from, a.to)}</span>
-              <span class="row__what" class:row__what--tent={a.tentative}
-                >{a.who}{#if a.tentative}?{/if}{#if a.what}<small>{a.what}</small>{/if}{#if a.legs}<small class="guess row__legs"
-                    >{a.legs}</small
-                  >{/if}</span
-              >
-            </button>
-          {/each}
-        {/if}
+        {#each away as a (a.key)}
+          <button type="button" class="row" onclick={() => onDay(a.from)}>
+            <span class="row__when">{range(a.from, a.to)}</span>
+            <span class="row__what" class:row__what--tent={a.tentative}
+              >{a.who}{#if a.tentative}?{/if}{#if a.what}<small>{a.what}</small>{/if}{#if a.legs}<small class="guess row__legs"
+                  >{a.legs}</small
+                >{/if}</span
+            >
+          </button>
+        {/each}
       </section>
+      {/if}
     </div>
     {/if}
   </div>

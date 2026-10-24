@@ -58,6 +58,20 @@ export const CONCEPTS = [
 ] as const;
 export type HelpConcept = (typeof CONCEPTS)[number];
 
+/**
+ * Lo que explica el «?» de cada sección, en el orden de sus bloques en la
+ * pantalla (ADR-145 § 2). Las cuatro lentes no llevan «i» en sus cabeceras:
+ * su texto vive aquí, en la tarjeta que abre el «?». Las fichas y los
+ * formularios conservan su «i», junto al dato.
+ */
+export const SECTION_CONCEPTS: Record<HelpSection, readonly HelpConcept[]> = {
+  desk: ['scope', 'guess', 'waiting', 'changed'],
+  planner: ['scope', 'hold', 'guess', 'decide', 'clashes', 'unclosed', 'gaps'],
+  conversations: ['scope', 'due', 'hot', 'season_sales', 'cold', 'relation'],
+  team: ['scope'],
+  books: ['scope', 'to_collect', 'next30', 'season_books', 'bolo'],
+};
+
 /** Los avisos de primera vez (textos.md § 4). */
 export const EVENTS = [
   'first_going',
@@ -101,6 +115,8 @@ export function conceptKeys(concept: HelpConcept): ConceptKeys {
     }));
     keys.more = 'help.concept.relation_more';
   }
+  // The season bar's instruction, out of its head (ADR-145 § 2).
+  if (concept === 'season_sales') keys.more = 'help.concept.season_sales_tap';
   return keys;
 }
 
