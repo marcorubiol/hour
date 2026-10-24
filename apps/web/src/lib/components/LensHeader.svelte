@@ -44,7 +44,7 @@
       {/if}
     </div>
     {#if section}
-      <span class="lenshead__tools">
+      <span class="lenshead__tools lenshead__tools--help">
         <button
           type="button"
           class="lenshead__help"
