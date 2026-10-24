@@ -78,7 +78,7 @@
         <span class="scopebar__lead">{t('planner.lanes_scope', locale)}<ConceptHint concept="scope" /></span>
         <span class="scopebar__all" title={t('shell.everything_all', locale)}>{t('shell.everything', locale)}</span>
       </span>
-      <button type="button" class="scopebar__add" onclick={openPaletteAdd}>
+      <button type="button" class="scopebar__add hit" onclick={openPaletteAdd}>
         {t('shell.narrow', locale)}
       </button>
     {:else}
@@ -98,29 +98,29 @@
           >
         </span>
       {/each}
-      <button type="button" class="scopebar__add" onclick={openPaletteAdd}>
+      <button type="button" class="scopebar__add hit" onclick={openPaletteAdd}>
         {t('shell.add', locale)}
       </button>
       <span class="scopebar__right">
         {#if exactSaved}
           <button
             type="button"
-            class="scopebar__save"
+            class="scopebar__save hit"
             onclick={() => scopes.remove(pins.pins)}>× {t('shell.delete_scope', locale)}</button
           >
         {:else if isModified}
-          <button type="button" class="scopebar__save" onclick={updateScope}
+          <button type="button" class="scopebar__save hit" onclick={updateScope}
             >↺ {t('shell.update_scope', locale)}</button
           >
-          <button type="button" class="scopebar__save" onclick={saveCurrentScope}
+          <button type="button" class="scopebar__save hit" onclick={saveCurrentScope}
             >☆ {t('shell.save_new_scope', locale)}</button
           >
         {:else}
-          <button type="button" class="scopebar__save" onclick={saveCurrentScope}
+          <button type="button" class="scopebar__save hit" onclick={saveCurrentScope}
             >☆ {t('shell.save_scope', locale)}</button
           >
         {/if}
-        <button type="button" class="scopebar__save" onclick={copyScopeLink}
+        <button type="button" class="scopebar__save hit" onclick={copyScopeLink}
           >⧉ {t('shell.copy_link', locale)}</button
         >
         <button type="button" class="scopebar__clear" onclick={clearScope}
@@ -217,7 +217,6 @@
     .scopebar__save {
       white-space: nowrap;
       flex: none;
-      min-block-size: var(--touch-target);
     }
   }
   .tok {

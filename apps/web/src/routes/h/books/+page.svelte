@@ -1599,7 +1599,9 @@
       .book, .book tbody { display: block; }
       .book__row {
         display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2xs) var(--space-s);
-        padding-block: var(--space-xs); border-block-end: var(--line-hairline) solid var(--border-color-light);
+        /* A row of two lines in a hand needs the air a table row gets from
+           its cells on a desk (Marco, 24-10: «todo apretado»). */
+        padding-block: var(--space-s); border-block-end: var(--line-hairline) solid var(--border-color-light);
       }
       .book__row td { padding: 0; border: 0; }
       .book__venue { grid-column: 1; grid-row: 1; }
@@ -1611,7 +1613,10 @@
       .book__group, .book__sheet { display: block; }
       .book__group th, .book__sheet td { display: block; }
       .sheet { grid-template-columns: 1fr; }
-      .sheet__acts { flex-direction: column; align-items: stretch; }
+      /* The bolo's acts stay a row that wraps, as on a desk: three buttons
+         stacked full-width were the loudest thing in the ledger. */
+      .sheet__acts { gap: var(--space-s); }
+      .att__row { padding-block: var(--space-s); }
       .mny__expenses li { grid-template-columns: 1fr auto; gap: var(--space-2xs) var(--space-s); }
       .mny__expense-description { grid-column: 1 / -1; }
       .mny__expenses strong { grid-column: 2; grid-row: 1; }

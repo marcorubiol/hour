@@ -176,9 +176,13 @@
 
   /* A phone: the bar at the foot of the screen (ADR-140). The four words,
      no icons, in the app's mono voice. Each link is a whole cell of the row
-     (the target); the word inside wears the same marks as on a desktop:
-     filled here, a stroke where you came from. The home pill and the
-     segmented group dissolve into that one row, over the safe area. */
+     (the target, 44px tall, invisible); the cells grow alike, so the air
+     between the words is the same everywhere. The word is marked as the
+     ledger's tabs mark theirs (Cuentas): ink and the rule that underlines a
+     choice (--line), never a fill, which crowded its neighbours (Marco,
+     24-10); where you came from, the same rule in the origin's faint ink.
+     The bar keeps its own air above and under the row (--lensbar-pad), and
+     the home indicator's inset is added under that, never folded into it. */
   @media (max-width: 47.999rem) {
     .lensswitch-wrap {
       position: fixed;
@@ -188,8 +192,8 @@
       display: flex;
       align-items: stretch;
       gap: 0;
-      padding-inline: var(--space-2xs);
-      padding-block-end: env(safe-area-inset-bottom);
+      padding-block: var(--lensbar-pad) var(--lensbar-foot);
+      padding-inline: max(var(--space-2xs), env(safe-area-inset-left)) max(var(--space-2xs), env(safe-area-inset-right));
       background: var(--bg);
       border-block-start: var(--line-hairline) solid var(--border-color-light);
     }
@@ -220,24 +224,22 @@
     }
     .lensswitch__word {
       padding-block: var(--space-2xs);
-      padding-inline: var(--space-xs);
-      border-radius: var(--radius-circle);
+      border-block-end: var(--line) solid transparent;
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       letter-spacing: var(--mono-letter-spacing);
       text-transform: uppercase;
       transition:
-        background var(--transition),
         color var(--transition),
-        box-shadow var(--transition);
+        border-color var(--transition);
     }
     .is-on .lensswitch__word {
-      background: var(--text-color);
-      color: var(--bg);
+      color: var(--text-color);
+      border-block-end-color: var(--text-color);
     }
     .is-origin .lensswitch__word {
       color: var(--text-color);
-      box-shadow: inset 0 0 0 var(--line-hairline) var(--lens-origin-stroke);
+      border-block-end-color: var(--lens-origin-stroke);
     }
   }
 </style>

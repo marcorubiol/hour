@@ -76,7 +76,7 @@
     {#each VIEW_ORDER as v (v)}
       <button
         type="button"
-        class="cal__view"
+        class="cal__view hit"
         class:cal__view--on={view === v}
         aria-pressed={view === v}
         onclick={() => onSetView(v)}>{t(`planner.view_${v}`, locale)}</button
@@ -90,7 +90,7 @@
       {#each ['scope', 'person'] as const as g (g)}
         <button
           type="button"
-          class="cal__dial-v"
+          class="cal__dial-v hit"
           class:cal__dial-v--on={laneAxis === g}
           aria-pressed={laneAxis === g}
           onclick={() => onSetLaneAxis(g)}>{t(`planner.lanes_${g}`, locale)}</button
@@ -107,13 +107,13 @@
        the row's own height, because a control that outgrows its band starts
        announcing itself instead of waiting to be used. -->
   {#if onCreate}
-    <button type="button" class="cal__add" onclick={onCreate}
+    <button type="button" class="cal__add hit" onclick={onCreate}
       >＋ <span>{t('planner.date_word', locale)}</span></button
     >
   {/if}
   <Menu
     align="end"
-    triggerClass="cal__kebab"
+    triggerClass="cal__kebab hit"
     label={t('planner.more', locale)}
     items={[
       { label: t('planner.read_marks', locale), onclick: onReadMarks },
@@ -135,16 +135,8 @@
 <style>
   @layer components {
     /* A finger's target on touch (móvil #5): 28px squares and 17px words
-       were under half of it. */
-    .cal__add,
-    .cal__view,
-    .cal__dial-v,
-    .cal__toolbar :global(.cal__kebab) {
-      min-block-size: var(--touch-target);
-    }
-    .cal__toolbar :global(.cal__kebab) {
-      min-inline-size: var(--touch-target);
-    }
+       were under half of it. The target reaches past them (`.hit`,
+       base.css); the squares and the words keep the row's height. */
     @media (max-width: 47.999rem) {
       /* TWO ROWS, NOT THREE (móvil #4): the words that name the drawing take
          the first row; the two acts the second. */
