@@ -74,6 +74,7 @@
     elapsedSince,
     goingAsks,
     paymentNews,
+    paymentsSinceEarlier,
     plannerDoor,
     sinceInstant,
     todayThings,
@@ -431,6 +432,12 @@
       queryKey: ['desk-payments', since, workspaces.map((w) => w.id)] as const,
       enabled: readMoney && workspaces.length > 0,
       retry: false,
+      placeholderData: () =>
+        paymentsSinceEarlier(
+          queryClient.getQueriesData<{ items: RecordedPayment[] }>({ queryKey: ['desk-payments'] }),
+          since,
+          workspaces.map((w) => w.id),
+        ),
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         fetchJSON<{ items: RecordedPayment[] }>(
           `/api/payments?${new URLSearchParams({ workspace_ids: workspaces.map((w) => w.id).join(','), recorded_since: since, others: '1', limit: '50' })}`,

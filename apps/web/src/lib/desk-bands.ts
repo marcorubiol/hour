@@ -144,6 +144,29 @@ export interface RecordedPayment {
   created_at: string;
 }
 
+/**
+ * The Desk's payments are asked «since your last visit», an instant that
+ * moves with every visit, so each open is a new query and the device cache
+ * (ADR-144) never holds this one. An earlier visit's answer holds what it
+ * needs: the newest one asked for an earlier instant over the same spaces,
+ * cut to this instant, paints while the real answer is on the wire.
+ */
+export function paymentsSinceEarlier(
+  cached: readonly (readonly [readonly unknown[], { readonly items: readonly RecordedPayment[] } | undefined])[],
+  since: string,
+  workspaceIds: readonly string[],
+): { items: RecordedPayment[] } | undefined {
+  const at = Date.parse(since);
+  const ids = JSON.stringify(workspaceIds);
+  let best: { from: number; items: readonly RecordedPayment[] } | undefined;
+  for (const [key, data] of cached) {
+    const from = typeof key[1] === 'string' ? Date.parse(key[1]) : NaN;
+    if (!data || !(from <= at) || JSON.stringify(key[2]) !== ids) continue;
+    if (!best || from > best.from) best = { from, items: data.items };
+  }
+  return best && { items: best.items.filter((p) => Date.parse(p.created_at) > at) };
+}
+
 /** «Cobrado X»: a payment someone else recorded, named by its deal. */
 interface PaymentNews {
   id: string;

@@ -1,5 +1,5 @@
 /**
- * Offline — the IndexedDB schema: the query cache kept on the device
+ * Offline: the IndexedDB schema, with the query cache kept on the device
  * (ADR-144, `query-cache.ts`) + the write queue (D-PRE-08).
  *
  * The write queue is still schema only: no mutation is enqueued yet. It lands

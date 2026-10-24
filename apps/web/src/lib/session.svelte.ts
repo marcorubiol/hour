@@ -52,6 +52,8 @@ let probe: Promise<SessionUser | null> | null = null;
  * limit), which says nothing about the session.
  */
 let outcome: 'ok' | 'denied' | 'unreachable' | null = null;
+/** The frame painted from the device cache: its reads are refreshes, and wait for the probe. */
+let paintedFromCache = false;
 /** The boot probe while it is on the wire (it renews a stale cookie itself). */
 let probing: Promise<SessionUser | null> | null = null;
 let refreshing: Promise<boolean> | null = null;
@@ -127,10 +129,11 @@ export function probeOutcome(): 'ok' | 'denied' | 'unreachable' | null {
  */
 export function adoptCachedUser(user: SessionUser): void {
   session.user ??= user;
+  paintedFromCache = true;
 }
 
 /**
- * Login just returned the user — seed the store without a second probe. The
+ * Login just returned the user: seed the store without a second probe. The
  * device cache stays only if it is this user's: await before showing data.
  */
 export function setSessionUser(user: SessionUser | null): Promise<void> {
@@ -151,6 +154,7 @@ export function clearSession(): Promise<void> {
   session.ready = true;
   probe = null;
   outcome = null;
+  paintedFromCache = false;
   return wipeQueryCache();
 }
 
@@ -187,8 +191,15 @@ export function refreshSession(): Promise<boolean> {
  * access cookie is known to be dead. Does not wait for the boot probe: on a
  * live session that would put a round trip before every first read; a read
  * that loses the race gets a 401 and joins the probe (`recoverSession`).
+ * Except when the frame painted from the device cache (ADR-144): the screen
+ * already shows data, so a read waits the probe's round trip instead of
+ * collecting a 401 each on the first open after the hour.
  */
 export async function sessionReady(): Promise<void> {
+  if (paintedFromCache && probing) {
+    await probing;
+    return;
+  }
   if (refreshing) {
     await refreshing;
     return;

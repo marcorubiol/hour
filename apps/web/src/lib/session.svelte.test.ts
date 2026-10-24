@@ -230,4 +230,18 @@ describe('probe outcome (device cache, ADR-144)', () => {
     s.adoptCachedUser({ sub: 'cached', email: null, name: null });
     expect(s.session.user?.sub).toBe('u1');
   });
+
+  test('painted from the cache, a read waits for the probe instead of collecting a 401', async () => {
+    const probe = deferred<Response>();
+    route((url) => (url.endsWith('/api/auth/session') ? probe.promise : json({ ok: true })));
+    const s = await load();
+    void s.ensureSession();
+    s.adoptCachedUser({ sub: 'u1', email: null, name: null });
+    const read = s.fetchJSON('/api/thing');
+    await Promise.resolve();
+    expect(count('/api/thing')).toBe(0);
+    probe.resolve(json({ user, expiresAt: Date.now() + HOUR }));
+    await read;
+    expect(count('/api/thing')).toBe(1);
+  });
 });

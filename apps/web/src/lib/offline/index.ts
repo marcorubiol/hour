@@ -1,5 +1,5 @@
 /**
- * Offline — IndexedDB schema (D-PRE-08), the query cache kept on the device
+ * Offline: IndexedDB schema (D-PRE-08), the query cache kept on the device
  * (ADR-144) and Service Worker registration (D-PRE-13). Browser-only.
  */
 

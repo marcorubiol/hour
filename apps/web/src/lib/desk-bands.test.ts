@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { changedBandLoading, changedLensChip, changesSince, elapsedSince, goingAsks, paymentNews, plannerDoor, sinceInstant, todayThings, CHANGED_ROWS } from './desk-bands';
+import { changedBandLoading, changedLensChip, changesSince, elapsedSince, goingAsks, paymentNews, paymentsSinceEarlier, plannerDoor, sinceInstant, todayThings, CHANGED_ROWS } from './desk-bands';
 import type { MoneyBolo } from './money';
 
 describe('changedBandLoading', () => {
@@ -268,5 +268,25 @@ describe('todayThings — the title says the day, not the debt (ADR-139 § 6)', 
       { of: 'date', kind: 'other', label: 'Reunió de producció', where: null },
     ]);
     expect(todayThings(input([perf('opt', TODAY, { status: 'proposed' })], []), TODAY)).toEqual([]);
+  });
+});
+
+describe('paymentsSinceEarlier', () => {
+  const pay = (id: string, created_at: string) => ({ id, invoice_id: null, bolo_id: null, amount: 1, created_at });
+  const ws = ['w1'];
+  it('the newest earlier answer over the same spaces, cut to this instant', () => {
+    const cached = [
+      [['desk-payments', '2026-10-01T00:00:00.000Z', ws], { items: [pay('old', '2026-10-02T00:00:00Z')] }],
+      [
+        ['desk-payments', '2026-10-20T00:00:00.000Z', ws],
+        { items: [pay('a', '2026-10-21T00:00:00+00:00'), pay('b', '2026-10-23T00:00:00+00:00')] },
+      ],
+      [['desk-payments', '2026-10-23T12:00:00.000Z', ['w2']], { items: [pay('other', '2026-10-24T00:00:00Z')] }],
+      [['desk-payments', '2026-10-25T00:00:00.000Z', ws], { items: [pay('future', '2026-10-26T00:00:00Z')] }],
+    ] as const;
+    expect(paymentsSinceEarlier(cached, '2026-10-22T00:00:00.000Z', ws)?.items.map((p) => p.id)).toEqual(['b']);
+  });
+  it('nothing earlier, no placeholder', () => {
+    expect(paymentsSinceEarlier([], '2026-10-22T00:00:00.000Z', ws)).toBeUndefined();
   });
 });
