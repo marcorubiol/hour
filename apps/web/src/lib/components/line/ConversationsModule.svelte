@@ -14,6 +14,7 @@
    */
 
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
+  import { refreshAfterWrite } from '$lib/query-refresh';
   import ConversationTable from '$lib/components/ConversationTable.svelte';
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
@@ -86,7 +87,7 @@
       }),
     onSuccess: (body) => {
       addOpen = false;
-      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      void refreshAfterWrite(queryClient, ['conversations']);
       void queryClient.invalidateQueries({ queryKey: ['organizations'] });
       void queryClient.invalidateQueries({ queryKey: ['line-eng-stats'] });
       const id = (body as { conversation?: { id?: string } } | null)?.conversation?.id;
@@ -96,7 +97,7 @@
         undo: id
           ? async () => {
               await mutateJSON('DELETE', `/api/conversations/${id}`);
-              await queryClient.invalidateQueries({ queryKey: ['conversations'] });
+              await refreshAfterWrite(queryClient, ['conversations']);
               await queryClient.invalidateQueries({ queryKey: ['line-eng-stats'] });
             }
           : undefined,

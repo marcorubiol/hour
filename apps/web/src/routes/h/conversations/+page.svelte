@@ -72,6 +72,7 @@
   import NextActionDialog from '$lib/components/NextActionDialog.svelte';
   import NotNowDialog from '$lib/components/NotNowDialog.svelte';
   import { useQueryClient } from '@tanstack/svelte-query';
+  import { refreshAfterWrite } from '$lib/query-refresh';
   import {
     MATCHING_MAX,
     bulkBodies,
@@ -474,7 +475,7 @@
 
   function refreshLists() {
     for (const key of ['conversations', 'conversation-overview', 'conversation-feed', 'line-eng-stats', 'conversation']) {
-      void queryClient.invalidateQueries({ queryKey: [key] });
+      void refreshAfterWrite(queryClient, [key]);
     }
   }
 

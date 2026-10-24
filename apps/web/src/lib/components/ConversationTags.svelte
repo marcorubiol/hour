@@ -11,6 +11,7 @@
 
   import BlockHead from '$lib/components/BlockHead.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
+  import { refreshAfterWrite } from '$lib/query-refresh';
   import { mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
   import Checkbox from '$lib/components/Checkbox.svelte';
@@ -60,7 +61,7 @@
       }),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ['conversation'] });
-      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      void refreshAfterWrite(queryClient, ['conversations']);
       void queryClient.invalidateQueries({ queryKey: ['conversation-overview'] });
     },
   });

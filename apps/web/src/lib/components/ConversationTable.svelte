@@ -46,6 +46,7 @@
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import ConversationsImportEmpty from '$lib/components/ConversationsImportEmpty.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
+  import { refreshAfterWrite } from '$lib/query-refresh';
   import { untrack } from 'svelte';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
@@ -260,7 +261,7 @@
       }
     },
     onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      void refreshAfterWrite(queryClient, ['conversations']);
       // Line header funnel stats (ADR-056) read the same rows.
       void queryClient.invalidateQueries({ queryKey: ['line-eng-stats'] });
       void queryClient.invalidateQueries({ queryKey: ['conversation-overview'] });

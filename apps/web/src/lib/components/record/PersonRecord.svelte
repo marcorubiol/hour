@@ -12,6 +12,7 @@
   import StateBadge from '$lib/components/StateBadge.svelte';
   import Acquaintance from '$lib/components/Acquaintance.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
+  import { refreshAfterWrite } from '$lib/query-refresh';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
@@ -266,7 +267,7 @@
       void queryClient.invalidateQueries({
         queryKey: ['person', contextWorkspaceId, slug],
       });
-      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      void refreshAfterWrite(queryClient, ['conversations']);
       const id = (body?.conversation as { id?: string } | undefined)?.id;
       toastCreated({
         locale,
@@ -275,7 +276,7 @@
           ? async () => {
               await mutateJSON('DELETE', `/api/conversations/${id}`);
               await queryClient.invalidateQueries({ queryKey: ['person', contextWorkspaceId, slug] });
-              await queryClient.invalidateQueries({ queryKey: ['conversations'] });
+              await refreshAfterWrite(queryClient, ['conversations']);
             }
           : undefined,
       });
