@@ -743,7 +743,10 @@ export interface LastMailout {
   simulated: boolean;
 }
 
-/** `GET /api/conversations/overview`. */
-export interface OverviewResponse extends ConversationOverview {
+/** `GET /api/conversations/overview`: the blocks, without the last mailout (2026-10-24). */
+export type OverviewResponse = ConversationOverview;
+
+/** `GET /api/conversations/last-mailout`: its own read, so the panel does not wait for it. */
+export interface LastMailoutResponse {
   last_mailout: LastMailout | null;
 }

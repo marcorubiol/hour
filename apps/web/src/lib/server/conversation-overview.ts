@@ -1,7 +1,9 @@
 /**
  * Las lecturas del dashboard de Conversations (ADR-117): las conversaciones
- * vivas del alcance con su último evento embebido, los días de sus funciones y
- * el último envío. Las lee `GET /api/conversations/overview` (el panel). Los
+ * vivas del alcance con su último evento embebido y los días de sus funciones,
+ * que lee `GET /api/conversations/overview` (el panel), y el último envío, que
+ * lee aparte `GET /api/conversations/last-mailout` (2026-10-24: el panel ya no
+ * lo espera). Los
  * filtros de la lista (`?turno=`/`?temp=`/`?temporada=`…) los resuelve
  * `conversation_feed` con las mismas reglas en SQL (plan de la lista, fase 3);
  * el test RLS `conversation-feed-list.test.ts` compara las dos lecturas.
@@ -32,6 +34,13 @@ interface OverviewScope {
 /** Lo que devuelve PostgREST hasta `max_rows` (config.toml); se pide por páginas. */
 const PAGE = 1000;
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Una lista de ids de la query (`project_ids=a,b`): únicos, solo los uuid. */
+export function parseIds(raw: string | null): string[] {
+  return raw ? [...new Set(raw.split(',').map((x) => x.trim()).filter((x) => UUID.test(x)))] : [];
+}
+
 /** El alcance de la barra lateral: unión de proyectos y espacios; sin ninguno, todo. */
 export function setScope(search: URLSearchParams, projectIds: string[], workspaceIds: string[]): void {
   if (projectIds.length > 0 && workspaceIds.length > 0) {
@@ -60,6 +69,11 @@ export function setLastTurnEmbed(search: URLSearchParams): void {
   search.set('last_turn.metadata->>auto', 'is.null');
   search.set('last_turn.order', 'occurred_at.desc');
   search.set('last_turn.limit', '1');
+  setLastInEmbed(search);
+}
+
+/** Los filtros de `LAST_IN_EMBED` solo: el último que vino de fuera. */
+function setLastInEmbed(search: URLSearchParams): void {
   search.set('last_in.direction', 'eq.inbound');
   search.set('last_in.kind', `in.(${TURN_KINDS.join(',')})`);
   search.set('last_in.metadata->>auto', 'is.null');
@@ -233,13 +247,13 @@ export async function loadConversationBolos(
   return out;
 }
 
-/** El envío más reciente que salió (o está saliendo) en el alcance, con sus cifras. */
-export async function loadLastMailout(
-  env: SupabaseEnv,
-  jwt: string,
-  scope: OverviewScope,
-  rows: readonly OverviewInput[],
-): Promise<LastMailout | null> {
+/**
+ * El envío más reciente que salió (o está saliendo) en el alcance, con sus
+ * cifras. Lectura propia (`GET /api/conversations/last-mailout`), fuera del
+ * panel: cuesta lo que la RLS de `mailout` (un `has_permission` por fila de la
+ * tabla, medido 1,1 s con 637 filas el 2026-10-24), y Hoy no la espera.
+ */
+export async function loadLastMailout(env: SupabaseEnv, jwt: string, scope: OverviewScope): Promise<LastMailout | null> {
   // The 4 latest, and the first with a recipient you can read: a mailout
   // whose recipients are all conversations you no longer see (deleted, or
   // someone else's private ones) would say «done, 0 recipients» and name a
@@ -253,25 +267,29 @@ export async function loadLastMailout(
   setScope(search, scope.projectIds, scope.workspaceIds);
   type Row = Omit<LastMailout, 'figures' | 'simulated'> & { mail_domain_id: string | null };
   const { data } = await pgGet<Row>(env, 'mailout', jwt, { search });
-  let m: Row | undefined;
-  let recipients: { data: (MailoutRecipientLite & { recipient_id: string })[] } = { data: [] };
-  for (const candidate of data) {
-    recipients = await pgPostRpc<MailoutRecipientLite & { recipient_id: string }>(env, 'mailout_preview', jwt, {
-      p_id: candidate.id,
-    });
-    if (recipients.data.length > 0) {
-      m = candidate;
-      break;
-    }
-  }
-  if (!m) return null;
+  // The four previews at once; the first in order with someone in it wins.
+  const previews = await Promise.all(
+    data.map((candidate) =>
+      pgPostRpc<PreviewRecipient>(env, 'mailout_preview', jwt, { p_id: candidate.id }).then((r) => r.data),
+    ),
+  );
+  const at = previews.findIndex((p) => p.length > 0);
+  if (at < 0) return null;
+  const m = data[at];
+  const recipients = previews[at];
   const { mail_domain_id, ...rest } = m;
-  const domain = mail_domain_id
-    ? (await pgGet<{ provider: string }>(env, 'mail_domain', jwt, { search: { select: 'provider', id: `eq.${mail_domain_id}` } })).data[0]
-    : undefined;
+  const [domain, withSent, lastIn] = await Promise.all([
+    mail_domain_id
+      ? pgGet<{ provider: string }>(env, 'mail_domain', jwt, {
+          search: { select: 'provider', id: `eq.${mail_domain_id}` },
+        }).then((r) => r.data[0])
+      : undefined,
+    withSentAt(env, jwt, m.id, recipients),
+    loadLastIn(env, jwt, scope, [...new Set(recipients.map((r) => r.conversation_id))]),
+  ]);
   return {
     ...rest,
-    figures: mailoutFigures(await withSentAt(env, jwt, m.id, recipients.data), m.queued_at, lastInMap(rows)),
+    figures: mailoutFigures(withSent, m.queued_at, lastIn),
     // The rule of the mailout screen (`route.ts`): its domain's provider, or the default one.
     simulated: (domain?.provider ?? defaultProviderKind(env as Partial<MailoutEnv>)) === 'simulator',
   };
@@ -285,6 +303,38 @@ async function withSentAt(env: SupabaseEnv, jwt: string, mailoutId: string, reci
   });
   const sentById = new Map(sentAt.data.map((r) => [r.id, r.sent_at]));
   return recipients.map((r) => ({ ...r, sent_at: sentById.get(r.recipient_id) ?? null }));
+}
+
+/** Ids per `id=in.(…)` read: about 5.5 kB of URL, under any proxy's limit. */
+const IDS_PER_READ = 150;
+
+/**
+ * The last inbound word of some conversations, read as the panel reads it:
+ * live, readable (RLS) and in the scope, or absent, which never counts as a
+ * reply. Before the split the figures took it from the panel's rows; these
+ * are the same rows, narrowed to the mailout's recipients.
+ */
+async function loadLastIn(
+  env: SupabaseEnv,
+  jwt: string,
+  scope: OverviewScope,
+  ids: readonly string[],
+): Promise<Map<string, string>> {
+  const batches: string[][] = [];
+  for (let i = 0; i < ids.length; i += IDS_PER_READ) batches.push(ids.slice(i, i + IDS_PER_READ));
+  const reads = await Promise.all(
+    batches.map((batch) => {
+      const search = new URLSearchParams({
+        select: `id,${LAST_IN_EMBED}`,
+        id: `in.(${batch.join(',')})`,
+        deleted_at: 'is.null',
+      });
+      setScope(search, scope.projectIds, scope.workspaceIds);
+      setLastInEmbed(search);
+      return pgGet<Pick<OverviewDbRow, 'id' | 'last_in'>>(env, 'conversation', jwt, { search }).then((r) => r.data);
+    }),
+  );
+  return lastInMap(reads.flat().map((r) => ({ id: r.id, last_in: r.last_in?.[0] ?? null })));
 }
 
 export function lastInMap(rows: readonly Pick<OverviewInput, 'id' | 'last_in'>[]): Map<string, string> {

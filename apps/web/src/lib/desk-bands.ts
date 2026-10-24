@@ -203,6 +203,24 @@ export function elapsedSince(since: string, now: Date): { unit: 'min' | 'h' | 'd
 }
 
 /**
+ * Whether «Ha cambiado» is still loading. Each source it reads holds it while
+ * pending, except the last mailout (its own read since 2026-10-24, about
+ * 1.5 s): with other news on screen the band draws and the mailout joins it
+ * when it lands; with nothing else, the band waits for it, so «nothing new»
+ * is never said before the mailout has answered. An error is not loading.
+ */
+export function changedBandLoading(o: {
+  errored: boolean;
+  /** Sources the band waits for: each one read here only if the viewer reads it. */
+  pending: boolean[];
+  mailoutPending: boolean;
+  hasChanges: boolean;
+}): boolean {
+  if (o.errored) return false;
+  return o.pending.some(Boolean) || (o.mailoutPending && !o.hasChanges);
+}
+
+/**
  * What moved since the last visit (ADR-117): team threads with new messages
  * written after it, rooms whose latest word is theirs and came after it (the
  * «caliente» rows of the Conversations overview whose turn is ours, unless

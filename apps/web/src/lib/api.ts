@@ -2,13 +2,16 @@
  * Client-side API fetch — the auth contract every page needs. Since the
  * Phase 0.9 cookie migration the JWT rides an httpOnly cookie, so there is
  * no header to attach: the contract is now 401 → refresh the session once
- * → retry once → still 401 → clear and bounce to /login. Error bodies
+ * → retry once → still 401 → clear and bounce to /login. The renewal itself
+ * lives with the session (`$lib/session.svelte`): a request waits for one on
+ * the wire, renews first when the cookie is known to be dead, and a 401
+ * joins whichever renewal is already going. Error bodies
  * surface their hint/error. Lives once (philosophy: the repeated utility
  * function is the named anti-pattern).
  */
 
 import { goto } from '$app/navigation';
-import { clearSession } from '$lib/session.svelte';
+import { clearSession, recoverSession, sessionReady } from '$lib/session.svelte';
 
 function clearAuthAndBounce(): void {
   clearSession();
@@ -19,26 +22,20 @@ function clearAuthAndBounce(): void {
 }
 
 /**
- * Single-flight session refresh: concurrent 401s (a page firing four
- * queries at once when the access token dies) share one POST and one
- * cookie rotation. Resolves true when the session was renewed.
+ * One request under the auth contract: ready the session, send, and on a 401
+ * retry once if the session could be recovered. Concurrent 401s (a page
+ * firing four queries at once when the access token dies) share one renewal.
  */
-let refreshing: Promise<boolean> | null = null;
-function tryRefresh(): Promise<boolean> {
-  refreshing ??= fetch('/api/auth/refresh', { method: 'POST' })
-    .then((res) => res.ok)
-    .catch(() => false)
-    .finally(() => {
-      refreshing = null;
-    });
-  return refreshing;
+async function sendWithSession(url: string, init: RequestInit): Promise<Response> {
+  await sessionReady();
+  const sentAt = Date.now();
+  const res = await fetch(url, init);
+  if (res.status === 401 && (await recoverSession(sentAt))) return fetch(url, init);
+  return res;
 }
 
 export async function fetchJSON<T>(url: string, signal?: AbortSignal): Promise<T> {
-  let res = await fetch(url, { signal });
-  if (res.status === 401 && (await tryRefresh())) {
-    res = await fetch(url, { signal });
-  }
+  const res = await sendWithSession(url, { signal });
   // Every failure is an ApiError (an Error with the same message as before)
   // so a reader can tell «not there for you» from «broke» by `.status`
   // (`load-fail.ts`). A network failure stays fetch's own TypeError.
@@ -93,10 +90,7 @@ export async function mutateJSON<T = unknown>(
     headers: body !== undefined ? { 'content-type': 'application/json' } : undefined,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   };
-  let res = await fetch(url, init);
-  if (res.status === 401 && (await tryRefresh())) {
-    res = await fetch(url, init);
-  }
+  const res = await sendWithSession(url, init);
   if (res.status === 401) {
     clearAuthAndBounce();
     throw new ApiError(401, 'Unauthorized');

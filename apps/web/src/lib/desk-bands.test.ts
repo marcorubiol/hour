@@ -1,6 +1,28 @@
 import { describe, expect, it } from 'vitest';
-import { changedLensChip, changesSince, elapsedSince, goingAsks, paymentNews, plannerDoor, sinceInstant, todayThings, CHANGED_ROWS } from './desk-bands';
+import { changedBandLoading, changedLensChip, changesSince, elapsedSince, goingAsks, paymentNews, plannerDoor, sinceInstant, todayThings, CHANGED_ROWS } from './desk-bands';
 import type { MoneyBolo } from './money';
+
+describe('changedBandLoading', () => {
+  const base = { errored: false, pending: [false, false, false], mailoutPending: false, hasChanges: false };
+
+  it('waits for the mailout only when it has nothing else to show', () => {
+    expect(changedBandLoading({ ...base, mailoutPending: true })).toBe(true);
+    expect(changedBandLoading({ ...base, mailoutPending: true, hasChanges: true })).toBe(false);
+  });
+
+  it('never says «nothing new» before the mailout has answered, and settles once it has', () => {
+    expect(changedBandLoading({ ...base, mailoutPending: true })).toBe(true);
+    expect(changedBandLoading({ ...base, mailoutPending: false })).toBe(false);
+  });
+
+  it('any other pending source holds the band, with or without news', () => {
+    expect(changedBandLoading({ ...base, pending: [false, true, false], hasChanges: true })).toBe(true);
+  });
+
+  it('an error is not loading', () => {
+    expect(changedBandLoading({ ...base, errored: true, pending: [true, false, false], mailoutPending: true })).toBe(false);
+  });
+});
 import { buildPersonAttribution, type TeamItem } from './people';
 import type { DateEvent, PerformanceEvent } from './month-events';
 import type { HotRow, LastMailout } from './conversation-overview';

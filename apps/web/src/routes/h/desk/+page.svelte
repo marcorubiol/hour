@@ -69,6 +69,7 @@
     type DeskItem,
   } from '$lib/desk-feed';
   import {
+    changedBandLoading,
     changesSince,
     elapsedSince,
     goingAsks,
@@ -89,6 +90,7 @@
   import { currentSeason } from '$lib/conversation-overview';
   import {
     conversationOverviewQueryOptions,
+    lastMailoutQueryOptions,
     waitingConversationsQueryOptions,
     waitingTasksQueryOptions,
   } from '$lib/waiting-feeds';
@@ -308,6 +310,15 @@
     toStore(() => conversationOverviewQueryOptions(filterIds, lineIds, !scopeUnresolved && readConversations)),
   );
   let overview = $derived(readConversations ? ($overviewQuery.data ?? null) : null);
+  // The last mailout, its own read (2026-10-24): a band with other news does
+  // not wait for it (it joins them when it lands); one with none stays busy
+  // until it answers, never «nothing new» before (`changedBandLoading`).
+  const lastMailoutQuery = createQuery(
+    toStore(() => lastMailoutQueryOptions(filterIds, !scopeUnresolved && readConversations)),
+  );
+  // Subscribed now (see `waitingLoading`): its readers sit behind `readConversations`.
+  void $lastMailoutQuery;
+  let lastMailout = $derived(readConversations ? ($lastMailoutQuery.data?.last_mailout ?? null) : null);
   let projectNameById = $derived(new Map(projectIndex.map((p) => [p.id, p.name])));
   // A reply from the press waits as one from a venue (ADR-138 fase 3); the
   // row says its tag when it is not Difusión.
@@ -382,13 +393,20 @@
   let waiting = $derived(rankWaiting(feed, clockNow));
   let calmWaits = $derived(calm.on ? calmWaiting(feed, clockNow) : null);
 
-  let waitingLoading = $derived(
-    $conversationsQuery.isPending ||
-      $tasksQuery.isPending ||
-      $workspacesQuery.isPending ||
-      $accessQuery.isPending ||
-      (readConversations && $overviewQuery.isPending),
-  );
+  // Every store read before any `||`: a `$query` only read past a pending one
+  // is not subscribed yet, and a query nobody subscribes to does not fetch.
+  // Short-circuited, `tasks` waited for `conversations` to come back (measured
+  // 2026-10-24: 1.8 s later on every open).
+  let waitingLoading = $derived.by(() => {
+    const pending = [
+      $conversationsQuery.isPending,
+      $tasksQuery.isPending,
+      $workspacesQuery.isPending,
+      $accessQuery.isPending,
+      $overviewQuery.isPending,
+    ];
+    return pending[0] || pending[1] || pending[2] || pending[3] || (readConversations && pending[4]);
+  });
   let waitingErrored = $derived($conversationsQuery.isError || $tasksQuery.isError);
 
   // ── Band 3 · Ha cambiado, and the Conversations door ───────────────────
@@ -434,7 +452,7 @@
       {
         threads: readTeam ? ($threadsQuery.data?.threads ?? []) : [],
         hot: overview?.hot.rows ?? [],
-        lastMailout: overview?.last_mailout ?? null,
+        lastMailout,
         payments: paymentsNews,
       },
       since,
@@ -443,16 +461,23 @@
     ),
   );
   let changedErrored = $derived(
-    (readConversations && $overviewQuery.isError) ||
+    (readConversations && ($overviewQuery.isError || $lastMailoutQuery.isError)) ||
       (readTeam && $threadsQuery.isError) ||
       (readMoney && $paymentsQuery.isError),
   );
-  let changedLoading = $derived(
-    !changedErrored &&
-      ((readConversations && $overviewQuery.isPending) ||
-        (readTeam && $threadsQuery.isPending) ||
-        (readMoney && $paymentsQuery.isPending)),
-  );
+  let changedLoading = $derived.by(() => {
+    // Read up front, as `waitingLoading` does: a store read only behind `||` is not subscribed.
+    const overviewPending = $overviewQuery.isPending;
+    const mailoutPending = $lastMailoutQuery.isPending;
+    const threadsPending = $threadsQuery.isPending;
+    const paymentsPending = $paymentsQuery.isPending;
+    return changedBandLoading({
+      errored: changedErrored,
+      pending: [readConversations && overviewPending, readTeam && threadsPending, readMoney && paymentsPending],
+      mailoutPending: readConversations && mailoutPending,
+      hasChanges: changes.length > 0,
+    });
+  });
   let quietLabel = $derived.by(() => {
     if (!lastVisit) return t('desk.changed_none_first', locale);
     const e = elapsedSince(since, clockNow);

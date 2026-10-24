@@ -71,6 +71,10 @@ const QuerySchema = v.object({
   // «Seleccionar las N que coinciden» (plan de la lista § 6.2): the ids of the
   // whole filter, in its order, without reading the rows (at most MATCHING_MAX).
   ids_only: v.optional(v.literal('1')),
+  // The rows only, what «Te espera» reads (the Desk and the Planner's margin):
+  // no count, no bolos, no last mailout. Plain path only (2026-10-24: the
+  // count and the two extras were about a third of its server time).
+  lean: v.optional(v.literal('1')),
   limit: v.optional(
     v.pipe(
       v.string(),
@@ -125,7 +129,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       400,
     );
   }
-  const { project_ids, workspace_ids, line_id, q, season, limit, offset, turno, temp, temporada, linea, line_ids, envio, r, relacion, etiqueta, orden, ids_only } =
+  const { project_ids, workspace_ids, line_id, q, season, limit, offset, turno, temp, temporada, linea, line_ids, envio, r, relacion, etiqueta, orden, ids_only, lean } =
     parsed.output;
   const idsOnly = ids_only === '1';
 
@@ -213,15 +217,17 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   try {
     const { data, total } = await pgGet<ConversationDbItem>(env, qTrim ? 'rpc/conversation_search' : 'conversation', jwt, {
       search,
-      exactCount: true,
+      exactCount: lean !== '1',
     });
+    const items = data.map((r) => normalizeConversationItem(r));
+    if (lean === '1') return json({ limit, offset, season, items });
 
     return json({
       total: total ?? data.length,
       limit,
       offset,
       season,
-      items: await withExtras(env, jwt, data.map((r) => normalizeConversationItem(r))),
+      items: await withExtras(env, jwt, items),
     });
   } catch (err) {
     return pgErrorResponse(
