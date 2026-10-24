@@ -56,6 +56,7 @@
   import ConversationTable from '$lib/components/ConversationTable.svelte';
   import ConversationOverview from '$lib/components/ConversationOverview.svelte';
   import Chip from '$lib/components/Chip.svelte';
+  import Dialog from '$lib/components/Dialog.svelte';
   import { tick, untrack } from 'svelte';
   import { toStore } from 'svelte/store';
   import { MAILOUT_PICKS, NO_LINE, hasListFilter, parseListFilter, type MailoutPick } from '$lib/conversation-overview';
@@ -396,6 +397,42 @@
     ...RELATIONS.map((s) => ({ value: s, label: relationLabel(s, locale) })),
   ];
 
+  // ── The filters' sheet (density review § 3): on a phone the four selects
+  //    fold into «Filtrar», a sheet with the same fields; what is on shows
+  //    under the search as chips that take it off. Each still lives in the
+  //    URL and applies at once: the sheet holds nothing to save. ──
+  let filtersOpen = $state(false);
+  const optionLabel = (options: { value: string; label: string }[], value: string) =>
+    options.find((o) => o.value === value)?.label ?? value;
+  let sheetFilters = $derived(
+    [
+      listFilter.relacion && !listFilter.temporada
+        ? { key: 'relacion', label: relationLabel(listFilter.relacion, locale), clear: () => setRelation('any') }
+        : null,
+      listFilter.linea && !listFilter.temporada && scopeLines.length > 0
+        ? { key: 'linea', label: optionLabel(lineOptions, listFilter.linea), clear: () => setLine('any') }
+        : null,
+      listFilter.envio && canBulkSend(chip)
+        ? { key: 'envio', label: optionLabel(mailoutOptions, listFilter.envio), clear: () => setMailout('none') }
+        : null,
+      listFilter.envio && listFilter.r && canBulkSend(chip)
+        ? { key: 'r', label: t(PICK_WORD[mailoutPick], locale), clear: () => setMailoutPick('todos') }
+        : null,
+      orden !== DEFAULT_ORDER ? { key: 'orden', label: t(ORDER_WORD[orden], locale), clear: () => setOrden(DEFAULT_ORDER) } : null,
+    ].filter((f) => f !== null),
+  );
+  /** «Quitar los filtros»: the sheet's own; a season segment's relation and line are the block's chip. */
+  function clearSheetFilters() {
+    const season = listFilter.temporada;
+    setParams({
+      relacion: season ? (listFilter.relacion ?? null) : null,
+      linea: season ? (listFilter.linea ?? null) : null,
+      envio: null,
+      r: null,
+      orden: null,
+    });
+  }
+
   // aria-busy: until the indexes answer, the pins cannot resolve and the
   // table would fetch the wrong slice. The table says its own busy below.
   let busy = $derived($workspacesQuery.isPending || $projectsQuery.isPending || $linesQuery.isPending);
@@ -620,6 +657,46 @@
           bind:value={qRaw}
         />
       </div>
+      <!-- In the row on a wide screen; in the sheet on a phone (one set at a time in the DOM). -->
+      {#if !filtersOpen}
+        <span class="conversations__inline">{@render filterFields()}</span>
+      {/if}
+      <button
+        type="button"
+        class="btn--secondary btn--s conversations__filter-open"
+        aria-haspopup="dialog"
+        aria-expanded={filtersOpen}
+        aria-label={sheetFilters.length === 0
+          ? undefined
+          : sheetFilters.length === 1
+            ? t('conversations.filter_on_one', locale)
+            : t('conversations.filter_on', locale, { n: sheetFilters.length })}
+        onclick={() => (filtersOpen = true)}
+        >{t('conversations.filter', locale)}{#if sheetFilters.length > 0}<span class="conversations__filter-n" aria-hidden="true"
+            >{sheetFilters.length}</span
+          >{/if}</button
+      >
+      {#if filterChip || sheetFilters.length > 0}
+        <div class="conversations__active">
+          {#if filterChip}
+            <Chip selected onRemove={clearListFilter} removeLabel={t('overview.clear_filter', locale)}>{filterChip}</Chip>
+          {/if}
+          {#each sheetFilters as f (f.key)}
+            <span class="conversations__sheet-chip">
+              <Chip onRemove={f.clear} removeLabel={t('conversations.filter_remove', locale, { filter: f.label })}>{f.label}</Chip>
+            </span>
+          {/each}
+        </div>
+      {/if}
+      {#if canEdit}
+        <Button size="s" onclick={openAdd}>{t('conversations.add', locale)}</Button>
+        <Button size="s" variant="secondary" onclick={togglePicking}>
+          {picking ? t('mailout.pick_done', locale) : t('mailout.pick', locale)}
+        </Button>
+      {/if}
+    </div>
+
+    {#snippet filterFields()}
       <span class="conversations__relation">
         <Select toolbar label={t('conversations.relation', locale)} options={relationOptions} bind:value={() => relationFilter, setRelation} />
         <ConceptHint concept="relation" />
@@ -634,16 +711,23 @@
         {/if}
       {/if}
       <Select toolbar label={t('conversations.order', locale)} options={orderOptions} bind:value={() => orden, setOrden} />
-      {#if filterChip}
-        <Chip selected onRemove={clearListFilter} removeLabel={t('overview.clear_filter', locale)}>{filterChip}</Chip>
+    {/snippet}
+
+    <!-- The sheet: a modal dialog (focus kept inside, Esc closes, named by
+         its title); the fields apply as they change, so nothing asks on close. -->
+    <Dialog bind:open={filtersOpen} title={t('conversations.filter', locale)} size="s" keepsDraft>
+      {#if filtersOpen}
+        <div class="conversations__sheet">{@render filterFields()}</div>
       {/if}
-      {#if canEdit}
-        <Button size="s" onclick={openAdd}>{t('conversations.add', locale)}</Button>
-        <Button size="s" variant="secondary" onclick={togglePicking}>
-          {picking ? t('mailout.pick_done', locale) : t('mailout.pick', locale)}
-        </Button>
-      {/if}
-    </div>
+      {#snippet lead()}
+        {#if sheetFilters.length > 0}
+          <button type="button" class="btn--quiet btn--s" onclick={clearSheetFilters}>{t('conversations.filters_clear', locale)}</button>
+        {/if}
+      {/snippet}
+      {#snippet actions()}
+        <Button onclick={() => (filtersOpen = false)}>{t('conversations.filters_done', locale)}</Button>
+      {/snippet}
+    </Dialog>
 
     {#if mixed}
       <!-- Todas (fase 3): conversations and threads in one list, one order. -->
@@ -847,6 +931,92 @@
     @media (max-width: 47.999rem) {
       .conversations__skip {
         display: inline-flex;
+      }
+    }
+
+    /* The filters (density review § 3). On a wide screen they stay in the
+       row as they were: the wrappers draw nothing and the sheet's door and
+       chips do not exist. */
+    .conversations__inline,
+    .conversations__active {
+      display: contents;
+    }
+    .conversations__filter-open,
+    .conversations__sheet-chip {
+      display: none;
+    }
+    .conversations__filter-n {
+      margin-inline-start: var(--space-xs);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      font-variant-numeric: tabular-nums;
+    }
+    .conversations__filter-n::before {
+      content: '·';
+      margin-inline-end: var(--space-xs);
+    }
+    /* In the sheet: one field under another, at the sheet's width. */
+    .conversations__sheet {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-m);
+    }
+    .conversations__sheet > :global(*) {
+      inline-size: 100%;
+    }
+    /* The relation's «i» on its label's line, at the end: every field keeps
+       the sheet's width and the four line up on both edges. */
+    .conversations__sheet .conversations__relation {
+      position: relative;
+    }
+    .conversations__sheet .conversations__relation > :global(:first-child) {
+      flex: 1;
+    }
+    .conversations__sheet .conversations__relation > :global(.hint) {
+      position: absolute;
+      inset-block-start: 0;
+      inset-inline-end: 0;
+      margin: 0;
+    }
+
+    /* Phone: the search and «Filtrar» on one line, what is on under them,
+       then the two buttons. The search's label is heard, not seen: its
+       placeholder already says what it is. */
+    @media (max-width: 47.999rem) {
+      .conversations__controls {
+        gap: var(--space-s);
+      }
+      .conversations__inline {
+        display: none;
+      }
+      .conversations__filter-open {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      /* Wide enough that only «Filtrar» fits beside it: the buttons go under. */
+      .conversations__search {
+        flex: 1 1 60%;
+        min-inline-size: 0;
+        max-inline-size: none;
+      }
+      .conversations__search :global(.field__label) {
+        position: absolute;
+        inline-size: var(--line-hairline);
+        block-size: var(--line-hairline);
+        margin: calc(-1 * var(--line-hairline));
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+      }
+      .conversations__active {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-xs);
+        flex-basis: 100%;
+      }
+      .conversations__sheet-chip {
+        display: contents;
       }
     }
     /* Touch: the chips and the skip link reach the finger's size through

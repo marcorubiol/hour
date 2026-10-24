@@ -563,7 +563,6 @@
             aria-label={item.next_action_at || item.next_action_note ? undefined : t('conversations.set_next_action', locale)}
           >
             {#if item.next_action_at || item.next_action_note}
-              <span class="crow-next__label">{t('conversations.card_next', locale)}</span>
               {#if item.next_action_at}<span class="crow-next__date">{dayMonth(item.next_action_at)}</span>{/if}
               {#if item.next_action_note}<span class="crow-next__note">{item.next_action_note}</span>{/if}
             {:else}
@@ -704,15 +703,6 @@
       min-inline-size: 0;
       text-align: end;
     }
-    /* The word «siguiente» only on the phone, where the step has no column. */
-    .crow-next__label {
-      display: none;
-      color: var(--text-faint);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing-loose);
-      text-transform: uppercase;
-    }
     .crow-next__date {
       white-space: nowrap;
       color: var(--text-dark-muted);
@@ -737,19 +727,6 @@
       color: var(--text-muted);
     }
 
-    @container (max-width: 47.999rem) {
-      .crow-next {
-        text-align: start;
-      }
-      .crow-next__label {
-        display: inline;
-      }
-      /* A card does not draw an empty line (plan § 3.3); the step is set in the file. */
-      .crow-next--empty {
-        display: none;
-      }
-    }
-
     /* Touch: every control of a row reaches the finger's size (móvil #8). */
     @media (pointer: coarse) {
       .crow-when,
@@ -764,6 +741,26 @@
       }
       .crow-next {
         min-inline-size: var(--touch-target);
+      }
+    }
+
+    /* Phone (density review § 4): the step closes the second line, only
+       when there is one, its note short. That line is read, not tapped: a
+       tap reaches the row, which opens the conversation, where the step and
+       the contact are set; the keyboard still stops on both. After the
+       touch rules, so it wins them. */
+    @container (max-width: 47.999rem) {
+      .crow-next.crow-next--empty {
+        display: none;
+      }
+      .crow-next,
+      .crow-contact {
+        min-block-size: 0;
+        min-inline-size: 0;
+        pointer-events: none;
+      }
+      .crow-next__note {
+        max-inline-size: 14ch;
       }
     }
   }

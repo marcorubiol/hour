@@ -248,9 +248,10 @@
       ></button>
     {/each}
   </div>
-  <div class="season__legend" class:season__legend--run={linea !== undefined}>
+  <!-- On a phone, columns by count (2 up to four, 3 above): never one alone on a row. -->
+  <div class="season__legend" class:season__legend--run={linea !== undefined} style:--season-legend-cols={present(counts).length > 4 ? 3 : 2}>
     {#each present(counts) as s (s)}
-      <button type="button" class="season__item" onclick={() => onrelation(s, linea)}>
+      <button type="button" class="season__item hit" onclick={() => onrelation(s, linea)}>
         <span class="season__n stat">{counts[s]}</span>
         <span class="season__k"><i data-relation={s}></i>{relationLabel(s, locale)}</span>
       </button>
@@ -920,11 +921,12 @@
         flex-wrap: wrap;
         row-gap: 0;
       }
-      /* The legend in one compact run: «6 Contactado · 4 Hold…». */
+      /* The legend in rows of even columns (density review, bug): a run
+         that wrapped left the last one alone under a touch-high gap. */
       .season__legend {
-        display: flex;
-        flex-wrap: wrap;
-        gap: var(--space-2xs) var(--space-m);
+        display: grid;
+        grid-template-columns: repeat(var(--season-legend-cols, 2), max-content);
+        gap: var(--space-xs) var(--space-l);
       }
       .season__item {
         flex-direction: row;
@@ -936,9 +938,9 @@
       }
     }
 
-    /* Touch: the links and the legend reach the finger's size (móvil #8). */
+    /* Touch: the links reach the finger's size (móvil #8); the legend's
+       items take it invisibly (`.hit`), so their rows keep the text's height. */
     @media (pointer: coarse) {
-      .season__item,
       .season__line-name {
         min-block-size: var(--touch-target);
       }
