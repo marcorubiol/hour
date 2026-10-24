@@ -39,7 +39,11 @@
     }).toString()}`,
   );
 
+  // The button waits for this (see the form's comment below).
+  let hydrated = $state(false);
+
   onMount(async () => {
+    hydrated = true;
     // Already signed in (httpOnly cookie — only the server can tell).
     if (await ensureSession()) {
       goto(nextPath, { replaceState: true });
@@ -128,7 +132,11 @@
            runs the browser's native default — which without this attribute is
            GET, i.e. the password lands in the query string (history, access
            logs, Referer). POST keeps it in the body; the route has no form
-           action, so it dead-ends at 405 instead of leaking. -->
+           action, so it dead-ends at 405 instead of leaking. And so the 405 is
+           never reached, the button stays disabled until the page has
+           hydrated: on a slow network a person (and the E2E's logins,
+           2026-10-24) pressed it in that window and landed on «405 Method Not
+           Allowed». What was typed before is kept: bind:value reads it in. -->
       <form class="login__form" method="post" onsubmit={handleSubmit}>
         {#if isSignup}
           <label class="login__field">
@@ -183,7 +191,7 @@
           <p class="login__error" role="alert">{errorMsg}</p>
         {/if}
 
-        <button class="btn--primary login__submit" type="submit" disabled={submitting}>
+        <button class="btn--primary login__submit" type="submit" disabled={!hydrated || submitting}>
           <span>
             {submitting
               ? isSignup
