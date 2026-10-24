@@ -503,6 +503,10 @@
 - [ ] **Polish de beta.** Mobile completo, GDPR export, accesibilidad WCAG,
   notificaciones y ratificación visual/naming con usuarios externos.
 
+- [ ] **Velocidad: RLS evalúa `has_permission` una vez por fila** (medido el 24-10, `build/coordination/load-speed/`): `mailout` 1,14 s por 637 filas, `conversation` 0,35 s por 306; en Supabase Free las lecturas de Hoy se frenan entre sí. Reescribir las políticas para calcular los proyectos permitidos una vez (InitPlan o función que devuelve el conjunto). Toca seguridad: migración, RLS entera y E2E. También: `/api/mailout?` de Difusión tarda unos 3 s por lo mismo.
+- [ ] **Realtime: el token del socket se congela a la hora** (`src/lib/realtime/client.ts` llama a `setAuth(token)` con token explícito; realtime-js 2.105 deja de reautenticar en el latido). Pasar a modo callback, sin coste de red con el token ya en memoria.
+- [ ] **Velocidad, primera carga en frío** (24-10): el fragmento de i18n lleva los cuatro idiomas (141 kB brotli), Google Fonts 350 kB y bloquea el primer pintado, y el service worker precachea 227 ficheros uno tras otro (16-25 s). Cargar solo el idioma activo, fuentes propias con preload, precache más corto.
+
 ## Deuda aceptada / observar en uso
 
 - [ ] **Los datos fiscales de una organización no se pueden retirar (visto el 2026-10-13, tests de la fase 4 de ADR-102).** Un borrado blando por PostgREST da 42501 (la fila borrada ya no pasa la policy de SELECT), `service_role` no tiene grant sobre `fiscal_identity` y no hay RPC para retirarla. La limpieza de `money-v3.test.ts` y de `money-payer-organization.test.ts` no borraba nada sin decirlo. Cuando haga falta: una RPC `retire_fiscal_identity` con `can_edit_workspace_money`. (chat 13-10, sin estimar)
