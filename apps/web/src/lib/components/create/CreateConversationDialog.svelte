@@ -12,6 +12,7 @@
    * deduce before asking).
    */
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
+  import { refreshAfterWrite } from '$lib/query-refresh';
   import { toStore } from 'svelte/store';
   import { mutateJSON, ApiError } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
@@ -277,7 +278,7 @@
         // The dialog stays open with the offer; what was created is already in.
         aJoin = r.joinable;
         aJoinPersonId = r.personId;
-        if (r.created) void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+        if (r.created) void refreshAfterWrite(queryClient, ['conversations']);
         void queryClient.invalidateQueries({ queryKey: ['organizations'] });
         return;
       }
@@ -290,7 +291,7 @@
       aNextNote = '';
       aProjectIds = [];
       aLineByProject = {};
-      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      void refreshAfterWrite(queryClient, ['conversations']);
       const parts: string[] = [];
       if (r.created)
         parts.push(
@@ -314,7 +315,7 @@
         undo: ids.length
           ? async () => {
               await Promise.all(ids.map((id) => mutateJSON('DELETE', `/api/conversations/${id}`)));
-              await queryClient.invalidateQueries({ queryKey: ['conversations'] });
+              await refreshAfterWrite(queryClient, ['conversations']);
             }
           : undefined,
       });
@@ -342,7 +343,7 @@
       open = false;
       aJoin = [];
       aJoinPersonId = null;
-      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      void refreshAfterWrite(queryClient, ['conversations']);
     },
     onError: (err) => {
       addToast({

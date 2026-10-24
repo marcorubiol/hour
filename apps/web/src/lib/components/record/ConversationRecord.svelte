@@ -29,6 +29,7 @@
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
+  import { refreshAfterWrite } from '$lib/query-refresh';
   import { toStore } from 'svelte/store';
   import { ApiError, fetchJSON, mutateJSON } from '$lib/api';
   import { retryLoad } from '$lib/load-fail';
@@ -261,7 +262,7 @@
       addToast({ tone: 'danger', title: t('mail.not_sent', locale), message: err instanceof Error ? err.message : String(err) }),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ['conversation-events', conv?.id ?? ''] });
-      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      void refreshAfterWrite(queryClient, ['conversations']);
     },
   });
 
@@ -273,7 +274,7 @@
       addToast({ tone: 'danger', title: t('mail.action_failed', locale), message: err instanceof Error ? err.message : String(err) }),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ['conversation'] });
-      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      void refreshAfterWrite(queryClient, ['conversations']);
       // Quién lee el hilo del equipo cambia con la privacidad.
       void queryClient.invalidateQueries({ queryKey: ['thread-audience', 'conversation', conv?.id ?? ''] });
     },
@@ -320,7 +321,7 @@
       }),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ['conversation'] });
-      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      void refreshAfterWrite(queryClient, ['conversations']);
       void queryClient.invalidateQueries({ queryKey: ['conversation-overview'] });
       void queryClient.invalidateQueries({ queryKey: ['line-eng-stats'] });
     },

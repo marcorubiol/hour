@@ -9,6 +9,7 @@
    */
 
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
+  import { refreshAfterWrite } from '$lib/query-refresh';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import { dayMonthYear, localDayISO } from '$lib/datetime';
@@ -106,15 +107,11 @@
         }),
       });
     },
-    onSettled: async () => {
+    onSettled: () => {
       // Si se apunta antes de que llegue la primera lectura, esa GET salió
-      // antes del POST y vuelve sin lo apuntado. Sin datos en caché,
-      // invalidateQueries no la reinicia: se suma a ella y la lista se queda
-      // con la versión anterior. Se cancela primero para que la recarga sea
-      // una petición nueva, posterior al POST.
-      await queryClient.cancelQueries({ queryKey: ['conversation-events', conversationId] });
-      void queryClient.invalidateQueries({ queryKey: ['conversation-events', conversationId] });
-      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      // antes del POST y vuelve sin lo apuntado (`$lib/query-refresh`).
+      void refreshAfterWrite(queryClient, ['conversation-events', conversationId]);
+      void refreshAfterWrite(queryClient, ['conversations']);
       void queryClient.invalidateQueries({ queryKey: ['line-eng-stats'] });
     },
   });

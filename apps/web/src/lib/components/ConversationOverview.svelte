@@ -18,6 +18,7 @@
   import StateBadge from '$lib/components/StateBadge.svelte';
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
+  import { refreshAfterWrite } from '$lib/query-refresh';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import { addToast } from '$lib/components/Toast.svelte';
@@ -158,7 +159,7 @@
       }),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ['conversation-overview'] });
-      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      void refreshAfterWrite(queryClient, ['conversations']);
       void queryClient.invalidateQueries({ queryKey: ['conversation'] });
     },
   });
