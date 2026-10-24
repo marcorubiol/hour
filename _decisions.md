@@ -4213,6 +4213,8 @@ sobre `claude/conv-fixes` (reutiliza `MailoutFigures`, `.load-fail` y el toast c
    hace 3 h»; sin visita guardada, «en la última semana»); si una fuente falla, lo dice. Un envío sin destinatarios no
    es novedad; el que lo es enseña las cifras de la lente (`MailoutFigures`) y abre el envío. Un hilo de bolo se llama
    «hilo del bolo».
+   > **Amended by ADR-145 (2026-10-24), solo en § 4.** Sin nada, «Ha cambiado» no se pinta; con «Te espera» también
+   > a cero, Hoy dice «Todo al día.» una vez. Si una fuente falla, se pinta y lo dice, como aquí.
 5. **«Ver todo» no pierde nada** (enmienda ADR-121 § 2): los «¿vas?» viven en su día en la lista por días, el botón no
    lleva cifra (la única es «7 de 16») y «Más adelante» se despliega en sitio en vez de abrir una Agenda que no tiene
    tareas ni llamadas. En calma no se ofrece «Ver todo».
@@ -4698,6 +4700,10 @@ solo nombra lo confirmado (la familia `confirmed` con la que el Planner dibuja s
 una fecha tentativa espera fuera de calma. La regla vive en `lib/calm.ts` (`railNextShows`) y el raíl le pregunta.
 «Ahora» no cambia, y con calma apagada el raíl es el de siempre. Sigue sin filtrar por ámbito.
 
+> **Amended by ADR-145 (2026-10-24), solo en § 2 en las cuatro lentes.** En Hoy, el Planificador, Conversaciones y
+> Cuentas, un bloque vacío no se pinta en vez de ocupar una línea; si la pantalla se queda sin ninguno, una sola línea.
+> En las fichas, «lo vacío en una línea» sigue igual.
+
 ## [2026-10-20] ADR-140 · Las secciones viven en el marco (enmienda la decisión del 18-07 y ADR-136 § 3)
 
 **Contexto.** Marco (20-10) se pierde al entrar en una ficha: el selector Hoy · Planificador · Conversaciones ·
@@ -4990,3 +4996,65 @@ ya invalida todos los registros por el buster.
 
 **Re-evaluar cuando** haya usuarios externos en la beta (si el borrado al salir basta para su política de datos) o
 el registro de `muk-cia` pese lo bastante como para notarse al escribir.
+
+## [2026-10-24] ADR-145 · Densidad: un bloque vacío no se pinta, las «i» de cabecera van al «?», mono mayúsculas solo en cabeceras y una escala de móvil (enmienda ADR-127 § 4 y ADR-139 § 2)
+
+**Contexto.** Marco (24-10): en el móvil todo pesa. Revisión de las cuatro pantallas a 390×844 contra producción, con
+el usuario E2E (`build/coordination/density-review/review.md`, fuera de git, con capturas y JSON). La causa no es el
+blanco y negro ni el copy: cada bloque se pinta entero aunque esté vacío y cuesta cuatro piezas (etiqueta en mono
+mayúsculas, raya, «i», frase de vacío), y el contenido va a 11,7 px, casi igual que sus etiquetas. Cifras de la
+revisión: alto total Hoy 844, Planner 1509, Difusión 5937, Cuentas 1058; de 14 a 18 estilos de texto por pantalla;
+21 «i» en las cuatro (3 + 6 + 6 + 6); Planner con 6 bloques y 5 a cero, Difusión con 4 de 4; el marco fijo (barra,
+fila «Ámbito», barra de lentes) se come 156 px, un 18 % de la pantalla. Marco aprobó las diez recomendaciones el 24-10.
+Este ADR recoge las cinco transversales (1, 2, 6, 7 y 8 de la revisión); las de cada pantalla (3, 4, 5, 9 y 10) van
+en sus carriles.
+
+**Decisión.**
+1. **Un bloque con nada dentro no se pinta** (escritorio y móvil): ni cabecera, ni raya, ni frase de vacío. La regla
+   vive en `$lib/dashboard-blocks.ts` (`blockDrawn`, `screenQuiet`) y cada bloque de las cuatro lentes le pregunta.
+   Un bloque cuya lectura falla sí se pinta, y dice que ha fallado (ADR-096 § 6). Mientras carga no se pinta (la lente
+   lo dice en su `aria-busy`; casi siempre llega del dispositivo, ADR-144). Si una pantalla se queda sin ninguno, una
+   sola línea: en Hoy, «Todo al día.» cuando «Te espera» y «Ha cambiado» están a cero. Se dejan de pintar a cero: Hoy
+   «Te espera» y «Ha cambiado»; Planner «Por decidir», «Choques», «Sin cerrar» y «Fuera»; Difusión «Esperan respuesta»,
+   «Se mueve», la temporada y «Sin noticias»; Cuentas «Lo que entra». Se quedan aunque estén a cero, porque su cero es
+   el dato (la revisión los mantiene): las tres cifras de La temporada en Hoy, la rejilla del Planner, las cuatro
+   cifras y «Pide atención» de Cuentas. Calma no cambia: es su propia composición y sus líneas dicen lo que oculta.
+   Las fichas tampoco: allí «lo vacío en una línea» de ADR-139 § 2 sigue, porque el hueco es donde se escribe.
+2. **Las «i» de cabecera de las cuatro lentes van al «?»** (escritorio y móvil). El «?» de cada lente abre su tarjeta
+   con «Qué es cada cosa»: el texto de cada «i», bloque a bloque y en el orden de la pantalla
+   (`SECTION_CONCEPTS` en `$lib/help.ts`), abierto cuando lo trae el «?» y plegado en la bienvenida de la primera vez.
+   Salen las del ámbito, «Te espera», «Ha cambiado», «Por decidir», «Choques», «Sin cerrar», «Huecos», la leyenda de
+   la rejilla (opción, deducida), las cuatro de Difusión, las tres cifras de Cuentas y la de «bolo» en su libro. La
+   instrucción «pulsa una línea o un estado para filtrar» sale de la cabecera de la temporada y va también al «?».
+   Se quedan las «i» de las fichas y los formularios (relación, «lo conozco», hoja de ruta, oficio...) y la de la
+   pregunta «¿vas?» de Lo siguiente, que acompaña un dato y no una cabecera. La del filtro «Relación» de Difusión la
+   quita el carril de los filtros de Difusión.
+3. **Mono mayúsculas solo para la cabecera de bloque** (escritorio y móvil). La etiqueta de un campo (`.field__label`,
+   formularios y fichas), «Ámbito» y el tipo de una pastilla del ámbito pasan a la letra del cuerpo, en su caja; la
+   unidad de las cifras de Cuentas («EUR») también. Las filas («SIGUIENTE»), la tira de cifras del Planner y la fecha
+   de Hoy las cortan sus carriles (la tira y la fecha desaparecen).
+4. **Una escala de móvil** (solo bajo 48 rem; escritorio igual). En `tokens.css`, bajo 48 rem `--text-s` toma el
+   paso del cuerpo (`--text-m`, 14 px) y los dos pasos más pequeños quedan en 11: contenido a 14, etiquetas a 11, y
+   cinco tamaños (11 · 14 · 16,8 · 20,2 · 24,3) en vez de seis más una tira a 9,5 y 8,5.
+5. **En el móvil, sin acotar, la fila «Ámbito» entra en la fila del título** (solo móvil): «Todo», en la pastilla
+   discontinua de «+ acotar», va antes del «?» (`LensHeader`, `lenshead__scope`) y abre la misma paleta
+   (`$lib/scope-door.ts`); la barra del ámbito no se pinta. Acotado, la barra vuelve, porque entonces dice algo
+   (ADR-139 § 6). En escritorio la barra sigue donde estaba.
+
+**Medido** (mismas cuatro pantallas, mismo usuario, 390 con táctil; antes en producción `972eb5db`, después en
+`vite dev` contra la Supabase de producción; capturas en `build/coordination/density-review/shared/`, fuera de git):
+Hoy 844 → 844 px (sin la fila del ámbito ni «Te espera» ni «Desde»), Planner 1509 → 1207, Difusión 5770 → 5535,
+Cuentas 1058 → 981; «i» en `main` 3/7/6/5 → 0/0/1/0 (la que queda es la del filtro «Relación»). Estilos de texto
+distintos en móvil: Hoy 10 → 6, Planner 15 → 14, Difusión 15 → 13, Cuentas 14 → 11. El objetivo de unos siete por
+pantalla no se cumple aún en Planner, Difusión y Cuentas: lo que sobra es la tira de cifras, las filas de Difusión y las
+cajas de Cuentas, que son de sus carriles.
+
+**Cómo se revierte.** Cada punto por separado. 1: devolver los `{#if}` de cada bloque a su rama de vacío
+(`EmptyLine`) y borrar `dashboard-blocks.ts`. 2: volver a pasar `concept` a cada `BlockHead` y los `ConceptHint` de
+la leyenda, el ámbito y Cuentas; quitar `SECTION_CONCEPTS` y el `details` de `FirstVisitCard`. 3: devolver
+`.field__label` al grupo de `.eyebrow` en `base.css`. 4: borrar el bloque «THE PHONE'S TYPE SCALE» de `tokens.css`.
+5: borrar `lenshead__scope` (`LensHeader`, `base.css`), `scope-door.ts` y la regla que oculta `.shell__lenschrome` en
+`ScopeBar`.
+
+**Re-evaluar cuando** los carriles de cada pantalla estén dentro: contar otra vez los estilos por pantalla, y si con
+calma y sin calma el vacío de Hoy en una línea se entiende.

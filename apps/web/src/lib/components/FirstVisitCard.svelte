@@ -8,10 +8,15 @@
    * «Enséñame» es el `Spotlight`: tres pasos como mucho sobre los bloques
    * marcados con `data-help-step`. Un paso cuyo bloque no está dibujado se
    * salta. Al acabar, o con «Entendido», queda vista.
+   *
+   * Debajo, «Qué es cada cosa»: lo que antes decía la «i» de cada cabecera,
+   * bloque a bloque (ADR-145 § 2). Plegado la primera vez, para que la
+   * bienvenida siga siendo corta; abierto cuando la trae el «?», que es
+   * cuando se ha pedido ayuda. Es el `details` del navegador.
    */
   import { tick } from 'svelte';
   import { t, appLocale } from '$lib/i18n';
-  import { cardKey, cardVisible, presentSteps, type HelpSection, type TourStep } from '$lib/help';
+  import { SECTION_CONCEPTS, cardKey, cardVisible, conceptKeys, presentSteps, type HelpSection, type TourStep } from '$lib/help';
   import { help, ensureHelp, markHelpSeen } from '$lib/help-seen.svelte';
   import Spotlight from '$lib/components/Spotlight.svelte';
 
@@ -30,6 +35,7 @@
   const id = $props.id();
   let key = $derived(cardKey(section));
   let visible = $derived(cardVisible(help, key));
+  let terms = $derived(SECTION_CONCEPTS[section].map(conceptKeys));
 
   let headEl: HTMLElement | undefined = $state();
   let tour = $state<TourStep[] | null>(null);
@@ -69,6 +75,23 @@
     <h2 class="welcome__title" id={`${id}-h`} tabindex="-1" bind:this={headEl}>{t(`help.card.${section}`, locale)}</h2>
     <p class="welcome__body">{t(`help.card.${section}_body`, locale)}</p>
     {#if note}<p class="welcome__body">{note}</p>{/if}
+    {#if terms.length > 0}
+      <details class="welcome__terms" open={help.reopened === key} data-testid="help-terms">
+        <summary>{t('help.terms', locale)}</summary>
+        <dl>
+          {#each terms as term (term.title)}
+            <div class="welcome__term">
+              <dt>{t(term.title, locale)}</dt>
+              <dd>{t(term.body, locale)}</dd>
+              {#if term.lines}{#each term.lines as line (line.label)}<dd class="welcome__line"
+                    ><b>{t(line.label, locale)}:</b> {t(line.text, locale)}</dd
+                  >{/each}{/if}
+              {#if term.more}<dd class="welcome__line">{t(term.more, locale)}</dd>{/if}
+            </div>
+          {/each}
+        </dl>
+      </details>
+    {/if}
     <p class="welcome__acts">
       <button type="button" class="btn--primary btn--s" onclick={done}>{t('help.got_it', locale)}</button>
       {#if steps.length > 0}
@@ -111,6 +134,41 @@
       max-inline-size: 60ch;
       color: var(--text-dark-muted);
       font-size: var(--text-s);
+    }
+    /* What each block is: the «i» of the heads, gathered (ADR-145 § 2). The
+       term speaks like the block head it names; its text like the card's. */
+    .welcome__terms {
+      max-inline-size: 60ch;
+    }
+    .welcome__terms summary {
+      color: var(--text-muted);
+      font-size: var(--text-s);
+      cursor: pointer;
+    }
+    .welcome__terms summary:hover {
+      color: var(--text-color);
+    }
+    .welcome__terms dl {
+      display: grid;
+      gap: var(--space-s);
+      margin: var(--space-s) 0 0;
+    }
+    .welcome__term dt {
+      color: var(--heading-color);
+      font-size: var(--text-s);
+      font-weight: 600;
+    }
+    .welcome__term dd {
+      margin: 0;
+      color: var(--text-dark-muted);
+      font-size: var(--text-s);
+    }
+    .welcome__line {
+      margin-block-start: var(--space-2xs);
+    }
+    .welcome__line b {
+      color: var(--text-color);
+      font-weight: 600;
     }
     .welcome__acts {
       display: flex;

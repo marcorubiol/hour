@@ -16,7 +16,6 @@
    */
 
   import StateBadge from '$lib/components/StateBadge.svelte';
-  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
@@ -335,14 +334,12 @@
 {:else if data && data.total > 0}
   <div class="board" data-testid="conversation-overview">
     <div class="board__col">
+      {#if data.due.count > 0}
       <section class="block block--due" aria-labelledby="ov-due" data-testid="block-due" data-help-step="conv-due">
-        <BlockHead id="ov-due" concept="due" title={t('overview.due', locale)} count={data.due.count}>
+        <BlockHead id="ov-due" title={t('overview.due', locale)} count={data.due.count}>
           {#if data.due.count > 0}<a class="block-head__act" href={link('turno=nuestro#lista')} onclick={() => calm.set(false)}>{t('overview.see_in_list', locale)}</a>{/if}
         </BlockHead>
         <FirstTimeNote event="first_reply_waiting" when={data.due.count > 0} />
-        {#if data.due.count === 0}
-          <EmptyLine text={t('overview.due_empty', locale)} />
-        {:else}
           <ol class="rows">
             {#each data.due.rows as row, i (row.id)}
               {@const firstFollowUp = data.due.rows.findIndex((r) => r.reason === 'follow_up')}
@@ -374,17 +371,14 @@
               </li>
             {/each}
           </ol>
-        {/if}
       </section>
+      {/if}
 
-      {#if full}
+      {#if full && data.hot.count > 0}
       <section class="block block--hot" aria-labelledby="ov-hot" data-testid="block-hot">
-        <BlockHead id="ov-hot" concept="hot" title={t('overview.hot', locale)} count={data.hot.count}>
+        <BlockHead id="ov-hot" title={t('overview.hot', locale)} count={data.hot.count}>
           {#if data.hot.count > 0}<a class="block-head__act" href={link('temp=caliente#lista')}>{t('overview.see_n', locale, { n: data.hot.count })}</a>{/if}
         </BlockHead>
-        {#if data.hot.count === 0}
-          <EmptyLine text={t('overview.hot_empty', locale)} />
-        {:else}
           <ol class="rows">
             {#each data.hot.rows as row (row.id)}
               <li>
@@ -403,21 +397,16 @@
               </li>
             {/each}
           </ol>
-        {/if}
       </section>
-
       {/if}
     </div>
 
     {#if full}
     <div class="board__col">
+      {#if data.season.total > 0}
       <section class="block block--season" aria-labelledby="ov-season" data-testid="block-season" data-help-step="conv-season">
-        <BlockHead id="ov-season" concept="season_sales" title={t('overview.season_of', locale, { season: data.season.label })} count={data.season.total}>
-          <span class="block__hint">{t(data.season.lines.length > 0 ? 'overview.season_hint_lines' : 'overview.season_hint', locale)}</span>
-        </BlockHead>
-        {#if data.season.total === 0}
-          <EmptyLine text={t('overview.season_empty', locale)} />
-        {:else}
+        <!-- «Pulsa una línea o un estado para filtrar» is an instruction: it lives in the «?» (ADR-145 § 2). -->
+        <BlockHead id="ov-season" title={t('overview.season_of', locale, { season: data.season.label })} count={data.season.total} />
           {#if data.season.lines.length > 0}
             <!-- One bar per line, «sin línea» last and never hidden (ADR-135). -->
             <ol class="season__lines">
@@ -449,16 +438,14 @@
           {#if bolosLine(data.season.bolos, 'overview.season_bolos')}
             <p class="season__note" data-testid="season-bolos">{bolosLine(data.season.bolos, 'overview.season_bolos')}</p>
           {/if}
-        {/if}
       </section>
+      {/if}
 
+      {#if data.cold.count > 0}
       <section class="block block--cold" aria-labelledby="ov-cold" data-testid="block-cold">
-        <BlockHead id="ov-cold" concept="cold" title={t('overview.cold', locale)} count={data.cold.count}>
+        <BlockHead id="ov-cold" title={t('overview.cold', locale)} count={data.cold.count}>
           {#if data.cold.count > 0}<a class="block-head__act" href={link('temp=fria#lista')}>{t('overview.see_n', locale, { n: data.cold.count })}</a>{/if}
         </BlockHead>
-        {#if data.cold.count === 0}
-          <EmptyLine text={t('overview.cold_empty', locale)} />
-        {:else}
           <ol class="rows">
             {#each data.cold.rows as row, i (row.id)}
               {#if i === 0 || data.cold.rows[i - 1].group !== row.group}
@@ -503,8 +490,8 @@
               </span>
             {/if}
           </div>
-        {/if}
       </section>
+      {/if}
 
       {#if full && mailoutLoading}
         {@render mailoutGhost(true)}
@@ -566,6 +553,14 @@
       flex-direction: column;
       gap: var(--space-l);
       min-inline-size: 0;
+    }
+    /* A column whose blocks are all at zero is not drawn (ADR-145 § 1), and
+       the other one takes the width. */
+    .board__col:not(:has(> *)) {
+      display: none;
+    }
+    .board:has(> .board__col:not(:has(> *))) {
+      grid-template-columns: minmax(0, 1fr);
     }
     .board__undated {
       grid-column: 1 / -1;

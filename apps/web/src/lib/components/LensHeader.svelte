@@ -17,6 +17,8 @@
   import { t, appLocale } from '$lib/i18n';
   import { cardKey, type HelpSection } from '$lib/help';
   import { help, toggleCard } from '$lib/help-seen.svelte';
+  import { scopeDoor } from '$lib/scope-door';
+  import { usePins } from '$lib/stores/pins.svelte';
 
   interface Props {
     /** the big display title — whatever the lens wants to say */
@@ -33,6 +35,13 @@
     help?: HelpSection;
   }
   let { title, sub, titleAside, help: section }: Props = $props();
+
+  // ON A PHONE THE SCOPE'S ROW IS THIS ROW (ADR-145 § 5): unscoped, «Todo»
+  // and its door sit before the «?», and the shell's scope bar is not drawn
+  // (ScopeBar). From 48 rem up the bar is there and this door is not.
+  const openScope = scopeDoor();
+  const pins = openScope ? usePins() : null;
+  let scopeAll = $derived(pins !== null && pins.pins.length === 0);
 </script>
 
 <header class="lenshead">
@@ -43,8 +52,18 @@
         <span class="lenshead__aside">{@render titleAside()}</span>
       {/if}
     </div>
-    {#if section}
+    {#if section || (openScope && scopeAll)}
       <span class="lenshead__tools lenshead__tools--help">
+        {#if openScope && scopeAll}
+          <button
+            type="button"
+            class="lenshead__scope"
+            aria-label={t('shell.scope_door_aria', appLocale(), { scope: t('shell.everything', appLocale()) })}
+            title={t('shell.everything_all', appLocale())}
+            onclick={openScope}>{t('shell.everything', appLocale())}</button
+          >
+        {/if}
+        {#if section}
         <button
           type="button"
           class="lenshead__help"
@@ -53,6 +72,7 @@
           aria-expanded={help.reopened === cardKey(section)}
           onclick={() => toggleCard(cardKey(section))}><span aria-hidden="true">?</span></button
         >
+        {/if}
       </span>
     {/if}
   </div>

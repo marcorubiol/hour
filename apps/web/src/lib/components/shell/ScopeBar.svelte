@@ -1,5 +1,4 @@
 <script lang="ts">
-  import ConceptHint from '$lib/components/ConceptHint.svelte';
   import ScopeGlyph from '$lib/components/ScopeGlyph.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { copyText } from '$lib/clipboard';
@@ -75,14 +74,14 @@
   <div class="scopebar" class:scopebar--all={pins.pins.length === 0}>
     {#if pins.pins.length === 0}
       <span class="scopebar__scope">
-        <span class="scopebar__lead">{t('planner.lanes_scope', locale)}<ConceptHint concept="scope" /></span>
+        <span class="scopebar__lead">{t('planner.lanes_scope', locale)}</span>
         <span class="scopebar__all" title={t('shell.everything_all', locale)}>{t('shell.everything', locale)}</span>
       </span>
       <button type="button" class="scopebar__add hit" onclick={openPaletteAdd}>
         {t('shell.narrow', locale)}
       </button>
     {:else}
-      <span class="scopebar__lead">{t('planner.lanes_scope', locale)}<ConceptHint concept="scope" /></span>
+      <span class="scopebar__lead">{t('planner.lanes_scope', locale)}</span>
       {#each pins.pins as tok (tok)}
         <span class="tok tok--{tokenKind(tok)}">
           <ScopeGlyph kind={tokenKind(tok)} accent={tokenAccent(tok)} lineKind={tokenLineKind(tok)} />
@@ -178,11 +177,11 @@
     align-items: baseline;
     gap: var(--space-s);
   }
+  /* A label, not a block's head: the body face in its own case (mono
+     capitals are for block heads only, ADR-145 § 3). */
   .scopebar__lead {
-    font-family: var(--font-mono);
+    font-family: var(--font-sans);
     font-size: var(--text-xs);
-    letter-spacing: var(--mono-letter-spacing-loose);
-    text-transform: uppercase;
     color: var(--text-faint);
   }
   .scopebar__all {
@@ -196,7 +195,14 @@
      and «copiar enlace» to a third, a hundred pixels before the lens began.
      The sentence ellipsizes (the full one is the bar's title); the acts stay
      on the same line. */
+  /* ON A PHONE, «Todo» IS NOT A ROW OF ITS OWN (ADR-145 § 5): unscoped, the
+     bar gives its line to the lens, whose title row carries the scope's door
+     (LensHeader, `lenshead__scope`). Scoped, the bar stays: then it says
+     something. Off a lens there is no title row, so the bar stays too. */
   @media (max-width: 47.999rem) {
+    .shell__lenschrome:has(> .scopebar--all) {
+      display: none;
+    }
     .scopebar:has(> .scopebar__scope) {
       flex-wrap: nowrap;
       min-block-size: 0;
@@ -242,11 +248,9 @@
     gap: 0.15rem;
   }
   .tok__kind {
-    font-family: var(--font-mono);
+    font-family: var(--font-sans);
     font-size: var(--text-xs);
     line-height: 1;
-    letter-spacing: var(--mono-letter-spacing);
-    text-transform: uppercase;
     color: var(--text-faint);
   }
   .tok__name {

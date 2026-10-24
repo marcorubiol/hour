@@ -2,9 +2,9 @@
   /**
    * «HA CAMBIADO» — band 3 of the Desk (ADR-117): what moved since your last
    * visit, nothing to act on. The rows are `changesSince` ($lib/desk-bands);
-   * each opens its own sheet. With nothing in it the band stays, as one line
-   * that says since when (amends ADR-121 § 5); if a source failed it says so,
-   * because a silent band would claim «nothing changed».
+   * each opens its own sheet. With nothing in it the Desk does not draw the
+   * band (ADR-145 § 1, amends ADR-121 § 5); if a source failed it is drawn
+   * and says so, because a silent band would claim «nothing changed».
    */
   import FirstTimeNote from '$lib/components/FirstTimeNote.svelte';
   import Button from '$lib/components/Button.svelte';
@@ -95,7 +95,7 @@
 </script>
 
 <section class="dband changed" aria-labelledby="desk-changed-h" aria-busy={loading} data-testid="desk-changed">
-  <BlockHead id="desk-changed-h" concept="changed" title={t('desk.changed_since', locale, { when: sinceLabel })}>
+  <BlockHead id="desk-changed-h" title={t('desk.changed_since', locale, { when: sinceLabel })}>
     {#if lensChip !== null}<a class="block-head__act" href={chipHref(lensChip, new URLSearchParams())} data-testid="desk-to-conversations" data-chip={lensChip}>{lensLabel} →</a>{/if}
   </BlockHead>
   <FirstTimeNote event="first_team_thread" when={!loading && changes.some((c) => c.kind === 'thread')} />
