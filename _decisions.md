@@ -4910,3 +4910,83 @@ el aviso y une con esta fusión. «Sin reescribir historial» deja de valer en e
 
 **Re-evaluar cuando** la primera persona real entre en dos espacios (Anouk en `muk-cia` y en el suyo): si el aviso en
 la ficha y en Ajustes basta, si 30 días es el plazo, y si perder el segundo email pide varios emails por dossier.
+
+## [2026-10-24] ADR-144 · Los datos se quedan en el dispositivo: Hour abre con lo último conocido y se borra al salir
+
+**Contexto.** Cada apertura empezaba en blanco: la caché de TanStack Query vivía en memoria y moría con la pestaña, y
+el marco de `/h` esperaba a `/api/auth/session` antes de pintar. Diagnóstico del 24-10
+(`build/coordination/load-speed/diagnosis.md`, Chromium 1228 como iPhone 390×844, CPU ×4): en una reapertura el marco
+pintaba a los 0,5 a 1,2 s y el contenido llegaba a los 0,9 a 3,7 s (Hoy: 3,1 a 3,7 s), siempre detrás de la cascada
+de red. Medido de nuevo contra producción `7c1de016` antes de este cambio: contenido a los 1,5 a 3,4 s en slow4g (Hoy
+3,1; Planner 1,7; Conversaciones 3,4; Cuentas 1,5) y a los 2,3 a 3,6 s en fast3g, con el marco pintado a los 0,6 a
+1,2 s: entre 0,8 y 3,1 s de pantalla sin datos después del marco en cada reapertura, y lo mismo en la primera
+apertura tras la hora.
+Marco eligió el 24-10, de tres opciones, guardar todo en el dispositivo.
+
+**Decisión.**
+1. **Todas las respuestas de lectura se guardan en el dispositivo**, Cuentas incluida: la caché de consultas entera se
+   deshidrata a IndexedDB (`hour-offline` › `query_cache`, un registro) y se hidrata antes de que monte la lente. La
+   pantalla pinta lo último conocido y las consultas revalidan detrás (stale-while-revalidate, lo que TanStack ya hace
+   cuando una consulta tiene datos). Implementación propia y pequeña sobre `dehydrate`/`hydrate`
+   (`$lib/offline/query-cache.ts`), sin el paquete de persistencia: se necesitaba controlar el dueño, el borrado y el
+   orden frente al probe de sesión. Sustituye al `read_cache` por URL de `$lib/offline/db.ts`, que nunca se usó
+   (esquema v2).
+2. **Qué no se guarda:** mutaciones, consultas que no han acabado bien y las que se marcan `meta: { persist: false }`.
+   Los tokens no pasan por TanStack: siguen en memoria del módulo de sesión, como antes.
+3. **Cuándo vale un registro** (el «buster»): el build que lo escribió (el SHA de `/health/live`; un build sucio solo
+   vale para sí mismo), su usuario (`sub`), los espacios y el rol en cada uno, y una edad de 7 días como máximo (cada
+   consulta también). Build o edad distintos: se borra al leerlo. Espacios o rol distintos solo se saben cuando la red
+   responde: entonces se vacían todas las demás consultas y se vuelven a pedir. Escritura como mucho una vez por
+   segundo y al pasar la app a segundo plano. `gcTime` de 24 h para que una consulta no vista en la sesión no se caiga
+   del registro.
+4. **El marco no espera a la sesión si hay registro:** guarda también el usuario de la sesión (`sub`, `email`, `name`,
+   lo que devuelve el probe, nada secreto), pinta con él y deja el probe detrás; la apertura desde la pantalla de
+   inicio (`/`) entra directa. El probe manda: si responde 401 (sin refresh posible), se borra todo y se va a
+   `/login`; si no responde (sin red, 5xx, límite), se queda lo último conocido. Pintado desde la caché, las lecturas
+   esperan al probe en vez de recoger un 401 cada una en la primera apertura de la hora.
+5. **Se borra** (registro, memoria y usuario guardado) al cerrar sesión, cuando el servidor rechaza la sesión, al
+   entrar como otro usuario (el login reclama el registro y lo borra si es de otro) y cuando cambia el build.
+6. **Nada nuevo en pantalla:** lo restaurado puede tener unos segundos o días; no había un indicador de «actualizando»
+   y no se añade uno. Las páginas que esperan a `isPending` pintan contenido al momento.
+7. **Desactivado bajo navegador automatizado** (`navigator.webdriver`, como el service worker) salvo que la página lo
+   pida (`hour.e2e.device-cache` en `localStorage`): una recarga en un E2E sigue probando lo que guardó el servidor.
+   `tests/device-cache.spec.ts` lo activa y prueba pintar antes del probe, el borrado al salir y el cambio de usuario.
+
+**Privacidad.** Contactos, conversaciones, cachés, facturas y cobros quedan en el teléfono o el ordenador en IndexedDB
+**sin cifrar**, como en una app nativa: los protege el bloqueo del dispositivo y se borran al cerrar sesión. Un
+dispositivo perdido sin código expone lo último visto hasta 7 días. Cifrar con una clave de sesión no protege nada
+mientras la clave viva en el mismo navegador; se descartó.
+
+**Alternativas.** (a) Todo menos el dinero: Cuentas seguiría abriendo en blanco y el dinero es lo que más se mira de
+pasada; Marco no quiso partir la regla. (b) Nada en el dispositivo y solo arreglar endpoints y cascada (propuestas 2 y
+3 del diagnóstico): baja el techo pero cada apertura sigue esperando a la red. Las dos siguen siendo compatibles con
+esto: la 2 y la 3 aceleran la revalidación.
+
+**Resultado medido** (mismo arnés; el después en `vite dev` contra la Supabase de producción, así que el FCP de dev no
+se compara con el de producción: lo que se compara es contenido menos montaje):
+
+| Contenido menos montaje (ms), reapertura / reapertura tras la hora | slow4g antes | slow4g después | fast3g antes | fast3g después |
+|---|---|---|---|---|
+| Producción `7c1de016` (antes) · Hoy | 2436 / 2399 | | 2462 / 3099 | |
+| Producción · Planner | 1161 / 1162 | | 1378 / 1489 | |
+| Producción · Conversaciones | 2746 / 1253 | | 1285 / 1221 | |
+| Producción · Cuentas | 807 / 954 | | 1210 / 1191 | |
+| `vite dev` · Hoy | 2283 / 2642 | 0 / 0 | 3022 / 2470 | 0 / 0 |
+| `vite dev` · Planner | 1571 / 1136 | 0 / 0 | 2131 / 2210 | 0 / 0 |
+| `vite dev` · Conversaciones | 1255 / 1305 | 0 / 0 | 1632 / 1671 | 0 / 1 |
+| `vite dev` · Cuentas | 503 / 632 | (1316) / 0 | 1672 / 1746 | 0 / 0 |
+
+Con la caché, el contenido está al montar la lente: en producción eso será el FCP de la reapertura, 0,6 a 1,2 s, en vez
+de 1,5 a 3,6 s (estimado: el despliegue no se ha medido). Los 401 de la primera apertura tras la hora siguen siendo 3,
+los del marco; las lecturas de la lente esperan al probe. El (1316) de Cuentas slow4g es un frío que no llegó a
+cargar en `vite dev` (el arnés agotó su tiempo), así que no había nada guardado. Hoy necesitó un arreglo: sus cobros
+se piden «desde tu última visita» y la clave cambia en cada apertura; ahora pinta con la respuesta anterior recortada
+(`paymentsSinceEarlier`) mientras llega la nueva.
+
+**Cómo se revierte.** Quitar `startQueryCache` de `src/routes/h/+layout.svelte` y el atajo de `src/routes/+page.svelte`
+deja la app como antes (el marco vuelve a esperar al probe). Para borrar lo que ya está en los dispositivos, dejar
+una versión con `wipeQueryCache()` al arrancar, o subir `DB_VERSION` y borrar `query_cache` en el `upgrade`. Un deploy
+ya invalida todos los registros por el buster.
+
+**Re-evaluar cuando** haya usuarios externos en la beta (si el borrado al salir basta para su política de datos) o
+el registro de `muk-cia` pese lo bastante como para notarse al escribir.
