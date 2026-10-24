@@ -69,6 +69,7 @@
     type DeskItem,
   } from '$lib/desk-feed';
   import {
+    changedBandLoading,
     changesSince,
     elapsedSince,
     goingAsks,
@@ -309,10 +310,9 @@
     toStore(() => conversationOverviewQueryOptions(filterIds, lineIds, !scopeUnresolved && readConversations)),
   );
   let overview = $derived(readConversations ? ($overviewQuery.data ?? null) : null);
-  // The last mailout, its own read (2026-10-24), and the band does not wait for
-  // it: it is a quiet line of news that joins the band when it lands (about
-  // 1.5 s of server time, the RLS of `mailout`), as a refetch's news do. The
-  // cost: for that moment a band with no other news says «nothing new».
+  // The last mailout, its own read (2026-10-24): a band with other news does
+  // not wait for it (it joins them when it lands); one with none stays busy
+  // until it answers, never «nothing new» before (`changedBandLoading`).
   const lastMailoutQuery = createQuery(
     toStore(() => lastMailoutQueryOptions(filterIds, !scopeUnresolved && readConversations)),
   );
@@ -466,16 +466,17 @@
       (readMoney && $paymentsQuery.isError),
   );
   let changedLoading = $derived.by(() => {
-    if (changedErrored) return false;
     // Read up front, as `waitingLoading` does: a store read only behind `||` is not subscribed.
     const overviewPending = $overviewQuery.isPending;
+    const mailoutPending = $lastMailoutQuery.isPending;
     const threadsPending = $threadsQuery.isPending;
     const paymentsPending = $paymentsQuery.isPending;
-    return (
-      (readConversations && overviewPending) ||
-      (readTeam && threadsPending) ||
-      (readMoney && paymentsPending)
-    );
+    return changedBandLoading({
+      errored: changedErrored,
+      pending: [readConversations && overviewPending, readTeam && threadsPending, readMoney && paymentsPending],
+      mailoutPending: readConversations && mailoutPending,
+      hasChanges: changes.length > 0,
+    });
   });
   let quietLabel = $derived.by(() => {
     if (!lastVisit) return t('desk.changed_none_first', locale);
