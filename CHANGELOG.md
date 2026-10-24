@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- Hoy carga antes: las consultas van a la vez, el último envío llega aparte sin frenar la pantalla, y abrir la app pide la sesión una sola vez. (2026-10-24, `7c1de016`)
 - En el móvil, Hour respira: los botones tienen su tamaño y el toque sigue siendo cómodo, más margen a los lados, Cuentas con aire entre filas, y la barra de secciones marca la tuya con una línea, reparte el ancho y no se pega al borde ni al indicador del iPhone. (2026-10-24, `78131bba`)
 - En Hoy y en «Siguiente» del raíl, una opción o una propuesta ya no sale sobre un rectángulo blanco, y la tarjeta dice qué opción es y cuándo vence. (2026-10-23, `30912dc4`)
 - Hour se instala con su icono: en el iPhone o el iPad, Compartir › Añadir a pantalla de inicio; en el Mac, Safari › Archivo › Añadir al Dock. Se abre en su propia ventana. (2026-10-23, `15603cd7`)
