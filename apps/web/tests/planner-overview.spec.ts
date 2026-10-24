@@ -6,8 +6,8 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
 
 /**
  * THE SEASON IS THE PORTADA (ADR-117). The Planner opens on twelve weeks from
- * today: the census in one line, the strip, what to decide, what is not
- * closed, the holes and who is out. Read-only: it never writes, so it can run
+ * today: the strip, what to decide, what is not closed, the holes and who is
+ * out, each block drawn when it has something (ADR-145). Read-only: it never writes, so it can run
  * against the fixture space without owning a row.
  *
  * Runs against a deployed origin or `vite dev` (`PW_BASE_URL`), never `vite
@@ -52,15 +52,16 @@ test.describe('the season (ADR-117)', () => {
     await expect(page.locator('.ov .d--today')).toHaveCount(1);
   });
 
-  test('EVERY BLOCK IS THERE, EMPTY OR NOT — a block that vanishes reads as «did not load»', async ({
-    page,
-  }) => {
+  test('THE STRIP IS ALWAYS THERE, AND THE SEASON DOES NOT COUNT ITSELF TWICE', async ({ page }) => {
     await open(page);
-    // Strip + decide + clashes + unclosed + gaps + away.
-    await expect(page.locator('.ov .block-head h2')).toHaveCount(6);
+    // A block with nothing in it is not drawn (ADR-145 § 1); the strip is the
+    // one that stays, empty or not.
+    await expect(page.locator('.ov__strip .block-head h2')).toHaveCount(1);
+    // Its census line is gone (ADR-145, fase 2): every figure it printed is a
+    // block below. Out of calm, with nobody guessed, the facts block is not drawn.
+    await expect(page.locator('.cal__facts')).toHaveCount(0);
     // Nothing is still waiting once the lens says it has loaded.
-    // The census lives in the head's window line, with every other drawing's.
-    expect(await page.locator('.cal__meta--window').innerText()).not.toContain('–');
+    expect(await page.locator('.ov').innerText()).not.toMatch(/·\s*–/);
   });
 
   test('A DAY OF THE STRIP OPENS THAT DAY', async ({ page }) => {

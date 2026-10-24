@@ -2174,7 +2174,6 @@
   let seasonTitle = $derived(
     `${localeDayMonth(season.from, localeTag)} → ${localeDayMonth(season.to, localeTag)}`,
   );
-  let seasonWindowLabel = $derived(t('planner.season_weeks', locale, { n: season.weeks.length }));
   let horizonTitle = $derived.by(() => {
     const s = t('planner.agenda_from', locale, { day: localeDayMonth(agendaFromIso, localeTag) });
     return `${s.charAt(0).toUpperCase()}${s.slice(1)}`;
@@ -2598,6 +2597,13 @@
     for (const d of shownDates) if (datePersonVerdict(d) === 'inferred') n++;
     return n;
   });
+
+  /* THE SEASON'S FACTS BLOCK IS EMPTY, SO IT IS NOT DRAWN (ADR-145 § 1, fase
+     2). Without its census the Season has nothing on either line unless calm
+     or a guessed cast has something to say: two empty struts and a rule over
+     the views were furniture. The other four drawings keep the block whole,
+     so their controls do not move between them. */
+  let factsDrawn = $derived(view !== 'overview' || !shows('planner', 'census', calm.on) || statInferred > 0);
 
   let statTrips = $derived.by(() => {
     let n = 0;
@@ -3219,6 +3225,7 @@
 
        The second line simply is not there when the drawing has nothing to
        say about itself — an empty Day. -->
+  {#if factsDrawn}
   <div class="cal__facts">
   <p class="cal__meta cal__meta--queue">
       <!-- Stats strip (ADR-080 §6 calls it the pulse strip; the pulse is now
@@ -3311,43 +3318,11 @@
              grows, so neither prints one. -->
         <!-- Weeks range: BOUNDED drawings only — the board grew a horizon
              and what grows is never counted. -->
-        <!-- The season names its horizon AND counts it, here, in the strip
-             every other drawing counts in: one strip, one style, one word per
-             fact (revisión del Planner, 2026-10-18). It used to carry its own
-             census under the tabs, lowercase, with «firm» where this line
-             said «confirmed». -->
-        {#if view === 'overview' && shows('planner', 'census', calm.on)}
-          <span class="cal__stat cal__stat--soft">{seasonWindowLabel}</span>
-          <span class="cal__stat"
-            ><b>{fig(seasonFacts.perfs)}</b>
-            {t(figOne(seasonFacts.perfs) ? 'planner.season_perf_one' : 'planner.season_perfs', locale)}</span
-          >
-          <span class="cal__stat"
-            ><b>{fig(seasonFacts.confirmed)}</b>
-            {t(figOne(seasonFacts.confirmed) ? 'planner.stat_confirmed_one' : 'planner.stat_confirmed', locale)}</span
-          >
-          <span class="cal__stat"
-            ><b>{fig(seasonFacts.holds)}</b>
-            {t(figOne(seasonFacts.holds) ? 'planner.stat_holds_one' : 'planner.stat_holds', locale)}</span
-          >
-          {#if !decisionsAbsent}
-            <span class="cal__stat" class:cal__stat--red={figuresKnown && decisionVMs.length > 0}
-              ><b>{fig(decisionVMs.length)}</b> {t('planner.season_to_decide', locale)}</span
-            >
-          {/if}
-          <span class="cal__stat" class:cal__stat--red={figuresKnown && seasonFacts.clashes > 0}
-            ><b>{fig(seasonFacts.clashes)}</b>
-            {t(figOne(seasonFacts.clashes) ? 'planner.season_clash_one' : 'planner.season_clashes', locale)}</span
-          >
-          <span class="cal__stat"
-            ><b>{fig(seasonFacts.unclosed)}</b> {t('planner.season_unclosed', locale)}</span
-          >
-          <span class="cal__stat"
-            ><b>{fig(seasonFacts.free)}</b>
-            {t(figOne(seasonFacts.free) ? 'planner.stat_free_one' : 'planner.stat_free', locale)}</span
-          >
-        {/if}
-
+        <!-- THE SEASON DOES NOT COUNT ITSELF HERE (ADR-145, fase 2). Its title
+             is its horizon, and every figure this line printed («0 por
+             decidir · 0 choques · 0 sin cerrar · 79 noches libres») is a block
+             right below, drawn when it has something: each fact was said
+             twice, once in the page's smallest type. -->
         <!-- The board names its grain and its horizon: a window that grows
              names where it begins and says NO END — what grows is never
              counted (law: el horizonte del tablero). Lanes from the one
@@ -3435,6 +3410,7 @@
         {/if}
     </p>
   </div>
+  {/if}
   <!-- THE DRAWER OPENS UNDER THE STRIP THAT NAMES IT — the queue line says
        `3 to decide · 1 urgent`, and what it names unfolds beneath both lines,
        above the controls. Not between them: the window line is a caption of
@@ -3846,13 +3822,13 @@
          a declaration. The global tokens are for what the whole app shares —
          space, colour, the reading scale — and these four are this page's.
 
-         FIXED px, and not the fluid `--text-*` clamps, ON PURPOSE: this is a
-         mono line whose grid is made of `·` separators and tabular numbers,
-         and `--text-xs` (9.7→10.2 with the viewport) would slide that grid
-         between one screen width and another. The reading scale breathes
-         because prose should; a report's ruler must not. */
-      --meta-line: 0.6875rem; /* the queue — mono read as WORDS, so short tracking */
-      --meta-caption: 0.5938rem; /* the window — a field you consult, so wide */
+         The two sizes were fixed px (11 and 9.5) so the `·` grid would not
+         slide with the viewport; since ADR-145 (fase 2) they are the scale's,
+         because a ruler of its own was one more style on every screen: the
+         queue at the label step, the window at the margin voice, and on a
+         phone both meet at 11. */
+      --meta-line: var(--text-xs); /* the queue — mono read as WORDS, so short tracking */
+      --meta-caption: var(--text-2xs); /* the window — a field you consult, so wide */
       --meta-track-line: 0.055em;
       --meta-track-caption: 0.13em;
 
@@ -3861,8 +3837,9 @@
       gap: var(--space-m);
     }
 
-    /* BAND 3 · the machine. Mono 9.5px in caps — one of the three scales the
-       head runs on (window 29px serif · view 21px serif · meta 9.5px mono). */
+    /* BAND 3 · the machine. Mono in caps at the margin voice (`--text-2xs`) —
+       one of the three scales the head runs on (window serif · view serif ·
+       meta mono). */
     .cal__meta {
       display: flex;
       flex-wrap: wrap;
@@ -3893,13 +3870,7 @@
          The house pattern for a drawing's own measurements is a NAMED LOCAL
          (`--eyebrow-tracking`, `--cal-wk-gutter`), not a number dropped into
          a declaration. The global tokens are for what the whole app shares —
-         space, colour, the reading scale — and these four are this band's.
-
-         FIXED px, and not the fluid `--text-*` clamps, ON PURPOSE: this is a
-         mono line whose grid is made of `·` separators and tabular numbers,
-         and `--text-xs` (9.7→10.2 with the viewport) would slide that grid
-         between one screen width and another. The reading scale breathes
-         because prose should; a report's ruler must not. */
+         space, colour, the reading scale — and these four are this band's. */
       display: flex;
       flex-direction: column;
       gap: var(--space-xs);
@@ -3968,11 +3939,6 @@
       overflow: hidden;
       margin-inline-end: calc(-1 * var(--space-s));
       pointer-events: none;
-    }
-    /* A count that asks for a call takes the danger ink, digits and word. */
-    .cal__stat--red,
-    .cal__stat--red b {
-      color: var(--danger-semi-dark);
     }
     .cal__stat-chev {
       font-style: normal;

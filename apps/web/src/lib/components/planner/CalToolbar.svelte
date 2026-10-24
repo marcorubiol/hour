@@ -107,8 +107,12 @@
        the row's own height, because a control that outgrows its band starts
        announcing itself instead of waiting to be used. -->
   {#if onCreate}
+    <!-- On a phone the word is not drawn (the row holds the views and the two
+         acts, ADR-145 fase 2); it is still the button's name, heard. -->
     <button type="button" class="cal__add hit" onclick={onCreate}
-      >＋ <span>{t('planner.date_word', locale)}</span></button
+      >＋ <span class="cal__add-word" aria-hidden="true">{t('planner.date_word', locale)}</span><span
+        class="visually-hidden">{t('planner.date_word', locale)}</span
+      ></button
     >
   {/if}
   <Menu
@@ -137,15 +141,6 @@
     /* A finger's target on touch (móvil #5): 28px squares and 17px words
        were under half of it. The target reaches past them (`.hit`,
        base.css); the squares and the words keep the row's height. */
-    @media (max-width: 47.999rem) {
-      /* TWO ROWS, NOT THREE (móvil #4): the words that name the drawing take
-         the first row; the two acts the second. */
-      .cal__views {
-        order: -1;
-        flex-basis: 100%;
-      }
-    }
-
     /* ── BAND 2 · the view, 21px serif, full ink ────────────────────── */
     .cal__views {
       display: flex;
@@ -296,7 +291,7 @@
       line-height: 1;
       cursor: pointer;
     }
-    .cal__add span {
+    .cal__add-word {
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
       letter-spacing: var(--tracking-l);
@@ -333,5 +328,40 @@
 
     /* Named projection toggle + Agrupa per — text tabs, active underlined
        (ADR-076: nunca un icono). Lighter than a pill: the word is the tab. */
+
+    /* After the rules it bends, so it wins at their specificity. */
+    @media (max-width: 47.999rem) {
+      /* ONE ROW (ADR-145, fase 2): the words that name the drawing and the
+         two acts share it, as on a desk. The acts were a row of their own,
+         56 px over the grid for two buttons. The words take what the acts
+         leave (`flex-basis: 0`, so they never push the acts to a second
+         line) and sit closer than on a desk; the board's dial, the one thing
+         that does not fit beside them, drops under the row. */
+      .cal__views {
+        flex: 1 1 0;
+        min-inline-size: 0;
+        gap: var(--space-s);
+        align-self: center;
+      }
+      .cal__spacer {
+        display: none;
+      }
+      .cal__dial {
+        order: 1;
+        flex-basis: 100%;
+        margin-inline-start: 0;
+      }
+      /* The five words, «＋ FECHA» and «⋯» measured 373 px on a row of 349:
+         the add keeps its ground and its ＋, in the kebab's square, and its
+         word is heard (the button's name), not drawn. */
+      .cal__add {
+        inline-size: var(--control-size-xs);
+        padding-inline: 0;
+        justify-content: center;
+      }
+      .cal__add-word {
+        display: none;
+      }
+    }
   }
 </style>

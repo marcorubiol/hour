@@ -62,6 +62,7 @@
     esTaxLines,
     expectedInflow,
     fmtFee,
+    fmtCurrency,
     fmtMoney,
     fmtMoneyCompact,
     invoicesByBolo as groupInvoicesByBolo,
@@ -251,7 +252,6 @@
   let pickedSeason = $state<number | null>(null);
   let season = $derived(pickedSeason ?? currentSeason);
   let seasonBolos = $derived(bolos.filter((b) => boloSeason(b, today) === season));
-  let obraNames = $derived([...new Set(seasonBolos.map((b) => b.project?.name).filter(Boolean))] as string[]);
   function seasonSpan(start: number): string {
     const m = (y: number, month: number) =>
       new Intl.DateTimeFormat(localeTag, { month: 'short', year: '2-digit', timeZone: 'UTC' }).format(
@@ -954,25 +954,32 @@
       {#if !noAccess}
         <!-- One child, so the sub line's «·» separators stay out of it (as Desk's «+ Tarea»). -->
         <span class="mny__subrow">
+          <!-- ONE SELECTOR, ONE SEASON (ADR-145, fase 2): «Temporada 26-27 ▾»,
+               the native list, instead of every season in a row and the one
+               obra after them, which read as noise. One way to write a season,
+               the «26-27» of the figure and of Desk: «sept 26» read as a day. -->
           <span class="mny__subleft">
             {#if seasons.length > 1}
-              <!-- One way to write a season, the «26-27» of the figure and of Desk: «sept 26» read as a day. -->
-              <span class="mny__seasons" role="group" aria-label={t('books.season_pick', locale)}>
-                {t('books.season_word', locale)}
-                {#each seasons as s (s)}
-                  <button
-                    type="button"
-                    class="lenshead__frag mny__season"
-                    aria-current={s === season ? 'true' : undefined}
-                    title={seasonSpan(s)}
-                    onclick={() => (pickedSeason = s === currentSeason ? null : s)}
-                  >{seasonLabel(s)}</button>
-                {/each}
-              </span>
+              <label class="mny__seasons">
+                <span class="visually-hidden">{t('books.season_pick', locale)}</span>
+                <select
+                  class="mny__season"
+                  value={season}
+                  title={seasonSpan(season)}
+                  onchange={(e) => {
+                    const s = Number(e.currentTarget.value);
+                    pickedSeason = s === currentSeason ? null : s;
+                  }}
+                >
+                  {#each seasons as s (s)}
+                    <option value={s}>{t('books.season_sub', locale, { season: seasonLabel(s) })}</option>
+                  {/each}
+                </select>
+                <span class="status-caret" aria-hidden="true">▾</span>
+              </label>
             {:else}
               <span>{t('books.season_sub', locale, { season: seasonLabel(season) })}</span>
             {/if}
-            {#if obraNames.length === 1}<span>· {obraNames[0]}</span>{/if}
           </span>
           {#if !seasonEmpty}
             <Button size="xs" variant="secondary" onclick={openDeal} disabled={projectIndex.length === 0}>{t('books.new_deal', locale)}</Button>
@@ -1016,34 +1023,35 @@
               {#if shows('books', 'other_figures', calm.on)}
               <button type="button" class="fig" data-fig="owed" onclick={() => showLedger('owed')}>
                 <span class="fig__label eyebrow eyebrow--sub">{t('books.fig_owed', locale)}</span>
-                <span class="fig__num stat">{fmtMoneyCompact(pos.owed)}<span class="fig__cur">{pos.currency}</span></span>
+                <span class="fig__num stat">{fmtCurrency(pos.owed, pos.currency)}</span>
+                {#if pos.owedCount > 0}
                 <span class="fig__sub">
                   {#if pos.overdue > 0}
                     <span class="fig__danger">{t('books.fig_overdue', locale, { amount: fmtMoneyCompact(pos.overdue) })}</span>
                     · {t(pos.owedCount === 1 ? 'books.fig_of_one' : 'books.fig_of_many', locale, { n: pos.owedCount })}
-                  {:else if pos.owedCount > 0}
-                    {t('books.fig_nothing_late', locale)} · {t(pos.owedCount === 1 ? 'books.fig_of_one' : 'books.fig_of_many', locale, { n: pos.owedCount })}
                   {:else}
-                    {t('books.fig_owed_none', locale)}
+                    {t('books.fig_nothing_late', locale)} · {t(pos.owedCount === 1 ? 'books.fig_of_one' : 'books.fig_of_many', locale, { n: pos.owedCount })}
                   {/if}
                 </span>
+                {/if}
               </button>
               <button type="button" class="fig" data-fig="to_invoice" onclick={() => showLedger('to_invoice')}>
                 <span class="fig__label eyebrow eyebrow--sub">{t('books.fig_to_invoice', locale)}</span>
-                <span class="fig__num stat">{fmtMoneyCompact(pos.toInvoice)}<span class="fig__cur">{pos.currency}</span></span>
-                <span class="fig__sub">{pos.toInvoiceCount === 0 ? t('books.fig_to_invoice_none', locale) : t(pos.toInvoiceCount === 1 ? 'books.fig_to_invoice_one' : 'books.fig_to_invoice_many', locale, { n: pos.toInvoiceCount })}</span>
+                <span class="fig__num stat">{fmtCurrency(pos.toInvoice, pos.currency)}</span>
+                {#if pos.toInvoiceCount > 0}<span class="fig__sub">{t(pos.toInvoiceCount === 1 ? 'books.fig_to_invoice_one' : 'books.fig_to_invoice_many', locale, { n: pos.toInvoiceCount })}</span>{/if}
               </button>
               {/if}
               <div class="fig" data-fig="inflow">
                 <span class="fig__label eyebrow eyebrow--sub">{t('books.fig_inflow', locale)}</span>
-                <span class="fig__num stat">{fmtMoneyCompact(pos.inflow30)}<span class="fig__cur">{pos.currency}</span></span>
-                <span class="fig__sub">{pos.inflow30Count === 0 ? t('books.fig_inflow_none', locale) : t(pos.inflow30Count === 1 ? 'books.fig_inflow_one' : 'books.fig_inflow_many', locale, { n: pos.inflow30Count })}</span>
+                <span class="fig__num stat">{fmtCurrency(pos.inflow30, pos.currency)}</span>
+                {#if pos.inflow30Count > 0}<span class="fig__sub">{t(pos.inflow30Count === 1 ? 'books.fig_inflow_one' : 'books.fig_inflow_many', locale, { n: pos.inflow30Count })}</span>{/if}
               </div>
               {#if shows('books', 'other_figures', calm.on)}
               <button type="button" class="fig" data-fig="season" onclick={() => showLedger('all')}>
                 <span class="fig__label eyebrow eyebrow--sub">{t('books.fig_season', locale)} {seasonLabel(season)}</span>
-                <span class="fig__num stat">{fmtMoneyCompact(pos.collected)}<span class="fig__cur">{pos.currency}</span></span>
-                <span class="fig__sub">{t('books.fig_collected_of_sold', locale, { amount: fmtMoneyCompact(pos.sold) })}</span>
+                <span class="fig__num stat">{fmtCurrency(pos.collected, pos.currency)}</span>
+                {#if pos.sold > 0}<span class="fig__sub">{t('books.fig_collected_of_sold', locale, { amount: fmtMoneyCompact(pos.sold) })}</span>{/if}
+                {#if pos.sold > 0}
                 <span class="fig__bar" role="img" aria-label={t('books.fig_bar_aria', locale, { collected: fmtMoney(pos.collected), invoiced: fmtMoney(pos.invoicedOpen), uninvoiced: fmtMoney(pos.uninvoiced) })}>
                   {#each [['collected', pos.collected], ['invoiced', pos.invoicedOpen], ['open', pos.uninvoiced]] as [tone, value] (tone)}
                     {#if Number(value) > 0}<span class="mbar__seg" data-tone={tone} style={`inline-size:${pct(Number(value), pos.sold)}%`}></span>{/if}
@@ -1054,6 +1062,7 @@
                   <span><i class="mkey" data-tone="invoiced"></i>{t('books.key_invoiced', locale)}</span>
                   <span><i class="mkey" data-tone="open"></i>{t('books.key_open', locale)}</span>
                 </span>
+                {/if}
                 {#if pos.holds > 0}
                   <span class="fig__sub">{t('books.fig_holds', locale, { amount: fmtMoneyCompact(pos.holds), n: pos.holdsCount })}</span>
                 {/if}
@@ -1465,10 +1474,12 @@
     .mny__subleft { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-xs) var(--space-s); }
     /* The deal button keeps its one line beside a season list that wraps (the phone scale, ADR-145 § 4). */
     .mny__subrow > :global([class*="btn--"]) { flex: none; white-space: nowrap; }
-    .mny__seasons { display: inline-flex; gap: var(--space-xs); align-items: baseline; }
-    .mny__season { appearance: none; border: 0; background: none; padding: 0; font: inherit; cursor: pointer; text-underline-offset: 0.25em; }
+    /* The season is a native select that reads as the sub line's words; the
+       caret is the one sign it opens, laid over its end (ADR-145, fase 2). */
+    .mny__seasons { position: relative; display: inline-flex; align-items: baseline; }
+    .mny__season { appearance: none; border: 0; background: none; padding: 0 1em 0 0; font: inherit; color: inherit; cursor: pointer; }
     .mny__season:hover { color: var(--text-color); }
-    .mny__season[aria-current='true'] { text-decoration: underline; }
+    .mny__seasons .status-caret { position: absolute; inset-inline-end: 0; pointer-events: none; }
     .mny__ghost { display: grid; gap: var(--space-xs); font-size: var(--text-s); }
     .mny__note { font-size: var(--text-xs); color: var(--text-faint); }
     .mny__empty { display: flex; flex-direction: column; gap: var(--space-s); align-items: flex-start; }
@@ -1478,19 +1489,19 @@
     /* ── 1 · the four figures ── */
     .figs { display: flex; flex-direction: column; gap: var(--space-s); }
     .figs__quiet { font-size: var(--text-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
-    .figs__row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-s); }
+    .figs__row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-m) var(--space-l); }
+    /* A FIGURE IS NOT A BOX (ADR-145, fase 2): its label, its number and,
+       when there is one, its sentence, on the page's ground. Four boxes for
+       four figures, three of them zero, were the screen's loudest shapes. */
     .fig {
       appearance: none; text-align: start; font: inherit; color: inherit;
       display: flex; flex-direction: column; gap: var(--space-2xs);
-      padding: var(--space-s) var(--space-m); border: var(--line-hairline) solid var(--border-color-light);
-      border-radius: var(--radius-m); background: var(--bg-ultra-light); min-inline-size: 0;
+      padding: 0; border: 0; background: none; min-inline-size: 0;
     }
-    /* A figure and its «i»: the «i» sits in the corner, beside the button, never in it. */
-    button.fig { cursor: pointer; transition: border-color var(--transition); }
-    button.fig:hover { border-color: var(--text-faint); }
-    .fig__num { display: flex; align-items: baseline; gap: var(--space-2xs); flex-wrap: wrap; }
-    /* The unit beside the figure speaks in the body face, not the mono of a head (ADR-145 § 3). */
-    .fig__cur { font-family: var(--font-sans); font-size: var(--text-xs); color: var(--text-muted); }
+    button.fig { cursor: pointer; }
+    button.fig:hover .fig__label { color: var(--text-color); }
+    /* The currency is the locale's («0 €», «€0»), part of the figure. */
+    .fig__num { white-space: nowrap; }
     .fig__sub { font-size: var(--text-xs); color: var(--text-muted); }
     .fig__danger { color: var(--danger); }
     .fig__bar { display: flex; gap: var(--space-2xs); block-size: var(--dot-m); border-radius: var(--radius-circle); background: var(--bg-light); overflow: hidden; margin-block: var(--space-2xs); }
@@ -1608,6 +1619,11 @@
       .book__venue { grid-column: 1; grid-row: 1; }
       .book__row .book__num:nth-of-type(5) { grid-column: 2; grid-row: 1; }
       .book__date { grid-column: 1; grid-row: 2; }
+      /* With the phone scale (ADR-145 § 4) a row's amount went mono at 14 and
+         outweighed the venue beside it. It reads in the body face, in
+         tabular figures, at the row's size; the date stays mono at the label
+         step (fase 2). */
+      .book .book__num, .att__amt { font-family: var(--font-sans); font-variant-numeric: tabular-nums; }
       .book__collect { grid-column: 2; grid-row: 2; justify-self: end; }
       .book .book__collect { padding-inline-start: 0; }
       .book__status, .book__doc, .book__row .book__num:nth-of-type(6), .book__owed { display: none; }

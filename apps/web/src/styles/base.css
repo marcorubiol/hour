@@ -1868,10 +1868,12 @@
   }
 
   /* Caret for status badges that double as dropdown triggers (conversation
-     table, performance header). One rule for both consumers. */
+     table, performance header, the season of Cuentas). One rule for all.
+     At the margin voice, on the scale: 0.8em of a badge was an 8.8 px style
+     of its own in every row of Difusión (ADR-145, fase 2). */
   .status-caret {
     margin-inline-start: 0.35em;
-    font-size: 0.8em;
+    font-size: var(--text-2xs);
     opacity: 0.6;
   }
 

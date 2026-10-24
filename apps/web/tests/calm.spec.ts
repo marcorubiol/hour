@@ -41,7 +41,8 @@ test.describe('Calm — a composition, not a grey (ADR-139 § 5)', () => {
   test('the title says the day, never the debt, in both modes', async ({ page }) => {
     for (const calm of [false, true]) {
       await open(page, '/h/desk', calm);
-      const title = (await page.locator('.lenshead__title').first().innerText()).trim();
+      // The greeting opens the title line (ADR-145, fase 2); the day is its own part.
+      const title = (await page.locator('.lenshead__title .desk__day').first().innerText()).trim();
       expect(title, 'the title counts what is overdue').not.toMatch(/overdue|waiting for you|wait for you/i);
       expect(title).toMatch(/^(Today|Nothing on the plan today)/);
     }
