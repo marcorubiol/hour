@@ -509,6 +509,8 @@
 
 - [ ] **Difusión: un texto de 8,8 px en las filas** (`ConversationRow.svelte`), fuera de la escala de ADR-145.
 
+- [ ] **Modo «Ahora» para día de bolo** (Marco, 29-10, las seis recomendadas de `build/coordination/ahora-mode/research.md`): v1 en carril `claude/ahora`. Después: hotel y aparcamiento estructurados, billetes y rider en PDF, «qué ha cambiado», escribir sin red, aviso 30 min antes de la llamada.
+
 ## Deuda aceptada / observar en uso
 
 - [ ] **Los datos fiscales de una organización no se pueden retirar (visto el 2026-10-13, tests de la fase 4 de ADR-102).** Un borrado blando por PostgREST da 42501 (la fila borrada ya no pasa la policy de SELECT), `service_role` no tiene grant sobre `fiscal_identity` y no hay RPC para retirarla. La limpieza de `money-v3.test.ts` y de `money-payer-organization.test.ts` no borraba nada sin decirlo. Cuando haga falta: una RPC `retire_fiscal_identity` con `can_edit_workspace_money`. (chat 13-10, sin estimar)
