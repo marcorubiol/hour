@@ -253,6 +253,10 @@
        mouse; on a coarse pointer the controls that opt in grow to it by
        padding — never by type size. */
     --touch-target: 0px;
+    /* PULL TO REFRESH (the phone's frame, PullRefresh.svelte): how far the
+       mark travels before letting go refreshes, and the mark itself. */
+    --pull-threshold: 4.5rem;
+    --pull-mark: 1.25rem;
 
     --today-ink: var(--text-color);
     --today-weight: 600;

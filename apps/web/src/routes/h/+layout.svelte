@@ -36,6 +36,7 @@
   import AccountMenu from '$lib/components/shell/AccountMenu.svelte';
   import ScopeBar from '$lib/components/shell/ScopeBar.svelte';
   import ScopeRail from '$lib/components/shell/ScopeRail.svelte';
+  import PullRefresh from '$lib/components/shell/PullRefresh.svelte';
   import { isReservedWorkspaceSlug } from '$lib/reserved-slugs';
   import { detectLocale, setTrade, t, tradeOf } from '$lib/i18n';
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
@@ -770,6 +771,8 @@
     {/if}
 
     <main class="shell__main" id="main" tabindex="-1">
+      <!-- Pull to refresh on a phone: every lens, from the frame. -->
+      <PullRefresh {locale} />
       {#if routedLens}
         <ScopeBar
           {tokenLabel}
@@ -906,6 +909,8 @@
   }
 
   .shell__main {
+    /* The pull's mark (PullRefresh) hangs from main's top edge, under the bar. */
+    position: relative;
     display: flex;
     flex-direction: column;
     min-inline-size: 0;
