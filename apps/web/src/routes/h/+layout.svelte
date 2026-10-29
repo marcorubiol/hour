@@ -78,6 +78,9 @@
     type RealtimeHandle,
   } from '$lib/realtime';
   import { fetchJSON } from '$lib/api';
+  import { useAhoraPreload } from '$lib/ahora-feeds.svelte';
+  import { viewerTimeZone } from '$lib/datetime';
+  import { dayKeyInTz } from '$lib/planner';
   import {
     adoptCachedUser,
     clearSession,
@@ -627,6 +630,10 @@
     next();
     return () => clearTimeout(timer);
   });
+  // AHORA'S NEXT 48 HOURS ARE ON THE PHONE BEFORE ANYONE OPENS IT (ADR-146
+  // § 3): the device cache keeps what was asked, so the frame asks.
+  const shellTz = viewerTimeZone();
+  useAhoraPreload(() => dayKeyInTz(clockNow.toISOString(), shellTz));
   let clockTime = $derived(
     new Intl.DateTimeFormat(locale, {
       hour: '2-digit',

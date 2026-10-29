@@ -42,6 +42,7 @@ import { extractAccessToken } from '$lib/auth';
 import { DateCreateSchema, type DateRow } from '$lib/date';
 import { pgGet, pgPostRpc, PostgrestError, type SupabaseEnv } from '$lib/supabase';
 import { DATE_BASE_SELECT, DATE_EXTENDED_SELECT } from '$lib/server/date-select';
+import { STAGE_SELECT } from '$lib/travel-stage';
 import { scheduleOf, type ScheduleMoment, type ScheduleSlotRow } from '$lib/schedule-slot';
 import { pgErrorResponse } from '$lib/server/errors';
 import { json } from '$lib/server/http';
@@ -52,6 +53,9 @@ const QuerySchema = v.object({
   from: v.optional(v.pipe(v.string(), v.isoDate())),
   to: v.optional(v.pipe(v.string(), v.isoDate())),
   spans: v.optional(v.picklist(['1'])),
+  /** ADR-146 — a trip's stages (`travel_stage`), embedded in their order: the
+      pulse, «Lo siguiente» and Ahora read the train at 9h12, not «viaje». */
+  stages: v.optional(v.picklist(['1'])),
   limit: v.optional(
     v.pipe(
       v.string(),
@@ -139,7 +143,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       400,
     );
   }
-  const { project_ids, workspace_ids, from, to, spans, limit } = parsed.output;
+  const { project_ids, workspace_ids, from, to, spans, stages, limit } = parsed.output;
 
   const projectIds = parseUuidList(project_ids);
   const workspaceIds = parseUuidList(workspace_ids);
@@ -149,7 +153,11 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   // the catch below retries with the legacy columns while the migrations
   // aren't applied (42703 undefined column — graceful absence).
   // The columns live in `$lib/server/date-select`, shared with GET /:id.
-  search.set('select', DATE_EXTENDED_SELECT.join(','));
+  search.set(
+    'select',
+    [...DATE_EXTENDED_SELECT, ...(stages ? [`stages:travel_stage(${STAGE_SELECT})`] : [])].join(','),
+  );
+  if (stages) search.set('stages.order', 'position.asc');
 
   if (projectIds.length > 0 && workspaceIds.length > 0) {
     search.set(

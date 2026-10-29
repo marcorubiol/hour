@@ -73,8 +73,12 @@ export function createPulseFeeds(today: () => string) {
       toStore(() => ({
         queryKey: ['pulse-dates', datesFrom()] as const,
         staleTime: 5 * 60_000,
+        // With each trip's stages (ADR-146): the pulse, «Lo siguiente» and
+        // Ahora name the train at 9h12, not «viaje».
         queryFn: ({ signal }: { signal: AbortSignal }) =>
-          soft(() => fetchJSON<{ items: DateEvent[] }>(`/api/dates?from=${datesFrom()}&limit=200`, signal)),
+          soft(() =>
+            fetchJSON<{ items: DateEvent[] }>(`/api/dates?from=${datesFrom()}&limit=200&stages=1`, signal),
+          ),
       })),
     ),
   );
@@ -132,6 +136,10 @@ export function createPulseFeeds(today: () => string) {
     },
     get errored() {
       return perf.current.isError;
+    },
+    /** When the older of the two feeds last answered (ms; 0 = never). */
+    get updatedAt() {
+      return Math.min(perf.current.dataUpdatedAt || 0, dates.current.dataUpdatedAt || 0);
     },
     /** The axis has its inputs: until then it is inactive and would let every
         show speak, so a surface that names YOUR shows waits for this. */

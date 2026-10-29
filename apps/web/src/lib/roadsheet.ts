@@ -175,6 +175,26 @@ export function isRoadsheetRole(value: string): value is RoadsheetRole {
   return (ROADSHEET_ROLES as readonly string[]).includes(value);
 }
 
+/** Workspace roles that are the company's own crew (`is_workspace_internal_member`). */
+const INTERNAL_ROLES: ReadonlySet<string> = new Set(['owner', 'admin', 'member', 'viewer']);
+
+/**
+ * WHO MAY READ THE WHOLE SHEET (ADR-146 § 6). `full` carries the company's
+ * internal notes and the programmer: it is for the space's own crew. Anyone
+ * else asking for it — a bolo guest (ADR-142), or a login with no membership
+ * row in the space — gets the technician's cut, `tech_manager`: schedule,
+ * venue, logistics, technical, crew and cast with phones, never notes and
+ * never money. The other roles are previews and only ever show less, so
+ * they pass as asked. The server applies it; the screen only asks.
+ */
+export function roadsheetRoleFor(
+  requested: RoadsheetRole,
+  workspaceRole: string | null | undefined,
+): RoadsheetRole {
+  if (requested !== 'full') return requested;
+  return workspaceRole && INTERNAL_ROLES.has(workspaceRole) ? 'full' : 'tech_manager';
+}
+
 function stripPerson(p: RoadsheetPerson | null): RoadsheetPerson | null {
   return p ? { full_name: p.full_name } : null;
 }

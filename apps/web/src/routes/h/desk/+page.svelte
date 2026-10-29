@@ -36,6 +36,8 @@
   import DeskWaiting from '$lib/components/desk/DeskWaiting.svelte';
   import DeskChanged from '$lib/components/desk/DeskChanged.svelte';
   import DeskSeason from '$lib/components/desk/DeskSeason.svelte';
+  import AhoraView from '$lib/components/desk/AhoraView.svelte';
+  import { AHORA_KEY, ahoraDay, ahoraItems } from '$lib/ahora';
   import { accentVarFor } from '$lib/utils/accent';
   import { spaceName } from '$lib/utils/identity';
   import { detectLocale, LOCALE_TAG, t } from '$lib/i18n';
@@ -240,6 +242,47 @@
   });
   const kindLabel = (kind: SlipKind) => t(`planner.kind_${kind}`, locale);
   let slipCtx = $derived(pulseSlipContext(feeds.workspaces, viewerTz, kindLabel));
+
+  // ── Ahora (ADR-146): a mode of Hoy, in the URL so a reload keeps it ─────
+  let ahoraMode = $derived(page.url.searchParams.get('mode') === 'ahora');
+  function withMode(on: boolean): string {
+    const u = new URL(page.url);
+    if (on) u.searchParams.set('mode', 'ahora');
+    else u.searchParams.delete('mode');
+    return `${u.pathname}${u.search}`;
+  }
+  let ahoraHref = $derived(withMode(true));
+  let exitHref = $derived(withMode(false));
+  let ahoraRows = $derived(
+    feeds.axisSettled ? ahoraItems({ performances: feeds.performances, dates: feeds.dates, viewerTz, axis: feeds.axis }) : [],
+  );
+  let ahoraOn = $derived(ahoraDay(ahoraRows, clockNow, viewerTz));
+  /** «Lo siguiente» suggests it on the day itself: a show or a trip of yours today. */
+  let ahoraSuggest = $derived.by(() => {
+    if (ahoraOn !== today) return null;
+    // The show names the day when there is one; the trip only on a day of travel.
+    const live = ahoraRows.filter((i) => i.day === today && i.end > clockNow.getTime());
+    const first = live.find((i) => i.of === 'performance') ?? live[0];
+    if (!first) return null;
+    const place =
+      first.of === 'performance'
+        ? (performanceSlip(first.row as PerformanceEvent, slipCtx).city ?? performanceSlip(first.row as PerformanceEvent, slipCtx).name)
+        : ((first.row as DateEvent).destination_city ?? (first.row as DateEvent).city ?? '');
+    return {
+      text: t(first.of === 'performance' ? 'ahora.suggest_show' : 'ahora.suggest_trip', locale, { place }),
+      href: ahoraHref,
+    };
+  });
+  // The home-screen app opens straight in Ahora on the day it was left open
+  // (`/`, `ahoraRelaunch`); back on Hoy, it forgets.
+  $effect(() => {
+    try {
+      if (ahoraMode) localStorage.setItem(AHORA_KEY, today);
+      else localStorage.removeItem(AHORA_KEY);
+    } catch {
+      /* private window: a relaunch opens Hoy */
+    }
+  });
   // Who goes, by name: the Planner's team feed (same key, one cache). Null
   // until it lands, so the card never says «sin reparto» while it loads.
   const teamQuery = createQuery(toStore(() => teamQueryOptions(feeds.workspaces.map((w) => w.id))));
@@ -786,8 +829,23 @@
   };
 </script>
 
-<svelte:head><title>{docTitle(t('lens.desk', locale))}</title></svelte:head>
+<svelte:head><title>{docTitle(t(ahoraMode ? 'ahora.title' : 'lens.desk', locale))}</title></svelte:head>
 
+{#if ahoraMode}
+  <AhoraView
+    performances={feeds.performances}
+    dates={feeds.dates}
+    axis={feeds.axis}
+    workspaces={feeds.workspaces}
+    settled={feeds.settled && feeds.axisSettled}
+    updatedAt={feeds.updatedAt || null}
+    now={clockNow}
+    {viewerTz}
+    {slipCtx}
+    {exitHref}
+    {locale}
+  />
+{:else}
 <div class="desk" class:desk--calm={calm.on} aria-busy={busy}>
   <!-- GREETING AND DAY ARE ONE LINE (ADR-145, fase 2): one idea in one face,
        the greeting an ink quieter than the day. They were two serif styles on
@@ -805,7 +863,12 @@
       >
     </span>
   {/snippet}
-  <LensHeader help="desk" {title} sub={taskSpaces.length > 0 ? addTask : undefined} />
+  <!-- AHORA'S DOOR (ADR-146): fixed in the title row while something of
+       yours is on in the next 48 hours; never enters by itself. -->
+  {#snippet ahoraDoor()}
+    <a class="desk__ahora hit" href={ahoraHref} aria-label={t('ahora.enter_aria', locale)} data-testid="ahora-enter">{t('ahora.title', locale)}</a>
+  {/snippet}
+  <LensHeader help="desk" {title} titleAside={ahoraOn ? ahoraDoor : undefined} sub={taskSpaces.length > 0 ? addTask : undefined} />
 
   <FirstVisitCard section="desk" steps={['desk-next', 'desk-waits', 'desk-more']} />
 
@@ -837,6 +900,7 @@
           boardNew={nextBoardNew}
           {slipCtx}
           {personNames}
+          ahora={ahoraSuggest}
           {locale}
         />
       </div>
@@ -900,6 +964,7 @@
     {/if}
   </div>
 </div>
+{/if}
 
 <style>
   @layer components {
@@ -924,6 +989,22 @@
     .desk__add[aria-expanded='true'] {
       --btn-text-color: var(--heading-color);
       --btn-border-color: var(--border-color-hover);
+    }
+    /* The Planner's «Hoy» pill (CalNav), in ink: the one door of the title
+       row, quiet until it is wanted; `.hit` gives a finger its 44px. */
+    .desk__ahora {
+      flex: none;
+      padding: var(--space-xs) var(--space-s);
+      border: var(--line-hairline) solid var(--border-color-dark);
+      border-radius: var(--radius-circle);
+      background: var(--bg-ultra-light);
+      color: var(--heading-color);
+      font-size: var(--text-s);
+      line-height: 1.1;
+      text-decoration: none;
+    }
+    .desk__ahora:hover {
+      border-color: var(--heading-color);
     }
     .desk__composer {
       margin-block-start: calc(-1 * var(--space-s));

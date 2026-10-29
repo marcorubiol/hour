@@ -310,3 +310,65 @@ describe('next in calm (enmienda a ADR-096 § 5)', () => {
     expect(inside.now.doing?.ref.id).toBe('h1');
   });
 });
+
+describe('a trip is its stages, and the sheet knows doors and curfew (ADR-146)', () => {
+  const trip = date({
+    id: 't1',
+    kind: 'travel_day',
+    all_day: true,
+    starts_at: `${DAY}T00:00:00Z`,
+    stages: [
+      {
+        id: 's1',
+        position: 1,
+        mode: 'train',
+        from_city: 'Barcelona',
+        from_country: null,
+        from_place: 'Sants',
+        to_city: 'Girona',
+        to_country: null,
+        to_place: null,
+        depart_at: `${DAY}T07:12:00Z`,
+        arrive_at: `${DAY}T08:31:00Z`,
+        depart_tz: null,
+        arrive_tz: null,
+        from_venue_id: null,
+        to_venue_id: null,
+        reference: 'K7Q2PX',
+        notes: null,
+      },
+    ],
+  });
+
+  test('NEXT names the first departure, not an untimed «viaje»', () => {
+    const p = pulse({ performances: [], dates: [trip], viewerTz: TZ }, at('06:30:00'));
+    expect(p.next?.ref.id).toBe('t1');
+    expect(p.next?.at).toBe(`${DAY}T07:12:00Z`);
+  });
+
+  test('NOW is the train while you are on it, until it arrives', () => {
+    const p = pulse({ performances: [], dates: [trip], viewerTz: TZ }, at('07:40:00'));
+    expect(p.now.doing?.word).toEqual({ of: 'stage', key: 'train' });
+    expect(p.now.until?.at).toBe(`${DAY}T08:31:00.000Z`);
+  });
+
+  test('after the arrival you are back on the travel day', () => {
+    const p = pulse({ performances: [], dates: [trip], viewerTz: TZ }, at('09:00:00'));
+    expect(p.now.doing?.word).toEqual({ of: 'kind', key: 'travel_day', label: null });
+  });
+
+  test('doors is a moment, curfew closes the sheet', () => {
+    const show = perf({
+      start_at: `${DAY}T18:30:00Z`,
+      schedule: [
+        { kind: 'doors', label: null, at: `${DAY}T18:00:00Z`, ends_at: null },
+        { kind: 'start', label: null, at: `${DAY}T18:30:00Z`, ends_at: null },
+        { kind: 'curfew', label: null, at: `${DAY}T21:30:00Z`, ends_at: null },
+      ],
+    });
+    const atDoors = pulse({ performances: [show], dates: [], viewerTz: TZ }, at('18:10:00'));
+    expect(atDoors.now.doing?.word).toEqual({ of: 'step', key: 'doors' });
+    const after = pulse({ performances: [show], dates: [], viewerTz: TZ }, at('21:40:00'));
+    expect(after.now.doing).toBeNull();
+  });
+});

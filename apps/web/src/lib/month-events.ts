@@ -11,6 +11,7 @@ import { decideBy, performanceStatusFamily, type StatusFamily } from '$lib/perfo
 import { dateStatusFamily } from '$lib/date';
 import type { ScheduleMoment } from '$lib/schedule-slot';
 import type { Commitment } from '$lib/people';
+import type { TravelStageRow } from '$lib/travel-stage';
 
 export type ProjectLite = {
   id: string;
@@ -107,6 +108,9 @@ export type DateEvent = {
   /** ADR-103 — each person's «voy / no voy» on it. Without any, who goes is
       inferred from the project cast. */
   commitments?: Commitment[] | null;
+  /** ADR-146 — a trip's stages, in their order, on the feeds that ask
+      `?stages=1` (the pulse's). Absent elsewhere: a trip is then one row. */
+  stages?: TravelStageRow[] | null;
 };
 
 /**
@@ -650,7 +654,6 @@ export function runSheetSteps(p: PerformanceEvent): RunSheetStep[] {
   return out;
 }
 
-const LEGACY_STEP_KEYS: ReadonlySet<string> = new Set(RUN_SHEET_ORDER.map(([k]) => k));
 
 /**
  * One moment of a day's running order, for the drawings that read it whole
@@ -658,7 +661,30 @@ const LEGACY_STEP_KEYS: ReadonlySet<string> = new Set(RUN_SHEET_ORDER.map(([k]) 
  * named (`key: null`, `label: 'photo call'`). A legacy step renamed by hand
  * keeps its key and carries its label too.
  */
-export type DayMoment = { key: RunSheetStepKey | null; label: string | null; at: string };
+export type DayMoment = { key: MomentKey | null; label: string | null; at: string };
+
+/**
+ * The moments with a NAME in the vocabulary: the five, plus doors and curfew
+ * (ADR-146). `schedule_slot.kind` is text, so the two need no migration; they
+ * are not columns either, so `runSheetSteps` (the five) never sees them and
+ * only a feed that carries `schedule` can say them.
+ */
+export type MomentKey = RunSheetStepKey | 'doors' | 'curfew';
+
+export const MOMENT_KEYS: ReadonlySet<string> = new Set<MomentKey>([
+  'load_in',
+  'soundcheck',
+  'doors',
+  'start',
+  'loadout',
+  'wrap',
+  'curfew',
+]);
+
+/** The dictionary key of a moment's word (`desk.anchor_*`, the one vocabulary). */
+export function momentWordKey(key: MomentKey): string {
+  return `desk.anchor_${key === 'load_in' ? 'loadin' : key === 'start' ? 'show' : key}`;
+}
 
 /**
  * The running order of a performance or a date, as it was written (ADR-090
@@ -673,7 +699,7 @@ export function dayMoments(e: PerformanceEvent | DateEvent): DayMoment[] {
   // fields (the API derives those from the same rows, so both agree there).
   if (e.schedule?.length) {
     return e.schedule.map((m) => ({
-      key: m.kind && LEGACY_STEP_KEYS.has(m.kind) ? (m.kind as RunSheetStepKey) : null,
+      key: m.kind && MOMENT_KEYS.has(m.kind) ? (m.kind as MomentKey) : null,
       label: m.label,
       at: m.at,
     }));

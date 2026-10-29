@@ -54,11 +54,13 @@
 
 import { wallClockToInstant } from './datetime';
 import {
+  MOMENT_KEYS,
   runSheetSteps,
   type DateEvent,
+  type MomentKey,
   type PerformanceEvent,
-  type RunSheetStepKey,
 } from './month-events';
+import type { TransportMode, TravelStageRow } from './travel-stage';
 import type { PersonAttribution, PersonAttributionScope } from './people';
 import { dayKeyInTz } from './planner';
 import { performanceStatusFamily, type StatusFamily } from './performance';
@@ -66,7 +68,9 @@ import { dateStatusFamily } from './date';
 
 /** A moment's name, as vocabulary — the caller owns the words. */
 export type PulseWord =
-  | { of: 'step'; key: RunSheetStepKey }
+  | { of: 'step'; key: MomentKey }
+  /** A trip's stage (ADR-146): the train, the taxi. Its word is the mode. */
+  | { of: 'stage'; key: TransportMode }
   /** `label` is the free text an `other` date carries instead of a kind. */
   | { of: 'kind'; key: string; label: string | null };
 
@@ -199,7 +203,31 @@ function endOfDay(at: string, tz: string): number {
  * a slot will have to declare whether it is a terminus, and this set becomes
  * that flag — the seam does not move.
  */
-const TERMINAL_STEPS = new Set<RunSheetStepKey>(['wrap']);
+const TERMINAL_STEPS = new Set<MomentKey>(['wrap', 'curfew']);
+
+/**
+ * The named moments of a performance, in TIME order (ADR-146): the five and
+ * doors and curfew, from the running order when the feed carries it, else
+ * the five fields. Free moments («photo call») have no word here and stay
+ * out, as before; a hand-made order that is not chronological is sorted,
+ * because a segment runs from one instant to the next.
+ */
+export function pulseSteps(p: PerformanceEvent): Array<{ key: MomentKey; at: string }> {
+  if (p.schedule?.length) {
+    const named = p.schedule
+      .filter((m) => m.kind && MOMENT_KEYS.has(m.kind) && Number.isFinite(Date.parse(m.at)))
+      .map((m) => ({ key: m.kind as MomentKey, at: m.at }));
+    if (named.length > 0) return named.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  }
+  return runSheetSteps(p);
+}
+
+/** A trip's stages with an hour, in time order. */
+export function timedStages(d: Pick<DateEvent, 'stages'>): TravelStageRow[] {
+  return [...(d.stages ?? [])]
+    .filter((s) => s.depart_at && Number.isFinite(Date.parse(s.depart_at)))
+    .sort((a, b) => Date.parse(a.depart_at!) - Date.parse(b.depart_at!));
+}
 
 function isCancelled(status: string | null | undefined): boolean {
   return status === 'cancelled';
@@ -228,7 +256,7 @@ function performanceEntry(
 
   // THE SEAM. Five columns today, rows tomorrow; this module never learns
   // which, and never learns their names either.
-  const steps = runSheetSteps(p);
+  const steps = pulseSteps(p);
   const segments: Segment[] = [];
   for (let i = 0; i < steps.length; i += 1) {
     const step = steps[i];
@@ -283,14 +311,28 @@ function dateEntry(d: DateEvent, viewerTz: string, attribution: PersonAttributio
       : endOfDay(d.starts_at, tz);
   const hard = d.all_day ? true : Boolean(d.ends_at);
   const usable = Number.isFinite(from) && Number.isFinite(to) && to > from;
+  const segments: Segment[] = usable ? [{ from, to, hard, word, ref, tz: ref.tz }] : [];
+
+  // A TRIP IS ITS STAGES (ADR-146): inside a stage you are on the train, the
+  // innermost segment wins over the day; the stage ends at its arrival, or at
+  // the next departure when nobody wrote one. Between stages you are back on
+  // the travel day. The trip's naming moment is its first departure.
+  const stages = timedStages(d);
+  stages.forEach((s, i) => {
+    const a = Date.parse(s.depart_at!);
+    const nextDepart = stages[i + 1]?.depart_at ? Date.parse(stages[i + 1].depart_at!) : NaN;
+    const arrive = s.arrive_at ? Date.parse(s.arrive_at) : NaN;
+    const b = Number.isFinite(arrive) ? arrive : Number.isFinite(nextDepart) ? nextDepart : endOfDay(s.depart_at!, tz);
+    if (b > a) segments.push({ from: a, to: b, hard: Number.isFinite(arrive) || Number.isFinite(nextDepart), word: { of: 'stage', key: s.mode }, ref, tz: s.depart_tz ?? ref.tz });
+  });
 
   return {
     ref,
     day: dayKeyInTz(d.starts_at, tz),
     tz,
-    segments: usable ? [{ from, to, hard, word, ref, tz: ref.tz }] : [],
+    segments,
     word,
-    at: d.all_day ? null : d.starts_at,
+    at: stages[0]?.depart_at ?? (d.all_day ? null : d.starts_at),
     call: null,
   };
 }

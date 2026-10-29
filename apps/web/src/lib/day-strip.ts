@@ -19,7 +19,7 @@
  */
 
 import type { PerformanceEvent, DateEvent, SlipKind } from './month-events';
-import { dayMoments, type DayMoment, type RunSheetStepKey } from './month-events';
+import { dayMoments, type DayMoment, type MomentKey } from './month-events';
 
 /** A moment on the track: an hour somebody wrote down. */
 type StripMark = {
@@ -27,7 +27,7 @@ type StripMark = {
   at: number;
   /** The vocabulary word for the step; the caller translates it. `moment`
       is a free moment (ADR-090 P3): its name is `label`. */
-  step: RunSheetStepKey | 'start' | 'moment';
+  step: MomentKey | 'moment';
   /** What somebody called it, when it is not just one of the five words. */
   label?: string | null;
   /**
@@ -95,7 +95,9 @@ function momentMarks(moments: DayMoment[], timeZone: string): StripMark[] {
     if (at === null) continue;
     while (at < prev) at += 24;
     prev = at;
-    const free = m.key === null;
+    // Doors and curfew (ADR-146) are named but not one of the five: a tick
+    // with its word in the tooltip, so the strip keeps its five labels.
+    const free = m.key === null || m.key === 'doors' || m.key === 'curfew';
     marks.push({
       at,
       step: m.key ?? 'moment',

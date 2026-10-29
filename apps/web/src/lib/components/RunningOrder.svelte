@@ -53,7 +53,7 @@
   import type * as Y from 'yjs';
   import {
     KIND_WORD_KEYS,
-    LEGACY_KINDS,
+    NAMED_KINDS,
     clockText,
     dayOf,
     endFor,
@@ -149,7 +149,7 @@
     return key ? t(key, locale) : kind.replace(/_/g, ' ');
   }
   /** Offered while typing: the five in the reader's language. */
-  let offered = $derived(LEGACY_KINDS.map((k) => [k, kindWord(k)] as const));
+  let offered = $derived(NAMED_KINDS.map((k) => [k, kindWord(k)] as const));
   /** Recognised when written: the five in every language the app speaks, and synonyms. */
   const known = recognisedWords((key, loc) => t(key, loc as Locale), LOCALES);
 
@@ -169,6 +169,7 @@
       ['planner-performances'],
       ['today-performances'],
       ['pulse-performances'],
+      ['pulse-dates'],
       ['planner-dates'],
       ['performance'],
     ]) {

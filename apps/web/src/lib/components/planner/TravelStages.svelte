@@ -159,6 +159,9 @@
         stages: res.stages,
         can_edit: prev?.can_edit ?? true,
       }));
+      // The pulse's feed embeds the stages (ADR-146): the rail, «Lo
+      // siguiente» and Ahora read the new hour.
+      void queryClient.invalidateQueries({ queryKey: ['pulse-dates'] });
     },
     onError: () => {
       addToast({ tone: 'danger', message: t('planner.trip_save_error', locale) });
