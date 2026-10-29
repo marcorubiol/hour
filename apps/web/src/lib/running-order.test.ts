@@ -192,6 +192,8 @@ describe('the five words in every language', () => {
       'desk.anchor_show': 'función',
       'desk.anchor_loadout': 'desmontaje',
       'desk.anchor_wrap': 'fin',
+      'desk.anchor_doors': 'puertas',
+      'desk.anchor_curfew': 'toque de queda',
     },
     ca: {
       'desk.anchor_loadin': 'càrrega',
@@ -199,6 +201,8 @@ describe('the five words in every language', () => {
       'desk.anchor_show': 'funció',
       'desk.anchor_loadout': 'desmuntatge',
       'desk.anchor_wrap': 'fi',
+      'desk.anchor_doors': 'portes',
+      'desk.anchor_curfew': 'toc de queda',
     },
     en: {
       'desk.anchor_loadin': 'load-in',
@@ -206,6 +210,8 @@ describe('the five words in every language', () => {
       'desk.anchor_show': 'show',
       'desk.anchor_loadout': 'load-out',
       'desk.anchor_wrap': 'wrap',
+      'desk.anchor_doors': 'doors',
+      'desk.anchor_curfew': 'curfew',
     },
   };
   const known = recognisedWords((k, l) => dict[l][k], ['ca', 'es', 'en']);
@@ -219,6 +225,10 @@ describe('the five words in every language', () => {
     ['show', 'start'],
     ['desmuntatge', 'loadout'],
     ['fin', 'wrap'],
+    // ADR-146: doors and curfew are named kinds too, no migration.
+    ['Puertas', 'doors'],
+    ['toc de queda', 'curfew'],
+    ['Curfew', 'curfew'],
   ])('%s → %s', (word, kind) => {
     expect(kindForLabel(word, known)).toBe(kind);
   });

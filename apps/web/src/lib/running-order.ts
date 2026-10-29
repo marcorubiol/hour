@@ -31,6 +31,13 @@ export const ORDERED_DATE_KINDS: readonly string[] = ['rehearsal', 'residency', 
 /** The five kinds the road sheet and the strip already know, in stage order. */
 export const LEGACY_KINDS: readonly string[] = TIMESLOT_KINDS.map(([k]) => k);
 
+/**
+ * Every kind with a word, in stage order: the five plus doors and curfew
+ * (ADR-146). `schedule_slot.kind` is text, so the two are vocabulary, not a
+ * migration; they are offered while typing like the five.
+ */
+export const NAMED_KINDS: readonly string[] = ['load_in', 'soundcheck', 'doors', 'start', 'loadout', 'wrap', 'curfew'];
+
 /** A clock somebody typed. Minutes since midnight. */
 export type Clock = { h: number; m: number };
 
@@ -158,6 +165,9 @@ export const KIND_WORD_KEYS: Readonly<Record<string, string>> = {
   start: 'desk.anchor_show',
   loadout: 'desk.anchor_loadout',
   wrap: 'desk.anchor_wrap',
+  // ADR-146: named, not columns. Same dictionary, same words everywhere.
+  doors: 'desk.anchor_doors',
+  curfew: 'desk.anchor_curfew',
 };
 
 /**
@@ -176,6 +186,8 @@ const KIND_SYNONYMS: ReadonlyArray<readonly [kind: string, word: string]> = [
   ['loadout', 'load out'],
   ['loadout', 'load-out'],
   ['wrap', 'wrap'],
+  ['doors', 'doors'],
+  ['curfew', 'curfew'],
 ];
 
 /**

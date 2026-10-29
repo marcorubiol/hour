@@ -239,6 +239,9 @@ The nav layer is **one home + three lenses**:
   logo (the rail's clock) and on sign-in: there is no page before it (ADR-137). Labelled by what it is in
   each language (Today · Hoy · Avui · Aujourd’hui); the route and the code keep `desk`. Revives the ADR-008 name (fits now that tasks return); replaces "Agenda", which reads as
   "calendar" in ES/CA/FR and blurred with the planning lens.
+  **Ahora** (ADR-146) is a *mode* of the Desk, not a fifth lens: `/h/desk?mode=ahora`, the gig day of the
+  person across their spaces (now and next with a countdown, the trip's stages, the venue, who to call, the
+  rest of the running order, today's crew). The selector keeps Desk marked; on a phone it covers the frame.
 - **Planner** — month grid / planning / conflict-detection. A ⌘K lens.
 - **Conversations** — your booking network: persons + conversations. **Not "People"** — the lens holds
   organizations too (theatres, town halls, festivals), and a theatre is not a person; a *contact* is

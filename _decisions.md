@@ -4568,6 +4568,9 @@ fallo. Marco (19-10) eligió moverlas junto al título. Carril `claude/planner-a
 
 **Re-evaluar cuando** Marco lo use en el teléfono: si las flechas debajo del título en el Mes pesan más que al lado.
 
+> **Amended by ADR-146 (2026-10-29), solo en § 1.** El botón «Ahora» se llama «Hoy» (Avui · Today · Aujourd’hui):
+> «Ahora» es el modo del día de bolo de Hoy. La clase `.cal__now` y su lugar no cambian.
+
 ## [2026-10-19] ADR-137 · Nombres y entrada: se entra en Desk, Desk se traduce, Venues en inglés (enmienda ADR-062, 121, 128 y 134)
 
 **Contexto.** Prueba de nombres del 19-10 con dos perfiles sin contexto (productora de teatro en castellano, tour
@@ -4997,6 +5000,10 @@ ya invalida todos los registros por el buster.
 **Re-evaluar cuando** haya usuarios externos en la beta (si el borrado al salir basta para su política de datos) o
 el registro de `muk-cia` pese lo bastante como para notarse al escribir.
 
+> **Amended by ADR-146 (2026-10-29), solo en § 6 y solo en Ahora.** Ahora dice cuándo se actualizó lo que pinta, en
+> una línea, sin red o con datos de más de una hora; y el marco precarga la hoja de ruta de las funciones de hoy y
+> mañana, así que el dispositivo guarda también lo que aún no se ha abierto. Fuera de Ahora, § 6 sigue igual.
+
 ## [2026-10-24] ADR-145 · Densidad: un bloque vacío no se pinta, las «i» de cabecera van al «?», mono mayúsculas solo en cabeceras y una escala de móvil (enmienda ADR-127 § 4 y ADR-139 § 2)
 
 **Contexto.** Marco (24-10): en el móvil todo pesa. Revisión de las cuatro pantallas a 390×844 contra producción, con
@@ -5101,3 +5108,95 @@ de `Chip`; en Difusión, sus filas.
 `font-size` de `.status-caret`.
 
 > **Nota a ADR-144 § 6 (2026-10-29):** sí hay un indicador de «actualizando», pero solo cuando la persona tira hacia abajo en el móvil (pull to refresh, `6872b3cf`). La pantalla sigue sin avisar cuando refresca sola detrás.
+
+## [2026-10-29] ADR-146 · «Ahora»: el día de bolo en una pantalla, un modo de Hoy (enmienda ADR-136 § 1 y ADR-144 § 6)
+
+**Contexto.** Marco trabaja de técnico en gira (Gota, Komunumo, Avi, MaMeMi) y pidió, sobre todo para el iPhone, un
+botón o modo que enseñe solo lo que importa en ese momento. Investigación y wireframes en
+`build/coordination/ahora-mode/` (`research.md`, `wireframes.html`, fuera de git). El motor ya existía: el pulso
+(`$lib/pulse`) es de la persona y de todos sus espacios, la hoja de ruta proyecta por rol y los datos se quedan en el
+dispositivo (ADR-144). Faltaba la pantalla, que el pulso leyera los tramos de viaje y que lo del día estuviera en el
+teléfono sin haberlo abierto. Marco aprobó el 29-10 la v1 con las seis decisiones recomendadas. Carril `claude/ahora`.
+Sin migración.
+
+**Decisión.**
+1. **Ahora es un modo de Hoy, no una lente.** Ruta `/h/desk?mode=ahora` (el estado va en la URL: recargar lo
+   mantiene). El selector sigue marcando Hoy. En el móvil (< 48 rem) cubre el marco entero, barra de secciones
+   incluida, como el vistazo y los diálogos (ADR-140 § 4), con «Salir» arriba y tres acciones abajo, a la altura del
+   pulgar: **Llamar**, **Mapa** y **Hoja** (la hoja de ruta). En escritorio es la misma columna dentro de la página, a
+   la medida de lectura, sin capa encima. Lo pinta `AhoraView.svelte`; la lógica es `$lib/ahora.ts` (pura, con
+   tests).
+2. **Se entra con un botón fijo y una sugerencia; nunca entra solo.** El botón «Ahora» va en la fila del título de Hoy
+   (`titleAside`) mientras haya algo tuyo en las próximas 48 horas (lo vacío no se pinta, ADR-145 § 1). El día de bolo,
+   «Lo siguiente» lleva una línea encima de su tarjeta («Hoy de bolo en Girona · Abrir Ahora →»). Se sale con «Salir»,
+   que vuelve a Hoy. La app instalada abre directa en Ahora si se quedó abierto ese mismo día (`hour.ahora` en
+   `localStorage`, leído por `/`); volver a Hoy lo olvida.
+3. **Frescura sin red, y precarga.** Una sola línea («actualizado a las 9h40») solo cuando no hay red o lo más viejo
+   en pantalla tiene más de una hora (`freshnessShown`). El marco de `/h` pide al abrir la app la hoja de ruta de cada
+   función de hoy y mañana (`useAhoraPreload`), así que está en la caché del dispositivo aunque Ahora no se abra nunca;
+   los tramos viajan con el feed de fechas del pulso (`/api/dates?stages=1`). Enmienda ADR-144 § 6 solo para Ahora.
+4. **Hotel, aparcamiento y acceso de carga: claves fijas en `performance.logistics`, sin migración.** Canónicas
+   `hotel`, `parking` y `load_access`. Se reconocen sin mayúsculas ni acentos, con las palabras que ya se escriben en
+   «Detalles» en los cuatro idiomas: `hotel`, `accommodation`, `alojamiento`, `allotjament`, `hébergement`;
+   `parking`, `aparcamiento`, `aparcament`, `estacionamiento`, `stationnement`; `load_access`, `acceso de carga`,
+   `accés de càrrega`, `carga`, `càrrega`, `accès de chargement`, `chargement` (`LOGISTICS_KEYS` en `$lib/ahora.ts`).
+   El valor puede ser texto o un objeto (se junta con «·»). Ahora las pinta en el bloque de la sala cuando están; el
+   resto de líneas sigue en «Detalles».
+5. **Se llama «Ahora», y el botón del Planificador que vuelve a hoy (ADR-136) pasa a «Hoy»** en los cuatro idiomas
+   (`planner.now`: Hoy · Avui · Today · Aujourd’hui). Los specs lo buscan por clase (`.cal__now`), no por el texto: no
+   cambian.
+6. **Qué hoja de ruta lee.** Pide `full` en los espacios donde la persona es del equipo interno y `tech_manager` donde
+   es invitada (`ahoraRoadsheetRole`). El servidor lo aplica (`roadsheetRoleFor` en el endpoint de la hoja de ruta):
+   `full` solo lo recibe un owner, admin, member o viewer del espacio de la función; cualquier otro (un invitado de
+   bolo, ADR-142, o un login sin fila de membresía) recibe el corte del técnico, sin notas internas ni programador. Los
+   demás roles de vista previa pasan como se piden porque solo enseñan menos. Nunca hay dinero en ninguna.
+
+**Lo que entra en la v1 (sin cambios de esquema).**
+- **Ahora y lo siguiente con cuenta atrás en minutos**, redondeada hacia arriba y recalculada cada minuto. La cifra
+  grande es la cuenta atrás a lo siguiente cuando falta una hora o menos («Función · en 30 min»); si no, lo que
+  estás haciendo y hasta cuándo («Carga · hasta las 17h · prueba de sonido en 2 h 50 min»). El día es el de trabajo:
+  lo tuyo de hoy, y cuando todo ha acabado, mañana; una sola línea de timeline con el viaje y el bolo en orden.
+- **Los tramos del día** con salida, modo, origen y destino, llegada y su localizador (`reference`). **El pulso y «Lo
+  siguiente» leen `travel_stage`**: un día de viaje se nombra por su primera salida (el tren de las 9h12, no «viaje»),
+  dentro de un tramo el pulso dice el modo hasta la llegada, y la tarjeta de un viaje lista sus tramos. Un viaje ya
+  llegado se pliega a una línea.
+- **La sala** con su dirección y el enlace a Apple Maps (`maps.apple.com/?q=`, abre la app en el iPhone).
+- **A quién llamar**: el primer contacto de `venue.contacts` cuyo `role` libre diga técnico (técnic, tech, regie,
+  regidor, stage, luces, sonido...), si no producción, si no el principal (el primero), y entre ellos primero los que
+  tienen teléfono (`venueCall`). Sin teléfono se nombra y no hay «Llamar».
+- **La escaleta restante**, con lo pasado plegado. **Dos kinds nuevos de `schedule_slot`: `doors` y `curfew`**
+  (`kind` es texto: sin migración). Tienen palabra en los cuatro idiomas (`desk.anchor_doors`, `desk.anchor_curfew`),
+  la escaleta los ofrece al escribir y los reconoce («Puertas», «toc de queda»), el pulso los nombra y `curfew` cierra
+  la hoja como `wrap`. En la tira del día son marcas sin rótulo, como un momento libre.
+- **El equipo de hoy**: reparto y equipo de la hoja de ruta con teléfono a un toque, y quién ha dicho «voy»
+  (`commitment_person`).
+- **Detalles plegados**: técnica, logística, acogida y, para el equipo interno, las notas de la compañía.
+- **Cada bloque lleva el monograma de la compañía**: Ahora cruza todos los espacios de Marco como el pulso.
+
+**Después (fuera de la v1).** Hotel y aparcamiento estructurados (tabla `stay` o campos de `venue` para lo que se
+repite en cada visita), billetes y rider en PDF (el pipeline de ficheros a R2 de ADR-089 y `travel_stage_document`),
+«qué ha cambiado» desde la última vez que miraste, escribir sin red (cola limitada) y el aviso 30 minutos antes de la
+llamada (Web Push).
+
+**Enmienda a ADR-136 § 1.** El botón que devuelve el Planificador a hoy se llama «Hoy» (antes «Ahora»): «Ahora» es
+ya este modo y la fila del pulso, con el mismo sentido.
+
+**Enmienda a ADR-144 § 6.** En Ahora sí hay algo nuevo en pantalla: la línea de frescura, solo sin red o con datos
+de más de una hora. Y la caché del dispositivo deja de ser solo lo que se pidió: el marco precarga la hoja de ruta de
+las funciones de hoy y mañana. Fuera de Ahora no cambia nada.
+
+**Verificado** (29-10, `vite dev` desde el worktree contra la Supabase de producción, Chromium 1228, usuario de los
+fixtures con un día de bolo plantado en `playwright` y borrado después): capturas de los tres momentos (8h30 viaje,
+14h10 carga, 20h00 media hora antes) a 390×844 táctil y a 1440 en `build/coordination/ahora-mode/build/` (fuera de
+git). `tests/ahora.spec.ts` (entrar desde Hoy, bloques, recargar, «Salir», el móvil tapa la barra) 2/2 contra ese
+origen. Unitarios: `ahora.test.ts`, y los nuevos de `pulse.test.ts`, `roadsheet.test.ts` y `running-order.test.ts`.
+
+**Cómo se revierte.** Quitar el `{#if ahoraMode}` y el botón de `routes/h/desk/+page.svelte`, la prop `ahora` de
+`DeskNext`, `useAhoraPreload` de `routes/h/+layout.svelte` y `landing()` de `routes/+page.svelte`; borrar
+`AhoraView.svelte`, `$lib/ahora.ts` y `$lib/ahora-feeds.svelte.ts`. El `?stages=1` de `/api/dates` y la lectura de
+tramos del pulso se pueden dejar o quitar por separado; `roadsheetRoleFor` conviene dejarlo (cierra `full` a un
+invitado). Los kinds `doors` y `curfew` escritos ya quedan como texto: sin su palabra se leen como su clave.
+
+**Re-evaluar cuando** Marco lo use en una gira de verdad: si la cuenta atrás de una hora es el corte justo, si el
+botón en la fila del título se encuentra con una mano o tiene que ir a la barra de arriba, si el contacto deducido
+acierta, y si hace falta la pantalla encendida (Wake Lock) o el aviso antes de la llamada.

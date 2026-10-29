@@ -38,7 +38,7 @@
   import { useQueryClient } from '@tanstack/svelte-query';
   import { dualTime, hourMark, localeDayMonthNear, localeWeekdayShort, viewerTimeZone } from '$lib/datetime';
   import { t, type Locale } from '$lib/i18n';
-  import type { SlipKind } from '$lib/month-events';
+  import { momentWordKey, type SlipKind } from '$lib/month-events';
   import type { CommitmentState } from '$lib/people';
   import { setCommitment } from '$lib/commitments';
   import { dayKeyInTz } from '$lib/planner';
@@ -93,10 +93,9 @@
       `start` has no anchor key of its own; the Desk calls that moment the
       show, and one moment may not have two names. */
   function wordLabel(word: PulseWord): string {
-    if (word.of === 'step') {
-      const key = word.key === 'load_in' ? 'loadin' : word.key === 'start' ? 'show' : word.key;
-      return t(`desk.anchor_${key}`, locale);
-    }
+    if (word.of === 'step') return t(momentWordKey(word.key), locale);
+    // A trip's stage says its mode (ADR-146): «tren» until it arrives.
+    if (word.of === 'stage') return t(`planner.mode_${word.key}`, locale);
     return word.label ?? kindLabel(word.key as SlipKind);
   }
 

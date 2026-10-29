@@ -18,6 +18,7 @@ import { extractAccessToken } from '$lib/auth';
 import {
   buildRoadsheet,
   isRoadsheetRole,
+  roadsheetRoleFor,
   type CastEntry,
   type PerformanceBundle,
 } from '$lib/roadsheet';
@@ -26,7 +27,8 @@ import {
   isUuid,
   type PerformanceBundleResult,
 } from '$lib/server/performance-bundle';
-import { type SupabaseEnv } from '$lib/supabase';
+import { pgGet, type SupabaseEnv } from '$lib/supabase';
+import { decodeJwtPayload } from '$lib/server/session';
 import { pgErrorResponse } from '$lib/server/errors';
 import { json } from '$lib/server/http';
 
@@ -141,7 +143,26 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
     const result = await fetchPerformanceBundle(env, jwt, key, ws);
     if (!result) return json({ error: 'not_found' }, 404);
 
-    const sheet = buildRoadsheet(toProjectionBundle(result), roleParam);
+    // ADR-146 § 6: `full` only for the space's own crew; a guest gets the
+    // technician's cut. Their own membership row (RLS: own rows).
+    let role = roleParam;
+    if (role === 'full') {
+      const sub = decodeJwtPayload(jwt)?.sub;
+      const own = new URLSearchParams({
+        select: 'workspace_role',
+        level: 'eq.workspace',
+        accepted_at: 'not.is.null',
+        workspace_id: `eq.${result.performance.workspace_id}`,
+        limit: '1',
+      });
+      if (typeof sub === 'string') own.set('user_id', `eq.${sub}`);
+      const { data: mine } =
+        typeof sub === 'string'
+          ? await pgGet<{ workspace_role: string | null }>(env, 'membership', jwt, { search: own })
+          : { data: [] as { workspace_role: string | null }[] };
+      role = roadsheetRoleFor(role, mine[0]?.workspace_role);
+    }
+    const sheet = buildRoadsheet(toProjectionBundle(result), role);
     // The viewer needs the venue timezone for dual-time display even when
     // the venue section itself is filtered out of the role.
     return json({

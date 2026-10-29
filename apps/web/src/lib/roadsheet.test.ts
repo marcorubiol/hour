@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildRoadsheet,
   isRoadsheetRole,
+  roadsheetRoleFor,
   ROADSHEET_ROLES,
   ROLE_SECTIONS,
   type PerformanceBundle,
@@ -160,5 +161,20 @@ describe('buildRoadsheet — degraded data', () => {
     b.programmer = null;
     const sheet = buildRoadsheet(b, 'full');
     expect(sheet.contacts).toBeNull();
+  });
+});
+
+describe('roadsheetRoleFor — the whole sheet is for the space crew (ADR-146 § 6)', () => {
+  it('the space crew gets `full`', () => {
+    for (const r of ['owner', 'admin', 'member', 'viewer']) expect(roadsheetRoleFor('full', r)).toBe('full');
+  });
+  it('a bolo guest, or a login with no membership row, gets the technician’s cut', () => {
+    expect(roadsheetRoleFor('full', 'guest')).toBe('tech_manager');
+    expect(roadsheetRoleFor('full', null)).toBe('tech_manager');
+    expect(buildRoadsheet(bundle(), roadsheetRoleFor('full', 'guest')).notes).toBeNull();
+  });
+  it('a preview role passes as asked: it only ever shows less', () => {
+    expect(roadsheetRoleFor('venue', 'guest')).toBe('venue');
+    expect(roadsheetRoleFor('tech_manager', 'owner')).toBe('tech_manager');
   });
 });

@@ -22,7 +22,9 @@
   import { LOCALE_TAG, t, type Locale } from '$lib/i18n';
   import { holdDeadlineLabel } from '$lib/performance';
   import { statusWord } from '$lib/planner';
-  import { dayMoments, type SlipContext, type SlipKind } from '$lib/month-events';
+  import { dayMoments, momentWordKey, type DateEvent, type SlipContext, type SlipKind } from '$lib/month-events';
+  import { timedStages } from '$lib/pulse';
+  import { stagePlace } from '$lib/travel-stage';
   import { setCommitment } from '$lib/commitments';
   import { plannerDayHref } from '$lib/planner';
   import { lensOn } from '$lib/lenses.svelte';
@@ -51,10 +53,12 @@
     /** The roster's names, as the Day draws them ($lib/people `castNames`);
         null while the names are loading, so «sin reparto» never flashes. */
     personNames: ReadonlyMap<string, string> | null;
+    /** On the gig day, one line that opens Ahora (ADR-146); never enters by itself. */
+    ahora?: { text: string; href: string } | null;
     locale: Locale;
   }
 
-  let { next, then, thenBefore = false, settled, errored, onretry, today, viewerTz, personId, boardNew = 0, slipCtx, personNames, locale }: Props = $props();
+  let { next, then, thenBefore = false, settled, errored, onretry, today, viewerTz, personId, boardNew = 0, slipCtx, personNames, ahora = null, locale }: Props = $props();
 
   const kindLabel = (kind: SlipKind) => t(`planner.kind_${kind}`, locale);
   /* A hold says what it is in the house word («1.ª opción · vence lun»), as
@@ -81,15 +85,22 @@
   const dateWords = (day: string) => `${localeWeekdayShort(day, locale)} ${localeDayMonth(day, locale)}`;
   const hour = (iso: string, tz: string | null) => hourMark(dualTime(iso, tz, viewerTz).primary);
 
-  /** The running order, venue-first; a free moment keeps its own name. */
-  let moments = $derived(
-    next
-      ? dayMoments(next.ref.row).map((m) => ({
-          label: m.label ?? (m.key ? t(`desk.anchor_${m.key === 'load_in' ? 'loadin' : m.key === 'start' ? 'show' : m.key}`, locale) : ''),
-          at: hour(m.at, next.ref.tz),
-        }))
-      : [],
-  );
+  /** The running order, venue-first; a free moment keeps its own name. A
+      trip says its stages instead (ADR-146): the train at 9h12, its
+      reference, not «viaje». */
+  let moments = $derived.by(() => {
+    if (!next) return [];
+    const stages = next.ref.of === 'date' ? timedStages(next.ref.row as DateEvent) : [];
+    if (stages.length > 0)
+      return stages.map((s) => ({
+        label: [t(`planner.mode_${s.mode}`, locale), stagePlace(s.to_city, s.to_place), s.reference].filter(Boolean).join(' · '),
+        at: hour(s.depart_at!, s.depart_tz ?? next.ref.tz),
+      }));
+    return dayMoments(next.ref.row).map((m) => ({
+      label: m.label ?? (m.key ? t(momentWordKey(m.key), locale) : ''),
+      at: hour(m.at, next.ref.tz),
+    }));
+  });
 
   let roadsheet = $derived(slip && next?.ref.of === 'performance' && slip.href ? `${slip.href}/roadsheet` : null);
   /* WHO GOES: a show has a cast, a trip or a press call does not (the Day's
@@ -154,6 +165,11 @@
   <!-- No «Planificador →» here (ADR-145, fase 2): the bar of sections already
        goes there, and the day below opens the Planner on itself. -->
   <BlockHead title={t('desk.band_next', locale)} titleId="desk-next-h" />
+  {#if ahora}
+    <p class="ahora-hint" data-testid="ahora-suggest">
+      <span>{ahora.text}</span> <a class="block-head__act" href={ahora.href}>{t('ahora.open', locale)} →</a>
+    </p>
+  {/if}
 
   {#if errored}
     <p class="load-fail" role="alert"><span>{t('desk.next_error', locale)}</span><Button size="xs" variant="secondary" onclick={onretry}>{t('ui.retry', locale)}</Button></p>
@@ -254,6 +270,15 @@
     /* The answer's room is held before the answer lands. */
     min-block-size: 7.5rem;
     align-content: start;
+  }
+  .ahora-hint {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-2xs) var(--space-s);
+    margin: 0 0 var(--space-s);
+    font-size: var(--text-s);
+    color: var(--text-muted);
   }
   .card--wait {
     color: var(--text-faint);
