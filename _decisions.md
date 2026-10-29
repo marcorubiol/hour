@@ -5099,3 +5099,5 @@ de `Chip`; en Difusión, sus filas.
 `DeskNext` y `DeskSeason`; las claves de i18n borradas (`books.season_word`, `books.fig_*_none`,
 `planner.season_weeks`, `season_perf(s)`, `season_to_decide`, `season_unclosed`) están en la historia de git. 4: el
 `font-size` de `.status-caret`.
+
+> **Nota a ADR-144 § 6 (2026-10-29):** sí hay un indicador de «actualizando», pero solo cuando la persona tira hacia abajo en el móvil (pull to refresh, `6872b3cf`). La pantalla sigue sin avisar cuando refresca sola detrás.

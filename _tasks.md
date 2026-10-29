@@ -507,7 +507,6 @@
 - [ ] **Realtime: el token del socket se congela a la hora** (`src/lib/realtime/client.ts` llama a `setAuth(token)` con token explícito; realtime-js 2.105 deja de reautenticar en el latido). Pasar a modo callback, sin coste de red con el token ya en memoria.
 - [ ] **Velocidad, primera carga en frío** (24-10): el fragmento de i18n lleva los cuatro idiomas (141 kB brotli), Google Fonts 350 kB y bloquea el primer pintado, y el service worker precachea 227 ficheros uno tras otro (16-25 s). Cargar solo el idioma activo, fuentes propias con preload, precache más corto.
 
-- [ ] **Pull to refresh en el móvil** (Marco, 24-10): tirar hacia abajo desde arriba refresca los datos de la pantalla (no la app entera), con un indicador sutil; solo táctil, sin pelear con el deslizar del Tablero ni con hojas abiertas. Sin empezar: el subagente cayó por el límite de gasto mensual.
 - [ ] **Difusión: un texto de 8,8 px en las filas** (`ConversationRow.svelte`), fuera de la escala de ADR-145.
 
 ## Deuda aceptada / observar en uso
