@@ -126,6 +126,13 @@
   html:focus-within {
     scroll-behavior: auto;
   }
+  /* A finger's pull at the top is the frame's (PullRefresh.svelte): the
+     browser's own refresh and the page's bounce do not join in. */
+  @media (pointer: coarse) {
+    html {
+      overscroll-behavior-y: contain;
+    }
+  }
 
   @media (prefers-reduced-motion: reduce) {
     html:focus-within {
