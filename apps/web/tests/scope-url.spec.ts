@@ -111,8 +111,14 @@ test('a scope change on a person opened from Conversations lands back on Convers
   await waitForLoaded(page);
   await expect(page.locator('[data-testid="conversation-row"]').first()).toBeVisible();
 
-  // The contact's link (ADR-102: the first link of a row is the organization).
-  await page.locator('[data-testid="conversation-row"]').first().locator('a.crow-contact').click();
+  // The contact's link (ADR-102: the first link of a row is the organization),
+  // on the first row that has one: a run cut short leaves rows without a person.
+  await page
+    .locator('[data-testid="conversation-row"]')
+    .filter({ has: page.locator('a.crow-contact') })
+    .first()
+    .locator('a.crow-contact')
+    .click();
   // The vistazo first (ADR-139 p1), then the page this test is about.
   await openInFull(page);
   await page.waitForURL(/\/h\/[^/]+\/person\//);

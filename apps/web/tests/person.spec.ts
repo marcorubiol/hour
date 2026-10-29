@@ -37,7 +37,14 @@ test.describe('person file', () => {
     // `person` is a global entity resolved by RLS, so any accessible segment
     // renders it (verified: the same person opened under two spaces). Don't
     // pin the URL to one space.
-    const firstName = page.locator('[data-testid="conversation-row"]').first().locator('a.crow-contact');
+    // THE FIRST ROW WITH A CONTACT, not the first row: a run cut short leaves
+    // conversations without a person (thread-feed's «E2E Feed Sala …»), and
+    // «What it asks» sorts them first.
+    const firstName = page
+      .locator('[data-testid="conversation-row"]')
+      .filter({ has: page.locator('a.crow-contact') })
+      .first()
+      .locator('a.crow-contact');
     const personName = (await firstName.innerText()).trim();
     await firstName.click();
     // The vistazo first (ADR-139 p1), then the page.

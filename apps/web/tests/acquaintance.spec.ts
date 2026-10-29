@@ -22,7 +22,13 @@ test.describe('«lo conozco»', () => {
 
     await page.goto('/h/conversations?etiqueta=sales&scope=s:playwright');
     await waitForLoaded(page);
-    const row = page.locator('[data-testid="conversation-row"]').first();
+    // THE FIRST ROW WITH A CONTACT, not the first row: a run cut short leaves
+    // conversations without a person (thread-feed's «E2E Feed Sala …»), and
+    // «What it asks» sorts them first.
+    const row = page
+      .locator('[data-testid="conversation-row"]')
+      .filter({ has: page.locator('a.crow-contact') })
+      .first();
     await expect(row).toBeVisible();
 
     const contact = row.locator('a.crow-contact');
