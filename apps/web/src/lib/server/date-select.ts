@@ -28,6 +28,6 @@ export const DATE_EXTENDED_SELECT = [
   // ADR-090 P3 — the running order, so the day strip can draw a
   // rehearsal's moments as it draws a gig's.
   SCHEDULE_SLOT_EMBED,
-  // ADR-103 — each person's «voy / no voy»; without it who goes is inferred.
+  // ADR-103 — each person's «voy / no voy»: on a date, the only way onto it (ADR-147).
   COMMITMENTS_EMBED,
 ];

@@ -31,8 +31,7 @@ import { taskSurfaceState, taskContextLabel, taskProjectId, type TaskItem } from
 import { LOCALE_TAG, t, type Locale } from './i18n';
 import { invoiceAging, observedPayerTermsDays, type MoneyInvoiceItem } from './money';
 
-/** `going`: a «voy · no voy» Hour asks about you (ADR-103); only «Te espera» has it. */
-export type DeskConcern = 'task' | 'conversation' | 'money' | 'going';
+export type DeskConcern = 'task' | 'conversation' | 'money';
 
 type BucketLabelKey =
   | 'overdue'
@@ -65,7 +64,7 @@ export type DeskInvoiceInput = MoneyInvoiceItem;
 export interface DeskItem {
   id: string;
   concern: DeskConcern;
-  /** Derived-call verb i18n key (conversation / money / going). null for a task. */
+  /** Derived-call verb i18n key (conversation / money). null for a task. */
   verbKey: string | null;
   subject: string;
   projectName: string;
@@ -94,8 +93,6 @@ export interface DeskItem {
   currency: string | null;
   /** The calendar day it sits on (YYYY-MM-DD), null for the anytime tail. */
   day: string | null;
-  /** A «voy · no voy» row: what the answer is written on. */
-  going: { of: 'performance' | 'date'; id: string } | null;
   /** A reply row: when they wrote (its «when» is how long ago). */
   repliedAt: string | null;
   /** A conversation's tags when they are not Difusión (ADR-138 fase 3): the row says what it is about. */
@@ -129,8 +126,6 @@ interface DeskFeedInput {
    * wait today until answered; their next-action call is not drawn twice.
    */
   replies?: DeskReplyInput[];
-  /** The «voy · no voy» Hour has for you (`goingItem`): each on its day, so «Ver todo» keeps them. */
-  asks?: DeskItem[];
 }
 
 interface DeskReplyInput {
@@ -162,9 +157,8 @@ export function conversationVerbKey(relation: string, overdue: boolean): string 
 // Fixed within-day order of the day list, mirroring the lens nav.
 const CONCERN_RANK: Record<DeskConcern, number> = {
   task: 0,
-  going: 1,
-  conversation: 2,
-  money: 3,
+  conversation: 1,
+  money: 2,
 };
 
 const DAY = 86_400_000;
@@ -257,7 +251,6 @@ function blankItem(over: Partial<DeskItem> & Pick<DeskItem, 'id' | 'concern' | '
     amount: null,
     currency: null,
     day: null,
-    going: null,
     repliedAt: null,
     tagName: null,
     ...over,
@@ -458,11 +451,6 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
     );
   }
 
-  // ── «Voy · no voy»: on their day, after the tasks.
-  for (const a of input.asks ?? []) {
-    if (a.day) push(a.day, 'going', Date.parse(`${a.day}T00:00:00Z`), a);
-  }
-
   // ── Group into buckets, order by fixed concern rank then secondary sub,
   //    collapse consecutive same-concern items into runs.
   const byKey = new Map<number, { labelKey: BucketLabelKey; weekday: string; dateLabel: string; entries: Entry[] }>();
@@ -492,14 +480,11 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
 
 /** How many rows «Te espera» draws; the rest waits behind «Ver todo». */
 const WAITING_ROWS = 7;
-/** How far ahead a «voy · no voy» is worth asking. */
-export const GOING_DAYS = 14;
 
-/** Within one tier: money owed, then a call, then «voy», then a task, then a proposal. */
+/** Within one tier: money owed, then a call, then a task, then a proposal. */
 function weightOf(i: DeskItem): number {
   if (i.concern === 'money') return 0;
   if (i.concern === 'conversation') return i.isProposal ? 4 : 1;
-  if (i.concern === 'going') return 2;
   return i.isProposal ? 4 : 3;
 }
 
@@ -582,12 +567,6 @@ function rankTiered(
           const day = waitingDay(item, now);
           if (!day || day < opts.window.from || day > opts.window.to) continue;
           tiered.push({ tier: tier === 0 ? 0 : 1, day, item });
-          continue;
-        }
-        if (item.concern === 'going') {
-          // A «voy» of the next two weeks rides behind the week, whatever its bucket.
-          const k = dayBucket(item.day, now, 'en').sortKey;
-          tiered.push({ tier: k === 0 ? 1 : k < 7 ? 2 : 3, day: item.day ?? '', item });
           continue;
         }
         // A task inside its warning (`lead_days`) is this week's, whatever its due day.
@@ -690,27 +669,4 @@ export function overviewReplies(
         tagName: tagName(r.tags ?? []),
       };
     });
-}
-
-/** A «voy · no voy» row for «Te espera» (the page names it with its slip). */
-export function goingItem(row: {
-  of: 'performance' | 'date';
-  id: string;
-  day: string;
-  subject: string;
-  projectId: string | null;
-  projectName: string;
-  href: string | null;
-}): DeskItem {
-  return blankItem({
-    id: `going-${row.id}`,
-    concern: 'going',
-    subject: row.subject,
-    projectName: row.projectName,
-    projectId: row.projectId,
-    verbKey: 'going',
-    day: row.day,
-    href: row.href,
-    going: { of: row.of, id: row.id },
-  });
 }

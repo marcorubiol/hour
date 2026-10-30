@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { changedBandLoading, changedLensChip, changesSince, elapsedSince, goingAsks, paymentNews, paymentsSinceEarlier, plannerDoor, sinceInstant, todayThings, CHANGED_ROWS } from './desk-bands';
+import { changedBandLoading, changedLensChip, changesSince, elapsedSince, paymentNews, paymentsSinceEarlier, plannerDoor, sinceInstant, todayThings, CHANGED_ROWS } from './desk-bands';
 import type { MoneyBolo } from './money';
 
 describe('changedBandLoading', () => {
@@ -23,7 +23,6 @@ describe('changedBandLoading', () => {
     expect(changedBandLoading({ ...base, errored: true, pending: [true, false, false], mailoutPending: true })).toBe(false);
   });
 });
-import { buildPersonAttribution, type TeamItem } from './people';
 import type { DateEvent, PerformanceEvent } from './month-events';
 import type { HotRow, LastMailout } from './conversation-overview';
 import type { FeedThread } from './threads';
@@ -64,38 +63,6 @@ function date(id: string, day: string, o: Partial<DateEvent> = {}): DateEvent {
     ...o,
   };
 }
-
-describe('goingAsks — the «voy · no voy» Hour has for you', () => {
-  const team = [{ person_id: 'me', project_ids: ['p1'] }] as unknown as TeamItem[];
-  const axis = buildPersonAttribution({ pinnedPersonIds: ['me'], team, blocks: [] });
-
-  it('asks only where you are in by inference, in the next N days', () => {
-    const asks = goingAsks(
-      {
-        performances: [
-          perf('inferred', '2026-10-17'),
-          perf('rostered', '2026-10-18', { person_ids: ['me'] }),
-          perf('answered', '2026-10-19', { commitments: [{ person_id: 'me', state: 'going' }] as never }),
-          perf('far', '2026-11-30'),
-          perf('cancelled', '2026-10-20', { status: 'cancelled' }),
-        ],
-        dates: [date('rehearsal', '2026-10-16')],
-        axis,
-        viewerTz: 'Europe/Madrid',
-      },
-      TODAY,
-      14,
-    );
-    expect(asks.map((a) => a.id)).toEqual(['rehearsal', 'inferred']);
-  });
-
-  it('a login with no person asks nothing; an excluded row is not asked twice', () => {
-    const none = buildPersonAttribution({ pinnedPersonIds: [], team, blocks: [] });
-    const input = { performances: [perf('a', '2026-10-17')], dates: [], axis: none, viewerTz: 'UTC' };
-    expect(goingAsks(input, TODAY, 14)).toEqual([]);
-    expect(goingAsks({ ...input, axis }, TODAY, 14, new Set(['a']))).toEqual([]);
-  });
-});
 
 describe('changesSince — «Ha cambiado»', () => {
   const since = '2026-10-14T18:00:00Z';

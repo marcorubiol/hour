@@ -129,7 +129,7 @@
     normalizePlannerView,
     statusWord as statusWordIn,
   } from '$lib/planner';
-  import { buildPersonScope, castNames } from '$lib/people';
+  import { buildPersonAttribution, castNames } from '$lib/people';
   import { buildDeskFeed, overviewReplies, rankWaiting, waitingByDay, type DeskItem } from '$lib/desk-feed';
   import {
     conversationOverviewQueryOptions,
@@ -658,36 +658,31 @@
   // ── The person axis (scope, never a display filter) ───────────────────
   // A person is not a container, so `resolveScope` only carries the ids and
   // the narrowing happens here, where a roster can actually be resolved: a
-  // performance brings its own (`?rosters=1`), a date brings none and is
-  // judged by its project's cast minus whoever is away that day.
+  // performance brings its own (`?rosters=1`), a date brings whoever said
+  // «voy»; a date nobody is named on is the company's date of the pinned
+  // person's project, kept and claimed for nobody (ADR-147).
   //
   // It sits at the SCOPE level deliberately. Scope narrows what the conflict
   // engine sees; the status filter below deliberately does not, so that
   // hiding chips can never hide a real clash. Pinning a person is the first
   // kind, not the second: you are changing what you are looking at.
   //
-  // Declared HERE, after the source-switch, because it reads
-  // `activeBlackoutRows` — and those are the UNFILTERED rows on purpose:
-  // calm hides bands from the page, it does not make anybody available.
   let personScope = $derived(
-    buildPersonScope({
+    buildPersonAttribution({
       pinnedPersonIds: scope.personIds,
       team: $teamQuery.data?.items ?? [],
-      blocks: activeBlackoutRows,
     }),
   );
   function perfPersonVerdict(p: PerformanceEvent) {
-    return personScope.verdict({
+    return personScope.attribute({
       projectId: p.project?.id ?? null,
-      day: perfDayKey(p),
       roster: p.person_ids,
       commitments: p.commitments,
     });
   }
   function datePersonVerdict(d: DateEvent) {
-    return personScope.verdict({
+    return personScope.attribute({
       projectId: d.project?.id ?? null,
-      day: dateDayKey(d, viewerTz),
       commitments: d.commitments,
     });
   }
@@ -1003,18 +998,6 @@
       initials: p.initials ?? null,
     })),
   );
-  /** The inference pool per project — the team feed's `project_ids`
-      inverted, the SAME source `personGroups` builds lanes from, so an
-      inferred placement always lands on a lane that exists. */
-  let boardCast = $derived.by(() => {
-    const m = new Map<string, string[]>();
-    for (const member of $teamQuery.data?.items ?? []) {
-      for (const pid of member.project_ids ?? []) {
-        (m.get(pid) ?? m.set(pid, []).get(pid)!).push(member.person_id);
-      }
-    }
-    return m;
-  });
   /** A person on file in MORE THAN ONE workspace is a shared identity —
       the portable person, present in two dossiers. The dossier didn't
       define the word; this derivation is the honest reading of the feed. */
@@ -1027,25 +1010,6 @@
     }
     return new Set([...spaces].filter(([, ws]) => ws.size > 1).map(([id]) => id));
   });
-  /** Who is recorded as away on each day — the door the inference stops
-      at (ADR-092 §3): the engine subtracts these from a date's cast. */
-  let boardAwayByDay = $derived.by(() => {
-    const m = new Map<string, Set<string>>();
-    if (view !== 'board') return m;
-    // D · THE GATE READS THE UNFILTERED FACTS: calm hides bands, it never
-    // makes anybody available (the same rule personScope already keeps) —
-    // and the clamp is the BOOK's window, which is the board's.
-    for (const b of allBlackouts) {
-      if (!b.person_id) continue;
-      const from = b.starts_on < agendaFromIso ? agendaFromIso : b.starts_on;
-      const to = b.ends_on > agendaToIso ? agendaToIso : b.ends_on;
-      for (let d = from; d <= to; d = addDaysIso(d, 1)) {
-        (m.get(d) ?? m.set(d, new Set()).get(d)!).add(b.person_id);
-      }
-    }
-    return m;
-  });
-
   /** Every calendar row as the board consumes it — THE SLIP travels inside
       (ADR-095: the board renders the app's one card, never a lookalike).
       The SCOPED rows, not the drawn ones: the lane tallies count the window,
@@ -1126,8 +1090,6 @@
       axis: laneAxis,
       groups,
       events: boardEvents,
-      castByProject: boardCast,
-      awayByDay: boardAwayByDay,
       spaces: ($workspacesQuery.data?.items ?? []).map((w) => ({ id: w.id, name: w.name })),
     });
   });
@@ -2579,22 +2541,21 @@
     return ids.size;
   });
   /**
-   * Rows the person filter admitted on an INFERENCE, not a fact — a date of
-   * a project the pinned person is on file for, with nobody actually cast on
-   * it (there is no date↔person table to be cast in).
+   * Rows the person filter kept WITHOUT naming the person: company dates of
+   * a project the pinned person is on file for, with nobody named on them
+   * (ADR-147: Hour does not guess who goes).
    *
-   * It has to be said out loud. Including them is the right call — excluding
-   * them would hide a person's own rehearsals — but a guess that looks like a
-   * fact is the one thing the person axis must not do, and the scope chip
-   * only says WHO is pinned, not on what evidence. Drops to nothing when the
-   * axis is inactive or everything matched a real roster, like every other
+   * It has to be said out loud. Including them is the right call (excluding
+   * them would hide a person's own rehearsals), but the scope chip only says
+   * WHO is pinned, not on what evidence. Drops to nothing when the axis is
+   * inactive or everything matched a roster or a «voy», like every other
    * segment of this strip.
    */
-  let statInferred = $derived.by(() => {
+  let statUnattributed = $derived.by(() => {
     if (!personScope.active) return 0;
     let n = 0;
-    for (const p of shownPerfs) if (perfPersonVerdict(p) === 'inferred') n++;
-    for (const d of shownDates) if (datePersonVerdict(d) === 'inferred') n++;
+    for (const p of shownPerfs) if (perfPersonVerdict(p) === 'unattributed') n++;
+    for (const d of shownDates) if (datePersonVerdict(d) === 'unattributed') n++;
     return n;
   });
 
@@ -2603,7 +2564,7 @@
      or a guessed cast has something to say: two empty struts and a rule over
      the views were furniture. The other four drawings keep the block whole,
      so their controls do not move between them. */
-  let factsDrawn = $derived(view !== 'overview' || !shows('planner', 'census', calm.on) || statInferred > 0);
+  let factsDrawn = $derived(view !== 'overview' || !shows('planner', 'census', calm.on) || statUnattributed > 0);
 
   let statTrips = $derived.by(() => {
     let n = 0;
@@ -3412,11 +3373,11 @@
         {/if}
         <!-- NOT a window count: it counts the rows actually DRAWN, so it is
              true on every view, horizon or no horizon. -->
-        {#if statInferred > 0}
-          <!-- The person filter is showing rows nobody is cast on. Say so:
-               a guess must never read as a fact. -->
+        {#if statUnattributed > 0}
+          <!-- The person filter is showing company dates nobody is named on.
+               Say so: kept is not claimed. -->
           <span class="cal__stat cal__stat--soft"
-            >{t('planner.stat_inferred', locale, { n: String(statInferred) })}</span
+            >{t('planner.stat_unattributed', locale, { n: String(statUnattributed) })}</span
           >
         {/if}
     </p>

@@ -9,15 +9,16 @@
    * Like the rail, it never follows the scope (ADR-096 § 5): it says what is
    * happening to you, wherever you are looking. And it never changes height
    * while the answer lands: the card is drawn with dashes first.
+   *
+   * THE CARD FIRST (ADR-148): when the card is today's, Hoy's headline is its
+   * title, so on a phone the band's head is heard and not seen; the trip
+   * before the show is a line inside the card, and «Ahora» is a door in its
+   * foot, next to the road sheet. One fact, said once. Hour asks nothing
+   * here: who goes is a roster or a «voy» (ADR-147).
    */
   import Button from '$lib/components/Button.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import EmptyLine from '$lib/components/EmptyLine.svelte';
-  import ConceptHint from '$lib/components/ConceptHint.svelte';
-  import FirstTimeNote from '$lib/components/FirstTimeNote.svelte';
-  import { useQueryClient } from '@tanstack/svelte-query';
-  import { addToast } from '$lib/components/Toast.svelte';
-  import { ApiError } from '$lib/api';
   import { dualTime, hourMark, localeDayMonth, localeDayMonthNear, localeWeekdayShort } from '$lib/datetime';
   import { LOCALE_TAG, t, type Locale } from '$lib/i18n';
   import { holdDeadlineLabel } from '$lib/performance';
@@ -25,10 +26,9 @@
   import { dayMoments, momentWordKey, type DateEvent, type SlipContext, type SlipKind } from '$lib/month-events';
   import { timedStages } from '$lib/pulse';
   import { stagePlace } from '$lib/travel-stage';
-  import { setCommitment } from '$lib/commitments';
   import { plannerDayHref } from '$lib/planner';
   import { lensOn } from '$lib/lenses.svelte';
-  import { castNames, type CommitmentState } from '$lib/people';
+  import { castNames } from '$lib/people';
   import type { PerformanceEvent } from '$lib/month-events';
   import type { PulseNext } from '$lib/pulse';
   import { pulseSlip } from '$lib/pulse-feeds.svelte';
@@ -38,7 +38,8 @@
     next: PulseNext | null;
     /** A second thing within 48 h of the first, as one line. */
     then: PulseNext | null;
-    /** The line comes before the card, the same day (the trip to the show). */
+    /** The line comes before the card, the same day (the trip to the show):
+        it is drawn inside the card. */
     thenBefore?: boolean;
     settled: boolean;
     errored: boolean;
@@ -46,19 +47,19 @@
     onretry: () => void;
     today: string;
     viewerTz: string;
-    personId: string | null;
     /** New messages on the card's board (a performance's bolo), 0 without. */
     boardNew?: number;
     slipCtx: SlipContext;
     /** The roster's names, as the Day draws them ($lib/people `castNames`);
         null while the names are loading, so «sin reparto» never flashes. */
     personNames: ReadonlyMap<string, string> | null;
-    /** On the gig day, one line that opens Ahora (ADR-146); never enters by itself. */
-    ahora?: { text: string; href: string } | null;
+    /** Ahora's door (ADR-146), in the card's foot while it applies; never
+        enters by itself. */
+    ahoraHref?: string | null;
     locale: Locale;
   }
 
-  let { next, then, thenBefore = false, settled, errored, onretry, today, viewerTz, personId, boardNew = 0, slipCtx, personNames, ahora = null, locale }: Props = $props();
+  let { next, then, thenBefore = false, settled, errored, onretry, today, viewerTz, boardNew = 0, slipCtx, personNames, ahoraHref = null, locale }: Props = $props();
 
   const kindLabel = (kind: SlipKind) => t(`planner.kind_${kind}`, locale);
   /* A hold says what it is in the house word («1.ª opción · vence lun»), as
@@ -68,7 +69,6 @@
     const rank = statusWord(sl.hold.rank ? `hold_${sl.hold.rank}` : 'hold', locale);
     return sl.hold.expires ? `${rank} · ${holdDeadlineLabel(sl.hold.expires, today, locale, LOCALE_TAG[locale], true)}` : rank;
   }
-  const queryClient = useQueryClient();
 
   let slip = $derived(next ? pulseSlip(next.ref, next.day, slipCtx) : null);
   // Its own page, else the day in the Planner while the space uses it (ADR-132).
@@ -119,22 +119,11 @@
   /* «Tablón · 3 nuevos» (plan 2026-10-22 § 3.3): only when it has news, and
      straight to the board (`#board`). */
   let boardHref = $derived(next?.ref.of === 'performance' && slip?.href && boardNew > 0 ? `${slip.href}#board` : null);
+  /* Anything but a fact is drawn as a claim: a company date nobody is
+     named on is shown, not claimed for you (ADR-147). */
   let guess = $derived(next ? next.ref.attribution !== 'explicit' : false);
-
-  // ADR-103: only an inferred row asks; an unattributed one is the company's day.
-  let answering = $state(false);
-  let canAnswer = $derived(Boolean(personId) && next?.ref.attribution === 'inferred' && !answering);
-  async function answer(state: CommitmentState) {
-    if (!next || !personId) return;
-    answering = true;
-    try {
-      await setCommitment(queryClient, next.ref.of, next.ref.id, personId, state);
-    } catch (err) {
-      addToast({ tone: 'danger', title: t('desk.toast_change_failed', locale), message: err instanceof ApiError ? err.message : t('perf.unexpected', locale) });
-    } finally {
-      answering = false;
-    }
-  }
+  /* The card is today's: Hoy's headline already names it (ADR-148). */
+  let headlined = $derived(settled && !errored && next !== null && daysTo(next.day) <= 0);
 </script>
 
 {#snippet thenLine()}
@@ -164,12 +153,9 @@
 <section class="dband next" aria-labelledby="desk-next-h">
   <!-- No «Planificador →» here (ADR-145, fase 2): the bar of sections already
        goes there, and the day below opens the Planner on itself. -->
-  <BlockHead title={t('desk.band_next', locale)} titleId="desk-next-h" />
-  {#if ahora}
-    <p class="ahora-hint" data-testid="ahora-suggest">
-      <span>{ahora.text}</span> <a class="block-head__act" href={ahora.href}>{t('ahora.open', locale)} →</a>
-    </p>
-  {/if}
+  <div class="next__head" class:visually-hidden--narrow={headlined}>
+    <BlockHead title={t('desk.band_next', locale)} titleId="desk-next-h" />
+  </div>
 
   {#if errored}
     <p class="load-fail" role="alert"><span>{t('desk.next_error', locale)}</span><Button size="xs" variant="secondary" onclick={onretry}>{t('ui.retry', locale)}</Button></p>
@@ -198,7 +184,6 @@
       >
     </EmptyLine>
   {:else}
-    {#if thenBefore}{@render thenLine()}{/if}
     <div class="card" data-testid="desk-next">
       <div class="card__eye">
         <span class="card__when">{relDay(next.day)} · {dateWords(next.day)}</span>{#if next.ref.row.project?.name}{' · '}<span class="card__proj"
@@ -220,41 +205,27 @@
           noCastWord={t('planner.no_cast', locale)}
         />
       </div>
+      {#if thenBefore}{@render thenLine()}{/if}
       {#if moments.length > 0}
         <div class="card__slots">
           {#each moments as m, i (i)}<span><span class="card__k">{m.label}</span> {m.at}</span>{/each}
         </div>
       {/if}
-      {#if canAnswer || roadsheet || whoHref || boardHref}
+      {#if roadsheet || whoHref || boardHref || ahoraHref}
         <div class="card__foot">
-          {#if canAnswer}
-            <span class="card__ask">
-              {t('desk.next_ask', locale)}<ConceptHint concept="guess" />
-              <!-- The same answer as a «¿vas?» row of «Te espera»: the system's button. -->
-              <button
-                type="button"
-                class="card__btn btn--secondary btn--xs"
-                aria-label={t('desk.going_aria', locale, { subject: slip.name })}
-                onclick={() => answer('going')}>{t('pulse.going', locale)}</button
-              ><button
-                type="button"
-                class="card__btn card__btn--quiet btn--secondary btn--xs"
-                aria-label={t('desk.not_going_aria', locale, { subject: slip.name })}
-                onclick={() => answer('not_going')}>{t('pulse.not_going', locale)}</button
-              >
-            </span>
-          {/if}
           <span class="card__links">
             {#if boardHref}<a class="block-head__act" href={boardHref} data-testid="desk-next-board"
                 >{boardNew === 1 ? t('desk.next_board_one', locale) : t('desk.next_board', locale, { n: boardNew })} →</a
               >{/if}
             {#if whoHref}<a class="block-head__act" href={whoHref}>{t('commitment.who_goes', locale)} →</a>{/if}
+            {#if ahoraHref}<a class="card__rs btn--secondary btn--s" href={ahoraHref} aria-label={t('ahora.enter_aria', locale)} data-testid="ahora-enter"
+                >{t('ahora.title', locale)}</a
+              >{/if}
             {#if roadsheet}<a class="card__rs btn--secondary btn--s" href={roadsheet}>{t('desk.roadsheet', locale)} ↗</a>{/if}
           </span>
         </div>
       {/if}
     </div>
-    <FirstTimeNote event="first_going" when={canAnswer} />
     {#if !thenBefore}{@render thenLine()}{/if}
   {/if}
 </section>
@@ -271,14 +242,15 @@
     min-block-size: 7.5rem;
     align-content: start;
   }
-  .ahora-hint {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: var(--space-2xs) var(--space-s);
-    margin: 0 0 var(--space-s);
-    font-size: var(--text-s);
-    color: var(--text-muted);
+  /* The band's head, wrapped so a phone can hear it without seeing it when the
+     headline already names the card (ADR-148): then it keeps no room either. */
+  .next__head {
+    margin-block-end: var(--space-s);
+  }
+  @media (max-width: 47.999rem) {
+    .next__head.visually-hidden--narrow {
+      margin: calc(-1 * var(--line-hairline));
+    }
   }
   .card--wait {
     color: var(--text-faint);
@@ -329,29 +301,12 @@
     gap: var(--space-s) var(--space-m);
     margin-block-start: var(--space-2xs);
   }
-  .card__ask {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    letter-spacing: var(--mono-letter-spacing-loose);
-    color: var(--text-faint);
+  .card__links {
     display: inline-flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--space-xs);
-  }
-  .card__btn {
-    --btn-padding-block: var(--space-2xs);
-    --btn-padding-inline: var(--space-s);
-  }
-  .card__btn--quiet {
-    --btn-border-color: transparent;
-    --btn-background-hover: transparent;
-    --btn-text-color: var(--text-faint);
-  }
-  .card__links {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-m);
+    justify-content: flex-end;
+    gap: var(--space-s) var(--space-m);
     margin-inline-start: auto;
   }
   .card__rs {
@@ -368,9 +323,10 @@
     font-size: var(--text-s);
     color: var(--text-muted);
   }
-  /* The trip before the show sits above its card. */
-  .then:has(+ .card) {
-    margin: 0 0 var(--space-s);
+  /* The trip before the show is a line of its card, on the card's edge. */
+  .card .then {
+    margin: 0;
+    padding-inline: 0;
   }
   .then__what {
     display: inline-flex;

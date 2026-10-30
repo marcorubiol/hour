@@ -249,10 +249,10 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
     expect(out).toEqual({ ok: 200, items: true, bad: 400 });
   });
 
-  test('«+ Task» opens the composer in place', async ({ page }) => {
+  test('«+» (New task) opens the composer in place', async ({ page }) => {
     await page.goto(DESK);
     await waitForLoaded(page);
-    const add = page.getByRole('button', { name: '+ Task' });
+    const add = page.getByRole('button', { name: 'New task', exact: true });
     await expect(add).toHaveAttribute('aria-expanded', 'false');
     await add.click();
     await expect(add).toHaveAttribute('aria-expanded', 'true');

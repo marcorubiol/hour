@@ -81,8 +81,6 @@ const scopeBase = laneEvents({
   axis: 'scope',
   groups: scopeGroups({ scopeProjectIds: null, workspaces, projects }),
   events,
-  castByProject: new Map(),
-  awayByDay: new Map(),
 });
 const p2Key = scopeBase.groups[0].lanes.find((l) => l.id === 'p2')!.key;
 const awayRuns = [
@@ -245,8 +243,6 @@ describe('CarrilsStrip — the board grid', () => {
           guest: { workspace_id: workspaces[0].id, venue_key: '', venue_name: null },
         },
       ],
-      castByProject: new Map(),
-      awayByDay: new Map(),
       spaces: workspaces,
     });
     const lane = base.groups[0].lanes[0];
@@ -343,7 +339,7 @@ describe('CarrilsStrip — the person axis', () => {
       sharedPersonIds: new Set(['mia']),
     }),
     events: [
-      // A date with no roster → inferred onto Mia (p1's cast).
+      // A date with no roster: Mia's «voy» puts it on her lane (ADR-147).
       {
         id: 'd1',
         day: '2026-07-14',
@@ -351,12 +347,11 @@ describe('CarrilsStrip — the person axis', () => {
         kind: 'date',
         cert: 'confirmed',
         roster: null,
+        commitments: [{ person_id: 'mia', state: 'going' }],
         venue_id: null,
         slip: { ...slipOf('d1', 'confirmed', 'Assaig'), kind: 'rehearsal' },
       },
     ],
-    castByProject: new Map([['p1', ['mia']]]),
-    awayByDay: new Map(),
   });
 
   function personProps(over: Record<string, unknown> = {}) {
@@ -387,11 +382,12 @@ describe('CarrilsStrip — the person axis', () => {
     expect(chip.compareDocumentPosition(name) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('an inferred placement is dotted and italic FROM THE SLOT — Slip untouched, no fade', () => {
+  it('a «voy» is drawn as the fact it is: a plain slot, no guess voice', () => {
     const { container } = render(CarrilsStrip, personProps());
-    const slot = container.querySelector('.board__slot--inf')!;
+    const slot = container.querySelector('.board__slot')!;
     expect(slot).not.toBeNull();
     expect(slot.querySelector('.slip')).not.toBeNull();
+    expect(container.querySelector('.board__slot--inf')).toBeNull();
   });
 
   it("the teamless project says 'no data yet' exactly once, in its ghost lane", () => {

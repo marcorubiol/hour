@@ -31,17 +31,17 @@
  * ── WHOSE DAY IT IS ────────────────────────────────────────────────────
  * The pulse is person-scoped: it answers for YOU, not for the company. But
  * it also says the word «free», and that puts it on the wrong side of the
- * filtering shortcut every other view can take. `matchesPinnedPeople` drops
- * a row nobody is on file for; a view that drops those rows and then draws
- * an empty evening has printed «free» off an `unknown` — the one thing
- * $lib/people forbids in as many words. So the pulse takes the four-state
- * `PersonAttribution` and keeps what it cannot rule out:
+ * filtering shortcut: a view that drops the rows nobody is named on and
+ * then draws an empty evening has printed «free» off an `unknown`, the one
+ * thing $lib/people forbids in as many words. So the pulse takes the
+ * three-state `PersonAttribution` and keeps what it cannot rule out
+ * (ADR-147: Hour no longer guesses who goes):
  *
- *   explicit      — a roster says you are on it. Certain.
- *   inferred      — your project's cast, nobody actually cast. A guess.
- *   unattributed  — no roster, no cast on file. Not a guess about YOU; it
- *                   is the company's day, still yours to read.
- *   no            — somebody IS on file and it is not you. Dropped.
+ *   explicit      — a roster or your own «voy» says you are on it.
+ *   unattributed  — nobody named: the company's date of your project.
+ *                   Not a claim about YOU; still yours to read.
+ *   no            — a roster without you, your «no voy», or a project you
+ *                   are not on. Dropped.
  *
  * Only `no` is dropped, and only that direction is safe: keeping a row too
  * many makes «free» harder to claim, which is the failure that costs
@@ -349,13 +349,12 @@ function dateEntry(d: DateEvent, viewerTz: string, attribution: PersonAttributio
     it asks the axis; without one every function speaks. The Desk reads the
     same rule, so its greeting and the rail never name different shows. */
 export function performanceAttribution(
-  p: Pick<PerformanceEvent, 'project' | 'performed_at' | 'person_ids' | 'commitments'>,
+  p: Pick<PerformanceEvent, 'project' | 'person_ids' | 'commitments'>,
   axis: PersonAttributionScope | null | undefined,
 ): PersonAttribution {
   if (!axis?.active) return 'explicit';
   return axis.attribute({
     projectId: p.project?.id ?? null,
-    day: p.performed_at.slice(0, 10),
     roster: p.person_ids,
     commitments: p.commitments,
   });
@@ -381,7 +380,6 @@ export function computePulse(input: PulseInput, now: Date): Pulse {
     const attribution = axis
       ? axis.attribute({
           projectId: d.project?.id ?? null,
-          day: dayKeyInTz(d.starts_at, d.venue?.timezone || viewerTz),
           commitments: d.commitments,
         })
       : 'explicit';

@@ -1,162 +1,115 @@
 import { describe, expect, it } from 'vitest';
 import {
-  awayIndex,
   attributionFor,
-  awayPersonIdsOn,
   buildPersonAttribution,
-  buildPersonScope,
-  linkOf,
-  matchesPinnedPeople,
   noCastKey,
   noCastProjectId,
   peopleOf,
   personRowKeys,
-  type AwayInput,
 } from './people';
 
-const away = (ids: string[]) => new Set(ids);
+const pins = (ids: string[]) => new Set(ids);
+const going = (id: string) => ({ person_id: id, state: 'going' as const });
+const notGoing = (id: string) => ({ person_id: id, state: 'not_going' as const });
 
 describe('peopleOf', () => {
-  it('an explicit roster wins and comes back as a fact', () => {
-    expect(peopleOf({ roster: ['laia', 'cloe'], projectCast: ['mia'] })).toEqual({
+  it('a roster is who goes, and a closed list', () => {
+    expect(peopleOf({ roster: ['laia', 'cloe'] })).toEqual({
       personIds: ['laia', 'cloe'],
       link: 'explicit',
-      inferredIds: [],
+      rostered: true,
       withdrawnIds: [],
     });
   });
 
   /**
-   * THE rule of this module. Somebody cast on a gig who is also away that
-   * day is a CLASH, and `conflictsFor` is what reports it (severity
-   * 'blackout'). Dropping them here would delete the clash from the only
-   * surface built to catch it — the bug would read as "no conflict".
+   * ADR-147: no inference. A date nobody gave their word on is `unknown`,
+   * which is NOT "nobody is on it": a caller that prints «free» off it is
+   * claiming a night on the strength of missing data.
    */
-  it('never filters an explicit roster by who is away — that is the clash', () => {
-    const got = peopleOf({
-      roster: ['laia', 'cloe'],
-      awayPersonIds: away(['laia']),
-    });
-    expect(got.personIds).toEqual(['laia', 'cloe']);
-    expect(got.link).toBe('explicit');
-  });
-
-  it('falls back to the project cast, and says it is an inference', () => {
-    expect(peopleOf({ roster: [], projectCast: ['mia', 'jordi'] })).toEqual({
-      personIds: ['mia', 'jordi'],
-      link: 'inferred',
-      inferredIds: ['mia', 'jordi'],
-      withdrawnIds: [],
-    });
-    // A null roster is the same fact as an empty one.
-    expect(peopleOf({ roster: null, projectCast: ['mia'] }).link).toBe('inferred');
-  });
-
-  /**
-   * The gate the Loom is missing today: without it one thread says both
-   * "away all day" and "maybe rehearsing at 10h" on the same day.
-   */
-  it('inference stops at the door of an absence', () => {
-    const got = peopleOf({
-      projectCast: ['mia', 'jordi', 'anouk'],
-      awayPersonIds: away(['jordi']),
-    });
-    expect(got.personIds).toEqual(['mia', 'anouk']);
-    expect(got.link).toBe('inferred');
-  });
-
-  /**
-   * `unknown` is NOT "nobody is on it". A caller that prints "free" off an
-   * unknown is claiming a night is available on the strength of missing
-   * data, which is the one thing the person axis must never do.
-   */
-  it('gives up as `unknown` rather than guessing, and unknown is its own word', () => {
-    const nobody = { personIds: [], link: 'unknown', inferredIds: [], withdrawnIds: [] };
+  it('a row nobody is named on is `unknown`, never a guess', () => {
+    const nobody = { personIds: [], link: 'unknown', rostered: false, withdrawnIds: [] };
     expect(peopleOf({})).toEqual(nobody);
-    expect(peopleOf({ projectCast: ['mia'], awayPersonIds: away(['mia']) })).toEqual(nobody);
+    expect(peopleOf({ roster: null, commitments: null })).toEqual(nobody);
+  });
+
+  it('«voy» puts one person on a date, and settles nobody else', () => {
+    const got = peopleOf({ commitments: [going('laia')] });
+    expect(got.personIds).toEqual(['laia']);
+    expect(got.link).toBe('explicit');
+    expect(got.rostered).toBe(false);
+  });
+
+  it('«voy» joins a roster', () => {
+    expect(peopleOf({ roster: ['cloe'], commitments: [going('pau')] }).personIds).toEqual(['cloe', 'pau']);
+  });
+
+  it('«no voy» is recorded, and a roster is never filtered by it', () => {
+    const date = peopleOf({ commitments: [notGoing('laia')] });
+    expect(date.personIds).toEqual([]);
+    expect(date.link).toBe('unknown');
+    expect(date.withdrawnIds).toEqual(['laia']);
+    // The roster is the record (Quién va); the disagreement is the record's to show.
+    expect(peopleOf({ roster: ['laia'], commitments: [notGoing('laia')] }).personIds).toEqual(['laia']);
   });
 
   it('dedupes and keeps the order the inputs offered', () => {
     expect(peopleOf({ roster: ['laia', 'cloe', 'laia'] }).personIds).toEqual(['laia', 'cloe']);
-    expect(peopleOf({ projectCast: ['mia', 'mia', 'jordi'] }).personIds).toEqual(['mia', 'jordi']);
+    expect(peopleOf({ roster: ['laia'], commitments: [going('laia')] }).personIds).toEqual(['laia']);
   });
 });
 
-describe('matchesPinnedPeople', () => {
+describe('attributionFor', () => {
   it('an empty pin set does not narrow', () => {
-    expect(matchesPinnedPeople(peopleOf({ roster: ['laia'] }), new Set())).toBe('explicit');
-    expect(matchesPinnedPeople(peopleOf({}), new Set())).toBe('explicit');
+    expect(attributionFor(peopleOf({ roster: ['laia'] }), pins([]))).toBe('explicit');
+    expect(attributionFor(peopleOf({}), pins([]))).toBe('explicit');
   });
 
-  it('reports the evidence, not just the hit', () => {
-    const gig = peopleOf({ roster: ['laia', 'cloe'] });
-    const rehearsal = peopleOf({ projectCast: ['laia', 'mia'] });
-    expect(matchesPinnedPeople(gig, away(['laia']))).toBe('explicit');
-    expect(matchesPinnedPeople(rehearsal, away(['laia']))).toBe('inferred');
+  it('a roster or a «voy» naming the pinned person is a fact', () => {
+    expect(attributionFor(peopleOf({ roster: ['laia', 'cloe'] }), pins(['laia']))).toBe('explicit');
+    expect(attributionFor(peopleOf({ commitments: [going('laia')] }), pins(['laia']))).toBe('explicit');
   });
 
-  it('says no when the pinned people are not on it', () => {
-    expect(matchesPinnedPeople(peopleOf({ roster: ['laia'] }), away(['nils']))).toBe('no');
-    expect(matchesPinnedPeople(peopleOf({}), away(['nils']))).toBe('no');
-  });
-
-  it('an explicit hit outranks an inferred one on the same row', () => {
-    // Roster present ⇒ the whole row is a fact; no member of it is inferred.
-    const row = peopleOf({ roster: ['laia'], projectCast: ['mia'] });
-    expect(matchesPinnedPeople(row, away(['laia', 'mia']))).toBe('explicit');
-  });
-});
-
-describe('awayPersonIdsOn', () => {
-  const blocks: AwayInput[] = [
-    { person_id: 'mia', starts_on: '2026-07-15', ends_on: '2026-07-20' },
-    { person_id: 'pol', starts_on: '2026-07-28', ends_on: '2026-08-01' },
-    // A company closure — not a person being away.
-    { person_id: null, starts_on: '2026-08-01', ends_on: '2026-08-15' },
-  ];
-
-  it('is inclusive at both ends', () => {
-    expect([...awayPersonIdsOn(blocks, '2026-07-15')]).toEqual(['mia']);
-    expect([...awayPersonIdsOn(blocks, '2026-07-20')]).toEqual(['mia']);
-    expect([...awayPersonIdsOn(blocks, '2026-07-14')]).toEqual([]);
-    expect([...awayPersonIdsOn(blocks, '2026-07-21')]).toEqual([]);
-  });
-
-  it('crosses the month boundary like any other range', () => {
-    expect([...awayPersonIdsOn(blocks, '2026-07-31')]).toEqual(['pol']);
+  it('a roster without the pinned person is a «no»', () => {
+    expect(attributionFor(peopleOf({ roster: ['laia'] }), pins(['nils']))).toBe('no');
   });
 
   /**
-   * A workspace does not go on holiday. Folding closures in here would make
-   * every member of the company un-inferable for the whole of August, and a
-   * date inside a closure is a conflict the engine reports anyway.
+   * The case that started ADR-147: Manou's train, a date of MaMeMi with
+   * nobody named, was asked of Marco because he is in the cast. Now it is
+   * the company's date: shown to him, claimed for nobody.
    */
-  it('ignores company closures', () => {
-    expect([...awayPersonIdsOn(blocks, '2026-08-10')]).toEqual([]);
+  it('a date nobody is named on, of the pinned person\'s project, is the company\'s', () => {
+    const date = peopleOf({});
+    expect(attributionFor(date, pins(['marco']), ['marco', 'manou'])).toBe('unattributed');
+    // Somebody else's «voy» on a date does not make it «not yours»: the list is open.
+    expect(attributionFor(peopleOf({ commitments: [going('manou')] }), pins(['marco']), ['marco', 'manou'])).toBe(
+      'unattributed',
+    );
+  });
+
+  it('a date of a project the pinned person is not on is a «no»', () => {
+    expect(attributionFor(peopleOf({}), pins(['marco']), ['laia'])).toBe('no');
+  });
+
+  it('a date of a project with nobody on file concerns everybody', () => {
+    expect(attributionFor(peopleOf({}), pins(['marco']), [])).toBe('unattributed');
+    expect(attributionFor(peopleOf({}), pins(['marco']))).toBe('unattributed');
+  });
+
+  /**
+   * The trap: the row resolves to nobody, and `unattributed` would read as
+   * «the company's day, still yours» — the rail would keep showing the very
+   * thing you just said no to.
+   */
+  it('a «no voy» is a «no» for whoever said it', () => {
+    const people = peopleOf({ commitments: [notGoing('laia')] });
+    expect(attributionFor(people, pins(['laia']), ['laia', 'pau'])).toBe('no');
+    expect(attributionFor(people, pins(['pau']), ['laia', 'pau'])).toBe('unattributed');
   });
 });
 
-describe('awayIndex', () => {
-  it('agrees with the per-day answer on every day of the window', () => {
-    const blocks: AwayInput[] = [
-      { person_id: 'mia', starts_on: '2026-07-02', ends_on: '2026-07-04' },
-      { person_id: 'pol', starts_on: '2026-07-04', ends_on: '2026-07-04' },
-      { person_id: null, starts_on: '2026-07-01', ends_on: '2026-07-05' },
-    ];
-    const days = ['2026-07-01', '2026-07-02', '2026-07-03', '2026-07-04', '2026-07-05'];
-    const index = awayIndex(blocks, days);
-
-    for (const day of days) {
-      expect([...index.get(day)!].sort()).toEqual([...awayPersonIdsOn(blocks, day)].sort());
-    }
-    // Every requested day exists as a key, even the empty ones — a caller
-    // must never get `undefined` and read it as "nobody is away".
-    expect([...index.keys()]).toEqual(days);
-    expect([...index.get('2026-07-04')!].sort()).toEqual(['mia', 'pol']);
-  });
-});
-
-describe('buildPersonScope', () => {
+describe('buildPersonAttribution', () => {
   const team = [
     { person_id: 'laia', workspace_id: 'ws1', slug: 'laia', full_name: 'Laia', project_ids: ['memorias'] },
     { person_id: 'cloe', workspace_id: 'ws1', slug: 'cloe', full_name: 'Cloe', project_ids: ['memorias', 'tres'] },
@@ -164,63 +117,42 @@ describe('buildPersonScope', () => {
   ];
 
   it('is inert with nobody pinned, and says so', () => {
-    const scope = buildPersonScope({ pinnedPersonIds: [], team, blocks: [] });
-    expect(scope.active).toBe(false);
-    expect(scope.verdict({ projectId: 'mamemi', day: '2026-07-18' })).toBe('explicit');
+    const axis = buildPersonAttribution({ pinnedPersonIds: [], team });
+    expect(axis.active).toBe(false);
+    expect(axis.attribute({ projectId: 'mamemi' })).toBe('explicit');
   });
 
-  it('keeps a gig whose roster names the pinned person', () => {
-    const scope = buildPersonScope({ pinnedPersonIds: ['laia'], team, blocks: [] });
-    expect(
-      scope.verdict({ projectId: 'memorias', day: '2026-07-18', roster: ['laia', 'cloe'] }),
-    ).toBe('explicit');
-    expect(scope.verdict({ projectId: 'tres', day: '2026-07-18', roster: ['cloe'] })).toBe('no');
+  it('judges a gig by its roster', () => {
+    const axis = buildPersonAttribution({ pinnedPersonIds: ['laia'], team });
+    expect(axis.attribute({ projectId: 'memorias', roster: ['laia', 'cloe'] })).toBe('explicit');
+    expect(axis.attribute({ projectId: 'tres', roster: ['cloe'] })).toBe('no');
   });
 
-  /** A date carries no roster, so it is judged by its project's cast. */
-  it('keeps a date of a project the pinned person is on file for — as an inference', () => {
-    const scope = buildPersonScope({ pinnedPersonIds: ['laia'], team, blocks: [] });
-    expect(scope.verdict({ projectId: 'memorias', day: '2026-07-18' })).toBe('inferred');
-    expect(scope.verdict({ projectId: 'mamemi', day: '2026-07-18' })).toBe('no');
+  it('a date of the pinned person\'s project is the company\'s; of another project, a «no»', () => {
+    const axis = buildPersonAttribution({ pinnedPersonIds: ['laia'], team });
+    expect(axis.attribute({ projectId: 'memorias' })).toBe('unattributed');
+    expect(axis.attribute({ projectId: 'mamemi' })).toBe('no');
   });
 
   it('inverts the team feed so one person can be on several projects', () => {
-    const scope = buildPersonScope({ pinnedPersonIds: ['cloe'], team, blocks: [] });
-    expect(scope.verdict({ projectId: 'memorias', day: '2026-07-18' })).toBe('inferred');
-    expect(scope.verdict({ projectId: 'tres', day: '2026-07-18' })).toBe('inferred');
+    const axis = buildPersonAttribution({ pinnedPersonIds: ['cloe'], team });
+    expect(axis.attribute({ projectId: 'memorias' })).toBe('unattributed');
+    expect(axis.attribute({ projectId: 'tres' })).toBe('unattributed');
   });
 
-  it('drops an inferred day the pinned person is away, and keeps the gig they are cast on', () => {
-    const scope = buildPersonScope({
-      pinnedPersonIds: ['laia'],
-      team,
-      blocks: [{ person_id: 'laia', starts_on: '2026-07-17', ends_on: '2026-07-19' }],
-    });
-    // The guess yields to the absence…
-    expect(scope.verdict({ projectId: 'memorias', day: '2026-07-18' })).toBe('no');
-    // …but a real roster on that same day survives: that is the clash, and
-    // hiding it would remove it from the view built to catch it.
-    expect(
-      scope.verdict({ projectId: 'memorias', day: '2026-07-18', roster: ['laia'] }),
-    ).toBe('explicit');
-    // Outside the absence the inference is back.
-    expect(scope.verdict({ projectId: 'memorias', day: '2026-07-20' })).toBe('inferred');
+  it('a word settles the person it is from', () => {
+    const axis = buildPersonAttribution({ pinnedPersonIds: ['laia'], team });
+    expect(axis.attribute({ projectId: 'memorias', commitments: [going('laia')] })).toBe('explicit');
+    expect(axis.attribute({ projectId: 'memorias', commitments: [notGoing('laia')] })).toBe('no');
+    // «Voy» counts on a project the person is not on file for: a fact is a fact.
+    expect(axis.attribute({ projectId: 'mamemi', commitments: [going('laia')] })).toBe('explicit');
   });
 
-  it('a team feed with no project_ids cannot infer, and does not pretend to', () => {
+  it('a team feed with no project_ids cannot rule a date out, and keeps it', () => {
     const bare = [{ person_id: 'laia', workspace_id: 'ws1', slug: 'laia', full_name: 'Laia' }];
-    const scope = buildPersonScope({ pinnedPersonIds: ['laia'], team: bare, blocks: [] });
-    expect(scope.verdict({ projectId: 'memorias', day: '2026-07-18' })).toBe('no');
-    // An explicit roster still works — it never needed the pool.
-    expect(scope.verdict({ projectId: 'memorias', day: '2026-07-18', roster: ['laia'] })).toBe(
-      'explicit',
-    );
-  });
-
-  it('a row with no project is judged by its roster alone', () => {
-    const scope = buildPersonScope({ pinnedPersonIds: ['laia'], team, blocks: [] });
-    expect(scope.verdict({ projectId: null, day: '2026-07-18', roster: ['laia'] })).toBe('explicit');
-    expect(scope.verdict({ projectId: null, day: '2026-07-18' })).toBe('no');
+    const axis = buildPersonAttribution({ pinnedPersonIds: ['laia'], team: bare });
+    expect(axis.attribute({ projectId: 'memorias' })).toBe('unattributed');
+    expect(axis.attribute({ projectId: 'memorias', roster: ['laia'] })).toBe('explicit');
   });
 });
 
@@ -230,13 +162,14 @@ describe('personRowKeys', () => {
       keys: ['laia'],
       link: 'explicit',
     });
+    expect(personRowKeys(peopleOf({ commitments: [going('pau')] }), 'memorias')).toEqual({
+      keys: ['pau'],
+      link: 'explicit',
+    });
   });
 
-  /**
-   * A project with nobody on file still has nights: a row that resolves to
-   * nobody is a row the view loses.
-   */
-  it('a row nobody owns lands on its project, never nowhere', () => {
+  /** A company date resolves to nobody, and a row that resolves to nobody is a row the view loses. */
+  it('a row nobody is named on lands on its project, never nowhere', () => {
     expect(personRowKeys(peopleOf({}), 'tres')).toEqual({
       keys: ['nocast:tres'],
       link: 'unknown',
@@ -250,82 +183,5 @@ describe('personRowKeys', () => {
   it('the synthetic key round-trips and cannot be mistaken for a person', () => {
     expect(noCastProjectId(noCastKey('mamemi'))).toBe('mamemi');
     expect(noCastProjectId('019f21d2-7482-77e6-9ad9-27d881cff305')).toBeNull();
-  });
-});
-
-/**
- * ADR-103 — the inference can be answered, person by person. «Voy» makes a
- * fact of a guess, «no voy» takes it out, and one answer settles nobody else.
- */
-describe('commitments (ADR-103)', () => {
-  const going = (id: string) => ({ person_id: id, state: 'going' as const });
-  const notGoing = (id: string) => ({ person_id: id, state: 'not_going' as const });
-
-  it('«voy» turns one guess into a fact and leaves the others guessed', () => {
-    const got = peopleOf({ projectCast: ['laia', 'pau'], commitments: [going('laia')] });
-    expect(got.personIds).toEqual(['laia', 'pau']);
-    expect(got.link).toBe('explicit');
-    expect(got.inferredIds).toEqual(['pau']);
-    expect(linkOf(got, 'laia')).toBe('explicit');
-    expect(linkOf(got, 'pau')).toBe('inferred');
-  });
-
-  it('«no voy» takes a person out of the inference', () => {
-    const got = peopleOf({ projectCast: ['laia', 'pau'], commitments: [notGoing('laia')] });
-    expect(got.personIds).toEqual(['pau']);
-    expect(got.link).toBe('inferred');
-    expect(got.withdrawnIds).toEqual(['laia']);
-  });
-
-  it('«voy» counts even when the person is away: a fact is never second-guessed', () => {
-    const got = peopleOf({
-      projectCast: ['laia'],
-      awayPersonIds: away(['laia']),
-      commitments: [going('laia')],
-    });
-    expect(got.personIds).toEqual(['laia']);
-    expect(got.link).toBe('explicit');
-  });
-
-  it('«voy» from outside the cast adds the person', () => {
-    const got = peopleOf({ projectCast: ['laia'], commitments: [going('anouk')] });
-    expect(got.personIds).toEqual(['anouk', 'laia']);
-    expect(got.inferredIds).toEqual(['laia']);
-  });
-
-  it('next to a roster nobody is inferred, and «voy» joins it', () => {
-    const got = peopleOf({ roster: ['cloe'], projectCast: ['laia'], commitments: [going('pau')] });
-    expect(got.personIds).toEqual(['cloe', 'pau']);
-    expect(got.inferredIds).toEqual([]);
-  });
-
-  it('the pinned verdict follows the person, not the row', () => {
-    const people = peopleOf({ projectCast: ['laia', 'pau'], commitments: [going('laia')] });
-    expect(attributionFor(people, new Set(['laia']))).toBe('explicit');
-    expect(attributionFor(people, new Set(['pau']))).toBe('inferred');
-  });
-
-  /**
-   * The trap: everyone withdrew, the row resolves to nobody, and `unknown`
-   * would read as «the company's day, still yours» — the rail would keep
-   * showing the very thing you just said no to.
-   */
-  it('a «no voy» is a «no» for whoever said it, even on an emptied row', () => {
-    const people = peopleOf({ projectCast: ['laia'], commitments: [notGoing('laia')] });
-    expect(people.link).toBe('unknown');
-    expect(attributionFor(people, new Set(['laia']))).toBe('no');
-    expect(attributionFor(people, new Set(['pau']))).toBe('unattributed');
-  });
-
-  it('reaches the axis the rail reads', () => {
-    const axis = buildPersonAttribution({
-      pinnedPersonIds: ['laia'],
-      team: [{ person_id: 'laia', workspace_id: 'w', slug: 'laia', full_name: 'Laia', project_ids: ['p'] }],
-      blocks: [],
-    });
-    const row = { projectId: 'p', day: '2026-10-20' };
-    expect(axis.attribute(row)).toBe('inferred');
-    expect(axis.attribute({ ...row, commitments: [going('laia')] })).toBe('explicit');
-    expect(axis.attribute({ ...row, commitments: [notGoing('laia')] })).toBe('no');
   });
 });

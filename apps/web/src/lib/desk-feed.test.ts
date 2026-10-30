@@ -4,7 +4,6 @@ import {
   calmWaiting,
   CALM_ROWS,
   dayBucket,
-  goingItem,
   invoiceHref,
   laterSummary,
   overdueInvoices,
@@ -299,10 +298,7 @@ describe('buildDeskFeed — horizon', () => {
 
 
 describe('rankWaiting — «Te espera» by weight (ADR-117)', () => {
-  const ask = (id: string, offset: number) =>
-    goingItem({ of: 'performance', id, day: isoDay(offset), subject: id, projectId: 'p1', projectName: 'MaMeMi', href: null });
-
-  it('overdue first, then today, then the week; inside a tier money > call > voy > task > proposal', () => {
+  it('overdue first, then today, then the week; inside a tier money > call > task > proposal', () => {
     const feed = buildDeskFeed(
       {
         conversations: [conv('call-today', { next_action_at: actionAt(0) }), conv('call-late', { next_action_at: actionAt(-1) })],
@@ -313,7 +309,6 @@ describe('rankWaiting — «Te espera» by weight (ADR-117)', () => {
           task('t-late', { due_at: actionAt(-2) }),
         ],
         invoices: [invoice('i')],
-        asks: [ask('voy-today', 0), ask('voy-far', 10)],
       },
       NOW,
       'en',
@@ -324,20 +319,13 @@ describe('rankWaiting — «Te espera» by weight (ADR-117)', () => {
       'conv-call-late',
       'task-t-late',
       'conv-call-today',
-      'going-voy-today',
       'task-t-today',
       'task-ai-today',
+      'task-t-week',
     ]);
-    expect(w.total).toBe(9);
-    expect(w.asking).toBe(8);
+    expect(w.total).toBe(7);
+    expect(w.asking).toBe(6);
     expect(w.overdue).toBe(3);
-  });
-
-  it('a «voy» sits on its day in the list by days, so «Ver todo» keeps it', () => {
-    const feed = buildDeskFeed({ ...EMPTY, asks: [ask('voy-far', 10)] }, NOW, 'en');
-    expect(feed.map((b) => b.labelKey)).toEqual(['later']);
-    expect(feed[0].runs[0]).toMatchObject({ concern: 'going' });
-    expect(rankWaiting(feed, NOW).rows.map((r) => r.id)).toEqual(['going-voy-far']);
   });
 
   it('the anytime tail and what lies past this week stay in the day list', () => {
@@ -368,7 +356,6 @@ describe('rankWaiting — «Te espera» by weight (ADR-117)', () => {
           task('b', { due_at: actionAt(3) }),
           task('old', { due_at: actionAt(-2) }),
         ],
-        asks: [ask('v', 4)],
       },
       NOW,
       'en',
@@ -376,8 +363,8 @@ describe('rankWaiting — «Te espera» by weight (ADR-117)', () => {
     const c = calmWaiting(feed, NOW);
     expect(c.today.map((r) => r.id)).toEqual(['task-a']);
     expect(c.overdue.map((r) => r.id)).toEqual(['conv-late', 'task-old']);
-    // the week's task, the «voy» and Hour's proposal wait outside calm
-    expect(c.more).toBe(3);
+    // the week's task and Hour's proposal wait outside calm
+    expect(c.more).toBe(2);
   });
 
   it('calm draws at most five of today; the overflow joins the number', () => {

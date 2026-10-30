@@ -189,7 +189,6 @@ describe('whose day it is', () => {
     buildPersonAttribution({
       pinnedPersonIds: [ME],
       team: [{ person_id: ME, workspace_id: 'w1', slug: 'me', full_name: 'Me', project_ids: projectIds }],
-      blocks: [],
     });
 
   test('a roster that names somebody else drops the row', () => {
@@ -215,13 +214,22 @@ describe('whose day it is', () => {
     expect(next?.ref.attribution).toBe('explicit');
   });
 
-  test('your project, nobody cast: kept, and marked as the guess it is', () => {
+  test('your project, nobody named: kept as the company\'s date, never claimed for you (ADR-147)', () => {
     const rehearsal = date({ project: PROJECT, starts_at: `${DAY}T10:00:00Z` });
     const { next } = pulse(
       { performances: [], dates: [rehearsal], viewerTz: TZ, axis: axisFor(['pr1']) },
       at('06:00:00'),
     );
-    expect(next?.ref.attribution).toBe('inferred');
+    expect(next?.ref.attribution).toBe('unattributed');
+  });
+
+  test('your «voy» makes a date yours; your «no voy» takes it off', () => {
+    const trip = (state: 'going' | 'not_going') =>
+      date({ project: PROJECT, starts_at: `${DAY}T10:00:00Z`, commitments: [{ person_id: ME, state }] });
+    const yes = pulse({ performances: [], dates: [trip('going')], viewerTz: TZ, axis: axisFor(['pr1']) }, at('06:00:00'));
+    expect(yes.next?.ref.attribution).toBe('explicit');
+    const no = pulse({ performances: [], dates: [trip('not_going')], viewerTz: TZ, axis: axisFor(['pr1']) }, at('06:00:00'));
+    expect(no.next).toBeNull();
   });
 
   test('NOBODY on file is not «not yours» — the row survives, so «free» stays honest', () => {
@@ -244,29 +252,27 @@ describe('whose day it is', () => {
         performances: [theirs],
         dates: [],
         viewerTz: TZ,
-        axis: buildPersonAttribution({ pinnedPersonIds: [], team: [], blocks: [] }),
+        axis: buildPersonAttribution({ pinnedPersonIds: [], team: [] }),
       },
       at('06:00:00'),
     );
     expect(next?.ref.attribution).toBe('explicit');
   });
 
-  test('inference stops at the door of an absence', () => {
+  test('a date of a project you are not on is not yours', () => {
     const rehearsal = date({ project: PROJECT, starts_at: `${DAY}T10:00:00Z` });
-    const away = buildPersonAttribution({
+    const elsewhere = buildPersonAttribution({
       pinnedPersonIds: [ME],
       team: [
-        { person_id: ME, workspace_id: 'w1', slug: 'me', full_name: 'Me', project_ids: ['pr1'] },
+        { person_id: ME, workspace_id: 'w1', slug: 'me', full_name: 'Me', project_ids: ['pr2'] },
+        { person_id: OTHER, workspace_id: 'w1', slug: 'other', full_name: 'Other', project_ids: ['pr1'] },
       ],
-      blocks: [{ person_id: ME, starts_on: DAY, ends_on: DAY }],
     });
     const { next } = pulse(
-      { performances: [], dates: [rehearsal], viewerTz: TZ, axis: away },
+      { performances: [], dates: [rehearsal], viewerTz: TZ, axis: elsewhere },
       at('06:00:00'),
     );
-    // Not inferred onto a day you are away — and not dropped either: with
-    // nobody left to guess from the row is unattributed, which is the truth.
-    expect(next?.ref.attribution).toBe('unattributed');
+    expect(next).toBeNull();
   });
 });
 

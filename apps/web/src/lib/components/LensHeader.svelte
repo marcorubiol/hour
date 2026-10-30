@@ -33,8 +33,11 @@
     titleAside?: Snippet;
     /** The section's welcome card (`FirstVisitCard`): its «?» lives here, at the end of the title row. */
     help?: HelpSection;
+    /** A lens's own act, in the ring of the «?» and before it (Hoy's «+»,
+        ADR-148): a gesture of the whole page, not of the title. */
+    tools?: Snippet;
   }
-  let { title, sub, titleAside, help: section }: Props = $props();
+  let { title, sub, titleAside, help: section, tools }: Props = $props();
 
   // ON A PHONE THE SCOPE'S ROW IS THIS ROW (ADR-145 § 5): unscoped, «Todo»
   // and its door sit before the «?», and the shell's scope bar is not drawn
@@ -52,8 +55,9 @@
         <span class="lenshead__aside">{@render titleAside()}</span>
       {/if}
     </div>
-    {#if section || (openScope && scopeAll)}
+    {#if section || (openScope && scopeAll) || tools}
       <span class="lenshead__tools lenshead__tools--help">
+        {#if tools}{@render tools()}{/if}
         {#if openScope && scopeAll}
           <button
             type="button"

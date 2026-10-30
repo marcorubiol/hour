@@ -219,7 +219,6 @@
         <WhoGoes
           target="date"
           {id}
-          projectId={row.project.id}
           workspaceId={row.project.workspace_id}
           commitments={row.commitments}
           {locale}

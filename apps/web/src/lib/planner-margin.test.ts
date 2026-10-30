@@ -7,7 +7,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildDeskFeed,
-  goingItem,
   overviewReplies,
   rankWaiting,
   waitingByDay,
@@ -92,7 +91,6 @@ const feed = buildDeskFeed(
     ],
     tasks: [task('t3', { due_at: actionAt(3) }), task('loose'), task('ai', { origin: 'ai', due_at: actionAt(3) })],
     invoices: [invoice],
-    asks: [goingItem({ of: 'performance', id: 'voy', day: isoDay(3), subject: 'voy', projectId: 'p1', projectName: 'MaMeMi', href: null })],
   },
   NOW,
   'en',
@@ -129,10 +127,9 @@ describe('the Planner margin — «Te espera» bounded to the view (ADR-138 § 6
     expect(rows[0]).toMatchObject({ verbKey: 'followup', conversationId: 'back' });
   });
 
-  it('leaves out money, the «voy», the anytime tail and Hour’s own proposals', () => {
+  it('leaves out money, the anytime tail and Hour’s own proposals', () => {
     const ids = margin(-30, 30).rows.map((r) => r.id);
     expect(ids).not.toContain('inv-i');
-    expect(ids).not.toContain('going-voy');
     expect(ids).not.toContain('task-loose');
     expect(ids).not.toContain('task-ai');
     expect(ids.some((id) => id.startsWith('revive-'))).toBe(false);

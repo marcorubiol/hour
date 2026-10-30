@@ -49,7 +49,6 @@
     ontoggle: (taskId: string, done: boolean) => void;
     onremove: (taskId: string) => void;
     onaccept: (taskId: string) => void;
-    onanswer: (going: NonNullable<DeskItem['going']>, state: 'going' | 'not_going') => void;
   }
 
   let {
@@ -70,7 +69,6 @@
     ontoggle,
     onremove,
     onaccept,
-    onanswer,
   }: Props = $props();
 
   let all = $state(false);
@@ -98,7 +96,6 @@
   // A lens the space does not use (ADR-132) is no destination.
   let LENS_HREF = $derived<Record<DeskConcern, string | null>>({
     task: null,
-    going: lensOn('planner') ? '/h/planner' : null,
     conversation: lensOn('conversations') ? '/h/conversations' : null,
     money: lensOn('books') ? '/h/books' : null,
   });
@@ -178,21 +175,7 @@
       </span>
       <span class="row__when" class:row__when--over={item.overdue}>{whenOf(item)}</span>
       <span class="row__acts">
-        {#if item.concern === 'going' && item.going}
-          {@const g = item.going}
-          <button
-            type="button"
-            class="row__act btn--secondary btn--xs"
-            aria-label={t('desk.going_aria', locale, { subject: item.subject })}
-            onclick={() => onanswer(g, 'going')}>{t('pulse.going', locale)}</button
-          ><button
-            type="button"
-            class="row__act row__act--quiet btn--secondary btn--xs"
-            aria-label={t('desk.not_going_aria', locale, { subject: item.subject })}
-            onclick={() => onanswer(g, 'not_going')}
-            >{t('pulse.not_going', locale)}</button
-          >
-        {:else if item.concern === 'task'}
+        {#if item.concern === 'task'}
           <button
             type="button"
             class="row__remove"
@@ -360,7 +343,6 @@
   .row--money .row__verb {
     color: color-mix(in oklch, var(--success) 60%, var(--text-muted));
   }
-  .row--going .row__verb,
   .row--ai .row__verb,
   .row--proposal .row__verb {
     color: var(--suggest-ink);
