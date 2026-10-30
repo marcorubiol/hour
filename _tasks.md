@@ -509,7 +509,7 @@
 
 - [ ] **Difusión: un texto de 8,8 px en las filas** (`ConversationRow.svelte`), fuera de la escala de ADR-145.
 
-- [ ] **Modo «Ahora» para día de bolo** (Marco, 29-10, las seis recomendadas de `build/coordination/ahora-mode/research.md`): v1 en carril `claude/ahora`. Después: hotel y aparcamiento estructurados, billetes y rider en PDF, «qué ha cambiado», escribir sin red, aviso 30 min antes de la llamada.
+- [ ] **Modo «Ahora», después de la v1** (ADR-146, v1 en producción el 30-10): hotel y aparcamiento estructurados, billetes y rider en PDF, «qué ha cambiado», escribir sin red, aviso 30 min antes de la llamada. Re-evaluar dónde va el botón en el móvil tras usarlo en gira.
 
 ## Deuda aceptada / observar en uso
 
