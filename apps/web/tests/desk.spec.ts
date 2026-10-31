@@ -283,9 +283,10 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
       return (await el.count()) ? ((await el.boundingBox())?.y ?? -1) : -1;
     };
     // A band with nothing in it is not drawn (ADR-145 § 1): the order holds
-    // among the bands that are there.
+    // among the bands that are there. What changed follows what waits, the
+    // season's doors close the page (ADR-149).
     const order = (
-      await Promise.all(['section.next', 'section.waits', 'section.season', 'section.changed'].map(top))
+      await Promise.all(['section.next', 'section.waits', 'section.changed', 'section.season'].map(top))
     ).filter((y) => y >= 0);
     expect(order[0]).toBeGreaterThan(0);
     expect(order).toEqual([...order].sort((a, b) => a - b));

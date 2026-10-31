@@ -389,3 +389,48 @@ describe('rankWaiting — «Te espera» by weight (ADR-117)', () => {
     expect(w.total).toBe(10);
   });
 });
+
+describe('buildDeskFeed — the Planner’s decisions wait too (ADR-149)', () => {
+  const decision = (id: string, o: Partial<Parameters<typeof buildDeskFeed>[0]['decisions'] & object> = {}) => ({
+    id,
+    day: isoDay(6),
+    decideBy: isoDay(-1),
+    kind: 'choose' as const,
+    a: 'Kursaal',
+    b: 'Apolo',
+    projectName: 'MaMeMi',
+    href: '/h/planner?view=day',
+    ...o,
+  });
+
+  it('waits on the day it must be decided by, overdue once past, and opens the Planner', () => {
+    const feed = buildDeskFeed({ conversations: [], tasks: [], decisions: [decision('d1')] }, NOW, 'es');
+    const w = rankWaiting(feed, NOW);
+    expect(w.rows).toHaveLength(1);
+    const row = w.rows[0];
+    expect(row.concern).toBe('decision');
+    expect(row.verbKey).toBe('decide');
+    expect(row.subject).toBe('Kursaal o Apolo');
+    expect(row.overdue).toBe(true);
+    expect(row.href).toBe('/h/planner?view=day');
+    expect(w.overdue).toBe(1);
+  });
+
+  it('without notice it waits on the gig day; a release names the one to let go', () => {
+    const feed = buildDeskFeed(
+      { conversations: [], tasks: [], decisions: [{ ...decision('d2'), decideBy: null, kind: 'release', b: 'Apolo' }] },
+      NOW,
+      'es',
+    );
+    const row = feed.flatMap((b) => b.runs.flatMap((r) => r.items))[0];
+    expect(row.day).toBe(isoDay(6));
+    expect(row.verbKey).toBe('release');
+    expect(row.subject).toBe('Apolo');
+    expect(row.overdue).toBe(false);
+  });
+
+  it('the Planner’s margin, which asks only for tasks and calls, does not get them', () => {
+    const feed = buildDeskFeed({ conversations: [], tasks: [], decisions: [decision('d3')] }, NOW, 'es');
+    expect(rankWaiting(feed, NOW, { concerns: ['task', 'conversation'] }).rows).toHaveLength(0);
+  });
+});

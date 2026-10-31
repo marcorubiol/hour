@@ -11,7 +11,7 @@
  */
 
 import { describe, expect, it, test } from 'vitest';
-import { computePulse, performanceAttribution } from './pulse';
+import { computePulse, dayCard, performanceAttribution, upcoming } from './pulse';
 import { railNextShows } from './calm';
 import { buildPersonAttribution } from './people';
 import type { DateEvent, PerformanceEvent } from './month-events';
@@ -376,5 +376,48 @@ describe('a trip is its stages, and the sheet knows doors and curfew (ADR-146)',
     expect(atDoors.now.doing?.word).toEqual({ of: 'step', key: 'doors' });
     const after = pulse({ performances: [show], dates: [], viewerTz: TZ }, at('21:40:00'));
     expect(after.now.doing).toBeNull();
+  });
+});
+
+describe('Hoy: the card is a day, and what follows (ADR-149)', () => {
+  // A busy day: the train at 7h, a rehearsal at noon, the show at 20h; then
+  // a rehearsal in two days, a show in four and one in six.
+  const train = date({ id: 'd-train', kind: 'travel_day', starts_at: `${DAY}T05:00:00Z` });
+  const noon = date({ id: 'd-noon', starts_at: `${DAY}T10:00:00Z` });
+  const show = perf({ id: 'p-show', start_at: `${DAY}T18:00:00Z` });
+  const reh = date({ id: 'd-reh', starts_at: '2026-08-16T08:00:00Z' });
+  const four = perf({ id: 'p-four', performed_at: '2026-08-18', start_at: '2026-08-18T18:00:00Z' });
+  const six = perf({ id: 'p-six', performed_at: '2026-08-20', start_at: '2026-08-20T18:00:00Z' });
+  const input = { performances: [six, show, four], dates: [reh, noon, train], viewerTz: TZ };
+
+  test('upcoming is NEXT, again and again, in order', () => {
+    const list = upcoming(input, at('04:00:00'), 10);
+    expect(list.map((x) => x.ref.id)).toEqual(['d-train', 'd-noon', 'p-show', 'd-reh', 'p-four', 'p-six']);
+    expect(upcoming(input, at('04:00:00'), 2)).toHaveLength(2);
+    expect(list[0].ref.id).toBe(computePulse(input, at('04:00:00')).next?.ref.id);
+  });
+
+  test('upcoming keeps the caller’s own rule (calm)', () => {
+    const list = upcoming({ ...input, nextKeeps: (ref) => ref.of === 'performance' }, at('04:00:00'), 10);
+    expect(list.map((x) => x.ref.id)).toEqual(['p-show', 'p-four', 'p-six']);
+  });
+
+  test('the show titles its day; the train and the rehearsal are lines of it', () => {
+    const c = dayCard(upcoming(input, at('04:00:00'), 10))!;
+    expect(c.card.ref.id).toBe('p-show');
+    expect(c.before.map((x) => x.ref.id)).toEqual(['d-train', 'd-noon']);
+    expect(c.later).toEqual([]);
+    expect(c.after.map((x) => x.ref.id)).toEqual(['d-reh', 'p-four', 'p-six']);
+  });
+
+  test('a day without a show is titled by its first thing; at most what is asked after', () => {
+    const c = dayCard(upcoming({ ...input, performances: [six, four] }, at('04:00:00'), 10), 2)!;
+    expect(c.card.ref.id).toBe('d-train');
+    expect(c.later.map((x) => x.ref.id)).toEqual(['d-noon']);
+    expect(c.after.map((x) => x.ref.id)).toEqual(['d-reh', 'p-four']);
+  });
+
+  test('nothing ahead, no card', () => {
+    expect(dayCard([])).toBeNull();
   });
 });

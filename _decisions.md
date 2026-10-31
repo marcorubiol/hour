@@ -5282,3 +5282,53 @@ del saludo, una fila solo con «+ Tarea», «LO SIGUIENTE», esa línea y la del
 
 **Re-evaluar cuando** Marco lo use en una gira: si el «+» se encuentra, y si la tarjeta de hoy necesita algo más del
 titular en el escritorio.
+
+## [2026-10-31] ADR-149 · Hoy: la tarjeta es un día, lo siguiente son tres, las decisiones esperan y las puertas sin ceros (enmienda ADR-121 § 1, ADR-127 § 2 y § 7, ADR-148 § 4)
+
+**Contexto.** Revisión de Hoy en el móvil (`build/coordination/hoy-review/proposal.md`, fuera de git, con capturas
+antes y después en tres estados: día tranquilo, día de bolo y día de bolo cargado, este último también acotado a
+`playwright` y a un proyecto). En un día cargado (tren a las 9h12, ensayo de otro proyecto a las 12h, función a las
+20h30) Hoy perdía la función: la tarjeta era el tren, la línea de debajo el ensayo, y el titular decía «función en
+Girona». La víspera de ADR-127 § 2 solo miraba las dos primeras cosas. Además Hoy no enseñaba lo que venía después de
+la primera cosa, las decisiones del Planificador (dos opciones el mismo día) solo eran una cifra en su puerta, y las
+puertas repetían ceros («0 por decidir · 0 días de viaje», «nada vencido») y lo que «Te espera» ya lista («N esperan
+respuesta»). Carril `claude/hoy-next`. Sin migración ni endpoint.
+
+**Decisión.**
+1. **La tarjeta es un día** (`dayCard` en `$lib/pulse`). Es el próximo día en que tienes algo, titulado por su
+   función si la tiene y si no por lo primero; lo demás de ese día va dentro como líneas con su hora, «Antes» lo que
+   va antes de la función y «Luego» lo que va después. Generaliza la víspera de ADR-127 § 2 y la línea «Antes» de
+   ADR-148 § 4. El orden es el del pulso, repetido quitando cada respuesta (`upcoming`): una sola regla para tarjeta,
+   raíl y lista.
+2. **«Después»: las tres siguientes de otros días**, una línea cada una (día, hora, tipo, sitio), bajo la tarjeta.
+   Sustituye la línea «Luego» de 48 horas de ADR-121 § 1. En el móvil la palabra va en su propia fila para que el
+   nombre tenga el ancho. Sin nada en 14 días, una sola frase: «Nada hasta el 15 ene 2031, en Testville →».
+3. **Las decisiones esperan en «Te espera».** La cola de decisiones del Planificador (`decisionsFor`, el mismo motor
+   que ya calculaba la puerta) entra como cuarto asunto, `decision`: «decidir · Kursaal o Apolo», o «liberar · Apolo»
+   cuando un lado ya está confirmado. Espera el día en que hay que decidir (`decideBy`), y si no hay aviso el día del
+   bolo; abre el Planificador en ese día. Pesa como una llamada. El margen del Planificador no las recibe (pide solo
+   tareas y conversaciones). Sin el Planificador encendido, no hay.
+4. **«Ha cambiado» sigue a «Te espera»**: en escritorio pasa a la columna izquierda bajo «Te espera», y en el móvil
+   el orden es 1, 2, 3, 4 (antes 1, 2, 4, 3). Lo nuevo es para actuar; las puertas cierran la página.
+5. **Las puertas sin ceros ni repeticiones** (enmienda ADR-127 § 7). La cifra grande se queda aunque sea cero
+   (ADR-145 § 1); las pequeñas solo si no son cero: «por decidir», «días de viaje», «choques», «vivas», «vencido».
+   Fuera «N esperan respuesta» de Conversaciones: esas respuestas ya son filas de «Te espera».
+
+**Qué no cambia.** El titular (ADR-148), Ahora y su puerta (ADR-146), que la banda 1 no sigue el ámbito (ADR-096 § 5),
+que Hour no pregunta quién va (ADR-147), calma. Un día tranquilo sigue con media pantalla vacía: no se rellena con
+ceros.
+
+**Lecturas.** Ninguna nueva: el pulso, el motor del Planificador y las facturas ya se leían en Hoy.
+
+**Medido** (alto a 390 táctil, producción `5ca8d20f` antes y `vite dev` después, contra la Supabase de producción,
+usuario de los fixtures, filas plantadas en `playwright` y borradas; la factura vencida solo existía en el navegador
+de la captura): tranquilo 844 → 844; día de bolo 844 → 947; cargado 1002 → 1239, porque ahora están la función, las
+tres siguientes y la decisión, que antes no se veían.
+
+**Cómo se revierte.** Volver `routes/h/desk/+page.svelte`, `DeskNext.svelte`, `DeskSeason.svelte`, `DeskWaiting.svelte`
+y `desk-feed.ts` al commit anterior; `upcoming` y `dayCard` de `$lib/pulse` pueden quedarse. Las claves borradas
+(`desk.door_planner_sub`, `desk.door_conv_due`, `desk.door_money_none`) están en el historial.
+
+**Re-evaluar cuando** Marco lo use una semana de gira: si tres en «Después» son pocas o muchas, si una opción que
+sale en «Después» y como decisión en «Te espera» se lee como repetida, y si la banda 1 acotada a un proyecto debería
+seguir el ámbito.

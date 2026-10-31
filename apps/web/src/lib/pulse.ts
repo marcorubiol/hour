@@ -451,3 +451,56 @@ export function computePulse(input: PulseInput, now: Date): Pulse {
       : null,
   };
 }
+
+/**
+ * The next `n` things, in the order NEXT names them: NEXT, then NEXT with
+ * that one gone, and so on. One rule, so Hoy's card, its «Después» and the
+ * rail never disagree about what comes first (ADR-149).
+ */
+export function upcoming(input: PulseInput, now: Date, n: number): PulseNext[] {
+  const out: PulseNext[] = [];
+  const seen = new Set<string>();
+  const keeps = input.nextKeeps;
+  while (out.length < n) {
+    const next = computePulse(
+      { ...input, nextKeeps: (ref) => !seen.has(`${ref.of}:${ref.id}`) && (!keeps || keeps(ref)) },
+      now,
+    ).next;
+    if (!next) break;
+    seen.add(`${next.ref.of}:${next.ref.id}`);
+    out.push(next);
+  }
+  return out;
+}
+
+export interface DayCard {
+  /** What titles the card: the day's first performance, else its first thing. */
+  card: PulseNext;
+  /** The card's day before it (the train to the show), in order. */
+  before: PulseNext[];
+  /** The card's day after it (a rehearsal after the show), in order. */
+  later: PulseNext[];
+  /** The next things on other days, at most `afterMax`. */
+  after: PulseNext[];
+}
+
+/**
+ * Hoy's card is a DAY, not a row (ADR-149): the next day you have something,
+ * titled by its performance when it has one, with that day's other things as
+ * lines inside it; then the next things of other days, one line each. Before,
+ * a busy day lost its show: the card was the 9h train, the line under it the
+ * noon rehearsal, and the headline said «función en Girona».
+ */
+export function dayCard(list: readonly PulseNext[], afterMax = 3): DayCard | null {
+  const first = list[0];
+  if (!first) return null;
+  const same = list.filter((x) => x.day === first.day);
+  const card = same.find((x) => x.ref.of === 'performance') ?? first;
+  const at = same.indexOf(card);
+  return {
+    card,
+    before: same.slice(0, at),
+    later: same.slice(at + 1),
+    after: list.filter((x) => x.day !== first.day).slice(0, afterMax),
+  };
+}

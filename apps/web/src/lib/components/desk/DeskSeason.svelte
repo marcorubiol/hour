@@ -1,7 +1,10 @@
 <script lang="ts">
   /**
    * «LA TEMPORADA» — band 4 of the Desk (ADR-117): one door per lens, a big
-   * figure and two small ones. A door is a door: it says what its lens says,
+   * figure and its word; the small ones only when they are not zero, and
+   * none that «Te espera» already lists (ADR-149: «0 por decidir · 0 días de
+   * viaje», «nada vencido» and «N esperan respuesta» are gone). A door is a
+   * door: it says what its lens says,
    * in the lens's own arithmetic (Planner: its twelve-week census and its
    * «Choques», in red as there; Conversations:
    * its overview; Cuentas: `moneyPosition`), and it opens the lens.
@@ -46,18 +49,20 @@
         <span class="door__n stat door__n--na">{DASH}</span><span class="door__txt">{t('desk.door_error', locale)}</span>
       {:else}
         <span class="door__n stat">{planner.value ? planner.value.confirmed : DASH}</span>
+        {@const pv = planner.value}
+        {@const subs = pv
+          ? [
+              pv.holds > 0 ? t('desk.door_holds', locale, { n: pv.holds }) : null,
+              pv.travel > 0 ? t(pv.travel === 1 ? 'desk.door_travel_one' : 'desk.door_travel_many', locale, { n: pv.travel }) : null,
+            ].filter(Boolean)
+          : []}
         <span class="door__txt"
-          >{t('desk.door_planner_n', locale)}<br />{planner.value
-            ? t('desk.door_planner_sub', locale, {
-                holds: planner.value.holds,
-                travel: t(planner.value.travel === 1 ? 'desk.door_travel_one' : 'desk.door_travel_many', locale, {
-                  n: planner.value.travel,
-                }),
-              })
-            : DASH}{#if planner.value && planner.value.clashes > 0}{' · '}<em class="door__hot"
-              >{planner.value.clashes}
-              {t(planner.value.clashes === 1 ? 'planner.season_clash_one' : 'planner.season_clashes', locale)}</em
-            >{/if}</span
+          >{t('desk.door_planner_n', locale)}{#if !pv}<br />{DASH}{:else if subs.length > 0 || pv.clashes > 0}<br />{subs.join(
+              ' · ',
+            )}{#if pv.clashes > 0}{subs.length > 0 ? ' · ' : ''}<em class="door__hot"
+                >{pv.clashes}
+                {t(pv.clashes === 1 ? 'planner.season_clash_one' : 'planner.season_clashes', locale)}</em
+              >{/if}{/if}</span
         >
       {/if}
       <span class="door__arrow" aria-hidden="true">→</span>
@@ -74,11 +79,11 @@
         {:else}
           <span class="door__n stat">{conversations.value ? conversations.value.holds : DASH}</span>
           <span class="door__txt"
-            >{t('desk.door_conv_n', locale)}<br />{#if conversations.value}{t('desk.door_conv_sub', locale, {
-                live: conversations.value.live,
-              })}{#if conversations.value.due > 0}{' · '}{t('desk.door_conv_due', locale, {
-                  n: conversations.value.due,
-                })}{/if}{:else}{DASH}{/if}</span
+            >{t('desk.door_conv_n', locale)}{#if !conversations.value}<br />{DASH}{:else if conversations.value.live > 0}<br />{t(
+                'desk.door_conv_sub',
+                locale,
+                { live: conversations.value.live },
+              )}{/if}</span
           >
         {/if}
         <span class="door__arrow" aria-hidden="true">→</span>
@@ -93,9 +98,9 @@
         {:else}
           <span class="door__n stat">{money.value ? money.value.owed : DASH}</span>
           <span class="door__txt"
-            >{t('desk.door_money_n', locale)}<br />{#if money.value}{#if money.value.overdueCount > 0}<em class="door__hot"
-                  >{t('desk.door_money_sub', locale, { amount: money.value.overdue })}</em
-                >{:else}{t('desk.door_money_none', locale)}{/if}{:else}{DASH}{/if}</span
+            >{t('desk.door_money_n', locale)}{#if !money.value}<br />{DASH}{:else if money.value.overdueCount > 0}<br /><em
+                  class="door__hot">{t('desk.door_money_sub', locale, { amount: money.value.overdue })}</em
+                >{/if}</span
           >
         {/if}
         <span class="door__arrow" aria-hidden="true">→</span>
