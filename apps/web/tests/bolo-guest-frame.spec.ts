@@ -167,8 +167,12 @@ test.describe('el marco de un guest de un solo bolo (comms carril 2, fase 3)', (
     const after = page.getByTestId('desk-after');
     await expect(after).toContainText(venue);
 
-    // ── su fila de «Después» abre la ficha, con el tablón ──
+    // ── su fila de «Después» abre el vistazo (ADR-139); «Abrir entera», la ficha con el tablón ──
     await after.getByRole('link').first().click();
+    const peek = page.getByTestId('peek');
+    await expect(peek).toBeVisible({ timeout: 15_000 });
+    await expect(page).toHaveURL(/peek=performance/);
+    await peek.getByTestId('peek-full').click();
     await page.waitForURL(new RegExp(`/h/playwright/performance/${perf!.slug}`));
     await waitForLoaded(page);
     await expect(page.locator('section.board')).toBeVisible();
