@@ -18,17 +18,35 @@ describe('the default comes from the package', () => {
     expect(defaultViewScope('owner', 'equip')).toBe('all');
   });
 
-  test('without a package, the role: admin and member all, viewer and guest theirs', () => {
+  test('without a package, the role: admin and member all, viewer theirs', () => {
     expect(defaultViewScope('owner', null)).toBe('all');
     expect(defaultViewScope('admin', null)).toBe('all');
     expect(defaultViewScope('member', null)).toBe('all');
     expect(defaultViewScope('viewer', null)).toBe('mine');
-    expect(defaultViewScope('guest', null)).toBe('mine');
+    expect(defaultViewScope('guest', null)).toBe('all');
   });
 
   test('a role that has not arrived reads as the generous side', () => {
     expect(defaultViewScope(null, null)).toBe('all');
     expect(viewScopeOf(null)).toBe('all');
+  });
+});
+
+describe('a bolo guest sees their bolo (ADR-142)', () => {
+  test('a guest defaults to «todo», whatever package the invitation carried: RLS is the limit', () => {
+    expect(defaultViewScope('guest', null)).toBe('all');
+    expect(defaultViewScope('guest', 'minim')).toBe('all');
+    expect(defaultViewScope('guest', 'equip')).toBe('all');
+  });
+
+  test('the performance of their bolo stays on Hoy although its roster does not name them', () => {
+    const guestPerf = perf('bolo-show', 'ws-co', ['someone-else']);
+    const axis = buildPersonAttribution({
+      pinnedPersonIds: ['guest'],
+      team: [],
+      viewScope: viewScopeIndex([{ id: 'ws-co', my_role: 'guest' }]),
+    });
+    expect(pulseRows({ performances: [guestPerf], dates: [], axis }).map((r) => r.row.id)).toEqual(['bolo-show']);
   });
 });
 

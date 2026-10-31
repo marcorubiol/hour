@@ -217,6 +217,8 @@
   {@const ws = company(i)}
   <p class="ahora__co">
     {#if ws}<IdentityMark accent={accentVarFor(ws)} name={spaceName(ws.name)} variant="full" mini />{/if}
+    <!-- And whose project, glyph first (identity norms), as Hoy says it. -->
+    {#if i.row.project}<IdentityMark accent={accentVarFor(i.row.project)} name={i.row.project.name} initials={i.row.project.initials} mini />{/if}
     <span class="ahora__where">{where(i)}</span>
   </p>
 {/snippet}

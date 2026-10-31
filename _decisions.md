@@ -5448,3 +5448,9 @@ ver (el motor de conflictos ya solo lee lo que se queda), y si hace falta la pre
 > (`agendaRows` + `dayThings`), así que dice lo mismo que la lista de debajo y sigue «lo mío / todo». Una fila de
 > todo el día cuenta en su día guardado (la regla del mes, `dateDayKey`); un viaje con tramos, el día en que sale un
 > tramo. Test RLS de `set_my_view_scope` en `tests/rls/view-scope.test.ts`: va rojo hasta aplicar la migración.
+
+> **Corrección (2026-10-31, E2E `bolo-guest-frame` contra `370bad9d`), en § 3.** Un invitado (rol `guest`, ADR-142)
+> va por defecto a «todo», no a «lo mío», tenga el paquete que tenga su invitación. La RLS ya le da solo su bolo, así
+> que «todo» es exactamente lo suyo; con «lo mío» su propia función desaparecía de Hoy porque el reparto no le nombra.
+> Se descartó hacer «suyas» las funciones de un bolo por la membresía de bolo: duplicaría en el cliente lo que la RLS
+> ya decide y pediría leer membresías de bolo en cada vista. El viewer sigue en «lo mío».

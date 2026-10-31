@@ -13,7 +13,10 @@
  * Unset (`view_scope` null), the access package decides: a technician on
  * Mínim or Equip sees theirs, Coordinació, Direcció and the owner see it all.
  * Without a package, the role: admin and member see it all (they run the
- * space), viewer and guest see theirs. Like the lenses and the roles, a
+ * space), a viewer sees theirs. A GUEST (a bolo or project invitation,
+ * ADR-142) sees it all: RLS already gives them only their bolo, so «todo» is
+ * exactly what is theirs, and «lo mío» hid their own bolo, whose roster does
+ * not name them (E2E `bolo-guest-frame`, 31-10). Like the lenses and the roles, a
  * workspace whose answer has not arrived reads as the generous side: «all».
  */
 import type { PersonAttribution } from './people';
@@ -22,11 +25,12 @@ export type ViewScope = 'mine' | 'all';
 
 const MINE_PRESETS: ReadonlySet<string> = new Set(['minim', 'equip']);
 const ALL_PRESETS: ReadonlySet<string> = new Set(['coordinacio', 'direccio']);
-const MINE_ROLES: ReadonlySet<string> = new Set(['viewer', 'guest']);
+const MINE_ROLES: ReadonlySet<string> = new Set(['viewer']);
 
 /** The default a package (else a role) gives. The owner always sees it all. */
 export function defaultViewScope(role: string | null | undefined, preset: string | null | undefined): ViewScope {
-  if (role === 'owner') return 'all';
+  // The owner sees the company; a guest sees all RLS lets them read: their bolo.
+  if (role === 'owner' || role === 'guest') return 'all';
   if (preset && MINE_PRESETS.has(preset)) return 'mine';
   if (preset && ALL_PRESETS.has(preset)) return 'all';
   return role && MINE_ROLES.has(role) ? 'mine' : 'all';
