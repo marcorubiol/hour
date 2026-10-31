@@ -217,20 +217,18 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
     else await expect(door).not.toContainText('clash');
   });
 
-  // ADR-133: a show on the card says who goes and opens the editor in its sheet.
-  test('«Next up» on a show: the cast line and «Who goes» to the sheet', async ({ page }) => {
+  // ADR-133: a show on the card opens «Who goes» in its sheet. Since ADR-150
+  // the card is the moment (what you do now), so it draws no cast line.
+  test('«Next up» on a show: «Who goes» to the sheet', async ({ page }) => {
     await page.goto(DESK);
     await waitForLoaded(page);
     const card = page.getByTestId('desk-next');
     test.skip((await card.count()) === 0, 'Nothing within two weeks to draw a card for.');
+    await expect(card.locator('.cast-line')).toHaveCount(0);
     const who = card.getByRole('link', { name: /^Who goes/ });
-    if ((await who.count()) === 0) {
-      // Not a show (a trip, a press call): no cast, no link (the Day's law).
-      await expect(card.locator('.cast-line')).toHaveCount(0);
-      return;
-    }
+    // Not a show (a trip, a press call): no link (the Day's law).
+    if ((await who.count()) === 0) return;
     await expect(who).toHaveAttribute('href', /\/performance\/[^/]+#who-goes$/);
-    await expect(card.locator('.cast-line')).toHaveCount(1);
     await who.click();
     await page.waitForURL(/#who-goes$/);
     await expect(page.locator('#who-goes')).toBeVisible();

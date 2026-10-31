@@ -2226,8 +2226,6 @@
   "desk.next_in_days": "dans {n} jours",
   "desk.next_empty": "Rien dans les deux prochaines semaines",
   "desk.next_far": "Rien avant le {day}, à {place}",
-  "desk.next_then": "Ensuite",
-  "desk.next_before": "Avant",
   "desk.next_error": "Impossible de charger la suite.",
   "desk.waiting_count": "{shown} sur {total}",
   "desk.see_all": "Tout voir par jour",

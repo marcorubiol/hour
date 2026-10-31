@@ -145,6 +145,9 @@ interface PulseInput {
   nextKeeps?: (ref: PulseRef) => boolean;
 }
 
+/** What a reader of the rows needs: the feeds, the zone and the person axis. */
+export type PulseInputRows = Pick<PulseInput, 'performances' | 'dates' | 'axis' | 'viewerTz'>;
+
 /** A stretch of the day one row occupies. `hard` = the end is a real
     moment; soft means «until the day is out», which is not an hour. */
 interface Segment {
@@ -244,15 +247,7 @@ function performanceEntry(
   attribution: PersonAttribution,
 ): Entry {
   const tz = p.venue?.timezone || viewerTz;
-  const ref: PulseRef = {
-    of: 'performance',
-    id: p.id,
-    row: p,
-    tz: p.venue?.timezone ?? null,
-    attribution,
-    tentative: isTentative(p.status),
-    family: performanceStatusFamily(p.status),
-  };
+  const ref = pulseRef({ of: 'performance', row: p, attribution });
 
   // THE SEAM. Five columns today, rows tomorrow; this module never learns
   // which, and never learns their names either.
@@ -289,15 +284,7 @@ function performanceEntry(
 
 function dateEntry(d: DateEvent, viewerTz: string, attribution: PersonAttribution): Entry {
   const tz = d.venue?.timezone || viewerTz;
-  const ref: PulseRef = {
-    of: 'date',
-    id: d.id,
-    row: d,
-    tz: d.venue?.timezone ?? null,
-    attribution,
-    tentative: isTentative(d.status),
-    family: dateStatusFamily(d.status),
-  };
+  const ref = pulseRef({ of: 'date', row: d, attribution });
   const word: PulseWord = { of: 'kind', key: d.kind, label: d.label ?? null };
 
   // An all-day row IS the day — midnight to midnight, across every day it
@@ -360,32 +347,67 @@ export function performanceAttribution(
   });
 }
 
-export function computePulse(input: PulseInput, now: Date): Pulse {
-  const t = now.getTime();
-  const viewerTz = input.viewerTz;
-  const today = dayKeyInTz(now.toISOString(), viewerTz);
+/** A row the pulse reads, with how it reaches the viewer. */
+export type PulseRow =
+  | { of: 'performance'; row: PerformanceEvent; attribution: PersonAttribution }
+  | { of: 'date'; row: DateEvent; attribution: PersonAttribution };
+
+/** The person-axis verdict of a date: its «voy» list and its project. */
+export function dateAttribution(
+  d: Pick<DateEvent, 'project' | 'commitments'>,
+  axis: PersonAttributionScope | null | undefined,
+): PersonAttribution {
+  if (!axis?.active) return 'explicit';
+  return axis.attribute({ projectId: d.project?.id ?? null, commitments: d.commitments });
+}
+
+/**
+ * THE ROWS THAT ARE YOURS TO READ: not cancelled, and not dropped by the
+ * person axis. One rule for the pulse, Hoy's agenda and Ahora, so the three
+ * never disagree about what is on (ADR-147: only `no` is dropped).
+ */
+export function pulseRows(input: Pick<PulseInput, 'performances' | 'dates' | 'axis'>): PulseRow[] {
   const axis = input.axis?.active ? input.axis : null;
-
-  const entries: Entry[] = [];
-
+  const out: PulseRow[] = [];
   for (const p of input.performances) {
     if (isCancelled(p.status)) continue;
     const attribution = performanceAttribution(p, axis);
     if (attribution === 'no') continue;
-    entries.push(performanceEntry(p, viewerTz, attribution));
+    out.push({ of: 'performance', row: p, attribution });
   }
-
   for (const d of input.dates) {
     if (isCancelled(d.status)) continue;
-    const attribution = axis
-      ? axis.attribute({
-          projectId: d.project?.id ?? null,
-          commitments: d.commitments,
-        })
-      : 'explicit';
+    const attribution = dateAttribution(d, axis);
     if (attribution === 'no') continue;
-    entries.push(dateEntry(d, viewerTz, attribution));
+    out.push({ of: 'date', row: d, attribution });
   }
+  return out;
+}
+
+/** The ref a row is drawn by (rail, card, agenda): its zone, verdict, certainty. */
+export function pulseRef(r: PulseRow): PulseRef {
+  const status = r.row.status;
+  return {
+    of: r.of,
+    id: r.row.id,
+    row: r.row,
+    tz: r.row.venue?.timezone ?? null,
+    attribution: r.attribution,
+    tentative: isTentative(status),
+    family: r.of === 'performance' ? performanceStatusFamily(status) : dateStatusFamily(status),
+  };
+}
+
+export function computePulse(input: PulseInput, now: Date): Pulse {
+  const t = now.getTime();
+  const viewerTz = input.viewerTz;
+  const today = dayKeyInTz(now.toISOString(), viewerTz);
+
+  const entries: Entry[] = pulseRows(input).map((r) =>
+    r.of === 'performance'
+      ? performanceEntry(r.row, viewerTz, r.attribution)
+      : dateEntry(r.row, viewerTz, r.attribution),
+  );
 
   // ── NOW ──────────────────────────────────────────────────────────────
   // The innermost segment wins: a rehearsal inside a residency is what you
@@ -471,36 +493,4 @@ export function upcoming(input: PulseInput, now: Date, n: number): PulseNext[] {
     out.push(next);
   }
   return out;
-}
-
-export interface DayCard {
-  /** What titles the card: the day's first performance, else its first thing. */
-  card: PulseNext;
-  /** The card's day before it (the train to the show), in order. */
-  before: PulseNext[];
-  /** The card's day after it (a rehearsal after the show), in order. */
-  later: PulseNext[];
-  /** The next things on other days, at most `afterMax`. */
-  after: PulseNext[];
-}
-
-/**
- * Hoy's card is a DAY, not a row (ADR-149): the next day you have something,
- * titled by its performance when it has one, with that day's other things as
- * lines inside it; then the next things of other days, one line each. Before,
- * a busy day lost its show: the card was the 9h train, the line under it the
- * noon rehearsal, and the headline said «función en Girona».
- */
-export function dayCard(list: readonly PulseNext[], afterMax = 3): DayCard | null {
-  const first = list[0];
-  if (!first) return null;
-  const same = list.filter((x) => x.day === first.day);
-  const card = same.find((x) => x.ref.of === 'performance') ?? first;
-  const at = same.indexOf(card);
-  return {
-    card,
-    before: same.slice(0, at),
-    later: same.slice(at + 1),
-    after: list.filter((x) => x.day !== first.day).slice(0, afterMax),
-  };
 }

@@ -2231,8 +2231,6 @@
   "desk.next_in_days": "en {n} días",
   "desk.next_empty": "Nada en las próximas dos semanas",
   "desk.next_far": "Nada hasta el {day}, en {place}",
-  "desk.next_then": "Luego",
-  "desk.next_before": "Antes",
   "desk.next_error": "No se pudo cargar lo siguiente.",
   "desk.waiting_count": "{shown} de {total}",
   "desk.see_all": "Ver todo por días",

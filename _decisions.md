@@ -5334,3 +5334,58 @@ sale en «Después» y como decisión en «Te espera» se lee como repetida, y s
 seguir el ámbito.
 
 > **Notas de ADR-149 (2026-10-31):** enmienda ADR-121, ADR-127 y ADR-148 en lo que toca a Hoy: la tarjeta es un día, no la siguiente fila; «Ha cambiado» sigue a «Te espera»; las decisiones entran en «Te espera».
+
+> **Amended by ADR-150 (2026-10-31), solo en § 1.** La tarjeta ya no es el día: el día es una agenda en orden y la
+> tarjeta es lo de ahora (o lo siguiente) dentro de ella. «Después» sigue.
+
+## [2026-10-31] ADR-150 · Hoy: el día como agenda, lo de ahora abierto como tarjeta (enmienda ADR-149 § 1 y ADR-148 § 4)
+
+**Contexto.** Marco, 31-10, eligió la opción D de `build/coordination/hoy-review/antes-opciones.html` (fuera de git):
+la tarjeta-día de ADR-149 metía el tren y el ensayo dentro, bajo «Antes», y la tarjeta decía la sala en grande, que
+un día de bolo ya sabes. Pidió dos cosas más: la línea grande de la tarjeta es lo que haces ahora y su hora, la sala y
+la ciudad van pequeñas; y que sea igual en escritorio, no solo en el móvil. Carril `claude/hoy-agenda`. Sin migración
+ni endpoint.
+
+**Decisión.**
+1. **El día es una agenda en orden** (`$lib/day-agenda`, pura y con tests): cada momento de la escaleta de una función,
+   cada tramo de un viaje y cada fecha a su hora. Las filas son las del pulso (`pulseRows`, el eje de persona incluido),
+   que ahora comparten el pulso, Ahora y Hoy. El día es hoy mientras algo de hoy siga en marcha o por venir; si no, el
+   día de lo siguiente (el mismo `upcoming` de ADR-149).
+2. **Lo de ahora, o lo siguiente, se abre como tarjeta** en su sitio de la agenda. Ahora y lo siguiente son los del
+   pulso: un momento dura hasta el siguiente de su fila, un tramo hasta su llegada, una fecha hasta su fin; dentro de
+   dos cosas gana la de dentro; el fin y el toque de queda cierran la hoja. La regla del titular es la de Ahora
+   (ADR-146): a una hora o menos, la cuenta atrás a lo siguiente gana a lo que estás haciendo. Excepción: el fin de la
+   hoja nunca quita la tarjeta a la función («Función · hasta las 22h», no «Fin en 60 min»).
+3. **La línea grande es qué y cuándo**: «Carga · hasta las 17h» (su propio fin si es un momento real, aunque haya un
+   ensayo en medio: ese es la fila siguiente), «Prueba de sonido en 40 min», «Función · 20h30», «Tren en 12 min». La
+   cabecera dice «Ahora» cuando estás dentro y el día si no, más el proyecto. Debajo, en pequeño: sala y ciudad, la
+   ruta de un tramo con su llegada y su localizador, o el sitio de una fecha.
+4. **Acciones de la tarjeta**: Llamar, Mapa, Ahora y Hoja de ruta, de la función de la tarjeta o, si la tarjeta es un
+   viaje o un ensayo, de la función principal del día (en el tren, la sala es adonde vas). Llamar y Mapa salen de la
+   hoja de ruta que el marco ya precarga para Ahora (`ahoraRoadsheetQuery`, misma clave): ninguna lectura nueva.
+   «Quién va →» y «Tablón · N nuevos» se quedan. Fuera la línea de reparto de la tarjeta: la tarjeta es un momento.
+   En el móvil «Hoja de ruta» se lee «Hoja», como en Ahora, para que las cuatro quepan en una fila.
+5. **Lo pasado se apaga** (una tinta más suave, sigue ahí). **La función principal se marca** (tinta del texto y peso
+   500, sin estrella ni icono) aunque no sea la tarjeta; el titular la sigue nombrando («Hoy, función en Girona»).
+6. **«Después» igual que ADR-149**, con el arreglo del móvil: a 390 la fila día + hora partía el nombre en dos líneas;
+   ahora el día va en su línea y el nombre debajo con todo el ancho.
+7. **Igual en escritorio.** Misma agenda y misma tarjeta en la columna izquierda de Hoy; la tarjeta ocupa el ancho de
+   la columna y las acciones van en una fila con «Quién va».
+
+**Qué no cambia.** El titular (ADR-148), Ahora (ADR-146), que la banda 1 no sigue el ámbito (ADR-096 § 5), que Hour
+no pregunta quién va (ADR-147), «Te espera», «Ha cambiado» y las puertas (ADR-149).
+
+**Verificado** (31-10, `vite dev` desde el worktree contra la Supabase de producción; antes, producción `c9e00c0a`;
+usuario de los fixtures; día cargado plantado en `playwright` y borrado después: tren 9h12, carga 11h, ensayo de otro
+proyecto 14h30, prueba 17h, función 20h30, fin 22h): capturas a las 9h, 13h y 20h, a 390 táctil y a 1440, en
+`build/coordination/hoy-review/agenda/` (fuera de git). Unitarios: `day-agenda.test.ts`.
+
+**Cómo se revierte.** Volver `DeskNext.svelte` y `routes/h/desk/+page.svelte` al commit anterior y recuperar `dayCard`
+de `$lib/pulse` (y sus tests) del historial; `$lib/day-agenda` puede quedarse. Las claves `desk.next_before` y
+`desk.next_then` están en el historial.
+
+**Re-evaluar cuando** Marco lo use una gira: si la cuenta atrás de una hora quita demasiado pronto la tarjeta a lo que
+estás haciendo, y si una agenda con dos funciones el mismo día necesita marcar las dos.
+
+> **Enmienda a ADR-149 § 1 y ADR-148 § 4:** la tarjeta ya no es un día con «Antes» y «Luego» dentro; es lo de ahora,
+> dentro de la agenda del día.

@@ -11,7 +11,7 @@
  */
 
 import { describe, expect, it, test } from 'vitest';
-import { computePulse, dayCard, performanceAttribution, upcoming } from './pulse';
+import { computePulse, performanceAttribution, upcoming } from './pulse';
 import { railNextShows } from './calm';
 import { buildPersonAttribution } from './people';
 import type { DateEvent, PerformanceEvent } from './month-events';
@@ -379,7 +379,7 @@ describe('a trip is its stages, and the sheet knows doors and curfew (ADR-146)',
   });
 });
 
-describe('Hoy: the card is a day, and what follows (ADR-149)', () => {
+describe('upcoming: NEXT again and again (ADR-149)', () => {
   // A busy day: the train at 7h, a rehearsal at noon, the show at 20h; then
   // a rehearsal in two days, a show in four and one in six.
   const train = date({ id: 'd-train', kind: 'travel_day', starts_at: `${DAY}T05:00:00Z` });
@@ -400,24 +400,5 @@ describe('Hoy: the card is a day, and what follows (ADR-149)', () => {
   test('upcoming keeps the caller’s own rule (calm)', () => {
     const list = upcoming({ ...input, nextKeeps: (ref) => ref.of === 'performance' }, at('04:00:00'), 10);
     expect(list.map((x) => x.ref.id)).toEqual(['p-show', 'p-four', 'p-six']);
-  });
-
-  test('the show titles its day; the train and the rehearsal are lines of it', () => {
-    const c = dayCard(upcoming(input, at('04:00:00'), 10))!;
-    expect(c.card.ref.id).toBe('p-show');
-    expect(c.before.map((x) => x.ref.id)).toEqual(['d-train', 'd-noon']);
-    expect(c.later).toEqual([]);
-    expect(c.after.map((x) => x.ref.id)).toEqual(['d-reh', 'p-four', 'p-six']);
-  });
-
-  test('a day without a show is titled by its first thing; at most what is asked after', () => {
-    const c = dayCard(upcoming({ ...input, performances: [six, four] }, at('04:00:00'), 10), 2)!;
-    expect(c.card.ref.id).toBe('d-train');
-    expect(c.later.map((x) => x.ref.id)).toEqual(['d-noon']);
-    expect(c.after.map((x) => x.ref.id)).toEqual(['d-reh', 'p-four']);
-  });
-
-  test('nothing ahead, no card', () => {
-    expect(dayCard([])).toBeNull();
   });
 });
