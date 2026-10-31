@@ -1,9 +1,11 @@
 /**
  * Desk feed (ADR-063/065/068/069/070 · converged design 2026-07-18; the
  * dashboard of ADR-117) — the pure builder behind /h/desk's «Te espera».
- * THREE concerns grouped in day buckets, in a FIXED within-day type order:
+ * FOUR concerns grouped in day buckets, in a FIXED within-day type order:
  *
- *     tasks → conversations → money
+ *     tasks → conversations → decisions → money
+ *
+ * (decisions: the Planner's queue, two options on one day, ADR-149)
  *
  * The agenda is the Planner's (ADR-117 § 2): the Desk no longer draws the
  * week's rehearsals and gigs; «Lo siguiente» carries the next one.
@@ -31,7 +33,7 @@ import { taskSurfaceState, taskContextLabel, taskProjectId, type TaskItem } from
 import { LOCALE_TAG, t, type Locale } from './i18n';
 import { invoiceAging, observedPayerTermsDays, type MoneyInvoiceItem } from './money';
 
-export type DeskConcern = 'task' | 'conversation' | 'money';
+export type DeskConcern = 'task' | 'conversation' | 'decision' | 'money';
 
 type BucketLabelKey =
   | 'overdue'
@@ -126,6 +128,27 @@ interface DeskFeedInput {
    * wait today until answered; their next-action call is not drawn twice.
    */
   replies?: DeskReplyInput[];
+  /**
+   * The Planner's decisions queue (`decisionsFor`, ADR-080), already scoped:
+   * two options on one day, or one to release (ADR-149). Each waits on the
+   * day it must be decided by, else on the day of the gig.
+   */
+  decisions?: DeskDecisionInput[];
+}
+
+export interface DeskDecisionInput {
+  id: string;
+  /** The gig day the options share. */
+  day: string;
+  /** min decideBy over the hold sides; null without notice. */
+  decideBy: string | null;
+  kind: 'choose' | 'release';
+  /** The two sides by name (venue, else city); for a release, `b` is the one to let go. */
+  a: string;
+  b: string;
+  projectName: string;
+  /** Where it is decided: the Planner on its day. */
+  href: string | null;
 }
 
 interface DeskReplyInput {
@@ -158,7 +181,8 @@ export function conversationVerbKey(relation: string, overdue: boolean): string 
 const CONCERN_RANK: Record<DeskConcern, number> = {
   task: 0,
   conversation: 1,
-  money: 2,
+  decision: 2,
+  money: 3,
 };
 
 const DAY = 86_400_000;
@@ -451,6 +475,27 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
     );
   }
 
+  // ── Decisions (derived, ADR-149): the Planner's queue, on the day it must
+  //    be decided by. «decidir Kursaal o Apolo», «liberar Apolo».
+  for (const d of input.decisions ?? []) {
+    const day = (d.decideBy ?? d.day).slice(0, 10);
+    const overdue = day < todayISO;
+    push(
+      day,
+      'decision',
+      Date.parse(`${day}T00:00:00Z`),
+      blankItem({
+        id: `decision-${d.id}`,
+        concern: 'decision',
+        subject: d.kind === 'choose' ? t('desk.decision_choose', locale, { a: d.a, b: d.b }) : d.b,
+        projectName: d.projectName || '—',
+        verbKey: d.kind === 'choose' ? 'decide' : 'release',
+        overdue,
+        href: d.href,
+      }),
+    );
+  }
+
   // ── Group into buckets, order by fixed concern rank then secondary sub,
   //    collapse consecutive same-concern items into runs.
   const byKey = new Map<number, { labelKey: BucketLabelKey; weekday: string; dateLabel: string; entries: Entry[] }>();
@@ -484,7 +529,7 @@ const WAITING_ROWS = 7;
 /** Within one tier: money owed, then a call, then a task, then a proposal. */
 function weightOf(i: DeskItem): number {
   if (i.concern === 'money') return 0;
-  if (i.concern === 'conversation') return i.isProposal ? 4 : 1;
+  if (i.concern === 'conversation' || i.concern === 'decision') return i.isProposal ? 4 : 1;
   return i.isProposal ? 4 : 3;
 }
 

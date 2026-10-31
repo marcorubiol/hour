@@ -3,8 +3,10 @@
    * «LO SIGUIENTE» — band 1 of the Desk (ADR-117). The rail's NEXT, given room:
    * the same `computePulse` answer over the same feeds ($lib/pulse-feeds), the
    * same Slip for what it is called and where (ADR-095 § 0), plus what the rail
-   * cannot afford: the day in words, the running order, the road sheet, and
-   * whatever else lands within 48 hours as one line under it.
+   * cannot afford: the day in words, the running order, the road sheet. The
+   * card is a DAY (ADR-149, `dayCard`): its performance titles it, its other
+   * things are lines inside with their hour, and the next three things of
+   * other days follow under it, one line each («Después»).
    *
    * Like the rail, it never follows the scope (ADR-096 § 5): it says what is
    * happening to you, wherever you are looking. And it never changes height
@@ -35,12 +37,14 @@
   import Slip from '$lib/components/planner/Slip.svelte';
 
   interface Props {
+    /** The card: the next day's performance, else its first thing (`dayCard`). */
     next: PulseNext | null;
-    /** A second thing within 48 h of the first, as one line. */
-    then: PulseNext | null;
-    /** The line comes before the card, the same day (the trip to the show):
-        it is drawn inside the card. */
-    thenBefore?: boolean;
+    /** The card's day before it and after it (the train to the show, a
+        rehearsal after): lines inside the card, with their hour. */
+    before?: PulseNext[];
+    later?: PulseNext[];
+    /** The next things of other days, one line each under the card (ADR-149). */
+    after?: PulseNext[];
     settled: boolean;
     errored: boolean;
     /** «Reintentar»: read again what failed (the one voice of a failure). */
@@ -59,7 +63,7 @@
     locale: Locale;
   }
 
-  let { next, then, thenBefore = false, settled, errored, onretry, today, viewerTz, boardNew = 0, slipCtx, personNames, ahoraHref = null, locale }: Props = $props();
+  let { next, before = [], later = [], after = [], settled, errored, onretry, today, viewerTz, boardNew = 0, slipCtx, personNames, ahoraHref = null, locale }: Props = $props();
 
   const kindLabel = (kind: SlipKind) => t(`planner.kind_${kind}`, locale);
   /* A hold says what it is in the house word («1.ª opción · vence lun»), as
@@ -73,7 +77,6 @@
   let slip = $derived(next ? pulseSlip(next.ref, next.day, slipCtx) : null);
   // Its own page, else the day in the Planner while the space uses it (ADR-132).
   let farHref = $derived(slip?.href ?? (next && lensOn('planner') ? plannerDayHref('day', next.day) : undefined));
-  let thenSlip = $derived(then ? pulseSlip(then.ref, then.day, slipCtx) : null);
 
   function daysTo(day: string): number {
     return Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
@@ -126,27 +129,35 @@
   let headlined = $derived(settled && !errored && next !== null && daysTo(next.day) <= 0);
 </script>
 
-{#snippet thenLine()}
-  {#if then && thenSlip}
-    {@const held = thenSlip.cert === 'hold' || thenSlip.cert === 'proposed'}
-    {@const when = thenBefore ? (then.at ? hour(then.at, then.ref.tz) : '') : dateWords(then.day)}
-    {@const place = [
-      thenSlip.lead ? `${t('planner.slip_to', locale)} ${thenSlip.name}` : thenSlip.name,
-      thenSlip.origin ? `${t('planner.slip_from', locale)} ${thenSlip.origin}` : null,
-      thenSlip.city,
-    ]
-      .filter(Boolean)
-      .join(' · ')}
-    <!-- The slip's own grammar in one line: the kind word, «?» and a leaning
-         name while it is not firm (certainty.css § INFERENCE voice). -->
-    <p class="then">
-      <span class="then__k">{t(thenBefore ? 'desk.next_before' : 'desk.next_then', locale)}</span>
-      <svelte:element this={thenSlip.href ? 'a' : 'span'} href={thenSlip.href} class="then__what">
-        {#if when}<span class="then__when">{when}</span>{/if}
-        <span class="then__kind">{kindLabel(thenSlip.kind)}{held ? '?' : ''}</span>
-        <span class:guess={held}>{place}</span>
-      </svelte:element>
-    </p>
+{#snippet line(item: PulseNext, label: string | null, withDay: boolean)}
+  {@const sl = pulseSlip(item.ref, item.day, slipCtx)}
+  {@const held = sl.cert === 'hold' || sl.cert === 'proposed'}
+  {@const when = [withDay ? dateWords(item.day) : null, item.at ? hour(item.at, item.ref.tz) : null].filter(Boolean).join(' · ')}
+  {@const place = [
+    sl.lead ? `${t('planner.slip_to', locale)} ${sl.name}` : sl.name,
+    sl.origin ? `${t('planner.slip_from', locale)} ${sl.origin}` : null,
+    sl.city && sl.city !== sl.name ? sl.city : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')}
+  <!-- The slip's own grammar in one line: the kind word, «?» and a leaning
+       name while it is not firm (certainty.css § INFERENCE voice). The label
+       is said once, on the first line of its group; its column stays. -->
+  <li class="then">
+    <span class="then__k" class:then__k--none={!label}>{label ?? ''}</span>
+    <span class="then__when">{when}</span>
+    <svelte:element this={sl.href ? 'a' : 'span'} href={sl.href} class="then__what">
+      <span class="then__kind">{kindLabel(sl.kind)}{held ? '?' : ''}</span>
+      <span class:guess={held}>{place}</span>
+    </svelte:element>
+  </li>
+{/snippet}
+
+{#snippet lines(items: PulseNext[], label: string, withDay: boolean)}
+  {#if items.length > 0}
+    <ul class="lines">
+      {#each items as item, i (item.ref.of + item.ref.id)}{@render line(item, i === 0 ? label : null, withDay)}{/each}
+    </ul>
   {/if}
 {/snippet}
 
@@ -173,16 +184,12 @@
   {:else if !next || !slip}
     <EmptyLine text={t('desk.next_empty', locale)} />
   {:else if daysTo(next.day) > 14}
-    <!-- Far away is still «the next thing»: the band says which, as the rail
-         does, as the empty line's way out. -->
-    <EmptyLine text={t('desk.next_empty', locale)}>
-      <svelte:element
-        this={farHref ? 'a' : 'span'}
-        class={farHref ? 'empty-line__act' : undefined}
-        href={farHref}
-        >{t('desk.next_far', locale, { day: localeDayMonthNear(next.day, today, locale), place: slip.city || slip.name })}{farHref ? ' →' : ''}</svelte:element
-      >
-    </EmptyLine>
+    <!-- Far away is still «the next thing»: one sentence says there is
+         nothing near and what comes, and opens it (ADR-149). -->
+    {@const far = t('desk.next_far', locale, { day: localeDayMonthNear(next.day, today, locale), place: slip.city || slip.name })}
+    <p class="empty-line">
+      {#if farHref}<a class="empty-line__text next__far" href={farHref}>{far} →</a>{:else}<span class="empty-line__text">{far}</span>{/if}
+    </p>
   {:else}
     <div class="card" data-testid="desk-next">
       <div class="card__eye">
@@ -205,12 +212,15 @@
           noCastWord={t('planner.no_cast', locale)}
         />
       </div>
-      {#if thenBefore}{@render thenLine()}{/if}
       {#if moments.length > 0}
         <div class="card__slots">
           {#each moments as m, i (i)}<span><span class="card__k">{m.label}</span> {m.at}</span>{/each}
         </div>
       {/if}
+      <!-- The card's day, in order around it: the train before the show,
+           a rehearsal after it (ADR-149; was one «Antes» line, ADR-148 § 4). -->
+      {@render lines(before, t('desk.next_before', locale), false)}
+      {@render lines(later, t('desk.next_then', locale), false)}
       {#if roadsheet || whoHref || boardHref || ahoraHref}
         <div class="card__foot">
           <span class="card__links">
@@ -226,7 +236,8 @@
         </div>
       {/if}
     </div>
-    {#if !thenBefore}{@render thenLine()}{/if}
+    <!-- What follows on other days, the next three, one line each (ADR-149). -->
+    {#if after.length > 0}<div class="next__after" data-testid="desk-after">{@render lines(after, t('desk.next_after', locale), true)}</div>{/if}
   {/if}
 </section>
 
@@ -313,28 +324,50 @@
     flex: none;
     white-space: nowrap;
   }
+  /* LINES: label · when · what, one column each down the group (subgrid),
+     so «Antes», «Luego» and «Después» and their hours fall on one vertical. */
+  .lines {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    column-gap: var(--space-s);
+    row-gap: var(--space-2xs);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
   .then {
-    display: flex;
-    gap: var(--space-s);
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
     align-items: baseline;
-    margin: var(--space-s) 0 0;
-    /* On the card's text edge: its padding plus its 1px border. */
-    padding-inline: calc(var(--space-l) + var(--line-hairline));
     font-size: var(--text-s);
     color: var(--text-muted);
   }
-  /* The trip before the show is a line of its card, on the card's edge. */
-  .card .then {
-    margin: 0;
-    padding-inline: 0;
+  /* The wait's ghost line, and «Después» under the card: on the card's text
+     edge (its padding plus its 1px border). */
+  p.then,
+  .next__after {
+    margin: var(--space-s) 0 0;
+    padding-inline: calc(var(--space-l) + var(--line-hairline));
   }
-  .then__what {
-    display: inline-flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 0 var(--space-xs);
+  .next__far {
     color: inherit;
     text-decoration: none;
+  }
+  .next__far:hover {
+    color: var(--text-color);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  /* The kind word and the name run as one text, so a long name wraps under
+     itself instead of dropping the whole name below its kind. */
+  .then__what {
+    min-inline-size: 0;
+    color: inherit;
+    text-decoration: none;
+  }
+  .then__what .then__kind {
+    margin-inline-end: var(--space-xs);
   }
   a.then__what:hover {
     text-decoration: underline;
@@ -362,8 +395,20 @@
       padding: var(--space-s) var(--space-m);
       min-block-size: 6rem;
     }
-    .then {
+    p.then,
+    .next__after {
       padding-inline: calc(var(--space-m) + var(--line-hairline));
+    }
+    /* «Después» on a phone: its word heads the group on a row of its own, so
+       the day and the name keep the width (three columns wrapped every name). */
+    .next__after .lines {
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+    .next__after .then__k {
+      grid-column: 1 / -1;
+    }
+    .next__after .then__k--none {
+      display: none;
     }
   }
 </style>

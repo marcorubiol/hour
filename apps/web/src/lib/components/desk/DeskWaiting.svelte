@@ -97,6 +97,7 @@
   let LENS_HREF = $derived<Record<DeskConcern, string | null>>({
     task: null,
     conversation: lensOn('conversations') ? '/h/conversations' : null,
+    decision: lensOn('planner') ? '/h/planner' : null,
     money: lensOn('books') ? '/h/books' : null,
   });
   const runHref = (run: DeskRun) => run.items[0]?.href ?? LENS_HREF[run.concern];

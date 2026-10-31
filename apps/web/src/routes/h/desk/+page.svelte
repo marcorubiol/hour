@@ -8,9 +8,10 @@
    *   3 · Ha cambiado   — since your last visit ($lib/desk-bands changesSince)
    *   4 · La temporada  — one door per lens, in the lens's own arithmetic
    *
-   * Desktop: two columns, what you act on (1, 2) on the left and what you
-   * look at (4, 3) on the right. Phone: one column in the same order as the
-   * DOM, 1, 2, 4, 3, so focus and reading follow what is seen.
+   * Desktop: two columns, what you act on and what is new (1, 2, 3) on the
+   * left and the season's doors (4) on the right. Phone: one column in the
+   * same order as the DOM, 1, 2, 3, 4, so focus and reading follow what is
+   * seen (ADR-149; it was 1, 2, 4, 3).
    *
    * Calm (ADR-139 § 5, `$lib/calm`) is another composition, not a grey: one
    * column at a reading measure, 1 and today's rows of 2 (`calmWaiting`);
@@ -66,8 +67,10 @@
     overviewReplies,
     rankWaiting,
     type DeskConvInput,
+    type DeskDecisionInput,
     type DeskItem,
   } from '$lib/desk-feed';
+  import type { Decision } from '$lib/planner';
   import {
     changedBandLoading,
     changesSince,
@@ -83,7 +86,7 @@
   import { blockDrawn, screenQuiet } from '$lib/dashboard-blocks';
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { daysAgoLabel } from '$lib/conversation';
-  import { computePulse } from '$lib/pulse';
+  import { dayCard, upcoming } from '$lib/pulse';
   import { createPulseFeeds, pulseSlipContext } from '$lib/pulse-feeds.svelte';
   import { dateSlip, perfDayKey, performanceSlip, perfWorkspaceId, type DateEvent, type PerformanceEvent, type SlipKind } from '$lib/month-events';
   import { clashesInSeason, seasonWindow } from '$lib/season';
@@ -206,36 +209,15 @@
 
   // ── Band 1 · Lo siguiente — the rail's feeds, the rail's answer ────────
   const feeds = createPulseFeeds(() => today);
-  let pulse = $derived(
-    computePulse({ performances: feeds.performances, dates: feeds.dates, viewerTz, axis: feeds.axis }, clockNow),
-  );
-  /** A second thing within 48 h of the first: the same answer, the first removed. */
-  let then = $derived.by(() => {
-    const first = pulse.next;
-    if (!first) return null;
-    const second = computePulse(
-      {
-        performances: feeds.performances.filter((p) => p.id !== first.ref.id),
-        dates: feeds.dates.filter((d) => d.id !== first.ref.id),
-        viewerTz,
-        axis: feeds.axis,
-      },
-      clockNow,
-    ).next;
-    return second && second.day <= addDaysIso(first.day, 2) ? second : null;
-  });
   /**
-   * The eve of a show that comes with a trip: the card is the show's day (its
-   * hours, its road sheet) and the trip that leads to it is the line before.
-   * Otherwise the card is the next thing and the line what follows.
+   * The card is a day (ADR-149): the next day you have something, titled by
+   * its performance when it has one, its other things as lines inside, and
+   * the next three things of other days under it. The pulse's own rule, run
+   * again with each answer gone (`upcoming`): one order for card and rail.
    */
-  let lead = $derived.by(() => {
-    const a = pulse.next;
-    const b = then;
-    if (a && b && a.day === b.day && a.ref.of !== 'performance' && b.ref.of === 'performance')
-      return { card: b, line: a, before: true };
-    return { card: a, line: b, before: false };
-  });
+  let lead = $derived(
+    dayCard(upcoming({ performances: feeds.performances, dates: feeds.dates, viewerTz, axis: feeds.axis }, clockNow, 10)),
+  );
   const kindLabel = (kind: SlipKind) => t(`planner.kind_${kind}`, locale);
   let slipCtx = $derived(pulseSlipContext(feeds.workspaces, viewerTz, kindLabel));
 
@@ -273,7 +255,7 @@
   // «Tablón · N nuevos» (plan 2026-10-22 § 3.3): the next performance's
   // board, under the record's own key, so opening it costs nothing more.
   // The signal that was missing on the day of the show; no mail, no push.
-  let nextPerformanceId = $derived(lead.card?.ref.of === 'performance' ? lead.card.ref.id : '');
+  let nextPerformanceId = $derived(lead?.card.ref.of === 'performance' ? lead.card.ref.id : '');
   const nextBoardQuery = createQuery(
     toStore(() => ({
       queryKey: ['bolo-board', nextPerformanceId] as const,
@@ -381,6 +363,7 @@
         invoices: readMoney && $invoicesQuery.isSuccess && $bolosQuery.isSuccess ? debtInvoices : undefined,
         showToday: scopedPerfs.some((p) => p.status !== 'cancelled' && perfDayKey(p) === today),
         replies,
+        decisions: lensOn('planner') ? deskDecisions() : [],
       },
       clockNow,
       locale,
@@ -529,6 +512,24 @@
     // The engine reads its day once, as on the Planner (a reload rolls it).
     todayIso: dayKeyInTz(new Date().toISOString(), viewerTz),
   });
+  // «Te espera» asks for the Planner's decisions too (ADR-149): two options on
+  // one day, or one to let go. The same queue the Season lists, one engine.
+  const sideName = (s: Decision['a']) => s.venue || s.city || s.project;
+  const isOption = (status: string) => status !== 'confirmed';
+  // A function, not a $derived: the feed above reads it, and the engine it
+  // reads is declared further down (a function is hoisted, a `let` is not).
+  function deskDecisions(): DeskDecisionInput[] {
+    return engine.decisionQueue.decisions.map((d) => ({
+      id: d.id,
+      day: d.day,
+      decideBy: d.decideBy,
+      kind: d.kind,
+      a: sideName(d.kind === 'release' && isOption(d.a.status) ? d.b : d.a),
+      b: sideName(d.kind === 'release' && isOption(d.a.status) ? d.a : d.b),
+      projectName: d.a.project === d.b.project ? d.a.project : `${d.a.project} · ${d.b.project}`,
+      href: plannerDayHref('day', d.day),
+    }));
+  }
   let plannerFig = $derived(
     feeds.settled && !$seasonBlocksQuery.isPending
       ? plannerDoor(
@@ -830,9 +831,10 @@
     <div class="desk__col">
       <div class="slot slot--next" data-help-step="desk-next">
         <DeskNext
-          next={lead.card}
-          then={lead.line}
-          thenBefore={lead.before}
+          next={lead?.card ?? null}
+          before={lead?.before}
+          later={lead?.later}
+          after={lead?.after}
           settled={feeds.settled}
           errored={feeds.errored}
           onretry={retryFailed}
@@ -871,6 +873,23 @@
         />
       </div>
       {/if}
+      <!-- What changed is news to act on, so it follows what waits (ADR-149;
+           it sat under the season's doors, last on a phone). -->
+      {#if drawChanged && shows('desk', 'season', calm.on)}
+      <div class="slot slot--changed" data-help-step="desk-more">
+        <DeskChanged
+          {changes}
+          loading={changedLoading}
+          errored={changedErrored}
+          onretry={retryFailed}
+          {quietLabel}
+          {sinceLabel}
+          {workspaceSlugById}
+          {tagNames}
+          {locale}
+        />
+      </div>
+      {/if}
     </div>
 
     <!-- What calm folds here is said in «Te espera»'s last line, which leaves calm. -->
@@ -885,21 +904,6 @@
             {locale}
           />
         </div>
-        {#if drawChanged}
-        <div class="slot slot--changed" data-help-step="desk-more">
-          <DeskChanged
-            {changes}
-            loading={changedLoading}
-            errored={changedErrored}
-          onretry={retryFailed}
-            {quietLabel}
-            {sinceLabel}
-            {workspaceSlugById}
-            {tagNames}
-            {locale}
-          />
-        </div>
-        {/if}
       </div>
     {/if}
   </div>

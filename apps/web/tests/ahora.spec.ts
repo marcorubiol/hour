@@ -169,7 +169,12 @@ test.describe('Ahora, the gig day (ADR-146)', () => {
     // Never by itself: Hoy is Hoy until you press the door, which is in the
     // foot of the card the headline titles (ADR-148), not a line of its own.
     await expect(page.getByTestId('ahora')).toHaveCount(0);
-    const enter = page.getByTestId('desk-next').getByTestId('ahora-enter');
+    // The card is the day (ADR-149): titled by the show although the train
+    // comes first, the train a line inside it with its hour.
+    const card = page.getByTestId('desk-next');
+    await expect(card.locator('.card__slip')).toContainText(VENUE, { timeout: 20_000 });
+    await expect(card.locator('.lines')).toContainText('09h12');
+    const enter = card.getByTestId('ahora-enter');
     await expect(enter).toBeVisible({ timeout: 20_000 });
     await enter.click();
     await expect(page).toHaveURL(/[?&]mode=ahora\b/);
