@@ -3,8 +3,15 @@
  * switcher, ⌘K, the Desk doors and the links that lead to it; reached by URL,
  * the lens says it is off and who turns it on. Nothing is deleted.
  *
- * Runs in the `playwright` workspace (`?scope=s:playwright`) and puts its
- * lenses back as it found them, whatever happens.
+ * Runs in the `playwright` workspace (`?scope=s:playwright`) and leaves every
+ * lens ON, whatever happens: that is the fixture's baseline, and the Books,
+ * Desk, calm and smoke specs read a lens that is there.
+ *
+ * NOT «as it found them». A snapshot-and-restore keeps whatever a killed run
+ * left behind: on 2026-10-31 an interrupted run had left Books off, every
+ * later run captured `['books']` as «before» and put it back, and the
+ * money, calm, desk and smoke specs failed against a lens that said it was
+ * off.
  */
 import { expect, test, type Page } from '@playwright/test';
 import { waitForLoaded } from './loaded';
@@ -43,23 +50,18 @@ test.describe('Lenses per space (ADR-132)', () => {
   test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL / PW_TEST_PASSWORD.');
 
   let id = '';
-  let before: string[] = [];
 
   test.beforeAll(async ({ browser }) => {
     const page = await browser.newPage();
     await page.goto(`/h/desk${SCOPE}`);
     id = await wsId(page);
-    before = await page.evaluate(
-      async (id) => ((await (await fetch(`/api/workspaces/${id}/lenses`)).json()) as { lenses_off: string[] }).lenses_off,
-      id,
-    );
     await page.close();
   });
 
   test.afterAll(async ({ browser }) => {
     const page = await browser.newPage();
     await page.goto(`/h/desk${SCOPE}`);
-    await setLensesOff(page, id, before);
+    await setLensesOff(page, id, []);
     await page.close();
   });
 

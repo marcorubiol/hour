@@ -72,6 +72,18 @@ describe.skipIf(!envReady())('RLS — update_workspace (ADR-062)', () => {
     expect(res.status).toBe(200);
     expect(res.rows).toHaveLength(1);
     fixture = res.rows[0];
+    // Every lens on is the fixture's baseline, not «as found»: a run killed
+    // with a lens off would otherwise be kept off by every later restore, and
+    // the E2E Books specs read a lens that is there (lens-toggle.spec.ts,
+    // 2026-10-31).
+    if (fixture.lenses_off.length > 0) {
+      const reset = await pgRpc('update_workspace', jwt, {
+        p_workspace_id: fixture.id,
+        p_patch: { lenses_off: [] },
+      });
+      expect(reset.status).toBe(200);
+      fixture = { ...fixture, lenses_off: [] };
+    }
 
     if (limitedEnvReady()) {
       const limited = requireLimitedEnv();
