@@ -58,6 +58,23 @@ function readRecord(page: Page): Promise<Record> {
   );
 }
 
+/** The record once it stops growing: the app writes it at most once a second. */
+async function settledRecord(page: Page): Promise<NonNullable<Record>> {
+  let last = -1;
+  await expect
+    .poll(
+      async () => {
+        const n = (await readRecord(page))?.queries ?? 0;
+        const settled = n > 2 && n === last;
+        last = n;
+        return settled;
+      },
+      { intervals: [1_200], timeout: 10_000 },
+    )
+    .toBe(true);
+  return (await readRecord(page))!;
+}
+
 async function login(page: Page, email: string, password: string) {
   await page.goto('/login');
   await page.locator('input[type=email]').fill(email);
@@ -89,9 +106,8 @@ test.describe('device cache', () => {
 
     await login(page, EMAIL!, PASSWORD!);
     await loaded(page, 0);
-    // Written within a second of the last answer.
-    await expect.poll(() => readRecord(page).then((r) => r?.queries ?? 0)).toBeGreaterThan(2);
-    const first = (await readRecord(page))!;
+    // Written with up to a second of delay: wait until it stops growing, or the reopen asks the network.
+    const first = await settledRecord(page);
 
     // Reopen with the session probe held back: the Desk paints from the device.
     const reopened = await context.newPage();
