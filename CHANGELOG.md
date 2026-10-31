@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- El ámbito ya no ocupa una caja encima del titular: es una pastilla en la fila del título que dice lo acotado («Txema Muñoz», «Gota») y abre una hoja en el móvil o un desplegable en el escritorio con añadir, guardar, copiar enlace y limpiar (ADR-152). En Hoy vuelve el monograma de cada proyecto en la tarjeta, la agenda y «Después», y quien entra por un bolo vuelve a ver su función. (2026-10-31, `15846ea9`)
 - Hoy es la agenda del día: lo que toca ahora se abre como tarjeta con qué haces y hasta cuándo en grande, la sala en pequeño y Llamar, Mapa, Ahora y Hoja; lo pasado se apaga y la función sigue marcada (ADR-150). En Ajustes › Perfil, «Lo que ves» elige por compañía «lo mío» o «todo», y Hoy, Ahora, el raíl y el Planificador lo respetan (ADR-151). (2026-10-31, `370bad9d`)
 - Hoy enseña tu día entero: la tarjeta lleva la función y, dentro, lo demás de ese día con su hora; debajo, «Después» con tus tres siguientes cosas. Las opciones por decidir entran en «Te espera», «Ha cambiado» va justo después y las puertas de la temporada solo dicen las cifras que no son cero (ADR-149). (2026-10-31, `c9e00c0a`)
 - Hoy en el móvil va al grano: el titular es la tarjeta de lo siguiente, con el viaje dentro y «Ahora» al pie, y «+» para una tarea junto al título (ADR-148). Hour ya no pregunta «¿vas?»: estás en lo que te asignan o en lo que dices «voy»; una fecha sin nadie es de la compañía y no te pregunta (ADR-147). (2026-10-31, `5ca8d20f`)
