@@ -34,7 +34,6 @@
   import BrandMark from '$lib/components/BrandMark.svelte';
   import CommandPalette from '$lib/components/CommandPalette.svelte';
   import AccountMenu from '$lib/components/shell/AccountMenu.svelte';
-  import ScopeBar from '$lib/components/shell/ScopeBar.svelte';
   import ScopeRail from '$lib/components/shell/ScopeRail.svelte';
   import PullRefresh from '$lib/components/shell/PullRefresh.svelte';
   import { isReservedWorkspaceSlug } from '$lib/reserved-slugs';
@@ -151,8 +150,6 @@
 
   const lens = provideLens('desk');
   const pins = providePins();
-  // The lens head's scope door on a phone (ADR-145 § 5) opens the same palette.
-  provideScopeDoor(() => openPaletteAdd());
   const scopes = provideScopes();
   const creation = provideCreation();
   // Calm lives in the shell (the toggle sits by the clock); the Desk consumes it.
@@ -206,7 +203,7 @@
     workspaceSlug || homeWorkspace(($workspacesQuery.data?.items ?? []) as NavWorkspace[])?.slug || '',
   );
 
-  // ── Scope model (pins → resolved scope) for the scope bar + sidebar ──
+  // ── Scope model (pins → resolved scope) for the scope pill + sidebar ──
   const projectsQuery = createQuery(activeProjectsQueryOptions());
   const linesQuery = createQuery(allLinesQueryOptions());
   let wsItems = $derived(($workspacesQuery.data?.items ?? []) as unknown as NavWorkspace[]);
@@ -549,7 +546,7 @@
 
   // ⌘K scope builder — Apply sets the pins and remembers the scope.
   let paletteOpen = $state(false);
-  // What the palette's BUILDING bar starts with. Opening from the scope bar
+  // What the palette's BUILDING bar starts with. Opening from the scope pill
   // (+ add / + narrow) seeds it with the current filters (you're adding to the
   // scope); opening from the command bar (⌘K, top search, browse & combine)
   // starts EMPTY — a fresh scope from zero. Reset on close so ⌘K is always
@@ -668,11 +665,30 @@
     openPaletteFresh();
   }
 
-  /** Clear from the scope bar = abandoning the working combo too. */
+  /** Clear from the scope pill = abandoning the working combo too. */
   function clearScope() {
     rememberWorkingScope();
     pins.set([]);
   }
+
+  // THE SCOPE IS A PILL IN THE LENS'S TITLE ROW (ADR-152): the lens head
+  // draws it, and what it does lives here, beside the pins' companions.
+  provideScopeDoor({
+    openPalette: openPaletteAdd,
+    tokenLabel,
+    tokenAccent,
+    tokenKind,
+    tokenLineKind,
+    get exactSaved() {
+      return exactSaved;
+    },
+    get isModified() {
+      return isModified;
+    },
+    save: saveCurrentScope,
+    update: updateScope,
+    clear: clearScope,
+  });
 </script>
 
 <!-- Tab close / hard navigation away: the working combo registers before
@@ -780,20 +796,6 @@
     <main class="shell__main" id="main" tabindex="-1">
       <!-- Pull to refresh on a phone: every lens, from the frame. -->
       <PullRefresh {locale} />
-      {#if routedLens}
-        <ScopeBar
-          {tokenLabel}
-          {tokenAccent}
-          {tokenKind}
-          {tokenLineKind}
-          {exactSaved}
-          {isModified}
-          {saveCurrentScope}
-          {updateScope}
-          {clearScope}
-          {openPaletteAdd}
-        />
-      {/if}
 
       <!-- CALM IS A COMPOSITION, NOT A GREY (ADR-139 § 5): each lens folds
            its own blocks ($lib/calm); the content keeps its contrast, and

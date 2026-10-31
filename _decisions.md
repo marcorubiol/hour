@@ -4720,6 +4720,10 @@ una fecha tentativa espera fuera de calma. La regla vive en `lib/calm.ts` (`rail
 > Cuentas, un bloque vacío no se pinta en vez de ocupar una línea; si la pantalla se queda sin ninguno, una sola línea.
 > En las fichas, «lo vacío en una línea» sigue igual.
 
+> **Amended by ADR-152 (2026-10-31), § 6.** «El ámbito solo cuando acota» ya no es una banda: el ámbito es una
+> pastilla en la fila del título de cada lente («Todo» o el nombre de lo acotado), y añadir, guardar, copiar y limpiar
+> esperan en el diálogo que abre.
+
 ## [2026-10-20] ADR-140 · Las secciones viven en el marco (enmienda la decisión del 18-07 y ADR-136 § 3)
 
 **Contexto.** Marco (20-10) se pierde al entrar en una ficha: el selector Hoy · Planificador · Conversaciones ·
@@ -5122,6 +5126,10 @@ de `Chip`; en Difusión, sus filas.
 
 > **Nota a ADR-144 § 6 (2026-10-29):** sí hay un indicador de «actualizando», pero solo cuando la persona tira hacia abajo en el móvil (pull to refresh, `6872b3cf`). La pantalla sigue sin avisar cuando refresca sola detrás.
 
+> **Amended by ADR-152 (2026-10-31), § 5.** «Todo» en la fila del título vale en todos los anchos, no solo en el
+> móvil, y acotado la barra ya no vuelve: la misma pastilla dice lo acotado (una hoja en el móvil, un desplegable en
+> escritorio). `ScopeBar` está borrado.
+
 ## [2026-10-29] ADR-146 · «Ahora»: el día de bolo en una pantalla, un modo de Hoy (enmienda ADR-136 § 1 y ADR-144 § 6)
 
 **Contexto.** Marco trabaja de técnico en gira (Gota, Komunumo, Avi, MaMeMi) y pidió, sobre todo para el iPhone, un
@@ -5454,3 +5462,60 @@ ver (el motor de conflictos ya solo lee lo que se queda), y si hace falta la pre
 > que «todo» es exactamente lo suyo; con «lo mío» su propia función desaparecía de Hoy porque el reparto no le nombra.
 > Se descartó hacer «suyas» las funciones de un bolo por la membresía de bolo: duplicaría en el cliente lo que la RLS
 > ya decide y pediría leer membresías de bolo en cada vista. El viewer sigue en «lo mío».
+
+## [2026-10-31] ADR-152 · El ámbito es una pastilla en la fila del título (enmienda ADR-139 § 6 y ADR-145 § 5)
+
+**Contexto.** Acotado, el ámbito ocupaba una caja de dos filas encima del titular en todas las lentes: «Ámbito», las
+pastillas, «+ añadir» y, debajo o a la derecha, «Guardar alcance», «Copiar enlace» y «Limpiar». Unos 130 px en el
+móvil para algo que se mira de vez en cuando. La caja (`ScopeBar`) viene de Scope v2 (2026-07-16, sin ADR propio);
+ADR-139 § 6 la dejó solo cuando acota y ADR-145 § 5 llevó «Todo» a la fila del título solo en el móvil. Maqueta con
+tres opciones en `build/coordination/hoy-review/ambito-opciones.html` (fuera de git); Marco eligió la A el 31-10,
+para el móvil y el escritorio, en todas las lentes. Carril `claude/scope-pill`. Sin migración ni API.
+
+**Decisión.**
+1. **El ámbito es una pastilla en la fila del título de cada lente**, en el sitio de «Todo», antes del «+» de Hoy y
+   del «?» (`ScopePill`, que pinta `LensHeader`). Igual en Hoy, Planificador, Conversaciones y Cuentas, a cualquier
+   ancho. **La caja del ámbito desaparece en todos los anchos** (`ScopeBar` borrado).
+2. **Sin acotar dice «Todo»**, en la pastilla discontinua de «+ acotar», y abre la paleta directamente: no hay nada
+   que listar. **Acotada dice el nombre de lo acotado**, nunca otro nivel: el espacio («Txema Muñoz»), el proyecto
+   («Gota»), la línea, la persona fijada; con varias cosas, la primera y «+N» («Txema Muñoz +1»). Un ▾ pequeño. Los
+   nombres salen del mismo punto que antes (`tokenLabel` del marco); la regla del texto es `scopePillLabel`
+   (`$lib/scope-door.ts`, con test). Un nombre largo se corta con puntos suspensivos y el entero va en el `title`.
+3. **Al pulsarla se abre un diálogo:** en el móvil una hoja desde abajo (el marco de `.dialog` de siempre), en
+   escritorio (desde 48 rem) un desplegable colgado de la pastilla, con su borde derecho en el de la pastilla y sin
+   velo. Dentro: «Ámbito», cada cosa acotada con su glifo, su tipo y su ×; «+ añadir» (la paleta de siempre, sembrada
+   con lo acotado); «☆ Guardar» (o «↺ Actualizar» y «☆ Guardar como nuevo» sobre un ámbito guardado que has tocado,
+   o «× Borrar alcance» si coincide con uno guardado); «Copiar enlace»; «Limpiar». Copiar, añadir y limpiar cierran
+   el diálogo; quitar la última cosa también, y la pastilla vuelve a «Todo».
+4. **Accesible.** La pastilla es un botón con nombre «Ámbito: Txema Muñoz» (`aria-haspopup="dialog"`,
+   `aria-expanded`); sin acotar, «Ámbito: Todo. Acotar». El diálogo es el `<dialog>` modal nativo, nombrado por su
+   «Ámbito»: el foco entra en ese nombre (no en la primera ×, para que un Intro no quite nada), se queda dentro, Esc o
+   un clic fuera lo cierran y el foco vuelve a la pastilla; si se cierra para abrir la paleta, el foco va a la paleta.
+   Mientras está abierto la página no se desplaza, para que el desplegable no se separe de su pastilla.
+5. **Lo que hace el ámbito sigue en el marco** (`routes/h/+layout.svelte`): nombres, guardar, actualizar, limpiar y
+   la paleta. El marco lo entrega a la cabecera por contexto (`provideScopeDoor`, ahora un objeto en vez de solo el
+   abridor), así que la cabecera no entra en el shell.
+
+**Qué no cambia.** El raíl con sus ámbitos guardados y recientes, ⌘K, `?scope=` en la URL y su copia canónica, y que
+Ahora (ADR-146) y el pulso no siguen el ámbito: Ahora no pinta cabecera de lente, así que tampoco pastilla. Fuera de
+las lentes (ficha, proyecto, espacio, Ajustes) no había caja y sigue sin haber pastilla.
+
+**Enmienda a ADR-139 § 6.** «El ámbito solo cuando acota» deja de ser una banda: acotado, lo dice una pastilla en la
+fila del título y lo demás espera en su diálogo.
+
+**Enmienda a ADR-145 § 5.** «Todo» en la fila del título deja de ser solo del móvil, y acotado la barra ya no vuelve:
+la misma pastilla dice lo acotado en todos los anchos.
+
+**Medido** (usuario E2E, espacio `playwright` y su proyecto «ZZZ e2e collab»; antes en producción `370bad9d`,
+después en `vite dev` contra la Supabase de producción; capturas en `build/coordination/hoy-review/scope-pill/`,
+fuera de git, con `before-report.json` y `after-report.json`). Dónde empieza la cabecera de la lente, igual en Hoy,
+Planificador y Conversaciones: a 390 con táctil, sin acotar 78 → 78 px y acotado (espacio o proyecto) 159 → 78; a
+1440, sin acotar 129 → 88 y acotado 154 → 88. El diálogo abierto: a 390 una hoja de 119 px pegada abajo, de 390 de
+ancho; a 1440 un desplegable de 352 × 134 colgado de la pastilla. Al abrir, el foco está en «Ámbito».
+
+**Cómo se revierte.** Recuperar `ScopeBar.svelte` y su montaje en `routes/h/+layout.svelte` de la historia de git,
+el bloque `.lenshead__scope` de `base.css` y el abridor suelto de `scope-door.ts`; borrar `ScopePill.svelte`. Las
+claves de i18n `shell.narrow`, `shell.save_scope` y `shell.update_scope` están en la historia.
+
+**Re-evaluar cuando** Marco lo use una semana acotado en el teléfono: si una pastilla en la fila del título se nota
+lo bastante como para no olvidar que está acotado (la opción B, la línea fina, era la más explícita).
