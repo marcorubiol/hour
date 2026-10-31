@@ -2787,6 +2787,11 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
   «las filas son personas» se gana su sitio; (c) haga falta reparto **por fecha** (un
   ensayo solo para tres músicos) → tabla nueva, y la inferencia deja de hacer falta.
 
+> **Amended by ADR-147 (2026-10-30), solo en § 3.** La atribución ya no infiere: una persona está en una fila por
+> reparto, por su propio «voy» o no está. El reparto del proyecto dice de quién es una fecha, no quién va. Sin
+> inferencia no hay puerta de la ausencia que guardar; el reparto explícito sigue sin filtrarse por ausencias y
+> `unknown` sigue sin poder leerse como «libre».
+
 ## [2026-07-31] — ADR-093 · La nota es privada; lo que ve el equipo es comunicación. Y `note` nace con la forma del mensaje
 
 > Grill sobre el margen del Planner v3. Marco arrancó con *«estas notas deberían
@@ -3479,6 +3484,11 @@ deducción no se puede confirmar ni quitar.
 - **«Voy» entra en el detector de conflictos (Marco, 2026-10-12, opción a).** Quien dijo «voy» está en el compromiso
   para el motor: choca con su ausencia, y dos compromisos con el mismo «voy» son un choque de personas. No es un
   reparto completo, así que nunca demuestra que dos compromisos no comparten a nadie.
+
+> **Amended by ADR-147 (2026-10-30).** No hay nada deducido que aprobar: un `date` sin «voy» no es de nadie en
+> particular, es una fecha de la compañía, y Hour no pregunta «¿vas?» ni en Hoy ni en el rail. «Voy / no voy» sigue
+> en «Quién va» de la ficha, que ya no lista el reparto como deducido. `commitment_person`, su RPC y su lugar en el
+> detector de conflictos no cambian.
 
 ## [2026-10-13] ADR-104 · Fase 3 de permisos: paquete en el espacio, quién quita y la invitación con paquete
 
@@ -4218,6 +4228,9 @@ sobre `claude/conv-fixes` (reutiliza `MailoutFigures`, `.load-fail` y el toast c
 5. **«Ver todo» no pierde nada** (enmienda ADR-121 § 2): los «¿vas?» viven en su día en la lista por días, el botón no
    lleva cifra (la única es «7 de 16») y «Más adelante» se despliega en sitio en vez de abrir una Agenda que no tiene
    tareas ni llamadas. En calma no se ofrece «Ver todo».
+   > **Amended by ADR-147 y ADR-148 (2026-10-30), solo en § 2 y § 5.** No hay «¿vas?» en «Te espera» ni en la lista
+   > por días (ADR-147). El viaje de la víspera ya no va encima de la tarjeta: es una línea «Antes» dentro de ella
+   > (ADR-148).
 6. **Una llamada abre la conversación**, no la ficha de la persona.
 7. **Las puertas hablan como su lente** (enmienda ADR-121 § 6). Sin rótulo común de temporada: cada puerta lleva su
    ventana en su eyebrow (Planificador «próximas 12 semanas», Conversaciones «Temporada 26-27»). Planificador:
@@ -5200,3 +5213,72 @@ invitado). Los kinds `doors` y `curfew` escritos ya quedan como texto: sin su pa
 **Re-evaluar cuando** Marco lo use en una gira de verdad: si la cuenta atrás de una hora es el corte justo, si el
 botón en la fila del título se encuentra con una mano o tiene que ir a la barra de arriba, si el contacto deducido
 acierta, y si hace falta la pantalla encendida (Wake Lock) o el aviso antes de la llamada.
+
+> **Amended by ADR-148 (2026-10-30), solo en § 2.** La puerta de Ahora ya no va en la fila del título ni hay línea
+> «Hoy de bolo en X · Abrir Ahora»: es un botón en el pie de la tarjeta de «Lo siguiente», junto a «Hoja de ruta»,
+> mientras Ahora aplica (lo mismo que antes: algo tuyo en las próximas 48 horas). Sigue sin entrar solo.
+
+## [2026-10-30] ADR-147 · Hour deja de adivinar quién va (enmienda ADR-092 § 3 y ADR-103)
+
+**Contexto.** Marco, 30-10, mirando Hoy: le preguntaba «¿vas?» por «Départ Manou (navette)», el viaje de otra persona,
+porque está en el reparto de MaMeMi. Un `date` no tiene reparto, así que `peopleOf` metía a todo el reparto del
+proyecto como «deducido» (ADR-092 § 3) y ADR-103 convertía cada deducción en una pregunta. El viaje de una persona se
+volvía la pregunta de todos.
+
+**Decisión.**
+1. **Una persona está en una fila por un hecho o no está.** Por el reparto (el de una función: reparto del proyecto
+   menos reemplazos, más cambios y su equipo), por su propio «voy», o nada. `peopleOf` ya no recibe el reparto del
+   proyecto: `PersonLink` es `explicit | unknown` y `inferred` desaparece del eje de personas (el «deducida» de una
+   gira sacada de dos tramos de viaje es otra cosa y sigue).
+2. **Una fila sin nadie es una fecha de la compañía.** `unknown`, y para quien está fijado `unattributed`: se enseña
+   sin preguntar y sin reclamarla como suya. Sigue sin poder leerse como «libre».
+3. **El reparto del proyecto dice de quién es una fecha, no quién va.** `attributionFor` da `no` a una fecha de un
+   proyecto en el que la persona no está (y a su propio «no voy», y a una función cuyo reparto no la nombra). Un
+   proyecto sin nadie en el equipo es de todos. Un «voy» de otro en una fecha no la quita: la lista de una fecha es
+   abierta, la de una función no.
+4. **Un solo veredicto para todos.** `buildPersonAttribution` (sin `blocks`: sin inferencia no hay puerta de ausencia)
+   lo leen el pulso, Ahora, «Lo siguiente» y el filtro de persona del Planificador, que ahora se queda lo que no es
+   `no` y cuenta las fechas de la compañía con la cifra que ya existía («N por proyecto, sin reparto»,
+   `planner.stat_unattributed`). Fuera `matchesPinnedPeople`, `buildPersonScope`, `linkOf`, `awayPersonIdsOn` y
+   `awayIndex`. El feed de disponibilidad del pulso (`pulse-availability`) ya no se pide.
+5. **El Tablero no adivina carriles.** Una fecha va al carril de quien dijo «voy»; sin nadie, al carril «sin reparto»
+   de su proyecto. El trazo punteado y la cursiva del carril deducido se van con él.
+6. **Hour no pregunta.** Fuera la banda «¿vas?» de «Te espera» (`goingAsks`, `goingItem`, `GOING_DAYS`, la
+   preocupación `going`), la pregunta de la tarjeta de «Lo siguiente», la del rail y el aviso de primera vez
+   `first_going`. La ayuda de «Lo deduce Hour» ya no menciona el reparto.
+7. **«Voy / no voy» sigue en la ficha.** «Quién va» (`WhoGoes`) lista el reparto de una función y a quien dio su
+   palabra, con «no voy» y «quitar»; «+ Voy» añade a cualquiera del espacio. Ya no lista el reparto del proyecto como
+   deducido.
+
+**Sin migración.** `commitment_person` y `set_commitment_person` no cambian.
+
+**Cómo se revierte.** Volver `lib/people.ts`, `board-lanes.ts`, `pulse-feeds.svelte.ts`, `WhoGoes.svelte` y los
+consumidores al commit anterior; las claves de i18n borradas están en el historial.
+
+**Re-evaluar cuando** una fecha necesite reparto propio (un ensayo solo para tres músicos): entonces es una lista en
+la ficha, como el de una función, no una deducción.
+
+## [2026-10-30] ADR-148 · Hoy en el móvil: la tarjeta primero (enmienda ADR-127 § 2 y ADR-146 § 2)
+
+**Contexto.** Marco, 30-10: un día de bolo, la primera pantalla de Hoy a 390 decía lo mismo tres veces (el titular
+«Hoy, función en X», la línea «Hoy de bolo en X · Abrir Ahora» y la tarjeta) y la tarjeta empezaba muy abajo, detrás
+del saludo, una fila solo con «+ Tarea», «LO SIGUIENTE», esa línea y la del viaje «ANTES».
+
+**Decisión.**
+1. **El titular es el título de la tarjeta.** En el móvil (< 48 rem) el `h1` es solo el día («Hoy, función en
+   Girona»), sin el saludo; en escritorio el saludo sigue delante, una tinta más suave, porque no repite el hecho.
+   Cuando la tarjeta es de hoy, la cabecera «Lo siguiente» se oye pero no se ve en el móvil
+   (`.visually-hidden--narrow`); en escritorio se queda, alineada con «La temporada».
+2. **Fuera la línea «Hoy de bolo en X · Abrir Ahora».** La puerta de Ahora es un botón en el pie de la tarjeta, junto a
+   «Hoja de ruta», con la misma regla que antes (algo tuyo en 48 horas). Ya no está en la fila del título.
+3. **«+ Tarea» es un «+» en la fila del título**, en el aro del «?» (`.lenshead__act`, prop `tools` de `LensHeader`),
+   con nombre accesible «Nueva tarea» (`desk.add_task`). Abre el mismo compositor en su sitio.
+4. **El viaje de antes va dentro de la tarjeta**, como una línea «Antes» entre la función y sus horas.
+5. Un día sin bolo Hoy pinta lo mismo, con la misma regla: si la tarjeta es de hoy, el titular la nombra y su cabecera
+   no se repite en el móvil.
+
+**Cómo se revierte.** Volver `routes/h/desk/+page.svelte`, `DeskNext.svelte`, `LensHeader.svelte` y las reglas de
+`base.css` (`.lenshead__act`, `.visually-hidden--narrow`) al commit anterior.
+
+**Re-evaluar cuando** Marco lo use en una gira: si el «+» se encuentra, y si la tarjeta de hoy necesita algo más del
+titular en el escritorio.

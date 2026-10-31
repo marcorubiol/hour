@@ -62,11 +62,9 @@
   import {
     buildDeskFeed,
     calmWaiting,
-    goingItem,
     laterSummary,
     overviewReplies,
     rankWaiting,
-    GOING_DAYS,
     type DeskConvInput,
     type DeskItem,
   } from '$lib/desk-feed';
@@ -74,7 +72,6 @@
     changedBandLoading,
     changesSince,
     elapsedSince,
-    goingAsks,
     paymentNews,
     paymentsSinceEarlier,
     plannerDoor,
@@ -100,7 +97,6 @@
     waitingTasksQueryOptions,
   } from '$lib/waiting-feeds';
   import { boardUnread, type BoardView, type ThreadFeedView } from '$lib/threads';
-  import { setCommitment } from '$lib/commitments';
   import {
     invoicesByBolo,
     fmtCurrency,
@@ -257,22 +253,6 @@
     feeds.axisSettled ? ahoraItems({ performances: feeds.performances, dates: feeds.dates, viewerTz, axis: feeds.axis }) : [],
   );
   let ahoraOn = $derived(ahoraDay(ahoraRows, clockNow, viewerTz));
-  /** «Lo siguiente» suggests it on the day itself: a show or a trip of yours today. */
-  let ahoraSuggest = $derived.by(() => {
-    if (ahoraOn !== today) return null;
-    // The show names the day when there is one; the trip only on a day of travel.
-    const live = ahoraRows.filter((i) => i.day === today && i.end > clockNow.getTime());
-    const first = live.find((i) => i.of === 'performance') ?? live[0];
-    if (!first) return null;
-    const place =
-      first.of === 'performance'
-        ? (performanceSlip(first.row as PerformanceEvent, slipCtx).city ?? performanceSlip(first.row as PerformanceEvent, slipCtx).name)
-        : ((first.row as DateEvent).destination_city ?? (first.row as DateEvent).city ?? '');
-    return {
-      text: t(first.of === 'performance' ? 'ahora.suggest_show' : 'ahora.suggest_trip', locale, { place }),
-      href: ahoraHref,
-    };
-  });
   // The home-screen app opens straight in Ahora on the day it was left open
   // (`/`, `ahoraRelaunch`); back on Hoy, it forgets.
   $effect(() => {
@@ -393,33 +373,6 @@
     );
   });
 
-  /** «Voy · no voy» Hour has for you; band 1 already asks about its own row. */
-  let asks = $derived(
-    goingAsks(
-      { performances: scopedPerfs, dates: scopedDates, axis: feeds.axis, viewerTz },
-      today,
-      GOING_DAYS,
-      new Set(lead.card ? [lead.card.ref.id] : []),
-    ).map((a) => {
-      const slip =
-        a.of === 'performance'
-          ? performanceSlip(a.row as PerformanceEvent, slipCtx)
-          : dateSlip(a.row as DateEvent, slipCtx);
-      return goingItem({
-        of: a.of,
-        id: a.id,
-        day: a.day,
-        subject: [slip.name, slip.city].filter(Boolean).join(' · '),
-        projectId: a.row.project?.id ?? null,
-        projectName: a.row.project?.name ?? '',
-        // A date has no page: its link opens its vistazo over Hoy (ADR-139 p1).
-        href:
-          a.of === 'date'
-            ? peekHref({ kind: 'date', id: a.id }, page.url)
-            : (slip.href ?? (lensOn('planner') ? plannerDayHref('day', a.day) : null)),
-      });
-    }),
-  );
   let feed = $derived(
     buildDeskFeed(
       {
@@ -428,7 +381,6 @@
         invoices: readMoney && $invoicesQuery.isSuccess && $bolosQuery.isSuccess ? debtInvoices : undefined,
         showToday: scopedPerfs.some((p) => p.status !== 'cancelled' && perfDayKey(p) === today),
         replies,
-        asks,
       },
       clockNow,
       locale,
@@ -737,15 +689,6 @@
   // task (origin → manual, persisted); «Descartar» removes it, with «Deshacer».
   const isGhost = (i: DeskItem) => i.concern === 'task' && i.isProposal && i.taskId != null;
 
-  async function answerGoing(g: NonNullable<DeskItem['going']>, state: 'going' | 'not_going') {
-    if (!feeds.personId) return;
-    try {
-      await setCommitment(queryClient, g.of, g.id, feeds.personId, state);
-    } catch (err) {
-      addToast({ tone: 'danger', title: t('desk.toast_change_failed', locale), message: err instanceof ApiError ? err.message : t('perf.unexpected', locale) });
-    }
-  }
-
   // ── «+ Tarea»: the composer is an occasional gesture, so it waits behind
   //    a button. TaskComposer owns the POST + cache; the default target
   //    follows the pins; the picker attaches to a show or a conversation. ──
@@ -848,27 +791,26 @@
 {:else}
 <div class="desk" class:desk--calm={calm.on} aria-busy={busy}>
   <!-- GREETING AND DAY ARE ONE LINE (ADR-145, fase 2): one idea in one face,
-       the greeting an ink quieter than the day. They were two serif styles on
-       two lines, over a date and time the clock in the bar already says. -->
+       the greeting an ink quieter than the day. On a phone the day alone:
+       it is the title of the card under it (ADR-148). -->
   {#snippet title()}
     <span class="desk__hello">{greeting}{firstName ? `, ${firstName}` : ''}.</span>
     <span class="desk__day"><LensTitle text={dayTitle} /></span>
   {/snippet}
-  <!-- One child, so the sub line's «·» separators stay out of it. Without a
-       space to write a task in, there is no sub line at all. -->
+  <!-- «+»: a task is an occasional gesture, so it waits in the title row, in
+       the ring of the «?» (ADR-148). Without a space to write one in, no «+». -->
   {#snippet addTask()}
-    <span class="desk__subrow">
-      <button type="button" class="desk__add btn--secondary btn--s" bind:this={addBtn} aria-expanded={composerOpen} onclick={openComposer}
-        >{t('desk.add_task', locale)}</button
-      >
-    </span>
+    <button
+      type="button"
+      class="lenshead__act desk__add"
+      bind:this={addBtn}
+      aria-label={t('desk.add_task', locale)}
+      title={t('desk.add_task', locale)}
+      aria-expanded={composerOpen}
+      onclick={openComposer}><span aria-hidden="true">+</span></button
+    >
   {/snippet}
-  <!-- AHORA'S DOOR (ADR-146): fixed in the title row while something of
-       yours is on in the next 48 hours; never enters by itself. -->
-  {#snippet ahoraDoor()}
-    <a class="desk__ahora hit" href={ahoraHref} aria-label={t('ahora.enter_aria', locale)} data-testid="ahora-enter">{t('ahora.title', locale)}</a>
-  {/snippet}
-  <LensHeader help="desk" {title} titleAside={ahoraOn ? ahoraDoor : undefined} sub={taskSpaces.length > 0 ? addTask : undefined} />
+  <LensHeader help="desk" {title} tools={taskSpaces.length > 0 ? addTask : undefined} />
 
   <FirstVisitCard section="desk" steps={['desk-next', 'desk-waits', 'desk-more']} />
 
@@ -896,11 +838,10 @@
           onretry={retryFailed}
           {today}
           {viewerTz}
-          personId={feeds.personId}
           boardNew={nextBoardNew}
           {slipCtx}
           {personNames}
-          ahora={ahoraSuggest}
+          ahoraHref={ahoraOn ? ahoraHref : null}
           {locale}
         />
       </div>
@@ -927,7 +868,6 @@
           ontoggle={(id, done) => $patchTask.mutate({ id, patch: { status: done ? 'done' : 'open' } })}
           onremove={removeWithUndo}
           onaccept={(id) => $patchTask.mutate({ id, patch: { origin: 'manual' } })}
-          onanswer={answerGoing}
         />
       </div>
       {/if}
@@ -978,34 +918,6 @@
     .desk__hello {
       color: var(--text-muted);
     }
-    .desk__subrow {
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      gap: var(--space-m);
-      inline-size: 100%;
-    }
-    /* The system's outline button (base.css), a step tighter in the sub line. */
-    .desk__add[aria-expanded='true'] {
-      --btn-text-color: var(--heading-color);
-      --btn-border-color: var(--border-color-hover);
-    }
-    /* The Planner's «Hoy» pill (CalNav), in ink: the one door of the title
-       row, quiet until it is wanted; `.hit` gives a finger its 44px. */
-    .desk__ahora {
-      flex: none;
-      padding: var(--space-xs) var(--space-s);
-      border: var(--line-hairline) solid var(--border-color-dark);
-      border-radius: var(--radius-circle);
-      background: var(--bg-ultra-light);
-      color: var(--heading-color);
-      font-size: var(--text-s);
-      line-height: 1.1;
-      text-decoration: none;
-    }
-    .desk__ahora:hover {
-      border-color: var(--heading-color);
-    }
     .desk__composer {
       margin-block-start: calc(-1 * var(--space-s));
     }
@@ -1049,6 +961,12 @@
        so the tab and the screen reader go where the eye goes (móvil #2).
        Beside the rail, under 64 rem, two columns left the season's doors
        and the waiting list a word wide (20-10); from 64 rem up, two. */
+    /* A phone: the day alone is the title, and the card's (ADR-148). */
+    @media (max-width: 47.999rem) {
+      .desk__hello {
+        display: none;
+      }
+    }
     @media (max-width: 63.999rem) {
       .desk__grid {
         display: flex;

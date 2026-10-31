@@ -75,6 +75,7 @@ function mkEvent(o: {
   kind?: BoardEventIn['kind'];
   cert?: StatusFamily;
   roster?: string[] | null;
+  commitments?: BoardEventIn['commitments'];
   venue_id?: string | null;
   venueName?: string;
 }): BoardEventIn {
@@ -85,6 +86,7 @@ function mkEvent(o: {
     kind: o.kind ?? 'perf',
     cert: o.cert ?? 'hold',
     roster: o.roster ?? null,
+    commitments: o.commitments ?? null,
     venue_id: o.venue_id ?? null,
     slip: mkSlip(o.venueName ?? 'Sala Beckett'),
   };
@@ -98,8 +100,6 @@ function mkClash(ids: [string, string], severity: ClashVM['severity'] = 'possibl
   return { severity, event_ids: ids, title: '', body: '', rows: [] };
 }
 
-const NO_CAST = new Map<string, readonly string[]>();
-const NO_AWAY = new Map<string, ReadonlySet<string>>();
 
 /* ── Groups & lanes ─────────────────────────────────────────────────────── */
 
@@ -197,8 +197,6 @@ describe('laneEvents on the scope axis', () => {
       axis: 'scope',
       groups,
       events: [mkEvent({ id: 'e1', day: '2026-07-18' }), mkEvent({ id: 'e2', day: '2026-07-19', project_id: 'aur' })],
-      castByProject: NO_CAST,
-      awayByDay: NO_AWAY,
     });
     expect(cells.get('project:tres')?.get('2026-07-18')?.map((p) => p.event.id)).toEqual(['e1']);
     expect(cells.get('project:aur')?.get('2026-07-19')?.[0].link).toBe('explicit');
@@ -209,8 +207,6 @@ describe('laneEvents on the scope axis', () => {
       axis: 'scope',
       groups,
       events: [mkEvent({ id: 'e1', day: '2026-07-18', project_id: 'zim' })],
-      castByProject: NO_CAST,
-      awayByDay: NO_AWAY,
     });
     expect(out.cells.size).toBe(0);
     expect(out.groups).toEqual(groups);
@@ -226,33 +222,30 @@ describe('laneEvents on the person axis', () => {
       personNames: new Map(),
       sharedPersonIds: new Set(),
     });
-  const cast = new Map([['tres', ['mia', 'joan']]]);
-
   it('an explicit roster is never second-guessed — away and cast is a clash, not a filter', () => {
     const { cells } = laneEvents({
       axis: 'person',
       groups: groups(),
       events: [mkEvent({ id: 'e1', day: '2026-07-18', roster: ['mia'] })],
-      castByProject: cast,
-      awayByDay: new Map([['2026-07-18', new Set(['mia'])]]),
     });
     const hit = cells.get('person:tres:mia')?.get('2026-07-18');
     expect(hit?.map((p) => p.event.id)).toEqual(['e1']);
     expect(hit?.[0].link).toBe('explicit');
   });
 
-  it("inference stops at the absence's door — someone away is never drawn as a candidate", () => {
+  // ADR-147: nobody is guessed onto a lane; a «voy» puts that one person there.
+  it('a date lands on the lane of whoever said «voy», and only theirs', () => {
     const { cells } = laneEvents({
       axis: 'person',
       groups: groups(),
-      events: [mkEvent({ id: 'd1', day: '2026-07-18', kind: 'date', roster: null })],
-      castByProject: cast,
-      awayByDay: new Map([['2026-07-18', new Set(['mia'])]]),
+      events: [
+        mkEvent({ id: 'd1', day: '2026-07-18', kind: 'date', roster: null, commitments: [{ person_id: 'joan', state: 'going' }] }),
+      ],
     });
     expect(cells.get('person:tres:mia')).toBeUndefined();
     const joan = cells.get('person:tres:joan')?.get('2026-07-18');
     expect(joan?.map((p) => p.event.id)).toEqual(['d1']);
-    expect(joan?.[0].link).toBe('inferred');
+    expect(joan?.[0].link).toBe('explicit');
   });
 
   it('a date that resolves to nobody births the nocast lane, named for its project', () => {
@@ -260,10 +253,8 @@ describe('laneEvents on the person axis', () => {
     const out = laneEvents({
       axis: 'person',
       groups: before,
+      // Nobody named on it: the project's company date, one lane.
       events: [mkEvent({ id: 'd1', day: '2026-07-18', kind: 'date' })],
-      // Everyone on file is away that day: no fact, no candidate, one lane.
-      castByProject: cast,
-      awayByDay: new Map([['2026-07-18', new Set(['mia', 'joan'])]]),
     });
     const born = out.groups[0].lanes.find((l) => l.kind === 'nocast');
     expect(born?.key).toBe('nocast:tres');
@@ -285,8 +276,6 @@ describe('laneEvents on the person axis', () => {
       axis: 'person',
       groups: teamless,
       events: [mkEvent({ id: 'd1', day: '2026-07-18', project_id: 'aur', kind: 'date' })],
-      castByProject: NO_CAST,
-      awayByDay: NO_AWAY,
     });
     expect(out.cells.get('ghost:aur')).toBeUndefined();
     expect(out.cells.get('nocast:aur')?.get('2026-07-18')).toHaveLength(1);
@@ -308,8 +297,6 @@ describe('laneEvents for a guest of a bolo (ADR-100 § 1)', () => {
       axis: 'scope',
       groups,
       events: [guest('g1', '2026-07-18', 'Teatre Lliure'), guest('g2', '2026-07-19', 'Teatre Lliure')],
-      castByProject: NO_CAST,
-      awayByDay: NO_AWAY,
       spaces: WORKSPACES,
     });
     // The space's band is born in the app's order, after MüK.
@@ -326,8 +313,6 @@ describe('laneEvents for a guest of a bolo (ADR-100 § 1)', () => {
       axis: 'scope',
       groups,
       events: [guest('g1', '2026-07-18', 'Zona'), guest('g2', '2026-07-19', 'Atrium')],
-      castByProject: NO_CAST,
-      awayByDay: NO_AWAY,
       spaces: WORKSPACES,
     });
     expect(out.groups.find((g) => g.id === 'demo')?.lanes.map((l) => [l.kind, l.name])).toEqual([
@@ -342,8 +327,6 @@ describe('laneEvents for a guest of a bolo (ADR-100 § 1)', () => {
       axis: 'scope',
       groups: [],
       events: [guest('g1', '2026-07-18', null)],
-      castByProject: NO_CAST,
-      awayByDay: NO_AWAY,
       spaces: WORKSPACES,
     });
     expect(out.groups[0].lanes[0]).toMatchObject({ kind: 'guest', name: '' });
@@ -361,8 +344,6 @@ describe('laneEvents for a guest of a bolo (ADR-100 § 1)', () => {
       axis: 'person',
       groups,
       events: [guest('g1', '2026-07-18', 'Teatre Lliure')],
-      castByProject: new Map([['tres', ['mia', 'joan']]]),
-      awayByDay: NO_AWAY,
       spaces: WORKSPACES,
     });
     expect(out.groups.map((g) => g.key)).toEqual(['project:tres', 'space:demo']);
@@ -372,7 +353,7 @@ describe('laneEvents for a guest of a bolo (ADR-100 § 1)', () => {
   it('nothing changes for whoever reads the project: the row stays in its project lane', () => {
     const groups = scopeGroups({ scopeProjectIds: null, workspaces: WORKSPACES, projects: PROJECTS });
     const row = { ...mkEvent({ id: 'e1', day: '2026-07-18' }), guest: null };
-    const out = laneEvents({ axis: 'scope', groups, events: [row], castByProject: NO_CAST, awayByDay: NO_AWAY, spaces: WORKSPACES });
+    const out = laneEvents({ axis: 'scope', groups, events: [row], spaces: WORKSPACES });
     expect(out.groups).toEqual(groups);
     expect(out.cells.get('project:tres')?.get('2026-07-18')?.map((p) => p.event.id)).toEqual(['e1']);
     expect([...out.cells.keys()]).toEqual(['project:tres']);
@@ -407,9 +388,9 @@ describe('laneTally (law 9)', () => {
     expect(t).toMatchObject({ confirmed: 1, options: 0, notCast: 0 });
   });
 
-  it("an inferred unit counts as 'not cast', never as somebody's option", () => {
+  it("a company unit counts as 'not cast', never as somebody's option", () => {
     const t = laneTally({
-      placed: [placed(mkEvent({ id: 'a', day: '2026-07-18' }), 'inferred')],
+      placed: [placed(mkEvent({ id: 'a', day: '2026-07-18' }), 'unknown')],
       ghost: false,
       touched: false,
     });
@@ -449,7 +430,7 @@ describe('groupTally (law 11)', () => {
     const groups = scopeGroups({ scopeProjectIds: null, workspaces: [WORKSPACES[0]], projects: PROJECTS });
     const tallies = new Map([
       ['project:tres', laneTally({ placed: [placed(mkEvent({ id: 'a', day: '2026-07-18', cert: 'confirmed' }))], ghost: false, touched: false })],
-      ['project:aur', laneTally({ placed: [placed(mkEvent({ id: 'b', day: '2026-07-19' }), 'inferred')], ghost: false, touched: false })],
+      ['project:aur', laneTally({ placed: [placed(mkEvent({ id: 'b', day: '2026-07-19' }), 'unknown')], ghost: false, touched: false })],
     ]);
     expect(groupTally(groups[0], tallies)).toEqual({ units: 2, confirmed: 1, options: 0, notCast: 1 });
   });

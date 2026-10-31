@@ -166,10 +166,12 @@ test.describe('Ahora, the gig day (ADR-146)', () => {
     await page.goto('/h/desk');
     await waitForLoaded(page);
 
-    // Never by itself: Hoy is Hoy until you press the door.
+    // Never by itself: Hoy is Hoy until you press the door, which is in the
+    // foot of the card the headline titles (ADR-148), not a line of its own.
     await expect(page.getByTestId('ahora')).toHaveCount(0);
-    await expect(page.getByTestId('ahora-suggest')).toBeVisible({ timeout: 20_000 });
-    await page.getByTestId('ahora-enter').click();
+    const enter = page.getByTestId('desk-next').getByTestId('ahora-enter');
+    await expect(enter).toBeVisible({ timeout: 20_000 });
+    await enter.click();
     await expect(page).toHaveURL(/[?&]mode=ahora\b/);
 
     const ahora = page.getByTestId('ahora');

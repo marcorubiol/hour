@@ -5,8 +5,8 @@
  *
  * Today forward for performances (with rosters: the person axis needs them),
  * dates from two weeks back (a residency that began last week is still on),
- * and the person axis — team and availability — only for a login that IS a
- * person. Call it synchronously from component init; `today` is a getter so
+ * and the person axis (the team feed: whose project a row is) only for a
+ * login that IS a person. Call it synchronously from component init; `today` is a getter so
  * the keys follow the clock across midnight.
  */
 import { createQuery } from '@tanstack/svelte-query';
@@ -27,7 +27,6 @@ import { buildPersonAttribution } from '$lib/people';
 import { plannerDayHref } from '$lib/planner';
 import { lensOn } from '$lib/lenses.svelte';
 import type { PulseRef } from '$lib/pulse';
-import type { AvailabilityItem } from '$lib/availability';
 import type { NavWorkspace } from '$lib/nav';
 
 const DAY_MS = 86_400_000;
@@ -92,25 +91,10 @@ export function createPulseFeeds(today: () => string) {
       ),
     ),
   );
-  const blocks = fromStore(
-    createQuery(
-      toStore(() => ({
-        queryKey: ['pulse-availability', datesFrom()] as const,
-        enabled: Boolean(personId),
-        staleTime: 5 * 60_000,
-        queryFn: ({ signal }: { signal: AbortSignal }) =>
-          soft(() =>
-            fetchJSON<{ items: AvailabilityItem[] }>(`/api/availability?from=${datesFrom()}&limit=500`, signal),
-          ),
-      })),
-    ),
-  );
-
   const axis = $derived(
     buildPersonAttribution({
       pinnedPersonIds: personId ? [personId] : [],
       team: team.current.data?.items ?? [],
-      blocks: blocks.current.data?.items ?? [],
     }),
   );
 
@@ -144,7 +128,7 @@ export function createPulseFeeds(today: () => string) {
     /** The axis has its inputs: until then it is inactive and would let every
         show speak, so a surface that names YOUR shows waits for this. */
     get axisSettled() {
-      return !personId || (team.current.isSuccess && blocks.current.isSuccess);
+      return !personId || team.current.isSuccess;
     },
   };
 }

@@ -2,17 +2,16 @@
   «Quién va» (ADR-103) — who a performance or a date involves, and each
   person's word on it.
 
-  Three kinds of people, three drawings, and the drawing is the claim:
-    · the roster of a performance — a fact; no button, because leaving it is
-      a roster edit, not an answer to an inference (Marco, 12-10);
-    · whoever said «voy» — a fact, with the way back;
-    · the project's cast nobody asked yet — a guess, in the inference voice
-      (`.guess`), with «voy / no voy».
-  Whoever said «no voy» stays listed, struck, so the answer can be undone.
+  Two kinds of people, and the drawing is the fact:
+    · the roster of a performance — no button, because leaving it is a
+      roster edit, not an answer (Marco, 12-10);
+    · whoever gave their word — «voy», with the way back; «no voy» stays
+      listed, struck, so the answer can be undone.
+  Nobody is listed on a guess (ADR-147): the project's cast is not who goes,
+  so a date nobody answered lists nobody, and «+ Voy» is how somebody joins.
 
-  The list is optional: with no words, the inference is the whole answer, as
-  it was before. The RPC is the gate (your own word: being able to read the
-  row; anybody else's: `edit:performance`), so a refused write says so here.
+  The RPC is the gate (your own word: being able to read the row; anybody
+  else's: `edit:performance`), so a refused write says so here.
 
   Two save models, one per place (ADR-139 p7): on a record page each word is
   written at once (in place); inside a dialog (`deferred`) the words are
@@ -34,7 +33,6 @@
   interface Props {
     target: CommitmentTarget;
     id: string;
-    projectId: string | null;
     workspaceId: string;
     commitments: readonly Commitment[] | null | undefined;
     /** A performance's explicit roster. A date has none. */
@@ -56,7 +54,6 @@
   let {
     target,
     id,
-    projectId,
     workspaceId,
     commitments,
     roster = null,
@@ -87,19 +84,11 @@
   let names = $derived(
     new Map(($teamQuery.data?.items ?? []).map((m) => [m.person_id, m.full_name])),
   );
-  let cast = $derived(
-    projectId
-      ? ($teamQuery.data?.items ?? [])
-          .filter((m) => m.project_ids?.includes(projectId))
-          .map((m) => m.person_id)
-      : [],
-  );
-
   let rosterIds = $derived([...new Set(roster ?? [])]);
-  /** Next to a roster nobody is inferred (`peopleOf`, rule 1). */
-  let infers = $derived(rosterIds.length === 0);
+  /** No roster (a date): the list is open, and «no voy» is an answer. */
+  let open = $derived(rosterIds.length === 0);
 
-  type Row = { personId: string; word: CommitmentState | null };
+  type Row = { personId: string; word: CommitmentState };
   let rows = $derived.by<Row[]>(() => {
     const out: Row[] = [];
     const seen = new Set(rosterIds);
@@ -107,13 +96,6 @@
       if (seen.has(w.person_id)) continue;
       seen.add(w.person_id);
       out.push({ personId: w.person_id, word: w.state });
-    }
-    if (infers) {
-      for (const p of cast) {
-        if (seen.has(p)) continue;
-        seen.add(p);
-        out.push({ personId: p, word: null });
-      }
     }
     return out;
   });
@@ -204,14 +186,7 @@
     {/if}
     {#each rows as row (row.personId)}
       <li class="who__row">
-        <span
-          class="who__name"
-          class:guess={row.word === null}
-          class:who__name--out={row.word === 'not_going'}>{nameOf(row.personId)}</span
-        >
-        {#if row.word === null}
-          <span class="who__state">{t('commitment.inferred', locale)}</span>
-        {/if}
+        <span class="who__name" class:who__name--out={row.word === 'not_going'}>{nameOf(row.personId)}</span>
         {#if editable}
         <span class="who__acts">
           {#if row.word !== 'going'}
@@ -222,7 +197,7 @@
               onclick={() => answer(row.personId, 'going')}>{t('commitment.going', locale)}</button
             >
           {/if}
-          {#if row.word !== 'not_going' && infers}
+          {#if row.word !== 'not_going' && open}
             <button
               type="button"
               class="who__btn"
@@ -314,12 +289,6 @@
     }
     .who__name {
       min-inline-size: 0;
-    }
-    .who__state {
-      white-space: nowrap;
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-faint);
     }
     .who__acts {
       margin-inline-start: auto;

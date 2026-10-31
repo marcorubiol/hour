@@ -700,7 +700,7 @@
                        An INFERRED placement is a weaker CLAIM, not fainter
                        INK: dotted edge, italic name, never an opacity fade
                        — set from outside, Slip internals untouched. -->
-                  <span class="board__slot" class:board__slot--inf={p.link === 'inferred'}>
+                  <span class="board__slot">
                     <Slip
                       slip={p.event.slip}
                       {kindLabel}
@@ -1236,29 +1236,6 @@
     .board__slot + .board__slot {
       margin-block-start: var(--space-xs);
     }
-    /* Inferred: a weaker CLAIM is not fainter INK — dotted edge, italic
-       name, explicitly NO opacity fade (the old .62 put the venue at
-       2.0:1). Set from the slot so Slip's own grammar stays untouched. */
-    /* INFERRED is a weaker CLAIM, and the claim channel must not borrow
-       the certainty stroke: dotted already means RELEASED on a slip. The
-       inference speaks OUTSIDE the box — a dotted outline offset off the
-       edge — plus the italic name the slot already sets.
-
-       THE ITALIC IS THE SHARED PART, and it now has a home: `.guess` in
-       styles/certainty.css, which the rail's pulse opts into (a claim
-       leaning is legible at 9px and at 30px; a dotted outline needs a box,
-       and only this drawing has one). It stays written out here because
-       the name lives INSIDE Slip and can only be reached through
-       `:global` — one voice, two ways in, not two opinions. */
-    .board__slot--inf :global(.slip) {
-      outline: var(--line-hairline) dotted color-mix(in oklch, var(--text-color) 22%, transparent);
-      outline-offset: 2px;
-    }
-    .board__slot--inf :global(.slip__n) {
-      font-style: italic;
-      color: var(--text-muted);
-    }
-
     /* ── the empty cell's door ────────────────────────────────────────── */
     .board__add {
       flex: 1;

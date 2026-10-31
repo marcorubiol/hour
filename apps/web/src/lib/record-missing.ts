@@ -216,8 +216,8 @@ export interface DateMissingInput {
 
 /**
  * What a date's vistazo asks for (ADR-139 p1, flujos § 12). A date has no
- * money, no road sheet and no roster (who goes is inferred from the cast,
- * ADR-103), so what it can lack is its certainty and, a trip, its stages.
+ * money, no road sheet and no roster (who goes is whoever said «voy»,
+ * ADR-147), so what it can lack is its certainty and, a trip, its stages.
  * A past or cancelled date asks for nothing.
  */
 export function dateMissing(input: DateMissingInput, today: string): DateMissing[] {

@@ -986,7 +986,6 @@
         <WhoGoes
           target="performance"
           id={perf.id}
-          projectId={bundle!.performance.project?.id ?? null}
           workspaceId={perf.workspace_id}
           commitments={perf.commitments}
           roster={performanceRoster(bundle!)}

@@ -169,7 +169,6 @@ export function ahoraItems(input: AhoraInput): AhoraItem[] {
     const attribution: PersonAttribution = axis
       ? axis.attribute({
           projectId: d.project?.id ?? null,
-          day: dayKeyInTz(d.starts_at, d.venue?.timezone || input.viewerTz),
           commitments: d.commitments,
         })
       : 'explicit';

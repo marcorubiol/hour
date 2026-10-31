@@ -74,7 +74,6 @@ export const SECTION_CONCEPTS: Record<HelpSection, readonly HelpConcept[]> = {
 
 /** Los avisos de primera vez (textos.md § 4). */
 export const EVENTS = [
-  'first_going',
   'first_clash',
   'first_hold_due',
   'first_trip_guess',

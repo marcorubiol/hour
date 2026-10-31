@@ -2,13 +2,13 @@
  * «Voy / no voy» — one person's word on a performance or a date (ADR-103).
  *
  * PUT /api/commitments/:target/:id — { person_id, state: 'going' | 'not_going' | null }
- *     via the `set_commitment_person` RPC. `null` clears the word and the
- *     person goes back to being inferred from the project cast.
+ *     via the `set_commitment_person` RPC. `null` clears the word: the
+ *     person is on the row again only if a roster says so (ADR-147).
  *
  * The RPC is the gate: on yourself, being able to read the commitment is
  * enough; on anybody else it takes `edit:performance`. «No voy» on a person
  * already on a performance's explicit roster is refused (22023): that is a
- * roster edit, not an answer to an inference.
+ * roster edit, not an answer.
  *
  * Auth: Bearer JWT required.
  */

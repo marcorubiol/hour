@@ -13,7 +13,7 @@ import { waitForLoaded } from './loaded';
  * con Equip, acepta por la RPC con su JWT y mira el marco con el espacio de la
  * compañía fijado en el ámbito (`?scope=s:playwright`), que es donde es guest:
  *   - Hoy: su función en «Lo siguiente» con «Tablón · 1 nuevo», que abre el
- *     tablón; ni «+ Tarea» ni Cuentas;
+ *     tablón; ni «+» (Nueva tarea) ni Cuentas;
  *   - el Planificador: su función, y ninguna puerta de crear;
  *   - la ficha: el tablón, sin «Editar datos», sin notas que no podría abrir;
  *   - ⌘K: ninguna fila de crear; Ajustes del espacio: solo su perfil.

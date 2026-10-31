@@ -453,7 +453,6 @@
           deferred
           target="date"
           id={date.id}
-          projectId={date.project.id}
           workspaceId={date.project.workspace_id}
           commitments={date.commitments}
           {locale}

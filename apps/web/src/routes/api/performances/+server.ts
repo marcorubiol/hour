@@ -208,7 +208,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       // them. The logistics/hospitality/technical CONTENT stays out of the
       // feed (heavy, and the month never shows it).
       'readiness',
-      // ADR-103 — each person's «voy / no voy» on an inferred gig.
+      // ADR-103 — each person's «voy / no voy» on a gig.
       COMMITMENTS_EMBED,
       ...(notice === '1' ? ['hold_notice_days'] : []),
       'venue:venue_id(id,name,city,country,timezone)',

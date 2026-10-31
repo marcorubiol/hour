@@ -105,8 +105,8 @@ export type DateEvent = {
   label?: string | null;
   /** ADR-090 P3 — a rehearsal's running order (see `dayMoments`). */
   schedule?: ScheduleMoment[] | null;
-  /** ADR-103 — each person's «voy / no voy» on it. Without any, who goes is
-      inferred from the project cast. */
+  /** ADR-103 — each person's «voy / no voy» on it. Without any, nobody in
+      particular goes: a company date (ADR-147). */
   commitments?: Commitment[] | null;
   /** ADR-146 — a trip's stages, in their order, on the feeds that ask
       `?stages=1` (the pulse's). Absent elsewhere: a trip is then one row. */

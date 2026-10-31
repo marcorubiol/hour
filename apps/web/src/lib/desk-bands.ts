@@ -4,13 +4,10 @@
  * injected, no words: every label is the page's.
  *
  *   «Lo siguiente»   → `computePulse` ($lib/pulse), the rail's own truth.
- *   «Voy · no voy»   → `goingAsks`: what Hour guesses you are on, unanswered.
  *   «Ha cambiado»    → `changesSince`: threads, replies, the last send, payments.
  *   «La temporada»   → `plannerDoor`: the Planner's own figures, same window.
  */
-import { addDaysIso } from './planner';
 import { dateDayKey, perfDayKey, type DateEvent, type PerformanceEvent } from './month-events';
-import type { PersonAttributionScope } from './people';
 import { performanceStatusFamily } from './performance';
 import { dateStatusFamily } from './date';
 import type { HotRow, LastMailout } from './conversation-overview';
@@ -66,58 +63,6 @@ export function todayThings(
       }),
     );
   return [...perfs, ...dates];
-}
-
-// ── Voy · no voy ─────────────────────────────────────────────────────────
-
-interface GoingAsk {
-  of: 'performance' | 'date';
-  id: string;
-  day: string;
-  row: PerformanceEvent | DateEvent;
-}
-
-/**
- * The rows of the next `days` days that count you IN BY INFERENCE (the
- * project's cast, nobody said «voy» or «no voy»): the questions Hour has for
- * you. A roster or an answer is a fact and asks nothing; an `unattributed`
- * row is the company's day, not a guess about you (ADR-103, as the rail).
- * Without a person behind the login the axis is inactive and nothing asks.
- */
-export function goingAsks(
-  input: {
-    performances: readonly PerformanceEvent[];
-    dates: readonly DateEvent[];
-    axis: PersonAttributionScope;
-    viewerTz: string;
-  },
-  today: string,
-  days: number,
-  exclude: ReadonlySet<string> = new Set(),
-): GoingAsk[] {
-  if (!input.axis.active) return [];
-  const last = addDaysIso(today, days);
-  const out: GoingAsk[] = [];
-  for (const p of input.performances) {
-    if (p.status === 'cancelled' || exclude.has(p.id)) continue;
-    const day = perfDayKey(p);
-    if (day < today || day > last) continue;
-    const verdict = input.axis.attribute({
-      projectId: p.project?.id ?? null,
-      day,
-      roster: p.person_ids,
-      commitments: p.commitments,
-    });
-    if (verdict === 'inferred') out.push({ of: 'performance', id: p.id, day, row: p });
-  }
-  for (const d of input.dates) {
-    if (d.status === 'cancelled' || exclude.has(d.id)) continue;
-    const day = dateDayKey(d, input.viewerTz);
-    if (day < today || day > last) continue;
-    const verdict = input.axis.attribute({ projectId: d.project?.id ?? null, day, commitments: d.commitments });
-    if (verdict === 'inferred') out.push({ of: 'date', id: d.id, day, row: d });
-  }
-  return out.sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
 }
 
 // ── Ha cambiado ──────────────────────────────────────────────────────────

@@ -22,15 +22,14 @@
  * 2. **Geometry never runs ahead of the data.** The person axis once drew
  *    an inferred all-team night on top of an away band — the same lane
  *    saying "out all day" and "maybe on the radio at 10h". Attribution goes
- *    through `peopleOf`/`personRowKeys` ($lib/people), where inference
- *    stops at the door of an absence and an explicit roster is never
- *    second-guessed.
+ *    through `peopleOf`/`personRowKeys` ($lib/people), which since ADR-147
+ *    guesses nobody: a roster or a «voy» puts a person on a lane, and a
+ *    date nobody is named on goes to its project's company lane.
  */
 
 import { isWeekendIso, type LaneAxis } from '$lib/carrils';
 import type { ClashVM, Slip } from '$lib/month-events';
 import {
-  linkOf,
   noCastKey,
   noCastProjectId,
   peopleOf,
@@ -257,10 +256,8 @@ export interface BoardEventIn {
   slip: Slip;
 }
 
-/** `link` is how the attribution was reached — 'explicit' always on the
-    scope axis (a project does not get inferred onto its own event). The
-    distinction must survive to the paint: an inferred slip draws dotted
-    with an italic name, never a fainter one. */
+/** `link` is how the attribution was reached: 'explicit' on the scope
+    axis and on a person's lane, 'unknown' on a project's company lane. */
 export interface PlacedEvent {
   event: BoardEventIn;
   link: PersonLink;
@@ -276,9 +273,9 @@ export interface PlacedEvent {
  * Person axis: attribution is $lib/people's, verbatim — an explicit roster
  * wins and is NEVER filtered by absences (that collision is the clash
  * engine's to report, and filtering here would hide it from the one
- * surface built to show it); no roster → the project's cast minus whoever
- * is away that day, drawn 'inferred'; nobody left → the project's nocast
- * lane, appended here so its dates are never homeless. A rostered person
+ * surface built to show it); whoever said «voy» joins it; nobody named →
+ * the project's nocast lane (its company dates, ADR-147), appended here so
+ * its dates are never homeless. A rostered person
  * with no lane on file gets one too — a fact outranks the team feed.
  *
  * Returns the possibly-extended groups: lane-birth and placement are one
@@ -288,8 +285,6 @@ export function laneEvents(input: {
   axis: BoardAxis;
   groups: readonly BoardGroup[];
   events: readonly BoardEventIn[];
-  castByProject: ReadonlyMap<string, readonly string[]>;
-  awayByDay: ReadonlyMap<string, ReadonlySet<string>>;
   /** The spaces in the app's order, for the band a guest lane is born in. */
   spaces?: readonly { id: string; name: string }[];
 }): {
@@ -396,12 +391,7 @@ export function laneEvents(input: {
     const group = groupByProject.get(e.project_id);
     if (!group) continue; // project not on the sheet — same rule as scope
 
-    const people = peopleOf({
-      roster: e.roster,
-      projectCast: input.castByProject.get(e.project_id),
-      awayPersonIds: input.awayByDay.get(e.day),
-      commitments: e.commitments,
-    });
+    const people = peopleOf({ roster: e.roster, commitments: e.commitments });
     const { keys, link } = personRowKeys(people, e.project_id);
     for (const k of keys) {
       const laneKey =
@@ -433,8 +423,7 @@ export function laneEvents(input: {
         );
         laneKeys.add(laneKey);
       }
-      // Per person: a row can be mixed (one confirmed, one still a guess).
-      place(laneKey, e.day, e, noCastProjectId(k) !== null ? link : linkOf(people, k));
+      place(laneKey, e.day, e, link);
     }
   }
   return { groups, cells };
@@ -484,8 +473,8 @@ export function laneTally(input: {
   let options = 0;
   let notCast = 0;
   for (const u of units.values()) {
-    // A unit nobody is explicitly on is 'not cast' whatever its clock says:
-    // a count built on inference cannot claim a person is booked.
+    // A unit nobody is named on is 'not cast' whatever its clock says: a
+    // company lane cannot claim a person is booked.
     if (!u.explicit) notCast++;
     else if (u.confirmed) confirmed++;
     else options++;

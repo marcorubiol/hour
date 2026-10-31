@@ -184,7 +184,7 @@ type ResolvedScope = {
    * Person ids of the pinned people. A person is NOT a container: it
    * contributes no workspace, project or line, so it never widens or narrows
    * `projectIds` — the surfaces that understand rosters narrow by it
-   * themselves (`matchesPinnedPeople` in $lib/people), and the ones that do
+   * themselves (`buildPersonAttribution` in $lib/people), and the ones that do
    * not simply ignore it.
    */
   personIds: string[];

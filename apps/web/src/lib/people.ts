@@ -1,35 +1,30 @@
 /**
- * The person axis — who a calendar row involves, and how sure we are.
+ * The person axis: who a calendar row involves, and on what evidence.
  *
- * A `performance` carries a real roster (project cast − replaced +
- * overrides + its crew, `rosterPersonIds` in $lib/planner); a `date` row
- * carries nobody unless somebody gave their word on it. So the honest
- * default for "this rehearsal is Laia's" is to INFER it from the project's
- * canonical cast (`cast_member`, which hangs off the project) — and an
- * inference that is allowed to say anything is worse than no inference.
- * Since ADR-103 the inference can be answered person by person
- * (`commitment_person`): «voy» turns it into a fact, «no voy» removes it.
+ * A person is on a row by a fact or not at all (ADR-147, amending ADR-092
+ * and ADR-103):
  *
- * Two rules govern this whole module, and they pull in opposite
- * directions on purpose:
+ * - **A roster.** A `performance` carries one (project cast − replaced +
+ *   overrides + its crew, `rosterPersonIds` in $lib/planner).
+ * - **Their own word.** «Voy» on a row (`commitment_person`) puts that one
+ *   person on it; «no voy» takes them off.
+ * - **Nothing.** A `date` nobody gave their word on involves nobody in
+ *   particular: it is the company's date (`unknown`). It is shown to whoever
+ *   it may concern and claimed for nobody.
  *
- * 1. **An explicit roster is never second-guessed.** If someone is cast on
- *    a gig and also away that day, that is a CLASH, and the conflict
- *    engine already reports it (`conflictsFor` → severity 'blackout').
- *    Filtering them out here would make the clash disappear from the one
- *    surface that exists to catch it.
+ * Hour used to INFER a date's people from the project's canonical cast and
+ * then ask each of them «¿vas?». That made one person's train everybody's
+ * question. The project's cast still answers WHOSE PROJECT a row is (a
+ * company date of a project you are not on is not yours to read), never WHO
+ * GOES.
  *
- * 2. **Inference stops at the door of an absence.** Somebody who is away
- *    is not a candidate for a night nobody was cast on. Without this gate
- *    one lane says both "she is away all day" and "she may be rehearsing
- *    at 10h" — the same row asserting two incompatible things.
+ * An explicit roster is never second-guessed: somebody cast on a gig and
+ * away that day is a CLASH, which the conflict engine reports
+ * (`conflictsFor` → severity 'blackout'). Filtering them out here would
+ * hide it from the one surface built to catch it.
  *
- * The two rules are the same idea seen from both ends: a fact outranks an
- * inference, and an inference must never overwrite a fact.
- *
- * Everything here is pure and day-precision (ISO `YYYY-MM-DD` string
- * compares), same contract as $lib/planner and $lib/carrils: the caller
- * buckets timestamps into days and supplies "today".
+ * Everything here is pure and day-precision, same contract as $lib/planner
+ * and $lib/carrils.
  */
 
 /**
@@ -45,33 +40,29 @@ export interface TeamItem {
   slug: string;
   full_name: string;
   /**
-   * Projects this person is on file for — the pool an inference draws from.
-   * Optional so a response from a Worker that predates the field reads as
-   * "no projects known" rather than breaking the feed; the person axis then
-   * degrades to `unknown`, which is its honest empty state.
+   * Projects this person is on file for: whose projects a company date
+   * concerns (never who goes on it, ADR-147). Optional so a response from a
+   * Worker that predates the field reads as "no projects known"; a company
+   * date then concerns everybody, which is the side that costs nothing.
    */
   project_ids?: string[];
 }
 
 /**
- * How an attribution was reached. The distinction is load-bearing and must
- * survive all the way to the paint: an inferred mark is drawn weaker than a
- * fact (and a count built on inference cannot claim somebody is free).
+ * How a row's people were reached: `explicit` when somebody is on it by a
+ * roster or their own «voy», `unknown` when nobody is. The two must survive
+ * to the paint: a caller must not print «free» off an `unknown`.
  */
-export type PersonLink = 'explicit' | 'inferred' | 'unknown';
+export type PersonLink = 'explicit' | 'unknown';
 
 interface PeopleOf {
-  /** Person ids, deduped, in the order the inputs offered them: the facts
-      first (roster, then whoever said «voy»), then the inference. */
+  /** Person ids, deduped: the roster first, then whoever said «voy». */
   personIds: string[];
-  /** How the row as a whole was reached: `explicit` as soon as one person
-      on it is a fact. A row can be MIXED since ADR-103 (Laia confirmed, Pau
-      is still a guess), so a drawing that is per person reads `inferredIds`. */
   link: PersonLink;
-  /** The subset of `personIds` that is a guess. */
-  inferredIds: string[];
-  /** Who said «no voy» (ADR-103): out of the inference, and a «no» for them
-      even when nobody else is left on the row. */
+  /** True when the row carries a roster: then the list is closed, and
+      somebody not on it is not going. A date's «voy» list is open. */
+  rostered: boolean;
+  /** Who said «no voy» (ADR-103): a «no» for them on this row. */
   withdrawnIds: string[];
 }
 
@@ -87,8 +78,6 @@ export interface Commitment {
     attribution can read each person's word (ADR-103). */
 export const COMMITMENTS_EMBED = 'commitments:commitment_person(person_id,state)';
 
-const EMPTY_AWAY: ReadonlySet<string> = new Set<string>();
-
 function dedupe(ids: readonly string[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
@@ -102,173 +91,72 @@ function dedupe(ids: readonly string[]): string[] {
 }
 
 /**
- * Who a calendar row involves.
+ * Who a calendar row involves: its roster plus whoever said «voy» (a «no
+ * voy» wins over a «voy» of the same person). Nobody → `unknown`, which is
+ * not the same fact as «nobody is on it».
  *
- * - A non-empty `roster` wins outright and comes back `explicit` — **never
- *   filtered by `awayPersonIds`** (rule 1 above). Whoever said «voy» joins
- *   it; nobody is inferred next to a roster.
- * - With no roster, the project's canonical cast minus whoever is away that
- *   day comes back `inferred` (rule 2), minus whoever already gave their
- *   word (ADR-103): «voy» makes a person a fact, «no voy» takes them out.
- *   The word is per person: one confirmation does not settle the others.
- * - Nothing left to say: `unknown` with an empty list. That is not the same
- *   fact as "nobody is on it" — a caller must not print "free" off an
- *   `unknown`, which is why it has its own word.
+ * A roster is never filtered by a «no voy»: the roster is the record (Quién
+ * va), and a disagreement there is the record's to show.
  */
 export function peopleOf(input: {
   /** The row's own roster, when it has one (a performance does). */
   roster?: readonly string[] | null;
-  /** The project's canonical cast — the inference pool for a date row. */
-  projectCast?: readonly string[] | null;
-  /** Person ids unavailable on this row's day (see `awayPersonIdsOn`). */
-  awayPersonIds?: ReadonlySet<string> | null;
   /** Each person's word on this row (ADR-103). */
   commitments?: readonly Commitment[] | null;
 }): PeopleOf {
   const roster = dedupe(input.roster ?? []);
   const commitments = input.commitments ?? [];
-  const going = commitments.filter((c) => c.state === 'going').map((c) => c.person_id);
   const withdrawnIds = dedupe(
     commitments.filter((c) => c.state === 'not_going').map((c) => c.person_id),
   );
-  const facts = dedupe([...roster, ...going]);
-
-  if (roster.length > 0) {
-    return { personIds: facts, link: 'explicit', inferredIds: [], withdrawnIds };
-  }
-
-  const away = input.awayPersonIds ?? EMPTY_AWAY;
   const withdrawn = new Set(withdrawnIds);
-  const known = new Set(facts);
-  const inferredIds = dedupe(input.projectCast ?? []).filter(
-    (id) => !away.has(id) && !withdrawn.has(id) && !known.has(id),
-  );
-  const personIds = [...facts, ...inferredIds];
-  const link: PersonLink =
-    facts.length > 0 ? 'explicit' : inferredIds.length > 0 ? 'inferred' : 'unknown';
-  return { personIds, link, inferredIds, withdrawnIds };
+  const going = commitments
+    .filter((c) => c.state === 'going' && !withdrawn.has(c.person_id))
+    .map((c) => c.person_id);
+  const personIds = dedupe([...roster, ...going]);
+  return {
+    personIds,
+    link: personIds.length > 0 ? 'explicit' : 'unknown',
+    rostered: roster.length > 0,
+    withdrawnIds,
+  };
 }
 
-/** How one person on a row was reached — the per-person view of `link`. */
-export function linkOf(people: PeopleOf, personId: string): PersonLink {
-  if (!people.personIds.includes(personId)) return 'unknown';
-  return people.inferredIds.includes(personId) ? 'inferred' : 'explicit';
-}
-
-/** The verdict of narrowing a row by a set of pinned people. */
-type PersonMatch = 'explicit' | 'inferred' | 'no';
-
 /**
- * The same verdict with the third state kept: `unattributed` is a row that
- * says nothing about anybody — no roster, and no cast on file to guess from.
+ * How a row reaches the pinned people:
  *
- * It exists because "not yours" and "nobody knows" are different facts and
- * only one of them may be silently dropped. A view that FILTERS can collapse
- * them (`matchesPinnedPeople` below): it removes the row and draws the rest,
- * and the reader never learns a claim that wasn't made. A view that then
- * says «free» cannot — dropping the unattributed and announcing an empty
- * evening IS printing "free" off an `unknown`, which `peopleOf` forbids in
- * as many words. So the pulse asks for this shape instead.
+ *   explicit      — one of them is on it (roster or «voy»).
+ *   unattributed  — nobody named, and it is a date of their project (or of a
+ *                   project with nobody on file): the company's date. Shown,
+ *                   claimed for nobody, never asked about.
+ *   no            — a roster without them, their own «no voy», or a
+ *                   project they are not on.
+ *
+ * An EMPTY pin set does not narrow: everything passes as `explicit`, so the
+ * predicate can sit in a filter chain unconditionally.
  */
-export type PersonAttribution = PersonMatch | 'unattributed';
+export type PersonAttribution = 'explicit' | 'unattributed' | 'no';
 
-/**
- * Does this row involve any of the pinned people, and on what evidence?
- *
- * An EMPTY pin set does not narrow: the person axis simply is not in play,
- * so everything passes as `explicit`. That lets the predicate sit in a
- * filter chain unconditionally instead of making every caller remember to
- * skip it — and it is the honest answer, because with nobody pinned no row
- * is being included *because of* an inference.
- */
 export function attributionFor(
   people: PeopleOf,
   pinnedPersonIds: ReadonlySet<string>,
+  /** Who is on file for the row's project: whose date it is, not who goes. */
+  projectPeople?: readonly string[] | null,
 ): PersonAttribution {
   if (pinnedPersonIds.size === 0) return 'explicit';
-  let guessed = false;
-  for (const id of people.personIds) {
-    if (!pinnedPersonIds.has(id)) continue;
-    if (!people.inferredIds.includes(id)) return 'explicit';
-    guessed = true;
-  }
-  if (guessed) return 'inferred';
-  // «No voy» is an answer: a row everybody withdrew from is not the
-  // company's unknown day any more for whoever said it.
+  if (people.personIds.some((id) => pinnedPersonIds.has(id))) return 'explicit';
+  if (people.rostered) return 'no';
   if (people.withdrawnIds.some((id) => pinnedPersonIds.has(id))) return 'no';
-  return people.link === 'unknown' ? 'unattributed' : 'no';
+  const onFile = projectPeople ?? [];
+  if (onFile.length > 0 && !onFile.some((id) => pinnedPersonIds.has(id))) return 'no';
+  return 'unattributed';
 }
 
 /**
- * The filtering answer: `unattributed` collapses to `no`, because a filter
- * that keeps every row nobody is on file for keeps everything.
- */
-export function matchesPinnedPeople(
-  people: PeopleOf,
-  pinnedPersonIds: ReadonlySet<string>,
-): PersonMatch {
-  const verdict = attributionFor(people, pinnedPersonIds);
-  return verdict === 'unattributed' ? 'no' : verdict;
-}
-
-/** A person-level unavailability, as this module consumes it. */
-export interface AwayInput {
-  /** NULL = a company closure, which is not a person being away. */
-  person_id: string | null;
-  /** Inclusive ISO day. */
-  starts_on: string;
-  /** Inclusive ISO day. */
-  ends_on: string;
-}
-
-/**
- * The person ids unavailable on one ISO day — the inference gate.
+ * The synthetic row key for a project's company dates: the rows nobody is
+ * named on (ADR-147).
  *
- * Company-wide closures (`person_id === null`) are deliberately NOT
- * included: only a person can be away, a workspace does not go on holiday.
- * A row that lands inside a closure is a conflict the engine reports; it is
- * not an attribution question, and folding it in here would make every
- * member of the company un-inferable for a fortnight in August.
- *
- * Certainty is deliberately ignored too: a tentative absence is still a
- * reason not to *guess* that somebody is working. The certainty axis
- * belongs to what gets drawn, not to who is a candidate.
- */
-export function awayPersonIdsOn(blocks: readonly AwayInput[], isoDay: string): Set<string> {
-  const out = new Set<string>();
-  for (const b of blocks) {
-    if (b.person_id === null) continue;
-    if (isoDay >= b.starts_on && isoDay <= b.ends_on) out.add(b.person_id);
-  }
-  return out;
-}
-
-/**
- * Same answer, indexed for a whole window — one pass over the blocks
- * instead of one pass per day. The grid asks 42 times and the agenda book
- * asks once per day of a multi-month span, so the index is the shape those
- * callers want; `awayPersonIdsOn` stays for a single lookup.
- */
-export function awayIndex(
-  blocks: readonly AwayInput[],
-  days: readonly string[],
-): Map<string, Set<string>> {
-  const index = new Map<string, Set<string>>();
-  for (const day of days) index.set(day, new Set<string>());
-  for (const b of blocks) {
-    if (b.person_id === null) continue;
-    for (const day of days) {
-      if (day >= b.starts_on && day <= b.ends_on) index.get(day)!.add(b.person_id);
-    }
-  }
-  return index;
-}
-
-/**
- * The synthetic row key for a project whose people are unknown.
- *
- * A project with nobody on file still has nights, and a row that resolves
- * to nobody is a row the view loses. It gets a lane of its own, named for
+ * A row that resolves to nobody is a row the view loses. It gets a lane of its own, named for
  * what it is, so its dates are never homeless. Prefixed so it can never
  * collide with a person id (uuids have no `:`).
  */
@@ -293,59 +181,26 @@ export function castNames(personIds: readonly string[] | null | undefined, names
   return (personIds ?? []).map((id) => names.get(id)).filter((n): n is string => Boolean(n));
 }
 
-/**
- * A narrowed person axis, ready to judge calendar rows — everything the
- * predicate needs resolved once instead of per row.
- *
- * `active` is false when nobody is pinned; a caller should skip the whole
- * filter then rather than trust a pass-through.
- */
-interface PersonScope {
-  active: boolean;
-  /**
-   * Does this row involve the pinned people, and on what evidence? A
-   * performance passes its own `roster`; a date passes none and gets the
-   * inference (its project's cast, minus whoever is away that day).
-   */
-  verdict(row: {
-    projectId: string | null;
-    /** ISO day the row is bucketed into — the away gate is per day. */
-    day: string;
-    roster?: readonly string[] | null;
-    commitments?: readonly Commitment[] | null;
-  }): PersonMatch;
-}
-
-/** The same axis, answering with the third state (see `PersonAttribution`). */
+/** The person axis, resolved once for a whole view. `active` is false
+    when nobody is pinned; a caller may skip the work then. */
 export interface PersonAttributionScope {
   active: boolean;
   attribute(row: {
     projectId: string | null;
-    /** ISO day the row is bucketed into — the away gate is per day. */
-    day: string;
     roster?: readonly string[] | null;
     commitments?: readonly Commitment[] | null;
   }): PersonAttribution;
 }
 
 /**
- * Resolve the person axis for a whole view: the pinned set, the per-project
- * cast pool inverted out of the team feed, and a lazily-built away index.
- *
- * The away index is per day and memoised because the month asks 42 times and
- * the agenda book once per day of a multi-month span; scanning every block per
- * row would be quadratic for no reason.
- *
- * This is the one place the team feed is inverted. `buildPersonScope` is a
- * projection of it, not a second copy — a view that filters and a view that
- * speaks read the same pool.
+ * Resolve the person axis for a whole view: the pinned set and, inverted out
+ * of the team feed, who is on file for each project. One reading for every
+ * view: the Planner keeps what is not `no`, and so do the pulse and Ahora.
  */
 export function buildPersonAttribution(input: {
   pinnedPersonIds: readonly string[];
-  /** GET /api/team — `project_ids` is the inference pool. */
+  /** GET /api/team: `project_ids` says whose project a row is. */
   team: readonly TeamItem[];
-  /** Availability rows; company closures are ignored (see `awayPersonIdsOn`). */
-  blocks: readonly AwayInput[];
 }): PersonAttributionScope {
   const pinned = new Set(input.pinnedPersonIds);
   if (pinned.size === 0) {
@@ -354,64 +209,31 @@ export function buildPersonAttribution(input: {
 
   // project → the people on file for it. Inverted from the team feed, which
   // is keyed the other way (one row per person per workspace).
-  const castByProject = new Map<string, string[]>();
+  const onFileByProject = new Map<string, string[]>();
   for (const member of input.team) {
     for (const projectId of member.project_ids ?? []) {
-      const list = castByProject.get(projectId);
+      const list = onFileByProject.get(projectId);
       if (list) {
         if (!list.includes(member.person_id)) list.push(member.person_id);
       } else {
-        castByProject.set(projectId, [member.person_id]);
+        onFileByProject.set(projectId, [member.person_id]);
       }
     }
   }
 
-  const awayCache = new Map<string, Set<string>>();
-  const awayOn = (day: string): Set<string> => {
-    const hit = awayCache.get(day);
-    if (hit) return hit;
-    const built = awayPersonIdsOn(input.blocks, day);
-    awayCache.set(day, built);
-    return built;
-  };
-
   return {
     active: true,
     attribute(row) {
-      const people = peopleOf({
-        roster: row.roster,
-        projectCast: row.projectId ? castByProject.get(row.projectId) : null,
-        awayPersonIds: awayOn(row.day),
-        commitments: row.commitments,
-      });
-      return attributionFor(people, pinned);
-    },
-  };
-}
-
-/** The filtering view of the axis — see `matchesPinnedPeople` for what the
-    collapse of `unattributed` costs and why a filter can afford it. */
-export function buildPersonScope(input: {
-  pinnedPersonIds: readonly string[];
-  team: readonly TeamItem[];
-  blocks: readonly AwayInput[];
-}): PersonScope {
-  const axis = buildPersonAttribution(input);
-  return {
-    active: axis.active,
-    verdict(row) {
-      const verdict = axis.attribute(row);
-      return verdict === 'unattributed' ? 'no' : verdict;
+      const people = peopleOf({ roster: row.roster, commitments: row.commitments });
+      return attributionFor(people, pinned, row.projectId ? onFileByProject.get(row.projectId) : null);
     },
   };
 }
 
 /**
- * The row keys a calendar row belongs to on the person axis — the
- * attribution above, with the homeless case resolved to its project's
- * `no cast` row. This is the function a lane view calls; a scope filter
- * calls `matchesPinnedPeople` instead, because a synthetic row is not
- * somebody you can pin.
+ * The row keys a calendar row belongs to on the person axis: its people,
+ * or, with nobody on it, its project's `no cast` row (a company date). This
+ * is the function a lane view calls.
  */
 export function personRowKeys(
   people: PeopleOf,
