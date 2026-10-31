@@ -53,6 +53,10 @@ export type NavWorkspace = {
       is here through a bolo or a project only, and the frame offers them
       no door of the space's own. Absent reads as able. */
   my_role?: 'owner' | 'admin' | 'member' | 'viewer' | 'guest' | null;
+  /** The caller's access package here (Mínim, Equip, Coordinació, Direcció), when one was granted. */
+  my_preset?: string | null;
+  /** ADR-151 — «lo mío / todo» here (`mine` | `all`); null = the package's default (`$lib/view-scope`). */
+  view_scope?: string | null;
 };
 
 /** Row shape of GET /api/projects — the shared ['projects', …] cache. */

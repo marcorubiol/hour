@@ -2560,6 +2560,7 @@ export type Database = {
           roles: string[]
           updated_at: string
           user_id: string
+          view_scope: string | null
           workspace_id: string
           workspace_role: Database["public"]["Enums"]["membership_role"] | null
         }
@@ -2582,6 +2583,7 @@ export type Database = {
           roles?: string[]
           updated_at?: string
           user_id: string
+          view_scope?: string | null
           workspace_id: string
           workspace_role?: Database["public"]["Enums"]["membership_role"] | null
         }
@@ -2604,6 +2606,7 @@ export type Database = {
           roles?: string[]
           updated_at?: string
           user_id?: string
+          view_scope?: string | null
           workspace_id?: string
           workspace_role?: Database["public"]["Enums"]["membership_role"] | null
         }
@@ -7196,6 +7199,10 @@ export type Database = {
       }
       set_my_mail_signature: {
         Args: { p_signature: string; p_workspace_id: string }
+        Returns: undefined
+      }
+      set_my_view_scope: {
+        Args: { p_scope: string | null; p_workspace_id: string }
         Returns: undefined
       }
       set_organization_fiscal_identity: {

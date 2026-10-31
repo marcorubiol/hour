@@ -86,7 +86,7 @@
   import { blockDrawn, screenQuiet } from '$lib/dashboard-blocks';
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { daysAgoLabel } from '$lib/conversation';
-  import { upcoming } from '$lib/pulse';
+  import { pulseRows, upcoming } from '$lib/pulse';
   import { agendaDay, dayAgenda } from '$lib/day-agenda';
   import { createPulseFeeds, pulseSlipContext } from '$lib/pulse-feeds.svelte';
   import { dateSlip, perfDayKey, performanceSlip, perfWorkspaceId, type DateEvent, type PerformanceEvent, type SlipKind } from '$lib/month-events';
@@ -603,7 +603,17 @@
   const KIND_WORDS = new Set(['show', 'rehearsal', 'residency', 'travel_day', 'press', 'other', 'day_off']);
   let dayTitle = $derived.by(() => {
     if (!feeds.settled || feeds.errored) return '—';
-    const things = todayThings({ performances: feeds.performances, dates: feeds.dates, viewerTz }, today);
+    // The rows that are yours to read, by the same rule as the agenda under it
+    // (the person axis and each space's «lo mío / todo», ADR-151).
+    const rows = pulseRows(pulseInput);
+    const things = todayThings(
+      {
+        performances: rows.flatMap((r) => (r.of === 'performance' ? [r.row] : [])),
+        dates: rows.flatMap((r) => (r.of === 'date' ? [r.row] : [])),
+        viewerTz,
+      },
+      today,
+    );
     const first = things[0];
     if (!first) return t('desk.day_none', locale);
     const what = first.label ?? t(`planner.kind_${KIND_WORDS.has(first.kind) ? first.kind : 'other'}`, locale);

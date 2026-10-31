@@ -80,4 +80,18 @@ describe('withMyRole: the caller\'s own membership rows on each workspace', () =
     );
     expect(items.map((w) => w.my_role)).toEqual(['guest', 'owner', null]);
   });
+
+  test('the package and «lo mío / todo» ride along; absent reads as null (ADR-151)', () => {
+    const items = withMyRole(
+      [{ id: 'muk-cia' }, { id: 'mine' }],
+      [
+        { workspace_id: 'muk-cia', workspace_role: 'member', preset: 'equip', view_scope: 'all' },
+        { workspace_id: 'mine', workspace_role: 'owner' },
+      ],
+    );
+    expect(items.map((w) => [w.my_preset, w.view_scope])).toEqual([
+      ['equip', 'all'],
+      [null, null],
+    ]);
+  });
 });

@@ -55,13 +55,14 @@
 import { wallClockToInstant } from './datetime';
 import {
   MOMENT_KEYS,
+  perfWorkspaceId,
   runSheetSteps,
   type DateEvent,
   type MomentKey,
   type PerformanceEvent,
 } from './month-events';
 import type { TransportMode, TravelStageRow } from './travel-stage';
-import type { PersonAttribution, PersonAttributionScope } from './people';
+import { keepsRow, type PersonAttribution, type PersonAttributionScope } from './people';
 import { dayKeyInTz } from './planner';
 import { performanceStatusFamily, type StatusFamily } from './performance';
 import { dateStatusFamily } from './date';
@@ -364,7 +365,9 @@ export function dateAttribution(
 /**
  * THE ROWS THAT ARE YOURS TO READ: not cancelled, and not dropped by the
  * person axis. One rule for the pulse, Hoy's agenda and Ahora, so the three
- * never disagree about what is on (ADR-147: only `no` is dropped).
+ * never disagree about what is on. ADR-147 drops only `no`; with the space's
+ * «lo mío / todo» on the axis (ADR-151), «lo mío» keeps only what you are on
+ * and «todo» keeps the whole company.
  */
 export function pulseRows(input: Pick<PulseInput, 'performances' | 'dates' | 'axis'>): PulseRow[] {
   const axis = input.axis?.active ? input.axis : null;
@@ -372,13 +375,13 @@ export function pulseRows(input: Pick<PulseInput, 'performances' | 'dates' | 'ax
   for (const p of input.performances) {
     if (isCancelled(p.status)) continue;
     const attribution = performanceAttribution(p, axis);
-    if (attribution === 'no') continue;
+    if (!keepsRow(axis, attribution, perfWorkspaceId(p))) continue;
     out.push({ of: 'performance', row: p, attribution });
   }
   for (const d of input.dates) {
     if (isCancelled(d.status)) continue;
     const attribution = dateAttribution(d, axis);
-    if (attribution === 'no') continue;
+    if (!keepsRow(axis, attribution, d.project?.workspace_id ?? null)) continue;
     out.push({ of: 'date', row: d, attribution });
   }
   return out;

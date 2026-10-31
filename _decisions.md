@@ -5258,6 +5258,10 @@ consumidores al commit anterior; las claves de i18n borradas están en el histor
 **Re-evaluar cuando** una fecha necesite reparto propio (un ensayo solo para tres músicos): entonces es una lista en
 la ficha, como el de una función, no una deducción.
 
+> **Amended by ADR-151 (2026-10-31), en § 2 y § 4.** Qué se queda depende de cada espacio: en «todo» toda la
+> compañía, fechas sin nadie incluidas; en «lo mío» solo lo que es tuyo por reparto o «voy». Sin preferencia (una
+> persona fijada en el Planificador) sigue esta regla.
+
 ## [2026-10-30] ADR-148 · Hoy en el móvil: la tarjeta primero (enmienda ADR-127 § 2 y ADR-146 § 2)
 
 **Contexto.** Marco, 30-10: un día de bolo, la primera pantalla de Hoy a 390 decía lo mismo tres veces (el titular
@@ -5389,3 +5393,50 @@ estás haciendo, y si una agenda con dos funciones el mismo día necesita marcar
 
 > **Enmienda a ADR-149 § 1 y ADR-148 § 4:** la tarjeta ya no es un día con «Antes» y «Luego» dentro; es lo de ahora,
 > dentro de la agenda del día.
+
+## [2026-10-31] ADR-151 · «Lo mío / Todo» por espacio (enmienda ADR-147 § 2 y § 4)
+
+**Contexto.** Marco, 31-10: un técnico de una compañía quiere ver lo suyo, y quien dirige quiere ver la compañía
+entera. ADR-147 dejó una sola regla para todos: se enseña lo que no es `no` (tu reparto, tu «voy» y las fechas de la
+compañía de tus proyectos). Marco eligió una preferencia por espacio frente a un interruptor global. Carril
+`claude/hoy-agenda`.
+
+**Decisión.**
+1. **Cada membresía de espacio guarda «lo mío» o «todo»** (`membership.view_scope`, `mine | all | null`).
+   «Lo mío»: solo las filas en las que estás, por reparto o por tu «voy». «Todo»: la compañía entera, las fechas sin
+   nadie (ADR-147 § 2) y también las funciones y fechas de los demás.
+2. **Lo leen las superficies personales y el Planificador**: Hoy (agenda, tarjeta, «Después» y el titular), Ahora, el
+   pulso del raíl, y el Planificador sin una persona fijada. Conversaciones y Cuentas no lo leen: son los libros de la
+   compañía. Una persona fijada a mano en el Planificador manda sobre la preferencia: miras a alguien, con la regla de
+   ADR-147, y solo entonces cuenta «N por proyecto, sin reparto».
+3. **Por defecto, el paquete de acceso**: Mínim y Equip → «lo mío»; Coordinació, Direcció y el owner → «todo». Sin
+   paquete, el rol: admin y member → «todo», viewer y guest → «lo mío». Un espacio cuyo dato no ha llegado se lee
+   como «todo», el lado que no esconde nada. La regla vive en `$lib/view-scope` (`defaultViewScope`), no en la base:
+   cambiar un paquete cambia el defecto sin migrar. Elegir en Ajustes el valor del paquete guarda `null`.
+4. **Sin control diario.** Se elige en Ajustes › Perfil, «Lo que ves», una línea por espacio con «Lo mío · Todo»
+   (`ViewScopeSetting`): es una preferencia de la persona, así que va donde ya están sus espacios y la alcanza un
+   invitado. No va en el selector de ámbito.
+5. **Un solo punto de decisión.** `PersonAttributionScope.keeps` (`$lib/people`, `keepsRow`) dice si una fila se
+   queda en su espacio; `pulseRows` (pulso, agenda de Hoy, Ahora) y el filtro del Planificador lo preguntan.
+
+**Enmienda a ADR-147.** § 2: una fecha sin nadie se enseña solo en un espacio en «todo». § 4: el veredicto sigue
+siendo uno, pero qué se queda depende del espacio: «todo» lo deja todo, «lo mío» solo `explicit`; sin preferencia
+(una persona fijada) sigue «todo menos `no`».
+
+**Migración escrita, sin aplicar:** `supabase/migrations/20261031100000_membership_view_scope.sql` (columna
+`membership.view_scope` con CHECK, sin grant nuevo: `authenticated` lee `membership` entera; función nueva
+`set_my_view_scope(uuid, text)`, SECURITY DEFINER, la propia membresía). Tipos a mano en `db-types.ts`. Mientras no se
+aplique, `GET /api/workspaces` lee la fila propia con `select=*` y no recibe `view_scope`: todos ven su defecto, y
+guardar en Ajustes falla (la RPC no existe).
+
+**Verificado** sin la migración: unitarios (`view-scope.test.ts`, `workspace-role.test.ts`) y capturas con la
+preferencia simulada en la respuesta de `/api/workspaces` (`vite dev`, Supabase de producción, día cargado en
+`playwright`, 9h, 13h y 20h a 390 y 1440, `build/coordination/hoy-review/agenda/mine-*` y `todo-*`, fuera de git):
+en «lo mío» se van el ensayo de otro proyecto y las funciones en opción sin reparto de «Después».
+
+**Cómo se revierte.** Quitar `viewScope` de `createPulseFeeds` y del Planificador (vuelve ADR-147 tal cual), la línea
+de Ajustes y `PUT /api/me/view-scope`; la columna y la función se borran con el rollback del fichero de migración.
+
+**Re-evaluar cuando** entre la primera persona con Equip: si «lo mío» en el Planificador esconde un choque que debería
+ver (el motor de conflictos ya solo lee lo que se queda), y si hace falta la preferencia también en el selector de
+ámbito.
