@@ -137,7 +137,7 @@
       if (agenda.until) return `${w} · ${t('ahora.until', locale, { time: hour(agenda.until, focus.tz) })}`;
       return focus.at ? `${w} · ${hour(focus.at, focus.tz)}` : `${w} · ${t('planner.all_day', locale)}`;
     }
-    return focus.at ? `${w} · ${hour(focus.at, focus.tz)}` : w;
+    return focus.at ? `${w} · ${hour(focus.at, focus.tz)}` : `${w} · ${t('planner.all_day', locale)}`;
   });
   let eye = $derived(
     agenda && focus

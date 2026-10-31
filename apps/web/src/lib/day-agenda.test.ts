@@ -215,6 +215,29 @@ describe('the headline counts the agenda’s own rows', () => {
   });
 });
 
+describe('an all-day row can be the card (E2E bolo-guest-frame, 31-10)', () => {
+  // A hold with no hour on file, on a later day: all a bolo guest may have.
+  const hold = perf({ id: 'p-hold', performed_at: '2026-08-18', status: 'hold_1', start_at: null });
+
+  test('on a day still to come, it is NEXT, and the card opens on it, without a countdown', () => {
+    const a = dayAgenda({ performances: [hold], dates: [], viewerTz: TZ }, '2026-08-18', at('23:30', '2026-08-17'));
+    expect(a.focus).toBe(0);
+    expect(a.headline).toBe('at');
+    expect(a.points[0].main).toBe(true);
+  });
+
+  test('on its own day, it is what you are in', () => {
+    const a = dayAgenda({ performances: [hold], dates: [], viewerTz: TZ }, '2026-08-18', at('10:00', '2026-08-18'));
+    expect(a.focus).toBe(0);
+    expect(a.headline).toBe('doing');
+  });
+
+  test('before a timed day, the all-day row ahead is next only while nothing timed comes first', () => {
+    const a = dayAgenda(input, DAY, at('08:00', '2026-08-13'));
+    expect(word(a, a.focus)).toBe('train');
+  });
+});
+
 describe('which day', () => {
   const tomorrow = perf({ id: 'p-tom', performed_at: '2026-08-15', start_at: iso('20:00', '2026-08-15') });
 
