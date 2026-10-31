@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- Hoy en el móvil va al grano: el titular es la tarjeta de lo siguiente, con el viaje dentro y «Ahora» al pie, y «+» para una tarea junto al título (ADR-148). Hour ya no pregunta «¿vas?»: estás en lo que te asignan o en lo que dices «voy»; una fecha sin nadie es de la compañía y no te pregunta (ADR-147). (2026-10-31, `5ca8d20f`)
 - «Ahora», el modo del día de bolo: desde Hoy, una pantalla con lo que toca ya y su cuenta atrás, el viaje con su localizador, la sala con mapa, acceso, aparcamiento, hotel y el técnico a un toque, lo que queda de escaleta (con puertas y toque de queda) y el equipo de hoy, de todas tus compañías. Abajo, Llamar, Mapa y Hoja. Sin red enseña lo último y dice de cuándo es. En el Planificador, el botón que vuelve a hoy se llama «Hoy» (ADR-146). (2026-10-30, `4f264eeb`)
 - En el móvil, tirar hacia abajo desde arriba actualiza los datos de la pantalla, sin recargar la app. (2026-10-29, `6872b3cf`)
 - Planner, Cuentas y Hoy más ligeros: el Planner sin la tira de cifras repetida y con «+ Fecha» en la fila de vistas en el móvil; Cuentas con cifras sin cajas, en «0 €» y sin frase cuando están a cero; Hoy sin la línea de fecha ni el enlace repetido al Planificador, y el saludo junto al titular (ADR-145, fase 2). (2026-10-24, `783911ca`)
