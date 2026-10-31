@@ -312,6 +312,11 @@ export function localeWeekdayShort(iso: string, locale: string): string {
     .replace(/\.+$/, '');
 }
 
+/** Locale-aware long weekday ("martes", "dimarts"), same contract. */
+export function localeWeekdayLong(iso: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { weekday: 'long', timeZone: 'UTC' }).format(new Date(`${iso.slice(0, 10)}T00:00:00Z`));
+}
+
 /** "17 jul" — bare day number + locale short month; the honest compact date. */
 export function localeDayMonth(iso: string, locale: string): string {
   return `${Number(iso.slice(8, 10))} ${localeMonthShort(iso, locale)}`;

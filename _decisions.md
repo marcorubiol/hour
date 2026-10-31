@@ -5402,6 +5402,9 @@ estás haciendo, y si una agenda con dos funciones el mismo día necesita marcar
 > **Enmienda a ADR-149 § 1 y ADR-148 § 4:** la tarjeta ya no es un día con «Antes» y «Luego» dentro; es lo de ahora,
 > dentro de la agenda del día.
 
+> **Amended by ADR-153 (2026-10-31), en § 1 y § 2.** El día de la agenda es solo hoy: si hoy no queda nada en marcha
+> ni por venir, no hay agenda ni tarjeta, y lo siguiente es la primera fila de «Después», que el titular nombra.
+
 ## [2026-10-31] ADR-151 · «Lo mío / Todo» por espacio (enmienda ADR-147 § 2 y § 4)
 
 **Contexto.** Marco, 31-10: un técnico de una compañía quiere ver lo suyo, y quien dirige quiere ver la compañía
@@ -5519,3 +5522,47 @@ claves de i18n `shell.narrow`, `shell.save_scope` y `shell.update_scope` están 
 
 **Re-evaluar cuando** Marco lo use una semana acotado en el teléfono: si una pastilla en la fila del título se nota
 lo bastante como para no olvidar que está acotado (la opción B, la línea fina, era la más explícita).
+
+## [2026-10-31] ADR-153 · Hoy: la tarjeta es para lo de hoy (enmienda ADR-150 § 1 y § 2)
+
+**Contexto.** Marco, 31-10 (chat, validado): la tarjeta grande de Hoy es para lo de hoy; si hoy no queda nada, no
+sale tarjeta. ADR-150 § 1 hacía del día de la agenda «hoy mientras algo de hoy siga en marcha o por venir; si no, el
+día de lo siguiente», así que a las 23h, con un tren mañana a las 7h, Hoy abría la agenda de mañana con el tren como
+tarjeta. Y el commit 5434d328 (31-10, E2E `bolo-guest-frame`) hizo que una fila de todo el día de un día por venir
+también fuera la tarjeta, para que el invitado de un bolo con solo una opción el martes viera su función. Carril
+`claude/hoy-card-today`. Sin migración ni endpoint.
+
+**Decisión.**
+1. **La agenda y su tarjeta son solo de hoy**, el día local del que mira (`viewerTz`). `agendaDay` devuelve hoy si
+   algo de hoy sigue en marcha o por venir y, si no, nada: ya no recibe el día de lo siguiente. Hoy no enseña nunca
+   la agenda de otro día. A medianoche el día nuevo ya es hoy, y su primera cosa es la tarjeta.
+2. **Sin nada que quede de hoy, el titular lo dice y nombra lo siguiente**: «Hoy, nada · martes, función en Girona»;
+   «Hoy, nada más · mañana, tren a Girona» si hoy hubo algo que ya pasó. El día es «mañana», el nombre del día hasta
+   seis días, y día y mes más allá; un viaje con tramos se nombra por su medio y su destino, una opción lleva su «?».
+   Claves `desk.day_none_then`, `desk.day_done_then`, `desk.day_next` y `desk.day_next_at` (ES, EN, CA, FR). Lo
+   siguiente es la primera fila de «Después», como cualquier otra; en el móvil la cabecera de la banda se oye y no
+   se ve, como cuando el titular nombra el día. A más de dos semanas manda la frase lejana de ADR-149 § 2 y el
+   titular sigue diciendo «Hoy no hay nada en el plan».
+3. **El invitado de bolo con solo una opción el martes** ve el titular y su fila en «Después», sin tarjeta; la fila
+   abre la ficha, donde está el tablón. El test unitario de 5434d328 y `tests/bolo-guest-frame.spec.ts` piden ahora
+   esto. Prueba de componente nueva: `DeskNext.svelte.test.ts`.
+4. **Una cosa de hoy en marcha con lo siguiente a más de dos semanas** ya no pierde la tarjeta: la agenda de hoy se
+   pinta y la frase lejana va debajo, en el sitio de «Después».
+
+**Qué no cambia.** Ahora (ADR-146) y el raíl: el «hasta» del raíl sale de `computePulse` (seguimiento de ADR-151), no
+de la tarjeta, así que no depende de que la haya. La tarjeta de un día de hoy, sus acciones y la cuenta atrás
+(ADR-150 § 2 a § 7). «Después» sigue siendo las tres siguientes de otros días (ADR-149 § 2). `dayAgenda` sigue siendo
+pura para cualquier día; solo Hoy deja de pedirle otro que no sea hoy.
+
+**Verificado** (31-10, en el worktree): `pnpm --filter web check` 0/0 y `pnpm --filter web test:unit` verde, con los
+casos nuevos en `day-agenda.test.ts` (a las 23h con un tren mañana a las 7h no hay día; a medianoche sí, y el tren es
+la tarjeta; la opción del martes no es tarjeta el día antes y sí el martes) y `DeskNext.svelte.test.ts`. Sin captura
+ni E2E: el worktree no tiene `.env` y el E2E corre contra un origen desplegado.
+
+**Cómo se revierte.** Devolver a `agendaDay` su tercer argumento (el día de lo siguiente) y a `routes/h/desk/+page.svelte`
+la llamada con `coming[0]?.day`, el filtro de `after` y el titular de antes; `DeskNext.svelte` al commit anterior.
+Las cuatro claves nuevas pueden quedarse o borrarse.
+
+**Re-evaluar cuando** Marco lo use una gira: si la noche antes de un viaje temprano echa de menos la tarjeta (el
+localizador, la hora de salida grande), y si «Tablón · N nuevos» hace falta en una fila de «Después» para quien solo
+tiene días por venir.

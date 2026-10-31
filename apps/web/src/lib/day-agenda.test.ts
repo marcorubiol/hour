@@ -215,19 +215,19 @@ describe('the headline counts the agenda’s own rows', () => {
   });
 });
 
-describe('an all-day row can be the card (E2E bolo-guest-frame, 31-10)', () => {
+describe('an all-day row on a later day is not the card (ADR-153; E2E bolo-guest-frame)', () => {
   // A hold with no hour on file, on a later day: all a bolo guest may have.
   const hold = perf({ id: 'p-hold', performed_at: '2026-08-18', status: 'hold_1', start_at: null });
 
-  test('on a day still to come, it is NEXT, and the card opens on it, without a countdown', () => {
-    const a = dayAgenda({ performances: [hold], dates: [], viewerTz: TZ }, '2026-08-18', at('23:30', '2026-08-17'));
-    expect(a.focus).toBe(0);
-    expect(a.headline).toBe('at');
-    expect(a.points[0].main).toBe(true);
+  test('the day before, Hoy has no agenda: the hold waits in «Después»', () => {
+    expect(agendaDay({ performances: [hold], dates: [], viewerTz: TZ }, at('23:30', '2026-08-17'))).toBeNull();
   });
 
-  test('on its own day, it is what you are in', () => {
-    const a = dayAgenda({ performances: [hold], dates: [], viewerTz: TZ }, '2026-08-18', at('10:00', '2026-08-18'));
+  test('on its own day, it is the agenda, and what you are in', () => {
+    const input1 = { performances: [hold], dates: [], viewerTz: TZ };
+    const now = at('10:00', '2026-08-18');
+    expect(agendaDay(input1, now)).toBe('2026-08-18');
+    const a = dayAgenda(input1, '2026-08-18', now);
     expect(a.focus).toBe(0);
     expect(a.headline).toBe('doing');
   });
@@ -240,13 +240,30 @@ describe('an all-day row can be the card (E2E bolo-guest-frame, 31-10)', () => {
 
 describe('which day', () => {
   const tomorrow = perf({ id: 'p-tom', performed_at: '2026-08-15', start_at: iso('20:00', '2026-08-15') });
-
-  test('today while anything of it is still on or ahead', () => {
-    expect(agendaDay({ ...input, performances: [show, tomorrow] }, at('21:00'), '2026-08-15')).toBe(DAY);
+  // A train tomorrow at 7h, nothing left today.
+  const early = date({
+    id: 'd-early',
+    kind: 'travel_day',
+    all_day: false,
+    starts_at: iso('07:00', '2026-08-15'),
+    ends_at: iso('09:00', '2026-08-15'),
   });
 
-  test('once today is over, the day of what comes next', () => {
-    expect(agendaDay({ ...input, performances: [show, tomorrow] }, at('22:30'), '2026-08-15')).toBe('2026-08-15');
+  test('today while anything of it is still on or ahead', () => {
+    expect(agendaDay({ ...input, performances: [show, tomorrow] }, at('21:00'))).toBe(DAY);
+  });
+
+  test('once today is over, no day: the card is for today (ADR-153)', () => {
+    expect(agendaDay({ ...input, performances: [show, tomorrow] }, at('22:30'))).toBeNull();
+  });
+
+  test('at 23h with a train tomorrow at 7h, no card; at midnight it is today', () => {
+    const night = { performances: [], dates: [early], viewerTz: TZ };
+    expect(agendaDay(night, at('23:00'))).toBeNull();
+    expect(agendaDay(night, at('00:00', '2026-08-15'))).toBe('2026-08-15');
+    const a = dayAgenda(night, '2026-08-15', at('00:00', '2026-08-15'));
+    expect(a.focus).toBe(0);
+    expect(a.headline).toBe('at');
   });
 });
 

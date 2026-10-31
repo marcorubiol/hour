@@ -42,7 +42,7 @@
   import { accentVarFor } from '$lib/utils/accent';
   import { spaceName } from '$lib/utils/identity';
   import { detectLocale, LOCALE_TAG, t } from '$lib/i18n';
-  import { viewerTimeZone } from '$lib/datetime';
+  import { localeDayMonth, localeWeekdayLong, localeWeekdayShort, viewerTimeZone } from '$lib/datetime';
   import { addDaysIso, dayKeyInTz, plannerDayHref } from '$lib/planner';
   import { page } from '$app/state';
   import { peekHref } from '$lib/peek';
@@ -86,9 +86,10 @@
   import { blockDrawn, screenQuiet } from '$lib/dashboard-blocks';
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { daysAgoLabel } from '$lib/conversation';
-  import { upcoming } from '$lib/pulse';
+  import { timedStages, upcoming } from '$lib/pulse';
+  import { stagePlace } from '$lib/travel-stage';
   import { agendaDay, agendaPoints, agendaRows, dayAgenda } from '$lib/day-agenda';
-  import { createPulseFeeds, pulseSlipContext } from '$lib/pulse-feeds.svelte';
+  import { createPulseFeeds, pulseSlip, pulseSlipContext } from '$lib/pulse-feeds.svelte';
   import { dateSlip, perfDayKey, performanceSlip, perfWorkspaceId, type DateEvent, type PerformanceEvent, type SlipKind } from '$lib/month-events';
   import { clashesInSeason, seasonWindow } from '$lib/season';
   import { createPlannerEngine } from '$lib/planner-engine.svelte';
@@ -212,9 +213,11 @@
   const feeds = createPulseFeeds(() => today);
   /**
    * The day as an agenda, what is on now opened as the card (ADR-150): today
-   * while anything of it is on or ahead, else the next day you have
-   * something. Under it the next three things of other days. The pulse's own
-   * rows and order (`upcoming`), so card, agenda and rail never disagree.
+   * while anything of it is on or ahead, and only today (ADR-153): with
+   * nothing left of it there is no card, and what comes next is the first
+   * row of «Después». Under it the next three things of other days. The
+   * pulse's own rows and order (`upcoming`), so card, agenda and rail never
+   * disagree.
    */
   let pulseInput = $derived({ performances: feeds.performances, dates: feeds.dates, viewerTz, axis: feeds.axis });
   let coming = $derived(upcoming(pulseInput, clockNow, 12));
@@ -225,9 +228,10 @@
       ? coming[0]
       : null,
   );
-  let agendaOn = $derived(farNext ? null : agendaDay(pulseInput, clockNow, coming[0]?.day ?? null));
+  let agendaOn = $derived(agendaDay(pulseInput, clockNow));
   let agenda = $derived(agendaOn ? dayAgenda(pulseInput, agendaOn, clockNow) : null);
-  let after = $derived(coming.filter((x) => x.day !== agendaOn).slice(0, 3));
+  // Two weeks away it is the far line, not «Después».
+  let after = $derived(farNext ? [] : coming.filter((x) => x.day !== agendaOn).slice(0, 3));
   /** The performance the card's actions are about: the focus, else the day's main one. */
   let cardPerformanceId = $derived.by(() => {
     if (!agenda) return '';
@@ -612,12 +616,38 @@
       dates: rows.flatMap((r) => (r.of === 'date' ? [r.row as DateEvent] : [])),
     });
     const first = things[0];
+    // NOTHING LEFT OF TODAY (ADR-153): no card, so the title says it and
+    // names what comes next, the first row of «Después» («Hoy, nada · martes,
+    // función en Girona»). Two weeks away it is the far line's to say.
+    const next = !agendaOn && !farNext ? coming[0] : null;
+    if (next) return t(first ? 'desk.day_done_then' : 'desk.day_none_then', locale, { next: nextWords(next) });
     if (!first) return t('desk.day_none', locale);
     const what = first.label ?? t(`planner.kind_${KIND_WORDS.has(first.kind) ? first.kind : 'other'}`, locale);
     const day = first.where ? t('desk.day_one_at', locale, { what, where: first.where }) : t('desk.day_one', locale, { what });
     const rest = things.length - 1;
     return rest === 0 ? day : t(rest === 1 ? 'desk.day_and_one' : 'desk.day_and_many', locale, { day, n: rest });
   });
+  /** «mañana, tren a Girona», «martes, función en Girona», «lun 9 nov, ensayo». */
+  function nextWords(next: (typeof coming)[number]): string {
+    const n = Math.round((Date.parse(`${next.day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
+    const when =
+      n <= 1
+        ? t('desk.next_tomorrow', locale)
+        : n < 7
+          ? localeWeekdayLong(next.day, locale)
+          : `${localeWeekdayShort(next.day, locale)} ${localeDayMonth(next.day, locale)}`;
+    const sl = pulseSlip(next.ref, next.day, slipCtx);
+    const held = sl.cert === 'hold' || sl.cert === 'proposed' ? '?' : '';
+    const to = (place: string) => `${t('planner.slip_to', locale)} ${place}`;
+    // A trip says how it goes and where to when it has its legs: «tren a Girona».
+    const leg = next.ref.of === 'date' ? timedStages(next.ref.row as DateEvent)[0] : undefined;
+    const legTo = leg ? stagePlace(leg.to_city, leg.to_place) : null;
+    if (leg) return t('desk.day_next', locale, { when, what: [`${t(`planner.mode_${leg.mode}`, locale)}${held}`, legTo ? to(legTo) : null].filter(Boolean).join(' ') });
+    const kind = `${kindLabel(sl.kind)}${held}`;
+    if (sl.lead) return t('desk.day_next', locale, { when, what: `${kind} ${to(sl.name)}` });
+    const where = sl.city || sl.name;
+    return where ? t('desk.day_next_at', locale, { when, what: kind, where }) : t('desk.day_next', locale, { when, what: kind });
+  }
   // ── The greeting: what the Hall said before the Desk was the way in
   //    (ADR-137). The date and time it also said are the bar's clock
   //    (ADR-145, fase 2). It reads the one minute tick.

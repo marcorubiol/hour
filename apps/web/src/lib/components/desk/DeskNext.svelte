@@ -18,7 +18,9 @@
    * headline rule); this file words and draws. The card moves with the day:
    * the train in the morning, the load-in at noon, the show at night. The
    * next three things of other days follow under it, one line each
-   * («Después», ADR-149).
+   * («Después», ADR-149). The card is for today (ADR-153): with nothing left
+   * of today there is no agenda and no card, and what comes next is the
+   * first row of «Después», which Hoy's headline names.
    *
    * Like the rail, it never follows the scope (ADR-096 § 5). It never changes
    * height while the answer lands: the card is drawn with dashes first. When
@@ -50,7 +52,7 @@
   import type { ProjectLite } from '$lib/month-events';
 
   interface Props {
-    /** The day in order, with its card (`dayAgenda`); null with nothing near. */
+    /** Today in order, with its card (`dayAgenda`); null with nothing left of today. */
     agenda: DayAgenda | null;
     /** The next thing when it is more than two weeks away (one sentence), or null. */
     far?: PulseNext | null;
@@ -180,8 +182,9 @@
   let boardHref = $derived(actionSlip?.href && boardNew > 0 ? `${actionSlip.href}#board` : null);
   let hasFoot = $derived(Boolean(call?.phone || map || ahoraHref || roadsheet || whoHref || boardHref));
 
-  /* The agenda is today's: Hoy's headline already names the day (ADR-148). */
-  let headlined = $derived(settled && !errored && agenda !== null && daysTo(agenda.day) <= 0);
+  /* Hoy's headline already names the day (ADR-148), or, with nothing left
+     of it, what comes next (ADR-153). */
+  let headlined = $derived(settled && !errored && (agenda !== null || (after.length > 0 && !far)));
   let farHref = $derived.by(() => {
     if (!far) return undefined;
     return pulseSlip(far.ref, far.day, slipCtx).href ?? (lensOn('planner') ? plannerDayHref('day', far.day) : undefined);
@@ -251,49 +254,51 @@
       </li>
       <li class="agenda__row"><span class="ghost-line" style:inline-size="45%">&nbsp;</span></li>
     </ol>
-  {:else if far}
-    <!-- Far away is still «the next thing»: one sentence (ADR-149). -->
-    {@const sl = pulseSlip(far.ref, far.day, slipCtx)}
-    {@const farText = t('desk.next_far', locale, { day: localeDayMonthNear(far.day, today, locale), place: sl.city || sl.name })}
-    <p class="empty-line">
-      {#if farHref}<a class="empty-line__text next__far" href={farHref}>{farText} →</a>{:else}<span class="empty-line__text">{farText}</span>{/if}
-    </p>
-  {:else if !agenda || agenda.points.length === 0}
-    <EmptyLine text={t('desk.next_empty', locale)} />
   {:else}
-    <ol class="agenda" data-testid="desk-agenda">
-      {#each agenda.points as p, i (p.key)}
-        {#if i === agenda.focus}
-          <li class="card" class:card--main={p.main} data-testid="desk-next">
-            <span class="card__eye">{@render mark(p.ref.row.project)}{eye}</span>
-            <span class="card__now" data-testid="desk-next-now">{big}</span>
-            {#if small}<span class="card__where" class:guess={p.ref.tentative}>{small}</span>{/if}
-            {#if hasFoot}
-              <span class="card__foot">
-                {#if boardHref}<a class="block-head__act" href={boardHref} data-testid="desk-next-board"
-                    >{boardNew === 1 ? t('desk.next_board_one', locale) : t('desk.next_board', locale, { n: boardNew })} →</a
-                  >{/if}
-                {#if whoHref}<a class="block-head__act" href={whoHref}>{t('commitment.who_goes', locale)} →</a>{/if}
-                <span class="card__acts">
-                  {#if call?.phone}<a class="btn--secondary btn--s" href={telHref(call.phone)} aria-label={t('ahora.call_aria', locale, { name: call.name })}>{t('ahora.call', locale)}</a>{/if}
-                  {#if map}<a class="btn--secondary btn--s" href={map} target="_blank" rel="noopener">{t('ahora.map', locale)}</a>{/if}
-                  {#if ahoraHref}<a class="btn--secondary btn--s" href={ahoraHref} aria-label={t('ahora.enter_aria', locale)} data-testid="ahora-enter">{t('ahora.title', locale)}</a>{/if}
-                  {#if roadsheet}<a class="btn--secondary btn--s" href={roadsheet} aria-label={t('desk.roadsheet', locale)}
-                      ><span class="card__wide">{t('desk.roadsheet', locale)}</span><span class="card__narrow">{t('ahora.sheet', locale)}</span> ↗</a
+    {#if agenda && agenda.points.length > 0}
+      <ol class="agenda" data-testid="desk-agenda">
+        {#each agenda.points as p, i (p.key)}
+          {#if i === agenda.focus}
+            <li class="card" class:card--main={p.main} data-testid="desk-next">
+              <span class="card__eye">{@render mark(p.ref.row.project)}{eye}</span>
+              <span class="card__now" data-testid="desk-next-now">{big}</span>
+              {#if small}<span class="card__where" class:guess={p.ref.tentative}>{small}</span>{/if}
+              {#if hasFoot}
+                <span class="card__foot">
+                  {#if boardHref}<a class="block-head__act" href={boardHref} data-testid="desk-next-board"
+                      >{boardNew === 1 ? t('desk.next_board_one', locale) : t('desk.next_board', locale, { n: boardNew })} →</a
                     >{/if}
+                  {#if whoHref}<a class="block-head__act" href={whoHref}>{t('commitment.who_goes', locale)} →</a>{/if}
+                  <span class="card__acts">
+                    {#if call?.phone}<a class="btn--secondary btn--s" href={telHref(call.phone)} aria-label={t('ahora.call_aria', locale, { name: call.name })}>{t('ahora.call', locale)}</a>{/if}
+                    {#if map}<a class="btn--secondary btn--s" href={map} target="_blank" rel="noopener">{t('ahora.map', locale)}</a>{/if}
+                    {#if ahoraHref}<a class="btn--secondary btn--s" href={ahoraHref} aria-label={t('ahora.enter_aria', locale)} data-testid="ahora-enter">{t('ahora.title', locale)}</a>{/if}
+                    {#if roadsheet}<a class="btn--secondary btn--s" href={roadsheet} aria-label={t('desk.roadsheet', locale)}
+                        ><span class="card__wide">{t('desk.roadsheet', locale)}</span><span class="card__narrow">{t('ahora.sheet', locale)}</span> ↗</a
+                      >{/if}
+                  </span>
                 </span>
-              </span>
-            {/if}
-          </li>
-        {:else}
-          {@render row(p, agenda.past[i])}
-        {/if}
-      {/each}
-    </ol>
+              {/if}
+            </li>
+          {:else}
+            {@render row(p, agenda.past[i])}
+          {/if}
+        {/each}
+      </ol>
+    {/if}
     {#if after.length > 0}
       <ul class="lines next__after" data-testid="desk-after">
         {#each after as item, i (item.ref.of + item.ref.id)}{@render then(item, i === 0 ? t('desk.next_after', locale) : null)}{/each}
       </ul>
+    {:else if far}
+      <!-- Far away is still «the next thing»: one sentence (ADR-149). -->
+      {@const sl = pulseSlip(far.ref, far.day, slipCtx)}
+      {@const farText = t('desk.next_far', locale, { day: localeDayMonthNear(far.day, today, locale), place: sl.city || sl.name })}
+      <p class="empty-line">
+        {#if farHref}<a class="empty-line__text next__far" href={farHref}>{farText} →</a>{:else}<span class="empty-line__text">{farText}</span>{/if}
+      </p>
+    {:else if !agenda || agenda.points.length === 0}
+      <EmptyLine text={t('desk.next_empty', locale)} />
     {/if}
   {/if}
 </section>
