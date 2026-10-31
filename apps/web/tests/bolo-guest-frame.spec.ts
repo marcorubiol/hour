@@ -12,8 +12,9 @@ import { waitForLoaded } from './loaded';
  * técnico de verdad. El spec lo invita a un bolo suyo de `zzz-e2e-collab`
  * con Equip, acepta por la RPC con su JWT y mira el marco con el espacio de la
  * compañía fijado en el ámbito (`?scope=s:playwright`), que es donde es guest:
- *   - Hoy: su función en «Lo siguiente» con «Tablón · 1 nuevo», que abre el
- *     tablón; ni «+» (Nueva tarea) ni Cuentas;
+ *   - Hoy: su función, dentro de tres días, sin tarjeta (la tarjeta es para
+ *     hoy, ADR-153): el titular la nombra y es la primera fila de «Después»,
+ *     que abre su ficha con el tablón; ni «+» (Nueva tarea) ni Cuentas;
  *   - el Planificador: su función, y ninguna puerta de crear;
  *   - la ficha: el tablón, sin «Editar datos», sin notas que no podría abrir;
  *   - ⌘K: ninguna fila de crear; Ajustes del espacio: solo su perfil.
@@ -45,7 +46,7 @@ async function signIn(page: Page, email: string, password: string) {
   await page.waitForURL(/\/h\/desk\/?/, { timeout: 60_000 });
 }
 
-/** In three days: «Lo siguiente» draws a card (not the far line) within 14. */
+/** In three days: a row of «Después» (not the far line, within 14), never the card (ADR-153). */
 function inDays(n: number): string {
   return new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
 }
@@ -160,13 +161,14 @@ test.describe('el marco de un guest de un solo bolo (comms carril 2, fase 3)', (
     const nav = page.getByTestId('lens-nav');
     await expect(nav).not.toContainText(/cuentas|comptes|books|money/i);
     await expect(page.locator('.desk__add')).toHaveCount(0);
-    const card = page.getByTestId('desk-next');
-    await expect(card).toContainText(venue);
-    const board = page.getByTestId('desk-next-board');
-    await expect(board).toContainText(/1/);
+    // No es hoy: sin tarjeta; el titular y «Después» la dicen (ADR-153).
+    await expect(page.getByTestId('desk-next')).toHaveCount(0);
+    await expect(page.locator('.desk__day')).toContainText(new RegExp(`${venue}|Manresa`));
+    const after = page.getByTestId('desk-after');
+    await expect(after).toContainText(venue);
 
-    // ── «Tablón · 1 nuevo» abre la ficha en el tablón ──
-    await board.click();
+    // ── su fila de «Después» abre la ficha, con el tablón ──
+    await after.getByRole('link').first().click();
     await page.waitForURL(new RegExp(`/h/playwright/performance/${perf!.slug}`));
     await waitForLoaded(page);
     await expect(page.locator('section.board')).toBeVisible();

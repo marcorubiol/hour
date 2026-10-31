@@ -1,6 +1,7 @@
 /**
  * HOY'S AGENDA — one day in time order, with what is on now opened as the
- * card (ADR-150, option D of the Hoy review).
+ * card (ADR-150, option D of the Hoy review). The day is always today
+ * (ADR-153): with nothing left of it, Hoy has no agenda and no card.
  *
  * The day is its points: every moment of a performance's running order, each
  * stage of a trip (the train at 9h12, not «viaje»), every other date at its
@@ -189,14 +190,16 @@ export function agendaPoints(input: PulseInputRows, day: string): AgendaPoint[] 
 }
 
 /**
- * THE DAY THE AGENDA SHOWS: today while anything of it is still on or
- * ahead, else the day of what comes next (`fallback`, the pulse's).
+ * THE DAY THE AGENDA SHOWS: today (the viewer's day) while anything of it
+ * is still on or ahead, else none (ADR-153): the card is for today. Another
+ * day is never Hoy's agenda; what comes next is a row of «Después», and the
+ * headline names it. At 23h with a train at 7h, no card; at midnight it is
+ * today.
  */
-export function agendaDay(input: PulseInputRows, now: Date, fallback: string | null): string | null {
+export function agendaDay(input: PulseInputRows, now: Date): string | null {
   const today = dayKeyInTz(now.toISOString(), input.viewerTz);
   const t = now.getTime();
-  if (agendaPoints(input, today).some((p) => p.to > t)) return today;
-  return fallback;
+  return agendaPoints(input, today).some((p) => p.to > t) ? today : null;
 }
 
 export function dayAgenda(input: PulseInputRows, day: string, now: Date): DayAgenda {
@@ -210,9 +213,9 @@ export function dayAgenda(input: PulseInputRows, day: string, now: Date): DayAge
   points.forEach((p, i) => {
     if (p.from <= t && t < p.to && (current === null || p.from >= points[current].from)) current = i;
   });
-  // NEXT: the first point still ahead. An all-day row counts too: on a day
-  // that has not begun, «función · todo el día» IS what comes next, and the
-  // card is it (ADR-150; a guest's hold on Tuesday lost its card, E2E 31-10).
+  // NEXT: the first point still ahead. Hoy only asks this of today
+  // (`agendaDay`, ADR-153), where an all-day row has already begun and is
+  // what you are in; on any other day an all-day row would count too.
   const nextIdx = points.findIndex((p) => p.from > t);
   const next = nextIdx >= 0 ? nextIdx : null;
 
