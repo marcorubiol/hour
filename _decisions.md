@@ -5440,3 +5440,11 @@ de Ajustes y `PUT /api/me/view-scope`; la columna y la función se borran con el
 **Re-evaluar cuando** entre la primera persona con Equip: si «lo mío» en el Planificador esconde un choque que debería
 ver (el motor de conflictos ya solo lee lo que se queda), y si hace falta la preferencia también en el selector de
 ámbito.
+
+> **Seguimiento (2026-10-31, Marco, opción A en los dos detalles).** El «hasta» del pulso en el raíl adopta la regla
+> de la tarjeta de Hoy (ADR-150 § 3): lo que estás haciendo acaba en su propio fin cuando es un momento real; un fin
+> blando o una fila de todo el día dura hasta que empieza lo siguiente. El raíl y la tarjeta ya no se contradicen
+> («carga hasta 14h30» frente a «hasta las 17h»). Y el titular de Hoy cuenta las filas de su propia agenda
+> (`agendaRows` + `dayThings`), así que dice lo mismo que la lista de debajo y sigue «lo mío / todo». Una fila de
+> todo el día cuenta en su día guardado (la regla del mes, `dateDayKey`); un viaje con tramos, el día en que sale un
+> tramo. Test RLS de `set_my_view_scope` en `tests/rls/view-scope.test.ts`: va rojo hasta aplicar la migración.

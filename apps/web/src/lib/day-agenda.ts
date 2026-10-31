@@ -139,12 +139,31 @@ function datePoints(d: DateEvent, ref: PulseRef, day: string, viewerTz: string):
   return [{ key: `d:${d.id}`, ref, what, at: d.starts_at, tz: ref.tz, from, to: Math.max(to, from), hard: Boolean(d.ends_at), main: false }];
 }
 
-/** Does a date touch the day? An all-day row across several days touches each. */
+/**
+ * Does a date touch the day? A trip with timed legs: when one of them leaves
+ * that day. An all-day row: its stored calendar days (the month's rule,
+ * `dateDayKey`), each day it spans. A timed row: its start, venue first.
+ */
 function dateOnDay(d: DateEvent, day: string, zone: string): boolean {
+  const legs = timedStages(d);
+  if (legs.length > 0) return legs.some((s) => dayKeyInTz(s.depart_at!, s.depart_tz ?? zone) === day);
   if (!d.all_day) return dayKeyInTz(d.starts_at, zone) === day;
-  const first = dayKeyInTz(d.starts_at, zone);
-  const last = dayKeyInTz(d.ends_at ?? d.starts_at, zone);
-  return first <= day && day <= last;
+  const first = d.starts_at.slice(0, 10);
+  const last = (d.ends_at ?? d.starts_at).slice(0, 10);
+  return first <= day && day <= (last < first ? first : last);
+}
+
+/** The rows of one day's agenda, each once, in the order the agenda lists them. */
+export function agendaRows(points: readonly AgendaPoint[]): PulseRef[] {
+  const seen = new Set<string>();
+  const out: PulseRef[] = [];
+  for (const p of points) {
+    const key = `${p.ref.of}:${p.ref.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(p.ref);
+  }
+  return out;
 }
 
 /** Every point of one day, in time order (all-day rows first). */
@@ -211,7 +230,8 @@ export function dayAgenda(input: PulseInputRows, day: string, now: Date): DayAge
     // Its own end when it is a real moment («Carga · hasta las 17h», even with
     // a rehearsal at 14h30 in between: that is the next row, not its end);
     // a soft end runs until the next thing starts.
-    const at = c.hard ? c.to : next !== null ? points[next].from : NaN;
+    // An all-day row is where you are: its midnight is no hour anybody wrote.
+    const at = c.hard && c.at !== null ? c.to : next !== null ? points[next].from : NaN;
     if (Number.isFinite(at)) {
       const iso = new Date(at).toISOString();
       if (dayKeyInTz(iso, input.viewerTz) === dayKeyInTz(now.toISOString(), input.viewerTz)) until = iso;

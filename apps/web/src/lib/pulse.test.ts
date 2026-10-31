@@ -79,6 +79,22 @@ describe('now — the day is segments, not events', () => {
     expect(now.until?.at).toBe(`${DAY}T15:00:00.000Z`);
   });
 
+  test('until is its own end when real, as Hoy’s card says it: a later start inside is NEXT, not the end', () => {
+    // A press call at 16h15 local (14:15Z) with no end, starting during the load-in.
+    const press = date({ id: 'd-press', kind: 'press', starts_at: `${DAY}T14:15:00Z`, ends_at: `${DAY}T14:45:00Z` });
+    const p = pulse({ performances: [SHEET], dates: [press], viewerTz: TZ }, at('14:00:00'));
+    expect(p.now.doing?.word).toEqual({ of: 'step', key: 'load_in' });
+    // Before: 14:15Z (the press call starting). Now: the load-in's own end.
+    expect(p.now.until?.at).toBe(`${DAY}T15:00:00.000Z`);
+  });
+
+  test('a soft end still runs until the next thing starts', () => {
+    const open = date({ id: 'd-open', kind: 'rehearsal', starts_at: `${DAY}T08:00:00Z`, ends_at: null });
+    const later = date({ id: 'd-later', kind: 'press', starts_at: `${DAY}T11:00:00Z` });
+    const p = pulse({ performances: [], dates: [open, later], viewerTz: TZ }, at('09:00:00'));
+    expect(p.now.until?.at).toBe(`${DAY}T11:00:00.000Z`);
+  });
+
   test('the last moment runs soft: what you are in, never an invented end', () => {
     const only = perf({ start_at: `${DAY}T18:00:00Z` });
     const { now } = pulse({ performances: [only], dates: [], viewerTz: TZ }, at('20:00:00'));

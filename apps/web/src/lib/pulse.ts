@@ -155,6 +155,9 @@ interface Segment {
   from: number;
   to: number;
   hard: boolean;
+  /** An all-day row: it is where you are, and its end (midnight) is not an
+      hour anybody wrote, so it never answers «until». */
+  allDay?: boolean;
   word: PulseWord;
   ref: PulseRef;
   tz: string | null;
@@ -299,7 +302,7 @@ function dateEntry(d: DateEvent, viewerTz: string, attribution: PersonAttributio
       : endOfDay(d.starts_at, tz);
   const hard = d.all_day ? true : Boolean(d.ends_at);
   const usable = Number.isFinite(from) && Number.isFinite(to) && to > from;
-  const segments: Segment[] = usable ? [{ from, to, hard, word, ref, tz: ref.tz }] : [];
+  const segments: Segment[] = usable ? [{ from, to, hard, allDay: d.all_day, word, ref, tz: ref.tz }] : [];
 
   // A TRIP IS ITS STAGES (ADR-146): inside a stage you are on the train, the
   // innermost segment wins over the day; the stage ends at its arrival, or at
@@ -424,8 +427,11 @@ export function computePulse(input: PulseInput, now: Date): Pulse {
     }
   }
 
-  // The next boundary is whichever comes first: something starting, or the
-  // end of what you are in — and the latter only when it is a real moment.
+  // UNTIL (ADR-151 follow-up, the card's rule, so the rail and Hoy agree):
+  // what you are in ends at its own end when that is a real moment («carga
+  // hasta las 17h», even with a rehearsal at 14h30 in between: that is NEXT,
+  // not its end). A soft end, or an all-day row, runs until the next thing
+  // starts; free time too.
   let boundaryAt = Number.POSITIVE_INFINITY;
   let boundaryTz: string | null = null;
   const consider = (at: number, tz: string | null) => {
@@ -433,10 +439,13 @@ export function computePulse(input: PulseInput, now: Date): Pulse {
     boundaryAt = at;
     boundaryTz = tz;
   };
-  for (const entry of entries) {
-    for (const segment of entry.segments) consider(segment.from, segment.tz);
+  if (doing?.hard && !doing.allDay) {
+    consider(doing.to, doing.tz);
+  } else {
+    for (const entry of entries) {
+      for (const segment of entry.segments) consider(segment.from, segment.tz);
+    }
   }
-  if (doing?.hard) consider(doing.to, doing.tz);
 
   const untilIso = Number.isFinite(boundaryAt) ? new Date(boundaryAt).toISOString() : null;
   const until =

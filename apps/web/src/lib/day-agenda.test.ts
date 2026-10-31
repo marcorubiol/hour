@@ -3,7 +3,8 @@
  * the past dims, the show stays marked.
  */
 import { describe, expect, test } from 'vitest';
-import { agendaDay, agendaPoints, dayAgenda } from './day-agenda';
+import { agendaDay, agendaPoints, agendaRows, dayAgenda } from './day-agenda';
+import { dayThings } from './desk-bands';
 import { buildPersonAttribution } from './people';
 import type { DateEvent, PerformanceEvent } from './month-events';
 
@@ -179,6 +180,38 @@ describe('the card moves with the day', () => {
     expect(a.headline).toBe('doing');
     expect(word(a, a.focus)).toBe('start');
     expect(a.until).toBe(iso('22:00'));
+  });
+});
+
+describe('the headline counts the agenda’s own rows', () => {
+  test('a show, a train and a rehearsal are three things: «función en Girona y 2 cosas más»', () => {
+    const rows = agendaRows(agendaPoints(input, DAY));
+    expect(rows.map((r) => r.id)).toEqual(['d-train', 'p-show', 'd-reh']);
+    const things = dayThings({
+      performances: rows.flatMap((r) => (r.of === 'performance' ? [r.row as PerformanceEvent] : [])),
+      dates: rows.flatMap((r) => (r.of === 'date' ? [r.row as DateEvent] : [])),
+    });
+    expect(things.map((x) => x.kind)).toEqual(['show', 'travel_day', 'rehearsal']);
+  });
+
+  test('a trip counts on the day its legs leave, whatever day its all-day row was stored on', () => {
+    const stored = { ...train, starts_at: '2026-08-13T22:00:00Z' };
+    expect(agendaRows(agendaPoints({ ...input, dates: [stored] }, DAY)).map((r) => r.id)).toEqual(['d-train', 'p-show']);
+  });
+
+  test('an all-day row without legs is on its stored calendar day (the month’s rule)', () => {
+    const off = date({ id: 'd-off', kind: 'day_off', all_day: true, starts_at: `${DAY}T00:00:00Z`, ends_at: null });
+    expect(agendaPoints({ performances: [], dates: [off], viewerTz: 'America/New_York' }, DAY).map((p) => p.ref.id)).toEqual(['d-off']);
+  });
+
+  test('«lo mío» drops the company date from the count as from the agenda', () => {
+    const axis = buildPersonAttribution({
+      pinnedPersonIds: ['me'],
+      team: [{ person_id: 'me', workspace_id: 'ws-a', slug: 'me', full_name: 'Me', project_ids: ['pr-gota', 'pr-other'] }],
+      viewScope: () => 'mine',
+    });
+    const mine = { performances: [{ ...show, person_ids: ['me'] }], dates: [{ ...train, commitments: [{ person_id: 'me', state: 'going' as const }] }, rehearsal], viewerTz: TZ, axis };
+    expect(agendaRows(agendaPoints(mine, DAY)).map((r) => r.id)).toEqual(['d-train', 'p-show']);
   });
 });
 
