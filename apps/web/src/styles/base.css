@@ -2404,43 +2404,6 @@
     position: absolute;
     inset: min(0em, calc((1.75em - var(--touch-target)) / 2));
   }
-  /* The scope's door on a phone (ADR-145 § 5): unscoped, the shell's scope
-     bar gives its row to the lens, and «Todo» waits here before the «?»,
-     in the bar's own dashed pill (the shape of «+ acotar»). From 48 rem up
-     the bar is drawn and this is not. */
-  .lenshead__scope {
-    position: relative;
-    display: none;
-    align-items: center;
-    padding-block: var(--space-2xs);
-    padding-inline: var(--space-s);
-    border: var(--line-hairline) dashed var(--border-color-dark);
-    border-radius: var(--radius-circle);
-    background: none;
-    color: var(--text-muted);
-    font-family: var(--font-display);
-    font-style: italic;
-    font-size: var(--text-s);
-    line-height: 1.2;
-    cursor: pointer;
-    transition:
-      color var(--transition),
-      border-color var(--transition);
-  }
-  .lenshead__scope:hover {
-    color: var(--text-color);
-    border-color: var(--text-muted);
-  }
-  .lenshead__scope::before {
-    content: '';
-    position: absolute;
-    inset: min(0em, calc((2em - var(--touch-target)) / 2));
-  }
-  @media (max-width: 47.999rem) {
-    .lenshead__scope {
-      display: inline-flex;
-    }
-  }
   /* The title voice: the lens title, and a dialog's title one step down
      (ADR-139 p4) — one rule, so the two never drift. */
   .lenshead__title,
