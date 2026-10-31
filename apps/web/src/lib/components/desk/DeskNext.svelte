@@ -45,6 +45,9 @@
   import { ahoraRoadsheetQuery, roleFor, type AhoraRoadsheet } from '$lib/ahora-feeds.svelte';
   import type { NavWorkspace } from '$lib/nav';
   import { pulseSlip } from '$lib/pulse-feeds.svelte';
+  import IdentityMark from '$lib/components/IdentityMark.svelte';
+  import { accentVarFor } from '$lib/utils/accent';
+  import type { ProjectLite } from '$lib/month-events';
 
   interface Props {
     /** The day in order, with its card (`dayAgenda`); null with nothing near. */
@@ -187,6 +190,15 @@
   const rowHref = (p: AgendaPoint) => pulseSlip(p.ref, agenda!.day, slipCtx).href ?? undefined;
 </script>
 
+<!-- WHOSE IT IS, at a glance: the project's monogram, glyph first, before
+     the kind word (identity norms; the Slip's pack). Marco spans companies,
+     so every card, row and line of the day carries it. -->
+{#snippet mark(project: ProjectLite | null | undefined)}
+  {#if project}<span class="next__mark"
+      ><IdentityMark mini accent={accentVarFor(project)} name={project.name} initials={project.initials} /></span
+    >{/if}
+{/snippet}
+
 {#snippet then(item: PulseNext, label: string | null)}
   {@const sl = pulseSlip(item.ref, item.day, slipCtx)}
   {@const held = sl.cert === 'hold' || sl.cert === 'proposed'}
@@ -202,7 +214,7 @@
     <span class="then__k" class:then__k--none={!label}>{label ?? ''}</span>
     <span class="then__when">{when}</span>
     <svelte:element this={sl.href ? 'a' : 'span'} href={sl.href} class="then__what">
-      <span class="then__kind">{kindLabel(sl.kind)}{held ? '?' : ''}</span>
+      {@render mark(item.ref.row.project)}<span class="then__kind">{kindLabel(sl.kind)}{held ? '?' : ''}</span>
       <span class:guess={held}>{where}</span>
     </svelte:element>
   </li>
@@ -214,7 +226,7 @@
   <li class="agenda__row" class:agenda__row--past={past} class:agenda__row--main={p.main} data-testid={p.main ? 'desk-agenda-main' : undefined}>
     <span class="agenda__h">{p.at ? hour(p.at, p.tz) : t('planner.all_day', locale)}</span>
     <svelte:element this={href ? 'a' : 'span'} {href} class="agenda__what">
-      {#if p.what.of !== 'moment' || p.main}<span class="agenda__k">{word(p)}{p.ref.tentative ? '?' : ''}</span>{:else}{cap(word(p))}{/if}
+      {@render mark(p.ref.row.project)}{#if p.what.of !== 'moment' || p.main}<span class="agenda__k">{word(p)}{p.ref.tentative ? '?' : ''}</span>{:else}{cap(word(p))}{/if}
       {#if p.what.of !== 'moment' || p.main}{#if where}<span class:guess={p.ref.tentative}>{where}</span>{/if}{/if}
     </svelte:element>
   </li>
@@ -253,7 +265,7 @@
       {#each agenda.points as p, i (p.key)}
         {#if i === agenda.focus}
           <li class="card" class:card--main={p.main} data-testid="desk-next">
-            <span class="card__eye">{eye}</span>
+            <span class="card__eye">{@render mark(p.ref.row.project)}{eye}</span>
             <span class="card__now" data-testid="desk-next-now">{big}</span>
             {#if small}<span class="card__where" class:guess={p.ref.tentative}>{small}</span>{/if}
             {#if hasFoot}
@@ -371,6 +383,14 @@
   }
   .card--wait {
     color: var(--text-faint);
+  }
+  /* The pack keeps its glyph and the word after it together, on the text's
+     baseline; it never yields to a long name. */
+  .next__mark {
+    display: inline-flex;
+    flex: none;
+    vertical-align: baseline;
+    margin-inline-end: var(--space-xs);
   }
   .card__eye {
     font-family: var(--font-mono);
