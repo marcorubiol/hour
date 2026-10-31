@@ -5332,3 +5332,5 @@ y `desk-feed.ts` al commit anterior; `upcoming` y `dayCard` de `$lib/pulse` pued
 **Re-evaluar cuando** Marco lo use una semana de gira: si tres en «Después» son pocas o muchas, si una opción que
 sale en «Después» y como decisión en «Te espera» se lee como repetida, y si la banda 1 acotada a un proyecto debería
 seguir el ámbito.
+
+> **Notas de ADR-149 (2026-10-31):** enmienda ADR-121, ADR-127 y ADR-148 en lo que toca a Hoy: la tarjeta es un día, no la siguiente fila; «Ha cambiado» sigue a «Te espera»; las decisiones entran en «Te espera».

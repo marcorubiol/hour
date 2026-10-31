@@ -511,6 +511,8 @@
 
 - [ ] **Modo «Ahora», después de la v1** (ADR-146, v1 en producción el 30-10): hotel y aparcamiento estructurados, billetes y rider en PDF, «qué ha cambiado», escribir sin red, aviso 30 min antes de la llamada. Re-evaluar dónde va el botón en el móvil tras usarlo en gira.
 
+- [ ] **Hoy, tras ADR-149:** en el móvil una línea de «Después» con día y hora parte el nombre en dos; la tarjeta dice «Sin reparto» aunque hayas dicho «voy» (el reparto es la lista de la función, ADR-147); una opción sale en «Después» y como decisión en «Te espera» (se deja así por ahora).
+
 ## Deuda aceptada / observar en uso
 
 - [ ] **Los datos fiscales de una organización no se pueden retirar (visto el 2026-10-13, tests de la fase 4 de ADR-102).** Un borrado blando por PostgREST da 42501 (la fila borrada ya no pasa la policy de SELECT), `service_role` no tiene grant sobre `fiscal_identity` y no hay RPC para retirarla. La limpieza de `money-v3.test.ts` y de `money-payer-organization.test.ts` no borraba nada sin decirlo. Cuando haga falta: una RPC `retire_fiscal_identity` con `can_edit_workspace_money`. (chat 13-10, sin estimar)
