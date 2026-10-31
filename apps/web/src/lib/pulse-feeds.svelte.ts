@@ -24,6 +24,7 @@ import {
 } from '$lib/month-events';
 import { meQueryOptions, teamQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
 import { buildPersonAttribution } from '$lib/people';
+import { viewScopeIndex } from '$lib/view-scope';
 import { plannerDayHref } from '$lib/planner';
 import { lensOn } from '$lib/lenses.svelte';
 import type { PulseRef } from '$lib/pulse';
@@ -91,10 +92,13 @@ export function createPulseFeeds(today: () => string) {
       ),
     ),
   );
+  // Each space's «lo mío / todo» (ADR-151): the pulse, Hoy and Ahora are the
+  // person's own surfaces, so they read it.
   const axis = $derived(
     buildPersonAttribution({
       pinnedPersonIds: personId ? [personId] : [],
       team: team.current.data?.items ?? [],
+      viewScope: viewScopeIndex(workspaces),
     }),
   );
 

@@ -79,13 +79,25 @@ export function settingsSectionsFor<S extends string>(
 export interface OwnMembership {
   workspace_id: string;
   workspace_role: string | null;
+  /** The access package (`access_preset.key`), when one was granted. */
+  preset?: string | null;
+  /** ADR-151 — «lo mío / todo»; absent until its migration is applied. */
+  view_scope?: string | null;
 }
 
-/** Each workspace with the caller's role in it; null where there is no row to say. */
+/** Each workspace with the caller's role, package and «lo mío / todo» in it; null where there is no row to say. */
 export function withMyRole<T extends { id: string }>(
   items: readonly T[],
   memberships: readonly OwnMembership[],
-): (T & { my_role: WorkspaceRole | null })[] {
-  const roles = new Map(memberships.map((m) => [m.workspace_id, m.workspace_role]));
-  return items.map((w) => ({ ...w, my_role: (roles.get(w.id) as WorkspaceRole | null | undefined) ?? null }));
+): (T & { my_role: WorkspaceRole | null; my_preset: string | null; view_scope: string | null })[] {
+  const own = new Map(memberships.map((m) => [m.workspace_id, m]));
+  return items.map((w) => {
+    const m = own.get(w.id);
+    return {
+      ...w,
+      my_role: (m?.workspace_role as WorkspaceRole | null | undefined) ?? null,
+      my_preset: m?.preset ?? null,
+      view_scope: m?.view_scope ?? null,
+    };
+  });
 }

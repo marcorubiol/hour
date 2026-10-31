@@ -49,7 +49,7 @@
   import { usePins } from '$lib/stores/pins.svelte';
   import { useCalm } from '$lib/stores/calm.svelte';
   import { buildLineIndex, buildProjectIndex, resolveScope, workspacesOnScreen, type NavWorkspace, type RawLine } from '$lib/nav';
-  import { workspacesQueryOptions, activeProjectsQueryOptions, allLinesQueryOptions, teamQueryOptions, meQueryOptions } from '$lib/nav-queries';
+  import { workspacesQueryOptions, activeProjectsQueryOptions, allLinesQueryOptions, meQueryOptions } from '$lib/nav-queries';
   import { userDisplayName } from '$lib/utils/identity';
   import { session } from '$lib/session.svelte';
   import { moneyAccessAnyQueryOptions } from '$lib/bolo-queries';
@@ -79,14 +79,15 @@
     paymentsSinceEarlier,
     plannerDoor,
     sinceInstant,
-    todayThings,
+    dayThings,
     type RecordedPayment,
   } from '$lib/desk-bands';
   import { shows } from '$lib/calm';
   import { blockDrawn, screenQuiet } from '$lib/dashboard-blocks';
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { daysAgoLabel } from '$lib/conversation';
-  import { dayCard, upcoming } from '$lib/pulse';
+  import { upcoming } from '$lib/pulse';
+  import { agendaDay, agendaPoints, agendaRows, dayAgenda } from '$lib/day-agenda';
   import { createPulseFeeds, pulseSlipContext } from '$lib/pulse-feeds.svelte';
   import { dateSlip, perfDayKey, performanceSlip, perfWorkspaceId, type DateEvent, type PerformanceEvent, type SlipKind } from '$lib/month-events';
   import { clashesInSeason, seasonWindow } from '$lib/season';
@@ -210,14 +211,30 @@
   // ── Band 1 · Lo siguiente — the rail's feeds, the rail's answer ────────
   const feeds = createPulseFeeds(() => today);
   /**
-   * The card is a day (ADR-149): the next day you have something, titled by
-   * its performance when it has one, its other things as lines inside, and
-   * the next three things of other days under it. The pulse's own rule, run
-   * again with each answer gone (`upcoming`): one order for card and rail.
+   * The day as an agenda, what is on now opened as the card (ADR-150): today
+   * while anything of it is on or ahead, else the next day you have
+   * something. Under it the next three things of other days. The pulse's own
+   * rows and order (`upcoming`), so card, agenda and rail never disagree.
    */
-  let lead = $derived(
-    dayCard(upcoming({ performances: feeds.performances, dates: feeds.dates, viewerTz, axis: feeds.axis }, clockNow, 10)),
+  let pulseInput = $derived({ performances: feeds.performances, dates: feeds.dates, viewerTz, axis: feeds.axis });
+  let coming = $derived(upcoming(pulseInput, clockNow, 12));
+  // Nothing within two weeks: one sentence names what comes (ADR-149).
+  const FAR_DAYS = 14;
+  let farNext = $derived(
+    coming[0] && Date.parse(`${coming[0].day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`) > FAR_DAYS * 86_400_000
+      ? coming[0]
+      : null,
   );
+  let agendaOn = $derived(farNext ? null : agendaDay(pulseInput, clockNow, coming[0]?.day ?? null));
+  let agenda = $derived(agendaOn ? dayAgenda(pulseInput, agendaOn, clockNow) : null);
+  let after = $derived(coming.filter((x) => x.day !== agendaOn).slice(0, 3));
+  /** The performance the card's actions are about: the focus, else the day's main one. */
+  let cardPerformanceId = $derived.by(() => {
+    if (!agenda) return '';
+    const focus = agenda.focus !== null ? agenda.points[agenda.focus] : null;
+    const p = focus?.ref.of === 'performance' ? focus : agenda.points.find((x) => x.main);
+    return p?.ref.id ?? '';
+  });
   const kindLabel = (kind: SlipKind) => t(`planner.kind_${kind}`, locale);
   let slipCtx = $derived(pulseSlipContext(feeds.workspaces, viewerTz, kindLabel));
 
@@ -245,17 +262,10 @@
       /* private window: a relaunch opens Hoy */
     }
   });
-  // Who goes, by name: the Planner's team feed (same key, one cache). Null
-  // until it lands, so the card never says «sin reparto» while it loads.
-  const teamQuery = createQuery(toStore(() => teamQueryOptions(feeds.workspaces.map((w) => w.id))));
-  let personNames = $derived(
-    $teamQuery.isSuccess ? new Map(($teamQuery.data?.items ?? []).map((m) => [m.person_id, m.full_name])) : null,
-  );
-
-  // «Tablón · N nuevos» (plan 2026-10-22 § 3.3): the next performance's
+  // «Tablón · N nuevos» (plan 2026-10-22 § 3.3): the card's performance's
   // board, under the record's own key, so opening it costs nothing more.
   // The signal that was missing on the day of the show; no mail, no push.
-  let nextPerformanceId = $derived(lead?.card.ref.of === 'performance' ? lead.card.ref.id : '');
+  let nextPerformanceId = $derived(cardPerformanceId);
   const nextBoardQuery = createQuery(
     toStore(() => ({
       queryKey: ['bolo-board', nextPerformanceId] as const,
@@ -593,7 +603,14 @@
   const KIND_WORDS = new Set(['show', 'rehearsal', 'residency', 'travel_day', 'press', 'other', 'day_off']);
   let dayTitle = $derived.by(() => {
     if (!feeds.settled || feeds.errored) return '—';
-    const things = todayThings({ performances: feeds.performances, dates: feeds.dates, viewerTz }, today);
+    // The rows of the agenda under it, each once: the title counts exactly
+    // what the agenda lists, by the person axis and each space's «lo mío /
+    // todo» (ADR-151).
+    const rows = agendaRows(agendaPoints(pulseInput, today));
+    const things = dayThings({
+      performances: rows.flatMap((r) => (r.of === 'performance' ? [r.row as PerformanceEvent] : [])),
+      dates: rows.flatMap((r) => (r.of === 'date' ? [r.row as DateEvent] : [])),
+    });
     const first = things[0];
     if (!first) return t('desk.day_none', locale);
     const what = first.label ?? t(`planner.kind_${KIND_WORDS.has(first.kind) ? first.kind : 'other'}`, locale);
@@ -831,10 +848,11 @@
     <div class="desk__col">
       <div class="slot slot--next" data-help-step="desk-next">
         <DeskNext
-          next={lead?.card ?? null}
-          before={lead?.before}
-          later={lead?.later}
-          after={lead?.after}
+          {agenda}
+          far={farNext}
+          {after}
+          now={clockNow}
+          workspaces={feeds.workspaces}
           settled={feeds.settled}
           errored={feeds.errored}
           onretry={retryFailed}
@@ -842,7 +860,6 @@
           {viewerTz}
           boardNew={nextBoardNew}
           {slipCtx}
-          {personNames}
           ahoraHref={ahoraOn ? ahoraHref : null}
           {locale}
         />

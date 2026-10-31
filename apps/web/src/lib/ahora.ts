@@ -30,7 +30,7 @@ import {
   type MomentKey,
   type PerformanceEvent,
 } from './month-events';
-import { performanceAttribution, timedStages } from './pulse';
+import { pulseRows, timedStages } from './pulse';
 import type { PersonAttribution, PersonAttributionScope } from './people';
 import type { TransportMode, TravelStageRow } from './travel-stage';
 
@@ -156,24 +156,10 @@ function tripItem(d: DateEvent, viewerTz: string, attribution: PersonAttribution
  * somebody else's (the pulse's rule: only `no` is dropped, ADR-096).
  */
 export function ahoraItems(input: AhoraInput): AhoraItem[] {
-  const axis = input.axis?.active ? input.axis : null;
   const out: AhoraItem[] = [];
-  for (const p of input.performances) {
-    if (p.status === 'cancelled') continue;
-    const attribution = performanceAttribution(p, axis);
-    if (attribution === 'no') continue;
-    out.push(performanceItem(p, input.viewerTz, attribution));
-  }
-  for (const d of input.dates) {
-    if (d.status === 'cancelled' || d.kind !== 'travel_day') continue;
-    const attribution: PersonAttribution = axis
-      ? axis.attribute({
-          projectId: d.project?.id ?? null,
-          commitments: d.commitments,
-        })
-      : 'explicit';
-    if (attribution === 'no') continue;
-    out.push(tripItem(d, input.viewerTz, attribution));
+  for (const r of pulseRows(input)) {
+    if (r.of === 'performance') out.push(performanceItem(r.row, input.viewerTz, r.attribution));
+    else if (r.row.kind === 'travel_day') out.push(tripItem(r.row, input.viewerTz, r.attribution));
   }
   return out.sort((a, b) => a.start - b.start);
 }

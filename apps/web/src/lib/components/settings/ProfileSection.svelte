@@ -14,6 +14,7 @@
   import { resetHelp } from '$lib/help-seen.svelte';
   import { SaveFlash } from '$lib/save-flash.svelte';
   import MasterViewSetting from './MasterViewSetting.svelte';
+  import ViewScopeSetting from './ViewScopeSetting.svelte';
 
   const locale = appLocale();
 
@@ -283,6 +284,8 @@
     {/if}
   </div>
 </section>
+
+<ViewScopeSetting />
 
 <MasterViewSetting />
 

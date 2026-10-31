@@ -55,13 +55,14 @@
 import { wallClockToInstant } from './datetime';
 import {
   MOMENT_KEYS,
+  perfWorkspaceId,
   runSheetSteps,
   type DateEvent,
   type MomentKey,
   type PerformanceEvent,
 } from './month-events';
 import type { TransportMode, TravelStageRow } from './travel-stage';
-import type { PersonAttribution, PersonAttributionScope } from './people';
+import { keepsRow, type PersonAttribution, type PersonAttributionScope } from './people';
 import { dayKeyInTz } from './planner';
 import { performanceStatusFamily, type StatusFamily } from './performance';
 import { dateStatusFamily } from './date';
@@ -145,12 +146,18 @@ interface PulseInput {
   nextKeeps?: (ref: PulseRef) => boolean;
 }
 
+/** What a reader of the rows needs: the feeds, the zone and the person axis. */
+export type PulseInputRows = Pick<PulseInput, 'performances' | 'dates' | 'axis' | 'viewerTz'>;
+
 /** A stretch of the day one row occupies. `hard` = the end is a real
     moment; soft means «until the day is out», which is not an hour. */
 interface Segment {
   from: number;
   to: number;
   hard: boolean;
+  /** An all-day row: it is where you are, and its end (midnight) is not an
+      hour anybody wrote, so it never answers «until». */
+  allDay?: boolean;
   word: PulseWord;
   ref: PulseRef;
   tz: string | null;
@@ -244,15 +251,7 @@ function performanceEntry(
   attribution: PersonAttribution,
 ): Entry {
   const tz = p.venue?.timezone || viewerTz;
-  const ref: PulseRef = {
-    of: 'performance',
-    id: p.id,
-    row: p,
-    tz: p.venue?.timezone ?? null,
-    attribution,
-    tentative: isTentative(p.status),
-    family: performanceStatusFamily(p.status),
-  };
+  const ref = pulseRef({ of: 'performance', row: p, attribution });
 
   // THE SEAM. Five columns today, rows tomorrow; this module never learns
   // which, and never learns their names either.
@@ -289,15 +288,7 @@ function performanceEntry(
 
 function dateEntry(d: DateEvent, viewerTz: string, attribution: PersonAttribution): Entry {
   const tz = d.venue?.timezone || viewerTz;
-  const ref: PulseRef = {
-    of: 'date',
-    id: d.id,
-    row: d,
-    tz: d.venue?.timezone ?? null,
-    attribution,
-    tentative: isTentative(d.status),
-    family: dateStatusFamily(d.status),
-  };
+  const ref = pulseRef({ of: 'date', row: d, attribution });
   const word: PulseWord = { of: 'kind', key: d.kind, label: d.label ?? null };
 
   // An all-day row IS the day — midnight to midnight, across every day it
@@ -311,7 +302,7 @@ function dateEntry(d: DateEvent, viewerTz: string, attribution: PersonAttributio
       : endOfDay(d.starts_at, tz);
   const hard = d.all_day ? true : Boolean(d.ends_at);
   const usable = Number.isFinite(from) && Number.isFinite(to) && to > from;
-  const segments: Segment[] = usable ? [{ from, to, hard, word, ref, tz: ref.tz }] : [];
+  const segments: Segment[] = usable ? [{ from, to, hard, allDay: d.all_day, word, ref, tz: ref.tz }] : [];
 
   // A TRIP IS ITS STAGES (ADR-146): inside a stage you are on the train, the
   // innermost segment wins over the day; the stage ends at its arrival, or at
@@ -360,32 +351,69 @@ export function performanceAttribution(
   });
 }
 
+/** A row the pulse reads, with how it reaches the viewer. */
+export type PulseRow =
+  | { of: 'performance'; row: PerformanceEvent; attribution: PersonAttribution }
+  | { of: 'date'; row: DateEvent; attribution: PersonAttribution };
+
+/** The person-axis verdict of a date: its «voy» list and its project. */
+export function dateAttribution(
+  d: Pick<DateEvent, 'project' | 'commitments'>,
+  axis: PersonAttributionScope | null | undefined,
+): PersonAttribution {
+  if (!axis?.active) return 'explicit';
+  return axis.attribute({ projectId: d.project?.id ?? null, commitments: d.commitments });
+}
+
+/**
+ * THE ROWS THAT ARE YOURS TO READ: not cancelled, and not dropped by the
+ * person axis. One rule for the pulse, Hoy's agenda and Ahora, so the three
+ * never disagree about what is on. ADR-147 drops only `no`; with the space's
+ * «lo mío / todo» on the axis (ADR-151), «lo mío» keeps only what you are on
+ * and «todo» keeps the whole company.
+ */
+export function pulseRows(input: Pick<PulseInput, 'performances' | 'dates' | 'axis'>): PulseRow[] {
+  const axis = input.axis?.active ? input.axis : null;
+  const out: PulseRow[] = [];
+  for (const p of input.performances) {
+    if (isCancelled(p.status)) continue;
+    const attribution = performanceAttribution(p, axis);
+    if (!keepsRow(axis, attribution, perfWorkspaceId(p))) continue;
+    out.push({ of: 'performance', row: p, attribution });
+  }
+  for (const d of input.dates) {
+    if (isCancelled(d.status)) continue;
+    const attribution = dateAttribution(d, axis);
+    if (!keepsRow(axis, attribution, d.project?.workspace_id ?? null)) continue;
+    out.push({ of: 'date', row: d, attribution });
+  }
+  return out;
+}
+
+/** The ref a row is drawn by (rail, card, agenda): its zone, verdict, certainty. */
+export function pulseRef(r: PulseRow): PulseRef {
+  const status = r.row.status;
+  return {
+    of: r.of,
+    id: r.row.id,
+    row: r.row,
+    tz: r.row.venue?.timezone ?? null,
+    attribution: r.attribution,
+    tentative: isTentative(status),
+    family: r.of === 'performance' ? performanceStatusFamily(status) : dateStatusFamily(status),
+  };
+}
+
 export function computePulse(input: PulseInput, now: Date): Pulse {
   const t = now.getTime();
   const viewerTz = input.viewerTz;
   const today = dayKeyInTz(now.toISOString(), viewerTz);
-  const axis = input.axis?.active ? input.axis : null;
 
-  const entries: Entry[] = [];
-
-  for (const p of input.performances) {
-    if (isCancelled(p.status)) continue;
-    const attribution = performanceAttribution(p, axis);
-    if (attribution === 'no') continue;
-    entries.push(performanceEntry(p, viewerTz, attribution));
-  }
-
-  for (const d of input.dates) {
-    if (isCancelled(d.status)) continue;
-    const attribution = axis
-      ? axis.attribute({
-          projectId: d.project?.id ?? null,
-          commitments: d.commitments,
-        })
-      : 'explicit';
-    if (attribution === 'no') continue;
-    entries.push(dateEntry(d, viewerTz, attribution));
-  }
+  const entries: Entry[] = pulseRows(input).map((r) =>
+    r.of === 'performance'
+      ? performanceEntry(r.row, viewerTz, r.attribution)
+      : dateEntry(r.row, viewerTz, r.attribution),
+  );
 
   // ── NOW ──────────────────────────────────────────────────────────────
   // The innermost segment wins: a rehearsal inside a residency is what you
@@ -399,8 +427,11 @@ export function computePulse(input: PulseInput, now: Date): Pulse {
     }
   }
 
-  // The next boundary is whichever comes first: something starting, or the
-  // end of what you are in — and the latter only when it is a real moment.
+  // UNTIL (ADR-151 follow-up, the card's rule, so the rail and Hoy agree):
+  // what you are in ends at its own end when that is a real moment («carga
+  // hasta las 17h», even with a rehearsal at 14h30 in between: that is NEXT,
+  // not its end). A soft end, or an all-day row, runs until the next thing
+  // starts; free time too.
   let boundaryAt = Number.POSITIVE_INFINITY;
   let boundaryTz: string | null = null;
   const consider = (at: number, tz: string | null) => {
@@ -408,10 +439,13 @@ export function computePulse(input: PulseInput, now: Date): Pulse {
     boundaryAt = at;
     boundaryTz = tz;
   };
-  for (const entry of entries) {
-    for (const segment of entry.segments) consider(segment.from, segment.tz);
+  if (doing?.hard && !doing.allDay) {
+    consider(doing.to, doing.tz);
+  } else {
+    for (const entry of entries) {
+      for (const segment of entry.segments) consider(segment.from, segment.tz);
+    }
   }
-  if (doing?.hard) consider(doing.to, doing.tz);
 
   const untilIso = Number.isFinite(boundaryAt) ? new Date(boundaryAt).toISOString() : null;
   const until =
@@ -471,36 +505,4 @@ export function upcoming(input: PulseInput, now: Date, n: number): PulseNext[] {
     out.push(next);
   }
   return out;
-}
-
-export interface DayCard {
-  /** What titles the card: the day's first performance, else its first thing. */
-  card: PulseNext;
-  /** The card's day before it (the train to the show), in order. */
-  before: PulseNext[];
-  /** The card's day after it (a rehearsal after the show), in order. */
-  later: PulseNext[];
-  /** The next things on other days, at most `afterMax`. */
-  after: PulseNext[];
-}
-
-/**
- * Hoy's card is a DAY, not a row (ADR-149): the next day you have something,
- * titled by its performance when it has one, with that day's other things as
- * lines inside it; then the next things of other days, one line each. Before,
- * a busy day lost its show: the card was the 9h train, the line under it the
- * noon rehearsal, and the headline said «función en Girona».
- */
-export function dayCard(list: readonly PulseNext[], afterMax = 3): DayCard | null {
-  const first = list[0];
-  if (!first) return null;
-  const same = list.filter((x) => x.day === first.day);
-  const card = same.find((x) => x.ref.of === 'performance') ?? first;
-  const at = same.indexOf(card);
-  return {
-    card,
-    before: same.slice(0, at),
-    later: same.slice(at + 1),
-    after: list.filter((x) => x.day !== first.day).slice(0, afterMax),
-  };
 }

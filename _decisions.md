@@ -5258,6 +5258,10 @@ consumidores al commit anterior; las claves de i18n borradas están en el histor
 **Re-evaluar cuando** una fecha necesite reparto propio (un ensayo solo para tres músicos): entonces es una lista en
 la ficha, como el de una función, no una deducción.
 
+> **Amended by ADR-151 (2026-10-31), en § 2 y § 4.** Qué se queda depende de cada espacio: en «todo» toda la
+> compañía, fechas sin nadie incluidas; en «lo mío» solo lo que es tuyo por reparto o «voy». Sin preferencia (una
+> persona fijada en el Planificador) sigue esta regla.
+
 ## [2026-10-30] ADR-148 · Hoy en el móvil: la tarjeta primero (enmienda ADR-127 § 2 y ADR-146 § 2)
 
 **Contexto.** Marco, 30-10: un día de bolo, la primera pantalla de Hoy a 390 decía lo mismo tres veces (el titular
@@ -5334,3 +5338,113 @@ sale en «Después» y como decisión en «Te espera» se lee como repetida, y s
 seguir el ámbito.
 
 > **Notas de ADR-149 (2026-10-31):** enmienda ADR-121, ADR-127 y ADR-148 en lo que toca a Hoy: la tarjeta es un día, no la siguiente fila; «Ha cambiado» sigue a «Te espera»; las decisiones entran en «Te espera».
+
+> **Amended by ADR-150 (2026-10-31), solo en § 1.** La tarjeta ya no es el día: el día es una agenda en orden y la
+> tarjeta es lo de ahora (o lo siguiente) dentro de ella. «Después» sigue.
+
+## [2026-10-31] ADR-150 · Hoy: el día como agenda, lo de ahora abierto como tarjeta (enmienda ADR-149 § 1 y ADR-148 § 4)
+
+**Contexto.** Marco, 31-10, eligió la opción D de `build/coordination/hoy-review/antes-opciones.html` (fuera de git):
+la tarjeta-día de ADR-149 metía el tren y el ensayo dentro, bajo «Antes», y la tarjeta decía la sala en grande, que
+un día de bolo ya sabes. Pidió dos cosas más: la línea grande de la tarjeta es lo que haces ahora y su hora, la sala y
+la ciudad van pequeñas; y que sea igual en escritorio, no solo en el móvil. Carril `claude/hoy-agenda`. Sin migración
+ni endpoint.
+
+**Decisión.**
+1. **El día es una agenda en orden** (`$lib/day-agenda`, pura y con tests): cada momento de la escaleta de una función,
+   cada tramo de un viaje y cada fecha a su hora. Las filas son las del pulso (`pulseRows`, el eje de persona incluido),
+   que ahora comparten el pulso, Ahora y Hoy. El día es hoy mientras algo de hoy siga en marcha o por venir; si no, el
+   día de lo siguiente (el mismo `upcoming` de ADR-149).
+2. **Lo de ahora, o lo siguiente, se abre como tarjeta** en su sitio de la agenda. Ahora y lo siguiente son los del
+   pulso: un momento dura hasta el siguiente de su fila, un tramo hasta su llegada, una fecha hasta su fin; dentro de
+   dos cosas gana la de dentro; el fin y el toque de queda cierran la hoja. La regla del titular es la de Ahora
+   (ADR-146): a una hora o menos, la cuenta atrás a lo siguiente gana a lo que estás haciendo. Excepción: el fin de la
+   hoja nunca quita la tarjeta a la función («Función · hasta las 22h», no «Fin en 60 min»).
+3. **La línea grande es qué y cuándo**: «Carga · hasta las 17h» (su propio fin si es un momento real, aunque haya un
+   ensayo en medio: ese es la fila siguiente), «Prueba de sonido en 40 min», «Función · 20h30», «Tren en 12 min». La
+   cabecera dice «Ahora» cuando estás dentro y el día si no, más el proyecto. Debajo, en pequeño: sala y ciudad, la
+   ruta de un tramo con su llegada y su localizador, o el sitio de una fecha.
+4. **Acciones de la tarjeta**: Llamar, Mapa, Ahora y Hoja de ruta, de la función de la tarjeta o, si la tarjeta es un
+   viaje o un ensayo, de la función principal del día (en el tren, la sala es adonde vas). Llamar y Mapa salen de la
+   hoja de ruta que el marco ya precarga para Ahora (`ahoraRoadsheetQuery`, misma clave): ninguna lectura nueva.
+   «Quién va →» y «Tablón · N nuevos» se quedan. Fuera la línea de reparto de la tarjeta: la tarjeta es un momento.
+   En el móvil «Hoja de ruta» se lee «Hoja», como en Ahora, para que las cuatro quepan en una fila.
+5. **Lo pasado se apaga** (una tinta más suave, sigue ahí). **La función principal se marca** (tinta del texto y peso
+   500, sin estrella ni icono) aunque no sea la tarjeta; el titular la sigue nombrando («Hoy, función en Girona»).
+6. **«Después» igual que ADR-149**, con el arreglo del móvil: a 390 la fila día + hora partía el nombre en dos líneas;
+   ahora el día va en su línea y el nombre debajo con todo el ancho.
+7. **Igual en escritorio.** Misma agenda y misma tarjeta en la columna izquierda de Hoy; la tarjeta ocupa el ancho de
+   la columna y las acciones van en una fila con «Quién va».
+
+**Qué no cambia.** El titular (ADR-148), Ahora (ADR-146), que la banda 1 no sigue el ámbito (ADR-096 § 5), que Hour
+no pregunta quién va (ADR-147), «Te espera», «Ha cambiado» y las puertas (ADR-149).
+
+**Verificado** (31-10, `vite dev` desde el worktree contra la Supabase de producción; antes, producción `c9e00c0a`;
+usuario de los fixtures; día cargado plantado en `playwright` y borrado después: tren 9h12, carga 11h, ensayo de otro
+proyecto 14h30, prueba 17h, función 20h30, fin 22h): capturas a las 9h, 13h y 20h, a 390 táctil y a 1440, en
+`build/coordination/hoy-review/agenda/` (fuera de git). Unitarios: `day-agenda.test.ts`.
+
+**Cómo se revierte.** Volver `DeskNext.svelte` y `routes/h/desk/+page.svelte` al commit anterior y recuperar `dayCard`
+de `$lib/pulse` (y sus tests) del historial; `$lib/day-agenda` puede quedarse. Las claves `desk.next_before` y
+`desk.next_then` están en el historial.
+
+**Re-evaluar cuando** Marco lo use una gira: si la cuenta atrás de una hora quita demasiado pronto la tarjeta a lo que
+estás haciendo, y si una agenda con dos funciones el mismo día necesita marcar las dos.
+
+> **Enmienda a ADR-149 § 1 y ADR-148 § 4:** la tarjeta ya no es un día con «Antes» y «Luego» dentro; es lo de ahora,
+> dentro de la agenda del día.
+
+## [2026-10-31] ADR-151 · «Lo mío / Todo» por espacio (enmienda ADR-147 § 2 y § 4)
+
+**Contexto.** Marco, 31-10: un técnico de una compañía quiere ver lo suyo, y quien dirige quiere ver la compañía
+entera. ADR-147 dejó una sola regla para todos: se enseña lo que no es `no` (tu reparto, tu «voy» y las fechas de la
+compañía de tus proyectos). Marco eligió una preferencia por espacio frente a un interruptor global. Carril
+`claude/hoy-agenda`.
+
+**Decisión.**
+1. **Cada membresía de espacio guarda «lo mío» o «todo»** (`membership.view_scope`, `mine | all | null`).
+   «Lo mío»: solo las filas en las que estás, por reparto o por tu «voy». «Todo»: la compañía entera, las fechas sin
+   nadie (ADR-147 § 2) y también las funciones y fechas de los demás.
+2. **Lo leen las superficies personales y el Planificador**: Hoy (agenda, tarjeta, «Después» y el titular), Ahora, el
+   pulso del raíl, y el Planificador sin una persona fijada. Conversaciones y Cuentas no lo leen: son los libros de la
+   compañía. Una persona fijada a mano en el Planificador manda sobre la preferencia: miras a alguien, con la regla de
+   ADR-147, y solo entonces cuenta «N por proyecto, sin reparto».
+3. **Por defecto, el paquete de acceso**: Mínim y Equip → «lo mío»; Coordinació, Direcció y el owner → «todo». Sin
+   paquete, el rol: admin y member → «todo», viewer y guest → «lo mío». Un espacio cuyo dato no ha llegado se lee
+   como «todo», el lado que no esconde nada. La regla vive en `$lib/view-scope` (`defaultViewScope`), no en la base:
+   cambiar un paquete cambia el defecto sin migrar. Elegir en Ajustes el valor del paquete guarda `null`.
+4. **Sin control diario.** Se elige en Ajustes › Perfil, «Lo que ves», una línea por espacio con «Lo mío · Todo»
+   (`ViewScopeSetting`): es una preferencia de la persona, así que va donde ya están sus espacios y la alcanza un
+   invitado. No va en el selector de ámbito.
+5. **Un solo punto de decisión.** `PersonAttributionScope.keeps` (`$lib/people`, `keepsRow`) dice si una fila se
+   queda en su espacio; `pulseRows` (pulso, agenda de Hoy, Ahora) y el filtro del Planificador lo preguntan.
+
+**Enmienda a ADR-147.** § 2: una fecha sin nadie se enseña solo en un espacio en «todo». § 4: el veredicto sigue
+siendo uno, pero qué se queda depende del espacio: «todo» lo deja todo, «lo mío» solo `explicit`; sin preferencia
+(una persona fijada) sigue «todo menos `no`».
+
+**Migración escrita, sin aplicar:** `supabase/migrations/20261031100000_membership_view_scope.sql` (columna
+`membership.view_scope` con CHECK, sin grant nuevo: `authenticated` lee `membership` entera; función nueva
+`set_my_view_scope(uuid, text)`, SECURITY DEFINER, la propia membresía). Tipos a mano en `db-types.ts`. Mientras no se
+aplique, `GET /api/workspaces` lee la fila propia con `select=*` y no recibe `view_scope`: todos ven su defecto, y
+guardar en Ajustes falla (la RPC no existe).
+
+**Verificado** sin la migración: unitarios (`view-scope.test.ts`, `workspace-role.test.ts`) y capturas con la
+preferencia simulada en la respuesta de `/api/workspaces` (`vite dev`, Supabase de producción, día cargado en
+`playwright`, 9h, 13h y 20h a 390 y 1440, `build/coordination/hoy-review/agenda/mine-*` y `todo-*`, fuera de git):
+en «lo mío» se van el ensayo de otro proyecto y las funciones en opción sin reparto de «Después».
+
+**Cómo se revierte.** Quitar `viewScope` de `createPulseFeeds` y del Planificador (vuelve ADR-147 tal cual), la línea
+de Ajustes y `PUT /api/me/view-scope`; la columna y la función se borran con el rollback del fichero de migración.
+
+**Re-evaluar cuando** entre la primera persona con Equip: si «lo mío» en el Planificador esconde un choque que debería
+ver (el motor de conflictos ya solo lee lo que se queda), y si hace falta la preferencia también en el selector de
+ámbito.
+
+> **Seguimiento (2026-10-31, Marco, opción A en los dos detalles).** El «hasta» del pulso en el raíl adopta la regla
+> de la tarjeta de Hoy (ADR-150 § 3): lo que estás haciendo acaba en su propio fin cuando es un momento real; un fin
+> blando o una fila de todo el día dura hasta que empieza lo siguiente. El raíl y la tarjeta ya no se contradicen
+> («carga hasta 14h30» frente a «hasta las 17h»). Y el titular de Hoy cuenta las filas de su propia agenda
+> (`agendaRows` + `dayThings`), así que dice lo mismo que la lista de debajo y sigue «lo mío / todo». Una fila de
+> todo el día cuenta en su día guardado (la regla del mes, `dateDayKey`); un viaje con tramos, el día en que sale un
+> tramo. Test RLS de `set_my_view_scope` en `tests/rls/view-scope.test.ts`: va rojo hasta aplicar la migración.

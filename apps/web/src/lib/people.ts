@@ -27,6 +27,8 @@
  * and $lib/carrils.
  */
 
+import { keepsVerdict, type ViewScope } from './view-scope';
+
 /**
  * One member of a workspace's team, as `GET /api/team` returns them. The
  * canonical shape lives here because this module is what reasons about
@@ -190,6 +192,22 @@ export interface PersonAttributionScope {
     roster?: readonly string[] | null;
     commitments?: readonly Commitment[] | null;
   }): PersonAttribution;
+  /**
+   * Does a row with this verdict stay on screen, in its space? The space's
+   * «lo mío / todo» (ADR-151) when the view reads it; absent, ADR-147's rule:
+   * everything but `no`.
+   */
+  keeps?(verdict: PersonAttribution, workspaceId: string | null): boolean;
+}
+
+/** A scope's verdict on keeping a row: its own rule, else ADR-147's. */
+export function keepsRow(
+  axis: PersonAttributionScope | null | undefined,
+  verdict: PersonAttribution,
+  workspaceId: string | null,
+): boolean {
+  if (!axis?.active) return true;
+  return axis.keeps ? axis.keeps(verdict, workspaceId) : verdict !== 'no';
 }
 
 /**
@@ -201,6 +219,9 @@ export function buildPersonAttribution(input: {
   pinnedPersonIds: readonly string[];
   /** GET /api/team: `project_ids` says whose project a row is. */
   team: readonly TeamItem[];
+  /** The space's «lo mío / todo» (ADR-151): for the viewer's own surfaces and
+      the Planner without a pin. Absent: ADR-147 (everything but `no`). */
+  viewScope?: (workspaceId: string | null) => ViewScope;
 }): PersonAttributionScope {
   const pinned = new Set(input.pinnedPersonIds);
   if (pinned.size === 0) {
@@ -221,12 +242,14 @@ export function buildPersonAttribution(input: {
     }
   }
 
+  const viewScope = input.viewScope;
   return {
     active: true,
     attribute(row) {
       const people = peopleOf({ roster: row.roster, commitments: row.commitments });
       return attributionFor(people, pinned, row.projectId ? onFileByProject.get(row.projectId) : null);
     },
+    keeps: viewScope ? (verdict, workspaceId) => keepsVerdict(verdict, viewScope(workspaceId)) : undefined,
   };
 }
 

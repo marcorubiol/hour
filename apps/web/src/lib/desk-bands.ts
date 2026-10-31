@@ -40,8 +40,20 @@ export function todayThings(
   input: { performances: readonly PerformanceEvent[]; dates: readonly DateEvent[]; viewerTz: string },
   today: string,
 ): TodayThing[] {
-  const perfs = input.performances
-    .filter((p) => perfDayKey(p) === today && performanceStatusFamily(p.status) === 'confirmed')
+  return dayThings({
+    performances: input.performances.filter((p) => perfDayKey(p) === today),
+    dates: input.dates.filter((d) => dateDayKey(d, input.viewerTz) === today),
+  });
+}
+
+/**
+ * The same title from rows already known to be the day's: Hoy passes the
+ * rows of its own agenda (`agendaPoints`), so the headline counts exactly
+ * what the agenda under it lists (a trip whose legs leave today included).
+ */
+export function dayThings(rows: { performances: readonly PerformanceEvent[]; dates: readonly DateEvent[] }): TodayThing[] {
+  const perfs = rows.performances
+    .filter((p) => performanceStatusFamily(p.status) === 'confirmed')
     .sort((a, b) => (a.start_at ?? a.performed_at).localeCompare(b.start_at ?? b.performed_at))
     .map(
       (p): TodayThing => ({
@@ -51,8 +63,8 @@ export function todayThings(
         where: p.venue?.city ?? p.city ?? p.venue?.name ?? p.venue_name ?? null,
       }),
     );
-  const dates = input.dates
-    .filter((d) => dateDayKey(d, input.viewerTz) === today && dateStatusFamily(d.status) === 'confirmed')
+  const dates = rows.dates
+    .filter((d) => dateStatusFamily(d.status) === 'confirmed')
     .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
     .map(
       (d): TodayThing => ({

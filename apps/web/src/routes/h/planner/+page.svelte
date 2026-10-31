@@ -114,7 +114,7 @@
     type NavWorkspace,
     type RawLine,
   } from '$lib/nav';
-  import { activeProjectsQueryOptions, allLinesQueryOptions } from '$lib/nav-queries';
+  import { activeProjectsQueryOptions, allLinesQueryOptions, meQueryOptions } from '$lib/nav-queries';
   import {
     addDaysIso,
     addMonths,
@@ -129,7 +129,8 @@
     normalizePlannerView,
     statusWord as statusWordIn,
   } from '$lib/planner';
-  import { buildPersonAttribution, castNames } from '$lib/people';
+  import { buildPersonAttribution, castNames, keepsRow } from '$lib/people';
+  import { viewScopeIndex, type WithViewScope } from '$lib/view-scope';
   import { buildDeskFeed, overviewReplies, rankWaiting, waitingByDay, type DeskItem } from '$lib/desk-feed';
   import {
     conversationOverviewQueryOptions,
@@ -667,11 +668,22 @@
   // hiding chips can never hide a real clash. Pinning a person is the first
   // kind, not the second: you are changing what you are looking at.
   //
+  // WITHOUT A PIN, EACH SPACE'S «LO MÍO / TODO» (ADR-151): the axis is the
+  // viewer, and a space on «lo mío» keeps only the rows they are on (a roster
+  // or their «voy»); one on «todo» keeps the whole company, as before. A
+  // person pinned by hand wins: you are looking at someone, by ADR-147's rule.
+  // A login with no person has no axis, and sees it all.
+  const meQuery = createQuery(meQueryOptions());
+  let personPinned = $derived(scope.personIds.length > 0);
+  let myPersonId = $derived($meQuery.data?.person_id ?? null);
   let personScope = $derived(
-    buildPersonAttribution({
-      pinnedPersonIds: scope.personIds,
-      team: $teamQuery.data?.items ?? [],
-    }),
+    personPinned
+      ? buildPersonAttribution({ pinnedPersonIds: scope.personIds, team: $teamQuery.data?.items ?? [] })
+      : buildPersonAttribution({
+          pinnedPersonIds: myPersonId ? [myPersonId] : [],
+          team: $teamQuery.data?.items ?? [],
+          viewScope: viewScopeIndex(($workspacesQuery.data?.items ?? []) as (WithViewScope & { id: string })[]),
+        }),
   );
   function perfPersonVerdict(p: PerformanceEvent) {
     return personScope.attribute({
@@ -688,10 +700,10 @@
   }
 
   let scopedPerfs = $derived(
-    activePerfRows.filter((p) => perfInScope(p) && perfPersonVerdict(p) !== 'no'),
+    activePerfRows.filter((p) => perfInScope(p) && keepsRow(personScope, perfPersonVerdict(p), perfWorkspaceId(p))),
   );
   let scopedDates = $derived(
-    activeDateRows.filter((d) => dateInScope(d) && datePersonVerdict(d) !== 'no'),
+    activeDateRows.filter((d) => dateInScope(d) && keepsRow(personScope, datePersonVerdict(d), d.project?.workspace_id ?? null)),
   );
 
   let allBlackouts = $derived(activeBlackoutRows);
@@ -2552,7 +2564,9 @@
    * segment of this strip.
    */
   let statUnattributed = $derived.by(() => {
-    if (!personScope.active) return 0;
+    // Only a pin by hand counts them: «lo mío / todo» is the viewer's own
+    // reading, not a question about who goes (ADR-151).
+    if (!personPinned || !personScope.active) return 0;
     let n = 0;
     for (const p of shownPerfs) if (perfPersonVerdict(p) === 'unattributed') n++;
     for (const d of shownDates) if (datePersonVerdict(d) === 'unattributed') n++;
