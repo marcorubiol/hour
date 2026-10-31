@@ -210,16 +210,19 @@ export function dayAgenda(input: PulseInputRows, day: string, now: Date): DayAge
   points.forEach((p, i) => {
     if (p.from <= t && t < p.to && (current === null || p.from >= points[current].from)) current = i;
   });
-  // NEXT: the first timed point still ahead.
-  const nextIdx = points.findIndex((p) => p.at !== null && p.from > t);
+  // NEXT: the first point still ahead. An all-day row counts too: on a day
+  // that has not begun, «función · todo el día» IS what comes next, and the
+  // card is it (ADR-150; a guest's hold on Tuesday lost its card, E2E 31-10).
+  const nextIdx = points.findIndex((p) => p.from > t);
   const next = nextIdx >= 0 ? nextIdx : null;
 
   // The end of a sheet (wrap, curfew) closes what you are in; it never takes
   // the card from it («Función · hasta las 22h», not «Fin en 60 min»).
   const nextWhat = next !== null ? points[next].what : null;
   const closes = current !== null && nextWhat?.of === 'moment' && nextWhat.key != null && TERMINAL.has(nextWhat.key);
+  // A countdown needs an hour: an all-day row has none.
   const imminent =
-    next !== null && !closes && Math.ceil((points[next].from - t) / 60_000) <= AGENDA_IMMINENT_MIN;
+    next !== null && !closes && points[next].at !== null && Math.ceil((points[next].from - t) / 60_000) <= AGENDA_IMMINENT_MIN;
   const headline: DayAgenda['headline'] =
     imminent ? 'countdown' : current !== null ? 'doing' : next !== null ? 'at' : 'done';
   const focus = headline === 'doing' ? current : headline === 'done' ? null : next;
