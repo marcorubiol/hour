@@ -38,7 +38,6 @@ export const CONCEPTS = [
   'unclosed',
   'gaps',
   'due',
-  'hot',
   'cold',
   'season_sales',
   'relation',
@@ -67,7 +66,7 @@ export type HelpConcept = (typeof CONCEPTS)[number];
 export const SECTION_CONCEPTS: Record<HelpSection, readonly HelpConcept[]> = {
   desk: ['scope', 'guess', 'waiting', 'changed'],
   planner: ['scope', 'hold', 'guess', 'decide', 'clashes', 'unclosed', 'gaps'],
-  conversations: ['scope', 'due', 'hot', 'season_sales', 'cold', 'relation'],
+  conversations: ['scope', 'due', 'season_sales', 'cold', 'relation'],
   team: ['scope'],
   books: ['scope', 'to_collect', 'next30', 'season_books', 'bolo'],
 };

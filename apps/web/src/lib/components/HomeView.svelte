@@ -1,8 +1,10 @@
 <script lang="ts">
   /**
    * Space portada — the `/h/[workspace]/` surface (ADR-062 edit surface #1;
-   * portada-only since 2026-07-17): space masthead (kicker · name · about ·
-   * stats) over the space's next-7-days agenda and its projects grid.
+   * portada-only since 2026-07-17): space masthead (kicker · name · about,
+   * with its edit) over its projects and their lines. The figures and the
+   * «Próximos 7 días» agenda went with § 70 (the ADR that amends ADR-154
+   * § 11-12): Hoy and the lenses already say both.
    *
    * This used to double as the cross-space home digest; that surface died
    * when the hall landed (`/h`, now the Desk itself, ADR-137) and the
@@ -11,12 +13,11 @@
    * engine; this page just no longer grows UI for it.
    *
    * The project is the unit of thought (the show); cards are ordered by
-   * activity (conversations + confirmed + holds).
+   * activity (confirmed + holds ahead).
    */
 
   import { docTitle } from '$lib/doc-title';
   import { createQuery } from '@tanstack/svelte-query';
-  import { toStore } from 'svelte/store';
   import { fetchJSON } from '$lib/api';
   import { lineKindGlyph } from '$lib/utils/line-kind';
   import { useCreation } from '$lib/stores/creation.svelte';
@@ -35,8 +36,6 @@
     activeProjectsQueryOptions,
     allLinesQueryOptions,
   } from '$lib/nav-queries';
-  import DeskBoard from '$lib/components/DeskBoard.svelte';
-  import type { Relation } from '$lib/conversation-relation';
   import { detectLocale, t } from '$lib/i18n';
 
   const locale = detectLocale(navigator.language);
@@ -60,17 +59,6 @@
   // Space portada: the edit-space dialog (opened from the masthead pencil).
   let editOpen = $state(false);
 
-  type Conversation = {
-    id: string;
-    relation: Relation;
-    next_action_at: string | null;
-    next_action_note: string | null;
-    updated_at: string;
-    workspace_id: string;
-    custom_fields: Record<string, unknown> | null;
-    person: { full_name: string | null; organization_name: string | null; slug: string | null } | null;
-    project: { id: string; slug: string; name: string } | null;
-  };
   type Performance = {
     id: string;
     status: string;
@@ -82,11 +70,6 @@
   const workspacesQuery = createQuery(workspacesQueryOptions());
   const projectsQuery = createQuery(activeProjectsQueryOptions());
   const linesQuery = createQuery(allLinesQueryOptions());
-  const conversationsQuery = createQuery({
-    queryKey: ['conversations', 'today'],
-    queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchJSON<{ items: Conversation[] }>('/api/conversations?limit=100', signal),
-  });
   const performancesQuery = createQuery({
     queryKey: ['today-performances'],
     queryFn: ({ signal }: { signal: AbortSignal }) =>
@@ -106,40 +89,7 @@
   let makesProjects = $derived(currentWorkspace ? writesSpaceIn(currentWorkspace) : true);
   let projectIndex = $derived(buildProjectIndex(workspaces, $projectsQuery.data?.items ?? []));
   let lineIndex = $derived(buildLineIndex(workspaces, ($linesQuery.data?.items as RawLine[]) ?? []));
-  let conversations = $derived<Conversation[]>($conversationsQuery.data?.items ?? []);
   let performances = $derived<Performance[]>($performancesQuery.data?.items ?? []);
-
-  // Conversations per project — the card's honest activity number. One
-  // count-only request per visible project (exact `total`, no rows).
-  const engTotalsOptions = toStore(() => {
-    const ids = projectIndex.map((p) => p.id);
-    return {
-      queryKey: ['project-eng-totals', ids] as const,
-      enabled: ids.length > 0,
-      queryFn: async ({ signal }: { signal: AbortSignal }): Promise<Record<string, number>> => {
-        const entries = await Promise.all(
-          ids.map(async (id) => {
-            const r = await fetchJSON<{ total: number }>(
-              `/api/conversations?project_ids=${id}&limit=1`,
-              signal,
-            );
-            return [id, r.total] as const;
-          }),
-        );
-        return Object.fromEntries(entries);
-      },
-    };
-  });
-  const engTotalsQuery = createQuery(engTotalsOptions);
-  let engTotals = $derived<Record<string, number>>($engTotalsQuery.data ?? {});
-
-  // The portada's agenda is this space's — a local view scope that never
-  // touches the pins store.
-  let scopedConversations = $derived(
-    currentWorkspace
-      ? conversations.filter((e) => e.workspace_id === currentWorkspace.id)
-      : [],
-  );
 
   // ── Project cards ─────────────────────────────────────────────────────
   function perfsForLine(lineId: string): Performance[] {
@@ -165,15 +115,10 @@
       );
     return parts.join(' · ');
   }
-  /** Card stat: conversations (exact count) + confirmed/holds (upcoming
-   *  performances). Zeros are omitted, never fabricated. */
+  /** Card stat: confirmed/holds (upcoming performances). Zeros are
+   *  omitted, never fabricated. */
   function projectStatLabel(project: NavProject): string {
     const parts: string[] = [];
-    const conv = engTotals[project.id];
-    if (conv)
-      parts.push(
-        conv === 1 ? t('hall.stat_conv_one', locale) : t('hall.stat_conv_many', locale, { n: conv }),
-      );
     const st = statOf(perfsForProject(project.id));
     if (st.confirmed) parts.push(t('hall.stat_confirmed_n', locale, { n: st.confirmed }));
     if (st.holds)
@@ -187,12 +132,12 @@
     return lineIndex.filter((l) => l.projectId === projectId);
   }
 
-  // Busiest first — project.updated_at (the API order) goes stale because
-  // working the show touches conversations/lines, never the project row. Sort
+  // Busiest first: project.updated_at (the API order) goes stale because
+  // working the show touches its dates and lines, never the project row. Sort
   // is stable, so zero-activity ties keep the API order.
   function activityOf(p: NavProject): number {
     const st = statOf(perfsForProject(p.id));
-    return (engTotals[p.id] ?? 0) + st.confirmed + st.holds;
+    return st.confirmed + st.holds;
   }
   let orderedProjects = $derived(
     [...projectIndex].sort((a, b) => activityOf(b) - activityOf(a)),
@@ -205,23 +150,6 @@
       ? orderedProjects.filter((p) => p.workspaceId === currentWorkspace.id)
       : [],
   );
-
-  // Masthead stats — aggregated from the same real data the cards show
-  // (upcoming performances + exact conversation counts). Zeros stay zero,
-  // never fabricated.
-  let spaceStats = $derived.by(() => {
-    if (!currentWorkspace) return null;
-    let confirmed = 0;
-    let holds = 0;
-    let conversations = 0;
-    for (const p of visibleProjects) {
-      const st = statOf(perfsForProject(p.id));
-      confirmed += st.confirmed;
-      holds += st.holds;
-      conversations += engTotals[p.id] ?? 0;
-    }
-    return { projects: visibleProjects.length, confirmed, holds, conversations };
-  });
 
   const DOMAIN_KEYS: Record<string, string> = {
     theatre: 'hall.domain_theatre',
@@ -283,29 +211,9 @@
       <p class="space-head__about">{currentWorkspace.description}</p>
     {/if}
   {/if}
-  {#if spaceStats}
-    <div class="space-stats">
-      <div class="space-stat"><b class:figure--zero={spaceStats.projects === 0}>{spaceStats.projects}</b><span>{t('hall.stat_projects', locale)}</span></div>
-      <div class="space-stat"><b class:figure--zero={spaceStats.confirmed === 0}>{spaceStats.confirmed}</b><span>{t('hall.stat_confirmed', locale)}</span></div>
-      <div class="space-stat"><b class:figure--zero={spaceStats.holds === 0}>{spaceStats.holds}</b><span>{t('hall.stat_holds', locale)}</span></div>
-      <div class="space-stat"><b class:figure--zero={spaceStats.conversations === 0}>{spaceStats.conversations}</b><span>{t('hall.stat_conversations', locale)}</span></div>
-    </div>
-  {/if}
   {#if currentWorkspace}
     <EditWorkspaceDialog bind:open={editOpen} workspace={currentWorkspace} />
   {/if}
-
-  <DeskBoard
-    conversations={scopedConversations}
-    {workspaceSlug}
-    cap={10}
-    next7Days
-    moreHref="/h/desk"
-    loading={$conversationsQuery.isPending}
-    error={$conversationsQuery.isError}
-  >
-    {#snippet head()}<div class="home__toolbar"><BlockHead title={t('hall.next7', locale)} /></div>{/snippet}
-  </DeskBoard>
 
   {#if visibleProjects.length > 0 || projectsSettled}
     <div class="home__projects-head"><BlockHead title={t('hall.projects', locale)} /></div>
@@ -385,34 +293,6 @@
       font-size: var(--text-m);
       line-height: 1.55;
       color: var(--text-muted);
-    }
-
-    .space-stats {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--space-l);
-      margin-block: var(--space-m) 0;
-      padding-block: var(--space-s);
-      border-block: var(--line-hairline) solid var(--border-color-light);
-    }
-    .space-stat b {
-      display: block;
-      font-family: var(--font-display);
-      font-size: var(--text-xl);
-      font-weight: 500;
-      line-height: 1.1;
-      color: var(--heading-color);
-    }
-    .space-stat span {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing-loose);
-      text-transform: uppercase;
-      color: var(--text-muted);
-    }
-
-    .home__toolbar {
-      margin-block: var(--space-s) var(--space-2xs);
     }
 
     /* ── projects grid ── */

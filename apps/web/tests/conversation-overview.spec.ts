@@ -142,11 +142,9 @@ test.describe('el dashboard de Conversations (ADR-117)', () => {
     await page.goto('/h/conversations?etiqueta=sales');
     const due = page.getByTestId('block-due');
     const season = page.getByTestId('block-season');
-    const hot = page.getByTestId('block-hot');
     await expect(due).toBeVisible({ timeout: 30_000 });
-    const [d, s, ho] = await Promise.all([due.boundingBox(), season.boundingBox(), hot.boundingBox()]);
-    expect(d!.y).toBeLessThan(ho!.y);
-    expect(ho!.y).toBeLessThan(s!.y);
+    const [d, s] = await Promise.all([due.boundingBox(), season.boundingBox()]);
+    expect(d!.y).toBeLessThan(s!.y);
     expect(Math.abs(d!.x - s!.x)).toBeLessThan(2);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });

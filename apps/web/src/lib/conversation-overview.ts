@@ -550,6 +550,11 @@ export interface ConversationOverview {
     lines: SeasonLine[];
   };
   due: Block<DueRow>;
+  /**
+   * Las calientes. El panel ya no las pinta (§ 69, fuera «Se mueve»); las lee
+   * Hoy, que saca de aquí las respuestas nuevas de «Ha cambiado»
+   * (`changesSince`), y el filtro `?temp=caliente` de la lista sigue.
+   */
   hot: Block<HotRow>;
   /**
    * `picks`: las de segunda ronda, para «Escribir a estas» (con su proyecto: un

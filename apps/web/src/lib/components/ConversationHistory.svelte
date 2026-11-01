@@ -11,6 +11,7 @@
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { refreshAfterWrite } from '$lib/query-refresh';
   import { toStore } from 'svelte/store';
+  import { untrack } from 'svelte';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import { dayMonthYear, localDayISO } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
@@ -34,9 +35,15 @@
     conversationId: string;
     /** false: solo el alta (la ficha pinta el registro con su propia vista). */
     showList?: boolean;
+    /**
+     * El tipo con el que se abre el alta: `email` casi siempre; `call` cuando
+     * se llega tocando el teléfono del contacto («Llamar»). Se lee al montar:
+     * quien quiera reabrirlo con otro tipo lo vuelve a montar.
+     */
+    initialKind?: ConversationEventKind;
   }
 
-  let { conversationId, showList = true }: Props = $props();
+  let { conversationId, showList = true, initialKind = 'email' }: Props = $props();
 
   const queryClient = useQueryClient();
   const locale = appLocale();
@@ -52,7 +59,7 @@
     })),
   );
 
-  let kind = $state<ConversationEventKind>('email');
+  let kind = $state<ConversationEventKind>(untrack(() => initialKind));
   let direction = $state<ConversationEventDirection | ''>('outbound');
   let day = $state(localDayISO());
   let body = $state('');
