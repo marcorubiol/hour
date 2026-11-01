@@ -6,6 +6,40 @@
 > Estado general y evidencia: `_context.md`. Historia: `_decisions.md` y `_notes/sessions-log.md`. Los documentos de
 > `build/archive/` no crean tareas.
 
+## AHORA: mejoras validadas por Marco el 2026-11-01 (sin empezar)
+
+Detalle de cada punto: `build/coordination/STATUS.md` (fuera de git) y los informes de propuestas. Orden sugerido: lo que
+no pide migración primero; las migraciones juntas por el gate de § 34.
+
+- [ ] **Antes de nada:** RLS tras el apply del 01-11 dio 513/516. `conversation-select-once.test.ts:155` (el espacio
+  `playwright` crea conversaciones privadas por defecto) y `comms-threads.test.ts` § 15 y fixture limitada § 4
+  (facetas de la membresía limitada en `zzz-e2e-collab`, ¿alteradas por el test anterior?). Aclarar antes de cerrar el gate.
+- [ ] Te espera: en filas «liberar», sólo «Liberar» (quitar «Confirmar», ADR-165).
+- [ ] Bugs visuales de las capturas de `a744db9d`: banda vacía y barra que salta en el Planificador, «mar1-11» y
+  recuentos en el Tablero, fila de conversación con columna vacía a 1440, selector de lentes que marca la de origen en
+  fichas y Ajustes, textos cortados en Nuevo bolo, «·» sueltos, ⌘K lento, Temporada de Hoy desalineada.
+- [ ] 78 temporada en una sola función, septiembre por defecto, configurable por espacio.
+- [ ] 79 gastos adelantados: «Lo pagó», devuelto, «Se debe al equipo», «+ Gasto» desde bolo y Ahora.
+- [ ] 82 quitar «Roles que asumo» de Ajustes › Espacios.
+- [ ] 83 «Copiar de otra función» (técnica, logística, acogida; después la escaleta).
+- [ ] 84 fusionar organizaciones (migración).
+- [ ] 85 proponer el caché del último bolo del proyecto al crear uno.
+- [ ] 87 alta de los datos fiscales del emisor en Ajustes (sin ella la proforma sale con hueco).
+- [ ] 88 materiales enlazados en la hoja de ruta; la función hereda los de su línea (pública: migración).
+- [ ] 89 textos guardados y enlaces a materiales en el correo de la conversación.
+- [ ] 90 calendario «sólo lo mío» y opciones como TENTATIVE (migración, junto a 71b).
+- [ ] 91 exportar el trimestre para la gestoría (CSV).
+- [ ] 92 `venue.organization_id`: la sala sabe quién la programa (migración).
+- [ ] 93 «Mover a la línea…» en acciones en bloque.
+- [ ] 94 login y alta en los cuatro idiomas (antes de invitar a Anouk).
+- [ ] 95 contract: borrar `performance.readiness`, `line.modules`, `line.dossier_url`, `project.dossier_url`,
+  `project.poster_url` (destructiva: staging e inspect).
+- [ ] 96 contar funciones vivas sin `venue_id`; con el número, decidir si la función y el bolo dejan de copiar nombre y ciudad.
+- [ ] Migraciones por escribir: 71b (escaleta, tramos e idioma en `get_public_calendar`), 80b (viaje en `get_public_roadsheet`).
+- [ ] De paso: subir los topes de 100 (Te espera, Nuevo trato, línea); rayas que quedan en textos; comentario de
+  `ProfileSection.svelte:40`; comprobar si siguen las tarjetas demo de MaMeMi (`demo_batch='cards-20260723'`).
+- Aparcado: 86 (responsable de tarea) hasta que entre Anouk; 45 (DNS) y 46 («(opcional)») sin decidir.
+
 ## PRIMERO — nada. `main` == prod y las dos suites están vivas (2026-07-30, noche)
 
 > Esta sección existía para dos cosas y ya no queda ninguna. Se deja el
