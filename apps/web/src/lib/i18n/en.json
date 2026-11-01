@@ -237,7 +237,7 @@
   "login.quote_attr": "Hour, Phase 0 · internal",
   "login.preview_week": "This week",
   "login.preview_kind_task": "task",
-  "login.preview_kind_wait": "waiting 4d",
+  "login.preview_kind_wait": "waiting",
   "login.preview_kind_event": "event",
   "login.preview_kind_money": "money",
   "login.preview_confirm": "Confirm",
