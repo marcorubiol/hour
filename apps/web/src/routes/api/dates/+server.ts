@@ -17,12 +17,8 @@
  *     days occupies all of them (Marco, 2026-10-18), so a residency that
  *     started on the 30th is in November's month too.
  *
- * NOTE (calendar v2): the GET select now ASKS for the ADR-078 columns
- * (line_id, travel_direction, label ← custom_fields->>label) but degrades
- * when the migrations aren't applied yet: an undefined-column error (42703)
- * retries once with the legacy select, so the live calendar keeps working
- * and the new fields simply arrive absent (§ Graceful absence of the
- * contract — feature silently off, zero errors surfaced).
+ * The select is `$lib/server/date-select`'s, whole: a column the database
+ * lacks is an error (the pre-migration retry is gone, ADR-156).
  *
  * POST /api/dates — create a date row (ADR-078) via the `create_date` RPC:
  * claim-independent, gated on has_permission(project, 'edit:performance').
@@ -40,8 +36,8 @@ import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import { DateCreateSchema, type DateRow } from '$lib/date';
-import { pgGet, pgPostRpc, PostgrestError, type SupabaseEnv } from '$lib/supabase';
-import { DATE_BASE_SELECT, DATE_EXTENDED_SELECT } from '$lib/server/date-select';
+import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
+import { DATE_SELECT } from '$lib/server/date-select';
 import { STAGE_SELECT } from '$lib/travel-stage';
 import { scheduleOf, type ScheduleMoment, type ScheduleSlotRow } from '$lib/schedule-slot';
 import { pgErrorResponse } from '$lib/server/errors';
@@ -149,13 +145,10 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   const workspaceIds = parseUuidList(workspace_ids);
 
   const search = new URLSearchParams();
-  // Extended select first (ADR-078 cascade columns + the Altres label);
-  // the catch below retries with the legacy columns while the migrations
-  // aren't applied (42703 undefined column — graceful absence).
   // The columns live in `$lib/server/date-select`, shared with GET /:id.
   search.set(
     'select',
-    [...DATE_EXTENDED_SELECT, ...(stages ? [`stages:travel_stage(${STAGE_SELECT})`] : [])].join(','),
+    [...DATE_SELECT, ...(stages ? [`stages:travel_stage(${STAGE_SELECT})`] : [])].join(','),
   );
   if (stages) search.set('stages.order', 'position.asc');
 
@@ -188,22 +181,6 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       items: data.map(({ schedule_slot, ...row }) => ({ ...row, schedule: scheduleOf(schedule_slot) })),
     });
   } catch (err) {
-    // Pre-migration DB: the cascade columns don't exist yet. Retry once
-    // with the legacy select — the calendar keeps working, the new fields
-    // are simply absent (contract § Graceful absence).
-    if (err instanceof PostgrestError && err.code === '42703') {
-      search.set('select', DATE_BASE_SELECT.join(','));
-      try {
-        const { data } = await pgGet<DateItem>(env, 'date', jwt, { search });
-        return json({ items: data });
-      } catch (retryErr) {
-        return pgErrorResponse(
-          retryErr,
-          { route: 'GET /api/dates', requestId: locals.requestId },
-          { passUpstream: [401, 403] },
-        );
-      }
-    }
     return pgErrorResponse(
       err,
       { route: 'GET /api/dates', requestId: locals.requestId },
