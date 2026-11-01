@@ -14,9 +14,6 @@ no pide migración primero; las migraciones juntas por el gate de § 34.
 - [ ] 78 temporada en una sola función, septiembre por defecto, configurable por espacio.
 - [ ] 95 contract: borrar `performance.readiness`, `line.modules`, `line.dossier_url`, `project.dossier_url`,
   `project.poster_url` (destructiva: staging e inspect).
-- [ ] 97 plantilla fija de correo por espacio: logo, firma e imagen del espectáculo con enlace al dossier, alrededor del
-  texto de la difusión (chat 01-11). Hecho en código (ADR-172, en `main`); falta el gate § 34 de `20261102170000` y
-  el deploy.
 - [ ] 98 invitar al público (chat 01-11, opción A de `research/2026-11-email-builder.md`): primero la audiencia con
   consentimiento (alta con doble confirmación, LSSI art. 21), una identidad de envío y un tenant separados de la
   difusión y su registro por destinatario; el editor de correos bonitos después (Templatical si sigue vivo). Empieza

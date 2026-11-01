@@ -33,16 +33,16 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
 ## Producción (verificado 2026-11-01)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`8018b229`**, `dirty:false`, builtAt
-  2026-11-01T12:31Z (ADR-155 a 171: Planificador con Temporada, caché por esquema, fichas de organización y sala, contrato del bolo, Cuentas para la gestoría, gastos por persona, sala con su organización, fusión de organizaciones, textos guardados; lo anterior, en `CHANGELOG.md`). `main` == prod salvo documentos y tests.
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`55b97891`**, `dirty:false`, builtAt
+  2026-11-01T20:05Z (ADR-155 a 172: plantilla del correo por espacio, materiales en la hoja de ruta, calendario «solo lo mío», Planificador con Temporada, caché por esquema, fichas de organización y sala, contrato del bolo, Cuentas para la gestoría, gastos por persona, sala con su organización, fusión de organizaciones, textos guardados; lo anterior, en `CHANGELOG.md`). `main` == prod salvo documentos y tests.
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free, con keepalive diario
   (`.github/workflows/keepalive.yml`) contra la pausa por inactividad. Pasar a Pro antes de la beta, aún no
   (`_tasks.md § 9`). Si algo de Supabase falla tras días sin uso, lo primero es `dig <ref>.supabase.co`.
-- **Última migración aplicada: `20261102160000`** (2026-11-01, las siete, `20261102100000` a `160000`, aditivas: backup 41300828724, plan 41301044995, apply 41301083986). Las anteriores, en `_notes/context-history.md`. Las migraciones van por `production-migrate.yml`: backup, plan, apply. **Al redefinir una función, copiar la firma de la base viva (`pg_get_functiondef`), no de la última migración que la nombra: otra firma crea una sobrecarga y PostgREST responde 300.**
+- **Última migración aplicada: `20261102170000`** (`mail_template`, 2026-11-01; backup 41344207864, plan 41344459520, apply 41344696936). Las anteriores, en `_notes/context-history.md`. Las migraciones van por `production-migrate.yml`: backup, plan, apply. **Al redefinir una función, copiar la firma de la base viva (`pg_get_functiondef`), no de la última migración que la nombra: otra firma crea una sobrecarga y PostgREST responde 300.**
 - `hour-staging` (ref `slccyknqpgmzhyiyclsq`, `eu-west-1`): reconstruido el 2026-10-13 con el contract de permisos
   (run 38469017859: RLS 309/313, smoke 2/2). Se volverá a pausar sin uso.
-- Últimas suites contra producción: RLS 532/533 contra `2f9ab41a` (2026-11-01): el rojo `mailout-not-now:201` pasa aislado 2/2 (hipótesis sin verificar: carrera con el cron de cada minuto). E2E contra `8018b229` (2026-11-01): 185/186 tras tres pasadas (las dos primeras rotas por la red de la máquina), único rojo `conversation-write.spec:189` intermitente (estado residual de la fixture o 502 al crearla). No prestar `.playwright/auth.json` a otro carril mientras corre la suite. Por `hour-web.marco-rubiol.workers.dev`.
+- Últimas suites contra producción: RLS 539/539 contra `55b97891` (2026-11-01, tras el apply). E2E contra `8018b229` (2026-11-01): 185/186, único rojo `conversation-write.spec:189` intermitente. No prestar `.playwright/auth.json` a otro carril mientras corre la suite. Por `hour-web.marco-rubiol.workers.dev`.
 - Desde el checkout principal (`~/Developer/hour`), nunca desde un worktree: los worktrees no llevan `.env` ni
   `.env.test` (RLS sale saltado, el login del E2E falla).
 - `pnpm --filter web test:rls`: siempre contra producción; carga `.env` + `.env.test` y no mira `.env.local`.
