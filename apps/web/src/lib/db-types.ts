@@ -379,6 +379,8 @@ export type Database = {
       bolo: {
         Row: {
           city: string | null
+          contract_sent_at: string | null
+          contract_signed_at: string | null
           conversation_id: string | null
           country: string | null
           created_at: string
@@ -396,6 +398,8 @@ export type Database = {
         }
         Insert: {
           city?: string | null
+          contract_sent_at?: string | null
+          contract_signed_at?: string | null
           conversation_id?: string | null
           country?: string | null
           created_at?: string
@@ -413,6 +417,8 @@ export type Database = {
         }
         Update: {
           city?: string | null
+          contract_sent_at?: string | null
+          contract_signed_at?: string | null
           conversation_id?: string | null
           country?: string | null
           created_at?: string
@@ -3371,6 +3377,7 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          expires_at: string
           id: string
           performance_id: string
           revoked_at: string | null
@@ -3381,6 +3388,7 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by?: string | null
+          expires_at?: string
           id?: string
           performance_id: string
           revoked_at?: string | null
@@ -3391,6 +3399,7 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string | null
+          expires_at?: string
           id?: string
           performance_id?: string
           revoked_at?: string | null
@@ -5087,6 +5096,8 @@ export type Database = {
         }
         Returns: {
           city: string | null
+          contract_sent_at: string | null
+          contract_signed_at: string | null
           conversation_id: string | null
           country: string | null
           created_at: string
@@ -5655,6 +5666,7 @@ export type Database = {
         Returns: {
           created_at: string
           created_by: string | null
+          expires_at: string
           id: string
           performance_id: string
           revoked_at: string | null
@@ -6192,6 +6204,8 @@ export type Database = {
         Returns: {
           city: string
           collected: number
+          contract_sent_at: string
+          contract_signed_at: string
           conversation_id: string
           country: string
           fee_amount: number
@@ -6233,6 +6247,7 @@ export type Database = {
         Returns: {
           created_at: string
           created_by: string | null
+          expires_at: string
           id: string
           performance_id: string
           revoked_at: string | null
@@ -7239,6 +7254,26 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      set_roadsheet_share_expiry: {
+        Args: { p_last_day: string; p_share_id: string }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          expires_at: string
+          id: string
+          performance_id: string
+          revoked_at: string | null
+          role: string
+          token: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "roadsheet_share"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       share_my_profile_with_workspace: {
         Args: { p_fields?: string[]; p_workspace_id: string }
         Returns: {
@@ -7305,6 +7340,18 @@ export type Database = {
       }
       travel_stage_zone: { Args: { p_tz: string }; Returns: string }
       undo_person_merge: { Args: { p_merge_id: string }; Returns: Json }
+      update_bolo_contract: {
+        Args: {
+          p_bolo_id: string
+          p_sent_at: string
+          p_signed_at: string
+        }
+        Returns: {
+          contract_sent_at: string
+          contract_signed_at: string
+          id: string
+        }[]
+      }
       update_bolo_fee: {
         Args: {
           p_bolo_id: string

@@ -35,6 +35,7 @@
 
 import type { Json, Tables } from './db-types';
 import type { ScheduleMoment, TimeslotFields } from './schedule-slot';
+import { localDayISO } from './datetime';
 
 export const ROADSHEET_ROLES = ['full', 'venue', 'performer', 'tech_manager'] as const;
 export type RoadsheetRole = (typeof ROADSHEET_ROLES)[number];
@@ -256,4 +257,26 @@ export function buildRoadsheet(bundle: PerformanceBundle, role: RoadsheetRole): 
     notes: has('notes') ? p.notes : null,
     assets: has('assets') ? bundle.assets : null,
   };
+}
+
+// ── Public links: when they stop opening (ADR-160 § 2) ─────────────────────
+
+/** A public road sheet link as `/api/performances/:key/roadsheet/shares` returns it. */
+export interface RoadsheetShare {
+  id: string;
+  token: string;
+  role: string;
+  created_at: string;
+  /** The first instant the link no longer opens. */
+  expires_at: string;
+}
+
+/** The last day the link opens (`YYYY-MM-DD`, this device's day): the instant before it expires. */
+export function shareLastDay(expiresAt: string): string {
+  return localDayISO(new Date(Date.parse(expiresAt) - 1));
+}
+
+/** Whether the link no longer opens. */
+export function shareExpired(expiresAt: string, now: Date = new Date()): boolean {
+  return Date.parse(expiresAt) <= now.getTime();
 }

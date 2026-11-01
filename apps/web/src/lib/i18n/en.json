@@ -2665,5 +2665,22 @@
   "desk.verb_release": "release",
   "desk.decision_choose": "{a} or {b}",
   "desk.next_after": "After",
-  "desk.door_holds": "{n} to decide"
+  "desk.door_holds": "{n} to decide",
+  "bolo.contract": "Contract",
+  "bolo.contract_unsent": "Not sent",
+  "bolo.contract_sent": "Sent",
+  "bolo.contract_signed": "Signed",
+  "bolo.contract_mark_sent": "Mark as sent",
+  "bolo.contract_mark_signed": "Mark as signed",
+  "bolo.contract_undo": "Undo",
+  "bolo.contract_not_saved": "Contract not saved",
+  "record.missing_bolo_contract": "Contract not signed",
+  "books.att_contract_unsent": "performance on {date}, contract not sent",
+  "books.att_contract_sent": "performance on {date}, contract sent, not signed",
+  "books.att_act_contract": "See the contract",
+  "roadsheet.link_expires": "expires {date}",
+  "roadsheet.link_expired": "expired {date}",
+  "roadsheet.change_expiry": "Change the date",
+  "roadsheet.expiry_last_day": "Opens until",
+  "roadsheet.expiry_not_saved": "Date not saved"
 }

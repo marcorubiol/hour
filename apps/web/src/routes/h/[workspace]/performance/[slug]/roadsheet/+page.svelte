@@ -20,6 +20,8 @@
   import RecordState from '$lib/components/RecordState.svelte';
   import Button from '$lib/components/Button.svelte';
   import Select from '$lib/components/Select.svelte';
+  import Dialog from '$lib/components/Dialog.svelte';
+  import Input from '$lib/components/Input.svelte';
   import { copyText } from '$lib/clipboard';
   import Pill from '$lib/components/Pill.svelte';
   import RoadsheetView from '$lib/components/RoadsheetView.svelte';
@@ -27,12 +29,19 @@
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { spaceCrumb, type Crumb } from '$lib/record-crumbs';
   import { addToast } from '$lib/components/Toast.svelte';
-  import { dayMonthYearTs } from '$lib/datetime';
+  import { dayMonth, dayMonthYearTs, localDayISO } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
-  import { ROADSHEET_ROLES, type Roadsheet, type RoadsheetRole } from '$lib/roadsheet';
+  import {
+    ROADSHEET_ROLES,
+    shareExpired,
+    shareLastDay,
+    type Roadsheet,
+    type RoadsheetRole,
+    type RoadsheetShare,
+  } from '$lib/roadsheet';
 
   type Response = { roadsheet: Roadsheet; venue_timezone: string | null };
-  type Share = { id: string; token: string; role: string; created_at: string };
+  type Share = RoadsheetShare;
 
   const PUBLIC_ROLES = ['venue', 'performer', 'tech_manager'] as const;
 
@@ -138,6 +147,42 @@
     },
   });
 
+  // ── When a link stops opening (ADR-160 § 2): «caduca el …», and move it ──
+  let expiryShare = $state<Share | null>(null);
+  let expiryDay = $state('');
+  const todayDay = localDayISO();
+
+  function openExpiry(s: Share) {
+    expiryShare = s;
+    const last = shareLastDay(s.expires_at);
+    expiryDay = last < todayDay ? todayDay : last;
+  }
+
+  const saveExpiry = createMutation({
+    mutationFn: () =>
+      mutateJSON(
+        'PATCH',
+        `/api/performances/${encodeURIComponent(slug)}/roadsheet/shares/${expiryShare!.id}?ws=${encodeURIComponent(workspaceSlug)}`,
+        { last_day: expiryDay },
+      ),
+    onSuccess: () => {
+      expiryShare = null;
+      void queryClient.invalidateQueries({ queryKey: ['roadsheet-shares'] });
+    },
+    onError: (err) => {
+      addToast({
+        tone: 'danger',
+        title: t('roadsheet.expiry_not_saved', locale),
+        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
+      });
+    },
+  });
+
+  function expiryWord(s: Share): string {
+    const day = dayMonth(shareLastDay(s.expires_at));
+    return t(shareExpired(s.expires_at) ? 'roadsheet.link_expired' : 'roadsheet.link_expires', locale, { date: day });
+  }
+
   function shareUrl(token: string): string {
     return `${location.origin}/public/roadsheet/${token}`;
   }
@@ -190,8 +235,13 @@
           {#each shares as s (s.id)}
             <li>
               <span class="rs__share-role">{roleWord(s.role)}</span>
-              <span class="rs__share-date">{dayMonthYearTs(s.created_at)}</span>
+              <span class="rs__share-date"
+                >{dayMonthYearTs(s.created_at)} · <span class:rs__share-gone={shareExpired(s.expires_at)}>{expiryWord(s)}</span></span
+              >
               <span class="rs__share-actions">
+                <Button size="s" variant="quiet" onclick={() => openExpiry(s)}>
+                  {t('roadsheet.change_expiry', locale)}
+                </Button>
                 <Button size="s" variant="secondary" onclick={() => copyShare(s.token)}>
                   {t('roadsheet.copy_link', locale)}
                 </Button>
@@ -224,6 +274,23 @@
     </section>
   {/if}
 </article>
+
+<Dialog
+  open={expiryShare !== null}
+  onclose={() => (expiryShare = null)}
+  title={t('roadsheet.change_expiry', locale)}
+  size="s"
+>
+  <div class="rs__expiry">
+    <Input label={t('roadsheet.expiry_last_day', locale)} type="date" min={todayDay} bind:value={expiryDay} required />
+  </div>
+  {#snippet actions()}
+    <Button variant="quiet" onclick={() => (expiryShare = null)}>{t('create.cancel', locale)}</Button>
+    <Button onclick={() => $saveExpiry.mutate()} loading={$saveExpiry.isPending} disabled={!expiryDay || expiryDay < todayDay}>
+      {t('edit.save', locale)}
+    </Button>
+  {/snippet}
+</Dialog>
 
 <style>
   @layer components {
@@ -276,6 +343,14 @@
       font-size: var(--text-xs);
       color: var(--text-faint);
       flex: 1;
+    }
+
+    .rs__share-gone {
+      color: var(--text-muted);
+    }
+
+    .rs__expiry {
+      margin-block-start: var(--space-s);
     }
 
     .rs__share-actions {

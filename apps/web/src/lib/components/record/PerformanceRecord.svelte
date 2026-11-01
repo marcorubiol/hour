@@ -72,6 +72,7 @@
   import MissingBand, { type MissingItem } from '$lib/components/MissingBand.svelte';
   import { hasJsonContent } from '$lib/components/JsonKV.svelte';
   import { performanceMissing, type PerformanceMissing } from '$lib/record-missing';
+  import { shareExpired, type RoadsheetShare } from '$lib/roadsheet';
 
   type PersonEmbed = {
     id: string;
@@ -734,7 +735,7 @@
         enabled: perf?.status === 'confirmed',
         retry: false,
         queryFn: ({ signal }: { signal: AbortSignal }) =>
-          fetchJSON<{ items: unknown[] }>(
+          fetchJSON<{ items: RoadsheetShare[] }>(
             `/api/performances/${encodeURIComponent(k.slug)}/roadsheet/shares?ws=${encodeURIComponent(k.ws)}`,
             signal,
           ),
@@ -754,7 +755,10 @@
             roster: performanceRoster(bundle),
             commitments: perf.commitments,
             hasBolo: boloReadable ? currentBoloId !== null : null,
-            roadsheetLinks: $sharesQuery.isSuccess ? $sharesQuery.data.items.length : null,
+            // An expired link opens nothing (ADR-160 § 2): it does not count.
+            roadsheetLinks: $sharesQuery.isSuccess
+              ? $sharesQuery.data.items.filter((l) => !shareExpired(l.expires_at)).length
+              : null,
           },
           today,
         )

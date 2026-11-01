@@ -2657,5 +2657,22 @@
   "desk.verb_release": "allibera",
   "desk.decision_choose": "{a} o {b}",
   "desk.next_after": "Després",
-  "desk.door_holds": "{n} per decidir"
+  "desk.door_holds": "{n} per decidir",
+  "bolo.contract": "Contracte",
+  "bolo.contract_unsent": "Sense enviar",
+  "bolo.contract_sent": "Enviat",
+  "bolo.contract_signed": "Signat",
+  "bolo.contract_mark_sent": "Marcar enviat",
+  "bolo.contract_mark_signed": "Marcar signat",
+  "bolo.contract_undo": "Desfer",
+  "bolo.contract_not_saved": "Contracte no desat",
+  "record.missing_bolo_contract": "Contracte sense signar",
+  "books.att_contract_unsent": "funció el {date}, contracte sense enviar",
+  "books.att_contract_sent": "funció el {date}, contracte enviat sense signar",
+  "books.att_act_contract": "Veure el contracte",
+  "roadsheet.link_expires": "caduca el {date}",
+  "roadsheet.link_expired": "va caducar el {date}",
+  "roadsheet.change_expiry": "Canviar la data",
+  "roadsheet.expiry_last_day": "Obre fins al dia",
+  "roadsheet.expiry_not_saved": "Data no desada"
 }

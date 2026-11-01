@@ -5802,3 +5802,46 @@ anterior (en el historial).
 
 **Re-evaluar cuando** se lleve una temporada de difusión con la ficha: si hace falta editar la organización desde
 ella, y si con muchas conversaciones la lista pide el orden de la lente en vez del del módulo.
+
+## [2026-11-01] ADR-160 · El contrato del bolo y la caducidad del enlace público de la hoja de ruta
+
+**Contexto.** Dos huecos que ya tenían dueño. ADR-087 define el bolo como «1 sala + 1 contrato + 1 fee», pero el
+contrato no tenía campos: un trato confirmado para dentro de una semana sin firmar no lo veía nadie. Y ADR-047 dejó
+apuntado que el enlace público de la hoja de ruta (`roadsheet_share`) no caducaba nunca: reenviado, abría la hoja de
+una función de hace un año. Puntos 66 y 68 de la tanda del 2026-11-01, con OK de Marco. Carril `claude/bolo-contract`.
+Migraciones `20261101120000_bolo_contract` y `20261101130000_roadsheet_share_expiry`, escritas y sin aplicar (gate de
+§ 34).
+
+**Decisión.**
+1. **El contrato son dos fechas en el bolo**: `contract_sent_at` y `contract_signed_at`. Sin enviar, enviado o firmado
+   (`contractState`), con un CHECK que impide «firmado sin enviar» o firmado antes de enviar. Viven donde vive el
+   caché y con la misma puerta: `bolo` se lee con `read:money` y se escribe por `update_bolo_contract`, con la forma
+   de `update_bolo_fee` (`edit:money`, 42501 único). `list_money_bolos` las devuelve.
+2. **En la ficha del bolo, el bloque «Contrato»**: el paso en que está, su fecha y el siguiente paso para marcarlo
+   («Marcar enviado», «Marcar firmado») más «Deshacer», que retrocede un paso. Es la única escritura de la ficha del
+   bolo: el dinero se sigue escribiendo en Cuentas (ADR-043), pero el contrato no es dinero y no pide diálogo.
+3. **«Pide atención»**: un bolo confirmado con función de hoy a 14 días vista (`CONTRACT_DUE_DAYS`) y el contrato
+   sin firmar pide atención en Cuentas (tipo `contract`, entre los datos fiscales y el caché que falta) y, por la
+   misma función (`boloMissing` = `attentionItems`), en la «Falta» de la ficha del bolo, donde el verbo marca el
+   siguiente paso. Una gira ya empezada sin contrato firmado también pide. **No se lleva a la «Falta» de la función**:
+   leer el bolo pide `read:money` y la función no lo lleva (§ 36, ADR-142 § 3).
+4. **El enlace público caduca.** `roadsheet_share.expires_at` (NOT NULL) es el primer instante en que el enlace ya no
+   abre. Por defecto, la regla de la invitación de bolo (ADR-142 § 2): el principio del segundo día tras la última
+   función viva del bolo de la función o, si no cuelga de un bolo, tras la propia función, en la zona del espacio
+   (`private.roadsheet_share_default_expiry`, que usa `private.bolo_access_ends_at`). A diferencia de la membresía,
+   **se calcula al crear el enlace y se guarda**: si el bolo se alarga después, el enlace no le sigue y se alarga a
+   mano. `get_public_roadsheet` no devuelve nada con un enlace caducado, igual que con uno revocado.
+5. **«Cambiar la fecha»** en la pantalla de enlaces: cada enlace dice «caduca el 13 mar» (o «caducó el …») y deja
+   elegir el último día que abre (`set_roadsheet_share_expiry`, la puerta de `revoke_roadsheet_share`); un último día
+   anterior a hoy se niega (para cortarlo, revocar). La lista sigue enseñando los caducados para poder alargarlos, y
+   la «Falta» de la función ya no cuenta un enlace caducado como compartido.
+6. **Los enlaces que ya existían** se rellenaron en la migración con la misma regla. Los de funciones ya pasadas
+   quedaron caducados en el acto: es lo que se buscaba. Quien necesite uno, lo alarga.
+
+**Qué no entra.** Hashear el token (ADR-047, sigue en `_tasks.md`). Avisar por correo de un contrato sin firmar.
+
+**Cómo se revierte.** Las cabeceras de las dos migraciones llevan su rollback: volver a aplicar `list_money_bolos`
+de `20261018170000`, `create_roadsheet_share` de `20260720105713` y `get_public_roadsheet` de `20261010180000`,
+borrar las dos RPC y el helper nuevos y las tres columnas. En la app: el tipo `contract` de `attentionItems`, el
+bloque de `BoloRecord`, el PATCH `contract` de `/api/money/bolos/[id]`, el PATCH de `…/roadsheet/shares/[id]` y la
+fecha de la pantalla de enlaces. `CACHE_SCHEMA` pasó de 1 a 2.
