@@ -1312,6 +1312,7 @@
                                   <p>
                                     <button type="button" class="sheet__link" onclick={() => void showDocument(d.id)}>{d.number ?? invoiceStatusLabel(d.status, locale)}</button>
                                     · {invoiceStatusLabel(d.status, locale)} · <span class="sheet__num">{fmtMoney(Number(d.total))} {d.currency}</span>
+                                    {#if d.doc_type === 'proforma'}· <a class="sheet__a" href={`/proforma/${d.id}`} target="_blank" rel="noopener">{t('proforma.print', locale)}</a>{/if}
                                   </p>
                                   {#if d.id === m.doc?.id && m.aging?.expectedOn && d.status === 'issued'}
                                     <p class="sheet__faint" class:sheet__danger={m.overdue}>{t('books.sheet_expected', locale, { date: dayLabel(m.aging.expectedOn) })}{#if d.payer}{` · ${d.payer.name}`}{/if}</p>

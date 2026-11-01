@@ -5878,3 +5878,48 @@ espacio, las tarjetas de proyecto con sus líneas.
 
 **Re-evaluar cuando** Marco use la portada del espacio una temporada: si echa de menos algo de lo que viene en ese
 espacio, y si «Llamar» debe ofrecer también el teléfono de otros contactos de la conversación.
+
+## [2026-11-01] ADR-162 · Calendario suscrito legible y proforma imprimible
+
+**Contexto.** Puntos 71 y 72 de la tanda del 2026-11-01. El feed ICS (ADR-054) escribía las descripciones en inglés
+fijo con la hora en crudo (`Status: confirmed`, `Load in: 2026-03-14T15:00:00+00:00`). Una proforma sólo se veía como
+fila de Cuentas: no había documento que mandar. Carril `claude/batch-71`. Sin migración.
+
+**Decisión.**
+1. **El feed habla como Hour** (`$lib/ics`). Cada momento de la escaleta en su línea, con la palabra del diccionario y
+   el reloj del Planner en la zona de la sala, o la del espacio si la sala no tiene (`carga 15h`, `fin 0h30`). Sin
+   línea de estado: todo lo que sale es confirmado o más, y lo de más (facturado, cobrado) es dinero, que el feed no
+   enseña. Las fechas dicen su tipo en el idioma y `· opción` mientras no están confirmadas. Entre partes de un título,
+   ` · `, nunca una raya.
+2. **El idioma va en el enlace.** El espacio no tiene idioma propio y una app de calendario no manda el suyo: el feed
+   lee `?lang=` (y `&trade=music`), que `FeedDialog` pone con el idioma de quien copia el enlace; si no, el
+   `Accept-Language`; si no, inglés. Los enlaces ya suscritos siguen en inglés hasta copiar uno nuevo.
+3. **Cada evento enlaza a Hour**, en `URL:` y en la descripción: la función a su ficha
+   (`/h/<espacio>/performance/<slug>`, si tiene slug); una fecha, que no tiene página, a su día en el Planner.
+4. **La escaleta entera, cuando el feed la traiga.** `get_public_calendar` sólo manda las cinco franjas
+   (`private.performance_timeslots`): puertas, toque de queda y las franjas libres no salen. `buildCalendar` ya lee un
+   `schedule` opcional (`kind`, `label`, `at`) y lo prefiere; falta la migración que lo añada a la función.
+5. **Proforma imprimible.** «Imprimir · guardar PDF» en cada proforma de Cuentas (lista de documentos y hoja del
+   bolo) abre `/proforma/<id>`, fuera del marco como la hoja de ruta pública: número, fecha, vencimiento, emisor,
+   pagador con sus datos fiscales, líneas, impuestos, total, forma de pago (con IBAN del emisor) y notas, con
+   `@media print`. El PDF lo guarda el navegador: sin librería ni R2. `GET /api/invoices/:id/proforma` lee todo con el
+   JWT de quien mira, así que `read:money` lo pone la RLS. Una factura responde 409: imprimir una factura emitida roza
+   Verifactu (ADR-087).
+6. **No se inventa un dato fiscal.** Emisor: el snapshot si la proforma se emitió; si no, el que congelaría
+   `issue_invoice` (el del espacio, si no el de la cuenta). Lo que falta sale en un hueco discreto en pantalla que no
+   se imprime: «Faltan datos: NIF, dirección», «este espacio aún no tiene datos fiscales de emisor» o «hay datos
+   fiscales, pero no los puedes ver» (el emisor de cuenta sólo lo leen sus admins).
+
+**Qué no cambia.** El JSON de `get_public_calendar`, el feed sin dinero ni notas, las facturas.
+
+**Pide migración (no hecha).** (a) `schedule` en `get_public_calendar`: un `jsonb_agg` de `schedule_slot`
+(`kind`, `label`, `at` ordenado por `sort`) por función, misma firma (copiarla de la base viva). (b) Idioma del
+espacio: hoy no existe; o una columna `workspace.locale` que el feed mande, o mandar `workspace.trade` en el feed para
+no depender del `&trade=` del enlace. (c) Los tramos de viaje como eventos propios. (d) No hay pantalla para dar de
+alta los datos fiscales del emisor: sin ella, toda proforma sale con el hueco del emisor.
+
+**Cómo se revierte.** Devolver `ics.ts`, el endpoint del feed y `FeedDialog` a su versión anterior; borrar
+`routes/proforma/`, `routes/api/invoices/[id]/proforma/`, `$lib/proforma` y los dos enlaces de Cuentas; las claves
+`ics.*` y `proforma.*` de los diccionarios.
+
+**Re-evaluar cuando** exista el alta de emisor o el idioma del espacio.
