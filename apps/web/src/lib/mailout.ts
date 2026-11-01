@@ -5,6 +5,7 @@
 
 import * as v from 'valibot';
 import type { ComposeContext } from './mailout-compose';
+import type { MailTemplateRow } from './mail-template';
 
 export type MailSendingProvider = 'simulator' | 'ses';
 export type MailDomainCheckStatus = 'NOT_STARTED' | 'PENDING' | 'SUCCESS' | 'FAILED' | 'TEMPORARY_FAILURE';
@@ -135,6 +136,10 @@ export interface MailoutItem {
   language: string;
   subject: string | null;
   body: string | null;
+  /** La imagen del espectáculo (ADR-172): ruta de Hour, su `alt` y a dónde lleva (el dossier). */
+  image_url: string | null;
+  image_alt: string | null;
+  image_link_url: string | null;
   status: MailoutStatus;
   status_reason: string | null;
   queued_at: string | null;
@@ -143,7 +148,7 @@ export interface MailoutItem {
 }
 
 export const MAILOUT_SELECT =
-  'id,workspace_id,project_id,line_id,mail_domain_id,from_local_part,from_name,from_address,reply_to_address,language,subject,body,status,status_reason,queued_at,finished_at,created_at';
+  'id,workspace_id,project_id,line_id,mail_domain_id,from_local_part,from_name,from_address,reply_to_address,language,subject,body,image_url,image_alt,image_link_url,status,status_reason,queued_at,finished_at,created_at';
 
 /** Una fila de `mailout_preview`. */
 export interface MailoutRecipientRow {
@@ -167,7 +172,8 @@ export interface MailoutDetail {
   mailout: MailoutItem;
   /** `edit:conversation` en el proyecto: redactar, enviar, cancelar. */
   can_edit: boolean;
-  workspace: { id: string; slug: string; name: string };
+  /** `logo_url`: la cabecera de la plantilla del correo (ADR-172). */
+  workspace: { id: string; slug: string; name: string; logo_url: string | null };
   project: { id: string; slug: string; name: string | null } | null;
   /** Los dominios verificados del espacio: de dónde puede salir. */
   domains: MailDomainItem[];
@@ -217,6 +223,17 @@ export function recipientState(r: MailoutRecipientRow, missing: boolean): Recipi
 }
 
 /** Recuentos de la pantalla de estado (plan § 10). */
+/** Las piezas de la plantilla (ADR-172) de lo que ya trae la pantalla: lo mismo que `mailout_template` a la cola. */
+export function detailTemplateRow(d: Pick<MailoutDetail, 'mailout' | 'workspace'>): MailTemplateRow {
+  return {
+    company_name: d.workspace.name,
+    logo_url: d.workspace.logo_url,
+    image_url: d.mailout.image_url,
+    image_alt: d.mailout.image_alt,
+    image_link_url: d.mailout.image_link_url,
+  };
+}
+
 export function recipientCounts(states: RecipientState[]): Record<RecipientState, number> {
   const out = {} as Record<RecipientState, number>;
   for (const s of states) out[s] = (out[s] ?? 0) + 1;
@@ -228,6 +245,16 @@ export const MailoutCreateSchema = v.object({
   conversation_ids: v.pipe(v.array(v.pipe(v.string(), v.uuid())), v.minLength(1), v.maxLength(2000)),
 });
 
+/** Una imagen de envío que sirve Hour (`/m/ws/<espacio>/mail/…`); el espacio lo comprueba la base. */
+const MAILOUT_IMAGE_RE = /^\/m\/ws\/[0-9a-f-]{36}\/mail\/[A-Za-z0-9._-]+$/;
+
+/** La imagen del espectáculo de un envío (ADR-172). */
+export const MailoutImageSchema = v.object({
+  url: v.pipe(v.string(), v.maxLength(300), v.regex(MAILOUT_IMAGE_RE)),
+  alt: v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(200))),
+  link: v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(2000), v.regex(/^(https?:\/\/[^\s<>"]+)?$/i))),
+});
+
 export const MailoutUpdateSchema = v.object({
   subject: v.pipe(v.string(), v.maxLength(200)),
   body: v.pipe(v.string(), v.maxLength(20000)),
@@ -235,6 +262,8 @@ export const MailoutUpdateSchema = v.object({
   mail_domain_id: v.nullable(v.pipe(v.string(), v.uuid())),
   from_local_part: localPart,
   from_name: fromName,
+  /** Solo cuando cambia: ausente no la toca, null la quita. */
+  image: v.optional(v.nullable(MailoutImageSchema)),
 });
 
 export const MailoutRecipientsSchema = v.object({

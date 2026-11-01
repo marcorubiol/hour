@@ -2300,6 +2300,9 @@ export type Database = {
           from_local_part: string
           from_name: string | null
           id: string
+          image_alt: string | null
+          image_link_url: string | null
+          image_url: string | null
           language: string
           line_id: string | null
           mail_domain_id: string | null
@@ -2325,6 +2328,9 @@ export type Database = {
           from_local_part?: string
           from_name?: string | null
           id?: string
+          image_alt?: string | null
+          image_link_url?: string | null
+          image_url?: string | null
           language?: string
           line_id?: string | null
           mail_domain_id?: string | null
@@ -2350,6 +2356,9 @@ export type Database = {
           from_local_part?: string
           from_name?: string | null
           id?: string
+          image_alt?: string | null
+          image_link_url?: string | null
+          image_url?: string | null
           language?: string
           line_id?: string | null
           mail_domain_id?: string | null
@@ -5019,6 +5028,9 @@ export type Database = {
           from_local_part: string
           from_name: string | null
           id: string
+          image_alt: string | null
+          image_link_url: string | null
+          image_url: string | null
           language: string
           line_id: string | null
           mail_domain_id: string | null
@@ -5600,6 +5612,9 @@ export type Database = {
           from_local_part: string
           from_name: string | null
           id: string
+          image_alt: string | null
+          image_link_url: string | null
+          image_url: string | null
           language: string
           line_id: string | null
           mail_domain_id: string | null
@@ -6643,6 +6658,9 @@ export type Database = {
           from_local_part: string
           from_name: string | null
           id: string
+          image_alt: string | null
+          image_link_url: string | null
+          image_url: string | null
           language: string
           line_id: string | null
           mail_domain_id: string | null
@@ -6823,6 +6841,17 @@ export type Database = {
           recipient_id: string
         }[]
       }
+      mailout_template: {
+        Args: { p_mailout_ids: string[] }
+        Returns: {
+          company_name: string
+          image_alt: string
+          image_link_url: string
+          image_url: string
+          logo_url: string
+          mailout_id: string
+        }[]
+      }
       mailout_test_authorize: { Args: { p_id: string }; Returns: string }
       mailout_unsubscribe: { Args: { p_token: string }; Returns: undefined }
       mailout_unsubscribe_info: {
@@ -6952,6 +6981,9 @@ export type Database = {
           from_local_part: string
           from_name: string | null
           id: string
+          image_alt: string | null
+          image_link_url: string | null
+          image_url: string | null
           language: string
           line_id: string | null
           mail_domain_id: string | null
@@ -7401,6 +7433,48 @@ export type Database = {
         Args: { p_account_id: string; p_signature: string }
         Returns: undefined
       }
+      set_mailout_image: {
+        Args: {
+          p_id: string
+          p_image_alt?: string
+          p_image_link_url?: string
+          p_image_url: string
+        }
+        Returns: {
+          body: string | null
+          created_at: string
+          created_by: string | null
+          finished_at: string | null
+          from_address: string | null
+          from_local_part: string
+          from_name: string | null
+          id: string
+          image_alt: string | null
+          image_link_url: string | null
+          image_url: string | null
+          language: string
+          line_id: string | null
+          mail_domain_id: string | null
+          project_id: string
+          queued_at: string | null
+          queued_by: string | null
+          reply_to_address: string | null
+          reply_to_mail_account_id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["mailout_status"]
+          status_reason: string | null
+          subject: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "mailout"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       set_mailout_recipients: {
         Args: { p_conversation_ids: string[]; p_id: string }
         Returns: {
@@ -7667,6 +7741,9 @@ export type Database = {
           from_local_part: string
           from_name: string | null
           id: string
+          image_alt: string | null
+          image_link_url: string | null
+          image_url: string | null
           language: string
           line_id: string | null
           mail_domain_id: string | null

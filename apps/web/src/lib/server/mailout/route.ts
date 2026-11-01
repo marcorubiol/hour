@@ -102,8 +102,8 @@ export async function loadDetail(env: MailoutEnv, jwt: string, id: string): Prom
   const mailout = await readMailout(env, jwt, id);
   if (!mailout) return null;
   const [ws, project, domains, accounts, rows, canEdit] = await Promise.all([
-    pgGet<{ id: string; slug: string; name: string }>(env, 'workspace', jwt, {
-      search: { select: 'id,slug,name', id: `eq.${mailout.workspace_id}` },
+    pgGet<{ id: string; slug: string; name: string; logo_url: string | null }>(env, 'workspace', jwt, {
+      search: { select: 'id,slug,name,logo_url', id: `eq.${mailout.workspace_id}` },
     }),
     pgGet<{ id: string; slug: string; name: string | null }>(env, 'project', jwt, {
       search: { select: 'id,slug,name', id: `eq.${mailout.project_id}` },

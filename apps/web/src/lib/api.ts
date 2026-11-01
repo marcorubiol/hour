@@ -85,11 +85,26 @@ export async function mutateJSON<T = unknown>(
   url: string,
   body?: unknown,
 ): Promise<T | null> {
-  const init: RequestInit = {
+  return sendMutation<T>(url, {
     method,
     headers: body !== undefined ? { 'content-type': 'application/json' } : undefined,
     body: body !== undefined ? JSON.stringify(body) : undefined,
-  };
+  });
+}
+
+/**
+ * A file as the raw request body (an image upload, ADR-172): POST, the
+ * blob's own content type, and the same contract as mutateJSON.
+ */
+export async function uploadBlob<T = unknown>(url: string, blob: Blob): Promise<T | null> {
+  return sendMutation<T>(url, {
+    method: 'POST',
+    headers: { 'content-type': blob.type || 'application/octet-stream' },
+    body: blob,
+  });
+}
+
+async function sendMutation<T>(url: string, init: RequestInit): Promise<T | null> {
   const res = await sendWithSession(url, init);
   if (res.status === 401) {
     clearAuthAndBounce();

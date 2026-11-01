@@ -14,9 +14,14 @@
  *   · Cabeceras de baja de RFC 8058.
  * Al historial de la conversación va el cuerpo con los campos y la firma, sin
  * el pie: el enlace de baja es de la sala, no del equipo.
+ *
+ * El texto plano es el correo. El HTML lleva el mismo texto vestido por la
+ * plantilla del espacio (logo, imagen del espectáculo; `mail-template.ts`,
+ * ADR-172), que es una pieza aparte: aquí solo se le pasan las piezas.
  */
 
 import { proposedSignature, withSignature, displayWebsite } from './mail';
+import { mailHtml, NO_TEMPLATE, type MailTemplate } from './mail-template';
 
 export const MAILOUT_LANGUAGES = ['es', 'ca', 'en', 'fr'] as const;
 type MailoutLanguage = (typeof MAILOUT_LANGUAGES)[number];
@@ -188,14 +193,23 @@ export function footerLines(ctx: ComposeContext, language: MailoutLanguage, unsu
   ].filter((l): l is string => Boolean(l));
 }
 
-export function composeMailout(draft: MailoutDraft, ctx: ComposeContext, unsubscribeUrl: string): ComposedMail {
+export function composeMailout(
+  draft: MailoutDraft,
+  ctx: ComposeContext,
+  unsubscribeUrl: string,
+  template: MailTemplate = NO_TEMPLATE,
+): ComposedMail {
   const language = mailoutLanguage(draft.language);
   const values = mergeValues(ctx, language);
   const missing = fieldsUsed(draft.subject, draft.body).filter((f) => values[f] === null);
   const subject = fillFields(draft.subject.trim(), values);
-  const recordBody = withSignature(fillFields(draft.body.trim(), values), companySignature(ctx));
-  const text = `${recordBody}\n\n${footerLines(ctx, language, unsubscribeUrl).join('\n')}\n`;
-  return { subject, text, html: textToHtml(text), recordBody, missing };
+  const body = fillFields(draft.body.trim(), values);
+  const signature = companySignature(ctx);
+  const footer = footerLines(ctx, language, unsubscribeUrl);
+  const recordBody = withSignature(body, signature);
+  const text = `${recordBody}\n\n${footer.join('\n')}\n`;
+  const html = mailHtml({ language, subject, body, signature, footer }, template);
+  return { subject, text, html, recordBody, missing };
 }
 
 export function testSubject(subject: string, language: string): string {
@@ -213,22 +227,4 @@ export function unsubscribeHeaders(url: string): Record<string, string> {
     'List-Unsubscribe': `<${url}>`,
     'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
   };
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-const URL_RE = /https?:\/\/[^\s<>"]+[^\s<>".,;:!?)]/g;
-
-/** El HTML gemelo mínimo: párrafos, saltos y enlaces; sin estilos ni imágenes. */
-export function textToHtml(text: string): string {
-  const paragraphs = text
-    .trim()
-    .split(/\n{2,}/)
-    .map((p) => {
-      const linked = escapeHtml(p).replace(URL_RE, (u) => `<a href="${u}">${u}</a>`);
-      return `<p>${linked.replace(/\n/g, '<br>')}</p>`;
-    });
-  return `<!doctype html><html><body>${paragraphs.join('')}</body></html>`;
 }
