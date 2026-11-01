@@ -29,7 +29,8 @@ no pide migración primero; las migraciones juntas por el gate de § 34.
 - [ ] 85 proponer el caché del último bolo del proyecto al crear uno.
 - [ ] 87 alta de los datos fiscales del emisor en Ajustes (sin ella la proforma sale con hueco).
 - [ ] 88 materiales enlazados en la hoja de ruta; la función hereda los de su línea (pública: migración).
-- [ ] 89 textos guardados y enlaces a materiales en el correo de la conversación.
+- [ ] 89 textos guardados y enlaces a materiales en el correo de la conversación. Enlaces hechos en `claude/batch-flows`;
+  los textos guardados piden tabla nueva `workspace_text` (migración).
 - [ ] 90 calendario «sólo lo mío» y opciones como TENTATIVE (migración, junto a 71b).
 - [ ] 91 exportar el trimestre para la gestoría (CSV).
 - [ ] 92 `venue.organization_id`: la sala sabe quién la programa (migración).
@@ -41,7 +42,8 @@ no pide migración primero; las migraciones juntas por el gate de § 34.
 - [ ] Migraciones por escribir: 71b (escaleta, tramos e idioma en `get_public_calendar`), 80b (viaje en `get_public_roadsheet`).
 - [ ] De paso: subir los topes de 100 (Te espera, Nuevo trato, línea); rayas que quedan en textos; comentario de
   `ProfileSection.svelte:40`; comprobar si siguen las tarjetas demo de MaMeMi (`demo_batch='cards-20260723'`).
-- [ ] 45 recomprobar el DNS del dominio de envío en el cron de 10 min, 72 h como mucho (Marco, 01-11).
+- [ ] 45 recomprobar el DNS del dominio de envío en el cron de 10 min, 72 h como mucho (Marco, 01-11). Código en
+  `claude/batch-flows`; no hace nada hasta la migración `mail_domain_pending_checks()` (RPC para service_role, ADR-110).
 - [ ] 46 quitar los cinco «(opcional)» y poner «*» en los cuatro obligatorios sin marca (Marco, 01-11).
 - Aparcado: 86 (responsable de tarea) hasta que entre Anouk.
 
