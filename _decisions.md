@@ -5815,7 +5815,7 @@ octubre no la vio nadie hasta que él la notó en el teléfono.
 **Decisión.** Tres capas, cada una con su tope:
 1. **Peso** (`src/lib/load-budget.test.ts`, en `test:unit`). La carga inicial de `/h/desk` (la entrada, los tres
    nodos de ruta, sus imports estáticos, el CSS y el diccionario es) en brotli no pasa de **450 kB**. El build del
-   01-11 da 427 kB en 173 ficheros (139 JS, 34 CSS). Solo juzga un build fresco: en `test:unit` se salta si no hay
+   01-11 daba 427 kB en 173 ficheros (139 JS, 34 CSS); sobre `a744db9d`, con la ficha de organización, ya da 444. Solo juzga un build fresco: en `test:unit` se salta si no hay
    build o si es más viejo que `src/`, y el deploy lo corre tras `vite build` con `LOAD_BUDGET_REQUIRED=1`, donde
    saltarse es fallar. Como el guard de tokens: si salta, se aligera la carga; el tope solo sube por una decisión que
    lo valga, dicha en el commit.

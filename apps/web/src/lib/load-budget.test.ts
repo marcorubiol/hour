@@ -12,10 +12,11 @@
  * deploy script builds and then runs this file with LOAD_BUDGET_REQUIRED=1,
  * where a skip is a failure: nothing goes out over the cap.
  *
- * Where the cap comes from: the build of 2026-11-01 (`claude/mobile-open-speed`,
- * after the per-language dictionaries) loads 427 kB br in 173 files (139 JS,
- * 34 CSS); with the four languages in one chunk it was about 36 kB more. The
- * cap is that plus about 5 %. Same spirit as the tokens guard: if it trips, make
+ * Where the cap comes from: the build of 2026-11-01 with the per-language
+ * dictionaries loaded 427 kB br in 173 files (139 JS, 34 CSS); with the four
+ * languages in one chunk it was about 36 kB more. The cap is that plus about
+ * 5 %. The same day, main a744db9d (the organisation record and more) was
+ * already at 444 kB in 182 files. Same spirit as the tokens guard: if it trips, make
  * the load lighter (split a chunk, lazy-load a dialog), do not raise the cap.
  * Raise it only for a decision that is worth its weight, and say which in the
  * commit.
