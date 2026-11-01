@@ -144,6 +144,29 @@ export default defineConfig(({ mode }) => {
                   networkTimeoutSeconds: 5,
                 },
               },
+              // Google's font stylesheet is render-blocking and its HTTP
+              // cache lasts a day (`private, max-age=86400`): the first open
+              // of each day waited a cross-origin round trip before painting
+              // anything. Served from the SW and refreshed behind; the font
+              // files themselves are immutable, so they never go back out.
+              // Status 0: the stylesheet is a no-cors (opaque) request.
+              {
+                urlPattern: ({ url }: { url: URL }) => url.origin === 'https://fonts.googleapis.com',
+                handler: 'StaleWhileRevalidate',
+                options: {
+                  cacheName: 'google-fonts-css',
+                  cacheableResponse: { statuses: [0, 200] },
+                },
+              },
+              {
+                urlPattern: ({ url }: { url: URL }) => url.origin === 'https://fonts.gstatic.com',
+                handler: 'CacheFirst',
+                options: {
+                  cacheName: 'google-fonts',
+                  cacheableResponse: { statuses: [0, 200] },
+                  expiration: { maxEntries: 40, maxAgeSeconds: 365 * 24 * 3600 },
+                },
+              },
             ],
           },
         }),
