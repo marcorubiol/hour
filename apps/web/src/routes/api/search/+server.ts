@@ -67,7 +67,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
     limit,
   });
   const orgs = new URLSearchParams({
-    select: 'workspace_id,id,name,conversations:conversation!conversation_workspace_organization_fkey(id)',
+    select: 'workspace_id,id,slug,name,conversations:conversation!conversation_workspace_organization_fkey(id)',
     workspace_id: inWs,
     name: `ilike.${like}`,
     deleted_at: 'is.null',

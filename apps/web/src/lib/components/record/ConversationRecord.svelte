@@ -52,7 +52,6 @@
   import NextActionDialog from '$lib/components/NextActionDialog.svelte';
   import MessageItem from '$lib/components/MessageItem.svelte';
   import ThreadBlock from '$lib/components/ThreadBlock.svelte';
-  import OrganizationFiscal from '$lib/components/OrganizationFiscal.svelte';
   import ConversationAcquaintances from '$lib/components/ConversationAcquaintances.svelte';
   import ConversationTags from '$lib/components/ConversationTags.svelte';
   import Segmented from '$lib/components/Segmented.svelte';
@@ -365,6 +364,12 @@
 
   // ADR-102: el título es la organización; debajo, el contacto principal.
   let title = $derived((conv && conversationTitle(conv)) || slug);
+  // The venue's name is its record (ADR-159): the fiscal data live there.
+  let titleHref = $derived(
+    conv?.organization?.slug && conv.organization.name === title
+      ? `/h/${workspaceSlug}/organization/${encodeURIComponent(conv.organization.slug)}`
+      : null,
+  );
 
   // Address: Space › [Project ›] Conversación (the title names who).
   const wsQuery = createQuery(workspacesQueryOptions());
@@ -518,7 +523,7 @@
   </section>
 {:else}
   <section class="record conv">
-    <RecordHead {crumbs} {title}>
+    <RecordHead {crumbs} {title} {titleHref}>
       <!-- La acción principal y cómo se lee, en la cabecera (ADR-139 p2). -->
       {#snippet actions()}
         <span class="conv__reading">
@@ -721,10 +726,6 @@
 
         <!-- Lo de consulta, plegado (ADR-139 p2): se toca una vez. -->
         <Fold word={t('record.details', locale)} keeps={detailsKeeps} id="details" testid="record-details">
-          {#if conv.organization}
-            <OrganizationFiscal organizationId={conv.organization.id} level={3} />
-          {/if}
-
           <ConversationAcquaintances workspaceId={conv.workspace_id} contacts={conv.contacts} {locale} />
 
           {#if conv.can_set_private}

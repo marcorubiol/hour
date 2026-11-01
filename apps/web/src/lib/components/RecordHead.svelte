@@ -26,6 +26,8 @@
     /** Ancestry, then the kind of record as the last, unlinked crumb. */
     crumbs: Crumb[];
     title: string;
+    /** The title is also another record's name: it links there (a conversation's venue, ADR-159). */
+    titleHref?: string | null;
     /** The identity mark before the title (a project's monogram): one pack, glyph first. */
     mark?: Snippet;
     /** What acts on the whole record, at the end of the title row. */
@@ -36,7 +38,7 @@
     band?: Snippet;
   }
 
-  let { crumbs, title, mark, actions, facts, band }: Props = $props();
+  let { crumbs, title, titleHref = null, mark, actions, facts, band }: Props = $props();
 
   const locale = appLocale();
 </script>
@@ -61,7 +63,11 @@
   <div class="lenshead__titlerow">
     <div class="lenshead__lead">
       {#if mark}{@render mark()}{/if}
-      <h1 class="lenshead__title"><LensTitle text={title} /></h1>
+      <h1 class="lenshead__title">
+        {#if titleHref}<a class="record-head__titlelink" href={titleHref}><LensTitle text={title} /></a>{:else}<LensTitle
+            text={title}
+          />{/if}
+      </h1>
     </div>
     {#if actions}<span class="lenshead__tools">{@render actions()}</span>{/if}
   </div>

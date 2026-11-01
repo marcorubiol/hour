@@ -57,6 +57,8 @@
       full_name: string;
       title: string | null;
       organization_name: string | null;
+      /** Where they work: its record links from the facts (ADR-159). */
+      organization?: { id: string; slug: string; name: string } | null;
       email: string | null;
       phone: string | null;
       website: string | null;
@@ -555,7 +557,11 @@
     <RecordHead {crumbs} title={file.person.full_name}>
       {#snippet facts()}
         {#if file!.person.title}<span>{file!.person.title}</span>{/if}
-        {#if file!.person.organization_name}<span class="person__org">{file!.person.organization_name}</span>{/if}
+        {#if file!.person.organization}
+          <a class="person__org" href={`/h/${workspaceSlug}/organization/${encodeURIComponent(file!.person.organization.slug)}`}
+            >{file!.person.organization.name}</a
+          >
+        {:else if file!.person.organization_name}<span class="person__org">{file!.person.organization_name}</span>{/if}
         {#if placeLine}<span>{placeLine}</span>{/if}
       {/snippet}
       {#snippet band()}

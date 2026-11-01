@@ -27,6 +27,7 @@ export interface SearchPerson {
 export interface SearchOrganization {
   workspace_id: string;
   id: string;
+  slug: string;
   name: string;
   conversation_ids: string[];
 }
@@ -86,9 +87,8 @@ export interface FindRow {
  * Las filas de los tres grupos.
  *
  * - Un contacto que ya está en el equipo no se repite: allí se puede fijar.
- * - Una organización con UNA conversación abre esa conversación (no hay ficha
- *   de organización), y esa conversación no se repite en su grupo. Con varias
- *   o ninguna, abre la lente de Conversaciones buscando su nombre.
+ * - Una organización abre su ficha (ADR-159), tenga una conversación o
+ *   varias; sus conversaciones salen en su grupo, cada una a lo suyo.
  * - Un espacio que no está en la lista (no debería pasar) deja la fila fuera:
  *   sin su slug no hay a dónde ir.
  */
@@ -118,28 +118,23 @@ export function paletteFindRows(
     });
   }
 
-  const opened = new Set<string>();
   const organizations: FindRow[] = [];
   for (const org of result.organizations) {
     const w = ws.get(org.workspace_id);
     if (!w) continue;
-    const only = org.conversation_ids.length === 1 ? org.conversation_ids[0] : null;
-    if (only) opened.add(only);
     organizations.push({
       kind: 'organization',
       token: `f:org:${org.id}`,
       name: org.name,
       path: many ? o.spaceLabel(w.name) : '',
-      href: only
-        ? `/h/${w.slug}/conversation/${only}`
-        : `/h/conversations?q=${encodeURIComponent(org.name)}`,
+      href: `/h/${w.slug}/organization/${encodeURIComponent(org.slug)}`,
     });
   }
 
   const conversations: FindRow[] = [];
   for (const c of result.conversations) {
     const w = ws.get(c.workspace_id);
-    if (!w || opened.has(c.id) || !c.title) continue;
+    if (!w || !c.title) continue;
     conversations.push({
       kind: 'conversation',
       token: `f:conv:${c.id}`,

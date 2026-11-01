@@ -10,7 +10,8 @@
  * mailout it received (plan de la lista § 3).
  *
  * Two paths:
- *   · plain (a project or line module: `line_id`, `season`, or nothing that
+ *   · plain (a project or line module: `line_id`, `season`; an organization's
+ *     record: `organization_id`, ADR-159; or nothing that
  *     derives): PostgREST, ordered by next step, as before;
  *   · the lens (`orden`, `etiqueta` or any derived filter: `turno`, `temp`,
  *     `temporada`, `relacion`, `linea`, `envio`+`r`): one source,
@@ -50,6 +51,8 @@ const QuerySchema = v.object({
   project_ids: v.optional(v.string()),
   workspace_ids: v.optional(v.string()),
   line_id: v.optional(v.pipe(v.string(), v.uuid())),
+  // ADR-159: the conversations of one organization, across its projects.
+  organization_id: v.optional(v.pipe(v.string(), v.uuid())),
   q: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(120))),
   season: v.optional(v.string(), 'any'),
   turno: v.optional(v.picklist(['nuestro', 'suyo'])),
@@ -129,7 +132,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       400,
     );
   }
-  const { project_ids, workspace_ids, line_id, q, season, limit, offset, turno, temp, temporada, linea, line_ids, envio, r, relacion, etiqueta, orden, ids_only, lean } =
+  const { project_ids, workspace_ids, line_id, organization_id, q, season, limit, offset, turno, temp, temporada, linea, line_ids, envio, r, relacion, etiqueta, orden, ids_only, lean } =
     parsed.output;
   const idsOnly = ids_only === '1';
 
@@ -153,6 +156,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
 
   setScope(search, projectIds, workspaceIds);
   if (line_id) search.set('line_id', `eq.${line_id}`);
+  if (organization_id) search.set('organization_id', `eq.${organization_id}`);
   search.set('deleted_at', 'is.null');
 
   if (season !== 'any') search.set('custom_fields->>season', `eq.${season}`);
@@ -170,7 +174,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   if (hasListFilter(listFilter) || etiqueta || orden) {
     // The derived filters only exist for the global lens: project and line
     // modules keep their own params (line_id, season).
-    if (line_id || season !== 'any') {
+    if (line_id || organization_id || season !== 'any') {
       return json(
         { error: 'invalid_query', hint: 'turno/temp/temporada/linea/envio/relacion/etiqueta/orden go with project_ids/workspace_ids only.' },
         400,
