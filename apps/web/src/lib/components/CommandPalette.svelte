@@ -14,7 +14,8 @@
    * the discoverable path). Creation (new space/project/line) stays reachable
    * from the footer; what goes INTO them (a performance, a date, a task, a
    * conversation) is found by typing (`paletteCreates`, ADR-139 «después»):
-   * its rows open the shell's dialogs, with the typed text as the title. Installs the global ⌘K / Escape shortcut; the shell also
+   * its rows open the shell's dialogs, with the typed text as the title. The shell owns the global ⌘K shortcut (and loads this the
+   * first time it opens); Escape closes it from here. The shell also
    * opens it from the top-bar search and the sidebar "browse & combine" button.
    */
 
@@ -572,15 +573,11 @@
     }
   });
 
-  // Global ⌘K toggle + Escape close.
+  // Escape closes. ⌘K itself lives in the shell (/h/+layout), which loads
+  // this palette the first time it opens.
   $effect(() => {
     function onKey(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        open = !open;
-      } else if (e.key === 'Escape' && open) {
-        open = false;
-      }
+      if (e.key === 'Escape' && open) open = false;
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);

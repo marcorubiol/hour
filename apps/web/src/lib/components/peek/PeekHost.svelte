@@ -24,17 +24,26 @@
   import { closePeek, currentPeek, openPeek } from '$lib/peek.svelte';
   import { appLocale, t } from '$lib/i18n';
   import Peek from './Peek.svelte';
-  import DateRecord from '$lib/components/record/DateRecord.svelte';
-  import BoloRecord from '$lib/components/record/BoloRecord.svelte';
-  import PerformanceRecord from '$lib/components/record/PerformanceRecord.svelte';
-  import ConversationRecord from '$lib/components/record/ConversationRecord.svelte';
-  import OrganizationRecord from '$lib/components/record/OrganizationRecord.svelte';
-  import PersonRecord from '$lib/components/record/PersonRecord.svelte';
+  import { lazy } from '$lib/lazy.svelte';
 
   const locale = appLocale();
 
   let target = $derived(currentPeek());
   let key = $derived(target ? formatPeek(target) : '');
+
+  // The records are each a page of their own, and Hoy paints without any:
+  // each kind's code arrives the first time a peek of it opens ($lib/lazy).
+  const records = {
+    date: lazy(() => import('$lib/components/record/DateRecord.svelte')),
+    bolo: lazy(() => import('$lib/components/record/BoloRecord.svelte')),
+    performance: lazy(() => import('$lib/components/record/PerformanceRecord.svelte')),
+    conversation: lazy(() => import('$lib/components/record/ConversationRecord.svelte')),
+    person: lazy(() => import('$lib/components/record/PersonRecord.svelte')),
+    organization: lazy(() => import('$lib/components/record/OrganizationRecord.svelte')),
+  };
+  $effect(() => {
+    if (target) void records[target.kind].load();
+  });
 
   const KIND_WORD: Record<PeekTarget['kind'], string> = {
     date: 'peek.kind_date',
@@ -87,18 +96,18 @@
 
 <Peek open={Boolean(target)} {label} {full} contentKey={key} onclose={closePeek}>
   {#key key}
-    {#if target?.kind === 'date'}
-      <DateRecord id={target.id} />
-    {:else if target?.kind === 'bolo'}
-      <BoloRecord projectId={target.projectId} id={target.id} />
-    {:else if target?.kind === 'performance'}
-      <PerformanceRecord workspaceSlug={target.ws} slug={target.slug} inPeek />
-    {:else if target?.kind === 'conversation'}
-      <ConversationRecord workspaceSlug={target.ws} slug={target.slug} inPeek />
-    {:else if target?.kind === 'person'}
-      <PersonRecord workspaceSlug={target.ws} slug={target.slug} inPeek />
-    {:else if target?.kind === 'organization'}
-      <OrganizationRecord workspaceSlug={target.ws} slug={target.slug} inPeek />
+    {#if target?.kind === 'date' && records.date.component}
+      <records.date.component id={target.id} />
+    {:else if target?.kind === 'bolo' && records.bolo.component}
+      <records.bolo.component projectId={target.projectId} id={target.id} />
+    {:else if target?.kind === 'performance' && records.performance.component}
+      <records.performance.component workspaceSlug={target.ws} slug={target.slug} inPeek />
+    {:else if target?.kind === 'conversation' && records.conversation.component}
+      <records.conversation.component workspaceSlug={target.ws} slug={target.slug} inPeek />
+    {:else if target?.kind === 'person' && records.person.component}
+      <records.person.component workspaceSlug={target.ws} slug={target.slug} inPeek />
+    {:else if target?.kind === 'organization' && records.organization.component}
+      <records.organization.component workspaceSlug={target.ws} slug={target.slug} inPeek />
     {/if}
   {/key}
 </Peek>

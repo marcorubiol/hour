@@ -32,7 +32,6 @@
   import SettingsNav from '$lib/components/SettingsNav.svelte';
   import PresenceBadge from '$lib/components/PresenceBadge.svelte';
   import BrandMark from '$lib/components/BrandMark.svelte';
-  import CommandPalette from '$lib/components/CommandPalette.svelte';
   import AccountMenu from '$lib/components/shell/AccountMenu.svelte';
   import ScopeRail from '$lib/components/shell/ScopeRail.svelte';
   import PullRefresh from '$lib/components/shell/PullRefresh.svelte';
@@ -49,12 +48,7 @@
   import { scopeUrlToWrite } from '$lib/scope-url';
   import { provideScopes, sameSet as scopesSameSet, type Scope } from '$lib/stores/scopes.svelte';
   import { provideCreation } from '$lib/stores/creation.svelte';
-  import CreateWorkspaceDialog from '$lib/components/create/CreateWorkspaceDialog.svelte';
-  import CreateProjectDialog from '$lib/components/create/CreateProjectDialog.svelte';
-  import CreateLineDialog from '$lib/components/create/CreateLineDialog.svelte';
-  import CreateEventDialog from '$lib/components/create/CreateEventDialog.svelte';
-  import CreateTaskDialog from '$lib/components/create/CreateTaskDialog.svelte';
-  import CreateConversationDialog from '$lib/components/create/CreateConversationDialog.svelte';
+  import { lazy } from '$lib/lazy.svelte';
   import { createEventType, scopeCreatePresets, scopeTaskTarget, type PaletteCreate } from '$lib/palette-create';
   import type { CreatedPerformance } from '$lib/plan-create';
   import {
@@ -563,6 +557,34 @@
     paletteSeed = [...pins.pins];
     paletteOpen = true;
   }
+
+  // ⌘K and the dialogs of adding are not needed to paint a lens: their code
+  // arrives the first time each opens, and stays ($lib/lazy, ADR-157). The
+  // ⌘K shortcut lives here, then, and not in the palette it opens.
+  const palette = lazy(() => import('$lib/components/CommandPalette.svelte'));
+  const dialogs = {
+    workspace: lazy(() => import('$lib/components/create/CreateWorkspaceDialog.svelte')),
+    project: lazy(() => import('$lib/components/create/CreateProjectDialog.svelte')),
+    line: lazy(() => import('$lib/components/create/CreateLineDialog.svelte')),
+    event: lazy(() => import('$lib/components/create/CreateEventDialog.svelte')),
+    task: lazy(() => import('$lib/components/create/CreateTaskDialog.svelte')),
+    conversation: lazy(() => import('$lib/components/create/CreateConversationDialog.svelte')),
+  };
+  $effect(() => {
+    if (paletteOpen) void palette.load();
+    if (creation.workspaceOpen) void dialogs.workspace.load();
+    if (creation.projectOpen) void dialogs.project.load();
+    if (creation.lineOpen) void dialogs.line.load();
+    if (creation.eventOpen) void dialogs.event.load();
+    if (creation.taskOpen) void dialogs.task.load();
+    if (creation.conversationOpen) void dialogs.conversation.load();
+  });
+  function onPaletteKey(e: KeyboardEvent) {
+    if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'k' || !authChecked || blocked) return;
+    e.preventDefault();
+    if (paletteOpen) paletteOpen = false;
+    else openPaletteFresh();
+  }
   function onApplyScope(tokens: string[]) {
     rememberWorkingScope(tokens);
     pins.set(tokens);
@@ -697,6 +719,7 @@
   onpagehide={() => rememberWorkingScope()}
   onkeydown={(e) => {
     if (e.key === 'Escape' && railOpen) closeRail({ returnFocus: true });
+    onPaletteKey(e);
   }}
 />
 
@@ -821,43 +844,57 @@
     </main>
   </div>
 
-  <CommandPalette
-    bind:open={paletteOpen}
-    initialTokens={paletteSeed}
-    {onApplyScope}
-    {onPickAction}
-    {onCreate}
-    {canTask}
-    {canProject}
-    {canLine}
-  />
+  {#if palette.component}
+    <palette.component
+      bind:open={paletteOpen}
+      initialTokens={paletteSeed}
+      {onApplyScope}
+      {onPickAction}
+      {onCreate}
+      {canTask}
+      {canProject}
+      {canLine}
+    />
+  {/if}
 
-  <CreateWorkspaceDialog bind:open={creation.workspaceOpen} />
-  <CreateProjectDialog bind:open={creation.projectOpen} workspaceId={creation.projectWorkspaceId} />
-  <CreateLineDialog
-    bind:open={creation.lineOpen}
-    workspaceId={creation.lineWorkspaceId}
-    projectId={creation.lineProjectId}
-  />
-  <CreateEventDialog
-    bind:open={creation.eventOpen}
-    presetProjectId={creation.event.projectId ?? createPresets.projectId}
-    presetLineId={creation.event.projectId && creation.event.projectId !== createPresets.projectId
-      ? null
-      : createPresets.lineId}
-    presetDate={creation.event.date ?? null}
-    presetType={creation.event.type ?? null}
-    presetTitle={creation.event.title ?? null}
-    presetWorkspaceId={createPresets.workspaceId}
-    canUnavailable={creation.eventHost?.canUnavailable ?? true}
-    onOpenPerformance={openCreatedPerformance}
-  />
-  <CreateTaskDialog bind:open={creation.taskOpen} target={taskTarget} title={creation.taskTitle} />
-  <CreateConversationDialog
-    bind:open={creation.conversationOpen}
-    who={creation.conversationWho}
-    tag={creation.conversationTag}
-  />
+  {#if dialogs.workspace.component}
+    <dialogs.workspace.component bind:open={creation.workspaceOpen} />
+  {/if}
+  {#if dialogs.project.component}
+    <dialogs.project.component bind:open={creation.projectOpen} workspaceId={creation.projectWorkspaceId} />
+  {/if}
+  {#if dialogs.line.component}
+    <dialogs.line.component
+      bind:open={creation.lineOpen}
+      workspaceId={creation.lineWorkspaceId}
+      projectId={creation.lineProjectId}
+    />
+  {/if}
+  {#if dialogs.event.component}
+    <dialogs.event.component
+      bind:open={creation.eventOpen}
+      presetProjectId={creation.event.projectId ?? createPresets.projectId}
+      presetLineId={creation.event.projectId && creation.event.projectId !== createPresets.projectId
+        ? null
+        : createPresets.lineId}
+      presetDate={creation.event.date ?? null}
+      presetType={creation.event.type ?? null}
+      presetTitle={creation.event.title ?? null}
+      presetWorkspaceId={createPresets.workspaceId}
+      canUnavailable={creation.eventHost?.canUnavailable ?? true}
+      onOpenPerformance={openCreatedPerformance}
+    />
+  {/if}
+  {#if dialogs.task.component}
+    <dialogs.task.component bind:open={creation.taskOpen} target={taskTarget} title={creation.taskTitle} />
+  {/if}
+  {#if dialogs.conversation.component}
+    <dialogs.conversation.component
+      bind:open={creation.conversationOpen}
+      who={creation.conversationWho}
+      tag={creation.conversationTag}
+    />
+  {/if}
 {/if}
 </svelte:boundary>
 
