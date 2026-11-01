@@ -10,7 +10,6 @@ import {
   lensChip,
   lensChips,
   otherTagsName,
-  legacyViewRedirect,
   panelHref,
   panelOf,
   scopeTags,
@@ -66,18 +65,6 @@ describe('the chip comes from the URL', () => {
   it('without Converses it is always Equipo', () => {
     expect(lensChip(q(''), false)).toBe(TEAM);
     expect(lensChip(q('etiqueta=sales'), false)).toBe(TEAM);
-  });
-});
-
-describe('the views of ADR-134 redirect to chips', () => {
-  it('?view=team and ?view=threads go to ?etiqueta=team, keeping the rest', () => {
-    expect(legacyViewRedirect(q('view=team'))?.toString()).toBe('etiqueta=team');
-    expect(legacyViewRedirect(q('view=threads&scope=s:playwright'))?.toString()).toBe('scope=s%3Aplaywright&etiqueta=team');
-  });
-  it('nothing to redirect otherwise', () => {
-    expect(legacyViewRedirect(q(''))).toBeNull();
-    expect(legacyViewRedirect(q('etiqueta=team'))).toBeNull();
-    expect(legacyViewRedirect(q('view=other'))).toBeNull();
   });
 });
 

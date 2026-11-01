@@ -10,6 +10,7 @@ import {
   daysCoveredBy,
   dayKeyInTz,
   decisionsFor,
+  dueOption,
   isoWeek,
   monthGrid,
   nightsFree,
@@ -1286,5 +1287,26 @@ describe('statusWord', () => {
   });
   it('keeps an unknown value raw, underscores as spaces', () => {
     expect(statusWord('on_the_road', 'en')).toBe('on the road');
+  });
+});
+
+describe('dueOption (ADR-165 § 2)', () => {
+  const side = (id: string, status = 'hold') => ({ id, project: 'Show A', venue: id, city: null, time: null, status });
+  const d = (a = side('a'), b = side('b')) => ({ day: '2026-08-20', a, b });
+
+  it('opens the hold that falls due first: the longer notice', () => {
+    const notice: Record<string, number | null> = { a: 10, b: 45 };
+    expect(dueOption(d(), (id) => notice[id]).id).toBe('b');
+    expect(dueOption(d(), (id) => ({ a: 45, b: 10 })[id]).id).toBe('a');
+  });
+
+  it('a side without notice never falls due; with neither, the first', () => {
+    expect(dueOption(d(), (id) => (id === 'a' ? 0 : 20)).id).toBe('b');
+    expect(dueOption(d(), () => 0).id).toBe('a');
+    expect(dueOption(d(), () => null).id).toBe('a');
+  });
+
+  it('a side that is not a hold is not the one to decide', () => {
+    expect(dueOption(d(side('a', 'confirmed'), side('b')), () => null).id).toBe('b');
   });
 });

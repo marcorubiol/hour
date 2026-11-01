@@ -19,7 +19,7 @@
    * context from home cards, ⌘K actions and empty states.
    *
    * Preserved from the previous shell: auth gate, lens provider, realtime
-   * + network presence, theme + DND account menu, master-view restore.
+   * + network presence, theme + DND account menu.
    * The selection store died with the sidebar (pins are the scope model).
    */
 
@@ -63,7 +63,6 @@
   import { accentVarFor } from '$lib/utils/accent';
   import { spaceName } from '$lib/utils/identity';
   import { homeWorkspace, spaceWriteWorkspaces, taskWorkspaces } from '$lib/workspace-role';
-  import { saveMasterViewPath } from '$lib/master-view';
   import {
     provideNetworkPresence,
     provideRealtime,
@@ -163,6 +162,13 @@
     pins.restoreFromLocalStorage();
     scopes.restoreFromLocalStorage();
     calm.restoreFromLocalStorage();
+    // Master View se fue (ADR-165): lo que dejó en este navegador se borra.
+    try {
+      localStorage.removeItem('hour_master_view_path');
+      localStorage.removeItem('hour_master_view_enabled');
+    } catch {
+      /* sin almacenamiento, nada que borrar */
+    }
     // Keyboard `c` toggles calm globally (spec) — never while typing.
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'c' || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -175,10 +181,6 @@
     calmRestored = true;
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  });
-
-  $effect(() => {
-    saveMasterViewPath(page.url.pathname);
   });
 
   let rt = $state<RealtimeHandle | null>(null);

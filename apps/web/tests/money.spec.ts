@@ -123,24 +123,6 @@ test.describe('Cuentas', () => {
     }
   });
 
-  test('/h/money answers 301 to /h/books with its query, and the anchor opens the sheet', async ({ page }) => {
-    test.setTimeout(60_000);
-    await page.goto('/h/books');
-    await waitForLoaded(page);
-    const { boloId } = await ownBolo(page, FEE, null);
-
-    const res = await page.request.get('/h/money?scope=x', { maxRedirects: 0 });
-    expect(res.status()).toBe(301);
-    const to = new URL(res.headers()['location']!, page.url());
-    expect(to.pathname + to.search).toBe('/h/books?scope=x');
-
-    await page.goto(`/h/money#bolo-${boloId}`);
-    await page.waitForURL(new RegExp(`/h/books#bolo-${boloId}$`));
-    await waitForLoaded(page);
-    await expect(page.locator(`#bolo-${boloId} .book__toggle`)).toHaveAttribute('aria-expanded', 'true');
-    await expect(page.locator(`#bolo-sheet-${boloId}`)).toBeVisible();
-  });
-
   test('a «Falta» verb from the bolo vistazo lands with its dialog open (`act=`)', async ({ page }) => {
     test.setTimeout(60_000);
     await page.goto('/h/books');

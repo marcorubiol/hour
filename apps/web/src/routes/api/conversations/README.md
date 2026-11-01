@@ -21,7 +21,6 @@ error).
 | `status`       | `contacted`    | the old stored status, or `any` (every caller sends `any`; ADR-138 E4 drops it) |
 | `relacion`     | none           | the derived relation (`never`, `contacted`, `talking`, `regular`, `dormant`, `not_now`; ADR-138) |
 | `project_ids`  | none           | comma-separated project ids (never a slug: slugs repeat across workspaces) |
-| `season`       | `2026-27`      | matches `custom_fields->>season`, or `any`         |
 | `limit`        | `50` (max 100) | page size                                          |
 | `offset`       | `0`            | pagination                                         |
 | `lean`         | none           | `1`: the rows only (no `total`, no bolos, no `last_mailout`), what «Te espera» reads; plain path only |
@@ -36,7 +35,6 @@ Invalid values return `400 invalid_query` with per-field issues from Valibot.
   "limit": 50,
   "offset": 0,
   "status": "contacted",
-  "season": "2026-27",
   "items": [
     {
       "id": "…uuid…",

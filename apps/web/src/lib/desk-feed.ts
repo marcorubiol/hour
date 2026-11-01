@@ -99,6 +99,8 @@ export interface DeskItem {
   repliedAt: string | null;
   /** A conversation's tags when they are not Difusión (ADR-138 fase 3): the row says what it is about. */
   tagName: string | null;
+  /** A «liberar» row: the option it confirms or releases in place (ADR-165 § 1). */
+  option: DeskOption | null;
 }
 
 export interface DeskRun {
@@ -147,8 +149,18 @@ export interface DeskDecisionInput {
   a: string;
   b: string;
   projectName: string;
-  /** Where it is decided: the Planner on its day. */
+  /** Where it is decided: «decidir» opens the option that falls due first in
+      the vistazo, «liberar» the Planner on its day (ADR-165 § 2). */
   href: string | null;
+  /** A release: the option to let go, which the row confirms or releases in
+      place (ADR-165 § 1). */
+  option?: DeskOption | null;
+}
+
+/** One performance a row acts on: its id and the status it has now (the undo). */
+export interface DeskOption {
+  id: string;
+  status: string;
 }
 
 interface DeskReplyInput {
@@ -277,6 +289,7 @@ function blankItem(over: Partial<DeskItem> & Pick<DeskItem, 'id' | 'concern' | '
     day: null,
     repliedAt: null,
     tagName: null,
+    option: null,
     ...over,
   };
 }
@@ -492,6 +505,7 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
         verbKey: d.kind === 'choose' ? 'decide' : 'release',
         overdue,
         href: d.href,
+        option: d.kind === 'release' ? (d.option ?? null) : null,
       }),
     );
   }

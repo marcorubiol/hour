@@ -161,7 +161,7 @@ describe('peekOpensFrom', () => {
   const bolo: PeekTarget = { kind: 'bolo', projectId: PROJECT, id: BOLO };
 
   it('from every lens, a record opens in the vistazo', () => {
-    for (const path of ['/h/desk', '/h/planner', '/h/conversations', '/h/books', '/h/muk-cia/planner', '/h/muk-cia/money']) {
+    for (const path of ['/h/desk', '/h/planner', '/h/conversations', '/h/books']) {
       expect(isLensPath(path)).toBe(true);
       expect(peekOpensFrom(perf, path, false)).toBe(true);
     }
