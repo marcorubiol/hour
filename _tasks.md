@@ -20,7 +20,9 @@ no pide migración primero; las migraciones juntas por el gate de § 34.
   recuentos en el Tablero, fila de conversación con columna vacía a 1440, selector de lentes que marca la de origen en
   fichas y Ajustes, textos cortados en Nuevo bolo, «·» sueltos, ⌘K lento, Temporada de Hoy desalineada.
 - [ ] 78 temporada en una sola función, septiembre por defecto, configurable por espacio.
-- [ ] 79 gastos adelantados: «Lo pagó», devuelto, «Se debe al equipo», «+ Gasto» desde bolo y Ahora.
+- [ ] 79 gastos adelantados: «Lo pagó», devuelto, «Se debe al equipo», «+ Gasto» desde bolo y Ahora. Pide migración
+  (01-11): `expense.paid_by_user_id` sólo nombra logins; hace falta `paid_by_person_id`, `reimbursed_on` y
+  `set_expense_reimbursed` (borrador en el informe de `claude/batch-books`, copiado en STATUS). Va con las migraciones.
 - [ ] 82 quitar «Roles que asumo» de Ajustes › Espacios.
 - [ ] 83 «Copiar de otra función» (técnica, logística, acogida; después la escaleta).
 - [ ] 84 fusionar organizaciones (migración).
