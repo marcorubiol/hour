@@ -10,6 +10,9 @@ export const LOCALES = ['ca', 'es', 'en', 'fr'] as const;
 
 export type Locale = (typeof LOCALES)[number];
 
+/** Each language in its own words: a picker is read by whoever does not speak the current one. */
+export const LOCALE_NAME: Record<Locale, string> = { ca: 'Català', es: 'Español', en: 'English', fr: 'Français' };
+
 /**
  * English is the fallback, so it ships with every page. The other three are
  * one chunk each, fetched when a page needs one (`loadLocale`): a browser
@@ -83,12 +86,43 @@ export function detectLocale(language: string | null | undefined): Locale {
 }
 
 /**
- * The session's locale, read where it lives today (the browser). English
- * when there is no browser (SSR, server routes), so a server render never
- * guesses a language.
+ * The language someone picked at the door (login, sign-up, invitation,
+ * ADR-169). A cookie, not localStorage: the server reads it too, so the door
+ * renders in that language before any script runs, and every screen after
+ * entering keeps it. Not httpOnly on purpose: it is a preference, not a secret.
+ */
+export const LOCALE_COOKIE = 'hour_locale';
+
+/** A cookie value that names one of the app's languages, or null. */
+export function localeFromCookie(value: string | null | undefined): Locale | null {
+  return value && (LOCALES as readonly string[]).includes(value) ? (value as Locale) : null;
+}
+
+/** The locale a request asks for: the chosen one, else the first of Accept-Language. */
+export function requestLocale(cookie: string | null | undefined, acceptLanguage: string | null | undefined): Locale {
+  return localeFromCookie(cookie) ?? detectLocale(acceptLanguage?.split(',')[0]?.trim());
+}
+
+function chosenLocale(): Locale | null {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(new RegExp(`(?:^|; )${LOCALE_COOKIE}=([^;]*)`));
+  return localeFromCookie(match?.[1]);
+}
+
+/** Keep `locale` for this device, a year (the door's picker). */
+export function chooseLocale(locale: Locale): void {
+  if (typeof document === 'undefined') return;
+  document.cookie = `${LOCALE_COOKIE}=${locale}; path=/; max-age=31536000; samesite=lax`;
+}
+
+/**
+ * The session's locale: the one chosen at the door, else the browser's.
+ * English when there is no browser (SSR, server routes), so a server render
+ * never guesses a language; a server page that renders words asks
+ * `requestLocale` instead.
  */
 export function appLocale(): Locale {
-  return detectLocale(typeof navigator !== 'undefined' ? navigator.language : null);
+  return chosenLocale() ?? detectLocale(typeof navigator !== 'undefined' ? navigator.language : null);
 }
 
 /** BCP 47 tag of the session's locale, for Intl date formatting. */

@@ -41,7 +41,7 @@
     type DateTypeKey,
   } from '$lib/quick-add';
   import { dayMonthYear, dualTime, instantToWallClock, wallClockToInstant, viewerTimeZone } from '$lib/datetime';
-  import { detectLocale, t } from '$lib/i18n';
+  import { appLocale, t } from '$lib/i18n';
   import { allLinesQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
   import {
     DATE_STATUSES,
@@ -62,7 +62,7 @@
 
   let { open = $bindable(false), date = null, inSeries = false }: Props = $props();
 
-  const locale = detectLocale(navigator.language);
+  const locale = appLocale();
   const viewerTz = viewerTimeZone();
   const queryClient = useQueryClient();
 

@@ -36,9 +36,9 @@
     activeProjectsQueryOptions,
     allLinesQueryOptions,
   } from '$lib/nav-queries';
-  import { detectLocale, t } from '$lib/i18n';
+  import { appLocale, t } from '$lib/i18n';
 
-  const locale = detectLocale(navigator.language);
+  const locale = appLocale();
   import { accentVar } from '$lib/utils/accent';
   import { spaceName } from '$lib/utils/identity';
   import RecordHead from '$lib/components/RecordHead.svelte';

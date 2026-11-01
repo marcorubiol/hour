@@ -35,7 +35,7 @@
   import type { Json } from '$lib/db-types';
   import type { KVObject } from '$lib/kv-lines';
   import { dayLabel, dayMonth, localDayISO, timeInTz, viewerTimeZone } from '$lib/datetime';
-  import { LOCALE_TAG, detectLocale, t } from '$lib/i18n';
+  import { LOCALE_TAG, appLocale, t } from '$lib/i18n';
   import {
     HOLD_NOTICE_DEFAULT,
     PERFORMANCE_MENU_STATUSES,
@@ -291,7 +291,7 @@
     $patchMutation.mutate({ status });
   }
 
-  const locale = detectLocale(navigator.language);
+  const locale = appLocale();
 
   let dialogOpen = $state(false);
   let fDay = $state('');

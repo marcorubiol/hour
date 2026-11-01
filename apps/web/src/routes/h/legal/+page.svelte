@@ -12,7 +12,7 @@
   import { docTitle } from '$lib/doc-title';
   import { createQuery } from '@tanstack/svelte-query';
   import { fetchJSON } from '$lib/api';
-  import { detectLocale, t } from '$lib/i18n';
+  import { appLocale, t } from '$lib/i18n';
 
   type Source = {
     key: string;
@@ -26,7 +26,7 @@
     imported_at: string | null;
   };
 
-  const locale = detectLocale(navigator.language);
+  const locale = appLocale();
   const sources = createQuery({
     queryKey: ['venue-directory', 'sources'],
     queryFn: ({ signal }) => fetchJSON<{ items: Source[] }>('/api/venue-directory/sources', signal),

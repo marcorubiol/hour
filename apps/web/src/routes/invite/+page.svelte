@@ -5,10 +5,21 @@
   import { ApiError, fetchJSON, mutateJSON } from '$lib/api';
   import { ensureSession } from '$lib/session.svelte';
   import { spaceName } from '$lib/utils/identity';
-  import { appLocale, appLocaleTag, t } from '$lib/i18n';
+  import { chooseLocale, LOCALE_NAME, LOCALE_TAG, LOCALES, loadLocale, t, type Locale } from '$lib/i18n';
+  import Segmented from '$lib/components/Segmented.svelte';
   import { dayMonthLong } from '$lib/datetime';
 
-  const locale = appLocale();
+  let { data }: { data: { locale: Locale } } = $props();
+
+  /** The door's language (ADR-169): the one chosen at login, or picked here. */
+  let locale = $derived<Locale>(data.locale);
+  const localeOptions = LOCALES.map((value) => ({ value, label: LOCALE_NAME[value] }));
+
+  async function pickLocale(next: Locale) {
+    await loadLocale(next);
+    chooseLocale(next);
+    locale = next;
+  }
   const MEMBERSHIP_ROLES = new Set(['owner', 'admin', 'member', 'viewer', 'guest']);
 
   type Invitation = {
@@ -129,7 +140,7 @@
   <title>{t('invite.title', locale)}</title>
 </svelte:head>
 
-<main class="invitation-page">
+<main class="invitation-page" lang={locale}>
   <header class="invitation-page__brand"><BrandMark size="m" /></header>
 
   <section class="invitation-card" aria-busy={loading}>
@@ -159,7 +170,7 @@
             <dt>{t('invite.bolo_landing', locale)}</dt>
             <dd>
               {invitation.landing_performed_at
-                ? t('invite.bolo_landing_day', locale, { day: dayMonthLong(invitation.landing_performed_at, appLocaleTag()) })
+                ? t('invite.bolo_landing_day', locale, { day: dayMonthLong(invitation.landing_performed_at, LOCALE_TAG[locale]) })
                 : t('invite.bolo_landing_space', locale)}
             </dd>
           </div>
@@ -173,7 +184,7 @@
             <dt>{t('invite.bolo_access_until', locale)}</dt>
             <dd>
               {invitation.bolo_access_last_day
-                ? dayMonthLong(invitation.bolo_access_last_day, appLocaleTag())
+                ? dayMonthLong(invitation.bolo_access_last_day, LOCALE_TAG[locale])
                 : t('invite.bolo_access_open', locale)}
             </dd>
           </div>
@@ -190,7 +201,7 @@
         {/if}
         <div>
           <dt>{isBolo ? t('invite.link_valid_until', locale) : t('invite.valid_until', locale)}</dt>
-          <dd>{new Date(invitation.expires_at).toLocaleDateString(appLocaleTag())}</dd>
+          <dd>{new Date(invitation.expires_at).toLocaleDateString(LOCALE_TAG[locale])}</dd>
         </div>
       </dl>
 
@@ -214,7 +225,16 @@
     {/if}
   </section>
 
-  <footer class="invitation-page__foot">{t('invite.foot', locale)}</footer>
+  <footer class="invitation-page__foot">
+    <span>{t('invite.foot', locale)}</span>
+    <Segmented
+      options={localeOptions}
+      value={locale}
+      ariaLabel={t('login.language', locale)}
+      name="locale"
+      onchange={pickLocale}
+    />
+  </footer>
 </main>
 
 <style>
@@ -291,6 +311,11 @@
     }
     .invitation-page__foot {
       justify-self: center;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-s);
       color: var(--text-faint);
       font-family: var(--font-mono);
       font-size: var(--text-xs);

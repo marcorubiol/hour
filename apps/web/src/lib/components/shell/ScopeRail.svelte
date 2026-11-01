@@ -1,6 +1,6 @@
 <script lang="ts">
   import { tick, type Snippet } from 'svelte';
-  import { detectLocale, LOCALE_TAG, t } from '$lib/i18n';
+  import { appLocale, LOCALE_TAG, t } from '$lib/i18n';
   import { useCalm } from '$lib/stores/calm.svelte';
   import { usePins } from '$lib/stores/pins.svelte';
   import { useScopes, sameSet as scopesSameSet, type Scope } from '$lib/stores/scopes.svelte';
@@ -55,7 +55,7 @@
 
   // Session locale — feeds both Intl (rail clock) and the dictionary (lens
   // labels). /h is client-only (ssr = false), so navigator is safe at init.
-  const locale = detectLocale(navigator.language);
+  const locale = appLocale();
 
   // "dilluns · 13 jul" — CSS mono-caps does the shouting; strip the
   // abbreviation dot some locales append to the short month.

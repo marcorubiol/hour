@@ -27,12 +27,6 @@ import { TRADES } from './trade.svelte';
 
 const SRC = join(import.meta.dirname, '..', '..');
 
-/** Login runs before a session exists, so it never picks a locale — those
-    keys live in English only, on purpose (routes/login/+page.svelte). */
-const EN_ONLY = new Set(
-  Object.keys(en).filter((k) => k.startsWith('login.')),
-);
-
 function sourceFiles(dir: string): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -78,8 +72,9 @@ describe('i18n keys', () => {
     expect([...LOCALES].sort()).toEqual(['en', ...Object.keys(others)].sort());
   });
 
-  test('every other language answers everything en does, bar the pre-session screen', () => {
-    const expected = Object.keys(en).filter((k) => !EN_ONLY.has(k));
+  /** The door too (login, sign-up): it speaks the chosen language (ADR-169). */
+  test('every other language answers everything en does', () => {
+    const expected = Object.keys(en);
     for (const [name, dict] of Object.entries(others)) {
       const have = new Set(Object.keys(dict));
       expect({ [name]: expected.filter((k) => !have.has(k)) }).toEqual({ [name]: [] });

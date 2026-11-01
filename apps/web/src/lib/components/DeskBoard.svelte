@@ -28,7 +28,7 @@
   import { accentVar } from '$lib/utils/accent';
   import { conversationVerbKey, dayBucket } from '$lib/desk-feed';
   import { localeWeekdayShort } from '$lib/datetime';
-  import { detectLocale, t } from '$lib/i18n';
+  import { appLocale, t } from '$lib/i18n';
 
   interface Props {
     conversations: DeskConversation[];
@@ -68,7 +68,7 @@
     dayLabel: string;
   };
 
-  const locale = detectLocale(navigator.language);
+  const locale = appLocale();
 
   const TAG_TONES: Tone[] = ['teal', 'blue', 'green', 'purple', 'amber', 'red', 'neutral'];
   function toneForTag(tag: string): Tone {

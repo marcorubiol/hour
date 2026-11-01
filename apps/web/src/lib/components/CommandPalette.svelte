@@ -43,7 +43,7 @@
   import { localeDayMonth, viewerTimeZone } from '$lib/datetime';
   import { openPeek } from '$lib/peek.svelte';
   import type { PeekTarget } from '$lib/peek';
-  import { detectLocale, LOCALE_TAG, t } from '$lib/i18n';
+  import { appLocale, LOCALE_TAG, t } from '$lib/i18n';
   import { accentVarFor } from '$lib/utils/accent';
   import { spaceName } from '$lib/utils/identity';
   import { lineKindLabel } from '$lib/utils/line-kind';
@@ -54,7 +54,7 @@
   import { paletteFindRows, paletteSearchQueryOptions, paletteSearchTerm } from '$lib/palette-search';
 
   // El mismo par que usa el Planner: el locale detectado y su etiqueta BCP-47.
-  const locale = detectLocale(navigator.language);
+  const locale = appLocale();
   const localeTag = LOCALE_TAG[locale];
   const viewerTz = viewerTimeZone();
   /** Hoy, en el huso del lector. `parseDayQuery` es puro y lo exige inyectado. */
