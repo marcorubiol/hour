@@ -6540,3 +6540,5 @@ después, en paralelo.
 **Re-evaluar cuando** conteste el abogado (las bases de la pregunta 10 y si una invitación a un profesional es
 comunicación comercial), o si una compañía manda invitaciones a cientos de profesionales: entonces la rama
 profesional pesa en el dominio de la difusión como el público, y se mira si pasa al subdominio.
+
+> **Nota a ADR-173 (2026-11-01):** pregunta 10 del plan decidida por Marco: invitan a un profesional las tres bases de la difusión (lo pidió, trato previo, genérico de la sala), con el pie que dice cuál; si el abogado excluye un tipo, sale de la propuesta y de la invitación a la vez.
