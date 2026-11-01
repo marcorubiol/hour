@@ -491,6 +491,24 @@ export interface MoneyBolo {
 	} | null;
 }
 
+/**
+ * The fee a new bolo of this project starts from (ADR-168): the one of its
+ * last bolo with a fee. «Last» is the last created: a bolo's id is a UUIDv7,
+ * time-ordered, so the greatest id is the newest. A cancelled bolo does not
+ * count (its fee was not agreed). Null when the project has none.
+ */
+export function lastBoloFee(
+	bolos: readonly Pick<MoneyBolo, 'id' | 'project_id' | 'fee_amount' | 'fee_currency' | 'status'>[],
+	projectId: string,
+): { amount: number; currency: string } | null {
+	let last: (typeof bolos)[number] | null = null;
+	for (const b of bolos) {
+		if (b.project_id !== projectId || b.fee_amount === null || b.status === 'cancelled') continue;
+		if (!last || b.id > last.id) last = b;
+	}
+	return last ? { amount: Number(last.fee_amount), currency: last.fee_currency ?? 'EUR' } : null;
+}
+
 export type InvoicingMode = 'off' | 'interno' | 'legal';
 
 /** Statuses that count as sold (ADR-087); holds and proposed are pipeline. */

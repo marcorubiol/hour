@@ -69,6 +69,7 @@
     invoicesByBolo as groupInvoicesByBolo,
     invoiceStatusLabel,
     isQuietPosition,
+    lastBoloFee,
     LEDGER_FILTERS,
     matchesLedgerFilter,
     moneyPosition,
@@ -108,7 +109,17 @@
   import { goto, replaceState } from '$app/navigation';
   import { peekFromLink } from '$lib/peek';
   import { openPeek } from '$lib/peek.svelte';
-  import { tick } from 'svelte';
+  import { tick, untrack } from 'svelte';
+  import {
+    QUARTER_COLUMNS,
+    defaultQuarter,
+    parseQuarterKey,
+    quarterCsv,
+    quarterFileName,
+    quarterKey,
+    recentQuarters,
+    type QuarterData,
+  } from '$lib/quarter-export';
 
   type WorkspaceLite = { id: string; slug: string; invoicing_mode: InvoicingMode | null };
 
@@ -874,6 +885,39 @@
     if (!dealVenue.trim()) dealVenue = c.organization.name;
     if (!dealCity.trim() && c.organization.city) dealCity = c.organization.city;
   }
+  // El caché del último bolo de la obra, como relleno editable (ADR-168):
+  // propuesto, nunca impuesto. Se lee del feed de esa obra (la misma clave
+  // que el libro cuando el ámbito es esa obra sola, así que a menudo ya está).
+  const dealProjectBolosQuery = createQuery(
+    toStore(() => {
+      const k = { projectIds: dealProjectId ? [dealProjectId] : [], workspaceIds: [] as string[] };
+      return {
+        queryKey: ['money-bolos', { p: k.projectIds, w: k.workspaceIds }] as const,
+        enabled: dealOpen && Boolean(dealProjectId),
+        queryFn: ({ signal }: { signal: AbortSignal }) =>
+          fetchJSON<{ items: MoneyBolo[] }>(`/api/money/bolos?${feedParams(k, { limit: String(BOLOS_CAP) })}`, signal),
+      };
+    }),
+  );
+  let dealFeeProposal = $derived(
+    dealProjectId ? lastBoloFee($dealProjectBolosQuery.data?.items ?? [], dealProjectId) : null,
+  );
+  // What the field was last filled with: while the person has not typed over
+  // it, another obra's proposal replaces it; once they have, it is theirs.
+  let dealFeeFilled = $state<string | null>(null);
+  $effect(() => {
+    const proposal = dealFeeProposal;
+    if (!dealOpen) return;
+    untrack(() => {
+      const untouched = String(dealFee).trim() === '' || String(dealFee) === dealFeeFilled;
+      if (!untouched) return;
+      dealFee = proposal ? String(proposal.amount) : '';
+      if (proposal) dealCurrency = proposal.currency;
+      dealFeeFilled = proposal ? dealFee : null;
+    });
+  });
+  let dealFeeIsProposal = $derived(dealFeeFilled !== null && String(dealFee) === dealFeeFilled);
+
   let dealOptions = $derived(
     projectIndex.map((p) => ({ value: p.id, label: `${p.name} · ${spaceName(p.workspaceName)}` })),
   );
@@ -882,6 +926,7 @@
     dealVenue = '';
     dealCity = '';
     dealFee = '';
+    dealFeeFilled = null;
     dealCurrency = currencies[0] ?? 'EUR';
     formErrors.clear();
     dealOpen = true;
@@ -921,6 +966,65 @@
     },
     onError: (err) => addToast({ tone: 'danger', title: t('books.deal_not_created', locale), message: err instanceof Error ? err.message : t('perf.unexpected', locale) }),
   });
+
+  // ── El trimestre para la gestoría (ADR-168) ─────────────────────────────
+  // Facturas emitidas y cobros del trimestre elegido, del ámbito de la lente,
+  // en un CSV (`$lib/quarter-export`). Se pide al pulsar, no antes: no es
+  // algo que la lente pinte.
+  let quarterOpen = $state(false);
+  let quarterPick = $state('');
+  let quarterBusy = $state(false);
+  let quarterOptions = $derived(
+    recentQuarters(localDayISO(today)).map((qq) => ({
+      value: quarterKey(qq),
+      label: t('books.quarter_label', locale, { q: qq.q, year: qq.year }),
+    })),
+  );
+  function openQuarter() {
+    quarterPick = quarterKey(defaultQuarter(localDayISO(today)));
+    quarterOpen = true;
+  }
+  async function downloadQuarter() {
+    const picked = parseQuarterKey(quarterPick);
+    if (!picked || quarterBusy) return;
+    quarterBusy = true;
+    try {
+      const params = feedParams(filterIds, { year: String(picked.year), q: String(picked.q) });
+      const data = await fetchJSON<QuarterData & { capped?: boolean }>(`/api/money/quarter?${params}`);
+      const csv = quarterCsv(data, {
+        headers: QUARTER_COLUMNS.map((c) => t(`books.csv_${c}`, locale)),
+        invoice: t('books.csv_row_invoice', locale),
+        payment: t('books.csv_row_payment', locale),
+        exempt: t('books.exempt', locale),
+        state: {
+          paid: t('books.csv_state_paid', locale),
+          partial: t('books.csv_state_partial', locale),
+          pending: t('books.csv_state_pending', locale),
+          cancelled: t('books.csv_state_cancelled', locale),
+        },
+      });
+      const href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+      const a = document.createElement('a');
+      a.href = href;
+      a.download = quarterFileName(picked);
+      a.click();
+      URL.revokeObjectURL(href);
+      quarterOpen = false;
+      const n = data.invoices.length + data.payments.length;
+      addToast({
+        tone: data.capped ? 'warning' : 'success',
+        message: data.capped
+          ? t('books.quarter_capped', locale)
+          : n === 0
+            ? t('books.quarter_empty', locale)
+            : t('books.quarter_done', locale, { invoices: data.invoices.length, payments: data.payments.length }),
+      });
+    } catch (err) {
+      addToast({ tone: 'danger', title: t('books.quarter_failed', locale), message: err instanceof Error ? err.message : t('perf.unexpected', locale) });
+    } finally {
+      quarterBusy = false;
+    }
+  }
 
   // ── Llegadas desde el alta y la ficha de una función (`_tasks.md § 36`) ──
   // `?new_bolo=<proyecto>` abre «New deal» con ese proyecto puesto (el ámbito
@@ -1025,6 +1129,7 @@
           {#if !seasonEmpty}
             <Button size="xs" variant="secondary" onclick={openDeal} disabled={projectIndex.length === 0}>{t('books.new_deal', locale)}</Button>
           {/if}
+          <Button size="xs" variant="quiet" onclick={openQuarter}>{t('books.quarter_export', locale)}</Button>
         </span>
       {/if}
     {/snippet}
@@ -1464,7 +1569,7 @@
       <Input label={t('create.city', locale)} bind:value={dealCity} placeholder={t('books.ph_city', locale)} />
     </div>
     <div class="mny__row2">
-      <Input id="deal-fee" label={t('books.fee', locale)} type="number" step="0.01" bind:value={dealFee} placeholder={t('books.ph_fee_later', locale)} error={formErrors.of('deal-fee')} />
+      <Input id="deal-fee" label={t('books.fee', locale)} type="number" step="0.01" bind:value={dealFee} placeholder={t('books.ph_fee_later', locale)} helper={dealFeeIsProposal ? t('books.fee_proposed', locale) : undefined} error={formErrors.of('deal-fee')} />
       <Input label={t('books.currency', locale)} bind:value={dealCurrency} placeholder="EUR" />
     </div>
     <button type="submit" hidden aria-hidden="true"></button>
@@ -1472,6 +1577,17 @@
   {#snippet actions()}
     <Button variant="quiet" onclick={() => (dealOpen = false)}>{t('create.cancel', locale)}</Button>
     <Button onclick={submitDeal} loading={$createBolo.isPending}>{t('books.create_deal', locale)}</Button>
+  {/snippet}
+</Dialog>
+
+<Dialog bind:open={quarterOpen} title={t('books.quarter_export', locale)} size="s" description={t('books.quarter_desc', locale)}>
+  <form class="mny__pay-form" novalidate onsubmit={(e) => { e.preventDefault(); void downloadQuarter(); }}>
+    <Select id="quarter-pick" label={t('books.quarter_pick', locale)} bind:value={quarterPick} options={quarterOptions} required />
+    <button type="submit" hidden aria-hidden="true"></button>
+  </form>
+  {#snippet actions()}
+    <Button variant="quiet" onclick={() => (quarterOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button onclick={() => void downloadQuarter()} loading={quarterBusy}>{t('books.quarter_download', locale)}</Button>
   {/snippet}
 </Dialog>
 
