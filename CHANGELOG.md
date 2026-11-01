@@ -4,7 +4,11 @@ Lo que ha llegado a producción, contado para quien usa Hour. Hour no tiene vers
 arriba. El cómo de cada cambio está en `_context.md`, `_decisions.md` y git. Empezado el 2026-10-09 con lo entregado
 hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está solo resumido.
 
-## Octubre 2026 (en curso)
+## Noviembre 2026 (en curso)
+
+- Las pantallas dicen solo lo que encaja con tu momento: sin instrucciones en los vacíos, sin «aún», sin rayas ni atajos de teclado en los textos, sin promesas de lo que vendrá; un plazo pasado lleva qué hacer, «Nada nuevo» no dice «hace N min» bajo una hora, un posible choque sin datos de equipo deja de ser aviso, y en el móvil la fila de «Después» lleva el nombre entero. Cincuenta arreglos de coherencia en Hoy, Planificador, fichas, Cuentas y Ajustes (ADR-154). (2026-11-01, `95288d0b`)
+
+## Octubre 2026
 
 - En Hoy, la tarjeta grande es solo para lo de hoy: si hoy ya no queda nada, no sale; el titular lo dice y nombra lo siguiente («Hoy, nada · martes, función en Girona»), que va como una fila más en «Después» (ADR-153). (2026-10-31, `9192b55b`)
 - El ámbito ya no ocupa una caja encima del titular: es una pastilla en la fila del título que dice lo acotado («Txema Muñoz», «Gota») y abre una hoja en el móvil o un desplegable en el escritorio con añadir, guardar, copiar enlace y limpiar (ADR-152). En Hoy vuelve el monograma de cada proyecto en la tarjeta, la agenda y «Después», y quien entra por un bolo vuelve a ver su función. (2026-10-31, `15846ea9`)

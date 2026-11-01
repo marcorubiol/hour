@@ -183,3 +183,4 @@ quedó en el roundtrip del caché.
 - **Etiquetas 1 a 4** y **facetas configurables en Ajustes**: en producción del 19 al 22-10.
 - **Borrado lógico de organización y persona por API** para los specs: migración `20261021200000` aplicada el 22-10.
 - **«Subir imagen» en Ajustes**: quitado (`def880c6`), no hay dónde guardar un avatar.
+- **Difusión: un texto de 8,8 px en las filas**: cerrado el 2026-11-01. Era el «▾» del badge de relación (`status-caret`), ya en `--text-2xs` desde `d8be8a85` (ADR-145 fase 2); medido en producción entre 8,9 y 9,1 px de 800 a 1000 px de ancho, dentro de la escala.

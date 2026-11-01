@@ -509,8 +509,6 @@
 - [ ] **Realtime: el token del socket se congela a la hora** (`src/lib/realtime/client.ts` llama a `setAuth(token)` con token explícito; realtime-js 2.105 deja de reautenticar en el latido). Pasar a modo callback, sin coste de red con el token ya en memoria.
 - [ ] **Velocidad, primera carga en frío** (24-10): el fragmento de i18n lleva los cuatro idiomas (141 kB brotli), Google Fonts 350 kB y bloquea el primer pintado, y el service worker precachea 227 ficheros uno tras otro (16-25 s). Cargar solo el idioma activo, fuentes propias con preload, precache más corto.
 
-- [ ] **Difusión: un texto de 8,8 px en las filas** (`ConversationRow.svelte`), fuera de la escala de ADR-145.
-
 - [ ] **Modo «Ahora», después de la v1** (ADR-146, v1 en producción el 30-10): hotel y aparcamiento estructurados, billetes y rider en PDF, «qué ha cambiado», escribir sin red, aviso 30 min antes de la llamada. Re-evaluar dónde va el botón en el móvil tras usarlo en gira.
 
 ## Deuda aceptada / observar en uso
