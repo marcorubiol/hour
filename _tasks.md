@@ -11,10 +11,6 @@
 Detalle de cada punto: `build/coordination/STATUS.md` (fuera de git) y los informes de propuestas. Orden sugerido: lo que
 no pide migración primero; las migraciones juntas por el gate de § 34.
 
-- [ ] **RLS tras el apply del 01-11 (513/516): los 3 rojos son del test, no de permisos** (diagnóstico del 01-11).
-  `conversation-select-once.test.ts` no apaga `new_conversations_private` (por defecto `true`) como hacen los demás;
-  `comms-threads` falla porque una pasada cortada a las 07:45 UTC dejó Materials apagada en `playwright` y el test 6
-  «restaura» ese estado sucio. Faceta encendida el 01-11 con OK de Marco. Falta: los dos arreglos de test y repetir esos dos ficheros.
 - [ ] 78 temporada en una sola función, septiembre por defecto, configurable por espacio.
 - [ ] 79 gastos adelantados: «Lo pagó», devuelto, «Se debe al equipo», «+ Gasto» desde bolo y Ahora. Pide migración
   (01-11): `expense.paid_by_user_id` sólo nombra logins; hace falta `paid_by_person_id`, `reimbursed_on` y
