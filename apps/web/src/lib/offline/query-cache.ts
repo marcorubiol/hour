@@ -52,7 +52,7 @@ export const RESTORE_TIMEOUT_MS = 1_500;
  * changes screens, styles or texts leaves it alone and the cache survives.
  * When in doubt, bump it: the cost is one slow open per device.
  */
-export const CACHE_SCHEMA = 2;
+export const CACHE_SCHEMA = 3;
 
 export interface PersistedQueryCache {
   schema: number;

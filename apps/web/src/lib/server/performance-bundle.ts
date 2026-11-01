@@ -220,8 +220,6 @@ const PERFORMANCE_COLS = [
   'logistics',
   'hospitality',
   'technical',
-  // ADR-084 §3 — the readiness ticks.
-  'readiness',
   // ADR-080 §2 — how many days of notice a hold gives.
   'hold_notice_days',
   'notes',

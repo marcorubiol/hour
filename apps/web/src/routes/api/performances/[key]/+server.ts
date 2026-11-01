@@ -235,7 +235,7 @@ export const PATCH: RequestHandler = async ({ request, params, url, platform, lo
         'venue_id,venue_name,city,country',
         SCHEDULE_SLOT_EMBED,
         'logistics,hospitality,technical,notes,custom_fields',
-        'created_by,created_at,updated_at,deleted_at,previous_slugs,hold_notice_days,readiness',
+        'created_by,created_at,updated_at,deleted_at,previous_slugs,hold_notice_days',
       ].join(','),
     );
     const { data } = await pgPatch<Record<string, unknown> & { schedule_slot: ScheduleSlotRow[] }>(

@@ -1,12 +1,19 @@
 import { describe, expect, test } from 'vitest';
-import { paletteFindRows, paletteSearchQueryOptions, paletteSearchTerm, type PaletteSearchResult } from './palette-search';
+import {
+  SEARCH_LIMIT,
+  paletteFindRows,
+  paletteSearchQueryOptions,
+  paletteSearchTerm,
+  searchPerformanceOrder,
+  type PaletteSearchResult,
+} from './palette-search';
 
 const W1 = { id: 'w1', slug: 'testing', name: 'Testing' };
 const W2 = { id: 'w2', slug: 'muk-cia', name: 'MüK Cia' };
 const label = (n: string) => n.toLowerCase();
 
 function result(over: Partial<PaletteSearchResult> = {}): PaletteSearchResult {
-  return { persons: [], organizations: [], conversations: [], ...over };
+  return { persons: [], organizations: [], conversations: [], venues: [], performances: [], bolos: [], ...over };
 }
 
 describe('paletteSearchTerm', () => {
@@ -32,10 +39,17 @@ describe('paletteSearchQueryOptions', () => {
 });
 
 describe('paletteFindRows', () => {
-  const base = { teamPersonIds: new Set<string>(), workspaces: [W1], spaceLabel: label };
+  const base = { teamPersonIds: new Set<string>(), workspaces: [W1], spaceLabel: label, dayLabel: (iso: string) => `d${iso}` };
 
   test('sin respuesta, nada', () => {
-    expect(paletteFindRows(undefined, base)).toEqual({ contacts: [], organizations: [], conversations: [] });
+    expect(paletteFindRows(undefined, base)).toEqual({
+      contacts: [],
+      organizations: [],
+      conversations: [],
+      venues: [],
+      performances: [],
+      bolos: [],
+    });
   });
 
   test('un espacio con contactos y sin equipo encuentra a sus contactos', () => {
@@ -109,5 +123,74 @@ describe('paletteFindRows', () => {
       { ...base, workspaces: [W1, W2] },
     );
     expect(rows.contacts.map((r) => [r.name, r.path, r.href])).toEqual([['A', 'mük cia', '/h/muk-cia/person/a/']]);
+  });
+
+  test('una sala abre su ficha, por slug o, sin él, por id', () => {
+    const rows = paletteFindRows(
+      result({
+        venues: [
+          { workspace_id: 'w1', id: 'v1', slug: 'auditori', name: 'Auditori', city: 'Girona' },
+          { workspace_id: 'w1', id: 'v2', slug: null, name: 'Nau', city: null },
+        ],
+      }),
+      base,
+    );
+    expect(rows.venues).toEqual([
+      { kind: 'venue', token: 'f:venue:v1', name: 'Auditori', path: 'Girona', href: '/h/testing/venue/auditori' },
+      { kind: 'venue', token: 'f:venue:v2', name: 'Nau', path: '', href: '/h/testing/venue/v2' },
+    ]);
+  });
+
+  test('una función abre su ficha, con su día y su proyecto; sin slug no hay a dónde ir', () => {
+    const perf = { workspace_id: 'w1', status: 'confirmed', city: 'Girona', project_name: 'Obra' };
+    const rows = paletteFindRows(
+      result({
+        performances: [
+          { ...perf, id: 'p1', slug: 'girona-1', performed_at: '2026-11-14', venue_name: 'Auditori' },
+          { ...perf, id: 'p2', slug: null, performed_at: '2026-11-15', venue_name: null },
+        ],
+      }),
+      base,
+    );
+    expect(rows.performances).toEqual([
+      {
+        kind: 'performance',
+        token: 'f:perf:p1',
+        name: 'Auditori',
+        path: 'd2026-11-14 · Obra',
+        href: '/h/testing/performance/girona-1',
+      },
+    ]);
+  });
+
+  test('un bolo no tiene página: abre su vistazo', () => {
+    const rows = paletteFindRows(
+      result({ bolos: [{ workspace_id: 'w1', id: 'b1', project_id: 'pr1', venue_name: null, city: 'Lleida', project_name: 'Obra' }] }),
+      base,
+    );
+    expect(rows.bolos).toEqual([
+      { kind: 'bolo', token: 'f:bolo:b1', name: 'Lleida', path: 'Obra', href: '', peek: { kind: 'bolo', projectId: 'pr1', id: 'b1' } },
+    ]);
+  });
+
+  test('una respuesta guardada de antes de salas y funciones no rompe', () => {
+    const old = { persons: [], organizations: [], conversations: [] } as unknown as PaletteSearchResult;
+    expect(paletteFindRows(old, base).performances).toEqual([]);
+  });
+});
+
+describe('searchPerformanceOrder', () => {
+  test('las que vienen primero, la más cercana; después las pasadas, la última; una vez cada una', () => {
+    const r = (id: string, performed_at: string) => ({ id, performed_at });
+    const out = searchPerformanceOrder(
+      [r('past-old', '2026-01-01'), r('soon', '2026-11-02'), r('later', '2026-12-01'), r('past-new', '2026-10-01'), r('soon', '2026-11-02')],
+      '2026-11-01',
+    );
+    expect(out.map((x) => x.id)).toEqual(['soon', 'later', 'past-new', 'past-old']);
+  });
+
+  test(`como mucho ${SEARCH_LIMIT}`, () => {
+    const rows = Array.from({ length: 20 }, (_, i) => ({ id: `p${i}`, performed_at: `2026-12-${String(i + 1).padStart(2, '0')}` }));
+    expect(searchPerformanceOrder(rows, '2026-11-01')).toHaveLength(SEARCH_LIMIT);
   });
 });

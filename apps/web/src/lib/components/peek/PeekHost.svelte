@@ -40,6 +40,7 @@
     conversation: lazy(() => import('$lib/components/record/ConversationRecord.svelte')),
     person: lazy(() => import('$lib/components/record/PersonRecord.svelte')),
     organization: lazy(() => import('$lib/components/record/OrganizationRecord.svelte')),
+    venue: lazy(() => import('$lib/components/record/VenueRecord.svelte')),
   };
   $effect(() => {
     if (target) void records[target.kind].load();
@@ -52,6 +53,7 @@
     conversation: 'peek.kind_conversation',
     person: 'peek.kind_person',
     organization: 'peek.kind_organization',
+    venue: 'peek.kind_venue',
   };
 
   // A bolo's «Abrir en Cuentas» keeps your scope when it already shows the
@@ -108,6 +110,8 @@
       <records.person.component workspaceSlug={target.ws} slug={target.slug} inPeek />
     {:else if target?.kind === 'organization' && records.organization.component}
       <records.organization.component workspaceSlug={target.ws} slug={target.slug} inPeek />
+    {:else if target?.kind === 'venue' && records.venue.component}
+      <records.venue.component workspaceSlug={target.ws} slug={target.slug} inPeek />
     {/if}
   {/key}
 </Peek>

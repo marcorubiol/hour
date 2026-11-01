@@ -13,6 +13,7 @@
  *   ?peek=conversation/<space>/<slug or id>
  *   ?peek=person/<space>/<slug>
  *   ?peek=organization/<space>/<slug>   (ADR-159)
+ *   ?peek=venue/<space>/<slug or id>    (the physical room, ADR-164)
  *
  * A bolo carries its project because the money feed is read by project
  * (`list_money_bolos` takes no id), and a shared link must be enough.
@@ -26,7 +27,8 @@ export type PeekTarget =
   | { kind: 'performance'; ws: string; slug: string }
   | { kind: 'conversation'; ws: string; slug: string }
   | { kind: 'person'; ws: string; slug: string }
-  | { kind: 'organization'; ws: string; slug: string };
+  | { kind: 'organization'; ws: string; slug: string }
+  | { kind: 'venue'; ws: string; slug: string };
 
 export type PeekKind = PeekTarget['kind'];
 
@@ -36,7 +38,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** One path segment: what a space slug or a record slug can be. */
 const SEGMENT = /^[^/?#\s]+$/;
 
-const RECORD_KINDS = ['performance', 'conversation', 'person', 'organization'] as const;
+const RECORD_KINDS = ['performance', 'conversation', 'person', 'organization', 'venue'] as const;
 type RecordKind = (typeof RECORD_KINDS)[number];
 
 function isRecordKind(k: string): k is RecordKind {
@@ -111,7 +113,7 @@ export function fullHref(t: PeekTarget, here?: BooksHere): string | null {
 }
 
 /** A record's page: `/h/<space>/<kind>/<slug>`, with nothing after it. */
-const RECORD_PATH = /^\/h\/([^/]+)\/(performance|conversation|person|organization)\/([^/]+)\/?$/;
+const RECORD_PATH = /^\/h\/([^/]+)\/(performance|conversation|person|organization|venue)\/([^/]+)\/?$/;
 /** The lens portadas: the four lenses, also inside one space. */
 const LENS_PATH = /^\/h\/(?:[^/]+\/)?(?:desk|planner|conversations|books|money)\/?$/;
 

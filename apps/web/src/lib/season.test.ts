@@ -52,38 +52,36 @@ describe('gapWindows', () => {
 });
 
 describe('unclosed', () => {
-  const ready = { hotel: true, technical: true };
-
   it('a closed gig is missing nothing', () => {
     const v = unclosed(
-      { start_at: '2026-11-01T19:00:00Z', readiness: ready, person_ids: ['p'], city: 'Girona' },
+      { start_at: '2026-11-01T19:00:00Z', person_ids: ['p'], city: 'Girona' },
       { home: 'Girona', travelCovered: false },
     );
     expect(v).toEqual({ missing: [], travelGuess: false });
   });
 
-  it('names each empty field, readiness absent reads as not ticked', () => {
+  it('names each empty field; hotel and technical are not fields any more (ADR-164 § 2)', () => {
     const v = unclosed(
-      { start_at: null, readiness: null, person_ids: [], city: 'Girona' },
+      { start_at: null, person_ids: [], city: 'Girona' },
       { home: 'Girona', travelCovered: false },
     );
-    expect(v.missing).toEqual(['time', 'hotel', 'technical', 'cast']);
+    expect(v.missing).toEqual(['time', 'cast']);
   });
 
   it('an unknown roster is not an empty one; a «voy» is somebody going', () => {
     expect(
-      unclosed({ start_at: 'x', readiness: ready, city: null }, { home: null, travelCovered: false }).missing,
+      unclosed({ start_at: 'x', city: null }, { home: null, travelCovered: false }).missing,
     ).toEqual([]);
     expect(
       unclosed(
-        { start_at: 'x', readiness: ready, person_ids: [], commitments: [{ state: 'going' }], city: null },
+        { start_at: 'x', person_ids: [], commitments: [{ state: 'going' }], city: null },
         { home: null, travelCovered: false },
       ).missing,
     ).toEqual([]);
   });
 
   it('travel is only ever a guess: another city, nothing covering it', () => {
-    const perf = { start_at: 'x', readiness: ready, person_ids: ['p'], city: 'Lisboa' };
+    const perf = { start_at: 'x', person_ids: ['p'], city: 'Lisboa' };
     expect(unclosed(perf, { home: 'Barcelona', travelCovered: false }).travelGuess).toBe(true);
     expect(unclosed(perf, { home: 'Barcelona', travelCovered: true }).travelGuess).toBe(false);
     // Same city, any spelling.

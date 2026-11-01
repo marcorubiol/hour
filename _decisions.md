@@ -6019,3 +6019,41 @@ de `20261018170000`, `create_roadsheet_share` de `20260720105713` y `get_public_
 borrar las dos RPC y el helper nuevos y las tres columnas. En la app: el tipo `contract` de `attentionItems`, el
 bloque de `BoloRecord`, el PATCH `contract` de `/api/money/bolos/[id]`, el PATCH de `…/roadsheet/shares/[id]` y la
 fecha de la pantalla de enlaces. `CACHE_SCHEMA` pasó de 1 a 2.
+
+## [2026-11-01] ADR-164 · La ficha de sala, fuera «Hotel» y «Técnica» de la función, «Con…» en su cabecera y funciones y bolos en ⌘K (supersede ADR-084 § 3; enmienda ADR-159 § 4)
+
+**Contexto.** Puntos 73 a 76 de la tanda del 2026-11-01, encargados por el coordinador con OK de Marco. Carril
+`claude/batch-73`, sobre `claude/desk-weight`. Sin migración.
+
+**Decisión.**
+1. **Ficha de sala en `/h/<espacio>/venue/<slug o id>`**, la sala física y no la organización que la programa
+   (ADR-159). Misma forma que toda ficha (ADR-139 p2), una columna, y también en el vistazo
+   (`?peek=venue/<espacio>/<slug>`, cargada en perezoso como las demás). Cabecera: ciudad, dirección, aforo, zona
+   horaria y «Con <organización>» por cada organización de las conversaciones de sus funciones. Cada dato se edita
+   donde se lee: abre el único editor de sala, `VenueEditDialog`, extraído de la ficha de función, que lo sigue
+   abriendo («Editar sala…»). «Falta»: la zona horaria cuando hay algo por venir allí. Bloques: por venir, contactos
+   (el teléfono es un `tel:`, el correo un `mailto:`), notas y pasadas, con la fila común de función
+   (`PerformanceRows`). Lectura: `GET /api/venues/:id_o_slug?workspace_id=` (la sala, un slug antiguo por
+   `previous_slugs`, y sus funciones con proyecto y organización). Se llega desde la función (su título, que es la
+   sala, enlaza a la ficha) y desde ⌘K. Desde la ficha de organización no: no hay relación entre `venue` y
+   `workspace_organization` en la base; la ficha de sala sí enlaza a quien programa allí.
+2. **«Hotel» y «Técnica» dejan de ser marcas de preparación** (supersede ADR-084 § 3). Desde ADR-146 § 4 el hotel es
+   una línea de `performance.logistics`, y la técnica tiene su bloque; una casilla aparte pedía en «Falta» lo que ya
+   está escrito al lado. Fuera de «Falta», fuera la sección «Preparación» de los Detalles (nadie la leía: el pie de
+   la tarjeta del Mes ya no la pintaba), fuera de «sin cerrar» de la Temporada y fuera del PATCH. `READINESS_KEYS`
+   desaparece. `performance.readiness` se queda en la base, sin lectores.
+3. **El bloque «Programador» sale de los Detalles de la función.** En su lugar, un hecho de la cabecera, «Con
+   <organización>» (si no, la del contacto, si no el contacto), que abre la conversación de la función (ADR-138 § 6:
+   lo de difusión vive en Conversaciones; la función solo enlaza). El bundle ya traía el id y el slug.
+4. **⌘K encuentra salas, funciones y bolos** por sala, ciudad, organización (las conversaciones de las
+   organizaciones encontradas) y fecha (la que la paleta lee entera, `parseDayQuery`, viaja como `day`). Una sala y
+   una función abren su ficha; un bolo, que no tiene página, su vistazo. El bolo se lee de su tabla, cuya política
+   pide `read:money`: quien no lee dinero no ve ninguno. `CACHE_SCHEMA` pasa de 2 a 3: la respuesta de la búsqueda y los
+   feeds de función cambian de forma.
+
+**Cómo se revierte.** Borrar `routes/h/[workspace]/venue/`, `VenueRecord.svelte`, `PerformanceRows.svelte`,
+`venue-record.ts` y el GET de `routes/api/venues/[id]`; quitar `venue` de `$lib/peek` y `PeekHost`. Lo de § 2 y § 3,
+en el historial del carril (las claves `hotel` y `technical` siguen en la columna).
+
+**Re-evaluar cuando** una sala acumule muchas funciones (la lista pediría paginar), o si aparece una relación real
+entre sala y organización que merezca columna.

@@ -28,6 +28,7 @@ describe('formatPeek / parsePeek', () => {
     { kind: 'conversation', ws: 'muk-cia', slug: BOLO },
     { kind: 'person', ws: 'playwright', slug: 'laia-puig' },
     { kind: 'organization', ws: 'muk-cia', slug: 'teatre-de-la-placa' },
+    { kind: 'venue', ws: 'muk-cia', slug: 'auditori-de-girona' },
   ];
 
   it('round-trips every kind', () => {
@@ -120,6 +121,7 @@ describe('peekFromLink', () => {
     });
     expect(peekFromLink(url('/h/muk-cia/person/laia/'), lens)).toEqual({ kind: 'person', ws: 'muk-cia', slug: 'laia' });
     expect(peekFromLink(url('/h/muk-cia/organization/sala'), lens)).toEqual({ kind: 'organization', ws: 'muk-cia', slug: 'sala' });
+    expect(peekFromLink(url('/h/muk-cia/venue/auditori'), lens)).toEqual({ kind: 'venue', ws: 'muk-cia', slug: 'auditori' });
     expect(peekFromLink(url(`/h/muk-cia/conversation/${BOLO}`), lens)).toEqual({
       kind: 'conversation',
       ws: 'muk-cia',

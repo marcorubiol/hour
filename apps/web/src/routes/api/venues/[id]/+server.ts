@@ -1,4 +1,9 @@
 /**
+ * GET /api/venues/:key?workspace_id=:workspace: la ficha de sala (ADR-164
+ * § 1): la sala (`VENUE_COLS`) y sus funciones, pasadas y futuras, con su
+ * proyecto y la organización de su conversación. `key` es el id o el slug.
+ * La RLS de siempre decide cada fila; sin migración.
+ *
  * PATCH /api/venues/:id — edit the venue entity (ADR-053): address,
  * timezone (feeds the road sheet dual-time), contacts, capacity, notes,
  * name/city/country.
@@ -15,11 +20,67 @@ import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import { VENUE_COLS, VenuePatchSchema } from '$lib/venue';
-import { pgPatch, type SupabaseEnv } from '$lib/supabase';
+import type { VenueFile, VenuePerformance } from '$lib/venue-record';
+import { pgGet, pgPatch, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
-import { json } from '$lib/server/http';
+import { json, UUID_RE } from '$lib/server/http';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const WorkspaceQuery = v.object({ workspace_id: v.pipe(v.string(), v.uuid()) });
+
+export const GET: RequestHandler = async ({ request, params, url, platform, locals }) => {
+  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  const env = platform.env as unknown as SupabaseEnv;
+
+  const jwt = extractAccessToken(request);
+  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+
+  const query = v.safeParse(WorkspaceQuery, Object.fromEntries(url.searchParams.entries()));
+  if (!query.success) return json({ error: 'invalid_query', hint: 'workspace_id is required.' }, 400);
+  const workspaceId = query.output.workspace_id;
+  const key = params.id;
+  const byId = UUID_RE.test(key);
+  if (!byId && !/^[a-z0-9-]{1,120}$/.test(key)) return json({ error: 'invalid_id' }, 400);
+
+  try {
+    const venueSearch = new URLSearchParams({
+      select: `workspace_id,${VENUE_COLS}`,
+      workspace_id: `eq.${workspaceId}`,
+      deleted_at: 'is.null',
+      limit: '1',
+    });
+    venueSearch.set(byId ? 'id' : 'slug', `eq.${key}`);
+    let venue = await pgGet<VenueFile['venue']>(env, 'venue', jwt, { search: venueSearch });
+    // An old link: the slug it had before a rename (`previous_slugs`).
+    if (venue.data.length === 0 && !byId) {
+      venueSearch.delete('slug');
+      venueSearch.set('previous_slugs', `cs.{${key}}`);
+      venue = await pgGet<VenueFile['venue']>(env, 'venue', jwt, { search: venueSearch });
+    }
+    if (venue.data.length === 0) return json({ error: 'not_found' }, 404);
+    const room = venue.data[0];
+
+    const perfSearch = new URLSearchParams({
+      select:
+        'id,slug,performed_at,status,project:project_id(id,slug,name),conversation:conversation_id(id,slug,organization:workspace_organization!conversation_workspace_organization_fkey(slug,name))',
+      venue_id: `eq.${room.id}`,
+      deleted_at: 'is.null',
+      order: 'performed_at.desc',
+      limit: '200',
+    });
+    const performances = await pgGet<VenuePerformance>(env, 'performance', jwt, { search: perfSearch });
+
+    const file: VenueFile = { venue: room, performances: performances.data };
+    return json(file);
+  } catch (err) {
+    return pgErrorResponse(
+      err,
+      { route: 'GET /api/venues/[id]', requestId: locals.requestId },
+      { passUpstream: [401, 403] },
+    );
+  }
+};
 
 export const PATCH: RequestHandler = async ({ request, params, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);

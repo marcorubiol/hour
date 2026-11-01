@@ -186,28 +186,6 @@ export function isValidHoldNotice(value: number | null | undefined): boolean {
 }
 
 /**
- * The readiness checklist shown on a confirmed gig's card foot (ADR-084 §3).
- * The DB holds the SHAPE (a jsonb object on `performance.readiness`); the
- * WORDS live here, so adding an item costs a line of app code and never a
- * migration. Array order is display order.
- */
-export const READINESS_KEYS = ['hotel', 'technical'] as const;
-export type ReadinessKey = (typeof READINESS_KEYS)[number];
-
-/** i18n key for a checklist item's word. */
-export function readinessLabelKey(key: string): string {
-  return `planner.ready_${key}`;
-}
-
-/** An absent key reads as NOT ticked — never as unknown. */
-export function isReady(
-  readiness: Record<string, boolean> | null | undefined,
-  key: string,
-): boolean {
-  return readiness?.[key] === true;
-}
-
-/**
  * UI label — holds keep their rank visible (hold 1 beats hold 3). With a
  * `locale`, the word comes from `perf.status_<estado>` (every enum value has
  * one); without it, the raw enum with spaces, for callers not yet passing a
@@ -386,12 +364,10 @@ export const PerformancePatchSchema = v.object({
    * es una decisión de producto abierta, no un descuido.
    */
   bolo_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
-  // ADR-084 §3 — the readiness ticks. The KEY SET is closed on purpose: the
-  // DB only guarantees "an object", so this is where the vocabulary is
-  // actually enforced. A client cannot invent `readiness.whatever` and have
-  // it silently persist, which is how a jsonb column rots into a junk
-  // drawer. Adding an item = adding it to READINESS_KEYS, still no migration.
-  readiness: v.optional(v.record(v.picklist([...READINESS_KEYS]), v.boolean())),
+  // `readiness` (ADR-084 § 3) is no longer written (ADR-164 § 2): the hotel
+  // is a line of `logistics` (ADR-146 § 4) and the technical rider has its
+  // own place. The column stays in the base, read by nobody; a client that
+  // still sends it is stripped like any unknown key.
   // Logística, acogida y técnica, escritas línea a línea en «Detalles»
   // (Marco, 2026-10-20; `$lib/kv-lines`). The shape stays open (ADR-023):
   // a flat object of words, plus whatever nested value is already there,
