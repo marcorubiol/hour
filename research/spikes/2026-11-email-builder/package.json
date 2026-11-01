@@ -1,0 +1,19 @@
+{
+  "name": "email-builder-spike",
+  "private": true,
+  "description": "Prueba de 2026-11-01 para research/2026-11-email-builder.md. Fuera del workspace pnpm; no es una dependencia de la app.",
+  "type": "module",
+  "scripts": {
+    "build": "bash build.sh",
+    "check": "node run.mjs"
+  },
+  "dependencies": {
+    "@templatical/editor": "0.52.0",
+    "@templatical/renderer": "0.52.0",
+    "@templatical/types": "0.52.0",
+    "esbuild": "0.28.2",
+    "grapesjs": "0.23.8",
+    "grapesjs-mjml": "1.0.8",
+    "mjml": "5.4.1"
+  }
+}

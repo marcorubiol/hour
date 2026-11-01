@@ -35,6 +35,10 @@
 20. [Product strategy review](product/20-product-strategy-review.md) — Critical product/UX review and Phase 0 MVP transversal strategy.
 21. [Directorio global de salas](product/21-venue-directory-sources.md) — Fuentes públicas de salas (Basilic, Equipaments de Catalunya, Wikidata, OSM, Overture, Foursquare), licencias (ODbL, Licence Ouverte, CC), RGPD y arquitectura directorio global + `venue` adoptado. 2026-10-10.
 
+## Correo (`research/`)
+
+23. [Editor de correos para invitar al público](2026-11-email-builder.md): Templatical, GrapesJS-mjml, Easy Email, EmailBuilder.js, Maily, React Email editor, Unlayer, Mosaico; MJML y react-email como motores. Licencias, actividad, encaje en Svelte 5, R2, i18n, prueba con peso medido. Recomienda Templatical; lo grande es la audiencia de público. 2026-11-01.
+
 ## Scope
 
 - Europe, centred on Spain / Catalonia. France, Germany, Benelux, UK, Nordics as touring destinations.
