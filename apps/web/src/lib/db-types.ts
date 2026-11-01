@@ -7568,6 +7568,41 @@ export type Database = {
         }
         Returns: undefined
       }
+      update_workspace_organization: {
+        Args: {
+          p_city?: string
+          p_email?: string
+          p_kind?: string
+          p_name: string
+          p_organization_id: string
+        }
+        Returns: {
+          address: string | null
+          city: string | null
+          country: string | null
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          deleted_at: string | null
+          email: string | null
+          fiscal_identity_id: string | null
+          id: string
+          kind: string
+          name: string
+          notes: string | null
+          phone: string | null
+          slug: string
+          updated_at: string
+          website: string | null
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workspace_organization"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       update_workspace_person: {
         Args: {
           p_email?: string
