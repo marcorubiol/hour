@@ -9,6 +9,18 @@
 import type { ConversationBolo } from './conversation-relation';
 import { MISSING_MAX, personMissing, type PersonMissing, type PersonMissingConversation } from './record-missing';
 
+/** Los tipos de organización (`workspace_organization_kind_check`). */
+export const ORGANIZATION_KINDS = [
+  'company',
+  'festival',
+  'theatre',
+  'presenter',
+  'agency',
+  'institution',
+  'other',
+] as const;
+export type OrganizationKind = (typeof ORGANIZATION_KINDS)[number];
+
 /** Una persona como contacto de una conversación de la organización. */
 export interface OrgConversationContact {
   person_id: string;

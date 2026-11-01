@@ -7,6 +7,11 @@
  * es el id o el slug. RLS decide cada lectura: una conversación privada de
  * otro no sale, ni sus bolos ni sus contactos.
  *
+ * PATCH /api/organizations/:id — { name, kind, city, email } via
+ * `update_workspace_organization` (§ 64): what the file shows, editable.
+ * Every field travels; an empty one clears it (not the name; an empty kind
+ * is `other`). The RPC gates on owner, admin or member who can read it.
+ *
  * DELETE /api/organizations/:id — soft-delete an organization of the
  * workspace through `delete_workspace_organization` (ADR-048: a soft delete
  * never rides a client PATCH). The RPC gates on owner, admin or member of the
@@ -21,7 +26,7 @@ import * as v from 'valibot';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { conversationRelation, type ConversationDbItem } from '$lib/conversation';
 import { TURN_EMBEDS, loadConversationBolos, setLastTurnEmbed } from '$lib/server/conversation-overview';
-import type { OrganizationFile, OrgConversationContact, OrgStaff } from '$lib/organization-record';
+import { ORGANIZATION_KINDS, type OrganizationFile, type OrgConversationContact, type OrgStaff } from '$lib/organization-record';
 import { pgErrorResponse } from '$lib/server/errors';
 import { json, UUID_RE } from '$lib/server/http';
 
@@ -103,6 +108,66 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
       err,
       { route: 'GET /api/organizations/[id]', requestId: locals.requestId },
       { passUpstream: [401, 403] },
+    );
+  }
+};
+
+const PatchSchema = v.object({
+  name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200)),
+  kind: v.nullish(v.union([v.literal(''), v.picklist(ORGANIZATION_KINDS)])),
+  city: v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(120))),
+  email: v.nullish(v.union([v.literal(''), v.pipe(v.string(), v.trim(), v.email(), v.maxLength(320))])),
+});
+
+export const PATCH: RequestHandler = async ({ request, params, platform, locals }) => {
+  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  const env = platform.env as unknown as SupabaseEnv;
+
+  const jwt = extractAccessToken(request);
+  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+  if (!UUID_RE.test(params.id)) return json({ error: 'invalid_id' }, 400);
+
+  const parsed = v.safeParse(PatchSchema, await request.json().catch(() => null));
+  if (!parsed.success) return json({ error: 'invalid_body' }, 400);
+  const b = parsed.output;
+
+  try {
+    const { data } = await pgPostRpc<OrganizationFile['organization']>(env, 'update_workspace_organization', jwt, {
+      p_organization_id: params.id,
+      p_name: b.name,
+      p_kind: b.kind || null,
+      p_city: b.city || null,
+      p_email: b.email || null,
+    });
+    if (data.length === 0) return json({ error: 'update_failed' }, 502);
+    const o = data[0];
+    // Only what the file reads: the row also carries notes and custom fields.
+    return json({
+      organization: {
+        id: o.id,
+        workspace_id: o.workspace_id,
+        slug: o.slug,
+        name: o.name,
+        kind: o.kind,
+        city: o.city,
+        country: o.country,
+        email: o.email,
+        phone: o.phone,
+        website: o.website,
+        address: o.address,
+      },
+    });
+  } catch (err) {
+    return pgErrorResponse(
+      err,
+      { route: 'PATCH /api/organizations/[id]', requestId: locals.requestId },
+      {
+        codes: {
+          '22023': { status: 400, error: 'invalid_input' },
+          '23505': { status: 409, error: 'name_taken' },
+          '42501': { status: 404, error: 'not_found' },
+        },
+      },
     );
   }
 };

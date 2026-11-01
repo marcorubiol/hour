@@ -13,7 +13,7 @@
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { tick } from 'svelte';
-  import { fetchJSON, mutateJSON } from '$lib/api';
+  import { ApiError, fetchJSON, mutateJSON } from '$lib/api';
   import { retryLoad } from '$lib/load-fail';
   import { refreshAfterWrite } from '$lib/query-refresh';
   import { toastCreated } from '$lib/created';
@@ -26,11 +26,12 @@
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Select from '$lib/components/Select.svelte';
+  import Input from '$lib/components/Input.svelte';
   import MissingBand, { type MissingItem } from '$lib/components/MissingBand.svelte';
   import ConversationTable from '$lib/components/ConversationTable.svelte';
   import OrganizationFiscal from '$lib/components/OrganizationFiscal.svelte';
   import type { OrganizationFiscalResponse } from '$lib/fiscal';
-  import { orgBolos, orgContacts, orgMissing, type OrganizationFile } from '$lib/organization-record';
+  import { ORGANIZATION_KINDS, orgBolos, orgContacts, orgMissing, type OrganizationFile } from '$lib/organization-record';
   import { relativeContactDate } from '$lib/conversation';
   import { performanceStatusLabel } from '$lib/performance';
   import { dayMonthYear, dayMonthYearTs, localDayISO } from '$lib/datetime';
@@ -214,6 +215,52 @@
     $addConversation.mutate();
   }
 
+  // ── Edit what the head shows: name, kind, city, email (§ 64) ─────────
+  // The shape of the person's file: every field travels, empty clears it.
+  let editOpen = $state(false);
+  let eName = $state('');
+  let eKind = $state('other');
+  let eCity = $state('');
+  let eEmail = $state('');
+
+  let kindOptions = $derived(ORGANIZATION_KINDS.map((k) => ({ value: k, label: t(`organization.kind_${k}`, locale) })));
+
+  function openEdit() {
+    if (!org) return;
+    eName = org.name;
+    eKind = org.kind ?? 'other';
+    eCity = org.city ?? '';
+    eEmail = org.email ?? '';
+    editOpen = true;
+  }
+
+  const saveDetails = createMutation({
+    mutationFn: () =>
+      mutateJSON('PATCH', `/api/organizations/${org!.id}`, {
+        name: eName,
+        kind: eKind,
+        city: eCity.trim() || null,
+        email: eEmail.trim() || null,
+      }),
+    onSuccess: () => {
+      editOpen = false;
+      void refreshOrg();
+      addToast({ tone: 'success', message: t('organization.saved', locale) });
+    },
+    onError: (err) => {
+      addToast({
+        tone: 'danger',
+        title: t('organization.not_saved', locale),
+        message:
+          err instanceof ApiError && err.status === 409
+            ? t('organization.name_taken', locale)
+            : err instanceof Error
+              ? err.message
+              : t('perf.unexpected', locale),
+      });
+    },
+  });
+
   let detailsKeeps = $derived(org ? [org.address, org.phone].filter(Boolean).join(' · ') : '');
 </script>
 
@@ -233,6 +280,9 @@
     />
   {:else if file && org}
     <RecordHead {crumbs} title={org.name}>
+      {#snippet actions()}
+        <Button variant="secondary" size="xs" onclick={openEdit}>{t('person.edit', locale)}</Button>
+      {/snippet}
       {#snippet facts()}
         {#if kindWord}<span>{kindWord}</span>{/if}
         {#if placeLine}<span>{placeLine}</span>{/if}
@@ -340,6 +390,21 @@
     <Button variant="quiet" onclick={() => (addOpen = false)}>{t('create.cancel', locale)}</Button>
     <Button onclick={submitAdd} loading={$addConversation.isPending} disabled={projectOptions.length === 0}>
       {t('composer.add', locale)}
+    </Button>
+  {/snippet}
+</Dialog>
+
+<Dialog bind:open={editOpen} title={t('organization.edit_title', locale, { name: org?.name ?? '' })} size="s">
+  <div class="organization__add-grid">
+    <Input label={t('organization.field_name', locale)} bind:value={eName} required />
+    <Select id="org-edit-kind" label={t('organization.field_kind', locale)} options={kindOptions} bind:value={eKind} />
+    <Input label={t('organization.field_city', locale)} bind:value={eCity} />
+    <Input label={t('organization.field_email', locale)} type="email" bind:value={eEmail} />
+  </div>
+  {#snippet actions()}
+    <Button variant="quiet" onclick={() => (editOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button onclick={() => $saveDetails.mutate()} loading={$saveDetails.isPending} disabled={!eName.trim()}>
+      {t('edit.save', locale)}
     </Button>
   {/snippet}
 </Dialog>
