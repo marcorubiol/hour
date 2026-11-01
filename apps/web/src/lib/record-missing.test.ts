@@ -101,12 +101,18 @@ describe('performanceMissing', () => {
     expect(performanceMissing(perf({ status: 'cancelled', hasBolo: false, roster: [] }), TODAY)).toEqual([]);
   });
 
-  it(`never says more than ${MISSING_MAX}, most pressing first`, () => {
+  it(`never says more than ${MISSING_MAX}, what blocks before what prepares`, () => {
     const all = performanceMissing(
       perf({ day: addDaysIso(TODAY, 7), roster: [], readiness: null, hasBolo: false, roadsheetLinks: 0 }),
       TODAY,
     );
-    expect(all).toEqual([{ kind: 'nobody_going' }, { kind: 'ready', key: 'hotel' }, { kind: 'ready', key: 'technical' }]);
+    expect(all).toEqual([{ kind: 'no_bolo' }, { kind: 'roadsheet_unshared' }, { kind: 'nobody_going' }]);
+    // With the bolo and the sheet in place, the preparation marks fill the rest.
+    const prep = performanceMissing(
+      perf({ day: addDaysIso(TODAY, 7), roster: [], readiness: null, hasBolo: true, roadsheetLinks: 2 }),
+      TODAY,
+    );
+    expect(prep).toEqual([{ kind: 'nobody_going' }, { kind: 'ready', key: 'hotel' }, { kind: 'ready', key: 'technical' }]);
   });
 });
 

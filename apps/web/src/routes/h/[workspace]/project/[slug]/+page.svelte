@@ -27,7 +27,7 @@
   import CastPanel from '$lib/components/CastPanel.svelte';
   import ProjectIdentityPopover from '$lib/components/ProjectIdentityPopover.svelte';
   import RelationshipStub from '$lib/components/RelationshipStub.svelte';
-  import { relationStubQueryOptions } from '$lib/relation-stub';
+  import { projectStepsQueryOptions } from '$lib/relation-stub';
   import MissingBand from '$lib/components/MissingBand.svelte';
   import { stepsDueBand } from '$lib/steps-due-band';
   import { lensOn } from '$lib/lenses.svelte';
@@ -105,9 +105,9 @@
   );
 
   // «Falta» (ADR-139 § 2): the project's conversations whose next step is
-  // due, from the page the conversations block already reads (same query:
-  // no new request), read by the project's id: the slug repeats across spaces.
-  const stubQuery = createQuery(toStore(() => relationStubQueryOptions(project?.id ?? null)));
+  // due, from a page in next-step order (the block below reads «lo que pide»),
+  // read by the project's id: the slug repeats across spaces.
+  const stubQuery = createQuery(toStore(() => projectStepsQueryOptions(project?.id ?? null)));
   let missingItems = $derived(
     project
       ? stepsDueBand($stubQuery.data?.items ?? [], {
@@ -151,7 +151,7 @@
     {/snippet}
   </RecordHead>
 
-  <RelationshipStub projectId={project?.id ?? null} />
+  <RelationshipStub projectId={project?.id ?? null} {workspaceSlug} />
 
   {#if project}
     <section class="project__notes" aria-label={t('person.notes', locale)}>
@@ -180,8 +180,6 @@
       <EmptyLine label={t('project.lines', locale)} text={t('project.no_lines', locale)} />
     {/if}
   </section>
-
-  <EmptyLine label={t('project.assets', locale)} text={t('project.assets_body', locale)} />
 
   {#if project}
     <section class="project__block" aria-label={t('project.cast', locale)}>

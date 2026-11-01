@@ -5675,3 +5675,48 @@ pulsar un día y que Hoy cubre para hoy (ADR-150). Marco eligió la opción A de
 
 **Re-evaluar el 23-11** (la entrada de `_tasks.md`): si alguien entra siempre en la Temporada y salta en seguida a otro
 dibujo, que cada uno abra en el suyo (opción D, una preferencia junto a `membership.view_scope`).
+
+## [2026-11-01] ADR-156 · Lo que sobra fuera, el bolo desde la conversación y Ajustes en una sección menos (enmienda ADR-139 § 2, ADR-141 § 1 y ADR-145 § 2)
+
+**Contexto.** Tanda «haría / quitaría» del 01-11, puntos 51 a 61, con el OK de Marco en el chat al coordinador; aquí
+los que hace la rama `claude/batch-51` (51, 53, 55, 56, 58, 59, 60, 61). 52, 54, 57 y 62 van aparte. Sin migración:
+la API de bolos ya aceptaba `conversation_id` y ninguna pantalla lo mandaba.
+
+**Decisión.**
+1. **(51) El bolo nace de la conversación** (ADR-138 § 3, ADR-102). En la ficha de conversación, bajo sus bolos,
+   «+ Opción con esta sala» crea un bolo en `hold` con el proyecto, el `conversation_id`, la sala y la ciudad de la
+   organización; la fecha se pone después en el Planificador. Sale a quien puede editar la conversación y tiene
+   proyecto; la base sigue exigiendo `edit:money`, y un 403 lo dice en palabras. En «Nuevo trato» de Cuentas, un
+   selector opcional con las conversaciones del proyecto elegido manda `conversation_id`, y al elegir una rellena la
+   sala y la ciudad que estén vacías.
+2. **(53) «Falta» de la función: lo que bloquea antes que lo que prepara** (enmienda ADR-139 § 2 en el orden): opción
+   que vence, sin bolo, hoja de ruta sin compartir, nadie va y, al final, las marcas de preparación (hotel, técnica…).
+   Sigue el tope de tres.
+3. **(55) Las conversaciones del proyecto con la fila de la lente** (ADR-141 § 1): `RelationshipStub` pinta
+   `ConversationRow` (la sala primero, turno, relación, bolo, lo último, cuándo y el paso), la fila es el enlace a la
+   ficha y el orden es «lo que pide» (`orden=pide`). Sin raya de relleno: sin nombre, «Conversación». La franja «Falta»
+   del proyecto lee su propia página en el orden del paso (`projectStepsQueryOptions`), porque `lineMissing` necesita
+   ese orden para saber si la página tiene todos los pasos vencidos: dos peticiones en vez de una.
+4. **(56) La ayuda dice lo que se ve.** «Te espera»: tareas, respuestas, dos opciones el mismo día por decidir y
+   cobros vencidos, por días, sin «si vas a las funciones de los próximos 14 días» (ADR-147 § 6, ADR-149 § 3). El
+   paso 1 de Hoy: la agenda de hoy con lo de ahora abierto y «Después» (ADR-150, ADR-153). «Lo deduce Hour» sin
+   «Confírmalo o corrígelo». Fuera las variantes `@music` que ya decían lo mismo.
+5. **(58) Fuera «Aquí vivirán los riders, dosieres y planos…»** de la portada del proyecto (ADR-154 § 16) y sus claves.
+6. **(59) Ajustes: «Visibilidad y privacidad» y «Oficio» son una sección, «Oficio y privacidad»** (id `space`,
+   `SpaceSection.svelte`). `?section=privacy` y `?section=languages` caen en ella (`sectionFrom`). Quedan siete
+   secciones, no seis: el encargo contaba ocho a seis, y juntar estas dos quita una.
+7. **(60) Fuera la compatibilidad muerta**: el reintento con 42703 de `GET /api/dates` y `GET /api/dates/:id` (un solo
+   `DATE_SELECT`; una columna que falte es un error), `hold_notice_absent` del bundle de la función (el aviso de la
+   opción se pide siempre) y `PerfChip.svelte`, sin ningún import.
+8. **(61) La «i» del filtro «Relación»** de Conversaciones se va: lo que significa cada relación ya estaba en el «?»
+   de la lente (`SECTION_CONCEPTS.conversations`, ADR-145 § 2).
+
+**Qué no cambia.** La API de bolos, el permiso `edit:money`, el texto de cada relación, lo que guarda cada ajuste.
+
+**Cómo se revierte.** Cada punto es su commit en `claude/batch-51`. Las claves i18n borradas (`project.assets*`,
+`settings.nav_privacy`, `settings.nav_languages`, `settings.priv_*`, `settings.lang_*` y las dos `@music`) están en
+el historial.
+
+**Re-evaluar cuando** Marco abra opciones desde la conversación una temporada: si «+ Opción» debe preguntar la fecha
+en el mismo gesto, y si quien no tiene `edit:money` debería ni ver el botón (hoy no hay en el cliente un permiso de
+dinero que leer).

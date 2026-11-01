@@ -1,35 +1,34 @@
 <script lang="ts">
   /**
-   * RelationshipStub — Project detail block showing conversations summary
-   * (Phase 0.1 trabajo #4).
-   *
-   * Shows the 10 most actionable conversations for a given Project (ordered by
-   * next_action_at asc nullslast, then updated_at desc — same as the API
-   * default). Header carries total count. "View all" link sends the user
-   * to the Conversations lens (the /booking wrapper it used to point at was
-   * retired in the ADR-056 cleanup).
-   *
-   * Anti-CRM vocabulary: surfaces the conversation state without using
-   * "lead/pipeline/funnel/prospect" anywhere. Status labels are humane.
+   * The project page's conversations block (ADR-141 § 1, ADR-102): the lens's
+   * own row (`ConversationRow`), the venue first, in the lens's order «lo que
+   * pide». Ten at most; past that, «ver las N» to the lens scoped to the
+   * project. Read-only: the row is the link to the conversation's file, where
+   * the relation, the step and the bolos are edited.
    */
 
   import BlockHead from '$lib/components/BlockHead.svelte';
+  import ConversationRow from '$lib/components/ConversationRow.svelte';
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import { lensOn } from '$lib/lenses.svelte';
   import { createQuery } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { appLocale, t } from '$lib/i18n';
-  import { type PersonLite } from '$lib/conversation';
-  import { relationLabel, relationTone } from '$lib/conversation-relation';
+  import { dayMonth } from '$lib/datetime';
+  import { conversationTitle, relationInputOf, relativeContactDate, type ConversationItem } from '$lib/conversation';
+  import { lastActivity, relationLabel, relationTone } from '$lib/conversation-relation';
+  import { boloLabel, nearestBolo, rowLast, rowTurn } from '$lib/conversation-row';
   import { relationStubQueryOptions } from '$lib/relation-stub';
 
   interface Props {
     /** The resolved project's id; null while the page resolves it. */
     projectId: string | null;
+    /** The project's space: the conversation's file lives there. */
+    workspaceSlug: string;
   }
 
-  let { projectId }: Props = $props();
+  let { projectId, workspaceSlug }: Props = $props();
 
   const locale = appLocale();
 
@@ -42,10 +41,33 @@
   let loading = $derived($query.isPending);
   let errored = $derived($query.isError);
 
-  function locationStr(p: PersonLite | null): string {
-    if (!p) return '';
-    return [p.city, p.country].filter(Boolean).join(', ');
+  const now = new Date();
+
+  function rowView(item: ConversationItem) {
+    const relation = relationInputOf(item);
+    const title = conversationTitle(item) || t('conversations.conversation', locale);
+    // The real contact under the venue, not the venue's name again (ADR-102 § 1).
+    const person = item.person && item.person.full_name !== title ? item.person : null;
+    const role = item.contacts.find((c) => c.is_primary)?.role ?? null;
+    const city = item.person?.city || item.organization?.city || null;
+    const contact = person ? [person.full_name, role].filter(Boolean).join(', ') : null;
+    return {
+      item,
+      title,
+      meta: [contact, city].filter(Boolean).join(' · '),
+      turn: rowTurn({ ...relation, reply_settled_at: item.reply_settled_at, next_action_at: item.next_action_at }, now, locale),
+      bolo: item.bolos ? nearestBolo(item.bolos, now) : null,
+      last: rowLast(
+        { last: relation.last ? (item.last_turn?.[0] ?? null) : null, last_in: relation.last_in, last_mailout: item.last_mailout },
+        locale,
+      ),
+      lastAt: lastActivity(relation),
+      step: [item.next_action_at ? dayMonth(item.next_action_at) : null, item.next_action_note].filter(Boolean).join(' · '),
+    };
   }
+
+  let rows = $derived(items.map(rowView));
+  let withBolos = $derived(rows.some((r) => r.bolo !== null));
 </script>
 
 <section class="rel-stub" aria-label={t('lens.conversations', locale)} aria-busy={loading}>
@@ -59,20 +81,35 @@
     <EmptyLine text={t('desk.loading', locale)} busy />
   {:else if errored}
     <p class="load-fail" role="alert">{t('perf.rel_error', locale)}</p>
-  {:else}
-    <ul class="rel-stub__list">
-      {#each items as e (e.id)}
-        <li class="rel-stub__item">
-          <div class="rel-stub__main">
-            <strong class="rel-stub__name">{e.person?.full_name ?? '—'}</strong>
-            {#if e.person?.organization_name}
-              <span class="rel-stub__org">{e.person.organization_name}</span>
-            {/if}
-            {#if locationStr(e.person)}
-              <span class="rel-stub__location">{locationStr(e.person)}</span>
-            {/if}
-          </div>
-          <StateBadge label={relationLabel(e.relation)} tone={relationTone(e.relation)} />
+  {:else if rows.length > 0}
+    <ul class="crow-list crow-list--relation" class:crow-list--bolos={withBolos} data-testid="project-conversations">
+      {#each rows as r (r.item.id)}
+        <li>
+          <ConversationRow
+            href={`/h/${workspaceSlug}/conversation/${r.item.id}`}
+            title={r.title}
+            turn={r.turn?.word}
+            since={r.turn?.since}
+            tone={r.turn?.tone}
+            unread={r.item.unread_count
+              ? t(r.item.unread_count === 1 ? 'threads.unread_one' : 'threads.unread', locale, { n: r.item.unread_count })
+              : null}
+            where={r.meta || undefined}
+            lead={r.last.lead}
+            last={r.last.last}
+            at={r.lastAt}
+            when={r.lastAt ? relativeContactDate(r.lastAt, locale) : ''}
+          >
+            {#snippet relation()}
+              <StateBadge label={relationLabel(r.item.relation, locale)} tone={relationTone(r.item.relation)} />
+            {/snippet}
+            {#snippet bolos()}
+              {#if r.bolo}{boloLabel(r.bolo, locale)}{/if}
+            {/snippet}
+            {#snippet next()}
+              {r.step}
+            {/snippet}
+          </ConversationRow>
         </li>
       {/each}
     </ul>
@@ -94,53 +131,7 @@
     gap: var(--space-s);
   }
 
-  .rel-stub__list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    border-block-start: var(--line-hairline) solid var(--border-color-light);
-  }
-
-  .rel-stub__item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-s);
-    padding-block: var(--space-xs);
-    padding-inline: 0;
-    border-block-end: var(--line-hairline) solid var(--border-color-light);
-  }
-
-  .rel-stub__main {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2xs);
-    min-inline-size: 0;
-  }
-
-  .rel-stub__name {
-    font-size: var(--text-m);
-    color: var(--text-color);
-    font-weight: 500;
-  }
-
-  .rel-stub__org {
-    font-size: var(--text-s);
-    color: var(--text-muted);
-  }
-
-  .rel-stub__location {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    color: var(--text-faint);
-    letter-spacing: var(--mono-letter-spacing-loose);
-  }
-
   .rel-stub__footer {
     padding-block-start: var(--space-xs);
   }
-
 </style>

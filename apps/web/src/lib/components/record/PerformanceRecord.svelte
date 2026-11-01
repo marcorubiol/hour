@@ -167,8 +167,6 @@
       notes: string | null;
       person: PersonEmbed | null;
     }>;
-    /** Pre-migration DB — hold_notice_days degraded to null; hide the field. */
-    hold_notice_absent?: boolean;
   };
 
   interface Props {
@@ -430,12 +428,8 @@
       bolosOptions.length === 1,
   );
 
-  // ADR-080 §2 — the notice field rides the dialog only for hold* gigs,
-  // and only while the DB has the column (a pre-migration bundle flags
-  // `hold_notice_absent`; a PATCH carrying it would be rejected whole).
-  let showHoldNotice = $derived(
-    Boolean(perf && isHoldStatus(perf.status) && !bundle?.hold_notice_absent),
-  );
+  // ADR-080 §2 — the notice field rides the dialog only for hold* gigs.
+  let showHoldNotice = $derived(Boolean(perf && isHoldStatus(perf.status)));
 
   // Address: Space › Project › [Line ›] Función. The title is the venue (a
   // performance has no name of its own), so the address ends with the kind.

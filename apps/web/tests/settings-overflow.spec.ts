@@ -12,7 +12,7 @@
  */
 import { expect, test, type Page } from '@playwright/test';
 
-const SECTIONS = ['profile', 'workspaces', 'privacy', 'languages', 'lenses', 'mail'] as const;
+const SECTIONS = ['profile', 'workspaces', 'space', 'lenses', 'mail'] as const;
 const WIDTHS = [390, 768, 900, 1024, 1440] as const;
 /** Under this width the sections are a dropdown, at or above it a nav column. */
 const NAV_FROM = 1024;
@@ -54,8 +54,8 @@ for (const width of WIDTHS) {
     }
     await expect(nav).toBeHidden();
     await expect(picker).toHaveValue('profile');
-    await picker.selectOption('privacy');
-    await expect(page).toHaveURL(/[?&]section=privacy\b/);
-    await expect(picker).toHaveValue('privacy');
+    await picker.selectOption('space');
+    await expect(page).toHaveURL(/[?&]section=space\b/);
+    await expect(picker).toHaveValue('space');
   });
 }
