@@ -100,6 +100,8 @@
     waitingTasksQueryOptions,
   } from '$lib/waiting-feeds';
   import { boardUnread, type BoardView, type ThreadFeedView } from '$lib/threads';
+  import { restoredFromDevice } from '$lib/offline';
+  import { markHoyContent } from '$lib/vitals';
   import {
     invoicesByBolo,
     fmtCurrency,
@@ -607,6 +609,10 @@
   let busy = $derived(
     waitingLoading || $projectsQuery.isPending || $linesQuery.isPending || !feeds.settled,
   );
+  // The first time it has drawn its data, a real phone's timing (ADR-158 § 6).
+  $effect(() => {
+    if (!busy) markHoyContent(restoredFromDevice());
+  });
 
   // ── Header: the day, not the debt (ADR-139 § 6) ───────────────────────
   // «Hoy, función en Girona»: what today IS, from the pulse's rows (not

@@ -3,7 +3,7 @@ import { handleErrorWithSentry } from '@sentry/sveltekit';
 import type { HandleClientError } from '@sveltejs/kit';
 import { dev } from '$app/environment';
 import { PUBLIC_SENTRY_DSN, PUBLIC_SENTRY_ENV } from '$env/static/public';
-import { scrubSentryEvent } from '$lib/sentry-scrub';
+import { scrubSentryEvent, scrubTransaction } from '$lib/sentry-scrub';
 
 if (PUBLIC_SENTRY_DSN) {
   Sentry.init({
@@ -15,12 +15,18 @@ if (PUBLIC_SENTRY_DSN) {
     // Server-side endpoint at src/routes/api/sentry-tunnel/+server.ts
     // forwards to the configured Sentry ingest host.
     tunnel: '/api/sentry-tunnel',
-    tracesSampleRate: 0.1,
+    // A page load (the Web Vitals and `hoy.content`, $lib/vitals) at 50 %:
+    // with a handful of people, 10 % is a few opens a week, too few to see a
+    // phone getting slower. Everything else stays at 10 % (ADR-158 § 6).
+    tracesSampler: ({ attributes, inheritOrSampleWith }) =>
+      attributes?.['sentry.op'] === 'pageload' ? 0.5 : inheritOrSampleWith(0.1),
     // PII posture (Phase 0.9): no IPs/cookies/headers on events, capability
     // tokens scrubbed out of URLs (see $lib/sentry-scrub.ts).
     sendDefaultPii: false,
     beforeSend: scrubSentryEvent,
-    beforeSendTransaction: scrubSentryEvent,
+    // A transaction carries timings and the route, never a URL with ids,
+    // slugs or a query (ADR-158 § 6).
+    beforeSendTransaction: scrubTransaction,
     // Replays: 10 % of normal sessions + 100 % of sessions with errors. Free
     // plan ships 50 replays/month so this is generous for Phase 0 traffic.
     // Masking explicit (they're also the defaults): external users' text
