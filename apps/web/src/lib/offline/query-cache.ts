@@ -284,6 +284,11 @@ export function bindQueryCache(client: QueryClient): void {
   bound = client;
 }
 
+/** Whether this open painted from the device record (for the open's own timing, ADR-157). */
+export function restoredFromDevice(): boolean {
+  return restoredThisOpen;
+}
+
 const RECOVERED_KEY = 'hour.device-cache.recovered';
 
 /**

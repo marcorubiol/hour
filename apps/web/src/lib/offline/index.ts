@@ -21,6 +21,7 @@ export {
   cachedSessionUser,
   claimQueryCache,
   recoverFromRestoredCrash,
+  restoredFromDevice,
   startQueryCache,
   wipeQueryCache,
 } from './query-cache';
