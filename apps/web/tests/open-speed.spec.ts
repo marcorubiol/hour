@@ -1,7 +1,7 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 
 /**
- * OPENING HOY ON A PHONE, AS A CAP (ADR-158).
+ * OPENING HOY ON A PHONE, AS A CAP (ADR-157).
  *
  * A phone-sized Chromium (390 wide, CPU ×4, slow 4G: 150 ms, 1.6 Mbps down)
  * opens /h/desk three ways, three times each, and the median of each must
@@ -14,9 +14,12 @@ import { test, expect, type BrowserContext, type Page } from '@playwright/test';
  * "Content" is the page law of tests/loaded.ts: `main` mounted and nothing in
  * it `aria-busy="true"`, timed from the navigation's own start.
  *
- * Where the caps come from: production 95288d0b on 2026-11-01, same throttle,
- * median of 5 from Madrid with the E2E user (build/coordination/load-speed):
- * cold 3799 ms, a reopen with the cache wiped 2674 ms, a warm reopen 660 ms.
+ * Where the caps come from: this spec against production 95288d0b on
+ * 2026-11-01, from Madrid: cold 7361 ms (6974 to 8535), warm 780 (770 to
+ * 2513), after a schema bump 2571 (2563 to 3174; 3933 in an earlier pass).
+ * Cold is really cold here (a fresh profile downloads all of it, about 550
+ * kB of JS); the reopen with the cache wiped is bound by two endpoints of
+ * about 1.7 s each (/api/conversations?limit=100, /api/conversations/overview).
  * The caps leave room for a day's network and server latency, not for a
  * slower app: if one trips, find what got slower, do not raise it.
  *
@@ -25,12 +28,15 @@ import { test, expect, type BrowserContext, type Page } from '@playwright/test';
  * this measures the app and the network, not the SW.
  */
 
-const CAP_MS = { cold: 5_000, warm: 1_000, schemaBump: 3_500 } as const;
+const CAP_MS = { cold: 9_000, warm: 1_200, schemaBump: 4_500 } as const;
 const RUNS = 3;
 const DEVICE_CACHE_OPT_IN = 'hour.e2e.device-cache';
 
+// A trace records every frame and request: off, or it is what gets measured.
+test.use({ trace: 'off' });
+
 const PHONE = { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true };
-test.describe.configure({ mode: 'serial' });
+test.describe.configure({ mode: 'serial', timeout: 300_000 });
 
 async function phone(page: Page) {
   const cdp = await page.context().newCDPSession(page);
@@ -115,7 +121,6 @@ test.describe('opening Hoy on a phone', () => {
   test.skip(({ browserName }) => browserName !== 'chromium', 'CPU and network throttling are Chromium (CDP) only.');
 
   test('cold, warm and after a schema bump stay under their caps', async ({ browser }, testInfo) => {
-    test.setTimeout(300_000);
     const { baseURL, storageState, timezoneId } = testInfo.project.use;
     const times = { cold: [] as number[], warm: [] as number[], schemaBump: [] as number[] };
 
@@ -143,6 +148,7 @@ test.describe('opening Hoy on a phone', () => {
       schemaBump: median(times.schemaBump),
     };
     testInfo.annotations.push({ type: 'open-speed', description: JSON.stringify({ result, times }) });
+    console.log(`open-speed ${JSON.stringify({ result, times })}`);
     expect.soft(result.cold, `cold ${times.cold.join(', ')} ms`).toBeLessThanOrEqual(CAP_MS.cold);
     expect.soft(result.warm, `warm ${times.warm.join(', ')} ms`).toBeLessThanOrEqual(CAP_MS.warm);
     expect

@@ -17,7 +17,7 @@ if (PUBLIC_SENTRY_DSN) {
     tunnel: '/api/sentry-tunnel',
     // A page load (the Web Vitals and `hoy.content`, $lib/vitals) at 50 %:
     // with a handful of people, 10 % is a few opens a week, too few to see a
-    // phone getting slower. Everything else stays at 10 % (ADR-158 § 6).
+    // phone getting slower. Everything else stays at 10 % (ADR-157).
     tracesSampler: ({ attributes, inheritOrSampleWith }) =>
       attributes?.['sentry.op'] === 'pageload' ? 0.5 : inheritOrSampleWith(0.1),
     // PII posture (Phase 0.9): no IPs/cookies/headers on events, capability
@@ -25,7 +25,7 @@ if (PUBLIC_SENTRY_DSN) {
     sendDefaultPii: false,
     beforeSend: scrubSentryEvent,
     // A transaction carries timings and the route, never a URL with ids,
-    // slugs or a query (ADR-158 § 6).
+    // slugs or a query (ADR-157).
     beforeSendTransaction: scrubTransaction,
     // Replays: 10 % of normal sessions + 100 % of sessions with errors. Free
     // plan ships 50 replays/month so this is generous for Phase 0 traffic.

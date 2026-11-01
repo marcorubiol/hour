@@ -1,5 +1,5 @@
 /**
- * How long a real phone waits for Hoy (ADR-158 § 6).
+ * How long a real phone waits for Hoy (ADR-157).
  *
  * Sentry's pageload transaction already carries the Web Vitals (LCP, FCP,
  * TTFB, CLS). What it cannot know is when Hoy has drawn its data: this adds

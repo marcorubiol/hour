@@ -284,7 +284,7 @@ export function bindQueryCache(client: QueryClient): void {
   bound = client;
 }
 
-/** Whether this open painted from the device record (for the open's own timing, ADR-158 § 6). */
+/** Whether this open painted from the device record (for the open's own timing, ADR-157). */
 export function restoredFromDevice(): boolean {
   return restoredThisOpen;
 }

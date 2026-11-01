@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { scrubTransaction } from './sentry-scrub';
 
-describe('a transaction carries timings, not who or what (ADR-158)', () => {
+describe('a transaction carries timings, not who or what (ADR-157)', () => {
   test('the page URL becomes the route; span URLs lose queries, ids and slugs', () => {
     const event = scrubTransaction({
       transaction: '/h/[workspace]/project/[slug]',

@@ -609,7 +609,7 @@
   let busy = $derived(
     waitingLoading || $projectsQuery.isPending || $linesQuery.isPending || !feeds.settled,
   );
-  // The first time it has drawn its data, a real phone's timing (ADR-158 § 6).
+  // The first time it has drawn its data, a real phone's timing (ADR-157).
   $effect(() => {
     if (!busy) markHoyContent(restoredFromDevice());
   });

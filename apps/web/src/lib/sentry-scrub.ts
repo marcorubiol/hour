@@ -70,7 +70,7 @@ interface TransactionEvent extends UrlBearingEvent {
 const URL_KEYS = ['url', 'http.url', 'url.full', 'url.path', 'url.query', 'http.query', 'server.address', 'http.fragment'];
 
 /**
- * beforeSendTransaction on the client (ADR-158 § 6): a transaction is for
+ * beforeSendTransaction on the client (ADR-157): a transaction is for
  * timings, so it carries the route and the timings and nothing that names a
  * person, a space or a record. The page URL becomes the route pattern
  * (`/h/[workspace]/…`, the transaction's name); every span keeps its op and
