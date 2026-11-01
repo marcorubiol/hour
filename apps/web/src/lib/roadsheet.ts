@@ -28,6 +28,10 @@
  *   - `assets` list for full + tech_manager (riders/plots are theirs);
  *     URLs are R2 keys with no public serving in Phase 0, so only
  *     metadata travels.
+ *   - `travel` (ADR-166) is the travelling party's: full + performer +
+ *     tech_manager, never the venue. The trips of the performance's day and
+ *     its eve, of the same project (`tripsOfPerformance`), with their timed
+ *     stages; who goes is only who said «voy» (ADR-147), never the cast.
  *
  * Pure module: the endpoint fetches the bundle, this filters it. Keep it
  * dependency-free so it stays unit-testable.
@@ -36,6 +40,8 @@
 import type { Json, Tables } from './db-types';
 import type { ScheduleMoment, TimeslotFields } from './schedule-slot';
 import { localDayISO } from './datetime';
+import { addDaysIso, dayKeyInTz } from './planner';
+import type { TravelStageRow } from './travel-stage';
 
 export const ROADSHEET_ROLES = ['full', 'venue', 'performer', 'tech_manager'] as const;
 export type RoadsheetRole = (typeof ROADSHEET_ROLES)[number];
@@ -43,6 +49,7 @@ export type RoadsheetRole = (typeof ROADSHEET_ROLES)[number];
 type RoadsheetSection =
   | 'schedule'
   | 'venue'
+  | 'travel'
   | 'logistics'
   | 'hospitality'
   | 'technical'
@@ -56,6 +63,7 @@ export const ROLE_SECTIONS: Record<RoadsheetRole, readonly RoadsheetSection[]> =
   full: [
     'schedule',
     'venue',
+    'travel',
     'logistics',
     'hospitality',
     'technical',
@@ -66,8 +74,8 @@ export const ROLE_SECTIONS: Record<RoadsheetRole, readonly RoadsheetSection[]> =
     'assets',
   ],
   venue: ['schedule', 'venue', 'technical', 'cast', 'crew'],
-  performer: ['schedule', 'venue', 'logistics', 'hospitality', 'cast', 'crew'],
-  tech_manager: ['schedule', 'venue', 'logistics', 'technical', 'cast', 'crew', 'assets'],
+  performer: ['schedule', 'venue', 'travel', 'logistics', 'hospitality', 'cast', 'crew'],
+  tech_manager: ['schedule', 'venue', 'travel', 'logistics', 'technical', 'cast', 'crew', 'assets'],
 };
 
 const PERSONAL_CONTACTS: ReadonlySet<RoadsheetRole> = new Set(['full', 'tech_manager']);
@@ -112,6 +120,121 @@ export interface VenueBlock {
   contacts: Json;
 }
 
+/** What a sheet draws of a stage: the line Ahora draws (ADR-146), no more. */
+export type RoadsheetStage = Pick<
+  TravelStageRow,
+  | 'mode'
+  | 'from_city'
+  | 'from_place'
+  | 'to_city'
+  | 'to_place'
+  | 'depart_at'
+  | 'arrive_at'
+  | 'depart_tz'
+  | 'arrive_tz'
+  | 'reference'
+>;
+
+/**
+ * A trip on the sheet (ADR-166). `tz` is the trip's venue zone: the clock of
+ * a stage end that names none, as in Ahora. `going` is who said «voy» to it,
+ * by name; empty is a company trip, and nobody is guessed (ADR-147).
+ */
+export interface RoadsheetTrip {
+  id: string;
+  title: string | null;
+  starts_at: string;
+  all_day: boolean;
+  origin_city: string | null;
+  destination_city: string | null;
+  tz: string | null;
+  /** The stages with an hour, in time order (`timedStages`). */
+  stages: RoadsheetStage[];
+  going: string[];
+}
+
+/** A `date` row as the sheet's endpoint reads it, before the cut. */
+export interface TripRow {
+  id: string;
+  kind: string;
+  status: string;
+  title: string | null;
+  starts_at: string;
+  ends_at: string | null;
+  all_day: boolean;
+  origin_city: string | null;
+  destination_city: string | null;
+  venue: { timezone: string | null } | null;
+  stages: TravelStageRow[] | null;
+  commitments: Array<{ person_id: string; state: string }> | null;
+}
+
+/** Local day of an instant; an all-day row keeps its stored day (`dateDayKey`). */
+function tripDay(at: string, allDay: boolean, tz: string): string {
+  return allDay ? at.slice(0, 10) : dayKeyInTz(at, tz);
+}
+
+/**
+ * WHICH TRIP IS «OF THIS PERFORMANCE» (ADR-166 § 2): a `travel_day` of the
+ * same project (the endpoint asks for that), not cancelled, that touches the
+ * performance's day or the day before. A trip's days are read on its own
+ * venue's clock, else on the performance's (UTC when neither has a zone);
+ * an all-day trip keeps its stored days, as the Planner does. Touching: it starts on one of them, or starts
+ * before and is still running on the eve. The way home the day after is the
+ * next sheet's business, or nobody's.
+ *
+ * `names` maps a person id to the name the space knows them by; a «voy»
+ * without a name in the space is left out rather than shown as an id.
+ */
+export function tripsOfPerformance(
+  rows: readonly TripRow[],
+  performedAt: string,
+  zone: string | null,
+  names: ReadonlyMap<string, string>,
+): RoadsheetTrip[] {
+  const tz = zone || 'UTC';
+  const day = performedAt.slice(0, 10);
+  const eve = addDaysIso(day, -1);
+  return rows
+    .filter((r) => r.kind === 'travel_day' && r.status !== 'cancelled')
+    .filter((r) => {
+      const own = r.venue?.timezone || tz;
+      const first = tripDay(r.starts_at, r.all_day, own);
+      const end = r.ends_at ? tripDay(r.ends_at, r.all_day, own) : first;
+      const last = end > first ? end : first;
+      return first <= day && last >= eve;
+    })
+    .sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at))
+    .map((r) => ({
+      id: r.id,
+      title: r.title,
+      starts_at: r.starts_at,
+      all_day: r.all_day,
+      origin_city: r.origin_city,
+      destination_city: r.destination_city,
+      tz: r.venue?.timezone ?? null,
+      stages: [...(r.stages ?? [])]
+        .filter((s) => s.depart_at && Number.isFinite(Date.parse(s.depart_at)))
+        .sort((a, b) => Date.parse(a.depart_at!) - Date.parse(b.depart_at!))
+        .map((s) => ({
+          mode: s.mode,
+          from_city: s.from_city,
+          from_place: s.from_place,
+          to_city: s.to_city,
+          to_place: s.to_place,
+          depart_at: s.depart_at,
+          arrive_at: s.arrive_at,
+          depart_tz: s.depart_tz,
+          arrive_tz: s.arrive_tz,
+          reference: s.reference,
+        })),
+      going: (r.commitments ?? [])
+        .filter((c) => c.state === 'going')
+        .map((c) => names.get(c.person_id))
+        .filter((n): n is string => Boolean(n)),
+    }));
+}
+
 export interface PerformanceBundle {
   performance: Pick<
     Tables<'performance'>,
@@ -138,6 +261,8 @@ export interface PerformanceBundle {
   cast: CastEntry[];
   crew: CrewEntry[];
   assets: AssetEntry[];
+  /** The trips of the day and its eve (`tripsOfPerformance`); absent = not read. */
+  travel?: RoadsheetTrip[];
 }
 
 export interface Roadsheet {
@@ -158,6 +283,9 @@ export interface Roadsheet {
     moments?: ScheduleMoment[];
   } | null;
   venue: VenueBlock | null;
+  /** ADR-166. Absent on the public sheet: `get_public_roadsheet` does not
+      read trips (it would take a migration). */
+  travel?: RoadsheetTrip[] | null;
   /** Denormalized fallback when there is no venue row. */
   venue_name: string | null;
   city: string | null;
@@ -244,6 +372,7 @@ export function buildRoadsheet(bundle: PerformanceBundle, role: RoadsheetRole): 
         }
       : null,
     venue: has('venue') ? bundle.venue : null,
+    travel: has('travel') ? (bundle.travel ?? []) : null,
     venue_name: has('venue') ? p.venue_name : null,
     city: has('venue') ? p.city : null,
     country: has('venue') ? p.country : null,

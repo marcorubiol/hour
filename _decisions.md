@@ -6097,3 +6097,54 @@ historial (`git show <commit>^`).
 
 **Re-evaluar cuando** Marco libere una opción de verdad desde Hoy: si «Liberar» sin pregunta se siente seguro con el
 «Deshacer» de 8 s, y si «Confirmar» en la fila debería avisar del otro lado ya confirmado.
+
+## [2026-11-01] ADR-166 · La hoja de ruta lleva el viaje del día; los módulos de una línea son los de su tipo (enmienda ADR-041 y ADR-056)
+
+**Contexto.** Puntos 80 y 81 de la tanda del 2026-11-01, con OK de Marco. Un técnico en ruta abre la hoja de ruta y
+no ve cómo llega: los tramos solo estaban en Ahora (ADR-146). Y la página de línea dejaba añadir, quitar y mover
+módulos (ADR-056), una composición que nadie usa y que la doctrina de lentes fijas ya no defiende («persona-fit =
+rol, no composición»). Carril `claude/batch-80`.
+
+**Decisión.**
+1. **Una sección «Viaje» en la hoja de ruta interna** (`ROLE_SECTIONS`, `$lib/roadsheet`), para `full`, `performer` y
+   `tech_manager`; nunca para `venue`: el viaje de la compañía no es asunto de la sala (la misma regla que
+   `logistics`, ADR-041). Va después de la sala.
+2. **Qué viaje es «de esta función».** Un `date` de tipo `travel_day` del mismo proyecto que la función, no
+   cancelado, que toca el día de la función o la víspera. Tocar: empieza uno de esos dos días, o empezó antes y sigue
+   en marcha la víspera. Los días se leen con el reloj de la sala del viaje y, si no tiene, con el de la sala de la
+   función (UTC si ninguna tiene zona); un viaje de día entero guarda sus días, como en el Planificador. La vuelta del
+   día siguiente no entra: es de la hoja siguiente o de nadie. Vive en `tripsOfPerformance`, pura.
+3. **Se leen y se dibujan como en Ahora.** El endpoint de la hoja (`GET /api/performances/:key/roadsheet`) lee la fila
+   `date` con sus tramos (`travel_stage`, en su orden) y los «voy» (`commitment_person`), lo mismo que
+   `/api/dates?stages=1`, solo cuando el rol lleva la sección. Se pintan los tramos con hora, en orden de salida:
+   hora · modo · `origen → destino` · llega · localizador. La hora de salida, en la zona de la salida; la de llegada,
+   en la de llegada; un extremo sin zona usa la de la sala del viaje, y si no, la de quien mira. Un viaje sin tramos
+   con hora es una línea `origen → destino`. Las notas del tramo no viajan.
+4. **Nadie se adivina (ADR-147).** «Quién va» de un viaje es solo quien dijo «voy», por el nombre de su dossier en el
+   espacio; sin nadie, es un viaje de la compañía y no lleva nombres. El reparto de la función no se copia al viaje.
+5. **La hoja pública no cambia.** `get_public_roadsheet` no lee viajes; `travel` es opcional en `Roadsheet` y la
+   pública no lo trae. Llevarlo ahí pide una migración: que la función lea los `travel_day` del proyecto en esa
+   ventana con sus `travel_stage` (sin `notes`) y los «voy» con el nombre del dossier, solo para los roles públicos
+   `performer` y `tech_manager`, y la misma regla del punto 2 en SQL (o devolver la ventana ancha y cortar aquí).
+6. **Los módulos de una línea son los de su tipo, en orden fijo** (`MODULES_BY_KIND`, `modulesForKind` en
+   `$lib/line-templates`). Fuera el menú «Añadir módulo» y el de cada módulo (subir, bajar, quitar). Tareas entra en
+   los tres conjuntos de trabajo después del Planificador, donde las plantillas ya lo ponían (ADR-071): gira, difusión
+   y creación. Una plantilla elige el tipo y el tipo los módulos; la plantilla ya no lleva lista propia.
+7. **`line.modules` se queda en la base y se ignora.** Nadie lo lee ni lo escribe: `GET /api/lines` deja de
+   seleccionarlo, `POST /api/lines` deja de aceptarlo (lo quita como cualquier campo desconocido) y no pasa
+   `p_modules` a `create_line`, y `PATCH /api/lines/:id`, que solo existía para escribirlo, se borra (responde 404).
+   Sin migración.
+8. **ADR-145 § 1 en la página de línea.** Un módulo que es solo lectura no se pinta vacío: Hojas de ruta (una
+   proyección de las funciones de la línea) desaparece, también de las anclas, mientras la línea no tiene funciones.
+   Los módulos donde se escribe (Conversaciones, Tareas, Materiales, Dinero, Equipo, Notas, Planificador) siguen con
+   su línea de vacío, porque el hueco es donde se escribe (la excepción de las fichas del mismo § 1).
+9. **Caché del dispositivo.** La hoja de ruta guardada gana `travel` y la lista de líneas pierde `modules`:
+   `CACHE_SCHEMA` pasa de 4 a 5 (ADR-158).
+
+**Cómo se revierte.** Volver `$lib/roadsheet.ts`, `RoadsheetView.svelte`, el endpoint de la hoja,
+`$lib/line-templates.ts`, `CreateLineDialog.svelte`, la página de línea y `routes/api/lines/` al commit anterior; la
+columna sigue en la base con lo que tenía. Las claves de i18n borradas están en el historial.
+
+**Re-evaluar cuando** un técnico pida en la hoja la vuelta del día siguiente, o una compañía necesite de verdad otra
+pila de módulos para un tipo: entonces es otro tipo de línea, no una composición a mano.
+

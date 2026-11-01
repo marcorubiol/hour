@@ -1,8 +1,8 @@
 <script lang="ts">
   /**
    * New-line dialog — THE TEMPLATE PICKER (ADR-056). Creating a line =
-   * picking a template: the card fixes kind + starting module set (sent as
-   * `modules` — the API accepts them since ADR-056), the 10-kind dropdown
+   * picking a template: the card fixes the kind, and the kind the modules
+   * (ADR-166: the card lists them, nothing sends them), the 10-kind dropdown
    * is gone. One dialog, one step: template cards → project → name →
    * accent. On success, refetch the ['lines'] caches before navigating to
    * the new line detail.
@@ -15,7 +15,7 @@
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
-  import { LINE_TEMPLATES, moduleLabel, type LineTemplate } from '$lib/line-templates';
+  import { LINE_TEMPLATES, moduleLabel, modulesForKind, type LineTemplate } from '$lib/line-templates';
   import { appLocale, t } from '$lib/i18n';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { accentVar } from '$lib/utils/accent';
@@ -91,14 +91,12 @@
       project_id: string;
       name: string;
       kind: LineTemplate['kind'];
-      modules: LineTemplate['modules'];
       accent: string | null;
     }) => {
       const body: Record<string, unknown> = {
         project_id: input.project_id,
         name: input.name,
         kind: input.kind,
-        modules: input.modules,
       };
       if (input.accent) body.accent = input.accent;
       const res = await mutateJSON<{ line: CreatedLine }>('POST', '/api/lines', body);
@@ -154,7 +152,6 @@
       project_id: effectiveProjectId,
       name: trimmed,
       kind: template.kind,
-      modules: template.modules,
       accent,
     });
   }
@@ -184,7 +181,7 @@
             <span class="cln__template-name">{t(tpl.nameKey, locale)}</span>
             <span class="cln__template-desc">{t(tpl.descriptionKey, locale)}</span>
             <span class="cln__template-modules">
-              {tpl.modules.map((m) => moduleLabel(m, locale)).join(' · ')}
+              {modulesForKind(tpl.kind).map((m) => moduleLabel(m, locale)).join(' · ')}
             </span>
           </button>
         {/each}

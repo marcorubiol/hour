@@ -144,6 +144,13 @@ export function stagePlace(city: string | null, place: string | null): string | 
   return place || city || null;
 }
 
+/** A stage's way, `from → to`, with whichever ends are named («» when none). */
+export function stageRoute(
+  s: Pick<TravelStageRow, 'from_city' | 'from_place' | 'to_city' | 'to_place'>,
+): string {
+  return [stagePlace(s.from_city, s.from_place), stagePlace(s.to_city, s.to_place)].filter(Boolean).join(' → ');
+}
+
 /**
  * WHERE A NEW STAGE LEAVES FROM: where the stage before it arrived, else
  * where the trip starts. Nobody types «Madrid» twice to change from the
