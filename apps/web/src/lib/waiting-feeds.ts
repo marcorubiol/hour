@@ -6,6 +6,7 @@
  */
 
 import { fetchJSON } from './api';
+import { CONVERSATIONS_WHOLE } from './conversation';
 import type { DeskConvInput } from './desk-feed';
 import type { LastMailoutResponse, OverviewResponse } from './conversation-overview';
 import type { TaskItem } from './task';
@@ -16,7 +17,7 @@ export function waitingConversationsQueryOptions() {
     queryKey: ['conversations', 'today'] as const,
     queryFn: ({ signal }: { signal: AbortSignal }) =>
       // `lean`: the rows only; neither surface reads the count, the bolos or the mailout.
-      fetchJSON<{ items: (DeskConvInput & { workspace_id: string })[] }>('/api/conversations?limit=100&lean=1', signal),
+      fetchJSON<{ items: (DeskConvInput & { workspace_id: string })[] }>(`/api/conversations?limit=${CONVERSATIONS_WHOLE}&lean=1`, signal),
   };
 }
 

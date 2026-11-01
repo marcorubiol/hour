@@ -447,6 +447,12 @@
       grid-template-areas: 'strip decide' 'lists lists';
       align-items: start;
     }
+    /* Nothing to decide, no column for it: the strip takes the measure
+       instead of stopping at two thirds beside air (ADR-167 § 2). */
+    .ov__grid:not(:has(> .ov__decide)) {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas: 'strip' 'lists';
+    }
     .ov__strip {
       grid-area: strip;
     }
@@ -457,7 +463,10 @@
       grid-area: lists;
       display: grid;
       gap: var(--space-l);
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      /* As many equal columns as lists drawn: two lists share the width
+         instead of leaving the third third empty. */
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(0, 1fr);
       align-items: start;
     }
     .ov__lists--calm {
@@ -818,7 +827,7 @@
         grid-template-areas: 'decide' 'strip' 'lists';
       }
       .ov__lists {
-        grid-template-columns: minmax(0, 1fr);
+        grid-auto-flow: row;
       }
       .strip__row {
         grid-template-columns: 2.2rem repeat(7, minmax(0, 1fr));

@@ -6148,3 +6148,75 @@ columna sigue en la base con lo que tenía. Las claves de i18n borradas están e
 **Re-evaluar cuando** un técnico pida en la hoja la vuelta del día siguiente, o una compañía necesite de verdad otra
 pila de módulos para un tipo: entonces es otro tipo de línea, no una composición a mano.
 
+
+## [2026-11-01] ADR-167 · Pasada visual: «Liberar» solo, lo vacío no se dibuja, una fila de conversación y ⌘K en una vuelta (enmienda ADR-165 § 1, ADR-140, ADR-122 § 12 y ADR-145 § 1)
+
+**Contexto.** Encargo de HOUR COOR con OK de Marco (01-11): capturas de producción a 1440 y 390 con bandas vacías,
+columnas sin contenido, separadores sueltos y textos cortados; «Confirmar» en las filas «liberar» de Te espera;
+⌘K lento; y lo de paso de `_tasks.md` (topes de 100, rayas en textos, un comentario viejo). Carril
+`claude/batch-visual`. Sin migración. Capturas de antes y después en local (vite dev contra la Supabase local con
+la base al día y un usuario de prueba en el espacio `playwright`).
+
+**Decisión.**
+1. **Te espera: la fila «liberar» lleva solo «Liberar»** (enmienda ADR-165 § 1). Confirmar es la otra mitad de la
+   decisión y se hace en la ficha o en el vistazo, no desde una fila que nombra lo que sobra. Fuera las claves
+   `desk.decision_confirm`, `desk.decision_confirm_aria` y `desk.decision_confirmed`. El aviso con «Deshacer» no
+   cambia.
+2. **Lo que no tiene nada que decir no se dibuja, y una columna existe si alguna fila la usa.**
+   - Planificador: las dos líneas de hechos (cola y ventana) ya no son mueble en ninguna vista (enmienda ADR-122
+     § 12 y ADR-145 § 1, que solo lo quitaba en Temporada): una línea vacía no ocupa sitio y, sin las dos, se va el
+     bloque con su regla. Era la banda de ~70 px bajo el título de Agenda y lo que hacía saltar la barra de vistas
+     entre Temporada y las demás. Una línea de censo está mientras carga (dice «–»), así que al llegar las filas no
+     se mueve nada.
+   - Agenda: el margen (15rem y su regla) se dibuja cuando la ventana tiene algo en él (tarjeta de decisión, pasos,
+     notas o una nota a medio escribir); sin nada, el diario ocupa la medida. El «＋» de nota se queda en la esquina
+     del día, en su línea de fecha, y en el móvil ya no es una línea propia bajo cada día.
+   - Temporada: sin nada que decidir, la rejilla toma el ancho; las listas de abajo se reparten entre las que hay.
+   - Tablero: un tramo plegado que abre mes lleva el mes encima, como la cabecera de un día («mar1-11» era el mes y
+     el rango pegados); el hueco del monograma es un mínimo (un «ZEC» invadía el nombre a 390) y el recuento del
+     carril vuelve al móvil.
+   - Ficha (cualquiera): la línea de hechos y la banda «Falta» sin contenido no se pintan; eran ~30 px de márgenes
+     sobre los 44 del ritmo de la ficha.
+   - Fila de conversación: sin turno en ninguna fila de la lista, no hay columna de turno (15ch vacíos a la
+     izquierda); se decide por lista, nunca por fila, para que las columnas sigan alineadas. Una lista que elige
+     mantiene su forma. El paso («24 oct · llamar») tiene un solo dibujo, `.crow-next` en `base.css`: la lente lo
+     pinta como botón, la portada del proyecto como texto; antes la portada lo ponía en grande y caía debajo.
+   - La ficha de organización ya no repite «1 conversación» bajo su cabecera (`counted` en `ConversationTable`).
+3. **Separadores y signos.** El «·» de la línea de hechos cierra el elemento anterior en vez de abrir el siguiente:
+   una línea que parte acaba en él y la siguiente no empieza suelta. Svelte 5 quita el espacio al principio de una
+   etiqueta, así que `<span> · {x}</span>` salía pegado («Venue 010· ZZZ»); se escribe `{' · '}{x}` (⌘K y seis
+   sitios más). El pliegue (`lid`) dice su estado con ▾/▴ aparte de lo que guarda: «vacío −» se leía como un guion
+   suelto. El selector de temporada de Cuentas mide lo que muestra y su ▾ va al tamaño de la línea.
+4. **El selector de lentes no marca ninguna fuera de una lente** (enmienda ADR-140): en una ficha o en Ajustes el
+   trazo de «vienes de aquí» se leía como «estás aquí». Fuera `--lens-origin-stroke` y `lens.origin_note`.
+5. **Etiquetas de la ficha de conversación.** La regla ya es una (ADR-139 p4, ADR-145 § 3): versalita mono para la
+   cabecera de un bloque (Falta, Etiquetas, Equipo, Detalles), la etiqueta de campo para el nombre de un dato. Los
+   `dt` de Bolos, Último contacto y Planificador pasan a `.field__label` en vez de un estilo propio.
+6. **Hoy › La temporada.** La cifra se alinea con la primera línea de su texto (baseline), no centrada contra dos.
+   «0 bolos en opción» y el «1 opción» del Tablero no miden lo mismo: la puerta cuenta bolos (tratos) de Difusión en
+   la temporada, como la lente (ADR-138 § 3, ADR-118 § 7); el Tablero, funciones en opción por carril. No se igualan:
+   la puerta nombra lo que mide, «Difusión · Temporada 26-27».
+7. **⌘K en una vuelta a la base.** Medido en local: el endpoint responde en 55-80 ms y las filas salen ~180 ms
+   después de la última tecla, así que en producción lo que pesa son los viajes a Supabase, no el debounce (150 ms)
+   ni el render. `/api/search` hacía dos o tres vueltas seguidas: funciones y bolos «por organización» esperaban a
+   las organizaciones encontradas. Ahora son un filtro sobre la conversación embebida
+   (`conversation!inner(organization…!inner())`) en la primera vuelta, en paralelo con todo; solo una fecha escrita
+   añade la cadena de sus bolos. Las organizaciones ya no traen sus conversaciones (nadie leía `conversation_ids`).
+   Sin medición en producción: si sigue pasando de 1 s, mirar en los logs de PostgREST cuál de las nueve consultas
+   tarda (sospechosa: `conversation_search` con la RLS por fila).
+8. **Topes.** `/api/conversations` acepta hasta `CONVERSATIONS_WHOLE` = 500 (antes 100) y lo piden las lecturas que
+   necesitan un espacio entero: Te espera, las conversaciones de un trato nuevo y los pasos de una línea. El espacio
+   real más grande ya tiene 154, así que Te espera podía perder lo que esperaba; 500 es el mismo techo que el feed de
+   bolos de Cuentas: una petición, tres veces lo de hoy. La lente sigue paginando de 50.
+9. **Textos.** Fuera las rayas largas de las cadenas de `en.json` (39) y de `RoadsheetView` (dos marcas de vacío
+   pasan a `DASH`, el motivo de un sustituto va tras dos puntos). Nuevo bolo abre en tamaño `m`: en `s` se cortaban
+   el proyecto y el texto de ayuda del caché.
+10. **Caché del dispositivo.** La búsqueda cambia de forma (sin `conversation_ids`) y el trato nuevo cambia de clave:
+    `CACHE_SCHEMA` pasa de 5 a 6 (ADR-158).
+
+**Cómo se revierte.** Cada punto es CSS o una cadena en su componente, salvo § 7 (`routes/api/search/+server.ts` y
+`$lib/palette-search.ts`) y § 8 (`CONVERSATIONS_WHOLE` en `$lib/conversation.ts`); volver esos ficheros al commit
+anterior. Sin datos que deshacer.
+
+**Re-evaluar cuando** un espacio pase de 500 conversaciones (Te espera necesitará su propia lectura, no la lista), o
+cuando el margen de la Agenda tenga que existir vacío porque se escriba en él a menudo.

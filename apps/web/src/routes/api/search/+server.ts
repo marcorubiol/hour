@@ -7,11 +7,15 @@
  * Todo con la RLS de quien busca. Las conversaciones van por
  * `conversation_search` (ADR-102), la misma que la lente: organización o
  * cualquier contacto, nombre o email. Funciones y bolos (ADR-164 § 4): por
- * sala o ciudad en la primera vuelta; por organización (las conversaciones de
- * las organizaciones encontradas) en la segunda; con `day`, también las
- * funciones de ese día y, por `list_performance_bolo_links`, sus bolos. Un
- * bolo se lee de su tabla, cuya política pide `read:money`: quien no lee
- * dinero no recibe ninguno, sin error.
+ * sala o ciudad, y por la organización de su conversación. TODO EN UNA VUELTA
+ * (ADR-167 § 3): lo de la organización iba en una segunda, con los ids de las
+ * conversaciones de las organizaciones encontradas, y cada vuelta es otro
+ * viaje a la base; ahora es un filtro sobre la conversación embebida
+ * (`conversation!inner`), en paralelo con lo demás. Con `day`, también las
+ * funciones de ese día y, por `list_performance_bolo_links`, sus bolos (esa
+ * cadena sí espera: solo cuando se escribe una fecha). Un bolo se lee de su
+ * tabla, cuya política pide `read:money`: quien no lee dinero no recibe
+ * ninguno, sin error.
  *
  * Auth: Bearer JWT (o la cookie de sesión).
  */
@@ -35,7 +39,6 @@ import {
 } from '$lib/palette-search';
 
 type PersonRow = Omit<SearchPerson, 'organization_name'> & { organization: { name: string } | null };
-type OrgRow = Omit<SearchOrganization, 'conversation_ids'> & { conversations: { id: string }[] | null };
 type ConvRow = {
   id: string;
   workspace_id: string;
@@ -48,8 +51,8 @@ type BoloRow = Omit<SearchBolo, 'project_name'> & { project: { name: string } | 
 
 const PERF_SELECT = 'workspace_id,id,slug,performed_at,status,venue_name,city,project:project_id(name)';
 const BOLO_SELECT = 'workspace_id,id,project_id,venue_name,city,project:project_id(name)';
-/** Conversaciones de las organizaciones encontradas que se miran: la URL tiene un largo. */
-const ORG_CONVERSATIONS_MAX = 60;
+/** Solo filtra: la organización de la conversación de la fila (vacío, no vuelve en la respuesta). */
+const BY_ORG = 'conversation!inner(organization:workspace_organization!conversation_workspace_organization_fkey!inner())';
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export const GET: RequestHandler = async ({ request, url, platform, locals }) => {
@@ -94,11 +97,10 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
     limit,
   });
   const orgs = new URLSearchParams({
-    select: 'workspace_id,id,slug,name,conversations:conversation!conversation_workspace_organization_fkey(id)',
+    select: 'workspace_id,id,slug,name',
     workspace_id: inWs,
     name: `ilike.${like}`,
     deleted_at: 'is.null',
-    'conversations.deleted_at': 'is.null',
     order: 'name.asc',
     limit,
   });
@@ -123,45 +125,39 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
     order: 'name.asc',
     limit,
   });
-  const perfSearch = (filter: Record<string, string>) =>
+  const perfSearch = (filter: Record<string, string>, select = PERF_SELECT) =>
     new URLSearchParams({
-      select: PERF_SELECT,
+      select,
       workspace_id: inWs,
       deleted_at: 'is.null',
       order: 'performed_at.desc',
       limit,
       ...filter,
     });
-  const boloSearch = (filter: Record<string, string>) =>
-    new URLSearchParams({ select: BOLO_SELECT, workspace_id: inWs, deleted_at: 'is.null', limit, ...filter });
+  const boloSearch = (filter: Record<string, string>, select = BOLO_SELECT) =>
+    new URLSearchParams({ select, workspace_id: inWs, deleted_at: 'is.null', limit, ...filter });
+  const byOrg = { 'conversation.organization.name': `ilike.${like}`, 'conversation.deleted_at': 'is.null' };
 
   try {
-    const [p, o, c, v, perfPlace, perfDay, boloPlace] = await Promise.all([
+    const [p, o, c, v, perfPlace, perfDay, boloPlace, perfOrg, boloOrg] = await Promise.all([
       pgGet<PersonRow>(env, 'workspace_person', jwt, { search: persons }),
-      pgGet<OrgRow>(env, 'workspace_organization', jwt, { search: orgs }),
+      pgGet<SearchOrganization>(env, 'workspace_organization', jwt, { search: orgs }),
       pgGet<ConvRow>(env, 'rpc/conversation_search', jwt, { search: convs }),
       pgGet<SearchVenue>(env, 'venue', jwt, { search: venues }),
       pgGet<PerfRow>(env, 'performance', jwt, { search: perfSearch({ or: byPlace }) }),
       day ? pgGet<PerfRow>(env, 'performance', jwt, { search: perfSearch({ performed_at: `eq.${day}` }) }) : null,
       pgGet<BoloRow>(env, 'bolo', jwt, { search: boloSearch({ or: byPlace }) }),
+      pgGet<PerfRow>(env, 'performance', jwt, { search: perfSearch(byOrg, `${PERF_SELECT},${BY_ORG}`) }),
+      pgGet<BoloRow>(env, 'bolo', jwt, { search: boloSearch(byOrg, `${BOLO_SELECT},${BY_ORG}`) }),
     ]);
 
-    // Segunda vuelta: lo de las organizaciones encontradas, y los bolos del día.
-    const orgConvIds = [...new Set(o.data.flatMap((r) => (r.conversations ?? []).map((x) => x.id)))].slice(
-      0,
-      ORG_CONVERSATIONS_MAX,
-    );
-    const inConvs = `in.(${orgConvIds.join(',')})`;
+    // Solo con una fecha escrita: los bolos de las funciones de ese día.
     const dayPerfIds = (perfDay?.data ?? []).map((r) => r.id);
-    const [perfOrg, boloOrg, dayLinks] = await Promise.all([
-      orgConvIds.length ? pgGet<PerfRow>(env, 'performance', jwt, { search: perfSearch({ conversation_id: inConvs }) }) : null,
-      orgConvIds.length ? pgGet<BoloRow>(env, 'bolo', jwt, { search: boloSearch({ conversation_id: inConvs }) }) : null,
-      dayPerfIds.length
-        ? pgPostRpc<{ performance_id: string; bolo_id: string | null }>(env, 'list_performance_bolo_links', jwt, {
-            p_performance_ids: dayPerfIds,
-          })
-        : null,
-    ]);
+    const dayLinks = dayPerfIds.length
+      ? await pgPostRpc<{ performance_id: string; bolo_id: string | null }>(env, 'list_performance_bolo_links', jwt, {
+          p_performance_ids: dayPerfIds,
+        })
+      : null;
     const dayBoloIds = [...new Set((dayLinks?.data ?? []).flatMap((l) => (l.bolo_id ? [l.bolo_id] : [])))];
     const boloDay = dayBoloIds.length
       ? await pgGet<BoloRow>(env, 'bolo', jwt, { search: boloSearch({ id: `in.(${dayBoloIds.join(',')})` }) })
@@ -171,13 +167,10 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
     const perfOut = ({ project, ...r }: PerfRow): SearchPerformance => ({ ...r, project_name: project?.name ?? null });
     const boloOut = ({ project, ...r }: BoloRow): SearchBolo => ({ ...r, project_name: project?.name ?? null });
     // Lo del día primero: una fecha escrita es lo que se busca.
-    const bolosAll = [...(boloDay?.data ?? []), ...boloPlace.data, ...(boloOrg?.data ?? [])];
+    const bolosAll = [...(boloDay?.data ?? []), ...boloPlace.data, ...boloOrg.data];
     const result: PaletteSearchResult = {
       persons: p.data.map(({ organization, ...r }) => ({ ...r, organization_name: organization?.name ?? null })),
-      organizations: o.data.map(({ conversations, ...r }) => ({
-        ...r,
-        conversation_ids: (conversations ?? []).map((x) => x.id),
-      })),
+      organizations: o.data,
       conversations: c.data.map(
         (r): SearchConversation => ({
           id: r.id,
@@ -192,7 +185,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       ).sort((a, b) => a.title.localeCompare(b.title)),
       venues: v.data,
       performances: searchPerformanceOrder(
-        [...(perfDay?.data ?? []), ...perfPlace.data, ...(perfOrg?.data ?? [])],
+        [...(perfDay?.data ?? []), ...perfPlace.data, ...perfOrg.data],
         today,
       ).map(perfOut),
       bolos: [...new Map(bolosAll.map((b) => [b.id, b])).values()].slice(0, SEARCH_LIMIT).map(boloOut),

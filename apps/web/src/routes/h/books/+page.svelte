@@ -28,7 +28,7 @@
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
-  import { conversationTitle, type ConversationItem } from '$lib/conversation';
+  import { CONVERSATIONS_WHOLE, conversationTitle, type ConversationItem } from '$lib/conversation';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import CalmLine from '$lib/components/CalmLine.svelte';
   import { useCalm } from '$lib/stores/calm.svelte';
@@ -846,11 +846,11 @@
   let dealConversationId = $state('');
   const dealConversationsQuery = createQuery(
     toStore(() => ({
-      queryKey: ['conversations', { project_ids: dealProjectId, limit: 100, lean: 1 }] as const,
+      queryKey: ['conversations', { project_ids: dealProjectId, limit: CONVERSATIONS_WHOLE, lean: 1 }] as const,
       enabled: dealOpen && Boolean(dealProjectId),
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         fetchJSON<{ items: ConversationItem[] }>(
-          `/api/conversations?project_ids=${encodeURIComponent(dealProjectId)}&limit=100&lean=1`,
+          `/api/conversations?project_ids=${encodeURIComponent(dealProjectId)}&limit=${CONVERSATIONS_WHOLE}&lean=1`,
           signal,
         ),
     })),
@@ -1374,7 +1374,7 @@
               {#each expenses as expense (expense.id)}
                 <li>
                   <span class="mny__cell-date">{expense.incurred_on ? dayLabel(expense.incurred_on) : DASH}</span>
-                  <span class="mny__expense-description"><b>{expense.description}</b>{#if expense.counterparty}<span class="mny__expense-counter"> · {expense.counterparty}</span>{/if}</span>
+                  <span class="mny__expense-description"><b>{expense.description}</b>{#if expense.counterparty}<span class="mny__expense-counter">{' · '}{expense.counterparty}</span>{/if}</span>
                   <span class="mny__expense-category">{categoryLabel(expense.category, locale)}</span>
                   <strong>− {fmtMoney(expense.amount)} {expense.currency}</strong>
                 </li>
@@ -1453,7 +1453,7 @@
   {/snippet}
 </Dialog>
 
-<Dialog bind:open={dealOpen} title={t('books.new_deal', locale)} size="s" description={t('books.deal_desc', locale)}>
+<Dialog bind:open={dealOpen} title={t('books.new_deal', locale)} size="m" description={t('books.deal_desc', locale)}>
   <form class="mny__pay-form" novalidate oninput={formErrors.onedit} onchange={formErrors.onedit} onsubmit={(e) => { e.preventDefault(); submitDeal(); }}>
     <Select id="deal-project" label={t('books.project_obra', locale)} bind:value={dealProjectId} options={dealOptions} error={formErrors.of('deal-project')} />
     {#if dealConversations.length > 0}
@@ -1526,9 +1526,11 @@
     /* The season is a native select that reads as the sub line's words; the
        caret is the one sign it opens, laid over its end (ADR-145, fase 2). */
     .mny__seasons { position: relative; display: inline-flex; align-items: baseline; }
-    .mny__season { appearance: none; border: 0; background: none; padding: 0 1em 0 0; font: inherit; color: inherit; cursor: pointer; }
+    /* As wide as the season it shows, not the widest it could (ADR-167 § 2): the caret sat a word away and read as a loose «·». */
+    .mny__season { appearance: none; field-sizing: content; border: 0; background: none; padding: 0 1em 0 0; font: inherit; color: inherit; cursor: pointer; }
     .mny__season:hover { color: var(--text-color); }
-    .mny__seasons .status-caret { position: absolute; inset-inline-end: 0; pointer-events: none; }
+    /* At the line's own size: at the shared 2xs, beside a line this small, it read as a loose «·» (ADR-167 § 2). */
+    .mny__seasons .status-caret { position: absolute; inset-inline-end: 0; pointer-events: none; font-size: inherit; }
     .mny__ghost { display: grid; gap: var(--space-xs); font-size: var(--text-s); }
     .mny__note { font-size: var(--text-xs); color: var(--text-faint); }
     .mny__empty { display: flex; flex-direction: column; gap: var(--space-s); align-items: flex-start; }

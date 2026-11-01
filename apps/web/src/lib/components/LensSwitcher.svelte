@@ -7,11 +7,9 @@
    *
    * What it marks:
    *   - on a lens, that lens, filled: «you are here» (`aria-current="page"`);
-   *   - anywhere else (a record, a project, Settings), the lens you came from
-   *     (the shell keeps it: `hour_lens`), with a soft stroke and no fill:
-   *     «you came from here». One click goes back to it with its view and its
-   *     scope. A record's crumb still says where the thing HANGS; this says
-   *     which section you are in. Two questions, two places.
+   *   - anywhere else (a record, a project, Settings), none (ADR-167 § 2). The
+   *     soft stroke on the lens you came from read as «you are here» on a page
+   *     that is not that lens; the record's crumb says where the thing hangs.
    *
    * Links in a `nav`, not tabs: each one goes to another page, so it can open
    * in a new tab or be long-pressed on a phone (Desk review, móvil #7).
@@ -48,8 +46,6 @@
 
   /** The lens on screen, when the page is one. */
   let active = $derived(routedLensOf(page.url.pathname));
-  /** Off a lens: the one you were working in. */
-  let origin = $derived<Lens | null>(active ? null : lens.current);
 
   const pick = (view: Lens) => lens.set(view);
 </script>
@@ -59,9 +55,7 @@
     href="/h/desk"
     class="lensswitch__home"
     class:is-on={active === 'desk'}
-    class:is-origin={origin === 'desk'}
     aria-current={active === 'desk' ? 'page' : undefined}
-    aria-describedby={origin === 'desk' ? 'lens-origin-note' : undefined}
     onclick={() => pick('desk')}
   >
     <span class="lensswitch__word">{t('lens.desk', locale)}</span>
@@ -74,9 +68,7 @@
       <a
         href="/h/{v.id}"
         aria-current={active === v.id ? 'page' : undefined}
-        aria-describedby={origin === v.id ? 'lens-origin-note' : undefined}
         class:is-on={active === v.id}
-        class:is-origin={origin === v.id}
         class:is-reserved={v.id === 'books' && moneyPending}
         aria-hidden={v.id === 'books' && moneyPending ? 'true' : undefined}
         tabindex={v.id === 'books' && moneyPending ? -1 : undefined}
@@ -86,8 +78,6 @@
       </a>
     {/each}
   </div>
-  <!-- What the stroke says, for whoever does not see it. -->
-  <span id="lens-origin-note" hidden>{t('lens.origin_note', locale)}</span>
 </nav>
 
 <style>
@@ -156,14 +146,6 @@
     background: var(--text-color);
     color: var(--bg);
   }
-  /* «You came from here»: the word in ink and a soft stroke round it, never
-     the fill (the fill is «you are here»). The ring is drawn inside the box,
-     so the mark moves nothing. */
-  .lensswitch__home.is-origin,
-  .lensswitch a.is-origin {
-    color: var(--text-color);
-    box-shadow: inset 0 0 0 var(--line-hairline) var(--lens-origin-stroke);
-  }
 
   /* A tablet with the rail beside it: the bar is narrower than the four
      pills with their desktop air, so they give up half of it. */
@@ -180,7 +162,7 @@
      between the words is the same everywhere. The word is marked as the
      ledger's tabs mark theirs (Cuentas): ink and the rule that underlines a
      choice (--line), never a fill, which crowded its neighbours (Marco,
-     24-10); where you came from, the same rule in the origin's faint ink.
+     24-10).
      The bar keeps its own air above and under the row (--lensbar-pad), and
      the home indicator's inset is added under that, never folded into it. */
   @media (max-width: 47.999rem) {
@@ -208,9 +190,7 @@
     .lensswitch__home,
     .lensswitch a,
     .lensswitch__home.is-on,
-    .lensswitch a.is-on,
-    .lensswitch__home.is-origin,
-    .lensswitch a.is-origin {
+    .lensswitch a.is-on {
       flex: 1 1 auto;
       justify-content: center;
       block-size: var(--lensbar-height);
@@ -236,10 +216,6 @@
     .is-on .lensswitch__word {
       color: var(--text-color);
       border-block-end-color: var(--text-color);
-    }
-    .is-origin .lensswitch__word {
-      color: var(--text-color);
-      border-block-end-color: var(--lens-origin-stroke);
     }
   }
 </style>

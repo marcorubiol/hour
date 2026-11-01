@@ -106,7 +106,7 @@
     <!-- The lid: fold state + the count, one row, one button. -->
     <button type="button" class="lid" aria-expanded={notesOpen} onclick={() => (notesOpen = !notesOpen)}>
       <span class="lid__w">{notesWord}</span>
-      <span class="lid__n">{notes.length === 0 ? emptyWord : notes.length} {notesOpen ? '−' : '+'}</span>
+      <span class="lid__n">{notes.length === 0 ? emptyWord : notes.length}<span class="lid__sign" aria-hidden="true">{notesOpen ? '▴' : '▾'}</span></span>
     </button>
     {#if notesOpen}
       {#if canWrite}
@@ -139,14 +139,14 @@
     {#if steps.length > 0}
       <button type="button" class="lid" aria-expanded={stepsOpen} onclick={() => (stepsOpen = !stepsOpen)}>
         <span class="lid__w">{stepsWord}</span>
-        <span class="lid__n">{steps.length} {stepsOpen ? '−' : '+'}</span>
+        <span class="lid__n">{steps.length}<span class="lid__sign" aria-hidden="true">{stepsOpen ? '▴' : '▾'}</span></span>
       </button>
       {#if stepsOpen}<PlannerSteps {steps} label={stepsWord} />{/if}
     {/if}
     {#if next.length > 0}
     <button type="button" class="lid" aria-expanded={nextOpen} onclick={() => (nextOpen = !nextOpen)}>
       <span class="lid__w">{nextWord}</span>
-      <span class="lid__n">{next[0].day} {nextOpen ? '−' : '+'}</span>
+      <span class="lid__n">{next[0].day}<span class="lid__sign" aria-hidden="true">{nextOpen ? '▴' : '▾'}</span></span>
     </button>
     {/if}
     {#if nextOpen && next.length > 0}

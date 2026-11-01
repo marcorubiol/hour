@@ -73,9 +73,13 @@
 
     {#if conversations}
       <!-- Its figure is Difusión's (bolos en opción, ADR-138 § 3): the door opens
-           that chip, so the door and the lens count the same (ADR-118 § 7). -->
+           that chip, so the door and the lens count the same (ADR-118 § 7).
+           The window NAMES the chip (ADR-167 § 2): «0 bolos en opción» beside
+           the Board's «1 opción» read as the same count disagreeing, and they
+           are two: deals of Difusión in the season here, functions on hold in
+           every lane there. -->
       <a class="door" href={chipHref(SALES, new URLSearchParams())} data-testid="door-conversations">
-        <span class="door__lens">{t('lens.conversations', locale)}<i>{seasonLabel}</i></span>
+        <span class="door__lens">{t('lens.conversations', locale)}<i>{t('conversations.view_sales', locale)} · {seasonLabel}</i></span>
         {#if conversations.errored}
           <span class="door__n stat door__n--na">{DASH}</span><span class="door__txt">{t('desk.door_error', locale)}</span>
         {:else}
@@ -131,7 +135,9 @@
     grid-template-columns: subgrid;
     grid-template-areas: 'lens lens arrow' 'n txt arrow';
     column-gap: var(--space-m);
-    align-items: center;
+    /* The figure sits on its word's line, not centred against the two lines
+       of words (ADR-167 § 2); the arrow alone centres on the row. */
+    align-items: baseline;
     padding-block: var(--space-s);
     color: inherit;
     text-decoration: none;
@@ -182,6 +188,7 @@
   }
   .door__arrow {
     grid-area: arrow;
+    align-self: center;
     color: var(--text-faint);
     transition: transform var(--transition);
   }

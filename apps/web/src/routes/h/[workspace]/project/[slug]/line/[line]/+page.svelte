@@ -21,6 +21,7 @@
    */
 
   import { docTitle } from '$lib/doc-title';
+  import { CONVERSATIONS_WHOLE } from '$lib/conversation';
   import { page } from '$app/state';
   import { createQuery } from '@tanstack/svelte-query';
   import { goto } from '$app/navigation';
@@ -145,7 +146,7 @@
         const base = `/api/conversations?line_id=${id}`;
         const [all, confirmed, holds] = await Promise.all([
           fetchJSON<{ total: number; items: StepsDueRow[] }>(
-            `${base}&status=any&limit=100`,
+            `${base}&status=any&limit=${CONVERSATIONS_WHOLE}`,
             signal,
           ),
           fetchJSON<{ total: number }>(`${base}&status=confirmed&limit=1`, signal),

@@ -27,11 +27,20 @@
     letter-spacing: var(--tracking-xl);
     text-transform: uppercase;
     color: var(--text-faint);
+    /* A word that wraps on a phone stays on the left edge, not centred as
+       a button's text is by default. */
+    text-align: start;
   }
   .lid:hover .lid__w {
     color: var(--text-muted);
   }
   .lid__n {
+    flex: none;
     font-variant-numeric: tabular-nums;
+  }
+  /* The fold's state is a chevron, apart from what it keeps (ADR-167 § 2):
+     «vacío −» read as a word and a loose dash, the `−` as punctuation. */
+  .lid__sign {
+    margin-inline-start: var(--space-xs);
   }
 }

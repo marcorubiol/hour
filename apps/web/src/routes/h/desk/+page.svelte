@@ -575,23 +575,23 @@
     });
   }
 
-  // ── «Confirmar» / «Liberar» on a release row (ADR-165 § 1): the record's
-  //    own write (a status PATCH), with «Deshacer» instead of a question, as
-  //    the bulk actions. The undo puts back the status it had.
+  // ── «Liberar» on a release row (ADR-165 § 1; only that verb, ADR-167 § 1):
+  //    the record's own write (a status PATCH), with «Deshacer» instead of a
+  //    question, as the bulk actions. The undo puts back the status it had.
   let deciding = $state<string | null>(null);
   async function setOptionStatus(id: string, status: string) {
     await mutateJSON('PATCH', `/api/performances/${id}`, { status });
     await Promise.all([invalidatePerformanceFeeds(queryClient), queryClient.invalidateQueries({ queryKey: ['performance'] })]);
   }
-  async function decide(item: DeskItem, status: 'confirmed' | 'cancelled') {
+  async function decide(item: DeskItem) {
     const option: DeskOption | null = item.option;
     if (!option || deciding) return;
     deciding = item.id;
     try {
-      await setOptionStatus(option.id, status);
+      await setOptionStatus(option.id, 'cancelled');
       addToast({
         tone: 'success',
-        message: t(status === 'confirmed' ? 'desk.decision_confirmed' : 'desk.decision_released', locale, { name: item.subject }),
+        message: t('desk.decision_released', locale, { name: item.subject }),
         // Time to read it and reach «Deshacer».
         duration: 8000,
         action: {

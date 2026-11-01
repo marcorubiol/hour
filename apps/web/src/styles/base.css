@@ -2172,6 +2172,13 @@
     gap: var(--space-s);
     margin-block-start: var(--space-m);
   }
+  /* A record's facts line or band with nothing in it (an organisation with
+     no address, nothing missing) is not drawn: its margins alone were a
+     band of air under the title (ADR-167 § 2). */
+  .lenshead__sub:not(:has(*)),
+  .record-head__band:not(:has(*)) {
+    display: none;
+  }
 
   /* Facts — the line under a record's title, each fact its own editor
      (ADR-139 § 2). A fact that opens its editor is a word in the line's own
@@ -2283,6 +2290,37 @@
   .crow-list--bolos {
     --crow-bolos: var(--crow-bolos-size);
     --crow-state: calc(var(--crow-relation-size) + var(--crow-bolos-size));
+  }
+  /* The step cell, «24 oct · llamar»: the date in mono, the note giving way
+     first. Every list of rows draws it so (ADR-167 § 2): the lens's table as
+     a button, a record's short list as text. */
+  .crow-next {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-xs);
+    max-inline-size: 100%;
+    min-inline-size: 0;
+    text-align: end;
+  }
+  .crow-next__date {
+    white-space: nowrap;
+    color: var(--text-dark-muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--mono-letter-spacing);
+  }
+  .crow-next__note {
+    min-inline-size: 0;
+    color: var(--text-faint);
+    font-size: var(--text-xs);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  @container (max-width: 47.999rem) {
+    .crow-next__note {
+      max-inline-size: 14ch;
+    }
   }
 
   /* Action bar — the floating bar at the foot of a work surface while a
@@ -2469,10 +2507,12 @@
     color: var(--text-color);
   }
   /* uniform · between every sub item, whatever its class (links, figures,
-     buttons) — one rhythm for all four lenses. */
-  .lenshead__sub > * + *::before {
+     buttons): one rhythm for all four lenses. It closes the item before it,
+     like punctuation, so a line that wraps ends on it and the next never
+     starts with a loose «·» (ADR-167 § 2). */
+  .lenshead__sub > :not(:last-child)::after {
     content: '·';
-    margin-inline-end: var(--space-s);
+    margin-inline-start: var(--space-s);
     color: var(--text-faint);
   }
   /* On a phone a record's actions may not fit beside its title: the row

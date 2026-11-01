@@ -430,5 +430,38 @@
         justify-self: end;
       }
     }
+
+    /* NO TURN IN THE LIST, NO TURN COLUMN (ADR-167 § 2). The turn track is
+       the list's, 15ch wide, and a list where no row is anybody's turn (a
+       record's short list, a filter) drew it as an empty band down the left.
+       It goes for the whole list, never row by row, so the columns still
+       line up; a list that picks keeps its layout. */
+    @container (min-width: 64rem) {
+      :global(.crow-list:not(:has(.crow__lead))) .crow:not(.crow--picking) {
+        grid-template-columns:
+          [who] minmax(0, 1fr) [rel] var(--crow-relation, auto) [bolos] var(--crow-bolos, auto)
+          [end] var(--crow-end, auto);
+        grid-template-areas:
+          'head rel  bolos when'
+          'meta last last  next';
+      }
+    }
+    @container (min-width: 48rem) and (max-width: 63.999rem) {
+      :global(.crow-list:not(:has(.crow__lead))) .crow:not(.crow--picking) {
+        grid-template-columns: [who] minmax(0, 1fr) [rel] var(--crow-state, auto) [end] var(--crow-end, auto);
+        grid-template-areas:
+          'head rel  when'
+          'meta last next';
+      }
+    }
+    @container (min-width: 48rem) {
+      :global(.crow-list:not(.crow-list--relation):not(:has(.crow__lead))) .crow:not(.crow--picking) {
+        grid-template-columns: [who] minmax(0, 1fr) [end] var(--crow-end, auto);
+        grid-template-areas:
+          'head when'
+          'meta next'
+          'last next';
+      }
+    }
   }
 </style>

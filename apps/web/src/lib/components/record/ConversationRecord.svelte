@@ -690,7 +690,7 @@
         <dl class="facts">
           {#if bolos.length > 0 || canOpenBolo}
             <div data-testid="conversation-bolos">
-              <dt>{t('conversations.bolos', locale)}</dt>
+              <dt class="field__label">{t('conversations.bolos', locale)}</dt>
               <dd class="facts__bolo-zone">
                 {#if bolos.length > 0}
                 <ul class="facts__bolos">
@@ -721,19 +721,19 @@
             </div>
           {/if}
           <div>
-            <dt>{t('mail.last_contact', locale)}</dt>
+            <dt class="field__label">{t('mail.last_contact', locale)}</dt>
             <dd>{relativeContactDate(conv.last_contacted_at, locale)}</dd>
           </div>
           {#if turn?.side === 'theirs'}
             <!-- Lo nuestro (te toca) sube a «Falta»; aquí queda cuánto esperamos. -->
             <div>
-              <dt>{t('overview.col_turn', locale)}</dt>
+              <dt class="field__label">{t('overview.col_turn', locale)}</dt>
               <dd>{t('overview.turn_theirs_cap', locale)} · {relativeContactDate(turn.since, locale)}</dd>
             </div>
           {/if}
           {#if plannerHref}
             <div>
-              <dt>{t('lens.planner', locale)}</dt>
+              <dt class="field__label">{t('lens.planner', locale)}</dt>
               <dd><a href={plannerHref} data-testid="conversation-planner">{t('conversations.see_in_planner', locale)}</a></dd>
             </div>
           {/if}
@@ -1150,10 +1150,9 @@
       gap: var(--space-s);
       margin: 0;
     }
-    .facts dt {
-      color: var(--text-faint);
-      font-size: var(--text-xs);
-    }
+    /* A fact's label is the system's field label (ADR-139 p4, ADR-167 § 2):
+       mono capitals are for the block heads around it (Falta, Etiquetas,
+       Equipo), never for the name of a datum. */
     .facts dd {
       margin: 0;
       font-size: var(--text-s);

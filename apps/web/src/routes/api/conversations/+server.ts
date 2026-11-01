@@ -24,6 +24,7 @@
  * Auth: Bearer JWT required. RLS denies anon.
  */
 
+import { CONVERSATIONS_WHOLE } from '$lib/conversation';
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
@@ -77,6 +78,9 @@ const QuerySchema = v.object({
   // no count, no bolos, no last mailout. Plain path only (2026-10-24: the
   // count and the two extras were about a third of its server time).
   lean: v.optional(v.literal('1')),
+  // A read that needs every row of a space (Te espera, a new deal's
+  // conversations, a line's steps) asks for CONVERSATIONS_WHOLE; the lens
+  // pages at 50 (ADR-167 § 3).
   limit: v.optional(
     v.pipe(
       v.string(),
@@ -84,7 +88,7 @@ const QuerySchema = v.object({
       v.number(),
       v.integer(),
       v.minValue(1),
-      v.maxValue(100),
+      v.maxValue(CONVERSATIONS_WHOLE),
     ),
     '50',
   ),

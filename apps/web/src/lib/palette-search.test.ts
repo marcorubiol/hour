@@ -80,9 +80,9 @@ describe('paletteFindRows', () => {
     const rows = paletteFindRows(
       result({
         organizations: [
-          { workspace_id: 'w1', id: 'o1', slug: 'sala-beckett', name: 'Sala Beckett', conversation_ids: ['c1'] },
-          { workspace_id: 'w1', id: 'o2', slug: 'sala-russafa', name: 'Sala Russafa', conversation_ids: ['c2', 'c3'] },
-          { workspace_id: 'w1', id: 'o3', slug: 'sala-co', name: 'Sala & Co', conversation_ids: [] },
+          { workspace_id: 'w1', id: 'o1', slug: 'sala-beckett', name: 'Sala Beckett' },
+          { workspace_id: 'w1', id: 'o2', slug: 'sala-russafa', name: 'Sala Russafa' },
+          { workspace_id: 'w1', id: 'o3', slug: 'sala-co', name: 'Sala & Co' },
         ],
         conversations: [
           { workspace_id: 'w1', id: 'c1', title: 'Sala Beckett', project_name: 'Sirena' },

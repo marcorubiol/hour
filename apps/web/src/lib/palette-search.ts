@@ -27,13 +27,12 @@ export interface SearchPerson {
   full_name: string;
   organization_name: string | null;
 }
-/** Una organización (`workspace_organization`) con sus conversaciones vivas. */
+/** Una organización (`workspace_organization`) cuyo nombre contiene el texto. */
 export interface SearchOrganization {
   workspace_id: string;
   id: string;
   slug: string;
   name: string;
-  conversation_ids: string[];
 }
 /** Una conversación cuya organización o algún contacto contiene el texto. */
 export interface SearchConversation {

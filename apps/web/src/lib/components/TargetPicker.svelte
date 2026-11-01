@@ -330,7 +330,7 @@
             {/if}
             <span class="tp__kind">{kindLabel(r)}</span>
             <span class="tp__name"
-              >{r.target.name}{#if r.path}<span class="tp__path"> · {r.path}</span>{/if}</span
+              >{r.target.name}{#if r.path}<span class="tp__path">{' · '}{r.path}</span>{/if}</span
             >
           </button>
           {#if r.drill}

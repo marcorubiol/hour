@@ -351,7 +351,7 @@
   <button type="button" class="lid" aria-expanded={open} onclick={() => (open = !open)}>
     <span class="lid__w">{lidWord}</span>
     <span class="lid__n"
-      >{order.length === 0 ? t('planner.lid_empty', locale) : order.length} {open ? '−' : '+'}</span
+      >{order.length === 0 ? t('planner.lid_empty', locale) : order.length}<span class="lid__sign" aria-hidden="true">{open ? '▴' : '▾'}</span></span
     >
   </button>
 
