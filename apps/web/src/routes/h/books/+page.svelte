@@ -28,6 +28,7 @@
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
+  import { conversationTitle, type ConversationItem } from '$lib/conversation';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import CalmLine from '$lib/components/CalmLine.svelte';
   import { useCalm } from '$lib/stores/calm.svelte';
@@ -835,6 +836,39 @@
   let dealCity = $state('');
   let dealFee = $state('');
   let dealCurrency = $state('EUR');
+  // La conversación de la que nace el trato, opcional (ADR-138 § 3, ADR-102):
+  // las del proyecto elegido, y al elegir una, su sala rellena lo vacío.
+  let dealConversationId = $state('');
+  const dealConversationsQuery = createQuery(
+    toStore(() => ({
+      queryKey: ['conversations', { project_ids: dealProjectId, limit: 100, lean: 1 }] as const,
+      enabled: dealOpen && Boolean(dealProjectId),
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchJSON<{ items: ConversationItem[] }>(
+          `/api/conversations?project_ids=${encodeURIComponent(dealProjectId)}&limit=100&lean=1`,
+          signal,
+        ),
+    })),
+  );
+  let dealConversations = $derived($dealConversationsQuery.data?.items ?? []);
+  let dealConversationOptions = $derived([
+    { value: '', label: t('books.deal_no_conversation', locale) },
+    ...dealConversations
+      .map((c) => ({ value: c.id, label: conversationTitle(c) }))
+      .filter((o) => o.label)
+      .sort((a, b) => a.label.localeCompare(b.label, locale)),
+  ]);
+  // Otro proyecto, otras conversaciones: la elegida no viaja.
+  $effect(() => {
+    void dealProjectId;
+    dealConversationId = '';
+  });
+  function pickDealConversation() {
+    const c = dealConversations.find((x) => x.id === dealConversationId);
+    if (!c?.organization) return;
+    if (!dealVenue.trim()) dealVenue = c.organization.name;
+    if (!dealCity.trim() && c.organization.city) dealCity = c.organization.city;
+  }
   let dealOptions = $derived(
     projectIndex.map((p) => ({ value: p.id, label: `${p.name} · ${spaceName(p.workspaceName)}` })),
   );
@@ -869,6 +903,7 @@
         city: dealCity.trim() || null,
         fee_amount: fee,
         fee_currency: dealCurrency.trim() || 'EUR',
+        conversation_id: dealConversationId || null,
       });
       if (!body?.bolo) throw new Error(t('books.unexpected_response', locale));
       return body.bolo;
@@ -876,6 +911,7 @@
     onSuccess: () => {
       dealOpen = false;
       void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
+      void queryClient.invalidateQueries({ queryKey: ['conversation-bolos'] });
       addToast({ tone: 'success', message: t('books.deal_created', locale) });
     },
     onError: (err) => addToast({ tone: 'danger', title: t('books.deal_not_created', locale), message: err instanceof Error ? err.message : t('perf.unexpected', locale) }),
@@ -1414,6 +1450,9 @@
 <Dialog bind:open={dealOpen} title={t('books.new_deal', locale)} size="s" description={t('books.deal_desc', locale)}>
   <form class="mny__pay-form" novalidate oninput={formErrors.onedit} onchange={formErrors.onedit} onsubmit={(e) => { e.preventDefault(); submitDeal(); }}>
     <Select id="deal-project" label={t('books.project_obra', locale)} bind:value={dealProjectId} options={dealOptions} error={formErrors.of('deal-project')} />
+    {#if dealConversations.length > 0}
+      <Select id="deal-conversation" label={t('books.deal_conversation', locale)} bind:value={dealConversationId} options={dealConversationOptions} onchange={pickDealConversation} />
+    {/if}
     <div class="mny__row2">
       <Input label={t('create.venue', locale)} bind:value={dealVenue} placeholder={t('books.ph_venue', locale)} />
       <Input label={t('create.city', locale)} bind:value={dealCity} placeholder={t('books.ph_city', locale)} />
