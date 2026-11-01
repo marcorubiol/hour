@@ -15,10 +15,12 @@
   import type { Crumb } from '$lib/record-crumbs';
   import ScheduleTable from '$lib/components/ScheduleTable.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
-  import { dayLabel, viewerTimeZone } from '$lib/datetime';
+  import { dayLabel, dualTime, hourMark, viewerTimeZone } from '$lib/datetime';
+  import { dayKeyInTz } from '$lib/planner';
+  import { stageRoute } from '$lib/travel-stage';
   import { LOCALE_TAG, appLocale, t, type Locale } from '$lib/i18n';
   import { performanceStatusLabel, performanceStatusTone } from '$lib/performance';
-  import type { Roadsheet } from '$lib/roadsheet';
+  import type { Roadsheet, RoadsheetTrip } from '$lib/roadsheet';
 
   let {
     sheet,
@@ -49,6 +51,17 @@
   }
 
   const viewerTz = viewerTimeZone();
+
+  // ── Trips (ADR-162), drawn as Ahora draws them (ADR-146) ───────────────
+  /** An hour on the clock of the end it belongs to; the trip's zone, else the viewer's. */
+  const hour = (iso: string, tz: string | null) => hourMark(dualTime(iso, tz, viewerTz).primary);
+  function tripDay(trip: RoadsheetTrip): string {
+    return trip.all_day ? trip.starts_at.slice(0, 10) : dayKeyInTz(trip.starts_at, trip.tz || venueTz || viewerTz);
+  }
+  function tripWay(trip: RoadsheetTrip): string {
+    return [trip.origin_city, trip.destination_city].filter(Boolean).join(' → ') || trip.title || t('planner.kind_travel_day', locale);
+  }
+  const cap = (s: string) => (s ? s[0].toLocaleUpperCase() + s.slice(1) : s);
 
   let address = $derived<Crumb[]>(
     crumbs ?? [...(sheet.project ? [{ label: sheet.project.name }] : []), { label: t('roadsheet.title', locale) }],
@@ -83,6 +96,39 @@
       {#if hasJsonContent(sheet.venue?.contacts)}
         <JsonKV value={sheet.venue!.contacts} />
       {/if}
+    </section>
+  {/if}
+
+  {#if sheet.travel && sheet.travel.length > 0}
+    <section class="rsv__section" aria-label={t('roadsheet.travel', locale)} data-testid="roadsheet-travel">
+      <BlockHead title={t('roadsheet.travel', locale)} />
+      {#each sheet.travel as trip (trip.id)}
+        <div class="rsv__trip">
+          <p class="rsv__trip-head">
+            <strong>{tripWay(trip)}</strong>
+            <span class="rsv__muted">{dayLabel(tripDay(trip), 'long', LOCALE_TAG[locale])}</span>
+          </p>
+          {#if trip.stages.length > 0}
+            <ul class="rsv__people" role="list">
+              {#each trip.stages as s, i (i)}
+                <li>
+                  <span class="rsv__role">{s.depart_at ? hour(s.depart_at, s.depart_tz ?? trip.tz) : ''}</span>
+                  <span class="rsv__name">
+                    {cap(t(`planner.mode_${s.mode}`, locale))}{stageRoute(s) ? ` · ${stageRoute(s)}` : ''}
+                    {#if s.arrive_at}<span class="rsv__muted"
+                        >{t('ahora.arrives', locale, { time: hour(s.arrive_at, s.arrive_tz ?? trip.tz) })}</span
+                      >{/if}
+                    {#if s.reference}<span class="rsv__contact">{t('ahora.reference', locale)} {s.reference}</span>{/if}
+                  </span>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+          {#if trip.going.length > 0}
+            <p class="rsv__muted">{t('commitment.who_goes', locale)}: {trip.going.join(', ')}</p>
+          {/if}
+        </div>
+      {/each}
     </section>
   {/if}
 
@@ -205,6 +251,20 @@
     }
 
     .rsv__venue {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+      font-size: var(--text-s);
+      color: var(--text-color);
+    }
+
+    .rsv__trip {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+    }
+
+    .rsv__trip-head {
       display: flex;
       flex-direction: column;
       gap: var(--space-2xs);

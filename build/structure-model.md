@@ -188,7 +188,7 @@ Three consequences worth stating so they are not rediscovered:
   fiscal fields later (ADR-062).
 - **Project** — the show's own content: name, status, about, **technical rider / canonical assets,
   cast**, poster / dossier.
-- **Line → modules** — the composable furniture, scoped to the line.
+- **Line → modules** — the furniture of its kind (ADR-162), scoped to the line.
 
 **A lens only shows. Option 2 (chosen 2026-07-14):** a lens defines no editing of its own, but **may
 host an entity's editor inline** for convenience. The editor it embeds is the entity's — the same one
@@ -203,22 +203,29 @@ A **read surface** is anything that shows entities in aggregate. There are two k
 by what needs you now — the home; owns no data, computed over the lenses + tasks). Below, which concern
 is a lens, a module, or both:
 
-| Concern / surface               | Global read surface     | Module (line edit)? | Note |
+| Concern / surface               | Global read surface     | Module (line page)? | Note |
 |---------------------------------|-------------------------|---------------------|------|
 | **Desk** (the now)              | **digest** (not a lens) | no                  | cross-concern, ranked by urgency; the home; owns no data — a query over the others + tasks; no per-line form |
 | Planner                         | lens                    | yes                 | Season (the portada) · Agenda · Month · Board, Day as a lens (ADR-155); distinct from Desk (now/triage vs planning) |
 | Conversations                   | lens                    | yes                 | your booking network — **people AND organizations** (a theatre is a contact, not a person); persons + conversations; comms folds in later |
 | Money                           | lens                    | yes                 | fees, invoices, expenses |
 | Team                            | — (module only)         | yes                 | cast + crew executing the line — **distinct from Conversations** (Conversations = who you book with; Team = who does the show) |
-| Notes · Materials · Road sheets | — (module only)         | yes                 | entity-bound content; no meaningful global view (ADR-009) |
+| Notes · Materials · Road sheets | — (module only)         | yes                 | entity-bound content; no meaningful global view (ADR-009). The road sheet itself is a projection of a performance and carries the day's trips (ADR-162) |
 
 Rule of thumb: **single-concern transversal read → lens. Cross-concern "what needs me now" → the Desk
 digest (not a lens). Entity-bound content → module only. Verb that hangs off objects → task.**
 
+**A line's modules are its kind's, in a fixed order (ADR-162).** Nobody adds, removes or moves a module:
+`MODULES_BY_KIND` (`$lib/line-templates`) is the stack: tour kinds Planner · Tasks · Road sheets · Team ·
+Money · Materials · Notes; outreach kinds Conversations · Planner · Tasks · Materials · Notes; creation kinds
+Planner · Tasks · Notes · Materials · Money; the rest Notes. A template picks the kind, the kind the modules.
+`line.modules` stays in the database and is read by nobody. ADR-145 § 1 on the stack: a module that is only a
+reading (Road sheets) is not drawn while empty; a module where one writes keeps its empty line.
+
 ## Canonical vocabulary (locked)
 
 - **Lens / lente** — a global read surface. Never composed, always present, narrowed by pins.
-- **Module / módulo** — a line-level composable section. The only place modules exist.
+- **Module / módulo** — a line-level section, fixed by the line's kind (ADR-162; no longer composable). The only place modules exist.
   Catalog: Planner · Conversations · Money · Notes · Materials · Team · Road sheets · Tasks (live, ADR-071).
   (Conversations module = the line's booking conversations — the Conversations lens scoped to it; Team = its cast/crew.)
 - **Task / tarea** — the verb layer. Not a lens. Module + inline next-action + Desk feed.
@@ -229,7 +236,7 @@ digest (not a lens). Entity-bound content → module only. Verb that hangs off o
 
 Do not blur these. If "module" starts appearing above the line **or at the performance**, or a
 lens grows its own edit logic, or a task is treated as a fourth data-domain lens, or a facet
-starts behaving like a module (composable, per-container, user-arranged) — that's drift. Fix it
+starts behaving like a module, or anything turns user-arranged — that's drift. Fix it
 back to this doc.
 
 ## Lens set — settled 2026-07-14 (ADR-065)

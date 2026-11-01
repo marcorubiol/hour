@@ -7,7 +7,8 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
 /**
  * E2E — tasks (ADR-068, D3): the Desk quick-add creates a free workspace
  * task, completing it drops it off the open feed; the Tasks line module
- * round-trips add-module → create → complete (done fold) → remove.
+ * (in every working kind's stack, ADR-162) round-trips create → complete
+ * (done fold) → remove.
  *
  * Scoping (ADR-052 discipline): every task is created in the playwright
  * workspace with a ZZZ prefix and soft-deleted through the API; sweeps are
@@ -132,7 +133,7 @@ test.describe('tasks — Desk feed + line module', () => {
     }
   });
 
-  test('Tasks line module: add module → create → complete → remove', async ({ page }) => {
+  test('Tasks line module: create → complete → remove', async ({ page }) => {
     test.setTimeout(120_000);
     await openApp(page);
     const line = await findFixtureLine(page);
@@ -140,23 +141,11 @@ test.describe('tasks — Desk feed + line module', () => {
     const wsId = await playwrightWsId(page);
     await sweepTasks(page, wsId!);
 
-    // Crash recovery: reset the stack to the fixture's booking shape (no
-    // tasks module) so the add-module step below is always real coverage.
-    await page.evaluate(async ({ lineId }) => {
-      await fetch(`/api/lines/${lineId}`, {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ modules: ['conversations', 'planner', 'materials', 'notes'] }),
-      });
-    }, { lineId: line!.id });
-
     await page.goto(`/h/playwright/project/zzz-e2e-collab/line/${line!.slug ?? line!.id}`);
     await waitForLoaded(page);
     await expect(page.getByRole('heading', { name: LINE_NAME })).toBeVisible();
 
-    // Add the Tasks module through the menu.
-    await page.getByRole('button', { name: /add module/i }).click();
-    await page.getByRole('menuitem', { name: /Tasks/ }).click();
+    // The campaign kind's stack carries Tasks (ADR-162): nothing to add.
     const mod = page.locator('#mod-tasks');
     await expect(mod).toBeVisible({ timeout: 10_000 });
 
@@ -192,7 +181,7 @@ test.describe('tasks — Desk feed + line module', () => {
       timeout: 10_000,
     });
 
-    // Remove the task (self-clean), then the module — full round-trip.
+    // Remove the task (self-clean).
     const [deleted] = await Promise.all([
       page.waitForResponse(
         (r) => /\/api\/tasks\//.test(r.url()) && r.request().method() === 'DELETE',
@@ -200,9 +189,5 @@ test.describe('tasks — Desk feed + line module', () => {
       mod.getByRole('button', { name: `Remove task: ${TASK_LINE}` }).click(),
     ]);
     expect(deleted.status()).toBe(204);
-
-    await mod.getByRole('button', { name: /module actions/i }).click();
-    await page.getByRole('menuitem', { name: /remove module/i }).click();
-    await expect(mod).not.toBeVisible({ timeout: 10_000 });
   });
 });

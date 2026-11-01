@@ -10,18 +10,31 @@
  * `?role=` ∈ full | venue | performer | tech_manager (default full).
  * Money never appears on a road sheet regardless of role.
  *
+ * Trips (ADR-162): for a role that gets `travel`, the project's travel
+ * days around the performance are read as Ahora reads them (the `date` row
+ * with its `travel_stage` stages and its «voy» words, ADR-146), and the
+ * pure `tripsOfPerformance` keeps the day's and the eve's. RLS decides what
+ * the viewer may see of them; a guest who reads no dates gets none.
+ *
  * Auth: Bearer JWT required (the signed anonymous link is D6, not built).
  */
 
 import type { RequestHandler } from './$types';
 import { extractAccessToken } from '$lib/auth';
 import {
+  ROLE_SECTIONS,
   buildRoadsheet,
   isRoadsheetRole,
   roadsheetRoleFor,
+  tripsOfPerformance,
   type CastEntry,
   type PerformanceBundle,
+  type RoadsheetTrip,
+  type TripRow,
 } from '$lib/roadsheet';
+import { COMMITMENTS_EMBED } from '$lib/people';
+import { addDaysIso } from '$lib/planner';
+import { STAGE_SELECT } from '$lib/travel-stage';
 import {
   fetchPerformanceBundle,
   isUuid,
@@ -110,6 +123,56 @@ function toProjectionBundle(result: PerformanceBundleResult): PerformanceBundle 
   };
 }
 
+/**
+ * The project's trips around the performance, cut to the day and its eve.
+ * The window asked of the database is a day wider on each side, so a zone
+ * far from UTC cannot push a trip out before the pure cut sees it.
+ */
+async function readTrips(
+  env: SupabaseEnv,
+  jwt: string,
+  performance: PerformanceBundleResult['performance'],
+): Promise<RoadsheetTrip[]> {
+  const day = performance.performed_at.slice(0, 10);
+  const from = addDaysIso(day, -2);
+  const search = new URLSearchParams({
+    select: [
+      'id,kind,status,title,starts_at,ends_at,all_day,origin_city,destination_city',
+      'venue:venue_id(timezone)',
+      COMMITMENTS_EMBED,
+      `stages:travel_stage(${STAGE_SELECT})`,
+    ].join(','),
+    'stages.order': 'position.asc',
+    project_id: `eq.${performance.project_id}`,
+    kind: 'eq.travel_day',
+    status: 'neq.cancelled',
+    deleted_at: 'is.null',
+    order: 'starts_at.asc',
+    limit: '50',
+  });
+  search.append('starts_at', `lte.${addDaysIso(day, 1)}T23:59:59.999Z`);
+  search.append('and', `(or(starts_at.gte.${from},ends_at.gte.${from}))`);
+  const { data: rows } = await pgGet<TripRow>(env, 'date', jwt, { search });
+
+  // Who said «voy», by the name the space knows them by (ADR-147).
+  const ids = [
+    ...new Set(rows.flatMap((r) => (r.commitments ?? []).filter((c) => c.state === 'going').map((c) => c.person_id))),
+  ];
+  const names = new Map<string, string>();
+  if (ids.length > 0) {
+    const { data: dossiers } = await pgGet<{ person_id: string; full_name: string }>(env, 'workspace_person', jwt, {
+      search: new URLSearchParams({
+        select: 'person_id,full_name',
+        workspace_id: `eq.${performance.workspace_id}`,
+        person_id: `in.(${ids.join(',')})`,
+        deleted_at: 'is.null',
+      }),
+    });
+    for (const d of dossiers) names.set(d.person_id, d.full_name);
+  }
+  return tripsOfPerformance(rows, performance.performed_at, performance.venue?.timezone ?? null, names);
+}
+
 export const GET: RequestHandler = async ({ request, params, url, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
@@ -162,7 +225,11 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
           : { data: [] as { workspace_role: string | null }[] };
       role = roadsheetRoleFor(role, mine[0]?.workspace_role);
     }
-    const sheet = buildRoadsheet(toProjectionBundle(result), role);
+    const bundle = toProjectionBundle(result);
+    if (ROLE_SECTIONS[role].includes('travel')) {
+      bundle.travel = await readTrips(env, jwt, result.performance);
+    }
+    const sheet = buildRoadsheet(bundle, role);
     // The viewer needs the venue timezone for dual-time display even when
     // the venue section itself is filtered out of the role.
     return json({

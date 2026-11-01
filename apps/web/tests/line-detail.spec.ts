@@ -5,10 +5,11 @@ const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
 
 /**
- * E2E — line detail as module composition (ADR-056): create a line through
- * the template picker (⌘K action), assert the template's module stack
- * renders, capture a contact from the line's Conversations module (line_id
- * auto-assigned), register+remove a material, add+remove a module.
+ * E2E: line detail as a stack of modules (ADR-056): create a line through
+ * the template picker (⌘K action), assert its kind's module stack renders in
+ * its fixed order with no way to add, remove or move one (ADR-162), capture
+ * a contact from the line's Conversations module (line_id auto-assigned),
+ * register+remove a material.
  *
  * The fixture LINE is STABLE and reused across runs — lines have no
  * delete path (no DELETE policy; ADR-048 forbids soft-delete by PATCH),
@@ -54,7 +55,7 @@ async function findFixtureLine(page: Page): Promise<LineRow | null> {
 
 test.describe.configure({ mode: 'serial' });
 
-test.describe('line detail — module composition', () => {
+test.describe('line detail: the kind\'s modules', () => {
   test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL / PW_TEST_PASSWORD.');
 
   test('template picker creates the line (first run) and the stack renders', async ({ page }) => {
@@ -79,11 +80,18 @@ test.describe('line detail — module composition', () => {
       await waitForLoaded(page);
     }
 
-    // Booking template stack: Conversations · Calendar · Materials · Notes.
+    // The campaign kind's stack, in its fixed order (ADR-162). The fixture
+    // line may carry an old `line.modules` from the PATCH era: it is ignored.
     await expect(page.getByRole('heading', { name: LINE_NAME })).toBeVisible({ timeout: 15_000 });
-    for (const label of ['Conversations', 'Planner', 'Materials', 'Notes']) {
-      await expect(page.locator(`#mod-${label.toLowerCase()}`)).toBeVisible();
-    }
+    const order = ['conversations', 'planner', 'tasks', 'materials', 'notes'];
+    for (const key of order) await expect(page.locator(`#mod-${key}`)).toBeVisible();
+    await expect(page.locator('.line-detail__module')).toHaveCount(order.length);
+    expect(await page.locator('.line-detail__module').evaluateAll((els) => els.map((e) => e.id))).toEqual(
+      order.map((k) => `mod-${k}`),
+    );
+    // Nothing composes the stack any more.
+    await expect(page.getByRole('button', { name: /add module/i })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /module actions/i })).toHaveCount(0);
 
     line = await findFixtureLine(page);
     expect(line, 'fixture line resolvable through /api/lines').not.toBeNull();
@@ -143,22 +151,11 @@ test.describe('line detail — module composition', () => {
     }
   });
 
-  test('materials register + remove, add + remove a module', async ({ page }) => {
+  test('materials register + remove', async ({ page }) => {
     test.setTimeout(120_000);
     await openApp(page);
     const line = await findFixtureLine(page);
     expect(line).not.toBeNull();
-
-    // Crash recovery: line.modules persists — a run killed after the add
-    // step leaves Team in the stack and the add-menu item gone forever.
-    // Reset to the booking template shape via the whitelist PATCH.
-    await page.evaluate(async ({ lineId }) => {
-      await fetch(`/api/lines/${lineId}`, {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ modules: ['conversations', 'planner', 'materials', 'notes'] }),
-      });
-    }, { lineId: line!.id });
 
     await page.goto(`/h/playwright/project/zzz-e2e-collab/line/${line!.slug ?? line!.id}`);
 
@@ -178,23 +175,5 @@ test.describe('line detail — module composition', () => {
     await page.locator('#mod-materials tbody tr').first().getByRole('button').last().click();
     await page.getByRole('menuitem', { name: /remove/i }).click();
     await expect(page.locator('#mod-materials tbody tr')).toHaveCount(0, { timeout: 10_000 });
-
-    // Add the Team module, then remove it — the stack round-trips.
-    //
-    // Was asserting on #mod-conversations: it clicked "People" (the pre-ADR-065
-    // name for Team) but then checked and removed CONTACTS — a module the
-    // reset above always puts in the stack, so the assertion passed without
-    // the added module ever being looked at, and the "round-trip" removed
-    // the wrong thing. Both halves now name the module actually added.
-    await page.getByRole('button', { name: /add module/i }).click();
-    await page.getByRole('menuitem', { name: /Team/ }).click();
-    await expect(page.locator('#mod-team')).toBeVisible({ timeout: 10_000 });
-
-    await page
-      .locator('#mod-team')
-      .getByRole('button', { name: /module actions/i })
-      .click();
-    await page.getByRole('menuitem', { name: /remove module/i }).click();
-    await expect(page.locator('#mod-team')).not.toBeVisible({ timeout: 10_000 });
   });
 });

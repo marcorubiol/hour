@@ -2,12 +2,13 @@
   /**
    * Line detail — /h/[workspace]/project/[slug]/line/[line]/
    *
-   * ADR-056: the page is a COMPOSITION OF MODULES — an ordered stack where
-   * each module is a line-scoped view of an existing entity/lens, never a
-   * data silo. `line.modules` (jsonb array) drives the stack; NULL falls
-   * back to kind defaults ($lib/line-templates). The stack is editable in
-   * place: per-module overflow menu (move/remove) + a quiet "Add module"
-   * at the end — composition yes, schema no (the Airtable guardrail).
+   * ADR-056: the page is a STACK OF MODULES, each a line-scoped view of an
+   * existing entity/lens, never a data silo. ADR-162: the stack is the
+   * line's KIND's, in a fixed order (`modulesForKind`, $lib/line-templates).
+   * Nobody adds, removes or moves a module; `line.modules` is not read.
+   * ADR-145 § 1 on the stack: a module that is only a reading (Road sheets,
+   * a projection of the line's performances) is not drawn while empty; one
+   * where something is written keeps its empty line, the gap is the place.
    *
    * Header: name + kind metadata + per-kind stats (booking kinds get the
    * funnel + overdue actions; tour kinds get next gig / confirmed / €
@@ -21,12 +22,10 @@
 
   import { docTitle } from '$lib/doc-title';
   import { page } from '$app/state';
-  import { createQuery, createMutation, useQueryClient } from '@tanstack/svelte-query';
+  import { createQuery } from '@tanstack/svelte-query';
   import { goto } from '$app/navigation';
   import { toStore } from 'svelte/store';
-  import { fetchJSON, mutateJSON, ApiError } from '$lib/api';
-  import { addToast } from '$lib/components/Toast.svelte';
-  import Menu from '$lib/components/Menu.svelte';
+  import { fetchJSON, mutateJSON } from '$lib/api';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import { lineKindGlyph, lineKindLabel } from '$lib/utils/line-kind';
   import { accentVar } from '$lib/utils/accent';
@@ -39,13 +38,8 @@
   import { spaceCrumb, type Crumb } from '$lib/record-crumbs';
   import { fmtMoneyCompact } from '$lib/money';
   import { dayMonth, dayMonthYear, localDayISO } from '$lib/datetime';
-  import {
-    MODULE_KEYS,
-    moduleDescription,
-    moduleLabel,
-    modulesForLine,
-    type ModuleKey,
-  } from '$lib/line-templates';
+  import { moduleLabel, modulesForKind, type ModuleKey } from '$lib/line-templates';
+  import { blockDrawn } from '$lib/dashboard-blocks';
   import { appLocale, t } from '$lib/i18n';
   import { workspacesQueryOptions, activeProjectsQueryOptions } from '$lib/nav-queries';
   import PlannerModule from '$lib/components/line/PlannerModule.svelte';
@@ -65,12 +59,10 @@
     status: string;
     start_date: string | null;
     end_date: string | null;
-    modules: ModuleKey[] | null;
     project_id: string;
     workspace_id: string;
   };
 
-  const queryClient = useQueryClient();
   const locale = appLocale();
 
   let workspaceSlug = $derived(page.params.workspace ?? '');
@@ -120,22 +112,8 @@
     { label: t('create.line', locale) },
   ]);
 
-  // ── Module stack ──────────────────────────────────────────────────────
-  // Optimistic local override so add/move/remove feel instant; the PATCH
-  // invalidation refreshes the cache underneath.
-  let localModules = $state<ModuleKey[] | null>(null);
-  let lastLineId = $state('');
-  $effect(() => {
-    if (activeLine && activeLine.id !== lastLineId) {
-      lastLineId = activeLine.id;
-      localModules = null;
-    }
-  });
-  let stack = $derived.by<ModuleKey[]>(() => {
-    if (!activeLine) return [];
-    return localModules ?? modulesForLine(activeLine);
-  });
-  let missingModules = $derived(MODULE_KEYS.filter((k) => !stack.includes(k)));
+  // ── Module stack (ADR-162: the kind's, fixed) ─────────────────────────
+  let kindStack = $derived<ModuleKey[]>(activeLine ? modulesForKind(activeLine.kind) : []);
   // Sibling lines of this project — "where am I among peers" (the same list
   // that drives the module stack query, so no extra fetch).
   let siblings = $derived($linesQuery.data?.items ?? []);
@@ -150,42 +128,6 @@
     team: TeamModule,
     tasks: TasksModule,
   } as const;
-
-  const modulesMutation = createMutation({
-    mutationFn: ({ id, modules }: { id: string; modules: ModuleKey[] }) =>
-      mutateJSON('PATCH', `/api/lines/${id}`, { modules }),
-    onError: (err) => {
-      localModules = null;
-      addToast({
-        tone: 'danger',
-        title: t('line.modules_not_saved', locale),
-        message: err instanceof ApiError ? err.message : String(err),
-      });
-    },
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ['lines'] });
-    },
-  });
-
-  function saveStack(next: ModuleKey[]) {
-    if (!activeLine) return;
-    localModules = next;
-    $modulesMutation.mutate({ id: activeLine.id, modules: next });
-  }
-  function addModule(key: ModuleKey) {
-    saveStack([...stack, key]);
-  }
-  function removeModule(key: ModuleKey) {
-    saveStack(stack.filter((k) => k !== key));
-  }
-  function moveModule(key: ModuleKey, dir: -1 | 1) {
-    const i = stack.indexOf(key);
-    const j = i + dir;
-    if (i < 0 || j < 0 || j >= stack.length) return;
-    const next = [...stack];
-    [next[i], next[j]] = [next[j], next[i]];
-    saveStack(next);
-  }
 
   // ── Per-kind header stats (shared query keys with the modules) ────────
   const BOOKING_KINDS = new Set(['campaign', 'comms']);
@@ -226,7 +168,7 @@
       today,
       total: $engStatsQuery.data?.total,
       workspaceSlug,
-      moreHref: stack.includes('conversations') ? '#mod-conversations' : null,
+      moreHref: kindStack.includes('conversations') ? '#mod-conversations' : null,
       locale,
     }),
   );
@@ -253,6 +195,21 @@
     };
   });
   const perfStatsQuery = createQuery(perfStatsOptions);
+
+  // ADR-145 § 1: Road sheets is only a reading (nothing is written there),
+  // so with no performance it is not drawn. It sits only in tour kinds, the
+  // ones that read `perfStatsQuery`, so it asks the same read.
+  let stack = $derived<ModuleKey[]>(
+    kindStack.filter(
+      (key) =>
+        key !== 'roadsheets' ||
+        blockDrawn({
+          count: $perfStatsQuery.data?.items.length ?? 0,
+          loading: $perfStatsQuery.isPending,
+          errored: $perfStatsQuery.isError,
+        }),
+    ),
+  );
 
   type LineFee = { fee_amount: number | null; status: string };
   const feeStatsOptions = toStore(() => {
@@ -437,64 +394,11 @@
       {#each stack as key (key)}
         {@const Module = REGISTRY[key]}
         <section class="line-detail__module" id={`mod-${key}`}>
-          <BlockHead title={moduleLabel(key, locale)}>
-            <Menu
-              direction="down"
-              align="end"
-              triggerClass="btn--none"
-              label={t('line.module_actions', locale, { name: moduleLabel(key, locale) })}
-            >
-              {#snippet trigger()}
-                <span class="line-detail__module-kebab" aria-hidden="true">⋯</span>
-              {/snippet}
-              {#snippet children({ close }: { close: (focus?: boolean) => void })}
-                <li role="none">
-                  <button type="button" role="menuitem" class="menu__item" onclick={() => { close(false); moveModule(key, -1); }}>
-                    {t('line.move_up', locale)}
-                  </button>
-                </li>
-                <li role="none">
-                  <button type="button" role="menuitem" class="menu__item" onclick={() => { close(false); moveModule(key, 1); }}>
-                    {t('line.move_down', locale)}
-                  </button>
-                </li>
-                <li role="none">
-                  <button type="button" role="menuitem" class="menu__item menu__item--danger" onclick={() => { close(false); removeModule(key); }}>
-                    {t('line.remove_module', locale)}
-                  </button>
-                </li>
-              {/snippet}
-            </Menu>
-          </BlockHead>
+          <BlockHead title={moduleLabel(key, locale)} />
           <Module line={activeLine} {workspaceSlug} />
         </section>
       {/each}
     </div>
-
-    {#if missingModules.length > 0}
-      <div class="line-detail__addwrap">
-        <Menu direction="up" align="start" triggerClass="btn--none" label={t('line.add_module', locale)}>
-          {#snippet trigger()}
-            <span class="creator">+ {t('line.add_module', locale)}</span>
-          {/snippet}
-          {#snippet children({ close }: { close: (focus?: boolean) => void })}
-            {#each missingModules as key (key)}
-              <li role="none">
-                <button
-                  type="button"
-                  role="menuitem"
-                  class="menu__item line-detail__add-item"
-                  onclick={() => { close(false); addModule(key); }}
-                >
-                  <span class="line-detail__add-name">{moduleLabel(key, locale)}</span>
-                  <span class="line-detail__add-desc">{moduleDescription(key, locale)}</span>
-                </button>
-              </li>
-            {/each}
-          {/snippet}
-        </Menu>
-      </div>
-    {/if}
   {/if}
 </article>
 
@@ -616,41 +520,6 @@
       gap: var(--space-s);
       /* Clear the shell bar + the sticky chips row on #hash jumps. */
       scroll-margin-block-start: calc(var(--header-height) + 3rem);
-    }
-
-    .line-detail__module-kebab {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      inline-size: var(--control-size-s);
-      block-size: var(--control-size-s);
-      border-radius: var(--radius-s);
-      color: var(--text-faint);
-      font-size: var(--text-m);
-      line-height: 1;
-    }
-    .line-detail__module-kebab:hover {
-      color: var(--text-color);
-      background: var(--bg-light);
-    }
-
-    .line-detail__addwrap {
-      display: flex;
-    }
-    /* Trigger styling via the shared .creator class (base.css). */
-    .line-detail__add-item {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 0;
-    }
-    .line-detail__add-name {
-      font-size: var(--text-s);
-      color: var(--text-color);
-    }
-    .line-detail__add-desc {
-      font-size: var(--text-xs);
-      color: var(--text-faint);
     }
 
   }
