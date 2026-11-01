@@ -16,6 +16,7 @@ interface MailoutDbEnv {
 
 const SERVICE_RPCS = [
   'mail_domain_record_status',
+  'mail_domain_pending_checks',
   'mailout_claim',
   'mailout_send_context',
   'mailout_record_sent',
