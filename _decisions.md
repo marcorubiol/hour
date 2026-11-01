@@ -6148,3 +6148,69 @@ columna sigue en la base con lo que tenía. Las claves de i18n borradas están e
 **Re-evaluar cuando** un técnico pida en la hoja la vuelta del día siguiente, o una compañía necesite de verdad otra
 pila de módulos para un tipo: entonces es otro tipo de línea, no una composición a mano.
 
+## [2026-11-01] ADR-168 · Cuentas para la gestoría: emisor en Ajustes, caché propuesto, trimestre en CSV; fuera «Roles que asumo» y «(opcional)»
+
+**Contexto.** Cinco mejoras validadas por Marco el 01-11 (`_tasks.md` 82, 87, 85, 91, 46) y una sexta (79) que pide
+schema. Sin migraciones en esta tanda.
+
+**Decisión.**
+
+1. **Fuera «Roles que asumo» (82).** El bloque de Ajustes › Espacios era estado local de pantalla (un `SvelteSet` con
+   los sombreros de Marco, sin lectura ni escritura): no filtraba nada. Se van el bloque, su estado, su CSS y sus
+   claves de i18n (`settings.roles_*`, `settings.hat_*`). La columna de la base no se toca.
+2. **Obligatorio con «*», opcional sin marca (46).** Es la convención de la casa (`Field` pinta el «*» con
+   `required`). Se quitan las seis marcas «(opcional)» que había, cinco etiquetas y un placeholder
+   (`perf.venue_placeholder`), en los cuatro idiomas; `books.fee_optional` y `books.reference_opt` quedaban iguales que
+   `books.fee` y `books.reference` y se borran. Llevan `required` los cuatro obligatorios sin marca: `pay-amount`,
+   `deal-project`, `exp-amount`, `exp-anchor`. La descripción del gasto no: sin ella se escribe `books.expense_default`.
+3. **El emisor se da de alta en Ajustes › Espacio (87).** Quien factura es el espacio: el bloque «Datos fiscales del
+   emisor» lee y escribe `/api/workspaces/:id/fiscal`, con la misma resolución que `issue_invoice` y la proforma (el
+   emisor propio del espacio, si no el de la cuenta). Guardar escribe siempre el del espacio: con uno, un PATCH de esa
+   fila; sin él, un INSERT de una `fiscal_identity` del espacio `kind='issuer'` y `update_workspace` con
+   `fiscal_identity_id` (ADR-086 D2). Ambas vías ya existían (policies `fiscal_identity_insert/update` de owner/admin,
+   que los tests de RLS ejercitan): sin migración. El de la cuenta no se edita desde aquí; si es el que rige, el
+   formulario sale relleno con él y el bloque dice que al guardar el espacio tendrá los suyos. Las dos escrituras no
+   son atómicas: si la segunda falla, queda una fila huérfana sin uso (no hay borrado de `fiscal_identity`, ver
+   `_tasks.md`); se acepta por ahora.
+4. **Un solo bloque fiscal.** `OrganizationFiscal.svelte` pasa a ser `FiscalIdentity.svelte`: recibe `endpoint`,
+   `queryKey` y `fields` (los del pagador, `RECEIVER_FISCAL_FIELDS`, o los del emisor, `ISSUER_FISCAL_FIELDS`, que
+   añaden IBAN y BIC porque la proforma los imprime en «Forma de pago»). El cuerpo de escritura vive una vez en
+   `$lib/server/fiscal.ts`.
+5. **La proforma dice qué falta y enlaza (87).** El hueco del emisor (sin datos, o «Faltan datos: NIF…») lleva
+   «Completar en Ajustes» a `/h/<espacio>/settings?section=space#fiscal`, que abre el formulario. No lo lleva si el
+   dato existe y quien mira no lo puede leer, ni en una proforma emitida (imprime su copia congelada). La respuesta de
+   `/api/invoices/:id/proforma` gana `workspace_slug`.
+6. **Nuevo bolo propone el caché del último de la obra (85).** El del último bolo creado de ese proyecto con caché y
+   no cancelado (el id es UUIDv7: el mayor es el más nuevo), con su moneda. Es relleno: se ve como «El del último bolo
+   de esta obra» bajo el campo, se cambia a mano, y cambiar de obra solo lo sustituye mientras nadie lo ha tocado.
+   `lastBoloFee` en `$lib/money`, pura; lee el feed de bolos de esa obra con la clave del libro.
+7. **El trimestre para la gestoría en CSV (91).** «Exportar trimestre» en la cabecera de Cuentas abre el trimestre
+   (por defecto el recién cerrado durante el primer mes del siguiente, que es cuando vencen las declaraciones; si no,
+   el que corre). `GET /api/money/quarter` lee bajo RLS las facturas emitidas en él (`doc_type='factura'`, emitidas,
+   cobradas o anuladas; nunca proformas ni borradores) y los cobros recibidos en él, del ámbito de la lente; el CSV se
+   escribe en el navegador en el idioma de la persona (`$lib/quarter-export`).
+   - **Columnas:** Tipo · Fecha · Número · Cliente · NIF · Base imponible · IVA % · Cuota IVA · IRPF % · Retención IRPF
+     · Total · Moneda · Cobrado · Estado de cobro · Fecha de cobro. Las nueve primeras tras «Tipo» son las del libro
+     registro de facturas emitidas que lleva una gestoría: de ahí salen el IVA repercutido y las retenciones
+     soportadas de las declaraciones trimestrales. Cliente y NIF son los congelados en la factura al emitirla (`payer_snapshot`), no los de
+     hoy. Las tres últimas dicen cómo está cobrada cada factura, de cualquier fecha.
+   - **Filas:** una por factura, luego una por cobro del trimestre (Tipo «Cobro», con el número de su factura si la
+     tiene). Sirve al criterio de caja y enseña los cachés cobrados sin factura, que una gestoría quiere ver.
+   - **Formato de la hoja española:** `;` entre columnas, coma decimal sin separador de miles, fechas dd/mm/aaaa,
+     UTF-8 con BOM para que Excel lea los acentos, CRLF.
+   - Varios tipos de IVA en una factura salen juntos («21+10») con la cuota sumada; una exenta dice «exenta».
+8. **Caché del dispositivo.** La proforma guardada gana `workspace_slug`: `CACHE_SCHEMA` sube (ADR-158).
+
+**Lo que no entra: gastos adelantados (79).** `expense` ya tiene `paid_by_user_id` y `reimbursed`, pero «lo pagó»
+apunta a `auth.users`: solo nombra a quien tiene login, y quien adelanta gastos en una gira (gasolina, dietas) es casi
+siempre alguien del equipo sin login, un `person`. «Se debe al equipo» por persona necesita `paid_by_person_id`, una
+fecha de devolución y que `create_expense` lo acepte. Pide migración; está escrita en el informe de la tanda y se hace
+aparte.
+
+**Cómo se revierte.** Volver al commit anterior `WorkspacesSection.svelte`, `SpaceSection.svelte`,
+`FiscalIdentity.svelte` (a `OrganizationFiscal.svelte`), la proforma y su endpoint, `routes/h/books/+page.svelte`, y
+borrar `routes/api/workspaces/[id]/fiscal`, `routes/api/money/quarter` y `$lib/quarter-export.ts`. Las
+`fiscal_identity` de emisor creadas se quedan; `workspace.fiscal_identity_id` se vacía con `update_workspace`.
+
+**Re-evaluar cuando** una gestoría pida su formato de importación concreto (A3, Sage, Holded): entonces es un exportador
+por programa, no columnas nuevas en este CSV.
