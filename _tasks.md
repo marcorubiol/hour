@@ -6,28 +6,18 @@
 > Estado general y evidencia: `_context.md`. Historia: `_decisions.md` y `_notes/sessions-log.md`. Los documentos de
 > `build/archive/` no crean tareas.
 
-## AHORA: mejoras validadas por Marco el 2026-11-01 (sin empezar)
+## AHORA: mejoras validadas por Marco el 2026-11-01 (lo hecho, en `_notes/tasks-archive.md`)
 
 Detalle de cada punto: `build/coordination/STATUS.md` (fuera de git) y los informes de propuestas. Orden sugerido: lo que
 no pide migración primero; las migraciones juntas por el gate de § 34.
 
 - [ ] 78 temporada en una sola función, septiembre por defecto, configurable por espacio.
-- [ ] 79 gastos adelantados: «Lo pagó», devuelto, «Se debe al equipo», «+ Gasto» desde bolo y Ahora. Pide migración
-  (01-11): `expense.paid_by_user_id` sólo nombra logins; hace falta `paid_by_person_id`, `reimbursed_on` y
-  `set_expense_reimbursed` (borrador en el informe de `claude/batch-books`, copiado en STATUS). Va con las migraciones.
-- [ ] 84 fusionar organizaciones (migración).
-- [ ] 88 materiales enlazados en la hoja de ruta; la función hereda los de su línea (pública: migración).
-- [ ] 89 textos guardados en el correo de la conversación. Los enlaces a materiales ya están (ADR-169); faltan los
-  textos guardados: tabla nueva `workspace_text` (migración); los escribe quien puede editar conversaciones
-  y los leen los miembros (Marco, 01-11).
-- [ ] 90 calendario «sólo lo mío» y opciones como TENTATIVE (migración, junto a 71b).
-- [ ] 92 `venue.organization_id`: la sala sabe quién la programa (migración).
+- [ ] 88 la hoja de ruta pública pinta los materiales de salida (la función hereda los de su línea). La base ya los entrega en `get_public_roadsheet` (`20261102150000`); falta que el Worker los pase y la página los muestre.
+- [ ] 90 crear un enlace de calendario «solo lo mío»: la base ya lo admite (`create_calendar_share(p_workspace_id, p_scope)`, `20261102160000`) y las opciones salen TENTATIVE; falta que `POST /api/calendar-shares` pase el alcance y el botón en la pantalla.
 - [ ] 95 contract: borrar `performance.readiness`, `line.modules`, `line.dossier_url`, `project.dossier_url`,
   `project.poster_url` (destructiva: staging e inspect).
 - [ ] 96 contado el 01-11: en `muk-cia`, 8 de 20 funciones sin `venue_id` (las fixtures, casi todas sin). Marco (01-11): siguen copiando nombre y ciudad; cerrado.
-- [ ] Migraciones por escribir: 71b (escaleta, tramos e idioma en `get_public_calendar`), 80b (viaje en `get_public_roadsheet`).
-- [ ] 45 recomprobar el DNS del dominio de envío en el cron de 10 min, 72 h como mucho (Marco, 01-11). El código
-  está (ADR-169) y espera la migración `mail_domain_pending_checks()` (RPC para service_role, ADR-110); no hace nada hasta entonces.
+- [ ] Renombrar «Oficio y privacidad» en Ajustes: la sección lleva ahora también los textos guardados (ADR-171), el nombre ya no la describe.
 - Aparcado: 86 (responsable de tarea) hasta que entre Anouk.
 
 ## PRIMERO — nada. `main` == prod y las dos suites están vivas (2026-07-30, noche)

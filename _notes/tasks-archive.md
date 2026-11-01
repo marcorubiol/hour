@@ -184,3 +184,15 @@ quedó en el roundtrip del caché.
 - **Borrado lógico de organización y persona por API** para los specs: migración `20261021200000` aplicada el 22-10.
 - **«Subir imagen» en Ajustes**: quitado (`def880c6`), no hay dónde guardar un avatar.
 - **Difusión: un texto de 8,8 px en las filas**: cerrado el 2026-11-01. Era el «▾» del badge de relación (`status-caret`), ya en `--text-2xs` desde `d8be8a85` (ADR-145 fase 2); medido en producción entre 8,9 y 9,1 px de 800 a 1000 px de ancho, dentro de la escala.
+
+## Cerrado el 2026-11-01 (tanda de migraciones y pantallas)
+
+Siete migraciones aditivas aplicadas a producción (`20261102100000` a `160000`; backup run 41300828724, plan 41301044995, apply 41301083986). Pantallas en producción con `8018b229` (ADR-170, ADR-171).
+
+- **79 gastos adelantados:** `expense.paid_by_person_id`, `reimbursed_on`, `set_expense_reimbursed`; «Lo pagó», «Se debe al equipo» y «+ Gasto» en el bolo y en Ahora (ADR-170).
+- **92 la sala sabe quién la programa:** `venue.organization_id` y «La programa» en la ficha de sala (ADR-170).
+- **84 fusionar organizaciones:** RPC con deshacer a 30 días y pantalla en la ficha y en Ajustes › Equipo (ADR-171).
+- **89 textos guardados:** `workspace_text`, Ajustes › Espacio e «Insertar texto» en el correo de la conversación (ADR-171).
+- **45 DNS del dominio de envío:** `mail_domain_pending_checks()`; el cron de 10 minutos lo recomprueba solo, 72 h como mucho. Migración aplicada (el código ya estaba, ADR-169).
+- **71b y 80b:** `get_public_calendar` lleva escaleta, tramos y oficio del espacio; `get_public_roadsheet` lleva el viaje del día para performer y tech_manager. Aplicadas, y el Worker las pasa.
+- **88 y 90, mitad de base:** `get_public_roadsheet` entrega `materials`; `get_public_calendar` marca las opciones TENTATIVE y admite `scope = 'mine'`. Lo que falta de pantalla sigue en `_tasks.md`.

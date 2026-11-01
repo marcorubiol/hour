@@ -6,6 +6,12 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Noviembre 2026 (en curso)
 
+- Fusionar dos organizaciones: «Fusionar con…» en la ficha (solo el admin), con vista previa de lo que se mueve, «Se queda» para elegir cuál, aviso con «Deshacer» durante 30 días, y Ajustes › Equipo lista las fusiones recientes. Si las dos tienen conversación en el mismo proyecto, lo dice y no deja fusionar (ADR-171). (2026-11-01, `8018b229`)
+- Textos guardados del espacio (presentación de la compañía, condiciones, un párrafo de gira): se crean en Ajustes › Espacio, los escribe quien puede editar conversaciones y los leen los miembros, y «Insertar texto» los pone en el correo de la conversación (ADR-171). (2026-11-01, `8018b229`)
+- Gastos adelantados: «Lo pagó» es una persona del equipo, aunque no tenga login; Cuentas › Gastos dice «Se debe al equipo» por persona, con «Devuelto» y deshacer; y «+ Gasto» se apunta desde el bolo y desde Ahora (ADR-170). (2026-11-01, `8018b229`)
+- Una sala sabe qué organización la programa: «La programa X» en su ficha, con enlace, y la ficha de la organización lista «Salas que programa» (ADR-170). (2026-11-01, `8018b229`)
+- La hoja de ruta pública lleva el viaje del día para performer y jefe técnico, no para la sala. Y el calendario suscrito lleva la escaleta entera y los tramos de cada viaje, con las opciones marcadas como provisionales (TENTATIVE) y el oficio del espacio. (2026-11-01, `8018b229`)
+- El dominio de envío de correo se vuelve a comprobar solo cada 10 minutos durante las primeras 72 h, sin pulsar nada. (2026-11-01, `8018b229`)
 - La puerta de Hour (entrar, crear cuenta, aceptar una invitación) sale en los cuatro idiomas de la app, con un selector en la propia puerta que se recuerda al entrar (ADR-169). (2026-11-01, `f0e6aace`)
 - En la ficha de una función, «Copiar de otra función» trae la técnica, la logística, la acogida y la escaleta de otra; si ya hay algo, pregunta si mantener y añadir lo que falta o reemplazar. Al redactar desde una conversación con línea, «Enlazar un material» pone el enlace en el correo, y en las conversaciones se puede «Mover a la línea…» en bloque (ADR-169). (2026-11-01, `f0e6aace`)
 - Cuentas para la gestoría: el emisor de las facturas se da de alta en Ajustes › Espacio y la proforma dice qué datos faltan; al crear un bolo se propone el caché del último de la obra; «Exportar trimestre» baja el trimestre en CSV. Fuera «Roles que asumo» de Ajustes, y los campos dejan de decir «(opcional)»: lo obligatorio lleva «*» (ADR-168). (2026-11-01, `f0e6aace`)

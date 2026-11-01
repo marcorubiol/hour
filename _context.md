@@ -31,18 +31,18 @@ aprueba, el sistema ejecuta y deja auditoría. UI manual e IA leen y escriben lo
 fixtures. Sin billing ni self-service. Modelo ya multi-workspace y multi-account. La beta externa espera a cerrar lo
 de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
-## Producción (verificado 2026-10-20)
+## Producción (verificado 2026-11-01)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`f0e6aace`**, `dirty:false`, builtAt
-  2026-11-01T10:47Z (ADR-155 a 169: Planificador con Temporada aparte, caché del dispositivo por esquema y vigilancia de velocidad, ficha de organización y de sala, contrato del bolo y caducidad del enlace de la hoja de ruta, viaje en la hoja de ruta, Cuentas para la gestoría, pasada visual, puerta en cuatro idiomas, copiar de otra función; lo anterior, en `CHANGELOG.md`). `main` == prod salvo documentos y tests.
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`8018b229`**, `dirty:false`, builtAt
+  2026-11-01T12:31Z (ADR-155 a 171: Planificador con Temporada, caché por esquema, fichas de organización y sala, contrato del bolo, Cuentas para la gestoría, gastos por persona, sala con su organización, fusión de organizaciones, textos guardados; lo anterior, en `CHANGELOG.md`). `main` == prod salvo documentos y tests.
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free, con keepalive diario
   (`.github/workflows/keepalive.yml`) contra la pausa por inactividad. Pasar a Pro antes de la beta, aún no
   (`_tasks.md § 9`). Si algo de Supabase falla tras días sin uso, lo primero es `dig <ref>.supabase.co`.
-- **Última migración aplicada: `20261101130000`** (2026-11-01, las cuatro de hoy, `20261101100000` a `130000`, run 41287272154; backup 41287046811). Las anteriores, en `_notes/context-history.md`. Las migraciones van por `production-migrate.yml`: backup, plan, apply. **Al redefinir una función, copiar la firma de la base viva (`pg_get_functiondef`), no de la última migración que la nombra: otra firma crea una sobrecarga y PostgREST responde 300.**
+- **Última migración aplicada: `20261102160000`** (2026-11-01, las siete, `20261102100000` a `160000`, aditivas: backup 41300828724, plan 41301044995, apply 41301083986). Las anteriores, en `_notes/context-history.md`. Las migraciones van por `production-migrate.yml`: backup, plan, apply. **Al redefinir una función, copiar la firma de la base viva (`pg_get_functiondef`), no de la última migración que la nombra: otra firma crea una sobrecarga y PostgREST responde 300.**
 - `hour-staging` (ref `slccyknqpgmzhyiyclsq`, `eu-west-1`): reconstruido el 2026-10-13 con el contract de permisos
   (run 38469017859: RLS 309/313, smoke 2/2). Se volverá a pausar sin uso.
-- Últimas suites contra producción: RLS 492/492 contra `1e03cf36` (2026-10-31). E2E contra `6116ada8` (2026-11-01): 173 pasan, 4 rojos fijos en diagnóstico, 8 saltados. Antes, contra `95288d0b` (2026-11-01, 26 min): 172 pasan, 8 saltados, 1 rojo intermitente (`help.spec:110`, 7/7 tres veces aislado) y 3 sin correr tras él. No prestar `.playwright/auth.json` a otro carril mientras corre la suite. Por `hour-web.marco-rubiol.workers.dev`.
+- Últimas suites contra producción: RLS 532/533 contra `2f9ab41a` (2026-11-01): el rojo `mailout-not-now:201` pasa aislado 2/2 (hipótesis sin verificar: carrera con el cron de cada minuto). E2E contra `6116ada8` (2026-11-01): 173 pasan, 4 rojos fijos en diagnóstico, 8 saltados. Antes, contra `95288d0b` (2026-11-01, 26 min): 172 pasan, 8 saltados, 1 rojo intermitente (`help.spec:110`, 7/7 tres veces aislado) y 3 sin correr tras él. No prestar `.playwright/auth.json` a otro carril mientras corre la suite. Por `hour-web.marco-rubiol.workers.dev`.
 - Desde el checkout principal (`~/Developer/hour`), nunca desde un worktree: los worktrees no llevan `.env` ni
   `.env.test` (RLS sale saltado, el login del E2E falla).
 - `pnpm --filter web test:rls`: siempre contra producción; carga `.env` + `.env.test` y no mira `.env.local`.
