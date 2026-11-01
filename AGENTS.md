@@ -6,12 +6,9 @@ Si tu herramienta no ha expandido los `@` de arriba, lee antes de trabajar `_con
 `~/Developer/AGENTS.md`. No hay `CLAUDE.md` a propósito: si existe uno (o un `CLAUDE.local.md`), Claude Code deja de
 leer los `AGENTS.md`.
 
-## Coordinación de sesiones
+## Carriles
 
-Este proyecto usa la skill `coordinador` (skill universal de Marco, en `~/.claude/skills/coordinador/`) cuando hay varias sesiones de Claude
-en paralelo, o cuando Marco te abre como «coordinador» o pregunta «¿cómo vamos?». Con una sola sesión no hace falta.
-
-Ficha del proyecto:
+Lo propio de Hour para la skill `carriles` (la sesión principal lleva la skill `coordinador`, ficha en § Producto):
 - **Cola de trabajo:** `_tasks.md` es la única cola activa y no se duplica; el coordinador la lee y la actualiza, no la
   sustituye. Decisiones en `_decisions.md`; estado general en `_context.md`.
 - **Estado de coordinación:** `build/coordination/` (en `.gitignore`: este repo es público, el estado no va a git).
@@ -30,7 +27,7 @@ Ficha del proyecto:
 - **Repo público:** sí. No escribas en git nada que no pueda ser público (claves, estado interno de carriles).
 
 ## Producto
-- Skill: producto al día con: 2026-10-14.4. Coordinación: skill coordinador sólo con carriles.
+- Skill: coordinador al día con: 2026-11-01.1.
 - Checkout principal: `/Users/marcorubiol/Developer/hour`
 - Estado: `/Users/marcorubiol/Developer/hour/build/coordination/STATUS.md`
 - Roadmap: `_tasks.md` · CHANGELOG: `CHANGELOG.md` (raíz, por meses) · Tareas: `_tasks.md`
