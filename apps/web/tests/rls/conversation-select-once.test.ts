@@ -80,8 +80,20 @@ describe.skipIf(!envReady() || !limitedEnvReady() || !SERVICE)(
     let projectId: string;
     let goneProjectId: string | null = null;
     let snapshot: ProjectAccess;
+    let originalSetting: boolean | undefined;
     const live: string[] = [];
     let created = 0;
+
+    /** Una conversación nueva nace compartida solo si el espacio no las hace privadas. */
+    async function setSetting(value: boolean) {
+      const r = await pgPatch<{ new_conversations_private: boolean }>(
+        'workspace',
+        admin,
+        { new_conversations_private: value },
+        new URLSearchParams({ id: `eq.${workspaceId}` }),
+      );
+      expect(r.rows[0]?.new_conversations_private).toBe(value);
+    }
 
     async function create(project: string, label: string): Promise<ConversationRow> {
       const n = ++created;
@@ -140,13 +152,21 @@ describe.skipIf(!envReady() || !limitedEnvReady() || !SERVICE)(
       if (p.rows.length === 0) throw new Error('zzz-e2e-collab missing in playwright');
       projectId = p.rows[0]!.id;
       workspaceId = p.rows[0]!.workspace_id;
+      const ws = await pgGet<{ new_conversations_private: boolean }>(
+        'workspace',
+        admin,
+        new URLSearchParams({ id: `eq.${workspaceId}`, select: 'new_conversations_private' }),
+      );
+      originalSetting = ws.rows[0]?.new_conversations_private;
       snapshot = await projectAccess(admin, projectId, limitedSub);
+      await setSetting(false);
     });
 
     afterAll(async () => {
       if (goneProjectId) await setProjectDeleted(goneProjectId, false).catch(() => undefined);
       for (const id of [...live]) await pgRpc('delete_conversation', admin, { p_conversation_id: id }).catch(() => undefined);
       if (goneProjectId) await setProjectDeleted(goneProjectId, true).catch(() => undefined);
+      if (originalSetting !== undefined) await setSetting(originalSetting);
       await restoreProjectAccess(admin, projectId, limitedSub, snapshot);
     });
 

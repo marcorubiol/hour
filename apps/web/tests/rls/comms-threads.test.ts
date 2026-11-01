@@ -331,7 +331,13 @@ describe.skipIf(!envReady())('RLS: hilos con facetas (ADR-106)', () => {
   test('6 · una faceta desactivada en el espacio no se lista, no se escribe y lo escrito deja de leerse', async () => {
     const key = { workspace_id: `eq.${workspaceId}`, facet_id: `eq.${facets.materials}` };
     const before = await pgGet<{ active: boolean }>('workspace_facet_setting', adminJwt, new URLSearchParams({ ...key, select: 'active' }));
-    const had = before.rows[0];
+    let had = before.rows[0];
+    if (had && !had.active) {
+      // Una pasada cortada la dejó apagada: se enciende antes, para no arrastrar el estado sucio.
+      const on = await pgPatch('workspace_facet_setting', adminJwt, { active: true }, new URLSearchParams(key));
+      expect(on.status).toBe(200);
+      had = { active: true };
+    }
     const written = await post(adminJwt, { anchor: boloId, facet: facets.materials, body: `antes de desactivar ${RUN}` });
     if (!had || had.active) expect(written.status, written.error).toBe(200);
     try {
