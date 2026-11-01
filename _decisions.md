@@ -5124,6 +5124,8 @@ de `Chip`; en Difusión, sus filas.
 `planner.season_weeks`, `season_perf(s)`, `season_to_decide`, `season_unclosed`) están en la historia de git. 4: el
 `font-size` de `.status-caret`.
 
+> **Nota a ADR-144 § 3 (2026-11-01):** superseded by ADR-158. El registro ya no se ata al SHA del build sino a `CACHE_SCHEMA`, que se sube a mano cuando cambia la forma de lo guardado.
+
 > **Nota a ADR-144 § 6 (2026-10-29):** sí hay un indicador de «actualizando», pero solo cuando la persona tira hacia abajo en el móvil (pull to refresh, `6872b3cf`). La pantalla sigue sin avisar cuando refresca sola detrás.
 
 > **Amended by ADR-152 (2026-10-31), § 5.** «Todo» en la fila del título vale en todos los anchos, no solo en el
@@ -5720,3 +5722,42 @@ el historial.
 **Re-evaluar cuando** Marco abra opciones desde la conversación una temporada: si «+ Opción» debe preguntar la fecha
 en el mismo gesto, y si quien no tiene `edit:money` debería ni ver el botón (hoy no hay en el cliente un permiso de
 dinero que leer).
+
+## [2026-11-01] ADR-158 · La caché del dispositivo sobrevive a un deploy: versión de esquema explícita (enmienda ADR-144 § 3)
+
+**Contexto.** ADR-144 § 3 ataba el registro de IndexedDB al SHA del build: cualquier deploy lo borraba. Del 24-10 al
+01-11 se integraron 18 ramas y casi todas se desplegaron, varias el mismo día, así que la primera apertura después de
+cada deploy volvía a esperar la cascada de red entera, que es justo lo que ADR-144 quería quitar. Solo 4 de esas 18
+tocaron `routes/api` o `lib/server`: las demás no cambiaban la forma de ningún dato guardado. Marco notó el 01-11 que
+la app «tarda demasiado en el contenido» al abrirla en el móvil.
+
+**Decisión.**
+1. **El registro vale por versión de esquema, no por build.** `CACHE_SCHEMA` en `$lib/offline/query-cache.ts` es una
+   constante que se sube a mano, en el mismo commit, cuando cambia la forma de lo que guarda una consulta: los campos o
+   el anidado de una respuesta, una clave de consulta que pasa a significar otra cosa, o lo que un `queryFn` hace con
+   la respuesta antes de devolverla. Un deploy que solo toca pantallas, estilos o textos deja la caché viva. En la
+   duda, se sube: cuesta una apertura lenta por dispositivo. El comentario de la constante lo dice donde se define.
+   Un registro escrito antes de esto (con `build` y sin `schema`) se borra una vez.
+2. **Red de reserva:** el marco de `/h` va dentro de un `<svelte:boundary>`. Si algo revienta al pintar en una apertura
+   que restauró datos del dispositivo, se borra el registro y se recarga una vez desde la red (`recoverFromRestoredCrash`,
+   una sola vez por pestaña). Cualquier otro error sigue como sin la red. El boundary solo atrapa lo que revienta, no
+   un dato de otra forma que pinta mal sin error: por eso la protección principal es la versión explícita.
+3. Lo demás de ADR-144 no cambia: usuario, espacios y rol, edad de 7 días, borrado al salir, consultas que revalidan
+   detrás.
+
+**Alternativas.** (a) Seguir con el SHA: correcto pero inútil con varios deploys al día. (b) Un hash de `routes/api`
+y `lib/server` en el build: no ve los `queryFn` que transforman la respuesta, que viven en 53 componentes. (c) Solo el
+boundary: no ve los datos que pintan mal sin error.
+
+**Riesgo.** Olvidar subir `CACHE_SCHEMA` deja ver, durante la primera revalidación tras un deploy, datos con la forma
+anterior; si eso revienta, la red recarga; si no revienta, se corrige al llegar la respuesta nueva.
+
+**Medido** (01-11, producción `95288d0b`, Chromium 1228 como iPhone 390×844, CPU ×4, slow4g, `/h/desk` con el
+usuario del E2E, mediana de 5; contenido = `main` sin `aria-busy="true"`): primera apertura tras un build nuevo
+(registro con otro buster) **2674 ms**; reapertura con el registro válido **660 ms** (desde `/`, 588). Con esta
+decisión, un deploy que no sube `CACHE_SCHEMA` abre como la reapertura: unos 2 s menos en la primera apertura tras
+cada uno (14 de las 18 integraciones del 24-10 al 01-11 no tocaron API ni servidor). El techo de la apertura sin registro
+lo ponen `/api/conversations?limit=100` y `/api/conversations/overview` (unos 1,7 s de servidor cada uno).
+
+**Cómo se revierte.** Volver a `buildIdOf()` como buster en `query-cache.ts` y quitar el boundary de
+`routes/h/+layout.svelte`.

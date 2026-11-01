@@ -20,6 +20,7 @@ export {
   bindQueryCache,
   cachedSessionUser,
   claimQueryCache,
+  recoverFromRestoredCrash,
   startQueryCache,
   wipeQueryCache,
 } from './query-cache';

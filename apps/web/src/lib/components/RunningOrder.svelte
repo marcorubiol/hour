@@ -40,7 +40,7 @@
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON } from '$lib/api';
-  import { LOCALES, t, type Locale } from '$lib/i18n';
+  import { loadAllLocales, LOCALES, t, type Locale } from '$lib/i18n';
   import { addToast } from './Toast.svelte';
   import { openCollabDoc } from '$lib/collab-doc';
   import { readSchedule, scheduleArray, writeSchedule } from '$lib/schedule-doc';
@@ -151,7 +151,10 @@
   /** Offered while typing: the five in the reader's language. */
   let offered = $derived(NAMED_KINDS.map((k) => [k, kindWord(k)] as const));
   /** Recognised when written: the five in every language the app speaks, and synonyms. */
-  const known = recognisedWords((key, loc) => t(key, loc as Locale), LOCALES);
+  const recognised = () => recognisedWords((key, loc) => t(key, loc as Locale), LOCALES);
+  let known = $state(recognised());
+  // The other languages' dictionaries load on demand (lib/i18n).
+  void loadAllLocales().then(() => (known = recognised()));
 
   /** The other hour, only when the reader's clock says something else. */
   function viewerClock(iso: string): string | null {

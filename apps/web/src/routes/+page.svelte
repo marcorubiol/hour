@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { goto } from '$app/navigation';
+  import { goto, preloadCode } from '$app/navigation';
 
   import { resolveLoginTarget } from '$lib/master-view';
   import { cachedSessionUser } from '$lib/offline';
@@ -27,12 +27,16 @@
     // The home-screen app opens here: with a device cache (ADR-144) it goes
     // straight in, and the /h frame settles the session behind it.
     const probe = ensureSession();
+    // The landing's code (the /h frame and the lens) loads alongside the
+    // probe and the device read, not after them.
+    const target = landing();
+    void preloadCode(target.split('?')[0]).catch(() => {});
     if (await cachedSessionUser()) {
-      goto(landing(), { replaceState: true });
+      goto(target, { replaceState: true });
       return;
     }
     const user = await probe;
-    goto(user ? landing() : '/login', { replaceState: true });
+    goto(user ? target : '/login', { replaceState: true });
   });
 </script>
 

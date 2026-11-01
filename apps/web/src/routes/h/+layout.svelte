@@ -88,7 +88,7 @@
     probeOutcome,
     session,
   } from '$lib/session.svelte';
-  import { startQueryCache, wipeQueryCache } from '$lib/offline';
+  import { recoverFromRestoredCrash, startQueryCache, wipeQueryCache } from '$lib/offline';
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 
   interface Props {
@@ -700,6 +700,14 @@
   }}
 />
 
+<!-- ADR-158: a crash while painting data restored from the device (a shape
+     CACHE_SCHEMA should have caught) wipes it and reloads once. Any other
+     crash goes on as it would without the net. -->
+<svelte:boundary
+  onerror={(error) => {
+    if (!recoverFromRestoredCrash()) throw error;
+  }}
+>
 {#if authChecked && !blocked}
   <div class="shell" class:shell--settings={inSettings}>
     <!-- THE FIRST STOP SKIPS THE CHROME (móvil #8, WCAG 2.4.1): twenty stops of
@@ -851,6 +859,7 @@
     tag={creation.conversationTag}
   />
 {/if}
+</svelte:boundary>
 
 <style>
   .shell__skip {

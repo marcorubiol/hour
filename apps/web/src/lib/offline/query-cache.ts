@@ -10,8 +10,12 @@
  *
  * One record per device, owned by one user. It is only good while all of
  * this holds, and wiped as soon as one does not:
- *   - `build`: the build that wrote it (the SHA `/health/live` reports). A
- *     deploy can change a response's shape; the cache never outlives one.
+ *   - `schema`: the shape of what is kept (`CACHE_SCHEMA`). A deploy that
+ *     does not change it keeps the cache (ADR-158, amending ADR-144 § 3: the
+ *     build SHA wiped it on every deploy, and the first open after each one
+ *     waited for the whole network again). The frame's error boundary is
+ *     the second net: an open that throws while painting restored data
+ *     wipes it and reloads (`recoverFromRestoredCrash`).
  *   - `user`: the session user it was written for. Logout, a dead session
  *     and a login as someone else wipe it (`wipeQueryCache`).
  *   - `scope`: the user's workspaces and role in each, when it was written.
@@ -39,8 +43,19 @@ export const WRITE_THROTTLE_MS = 1_000;
 /** A device store that does not answer in this long is skipped: the open goes to the network. */
 export const RESTORE_TIMEOUT_MS = 1_500;
 
+/**
+ * The version of the shape of what this cache keeps. BUMP IT BY HAND, in the
+ * same commit, whenever a change alters the data a query stores: a response's
+ * fields or nesting, a query key that now means something else, or what a
+ * `queryFn` makes of the response before returning it. Every device then
+ * wipes its record once and starts from the network. A deploy that only
+ * changes screens, styles or texts leaves it alone and the cache survives.
+ * When in doubt, bump it: the cost is one slow open per device.
+ */
+export const CACHE_SCHEMA = 1;
+
 export interface PersistedQueryCache {
-  build: string;
+  schema: number;
   user: SessionUser;
   scope: string;
   savedAt: number;
@@ -52,13 +67,6 @@ export interface QueryCacheStore {
   get(): Promise<PersistedQueryCache | undefined>;
   set(record: PersistedQueryCache): Promise<void>;
   clear(): Promise<void>;
-}
-
-type BuildStamp = { sha: string; dirty: boolean; builtAt: string };
-
-/** The build a record belongs to. A dirty build (dev, an escape-hatch deploy) is only itself. */
-export function buildIdOf(stamp: BuildStamp = __BUILD_STAMP__): string {
-  return stamp.dirty ? `${stamp.sha}+${stamp.builtAt}` : stamp.sha;
 }
 
 /** The workspaces the cached data was read under, with the role in each. Null until known. */
@@ -86,6 +94,8 @@ let bound: QueryClient | null = null;
 let recordRead: Promise<PersistedQueryCache | undefined> | null = null;
 /** The scope of the record restored on this open; checked once the network says the real one. */
 let restoredScope: string | null = null;
+/** This open painted from the device: a crash while painting may be its data. */
+let restoredThisOpen = false;
 /** Bumped on every wipe: a write or restore that started before it must not land after it. */
 let epoch = 0;
 
@@ -123,7 +133,7 @@ function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
 }
 
 /**
- * The record on this device if it is still good for this build and age; a
+ * The record on this device if it is still good for this schema and age; a
  * bad one is wiped. Read once per tab (the root page and the /h frame share
  * it). Never throws: a broken store is an empty one.
  */
@@ -137,7 +147,7 @@ export function readQueryCache(now = Date.now()): Promise<PersistedQueryCache | 
       undefined,
     );
     if (!record) return undefined;
-    if (record.build !== buildIdOf() || now - record.savedAt > MAX_AGE_MS || !record.user?.sub) {
+    if (record.schema !== CACHE_SCHEMA || now - record.savedAt > MAX_AGE_MS || !record.user?.sub) {
       await s.clear().catch(() => {});
       return undefined;
     }
@@ -166,6 +176,7 @@ export function startQueryCache(
     if (!record || epoch !== startedAt) return null;
     hydrate(client, record.state);
     restoredScope = record.scope;
+    restoredThisOpen = true;
     // The network may have answered the workspaces before the device did.
     if ((client.getQueryState(['workspaces'])?.dataUpdatedAt ?? 0) > record.savedAt) checkScope(client);
     return record.user;
@@ -230,7 +241,7 @@ export async function writeQueryCache(client: QueryClient, user: SessionUser | n
     shouldDehydrateMutation: () => false,
   });
   const record: PersistedQueryCache = {
-    build: buildIdOf(),
+    schema: CACHE_SCHEMA,
     user: { sub: user.sub, email: user.email, name: user.name },
     scope: scopeOf(client) ?? '',
     savedAt: now,
@@ -252,6 +263,7 @@ export async function writeQueryCache(client: QueryClient, user: SessionUser | n
 export async function wipeQueryCache(): Promise<void> {
   epoch++;
   restoredScope = null;
+  restoredThisOpen = false;
   recordRead = Promise.resolve(undefined);
   bound?.clear();
   const s = await defaultStore().catch(() => null);
@@ -270,4 +282,25 @@ export async function claimQueryCache(user: SessionUser | null): Promise<void> {
 /** The app's one client: a wipe clears its memory too, on any page. */
 export function bindQueryCache(client: QueryClient): void {
   bound = client;
+}
+
+const RECOVERED_KEY = 'hour.device-cache.recovered';
+
+/**
+ * The frame's error boundary caught a crash. If this open painted from the
+ * device, the restored data may be what broke (a shape `CACHE_SCHEMA` should
+ * have caught): wipe it and reload once, from the network. Returns false when
+ * the crash is not the cache's, or a reload already happened this tab, so
+ * the caller lets it through.
+ */
+export function recoverFromRestoredCrash(): boolean {
+  if (!restoredThisOpen) return false;
+  try {
+    if (sessionStorage.getItem(RECOVERED_KEY)) return false;
+    sessionStorage.setItem(RECOVERED_KEY, '1');
+  } catch {
+    return false;
+  }
+  void wipeQueryCache().finally(() => location.reload());
+  return true;
 }
