@@ -154,11 +154,14 @@
 </script>
 
 <div class="ynotes" class:ynotes--remote={editingNames.length > 0} data-collab-status={status}>
+  <!-- Live and alone is the normal case, not news: no line (ADR-154). The
+       attribute stays, so the state is still readable. -->
+  {#if status !== 'live' || peers > 0}
   <div class="ynotes__meta">
     <span class="ynotes__dot" aria-hidden="true"></span>
     <span class="ynotes__status">
       {#if status === 'live'}
-        {t('perf.notes_live', locale)}{#if peers > 0} · {t('perf.notes_here', locale, { n: peers + 1 })}{/if}
+        {t('perf.notes_here', locale, { n: peers + 1 })}
       {:else if status === 'offline'}
         {t('perf.notes_offline', locale)}
       {:else}
@@ -169,6 +172,7 @@
       <span class="ynotes__editing">{t('perf.notes_editing', locale, { names: editingNames.join(', ') })}</span>
     {/if}
   </div>
+  {/if}
   <textarea bind:this={el} {rows} placeholder={shownPlaceholder} aria-label={t('perf.notes', locale)}></textarea>
 </div>
 

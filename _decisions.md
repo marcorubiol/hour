@@ -5613,6 +5613,12 @@ de quien la mira. Carril `claude/hoy-coherence`. Sin migración ni endpoint.
     de añadir gasto pierde su subtítulo (fuera `books.expense_desc`).
 13. **La ayuda de Hoy no promete preguntas** que Hour ya no hace (ADR-147): fuera «Si Hour cree que vas, te lo
     pregunta aquí» de `help.card.desk_step_1`.
+14. **Un aviso lleva a donde se arregla, y lo normal no se anuncia.** Añadir en una línea una conversación que ya
+    existe: «Ya tiene una conversación en este proyecto…» con «Abrir» cuando el 409 trae su id (el choque de la
+    organización); sin «Búscala en la tabla». Un envío sin buzón enlaza a Ajustes, Buzones. El recordatorio de un
+    cobro dice su día («Recordatorio en Hoy el 12 nov.»). Fuera la fase de un documento registrado
+    («la subida llega en la fase 0.3+»). Estar solo no es noticia: la presencia del marco no se dibuja con una
+    persona, y las notas en directo sin nadie más no dicen «en directo» (`data-collab-status` sigue).
 
 **Qué no cambia.** La tarjeta de Hoy (ADR-150, 153): ya no pinta reparto desde ADR-150 § 4. Calma: su «Todo al
 día…» no coincide con ningún título que diga «nada te espera» (esas claves no tienen uso).
@@ -5622,7 +5628,9 @@ día…» no coincide con ningún título que diga «nada te espera» (esas clav
 `routes/h/desk/+page.svelte`; 5 en `DeskNext.svelte`; 7 en `performance.ts`; 8 en `CalNav.svelte`; 10 en
 `people.ts` y `routes/h/planner/+page.svelte`; 11 en `.figure--zero` y sus usos; 12 en `DayFoot.svelte`,
 `RunningOrder.svelte`, `TravelStages.svelte`, `DeskWaiting.svelte`, `DeskBoard.svelte`, `HomeView.svelte` y
-`routes/h/books/+page.svelte`. Las claves borradas están en el historial.
+`routes/h/books/+page.svelte`; 14 en `line/ConversationsModule.svelte`, `mailout/[id]/+page.svelte`,
+`MoneyInvoices.svelte`, `PerformanceRecord.svelte`, `PresenceBadge.svelte` y `YNotes.svelte`. Las claves borradas
+están en el historial.
 
 **Re-evaluar cuando** Marco lo use una gira: si echa de menos ver dos opciones de proyectos distintos el mismo día
 sin reparto (entonces es un hecho en la celda, no una decisión), y si una opción que solo sale en «Te espera» se

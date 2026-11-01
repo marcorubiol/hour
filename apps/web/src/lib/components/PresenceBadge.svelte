@@ -9,8 +9,9 @@
    *   <PresenceBadge count={presence?.count ?? null} />
    *
    * When count is null (presence not yet wired — initial render before
-   * onMount fires), nothing renders. Once connected, the badge animates
-   * in via opacity transition.
+   * onMount fires), nothing renders; alone (count ≤ 1) neither: that you are
+   * here is not news (ADR-154). With someone else, the badge animates in via
+   * opacity transition.
    *
    * `dots` (the foot of the rail, beside the monogram; ADR-140, enmienda del
    * 20-10): no words on screen, one dot per person here (three at most). The
@@ -28,24 +29,17 @@
 
   const locale = appLocale();
 
-  let label = $derived(
-    t(count === 1 ? 'perf.presence_online_one' : 'perf.presence_online_other', locale, {
-      n: count ?? 0,
-    }),
-  );
-  let isAlone = $derived(count !== null && count <= 1);
+  let label = $derived(t('perf.presence_online_other', locale, { n: count ?? 0 }));
   let dots = $derived(variant === 'dots' ? Math.min(Math.max(count ?? 0, 1), 3) : 1);
 </script>
 
-{#if count !== null}
+{#if count !== null && count > 1}
   <span
-    class={['presence-badge', isAlone && 'presence-badge--alone', variant === 'dots' && 'presence-badge--dots']
+    class={['presence-badge', variant === 'dots' && 'presence-badge--dots']
       .filter(Boolean)
       .join(' ')}
     aria-live="polite"
-    title={count > 1
-      ? t('perf.presence_others', locale, { n: count })
-      : t('perf.presence_alone', locale)}
+    title={t('perf.presence_others', locale, { n: count })}
   >
     {#each { length: dots } as _, i (i)}
       <span class="presence-badge__dot" aria-hidden="true"></span>
@@ -73,16 +67,6 @@
     background: var(--success);
     box-shadow: 0 0 0 var(--line-thick) color-mix(in oklch, var(--success) 25%, transparent);
     flex-shrink: 0;
-  }
-
-  .presence-badge--alone .presence-badge__dot {
-    background: var(--text-color);
-    box-shadow: none;
-    opacity: 0.55;
-  }
-
-  .presence-badge--alone {
-    color: var(--text-dark-muted);
   }
 
   /* Beside the monogram: the dots alone, close together, without the ring. */

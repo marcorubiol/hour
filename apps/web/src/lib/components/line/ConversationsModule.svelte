@@ -20,6 +20,7 @@
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
+  import { goto } from '$app/navigation';
   import { toastCreated } from '$lib/created';
   import { mutateJSON, ApiError } from '$lib/api';
   import { conversationWhoBody } from '$lib/conversation';
@@ -106,10 +107,16 @@
     onError: (err) => {
       if (err instanceof ApiError && err.status === 409) {
         addOpen = false;
+        // The 409 names the conversation when the clash is the organization's
+        // (POST /api/conversations): then «Abrir» goes to it (ADR-154).
+        const existing = typeof err.body?.conversation_id === 'string' ? err.body.conversation_id : null;
         addToast({
           tone: 'warning',
           title: t('line.conv_exists_title', locale),
           message: t('line.conv_exists_msg', locale),
+          action: existing
+            ? { label: t('line.conv_exists_open', locale), run: () => void goto(`/h/${workspaceSlug}/conversation/${existing}`) }
+            : undefined,
         });
         return;
       }
