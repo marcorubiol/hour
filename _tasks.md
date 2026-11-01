@@ -14,7 +14,6 @@ no pide migración primero; las migraciones juntas por el gate de § 34.
 - [ ] 78 temporada en una sola función, septiembre por defecto, configurable por espacio.
 - [ ] 95 contract: borrar `performance.readiness`, `line.modules`, `line.dossier_url`, `project.dossier_url`,
   `project.poster_url` (destructiva: staging e inspect).
-- [ ] Renombrar «Oficio y privacidad» en Ajustes: la sección lleva ahora también los textos guardados (ADR-171), el nombre ya no la describe.
 - Aparcado: 86 (responsable de tarea) hasta que entre Anouk.
 
 ## PRIMERO — nada. `main` == prod y las dos suites están vivas (2026-07-30, noche)
