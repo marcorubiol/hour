@@ -22,6 +22,7 @@
   import { fmtMoney, invoiceStatusLabel } from '$lib/money';
   import { appLocale, LOCALE_TAG, t } from '$lib/i18n';
   import {
+    issuerFixHref,
     missingFields,
     orderedTaxes,
     partyLines,
@@ -111,12 +112,17 @@
         {#each [['issuer', doc.issuer], ['payer', doc.payer]] as const as [role, party] (role)}
           {@const lines = partyLines(party)}
           {@const hole = gap(party, role)}
+          {@const fix = role === 'issuer' ? issuerFixHref(doc) : null}
           <div class="pf__party">
             <h2 class="pf__label">{t(`proforma.${role}`, locale)}</h2>
             {#each lines as line, i (i)}
               <p class:pf__name={i === 0}>{line}</p>
             {/each}
-            {#if hole}<p class="pf__gap">{hole}</p>{/if}
+            {#if hole}
+              <p class="pf__gap">
+                {hole}{#if fix}{' '}<a href={fix}>{t('proforma.fix_in_settings', locale)}</a>{/if}
+              </p>
+            {/if}
           </div>
         {/each}
       </section>

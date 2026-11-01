@@ -81,6 +81,8 @@ export interface ProformaDocument {
   subtotal: number;
   total: number;
   project: { name: string } | null;
+  /** The space that bills: where its issuer data is completed (ADR-168). */
+  workspace_slug: string | null;
   issuer: ProformaParty;
   payer: ProformaParty;
   lines: ProformaLine[];
@@ -122,6 +124,20 @@ export function partyLines(party: Pick<ProformaParty, 'name' | 'fiscal'>): strin
     f ? join([f.postal_code, f.city], ' ') : null,
     f ? join([f.region, f.country], ', ') : null,
   ].filter(filled);
+}
+
+/**
+ * Where to complete the issuer, when the issuer is what has the gap: the
+ * space's Ajustes › Espacio, the fiscal block (ADR-168). Null when nothing is
+ * missing, when the data exists but this reader cannot see it, or when the
+ * proforma is issued (its snapshot is frozen: completing the space would not
+ * change it).
+ */
+export function issuerFixHref(doc: Pick<ProformaDocument, 'issuer' | 'workspace_slug' | 'status'>): string | null {
+  if (!doc.workspace_slug || doc.status !== 'draft') return null;
+  if (doc.issuer.state === 'hidden') return null;
+  if (doc.issuer.state === 'ok' && missingFields(doc.issuer).length === 0) return null;
+  return `/h/${encodeURIComponent(doc.workspace_slug)}/settings?section=space#fiscal`;
 }
 
 /** Taxes in the order the document keeps them. */

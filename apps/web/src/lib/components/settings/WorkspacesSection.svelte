@@ -461,13 +461,6 @@
 </Dialog>
 
 <style>
-  .set-prose {
-    font-size: var(--text-s);
-    color: var(--text-muted);
-    line-height: 1.6;
-    margin-block: 0 var(--space-s);
-    max-inline-size: 56ch;
-  }
 
   .set-ws-list {
     display: flex;
