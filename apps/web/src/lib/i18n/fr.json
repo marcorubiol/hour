@@ -1110,7 +1110,6 @@
   "conversations.dir_inbound": "Reçu",
   "conversations.dir_outbound": "Envoyé",
   "conversations.email": "E-mail",
-  "conversations.empty_body": "Importez le tableur que vous utilisez déjà, puis suivez ici chaque relation.",
   "conversations.empty_title": "Apportez votre carnet.",
   "conversations.event_body_ph": "Ce qui a été dit ou envoyé",
   "conversations.event_day": "Jour",

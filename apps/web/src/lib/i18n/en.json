@@ -1152,7 +1152,6 @@
   "conversations.dir_inbound": "Received",
   "conversations.dir_outbound": "Sent",
   "conversations.email": "Email",
-  "conversations.empty_body": "Import the spreadsheet you already use, then keep each relationship here.",
   "conversations.empty_title": "Bring your book.",
   "conversations.event_body_ph": "What was said or sent",
   "conversations.event_day": "Day",
