@@ -5644,3 +5644,34 @@ están en el historial.
 **Re-evaluar cuando** Marco lo use una gira: si echa de menos ver dos opciones de proyectos distintos el mismo día
 sin reparto (entonces es un hecho en la celda, no una decisión), y si una opción que solo sale en «Te espera» se
 pierde de vista en «Después».
+
+## [2026-11-01] ADR-155 · Planificador: la Temporada aparte, tres dibujos y el Día como lupa (enmienda ADR-095 § 1 y ADR-120 § 7)
+
+**Contexto.** Marco, 01-11: las cinco vistas del Planificador parecen muchas, pero todas sirven. Análisis del carril
+`claude/planner-views` (fuera de git): la barra ponía cinco palabras iguales para tres cosas distintas, un panel
+(Temporada), tres dibujos de las mismas filas (Agenda, Mes, Tablero) y una lupa (Día), que las otras cuatro ya abren al
+pulsar un día y que Hoy cubre para hoy (ADR-150). Marco eligió la opción A de cuatro. Sin migración.
+
+**Decisión.**
+1. **La barra dice cuatro palabras: Temporada | Agenda · Mes · Tablero.** Una raya fina separa la portada de los tres
+   dibujos. El orden no cambia con el estado y las teclas lo siguen: `1` a `4`.
+2. **El Día sale de la barra.** Se abre pulsando un día en cualquier dibujo, desde Hoy, ⌘K o Cuentas, como hasta ahora.
+   Mientras estás en él, «Día» es la palabra encendida al final de la fila, con una × que lo cierra. `?view=day` sigue
+   siendo su dirección.
+3. **Cerrar el Día vuelve al dibujo del que venías** (un paso atrás en el historial, que deja ese dibujo como estaba).
+   Si no hay dibujo detrás (un enlace, Hoy, ⌘K, una recarga), abre la Agenda en ese día. `Esc` hace lo mismo que la ×.
+   El dibujo de origen viaja en el estado de la entrada del historial (`plannerFrom`), no en la URL: un enlace copiado
+   no dice de dónde venías.
+   **En el móvil** (menos de 48rem), dentro del Día la fila deja solo «Temporada | Día ×» y los botones de crear y
+   del menú: los tres dibujos se esconden porque la salida es la ×, y así la fila no desborda (Marco, 01-11).
+4. **La Temporada sigue siendo la portada** (ADR-117 § 2, ADR-120 § 2). Marco lo preguntó; se mantiene porque responde
+   lo que ninguna otra pantalla responde al entrar y porque la puerta de Hoy enseña sus cifras.
+
+**Qué no cambia.** Las cinco vistas y lo que dibujan, la vista por la URL (ADR-120 § 2), el dial del Tablero
+(ADR-094), las flechas junto al título (ADR-136).
+
+**Cómo se revierte.** Volver `CalToolbar.svelte` y la página del Planificador al commit anterior; las claves
+`planner.day_close` pueden quedarse.
+
+**Re-evaluar el 23-11** (la entrada de `_tasks.md`): si alguien entra siempre en la Temporada y salta en seguida a otro
+dibujo, que cada uno abra en el suyo (opción D, una preferencia junto a `membership.view_scope`).

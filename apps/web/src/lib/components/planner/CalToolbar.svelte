@@ -28,11 +28,15 @@
     /** «reading the marks» — the grammar key, one door for all four views. */
     onReadMarks: () => void;
     onBlackout: () => void;
+    /** Leave the Day for the drawing it was opened from (ADR-155). */
+    onCloseDay: () => void;
   }
 
   /** The order the design fixes, and the order the keys follow. The season
-      overview (ADR-117) is the portada, so it opens the row. */
-  const VIEW_ORDER = ['overview', 'day', 'agenda', 'month', 'board'] as const;
+      overview (ADR-117) is the portada, so it opens the row, apart from the
+      three drawings. The Day is not a word of the row (ADR-155): it is the
+      lens on one day, opened from a day of any drawing. */
+  const VIEW_ORDER = ['overview', 'agenda', 'month', 'board'] as const;
 
   let {
     view,
@@ -45,6 +49,7 @@
     onFeed,
     onReadMarks,
     onBlackout,
+    onCloseDay,
   }: Props = $props();
 
 </script>
@@ -57,8 +62,11 @@
      its siblings — knowing which drawing you are in at a glance is worth one
      — and it does not need to be the title to have it.
 
-     THE ORDER NEVER CHANGES WITH THE STATE: Today · Agenda · Month · Board,
-     the same order as the keys 1 2 3 4.
+     THE ORDER NEVER CHANGES WITH THE STATE: Season | Agenda · Month · Board,
+     the same order as the keys 1 2 3 4. The Season is a dashboard and the
+     other three are drawings of the same rows, so a rule sets it apart. The
+     Day is a lens, not a fifth word (ADR-155): while you are in it, it is
+     the lit word at the end of the row, with the × that closes it.
 
      And the dial is METADATA and looks like it: mono, in this row, right
      behind the last view word, with ONE word of grammar — `Board by scope
@@ -72,7 +80,12 @@
        window's controls went up beside the title they move, so nothing here
        is reserved for a drawing that has no window: the Season's row starts
        where every other row starts. -->
-  <div class="cal__views" role="group" aria-label={t('planner.view_label', locale)}>
+  <div
+    class="cal__views"
+    class:cal__views--lens={view === 'day'}
+    role="group"
+    aria-label={t('planner.view_label', locale)}
+  >
     {#each VIEW_ORDER as v (v)}
       <button
         type="button"
@@ -81,7 +94,20 @@
         aria-pressed={view === v}
         onclick={() => onSetView(v)}>{t(`planner.view_${v}`, locale)}</button
       >
+      {#if v === 'overview'}<span class="cal__views-rule" aria-hidden="true"></span>{/if}
     {/each}
+    {#if view === 'day'}
+      <span class="cal__lens">
+        <span class="cal__lens-word" aria-current="page">{t('planner.view_day', locale)}</span>
+        <button
+          type="button"
+          class="cal__lens-close hit"
+          aria-label={t('planner.day_close', locale)}
+          title={t('planner.day_close', locale)}
+          onclick={onCloseDay}>×</button
+        >
+      </span>
+    {/if}
   </div>
 
   {#if view === 'board'}
@@ -178,6 +204,40 @@
        reads as a tab, which is the shape this axis stopped being. */
     .cal__view--on {
       font-size: var(--text-l);
+      color: var(--text-color);
+    }
+    /* THE PORTADA STANDS APART (ADR-155): one hairline between the
+       dashboard and the three drawings, at the height of a word. */
+    .cal__views-rule {
+      align-self: center;
+      inline-size: var(--line-hairline);
+      block-size: 1em;
+      background: var(--border-color-light);
+    }
+    /* THE DAY IS THE LIT WORD while you are in it, in the lit word's own
+       size and ink, and its × is the dial's quiet voice: a way out, not a
+       sixth control. */
+    .cal__lens {
+      display: inline-flex;
+      align-items: baseline;
+      gap: var(--space-xs);
+    }
+    .cal__lens-word {
+      font-family: var(--font-display);
+      font-size: var(--text-l);
+      line-height: 1.1;
+      color: var(--text-color);
+    }
+    .cal__lens-close {
+      border: 0;
+      background: none;
+      padding: 0;
+      cursor: pointer;
+      font-size: var(--text-s);
+      line-height: 1;
+      color: var(--text-faint);
+    }
+    .cal__lens-close:hover {
       color: var(--text-color);
     }
 
@@ -344,6 +404,12 @@
         align-self: center;
       }
       .cal__spacer {
+        display: none;
+      }
+      /* IN THE DAY, THE WAY OUT IS THE ×, so on a phone the three drawings
+         step aside (Marco, 2026-11-01, ADR-155): the row keeps the portada
+         and «Día ×», and the four words never fight the two acts for 349 px. */
+      .cal__views--lens > .cal__view:not(:first-child) {
         display: none;
       }
       .cal__dial {
