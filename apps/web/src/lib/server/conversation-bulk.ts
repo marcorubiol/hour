@@ -39,6 +39,8 @@ export function bulkPg(env: SupabaseEnv, jwt: string): BulkPg {
 interface Row {
   id: string;
   workspace_id: string;
+  project_id: string;
+  line_id: string | null;
   not_now_at: string | null;
   not_now_until: string | null;
   next_action_at: string | null;
@@ -89,7 +91,7 @@ class Outcome {
 /** Las filas pedidas que quien llama lee; las demás, `not_found`. */
 async function readRows(pg: BulkPg, ids: readonly string[], extra: { tags?: boolean; turn?: boolean }): Promise<Map<string, Row>> {
   const select = [
-    'id,workspace_id,not_now_at,not_now_until,next_action_at,next_action_note,reply_settled_at',
+    'id,workspace_id,project_id,line_id,not_now_at,not_now_until,next_action_at,next_action_note,reply_settled_at',
     extra.tags ? 'tagging:conversation_tagging(tag_id)' : null,
     extra.turn ? TURN_EMBEDS : null,
   ]
@@ -226,6 +228,69 @@ async function restoreTags(pg: BulkPg, out: Outcome, items: RestoreItem[]): Prom
   });
 }
 
+/**
+ * «Mover a la línea…» (ADR-169, punto 93). La línea tiene que ser del
+ * proyecto de cada conversación, como pide el PATCH de la ficha (ADR-056): la
+ * FK no mira el proyecto y la RLS solo mira la conversación. Una línea que no
+ * se lee deja el lote entero en `not_found`; la que ya está ahí cuenta como
+ * hecha, sin escribirla ni deshacerla. `null` las saca de su línea.
+ */
+async function moveToLine(pg: BulkPg, out: Outcome, rows: Row[], lineId: string | null): Promise<void> {
+  let lineProject: string | null = null;
+  if (lineId) {
+    const found = await pg.get<{ id: string; project_id: string }>(
+      'line',
+      new URLSearchParams({ select: 'id,project_id', id: `eq.${lineId}`, deleted_at: 'is.null', limit: '1' }),
+    );
+    if (found.length === 0) {
+      for (const r of rows) out.fail(r.id, 'not_found');
+      return;
+    }
+    lineProject = found[0].project_id;
+  }
+  const writes: { id: string; columns: Columns }[] = [];
+  for (const r of rows) {
+    if (lineProject && r.project_id !== lineProject) out.fail(r.id, 'other_project');
+    else if (r.line_id === lineId) out.done.add(r.id);
+    else {
+      writes.push({ id: r.id, columns: { line_id: lineId } });
+      out.undo.push(before(r, ['line_id']));
+    }
+  }
+  await patchColumns(pg, out, writes);
+}
+
+/**
+ * A restore is a body like any other: one that puts a line back must name a
+ * line of the conversation's project, or it would be a way round the guard.
+ * The ids whose line is not theirs (or not readable).
+ */
+async function crossProjectRestores(pg: BulkPg, items: RestoreItem[]): Promise<Set<string>> {
+  const relinks = items.filter((x) => x.columns?.line_id);
+  if (relinks.length === 0) return new Set();
+  const lineIds = [...new Set(relinks.map((x) => x.columns!.line_id!))];
+  const [convs, lines] = await Promise.all([
+    pg.get<{ id: string; project_id: string }>(
+      'conversation',
+      new URLSearchParams({ select: 'id,project_id', id: `in.(${relinks.map((x) => x.id).join(',')})` }),
+    ),
+    pg.get<{ id: string; project_id: string }>(
+      'line',
+      new URLSearchParams({ select: 'id,project_id', id: `in.(${lineIds.join(',')})` }),
+    ),
+  ]);
+  const convProject = new Map(convs.map((c) => [c.id, c.project_id]));
+  const lineProject = new Map(lines.map((l) => [l.id, l.project_id]));
+  return new Set(
+    relinks
+      .filter((x) => {
+        const p = convProject.get(x.id);
+        return !p || lineProject.get(x.columns!.line_id!) !== p;
+      })
+      .map((x) => x.id),
+  );
+}
+
 /** Aplica la acción a cada conversación pedida; nunca aborta por una. */
 export async function runConversationBulk(pg: BulkPg, req: BulkRequest, now: Date = new Date()): Promise<BulkResult> {
   const out = new Outcome();
@@ -233,10 +298,12 @@ export async function runConversationBulk(pg: BulkPg, req: BulkRequest, now: Dat
 
   if (req.action === 'restore') {
     const items = req.items.filter((x, i) => req.items.findIndex((y) => y.id === x.id) === i);
-    const cols = items.filter((x) => x.columns && Object.keys(x.columns).length > 0);
+    const linked = await crossProjectRestores(pg, items);
+    for (const id of linked) out.fail(id, 'other_project');
+    const cols = items.filter((x) => x.columns && Object.keys(x.columns).length > 0 && !linked.has(x.id));
     await patchColumns(pg, out, cols.map((x) => ({ id: x.id, columns: x.columns! })));
     // Una conversación con columnas y etiquetas no la da ninguna acción; si llega, cuentan las dos.
-    const tags = items.filter((x) => x.tag_ids !== undefined);
+    const tags = items.filter((x) => x.tag_ids !== undefined && !linked.has(x.id));
     const colsFailed = new Set(cols.filter((x) => out.failed.has(x.id)).map((x) => x.id));
     await restoreTags(pg, out, tags.filter((x) => !colsFailed.has(x.id)));
     for (const id of ids) if (!out.done.has(id) && !out.failed.has(id)) out.fail(id, 'error');
@@ -273,6 +340,9 @@ export async function runConversationBulk(pg: BulkPg, req: BulkRequest, now: Dat
     }
     case 'tag':
       await tagRows(pg, out, seen, req.key, req.op);
+      break;
+    case 'line':
+      await moveToLine(pg, out, seen, req.line_id);
       break;
   }
   return out.result(ids);

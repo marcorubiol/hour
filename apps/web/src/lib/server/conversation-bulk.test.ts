@@ -8,6 +8,16 @@ const PRESS = 'bbbbbbbb-0000-4000-8000-000000000002';
 const OFF = 'bbbbbbbb-0000-4000-8000-000000000003';
 const id = (n: number) => `cccccccc-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const NOW = new Date('2026-10-22T10:00:00Z');
+const P1 = 'dddddddd-0000-4000-8000-000000000001';
+const P2 = 'dddddddd-0000-4000-8000-000000000002';
+const L1 = 'eeeeeeee-0000-4000-8000-000000000001';
+const L1B = 'eeeeeeee-0000-4000-8000-000000000003';
+const L2 = 'eeeeeeee-0000-4000-8000-000000000002';
+const LINES = [
+  { id: L1, project_id: P1 },
+  { id: L1B, project_id: P1 },
+  { id: L2, project_id: P2 },
+];
 
 interface FakeRow {
   id: string;
@@ -19,6 +29,8 @@ interface FakeRow {
   next_action_note: string | null;
   reply_settled_at: string | null;
   tags: string[];
+  project_id: string;
+  line_id: string | null;
   last: { direction: string | null; occurred_at: string } | null;
 }
 
@@ -33,13 +45,15 @@ function row(n: number, over: Partial<FakeRow> = {}): FakeRow {
     next_action_note: null,
     reply_settled_at: null,
     tags: [SALES],
+    project_id: P1,
+    line_id: null,
     last: null,
     ...over,
   };
 }
 
 function idsOf(search: URLSearchParams): string[] {
-  return (search.get('id') ?? '').replace(/^in\.\(|\)$/g, '').split(',');
+  return (search.get('id') ?? '').replace(/^in\.\(|\)$|^eq\./g, '').split(',');
 }
 
 /** PostgREST as the RLS leaves it: what you do not read is not there; what you do not edit is not patched. */
@@ -56,6 +70,7 @@ function fakePg(rows: FakeRow[], opts: { failGroupPatch?: boolean } = {}) {
           { id: OFF, key: 'off', workspace_id: WS },
         ].filter((t) => (search.get('key') ?? '').includes(t.key)) as T[];
       }
+      if (path === 'line') return LINES.filter((l) => idsOf(search).includes(l.id)) as T[];
       if (path === 'workspace_conversation_tag_setting') return [{ workspace_id: WS, tag_id: OFF }] as T[];
       return idsOf(search)
         .map((x) => byId.get(x))
@@ -183,5 +198,69 @@ describe('runConversationBulk', () => {
     expect(byId.get(id(1))!.not_now_at).toBeNull();
     expect(byId.get(id(2))!.tags).toEqual([]);
     expect(r.undo).toEqual([]);
+  });
+});
+
+describe('line (ADR-169, punto 93)', () => {
+  test('moves to a line of its project, with the line before as undo', async () => {
+    const { pg, byId } = fakePg([row(1), row(2, { line_id: L1B })]);
+    const r = await runConversationBulk(pg, { action: 'line', ids: [id(1), id(2)], line_id: L1 }, NOW);
+    expect(r.done).toEqual([id(1), id(2)]);
+    expect(byId.get(id(1))!.line_id).toBe(L1);
+    expect(r.undo).toEqual([
+      { id: id(1), columns: { line_id: null } },
+      { id: id(2), columns: { line_id: L1B } },
+    ]);
+  });
+
+  test('a line of another project is refused for that conversation only', async () => {
+    const { pg, byId } = fakePg([row(1), row(2, { project_id: P2 })]);
+    const r = await runConversationBulk(pg, { action: 'line', ids: [id(1), id(2)], line_id: L1 }, NOW);
+    expect(r.done).toEqual([id(1)]);
+    expect(r.failed).toEqual([{ id: id(2), reason: 'other_project' }]);
+    expect(byId.get(id(2))!.line_id).toBeNull();
+  });
+
+  test('already there: done, nothing written, nothing to undo', async () => {
+    const { pg, calls } = fakePg([row(1, { line_id: L1 })]);
+    const r = await runConversationBulk(pg, { action: 'line', ids: [id(1)], line_id: L1 }, NOW);
+    expect(r.done).toEqual([id(1)]);
+    expect(r.undo).toEqual([]);
+    expect(calls.patch).toBe(0);
+  });
+
+  test('null takes them out of their line', async () => {
+    const { pg, byId } = fakePg([row(1, { line_id: L1 })]);
+    const r = await runConversationBulk(pg, { action: 'line', ids: [id(1)], line_id: null }, NOW);
+    expect(r.done).toEqual([id(1)]);
+    expect(byId.get(id(1))!.line_id).toBeNull();
+  });
+
+  test('a line nobody reads leaves every row not_found', async () => {
+    const { pg } = fakePg([row(1)]);
+    const r = await runConversationBulk(
+      pg,
+      { action: 'line', ids: [id(1)], line_id: 'eeeeeeee-0000-4000-8000-0000000000ff' },
+      NOW,
+    );
+    expect(r.failed).toEqual([{ id: id(1), reason: 'not_found' }]);
+  });
+
+  test('a restore cannot link a line of another project', async () => {
+    const { pg, byId } = fakePg([row(1), row(2)]);
+    const r = await runConversationBulk(
+      pg,
+      {
+        action: 'restore',
+        items: [
+          { id: id(1), columns: { line_id: L2 } },
+          { id: id(2), columns: { line_id: L1 } },
+        ],
+      },
+      NOW,
+    );
+    expect(r.failed).toEqual([{ id: id(1), reason: 'other_project' }]);
+    expect(r.done).toEqual([id(2)]);
+    expect(byId.get(id(1))!.line_id).toBeNull();
   });
 });
