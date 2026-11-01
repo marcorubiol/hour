@@ -36,7 +36,10 @@ export interface VenueFile {
     timezone: string | null;
     contacts: VenueContact[] | null;
     notes: string | null;
+    organization_id: string | null;
   };
+  /** Who programs it (92, ADR-170), alive and readable; null otherwise. */
+  organization: { id: string; slug: string; name: string } | null;
   performances: VenuePerformance[];
 }
 

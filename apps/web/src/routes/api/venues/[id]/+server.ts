@@ -1,7 +1,8 @@
 /**
  * GET /api/venues/:key?workspace_id=:workspace: la ficha de sala (ADR-164
  * § 1): la sala (`VENUE_COLS`) y sus funciones, pasadas y futuras, con su
- * proyecto y la organización de su conversación. `key` es el id o el slug.
+ * proyecto y la organización de su conversación, y la organización que la
+ * programa (92, ADR-170: viva; una borrada sale null). `key` es el id o el slug.
  * La RLS de siempre decide cada fila; sin migración.
  *
  * PATCH /api/venues/:id — edit the venue entity (ADR-053): address,
@@ -69,9 +70,27 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
       order: 'performed_at.desc',
       limit: '200',
     });
-    const performances = await pgGet<VenuePerformance>(env, 'performance', jwt, { search: perfSearch });
+    const orgSearch = room.organization_id
+      ? new URLSearchParams({
+          select: 'id,slug,name',
+          id: `eq.${room.organization_id}`,
+          workspace_id: `eq.${workspaceId}`,
+          deleted_at: 'is.null',
+          limit: '1',
+        })
+      : null;
+    const [performances, organization] = await Promise.all([
+      pgGet<VenuePerformance>(env, 'performance', jwt, { search: perfSearch }),
+      orgSearch
+        ? pgGet<NonNullable<VenueFile['organization']>>(env, 'workspace_organization', jwt, { search: orgSearch })
+        : Promise.resolve({ data: [] }),
+    ]);
 
-    const file: VenueFile = { venue: room, performances: performances.data };
+    const file: VenueFile = {
+      venue: room,
+      organization: organization.data[0] ?? null,
+      performances: performances.data,
+    };
     return json(file);
   } catch (err) {
     return pgErrorResponse(
@@ -138,8 +157,11 @@ export const PATCH: RequestHandler = async ({ request, params, platform, locals 
             error: 'venue_exists',
             hint: 'Another venue in this workspace already has this name and city.',
           },
-          // 23514 = CHECK violation (country format, empty name).
+          // 23514 = CHECK violation (country format, empty name) or the
+          // organization is not a live one of the venue's space (92).
           '23514': { status: 400, error: 'constraint_violation' },
+          // The composite FK: an organization of another space (92).
+          '23503': { status: 400, error: 'organization_not_in_space' },
         },
         passUpstream: [401, 403],
       },

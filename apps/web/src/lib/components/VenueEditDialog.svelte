@@ -12,6 +12,8 @@
     timezone: string | null;
     contacts: VenueContact[] | null;
     notes: string | null;
+    /** 92: who programs it. Absent in an older cached row: then unknown. */
+    organization_id?: string | null;
   }
 </script>
 
@@ -22,25 +24,34 @@
    * notes. PATCH /api/venues/:id. Two callers draw it: the performance's
    * «Editar sala…» (stacked on its details dialog) and the venue's own
    * record (ADR-164 § 1).
+   *
+   * «La programa» (92, ADR-170): the organization of the same space that
+   * programs the room. Sent only when it changes, so a venue whose
+   * organization was deleted later still saves its other fields.
    */
-  import { createMutation, useQueryClient } from '@tanstack/svelte-query';
+  import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
+  import { toStore } from 'svelte/store';
   import { mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
+  import Select from '$lib/components/Select.svelte';
   import Textarea from '$lib/components/Textarea.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { FormErrors } from '$lib/form-errors.svelte';
   import { appLocale, t } from '$lib/i18n';
+  import { organizationsQueryOptions } from '$lib/organizations';
 
   interface Props {
     open: boolean;
     /** The venue as it is now; the form fills from it each time it opens. */
     venue: VenueEditable | null;
+    /** The venue's space: its organizations are the ones offered. */
+    workspaceId: string;
     onsaved?: (venue: VenueEditable) => void;
   }
 
-  let { open = $bindable(false), venue, onsaved }: Props = $props();
+  let { open = $bindable(false), venue, workspaceId, onsaved }: Props = $props();
 
   const locale = appLocale();
   const queryClient = useQueryClient();
@@ -56,6 +67,14 @@
   let vTimezone = $state('');
   let vNotes = $state('');
   let vContacts = $state<ContactDraft[]>([]);
+  let vOrganization = $state('');
+
+  const orgsQuery = createQuery(toStore(() => ({ ...organizationsQueryOptions(), enabled: open })));
+  let orgOptions = $derived(
+    ($orgsQuery.data?.items ?? [])
+      .filter((o) => o.workspace_id === workspaceId)
+      .map((o) => ({ value: o.id, label: o.name })),
+  );
 
   // The native medium already knows every IANA zone: no bundled list.
   const timezoneOptions = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : [];
@@ -78,6 +97,7 @@
     vCapacity = venue.capacity != null ? String(venue.capacity) : '';
     vTimezone = venue.timezone ?? '';
     vNotes = venue.notes ?? '';
+    vOrganization = venue.organization_id ?? '';
     vContacts = (venue.contacts ?? []).map((c) => ({
       name: c.name ?? '',
       role: c.role ?? '',
@@ -112,12 +132,15 @@
             email: c.email.trim() || null,
             phone: c.phone.trim() || null,
           })),
+        ...(vOrganization !== (venue!.organization_id ?? '') ? { organization_id: vOrganization || null } : {}),
       }),
     onSuccess: (result) => {
       open = false;
       void queryClient.invalidateQueries({ queryKey: ['venues'] });
       void queryClient.invalidateQueries({ queryKey: ['venue'] });
       void queryClient.invalidateQueries({ queryKey: ['performance'] });
+      // The organization's record lists its rooms.
+      void queryClient.invalidateQueries({ queryKey: ['organization'] });
       addToast({
         tone: 'success',
         message: t('venue.updated', locale, { name: result?.venue.name ?? vName }),
@@ -150,6 +173,11 @@
     <Input label={t('create.city', locale)} bind:value={vCity} />
     <Input label={t('perf.country', locale)} bind:value={vCountry} placeholder="ES" />
     <Input label={t('venue.capacity', locale)} type="number" bind:value={vCapacity} />
+    <Select
+      label={t('venue.programmed_by', locale)}
+      bind:value={vOrganization}
+      options={[{ value: '', label: t('venue.programmed_by_none', locale) }, ...orgOptions]}
+    />
   </div>
   <div class="venue-edit__grid">
     <Input label={t('venue.address', locale)} bind:value={vAddress} placeholder={t('venue.address_placeholder', locale)} />

@@ -6333,3 +6333,51 @@ schema queda escrito aquí y en el informe del carril, no aplicado. Carril `clau
 
 **Re-evaluar cuando** `user_profile.locale` se cablee (manda sobre la cookie dentro de la app), o los textos
 guardados tengan su tabla.
+
+## [2026-11-02] ADR-170 · Gastos adelantados con «Se debe al equipo» y la sala que sabe quién la programa (cierra «Lo que no entra» de ADR-168; enmienda ADR-043 y ADR-164 § 1)
+
+**Contexto.** Pantallas de 79 y 92 (`_tasks.md` § AHORA). Las migraciones ya están en producción:
+`20261102100000_expense_paid_by_person` (`expense.paid_by_person_id`, `reimbursed_on`, `create_expense` con
+`p_paid_by_person_id`, `set_expense_reimbursed`) y `20261102130000_venue_organization` (`venue.organization_id`, FK
+compuesta al mismo espacio y guard de organización viva). Sin migración en este carril.
+
+**Decisión.**
+
+1. **Un solo «+ Gasto».** `ExpenseDialog` es el único formulario de gasto: lo abren Cuentas (con todas las anclas del
+   ámbito), el módulo Dinero de la línea, la ficha del bolo y Ahora. Quien conoce su bolo o su línea la pasa fija
+   (`lockAnchor`): se ve, no se elige. Las dos copias que había (Cuentas y la línea) se van; el diálogo une sus campos
+   (contraparte de Cuentas y notas de la línea).
+2. **«Lo pagó» es una persona, no un login (79).** Un `PersonPicker` con el equipo del espacio del ancla y, al
+   escribir, el directorio de ese espacio (la búsqueda del ⌘K); un nombre que no es nadie se crea ahí (ADR-107), así
+   que el guard (23514) siempre encuentra el dossier. Vacío es «lo pagó la compañía», dicho bajo el campo. Cambiar de
+   ancla a otro espacio vacía la persona.
+3. **«Se debe al equipo» en Cuentas › Gastos.** Encima de la lista: por persona, sus gastos adelantados sin devolver,
+   el más antiguo primero, y su total por moneda (nunca se suman monedas); la persona a la que más se debe, primero.
+   Cada gasto lleva «Devuelto», que escribe con `POST /api/expenses/:id/reimbursed` (`set_expense_reimbursed`, con el
+   día de hoy) y ofrece deshacer. Puro en `owedToTeam` (`$lib/expense`). La lista, la ficha del bolo y la línea dicen
+   en cada fila «lo pagó X» y, si ya está, «devuelto el …».
+4. **«Devuelto» deja el PATCH.** Lleva su día y la base exige los dos juntos (`reimbursed_on` solo con
+   `reimbursed`), así que va por su RPC; `ExpensePatchSchema` pierde `reimbursed` y gana `paid_by_person_id`.
+5. **`GET /api/expenses` nombra a quien pagó.** Cada fila gana `paid_by_name`, leído bajo RLS del dossier de esa
+   persona en el espacio del gasto (una lectura más, solo si hay alguno). Un dossier oculto o borrado deja el nombre
+   null y la pantalla dice «alguien del equipo».
+6. **Ficha del bolo y Ahora escriben un gasto (enmienda ADR-043).** El dinero se sigue leyendo y cobrando en Cuentas,
+   pero el gasto del día (gasolina, dietas) se apunta donde se está: «+ Gasto» en el bloque Gastos de la ficha del
+   bolo y como cuarta acción de pulgar en Ahora, con el bolo de la función del día ya puesto. Las dos siguen a la lente
+   Cuentas; Ahora además solo cuando el enlace función → bolo es legible (`read:money`). `create_expense` sigue pidiendo
+   `edit:money`.
+7. **La sala sabe quién la programa (92, enmienda ADR-164 § 1).** `VenueEditDialog` gana «La programa», un desplegable
+   con las organizaciones del espacio de la sala (el diálogo recibe `workspaceId`); se envía solo si cambia, así una
+   sala cuya organización se borró después guarda lo demás. La ficha de sala la muestra primero en su cabecera, «La
+   programa X» con enlace a su ficha (y ya no se repite entre los «Con…» de sus funciones); sin ella, quien edita ve
+   «¿Quién la programa?», que abre el editor. `GET /api/venues/:key` devuelve `organization` (viva, del espacio) y la
+   ficha de organización lista «Salas que programa» (`GET /api/organizations/:key` gana `venues`).
+8. **Caché del dispositivo:** las filas de gastos, las salas (`VENUE_COLS` con `organization_id`), la ficha de sala y la
+   de organización cambian de forma: `CACHE_SCHEMA` sube de 7 a 8 (ADR-158).
+
+**Cómo se revierte.** Volver al commit anterior `ExpenseDialog`, Cuentas, `MoneyModule`, `BoloRecord`, `AhoraView`,
+`VenueEditDialog`, `VenueRecord`, `OrganizationRecord` y sus endpoints, y borrar `routes/api/expenses/[id]/reimbursed`.
+Los datos escritos (personas que pagaron, devoluciones, organizaciones de sala) se quedan en columnas que ya existían.
+
+**Re-evaluar cuando** se pague a alguien varios gastos de una vez (una transferencia): entonces «Devolver todo» por
+persona, con un solo día, en vez de gasto a gasto.

@@ -28,6 +28,7 @@
     dateSlip,
     momentWordKey,
     performanceSlip,
+    perfWorkspaceId,
     type DateEvent,
     type PerformanceEvent,
     type SlipContext,
@@ -38,6 +39,9 @@
   import { accentVarFor } from '$lib/utils/accent';
   import { spaceName } from '$lib/utils/identity';
   import { teamQueryOptions } from '$lib/nav-queries';
+  import { performanceBoloQueryOptions } from '$lib/bolo-queries';
+  import { lensOn } from '$lib/lenses.svelte';
+  import ExpenseDialog from '$lib/components/ExpenseDialog.svelte';
   import { ahoraRoadsheetQuery, roleFor, type AhoraRoadsheet } from '$lib/ahora-feeds.svelte';
   import {
     ahoraDay,
@@ -211,6 +215,15 @@
     return null;
   });
   let sheet = $derived(actionItem ? sheetHref(actionItem) : null);
+
+  // «+ Gasto» (ADR-170): the gasolina or the dinner of the day, on its bolo
+  // already. Only when the bolo is readable (read:money) and Cuentas is on;
+  // `create_expense` still gates on edit:money.
+  const boloQuery = createQuery(
+    toStore(() => performanceBoloQueryOptions(actionItem?.id ?? '', lensOn('books') && Boolean(actionItem))),
+  );
+  let expenseBolo = $derived($boloQuery.data?.readable ? $boloQuery.data.bolo_id : null);
+  let expenseOpen = $state(false);
 </script>
 
 {#snippet mark(i: AhoraItem)}
@@ -380,12 +393,20 @@
     {/if}
   </div>
 
-  {#if call?.phone || map || sheet}
+  {#if call?.phone || map || sheet || expenseBolo}
     <nav class="ahora__actions" aria-label={t('ahora.actions', locale)}>
       {#if call?.phone}<a class="ahora__act ahora__act--main" href={telHref(call.phone)} aria-label={t('ahora.call_aria', locale, { name: call.name })}>{t('ahora.call', locale)}</a>{/if}
       {#if map}<a class="ahora__act" href={map} target="_blank" rel="noopener">{t('ahora.map', locale)}</a>{/if}
       {#if sheet}<a class="ahora__act" href={sheet}>{t('ahora.sheet', locale)}</a>{/if}
+      {#if expenseBolo}<button type="button" class="ahora__act" onclick={() => (expenseOpen = true)}>{t('books.add_expense_short', locale)}</button>{/if}
     </nav>
+  {/if}
+  {#if expenseBolo && actionItem}
+    <ExpenseDialog
+      bind:open={expenseOpen}
+      anchors={[{ value: `bolo:${expenseBolo}`, label: where(actionItem), workspaceId: perfWorkspaceId(actionItem.row as PerformanceEvent) ?? '' }]}
+      lockAnchor
+    />
   {/if}
 </section>
 
@@ -563,6 +584,10 @@
       font-weight: 600;
       color: var(--heading-color);
       text-decoration: none;
+      /* The same action as a button (it opens a dialog, it goes nowhere). */
+      background: none;
+      font-family: inherit;
+      cursor: pointer;
     }
     .ahora__act--main {
       background: var(--heading-color);

@@ -41,6 +41,14 @@ export interface OrgStaff {
   phone: string | null;
 }
 
+/** Una sala que la organización programa (`venue.organization_id`, 92). */
+export interface OrgVenue {
+  id: string;
+  slug: string | null;
+  name: string;
+  city: string | null;
+}
+
 /** Lo que lee la ficha: `GET /api/organizations/:key`. */
 export interface OrganizationFile {
   organization: {
@@ -64,6 +72,7 @@ export interface OrganizationFile {
   }>;
   contacts: OrgConversationContact[];
   staff: OrgStaff[];
+  venues: OrgVenue[];
   bolos: ConversationBolo[];
 }
 

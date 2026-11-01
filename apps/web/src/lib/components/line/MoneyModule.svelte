@@ -19,16 +19,11 @@
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
-  import Field from '../Field.svelte';
-  import Dialog from '$lib/components/Dialog.svelte';
-  import Input from '$lib/components/Input.svelte';
+  import ExpenseDialog from '$lib/components/ExpenseDialog.svelte';
   import Menu from '$lib/components/Menu.svelte';
-  import Select from '$lib/components/Select.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
-  import { toastCreated } from '$lib/created';
-  import { FormErrors } from '$lib/form-errors.svelte';
-  import { dayLabel, localDayISO } from '$lib/datetime';
+  import { dayLabel } from '$lib/datetime';
   import {
     boloStatusLabel,
     fmtFee,
@@ -37,7 +32,7 @@
     invoiceTone,
     totalsByCurrency,
   } from '$lib/money';
-  import { EXPENSE_CATEGORIES, categoryLabel } from '$lib/expense';
+  import { categoryLabel } from '$lib/expense';
   import { appLocale, t } from '$lib/i18n';
   import { performanceStatusTone } from '$lib/performance';
 
@@ -93,6 +88,8 @@
     incurred_on: string | null;
     reimbursed: boolean;
     notes: string | null;
+    paid_by_person_id: string | null;
+    paid_by_name?: string | null;
   };
 
   const queryClient = useQueryClient();
@@ -165,95 +162,9 @@
     $expensesQuery.error instanceof Error ? $expensesQuery.error.message : '',
   );
 
-  // ── Add expense dialog ────────────────────────────────────────────────
-  const categoryOptions = EXPENSE_CATEGORIES.map((c) => ({
-    value: c,
-    label: categoryLabel(c, locale),
-  }));
-
+  // ── Add expense: the shared dialog (ADR-170), on this line ───────────
   let expOpen = $state(false);
-  let eCategory = $state('other');
-  let eDescription = $state('');
-  let eAmount = $state('');
-  let eCurrency = $state('EUR');
-  let eDate = $state('');
-  let eNotes = $state('');
-
-  function openExpense() {
-    eCategory = 'other';
-    eDescription = '';
-    eAmount = '';
-    eCurrency = 'EUR';
-    eDate = localDayISO();
-    eNotes = '';
-    expOpen = true;
-  }
-
-  type ExpensePayload = {
-    line_id: string;
-    category: string;
-    description: string;
-    amount: number;
-    currency: string;
-    incurred_on: string | null;
-    notes: string | null;
-  };
-
-  const createExpense = createMutation({
-    mutationFn: (input: ExpensePayload) =>
-      mutateJSON<{ expense: unknown }>('POST', '/api/expenses', input),
-    onSuccess: (body, input) => {
-      expOpen = false;
-      void queryClient.invalidateQueries({ queryKey: ['line-expenses', line.id] });
-      const id = (body as { expense?: { id?: string } } | null)?.expense?.id;
-      toastCreated({
-        locale,
-        message: `${t('books.add_expense', locale)} · ${input.description}`,
-        undo: id
-          ? async () => {
-              await mutateJSON('DELETE', `/api/expenses/${id}`);
-              await queryClient.invalidateQueries({ queryKey: ['line-expenses', line.id] });
-            }
-          : undefined,
-      });
-    },
-    onError: (err) => {
-      addToast({
-        tone: 'danger',
-        title: t('books.expense_not_added', locale),
-        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
-      });
-    },
-  });
-
-  const expErrors = new FormErrors();
-  let expFormEl: HTMLFormElement | undefined = $state();
-
-  /** Runs from the form's submit; what is wrong is said under its field. */
-  function submitExpense() {
-    expErrors.clear();
-    const description = eDescription.trim();
-    if (!description) expErrors.set('lmm-exp-desc', t('books.description_required', locale));
-    // type=number binds a number (or undefined on empty) through Svelte —
-    // normalize via String before deciding empty-vs-value.
-    const rawAmount = String(eAmount ?? '').trim();
-    const amount = Number(rawAmount);
-    if (rawAmount === '' || Number.isNaN(amount) || amount <= 0) {
-      expErrors.set('lmm-exp-amount', t('books.amount_positive', locale));
-    }
-    const currency = eCurrency.trim().toUpperCase();
-    if (!/^[A-Z]{3}$/.test(currency)) expErrors.set('lmm-exp-currency', t('books.currency_code', locale));
-    if (expErrors.any) return void expErrors.focusFirst();
-    $createExpense.mutate({
-      line_id: line.id,
-      category: eCategory,
-      description,
-      amount: Number(amount.toFixed(2)),
-      currency,
-      incurred_on: eDate || null,
-      notes: eNotes.trim() || null,
-    });
-  }
+  const openExpense = () => (expOpen = true);
 
   const removeExpense = createMutation({
     mutationFn: (id: string) => mutateJSON('DELETE', `/api/expenses/${id}`),
@@ -381,7 +292,11 @@
               <tr>
                 <td class="lmm__cell-date">{e.incurred_on ? dayLabel(e.incurred_on) : '—'}</td>
                 <td class="lmm__cell-muted">{categoryLabel(e.category, locale)}</td>
-                <td>{e.description}</td>
+                <td
+                  >{e.description}{#if e.paid_by_person_id}<span class="lmm__cell-muted"
+                      >{` · ${t('books.paid_by_named', locale, { name: e.paid_by_name ?? t('books.owed_someone', locale) })}`}{#if e.reimbursed}{` · ${t('books.reimbursed', locale)}`}{/if}</span
+                    >{/if}</td
+                >
                 <td class="lmm__cell-amount">{fmtMoney(e.amount)} {e.currency}</td>
                 <td class="lmm__cell-actions">
                   <Menu
@@ -409,55 +324,11 @@
   </section>
 </section>
 
-<Dialog bind:open={expOpen} title={t('books.add_expense', locale)} size="m">
-  <form
-    class="lmm__form-grid"
-    bind:this={expFormEl}
-    novalidate
-    oninput={expErrors.onedit}
-    onchange={expErrors.onedit}
-    onsubmit={(e) => {
-      e.preventDefault();
-      submitExpense();
-    }}
-  >
-    <Select label={t('books.category', locale)} bind:value={eCategory} options={categoryOptions} />
-    <Input
-      id="lmm-exp-desc"
-      label={t('books.description', locale)}
-      bind:value={eDescription}
-      required
-      error={expErrors.of('lmm-exp-desc')}
-    />
-    <Field id="lmm-exp-amount" label={t('books.amount', locale)} required error={expErrors.of('lmm-exp-amount')}>
-      <input
-        id="lmm-exp-amount"
-        type="number"
-        step="0.01"
-        min="0.01"
-        bind:value={eAmount}
-        required
-      />
-    </Field>
-    <Input
-      id="lmm-exp-currency"
-      label={t('books.currency', locale)}
-      bind:value={eCurrency}
-      placeholder="EUR"
-      error={expErrors.of('lmm-exp-currency')}
-    />
-    <Input label={t('perf.date', locale)} type="date" bind:value={eDate} />
-    <Input label={t('books.notes', locale)} bind:value={eNotes} placeholder={t('books.optional', locale)} />
-    <!-- Hidden submit lets Enter inside an input trigger submit. -->
-    <button type="submit" hidden aria-hidden="true"></button>
-  </form>
-  {#snippet actions()}
-    <Button variant="quiet" onclick={() => (expOpen = false)}>{t('create.cancel', locale)}</Button>
-    <Button onclick={() => expFormEl?.requestSubmit()} loading={$createExpense.isPending}
-      >{t('composer.add', locale)}</Button
-    >
-  {/snippet}
-</Dialog>
+<ExpenseDialog
+  bind:open={expOpen}
+  anchors={[{ value: `line:${line.id}`, label: line.name, workspaceId: line.workspace_id }]}
+  lockAnchor
+/>
 
 <style>
   @layer components {
@@ -552,12 +423,6 @@
       font-size: var(--text-xs);
       color: var(--text-muted);
       font-variant-numeric: tabular-nums;
-    }
-
-    .lmm__form-grid {
-      display: flex;
-      flex-direction: column;
-      gap: var(--field-gap);
     }
   }
 </style>

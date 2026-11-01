@@ -6,7 +6,9 @@
    *
    * Its data is edited where it is read: each fact of the head (address,
    * capacity, timezone) and the notes open the one venue editor
-   * (`VenueEditDialog`), the same the performance opens. Its technical
+   * (`VenueEditDialog`), the same the performance opens. The organization
+   * that programs it (92, ADR-170) is a fact with a link to its record; set
+   * in the same editor. Its technical
    * contacts call (`tel:`) and write (`mailto:`); its performances, past and
    * to come, are the common row (`PerformanceRows`).
    *
@@ -81,7 +83,12 @@
 
   const today = localDayISO();
   let split = $derived(file ? venuePerformances(file.performances, today) : { coming: [], past: [] });
-  let organizations = $derived(file ? venueOrganizations(file.performances) : []);
+  // Who programs it (92, ADR-170) goes first; the others are whom its
+  // performances were with, once each.
+  let programmer = $derived(file?.organization ?? null);
+  let organizations = $derived(
+    file ? venueOrganizations(file.performances).filter((o) => o.slug !== programmer?.slug) : [],
+  );
   let contacts = $derived(venueContactRows(venue?.contacts));
   let placeLine = $derived(venue ? [venue.city, venue.country].filter(Boolean).join(', ') : '');
 
@@ -160,6 +167,14 @@
             <span>{venue!.timezone}</span>
           {/if}
         {/if}
+        {#if programmer}
+          <span data-testid="venue-programmer"
+            >{t('venue.programmed_by_fact', locale)}
+            <a class="lenshead__frag" href={`/h/${workspaceSlug}/organization/${encodeURIComponent(programmer.slug)}`}>{programmer.name}</a></span
+          >
+        {:else if canEdit}
+          <span><button type="button" class="fact-act" onclick={edit}>{t('venue.programmed_by_add', locale)}</button></span>
+        {/if}
         {#each organizations as o (o.slug)}
           <span
             >{t('perf.with', locale)}
@@ -225,7 +240,7 @@
   {/if}
 </article>
 
-<VenueEditDialog bind:open={editOpen} {venue} />
+<VenueEditDialog bind:open={editOpen} {venue} {workspaceId} />
 
 <style>
   @layer components {

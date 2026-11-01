@@ -337,6 +337,21 @@
       </section>
     {/if}
 
+    {#if file.venues?.length}
+      <!-- The rooms it programs (92, ADR-170): each venue says it, here they meet. -->
+      <section class="organization__section" aria-label={t('organization.venues', locale)} data-testid="organization-venues">
+        <BlockHead title={t('organization.venues', locale)} count={file.venues.length} />
+        <ul class="organization__rows" role="list">
+          {#each file.venues as v (v.id)}
+            <li>
+              <a class="organization__row-name" href={`/h/${workspaceSlug}/venue/${encodeURIComponent(v.slug ?? v.id)}`}>{v.name}</a>
+              <span class="organization__row-main">{v.city ?? ''}</span>
+            </li>
+          {/each}
+        </ul>
+      </section>
+    {/if}
+
     <section class="organization__section" aria-label={t('organization.contacts', locale)}>
       {#if contacts.length > 0}
         <BlockHead title={t('organization.contacts', locale)} count={contacts.length} />
