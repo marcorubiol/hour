@@ -1,8 +1,10 @@
 <script lang="ts">
   /**
-   * The fiscal data of an organization (ADR-102 phase 2b): what a factura
-   * prints for the payer. Read through `/api/organizations/:id/fiscal`, written
-   * through `set_organization_fiscal_identity` (can_edit_workspace_money).
+   * One party's fiscal data, read and written through `endpoint` (GET and
+   * PUT, a `FiscalBlockResponse`): an organization's as payer (ADR-102 phase
+   * 2b, `/api/organizations/:id/fiscal`) or the space's as issuer (ADR-168,
+   * `/api/workspaces/:id/fiscal`, which adds the bank account). The caller
+   * names the fields; the block draws them in that order.
    *
    * Renders nothing for someone who can neither read nor edit them. `onsaved`
    * lets the caller follow up (Books re-sets the payer of a draft so it picks
@@ -16,8 +18,8 @@
   import {
     RECEIVER_FISCAL_FIELDS,
     receiverFiscalSummary,
-    type OrganizationFiscalResponse,
-    type ReceiverFiscal,
+    type FiscalBlockResponse,
+    type FiscalField,
   } from '$lib/fiscal';
   import { appLocale, t } from '$lib/i18n';
   import Button from './Button.svelte';
@@ -25,7 +27,19 @@
   import { addToast } from './Toast.svelte';
 
   interface Props {
-    organizationId: string;
+    /** GET reads the block, PUT saves it. */
+    endpoint: string;
+    queryKey: readonly unknown[];
+    /** What the form asks, in order. `legal_name` is always first and required. */
+    fields?: readonly FiscalField[];
+    /** The block's head; «Datos fiscales» by default. */
+    title?: string;
+    /** The line under the form: what this party's data is for. */
+    hint?: string;
+    /** A line under the summary (where the record comes from). */
+    note?: string;
+    /** Prefix for the form's ids (two blocks on one page must not collide). */
+    idPrefix?: string;
     /** Open the form straight away when there is nothing yet. */
     startEditing?: boolean;
     onsaved?: () => void;
@@ -33,32 +47,43 @@
     level?: 2 | 3;
   }
 
-  let { organizationId, startEditing = false, onsaved, level = 3 }: Props = $props();
+  let {
+    endpoint,
+    queryKey,
+    fields = RECEIVER_FISCAL_FIELDS,
+    title,
+    hint,
+    note,
+    idPrefix = 'fiscal',
+    startEditing = false,
+    onsaved,
+    level = 3,
+  }: Props = $props();
 
   const locale = appLocale();
+  let heading = $derived(title ?? t('fiscal.title', locale));
   const queryClient = useQueryClient();
 
   const query = createQuery(
     toStore(() => ({
-      queryKey: ['organization-fiscal', organizationId] as const,
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
-        fetchJSON<OrganizationFiscalResponse>(`/api/organizations/${organizationId}/fiscal`, signal),
+      queryKey,
+      queryFn: ({ signal }: { signal: AbortSignal }) => fetchJSON<FiscalBlockResponse>(endpoint, signal),
     })),
   );
   let data = $derived($query.data ?? null);
   let fiscal = $derived(data?.fiscal ?? null);
-  let visible = $derived(Boolean(data && (data.can_edit || fiscal)));
+  let visible = $derived(Boolean(data && (data.can_edit || fiscal || data.hidden)));
 
   let editing = $state(false);
-  let draft = $state<Record<keyof ReceiverFiscal, string>>(blank());
+  let draft = $state<Record<FiscalField, string>>(blank());
 
-  function blank(): Record<keyof ReceiverFiscal, string> {
-    return Object.fromEntries(RECEIVER_FISCAL_FIELDS.map((k) => [k, ''])) as Record<keyof ReceiverFiscal, string>;
+  function blank(): Record<FiscalField, string> {
+    return Object.fromEntries(fields.map((k) => [k, ''])) as Record<FiscalField, string>;
   }
 
   function edit() {
     const next = blank();
-    for (const k of RECEIVER_FISCAL_FIELDS) next[k] = fiscal?.[k] ?? '';
+    for (const k of fields) next[k] = fiscal?.[k] ?? '';
     draft = next;
     editing = true;
   }
@@ -74,14 +99,15 @@
 
   const save = createMutation({
     mutationFn: () =>
-      mutateJSON('PUT', `/api/organizations/${organizationId}/fiscal`, {
-        ...Object.fromEntries(RECEIVER_FISCAL_FIELDS.map((k) => [k, draft[k].trim() || null])),
+      mutateJSON('PUT', endpoint, {
+        ...Object.fromEntries(fields.map((k) => [k, draft[k].trim() || null])),
         legal_name: draft.legal_name.trim(),
       }),
     onSuccess: () => {
       editing = false;
       addToast({ tone: 'success', message: t('fiscal.saved', locale) });
-      void queryClient.invalidateQueries({ queryKey: ['organization-fiscal', organizationId] });
+      void queryClient.invalidateQueries({ queryKey: [...queryKey] });
+      void queryClient.invalidateQueries({ queryKey: ['proforma'] });
       void queryClient.invalidateQueries({ queryKey: ['money-payers'] });
       void queryClient.invalidateQueries({ queryKey: ['invoices'] });
       onsaved?.();
@@ -105,7 +131,7 @@
     if (!draft.legal_name.trim()) {
       // Said under the field (ADR-139 p7), never as a toast.
       legalNameError = t('fiscal.legal_name_required', locale);
-      document.getElementById('org-fiscal-legal-name')?.focus();
+      document.getElementById(`${idPrefix}-legal_name`)?.focus();
       return;
     }
     if (!$save.isPending) $save.mutate();
@@ -113,16 +139,16 @@
 </script>
 
 {#if visible}
-  <section class="org-fiscal" aria-label={t('fiscal.title', locale)}>
+  <section class="org-fiscal" aria-label={heading}>
     {#if !editing && !fiscal}
       <!-- Nothing on file: the block is one line, with its way in. -->
-      <EmptyLine label={t('fiscal.title', locale)} text={t('fiscal.none', locale)}>
+      <EmptyLine label={heading} text={t(data?.hidden ? 'proforma.party_hidden' : 'fiscal.none', locale)}>
         {#if data?.can_edit}
           <button type="button" class="empty-line__act" onclick={edit}>{t('fiscal.add', locale)}</button>
         {/if}
       </EmptyLine>
     {:else}
-      <BlockHead title={t('fiscal.title', locale)} {level}>
+      <BlockHead title={heading} {level}>
         {#if data?.can_edit && !editing}
           <button type="button" class="block-head__act" onclick={edit}>{t('fiscal.edit', locale)}</button>
         {/if}
@@ -131,32 +157,25 @@
 
     {#if editing}
       <form class="org-fiscal__form" onsubmit={submit}>
-        <Input
-          id="org-fiscal-legal-name"
-          label={t('fiscal.legal_name', locale)}
-          bind:value={draft.legal_name}
-          required
-          error={legalNameError}
-        />
-        <Input label={t('fiscal.tax_id', locale)} bind:value={draft.tax_id} />
-        <Input label={t('fiscal.address_line_1', locale)} bind:value={draft.address_line_1} />
-        <Input label={t('fiscal.address_line_2', locale)} bind:value={draft.address_line_2} />
-        <div class="org-fiscal__row">
-          <Input label={t('fiscal.postal_code', locale)} bind:value={draft.postal_code} />
-          <Input label={t('fiscal.city', locale)} bind:value={draft.city} />
-        </div>
-        <div class="org-fiscal__row">
-          <Input label={t('fiscal.region', locale)} bind:value={draft.region} />
-          <Input label={t('fiscal.country', locale)} bind:value={draft.country} placeholder="ES" />
-        </div>
-        <p class="org-fiscal__hint">{t('fiscal.hint', locale)}</p>
+        {#each fields as field (field)}
+          <Input
+            id={`${idPrefix}-${field}`}
+            label={t(`fiscal.${field}`, locale)}
+            bind:value={draft[field]}
+            required={field === 'legal_name'}
+            error={field === 'legal_name' ? legalNameError : undefined}
+            placeholder={field === 'country' ? 'ES' : undefined}
+          />
+        {/each}
+        <p class="org-fiscal__hint">{hint ?? t('fiscal.hint', locale)}</p>
         <div class="org-fiscal__actions">
           <Button size="xs" variant="quiet" onclick={() => (editing = false)}>{t('create.cancel', locale)}</Button>
           <Button size="xs" type="submit" loading={$save.isPending}>{t('fiscal.save', locale)}</Button>
         </div>
       </form>
     {:else if fiscal}
-      <p class="org-fiscal__summary">{receiverFiscalSummary(fiscal)}</p>
+      <p class="org-fiscal__summary">{receiverFiscalSummary({ legal_name: fiscal.legal_name ?? null, tax_id: fiscal.tax_id ?? null, city: fiscal.city ?? null })}</p>
+      {#if note}<p class="org-fiscal__hint">{note}</p>{/if}
     {/if}
   </section>
 {/if}
@@ -182,9 +201,6 @@
     .org-fiscal__form {
       display: flex;
       flex-direction: column;
-    }
-    .org-fiscal__row {
-      display: contents;
     }
     .org-fiscal__summary {
       font-size: var(--text-s);

@@ -84,10 +84,11 @@ export const GET: RequestHandler = async ({ request, params, platform, locals })
 
     const { data: workspaces } = await pgGet<{
       name: string;
+      slug: string;
       fiscal_identity_id: string | null;
       account_id: string;
     }>(env, 'workspace', jwt, {
-      search: { id: `eq.${inv.workspace_id}`, select: 'name,fiscal_identity_id,account_id' },
+      search: { id: `eq.${inv.workspace_id}`, select: 'name,slug,fiscal_identity_id,account_id' },
     });
     const ws = workspaces[0] ?? null;
 
@@ -122,6 +123,7 @@ export const GET: RequestHandler = async ({ request, params, platform, locals })
       subtotal: Number(inv.subtotal),
       total: Number(inv.total),
       project: inv.project,
+      workspace_slug: ws?.slug ?? null,
       issuer: resolveParty({
         snapshot: inv.issuer_snapshot,
         pointer: issuerId,

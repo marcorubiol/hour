@@ -41,6 +41,35 @@ type ReceiverFiscalField = (typeof RECEIVER_FISCAL_FIELDS)[number];
 export type ReceiverFiscal = Record<ReceiverFiscalField, string | null>;
 
 /**
+ * The issuer's: the receiver's fields plus the bank account a proforma prints
+ * under «Forma de pago» (ADR-168). Same order, banking last.
+ */
+export const ISSUER_FISCAL_FIELDS = [...RECEIVER_FISCAL_FIELDS, 'iban', 'swift_bic'] as const;
+export type FiscalField = (typeof ISSUER_FISCAL_FIELDS)[number];
+export type IssuerFiscal = Record<FiscalField, string | null>;
+
+/**
+ * What a fiscal block reads, whoever the party is: the record (null when
+ * there is none or the caller cannot see it), whether the caller may edit it,
+ * and `hidden` when a record exists that this caller cannot read.
+ */
+export interface FiscalBlockResponse {
+	fiscal: (Partial<IssuerFiscal> & { id: string }) | null;
+	can_edit: boolean;
+	hidden?: boolean;
+}
+
+/**
+ * GET /api/workspaces/[id]/fiscal (ADR-168): the space's issuer, the one a
+ * proforma prints. `source` says where it comes from: the space's own record,
+ * the account default, or nowhere yet. Saving always writes the space's own.
+ */
+export interface WorkspaceFiscalResponse extends FiscalBlockResponse {
+	fiscal: (IssuerFiscal & { id: string }) | null;
+	source: 'workspace' | 'account' | null;
+}
+
+/**
  * GET /api/organizations/[id]/fiscal. `fiscal` is null when the organization
  * has none, or when the caller cannot read money (RLS on fiscal_identity).
  */

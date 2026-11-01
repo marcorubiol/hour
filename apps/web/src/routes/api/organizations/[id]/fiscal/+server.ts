@@ -16,6 +16,7 @@ import type { OrganizationFiscalResponse, ReceiverFiscal } from '$lib/fiscal';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import { jsonNoStore, UUID_RE } from '$lib/server/http';
+import { ReceiverFiscalSchema } from '$lib/server/fiscal';
 
 type OrganizationRow = OrganizationFiscalResponse['organization'] & {
   fiscal: (ReceiverFiscal & { id: string }) | null;
@@ -54,19 +55,6 @@ export const GET: RequestHandler = async ({ request, params, platform, locals })
   }
 };
 
-const text = (max: number) => v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(max))), null);
-
-const PutSchema = v.object({
-  legal_name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(300)),
-  tax_id: text(60),
-  address_line_1: text(300),
-  address_line_2: text(300),
-  postal_code: text(30),
-  city: text(120),
-  region: text(120),
-  country: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.regex(/^([A-Za-z]{2})?$/))), null),
-});
-
 export const PUT: RequestHandler = async ({ request, params, platform, locals }) => {
   if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
@@ -80,7 +68,7 @@ export const PUT: RequestHandler = async ({ request, params, platform, locals })
   } catch {
     return jsonNoStore({ error: 'invalid_body' }, 400);
   }
-  const parsed = v.safeParse(PutSchema, raw);
+  const parsed = v.safeParse(ReceiverFiscalSchema, raw);
   if (!parsed.success) {
     return jsonNoStore(
       {

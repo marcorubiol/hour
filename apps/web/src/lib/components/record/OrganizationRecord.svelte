@@ -29,7 +29,7 @@
   import Input from '$lib/components/Input.svelte';
   import MissingBand, { type MissingItem } from '$lib/components/MissingBand.svelte';
   import ConversationTable from '$lib/components/ConversationTable.svelte';
-  import OrganizationFiscal from '$lib/components/OrganizationFiscal.svelte';
+  import FiscalIdentity from '$lib/components/FiscalIdentity.svelte';
   import type { OrganizationFiscalResponse } from '$lib/fiscal';
   import { ORGANIZATION_KINDS, orgBolos, orgContacts, orgMissing, type OrganizationFile } from '$lib/organization-record';
   import { relativeContactDate } from '$lib/conversation';
@@ -360,7 +360,12 @@
 
     <div class="organization__section" bind:this={fiscalEl} id="fiscal">
       {#key fiscalStart}
-        <OrganizationFiscal organizationId={org.id} level={2} startEditing={fiscalStart} />
+        <FiscalIdentity
+          endpoint={`/api/organizations/${org.id}/fiscal`}
+          queryKey={['organization-fiscal', org.id]}
+          level={2}
+          startEditing={fiscalStart}
+        />
       {/key}
     </div>
 

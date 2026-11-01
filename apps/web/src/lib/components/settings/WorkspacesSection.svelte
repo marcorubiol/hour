@@ -2,7 +2,6 @@
   import RecordHead from '$lib/components/RecordHead.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import { toStore } from 'svelte/store';
-  import { SvelteSet } from 'svelte/reactivity';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { accentVar } from '$lib/utils/accent';
   import { spaceName } from '$lib/utils/identity';
@@ -250,31 +249,6 @@
       });
     },
   });
-
-  // Hardcoded role set for Phase 0 — Marco's hats.
-  const ALL_ROLES = [
-    'author',
-    'performer',
-    'musician',
-    'lighting',
-    'sound',
-    'production',
-    'distribution',
-    'technician',
-  ];
-  const activeRoles = new SvelteSet<string>([
-      'musician',
-      'lighting',
-      'distribution',
-      'production',
-      'author',
-      'performer',
-    ]);
-
-  function toggleRole(role: string) {
-    if (activeRoles.has(role)) activeRoles.delete(role);
-    else activeRoles.add(role);
-  }
 </script>
 
 <RecordHead crumbs={[{ label: t('settings.title', locale) }, { label: t('settings.ws_kicker', locale) }]} title={t('settings.nav_workspaces', locale)}>
@@ -473,29 +447,6 @@
   </section>
 {/if}
 
-<section class="set-group">
-  <BlockHead title={t('settings.roles_kicker', locale)} count={t('settings.roles_title', locale)} />
-  <div class="set-group__body">
-    <p class="set-prose">
-      {t('settings.roles_prose', locale)}
-    </p>
-    <div class="set-roles-grid">
-      {#each ALL_ROLES as role (role)}
-        <button
-          type="button"
-          class={['pill--sm', 'pill--mono', 'set-role-chip', activeRoles.has(role) && 'pill--on']
-            .filter(Boolean)
-            .join(' ')}
-          onclick={() => toggleRole(role)}
-        >
-          <span class="set-role-chip__dot" aria-hidden="true"></span>
-          <span>{t(`settings.hat_${role}`, locale)}</span>
-        </button>
-      {/each}
-    </div>
-  </div>
-</section>
-
 <Dialog
   open={revoking !== null}
   onclose={() => (revoking = null)}
@@ -510,13 +461,6 @@
 </Dialog>
 
 <style>
-  .set-prose {
-    font-size: var(--text-s);
-    color: var(--text-muted);
-    line-height: 1.6;
-    margin-block: 0 var(--space-s);
-    max-inline-size: 56ch;
-  }
 
   .set-ws-list {
     display: flex;
@@ -596,26 +540,6 @@
   .set-alias__actions {
     display: flex;
     gap: var(--space-xs);
-  }
-
-  .set-roles-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-xs);
-  }
-  /* Pill skeleton (base.css) carries the chip; only the dot is local. */
-  .set-role-chip {
-    --pill-gap: var(--space-xs);
-  }
-  .set-role-chip__dot {
-    inline-size: var(--dot-l);
-    block-size: var(--dot-l);
-    border: var(--line-hairline) solid currentColor;
-    border-radius: 50%;
-    display: inline-block;
-  }
-  :global(.set-role-chip.pill--on) .set-role-chip__dot {
-    background: currentColor;
   }
 
   .set-access {

@@ -22,7 +22,7 @@
   import Field from './Field.svelte';
   import Input from './Input.svelte';
   import Menu from './Menu.svelte';
-  import OrganizationFiscal from './OrganizationFiscal.svelte';
+  import FiscalIdentity from './FiscalIdentity.svelte';
   import Select from './Select.svelte';
   import StateBadge from './StateBadge.svelte';
   import { addToast } from './Toast.svelte';
@@ -372,8 +372,9 @@
                   </p>
                 {:else if invoice.doc_type === 'factura' && fiscalState === 'missing' && invoice.payer}
                   <p class="mny-inv__warn">{t('books.payer_fiscal_missing', locale, { payer: payerName(invoice) })}</p>
-                  <OrganizationFiscal
-                    organizationId={invoice.payer.id}
+                  <FiscalIdentity
+                    endpoint={`/api/organizations/${invoice.payer.id}/fiscal`}
+                    queryKey={['organization-fiscal', invoice.payer.id]}
                     startEditing
                     onsaved={() => setPayer(invoice, invoice.payer_organization_id)}
                   />

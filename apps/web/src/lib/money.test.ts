@@ -3,6 +3,7 @@ import {
 	agingState,
 	applyTaxLines,
 	boloStatusLabel,
+	lastBoloFee,
 	esTaxLines,
 	fmtCurrency,
 	fmtFee,
@@ -215,5 +216,30 @@ describe('money formatting follows the language (one formatter for Cuentas and D
 	it('Desk and Cuentas write the same amount the same way', () => {
 		expect(fmtCurrency(8070, 'EUR', 'es').replace(/\s/g, ' ')).toBe('8.070 €');
 		expect(fmtFee(3500, 'CHF', 'es')).toBe('3.500,00 CHF');
+	});
+});
+
+describe('lastBoloFee', () => {
+	const b = (id: string, project_id: string, fee_amount: number | null, status = 'confirmed', fee_currency: string | null = 'EUR') => ({
+		id,
+		project_id,
+		fee_amount,
+		fee_currency,
+		status,
+	});
+
+	it('takes the newest bolo of the project with a fee', () => {
+		const bolos = [b('0190-a', 'p1', 1200), b('0190-c', 'p1', 1500, 'done', 'CHF'), b('0190-b', 'p1', 900), b('0190-d', 'p2', 9999)];
+		expect(lastBoloFee(bolos, 'p1')).toEqual({ amount: 1500, currency: 'CHF' });
+	});
+
+	it('skips bolos without a fee and cancelled ones', () => {
+		const bolos = [b('0190-a', 'p1', 1200), b('0190-b', 'p1', null), b('0190-c', 'p1', 3000, 'cancelled')];
+		expect(lastBoloFee(bolos, 'p1')).toEqual({ amount: 1200, currency: 'EUR' });
+	});
+
+	it('is null for a project with nothing to propose', () => {
+		expect(lastBoloFee([b('0190-a', 'p1', null)], 'p1')).toBeNull();
+		expect(lastBoloFee([], 'p1')).toBeNull();
 	});
 });
