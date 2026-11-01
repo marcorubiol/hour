@@ -341,6 +341,9 @@
   );
 </script>
 
+<!-- Empty and not yours to write: no lid (ADR-154). While it loads, or when
+     the read fails, it is drawn, so an editor's lid does not jump in. -->
+{#if canEdit || order.length > 0 || $feed.isPending || $feed.isError}
 <section class="hours" aria-busy={$feed.isPending}>
   <button type="button" class="lid" aria-expanded={open} onclick={() => (open = !open)}>
     <span class="lid__w">{lidWord}</span>
@@ -537,6 +540,7 @@
     {#if eBad}<p class="hours__hint" role="status">{t('planner.ro_bad_clock', locale)}</p>{/if}
   {/if}
 </section>
+{/if}
 
 <style>
   @layer components {

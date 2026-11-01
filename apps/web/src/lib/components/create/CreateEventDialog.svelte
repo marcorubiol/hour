@@ -45,7 +45,7 @@
   import { toastCreated } from '$lib/created';
   import { markFresh } from '$lib/fresh.svelte';
   import { dayKeyInTz } from '$lib/planner';
-  import { dayMonthYear, viewerTimeZone } from '$lib/datetime';
+  import { dayMonthYear, dualTime, viewerTimeZone } from '$lib/datetime';
   import { BLOCK_MAX_DAYS } from '$lib/block';
   import { appLocale, appLocaleTag, t } from '$lib/i18n';
   import {
@@ -191,6 +191,10 @@
   /** The clock an hour is typed in: the project's space (ADR-078 §11). */
   let entryTz = $derived(
     workspaces.find((w) => w.id === (project?.workspace_id ?? d.workspace))?.timezone || viewerTz,
+  );
+  /** Said only when the space's clock is not yours (ADR-154, `dualTime`'s test). */
+  let timeHint = $derived(
+    dualTime(new Date().toISOString(), entryTz, viewerTz).secondary !== null ? t('create.time_hint_tz', locale, { tz: entryTz }) : undefined,
   );
 
   // The team, for an unavailability: who can be marked (cast ∪ crew).
@@ -876,7 +880,7 @@
             onchange={() => (touched.day = true)}
           />
           {#if sk.when.hours && d.when.timed}
-            <Field id="{uid}-start" label={t('qa.hours', locale)} error={errors.end} helper={t('create.time_hint_tz', locale, { tz: entryTz })}>
+            <Field id="{uid}-start" label={t('qa.hours', locale)} error={errors.end} helper={timeHint}>
               <input
                 id="{uid}-start"
                 type="time"

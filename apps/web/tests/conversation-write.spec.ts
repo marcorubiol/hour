@@ -210,7 +210,7 @@ test.describe('conversation inline write', () => {
       await page.getByRole('menuitem', { name: 'Not this time…', exact: true }).click();
       const dialog = page.locator('dialog[open]');
       await expect(dialog).toBeVisible();
-      await dialog.getByLabel(/Write again on/).fill('2099-01-15');
+      await dialog.getByLabel(/When to write again/).fill('2099-01-15');
       await patchOk(page, original.id, () => dialog.getByRole('button', { name: 'Save' }).click());
       await expect(trigger).toContainText('Not this time');
 

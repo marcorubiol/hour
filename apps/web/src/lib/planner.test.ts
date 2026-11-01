@@ -712,22 +712,19 @@ describe('decisionsFor', () => {
     expect(decisions[0].kind).toBe('release');
   });
 
-  it('a possible pair of holds is a choose decision while both sides are open', () => {
-    const { decisions } = run(
+  it('a possible pair of holds is never a decision — not knowing who goes asserts nothing (ADR-154)', () => {
+    const { decisions, concurrences } = run(
       [
         perf({ id: 'a', project_id: 'proj-a', status: 'hold' }),
         perf({ id: 'b', project_id: 'proj-b', status: 'hold' }),
       ],
       { a: ['p1'] }, // b has no roster
     );
-    expect(decisions).toHaveLength(1);
-    expect(decisions[0].level).toBe('possible');
-    expect(decisions[0].kind).toBe('choose');
+    expect(decisions).toEqual([]);
+    expect(concurrences).toEqual([]);
   });
 
-  it('a possible pair drops once one side is confirmed — no roster, no asserted friction, never a release prompt', () => {
-    // ADR-080 §3 — 'possible' is a decision only while both sides are
-    // options to confront; §5's release follow-up is people|double only.
+  it('a possible pair with one side confirmed is never a release prompt either', () => {
     const { decisions, concurrences } = run(
       [
         perf({ id: 'a', project_id: 'proj-a', status: 'confirmed' }),

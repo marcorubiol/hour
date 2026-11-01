@@ -515,13 +515,15 @@
       padding-inline: calc(var(--space-m) + var(--line-hairline));
     }
     /* «Después» on a phone: its word heads the group on a row of its own,
-       and each line is two: the day and hour, then the name with the whole
-       width (at 390 a day and an hour beside the name wrapped every name). */
+       and each line is two: the name first with the whole width, then the
+       day and hour under it (at 390 a day and an hour beside the name
+       wrapped every name; Marco, 01-11: what it is reads before when). */
     .lines {
       grid-template-columns: minmax(0, 1fr);
     }
     .then__k {
       grid-column: 1 / -1;
+      order: -2;
     }
     .then__k--none {
       display: none;
@@ -531,6 +533,9 @@
       row-gap: 0;
     }
     .then__what {
+      order: -1;
+    }
+    .then__when {
       padding-block-end: var(--space-2xs);
     }
   }

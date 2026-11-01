@@ -84,12 +84,10 @@
   /** Calm's overdue line, opened in place. */
   let overdueOpen = $state(false);
   const overdueWord = (n: number) => t(n === 1 ? 'desk.title_overdue_one' : 'desk.title_overdue_many', locale, { n });
+  // With nothing more waiting, calm has nothing to say about the rest
+  // (ADR-154): the line is drawn from one on.
   let calmRest = $derived(
-    calm
-      ? t(calm.more === 0 ? 'desk.calm_rest_zero' : calm.more === 1 ? 'desk.calm_rest_one' : 'desk.calm_rest_many', locale, {
-          n: calm.more,
-        })
-      : '',
+    calm && calm.more > 0 ? t(calm.more === 1 ? 'desk.calm_rest_one' : 'desk.calm_rest_many', locale, { n: calm.more }) : '',
   );
   let feedCount = $derived(feed.reduce((n, b) => n + b.runs.reduce((m, r) => m + r.items.length, 0), 0));
 
@@ -259,7 +257,7 @@
         </ul>
       {/if}
     {/if}
-    <CalmLine text={calmRest} action={t('calm.see_all', locale)} onclick={() => onleavecalm?.()} />
+    {#if calmRest}<CalmLine text={calmRest} action={t('calm.see_all', locale)} onclick={() => onleavecalm?.()} />{/if}
   {:else if all}
     <div class="timeline">
       {#each feed as bucket (bucket.sortKey)}

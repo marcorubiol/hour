@@ -254,15 +254,15 @@ describe('holdDeadlineLabel (revisión del Planner, 2026-10-18)', () => {
     expect(holdDeadlineLabel('2026-11-05', today, 'es', 'es-ES')).toBe('vence 5 nov');
     expect(holdDeadlineLabel('2026-10-25', today, 'en', 'en-GB')).toBe('expires 25 Oct');
   });
-  it('today, yesterday and how long ago', () => {
+  it('today; a past deadline says what it asks for, never how long ago', () => {
     expect(holdDeadlineLabel(today, today, 'es', 'es-ES')).toBe('vence hoy');
-    expect(holdDeadlineLabel('2026-10-17', today, 'es', 'es-ES')).toBe('venció ayer');
-    expect(holdDeadlineLabel('2026-09-30', today, 'es', 'es-ES')).toBe('venció hace 18 días');
+    expect(holdDeadlineLabel('2026-10-17', today, 'es', 'es-ES')).toBe('plazo pasado: confirma o libera');
+    expect(holdDeadlineLabel('2026-09-30', today, 'es', 'es-ES')).toBe('plazo pasado: confirma o libera');
   });
-  it('compact (the slip state line): no verb, a past deadline names its date', () => {
+  it('compact (the slip state line): no verb, a past deadline in two words', () => {
     expect(holdDeadlineLabel('2026-10-21', today, 'es', 'es-ES', true)).toBe('mié');
     expect(holdDeadlineLabel('2026-11-05', today, 'es', 'es-ES', true)).toBe('5 nov');
     expect(holdDeadlineLabel(today, today, 'es', 'es-ES', true)).toBe('hoy');
-    expect(holdDeadlineLabel('2026-09-30', today, 'es', 'es-ES', true)).toBe('venció 30 sept');
+    expect(holdDeadlineLabel('2026-09-30', today, 'es', 'es-ES', true)).toBe('plazo pasado');
   });
 });

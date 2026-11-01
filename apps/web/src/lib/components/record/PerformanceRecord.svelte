@@ -1143,7 +1143,6 @@
               <li>
                 <span class="perf__asset-dir">{enumWord('perf.asset_dir_', a.direction)}</span>
                 <span class="perf__asset-kind">{enumWord('perf.asset_kind_', a.kind)}</span>
-                <span class="perf__person-note">{t('perf.asset_registered', locale)}</span>
               </li>
             {/each}
           </ul>

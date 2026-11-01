@@ -14,7 +14,7 @@
     type MoneyPayer,
     type PaymentMethod,
   } from '$lib/money';
-  import { dayLabel } from '$lib/datetime';
+  import { dayLabel, localeDayMonth } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
   import Button from './Button.svelte';
   import EmptyLine from './EmptyLine.svelte';
@@ -248,10 +248,12 @@
         ...parent,
       });
     },
-    onSuccess: () => {
+    onSuccess: (_data, invoice) => {
       void queryClient.invalidateQueries({ queryKey: ['tasks', 'open'] });
       void queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      addToast({ tone: 'success', message: t('books.followup_added', locale) });
+      // The day it lands on, said (ADR-154): «Recordatorio en Hoy el 12 nov.»
+      const on = agingFor(invoice).expectedOn;
+      addToast({ tone: 'success', message: t('books.followup_added', locale, { day: on ? localeDayMonth(on.slice(0, 10), locale) : '' }) });
     },
     onError: (err) => {
       addToast({

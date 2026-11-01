@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   attributionFor,
   buildPersonAttribution,
+  goesNames,
   noCastKey,
   noCastProjectId,
   peopleOf,
@@ -183,5 +184,23 @@ describe('personRowKeys', () => {
   it('the synthetic key round-trips and cannot be mistaken for a person', () => {
     expect(noCastProjectId(noCastKey('mamemi'))).toBe('mamemi');
     expect(noCastProjectId('019f21d2-7482-77e6-9ad9-27d881cff305')).toBeNull();
+  });
+});
+
+describe('goesNames (ADR-154: «sin reparto» never contradicts a «voy»)', () => {
+  const names = new Map([['me', 'Marco'], ['ana', 'Ana'], ['joe', 'Joe']]);
+  const you = { one: 'vas tú', many: 'tú' };
+  it('the roster on file wins', () => {
+    expect(goesNames({ roster: ['ana'], commitments: [going('me')] }, names, 'me', you)).toEqual(['Ana']);
+  });
+  it('without a roster, your «voy» says you go', () => {
+    expect(goesNames({ roster: [], commitments: [going('me')] }, names, 'me', you)).toEqual(['vas tú']);
+  });
+  it('with others, a list with you in it', () => {
+    expect(goesNames({ roster: null, commitments: [going('me'), going('ana')] }, names, 'me', you)).toEqual(['tú', 'Ana']);
+  });
+  it('a «no voy» wins; nobody is guessed', () => {
+    expect(goesNames({ roster: [], commitments: [going('joe'), notGoing('joe')] }, names, 'me', you)).toEqual([]);
+    expect(goesNames({ roster: [], commitments: [] }, names, 'me', you)).toEqual([]);
   });
 });

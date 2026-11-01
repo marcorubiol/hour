@@ -1089,6 +1089,9 @@
         <div class="radar" aria-busy={loading}>
           <!-- 2 · Pide atención -->
           <section class="att" aria-label={t('books.attention', locale)} data-help-step="books-att">
+            <!-- At zero, no head and no count: the one line in its place keeps
+                 the grid square (ADR-154). Loading or failing, as before. -->
+            {#if loading || invoicesError || attention.length > 0}
             <BlockHead title={t('books.attention', locale)} count={loading || invoicesError ? DASH : attention.length}>
               {#if attention.length > ATTENTION_VISIBLE}
                 <button type="button" class="block-head__act" onclick={() => (attentionAll = !attentionAll)}>
@@ -1096,6 +1099,7 @@
                 </button>
               {/if}
             </BlockHead>
+            {/if}
             <FirstTimeNote event="first_overdue" when={!loading && attention.some((a) => a.kind === 'overdue')} />
             {#if invoicesError}
               {@render failed('books.err_invoices', () => $invoicesQuery.refetch())}
@@ -1426,7 +1430,7 @@
   {/snippet}
 </Dialog>
 
-<Dialog bind:open={expOpen} title={t('books.add_expense', locale)} size="s" description={t('books.expense_desc', locale)}>
+<Dialog bind:open={expOpen} title={t('books.add_expense', locale)} size="s">
   <form class="mny__pay-form" novalidate oninput={formErrors.onedit} onchange={formErrors.onedit} onsubmit={(e) => { e.preventDefault(); submitExpense(); }}>
     <div class="mny__row2">
       <Input id="exp-amount" label={t('books.amount', locale)} type="number" step="0.01" bind:value={eAmount} error={formErrors.of('exp-amount')} />

@@ -404,6 +404,7 @@
                 {d.reply_to.address}
               {:else}
                 <span class="mo__warn-inline">{t('mailout.reply_to_none', locale, { address: domain ? senderAddress(localPart, domain.domain) : '' })}</span>
+                <a class="link-arrow" href={`/h/${workspaceSlug}/settings?section=mail`}>{t('mailout.to_settings', locale)}</a>
               {/if}
             </p>
             <div class="mo__row">

@@ -31,8 +31,11 @@ test.describe('Calm — a composition, not a grey (ADR-139 § 5)', () => {
     // The right column is folded, not greyed: it is not on the page at all.
     await expect(main.getByRole('heading', { name: /^The season/ })).toHaveCount(0);
     await expect(page.getByTestId('desk-changed')).toHaveCount(0);
-    // «Ver todo por días» is not offered in calm; the line says what waits.
-    await expect(main.getByText(/wait outside calm/)).toBeVisible();
+    // «Ver todo por días» is not offered in calm; the line says what waits,
+    // from one on (ADR-154: with nothing more, no line).
+    const rest = main.getByText(/wait outside calm/);
+    if ((await rest.count()) === 0) test.skip(true, 'nothing more waits outside calm today');
+    await expect(rest).toBeVisible();
     await main.getByRole('button', { name: /^see all/ }).last().click();
     await expect(main.getByRole('heading', { name: /^The season/ })).toBeVisible();
     await expect(page.locator('.side-calm')).toHaveAttribute('aria-pressed', 'false');
@@ -41,7 +44,7 @@ test.describe('Calm — a composition, not a grey (ADR-139 § 5)', () => {
   test('the title says the day, never the debt, in both modes', async ({ page }) => {
     for (const calm of [false, true]) {
       await open(page, '/h/desk', calm);
-      // The greeting opens the title line (ADR-145, fase 2); the day is its own part.
+      // The day is the title (ADR-154: no greeting before it).
       const title = (await page.locator('.lenshead__title .desk__day').first().innerText()).trim();
       expect(title, 'the title counts what is overdue').not.toMatch(/overdue|waiting for you|wait for you/i);
       expect(title).toMatch(/^(Today|Nothing on the plan today)/);

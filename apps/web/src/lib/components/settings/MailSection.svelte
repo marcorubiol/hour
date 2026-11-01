@@ -150,7 +150,6 @@
           <Button size="s" variant="secondary" disabled={!configured || !workspaceId} onclick={() => connect('personal')}>
             {t('mail.connect_google', locale)}
           </Button>
-          <span class="muted">{t('mail.other_providers_later', locale)}</span>
         {/if}
       </div>
     </div>

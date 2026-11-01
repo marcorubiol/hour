@@ -169,7 +169,7 @@
 </RecordHead>
 
 <section class="set-group" data-testid="settings-tags">
-  <BlockHead title={t('settings.tags_group', locale)} count={canEdit ? t('settings.tags_order_hint', locale) : undefined} />
+  <BlockHead title={t('settings.tags_group', locale)} />
   <div class="set-group__body">
     {#each tags as tag, i (tag.id)}
       {@const name = tagLabel(tag, locale)}

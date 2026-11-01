@@ -129,7 +129,7 @@
     normalizePlannerView,
     statusWord as statusWordIn,
   } from '$lib/planner';
-  import { buildPersonAttribution, castNames, keepsRow } from '$lib/people';
+  import { buildPersonAttribution, goesNames, keepsRow } from '$lib/people';
   import { viewScopeIndex, type WithViewScope } from '$lib/view-scope';
   import { buildDeskFeed, overviewReplies, rankWaiting, waitingByDay, type DeskItem } from '$lib/desk-feed';
   import {
@@ -759,6 +759,12 @@
   let aways = $derived(engine.aways);
 
   // ── Names for labels/cards ────────────────────────────────────────────
+  /** A gig's people as a line says them: its roster, else whoever said «voy» (ADR-154). */
+  const goesOf = (p: PerformanceEvent) =>
+    goesNames({ roster: p.person_ids, commitments: p.commitments }, personNames, myPersonId, {
+      one: t('planner.cast_you_one', locale),
+      many: t('planner.cast_you', locale),
+    });
   let personNames = $derived.by(() => {
     const m = new Map<string, string>();
     for (const item of $teamQuery.data?.items ?? []) m.set(item.person_id, item.full_name);
@@ -890,6 +896,9 @@
     // the decisions build renders them (double via the queue, concurrence
     // deliberately silent, never a mark).
     if (c.severity === 'double' || c.severity === 'concurrence') return null;
+    // A roster nobody entered is a missing fact, drawn as «sin reparto» on
+    // the gig, never a clash mark (ADR-147, ADR-154).
+    if (c.severity === 'possible') return null;
     const rows = c.event_ids
       .map((id) => eventSummaryById.get(id))
       .filter((r): r is NonNullable<typeof r> => Boolean(r));
@@ -899,15 +908,6 @@
         severity: c.severity,
         title: t('planner.clash_people_title', locale),
         body: t('planner.clash_people_body', locale, { people }),
-        rows,
-        event_ids: c.event_ids,
-      };
-    }
-    if (c.severity === 'possible') {
-      return {
-        severity: c.severity,
-        title: t('planner.clash_possible_title', locale),
-        body: t('planner.clash_possible_body', locale),
         rows,
         event_ids: c.event_ids,
       };
@@ -1401,7 +1401,7 @@
         slip: sl,
         // Data or the honest word — the project-team inference is not drawn
         // here (design law: four people affirmed at a radio at 10h).
-        cast: castNames(p.person_ids, personNames),
+        cast: goesOf(p),
         roadSheetHref: p.slug && ws ? `/h/${ws}/performance/${p.slug}/roadsheet` : null,
         clash: cl?.clash ?? null,
         clashPeople: cl?.people ?? false,
@@ -1621,16 +1621,13 @@
     for (const c of clashesByDay?.get(selectedDay) ?? []) {
       if (seen.has(c.body)) continue; // one reason, said once
       seen.add(c.body);
-      const fixes =
-        c.severity === 'possible'
-          ? []
-          : c.event_ids.flatMap((id) => {
-              const p = shownPerfs.find((x) => x.id === id);
-              const ws = p ? workspaceSlugById.get(perfWorkspaceId(p) ?? '') : undefined;
-              return p?.slug && ws
-                ? [{ href: `/h/${ws}/performance/${p.slug}#who-goes`, name: performanceSlip(p, slipCtxPage).name }]
-                : [];
-            });
+      const fixes = c.event_ids.flatMap((id) => {
+        const p = shownPerfs.find((x) => x.id === id);
+        const ws = p ? workspaceSlugById.get(perfWorkspaceId(p) ?? '') : undefined;
+        return p?.slug && ws
+          ? [{ href: `/h/${ws}/performance/${p.slug}#who-goes`, name: performanceSlip(p, slipCtxPage).name }]
+          : [];
+      });
       out.push({ key: `c${out.length}`, body: c.body, fixes });
     }
     return out;
@@ -1843,14 +1840,6 @@
   }
   let decisionVMs = $derived.by((): DecisionVM[] =>
     decisionQueue.decisions.map((d) => {
-      // 'possible' = ≥1 roster unknown; name the side missing team data
-      // when only one is (the honest "add the team to confirm" pointer).
-      const aKnown = (decisionRosters[d.a.id] ?? []).length > 0;
-      const bKnown = (decisionRosters[d.b.id] ?? []).length > 0;
-      const missingTeam =
-        d.level === 'possible' && aKnown !== bKnown
-          ? (aKnown ? d.b : d.a).project
-          : null;
       return {
         id: d.id,
         day: d.day,
@@ -1859,7 +1848,6 @@
         urgent: d.urgent,
         decideBy: d.decideBy,
         people: (d.people ?? []).map((id) => personNames.get(id) ?? '—'),
-        missingTeam,
         a: decisionOptionVM(d.a),
         b: decisionOptionVM(d.b),
       };
@@ -3262,10 +3250,15 @@
         {#if !shows('planner', 'census', calm.on)}
           {@const cf = plannerCalmFacts(view, stats)}
           {#if cf.confirmed !== null && cf.options !== null}
-            <span class="cal__stat"
-              ><b>{fig(cf.confirmed)}</b>
-              {t(figOne(cf.confirmed) ? 'planner.stat_confirmed_one' : 'planner.stat_confirmed', locale)}</span
-            >
+            <!-- Nothing confirmed is said, not counted (ADR-154). -->
+            {#if figuresKnown && cf.confirmed === 0}
+              <span class="cal__stat">{t('planner.calm_none_confirmed', locale)}</span>
+            {:else}
+              <span class="cal__stat"
+                ><b>{fig(cf.confirmed)}</b>
+                {t(figOne(cf.confirmed) ? 'planner.stat_confirmed_one' : 'planner.stat_confirmed', locale)}</span
+              >
+            {/if}
             {#if figuresKnown && cf.options > 0}
               <span class="cal__stat cal__stat--soft"
                 >{t(cf.options === 1 ? 'planner.calm_options_one' : 'planner.calm_options_many', locale, {
@@ -3688,10 +3681,7 @@
               .filter(Boolean)
               .join(' · ') || t('planner.week_nothing', locale)}
       freeNight={engine.isFreeNight}
-      castOf={(p) =>
-        p.person_ids
-          ? p.person_ids.map((id) => personNames.get(id)).filter((n): n is string => Boolean(n))
-          : null}
+      castOf={(p) => (p.person_ids || p.commitments ? goesOf(p) : null)}
       noCastWord={t('planner.no_cast', locale)}
       onDayOpen={(iso) => {
         dayIso = iso;

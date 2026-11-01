@@ -9,7 +9,9 @@
    * «Choques», in red as there; Conversations:
    * its overview; Cuentas: `moneyPosition`), and it opens the lens.
    *
-   * Never empty — zero is a figure. While loading, a `·` holds the figure's
+   * Never empty: a door is still a door at zero, but a zero is not news, so
+   * it is said small and in the faint ink; the big figure is for what is
+   * there (ADR-154). While loading, a `·` holds the figure's
    * place. A door whose lens failed says so alone. Cuentas exists only with
    * `read:money`: without it, no trace. A lens the space does not use
    * (ADR-132) has no door either.
@@ -28,7 +30,7 @@
     /** null: no read on conversations anywhere (ADR-124), the door does not exist. */
     conversations: Door<{ holds: number; live: number; due: number }> | null;
     /** null: no read:money, the door does not exist. */
-    money: Door<{ owed: string; overdue: string; overdueCount: number }> | null;
+    money: Door<{ owed: string; overdue: string; overdueCount: number; nothingOwed: boolean }> | null;
     seasonLabel: string;
     locale: Locale;
   }
@@ -48,7 +50,7 @@
       {#if planner.errored}
         <span class="door__n stat door__n--na">{DASH}</span><span class="door__txt">{t('desk.door_error', locale)}</span>
       {:else}
-        <span class="door__n stat">{planner.value ? planner.value.confirmed : DASH}</span>
+        <span class="door__n stat" class:figure--zero={planner.value?.confirmed === 0}>{planner.value ? planner.value.confirmed : DASH}</span>
         {@const pv = planner.value}
         {@const subs = pv
           ? [
@@ -77,7 +79,7 @@
         {#if conversations.errored}
           <span class="door__n stat door__n--na">{DASH}</span><span class="door__txt">{t('desk.door_error', locale)}</span>
         {:else}
-          <span class="door__n stat">{conversations.value ? conversations.value.holds : DASH}</span>
+          <span class="door__n stat" class:figure--zero={conversations.value?.holds === 0}>{conversations.value ? conversations.value.holds : DASH}</span>
           <span class="door__txt"
             >{t('desk.door_conv_n', locale)}{#if !conversations.value}<br />{DASH}{:else if conversations.value.live > 0}<br />{t(
                 'desk.door_conv_sub',
@@ -96,7 +98,7 @@
         {#if money.errored}
           <span class="door__n stat door__n--na">{DASH}</span><span class="door__txt">{t('desk.door_error', locale)}</span>
         {:else}
-          <span class="door__n stat">{money.value ? money.value.owed : DASH}</span>
+          <span class="door__n stat" class:figure--zero={money.value?.nothingOwed}>{money.value ? money.value.owed : DASH}</span>
           <span class="door__txt"
             >{t('desk.door_money_n', locale)}{#if !money.value}<br />{DASH}{:else if money.value.overdueCount > 0}<br /><em
                   class="door__hot">{t('desk.door_money_sub', locale, { amount: money.value.overdue })}</em
@@ -110,6 +112,7 @@
 </section>
 
 <style>
+  @layer components {
   /* The figure column belongs to the doors, not to each door: the words
      start on one vertical whatever the widest figure is, and a reserved
      minimum (room for «2.400 €» at --stat-lead) keeps them still while the
@@ -215,5 +218,6 @@
     .door__n {
       font-size: var(--stat-inline);
     }
+  }
   }
 </style>

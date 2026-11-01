@@ -40,7 +40,7 @@
     TYPE_LABEL_KEYS,
     type DateTypeKey,
   } from '$lib/quick-add';
-  import { dayMonthYear, instantToWallClock, wallClockToInstant, viewerTimeZone } from '$lib/datetime';
+  import { dayMonthYear, dualTime, instantToWallClock, wallClockToInstant, viewerTimeZone } from '$lib/datetime';
   import { detectLocale, t } from '$lib/i18n';
   import { allLinesQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
   import {
@@ -112,7 +112,11 @@
   let entryTz = $derived(
     ($workspacesQuery.data?.items ?? []).find((w) => w.id === workspaceId)?.timezone || viewerTz,
   );
-  let timeHint = $derived(t('create.time_hint_tz', locale, { tz: entryTz }));
+  // Only when the space's clock is not yours (ADR-154): the same test as
+  // `dualTime`, by name and then by what the clock reads now.
+  let timeHint = $derived(
+    dualTime(new Date().toISOString(), entryTz, viewerTz).secondary !== null ? t('create.time_hint_tz', locale, { tz: entryTz }) : '',
+  );
 
   let projectLines = $derived(
     ($linesQuery.data?.items ?? []).filter((l) => l.project?.id === projectId),
@@ -436,7 +440,7 @@
           />
           <Input label={t('create.ends', locale)} type="datetime-local" bind:value={dEndWall} error={errEnd} />
         {/if}
-        {#if !dAllDay}
+        {#if !dAllDay && timeHint}
           <p class="edd__hint">{timeHint}</p>
         {/if}
 

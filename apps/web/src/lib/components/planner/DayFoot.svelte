@@ -31,6 +31,11 @@
    * (ADR-093): always private, so the only word the writer needs is
    * `private` — before you write, the one thing to know is who will read
    * it. The team's signed notes are comms, and comms is not built.
+   *
+   * A lid with nothing to keep and nothing to do is not drawn (ADR-154):
+   * «Después» without next things, like «pasos» without steps, and «Notas»
+   * with none when the writer cannot be drawn. With nothing in either
+   * column, no foot.
    */
   import type { NoteEvent } from '$lib/month-events';
   import { appLocale, t } from '$lib/i18n';
@@ -94,7 +99,9 @@
   }
 </script>
 
+{#if canWrite || notes.length > 0 || steps.length > 0 || next.length > 0}
 <div class="df">
+  {#if canWrite || notes.length > 0}
   <section class="df__col df__col--notes">
     <!-- The lid: fold state + the count, one row, one button. -->
     <button type="button" class="lid" aria-expanded={notesOpen} onclick={() => (notesOpen = !notesOpen)}>
@@ -125,7 +132,9 @@
       {/each}
     {/if}
   </section>
+  {/if}
 
+  {#if steps.length > 0 || next.length > 0}
   <section class="df__col df__col--next">
     {#if steps.length > 0}
       <button type="button" class="lid" aria-expanded={stepsOpen} onclick={() => (stepsOpen = !stepsOpen)}>
@@ -134,11 +143,13 @@
       </button>
       {#if stepsOpen}<PlannerSteps {steps} label={stepsWord} />{/if}
     {/if}
+    {#if next.length > 0}
     <button type="button" class="lid" aria-expanded={nextOpen} onclick={() => (nextOpen = !nextOpen)}>
       <span class="lid__w">{nextWord}</span>
-      <span class="lid__n">{next.length === 0 ? emptyWord : next[0].day} {nextOpen ? '−' : '+'}</span>
+      <span class="lid__n">{next[0].day} {nextOpen ? '−' : '+'}</span>
     </button>
-    {#if nextOpen}
+    {/if}
+    {#if nextOpen && next.length > 0}
       {#each next as it (it.id)}
         <svelte:element
           this={it.href ? 'a' : 'div'}
@@ -164,7 +175,9 @@
       {/each}
     {/if}
   </section>
+  {/if}
 </div>
+{/if}
 
 <style>
   @layer components {

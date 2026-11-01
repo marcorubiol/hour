@@ -371,9 +371,9 @@
     {#if isBooking && $engStatsQuery.data}
       {@const st = $engStatsQuery.data}
       <p class="line-detail__stats">
-        <span class="line-detail__stat"><b>{st.total}</b> {t('line.stat_conversations', locale)}</span>
-        <span class="line-detail__stat"><b>{st.holds}</b> {t('line.stat_holds', locale)}</span>
-        <span class="line-detail__stat"><b>{st.confirmed}</b> {t('line.stat_confirmed', locale)}</span>
+        <span class="line-detail__stat"><b class:figure--zero={st.total === 0}>{st.total}</b> {t('line.stat_conversations', locale)}</span>
+        <span class="line-detail__stat"><b class:figure--zero={st.holds === 0}>{st.holds}</b> {t('line.stat_holds', locale)}</span>
+        <span class="line-detail__stat"><b class:figure--zero={st.confirmed === 0}>{st.confirmed}</b> {t('line.stat_confirmed', locale)}</span>
         {#if overdue > 0}
           <span class="line-detail__stat line-detail__stat--danger"
             ><b>{overdue}</b> {t('line.stat_overdue', locale)}</span
@@ -389,8 +389,8 @@
             {st.next.venue?.name ?? st.next.venue_name ?? ''}
           </span>
         {/if}
-        <span class="line-detail__stat"><b>{st.confirmed}</b> {t('line.stat_confirmed', locale)}</span>
-        <span class="line-detail__stat"><b>{st.holds}</b> {t('line.stat_holds', locale)}</span>
+        <span class="line-detail__stat"><b class:figure--zero={st.confirmed === 0}>{st.confirmed}</b> {t('line.stat_confirmed', locale)}</span>
+        <span class="line-detail__stat"><b class:figure--zero={st.holds === 0}>{st.holds}</b> {t('line.stat_holds', locale)}</span>
         {#if st.hasFees && st.pipeline > 0}
           <span class="line-detail__stat"
             ><b>{fmtMoneyCompact(st.pipeline)}</b> {t('line.stat_in_progress', locale)}</span

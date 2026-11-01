@@ -285,17 +285,16 @@
   {/if}
   {#if spaceStats}
     <div class="space-stats">
-      <div class="space-stat"><b>{spaceStats.projects}</b><span>{t('hall.stat_projects', locale)}</span></div>
-      <div class="space-stat"><b>{spaceStats.confirmed}</b><span>{t('hall.stat_confirmed', locale)}</span></div>
-      <div class="space-stat"><b>{spaceStats.holds}</b><span>{t('hall.stat_holds', locale)}</span></div>
-      <div class="space-stat"><b>{spaceStats.conversations}</b><span>{t('hall.stat_conversations', locale)}</span></div>
+      <div class="space-stat"><b class:figure--zero={spaceStats.projects === 0}>{spaceStats.projects}</b><span>{t('hall.stat_projects', locale)}</span></div>
+      <div class="space-stat"><b class:figure--zero={spaceStats.confirmed === 0}>{spaceStats.confirmed}</b><span>{t('hall.stat_confirmed', locale)}</span></div>
+      <div class="space-stat"><b class:figure--zero={spaceStats.holds === 0}>{spaceStats.holds}</b><span>{t('hall.stat_holds', locale)}</span></div>
+      <div class="space-stat"><b class:figure--zero={spaceStats.conversations === 0}>{spaceStats.conversations}</b><span>{t('hall.stat_conversations', locale)}</span></div>
     </div>
   {/if}
   {#if currentWorkspace}
     <EditWorkspaceDialog bind:open={editOpen} workspace={currentWorkspace} />
   {/if}
 
-  <div class="home__toolbar"><BlockHead title={t('hall.next7', locale)} /></div>
   <DeskBoard
     conversations={scopedConversations}
     {workspaceSlug}
@@ -304,7 +303,9 @@
     moreHref="/h/desk"
     loading={$conversationsQuery.isPending}
     error={$conversationsQuery.isError}
-  />
+  >
+    {#snippet head()}<div class="home__toolbar"><BlockHead title={t('hall.next7', locale)} /></div>{/snippet}
+  </DeskBoard>
 
   {#if visibleProjects.length > 0 || projectsSettled}
     <div class="home__projects-head"><BlockHead title={t('hall.projects', locale)} /></div>

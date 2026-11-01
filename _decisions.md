@@ -5566,3 +5566,81 @@ Las cuatro claves nuevas pueden quedarse o borrarse.
 **Re-evaluar cuando** Marco lo use una gira: si la noche antes de un viaje temprano echa de menos la tarjeta (el
 localizador, la hora de salida grande), y si «Tablón · N nuevos» hace falta en una fila de «Después» para quien solo
 tiene días por venir.
+
+## [2026-11-01] ADR-154 · La pantalla no dice nada que no encaje con tu momento (enmienda ADR-080 § 3, ADR-145 fase 2 § 3, ADR-149 § 2 y ADR-150 § 6)
+
+**Contexto.** Marco, 01-11 (chat, validado punto a punto): el mismo criterio que ADR-153, aplicado al resto de Hoy y
+al Planificador. Una pantalla que cuenta minutos que no importan, da instrucciones donde no hay nada, avisa de un
+choque que solo sale de no saber quién va o repite una opción en dos sitios dice cosas que no encajan con el momento
+de quien la mira. Carril `claude/hoy-coherence`. Sin migración ni endpoint.
+
+**Decisión.**
+1. **«Nada nuevo», sin minutos.** Por debajo de una hora desde la última visita, «Ha cambiado» vacío dice «Nada
+   nuevo» (`desk.changed_none_recent`); desde una hora, como antes («…, hace 3 h»). Fuera `desk.ago_min`.
+2. **Un vacío constata, no instruye.** «Nada pendiente en este ámbito.», «Nada que hacer en esta línea.», «Nada en
+   las próximas 12 semanas.» (el «＋ fecha» de al lado se queda), «No hay facturas.»; los vacíos pierden «aún» y
+   «todavía». La explicación vive en la «?». Los bloques que ADR-145 dibuja a cero siguen.
+3. **No saber quién va no es un choque** (sigue ADR-147). Un par `possible` (un reparto vacío) ya no es decisión
+   (`decisionsFor` lo descarta: baja «por decidir» en el Planificador y en Hoy, y sale de «Te espera») ni marca de
+   choque en el Planificador (`clashVM` lo devuelve nulo). El hecho neutro es el «sin reparto» que la función ya
+   dice donde se dibuja su reparto. El motor (`conflictsFor`) sigue dando `possible`; «Choques» de la Temporada y de
+   Hoy ya no lo contaban (`clashesInSeason`).
+4. **Una opción por decidir sale en «Te espera», no en «Después».** El lado en opción de una decisión que Hoy pide
+   deja «Después» y el titular de ADR-153; el lado confirmado de un «liberar» se queda. Solo filtra lo que «Te espera»
+   ya lista (mismo ámbito, Planificador encendido).
+5. **«Después» en el móvil: el nombre primero**, entero en su renglón, y día y hora debajo (enmienda ADR-150 § 6).
+6. **Hoy sin saludo** también en escritorio: el título es el día (enmienda ADR-145 fase 2 § 3). Fuera
+   `desk.greeting_*` y la lectura de `/api/me` que solo servía al nombre.
+7. **Un plazo pasado dice qué toca**: «plazo pasado: confirma o libera» (compacto, «plazo pasado»), no cuántos días
+   hace. Fuera `planner.deadline_past_one` y `deadline_past_on`.
+8. **Los atajos no se anuncian en la pantalla**: fuera «Mayús+← →» de `planner.no_more_plan` y `planner.step_hint`
+   del título de las flechas. El atajo sigue.
+9. **Texto**: sin raya como separador en la app (dos puntos, punto o «·»); «Nada este mes.»; «pedido, sin
+   confirmar»; una sola forma de carga, «Cargando…» (la puerta de la Agenda sigue en minúscula: alterna con «↑ meses
+   anteriores» en el mismo botón). Sin «cosas» en las cuentas: «y 2 más», «3 hasta el martes».
+10. **Un «voy» no se contradice.** En Día y Agenda del Planificador una función sin reparto en ficha dice quién dijo
+    «voy» («vas tú», o «tú · Ana») en vez de «sin reparto» (`goesNames` en `$lib/people`, con los `commitments` que
+    el feed ya trae). El reparto en ficha manda; nadie se adivina (ADR-147).
+11. **Un cero se dice pequeño y en tinta suave**; la cifra grande es para lo que hay. Una sola pieza,
+    `.figure--zero` (`base.css`, capa `utilities`): las puertas de «La temporada» en Hoy (siguen siendo puertas;
+    enmienda ADR-145 § 1 en lo que toca a esas cifras), las cifras de la portada del espacio y las de la ficha de
+    línea. En el Planificador en calma, «Nada confirmado.» en vez de «0 confirmadas».
+12. **Un pliegue sin nada que guardar ni que hacer no se dibuja.** En el Día, «Después» sin próximos (como «pasos»)
+    y «Notas» sin notas cuando no se puede escribir; Escaleta y Tramos vacíos para quien no puede editarlos. Con
+    permiso, siguen. En calma, la línea «… esperan fuera de calma» solo desde 1 (fuera `desk.calm_rest_zero`). En
+    la portada del espacio, «Próximos 7 días» sin nada no se dibuja (fuera `desk.week_empty`). En Cuentas, «Pide
+    atención» a cero pierde cabecera y cifra y deja solo su línea, para que la rejilla no se descuadre. El diálogo
+    de añadir gasto pierde su subtítulo (fuera `books.expense_desc`).
+13. **La ayuda de Hoy no promete preguntas** que Hour ya no hace (ADR-147): fuera «Si Hour cree que vas, te lo
+    pregunta aquí» de `help.card.desk_step_1`.
+14. **Un aviso lleva a donde se arregla, y lo normal no se anuncia.** Añadir en una línea una conversación que ya
+    existe: «Ya tiene una conversación en este proyecto…» con «Abrir» cuando el 409 trae su id (el choque de la
+    organización); sin «Búscala en la tabla». Un envío sin buzón enlaza a Ajustes, Buzones. El recordatorio de un
+    cobro dice su día («Recordatorio en Hoy el 12 nov.»). Fuera la fase de un documento registrado
+    («la subida llega en la fase 0.3+»). Estar solo no es noticia: la presencia del marco no se dibuja con una
+    persona, y las notas en directo sin nadie más no dicen «en directo» (`data-collab-status` sigue).
+15. **Ajustes y Ahora, lo mismo.** «Este espacio no tiene tu nombre» (no «aún no eres persona»); revocar un
+    acceso dice lo que pasa: deja de entrar enseguida (las políticas leen `membership` en cada lectura, no el JWT);
+    «Un monograma.» sin promesa; fuera «Alt y las flechas la mueven» de las etiquetas; la hora local del espacio
+    solo se avisa cuando su reloj no es el tuyo (la regla de `dualTime`); en Ahora, sin nada de la sala en ficha,
+    no hay cabecera «Sala» y queda la línea de quién y dónde.
+16. **Sin promesas ni atajos en la pantalla.** Fuera «Microsoft y otros proveedores, más adelante» y «Por ahora se
+    registran enlaces»; fuera «Alt y las flechas» también en el orden de los hilos; «Cuándo volver a escribir
+    (opcional)». Las claves sin uso `overview.season_hint*` se borran.
+
+**Qué no cambia.** La tarjeta de Hoy (ADR-150, 153): ya no pinta reparto desde ADR-150 § 4. Calma: su «Todo al
+día…» no coincide con ningún título que diga «nada te espera» (esas claves no tienen uso).
+
+**Cómo se revierte.** Cada punto por separado, desde el historial de `claude/hoy-coherence`: 3 en `planner.ts`
+(`decisionsFor`), `DecisionBand.svelte`, `AgendaList.svelte` y `routes/h/planner/+page.svelte`; 4, 1 y 6 en
+`routes/h/desk/+page.svelte`; 5 en `DeskNext.svelte`; 7 en `performance.ts`; 8 en `CalNav.svelte`; 10 en
+`people.ts` y `routes/h/planner/+page.svelte`; 11 en `.figure--zero` y sus usos; 12 en `DayFoot.svelte`,
+`RunningOrder.svelte`, `TravelStages.svelte`, `DeskWaiting.svelte`, `DeskBoard.svelte`, `HomeView.svelte` y
+`routes/h/books/+page.svelte`; 14 en `line/ConversationsModule.svelte`, `mailout/[id]/+page.svelte`,
+`MoneyInvoices.svelte`, `PerformanceRecord.svelte`, `PresenceBadge.svelte` y `YNotes.svelte`; 15 en
+`EditDateDialog.svelte`, `CreateEventDialog.svelte`, `ConversationTagsSection.svelte` y `AhoraView.svelte`. Las claves borradas
+están en el historial.
+
+**Re-evaluar cuando** Marco lo use una gira: si echa de menos ver dos opciones de proyectos distintos el mismo día
+sin reparto (entonces es un hecho en la celda, no una decisión), y si una opción que solo sale en «Te espera» se
+pierde de vista en «Después».

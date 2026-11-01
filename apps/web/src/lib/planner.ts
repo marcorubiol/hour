@@ -430,7 +430,7 @@ export interface Decision {
   day: string;
   /** YYYY-MM — the queue spans months (window, not visible month). */
   month: string;
-  level: 'people' | 'double' | 'possible';
+  level: 'people' | 'double';
   /** 'choose' = A o B · 'release' = one side already confirmed (ADR-080 §5). */
   kind: 'choose' | 'release';
   a: DecisionSide;
@@ -468,15 +468,11 @@ function pairId(day: string, aId: string, bId: string): string {
 
 /**
  * The decisions queue, derived (ADR-080 §1/§4): conflict pairs of
- * severities people|double|possible where ≥1 side is a hold* — kind
- * 'choose' while both are open, 'release' once one side of a
- * people/double pair is confirmed ("Ja has confirmat A — alliberar B?").
- * A 'possible' pair (≥1 roster unknown) is a decision only while BOTH
- * sides are open options: once one side is confirmed the queue cannot
- * assert friction without roster data, so the pair drops instead of
- * mutating to release — never a release prompt over unknown data
- * (ADR-080 §3: decisión cuando ambos lados tienen opciones que
- * confrontar; §5's follow-up is people|double only).
+ * severities people|double where ≥1 side is a hold* — kind 'choose' while
+ * both are open, 'release' once one side is confirmed ("Ja has confirmat
+ * A — alliberar B?"). A 'possible' pair (≥1 roster unknown) is never a
+ * decision (ADR-154): not knowing who goes asserts nothing; the gig says
+ * «sin reparto» where its cast is drawn.
  * Urgency (ADR-080 §2): today ≥ min decideBy over the HOLD sides
  * (`decideBy` from $lib/performance; notice 0 contributes nothing — a
  * hold without notice never turns urgent).
@@ -528,22 +524,15 @@ export function decisionsFor(input: {
       });
       continue;
     }
-    if (c.severity !== 'people' && c.severity !== 'double' && c.severity !== 'possible') {
-      continue;
-    }
+    // 'possible' (a roster nobody entered) is a missing fact, not a call to
+    // make: not knowing who goes asserts no clash (ADR-147, ADR-154).
+    if (c.severity !== 'people' && c.severity !== 'double') continue;
     const holdA = isHoldStatus(a.status);
     const holdB = isHoldStatus(b.status);
     if (!holdA && !holdB) continue;
 
     const confirmedA = performanceStatusFamily(a.status) === 'confirmed';
     const confirmedB = performanceStatusFamily(b.status) === 'confirmed';
-    if (c.severity === 'possible' && (confirmedA || confirmedB)) {
-      // ADR-080 §3 — no roster data means no asserted friction: once one
-      // side is confirmed there is nothing left to confront, and a
-      // release prompt would push a destructive suggestion over unknown
-      // data. The pair leaves the queue.
-      continue;
-    }
     const release = (confirmedA && holdB) || (confirmedB && holdA);
 
     let by: string | null = null;
