@@ -194,5 +194,5 @@ Siete migraciones aditivas aplicadas a producción (`20261102100000` a `160000`;
 - **84 fusionar organizaciones:** RPC con deshacer a 30 días y pantalla en la ficha y en Ajustes › Equipo (ADR-171).
 - **89 textos guardados:** `workspace_text`, Ajustes › Espacio e «Insertar texto» en el correo de la conversación (ADR-171).
 - **45 DNS del dominio de envío:** `mail_domain_pending_checks()`; el cron de 10 minutos lo recomprueba solo, 72 h como mucho. Migración aplicada (el código ya estaba, ADR-169).
-- **71b y 80b:** `get_public_calendar` lleva escaleta, tramos y oficio del espacio; `get_public_roadsheet` lleva el viaje del día para performer y tech_manager. Aplicadas, y el Worker las pasa.
+- **71b y 80b:** `get_public_calendar` lleva escaleta, tramos y oficio del espacio (el feed `ics.ts` usa la escaleta y el oficio; los tramos de viaje aún no); `get_public_roadsheet` lleva el viaje del día para performer y tech_manager. Aplicadas; el Worker pasa el viaje de la hoja.
 - **88 y 90, mitad de base:** `get_public_roadsheet` entrega `materials`; `get_public_calendar` marca las opciones TENTATIVE y admite `scope = 'mine'`. Lo que falta de pantalla sigue en `_tasks.md`.
