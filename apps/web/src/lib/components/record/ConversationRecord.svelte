@@ -356,7 +356,14 @@
   /** «Anotar contacto…» del menú de estado: abre el apunte de abajo. */
   let logOpen = $state(false);
   let logEl = $state<HTMLElement>();
-  function openLog() {
+  // «Llamar» (§ 67): el alta se vuelve a montar con el tipo, saliente y hoy.
+  let logKind = $state<'email' | 'call'>('email');
+  let logSeq = $state(0);
+  function openLog(kind: 'email' | 'call' = 'email') {
+    if (kind !== logKind || kind === 'call') {
+      logKind = kind;
+      logSeq += 1;
+    }
     if (reading !== 'registro') setReading('registro');
     logOpen = true;
     requestAnimationFrame(() => logEl?.scrollIntoView({ block: 'nearest' }));
@@ -385,6 +392,11 @@
     const p = conv?.contacts.find((c) => c.is_primary)?.person ?? null;
     if (p?.email) return { full_name: p.full_name, email: p.email };
     return conv?.person?.email ? { full_name: conv.person.full_name, email: conv.person.email } : null;
+  });
+  /** A quién se llama: el contacto principal, si tiene teléfono. */
+  let caller = $derived.by(() => {
+    const p = conv?.contacts.find((c) => c.is_primary)?.person ?? null;
+    return p?.phone ? { full_name: p.full_name, phone: p.phone, tel: `tel:${p.phone.replace(/[^\d+]/g, '')}` } : null;
   });
 
   // «Escribir correo» desactivado dice por qué (ADR-139 p2): sin buzón que
@@ -555,6 +567,16 @@
       {#snippet facts()}
         {#if conv!.person && conv!.person.full_name !== title}<span>{conv!.person.full_name}</span>{/if}
         {#if conv!.person?.email}<span>{conv!.person.email}</span>{/if}
+        {#if caller}
+          <span
+            ><a
+              href={caller.tel}
+              aria-label={t('record.call_aria', locale, { name: caller.full_name, phone: caller.phone })}
+              data-testid="conversation-call"
+              onclick={() => openLog('call')}>{caller.phone}</a
+            ></span
+          >
+        {/if}
         {#if conv!.private}<span class="conv__private">{t('mail.private_badge', locale)}</span>{/if}
         <span class="conv__relation">
           {#if conv!.can_edit}
@@ -564,7 +586,7 @@
               look="word"
               {locale}
               onnotnow={(not_now) => $patch.mutate({ not_now })}
-              onlog={openLog}
+              onlog={() => openLog()}
             />
           {:else}
             <span class="fact-word">{relationLabel(conv!.relation, locale)}</span>
@@ -636,7 +658,9 @@
           {/if}
           <Fold word={t('mail.log_other', locale)} bind:open={logOpen} bind:el={logEl} testid="conversation-log">
             <p class="muted">{t('mail.log_turn_hint', locale)}</p>
-            <ConversationHistory conversationId={conv.id} showList={false} />
+            {#key logSeq}
+              <ConversationHistory conversationId={conv.id} showList={false} initialKind={logKind} />
+            {/key}
           </Fold>
         {:else}
           <BlockHead title={t('mail.thread', locale)} count={events.length} />

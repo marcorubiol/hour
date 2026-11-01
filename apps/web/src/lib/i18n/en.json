@@ -2480,6 +2480,7 @@
   "record.verb_postpone": "postpone",
   "record.verb_add_step": "add one",
   "record.step_none": "no next step",
+  "record.call_aria": "Call {name}, {phone}",
   "record.step_edit_aria": "Next step: {step}. Change",
   "record.step_tomorrow": "tomorrow",
   "record.step_monday": "Monday",
