@@ -591,12 +591,21 @@ test.describe('the diary', () => {
       },
     });
     expect(made.status(), 'the past could not be planted').toBe(201);
-    const pastId = ((await made.json()) as { date: { id: string } }).date.id;
-    try {
-      await growsOneMonth(page);
-    } finally {
-      await page.request.delete(`/api/dates/${pastId}`);
-    }
+    plantedPastId = ((await made.json()) as { date: { id: string } }).date.id;
+    await growsOneMonth(page);
+  });
+
+  // THE PLANTED PAST IS TAKEN AWAY IN ITS OWN SLOT. It used to go in a
+  // `finally` inside the test, which shares the test's timeout: a red that
+  // ran the clock out (the look-ahead waits with `timeout: 0`) killed the
+  // DELETE too, and every such red left one «E2E Diary past» behind (five on
+  // 2026-11-01). Playwright gives `afterEach` a fresh timeout after a timeout.
+  let plantedPastId: string | null = null;
+  test.afterEach(async ({ page }) => {
+    if (!plantedPastId) return;
+    const id = plantedPastId;
+    plantedPastId = null;
+    await page.request.delete(`/api/dates/${id}`);
   });
 
   async function growsOneMonth(page: Page) {
