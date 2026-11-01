@@ -34,7 +34,7 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 ## Producción (verificado 2026-10-20)
 
 - Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`f0e6aace`**, `dirty:false`, builtAt
-  2026-11-01T10:47Z (ADR-155 a 169: Planificador con Temporada aparte, caché del dispositivo por esquema y vigilancia de velocidad, ficha de organización y de sala, contrato del bolo y caducidad del enlace de la hoja de ruta, viaje en la hoja de ruta, Cuentas para la gestoría, pasada visual, puerta en cuatro idiomas, copiar de otra función; antes: coherencia de pantallas ADR-154, Hoy como agenda y tarjeta solo para lo de hoy ADR-148 a 153, ámbito como pastilla ADR-152, modo Ahora ADR-146, densidad ADR-145, datos en el dispositivo ADR-144, selector de lentes ADR-140, conversaciones desde `conversation_feed`, fusiones de persona, E4 sin `conversation.status`, etiquetas y facetas del espacio, E2E 132/135). `main` == prod salvo documentos y tests.
+  2026-11-01T10:47Z (ADR-155 a 169: Planificador con Temporada aparte, caché del dispositivo por esquema y vigilancia de velocidad, ficha de organización y de sala, contrato del bolo y caducidad del enlace de la hoja de ruta, viaje en la hoja de ruta, Cuentas para la gestoría, pasada visual, puerta en cuatro idiomas, copiar de otra función; lo anterior, en `CHANGELOG.md`). `main` == prod salvo documentos y tests.
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free, con keepalive diario
   (`.github/workflows/keepalive.yml`) contra la pausa por inactividad. Pasar a Pro antes de la beta, aún no
