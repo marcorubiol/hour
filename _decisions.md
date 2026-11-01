@@ -6334,7 +6334,7 @@ schema queda escrito aquí y en el informe del carril, no aplicado. Carril `clau
 **Re-evaluar cuando** `user_profile.locale` se cablee (manda sobre la cookie dentro de la app), o los textos
 guardados tengan su tabla.
 
-## [2026-11-02] ADR-170 · Gastos adelantados con «Se debe al equipo» y la sala que sabe quién la programa (cierra «Lo que no entra» de ADR-168; enmienda ADR-043 y ADR-164 § 1)
+## [2026-11-01] ADR-170 · Gastos adelantados con «Se debe al equipo» y la sala que sabe quién la programa (cierra «Lo que no entra» de ADR-168; enmienda ADR-043 y ADR-164 § 1)
 
 **Contexto.** Pantallas de 79 y 92 (`_tasks.md` § AHORA). Las migraciones ya están en producción:
 `20261102100000_expense_paid_by_person` (`expense.paid_by_person_id`, `reimbursed_on`, `create_expense` con
