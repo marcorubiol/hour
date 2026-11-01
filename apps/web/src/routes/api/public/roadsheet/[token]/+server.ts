@@ -17,6 +17,7 @@ import {
   type CastEntry,
   type PerformanceBundle,
   type RoadsheetPerson,
+  type RoadsheetMaterial,
   type RoadsheetRole,
   type RoadsheetTrip,
 } from '$lib/roadsheet';
@@ -46,6 +47,9 @@ type PublicBundle = {
     person: RoadsheetPerson | null;
   }>;
   assets: PerformanceBundle['assets'];
+  /** 88 (20261102150000): the outbound links of the performance and its
+      line, for every role. `slug` comes too and is not passed on. */
+  materials?: Array<RoadsheetMaterial & { slug?: string | null }>;
   /** 80b (20261102150000): the day's and the eve's trips, already cut by the
       rule of `tripsOfPerformance`, only for performer and tech_manager. */
   travel?: RoadsheetTrip[];
@@ -82,6 +86,7 @@ export const GET: RequestHandler = async ({ params, platform, locals }) => {
       cast,
       crew: b.crew,
       assets: b.assets,
+      materials: (b.materials ?? []).map(({ kind, url, uploaded_at, scope }) => ({ kind, url, uploaded_at, scope })),
       ...(b.travel ? { travel: b.travel } : {}),
     };
 

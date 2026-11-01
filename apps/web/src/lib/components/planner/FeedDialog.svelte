@@ -6,7 +6,8 @@
    */
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
-  import { fetchJSON, mutateJSON } from '$lib/api';
+  import { ApiError, fetchJSON, mutateJSON } from '$lib/api';
+  import Badge from '$lib/components/Badge.svelte';
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Select from '$lib/components/Select.svelte';
@@ -14,10 +15,11 @@
   import { copyText } from '$lib/clipboard';
   import { spaceName } from '$lib/utils/identity';
   import { appLocale, t } from '$lib/i18n';
+  import type { CalendarShare, CalendarShareScope } from '$lib/calendar-share';
 
   const locale = appLocale();
 
-  type FeedShare = { id: string; token: string; workspace_id: string; created_at: string };
+  type FeedShare = CalendarShare;
 
   interface Props {
     open: boolean;
@@ -33,6 +35,13 @@
   // workspace applies — the same default the page used to set on open.
   let chosenWs = $state<string | null>(null);
   let feedWs = $derived(chosenWs ?? workspaces[0]?.id ?? '');
+
+  /** What the next link shows (90): the whole space, or only what is yours. */
+  let feedScope = $state<CalendarShareScope>('all');
+  const feedScopeOptions = [
+    { value: 'all', label: t('planner.feed_scope_all', locale) },
+    { value: 'mine', label: t('planner.feed_scope_mine', locale) },
+  ];
 
   let feedWsOptions = $derived(
     workspaces.map((w) => ({ value: w.id, label: spaceName(w.name) })),
@@ -82,6 +91,7 @@
     mutationFn: () =>
       mutateJSON<{ share: FeedShare }>('POST', '/api/calendar-shares', {
         workspace_id: feedWs,
+        scope: feedScope,
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['calendar-shares'] });
@@ -91,7 +101,12 @@
       addToast({
         tone: 'danger',
         title: t('planner.feed_not_created', locale),
-        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
+        message:
+          err instanceof ApiError && err.body?.error === 'not_a_person'
+            ? t('planner.feed_mine_needs_person', locale)
+            : err instanceof Error
+              ? err.message
+              : t('perf.unexpected', locale),
       });
     },
   });
@@ -117,6 +132,11 @@
     {t('planner.feed_hint', locale)}
   </p>
   <Select label={t('planner.feed_workspace', locale)} options={feedWsOptions} bind:value={() => feedWs, (v) => (chosenWs = v)} />
+  <Select
+    label={t('planner.feed_scope', locale)}
+    options={feedScopeOptions}
+    bind:value={() => feedScope, (v) => (feedScope = v === 'mine' ? 'mine' : 'all')}
+  />
   {#if $feedSharesQuery.isPending && feedWs}
     <p class="cal__feed-hint">{t('desk.loading', locale)}</p>
   {:else if feedShares.length === 0}
@@ -125,7 +145,10 @@
     <ul class="cal__feed-list" role="list">
       {#each feedShares as share (share.id)}
         <li class="cal__feed-row">
-          <code class="cal__feed-token">…{share.token.slice(-8)}</code>
+          <span class="cal__feed-token">
+            <code>…{share.token.slice(-8)}</code>
+            {#if share.scope === 'mine'}<Badge size="xs">{t('planner.feed_badge_mine', locale)}</Badge>{/if}
+          </span>
           <Button variant="secondary" size="xs" onclick={() => copyFeedUrl(share.token, 'https')}>
             {t('planner.feed_copy_link', locale)}
           </Button>
@@ -180,6 +203,9 @@
     }
 
     .cal__feed-token {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       color: var(--text-muted);

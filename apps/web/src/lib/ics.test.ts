@@ -359,4 +359,46 @@ describe('legible descriptions (ADR-162)', () => {
     ]);
     expect(ics).not.toMatch(/—/);
   });
+
+  it('a trip says its stages in their order, each hour on its own clock (71b)', () => {
+    const stage = {
+      from_place: null,
+      to_place: null,
+      depart_tz: null,
+      arrive_tz: null,
+    };
+    const ics = buildCalendar(
+      baseFeed({
+        dates: [
+          {
+            id: 'd2',
+            kind: 'travel_day',
+            status: 'confirmed',
+            title: null,
+            starts_at: '2026-09-10T06:00:00Z',
+            ends_at: '2026-09-10T16:00:00Z',
+            all_day: false,
+            venue_name: null,
+            city: null,
+            updated_at: null,
+            project: null,
+            stages: [
+              { ...stage, mode: 'train', from_city: 'Barcelona', to_city: 'Madrid', depart_at: '2026-09-10T07:30:00Z', arrive_at: '2026-09-10T10:00:00Z' },
+              { ...stage, mode: 'plane', from_city: 'Madrid', to_city: 'London', depart_at: '2026-09-10T12:00:00Z', arrive_at: '2026-09-10T14:15:00Z', arrive_tz: 'Europe/London' },
+              { ...stage, mode: 'walk', from_city: null, to_place: 'Hotel', to_city: null, depart_at: null, arrive_at: null },
+            ],
+          },
+        ],
+      }),
+      NOW,
+      { locale: 'es' },
+    );
+    expect(description(ics).split('\n')).toEqual([
+      'día de viaje',
+      'tren 9h30 · Barcelona → Madrid · llega 12h',
+      'avión 14h · Madrid → London · llega 15h15',
+      'a pie · Hotel',
+    ]);
+    expect(ics).not.toMatch(/—/);
+  });
 });
