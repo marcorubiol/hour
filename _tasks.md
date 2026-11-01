@@ -27,8 +27,10 @@
     `performance_guard_bolo` (`20260828100000`) que exige mismo proyecto —
     aplicado a producción, con `tests/rls/performance-bolo.test.ts` (5 casos)
     sujetándolo. RLS 151 → **156**.
-    *Lo que queda, y es lo que Marco tiene que dibujar:* el selector de bolo en
-    la ficha de función y/o en el alta del Planner. Con una **tensión de
+    *Hecho después (comprobado el 2026-11-01 en el código):* el selector de bolo
+    ya está en la ficha de función (`showBoloSelect`, `PerformanceRecord.svelte`)
+    y en el alta (`bolo_id` en `PerformanceForm.svelte`). *Lo que queda:* «+
+    función» desde la ficha del bolo, para colgar la segunda. Con la **tensión de
     producto abierta** que no me toca resolver: escribir el enlace es
     `edit:performance` pero leer el bolo es `read:money`, así que quien coloca
     fechas sin leer dinero puede **enlazar y no ver lo enlazado**. Es coherente
