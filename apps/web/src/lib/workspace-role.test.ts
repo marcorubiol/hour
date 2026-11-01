@@ -59,7 +59,7 @@ describe('a door points at a space that takes it, never at the first one', () =>
 });
 
 describe('settings in a space they are a guest of', () => {
-  const ALL = ['profile', 'workspaces', 'privacy', 'lenses'] as const;
+  const ALL = ['profile', 'workspaces', 'space', 'lenses'] as const;
   test('only the profile', () => {
     expect(settingsSectionsFor(COMPANY, ALL, ['profile'])).toEqual(['profile']);
   });

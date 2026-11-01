@@ -27,8 +27,7 @@
   import type { NavWorkspace } from '$lib/nav';
   import ProfileSection from '$lib/components/settings/ProfileSection.svelte';
   import WorkspacesSection from '$lib/components/settings/WorkspacesSection.svelte';
-  import PrivacySection from '$lib/components/settings/PrivacySection.svelte';
-  import LanguagesSection from '$lib/components/settings/LanguagesSection.svelte';
+  import SpaceSection from '$lib/components/settings/SpaceSection.svelte';
   import LensesSection from '$lib/components/settings/LensesSection.svelte';
   import ConversationTagsSection from '$lib/components/settings/ConversationTagsSection.svelte';
   import FacetsSection from '$lib/components/settings/FacetsSection.svelte';
@@ -95,12 +94,8 @@
     <WorkspacesSection {workspaces} {projects} {currentWorkspace} {currentProjects} />
   {/if}
 
-  {#if active === 'privacy'}
-    <PrivacySection workspaceId={currentWorkspace?.id} />
-  {/if}
-
-  {#if active === 'languages'}
-    <LanguagesSection workspaceId={currentWorkspace?.id} />
+  {#if active === 'space'}
+    <SpaceSection workspaceId={currentWorkspace?.id} />
   {/if}
 
   {#if active === 'lenses'}
