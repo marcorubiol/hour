@@ -7,7 +7,7 @@
     "dev": "vite dev",
     "build": "vite build",
     "preview": "wrangler dev",
-    "deploy": "node ../../scripts/assert-clean-tree.mjs && vite build && wrangler deploy worker-entry.js",
+    "deploy": "node ../../scripts/assert-clean-tree.mjs && vite build && LOAD_BUDGET_REQUIRED=1 vitest run --project server src/lib/load-budget.test.ts && wrangler deploy worker-entry.js",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "cf-typegen": "wrangler types",
     "test:install": "playwright install --with-deps chromium",
