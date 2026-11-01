@@ -5651,7 +5651,7 @@ pierde de vista en «Después».
 
 **Contexto.** ADR-144 § 3 ataba el registro de IndexedDB al SHA del build: cualquier deploy lo borraba. Del 24-10 al
 01-11 se integraron 18 ramas y casi todas se desplegaron, varias el mismo día, así que la primera apertura después de
-cada deploy volvía a esperar la cascada de red entera, que es justo lo que ADR-144 quería quitar. Solo 5 de esas 18
+cada deploy volvía a esperar la cascada de red entera, que es justo lo que ADR-144 quería quitar. Solo 4 de esas 18
 tocaron `routes/api` o `lib/server`: las demás no cambiaban la forma de ningún dato guardado. Marco notó el 01-11 que
 la app «tarda demasiado en el contenido» al abrirla en el móvil.
 
@@ -5680,7 +5680,7 @@ anterior; si eso revienta, la red recarga; si no revienta, se corrige al llegar 
 usuario del E2E, mediana de 5; contenido = `main` sin `aria-busy="true"`): primera apertura tras un build nuevo
 (registro con otro buster) **2674 ms**; reapertura con el registro válido **660 ms** (desde `/`, 588). Con esta
 decisión, un deploy que no sube `CACHE_SCHEMA` abre como la reapertura: unos 2 s menos en la primera apertura tras
-cada uno (13 de los 18 deploys del 24-10 al 01-11 no tocaron API ni servidor). El techo de la apertura sin registro
+cada uno (14 de las 18 integraciones del 24-10 al 01-11 no tocaron API ni servidor). El techo de la apertura sin registro
 lo ponen `/api/conversations?limit=100` y `/api/conversations/overview` (unos 1,7 s de servidor cada uno).
 
 **Cómo se revierte.** Volver a `buildIdOf()` como buster en `query-cache.ts` y quitar el boundary de
