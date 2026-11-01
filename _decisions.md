@@ -5802,3 +5802,40 @@ anterior (en el historial).
 
 **Re-evaluar cuando** se lleve una temporada de difusión con la ficha: si hace falta editar la organización desde
 ella, y si con muchas conversaciones la lista pide el orden de la lente en vez del del módulo.
+
+## [2026-11-01] ADR-161 · Llamar desde la conversación, fuera «Se mueve» y la portada del espacio sin cifras (enmienda ADR-154 § 11, § 12 y § 16)
+
+**Contexto.** Tanda del 01-11, puntos 67, 69 y 70, con el OK de Marco al coordinador. Rama `claude/batch-67`. Sin
+migración ni endpoint nuevo.
+
+**Decisión.**
+1. **(67) «Llamar» en la ficha de conversación.** Con teléfono en el dossier del contacto principal, los hechos lo
+   pintan como enlace `tel:`. Al tocarlo, además de llamar, se abre «Anotar contacto» con tipo llamada, saliente y
+   hoy (`ConversationHistory` acepta `initialKind`, `email` por defecto). Sin teléfono no se pinta nada.
+2. **(69) Fuera «Se mueve»** del panel de Difusión, con su esqueleto de carga, su «i» en la ayuda de la lente
+   (`SECTION_CONCEPTS.conversations`) y sus claves (`overview.hot_empty`, `overview.turn_ours`,
+   `overview.turn_theirs`, `help.concept.hot*`). El filtro `?temp=caliente` de la lista se queda, con su chip
+   (`overview.hot`). **La parte `hot` de la respuesta del panel se queda**: Hoy la lee para las respuestas nuevas de
+   «Ha cambiado» (`changesSince`), así que quitarla sería quitar eso también. Como la forma no cambia,
+   `CACHE_SCHEMA` no se sube.
+3. **(70) La portada del espacio es cabecera y proyectos.** Fuera las cuatro cifras (proyectos, confirmadas,
+   opciones, conversaciones) y «Próximos 7 días»: Hoy y las lentes ya lo dicen. Fuera también las dos lecturas que
+   solo servían a eso: la de conversaciones (que, con la clave `['conversations','today']` de «Te espera» y otra
+   URL sin `lean`, pisaba la caché de Hoy) y el recuento de conversaciones por proyecto. Las tarjetas dicen y
+   ordenan por confirmadas y opciones por venir. Enmienda ADR-154 § 11 (ya no hay cifras de la portada a las que
+   aplicar `.figure--zero`) y § 12 (la regla del «Próximos 7 días» vacío deja de tener objeto).
+4. **Ninguna otra clave de consulta repetida con otra URL.** Revisadas las claves literales del cliente: la única
+   colisión era la del punto 3.
+5. **Sin promesa de importar** (ADR-154 § 16): el vacío de Conversaciones dice «Trae tu agenda.» y ya no «Importa la
+   hoja de cálculo que ya usas…». Comprobado que no hay importación de hojas de cálculo en el código (ni ruta ni
+   componente ni dependencia de CSV o XLSX). Fuera `conversations.empty_body`.
+
+**Qué no cambia.** La respuesta de `GET /api/conversations/overview`, el filtro caliente de la lista, la edición del
+espacio, las tarjetas de proyecto con sus líneas.
+
+**Cómo se revierte.** Cada punto es su commit en `claude/batch-67`. Las claves borradas (`hall.stat_projects`,
+`hall.stat_confirmed`, `hall.stat_holds`, `hall.stat_conversations`, `hall.stat_conv_one`, `hall.stat_conv_many`,
+`hall.next7` y las del punto 2 y 5) están en el historial.
+
+**Re-evaluar cuando** Marco use la portada del espacio una temporada: si echa de menos algo de lo que viene en ese
+espacio, y si «Llamar» debe ofrecer también el teléfono de otros contactos de la conversación.
