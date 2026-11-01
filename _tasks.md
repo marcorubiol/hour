@@ -12,11 +12,8 @@ Detalle de cada punto: `build/coordination/STATUS.md` (fuera de git) y los infor
 no pide migración primero; las migraciones juntas por el gate de § 34.
 
 - [ ] 78 temporada en una sola función, septiembre por defecto, configurable por espacio.
-- [ ] 88 la hoja de ruta pública pinta los materiales de salida (la función hereda los de su línea). La base ya los entrega en `get_public_roadsheet` (`20261102150000`); falta que el Worker los pase y la página los muestre.
-- [ ] 90 crear un enlace de calendario «solo lo mío»: la base ya lo admite (`create_calendar_share(p_workspace_id, p_scope)`, `20261102160000`) y las opciones salen TENTATIVE; falta que `POST /api/calendar-shares` pase el alcance y el botón en la pantalla.
 - [ ] 95 contract: borrar `performance.readiness`, `line.modules`, `line.dossier_url`, `project.dossier_url`,
   `project.poster_url` (destructiva: staging e inspect).
-- [ ] 96 contado el 01-11: en `muk-cia`, 8 de 20 funciones sin `venue_id` (las fixtures, casi todas sin). Marco (01-11): siguen copiando nombre y ciudad; cerrado.
 - [ ] Renombrar «Oficio y privacidad» en Ajustes: la sección lleva ahora también los textos guardados (ADR-171), el nombre ya no la describe.
 - Aparcado: 86 (responsable de tarea) hasta que entre Anouk.
 

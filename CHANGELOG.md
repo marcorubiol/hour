@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Noviembre 2026 (en curso)
 
+- La hoja de ruta pública enseña los materiales de salida de la función (los de su línea si no tiene propios), cada uno con su enlace. El enlace del calendario puede ser «Solo lo mío»: las funciones donde estás en el reparto o dijiste «voy»; para crearlo hay que compartir antes tu nombre con el espacio. Y el calendario suscrito lleva los tramos de cada viaje. (2026-11-01, sin desplegar)
 - Fusionar dos organizaciones: «Fusionar con…» en la ficha (solo el admin), con vista previa de lo que se mueve, «Se queda» para elegir cuál, aviso con «Deshacer» durante 30 días, y Ajustes › Equipo lista las fusiones recientes. Si las dos tienen conversación en el mismo proyecto, lo dice y no deja fusionar (ADR-171). (2026-11-01, `8018b229`)
 - Textos guardados del espacio (presentación de la compañía, condiciones, un párrafo de gira): se crean en Ajustes › Espacio, los escribe quien puede editar conversaciones y los leen los miembros, y «Insertar texto» los pone en el correo de la conversación (ADR-171). (2026-11-01, `8018b229`)
 - Gastos adelantados: «Lo pagó» es una persona del equipo, aunque no tenga login; Cuentas › Gastos dice «Se debe al equipo» por persona, con «Devuelto» y deshacer; y «+ Gasto» se apunta desde el bolo y desde Ahora (ADR-170). (2026-11-01, `8018b229`)
