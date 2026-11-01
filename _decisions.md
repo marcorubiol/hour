@@ -5676,5 +5676,12 @@ boundary: no ve los datos que pintan mal sin error.
 **Riesgo.** Olvidar subir `CACHE_SCHEMA` deja ver, durante la primera revalidación tras un deploy, datos con la forma
 anterior; si eso revienta, la red recarga; si no revienta, se corrige al llegar la respuesta nueva.
 
+**Medido** (01-11, producción `95288d0b`, Chromium 1228 como iPhone 390×844, CPU ×4, slow4g, `/h/desk` con el
+usuario del E2E, mediana de 5; contenido = `main` sin `aria-busy="true"`): primera apertura tras un build nuevo
+(registro con otro buster) **2674 ms**; reapertura con el registro válido **660 ms** (desde `/`, 588). Con esta
+decisión, un deploy que no sube `CACHE_SCHEMA` abre como la reapertura: unos 2 s menos en la primera apertura tras
+cada uno (13 de los 18 deploys del 24-10 al 01-11 no tocaron API ni servidor). El techo de la apertura sin registro
+lo ponen `/api/conversations?limit=100` y `/api/conversations/overview` (unos 1,7 s de servidor cada uno).
+
 **Cómo se revierte.** Volver a `buildIdOf()` como buster en `query-cache.ts` y quitar el boundary de
 `routes/h/+layout.svelte`.
