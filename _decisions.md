@@ -5644,3 +5644,44 @@ están en el historial.
 **Re-evaluar cuando** Marco lo use una gira: si echa de menos ver dos opciones de proyectos distintos el mismo día
 sin reparto (entonces es un hecho en la celda, no una decisión), y si una opción que solo sale en «Te espera» se
 pierde de vista en «Después».
+
+## [2026-11-01] ADR-159 · La ficha de organización (fase 3 de ADR-102)
+
+**Contexto.** Una conversación de difusión es con la organización (ADR-102), pero la organización no tenía ficha:
+sus datos fiscales se editaban desde la ficha de conversación y sus conversaciones solo se encontraban buscando su
+nombre. Punto 52 de la tanda del 2026-11-01. Marco eligió la opción A del dibujo
+(https://claude.ai/artifact/MJWNSfWn8ekTudpWXp389i) el 01-11. Carril `claude/org-record-c981e6`. Sin migración.
+
+**Decisión.**
+1. **Una ficha en `/h/<espacio>/organization/<slug>`**, con la forma de toda ficha (ADR-139 p2) y en una columna,
+   porque la misma ficha se pinta en el vistazo (`?peek=organization/<espacio>/<slug>`), que es estrecho. Cabecera:
+   tipo (sin «otra»), ciudad, correo y web. «Falta»: los datos fiscales cuando paga algún bolo vivo y quien mira
+   puede escribirlos (el pagador es la organización, ADR-102 § 5), y los pasos vencidos de sus conversaciones; tres
+   como mucho (`$lib/organization-record`).
+2. **Sus conversaciones de todos los proyectos del espacio, con la fila de la lista** (`ConversationTable` con
+   `organizationId`, ADR-141), titulada por el proyecto: la sala ya es la página. «Añadir a un proyecto» crea la
+   conversación con la organización en un proyecto del ámbito que aún no la tenga.
+3. **Sus bolos** (`conversations_bolos`, sin dinero): los que vienen primero, después los pasados, los cancelados
+   fuera. **Sus contactos**: los de sus conversaciones y quien la tiene en su dossier, una vez cada persona; quien
+   se fue, detrás y en tinta suave con su último día. **Datos fiscales**: el mismo `OrganizationFiscal`, que deja la
+   ficha de conversación (lo que ADR-102 fase 2b dejó escrito). Dirección y teléfono, plegados en «Detalles».
+4. **Cómo se llega.** ⌘K: una organización abre siempre su ficha, y sus conversaciones salen en su grupo (antes, con
+   una conversación abría esa; con varias, una búsqueda). El título de la ficha de conversación, cuando es el nombre
+   de la sala, enlaza a su ficha (`RecordHead` `titleHref`). La ficha de bolo dice «Paga <organización>» con enlace.
+   En la ficha de persona, su organización pasa de texto a enlace.
+5. **Lecturas.** `GET /api/organizations/:id_o_slug?workspace_id=` (organización, conversaciones para «Falta»,
+   contactos, dossiers, bolos) y el filtro `organization_id` en la ruta simple de `/api/conversations`, con la
+   RLS de siempre: una conversación privada de otro no sale, ni sus bolos ni sus contactos.
+
+**Qué no cambia.** Los datos propios de la organización (nombre, tipo, ciudad, correo) no se editan desde la ficha:
+`workspace_organization` solo tiene `SELECT` para `authenticated` y escribirla pide una RPC nueva (migración por el
+gate de § 34). Queda en `_tasks.md` como siguiente paso.
+
+**Cómo se revierte.** Borrar `routes/h/[workspace]/organization/`, `OrganizationRecord.svelte`,
+`organization-record.ts` y el GET de `routes/api/organizations/[id]`; quitar `organization` de `$lib/peek` y
+`PeekHost`, `titleHref` de `RecordHead` y `ConversationRecord`, el «Paga» de `BoloRecord` y el enlace de
+`PersonRecord`; devolver `OrganizationFiscal` al pliegue de la ficha de conversación y `paletteFindRows` a su regla
+anterior (en el historial).
+
+**Re-evaluar cuando** se lleve una temporada de difusión con la ficha: si hace falta editar la organización desde
+ella, y si con muchas conversaciones la lista pide el orden de la lente en vez del del módulo.

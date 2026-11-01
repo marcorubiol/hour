@@ -1,5 +1,5 @@
 /**
- * La ficha de organización (ADR-156): la sala o quien programa, con quien es
+ * La ficha de organización (ADR-159): la sala o quien programa, con quien es
  * la conversación de difusión (ADR-102). Lo que la ficha dice de sus
  * contactos y de sus bolos, y lo que le falta.
  *

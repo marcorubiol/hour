@@ -940,6 +940,7 @@
   "organization.contact_until": "until {date}",
   "organization.missing_fiscal": "Pays for a deal and has no tax details",
   "organization.missing_step_due_in": "Next step overdue in {project}",
+  "organization.payer": "Billed to",
   "books.aging_no_expect": "{days} days · no expectation",
   "books.aging_of": "{days} of ~{expected} days",
   "books.invoice_not_updated": "Invoice not updated",

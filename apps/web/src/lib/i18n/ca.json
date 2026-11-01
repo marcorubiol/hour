@@ -932,6 +932,7 @@
   "organization.contact_until": "fins al {date}",
   "organization.missing_fiscal": "Paga un bolo i no té dades fiscals",
   "organization.missing_step_due_in": "Pas següent vençut a {project}",
+  "organization.payer": "Paga",
   "books.aging_no_expect": "{days} dies · sense previsió",
   "books.aging_of": "{days} de ~{expected} dies",
   "books.invoice_not_updated": "Factura no actualitzada",

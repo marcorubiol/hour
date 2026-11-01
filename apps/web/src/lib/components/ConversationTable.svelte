@@ -7,7 +7,7 @@
   export interface ConversationFilters {
     projectIds?: string[];
     lineId?: string;
-    /** One organization's conversations, across its projects (ADR-156). */
+    /** One organization's conversations, across its projects (ADR-159). */
     organizationId?: string;
     workspaceIds?: string[];
     season?: string;
@@ -107,7 +107,7 @@
     projectName?: (id: string) => string | null;
     /** The line's name, when the scope has several. */
     lineName?: (id: string) => string | null;
-    /** The row's title: the venue (the lists), or the project where the venue is the page (its record, ADR-156). */
+    /** The row's title: the venue (the lists), or the project where the venue is the page (its record, ADR-159). */
     titleBy?: 'organization' | 'project';
     /** What the selection bar needs of the page: how many match, and whether the page is all picked. */
     onpage?: (page: { total: number; size: number; full: boolean }) => void;

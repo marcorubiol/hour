@@ -1,8 +1,8 @@
 /**
  * GET /api/organizations/:key?workspace_id=:workspace — la ficha de una
- * organización (ADR-156): la organización, sus conversaciones de todos los
+ * organización (ADR-159): la organización, sus conversaciones de todos los
  * proyectos (lo justo para «Falta»; la lista la lee `/api/conversations` con
- * `organization_id`), sus bolos (`conversation_bolos`, sin dinero) y sus
+ * `organization_id`), sus bolos (`conversations_bolos`, sin dinero) y sus
  * contactos: los de sus conversaciones y quien la tiene en su dossier. `key`
  * es el id o el slug. RLS decide cada lectura: una conversación privada de
  * otro no sale, ni sus bolos ni sus contactos.
@@ -20,8 +20,7 @@ import { extractAccessToken } from '$lib/auth';
 import * as v from 'valibot';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { conversationRelation, type ConversationDbItem } from '$lib/conversation';
-import type { ConversationBolo } from '$lib/conversation-relation';
-import { TURN_EMBEDS, setLastTurnEmbed } from '$lib/server/conversation-overview';
+import { TURN_EMBEDS, loadConversationBolos, setLastTurnEmbed } from '$lib/server/conversation-overview';
 import type { OrganizationFile, OrgConversationContact, OrgStaff } from '$lib/organization-record';
 import { pgErrorResponse } from '$lib/server/errors';
 import { json, UUID_RE } from '$lib/server/http';
@@ -29,9 +28,6 @@ import { json, UUID_RE } from '$lib/server/http';
 const QuerySchema = v.object({
   workspace_id: v.pipe(v.string(), v.uuid()),
 });
-
-/** Bolos de como mucho tantas conversaciones (una RPC cada una). */
-const BOLO_READS_MAX = 40;
 
 export const GET: RequestHandler = async ({ request, params, url, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
@@ -85,15 +81,9 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
       pgGet<OrgStaff>(env, 'workspace_person', jwt, { search: staffSearch }),
     ]);
 
-    // Quien no lee las funciones del proyecto recibe una lista vacía (la RPC
-    // lo decide), así que un bolo nunca hace fallar la ficha.
-    const bolos = await Promise.all(
-      conversations.data.slice(0, BOLO_READS_MAX).map((c) =>
-        pgPostRpc<ConversationBolo>(env, 'conversation_bolos', jwt, { p_conversation_id: c.id })
-          .then((r) => r.data)
-          .catch(() => [] as ConversationBolo[]),
-      ),
-    );
+    // Sin `read:performance` la RPC no devuelve nada, así que un bolo nunca
+    // hace fallar la ficha.
+    const bolos = await loadConversationBolos(env, jwt, conversations.data.map((c) => c.id));
 
     const file: OrganizationFile = {
       organization: o,
@@ -105,7 +95,7 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
       })),
       contacts: conversations.data.flatMap((c) => c.contacts ?? []),
       staff: staff.data,
-      bolos: bolos.flat(),
+      bolos: [...bolos.values()].flat(),
     };
     return json(file);
   } catch (err) {

@@ -62,13 +62,13 @@ describe('paletteFindRows', () => {
     expect(rows.contacts).toEqual([]);
   });
 
-  test('una organización con una conversación la abre, y esa no se repite', () => {
+  test('una organización abre su ficha, y sus conversaciones siguen en su grupo', () => {
     const rows = paletteFindRows(
       result({
         organizations: [
-          { workspace_id: 'w1', id: 'o1', name: 'Sala Beckett', conversation_ids: ['c1'] },
-          { workspace_id: 'w1', id: 'o2', name: 'Sala Russafa', conversation_ids: ['c2', 'c3'] },
-          { workspace_id: 'w1', id: 'o3', name: 'Sala & Co', conversation_ids: [] },
+          { workspace_id: 'w1', id: 'o1', slug: 'sala-beckett', name: 'Sala Beckett', conversation_ids: ['c1'] },
+          { workspace_id: 'w1', id: 'o2', slug: 'sala-russafa', name: 'Sala Russafa', conversation_ids: ['c2', 'c3'] },
+          { workspace_id: 'w1', id: 'o3', slug: 'sala-co', name: 'Sala & Co', conversation_ids: [] },
         ],
         conversations: [
           { workspace_id: 'w1', id: 'c1', title: 'Sala Beckett', project_name: 'Sirena' },
@@ -78,13 +78,11 @@ describe('paletteFindRows', () => {
       base,
     );
     expect(rows.organizations.map((r) => r.href)).toEqual([
-      '/h/testing/conversation/c1',
-      '/h/conversations?q=Sala%20Russafa',
-      '/h/conversations?q=Sala%20%26%20Co',
+      '/h/testing/organization/sala-beckett',
+      '/h/testing/organization/sala-russafa',
+      '/h/testing/organization/sala-co',
     ]);
-    expect(rows.conversations).toEqual([
-      { kind: 'conversation', token: 'f:conv:c2', name: 'Sala Russafa', path: '', href: '/h/testing/conversation/c2' },
-    ]);
+    expect(rows.conversations.map((r) => r.href)).toEqual(['/h/testing/conversation/c1', '/h/testing/conversation/c2']);
   });
 
   test('una conversación sin título no se lista; con proyecto, lo lleva', () => {

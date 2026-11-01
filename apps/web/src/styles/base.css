@@ -2142,6 +2142,20 @@
   a.record-head__crumb:hover {
     color: var(--text-color);
   }
+  /* A title that is also a record of its own (a conversation's venue, ADR-159):
+     ink as any title, a soft underline that says it goes somewhere. */
+  .record-head__titlelink {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: var(--border-color-light);
+    text-decoration-thickness: var(--line-hairline);
+    text-underline-offset: 0.2em;
+    transition: text-decoration-color var(--transition);
+  }
+  .record-head__titlelink:hover,
+  .record-head__titlelink:focus-visible {
+    text-decoration-color: currentColor;
+  }
   .record-head__dot {
     inline-size: 0.5rem;
     block-size: 0.5rem;

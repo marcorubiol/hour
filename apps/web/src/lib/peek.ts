@@ -12,7 +12,7 @@
  *   ?peek=performance/<space>/<slug>
  *   ?peek=conversation/<space>/<slug or id>
  *   ?peek=person/<space>/<slug>
- *   ?peek=organization/<space>/<slug>   (ADR-156)
+ *   ?peek=organization/<space>/<slug>   (ADR-159)
  *
  * A bolo carries its project because the money feed is read by project
  * (`list_money_bolos` takes no id), and a shared link must be enough.

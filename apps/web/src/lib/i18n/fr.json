@@ -899,6 +899,7 @@
   "organization.contact_until": "jusqu’au {date}",
   "organization.missing_fiscal": "Paie un contrat et n’a pas de données fiscales",
   "organization.missing_step_due_in": "Prochaine étape en retard dans {project}",
+  "organization.payer": "Facturé à",
   "books.aging_no_expect": "{days} jours · sans prévision",
   "books.aging_of": "{days} sur ~{expected} jours",
   "books.invoice_not_updated": "Facture non mise à jour",

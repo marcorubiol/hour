@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * Organization detail (ADR-156): the venue or whoever programs it, the one
+   * Organization detail (ADR-159): the venue or whoever programs it, the one
    * a sales conversation is with (ADR-102). Its conversations across the
    * projects of the space, its bolos, its contacts and its fiscal data, in
    * the shape of every record (ADR-139 p2): head, «Falta», blocks, Detalles.

@@ -73,6 +73,23 @@
   );
   let workspaceSlug = $derived(space?.slug ?? '');
 
+  // Who pays is the organization of its conversation (ADR-102 § 5): its
+  // record links from the facts (ADR-159). The conversation's own read, the
+  // one its record uses, so a bolo opened from there costs nothing.
+  const convQuery = createQuery(
+    toStore(() => ({
+      queryKey: ['conversation', workspaceSlug, bolo?.conversation_id ?? ''] as const,
+      enabled: Boolean(workspaceSlug && bolo?.conversation_id),
+      retry: retryLoad,
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchJSON<{ item: { organization: { slug: string; name: string } | null } }>(
+          `/api/conversations/${bolo!.conversation_id}`,
+          signal,
+        ),
+    })),
+  );
+  let payer = $derived($convQuery.data?.item.organization ?? null);
+
   const invoicesQuery = createQuery(
     toStore(() => ({
       queryKey: ['invoices', 'project', projectId] as const,
@@ -215,6 +232,12 @@
     <RecordHead {crumbs} {title}>
       {#snippet facts()}
         <span class="fact-word" data-family={performanceStatusFamily(bolo!.status)}>{boloStatusLabel(bolo!.status, locale)}</span>
+        {#if payer}
+          <span
+            >{t('organization.payer', locale)}
+            <a href={`/h/${workspaceSlug}/organization/${encodeURIComponent(payer.slug)}`}>{payer.name}</a></span
+          >
+        {/if}
         {#if bolo!.city && bolo!.city !== title}<span>{bolo!.city}</span>{/if}
         <span class="bolo-record__num">{fmt(money!.fee, money!.currency)}</span>
         {#if money!.fee !== null || money!.collected > 0}

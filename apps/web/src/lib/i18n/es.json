@@ -932,6 +932,7 @@
   "organization.contact_until": "hasta el {date}",
   "organization.missing_fiscal": "Paga un bolo y no tiene datos fiscales",
   "organization.missing_step_due_in": "Siguiente paso vencido en {project}",
+  "organization.payer": "Paga",
   "books.aging_no_expect": "{days} días · sin previsión",
   "books.aging_of": "{days} de ~{expected} días",
   "books.invoice_not_updated": "Factura no actualizada",

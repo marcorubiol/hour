@@ -11,7 +11,7 @@
  *
  * Two paths:
  *   · plain (a project or line module: `line_id`, `season`; an organization's
- *     record: `organization_id`, ADR-156; or nothing that
+ *     record: `organization_id`, ADR-159; or nothing that
  *     derives): PostgREST, ordered by next step, as before;
  *   · the lens (`orden`, `etiqueta` or any derived filter: `turno`, `temp`,
  *     `temporada`, `relacion`, `linea`, `envio`+`r`): one source,
@@ -51,7 +51,7 @@ const QuerySchema = v.object({
   project_ids: v.optional(v.string()),
   workspace_ids: v.optional(v.string()),
   line_id: v.optional(v.pipe(v.string(), v.uuid())),
-  // ADR-156: the conversations of one organization, across its projects.
+  // ADR-159: the conversations of one organization, across its projects.
   organization_id: v.optional(v.pipe(v.string(), v.uuid())),
   q: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(120))),
   season: v.optional(v.string(), 'any'),
