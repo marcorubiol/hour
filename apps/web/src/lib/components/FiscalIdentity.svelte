@@ -45,6 +45,12 @@
     onsaved?: () => void;
     /** The head's rank where it sits: a block of the page (2) or inside one (3). */
     level?: 2 | 3;
+    /** Always draw the head, with the empty line under it, as a block among
+        headed blocks (Ajustes). Without it an empty block is one labelled line. */
+    headed?: boolean;
+    /** The block's anchor (`#fiscal`) and the class of the page it sits in. */
+    id?: string;
+    class?: string;
   }
 
   let {
@@ -58,6 +64,9 @@
     startEditing = false,
     onsaved,
     level = 3,
+    headed = false,
+    id,
+    class: className,
   }: Props = $props();
 
   const locale = appLocale();
@@ -139,8 +148,8 @@
 </script>
 
 {#if visible}
-  <section class="org-fiscal" aria-label={heading}>
-    {#if !editing && !fiscal}
+  <section class={['org-fiscal', className]} {id} aria-label={heading}>
+    {#if !editing && !fiscal && !headed}
       <!-- Nothing on file: the block is one line, with its way in. -->
       <EmptyLine label={heading} text={t(data?.hidden ? 'proforma.party_hidden' : 'fiscal.none', locale)}>
         {#if data?.can_edit}
@@ -150,7 +159,7 @@
     {:else}
       <BlockHead title={heading} {level}>
         {#if data?.can_edit && !editing}
-          <button type="button" class="block-head__act" onclick={edit}>{t('fiscal.edit', locale)}</button>
+          <button type="button" class="block-head__act" onclick={edit}>{t(fiscal ? 'fiscal.edit' : 'fiscal.add', locale)}</button>
         {/if}
       </BlockHead>
     {/if}
@@ -176,6 +185,8 @@
     {:else if fiscal}
       <p class="org-fiscal__summary">{receiverFiscalSummary({ legal_name: fiscal.legal_name ?? null, tax_id: fiscal.tax_id ?? null, city: fiscal.city ?? null })}</p>
       {#if note}<p class="org-fiscal__hint">{note}</p>{/if}
+    {:else if headed}
+      <EmptyLine text={t(data?.hidden ? 'proforma.party_hidden' : 'fiscal.none', locale)} />
     {/if}
   </section>
 {/if}
