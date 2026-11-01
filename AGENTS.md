@@ -23,7 +23,8 @@ Lo propio de Hour para la skill `carriles` (la sesión principal lleva la skill 
 - **Puerta** (verde antes de integrar y empujar): `pnpm --filter web check` 0/0 y `pnpm --filter web test:unit`;
   si toca schema o permisos, `pnpm --filter web test:rls`; si toca pantalla, el E2E contra un origen desplegado tras
   el deploy. Una migración a producción sigue su gate propio (`_tasks.md § 34`: backup, staging si es destructiva,
-  plan, apply).
+  plan, apply). Si cambia la forma de lo que guarda la caché del dispositivo (respuesta de API, clave de consulta,
+  queryFn), sube `CACHE_SCHEMA` en el mismo commit (ADR-158).
 - **Repo público:** sí. No escribas en git nada que no pueda ser público (claves, estado interno de carriles).
 
 ## Producto
