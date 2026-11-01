@@ -7,6 +7,7 @@
  */
 
 import type { ConversationBolo } from './conversation-relation';
+import type { OrgMergeLine } from './organization-merge';
 import { MISSING_MAX, personMissing, type PersonMissing, type PersonMissingConversation } from './record-missing';
 
 /** Los tipos de organización (`workspace_organization_kind_check`). */
@@ -74,6 +75,10 @@ export interface OrganizationFile {
   staff: OrgStaff[];
   venues: OrgVenue[];
   bolos: ConversationBolo[];
+  /** «Fusionar con…» (84): only the space's admin. */
+  can_merge?: boolean;
+  /** The merges this one absorbed, not undone (admin only). */
+  merges?: OrgMergeLine[];
 }
 
 export interface OrgContact {

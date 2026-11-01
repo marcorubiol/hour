@@ -6381,3 +6381,44 @@ Los datos escritos (personas que pagaron, devoluciones, organizaciones de sala) 
 
 **Re-evaluar cuando** se pague a alguien varios gastos de una vez (una transferencia): entonces «Devolver todo» por
 persona, con un solo día, en vez de gasto a gasto.
+
+## [2026-11-01] ADR-171 · Pantallas de la fusión de organizaciones (84) y de los textos guardados (89)
+
+**Contexto.** Las migraciones `20261102140000_organization_merge` y `20261102120000_workspace_text` están en
+producción desde el 01-11 sin pantalla. Carril `claude/screens-84-89`. Cierra la mitad que ADR-169 § 3 dejó
+pendiente.
+
+**Decisión.**
+1. **«Fusionar con…» en la ficha de organización (84)**, junto a «Editar», solo para el admin del espacio
+   (`can_merge` en `GET /api/organizations/:key`, el mismo `is_workspace_admin` que la ficha de persona). El flujo es
+   el de la fusión de persona: elegir la otra (por nombre, con la lista de organizaciones del espacio), vista previa
+   con los recuentos que la RLS deja ver (conversaciones, bolos, contactos, salas, facturas), «Se queda» para elegir
+   cuál (por defecto la más antigua), confirmar, aviso con «Deshacer». La ficha que se quedó dice cada fusión que
+   absorbió con su «Deshacer la fusión» durante 30 días, y el slug de la que desapareció abre la que se quedó
+   (`previous_slugs`, como en persona). No hay campos que elegir: la RPC rellena lo vacío y suma las notas, y la
+   pantalla lo dice.
+2. **El choque de proyecto se dice con las conversaciones que chocan.** Si las dos tienen conversación en el mismo
+   proyecto (con la misma privacidad, los índices únicos de `conversation`), la vista previa lo cuenta y la ruta
+   lista las parejas que quien llama ve, cada una con su proyecto y un enlace a cada conversación; «Fusionar» queda
+   apagado. Si el rechazo llega solo al fusionar (una conversación privada de otra persona que la vista previa no
+   ve), el diálogo dice eso. Fusionar dos conversaciones sigue sin existir.
+3. **Ajustes › Equipo, el mismo sitio que las fusiones de persona:** el bloque pasa a ser `MergesSection` y, detrás
+   de «Fichas de persona», dibuja «Organizaciones» con sus fusiones recientes y el mismo «Deshacer». Rutas:
+   `GET/POST /api/organization-merges`, `DELETE /api/organization-merges/:id`,
+   `GET /api/workspaces/:id/organization-merges`. Los tratamientos de fusión (el diálogo y la línea de «fusionada»)
+   tienen casa propia, `styles/merge.css`, que comparten persona y organización.
+4. **Textos guardados (89):** Ajustes › Espacio los lista por título (crear, editar y borrar en un diálogo; borrar
+   con dos pulsaciones, como una fecha). Escribe quien tiene `edit:conversation` en algún proyecto vivo del espacio
+   (`can_edit` en `GET /api/workspaces/:id/texts`, que lo pregunta con `has_permission` proyecto a proyecto, hasta
+   50); leen los miembros internos. Borrar va por `delete_workspace_text`.
+5. **«Insertar texto» en el redactor del correo de la conversación**, junto a «Enlazar un material»: inserta el
+   cuerpo del texto en el cursor, en su propia línea (`insertBlock`, el mismo camino que el material). Sale aunque la
+   conversación no tenga línea; sin textos, el menú dice dónde se crean. Una consulta por espacio
+   (`['workspace-texts', id]`) para Ajustes y el redactor.
+6. **Caché del dispositivo:** la ficha de organización trae `can_merge` y `merges`; `CACHE_SCHEMA` sube a 8 en el carril y queda en 9 al integrarse detrás de ADR-170, que también lo subió a 8.
+
+**Cómo se revierte.** Cada punto es de este carril y no deja datos propios: quitar las pantallas deja las RPC y las
+tablas como estaban. Una fusión hecha se deshace desde la ficha o Ajustes durante 30 días.
+
+**Re-evaluar cuando** exista fusionar dos conversaciones (el choque dejaría de bloquear), o el redactor pase a texto
+enriquecido (insertar en el cursor cambia de forma).

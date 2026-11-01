@@ -28,6 +28,7 @@ import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { conversationRelation, type ConversationDbItem } from '$lib/conversation';
 import { TURN_EMBEDS, loadConversationBolos, setLastTurnEmbed } from '$lib/server/conversation-overview';
 import { ORGANIZATION_KINDS, type OrganizationFile, type OrgConversationContact, type OrgStaff, type OrgVenue } from '$lib/organization-record';
+import type { OrgMergeLine } from '$lib/organization-merge';
 import { pgErrorResponse } from '$lib/server/errors';
 import { json, UUID_RE } from '$lib/server/http';
 
@@ -56,7 +57,15 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
       limit: '1',
     });
     orgSearch.set(UUID_RE.test(key) ? 'id' : 'slug', `eq.${key}`);
-    const org = await pgGet<OrganizationFile['organization']>(env, 'workspace_organization', jwt, { search: orgSearch });
+    let org = await pgGet<OrganizationFile['organization']>(env, 'workspace_organization', jwt, { search: orgSearch });
+    // The slug of an organization merged into this one still opens it
+    // (`previous_slugs`, 84); a live slug always wins.
+    if (org.data.length === 0 && !UUID_RE.test(key)) {
+      const previous = new URLSearchParams(orgSearch);
+      previous.delete('slug');
+      previous.set('previous_slugs', `cs.{${key}}`);
+      org = await pgGet<OrganizationFile['organization']>(env, 'workspace_organization', jwt, { search: previous });
+    }
     if (org.data.length === 0) return json({ error: 'not_found' }, 404);
     const o = org.data[0];
 
@@ -90,10 +99,23 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
       order: 'name.asc',
       limit: '200',
     });
-    const [conversations, staff, venues] = await Promise.all([
+    // The merges this one absorbed and can still undo (`organization_merge`:
+    // RLS shows it to the space's admin only; anyone else reads none).
+    const mergesSearch = new URLSearchParams({
+      select: 'id,merged_at,drop_name:drop_before->>name',
+      workspace_id: `eq.${workspaceId}`,
+      keep_organization_id: `eq.${o.id}`,
+      undone_at: 'is.null',
+      order: 'merged_at.desc',
+      limit: '5',
+    });
+    const [conversations, staff, venues, admin, merges] = await Promise.all([
       pgGet<ConvRow>(env, 'conversation', jwt, { search: convSearch }),
       pgGet<OrgStaff>(env, 'workspace_person', jwt, { search: staffSearch }),
       pgGet<OrgVenue>(env, 'venue', jwt, { search: venueSearch }),
+      // «Fusionar con…» is the admin's verb, as in the person's file.
+      pgPostRpc<boolean>(env, 'is_workspace_admin', jwt, { ws_id: workspaceId }),
+      pgGet<OrgMergeLine>(env, 'organization_merge', jwt, { search: mergesSearch }),
     ]);
 
     // Sin `read:performance` la RPC no devuelve nada, así que un bolo nunca
@@ -112,6 +134,8 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
       staff: staff.data,
       venues: venues.data,
       bolos: [...bolos.values()].flat(),
+      can_merge: admin.data[0] === true,
+      merges: merges.data,
     };
     return json(file);
   } catch (err) {

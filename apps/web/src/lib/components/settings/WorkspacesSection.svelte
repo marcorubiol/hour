@@ -15,7 +15,7 @@
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
-  import PersonMergesSection from '$lib/components/settings/PersonMergesSection.svelte';
+  import MergesSection from '$lib/components/settings/MergesSection.svelte';
 
   const locale = appLocale();
 
@@ -397,9 +397,9 @@
       {/each}
     </div>
   </section>
-  <!-- Fichas por unir y fusiones recientes (fusión de persona, fase 3): el
-       mismo admin que ve los accesos. -->
-  <PersonMergesSection workspace={currentWorkspace} />
+  <!-- Fichas por unir y fusiones recientes, de persona (fase 3) y de
+       organización (ADR-171): el mismo admin que ve los accesos. -->
+  <MergesSection workspace={currentWorkspace} />
 {/if}
 
 {#if aliasRequests.length > 0}

@@ -13,6 +13,13 @@
    * con las dos fichas ya elegidas. «Fusiones recientes»: las de 30 días sin
    * deshacer, con su «Deshacer». Solo para el admin (lo monta el bloque de
    * accesos, que ya solo ve él); sin nada que decir, no se dibuja.
+   *
+   *   ORGANIZACIONES
+   *   Fusiones recientes
+   *   «Teatre Principal SL» pasó a «Teatre Principal»   1 nov 2026   Deshacer la fusión
+   *
+   * Las fusiones de organización (84, ADR-171) van detrás, con la misma
+   * fila y el mismo «Deshacer»; solo hay recientes (no hay invitaciones).
    */
   import { toStore } from 'svelte/store';
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
@@ -26,6 +33,7 @@
   import { dayMonthYearTs } from '$lib/datetime';
   import { t, appLocale } from '$lib/i18n';
   import { undoOpen, type RecentMerge, type UnmergedInvitation } from '$lib/person-merge';
+  import type { RecentOrgMerge } from '$lib/organization-merge';
 
   interface Props {
     workspace: { id: string; slug: string };
@@ -49,6 +57,52 @@
         ),
     })),
   );
+  const orgMerges = createQuery(
+    toStore(() => ({
+      queryKey: ['organization-merges', workspace.id] as const,
+      retry: false,
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchJSON<{ recent: RecentOrgMerge[] }>(`/api/workspaces/${workspace.id}/organization-merges`, signal),
+    })),
+  );
+  let orgRecent = $derived(($orgMerges.data?.recent ?? []).filter((m) => undoOpen(m.merged_at)));
+  const orgHref = (slug: string) => `/h/${workspace.slug}/organization/${encodeURIComponent(slug)}`;
+
+  async function undoOrg(id: string, name: string) {
+    try {
+      const body = await mutateJSON<{ undo: { skipped?: number } }>('DELETE', `/api/organization-merges/${id}`);
+      await Promise.all(
+        [['organization-merges'], ['organization'], ['organizations'], ['conversations']].map((queryKey) =>
+          queryClient.invalidateQueries({ queryKey }),
+        ),
+      );
+      const skipped = body?.undo.skipped ?? 0;
+      addToast({
+        tone: 'info',
+        message: t('person.merge_undone', locale, { name }),
+        ...(skipped > 0 ? { title: t('person.merge_undone_skipped', locale, { n: skipped }) } : {}),
+      });
+    } catch (err) {
+      const code = err instanceof ApiError ? String(err.body?.error ?? '') : '';
+      addToast({
+        tone: 'danger',
+        title: t('person.merge_undo_failed', locale),
+        message:
+          code === 'undo_expired'
+            ? t('person.merge_err_expired', locale)
+            : code === 'already_undone'
+              ? t('person.merge_err_undone', locale)
+              : code === 'later_merge'
+                ? t('organization.merge_err_later', locale)
+                : code === 'name_taken'
+                  ? t('organization.merge_err_name_taken', locale)
+                  : err instanceof Error
+                    ? err.message
+                    : t('perf.unexpected', locale),
+      });
+    }
+  }
+
   let unmerged = $derived($merges.data?.unmerged ?? []);
   let recent = $derived(($merges.data?.recent ?? []).filter((m) => undoOpen(m.merged_at)));
 
@@ -163,6 +217,31 @@
         {/each}
       </ul>
     {/if}
+  </section>
+{/if}
+
+{#if orgRecent.length > 0}
+  <section class="set-group set-merges" aria-labelledby="set-org-merges-title" data-testid="settings-org-merges">
+    <BlockHead title={t('settings.merges_org_title', locale)} id="set-org-merges-title" />
+    <h3 class="eyebrow eyebrow--sub set-merges__sub">{t('settings.merges_recent', locale)}</h3>
+    <ul class="set-merges__list" role="list">
+      {#each orgRecent as m (m.id)}
+        {@const keep = m.keep_name ?? t('settings.merges_keep_gone', locale)}
+        <li class="set-merges__row" data-testid="settings-recent-org-merge">
+          <span class="set-merges__name">
+            {#if m.keep_slug}
+              <a href={orgHref(m.keep_slug)}>{t('settings.merges_recent_line', locale, { drop: m.drop_name ?? '?', keep })}</a>
+            {:else}
+              {t('settings.merges_recent_line', locale, { drop: m.drop_name ?? '?', keep })}
+            {/if}
+          </span>
+          <span class="set-merges__meta">{dayMonthYearTs(m.merged_at)}</span>
+          <button type="button" class="btn--secondary btn--s" onclick={() => undoOrg(m.id, m.drop_name ?? '')}
+            >{t('person.merge_line_undo', locale)}</button
+          >
+        </li>
+      {/each}
+    </ul>
   </section>
 {/if}
 
