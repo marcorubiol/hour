@@ -5619,6 +5619,11 @@ de quien la mira. Carril `claude/hoy-coherence`. Sin migración ni endpoint.
     cobro dice su día («Recordatorio en Hoy el 12 nov.»). Fuera la fase de un documento registrado
     («la subida llega en la fase 0.3+»). Estar solo no es noticia: la presencia del marco no se dibuja con una
     persona, y las notas en directo sin nadie más no dicen «en directo» (`data-collab-status` sigue).
+15. **Ajustes y Ahora, lo mismo.** «Este espacio no tiene tu nombre» (no «aún no eres persona»); revocar un
+    acceso dice lo que pasa: deja de entrar enseguida (las políticas leen `membership` en cada lectura, no el JWT);
+    «Un monograma.» sin promesa; fuera «Alt y las flechas la mueven» de las etiquetas; la hora local del espacio
+    solo se avisa cuando su reloj no es el tuyo (la regla de `dualTime`); en Ahora, sin nada de la sala en ficha,
+    no hay cabecera «Sala» y queda la línea de quién y dónde.
 
 **Qué no cambia.** La tarjeta de Hoy (ADR-150, 153): ya no pinta reparto desde ADR-150 § 4. Calma: su «Todo al
 día…» no coincide con ningún título que diga «nada te espera» (esas claves no tienen uso).
@@ -5629,7 +5634,8 @@ día…» no coincide con ningún título que diga «nada te espera» (esas clav
 `people.ts` y `routes/h/planner/+page.svelte`; 11 en `.figure--zero` y sus usos; 12 en `DayFoot.svelte`,
 `RunningOrder.svelte`, `TravelStages.svelte`, `DeskWaiting.svelte`, `DeskBoard.svelte`, `HomeView.svelte` y
 `routes/h/books/+page.svelte`; 14 en `line/ConversationsModule.svelte`, `mailout/[id]/+page.svelte`,
-`MoneyInvoices.svelte`, `PerformanceRecord.svelte`, `PresenceBadge.svelte` y `YNotes.svelte`. Las claves borradas
+`MoneyInvoices.svelte`, `PerformanceRecord.svelte`, `PresenceBadge.svelte` y `YNotes.svelte`; 15 en
+`EditDateDialog.svelte`, `CreateEventDialog.svelte`, `ConversationTagsSection.svelte` y `AhoraView.svelte`. Las claves borradas
 están en el historial.
 
 **Re-evaluar cuando** Marco lo use una gira: si echa de menos ver dos opciones de proyectos distintos el mismo día

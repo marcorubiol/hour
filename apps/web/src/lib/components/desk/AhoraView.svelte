@@ -300,6 +300,10 @@
           {@const rest = moments.filter((p) => !pointPast(p, clock, now))}
           {@const going = ((item.row as PerformanceEvent).commitments ?? []).filter((c) => c.state === 'going').map((c) => names.get(c.person_id)).filter(Boolean)}
           {@const crew = [...(rs?.crew ?? []), ...(rs?.cast ?? [])].filter((c) => c.person)}
+          {@const venueKnown = Boolean(rs?.venue?.address || lines.load_access || lines.parking || who || lines.hotel)}
+          <!-- Nothing on file about the venue: no «Sala» head and no empty
+               block (ADR-154); whose gig and where (the mark) still say it. -->
+          {#if !venueKnown}{@render mark(item)}{:else}
           <section class="ahora__block" data-testid="ahora-venue">
             <BlockHead title={t('ahora.venue', locale)} />
             {@render mark(item)}
@@ -314,6 +318,7 @@
             {/if}
             {#if lines.hotel}<p class="ahora__kv"><span>{t('ahora.hotel', locale)}</span> {lines.hotel}</p>{/if}
           </section>
+          {/if}
 
           {#if moments.length > 0}
             <section class="ahora__block" data-testid="ahora-order">
