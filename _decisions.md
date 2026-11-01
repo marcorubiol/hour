@@ -5846,8 +5846,12 @@ de quien llama.
 PATCH. (b) Índices parciales sobre `conversation_event` para los dos embebidos: no tocan el coste, que está en la
 política. (c) Cachear `has_permission` en la sesión: Postgres no lo ofrece para funciones.
 
-**Cómo se aplica.** Gate de `_tasks.md § 34`, con OK de Marco: backup, plan y apply; antes, comprobar en
-`pg_policies` que el USING vivo es el de 20261011200000 (§ 5 del runbook). Después, `test:rls` entero y la medición por
-HTTP de los dos endpoints.
+**Política viva, comprobada el 01-11** por HOUR COOR en `pg_policies` (§ 5 del runbook): `conversation_select` es
+`((deleted_at IS NULL) AND has_permission(project_id, 'read:conversation') AND ((private_to IS NULL) OR (private_to =
+(SELECT auth.uid()))))`, la de 20261011200000, y las tres hijas son `EXISTS (SELECT 1 FROM conversation c WHERE c.id =
+<hija>.conversation_id)`. La migración solo cambia el término de `has_permission`.
+
+**Cómo se aplica.** Gate de `_tasks.md § 34`, con OK de Marco: backup, plan y apply. Después, `test:rls` entero y la
+medición por HTTP de los dos endpoints.
 
 **Cómo se revierte.** `build/runbooks/rollback-20261101-conversation-select-once.sql`.

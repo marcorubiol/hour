@@ -17,8 +17,8 @@
 -- Equivalencia: `accessible_project_ids(p)` son los proyectos vivos donde
 -- `has_permission(id, p)`, y `has_permission` ya exige proyecto vivo
 -- (`private.model_has_facet`: `p.deleted_at IS NULL`). Borrado y privada no
--- cambian. Parte del USING de 20261011200000_mail_google: antes del apply,
--- comprobar en pg_policies que es el vivo (§ 5 del runbook de EXPLAIN).
+-- cambian. Parte del USING de 20261011200000_mail_google, que es el vivo
+-- (pg_policies, comprobado el 01-11): solo cambia el término de has_permission.
 --
 -- Las tablas hijas (`conversation_event`, `conversation_contact`,
 -- `conversation_tagging`) no se tocan: sus políticas son
