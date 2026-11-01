@@ -28,6 +28,7 @@
   import Input from '$lib/components/Input.svelte';
   import Menu from '$lib/components/Menu.svelte';
   import ProductionStub from '$lib/components/ProductionStub.svelte';
+  import PerformanceCopyDialog from './PerformanceCopyDialog.svelte';
   import RunningOrder from '$lib/components/RunningOrder.svelte';
   import YNotes from '$lib/components/YNotes.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
@@ -718,6 +719,7 @@
 
   // «Detalles»: lo de consulta, plegado. Cerrado, dice lo que guarda.
   let detailsOpen = $state(false);
+  let copyOpen = $state(false);
   let hasProduction = $derived(
     Boolean(
       perf &&
@@ -968,6 +970,27 @@
          las fechas y los materiales. Quién programa es un hecho de la
          cabecera («Con…», ADR-164 § 3). -->
     <Fold word={t('record.details', locale)} keeps={detailsKeeps} bind:open={detailsOpen} id="details" testid="record-details">
+      {#if canEdit && perf.project}
+        <!-- ADR-169 (punto 83): la técnica, la logística, la acogida y el
+             plan de trabajo de otra función, sin pisar nada sin preguntar. -->
+        <div class="perf__copy">
+          <Button variant="quiet" size="s" onclick={() => (copyOpen = true)}
+            >{t('perf_copy.open', locale)}</Button
+          >
+        </div>
+        <PerformanceCopyDialog
+          bind:open={copyOpen}
+          perf={{ ...perf, project_id: perf.project.id }}
+          {workspaceSlug}
+          tz={perf.venue?.timezone ?? workspaceTz ?? viewerTz}
+          fallbackTz={workspaceTz ?? viewerTz}
+          {locale}
+          oncopied={() => {
+            void queryClient.invalidateQueries({ queryKey: ['performance'] });
+            void queryClient.invalidateQueries({ queryKey: ['schedule'] });
+          }}
+        />
+      {/if}
       <ProductionStub
         venue={perf.venue}
         venueName={perf.venue_name}
@@ -1190,6 +1213,11 @@
       flex: 1 1 100%;
     }
 
+
+    .perf__copy {
+      display: flex;
+      justify-content: flex-end;
+    }
 
     .perf__section {
       display: flex;
