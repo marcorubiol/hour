@@ -29,7 +29,7 @@
   import { tick } from 'svelte';
   import { fetchJSON, mutateJSON, ApiError } from '$lib/api';
   import { addToast } from '$lib/components/Toast.svelte';
-  import TaskComposer from '$lib/components/TaskComposer.svelte';
+  import { lazy } from '$lib/lazy.svelte';
   import LensHeader from '$lib/components/LensHeader.svelte';
   import LensTitle from '$lib/components/LensTitle.svelte';
   import FirstVisitCard from '$lib/components/FirstVisitCard.svelte';
@@ -753,9 +753,12 @@
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   });
+  // Its code arrives with the first «+», not with Hoy ($lib/lazy, ADR-157).
+  const composer = lazy(() => import('$lib/components/TaskComposer.svelte'));
   async function openComposer() {
     composerOpen = !composerOpen;
     if (!composerOpen) return;
+    await composer.load();
     await tick();
     composerEl?.querySelector<HTMLElement>('input, textarea')?.focus();
   }
@@ -859,9 +862,9 @@
 
   <FirstVisitCard section="desk" steps={['desk-next', 'desk-waits', 'desk-more']} />
 
-  {#if composerOpen && taskSpaces.length > 0}
+  {#if composerOpen && taskSpaces.length > 0 && composer.component}
     <div class="desk__composer" bind:this={composerEl}>
-      <TaskComposer
+      <composer.component
         {locale}
         target={composerTarget}
         performances={composerPerformances}
