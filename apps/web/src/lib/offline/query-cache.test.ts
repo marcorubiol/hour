@@ -49,19 +49,30 @@ afterEach(() => {
 });
 
 describe('buster', () => {
-  test('a dirty build is only itself; a clean one is its SHA', async () => {
-    const { buildIdOf } = await load();
-    expect(buildIdOf({ sha: 'abc1234', dirty: false, builtAt: 't1' })).toBe('abc1234');
-    expect(buildIdOf({ sha: 'abc1234', dirty: true, builtAt: 't1' })).not.toBe(
-      buildIdOf({ sha: 'abc1234', dirty: true, builtAt: 't2' }),
-    );
+  test('a record of the current schema survives a new build', async () => {
+    const { store, writeQueryCache, readQueryCache, setQueryCacheStore, CACHE_SCHEMA } = await load();
+    await writeQueryCache(warm(), A);
+    expect(store.peek()!.schema).toBe(CACHE_SCHEMA);
+    setQueryCacheStore(store); // forget the memoized read
+    expect((await readQueryCache())?.user.sub).toBe(A.sub);
   });
 
-  test('a record of another build is wiped, not restored', async () => {
+  test('a record of another schema is wiped, not restored', async () => {
+    const { store, writeQueryCache, readQueryCache, setQueryCacheStore, CACHE_SCHEMA } = await load();
+    await writeQueryCache(warm(), A);
+    store.peek()!.schema = CACHE_SCHEMA - 1;
+    setQueryCacheStore(store);
+    expect(await readQueryCache()).toBeUndefined();
+    expect(store.peek()).toBeUndefined();
+  });
+
+  test('a record written under the build SHA (before ADR-158) is wiped', async () => {
     const { store, writeQueryCache, readQueryCache, setQueryCacheStore } = await load();
     await writeQueryCache(warm(), A);
-    store.peek()!.build = 'some-older-build';
-    setQueryCacheStore(store); // forget the memoized read
+    const legacy = store.peek()! as unknown as Record<string, unknown>;
+    delete legacy.schema;
+    legacy.build = 'abc1234';
+    setQueryCacheStore(store);
     expect(await readQueryCache()).toBeUndefined();
     expect(store.peek()).toBeUndefined();
   });
@@ -212,5 +223,42 @@ describe('wipe', () => {
     expect(store.peek()?.user).toEqual(A);
     await claimQueryCache(B);
     expect(store.peek()).toBeUndefined();
+  });
+});
+
+describe('the frame\'s safety net (ADR-158)', () => {
+  function stubBrowser() {
+    const kept = new Map<string, string>();
+    const reload = vi.fn();
+    vi.stubGlobal('sessionStorage', {
+      getItem: (k: string) => kept.get(k) ?? null,
+      setItem: (k: string, v: string) => void kept.set(k, v),
+    });
+    vi.stubGlobal('location', { reload });
+    return reload;
+  }
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  test('a crash in an open that painted from the device wipes it and reloads, once', async () => {
+    const reload = stubBrowser();
+    const { store, writeQueryCache, startQueryCache, setQueryCacheStore, recoverFromRestoredCrash } = await load();
+    await writeQueryCache(warm(), A);
+    setQueryCacheStore(store);
+    await startQueryCache(client(), () => A).restored;
+    expect(recoverFromRestoredCrash()).toBe(true);
+    await vi.waitFor(() => expect(reload).toHaveBeenCalledOnce());
+    expect(store.peek()).toBeUndefined();
+    // The reloaded tab crashing again is not the cache's doing.
+    expect(recoverFromRestoredCrash()).toBe(false);
+  });
+
+  test('a crash with nothing restored goes through', async () => {
+    const reload = stubBrowser();
+    const { startQueryCache, recoverFromRestoredCrash } = await load();
+    await startQueryCache(client(), () => A).restored;
+    expect(recoverFromRestoredCrash()).toBe(false);
+    expect(reload).not.toHaveBeenCalled();
   });
 });
