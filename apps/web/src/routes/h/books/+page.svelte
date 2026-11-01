@@ -1406,14 +1406,14 @@
 <Dialog bind:open={payOpen} title={t('books.record_payment', locale)} size="s" description={payBolo ? `${[payBolo.venue_name, payBolo.city].filter(Boolean).join(', ')}` : ''} onclose={() => (payBolo = null)}>
   <form class="mny__pay-form" novalidate oninput={formErrors.onedit} onsubmit={(e) => { e.preventDefault(); submitPay(); }}>
     <div class="mny__row2">
-      <Input id="pay-amount" label={t('books.amount_cur', locale, { currency: payBolo?.fee_currency ?? 'EUR' })} type="number" step="0.01" bind:value={payAmount} error={formErrors.of('pay-amount')} />
+      <Input id="pay-amount" label={t('books.amount_cur', locale, { currency: payBolo?.fee_currency ?? 'EUR' })} type="number" step="0.01" bind:value={payAmount} required error={formErrors.of('pay-amount')} />
       <Input label={t('books.received_on', locale)} type="date" bind:value={payReceivedOn} />
     </div>
     <div class="mny__row2">
       <Select label={t('books.method', locale)} bind:value={payMethod} options={PAYMENT_METHODS.map((m) => ({ value: m, label: paymentMethodLabel(m, locale) }))} />
       <Input label={t('books.counterparty_payer', locale)} bind:value={payCounterparty} placeholder={t('books.ph_venue', locale)} />
     </div>
-    <Input label={t('books.reference_opt', locale)} bind:value={payReference} placeholder={t('books.ph_reference', locale)} />
+    <Input label={t('books.reference', locale)} bind:value={payReference} placeholder={t('books.ph_reference', locale)} />
     <button type="submit" hidden aria-hidden="true"></button>
   </form>
   <p class="mny__dialog-note">{t(payInvoiceId ? 'books.pay_note_doc' : 'books.pay_note', locale)}</p>
@@ -1455,7 +1455,7 @@
 
 <Dialog bind:open={dealOpen} title={t('books.new_deal', locale)} size="s" description={t('books.deal_desc', locale)}>
   <form class="mny__pay-form" novalidate oninput={formErrors.onedit} onchange={formErrors.onedit} onsubmit={(e) => { e.preventDefault(); submitDeal(); }}>
-    <Select id="deal-project" label={t('books.project_obra', locale)} bind:value={dealProjectId} options={dealOptions} error={formErrors.of('deal-project')} />
+    <Select id="deal-project" label={t('books.project_obra', locale)} bind:value={dealProjectId} options={dealOptions} required error={formErrors.of('deal-project')} />
     {#if dealConversations.length > 0}
       <Select id="deal-conversation" label={t('books.deal_conversation', locale)} bind:value={dealConversationId} options={dealConversationOptions} onchange={pickDealConversation} />
     {/if}
@@ -1464,7 +1464,7 @@
       <Input label={t('create.city', locale)} bind:value={dealCity} placeholder={t('books.ph_city', locale)} />
     </div>
     <div class="mny__row2">
-      <Input id="deal-fee" label={t('books.fee_optional', locale)} type="number" step="0.01" bind:value={dealFee} placeholder={t('books.ph_fee_later', locale)} error={formErrors.of('deal-fee')} />
+      <Input id="deal-fee" label={t('books.fee', locale)} type="number" step="0.01" bind:value={dealFee} placeholder={t('books.ph_fee_later', locale)} error={formErrors.of('deal-fee')} />
       <Input label={t('books.currency', locale)} bind:value={dealCurrency} placeholder="EUR" />
     </div>
     <button type="submit" hidden aria-hidden="true"></button>
@@ -1478,7 +1478,7 @@
 <Dialog bind:open={expOpen} title={t('books.add_expense', locale)} size="s">
   <form class="mny__pay-form" novalidate oninput={formErrors.onedit} onchange={formErrors.onedit} onsubmit={(e) => { e.preventDefault(); submitExpense(); }}>
     <div class="mny__row2">
-      <Input id="exp-amount" label={t('books.amount', locale)} type="number" step="0.01" bind:value={eAmount} error={formErrors.of('exp-amount')} />
+      <Input id="exp-amount" label={t('books.amount', locale)} type="number" step="0.01" bind:value={eAmount} required error={formErrors.of('exp-amount')} />
       <Input label={t('books.currency', locale)} bind:value={eCurrency} placeholder="EUR" />
     </div>
     <Input label={t('books.description', locale)} bind:value={eDescription} placeholder={t('books.ph_expense', locale)} />
@@ -1486,7 +1486,7 @@
       <Input label={t('perf.date', locale)} type="date" bind:value={eIncurredOn} />
       <Select label={t('books.category', locale)} bind:value={eCategory} options={EXPENSE_CATEGORIES.map((c) => ({ value: c, label: categoryLabel(c, locale) }))} />
     </div>
-    <Select id="exp-anchor" label={t('books.anchor', locale)} bind:value={eAnchor} options={expenseAnchorOptions} error={formErrors.of('exp-anchor')} />
+    <Select id="exp-anchor" label={t('books.anchor', locale)} bind:value={eAnchor} options={expenseAnchorOptions} required error={formErrors.of('exp-anchor')} />
     <Input label={t('books.counterparty_paid', locale)} bind:value={eCounterparty} placeholder={t('books.ph_counterparty', locale)} />
     <button type="submit" hidden aria-hidden="true"></button>
   </form>
