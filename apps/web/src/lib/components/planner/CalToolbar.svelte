@@ -80,7 +80,12 @@
        window's controls went up beside the title they move, so nothing here
        is reserved for a drawing that has no window: the Season's row starts
        where every other row starts. -->
-  <div class="cal__views" role="group" aria-label={t('planner.view_label', locale)}>
+  <div
+    class="cal__views"
+    class:cal__views--lens={view === 'day'}
+    role="group"
+    aria-label={t('planner.view_label', locale)}
+  >
     {#each VIEW_ORDER as v (v)}
       <button
         type="button"
@@ -399,6 +404,12 @@
         align-self: center;
       }
       .cal__spacer {
+        display: none;
+      }
+      /* IN THE DAY, THE WAY OUT IS THE ×, so on a phone the three drawings
+         step aside (Marco, 2026-11-01, ADR-155): the row keeps the portada
+         and «Día ×», and the four words never fight the two acts for 349 px. */
+      .cal__views--lens > .cal__view:not(:first-child) {
         display: none;
       }
       .cal__dial {

@@ -5662,6 +5662,8 @@ pulsar un día y que Hoy cubre para hoy (ADR-150). Marco eligió la opción A de
    Si no hay dibujo detrás (un enlace, Hoy, ⌘K, una recarga), abre la Agenda en ese día. `Esc` hace lo mismo que la ×.
    El dibujo de origen viaja en el estado de la entrada del historial (`plannerFrom`), no en la URL: un enlace copiado
    no dice de dónde venías.
+   **En el móvil** (menos de 48rem), dentro del Día la fila deja solo «Temporada | Día ×» y los botones de crear y
+   del menú: los tres dibujos se esconden porque la salida es la ×, y así la fila no desborda (Marco, 01-11).
 4. **La Temporada sigue siendo la portada** (ADR-117 § 2, ADR-120 § 2). Marco lo preguntó; se mantiene porque responde
    lo que ninguna otra pantalla responde al entrar y porque la puerta de Hoy enseña sus cifras.
 
