@@ -5723,6 +5723,45 @@ el historial.
 en el mismo gesto, y si quien no tiene `edit:money` debería ni ver el botón (hoy no hay en el cliente un permiso de
 dinero que leer).
 
+## [2026-11-01] ADR-157 · La velocidad de apertura en el móvil queda vigilada: peso, tiempo y teléfonos reales
+
+**Contexto.** ADR-158 hizo que la caché del dispositivo sobreviva a un deploy. Con él entraron dos piezas que no
+quedaron escritas: un diccionario por idioma (el inglés en cada página, el del navegador cargado en el `+layout.ts`
+raíz antes del primer render; para es, 99 → 63 kB br) y la hoja de Google Fonts servida por el service worker (su
+caché HTTP dura 24 h y bloquea el primer pintado: 170 a 275 ms medidos en frío). Marco pidió el 01-11, por HOUR COOR,
+que algo avise si la apertura vuelve a empeorar: «optimízalo» no se sostiene si nadie ve que empeora, y la lentitud de
+octubre no la vio nadie hasta que él la notó en el teléfono.
+
+**Decisión.** Tres capas, cada una con su tope:
+1. **Peso** (`src/lib/load-budget.test.ts`, en `test:unit`). La carga inicial de `/h/desk` (la entrada, los tres
+   nodos de ruta, sus imports estáticos, el CSS y el diccionario es) en brotli no pasa de **450 kB**. El build del
+   01-11 daba 427 kB en 173 ficheros (139 JS, 34 CSS); sobre `a744db9d`, con la ficha de organización, ya da 444. Solo juzga un build fresco: en `test:unit` se salta si no hay
+   build o si es más viejo que `src/`, y el deploy lo corre tras `vite build` con `LOAD_BUDGET_REQUIRED=1`, donde
+   saltarse es fallar. Como el guard de tokens: si salta, se aligera la carga; el tope solo sube por una decisión que
+   lo valga, dicha en el commit.
+2. **Tiempo** (`tests/open-speed.spec.ts`, con la suite normal contra un origen desplegado). 390 de ancho, CPU ×4, 4G
+   lenta (150 ms, 1,6 Mbps); mediana de 3 hasta el primer contenido de Hoy (la ley de `tests/loaded.ts`). Topes:
+   **frío 9 s, caliente 1,2 s, tras subir `CACHE_SCHEMA` 4,5 s**. Medido con el propio spec contra producción
+   `95288d0b` el 01-11: frío 7361 y 6918 ms, caliente 780 y 911, tras el esquema 2571 y 2551 (3933 en una pasada
+   anterior). El frío es frío de verdad (un perfil nuevo baja unos 550 kB de JS); tras el esquema mandan dos endpoints
+   de unos 1,7 s (`/api/conversations?limit=100`, `/api/conversations/overview`). El margen es para la red y el
+   servidor de un día, no para una app más lenta. Solo lee; traza apagada, porque grabarla es lo que se mediría.
+3. **Teléfonos reales** (Sentry, sin dependencia nueva). La transacción de carga de página ya llevaba LCP, FCP, TTFB y
+   CLS. Se añade `hoy.content` (ms desde el inicio del documento hasta que Hoy deja de estar `aria-busy`, solo cuando
+   la apertura aterriza en Hoy: `/`, `/h` o `/h/desk`) y el atributo `hoy.from_device` (si pintó desde la caché del
+   dispositivo). Muestreo: la carga de página al **50 %**, el resto al 10 % como antes. Una transacción del cliente
+   lleva la ruta como patrón (`/h/[workspace]/…`) y sus spans solo la forma de la URL (`GET /api/team`,
+   `/api/persons/*`, `/_app/immutable/…`): sin consulta, ids ni slugs; fuera también la URL de la imagen del LCP
+   (`scrubTransaction` en `$lib/sentry-scrub`). Las del servidor siguen con `scrubSentryEvent`. Esto cambia lo que
+   producción manda a Sentry: Marco lo ve antes de integrar.
+
+**Alternativas.** Lighthouse en CI: no hay CI que despliegue, y mide una página sin sesión. Solo Sentry: avisa tarde
+y con pocos usuarios no tiene muestra. Solo el spec: no ve el teléfono de Marco ni la red real.
+
+**Cómo se revierte.** Borrar los dos tests y el paso de `LOAD_BUDGET_REQUIRED` del script `deploy`; en
+`hooks.client.ts`, `tracesSampleRate: 0.1` y `beforeSendTransaction: scrubSentryEvent`; quitar `markHoyContent` de
+`routes/h/desk/+page.svelte` y `$lib/vitals.ts`.
+
 ## [2026-11-01] ADR-158 · La caché del dispositivo sobrevive a un deploy: versión de esquema explícita (enmienda ADR-144 § 3)
 
 **Contexto.** ADR-144 § 3 ataba el registro de IndexedDB al SHA del build: cualquier deploy lo borraba. Del 24-10 al
@@ -5802,42 +5841,3 @@ anterior (en el historial).
 
 **Re-evaluar cuando** se lleve una temporada de difusión con la ficha: si hace falta editar la organización desde
 ella, y si con muchas conversaciones la lista pide el orden de la lente en vez del del módulo.
-
-## [2026-11-01] ADR-157 · La velocidad de apertura en el móvil queda vigilada: peso, tiempo y teléfonos reales
-
-**Contexto.** ADR-158 hizo que la caché del dispositivo sobreviva a un deploy. Con él entraron dos piezas que no
-quedaron escritas: un diccionario por idioma (el inglés en cada página, el del navegador cargado en el `+layout.ts`
-raíz antes del primer render; para es, 99 → 63 kB br) y la hoja de Google Fonts servida por el service worker (su
-caché HTTP dura 24 h y bloquea el primer pintado: 170 a 275 ms medidos en frío). Marco pidió el 01-11, por HOUR COOR,
-que algo avise si la apertura vuelve a empeorar: «optimízalo» no se sostiene si nadie ve que empeora, y la lentitud de
-octubre no la vio nadie hasta que él la notó en el teléfono.
-
-**Decisión.** Tres capas, cada una con su tope:
-1. **Peso** (`src/lib/load-budget.test.ts`, en `test:unit`). La carga inicial de `/h/desk` (la entrada, los tres
-   nodos de ruta, sus imports estáticos, el CSS y el diccionario es) en brotli no pasa de **450 kB**. El build del
-   01-11 daba 427 kB en 173 ficheros (139 JS, 34 CSS); sobre `a744db9d`, con la ficha de organización, ya da 444. Solo juzga un build fresco: en `test:unit` se salta si no hay
-   build o si es más viejo que `src/`, y el deploy lo corre tras `vite build` con `LOAD_BUDGET_REQUIRED=1`, donde
-   saltarse es fallar. Como el guard de tokens: si salta, se aligera la carga; el tope solo sube por una decisión que
-   lo valga, dicha en el commit.
-2. **Tiempo** (`tests/open-speed.spec.ts`, con la suite normal contra un origen desplegado). 390 de ancho, CPU ×4, 4G
-   lenta (150 ms, 1,6 Mbps); mediana de 3 hasta el primer contenido de Hoy (la ley de `tests/loaded.ts`). Topes:
-   **frío 9 s, caliente 1,2 s, tras subir `CACHE_SCHEMA` 4,5 s**. Medido con el propio spec contra producción
-   `95288d0b` el 01-11: frío 7361 y 6918 ms, caliente 780 y 911, tras el esquema 2571 y 2551 (3933 en una pasada
-   anterior). El frío es frío de verdad (un perfil nuevo baja unos 550 kB de JS); tras el esquema mandan dos endpoints
-   de unos 1,7 s (`/api/conversations?limit=100`, `/api/conversations/overview`). El margen es para la red y el
-   servidor de un día, no para una app más lenta. Solo lee; traza apagada, porque grabarla es lo que se mediría.
-3. **Teléfonos reales** (Sentry, sin dependencia nueva). La transacción de carga de página ya llevaba LCP, FCP, TTFB y
-   CLS. Se añade `hoy.content` (ms desde el inicio del documento hasta que Hoy deja de estar `aria-busy`, solo cuando
-   la apertura aterriza en Hoy: `/`, `/h` o `/h/desk`) y el atributo `hoy.from_device` (si pintó desde la caché del
-   dispositivo). Muestreo: la carga de página al **50 %**, el resto al 10 % como antes. Una transacción del cliente
-   lleva la ruta como patrón (`/h/[workspace]/…`) y sus spans solo la forma de la URL (`GET /api/team`,
-   `/api/persons/*`, `/_app/immutable/…`): sin consulta, ids ni slugs; fuera también la URL de la imagen del LCP
-   (`scrubTransaction` en `$lib/sentry-scrub`). Las del servidor siguen con `scrubSentryEvent`. Esto cambia lo que
-   producción manda a Sentry: Marco lo ve antes de integrar.
-
-**Alternativas.** Lighthouse en CI: no hay CI que despliegue, y mide una página sin sesión. Solo Sentry: avisa tarde
-y con pocos usuarios no tiene muestra. Solo el spec: no ve el teléfono de Marco ni la red real.
-
-**Cómo se revierte.** Borrar los dos tests y el paso de `LOAD_BUDGET_REQUIRED` del script `deploy`; en
-`hooks.client.ts`, `tracesSampleRate: 0.1` y `beforeSendTransaction: scrubSentryEvent`; quitar `markHoyContent` de
-`routes/h/desk/+page.svelte` y `$lib/vitals.ts`.
