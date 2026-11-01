@@ -30,7 +30,8 @@ no pide migración primero; las migraciones juntas por el gate de § 34.
 - [ ] 87 alta de los datos fiscales del emisor en Ajustes (sin ella la proforma sale con hueco).
 - [ ] 88 materiales enlazados en la hoja de ruta; la función hereda los de su línea (pública: migración).
 - [ ] 89 textos guardados y enlaces a materiales en el correo de la conversación. Enlaces hechos en `claude/batch-flows`;
-  los textos guardados piden tabla nueva `workspace_text` (migración).
+  los textos guardados piden tabla nueva `workspace_text` (migración); los escribe quien puede editar conversaciones
+  y los leen los miembros (Marco, 01-11).
 - [ ] 90 calendario «sólo lo mío» y opciones como TENTATIVE (migración, junto a 71b).
 - [ ] 91 exportar el trimestre para la gestoría (CSV).
 - [ ] 92 `venue.organization_id`: la sala sabe quién la programa (migración).
