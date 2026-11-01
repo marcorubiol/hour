@@ -136,19 +136,15 @@ test.describe('Contextual help (approach A)', () => {
     await expect(venues).toHaveCount(0);
   });
 
-  test('the relation’s «i» names each relation and opens «More»', async ({ page }) => {
+  test('what each relation means lives in the «?», not beside the filter (ADR-156 § 8)', async ({ page }) => {
     await page.goto(CONVERSATIONS);
     await waitForLoaded(page);
-    const hint = page.getByRole('button', { name: 'What is Relation' }).first();
-    const panel = page.locator(`#${await hint.getAttribute('popovertarget')}`);
-    await hint.click();
-    await expect(panel).toBeVisible();
-    await expect(panel).toContainText('Not this time:');
-    await expect(panel).toContainText('Not contacted:');
-    await panel.getByRole('button', { name: 'More' }).click();
-    await expect(panel).toContainText('the higher one wins');
-    await page.keyboard.press('Escape');
-    await expect(panel).toBeHidden();
+    await expect(page.getByRole('button', { name: 'What is Relation' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'About this section' }).click();
+    const terms = card(page, 'conversations').getByTestId('help-terms');
+    await expect(terms).toContainText('Not this time:');
+    await expect(terms).toContainText('Not contacted:');
+    await expect(terms).toContainText('the higher one wins');
   });
 
   test('the «?» gathers what each block is, open, and the heads keep no «i»', async ({ page }) => {
@@ -164,7 +160,7 @@ test.describe('Contextual help (approach A)', () => {
     const terms = desk.getByTestId('help-terms');
     await expect(terms).toHaveAttribute('open', '');
     await expect(terms).toContainText('Waiting for you');
-    await expect(terms).toContainText('14 days');
+    await expect(terms).toContainText('to decide');
     await expect(terms).toContainText('Scope');
 
     await desk.getByRole('button', { name: 'Got it' }).click();
