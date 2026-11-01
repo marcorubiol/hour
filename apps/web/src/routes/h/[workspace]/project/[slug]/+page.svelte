@@ -181,8 +181,6 @@
     {/if}
   </section>
 
-  <EmptyLine label={t('project.assets', locale)} text={t('project.assets_body', locale)} />
-
   {#if project}
     <section class="project__block" aria-label={t('project.cast', locale)}>
       <BlockHead title={t('project.cast', locale)} />
