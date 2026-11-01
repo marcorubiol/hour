@@ -607,10 +607,10 @@
         {/if}
       </ul>
       {#each file.merges ?? [] as m (m.id)}
-        <p class="person__merged" data-testid="person-merged">
+        <p class="merged-line" data-testid="person-merged">
           {t('person.merge_line', locale, { name: m.drop_name ?? '—', date: dayMonthYearTs(m.merged_at) })}
           {#if undoOpen(m.merged_at)}
-            <button type="button" class="person__merged-undo" onclick={() => undoMerge(m.id, m.drop_name ?? '')}
+            <button type="button" class="merged-line__undo" onclick={() => undoMerge(m.id, m.drop_name ?? '')}
               >{t('person.merge_line_undo', locale)}</button
             >
           {/if}
@@ -945,35 +945,6 @@
     }
     .person__note-delete:hover {
       color: var(--danger);
-    }
-
-    /* A merge this file absorbed: a quiet fact, with its way back for 30 days. */
-    .person__merged {
-      margin: 0;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: baseline;
-      gap: var(--space-s);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--tracking-s);
-      color: var(--text-faint);
-    }
-
-    .person__merged-undo {
-      font: inherit;
-      letter-spacing: inherit;
-      color: var(--text-muted);
-      background: none;
-      border: none;
-      padding: 0;
-      cursor: pointer;
-      text-decoration: underline;
-      text-underline-offset: 0.2em;
-    }
-    .person__merged-undo:hover,
-    .person__merged-undo:focus-visible {
-      color: var(--text-color);
     }
 
     .person__note-body {

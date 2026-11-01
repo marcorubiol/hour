@@ -1,0 +1,97 @@
+/*
+  Merge: how a merge of two files speaks (persona, plan 2026-10-22; organización, ADR-171).
+
+  Two dialogs («Fusionar dos fichas», «Fusionar dos organizaciones») and two
+  records draw the same thing: a picker and its choices, then what happens in
+  quiet prose, and on the file that stayed a line per merge it absorbed with
+  its way back for 30 days. One home, so both say it the same way.
+*/
+
+@layer components {
+  /* ── The dialog ─────────────────────────────────────────────────────── */
+  .merge__grid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--field-gap);
+    margin-block-start: var(--space-s);
+  }
+
+  .merge__say {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2xs);
+    margin-block-start: var(--space-m);
+    font-size: var(--text-s);
+    color: var(--text-color);
+    line-height: 1.55;
+  }
+
+  .merge__say p,
+  .merge__say ul,
+  .merge__hint {
+    margin: 0;
+  }
+
+  .merge__hint {
+    font-size: var(--text-s);
+    color: var(--text-muted);
+    line-height: 1.55;
+  }
+
+  .merge__goes {
+    color: var(--text-muted);
+  }
+
+  .merge__warn {
+    color: var(--warning-dark);
+  }
+
+  .merge__fail {
+    color: var(--danger);
+  }
+
+  /* The conversations that stop a merge: one row per project. */
+  .merge__clashes {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2xs);
+    padding: 0;
+    list-style: none;
+  }
+
+  .merge__clashes a {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  /* ── On the file that stayed: a quiet fact, with its way back ───────── */
+  .merged-line {
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-s);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-s);
+    color: var(--text-faint);
+  }
+
+  .merged-line__undo {
+    font: inherit;
+    letter-spacing: inherit;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  .merged-line__undo:hover,
+  .merged-line__undo:focus-visible {
+    color: var(--text-color);
+  }
+}

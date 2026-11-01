@@ -16,7 +16,7 @@
   import { ApiError, fetchJSON, mutateJSON } from '$lib/api';
   import { retryLoad } from '$lib/load-fail';
   import { refreshAfterWrite } from '$lib/query-refresh';
-  import { toastCreated } from '$lib/created';
+  import { CREATED_TOAST_MS, toastCreated } from '$lib/created';
   import { addToast } from '$lib/components/Toast.svelte';
   import RecordState from '$lib/components/RecordState.svelte';
   import RecordHead from '$lib/components/RecordHead.svelte';
@@ -30,6 +30,10 @@
   import MissingBand, { type MissingItem } from '$lib/components/MissingBand.svelte';
   import ConversationTable from '$lib/components/ConversationTable.svelte';
   import FiscalIdentity from '$lib/components/FiscalIdentity.svelte';
+  import OrganizationMergeDialog, { type OrgMergeResult } from '$lib/components/OrganizationMergeDialog.svelte';
+  import { undoOpen } from '$lib/organization-merge';
+  import { goto } from '$app/navigation';
+  import { openPeek } from '$lib/peek.svelte';
   import type { OrganizationFiscalResponse } from '$lib/fiscal';
   import { ORGANIZATION_KINDS, orgBolos, orgContacts, orgMissing, type OrganizationFile } from '$lib/organization-record';
   import { relativeContactDate } from '$lib/conversation';
@@ -261,6 +265,79 @@
     },
   });
 
+  // ── Merge with another organization (84, ADR-171) ────────────────────
+  let mergeOpen = $state(false);
+
+  /** Everything that names organizations, after a merge or its undo. */
+  async function refreshOrgs() {
+    await Promise.all(
+      [['organization'], ['organizations'], ['conversations'], ['organization-merges'], ['person']].map((queryKey) =>
+        queryClient.invalidateQueries({ queryKey }),
+      ),
+    );
+  }
+
+  /** Where an organization opens: the page, or the vistazo it was in. */
+  function showOrg(orgSlug: string) {
+    if (orgSlug === slug) return;
+    if (inPeek) openPeek({ kind: 'organization', ws: workspaceSlug, slug: orgSlug });
+    else void goto(`/h/${workspaceSlug}/organization/${encodeURIComponent(orgSlug)}`, { replaceState: true });
+  }
+
+  async function undoMerge(mergeId: string, name: string) {
+    try {
+      const body = await mutateJSON<{ undo: { skipped?: number; drop_slug: string | null } }>(
+        'DELETE',
+        `/api/organization-merges/${mergeId}`,
+      );
+      await refreshOrgs();
+      const skipped = body?.undo.skipped ?? 0;
+      addToast({
+        tone: 'info',
+        message: t('person.merge_undone', locale, { name }),
+        ...(skipped > 0 ? { title: t('person.merge_undone_skipped', locale, { n: skipped }) } : {}),
+      });
+    } catch (err) {
+      const code = err instanceof ApiError ? String(err.body?.error ?? '') : '';
+      addToast({
+        tone: 'danger',
+        title: t('person.merge_undo_failed', locale),
+        message:
+          code === 'undo_expired'
+            ? t('person.merge_err_expired', locale)
+            : code === 'already_undone'
+              ? t('person.merge_err_undone', locale)
+              : code === 'later_merge'
+                ? t('organization.merge_err_later', locale)
+                : code === 'name_taken'
+                  ? t('organization.merge_err_name_taken', locale)
+                  : err instanceof ApiError && err.status === 404
+                    ? t('organization.merge_err_not_found', locale)
+                    : err instanceof Error
+                      ? err.message
+                      : t('perf.unexpected', locale),
+      });
+    }
+  }
+
+  async function onMerged(m: OrgMergeResult) {
+    await refreshOrgs();
+    if (m.keep_slug) showOrg(m.keep_slug);
+    addToast({
+      tone: 'success',
+      message: t('organization.merge_done', locale),
+      duration: CREATED_TOAST_MS,
+      action: { label: t('ui.undo', locale), run: () => void undoMerge(m.merge_id, m.drop_name) },
+    });
+  }
+
+  // The slug of an organization merged into this one opens this one
+  // (`previous_slugs`): the address says where you are.
+  $effect(() => {
+    const now = org?.slug;
+    if (now && now !== slug && !inPeek) showOrg(now);
+  });
+
   let detailsKeeps = $derived(org ? [org.address, org.phone].filter(Boolean).join(' · ') : '');
 </script>
 
@@ -282,6 +359,9 @@
     <RecordHead {crumbs} title={org.name}>
       {#snippet actions()}
         <Button variant="secondary" size="xs" onclick={openEdit}>{t('person.edit', locale)}</Button>
+        {#if file!.can_merge}
+          <Button variant="quiet" size="xs" onclick={() => (mergeOpen = true)}>{t('organization.merge', locale)}</Button>
+        {/if}
       {/snippet}
       {#snippet facts()}
         {#if kindWord}<span>{kindWord}</span>{/if}
@@ -293,6 +373,17 @@
         <MissingBand items={missingItems} {locale} />
       {/snippet}
     </RecordHead>
+
+    {#each file.merges ?? [] as m (m.id)}
+      <p class="merged-line" data-testid="organization-merged">
+        {t('person.merge_line', locale, { name: m.drop_name ?? '?', date: dayMonthYearTs(m.merged_at) })}
+        {#if undoOpen(m.merged_at)}
+          <button type="button" class="merged-line__undo" onclick={() => undoMerge(m.id, m.drop_name ?? '')}
+            >{t('person.merge_line_undo', locale)}</button
+          >
+        {/if}
+      </p>
+    {/each}
 
     <section class="organization__section" aria-label={t('lens.conversations', locale)}>
       {#if file.conversations.length > 0}
@@ -379,6 +470,17 @@
     {/if}
   {/if}
 </article>
+
+{#if file?.can_merge && org}
+  <OrganizationMergeDialog
+    bind:open={mergeOpen}
+    {workspaceId}
+    {workspaceSlug}
+    organization={{ id: org.id, name: org.name }}
+    {locale}
+    onmerged={onMerged}
+  />
+{/if}
 
 <Dialog bind:open={addOpen} title={t('person.add_to_project', locale)} size="s">
   <div class="organization__add-grid">

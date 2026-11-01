@@ -76,6 +76,7 @@
   import { conversationPlannerHref, dayKeyInTz } from '$lib/planner';
   import { firstLine, insertBlock, materialLine, replySubject, type MailAccountsResponse } from '$lib/mail';
   import { kindLabel, type MaterialItem } from '$lib/material';
+  import { sortTexts, workspaceTextsQueryOptions, type WorkspaceText } from '$lib/workspace-texts';
   import { safeHref } from '$lib/utils/safe-url';
   import Menu from '$lib/components/Menu.svelte';
   import { tick } from 'svelte';
@@ -294,15 +295,30 @@
     }));
   });
 
+  // ── Un texto guardado del espacio, en el cursor (ADR-171, punto 89) ──
+  // The same read as Ajustes › Espacio: one key per space.
+  const textsQuery = createQuery(
+    toStore(() => workspaceTextsQueryOptions(conv?.workspace_id ?? '', composing !== null)),
+  );
+  let textActions = $derived.by(() => {
+    if ($textsQuery.isPending) return [{ label: t('mail.text_loading', locale), disabled: true }];
+    const items = sortTexts($textsQuery.data?.items ?? []);
+    if (items.length === 0) return [{ label: t('mail.text_none', locale), disabled: true }];
+    return items.map((x) => ({ label: x.title, onclick: () => void insertText(x) }));
+  });
+
   /** At the caret of the body (where it was left), on its own line. */
-  async function insertMaterial(m: MaterialItem) {
+  async function insertAtCaret(insert: string) {
     const el = document.getElementById('reply-body') as HTMLTextAreaElement | null;
-    const r = insertBlock(body, materialLine(kindLabel(m.kind, locale), m.url), el?.selectionStart ?? body.length, el?.selectionEnd ?? body.length);
+    const r = insertBlock(body, insert, el?.selectionStart ?? body.length, el?.selectionEnd ?? body.length);
     body = r.text;
     await tick();
     el?.focus();
     el?.setSelectionRange(r.caret, r.caret);
   }
+
+  const insertMaterial = (m: MaterialItem) => insertAtCaret(materialLine(kindLabel(m.kind, locale), m.url));
+  const insertText = (x: WorkspaceText) => insertAtCaret(x.body);
 
   const send = createMutation({
     mutationFn: () =>
@@ -950,13 +966,16 @@
     </Field>
     <Input id="reply-subject" label={t('mail.subject', locale)} bind:value={subject} required />
     <Textarea id="reply-body" rows={5} maxlength={20000} ariaLabel={t('mail.body', locale)} bind:value={body} required />
-    {#if conv?.line_id}
-      <div class="reply__insert">
+    <div class="reply__insert">
+      {#if conv?.line_id}
         <Menu items={materialActions} align="start" label={t('mail.insert_material', locale)} triggerClass="btn--quiet btn--xs">
           {#snippet trigger()}{t('mail.insert_material', locale)}<span aria-hidden="true"> ▾</span>{/snippet}
         </Menu>
-      </div>
-    {/if}
+      {/if}
+      <Menu items={textActions} align="start" label={t('mail.insert_text', locale)} triggerClass="btn--quiet btn--xs">
+        {#snippet trigger()}{t('mail.insert_text', locale)}<span aria-hidden="true"> ▾</span>{/snippet}
+      </Menu>
+    </div>
     {#if fromSignature}
       <p class="reply__sig">-- <br />{fromSignature}</p>
     {/if}
@@ -1157,6 +1176,8 @@
     }
     .reply__insert {
       display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2xs);
     }
     .reply__sig {
       margin: 0;
