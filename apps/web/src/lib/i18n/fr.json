@@ -2162,6 +2162,8 @@
   "books.pill_overdue": "en retard · {n} j",
   "books.sheet_functions": "Représentations",
   "books.sheet_functions@music": "Concerts",
+  "books.add_function": "+ représentation",
+  "books.add_function@music": "+ concert",
   "books.sheet_fn_one": "1 représentation",
   "books.sheet_fn_one@music": "1 concert",
   "books.sheet_fn_many": "{n} représentations",
