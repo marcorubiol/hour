@@ -2173,6 +2173,8 @@
   "books.pill_overdue": "overdue · {n} d",
   "books.sheet_functions": "Performances",
   "books.sheet_functions@music": "Shows",
+  "books.add_function": "+ performance",
+  "books.add_function@music": "+ show",
   "books.sheet_fn_one": "1 performance",
   "books.sheet_fn_one@music": "1 show",
   "books.sheet_fn_many": "{n} performances",

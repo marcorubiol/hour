@@ -17,6 +17,13 @@
    * project's functions in the bolo's window with the link of each to its
    * bolo. «Falta» is Cuentas' «Pide atención» for this bolo (`boloMissing`),
    * so the two can never disagree.
+   *
+   * «+ función» (§ 36): the second function of a bolo is as ordinary as the
+   * first (residencies, doubles, runs in one room). It opens the one create
+   * dialog with the project locked and this bolo picked (its room comes with
+   * it), behind `edit:performance` in this project: reading the bolo is
+   * `read:money`, writing a function is not. The new row shows by itself:
+   * the create refreshes every `money-bolos` read, the bolo's window with it.
    */
   import { createQuery } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
@@ -28,6 +35,7 @@
   import { dayLabel, localDayISO } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
   import { lensOn } from '$lib/lenses.svelte';
+  import { planAccessQueryOptions } from '$lib/plan-create';
   import {
     boloMoney,
     boloStatusLabel,
@@ -51,6 +59,7 @@
   import MissingBand, { type MissingItem } from '$lib/components/MissingBand.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import EmptyLine from '$lib/components/EmptyLine.svelte';
+  import PerformanceCreateDialog from '$lib/components/PerformanceCreateDialog.svelte';
 
   interface Props {
     projectId: string;
@@ -135,6 +144,11 @@
     }),
   );
   let functions = $derived($functionsQuery.data ?? []);
+
+  // Only an explicit «no» hides it (the RPC still gates the write).
+  const planAccessQuery = createQuery(toStore(() => ({ ...planAccessQueryOptions(projectId), enabled: Boolean(bolo) })));
+  let canAddFunction = $derived(lensOn('planner') && $planAccessQuery.data?.edit !== false);
+  let addOpen = $state(false);
 
   let invoices = $derived($invoicesQuery.data?.items ?? []);
   let docs = $derived(bolo ? (invoicesByBolo(invoices).get(bolo.id) ?? []) : []);
@@ -252,7 +266,11 @@
     </RecordHead>
 
     <section class="bolo-record__section" aria-label={t('books.sheet_functions', locale)}>
-      <BlockHead title={t('books.sheet_functions', locale)} count={bolo.function_count} />
+      <BlockHead title={t('books.sheet_functions', locale)} count={bolo.function_count}>
+        {#if canAddFunction}
+          <button type="button" class="block-head__act" onclick={() => (addOpen = true)}>{t('books.add_function', locale)}</button>
+        {/if}
+      </BlockHead>
       {#if functions.length > 0}
         <ul class="bolo-record__rows" role="list">
           {#each functions as p (p.id)}
@@ -334,6 +352,10 @@
     </section>
   {/if}
 </article>
+
+{#if canAddFunction}
+  <PerformanceCreateDialog bind:open={addOpen} presetProjectId={projectId} lockProject presetBoloId={id} />
+{/if}
 
 <style>
   @layer components {

@@ -21,17 +21,23 @@ type Client = {
 export type CreatedPerformance = { id: string; slug: string | null; workspace_id: string };
 
 /**
- * ¿Escribe en el plan en ALGÚN proyecto? (`edit:performance`, la regla de
- * funciones y fechas). La puerta de «Nueva función / fecha» en ⌘K. Solo un
- * «no» explícito esconde: mientras no responde, o si falla, se ofrece (la
+ * ¿Escribe en el plan? (`edit:performance`, la regla de funciones y fechas).
+ * Sin proyecto, en ALGUNO: la puerta de «Nueva función / fecha» en ⌘K. Con
+ * proyecto, en ése: la de «+ función» en la ficha del bolo. Solo un «no»
+ * explícito esconde: mientras no responde, o si falla, se ofrece (la
  * escritura sigue gateada por la RPC).
  */
-export function planAccessQueryOptions() {
+export function planAccessQueryOptions(projectId?: string) {
   return {
-    queryKey: ['plan-access'] as const,
+    queryKey: projectId ? (['plan-access', projectId] as const) : (['plan-access'] as const),
+    enabled: projectId === undefined || Boolean(projectId),
     retry: false,
     staleTime: 5 * 60_000,
-    queryFn: ({ signal }: { signal: AbortSignal }) => fetchJSON<{ edit: boolean }>('/api/performances/access', signal),
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
+      fetchJSON<{ edit: boolean }>(
+        projectId ? `/api/performances/access?project_id=${encodeURIComponent(projectId)}` : '/api/performances/access',
+        signal,
+      ),
   };
 }
 

@@ -2165,6 +2165,8 @@
   "books.pill_overdue": "vençut · {n} d",
   "books.sheet_functions": "Funcions",
   "books.sheet_functions@music": "Concerts",
+  "books.add_function": "+ funció",
+  "books.add_function@music": "+ concert",
   "books.sheet_fn_one": "1 funció",
   "books.sheet_fn_one@music": "1 concert",
   "books.sheet_fn_many": "{n} funcions",

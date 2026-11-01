@@ -74,6 +74,11 @@
     /** ISO day to prefill on open; defaults to the viewer's today. */
     presetDate?: string | null;
     /**
+     * § 36: the bolo it hangs from, when it is born from the bolo's record
+     * («+ función»). Proposed like the one open bolo is, with its room.
+     */
+    presetBoloId?: string | null;
+    /**
      * ADR-084 §1 — los días RESUELTOS de una tanda, o null para una sola
      * función. Los calcula `BlockDays` en el diálogo anfitrión (regla de tramo
      * + días de la semana con excepciones punzadas) y llegan aquí ya hechos:
@@ -92,6 +97,7 @@
     presetLineId = null,
     lockProject = false,
     presetDate = null,
+    presetBoloId = null,
     days = null,
     pending = $bindable(false),
     onCreated,
@@ -172,13 +178,13 @@
   let emptyBoloOptions = $derived([{ value: '', label: t('perf.bolo_empty', locale) }]);
 
   // Con UN solo bolo abierto, el alta lo propone (Marco, 2026-10-10); con
-  // varios, «sin bolo». Una vez por proyecto: lo que elija la persona después
-  // no se vuelve a pisar.
+  // varios, «sin bolo»; desde la ficha de un bolo, ése. Una vez por proyecto:
+  // lo que elija la persona después no se vuelve a pisar.
   let boloSeededFor = $state('');
   $effect(() => {
     if (!cProject || boloSeededFor === cProject || !$bolosQuery.isSuccess) return;
     boloSeededFor = cProject;
-    cBolo = boloDefault(projectBolos);
+    cBolo = presetBoloId && projectBolos.some((b) => b.id === presetBoloId) ? presetBoloId : boloDefault(projectBolos);
     if (cBolo) pickBolo(cBolo);
   });
 
@@ -210,7 +216,7 @@
     if (open && !wasOpen) {
       cDay = presetDate ?? dayKeyInTz(new Date().toISOString(), viewerTz);
       if (presetProjectId) {
-        if (cProject !== presetProjectId) resetBolo();
+        if (cProject !== presetProjectId || presetBoloId) resetBolo();
         cProject = presetProjectId;
         cLine = presetLineId ?? '';
       } else if (!cProject) {

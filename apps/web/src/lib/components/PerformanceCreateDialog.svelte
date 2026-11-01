@@ -26,6 +26,8 @@
     lockProject?: boolean;
     /** ISO day to prefill on open; defaults to the viewer's today. */
     presetDate?: string | null;
+    /** Hang it from this bolo (and its room) on open: «+ función» on the bolo. */
+    presetBoloId?: string | null;
     onCreated?: (perf: CreatedPerformance) => void;
   }
 
@@ -35,6 +37,7 @@
     presetLineId = null,
     lockProject = false,
     presetDate = null,
+    presetBoloId = null,
     onCreated,
   }: Props = $props();
 
@@ -57,6 +60,7 @@
     {presetLineId}
     {lockProject}
     {presetDate}
+    {presetBoloId}
     onCreated={handleCreated}
   />
   {#snippet actions()}
