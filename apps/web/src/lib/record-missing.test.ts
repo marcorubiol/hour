@@ -367,6 +367,17 @@ describe('boloMissing', () => {
     expect(boloMissing(bolo({ status: 'confirmed', first_performed_at: '2026-12-01T19:00:00Z', last_performed_at: '2026-12-01T19:00:00Z' }), ctx)).toEqual([]);
   });
 
+  it('a confirmed deal next week without a signed contract asks for it (ADR-163)', () => {
+    const soon = new Date(Date.parse(`${TODAY}T10:00:00Z`) + 7 * 86_400_000).toISOString();
+    expect(boloMissing(bolo({ status: 'confirmed', first_performed_at: soon, last_performed_at: soon }), ctx).map((i) => i.kind)).toEqual(['contract']);
+    expect(
+      boloMissing(
+        bolo({ status: 'confirmed', first_performed_at: soon, last_performed_at: soon, contract_sent_at: soon, contract_signed_at: soon }),
+        ctx,
+      ),
+    ).toEqual([]);
+  });
+
   it('with invoicing off, nothing to invoice', () => {
     expect(boloMissing(bolo(), { ...ctx, modeOf: () => 'off' as const })).toEqual([]);
   });

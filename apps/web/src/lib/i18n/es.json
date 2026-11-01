@@ -2682,5 +2682,22 @@
   "proforma.party_hidden": "Hay datos fiscales, pero no los puedes ver.",
   "proforma.not_proforma": "Desde aquí sólo se imprimen proformas.",
   "proforma.gone": "Esta proforma no existe o no la puedes ver.",
-  "proforma.load_error": "No se pudo cargar la proforma."
+  "proforma.load_error": "No se pudo cargar la proforma.",
+  "bolo.contract": "Contrato",
+  "bolo.contract_unsent": "Sin enviar",
+  "bolo.contract_sent": "Enviado",
+  "bolo.contract_signed": "Firmado",
+  "bolo.contract_mark_sent": "Marcar enviado",
+  "bolo.contract_mark_signed": "Marcar firmado",
+  "bolo.contract_undo": "Deshacer",
+  "bolo.contract_not_saved": "Contrato no guardado",
+  "record.missing_bolo_contract": "Contrato sin firmar",
+  "books.att_contract_unsent": "función el {date}, contrato sin enviar",
+  "books.att_contract_sent": "función el {date}, contrato enviado sin firmar",
+  "books.att_act_contract": "Ver el contrato",
+  "roadsheet.link_expires": "caduca el {date}",
+  "roadsheet.link_expired": "caducó el {date}",
+  "roadsheet.change_expiry": "Cambiar la fecha",
+  "roadsheet.expiry_last_day": "Abre hasta el día",
+  "roadsheet.expiry_not_saved": "Fecha no guardada"
 }

@@ -6,7 +6,9 @@
  * reads; both RPCs gate on `edit:performance`.
  *
  * GET  → active shares for the performance (token included: the operator
- *        needs it to build/copy the URL — it is not a secret FROM them).
+ *        needs it to build/copy the URL — it is not a secret FROM them),
+ *        expired ones too, with `expires_at` (ADR-163 § 2): the screen says
+ *        «caducó el …» and lets the date move.
  * POST → { role: venue|performer|tech_manager } → 201 with the new share.
  */
 
@@ -17,20 +19,16 @@ import { resolvePerformanceId } from '$lib/server/performance-bundle';
 import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import { json } from '$lib/server/http';
+import type { RoadsheetShare } from '$lib/roadsheet';
 
 const BodySchema = v.object({
   role: v.picklist(['venue', 'performer', 'tech_manager']),
 });
 
-type ShareRow = {
-  id: string;
-  token: string;
-  role: string;
-  created_at: string;
-};
+type ShareRow = RoadsheetShare;
 
-function mapShare(s: ShareRow) {
-  return { id: s.id, token: s.token, role: s.role, created_at: s.created_at };
+function mapShare(s: ShareRow): RoadsheetShare {
+  return { id: s.id, token: s.token, role: s.role, created_at: s.created_at, expires_at: s.expires_at };
 }
 
 // Both "performance not found" and "edit:performance required" surface as 42501

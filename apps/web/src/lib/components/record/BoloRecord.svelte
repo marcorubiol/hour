@@ -8,9 +8,10 @@
    * when you want to record a payment or make the invoice.
    *
    * The shape of every record: RecordHead (address, name, facts), «Falta»,
-   * then its blocks: the functions, the documents, what came in, what went
-   * out. Read only: money is written in Cuentas (ADR-043), so each «Falta»
-   * verb goes there, to the row, with its dialog open (`act=`).
+   * then its blocks: the contract, the functions, the documents, what came
+   * in, what went out. Money is written in Cuentas (ADR-043), so each «Falta»
+   * verb goes there, to the row, with its dialog open (`act=`); the one
+   * exception is the contract (ADR-163): three steps marked right here.
    *
    * Reads what Cuentas reads, narrowed to the one project (the money feed
    * takes no id): its bolos, its invoices, the bolo's expenses, and the
@@ -25,9 +26,11 @@
    * `read:money`, writing a function is not. The new row shows by itself:
    * the create refreshes every `money-bolos` read, the bolo's window with it.
    */
-  import { createQuery } from '@tanstack/svelte-query';
+  import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
-  import { ApiError, fetchJSON } from '$lib/api';
+  import { ApiError, fetchJSON, mutateJSON } from '$lib/api';
+  import { addToast } from '$lib/components/Toast.svelte';
+  import Button from '$lib/components/Button.svelte';
   import { retryLoad } from '$lib/load-fail';
   import { booksHref } from '$lib/bolo-pick';
   import { usePins } from '$lib/stores/pins.svelte';
@@ -39,6 +42,7 @@
   import {
     boloMoney,
     boloStatusLabel,
+    contractState,
     fmtFee,
     invoiceStatusLabel,
     invoicesByBolo,
@@ -194,6 +198,7 @@
     to_invoice: 'record.missing_bolo_to_invoice',
     draft: 'record.missing_bolo_draft',
     fiscal: 'record.missing_bolo_fiscal',
+    contract: 'record.missing_bolo_contract',
     no_fee: 'record.missing_bolo_no_fee',
   };
   const ATTENTION_VERB: Record<AttentionItem['kind'], string> = {
@@ -201,9 +206,18 @@
     to_invoice: 'books.att_act_invoice',
     draft: 'books.att_act_issue',
     fiscal: 'books.att_act_fiscal',
+    contract: 'books.att_act_contract',
     no_fee: 'books.att_act_fee',
   };
   function missingItem(a: AttentionItem): MissingItem {
+    // The contract is marked here, not in Cuentas: its verb is the next step.
+    if (a.kind === 'contract') {
+      return {
+        id: a.kind,
+        text: t(ATTENTION_TEXT[a.kind], locale),
+        verbs: [{ label: t(contractVerb, locale).toLowerCase(), onclick: contractForward }],
+      };
+    }
     // Late money is chased in its conversation; everything else is done in Cuentas.
     const chase = a.kind === 'overdue' && conversationHref;
     return {
@@ -224,7 +238,46 @@
       ],
     };
   }
-  let missingItems = $derived(lensOn('books') ? missing.map(missingItem) : missing.map((a) => ({ ...missingItem(a), verbs: [] })));
+  let missingItems = $derived(
+    lensOn('books')
+      ? missing.map(missingItem)
+      : missing.map((a) => (a.kind === 'contract' ? missingItem(a) : { ...missingItem(a), verbs: [] })),
+  );
+
+  // ── The contract (ADR-163): unsent → sent → signed, a date at each step ─
+  const queryClient = useQueryClient();
+  let contract = $derived(bolo ? contractState(bolo) : 'unsent');
+  let contractDay = $derived.by(() => {
+    const at = contract === 'signed' ? bolo?.contract_signed_at : contract === 'sent' ? bolo?.contract_sent_at : null;
+    return at ? dayLabel(localDayISO(new Date(at))) : null;
+  });
+  type ContractDates = { sent_at: string | null; signed_at: string | null };
+  const saveContract = createMutation({
+    mutationFn: (dates: ContractDates) => mutateJSON('PATCH', `/api/money/bolos/${id}`, { contract: dates }),
+    // `money-bolos` is this record's feed and Cuentas' (bolo-queries).
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['money-bolos'] }),
+    onError: (err) => {
+      addToast({
+        tone: 'danger',
+        title: t('bolo.contract_not_saved', locale),
+        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
+      });
+    },
+  });
+  /** The next step, now. */
+  function contractForward() {
+    if (!bolo) return;
+    const now = new Date().toISOString();
+    if (contract === 'unsent') $saveContract.mutate({ sent_at: now, signed_at: null });
+    else if (contract === 'sent') $saveContract.mutate({ sent_at: bolo.contract_sent_at ?? now, signed_at: now });
+  }
+  /** One step back: signed → sent, sent → unsent. */
+  function contractBack() {
+    if (!bolo) return;
+    if (contract === 'signed') $saveContract.mutate({ sent_at: bolo.contract_sent_at ?? null, signed_at: null });
+    else if (contract === 'sent') $saveContract.mutate({ sent_at: null, signed_at: null });
+  }
+  let contractVerb = $derived(contract === 'unsent' ? 'bolo.contract_mark_sent' : 'bolo.contract_mark_signed');
 
   const today = localDayISO();
   function fmt(amount: number | string | null, currency: string | null): string {
@@ -264,6 +317,28 @@
         <MissingBand items={missingItems} {locale} />
       {/snippet}
     </RecordHead>
+
+    <section class="bolo-record__section" aria-label={t('bolo.contract', locale)} data-testid="bolo-contract">
+      <BlockHead title={t('bolo.contract', locale)} />
+      <div class="bolo-record__row">
+        <span class="bolo-record__when">{contractDay ?? ''}</span>
+        <span class="fact-word" data-family={contract === 'signed' ? 'confirmed' : contract === 'sent' ? 'hold' : 'proposed'}
+          >{t(`bolo.contract_${contract}`, locale)}</span
+        >
+        <span class="bolo-record__acts">
+          {#if contract !== 'signed'}
+            <Button size="xs" variant="secondary" loading={$saveContract.isPending} onclick={contractForward}
+              >{t(contractVerb, locale)}</Button
+            >
+          {/if}
+          {#if contract !== 'unsent'}
+            <Button size="xs" variant="quiet" disabled={$saveContract.isPending} onclick={contractBack}
+              >{t('bolo.contract_undo', locale)}</Button
+            >
+          {/if}
+        </span>
+      </div>
+    </section>
 
     <section class="bolo-record__section" aria-label={t('books.sheet_functions', locale)}>
       <BlockHead title={t('books.sheet_functions', locale)} count={bolo.function_count}>
@@ -409,6 +484,11 @@
     }
     .bolo-record__more {
       margin: 0;
+    }
+    .bolo-record__acts {
+      display: inline-flex;
+      gap: var(--space-2xs);
+      margin-inline-start: auto;
     }
   }
 </style>

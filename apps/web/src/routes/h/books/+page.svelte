@@ -325,6 +325,8 @@
         return day ? t('books.att_draft', locale, { date: day }) : t('books.att_draft_nodate', locale);
       case 'fiscal':
         return t('books.att_fiscal', locale);
+      case 'contract':
+        return t(b.contract_sent_at ? 'books.att_contract_sent' : 'books.att_contract_unsent', locale, { date: day ?? DASH });
       case 'no_fee':
         if (b.status === 'done') return day ? t('books.att_no_fee_done', locale, { date: day }) : t('books.att_no_fee_done_nodate', locale);
         return day ? t('books.att_no_fee', locale, { date: day }) : t('books.att_no_fee_nodate', locale);
@@ -335,6 +337,7 @@
     to_invoice: 'books.att_act_invoice',
     draft: 'books.att_act_issue',
     fiscal: 'books.att_act_fiscal',
+    contract: 'books.att_act_contract',
     no_fee: 'books.att_act_fee',
   };
   /** The bolo's conversation, where a late payment is chased. */
@@ -360,6 +363,8 @@
     else if (item.kind === 'overdue') openPay(item.bolo);
     else if (item.kind === 'to_invoice') openInvoice(item.bolo);
     else if (item.kind === 'no_fee') openFee(item.bolo);
+    // The contract is marked in the bolo's record, in its vistazo (ADR-163).
+    else if (item.kind === 'contract') openPeek({ kind: 'bolo', projectId: item.bolo.project_id, id: item.bolo.id });
     else if (item.doc) void showDocument(item.doc.id);
   }
 

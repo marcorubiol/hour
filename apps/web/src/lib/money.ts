@@ -478,6 +478,10 @@ export interface MoneyBolo {
 	first_performed_at: string | null;
 	/** La última función viva: el trato está hecho, y se puede facturar, cuando pasa (ADR-131). */
 	last_performed_at: string | null;
+	/** El contrato salió hacia la sala (ADR-163). Null: sin enviar. */
+	contract_sent_at?: string | null;
+	/** El contrato volvió firmado (ADR-163). Null: sin firmar. */
+	contract_signed_at?: string | null;
 	project: {
 		id: string;
 		slug: string;
@@ -856,7 +860,38 @@ export function isQuietPosition(p: MoneyPosition): boolean {
 
 // ── Pide atención ──
 
-type AttentionKind = 'overdue' | 'to_invoice' | 'draft' | 'fiscal' | 'no_fee';
+type AttentionKind = 'overdue' | 'to_invoice' | 'draft' | 'fiscal' | 'contract' | 'no_fee';
+
+/** Days before a confirmed deal's function when an unsigned contract asks for a hand (ADR-163). */
+export const CONTRACT_DUE_DAYS = 14;
+
+export type ContractState = 'unsent' | 'sent' | 'signed';
+
+/** Where a bolo's contract stands (ADR-163): unsent, sent, signed. */
+export function contractState(b: Pick<MoneyBolo, 'contract_sent_at' | 'contract_signed_at'>): ContractState {
+	if (b.contract_signed_at) return 'signed';
+	if (b.contract_sent_at) return 'sent';
+	return 'unsent';
+}
+
+/**
+ * A confirmed deal with a function from today to `CONTRACT_DUE_DAYS` ahead
+ * and no signed contract (ADR-163). «A function in the window» is read from
+ * the first and last live functions: the deal has not ended and its first
+ * date is inside the window or already behind (a tour under way still has
+ * no signed contract, and that asks too).
+ */
+export function contractDue(
+	b: Pick<MoneyBolo, 'status' | 'first_performed_at' | 'last_performed_at' | 'contract_signed_at'>,
+	today: Date,
+): boolean {
+	if (b.status !== 'confirmed' || b.contract_signed_at) return false;
+	if (!b.first_performed_at || !b.last_performed_at) return false;
+	const day = todayDay(today);
+	const first = b.first_performed_at.slice(0, 10);
+	const last = b.last_performed_at.slice(0, 10);
+	return last >= day && first <= addDays(day, CONTRACT_DUE_DAYS);
+}
 
 export interface AttentionItem {
 	kind: AttentionKind;
@@ -872,13 +907,14 @@ export interface AttentionItem {
 	observedDays: number | null;
 }
 
-const KIND_ORDER: Record<AttentionKind, number> = { overdue: 0, to_invoice: 1, draft: 2, fiscal: 3, no_fee: 4 };
+const KIND_ORDER: Record<AttentionKind, number> = { overdue: 0, to_invoice: 1, draft: 2, fiscal: 3, contract: 4, no_fee: 5 };
 
 /**
  * What asks for a hand, worst first: overdue (most days late first), functions
  * done without a document (oldest first), done with a draft nobody issued,
- * factura drafts the payer's missing fiscal data blocks, contracted deals with
- * no fee. One row per problem, each
+ * factura drafts the payer's missing fiscal data blocks, confirmed deals with
+ * a function within two weeks and no signed contract (ADR-163), contracted
+ * deals with no fee. One row per bolo, each
  * with ONE action (the screen maps kind → action).
  */
 export function attentionItems(bolos: readonly MoneyBolo[], ctx: MoneyContext): AttentionItem[] {
@@ -908,6 +944,8 @@ export function attentionItems(bolos: readonly MoneyBolo[], ctx: MoneyContext): 
 			out.push({ ...base, kind: 'fiscal', doc: m.doc, amount: Number(m.doc.total) });
 		} else if (m.toInvoice && m.doc) {
 			out.push({ ...base, kind: 'draft', doc: m.doc, amount: Number(m.doc.total) });
+		} else if (contractDue(b, ctx.today)) {
+			out.push({ ...base, kind: 'contract', doc: null, amount: m.fee });
 		} else if (m.noFee && (b.status === 'confirmed' || b.status === 'done')) {
 			// A function done without a fee is one nobody will ever invoice.
 			out.push({ ...base, kind: 'no_fee', doc: null, amount: null });

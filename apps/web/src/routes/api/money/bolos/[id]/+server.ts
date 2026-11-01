@@ -4,7 +4,10 @@
  * design. The `update_bolo_fee` RPC requires `edit:money`; callers never
  * receive direct SELECT access to the fee.
  *
- * Body: { fee_amount: number|null, fee_currency?: 'EUR'-style code }.
+ * Body: { fee_amount: number|null, fee_currency?: 'EUR'-style code,
+ * status?, contract?: { sent_at: ISO|null, signed_at: ISO|null } }. The
+ * contract (ADR-163) goes through `update_bolo_contract`, same gate; both
+ * dates always travel, null clears.
  */
 
 import type { RequestHandler } from './$types';
@@ -31,6 +34,12 @@ const BodySchema = v.object({
   fee_currency: v.optional(v.pipe(v.string(), v.regex(/^[A-Za-z]{3}$/, 'ISO 4217'))),
   /** `invoiced`/`paid` NO están: money v3 los deriva de los pagos. */
   status: v.optional(v.picklist(BOLO_MOVE_STATUSES)),
+  contract: v.optional(
+    v.object({
+      sent_at: v.nullable(v.pipe(v.string(), v.isoTimestamp())),
+      signed_at: v.nullable(v.pipe(v.string(), v.isoTimestamp())),
+    }),
+  ),
 });
 
 const IdSchema = v.pipe(v.string(), v.uuid());
@@ -64,9 +73,9 @@ export const PATCH: RequestHandler = async ({ request, params, platform, locals 
       400,
     );
   }
-  const { fee_amount, fee_currency, status } = parsed.output;
-  if (fee_amount === undefined && status === undefined) {
-    return json({ error: 'empty_patch', hint: 'Send fee_amount, status, or both.' }, 400);
+  const { fee_amount, fee_currency, status, contract } = parsed.output;
+  if (fee_amount === undefined && status === undefined && contract === undefined) {
+    return json({ error: 'empty_patch', hint: 'Send fee_amount, status or contract.' }, 400);
   }
 
   try {
@@ -96,6 +105,19 @@ export const PATCH: RequestHandler = async ({ request, params, platform, locals 
         jwt,
         { p_bolo_id: idParsed.output, p_status: status },
       );
+      if (data.length === 0) return json({ error: 'not_found' }, 404);
+      out = { ...(out ?? {}), ...data[0] };
+    }
+    if (contract !== undefined) {
+      const { data } = await pgPostRpc<{
+        id: string;
+        contract_sent_at: string | null;
+        contract_signed_at: string | null;
+      }>(env, 'update_bolo_contract', jwt, {
+        p_bolo_id: idParsed.output,
+        p_sent_at: contract.sent_at,
+        p_signed_at: contract.signed_at,
+      });
       if (data.length === 0) return json({ error: 'not_found' }, 404);
       out = { ...(out ?? {}), ...data[0] };
     }

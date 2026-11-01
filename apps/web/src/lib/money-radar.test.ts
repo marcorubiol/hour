@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
 	attentionItems,
 	boloMoney,
+	contractDue,
+	contractState,
 	boloSeason,
 	expectedInflow,
 	invoicesByBolo,
@@ -367,6 +369,40 @@ describe('attentionItems', () => {
 			['no_fee', 'granollers'],
 			['no_fee', 'future'],
 		]);
+	});
+
+	it('a confirmed deal within two weeks and no signed contract asks for it (ADR-163)', () => {
+		const bolos = [
+			bolo({ id: 'soon', status: 'confirmed', first_performed_at: '2026-10-25' }),
+			bolo({ id: 'sent', status: 'confirmed', first_performed_at: '2026-10-29', contract_sent_at: '2026-10-01T10:00:00Z' }),
+			bolo({ id: 'signed', status: 'confirmed', first_performed_at: '2026-10-20', contract_sent_at: '2026-10-01T10:00:00Z', contract_signed_at: '2026-10-05T10:00:00Z' }),
+			bolo({ id: 'far', status: 'confirmed', first_performed_at: '2026-10-30' }),
+			bolo({ id: 'hold', status: 'hold', first_performed_at: '2026-10-20' }),
+			bolo({ id: 'nofee', status: 'confirmed', fee_amount: null, first_performed_at: '2026-10-20' }),
+		];
+		expect(attentionItems(bolos, ctx()).map((i) => [i.kind, i.bolo.id])).toEqual([
+			// The soonest first; a deal with no fee still asks for its contract first.
+			['contract', 'nofee'],
+			['contract', 'soon'],
+			['contract', 'sent'],
+		]);
+	});
+
+	it('contractDue: the window is today to fourteen days ahead, a tour under way included', () => {
+		const c = { status: 'confirmed', contract_signed_at: null };
+		expect(contractDue({ ...c, first_performed_at: '2026-10-15', last_performed_at: '2026-10-15' }, TODAY)).toBe(true);
+		expect(contractDue({ ...c, first_performed_at: '2026-10-29', last_performed_at: '2026-10-29' }, TODAY)).toBe(true);
+		expect(contractDue({ ...c, first_performed_at: '2026-10-30', last_performed_at: '2026-10-30' }, TODAY)).toBe(false);
+		expect(contractDue({ ...c, first_performed_at: '2026-10-10', last_performed_at: '2026-10-20' }, TODAY)).toBe(true);
+		expect(contractDue({ ...c, first_performed_at: '2026-10-10', last_performed_at: '2026-10-14' }, TODAY)).toBe(false);
+		expect(contractDue({ ...c, first_performed_at: null, last_performed_at: null }, TODAY)).toBe(false);
+		expect(contractDue({ ...c, status: 'done', first_performed_at: '2026-10-20', last_performed_at: '2026-10-20' }, TODAY)).toBe(false);
+	});
+
+	it('contractState reads the two dates', () => {
+		expect(contractState({})).toBe('unsent');
+		expect(contractState({ contract_sent_at: 'x', contract_signed_at: null })).toBe('sent');
+		expect(contractState({ contract_sent_at: 'x', contract_signed_at: 'y' })).toBe('signed');
 	});
 
 	it('a proforma draft is never blocked by fiscal data', () => {
