@@ -14,10 +14,7 @@ no pide migración primero; las migraciones juntas por el gate de § 34.
 - [ ] 78 temporada en una sola función, septiembre por defecto, configurable por espacio.
 - [ ] 95 contract: borrar `performance.readiness`, `line.modules`, `line.dossier_url`, `project.dossier_url`,
   `project.poster_url` (destructiva: staging e inspect).
-- [ ] 98 invitar al público (chat 01-11, opción A de `research/2026-11-email-builder.md`): primero la audiencia con
-  consentimiento (alta con doble confirmación, LSSI art. 21), una identidad de envío y un tenant separados de la
-  difusión y su registro por destinatario; el editor de correos bonitos después (Templatical si sigue vivo). Empieza
-  por un plan en `build/plans/`.
+- [ ] 98 invitar, al público y a profesionales: decidido (ADR-173, `build/plans/2026-11-01-audience.md`); siguiente paso, la fase 1.
 - Aparcado: 86 (responsable de tarea) hasta que entre Anouk.
 
 ## PRIMERO — nada. `main` == prod y las dos suites están vivas (2026-07-30, noche)

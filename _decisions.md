@@ -6474,3 +6474,69 @@ queda bajo `public/ws/` y se puede borrar por prefijo.
 
 **Re-evaluar cuando** llegue el editor de correos para invitaciones (otra plantilla sobre la misma entrada), o cuando
 los materiales tengan ficheros en R2 (la imagen del espectáculo podría elegirse de ellos en vez de subirse aparte).
+
+## [2026-11-01] ADR-173 · El público y sus invitaciones: las nueve respuestas del plan y la invitación también a profesionales
+
+**Contexto.** Plan `build/plans/2026-11-01-audience.md` (punto 98: invitar, con el público con consentimiento
+primero; opción A de `research/2026-11-email-builder.md`). Marco contesta en el chat el 2026-11-01 las nueve preguntas
+de su § 8, todas con la opción recomendada, y añade: «invitar también es para pros». Una invitación a un estreno, a
+una muestra o a una función también va a programadoras, salas y festivales, que hoy están en la difusión. Se apoya en
+ADR-108 a 115 (envío en bloque) y ADR-172 (plantilla del correo).
+
+**Decisión.**
+1. **Palabras:** «Público» la vista, «lista» cada una, «apuntarse» el alta, «invitación» el correo; en código
+   `audience`, `audience_subscription` y `mailout` con `kind = 'invitation'`. «Campaña» sigue siendo un tipo de línea.
+2. **Varias listas por espacio**, cada una con su texto de consentimiento versionado.
+3. **Navegación:** una tercera vista de Conversaciones, «Público» (`/h/conversations?view=audience`), junto a Difusión
+   y Equipo (ADR-134). El conjunto de lentes sigue cerrado (ADR-065).
+4. **Acceso:** una faceta nueva, «Público», a nivel de espacio, con ver o ver y editar; la prueba del consentimiento
+   con IP y el borrado de datos, solo admin. La frontera de service_role (`architecture.md` § 7) se amplía de `mail_*`
+   y `mailout_*` a las RPC de máquina `audience_*`, en el mismo módulo del servidor.
+5. **Identidad del público:** un subdominio de la compañía, `publico.<dominio>` por defecto, con su tenant
+   (`hour-aud-<workspace_id>`), su tope diario y su revisión del primer envío real. Sin dominio propio no hay
+   invitaciones al público: Hour no presta el suyo (ADR-108).
+6. **Importar una lista:** base declarada por importación (lo aceptaron, con la fuente escrita; o fueron clientes),
+   con la declaración guardada; la primera importación de cada espacio la revisa Marco. No se manda confirmación a
+   una lista importada.
+7. **Una persona del público no se enlaza con un contacto del espacio:** son registros aparte; la ficha del contacto
+   dice «también está apuntada a {lista}» a quien puede leer las dos cosas.
+8. **Se construye ya contra el simulador** (ADR-111): fases 1 a 3; ninguna lista se abre a gente real hasta SES.
+9. **La invitación usa las tablas del envío:** `mailout.kind` y un destinatario que apunta a una suscripción o a una
+   conversación. Una cola, un ritmo de SES, un endpoint de eventos.
+10. **Invitar también es para profesionales** (plan § 2.5 y § 5.6). Una invitación tiene dos orígenes de
+    destinatarios, juntos o por separado: las suscripciones confirmadas de una lista y conversaciones de la difusión.
+    - **El origen lo dice la fila:** `mailout_recipient` lleva `conversation_id` o `audience_subscription_id`, nunca
+      los dos; baja, pie, historial, tope e identidad miran eso, no `mailout.kind`. La lista de una invitación es
+      opcional; `queue_mailout` exige al menos un origen.
+    - **Base de un profesional:** la de `mail_basis`, con la misma puerta del envío (ADR-110 § 2): sin base no sale.
+      Se trata la invitación como comunicación comercial (LSSI art. 20.1 y 21) y el interés legítimo no se usa como
+      base para el correo: no hay tipo nuevo en `mail_basis_kind`. Qué tipos valen es la pregunta 10, abierta; lo
+      dudoso, para el abogado (plan § 3.7, punto 9).
+    - **Identidad de un profesional:** el dominio de la difusión y su tenant (`difusion@<dominio>`), no el subdominio
+      del público: es el remitente que conocen, sus respuestas entran en la conversación por la regla del hilo, y el
+      volumen es el de la difusión. **Techo de diseño: la plantilla del 97** (ADR-172); el editor de la fase 5 solo
+      llega a la rama del público. Cuentan en el tope de la difusión. Cada destinatario lleva su identidad congelada
+      (`mailout_recipient.mail_domain_id`); una invitación pide solo los dominios de los orígenes que usa.
+    - **Historial:** un profesional deja `conversation_event` en su conversación como un correo del envío (mueve
+      `last_contacted_at`, no el estado), con «de la invitación "{asunto}"»; su baja es la de la difusión. Una persona
+      del público no deja `conversation_event`.
+    - **Cómo se eligen:** desde Conversaciones, con el modo selección del envío (ADR-115 § 10): «Invitar a N» junto a
+      «Escribir a N»; y desde la invitación, «Añadir profesionales». De cualquier proyecto del espacio que quien pone
+      en cola pueda editar (`edit:conversation`), porque al estreno de una obra nueva se invita a quien programó las
+      anteriores. Nunca el directorio global ni una dirección a mano (ADR-108).
+    - **Deduplicación:** un correo por dirección y por invitación; si una dirección está en los dos orígenes, gana el
+      profesional (dominio de la difusión, su base, su conversación) y la suscripción no lleva fila en esa invitación.
+      La supresión del espacio vale para los dos; la baja de una lista no impide la invitación como profesional.
+    - **Campos:** en una invitación `{sala}` y `{ciudad}` son los de la función a la que se invita, para los dos
+      orígenes.
+
+**Pendiente.** Pregunta 10 del plan (qué bases de `mail_basis` dejan invitar a un profesional; recomendada: las tres
+de la difusión). Lo del abogado (plan § 3.7). Siguiente paso: la fase 1 (esquema y RPC, un carril); las fases 2 y 3
+después, en paralelo.
+
+**Cómo se revierte.** Nada construido aún. La rama profesional de una invitación se quita sin tocar el resto: sin
+`conversation_id` en los destinatarios de `kind = 'invitation'`, la invitación vuelve a ser solo del público.
+
+**Re-evaluar cuando** conteste el abogado (las bases de la pregunta 10 y si una invitación a un profesional es
+comunicación comercial), o si una compañía manda invitaciones a cientos de profesionales: entonces la rama
+profesional pesa en el dominio de la difusión como el público, y se mira si pasa al subdominio.
