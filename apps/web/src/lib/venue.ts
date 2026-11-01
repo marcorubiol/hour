@@ -62,9 +62,12 @@ export const VenuePatchSchema = v.object({
   ),
   contacts: v.optional(v.pipe(v.array(VenueContactSchema), v.maxLength(20))),
   notes: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000)))),
+  /** 92 (ADR-170): the organization that programs it, of the same space (the
+      base says so: a composite FK and a guard that wants it alive). */
+  organization_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
 });
 
 /** Columns the venue endpoints return — superset of the ADR-049 list
  * (adds the 1c-editable address/contacts/notes payload). */
 export const VENUE_COLS =
-  'id,slug,name,city,country,address,capacity,timezone,contacts,notes';
+  'id,slug,name,city,country,address,capacity,timezone,contacts,notes,organization_id';

@@ -1128,7 +1128,7 @@
   {/snippet}
 </Dialog>
 
-<VenueEditDialog bind:open={venueEditOpen} venue={editingVenue} />
+<VenueEditDialog bind:open={venueEditOpen} venue={editingVenue} workspaceId={perf?.workspace_id ?? ''} />
 
 <Dialog bind:open={confirmCancelOpen} title={t('perf.cancel_title', locale)} size="s">
   <p>

@@ -37,6 +37,8 @@
         host that only chooses among existing people (merging two files)
         turns it off. */
     canCreate?: boolean;
+    /** The line under the field (what an empty field means). */
+    helper?: string;
     /** A person was chosen or created. */
     onpick: (person: PersonOption) => void;
   }
@@ -51,6 +53,7 @@
     showLabel = true,
     text = $bindable(''),
     canCreate = true,
+    helper,
     onpick,
   }: Props = $props();
 
@@ -135,7 +138,7 @@
 </script>
 
 <div class="picker">
-  <Field id={`${listId}-in`} label={showLabel ? label : undefined}>
+  <Field id={`${listId}-in`} label={showLabel ? label : undefined} {helper}>
     <input
       id={`${listId}-in`}
       role="combobox"

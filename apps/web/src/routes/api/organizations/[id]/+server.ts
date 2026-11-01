@@ -3,7 +3,8 @@
  * organización (ADR-159): la organización, sus conversaciones de todos los
  * proyectos (lo justo para «Falta»; la lista la lee `/api/conversations` con
  * `organization_id`), sus bolos (`conversations_bolos`, sin dinero) y sus
- * contactos: los de sus conversaciones y quien la tiene en su dossier. `key`
+ * contactos: los de sus conversaciones y quien la tiene en su dossier, y las
+ * salas que programa (`venue.organization_id`, 92, ADR-170). `key`
  * es el id o el slug. RLS decide cada lectura: una conversación privada de
  * otro no sale, ni sus bolos ni sus contactos.
  *
@@ -26,7 +27,7 @@ import * as v from 'valibot';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { conversationRelation, type ConversationDbItem } from '$lib/conversation';
 import { TURN_EMBEDS, loadConversationBolos, setLastTurnEmbed } from '$lib/server/conversation-overview';
-import { ORGANIZATION_KINDS, type OrganizationFile, type OrgConversationContact, type OrgStaff } from '$lib/organization-record';
+import { ORGANIZATION_KINDS, type OrganizationFile, type OrgConversationContact, type OrgStaff, type OrgVenue } from '$lib/organization-record';
 import { pgErrorResponse } from '$lib/server/errors';
 import { json, UUID_RE } from '$lib/server/http';
 
@@ -81,9 +82,18 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
       project: { id: string; slug: string; name: string } | null;
       contacts: OrgConversationContact[];
     };
-    const [conversations, staff] = await Promise.all([
+    const venueSearch = new URLSearchParams({
+      select: 'id,slug,name,city',
+      workspace_id: `eq.${workspaceId}`,
+      organization_id: `eq.${o.id}`,
+      deleted_at: 'is.null',
+      order: 'name.asc',
+      limit: '200',
+    });
+    const [conversations, staff, venues] = await Promise.all([
       pgGet<ConvRow>(env, 'conversation', jwt, { search: convSearch }),
       pgGet<OrgStaff>(env, 'workspace_person', jwt, { search: staffSearch }),
+      pgGet<OrgVenue>(env, 'venue', jwt, { search: venueSearch }),
     ]);
 
     // Sin `read:performance` la RPC no devuelve nada, así que un bolo nunca
@@ -100,6 +110,7 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
       })),
       contacts: conversations.data.flatMap((c) => c.contacts ?? []),
       staff: staff.data,
+      venues: venues.data,
       bolos: [...bolos.values()].flat(),
     };
     return json(file);

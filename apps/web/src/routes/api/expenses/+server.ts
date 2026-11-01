@@ -2,7 +2,9 @@
  * GET /api/expenses — expense rows for the Money surfaces (ADR-056).
  * Filter by workspace/project/line/bolo ids (union). RLS hides whole rows
  * without read:money (there is no redacted view for expense — invisible,
- * not masked).
+ * not masked). Each row carries `paid_by_name`: the name of who advanced it,
+ * from their dossier in the expense's space (79, ADR-170), read under RLS in
+ * one more request; a hidden dossier leaves it null.
  *
  * POST /api/expenses — record an expense against a line or a bolo (exactly
  * one; ADR-087). Goes through the `create_expense` RPC: the direct INSERT
@@ -16,7 +18,7 @@ import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import { EXPENSE_CATEGORIES, ExpenseCreateSchema, type ExpenseItem } from '$lib/expense';
-import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
+import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import { json } from '$lib/server/http';
 
@@ -46,6 +48,31 @@ function parseUuidList(raw: string | undefined): string[] {
   if (!raw) return [];
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   return [...new Set(raw.split(',').map((s) => s.trim()).filter((s) => UUID.test(s)))];
+}
+
+/** Adds `paid_by_name` from each payer's dossier in the expense's space. */
+async function withPayerNames(env: SupabaseEnv, jwt: string, rows: ExpenseItem[]): Promise<ExpenseItem[]> {
+  const people = [...new Set(rows.map((r) => r.paid_by_person_id).filter((id): id is string => Boolean(id)))];
+  if (people.length === 0) return rows.map((r) => ({ ...r, paid_by_name: null }));
+  const spaces = [...new Set(rows.map((r) => r.workspace_id))];
+  const { data } = await pgGet<{ workspace_id: string; person_id: string; full_name: string }>(
+    env,
+    'workspace_person',
+    jwt,
+    {
+      search: new URLSearchParams({
+        select: 'workspace_id,person_id,full_name',
+        workspace_id: `in.(${spaces.join(',')})`,
+        person_id: `in.(${people.join(',')})`,
+        limit: '1000',
+      }),
+    },
+  );
+  const name = new Map(data.map((d) => [`${d.workspace_id}:${d.person_id}`, d.full_name]));
+  return rows.map((r) => ({
+    ...r,
+    paid_by_name: r.paid_by_person_id ? (name.get(`${r.workspace_id}:${r.paid_by_person_id}`) ?? null) : null,
+  }));
 }
 
 export const GET: RequestHandler = async ({ request, url, platform, locals }) => {
@@ -84,7 +111,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       p_category: category === 'any' ? null : category,
       p_limit: limit,
     });
-    return json({ items: data });
+    return json({ items: await withPayerNames(env, jwt, data) });
   } catch (err) {
     return pgErrorResponse(
       err,
@@ -140,6 +167,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
       p_incurred_on: input.incurred_on ?? null,
       p_notes: input.notes ?? null,
       p_counterparty: input.counterparty ?? null,
+      p_paid_by_person_id: input.paid_by_person_id ?? null,
     });
     if (data.length === 0 || !data[0]) return json({ error: 'create_failed' }, 502);
     return json({ expense: data[0] }, 201);
@@ -150,6 +178,8 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
       {
         codes: {
           '22023': { status: 400, error: 'invalid_input' },
+          // The payer has no dossier in the expense's space (79).
+          '23514': { status: 400, error: 'payer_not_in_space' },
           '42501': { status: 403, error: 'forbidden' },
         },
       },

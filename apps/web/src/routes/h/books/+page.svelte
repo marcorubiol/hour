@@ -53,7 +53,8 @@
   import { FormErrors } from '$lib/form-errors.svelte';
   import { dayLabel, localDayISO } from '$lib/datetime';
   import { DASH } from '$lib/glyphs';
-  import { categoryLabel, EXPENSE_CATEGORIES, type ExpenseItem } from '$lib/expense';
+  import { categoryLabel, owedToTeam, type ExpenseItem } from '$lib/expense';
+  import ExpenseDialog, { type ExpenseAnchor } from '$lib/components/ExpenseDialog.svelte';
   import {
     applyTaxLines,
     attentionItems,
@@ -760,16 +761,10 @@
   }
 
   // ── Add expense (money out) — anchored to a deal or a line (ADR-087) ────
+  // The dialog is the shared one (ADR-170); here it offers every anchor in scope.
   let expOpen = $state(false);
-  let eAmount = $state('');
-  let eCurrency = $state('EUR');
-  let eDescription = $state('');
-  let eCategory = $state<string>('other');
-  let eIncurredOn = $state('');
-  let eCounterparty = $state('');
-  let eAnchor = $state('');
-  // Anchor an expense to a whole line OR an individual deal (ADR-087). The value
-  // encodes which: line:<id> | bolo:<id>.
+  let expAnchor = $state<string | undefined>(undefined);
+  let expCurrency = $state('EUR');
   let scopedLines = $derived.by(() => {
     const seen = new Map<string, NavLine>();
     for (const b of bolos) {
@@ -780,67 +775,47 @@
     }
     return [...seen.values()];
   });
-  let expenseAnchorOptions = $derived([
-    ...scopedLines.map((l) => ({ value: `line:${l.id}`, label: t('books.anchor_line', locale, { name: l.name, project: l.projectName }) })),
+  let expenseAnchors = $derived<ExpenseAnchor[]>([
+    ...scopedLines.map((l) => ({
+      value: `line:${l.id}`,
+      label: t('books.anchor_line', locale, { name: l.name, project: l.projectName }),
+      workspaceId: l.workspaceId,
+    })),
     ...bolos.map((b) => ({
       value: `bolo:${b.id}`,
       label: t('books.anchor_deal', locale, { where: [b.venue_name, b.city].filter(Boolean).join(', ') || b.project?.name || DASH }),
+      workspaceId: b.project?.workspace_id ?? '',
     })),
   ]);
   function openExpense(b?: MoneyBolo) {
-    eAmount = '';
-    eCurrency = b?.fee_currency ?? currencies[0] ?? 'EUR';
-    eDescription = '';
-    eCategory = 'other';
-    eIncurredOn = localDayISO();
-    eCounterparty = '';
-    eAnchor = b ? `bolo:${b.id}` : (expenseAnchorOptions[0]?.value ?? '');
-    formErrors.clear();
+    expAnchor = b ? `bolo:${b.id}` : undefined;
+    expCurrency = b?.fee_currency ?? currencies[0] ?? 'EUR';
     expOpen = true;
   }
-  function submitExpense() {
-    if ($createExpense.isPending) return;
-    formErrors.clear();
-    const amount = Number(String(eAmount).trim());
-    if (!Number.isFinite(amount) || amount <= 0) formErrors.set('exp-amount', t('books.amount_gt_zero', locale));
-    if (!eAnchor) formErrors.set('exp-anchor', t('books.pick_anchor', locale));
-    if (formErrors.any) return void formErrors.focusFirst();
-    $createExpense.mutate();
-  }
-  const createExpense = createMutation({
-    mutationFn: async () => {
-      const amount = Number(String(eAmount).trim());
-      if (!Number.isFinite(amount) || amount <= 0) throw new Error(t('books.amount_gt_zero', locale));
-      if (!eAnchor) throw new Error(t('books.pick_anchor', locale));
-      const [kind, id] = eAnchor.split(':');
-      const body = await mutateJSON<{ expense?: unknown }>('POST', '/api/expenses', {
-        ...(kind === 'bolo' ? { bolo_id: id } : { line_id: id }),
-        category: eCategory,
-        description: eDescription.trim() || t('books.expense_default', locale),
-        amount,
-        currency: eCurrency,
-        incurred_on: eIncurredOn || null,
-        counterparty: eCounterparty.trim() || null,
-      });
-      if (!body?.expense) throw new Error(t('books.unexpected_response', locale));
-      return body.expense;
-    },
-    onSuccess: (expense) => {
-      expOpen = false;
+
+  // ── Se debe al equipo (79, ADR-170): advances not yet given back ──────
+  let owed = $derived(owedToTeam(expenses));
+  const setReimbursed = createMutation({
+    mutationFn: ({ id, reimbursed }: { id: string; reimbursed: boolean }) =>
+      mutateJSON('POST', `/api/expenses/${id}/reimbursed`, { reimbursed }),
+    onSuccess: (_body, { id, reimbursed }) => {
       void queryClient.invalidateQueries({ queryKey: ['expenses'] });
-      const id = (expense as { id?: string } | null)?.id;
-      toastCreated({
-        locale,
-        message: t('books.expense_added', locale),
-        undo: id
-          ? async () => {
-              await mutateJSON('DELETE', `/api/expenses/${id}`);
-              await queryClient.invalidateQueries({ queryKey: ['expenses'] });
-            }
-          : undefined,
+      if (!reimbursed) return;
+      addToast({
+        tone: 'success',
+        message: t('books.reimbursed_done', locale),
+        action: {
+          label: t('ui.undo', locale),
+          run: () => $setReimbursed.mutate({ id, reimbursed: false }),
+        },
       });
     },
-    onError: (err) => addToast({ tone: 'danger', title: t('books.expense_not_added', locale), message: err instanceof Error ? err.message : t('perf.unexpected', locale) }),
+    onError: (err) =>
+      addToast({
+        tone: 'danger',
+        title: t('books.reimbursed_not_saved', locale),
+        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
+      }),
   });
 
   // ── New deal — create a bolo by hand (ADR-087) ─────────────────────────
@@ -1468,18 +1443,42 @@
                 {#each expenseTotals as [currency, amount] (currency)}<span>− {fmtMoney(amount)} {currency}</span>{/each}
               </p>
             {/if}
-            <Button size="xs" variant="secondary" onclick={() => openExpense()} disabled={expenseAnchorOptions.length === 0}>{t('books.add_expense', locale)}</Button>
+            <Button size="xs" variant="secondary" onclick={() => openExpense()} disabled={expenseAnchors.length === 0}>{t('books.add_expense', locale)}</Button>
           </div>
           {#if expensesError}
             {@render failed('books.err_expenses', () => $expensesQuery.refetch())}
           {:else if expenses.length === 0}
             <EmptyLine text={t('books.no_expenses_scope', locale)} />
           {:else}
+            {#if owed.length > 0}
+              <!-- Se debe al equipo (ADR-170): who advanced what, still to give back. -->
+              <section class="mny__owed" aria-label={t('books.owed_team', locale)} data-testid="books-owed">
+                <BlockHead title={t('books.owed_team', locale)} count={owed.length} />
+                {#each owed as o (o.personId)}
+                  <div class="mny__owed-person">
+                    <p class="mny__owed-who">
+                      <b>{o.name ?? t('books.owed_someone', locale)}</b>
+                      <span class="mny__owed-total">{o.totals.map(([c, n]) => `${fmtMoney(n)} ${c}`).join(' · ')}</span>
+                    </p>
+                    <ul class="mny__expenses" role="list">
+                      {#each o.items as e (e.id)}
+                        <li>
+                          <span class="mny__cell-date">{e.incurred_on ? dayLabel(e.incurred_on) : DASH}</span>
+                          <span class="mny__expense-description">{e.description}</span>
+                          <span><Button size="xs" variant="secondary" disabled={$setReimbursed.isPending} onclick={() => $setReimbursed.mutate({ id: e.id, reimbursed: true })}>{t('books.reimbursed_mark', locale)}</Button></span>
+                          <strong>{fmtMoney(e.amount)} {e.currency}</strong>
+                        </li>
+                      {/each}
+                    </ul>
+                  </div>
+                {/each}
+              </section>
+            {/if}
             <ul class="mny__expenses" role="list">
               {#each expenses as expense (expense.id)}
                 <li>
                   <span class="mny__cell-date">{expense.incurred_on ? dayLabel(expense.incurred_on) : DASH}</span>
-                  <span class="mny__expense-description"><b>{expense.description}</b>{#if expense.counterparty}<span class="mny__expense-counter">{' · '}{expense.counterparty}</span>{/if}</span>
+                  <span class="mny__expense-description"><b>{expense.description}</b>{#if expense.counterparty}<span class="mny__expense-counter">{' · '}{expense.counterparty}</span>{/if}{#if expense.paid_by_person_id}<span class="mny__expense-counter">{' · '}{t('books.paid_by_named', locale, { name: expense.paid_by_name ?? t('books.owed_someone', locale) })}{#if expense.reimbursed}{' · '}{expense.reimbursed_on ? t('books.reimbursed_on', locale, { date: dayLabel(expense.reimbursed_on) }) : t('books.reimbursed', locale)}{/if}</span>{/if}</span>
                   <span class="mny__expense-category">{categoryLabel(expense.category, locale)}</span>
                   <strong>− {fmtMoney(expense.amount)} {expense.currency}</strong>
                 </li>
@@ -1591,26 +1590,7 @@
   {/snippet}
 </Dialog>
 
-<Dialog bind:open={expOpen} title={t('books.add_expense', locale)} size="s">
-  <form class="mny__pay-form" novalidate oninput={formErrors.onedit} onchange={formErrors.onedit} onsubmit={(e) => { e.preventDefault(); submitExpense(); }}>
-    <div class="mny__row2">
-      <Input id="exp-amount" label={t('books.amount', locale)} type="number" step="0.01" bind:value={eAmount} required error={formErrors.of('exp-amount')} />
-      <Input label={t('books.currency', locale)} bind:value={eCurrency} placeholder="EUR" />
-    </div>
-    <Input label={t('books.description', locale)} bind:value={eDescription} placeholder={t('books.ph_expense', locale)} />
-    <div class="mny__row2">
-      <Input label={t('perf.date', locale)} type="date" bind:value={eIncurredOn} />
-      <Select label={t('books.category', locale)} bind:value={eCategory} options={EXPENSE_CATEGORIES.map((c) => ({ value: c, label: categoryLabel(c, locale) }))} />
-    </div>
-    <Select id="exp-anchor" label={t('books.anchor', locale)} bind:value={eAnchor} options={expenseAnchorOptions} required error={formErrors.of('exp-anchor')} />
-    <Input label={t('books.counterparty_paid', locale)} bind:value={eCounterparty} placeholder={t('books.ph_counterparty', locale)} />
-    <button type="submit" hidden aria-hidden="true"></button>
-  </form>
-  {#snippet actions()}
-    <Button variant="quiet" onclick={() => (expOpen = false)}>{t('create.cancel', locale)}</Button>
-    <Button onclick={submitExpense} loading={$createExpense.isPending}>{t('composer.add', locale)}</Button>
-  {/snippet}
-</Dialog>
+<ExpenseDialog bind:open={expOpen} anchors={expenseAnchors} anchor={expAnchor} currency={expCurrency} />
 
 <style>
   @layer components {
@@ -1759,6 +1739,10 @@
     .mny__expense-category { color: var(--text-faint); font-family: var(--font-mono); font-size: var(--text-xs); text-transform: lowercase; }
     .mny__expense-description { color: var(--text-color); }
     .mny__expense-counter { color: var(--text-muted); }
+    .mny__owed { display: flex; flex-direction: column; gap: var(--space-s); margin-block-end: var(--space-l); }
+    .mny__owed-person { display: flex; flex-direction: column; }
+    .mny__owed-who { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-s); margin: 0; padding-inline: var(--space-xs); font-size: var(--text-s); }
+    .mny__owed-total { font-family: var(--font-mono); font-size: var(--text-xs); font-variant-numeric: tabular-nums; color: var(--text-muted); }
     .mny__cell-date { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); white-space: nowrap; }
 
 .mny__dialog-who { font-size: var(--text-s); color: var(--text-muted); }

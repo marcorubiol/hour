@@ -64,6 +64,7 @@
   import BlockHead from '$lib/components/BlockHead.svelte';
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import PerformanceCreateDialog from '$lib/components/PerformanceCreateDialog.svelte';
+  import ExpenseDialog from '$lib/components/ExpenseDialog.svelte';
 
   interface Props {
     projectId: string;
@@ -153,6 +154,10 @@
   const planAccessQuery = createQuery(toStore(() => ({ ...planAccessQueryOptions(projectId), enabled: Boolean(bolo) })));
   let canAddFunction = $derived(lensOn('planner') && $planAccessQuery.data?.edit !== false);
   let addOpen = $state(false);
+  // «+ Gasto» (ADR-170): the bolo is already chosen. Money is Cuentas'
+  // (ADR-043), so it follows that lens; `create_expense` gates on edit:money.
+  let canAddExpense = $derived(lensOn('books'));
+  let expenseOpen = $state(false);
 
   let invoices = $derived($invoicesQuery.data?.items ?? []);
   let docs = $derived(bolo ? (invoicesByBolo(invoices).get(bolo.id) ?? []) : []);
@@ -411,14 +416,25 @@
 
     <section class="bolo-record__section" aria-label={t('books.expenses', locale)}>
       {#if expenses.length === 0}
-        <EmptyLine label={t('books.expenses', locale)} text={t('peek.bolo_no_expenses', locale)} busy={$expensesQuery.isLoading} />
+        <EmptyLine label={t('books.expenses', locale)} text={t('peek.bolo_no_expenses', locale)} busy={$expensesQuery.isLoading}>
+          {#if canAddExpense}<button type="button" class="empty-line__act" onclick={() => (expenseOpen = true)}>{t('books.add_expense_short', locale)}</button>{/if}
+        </EmptyLine>
       {:else}
-        <BlockHead title={t('books.expenses', locale)} count={expenses.length} />
+        <BlockHead title={t('books.expenses', locale)} count={expenses.length}>
+          {#if canAddExpense}
+            <button type="button" class="block-head__act" onclick={() => (expenseOpen = true)}>{t('books.add_expense_short', locale)}</button>
+          {/if}
+        </BlockHead>
         <ul class="bolo-record__rows" role="list">
           {#each expenses as e (e.id)}
             <li class="bolo-record__row">
               <span class="bolo-record__when">{dayLabel(e.incurred_on)}</span>
-              <span>{e.description}<span class="bolo-record__faint">{` · ${categoryLabel(e.category, locale)}`}</span></span>
+              <span
+                >{e.description}<span class="bolo-record__faint">{` · ${categoryLabel(e.category, locale)}`}</span
+                >{#if e.paid_by_person_id}<span class="bolo-record__faint"
+                    >{` · ${t('books.paid_by_named', locale, { name: e.paid_by_name ?? t('books.owed_someone', locale) })}`}{#if e.reimbursed}{` · ${t('books.reimbursed', locale)}`}{/if}</span
+                  >{/if}</span
+              >
               <span class="bolo-record__num">{fmt(e.amount, e.currency)}</span>
             </li>
           {/each}
@@ -427,6 +443,15 @@
     </section>
   {/if}
 </article>
+
+{#if canAddExpense && bolo}
+  <ExpenseDialog
+    bind:open={expenseOpen}
+    anchors={[{ value: `bolo:${id}`, label: title, workspaceId: bolo.project?.workspace_id ?? '' }]}
+    lockAnchor
+    currency={bolo.fee_currency ?? 'EUR'}
+  />
+{/if}
 
 {#if canAddFunction}
   <PerformanceCreateDialog bind:open={addOpen} presetProjectId={projectId} lockProject presetBoloId={id} />
