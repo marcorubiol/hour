@@ -65,7 +65,6 @@
   import ThreadFeed from '$lib/components/ThreadFeed.svelte';
   import ConversationFeed from '$lib/components/ConversationFeed.svelte';
   import FirstVisitCard from '$lib/components/FirstVisitCard.svelte';
-  import ConceptHint from '$lib/components/ConceptHint.svelte';
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
@@ -697,10 +696,8 @@
     </div>
 
     {#snippet filterFields()}
-      <span class="conversations__relation">
-        <Select toolbar label={t('conversations.relation', locale)} options={relationOptions} bind:value={() => relationFilter, setRelation} />
-        <ConceptHint concept="relation" />
-      </span>
+      <!-- What each relation means lives in the lens's «?» (ADR-145 § 2). -->
+      <Select toolbar label={t('conversations.relation', locale)} options={relationOptions} bind:value={() => relationFilter, setRelation} />
       {#if scopeLines.length > 0}
         <Select toolbar label={t('conversations.line', locale)} options={lineOptions} bind:value={() => lineFilter, setLine} />
       {/if}
@@ -874,14 +871,6 @@
       flex-wrap: wrap;
     }
 
-    /* The relation filter and its «i»: the «i» level with the control, not the label. */
-    .conversations__relation {
-      display: inline-flex;
-      align-items: flex-end;
-    }
-    .conversations__relation > :global(.hint) {
-      margin-block-end: calc((var(--control-size-m) - 1.4em) / 2);
-    }
     /* One height for the search, the status and the two buttons (diseño M9):
        the fields take it from `toolbar`, the buttons from here. */
     .conversations__controls > :global(button) {
@@ -963,20 +952,6 @@
     }
     .conversations__sheet > :global(*) {
       inline-size: 100%;
-    }
-    /* The relation's «i» on its label's line, at the end: every field keeps
-       the sheet's width and the four line up on both edges. */
-    .conversations__sheet .conversations__relation {
-      position: relative;
-    }
-    .conversations__sheet .conversations__relation > :global(:first-child) {
-      flex: 1;
-    }
-    .conversations__sheet .conversations__relation > :global(.hint) {
-      position: absolute;
-      inset-block-start: 0;
-      inset-inline-end: 0;
-      margin: 0;
     }
 
     /* Phone: the search and «Filtrar» on one line, what is on under them,
