@@ -154,12 +154,12 @@ WHERE schemaname = 'public' AND tablename IN ('conversation', 'conversation_even
   AND cmd = 'SELECT';
 ```
 
-`conversation_select` tiene que ser el USING de `20261011200000_mail_google.sql`: la candidata
-`supabase/candidates/20261101100000_conversation_select_once.sql` parte de ese.
+`conversation_select` tiene que ser el USING de `20261011200000_mail_google.sql`: la migración
+`supabase/migrations/20261101100000_conversation_select_once.sql` (ADR-160) parte de ese.
 
-## 6. Con la candidata, dentro de la misma transacción
+## 6. Con la migración, dentro de la misma transacción
 
-Para probarla sin aplicarla: en un bloque con `ROLLBACK`, como `postgres`, ejecutar el `ALTER POLICY` de la candidata,
+Para probarla sin aplicarla: en un bloque con `ROLLBACK`, como `postgres`, ejecutar el `ALTER POLICY` de la migración,
 después `SET LOCAL role authenticated` y las claims, y repetir la 1 y la 3. El `ROLLBACK` deshace también el
-`ALTER POLICY`. Si baja de forma clara, la candidata pasa a `supabase/migrations/` y sigue el gate de § 34 (backup,
-plan, apply y `test:rls` entero).
+`ALTER POLICY`. Ojo: `= ANY ((SELECT …))` sin el `::uuid[]` falla (`uuid = uuid[]`); la migración lleva la forma buena.
+Resultado del 01-11 y decisión: ADR-160.

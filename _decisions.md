@@ -5802,3 +5802,52 @@ anterior (en el historial).
 
 **Re-evaluar cuando** se lleve una temporada de difusión con la ficha: si hace falta editar la organización desde
 ella, y si con muchas conversaciones la lista pide el orden de la lente en vez del del módulo.
+
+## [2026-11-01] ADR-160 · La lectura de conversaciones resuelve los permisos una vez por consulta, no por fila
+
+**Contexto.** Sin caché del dispositivo, Hoy espera a `GET /api/conversations?limit=100&lean=1` y a
+`GET /api/conversations/overview`: unos 1,7 s de servidor cada uno, medidos desde el navegador el 01-11 con el usuario
+del E2E (ADR-157). Las dos leen `conversation` con embebidos de `conversation_event` (dos por fila: el turno y la
+última respuesta), `conversation_contact` y `conversation_tagging`. La política `conversation_select`
+(20261011200000) llama a `has_permission(project_id, 'read:conversation')` en cada fila, y las políticas de las tres
+tablas hijas son `EXISTS (… conversation …)`, que la reaplican. Postgres no recuerda una función STABLE entre filas.
+
+Medido por HOUR COOR el 01-11 en producción, con OK de Marco, solo lecturas, como el usuario de Marco (`muk-cia`, 309
+conversaciones, 152 visibles):
+- `pg_stat_statements`: las lecturas de lista de `conversation` tardan de 1,4 a 1,7 s de media en la base, con miles de
+  llamadas.
+- La política actual sola (§ 1 de `build/runbooks/explain-20261101-conversation-reads.md`): 1559 ms en frío y 335 en
+  caliente. Todo se va en el filtro `has_permission` por fila: el Index Scan de `conversation_workspace_idx` pasa por las
+  309 filas.
+- El predicado de esta decisión, como `postgres` con las claims del usuario: 181 ms en frío y 44 en caliente, por
+  `conversation_project_idx` (Index Cond), con el InitPlan evaluado una vez. Las dos formas devuelven las mismas 152
+  filas.
+
+**Decisión.**
+1. `conversation_select` compara con `accessible_project_ids('read:conversation')` evaluado una vez por consulta
+   (`project_id = ANY (((SELECT …))::uuid[])`), el patrón de 20260724093000. Borrado y privada no cambian
+   (20261101100000_conversation_select_once).
+2. Es equivalente: `accessible_project_ids(p)` son los proyectos vivos donde `has_permission(id, p)`, y
+   `has_permission` ya exige proyecto vivo. Lo sujeta `tests/rls/conversation-select-once.test.ts`: con y sin
+   Converses, ver la fila es lo que dice `has_permission`; una privada de otra persona no se ve y la propia sí; la
+   conversación de un proyecto borrado no se ve, ni la de otro espacio; y las tablas hijas siguen a su conversación.
+3. Las políticas de las tablas hijas no se tocan. Aplican esta política dentro de su `EXISTS`, y el InitPlan no
+   depende de la fila de fuera, así que se calcula una vez por consulta y no por fila hija. Esto es lo esperado, no
+   está medido. Se comprueba tras el apply con la § 3 del runbook; si alguna sigue pagando por fila, una migración
+   aparte le da la misma forma.
+4. Sin cambios en la app: la forma de las respuestas no cambia y `CACHE_SCHEMA` no se toca. Va junto con lo único que
+   se pudo arreglar sin migración: `/overview` pide los bolos en paralelo con las filas, no detrás.
+
+**Límite.** `accessible_project_ids` recorre todos los proyectos vivos de la base y llama a `has_permission` en cada
+uno. Con unas decenas, poco; con muchos espacios, el InitPlan crecerá. Antes de la beta, que lo acote a los espacios
+de quien llama.
+
+**Alternativas.** (a) Una RPC para la lista: deshace el contrato de PostgREST que comparten la lista, la ficha y el
+PATCH. (b) Índices parciales sobre `conversation_event` para los dos embebidos: no tocan el coste, que está en la
+política. (c) Cachear `has_permission` en la sesión: Postgres no lo ofrece para funciones.
+
+**Cómo se aplica.** Gate de `_tasks.md § 34`, con OK de Marco: backup, plan y apply; antes, comprobar en
+`pg_policies` que el USING vivo es el de 20261011200000 (§ 5 del runbook). Después, `test:rls` entero y la medición por
+HTTP de los dos endpoints.
+
+**Cómo se revierte.** `build/runbooks/rollback-20261101-conversation-select-once.sql`.
