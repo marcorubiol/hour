@@ -113,7 +113,8 @@ test('Conversations is a scoped lens and copies its canonical scoped URL', async
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: 'Copy link' }).click();
   await expect(dialog).toBeHidden();
-  await expect(page.getByText('Link copied — scope included.')).toBeVisible();
+  // No long dashes in the copy (ADR-167 § 9).
+  await expect(page.getByText('Link copied, scope included.')).toBeVisible();
 
   const copied = await page.evaluate(() => navigator.clipboard.readText());
   expect(copied).toBe(page.url());

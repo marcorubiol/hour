@@ -58,8 +58,9 @@ test.describe('the season (ADR-117)', () => {
     // one that stays, empty or not.
     await expect(page.locator('.ov__strip .block-head h2')).toHaveCount(1);
     // Its census line is gone (ADR-145, fase 2): every figure it printed is a
-    // block below. Out of calm, with nobody guessed, the facts block is not drawn.
-    await expect(page.locator('.cal__facts')).toHaveCount(0);
+    // block below. Out of calm, with nobody guessed, the facts block is not
+    // drawn: it stays in the DOM and an empty block is hidden (ADR-167 § 2).
+    await expect(page.locator('.cal__facts')).toBeHidden();
     // Nothing is still waiting once the lens says it has loaded.
     expect(await page.locator('.ov').innerText()).not.toMatch(/·\s*–/);
   });

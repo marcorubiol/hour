@@ -93,12 +93,16 @@ test.describe('planner laws (ADR-095)', () => {
     // the biggest body on the page a control and the smallest the answer.
     await planner(page, 'month');
     const head = await page.evaluate(() => {
+      // The first one DRAWN: a line with nothing to say stays in the DOM
+      // and is not drawn (ADR-167 § 2), so the first in the DOM may be empty.
+      const drawn = (s: string) =>
+        [...document.querySelectorAll(s)].find((el) => el.getClientRects().length > 0) ?? null;
       const top = (s: string) => {
-        const el = document.querySelector(s);
+        const el = drawn(s);
         return el ? Math.round(el.getBoundingClientRect().top) : -1;
       };
       const px = (s: string) => {
-        const el = document.querySelector(s);
+        const el = drawn(s);
         return el ? Math.round(parseFloat(getComputedStyle(el).fontSize)) : -1;
       };
       return {

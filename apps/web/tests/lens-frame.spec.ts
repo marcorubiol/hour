@@ -132,7 +132,10 @@ test.describe('the sections in the frame (ADR-140)', () => {
     expect((await account().boundingBox())!.y).toBeLessThan(60);
   });
 
-  test('off a lens, it marks the lens you came from, and says so', async ({ page }) => {
+  test('off a lens, no lens is marked, and the way back is one click', async ({ page }) => {
+    // ADR-167 § 4 (enmienda ADR-140): the stroke on the lens you came from
+    // read as «you are here» on a page that is not that lens. Off a lens the
+    // switcher marks none and describes none.
     await readOnly(page);
     await page.goto(`/h/planner${SCOPE}`);
     await waitForLoaded(page);
@@ -140,11 +143,8 @@ test.describe('the sections in the frame (ADR-140)', () => {
     await expect(planner).toHaveAttribute('aria-current', 'page');
 
     await page.goto('/h/playwright/settings');
-    // Not the page you are on: no aria-current anywhere in the sections…
     await expect(sections(page).locator('[aria-current]')).toHaveCount(0);
-    // …but the lens you came from, described as such.
-    await expect(planner).toHaveAccessibleDescription('You came from this section');
-    await expect(sections(page).getByRole('link', { name: 'Today' })).not.toHaveAttribute('aria-describedby', /.+/);
+    await expect(sections(page).locator('[aria-describedby]')).toHaveCount(0);
 
     await planner.click();
     await expect(page).toHaveURL(/\/h\/planner/);
