@@ -10,7 +10,7 @@
  * mailout it received (plan de la lista § 3).
  *
  * Two paths:
- *   · plain (a project or line module: `line_id`, `season`; an organization's
+ *   · plain (a project or line module: `line_id`; an organization's
  *     record: `organization_id`, ADR-159; or nothing that
  *     derives): PostgREST, ordered by next step, as before;
  *   · the lens (`orden`, `etiqueta` or any derived filter: `turno`, `temp`,
@@ -54,7 +54,6 @@ const QuerySchema = v.object({
   // ADR-159: the conversations of one organization, across its projects.
   organization_id: v.optional(v.pipe(v.string(), v.uuid())),
   q: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(120))),
-  season: v.optional(v.string(), 'any'),
   turno: v.optional(v.picklist(['nuestro', 'suyo'])),
   temp: v.optional(v.picklist(['caliente', 'fria', 'ronda', 'parada', 'sin-fecha'])),
   temporada: v.optional(v.literal('actual')),
@@ -132,7 +131,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       400,
     );
   }
-  const { project_ids, workspace_ids, line_id, organization_id, q, season, limit, offset, turno, temp, temporada, linea, line_ids, envio, r, relacion, etiqueta, orden, ids_only, lean } =
+  const { project_ids, workspace_ids, line_id, organization_id, q, limit, offset, turno, temp, temporada, linea, line_ids, envio, r, relacion, etiqueta, orden, ids_only, lean } =
     parsed.output;
   const idsOnly = ids_only === '1';
 
@@ -159,8 +158,6 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   if (organization_id) search.set('organization_id', `eq.${organization_id}`);
   search.set('deleted_at', 'is.null');
 
-  if (season !== 'any') search.set('custom_fields->>season', `eq.${season}`);
-
   setLastTurnEmbed(search);
 
   const listFilter: ListFilter = {
@@ -173,8 +170,8 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   };
   if (hasListFilter(listFilter) || etiqueta || orden) {
     // The derived filters only exist for the global lens: project and line
-    // modules keep their own params (line_id, season).
-    if (line_id || organization_id || season !== 'any') {
+    // modules keep their own params (line_id).
+    if (line_id || organization_id) {
       return json(
         { error: 'invalid_query', hint: 'turno/temp/temporada/linea/envio/relacion/etiqueta/orden go with project_ids/workspace_ids only.' },
         400,
@@ -224,13 +221,12 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       exactCount: lean !== '1',
     });
     const items = data.map((r) => normalizeConversationItem(r));
-    if (lean === '1') return json({ limit, offset, season, items });
+    if (lean === '1') return json({ limit, offset, items });
 
     return json({
       total: total ?? data.length,
       limit,
       offset,
-      season,
       items: await withExtras(env, jwt, items),
     });
   } catch (err) {
@@ -286,7 +282,6 @@ async function lensPage(
     total: page.total,
     limit: o.limit,
     offset: o.offset,
-    season: 'any',
     orden: o.orden,
     items: await withExtras(env, jwt, items.map((it) => ({ ...it, unread_count: unread.get(it.id) ?? 0 }))),
   };

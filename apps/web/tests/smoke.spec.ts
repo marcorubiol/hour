@@ -63,9 +63,7 @@ test.describe('smoke', () => {
     // Books opens on its collection radar (ADR-117): the ledger is always there.
     await expect(page.locator('#mny-ledger')).toBeVisible();
 
-    // Old space-scoped lens bookmarks 308 to the space-less lens.
-    await page.goto('/h/playwright/desk');
-    await page.waitForURL(/\/h\/desk\/?$/);
+    await page.goto('/h/desk');
     await waitForLoaded(page);
     // Lens headers were unified to the shared LensHeader (.lenshead) in a6cd10e.
     await expect(page.locator('.lenshead').first()).toBeVisible();

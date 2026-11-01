@@ -67,8 +67,10 @@
     type DeskConvInput,
     type DeskDecisionInput,
     type DeskItem,
+    type DeskOption,
   } from '$lib/desk-feed';
-  import type { Decision } from '$lib/planner';
+  import { dueOption, type Decision } from '$lib/planner';
+  import { invalidatePerformanceFeeds } from '$lib/plan-create';
   import {
     changedBandLoading,
     changesSince,
@@ -542,17 +544,71 @@
       engine.decisionQueue.decisions.flatMap((d) => [d.a, d.b].filter((s) => isOption(s.status)).map((s) => s.id)),
     );
   }
+  /** A performance's own page, which a lens opens as its vistazo (ADR-139 p1). */
+  function performancePage(id: string): string | null {
+    const p = scopedPerfs.find((x) => x.id === id);
+    const ws = p && workspaceSlugById.get(perfWorkspaceId(p) ?? '');
+    return p?.slug && ws ? `/h/${ws}/performance/${p.slug}` : null;
+  }
   function deskDecisions(): DeskDecisionInput[] {
-    return engine.decisionQueue.decisions.map((d) => ({
-      id: d.id,
-      day: d.day,
-      decideBy: d.decideBy,
-      kind: d.kind,
-      a: sideName(d.kind === 'release' && isOption(d.a.status) ? d.b : d.a),
-      b: sideName(d.kind === 'release' && isOption(d.a.status) ? d.a : d.b),
-      projectName: d.a.project === d.b.project ? d.a.project : `${d.a.project} · ${d.b.project}`,
-      href: plannerDayHref('day', d.day),
-    }));
+    const notice = new Map(scopedPerfs.map((p) => [p.id, p.hold_notice_days]));
+    return engine.decisionQueue.decisions.map((d) => {
+      // A release: `loose` is the open option, `kept` the confirmed one.
+      const flip = d.kind === 'release' && isOption(d.a.status);
+      const kept = flip ? d.b : d.a;
+      const loose = flip ? d.a : d.b;
+      return {
+        id: d.id,
+        day: d.day,
+        decideBy: d.decideBy,
+        kind: d.kind,
+        a: sideName(kept),
+        b: sideName(loose),
+        projectName: d.a.project === d.b.project ? d.a.project : `${d.a.project} · ${d.b.project}`,
+        // «decidir»: the option that falls due first, in its vistazo; «liberar»
+        // is answered on the row, the Planner its fallback (ADR-162).
+        href:
+          (d.kind === 'choose' ? performancePage(dueOption(d, (id) => notice.get(id)).id) : null) ??
+          plannerDayHref('day', d.day),
+        option: d.kind === 'release' ? { id: loose.id, status: loose.status } : null,
+      };
+    });
+  }
+
+  // ── «Confirmar» / «Liberar» on a release row (ADR-162 § 1): the record's
+  //    own write (a status PATCH), with «Deshacer» instead of a question, as
+  //    the bulk actions. The undo puts back the status it had.
+  let deciding = $state<string | null>(null);
+  async function setOptionStatus(id: string, status: string) {
+    await mutateJSON('PATCH', `/api/performances/${id}`, { status });
+    await Promise.all([invalidatePerformanceFeeds(queryClient), queryClient.invalidateQueries({ queryKey: ['performance'] })]);
+  }
+  async function decide(item: DeskItem, status: 'confirmed' | 'cancelled') {
+    const option: DeskOption | null = item.option;
+    if (!option || deciding) return;
+    deciding = item.id;
+    try {
+      await setOptionStatus(option.id, status);
+      addToast({
+        tone: 'success',
+        message: t(status === 'confirmed' ? 'desk.decision_confirmed' : 'desk.decision_released', locale, { name: item.subject }),
+        // Time to read it and reach «Deshacer».
+        duration: 8000,
+        action: {
+          label: t('ui.undo', locale),
+          run: () =>
+            void setOptionStatus(option.id, option.status).then(
+              () => addToast({ tone: 'info', message: t('ui.undone', locale) }),
+              (err: unknown) =>
+                addToast({ tone: 'danger', title: t('ui.not_undone', locale), message: err instanceof ApiError ? err.message : t('perf.unexpected', locale) }),
+            ),
+        },
+      });
+    } catch (err) {
+      addToast({ tone: 'danger', title: t('desk.toast_change_failed', locale), message: err instanceof ApiError ? err.message : t('perf.unexpected', locale) });
+    } finally {
+      deciding = null;
+    }
   }
   let plannerFig = $derived(
     feeds.settled && !$seasonBlocksQuery.isPending
@@ -917,6 +973,8 @@
           ontoggle={(id, done) => $patchTask.mutate({ id, patch: { status: done ? 'done' : 'open' } })}
           onremove={removeWithUndo}
           onaccept={(id) => $patchTask.mutate({ id, patch: { origin: 'manual' } })}
+          {deciding}
+          ondecide={decide}
         />
       </div>
       {/if}

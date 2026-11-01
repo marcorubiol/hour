@@ -62,7 +62,7 @@ export function createPulseFeeds(today: () => string) {
         staleTime: 5 * 60_000,
         queryFn: ({ signal }: { signal: AbortSignal }) =>
           fetchJSON<{ items: PerformanceEvent[] }>(
-            `/api/performances?status=any&from=${today()}&limit=200&rosters=1`,
+            `/api/performances?status=any&from=${today()}&limit=200&rosters=1&notice=1`,
             signal,
           ),
       })),

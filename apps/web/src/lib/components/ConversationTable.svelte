@@ -10,7 +10,6 @@
     /** One organization's conversations, across its projects (ADR-159). */
     organizationId?: string;
     workspaceIds?: string[];
-    season?: string;
     q?: string;
     /** One relation (ADR-138), derived like the dashboard's filters. */
     relacion?: Relation;
@@ -167,7 +166,6 @@
     if (f.organizationId) p.set('organization_id', f.organizationId);
     if (f.workspaceIds && f.workspaceIds.length > 0)
       p.set('workspace_ids', f.workspaceIds.join(','));
-    if (f.season) p.set('season', f.season);
     if (f.q) p.set('q', f.q);
     if (f.turno) p.set('turno', f.turno);
     if (f.temp) p.set('temp', f.temp);

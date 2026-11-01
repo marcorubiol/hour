@@ -49,6 +49,10 @@
     ontoggle: (taskId: string, done: boolean) => void;
     onremove: (taskId: string) => void;
     onaccept: (taskId: string) => void;
+    /** The row being confirmed or released (its id), while the write is in flight. */
+    deciding?: string | null;
+    /** «Confirmar» / «Liberar» on a «liberar» row (ADR-162 § 1). */
+    ondecide?: (item: DeskItem, status: 'confirmed' | 'cancelled') => void;
   }
 
   let {
@@ -69,6 +73,8 @@
     ontoggle,
     onremove,
     onaccept,
+    deciding = null,
+    ondecide,
   }: Props = $props();
 
   let all = $state(false);
@@ -180,6 +186,22 @@
             class="row__remove"
             aria-label={t('desk.remove_aria', locale, { subject: item.subject })}
             onclick={() => item.taskId && onremove(item.taskId)}>×</button
+          >
+        {:else if item.option && ondecide}
+          <!-- A release is answered here (ADR-162 § 1), the record's own two
+               verbs; «Deshacer» comes in the notice. -->
+          <button
+            type="button"
+            class="row__act btn--secondary btn--xs"
+            aria-label={t('desk.decision_confirm_aria', locale, { name: item.subject })}
+            disabled={deciding !== null}
+            onclick={() => ondecide(item, 'confirmed')}>{t('desk.decision_confirm', locale)}</button
+          ><button
+            type="button"
+            class="row__act row__act--quiet btn--secondary btn--xs"
+            aria-label={t('desk.decision_release_aria', locale, { name: item.subject })}
+            disabled={deciding !== null}
+            onclick={() => ondecide(item, 'cancelled')}>{t('desk.decision_release', locale)}</button
           >
         {/if}
       </span>

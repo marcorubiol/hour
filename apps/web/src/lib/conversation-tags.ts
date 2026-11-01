@@ -50,20 +50,6 @@ export function lensChip(params: URLSearchParams, canRead: boolean): LensChip {
   return TAG_KEY_RE.test(raw) ? raw : ALL;
 }
 
-/**
- * Las vistas de ADR-134 pasan a chips: `?view=team` (y el viejo
- * `?view=threads`, ADR-116) van a `?etiqueta=team`. El resto de la query se
- * queda. Null si no hay nada que redirigir.
- */
-export function legacyViewRedirect(params: URLSearchParams): URLSearchParams | null {
-  const view = params.get('view');
-  if (view !== 'team' && view !== 'threads') return null;
-  const next = new URLSearchParams(params);
-  next.delete('view');
-  next.set('etiqueta', TEAM);
-  return next;
-}
-
 /** Los filtros de bloque del panel: son del chip, y cambiar de chip los quita. */
 const PANEL_PARAMS = ['turno', 'temp', 'temporada', 'linea', 'envio', 'r', 'relacion', 'view', 'etiqueta'];
 

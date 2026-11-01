@@ -40,7 +40,7 @@
         // sibling feed has only `error` tracked; when THAT sibling resolves,
         // status/isLoading/data change but error doesn't, the notification is
         // suppressed, and its Svelte store freezes at isLoading:true forever —
-        // the non-deterministic "/h/money stuck on Loading…" bug (a reload
+        // the non-deterministic "Cuentas stuck on Loading…" bug (a reload
         // cured it). Opting every query out of tracked-props makes each
         // resolution notify unconditionally. Cost is negligible: queries here
         // are lens/page-level, not per-row, and Svelte's own equality checks

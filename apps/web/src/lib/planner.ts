@@ -566,6 +566,18 @@ export function decisionsFor(input: {
   return { decisions, concurrences };
 }
 
+/**
+ * The option a «decidir · A o B» opens (ADR-162 § 2): the hold that falls due
+ * first, by its own notice (`decideBy` of each hold side, the same day for
+ * both, so the longer notice wins). Without a notice on either, `a`.
+ */
+export function dueOption(d: Pick<Decision, 'a' | 'b' | 'day'>, noticeOf: (id: string) => number | null | undefined): DecisionSide {
+  const by = (s: DecisionSide) => (isHoldStatus(s.status) ? decideBy(d.day, noticeOf(s.id)) : null);
+  const [ba, bb] = [by(d.a), by(d.b)];
+  if (bb !== null && (ba === null || bb < ba)) return d.b;
+  return d.a;
+}
+
 /** One derived "fora" day-range (ADR-078 §6). Both ends inclusive. */
 interface AwayBand {
   from: string;

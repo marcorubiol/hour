@@ -5352,6 +5352,9 @@ seguir el ámbito.
 > **Amended by ADR-150 (2026-10-31), solo en § 1.** La tarjeta ya no es el día: el día es una agenda en orden y la
 > tarjeta es lo de ahora (o lo siguiente) dentro de ella. «Después» sigue.
 
+> **Amended by ADR-162 (2026-11-01), solo en § 3.** «liberar» se confirma o se libera en la misma fila, con
+> «Deshacer»; «decidir» abre el vistazo de la opción que vence primero.
+
 ## [2026-10-31] ADR-150 · Hoy: el día como agenda, lo de ahora abierto como tarjeta (enmienda ADR-149 § 1 y ADR-148 § 4)
 
 **Contexto.** Marco, 31-10, eligió la opción D de `build/coordination/hoy-review/antes-opciones.html` (fuera de git):
@@ -5841,3 +5844,43 @@ y con pocos usuarios no tiene muestra. Solo el spec: no ve el teléfono de Marco
 **Cómo se revierte.** Borrar los dos tests y el paso de `LOAD_BUDGET_REQUIRED` del script `deploy`; en
 `hooks.client.ts`, `tracesSampleRate: 0.1` y `beforeSendTransaction: scrubSentryEvent`; quitar `markHoyContent` de
 `routes/h/desk/+page.svelte` y `$lib/vitals.ts`.
+
+## [2026-11-01] ADR-162 · Hoy: liberar en la fila y decidir en el vistazo; fuera Master View y las redirecciones viejas (enmienda ADR-149 § 3)
+
+**Contexto.** Encargo de HOUR COOR con OK de Marco (01-11), tareas 54, 57 y 77 de `_tasks.md`. Una decisión de «Te
+espera» solo abría el Planificador en su día: para soltar una opción había que ir allí, abrir la función y elegir el
+estado. Master View («recuerda la última página», Ajustes › Perfil) hacía que el arranque no fuera siempre Hoy,
+contra ADR-137, y su clave quedaba en el navegador. Las redirecciones de ADR-067, ADR-119 y ADR-138 § 2 llevaban
+semanas sin enlaces internos que las usaran, y nadie usa la app (ADR-139 en adelante, memoria «no users»). Carril
+`claude/batch-54`. Sin migración.
+
+**Decisión.**
+1. **«liberar · Apolo» se contesta en la fila** (enmienda ADR-149 § 3). La fila lleva «Confirmar» y «Liberar», los
+   dos verbos de la ficha de la función (`changeStatus` de `PerformanceRecord`: `confirmed` y `cancelled`), con el
+   mismo PATCH de estado. No se pregunta antes: el aviso trae «Deshacer», como las acciones en bloque, y deshacer
+   vuelve al estado que tenía (una opción, nunca una función firme: lo que se libera es siempre el lado abierto).
+   La ficha sigue preguntando antes de cancelar; esa pregunta es para una función confirmada.
+2. **«decidir · Kursaal o Apolo» abre el vistazo** de la opción que vence primero (`dueOption` en `$lib/planner`:
+   el lado en opción con el `decideBy` más temprano, que el mismo día es el de más aviso; sin aviso en ninguno, el
+   primero). Para saberlo el pulso pide `notice=1` (`hold_notice_days`), y con eso la fecha en que espera la decisión
+   en Hoy deja de suponer el aviso estándar. Sin página de la función a mano, el Planificador en su día, como antes.
+3. **Fuera Master View.** Se entra siempre en Hoy (ADR-137); `?next=` del login sigue mandando. El arranque de `/h`
+   borra `hour_master_view_path` y `hour_master_view_enabled` del `localStorage`. El ámbito no se toca:
+   `membership.view_scope` («Lo mío / Todo» por espacio) y la pastilla siguen persistiendo como hoy.
+4. **Fuera las redirecciones viejas**: los stubs `/h/money`, `/h/[ws]/money`, `/h/[ws]/desk` y `/h/[ws]/planner`;
+   en `hooks.server.ts`, `/calendar` → `/h/planner`, `/money` → `/h/books` y `?view=team|threads` →
+   `?etiqueta=team` (también la de cliente, `routes/h/conversations/+page.ts`, y `legacyViewRedirect`). Su spec
+   (`money.spec.ts`) se va con ellas. `/h/[ws]/agenda` sigue, ahora directo a `/h/desk` (antes iba a un stub). La
+   lente del vistazo (`isLensPath`) ya no reconoce `/h/<espacio>/<lente>`. Fuera también `?season=` de
+   `/api/conversations`: ninguna pantalla lo pasaba.
+5. `CACHE_SCHEMA` sube a 2: el pulso trae un campo más y `/api/conversations` uno menos.
+
+**Qué no cambia.** El resto de ADR-149 § 3 (la decisión espera el día de `decideBy`, pesa como una llamada, el margen
+del Planificador no la recibe). Las redirecciones de vocabulario de ADR-008 (`room`, `gig`, `/api/houses`).
+
+**Cómo se revierte.** Volver `DeskWaiting.svelte`, `desk-feed.ts`, `routes/h/desk/+page.svelte` y `pulse-feeds` al
+commit anterior; `dueOption` puede quedarse. Master View, los stubs, las redirecciones y el spec están en el
+historial (`git show <commit>^`).
+
+**Re-evaluar cuando** Marco libere una opción de verdad desde Hoy: si «Liberar» sin pregunta se siente seguro con el
+«Deshacer» de 8 s, y si «Confirmar» en la fila debería avisar del otro lado ya confirmado.

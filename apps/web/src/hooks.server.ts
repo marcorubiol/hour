@@ -8,7 +8,6 @@ import type { Handle, HandleServerError } from '@sveltejs/kit';
 import { dev } from '$app/environment';
 import { PUBLIC_SENTRY_DSN, PUBLIC_SENTRY_ENV } from '$env/static/public';
 import { scrubSentryEvent } from '$lib/sentry-scrub';
-import { legacyViewRedirect } from '$lib/conversation-tags';
 
 /**
  * `initCloudflareSentryHandle` is the Workers-runtime-correct equivalent of
@@ -135,10 +134,9 @@ const legacyVocabRedirects: Handle = async ({ event, resolve }) => {
     return Response.redirect(dest.toString(), 301);
   }
 
-  // Lens rename (ADR-065): /h/[ws]/agenda → /desk.
-  const agendaMatch = path.match(/^(\/h\/[^/]+)\/agenda\/?$/);
-  if (agendaMatch) {
-    const dest = new URL(agendaMatch[1] + '/desk', event.url);
+  // Lens rename (ADR-065): /h/[ws]/agenda → the Desk, space-less since ADR-067.
+  if (/^\/h\/[^/]+\/agenda\/?$/.test(path)) {
+    const dest = new URL('/h/desk', event.url);
     dest.search = event.url.search;
     return Response.redirect(dest.toString(), 301);
   }
@@ -151,32 +149,6 @@ const legacyVocabRedirects: Handle = async ({ event, resolve }) => {
     const dest = new URL('/h/desk', event.url);
     dest.search = event.url.search;
     return Response.redirect(dest.toString(), 302);
-  }
-
-  // Lens rename (Calendar → Planner): /h/calendar and /h/[ws]/calendar → /h/planner
-  // (lenses are space-less since ADR-067; scope rides in ?scope=, preserved).
-  if (/^\/h(\/[^/]+)?\/calendar\/?$/.test(path)) {
-    const dest = new URL('/h/planner', event.url);
-    dest.search = event.url.search;
-    return Response.redirect(dest.toString(), 301);
-  }
-
-  // Cuentas route (ADR-119): /h/money and /h/[ws]/money → /h/books, query kept.
-  // The #bolo-<id> anchor never reaches the server; the browser carries it
-  // across the 301. Client-side navigations land on routes/h/money/+page.ts.
-  if (/^\/h(\/[^/]+)?\/money\/?$/.test(path)) {
-    const dest = new URL('/h/books', event.url);
-    dest.search = event.url.search;
-    return Response.redirect(dest.toString(), 301);
-  }
-
-  // The views of ADR-134 are chips now (ADR-138 § 2): ?view=team, and the
-  // older «de qué se habla» ?view=threads, go to ?etiqueta=team.
-  const chipped = /^\/h\/conversations\/?$/.test(path) ? legacyViewRedirect(event.url.searchParams) : null;
-  if (chipped) {
-    const dest = new URL('/h/conversations', event.url);
-    dest.search = chipped.toString();
-    return Response.redirect(dest.toString(), 301);
   }
 
   return resolve(event);

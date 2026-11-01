@@ -13,9 +13,11 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { t } from '$lib/i18n';
-  import { resolveLoginTarget } from '$lib/master-view';
   import { ensureSession, setSessionUser, type SessionUser } from '$lib/session.svelte';
   import BrandMark from '$lib/components/BrandMark.svelte';
+
+  /** After signing in: Hoy (ADR-137), unless `?next=` says where. */
+  const HOME = '/h/desk';
 
   let email = $state('');
   let password = $state('');
@@ -30,12 +32,12 @@
     // backslash-folded ('/\host', which URL parsers normalise to '//host')
     // so this stays safe even if the redirect ever moves off goto()'s
     // internal-navigation guard.
-    return candidate && /^\/(?![/\\])/.test(candidate) ? candidate : resolveLoginTarget();
+    return candidate && /^\/(?![/\\])/.test(candidate) ? candidate : HOME;
   });
   let alternateHref = $derived(
     `/login?${new URLSearchParams({
       ...(isSignup ? {} : { mode: 'signup' }),
-      ...(nextPath !== resolveLoginTarget() ? { next: nextPath } : {}),
+      ...(nextPath !== HOME ? { next: nextPath } : {}),
     }).toString()}`,
   );
 

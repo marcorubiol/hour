@@ -112,8 +112,8 @@ export function fullHref(t: PeekTarget, here?: BooksHere): string | null {
 
 /** A record's page: `/h/<space>/<kind>/<slug>`, with nothing after it. */
 const RECORD_PATH = /^\/h\/([^/]+)\/(performance|conversation|person|organization)\/([^/]+)\/?$/;
-/** The lens portadas: the four lenses, also inside one space. */
-const LENS_PATH = /^\/h\/(?:[^/]+\/)?(?:desk|planner|conversations|books|money)\/?$/;
+/** The lens portadas: the four lenses, space-less (ADR-067; the old paths left with ADR-162). */
+const LENS_PATH = /^\/h\/(?:desk|planner|conversations|books)\/?$/;
 
 export function isLensPath(pathname: string): boolean {
   return LENS_PATH.test(pathname);

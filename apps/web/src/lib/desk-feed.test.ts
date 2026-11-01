@@ -429,6 +429,25 @@ describe('buildDeskFeed — the Planner’s decisions wait too (ADR-149)', () =>
     expect(row.overdue).toBe(false);
   });
 
+  it('a release carries the option it answers in place; a choice carries none (ADR-162)', () => {
+    const option = { id: 'p-apolo', status: 'hold_1' };
+    const feed = buildDeskFeed(
+      {
+        conversations: [],
+        tasks: [],
+        decisions: [
+          { ...decision('d4'), kind: 'release', option },
+          { ...decision('d5'), option },
+        ],
+      },
+      NOW,
+      'es',
+    );
+    const rows = feed.flatMap((b) => b.runs.flatMap((r) => r.items));
+    expect(rows.find((r) => r.id === 'decision-d4')?.option).toEqual(option);
+    expect(rows.find((r) => r.id === 'decision-d5')?.option).toBeNull();
+  });
+
   it('the Planner’s margin, which asks only for tasks and calls, does not get them', () => {
     const feed = buildDeskFeed({ conversations: [], tasks: [], decisions: [decision('d3')] }, NOW, 'es');
     expect(rankWaiting(feed, NOW, { concerns: ['task', 'conversation'] }).rows).toHaveLength(0);
