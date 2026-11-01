@@ -49,19 +49,20 @@
 <ConversationPrivacyDefault {workspaceId} />
 
 {#if workspaceId}
-  <section class="set-group" id="fiscal">
-    <FiscalIdentity
-      endpoint={fiscalEndpoint}
-      queryKey={fiscalKey}
-      fields={ISSUER_FISCAL_FIELDS}
-      title={t('fiscal.issuer_title', locale)}
-      hint={t('fiscal.issuer_hint', locale)}
-      note={fromAccount ? t('fiscal.issuer_from_account', locale) : undefined}
-      idPrefix="issuer-fiscal"
-      level={2}
-      startEditing={page.url.hash === '#fiscal'}
-    />
-  </section>
+  <FiscalIdentity
+    endpoint={fiscalEndpoint}
+    queryKey={fiscalKey}
+    fields={ISSUER_FISCAL_FIELDS}
+    title={t('fiscal.issuer_title', locale)}
+    hint={t('fiscal.issuer_hint', locale)}
+    note={fromAccount ? t('fiscal.issuer_from_account', locale) : undefined}
+    idPrefix="issuer-fiscal"
+    level={2}
+    headed
+    id="fiscal"
+    class="set-group"
+    startEditing={page.url.hash === '#fiscal'}
+  />
 {/if}
 
 {#if workspaceId}
