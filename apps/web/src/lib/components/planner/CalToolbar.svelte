@@ -25,7 +25,7 @@
     onCreate?: () => void;
     /** Absent: no space on screen publishes a calendar feed for them. */
     onFeed?: () => void;
-    /** «reading the marks» — the grammar key, one door for all four views. */
+    /** «reading the marks» — the grammar key, one door for every view. */
     onReadMarks: () => void;
     onBlackout: () => void;
     /** Leave the Day for the drawing it was opened from (ADR-155). */
