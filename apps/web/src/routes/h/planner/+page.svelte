@@ -105,7 +105,7 @@
   import { useCreation } from '$lib/stores/creation.svelte';
   import { useCalm } from '$lib/stores/calm.svelte';
   import { plannerCalmFacts, shows } from '$lib/calm';
-  import { LOCALE_TAG, detectLocale, t } from '$lib/i18n';
+  import { LOCALE_TAG, appLocale, t } from '$lib/i18n';
   import {
     buildLineIndex,
     buildProjectIndex,
@@ -193,7 +193,7 @@
       return raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : null;
     })(),
   );
-  const locale = detectLocale(navigator.language);
+  const locale = appLocale();
   const localeTag = LOCALE_TAG[locale];
   /** The ghost row's word: «nobody is on this» is an answer, not a hole. */
   const noCastWord = t('planner.no_cast', locale);

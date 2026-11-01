@@ -14,7 +14,7 @@
   import Button from './Button.svelte';
   import Dialog from './Dialog.svelte';
   import PerformanceForm, { type CreatedPerformance } from './PerformanceForm.svelte';
-  import { detectLocale, t } from '$lib/i18n';
+  import { appLocale, t } from '$lib/i18n';
 
   interface Props {
     open?: boolean;
@@ -41,7 +41,7 @@
     onCreated,
   }: Props = $props();
 
-  const locale = detectLocale(navigator.language);
+  const locale = appLocale();
   let form: { submit: () => void } | undefined = $state();
   let pending = $state(false);
 

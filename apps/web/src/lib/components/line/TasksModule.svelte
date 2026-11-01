@@ -12,7 +12,7 @@
   import TaskBoard from '$lib/components/TaskBoard.svelte';
   import TaskComposer from '$lib/components/TaskComposer.svelte';
   import { fetchJSON } from '$lib/api';
-  import { detectLocale, t } from '$lib/i18n';
+  import { appLocale, t } from '$lib/i18n';
   import type { TaskItem, TaskTarget } from '$lib/task';
 
   interface Props {
@@ -29,7 +29,7 @@
 
   let { line }: Props = $props();
 
-  const locale = detectLocale(typeof navigator !== 'undefined' ? navigator.language : 'en');
+  const locale = appLocale();
 
   const tasksOptions = toStore(() => ({
     queryKey: ['line-tasks', line.id] as const,

@@ -41,6 +41,7 @@ export const RestoreItemSchema = v.object({
       next_action_at: v.optional(Instant),
       next_action_note: v.optional(v.nullable(v.pipe(v.string(), v.maxLength(500)))),
       reply_settled_at: v.optional(Instant),
+      line_id: v.optional(v.nullable(Id)),
     }),
   ),
   // Vacío vale aquí: deshacer deja sin etiqueta a la que no tenía ninguna.
@@ -67,6 +68,8 @@ export const BulkSchema = v.variant('action', [
     key: v.pipe(v.string(), v.regex(TAG_KEY_RE)),
     op: v.picklist(['add', 'remove']),
   }),
+  // «Mover a la línea…» (ADR-169, punto 93): una línea de su proyecto, o null para sacarlas de la suya.
+  v.object({ action: v.literal('line'), ids: Ids, line_id: v.nullable(Id) }),
   // Deshacer: lo de antes, tal como lo devolvió la acción.
   v.object({ action: v.literal('restore'), items: v.pipe(v.array(RestoreItemSchema), v.minLength(1), v.maxLength(BULK_MAX)) }),
 ]);
@@ -80,10 +83,19 @@ export type BulkAction = BulkRequest['action'];
  * - `not_due`: «no pide respuesta» sin una respuesta suya esperando;
  * - `last_tag`: quitarle la única etiqueta;
  * - `tag_unavailable`: la etiqueta no está activa en su espacio;
+ * - `other_project`: la línea es de otro proyecto que la conversación;
  * - `error`: otra cosa (la red, la base).
  */
-export type BulkReason = 'not_found' | 'forbidden' | 'not_due' | 'last_tag' | 'tag_unavailable' | 'error';
-export const BULK_REASONS: readonly BulkReason[] = ['not_found', 'forbidden', 'not_due', 'last_tag', 'tag_unavailable', 'error'];
+export type BulkReason = 'not_found' | 'forbidden' | 'not_due' | 'last_tag' | 'tag_unavailable' | 'other_project' | 'error';
+export const BULK_REASONS: readonly BulkReason[] = [
+  'not_found',
+  'forbidden',
+  'not_due',
+  'last_tag',
+  'tag_unavailable',
+  'other_project',
+  'error',
+];
 
 export interface BulkResult {
   done: string[];
@@ -97,7 +109,8 @@ export type BulkArgs =
   | { action: 'not_now'; until?: string | null }
   | { action: 'next_step'; next_action_at: string | null; next_action_note: string | null }
   | { action: 'settle' }
-  | { action: 'tag'; key: string; op: 'add' | 'remove' };
+  | { action: 'tag'; key: string; op: 'add' | 'remove' }
+  | { action: 'line'; line_id: string | null };
 
 /** Trozos de `size`, en orden. */
 export function chunk<T>(list: readonly T[], size = BULK_MAX): T[][] {
@@ -157,6 +170,7 @@ const DONE_WORD: Record<Exclude<BulkAction, 'restore'>, string> = {
   next_step: 'bulk.done_next_step',
   settle: 'bulk.done_settle',
   tag: 'bulk.done_tag',
+  line: 'bulk.done_line',
 };
 
 /** El título del aviso: «23 en no esta vez», «23 etiquetadas»… */

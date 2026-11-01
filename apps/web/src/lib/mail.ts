@@ -84,6 +84,27 @@ export function firstLine(body: string | null | undefined): string {
   return (body ?? '').split('\n').map((l) => l.trim()).find(Boolean) ?? '';
 }
 
+/** Un material en el cuerpo de un correo, en una línea: «Rider: https://…» (ADR-169, punto 89). */
+export function materialLine(label: string, url: string): string {
+  return `${label}: ${url}`;
+}
+
+/**
+ * `insert` en el cursor de `text` (o sustituyendo lo seleccionado), en su
+ * propia línea; devuelve el texto y dónde queda el cursor, tras lo insertado.
+ */
+export function insertBlock(
+  text: string,
+  insert: string,
+  start: number = text.length,
+  end: number = start,
+): { text: string; caret: number } {
+  const before = text.slice(0, start);
+  const after = text.slice(end);
+  const head = `${before}${before && !before.endsWith('\n') ? '\n' : ''}${insert}`;
+  return { text: `${head}${after && !after.startsWith('\n') ? '\n' : ''}${after}`, caret: head.length };
+}
+
 /** El cuerpo con la firma de Hour al pie, tras el separador estándar «-- ». */
 export function withSignature(body: string, signature: string | null | undefined): string {
   const sig = (signature ?? '').trim();

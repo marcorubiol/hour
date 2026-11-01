@@ -12,9 +12,28 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
-  import { t } from '$lib/i18n';
+  import { chooseLocale, LOCALE_NAME, LOCALE_TAG, LOCALES, loadLocale, t, type Locale } from '$lib/i18n';
+  import Segmented from '$lib/components/Segmented.svelte';
   import { ensureSession, setSessionUser, type SessionUser } from '$lib/session.svelte';
   import BrandMark from '$lib/components/BrandMark.svelte';
+
+  let { data }: { data: { locale: Locale } } = $props();
+
+  /** The door's language (ADR-169): chosen here, it stays after entering. */
+  let locale = $derived<Locale>(data.locale);
+  const localeOptions = LOCALES.map((value) => ({ value, label: LOCALE_NAME[value] }));
+
+  async function pickLocale(next: Locale) {
+    await loadLocale(next);
+    chooseLocale(next);
+    locale = next;
+  }
+
+  /** The preview card's illustrative day, in the door's language. */
+  const PREVIEW_DAY = new Date(2026, 4, 18);
+  let previewDay = $derived(
+    `${new Intl.DateTimeFormat(LOCALE_TAG[locale], { weekday: 'short' }).format(PREVIEW_DAY)} · ${new Intl.DateTimeFormat(LOCALE_TAG[locale], { day: 'numeric', month: 'short' }).format(PREVIEW_DAY)}`,
+  );
 
   /** After signing in: Hoy (ADR-137), unless `?next=` says where. */
   const HOME = '/h/desk';
@@ -82,8 +101,8 @@
             ? // Deliberately generic — do not confirm whether the address is
               // already registered (email-enumeration oracle). Point existing
               // users at sign-in without asserting the account exists.
-              "We couldn't create an account with those details. If you already have one, sign in instead."
-            : t(key),
+              t('login.signup_rejected', locale)
+            : t(key, locale),
         );
       }
 
@@ -101,31 +120,30 @@
 
       goto(nextPath, { replaceState: true });
     } catch (err) {
-      errorMsg = err instanceof Error ? err.message : t('login.invalid_credentials');
+      errorMsg = err instanceof Error ? err.message : t('login.invalid_credentials', locale);
       submitting = false;
     }
   }
 </script>
 
 <svelte:head>
-  <title>{docTitle(t('login.submit'))}</title>
+  <title>{docTitle(t(isSignup ? 'login.signup_kicker' : 'login.submit', locale))}</title>
 </svelte:head>
 
-<main class="login">
+<main class="login" lang={locale}>
   <section class="login__left">
     <header class="login__brand">
       <BrandMark size="m" />
     </header>
 
     <div class="login__center">
-      <span class="eyebrow login__kicker">{isSignup ? 'Create account' : t('login.submit')}</span>
+      <span class="eyebrow login__kicker">{t(isSignup ? 'login.signup_kicker' : 'login.submit', locale)}</span>
       <h1 class="login__title">
-        {isSignup ? 'Join the' : 'Hello'} <em>{isSignup ? 'company.' : 'again.'}</em>
+        {t(isSignup ? 'login.title_signup_a' : 'login.title_signin_a', locale)}
+        <em>{t(isSignup ? 'login.title_signup_b' : 'login.title_signin_b', locale)}</em>
       </h1>
       <p class="login__sub">
-        {isSignup
-          ? 'Create your private Hour identity, then review and accept the invitation.'
-          : 'Your projects, contacts, shows and money — held together, one hour at a time.'}
+        {t(isSignup ? 'login.sub_signup' : 'login.sub_signin', locale)}
       </p>
 
       <!-- method="post" is the safety net, not the path: handleSubmit
@@ -142,12 +160,12 @@
       <form class="login__form" method="post" onsubmit={handleSubmit}>
         {#if isSignup}
           <label class="login__field">
-            <span class="eyebrow login__label">Full name</span>
+            <span class="eyebrow login__label">{t('login.full_name', locale)}</span>
             <input
               type="text"
               name="full_name"
               autocomplete="name"
-              placeholder="Your name"
+              placeholder={t('login.full_name_placeholder', locale)}
               required
               minlength="2"
               bind:value={fullName}
@@ -155,14 +173,14 @@
           </label>
         {/if}
         <label class="login__field">
-          <span class="eyebrow login__label">{t('login.email')}</span>
+          <span class="eyebrow login__label">{t('login.email', locale)}</span>
           <!-- svelte-ignore a11y_autofocus -->
           <input
             
             type="email"
             name="email"
             autocomplete="email"
-            placeholder="you@somewhere.com"
+            placeholder={t('login.email_placeholder', locale)}
             required
             autofocus={!isSignup}
             bind:value={email}
@@ -170,7 +188,7 @@
         </label>
 
         <label class="login__field">
-          <span class="eyebrow login__label">{t('login.password')}</span>
+          <span class="eyebrow login__label">{t('login.password', locale)}</span>
           <input
             
             type="password"
@@ -185,7 +203,7 @@
 
         {#if confirmationRequired}
           <p class="login__notice" role="status">
-            Check {email} to confirm the account. Then reopen this invitation and sign in.
+            {t('login.confirm_notice', locale, { email })}
           </p>
         {/if}
 
@@ -196,67 +214,67 @@
         <button class="btn--primary login__submit" type="submit" disabled={!hydrated || submitting}>
           <span>
             {submitting
-              ? isSignup
-                ? 'Creating account…'
-                : t('login.signing_in')
-              : isSignup
-                ? 'Create account'
-                : t('login.submit')}
+              ? t(isSignup ? 'login.creating' : 'login.signing_in', locale)
+              : t(isSignup ? 'login.create' : 'login.submit', locale)}
           </span>
           <span class="login__submit-arrow" aria-hidden="true">→</span>
         </button>
       </form>
       <p class="login__alternate">
-        {isSignup ? 'Already have an account?' : 'Joining through an invitation?'}
-        <a href={alternateHref}>{isSignup ? 'Sign in' : 'Create one'}</a>
+        {t(isSignup ? 'login.have_account' : 'login.via_invite', locale)}
+        <a href={alternateHref}>{t(isSignup ? 'login.submit' : 'login.create_one', locale)}</a>
       </p>
     </div>
 
     <footer class="login__foot">
-      <span>{t('login.phase')}</span>
+      <span>{t('login.phase', locale)}</span>
+      <Segmented
+        options={localeOptions}
+        value={locale}
+        ariaLabel={t('login.language', locale)}
+        name="locale"
+        onchange={pickLocale}
+      />
     </footer>
   </section>
 
   <aside class="login__right" aria-hidden="true">
     <div class="login__quote">
-      <div class="login__quote-kicker">
-        For freelance artists who wear too many hats
-      </div>
+      <div class="login__quote-kicker">{t('login.quote_kicker', locale)}</div>
       <p class="login__quote-text">
-        One inbox can't hold a tour, a band, a song, a residency, and a press kit
-        at the same time. <em>So we made one that can.</em>
+        {t('login.quote_a', locale)} <em>{t('login.quote_b', locale)}</em>
       </p>
-      <div class="login__quote-attr">— Hour, Phase 0 · internal</div>
+      <div class="login__quote-attr">{t('login.quote_attr', locale)}</div>
     </div>
 
     <div class="login__preview">
       <div class="login__preview-head">
         <span class="login__preview-dot" style="background: var(--accent-1)"></span>
-        <span class="login__preview-name">This week</span>
-        <span class="login__preview-day">Mon · 18 May</span>
+        <span class="login__preview-name">{t('login.preview_week', locale)}</span>
+        <span class="login__preview-day">{previewDay}</span>
       </div>
       <div class="login__preview-item">
-        <span class="login__preview-kind">task</span>
-        <span class="login__preview-verb">Confirm</span>
-        <span class="login__preview-subj">hotel block · Igualada</span>
+        <span class="login__preview-kind">{t('login.preview_kind_task', locale)}</span>
+        <span class="login__preview-verb">{t('login.preview_confirm', locale)}</span>
+        <span class="login__preview-subj">{t('login.preview_hotel', locale)}</span>
         <span class="login__preview-proj">mamemi</span>
       </div>
       <div class="login__preview-item">
-        <span class="login__preview-kind login__preview-kind--wait">waiting 4d</span>
+        <span class="login__preview-kind login__preview-kind--wait">{t('login.preview_kind_wait', locale)}</span>
         <span class="login__preview-verb">Ruth Schmidli</span>
-        <span class="login__preview-subj">Gessnerallee fee</span>
+        <span class="login__preview-subj">{t('login.preview_fee', locale)}</span>
         <span class="login__preview-proj">mamemi</span>
       </div>
       <div class="login__preview-item">
-        <span class="login__preview-kind login__preview-kind--event">event</span>
-        <span class="login__preview-verb">Mix</span>
-        <span class="login__preview-subj">Tamarit · session 3/5 · 10h</span>
+        <span class="login__preview-kind login__preview-kind--event">{t('login.preview_kind_event', locale)}</span>
+        <span class="login__preview-verb">{t('login.preview_mix', locale)}</span>
+        <span class="login__preview-subj">{t('login.preview_session', locale)}</span>
         <span class="login__preview-proj">marco rubiol</span>
       </div>
       <div class="login__preview-item">
-        <span class="login__preview-kind login__preview-kind--money">money</span>
-        <span class="login__preview-verb">Chase</span>
-        <span class="login__preview-subj">Aarhus residency · €1,800</span>
+        <span class="login__preview-kind login__preview-kind--money">{t('login.preview_kind_money', locale)}</span>
+        <span class="login__preview-verb">{t('login.preview_chase', locale)}</span>
+        <span class="login__preview-subj">{t('login.preview_residency', locale)}</span>
         <span class="login__preview-proj">marco rubiol</span>
       </div>
     </div>

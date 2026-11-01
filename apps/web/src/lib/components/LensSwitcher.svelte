@@ -17,12 +17,12 @@
   import { createQuery } from '@tanstack/svelte-query';
   import { page } from '$app/state';
   import { useLens, type Lens } from '$lib/stores/lens.svelte';
-  import { detectLocale, t } from '$lib/i18n';
+  import { appLocale, t } from '$lib/i18n';
   import { moneyAccessAnyQueryOptions } from '$lib/bolo-queries';
   import { lensOn, routedLensOf } from '$lib/lenses.svelte';
 
   const lens = useLens();
-  const locale = detectLocale(navigator.language);
+  const locale = appLocale();
 
   // Desk is the home/digest, not a peer lens (grill 2026-07-23): it gets its own
   // pill; the segmented "view as" holds only the three concern lenses.

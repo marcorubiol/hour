@@ -36,7 +36,7 @@
   import ScopeRail from '$lib/components/shell/ScopeRail.svelte';
   import PullRefresh from '$lib/components/shell/PullRefresh.svelte';
   import { isReservedWorkspaceSlug } from '$lib/reserved-slugs';
-  import { detectLocale, setTrade, t, tradeOf } from '$lib/i18n';
+  import { appLocale, setTrade, t, tradeOf } from '$lib/i18n';
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
   import { lensesOnFor, lensOn, routedLensOf, setLensesOn } from '$lib/lenses.svelte';
   import LensOff from '$lib/components/LensOff.svelte';
@@ -90,7 +90,7 @@
 
   let { children }: Props = $props();
 
-  const locale = detectLocale(navigator.language);
+  const locale = appLocale();
 
   let workspaceSlug = $derived(page.params.workspace ?? '');
   let hasWorkspace = $derived(workspaceSlug.length > 0);

@@ -6287,3 +6287,49 @@ borrar `routes/api/workspaces/[id]/fiscal`, `routes/api/money/quarter` y `$lib/q
 
 **Re-evaluar cuando** una gestoría pida su formato de importación concreto (A3, Sage, Holded): entonces es un exportador
 por programa, no columnas nuevas en este CSV.
+
+## [2026-11-01] ADR-169 · La puerta en cuatro idiomas, copiar de otra función, materiales en el correo, mover a la línea en bloque y el DNS del dominio de envío comprobado solo
+
+**Contexto.** Puntos 94, 83, 89, 93 y 45 de la tanda del 2026-11-01, con OK de Marco. Sin migraciones: lo que pide
+schema queda escrito aquí y en el informe del carril, no aplicado. Carril `claude/batch-flows`.
+
+**Decisión.**
+1. **La puerta habla el idioma de quien entra (94).** Login, alta e invitación salen en los cuatro idiomas de la app.
+   El idioma es, por orden: el elegido en la propia puerta (un selector con cada idioma en su lengua), si no el del
+   navegador, si no inglés. La elección es la cookie `hour_locale` (un año, no httpOnly: es una preferencia), no
+   localStorage, para que el servidor la lea y la puerta se pinte ya en ese idioma (`+page.server.ts` de `/login` e
+   `/invite`, `requestLocale`). `appLocale()` la lee primero, así que la elección se queda al entrar: todas las
+   pantallas que leían `navigator.language` a mano pasan por `appLocale()`. Las claves `login.*` dejan de ser solo
+   inglesas; la guarda de claves ya no las exime. `user_profile.locale` sigue sin cablear.
+2. **«Copiar de otra función» (83)**, en «Detalles» de la ficha, para quien edita la función. Elige otra función
+   del espacio, las del mismo proyecto primero y la de día más cercano antes; nunca ella misma ni una cancelada.
+   Copia técnica, logística y acogida (un PATCH) y el plan de trabajo (la escaleta), cada parte que la otra tenga.
+   La escaleta se escribe en el doc colaborativo de la función, como cualquier edición (ADR-090 P2), con las mismas
+   horas de reloj en el día de destino y en su zona; lo que pasa de medianoche sigue al día siguiente.
+   **Nada se pisa sin preguntar:** si esta función ya tiene alguna de las partes elegidas, el diálogo pregunta en la
+   pantalla: «mantener y añadir lo que falta» (por defecto: las claves que no tiene, los momentos que no tiene) o
+   «reemplazar». Puro en `$lib/performance-copy`.
+3. **Materiales de la línea en el correo (89).** Al redactar desde una conversación con línea, «Enlazar un material»
+   inserta en el cursor una línea `Tipo: url` con un material de la línea (la misma lectura y clave que el módulo
+   Materiales). **Los textos guardados del espacio no existen en la base** (solo hay firmas: `mail_account.signature`,
+   `membership.mail_signature`, `workspace.mail_signature`), así que esa mitad espera una migración: una tabla
+   `workspace_text` (espacio, título, cuerpo) con RLS de lectura para miembros y escritura para admins.
+4. **«Mover a la línea…» en bloque (93).** Nueva acción `line` de `POST /api/conversations/bulk`: una línea o `null`
+   (fuera de toda línea). La línea tiene que ser del proyecto de cada conversación, como pide el PATCH de la ficha
+   (ADR-056): la que es de otro proyecto falla con `other_project` y el resto sigue. Se deshace como las demás; y un
+   deshacer que pone una línea pasa la misma comprobación, para que no sea un camino alrededor de la guarda.
+5. **El cron de 10 minutos comprueba el DNS de los dominios de envío (45).** Los dominios sin verificar de un
+   servicio real (no el simulador, que comprobando se da por verificado), sin fallo, y dados de alta hace menos de
+   72 h se comprueban por el mismo camino que «Comprobar» (`checkDomain` + `recordDomainStatus`). Pasadas las 72 h
+   dejan de comprobarse y la pantalla sigue ofreciendo «Comprobar». Un dominio que falla no corta los demás, y la
+   pasada va aparte de la sincronización de buzones del mismo cron. La lista sale de una RPC de máquina
+   (`mail_domain_pending_checks`), la frontera de ADR-110; **esa RPC es una migración pendiente**: hasta aplicarla,
+   la pasada no hace nada y deja `mail_domain_recheck_unavailable` en el log.
+6. **Caché del dispositivo:** nada cambia de forma (el bloque responde lo mismo, los materiales usan su clave de
+   siempre, la puerta y el diálogo de copia no pasan por la caché). `CACHE_SCHEMA` no sube.
+
+**Cómo se revierte.** Cada punto es un commit de la rama. La cookie se ignora sola si se quita su lectura en
+`appLocale`; la acción `line` y la RPC de dominios no dejan datos que limpiar.
+
+**Re-evaluar cuando** `user_profile.locale` se cablee (manda sobre la cookie dentro de la app), o los textos
+guardados tengan su tabla.

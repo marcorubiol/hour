@@ -558,6 +558,21 @@
     })),
   ]);
 
+  /**
+   * «Mover a la línea…» (ADR-169, punto 93): the lines of the picked
+   * conversations' projects, and «out of any line». A line belongs to one
+   * project, so a conversation of another one stays where it was and says so.
+   */
+  let lineActions = $derived([
+    ...lineIndex
+      .filter((l) => pickedProjects.includes(l.projectId))
+      .map((l) => ({
+        label: pickedProjects.length > 1 ? `${l.name} · ${l.projectName}` : l.name,
+        onclick: () => void bulk({ action: 'line', line_id: l.id }),
+      })),
+    { label: t('bulk.line_none', locale), onclick: () => void bulk({ action: 'line', line_id: null }) },
+  ]);
+
   const writeMutation = createMutation({
     mutationFn: () =>
       mutateJSON<{ id: string; workspace_slug: string }>('POST', '/api/mailout', {
@@ -810,6 +825,13 @@
             </Menu>
           {:else if tagActions.length > 0}
             <Button size="s" variant="secondary" disabled>{t('bulk.tag', locale)}</Button>
+          {/if}
+          {#if picked.length > 0 && !bulkBusy}
+            <Menu items={lineActions} direction="up" align="end" label={t('bulk.line', locale)}>
+              {#snippet trigger()}{t('bulk.line', locale)}<span class="action-bar__caret" aria-hidden="true">▾</span>{/snippet}
+            </Menu>
+          {:else}
+            <Button size="s" variant="secondary" disabled>{t('bulk.line', locale)}</Button>
           {/if}
           <Button size="s" variant="secondary" disabled={picked.length === 0 || bulkBusy} onclick={() => (nextOpen = true)}
             >{t('conversations.col_next_action', locale)}</Button

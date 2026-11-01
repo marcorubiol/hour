@@ -41,7 +41,7 @@
   } from '$lib/plan-create';
   import { dayMonthYear } from '$lib/datetime';
   import { dayKeyInTz } from '$lib/planner';
-  import { detectLocale, t } from '$lib/i18n';
+  import { appLocale, t } from '$lib/i18n';
   import { allLinesQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
   import { usePins } from '$lib/stores/pins.svelte';
   import {
@@ -103,7 +103,7 @@
     onCreated,
   }: Props = $props();
 
-  const locale = detectLocale(navigator.language);
+  const locale = appLocale();
   const viewerTz = viewerTimeZone();
   const queryClient = useQueryClient();
 

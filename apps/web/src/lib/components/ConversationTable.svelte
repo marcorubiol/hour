@@ -52,7 +52,7 @@
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import { dayMonth, dayMonthYear } from '$lib/datetime';
-  import { detectLocale, t } from '$lib/i18n';
+  import { appLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
   import Checkbox from '$lib/components/Checkbox.svelte';
   import ConversationHistory from '$lib/components/ConversationHistory.svelte';
@@ -144,7 +144,7 @@
     items: ConversationItem[];
   };
 
-  const locale = detectLocale(navigator.language);
+  const locale = appLocale();
 
   const LIMIT = 50;
 

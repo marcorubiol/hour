@@ -1,6 +1,8 @@
 /**
  * El cron del Worker. Dos disparadores (wrangler.jsonc):
- *   · `*\/10 * * * *` (ADR-099): una pasada de sincronización de buzones;
+ *   · `*\/10 * * * *` (ADR-099): una pasada de sincronización de buzones y,
+ *     aparte, otra comprobación del DNS de los dominios de envío pendientes
+ *     (ADR-169); una no espera ni corta a la otra;
  *   · `* * * * *` (ADR-115): vaciar la cola del envío en bloque, nada más.
  * El adaptador de SvelteKit no exporta `scheduled`, así que el despliegue usa
  * `worker-entry.js` como entrada: reexporta el `fetch` de SvelteKit y añade
@@ -10,6 +12,7 @@
 
 import { runMailSync } from './lib/server/mail/sync';
 import { runMailoutQueue } from './lib/server/mailout/queue';
+import { runDomainRecheck } from './lib/server/mailout/recheck';
 import type { MailEnv } from './lib/server/mail/db';
 import type { MailoutEnv } from './lib/server/mailout';
 
@@ -35,4 +38,5 @@ export async function scheduled(
     return;
   }
   ctx.waitUntil(runMailSync(env).then(() => undefined, logFailure('mail_sync_failed')));
+  ctx.waitUntil(runDomainRecheck(env).then(() => undefined, logFailure('mail_domain_recheck_failed')));
 }

@@ -41,7 +41,7 @@
   import { AHORA_KEY, ahoraDay, ahoraItems } from '$lib/ahora';
   import { accentVarFor } from '$lib/utils/accent';
   import { spaceName } from '$lib/utils/identity';
-  import { detectLocale, LOCALE_TAG, t } from '$lib/i18n';
+  import { appLocale, LOCALE_TAG, t } from '$lib/i18n';
   import { localeDayMonth, localeWeekdayLong, localeWeekdayShort, viewerTimeZone } from '$lib/datetime';
   import { addDaysIso, dayKeyInTz, plannerDayHref } from '$lib/planner';
   import { page } from '$app/state';
@@ -123,7 +123,7 @@
   const queryClient = useQueryClient();
   // «Reintentar» on any band: read again exactly what failed, nothing else.
   const retryFailed = () => void queryClient.refetchQueries({ predicate: (q) => q.state.status === 'error' });
-  const locale = detectLocale(navigator.language);
+  const locale = appLocale();
   const viewerTz = viewerTimeZone();
 
   // Tick on the minute so buckets roll over at midnight (shell-clock idiom).

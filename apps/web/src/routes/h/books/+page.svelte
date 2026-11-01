@@ -91,7 +91,7 @@
     type MoneyPayer,
   } from '$lib/money';
   import { moneyAccessAnyQueryOptions } from '$lib/bolo-queries';
-  import { detectLocale, LOCALE_TAG, t } from '$lib/i18n';
+  import { appLocale, LOCALE_TAG, t } from '$lib/i18n';
   import { performanceStatusTone } from '$lib/performance';
   import { plannerDayHref } from '$lib/planner';
   import { lensOn } from '$lib/lenses.svelte';
@@ -124,7 +124,7 @@
   type WorkspaceLite = { id: string; slug: string; invoicing_mode: InvoicingMode | null };
 
   const pins = usePins();
-  const locale = detectLocale(navigator.language);
+  const locale = appLocale();
   const localeTag = LOCALE_TAG[locale];
 
   const accessQuery = createQuery(moneyAccessAnyQueryOptions());
