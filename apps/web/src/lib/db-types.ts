@@ -471,6 +471,7 @@ export type Database = {
           created_by: string | null
           id: string
           revoked_at: string | null
+          scope: string
           token: string
           workspace_id: string
         }
@@ -479,6 +480,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           revoked_at?: string | null
+          scope?: string
           token: string
           workspace_id: string
         }
@@ -487,6 +489,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           revoked_at?: string | null
+          scope?: string
           token?: string
           workspace_id?: string
         }
@@ -1337,9 +1340,11 @@ export type Database = {
           incurred_on: string
           line_id: string | null
           notes: string | null
+          paid_by_person_id: string | null
           paid_by_user_id: string | null
           receipt_url: string | null
           reimbursed: boolean
+          reimbursed_on: string | null
           updated_at: string
           workspace_id: string
         }
@@ -1358,9 +1363,11 @@ export type Database = {
           incurred_on?: string
           line_id?: string | null
           notes?: string | null
+          paid_by_person_id?: string | null
           paid_by_user_id?: string | null
           receipt_url?: string | null
           reimbursed?: boolean
+          reimbursed_on?: string | null
           updated_at?: string
           workspace_id: string
         }
@@ -1379,9 +1386,11 @@ export type Database = {
           incurred_on?: string
           line_id?: string | null
           notes?: string | null
+          paid_by_person_id?: string | null
           paid_by_user_id?: string | null
           receipt_url?: string | null
           reimbursed?: boolean
+          reimbursed_on?: string | null
           updated_at?: string
           workspace_id?: string
         }
@@ -1398,6 +1407,13 @@ export type Database = {
             columns: ["line_id"]
             isOneToOne: false
             referencedRelation: "line"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_paid_by_person_id_fkey"
+            columns: ["paid_by_person_id"]
+            isOneToOne: false
+            referencedRelation: "person"
             referencedColumns: ["id"]
           },
           {
@@ -2854,6 +2870,99 @@ export type Database = {
           },
         ]
       }
+      organization_merge: {
+        Row: {
+          drop_before: Json
+          drop_organization_id: string
+          id: string
+          keep_before: Json
+          keep_organization_id: string
+          merged_at: string
+          merged_by: string | null
+          undone_at: string | null
+          undone_by: string | null
+          workspace_id: string
+        }
+        Insert: {
+          drop_before: Json
+          drop_organization_id: string
+          id?: string
+          keep_before: Json
+          keep_organization_id: string
+          merged_at?: string
+          merged_by?: string | null
+          undone_at?: string | null
+          undone_by?: string | null
+          workspace_id: string
+        }
+        Update: {
+          drop_before?: Json
+          drop_organization_id?: string
+          id?: string
+          keep_before?: Json
+          keep_organization_id?: string
+          merged_at?: string
+          merged_by?: string | null
+          undone_at?: string | null
+          undone_by?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_merge_drop_organization_id_fkey"
+            columns: ["drop_organization_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_organization"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_merge_keep_organization_id_fkey"
+            columns: ["keep_organization_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_organization"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_merge_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_merge_row: {
+        Row: {
+          action: string
+          id: number
+          merge_id: string
+          row_id: string
+          table_name: string
+        }
+        Insert: {
+          action?: string
+          id?: never
+          merge_id: string
+          row_id: string
+          table_name: string
+        }
+        Update: {
+          action?: string
+          id?: never
+          merge_id?: string
+          row_id?: string
+          table_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_merge_row_merge_id_fkey"
+            columns: ["merge_id"]
+            isOneToOne: false
+            referencedRelation: "organization_merge"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment: {
         Row: {
           amount: number
@@ -3911,6 +4020,7 @@ export type Database = {
           id: string
           name: string
           notes: string | null
+          organization_id: string | null
           previous_slugs: string[]
           slug: string | null
           timezone: string | null
@@ -3931,6 +4041,7 @@ export type Database = {
           id?: string
           name: string
           notes?: string | null
+          organization_id?: string | null
           previous_slugs?: string[]
           slug?: string | null
           timezone?: string | null
@@ -3951,6 +4062,7 @@ export type Database = {
           id?: string
           name?: string
           notes?: string | null
+          organization_id?: string | null
           previous_slugs?: string[]
           slug?: string | null
           timezone?: string | null
@@ -3971,6 +4083,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "workspace"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venue_workspace_organization_fkey"
+            columns: ["workspace_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_organization"
+            referencedColumns: ["workspace_id", "id"]
           },
         ]
       }
@@ -4478,6 +4597,7 @@ export type Database = {
           name: string
           notes: string | null
           phone: string | null
+          previous_slugs: string[]
           slug: string
           updated_at: string
           website: string | null
@@ -4498,6 +4618,7 @@ export type Database = {
           name: string
           notes?: string | null
           phone?: string | null
+          previous_slugs?: string[]
           slug: string
           updated_at?: string
           website?: string | null
@@ -4518,6 +4639,7 @@ export type Database = {
           name?: string
           notes?: string | null
           phone?: string | null
+          previous_slugs?: string[]
           slug?: string
           updated_at?: string
           website?: string | null
@@ -4684,6 +4806,47 @@ export type Database = {
           },
         ]
       }
+      workspace_text: {
+        Row: {
+          body: string
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          id: string
+          title: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          id?: string
+          title: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          id?: string
+          title?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_text_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -4802,6 +4965,7 @@ export type Database = {
           id: string
           name: string
           notes: string | null
+          organization_id: string | null
           previous_slugs: string[]
           slug: string | null
           timezone: string | null
@@ -5121,12 +5285,13 @@ export type Database = {
         }
       }
       create_calendar_share: {
-        Args: { p_workspace_id: string }
+        Args: { p_scope?: string; p_workspace_id: string }
         Returns: {
           created_at: string
           created_by: string | null
           id: string
           revoked_at: string | null
+          scope: string
           token: string
           workspace_id: string
         }
@@ -5300,6 +5465,7 @@ export type Database = {
           p_incurred_on?: string
           p_line_id?: string
           p_notes?: string
+          p_paid_by_person_id?: string
         }
         Returns: {
           amount: number
@@ -5316,9 +5482,11 @@ export type Database = {
           incurred_on: string
           line_id: string | null
           notes: string | null
+          paid_by_person_id: string | null
           paid_by_user_id: string | null
           receipt_url: string | null
           reimbursed: boolean
+          reimbursed_on: string | null
           updated_at: string
           workspace_id: string
         }
@@ -5829,6 +5997,7 @@ export type Database = {
           id: string
           name: string
           notes: string | null
+          organization_id: string | null
           previous_slugs: string[]
           slug: string | null
           timezone: string | null
@@ -6003,6 +6172,7 @@ export type Database = {
         Args: { p_person_id: string; p_workspace_id: string }
         Returns: undefined
       }
+      delete_workspace_text: { Args: { p_text_id: string }; Returns: undefined }
       disconnect_mail_account: {
         Args: { p_account_id: string }
         Returns: undefined
@@ -6145,6 +6315,7 @@ export type Database = {
           created_by: string | null
           id: string
           revoked_at: string | null
+          scope: string
           token: string
           workspace_id: string
         }[]
@@ -6179,9 +6350,11 @@ export type Database = {
           incurred_on: string
           line_id: string | null
           notes: string | null
+          paid_by_person_id: string | null
           paid_by_user_id: string | null
           receipt_url: string | null
           reimbursed: boolean
+          reimbursed_on: string | null
           updated_at: string
           workspace_id: string
         }[]
@@ -6341,6 +6514,21 @@ export type Database = {
       mail_deferred_ready: {
         Args: { p_account_id: string; p_limit?: number }
         Returns: string[]
+      }
+      mail_domain_pending_checks: {
+        Args: never
+        Returns: {
+          configuration_set: string
+          created_at: string
+          dkim_status: string
+          domain: string
+          id: string
+          mail_from_status: string
+          mail_from_subdomain: string
+          provider: Database["public"]["Enums"]["mail_sending_provider"]
+          tenant_name: string
+          verified_at: string
+        }[]
       }
       mail_domain_record_status: {
         Args: {
@@ -6651,6 +6839,14 @@ export type Database = {
       }
       mark_help_seen: { Args: { p_key: string }; Returns: Json }
       mark_thread_read: { Args: { p_thread_id: string }; Returns: string }
+      merge_workspace_organization: {
+        Args: {
+          p_drop_organization_id: string
+          p_keep_organization_id: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
       merge_workspace_person: {
         Args: {
           p_drop_person_id: string
@@ -6708,6 +6904,14 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      preview_organization_merge: {
+        Args: {
+          p_drop_organization_id: string
+          p_keep_organization_id: string
+          p_workspace_id: string
+        }
+        Returns: Json
       }
       preview_person_merge: {
         Args: {
@@ -7105,6 +7309,38 @@ export type Database = {
         Args: { p_conversation_id: string; p_tag_ids: string[] }
         Returns: string[]
       }
+      set_expense_reimbursed: {
+        Args: { p_expense_id: string; p_on?: string; p_reimbursed: boolean }
+        Returns: {
+          amount: number
+          bolo_id: string | null
+          category: Database["public"]["Enums"]["expense_category"]
+          counterparty: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          custom_fields: Json
+          deleted_at: string | null
+          description: string
+          id: string
+          incurred_on: string
+          line_id: string | null
+          notes: string | null
+          paid_by_person_id: string | null
+          paid_by_user_id: string | null
+          receipt_url: string | null
+          reimbursed: boolean
+          reimbursed_on: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "expense"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       set_mail_basis: {
         Args: {
           p_address: string
@@ -7339,6 +7575,7 @@ export type Database = {
         Returns: string
       }
       travel_stage_zone: { Args: { p_tz: string }; Returns: string }
+      undo_organization_merge: { Args: { p_merge_id: string }; Returns: Json }
       undo_person_merge: { Args: { p_merge_id: string }; Returns: Json }
       update_bolo_contract: {
         Args: {
@@ -7638,6 +7875,7 @@ export type Database = {
           name: string
           notes: string | null
           phone: string | null
+          previous_slugs: string[]
           slug: string
           updated_at: string
           website: string | null

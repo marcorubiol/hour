@@ -16,7 +16,7 @@
  */
 
 import { clockText, dayOf, KIND_WORD_KEYS } from './running-order';
-import { t, type Locale, type Trade } from './i18n';
+import { t, TRADES, type Locale, type Trade } from './i18n';
 
 type FeedPerformance = {
   id: string;
@@ -65,7 +65,8 @@ type FeedDate = {
 };
 
 export type CalendarFeed = {
-  workspace: { name: string; slug: string; timezone: string | null } | null;
+  /** `trade` since 20261102160000: the space's own trade, when the link names none. */
+  workspace: { name: string; slug: string; timezone: string | null; trade?: string | null } | null;
   performances: FeedPerformance[];
   dates: FeedDate[];
 };
@@ -234,9 +235,12 @@ function performanceEvent(
   // Its page: `/h/<space>/performance/<slug>`. No slug, no page to point at.
   const url = o.origin && ws?.slug && p.slug ? `${o.origin}/h/${ws.slug}/performance/${p.slug}` : null;
 
-  // No status line: every performance in the feed is confirmed or beyond, and
-  // the beyond (invoiced, paid) is money the feed never shows.
+  // No status line: a performance in the feed is an option (hold, 90) or
+  // confirmed and beyond, and the beyond (invoiced, paid) is money the feed
+  // never shows. An option says so, as a date does, and goes TENTATIVE.
+  const option = isOption(p.status);
   const descParts = runningOrderLines(momentsOf(p), tz, o);
+  if (option) descParts.unshift(t('planner.state_tentative', o.locale, undefined, o.trade));
   const link = hourLink(url, o);
   if (link) descParts.push(link);
 
@@ -246,7 +250,7 @@ function performanceEvent(
     location: location || null,
     description: descParts.join('\n') || null,
     url,
-    status: 'CONFIRMED',
+    status: option ? 'TENTATIVE' : 'CONFIRMED',
     updatedAt: p.updated_at,
   };
 
@@ -264,6 +268,11 @@ function performanceEvent(
     return { ...base, startUtc: p.start_at, endUtc: end };
   }
   return { ...base, startDate: p.performed_at };
+}
+
+/** `hold`, `hold_1`..`hold_3`: an option, which the feed carries since 90. */
+function isOption(status: string): boolean {
+  return status === 'hold' || /^hold_[1-3]$/.test(status);
 }
 
 /** The word for a date's kind; the raw kind with spaces if Hour has none. */
@@ -309,6 +318,10 @@ function dateEvent(d: FeedDate, ws: CalendarFeed['workspace'], o: Required<Calen
   return { ...base, startUtc: d.starts_at, endUtc: d.ends_at };
 }
 
+function feedTrade(trade: string | null | undefined): Trade | undefined {
+  return trade && (TRADES as readonly string[]).includes(trade) ? (trade as Trade) : undefined;
+}
+
 /**
  * Render the whole feed. `now` is injected for a stable DTSTAMP (tests)
  * — pass `new Date()` from the endpoint.
@@ -316,7 +329,7 @@ function dateEvent(d: FeedDate, ws: CalendarFeed['workspace'], o: Required<Calen
 export function buildCalendar(feed: CalendarFeed, now: Date, options: CalendarOptions = {}): string {
   const o: Required<CalendarOptions> = {
     locale: options.locale ?? 'en',
-    trade: options.trade ?? 'stage',
+    trade: options.trade ?? feedTrade(feed.workspace?.trade) ?? 'stage',
     origin: options.origin ?? null,
   };
   const dtstamp = toIcsUtc(now.toISOString());

@@ -283,8 +283,8 @@ export interface Roadsheet {
     moments?: ScheduleMoment[];
   } | null;
   venue: VenueBlock | null;
-  /** ADR-166. Absent on the public sheet: `get_public_roadsheet` does not
-      read trips (it would take a migration). */
+  /** ADR-166. On the public sheet since 20261102150000: `get_public_roadsheet`
+      sends the trips already cut, for performer and tech_manager only. */
   travel?: RoadsheetTrip[] | null;
   /** Denormalized fallback when there is no venue row. */
   venue_name: string | null;

@@ -282,6 +282,25 @@ describe('legible descriptions (ADR-162)', () => {
     expect(description(ics).split('\n')[0]).toBe('concierto 20h');
   });
 
+  it('speaks the space trade when the link names none (20261102160000)', () => {
+    const ics = buildCalendar(
+      baseFeed({
+        workspace: { name: 'Banda', slug: 'banda', timezone: 'Atlantic/Canary', trade: 'music' },
+        performances: [perf({ venue: null, venue_name: 'Sala', load_in_at: null, soundcheck_at: null, loadout_at: null, wrap_at: null })],
+      }),
+      NOW,
+      { locale: 'es', origin: ORIGIN },
+    );
+    expect(description(ics).split('\n')[0]).toBe('concierto 20h');
+  });
+
+  it('marks an option TENTATIVE and says so (90)', () => {
+    const ics = buildCalendar(baseFeed({ performances: [perf({ status: 'hold_1' })] }), NOW, { locale: 'es' });
+    expect(ics).toContain('STATUS:TENTATIVE');
+    expect(ics).not.toContain('STATUS:CONFIRMED');
+    expect(description(ics).split('\n')[0]).toBe('opción');
+  });
+
   it('carries the whole running order when the feed sends one (doors, curfew, free labels)', () => {
     const ics = buildCalendar(
       baseFeed({

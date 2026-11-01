@@ -28,9 +28,10 @@ function feedLocale(url: URL, acceptLanguage: string | null): Locale {
   return detectLocale(acceptLanguage?.split(',')[0]?.trim());
 }
 
-function feedTrade(url: URL): Trade {
+/** The link's trade; none, and the feed's own (`workspace.trade`) decides. */
+function feedTrade(url: URL): Trade | undefined {
   const trade = url.searchParams.get('trade');
-  return trade && (TRADES as readonly string[]).includes(trade) ? (trade as Trade) : 'stage';
+  return trade && (TRADES as readonly string[]).includes(trade) ? (trade as Trade) : undefined;
 }
 
 export const GET: RequestHandler = async ({ params, platform, url, request }) => {
