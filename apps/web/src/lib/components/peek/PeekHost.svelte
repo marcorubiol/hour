@@ -28,6 +28,7 @@
   import BoloRecord from '$lib/components/record/BoloRecord.svelte';
   import PerformanceRecord from '$lib/components/record/PerformanceRecord.svelte';
   import ConversationRecord from '$lib/components/record/ConversationRecord.svelte';
+  import OrganizationRecord from '$lib/components/record/OrganizationRecord.svelte';
   import PersonRecord from '$lib/components/record/PersonRecord.svelte';
 
   const locale = appLocale();
@@ -41,6 +42,7 @@
     performance: 'peek.kind_performance',
     conversation: 'peek.kind_conversation',
     person: 'peek.kind_person',
+    organization: 'peek.kind_organization',
   };
 
   // A bolo's «Abrir en Cuentas» keeps your scope when it already shows the
@@ -95,6 +97,8 @@
       <ConversationRecord workspaceSlug={target.ws} slug={target.slug} inPeek />
     {:else if target?.kind === 'person'}
       <PersonRecord workspaceSlug={target.ws} slug={target.slug} inPeek />
+    {:else if target?.kind === 'organization'}
+      <OrganizationRecord workspaceSlug={target.ws} slug={target.slug} inPeek />
     {/if}
   {/key}
 </Peek>

@@ -7,6 +7,8 @@
   export interface ConversationFilters {
     projectIds?: string[];
     lineId?: string;
+    /** One organization's conversations, across its projects (ADR-156). */
+    organizationId?: string;
     workspaceIds?: string[];
     season?: string;
     q?: string;
@@ -105,6 +107,8 @@
     projectName?: (id: string) => string | null;
     /** The line's name, when the scope has several. */
     lineName?: (id: string) => string | null;
+    /** The row's title: the venue (the lists), or the project where the venue is the page (its record, ADR-156). */
+    titleBy?: 'organization' | 'project';
     /** What the selection bar needs of the page: how many match, and whether the page is all picked. */
     onpage?: (page: { total: number; size: number; full: boolean }) => void;
     /** Esc in the list while picking: leave the selection (plan § 6.1). */
@@ -125,6 +129,7 @@
     bolosColumn = false,
     projectName,
     lineName,
+    titleBy = 'organization',
     onpage,
     onexit,
   }: Props = $props();
@@ -159,6 +164,7 @@
     if (f.orden) p.set('orden', f.orden);
     if (f.projectIds && f.projectIds.length > 0) p.set('project_ids', f.projectIds.join(','));
     if (f.lineId) p.set('line_id', f.lineId);
+    if (f.organizationId) p.set('organization_id', f.organizationId);
     if (f.workspaceIds && f.workspaceIds.length > 0)
       p.set('workspace_ids', f.workspaceIds.join(','));
     if (f.season) p.set('season', f.season);
@@ -352,13 +358,14 @@
 
   function rowView(item: ConversationItem): RowView {
     const relation = relationInputOf(item);
-    const title = organizationOf(item) ?? item.person?.full_name ?? '—';
+    const byProject = titleBy === 'project' && item.project?.name;
+    const title = (byProject ? item.project!.name : organizationOf(item)) ?? item.person?.full_name ?? '—';
     // The real contact under the venue, not the venue's name again (an
     // independent programmer's organization carries their name, ADR-102 § 1).
     const person = item.person && item.person.full_name !== title ? item.person : null;
     const role = item.contacts.find((c) => c.is_primary)?.role ?? null;
     const city = item.person?.city || item.organization?.city || null;
-    const project = projectName && item.project_id ? projectName(item.project_id) : null;
+    const project = !byProject && projectName && item.project_id ? projectName(item.project_id) : null;
     const line = lineName && item.line_id ? lineName(item.line_id) : null;
     return {
       item,
