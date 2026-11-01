@@ -5663,7 +5663,7 @@ la API de bolos ya aceptaba `conversation_id` y ninguna pantalla lo mandaba.
    Sigue el tope de tres.
 3. **(55) Las conversaciones del proyecto con la fila de la lente** (ADR-141 § 1): `RelationshipStub` pinta
    `ConversationRow` (la sala primero, turno, relación, bolo, lo último, cuándo y el paso), la fila es el enlace a la
-   ficha y el orden es «lo que pide» (`orden=pide`). Sin «—» de relleno: sin nombre, «Conversación». La franja «Falta»
+   ficha y el orden es «lo que pide» (`orden=pide`). Sin raya de relleno: sin nombre, «Conversación». La franja «Falta»
    del proyecto lee su propia página en el orden del paso (`projectStepsQueryOptions`), porque `lineMissing` necesita
    ese orden para saber si la página tiene todos los pasos vencidos: dos peticiones en vez de una.
 4. **(56) La ayuda dice lo que se ve.** «Te espera»: tareas, respuestas, dos opciones el mismo día por decidir y
