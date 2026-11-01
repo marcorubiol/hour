@@ -127,9 +127,18 @@ async function pages<T>(read: (offset: number) => Promise<T[]>): Promise<T[]> {
   }
 }
 
+/** Los ids de las conversaciones vivas del alcance, sin nada más. */
+function loadOverviewIds(env: SupabaseEnv, jwt: string, scope: OverviewScope): Promise<string[]> {
+  return pages((offset) => {
+    const search = new URLSearchParams({ select: 'id', deleted_at: 'is.null', order: 'id', limit: String(PAGE), offset: String(offset) });
+    setScope(search, scope.projectIds, scope.workspaceIds);
+    return pgGet<{ id: string }>(env, 'conversation', jwt, { search }).then((r) => r.data);
+  }).then((rows) => rows.map((r) => r.id));
+}
+
 /** Las conversaciones vivas del alcance, con su turno y los días de sus funciones. */
 export async function loadOverviewRows(env: SupabaseEnv, jwt: string, scope: OverviewScope): Promise<OverviewInput[]> {
-  const [rows, perfs] = await Promise.all([
+  const [rows, perfs, bolos] = await Promise.all([
     pages((offset) => {
       const search = new URLSearchParams({ select: OVERVIEW_SELECT, deleted_at: 'is.null', order: 'id', limit: String(PAGE), offset: String(offset) });
       setScope(search, scope.projectIds, scope.workspaceIds);
@@ -152,9 +161,11 @@ export async function loadOverviewRows(env: SupabaseEnv, jwt: string, scope: Ove
       setScope(search, scope.projectIds, scope.workspaceIds);
       return pgGet<{ conversation_id: string; performed_at: string }>(env, 'performance', jwt, { search }).then((r) => r.data);
     }),
+    // The bolos used to wait for the rows, the heavy read, to know their ids.
+    // The ids alone are a light read of the same scope (the same RLS), so the
+    // bolos go alongside instead of after (2026-11-01).
+    loadOverviewIds(env, jwt, scope).then((ids) => loadConversationBolos(env, jwt, ids)),
   ]);
-
-  const bolos = await loadConversationBolos(env, jwt, rows.map((r) => r.id));
 
   const days = new Map<string, string[]>();
   for (const p of perfs) {
