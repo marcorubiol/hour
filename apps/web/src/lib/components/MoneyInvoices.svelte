@@ -328,6 +328,10 @@
                 {/each}
               {/snippet}
             </Menu>
+            {#if invoice.doc_type === 'proforma'}
+              <!-- ADR-162: the document, to print or save as PDF. Only a proforma. -->
+              <a class="btn--secondary btn--xs" href={`/proforma/${invoice.id}`} target="_blank" rel="noopener">{t('proforma.print', locale)}</a>
+            {/if}
             {#if invoice.status === 'draft'}
               <Button
                 size="xs"

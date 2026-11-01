@@ -9,15 +9,31 @@
  * `cache-control: no-store` — revocation must bite on the next poll.
  * Calendar apps poll on their own schedule anyway (X-PUBLISHED-TTL:PT1H
  * is the hint inside the payload).
+ *
+ * Language (ADR-162): the link carries it (`?lang=es`, `&trade=music`), set by
+ * whoever copied it from Hour; else the caller's Accept-Language; else
+ * English. The workspace has no language of its own to read.
  */
 
 import type { RequestHandler } from './$types';
 import { buildCalendar, type CalendarFeed } from '$lib/ics';
+import { detectLocale, LOCALES, TRADES, type Locale, type Trade } from '$lib/i18n';
 import { pgPostRpc, PostgrestError, type SupabaseEnv } from '$lib/supabase';
 
 const TOKEN = /^[0-9a-f]{40,128}$/i;
 
-export const GET: RequestHandler = async ({ params, platform }) => {
+function feedLocale(url: URL, acceptLanguage: string | null): Locale {
+  const lang = url.searchParams.get('lang');
+  if (lang && (LOCALES as readonly string[]).includes(lang)) return lang as Locale;
+  return detectLocale(acceptLanguage?.split(',')[0]?.trim());
+}
+
+function feedTrade(url: URL): Trade {
+  const trade = url.searchParams.get('trade');
+  return trade && (TRADES as readonly string[]).includes(trade) ? (trade as Trade) : 'stage';
+}
+
+export const GET: RequestHandler = async ({ params, platform, url, request }) => {
   if (!platform?.env) return new Response('unavailable', { status: 500 });
   const env = platform.env as unknown as SupabaseEnv;
 
@@ -30,7 +46,11 @@ export const GET: RequestHandler = async ({ params, platform }) => {
     const feed = data[0];
     if (!feed) return new Response('not found', { status: 404 });
 
-    const ics = buildCalendar(feed, new Date());
+    const ics = buildCalendar(feed, new Date(), {
+      locale: feedLocale(url, request.headers.get('accept-language')),
+      trade: feedTrade(url),
+      origin: url.origin,
+    });
     return new Response(ics, {
       status: 200,
       headers: {

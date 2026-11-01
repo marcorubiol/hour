@@ -69,7 +69,7 @@ describe('buildCalendar', () => {
     const ics = buildCalendar(baseFeed(), NOW);
     expect(ics.startsWith('BEGIN:VCALENDAR\r\n')).toBe(true);
     expect(ics.endsWith('END:VCALENDAR\r\n')).toBe(true);
-    expect(ics).toContain('X-WR-CALNAME:MüK Cia — Hour');
+    expect(ics).toContain('X-WR-CALNAME:MüK Cia · Hour');
     expect(ics).toContain('PRODID:-//Hour//Calendar Feed//EN');
   });
 
@@ -107,7 +107,7 @@ describe('buildCalendar', () => {
     expect(ics).toContain('UID:perf-0197f000-0000-7000-8000-000000000001@hour.zerosense.studio');
     expect(ics).toContain('DTSTART:20260912T190000Z');
     expect(ics).toContain('DTEND:20260912T210000Z'); // start + 2h fallback
-    expect(ics).toContain('SUMMARY:MaMeMi — Teatre X');
+    expect(ics).toContain('SUMMARY:MaMeMi · Teatre X');
     expect(ics).toContain('LOCATION:Teatre X\\, C/ Gran 1\\, Barcelona\\, ES');
     expect(ics).toContain('STATUS:CONFIRMED');
     expect(ics).toContain('LAST-MODIFIED:20260701T100000Z');
@@ -210,11 +210,134 @@ describe('buildCalendar', () => {
       NOW,
     );
     expect(ics).toContain('UID:date-d1@hour.zerosense.studio');
-    expect(ics).toContain('SUMMARY:MaMeMi — travel day');
+    expect(ics).toContain('SUMMARY:MaMeMi · travel day');
     expect(ics).toContain('STATUS:TENTATIVE');
     // Multi-day all-day: DTEND exclusive = last day + 1.
     expect(ics).toContain('DTSTART;VALUE=DATE:20261001');
     expect(ics).toContain('DTEND;VALUE=DATE:20261004');
     expect(ics).toContain('SUMMARY:Residència tècnica');
+  });
+});
+
+/** Unfold (RFC 5545 §3.1) and unescape the DESCRIPTION of the first event. */
+function description(ics: string): string {
+  const unfolded = ics.replace(/\r\n /g, '');
+  const line = unfolded.split('\r\n').find((l) => l.startsWith('DESCRIPTION:')) ?? '';
+  return line.slice('DESCRIPTION:'.length).replace(/\\n/g, '\n').replace(/\\([,;\\])/g, '$1');
+}
+
+function perf(overrides: Partial<CalendarFeed['performances'][number]> = {}): CalendarFeed['performances'][number] {
+  return {
+    id: 'p1',
+    slug: 'teatre-x-2026-03-14',
+    performed_at: '2026-03-14',
+    status: 'paid',
+    venue_name: null,
+    city: null,
+    country: null,
+    load_in_at: '2026-03-14T14:00:00Z',
+    soundcheck_at: '2026-03-14T17:30:00Z',
+    start_at: '2026-03-14T20:00:00Z',
+    loadout_at: '2026-03-14T22:00:00Z',
+    wrap_at: '2026-03-14T23:30:00Z',
+    updated_at: null,
+    project: { name: 'MaMeMi' },
+    venue: { name: 'Teatre X', city: 'Barcelona', country: 'ES', address: null, timezone: 'Europe/Madrid' },
+    ...overrides,
+  };
+}
+
+describe('legible descriptions (ADR-162)', () => {
+  const ORIGIN = 'https://hour.zerosense.studio';
+
+  it('says the running order in the feed language, with the Planner clock in the venue zone', () => {
+    const ics = buildCalendar(baseFeed({ performances: [perf()] }), NOW, { locale: 'es', origin: ORIGIN });
+    expect(description(ics).split('\n')).toEqual([
+      'carga 15h',
+      'prueba de sonido 18h30',
+      'función 21h',
+      'desmontaje 23h',
+      'fin 0h30',
+      `En Hour: ${ORIGIN}/h/muk-cia/performance/teatre-x-2026-03-14`,
+    ]);
+    expect(ics).toContain(`URL:${ORIGIN}/h/muk-cia/performance/teatre-x-2026-03-14`);
+  });
+
+  it('never says the raw status nor an ISO instant, and keeps money states out', () => {
+    const ics = buildCalendar(baseFeed({ performances: [perf()] }), NOW, { locale: 'ca', origin: ORIGIN });
+    const desc = description(ics);
+    expect(desc).not.toMatch(/Status|Load in|T14:00|paid|cobrat/);
+    expect(desc).toContain('càrrega 15h');
+  });
+
+  it('falls back to the space zone when the venue has none, and speaks the trade', () => {
+    const ics = buildCalendar(
+      baseFeed({
+        workspace: { name: 'Banda', slug: 'banda', timezone: 'Atlantic/Canary' },
+        performances: [perf({ venue: null, venue_name: 'Sala', load_in_at: null, soundcheck_at: null, loadout_at: null, wrap_at: null })],
+      }),
+      NOW,
+      { locale: 'es', trade: 'music', origin: ORIGIN },
+    );
+    expect(description(ics).split('\n')[0]).toBe('concierto 20h');
+  });
+
+  it('carries the whole running order when the feed sends one (doors, curfew, free labels)', () => {
+    const ics = buildCalendar(
+      baseFeed({
+        performances: [
+          perf({
+            schedule: [
+              { kind: 'doors', label: null, at: '2026-03-14T19:30:00Z' },
+              { kind: 'start', label: null, at: '2026-03-14T20:00:00Z' },
+              { kind: null, label: 'Photocall', at: '2026-03-14T21:15:00Z' },
+              { kind: 'curfew', label: null, at: '2026-03-14T22:59:00Z' },
+            ],
+          }),
+        ],
+      }),
+      NOW,
+      { locale: 'es' },
+    );
+    expect(description(ics).split('\n')).toEqual(['puertas 20h30', 'función 21h', 'Photocall 22h15', 'toque de queda 23h59']);
+    // Without an origin there is no link to point at.
+    expect(ics).not.toContain('URL:');
+  });
+
+  it('a performance without slug has no link', () => {
+    const ics = buildCalendar(baseFeed({ performances: [perf({ slug: null })] }), NOW, { locale: 'en', origin: ORIGIN });
+    expect(ics).not.toContain('URL:');
+    expect(description(ics)).not.toContain('In Hour');
+  });
+
+  it('a date says its kind in the language, the hold, and links to its day in the Planner', () => {
+    const ics = buildCalendar(
+      baseFeed({
+        dates: [
+          {
+            id: 'd1',
+            kind: 'travel_day',
+            status: 'tentative',
+            title: null,
+            starts_at: '2026-09-10T23:30:00Z',
+            ends_at: '2026-09-11T08:00:00Z',
+            all_day: false,
+            venue_name: null,
+            city: null,
+            updated_at: null,
+            project: { name: 'MaMeMi' },
+          },
+        ],
+      }),
+      NOW,
+      { locale: 'es', origin: ORIGIN },
+    );
+    expect(ics).toContain('SUMMARY:MaMeMi · día de viaje');
+    // 23h30 UTC is already the 11th in Madrid.
+    expect(description(ics).split('\n')).toEqual([
+      'día de viaje · opción',
+      `En Hour: ${ORIGIN}/h/planner?view=day&d=2026-09-11`,
+    ]);
+    expect(ics).not.toMatch(/—/);
   });
 });

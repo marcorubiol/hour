@@ -22,7 +22,7 @@
   interface Props {
     open: boolean;
     /** Workspaces for the Select — the first one is the default pick. */
-    workspaces: Array<{ id: string; name: string }>;
+    workspaces: Array<{ id: string; name: string; trade?: string | null }>;
   }
 
   let { open = $bindable(), workspaces }: Props = $props();
@@ -53,8 +53,16 @@
   const feedSharesQuery = createQuery(feedSharesOptions);
   let feedShares = $derived($feedSharesQuery.data?.items ?? []);
 
+  /**
+   * The link speaks the language of whoever copies it, and the space's trade
+   * (ADR-162): a calendar app sends no language of its own, and the space has
+   * none to read.
+   */
   function feedUrl(token: string): string {
-    return `${location.origin}/api/public/calendar/${token}`;
+    const trade = workspaces.find((w) => w.id === feedWs)?.trade;
+    const query = new URLSearchParams({ lang: locale });
+    if (trade && trade !== 'stage') query.set('trade', trade);
+    return `${location.origin}/api/public/calendar/${token}?${query}`;
   }
 
   async function copyFeedUrl(token: string, scheme: 'https' | 'webcal') {
