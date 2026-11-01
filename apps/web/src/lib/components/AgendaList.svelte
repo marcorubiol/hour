@@ -683,6 +683,20 @@
     return out;
   }
   let writingDay = $state<string | null>(null);
+  /* THE MARGIN IS DRAWN WHEN THE WINDOW USES IT (ADR-167 § 2). A column is
+     still a column all the way down, so the choice is the diary's, never the
+     day's: one card, step or note in the window and the margin and its rule
+     are there for every day; none, and the diary takes the whole measure
+     instead of ruling off 15rem of nothing. The `＋` stays on each day. */
+  let marginUsed = $derived(
+    writingDay !== null ||
+      shownDays.some(
+        (d) =>
+          (stepsByDay?.get(d)?.length ?? 0) > 0 ||
+          (decisionsByDay?.get(d)?.length ?? 0) > 0 ||
+          (notesByDay?.get(d)?.length ?? 0) > 0,
+      ),
+  );
   let noteDraft = $state('');
   /** '' = the fallback (company/scope); otherwise a NoteAnchorOption key. */
   let noteAnchorKey = $state('');
@@ -902,6 +916,7 @@
 <div
   class="ag"
   class:ag--loading={loading}
+  class:ag--bare={!marginUsed}
 >
   <!-- THE NOTES COLUMN AND THE ABSENCE RAIL ARE GONE (Marco, 2026-08-03).
 
@@ -1549,6 +1564,21 @@ button.ag__head:hover .ag__num {
   color: var(--text-color);
 }
 
+.ag--bare {
+  --ag-margin: 0;
+  background-image: none;
+}
+/* A margin that holds only the `＋` takes no line and no column: the verb
+   waits at the day's corner, on its date line (ADR-167 § 2). On a bare
+   diary that is every day; on a phone, every day with nothing to annotate,
+   where it used to be a loose `＋` on a line of its own under each day. */
+.ag--bare .ag__marg,
+.ag__marg:not(:has(> :not(.ag__note-add))) {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-end: 0;
+  padding: 0;
+}
 .ag__marg {
   padding: var(--space-xs) 0 var(--space-xs) var(--space-s);
   /* THE SAME 9% NEUTRAL THAT WAS INVISIBLE ON THE CARD IS INVISIBLE HERE,

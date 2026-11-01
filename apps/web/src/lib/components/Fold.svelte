@@ -38,7 +38,7 @@
 <section class="fold" {id} data-testid={testid} bind:this={el}>
   <button type="button" class="lid" aria-expanded={open} aria-controls={bodyId} onclick={() => (open = !open)}>
     <span class="lid__w">{word}</span>
-    <span class="lid__n">{keeps} {open ? '−' : '+'}</span>
+    <span class="lid__n">{keeps}<span class="lid__sign" aria-hidden="true">{open ? '▴' : '▾'}</span></span>
   </button>
   {#if open}
     <div class="fold__body" id={bodyId}>{@render children()}</div>

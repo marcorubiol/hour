@@ -23,6 +23,15 @@ import { TAGGING_EMBED, tagKeysOf, type TaggingEmbed } from './conversation-tags
  * ride along. `next_action_at` travels date-only (the column is
  * timestamptz; Postgres casts) or null to clear.
  */
+/**
+ * The most rows one read of `/api/conversations` returns, for the reads that
+ * need a space whole: «Te espera», a new deal's conversations, a line's
+ * steps (ADR-167 § 3). It was 100 and the largest real space already has 154,
+ * so «Te espera» could miss what waited. 500 is the same ceiling as the bolos
+ * feed of Cuentas (`BOLOS_CAP`): one request, three times today's largest.
+ */
+export const CONVERSATIONS_WHOLE = 500;
+
 export const ConversationPatchSchema = v.object({
   // ADR-138: the only relation kept by hand. An object sets it (now, on the
   // server clock, with an optional day to write again); null lifts it. The

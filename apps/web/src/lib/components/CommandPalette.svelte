@@ -754,7 +754,7 @@
                   <span class="cmdk__kind">{r.kind === 'line' ? lineKindLabel(r.lineKind ?? '', locale) : t(KIND_KEY[r.kind], locale)}</span>
                 {/if}
                 <span class="cmdk__name">
-                  {r.name}{#if r.kind === 'create' && r.path}<span class="cmdk__path">&nbsp;{r.path}</span>{:else if r.path}<span class="cmdk__path"> · {r.path}</span>{/if}
+                  {r.name}{#if r.kind === 'create' && r.path}<span class="cmdk__path">&nbsp;{r.path}</span>{:else if r.path}<span class="cmdk__path">{' · '}{r.path}</span>{/if}
                 </span>
                 {#if isStaged(r.token)}<span class="cmdk__added">✓ {t('palette.added', locale)}</span>{/if}
               </button>

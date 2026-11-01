@@ -37,9 +37,6 @@
   );
 
   // ─── where I exist as a person ────────────────────────────────────────
-  // The one live group in this section: everything above it is still the
-  // design mock (the name and avatar inputs persist nothing yet).
-  //
   // A login and a person are two different things. Being a PERSON in a
   // workspace is what lets you be cast in a production, appear on a road
   // sheet, carry an absence and be found on the person axis — roster rows

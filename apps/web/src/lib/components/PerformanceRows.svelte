@@ -35,7 +35,7 @@
       <span class="perf-rows__day">{dayLabel(r.day)}</span>
       <span class="perf-rows__main">
         {#if r.href}<a class="perf-rows__link" href={r.href}>{r.title}</a>{:else}{r.title}{/if}
-        {#if r.note}<span class="perf-rows__note"> · {r.note}</span>{/if}
+        {#if r.note}<span class="perf-rows__note">{' · '}{r.note}</span>{/if}
       </span>
       <span class="fact-word" data-family={performanceStatusFamily(r.status)}>{performanceStatusLabel(r.status, locale)}</span>
     </li>

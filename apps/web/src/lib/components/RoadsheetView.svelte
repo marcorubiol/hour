@@ -9,6 +9,7 @@
    */
 
   import type { Snippet } from 'svelte';
+  import { DASH } from '$lib/glyphs';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import JsonKV, { hasJsonContent } from '$lib/components/JsonKV.svelte';
   import RecordHead from '$lib/components/RecordHead.svelte';
@@ -161,9 +162,9 @@
           <li>
             <span class="rsv__role">{m.role}</span>
             <span class="rsv__name">
-              {m.person?.full_name ?? '—'}
+              {m.person?.full_name ?? DASH}
               {#if m.replaces}
-                <span class="rsv__muted">{t('perf.replaces', locale, { name: m.replaces })}{#if m.reason} — {m.reason}{/if}</span>
+                <span class="rsv__muted">{t('perf.replaces', locale, { name: m.replaces })}{#if m.reason}: {m.reason}{/if}</span>
               {/if}
               {#if m.person?.email || m.person?.phone}
                 <span class="rsv__contact">
@@ -185,7 +186,7 @@
           <li>
             <span class="rsv__role">{m.role}</span>
             <span class="rsv__name">
-              {m.person?.full_name ?? '—'}
+              {m.person?.full_name ?? DASH}
               {#if m.notes}<span class="rsv__muted">{m.notes}</span>{/if}
               {#if m.person?.email || m.person?.phone}
                 <span class="rsv__contact">

@@ -112,6 +112,9 @@
     onpage?: (page: { total: number; size: number; full: boolean }) => void;
     /** Esc in the list while picking: leave the selection (plan § 6.1). */
     onexit?: () => void;
+    /** The host's head already says how many (a record's BlockHead): the
+     *  bar does not say it again (ADR-167 § 2). */
+    counted?: boolean;
   }
 
   let {
@@ -131,6 +134,7 @@
     titleBy = 'organization',
     onpage,
     onexit,
+    counted = false,
   }: Props = $props();
 
   type ConversationsResponse = {
@@ -458,14 +462,15 @@
   let rangeEnd = $derived(Math.min(offset + LIMIT, total));
 </script>
 
+{#if !counted || loading || showPagination || (selectable && items.length > 0)}
 <div class="status-bar">
   <div class="status-bar__summary">
     {#if loading}
       <span>{t('conversations.loading', locale)}</span>
     {:else if !errorMsg}
-      <span class="status-bar__count"
+      {#if !counted}<span class="status-bar__count"
         >{t(total === 1 ? 'conversations.count_one' : 'conversations.count_other', locale, { n: total })}</span
-      >
+      >{/if}
       {#if showPagination}
         <span>{t('conversations.showing', locale, { from: offset + 1, to: rangeEnd })}</span>
       {/if}
@@ -480,6 +485,7 @@
     />
   {/if}
 </div>
+{/if}
 
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <ul
@@ -699,32 +705,10 @@
       text-underline-offset: 0.2em;
     }
 
-    /* «24 oct · llamar»: the date in mono, the note giving way first. */
-    .crow-next {
-      display: flex;
-      align-items: baseline;
-      gap: var(--space-xs);
-      max-inline-size: 100%;
-      min-inline-size: 0;
-      text-align: end;
-    }
-    .crow-next__date {
-      white-space: nowrap;
-      color: var(--text-dark-muted);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing);
-    }
+    /* The step's look is the list's (base.css, `.crow-next`); here, only
+       what the button adds: the date inks under the pointer. */
     .crow-next:hover .crow-next__date {
       color: var(--text-color);
-    }
-    .crow-next__note {
-      min-inline-size: 0;
-      color: var(--text-faint);
-      font-size: var(--text-xs);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
     }
 
     .next-action-who {
@@ -763,9 +747,6 @@
         min-block-size: 0;
         min-inline-size: 0;
         pointer-events: none;
-      }
-      .crow-next__note {
-        max-inline-size: 14ch;
       }
     }
   }

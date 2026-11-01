@@ -62,7 +62,8 @@
         locale,
       ),
       lastAt: lastActivity(relation),
-      step: [item.next_action_at ? dayMonth(item.next_action_at) : null, item.next_action_note].filter(Boolean).join(' · '),
+      stepDate: item.next_action_at ? dayMonth(item.next_action_at) : null,
+      stepNote: item.next_action_note || null,
     };
   }
 
@@ -107,7 +108,12 @@
               {#if r.bolo}{boloLabel(r.bolo, locale)}{/if}
             {/snippet}
             {#snippet next()}
-              {r.step}
+              {#if r.stepDate || r.stepNote}
+                <span class="crow-next">
+                  {#if r.stepDate}<span class="crow-next__date">{r.stepDate}</span>{/if}
+                  {#if r.stepNote}<span class="crow-next__note" title={r.stepNote}>{r.stepNote}</span>{/if}
+                </span>
+              {/if}
             {/snippet}
           </ConversationRow>
         </li>

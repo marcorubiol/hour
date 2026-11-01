@@ -311,7 +311,7 @@
               <tr>
                 <td class="lmm__cell-date">
                   {f.first_performed_at ? dayLabel(f.first_performed_at) : '—'}
-                  {#if f.function_count > 1}<span class="lmm__fn-count"> · {t('books.fn_count', locale, { n: f.function_count })}</span>{/if}
+                  {#if f.function_count > 1}<span class="lmm__fn-count">{' · '}{t('books.fn_count', locale, { n: f.function_count })}</span>{/if}
                 </td>
                 <td>
                   <StateBadge

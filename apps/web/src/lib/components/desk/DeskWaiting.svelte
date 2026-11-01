@@ -49,10 +49,10 @@
     ontoggle: (taskId: string, done: boolean) => void;
     onremove: (taskId: string) => void;
     onaccept: (taskId: string) => void;
-    /** The row being confirmed or released (its id), while the write is in flight. */
+    /** The row being released (its id), while the write is in flight. */
     deciding?: string | null;
-    /** «Confirmar» / «Liberar» on a «liberar» row (ADR-165 § 1). */
-    ondecide?: (item: DeskItem, status: 'confirmed' | 'cancelled') => void;
+    /** «Liberar» on a «liberar» row (ADR-165 § 1, ADR-167 § 1). */
+    ondecide?: (item: DeskItem) => void;
   }
 
   let {
@@ -188,20 +188,14 @@
             onclick={() => item.taskId && onremove(item.taskId)}>×</button
           >
         {:else if item.option && ondecide}
-          <!-- A release is answered here (ADR-165 § 1), the record's own two
-               verbs; «Deshacer» comes in the notice. -->
+          <!-- A release is answered here (ADR-165 § 1): only «Liberar», the
+               row's own verb (ADR-167 § 1); «Deshacer» comes in the notice. -->
           <button
             type="button"
             class="row__act btn--secondary btn--xs"
-            aria-label={t('desk.decision_confirm_aria', locale, { name: item.subject })}
-            disabled={deciding !== null}
-            onclick={() => ondecide(item, 'confirmed')}>{t('desk.decision_confirm', locale)}</button
-          ><button
-            type="button"
-            class="row__act row__act--quiet btn--secondary btn--xs"
             aria-label={t('desk.decision_release_aria', locale, { name: item.subject })}
             disabled={deciding !== null}
-            onclick={() => ondecide(item, 'cancelled')}>{t('desk.decision_release', locale)}</button
+            onclick={() => ondecide(item)}>{t('desk.decision_release', locale)}</button
           >
         {/if}
       </span>

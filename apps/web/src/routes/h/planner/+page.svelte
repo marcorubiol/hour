@@ -2579,13 +2579,6 @@
     return n;
   });
 
-  /* THE SEASON'S FACTS BLOCK IS EMPTY, SO IT IS NOT DRAWN (ADR-145 § 1, fase
-     2). Without its census the Season has nothing on either line unless calm
-     or a guessed cast has something to say: two empty struts and a rule over
-     the views were furniture. The other four drawings keep the block whole,
-     so their controls do not move between them. */
-  let factsDrawn = $derived(view !== 'overview' || !shows('planner', 'census', calm.on) || statUnattributed > 0);
-
   let statTrips = $derived.by(() => {
     let n = 0;
     for (const d of scopedDates) {
@@ -3222,7 +3215,6 @@
 
        The second line simply is not there when the drawing has nothing to
        say about itself — an empty Day. -->
-  {#if factsDrawn}
   <div class="cal__facts">
   <p class="cal__meta cal__meta--queue">
       <!-- Stats strip (ADR-080 §6 calls it the pulse strip; the pulse is now
@@ -3251,19 +3243,14 @@
               aria-hidden="true">{decisionsOpen ? '▴' : '▾'}</i
             >
           </button>
-        {:else}
-          <!-- The line keeps its height with nothing to say: the same control,
-               unseen and unreachable, so the reserve is exact by construction
-               and the tabs sit at the same height in all five drawings. -->
-          <span class="cal__stat cal__stat--decide cal__strut" aria-hidden="true">&nbsp;</span>
         {/if}
     </p>
-  <!-- BOTH LINES ARE FURNITURE: always laid out, loading, empty or failed,
-       so nothing under them moves when the rows land (ADR-096 §6, diseño M4).
-       A line with nothing true to say is empty, never absent. -->
+  <!-- A LINE WITH NOTHING TO SAY IS NOT DRAWN, IN ANY VIEW (ADR-167 § 2;
+       it was furniture, ADR-096 §6, and the Season alone dropped it, ADR-145
+       § 1). Two unseen lines were a band of air under the Agenda's title, and
+       the tabs jumped when the Season left them out. A census line is there
+       while it loads (its figures say «—»), so the rows landing move nothing. -->
     <p class="cal__meta cal__meta--window">
-      <!-- One empty line box: the caption's own height, whatever it says. -->
-      <span class="cal__strut" aria-hidden="true">&#8203;</span>
         <!-- CALM IS ONE SENTENCE, NOT A WORD MORE (ADR-139 § 5; it was
              «calma · solo confirmados» in front of the whole census, ADR-095
              §3). The line still says what calm hides, because a filter you
@@ -3412,7 +3399,6 @@
         {/if}
     </p>
   </div>
-  {/if}
   <!-- THE DRAWER OPENS UNDER THE STRIP THAT NAMES IT — the queue line says
        `3 to decide · 1 urgent`, and what it names unfolds beneath both lines,
        above the controls. Not between them: the window line is a caption of
@@ -3870,6 +3856,12 @@
     .cal__facts .cal__meta {
       margin: 0;
     }
+    /* Nothing to say, nothing drawn (ADR-167 § 2): an empty line goes, and
+       with both gone the block and its rule go too. */
+    .cal__facts .cal__meta:not(:has(*)),
+    .cal__facts:not(:has(.cal__meta *)) {
+      display: none;
+    }
     /* TWO LINES, TWO REGISTERS — and this is the step I claimed and did not
        make: both lines were 9.5px, 0.1em and the same faint ink, so the cut
        read as a badly-wrapped paragraph. The pair now DESCENDS with the head
@@ -3920,16 +3912,6 @@
       margin-inline-end: var(--space-2xs);
     }
     /* The stat "per decidir" — the one red figure; a jump, not a decoration. */
-    /* A line's height with nothing in it. Zero wide, and it gives back the
-       flex gap it would add before the first real stat. */
-    .cal__strut {
-      display: inline-block;
-      visibility: hidden;
-      inline-size: 0;
-      overflow: hidden;
-      margin-inline-end: calc(-1 * var(--space-s));
-      pointer-events: none;
-    }
     .cal__stat-chev {
       font-style: normal;
       margin-inline-start: var(--space-xs);

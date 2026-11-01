@@ -914,11 +914,14 @@
       display: none;
     }
 
-    /* The fold's head: the range word, small and faint, centered. */
+    /* The fold's head: the range word, small and faint, centered. A fold
+       that opens a month carries the month word over it, on its own line as
+       a day's head does: side by side they read «mar1-11» (ADR-167 § 2). */
     .board__head.gap {
       display: flex;
-      align-items: flex-end;
-      justify-content: center;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
     }
     .board__gaplab {
       font-family: var(--font-mono);
@@ -1141,7 +1144,9 @@
     /* Cap height, not the box's top edge: a 14px chip against a 15px serif
        needs three pixels to sit on the line the eye reads the word from. */
     .board__mark {
-      inline-size: 1.375rem;
+      /* A floor, not a width: a three-letter monogram («ZEC») is wider than
+         the slot and ran into the name at 390 (ADR-167 § 2). */
+      min-inline-size: 1.375rem;
       flex: none;
       display: inline-flex;
       align-items: flex-start;
@@ -1179,9 +1184,11 @@
     /* ── ON A PHONE THE NAMES GIVE WAY TO THE DAYS (revisión del Planner,
        2026-10-18). At 375px the frozen labels took 194 of 347px and no whole
        day fitted beside them. Below a measured width (ADR-095 §8) the label
-       keeps the monogram and the name at a reading size and drops the tally,
-       so two days and more sit next to the names and the rest scroll. The
-       day columns keep their width: the away bands are measured on it. ── */
+       keeps the monogram and the name at a reading size, and the tally under
+       it (ADR-167 § 2: dropping it left the phone without the lane's
+       count), so two days and more sit next to the names and the rest
+       scroll. The day columns keep their width: the away bands are measured
+       on it. ── */
     @container (max-width: 34rem) {
       .board {
         --board-lab: 6rem;
@@ -1195,7 +1202,6 @@
         font-size: var(--text-s);
         line-height: 1.15;
       }
-      .board__tally,
       .board__badge {
         display: none;
       }

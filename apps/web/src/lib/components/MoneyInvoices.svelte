@@ -289,8 +289,8 @@
           <span class="mny-inv__number">{invoice.number ?? t('books.no_number', locale)}</span>
           <span class="mny-inv__main">
             {invoice.payer?.name ?? '—'}
-            {#if invoice.project}<span class="mny-inv__muted"> · {invoice.project.name}</span>{/if}
-            {#if needsPayerFiscal(invoice)}<span class="mny-inv__warn"> · {t('books.payer_no_fiscal', locale)}</span>{/if}
+            {#if invoice.project}<span class="mny-inv__muted">{' · '}{invoice.project.name}</span>{/if}
+            {#if needsPayerFiscal(invoice)}<span class="mny-inv__warn">{' · '}{t('books.payer_no_fiscal', locale)}</span>{/if}
           </span>
           <span class="mny-inv__age mny-inv__age--{aging.state}">{agingCopy(invoice)}</span>
           <span class="mny-inv__total">{fmtMoney(invoice.total)} {invoice.currency}</span>

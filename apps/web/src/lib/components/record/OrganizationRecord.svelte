@@ -302,6 +302,7 @@
         <ConversationTable
           filters={{ organizationId: org.id, workspaceIds: [workspaceId] }}
           titleBy="project"
+          counted
           personBase={`/h/${workspaceSlug}/person`}
           conversationHref={(item) => `/h/${workspaceSlug}/conversation/${item.id}`}
         />
@@ -327,7 +328,7 @@
                 {:else}
                   {project || when}
                 {/if}
-                {#if b.function_count > 1}<span class="organization__faint"> · {t('perf.bolo_functions_other', locale, { n: b.function_count })}</span>{/if}
+                {#if b.function_count > 1}<span class="organization__faint">{' · '}{t('perf.bolo_functions_other', locale, { n: b.function_count })}</span>{/if}
               </span>
               <span class="organization__row-meta">{performanceStatusLabel(b.status, locale)}</span>
             </li>
