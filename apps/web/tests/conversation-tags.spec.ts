@@ -15,7 +15,7 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  *    Todas (una sola lista desde la fase 3) con su etiqueta en la fila.
  * 3. La ficha enseña sus etiquetas y quien edita las cambia: con Venues
  *    también, sale en Venues, que sí ofrece «Select».
- * 4. `?view=team` lleva a `?etiqueta=team`.
+ * 4. (Fuera: `?view=team` → `?etiqueta=team`, ADR-165 § 4 quitó la redirección.)
  *
  * Fixture: `playwright`, proyecto `ZZZ e2e collab`, organización propia
  * `ZZZ E2E Press`. Se recoge al empezar (por si una pasada murió a medias) y
@@ -126,9 +126,5 @@ test.describe('conversation tags', () => {
     }
   });
 
-  test('?view=team goes to ?etiqueta=team', async ({ page }) => {
-    await page.goto('/h/conversations?view=team');
-    await page.waitForURL(/\/h\/conversations\?etiqueta=team$/);
-    await expect(page.locator('.lenshead__sub [data-chip="team"]')).toHaveAttribute('aria-current', 'page');
-  });
+  // `?view=team` → `?etiqueta=team` no se prueba: ADR-165 § 4 quitó la redirección.
 });

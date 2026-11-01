@@ -139,9 +139,9 @@ test.describe('Conversaciones › Equipo: los hilos del equipo (ADR-116, ADR-134
 
   test('lo nuevo arriba, y la fila del bolo abre la función con su tablón', async ({ page }) => {
     test.setTimeout(90_000);
-    // La URL vieja de «de qué se habla» lleva a la vista Equipo (ADR-134).
-    await page.goto('/h/conversations?view=threads');
-    await page.waitForURL(/\/h\/conversations\?etiqueta=team$/);
+    // La vista Equipo es el chip `team` (ADR-134). `?view=threads` ya no
+    // redirige: ADR-165 § 4 quitó esa redirección, así que se entra directo.
+    await page.goto('/h/conversations?etiqueta=team');
     await expect(page.getByRole('navigation', { name: 'Sections' }).getByRole('link', { name: 'Conversations' })).toHaveAttribute(
       'aria-current',
       'page',
