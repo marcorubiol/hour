@@ -5826,7 +5826,7 @@ conversaciones, 152 visibles):
 **Decisión.**
 1. `conversation_select` compara con `accessible_project_ids('read:conversation')` evaluado una vez por consulta
    (`project_id = ANY (((SELECT …))::uuid[])`), el patrón de 20260724093000. Borrado y privada no cambian
-   (20261101100000_conversation_select_once).
+   (20261101110000_conversation_select_once).
 2. Es equivalente: `accessible_project_ids(p)` son los proyectos vivos donde `has_permission(id, p)`, y
    `has_permission` ya exige proyecto vivo. Lo sujeta `tests/rls/conversation-select-once.test.ts`: con y sin
    Converses, ver la fila es lo que dice `has_permission`; una privada de otra persona no se ve y la propia sí; la

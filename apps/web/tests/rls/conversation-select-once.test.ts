@@ -17,7 +17,7 @@ import {
 
 /**
  * ADR-160 · `conversation_select` resuelve los proyectos una vez por consulta
- * (20261101100000_conversation_select_once).
+ * (20261101110000_conversation_select_once).
  *
  * La política deja de llamar a `has_permission` por fila y compara con
  * `accessible_project_ids('read:conversation')`. Lo que fija este fichero es

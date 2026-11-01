@@ -1,4 +1,4 @@
--- 20261101100000_conversation_select_once (ADR-160)
+-- 20261101110000_conversation_select_once (ADR-160)
 --
 -- Qué: la política de lectura de `conversation` resuelve los proyectos que
 -- quien llama puede leer UNA vez por consulta (un InitPlan sobre

@@ -155,7 +155,7 @@ WHERE schemaname = 'public' AND tablename IN ('conversation', 'conversation_even
 ```
 
 `conversation_select` tiene que ser el USING de `20261011200000_mail_google.sql`: la migración
-`supabase/migrations/20261101100000_conversation_select_once.sql` (ADR-160) parte de ese.
+`supabase/migrations/20261101110000_conversation_select_once.sql` (ADR-160) parte de ese.
 
 ## 6. Con la migración, dentro de la misma transacción
 
