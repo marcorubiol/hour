@@ -120,7 +120,7 @@
       {/if}
     </BlockHead>
     {#if items.length === 0}
-      <EmptyLine label={t('settings.texts_title', locale)} text={t('settings.texts_empty', locale)} />
+      <EmptyLine text={t('settings.texts_empty', locale)} />
     {:else}
       <div class="set-group__body">
         {#each items as item (item.id)}
