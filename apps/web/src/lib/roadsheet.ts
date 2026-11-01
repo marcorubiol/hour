@@ -28,6 +28,10 @@
  *   - `assets` list for full + tech_manager (riders/plots are theirs);
  *     URLs are R2 keys with no public serving in Phase 0, so only
  *     metadata travels.
+ *   - `materials` (88) are the outbound links of the performance and of its
+ *     line, which the public sheet reads (`get_public_roadsheet`): the
+ *     rider and the plot are what a venue needs, so every role gets them.
+ *     Only what the company sends out, never what it received.
  *   - `travel` (ADR-166) is the travelling party's: full + performer +
  *     tech_manager, never the venue. The trips of the performance's day and
  *     its eve, of the same project (`tripsOfPerformance`), with their timed
@@ -57,7 +61,8 @@ type RoadsheetSection =
   | 'crew'
   | 'contacts'
   | 'notes'
-  | 'assets';
+  | 'assets'
+  | 'materials';
 
 export const ROLE_SECTIONS: Record<RoadsheetRole, readonly RoadsheetSection[]> = {
   full: [
@@ -72,10 +77,11 @@ export const ROLE_SECTIONS: Record<RoadsheetRole, readonly RoadsheetSection[]> =
     'contacts',
     'notes',
     'assets',
+    'materials',
   ],
-  venue: ['schedule', 'venue', 'technical', 'cast', 'crew'],
-  performer: ['schedule', 'venue', 'travel', 'logistics', 'hospitality', 'cast', 'crew'],
-  tech_manager: ['schedule', 'venue', 'travel', 'logistics', 'technical', 'cast', 'crew', 'assets'],
+  venue: ['schedule', 'venue', 'technical', 'cast', 'crew', 'materials'],
+  performer: ['schedule', 'venue', 'travel', 'logistics', 'hospitality', 'cast', 'crew', 'materials'],
+  tech_manager: ['schedule', 'venue', 'travel', 'logistics', 'technical', 'cast', 'crew', 'assets', 'materials'],
 };
 
 const PERSONAL_CONTACTS: ReadonlySet<RoadsheetRole> = new Set(['full', 'tech_manager']);
@@ -107,6 +113,26 @@ interface AssetEntry {
   direction: Tables<'asset_version'>['direction'];
   notes: string | null;
   uploaded_at: string | null;
+}
+
+/**
+ * A material the company sends out, with its link (88): the performance's
+ * own and its line's, outbound only, http(s) only. `scope` says which.
+ */
+export interface RoadsheetMaterial {
+  kind: Tables<'asset_version'>['kind'];
+  url: string;
+  uploaded_at: string | null;
+  scope: 'performance' | 'line';
+}
+
+/** What a link says of itself on the sheet: its host (`drive.google.com`), else the link. */
+export function materialHost(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '') || url;
+  } catch {
+    return url;
+  }
 }
 
 export interface VenueBlock {
@@ -261,6 +287,8 @@ export interface PerformanceBundle {
   cast: CastEntry[];
   crew: CrewEntry[];
   assets: AssetEntry[];
+  /** The outbound links of the performance and its line (88); absent = not read. */
+  materials?: RoadsheetMaterial[];
   /** The trips of the day and its eve (`tripsOfPerformance`); absent = not read. */
   travel?: RoadsheetTrip[];
 }
@@ -298,6 +326,8 @@ export interface Roadsheet {
   contacts: { programmer: RoadsheetPerson } | null;
   notes: string | null;
   assets: AssetEntry[] | null;
+  /** 88: the links the company sends out. The same section as `assets` on screen. */
+  materials?: RoadsheetMaterial[] | null;
 }
 
 export function isRoadsheetRole(value: string): value is RoadsheetRole {
@@ -343,6 +373,20 @@ function filterCast(cast: CastEntry[], withContacts: boolean): CastEntry[] {
   }));
 }
 
+/** An http(s) link only: the sheet is handed around, a stored `javascript:` must not travel. */
+const HTTP_LINK = /^https?:\/\//i;
+
+/**
+ * The performance's own assets that a material already shows with its link
+ * are not listed twice: same kind, same upload, outbound.
+ */
+function assetsBesideMaterials(assets: AssetEntry[], materials: readonly RoadsheetMaterial[]): AssetEntry[] {
+  const linked = new Set(
+    materials.filter((m) => m.scope === 'performance').map((m) => `${m.kind}|${m.uploaded_at}`),
+  );
+  return assets.filter((a) => !(a.direction === 'outbound' && linked.has(`${a.kind}|${a.uploaded_at}`)));
+}
+
 /**
  * Project the bundle down to what `role` gets to see. Sections outside the
  * role's list come back null — the page renders only non-null sections,
@@ -353,6 +397,7 @@ export function buildRoadsheet(bundle: PerformanceBundle, role: RoadsheetRole): 
   const has = (s: RoadsheetSection) => sections.includes(s);
   const withContacts = PERSONAL_CONTACTS.has(role);
   const p = bundle.performance;
+  const materials = has('materials') ? (bundle.materials ?? []).filter((m) => HTTP_LINK.test(m.url)) : null;
 
   return {
     role,
@@ -384,7 +429,8 @@ export function buildRoadsheet(bundle: PerformanceBundle, role: RoadsheetRole): 
     contacts:
       has('contacts') && bundle.programmer ? { programmer: bundle.programmer } : null,
     notes: has('notes') ? p.notes : null,
-    assets: has('assets') ? bundle.assets : null,
+    assets: has('assets') ? assetsBesideMaterials(bundle.assets, materials ?? []) : null,
+    materials,
   };
 }
 

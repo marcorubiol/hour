@@ -17,6 +17,7 @@
 
 import { clockText, dayOf, KIND_WORD_KEYS } from './running-order';
 import { t, TRADES, type Locale, type Trade } from './i18n';
+import { stageRoute, type TravelStageRow } from './travel-stage';
 
 type FeedPerformance = {
   id: string;
@@ -33,9 +34,8 @@ type FeedPerformance = {
   wrap_at: string | null;
   updated_at: string | null;
   /**
-   * The whole running order, when the feed carries it. Today
-   * `get_public_calendar` sends only the five fields above (doors and curfew
-   * stay out); a migration that adds this array lights it up here unchanged.
+   * The whole running order (`get_public_calendar` since 20261102160000).
+   * Absent or empty, the five fields above stand in for it.
    */
   schedule?: FeedMoment[] | null;
   project: { name: string } | null;
@@ -62,7 +62,15 @@ type FeedDate = {
   city: string | null;
   updated_at: string | null;
   project: { name: string } | null;
+  /** A trip's stages in their order (20261102160000); empty on any other kind. */
+  stages?: FeedStage[] | null;
 };
+
+/** A stage as the feed carries it: no reference, no notes. */
+type FeedStage = Pick<
+  TravelStageRow,
+  'mode' | 'from_city' | 'from_place' | 'to_city' | 'to_place' | 'depart_at' | 'arrive_at' | 'depart_tz' | 'arrive_tz'
+>;
 
 export type CalendarFeed = {
   /** `trade` since 20261102160000: the space's own trade, when the link names none. */
@@ -275,6 +283,24 @@ function isOption(status: string): boolean {
   return status === 'hold' || /^hold_[1-3]$/.test(status);
 }
 
+/**
+ * «tren 9h30 · Barcelona → Madrid · llega 12h», one stage per line, in the
+ * trip's order, as the road sheet draws them. Each hour on the clock of its
+ * own end, the space's when the stage names none.
+ */
+export function stageLines(stages: readonly FeedStage[], tz: string, o: Required<CalendarOptions>): string[] {
+  const valid = (iso: string | null): iso is string => Boolean(iso) && !Number.isNaN(new Date(iso!).getTime());
+  return stages.map((s) => {
+    const mode = t(`planner.mode_${s.mode}`, o.locale, undefined, o.trade);
+    const head = valid(s.depart_at) ? `${mode} ${clockText(s.depart_at, s.depart_tz || tz)}` : mode;
+    const route = stageRoute(s);
+    const arrives = valid(s.arrive_at)
+      ? t('ahora.arrives', o.locale, { time: clockText(s.arrive_at, s.arrive_tz || tz) }, o.trade)
+      : '';
+    return [head, route, arrives].filter(Boolean).join(SEP);
+  });
+}
+
 /** The word for a date's kind; the raw kind with spaces if Hour has none. */
 function kindWord(kind: string, o: Required<CalendarOptions>): string {
   const key = `perf.date_kind_${kind}`;
@@ -302,7 +328,7 @@ function dateEvent(d: FeedDate, ws: CalendarFeed['workspace'], o: Required<Calen
     uid: `date-${d.id}@${UID_HOST}`,
     summary: summaryParts.join(SEP) || kindLabel,
     location: location || null,
-    description: [head, link].filter(Boolean).join('\n'),
+    description: [head, ...stageLines(d.stages ?? [], tz, o), link].filter(Boolean).join('\n'),
     url,
     status: d.status === 'tentative' ? 'TENTATIVE' : 'CONFIRMED',
     updatedAt: d.updated_at,

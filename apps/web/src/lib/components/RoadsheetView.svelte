@@ -21,7 +21,8 @@
   import { stageRoute } from '$lib/travel-stage';
   import { LOCALE_TAG, appLocale, t, type Locale } from '$lib/i18n';
   import { performanceStatusLabel, performanceStatusTone } from '$lib/performance';
-  import type { Roadsheet, RoadsheetTrip } from '$lib/roadsheet';
+  import { materialHost, type Roadsheet, type RoadsheetTrip } from '$lib/roadsheet';
+  import { safeHref } from '$lib/utils/safe-url';
 
   let {
     sheet,
@@ -219,11 +220,17 @@
     </section>
   {/if}
 
-  {#if sheet.assets && sheet.assets.length > 0}
-    <section class="rsv__section" aria-label={t('perf.assets', locale)}>
+  {#if (sheet.materials?.length ?? 0) > 0 || (sheet.assets?.length ?? 0) > 0}
+    <section class="rsv__section" aria-label={t('perf.assets', locale)} data-testid="roadsheet-materials">
       <BlockHead title={t('perf.assets', locale)} />
       <ul class="rsv__people" role="list">
-        {#each sheet.assets as a, i (i)}
+        {#each sheet.materials ?? [] as m, i (i)}
+          <li>
+            <span class="rsv__role">{enumWord('perf.asset_kind_', m.kind)}</span>
+            <a class="rsv__name rsv__link" href={safeHref(m.url)} target="_blank" rel="noopener noreferrer">{materialHost(m.url)}</a>
+          </li>
+        {/each}
+        {#each sheet.assets ?? [] as a, i (i)}
           <li>
             <span class="rsv__role">{enumWord('perf.asset_dir_', a.direction)}</span>
             <span class="rsv__name">{enumWord('perf.asset_kind_', a.kind)}</span>
@@ -292,6 +299,10 @@
     .rsv__name {
       font-size: var(--text-s);
       color: var(--text-color);
+    }
+
+    .rsv__link {
+      overflow-wrap: anywhere;
     }
 
     .rsv__muted {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildRoadsheet,
   isRoadsheetRole,
+  materialHost,
   roadsheetRoleFor,
   ROADSHEET_ROLES,
   ROLE_SECTIONS,
@@ -319,5 +320,36 @@ describe('buildRoadsheet: the travel section', () => {
 
   it('a bundle that did not read trips gives an empty section, not a crash', () => {
     expect(buildRoadsheet(bundle(), 'full').travel).toEqual([]);
+  });
+});
+
+describe('buildRoadsheet: materials (88)', () => {
+  const withMaterials = (): PerformanceBundle => ({
+    ...bundle(),
+    materials: [
+      { kind: 'rider', url: 'https://drive.example/rider.pdf', uploaded_at: '2026-05-19T10:00:00Z', scope: 'performance' },
+      { kind: 'stage_plot', url: 'https://www.dropbox.example/plot', uploaded_at: '2026-04-01T10:00:00Z', scope: 'line' },
+      { kind: 'dossier', url: 'javascript:alert(1)', uploaded_at: '2026-04-02T10:00:00Z', scope: 'line' },
+    ],
+  });
+
+  it('every role gets the links, and only http(s) ones travel', () => {
+    for (const role of ROADSHEET_ROLES) {
+      expect(buildRoadsheet(withMaterials(), role).materials?.map((m) => m.kind)).toEqual(['rider', 'stage_plot']);
+    }
+  });
+
+  it('a performance asset already shown with its link is not listed twice', () => {
+    expect(buildRoadsheet(withMaterials(), 'tech_manager').assets).toEqual([]);
+    expect(buildRoadsheet(bundle(), 'tech_manager').assets).toHaveLength(1);
+  });
+
+  it('a bundle that did not read them gives an empty list', () => {
+    expect(buildRoadsheet(bundle(), 'venue').materials).toEqual([]);
+  });
+
+  it('a link says its host', () => {
+    expect(materialHost('https://www.dropbox.example/plot')).toBe('dropbox.example');
+    expect(materialHost('not a url')).toBe('not a url');
   });
 });

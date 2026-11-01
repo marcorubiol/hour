@@ -5,8 +5,10 @@
  * token never travels through PostgREST table reads; all RPCs gate on
  * accepted workspace membership.
  *
- * GET  ?workspace_id= → active feed links for the workspace.
- * POST { workspace_id } → 201 with the new share.
+ * GET  ?workspace_id= → active feed links for the workspace, each with its scope.
+ * POST { workspace_id, scope? } → 201 with the new share. `scope` is `all`
+ *   (the default) or `mine` (90): only the caller's own, which needs the
+ *   caller to be a person (`user_profile.person_id`), else 400 `not_a_person`.
  */
 
 import type { RequestHandler } from './$types';
@@ -15,32 +17,22 @@ import { extractAccessToken } from '$lib/auth';
 import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import { json } from '$lib/server/http';
+import { CalendarShareCreateSchema, toCalendarShare } from '$lib/calendar-share';
 
-const BodySchema = v.object({
-  workspace_id: v.pipe(v.string(), v.uuid()),
-});
-
-type ShareRow = {
-  id: string;
-  token: string;
-  workspace_id: string;
-  created_at: string;
-};
-
-function mapShare(s: ShareRow) {
-  return {
-    id: s.id,
-    token: s.token,
-    workspace_id: s.workspace_id,
-    created_at: s.created_at,
-  };
-}
+type ShareRow = Parameters<typeof toCalendarShare>[0];
 
 // "workspace not found" and "not a member" both surface as 42501 —
 // indistinguishable by design.
 const SHARE_CODES = {
   '42501': { status: 403, error: 'forbidden_or_not_found' },
   '22023': { status: 400, error: 'invalid_input' },
+};
+
+// On create, the scope is already valid (Valibot): a 22023 there is «mine»
+// asked by a login that is not a person yet.
+const CREATE_CODES = {
+  ...SHARE_CODES,
+  '22023': { status: 400, error: 'not_a_person' },
 };
 
 export const GET: RequestHandler = async ({ request, url, platform, locals }) => {
@@ -58,7 +50,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
     const { data } = await pgPostRpc<ShareRow>(env, 'list_calendar_shares', jwt, {
       p_workspace_id: wsId,
     });
-    return json({ items: data.filter(Boolean).map(mapShare) });
+    return json({ items: data.filter(Boolean).map(toCalendarShare) });
   } catch (err) {
     return pgErrorResponse(
       err,
@@ -81,20 +73,21 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
   } catch {
     return json({ error: 'invalid_body' }, 400);
   }
-  const parsed = v.safeParse(BodySchema, raw);
+  const parsed = v.safeParse(CalendarShareCreateSchema, raw);
   if (!parsed.success) return json({ error: 'invalid_body' }, 400);
 
   try {
     const { data } = await pgPostRpc<ShareRow>(env, 'create_calendar_share', jwt, {
       p_workspace_id: parsed.output.workspace_id,
+      p_scope: parsed.output.scope,
     });
     if (data.length === 0 || !data[0]) return json({ error: 'create_failed' }, 502);
-    return json({ share: mapShare(data[0]) }, 201);
+    return json({ share: toCalendarShare(data[0]) }, 201);
   } catch (err) {
     return pgErrorResponse(
       err,
       { route: 'POST /api/calendar-shares', requestId: locals.requestId },
-      { codes: SHARE_CODES },
+      { codes: CREATE_CODES },
     );
   }
 };

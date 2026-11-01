@@ -16,6 +16,10 @@
  * pure `tripsOfPerformance` keeps the day's and the eve's. RLS decides what
  * the viewer may see of them; a guest who reads no dates gets none.
  *
+ * Materials (88): the outbound links of the performance and of its line,
+ * the same rule as `get_public_roadsheet`, so «view as» shows what the
+ * public link shows.
+ *
  * Auth: Bearer JWT required (the signed anonymous link is D6, not built).
  */
 
@@ -29,6 +33,7 @@ import {
   tripsOfPerformance,
   type CastEntry,
   type PerformanceBundle,
+  type RoadsheetMaterial,
   type RoadsheetTrip,
   type TripRow,
 } from '$lib/roadsheet';
@@ -173,6 +178,38 @@ async function readTrips(
   return tripsOfPerformance(rows, performance.performed_at, performance.venue?.timezone ?? null, names);
 }
 
+/** The outbound links of the performance and its line (88), as the public sheet reads them. */
+async function readMaterials(
+  env: SupabaseEnv,
+  jwt: string,
+  performance: PerformanceBundleResult['performance'],
+): Promise<RoadsheetMaterial[]> {
+  const owners = [`performance_id.eq.${performance.id}`];
+  if (performance.line_id) owners.push(`line_id.eq.${performance.line_id}`);
+  const { data } = await pgGet<{
+    kind: RoadsheetMaterial['kind'];
+    url: string;
+    uploaded_at: string | null;
+    performance_id: string | null;
+  }>(env, 'asset_version', jwt, {
+    search: new URLSearchParams({
+      select: 'kind,url,uploaded_at,performance_id',
+      or: `(${owners.join(',')})`,
+      direction: 'eq.outbound',
+      deleted_at: 'is.null',
+      order: 'kind.asc,uploaded_at.desc',
+      limit: '100',
+    }),
+  });
+  const own = (m: { performance_id: string | null }) => m.performance_id !== null;
+  return [...data.filter(own), ...data.filter((m) => !own(m))].map((m) => ({
+    kind: m.kind,
+    url: m.url,
+    uploaded_at: m.uploaded_at,
+    scope: own(m) ? 'performance' : 'line',
+  }));
+}
+
 export const GET: RequestHandler = async ({ request, params, url, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
@@ -228,6 +265,9 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
     const bundle = toProjectionBundle(result);
     if (ROLE_SECTIONS[role].includes('travel')) {
       bundle.travel = await readTrips(env, jwt, result.performance);
+    }
+    if (ROLE_SECTIONS[role].includes('materials')) {
+      bundle.materials = await readMaterials(env, jwt, result.performance);
     }
     const sheet = buildRoadsheet(bundle, role);
     // The viewer needs the venue timezone for dual-time display even when
