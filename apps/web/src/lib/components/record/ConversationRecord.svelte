@@ -74,7 +74,11 @@
   import { relationLabel, type ConversationBolo } from '$lib/conversation-relation';
   import { performanceStatusLabel } from '$lib/performance';
   import { conversationPlannerHref, dayKeyInTz } from '$lib/planner';
-  import { firstLine, replySubject, type MailAccountsResponse } from '$lib/mail';
+  import { firstLine, insertBlock, materialLine, replySubject, type MailAccountsResponse } from '$lib/mail';
+  import { kindLabel, type MaterialItem } from '$lib/material';
+  import { safeHref } from '$lib/utils/safe-url';
+  import Menu from '$lib/components/Menu.svelte';
+  import { tick } from 'svelte';
   import { markConversationReadOnOpen, markReadWhenSeen, readAtOpen, scrollWhenNamed } from '$lib/thread-reading.svelte';
   import { markConversationRead, type ConversationFeedView } from '$lib/conversation-feed';
   import { THREAD_REFRESH_MS, firstUnreadId, teamTimeline, type ConversationThreadView } from '$lib/threads';
@@ -268,6 +272,36 @@
     const preferred = e?.mail_account_id && sendable.some((a) => a.id === e.mail_account_id) ? e.mail_account_id : null;
     fromAccount = preferred ?? sendable.find((a) => a.scope === 'personal')?.id ?? sendable[0]?.id ?? '';
     if (e) open = new Set(open).add(e.id);
+  }
+
+  // ── Un material de la línea, enlazado en el correo (ADR-169, punto 89) ──
+  // The same read as the line's Materials module: one key, one shape.
+  const materialsQuery = createQuery(
+    toStore(() => ({
+      queryKey: ['line-materials', conv?.line_id ?? ''] as const,
+      enabled: Boolean(conv?.line_id) && composing !== null,
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchJSON<{ items: MaterialItem[] }>(`/api/lines/${conv!.line_id}/materials`, signal),
+    })),
+  );
+  let materialActions = $derived.by(() => {
+    if ($materialsQuery.isPending) return [{ label: t('mail.material_loading', locale), disabled: true }];
+    const items = ($materialsQuery.data?.items ?? []).filter((m) => safeHref(m.url));
+    if (items.length === 0) return [{ label: t('mail.material_none', locale), disabled: true }];
+    return items.map((m) => ({
+      label: m.notes ? `${kindLabel(m.kind, locale)} · ${m.notes}` : kindLabel(m.kind, locale),
+      onclick: () => void insertMaterial(m),
+    }));
+  });
+
+  /** At the caret of the body (where it was left), on its own line. */
+  async function insertMaterial(m: MaterialItem) {
+    const el = document.getElementById('reply-body') as HTMLTextAreaElement | null;
+    const r = insertBlock(body, materialLine(kindLabel(m.kind, locale), m.url), el?.selectionStart ?? body.length, el?.selectionEnd ?? body.length);
+    body = r.text;
+    await tick();
+    el?.focus();
+    el?.setSelectionRange(r.caret, r.caret);
   }
 
   const send = createMutation({
@@ -916,6 +950,13 @@
     </Field>
     <Input id="reply-subject" label={t('mail.subject', locale)} bind:value={subject} required />
     <Textarea id="reply-body" rows={5} maxlength={20000} ariaLabel={t('mail.body', locale)} bind:value={body} required />
+    {#if conv?.line_id}
+      <div class="reply__insert">
+        <Menu items={materialActions} align="start" label={t('mail.insert_material', locale)} triggerClass="btn--quiet btn--xs">
+          {#snippet trigger()}{t('mail.insert_material', locale)}<span aria-hidden="true"> ▾</span>{/snippet}
+        </Menu>
+      </div>
+    {/if}
     {#if fromSignature}
       <p class="reply__sig">-- <br />{fromSignature}</p>
     {/if}
@@ -1113,6 +1154,9 @@
       font-size: var(--text-s);
       color: var(--text-muted);
       overflow-wrap: anywhere;
+    }
+    .reply__insert {
+      display: flex;
     }
     .reply__sig {
       margin: 0;
