@@ -71,23 +71,21 @@ export function performanceMissing(input: PerformanceMissingInput, today: string
     if (by && by <= addDaysIso(today, DEADLINE_WEEKDAY_DAYS)) out.push({ kind: 'hold_deadline', day: by });
   }
 
-  if (input.status === 'confirmed' && upcoming) {
+  // Lo que bloquea antes que lo que prepara (ADR-139 § 2): sin bolo, la hoja
+  // sin compartir y nadie va; las marcas de preparación, al final.
+  if (input.hasBolo === false) out.push({ kind: 'no_bolo' });
+
+  const confirmedAhead = input.status === 'confirmed' && upcoming;
+  if (confirmedAhead && input.roadsheetLinks === 0 && day <= addDaysIso(today, ROADSHEET_SHARE_DAYS)) {
+    out.push({ kind: 'roadsheet_unshared' });
+  }
+
+  if (confirmedAhead) {
     const going = (input.commitments ?? []).some((c) => c.state === 'going');
     if (input.roster.length === 0 && !going) out.push({ kind: 'nobody_going' });
     for (const key of READINESS_KEYS) {
       if (!isReady(input.readiness, key)) out.push({ kind: 'ready', key });
     }
-  }
-
-  if (input.hasBolo === false) out.push({ kind: 'no_bolo' });
-
-  if (
-    input.status === 'confirmed' &&
-    upcoming &&
-    input.roadsheetLinks === 0 &&
-    day <= addDaysIso(today, ROADSHEET_SHARE_DAYS)
-  ) {
-    out.push({ kind: 'roadsheet_unshared' });
   }
 
   return out.slice(0, MISSING_MAX);
