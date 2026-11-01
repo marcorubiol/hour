@@ -30,9 +30,9 @@ import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import { DatePatchSchema, type DateRow } from '$lib/date';
-import { pgGet, pgPatch, pgPostRpc, PostgrestError, type SupabaseEnv } from '$lib/supabase';
+import { pgGet, pgPatch, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
-import { DATE_BASE_SELECT, DATE_EXTENDED_SELECT } from '$lib/server/date-select';
+import { DATE_SELECT } from '$lib/server/date-select';
 import { scheduleOf, type ScheduleSlotRow } from '$lib/schedule-slot';
 import { json } from '$lib/server/http';
 
@@ -56,21 +56,12 @@ export const GET: RequestHandler = async ({ request, params, platform, locals })
   if (!idParsed.success) return json({ error: 'invalid_id' }, 400);
 
   const search = new URLSearchParams();
-  search.set('select', DATE_EXTENDED_SELECT.join(','));
+  search.set('select', DATE_SELECT.join(','));
   search.set('id', `eq.${idParsed.output}`);
   search.set('deleted_at', 'is.null');
   search.set('limit', '1');
   try {
-    let rows: Array<Record<string, unknown> & { schedule_slot?: ScheduleSlotRow[] }>;
-    try {
-      rows = (await pgGet<Record<string, unknown> & { schedule_slot?: ScheduleSlotRow[] }>(env, 'date', jwt, { search })).data;
-    } catch (err) {
-      // Same graceful absence as the list: a database without the ADR-078
-      // columns still answers with the legacy ones.
-      if (!(err instanceof PostgrestError && err.code === '42703')) throw err;
-      search.set('select', DATE_BASE_SELECT.join(','));
-      rows = (await pgGet<Record<string, unknown>>(env, 'date', jwt, { search })).data;
-    }
+    const rows = (await pgGet<Record<string, unknown> & { schedule_slot?: ScheduleSlotRow[] }>(env, 'date', jwt, { search })).data;
     const found = rows[0];
     if (!found) return json({ error: 'not_found' }, 404);
     const { schedule_slot, ...row } = found;

@@ -28,7 +28,7 @@ test.describe('the season (ADR-117)', () => {
     await open(page);
     await expect(page.locator('.cal__view--on')).toHaveText(/season|temporada|saison/i);
     // Pick the month: the choice lives in that visit's URL…
-    await page.locator('.cal__view').nth(3).click();
+    await page.locator('.cal__view').nth(2).click();
     await expect(page).toHaveURL(/view=month/);
     await page.reload();
     await waitForLoaded(page);

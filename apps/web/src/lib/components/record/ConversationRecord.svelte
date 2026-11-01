@@ -139,6 +139,32 @@
   );
   let bolos = $derived($bolosQuery.data?.items ?? []);
 
+  // «+ Opción con esta sala» (ADR-138 § 3, ADR-102): el trato nace aquí, con
+  // el proyecto y la sala de la conversación, y ya colgado de ella. Las fechas
+  // se ponen después en el Planificador; la base exige `edit:money`.
+  let canOpenBolo = $derived(Boolean(conv?.can_edit && conv?.project));
+  const openBolo = createMutation({
+    mutationFn: () =>
+      mutateJSON<{ bolo?: unknown }>('POST', '/api/money/bolos', {
+        project_id: conv!.project!.id,
+        conversation_id: conv!.id,
+        venue_name: conv!.organization?.name ?? null,
+        city: conv!.organization?.city ?? null,
+        status: 'hold',
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['conversation-bolos', conv?.id ?? ''] });
+      void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
+      addToast({ tone: 'success', message: t('conversations.bolo_opened', locale) });
+    },
+    onError: (err) =>
+      addToast({
+        tone: 'danger',
+        title: t('books.deal_not_created', locale),
+        message: err instanceof ApiError && err.status === 403 ? t('conversations.bolo_forbidden', locale) : err instanceof Error ? err.message : t('perf.unexpected', locale),
+      }),
+  });
+
   // «Ver en el Planner» (ADR-138 § 6): la conversación no se dibuja en la
   // rejilla; desde aquí, la Agenda en su primer día con el proyecto fijado.
   let plannerHref = $derived.by(() => {
@@ -638,10 +664,11 @@
 
       <div class="conv__aside">
         <dl class="facts">
-          {#if bolos.length > 0}
+          {#if bolos.length > 0 || canOpenBolo}
             <div data-testid="conversation-bolos">
               <dt>{t('conversations.bolos', locale)}</dt>
-              <dd>
+              <dd class="facts__bolo-zone">
+                {#if bolos.length > 0}
                 <ul class="facts__bolos">
                   {#each bolos as b (b.bolo_id)}
                     {@const when = b.first_performed_at ? dayMonth(b.first_performed_at) : t('conversations.bolo_undated', locale)}
@@ -657,6 +684,15 @@
                     </li>
                   {/each}
                 </ul>
+                {/if}
+                {#if canOpenBolo}
+                  <Button
+                    variant="quiet"
+                    size="xs"
+                    loading={$openBolo.isPending}
+                    onclick={() => $openBolo.mutate()}>{t('conversations.open_bolo', locale)}</Button
+                  >
+                {/if}
               </dd>
             </div>
           {/if}
@@ -1097,6 +1133,12 @@
     .facts dd {
       margin: 0;
       font-size: var(--text-s);
+    }
+    .facts__bolo-zone {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-2xs);
     }
     .facts__bolos {
       display: flex;

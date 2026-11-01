@@ -175,11 +175,12 @@ Three consequences worth stating so they are not rediscovered:
   container", so counting a person pin there would blank out Conversations, Books and the Desk
   — surfaces that have no idea what a person is. They ignore the person token; that is the
   honest degradation, not a bug.
-- **Attribution can be an inference, and must say so.** A `performance` carries a real roster;
-  a `date` carries nobody (there is no date↔person table), so its people are inferred from the
-  project's cast — and the inference stops at the door of an absence. An inferred row is
-  included, never silently: see `$lib/people.ts`.
-- **Being on the axis at all requires a roster row.** No cast, no presence — which is why the
+- **Attribution is a fact or nothing (ADR-147).** A person is on a row by a roster (a
+  `performance`'s cast) or by their own «voy» (`commitment_person`); nothing is inferred. A `date`
+  carries nobody, and the project's cast says whose date it is, not who goes: a date with no «voy»
+  is a company date (`unknown`, `unattributed` for whoever is pinned), shown without asking and
+  never read as «free». One verdict for every reader: `buildPersonAttribution` in `$lib/people.ts`.
+- **Being on the axis at all requires a roster row or one's own «voy».** Neither, no presence — which is why the
   cast write path (still missing) is the thing that makes this model usable, not more model.
 
 **Editing happens at a container. Three edit levels:**
@@ -205,7 +206,7 @@ is a lens, a module, or both:
 | Concern / surface               | Global read surface     | Module (line edit)? | Note |
 |---------------------------------|-------------------------|---------------------|------|
 | **Desk** (the now)              | **digest** (not a lens) | no                  | cross-concern, ranked by urgency; the home; owns no data — a query over the others + tasks; no per-line form |
-| Planner                         | lens                    | yes                 | month grid / planning; distinct from Desk (now/triage vs planning) |
+| Planner                         | lens                    | yes                 | Season (the portada) · Agenda · Month · Board, Day as a lens (ADR-155); distinct from Desk (now/triage vs planning) |
 | Conversations                   | lens                    | yes                 | your booking network — **people AND organizations** (a theatre is a contact, not a person); persons + conversations; comms folds in later |
 | Money                           | lens                    | yes                 | fees, invoices, expenses |
 | Team                            | — (module only)         | yes                 | cast + crew executing the line — **distinct from Conversations** (Conversations = who you book with; Team = who does the show) |
@@ -242,7 +243,10 @@ The nav layer is **one home + three lenses**:
   **Ahora** (ADR-146) is a *mode* of the Desk, not a fifth lens: `/h/desk?mode=ahora`, the gig day of the
   person across their spaces (now and next with a countdown, the trip's stages, the venue, who to call, the
   rest of the running order, today's crew). The selector keeps Desk marked; on a phone it covers the frame.
-- **Planner** — month grid / planning / conflict-detection. A ⌘K lens.
+- **Planner** — planning / conflict-detection. A ⌘K lens. Its row reads Season | Agenda · Month · Board
+  (ADR-155): the Season is the portada (ADR-117), the other three are drawings of the same rows, and the
+  Day is not a word of the row but the lens on one day, opened from a day of any drawing and closed back
+  to it (`?view=day`).
 - **Conversations** — your booking network: persons + conversations. **Not "People"** — the lens holds
   organizations too (theatres, town halls, festivals), and a theatre is not a person; a *contact* is
   whoever you deal with, individual or org. Comms folds in later as a per-contact timeline (ADR-056

@@ -323,7 +323,7 @@
      Day's arrows, the board's dial) still replaces. The entry's state carries
      its own search so going back is a change `page.state` can see: shallow
      routing never moves `page.url` (see tests/scope-url.spec.ts). */
-  function syncUrl(mode: 'push' | 'replace' = 'replace') {
+  function syncUrl(mode: 'push' | 'replace' = 'replace', from?: PlannerView) {
     const url = new URL(location.href);
     url.searchParams.set('view', view);
     if (view === 'board') url.searchParams.set('lanes', laneAxis);
@@ -335,15 +335,36 @@
     else url.searchParams.delete('d');
     url.searchParams.delete('group');
     if (url.href === location.href) return;
-    (mode === 'push' ? pushState : replaceState)(url, { planner: url.search });
+    // A replace keeps the entry's `plannerFrom`: the Day's arrows move the
+    // day, not where the Day was opened from.
+    if (mode === 'push') pushState(url, { planner: url.search, ...(from ? { plannerFrom: from } : {}) });
+    else replaceState(url, { ...page.state, planner: url.search });
   }
   function setView(v: PlannerView) {
     if (view === v) return;
+    // THE DAY IS A LENS, NOT A WORD OF THE ROW (ADR-155): its entry remembers
+    // the drawing it was opened from, so its × goes back there.
+    const from = v === 'day' ? view : undefined;
     view = v;
     // The address bar is the truth: shallow routing never updates the
     // reactive page.url (see tests/scope-url.spec.ts), so both read and
     // write go through location.href.
-    syncUrl('push');
+    syncUrl('push', from);
+  }
+  /** The Day's ×. Opened from a drawing of this page, it is one step back
+      (that drawing, as you left it). Opened from anywhere else (Hoy, ⌘K, a
+      link, a reload), there is no drawing behind it: the Agenda opens at
+      that day, the day among its neighbours. */
+  function closeDay() {
+    if ((page.state as { plannerFrom?: PlannerView }).plannerFrom) history.back();
+    else openAgendaAt(selectedDay);
+  }
+  function openAgendaAt(iso: string) {
+    agendaFromIso = iso;
+    if (iso.slice(0, 7) > agendaToIso.slice(0, 7)) {
+      agendaEnd = { year: Number(iso.slice(0, 4)), month: Number(iso.slice(5, 7)) };
+    }
+    setView('agenda');
   }
   function setLaneAxis(g: LaneAxis) {
     if (laneAxis === g) return;
@@ -2918,8 +2939,8 @@
 
   /* ── THE KEYBOARD (ADR-095) ───────────────────────────────────────────
      Views by number, in the SAME ORDER AS THE WORDS ON SCREEN — that is the
-     rule, not the specific digits, so when the Day view lands and becomes the
-     first word it becomes `1` and the rest shift with it.
+     rule, not the specific digits: the Day left the row (ADR-155), so the
+     keys are 1 to 4 and `Esc` closes the Day, as its × does.
 
      `T` today · `← →` move the window · `N` a new date on the day you are
      looking at. `N` IS THE ONLY KEY THAT WRITES, and it goes through the same
@@ -2958,7 +2979,7 @@
       }
 
       // The SAME order as the words on screen (CalToolbar's VIEW_ORDER).
-      const views: PlannerView[] = ['overview', 'day', 'agenda', 'month', 'board'];
+      const views: PlannerView[] = ['overview', 'agenda', 'month', 'board'];
       const n = Number(e.key);
       if (n >= 1 && n <= views.length) {
         e.preventDefault();
@@ -2966,6 +2987,11 @@
         return;
       }
       switch (e.key) {
+        case 'Escape':
+          if (view !== 'day') return;
+          e.preventDefault();
+          closeDay();
+          return;
         case 't':
         case 'T':
           e.preventDefault();
@@ -3423,6 +3449,7 @@
     onCreate={canPlan ? () => openCreate() : undefined}
     onFeed={feedWorkspaces.length > 0 ? openFeed : undefined}
     onBlackout={openBlackout}
+    onCloseDay={closeDay}
   />
 
 
@@ -3462,13 +3489,7 @@
         ym = { year: Number(thu.slice(0, 4)), month: Number(thu.slice(5, 7)) };
         setView('month');
       }}
-      onGap={(iso) => {
-        agendaFromIso = iso;
-        if (iso.slice(0, 7) > agendaToIso.slice(0, 7)) {
-          agendaEnd = { year: Number(iso.slice(0, 4)), month: Number(iso.slice(5, 7)) };
-        }
-        setView('agenda');
-      }}
+      onGap={openAgendaAt}
       onCreate={canPlan ? () => openCreate() : undefined}
       calm={calm.on}
       onLeaveCalm={() => calm.set(false)}

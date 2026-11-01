@@ -10,8 +10,7 @@
   export type SectionId =
     | 'profile'
     | 'workspaces'
-    | 'privacy'
-    | 'languages'
+    | 'space'
     | 'lenses'
     | 'tags'
     | 'facets'
@@ -28,8 +27,7 @@
   export const SECTIONS: Section[] = [
     { id: 'profile', labelKey: 'settings.nav_profile', glyph: '◯' },
     { id: 'workspaces', labelKey: 'settings.nav_workspaces', glyph: '▸' },
-    { id: 'privacy', labelKey: 'settings.nav_privacy', glyph: '◌' },
-    { id: 'languages', labelKey: 'settings.nav_languages', glyph: '¶' },
+    { id: 'space', labelKey: 'settings.nav_space', glyph: '¶' },
     { id: 'lenses', labelKey: 'settings.nav_lenses', glyph: '◫' },
     { id: 'tags', labelKey: 'settings.nav_tags', glyph: '#' },
     { id: 'facets', labelKey: 'settings.nav_facets', glyph: '◇' },
@@ -52,9 +50,13 @@
     return SECTIONS.filter((s) => ids.includes(s.id));
   }
 
+  /** The ids of sections that were folded into another: old links still land (ADR-156). */
+  const FOLDED: Readonly<Record<string, SectionId>> = { privacy: 'space', languages: 'space' };
+
   /** A `?section=` that is not (or no longer) a section, or not one this space offers, lands on Profile. */
   export function sectionFrom(param: string | null, offered: readonly Section[] = SECTIONS): SectionId {
-    return offered.some((s) => s.id === param) ? (param as SectionId) : 'profile';
+    const id = (param && FOLDED[param]) || param;
+    return offered.some((s) => s.id === id) ? (id as SectionId) : 'profile';
   }
 </script>
 

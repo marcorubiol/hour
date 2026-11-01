@@ -5645,6 +5645,82 @@ están en el historial.
 sin reparto (entonces es un hecho en la celda, no una decisión), y si una opción que solo sale en «Te espera» se
 pierde de vista en «Después».
 
+## [2026-11-01] ADR-155 · Planificador: la Temporada aparte, tres dibujos y el Día como lupa (enmienda ADR-095 § 1 y ADR-120 § 7)
+
+**Contexto.** Marco, 01-11: las cinco vistas del Planificador parecen muchas, pero todas sirven. Análisis del carril
+`claude/planner-views` (fuera de git): la barra ponía cinco palabras iguales para tres cosas distintas, un panel
+(Temporada), tres dibujos de las mismas filas (Agenda, Mes, Tablero) y una lupa (Día), que las otras cuatro ya abren al
+pulsar un día y que Hoy cubre para hoy (ADR-150). Marco eligió la opción A de cuatro. Sin migración.
+
+**Decisión.**
+1. **La barra dice cuatro palabras: Temporada | Agenda · Mes · Tablero.** Una raya fina separa la portada de los tres
+   dibujos. El orden no cambia con el estado y las teclas lo siguen: `1` a `4`.
+2. **El Día sale de la barra.** Se abre pulsando un día en cualquier dibujo, desde Hoy, ⌘K o Cuentas, como hasta ahora.
+   Mientras estás en él, «Día» es la palabra encendida al final de la fila, con una × que lo cierra. `?view=day` sigue
+   siendo su dirección.
+3. **Cerrar el Día vuelve al dibujo del que venías** (un paso atrás en el historial, que deja ese dibujo como estaba).
+   Si no hay dibujo detrás (un enlace, Hoy, ⌘K, una recarga), abre la Agenda en ese día. `Esc` hace lo mismo que la ×.
+   El dibujo de origen viaja en el estado de la entrada del historial (`plannerFrom`), no en la URL: un enlace copiado
+   no dice de dónde venías.
+   **En el móvil** (menos de 48rem), dentro del Día la fila deja solo «Temporada | Día ×» y los botones de crear y
+   del menú: los tres dibujos se esconden porque la salida es la ×, y así la fila no desborda (Marco, 01-11).
+4. **La Temporada sigue siendo la portada** (ADR-117 § 2, ADR-120 § 2). Marco lo preguntó; se mantiene porque responde
+   lo que ninguna otra pantalla responde al entrar y porque la puerta de Hoy enseña sus cifras.
+
+**Qué no cambia.** Las cinco vistas y lo que dibujan, la vista por la URL (ADR-120 § 2), el dial del Tablero
+(ADR-094), las flechas junto al título (ADR-136).
+
+**Cómo se revierte.** Volver `CalToolbar.svelte` y la página del Planificador al commit anterior; las claves
+`planner.day_close` pueden quedarse.
+
+**Re-evaluar el 23-11** (la entrada de `_tasks.md`): si alguien entra siempre en la Temporada y salta en seguida a otro
+dibujo, que cada uno abra en el suyo (opción D, una preferencia junto a `membership.view_scope`).
+
+## [2026-11-01] ADR-156 · Lo que sobra fuera, el bolo desde la conversación y Ajustes en una sección menos (enmienda ADR-139 § 2, ADR-141 § 1 y ADR-145 § 2)
+
+**Contexto.** Tanda «haría / quitaría» del 01-11, puntos 51 a 61, con el OK de Marco en el chat al coordinador; aquí
+los que hace la rama `claude/batch-51` (51, 53, 55, 56, 58, 59, 60, 61). 52, 54, 57 y 62 van aparte. Sin migración:
+la API de bolos ya aceptaba `conversation_id` y ninguna pantalla lo mandaba.
+
+**Decisión.**
+1. **(51) El bolo nace de la conversación** (ADR-138 § 3, ADR-102). En la ficha de conversación, bajo sus bolos,
+   «+ Opción con esta sala» crea un bolo en `hold` con el proyecto, el `conversation_id`, la sala y la ciudad de la
+   organización; la fecha se pone después en el Planificador. Sale a quien puede editar la conversación y tiene
+   proyecto; la base sigue exigiendo `edit:money`, y un 403 lo dice en palabras. En «Nuevo trato» de Cuentas, un
+   selector opcional con las conversaciones del proyecto elegido manda `conversation_id`, y al elegir una rellena la
+   sala y la ciudad que estén vacías.
+2. **(53) «Falta» de la función: lo que bloquea antes que lo que prepara** (enmienda ADR-139 § 2 en el orden): opción
+   que vence, sin bolo, hoja de ruta sin compartir, nadie va y, al final, las marcas de preparación (hotel, técnica…).
+   Sigue el tope de tres.
+3. **(55) Las conversaciones del proyecto con la fila de la lente** (ADR-141 § 1): `RelationshipStub` pinta
+   `ConversationRow` (la sala primero, turno, relación, bolo, lo último, cuándo y el paso), la fila es el enlace a la
+   ficha y el orden es «lo que pide» (`orden=pide`). Sin raya de relleno: sin nombre, «Conversación». La franja «Falta»
+   del proyecto lee su propia página en el orden del paso (`projectStepsQueryOptions`), porque `lineMissing` necesita
+   ese orden para saber si la página tiene todos los pasos vencidos: dos peticiones en vez de una.
+4. **(56) La ayuda dice lo que se ve.** «Te espera»: tareas, respuestas, dos opciones el mismo día por decidir y
+   cobros vencidos, por días, sin «si vas a las funciones de los próximos 14 días» (ADR-147 § 6, ADR-149 § 3). El
+   paso 1 de Hoy: la agenda de hoy con lo de ahora abierto y «Después» (ADR-150, ADR-153). «Lo deduce Hour» sin
+   «Confírmalo o corrígelo». Fuera las variantes `@music` que ya decían lo mismo.
+5. **(58) Fuera «Aquí vivirán los riders, dosieres y planos…»** de la portada del proyecto (ADR-154 § 16) y sus claves.
+6. **(59) Ajustes: «Visibilidad y privacidad» y «Oficio» son una sección, «Oficio y privacidad»** (id `space`,
+   `SpaceSection.svelte`). `?section=privacy` y `?section=languages` caen en ella (`sectionFrom`). Quedan siete
+   secciones, no seis: el encargo contaba ocho a seis, y juntar estas dos quita una.
+7. **(60) Fuera la compatibilidad muerta**: el reintento con 42703 de `GET /api/dates` y `GET /api/dates/:id` (un solo
+   `DATE_SELECT`; una columna que falte es un error), `hold_notice_absent` del bundle de la función (el aviso de la
+   opción se pide siempre) y `PerfChip.svelte`, sin ningún import.
+8. **(61) La «i» del filtro «Relación»** de Conversaciones se va: lo que significa cada relación ya estaba en el «?»
+   de la lente (`SECTION_CONCEPTS.conversations`, ADR-145 § 2).
+
+**Qué no cambia.** La API de bolos, el permiso `edit:money`, el texto de cada relación, lo que guarda cada ajuste.
+
+**Cómo se revierte.** Cada punto es su commit en `claude/batch-51`. Las claves i18n borradas (`project.assets*`,
+`settings.nav_privacy`, `settings.nav_languages`, `settings.priv_*`, `settings.lang_*` y las dos `@music`) están en
+el historial.
+
+**Re-evaluar cuando** Marco abra opciones desde la conversación una temporada: si «+ Opción» debe preguntar la fecha
+en el mismo gesto, y si quien no tiene `edit:money` debería ni ver el botón (hoy no hay en el cliente un permiso de
+dinero que leer).
+
 ## [2026-11-01] ADR-159 · La ficha de organización (fase 3 de ADR-102)
 
 **Contexto.** Una conversación de difusión es con la organización (ADR-102), pero la organización no tenía ficha:

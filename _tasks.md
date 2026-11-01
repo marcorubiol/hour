@@ -27,8 +27,10 @@
     `performance_guard_bolo` (`20260828100000`) que exige mismo proyecto —
     aplicado a producción, con `tests/rls/performance-bolo.test.ts` (5 casos)
     sujetándolo. RLS 151 → **156**.
-    *Lo que queda, y es lo que Marco tiene que dibujar:* el selector de bolo en
-    la ficha de función y/o en el alta del Planner. Con una **tensión de
+    *Hecho después (comprobado el 2026-11-01 en el código):* el selector de bolo
+    ya está en la ficha de función (`showBoloSelect`, `PerformanceRecord.svelte`)
+    y en el alta (`bolo_id` en `PerformanceForm.svelte`). *Lo que queda:* «+
+    función» desde la ficha del bolo, para colgar la segunda. Con la **tensión de
     producto abierta** que no me toca resolver: escribir el enlace es
     `edit:performance` pero leer el bolo es `read:money`, así que quien coloca
     fechas sin leer dinero puede **enlazar y no ver lo enlazado**. Es coherente
@@ -130,7 +132,7 @@
 ## Decisiones con coste o autoridad externa
 
 - [ ] Marco: hacer — **Recorrer la app él mismo antes de invitar a Anouk** (Marco, 10-10); después, pasar su email para invitarla a `muk-cia`.
-- [ ] Marco: decidir (23-11) — **Planner: ¿sobran vistas?** Cinco (Temporada, Día, Agenda, Mes, Tablero). Se dejan las cinco un mes de uso real y se decide entonces con qué vista abre cada uno (drop 19-10, chat 23-10: opción A). Las otras: quitar Día como pestaña y abrirlo al pulsar un día en Agenda o Mes; o recortar a Temporada, Mes y Tablero. No hay medición instrumentada: se decide por el uso de Marco y Anouk.
+- [ ] Marco: decidir (23-11) — **Planner: ¿vista de entrada por persona?** ADR-155 ya ordenó la barra (Temporada | Agenda · Mes · Tablero, Día como lupa). Queda la opción D: si alguien entra siempre en la Temporada y salta en seguida a otro dibujo, que cada uno abra en el suyo (una preferencia junto a `membership.view_scope`). Sin medición instrumentada: se decide por el uso de Marco y Anouk.
 9. [ ] **Pasar `hour-phase0` a Supabase Pro (25 $/mes) antes de la beta; después el coordinador activa HIBP y corre el advisor.** Marco, 2026-10-10: Pro antes de la beta, pero **aún no**; sigue en Free con el keepalive diario. El proyecto está en plan
    Free y la función requiere Pro. Marco debe decidir el upgrade; después activar
    `password_hibp_enabled` y volver a ejecutar el advisor. **Ojo: el upgrade que
@@ -506,8 +508,6 @@
 - [ ] **Velocidad: RLS evalúa `has_permission` una vez por fila** (medido el 24-10, `build/coordination/load-speed/`): `mailout` 1,14 s por 637 filas, `conversation` 0,35 s por 306; en Supabase Free las lecturas de Hoy se frenan entre sí. Reescribir las políticas para calcular los proyectos permitidos una vez (InitPlan o función que devuelve el conjunto). Toca seguridad: migración, RLS entera y E2E. También: `/api/mailout?` de Difusión tarda unos 3 s por lo mismo.
 - [ ] **Realtime: el token del socket se congela a la hora** (`src/lib/realtime/client.ts` llama a `setAuth(token)` con token explícito; realtime-js 2.105 deja de reautenticar en el latido). Pasar a modo callback, sin coste de red con el token ya en memoria.
 - [ ] **Velocidad, primera carga en frío** (24-10): el fragmento de i18n lleva los cuatro idiomas (141 kB brotli), Google Fonts 350 kB y bloquea el primer pintado, y el service worker precachea 227 ficheros uno tras otro (16-25 s). Cargar solo el idioma activo, fuentes propias con preload, precache más corto.
-
-- [ ] **Difusión: un texto de 8,8 px en las filas** (`ConversationRow.svelte`), fuera de la escala de ADR-145.
 
 - [ ] **Modo «Ahora», después de la v1** (ADR-146, v1 en producción el 30-10): hotel y aparcamiento estructurados, billetes y rider en PDF, «qué ha cambiado», escribir sin red, aviso 30 min antes de la llamada. Re-evaluar dónde va el botón en el móvil tras usarlo en gira.
 

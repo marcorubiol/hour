@@ -132,17 +132,28 @@ test.describe('planner laws (ADR-095)', () => {
     // follow — so a reader who learns one has learned the other.
     await planner(page, 'month');
     const words = await page.locator('.cal__view').allInnerTexts();
-    // `Day` names the DRAWING; `Now` (the window control beside it) names the
-    // act of going to the present. Two words, two jobs — they used to be the
-    // same word seventy pixels apart.
-    // The season (ADR-117) is the portada, so it opens the row.
-    expect(words.map((w) => w.trim().toLowerCase())).toEqual([
-      'season',
-      'day',
-      'agenda',
-      'month',
-      'board',
-    ]);
+    // The season (ADR-117) is the portada, so it opens the row. The Day is
+    // not a word of it (ADR-155): it opens from a day of any drawing.
+    expect(words.map((w) => w.trim().toLowerCase())).toEqual(['season', 'agenda', 'month', 'board']);
+  });
+
+  test('THE DAY IS A LENS: lit while you are in it, and its × goes back to where it was opened', async ({
+    page,
+  }) => {
+    await planner(page, 'month');
+    await expect(page.locator('.cal__lens')).toHaveCount(0);
+    // A day of the month opens the Day, which lights its word with a ×…
+    await page.locator('button.cal__day-num').first().click();
+    await expect(page).toHaveURL(/view=day/);
+    await expect(page.locator('.cal__lens-word')).toBeVisible();
+    await expect(page.locator('.cal__view--on')).toHaveCount(0);
+    // …and the × is the way back to the Month, as you left it.
+    await page.locator('.cal__lens-close').click();
+    await expect(page).toHaveURL(/view=month/);
+    // With no drawing behind it (a link, Hoy, ⌘K), the × opens the Agenda.
+    await planner(page, 'day');
+    await page.keyboard.press('Escape');
+    await expect(page).toHaveURL(/view=agenda/);
   });
 
   test('THE WINDOW’S CONTROLS RIDE WITH THE TITLE, and they are the smallest things there', async ({
@@ -198,7 +209,7 @@ test.describe('planner laws (ADR-095)', () => {
     );
   });
 
-  test('THE VIEW WORDS START AT THE SAME PLACE IN ALL FIVE DRAWINGS, and the title does not jump', async ({
+  test('THE VIEW WORDS START AT THE SAME PLACE IN ALL FIVE VIEWS, and the title does not jump', async ({
     page,
   }) => {
     // ADR-136: nothing is reserved before the words for a drawing that has no
@@ -318,8 +329,9 @@ test.describe('planner laws (ADR-095)', () => {
       [...document.querySelectorAll<HTMLButtonElement>('.cal__view')].filter((b) => b.disabled).length,
     );
     expect(inert).toBe(0);
-    // All five projections are reachable (the season joined, ADR-117).
-    await expect(page.locator('.cal__view')).toHaveCount(5);
+    // Four words: the season and three drawings; the Day opens from a day
+    // (ADR-155).
+    await expect(page.locator('.cal__view')).toHaveCount(4);
   });
 
   /* ONE TEST PER VIEW. The five used to share one test: ten full loads of the
