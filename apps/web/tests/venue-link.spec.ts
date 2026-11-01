@@ -127,10 +127,10 @@ test.describe('venue linking', () => {
     // Timezone drives the road sheet dual-time; one contact for the
     // production block. Idempotent values — reruns overwrite in place.
     await venueDialog.locator('#v-timezone').fill('Europe/Paris');
-    if ((await venueDialog.locator('.perf__contact-row').count()) === 0) {
+    if ((await venueDialog.locator('.venue-edit__contact-row').count()) === 0) {
       await venueDialog.getByRole('button', { name: 'Add contact' }).click();
     }
-    const firstRow = venueDialog.locator('.perf__contact-row').first();
+    const firstRow = venueDialog.locator('.venue-edit__contact-row').first();
     await firstRow.locator('input').nth(0).fill('ZZZ Tech Manager');
     await firstRow.locator('input').nth(1).fill('Regidoria');
     await firstRow.locator('input').nth(3).fill('+34 600 000 001');
@@ -167,4 +167,40 @@ test.describe('venue linking', () => {
     await dialog2.getByRole('button', { name: 'Save changes', exact: true }).click();
     await expect(dialog2).not.toBeVisible({ timeout: 10_000 });
   });
+
+  test('the venue title opens its record: its contact calls, the performance is listed (ADR-162)', async ({ page }) => {
+    test.setTimeout(90_000);
+
+    await startUnlinked(page);
+    await page.getByRole('button', { name: 'Edit details' }).click();
+    const dialog = page.locator('dialog[open]').filter({ hasText: 'Edit performance' });
+    const select = dialog.locator('#f-venue-entity');
+    const option = select.locator('option', { hasText: 'ZZZ E2E Venue' });
+    await select.selectOption({ value: (await option.getAttribute('value'))! });
+    await dialog.getByRole('button', { name: 'Save changes', exact: true }).click();
+    await expect(dialog).not.toBeVisible({ timeout: 10_000 });
+
+    try {
+      await page.reload();
+      await waitForLoaded(page);
+      const title = page.locator('h1 a.record-head__titlelink');
+      await expect(title).toHaveText('ZZZ E2E Venue', { timeout: 10_000 });
+      await title.click();
+
+      await expect(page).toHaveURL(/\/h\/playwright\/venue\/[^/]+$/);
+      const record = page.getByTestId('venue-record');
+      await expect(record.locator('h1')).toContainText('ZZZ E2E Venue');
+      // The contact the other test wrote, with its phone as a tel: link.
+      await expect(record.getByTestId('venue-contacts').locator('a[href^="tel:"]')).toHaveAttribute(
+        'href',
+        'tel:+34600000001',
+      );
+      await expect(
+        record.locator('[data-testid="venue-coming"], [data-testid="venue-past"]').locator('a[href="/h/playwright/performance/zzz-e2e-1"]'),
+      ).toBeVisible();
+    } finally {
+      await startUnlinked(page);
+    }
+  });
 });
+

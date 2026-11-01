@@ -22,10 +22,10 @@
   import RecordState from '$lib/components/RecordState.svelte';
   import Button from '$lib/components/Button.svelte';
   import Checkbox from '$lib/components/Checkbox.svelte';
+  import VenueEditDialog, { type VenueEditable } from '$lib/components/VenueEditDialog.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Field from '$lib/components/Field.svelte';
   import Input from '$lib/components/Input.svelte';
-  import Textarea from '$lib/components/Textarea.svelte';
   import Menu from '$lib/components/Menu.svelte';
   import ProductionStub from '$lib/components/ProductionStub.svelte';
   import RunningOrder from '$lib/components/RunningOrder.svelte';
@@ -46,9 +46,6 @@
     performanceStatusLabel,
     type PerformancePatch,
     type PerformanceStatus,
-    READINESS_KEYS,
-    readinessLabelKey,
-    isReady,
   } from '$lib/performance';
   import type { VenueContact } from '$lib/venue';
   import DirectoryPicker from '$lib/components/DirectoryPicker.svelte';
@@ -103,9 +100,6 @@
       logistics: Json;
       hospitality: Json;
       technical: Json;
-      /* ADR-084 §3 — the verdict, next to the content it summarises. Typed
-         narrower than Json on purpose: the key set is closed app-side. */
-      readiness: Record<string, boolean> | null;
       venue: {
         id: string;
         slug: string | null;
@@ -267,18 +261,6 @@
       });
     },
   });
-
-  /**
-   * ADR-084 §3 — tick "is it sorted?". Reuses the generic patch mutation on
-   * purpose: a readiness tick is an ordinary field write, and that mutation
-   * already invalidates the planner feed, so the month card's foot repaints
-   * without a second invalidation path to keep in sync.
-   */
-  function toggleReady(key: string) {
-    if (!perf) return;
-    const current = (perf.readiness ?? {}) as Record<string, boolean>;
-    $patchMutation.mutate({ readiness: { ...current, [key]: !current[key] } });
-  }
 
   /**
    * Logística, acogida y técnica, línea a línea (Marco, 2026-10-20): the
@@ -551,97 +533,13 @@
     void queryClient.invalidateQueries({ queryKey: ['venues'] });
   }
 
-  // ── Venue edit (ADR-053): address, timezone (feeds dual-time on the
-  // road sheet), contacts, capacity, notes. PATCH /api/venues/:id — no
-  // RPC (venue_update RLS covers workspace members; ADR-048 only bites
-  // soft-deletes). ─────────────────────────────────────────────────────
-  type ContactDraft = { name: string; role: string; email: string; phone: string };
-
+  // ── Venue edit (ADR-053): one editor, `VenueEditDialog`, also drawn by
+  // the venue's own record (ADR-162 § 1). ────────────────────────────────
   let venueEditOpen = $state(false);
-  let vName = $state('');
-  let vCity = $state('');
-  let vCountry = $state('');
-  let vAddress = $state('');
-  let vCapacity = $state('');
-  let vTimezone = $state('');
-  let vNotes = $state('');
-  let vContacts = $state<ContactDraft[]>([]);
-
-  // The native medium already knows every IANA zone — no bundled list.
-  const timezoneOptions =
-    typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : [];
+  let editingVenue = $derived<VenueEditable | null>(venues.find((vn) => vn.id === fVenueId) ?? null);
 
   function openVenueEdit() {
-    const venue = venues.find((vn) => vn.id === fVenueId);
-    if (!venue) return;
-    vName = venue.name;
-    vCity = venue.city ?? '';
-    vCountry = venue.country ?? '';
-    vAddress = venue.address ?? '';
-    vCapacity = venue.capacity != null ? String(venue.capacity) : '';
-    vTimezone = venue.timezone ?? '';
-    vNotes = venue.notes ?? '';
-    vContacts = (venue.contacts ?? []).map((c) => ({
-      name: c.name ?? '',
-      role: c.role ?? '',
-      email: c.email ?? '',
-      phone: c.phone ?? '',
-    }));
-    venueEditOpen = true;
-  }
-
-  function addContactRow() {
-    vContacts = [...vContacts, { name: '', role: '', email: '', phone: '' }];
-  }
-
-  function removeContactRow(index: number) {
-    vContacts = vContacts.filter((_, i) => i !== index);
-  }
-
-  const venuePatch = createMutation({
-    mutationFn: () =>
-      mutateJSON<{ venue: VenueLite }>('PATCH', `/api/venues/${fVenueId}`, {
-        name: vName.trim(),
-        city: vCity.trim() || null,
-        country: vCountry.trim() || null,
-        address: vAddress.trim() || null,
-        capacity: vCapacity.trim() ? Number(vCapacity) : null,
-        timezone: vTimezone.trim() || null,
-        notes: vNotes.trim() || null,
-        contacts: vContacts
-          .filter((c) => c.name.trim())
-          .map((c) => ({
-            name: c.name.trim(),
-            role: c.role.trim() || null,
-            email: c.email.trim() || null,
-            phone: c.phone.trim() || null,
-          })),
-      }),
-    onSuccess: (result) => {
-      venueEditOpen = false;
-      void queryClient.invalidateQueries({ queryKey: ['venues'] });
-      void queryClient.invalidateQueries({ queryKey: ['performance'] });
-      addToast({
-        tone: 'success',
-        message: t('venue.updated', locale, { name: result?.venue.name ?? vName }),
-      });
-    },
-    onError: (err) => {
-      addToast({
-        tone: 'danger',
-        title: t('venue.not_saved', locale),
-        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
-      });
-    },
-  });
-
-  function saveVenue() {
-    formErrors.clear();
-    if (!vName.trim()) {
-      formErrors.set('v-name', t('venue.needs_name', locale));
-      return void formErrors.focusFirst();
-    }
-    $venuePatch.mutate();
+    if (editingVenue) venueEditOpen = true;
   }
 
   let loading = $derived($query.isPending);
@@ -655,6 +553,22 @@
   let workspaceTz = $derived(
     $wsQuery.data?.items.find((w) => w.slug === workspaceSlug)?.timezone ?? null,
   );
+
+  // The title is the venue: when it is a venue of the space, it links to its
+  // record (ADR-162 § 1); its id while it has no slug (the route reads both).
+  let titleHref = $derived(
+    perf?.venue ? `/h/${workspaceSlug}/venue/${encodeURIComponent(perf.venue.slug ?? perf.venue.id)}` : null,
+  );
+
+  // «Con <organización>»: who the deal is with, a fact of the head that opens
+  // the conversation (ADR-138 § 6, ADR-162 § 3). Its organization, else the
+  // contact's own, else the contact.
+  let withWhom = $derived.by(() => {
+    const c = perf?.conversation;
+    if (!c) return null;
+    const name = c.organization?.name || c.person?.organization_name || c.person?.full_name || '';
+    return name ? { name, href: `/h/${workspaceSlug}/conversation/${encodeURIComponent(c.slug || c.id)}` } : null;
+  });
 
   let title = $derived(
     perf?.venue?.name ?? perf?.venue_name ?? perf?.project?.name ?? slug,
@@ -750,7 +664,6 @@
             status: perf.status,
             day: perf.performed_at,
             hold_notice_days: perf.hold_notice_days,
-            readiness: perf.readiness,
             roster: performanceRoster(bundle),
             commitments: perf.commitments,
             hasBolo: boloReadable ? currentBoloId !== null : null,
@@ -779,21 +692,6 @@
           text: t('record.missing_nobody_going', locale),
           verbs: [{ label: t('record.verb_sign_up', locale), href: '#who-goes' }],
         };
-      case 'ready': {
-        const word = t(readinessLabelKey(m.key), locale);
-        return {
-          id: `ready_${m.key}`,
-          text: t('record.missing_ready', locale, { item: word }),
-          verbs: [
-            {
-              label: t('record.verb_done', locale),
-              ariaLabel: t('record.verb_done_aria', locale, { item: word }),
-              onclick: () => toggleReady(m.key),
-              disabled: $patchMutation.isPending,
-            },
-          ],
-        };
-      }
       case 'no_bolo':
         return {
           id: 'no_bolo',
@@ -828,14 +726,11 @@
           hasJsonContent(perf.technical)),
     ),
   );
-  let readyCount = $derived(perf ? READINESS_KEYS.filter((k) => isReady(perf!.readiness, k)).length : 0);
   let detailsKeeps = $derived(
     perf
       ? [
-          `${t('perf.readiness', locale)} ${readyCount}/${READINESS_KEYS.length}`,
           hasProduction ? t('perf.production', locale) : null,
           perf.date.length > 0 ? `${t('perf.dates', locale)} ${perf.date.length}` : null,
-          perf.conversation?.person || perf.conversation?.organization ? t('perf.programmer', locale) : null,
           perf.asset_version.length > 0 ? `${t('perf.assets', locale)} ${perf.asset_version.length}` : null,
         ]
           .filter(Boolean)
@@ -860,7 +755,7 @@
       {locale}
     />
   {:else if perf}
-    <RecordHead {crumbs} {title}>
+    <RecordHead {crumbs} {title} {titleHref}>
       {#snippet actions()}
         <span class="perf__roadsheet-link"
           ><a class="link-arrow" href={`/h/${workspaceSlug}/performance/${slug}/roadsheet`}>{t('roadsheet.open', locale)}</a
@@ -924,6 +819,11 @@
           {:else}
             <span>{placeLine}</span>
           {/if}
+        {/if}
+        {#if withWhom}
+          <span data-testid="perf-with"
+            >{t('perf.with', locale)} <a class="lenshead__frag" href={withWhom.href}>{withWhom.name}</a></span
+          >
         {/if}
         {#if boloReadable && currentBolo && perf!.project}
           <span class="perf__bolo-fact">
@@ -1060,29 +960,10 @@
       </section>
     {/if}
 
-    <!-- Lo de consulta, plegado (ADR-139 p2): la lista entera de la
-         preparación (lo que falta ya sube a «Falta»), la sala por dentro,
-         las fechas, el programador y los materiales. -->
+    <!-- Lo de consulta, plegado (ADR-139 p2): la sala por dentro,
+         las fechas y los materiales. Quién programa es un hecho de la
+         cabecera («Con…», ADR-162 § 3). -->
     <Fold word={t('record.details', locale)} keeps={detailsKeeps} bind:open={detailsOpen} id="details" testid="record-details">
-      <!-- ADR-084 §3 — the answer to "is it sorted?", which the month card's
-           foot reads. -->
-      <section class="perf__section" aria-label={t('perf.readiness', locale)}>
-        <BlockHead title={t('perf.readiness', locale)} level={3} />
-        <ul class="perf__ready" role="list">
-          {#each READINESS_KEYS as key (key)}
-            {@const on = isReady(perf.readiness, key)}
-            <li>
-              <Checkbox
-                label={t(readinessLabelKey(key), locale)}
-                checked={on}
-                disabled={!canEdit || $patchMutation.isPending}
-                onchange={() => toggleReady(key)}
-              />
-            </li>
-          {/each}
-        </ul>
-      </section>
-
       <ProductionStub
         venue={perf.venue}
         venueName={perf.venue_name}
@@ -1110,22 +991,6 @@
               </li>
             {/each}
           </ul>
-        </section>
-      {/if}
-
-      {#if perf.conversation?.person || perf.conversation?.organization}
-        <section class="perf__section" aria-label={t('perf.programmer', locale)}>
-          <BlockHead title={t('perf.programmer', locale)} level={3} />
-          <p class="perf__programmer">
-            {#if perf.conversation.person}
-              <a href={`/h/${workspaceSlug}/person/${perf.conversation.person.slug}`}>
-                {perf.conversation.person.full_name}
-              </a>
-            {/if}
-            {#if perf.conversation.organization?.name || perf.conversation.person?.organization_name}
-              <span class="perf__person-note">{perf.conversation.organization?.name || perf.conversation.person?.organization_name}</span>
-            {/if}
-          </p>
         </section>
       {/if}
 
@@ -1236,55 +1101,7 @@
   {/snippet}
 </Dialog>
 
-<Dialog bind:open={venueEditOpen} title={t('venue.edit_title', locale)} size="m">
-  <p class="perf__dialog-hint">{t('venue.edit_hint', locale)}</p>
-  <div class="perf__form-grid" oninput={formErrors.onedit}>
-    <Input id="v-name" label={t('venue.name', locale)} bind:value={vName} required error={formErrors.of('v-name')} />
-    <Input label={t('create.city', locale)} bind:value={vCity} />
-    <Input label={t('perf.country', locale)} bind:value={vCountry} placeholder="ES" />
-    <Input label={t('venue.capacity', locale)} type="number" bind:value={vCapacity} />
-  </div>
-  <div class="perf__form-grid">
-    <Input label={t('venue.address', locale)} bind:value={vAddress} placeholder={t('venue.address_placeholder', locale)} />
-    <Input
-      id="v-timezone"
-      label={t('venue.timezone', locale)}
-      list="v-timezone-list"
-      bind:value={vTimezone}
-      placeholder="Europe/Madrid"
-    />
-    <datalist id="v-timezone-list">
-      {#each timezoneOptions as tz (tz)}
-        <option value={tz}></option>
-      {/each}
-    </datalist>
-  </div>
-  <div class="perf__venue-contacts">
-    <p class="eyebrow">{t('venue.contacts', locale)}</p>
-    {#each vContacts as _, i (i)}
-      <div class="perf__contact-row">
-        <Input label={i === 0 ? t('venue.name', locale) : undefined} bind:value={vContacts[i].name} placeholder={t('venue.name', locale)} />
-        <Input label={i === 0 ? t('venue.contact_role', locale) : undefined} bind:value={vContacts[i].role} placeholder={t('venue.contact_role_placeholder', locale)} />
-        <Input label={i === 0 ? t('settings.email', locale) : undefined} type="email" bind:value={vContacts[i].email} placeholder={t('settings.email', locale)} />
-        <Input label={i === 0 ? t('venue.phone', locale) : undefined} type="tel" bind:value={vContacts[i].phone} placeholder={t('venue.phone', locale)} />
-        <button
-          type="button"
-          class="perf__contact-remove"
-          aria-label={t('venue.remove_contact', locale)}
-          onclick={() => removeContactRow(i)}
-        >×</button>
-      </div>
-    {/each}
-    <Button variant="secondary" size="xs" onclick={addContactRow}>{t('venue.add_contact', locale)}</Button>
-  </div>
-  <div class="perf__venue-notes">
-    <Textarea id="v-notes" label={t('perf.notes', locale)} rows={3} bind:value={vNotes} />
-  </div>
-  {#snippet actions()}
-    <Button variant="quiet" onclick={() => (venueEditOpen = false)}>{t('create.cancel', locale)}</Button>
-    <Button onclick={saveVenue} loading={$venuePatch.isPending}>{t('venue.save', locale)}</Button>
-  {/snippet}
-</Dialog>
+<VenueEditDialog bind:open={venueEditOpen} venue={editingVenue} />
 
 <Dialog bind:open={confirmCancelOpen} title={t('perf.cancel_title', locale)} size="s">
   <p>
@@ -1369,40 +1186,6 @@
       flex: 1 1 100%;
     }
 
-    /* The button keeps its one line; the hint is what wraps (it broke
-       «Delete performance…» in two at every width). */
-    .perf__venue-contacts {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-xs);
-      margin-block-start: var(--space-m);
-    }
-
-    .perf__contact-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr 1fr auto;
-      gap: var(--space-xs);
-      align-items: end;
-      --field-label-width: 100%;
-    }
-
-    .perf__contact-remove {
-      inline-size: 2rem;
-      block-size: 2rem;
-      border: var(--line-hairline) solid var(--border-color-light);
-      border-radius: var(--radius-s);
-      background: none;
-      color: var(--text-faint);
-      cursor: pointer;
-    }
-    .perf__contact-remove:hover {
-      color: var(--danger);
-      border-color: var(--danger);
-    }
-
-    .perf__venue-notes {
-      margin-block-start: var(--space-m);
-    }
 
     .perf__section {
       display: flex;
@@ -1410,16 +1193,6 @@
       gap: var(--space-s);
     }
 
-    /* Readiness — a checklist you TICK, not a status you read. The whole
-       row is the target (box + word), never a 12px square. */
-    .perf__ready {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--space-xs) var(--space-m);
-      margin: 0;
-      padding: 0;
-      list-style: none;
-    }
 
 
     .perf__people li,
@@ -1462,9 +1235,6 @@
       min-inline-size: 4rem;
     }
 
-    .perf__programmer {
-      font-size: var(--text-s);
-    }
 
   }
 </style>

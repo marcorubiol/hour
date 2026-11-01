@@ -25,7 +25,6 @@ function perf(over: Partial<PerformanceMissingInput> = {}): PerformanceMissingIn
     status: 'confirmed',
     day: addDaysIso(TODAY, 30),
     hold_notice_days: null,
-    readiness: { hotel: true, technical: true },
     roster: ['p1'],
     commitments: [],
     hasBolo: true,
@@ -39,14 +38,9 @@ describe('performanceMissing', () => {
     expect(performanceMissing(perf(), TODAY)).toEqual([]);
   });
 
-  it('names each preparation item not ticked, in the checklist order', () => {
-    expect(performanceMissing(perf({ readiness: null }), TODAY)).toEqual([
-      { kind: 'ready', key: 'hotel' },
-      { kind: 'ready', key: 'technical' },
-    ]);
-    expect(performanceMissing(perf({ readiness: { hotel: true } }), TODAY)).toEqual([
-      { kind: 'ready', key: 'technical' },
-    ]);
+  it('hotel and technical are not asked for (ADR-162 § 2)', () => {
+    const kinds = performanceMissing(perf({ day: addDaysIso(TODAY, 3) }), TODAY).map((m) => m.kind);
+    expect(kinds).toEqual([]);
   });
 
   it('nobody going: no roster and nobody said «voy»; a «voy» or a roster is enough', () => {
@@ -57,13 +51,13 @@ describe('performanceMissing', () => {
     expect(performanceMissing(perf({ roster: [], commitments: [{ person_id: 'p2', state: 'going' }] }), TODAY)).toEqual([]);
   });
 
-  it('preparation and people are asked only of a confirmed one still to come', () => {
-    const empty = { roster: [], readiness: null };
+  it('people are asked only of a confirmed one still to come', () => {
+    const empty = { roster: [] };
     expect(performanceMissing(perf({ ...empty, day: addDaysIso(TODAY, -1) }), TODAY)).toEqual([]);
     expect(performanceMissing(perf({ ...empty, status: 'done' }), TODAY)).toEqual([]);
     expect(performanceMissing(perf({ ...empty, status: 'proposed' }), TODAY)).toEqual([]);
     // Today still counts as to come.
-    expect(performanceMissing(perf({ ...empty, day: TODAY }), TODAY)).toHaveLength(3);
+    expect(performanceMissing(perf({ ...empty, day: TODAY }), TODAY)).toEqual([{ kind: 'nobody_going' }]);
   });
 
   it('a hold asks for a decision when its deadline is within the coming week or past', () => {
@@ -103,16 +97,15 @@ describe('performanceMissing', () => {
 
   it(`never says more than ${MISSING_MAX}, what blocks before what prepares`, () => {
     const all = performanceMissing(
-      perf({ day: addDaysIso(TODAY, 7), roster: [], readiness: null, hasBolo: false, roadsheetLinks: 0 }),
+      perf({ day: addDaysIso(TODAY, 7), roster: [], hasBolo: false, roadsheetLinks: 0, status: 'hold', hold_notice_days: 3 }),
       TODAY,
     );
-    expect(all).toEqual([{ kind: 'no_bolo' }, { kind: 'roadsheet_unshared' }, { kind: 'nobody_going' }]);
-    // With the bolo and the sheet in place, the preparation marks fill the rest.
-    const prep = performanceMissing(
-      perf({ day: addDaysIso(TODAY, 7), roster: [], readiness: null, hasBolo: true, roadsheetLinks: 2 }),
+    expect(all).toEqual([{ kind: 'hold_deadline', day: addDaysIso(TODAY, 4) }, { kind: 'no_bolo' }]);
+    const many = performanceMissing(
+      perf({ day: addDaysIso(TODAY, 7), roster: [], hasBolo: false, roadsheetLinks: 0 }),
       TODAY,
     );
-    expect(prep).toEqual([{ kind: 'nobody_going' }, { kind: 'ready', key: 'hotel' }, { kind: 'ready', key: 'technical' }]);
+    expect(many).toEqual([{ kind: 'no_bolo' }, { kind: 'roadsheet_unshared' }, { kind: 'nobody_going' }]);
   });
 });
 

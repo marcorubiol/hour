@@ -1,6 +1,9 @@
 /**
- * ⌘K, lo que se busca pero no se fija: contactos, organizaciones y
- * conversaciones de los espacios de quien busca.
+ * ⌘K, lo que se busca pero no se fija: contactos, organizaciones,
+ * conversaciones, salas, funciones y bolos de los espacios de quien busca.
+ * Funciones y bolos se encuentran por sala, ciudad, organización y fecha
+ * (ADR-162 § 4); un bolo solo sale a quien lee dinero en su proyecto
+ * (`bolo_select` pide `read:money`).
  *
  * El equipo (reparto y técnica) sigue siendo el eje de personas que se puede
  * fijar en el ámbito; la agenda de contactos no lo es, porque cientos de
@@ -14,6 +17,7 @@
  */
 
 import { fetchJSON } from './api';
+import type { PeekTarget } from './peek';
 
 /** Un contacto: un dossier del espacio (`workspace_person`). */
 export interface SearchPerson {
@@ -38,10 +42,41 @@ export interface SearchConversation {
   title: string;
   project_name: string | null;
 }
+/** Una sala del espacio (`venue`): su nombre o su ciudad contienen el texto. */
+export interface SearchVenue {
+  workspace_id: string;
+  id: string;
+  slug: string | null;
+  name: string;
+  city: string | null;
+}
+/** Una función cuya sala, ciudad u organización contiene el texto, o del día escrito. */
+export interface SearchPerformance {
+  workspace_id: string;
+  id: string;
+  slug: string | null;
+  performed_at: string;
+  status: string;
+  venue_name: string | null;
+  city: string | null;
+  project_name: string | null;
+}
+/** Un bolo, igual que una función; solo con `read:money` en su proyecto. */
+export interface SearchBolo {
+  workspace_id: string;
+  id: string;
+  project_id: string;
+  venue_name: string | null;
+  city: string | null;
+  project_name: string | null;
+}
 export interface PaletteSearchResult {
   persons: SearchPerson[];
   organizations: SearchOrganization[];
   conversations: SearchConversation[];
+  venues: SearchVenue[];
+  performances: SearchPerformance[];
+  bolos: SearchBolo[];
 }
 
 /** Filas por grupo: el ⌘K salta, no lista. */
@@ -60,35 +95,67 @@ export function paletteSearchTerm(raw: string): string {
   return term.length >= 2 ? term : '';
 }
 
-export function paletteSearchQueryOptions(term: string, workspaceIds: string[]) {
+/**
+ * `day` (YYYY-MM-DD) es la fecha que el texto nombra entera (`parseDayQuery`
+ * en la paleta): con ella, también las funciones de ese día y sus bolos.
+ */
+export function paletteSearchQueryOptions(term: string, workspaceIds: string[], day: string | null = null) {
   return {
-    queryKey: ['palette-search', term, workspaceIds] as const,
+    queryKey: ['palette-search', term, workspaceIds, day] as const,
     enabled: term.length >= 2 && workspaceIds.length > 0,
     staleTime: 30_000,
     queryFn: ({ signal }: { signal: AbortSignal }) =>
       fetchJSON<PaletteSearchResult>(
-        `/api/search?q=${encodeURIComponent(term)}&workspace_ids=${workspaceIds.join(',')}`,
+        `/api/search?q=${encodeURIComponent(term)}&workspace_ids=${workspaceIds.join(',')}${day ? `&day=${day}` : ''}`,
         signal,
       ),
   };
 }
 
+/**
+ * Las funciones en el orden en que se buscan: las que vienen, la más cercana
+ * primero; después las pasadas, la última primero. Una vez cada una, y
+ * `SEARCH_LIMIT` como mucho.
+ */
+export function searchPerformanceOrder<T extends { id: string; performed_at: string }>(rows: readonly T[], today: string): T[] {
+  const once = [...new Map(rows.map((r) => [r.id, r])).values()];
+  const day = (r: T) => r.performed_at.slice(0, 10);
+  const coming = once.filter((r) => day(r) >= today).sort((a, b) => day(a).localeCompare(day(b)));
+  const past = once.filter((r) => day(r) < today).sort((a, b) => day(b).localeCompare(day(a)));
+  return [...coming, ...past].slice(0, SEARCH_LIMIT);
+}
+
 /** Una fila de destino del ⌘K: abre `href`, no se fija. */
 export interface FindRow {
-  kind: 'contact' | 'organization' | 'conversation';
+  kind: 'contact' | 'organization' | 'conversation' | 'venue' | 'performance' | 'bolo';
   /** Única entre todas las filas de la paleta. */
   token: string;
   name: string;
   path: string;
+  /** Su página; vacío cuando no tiene (un bolo), y entonces abre `peek`. */
   href: string;
+  /** Lo que no tiene página se abre en el vistazo (un bolo, ADR-139 p1). */
+  peek?: PeekTarget;
+}
+
+/** Cada grupo de filas de destino, en el orden de la paleta. */
+export interface FindRows {
+  contacts: FindRow[];
+  organizations: FindRow[];
+  conversations: FindRow[];
+  venues: FindRow[];
+  performances: FindRow[];
+  bolos: FindRow[];
 }
 
 /**
- * Las filas de los tres grupos.
+ * Las filas de los grupos.
  *
  * - Un contacto que ya está en el equipo no se repite: allí se puede fijar.
  * - Una organización abre su ficha (ADR-159), tenga una conversación o
  *   varias; sus conversaciones salen en su grupo, cada una a lo suyo.
+ * - Una sala abre su ficha (ADR-162); una función, la suya, con su día y su
+ *   proyecto al lado; un bolo, su vistazo (no tiene página).
  * - Un espacio que no está en la lista (no debería pasar) deja la fila fuera:
  *   sin su slug no hay a dónde ir.
  */
@@ -98,9 +165,11 @@ export function paletteFindRows(
     teamPersonIds: ReadonlySet<string>;
     workspaces: readonly { id: string; slug: string; name: string }[];
     spaceLabel: (name: string) => string;
+    /** Cómo se dice el día de una función en su fila. */
+    dayLabel: (iso: string) => string;
   },
-): { contacts: FindRow[]; organizations: FindRow[]; conversations: FindRow[] } {
-  const empty = { contacts: [], organizations: [], conversations: [] };
+): FindRows {
+  const empty = { contacts: [], organizations: [], conversations: [], venues: [], performances: [], bolos: [] };
   if (!result) return empty;
   const ws = new Map(o.workspaces.map((w) => [w.id, w]));
   const many = o.workspaces.length > 1;
@@ -143,5 +212,48 @@ export function paletteFindRows(
       href: `/h/${w.slug}/conversation/${c.id}`,
     });
   }
-  return { contacts, organizations, conversations };
+
+  // Una respuesta de antes de estos grupos (la caché del dispositivo) no los trae.
+  const venues: FindRow[] = [];
+  for (const v of result.venues ?? []) {
+    const w = ws.get(v.workspace_id);
+    if (!w) continue;
+    venues.push({
+      kind: 'venue',
+      token: `f:venue:${v.id}`,
+      name: v.name,
+      path: v.city ?? (many ? o.spaceLabel(w.name) : ''),
+      href: `/h/${w.slug}/venue/${encodeURIComponent(v.slug ?? v.id)}`,
+    });
+  }
+
+  const performances: FindRow[] = [];
+  for (const p of result.performances ?? []) {
+    const w = ws.get(p.workspace_id);
+    if (!w || !p.slug) continue;
+    performances.push({
+      kind: 'performance',
+      token: `f:perf:${p.id}`,
+      name: p.venue_name || p.city || p.project_name || o.dayLabel(p.performed_at),
+      path: [o.dayLabel(p.performed_at), p.project_name].filter(Boolean).join(' · '),
+      href: `/h/${w.slug}/performance/${encodeURIComponent(p.slug)}`,
+    });
+  }
+
+  const bolos: FindRow[] = [];
+  for (const b of result.bolos ?? []) {
+    const w = ws.get(b.workspace_id);
+    const name = b.venue_name || b.city || b.project_name;
+    if (!w || !name) continue;
+    bolos.push({
+      kind: 'bolo',
+      token: `f:bolo:${b.id}`,
+      name,
+      path: b.project_name ?? '',
+      href: '',
+      peek: { kind: 'bolo', projectId: b.project_id, id: b.id },
+    });
+  }
+
+  return { contacts, organizations, conversations, venues, performances, bolos };
 }

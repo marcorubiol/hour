@@ -111,13 +111,6 @@
      * actually being decided between.
      */
     stateLabel?: (status: string) => string | null;
-    /**
-     * The readiness checklist a CONFIRMED gig shows on its foot, in display
-     * order (ADR-084 §3). A settled gig's foot answers "is it sorted?"
-     * instead of restating "confirmed" — which the fill already says. Items
-     * always print; the tick is what varies, so the foot never collapses.
-     */
-    readinessItems?: { key: string; label: string }[];
     /** «more» — the word after the +N door on a full cell. */
     moreLabel?: string;
     /** «week 27» — the gutter's own label. */
@@ -165,10 +158,6 @@
       const key = statusFootKey(status);
       return key ? t(key, L) : null;
     },
-    readinessItems = [
-      { key: 'hotel', label: t('planner.ready_hotel', L) },
-      { key: 'technical', label: t('planner.ready_technical', L) },
-    ],
     moreLabel = t('planner.more_n', L),
     isoWeekLabel = (n: number) => `${t('planner.week_n', L)} ${n}`,
     releasedLabel = t('planner.released', L),
@@ -2269,29 +2258,6 @@
       letter-spacing: var(--mono-letter-spacing-loose);
       color: var(--text-faint);
     }
-    /* Readiness ticks: the WORD always prints, only the ✓ varies. "Not
-       sorted" then reads as a visible absence rather than as nothing at
-       all — and the settled gig's foot never collapses to empty. */
-    .cal__grid :global(.cal__event-foot--ready) {
-      display: flex;
-      gap: var(--space-xs);
-      letter-spacing: var(--mono-letter-spacing);
-      min-inline-size: 0;
-    }
-    .cal__grid :global(.cal__ready) {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .cal__grid :global(.cal__ready--on) {
-      color: var(--text-muted);
-    }
-    .cal__grid :global(.cal__ready--on::before) {
-      content: '✓';
-      margin-inline-end: 0.2em;
-      color: var(--success, currentColor);
-    }
-
     .cal__grid :global(a.cal__event:hover),
     .cal__grid :global(.cal__event--openable:hover) {
       filter: brightness(0.97);

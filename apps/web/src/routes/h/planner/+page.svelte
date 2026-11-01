@@ -165,8 +165,6 @@
     holdDeadlineLabel,
     isHoldStatus,
     performanceStatusFamily,
-    READINESS_KEYS,
-    readinessLabelKey,
     statusFootKey,
   } from '$lib/performance';
   import { dateStatusFamily } from '$lib/date';
@@ -2022,7 +2020,6 @@
       const v = unclosedOf(
         {
           start_at: p.start_at,
-          readiness: p.readiness,
           person_ids: p.person_ids,
           commitments: p.commitments,
           city: p.venue?.city ?? p.city,
@@ -2041,7 +2038,7 @@
         city: p.venue?.city ?? p.city,
         href: p.slug && ws ? `/h/${ws}/performance/${p.slug}` : null,
         missing: v.missing.map((k) =>
-          k === 'time' ? 'planner.season_miss_time' : k === 'cast' ? 'planner.season_miss_cast' : readinessLabelKey(k),
+          k === 'time' ? 'planner.season_miss_time' : 'planner.season_miss_cast',
         ),
         travelGuess: v.travelGuess,
         soon: day <= addDaysIso(todayIso, 13),
@@ -3629,10 +3626,6 @@
       awayWord={t('planner.band_away', locale)}
       tourWord={t('planner.band_tour', locale)}
       untilLabel={(day) => t('planner.band_until', locale, { day })}
-      readinessItems={READINESS_KEYS.map((k) => ({
-        key: k,
-        label: t(readinessLabelKey(k), locale),
-      }))}
     />
   {:else if view === 'agenda'}
     <AgendaList

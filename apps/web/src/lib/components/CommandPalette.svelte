@@ -41,6 +41,8 @@
   import { dayKeyInTz, plannerDayHref } from '$lib/planner';
   import { lensOn } from '$lib/lenses.svelte';
   import { localeDayMonth, viewerTimeZone } from '$lib/datetime';
+  import { openPeek } from '$lib/peek.svelte';
+  import type { PeekTarget } from '$lib/peek';
   import { detectLocale, LOCALE_TAG, t } from '$lib/i18n';
   import { accentVarFor } from '$lib/utils/accent';
   import { spaceName } from '$lib/utils/identity';
@@ -176,9 +178,13 @@
     const timer = setTimeout(() => (searchTerm = next), 150);
     return () => clearTimeout(timer);
   });
+  // A date written whole also finds that day's performances and bolos.
+  let searchDay = $derived(
+    searchTerm ? parseDayQuery(searchTerm.toLowerCase(), { today: todayIso, locales: [localeTag, 'es', 'ca', 'en'] }) : null,
+  );
   const findQuery = createQuery(
     toStore(() => ({
-      ...paletteSearchQueryOptions(searchTerm, workspaces.map((w) => w.id)),
+      ...paletteSearchQueryOptions(searchTerm, workspaces.map((w) => w.id), searchDay),
       enabled: open && searchTerm.length >= 2 && workspaces.length > 0,
       placeholderData: (prev: unknown) => prev as never,
     })),
@@ -188,6 +194,7 @@
       teamPersonIds: new Set(people.map((p) => p.person_id)),
       workspaces,
       spaceLabel: spaceName,
+      dayLabel: (iso: string) => localeDayMonth(iso, localeTag),
     }),
   );
   /** Aún buscando lo que se acaba de escribir: no es lo mismo que «nada». */
@@ -208,10 +215,30 @@
    * te lleva— y porque el ⌘K ya es la única puerta de navegación que esta app
    * tiene: inventarle otra ventana para escribir una fecha sería la segunda.
    */
-  type Kind = 'space' | 'project' | 'line' | 'person' | 'contact' | 'organization' | 'conversation' | 'day' | 'create';
+  type Kind =
+    | 'space'
+    | 'project'
+    | 'line'
+    | 'person'
+    | 'contact'
+    | 'organization'
+    | 'conversation'
+    | 'venue'
+    | 'performance'
+    | 'bolo'
+    | 'day'
+    | 'create';
   /** Las filas que se abren y no se fijan: un día, un «crear» y lo que busca
       `palette-search`. Ninguna entra en el ámbito. */
-  const GOES = new Set<Kind>(['day', 'create', 'contact', 'organization', 'conversation']);
+  const GOES = new Set<Kind>(['day', 'create', 'contact', 'organization', 'conversation', 'venue', 'performance', 'bolo']);
+  /** The glyph of a found row: what it is, not a scope (`ScopeGlyph` draws scopes). */
+  const FOUND_GLYPH: Record<'organization' | 'conversation' | 'venue' | 'performance' | 'bolo', string> = {
+    organization: '⌂',
+    conversation: '⇄',
+    venue: '▭',
+    performance: '◇',
+    bolo: '¤',
+  };
   interface Row {
     token: string;
     kind: Kind;
@@ -222,8 +249,10 @@
     lineKind?: string;
     /** for a «crear» row: what it opens */
     create?: PaletteCreate;
-    /** for a found row (contact, organization, conversation): where it goes */
+    /** for a found row (contact, organization, conversation…): where it goes */
     href?: string;
+    /** for a found row without a page (a bolo): the vistazo it opens */
+    peek?: PeekTarget;
   }
   interface Group {
     key: Kind;
@@ -244,6 +273,9 @@
     contact: 'palette.kind_contact',
     organization: 'palette.kind_organization',
     conversation: 'picker.kind_conversation',
+    venue: 'peek.kind_venue',
+    performance: 'peek.kind_performance',
+    bolo: 'peek.kind_bolo',
     day: 'palette.kind_day',
   };
 
@@ -375,7 +407,7 @@
       // look alike: still fetching · the feed could not be read · nobody
       // matches. Only the last one is silence.
       const found = (rows: typeof finds.contacts): Row[] =>
-        rows.map((f) => ({ token: f.token, kind: f.kind, name: f.name, path: f.path, drill: null, href: f.href }));
+        rows.map((f) => ({ token: f.token, kind: f.kind, name: f.name, path: f.path, drill: null, href: f.href, peek: f.peek }));
       const contacts = found(finds.contacts);
       // The team is empty but a contact matched: «nobody yet» would read as
       // the search failing, which is the bug this group exists to fix.
@@ -405,6 +437,9 @@
           },
           { key: 'organization', header: t('palette.organizations', locale), rows: found(finds.organizations) },
           { key: 'conversation', header: t('palette.conversations', locale), rows: found(finds.conversations) },
+          { key: 'venue', header: t('palette.venues', locale), rows: found(finds.venues) },
+          { key: 'performance', header: t('palette.performances', locale), rows: found(finds.performances) },
+          { key: 'bolo', header: t('conversations.bolos', locale), rows: found(finds.bolos) },
           { key: 'day', header: t('palette.day', locale), rows: dayRows },
           // The last: what you can make, after what already exists.
           { key: 'create', header: t('palette.create', locale), rows: createRows },
@@ -463,6 +498,11 @@
 
   function openRow(r: Row) {
     if (r.kind === 'create') return runCreate(r);
+    if (r.peek) {
+      open = false;
+      openPeek(r.peek);
+      return;
+    }
     if (r.href) {
       void goto(r.href);
       open = false;
@@ -705,8 +745,8 @@
                        (ver `Kind`). Añadirle un caso sería estirar su
                        significado para un solo llamador. -->
                   <span class="cmdk__dayglyph" aria-hidden="true">◷</span>
-                {:else if r.kind === 'organization' || r.kind === 'conversation'}
-                  <span class="cmdk__dayglyph" aria-hidden="true">{r.kind === 'organization' ? '⌂' : '⇄'}</span>
+                {:else if r.kind === 'organization' || r.kind === 'conversation' || r.kind === 'venue' || r.kind === 'performance' || r.kind === 'bolo'}
+                  <span class="cmdk__dayglyph" aria-hidden="true">{FOUND_GLYPH[r.kind]}</span>
                 {:else}
                   <ScopeGlyph kind={r.kind === 'contact' ? 'person' : r.kind} accent={r.kind === 'contact' ? 'var(--text-faint)' : accentFor(r.token)} lineKind={r.lineKind ?? ''} />
                 {/if}

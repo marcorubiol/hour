@@ -5,7 +5,6 @@
  * holds into that shape. Every label is a key; the page translates.
  */
 import { addDaysIso } from '$lib/planner';
-import { READINESS_KEYS } from '$lib/performance';
 
 /** Twelve weeks: one season of booking, and it fits on one screen. */
 export const SEASON_WEEKS = 12;
@@ -81,11 +80,10 @@ export function gapWindows(
 }
 
 /** What a confirmed gig can still be missing. `travel` is a guess (see below). */
-type UnclosedKey = 'time' | 'cast' | (typeof READINESS_KEYS)[number];
+type UnclosedKey = 'time' | 'cast';
 
 interface UnclosedInput {
   start_at: string | null;
-  readiness?: Record<string, boolean> | null;
   /** Roster from `?rosters=1`; null/undefined = the feed did not say. */
   person_ids?: string[] | null;
   /** ADR-103 — a «voy» counts as somebody going even with no roster row. */
@@ -126,7 +124,6 @@ export function unclosed(
 ): UnclosedVerdict {
   const missing: UnclosedKey[] = [];
   if (!perf.start_at) missing.push('time');
-  for (const key of READINESS_KEYS) if (perf.readiness?.[key] !== true) missing.push(key);
   const going = (perf.commitments ?? []).some((c) => c.state === 'going');
   if (Array.isArray(perf.person_ids) && perf.person_ids.length === 0 && !going) missing.push('cast');
   const home = cityKey(ctx.home);

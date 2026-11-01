@@ -128,7 +128,6 @@ type PerformanceItem = {
   project_id: string;
   line_id: string | null;
   conversation_id: string | null;
-  readiness: Record<string, boolean> | null;
   load_in_at: string | null;
   soundcheck_at: string | null;
   start_at: string | null;
@@ -204,10 +203,8 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       // ADR-090: the five timeslots are `schedule_slot` rows; the items keep
       // their five fields, derived below.
       SCHEDULE_SLOT_EMBED,
-      // ADR-084 §3 — the operator's readiness ticks; the card's foot reads
-      // them. The logistics/hospitality/technical CONTENT stays out of the
-      // feed (heavy, and the month never shows it).
-      'readiness',
+      // The logistics/hospitality/technical CONTENT stays out of the feed
+      // (heavy, and the month never shows it).
       // ADR-103 — each person's «voy / no voy» on a gig.
       COMMITMENTS_EMBED,
       ...(notice === '1' ? ['hold_notice_days'] : []),

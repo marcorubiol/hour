@@ -61,8 +61,6 @@ export type PerformanceEvent = {
     country?: string | null;
     timezone: string | null;
   } | null;
-  /** ADR-084 §3 — the operator's readiness ticks, read by the card foot. */
-  readiness?: Record<string, boolean> | null;
   /**
    * ADR-080 §2 — days of notice before the gig, NULL meaning "the standard".
    * It travels under `?notice=1`, which until ADR-095 only the decisions feed

@@ -13,7 +13,7 @@
  * only says what and in which order.
  */
 
-import { DEADLINE_WEEKDAY_DAYS, READINESS_KEYS, decideBy, isHoldStatus, isReady, type ReadinessKey } from './performance';
+import { DEADLINE_WEEKDAY_DAYS, decideBy, isHoldStatus } from './performance';
 import { addDaysIso } from './planner';
 import type { Commitment } from './people';
 import { followUpDue, turnOf, type TurnRow } from './conversation-overview';
@@ -38,8 +38,6 @@ export type PerformanceMissing =
   | { kind: 'hold_deadline'; day: string }
   /** Confirmed and upcoming, and nobody is down to go (no roster, no «voy»). */
   | { kind: 'nobody_going' }
-  /** Confirmed and upcoming, and this preparation item is not ticked. */
-  | { kind: 'ready'; key: ReadinessKey }
   /** It hangs from no bolo: there is nowhere for its money to live. */
   | { kind: 'no_bolo' }
   /** Confirmed, close, and the road sheet has no link for anybody yet. */
@@ -50,7 +48,6 @@ export interface PerformanceMissingInput {
   /** The performance day, YYYY-MM-DD (or an instant whose date part is it). */
   day: string;
   hold_notice_days: number | null;
-  readiness: Record<string, boolean> | null;
   /** The explicit roster (cast, overrides, crew): `performanceRoster`. */
   roster: readonly string[];
   commitments: readonly Commitment[] | null | undefined;
@@ -71,8 +68,8 @@ export function performanceMissing(input: PerformanceMissingInput, today: string
     if (by && by <= addDaysIso(today, DEADLINE_WEEKDAY_DAYS)) out.push({ kind: 'hold_deadline', day: by });
   }
 
-  // Lo que bloquea antes que lo que prepara (ADR-139 § 2): sin bolo, la hoja
-  // sin compartir y nadie va; las marcas de preparación, al final.
+  // Lo que bloquea, en orden (ADR-139 § 2): sin bolo, la hoja sin compartir
+  // y nadie va. Hotel y técnica ya no son marcas que pedir (ADR-162 § 2).
   if (input.hasBolo === false) out.push({ kind: 'no_bolo' });
 
   const confirmedAhead = input.status === 'confirmed' && upcoming;
@@ -83,9 +80,6 @@ export function performanceMissing(input: PerformanceMissingInput, today: string
   if (confirmedAhead) {
     const going = (input.commitments ?? []).some((c) => c.state === 'going');
     if (input.roster.length === 0 && !going) out.push({ kind: 'nobody_going' });
-    for (const key of READINESS_KEYS) {
-      if (!isReady(input.readiness, key)) out.push({ kind: 'ready', key });
-    }
   }
 
   return out.slice(0, MISSING_MAX);
