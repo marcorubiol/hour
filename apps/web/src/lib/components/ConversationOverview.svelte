@@ -45,7 +45,6 @@
     type BlockRow,
     type ColdRow,
     type DueRow,
-    type HotRow,
     type OverviewResponse,
     type RelationCounts,
     type SeasonLine,
@@ -181,10 +180,6 @@
       ? t('overview.aria_reply', locale, { name: name(row), when: relativeContactDate(row.at, locale), what: row.subject || kindLabel(row.kind) })
       : t('overview.aria_follow_up', locale, { name: name(row), when: dayMonth(row.at), what: row.note ?? '' });
   }
-  function hotAria(row: HotRow): string {
-    const turn = row.turn === 'ours' ? t('overview.turn_ours', locale) : row.turn === 'theirs' ? t('overview.turn_theirs', locale) : '';
-    return [name(row), relationLabel(row.relation, locale), relativeContactDate(row.at, locale), turn].filter(Boolean).join(', ');
-  }
   /** «parada» for a stalled one that is not waiting on our email; «sin respuesta» otherwise. */
   function coldWord(row: ColdRow): string {
     return row.reason === 'idle' ? t('overview.idle', locale) : t('overview.no_reply', locale);
@@ -287,7 +282,6 @@
   <div class="board" aria-busy="true" aria-label={t('overview.loading', locale)}>
     <div class="board__col">
       <section class="block block--due"><BlockHead title={t('overview.due', locale)} count={DASH} />{@render ghost(5)}</section>
-      {#if full}<section class="block block--hot"><BlockHead title={t('overview.hot', locale)} count={DASH} />{@render ghost(5)}</section>{/if}
     </div>
     {#if full}
     <div class="board__col">
@@ -370,32 +364,6 @@
                     onclick={() => $settle.mutate(row)}>{t('overview.settle', locale)}</button
                   >
                 {/if}
-              </li>
-            {/each}
-          </ol>
-      </section>
-      {/if}
-
-      {#if full && data.hot.count > 0}
-      <section class="block block--hot" aria-labelledby="ov-hot" data-testid="block-hot">
-        <BlockHead id="ov-hot" title={t('overview.hot', locale)} count={data.hot.count}>
-          {#if data.hot.count > 0}<a class="block-head__act" href={link('temp=caliente#lista')}>{t('overview.see_n', locale, { n: data.hot.count })}</a>{/if}
-        </BlockHead>
-          <ol class="rows">
-            {#each data.hot.rows as row (row.id)}
-              <li>
-                <a class="row" href={href(row)} aria-label={hotAria(row)}>
-                  {@render who(row, true)}
-                  <!-- Always two lines: a row without a contact keeps the block's rhythm (diseño M6). -->
-                  <span class="row__what">{row.person ?? '\u00a0'}</span>
-                  <span class="row__when"
-                    ><strong>{relativeContactDate(row.at, locale)}</strong>{row.turn === 'ours'
-                      ? t('overview.turn_ours', locale)
-                      : row.turn === 'theirs'
-                        ? t('overview.turn_theirs', locale)
-                        : ''}</span
-                  >
-                </a>
               </li>
             {/each}
           </ol>
@@ -889,9 +857,8 @@
       color: var(--text-muted);
     }
     /* Móvil: una columna en el orden del documento, que es el que lee el
-       teclado y el lector de pantalla: primero lo que pide acción (te toca,
-       caliente), después el estado (temporada, se enfría, el
-       envío). Sin `order`: lo que se ve y lo que se recorre no se separan
+       teclado y el lector de pantalla: primero lo que pide acción (te
+       toca), después el estado (temporada, se enfría, el envío). Sin `order`: lo que se ve y lo que se recorre no se separan
        (móvil #4). Tres filas por bloque y los botones a lo ancho. */
     @container (max-width: 44rem) {
       .board {
