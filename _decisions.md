@@ -5566,3 +5566,48 @@ Las cuatro claves nuevas pueden quedarse o borrarse.
 **Re-evaluar cuando** Marco lo use una gira: si la noche antes de un viaje temprano echa de menos la tarjeta (el
 localizador, la hora de salida grande), y si «Tablón · N nuevos» hace falta en una fila de «Después» para quien solo
 tiene días por venir.
+
+## [2026-11-01] ADR-154 · La pantalla no dice nada que no encaje con tu momento (enmienda ADR-080 § 3, ADR-145 fase 2 § 3, ADR-149 § 2 y ADR-150 § 6)
+
+**Contexto.** Marco, 01-11 (chat, validado punto a punto): el mismo criterio que ADR-153, aplicado al resto de Hoy y
+al Planificador. Una pantalla que cuenta minutos que no importan, da instrucciones donde no hay nada, avisa de un
+choque que solo sale de no saber quién va o repite una opción en dos sitios dice cosas que no encajan con el momento
+de quien la mira. Carril `claude/hoy-coherence`. Sin migración ni endpoint.
+
+**Decisión.**
+1. **«Nada nuevo», sin minutos.** Por debajo de una hora desde la última visita, «Ha cambiado» vacío dice «Nada
+   nuevo» (`desk.changed_none_recent`); desde una hora, como antes («…, hace 3 h»). Fuera `desk.ago_min`.
+2. **Un vacío constata, no instruye.** «Nada pendiente en este ámbito.», «Nada que hacer en esta línea.», «Nada en
+   las próximas 12 semanas.» (el «＋ fecha» de al lado se queda), «No hay facturas.»; los vacíos pierden «aún» y
+   «todavía». La explicación vive en la «?». Los bloques que ADR-145 dibuja a cero siguen.
+3. **No saber quién va no es un choque** (sigue ADR-147). Un par `possible` (un reparto vacío) ya no es decisión
+   (`decisionsFor` lo descarta: baja «por decidir» en el Planificador y en Hoy, y sale de «Te espera») ni marca de
+   choque en el Planificador (`clashVM` lo devuelve nulo). El hecho neutro es el «sin reparto» que la función ya
+   dice donde se dibuja su reparto. El motor (`conflictsFor`) sigue dando `possible`; «Choques» de la Temporada y de
+   Hoy ya no lo contaban (`clashesInSeason`).
+4. **Una opción por decidir sale en «Te espera», no en «Después».** El lado en opción de una decisión que Hoy pide
+   deja «Después» y el titular de ADR-153; el lado confirmado de un «liberar» se queda. Solo filtra lo que «Te espera»
+   ya lista (mismo ámbito, Planificador encendido).
+5. **«Después» en el móvil: el nombre primero**, entero en su renglón, y día y hora debajo (enmienda ADR-150 § 6).
+6. **Hoy sin saludo** también en escritorio: el título es el día (enmienda ADR-145 fase 2 § 3). Fuera
+   `desk.greeting_*` y la lectura de `/api/me` que solo servía al nombre.
+7. **Un plazo pasado dice qué toca**: «plazo pasado: confirma o libera» (compacto, «plazo pasado»), no cuántos días
+   hace. Fuera `planner.deadline_past_one` y `deadline_past_on`.
+8. **Los atajos no se anuncian en la pantalla**: fuera «Mayús+← →» de `planner.no_more_plan` y `planner.step_hint`
+   del título de las flechas. El atajo sigue.
+9. **Texto**: sin raya como separador en la app (dos puntos, punto o «·»); «Nada este mes.»; «pedido, sin
+   confirmar»; una sola forma de carga, «Cargando…» (la puerta de la Agenda sigue en minúscula: alterna con «↑ meses
+   anteriores» en el mismo botón).
+
+**Qué no cambia.** La tarjeta de Hoy (ADR-150, 153): ya no pinta reparto desde ADR-150 § 4, así que el «Sin reparto
+aunque dijiste voy» de `_tasks.md` ya no sale en Hoy. Calma: su «Todo al día…» no coincide con ningún título que
+diga «nada te espera» (esas claves no tienen uso).
+
+**Cómo se revierte.** Cada punto por separado, desde el historial de `claude/hoy-coherence`: 3 en `planner.ts`
+(`decisionsFor`), `DecisionBand.svelte`, `AgendaList.svelte` y `routes/h/planner/+page.svelte`; 4, 1 y 6 en
+`routes/h/desk/+page.svelte`; 5 en `DeskNext.svelte`; 7 en `performance.ts`; 8 en `CalNav.svelte`. Las claves
+borradas están en el historial.
+
+**Re-evaluar cuando** Marco lo use una gira: si echa de menos ver dos opciones de proyectos distintos el mismo día
+sin reparto (entonces es un hecho en la celda, no una decisión), y si una opción que solo sale en «Te espera» se
+pierde de vista en «Después».

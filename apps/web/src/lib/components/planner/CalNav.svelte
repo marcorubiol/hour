@@ -12,9 +12,9 @@
   interface Props {
     view: PlannerView;
     locale: Locale;
-    /** `shift` = una muesca literal, no un salto a plan. El teclado ya lo dice
-        así (`Shift+← →` en el Planner); esto es el mismo gesto con el ratón,
-        para que no haya que saberse el atajo para llegar a un hueco. */
+    /** `shift` = una muesca literal, no un salto a plan: el mismo gesto que
+        `Shift+← →` en el Planner, con el ratón. La pantalla no lo anuncia
+        (ADR-154): es un atajo para quien lo sabe. */
     onStepBack: (shift?: boolean) => void;
     onStepNext: (shift?: boolean) => void;
     onNow: () => void;
@@ -31,9 +31,6 @@
         ? { prev: 'planner.pan_back', next: 'planner.pan_next' }
         : { prev: 'planner.prev_month', next: 'planner.next_month' },
   );
-  function stepTitle(key: string): string {
-    return view === 'day' ? `${t(key, locale)} · ${t('planner.step_hint', locale)}` : t(key, locale);
-  }
 </script>
 
 <!-- Small on purpose — 28px squares and a 12px pill — because the thing they
@@ -47,14 +44,14 @@
   type="button"
   class="cal__arw hit"
   aria-label={t(stepKeys.prev, locale)}
-  title={stepTitle(stepKeys.prev)}
+  title={t(stepKeys.prev, locale)}
   onclick={(e) => onStepBack(e.shiftKey)}>‹</button
 >
 <button
   type="button"
   class="cal__arw hit"
   aria-label={t(stepKeys.next, locale)}
-  title={stepTitle(stepKeys.next)}
+  title={t(stepKeys.next, locale)}
   onclick={(e) => onStepNext(e.shiftKey)}>›</button
 >
 <button type="button" class="cal__now hit" onclick={onNow}>{t('planner.now', locale)}</button>

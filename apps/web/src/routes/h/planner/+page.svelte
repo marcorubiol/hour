@@ -890,6 +890,9 @@
     // the decisions build renders them (double via the queue, concurrence
     // deliberately silent, never a mark).
     if (c.severity === 'double' || c.severity === 'concurrence') return null;
+    // A roster nobody entered is a missing fact, drawn as «sin reparto» on
+    // the gig, never a clash mark (ADR-147, ADR-154).
+    if (c.severity === 'possible') return null;
     const rows = c.event_ids
       .map((id) => eventSummaryById.get(id))
       .filter((r): r is NonNullable<typeof r> => Boolean(r));
@@ -899,15 +902,6 @@
         severity: c.severity,
         title: t('planner.clash_people_title', locale),
         body: t('planner.clash_people_body', locale, { people }),
-        rows,
-        event_ids: c.event_ids,
-      };
-    }
-    if (c.severity === 'possible') {
-      return {
-        severity: c.severity,
-        title: t('planner.clash_possible_title', locale),
-        body: t('planner.clash_possible_body', locale),
         rows,
         event_ids: c.event_ids,
       };
@@ -1621,16 +1615,13 @@
     for (const c of clashesByDay?.get(selectedDay) ?? []) {
       if (seen.has(c.body)) continue; // one reason, said once
       seen.add(c.body);
-      const fixes =
-        c.severity === 'possible'
-          ? []
-          : c.event_ids.flatMap((id) => {
-              const p = shownPerfs.find((x) => x.id === id);
-              const ws = p ? workspaceSlugById.get(perfWorkspaceId(p) ?? '') : undefined;
-              return p?.slug && ws
-                ? [{ href: `/h/${ws}/performance/${p.slug}#who-goes`, name: performanceSlip(p, slipCtxPage).name }]
-                : [];
-            });
+      const fixes = c.event_ids.flatMap((id) => {
+        const p = shownPerfs.find((x) => x.id === id);
+        const ws = p ? workspaceSlugById.get(perfWorkspaceId(p) ?? '') : undefined;
+        return p?.slug && ws
+          ? [{ href: `/h/${ws}/performance/${p.slug}#who-goes`, name: performanceSlip(p, slipCtxPage).name }]
+          : [];
+      });
       out.push({ key: `c${out.length}`, body: c.body, fixes });
     }
     return out;
@@ -1843,14 +1834,6 @@
   }
   let decisionVMs = $derived.by((): DecisionVM[] =>
     decisionQueue.decisions.map((d) => {
-      // 'possible' = ≥1 roster unknown; name the side missing team data
-      // when only one is (the honest "add the team to confirm" pointer).
-      const aKnown = (decisionRosters[d.a.id] ?? []).length > 0;
-      const bKnown = (decisionRosters[d.b.id] ?? []).length > 0;
-      const missingTeam =
-        d.level === 'possible' && aKnown !== bKnown
-          ? (aKnown ? d.b : d.a).project
-          : null;
       return {
         id: d.id,
         day: d.day,
@@ -1859,7 +1842,6 @@
         urgent: d.urgent,
         decideBy: d.decideBy,
         people: (d.people ?? []).map((id) => personNames.get(id) ?? '—'),
-        missingTeam,
         a: decisionOptionVM(d.a),
         b: decisionOptionVM(d.b),
       };

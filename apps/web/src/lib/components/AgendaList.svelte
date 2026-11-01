@@ -10,7 +10,7 @@
     ids: [string, string];
     /** Localized reason ("… a dues reserves el mateix dia", "Sense dades…"). */
     reason: string;
-    severity: 'people' | 'possible' | 'double';
+    severity: 'people' | 'double';
   };
 
   /**

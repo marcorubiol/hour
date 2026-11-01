@@ -49,9 +49,7 @@
   import { usePins } from '$lib/stores/pins.svelte';
   import { useCalm } from '$lib/stores/calm.svelte';
   import { buildLineIndex, buildProjectIndex, resolveScope, workspacesOnScreen, type NavWorkspace, type RawLine } from '$lib/nav';
-  import { workspacesQueryOptions, activeProjectsQueryOptions, allLinesQueryOptions, meQueryOptions } from '$lib/nav-queries';
-  import { userDisplayName } from '$lib/utils/identity';
-  import { session } from '$lib/session.svelte';
+  import { workspacesQueryOptions, activeProjectsQueryOptions, allLinesQueryOptions } from '$lib/nav-queries';
   import { moneyAccessAnyQueryOptions } from '$lib/bolo-queries';
   import { conversationAccessQueryOptions } from '$lib/conversation-access';
   import { otherTagsName, scopeTags } from '$lib/conversation-tags';
@@ -220,7 +218,13 @@
    * disagree.
    */
   let pulseInput = $derived({ performances: feeds.performances, dates: feeds.dates, viewerTz, axis: feeds.axis });
-  let coming = $derived(upcoming(pulseInput, clockNow, 12));
+  /* An option waiting for a decision is decided in «Te espera», so it is not
+     also a row of «Después» nor the next thing the title names (ADR-154).
+     The confirmed side of a «liberar» stays: it is going ahead. */
+  let coming = $derived.by(() => {
+    const deciding = decidingIds();
+    return upcoming(pulseInput, clockNow, 12).filter((x) => !(x.ref.of === 'performance' && deciding.has(x.ref.id)));
+  });
   // Nothing within two weeks: one sentence names what comes (ADR-149).
   const FAR_DAYS = 14;
   let farNext = $derived(
@@ -494,12 +498,9 @@
   let quietLabel = $derived.by(() => {
     if (!lastVisit) return t('desk.changed_none_first', locale);
     const e = elapsedSince(since, clockNow);
-    const ago =
-      e.unit === 'min'
-        ? t('desk.ago_min', locale, { n: e.n })
-        : e.unit === 'h'
-          ? t('desk.ago_hours', locale, { n: e.n })
-          : daysAgoLabel(e.n, locale);
+    // Under an hour the minutes are noise: you were just here.
+    if (e.unit === 'min') return t('desk.changed_none_recent', locale);
+    const ago = e.unit === 'h' ? t('desk.ago_hours', locale, { n: e.n }) : daysAgoLabel(e.n, locale);
     return t('desk.changed_none', locale, { ago });
   });
 
@@ -532,6 +533,13 @@
   const isOption = (status: string) => status !== 'confirmed';
   // A function, not a $derived: the feed above reads it, and the engine it
   // reads is declared further down (a function is hoisted, a `let` is not).
+  /** The options «Te espera» asks you to decide (ids of their hold sides). */
+  function decidingIds(): Set<string> {
+    if (!lensOn('planner')) return new Set();
+    return new Set(
+      engine.decisionQueue.decisions.flatMap((d) => [d.a, d.b].filter((s) => isOption(s.status)).map((s) => s.id)),
+    );
+  }
   function deskDecisions(): DeskDecisionInput[] {
     return engine.decisionQueue.decisions.map((d) => ({
       id: d.id,
@@ -648,22 +656,6 @@
     const where = sl.city || sl.name;
     return where ? t('desk.day_next_at', locale, { when, what: kind, where }) : t('desk.day_next', locale, { when, what: kind });
   }
-  // ── The greeting: what the Hall said before the Desk was the way in
-  //    (ADR-137). The date and time it also said are the bar's clock
-  //    (ADR-145, fase 2). It reads the one minute tick.
-  let greeting = $derived.by(() => {
-    const h = clockNow.getHours();
-    return t(h < 6 || h >= 21 ? 'desk.greeting_night' : h < 14 ? 'desk.greeting_morning' : 'desk.greeting_afternoon', locale);
-  });
-  // The stored name (user_profile.full_name), held back while /api/me is in
-  // flight so the greeting never flashes the email handle first.
-  const meQuery = createQuery(meQueryOptions());
-  let firstName = $derived(
-    $meQuery.isPending
-      ? ''
-      : (userDisplayName($meQuery.data?.full_name, session.user?.name, session.user?.email).split(/\s+/)[0] ?? ''),
-  );
-
   // ── Task + proposal mutations (TaskBoard contract; optimistic toggle). ──
   // One PATCH for the check (status) and for accepting a proposal (origin).
   const patchTask = createMutation({
@@ -838,11 +830,9 @@
   />
 {:else}
 <div class="desk" class:desk--calm={calm.on} aria-busy={busy}>
-  <!-- GREETING AND DAY ARE ONE LINE (ADR-145, fase 2): one idea in one face,
-       the greeting an ink quieter than the day. On a phone the day alone:
-       it is the title of the card under it (ADR-148). -->
+  <!-- THE DAY IS THE TITLE, in every width (ADR-154; the greeting went: on a
+       phone it already had, ADR-148). -->
   {#snippet title()}
-    <span class="desk__hello">{greeting}{firstName ? `, ${firstName}` : ''}.</span>
     <span class="desk__day"><LensTitle text={dayTitle} /></span>
   {/snippet}
   <!-- «+»: a task is an occasional gesture, so it waits in the title row, in
@@ -964,11 +954,6 @@
       flex-direction: column;
       gap: var(--space-l);
     }
-    /* The greeting opens the title, in its face and size, an ink quieter, so
-       the day («Hoy, función en Girona») stays the part that speaks. */
-    .desk__hello {
-      color: var(--text-muted);
-    }
     .desk__composer {
       margin-block-start: calc(-1 * var(--space-s));
     }
@@ -1012,12 +997,6 @@
        so the tab and the screen reader go where the eye goes (móvil #2).
        Beside the rail, under 64 rem, two columns left the season's doors
        and the waiting list a word wide (20-10); from 64 rem up, two. */
-    /* A phone: the day alone is the title, and the card's (ADR-148). */
-    @media (max-width: 47.999rem) {
-      .desk__hello {
-        display: none;
-      }
-    }
     @media (max-width: 63.999rem) {
       .desk__grid {
         display: flex;

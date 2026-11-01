@@ -152,11 +152,12 @@ export const DEADLINE_WEEKDAY_DAYS = 6;
  * «vence mié» was printed for a deadline three weeks out AND for one that had
  * passed eighteen days ago: a weekday is read as the coming one. So the
  * weekday only inside the next six days; further out, the date; today, «hoy»;
- * and a past deadline says that it passed and how long ago.
+ * and a past deadline says what it asks for, not how long ago (Marco, 01-11:
+ * «venció hace 18 días» counts a fault; «plazo pasado: confirma o libera»
+ * says what to do).
  *
- * `compact` is the slip's state line (month and board cells): the verb goes
- * except where the time has run out, and a past deadline names its date
- * instead of counting, which would not fit a 76px cell.
+ * `compact` is the slip's state line (month and board cells): the verb goes,
+ * and a past deadline is the two words that fit a 76px cell.
  */
 export function holdDeadlineLabel(
   expires: string,
@@ -167,12 +168,7 @@ export function holdDeadlineLabel(
 ): string {
   const n = daysBetween(today, expires);
   const date = () => localeDayMonth(expires, localeTag);
-  if (n < 0) {
-    if (compact) return t('planner.deadline_past_on', locale, { day: date() });
-    return n === -1
-      ? t('planner.deadline_past_one', locale)
-      : t('planner.deadline_past', locale, { n: -n });
-  }
+  if (n < 0) return t(compact ? 'planner.deadline_past_short' : 'planner.deadline_past', locale);
   if (n === 0) return t(compact ? 'planner.deadline_today_short' : 'planner.deadline_today', locale);
   const day = n <= DEADLINE_WEEKDAY_DAYS ? localeWeekdayShort(expires, localeTag) : date();
   return compact ? day : t('planner.dec_row_expires', locale, { day });
