@@ -5647,7 +5647,7 @@ están en el historial.
 sin reparto (entonces es un hecho en la celda, no una decisión), y si una opción que solo sale en «Te espera» se
 pierde de vista en «Después».
 
-## [2026-11-01] ADR-158 · La caché del dispositivo sobrevive a un deploy: versión de esquema explícita (enmienda ADR-144 § 3)
+## [2026-11-01] ADR-158 · Abrir en el móvil: la caché sobrevive a un deploy y la velocidad queda vigilada (enmienda ADR-144 § 3)
 
 **Contexto.** ADR-144 § 3 ataba el registro de IndexedDB al SHA del build: cualquier deploy lo borraba. Del 24-10 al
 01-11 se integraron 18 ramas y casi todas se desplegaron, varias el mismo día, así que la primera apertura después de
@@ -5668,6 +5668,30 @@ la app «tarda demasiado en el contenido» al abrirla en el móvil.
    un dato de otra forma que pinta mal sin error: por eso la protección principal es la versión explícita.
 3. Lo demás de ADR-144 no cambia: usuario, espacios y rol, edad de 7 días, borrado al salir, consultas que revalidan
    detrás.
+4. **Un diccionario por idioma.** El inglés va en cada página (es el respaldo); los otros tres son un trozo cada uno y
+   el del navegador se carga en el `+layout.ts` raíz antes del primer render (`loadLocale`). La página de baja carga el
+   suyo; la escaleta, los cuatro. Para es: 99 → 63 kB br. Leerlos cuesta 14 ms con CPU ×4 los cuatro y 7 es+en: la
+   ganancia es de bytes, en frío y tras un deploy que cambie textos.
+5. **El service worker guarda la hoja de Google Fonts** (StaleWhileRevalidate) y sus ficheros (CacheFirst). La hoja
+   bloquea el primer pintado y su caché HTTP dura 24 h: la primera apertura de cada día esperaba esa petición (170 a
+   275 ms medidos en frío).
+6. **La velocidad de apertura queda vigilada, en tres capas** (Marco, 01-11, por HOUR COOR): «optimízalo» no se
+   sostiene si nada avisa cuando vuelve a empeorar, y lo que ralentizó la apertura en octubre no lo vio nadie hasta que
+   Marco lo notó en el teléfono.
+   - **Peso** (`src/lib/load-budget.test.ts`): la carga inicial de `/h/desk` (entrada, los tres nodos, sus imports
+     estáticos, CSS y el diccionario es) en brotli no pasa de 450 kB; el build del 01-11 da 427. Solo juzga un build
+     fresco: en `test:unit` se salta si no lo hay, y el deploy lo corre tras `vite build` con
+     `LOAD_BUDGET_REQUIRED=1`, donde saltarse es fallar. Como el guard de tokens: si salta, se aligera la carga.
+   - **Tiempo** (`tests/open-speed.spec.ts`, con la suite contra un origen desplegado): 390 de ancho, CPU ×4, 4G lenta,
+     mediana de 3 hasta el primer contenido de Hoy. Topes: frío 5 s, caliente 1 s, tras subir `CACHE_SCHEMA` 3,5 s,
+     sobre lo medido el 01-11 (3,8; 0,66; 2,7 s): margen para la red y el servidor de un día, no para una app más lenta.
+     Solo lee.
+   - **Teléfonos reales** (Sentry, sin dependencia nueva): la transacción de carga ya llevaba LCP, FCP, TTFB y CLS;
+     ahora también `hoy.content` (ms desde el inicio del documento hasta que Hoy deja de estar `aria-busy`, solo si la
+     apertura aterriza en Hoy) y el atributo `hoy.from_device`. Muestreo: la carga de página al 50 %, el resto al 10 %
+     como antes. Una transacción del cliente lleva la ruta como patrón (`/h/[workspace]/…`) y sus spans solo la forma
+     de la URL (`GET /api/team`, `/api/persons/*`): sin consulta, ids ni slugs (`scrubTransaction`). Cambia lo que
+     producción manda a Sentry: Marco lo ve antes de integrar.
 
 **Alternativas.** (a) Seguir con el SHA: correcto pero inútil con varios deploys al día. (b) Un hash de `routes/api`
 y `lib/server` en el build: no ve los `queryFn` que transforman la respuesta, que viven en 53 componentes. (c) Solo el
@@ -5683,5 +5707,7 @@ decisión, un deploy que no sube `CACHE_SCHEMA` abre como la reapertura: unos 2 
 cada uno (14 de las 18 integraciones del 24-10 al 01-11 no tocaron API ni servidor). El techo de la apertura sin registro
 lo ponen `/api/conversations?limit=100` y `/api/conversations/overview` (unos 1,7 s de servidor cada uno).
 
-**Cómo se revierte.** Volver a `buildIdOf()` como buster en `query-cache.ts` y quitar el boundary de
-`routes/h/+layout.svelte`.
+**Cómo se revierte.** 1 y 2: volver a `buildIdOf()` como buster en `query-cache.ts` y quitar el boundary de
+`routes/h/+layout.svelte`. 4: la importación estática de los cuatro JSON en `$lib/i18n` y borrar `routes/+layout.ts`
+y `routes/u/[token]/+page.ts`. 5: las dos entradas de `runtimeCaching` en `vite.config.ts`. 6: borrar los dos tests y
+el paso del deploy; en `hooks.client.ts`, `tracesSampleRate: 0.1` y `beforeSendTransaction: scrubSentryEvent`.
