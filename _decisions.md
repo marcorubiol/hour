@@ -5624,6 +5624,9 @@ de quien la mira. Carril `claude/hoy-coherence`. Sin migración ni endpoint.
     «Un monograma.» sin promesa; fuera «Alt y las flechas la mueven» de las etiquetas; la hora local del espacio
     solo se avisa cuando su reloj no es el tuyo (la regla de `dualTime`); en Ahora, sin nada de la sala en ficha,
     no hay cabecera «Sala» y queda la línea de quién y dónde.
+16. **Sin promesas ni atajos en la pantalla.** Fuera «Microsoft y otros proveedores, más adelante» y «Por ahora se
+    registran enlaces»; fuera «Alt y las flechas» también en el orden de los hilos; «Cuándo volver a escribir
+    (opcional)». Las claves sin uso `overview.season_hint*` se borran.
 
 **Qué no cambia.** La tarjeta de Hoy (ADR-150, 153): ya no pinta reparto desde ADR-150 § 4. Calma: su «Todo al
 día…» no coincide con ningún título que diga «nada te espera» (esas claves no tienen uso).

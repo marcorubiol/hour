@@ -232,7 +232,7 @@
 </RecordHead>
 
 <section class="set-group" data-testid="settings-facets">
-  <BlockHead title={t('settings.facets_group', locale)} count={canEdit ? t('settings.facets_order_hint', locale) : undefined} />
+  <BlockHead title={t('settings.facets_group', locale)} />
   <div class="set-group__body">
     {#each facets as f, i (f.id)}
       {@const name = facetLabel(f, locale)}
