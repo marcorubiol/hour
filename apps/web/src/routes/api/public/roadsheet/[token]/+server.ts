@@ -18,6 +18,7 @@ import {
   type PerformanceBundle,
   type RoadsheetPerson,
   type RoadsheetRole,
+  type RoadsheetTrip,
 } from '$lib/roadsheet';
 import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
@@ -45,6 +46,9 @@ type PublicBundle = {
     person: RoadsheetPerson | null;
   }>;
   assets: PerformanceBundle['assets'];
+  /** 80b (20261102150000): the day's and the eve's trips, already cut by the
+      rule of `tripsOfPerformance`, only for performer and tech_manager. */
+  travel?: RoadsheetTrip[];
 };
 
 export const GET: RequestHandler = async ({ params, platform, locals }) => {
@@ -78,6 +82,7 @@ export const GET: RequestHandler = async ({ params, platform, locals }) => {
       cast,
       crew: b.crew,
       assets: b.assets,
+      ...(b.travel ? { travel: b.travel } : {}),
     };
 
     return jsonNoStore({
