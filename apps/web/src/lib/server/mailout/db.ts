@@ -19,6 +19,7 @@ const SERVICE_RPCS = [
   'mail_domain_pending_checks',
   'mailout_claim',
   'mailout_send_context',
+  'mailout_template',
   'mailout_record_sent',
   'mailout_record_failure',
   'mailout_record_event',

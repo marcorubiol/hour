@@ -7,7 +7,8 @@
    * the rest see them. Also who bills (ADR-168): the space's issuer fiscal
    * data, what a proforma prints as «Emisor»; the proforma links here
    * (`#fiscal`) when it is missing, and the form opens straight away.
-   * And the space's saved texts (ADR-171), for «Insertar texto» in the mail.
+   * And the space's saved texts (ADR-171), for «Insertar texto» in the mail,
+   * and the company logo that heads its mailouts (ADR-172).
    */
   import RecordHead from '$lib/components/RecordHead.svelte';
   import { t, appLocale } from '$lib/i18n';
@@ -15,6 +16,7 @@
   import ConversationPrivacyDefault from './ConversationPrivacyDefault.svelte';
   import FiscalIdentity from '$lib/components/FiscalIdentity.svelte';
   import WorkspaceTexts from './WorkspaceTexts.svelte';
+  import WorkspaceLogo from './WorkspaceLogo.svelte';
   import { createQuery } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { page } from '$app/state';
@@ -64,4 +66,5 @@
 
 {#if workspaceId}
   <WorkspaceTexts {workspaceId} />
+  <WorkspaceLogo {workspaceId} />
 {/if}

@@ -6,7 +6,6 @@ import {
   mailoutLanguage,
   MAILOUT_LANGUAGES,
   testSubject,
-  textToHtml,
   unsubscribeHeaders,
   unsubscribeUrl,
   type ComposeContext,
@@ -121,11 +120,15 @@ describe('cabeceras y enlaces', () => {
     expect(unsubscribeUrl('https://hour.zerosense.studio/', 'tok')).toBe('https://hour.zerosense.studio/u/tok');
   });
 
-  test('el HTML gemelo escapa y enlaza, sin estilos', () => {
-    const html = textToHtml('Hola <b>\n\nMira https://mamemi.cat/dossier.');
-    expect(html).toContain('<p>Hola &lt;b&gt;</p>');
-    expect(html).toContain('<a href="https://mamemi.cat/dossier">https://mamemi.cat/dossier</a>.');
-    expect(html).not.toContain('style');
+  test('el HTML lleva el mismo texto que la versión plana, escapado y con enlaces', () => {
+    const m = composeMailout({ subject: 's', body: 'Hola <b>\n\nMira https://mamemi.cat/dossier.', language: 'es' }, ctx, URL);
+    expect(m.text).toContain('Hola <b>');
+    expect(m.html).toContain('Hola &lt;b&gt;</p>');
+    expect(m.html).toContain('<a href="https://mamemi.cat/dossier" style="');
+    expect(m.html).toContain('>https://mamemi.cat/dossier</a>.');
+    expect(m.html).toContain(`href="${URL}"`);
+    expect(m.html).toContain('mamemi.cat');
+    expect(m.html).not.toContain('<img');
   });
 
   test('la prueba lleva su marca en el idioma del envío; idioma desconocido, castellano', () => {

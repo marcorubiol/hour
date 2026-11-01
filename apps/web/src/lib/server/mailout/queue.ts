@@ -5,7 +5,8 @@
  * justo entre espacios, tope diario de 24 horas, y vuelve a mirar supresión y
  * base justo antes de tomarlos), los deja en `sending` con su arriendo y
  * devuelve lo que hace falta para enviar. Después, por cada uno:
- *   montar (mailout-compose.ts con `mailout_send_context`) → enviar con el
+ *   montar (mailout-compose.ts con `mailout_send_context`, y la plantilla
+ *   de cada envío con `mailout_template`, ADR-172) → enviar con el
  *   adaptador de su dominio → `mailout_record_sent` (estado, evento en la
  *   conversación con el asunto de ese destinatario, last_contacted_at) → los eventos que devuelva el simulador
  *   (`mailout_record_event`).
@@ -24,6 +25,7 @@ import {
   unsubscribeUrl,
   type ComposeContext,
 } from '../../mailout-compose';
+import { mailTemplate, NO_TEMPLATE, type MailTemplate, type MailTemplateRow } from '../../mail-template';
 import type { MailSendingProvider } from '../../mailout';
 import { serviceRpc } from './db';
 import { MailoutSendError, type SendingProvider } from './provider';
@@ -56,6 +58,7 @@ export interface ClaimedRecipient {
 export interface MailoutQueueDb {
   claim(limit: number, mailoutId?: string): Promise<ClaimedRecipient[]>;
   context(recipientIds: string[]): Promise<ComposeContext[]>;
+  template(mailoutIds: string[]): Promise<(MailTemplateRow & { mailout_id: string })[]>;
   recordSent(
     recipientId: string,
     providerMessageId: string,
@@ -72,6 +75,8 @@ function serviceQueueDb(env: Partial<MailoutEnv>, fetchFn: typeof fetch = fetch)
     claim: (limit, mailoutId) =>
       serviceRpc<ClaimedRecipient[]>(env, 'mailout_claim', { p_limit: limit, p_mailout_id: mailoutId ?? null }, fetchFn),
     context: (ids) => serviceRpc<ComposeContext[]>(env, 'mailout_send_context', { p_recipient_ids: ids }, fetchFn),
+    template: (ids) =>
+      serviceRpc<(MailTemplateRow & { mailout_id: string })[]>(env, 'mailout_template', { p_mailout_ids: ids }, fetchFn),
     recordSent: async (id, providerMessageId, rfc, body, subject) => {
       await serviceRpc(
         env,
@@ -120,6 +125,21 @@ interface QueueOptions {
   now?: () => Date;
 }
 
+/**
+ * La plantilla de cada envío del lote. Si no se puede leer, el correo sale
+ * igual con el texto en la caja de siempre: la plantilla viste, no decide si
+ * un correo sale.
+ */
+async function loadTemplates(db: MailoutQueueDb, ids: string[], origin: string): Promise<Map<string, MailTemplate>> {
+  try {
+    return new Map((await db.template(ids)).map((row) => [row.mailout_id, mailTemplate(row, origin)]));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(JSON.stringify({ level: 'error', kind: 'mailout_template_failed', message }));
+    return new Map();
+  }
+}
+
 export async function runMailoutQueue(env: Partial<MailoutEnv>, opts: QueueOptions = {}): Promise<QueueResult> {
   const db = opts.db ?? serviceQueueDb(env);
   const providerFor = opts.providerFor ?? ((kind: MailSendingProvider) => sendingProvider(kind, env));
@@ -131,6 +151,7 @@ export async function runMailoutQueue(env: Partial<MailoutEnv>, opts: QueueOptio
   result.claimed = claimed.length;
   if (!claimed.length) return result;
   const contexts = new Map((await db.context(claimed.map((r) => r.recipient_id))).map((c) => [c.recipient_id, c]));
+  const templates = await loadTemplates(db, [...new Set(claimed.map((r) => r.mailout_id))], origin);
 
   for (const r of claimed) {
     let accepted = false;
@@ -146,7 +167,8 @@ export async function runMailoutQueue(env: Partial<MailoutEnv>, opts: QueueOptio
         continue;
       }
       const url = unsubscribeUrl(origin, r.unsubscribe_token);
-      const mail = composeMailout({ subject: r.subject, body: r.body, language: r.language }, ctx, url);
+      const template = templates.get(r.mailout_id) ?? NO_TEMPLATE;
+      const mail = composeMailout({ subject: r.subject, body: r.body, language: r.language }, ctx, url, template);
       if (mail.missing.length) {
         await fail(`missing_fields:${mail.missing.join(',')}`, true);
         continue;

@@ -50,7 +50,13 @@ function context(id: string, over: Partial<ComposeContext> = {}): ComposeContext
   };
 }
 
-function memoryDb(rows: ClaimedRecipient[], ctx: ComposeContext[] = rows.map((r) => context(r.recipient_id))) {
+type TemplateRows = Awaited<ReturnType<MailoutQueueDb['template']>>;
+
+function memoryDb(
+  rows: ClaimedRecipient[],
+  ctx: ComposeContext[] = rows.map((r) => context(r.recipient_id)),
+  templates: TemplateRows | Error = [],
+) {
   const calls = {
     claim: [] as [number, string | undefined][],
     sent: [] as [string, string, string | null, string, string][],
@@ -63,6 +69,10 @@ function memoryDb(rows: ClaimedRecipient[], ctx: ComposeContext[] = rows.map((r)
       return rows;
     },
     context: async () => ctx,
+    template: async () => {
+      if (templates instanceof Error) throw templates;
+      return templates;
+    },
     recordSent: async (...args) => {
       calls.sent.push(args);
     },
@@ -132,6 +142,44 @@ describe('runMailoutQueue con el simulador', () => {
       ['c', 'delivery', null],
       ['c', 'complaint', null],
     ]);
+  });
+});
+
+describe('la plantilla (ADR-172)', () => {
+  const WS = '20000000-0000-4000-8000-000000000001';
+  const row = {
+    mailout_id: 'm1',
+    company_name: 'MüK Cia',
+    logo_url: `/m/ws/${WS}/logo/${'a'.repeat(32)}-480x120.png`,
+    image_url: `/m/ws/${WS}/mail/${'b'.repeat(32)}-1200x800.jpg`,
+    image_alt: 'MaMeMi',
+    image_link_url: 'https://mamemi.cat/dossier.pdf',
+  };
+
+  test('el HTML lleva el logo y la imagen con URL absoluta; el texto no cambia', async () => {
+    const plain = memoryDb([claimed()]);
+    const plainSend = vi.fn(simulatorProvider().sendEmail);
+    await runMailoutQueue(env, { db: plain.db, providerFor: () => ({ ...simulatorProvider(), sendEmail: plainSend }) });
+
+    const { db } = memoryDb([claimed()], undefined, [row]);
+    const sendEmail = vi.fn(simulatorProvider().sendEmail);
+    await runMailoutQueue(env, { db, providerFor: () => ({ ...simulatorProvider(), sendEmail }) });
+    const email = sendEmail.mock.calls[0][0];
+    expect(email.html).toContain(`src="https://hour.test/m/ws/${WS}/logo/`);
+    expect(email.html).toContain(`<a href="https://mamemi.cat/dossier.pdf"`);
+    expect(email.text).toBe(plainSend.mock.calls[0][0].text);
+    expect(plainSend.mock.calls[0][0].html).not.toContain('<img');
+  });
+
+  test('si la plantilla no se puede leer, el correo sale igual, sin imágenes', async () => {
+    const { db, calls } = memoryDb([claimed()], undefined, new Error('404 mailout_template'));
+    const sendEmail = vi.fn(simulatorProvider().sendEmail);
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const r = await runMailoutQueue(env, { db, providerFor: () => ({ ...simulatorProvider(), sendEmail }) });
+    spy.mockRestore();
+    expect(r.sent).toBe(1);
+    expect(calls.failures).toEqual([]);
+    expect(sendEmail.mock.calls[0][0].html).not.toContain('<img');
   });
 });
 

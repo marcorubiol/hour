@@ -15,6 +15,10 @@
    *
    * Mientras el envío sea simulado (ADR-111), la pantalla lo dice; nunca
    * nombra el servicio.
+   *
+   * La plantilla (ADR-172): el logo del espacio arriba (se cambia en Ajustes)
+   * y, si se elige aquí, una imagen del espectáculo tras el texto, enlazada al
+   * dosier. La vista previa enseña el correo con la plantilla o solo el texto.
    */
   import { docTitle } from '$lib/doc-title';
   import { lensOn } from '$lib/lenses.svelte';
@@ -22,7 +26,11 @@
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { untrack } from 'svelte';
-  import { ApiError, fetchJSON, mutateJSON } from '$lib/api';
+  import { ApiError, fetchJSON, mutateJSON, uploadBlob } from '$lib/api';
+  import { shrinkImage } from '$lib/image-shrink';
+  import { mailTemplate } from '$lib/mail-template';
+  import { kindLabel, type MaterialItem } from '$lib/material';
+  import Segmented from '$lib/components/Segmented.svelte';
   import { retryLoad } from '$lib/load-fail';
   import RecordState from '$lib/components/RecordState.svelte';
   import { dayMonthYear } from '$lib/datetime';
@@ -81,6 +89,12 @@
   let domainId = $state('');
   let localPart = $state('difusion');
   let fromName = $state('');
+  // La imagen del espectáculo (ADR-172): se manda solo cuando cambia.
+  let imageUrl = $state('');
+  let imageAlt = $state('');
+  let imageLink = $state('');
+  let imageDirty = $state(false);
+  let imageRev = 0;
   let loadedFor = $state('');
   let dirty = $state(false);
 
@@ -94,6 +108,10 @@
     domainId = mo.mail_domain_id ?? d?.domains[0]?.id ?? '';
     localPart = mo.from_local_part;
     fromName = mo.from_name ?? '';
+    imageUrl = mo.image_url ?? '';
+    imageAlt = mo.image_alt ?? '';
+    imageLink = mo.image_link_url ?? '';
+    imageDirty = false;
     dirty = false;
   });
 
@@ -101,25 +119,85 @@
     dirty = true;
   }
 
+  function touchImage() {
+    imageRev += 1;
+    imageDirty = true;
+    dirty = true;
+  }
+
   const save = createMutation({
-    mutationFn: () =>
-      mutateJSON('PATCH', `/api/mailout/${id}`, {
+    mutationFn: () => {
+      const sendsImage = imageDirty;
+      const rev = imageRev;
+      return mutateJSON('PATCH', `/api/mailout/${id}`, {
         subject,
         body,
         language,
         mail_domain_id: domainId || null,
         from_local_part: localPart,
         from_name: fromName.trim() || null,
-      }),
-    onSuccess: () => {
+        ...(sendsImage
+          ? { image: imageUrl ? { url: imageUrl, alt: imageAlt.trim() || null, link: imageLink.trim() || null } : null }
+          : {}),
+      }).then(() => (sendsImage ? rev : null));
+    },
+    onSuccess: (sentRev) => {
       dirty = false;
+      // Lo que cambió mientras se guardaba sigue pendiente.
+      if (sentRev === imageRev) imageDirty = false;
     },
     onError: (err) => failed(err),
   });
 
+  const uploadImage = createMutation({
+    mutationFn: async (file: File) => {
+      const blob = await shrinkImage(file, { maxWidth: 1200, maxHeight: 2400, type: 'image/jpeg', maxBytes: 600_000 });
+      return uploadBlob<{ image_url: string }>(`/api/mailout/${id}/image`, blob);
+    },
+    onSuccess: (r) => {
+      if (!r) return;
+      imageUrl = r.image_url;
+      if (!imageAlt.trim()) imageAlt = d?.project?.name ?? '';
+      touchImage();
+    },
+    onError: (err) => failed(err),
+  });
+
+  let imageInput = $state<HTMLInputElement | null>(null);
+  function imagePicked(e: Event) {
+    const el = e.currentTarget as HTMLInputElement;
+    const file = el.files?.[0];
+    if (file) $uploadImage.mutate(file);
+    el.value = '';
+  }
+  function removeImage() {
+    imageUrl = '';
+    imageAlt = '';
+    imageLink = '';
+    touchImage();
+  }
+
+  // Los enlaces que ya tiene la línea del envío: el dosier primero.
+  const LINK_KINDS = ['dossier', 'video', 'tech_sheet', 'rider'];
+  let lineId = $derived(m?.line_id ?? '');
+  const materials = createQuery(
+    toStore(() => ({
+      queryKey: ['line-materials', lineId] as const,
+      enabled: Boolean(lineId && editable),
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchJSON<{ items: MaterialItem[] }>(`/api/lines/${lineId}/materials`, signal),
+    })),
+  );
+  let linkChoices = $derived(
+    ($materials.data?.items ?? [])
+      .filter((x) => LINK_KINDS.includes(x.kind))
+      .sort((a, b) => LINK_KINDS.indexOf(a.kind) - LINK_KINDS.indexOf(b.kind))
+      .slice(0, 4),
+  );
+
   $effect(() => {
     // Leer los campos ata el efecto a ellos: cada cambio reinicia la espera.
-    void [subject, body, language, domainId, localPart, fromName];
+    void [subject, body, language, domainId, localPart, fromName, imageUrl, imageAlt, imageLink];
     if (!dirty || !editable) return;
     const timer = setTimeout(() => $save.mutate(), 700);
     return () => clearTimeout(timer);
@@ -172,7 +250,31 @@
   let previewIndex = $state(0);
   let current = $derived(previewable[Math.min(previewIndex, Math.max(previewable.length - 1, 0))] ?? null);
   let exampleLink = $derived(unsubscribeUrl(page.url.origin, '…'));
-  let preview = $derived(current?.ctx ? composeMailout(draft, current.ctx, exampleLink) : null);
+  let template = $derived(
+    mailTemplate(
+      d
+        ? {
+            company_name: d.workspace.name,
+            logo_url: d.workspace.logo_url,
+            image_url: imageUrl || null,
+            image_alt: imageAlt.trim() || null,
+            image_link_url: imageLink.trim() || null,
+          }
+        : null,
+      page.url.origin,
+    ),
+  );
+  let hasTemplate = $derived(Boolean(template.logo || template.image));
+  let preview = $derived(current?.ctx ? composeMailout(draft, current.ctx, exampleLink, template) : null);
+  // Con plantilla si la hay; quien mira puede pasar a solo texto (lo que leen
+  // los clientes sin HTML) y volver.
+  let previewChoice = $state<'html' | 'text' | null>(null);
+  let previewMode = $derived(previewChoice ?? (hasTemplate ? 'html' : 'text'));
+  let frameHeight = $state(0);
+  function fitFrame(e: Event) {
+    const doc = (e.currentTarget as HTMLIFrameElement).contentDocument;
+    frameHeight = doc?.documentElement.scrollHeight ?? 0;
+  }
 
   // ── Acciones ──────────────────────────────────────────────────────────
   function failed(err: unknown) {
@@ -422,6 +524,53 @@
               </span>
             </p>
             <p class="mo__hint">{t('mailout.footer_hint', locale)}</p>
+
+            <div class="mo__image" data-testid="mailout-image">
+              <h3 class="eyebrow eyebrow--sub">{t('mailout.image_title', locale)}</h3>
+              <p class="mo__hint">{t('mailout.image_hint', locale)}</p>
+              <input
+                bind:this={imageInput}
+                class="mo__file"
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onchange={imagePicked}
+              />
+              {#if imageUrl}
+                <img class="mo__thumb" src={imageUrl} alt={imageAlt} />
+                <Input label={t('mailout.image_alt', locale)} bind:value={imageAlt} oninput={touchImage} placeholder={t('mailout.image_alt_ph', locale)} />
+                <Input label={t('mailout.image_link', locale)} bind:value={imageLink} oninput={touchImage} placeholder="https://" />
+                {#if linkChoices.length}
+                  <p class="mo__fields">
+                    <span>{t('mailout.image_link_from', locale)}</span>
+                    {#each linkChoices as x (x.id)}
+                      <button
+                        type="button"
+                        class="mo__chip mo__chip--text"
+                        aria-pressed={imageLink === x.url}
+                        onclick={() => {
+                          imageLink = x.url;
+                          touchImage();
+                        }}>{kindLabel(x.kind, locale)}</button
+                      >
+                    {/each}
+                  </p>
+                {/if}
+              {/if}
+              <div class="mo__image-acts">
+                <Button size="s" variant="secondary" loading={$uploadImage.isPending} onclick={() => imageInput?.click()}>
+                  {t(imageUrl ? 'mailout.image_replace' : 'mailout.image_add', locale)}
+                </Button>
+                {#if imageUrl}
+                  <Button size="s" variant="quiet" tone="warn" disabled={$uploadImage.isPending} onclick={removeImage}>
+                    {t('mailout.image_remove', locale)}
+                  </Button>
+                {/if}
+              </div>
+              <p class="mo__hint">
+                {t(d.workspace.logo_url ? 'mailout.logo_set' : 'mailout.logo_missing', locale)}
+                <a class="link-arrow" href={`/h/${workspaceSlug}/settings?section=space#logo`}>{t('mailout.logo_change', locale)}</a>
+              </p>
+            </div>
           </div>
         {/if}
 
@@ -457,7 +606,32 @@
                 {t('mailout.missing', locale, { fields: preview.missing.map((f) => `{${f}}`).join(', ') })}
               </p>
             {/if}
-            <pre class="mail-preview__text">{preview.text}</pre>
+            <div class="mo__view">
+              <Segmented
+                ariaLabel={t('mailout.preview', locale)}
+                options={[
+                  { value: 'html', label: t('mailout.preview_html', locale) },
+                  { value: 'text', label: t('mailout.preview_text', locale) },
+                ]}
+                value={previewMode}
+                onchange={(v) => (previewChoice = v as 'html' | 'text')}
+              />
+            </div>
+            {#if previewMode === 'html'}
+              <!-- The email itself, as a recipient's client paints it. No scripts
+                   (sandbox without allow-scripts); same origin only so the frame
+                   can be measured and the app's images load under its CSP. -->
+              <iframe
+                class="mail-frame"
+                title={t('mailout.preview', locale)}
+                sandbox="allow-same-origin"
+                srcdoc={preview.html}
+                onload={fitFrame}
+                style:block-size={frameHeight ? `${frameHeight}px` : undefined}
+              ></iframe>
+            {:else}
+              <pre class="mail-preview__text">{preview.text}</pre>
+            {/if}
           </article>
         {:else}
           <p class="mo__msg">{t('mailout.preview_empty', locale)}</p>
@@ -679,6 +853,54 @@
     .mo__saved {
       margin-inline-start: auto;
       color: var(--text-faint);
+    }
+    .mo__chip--text {
+      font-family: inherit;
+    }
+    .mo__chip--text[aria-pressed='true'] {
+      color: var(--text-color);
+      box-shadow: 0 0 0 var(--line-hairline) var(--border-color-dark);
+    }
+
+    /* La imagen del espectáculo (ADR-172). */
+    .mo__image {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+      padding-block-start: var(--space-s);
+      border-block-start: var(--divider);
+    }
+    .mo__image h3 {
+      margin: 0;
+    }
+    .mo__file {
+      display: none;
+    }
+    .mo__thumb {
+      display: block;
+      max-inline-size: 100%;
+      max-block-size: 12rem;
+      inline-size: auto;
+      border-radius: var(--radius-s);
+    }
+    .mo__image-acts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-s);
+    }
+
+    .mo__view {
+      display: flex;
+      margin-block-start: var(--space-s);
+    }
+    /* El correo tal cual: su propio fondo, a todo el ancho de la tarjeta. */
+    .mail-frame {
+      display: block;
+      inline-size: 100%;
+      min-block-size: 16rem;
+      margin-block-start: var(--space-s);
+      border: var(--border);
+      border-radius: var(--radius-s);
     }
     .mo__hint {
       margin: 0;

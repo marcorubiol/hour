@@ -14,7 +14,8 @@ import { loadDetail, mailoutRoute, readBody } from '$lib/server/mailout/route';
 import { mailoutLinkOrigin, MailoutNotConfiguredError, sendingProvider } from '$lib/server/mailout';
 import { notConfigured } from '$lib/server/mailout/http';
 import { composeMailout, testSubject, unsubscribeHeaders, unsubscribeUrl } from '$lib/mailout-compose';
-import { recipientState, senderAddress } from '$lib/mailout';
+import { detailTemplateRow, recipientState, senderAddress } from '$lib/mailout';
+import { mailTemplate } from '$lib/mail-template';
 
 const TestSchema = v.object({ recipient_id: v.nullish(v.pipe(v.string(), v.uuid())) });
 
@@ -35,8 +36,10 @@ export const POST: RequestHandler = (event) =>
     const ctx = d.compose.find((c) => c.recipient_id === row?.recipient_id);
     if (!row || !ctx) return jsonNoStore({ error: 'no_recipients' }, 409);
 
-    const url = unsubscribeUrl(mailoutLinkOrigin(env), 'prueba');
-    const mail = composeMailout({ subject: m.subject, body: m.body, language: m.language }, ctx, url);
+    const origin = mailoutLinkOrigin(env);
+    const url = unsubscribeUrl(origin, 'prueba');
+    const template = mailTemplate(detailTemplateRow(d), origin);
+    const mail = composeMailout({ subject: m.subject, body: m.body, language: m.language }, ctx, url, template);
     if (mail.missing.length) return jsonNoStore({ error: 'missing_fields', count: 1 }, 409);
     try {
       const provider = sendingProvider(domain.provider, env);

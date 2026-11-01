@@ -6422,3 +6422,55 @@ tablas como estaban. Una fusión hecha se deshace desde la ficha o Ajustes duran
 
 **Re-evaluar cuando** exista fusionar dos conversaciones (el choque dejaría de bloquear), o el redactor pase a texto
 enriquecido (insertar en el cursor cambia de forma).
+
+## [2026-11-01] ADR-172 · La plantilla del correo de difusión: logo del espacio, imagen del espectáculo y el primer fichero en R2
+
+**Contexto.** Encargo de Marco (2026-11-01): una plantilla fija por espacio para los correos del envío en bloque, no
+un editor. El plan (`build/plans/2026-10-14-bulk-send.md` § 3.4 y § 5) dejaba el HTML como gemelo mínimo «sin imágenes
+ni estilos en este corte». `workspace.logo_url` existía desde ADR-062 sin subida; `MEDIA` (R2) estaba declarado sin
+una línea que escribiera en él. Carril `claude/mail-template`.
+
+**Decisión.**
+1. **El texto manda.** La versión de texto plano no cambia en nada. El HTML lleva el mismo texto (cuerpo, firma y pie,
+   las mismas piezas) dentro de una caja de correo robusta: tablas, estilos en línea, 600 px de ancho máximo, sin
+   hojas de estilo, sin texto escondido, sin imagen-cartel. Con las imágenes bloqueadas se lee entero; cada imagen
+   lleva `alt`, ancho y alto. Pesa unos 4 KB.
+2. **La plantilla es una pieza aparte** (`$lib/mail-template.ts`): recibe el texto ya montado y lo viste; no sabe de
+   campos, bases ni envíos. El compositor (`mailout-compose.ts`) le pasa las piezas y una `MailTemplate` (logo,
+   imagen). Un editor de correos «bonitos» (invitaciones) sería otra plantilla con la misma entrada, sin tocar el
+   compositor. Los colores y px del HTML son literales a propósito: es HTML de correo, no un componente de la app, y
+   la guarda de tokens (que solo lee `<style>` de `.svelte` y `src/styles`) no lo toca.
+3. **Cabecera: el logo del espacio**, que sube un admin en Ajustes › Este espacio. Sin logo, el correo no lleva
+   cabecera (no se pinta el nombre: ya lo dice el remitente). La firma es la de siempre (`company_signature` o la
+   propuesta), sin duplicar.
+4. **Imagen del espectáculo, opcional, elegida al redactar:** tras el cuerpo y antes de la firma, a 600 px si llena
+   la caja, enlazada al dosier si hay enlace. Los materiales de la línea son enlaces (ADR-056), no imágenes que Hour
+   pueda servir, así que la imagen se sube en la pantalla del envío; el enlace se escribe o se toma con un clic de
+   los materiales de la línea (dosier, vídeo, ficha técnica, rider). Texto alternativo por defecto: el nombre del
+   proyecto.
+5. **El primer fichero en R2: imágenes públicas por URL estable de la app.** `public/ws/<espacio>/<logo|mail>/<sha>-
+   <ancho>x<alto>.<png|jpg>` en `MEDIA`, servido sin sesión por `GET /m/ws/…` (cache inmutable, `nosniff`); ninguna
+   otra clave del bucket es alcanzable por ahí. El nombre es el hash del contenido y su tamaño: la URL no cambia
+   mientras la imagen no cambie, y la plantilla declara el tamaño sin leer la imagen. Solo PNG y JPEG, reconocidos
+   por sus bytes; la pantalla reduce antes de subir (logo a 480×128 en PNG, foto a 1200 de ancho en JPEG) y el
+   servidor pone el tope (200 KB el logo, 600 KB la foto). En la base se guarda la ruta (`/m/…`); el correo la hace
+   absoluta con `MAILOUT_LINK_ORIGIN`, la vista previa con el origen de la página. Quitar un logo o una imagen no
+   borra el fichero (su ruta es su contenido; puede estar en correos ya enviados).
+6. **Esquema** (`20261102170000_mail_template`, aditiva, probada en local dentro de una transacción revertida; **no
+   aplicada en producción**): `mailout.image_url`, `image_alt`, `image_link_url`, con CHECK de que la imagen es una
+   ruta de Hour de ese mismo espacio y el enlace http(s). `set_mailout_image` (quien edita el envío, solo en
+   borrador; el PATCH del borrador la llama solo si la imagen cambió). `mailout_template` (service_role): la cola
+   lee por envío el nombre, el logo y la imagen; si no puede leerla, el correo sale igual sin imágenes (la plantilla
+   viste, no decide si un correo sale), así que desplegar antes de aplicar la migración no rompe la cola. El logo no
+   pide esquema: `workspace.logo_url` ya está en el grant de UPDATE por columnas y en `update_workspace`.
+7. **La vista previa** del envío enseña «Con plantilla» (el HTML en un iframe sin scripts) cuando hay logo o imagen,
+   y «Solo texto» si no; quien mira cambia de una a otra.
+8. **Caché del dispositivo:** el detalle del envío trae el logo del espacio y las columnas de imagen; `CACHE_SCHEMA`
+   sube de 10 a 11 (ADR-158).
+
+**Cómo se revierte.** Quitar el argumento `template` de `composeMailout` deja el HTML sin imágenes; las columnas y las
+RPC son aditivas (rollback: `DROP FUNCTION set_mailout_image, mailout_template` y las tres columnas). Lo subido a R2
+queda bajo `public/ws/` y se puede borrar por prefijo.
+
+**Re-evaluar cuando** llegue el editor de correos para invitaciones (otra plantilla sobre la misma entrada), o cuando
+los materiales tengan ficheros en R2 (la imagen del espectáculo podría elegirse de ellos en vez de subirse aparte).
