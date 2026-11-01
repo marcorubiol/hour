@@ -11,9 +11,10 @@
 Detalle de cada punto: `build/coordination/STATUS.md` (fuera de git) y los informes de propuestas. Orden sugerido: lo que
 no pide migración primero; las migraciones juntas por el gate de § 34.
 
-- [ ] **Antes de nada:** RLS tras el apply del 01-11 dio 513/516. `conversation-select-once.test.ts:155` (el espacio
-  `playwright` crea conversaciones privadas por defecto) y `comms-threads.test.ts` § 15 y fixture limitada § 4
-  (facetas de la membresía limitada en `zzz-e2e-collab`, ¿alteradas por el test anterior?). Aclarar antes de cerrar el gate.
+- [ ] **RLS tras el apply del 01-11 (513/516): los 3 rojos son del test, no de permisos** (diagnóstico del 01-11).
+  `conversation-select-once.test.ts` no apaga `new_conversations_private` (por defecto `true`) como hacen los demás;
+  `comms-threads` falla porque una pasada cortada a las 07:45 UTC dejó Materials apagada en `playwright` y el test 6
+  «restaura» ese estado sucio. Falta: OK de Marco al UPDATE de la faceta, los dos arreglos de test y repetir esos dos ficheros.
 - [ ] Te espera: en filas «liberar», sólo «Liberar» (quitar «Confirmar», ADR-165).
 - [ ] Bugs visuales de las capturas de `a744db9d`: banda vacía y barra que salta en el Planificador, «mar1-11» y
   recuentos en el Tablero, fila de conversación con columna vacía a 1440, selector de lentes que marca la de origen en
@@ -34,7 +35,7 @@ no pide migración primero; las migraciones juntas por el gate de § 34.
 - [ ] 94 login y alta en los cuatro idiomas (antes de invitar a Anouk).
 - [ ] 95 contract: borrar `performance.readiness`, `line.modules`, `line.dossier_url`, `project.dossier_url`,
   `project.poster_url` (destructiva: staging e inspect).
-- [ ] 96 contar funciones vivas sin `venue_id`; con el número, decidir si la función y el bolo dejan de copiar nombre y ciudad.
+- [ ] 96 contado el 01-11: en `muk-cia`, 8 de 20 funciones sin `venue_id` (las fixtures, casi todas sin). Decidir si la función y el bolo dejan de copiar nombre y ciudad.
 - [ ] Migraciones por escribir: 71b (escaleta, tramos e idioma en `get_public_calendar`), 80b (viaje en `get_public_roadsheet`).
 - [ ] De paso: subir los topes de 100 (Te espera, Nuevo trato, línea); rayas que quedan en textos; comentario de
   `ProfileSection.svelte:40`; comprobar si siguen las tarjetas demo de MaMeMi (`demo_batch='cards-20260723'`).
