@@ -183,6 +183,28 @@ export function castNames(personIds: readonly string[] | null | undefined, names
   return (personIds ?? []).map((id) => names.get(id)).filter((n): n is string => Boolean(n));
 }
 
+/**
+ * WHO GOES, when the roster is empty: whoever said «voy» (ADR-154). The
+ * roster on file wins (it is the record); without one, a «voy» is a fact
+ * and the line says it instead of «sin reparto». Nobody is guessed
+ * (ADR-147). The viewer is `you.one` alone («vas tú») and `you.many` in a
+ * list («tú · Ana»).
+ */
+export function goesNames(
+  row: { roster?: readonly string[] | null; commitments?: readonly Commitment[] | null },
+  names: ReadonlyMap<string, string>,
+  selfId: string | null,
+  you: { one: string; many: string },
+): string[] {
+  const cast = castNames(row.roster, names);
+  if (cast.length > 0) return cast;
+  const going = peopleOf({ commitments: row.commitments }).personIds;
+  if (going.length === 1 && going[0] === selfId) return [you.one];
+  return going
+    .map((id) => (id === selfId ? you.many : names.get(id)))
+    .filter((n): n is string => Boolean(n));
+}
+
 /** The person axis, resolved once for a whole view. `active` is false
     when nobody is pinned; a caller may skip the work then. */
 export interface PersonAttributionScope {

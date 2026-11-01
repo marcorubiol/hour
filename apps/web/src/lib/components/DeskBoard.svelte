@@ -1,5 +1,6 @@
 <script lang="ts" module>
   import type { Relation } from '$lib/conversation-relation';
+  import type { Snippet } from 'svelte';
   export type DeskConversation = {
     id: string;
     /** The derived relation (ADR-138 § 4). */
@@ -38,6 +39,9 @@
     moreHref?: string;
     loading?: boolean;
     error?: boolean;
+    /** The block's head: with nothing in the week the block is not drawn,
+        head included (ADR-154, ADR-145 § 1). */
+    head?: Snippet;
   }
   let {
     conversations,
@@ -47,6 +51,7 @@
     moreHref,
     loading = false,
     error = false,
+    head,
   }: Props = $props();
 
   type Tone = 'amber' | 'blue' | 'teal' | 'green' | 'purple' | 'red' | 'neutral';
@@ -138,13 +143,13 @@
   });
 </script>
 
+{#if loading || error || grouped.length > 0}
+{@render head?.()}
 <div class="agenda-wrap">
   {#if loading}
     <EmptyLine busy text={t('desk.loading', locale)} />
   {:else if error}
     <p class="load-fail" role="alert"><span>{t('desk.week_error', locale)}</span></p>
-  {:else if grouped.length === 0}
-    <EmptyLine text={t('desk.week_empty', locale)} />
   {:else}
     <div class="week">
       {#each grouped as group (group.day)}
@@ -182,6 +187,7 @@
     {/if}
   {/if}
 </div>
+{/if}
 
 <style>
   @layer components {

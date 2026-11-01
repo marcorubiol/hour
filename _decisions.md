@@ -5597,16 +5597,32 @@ de quien la mira. Carril `claude/hoy-coherence`. Sin migración ni endpoint.
    del título de las flechas. El atajo sigue.
 9. **Texto**: sin raya como separador en la app (dos puntos, punto o «·»); «Nada este mes.»; «pedido, sin
    confirmar»; una sola forma de carga, «Cargando…» (la puerta de la Agenda sigue en minúscula: alterna con «↑ meses
-   anteriores» en el mismo botón).
+   anteriores» en el mismo botón). Sin «cosas» en las cuentas: «y 2 más», «3 hasta el martes».
+10. **Un «voy» no se contradice.** En Día y Agenda del Planificador una función sin reparto en ficha dice quién dijo
+    «voy» («vas tú», o «tú · Ana») en vez de «sin reparto» (`goesNames` en `$lib/people`, con los `commitments` que
+    el feed ya trae). El reparto en ficha manda; nadie se adivina (ADR-147).
+11. **Un cero se dice pequeño y en tinta suave**; la cifra grande es para lo que hay. Una sola pieza,
+    `.figure--zero` (`base.css`, capa `utilities`): las puertas de «La temporada» en Hoy (siguen siendo puertas;
+    enmienda ADR-145 § 1 en lo que toca a esas cifras), las cifras de la portada del espacio y las de la ficha de
+    línea. En el Planificador en calma, «Nada confirmado.» en vez de «0 confirmadas».
+12. **Un pliegue sin nada que guardar ni que hacer no se dibuja.** En el Día, «Después» sin próximos (como «pasos»)
+    y «Notas» sin notas cuando no se puede escribir; Escaleta y Tramos vacíos para quien no puede editarlos. Con
+    permiso, siguen. En calma, la línea «… esperan fuera de calma» solo desde 1 (fuera `desk.calm_rest_zero`). En
+    la portada del espacio, «Próximos 7 días» sin nada no se dibuja (fuera `desk.week_empty`). En Cuentas, «Pide
+    atención» a cero pierde cabecera y cifra y deja solo su línea, para que la rejilla no se descuadre. El diálogo
+    de añadir gasto pierde su subtítulo (fuera `books.expense_desc`).
+13. **La ayuda de Hoy no promete preguntas** que Hour ya no hace (ADR-147): fuera «Si Hour cree que vas, te lo
+    pregunta aquí» de `help.card.desk_step_1`.
 
-**Qué no cambia.** La tarjeta de Hoy (ADR-150, 153): ya no pinta reparto desde ADR-150 § 4, así que el «Sin reparto
-aunque dijiste voy» de `_tasks.md` ya no sale en Hoy. Calma: su «Todo al día…» no coincide con ningún título que
-diga «nada te espera» (esas claves no tienen uso).
+**Qué no cambia.** La tarjeta de Hoy (ADR-150, 153): ya no pinta reparto desde ADR-150 § 4. Calma: su «Todo al
+día…» no coincide con ningún título que diga «nada te espera» (esas claves no tienen uso).
 
 **Cómo se revierte.** Cada punto por separado, desde el historial de `claude/hoy-coherence`: 3 en `planner.ts`
 (`decisionsFor`), `DecisionBand.svelte`, `AgendaList.svelte` y `routes/h/planner/+page.svelte`; 4, 1 y 6 en
-`routes/h/desk/+page.svelte`; 5 en `DeskNext.svelte`; 7 en `performance.ts`; 8 en `CalNav.svelte`. Las claves
-borradas están en el historial.
+`routes/h/desk/+page.svelte`; 5 en `DeskNext.svelte`; 7 en `performance.ts`; 8 en `CalNav.svelte`; 10 en
+`people.ts` y `routes/h/planner/+page.svelte`; 11 en `.figure--zero` y sus usos; 12 en `DayFoot.svelte`,
+`RunningOrder.svelte`, `TravelStages.svelte`, `DeskWaiting.svelte`, `DeskBoard.svelte`, `HomeView.svelte` y
+`routes/h/books/+page.svelte`. Las claves borradas están en el historial.
 
 **Re-evaluar cuando** Marco lo use una gira: si echa de menos ver dos opciones de proyectos distintos el mismo día
 sin reparto (entonces es un hecho en la celda, no una decisión), y si una opción que solo sale en «Te espera» se

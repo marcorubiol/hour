@@ -431,6 +431,8 @@
   );
 </script>
 
+<!-- Empty and not yours to write: no lid (ADR-154). -->
+{#if canEdit || stages.length > 0 || $feed.isPending || $feed.isError}
 <section class="hours ts" aria-busy={$feed.isPending}>
   <button type="button" class="lid" aria-expanded={open} onclick={() => (open = !open)}>
     <span class="lid__w">{lidWord}</span>
@@ -705,6 +707,7 @@
     {/if}
   {/if}
 </section>
+{/if}
 
 <style>
   @layer components {

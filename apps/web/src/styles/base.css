@@ -2600,6 +2600,14 @@
 /* UTILITIES — text + sizing helpers                              */
 /* ============================================================ */
 @layer utilities {
+  /* A ZERO IS SAID, NOT SHOUTED (ADR-154): a figure that is 0 takes the
+     body's small step and the faint ink; with something, the figure is the
+     caller's. Hoy's doors, the space's portada, a line's stats. */
+  .figure--zero {
+    font-size: var(--text-s);
+    color: var(--text-faint);
+  }
+
   .text--dark-muted {
     color: var(--text-dark-muted);
   }

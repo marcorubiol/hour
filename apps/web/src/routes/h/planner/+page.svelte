@@ -129,7 +129,7 @@
     normalizePlannerView,
     statusWord as statusWordIn,
   } from '$lib/planner';
-  import { buildPersonAttribution, castNames, keepsRow } from '$lib/people';
+  import { buildPersonAttribution, goesNames, keepsRow } from '$lib/people';
   import { viewScopeIndex, type WithViewScope } from '$lib/view-scope';
   import { buildDeskFeed, overviewReplies, rankWaiting, waitingByDay, type DeskItem } from '$lib/desk-feed';
   import {
@@ -759,6 +759,12 @@
   let aways = $derived(engine.aways);
 
   // ── Names for labels/cards ────────────────────────────────────────────
+  /** A gig's people as a line says them: its roster, else whoever said «voy» (ADR-154). */
+  const goesOf = (p: PerformanceEvent) =>
+    goesNames({ roster: p.person_ids, commitments: p.commitments }, personNames, myPersonId, {
+      one: t('planner.cast_you_one', locale),
+      many: t('planner.cast_you', locale),
+    });
   let personNames = $derived.by(() => {
     const m = new Map<string, string>();
     for (const item of $teamQuery.data?.items ?? []) m.set(item.person_id, item.full_name);
@@ -1395,7 +1401,7 @@
         slip: sl,
         // Data or the honest word — the project-team inference is not drawn
         // here (design law: four people affirmed at a radio at 10h).
-        cast: castNames(p.person_ids, personNames),
+        cast: goesOf(p),
         roadSheetHref: p.slug && ws ? `/h/${ws}/performance/${p.slug}/roadsheet` : null,
         clash: cl?.clash ?? null,
         clashPeople: cl?.people ?? false,
@@ -3244,10 +3250,15 @@
         {#if !shows('planner', 'census', calm.on)}
           {@const cf = plannerCalmFacts(view, stats)}
           {#if cf.confirmed !== null && cf.options !== null}
-            <span class="cal__stat"
-              ><b>{fig(cf.confirmed)}</b>
-              {t(figOne(cf.confirmed) ? 'planner.stat_confirmed_one' : 'planner.stat_confirmed', locale)}</span
-            >
+            <!-- Nothing confirmed is said, not counted (ADR-154). -->
+            {#if figuresKnown && cf.confirmed === 0}
+              <span class="cal__stat">{t('planner.calm_none_confirmed', locale)}</span>
+            {:else}
+              <span class="cal__stat"
+                ><b>{fig(cf.confirmed)}</b>
+                {t(figOne(cf.confirmed) ? 'planner.stat_confirmed_one' : 'planner.stat_confirmed', locale)}</span
+              >
+            {/if}
             {#if figuresKnown && cf.options > 0}
               <span class="cal__stat cal__stat--soft"
                 >{t(cf.options === 1 ? 'planner.calm_options_one' : 'planner.calm_options_many', locale, {
@@ -3670,10 +3681,7 @@
               .filter(Boolean)
               .join(' · ') || t('planner.week_nothing', locale)}
       freeNight={engine.isFreeNight}
-      castOf={(p) =>
-        p.person_ids
-          ? p.person_ids.map((id) => personNames.get(id)).filter((n): n is string => Boolean(n))
-          : null}
+      castOf={(p) => (p.person_ids || p.commitments ? goesOf(p) : null)}
       noCastWord={t('planner.no_cast', locale)}
       onDayOpen={(iso) => {
         dayIso = iso;
