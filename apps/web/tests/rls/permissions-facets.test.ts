@@ -71,6 +71,8 @@ const DECIDED_LEVELS: Record<string, string[]> = {
   full_de_ruta: ['project', 'bolo', 'performance'],
   comidas: ['project', 'bolo', 'performance'],
   diners: ['workspace', 'project', 'line', 'bolo'],
+  // ADR-173: Público, solo en el espacio.
+  audience: ['workspace'],
 };
 
 interface MembershipRow {
@@ -180,7 +182,7 @@ describe.skipIf(!envReady())('RLS: permisos por facetas', () => {
     expect(sources).toMatchObject({ status: 200, rows: [] });
   });
 
-  test('vocabulario: las siete facetas estándar y la tabla de niveles decidida', async () => {
+  test('vocabulario: las ocho facetas estándar y la tabla de niveles decidida', async () => {
     const facets = await pgGet<FacetRow>(
       'facet',
       adminJwt,
@@ -194,6 +196,7 @@ describe.skipIf(!envReady())('RLS: permisos por facetas', () => {
       'full_de_ruta',
       'comidas',
       'diners',
+      'audience',
     ]);
 
     const levels = await pgGet<{ facet_id: string; level: string }>(
