@@ -245,9 +245,11 @@ describe('el simulador y la frontera', () => {
     const e = { PUBLIC_SUPABASE_URL: 'https://db.example', SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_x' };
     await serviceRpc(e, 'mailout_claim', { p_limit: 1 }, fetchFn as unknown as typeof fetch);
     expect((fetchFn.mock.calls[0] as unknown as [string])[0]).toBe('https://db.example/rest/v1/rpc/mailout_claim');
+    await serviceRpc(e, 'audience_confirm', { p_token: 't' }, fetchFn as unknown as typeof fetch);
+    expect((fetchFn.mock.calls[1] as unknown as [string])[0]).toBe('https://db.example/rest/v1/rpc/audience_confirm');
     await expect(
       serviceRpc(e, 'create_mailout' as 'mailout_claim', {}, fetchFn as unknown as typeof fetch),
-    ).rejects.toThrow(/not a mailout service rpc/);
+    ).rejects.toThrow(/not a service rpc/);
   });
 });
 

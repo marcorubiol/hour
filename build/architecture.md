@@ -212,6 +212,10 @@ No crear usuarios insertando en `auth.users`: usar Auth Admin API/Dashboard.
   a service_role; enviar, conectar, desconectar, crear un envío, ponerlo en
   cola o dar de alta un dominio siguen pidiendo antes permiso a la base con el
   JWT de la persona.
+  La frontera cubre también las RPC `audience_*` de máquina (alta, confirmación,
+  reapuntarse, purga de pendientes, aprobar importación) por ADR-173: solo las
+  llama `$lib/server/mailout/` (`SERVICE_RPCS`), y un alta o confirmación pública
+  llega sin persona detrás, con limitador y token.
 
 ### Buzón sincronizado (ADR-099, carril 1)
 

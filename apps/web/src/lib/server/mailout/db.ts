@@ -2,7 +2,8 @@
  * La base sin persona detrás, para el envío en bloque: la cola (cron y
  * primera pasada) y el estado de los dominios.
  *
- * Frontera (ADR-110, architecture.md § seguridad): la clave de servicio solo
+ * Frontera (ADR-110, ampliada a `audience_*` por ADR-173 § 4; architecture.md
+ * § seguridad): la clave de servicio solo
  * llama a las RPC de esta lista, ninguna tabla. Lo que hace una persona sigue
  * yendo con su JWT y RLS.
  */
@@ -23,6 +24,14 @@ const SERVICE_RPCS = [
   'mailout_record_sent',
   'mailout_record_failure',
   'mailout_record_event',
+  'mailout_approve_review',
+  'audience_subscribe',
+  'audience_confirmation_token',
+  'audience_confirm',
+  'audience_resubscribe',
+  'audience_confirmation_sent',
+  'audience_purge_pending',
+  'audience_approve_import',
 ] as const;
 type MailoutServiceRpc = (typeof SERVICE_RPCS)[number];
 
@@ -42,7 +51,7 @@ export async function serviceRpc<T>(
   args: Record<string, unknown>,
   fetchFn: typeof fetch = fetch,
 ): Promise<T> {
-  if (!SERVICE_RPCS.includes(name)) throw new Error(`not a mailout service rpc: ${name}`);
+  if (!SERVICE_RPCS.includes(name)) throw new Error(`not a service rpc: ${name}`);
   const key = env.SUPABASE_SERVICE_ROLE_KEY;
   if (!key || !env.PUBLIC_SUPABASE_URL) throw new MailoutNotConfiguredError(['SUPABASE_SERVICE_ROLE_KEY']);
   // Las claves nuevas (`sb_secret_…`) van solo en `apikey`; la legada es un JWT
