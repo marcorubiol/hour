@@ -51,25 +51,30 @@ test.describe('sending domain (simulated)', () => {
     await expect(section).toBeVisible();
     await expect(section.getByTestId('mailout-simulated')).toBeVisible();
 
+    // Dos propósitos (ADR-173 § 5): este es el de la difusión; el del público
+    // tiene su propio formulario, con hola@ por defecto.
+    const outreach = section.getByTestId('mailout-domain-outreach');
+    await expect(section.getByTestId('mailout-domain-audience').locator('#md-local-audience')).toHaveValue('hola');
+
     // Alta: el remitente por defecto es difusion@.
-    await section.getByLabel(/^Domain$|^Dominio$|^Domini$|^Domaine$/).fill(`https://www.${domain}/`);
-    await expect(section.locator('#md-local')).toHaveValue('difusion');
-    await section.getByRole('button', { name: /Add domain|Añadir dominio|Afegir domini|Ajouter le domaine/ }).click();
+    await outreach.getByLabel(/^Domain$|^Dominio$|^Domini$|^Domaine$/).fill(`https://www.${domain}/`);
+    await expect(outreach.locator('#md-local-outreach')).toHaveValue('difusion');
+    await outreach.getByRole('button', { name: /Add domain|Añadir dominio|Afegir domini|Ajouter le domaine/ }).click();
 
     // Registros: 3 CNAME de firma, MX y TXT de rebotes en bounce., DMARC sugerido.
-    const records = section.getByTestId('mailout-dns-record');
+    const records = outreach.getByTestId('mailout-dns-record');
     await expect(records).toHaveCount(6, { timeout: 15_000 });
     await expect(records.filter({ hasText: `._domainkey.${domain}` })).toHaveCount(3);
     await expect(records.filter({ hasText: `bounce.${domain}` })).toHaveCount(2);
     await expect(records.filter({ hasText: `_dmarc.${domain}` })).toHaveCount(1);
-    await expect(section.getByTestId('mailout-domain-state')).toContainText(/Pending|Pendiente|Pendent|En attente/);
+    await expect(outreach.getByTestId('mailout-domain-state')).toContainText(/Pending|Pendiente|Pendent|En attente/);
 
     // Ninguna palabra del servicio que envía en la pantalla (plan § 3.3).
     await expect(section).not.toContainText(/\bSES\b|tenant|proveedor|provider/i);
 
     // Comprobar: el simulador lo da por verificado.
-    await section.getByRole('button', { name: /^(Check|Comprobar|Comprovar|Vérifier)$/ }).click();
-    await expect(section.getByTestId('mailout-domain-state')).toContainText(/Verified|Verificado|Verificat|Vérifié/, {
+    await outreach.getByRole('button', { name: /^(Check|Comprobar|Comprovar|Vérifier)$/ }).click();
+    await expect(outreach.getByTestId('mailout-domain-state')).toContainText(/Verified|Verificado|Verificat|Vérifié/, {
       timeout: 15_000,
     });
 

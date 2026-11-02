@@ -888,7 +888,11 @@
     </span>
   {/if}
   {#if e.mailout_id && e.kind === 'email'}
-    <a class="mb" href={`/h/${workspaceSlug}/mailout/${e.mailout_id}`} data-testid="event-mailout">{t('mailout.of_mailout', locale)}</a>
+    <a class="mb" href={`/h/${workspaceSlug}/mailout/${e.mailout_id}`} data-testid="event-mailout"
+      >{e.mailout_kind === 'invitation'
+        ? t('mailout.from_invitation', locale, { subject: e.subject ?? '' })
+        : t('mailout.of_mailout', locale)}</a
+    >
   {/if}
 {/snippet}
 

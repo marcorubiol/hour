@@ -126,7 +126,9 @@ async function grants({ env, jwt, ws }: Ctx): Promise<GrantRow[]> {
       search: {
         select: 'id,level,user_id,preset,project_id,line_id,bolo_id,performance_id,facets:membership_facet(facet_id,verb,source)',
         workspace_id: `eq.${ws}`,
-        level: 'neq.workspace',
+        // Below the space; and in it, the members who are not owner or admin
+        // (ADR-173 § 4: Público is given there by hand; owner and admin carry all).
+        or: '(level.neq.workspace,workspace_role.not.in.(owner,admin))',
       },
     }),
     pgPostRpc<{ access_kind: string; user_id: string | null; display_name: string }>(env, 'list_workspace_access', jwt, {

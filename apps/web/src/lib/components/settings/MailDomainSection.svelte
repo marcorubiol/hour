@@ -8,6 +8,10 @@
    * Mientras el envío sea simulado (ADR-111) la pantalla lo dice arriba: no
    * sale ningún correo real. Palabras de § 3.3: nunca el nombre del servicio
    * que envía.
+   *
+   * Dos propósitos (ADR-173 § 5): «Dominio para la difusión» y «Dominio para
+   * el público» (un subdominio, `publico.<dominio>` por defecto, remitente
+   * `hola@`), cada uno con sus registros y su estado.
    */
   import BlockHead from '$lib/components/BlockHead.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
@@ -28,6 +32,7 @@
     senderAddress,
     type DnsRecord,
     type MailDomainItem,
+    type MailDomainPurpose,
     type MailDomainsResponse,
     type MailDomainState,
   } from '$lib/mailout';
@@ -90,22 +95,33 @@
     void queryClient.invalidateQueries({ queryKey: ['mailout-domains'] });
   }
 
-  // ── Alta ──
-  let domainInput = $state('');
-  let localInput = $state('difusion');
+  // ── Alta, una por propósito ──
+  const PURPOSES: MailDomainPurpose[] = ['outreach', 'audience'];
+  const DEFAULT_LOCAL: Record<MailDomainPurpose, string> = { outreach: 'difusion', audience: 'hola' };
+  let domainInput = $state<Record<MailDomainPurpose, string>>({ outreach: '', audience: '' });
+  let localInput = $state<Record<MailDomainPurpose, string>>({ ...DEFAULT_LOCAL });
   let nameInput = $state<string | null>(null);
   let nameShown = $derived(nameInput ?? data?.workspace_name ?? '');
+  let byPurpose = $derived(
+    Object.fromEntries(PURPOSES.map((p) => [p, domains.filter((d) => (d.purpose ?? 'outreach') === p)])) as Record<
+      MailDomainPurpose,
+      MailDomainItem[]
+    >,
+  );
+  /** El subdominio que se propone para el público: `publico.` delante del de la difusión. */
+  let audienceSuggestion = $derived(byPurpose.outreach[0] ? `publico.${byPurpose.outreach[0].domain}` : 'publico.mamemi.cat');
 
   const add = createMutation({
-    mutationFn: () =>
+    mutationFn: (purpose: MailDomainPurpose) =>
       mutateJSON<{ item: MailDomainItem }>('POST', '/api/mailout/domains', {
         workspace_id: workspaceId,
-        domain: domainInput,
-        from_local_part: localInput.trim() || 'difusion',
+        purpose,
+        domain: domainInput[purpose],
+        from_local_part: localInput[purpose].trim() || DEFAULT_LOCAL[purpose],
         from_name: nameShown.trim() || null,
       }),
-    onSuccess: () => {
-      domainInput = '';
+    onSuccess: (_r, purpose) => {
+      domainInput[purpose] = '';
       nameInput = null;
     },
     onError: failed,
@@ -205,88 +221,98 @@
       {#if $query.isLoading}
         <p class="muted">{t('mailout.loading', locale)}</p>
       {:else}
-        {#each domains as d (d.id)}
-          {@render domainBlock(d)}
+        {#each PURPOSES as purpose (purpose)}
+          <div class="md-purpose" data-purpose={purpose} data-testid={`mailout-domain-${purpose}`}>
+            <h3 class="eyebrow eyebrow--sub">{t(`mail.domain_purpose_${purpose}`, locale)}</h3>
+            {#if purpose === 'audience'}<p class="set-row__hint">{t('mail.domain_purpose_audience_hint', locale)}</p>{/if}
+            {#each byPurpose[purpose] as d (d.id)}
+              {@render domainBlock(d)}
+            {/each}
+
+            {#if byPurpose[purpose].length === 0 && !canManage}
+              <p class="muted">{t('mailout.admin_only', locale)}</p>
+            {/if}
+
+            {#if byPurpose[purpose].length === 0 && canManage}
+              {@render addForm(purpose)}
+            {/if}
+          </div>
         {/each}
-
-        {#if domains.length === 0 && !canManage}
-          <p class="muted">{t('mailout.admin_only', locale)}</p>
-        {/if}
-
-        {#if domains.length === 0 && canManage}
-          <form
-            class="md-add"
-            onsubmit={(e) => {
-              e.preventDefault();
-              $add.mutate();
-            }}
-          >
-            <div class="set-row">
-              <div class="set-row__lead">
-                <label class="set-row__label" for="md-domain">{t('mailout.domain_label', locale)}</label>
-                <div class="set-row__hint">{t('mailout.domain_hint', locale)}</div>
-              </div>
-              <div class="set-row__ctrl">
-                <Field id="md-domain">
-                  <input
-                    id="md-domain"
-                    type="text"
-                    inputmode="url"
-                    autocomplete="off"
-                    spellcheck="false"
-                    maxlength="253"
-                    placeholder="mamemi.cat"
-                    bind:value={domainInput}
-                    disabled={$add.isPending || !data?.configured}
-                  />
-                </Field>
-              </div>
-            </div>
-            <div class="set-row">
-              <div class="set-row__lead">
-                <label class="set-row__label" for="md-local">{t('mailout.sender_label', locale)}</label>
-                <div class="set-row__hint">{t('mailout.sender_hint', locale)}</div>
-              </div>
-              <div class="set-row__ctrl"><div class="md-sender">
-                <Field id="md-name">
-                  <input
-                    id="md-name"
-                    type="text"
-                    maxlength="100"
-                    aria-label={t('mailout.sender_name', locale)}
-                    placeholder={t('mailout.sender_name', locale)}
-                    value={nameShown}
-                    oninput={(e) => (nameInput = e.currentTarget.value)}
-                    disabled={$add.isPending || !data?.configured}
-                  />
-                </Field>
-                <div class="md-addr">
-                  <Field id="md-local">
-                    <input
-                      id="md-local"
-                      type="text"
-                      maxlength="64"
-                      autocomplete="off"
-                      spellcheck="false"
-                      bind:value={localInput}
-                      disabled={$add.isPending || !data?.configured}
-                    />
-                    {#snippet suffix()}@{domainInput.trim().toLowerCase() || t('mailout.your_domain', locale)}{/snippet}
-                  </Field>
-                </div>
-              </div></div>
-            </div>
-            <div class="md-actions">
-              <Button size="s" type="submit" disabled={!domainInput.trim() || $add.isPending || !data?.configured}>
-                {t('mailout.add_domain', locale)}
-              </Button>
-            </div>
-          </form>
-        {/if}
       {/if}
     </div>
   </section>
 {/if}
+
+{#snippet addForm(purpose: MailDomainPurpose)}
+  <form
+    class="md-add"
+    onsubmit={(e) => {
+      e.preventDefault();
+      $add.mutate(purpose);
+    }}
+  >
+    <div class="set-row">
+      <div class="set-row__lead">
+        <label class="set-row__label" for={`md-domain-${purpose}`}>{t('mailout.domain_label', locale)}</label>
+        <div class="set-row__hint">{t(purpose === 'audience' ? 'mail.domain_audience_hint' : 'mailout.domain_hint', locale)}</div>
+      </div>
+      <div class="set-row__ctrl">
+        <Field id={`md-domain-${purpose}`}>
+          <input
+            id={`md-domain-${purpose}`}
+            type="text"
+            inputmode="url"
+            autocomplete="off"
+            spellcheck="false"
+            maxlength="253"
+            placeholder={purpose === 'audience' ? audienceSuggestion : 'mamemi.cat'}
+            bind:value={domainInput[purpose]}
+            disabled={$add.isPending || !data?.configured}
+          />
+        </Field>
+      </div>
+    </div>
+    <div class="set-row">
+      <div class="set-row__lead">
+        <label class="set-row__label" for={`md-local-${purpose}`}>{t('mailout.sender_label', locale)}</label>
+        <div class="set-row__hint">{t('mailout.sender_hint', locale)}</div>
+      </div>
+      <div class="set-row__ctrl"><div class="md-sender">
+        <Field id={`md-name-${purpose}`}>
+          <input
+            id={`md-name-${purpose}`}
+            type="text"
+            maxlength="100"
+            aria-label={t('mailout.sender_name', locale)}
+            placeholder={t('mailout.sender_name', locale)}
+            value={nameShown}
+            oninput={(e) => (nameInput = e.currentTarget.value)}
+            disabled={$add.isPending || !data?.configured}
+          />
+        </Field>
+        <div class="md-addr">
+          <Field id={`md-local-${purpose}`}>
+            <input
+              id={`md-local-${purpose}`}
+              type="text"
+              maxlength="64"
+              autocomplete="off"
+              spellcheck="false"
+              bind:value={localInput[purpose]}
+              disabled={$add.isPending || !data?.configured}
+            />
+            {#snippet suffix()}@{domainInput[purpose].trim().toLowerCase() || t('mailout.your_domain', locale)}{/snippet}
+          </Field>
+        </div>
+      </div></div>
+    </div>
+    <div class="md-actions">
+      <Button size="s" type="submit" disabled={!domainInput[purpose].trim() || $add.isPending || !data?.configured}>
+        {t('mailout.add_domain', locale)}
+      </Button>
+    </div>
+  </form>
+{/snippet}
 
 {#snippet domainBlock(d: MailDomainItem)}
   {@const state = domainState(d)}
@@ -393,6 +419,15 @@
 
 <style>
   @layer components {
+    .md-purpose {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-s);
+    }
+    .md-purpose + .md-purpose {
+      padding-block-start: var(--space-m);
+      border-block-start: var(--border);
+    }
     .md-intro {
       margin: 0 0 var(--space-s);
       color: var(--text-muted);

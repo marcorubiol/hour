@@ -128,7 +128,7 @@ describe('personGrants', () => {
   ];
   const out = personGrants(rows, facets, PRESET_FACETS, 'No name');
 
-  it('leaves out the space memberships: their facets are not decided', () => {
+  it('leaves out the space memberships with nothing to give there', () => {
     // By name: «Laia» before the fallback «No name».
     expect(out.map((g) => g.membership_id)).toEqual(['m-bolo', 'm-perf']);
   });
@@ -151,5 +151,29 @@ describe('personGrants', () => {
     expect(by.get('vestuari')).toMatchObject({ verb: 'view', presetVerb: null, adjusted: true });
     expect(by.get('diners')).toMatchObject({ verb: null, presetVerb: null, adjusted: false });
     expect(bolo.adjusted).toBe(2);
+  });
+});
+
+describe('Público, the one facet given in the space (ADR-173 § 4)', () => {
+  const lvw = (...l: ContainerLevel[]) => l.map((level) => ({ level }));
+  const rows: FacetRow[] = [
+    { id: 'f-aud', workspace_id: null, key: 'audience', label: null, labels: {}, sort: 70, levels: lvw('workspace') },
+    { id: 'f-din2', workspace_id: null, key: 'diners', label: null, labels: {}, sort: 60, levels: lvw('workspace', 'bolo') },
+  ];
+  const vocab = settingsFacets(rows, [], 'ws-a');
+  it('a space membership offers Público and nothing else', () => {
+    const out = personGrants(
+      [
+        { id: 'm-ws', level: 'workspace', user_id: 'u', preset: null, name: 'Anouk', container: null, facets: [{ facet_id: 'f-aud', verb: 'edit', source: 'override' }] },
+        { id: 'm-b', level: 'bolo', user_id: 'v', preset: null, name: 'Laia', container: null, facets: [] },
+      ],
+      vocab,
+      [],
+      'No name',
+    );
+    const ws = out.find((g) => g.membership_id === 'm-ws')!;
+    expect(ws.facets.map((f) => f.facet.key)).toEqual(['audience']);
+    expect(ws.facets[0]).toMatchObject({ verb: 'edit', adjusted: true });
+    expect(out.find((g) => g.membership_id === 'm-b')!.facets.map((f) => f.facet.key)).toEqual(['diners']);
   });
 });

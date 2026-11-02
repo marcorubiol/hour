@@ -95,8 +95,8 @@
     const company = d?.workspace.name ?? '';
     const policy = d?.workspace.privacy_url ?? '';
     return {
-      consent_text: t('audience.form_consent_default', lang, { company }),
-      info_text: t('audience.form_info_default', lang, { company, policy }),
+      consent_text: t('audience.list_consent_default', lang, { company }),
+      info_text: t('audience.list_info_default', lang, { company, policy }),
     };
   }
 
@@ -349,7 +349,7 @@
 
     <!-- ── Formulario ─────────────────────────────────────────────────── -->
     <section class="al__block" aria-labelledby="al-form">
-      <BlockHead id="al-form" title={t('audience.form_block', locale)} />
+      <BlockHead id="al-form" title={t('audience.list_form_block', locale)} />
       {#if !d.workspace.privacy_url}
         <p class="al__warn">
           {t('audience.needs_privacy', locale)}
@@ -405,7 +405,7 @@
       {/if}
 
       <div class="al__share">
-        <p class="al__line"><span class="al__name">{t('audience.form_link', locale)}</span> <code class="al__addr" data-testid="audience-form-link">{link}</code></p>
+        <p class="al__line"><span class="al__name">{t('audience.list_form_link', locale)}</span> <code class="al__addr" data-testid="audience-form-link">{link}</code></p>
         <div class="al__row-acts">
           <Button size="s" variant="secondary" onclick={() => copy(link, t('audience.copied', locale))}>{t('audience.copy_link', locale)}</Button>
           <Button size="s" variant="secondary" onclick={() => copy(embedCode(page.url.origin, a!.form_key, a!.name), t('audience.copied', locale))}>
