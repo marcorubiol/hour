@@ -18,7 +18,8 @@
    * server's filtered list (ConversationTable in its chat shape).
    *
    * On a wide screen two panes: the list and the open conversation beside it
-   * (`?abierta=<space>/<id>`, its record as the vistazo draws it). Narrower,
+   * (`?abierta=<space>/<id>`, its record as the vistazo draws it; a bolo's
+   * thread as a group, `?grupo=<space>/<performance>[/<facet>]`). Narrower,
    * a row opens the conversation's page: on a phone, the list is the whole
    * screen and the conversation opens over it. No swiping rows (decided).
    *
@@ -51,7 +52,7 @@
   import { tick, untrack } from 'svelte';
   import { toStore } from 'svelte/store';
   import { MAILOUT_PICKS, NO_LINE, hasListFilter, parseListFilter, type MailoutPick, type OverviewResponse } from '$lib/conversation-overview';
-  import type { ConversationFeedView, FeedConversationView } from '$lib/conversation-feed';
+  import type { ConversationFeedView, FeedConversationView, FeedThreadRow } from '$lib/conversation-feed';
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { lazy } from '$lib/lazy.svelte';
   import { DEFAULT_ORDER, ORDERS, parseOrden, type Orden } from '$lib/conversation-order';
@@ -474,7 +475,25 @@
     const ws = workspaceSlugById.get(workspaceId);
     if (!wide || !ws || event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
     event.preventDefault();
-    setParams({ abierta: `${ws}/${id}` });
+    setParams({ abierta: `${ws}/${id}`, grupo: null });
+  }
+  // A bolo's thread opens as a group (BoloGroup, the record lane's): beside on a wide screen.
+  let groupRaw = $derived(page.url.searchParams.get('grupo'));
+  let group = $derived.by(() => {
+    const [ws, performanceId, facetId] = (groupRaw ?? '').split('/');
+    return ws && performanceId ? { ws, performanceId, facetId: facetId || null } : null;
+  });
+  const boloGroup = lazy(() => import('$lib/components/BoloGroup.svelte'));
+  $effect(() => {
+    if (wide && group) void boloGroup.load();
+  });
+  function openThread(th: FeedThreadRow, event: MouseEvent) {
+    const ws = workspaceSlugById.get(th.workspace_id);
+    const performanceId = th.bolo?.performance_id;
+    if (!wide || !ws || !performanceId || th.anchor_kind !== 'bolo') return;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+    event.preventDefault();
+    setParams({ grupo: [ws, performanceId, th.facet_id].filter(Boolean).join('/'), abierta: null });
   }
   const openFeedRow = (c: FeedConversationView, e: MouseEvent) => openBeside(c.workspace_id, c.id, e);
   const openTableRow = (c: ConversationItem, e: MouseEvent) => openBeside(c.workspace_id, c.id, e);
@@ -973,6 +992,8 @@
             importEmptyState={canEdit}
             activeId={wide ? (opened?.id ?? null) : null}
             onopen={openFeedRow}
+            activeThread={wide && group ? `${group.performanceId}/${group.facetId ?? ''}` : null}
+            onopenthread={openThread}
           />
         {:else}
           <ConversationTable
@@ -1001,11 +1022,15 @@
       {#if wide}
         <!-- The open conversation beside the list: its record, as the vistazo draws it. -->
         <div class="conversations__pane" data-testid="conversation-pane">
-          {#if opened && conversationRecord.component}
+          {#if group && boloGroup.component}
+            {#key groupRaw}
+              <boloGroup.component workspaceSlug={group.ws} performanceId={group.performanceId} facetId={group.facetId} inPeek />
+            {/key}
+          {:else if opened && conversationRecord.component}
             {#key openRaw}
               <conversationRecord.component workspaceSlug={opened.ws} slug={opened.id} inPeek />
             {/key}
-          {:else if !opened}
+          {:else if !opened && !group}
             <EmptyLine text={t('chat.pick_one', locale)} />
           {/if}
         </div>

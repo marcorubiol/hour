@@ -28,7 +28,7 @@
   import { SALES, TEAM, keyLabel, type WorkspaceTag } from '$lib/conversation-tags';
   import { rowTurn } from '$lib/conversation-row';
   import { feedKey, feedTurnRow, type ConversationFeedView, type FeedConversationView, type FeedThreadRow } from '$lib/conversation-feed';
-  import { THREAD_REFRESH_MS, boloDays, feedHref, feedThreadName, feedTitle } from '$lib/threads';
+  import { THREAD_REFRESH_MS, boloDays, feedHref, feedThreadName, feedTitle, groupHref } from '$lib/threads';
 
   interface Props {
     /** El alcance de la barra lateral; vacío = todo. */
@@ -50,6 +50,10 @@
     activeId?: string | null;
     /** Abrir al lado en vez de navegar; sin ella, el enlace va a la ficha. */
     onopen?: (c: FeedConversationView, event: MouseEvent) => void;
+    /** The bolo thread open beside, as `<performance>/<facet or ''>`. */
+    activeThread?: string | null;
+    /** Open a bolo's thread beside, as a group; without it, its group page. */
+    onopenthread?: (th: FeedThreadRow, event: MouseEvent) => void;
   }
 
   let {
@@ -64,6 +68,8 @@
     importEmptyState = false,
     activeId = null,
     onopen,
+    activeThread = null,
+    onopenthread,
   }: Props = $props();
 
   const tz = viewerTimeZone();
@@ -111,7 +117,8 @@
 
   function href(c: FeedConversationView): string | null {
     const ws = workspaceSlugById.get(c.workspace_id);
-    return ws ? `/h/${ws}/conversation/${c.id}` : null;
+    // What is new is only the team's: the conversation opens on its team thread.
+    return ws ? `/h/${ws}/conversation/${c.id}${c.thread_unread > 0 && c.event_unread === 0 ? '#team' : ''}` : null;
   }
 
   function unreadLabel(n: number): string | null {
@@ -188,7 +195,7 @@
             />
           {:else}
             <ChatRow
-              href={feedHref(row, workspaceSlugById.get(row.workspace_id))}
+              href={groupHref(row, workspaceSlugById.get(row.workspace_id)) ?? feedHref(row, workspaceSlugById.get(row.workspace_id))}
               title={[feedTitle(row), feedThreadName(row, locale)].filter(Boolean).join(' · ')}
               group
               at={row.last_message_at}
@@ -198,6 +205,8 @@
               lead={author(feed, row)}
               last={row.last_message.body}
               context={threadContext(row)}
+              active={activeThread !== null && activeThread === `${row.bolo?.performance_id}/${row.facet_id ?? ''}`}
+              onopen={onopenthread ? (e) => onopenthread(row, e) : undefined}
             />
           {/if}
         </li>
