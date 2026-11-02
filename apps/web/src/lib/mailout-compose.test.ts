@@ -117,7 +117,7 @@ describe('firma y pie', () => {
 
   test('ADR-174: la base del sector dice por qué le llega, en su idioma', () => {
     expect(footerLines({ ...ctx, basis_kind: 'sector' }, 'es', URL)[1]).toBe(
-      'Te escribimos porque trabajas en programación o difusión de artes en vivo.',
+      'Os escribimos porque trabajáis en programación o difusión de artes en vivo.',
     );
     expect(footerLines({ ...ctx, basis_kind: 'sector' }, 'ca', URL)[1]).toContain('arts en viu');
   });

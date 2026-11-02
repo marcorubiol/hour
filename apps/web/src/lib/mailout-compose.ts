@@ -84,7 +84,7 @@ const COPY: Record<MailoutLanguage, Copy> = {
       s
         ? `Os escribimos porque es la dirección de programación de ${s}.`
         : 'Os escribimos porque es vuestra dirección pública de programación.',
-    sector: 'Te escribimos porque trabajas en programación o difusión de artes en vivo.',
+    sector: 'Os escribimos porque trabajáis en programación o difusión de artes en vivo.',
     unsubscribe: (c, u) => `Si no queréis recibir más envíos de ${c}, daos de baja aquí: ${u} Un clic basta.`,
     privacy: (u) => `Política de privacidad: ${u}`,
     test: '[Prueba]',
@@ -97,7 +97,7 @@ const COPY: Record<MailoutLanguage, Copy> = {
       s
         ? `Us escrivim perquè és l'adreça de programació de ${s}.`
         : 'Us escrivim perquè és la vostra adreça pública de programació.',
-    sector: "T'escrivim perquè treballes en programació o difusió d'arts en viu.",
+    sector: "Us escrivim perquè treballeu en programació o difusió d'arts en viu.",
     unsubscribe: (c, u) =>
       `Si no voleu rebre més enviaments de ${c}, doneu-vos de baixa aquí: ${u} N'hi ha prou amb un clic.`,
     privacy: (u) => `Política de privacitat: ${u}`,
