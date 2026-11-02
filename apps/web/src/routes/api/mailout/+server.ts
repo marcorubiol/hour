@@ -30,7 +30,15 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
     const p = project.data[0];
     if (!p?.workspace) return jsonNoStore({ error: 'not_found' }, 404);
     const domains = await pgGet<{ id: string }>(env, 'mail_domain', jwt, {
-      search: { select: 'id', workspace_id: `eq.${p.workspace_id}`, verified_at: 'not.is.null', order: 'created_at.asc', limit: '1' },
+      // El de la difusión: el del público (ADR-173 § 5) no sirve a un envío.
+      search: {
+        select: 'id',
+        workspace_id: `eq.${p.workspace_id}`,
+        purpose: 'eq.outreach',
+        verified_at: 'not.is.null',
+        order: 'created_at.asc',
+        limit: '1',
+      },
     });
     const created = await pgPostRpc<MailoutItem>(env, 'create_mailout', jwt, {
       p_project_id: body.project_id,
@@ -66,6 +74,8 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   const search = new URLSearchParams({
     select: 'id,project_id,subject,queued_at',
     status: 'in.(queued,sending,paused,done)',
+    // El filtro Envío es de la difusión: una invitación no filtra conversaciones así.
+    kind: 'eq.outreach',
     order: 'queued_at.desc.nullslast',
     limit: '10',
   });

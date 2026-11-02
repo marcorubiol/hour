@@ -4,7 +4,7 @@
  * GET ?workspace_id=… → MailDomainsResponse: los dominios (RLS: miembros del
  *     espacio), si quien llama los gestiona (admin), con qué adaptador se dan
  *     de alta los nuevos y si el Worker está configurado para ello.
- * POST { workspace_id, domain, from_local_part?, from_name? } → el dominio
+ * POST { workspace_id, domain, purpose?, from_local_part?, from_name? } → el dominio
  *     dado de alta: `add_mail_domain` con el JWT (solo admin), después el
  *     adaptador da los registros DNS y su estado se escribe como service_role.
  *     Si el adaptador falla, el alta se deshace.
@@ -81,8 +81,9 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
       p_workspace_id: body.workspace_id,
       p_domain: body.domain,
       p_provider: kind,
-      p_from_local_part: body.from_local_part,
+      p_from_local_part: body.from_local_part ?? null,
       p_from_name: body.from_name ?? null,
+      p_purpose: body.purpose,
     });
     created = res.data[0];
     if (!created) return jsonNoStore({ error: 'not_found' }, 404);

@@ -272,6 +272,8 @@ export async function loadLastMailout(env: SupabaseEnv, jwt: string, scope: Over
   const search = new URLSearchParams({
     select: 'id,workspace_id,subject,from_address,status,queued_at,mail_domain_id',
     status: 'in.(queued,sending,paused,done)',
+    // De la difusión: una invitación lleva público sin conversación (ADR-173 § 10).
+    kind: 'eq.outreach',
     order: 'queued_at.desc.nullslast',
     limit: '4',
   });

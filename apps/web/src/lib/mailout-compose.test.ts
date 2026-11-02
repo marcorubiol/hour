@@ -3,6 +3,7 @@ import {
   composeMailout,
   fieldsUsed,
   footerLines,
+  isAudienceRecipient,
   mailoutLanguage,
   MAILOUT_LANGUAGES,
   suggestedBasis,
@@ -26,6 +27,13 @@ const ctx: ComposeContext = {
   company_phone: null,
   company_signature: null,
   privacy_url: null,
+  mailout_kind: 'outreach',
+  audience_subscription_id: null,
+  audience_name: null,
+  subscriber_name: null,
+  subscribed_at: null,
+  venue_name: null,
+  venue_city: null,
 };
 
 const URL = 'https://hour.zerosense.studio/u/abc';
@@ -150,5 +158,107 @@ describe('cabeceras y enlaces', () => {
   test('la prueba lleva su marca en el idioma del envío; idioma desconocido, castellano', () => {
     expect(testSubject('Hola', 'ca')).toBe('[Prova] Hola');
     expect(mailoutLanguage('de')).toBe('es');
+  });
+});
+
+describe('invitaciones (ADR-173 § 10)', () => {
+  const invitation: ComposeContext = { ...ctx, mailout_kind: 'invitation', venue_name: 'Teatre Lliure', venue_city: 'Barcelona' };
+  const subscriber: ComposeContext = {
+    ...invitation,
+    address_kind: 'subscriber',
+    basis_kind: 'consent',
+    contact_first_name: null,
+    contact_name: null,
+    organization_name: null,
+    city: null,
+    audience_subscription_id: 's1',
+    audience_name: 'Estrenos en Cataluña',
+    subscriber_name: 'Núria Vidal',
+    subscribed_at: '2026-03-14T10:00:00Z',
+  };
+
+  test('{sala} y {ciudad} son los de la función, para un profesional y para el público', () => {
+    const draft = { subject: 'Estreno en {sala}', body: 'Hola, {nombre}: en {ciudad}.', language: 'es' };
+    const pro = composeMailout(draft, invitation, URL);
+    expect(pro.subject).toBe('Estreno en Teatre Lliure');
+    expect(pro.text.startsWith('Hola, Laia: en Barcelona.')).toBe(true);
+    const aud = composeMailout(draft, subscriber, URL);
+    expect(aud.subject).toBe('Estreno en Teatre Lliure');
+    expect(aud.text.startsWith('Hola, Núria: en Barcelona.')).toBe(true);
+    expect(aud.missing).toEqual([]);
+  });
+
+  test('una invitación sin función bloquea {sala} como en la difusión', () => {
+    const m = composeMailout({ subject: '{sala}', body: 'x', language: 'es' }, { ...invitation, venue_name: null }, URL);
+    expect(m.missing).toEqual(['sala']);
+  });
+
+  test('el público sin nombre recibe el saludo sin él, sin bloquear', () => {
+    const nameless = { ...subscriber, subscriber_name: null };
+    expect(composeMailout({ subject: 's', body: 'Hola, {nombre}:\n\nVen.', language: 'es' }, nameless, URL).text).toMatch(
+      /^Hola:\n\nVen\./,
+    );
+    expect(composeMailout({ subject: 's', body: 'Hello {nombre},', language: 'en' }, nameless, URL).text).toMatch(/^Hello,/);
+    expect(composeMailout({ subject: '{nombre}, ven', body: 'x', language: 'es' }, nameless, URL).subject).toBe('ven');
+    expect(composeMailout({ subject: 's', body: 'Gracias, {nombre}, por venir.', language: 'es' }, nameless, URL).text).toMatch(
+      /^Gracias por venir\./,
+    );
+    expect(composeMailout({ subject: 's', body: 'Hola, {nombre}', language: 'es' }, nameless, URL).missing).toEqual([]);
+  });
+
+  test('un profesional sin nombre sigue bloqueando', () => {
+    const m = composeMailout({ subject: 's', body: 'Hola, {nombre}', language: 'es' }, { ...invitation, contact_first_name: null }, URL);
+    expect(m.missing).toEqual(['nombre']);
+  });
+
+  test('el pie del público: la lista y la fecha, su baja y la privacidad', () => {
+    const lines = footerLines({ ...subscriber, privacy_url: 'https://mamemi.cat/privacidad' }, 'es', URL);
+    expect(lines).toEqual([
+      'MüK Cia · Barcelona · mamemi.cat',
+      'Te llega porque te apuntaste a «Estrenos en Cataluña» de MüK Cia el 14 de marzo de 2026.',
+      `Darte de baja: ${URL} Un clic basta.`,
+      'Política de privacidad: https://mamemi.cat/privacidad',
+    ]);
+  });
+
+  test('el pie del público por trato previo, y sin fecha si no la hay', () => {
+    expect(footerLines({ ...subscriber, basis_kind: 'relationship' }, 'ca', URL)[1]).toBe(
+      'Et arriba perquè has estat client de MüK Cia.',
+    );
+    expect(footerLines({ ...subscriber, subscribed_at: null }, 'en', URL)[1]).toBe(
+      'You\'re getting this because you signed up to "Estrenos en Cataluña" from MüK Cia.',
+    );
+  });
+
+  test('cada idioma tiene el pie del público con su baja', () => {
+    for (const lang of MAILOUT_LANGUAGES) {
+      for (const basis of ['consent', 'relationship'] as const) {
+        const lines = footerLines({ ...subscriber, basis_kind: basis }, lang, URL);
+        expect(lines).toHaveLength(3);
+        expect(lines[2]).toContain(URL);
+      }
+    }
+  });
+
+  test('un profesional de una invitación lleva el pie de la difusión según su base', () => {
+    expect(footerLines({ ...invitation, basis_kind: 'sector' }, 'es', URL)[1]).toBe(
+      'Os escribimos porque trabajáis en programación o difusión de artes en vivo.',
+    );
+    expect(footerLines(invitation, 'es', URL)[2]).toContain('daos de baja');
+  });
+
+  test('el origen lo dice la fila, no el envío', () => {
+    expect(isAudienceRecipient(subscriber)).toBe(true);
+    expect(isAudienceRecipient(invitation)).toBe(false);
+  });
+
+  test('las dos ramas visten la misma plantilla (ADR-172)', () => {
+    const template = {
+      logo: { url: 'https://hour.zerosense.studio/m/ws/x/logo.png', alt: 'MüK', width: null, height: null },
+      image: null,
+    };
+    for (const c of [invitation, subscriber]) {
+      expect(composeMailout({ subject: 's', body: 'x', language: 'es' }, c, URL, template).html).toContain('<img');
+    }
   });
 });

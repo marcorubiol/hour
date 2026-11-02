@@ -58,6 +58,8 @@ export const EVENT_MAIL_SELECT = [
   // Envío en bloque (ADR-115): el correo que salió de un envío, y las notas
   // de baja, vuelta o «spam» (ADR-112 § 8).
   'mailout_id:metadata->>mailout_id',
+  // Una invitación (ADR-173 § 10): «de la invitación "{asunto}"».
+  'mailout_kind:metadata->>mailout_kind',
   'mailout_note:metadata->>mailout',
 ].join(',');
 
@@ -69,6 +71,7 @@ export interface EventMailFields {
   mailbox_scope?: MailAccountScope | null;
   mail_account_id?: string | null;
   mailout_id?: string | null;
+  mailout_kind?: 'outreach' | 'invitation' | null;
   mailout_note?: 'unsubscribed' | 'resubscribed' | 'complained' | null;
 }
 

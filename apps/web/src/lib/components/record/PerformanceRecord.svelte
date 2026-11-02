@@ -378,6 +378,38 @@
   );
   let canEdit = $derived($editQuery.data?.can_edit !== false);
 
+  // «Invitar» (ADR-173 § 10, plan del público § 6.1): una invitación en
+  // borrador con proyecto y función puestos, sin destinatarios; en su pantalla
+  // se elige la lista, profesionales o los dos.
+  const inviteAccess = createQuery(
+    toStore(() => ({
+      queryKey: ['can-invite', perf?.workspace_id ?? '', perf?.project?.id ?? ''] as const,
+      enabled: Boolean(perf?.workspace_id),
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchJSON<{ can_invite: boolean }>(
+          `/api/mailout/invitation?workspace_id=${perf!.workspace_id}&project_id=${perf!.project?.id ?? ''}`,
+          signal,
+        ),
+    })),
+  );
+  let canInvite = $derived($inviteAccess.data?.can_invite === true);
+  const invite = createMutation({
+    mutationFn: () =>
+      mutateJSON<{ id: string; workspace_slug: string }>('POST', '/api/mailout/invitation', {
+        workspace_id: perf!.workspace_id,
+        performance_id: perf!.id,
+      }),
+    onSuccess: (r) => {
+      if (r) void goto(`/h/${r.workspace_slug}/mailout/${r.id}`);
+    },
+    onError: (err) =>
+      addToast({
+        tone: 'danger',
+        title: t('mailout.not_created', locale),
+        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
+      }),
+  });
+
   // ADR-087 · § 36 — DE QUÉ BOLO CUELGA. `bolo_id` no viaja en el bundle (es
   // dinero, fuera del SELECT por columnas), así que se lee aparte por la
   // puerta de `read:money`. Sin fila, la ficha no dice nada del trato ni
@@ -768,6 +800,11 @@
           ><ConceptHint concept="roadsheet" /></span
         >
         {#if canEdit}<Button variant="secondary" size="xs" onclick={openEdit}>{t('perf.edit_details', locale)}</Button>{/if}
+        {#if canInvite}
+          <Button variant="secondary" size="xs" loading={$invite.isPending} onclick={() => $invite.mutate()}
+            >{t('audience.invite_from_performance', locale)}</Button
+          >
+        {/if}
       {/snippet}
       <!-- Los hechos, cada uno su editor (ADR-139 p2): el estado como palabra
            mono con su menú, el cuándo y el dónde abren los datos, el bolo se

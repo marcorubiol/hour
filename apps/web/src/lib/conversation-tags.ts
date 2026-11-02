@@ -22,6 +22,11 @@ export const SALES = 'sales';
 export const TEAM = 'team';
 /** Todas: el chip sin parámetro. */
 export const ALL = 'all';
+/**
+ * El público (ADR-173 § 3): las listas de quien se apuntó a las invitaciones,
+ * no conversaciones. Lo ve quien lleva el público, también sin Converses.
+ */
+export const AUDIENCE = 'audience';
 
 /** La clave de una etiqueta, con el CHECK de `conversation_tag.key`. */
 export const TAG_KEY_RE = /^[a-z][a-z0-9_]{1,31}$/;
@@ -43,8 +48,9 @@ const STANDARD_LABEL: Record<string, string> = {
  * (ADR-138 § 2).
  */
 export function lensChip(params: URLSearchParams, canRead: boolean): LensChip {
+  const raw = params.get('etiqueta') ?? (params.get('view') === AUDIENCE ? AUDIENCE : null);
+  if (raw === AUDIENCE) return AUDIENCE;
   if (!canRead) return TEAM;
-  const raw = params.get('etiqueta');
   if (!raw || raw === ALL) return ALL;
   if (raw === TEAM) return TEAM;
   return TAG_KEY_RE.test(raw) ? raw : ALL;
@@ -67,16 +73,17 @@ export function chipHref(chip: LensChip, params: URLSearchParams): string {
  * el bloque y su filtro cuenten lo mismo (ADR-118 § 7: el dominio es el chip).
  */
 export function panelHref(chip: LensChip, qs: string): string {
-  if (chip === ALL || chip === TEAM) return `?${qs}`;
+  if (chip === ALL || chip === TEAM || chip === AUDIENCE) return `?${qs}`;
   return `?etiqueta=${chip}${qs.startsWith('#') ? '' : '&'}${qs}`;
 }
 
 /** Qué panel lleva cada chip (plan § 3): el de Difusión, el común o el de los hilos. */
-export type PanelKind = 'sales' | 'common' | 'team';
+export type PanelKind = 'sales' | 'common' | 'team' | 'audience';
 
 export function panelOf(chip: LensChip): PanelKind {
   if (chip === SALES) return 'sales';
   if (chip === TEAM) return 'team';
+  if (chip === AUDIENCE) return 'audience';
   return 'common';
 }
 
@@ -87,7 +94,7 @@ export function canBulkSend(chip: LensChip): boolean {
 
 /** La etiqueta con la que nace una conversación desde «Añadir»: la del chip, o Difusión. */
 export function addTagKey(chip: LensChip): string {
-  return chip === ALL || chip === TEAM ? SALES : chip;
+  return chip === ALL || chip === TEAM || chip === AUDIENCE ? SALES : chip;
 }
 
 // ── Lo que lleva cada conversación ─────────────────────────────────────────
@@ -223,16 +230,23 @@ export interface ChipOption {
 }
 
 /**
- * La fila de chips (ADR-138 § 1 y 2): Todas, las etiquetas, Equipo al final.
+ * La fila de chips (ADR-138 § 1 y 2): Todas, las etiquetas, Equipo y, para
+ * quien lleva el público de algún espacio, Público al final (ADR-173 § 3).
  * Sin Converses no hay conversación que leer: solo Equipo (ADR-134 § 4).
  */
-export function lensChips(canRead: boolean, tags: readonly WorkspaceTag[], locale: Locale): ChipOption[] {
+export function lensChips(
+  canRead: boolean,
+  tags: readonly WorkspaceTag[],
+  locale: Locale,
+  audience = false,
+): ChipOption[] {
   const team = { chip: TEAM, label: t('conversations.view_team', locale) };
-  if (!canRead) return [team];
+  const tail = audience ? [team, { chip: AUDIENCE, label: t('audience.view', locale) }] : [team];
+  if (!canRead) return tail;
   return [
     { chip: ALL, label: t('conversations.tag_all', locale) },
     ...tags.map((tag) => ({ chip: tag.key, label: tagLabel(tag, locale) })),
-    team,
+    ...tail,
   ];
 }
 
@@ -243,7 +257,7 @@ export function lensChips(canRead: boolean, tags: readonly WorkspaceTag[], local
  * Equipo), y `?etiqueta=team` dejaría de filtrar por la etiqueta. El CHECK de
  * la base no las prohíbe; lo hacen la pantalla y el endpoint.
  */
-export const RESERVED_TAG_KEYS: readonly string[] = [ALL, TEAM];
+export const RESERVED_TAG_KEYS: readonly string[] = [ALL, TEAM, AUDIENCE];
 
 /** El largo del nombre: el CHECK de `conversation_tag.label`. */
 export const TAG_LABEL_MAX = 60;

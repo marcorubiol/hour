@@ -230,6 +230,12 @@ export interface PersonGrant {
 }
 
 /**
+ * Las facetas que se dan a mano a una membresía del espacio: solo Público
+ * (ADR-173 § 4). Owner y admin no salen: ya lo llevan todo.
+ */
+export const WORKSPACE_FACETS: readonly string[] = ['audience'];
+
+/**
  * Las membresías bajo el espacio con sus facetas posibles en su nivel. Solo
  * las facetas que existen en ese nivel: ausente no es denegado
  * (structure-model § Facet), y la pantalla no lo dibuja como «no».
@@ -241,7 +247,6 @@ export function personGrants(
   fallbackName: string,
 ): PersonGrant[] {
   return grants
-    .filter((g) => g.level !== 'workspace')
     .map((g) => {
       const held = new Map((g.facets ?? []).map((f) => [f.facet_id, f]));
       const fromPreset = new Map(
@@ -249,6 +254,8 @@ export function personGrants(
       );
       const list: GrantFacet[] = facets
         .filter((f) => f.levels.includes(g.level))
+        // In the space only Público is given by hand (ADR-173 § 4; `set_membership_facet`).
+        .filter((f) => g.level !== 'workspace' || (f.standard && WORKSPACE_FACETS.includes(f.key)))
         .map((f) => {
           const verb = held.get(f.id)?.verb ?? null;
           // The presets expand over the standard facets only (ADR-100 § 6).
@@ -265,6 +272,8 @@ export function personGrants(
         adjusted: list.filter((f) => f.adjusted).length,
       };
     })
+    // A space membership is only listed for what can be given there.
+    .filter((g) => g.level !== 'workspace' || g.facets.length > 0)
     .sort(
       (a, b) =>
         a.name.localeCompare(b.name) ||

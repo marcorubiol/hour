@@ -6,6 +6,12 @@
  *   · Campos: `{nombre}`, `{sala}`, `{ciudad}`. Un campo que no tiene valor
  *     para un destinatario se marca y ese correo no sale (nunca vacío).
  *     `{nombre}` de una dirección genérica es «equipo de {sala}».
+ *   · Origen (ADR-173 § 10): lo dice la fila, no el envío. Una persona del
+ *     público (`audience_subscription_id`) lleva su pie («te apuntaste a…») y,
+ *     sin nombre, el saludo cae a «Hola» en vez de bloquear. Un profesional,
+ *     el pie de la difusión según su base, también en una invitación.
+ *   · En una invitación, `{sala}` y `{ciudad}` son los de la función a la que
+ *     se invita, para los dos orígenes (plan del público § 4.7).
  *   · Firma: la de la compañía (el remitente es la compañía, ADR-110 § 3): la
  *     guardada o la que propone Hour, como el buzón común (ADR-099).
  *   · Pie (no se puede quitar): quién escribe, por qué le llega según su base,
@@ -34,7 +40,7 @@ export type MailBasisKind = 'consent' | 'relationship' | 'generic' | 'sector';
 /** Lo que devuelven `mailout_compose_preview` y `mailout_send_context`. */
 export interface ComposeContext {
   recipient_id: string;
-  address_kind: 'contact' | 'organization' | null;
+  address_kind: 'contact' | 'organization' | 'subscriber' | null;
   basis_kind: MailBasisKind | null;
   contact_first_name: string | null;
   contact_name: string | null;
@@ -46,6 +52,21 @@ export interface ComposeContext {
   company_phone: string | null;
   company_signature: string | null;
   privacy_url: string | null;
+  mailout_kind: 'outreach' | 'invitation';
+  /** Puesta: el destinatario es una persona del público, no una conversación. */
+  audience_subscription_id: string | null;
+  audience_name: string | null;
+  subscriber_name: string | null;
+  /** Cuándo confirmó (o entró importada): la fecha del pie del público. */
+  subscribed_at: string | null;
+  /** La función de la invitación: `{sala}` y `{ciudad}`. */
+  venue_name: string | null;
+  venue_city: string | null;
+}
+
+/** Una persona del público, no una conversación (ADR-173 § 10). */
+export function isAudienceRecipient(ctx: Pick<ComposeContext, 'audience_subscription_id'>): boolean {
+  return ctx.audience_subscription_id !== null;
 }
 
 interface MailoutDraft {
@@ -71,6 +92,10 @@ type Copy = {
   generic: (sala: string | null) => string;
   sector: string;
   unsubscribe: (company: string, url: string) => string;
+  /** El público (plan § 6.2): por qué le llega y su baja, de tú. */
+  audienceConsent: (list: string, company: string, date: string | null) => string;
+  audienceRelationship: (company: string) => string;
+  audienceUnsubscribe: (url: string) => string;
   privacy: (url: string) => string;
   test: string;
 };
@@ -86,6 +111,9 @@ const COPY: Record<MailoutLanguage, Copy> = {
         : 'Os escribimos porque es vuestra dirección pública de programación.',
     sector: 'Os escribimos porque trabajáis en programación o difusión de artes en vivo.',
     unsubscribe: (c, u) => `Si no queréis recibir más envíos de ${c}, daos de baja aquí: ${u} Un clic basta.`,
+    audienceConsent: (l, c, d) => `Te llega porque te apuntaste a «${l}» de ${c}${d ? ` el ${d}` : ''}.`,
+    audienceRelationship: (c) => `Te llega porque has sido cliente de ${c}.`,
+    audienceUnsubscribe: (u) => `Darte de baja: ${u} Un clic basta.`,
     privacy: (u) => `Política de privacidad: ${u}`,
     test: '[Prueba]',
   },
@@ -100,6 +128,9 @@ const COPY: Record<MailoutLanguage, Copy> = {
     sector: "Us escrivim perquè treballeu en programació o difusió d'arts en viu.",
     unsubscribe: (c, u) =>
       `Si no voleu rebre més enviaments de ${c}, doneu-vos de baixa aquí: ${u} N'hi ha prou amb un clic.`,
+    audienceConsent: (l, c, d) => `Et arriba perquè et vas apuntar a «${l}» de ${c}${d ? ` el ${d}` : ''}.`,
+    audienceRelationship: (c) => `Et arriba perquè has estat client de ${c}.`,
+    audienceUnsubscribe: (u) => `Donar-te de baixa: ${u} N'hi ha prou amb un clic.`,
     privacy: (u) => `Política de privacitat: ${u}`,
     test: '[Prova]',
   },
@@ -114,6 +145,9 @@ const COPY: Record<MailoutLanguage, Copy> = {
     sector: 'We are writing because you work in programming or promoting live performing arts.',
     unsubscribe: (c, u) =>
       `If you would rather not receive more mailouts from ${c}, unsubscribe here: ${u} One click is enough.`,
+    audienceConsent: (l, c, d) => `You're getting this because you signed up to "${l}" from ${c}${d ? ` on ${d}` : ''}.`,
+    audienceRelationship: (c) => `You're getting this because you have been a customer of ${c}.`,
+    audienceUnsubscribe: (u) => `Unsubscribe: ${u} One click is enough.`,
     privacy: (u) => `Privacy policy: ${u}`,
     test: '[Test]',
   },
@@ -128,6 +162,10 @@ const COPY: Record<MailoutLanguage, Copy> = {
     sector: "Nous vous écrivons parce que vous travaillez dans la programmation ou la diffusion du spectacle vivant.",
     unsubscribe: (c, u) =>
       `Si vous ne souhaitez plus recevoir d'envois de ${c}, désinscrivez-vous ici : ${u} Un clic suffit.`,
+    audienceConsent: (l, c, d) =>
+      `Vous recevez ce message car vous vous êtes inscrit à « ${l} » de ${c}${d ? ` le ${d}` : ''}.`,
+    audienceRelationship: (c) => `Vous recevez ce message car vous avez été client de ${c}.`,
+    audienceUnsubscribe: (u) => `Se désinscrire : ${u} Un clic suffit.`,
     privacy: (u) => `Politique de confidentialité : ${u}`,
     test: '[Test]',
   },
@@ -146,16 +184,55 @@ export function fieldsUsed(...texts: string[]): MergeField[] {
   return MERGE_FIELDS.filter((f) => found.has(f));
 }
 
-/** El valor de cada campo para un destinatario; null si no lo tiene. */
-function mergeValues(ctx: ComposeContext, language: MailoutLanguage): Record<MergeField, string | null> {
-  const sala = ctx.organization_name?.trim() || null;
-  const nombre =
-    ctx.address_kind === 'organization' ? (sala ? COPY[language].team(sala) : null) : ctx.contact_first_name?.trim() || null;
-  return { nombre, sala, ciudad: ctx.city?.trim() || null };
+/** El nombre de pila de quien se apuntó, si lo dio. */
+function subscriberFirstName(name: string | null): string | null {
+  return name?.trim().split(/\s+/)[0] || null;
 }
 
-function fillFields(text: string, values: Record<MergeField, string | null>): string {
-  return text.replace(FIELD_RE, (whole, f: MergeField) => values[f] ?? whole);
+/** El valor de cada campo para un destinatario; null si no lo tiene. */
+function mergeValues(ctx: ComposeContext, language: MailoutLanguage): Record<MergeField, string | null> {
+  const org = ctx.organization_name?.trim() || null;
+  const nombre = isAudienceRecipient(ctx)
+    ? subscriberFirstName(ctx.subscriber_name)
+    : ctx.address_kind === 'organization'
+      ? org
+        ? COPY[language].team(org)
+        : null
+      : ctx.contact_first_name?.trim() || null;
+  if (ctx.mailout_kind === 'invitation') {
+    return { nombre, sala: ctx.venue_name?.trim() || null, ciudad: ctx.venue_city?.trim() || null };
+  }
+  return { nombre, sala: org, ciudad: ctx.city?.trim() || null };
+}
+
+/**
+ * Sin nombre, una persona del público recibe el saludo sin él («Hola, {nombre}:»
+ * → «Hola:»): quien se apunta no siempre lo da (plan § 6.1).
+ */
+function dropName(text: string): string {
+  return text
+    .replace(/,[ \t]*\{nombre\}[ \t]*,[ \t]*/g, ' ')
+    .replace(/^\{nombre\}[ \t]*,?[ \t]*/gm, '')
+    .replace(/,?[ \t]*\{nombre\}/g, '');
+}
+
+function fillFields(text: string, values: Record<MergeField, string | null>, nameless: boolean): string {
+  return (nameless ? dropName(text) : text).replace(FIELD_RE, (whole, f: MergeField) => values[f] ?? whole);
+}
+
+const DATE_LOCALE: Record<MailoutLanguage, string> = { es: 'es-ES', ca: 'ca-ES', en: 'en-GB', fr: 'fr-FR' };
+
+/** «3 de noviembre de 2026», en el idioma del correo y la hora de la compañía. */
+function footerDate(iso: string | null, language: MailoutLanguage): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return new Intl.DateTimeFormat(DATE_LOCALE[language], {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'Europe/Madrid',
+  }).format(d);
 }
 
 /** La firma de la compañía: la guardada, o la que propone Hour. */
@@ -189,6 +266,18 @@ export function suggestedBasis(addressKind: 'contact' | 'organization' | null): 
 export function footerLines(ctx: ComposeContext, language: MailoutLanguage, unsubscribeUrl: string): string[] {
   const copy = COPY[language];
   const who = [ctx.company_name, ctx.company_city, displayWebsite(ctx.company_website)].filter(Boolean).join(' · ');
+  if (isAudienceRecipient(ctx)) {
+    const why =
+      ctx.basis_kind === 'relationship'
+        ? copy.audienceRelationship(ctx.company_name)
+        : copy.audienceConsent(ctx.audience_name ?? '', ctx.company_name, footerDate(ctx.subscribed_at, language));
+    return [
+      who,
+      why,
+      copy.audienceUnsubscribe(unsubscribeUrl),
+      ctx.privacy_url ? copy.privacy(ctx.privacy_url) : null,
+    ].filter((l): l is string => Boolean(l));
+  }
   const sala = ctx.organization_name?.trim() || null;
   const why =
     ctx.basis_kind === 'consent'
@@ -216,9 +305,11 @@ export function composeMailout(
 ): ComposedMail {
   const language = mailoutLanguage(draft.language);
   const values = mergeValues(ctx, language);
-  const missing = fieldsUsed(draft.subject, draft.body).filter((f) => values[f] === null);
-  const subject = fillFields(draft.subject.trim(), values);
-  const body = fillFields(draft.body.trim(), values);
+  // Al público sin nombre se le saluda sin él: no bloquea.
+  const nameless = isAudienceRecipient(ctx) && values.nombre === null;
+  const missing = fieldsUsed(draft.subject, draft.body).filter((f) => values[f] === null && !(nameless && f === 'nombre'));
+  const subject = fillFields(draft.subject.trim(), values, nameless);
+  const body = fillFields(draft.body.trim(), values, nameless);
   const signature = companySignature(ctx);
   const footer = footerLines(ctx, language, unsubscribeUrl);
   const recordBody = withSignature(body, signature);

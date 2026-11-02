@@ -19,6 +19,13 @@
    * La plantilla (ADR-172): el logo del espacio arriba (se cambia en Ajustes)
    * y, si se elige aquí, una imagen del espectáculo tras el texto, enlazada al
    * dosier. La vista previa enseña el correo con la plantilla o solo el texto.
+   *
+   * Una invitación (ADR-173 § 10, plan del público § 6.1) es esta misma
+   * pantalla con dos bloques de destinatarios: «Público» (una lista, cuántas
+   * recibirán y desde el subdominio del público) y «Profesionales» (las
+   * conversaciones elegidas, como en el envío, desde la difusión). La vista
+   * previa recorre los dos orígenes con el pie real de cada uno; en borrador,
+   * el público es una muestra (sus filas se congelan al poner en cola).
    */
   import { docTitle } from '$lib/doc-title';
   import { lensOn } from '$lib/lenses.svelte';
@@ -47,10 +54,12 @@
     recipientCounts,
     recipientState,
     senderAddress,
+    type AudiencePreview,
     type MailoutDetail,
     type MailoutRecipientRow,
     type RecipientState,
   } from '$lib/mailout';
+  import { goto } from '$app/navigation';
   import {
     composeMailout,
     MAILOUT_LANGUAGES,
@@ -82,6 +91,7 @@
   let d = $derived($query.data ?? null);
   let m = $derived(d?.mailout ?? null);
   let editable = $derived(Boolean(d?.can_edit && m?.status === 'draft'));
+  let invitation = $derived(m?.kind === 'invitation');
 
   // ── El borrador, en local; se guarda solo ─────────────────────────────
   let subject = $state('');
@@ -213,6 +223,13 @@
   let fromLine = $derived(
     domain ? `${fromName.trim() || d?.workspace.name || ''} <${senderAddress(localPart, domain.domain)}>` : '',
   );
+  // El público sale por su subdominio, con la parte local de ese dominio (ADR-173 § 5).
+  let audienceDomain = $derived(d?.audience_domain ?? null);
+  let audienceFromLine = $derived(
+    audienceDomain
+      ? `${fromName.trim() || d?.workspace.name || ''} <${senderAddress(audienceDomain.from_local_part, audienceDomain.domain)}>`
+      : '',
+  );
   let draft = $derived({ subject, body, language });
   let ctxById = $derived(new Map((d?.compose ?? []).map((c) => [c.recipient_id, c])));
 
@@ -228,8 +245,41 @@
       state: (editable ? recipientState(r, missingFor(r)) : recipientState(r, false)) as RecipientState,
     })),
   );
-  let readyCount = $derived(rows.filter((x) => x.state === 'ready').length);
-  let missingCount = $derived(rows.filter((x) => x.state === 'missing_fields').length);
+  // Los dos orígenes de una invitación (la fila dice el suyo).
+  let proRows = $derived(rows.filter((x) => x.row.conversation_id !== null));
+  let audienceRows = $derived(rows.filter((x) => x.row.audience_subscription_id !== null));
+  /** Una persona del público de la muestra, como una fila más de la vista previa. */
+  function sampleRow(c: AudiencePreview): MailoutRecipientRow {
+    return {
+      recipient_id: c.recipient_id,
+      conversation_id: null,
+      audience_subscription_id: c.audience_subscription_id,
+      mail_domain_id: null,
+      address: c.address,
+      display_name: c.display_name,
+      address_kind: 'subscriber',
+      status: 'pending',
+      skip_reason: null,
+      basis_kind: c.basis_kind,
+      basis_withdrawn_at: null,
+      suppressed_reason: null,
+      suppressed_at: null,
+      ready: true,
+    };
+  }
+  let samples = $derived(
+    editable
+      ? (d?.audience_preview ?? []).map((c) => {
+          const row = sampleRow(c);
+          return { row, ctx: c as ComposeContext, state: (composeMailout(draft, c, '').missing.length ? 'missing_fields' : 'ready') as RecipientState };
+        })
+      : [],
+  );
+  // En borrador, el público que recibiría es el de la lista; luego, sus filas.
+  let audienceReady = $derived(editable ? (d?.audience?.eligible ?? 0) : 0);
+  let audienceMissing = $derived(samples.some((x) => x.state === 'missing_fields'));
+  let readyCount = $derived(rows.filter((x) => x.state === 'ready').length + (audienceMissing ? 0 : audienceReady));
+  let missingCount = $derived(rows.filter((x) => x.state === 'missing_fields').length + (audienceMissing ? audienceReady : 0));
   let counts = $derived(recipientCounts(rows.map((x) => x.state)));
 
   // Vista previa: los que tienen dirección, el que se mira; primero los que
@@ -244,7 +294,7 @@
     'cancelled',
   ];
   let previewable = $derived(
-    rows
+    [...rows, ...samples]
       .filter((x) => x.ctx && x.row.address)
       .sort((a, b) => Number(OUT_STATES.includes(a.state)) - Number(OUT_STATES.includes(b.state))),
   );
@@ -267,6 +317,7 @@
   );
   let hasTemplate = $derived(Boolean(template.logo || template.image));
   let preview = $derived(current?.ctx ? composeMailout(draft, current.ctx, exampleLink, template) : null);
+  let currentFrom = $derived(current?.row.audience_subscription_id ? audienceFromLine : fromLine);
   // Con plantilla si la hay; quien mira puede pasar a solo texto (lo que leen
   // los clientes sin HTML) y volver.
   let previewChoice = $state<'html' | 'text' | null>(null);
@@ -298,10 +349,15 @@
     mutationFn: (conversationIds: string[]) =>
       mutateJSON('PUT', `/api/mailout/${id}/recipients`, { conversation_ids: conversationIds }),
     onSuccess: refresh,
-    onError: failed,
+    // In an invitation the list may hold another editor's professionals from
+    // a project the caller does not edit: the replace is refused whole.
+    onError: (err) =>
+      invitation && err instanceof ApiError && err.status === 404
+        ? addToast({ tone: 'danger', title: t('mailout.action_failed', locale), message: t('mailout.err_pros_not_yours', locale) })
+        : failed(err),
   });
   function removeOne(r: MailoutRecipientRow, name: string) {
-    const before = (d?.recipients ?? []).map((x) => x.conversation_id);
+    const before = (d?.recipients ?? []).map((x) => x.conversation_id).filter((cid): cid is string => cid !== null);
     $setRecipients.mutate(before.filter((cid) => cid !== r.conversation_id), {
       onSuccess: () =>
         addToast({
@@ -320,7 +376,7 @@
 
   function openBasis(r: MailoutRecipientRow) {
     basisFor = r;
-    basisKind = suggestedBasis(r.address_kind);
+    basisKind = suggestedBasis(r.address_kind === 'subscriber' ? null : r.address_kind);
     basisNote = '';
     basisOpen = true;
   }
@@ -342,8 +398,10 @@
   const sendTest = createMutation({
     mutationFn: async () => {
       await flush();
+      const sub = current?.row.audience_subscription_id ?? null;
       return mutateJSON<{ to: string; simulated: boolean }>('POST', `/api/mailout/${id}/test`, {
-        recipient_id: current?.row.recipient_id ?? null,
+        recipient_id: sub ? null : (current?.row.recipient_id ?? null),
+        audience_subscription_id: sub,
       });
     },
     onSuccess: (r) => {
@@ -375,6 +433,23 @@
       refresh();
     },
   });
+
+  // La lista de una invitación: ponerla, cambiarla o quitarla.
+  const setAudience = createMutation({
+    mutationFn: (audienceId: string | null) => mutateJSON('PUT', `/api/mailout/${id}/audience`, { audience_id: audienceId }),
+    onSuccess: refresh,
+    onError: failed,
+  });
+  let audienceOptions = $derived([
+    { value: '', label: t('mailout.invitation_no_list', locale) },
+    ...(d?.audiences ?? []).map((a) => ({ value: a.id, label: a.name })),
+  ]);
+
+  /** «Añadir profesionales»: Conversaciones en modo selección, que vuelve aquí con lo elegido. */
+  async function addPros() {
+    await flush();
+    await goto(`/h/conversations?etiqueta=sales&invitacion=${id}`);
+  }
 
   const cancel = createMutation({
     mutationFn: () => mutateJSON('POST', `/api/mailout/${id}/cancel`, {}),
@@ -413,7 +488,7 @@
   }
 
   function who(x: { row: MailoutRecipientRow; ctx: ComposeContext | null }): string {
-    return x.ctx?.organization_name ?? x.row.display_name ?? '—';
+    return x.ctx?.organization_name ?? x.row.display_name ?? x.row.address ?? '—';
   }
 
   function insertField(f: string) {
@@ -447,7 +522,8 @@
   <section class="mo" data-testid="mailout">
     <header class="mo__mast">
       <p class="eyebrow">
-        {t('mailout.title', locale)}{#if d.project?.name}&nbsp;· {d.project.name}{/if}
+        {t(invitation ? 'mailout.invitation_title' : 'mailout.title', locale)}{#if d.project?.name}&nbsp;· {d.project.name}{/if}{#if d.performance}&nbsp;·
+          {[dayMonthYear(d.performance.performed_at), d.performance.venue_name, d.performance.city].filter(Boolean).join(', ')}{/if}
       </p>
       <h1 class="mo__title"><em>{m.subject || t('mailout.untitled', locale)}</em></h1>
       <p class="mo__sub">
@@ -485,7 +561,18 @@
       <div class="mo__main">
         {#if editable}
           <div class="mo__form">
-            {#if d.domains.length === 0}
+            {#if d.domains.length === 0 && invitation}
+              <!-- Sin dominio de la difusión una invitación aún puede ir al público: solo el nombre. -->
+              {#if proRows.length > 0}
+                <p class="mo__warn">
+                  {t('mailout.no_domain', locale)}
+                  <a class="link-arrow" href={`/h/${workspaceSlug}/settings?section=mail`}>{t('mailout.to_settings', locale)}</a>
+                </p>
+              {/if}
+              <div class="mo__row">
+                <Input label={t('mailout.from_name', locale)} bind:value={fromName} oninput={touch} placeholder={d.workspace.name} />
+              </div>
+            {:else if d.domains.length === 0}
               <p class="mo__warn">
                 {t('mailout.no_domain', locale)}
                 <a class="link-arrow" href={`/h/${workspaceSlug}/settings?section=mail`}>{t('mailout.to_settings', locale)}</a>
@@ -601,7 +688,7 @@
         </div>
         {#if preview && current}
           <article class="mail-card" data-testid="mailout-preview">
-            <p class="mail-card__meta"><span>{t('mail.from', locale)}</span> {fromLine}</p>
+            <p class="mail-card__meta"><span>{t('mail.from', locale)}</span> {currentFrom}</p>
             <p class="mail-card__meta">
               <span>{t('mail.to', locale)}</span>
               {current.row.display_name ?? ''} &lt;{current.row.address}&gt;
@@ -645,39 +732,108 @@
       </div>
 
       <div class="mo__aside">
-        <div class="block-head">
-          <h2 class="eyebrow eyebrow--sub">{t('mailout.recipients', locale)} · {rows.length}</h2>
-        </div>
-        <ul class="rcp" data-testid="mailout-recipients">
-          {#each rows as x (x.row.recipient_id)}
-            <li class="rcp__item">
-              <div class="rcp__who">
-                <a class="rcp__name" href={`/h/${workspaceSlug}/conversation/${x.row.conversation_id}`}>{who(x)}</a>
-                {#if x.row.address}<span class="rcp__addr">{x.row.address}</span>{/if}
-              </div>
-              <span class="rcp__state" data-tone={stateTone(x.state)} data-state={x.state}>{stateLabel(x)}</span>
-              {#if editable}
-                <div class="rcp__acts">
-                  {#if x.state === 'no_basis'}
+        {#snippet recipientList(list: typeof rows, testid: string)}
+          <ul class="rcp" data-testid={testid}>
+            {#each list as x (x.row.recipient_id)}
+              <li class="rcp__item">
+                <div class="rcp__who">
+                  {#if x.row.conversation_id}
+                    <a class="rcp__name" href={`/h/${workspaceSlug}/conversation/${x.row.conversation_id}`}>{who(x)}</a>
+                  {:else}
+                    <span class="rcp__name">{who(x)}</span>
+                  {/if}
+                  {#if x.row.address && who(x) !== x.row.address}<span class="rcp__addr">{x.row.address}</span>{/if}
+                </div>
+                <span class="rcp__state" data-tone={stateTone(x.state)} data-state={x.state}>{stateLabel(x)}</span>
+                {#if editable && x.row.conversation_id}
+                  <div class="rcp__acts">
+                    {#if x.state === 'no_basis'}
+                      <button
+                        type="button"
+                        class="rcp__act"
+                        aria-label={t('mailout.set_basis_named', locale, { name: who(x) })}
+                        onclick={() => openBasis(x.row)}>{t('mailout.set_basis', locale)}</button
+                      >
+                    {/if}
                     <button
                       type="button"
                       class="rcp__act"
-                      aria-label={t('mailout.set_basis_named', locale, { name: who(x) })}
-                      onclick={() => openBasis(x.row)}>{t('mailout.set_basis', locale)}</button
+                      aria-label={t('mailout.remove_named', locale, { name: who(x) })}
+                      disabled={$setRecipients.isPending}
+                      onclick={() => removeOne(x.row, who(x))}>{t('mailout.remove_one', locale)}</button
                     >
-                  {/if}
-                  <button
-                    type="button"
-                    class="rcp__act"
-                    aria-label={t('mailout.remove_named', locale, { name: who(x) })}
-                    disabled={$setRecipients.isPending}
-                    onclick={() => removeOne(x.row, who(x))}>{t('mailout.remove_one', locale)}</button
-                  >
-                </div>
+                  </div>
+                {/if}
+              </li>
+            {/each}
+          </ul>
+        {/snippet}
+
+        {#if invitation}
+          <!-- Dos orígenes (ADR-173 § 10): cada uno con su remitente. -->
+          <section class="mo__origin" data-testid="invitation-audience" aria-labelledby="inv-aud">
+            <div class="block-head">
+              <h2 class="eyebrow eyebrow--sub" id="inv-aud">{t('mailout.invitation_audience', locale)}</h2>
+            </div>
+            {#if editable && d.can_edit_audience}
+              <Select
+                label={t('mailout.invitation_list', locale)}
+                options={audienceOptions}
+                value={m.audience_id ?? ''}
+                disabled={$setAudience.isPending}
+                onchange={(e) => $setAudience.mutate((e.currentTarget as HTMLSelectElement).value || null)}
+              />
+            {/if}
+            {#if d.audience}
+              {#if !editable}<p class="mo__line">{d.audience.name}</p>{/if}
+              {#if editable}
+                <p class="mo__line" data-testid="invitation-audience-count">
+                  {t(d.audience.eligible === 1 ? 'mailout.invitation_people_one' : 'mailout.invitation_people_other', locale, {
+                    n: d.audience.eligible,
+                  })}
+                </p>
+                {#if d.audience.truncated}
+                  <p class="mo__hint">{t('mailout.invitation_truncated', locale)}</p>
+                {/if}
+                {#if d.audience.as_pros > 0}
+                  <p class="mo__hint">{t('mailout.invitation_dupes', locale, { n: d.audience.as_pros })}</p>
+                {/if}
               {/if}
-            </li>
-          {/each}
-        </ul>
+              {#if audienceDomain}
+                <p class="mo__reply"><span>{t('mail.from', locale)}</span> {audienceFromLine}</p>
+                {#if !audienceDomain.verified_at}
+                  <p class="mo__warn-inline">
+                    {t('mailout.audience_domain_pending', locale)}
+                    <a class="link-arrow" href={`/h/${workspaceSlug}/settings?section=mail`}>{t('mailout.to_settings', locale)}</a>
+                  </p>
+                {/if}
+              {/if}
+            {:else if m.audience_id === null}
+              <p class="mo__hint">{t('mailout.invitation_no_list_hint', locale)}</p>
+            {/if}
+            {#if audienceRows.length > 0}
+              {@render recipientList(audienceRows, 'invitation-audience-recipients')}
+            {/if}
+          </section>
+
+          <section class="mo__origin" data-testid="invitation-pros" aria-labelledby="inv-pros">
+            <div class="block-head">
+              <h2 class="eyebrow eyebrow--sub" id="inv-pros">{t('mailout.invitation_pros', locale)} · {proRows.length}</h2>
+              {#if editable}
+                <Button size="xs" variant="secondary" onclick={addPros}>{t('mailout.invitation_add_pros', locale)}</Button>
+              {/if}
+            </div>
+            {#if proRows.length > 0 && domain}
+              <p class="mo__reply"><span>{t('mail.from', locale)}</span> {fromLine}</p>
+            {/if}
+            {@render recipientList(proRows, 'mailout-recipients')}
+          </section>
+        {:else}
+          <div class="block-head">
+            <h2 class="eyebrow eyebrow--sub">{t('mailout.recipients', locale)} · {rows.length}</h2>
+          </div>
+          {@render recipientList(rows, 'mailout-recipients')}
+        {/if}
       </div>
     </div>
 
@@ -693,7 +849,7 @@
         <Button
           size="s"
           variant="secondary"
-          disabled={!domain || !subject.trim() || !body.trim() || !current}
+          disabled={!(current?.row.audience_subscription_id ? audienceDomain?.verified_at : domain) || !subject.trim() || !body.trim() || !current}
           loading={$sendTest.isPending}
           onclick={() => $sendTest.mutate()}
         >
@@ -701,7 +857,7 @@
         </Button>
         <Button
           size="s"
-          disabled={!domain || !subject.trim() || !body.trim() || readyCount === 0 || missingCount > 0}
+          disabled={!(domain || (invitation && proRows.length === 0)) || !subject.trim() || !body.trim() || readyCount === 0 || missingCount > 0}
           onclick={() => (confirmOpen = true)}
         >
           {t('mailout.send_to', locale, { n: readyCount })}
@@ -711,7 +867,13 @@
   </section>
 
   <Dialog bind:open={confirmOpen} title={t('mailout.confirm_title', locale)} size="s">
-    <p>{t('mailout.confirm_body', locale, { n: readyCount, subject, from: fromLine })}</p>
+    <p>
+      {t('mailout.confirm_body', locale, {
+        n: readyCount,
+        subject,
+        from: invitation ? [proRows.length ? fromLine : '', d.audience ? audienceFromLine : ''].filter(Boolean).join(' · ') : fromLine,
+      })}
+    </p>
     {#if d.simulated}<p class="mo__hint">{t('mailout.confirm_simulated', locale)}</p>{/if}
     {#snippet actions()}
       <Button variant="quiet" onclick={() => (confirmOpen = false)}>{t('create.cancel', locale)}</Button>
@@ -920,6 +1082,20 @@
     }
     .mo__warn {
       margin: 0;
+    }
+    /* Los dos orígenes de una invitación, uno bajo el otro. */
+    .mo__origin {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+    }
+    .mo__origin + .mo__origin {
+      padding-block-start: var(--space-m);
+      border-block-start: var(--border);
+    }
+    .mo__line {
+      margin: 0;
+      font-size: var(--text-s);
     }
 
     .mo__pager {

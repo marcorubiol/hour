@@ -36,10 +36,14 @@ export interface ClaimedRecipient {
   recipient_id: string;
   mailout_id: string;
   workspace_id: string;
-  conversation_id: string;
+  /** El origen (ADR-173 § 10): una conversación o una persona del público. */
+  conversation_id: string | null;
+  audience_subscription_id: string | null;
+  /** La identidad por la que sale, congelada al poner en cola. */
+  mail_domain_id: string;
   address: string;
   display_name: string | null;
-  address_kind: 'contact' | 'organization';
+  address_kind: 'contact' | 'organization' | 'subscriber';
   basis_kind: 'consent' | 'relationship' | 'generic' | 'sector';
   unsubscribe_token: string;
   attempts: number;

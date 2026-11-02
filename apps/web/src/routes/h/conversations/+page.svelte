@@ -42,19 +42,29 @@
    * ConversationOverview blocks above the list. Each block is a filter of the
    * list, carried in the URL (`?turno=`, `?temp=`, `?temporada=actual`) and
    * shown as a removable chip; «Escribir a estas» preloads the selection.
+   *
+   * Público (ADR-173 § 3): a last chip, only for who carries the audience of
+   * a space on screen (owner, admin or the Público facet); its panel is the
+   * lists (AudiencePanel). Under Difusión the bar also offers «Invitar a N»:
+   * an invitation draft with those professionals, of any project of one
+   * space. `?invitacion=<id>` opens the selection to add professionals to
+   * that draft, and goes back to it.
    */
 
   import { docTitle } from '$lib/doc-title';
   import { createMutation, createQuery } from '@tanstack/svelte-query';
   import { afterNavigate, goto } from '$app/navigation';
   import { page } from '$app/state';
-  import { fetchJSON, mutateJSON } from '$lib/api';
+  import { ApiError, fetchJSON, mutateJSON } from '$lib/api';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import Button from '$lib/components/Button.svelte';
   import LensHeader from '$lib/components/LensHeader.svelte';
   import LensTitle from '$lib/components/LensTitle.svelte';
   import ConversationTable from '$lib/components/ConversationTable.svelte';
   import ConversationOverview from '$lib/components/ConversationOverview.svelte';
+  import AudiencePanel from '$lib/components/AudiencePanel.svelte';
+  import { audienceListQueryOptions } from '$lib/audience-query';
+  import type { MailoutDetail } from '$lib/mailout';
   import Chip from '$lib/components/Chip.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import { tick, untrack } from 'svelte';
@@ -176,7 +186,10 @@
       : [...new Set([...scope.workspaceIds, ...scope.projects.map((p) => p.workspaceId), ...scope.lines.map((l) => l.workspaceId)])],
   );
   let tagNames = $derived($tagsQuery.data ? scopeTags($tagsQuery.data, scopeWorkspaceIds) : []);
-  let chips = $derived(lensChips(!noAccess, tagNames, locale));
+  // Who carries the audience of a space on screen sees the Público chip (ADR-173 § 3).
+  const audienceQuery = createQuery(toStore(() => audienceListQueryOptions(scopeWorkspaceIds)));
+  let canAudience = $derived(Object.values($audienceQuery.data?.access ?? {}).some((a) => a.read));
+  let chips = $derived(lensChips(!noAccess, tagNames, locale, canAudience));
   // Project pins scope directly; a line pin scopes conversations through its
   // project. The endpoint filters by project_ids ∪ workspace_ids.
   let filterIds = $derived({
@@ -471,7 +484,7 @@
   }
   // Equipo has no conversations to pick: going there leaves the selection.
   $effect(() => {
-    if (panel === 'team') untrack(() => {
+    if (panel === 'team' || panel === 'audience') untrack(() => {
       picking = false;
       picked = [];
     });
@@ -573,6 +586,59 @@
     { label: t('bulk.line_none', locale), onclick: () => void bulk({ action: 'line', line_id: null }) },
   ]);
 
+  // «Invitar a N» (ADR-173 § 10): professionals of any project, of one space.
+  let pickedWorkspaces = $derived([
+    ...new Set(pickedProjects.map((pid) => projectIndex.find((p) => p.id === pid)?.workspaceId).filter(Boolean)),
+  ] as string[]);
+  const inviteMutation = createMutation({
+    mutationFn: () =>
+      mutateJSON<{ id: string; workspace_slug: string }>('POST', '/api/mailout/invitation', {
+        workspace_id: pickedWorkspaces[0],
+        conversation_ids: picked.map((c) => c.id),
+      }),
+    onSuccess: (r) => {
+      if (r) void goto(`/h/${r.workspace_slug}/mailout/${r.id}`);
+    },
+    onError: (err) => {
+      addToast({
+        tone: 'danger',
+        title: t('mailout.not_created', locale),
+        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
+      });
+    },
+  });
+
+  // «Añadir profesionales» from an invitation draft: the selection opens, and
+  // «Añadir a la invitación» puts the picks next to the ones it had.
+  let invitationId = $derived(page.url.searchParams.get('invitacion'));
+  $effect(() => {
+    if (invitationId) untrack(() => (picking = true));
+  });
+  const addToInvitation = createMutation({
+    mutationFn: async () => {
+      const d = await fetchJSON<MailoutDetail>(`/api/mailout/${invitationId}`);
+      const had = (d?.recipients ?? []).map((r) => r.conversation_id).filter((x): x is string => x !== null);
+      await mutateJSON('PUT', `/api/mailout/${invitationId}/recipients`, {
+        conversation_ids: [...new Set([...had, ...picked.map((c) => c.id)])],
+      });
+      return d?.workspace.slug ?? '';
+    },
+    onSuccess: (slug) => void goto(`/h/${slug}/mailout/${invitationId}`),
+    // The list is replaced whole: a professional another editor added from a
+    // project the caller does not edit makes the whole change a «not found».
+    onError: (err) =>
+      addToast({
+        tone: 'danger',
+        title: t('mailout.action_failed', locale),
+        message:
+          err instanceof ApiError && err.status === 404
+            ? t('mailout.err_pros_not_yours', locale)
+            : err instanceof Error
+              ? err.message
+              : t('perf.unexpected', locale),
+      }),
+  });
+
   const writeMutation = createMutation({
     mutationFn: () =>
       mutateJSON<{ id: string; workspace_slug: string }>('POST', '/api/mailout', {
@@ -597,7 +663,7 @@
   <title>{docTitle(t('lens.conversations', locale))}</title>
 </svelte:head>
 
-<section class="conversations" class:conversations--calm={calm.on && panel !== 'team'} aria-busy={busy}>
+<section class="conversations" class:conversations--calm={calm.on && panel !== 'team' && panel !== 'audience'} aria-busy={busy}>
   <LensHeader help={panel === 'team' ? 'team' : 'conversations'}>
     {#snippet title()}<LensTitle text={t('lens.conversations', locale)} />{/snippet}
     {#snippet sub()}
@@ -610,14 +676,16 @@
           data-chip={c.chip}>{c.label}</a
         >
       {/each}
-      {#if panel !== 'team' && shows('conversations', 'list', calm.on)}
+      {#if panel !== 'team' && panel !== 'audience' && shows('conversations', 'list', calm.on)}
         <!-- On a phone the list starts a screen and a half down: a way straight to it (móvil #11). -->
         <a class="lenshead__frag conversations__skip" href="#lista">{t('overview.go_to_list', locale)}</a>
       {/if}
     {/snippet}
   </LensHeader>
 
-  {#if panel === 'team'}
+  {#if panel === 'audience'}
+    <!-- The audience has no first-visit card of its own yet. -->
+  {:else if panel === 'team'}
     <FirstVisitCard section="team" />
   {:else if panel === 'sales'}
     <FirstVisitCard section="conversations" steps={['conv-due', 'conv-season', 'conv-list']} />
@@ -634,7 +702,13 @@
     />
   {/snippet}
 
-  {#if panel === 'team'}
+  {#if panel === 'audience'}
+    {#if canAudience}
+      <AudiencePanel workspaceIds={scopeWorkspaceIds} {workspaces} {locale} />
+    {:else if $audienceQuery.isSuccess}
+      <p class="conversations__none">{t('audience.no_access', locale)}</p>
+    {/if}
+  {:else if panel === 'team'}
     {@render threads()}
   {:else}
     <ConversationOverview
@@ -839,7 +913,20 @@
           <Button size="s" variant="secondary" disabled={picked.length === 0 || bulkBusy} onclick={() => void bulk({ action: 'settle' })}
             >{t('overview.settle', locale)}</Button
           >
-          {#if canBulkSend(chip)}
+          {#if invitationId}
+            <Button size="s" disabled={picked.length === 0} loading={$addToInvitation.isPending} onclick={() => $addToInvitation.mutate()}>
+              {t('mailout.invitation_add_n', locale, { n: picked.length })}
+            </Button>
+          {:else if canBulkSend(chip)}
+            <Button
+              size="s"
+              variant="secondary"
+              disabled={picked.length === 0 || pickedWorkspaces.length !== 1}
+              loading={$inviteMutation.isPending}
+              onclick={() => $inviteMutation.mutate()}
+            >
+              {t('mailout.invite_selection', locale, { n: picked.length })}
+            </Button>
             <Button
               size="s"
               disabled={picked.length === 0 || pickedProjects.length !== 1}
@@ -876,6 +963,11 @@
        head keeps the page's width, so the lens switcher does not move. */
     .conversations--calm > :global(:not(.lenshead)) {
       max-inline-size: var(--calm-measure);
+    }
+    .conversations__none {
+      margin: 0;
+      color: var(--text-dark-muted);
+      font-size: var(--text-s);
     }
     .conversations__calm {
       display: flex;

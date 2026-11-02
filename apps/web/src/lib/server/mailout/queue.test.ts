@@ -12,6 +12,8 @@ function claimed(over: Partial<ClaimedRecipient> = {}): ClaimedRecipient {
     mailout_id: 'm1',
     workspace_id: 'w1',
     conversation_id: 'c1',
+    audience_subscription_id: null,
+    mail_domain_id: 'd1',
     address: 'success@simulator.amazonses.com',
     display_name: 'Laia Puig',
     address_kind: 'contact',
@@ -46,6 +48,13 @@ function context(id: string, over: Partial<ComposeContext> = {}): ComposeContext
     company_phone: null,
     company_signature: null,
     privacy_url: null,
+    mailout_kind: 'outreach',
+    audience_subscription_id: null,
+    audience_name: null,
+    subscriber_name: null,
+    subscribed_at: null,
+    venue_name: null,
+    venue_city: null,
     ...over,
   };
 }
@@ -257,6 +266,8 @@ describe('estado de cada destinatario en la pantalla', () => {
   const row = (over: Partial<MailoutRecipientRow>): MailoutRecipientRow => ({
     recipient_id: 'r',
     conversation_id: 'c',
+    audience_subscription_id: null,
+    mail_domain_id: null,
     address: 'a@b.example',
     display_name: null,
     address_kind: 'contact',

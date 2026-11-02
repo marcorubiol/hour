@@ -24,10 +24,14 @@ export interface DnsRecord {
   suggested?: boolean;
 }
 
+/** Para qué sirve un dominio (ADR-173 § 5): la difusión o el público. */
+export type MailDomainPurpose = 'outreach' | 'audience';
+
 export interface MailDomainItem {
   id: string;
   workspace_id: string;
   provider: MailSendingProvider;
+  purpose: MailDomainPurpose;
   domain: string;
   mail_from_subdomain: string;
   tenant_name: string | null;
@@ -45,7 +49,7 @@ export interface MailDomainItem {
 }
 
 export const MAIL_DOMAIN_SELECT =
-  'id,workspace_id,provider,domain,mail_from_subdomain,tenant_name,configuration_set,from_local_part,from_name,dkim_status,mail_from_status,dns_records,dmarc_record,last_error,checked_at,verified_at,created_at';
+  'id,workspace_id,provider,purpose,domain,mail_from_subdomain,tenant_name,configuration_set,from_local_part,from_name,dkim_status,mail_from_status,dns_records,dmarc_record,last_error,checked_at,verified_at,created_at';
 
 export interface MailDomainsResponse {
   items: MailDomainItem[];
@@ -91,8 +95,10 @@ const fromName = v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(100)));
 
 export const MailDomainCreateSchema = v.object({
   workspace_id: v.pipe(v.string(), v.uuid()),
+  purpose: v.optional(v.picklist(['outreach', 'audience']), 'outreach'),
   domain: v.pipe(v.string(), v.transform(normalizeDomain), v.maxLength(253), v.regex(DOMAIN_RE)),
-  from_local_part: v.optional(localPart, 'difusion'),
+  /** Sin ella, la de su propósito: `difusion` o `hola` (add_mail_domain). */
+  from_local_part: v.optional(localPart),
   from_name: fromName,
 });
 
@@ -123,10 +129,21 @@ export type MailoutSkipReason =
   | 'unavailable'
   | 'not_now';
 
+export type MailoutKind = 'outreach' | 'invitation';
+
 export interface MailoutItem {
   id: string;
   workspace_id: string;
-  project_id: string;
+  /** Un envío de difusión o una invitación (ADR-173). */
+  kind: MailoutKind;
+  /** Una invitación puede no tener proyecto. */
+  project_id: string | null;
+  /** La lista de una invitación y su identidad (el subdominio del público). */
+  audience_id: string | null;
+  audience_mail_domain_id: string | null;
+  /** La función a la que se invita: `{sala}` y `{ciudad}`. */
+  performance_id: string | null;
+  created_by: string | null;
   line_id: string | null;
   mail_domain_id: string | null;
   from_local_part: string;
@@ -148,15 +165,19 @@ export interface MailoutItem {
 }
 
 export const MAILOUT_SELECT =
-  'id,workspace_id,project_id,line_id,mail_domain_id,from_local_part,from_name,from_address,reply_to_address,language,subject,body,image_url,image_alt,image_link_url,status,status_reason,queued_at,finished_at,created_at';
+  'id,workspace_id,kind,project_id,audience_id,audience_mail_domain_id,performance_id,created_by,line_id,mail_domain_id,from_local_part,from_name,from_address,reply_to_address,language,subject,body,image_url,image_alt,image_link_url,status,status_reason,queued_at,finished_at,created_at';
 
 /** Una fila de `mailout_preview`. */
 export interface MailoutRecipientRow {
   recipient_id: string;
-  conversation_id: string;
+  /** El origen (ADR-173 § 10): una conversación o una persona del público. */
+  conversation_id: string | null;
+  audience_subscription_id: string | null;
+  /** La identidad por la que sale, una vez en cola. */
+  mail_domain_id: string | null;
   address: string | null;
   display_name: string | null;
-  address_kind: 'contact' | 'organization' | null;
+  address_kind: 'contact' | 'organization' | 'subscriber' | null;
   status: MailoutRecipientStatus;
   /** En un borrador, `not_now` con `status` pendiente: lo que pasará al poner en cola (ADR-138 § 3). */
   skip_reason: MailoutSkipReason | null;
@@ -167,15 +188,53 @@ export interface MailoutRecipientRow {
   ready: boolean;
 }
 
+/** La lista de una invitación, como la pinta su bloque «Público». */
+export interface InvitationAudience {
+  id: string;
+  name: string;
+  /** Confirmadas que pueden recibir (sin importaciones en revisión). */
+  eligible: number;
+  /** De esas, las que ya van como profesionales en esta invitación. */
+  as_pros: number;
+  /** La lista tiene más confirmadas de las que se han contado: los números se quedan cortos. */
+  truncated: boolean;
+}
+
+/** Una persona del público en la vista previa de un borrador: lo que se monta y a quién va. */
+export type AudiencePreview = ComposeContext & { address: string; display_name: string | null };
+
+/** La función de una invitación. */
+export interface InvitationPerformance {
+  id: string;
+  performed_at: string;
+  venue_name: string | null;
+  city: string | null;
+}
+
 /** GET /api/mailout/[id]. */
 export interface MailoutDetail {
   mailout: MailoutItem;
-  /** `edit:conversation` en el proyecto: redactar, enviar, cancelar. */
+  /** Redactar, enviar, cancelar: `edit:conversation` en el proyecto, o en una invitación quien la creó o lleva el público. */
   can_edit: boolean;
+  /** Una invitación: ver y elegir listas (la faceta Público con «ver y editar»). */
+  can_edit_audience: boolean;
+  /** Las listas del espacio que se pueden elegir en una invitación. */
+  audiences: { id: string; name: string }[];
+  /** La lista elegida, con cuántas recibirán. */
+  audience: InvitationAudience | null;
+  /** El dominio del público (verificado o no) de una invitación con lista. */
+  audience_domain: MailDomainItem | null;
+  performance: InvitationPerformance | null;
+  /**
+   * Una muestra del público para la vista previa de un borrador: sus
+   * destinatarios se congelan al poner en cola, así que antes no hay filas.
+   * Lo mismo que daría `mailout_compose_preview` a cada persona.
+   */
+  audience_preview: AudiencePreview[];
   /** `logo_url`: la cabecera de la plantilla del correo (ADR-172). */
   workspace: { id: string; slug: string; name: string; logo_url: string | null };
   project: { id: string; slug: string; name: string | null } | null;
-  /** Los dominios verificados del espacio: de dónde puede salir. */
+  /** Los dominios verificados de la difusión del espacio: de dónde sale (y un profesional de una invitación). */
   domains: MailDomainItem[];
   /** A dónde irán las respuestas si se envía ahora (buzón conectado) o null: aviso. */
   reply_to: { address: string; scope: 'personal' | 'workspace' } | null;
@@ -210,7 +269,8 @@ export function recipientState(r: MailoutRecipientRow, missing: boolean): Recipi
       if (!r.address) return 'no_address';
       if (r.skip_reason === 'not_now') return 'not_now';
       if (r.suppressed_reason) return 'suppressed';
-      if (!r.basis_kind || r.basis_withdrawn_at) return 'no_basis';
+      // La base de una persona del público es su suscripción, no `mail_basis`.
+      if (r.audience_subscription_id === null && (!r.basis_kind || r.basis_withdrawn_at)) return 'no_basis';
       return missing ? 'missing_fields' : 'ready';
     case 'skipped':
       return r.skip_reason ?? 'unavailable';
