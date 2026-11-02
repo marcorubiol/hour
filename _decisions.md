@@ -6228,6 +6228,9 @@ cuando el margen de la Agenda tenga que existir vacío porque se escriba en él 
 > censo que el motor ya tenía; no repite lo que dicen sus bloques (ADR-145 fase 2). Agenda: nombra su horizonte
 > («desde hoy», o «abierta el 12 nov, no hoy») y «sin final», sin contar (ADR-095). La línea de la cola sigue sin
 > dibujarse vacía.
+> Lo mismo para ‹ › «Hoy» (02-11, E2E a 390 px): en una cabecera estrecha bajan a una línea propia bajo el título, y
+> Temporada, sin ellas, subía la barra 30 px; Temporada guarda su sitio, invisible e inerte (ADR-136 sigue: no hay
+> nada que mover allí).
 
 ## [2026-11-01] ADR-168 · Cuentas para la gestoría: emisor en Ajustes, caché propuesto, trimestre en CSV; fuera «Roles que asumo» y «(opcional)»
 

@@ -3,8 +3,9 @@
    * The window's controls — ‹ › Now — beside the title they move (ADR-136).
    * The title of Day, Agenda, Month and Board IS the window («October 2026»,
    * «Mon 20 Oct», «From 18 Oct»), so its three verbs ride with it. The Season
-   * is a horizon from today with nothing to step: the page simply does not
-   * render this there, and nothing is reserved.
+   * is a horizon from today with nothing to step: the page renders this
+   * there invisible and inert, only to keep its room (§ 109), so the view
+   * bar does not move when the arrows drop under the title on a phone.
    */
   import { t, type Locale } from '$lib/i18n';
   import type { PlannerView } from '$lib/planner';
