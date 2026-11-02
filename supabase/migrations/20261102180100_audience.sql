@@ -57,6 +57,10 @@
 --     confirmarla por la persona).
 --   · Una dirección de baja que vuelve a apuntarse sigue `unsubscribed` hasta
 --     que confirma (así la purga de pendientes no borra su baja).
+--   · La unicidad `(mailout_id, address)` cuenta solo las filas que no quedan
+--     saltadas: un profesional que no sale deja sitio a su suscripción.
+--   · «Volver a apuntarme» del público es de máquina (`audience_resubscribe`,
+--     con IP y agente): por token anon, `mailout_resubscribe` no lo hace.
 
 -- ── Vocabulario ───────────────────────────────────────────────────────────
 CREATE TYPE public.mail_domain_purpose AS ENUM ('outreach', 'audience');
@@ -548,6 +552,13 @@ ALTER TABLE public.mailout_recipient
   ADD CONSTRAINT mailout_recipient_in_flight_has_domain
     CHECK (status NOT IN ('queued', 'sending') OR mail_domain_id IS NOT NULL);
 
+-- Un correo por dirección y envío, entre las filas que salen: una fila
+-- saltada (un profesional sin base, en «no esta vez», no disponible) deja
+-- sitio a la suscripción de la misma dirección (ADR-173 § 10).
+ALTER TABLE public.mailout_recipient DROP CONSTRAINT mailout_recipient_mailout_address_key;
+CREATE UNIQUE INDEX mailout_recipient_mailout_address_key
+  ON public.mailout_recipient (mailout_id, address) WHERE status <> 'skipped';
+
 COMMENT ON COLUMN public.mailout_recipient.audience_subscription_id IS
   'ADR-173 § 10: set for a recipient from the audience (then conversation_id is NULL). The column that is set is the origin.';
 COMMENT ON COLUMN public.mailout_recipient.mail_domain_id IS
@@ -567,8 +578,9 @@ GRANT SELECT (audience_subscription_id, mail_domain_id, consent_event_id)
 
 -- ── Lectura de una invitación ─────────────────────────────────────────────
 
--- Una invitación la lee, en su espacio, quien la creó, quien lleva el público
--- o quien lee alguna conversación de sus destinatarios (como ADR-124 § 8).
+-- Una invitación la lee quien la creó (miembro del espacio), quien lleva el
+-- público o quien lee alguna conversación de sus destinatarios, también por
+-- una membresía solo de proyecto (plan § 4.3; como ADR-124 § 8).
 -- SECURITY DEFINER: la política de `mailout_recipient` lee `mailout`.
 CREATE FUNCTION private.invitation_readable_by_caller(p_mailout_id uuid, p_workspace_id uuid, p_created_by uuid)
 RETURNS boolean
@@ -576,8 +588,8 @@ LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path TO 'public', 'pg_temp'
 AS $$
   WITH me AS (SELECT auth.uid() AS uid)
-  SELECT public.is_workspace_member(p_workspace_id) AND (
-    p_created_by = me.uid
+  SELECT (
+    (p_created_by = me.uid AND public.is_workspace_member(p_workspace_id))
     OR private.audience_access(p_workspace_id, false)
     OR EXISTS (
       SELECT 1
@@ -631,8 +643,9 @@ BEGIN
   END IF;
   SELECT m.* INTO v_row FROM public.mailout m WHERE m.id = p_id;
   IF v_row.kind = 'invitation' THEN
-    v_ok := public.is_workspace_member(v_row.workspace_id) AND CASE
-      WHEN p_edit THEN (v_row.created_by = auth.uid() OR private.audience_access(v_row.workspace_id, true))
+    v_ok := CASE
+      WHEN p_edit THEN public.is_workspace_member(v_row.workspace_id)
+                       AND (v_row.created_by = auth.uid() OR private.audience_access(v_row.workspace_id, true))
                        AND (v_row.audience_id IS NULL OR private.audience_access(v_row.workspace_id, true))
       ELSE private.invitation_readable_by_caller(v_row.id, v_row.workspace_id, v_row.created_by)
     END;
@@ -933,6 +946,12 @@ BEGIN
                AND m.status IN ('review', 'queued', 'sending', 'paused')) THEN
     RAISE EXCEPTION 'a mailout in progress uses this domain' USING ERRCODE = '23503';
   END IF;
+  -- Lo que se quedó a medias en un envío ya cancelado o acabado (un arriendo
+  -- devuelto a la cola después de cancelar) no sale nunca: queda cancelado,
+  -- y el dominio se puede borrar sin romper el CHECK de las filas en vuelo.
+  UPDATE public.mailout_recipient r
+  SET status = 'skipped', skip_reason = 'cancelled', claimed_at = NULL
+  WHERE r.mail_domain_id = p_id AND r.status IN ('queued', 'sending');
   DELETE FROM public.mail_domain WHERE id = p_id;
 END;
 $$;
@@ -1061,7 +1080,9 @@ $$;
 -- Una invitación en borrador (§ 4.4). Lista y profesionales, cada uno
 -- opcional; desde una función puede nacer sin ninguno (se elige después; la
 -- puesta en cola exige al menos uno). Toma el primer dominio de cada propósito
--- que haga falta, el verificado antes.
+-- que haga falta, el verificado antes. La función y el proyecto, si los hay,
+-- los ve quien llama (`read:performance` en el proyecto de la función; en un
+-- proyecto sin función, leer sus funciones o sus conversaciones).
 CREATE FUNCTION public.create_invitation(
   p_workspace_id     uuid,
   p_audience_id      uuid DEFAULT NULL,
@@ -1074,7 +1095,9 @@ SET search_path TO 'public', 'pg_temp'
 AS $$
 DECLARE
   v_uid     uuid := auth.uid();
-  v_pros    boolean := coalesce(cardinality(p_conversation_ids), 0) > 0;
+  v_ids     uuid[];
+  v_pros    boolean;
+  v_perf    uuid;
   v_outdom  public.mail_domain;
   v_auddom  public.mail_domain;
   v_project uuid := p_project_id;
@@ -1083,6 +1106,8 @@ BEGIN
   IF v_uid IS NULL OR NOT public.is_workspace_member(p_workspace_id) THEN
     RAISE EXCEPTION 'workspace % not found', p_workspace_id USING ERRCODE = '42501';
   END IF;
+  SELECT coalesce(array_agg(DISTINCT x), '{}') INTO v_ids FROM unnest(p_conversation_ids) x WHERE x IS NOT NULL;
+  v_pros := cardinality(v_ids) > 0;
   IF p_audience_id IS NOT NULL THEN
     IF NOT EXISTS (SELECT 1 FROM public.audience a WHERE a.id = p_audience_id AND a.workspace_id = p_workspace_id)
        OR NOT private.audience_access(p_workspace_id, true) THEN
@@ -1100,16 +1125,23 @@ BEGIN
     RAISE EXCEPTION 'workspace % not found', p_workspace_id USING ERRCODE = '42501';
   END IF;
   IF p_performance_id IS NOT NULL THEN
-    SELECT coalesce(v_project, p.project_id) INTO v_project FROM public.performance p
+    SELECT p.project_id INTO v_perf FROM public.performance p
     WHERE p.id = p_performance_id AND p.workspace_id = p_workspace_id AND p.deleted_at IS NULL;
-    IF NOT FOUND THEN
-      RAISE EXCEPTION 'performance % not found', p_performance_id USING ERRCODE = '22023';
+    IF v_perf IS NULL OR NOT public.has_permission(v_perf, 'read:performance') THEN
+      RAISE EXCEPTION 'performance % not found', p_performance_id USING ERRCODE = '42501';
     END IF;
+    IF v_project IS NOT NULL AND v_project <> v_perf THEN
+      RAISE EXCEPTION 'the performance is not in this project' USING ERRCODE = '22023';
+    END IF;
+    v_project := v_perf;
   END IF;
-  IF v_project IS NOT NULL AND NOT EXISTS (
-    SELECT 1 FROM public.project p WHERE p.id = v_project AND p.workspace_id = p_workspace_id AND p.deleted_at IS NULL
+  IF v_project IS NOT NULL AND (
+    NOT EXISTS (SELECT 1 FROM public.project p
+                WHERE p.id = v_project AND p.workspace_id = p_workspace_id AND p.deleted_at IS NULL)
+    OR NOT (public.has_permission(v_project, 'read:performance')
+            OR public.has_permission(v_project, 'read:conversation'))
   ) THEN
-    RAISE EXCEPTION 'project % not found', v_project USING ERRCODE = '22023';
+    RAISE EXCEPTION 'project % not found', v_project USING ERRCODE = '42501';
   END IF;
   SELECT * INTO v_outdom FROM public.mail_domain d
   WHERE d.workspace_id = p_workspace_id AND d.purpose = 'outreach'
@@ -1127,7 +1159,7 @@ BEGIN
   RETURNING * INTO v_row;
 
   IF v_pros THEN
-    PERFORM public.set_mailout_recipients(v_row.id, p_conversation_ids);
+    PERFORM public.set_mailout_recipients(v_row.id, v_ids);
   END IF;
   RETURN v_row;
 END;
@@ -1232,7 +1264,7 @@ $$;
 -- identidad por fila). Una invitación congela sus dos orígenes (§ 4.4): las
 -- conversaciones con su base de `mail_basis` y las suscripciones `confirmed`
 -- de la lista (sin importaciones en revisión). Una dirección en los dos sale
--- como profesional (ADR-173 § 10). Pide el dominio verificado de cada origen
+-- como profesional si el profesional sale; si no, como público (ADR-173 § 10). Pide el dominio verificado de cada origen
 -- que usa, el modo simulador, y la revisión del primer envío real de cada
 -- identidad. Cuerpo vivo (20261020140100) con las ramas.
 CREATE OR REPLACE FUNCTION public.queue_mailout(p_id uuid)
@@ -1304,23 +1336,7 @@ BEGIN
   WHERE r.mailout_id = v_m.id AND r.status = 'pending' AND r.conversation_id IS NOT NULL
     AND private.conversation_not_now(r.conversation_id);
 
-  -- El público: las confirmadas de la lista ahora, sin importaciones en
-  -- revisión; una dirección que ya va como profesional no lleva fila.
-  IF v_m.audience_id IS NOT NULL THEN
-    INSERT INTO public.mailout_recipient (
-      mailout_id, workspace_id, audience_subscription_id, address, display_name, address_kind,
-      status, basis_kind, consent_event_id, mail_domain_id
-    )
-    SELECT v_m.id, v_m.workspace_id, s.id, s.address, s.name, 'subscriber',
-           'pending', s.basis_kind, private.audience_basis_event(s.id), v_auddom.id
-    FROM public.audience_subscription s
-    LEFT JOIN public.audience_import i ON i.id = s.import_id
-    WHERE s.audience_id = v_m.audience_id AND s.status = 'confirmed'
-      AND (s.import_id IS NULL OR i.status = 'done')
-      AND NOT EXISTS (SELECT 1 FROM public.mailout_recipient x
-                      WHERE x.mailout_id = v_m.id AND x.address = s.address);
-  END IF;
-
+  -- Los profesionales, como el envío: modo simulador, exclusión y base.
   IF v_ws.mailout_simulator_only AND EXISTS (
     SELECT 1 FROM public.mailout_recipient r
     WHERE r.mailout_id = v_m.id AND r.status = 'pending'
@@ -1341,6 +1357,41 @@ BEGIN
     AND NOT EXISTS (SELECT 1 FROM public.mail_basis b
                     WHERE b.workspace_id = r.workspace_id AND b.address = r.address
                       AND b.withdrawn_at IS NULL);
+
+  -- El público: las confirmadas de la lista ahora, sin importaciones en
+  -- revisión. Una dirección que sale como profesional no lleva fila del
+  -- público; si el profesional quedó fuera (sin base, «no esta vez», no
+  -- disponible, duplicado), la suscripción sale por la suya: el
+  -- consentimiento de la lista es independiente (plan § 2.3). La exclusión del
+  -- espacio corta las dos.
+  IF v_m.audience_id IS NOT NULL THEN
+    INSERT INTO public.mailout_recipient (
+      mailout_id, workspace_id, audience_subscription_id, address, display_name, address_kind,
+      status, basis_kind, consent_event_id, mail_domain_id
+    )
+    SELECT v_m.id, v_m.workspace_id, s.id, s.address, s.name, 'subscriber',
+           'pending', s.basis_kind, private.audience_basis_event(s.id), v_auddom.id
+    FROM public.audience_subscription s
+    LEFT JOIN public.audience_import i ON i.id = s.import_id
+    WHERE s.audience_id = v_m.audience_id AND s.status = 'confirmed'
+      AND (s.import_id IS NULL OR i.status = 'done')
+      AND NOT EXISTS (SELECT 1 FROM public.mailout_recipient x
+                      WHERE x.mailout_id = v_m.id AND x.address = s.address AND x.status <> 'skipped');
+
+    IF v_ws.mailout_simulator_only AND EXISTS (
+      SELECT 1 FROM public.mailout_recipient r
+      WHERE r.mailout_id = v_m.id AND r.status = 'pending'
+        AND r.address::text !~* '@simulator\.amazonses\.com$'
+    ) THEN
+      RAISE EXCEPTION 'this workspace only sends to the mail simulator' USING ERRCODE = '42501';
+    END IF;
+
+    UPDATE public.mailout_recipient r
+    SET status = 'skipped', skip_reason = 'suppressed'
+    WHERE r.mailout_id = v_m.id AND r.status = 'pending' AND r.audience_subscription_id IS NOT NULL
+      AND EXISTS (SELECT 1 FROM public.mail_suppression s
+                  WHERE s.workspace_id = r.workspace_id AND s.address = r.address);
+  END IF;
 
   UPDATE public.mailout_recipient r
   SET status = 'queued', next_attempt_at = now(),
@@ -2077,20 +2128,18 @@ BEGIN
 END;
 $$;
 
--- Deshacer la propia baja desde la página de baja. Un destinatario del
--- público vuelve a su lista (evento `resubscribed` con el texto vigente) y
--- levanta su propia exclusión del espacio, si la había; un profesional, como
--- siempre: la base pasa a consentimiento con su nota.
+-- Deshacer la propia baja desde la página de baja. Un profesional, como
+-- siempre: la base pasa a consentimiento con su nota. Un destinatario del
+-- público no: volver a su lista es un consentimiento nuevo y su prueba lleva
+-- IP y agente, que pone el Worker (audience_resubscribe, de máquina, § 3.4).
+-- Por token anon no hace nada. Cuerpo vivo con esa rama.
 CREATE OR REPLACE FUNCTION public.mailout_resubscribe(p_token text)
 RETURNS void
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER
 SET search_path TO 'public', 'pg_temp'
 AS $$
 DECLARE
-  v_r    public.mailout_recipient;
-  v_a    public.audience;
-  v_s    public.audience_subscription;
-  v_text uuid;
+  v_r public.mailout_recipient;
 BEGIN
   SELECT * INTO v_r FROM public.mailout_recipient
   WHERE unsubscribe_token = btrim(coalesce(p_token, '')) AND address IS NOT NULL;
@@ -2098,20 +2147,6 @@ BEGIN
     RETURN;
   END IF;
   IF v_r.audience_subscription_id IS NOT NULL THEN
-    DELETE FROM public.mail_suppression
-    WHERE workspace_id = v_r.workspace_id AND address = v_r.address AND reason IN ('unsubscribe', 'complaint');
-    SELECT * INTO v_s FROM public.audience_subscription WHERE id = v_r.audience_subscription_id FOR UPDATE;
-    IF v_s.status <> 'unsubscribed' THEN
-      RETURN;
-    END IF;
-    SELECT * INTO v_a FROM public.audience WHERE id = v_s.audience_id;
-    v_text := (private.audience_current_text(v_a, v_s.language)).id;
-    UPDATE public.audience_subscription
-    SET status = 'confirmed', confirmed_at = coalesce(confirmed_at, now()), unsubscribed_at = NULL,
-        consent_text_id = coalesce(v_text, consent_text_id)
-    WHERE id = v_s.id;
-    INSERT INTO public.audience_consent_event (workspace_id, subscription_id, kind, consent_text_id, channel)
-    VALUES (v_s.workspace_id, v_s.id, 'resubscribed', v_text, 'page');
     RETURN;
   END IF;
   DELETE FROM public.mail_suppression
@@ -2221,6 +2256,57 @@ LANGUAGE sql VOLATILE SECURITY DEFINER
 SET search_path TO 'public', 'pg_temp'
 AS $$
   SELECT private.audience_issue_token(p_subscription_id);
+$$;
+
+-- «¿Ha sido un error? Volver a apuntarme» desde la página de baja de una
+-- invitación (§ 3.5). El Worker pone IP y agente: el evento `resubscribed`
+-- guarda, como la confirmación, la versión vigente del texto, y vale como base
+-- (audience_basis_event). Primero la suscripción del token; después solo se
+-- levanta la exclusión del espacio que nació de ella (su «nada más» o su
+-- queja), nunca una de la difusión. Idempotente. false si el token no es de
+-- una persona del público.
+CREATE FUNCTION public.audience_resubscribe(p_token text, p_ip inet DEFAULT NULL, p_user_agent text DEFAULT NULL)
+RETURNS boolean
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+DECLARE
+  v_r    public.mailout_recipient;
+  v_s    public.audience_subscription;
+  v_a    public.audience;
+  v_text uuid;
+BEGIN
+  SELECT * INTO v_r FROM public.mailout_recipient
+  WHERE unsubscribe_token = btrim(coalesce(p_token, '')) AND address IS NOT NULL
+    AND audience_subscription_id IS NOT NULL;
+  IF v_r.id IS NULL THEN
+    RETURN false;
+  END IF;
+  SELECT * INTO v_s FROM public.audience_subscription WHERE id = v_r.audience_subscription_id FOR UPDATE;
+  SELECT * INTO v_a FROM public.audience WHERE id = v_s.audience_id;
+  IF v_a.status = 'archived' THEN
+    RETURN false;
+  END IF;
+  DELETE FROM public.mail_suppression s
+  WHERE s.workspace_id = v_s.workspace_id AND s.address = v_s.address
+    AND s.reason IN ('unsubscribe', 'complaint')
+    AND s.mailout_recipient_id IN (SELECT x.id FROM public.mailout_recipient x
+                                   WHERE x.audience_subscription_id = v_s.id);
+  IF v_s.status <> 'unsubscribed' THEN
+    RETURN true;
+  END IF;
+  v_text := (private.audience_current_text(v_a, v_s.language)).id;
+  UPDATE public.audience_subscription
+  SET status = 'confirmed', confirmed_at = coalesce(confirmed_at, now()), unsubscribed_at = NULL,
+      consent_text_id = coalesce(v_text, consent_text_id)
+  WHERE id = v_s.id;
+  INSERT INTO public.audience_consent_event (
+    workspace_id, subscription_id, kind, consent_text_id, channel, ip, user_agent
+  ) VALUES (
+    v_s.workspace_id, v_s.id, 'resubscribed', v_text, 'page', p_ip, left(p_user_agent, 500)
+  );
+  RETURN true;
+END;
 $$;
 
 -- El POST de la página de confirmación (§ 3.3, paso 4). Idempotente: una
@@ -2714,6 +2800,7 @@ BEGIN
     'public.audience_subscribe(text, text, text, text, uuid, boolean, inet, text, public.audience_consent_channel, text)',
     'public.audience_confirmation_token(uuid)',
     'public.audience_confirm(text, inet, text)',
+    'public.audience_resubscribe(text, inet, text)',
     'public.audience_confirmation_sent(uuid, text)',
     'public.audience_purge_pending()',
     'public.audience_approve_import(uuid, uuid)'

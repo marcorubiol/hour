@@ -5486,6 +5486,10 @@ export type Database = {
         }[]
       }
       audience_purge_pending: { Args: never; Returns: number }
+      audience_resubscribe: {
+        Args: { p_ip?: unknown; p_token: string; p_user_agent?: string }
+        Returns: boolean
+      }
       audience_subscribe: {
         Args: {
           p_address: string

@@ -59,6 +59,7 @@ DROP FUNCTION IF EXISTS public.mailout_unsubscribe_everything(text);
 DROP FUNCTION IF EXISTS public.audience_subscribe(text, text, text, text, uuid, boolean, inet, text, public.audience_consent_channel, text);
 DROP FUNCTION IF EXISTS public.audience_confirmation_token(uuid);
 DROP FUNCTION IF EXISTS public.audience_confirm(text, inet, text);
+DROP FUNCTION IF EXISTS public.audience_resubscribe(text, inet, text);
 DROP FUNCTION IF EXISTS public.audience_confirmation_sent(uuid, text);
 DROP FUNCTION IF EXISTS public.audience_purge_pending();
 DROP FUNCTION IF EXISTS public.audience_approve_import(uuid, uuid);
@@ -920,6 +921,9 @@ ALTER TABLE public.mailout_recipient
   DROP COLUMN IF EXISTS mail_domain_id,
   DROP COLUMN IF EXISTS audience_subscription_id,
   ALTER COLUMN conversation_id SET NOT NULL;
+DROP INDEX IF EXISTS public.mailout_recipient_mailout_address_key;
+ALTER TABLE public.mailout_recipient
+  ADD CONSTRAINT mailout_recipient_mailout_address_key UNIQUE (mailout_id, address);
 
 DROP TRIGGER IF EXISTS mailout_guard_kind ON public.mailout;
 DROP FUNCTION IF EXISTS private.mailout_guard_kind();
