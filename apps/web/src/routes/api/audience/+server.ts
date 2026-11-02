@@ -3,7 +3,8 @@
  *
  * GET ?workspace_ids=a,b → AudienceListResponse: las listas que quien llama
  *     lee en esos espacios (la RLS: owner, admin o la faceta Público), con sus
- *     recuentos, las últimas invitaciones y qué puede hacer en cada espacio.
+ *     recuentos y qué puede hacer en cada espacio (las invitaciones van en la
+ *     lista de Envíos, `GET /api/mailout?list=1`, ADR-176).
  * POST { workspace_id, name, languages?, default_language? } → la lista nueva
  *     en borrador (`create_audience`).
  */
@@ -22,7 +23,6 @@ import {
   type AudienceItem,
   type AudienceListResponse,
   type SubscriptionStatus,
-  type InvitationSummary,
 } from '$lib/audience';
 
 const STATUSES: SubscriptionStatus[] = ['confirmed', 'pending', 'unsubscribed'];
@@ -36,27 +36,15 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
     .split(',')
     .map((x) => x.trim())
     .filter((x) => UUID_RE.test(x));
-  if (ids.length === 0) return jsonNoStore({ items: [], invitations: [], access: {} } satisfies AudienceListResponse);
+  if (ids.length === 0) return jsonNoStore({ items: [], access: {} } satisfies AudienceListResponse);
   try {
     const access = await audienceAccess(env, jwt, ids);
     const readable = ids.filter((w) => access[w]?.read);
-    if (readable.length === 0) return jsonNoStore({ items: [], invitations: [], access } satisfies AudienceListResponse);
+    if (readable.length === 0) return jsonNoStore({ items: [], access } satisfies AudienceListResponse);
     const inWs = `in.(${readable.join(',')})`;
-    const [lists, invitations] = await Promise.all([
-      pgGet<AudienceItem>(env, 'audience', jwt, {
-        search: { select: AUDIENCE_SELECT, workspace_id: inWs, status: 'neq.archived', order: 'created_at.asc' },
-      }),
-      pgGet<InvitationSummary>(env, 'mailout', jwt, {
-        search: {
-          select: 'id,workspace_id,audience_id,subject,status,queued_at,created_at',
-          workspace_id: inWs,
-          kind: 'eq.invitation',
-          status: 'neq.cancelled',
-          order: 'created_at.desc',
-          limit: '10',
-        },
-      }),
-    ]);
+    const lists = await pgGet<AudienceItem>(env, 'audience', jwt, {
+      search: { select: AUDIENCE_SELECT, workspace_id: inWs, status: 'neq.archived', order: 'created_at.asc' },
+    });
     // Un recuento por lista y estado, con `select=id`. No embebido
     // (`audience_subscription(count)`): la tabla solo da SELECT por columnas y
     // PostgREST cuenta el embebido con `*`, que da 403.
@@ -74,7 +62,6 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
     );
     return jsonNoStore({
       items: lists.data.map((a, i) => ({ ...a, counts: Object.fromEntries(counts[i]) as AudienceCounts })),
-      invitations: invitations.data,
       access,
     } satisfies AudienceListResponse);
   } catch (err) {

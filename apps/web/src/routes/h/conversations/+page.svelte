@@ -43,12 +43,14 @@
    * list, carried in the URL (`?turno=`, `?temp=`, `?temporada=actual`) and
    * shown as a removable chip; «Escribir a estas» preloads the selection.
    *
-   * Público (ADR-173 § 3): a last chip, only for who carries the audience of
-   * a space on screen (owner, admin or the Público facet); its panel is the
-   * lists (AudiencePanel). Under Difusión the bar also offers «Invitar a N»:
-   * an invitation draft with those professionals, of any project of one
-   * space. `?invitacion=<id>` opens the selection to add professionals to
-   * that draft, and goes back to it.
+   * Two views in the header (ADR-176): Conversaciones (what goes and comes
+   * back) and Envíos (`?view=envios`, what goes out to many: MailoutsView,
+   * with the Difusión season on top and the audience lists beside). The old
+   * Público chip (`?etiqueta=audience`) redirects there. Under Difusión the
+   * bar also offers «Invitar a N»: an invitation draft with those
+   * professionals, of any project of one space. `?invitacion=<id>` opens the
+   * selection to add professionals to that draft, and goes back to it;
+   * `?seleccionar=1` opens it plain («Nuevo envío › Difusión»).
    */
 
   import { docTitle } from '$lib/doc-title';
@@ -62,7 +64,8 @@
   import LensTitle from '$lib/components/LensTitle.svelte';
   import ConversationTable from '$lib/components/ConversationTable.svelte';
   import ConversationOverview from '$lib/components/ConversationOverview.svelte';
-  import AudiencePanel from '$lib/components/AudiencePanel.svelte';
+  import MailoutsView from '$lib/components/MailoutsView.svelte';
+  import { parseMailoutType, type MailoutType } from '$lib/mailout-list';
   import { audienceListQueryOptions } from '$lib/audience-query';
   import type { MailoutDetail } from '$lib/mailout';
   import Chip from '$lib/components/Chip.svelte';
@@ -103,6 +106,7 @@
     addTagKey,
     canBulkSend,
     chipHref,
+    isAudienceLink,
     lensChip,
     lensChips,
     panelHref,
@@ -153,6 +157,32 @@
    *  Converses there is no conversation to show: the lens is Equipo (ADR-134 § 4). */
   let chip = $derived(lensChip(page.url.searchParams, !noAccess));
   let panel = $derived(panelOf(chip));
+
+  // ── The two views (ADR-176): in the URL, so a link says which one it shows ──
+  let envios = $derived(page.url.searchParams.get('view') === 'envios');
+  let mailoutType = $derived(parseMailoutType(page.url.searchParams.get('tipo')));
+  // A link to the old Público chip lands on Envíos, where the lists live now.
+  $effect(() => {
+    if (isAudienceLink(page.url.searchParams)) untrack(() => void goto(viewHref('envios'), { replaceState: true, noScroll: true }));
+  });
+  /** A view's link: the scope stays, the other view's filters go. */
+  function viewHref(view: 'conversations' | 'envios'): string {
+    const scopeParam = page.url.searchParams.get('scope');
+    const next = new URLSearchParams();
+    if (scopeParam) next.set('scope', scopeParam);
+    if (view === 'envios') next.set('view', 'envios');
+    const qs = next.toString();
+    return `/h/conversations${qs ? `?${qs}` : ''}`;
+  }
+  /** A link into Conversaciones with these filters, from Envíos (the season, a mailout's replies). */
+  function conversationsHref(qs: string): string {
+    const base = viewHref('conversations');
+    return `${base}${base.includes('?') ? '&' : '?'}${qs}`;
+  }
+  function mailoutTypeHref(type: MailoutType): string {
+    const base = viewHref('envios');
+    return type === 'todos' ? base : `${base}&tipo=${type}`;
+  }
   // The vocabulary is names, not data; it is asked only by who reads conversations.
   const tagsQuery = createQuery(toStore(() => conversationTagsQueryOptions($accessQuery.data?.read !== false)));
 
@@ -186,10 +216,13 @@
       : [...new Set([...scope.workspaceIds, ...scope.projects.map((p) => p.workspaceId), ...scope.lines.map((l) => l.workspaceId)])],
   );
   let tagNames = $derived($tagsQuery.data ? scopeTags($tagsQuery.data, scopeWorkspaceIds) : []);
-  // Who carries the audience of a space on screen sees the Público chip (ADR-173 § 3).
+  // Who carries the audience of a space on screen sees its lists in Envíos (ADR-173 § 3, ADR-176).
   const audienceQuery = createQuery(toStore(() => audienceListQueryOptions(scopeWorkspaceIds)));
   let canAudience = $derived(Object.values($audienceQuery.data?.access ?? {}).some((a) => a.read));
-  let chips = $derived(lensChips(!noAccess, tagNames, locale, canAudience));
+  let audienceEditable = $derived(
+    scopeWorkspaceIds.filter((w) => $audienceQuery.data?.access[w]?.edit),
+  );
+  let chips = $derived(lensChips(!noAccess, tagNames, locale));
   // Project pins scope directly; a line pin scopes conversations through its
   // project. The endpoint filters by project_ids ∪ workspace_ids.
   let filterIds = $derived({
@@ -282,13 +315,7 @@
 
   // ── Dashboard filters (ADR-117): in the URL, so a block's link is the filter ──
   let lineIds = $derived(scope.lines.map((l) => l.id));
-  // How many season bars the overview will likely draw while it loads (ADR-135):
-  // the pinned lines, or every line the scope reaches.
-  let lineHint = $derived(
-    scope.lines.length > 0
-      ? scope.lines.length
-      : lineIndex.filter((l) => inScope(scope, { workspaceId: l.workspaceId, projectId: l.projectId })).length,
-  );
+
   function lineLabel(linea: string): string {
     if (linea === NO_LINE) return t('overview.no_line', locale);
     return lineIndex.find((l) => l.id === linea)?.name ?? t('overview.unnamed_line', locale);
@@ -386,14 +413,14 @@
     if (to?.url.hash === '#lista') listHeading?.focus({ preventScroll: true });
   });
 
-  /** A season segment: that relation, in the season (and the pinned lines, or its own line). */
+  /** A season segment, in Envíos: Conversaciones with that relation in the season (and its line). */
   async function filterSeasonRelation(relation: Relation, linea?: string) {
-    await goto(panelHref(chip, `temporada=actual&relacion=${relation}${linea ? `&linea=${linea}` : ''}`), { noScroll: true, keepFocus: true });
+    await goto(conversationsHref(`etiqueta=sales&temporada=actual&relacion=${relation}${linea ? `&linea=${linea}` : ''}`));
     await showList();
   }
   /** A line's name in the season: that line, every relation (ADR-135). */
   async function filterSeasonLine(linea: string) {
-    await goto(panelHref(chip, `temporada=actual&linea=${linea}`), { noScroll: true, keepFocus: true });
+    await goto(conversationsHref(`etiqueta=sales&temporada=actual&linea=${linea}`));
     await showList();
   }
 
@@ -482,9 +509,9 @@
     picked = [];
     void tick().then(() => listHeading?.focus({ preventScroll: true }));
   }
-  // Equipo has no conversations to pick: going there leaves the selection.
+  // Equipo and Envíos have no conversations to pick: going there leaves the selection.
   $effect(() => {
-    if (panel === 'team' || panel === 'audience') untrack(() => {
+    if (panel === 'team' || envios) untrack(() => {
       picking = false;
       picked = [];
     });
@@ -612,7 +639,7 @@
   // «Añadir a la invitación» puts the picks next to the ones it had.
   let invitationId = $derived(page.url.searchParams.get('invitacion'));
   $effect(() => {
-    if (invitationId) untrack(() => (picking = true));
+    if (invitationId || page.url.searchParams.get('seleccionar') === '1') untrack(() => (picking = true));
   });
   const addToInvitation = createMutation({
     mutationFn: async () => {
@@ -662,17 +689,65 @@
     },
   });
 
+  // «Nuevo envío» (ADR-176): difusión opens the selection under Difusión
+  // (a mailout is born with its recipients); an invitation is born empty in
+  // a space whose audience the caller edits (`create_invitation`).
+  const newInvitation = createMutation({
+    mutationFn: (workspaceId: string) =>
+      mutateJSON<{ id: string; workspace_slug: string }>('POST', '/api/mailout/invitation', { workspace_id: workspaceId }),
+    onSuccess: (r) => {
+      if (r) void goto(`/h/${r.workspace_slug}/mailout/${r.id}`);
+    },
+    onError: (err) =>
+      addToast({
+        tone: 'danger',
+        title: t('mailout.not_created', locale),
+        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
+      }),
+  });
+  let workspaceName = $derived(new Map(workspaces.map((w) => [w.id, w.name])));
+  let newMailoutItems = $derived([
+    ...(canEdit && !noAccess
+      ? [{ label: t('envios.new_outreach', locale), onclick: () => void goto(conversationsHref('etiqueta=sales&seleccionar=1')) }]
+      : []),
+    ...audienceEditable.map((w) => ({
+      label:
+        audienceEditable.length > 1
+          ? t('envios.new_invitation_in', locale, { space: workspaceName.get(w) ?? '' })
+          : t('envios.new_invitation', locale),
+      onclick: () => $newInvitation.mutate(w),
+    })),
+  ]);
 </script>
 
 <svelte:head>
   <title>{docTitle(t('lens.conversations', locale))}</title>
 </svelte:head>
 
-<section class="conversations" class:conversations--calm={calm.on && panel !== 'team' && panel !== 'audience'} aria-busy={busy}>
-  <LensHeader help={panel === 'team' ? 'team' : 'conversations'}>
+<section class="conversations" class:conversations--calm={calm.on && panel !== 'team' && !envios} aria-busy={busy}>
+  <LensHeader help={envios ? undefined : panel === 'team' ? 'team' : 'conversations'}>
     {#snippet title()}<LensTitle text={t('lens.conversations', locale)} />{/snippet}
+    {#snippet tools()}
+      {#if envios && newMailoutItems.length > 0}
+        <Menu items={newMailoutItems} align="end" label={t('envios.new', locale)} triggerClass="btn--primary btn--s">
+          {#snippet trigger()}{t('envios.new', locale)}<span class="conversations__caret" aria-hidden="true">▾</span>{/snippet}
+        </Menu>
+      {/if}
+    {/snippet}
     {#snippet sub()}
-      <!-- The chips (ADR-138 § 2): one at a time, each a link that says where you are. -->
+      <!-- The two views (ADR-176): by the verb, what goes and comes back, what goes out to many. -->
+      <a class="lenshead__frag" href={viewHref('conversations')} aria-current={envios ? undefined : 'page'} data-view="conversations"
+        >{t('lens.conversations', locale)}</a
+      >
+      <a class="lenshead__frag" href={viewHref('envios')} aria-current={envios ? 'page' : undefined} data-view="envios"
+        >{t('envios.view', locale)}</a
+      >
+    {/snippet}
+  </LensHeader>
+
+  {#if !envios}
+    <!-- The chips (ADR-138 § 2): one at a time, each a link that says where you are. -->
+    <nav class="conversations__chips" aria-label={t('conversations.view_label', locale)}>
       {#each chips as c (c.chip)}
         <a
           class="lenshead__frag"
@@ -681,15 +756,15 @@
           data-chip={c.chip}>{c.label}</a
         >
       {/each}
-      {#if panel !== 'team' && panel !== 'audience' && shows('conversations', 'list', calm.on)}
+      {#if panel !== 'team' && shows('conversations', 'list', calm.on)}
         <!-- On a phone the list starts a screen and a half down: a way straight to it (móvil #11). -->
         <a class="lenshead__frag conversations__skip" href="#lista">{t('overview.go_to_list', locale)}</a>
       {/if}
-    {/snippet}
-  </LensHeader>
+    </nav>
+  {/if}
 
-  {#if panel === 'audience'}
-    <!-- The audience has no first-visit card of its own yet. -->
+  {#if envios}
+    <!-- Envíos has no first-visit card of its own yet. -->
   {:else if panel === 'team'}
     <FirstVisitCard section="team" />
   {:else if panel === 'sales'}
@@ -707,11 +782,24 @@
     />
   {/snippet}
 
-  {#if panel === 'audience'}
-    {#if canAudience}
-      <AudiencePanel workspaceIds={scopeWorkspaceIds} {workspaces} {locale} />
+  {#if envios}
+    {#if !noAccess || canAudience}
+      <MailoutsView
+        filters={{ projectIds: filterIds.projectIds, workspaceIds: filterIds.workspaceIds, lineIds, enabled: !scopeUnresolved }}
+        {scopeWorkspaceIds}
+        {workspaces}
+        {workspaceSlugById}
+        {locale}
+        canRead={!noAccess}
+        {canAudience}
+        type={mailoutType}
+        typeHref={mailoutTypeHref}
+        {conversationsHref}
+        onrelation={filterSeasonRelation}
+        online={filterSeasonLine}
+      />
     {:else if $audienceQuery.isSuccess}
-      <p class="conversations__none">{t('audience.no_access', locale)}</p>
+      <p class="conversations__none">{t('envios.no_access', locale)}</p>
     {/if}
   {:else if panel === 'team'}
     {@render threads()}
@@ -721,11 +809,8 @@
       {workspaceSlugById}
       {projectNameById}
       {locale}
-      {lineHint}
       {chip}
       panel={panel === 'sales' && shows('conversations', 'sales', calm.on) ? 'sales' : 'common'}
-      onrelation={filterSeasonRelation}
-      online={filterSeasonLine}
       onwrite={canEdit && canBulkSend(chip) ? writeTo : undefined}
     />
 
@@ -968,6 +1053,17 @@
        head keeps the page's width, so the lens switcher does not move. */
     .conversations--calm > :global(:not(.lenshead)) {
       max-inline-size: var(--calm-measure);
+    }
+    /* The chips under the head, in the head's sub voice (until the list's own chips, ADR-176 lane 2). */
+    .conversations__chips {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: var(--space-xs) var(--space-m);
+      font-size: var(--text-s);
+    }
+    .conversations__caret {
+      margin-inline-start: var(--space-2xs);
     }
     .conversations__none {
       margin: 0;

@@ -53,11 +53,11 @@ test.describe('conversation tags', () => {
     // specs read the first row of Conversations and expect a contact.
     try {
       // 1. The chips, Press active; selection, but no bulk send and no season outside Difusión.
-      const chips = page.locator('.lenshead__sub [data-chip]');
+      const chips = page.locator('.conversations__chips [data-chip]');
       await expect(chips.first()).toHaveAttribute('data-chip', 'all');
       await expect(chips.last()).toHaveAttribute('data-chip', 'audience');
-      await expect(page.locator('.lenshead__sub [data-chip="sales"]')).toHaveText('Venues');
-      await expect(page.locator('.lenshead__sub [data-chip="press"]')).toHaveAttribute('aria-current', 'page');
+      await expect(page.locator('.conversations__chips [data-chip="sales"]')).toHaveText('Venues');
+      await expect(page.locator('.conversations__chips [data-chip="press"]')).toHaveAttribute('aria-current', 'page');
       await expect(page.getByRole('button', { name: /^Select$/ })).toBeVisible();
       await page.getByRole('button', { name: /^Select$/ }).click();
       await expect(page.getByRole('toolbar', { name: 'Actions on the selection' })).toBeVisible();
@@ -87,12 +87,12 @@ test.describe('conversation tags', () => {
       // Under its own chip the row does not repeat the tag.
       await expect(row.locator('.tag-chip')).toHaveCount(0);
 
-      await page.locator('.lenshead__sub [data-chip="sales"]').click();
+      await page.locator('.conversations__chips [data-chip="sales"]').click();
       await waitForLoaded(page);
       await search(page);
       await expect(page.locator('main [data-testid="conversation-row"]', { hasText: ORG })).toHaveCount(0, { timeout: 15_000 });
 
-      await page.locator('.lenshead__sub [data-chip="all"]').click();
+      await page.locator('.conversations__chips [data-chip="all"]').click();
       await waitForLoaded(page);
       await search(page);
       // Todas is one list since phase 3 (conversations and threads, one order),

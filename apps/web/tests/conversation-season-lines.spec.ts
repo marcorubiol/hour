@@ -79,7 +79,7 @@ test.describe('la temporada por línea (ADR-135)', () => {
 
   test('una barra por línea, «sin línea» al final', async ({ page }) => {
     test.setTimeout(60_000);
-    await page.goto('/h/conversations?etiqueta=sales');
+    await page.goto('/h/conversations?view=envios');
     const season = page.getByTestId('block-season');
     await expect(season).toBeVisible({ timeout: 30_000 });
     const lines = season.getByTestId('season-line');
@@ -91,7 +91,7 @@ test.describe('la temporada por línea (ADR-135)', () => {
 
   test('el nombre de una línea filtra la lista por ella; una relación, por esa relación en ella', async ({ page }) => {
     test.setTimeout(60_000);
-    await page.goto('/h/conversations?etiqueta=sales');
+    await page.goto('/h/conversations?view=envios');
     const season = page.getByTestId('block-season');
     await expect(season).toBeVisible({ timeout: 30_000 });
 
@@ -101,7 +101,7 @@ test.describe('la temporada por línea (ADR-135)', () => {
     await expect(page.locator('[data-testid="conversation-row"]', { hasText: IN_LINE })).toHaveCount(1, { timeout: 30_000 });
     await expect(page.locator('[data-testid="conversation-row"]', { hasText: NO_LINE })).toHaveCount(0);
 
-    await page.goto('/h/conversations?etiqueta=sales');
+    await page.goto('/h/conversations?view=envios');
     await expect(season).toBeVisible({ timeout: 30_000 });
     // Sin historial: nunca contactadas (la relación se deriva, ADR-138).
     const never = season.locator('[data-line="sin"] .season__item', { has: page.locator('[data-relation="never"]') });
@@ -112,16 +112,15 @@ test.describe('la temporada por línea (ADR-135)', () => {
     await expect(page.locator('[data-testid="conversation-row"]', { hasText: IN_LINE })).toHaveCount(0);
   });
 
-  test('en el móvil, la temporada se pliega a su primera barra y sin scroll lateral', async ({ page }) => {
+  test('en el móvil, cada línea su barra y sin scroll lateral', async ({ page }) => {
     test.setTimeout(60_000);
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/h/conversations?etiqueta=sales');
-    // Plan de la lista § 3.3 (móvil 11): cada bloque guarda su primera línea
-    // para que la lista empiece en la primera pantalla; el resto, en la lista.
+    await page.goto('/h/conversations?view=envios');
+    // En Envíos (ADR-176) la temporada es la cabeza de la vista: no se pliega.
     const lines = page.getByTestId('block-season').getByTestId('season-line');
     await expect(lines.first()).toBeVisible({ timeout: 30_000 });
     expect(await lines.count()).toBeGreaterThanOrEqual(2);
-    await expect(lines.nth(1)).toBeHidden();
+    await expect(lines.nth(1)).toBeVisible();
     const a = await lines.first().boundingBox();
     expect(a!.x + a!.width).toBeLessThanOrEqual(390);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

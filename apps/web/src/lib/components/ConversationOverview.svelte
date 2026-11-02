@@ -6,13 +6,10 @@
    * la lista de debajo (sus enlaces llevan `?turno=`/`?temp=` y bajan a
    * `#lista`) y «Se enfría» es una selección hecha para «Escribir a N».
    *
-   * Un bloque sin filas se queda en una línea (el vacío también contesta);
-   * «Último envío» desaparece si no hay nada (los hilos del equipo son la
-   * lente Equipo, ADR-133). Sin
-   * conversaciones en el alcance no se pinta nada: la lista enseña su vacío.
-   *
-   * La temporada, con dos líneas o más (contando «sin línea»), es una barra
-   * por línea; con una o ninguna, una sola barra (ADR-135).
+   * Un bloque sin filas se queda en una línea (el vacío también contesta).
+   * Sin conversaciones en el alcance no se pinta nada: la lista enseña su
+   * vacío. La temporada y el último envío se mudaron a la vista Envíos
+   * (ADR-176, SeasonBand y MailoutsView).
    */
 
   import StateBadge from '$lib/components/StateBadge.svelte';
@@ -25,7 +22,6 @@
   import { useCalm } from '$lib/stores/calm.svelte';
   import FirstTimeNote from '$lib/components/FirstTimeNote.svelte';
   import Button from '$lib/components/Button.svelte';
-  import MailoutFigures from '$lib/components/MailoutFigures.svelte';
   import { dayMonth } from '$lib/datetime';
   import { LATE_DAYS } from '$lib/conversation-row';
   import { DASH } from '$lib/glyphs';
@@ -36,21 +32,16 @@
     relativeContactDate,
     type ConversationEventKind,
   } from '$lib/conversation';
-  import { RELATIONS, relationLabel, relationTone, type BoloCounts, type Relation } from '$lib/conversation-relation';
+  import { relationLabel, relationTone } from '$lib/conversation-relation';
   import {
     COLD_IDLE_DAYS,
     COLD_REPLY_DAYS,
-    NO_LINE,
-    currentSeason,
     type BlockRow,
     type ColdRow,
     type DueRow,
     type OverviewResponse,
-    type RelationCounts,
-    type SeasonLine,
   } from '$lib/conversation-overview';
   import { ALL, panelHref, type LensChip } from '$lib/conversation-tags';
-  import { lastMailoutQueryOptions } from '$lib/waiting-feeds';
 
   interface Props {
     filters: { projectIds: string[]; workspaceIds: string[]; lineIds: string[]; enabled: boolean };
@@ -58,23 +49,13 @@
     /** Names «Escribir a estas» per project when the cooling spans several. */
     projectNameById: Map<string, string>;
     locale: Locale;
-    /**
-     * Cuántas líneas tiene el alcance, para que la carga dibuje tantas barras
-     * como llegarán (una estimación: la temporada puede tener menos o un «sin
-     * línea» de más).
-     */
-    lineHint?: number;
-    /** Pulsar un tramo de la temporada: filtra la lista por esa relación en la temporada (y su línea). */
-    onrelation: (relation: Relation, linea?: string) => void;
-    /** Pulsar el nombre de una línea: la lista, solo esa línea en la temporada. */
-    online: (linea: string) => void;
     /** «Escribir a estas»: precarga el modo selección del envío en bloque (ADR-115). */
     /** Absent for whoever cannot edit conversations: no «write to these». */
     onwrite?: (picks: { id: string; project_id: string }[]) => void;
     /**
      * ADR-138 fase 2, el dominio es el chip: la etiqueta que acota (`all`,
      * ninguna) y qué panel se pinta. `sales` es el de Difusión entero;
-     * `common`, solo te toca (sin temperatura, temporada ni envío).
+     * `common`, solo te toca (sin temperatura).
      */
     chip?: LensChip;
     panel?: 'sales' | 'common';
@@ -85,9 +66,6 @@
     workspaceSlugById,
     projectNameById,
     locale,
-    lineHint = 0,
-    onrelation,
-    online,
     onwrite,
     chip = ALL,
     panel = 'sales',
@@ -100,9 +78,6 @@
   function link(qs: string): string {
     return panelHref(chip, qs);
   }
-
-  /** Ghost lines while loading: as many as the scope has, at most four. */
-  let ghostLines = $derived(lineHint >= 2 ? Math.min(lineHint, 4) : 0);
 
   type Pick = { id: string; project_id: string };
   function picksByProject(picks: Pick[]): { projectId: string; picks: Pick[] }[] {
@@ -131,14 +106,6 @@
     })),
   );
 
-  // The last mailout is Difusión's alone, and its own read (2026-10-24): the
-  // panel draws without it; its block keeps a ghost until it arrives.
-  const mailoutQuery = createQuery(toStore(() => lastMailoutQueryOptions(filters, filters.enabled && full)));
-  // Subscribed now, not when its block first draws (after the panel): a query
-  // nobody subscribes to does not fetch, and it would start a panel late.
-  void $mailoutQuery;
-  let lastMailout = $derived($mailoutQuery.data?.last_mailout ?? null);
-  let mailoutLoading = $derived($mailoutQuery.isPending);
 
   let data = $derived($query.data ?? null);
   let pickGroups = $derived(data ? new Set(data.cold.picks.map((p) => p.project_id)).size : 0);
@@ -192,22 +159,8 @@
     return kind ? eventKindLabel(kind as ConversationEventKind, locale) : '';
   }
 
-  function present(counts: RelationCounts): Relation[] {
-    return RELATIONS.filter((s) => counts[s] > 0);
-  }
-  function countsAria(counts: RelationCounts): string {
-    return present(counts).map((s) => `${counts[s]} ${relationLabel(s, locale)}`).join(', ');
-  }
-  /** Los bolos en opción y firmes (ADR-138 § 3), o nada si no hay ninguno. */
-  function bolosLine(b: BoloCounts, key: 'overview.season_bolos' | 'overview.line_bolos'): string {
-    return b.option + b.firm > 0 ? t(key, locale, { option: b.option, firm: b.firm }) : '';
-  }
-  function lineKey(l: SeasonLine): string {
-    return l.line_id ?? NO_LINE;
-  }
-  function lineName(l: SeasonLine): string {
-    return l.line_id === null ? t('overview.no_line', locale) : l.name || t('overview.unnamed_line', locale);
-  }
+
+
 </script>
 
 {#snippet who(row: BlockRow, badge = false)}
@@ -224,35 +177,6 @@
 <!-- Loading: the same rows as the real ones (two lines and the time column,
      `&nbsp;` so each bar is exactly a line high) and the typical blocks, so
      the list below does not jump when the overview arrives (diseño A3). -->
-<!-- A season bar and its legend: the whole season, or one line of it (ADR-135). -->
-{#snippet seasonBar(counts: RelationCounts, aria: string, linea?: string)}
-  <!-- A drawing for the pointer; the legend below is the control for the
-       keyboard and the screen reader (móvil #7): one stop per relation. -->
-  <div class="season__bar" role="img" aria-label={aria}>
-    {#each present(counts) as s (s)}
-      <button
-        type="button"
-        class="season__seg"
-        data-relation={s}
-        style:flex-grow={counts[s]}
-        title={`${relationLabel(s, locale)} · ${counts[s]}`}
-        tabindex="-1"
-        aria-hidden="true"
-        onclick={() => onrelation(s, linea)}
-      ></button>
-    {/each}
-  </div>
-  <!-- On a phone, columns by count (2 up to four, 3 above): never one alone on a row. -->
-  <div class="season__legend" class:season__legend--run={linea !== undefined} style:--season-legend-cols={present(counts).length > 4 ? 3 : 2}>
-    {#each present(counts) as s (s)}
-      <button type="button" class="season__item hit" onclick={() => onrelation(s, linea)}>
-        <span class="season__n stat">{counts[s]}</span>
-        <span class="season__k"><i data-relation={s}></i>{relationLabel(s, locale)}</span>
-      </button>
-    {/each}
-  </div>
-{/snippet}
-
 {#snippet ghost(n: number)}
   <ol class="rows" aria-hidden="true">
     {#each Array(n) as _, i (i)}
@@ -267,16 +191,6 @@
   </ol>
 {/snippet}
 
-{#snippet mailoutGhost(busy: boolean)}
-  <!-- Inside the loading board the board is busy; after it, the block alone is. -->
-  <section class="block block--mailout" aria-hidden="true" aria-busy={busy || undefined}>
-    <BlockHead title={t('overview.last_mailout', locale)} />
-    <p class="mailout__subject"><span class="ghost-line" style:inline-size="50%">&nbsp;</span></p>
-    <p class="mailout__meta"><span class="ghost-line" style:inline-size="70%">&nbsp;</span></p>
-    <p class="mailout__ghost-figs"><span class="ghost-line">&nbsp;</span></p>
-  </section>
-{/snippet}
-
 <div class="overview">
 {#if loading}
   <div class="board" aria-busy="true" aria-label={t('overview.loading', locale)}>
@@ -285,40 +199,10 @@
     </div>
     {#if full}
     <div class="board__col">
-      <section class="block block--season">
-        <BlockHead title={t('overview.season_of', locale, { season: currentSeason(new Date()).label })} count={DASH} />
-        {#if ghostLines > 0}
-          <ol class="season__lines" aria-hidden="true">
-            {#each Array(ghostLines) as _, i (i)}
-              <li class="season__line">
-                <div class="season__line-head">
-                  <span class="season__line-name"><span class="ghost-line" style:inline-size="{10 - (i % 2) * 2}rem">&nbsp;</span></span>
-                  <span class="season__line-figs"><span class="ghost-line" style:inline-size="5rem">&nbsp;</span></span>
-                </div>
-                <div class="season__bar season__bar--ghost"></div>
-                <div class="season__legend season__legend--run">
-                  {#each Array(3) as _, j (j)}
-                    <span class="season__item"><span class="season__n stat">{DASH}</span><span class="season__k"><span class="ghost-line" style:inline-size="4rem">&nbsp;</span></span></span>
-                  {/each}
-                </div>
-              </li>
-            {/each}
-          </ol>
-        {:else}
-          <div class="season__bar season__bar--ghost"></div>
-          <div class="season__legend" aria-hidden="true">
-            {#each Array(6) as _, i (i)}
-              <span class="season__item"><span class="season__n stat">{DASH}</span><span class="season__k"><span class="ghost-line">&nbsp;</span></span></span>
-            {/each}
-          </div>
-        {/if}
-        <p class="season__note" aria-hidden="true"><span class="ghost-line" style:inline-size="60%">&nbsp;</span></p>
-      </section>
       <section class="block block--cold">
         <BlockHead title={t('overview.cold', locale)} count={DASH} />
         {@render ghost(5)}
       </section>
-      {@render mailoutGhost(false)}
     </div>
     {/if}
   </div>
@@ -373,44 +257,6 @@
 
     {#if full}
     <div class="board__col">
-      {#if data.season.total > 0}
-      <section class="block block--season" aria-labelledby="ov-season" data-testid="block-season" data-help-step="conv-season">
-        <!-- «Pulsa una línea o un estado para filtrar» is an instruction: it lives in the «?» (ADR-145 § 2). -->
-        <BlockHead id="ov-season" title={t('overview.season_of', locale, { season: data.season.label })} count={data.season.total} />
-          {#if data.season.lines.length > 0}
-            <!-- One bar per line, «sin línea» last and never hidden (ADR-135). -->
-            <ol class="season__lines">
-              {#each data.season.lines as l (lineKey(l))}
-                <li class="season__line" data-testid="season-line" data-line={lineKey(l)}>
-                  <div class="season__line-head">
-                    <button
-                      type="button"
-                      class="season__line-name"
-                      aria-label={t('overview.line_open', locale, { line: lineName(l), n: l.total })}
-                      onclick={() => online(lineKey(l))}>{lineName(l)}</button
-                    >
-                    <span class="season__line-figs"
-                      >{[t('overview.line_figures', locale, { total: l.total, answered: l.answered }), bolosLine(l.bolos, 'overview.line_bolos')]
-                        .filter(Boolean)
-                        .join(' · ')}</span
-                    >
-                  </div>
-                  {@render seasonBar(l.counts, `${lineName(l)}: ${countsAria(l.counts)}`, lineKey(l))}
-                </li>
-              {/each}
-            </ol>
-          {:else}
-            {@render seasonBar(data.season.counts, countsAria(data.season.counts))}
-          {/if}
-          <p class="season__note">
-            {t('overview.season_note', locale, { answered: data.season.answered, silent: data.season.total - data.season.answered })}
-          </p>
-          {#if bolosLine(data.season.bolos, 'overview.season_bolos')}
-            <p class="season__note" data-testid="season-bolos">{bolosLine(data.season.bolos, 'overview.season_bolos')}</p>
-          {/if}
-      </section>
-      {/if}
-
       {#if data.cold.count > 0}
       <section class="block block--cold" aria-labelledby="ov-cold" data-testid="block-cold">
         <BlockHead id="ov-cold" title={t('overview.cold', locale)} count={data.cold.count}>
@@ -463,38 +309,6 @@
       </section>
       {/if}
 
-      {#if full && mailoutLoading}
-        {@render mailoutGhost(true)}
-      {:else if full && lastMailout}
-        {@const m = lastMailout}
-        {@const ws = workspaceSlugById.get(m.workspace_id)}
-        <section class="block block--mailout" aria-labelledby="ov-mail" data-testid="block-mailout">
-          <BlockHead id="ov-mail" title={t('overview.last_mailout', locale)}>
-            {#if ws}<a class="block-head__act" href={`/h/${ws}/mailout/${m.id}`}>{t('overview.open_mailout', locale)}</a>{/if}
-          </BlockHead>
-          <p class="mailout__subject">
-            {m.subject || t('overview.no_subject', locale)}
-            <!-- While sending is simulated, «45 delivered» must not read as real (diseño M3). -->
-            {#if m.simulated}<span class="mailout__simulated">{t('mailout.simulated_mark', locale)}</span>{/if}
-          </p>
-          <p class="mailout__meta">
-            {[m.queued_at ? dayMonth(m.queued_at) : null, t('overview.recipients', locale, { n: m.figures.recipients }), m.from_address]
-              .filter(Boolean)
-              .join(' · ')}
-          </p>
-          <!-- The figures that name someone lead to them (uso #10). -->
-          <MailoutFigures
-            {locale}
-            figures={[
-              { key: 'delivered', n: m.figures.delivered },
-              { key: 'replies', n: m.figures.replies, href: m.figures.replies > 0 ? link(`envio=${m.id}&r=respuestas#lista`) : null },
-              { key: 'bounced', n: m.figures.bounced, warn: true, href: m.figures.bounced > 0 ? link(`envio=${m.id}&r=rebotes#lista`) : null },
-              { key: 'unsubscribed', n: m.figures.unsubscribed },
-              ...(m.figures.complained > 0 ? [{ key: 'complained' as const, n: m.figures.complained, warn: true }] : []),
-            ]}
-          />
-        </section>
-      {/if}
 
     </div>
     {/if}
@@ -698,167 +512,9 @@
       inline-size: 3.5rem;
     }
 
-    /* La temporada: una barra apilada en el tono de cada estado (`--status`,
-       base.css, el mismo que sus pastillas), con una sola receta. */
-    .season__seg,
-    .season__k i {
-      --seg: color-mix(in oklab, var(--status) 50%, transparent);
-    }
-
-    .season__bar {
-      display: flex;
-      gap: var(--space-2xs);
-      block-size: 0.9rem;
-      border-radius: var(--radius-s);
-      overflow: hidden;
-    }
-    .season__bar--ghost {
-      background: var(--bg-light);
-    }
-    .season__seg {
-      flex-basis: 0;
-      min-inline-size: var(--dot-xs);
-      padding: 0;
-      border: 0;
-      background: var(--seg);
-      cursor: pointer;
-    }
-    .season__seg:hover,
-    .season__seg:focus-visible {
-      filter: brightness(0.92);
-    }
-    /* Four columns: seven statuses read 4 + 3, never one alone on its row (diseño B3). */
-    .season__legend {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: var(--space-xs) var(--space-m);
-      margin-block-start: var(--space-s);
-    }
-    .season__item {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      padding: 0;
-      border: 0;
-      background: none;
-      color: inherit;
-      text-align: start;
-      cursor: pointer;
-    }
-    .season__k {
-      display: flex;
-      align-items: center;
-      gap: var(--space-2xs);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-    }
-    .season__k i {
-      display: inline-block;
-      inline-size: 0.6rem;
-      block-size: 0.6rem;
-      border-radius: var(--radius-xs);
-      background: var(--seg);
-    }
-    .season__item:hover .season__k {
-      color: var(--text-color);
-    }
-    /* Per line (ADR-135): its name and figures, its bar, its legend in one run. */
-    .season__lines {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-m);
-      list-style: none;
-      margin: 0;
-      padding: 0;
-    }
-    .season__line {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-2xs);
-      min-inline-size: 0;
-    }
-    .season__line-head {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      gap: var(--space-s);
-      min-inline-size: 0;
-    }
-    .season__line-name {
-      min-inline-size: 0;
-      padding: 0;
-      border: 0;
-      background: none;
-      color: inherit;
-      font: inherit;
-      font-weight: 500;
-      text-align: start;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      cursor: pointer;
-    }
-    button.season__line-name:hover {
-      text-decoration: underline;
-      text-decoration-color: var(--border-color-dark);
-      text-underline-offset: 0.25em;
-    }
-    .season__line-figs {
-      flex-shrink: 0;
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-    }
-    .season__line .season__bar {
-      block-size: 0.6rem;
-    }
-    .season__legend--run {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--space-2xs) var(--space-m);
-      margin-block-start: var(--space-2xs);
-    }
-    .season__legend--run .season__item {
-      flex-direction: row;
-      align-items: baseline;
-      gap: var(--space-2xs);
-    }
-    .season__legend--run .season__n {
-      font-size: var(--text-m);
-    }
-
-    .season__note {
-      margin-block-start: var(--space-xs);
-      font-size: var(--text-s);
-      color: var(--text-muted);
-    }
-
-    .mailout__ghost-figs {
-      font-family: var(--font-display);
-      font-size: var(--stat-inline);
-    }
-    .mailout__ghost-figs .ghost-line {
-      inline-size: 60%;
-    }
-    .mailout__simulated {
-      margin-inline-start: var(--space-xs);
-      color: var(--text-muted);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      font-weight: 400;
-      letter-spacing: var(--mono-letter-spacing);
-    }
-    .mailout__subject {
-      font-weight: 500;
-    }
-    .mailout__meta {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-    }
     /* Móvil: una columna en el orden del documento, que es el que lee el
        teclado y el lector de pantalla: primero lo que pide acción (te
-       toca), después el estado (temporada, se enfría, el envío). Sin `order`: lo que se ve y lo que se recorre no se separan
+       toca), después lo que se enfría. Sin `order`: lo que se ve y lo que se recorre no se separan
        (móvil #4). Tres filas por bloque y los botones a lo ancho. */
     @container (max-width: 44rem) {
       .board {
@@ -869,10 +525,7 @@
          and its link «see N»; the rest is in the list itself. */
       .rows > li.rows__sep,
       .rows > li:not(.rows__sep) ~ li,
-      .season__lines > li ~ li,
-      .season__note,
-      .block__foot .block__hint,
-      .block--mailout > :global(:not(.block-head, .mailout__subject)) {
+      .block__foot .block__hint {
         display: none;
       }
       .block__foot :global(button) {
@@ -882,29 +535,6 @@
       .row__who {
         flex-wrap: wrap;
         row-gap: 0;
-      }
-      /* The legend in rows of even columns (density review, bug): a run
-         that wrapped left the last one alone under a touch-high gap. */
-      .season__legend {
-        display: grid;
-        grid-template-columns: repeat(var(--season-legend-cols, 2), max-content);
-        gap: var(--space-xs) var(--space-l);
-      }
-      .season__item {
-        flex-direction: row;
-        align-items: baseline;
-        gap: var(--space-2xs);
-      }
-      .season__n {
-        font-size: var(--text-m);
-      }
-    }
-
-    /* Touch: the links reach the finger's size (móvil #8); the legend's
-       items take it invisibly (`.hit`), so their rows keep the text's height. */
-    @media (pointer: coarse) {
-      .season__line-name {
-        min-block-size: var(--touch-target);
       }
     }
   }

@@ -146,9 +146,9 @@ test.describe('Conversaciones › Equipo: los hilos del equipo (ADR-116, ADR-134
       'aria-current',
       'page',
     );
-    await expect(page.locator('.lenshead__sub').getByRole('link', { name: 'Team' })).toHaveAttribute('aria-current', 'page');
+    await expect(page.locator('.conversations__chips').getByRole('link', { name: 'Team' })).toHaveAttribute('aria-current', 'page');
     // In English the sales view is «Venues», not «Booking» beside «Books» (ADR-137).
-    await expect(page.locator('.lenshead__sub').getByRole('link', { name: 'Venues' })).toBeVisible();
+    await expect(page.locator('.conversations__chips').getByRole('link', { name: 'Venues' })).toBeVisible();
 
     // Desk enseña lo nuevo del equipo y enlaza a la vista Equipo.
     await page.goto('/h/desk?scope=s:playwright');
@@ -216,7 +216,7 @@ test.describe('Conversaciones › Equipo: los hilos del equipo (ADR-116, ADR-134
       await expect(page.getByText(TEAM_BODY)).toHaveCount(0);
       // Sin Converses no hay vista de venta, pero la lente sigue por Equipo: lee el General del bolo.
       await expect(page.getByRole('navigation', { name: 'Sections' }).getByRole('link', { name: 'Conversations' })).toBeVisible();
-      await expect(page.locator('.lenshead__sub').getByRole('link', { name: 'Venues' })).toHaveCount(0);
+      await expect(page.locator('.conversations__chips').getByRole('link', { name: 'Venues' })).toHaveCount(0);
     } finally {
       await context.close();
     }

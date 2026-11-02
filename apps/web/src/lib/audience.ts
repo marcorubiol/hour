@@ -51,21 +51,9 @@ export interface AudienceSummary extends AudienceItem {
   counts: AudienceCounts;
 }
 
-/** Una invitación reciente en la vista Público. */
-export interface InvitationSummary {
-  id: string;
-  workspace_id: string;
-  audience_id: string | null;
-  subject: string | null;
-  status: string;
-  queued_at: string | null;
-  created_at: string;
-}
-
 /** GET /api/audience. */
 export interface AudienceListResponse {
   items: AudienceSummary[];
-  invitations: InvitationSummary[];
   /** Por espacio: quien no lleva el público de ninguno no ve la vista. */
   access: Record<string, AudienceAccess>;
 }

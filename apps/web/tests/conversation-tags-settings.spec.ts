@@ -44,7 +44,7 @@ async function chipsOfTheLens(page: Page) {
   await page.getByRole('navigation', { name: 'Sections' }).getByRole('link', { name: 'Conversations', exact: true }).click();
   await expect(page).toHaveURL(/\/h\/conversations/);
   await waitForLoaded(page);
-  return page.locator('.lenshead__sub [data-chip]');
+  return page.locator('.conversations__chips [data-chip]');
 }
 
 test.describe('conversation tags in settings', () => {
@@ -82,7 +82,7 @@ test.describe('conversation tags in settings', () => {
 
       // On: a chip of the lens, without reloading the page.
       const chips = await chipsOfTheLens(page);
-      await expect(page.locator(`.lenshead__sub [data-chip="${KEY}"]`)).toBeVisible();
+      await expect(page.locator(`.conversations__chips [data-chip="${KEY}"]`)).toBeVisible();
       await expect(chips.last()).toHaveAttribute('data-chip', 'team');
       await page.goBack();
       await settingsLoaded(page);
@@ -111,8 +111,8 @@ test.describe('conversation tags in settings', () => {
       // 3. Off: out of the chips.
       await setActive(page, false);
       await chipsOfTheLens(page);
-      await expect(page.locator('.lenshead__sub [data-chip="sales"]')).toBeVisible();
-      await expect(page.locator(`.lenshead__sub [data-chip="${KEY}"]`)).toHaveCount(0);
+      await expect(page.locator('.conversations__chips [data-chip="sales"]')).toBeVisible();
+      await expect(page.locator(`.conversations__chips [data-chip="${KEY}"]`)).toHaveCount(0);
     } finally {
       // Whatever happened, it ends off and with its name.
       await page.goto(SETTINGS);

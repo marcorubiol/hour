@@ -126,26 +126,28 @@ test.describe('el dashboard de Conversations (ADR-117)', () => {
     await expect(page).not.toHaveURL(/temp=/);
   });
 
-  test('un tramo de la temporada filtra la lista por esa relación', async ({ page }) => {
+  test('un tramo de la temporada, en Envíos, abre Conversaciones filtrada por esa relación', async ({ page }) => {
     test.setTimeout(60_000);
-    await page.goto('/h/conversations?etiqueta=sales');
+    await page.goto('/h/conversations?view=envios');
     const season = page.getByTestId('block-season');
     await expect(season).toBeVisible({ timeout: 30_000 });
     await season.locator('.season__item').first().click();
     await expect(page).toHaveURL(/temporada=actual.*relacion=|relacion=.*temporada=actual/);
+    await expect(page).not.toHaveURL(/view=envios/);
     await expect(page.locator('[data-testid="conversation-row"]').first()).toBeVisible({ timeout: 30_000 });
   });
 
-  test('en el móvil, una columna en el orden del documento, «Esperan respuesta» primero', async ({ page }) => {
+  test('en el móvil, Envíos: la temporada encima de la lista, alineadas y sin scroll lateral', async ({ page }) => {
     test.setTimeout(60_000);
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/h/conversations?etiqueta=sales');
-    const due = page.getByTestId('block-due');
+    await page.goto('/h/conversations?view=envios');
     const season = page.getByTestId('block-season');
-    await expect(due).toBeVisible({ timeout: 30_000 });
-    const [d, s] = await Promise.all([due.boundingBox(), season.boundingBox()]);
-    expect(d!.y).toBeLessThan(s!.y);
-    expect(Math.abs(d!.x - s!.x)).toBeLessThan(2);
+    const list = page.getByTestId('mailout-list');
+    await expect(season).toBeVisible({ timeout: 30_000 });
+    await expect(list).toBeVisible({ timeout: 30_000 });
+    const [s, l] = await Promise.all([season.boundingBox(), list.boundingBox()]);
+    expect(s!.y).toBeLessThan(l!.y);
+    expect(Math.abs(s!.x - l!.x)).toBeLessThan(2);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 });
