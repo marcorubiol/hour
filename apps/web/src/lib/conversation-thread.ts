@@ -153,3 +153,30 @@ export function threadDayLabel(day: string, locale: Locale, today: string = loca
   if (day === localDayISO(y)) return t('thread.yesterday', locale);
   return localeDayMonthNear(day, today, LOCALE_TAG[locale]);
 }
+
+/**
+ * Llevar `el` al borde de lo que se ve. En su página, `scrollIntoView`; en un
+ * panel (`within`: el vistazo o el segundo panel de la lista) sólo se mueve
+ * el contenedor que desplaza al panel, nunca la ventana, que escondería la
+ * cabecera de la página. Respeta el `scroll-margin` del elemento.
+ */
+export function scrollToEdge(el: HTMLElement, block: 'start' | 'end', within: boolean): void {
+  if (!within) {
+    el.scrollIntoView({ block });
+    return;
+  }
+  let box = el.parentElement;
+  while (box) {
+    const { overflowY } = getComputedStyle(box);
+    if (/(auto|scroll)/.test(overflowY) && box.scrollHeight > box.clientHeight) break;
+    box = box.parentElement;
+  }
+  if (!box) return;
+  const style = getComputedStyle(el);
+  const r = el.getBoundingClientRect();
+  const b = box.getBoundingClientRect();
+  box.scrollTop +=
+    block === 'start'
+      ? r.top - b.top - (parseFloat(style.scrollMarginBlockStart) || 0)
+      : r.bottom - b.bottom + (parseFloat(style.scrollMarginBlockEnd) || 0);
+}

@@ -27,6 +27,7 @@
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import ThreadBlock from '$lib/components/ThreadBlock.svelte';
   import { markReadWhenSeen, readAtOpen } from '$lib/thread-reading.svelte';
+  import { scrollToEdge } from '$lib/conversation-thread';
   import { THREAD_REFRESH_MS, boloDays, boloPlace, facetName, messagesByThread, type BoardView } from '$lib/threads';
 
   interface Props {
@@ -100,7 +101,7 @@
   $effect(() => {
     if (placed || !thread || !footEl) return;
     placed = true;
-    void tick().then(() => footEl?.scrollIntoView({ block: 'end' }));
+    void tick().then(() => footEl && scrollToEdge(footEl, 'end', inPeek));
   });
 </script>
 
