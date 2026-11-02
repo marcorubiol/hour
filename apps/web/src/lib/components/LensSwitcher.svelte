@@ -166,6 +166,11 @@
      The bar keeps its own air above and under the row (--lensbar-pad), and
      the home indicator's inset is added under that, never folded into it. */
   @media (max-width: 47.999rem) {
+    /* An open conversation is a chat at full screen (punto 110): the bar
+       steps out, and the conversation's own head leads back to the list. */
+    :global(:root:has([data-chat-open])) .lensswitch-wrap {
+      display: none;
+    }
     .lensswitch-wrap {
       position: fixed;
       inset-inline: 0;

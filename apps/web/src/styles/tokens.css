@@ -343,6 +343,26 @@
     --tag-neutral-fg: var(--text-muted);
 
     /* ============================================================ */
+    /* THREAD — a conversation read as a chat (punto 110)             */
+    /* ============================================================ */
+    /* Built from the tones above, so the dark mode follows on its own.
+       Theirs on the raised card, ours on the sunk cream (a messaging
+       app's two sides, softly); the team's note in a pale amber with its
+       rule, never mistaken for something that went out. */
+    --thread-theirs-bg: var(--bg-ultra-light);
+    --thread-ours-bg: var(--bg-light);
+    --thread-team-bg: color-mix(in oklch, var(--tag-amber-bg) 55%, var(--bg));
+    --thread-team-rule: color-mix(in oklch, var(--tag-amber-fg) 35%, transparent);
+    --thread-team-fg: var(--tag-amber-fg);
+    --thread-mailout-rule: var(--border-color-dark);
+    /* A letter and a bubble never take the whole row: the side they sit on
+       is half of what they say. */
+    --thread-letter-max: 40rem;
+    --thread-bubble-max: 30rem;
+    /* How much of a long mail shows before it unfolds in place. */
+    --thread-fold-lines: 6;
+
+    /* ============================================================ */
     /* TYPOGRAPHY                                                     */
     /* ============================================================ */
 
@@ -822,9 +842,11 @@
   /* theme: `<html data-theme="presenter" data-mode="dark">`.        */
 
   /* On a phone the sections are a bar at the foot of every /h page
-     (LensSwitcher): the page, its toasts and its sticky bars give it room. */
+     (LensSwitcher): the page, its toasts and its sticky bars give it room.
+     An open conversation is a chat at full screen, without the bar
+     (punto 110): its page carries `data-chat-open` and the bar steps out. */
   @media (max-width: 47.999rem) {
-    :root:has(.lensswitch-wrap) {
+    :root:has(.lensswitch-wrap):not(:has([data-chat-open])) {
       --shell-foot: calc(var(--lensbar-pad) + var(--lensbar-height) + var(--line-hairline) + var(--lensbar-foot));
     }
   }

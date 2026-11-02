@@ -60,8 +60,8 @@ test.describe('organization record', () => {
 
       await page.goto(`/h/playwright/conversation/${found!.id}`);
       await waitForLoaded(page);
-      await expect(page.getByTestId('record-details')).toBeVisible();
-      const title = page.locator('h1 a.record-head__titlelink');
+      await expect(page.getByTestId('conversation-thread')).toBeVisible();
+      const title = page.locator('h1 a.chat__titlelink');
       await expect(title).toHaveText(ORG);
       await title.click();
 

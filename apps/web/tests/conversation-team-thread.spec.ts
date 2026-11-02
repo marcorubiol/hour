@@ -8,8 +8,8 @@ import { forgetConversationsRpc } from './forget';
  *
  * Lo que fija, con dos logins de verdad:
  *   - la fixture limitada, con Coordinació en el proyecto (lee Converses),
- *     escribe en el hilo del equipo desde la vista «registro» y lo ve;
- *   - el admin lo ve en la vista «hilo», mezclado con el registro, con su
+ *     escribe al equipo desde el campo único del pie (punto 110) y lo ve;
+ *   - el admin lo ve en el hilo, intercalado con lo de fuera, con su
  *     marca «Solo el equipo» y como nuevo;
  *   - privada del admin, la limitada no ve ni la conversación ni su hilo, y la
  *     lectura del hilo le responde 404.
@@ -100,47 +100,43 @@ test.describe('el hilo del equipo de una conversación (ADR-106)', () => {
     if (snapshot) await h.restoreProjectAccess(adminJwt, projectId, limitedId, snapshot);
   });
 
-  test('con Converses: escribe en el hilo del equipo y lo ve', async ({ browser }) => {
+  test('con Converses: escribe al equipo desde el campo del pie y lo ve en el hilo', async ({ browser }) => {
     test.setTimeout(90_000);
     const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
     const page = await context.newPage();
     await signIn(page, LIMITED_EMAIL!, LIMITED_PASSWORD!);
 
     await page.goto(`/h/playwright/conversation/${conversationId}`);
-    // En «registro», el hilo del equipo va al lado de lo hablado con fuera.
-    const team = page.locator('.conv__aside .inside article.thread');
-    await expect(team).toBeVisible({ timeout: 30_000 });
-    await expect(team.locator('.empty-line')).toBeVisible();
+    // Un solo campo al pie (punto 110): «Solo el equipo» es uno de sus destinos.
+    const composer = page.getByTestId('thread-composer');
+    await expect(composer).toBeVisible({ timeout: 30_000 });
+    await composer.getByTestId('composer-to-team').click();
+    await expect(composer.getByTestId('composer-to-team')).toHaveAttribute('aria-pressed', 'true');
     // La línea de audiencia, sin plegar: quien ve esta conversación.
-    await expect(team.locator('.thread__audience')).toContainText(/\d/);
+    await expect(composer.getByTestId('write-why')).toContainText(/\d/);
 
-    await team.locator('.thread__compose textarea').fill(BODY);
+    // Intro envía en el equipo, como en un grupo.
     const posted = page.waitForResponse((r) => r.url().endsWith('/api/messages') && r.request().method() === 'POST');
-    await team.getByRole('button', { name: /send|enviar|envoyer/i }).click();
+    await composer.locator('textarea').fill(BODY);
+    await composer.locator('textarea').press('Enter');
     const res = await posted;
     expect(res.status()).toBe(201);
     messageId = ((await res.json()) as { message: { id: string } }).message.id;
 
-    await expect(team.locator('.msg', { hasText: BODY })).toBeVisible({ timeout: 15_000 });
-    // In the file the count rides in its eyebrow: «Equipo · 1» (ADR-126 § 10).
-    await expect(team.getByRole('heading')).toHaveText(/·\s*1$/);
+    const flow = page.getByTestId('conversation-thread');
+    await expect(flow.locator('.msg--note', { hasText: BODY })).toBeVisible({ timeout: 15_000 });
     await context.close();
   });
 
-  test('el admin lo ve en la vista «hilo», mezclado, marcado y nuevo', async ({ page }) => {
+  test('el admin lo ve en el hilo, intercalado, marcado y nuevo', async ({ page }) => {
     test.setTimeout(60_000);
     test.skip(!messageId, 'needs the message of the previous test');
-    await page.goto(`/h/playwright/conversation/${conversationId}?vista=hilo`);
-    const flow = page.locator('ol.flow');
-    const msg = flow.locator('.msg', { hasText: BODY });
+    await page.goto(`/h/playwright/conversation/${conversationId}`);
+    const flow = page.getByTestId('conversation-thread');
+    const msg = flow.locator('.msg--note', { hasText: BODY });
     await expect(msg).toBeVisible({ timeout: 30_000 });
-    await expect(msg.locator('.tag-chip')).toHaveText(/solo el equipo|només l'equip|team only|équipe seulement/i);
-    await expect(flow.locator('.thread__new')).toBeVisible();
-    // Debajo de la línea, la cabecera, la audiencia y el compositor del hilo,
-    // sin repetir sus mensajes.
-    const block = page.locator('.conv__main article.thread');
-    await expect(block.locator('.thread__compose textarea')).toBeVisible();
-    await expect(block.locator('.msg')).toHaveCount(0);
+    await expect(msg.locator('.msg__mark')).toHaveText(/solo el equipo|només l'equip|team only|équipe seulement/i);
+    await expect(flow.locator('[data-entry="new"]')).toBeVisible();
   });
 
   test('privada del admin: la limitada no ve ni la conversación ni su hilo', async ({ browser }) => {
@@ -154,8 +150,8 @@ test.describe('el hilo del equipo de una conversación (ADR-106)', () => {
       await page.goto(`/h/playwright/conversation/${conversationId}`);
       // La ficha dice que no la encuentra: ni título ni hilo.
       await expect(page.locator('section.conv [data-testid="record-state"]')).toBeVisible({ timeout: 30_000 });
-      await expect(page.locator('.record-head')).toHaveCount(0);
-      await expect(page.locator('article.thread')).toHaveCount(0);
+      await expect(page.locator('.chat__head')).toHaveCount(0);
+      await expect(page.getByTestId('conversation-thread')).toHaveCount(0);
       await expect(page.getByText(BODY)).toHaveCount(0);
       const res = await page.request.get(`/api/conversations/${conversationId}/thread`);
       expect(res.status()).toBe(404);

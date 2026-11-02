@@ -34,6 +34,12 @@
    * conversación, mezclado con lo hablado con fuera. Con `newBefore`, la raya
    * de «nuevos» va delante. Sin realtime: tras corregir o borrar, `onchange`
    * pide al dueño que recargue.
+   *
+   * Tres formas (punto 110), un solo dueño de corregir y borrar:
+   *  - `row`: la fila del tablón, con su monograma;
+   *  - `note`: la nota del equipo intercalada en el hilo de una conversación,
+   *    sombreada y con su marca, para que no se confunda con lo de fuera;
+   *  - `bubble`: el mensaje de un grupo (el hilo de un bolo), en su lado.
    */
 
   import { createMutation } from '@tanstack/svelte-query';
@@ -42,6 +48,7 @@
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Menu from '$lib/components/Menu.svelte';
+  import { hourMark, timeInTz } from '$lib/datetime';
   import { MESSAGE_MAX, messageWhen, type ThreadMessage } from '$lib/threads';
 
   interface Props {
@@ -56,15 +63,30 @@
     mark?: string;
     /** La raya de «nuevos» va justo delante. */
     newBefore?: boolean;
+    look?: 'row' | 'note' | 'bubble';
+    /** Sólo la hora: el día ya lo dice el separador del hilo. */
+    timeOnly?: boolean;
     locale: Locale;
     onchange: () => void;
   }
 
-  let { message: m, author, mine, about, mark, newBefore = false, locale, onchange }: Props = $props();
+  let {
+    message: m,
+    author,
+    mine,
+    about,
+    mark,
+    newBefore = false,
+    look = 'row',
+    timeOnly = false,
+    locale,
+    onchange,
+  }: Props = $props();
 
   // Un mensaje es un momento: se dice en la zona de quien lo lee.
   const viewerTz = viewerTimeZone();
   let by = $derived(author || t('threads.someone', locale));
+  let when = $derived(timeOnly ? hourMark(timeInTz(m.created_at, viewerTz)) : messageWhen(m.created_at, locale, viewerTz));
 
   let editing = $state(false);
   let draft = $state('');
@@ -115,15 +137,16 @@
     <span>{t('threads.new_divider', locale)}</span>
   </li>
 {/if}
-<li class="msg">
-  <Avatar size="xs" name={by} />
+<li class="msg msg--{look}" class:msg--mine={mine}>
+  {#if look === 'row'}<Avatar size="xs" name={by} />{/if}
   <div class="msg__main">
     <p class="msg__head">
-      <span class="msg__by">{by}</span>
-      <time datetime={m.created_at}>{messageWhen(m.created_at, locale, viewerTz)}</time>
+      {#if look === 'note' && mark}<span class="msg__mark">{mark}</span>{/if}
+      {#if !(look === 'bubble' && mine)}<span class="msg__by">{by}</span>{/if}
+      <time datetime={m.created_at}>{when}</time>
       {#if m.edited_at}<span>{t('threads.edited', locale)}</span>{/if}
       {#if about}<span class="tag-chip" data-tone="blue">{about}</span>{/if}
-      {#if mark}<span class="tag-chip">{mark}</span>{/if}
+      {#if mark && look !== 'note'}<span class="tag-chip">{mark}</span>{/if}
     </p>
     {#if editing}
       <form
@@ -227,6 +250,46 @@
       font-size: var(--text-s);
       white-space: pre-line;
       overflow-wrap: anywhere;
+    }
+    /* La nota del equipo en el hilo de fuera: sombreada, con su raya y su
+       marca en versalita, como «Solo el equipo» del boceto A2. */
+    .msg--note {
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: var(--space-xs);
+      max-inline-size: var(--thread-letter-max);
+      padding: var(--space-xs) var(--space-s);
+      background: var(--thread-team-bg);
+      border-inline-start: var(--line) solid var(--thread-team-rule);
+      border-radius: var(--radius-s);
+    }
+    .msg__mark {
+      color: var(--thread-team-fg);
+      font-family: var(--font-mono);
+      letter-spacing: var(--mono-letter-spacing);
+      text-transform: uppercase;
+    }
+    /* Un grupo: cada mensaje en su lado, el texto en su globo. */
+    .msg--bubble {
+      grid-template-columns: minmax(0, auto) auto;
+      justify-content: start;
+      gap: var(--space-2xs);
+      max-inline-size: var(--thread-bubble-max);
+    }
+    .msg--bubble.msg--mine {
+      justify-content: end;
+      align-self: flex-end;
+    }
+    .msg--bubble .msg__text {
+      padding: var(--space-xs) var(--space-s);
+      background: var(--thread-theirs-bg);
+      border: var(--line-hairline) solid var(--border-color-light);
+      border-radius: var(--radius-l);
+    }
+    .msg--bubble.msg--mine .msg__text {
+      background: var(--thread-ours-bg);
+    }
+    .msg--bubble.msg--mine .msg__head {
+      justify-content: flex-end;
     }
     .msg__edit {
       display: flex;

@@ -199,7 +199,11 @@ test.describe('Conversaciones › Equipo: los hilos del equipo (ADR-116, ADR-134
     await expect(row).toBeVisible({ timeout: 30_000 });
     await row.locator('a').click();
     await page.waitForURL(new RegExp(`/h/playwright/conversation/${conversationId}#team$`));
-    await expect(page.locator('.conv__aside .inside .msg', { hasText: TEAM_BODY })).toBeVisible({ timeout: 30_000 });
+    // The thread opens with «Solo el equipo» in the field (punto 110), the note in the thread.
+    await expect(page.getByTestId('conversation-thread').locator('.msg--note', { hasText: TEAM_BODY })).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(page.getByTestId('composer-to-team')).toHaveAttribute('aria-pressed', 'true');
   });
 
   test('con Mínim: el General del bolo, ni Diners ni la conversación', async ({ browser }) => {
