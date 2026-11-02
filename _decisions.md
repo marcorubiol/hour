@@ -6646,3 +6646,8 @@ RPC nuevas se borran con `DROP FUNCTION` (`audience_confirmation_context`, `audi
 
 **Re-evaluar cuando** llegue SES (fase 4): la confirmación sale ya por el adaptador y el dominio del público, pero el
 E2E contra correo real pediría leer un buzón de prueba.
+
+**Nota (2026-11-02, límite de crons):** la purga diaria (`audience_purge_pending`) no tiene cron propio. Cloudflare
+rechazó el tercero (`17 3 * * *`, error 10072: Workers Free admite 5 crons por cuenta), así que va dentro de la pasada
+de `*/10 * * * *`, la de las 03:10 a 03:19 UTC. Es idempotente, una pasada doble no rompe nada. Si la cuenta pasa a
+Workers Paid, puede volver a ser un cron propio.

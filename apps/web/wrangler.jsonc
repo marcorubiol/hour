@@ -25,12 +25,12 @@
   },
 
   // Cron (ADR-099): una pasada de sincronización de buzones cada 10 minutos.
-  // Cada minuto, solo vaciar la cola del envío en bloque (ADR-115). Y una vez
-  // al día, borrar las altas del público sin confirmar de más de 30 días
-  // (ADR-175). El handler `scheduled` lo añade worker-entry.js (la entrada
+  // Cada minuto, solo vaciar la cola del envío en bloque (ADR-115). La purga
+  // diaria de altas del público sin confirmar (ADR-175) va dentro de la pasada
+  // de 10 minutos de las 03:10 UTC: Workers Free admite 5 crons por cuenta. El handler `scheduled` lo añade worker-entry.js (la entrada
   // del deploy, ver package.json); la salida del adaptador sola no lo tiene.
   "triggers": {
-    "crons": ["*/10 * * * *", "* * * * *", "17 3 * * *"]
+    "crons": ["*/10 * * * *", "* * * * *"]
   },
 
   // Observability: surface Worker logs in the Cloudflare dashboard.
