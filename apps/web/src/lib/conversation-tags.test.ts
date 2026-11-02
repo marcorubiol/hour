@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ALL,
+  AUDIENCE,
   SALES,
   TEAM,
   addTagKey,
@@ -232,5 +233,25 @@ describe('the settings of a space (ADR-138 fase 4)', () => {
       { id: 'c', sort: 10 },
       { id: 'a', sort: 20 },
     ]);
+  });
+});
+
+describe('Público (ADR-173 § 3)', () => {
+  const q = (s: string) => new URLSearchParams(s);
+  it('es un chip de la URL, también por ?view=audience y sin Converses', () => {
+    expect(lensChip(q('etiqueta=audience'), true)).toBe(AUDIENCE);
+    expect(lensChip(q('view=audience'), true)).toBe(AUDIENCE);
+    expect(lensChip(q('etiqueta=audience'), false)).toBe(AUDIENCE);
+    expect(panelOf(AUDIENCE)).toBe('audience');
+    expect(canBulkSend(AUDIENCE)).toBe(false);
+    expect(addTagKey(AUDIENCE)).toBe(SALES);
+  });
+  it('sale al final, solo para quien lleva el público', () => {
+    expect(lensChips(true, [], 'es').map((c) => c.chip)).toEqual([ALL, TEAM]);
+    expect(lensChips(true, [], 'es', true).map((c) => c.chip)).toEqual([ALL, TEAM, AUDIENCE]);
+    expect(lensChips(false, [], 'es', true).map((c) => c.chip)).toEqual([TEAM, AUDIENCE]);
+  });
+  it('ninguna etiqueta propia puede llamarse así', () => {
+    expect(RESERVED_TAG_KEYS).toContain(AUDIENCE);
   });
 });
