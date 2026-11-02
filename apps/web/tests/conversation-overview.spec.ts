@@ -4,17 +4,17 @@ import { loadEnvFile } from 'node:process';
 import { forgetConversationsRpc } from './forget';
 
 /**
- * ADR-117: «con quién hablas» abre con su dashboard.
+ * ADR-117, con la forma de mensajería de ADR-176: el panel se plegó en los
+ * chips de la lista (Te toca, Se enfría) y la temporada pasó a Envíos.
  *
  * Lo que fija:
- *   - una sala que nos acaba de escribir sale en «Esperan respuesta», y su filtro la
- *     encuentra en la lista con la columna Respuesta;
- *   - una sala contactada a la que escribimos hace 40 días sin respuesta se
- *     enfría en la segunda ronda, y «Escribir a estas» abre el modo selección
- *     con ella ya marcada (ADR-126 § 8: las paradas no van en bloque);
- *   - el chip del filtro lo quita, y un tramo de la temporada filtra por relación (ADR-138);
- *   - en el móvil, una sola columna en el orden del documento: lo que pide
- *     acción (esperan respuesta, se mueve) antes que la temporada (ADR-126 § 11).
+ *   - una sala que nos acaba de escribir sale en «Te toca», cuya cifra es la
+ *     de las filas que filtra, con el turno en tinta;
+ *   - una sala contactada a la que escribimos hace 40 días sin respuesta sale
+ *     en «Se enfría» y en la segunda ronda (un filtro de «Filtrar ▾»), y se
+ *     puede marcar desde «Seleccionar»;
+ *   - el chip del filtro lo quita, y un tramo de la temporada (en Envíos) filtra por relación (ADR-138);
+ *   - en el móvil, Envíos: la temporada encima de la lista de envíos.
  *
  * En el espacio `playwright`, en `zzz-e2e-collab`, con dos conversaciones del
  * propio spec (nunca `muk-cia`). Autolimpiante: las borra al acabar (sus
@@ -37,7 +37,7 @@ const SUBJECT = `Re: fechas ${RUN}`;
 type Helpers = typeof import('./rls/_helpers');
 const one = <T>(d: T | T[] | null): T => (Array.isArray(d) ? d[0] : d)!;
 
-test.describe('el dashboard de Conversations (ADR-117)', () => {
+test.describe('Te toca y Se enfría en Conversaciones (ADR-117, ADR-176)', () => {
   test.skip(!EMAIL || !PASSWORD || !process.env.PUBLIC_SUPABASE_URL, 'Set PW_TEST_* and PUBLIC_SUPABASE_*.');
   test.describe.configure({ mode: 'serial' });
 
@@ -88,41 +88,66 @@ test.describe('el dashboard de Conversations (ADR-117)', () => {
     await forgetConversationsRpc(h, jwt, ids);
   });
 
-  test('esperan respuesta: el bloque cuenta y su filtro la encuentra con su columna Respuesta', async ({ page }) => {
+  test('te toca: el chip cuenta, filtra la lista y su cifra es la de las filas', async ({ page }) => {
     test.setTimeout(60_000);
     await page.goto('/h/conversations?etiqueta=sales');
-    const due = page.getByTestId('block-due');
-    await expect(due).toBeVisible({ timeout: 30_000 });
-    // The count rides in the block's title: «Esperan respuesta · N».
-    await expect(due.getByRole('heading')).not.toHaveText(/·\s*0$/);
+    // Te toca es un chip de la lista desde ADR-176 (el bloque «Esperan respuesta» del panel se fue con él).
+    const due = page.locator('.conversations__chip[data-chip="tetoca"]');
+    await expect(due.locator('.conversations__chip-n')).toBeVisible({ timeout: 30_000 });
+    const n = Number(await due.locator('.conversations__chip-n').textContent());
+    expect(n).toBeGreaterThan(0);
 
-    await due.getByRole('link', { name: /lista|list|llista|liste/i }).click();
+    await due.click();
     await expect(page).toHaveURL(/turno=nuestro/);
-    await page.getByRole('searchbox').fill(WARM);
+    await expect(due).toHaveAttribute('aria-current', 'page');
+    // La etiqueta sigue de filtro: el chip no la quita.
+    await expect(page).toHaveURL(/etiqueta=sales/);
+    const rows = page.locator('[data-testid="conversation-list"] [data-testid="conversation-row"]');
+    // La cifra es la de la lista filtrada (una página de 50 como mucho).
+    await expect(rows).toHaveCount(Math.min(n, 50), { timeout: 30_000 });
+
+    await page.locator('.conversations__search').getByRole('searchbox').fill(WARM);
     const row = page.locator('[data-testid="conversation-row"]', { hasText: WARM });
     await expect(row).toHaveCount(1, { timeout: 30_000 });
-    await expect(row.locator('.crow[data-tone="ours"], .crow[data-tone="late"]')).toBeVisible();
+    // El turno en la línea de contexto, en tinta: nos toca.
+    await expect(row.locator('.chat__ctx .is-ink')).toHaveText('We owe a reply');
     await expect(page.locator('[data-testid="conversation-row"]', { hasText: COLD })).toHaveCount(0);
   });
 
-  test('sin noticias: «Escribir a estas» deja la selección hecha; el chip quita el filtro', async ({ page }) => {
+  test('se enfría: el chip la encuentra; la segunda ronda es un filtro con su chip que se quita', async ({ page }) => {
     test.setTimeout(60_000);
     await page.goto('/h/conversations?etiqueta=sales');
-    const cold = page.getByTestId('block-cold');
-    await expect(cold).toBeVisible({ timeout: 30_000 });
-    // One «write to these» per project when the cooling spans several: ours is zzz-e2e-collab.
-    const write = cold.locator('.block__acts button');
-    await ((await write.count()) > 1 ? write.filter({ hasText: /Collab/i }) : write).click();
-
-    await expect(page).toHaveURL(/temp=ronda/);
-    await expect(page.locator('.action-bar')).toBeVisible();
-    await page.getByRole('searchbox').fill(COLD);
+    // «Escribir a estas» se fue con el panel (ADR-176): Se enfría es un chip, y la selección se abre desde la cabecera.
+    const cold = page.locator('.conversations__chip[data-chip="enfria"]');
+    await expect(cold.locator('.conversations__chip-n')).toBeVisible({ timeout: 30_000 });
+    await cold.click();
+    await expect(page).toHaveURL(/temp=fria/);
+    await expect(cold).toHaveAttribute('aria-current', 'page');
+    await page.locator('.conversations__search').getByRole('searchbox').fill(COLD);
     const row = page.locator('[data-testid="conversation-row"]', { hasText: COLD });
     await expect(row).toHaveCount(1, { timeout: 30_000 });
-    await expect(row.getByRole('checkbox')).toBeChecked();
-    await expect(row.locator('.crow[data-tone="theirs"]')).toBeVisible();
+    // Les toca a ellos: el turno sin tinta.
+    await expect(row.locator('.chat__ctx')).toContainText('Awaiting reply');
+    await expect(row.locator('.chat__ctx .is-ink')).toHaveCount(0);
 
-    await page.locator('.chip--selected button, [class*="chip--"] button').first().click();
+    // La segunda ronda (la de antes de «Escribir a estas»), desde «Filtrar ▾».
+    await page.locator('.conversations__filter-open').click();
+    const sheet = page.getByRole('dialog', { name: 'Filter' });
+    await sheet.getByLabel('Temperature').selectOption('ronda');
+    await expect(page).toHaveURL(/temp=ronda/);
+    await sheet.getByRole('button', { name: 'Done' }).click();
+    await expect(row).toHaveCount(1, { timeout: 30_000 });
+
+    // Seleccionar, en la cabecera, deja marcar la fila.
+    await page.getByRole('button', { name: /^Select$/ }).click();
+    await expect(page.locator('.action-bar')).toBeVisible();
+    await row.locator('.chat__pick input').check({ force: true });
+    await expect(row.locator('.chat__pick input')).toBeChecked();
+    await page.getByRole('button', { name: 'Stop selecting' }).first().click();
+
+    const active = page.locator('.conversations__active');
+    await expect(active).toContainText('No reply to the mailout');
+    await active.getByRole('button', { name: 'Clear the filter' }).click();
     await expect(page).not.toHaveURL(/temp=/);
   });
 

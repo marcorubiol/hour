@@ -1,6 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
 import { waitForLoaded } from './loaded';
-import { openInFull } from './peek';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
@@ -8,13 +7,16 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
 /**
  * E2E · etiquetas de conversación, fase 2 (ADR-138 § 1 y 2).
  *
- * 1. La fila de chips: Todas · Venues · Press · … · Team; Press activo por la
- *    URL, con «Select» (las acciones en bloque son de todas, plan de la lista
- *    § 6.2) y sin «Write to N» (el envío es de Difusión) ni temporada.
- * 2. «Añadir» bajo Press nace con Press: sale en Press, no en Venues, y en
- *    Todas (una sola lista desde la fase 3) con su etiqueta en la fila.
- * 3. La ficha enseña sus etiquetas y quien edita las cambia: con Venues
- *    también, sale en Venues, que sí ofrece «Select».
+ * 1. Desde ADR-176 la etiqueta es un filtro, no un chip: la fila de chips es
+ *    All · Your turn · Cooling · Team, y Press (por la URL) es el valor del
+ *    select Tag de «Filter ▾» y un chip que se quita. Con «Select» (las
+ *    acciones en bloque son de todas, plan de la lista § 6.2) y sin «Write to
+ *    N» (el envío es de Difusión) ni temporada.
+ * 2. «Añadir» con Press nace con Press: sale con Press, no con Venues, y en
+ *    All (una sola lista desde la fase 3) con su etiqueta en la línea de contexto.
+ * 3. La ficha enseña sus etiquetas y quien edita las cambia (en el panel de al
+ *    lado, a la anchura de escritorio): con Venues también, sale con Venues,
+ *    que sí ofrece «Select».
  * 4. (Fuera: `?view=team` → `?etiqueta=team`, ADR-165 § 4 quitó la redirección.)
  *
  * Fixture: `playwright`, proyecto `ZZZ e2e collab`, organización propia
@@ -36,7 +38,17 @@ async function sweep(page: Page) {
 }
 
 async function search(page: Page) {
-  await page.getByPlaceholder('People or organizations…').fill(ORG);
+  await page.getByPlaceholder('Search conversations and team…').fill(ORG);
+}
+
+/** The Tag of «Filter ▾»: the tag is a filter of the list (ADR-176). */
+async function filterTag(page: Page, key: string) {
+  await page.locator('.conversations__filter-open').click();
+  const sheet = page.getByRole('dialog', { name: 'Filter' });
+  await sheet.getByLabel('Tag').selectOption(key);
+  await expect(page).toHaveURL(new RegExp(`etiqueta=${key}`));
+  await sheet.getByRole('button', { name: 'Done' }).click();
+  await expect(sheet).not.toBeVisible();
 }
 
 test.describe('conversation tags', () => {
@@ -52,12 +64,20 @@ test.describe('conversation tags', () => {
     // A red here must not leave its org-only row on top of the list: other
     // specs read the first row of Conversations and expect a contact.
     try {
-      // 1. The chips, Press active; selection, but no bulk send and no season outside Difusión.
+      // 1. The chips, Todo active; Press is the Tag filter. Selection, but no bulk send and no season outside Difusión.
       const chips = page.locator('.conversations__chips [data-chip]');
-      await expect(chips.first()).toHaveAttribute('data-chip', 'all');
-      await expect(chips.last()).toHaveAttribute('data-chip', 'audience');
-      await expect(page.locator('.conversations__chips [data-chip="sales"]')).toHaveText('Venues');
-      await expect(page.locator('.conversations__chips [data-chip="press"]')).toHaveAttribute('aria-current', 'page');
+      await expect(chips.first()).toHaveAttribute('data-chip', 'todo');
+      await expect(chips.last()).toHaveAttribute('data-chip', 'equipo');
+      await expect(page.locator('.conversations__chips [data-chip="todo"]')).toHaveAttribute('aria-current', 'page');
+      await expect(page.locator('.conversations__chips [data-chip="press"]')).toHaveCount(0);
+      await expect(page.locator('.conversations__active')).toContainText('Press');
+      await expect(page.locator('.conversations__filter-open')).toHaveAttribute('aria-label', 'Filter, 1 on');
+      await page.locator('.conversations__filter-open').click();
+      const sheet = page.getByRole('dialog', { name: 'Filter' });
+      await expect(sheet.getByLabel('Tag')).toHaveValue('press');
+      // In English the sales tag is «Venues» (ADR-137).
+      await expect(sheet.getByLabel('Tag').locator('option[value="sales"]')).toHaveText('Venues');
+      await sheet.getByRole('button', { name: 'Done' }).click();
       await expect(page.getByRole('button', { name: /^Select$/ })).toBeVisible();
       await page.getByRole('button', { name: /^Select$/ }).click();
       await expect(page.getByRole('toolbar', { name: 'Actions on the selection' })).toBeVisible();
@@ -84,32 +104,31 @@ test.describe('conversation tags', () => {
       const row = page.locator('main [data-testid="conversation-row"]', { hasText: ORG });
       await expect(row).toHaveCount(1, { timeout: 15_000 });
       await expect(page.getByText('The conversations could not be read.')).toHaveCount(0);
-      // Under its own chip the row does not repeat the tag.
-      await expect(row.locator('.tag-chip')).toHaveCount(0);
+      // Filtered by its own tag the row does not repeat it in its context line.
+      await expect(row.locator('.chat__ctx')).not.toContainText('Press');
 
-      await page.locator('.conversations__chips [data-chip="sales"]').click();
-      await waitForLoaded(page);
+      await filterTag(page, 'sales');
       await search(page);
       await expect(page.locator('main [data-testid="conversation-row"]', { hasText: ORG })).toHaveCount(0, { timeout: 15_000 });
 
-      await page.locator('.conversations__chips [data-chip="all"]').click();
-      await waitForLoaded(page);
+      // Taking the tag off (its chip under the search) is the plain list.
+      await page.locator('.conversations__active').getByRole('button', { name: 'Remove «Venues»' }).click();
+      await expect(page).not.toHaveURL(/etiqueta=/);
       await search(page);
       // Todas is one list since phase 3 (conversations and threads, one order),
       // and its search reads both sources.
       const all = page.getByTestId('conversation-feed').getByTestId('feed-row').filter({ hasText: ORG });
       await expect(all).toHaveCount(1, { timeout: 15_000 });
       await expect(all).toHaveAttribute('data-kind', 'conversation');
-      // Its tags ride after the title, in the same row as the list's (ConversationRow).
-      await expect(all.locator('.conv-tags')).toHaveText('Press');
-      await expect(page.getByTestId('all-threads')).toHaveCount(0);
+      // Its tag rides in the context line (ChatRow), as in the filtered list's rows.
+      await expect(all.locator('.chat__ctx')).toContainText('Press');
 
-      // 3. The file shows its tags; whoever edits changes them.
-      await all.getByRole('link').click();
-      // The vistazo first (ADR-139 p1), then the page.
-      await openInFull(page);
-      await expect(page).toHaveURL(/\/conversation\//);
-      const tags = page.getByTestId('conversation-tags');
+      // 3. The file shows its tags; whoever edits changes them. At desktop width
+      //    the row opens it in the pane beside the list (ADR-176), not the vistazo.
+      await all.locator('a.chat__title').click();
+      await expect(page).toHaveURL(/abierta=playwright%2F|abierta=playwright\//);
+      await expect(page.getByTestId('peek')).toHaveCount(0);
+      const tags = page.getByTestId('conversation-pane').getByTestId('conversation-tags');
       await expect(tags.locator('.tag-chip')).toHaveText(['Press'], { timeout: 15_000 });
       await tags.getByRole('button', { name: 'Change' }).click();
       await tags.getByLabel('Venues').check({ force: true });
