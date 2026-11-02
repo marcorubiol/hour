@@ -559,6 +559,12 @@
       <h3 class="eyebrow eyebrow--sub">{t('audience.person_invitations', locale)}</h3>
       {#if $history.isLoading}
         <p class="al__hint">{t('audience.loading', locale)}</p>
+      {:else if $history.isError}
+        <!-- Una lectura que falla no es «Aún ninguna» (ADR-130 § 3). -->
+        <p class="load-fail" role="alert" data-testid="audience-person-invitations-error">
+          <span>{t('audience.person_invitations_error', locale)}</span>
+          <Button variant="secondary" size="xs" onclick={() => $history.refetch()}>{t('ui.retry', locale)}</Button>
+        </p>
       {:else if ($history.data?.invitations ?? []).length === 0}
         <p class="al__hint">{t('audience.person_no_invitations', locale)}</p>
       {:else}

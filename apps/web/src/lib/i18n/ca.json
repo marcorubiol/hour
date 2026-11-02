@@ -3015,6 +3015,7 @@
   "audience.basis_relationship": "ha estat client",
   "audience.person_invitations": "Invitacions que ha rebut",
   "audience.person_no_invitations": "Encara cap.",
+  "audience.person_invitations_error": "No s'han pogut llegir les seves invitacions.",
   "audience.unsubscribe_person": "Donar de baixa",
   "audience.erase_person": "Esborrar les seves dades",
   "audience.consent_proof": "Prova del consentiment",

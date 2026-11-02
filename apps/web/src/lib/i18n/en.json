@@ -3015,6 +3015,7 @@
   "audience.basis_relationship": "past customer",
   "audience.person_invitations": "Invitations received",
   "audience.person_no_invitations": "None yet.",
+  "audience.person_invitations_error": "Could not load their invitations.",
   "audience.unsubscribe_person": "Unsubscribe",
   "audience.erase_person": "Erase their data",
   "audience.consent_proof": "Consent record",

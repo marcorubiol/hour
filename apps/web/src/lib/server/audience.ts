@@ -6,7 +6,7 @@
 
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { jwtSubject } from '$lib/server/http';
-import type { AudienceAccess } from '$lib/audience';
+import type { AudienceAccess, SubscriptionInvitation } from '$lib/audience';
 
 type MembershipRow = {
   workspace_id: string;
@@ -62,6 +62,46 @@ export async function audienceSimulated(
   ]);
   if (ws.data[0]?.mailout_simulator_only) return true;
   return (domains.data[0]?.provider ?? fallback) === 'simulator';
+}
+
+/**
+ * Las invitaciones que recibió una persona apuntada, con el asunto del envío.
+ * `mailout` se embebe por el NOMBRE de su FK: es compuesta (`mailout_id,
+ * workspace_id`) y PostgREST solo resuelve la pista por columna
+ * (`mailout:mailout_id(...)`) en una FK de una sola columna; con ella
+ * respondía 400 (PGRST200) a cualquier id (tarea 112).
+ */
+export const SUBSCRIPTION_INVITATIONS_SELECT =
+  'id,mailout_id,status,sent_at,mailout:mailout!mailout_recipient_mailout_fkey(subject)';
+
+type SubscriptionRecipientRow = {
+  id: string;
+  mailout_id: string;
+  status: string;
+  sent_at: string | null;
+  mailout: { subject: string | null } | null;
+};
+
+export async function subscriptionInvitations(
+  env: SupabaseEnv,
+  jwt: string,
+  subscriptionId: string,
+): Promise<SubscriptionInvitation[]> {
+  const rows = await pgGet<SubscriptionRecipientRow>(env, 'mailout_recipient', jwt, {
+    search: {
+      select: SUBSCRIPTION_INVITATIONS_SELECT,
+      audience_subscription_id: `eq.${subscriptionId}`,
+      order: 'created_at.desc',
+      limit: '50',
+    },
+  });
+  return rows.data.map((r) => ({
+    recipient_id: r.id,
+    mailout_id: r.mailout_id,
+    subject: r.mailout?.subject ?? null,
+    status: r.status,
+    sent_at: r.sent_at,
+  }));
 }
 
 /** Admin del espacio (la prueba con IP y borrar datos). */
