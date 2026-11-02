@@ -6574,3 +6574,15 @@ diseño; el resto de ADR-173 sigue.
 
 **Cómo se revierte.** Quitar `sector` de lo que se ofrece y de lo que acepta la puerta (`queue_mailout`,
 `mailout_claim`); el valor del enum puede quedarse. El diseño se vuelve a limitar en el editor sin tocar datos.
+
+> **Nota a ADR-173 (2026-11-02):** la fase 1 (en producción, `72f34a1d`) se aparta del plan en esto, revisado y aceptado por HOUR COOR:
+> 1. `mailout_recipient.mail_domain_id` admite NULL con un CHECK «en cola o saliendo, con dominio» (los borradores tienen destinatarios antes de dominio y los 1012 destinatarios previos no tienen dominio).
+> 2. Sin `CHECK (kind = 'invitation' OR mail_domain_id IS NOT NULL)`: un borrador de difusión ya podía no tener dominio.
+> 3. `CHECK (audience_mail_domain_id IS NULL OR audience_id IS NOT NULL)` en vez de la igualdad; `queue_mailout` exige los dos.
+> 4. RPC de máquina `audience_confirmation_token`: el alta a mano no devuelve el token a quien apunta.
+> 5. Una dirección de baja que vuelve a apuntarse sigue de baja hasta confirmar; una petición sin correo (24 h o 3 en total) no deja evento.
+> 6. Una queja del público, además de la exclusión del espacio, pasa la suscripción a `unsubscribed` (`complained`).
+> 7. El calentamiento (§ 5.3) es de la fase 4, no de `mailout_claim`.
+> 8. La baja por token apunta el canal `page`.
+> 9. Deduplicación: el profesional gana sólo si sale; si queda saltado, la suscripción confirmada va como público. La unicidad `(mailout_id, address)` pasa a índice único parcial `WHERE status <> 'skipped'`.
+> 10. «Volver a apuntarme» del público va por la RPC de máquina `audience_resubscribe` con IP, agente y texto vigente; sólo levanta exclusiones nacidas de esa suscripción.
