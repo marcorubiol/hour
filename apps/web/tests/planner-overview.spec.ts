@@ -52,17 +52,41 @@ test.describe('the season (ADR-117)', () => {
     await expect(page.locator('.ov .d--today')).toHaveCount(1);
   });
 
-  test('THE STRIP IS ALWAYS THERE, AND THE SEASON DOES NOT COUNT ITSELF TWICE', async ({ page }) => {
+  test('THE STRIP IS ALWAYS THERE, AND THE SEASON COUNTS ITSELF ONCE', async ({ page }) => {
     await open(page);
     // A block with nothing in it is not drawn (ADR-145 § 1); the strip is the
     // one that stays, empty or not.
     await expect(page.locator('.ov__strip .block-head h2')).toHaveCount(1);
-    // Its census line is gone (ADR-145, fase 2): every figure it printed is a
-    // block below. Out of calm, with nobody guessed, the facts block is not
-    // drawn: it stays in the DOM and an empty block is hidden (ADR-167 § 2).
-    await expect(page.locator('.cal__facts')).toBeHidden();
+    // The window line is drawn in every view (nota a ADR-167, 2026-11-02):
+    // here it counts the season, with the figures no block below prints.
+    const meta = page.locator('.cal__meta--window');
+    await expect(meta).toBeVisible();
+    await expect(meta).toContainText(/confirmed/i);
+    await expect(meta).toContainText(/nights? free/i);
+    await expect(meta).not.toContainText(/to decide|clash/i);
     // Nothing is still waiting once the lens says it has loaded.
     expect(await page.locator('.ov').innerText()).not.toMatch(/·\s*–/);
+    expect(await meta.innerText()).not.toMatch(/–/);
+  });
+
+  test('THE WINDOW LINE IS IN THE SAME PLACE IN THE FOUR VIEWS', async ({ page }) => {
+    // Marco, 2026-11-02: «al cambiar de vista todo salta». The line is drawn
+    // in Season, Agenda, Month and Board, one line high, saying what each
+    // window is; the Agenda names its horizon and counts nothing (ADR-095).
+    const heights: number[] = [];
+    for (const v of ['', '&view=agenda', '&view=month', '&view=board']) {
+      await open(page, v);
+      const meta = page.locator('.cal__meta--window');
+      await expect(meta, `window line in ${v || 'season'}`).toBeVisible();
+      expect((await meta.innerText()).trim(), `window line in ${v || 'season'}`).not.toBe('');
+      if (v === '&view=agenda') {
+        await expect(meta).toContainText(/from today|open at/i);
+        await expect(meta).not.toContainText(/confirmed|nights? free/i);
+      }
+      heights.push(Math.round((await meta.boundingBox())?.height ?? -1));
+    }
+    // One line each at 1440: no view wraps or drops it.
+    expect(new Set(heights).size, `heights ${heights.join(', ')}`).toBe(1);
   });
 
   test('A DAY OF THE STRIP OPENS THAT DAY', async ({ page }) => {

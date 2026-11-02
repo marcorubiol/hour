@@ -568,6 +568,8 @@
   "planner.cast_you": "vous",
   "planner.no_cast@music": "sans musiciens",
   "planner.agenda_from": "à partir du {day}",
+  "planner.agenda_from_today": "à partir d’aujourd’hui",
+  "planner.agenda_open_at": "ouvert au {day}, pas aujourd’hui",
   "planner.new_date": "Nouvelle date",
   "planner.now": "Aujourd’hui",
   "planner.date_word": "date",

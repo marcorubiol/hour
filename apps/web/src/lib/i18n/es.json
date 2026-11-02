@@ -601,6 +601,8 @@
   "planner.cast_you": "tú",
   "planner.no_cast@music": "sin formación",
   "planner.agenda_from": "desde {day}",
+  "planner.agenda_from_today": "desde hoy",
+  "planner.agenda_open_at": "abierta el {day}, no hoy",
   "planner.new_date": "Nueva fecha",
   "planner.now": "Hoy",
   "planner.date_word": "fecha",
