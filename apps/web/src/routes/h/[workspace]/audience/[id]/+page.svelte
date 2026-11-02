@@ -499,7 +499,7 @@
               <li data-status={im.status}>
                 <span>{dayMonthYear(im.declared_at)} · {im.filename ?? '—'}</span>
                 <span>{t('audience.import_done', locale, { n: im.imported_count })}</span>
-                <span class="al__status" data-status={im.status}>{t(`audience.import_${im.status}`, locale)}</span>
+                <span class="al__status" data-status={im.status}>{t(`audience.import_status_${im.status}`, locale)}</span>
               </li>
             {/each}
           </ul>
@@ -551,7 +551,7 @@
           {#each $history.data?.invitations ?? [] as inv (inv.recipient_id)}
             <li>
               <a href={`/h/${workspaceSlug}/mailout/${inv.mailout_id}`}>{inv.subject || t('mailout.untitled', locale)}</a>
-              <span class="al__status" data-state={inv.status}>{t(`mailout.r_${inv.status === 'pending' ? 'queued' : inv.status}`, locale)}</span>
+              <span class="al__status" data-state={inv.status}>{t(`mailout.r_${['pending', 'sending'].includes(inv.status) ? 'queued' : inv.status === 'skipped' ? 'unavailable' : inv.status}`, locale)}</span>
               {#if inv.sent_at}<span>{dayMonthYear(inv.sent_at)}</span>{/if}
             </li>
           {/each}
