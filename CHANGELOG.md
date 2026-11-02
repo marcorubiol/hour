@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Noviembre 2026 (en curso)
 
+- La sección de Ajustes del espacio se llama «Este espacio» (ES), con un subtítulo que nombra lo que guarda (nombre, datos fiscales, textos y logo de los correos); los datos fiscales del emisor van como bloque con su cabecera, y los textos guardados ya no repiten el rótulo cuando están vacíos. (2026-11-02, `26102cba`)
 - Los correos de difusión llevan plantilla del espacio: el logo, que sube un admin en Ajustes › Este espacio, y, si quieres, una imagen del espectáculo al redactar, enlazada al dosier o a otro material de la línea. El texto sigue mandando: con las imágenes bloqueadas el correo se lee entero, y la vista previa enseña «Con plantilla» y «Solo texto» (ADR-172). (2026-11-01, `55b97891`)
 - La hoja de ruta pública enseña los materiales de salida de la función (los de su línea si no tiene propios), cada uno con su enlace. El enlace del calendario puede ser «Solo lo mío»: las funciones donde estás en el reparto o dijiste «voy»; para crearlo hay que compartir antes tu nombre con el espacio. Y el calendario suscrito lleva los tramos de cada viaje. (2026-11-01, `55b97891`)
 - Fusionar dos organizaciones: «Fusionar con…» en la ficha (solo el admin), con vista previa de lo que se mueve, «Se queda» para elegir cuál, aviso con «Deshacer» durante 30 días, y Ajustes › Equipo lista las fusiones recientes. Si las dos tienen conversación en el mismo proyecto, lo dice y no deja fusionar (ADR-171). (2026-11-01, `8018b229`)
