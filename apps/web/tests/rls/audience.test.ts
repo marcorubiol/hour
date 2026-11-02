@@ -444,6 +444,17 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: el público y sus invit
         audience_import: 1,
         mailout: 1,
       });
+      // Los recuentos de GET /api/audience: por lista y estado, con `select=id`.
+      // Embebido (`audience_subscription(count)`) PostgREST cuenta con `*` y la
+      // tabla solo da SELECT por columnas: 403 (el 502 de fee0407b).
+      for (const jwt of [adminJwt, limitedJwt]) {
+        const q = { select: 'id', audience_id: `eq.${listId}`, status: 'eq.pending' };
+        const counted = await pgGet('audience_subscription', jwt, new URLSearchParams(q));
+        expect(counted.status).toBe(200);
+        expect(counted.rows.length).toBe(1);
+        const embedded = { select: 'id,n:audience_subscription(count)', id: `eq.${listId}` };
+        expect((await pgGet('audience', jwt, new URLSearchParams(embedded))).status).toBe(403);
+      }
       expect((await pgRpc('mailout_preview', limitedJwt, { p_id: inv.row!.id })).status).toBe(200);
       expect((await newList('Limitada', limitedJwt)).status).toBe(403);
       expect((await setText(listId, 'limitada', limitedJwt)).status).toBe(403);
