@@ -14,7 +14,14 @@ no pide migración primero; las migraciones juntas por el gate de § 34.
 - [ ] 78 temporada en una sola función, septiembre por defecto, configurable por espacio.
 - [ ] 95 contract: borrar `performance.readiness`, `line.modules`, `line.dossier_url`, `project.dossier_url`,
   `project.poster_url` (destructiva: staging e inspect).
-- [ ] 98 invitar, al público y a profesionales: decidido (ADR-173, ADR-174, `build/plans/2026-11-01-audience.md`); fase 1 (esquema y RPC) en producción desde 2026-11-02 (`72f34a1d`). Siguiente: fases 2 (alta pública) y 3 (listas, importación, invitaciones), en paralelo; antes de la 2, la frontera de service_role de `audience_*` en `build/architecture.md` y `SERVICE_RPCS`. Lo que la fase 1 cambió del plan: nota a ADR-173.
+- [ ] 98 invitar, al público y a profesionales: decidido (ADR-173, ADR-174, ADR-175, `build/plans/2026-11-01-audience.md`); fases 1 a 3 (esquema, alta pública, listas, importación, invitaciones) en producción desde 2026-11-02 (`49ffb30c`). Quedan la fase 4 (envío real por SES) y la 5 (el editor, que es el 99).
+- [ ] 101 público: alta a mano de una persona en una lista (`add_audience_subscription`, ya en la base, sin pantalla).
+- [ ] 102 público: `{obra}`, `{fecha}` y `{hora}` en la invitación (migración pequeña).
+- [ ] 103 público: «añadir a un borrador existente» desde la lista y «también está apuntada a {lista}».
+- [ ] 104 Marco: decidir el idioma de una invitación: el de cada suscripción o el del envío (aparcado por la fase 3).
+- [ ] 105 público: la declaración de clientes de `import_audience` más firme («puedo demostrarlo»; migración).
+- [ ] 106 público: tope de unas 16 listas en la vista Público (3 subpeticiones por lista; Workers Free da 50 por petición). Se cae con Workers Paid o con un recuento en una RPC.
+- [ ] 107 Marco: decidir la limpieza de restos de las suites en `playwright`: 3 conversaciones «RLS Sala» vivas (22-10, 31-10), 1 exclusión manual (15-10) y 563 organizaciones «RLS Sala %» (`delete_conversation` no borra la organización).
 - [ ] 99 editor de correos bonitos, tipo Mailchimp, para las invitaciones al público y a profesionales (Marco, 2026-11-01: va después del público, opción A; 2026-11-02: sirve a los dos orígenes, ADR-174). Candidato Templatical; plan B GrapesJS + grapesjs-mjml (`research/2026-11-email-builder.md`). Hoy sólo existe la plantilla fija por espacio (ADR-172).
 - [ ] 100 bug: `mailout_record_event` (función viva del envío) falla con 23514 si llega una queja o un rebote de un destinatario `skipped` (hallado por el carril del público, 2026-11-02). Sin arreglar.
 - Aparcado: 86 (responsable de tarea) hasta que entre Anouk.
@@ -146,7 +153,7 @@ no pide migración primero; las migraciones juntas por el gate de § 34.
 
 - [ ] Marco: hacer — **Recorrer la app él mismo antes de invitar a Anouk** (Marco, 10-10); después, pasar su email para invitarla a `muk-cia`.
 - [ ] Marco: decidir (23-11) — **Planner: ¿vista de entrada por persona?** ADR-155 ya ordenó la barra (Temporada | Agenda · Mes · Tablero, Día como lupa). Queda la opción D: si alguien entra siempre en la Temporada y salta en seguida a otro dibujo, que cada uno abra en el suyo (una preferencia junto a `membership.view_scope`). Sin medición instrumentada: se decide por el uso de Marco y Anouk.
-9. [ ] **Pasar `hour-phase0` a Supabase Pro (25 $/mes) antes de la beta; después el coordinador activa HIBP y corre el advisor.** Marco, 2026-10-10: Pro antes de la beta, pero **aún no**; sigue en Free con el keepalive diario. El proyecto está en plan
+9. [ ] **Pasar `hour-phase0` a Supabase Pro (25 $/mes) antes de la beta; después el coordinador activa HIBP y corre el advisor.** Marco, 2026-11-02: tampoco Workers Paid por ahora (5 crons por cuenta en Free; la purga del público va dentro del cron de 10 min); se mira junto a este punto. Marco, 2026-10-10: Pro antes de la beta, pero **aún no**; sigue en Free con el keepalive diario. El proyecto está en plan
    Free y la función requiere Pro. Marco debe decidir el upgrade; después activar
    `password_hibp_enabled` y volver a ejecutar el advisor. **Ojo: el upgrade que
    pide esta tarea resuelve también la § 33**, así que las dos son la misma
