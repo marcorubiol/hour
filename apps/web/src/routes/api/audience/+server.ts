@@ -18,6 +18,7 @@ import { audienceAccess } from '$lib/server/audience';
 import {
   AUDIENCE_SELECT,
   AudienceCreateSchema,
+  type AudienceCounts,
   type AudienceItem,
   type AudienceListResponse,
   type SubscriptionStatus,
@@ -41,18 +42,9 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
     const readable = ids.filter((w) => access[w]?.read);
     if (readable.length === 0) return jsonNoStore({ items: [], invitations: [], access } satisfies AudienceListResponse);
     const inWs = `in.(${readable.join(',')})`;
-    // Los recuentos, en la misma lectura: un `count` embebido por estado,
-    // con la RLS de la suscripción (sin traer filas ni pedir uno por lista).
-    type Counted = AudienceItem & Record<SubscriptionStatus, { count: number }[] | null>;
     const [lists, invitations] = await Promise.all([
-      pgGet<Counted>(env, 'audience', jwt, {
-        search: {
-          select: `${AUDIENCE_SELECT},${STATUSES.map((s) => `${s}:audience_subscription(count)`).join(',')}`,
-          ...Object.fromEntries(STATUSES.map((s) => [`${s}.status`, `eq.${s}`])),
-          workspace_id: inWs,
-          status: 'neq.archived',
-          order: 'created_at.asc',
-        },
+      pgGet<AudienceItem>(env, 'audience', jwt, {
+        search: { select: AUDIENCE_SELECT, workspace_id: inWs, status: 'neq.archived', order: 'created_at.asc' },
       }),
       pgGet<InvitationSummary>(env, 'mailout', jwt, {
         search: {
@@ -65,15 +57,23 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
         },
       }),
     ]);
+    // Un recuento por lista y estado, con `select=id`. No embebido
+    // (`audience_subscription(count)`): la tabla solo da SELECT por columnas y
+    // PostgREST cuenta el embebido con `*`, que da 403.
+    const counts = await Promise.all(
+      lists.data.map((a) =>
+        Promise.all(
+          STATUSES.map((status) =>
+            pgGet(env, 'audience_subscription', jwt, {
+              search: { select: 'id', audience_id: `eq.${a.id}`, status: `eq.${status}`, limit: '1' },
+              exactCount: true,
+            }).then((r) => [status, r.total ?? 0] as const),
+          ),
+        ),
+      ),
+    );
     return jsonNoStore({
-      items: lists.data.map(({ confirmed, pending, unsubscribed, ...a }) => ({
-        ...a,
-        counts: {
-          confirmed: confirmed?.[0]?.count ?? 0,
-          pending: pending?.[0]?.count ?? 0,
-          unsubscribed: unsubscribed?.[0]?.count ?? 0,
-        },
-      })),
+      items: lists.data.map((a, i) => ({ ...a, counts: Object.fromEntries(counts[i]) as AudienceCounts })),
       invitations: invitations.data,
       access,
     } satisfies AudienceListResponse);
