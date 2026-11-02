@@ -1,5 +1,5 @@
 /**
- * RLS regression: el público y sus invitaciones, fase 1 (ADR-173; migración
+ * RLS regression: el público y sus invitaciones, fase 1 (ADR-173 y ADR-174; migración
  * 20261102180100_audience; plan build/plans/2026-11-01-audience.md § 7, los 16
  * casos de la puerta de la fase 1).
  *
@@ -1008,6 +1008,45 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: el público y sus invit
         new URLSearchParams({ conversation_id: `eq.${conv.pa}`, 'metadata->>mailout': 'eq.unsubscribed', select: 'id' }),
       );
       expect(notes.rows.length).toBe(1);
+    });
+
+    test('ADR-174 · solo con la base del sector sale en un envío de difusión y en una invitación a profesionales; su baja, exclusión y base retirada', async () => {
+      const sec = await conversation('sector', homeProjectId, { email: SIM('sector') });
+      await basis(SIM('sector'), 'sector');
+
+      // Envío de difusión.
+      const out = await pgRpc<Mailout>('create_mailout', adminJwt, { p_project_id: homeProjectId, p_mail_domain_id: outDomain });
+      expect(out.status, out.error).toBe(200);
+      const outId = one(out.data)!.id;
+      mailouts.push(outId);
+      await write(outId);
+      await pgRpc('set_mailout_recipients', adminJwt, { p_id: outId, p_conversation_ids: [sec] });
+      const queuedOut = await pgRpc('queue_mailout', adminJwt, { p_id: outId });
+      expect(queuedOut.status, queuedOut.error).toBe(200);
+      expect((await recipients(outId)).rows).toMatchObject([{ status: 'queued', basis_kind: 'sector', mail_domain_id: outDomain }]);
+
+      // Invitación solo a profesionales.
+      const inv = (await invitation({ convs: [sec] })).row!;
+      await write(inv.id);
+      const queuedInv = await pgRpc('queue_mailout', adminJwt, { p_id: inv.id });
+      expect(queuedInv.status, queuedInv.error).toBe(200);
+      const row = (await recipients(inv.id)).rows[0];
+      expect(row).toMatchObject({ status: 'queued', basis_kind: 'sector', mail_domain_id: outDomain });
+      const claim = await svc<{ basis_kind: string }[]>('POST', 'rpc/mailout_claim', { p_limit: 5, p_mailout_id: inv.id });
+      expect(claim.data!.map((x) => x.basis_kind), 'la cola también la acepta').toEqual(['sector']);
+
+      // Su baja: exclusión del espacio y base retirada, como las otras tres.
+      const tok = await svc<{ unsubscribe_token: string }[]>('GET', `mailout_recipient?id=eq.${row.id}&select=unsubscribe_token`);
+      expect((await pgRpc('mailout_unsubscribe', null, { p_token: tok.data![0].unsubscribe_token })).status).toBeLessThan(300);
+      const sup = await pgGet<{ reason: string }>('mail_suppression', adminJwt, new URLSearchParams({ address: `eq.${SIM('sector')}`, select: 'reason' }));
+      expect(sup.rows).toEqual([{ reason: 'unsubscribe' }]);
+      const b = await pgGet<{ kind: string; withdrawn_at: string | null }>(
+        'mail_basis',
+        adminJwt,
+        new URLSearchParams({ address: `eq.${SIM('sector')}`, select: 'kind,withdrawn_at' }),
+      );
+      expect(b.rows[0].kind).toBe('sector');
+      expect(b.rows[0].withdrawn_at).not.toBeNull();
     });
   });
 

@@ -2092,6 +2092,7 @@
   "mailout.basis_consent": "L'a demandé",
   "mailout.basis_relationship": "Nous avons déjà travaillé ensemble",
   "mailout.basis_generic": "C'est l'adresse générique de la salle",
+  "mailout.basis_sector": "Contact professionnel du secteur",
   "mailout.basis_note": "Comment et quand",
   "mailout.basis_note_ph": "Nous a demandé le dossier à FiraTàrrega 2026",
   "mailout.remove_one": "Retirer",

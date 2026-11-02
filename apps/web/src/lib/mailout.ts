@@ -160,7 +160,7 @@ export interface MailoutRecipientRow {
   status: MailoutRecipientStatus;
   /** En un borrador, `not_now` con `status` pendiente: lo que pasará al poner en cola (ADR-138 § 3). */
   skip_reason: MailoutSkipReason | null;
-  basis_kind: 'consent' | 'relationship' | 'generic' | null;
+  basis_kind: 'consent' | 'relationship' | 'generic' | 'sector' | null;
   basis_withdrawn_at: string | null;
   suppressed_reason: 'unsubscribe' | 'bounce' | 'complaint' | 'manual' | null;
   suppressed_at: string | null;
@@ -272,6 +272,6 @@ export const MailoutRecipientsSchema = v.object({
 
 export const MailBasisSchema = v.object({
   recipient_id: v.pipe(v.string(), v.uuid()),
-  kind: v.picklist(['consent', 'relationship', 'generic']),
+  kind: v.picklist(['consent', 'relationship', 'generic', 'sector']),
   note: v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(1000))),
 });

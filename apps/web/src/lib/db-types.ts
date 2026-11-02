@@ -8908,7 +8908,7 @@ export type Database = {
       line_status: "open" | "closed" | "archived"
       mail_account_scope: "personal" | "workspace"
       mail_account_status: "active" | "revoked" | "error"
-      mail_basis_kind: "consent" | "relationship" | "generic"
+      mail_basis_kind: "consent" | "relationship" | "generic" | "sector"
       mail_domain_purpose: "outreach" | "audience"
       mail_provider: "google"
       mail_sending_provider: "simulator" | "ses"
@@ -9194,7 +9194,7 @@ export const Constants = {
       line_status: ["open", "closed", "archived"],
       mail_account_scope: ["personal", "workspace"],
       mail_account_status: ["active", "revoked", "error"],
-      mail_basis_kind: ["consent", "relationship", "generic"],
+      mail_basis_kind: ["consent", "relationship", "generic", "sector"],
       mail_domain_purpose: ["outreach", "audience"],
       mail_provider: ["google"],
       mail_sending_provider: ["simulator", "ses"],

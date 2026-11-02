@@ -1,4 +1,4 @@
--- Rollback de 20261102180100_audience y 20261102180000_audience_address_kind
+-- Rollback de 20261102180100_audience y 20261102180000_audience_enums
 -- (ADR-173, el público, fase 1).
 --
 -- Antes: desplegar el Worker anterior si el nuevo ya llama a algo del público.
@@ -7,8 +7,11 @@
 --
 -- Se niega si hay datos del público (listas, invitaciones, dominios del
 -- público): borrarlos es una decisión, no un efecto del rollback. Sin datos,
--- deja el esquema como 20261102170000 salvo el valor 'subscriber' de
--- `mailout_address_kind`, que no se puede quitar de un enum y no se usa.
+-- deja el esquema como 20261102170000 salvo los valores 'subscriber' de
+-- `mailout_address_kind` y 'sector' de `mail_basis_kind` (ADR-174), que no se
+-- pueden quitar de un enum. Una base `sector` ya apuntada en `mail_basis` se
+-- queda, y la puerta del envío de antes la sigue aceptando (mira que haya base,
+-- no cuál): quitarla es borrar esas filas a propósito.
 -- Las funciones vuelven con su cuerpo vivo anterior (pg_get_functiondef de
 -- la base reconstruida hasta 20261102170000, idéntica a producción el
 -- 2026-11-02 por md5). Probado en local: aplicar, revertir y comparar el

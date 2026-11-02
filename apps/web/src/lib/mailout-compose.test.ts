@@ -5,6 +5,7 @@ import {
   footerLines,
   mailoutLanguage,
   MAILOUT_LANGUAGES,
+  suggestedBasis,
   testSubject,
   unsubscribeHeaders,
   unsubscribeUrl,
@@ -91,7 +92,7 @@ describe('firma y pie', () => {
 
   test('cada idioma tiene su pie, y el enlace de baja nunca falta', () => {
     for (const lang of MAILOUT_LANGUAGES) {
-      for (const basis of ['consent', 'relationship', 'generic'] as const) {
+      for (const basis of ['consent', 'relationship', 'generic', 'sector'] as const) {
         const lines = footerLines({ ...ctx, basis_kind: basis }, lang, URL);
         expect(lines).toHaveLength(3);
         expect(lines[2]).toContain(URL);
@@ -104,6 +105,21 @@ describe('firma y pie', () => {
     expect(m.recordBody).not.toContain(URL);
     expect(m.text).toContain(URL);
     expect(m.text).toContain('Un clic suffit.');
+  });
+
+  test('ADR-174: la base que propone la pantalla nunca es la del sector', () => {
+    for (const kind of ['contact', 'organization', null] as const) {
+      expect(suggestedBasis(kind)).not.toBe('sector');
+    }
+    expect(suggestedBasis('organization')).toBe('generic');
+    expect(suggestedBasis('contact')).toBe('relationship');
+  });
+
+  test('ADR-174: la base del sector dice por qué le llega, en su idioma', () => {
+    expect(footerLines({ ...ctx, basis_kind: 'sector' }, 'es', URL)[1]).toBe(
+      'Te escribimos porque trabajas en programación o difusión de artes en vivo.',
+    );
+    expect(footerLines({ ...ctx, basis_kind: 'sector' }, 'ca', URL)[1]).toContain('arts en viu');
   });
 
   test('sin base no inventa una razón', () => {

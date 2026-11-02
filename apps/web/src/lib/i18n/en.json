@@ -2095,6 +2095,7 @@
   "mailout.basis_consent": "They asked for it",
   "mailout.basis_relationship": "We have worked together",
   "mailout.basis_generic": "It is the venue's generic address",
+  "mailout.basis_sector": "Industry contact",
   "mailout.basis_note": "How and when",
   "mailout.basis_note_ph": "Asked us for the dossier at FiraTàrrega 2026",
   "mailout.remove_one": "Remove",

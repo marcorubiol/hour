@@ -55,6 +55,7 @@
     composeMailout,
     MAILOUT_LANGUAGES,
     MERGE_FIELDS,
+    suggestedBasis,
     unsubscribeUrl,
     type ComposeContext,
     type MailBasisKind,
@@ -319,7 +320,7 @@
 
   function openBasis(r: MailoutRecipientRow) {
     basisFor = r;
-    basisKind = r.address_kind === 'organization' ? 'generic' : 'relationship';
+    basisKind = suggestedBasis(r.address_kind);
     basisNote = '';
     basisOpen = true;
   }
@@ -385,9 +386,14 @@
   const languageOptions = MAILOUT_LANGUAGES.map((l) => ({ value: l, label: t(`mailout.lang_${l}`, locale) }));
   let domainOptions = $derived((d?.domains ?? []).map((x) => ({ value: x.id, label: `@${x.domain}` })));
   let basisOptions = $derived(
-    (['relationship', 'consent', ...(basisFor?.address_kind === 'organization' ? ['generic'] : [])] as MailBasisKind[]).map(
-      (k) => ({ value: k, label: t(`mailout.basis_${k}`, locale) }),
-    ),
+    (
+      [
+        'relationship',
+        'consent',
+        ...(basisFor?.address_kind === 'organization' ? ['generic'] : []),
+        'sector',
+      ] as MailBasisKind[]
+    ).map((k) => ({ value: k, label: t(`mailout.basis_${k}`, locale) })),
   );
 
   function stateLabel(x: { row: MailoutRecipientRow; state: RecipientState }): string {

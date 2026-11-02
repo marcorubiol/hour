@@ -29,7 +29,7 @@ type MailoutLanguage = (typeof MAILOUT_LANGUAGES)[number];
 export const MERGE_FIELDS = ['nombre', 'sala', 'ciudad'] as const;
 type MergeField = (typeof MERGE_FIELDS)[number];
 
-export type MailBasisKind = 'consent' | 'relationship' | 'generic';
+export type MailBasisKind = 'consent' | 'relationship' | 'generic' | 'sector';
 
 /** Lo que devuelven `mailout_compose_preview` y `mailout_send_context`. */
 export interface ComposeContext {
@@ -69,6 +69,7 @@ type Copy = {
   consent: string;
   relationship: string;
   generic: (sala: string | null) => string;
+  sector: string;
   unsubscribe: (company: string, url: string) => string;
   privacy: (url: string) => string;
   test: string;
@@ -83,6 +84,7 @@ const COPY: Record<MailoutLanguage, Copy> = {
       s
         ? `Os escribimos porque es la dirección de programación de ${s}.`
         : 'Os escribimos porque es vuestra dirección pública de programación.',
+    sector: 'Te escribimos porque trabajas en programación o difusión de artes en vivo.',
     unsubscribe: (c, u) => `Si no queréis recibir más envíos de ${c}, daos de baja aquí: ${u} Un clic basta.`,
     privacy: (u) => `Política de privacidad: ${u}`,
     test: '[Prueba]',
@@ -95,6 +97,7 @@ const COPY: Record<MailoutLanguage, Copy> = {
       s
         ? `Us escrivim perquè és l'adreça de programació de ${s}.`
         : 'Us escrivim perquè és la vostra adreça pública de programació.',
+    sector: "T'escrivim perquè treballes en programació o difusió d'arts en viu.",
     unsubscribe: (c, u) =>
       `Si no voleu rebre més enviaments de ${c}, doneu-vos de baixa aquí: ${u} N'hi ha prou amb un clic.`,
     privacy: (u) => `Política de privacitat: ${u}`,
@@ -108,6 +111,7 @@ const COPY: Record<MailoutLanguage, Copy> = {
       s
         ? `We are writing because this is the programming address of ${s}.`
         : 'We are writing because this is your public programming address.',
+    sector: 'We are writing because you work in programming or promoting live performing arts.',
     unsubscribe: (c, u) =>
       `If you would rather not receive more mailouts from ${c}, unsubscribe here: ${u} One click is enough.`,
     privacy: (u) => `Privacy policy: ${u}`,
@@ -121,6 +125,7 @@ const COPY: Record<MailoutLanguage, Copy> = {
       s
         ? `Nous vous écrivons parce que c'est l'adresse de programmation de ${s}.`
         : "Nous vous écrivons parce que c'est votre adresse publique de programmation.",
+    sector: "Nous vous écrivons parce que vous travaillez dans la programmation ou la diffusion du spectacle vivant.",
     unsubscribe: (c, u) =>
       `Si vous ne souhaitez plus recevoir d'envois de ${c}, désinscrivez-vous ici : ${u} Un clic suffit.`,
     privacy: (u) => `Politique de confidentialité : ${u}`,
@@ -172,6 +177,14 @@ function companySignature(ctx: ComposeContext): string {
   );
 }
 
+/**
+ * La base que la pantalla propone al apuntar la de una dirección. Nunca `sector`:
+ * esa la declara quien envía y Hour no la propone (ADR-174).
+ */
+export function suggestedBasis(addressKind: 'contact' | 'organization' | null): MailBasisKind {
+  return addressKind === 'organization' ? 'generic' : 'relationship';
+}
+
 /** El pie: quién escribe, por qué le llega, la baja y la privacidad. */
 export function footerLines(ctx: ComposeContext, language: MailoutLanguage, unsubscribeUrl: string): string[] {
   const copy = COPY[language];
@@ -184,7 +197,9 @@ export function footerLines(ctx: ComposeContext, language: MailoutLanguage, unsu
         ? copy.relationship
         : ctx.basis_kind === 'generic'
           ? copy.generic(sala)
-          : null;
+          : ctx.basis_kind === 'sector'
+            ? copy.sector
+            : null;
   return [
     who,
     why,

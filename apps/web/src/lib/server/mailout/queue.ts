@@ -40,7 +40,7 @@ export interface ClaimedRecipient {
   address: string;
   display_name: string | null;
   address_kind: 'contact' | 'organization';
-  basis_kind: 'consent' | 'relationship' | 'generic';
+  basis_kind: 'consent' | 'relationship' | 'generic' | 'sector';
   unsubscribe_token: string;
   attempts: number;
   provider: MailSendingProvider;
