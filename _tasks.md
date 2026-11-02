@@ -15,6 +15,7 @@ no pide migración primero; las migraciones juntas por el gate de § 34.
 - [ ] 95 contract: borrar `performance.readiness`, `line.modules`, `line.dossier_url`, `project.dossier_url`,
   `project.poster_url` (destructiva: staging e inspect).
 - [ ] 98 invitar, al público y a profesionales: decidido (ADR-173, `build/plans/2026-11-01-audience.md`); siguiente paso, la fase 1.
+- [ ] 99 editor de correos bonitos, tipo Mailchimp, para las invitaciones (Marco, 2026-11-01: va después del público, opción A). Candidato Templatical; plan B GrapesJS + grapesjs-mjml (`research/2026-11-email-builder.md`). Hoy sólo existe la plantilla fija por espacio (ADR-172).
 - Aparcado: 86 (responsable de tarea) hasta que entre Anouk.
 
 ## PRIMERO — nada. `main` == prod y las dos suites están vivas (2026-07-30, noche)
