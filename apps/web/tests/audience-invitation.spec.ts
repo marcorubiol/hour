@@ -209,25 +209,31 @@ test.describe('audience invitation (simulated)', () => {
       await link.click();
       await expect(page).toHaveURL(mailoutUrl);
     } finally {
-      await forgetConversations(page, [conversationId]);
-      if (audienceId && SB_URL && SERVICE_KEY) {
-        // Ninguna RPC borra una lista ni un envío: lo hace la clave de servicio.
-        // El envío primero (sus destinatarios y eventos caen con él); la lista
-        // después (textos, importaciones, suscripciones y su prueba, en cascada).
-        await serviceDelete(`mailout?audience_id=eq.${audienceId}`);
-        if (mailoutId) await serviceDelete(`mailout?id=eq.${mailoutId}`);
-        await serviceDelete(`audience?id=eq.${audienceId}`);
-      } else if (audienceId) {
-        // Sin la clave: borrar los datos de cada persona (admin) y archivar.
-        // Quedan la lista archivada, su importación y la invitación enviada.
-        const subs = await api<{ subscriptions: { id: string }[] }>(page, 'GET', `/api/audience/${audienceId}`);
-        for (const s of subs.data?.subscriptions ?? []) await api(page, 'DELETE', `/api/audience/subscription/${s.id}`);
-        await api(page, 'PATCH', `/api/audience/${audienceId}`, { action: 'status', status: 'archived' });
-      }
-      for (const id of ownDomains) await api(page, 'DELETE', `/api/mailout/domains/${id}`);
-      if (SB_URL && SERVICE_KEY) {
-        const addr = encodeURIComponent(`"${PRO}"`);
-        await serviceDelete(`mail_basis?workspace_id=eq.${workspaceId}&address=eq.${addr}`);
+      // The page goes first and may already be closed (a timeout): the
+      // service-key deletes sit in their own finally so they run anyway.
+      try {
+        await forgetConversations(page, [conversationId]);
+        if (audienceId && !(SB_URL && SERVICE_KEY)) {
+          // Sin la clave: borrar los datos de cada persona (admin) y archivar.
+          // Quedan la lista archivada, su importación y la invitación enviada.
+          const subs = await api<{ subscriptions: { id: string }[] }>(page, 'GET', `/api/audience/${audienceId}`);
+          for (const s of subs.data?.subscriptions ?? []) await api(page, 'DELETE', `/api/audience/subscription/${s.id}`);
+          await api(page, 'PATCH', `/api/audience/${audienceId}`, { action: 'status', status: 'archived' });
+        }
+        for (const id of ownDomains) await api(page, 'DELETE', `/api/mailout/domains/${id}`);
+      } finally {
+        if (SB_URL && SERVICE_KEY) {
+          if (audienceId) {
+            // Ninguna RPC borra una lista ni un envío: lo hace la clave de servicio.
+            // El envío primero (sus destinatarios y eventos caen con él); la lista
+            // después (textos, importaciones, suscripciones y su prueba, en cascada).
+            await serviceDelete(`mailout?audience_id=eq.${audienceId}`);
+            if (mailoutId) await serviceDelete(`mailout?id=eq.${mailoutId}`);
+            await serviceDelete(`audience?id=eq.${audienceId}`);
+          }
+          const addr = encodeURIComponent(`"${PRO}"`);
+          await serviceDelete(`mail_basis?workspace_id=eq.${workspaceId}&address=eq.${addr}`);
+        }
       }
     }
   });

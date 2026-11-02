@@ -623,7 +623,12 @@
       });
       return d?.workspace.slug ?? '';
     },
-    onSuccess: (slug) => void goto(`/h/${slug}/mailout/${invitationId}`),
+    // The invitation's cached detail still holds the old list: mark it stale
+    // first, or the draft opens on «Profesionales · 0» until a reload.
+    onSuccess: async (slug) => {
+      await refreshAfterWrite(queryClient, ['mailout', invitationId]);
+      void goto(`/h/${slug}/mailout/${invitationId}`);
+    },
     // The list is replaced whole: a professional another editor added from a
     // project the caller does not edit makes the whole change a «not found».
     onError: (err) =>
