@@ -271,6 +271,344 @@ export type Database = {
           },
         ]
       }
+      audience: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          current_text_version: number | null
+          default_language: string
+          description: string | null
+          form_key: string
+          id: string
+          languages: string[]
+          name: string
+          status: Database["public"]["Enums"]["audience_status"]
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          current_text_version?: number | null
+          default_language?: string
+          description?: string | null
+          form_key?: string
+          id?: string
+          languages?: string[]
+          name: string
+          status?: Database["public"]["Enums"]["audience_status"]
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          current_text_version?: number | null
+          default_language?: string
+          description?: string | null
+          form_key?: string
+          id?: string
+          languages?: string[]
+          name?: string
+          status?: Database["public"]["Enums"]["audience_status"]
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audience_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audience_consent_event: {
+        Row: {
+          actor_user_id: string | null
+          age_confirmed: boolean | null
+          channel:
+            | Database["public"]["Enums"]["audience_consent_channel"]
+            | null
+          consent_text_id: string | null
+          id: string
+          import_id: string | null
+          ip: unknown
+          kind: Database["public"]["Enums"]["audience_consent_event_kind"]
+          occurred_at: string
+          page_url: string | null
+          provider_event_id: string | null
+          subscription_id: string
+          user_agent: string | null
+          workspace_id: string
+        }
+        Insert: {
+          actor_user_id?: string | null
+          age_confirmed?: boolean | null
+          channel?:
+            | Database["public"]["Enums"]["audience_consent_channel"]
+            | null
+          consent_text_id?: string | null
+          id?: string
+          import_id?: string | null
+          ip?: unknown
+          kind: Database["public"]["Enums"]["audience_consent_event_kind"]
+          occurred_at?: string
+          page_url?: string | null
+          provider_event_id?: string | null
+          subscription_id: string
+          user_agent?: string | null
+          workspace_id: string
+        }
+        Update: {
+          actor_user_id?: string | null
+          age_confirmed?: boolean | null
+          channel?:
+            | Database["public"]["Enums"]["audience_consent_channel"]
+            | null
+          consent_text_id?: string | null
+          id?: string
+          import_id?: string | null
+          ip?: unknown
+          kind?: Database["public"]["Enums"]["audience_consent_event_kind"]
+          occurred_at?: string
+          page_url?: string | null
+          provider_event_id?: string | null
+          subscription_id?: string
+          user_agent?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audience_consent_event_import_fkey"
+            columns: ["import_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "audience_import"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "audience_consent_event_subscription_fkey"
+            columns: ["subscription_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "audience_subscription"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "audience_consent_event_text_fkey"
+            columns: ["consent_text_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "audience_consent_text"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      audience_consent_text: {
+        Row: {
+          audience_id: string
+          consent_text: string
+          created_at: string
+          created_by: string | null
+          id: string
+          info_text: string | null
+          language: string
+          privacy_url: string | null
+          version: number
+          workspace_id: string
+        }
+        Insert: {
+          audience_id: string
+          consent_text: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          info_text?: string | null
+          language: string
+          privacy_url?: string | null
+          version: number
+          workspace_id: string
+        }
+        Update: {
+          audience_id?: string
+          consent_text?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          info_text?: string | null
+          language?: string
+          privacy_url?: string | null
+          version?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audience_consent_text_audience_fkey"
+            columns: ["audience_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "audience"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      audience_import: {
+        Row: {
+          audience_id: string
+          basis_kind: Database["public"]["Enums"]["mail_basis_kind"]
+          declared_at: string
+          declared_by: string | null
+          filename: string | null
+          id: string
+          imported_count: number
+          reviewed_at: string | null
+          reviewed_by: string | null
+          row_count: number
+          skipped: Json
+          source_note: string
+          statement_language: string
+          statement_text: string
+          status: Database["public"]["Enums"]["audience_import_status"]
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          audience_id: string
+          basis_kind: Database["public"]["Enums"]["mail_basis_kind"]
+          declared_at?: string
+          declared_by?: string | null
+          filename?: string | null
+          id?: string
+          imported_count?: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          row_count?: number
+          skipped?: Json
+          source_note: string
+          statement_language: string
+          statement_text: string
+          status?: Database["public"]["Enums"]["audience_import_status"]
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          audience_id?: string
+          basis_kind?: Database["public"]["Enums"]["mail_basis_kind"]
+          declared_at?: string
+          declared_by?: string | null
+          filename?: string | null
+          id?: string
+          imported_count?: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          row_count?: number
+          skipped?: Json
+          source_note?: string
+          statement_language?: string
+          statement_text?: string
+          status?: Database["public"]["Enums"]["audience_import_status"]
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audience_import_audience_fkey"
+            columns: ["audience_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "audience"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      audience_subscription: {
+        Row: {
+          address: string
+          audience_id: string
+          basis_kind: Database["public"]["Enums"]["mail_basis_kind"]
+          confirm_expires_at: string | null
+          confirm_last_sent_at: string | null
+          confirm_provider_message_id: string | null
+          confirm_sent_count: number
+          confirm_token_hash: string | null
+          confirmed_at: string | null
+          consent_text_id: string | null
+          created_at: string
+          id: string
+          import_id: string | null
+          language: string
+          name: string | null
+          source: Database["public"]["Enums"]["audience_source"]
+          status: Database["public"]["Enums"]["audience_subscription_status"]
+          unsubscribed_at: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          address: string
+          audience_id: string
+          basis_kind?: Database["public"]["Enums"]["mail_basis_kind"]
+          confirm_expires_at?: string | null
+          confirm_last_sent_at?: string | null
+          confirm_provider_message_id?: string | null
+          confirm_sent_count?: number
+          confirm_token_hash?: string | null
+          confirmed_at?: string | null
+          consent_text_id?: string | null
+          created_at?: string
+          id?: string
+          import_id?: string | null
+          language?: string
+          name?: string | null
+          source: Database["public"]["Enums"]["audience_source"]
+          status?: Database["public"]["Enums"]["audience_subscription_status"]
+          unsubscribed_at?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          address?: string
+          audience_id?: string
+          basis_kind?: Database["public"]["Enums"]["mail_basis_kind"]
+          confirm_expires_at?: string | null
+          confirm_last_sent_at?: string | null
+          confirm_provider_message_id?: string | null
+          confirm_sent_count?: number
+          confirm_token_hash?: string | null
+          confirmed_at?: string | null
+          consent_text_id?: string | null
+          created_at?: string
+          id?: string
+          import_id?: string | null
+          language?: string
+          name?: string | null
+          source?: Database["public"]["Enums"]["audience_source"]
+          status?: Database["public"]["Enums"]["audience_subscription_status"]
+          unsubscribed_at?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audience_subscription_audience_fkey"
+            columns: ["audience_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "audience"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "audience_subscription_import_fkey"
+            columns: ["import_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "audience_import"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "audience_subscription_text_fkey"
+            columns: ["consent_text_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "audience_consent_text"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
       audit_log: {
         Row: {
           action: string
@@ -2150,6 +2488,7 @@ export type Database = {
           mail_from_status: string
           mail_from_subdomain: string
           provider: Database["public"]["Enums"]["mail_sending_provider"]
+          purpose: Database["public"]["Enums"]["mail_domain_purpose"]
           tenant_name: string | null
           updated_at: string
           verified_at: string | null
@@ -2171,6 +2510,7 @@ export type Database = {
           mail_from_status?: string
           mail_from_subdomain?: string
           provider?: Database["public"]["Enums"]["mail_sending_provider"]
+          purpose?: Database["public"]["Enums"]["mail_domain_purpose"]
           tenant_name?: string | null
           updated_at?: string
           verified_at?: string | null
@@ -2192,6 +2532,7 @@ export type Database = {
           mail_from_status?: string
           mail_from_subdomain?: string
           provider?: Database["public"]["Enums"]["mail_sending_provider"]
+          purpose?: Database["public"]["Enums"]["mail_domain_purpose"]
           tenant_name?: string | null
           updated_at?: string
           verified_at?: string | null
@@ -2292,6 +2633,8 @@ export type Database = {
       }
       mailout: {
         Row: {
+          audience_id: string | null
+          audience_mail_domain_id: string | null
           body: string | null
           created_at: string
           created_by: string | null
@@ -2303,10 +2646,12 @@ export type Database = {
           image_alt: string | null
           image_link_url: string | null
           image_url: string | null
+          kind: Database["public"]["Enums"]["mailout_kind"]
           language: string
           line_id: string | null
           mail_domain_id: string | null
-          project_id: string
+          performance_id: string | null
+          project_id: string | null
           queued_at: string | null
           queued_by: string | null
           reply_to_address: string | null
@@ -2320,6 +2665,8 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          audience_id?: string | null
+          audience_mail_domain_id?: string | null
           body?: string | null
           created_at?: string
           created_by?: string | null
@@ -2331,10 +2678,12 @@ export type Database = {
           image_alt?: string | null
           image_link_url?: string | null
           image_url?: string | null
+          kind?: Database["public"]["Enums"]["mailout_kind"]
           language?: string
           line_id?: string | null
           mail_domain_id?: string | null
-          project_id: string
+          performance_id?: string | null
+          project_id?: string | null
           queued_at?: string | null
           queued_by?: string | null
           reply_to_address?: string | null
@@ -2348,6 +2697,8 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          audience_id?: string | null
+          audience_mail_domain_id?: string | null
           body?: string | null
           created_at?: string
           created_by?: string | null
@@ -2359,10 +2710,12 @@ export type Database = {
           image_alt?: string | null
           image_link_url?: string | null
           image_url?: string | null
+          kind?: Database["public"]["Enums"]["mailout_kind"]
           language?: string
           line_id?: string | null
           mail_domain_id?: string | null
-          project_id?: string
+          performance_id?: string | null
+          project_id?: string | null
           queued_at?: string | null
           queued_by?: string | null
           reply_to_address?: string | null
@@ -2377,6 +2730,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "mailout_audience_domain_fkey"
+            columns: ["audience_mail_domain_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "mail_domain"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "mailout_audience_fkey"
+            columns: ["audience_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "audience"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
             foreignKeyName: "mailout_domain_fkey"
             columns: ["mail_domain_id", "workspace_id"]
             isOneToOne: false
@@ -2388,6 +2755,13 @@ export type Database = {
             columns: ["line_id"]
             isOneToOne: false
             referencedRelation: "line"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mailout_performance_id_fkey"
+            columns: ["performance_id"]
+            isOneToOne: false
+            referencedRelation: "performance"
             referencedColumns: ["id"]
           },
           {
@@ -2464,14 +2838,17 @@ export type Database = {
             | Database["public"]["Enums"]["mailout_address_kind"]
             | null
           attempts: number
+          audience_subscription_id: string | null
           basis_kind: Database["public"]["Enums"]["mail_basis_kind"] | null
           claimed_at: string | null
+          consent_event_id: string | null
           conversation_event_id: string | null
-          conversation_id: string
+          conversation_id: string | null
           created_at: string
           display_name: string | null
           id: string
           last_error: string | null
+          mail_domain_id: string | null
           mailout_id: string
           next_attempt_at: string | null
           person_id: string | null
@@ -2490,14 +2867,17 @@ export type Database = {
             | Database["public"]["Enums"]["mailout_address_kind"]
             | null
           attempts?: number
+          audience_subscription_id?: string | null
           basis_kind?: Database["public"]["Enums"]["mail_basis_kind"] | null
           claimed_at?: string | null
+          consent_event_id?: string | null
           conversation_event_id?: string | null
-          conversation_id: string
+          conversation_id?: string | null
           created_at?: string
           display_name?: string | null
           id?: string
           last_error?: string | null
+          mail_domain_id?: string | null
           mailout_id: string
           next_attempt_at?: string | null
           person_id?: string | null
@@ -2518,14 +2898,17 @@ export type Database = {
             | Database["public"]["Enums"]["mailout_address_kind"]
             | null
           attempts?: number
+          audience_subscription_id?: string | null
           basis_kind?: Database["public"]["Enums"]["mail_basis_kind"] | null
           claimed_at?: string | null
+          consent_event_id?: string | null
           conversation_event_id?: string | null
-          conversation_id?: string
+          conversation_id?: string | null
           created_at?: string
           display_name?: string | null
           id?: string
           last_error?: string | null
+          mail_domain_id?: string | null
           mailout_id?: string
           next_attempt_at?: string | null
           person_id?: string | null
@@ -2542,6 +2925,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "mailout_recipient_consent_event_fkey"
+            columns: ["consent_event_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "audience_consent_event"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
             foreignKeyName: "mailout_recipient_conversation_event_id_fkey"
             columns: ["conversation_event_id"]
             isOneToOne: false
@@ -2556,6 +2946,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "mailout_recipient_domain_fkey"
+            columns: ["mail_domain_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "mail_domain"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
             foreignKeyName: "mailout_recipient_mailout_fkey"
             columns: ["mailout_id", "workspace_id"]
             isOneToOne: false
@@ -2568,6 +2965,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "workspace_person"
             referencedColumns: ["workspace_id", "person_id"]
+          },
+          {
+            foreignKeyName: "mailout_recipient_subscription_fkey"
+            columns: ["audience_subscription_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "audience_subscription"
+            referencedColumns: ["id", "workspace_id"]
           },
         ]
       }
@@ -4250,6 +4654,9 @@ export type Database = {
           domain: Database["public"]["Enums"]["workspace_domain"] | null
           fiscal_identity_id: string | null
           id: string
+          invitation_daily_cap: number
+          invitation_reviewed_at: string | null
+          invitation_reviewed_by: string | null
           kind: Database["public"]["Enums"]["workspace_kind"]
           lenses_off: string[]
           logo_url: string | null
@@ -4283,6 +4690,9 @@ export type Database = {
           domain?: Database["public"]["Enums"]["workspace_domain"] | null
           fiscal_identity_id?: string | null
           id?: string
+          invitation_daily_cap?: number
+          invitation_reviewed_at?: string | null
+          invitation_reviewed_by?: string | null
           kind?: Database["public"]["Enums"]["workspace_kind"]
           lenses_off?: string[]
           logo_url?: string | null
@@ -4316,6 +4726,9 @@ export type Database = {
           domain?: Database["public"]["Enums"]["workspace_domain"] | null
           fiscal_identity_id?: string | null
           id?: string
+          invitation_daily_cap?: number
+          invitation_reviewed_at?: string | null
+          invitation_reviewed_by?: string | null
           kind?: Database["public"]["Enums"]["workspace_kind"]
           lenses_off?: string[]
           logo_url?: string | null
@@ -4871,6 +5284,18 @@ export type Database = {
         }[]
       }
       accessible_project_ids: { Args: { p_perm: string }; Returns: string[] }
+      add_audience_subscription: {
+        Args: {
+          p_address: string
+          p_audience_id: string
+          p_language?: string
+          p_name?: string
+        }
+        Returns: {
+          send_confirmation: boolean
+          subscription_id: string
+        }[]
+      }
       add_cast_member: {
         Args: { p_person_id: string; p_project_id: string; p_role: string }
         Returns: {
@@ -4928,6 +5353,7 @@ export type Database = {
           p_from_local_part?: string
           p_from_name?: string
           p_provider?: Database["public"]["Enums"]["mail_sending_provider"]
+          p_purpose?: Database["public"]["Enums"]["mail_domain_purpose"]
           p_workspace_id: string
         }
         Returns: {
@@ -4946,6 +5372,7 @@ export type Database = {
           mail_from_status: string
           mail_from_subdomain: string
           provider: Database["public"]["Enums"]["mail_sending_provider"]
+          purpose: Database["public"]["Enums"]["mail_domain_purpose"]
           tenant_name: string | null
           updated_at: string
           verified_at: string | null
@@ -4988,6 +5415,96 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      audience_approve_import: {
+        Args: { p_import_id: string; p_reviewed_by?: string }
+        Returns: {
+          audience_id: string
+          basis_kind: Database["public"]["Enums"]["mail_basis_kind"]
+          declared_at: string
+          declared_by: string | null
+          filename: string | null
+          id: string
+          imported_count: number
+          reviewed_at: string | null
+          reviewed_by: string | null
+          row_count: number
+          skipped: Json
+          source_note: string
+          statement_language: string
+          statement_text: string
+          status: Database["public"]["Enums"]["audience_import_status"]
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "audience_import"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      audience_confirm: {
+        Args: { p_ip?: unknown; p_token: string; p_user_agent?: string }
+        Returns: boolean
+      }
+      audience_confirm_info: {
+        Args: { p_token: string }
+        Returns: {
+          audience_name: string
+          company_name: string
+          confirmed: boolean
+          language: string
+          valid: boolean
+        }[]
+      }
+      audience_confirmation_sent: {
+        Args: { p_provider_message_id: string; p_subscription_id: string }
+        Returns: undefined
+      }
+      audience_confirmation_token: {
+        Args: { p_subscription_id: string }
+        Returns: string
+      }
+      audience_consent_proof: {
+        Args: { p_subscription_id: string }
+        Returns: Json
+      }
+      audience_form_info: {
+        Args: { p_key: string; p_language?: string }
+        Returns: {
+          audience_name: string
+          company_name: string
+          consent_text: string
+          consent_text_id: string
+          description: string
+          info_text: string
+          language: string
+          languages: string[]
+          logo_url: string
+          open: boolean
+          privacy_url: string
+        }[]
+      }
+      audience_purge_pending: { Args: never; Returns: number }
+      audience_subscribe: {
+        Args: {
+          p_address: string
+          p_age_confirmed: boolean
+          p_channel?: Database["public"]["Enums"]["audience_consent_channel"]
+          p_ip: unknown
+          p_key: string
+          p_language: string
+          p_name: string
+          p_page_url?: string
+          p_text_id: string
+          p_user_agent: string
+        }
+        Returns: {
+          language: string
+          subscription_id: string
+          token: string
+        }[]
+      }
       bolo_access: { Args: { p_bolo_id: string }; Returns: Json }
       bolo_board: { Args: { p_performance_id: string }; Returns: Json }
       bolo_status_can_move: {
@@ -5020,6 +5537,8 @@ export type Database = {
       cancel_mailout: {
         Args: { p_id: string }
         Returns: {
+          audience_id: string | null
+          audience_mail_domain_id: string | null
           body: string | null
           created_at: string
           created_by: string | null
@@ -5031,10 +5550,12 @@ export type Database = {
           image_alt: string | null
           image_link_url: string | null
           image_url: string | null
+          kind: Database["public"]["Enums"]["mailout_kind"]
           language: string
           line_id: string | null
           mail_domain_id: string | null
-          project_id: string
+          performance_id: string | null
+          project_id: string | null
           queued_at: string | null
           queued_by: string | null
           reply_to_address: string | null
@@ -5225,6 +5746,34 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "asset_version"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_audience: {
+        Args: {
+          p_default_language?: string
+          p_languages?: string[]
+          p_name: string
+          p_workspace_id: string
+        }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          current_text_version: number | null
+          default_language: string
+          description: string | null
+          form_key: string
+          id: string
+          languages: string[]
+          name: string
+          status: Database["public"]["Enums"]["audience_status"]
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "audience"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -5509,6 +6058,53 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_invitation: {
+        Args: {
+          p_audience_id?: string
+          p_conversation_ids?: string[]
+          p_performance_id?: string
+          p_project_id?: string
+          p_workspace_id: string
+        }
+        Returns: {
+          audience_id: string | null
+          audience_mail_domain_id: string | null
+          body: string | null
+          created_at: string
+          created_by: string | null
+          finished_at: string | null
+          from_address: string | null
+          from_local_part: string
+          from_name: string | null
+          id: string
+          image_alt: string | null
+          image_link_url: string | null
+          image_url: string | null
+          kind: Database["public"]["Enums"]["mailout_kind"]
+          language: string
+          line_id: string | null
+          mail_domain_id: string | null
+          performance_id: string | null
+          project_id: string | null
+          queued_at: string | null
+          queued_by: string | null
+          reply_to_address: string | null
+          reply_to_mail_account_id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["mailout_status"]
+          status_reason: string | null
+          subject: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "mailout"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_invoice_from_bolo: {
         Args: {
           p_bolo_id: string
@@ -5604,6 +6200,8 @@ export type Database = {
           p_project_id: string
         }
         Returns: {
+          audience_id: string | null
+          audience_mail_domain_id: string | null
           body: string | null
           created_at: string
           created_by: string | null
@@ -5615,10 +6213,12 @@ export type Database = {
           image_alt: string | null
           image_link_url: string | null
           image_url: string | null
+          kind: Database["public"]["Enums"]["mailout_kind"]
           language: string
           line_id: string | null
           mail_domain_id: string | null
-          project_id: string
+          performance_id: string | null
+          project_id: string | null
           queued_at: string | null
           queued_by: string | null
           reply_to_address: string | null
@@ -6046,6 +6646,9 @@ export type Database = {
           domain: Database["public"]["Enums"]["workspace_domain"] | null
           fiscal_identity_id: string | null
           id: string
+          invitation_daily_cap: number
+          invitation_reviewed_at: string | null
+          invitation_reviewed_by: string | null
           kind: Database["public"]["Enums"]["workspace_kind"]
           lenses_off: string[]
           logo_url: string | null
@@ -6239,6 +6842,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      erase_audience_subscription: {
+        Args: { p_id: string }
+        Returns: undefined
+      }
       fiscal_identity_snapshot: { Args: { p_id: string }; Returns: Json }
       generate_workspace_sid: { Args: never; Returns: string }
       get_public_calendar: { Args: { p_token: string }; Returns: Json }
@@ -6259,6 +6866,17 @@ export type Database = {
       has_permission_for_user: {
         Args: { p_perm: string; p_project_id: string; p_user_id: string }
         Returns: boolean
+      }
+      import_audience: {
+        Args: {
+          p_audience_id: string
+          p_basis_kind: Database["public"]["Enums"]["mail_basis_kind"]
+          p_filename: string
+          p_rows: Json
+          p_source_note: string
+          p_statement_language?: string
+        }
+        Returns: Json
       }
       invite_workspace_person: {
         Args: {
@@ -6570,6 +7188,7 @@ export type Database = {
           mail_from_status: string
           mail_from_subdomain: string
           provider: Database["public"]["Enums"]["mail_sending_provider"]
+          purpose: Database["public"]["Enums"]["mail_domain_purpose"]
           tenant_name: string | null
           updated_at: string
           verified_at: string | null
@@ -6650,6 +7269,8 @@ export type Database = {
       mailout_approve_review: {
         Args: { p_mailout_id: string; p_reviewed_by?: string }
         Returns: {
+          audience_id: string | null
+          audience_mail_domain_id: string | null
           body: string | null
           created_at: string
           created_by: string | null
@@ -6661,10 +7282,12 @@ export type Database = {
           image_alt: string | null
           image_link_url: string | null
           image_url: string | null
+          kind: Database["public"]["Enums"]["mailout_kind"]
           language: string
           line_id: string | null
           mail_domain_id: string | null
-          project_id: string
+          performance_id: string | null
+          project_id: string | null
           queued_at: string | null
           queued_by: string | null
           reply_to_address: string | null
@@ -6690,6 +7313,7 @@ export type Database = {
           address: string
           address_kind: Database["public"]["Enums"]["mailout_address_kind"]
           attempts: number
+          audience_subscription_id: string
           basis_kind: Database["public"]["Enums"]["mail_basis_kind"]
           body: string
           configuration_set: string
@@ -6698,6 +7322,7 @@ export type Database = {
           from_address: string
           from_name: string
           language: string
+          mail_domain_id: string
           mailout_id: string
           provider: Database["public"]["Enums"]["mail_sending_provider"]
           recipient_id: string
@@ -6712,6 +7337,8 @@ export type Database = {
         Args: { p_id: string }
         Returns: {
           address_kind: Database["public"]["Enums"]["mailout_address_kind"]
+          audience_name: string
+          audience_subscription_id: string
           basis_kind: Database["public"]["Enums"]["mail_basis_kind"]
           city: string
           company_city: string
@@ -6722,9 +7349,14 @@ export type Database = {
           contact_first_name: string
           contact_name: string
           mailout_id: string
+          mailout_kind: Database["public"]["Enums"]["mailout_kind"]
           organization_name: string
           privacy_url: string
           recipient_id: string
+          subscribed_at: string
+          subscriber_name: string
+          venue_city: string
+          venue_name: string
         }[]
       }
       mailout_preview: {
@@ -6732,10 +7364,12 @@ export type Database = {
         Returns: {
           address: string
           address_kind: Database["public"]["Enums"]["mailout_address_kind"]
+          audience_subscription_id: string
           basis_kind: Database["public"]["Enums"]["mail_basis_kind"]
           basis_withdrawn_at: string
           conversation_id: string
           display_name: string
+          mail_domain_id: string
           ready: boolean
           recipient_id: string
           skip_reason: Database["public"]["Enums"]["mailout_skip_reason"]
@@ -6753,14 +7387,17 @@ export type Database = {
             | Database["public"]["Enums"]["mailout_address_kind"]
             | null
           attempts: number
+          audience_subscription_id: string | null
           basis_kind: Database["public"]["Enums"]["mail_basis_kind"] | null
           claimed_at: string | null
+          consent_event_id: string | null
           conversation_event_id: string | null
-          conversation_id: string
+          conversation_id: string | null
           created_at: string
           display_name: string | null
           id: string
           last_error: string | null
+          mail_domain_id: string | null
           mailout_id: string
           next_attempt_at: string | null
           person_id: string | null
@@ -6794,14 +7431,17 @@ export type Database = {
             | Database["public"]["Enums"]["mailout_address_kind"]
             | null
           attempts: number
+          audience_subscription_id: string | null
           basis_kind: Database["public"]["Enums"]["mail_basis_kind"] | null
           claimed_at: string | null
+          consent_event_id: string | null
           conversation_event_id: string | null
-          conversation_id: string
+          conversation_id: string | null
           created_at: string
           display_name: string | null
           id: string
           last_error: string | null
+          mail_domain_id: string | null
           mailout_id: string
           next_attempt_at: string | null
           person_id: string | null
@@ -6826,6 +7466,8 @@ export type Database = {
         Args: { p_recipient_ids: string[] }
         Returns: {
           address_kind: Database["public"]["Enums"]["mailout_address_kind"]
+          audience_name: string
+          audience_subscription_id: string
           basis_kind: Database["public"]["Enums"]["mail_basis_kind"]
           city: string
           company_city: string
@@ -6836,9 +7478,14 @@ export type Database = {
           contact_first_name: string
           contact_name: string
           mailout_id: string
+          mailout_kind: Database["public"]["Enums"]["mailout_kind"]
           organization_name: string
           privacy_url: string
           recipient_id: string
+          subscribed_at: string
+          subscriber_name: string
+          venue_city: string
+          venue_name: string
         }[]
       }
       mailout_template: {
@@ -6854,11 +7501,17 @@ export type Database = {
       }
       mailout_test_authorize: { Args: { p_id: string }; Returns: string }
       mailout_unsubscribe: { Args: { p_token: string }; Returns: undefined }
+      mailout_unsubscribe_everything: {
+        Args: { p_token: string }
+        Returns: undefined
+      }
       mailout_unsubscribe_info: {
         Args: { p_token: string }
         Returns: {
+          audience_name: string
           company_name: string
           language: string
+          suppressed: boolean
           unsubscribed: boolean
         }[]
       }
@@ -6973,6 +7626,8 @@ export type Database = {
       queue_mailout: {
         Args: { p_id: string }
         Returns: {
+          audience_id: string | null
+          audience_mail_domain_id: string | null
           body: string | null
           created_at: string
           created_by: string | null
@@ -6984,10 +7639,12 @@ export type Database = {
           image_alt: string | null
           image_link_url: string | null
           image_url: string | null
+          kind: Database["public"]["Enums"]["mailout_kind"]
           language: string
           line_id: string | null
           mail_domain_id: string | null
-          project_id: string
+          performance_id: string | null
+          project_id: string | null
           queued_at: string | null
           queued_by: string | null
           reply_to_address: string | null
@@ -7043,6 +7700,29 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "conversation_event"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      regenerate_audience_form_key: {
+        Args: { p_id: string }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          current_text_version: number | null
+          default_language: string
+          description: string | null
+          form_key: string
+          id: string
+          languages: string[]
+          name: string
+          status: Database["public"]["Enums"]["audience_status"]
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "audience"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -7283,6 +7963,55 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      set_audience_consent_text: {
+        Args: { p_audience_id: string; p_texts: Json }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          current_text_version: number | null
+          default_language: string
+          description: string | null
+          form_key: string
+          id: string
+          languages: string[]
+          name: string
+          status: Database["public"]["Enums"]["audience_status"]
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "audience"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_audience_status: {
+        Args: {
+          p_id: string
+          p_status: Database["public"]["Enums"]["audience_status"]
+        }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          current_text_version: number | null
+          default_language: string
+          description: string | null
+          form_key: string
+          id: string
+          languages: string[]
+          name: string
+          status: Database["public"]["Enums"]["audience_status"]
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "audience"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       set_commitment_person: {
         Args: {
           p_person_id: string
@@ -7373,6 +8102,47 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      set_invitation_audience: {
+        Args: { p_audience_id: string; p_mailout_id: string }
+        Returns: {
+          audience_id: string | null
+          audience_mail_domain_id: string | null
+          body: string | null
+          created_at: string
+          created_by: string | null
+          finished_at: string | null
+          from_address: string | null
+          from_local_part: string
+          from_name: string | null
+          id: string
+          image_alt: string | null
+          image_link_url: string | null
+          image_url: string | null
+          kind: Database["public"]["Enums"]["mailout_kind"]
+          language: string
+          line_id: string | null
+          mail_domain_id: string | null
+          performance_id: string | null
+          project_id: string | null
+          queued_at: string | null
+          queued_by: string | null
+          reply_to_address: string | null
+          reply_to_mail_account_id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["mailout_status"]
+          status_reason: string | null
+          subject: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "mailout"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       set_mail_basis: {
         Args: {
           p_address: string
@@ -7417,6 +8187,7 @@ export type Database = {
           mail_from_status: string
           mail_from_subdomain: string
           provider: Database["public"]["Enums"]["mail_sending_provider"]
+          purpose: Database["public"]["Enums"]["mail_domain_purpose"]
           tenant_name: string | null
           updated_at: string
           verified_at: string | null
@@ -7441,6 +8212,8 @@ export type Database = {
           p_image_url: string
         }
         Returns: {
+          audience_id: string | null
+          audience_mail_domain_id: string | null
           body: string | null
           created_at: string
           created_by: string | null
@@ -7452,10 +8225,12 @@ export type Database = {
           image_alt: string | null
           image_link_url: string | null
           image_url: string | null
+          kind: Database["public"]["Enums"]["mailout_kind"]
           language: string
           line_id: string | null
           mail_domain_id: string | null
-          project_id: string
+          performance_id: string | null
+          project_id: string | null
           queued_at: string | null
           queued_by: string | null
           reply_to_address: string | null
@@ -7483,14 +8258,17 @@ export type Database = {
             | Database["public"]["Enums"]["mailout_address_kind"]
             | null
           attempts: number
+          audience_subscription_id: string | null
           basis_kind: Database["public"]["Enums"]["mail_basis_kind"] | null
           claimed_at: string | null
+          consent_event_id: string | null
           conversation_event_id: string | null
-          conversation_id: string
+          conversation_id: string | null
           created_at: string
           display_name: string | null
           id: string
           last_error: string | null
+          mail_domain_id: string | null
           mailout_id: string
           next_attempt_at: string | null
           person_id: string | null
@@ -7651,6 +8429,39 @@ export type Database = {
       travel_stage_zone: { Args: { p_tz: string }; Returns: string }
       undo_organization_merge: { Args: { p_merge_id: string }; Returns: Json }
       undo_person_merge: { Args: { p_merge_id: string }; Returns: Json }
+      unsubscribe_audience_subscription: {
+        Args: { p_id: string }
+        Returns: undefined
+      }
+      update_audience: {
+        Args: {
+          p_default_language: string
+          p_description: string
+          p_id: string
+          p_languages: string[]
+          p_name: string
+        }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          current_text_version: number | null
+          default_language: string
+          description: string | null
+          form_key: string
+          id: string
+          languages: string[]
+          name: string
+          status: Database["public"]["Enums"]["audience_status"]
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "audience"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       update_bolo_contract: {
         Args: {
           p_bolo_id: string
@@ -7733,6 +8544,8 @@ export type Database = {
           p_subject: string
         }
         Returns: {
+          audience_id: string | null
+          audience_mail_domain_id: string | null
           body: string | null
           created_at: string
           created_by: string | null
@@ -7744,10 +8557,12 @@ export type Database = {
           image_alt: string | null
           image_link_url: string | null
           image_url: string | null
+          kind: Database["public"]["Enums"]["mailout_kind"]
           language: string
           line_id: string | null
           mail_domain_id: string | null
-          project_id: string
+          performance_id: string | null
+          project_id: string | null
           queued_at: string | null
           queued_by: string | null
           reply_to_address: string | null
@@ -7895,6 +8710,9 @@ export type Database = {
           domain: Database["public"]["Enums"]["workspace_domain"] | null
           fiscal_identity_id: string | null
           id: string
+          invitation_daily_cap: number
+          invitation_reviewed_at: string | null
+          invitation_reviewed_by: string | null
           kind: Database["public"]["Enums"]["workspace_kind"]
           lenses_off: string[]
           logo_url: string | null
@@ -8031,6 +8849,24 @@ export type Database = {
         | "photo"
         | "video"
         | "other"
+      audience_consent_channel:
+        | "form"
+        | "embed"
+        | "header"
+        | "page"
+        | "admin"
+        | "import"
+      audience_consent_event_kind:
+        | "requested"
+        | "confirmed"
+        | "imported"
+        | "unsubscribed"
+        | "resubscribed"
+        | "complained"
+      audience_import_status: "review" | "done" | "rejected"
+      audience_source: "form" | "embed" | "import" | "manual"
+      audience_status: "draft" | "open" | "closed" | "archived"
+      audience_subscription_status: "pending" | "confirmed" | "unsubscribed"
       commitment_state: "going" | "not_going"
       container_level: "workspace" | "project" | "line" | "bolo" | "performance"
       conversation_event_direction: "inbound" | "outbound"
@@ -8073,10 +8909,11 @@ export type Database = {
       mail_account_scope: "personal" | "workspace"
       mail_account_status: "active" | "revoked" | "error"
       mail_basis_kind: "consent" | "relationship" | "generic"
+      mail_domain_purpose: "outreach" | "audience"
       mail_provider: "google"
       mail_sending_provider: "simulator" | "ses"
       mail_suppression_reason: "unsubscribe" | "bounce" | "complaint" | "manual"
-      mailout_address_kind: "contact" | "organization"
+      mailout_address_kind: "contact" | "organization" | "subscriber"
       mailout_event_type:
         | "send"
         | "delivery"
@@ -8085,6 +8922,7 @@ export type Database = {
         | "reject"
         | "delivery_delay"
         | "rendering_failure"
+      mailout_kind: "outreach" | "invitation"
       mailout_recipient_status:
         | "pending"
         | "queued"
@@ -8291,6 +9129,26 @@ export const Constants = {
         "video",
         "other",
       ],
+      audience_consent_channel: [
+        "form",
+        "embed",
+        "header",
+        "page",
+        "admin",
+        "import",
+      ],
+      audience_consent_event_kind: [
+        "requested",
+        "confirmed",
+        "imported",
+        "unsubscribed",
+        "resubscribed",
+        "complained",
+      ],
+      audience_import_status: ["review", "done", "rejected"],
+      audience_source: ["form", "embed", "import", "manual"],
+      audience_status: ["draft", "open", "closed", "archived"],
+      audience_subscription_status: ["pending", "confirmed", "unsubscribed"],
       commitment_state: ["going", "not_going"],
       container_level: ["workspace", "project", "line", "bolo", "performance"],
       conversation_event_direction: ["inbound", "outbound"],
@@ -8337,10 +9195,11 @@ export const Constants = {
       mail_account_scope: ["personal", "workspace"],
       mail_account_status: ["active", "revoked", "error"],
       mail_basis_kind: ["consent", "relationship", "generic"],
+      mail_domain_purpose: ["outreach", "audience"],
       mail_provider: ["google"],
       mail_sending_provider: ["simulator", "ses"],
       mail_suppression_reason: ["unsubscribe", "bounce", "complaint", "manual"],
-      mailout_address_kind: ["contact", "organization"],
+      mailout_address_kind: ["contact", "organization", "subscriber"],
       mailout_event_type: [
         "send",
         "delivery",
@@ -8350,6 +9209,7 @@ export const Constants = {
         "delivery_delay",
         "rendering_failure",
       ],
+      mailout_kind: ["outreach", "invitation"],
       mailout_recipient_status: [
         "pending",
         "queued",
