@@ -25,6 +25,8 @@ no pide migración primero; las migraciones juntas por el gate de § 34.
 - [ ] 108 bug: al añadir profesionales a una invitación del público, la invitación sigue diciendo «Profesionales · 0» hasta recargar (la caché no se invalida; hallado por el E2E, 2026-11-02). Arreglo en `claude/audience-invitation-cache`, junto con tres specs al día.
 - [ ] 99 editor de correos bonitos, tipo Mailchimp, para las invitaciones al público y a profesionales (Marco, 2026-11-01: va después del público, opción A; 2026-11-02: sirve a los dos orígenes, ADR-174). Candidato Templatical; plan B GrapesJS + grapesjs-mjml (`research/2026-11-email-builder.md`). Hoy sólo existe la plantilla fija por espacio (ADR-172).
 - [ ] 100 bug: `mailout_record_event` (función viva del envío) falla con 23514 si llega una queja o un rebote de un destinatario `skipped` (hallado por el carril del público, 2026-11-02). Sin arreglar.
+- [ ] 109 Planificador: la línea de cifras (confirmadas, opciones, noches libres) sale en Mes y Tablero y no en Temporada ni Agenda, y al cambiar de vista todo salta. La línea ocupa el mismo sitio en las cuatro vistas: la Agenda dice desde dónde se lee y la Temporada su propio recuento, en vez de quitarla (drop 02-11).
+- [ ] 110 Conversaciones: repensar el diseño general; hoy no se sabe dónde mirar ni qué es una conversación y qué no (Todas, Difusión, Equipo, envíos y ahora Público, que son listas y no conversaciones). Primero un diagnóstico con capturas y dos o tres direcciones; eliges tú y después se construye (drop 02-11).
 - Aparcado: 86 (responsable de tarea) hasta que entre Anouk.
 
 ## PRIMERO — nada. `main` == prod y las dos suites están vivas (2026-07-30, noche)
