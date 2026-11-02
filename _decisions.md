@@ -6586,3 +6586,46 @@ diseño; el resto de ADR-173 sigue.
 > 8. La baja por token apunta el canal `page`.
 > 9. Deduplicación: el profesional gana sólo si sale; si queda saltado, la suscripción confirmada va como público. La unicidad `(mailout_id, address)` pasa a índice único parcial `WHERE status <> 'skipped'`.
 > 10. «Volver a apuntarme» del público va por la RPC de máquina `audience_resubscribe` con IP, agente y texto vigente; sólo levanta exclusiones nacidas de esa suscripción.
+
+## [2026-11-02] ADR-175 · El alta pública del público (fase 2): cómo saca el E2E el enlace de confirmación y lo que se fijó al construir
+
+**Contexto.** Fase 2 del plan `build/plans/2026-11-01-audience.md` (§ 3.2, § 3.3, § 3.5, § 7): formulario público,
+versión para iframe, confirmación, correo de confirmación, purga diaria y rama del público en la baja. El plan dejó
+marcada [S] una pregunta: con el simulador no llega ningún correo, y la base guarda solo el hash del token, así que el
+E2E no tiene de dónde sacar el enlace de `/c/<token>`. Propuesta del plan: que el endpoint lo devuelva en espacios
+`mailout_simulator_only`. Carril `claude/audience-signup`.
+
+**Decisión.**
+1. **El endpoint público no devuelve nunca el enlace, tampoco en el simulador.** El E2E (`tests/audience-signup.spec.ts`,
+   en `playwright`) prueba el alta en dos partes: por la página, que la respuesta es la de siempre y que la
+   suscripción queda `pending` con `confirm_provider_message_id` del simulador (el correo salió por el adaptador); y,
+   para confirmar, pide su propio token a `audience_subscribe` con la clave de servicio, como la pide el formulario,
+   y abre `/c/<token>` como la persona. Razones: una rama de prueba en una ruta pública sin sesión es código de
+   producción que reparte el secreto de la prueba del consentimiento, y el formulario necesitaría además leer el modo
+   simulador de cada espacio; la construcción del enlace queda cubierta por los unit (`confirmUrl`, el texto del
+   correo por idioma). Lo que no prueba el E2E: el enlace que lleva el correo; lo prueban los unit (`sendConfirmation`
+   pone en el enlace el token que recibe, y `signup` le pasa el que da la RPC).
+2. **Alta y confirmación son acciones de formulario de SvelteKit en el Worker**, sin `/api`: funcionan sin
+   JavaScript, como `/u/<token>`. Formulario e iframe son la misma página con otro canal (`form`, `embed`); el iframe
+   guarda como página de origen el Referer de su GET, en un campo oculto, porque el POST lleva el de Hour.
+3. **Una RPC de máquina nueva, `audience_confirmation_context`** (migración `20261102200000`, aditiva): a quién, en
+   qué idioma, de qué lista y por qué identidad sale la confirmación. La identidad es el primer dominio verificado de
+   propósito `audience`; sin él no sale nada y queda un aviso en el log. Plantilla del 97 con el logo del espacio;
+   sin `List-Unsubscribe`: sin confirmar no hay suscripción de la que darse de baja, y el correo dice que, si no fue
+   ella, no haga nada. Los
+   eventos del simulador se apuntan por `provider_message_id`, como casaría un rebote real.
+4. **Límites del Worker**, además de los de la base (un correo por dirección y lista cada 24 horas, tres en total):
+   10 altas y 30 confirmaciones por IP cada 10 minutos (KV, `rate-limit.ts`), y el campo trampa `website`. La trampa,
+   una clave mal formada, una lista cerrada o una dirección ya confirmada dan la misma respuesta que un alta nueva.
+5. **`/public/audience/<clave>/embed` es la única ruta enmarcable:** `frame-ancestors *` y sin `x-frame-options`, en
+   `hooks.server.ts` por ruta exacta (`$lib/server/frame.ts`); el resto sigue en `'none'` y `DENY`.
+6. **Purga diaria** a las 03:17 UTC (`17 3 * * *`), `audience_purge_pending` desde `worker-cron.ts`.
+7. **La baja del público** (`/u/<token>`): baja de la lista; después, «no recibir nada más» (`mailout_unsubscribe_everything`)
+   y «volver a apuntarme» por la RPC de máquina `audience_resubscribe` con IP y agente. La rama profesional no cambia.
+8. Los tokens de `/c/` y `/u/` se borran de las URL que van a Sentry.
+
+**Cómo se revierte.** Quitar las rutas `public/audience` y `c`, el disparador del cron y la rama `list` de `/u`; la
+RPC nueva se borra con `DROP FUNCTION public.audience_confirmation_context(uuid)`.
+
+**Re-evaluar cuando** llegue SES (fase 4): la confirmación sale ya por el adaptador y el dominio del público, pero el
+E2E contra correo real pediría leer un buzón de prueba.

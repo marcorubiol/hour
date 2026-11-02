@@ -12,6 +12,12 @@
  *   · POST con `undo=1`: «¿Ha sido un error? Volver a recibirlos». Una sola
  *     acción (SvelteKit no deja una por defecto junto a otras con nombre); el
  *     POST de Gmail lleva `List-Unsubscribe=One-Click` y nunca `undo`.
+ *   · POST con `everything=1`: «No recibir nada más de {compañía}», solo en la
+ *     rama del público (`mailout_unsubscribe_everything`).
+ * Rama del público (plan 2026-11-01-audience § 3.5): la baja es de la lista,
+ * no del espacio; «volver a apuntarme» es un consentimiento nuevo y va por la
+ * RPC de máquina `audience_resubscribe`, con la IP y el agente que pone el
+ * Worker. Un profesional, como siempre.
  * Sin sesión: las RPC por token corren como anon. Un token que no existe no
  * hace nada y la página no lo distingue de uno caducado. En el idioma del
  * envío, no en el del navegador.
@@ -22,6 +28,8 @@ import { fail } from '@sveltejs/kit';
 import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { allowRequest, clientIp } from '$lib/server/rate-limit';
 import { detectLocale, type Locale } from '$lib/i18n';
+import { serviceRpc } from '$lib/server/mailout/db';
+import type { MailoutEnv } from '$lib/server/mailout';
 
 /** 24 bytes en hexadecimal (`mailout_recipient.unsubscribe_token`). */
 const TOKEN_RE = /^[0-9a-f]{48}$/;
@@ -31,6 +39,10 @@ interface Info {
   company_name: string;
   language: string;
   unsubscribed: boolean;
+  /** La lista, si el destinatario es del público. */
+  audience_name: string | null;
+  /** Excluida de todo el espacio. */
+  suppressed: boolean;
 }
 
 function pageLocale(info: Info | null, request: Request): Locale {
@@ -49,24 +61,37 @@ export const load: PageServerLoad = async ({ params, platform, request }) => {
     found: info !== null,
     company: info?.company_name ?? null,
     unsubscribed: info?.unsubscribed ?? false,
+    list: info?.audience_name ?? null,
+    suppressed: info?.suppressed ?? false,
     locale: pageLocale(info, request),
   };
 };
 
-async function act(
-  rpc: 'mailout_unsubscribe' | 'mailout_resubscribe',
-  { params, platform, request }: Parameters<Actions[string]>[0],
-) {
-  const env = platform?.env as (SupabaseEnv & { RATE_LIMIT?: KVNamespace }) | undefined;
+type Done = 'unsubscribed' | 'resubscribed' | 'everything';
+
+async function act(done: Done, { params, platform, request }: Parameters<Actions[string]>[0]) {
+  const env = platform?.env as (SupabaseEnv & MailoutEnv & { RATE_LIMIT?: KVNamespace }) | undefined;
   if (!env) return fail(500, { error: 'unavailable' });
   if (!(await allowRequest(env.RATE_LIMIT, `unsub:${clientIp(request)}`, RULE))) return fail(429, { error: 'busy' });
-  if (TOKEN_RE.test(params.token)) await pgPostRpc(env, rpc, null, { p_token: params.token });
-  return { done: rpc === 'mailout_unsubscribe' ? 'unsubscribed' : 'resubscribed' };
+  if (!TOKEN_RE.test(params.token)) return { done };
+  const p_token = params.token;
+  if (done === 'unsubscribed') await pgPostRpc(env, 'mailout_unsubscribe', null, { p_token });
+  else if (done === 'everything') await pgPostRpc(env, 'mailout_unsubscribe_everything', null, { p_token });
+  else if ((await readInfo(env, p_token))?.audience_name) {
+    await serviceRpc(env, 'audience_resubscribe', {
+      p_token,
+      p_ip: request.headers.get('cf-connecting-ip'),
+      p_user_agent: request.headers.get('user-agent'),
+    });
+  } else await pgPostRpc(env, 'mailout_resubscribe', null, { p_token });
+  return { done };
 }
 
 export const actions: Actions = {
   default: async (event) => {
     const form = await event.request.formData().catch(() => null);
-    return act(form?.get('undo') === '1' ? 'mailout_resubscribe' : 'mailout_unsubscribe', event);
+    const done: Done =
+      form?.get('undo') === '1' ? 'resubscribed' : form?.get('everything') === '1' ? 'everything' : 'unsubscribed';
+    return act(done, event);
   },
 };

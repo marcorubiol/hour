@@ -4,7 +4,8 @@
  *
  * What gets scrubbed and why:
  *   - Capability tokens in public-share URLs (/public/roadsheet/<token>,
- *     /api/public/calendar/<token>) — the URL IS the secret; an event or
+ *     /api/public/calendar/<token>), the confirmation of an audience sign-up
+ *     (/c/<token>) and the unsubscribe page (/u/<token>) — the URL IS the secret; an event or
  *     navigation breadcrumb that captures it would hand out the share.
  *   - token / apikey / sentry_key query params, defensively — the collab
  *     WS token param died with the cookie migration, but a regression
@@ -14,7 +15,7 @@
  * and headers out; this covers what rides inside URLs.
  */
 
-const CAPABILITY_PATH = /(\/(?:roadsheet|calendar)\/)[0-9a-f]{16,}/gi;
+const CAPABILITY_PATH = /(\/(?:roadsheet|calendar|c|u)\/)[0-9a-f]{16,}/gi;
 const SENSITIVE_QUERY = /([?&](?:token|apikey|sentry_key)=)[^&#\s]+/gi;
 
 function scrubUrl(url: string): string {

@@ -8,6 +8,7 @@ import type { Handle, HandleServerError } from '@sveltejs/kit';
 import { dev } from '$app/environment';
 import { PUBLIC_SENTRY_DSN, PUBLIC_SENTRY_ENV } from '$env/static/public';
 import { scrubSentryEvent } from '$lib/sentry-scrub';
+import { applyFrameHeaders } from '$lib/server/frame';
 
 /**
  * `initCloudflareSentryHandle` is the Workers-runtime-correct equivalent of
@@ -37,7 +38,8 @@ const sentryConfig = {
  * Non-CSP security headers (CSP itself is kit.csp in svelte.config.js —
  * SvelteKit owns the nonces for its inline hydration scripts). HSTS only
  * outside dev; frame-ancestors lives in the CSP, x-frame-options covers
- * pre-CSP2 agents.
+ * pre-CSP2 agents. One route opts out of both: the audience form for
+ * iframes (/public/audience/<key>/embed, $lib/server/frame).
  */
 const SECURITY_HEADERS: Record<string, string> = {
   'x-content-type-options': 'nosniff',
@@ -80,9 +82,8 @@ const requestContext: Handle = async ({ event, resolve }) => {
   if (response.status === 101) return response;
   try {
     response.headers.set('x-request-id', event.locals.requestId);
-    for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
-      response.headers.set(name, value);
-    }
+    // El formulario del público para iframe es la única ruta enmarcable ($lib/server/frame).
+    applyFrameHeaders(event.url.pathname, response.headers, SECURITY_HEADERS);
   } catch {
     /* immutable headers on a passthrough response — serve it as-is */
   }

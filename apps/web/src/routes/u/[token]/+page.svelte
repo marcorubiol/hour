@@ -2,7 +2,9 @@
   /**
    * La página de baja (plan § 3.4): una frase, un botón, y la vuelta atrás.
    * Sin pedir motivo ni iniciar sesión; funciona sin JavaScript (formularios
-   * normales contra las acciones de +page.server.ts).
+   * normales contra las acciones de +page.server.ts). Una persona del público
+   * (plan 2026-11-01-audience § 3.5) se da de baja de su lista y tiene dos
+   * cosas más: no recibir nada más de la compañía, y volver a apuntarse.
    */
   import { t } from '$lib/i18n';
   import type { ActionData, PageData } from './$types';
@@ -13,6 +15,9 @@
   let company = $derived(data.company ?? '');
   let done = $derived(form && 'done' in form ? form.done : null);
   let unsubscribed = $derived(done ? done === 'unsubscribed' : data.unsubscribed);
+  let list = $derived(data.list);
+  let vars = $derived({ company, list: list ?? '' });
+  let suppressed = $derived(done === 'everything' || (done !== 'resubscribed' && data.suppressed));
 </script>
 
 <svelte:head>
@@ -25,6 +30,31 @@
     <p class="unsub__lead">{t('unsub.invalid', locale)}</p>
   {:else if form && 'error' in form && form.error === 'busy'}
     <p class="unsub__lead">{t('unsub.busy', locale)}</p>
+  {:else if list}
+    {#if done === 'resubscribed'}
+      <p class="unsub__lead">{t('audience.unsub_resubscribed', locale, vars)}</p>
+    {:else if unsubscribed || done === 'everything'}
+      <p class="unsub__lead">
+        {suppressed ? t('audience.unsub_everything_done', locale, vars) : t('audience.unsub_done', locale, vars)}
+      </p>
+      {#if !suppressed}
+        <form method="POST">
+          <input type="hidden" name="everything" value="1" />
+          <button type="submit" class="btn--secondary btn--s">{t('audience.unsub_everything', locale, vars)}</button>
+        </form>
+      {/if}
+      <form method="POST">
+        <input type="hidden" name="undo" value="1" />
+        <p class="unsub__aside">
+          <button type="submit" class="unsub__link">{t('audience.unsub_undo', locale)}</button>
+        </p>
+      </form>
+    {:else}
+      <p class="unsub__lead">{t('audience.unsub_ask', locale, vars)}</p>
+      <form method="POST">
+        <button type="submit" class="btn--primary btn--s">{t('unsub.confirm', locale)}</button>
+      </form>
+    {/if}
   {:else if unsubscribed}
     <p class="unsub__lead">{t('unsub.done', locale, { company })}</p>
     <form method="POST">
