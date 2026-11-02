@@ -2,8 +2,11 @@
  * El formulario público de una lista (plan 2026-11-01-audience § 3.2), para
  * /public/audience/<clave> y su versión para iframe, /…/embed. Las dos rutas
  * son la misma página con otro canal: lo que cambia es la prueba (`form` o
- * `embed`) y, en el iframe, la página que lo enmarca (el Referer del GET, que
- * vuelve en un campo oculto: el POST lleva el Referer de Hour).
+ * `embed`) y, en el iframe, la web que lo enmarca: el Referer del primer GET,
+ * solo si es de otro origen (el POST, un error o el cambio de idioma llevan el
+ * de Hour), que sigue en un campo oculto, en la respuesta de un error y en los
+ * enlaces de idioma (`?page=`). Según la política de Referer de esa web llega
+ * la página entera o solo su origen (ADR-175).
  *
  * Sin sesión. La lectura va por la RPC anon `audience_form_info`; el alta, por
  * la de máquina (`signup`, $lib/server/mailout/audience). Funciona sin
@@ -59,6 +62,17 @@ export function pageUrl(raw: string | null | undefined): string | null {
   return /^https?:\/\//i.test(v) && v.length <= 2048 ? v : null;
 }
 
+/** El Referer, si viene de otra web; el de Hour (un POST, un `?lang=`) no dice dónde está el iframe. */
+export function framingPage(referer: string | null, own: URL): string | null {
+  const ref = pageUrl(referer);
+  if (!ref) return null;
+  try {
+    return new URL(ref).origin === own.origin ? null : ref;
+  } catch {
+    return null;
+  }
+}
+
 function asLocales(values: string[] | null | undefined): Locale[] {
   return (values ?? []).filter((l): l is Locale => LOCALES.includes(l as Locale));
 }
@@ -89,7 +103,10 @@ export function audienceFormLoad(channel: SignupChannel): ServerLoad<{ key: stri
       consentText: info?.consent_text ?? null,
       infoText: info?.info_text ?? null,
       privacyUrl: info?.privacy_url ?? null,
-      pageUrl: channel === 'embed' ? pageUrl(request.headers.get('referer')) : null,
+      pageUrl:
+        channel === 'embed'
+          ? (pageUrl(url.searchParams.get('page')) ?? framingPage(request.headers.get('referer'), url))
+          : null,
     };
     return data;
   };
@@ -104,6 +121,7 @@ export function audienceFormActions(channel: SignupChannel): Actions {
       const field = (name: string) => String(form?.get(name) ?? '');
       const email = field('email');
       const name = field('name');
+      const page = channel === 'embed' ? pageUrl(field('page_url')) : null;
       try {
         const result = await signup(
           env,
@@ -119,11 +137,13 @@ export function audienceFormActions(channel: SignupChannel): Actions {
             channel,
             ip: request.headers.get('cf-connecting-ip'),
             userAgent: request.headers.get('user-agent'),
-            pageUrl: channel === 'embed' ? pageUrl(field('page_url')) : null,
+            pageUrl: page,
           },
           (p) => platform?.ctx?.waitUntil(p),
         );
-        if (!result.ok) return fail(result.error === 'busy' ? 429 : 400, { error: result.error, email, name });
+        if (!result.ok) {
+          return fail(result.error === 'busy' ? 429 : 400, { error: result.error, email, name, pageUrl: page });
+        }
         return { sent: true as const };
       } catch (err) {
         console.error(
@@ -133,7 +153,7 @@ export function audienceFormActions(channel: SignupChannel): Actions {
             message: err instanceof Error ? err.message : String(err),
           }),
         );
-        return fail(500, { error: 'unavailable' as const, email, name });
+        return fail(500, { error: 'unavailable' as const, email, name, pageUrl: page });
       }
     },
   };

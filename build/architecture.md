@@ -213,9 +213,12 @@ No crear usuarios insertando en `auth.users`: usar Auth Admin API/Dashboard.
   cola o dar de alta un dominio siguen pidiendo antes permiso a la base con el
   JWT de la persona.
   La frontera cubre también las RPC `audience_*` de máquina (alta, confirmación,
-  reapuntarse, purga de pendientes, aprobar importación) por ADR-173: solo las
-  llama `$lib/server/mailout/` (`SERVICE_RPCS`), y un alta o confirmación pública
-  llega sin persona detrás, con limitador y token.
+  su contexto y su fallo, reapuntarse, purga de pendientes, aprobar
+  importación) por ADR-173 y ADR-175. La frontera es la lista `SERVICE_RPCS` de
+  `$lib/server/mailout/db.ts`: `serviceRpc` no llama a nada fuera de ella, y la
+  llaman `$lib/server/mailout/`, la baja `/u/<token>` (volver a la lista) y el
+  cron (`worker-cron.ts`, la purga). Un alta o confirmación pública llega sin
+  persona detrás, con limitador y token.
 
 ### Buzón sincronizado (ADR-099, carril 1)
 

@@ -5474,6 +5474,10 @@ export type Database = {
           tenant_name: string
         }[]
       }
+      audience_confirmation_failed: {
+        Args: { p_subscription_id: string }
+        Returns: undefined
+      }
       audience_confirmation_sent: {
         Args: { p_provider_message_id: string; p_subscription_id: string }
         Returns: undefined

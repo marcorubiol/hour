@@ -3,6 +3,7 @@ import {
   composeConfirmation,
   confirmSubscription,
   confirmUrl,
+  ipBucket,
   sendConfirmation,
   signup,
   SIGNUP_RULE,
@@ -127,13 +128,26 @@ describe('sending the confirmation', () => {
     expect(calls[2].body.p_payload).not.toHaveProperty('recipient_id');
   });
 
-  test('without a verified audience domain nothing goes out', async () => {
+  test('with no route nothing goes out and the quota comes back', async () => {
     const { fetchFn, calls } = rpcFetch({ audience_confirmation_context: [ctx({ provider: null, from_address: null })] });
     const sendEmail = vi.fn();
     const provider = { kind: 'simulator', sendEmail } as unknown as SendingProvider;
     expect(await sendConfirmation(ENV, 's1', TOKEN, { fetchFn, providerFor: () => provider })).toBe(false);
     expect(sendEmail).not.toHaveBeenCalled();
-    expect(calls.map((c) => c.rpc)).toEqual(['audience_confirmation_context']);
+    expect(calls.map((c) => c.rpc)).toEqual(['audience_confirmation_context', 'audience_confirmation_failed']);
+  });
+
+  test('a provider that refuses the email gives the quota back and the error goes up', async () => {
+    const { fetchFn, calls } = rpcFetch({ audience_confirmation_context: [ctx()] });
+    const provider = {
+      kind: 'ses',
+      sendEmail: async () => {
+        throw new Error('ses down');
+      },
+    } as unknown as SendingProvider;
+    await expect(sendConfirmation(ENV, 's1', TOKEN, { fetchFn, providerFor: () => provider })).rejects.toThrow('ses down');
+    expect(calls.map((c) => c.rpc)).toEqual(['audience_confirmation_context', 'audience_confirmation_failed']);
+    expect(calls[1].body).toEqual({ p_subscription_id: 's1' });
   });
 });
 
@@ -214,6 +228,16 @@ describe('signing up (plan § 3.2, § 3.3)', () => {
     expect(await signup(env, input(), vi.fn(), fetchFn)).toEqual({ ok: false, error: 'busy' });
     // Otra IP sigue pudiendo.
     expect(await signup(env, input({ ip: '198.51.100.1' }), vi.fn(), fetchFn)).toEqual({ ok: true });
+  });
+});
+
+describe('the limiter key', () => {
+  test('IPv4 as is; IPv6 by its /64, however it is written', () => {
+    expect(ipBucket('203.0.113.7')).toBe('203.0.113.7');
+    expect(ipBucket('2001:db8:85a3:1:aaaa:bbbb:cccc:dddd')).toBe('2001:db8:85a3:1::/64');
+    expect(ipBucket('2001:0db8:85a3:0001::1')).toBe('2001:db8:85a3:1::/64');
+    expect(ipBucket('2001:db8::1')).toBe('2001:db8:0:0::/64');
+    expect(ipBucket(null)).toBe('unknown');
   });
 });
 

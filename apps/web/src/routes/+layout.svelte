@@ -6,6 +6,7 @@
   import Toast from '$lib/components/Toast.svelte';
   import { bindQueryCache, prewarmDB, registerServiceWorker } from '$lib/offline';
   import { provideTheme } from '$lib/theme.svelte';
+  import { isEmbedPath } from '$lib/public-route';
 
   interface Props {
     children: Snippet;
@@ -55,8 +56,10 @@
 
   // Offline scaffold — register SW + open the IndexedDB schema. Both are
   // idempotent and browser-only; helpers have their own guards (Playwright,
-  // SSR, no-IDB-support).
+  // SSR, no-IDB-support). Not inside another site's iframe (the audience form,
+  // ADR-175): nothing of the app's stays in someone else's web.
   onMount(() => {
+    if (isEmbedPath(location.pathname)) return;
     void registerServiceWorker();
     prewarmDB();
   });

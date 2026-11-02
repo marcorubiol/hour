@@ -24,7 +24,7 @@ import { detectLocale, t, type Locale } from '$lib/i18n';
 import { allowRequest } from '$lib/server/rate-limit';
 import { mailoutLinkOrigin, sendingProvider, type MailoutEnv } from './index';
 import { serviceRpc } from './db';
-import type { SendingProvider } from './provider';
+import type { SendingProvider, SentEmail } from './provider';
 
 /** `audience.form_key`: 16 bytes en hexadecimal. */
 export const FORM_KEY_RE = /^[0-9a-f]{32}$/;
@@ -37,6 +37,24 @@ const ADDRESS_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 export const SIGNUP_RULE = { limit: 10, windowSec: 600 };
 /** Confirmaciones por IP: un escáner de enlaces no llega, un script sí. */
 export const CONFIRM_RULE = { limit: 30, windowSec: 600 };
+
+/**
+ * La clave del limitador para una IP: una IPv4 tal cual; una IPv6, su /64,
+ * que es lo que suele tener una sola conexión (cambiar de dirección dentro de
+ * él no da otra cuota).
+ */
+export function ipBucket(ip: string | null): string {
+  if (!ip) return 'unknown';
+  if (!ip.includes(':')) return ip;
+  const [head, tail = ''] = ip.toLowerCase().split('::');
+  const left = head ? head.split(':') : [];
+  const right = tail ? tail.split(':') : [];
+  const groups = ip.includes('::') ? [...left, ...Array(Math.max(8 - left.length - right.length, 0)).fill('0'), ...right] : left;
+  return `${groups
+    .slice(0, 4)
+    .map((g) => g.replace(/^0+(?=.)/, ''))
+    .join(':')}::/64`;
+}
 
 /** El campo trampa: oculto para una persona, lo rellena un robot. */
 export const HONEYPOT_FIELD = 'website';
@@ -105,7 +123,9 @@ export function composeConfirmation(ctx: ConfirmationContext, link: string, orig
 /**
  * Manda el correo de confirmación de una suscripción con su token. Apunta el
  * id del proveedor (para casar un rebote o una queja) y, con el simulador, los
- * eventos que daría el servicio. false si no salió (sin dominio del público).
+ * eventos que daría el servicio. false si no salió (sin ruta de entrega); si
+ * no salió, o el proveedor no lo aceptó, el cupo de la persona vuelve
+ * (`audience_confirmation_failed`).
  */
 export async function sendConfirmation(
   env: Partial<MailoutEnv>,
@@ -121,27 +141,40 @@ export async function sendConfirmation(
     fetchFn,
   );
   const ctx = rows?.[0];
+  // Sin ruta (sin dominio del público verificado, o un espacio solo-simulador
+  // y una dirección real): no sale nada y el cupo vuelve. audience_subscribe
+  // ya no da token en ese caso; esto cubre un dominio quitado entre medias.
+  const giveBack = () =>
+    serviceRpc(env, 'audience_confirmation_failed', { p_subscription_id: subscriptionId }, fetchFn);
   if (!ctx?.provider || !ctx.from_address) {
-    console.warn(JSON.stringify({ level: 'warn', kind: 'audience_confirmation_no_domain', subscription: subscriptionId }));
+    console.warn(JSON.stringify({ level: 'warn', kind: 'audience_confirmation_no_route', subscription: subscriptionId }));
+    await giveBack();
     return false;
   }
   const origin = mailoutLinkOrigin(env);
   const mail = composeConfirmation(ctx, confirmUrl(origin, token), origin);
   const provider = (opts.providerFor ?? ((k: MailSendingProvider) => sendingProvider(k, env)))(ctx.provider);
-  const sent = await provider.sendEmail({
-    from: ctx.from_address,
-    fromName: ctx.from_name,
-    to: ctx.address,
-    toName: ctx.name,
-    replyTo: null,
-    subject: mail.subject,
-    text: mail.text,
-    html: mail.html,
-    headers: {},
-    tenantName: ctx.tenant_name,
-    configurationSet: ctx.configuration_set,
-    tags: { subscription: subscriptionId },
-  });
+  let sent: SentEmail;
+  try {
+    sent = await provider.sendEmail({
+      from: ctx.from_address,
+      fromName: ctx.from_name,
+      to: ctx.address,
+      toName: ctx.name,
+      replyTo: null,
+      subject: mail.subject,
+      text: mail.text,
+      html: mail.html,
+      headers: {},
+      tenantName: ctx.tenant_name,
+      configurationSet: ctx.configuration_set,
+      tags: { subscription: subscriptionId },
+    });
+  } catch (err) {
+    // El proveedor no lo aceptó: la persona puede volver a pedirlo ya.
+    await giveBack().catch(() => undefined);
+    throw err;
+  }
   await serviceRpc(
     env,
     'audience_confirmation_sent',
@@ -192,7 +225,7 @@ export async function signup(
   const invalid = checkSignup(input);
   if (invalid) return invalid;
   if (input.honeypot.trim() || !FORM_KEY_RE.test(input.key)) return { ok: true };
-  if (!(await allowRequest(env.RATE_LIMIT, `aud-signup:${input.ip ?? 'unknown'}`, SIGNUP_RULE))) {
+  if (!(await allowRequest(env.RATE_LIMIT, `aud-signup:${ipBucket(input.ip)}`, SIGNUP_RULE))) {
     return { ok: false, error: 'busy' };
   }
   const rows = await serviceRpc<{ subscription_id: string | null; token: string | null }[]>(
@@ -240,7 +273,7 @@ export async function confirmSubscription(
   fetchFn: typeof fetch = fetch,
 ): Promise<boolean | 'busy'> {
   if (!CONFIRM_TOKEN_RE.test(token)) return false;
-  if (!(await allowRequest(env.RATE_LIMIT, `aud-confirm:${ip ?? 'unknown'}`, CONFIRM_RULE))) return 'busy';
+  if (!(await allowRequest(env.RATE_LIMIT, `aud-confirm:${ipBucket(ip)}`, CONFIRM_RULE))) return 'busy';
   const ok = await serviceRpc<boolean>(
     env,
     'audience_confirm',

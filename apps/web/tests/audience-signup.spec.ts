@@ -119,17 +119,32 @@ test.describe('audience sign-up (simulated)', () => {
 
   test.afterAll(async () => {
     if (!fx.workspaceId) return;
-    if (fx.mailoutId) await service(`mailout?id=eq.${fx.mailoutId}`, { method: 'DELETE' });
+    // Cada paso corre aunque falle el anterior: la política y el dominio vuelven siempre.
+    const steps: (() => Promise<unknown>)[] = [];
+    if (fx.mailoutId) steps.push(() => service(`mailout?id=eq.${fx.mailoutId}`, { method: 'DELETE' }));
     for (const address of [FORM_ADDRESS, CONFIRM_ADDRESS]) {
-      await service(`mail_suppression?workspace_id=eq.${fx.workspaceId}&address=eq.${encodeURIComponent(address)}`, {
-        method: 'DELETE',
-      });
+      steps.push(() =>
+        service(`mail_suppression?workspace_id=eq.${fx.workspaceId}&address=eq.${encodeURIComponent(address)}`, {
+          method: 'DELETE',
+        }),
+      );
     }
-    if (fx.audienceId) await service(`audience?id=eq.${fx.audienceId}`, { method: 'DELETE' });
-    if (fx.domainId) await service(`mail_domain?id=eq.${fx.domainId}`, { method: 'DELETE' });
+    if (fx.audienceId) steps.push(() => service(`audience?id=eq.${fx.audienceId}`, { method: 'DELETE' }));
+    if (fx.domainId) steps.push(() => service(`mail_domain?id=eq.${fx.domainId}`, { method: 'DELETE' }));
     if (!fx.privacyBefore) {
-      await service(`workspace?id=eq.${fx.workspaceId}`, { method: 'PATCH', body: JSON.stringify({ privacy_url: null }) });
+      steps.push(() =>
+        service(`workspace?id=eq.${fx.workspaceId}`, { method: 'PATCH', body: JSON.stringify({ privacy_url: null }) }),
+      );
     }
+    const errors: unknown[] = [];
+    for (const step of steps) {
+      try {
+        await step();
+      } catch (err) {
+        errors.push(err);
+      }
+    }
+    if (errors.length) throw errors[0];
   });
 
   test('sign up from the form: same answer, a pending subscription and the email through the simulator', async ({ page }) => {
@@ -163,6 +178,19 @@ test.describe('audience sign-up (simulated)', () => {
       `audience_subscription?audience_id=eq.${fx.audienceId}&address=eq.${encodeURIComponent(FORM_ADDRESS)}&select=confirm_sent_count`,
     );
     expect(again.confirm_sent_count).toBe(1);
+
+    // Una dirección fuera del simulador en un espacio solo-simulador: la misma
+    // respuesta, y ni fila ni correo (ADR-175).
+    const real = `e2e-aud-${RUN}@example.test`;
+    await page.goto(`/public/audience/${fx.formKey}`);
+    await page.getByLabel('Correo electrónico').fill(real);
+    await page.getByText(`Quiero recibir invitaciones de prueba (${RUN}).`).click();
+    await page.getByText('Tengo 14 años o más.').click();
+    await page.getByRole('button', { name: 'Apuntarme' }).click();
+    await expect(page.getByRole('status')).toHaveText(/Te hemos enviado un correo/);
+    expect(
+      await service<unknown[]>(`audience_subscription?audience_id=eq.${fx.audienceId}&address=eq.${encodeURIComponent(real)}`),
+    ).toHaveLength(0);
   });
 
   test('the embed is framable; the plain form is not', async ({ request }) => {

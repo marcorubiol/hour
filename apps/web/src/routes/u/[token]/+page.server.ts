@@ -67,24 +67,36 @@ export const load: PageServerLoad = async ({ params, platform, request }) => {
   };
 };
 
-type Done = 'unsubscribed' | 'resubscribed' | 'everything';
+type Done = 'unsubscribed' | 'resubscribed' | 'everything' | 'not_resubscribed';
 
-async function act(done: Done, { params, platform, request }: Parameters<Actions[string]>[0]) {
+async function act(asked: Done, { params, platform, request }: Parameters<Actions[string]>[0]) {
   const env = platform?.env as (SupabaseEnv & MailoutEnv & { RATE_LIMIT?: KVNamespace }) | undefined;
   if (!env) return fail(500, { error: 'unavailable' });
   if (!(await allowRequest(env.RATE_LIMIT, `unsub:${clientIp(request)}`, RULE))) return fail(429, { error: 'busy' });
-  if (!TOKEN_RE.test(params.token)) return { done };
+  if (!TOKEN_RE.test(params.token)) return { done: asked, suppressed: false };
   const p_token = params.token;
-  if (done === 'unsubscribed') await pgPostRpc(env, 'mailout_unsubscribe', null, { p_token });
-  else if (done === 'everything') await pgPostRpc(env, 'mailout_unsubscribe_everything', null, { p_token });
-  else if ((await readInfo(env, p_token))?.audience_name) {
-    await serviceRpc(env, 'audience_resubscribe', {
-      p_token,
-      p_ip: request.headers.get('cf-connecting-ip'),
-      p_user_agent: request.headers.get('user-agent'),
-    });
-  } else await pgPostRpc(env, 'mailout_resubscribe', null, { p_token });
-  return { done };
+  try {
+    let done = asked;
+    if (asked === 'unsubscribed') await pgPostRpc(env, 'mailout_unsubscribe', null, { p_token });
+    else if (asked === 'everything') await pgPostRpc(env, 'mailout_unsubscribe_everything', null, { p_token });
+    else if ((await readInfo(env, p_token))?.audience_name) {
+      // Volver a la lista es un consentimiento nuevo, con IP y agente (de máquina).
+      const ok = await serviceRpc<boolean>(env, 'audience_resubscribe', {
+        p_token,
+        p_ip: request.headers.get('cf-connecting-ip'),
+        p_user_agent: request.headers.get('user-agent'),
+      });
+      if (ok !== true) done = 'not_resubscribed';
+    } else await pgPostRpc(env, 'mailout_resubscribe', null, { p_token });
+    // Tras volver, la dirección puede seguir excluida por otra baja (la de la difusión).
+    const suppressed = done === 'resubscribed' ? ((await readInfo(env, p_token))?.suppressed ?? false) : false;
+    return { done, suppressed };
+  } catch (err) {
+    console.error(
+      JSON.stringify({ level: 'error', kind: 'unsubscribe_failed', message: err instanceof Error ? err.message : String(err) }),
+    );
+    return fail(500, { error: 'unavailable' });
+  }
 }
 
 export const actions: Actions = {

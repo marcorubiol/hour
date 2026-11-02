@@ -30,9 +30,16 @@
     <p class="unsub__lead">{t('unsub.invalid', locale)}</p>
   {:else if form && 'error' in form && form.error === 'busy'}
     <p class="unsub__lead">{t('unsub.busy', locale)}</p>
+  {:else if form && 'error' in form}
+    <p class="unsub__lead">{t('audience.unsub_error', locale)}</p>
   {:else if list}
     {#if done === 'resubscribed'}
       <p class="unsub__lead">{t('audience.unsub_resubscribed', locale, vars)}</p>
+      {#if form && 'suppressed' in form && form.suppressed}
+        <p class="unsub__aside">{t('audience.unsub_still_suppressed', locale, vars)}</p>
+      {/if}
+    {:else if done === 'not_resubscribed'}
+      <p class="unsub__lead">{t('audience.unsub_list_closed', locale, vars)}</p>
     {:else if unsubscribed || done === 'everything'}
       <p class="unsub__lead">
         {suppressed ? t('audience.unsub_everything_done', locale, vars) : t('audience.unsub_done', locale, vars)}

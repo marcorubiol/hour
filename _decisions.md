@@ -6606,26 +6606,43 @@ E2E no tiene de dónde sacar el enlace de `/c/<token>`. Propuesta del plan: que 
    correo por idioma). Lo que no prueba el E2E: el enlace que lleva el correo; lo prueban los unit (`sendConfirmation`
    pone en el enlace el token que recibe, y `signup` le pasa el que da la RPC).
 2. **Alta y confirmación son acciones de formulario de SvelteKit en el Worker**, sin `/api`: funcionan sin
-   JavaScript, como `/u/<token>`. Formulario e iframe son la misma página con otro canal (`form`, `embed`); el iframe
-   guarda como página de origen el Referer de su GET, en un campo oculto, porque el POST lleva el de Hour.
-3. **Una RPC de máquina nueva, `audience_confirmation_context`** (migración `20261102200000`, aditiva): a quién, en
-   qué idioma, de qué lista y por qué identidad sale la confirmación. La identidad es el primer dominio verificado de
-   propósito `audience`; sin él no sale nada y queda un aviso en el log. Plantilla del 97 con el logo del espacio;
+   JavaScript, como `/u/<token>`. Formulario e iframe son la misma página con otro canal (`form`, `embed`). El iframe
+   guarda como web de origen el Referer del primer GET, solo si es de otro origen (un POST, un error o el cambio de
+   idioma llevan el de Hour), y la arrastra en un campo oculto, en la respuesta de un error y en los enlaces de idioma.
+   Según la política de Referer de esa web llega la página entera o solo su origen (con la de por defecto,
+   `strict-origin-when-cross-origin`, solo el origen).
+3. **Ruta de entrega de la confirmación** (migración `20261102200000`): el primer dominio verificado de propósito
+   `audience` y, en un espacio `mailout_simulator_only`, solo direcciones `@simulator.amazonses.com`, como ya cumple
+   `queue_mailout` para las invitaciones. Sin ruta, `audience_subscribe` (redefinida desde la base viva) no escribe
+   nada ni emite token, con la misma respuesta a la persona: un espacio de prueba nunca manda un correo real, y un
+   alta que no puede salir no gasta el cupo (24 horas, tres en total). `audience_confirmation_context` (nueva, de
+   máquina) da a quién, en qué idioma y por qué identidad, con la misma ruta. Si el proveedor no acepta el correo,
+   `audience_confirmation_failed` (nueva) anula el token y devuelve el cupo. Se eligió esto y no impedir abrir la
+   lista sin dominio verificado porque cubre también el fallo del proveedor y no toca `set_audience_status`. Plantilla del 97 con el logo del espacio;
    sin `List-Unsubscribe`: sin confirmar no hay suscripción de la que darse de baja, y el correo dice que, si no fue
    ella, no haga nada. Los
    eventos del simulador se apuntan por `provider_message_id`, como casaría un rebote real.
 4. **Límites del Worker**, además de los de la base (un correo por dirección y lista cada 24 horas, tres en total):
-   10 altas y 30 confirmaciones por IP cada 10 minutos (KV, `rate-limit.ts`), y el campo trampa `website`. La trampa,
-   una clave mal formada, una lista cerrada o una dirección ya confirmada dan la misma respuesta que un alta nueva.
+   10 altas y 30 confirmaciones por IP cada 10 minutos (KV, `rate-limit.ts`; una IPv6 cuenta por su /64), y el campo
+   trampa `website`. La trampa, una clave mal formada, una lista cerrada, sin ruta o una dirección ya confirmada dan la
+   misma respuesta que un alta nueva. Límites sabidos: el KV no es atómico (una ráfaga simultánea pasa entera; los
+   topes de la base siguen); y un iframe con `sandbox` sin `allow-same-origin` manda `Origin: null` y
+   `hooks.server.ts` lo rechaza con 403 (el código para copiar de la fase 3 no debe llevar `sandbox`).
 5. **`/public/audience/<clave>/embed` es la única ruta enmarcable:** `frame-ancestors *` y sin `x-frame-options`, en
    `hooks.server.ts` por ruta exacta (`$lib/server/frame.ts`); el resto sigue en `'none'` y `DENY`.
 6. **Purga diaria** a las 03:17 UTC (`17 3 * * *`), `audience_purge_pending` desde `worker-cron.ts`.
 7. **La baja del público** (`/u/<token>`): baja de la lista; después, «no recibir nada más» (`mailout_unsubscribe_everything`)
-   y «volver a apuntarme» por la RPC de máquina `audience_resubscribe` con IP y agente. La rama profesional no cambia.
-8. Los tokens de `/c/` y `/u/` se borran de las URL que van a Sentry.
+   y «volver a apuntarme» por la RPC de máquina `audience_resubscribe` con IP y agente. Si la lista ya no admite la
+   vuelta, la página lo dice; si la dirección sigue excluida por otra baja (la de la difusión), también. La rama
+   profesional no cambia. «No recibir nada más» (redefinida desde la base viva) ya no convierte una exclusión por
+   rebote o manual en `unsubscribe`, así que «volver a apuntarme» no borra un rebote.
+8. **Rastro en el navegador:** los tokens de `/c/` y `/u/` se borran de las URL de los eventos de Sentry, y esas dos
+   páginas cargan Sentry de cliente sin Replay (las grabaciones no pasan por `beforeSend`). El iframe no carga Sentry
+   de cliente, ni service worker, ni IndexedDB en la web de otro (`$lib/public-route.ts`).
 
-**Cómo se revierte.** Quitar las rutas `public/audience` y `c`, el disparador del cron y la rama `list` de `/u`; la
-RPC nueva se borra con `DROP FUNCTION public.audience_confirmation_context(uuid)`.
+**Cómo se revierte.** Quitar las rutas `public/audience` y `c`, el disparador del cron y la rama `list` de `/u`; las
+RPC nuevas se borran con `DROP FUNCTION` (`audience_confirmation_context`, `audience_confirmation_failed`,
+`private.audience_confirmation_route`) y las dos redefinidas vuelven al cuerpo de `20261102180100_audience.sql`.
 
 **Re-evaluar cuando** llegue SES (fase 4): la confirmación sale ya por el adaptador y el dominio del público, pero el
 E2E contra correo real pediría leer un buzón de prueba.

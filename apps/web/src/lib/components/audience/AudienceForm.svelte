@@ -13,7 +13,7 @@
 
   interface Props {
     data: AudienceFormData;
-    form: { sent?: true; error?: string; email?: string; name?: string } | null;
+    form: { sent?: true; error?: string; email?: string; name?: string; pageUrl?: string | null } | null;
   }
 
   let { data, form }: Props = $props();
@@ -21,6 +21,9 @@
   let locale = $derived(data.locale);
   let company = $derived(data.company);
   let error = $derived(form?.error ?? null);
+  // La web que enmarca el iframe: la del primer GET, o la que volvió con un error.
+  let page = $derived(form?.pageUrl ?? data.pageUrl);
+  let pageParam = $derived(page ? `&page=${encodeURIComponent(page)}` : '');
   let target = $derived(data.channel === 'embed' ? '_blank' : undefined);
   // La primera capa: la de la lista o la propuesta, con la política enlazada donde dice {policy}.
   let info = $derived(
@@ -61,7 +64,7 @@
           {#if l === locale}
             <span aria-current="true">{LOCALE_NAME[l]}</span>
           {:else}
-            <a href="?lang={l}" hreflang={l}>{LOCALE_NAME[l]}</a>
+            <a href="?lang={l}{pageParam}" hreflang={l}>{LOCALE_NAME[l]}</a>
           {/if}
         {/each}
       </nav>
@@ -70,7 +73,7 @@
     <form class="aud__form" method="POST">
       <input type="hidden" name="language" value={locale} />
       <input type="hidden" name="consent_text_id" value={data.textId} />
-      {#if data.pageUrl}<input type="hidden" name="page_url" value={data.pageUrl} />{/if}
+      {#if page}<input type="hidden" name="page_url" value={page} />{/if}
 
       <label class="field field--stack" class:field--error={error === 'email'}>
         <span class="field__label eyebrow">{t('audience.form_email', locale)}</span>

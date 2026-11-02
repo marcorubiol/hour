@@ -9,11 +9,9 @@
  * comprobación de Origin sin otra excepción.
  */
 
-export const EMBED_PATH_RE = /^\/public\/audience\/[0-9a-f]{32}\/embed\/?$/;
+import { isEmbedPath } from '$lib/public-route';
 
-export function isEmbedPath(pathname: string): boolean {
-  return EMBED_PATH_RE.test(pathname);
-}
+export { isEmbedPath };
 
 /** La CSP de la app con `frame-ancestors *` en lugar de la suya. */
 export function frameableCsp(csp: string): string {
