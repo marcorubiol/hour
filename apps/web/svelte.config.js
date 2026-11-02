@@ -75,6 +75,9 @@ export default {
      *    present). The XSS win that matters is nonced script-src.
      *  - worker-src blob: is required by Sentry Replay's compression
      *    worker; 'self' covers the PWA service worker.
+     *  - frame-ancestors 'none' everywhere but one route, the audience form
+     *    for iframes (/public/audience/<key>/embed): hooks.server.ts opens it
+     *    to `*` there ($lib/server/frame.ts, ADR-175).
      */
     csp: {
       mode: 'auto',

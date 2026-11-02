@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { scrubTransaction } from './sentry-scrub';
+import { scrubSentryEvent, scrubTransaction } from './sentry-scrub';
 
 describe('a transaction carries timings, not who or what (ADR-157)', () => {
   test('the page URL becomes the route; span URLs lose queries, ids and slugs', () => {
@@ -29,5 +29,16 @@ describe('a transaction carries timings, not who or what (ADR-157)', () => {
     ]);
     expect(event.spans![0].data).toEqual({});
     expect(event.contexts!.trace!.data).toEqual({ 'sentry.op': 'pageload' });
+  });
+});
+
+describe('capability tokens in URLs never reach an event', () => {
+  test('the audience confirmation (/c/) and the unsubscribe page (/u/) lose their token', () => {
+    const event = scrubSentryEvent({
+      request: { url: `https://hour.zerosense.studio/c/${'b'.repeat(64)}` },
+      breadcrumbs: [{ data: { url: `/u/${'a'.repeat(48)}` } }],
+    });
+    expect(event.request!.url).toBe('https://hour.zerosense.studio/c/[token]');
+    expect(event.breadcrumbs![0].data!.url).toBe('/u/[token]');
   });
 });

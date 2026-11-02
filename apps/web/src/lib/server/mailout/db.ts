@@ -32,6 +32,8 @@ const SERVICE_RPCS = [
   'audience_confirmation_sent',
   'audience_purge_pending',
   'audience_approve_import',
+  'audience_confirmation_context',
+  'audience_confirmation_failed',
 ] as const;
 type MailoutServiceRpc = (typeof SERVICE_RPCS)[number];
 

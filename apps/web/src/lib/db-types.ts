@@ -5457,6 +5457,27 @@ export type Database = {
           valid: boolean
         }[]
       }
+      audience_confirmation_context: {
+        Args: { p_subscription_id: string }
+        Returns: {
+          address: string
+          audience_name: string
+          company_name: string
+          configuration_set: string
+          form_key: string
+          from_address: string
+          from_name: string
+          language: string
+          logo_url: string
+          name: string
+          provider: Database["public"]["Enums"]["mail_sending_provider"]
+          tenant_name: string
+        }[]
+      }
+      audience_confirmation_failed: {
+        Args: { p_subscription_id: string }
+        Returns: undefined
+      }
       audience_confirmation_sent: {
         Args: { p_provider_message_id: string; p_subscription_id: string }
         Returns: undefined

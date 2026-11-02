@@ -4,8 +4,14 @@ import type { HandleClientError } from '@sveltejs/kit';
 import { dev } from '$app/environment';
 import { PUBLIC_SENTRY_DSN, PUBLIC_SENTRY_ENV } from '$env/static/public';
 import { scrubSentryEvent, scrubTransaction } from '$lib/sentry-scrub';
+import { clientSentryMode } from '$lib/public-route';
 
-if (PUBLIC_SENTRY_DSN) {
+// The audience form inside another company's site loads no Sentry; the token
+// pages (/c/, /u/) load it without Replay, whose recordings skip beforeSend
+// and would carry the token in the URL (ADR-175, $lib/public-route).
+const sentryMode = clientSentryMode(location.pathname);
+
+if (PUBLIC_SENTRY_DSN && sentryMode !== 'off') {
   Sentry.init({
     dsn: PUBLIC_SENTRY_DSN,
     enabled: true,
@@ -31,11 +37,10 @@ if (PUBLIC_SENTRY_DSN) {
     // plan ships 50 replays/month so this is generous for Phase 0 traffic.
     // Masking explicit (they're also the defaults): external users' text
     // and media never leave the page.
-    replaysSessionSampleRate: 0.1,
-    replaysOnErrorSampleRate: 1.0,
-    integrations: [
-      Sentry.replayIntegration({ maskAllText: true, blockAllMedia: true }),
-    ],
+    replaysSessionSampleRate: sentryMode === 'full' ? 0.1 : 0,
+    replaysOnErrorSampleRate: sentryMode === 'full' ? 1.0 : 0,
+    integrations:
+      sentryMode === 'full' ? [Sentry.replayIntegration({ maskAllText: true, blockAllMedia: true })] : [],
   });
 }
 
