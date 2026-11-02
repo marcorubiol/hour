@@ -37,17 +37,19 @@
   import { messageFailed } from '$lib/components/MessageItem.svelte';
   import {
     CONVERSATION_EVENT_KINDS,
+    EVENT_BODY_MAX,
     eventKindLabel,
     occurredAtForDay,
     type ConversationEventCreate,
     type ConversationEventItem,
     type ConversationEventKind,
   } from '$lib/conversation';
-  import { insertBlock, materialLine, replySubject, type MailAccountsResponse } from '$lib/mail';
+  import { MAIL_BODY_MAX, insertBlock, materialLine, replySubject, type MailAccountsResponse } from '$lib/mail';
   import { kindLabel, type MaterialItem } from '$lib/material';
   import { sortTexts, workspaceTextsQueryOptions, type WorkspaceText } from '$lib/workspace-texts';
   import { safeHref } from '$lib/utils/safe-url';
   import { MESSAGE_MAX, audienceLine, type MessageCreate, type ThreadAudience } from '$lib/threads';
+  import { senderName } from '$lib/conversation-thread';
 
   interface Props {
     conversation: { id: string; workspace_id: string; line_id: string | null; can_edit: boolean };
@@ -76,11 +78,27 @@
   }: Props = $props();
 
   const queryClient = useQueryClient();
+  // Página y vistazo pueden dibujar la misma ficha: ids propios de esta.
+  const uid = $props.id();
+  const ids = { body: `${uid}-body`, subject: `${uid}-subject`, from: `${uid}-from`, to: `${uid}-to`, hint: `${uid}-hint` };
 
-  let body = $state('');
+  /**
+   * Un borrador por destino: lo escrito para el equipo no se vuelve cuerpo de
+   * un correo al cambiar de destino (ni al pulsar «Responder»).
+   */
+  let drafts = $state<Record<ComposerTarget, string>>({ mail: '', team: '', log: '' });
+  let body = $derived(drafts[target]);
   let field = $state<HTMLTextAreaElement>();
   /** Se eligió destino a mano: la falta de buzón ya no lo mueve. */
   let chosen = $state(false);
+
+  /** Correo sólo sale con `edit:conversation` (`mail_send_authorize`): sin él, el equipo. */
+  $effect.pre(() => {
+    if (!conv.can_edit && target !== 'team') target = 'team';
+  });
+
+  /** ⌘ en un Mac, Ctrl en el resto: lo que el atajo de enviar dice. */
+  const mod = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent) ? '⌘' : 'Ctrl';
   /** «Abrir como correo»: de, para, asunto, insertar y firma a la vista. */
   let full = $state(false);
 
@@ -99,8 +117,9 @@
   let mailBlocked = $derived<'no_mailbox' | 'no_email' | null>(
     !mail ? null : sendable.length === 0 ? 'no_mailbox' : !recipient?.email ? 'no_email' : null,
   );
+  // Sin buzón ni email, el campo pasa a «Apuntar»; nunca con algo escrito.
   $effect(() => {
-    if (mailBlocked && !chosen && target === 'mail') target = conv.can_edit ? 'log' : 'team';
+    if (mailBlocked && !chosen && target === 'mail' && !drafts.mail.trim()) target = conv.can_edit ? 'log' : 'team';
   });
 
   let accountPick = $state('');
@@ -154,8 +173,8 @@
 
   /** En el cursor del texto (donde se dejó), en su propia línea. */
   async function insertAtCaret(insert: string) {
-    const r = insertBlock(body, insert, field?.selectionStart ?? body.length, field?.selectionEnd ?? body.length);
-    body = r.text;
+    const r = insertBlock(drafts.mail, insert, field?.selectionStart ?? drafts.mail.length, field?.selectionEnd ?? drafts.mail.length);
+    drafts.mail = r.text;
     await tick();
     field?.focus();
     field?.setSelectionRange(r.caret, r.caret);
@@ -167,12 +186,12 @@
         conversation_id: conv.id,
         account_id: fromAccount,
         subject: subject.trim(),
-        body,
+        body: drafts.mail,
         reply_to_event_id: replyTo?.id ?? null,
       }),
     onSuccess: () => {
       addToast({ tone: 'success', title: t('mail.sent', locale), message: subject });
-      body = '';
+      drafts.mail = '';
       full = false;
       subjectEdit = null;
       onsent('mail');
@@ -201,7 +220,7 @@
   const postTeam = createMutation({
     mutationFn: (input: MessageCreate) => mutateJSON('POST', '/api/messages', input),
     onSuccess: () => {
-      body = '';
+      drafts.team = '';
       onsent('team');
     },
     onError: (err) => messageFailed(err, 'threads.not_sent', locale),
@@ -227,7 +246,7 @@
     mutationFn: (event: ConversationEventCreate) =>
       mutateJSON<{ item: ConversationEventItem }>('POST', `/api/conversations/${conv.id}/events`, event),
     onSuccess: (data) => {
-      body = '';
+      drafts.log = '';
       logDay = localDayISO();
       // Sale ya en el hilo, sin esperar a la recarga (que llega después y manda).
       const item = data?.item;
@@ -279,7 +298,7 @@
       if (!subject.trim()) {
         full = true;
         await tick();
-        document.getElementById('thread-subject')?.focus();
+        document.getElementById(ids.subject)?.focus();
         return;
       }
       $sendMail.mutate();
@@ -289,17 +308,30 @@
         anchor_id: conv.id,
         facet_id: null,
         performance_id: null,
-        body: body.trim(),
+        body: drafts.team.trim(),
       });
     } else {
       $logEvent.mutate({
         kind: logKind,
         direction: logDirection || null,
-        body: body.trim() || null,
+        body: drafts.log.trim() || null,
         occurred_at: occurredAtForDay(logDay),
       });
     }
   }
+
+  /**
+   * Intro en un campo de una línea (el asunto, el día) no envía nada: el
+   * correo sale sólo desde el texto o el botón, y lo apuntado no se deshace.
+   */
+  let formEl = $state<HTMLFormElement>();
+  $effect(() => {
+    const guard = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && e.target instanceof HTMLInputElement) e.preventDefault();
+    };
+    formEl?.addEventListener('keydown', guard);
+    return () => formEl?.removeEventListener('keydown', guard);
+  });
 
   /** Intro envía en el equipo; en un correo y en lo apuntado es un salto de línea y ⌘/Ctrl+Intro envía. */
   function onKey(e: KeyboardEvent) {
@@ -311,26 +343,41 @@
   }
 
   let name = $derived(recipient?.full_name ?? '');
+  /** Quien escribió el correo al que se responde, si no es a quien sale la respuesta. */
+  let replySender = $derived.by(() => {
+    const who = senderName(replyTo?.mail_from);
+    return who && who !== name && who.toLowerCase() !== recipient?.email.toLowerCase() ? who : '';
+  });
   let placeholder = $derived(
     target === 'mail'
-      ? t(replyTo ? 'thread.mail_placeholder_reply' : 'thread.mail_placeholder', locale, { name })
+      ? replySender
+        ? t('thread.mail_placeholder_reply_other', locale, { name, sender: replySender })
+        : t(replyTo ? 'thread.mail_placeholder_reply' : 'thread.mail_placeholder', locale, { name })
       : target === 'team'
         ? t('thread.team_placeholder', locale)
         : t('thread.log_placeholder', locale),
   );
 </script>
 
-<form class="composer" class:composer--team={target === 'team'} onsubmit={submit} data-testid="thread-composer">
+<form
+  class="composer"
+  class:composer--team={target === 'team'}
+  onsubmit={submit}
+  bind:this={formEl}
+  data-testid="thread-composer"
+>
   <div class="composer__targets" role="group" aria-label={t('thread.target_label', locale)}>
-    <button
-      type="button"
-      class="composer__target"
-      aria-pressed={target === 'mail'}
-      data-testid="composer-to-mail"
-      onclick={() => focus('mail')}
-    >
-      {#if name}{t('thread.to_mail', locale, { name })}{:else}{t('thread.to_mail_none', locale)}{/if}
-    </button>
+    {#if conv.can_edit}
+      <button
+        type="button"
+        class="composer__target"
+        aria-pressed={target === 'mail'}
+        data-testid="composer-to-mail"
+        onclick={() => focus('mail')}
+      >
+        {#if name}{t('thread.to_mail', locale, { name })}{:else}{t('thread.to_mail_none', locale)}{/if}
+      </button>
+    {/if}
     <button
       type="button"
       class="composer__target"
@@ -354,16 +401,16 @@
 
   {#if target === 'mail' && full}
     <div class="composer__mail">
-      <Select id="thread-from" label={t('mail.from', locale)} value={fromAccount} onchange={(e) => (accountPick = (e.currentTarget as HTMLSelectElement).value)}>
+      <Select id={ids.from} label={t('mail.from', locale)} value={fromAccount} onchange={(e) => (accountPick = (e.currentTarget as HTMLSelectElement).value)}>
         {#each sendable as a (a.id)}
           <option value={a.id}>{accountLabel(a)}</option>
         {/each}
       </Select>
-      <Field id="thread-to" label={t('mail.to', locale)} group>
+      <Field id={ids.to} label={t('mail.to', locale)} group>
         <span class="composer__to">{recipient?.full_name} &lt;{recipient?.email}&gt;</span>
       </Field>
       <Input
-        id="thread-subject"
+        id={ids.subject}
         label={t('mail.subject', locale)}
         value={subject}
         oninput={(e) => (subjectEdit = { for: replyTo?.id ?? '', text: (e.currentTarget as HTMLInputElement).value })}
@@ -390,13 +437,14 @@
 
   <div class="composer__row">
     <textarea
-      id="thread-body"
+      id={ids.body}
       rows="1"
-      maxlength={target === 'team' ? MESSAGE_MAX : 20000}
+      maxlength={target === 'team' ? MESSAGE_MAX : target === 'log' ? EVENT_BODY_MAX : MAIL_BODY_MAX}
       {placeholder}
       aria-label={placeholder}
+      aria-describedby={ids.hint}
       disabled={target === 'mail' && Boolean(mailBlocked)}
-      bind:value={body}
+      bind:value={drafts[target]}
       bind:this={field}
       onkeydown={onKey}
     ></textarea>
@@ -426,21 +474,21 @@
     {#if signature}<p class="composer__sig">-- <br />{signature}</p>{/if}
   {/if}
 
-  <p class="composer__hint" data-testid="write-why">
+  <p class="composer__hint" id={ids.hint} data-testid="write-why">
     {#if target === 'mail'}
       {#if mailBlocked}
         {t(`record.write_${mailBlocked}`, locale)}{#if mailBlocked === 'no_mailbox'}{' · '}<a
             href={`/h/${workspaceSlug}/settings?section=mail`}>{t('record.write_to_settings', locale)}</a
           >{/if}
       {:else if from && subject.trim()}
-        {t('thread.mail_hint', locale, { address: from.address, subject })}
+        {t('thread.mail_hint', locale, { address: from.address, subject, mod })}
       {:else if from}
         {t('thread.mail_hint_new', locale, { address: from.address })}
       {/if}
     {:else if target === 'team'}
       {#if $audienceQuery.data}{audienceLine($audienceQuery.data, locale)} · {/if}{t('thread.team_hint', locale)}
     {:else}
-      {futureDay ? t('conversations.not_future', locale) : t('thread.log_hint', locale)}
+      {futureDay ? t('conversations.not_future', locale) : t('thread.log_hint', locale, { mod })}
     {/if}
   </p>
 </form>
@@ -510,6 +558,14 @@
       min-block-size: var(--control-size-m);
       max-block-size: 40vh;
       resize: none;
+    }
+    /* Without field-sizing (Firefox, older Safari) the field does not grow
+       with the text: give it room for a few lines, and let it be dragged. */
+    @supports not (field-sizing: content) {
+      .composer__row textarea {
+        min-block-size: calc(var(--control-size-m) * 2);
+        resize: vertical;
+      }
     }
     .composer__btns {
       display: inline-flex;

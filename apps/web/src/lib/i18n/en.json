@@ -3054,10 +3054,10 @@
   "thread.open_as_mail": "Open as email",
   "thread.close_mail": "Close the email",
   "thread.log_send": "Log",
-  "thread.mail_hint": "Goes out from {address} with the subject “{subject}” and your signature, and comes back to the thread. ⌘ Enter sends.",
+  "thread.mail_hint": "Goes out from {address} with the subject “{subject}” and your signature, and comes back to the thread. {mod} Enter sends.",
   "thread.mail_hint_new": "Goes out from {address} with your signature. It needs a subject: open it as an email.",
   "thread.team_hint": "Enter sends",
-  "thread.log_hint": "Sent to nobody: it stays in the thread and counts as a contact. ⌘ Enter logs it.",
+  "thread.log_hint": "It never leaves Hour: whoever sees this conversation sees it, and it counts as a contact. {mod} Enter logs it.",
   "thread.mail_placeholder": "Write to {name}…",
   "thread.mail_placeholder_reply": "Reply to {name}… (Enter makes a new line)",
   "thread.team_placeholder": "Write to the team…",
@@ -3087,5 +3087,8 @@
   "thread.dir_in": "from them",
   "thread.group_team": "Team",
   "thread.open_bolo": "Open the gig",
-  "thread.group_missing": "This thread is not here, or you do not read it."
+  "thread.group_missing": "This thread is not here, or you do not read it.",
+  "thread.mail_placeholder_reply_other": "Replying to {sender}; the email goes to {name}… (Enter makes a new line)",
+  "thread.back_list": "Back to the list",
+  "thread.back_home": "Back to Today"
 }

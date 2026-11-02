@@ -60,7 +60,8 @@ export const GET: RequestHandler = async ({ request, params, platform, locals })
         search: new URLSearchParams({ select: 'last_read_at', conversation_id: `eq.${idParsed.output}`, limit: '1' }),
       }),
     ]);
-    return json({ items: data, last_read_at: reads[0]?.last_read_at ?? null });
+    // Sin nada que leer (o sin poder leerla ya) no se dice hasta dónde se leyó.
+    return json({ items: data, last_read_at: data.length > 0 ? (reads[0]?.last_read_at ?? null) : null });
   } catch (err) {
     return pgErrorResponse(
       err,

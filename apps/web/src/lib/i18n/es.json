@@ -3054,10 +3054,10 @@
   "thread.open_as_mail": "Abrir como correo",
   "thread.close_mail": "Cerrar el correo",
   "thread.log_send": "Apuntar",
-  "thread.mail_hint": "Sale por {address} con el asunto «{subject}» y tu firma; vuelve al hilo al salir. ⌘ Intro envía.",
+  "thread.mail_hint": "Sale por {address} con el asunto «{subject}» y tu firma; vuelve al hilo al salir. {mod} Intro envía.",
   "thread.mail_hint_new": "Sale por {address} con tu firma. Le falta el asunto: ábrelo como correo.",
   "thread.team_hint": "Intro envía",
-  "thread.log_hint": "No se manda a nadie: queda en el hilo y cuenta como contacto. ⌘ Intro apunta.",
+  "thread.log_hint": "No sale de Hour: lo ve quien ve esta conversación y cuenta como contacto. {mod} Intro apunta.",
   "thread.mail_placeholder": "Escribir a {name}…",
   "thread.mail_placeholder_reply": "Responder a {name}… (Intro hace salto de línea)",
   "thread.team_placeholder": "Escribe al equipo…",
@@ -3087,5 +3087,8 @@
   "thread.dir_in": "de su parte",
   "thread.group_team": "Equipo",
   "thread.open_bolo": "Abrir el bolo",
-  "thread.group_missing": "Este hilo no está, o no lo lees."
+  "thread.group_missing": "Este hilo no está, o no lo lees.",
+  "thread.mail_placeholder_reply_other": "Respondes a {sender}; el correo va a {name}… (Intro hace salto de línea)",
+  "thread.back_list": "Volver a la lista",
+  "thread.back_home": "Volver a Hoy"
 }

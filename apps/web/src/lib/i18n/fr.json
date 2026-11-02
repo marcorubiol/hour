@@ -3054,10 +3054,10 @@
   "thread.open_as_mail": "Ouvrir en mail",
   "thread.close_mail": "Fermer le mail",
   "thread.log_send": "Noter",
-  "thread.mail_hint": "Part de {address} avec l’objet « {subject} » et ta signature, puis revient au fil. ⌘ Entrée envoie.",
+  "thread.mail_hint": "Part de {address} avec l’objet « {subject} » et ta signature, puis revient au fil. {mod} Entrée envoie.",
   "thread.mail_hint_new": "Part de {address} avec ta signature. Il manque l’objet : ouvre-le en mail.",
   "thread.team_hint": "Entrée envoie",
-  "thread.log_hint": "N’est envoyé à personne : reste dans le fil et compte comme contact. ⌘ Entrée le note.",
+  "thread.log_hint": "Ne sort pas de Hour : qui voit cette conversation le voit, et il compte comme contact. {mod} Entrée le note.",
   "thread.mail_placeholder": "Écrire à {name}…",
   "thread.mail_placeholder_reply": "Répondre à {name}… (Entrée va à la ligne)",
   "thread.team_placeholder": "Écris à l’équipe…",
@@ -3087,5 +3087,8 @@
   "thread.dir_in": "de leur part",
   "thread.group_team": "Équipe",
   "thread.open_bolo": "Ouvrir le contrat",
-  "thread.group_missing": "Ce fil n’existe pas, ou tu ne le lis pas."
+  "thread.group_missing": "Ce fil n’existe pas, ou tu ne le lis pas.",
+  "thread.mail_placeholder_reply_other": "Tu réponds à {sender} ; le mail va à {name}… (Entrée va à la ligne)",
+  "thread.back_list": "Retour à la liste",
+  "thread.back_home": "Retour à Aujourd’hui"
 }

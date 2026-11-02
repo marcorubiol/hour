@@ -79,6 +79,14 @@
   );
   let title = $derived([place, name].filter(Boolean).join(' · '));
   let boardHref = $derived(first?.slug ? `/h/${workspaceSlug}/performance/${first.slug}#board` : null);
+  /** Sin la barra de lentes en el móvil, siempre hay vuelta: la lista, el tablón o Hoy. */
+  let back = $derived(
+    lensOn('conversations')
+      ? { href: '/h/conversations', label: t('thread.back_list', locale) }
+      : boardHref
+        ? { href: boardHref, label: t('thread.open_bolo', locale) }
+        : { href: '/h', label: t('thread.back_home', locale) },
+  );
 
   let footEl = $state<HTMLElement>();
   markReadWhenSeen({
@@ -102,8 +110,8 @@
 
 <section class="record group" data-chat-open={inPeek ? undefined : ''} data-testid="bolo-group">
   <header class="group__head">
-    {#if !inPeek && lensOn('conversations')}
-      <a class="group__back" href="/h/conversations" aria-label={t('conversations.back', locale)}>
+    {#if !inPeek}
+      <a class="group__back" href={back.href} aria-label={back.label}>
         <span aria-hidden="true">‹</span>
       </a>
     {/if}

@@ -180,8 +180,10 @@
 
   // Abrirla la deja leída (ADR-138, fase 3): la lista común deja de contar sus
   // entrantes; la fila se apaga sin esperar a la recarga.
+  // Sólo después de apuntar hasta dónde se había leído: si se marcase antes,
+  // la raya de «nuevos» se perdería.
   markConversationReadOnOpen({
-    conversationId: () => ($eventsQuery.isSuccess ? conv?.id : null),
+    conversationId: () => ($eventsQuery.isSuccess && conv && openedRead?.id === conv.id ? conv.id : null),
     latest: () => events[0]?.id ?? '',
     onmarked: (id) => {
       queryClient.setQueriesData<ConversationFeedView>({ queryKey: ['conversation-feed'] }, (view) =>
@@ -373,12 +375,21 @@
   let contacts = $derived(conv ? currentContacts(conv.contacts).filter((c) => c.person) : []);
   let who = $derived(contacts.map((c) => (c.role ? `${c.person!.full_name} (${c.role})` : c.person!.full_name)).join(', '));
 
-  /** A quién sale un correo: el contacto principal (`mail_send_authorize`). */
+  /**
+   * A quién sale un correo: el contacto principal y nadie más
+   * (`mail_send_authorize`). Sin email suyo, el correo dice por qué y no sale.
+   */
   let recipient = $derived.by(() => {
     const p = conv?.contacts.find((c) => c.is_primary)?.person ?? null;
-    if (p?.email) return { full_name: p.full_name, email: p.email };
-    return conv?.person?.email ? { full_name: conv.person.full_name, email: conv.person.email } : null;
+    return p?.email ? { full_name: p.full_name, email: p.email } : null;
   });
+
+  /** La vuelta de un chat a pantalla entera: la lista, o Hoy sin la lente. */
+  let back = $derived(
+    lensOn('conversations')
+      ? { href: '/h/conversations', label: t('thread.back_list', locale) }
+      : { href: '/h', label: t('thread.back_home', locale) },
+  );
 
   // ── El siguiente paso, en sitio (ADR-139 p2 A) ──
   let stepOpen = $state(false);
@@ -451,8 +462,8 @@
   <section class="record conv chat" data-chat-open={inPeek ? undefined : ''}>
     <!-- Con quién: tocar la cabecera abre los detalles, como un chat. -->
     <header class="chat__head">
-      {#if !inPeek && lensOn('conversations')}
-        <a class="chat__back" href="/h/conversations" aria-label={t('conversations.back', locale)}>
+      {#if !inPeek}
+        <a class="chat__back" href={back.href} aria-label={back.label}>
           <span aria-hidden="true">‹</span>
         </a>
       {/if}
@@ -648,6 +659,7 @@
     </ol>
 
     <div class="chat__foot" bind:this={footEl}>
+      {#key conv.id}
       <ConversationComposer
         bind:this={composer}
         bind:target
@@ -659,6 +671,7 @@
         {locale}
         onsent={afterSent}
       />
+      {/key}
     </div>
   </section>
 

@@ -3054,10 +3054,10 @@
   "thread.open_as_mail": "Obrir com a correu",
   "thread.close_mail": "Tancar el correu",
   "thread.log_send": "Apuntar",
-  "thread.mail_hint": "Surt per {address} amb l’assumpte «{subject}» i la teva signatura; torna al fil en sortir. ⌘ Intro envia.",
+  "thread.mail_hint": "Surt per {address} amb l’assumpte «{subject}» i la teva signatura; torna al fil en sortir. {mod} Intro envia.",
   "thread.mail_hint_new": "Surt per {address} amb la teva signatura. Li falta l’assumpte: obre’l com a correu.",
   "thread.team_hint": "Intro envia",
-  "thread.log_hint": "No s’envia a ningú: queda al fil i compta com a contacte. ⌘ Intro apunta.",
+  "thread.log_hint": "No surt de Hour: ho veu qui veu aquesta conversa i compta com a contacte. {mod} Intro apunta.",
   "thread.mail_placeholder": "Escriure a {name}…",
   "thread.mail_placeholder_reply": "Respondre a {name}… (Intro fa salt de línia)",
   "thread.team_placeholder": "Escriu a l’equip…",
@@ -3087,5 +3087,8 @@
   "thread.dir_in": "de part seva",
   "thread.group_team": "Equip",
   "thread.open_bolo": "Obrir el bolo",
-  "thread.group_missing": "Aquest fil no hi és, o no el llegeixes."
+  "thread.group_missing": "Aquest fil no hi és, o no el llegeixes.",
+  "thread.mail_placeholder_reply_other": "Respons a {sender}; el correu va a {name}… (Intro fa salt de línia)",
+  "thread.back_list": "Tornar a la llista",
+  "thread.back_home": "Tornar a Avui"
 }
