@@ -64,12 +64,13 @@ test.describe('mailout (simulated)', () => {
     // ── Lo que pone el spec: dominio verificado y una conversación suya ──
     const workspaces = await api<{ items: { id: string; slug: string }[] }>(page, 'GET', '/api/workspaces');
     const workspaceId = workspaces.data.items.find((w) => w.slug === 'playwright')!.id;
-    const domains = await api<{ items: { id: string; verified_at: string | null }[] }>(
+    const domains = await api<{ items: { id: string; verified_at: string | null; purpose: string }[] }>(
       page,
       'GET',
       `/api/mailout/domains?workspace_id=${workspaceId}`,
     );
-    let domainId = domains.data.items.find((d) => d.verified_at)?.id ?? null;
+    // El de la difusión: el del público (ADR-173 § 5) no sirve a un envío.
+    let domainId = domains.data.items.find((d) => d.verified_at && d.purpose === 'outreach')?.id ?? null;
     let ownDomain = false;
     if (!domainId) {
       const added = await api<{ item: { id: string } }>(page, 'POST', '/api/mailout/domains', {
