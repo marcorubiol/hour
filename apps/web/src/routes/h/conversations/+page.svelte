@@ -55,7 +55,7 @@
   import { createMutation, createQuery } from '@tanstack/svelte-query';
   import { afterNavigate, goto } from '$app/navigation';
   import { page } from '$app/state';
-  import { fetchJSON, mutateJSON } from '$lib/api';
+  import { ApiError, fetchJSON, mutateJSON } from '$lib/api';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import Button from '$lib/components/Button.svelte';
   import LensHeader from '$lib/components/LensHeader.svelte';
@@ -624,11 +624,18 @@
       return d?.workspace.slug ?? '';
     },
     onSuccess: (slug) => void goto(`/h/${slug}/mailout/${invitationId}`),
+    // The list is replaced whole: a professional another editor added from a
+    // project the caller does not edit makes the whole change a «not found».
     onError: (err) =>
       addToast({
         tone: 'danger',
         title: t('mailout.action_failed', locale),
-        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
+        message:
+          err instanceof ApiError && err.status === 404
+            ? t('mailout.err_pros_not_yours', locale)
+            : err instanceof Error
+              ? err.message
+              : t('perf.unexpected', locale),
       }),
   });
 
@@ -656,7 +663,7 @@
   <title>{docTitle(t('lens.conversations', locale))}</title>
 </svelte:head>
 
-<section class="conversations" class:conversations--calm={calm.on && panel === 'common'} aria-busy={busy}>
+<section class="conversations" class:conversations--calm={calm.on && panel !== 'team' && panel !== 'audience'} aria-busy={busy}>
   <LensHeader help={panel === 'team' ? 'team' : 'conversations'}>
     {#snippet title()}<LensTitle text={t('lens.conversations', locale)} />{/snippet}
     {#snippet sub()}

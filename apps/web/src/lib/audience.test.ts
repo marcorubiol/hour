@@ -1,4 +1,10 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
+import es from './i18n/es.json';
+import ca from './i18n/ca.json';
+import en from './i18n/en.json';
+import fr from './i18n/fr.json';
 import * as v from 'valibot';
 import { embedCode, formUrl, ImportSchema, parseCsv, readAudienceCsv } from './audience';
 
@@ -59,5 +65,20 @@ describe('enlaces del formulario (plan § 3.2)', () => {
     expect(code).toContain('src="https://hour.zerosense.studio/public/audience/abc/embed"');
     expect(code).toContain('title="Estrenos &quot;MüK&quot; &amp; más"');
     expect(code).toContain('loading="lazy"');
+  });
+});
+
+describe('la declaración aceptada es la que guarda la base (plan § 3.6)', () => {
+  const sql = readFileSync(
+    join(import.meta.dirname, '..', '..', '..', '..', 'supabase', 'migrations', '20261102180100_audience.sql'),
+    'utf8',
+  );
+  test('cada idioma y cada base, palabra por palabra en import_audience', () => {
+    for (const dict of [es, ca, en, fr] as Record<string, string>[]) {
+      for (const key of ['audience.import_statement_consent', 'audience.import_statement_relationship']) {
+        const asSql = dict[key].replace(/'/g, "''").replace('{company}', "' || v_company || '");
+        expect(sql, `${key}: ${dict[key]}`).toContain(asSql);
+      }
+    }
   });
 });

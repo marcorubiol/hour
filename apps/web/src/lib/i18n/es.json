@@ -2954,8 +2954,7 @@
   "audience.import_relationship_hint": "Si las entradas las vendió la sala o una ticketera, el trato fue con ellas, no con vosotros: probablemente esta base no sirve.",
   "audience.import_source": "¿De dónde sale esta lista?",
   "audience.import_source_ph": "Formulario de nuestra web con casilla, de 2022 a 2026",
-  "audience.import_statement": "Puedo demostrar que estas personas lo aceptaron.",
-  "audience.import_statement_relationship": "Puedo demostrar que estas personas han sido clientes nuestras.",
+  "audience.import_statement_relationship": "Han sido clientes de {company}.",
   "audience.import_go": "Importar {n}",
   "audience.import_done": "{n} importadas",
   "audience.import_review": "Pendiente de revisión",
@@ -3006,5 +3005,9 @@
   "mail.domain_purpose_outreach": "Dominio para la difusión",
   "mail.domain_purpose_audience": "Dominio para el público",
   "mail.domain_purpose_audience_hint": "Un subdominio solo para las invitaciones al público: si una invitación recibe quejas, no toca a vuestras propuestas a programadores.",
-  "mail.domain_audience_hint": "Por ejemplo publico.vuestrodominio.cat. Sin dominio propio no hay invitaciones al público."
+  "mail.domain_audience_hint": "Por ejemplo publico.vuestrodominio.cat. Sin dominio propio no hay invitaciones al público.",
+  "audience.import_statement_consent": "Aceptaron recibir comunicaciones de {company}. Puedo demostrar que estas personas lo aceptaron.",
+  "mailout.invitation_truncated": "La lista tiene más de 5000 confirmadas: el recuento se queda corto, la cola las toma todas.",
+  "mailout.err_pros_not_yours": "Hay profesionales en esta invitación de un proyecto que no editas: quien los añadió puede cambiar la lista.",
+  "audience.people_truncated": "Se ven las {n} más recientes de {total}."
 }

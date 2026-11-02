@@ -2954,8 +2954,7 @@
   "audience.import_relationship_hint": "If the venue or a ticketing site sold the tickets, the deal was with them, not you: this basis probably does not apply.",
   "audience.import_source": "Where does this list come from?",
   "audience.import_source_ph": "Our website form with a checkbox, 2022 to 2026",
-  "audience.import_statement": "I can prove these people agreed to it.",
-  "audience.import_statement_relationship": "I can prove these people have been our customers.",
+  "audience.import_statement_relationship": "They have been customers of {company}.",
   "audience.import_go": "Import {n}",
   "audience.import_done": "{n} imported",
   "audience.import_review": "Awaiting review",
@@ -3006,5 +3005,9 @@
   "mail.domain_purpose_outreach": "Domain for outreach",
   "mail.domain_purpose_audience": "Domain for your audience",
   "mail.domain_purpose_audience_hint": "A subdomain only for audience invitations: if an invitation gets complaints, your proposals to programmers are not affected.",
-  "mail.domain_audience_hint": "For example publico.yourdomain.com. Without your own domain there are no audience invitations."
+  "mail.domain_audience_hint": "For example publico.yourdomain.com. Without your own domain there are no audience invitations.",
+  "audience.import_statement_consent": "They agreed to receive messages from {company}. I can prove these people agreed to it.",
+  "mailout.invitation_truncated": "The list has over 5000 confirmed: the count falls short; the queue takes them all.",
+  "mailout.err_pros_not_yours": "This invitation has professionals from a project you do not edit: whoever added them can change the list.",
+  "audience.people_truncated": "Showing the {n} most recent of {total}."
 }

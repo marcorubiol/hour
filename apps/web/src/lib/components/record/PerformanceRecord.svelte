@@ -381,6 +381,18 @@
   // «Invitar» (ADR-173 § 10, plan del público § 6.1): una invitación en
   // borrador con proyecto y función puestos, sin destinatarios; en su pantalla
   // se elige la lista, profesionales o los dos.
+  const inviteAccess = createQuery(
+    toStore(() => ({
+      queryKey: ['can-invite', perf?.workspace_id ?? '', perf?.project?.id ?? ''] as const,
+      enabled: Boolean(perf?.workspace_id),
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchJSON<{ can_invite: boolean }>(
+          `/api/mailout/invitation?workspace_id=${perf!.workspace_id}&project_id=${perf!.project?.id ?? ''}`,
+          signal,
+        ),
+    })),
+  );
+  let canInvite = $derived($inviteAccess.data?.can_invite === true);
   const invite = createMutation({
     mutationFn: () =>
       mutateJSON<{ id: string; workspace_slug: string }>('POST', '/api/mailout/invitation', {
@@ -788,7 +800,7 @@
           ><ConceptHint concept="roadsheet" /></span
         >
         {#if canEdit}<Button variant="secondary" size="xs" onclick={openEdit}>{t('perf.edit_details', locale)}</Button>{/if}
-        {#if canEdit}
+        {#if canInvite}
           <Button variant="secondary" size="xs" loading={$invite.isPending} onclick={() => $invite.mutate()}
             >{t('audience.invite_from_performance', locale)}</Button
           >

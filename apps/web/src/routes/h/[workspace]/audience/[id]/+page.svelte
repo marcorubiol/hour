@@ -210,6 +210,12 @@
     lastImport = null;
   }
 
+  // Otra base es otra declaración: se vuelve a aceptar.
+  $effect(() => {
+    void basis;
+    untrack(() => (statement = false));
+  });
+
   let importable = $derived(
     Boolean(
       csv &&
@@ -475,10 +481,16 @@
               bind:value={sourceNote}
               placeholder={t('audience.import_source_ph', locale)}
             />
-            <Checkbox
-              label={basis === 'relationship' ? t('audience.import_statement_relationship', locale) : t('audience.import_statement', locale)}
-              bind:checked={statement}
-            />
+            <!-- La declaración que se acepta es, palabra por palabra, la que guarda
+                 `import_audience` en el idioma de la pantalla (plan § 3.6). -->
+            {#if basis}
+              <Checkbox
+                label={t(basis === 'relationship' ? 'audience.import_statement_relationship' : 'audience.import_statement_consent', locale, {
+                  company: d.workspace.name,
+                })}
+                bind:checked={statement}
+              />
+            {/if}
             <div class="al__row-acts">
               <Button size="s" loading={$runImport.isPending} disabled={!importable} onclick={() => $runImport.mutate()}>
                 {t('audience.import_go', locale, { n: csv.rows.length })}
@@ -509,7 +521,10 @@
 
     <!-- ── Personas ───────────────────────────────────────────────────── -->
     <section class="al__block" aria-labelledby="al-people">
-      <BlockHead id="al-people" title={t('audience.people', locale)} count={d.subscriptions.length} />
+      <BlockHead id="al-people" title={t('audience.people', locale)} count={d.subscriptions_total} />
+      {#if d.subscriptions_total > d.subscriptions.length}
+        <p class="al__hint">{t('audience.people_truncated', locale, { n: d.subscriptions.length, total: d.subscriptions_total })}</p>
+      {/if}
       {#if d.subscriptions.length === 0}
         <p class="al__hint">{t('audience.people_empty', locale)}</p>
       {:else}

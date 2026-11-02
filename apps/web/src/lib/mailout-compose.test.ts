@@ -200,6 +200,9 @@ describe('invitaciones (ADR-173 § 10)', () => {
     );
     expect(composeMailout({ subject: 's', body: 'Hello {nombre},', language: 'en' }, nameless, URL).text).toMatch(/^Hello,/);
     expect(composeMailout({ subject: '{nombre}, ven', body: 'x', language: 'es' }, nameless, URL).subject).toBe('ven');
+    expect(composeMailout({ subject: 's', body: 'Gracias, {nombre}, por venir.', language: 'es' }, nameless, URL).text).toMatch(
+      /^Gracias por venir\./,
+    );
     expect(composeMailout({ subject: 's', body: 'Hola, {nombre}', language: 'es' }, nameless, URL).missing).toEqual([]);
   });
 

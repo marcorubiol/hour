@@ -6,7 +6,7 @@
 
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { jwtSubject } from '$lib/server/http';
-import { emptyCounts, type AudienceAccess, type AudienceCounts, type SubscriptionStatus } from '$lib/audience';
+import type { AudienceAccess } from '$lib/audience';
 
 type MembershipRow = {
   workspace_id: string;
@@ -43,23 +43,6 @@ export async function audienceAccess(
     out[m.workspace_id] = { read: admin || Boolean(facet), edit: admin || facet?.verb === 'edit', admin };
   }
   return out;
-}
-
-const STATUSES: SubscriptionStatus[] = ['confirmed', 'pending', 'unsubscribed'];
-
-/** Cuántas personas hay en cada estado de una lista: tres cuentas exactas, sin traer filas. */
-export async function audienceCounts(env: SupabaseEnv, jwt: string, audienceId: string): Promise<AudienceCounts> {
-  const counts = emptyCounts();
-  const totals = await Promise.all(
-    STATUSES.map((status) =>
-      pgGet(env, 'audience_subscription', jwt, {
-        search: { select: 'id', audience_id: `eq.${audienceId}`, status: `eq.${status}`, limit: '1' },
-        exactCount: true,
-      }),
-    ),
-  );
-  STATUSES.forEach((s, i) => (counts[s] = totals[i].total ?? 0));
-  return counts;
 }
 
 /** Si el envío de un espacio sale del simulador: su dominio del público, o el modo del Worker. */

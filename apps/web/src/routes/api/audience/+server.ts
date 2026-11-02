@@ -14,14 +14,17 @@ import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import { jsonNoStore, UUID_RE } from '$lib/server/http';
 import { MAILOUT_PG_CODES, readBody } from '$lib/server/mailout/route';
-import { audienceAccess, audienceCounts } from '$lib/server/audience';
+import { audienceAccess } from '$lib/server/audience';
 import {
   AUDIENCE_SELECT,
   AudienceCreateSchema,
   type AudienceItem,
   type AudienceListResponse,
+  type SubscriptionStatus,
   type InvitationSummary,
 } from '$lib/audience';
+
+const STATUSES: SubscriptionStatus[] = ['confirmed', 'pending', 'unsubscribed'];
 
 export const GET: RequestHandler = async ({ request, url, platform, locals }) => {
   if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
@@ -38,9 +41,18 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
     const readable = ids.filter((w) => access[w]?.read);
     if (readable.length === 0) return jsonNoStore({ items: [], invitations: [], access } satisfies AudienceListResponse);
     const inWs = `in.(${readable.join(',')})`;
+    // Los recuentos, en la misma lectura: un `count` embebido por estado,
+    // con la RLS de la suscripción (sin traer filas ni pedir uno por lista).
+    type Counted = AudienceItem & Record<SubscriptionStatus, { count: number }[] | null>;
     const [lists, invitations] = await Promise.all([
-      pgGet<AudienceItem>(env, 'audience', jwt, {
-        search: { select: AUDIENCE_SELECT, workspace_id: inWs, status: 'neq.archived', order: 'created_at.asc' },
+      pgGet<Counted>(env, 'audience', jwt, {
+        search: {
+          select: `${AUDIENCE_SELECT},${STATUSES.map((s) => `${s}:audience_subscription(count)`).join(',')}`,
+          ...Object.fromEntries(STATUSES.map((s) => [`${s}.status`, `eq.${s}`])),
+          workspace_id: inWs,
+          status: 'neq.archived',
+          order: 'created_at.asc',
+        },
       }),
       pgGet<InvitationSummary>(env, 'mailout', jwt, {
         search: {
@@ -53,9 +65,15 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
         },
       }),
     ]);
-    const counts = await Promise.all(lists.data.map((a) => audienceCounts(env, jwt, a.id)));
     return jsonNoStore({
-      items: lists.data.map((a, i) => ({ ...a, counts: counts[i] })),
+      items: lists.data.map(({ confirmed, pending, unsubscribed, ...a }) => ({
+        ...a,
+        counts: {
+          confirmed: confirmed?.[0]?.count ?? 0,
+          pending: pending?.[0]?.count ?? 0,
+          unsubscribed: unsubscribed?.[0]?.count ?? 0,
+        },
+      })),
       invitations: invitations.data,
       access,
     } satisfies AudienceListResponse);

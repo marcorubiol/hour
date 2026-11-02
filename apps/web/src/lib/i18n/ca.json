@@ -2954,8 +2954,7 @@
   "audience.import_relationship_hint": "Si les entrades les va vendre la sala o una ticketera, el tracte va ser amb elles, no amb vosaltres: probablement aquesta base no serveix.",
   "audience.import_source": "D'on surt aquesta llista?",
   "audience.import_source_ph": "Formulari del nostre web amb casella, del 2022 al 2026",
-  "audience.import_statement": "Puc demostrar que aquestes persones ho van acceptar.",
-  "audience.import_statement_relationship": "Puc demostrar que aquestes persones han estat clientes nostres.",
+  "audience.import_statement_relationship": "Han estat clients de {company}.",
   "audience.import_go": "Importar-ne {n}",
   "audience.import_done": "{n} importades",
   "audience.import_review": "Pendent de revisió",
@@ -3006,5 +3005,9 @@
   "mail.domain_purpose_outreach": "Domini per a la difusió",
   "mail.domain_purpose_audience": "Domini per al públic",
   "mail.domain_purpose_audience_hint": "Un subdomini només per a les invitacions al públic: si una invitació rep queixes, no toca les vostres propostes a programadors.",
-  "mail.domain_audience_hint": "Per exemple publico.elvostredomini.cat. Sense domini propi no hi ha invitacions al públic."
+  "mail.domain_audience_hint": "Per exemple publico.elvostredomini.cat. Sense domini propi no hi ha invitacions al públic.",
+  "audience.import_statement_consent": "Van acceptar rebre comunicacions de {company}. Puc demostrar que aquestes persones ho van acceptar.",
+  "mailout.invitation_truncated": "La llista té més de 5000 confirmades: el recompte es queda curt, la cua les agafa totes.",
+  "mailout.err_pros_not_yours": "Hi ha professionals en aquesta invitació d'un projecte que no edites: qui els va afegir pot canviar la llista.",
+  "audience.people_truncated": "Es veuen les {n} més recents de {total}."
 }

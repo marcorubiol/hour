@@ -210,7 +210,10 @@ function mergeValues(ctx: ComposeContext, language: MailoutLanguage): Record<Mer
  * → «Hola:»): quien se apunta no siempre lo da (plan § 6.1).
  */
 function dropName(text: string): string {
-  return text.replace(/^\{nombre\}[ \t]*,?[ \t]*/gm, '').replace(/,?[ \t]*\{nombre\}/g, '');
+  return text
+    .replace(/,[ \t]*\{nombre\}[ \t]*,[ \t]*/g, ' ')
+    .replace(/^\{nombre\}[ \t]*,?[ \t]*/gm, '')
+    .replace(/,?[ \t]*\{nombre\}/g, '');
 }
 
 function fillFields(text: string, values: Record<MergeField, string | null>, nameless: boolean): string {

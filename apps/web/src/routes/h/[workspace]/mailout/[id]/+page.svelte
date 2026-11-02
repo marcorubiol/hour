@@ -349,7 +349,12 @@
     mutationFn: (conversationIds: string[]) =>
       mutateJSON('PUT', `/api/mailout/${id}/recipients`, { conversation_ids: conversationIds }),
     onSuccess: refresh,
-    onError: failed,
+    // In an invitation the list may hold another editor's professionals from
+    // a project the caller does not edit: the replace is refused whole.
+    onError: (err) =>
+      invitation && err instanceof ApiError && err.status === 404
+        ? addToast({ tone: 'danger', title: t('mailout.action_failed', locale), message: t('mailout.err_pros_not_yours', locale) })
+        : failed(err),
   });
   function removeOne(r: MailoutRecipientRow, name: string) {
     const before = (d?.recipients ?? []).map((x) => x.conversation_id).filter((cid): cid is string => cid !== null);
@@ -787,6 +792,9 @@
                     n: d.audience.eligible,
                   })}
                 </p>
+                {#if d.audience.truncated}
+                  <p class="mo__hint">{t('mailout.invitation_truncated', locale)}</p>
+                {/if}
                 {#if d.audience.as_pros > 0}
                   <p class="mo__hint">{t('mailout.invitation_dupes', locale, { n: d.audience.as_pros })}</p>
                 {/if}

@@ -122,7 +122,10 @@ export interface AudienceDetail {
   access: AudienceAccess;
   /** Los textos vigentes, uno por idioma de la lista. */
   texts: ConsentTextRow[];
+  /** Las más recientes, hasta 5000. */
   subscriptions: SubscriptionRow[];
+  /** Cuántas hay en total: si son más que las traídas, la página lo dice. */
+  subscriptions_total: number;
   imports: ImportRow[];
   /** Mientras el envío sea simulado, la lista no se abre a gente real (plan § 5.4). */
   simulated: boolean;
@@ -331,9 +334,4 @@ export function formUrl(origin: string, key: string): string {
 export function embedCode(origin: string, key: string, title: string): string {
   const safe = title.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
   return `<iframe src="${formUrl(origin, key)}/embed" title="${safe}" width="100%" height="560" loading="lazy" style="border:0"></iframe>`;
-}
-
-/** Recuentos a cero, para una lista sin nadie. */
-export function emptyCounts(): AudienceCounts {
-  return { pending: 0, confirmed: 0, unsubscribed: 0 };
 }

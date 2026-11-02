@@ -196,6 +196,8 @@ export interface InvitationAudience {
   eligible: number;
   /** De esas, las que ya van como profesionales en esta invitación. */
   as_pros: number;
+  /** La lista tiene más confirmadas de las que se han contado: los números se quedan cortos. */
+  truncated: boolean;
 }
 
 /** Una persona del público en la vista previa de un borrador: lo que se monta y a quién va. */

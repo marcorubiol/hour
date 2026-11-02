@@ -57,6 +57,14 @@ async function serviceRpc<T>(name: string, args: Record<string, unknown>): Promi
   return (text ? JSON.parse(text) : null) as T;
 }
 
+async function serviceDelete(path: string): Promise<void> {
+  const res = await fetch(new URL(`/rest/v1/${path}`, SB_URL), {
+    method: 'DELETE',
+    headers: { apikey: SERVICE_KEY!, Authorization: `Bearer ${SERVICE_KEY}` },
+  });
+  if (!res.ok) throw new Error(`DELETE ${path} ${res.status}: ${await res.text()}`);
+}
+
 type Domain = { id: string; verified_at: string | null; purpose: 'outreach' | 'audience' };
 
 /** Un dominio verificado de ese propósito: el que haya, o uno propio que se quita al final. */
@@ -96,6 +104,7 @@ test.describe('audience invitation (simulated)', () => {
     expect(created.status, JSON.stringify(created.data)).toBe(201);
     const conversationId = created.data.conversation.id;
     let audienceId: string | null = null;
+    let mailoutId: string | null = null;
 
     try {
       // ── Vista Público: «Nueva lista» ──
@@ -148,6 +157,7 @@ test.describe('audience invitation (simulated)', () => {
       await screen.getByRole('button', { name: /Write an invitation|Escribir una invitación|Escriure una invitació|Écrire une invitation/ }).click();
       await page.waitForURL(/\/h\/playwright\/mailout\/[0-9a-f-]{36}$/, { timeout: 15_000 });
       const mailoutUrl = page.url();
+      mailoutId = mailoutUrl.split('/').pop()!;
       const mo = page.getByTestId('mailout');
       await expect(mo).toBeVisible({ timeout: 15_000 });
       await expect(mo.getByTestId('mailout-simulated')).toBeVisible();
@@ -200,7 +210,16 @@ test.describe('audience invitation (simulated)', () => {
       await expect(page).toHaveURL(mailoutUrl);
     } finally {
       await forgetConversations(page, [conversationId]);
-      if (audienceId) {
+      if (audienceId && SB_URL && SERVICE_KEY) {
+        // Ninguna RPC borra una lista ni un envío: lo hace la clave de servicio.
+        // El envío primero (sus destinatarios y eventos caen con él); la lista
+        // después (textos, importaciones, suscripciones y su prueba, en cascada).
+        await serviceDelete(`mailout?audience_id=eq.${audienceId}`);
+        if (mailoutId) await serviceDelete(`mailout?id=eq.${mailoutId}`);
+        await serviceDelete(`audience?id=eq.${audienceId}`);
+      } else if (audienceId) {
+        // Sin la clave: borrar los datos de cada persona (admin) y archivar.
+        // Quedan la lista archivada, su importación y la invitación enviada.
         const subs = await api<{ subscriptions: { id: string }[] }>(page, 'GET', `/api/audience/${audienceId}`);
         for (const s of subs.data?.subscriptions ?? []) await api(page, 'DELETE', `/api/audience/subscription/${s.id}`);
         await api(page, 'PATCH', `/api/audience/${audienceId}`, { action: 'status', status: 'archived' });
@@ -208,10 +227,7 @@ test.describe('audience invitation (simulated)', () => {
       for (const id of ownDomains) await api(page, 'DELETE', `/api/mailout/domains/${id}`);
       if (SB_URL && SERVICE_KEY) {
         const addr = encodeURIComponent(`"${PRO}"`);
-        await fetch(new URL(`/rest/v1/mail_basis?workspace_id=eq.${workspaceId}&address=eq.${addr}`, SB_URL), {
-          method: 'DELETE',
-          headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
-        });
+        await serviceDelete(`mail_basis?workspace_id=eq.${workspaceId}&address=eq.${addr}`);
       }
     }
   });

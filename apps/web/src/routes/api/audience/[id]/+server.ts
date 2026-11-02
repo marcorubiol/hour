@@ -27,6 +27,9 @@ import {
   type SubscriptionRow,
 } from '$lib/audience';
 
+/** Cuántas personas trae la página de una lista; más, y lo dice. */
+const PEOPLE_MAX = 5000;
+
 /** Por qué no se abre, para la pantalla. */
 const STATUS_REFUSALS: [RegExp, string][] = [
   [/privacy/, 'needs_privacy'],
@@ -53,7 +56,8 @@ export const GET: RequestHandler = (event) =>
           })
         : Promise.resolve({ data: [] as ConsentTextRow[] }),
       pgGet<SubscriptionRow>(env, 'audience_subscription', jwt, {
-        search: { select: SUBSCRIPTION_SELECT, audience_id: `eq.${id}`, order: 'created_at.desc', limit: '5000' },
+        search: { select: SUBSCRIPTION_SELECT, audience_id: `eq.${id}`, order: 'created_at.desc', limit: String(PEOPLE_MAX) },
+        exactCount: true,
       }),
       pgGet<ImportRow>(env, 'audience_import', jwt, {
         search: { select: IMPORT_SELECT, audience_id: `eq.${id}`, order: 'declared_at.desc' },
@@ -68,6 +72,7 @@ export const GET: RequestHandler = (event) =>
       access: access[audience.workspace_id] ?? { read: true, edit: false, admin: false },
       texts: texts.data,
       subscriptions: subs.data,
+      subscriptions_total: subs.total ?? subs.data.length,
       imports: imports.data,
       simulated,
     } satisfies AudienceDetail);

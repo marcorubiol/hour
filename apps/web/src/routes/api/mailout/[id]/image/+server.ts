@@ -10,9 +10,8 @@
  */
 
 import type { RequestHandler } from './$types';
-import { pgPostRpc } from '$lib/supabase';
 import { jsonNoStore } from '$lib/server/http';
-import { mailoutRoute, readMailout } from '$lib/server/mailout/route';
+import { canEditMailout, mailoutRoute, readMailout } from '$lib/server/mailout/route';
 import { putPublicImage, readUpload, rejectImage } from '$lib/server/media';
 
 export const POST: RequestHandler = (event) =>
@@ -21,11 +20,8 @@ export const POST: RequestHandler = (event) =>
     if (!bucket) return jsonNoStore({ error: 'platform_unavailable' }, 500);
     const mailout = await readMailout(env, jwt, id);
     if (!mailout) return jsonNoStore({ error: 'not_found' }, 404);
-    const canEdit = await pgPostRpc<boolean>(env, 'has_permission', jwt, {
-      p_project_id: mailout.project_id,
-      p_perm: 'edit:conversation',
-    });
-    if (canEdit.data[0] !== true) return jsonNoStore({ error: 'not_found' }, 404);
+    // Por tipo (ADR-173): una invitación puede no tener proyecto.
+    if (!(await canEditMailout(env, jwt, mailout)).edit) return jsonNoStore({ error: 'not_found' }, 404);
     if (mailout.status !== 'draft') return jsonNoStore({ error: 'invalid_state' }, 409);
 
     const bytes = await readUpload(event.request, 'mail');

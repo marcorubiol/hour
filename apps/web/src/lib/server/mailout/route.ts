@@ -13,6 +13,7 @@ import { jsonNoStore, jwtSubject, UUID_RE } from '$lib/server/http';
 import { audienceAccess } from '$lib/server/audience';
 import type { AudienceAccess } from '$lib/audience';
 import {
+  recipientState,
   MAIL_DOMAIN_SELECT,
   MAILOUT_SELECT,
   type MailDomainItem,
@@ -121,6 +122,9 @@ type CompanyRow = {
   privacy_url: string | null;
 };
 
+/** Cuántas personas de una lista se leen para contar (el tope de una importación). */
+const AUDIENCE_MAX = 5000;
+
 /** Cuántas personas del público enseña la vista previa de un borrador. */
 const AUDIENCE_PREVIEW = 20;
 
@@ -147,7 +151,7 @@ async function invitationAudience(
         audience_id: `eq.${mailout.audience_id}`,
         status: 'eq.confirmed',
         order: 'confirmed_at.desc.nullslast',
-        limit: '5000',
+        limit: String(AUDIENCE_MAX),
       },
     }),
     pgGet<{ id: string }>(env, 'audience_import', jwt, {
@@ -160,9 +164,12 @@ async function invitationAudience(
   const a = list.data[0];
   if (!a) return { audience: null, preview: [] };
   const held = new Set(imports.data.map((i) => i.id));
-  // Un profesional que sale gana la dirección; uno saltado la deja al público.
+  // Un profesional que sale gana la dirección; uno que no saldría (saltado,
+  // sin base, excluido) la deja al público, como `queue_mailout`.
   const pros = new Set(
-    recipients.filter((r) => r.conversation_id && r.address && r.status !== 'skipped').map((r) => r.address!.toLowerCase()),
+    recipients
+      .filter((r) => r.conversation_id && r.address && recipientState(r, false) === 'ready')
+      .map((r) => r.address!.toLowerCase()),
   );
   const open = subs.data.filter((s) => !s.import_id || !held.has(s.import_id));
   const eligible = open.filter((s) => !pros.has(s.address.toLowerCase()));
@@ -194,7 +201,13 @@ async function invitationAudience(
       }))
     : [];
   return {
-    audience: { id: a.id, name: a.name, eligible: eligible.length, as_pros: open.length - eligible.length },
+    audience: {
+      id: a.id,
+      name: a.name,
+      eligible: eligible.length,
+      as_pros: open.length - eligible.length,
+      truncated: subs.data.length >= AUDIENCE_MAX,
+    },
     preview,
   };
 }
@@ -223,12 +236,34 @@ async function invitationPerformance(
   };
 }
 
+/**
+ * Si quien llama redacta este envío, la regla de `private.mailout_for_caller`
+ * leída para pintar (la base la vuelve a mirar): uno de difusión, con
+ * `edit:conversation` en su proyecto; una invitación, quien la creó o lleva el
+ * público, y con lista solo quien lleva el público.
+ */
+export async function canEditMailout(
+  env: SupabaseEnv,
+  jwt: string,
+  mailout: MailoutItem,
+): Promise<{ edit: boolean; access: AudienceAccess | undefined }> {
+  if (mailout.kind !== 'invitation') {
+    if (!mailout.project_id) return { edit: false, access: undefined };
+    const r = await pgPostRpc<boolean>(env, 'has_permission', jwt, { p_project_id: mailout.project_id, p_perm: 'edit:conversation' });
+    return { edit: r.data[0] === true, access: undefined };
+  }
+  const access = (await audienceAccess(env, jwt, [mailout.workspace_id]))[mailout.workspace_id];
+  const edit =
+    (mailout.created_by === jwtSubject(jwt) || Boolean(access?.edit)) && (!mailout.audience_id || Boolean(access?.edit));
+  return { edit, access };
+}
+
 /** Todo lo que pinta la pantalla del envío; null si quien llama no lo ve. */
 export async function loadDetail(env: MailoutEnv, jwt: string, id: string): Promise<MailoutDetail | null> {
   const mailout = await readMailout(env, jwt, id);
   if (!mailout) return null;
   const invitation = mailout.kind === 'invitation';
-  const [ws, project, domains, accounts, rows, canEditProject, access, performance] = await Promise.all([
+  const [ws, project, domains, accounts, rows, editing, performance] = await Promise.all([
     pgGet<{ id: string; slug: string; name: string; logo_url: string | null }>(env, 'workspace', jwt, {
       search: { select: 'id,slug,name,logo_url', id: `eq.${mailout.workspace_id}` },
     }),
@@ -258,10 +293,7 @@ export async function loadDetail(env: MailoutEnv, jwt: string, id: string): Prom
       },
     }),
     previewRows(env, jwt, id),
-    mailout.project_id && !invitation
-      ? pgPostRpc<boolean>(env, 'has_permission', jwt, { p_project_id: mailout.project_id, p_perm: 'edit:conversation' })
-      : Promise.resolve({ data: [false] }),
-    invitation ? audienceAccess(env, jwt, [mailout.workspace_id]) : Promise.resolve({} as Record<string, AudienceAccess>),
+    canEditMailout(env, jwt, mailout),
     invitation ? invitationPerformance(env, jwt, mailout.performance_id) : Promise.resolve(null),
   ]);
   if (!ws.data[0]) return null;
@@ -269,12 +301,8 @@ export async function loadDetail(env: MailoutEnv, jwt: string, id: string): Prom
   const domain = outreach.find((d) => d.id === mailout.mail_domain_id);
   const audienceDomain = invitation ? (domains.data.find((d) => d.id === mailout.audience_mail_domain_id) ?? null) : null;
   const reply = accounts.data.find((a) => a.scope === 'workspace') ?? accounts.data[0] ?? null;
-  const mine = access[mailout.workspace_id];
-  // Una invitación la escribe quien la creó o lleva el público; con lista,
-  // solo quien lleva el público (`private.mailout_for_caller`).
-  const canEdit = invitation
-    ? (mailout.created_by === jwtSubject(jwt) || Boolean(mine?.edit)) && (!mailout.audience_id || Boolean(mine?.edit))
-    : canEditProject.data[0] === true;
+  const mine = editing.access;
+  const canEdit = editing.edit;
   const [lists, block] = invitation
     ? await Promise.all([
         mine?.read
