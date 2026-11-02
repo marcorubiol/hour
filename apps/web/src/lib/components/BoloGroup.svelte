@@ -23,7 +23,7 @@
   import { lensOn } from '$lib/lenses.svelte';
   import { appLocale, t } from '$lib/i18n';
   import { viewerTimeZone } from '$lib/datetime';
-  import Avatar from '$lib/components/Avatar.svelte';
+  import ChatMonogram from '$lib/components/ChatMonogram.svelte';
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import ThreadBlock from '$lib/components/ThreadBlock.svelte';
   import { markReadWhenSeen, readAtOpen } from '$lib/thread-reading.svelte';
@@ -107,7 +107,7 @@
         <span aria-hidden="true">‹</span>
       </a>
     {/if}
-    <span class="group__mark"><Avatar size="m" name={place || name} /></span>
+    <ChatMonogram name={place || name} group />
     <div class="group__who">
       <h1 class="group__title">{title || t('threads.board', locale)}</h1>
       <p class="group__sub">
@@ -185,13 +185,6 @@
       color: var(--heading-color);
       font-size: var(--text-l);
       text-decoration: none;
-    }
-    /* A group is not an organisation: its mark is drawn with a dashed ring. */
-    .group__mark {
-      display: inline-flex;
-      padding: var(--space-2xs);
-      border: var(--line-hairline) dashed var(--thread-mailout-rule);
-      border-radius: var(--radius-circle);
     }
     .group__who {
       display: flex;

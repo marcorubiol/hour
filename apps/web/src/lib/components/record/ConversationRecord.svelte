@@ -39,7 +39,7 @@
   import RecordState from '$lib/components/RecordState.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import EmptyLine from '$lib/components/EmptyLine.svelte';
-  import Avatar from '$lib/components/Avatar.svelte';
+  import ChatMonogram from '$lib/components/ChatMonogram.svelte';
   import { dayMonth, dayMonthYear, dayMonthYearTs, hourMark, localDayISO, timeInTz, viewerTimeZone } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
@@ -456,7 +456,7 @@
           <span aria-hidden="true">‹</span>
         </a>
       {/if}
-      <Avatar size="m" name={title} />
+      <ChatMonogram name={title} />
       <div class="chat__who">
         <!-- The venue's name is its record (ADR-159): the fiscal data live there. -->
         <h1 class="chat__title">
