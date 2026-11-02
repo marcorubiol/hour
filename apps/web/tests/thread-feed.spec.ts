@@ -218,8 +218,12 @@ test.describe('Conversaciones › Equipo: los hilos del equipo (ADR-116, ADR-134
     const row = page.getByTestId('feed-row').filter({ hasText: CONV });
     await expect(row).toBeVisible({ timeout: 30_000 });
     await row.locator('a.chat__title').click();
-    await page.waitForURL(new RegExp(`/h/playwright/conversation/${conversationId}$`));
-    await expect(page.locator('.conv__aside .inside .msg', { hasText: TEAM_BODY })).toBeVisible({ timeout: 30_000 });
+    await page.waitForURL(new RegExp(`/h/playwright/conversation/${conversationId}#team$`));
+    // The thread opens with «Solo el equipo» in the field (punto 110), the note in the thread.
+    await expect(page.getByTestId('conversation-thread').locator('.msg--note', { hasText: TEAM_BODY })).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(page.getByTestId('composer-to-team')).toHaveAttribute('aria-pressed', 'true');
   });
 
   test('con Mínim: el General del bolo, ni Diners ni la conversación', async ({ browser }) => {

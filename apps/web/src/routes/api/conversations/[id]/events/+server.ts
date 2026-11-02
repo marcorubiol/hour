@@ -2,7 +2,8 @@
  * The history of a conversation (ADR-098, contract:
  * build/conversation-event-contract.md).
  *
- * GET  /api/conversations/:id/events — the events, most recent first. RLS on
+ * GET  /api/conversations/:id/events — the events, most recent first, and
+ *      the caller's own `last_read_at` (null: no read yet). RLS on
  *      `conversation_event` inherits the conversation's own frontier, so a
  *      conversation the caller cannot read answers an empty list: never a 404
  *      that would confirm it exists.
@@ -50,10 +51,17 @@ export const GET: RequestHandler = async ({ request, params, platform, locals })
       order: 'occurred_at.desc,recorded_at.desc',
       limit: String(LIMIT),
     });
-    const { data } = await pgGet<ConversationEventItem>(env, 'conversation_event', jwt, {
-      search,
-    });
-    return json({ items: data });
+    // Hasta dónde había leído quien mira (`conversation_read`, solo su fila):
+    // la ficha pinta la raya de «nuevos» con la misma regla que la lista.
+    // Sin fila, null: leída hasta que nació la conversación.
+    const [{ data }, { data: reads }] = await Promise.all([
+      pgGet<ConversationEventItem>(env, 'conversation_event', jwt, { search }),
+      pgGet<{ last_read_at: string }>(env, 'conversation_read', jwt, {
+        search: new URLSearchParams({ select: 'last_read_at', conversation_id: `eq.${idParsed.output}`, limit: '1' }),
+      }),
+    ]);
+    // Sin nada que leer (o sin poder leerla ya) no se dice hasta dónde se leyó.
+    return json({ items: data, last_read_at: data.length > 0 ? (reads[0]?.last_read_at ?? null) : null });
   } catch (err) {
     return pgErrorResponse(
       err,

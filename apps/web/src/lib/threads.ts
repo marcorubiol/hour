@@ -389,6 +389,19 @@ export function feedHref(row: Pick<FeedThread, 'anchor_kind' | 'anchor_id' | 'bo
   return slug ? `/h/${workspaceSlug}/performance/${slug}#board` : null;
 }
 
+/**
+ * Un hilo de bolo abierto solo, como un grupo (punto 110): la función que abre
+ * su tablón y la faceta (General sin `hilo`). Sin función viva, null.
+ */
+export function groupHref(
+  row: Pick<FeedThread, 'anchor_kind' | 'facet_id' | 'bolo'>,
+  workspaceSlug: string | undefined,
+): string | null {
+  const id = row.bolo?.performance_id;
+  if (!workspaceSlug || row.anchor_kind !== 'bolo' || !id) return null;
+  return `/h/${workspaceSlug}/group/${id}${row.facet_id ? `?hilo=${row.facet_id}` : ''}`;
+}
+
 /** El nombre del hilo dentro de su ancla: la faceta (o General) en un bolo, «Equipo» en una conversación. */
 export function feedThreadName(row: Pick<FeedThread, 'anchor_kind' | 'facet_key' | 'label' | 'labels'>, locale: Locale): string {
   return row.anchor_kind === 'conversation' ? t('threads.team', locale) : facetName(row, locale);

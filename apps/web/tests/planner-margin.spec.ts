@@ -151,6 +151,8 @@ test.describe('el margen del Planner (ADR-138 § 6)', () => {
   test('desde la conversación, «Ver en el Planner» abre la Agenda con el proyecto fijado', async ({ page }) => {
     test.setTimeout(60_000);
     await open(page, `/h/playwright/conversation/${convId}`);
+    // The link lives in the conversation's details, opened from its head (punto 110).
+    await page.getByTestId('conversation-who').click();
     const link = page.getByTestId('conversation-planner');
     await expect(link).toHaveAttribute('href', `/h/planner?view=agenda&scope=p:${projectId}`);
     await link.click();
