@@ -39,10 +39,10 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free, con keepalive diario
   (`.github/workflows/keepalive.yml`) contra la pausa por inactividad. Pasar a Pro antes de la beta, aún no
   (`_tasks.md § 9`). Si algo de Supabase falla tras días sin uso, lo primero es `dig <ref>.supabase.co`.
-- **Última migración aplicada: `20261102170000`** (`mail_template`, 2026-11-01; backup 41344207864, plan 41344459520, apply 41344696936). Las anteriores, en `_notes/context-history.md`. Las migraciones van por `production-migrate.yml`: backup, plan, apply. **Al redefinir una función, copiar la firma de la base viva (`pg_get_functiondef`), no de la última migración que la nombra: otra firma crea una sobrecarga y PostgREST responde 300.**
+- **Última migración aplicada: `20261102180100`** (público fase 1, `audience_enums` + `audience`, 2026-11-02; backup 41438358206, plan 41438871017, apply 41438953215). Las anteriores, en `_notes/context-history.md`. Las migraciones van por `production-migrate.yml`: backup, plan, apply. **Al redefinir una función, copiar la firma de la base viva (`pg_get_functiondef`), no de la última migración que la nombra: otra firma crea una sobrecarga y PostgREST responde 300.**
 - `hour-staging` (ref `slccyknqpgmzhyiyclsq`, `eu-west-1`): reconstruido el 2026-10-13 con el contract de permisos
   (run 38469017859: RLS 309/313, smoke 2/2). Se volverá a pausar sin uso.
-- Últimas suites contra producción: RLS 539/539 contra `55b97891` (2026-11-01, tras el apply). E2E contra `8018b229` (2026-11-01): 185/186, único rojo `conversation-write.spec:189` intermitente. No prestar `.playwright/auth.json` a otro carril mientras corre la suite. Por `hour-web.marco-rubiol.workers.dev`.
+- Últimas suites contra producción: RLS 555/556 contra `1ca36475` (2026-11-02, tras el apply del público); único rojo `audience.test.ts` caso 5, que pide como `anon` la raíz OpenAPI de PostgREST y producción responde 401: es del test, no del esquema. E2E contra `8018b229` (2026-11-01): 185/186, único rojo `conversation-write.spec:189` intermitente. No prestar `.playwright/auth.json` a otro carril mientras corre la suite. Por `hour-web.marco-rubiol.workers.dev`.
 - Desde el checkout principal (`~/Developer/hour`), nunca desde un worktree: los worktrees no llevan `.env` ni
   `.env.test` (RLS sale saltado, el login del E2E falla).
 - `pnpm --filter web test:rls`: siempre contra producción; carga `.env` + `.env.test` y no mira `.env.local`.
