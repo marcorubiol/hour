@@ -55,7 +55,7 @@ test.describe('conversation tags', () => {
       // 1. The chips, Press active; selection, but no bulk send and no season outside Difusión.
       const chips = page.locator('.lenshead__sub [data-chip]');
       await expect(chips.first()).toHaveAttribute('data-chip', 'all');
-      await expect(chips.last()).toHaveAttribute('data-chip', 'team');
+      await expect(chips.last()).toHaveAttribute('data-chip', 'audience');
       await expect(page.locator('.lenshead__sub [data-chip="sales"]')).toHaveText('Venues');
       await expect(page.locator('.lenshead__sub [data-chip="press"]')).toHaveAttribute('aria-current', 'page');
       await expect(page.getByRole('button', { name: /^Select$/ })).toBeVisible();

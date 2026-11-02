@@ -62,6 +62,9 @@ interface Fixture {
 test.describe('audience sign-up (simulated)', () => {
   test.skip(!SB_URL || !SERVICE_KEY, 'Set PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY.');
   test.describe.configure({ mode: 'serial' });
+  // The public pages speak the subscriber's language; one with none (a token
+  // that does not exist) falls back to Accept-Language, and Playwright sends en-US.
+  test.use({ locale: 'es-ES' });
 
   const fx = {} as Fixture;
 
