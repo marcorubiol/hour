@@ -6221,6 +6221,14 @@ anterior. Sin datos que deshacer.
 **Re-evaluar cuando** un espacio pase de 500 conversaciones (Te espera necesitará su propia lectura, no la lista), o
 cuando el margen de la Agenda tenga que existir vacío porque se escriba en él a menudo.
 
+> **Nota (2026-11-02, `_tasks.md` § 109, Marco en el drop 02-11), solo en § 2, Planificador.** La línea de ventana
+> se dibuja siempre, en las cuatro vistas y con la altura de una línea aunque esté vacía (un Día sin nada): sin ella
+> la barra de vistas subía al pasar de Mes o Tablero a Temporada o Agenda. Cambia lo que dice, no el sitio. Mes y
+> Tablero, como estaban. Temporada: su recuento (confirmadas, opciones, noches libres) de la temporada visible, el
+> censo que el motor ya tenía; no repite lo que dicen sus bloques (ADR-145 fase 2). Agenda: nombra su horizonte
+> («desde hoy», o «abierta el 12 nov, no hoy») y «sin final», sin contar (ADR-095). La línea de la cola sigue sin
+> dibujarse vacía.
+
 ## [2026-11-01] ADR-168 · Cuentas para la gestoría: emisor en Ajustes, caché propuesto, trimestre en CSV; fuera «Roles que asumo» y «(opcional)»
 
 **Contexto.** Cinco mejoras validadas por Marco el 01-11 (`_tasks.md` 82, 87, 85, 91, 46) y una sexta (79) que pide

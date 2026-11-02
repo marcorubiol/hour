@@ -3213,8 +3213,8 @@
        and the red figure, which is the only one that asks for an action,
        had to compete with a nights-free count.
 
-       The second line simply is not there when the drawing has nothing to
-       say about itself — an empty Day. -->
+       The second line is always there (nota a ADR-167): an empty Day keeps
+       its height with nothing in it. -->
   <div class="cal__facts">
   <p class="cal__meta cal__meta--queue">
       <!-- Stats strip (ADR-080 §6 calls it the pulse strip; the pulse is now
@@ -3245,11 +3245,13 @@
           </button>
         {/if}
     </p>
-  <!-- A LINE WITH NOTHING TO SAY IS NOT DRAWN, IN ANY VIEW (ADR-167 § 2;
-       it was furniture, ADR-096 §6, and the Season alone dropped it, ADR-145
-       § 1). Two unseen lines were a band of air under the Agenda's title, and
-       the tabs jumped when the Season left them out. A census line is there
-       while it loads (its figures say «—»), so the rows landing move nothing. -->
+  <!-- THE QUEUE LINE WITH NOTHING TO SAY IS NOT DRAWN (ADR-167 § 2). THE
+       WINDOW LINE ALWAYS IS (nota a ADR-167, 2026-11-02, Marco: «al cambiar
+       de vista todo salta»): every view says what its window is, so the line
+       sits in the same place at the same height in Season, Agenda, Month and
+       Board, and the tabs under it never move. What changes is what it says.
+       A census line is there while it loads (its figures say «–»), so the
+       rows landing move nothing. -->
     <p class="cal__meta cal__meta--window">
         <!-- CALM IS ONE SENTENCE, NOT A WORD MORE (ADR-139 § 5; it was
              «calma · solo confirmados» in front of the whole census, ADR-095
@@ -3307,11 +3309,24 @@
              grows, so neither prints one. -->
         <!-- Weeks range: BOUNDED drawings only — the board grew a horizon
              and what grows is never counted. -->
-        <!-- THE SEASON DOES NOT COUNT ITSELF HERE (ADR-145, fase 2). Its title
-             is its horizon, and every figure this line printed («0 por
-             decidir · 0 choques · 0 sin cerrar · 79 noches libres») is a block
-             right below, drawn when it has something: each fact was said
-             twice, once in the page's smallest type. -->
+        <!-- THE SEASON COUNTS ITS OWN WINDOW, AND ONLY WHAT NO BLOCK SAYS
+             (ADR-145 fase 2 took out «0 por decidir · 0 choques · 0 sin
+             cerrar», which the blocks below already say). Confirmed, options
+             and nights free over the visible season are the census the engine
+             already holds (its window is the season's in this view), and no
+             block prints them: «Sin cerrar» counts the first weeks only. -->
+        <!-- THE AGENDA NAMES ITS HORIZON AND COUNTS NOTHING (ADR-095: a
+             window with no end is never counted). Its title is the day the
+             book opens at; the line says whether that day is today, and that
+             the book has no last page. -->
+        {#if view === 'agenda' && shows('planner', 'census', calm.on)}
+          <span class="cal__stat cal__stat--soft"
+            >{agendaFromIso === todayIso
+              ? t('planner.agenda_from_today', locale)
+              : t('planner.agenda_open_at', locale, { day: localeDayMonth(agendaFromIso, localeTag) })}</span
+          >
+          <span class="cal__stat cal__stat--soft">{t('planner.board_no_end', locale)}</span>
+        {/if}
         <!-- The board names its grain and its horizon: a window that grows
              names where it begins and says NO END — what grows is never
              counted (law: el horizonte del tablero). Lanes from the one
@@ -3331,7 +3346,7 @@
         {#if view === 'day' && daySpanLabel}
           <span class="cal__stat cal__stat--soft">{daySpanLabel}</span>
         {/if}
-        <!-- THE CENSUS BELONGS TO THE MONTH, AND ONLY TO THE MONTH.
+        <!-- THE CENSUS BELONGS TO THE BOUNDED WINDOWS: THE MONTH AND THE SEASON.
              (Marco, 2026-08-10: «las cifras mensuales cuando estamos en la
              vista day confunden».)
 
@@ -3346,10 +3361,11 @@
              The rule this leaves is clean enough to check by looking: A VIEW
              COUNTS WHAT IT DRAWS, OR IT COUNTS NOTHING. The month draws a
              month and counts it. The Day draws a day, and a day does not need
-             counting — the drawing is the count. The agenda and the board
-             have no last day, so they name where they begin and count
+             counting — the drawing is the count. The Season draws its weeks
+             and counts them (2026-11-02). The agenda and the board have no
+             last day, so they name where they begin and count
              nothing. -->
-        {#if view === 'month' && shows('planner', 'census', calm.on)}
+        {#if (view === 'month' || view === 'overview') && shows('planner', 'census', calm.on)}
         <span class="cal__stat"
           ><b>{fig(stats.confirmed)}</b>
           {t(figOne(stats.confirmed) ? 'planner.stat_confirmed_one' : 'planner.stat_confirmed', locale)}</span
@@ -3372,15 +3388,15 @@
              the Day under a single date — August's numbers on three drawings
              that are not a month. On the board the bands are ON the sheet
              anyway, so the counter was saying twice what one of the two
-             sayings had wrong. -->
-        {#if figuresKnown && statAwayPersons > 0}
+             sayings had wrong. The Season has its own «Fuera» block. -->
+        {#if view === 'month' && figuresKnown && statAwayPersons > 0}
           <span class="cal__stat cal__stat--soft"
             >{statAwayPersons === 1
               ? t('planner.stat_away_one', locale)
               : t('planner.stat_away', locale, { z: statAwayPersons })}</span
           >
         {/if}
-        {#if figuresKnown && statTrips > 0}
+        {#if view === 'month' && figuresKnown && statTrips > 0}
           <span class="cal__stat cal__stat--soft"
             >{statTrips === 1
               ? t('planner.stat_trips_one', locale)
@@ -3856,11 +3872,15 @@
     .cal__facts .cal__meta {
       margin: 0;
     }
-    /* Nothing to say, nothing drawn (ADR-167 § 2): an empty line goes, and
-       with both gone the block and its rule go too. */
-    .cal__facts .cal__meta:not(:has(*)),
-    .cal__facts:not(:has(.cal__meta *)) {
+    /* The queue with nothing to say goes (ADR-167 § 2). The window line
+       stays in every view and keeps one line of height even when it is empty
+       (a Day with nothing on it), so the tabs below never move (nota a
+       ADR-167, 2026-11-02). */
+    .cal__facts .cal__meta--queue:not(:has(*)) {
       display: none;
+    }
+    .cal__meta--window {
+      min-block-size: 1lh;
     }
     /* TWO LINES, TWO REGISTERS — and this is the step I claimed and did not
        make: both lines were 9.5px, 0.1em and the same faint ink, so the cut
@@ -3876,8 +3896,8 @@
        faintest — a field you consult, not one you read. Its numbers keep the
        one step of ink the strip gives them (`.cal__stat b`), because a census
        is scanned by its digits. */
-    /* No `.cal__meta--window` rule: the caption IS the base, and the queue is
-       the one that steps up from it. The class stays as the markup's hook. */
+    /* The window rule above only holds its place: the caption IS the base,
+       and the queue is the one that steps up from it. */
     .cal__meta :global(.cal__stat) {
       white-space: nowrap;
     }

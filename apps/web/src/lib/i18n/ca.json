@@ -601,6 +601,8 @@
   "planner.cast_you": "tu",
   "planner.no_cast@music": "sense formació",
   "planner.agenda_from": "des de {day}",
+  "planner.agenda_from_today": "des d’avui",
+  "planner.agenda_open_at": "oberta el {day}, no avui",
   "planner.new_date": "Nova data",
   "planner.now": "Avui",
   "planner.date_word": "data",
