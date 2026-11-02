@@ -357,8 +357,8 @@
     --thread-mailout-rule: var(--border-color-dark);
     /* A letter and a bubble never take the whole row: the side they sit on
        is half of what they say. */
-    --thread-letter-max: 40rem;
-    --thread-bubble-max: 30rem;
+    --thread-letter-max: min(88%, 40rem);
+    --thread-bubble-max: min(80%, 30rem);
     /* How much of a long mail shows before it unfolds in place. */
     --thread-fold-lines: 6;
 

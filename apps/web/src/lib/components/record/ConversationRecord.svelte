@@ -807,6 +807,13 @@
       flex-direction: column;
       gap: var(--space-s);
     }
+    /* On its own page the chat fills the screen: the field at the foot even
+       when little has been said. */
+    .chat[data-chat-open] {
+      /* What the shell leaves: its top bar (set on .shell, so read here), the
+         page's own air above and under, the lens bar on a phone. */
+      min-block-size: calc(100dvh - var(--header-height) - var(--space-l) - var(--space-xxl) - var(--shell-foot));
+    }
 
     /* ── Cabecera ── */
     .chat__head {
@@ -979,7 +986,7 @@
       flex-direction: column;
       gap: var(--space-2xs);
       align-self: flex-start;
-      inline-size: min(100%, var(--thread-letter-max));
+      inline-size: var(--thread-letter-max);
       padding: var(--space-s) var(--space-m);
       background: var(--thread-theirs-bg);
       border: var(--line-hairline) solid var(--border-color-light);
@@ -1040,7 +1047,7 @@
       align-items: baseline;
       gap: var(--space-xs);
       align-self: flex-end;
-      max-inline-size: min(100%, var(--thread-letter-max));
+      max-inline-size: var(--thread-letter-max);
       padding: var(--space-xs) var(--space-s);
       color: var(--text-muted);
       border: var(--line-hairline) dashed var(--thread-mailout-rule);

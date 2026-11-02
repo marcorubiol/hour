@@ -3084,5 +3084,8 @@
   "thread.no_contacts": "Pas encore de contacts.",
   "thread.org_record": "Fiche de l’organisation",
   "thread.dir_out": "de notre part",
-  "thread.dir_in": "de leur part"
+  "thread.dir_in": "de leur part",
+  "thread.group_team": "Équipe",
+  "thread.open_bolo": "Ouvrir le contrat",
+  "thread.group_missing": "Ce fil n’existe pas, ou tu ne le lis pas."
 }

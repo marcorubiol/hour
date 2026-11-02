@@ -3084,5 +3084,8 @@
   "thread.no_contacts": "Sin contactos todavía.",
   "thread.org_record": "Ficha de la organización",
   "thread.dir_out": "de nuestra parte",
-  "thread.dir_in": "de su parte"
+  "thread.dir_in": "de su parte",
+  "thread.group_team": "Equipo",
+  "thread.open_bolo": "Abrir el bolo",
+  "thread.group_missing": "Este hilo no está, o no lo lees."
 }

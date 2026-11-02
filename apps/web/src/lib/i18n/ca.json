@@ -3084,5 +3084,8 @@
   "thread.no_contacts": "Encara sense contactes.",
   "thread.org_record": "Fitxa de l’organització",
   "thread.dir_out": "de part nostra",
-  "thread.dir_in": "de part seva"
+  "thread.dir_in": "de part seva",
+  "thread.group_team": "Equip",
+  "thread.open_bolo": "Obrir el bolo",
+  "thread.group_missing": "Aquest fil no hi és, o no el llegeixes."
 }

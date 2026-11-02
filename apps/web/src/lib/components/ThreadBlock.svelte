@@ -167,7 +167,10 @@
       <Badge tone="info" size="xs">{t(thread.unread_count === 1 ? 'threads.unread_one' : 'threads.unread', locale, { n: thread.unread_count })}</Badge>
     {/if}
   {/snippet}
-  {#if heading === 'eyebrow'}
+  {#if look === 'group'}
+    <!-- A group's name is its screen's head: here only its audience line. -->
+    <h2 class="visually-hidden" id={headingId}>{name}</h2>
+  {:else if heading === 'eyebrow'}
     <!-- In the conversation's column (`list`) the thread is a block of the page;
          in the mixed flow it sits under the flow's own head. -->
     <BlockHead level={list ? 2 : 3} title={name} count={thread.message_count} id={headingId}>{@render unread()}</BlockHead>
@@ -283,7 +286,13 @@
       padding-block-start: 0;
       border-block-start: 0;
     }
+    .thread--group .thread__audience {
+      margin: 0;
+      color: var(--text-faint);
+      font-size: var(--text-xs);
+    }
     .thread--group .thread__compose {
+      margin-block-start: auto;
       position: sticky;
       inset-block-end: var(--shell-foot);
       padding-block: var(--space-s);

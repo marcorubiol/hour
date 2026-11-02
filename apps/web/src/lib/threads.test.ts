@@ -11,6 +11,7 @@ import {
   conversationThread,
   facetName,
   feedHref,
+  groupHref,
   feedThreadName,
   feedTitle,
   firstUnreadId,
@@ -305,6 +306,13 @@ describe('«de qué se habla» (ADR-116)', () => {
   test('sin espacio conocido, o un bolo sin funciones vivas, no hay enlace', () => {
     expect(feedHref(bolo, undefined)).toBeNull();
     expect(feedHref({ ...bolo, bolo: { ...bolo.bolo, performance_slug: null } }, 'muk')).toBeNull();
+  });
+
+  test('un hilo de bolo abre solo, como grupo: su función y su faceta (General sin hilo)', () => {
+    expect(groupHref({ ...bolo, facet_id: null }, 'muk')).toBe('/h/muk/group/p1');
+    expect(groupHref({ ...bolo, facet_id: 'f1' }, 'muk')).toBe('/h/muk/group/p1?hilo=f1');
+    expect(groupHref({ ...conv, facet_id: null }, 'muk')).toBeNull();
+    expect(groupHref({ ...bolo, facet_id: null, bolo: { ...bolo.bolo, performance_id: null } }, 'muk')).toBeNull();
   });
 
   test('el nombre del hilo: la faceta en un bolo, «Equipo» en una conversación', () => {
