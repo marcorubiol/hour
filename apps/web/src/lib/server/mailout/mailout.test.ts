@@ -154,13 +154,20 @@ describe('recordDomainStatus', () => {
 });
 
 describe('el formulario del dominio', () => {
-  test('normaliza lo que se pega y pone difusion por defecto', () => {
+  test('normaliza lo que se pega; sin parte local ni propósito, la difusión y la de la base', () => {
     expect(normalizeDomain('  https://www.MaMeMi.cat/contacto ')).toBe('mamemi.cat');
     const ok = v.safeParse(MailDomainCreateSchema, {
       workspace_id: '0190a0a0-0000-7000-8000-000000000000',
       domain: 'https://MaMeMi.cat/',
     });
-    expect(ok.success && ok.output).toMatchObject({ domain: 'mamemi.cat', from_local_part: 'difusion' });
+    expect(ok.success && ok.output).toMatchObject({ domain: 'mamemi.cat', purpose: 'outreach' });
+    expect(ok.success && ok.output.from_local_part).toBeUndefined();
+    const aud = v.safeParse(MailDomainCreateSchema, {
+      workspace_id: '0190a0a0-0000-7000-8000-000000000000',
+      domain: 'publico.mamemi.cat',
+      purpose: 'audience',
+    });
+    expect(aud.success && aud.output.purpose).toBe('audience');
     for (const domain of ['mamemi', 'mamemi .cat', 'gmail@mamemi.cat']) {
       expect(
         v.safeParse(MailDomainCreateSchema, { workspace_id: '0190a0a0-0000-7000-8000-000000000000', domain }).success,

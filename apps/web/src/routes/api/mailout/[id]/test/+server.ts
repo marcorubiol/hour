@@ -4,6 +4,11 @@
  * primero listo) a tu propio email (`mailout_test_authorize`), con «[Prueba]»
  * delante del asunto y sin registro en ninguna conversación. Sale por el
  * adaptador del dominio del envío: con el simulador, no sale nada.
+ *
+ * En una invitación, una prueba por identidad (ADR-173 § 10): con
+ * `audience_subscription_id`, el correo de esa persona del público desde el
+ * dominio del público y con su pie; si no, el de un profesional desde el de
+ * la difusión.
  */
 
 import type { RequestHandler } from './$types';
@@ -17,7 +22,10 @@ import { composeMailout, testSubject, unsubscribeHeaders, unsubscribeUrl } from 
 import { detailTemplateRow, recipientState, senderAddress } from '$lib/mailout';
 import { mailTemplate } from '$lib/mail-template';
 
-const TestSchema = v.object({ recipient_id: v.nullish(v.pipe(v.string(), v.uuid())) });
+const TestSchema = v.object({
+  recipient_id: v.nullish(v.pipe(v.string(), v.uuid())),
+  audience_subscription_id: v.nullish(v.pipe(v.string(), v.uuid())),
+});
 
 export const POST: RequestHandler = (event) =>
   mailoutRoute(event, 'POST /api/mailout/[id]/test', async ({ env, jwt, id }) => {
@@ -27,14 +35,24 @@ export const POST: RequestHandler = (event) =>
     const d = await loadDetail(env, jwt, id);
     if (!d || !to) return jsonNoStore({ error: 'not_found' }, 404);
     const m = d.mailout;
-    const domain = d.domains.find((x) => x.id === m.mail_domain_id);
-    if (!domain) return jsonNoStore({ error: 'domain_not_verified' }, 409);
     if (!m.subject || !m.body) return jsonNoStore({ error: 'empty' }, 409);
-    const row =
-      d.recipients.find((r) => r.recipient_id === body.recipient_id) ??
-      d.recipients.find((r) => recipientState(r, false) === 'ready');
-    const ctx = d.compose.find((c) => c.recipient_id === row?.recipient_id);
-    if (!row || !ctx) return jsonNoStore({ error: 'no_recipients' }, 409);
+    const audience = Boolean(body.audience_subscription_id);
+    const domain = audience
+      ? d.audience_domain?.verified_at
+        ? d.audience_domain
+        : null
+      : d.domains.find((x) => x.id === m.mail_domain_id);
+    if (!domain) return jsonNoStore({ error: audience ? 'audience_domain_not_verified' : 'domain_not_verified' }, 409);
+    let ctx;
+    if (audience) {
+      ctx = d.audience_preview.find((c) => c.audience_subscription_id === body.audience_subscription_id);
+    } else {
+      const row =
+        d.recipients.find((r) => r.recipient_id === body.recipient_id) ??
+        d.recipients.find((r) => r.conversation_id && recipientState(r, false) === 'ready');
+      ctx = d.compose.find((c) => c.recipient_id === row?.recipient_id);
+    }
+    if (!ctx) return jsonNoStore({ error: 'no_recipients' }, 409);
 
     const origin = mailoutLinkOrigin(env);
     const url = unsubscribeUrl(origin, 'prueba');
@@ -44,7 +62,8 @@ export const POST: RequestHandler = (event) =>
     try {
       const provider = sendingProvider(domain.provider, env);
       await provider.sendEmail({
-        from: senderAddress(m.from_local_part, domain.domain),
+        // El público sale con la parte local de su dominio (como `mailout_claim`).
+        from: senderAddress(audience ? domain.from_local_part : m.from_local_part, domain.domain),
         fromName: m.from_name,
         to,
         toName: null,

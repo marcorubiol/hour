@@ -266,6 +266,8 @@ describe('estado de cada destinatario en la pantalla', () => {
   const row = (over: Partial<MailoutRecipientRow>): MailoutRecipientRow => ({
     recipient_id: 'r',
     conversation_id: 'c',
+    audience_subscription_id: null,
+    mail_domain_id: null,
     address: 'a@b.example',
     display_name: null,
     address_kind: 'contact',
