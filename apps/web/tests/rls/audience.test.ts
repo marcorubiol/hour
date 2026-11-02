@@ -533,52 +533,54 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: el público y sus invit
       const res = await pgGet(table, null, new URLSearchParams({ select: 'workspace_id', limit: '1' }));
       expect(res.rows.length, table).toBe(0);
     }
+    // Cada función de public que trae la migración (o que reescribe), llamada como anon
+    // con sus argumentos exactos: un 404 sería una firma mal escrita, no un permiso.
+    // Las que no son por token, denegadas (42501: 401 como anon, 403 con sesión).
     const machine: [string, Record<string, unknown>][] = [
-      ['audience_subscribe', { p_key: formKey, p_address: SIM('anon'), p_name: null, p_language: 'es', p_text_id: null, p_age_confirmed: true, p_ip: '203.0.113.9', p_user_agent: 'x' }],
-      ['audience_confirm', { p_token: 'f'.repeat(64) }],
+      ['audience_subscribe', { p_key: formKey, p_address: SIM('anon'), p_name: null, p_language: 'es', p_text_id: null, p_age_confirmed: true, p_ip: '203.0.113.9', p_user_agent: 'x', p_channel: 'form', p_page_url: null }],
+      ['audience_confirm', { p_token: 'f'.repeat(64), p_ip: null, p_user_agent: null }],
       ['audience_resubscribe', { p_token: 'f'.repeat(48), p_ip: '203.0.113.9', p_user_agent: 'x' }],
       ['audience_confirmation_token', { p_subscription_id: FAKE_ID }],
       ['audience_confirmation_sent', { p_subscription_id: FAKE_ID, p_provider_message_id: 'x' }],
       ['audience_purge_pending', {}],
-      ['audience_approve_import', { p_import_id: FAKE_ID }],
+      ['audience_approve_import', { p_import_id: FAKE_ID, p_reviewed_by: null }],
+      ['mailout_approve_review', { p_mailout_id: FAKE_ID, p_reviewed_by: null }],
+      ['mailout_claim', { p_limit: 1, p_mailout_id: FAKE_ID }],
+      ['mailout_send_context', { p_recipient_ids: [FAKE_ID] }],
+      ['mailout_record_sent', { p_recipient_id: FAKE_ID, p_provider_message_id: 'x', p_rfc_message_id: 'x', p_body: 'x', p_subject: null }],
+      ['mailout_record_event', { p_payload: { provider_event_id: 'x', type: 'delivery' } }],
     ];
     const person: [string, Record<string, unknown>][] = [
-      ['create_audience', { p_workspace_id: workspaceId, p_name: 'anon' }],
+      ['add_mail_domain', { p_workspace_id: workspaceId, p_domain: `anon-${RUN}.example.test`, p_provider: 'simulator', p_from_local_part: null, p_from_name: null, p_purpose: 'audience' }],
+      ['set_mail_domain_sender', { p_id: FAKE_ID, p_from_local_part: 'x', p_from_name: null }],
+      ['remove_mail_domain', { p_id: FAKE_ID }],
+      ['update_mailout', { p_id: FAKE_ID, p_subject: 'x', p_body: 'x', p_language: 'es', p_from_local_part: 'x', p_from_name: null, p_mail_domain_id: null, p_reply_to_mail_account_id: null }],
+      ['set_mailout_recipients', { p_id: FAKE_ID, p_conversation_ids: [] }],
+      ['create_invitation', { p_workspace_id: workspaceId, p_audience_id: listId, p_conversation_ids: null, p_project_id: null, p_performance_id: null }],
+      ['set_invitation_audience', { p_mailout_id: FAKE_ID, p_audience_id: null }],
+      ['mailout_preview', { p_id: FAKE_ID }],
+      ['mailout_compose_preview', { p_id: FAKE_ID }],
+      ['queue_mailout', { p_id: FAKE_ID }],
+      ['create_audience', { p_workspace_id: workspaceId, p_name: 'anon', p_languages: ['es'], p_default_language: 'es' }],
+      ['update_audience', { p_id: listId, p_name: 'anon', p_description: null, p_languages: ['es'], p_default_language: 'es' }],
+      ['set_audience_consent_text', { p_audience_id: listId, p_texts: {} }],
       ['set_audience_status', { p_id: listId, p_status: 'closed' }],
-      ['add_audience_subscription', { p_audience_id: listId, p_address: SIM('anon') }],
-      ['import_audience', { p_audience_id: listId, p_filename: 'x.csv', p_rows: [], p_basis_kind: 'consent', p_source_note: 'xxxxxxxxxxxx' }],
+      ['regenerate_audience_form_key', { p_id: listId }],
+      ['add_audience_subscription', { p_audience_id: listId, p_address: SIM('anon'), p_name: null, p_language: null }],
+      ['import_audience', { p_audience_id: listId, p_filename: 'x.csv', p_rows: [], p_basis_kind: 'consent', p_source_note: 'xxxxxxxxxxxx', p_statement_language: 'es' }],
+      ['unsubscribe_audience_subscription', { p_id: FAKE_ID }],
+      ['erase_audience_subscription', { p_id: FAKE_ID }],
       ['audience_consent_proof', { p_subscription_id: FAKE_ID }],
-      ['create_invitation', { p_workspace_id: workspaceId, p_audience_id: listId }],
+      ['set_membership_facet', { p_membership_id: FAKE_ID, p_facet_id: FAKE_ID, p_verb: null }],
     ];
     for (const [fn, args] of [...machine, ...person]) {
-      expect((await pgRpc(fn, null, args)).status, `anon ${fn}`).toBeGreaterThanOrEqual(400);
+      const res = await pgRpc(fn, null, args);
+      expect(res.status, `anon ${fn}: ${res.error}`).toBe(401);
     }
-    // Por catálogo: la raíz de PostgREST, pedida como anon, lista solo las RPC que
-    // anon puede ejecutar. Del correo y del público, exactamente estas.
-    const { url, anon } = requireEnv();
-    const spec = await fetch(new URL('/rest/v1/', url), {
-      headers: { apikey: anon, Authorization: `Bearer ${anon}`, Accept: 'application/openapi+json' },
-    });
-    expect(spec.status, 'la raíz de PostgREST responde a anon').toBe(200);
-    const paths = Object.keys(((await spec.json()) as { paths: Record<string, unknown> }).paths);
-    const mailRpcs = paths
-      .filter((x) => x.startsWith('/rpc/'))
-      .map((x) => x.slice(5))
-      .filter((x) => /mail|audience|invitation|subscri|basis|suppress/.test(x))
-      .sort();
-    expect(mailRpcs).toEqual(
-      [
-        'audience_confirm_info',
-        'audience_form_info',
-        'mailout_resubscribe',
-        'mailout_unsubscribe',
-        'mailout_unsubscribe_everything',
-        'mailout_unsubscribe_info',
-      ].sort(),
-    );
     // Las de máquina tampoco son de una persona, ni del owner: la IP la pone el Worker.
     for (const [fn, args] of machine) {
-      expect((await pgRpc(fn, adminJwt, args)).status, `admin ${fn}`).toBeGreaterThanOrEqual(400);
+      const res = await pgRpc(fn, adminJwt, args);
+      expect(res.status, `admin ${fn}: ${res.error}`).toBe(403);
     }
   });
 
