@@ -6542,3 +6542,35 @@ comunicación comercial), o si una compañía manda invitaciones a cientos de pr
 profesional pesa en el dominio de la difusión como el público, y se mira si pasa al subdominio.
 
 > **Nota a ADR-173 (2026-11-01):** pregunta 10 del plan decidida por Marco: invitan a un profesional las tres bases de la difusión (lo pidió, trato previo, genérico de la sala), con el pie que dice cuál; si el abogado excluye un tipo, sale de la propuesta y de la invitación a la vez.
+
+## [2026-11-02] ADR-174 · Cuarta base, «contacto profesional del sector», y el diseño para los dos orígenes
+
+**Contexto.** ADR-110 § 2 y ADR-173 § 10 dejan salir a un profesional sólo con una de tres bases (lo pidió, trato
+previo, genérico de la sala). Marco (2026-11-02): en las artes en vivo, escribir a programadoras, salas y festivales
+para invitarles a ver una obra es parte del trabajo y lo hace todo el mundo; Hour no puede bloquearlo. Y el diseño de
+una invitación tiene que servir para el público y para los profesionales, no sólo para el público.
+
+**Decisión (Marco, 2026-11-02).**
+1. **Cuarta base en `mail_basis_kind`: `sector`** («contacto profesional del sector»; CA «contacte professional del
+   sector», EN «industry contact», FR «contact professionnel du secteur»). La declara quien envía con un clic sobre una
+   dirección de una conversación de difusión; Hour no la propone sola. Vale para el envío de difusión y para la rama
+   profesional de una invitación, porque `mail_basis` es una sola por dirección. Lleva su pie («Te escribimos porque
+   trabajas en programación o difusión de artes en vivo»), la baja de un clic y la supresión del espacio como las
+   otras tres. Se guarda quién la declaró y cuándo.
+2. **La responsabilidad es de la compañía**, en cuyo nombre se envía (ADR-109), como con las otras bases. Queda para
+   el abogado (plan del público § 3.7): si entre empresas del sector basta esta base o pide algo más; si dice que no,
+   la base deja de ofrecerse y las direcciones que sólo la tienen quedan `no_basis`, sin migración de datos.
+3. **El diseño sirve a los dos orígenes.** Se supera el techo de ADR-173 § 10 («la plantilla del 97 y nada más» para
+   los profesionales): el editor del 99 llega a la rama profesional igual que al público. Una invitación diseñada sale
+   diseñada a todos sus destinatarios, cada uno desde su identidad. Las reglas de palabras del envío (asunto concreto,
+   pocos enlaces, sin acortadores ni adjuntos) siguen para los dos.
+
+**Lo que cuesta.** Un correo de diseño desde el dominio de la difusión pesa más en su reputación que la plantilla de
+texto (plan § 5.2 y § 5.6) [S: sin medida propia]. Se acepta; si las quejas o los rebotes de una invitación diseñada
+pausan la difusión, se mira de nuevo.
+
+**Supera** ADR-173 § 10 en la base de un profesional («no hay tipo nuevo en `mail_basis_kind`») y en el techo de
+diseño; el resto de ADR-173 sigue.
+
+**Cómo se revierte.** Quitar `sector` de lo que se ofrece y de lo que acepta la puerta (`queue_mailout`,
+`mailout_claim`); el valor del enum puede quedarse. El diseño se vuelve a limitar en el editor sin tocar datos.
