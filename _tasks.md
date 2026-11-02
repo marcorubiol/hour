@@ -16,6 +16,7 @@ no pide migración primero; las migraciones juntas por el gate de § 34.
   `project.poster_url` (destructiva: staging e inspect).
 - [ ] 98 invitar, al público y a profesionales: decidido (ADR-173, `build/plans/2026-11-01-audience.md`); siguiente paso, la fase 1.
 - [ ] 99 editor de correos bonitos, tipo Mailchimp, para las invitaciones al público y a profesionales (Marco, 2026-11-01: va después del público, opción A; 2026-11-02: sirve a los dos orígenes, ADR-174). Candidato Templatical; plan B GrapesJS + grapesjs-mjml (`research/2026-11-email-builder.md`). Hoy sólo existe la plantilla fija por espacio (ADR-172).
+- [ ] 100 bug: `mailout_record_event` (función viva del envío) falla con 23514 si llega una queja o un rebote de un destinatario `skipped` (hallado por el carril del público, 2026-11-02). Sin arreglar.
 - Aparcado: 86 (responsable de tarea) hasta que entre Anouk.
 
 ## PRIMERO — nada. `main` == prod y las dos suites están vivas (2026-07-30, noche)
