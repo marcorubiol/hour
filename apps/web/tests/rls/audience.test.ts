@@ -111,6 +111,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: el público y sus invit
   let homeProjectId: string;
   let foreignProjectId: string;
   let privacyBefore: string | null = null;
+  let privacyTouched = false;
   let outDomain: string;
   let audDomain: string;
   let listId: string;
@@ -262,6 +263,18 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: el público y sus invit
     return row.subscription_id!;
   }
 
+  /** El estado de un dominio, como lo apuntaría la comprobación del DNS (service_role). */
+  async function domainStatus(id: string, verified: boolean) {
+    const status = verified ? 'SUCCESS' : 'PENDING';
+    const ok = await svc('POST', 'rpc/mail_domain_record_status', {
+      p_id: id,
+      p_dkim_status: status,
+      p_mail_from_status: status,
+      p_dns_records: [],
+    });
+    expect(ok.status, ok.error).toBe(200);
+  }
+
   beforeAll(async () => {
     const admin = requireEnv();
     adminJwt = await login(admin.email, admin.password);
@@ -302,6 +315,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: el público y sus invit
       new URLSearchParams({ id: `eq.${workspaceId}`, select: 'privacy_url' }),
     );
     privacyBefore = ws.rows[0].privacy_url;
+    privacyTouched = true;
     await pgPatch(
       'workspace',
       adminJwt,
@@ -345,23 +359,41 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: el público y sus invit
   });
 
   afterAll(async () => {
-    for (const id of mailouts) await pgRpc('cancel_mailout', adminJwt, { p_id: id });
+    // Cada paso corre aunque falle otro: un caso a medias no deja restos.
+    const errors: unknown[] = [];
+    const step = async (f: () => Promise<unknown>) => {
+      try {
+        await f();
+      } catch (err) {
+        errors.push(err);
+      }
+    };
+    for (const id of mailouts) await step(() => pgRpc('cancel_mailout', adminJwt, { p_id: id }));
     if (SERVICE_KEY) {
-      if (mailouts.length) await svc('DELETE', `mailout?id=in.(${mailouts.join(',')})`);
-      if (audiences.length) await svc('DELETE', `audience?id=in.(${audiences.join(',')})`);
-      const list = `in.(${addresses.map((a) => `"${a}"`).join(',')})`;
-      await svc('DELETE', `mail_suppression?workspace_id=eq.${workspaceId}&address=${encodeURIComponent(list)}`);
-      await svc('DELETE', `mail_basis?workspace_id=eq.${workspaceId}&address=${encodeURIComponent(list)}`);
+      if (mailouts.length) await step(() => svc('DELETE', `mailout?id=in.(${mailouts.join(',')})`));
+      if (audiences.length) await step(() => svc('DELETE', `audience?id=in.(${audiences.join(',')})`));
+      if (addresses.length) {
+        const list = `in.(${addresses.map((a) => `"${a}"`).join(',')})`;
+        await step(() => svc('DELETE', `mail_suppression?workspace_id=eq.${workspaceId}&address=${encodeURIComponent(list)}`));
+        await step(() => svc('DELETE', `mail_basis?workspace_id=eq.${workspaceId}&address=${encodeURIComponent(list)}`));
+      }
     } else {
-      for (const id of audiences) await pgRpc('set_audience_status', adminJwt, { p_id: id, p_status: 'archived' });
+      for (const id of audiences) await step(() => pgRpc('set_audience_status', adminJwt, { p_id: id, p_status: 'archived' }));
     }
-    for (const id of domains) await pgRpc('remove_mail_domain', adminJwt, { p_id: id });
-    for (const id of performances) await pgRpc('delete_performance', adminJwt, { p_performance_id: id });
-    for (const id of Object.values(conv)) await pgRpc('delete_conversation', adminJwt, { p_conversation_id: id });
-    await pgPatch('workspace', adminJwt, { privacy_url: privacyBefore }, new URLSearchParams({ id: `eq.${workspaceId}` }));
-    if (limitedWsMembership) await setFacets(adminJwt, limitedWsMembership, { audience: null });
-    if (limitedSnapshot) await restoreProjectAccess(adminJwt, homeProjectId, limitedUserId, limitedSnapshot);
+    for (const id of domains) await step(() => pgRpc('remove_mail_domain', adminJwt, { p_id: id }));
+    for (const id of performances) await step(() => pgRpc('delete_performance', adminJwt, { p_performance_id: id }));
+    for (const id of Object.values(conv)) await step(() => pgRpc('delete_conversation', adminJwt, { p_conversation_id: id }));
+    // Solo si se llegó a leer: si no, se borraría la política de verdad del espacio.
+    if (privacyTouched) {
+      await step(() =>
+        pgPatch('workspace', adminJwt, { privacy_url: privacyBefore }, new URLSearchParams({ id: `eq.${workspaceId}` })),
+      );
+    }
+    if (limitedWsMembership) await step(() => setFacets(adminJwt, limitedWsMembership, { audience: null }));
+    if (limitedSnapshot) await step(() => restoreProjectAccess(adminJwt, homeProjectId, limitedUserId, limitedSnapshot!));
+    if (errors.length) throw errors[0];
   });
+
 
   test('2 · sin la faceta Público no se lee nada; con «ver» se lee y no se escribe; con «ver y editar», sí', async () => {
     // Una persona apuntada (con su evento), una importación y una invitación solo a la lista.
@@ -542,6 +574,8 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: el público y sus invit
       ['audience_resubscribe', { p_token: 'f'.repeat(48), p_ip: '203.0.113.9', p_user_agent: 'x' }],
       ['audience_confirmation_token', { p_subscription_id: FAKE_ID }],
       ['audience_confirmation_sent', { p_subscription_id: FAKE_ID, p_provider_message_id: 'x' }],
+      ['audience_confirmation_context', { p_subscription_id: FAKE_ID }],
+      ['audience_confirmation_failed', { p_subscription_id: FAKE_ID }],
       ['audience_purge_pending', {}],
       ['audience_approve_import', { p_import_id: FAKE_ID, p_reviewed_by: null }],
       ['mailout_approve_review', { p_mailout_id: FAKE_ID, p_reviewed_by: null }],
@@ -740,8 +774,12 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: el público y sus invit
       expect(noOrigin.status).toBe(400);
       expect(noOrigin.error).toMatch(/needs a list or professionals/);
 
+      // Una confirmación pide un dominio del público verificado (ADR-175): se verifica
+      // para el alta y se deja como estaba, sin verificar, para lo que mira este caso.
+      await domainStatus(audDomain, true);
       const s = await confirmed(SIM('q16'));
       expect(s).toBeTruthy();
+      await domainStatus(audDomain, false);
       const withList = (await invitation({ audience: listId })).row!;
       expect(withList.audience_mail_domain_id).toBe(audDomain);
       await write(withList.id);
@@ -755,15 +793,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: el público y sus invit
       expect(noOut.status).toBe(400);
       expect(noOut.error).toMatch(/sending domain is not verified/);
 
-      for (const id of [outDomain, audDomain]) {
-        const ok = await svc('POST', 'rpc/mail_domain_record_status', {
-          p_id: id,
-          p_dkim_status: 'SUCCESS',
-          p_mail_from_status: 'SUCCESS',
-          p_dns_records: [],
-        });
-        expect(ok.status, ok.error).toBe(200);
-      }
+      for (const id of [outDomain, audDomain]) await domainStatus(id, true);
       // Verificados, los dos salen; y se cancelan en seguida, que el cron no los tome.
       for (const id of [withList.id, withPros.id]) {
         const queued = await pgRpc('queue_mailout', adminJwt, { p_id: id });
@@ -853,6 +883,62 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: el público y sus invit
       expect((await pgGet('audience_subscription', adminJwt, new URLSearchParams({ id: `eq.${old}`, select: 'id' }))).rows.length).toBe(0);
     });
 
+    test('ADR-175 · sin ruta de entrega no hay fila; en solo-simulador una dirección real no deja fila; un envío fallido devuelve el cupo', async () => {
+      const ws = await svc<{ mailout_simulator_only: boolean }[]>('GET', `workspace?id=eq.${workspaceId}&select=mailout_simulator_only`);
+      expect(ws.data![0].mailout_simulator_only, 'el espacio de los tests no sale del simulador').toBe(true);
+      const rows = async (address: string) =>
+        (await svc<unknown[]>('GET', `audience_subscription?audience_id=eq.${listId}&address=eq.${encodeURIComponent(address)}&select=id`)).data!;
+
+      // Una dirección real: la misma salida, ni fila ni evento.
+      const realAddress = `real-adr175-${RUN}@example.test`;
+      const real = await subscribe(realAddress);
+      expect(real.status, real.error).toBe(200);
+      expect(one(real.data)).toMatchObject({ subscription_id: null, token: null });
+      expect(await rows(realAddress)).toEqual([]);
+
+      // Sin dominio del público verificado: lo mismo, también para el simulador.
+      await domainStatus(audDomain, false);
+      try {
+        const none = await subscribe(SIM('noroute'));
+        expect(one(none.data)).toMatchObject({ subscription_id: null, token: null });
+        expect(await rows(SIM('noroute'))).toEqual([]);
+      } finally {
+        await domainStatus(audDomain, true);
+      }
+
+      // Con ruta: el contexto dice por dónde sale.
+      const first = one((await subscribe(SIM('fail'))).data)!;
+      expect(first.token).toMatch(/^[0-9a-f]{64}$/);
+      const ctx = await svc<{ provider: string; from_address: string; address: string }[]>(
+        'POST',
+        'rpc/audience_confirmation_context',
+        { p_subscription_id: first.subscription_id },
+      );
+      expect(ctx.data![0]).toMatchObject({
+        provider: 'simulator',
+        from_address: `hola@publico.inv-${RUN}.example.test`,
+        address: SIM('fail'),
+      });
+
+      // El proveedor no lo aceptó: el token deja de valer y el cupo vuelve.
+      const failed = await svc('POST', 'rpc/audience_confirmation_failed', { p_subscription_id: first.subscription_id });
+      expect(failed.status, failed.error).toBeLessThan(300);
+      const after = await svc<{ confirm_sent_count: number; confirm_last_sent_at: string | null }[]>(
+        'GET',
+        `audience_subscription?id=eq.${first.subscription_id}&select=confirm_sent_count,confirm_last_sent_at`,
+      );
+      expect(after.data![0]).toEqual({ confirm_sent_count: 0, confirm_last_sent_at: null });
+      expect((await svc<boolean>('POST', 'rpc/audience_confirm', { p_token: first.token })).data).toBe(false);
+      const retry = one((await subscribe(SIM('fail'))).data)!;
+      expect(retry.token, 'se puede volver a pedir enseguida').toMatch(/^[0-9a-f]{64}$/);
+
+      // Un correo ya aceptado no devuelve nada.
+      await svc('POST', 'rpc/audience_confirmation_sent', { p_subscription_id: retry.subscription_id, p_provider_message_id: `adr175-${RUN}` });
+      await svc('POST', 'rpc/audience_confirmation_failed', { p_subscription_id: retry.subscription_id });
+      const kept = await svc<{ confirm_sent_count: number }[]>('GET', `audience_subscription?id=eq.${retry.subscription_id}&select=confirm_sent_count`);
+      expect(kept.data![0].confirm_sent_count).toBe(1);
+    });
+
     test('7 · queue_mailout de una invitación: solo confirmadas, sin importaciones en revisión, sin excluidas; dominio del público; el simulador manda', async () => {
       const list = await openList('Cola');
       await confirmed(SIM('s1'), list.key);
@@ -873,7 +959,13 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: el público y sus invit
       expect(imp.status, imp.error).toBe(200);
       expect(imp.data).toMatchObject({ status: 'review' });
       addresses.push(SIM('ir'));
-      const real = await confirmed(`real-${RUN}@example.test`, list.key);
+      // En un espacio solo-simulador una dirección real ya no se apunta (ADR-175): se
+      // confirma una del simulador y se le cambia la dirección por debajo.
+      const realAddress = `real-${RUN}@example.test`;
+      const real = await confirmed(SIM('real'), list.key);
+      const moved = await svc('PATCH', `audience_subscription?id=eq.${real}`, { address: realAddress });
+      expect(moved.status, moved.error).toBe(200);
+      addresses.push(realAddress);
 
       const m = (await invitation({ audience: list.id })).row!;
       await write(m.id);
