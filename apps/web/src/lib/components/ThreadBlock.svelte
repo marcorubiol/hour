@@ -9,10 +9,11 @@
    * una vez, `lib/server/threads.ts`). Sí lee su audiencia, que cambia poco.
    * Sin realtime: tras escribir, `onchange` pide al dueño que recargue.
    *
-   * Lo usan el tablón del bolo y el hilo del equipo de una conversación
-   * (`anchorKind="conversation"`, con su propio `title`). En la vista «hilo» de
-   * la conversación los mensajes se mezclan con el registro fuera de aquí
-   * (`list={false}`): el bloque queda en cabecera, audiencia y compositor.
+   * Lo usa el tablón del bolo. Con `look="group"` (punto 110) es el hilo de un
+   * bolo abierto como grupo de una app de mensajería: cada mensaje en su globo
+   * y en su lado, e Intro envía (Mayús+Intro, salto de línea). El hilo del
+   * equipo de una conversación ya no pasa por aquí: va intercalado en el hilo
+   * de fuera y se escribe en el campo único de la ficha.
    */
 
   import { createMutation, createQuery } from '@tanstack/svelte-query';
@@ -64,6 +65,8 @@
      * lateral, como Datos fiscales o Buzones; revisión de diseño B8).
      */
     heading?: 'name' | 'eyebrow';
+    /** `board`: un hilo entre los del tablón; `group`: el hilo solo, como un grupo. */
+    look?: 'board' | 'group';
     locale: Locale;
     onchange: () => void;
   }
@@ -82,6 +85,7 @@
     title,
     list = true,
     heading = 'name',
+    look = 'board',
     locale,
     onchange,
   }: Props = $props();
@@ -133,6 +137,16 @@
     onError: (err) => messageFailed(err, 'threads.not_sent', locale),
   });
 
+  /** En un grupo Intro envía, como en una app de mensajería; en el tablón, ⌘/Ctrl+Intro. */
+  function onKey(e: KeyboardEvent) {
+    if (look === 'group' && e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+      e.preventDefault();
+      send();
+      return;
+    }
+    sendOnModEnter(e, () => send());
+  }
+
   function send(event?: SubmitEvent) {
     event?.preventDefault();
     const text = body.trim();
@@ -147,13 +161,16 @@
   }
 </script>
 
-<article class="thread" aria-labelledby={headingId} data-facet={thread.facet_key ?? 'general'}>
+<article class="thread thread--{look}" aria-labelledby={headingId} data-facet={thread.facet_key ?? 'general'}>
   {#snippet unread()}
     {#if thread.unread_count > 0}
       <Badge tone="info" size="xs">{t(thread.unread_count === 1 ? 'threads.unread_one' : 'threads.unread', locale, { n: thread.unread_count })}</Badge>
     {/if}
   {/snippet}
-  {#if heading === 'eyebrow'}
+  {#if look === 'group'}
+    <!-- A group's name is its screen's head: here only its audience line. -->
+    <h2 class="visually-hidden" id={headingId}>{name}</h2>
+  {:else if heading === 'eyebrow'}
     <!-- In the conversation's column (`list`) the thread is a block of the page;
          in the mixed flow it sits under the flow's own head. -->
     <BlockHead level={list ? 2 : 3} title={name} count={thread.message_count} id={headingId}>{@render unread()}</BlockHead>
@@ -189,6 +206,7 @@
           mine={m.author_id === me}
           about={perf ? performanceTag(perf, locale, tz) : undefined}
           newBefore={m.id === dividerId}
+          look={look === 'group' ? 'bubble' : 'row'}
           {locale}
           {onchange}
         />
@@ -204,7 +222,7 @@
       aria-label={t('threads.write_in', locale, { name })}
       bind:value={body}
       bind:this={composer}
-      onkeydown={(e) => sendOnModEnter(e, () => send())}
+      onkeydown={onKey}
     ></textarea>
     <div class="thread__compose-row">
       {#if perfOptions.length > 0}
@@ -263,6 +281,23 @@
       list-style: none;
     }
 
+    /* A group: the thread alone, its composer kept at hand at the foot. */
+    .thread--group {
+      padding-block-start: 0;
+      border-block-start: 0;
+    }
+    .thread--group .thread__audience {
+      margin: 0;
+      color: var(--text-faint);
+      font-size: var(--text-xs);
+    }
+    .thread--group .thread__compose {
+      margin-block-start: auto;
+      position: sticky;
+      inset-block-end: var(--shell-foot);
+      padding-block: var(--space-s);
+      background: var(--bg);
+    }
     .thread__compose {
       display: flex;
       flex-direction: column;

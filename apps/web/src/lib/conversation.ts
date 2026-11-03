@@ -72,6 +72,9 @@ export type ConversationEventKind = Enums<'conversation_event_kind'>;
 export type ConversationEventDirection = Enums<'conversation_event_direction'>;
 type ConversationEvent = Tables<'conversation_event'>;
 
+/** The longest note an event takes (`record_conversation_event` checks it too). */
+export const EVENT_BODY_MAX = 5000;
+
 export const CONVERSATION_EVENT_KINDS = Constants.public.Enums.conversation_event_kind;
 const CONVERSATION_EVENT_DIRECTIONS = Constants.public.Enums.conversation_event_direction;
 
@@ -104,7 +107,7 @@ export function eventDirectionLabel(direction: ConversationEventDirection, local
 export const ConversationEventCreateSchema = v.object({
   kind: v.picklist(CONVERSATION_EVENT_KINDS),
   direction: v.optional(v.nullable(v.picklist(CONVERSATION_EVENT_DIRECTIONS))),
-  body: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(5000)))),
+  body: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(EVENT_BODY_MAX)))),
   occurred_at: v.optional(realIsoInstant),
 });
 

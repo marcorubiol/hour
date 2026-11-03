@@ -16,7 +16,7 @@
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
-import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
+import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import { decodeJwtPayload } from '$lib/server/session';
 import { loadThreadMessages } from '$lib/server/threads';
@@ -38,15 +38,21 @@ export const GET: RequestHandler = async ({ request, params, platform, locals })
   if (!idParsed.success) return json({ error: 'invalid_id' }, 400);
 
   try {
-    const { data } = await pgPostRpc<BoloBoard>(env, 'bolo_board', jwt, {
-      p_performance_id: idParsed.output,
-    });
+    // The space comes from the function itself, never from the address: a
+    // group's link to its board must not borrow another space's slug (ADR-176).
+    const [{ data }, place] = await Promise.all([
+      pgPostRpc<BoloBoard>(env, 'bolo_board', jwt, { p_performance_id: idParsed.output }),
+      pgGet<{ project: { workspace: { slug: string } | null } | null }>(env, 'performance', jwt, {
+        search: { select: 'project:project_id(workspace:workspace_id(slug))', id: `eq.${idParsed.output}` },
+      }),
+    ]);
     const board = data[0];
     if (!board) return json({ error: 'not_found' }, 404);
+    const workspace_slug = place.data[0]?.project?.workspace?.slug ?? null;
 
     const threadIds = board.threads.map((th) => th.thread_id).filter((id): id is string => Boolean(id));
     const loaded = await loadThreadMessages(env, jwt, threadIds);
-    const view: BoardView = { ...board, me, ...loaded };
+    const view: BoardView = { ...board, me, workspace_slug, ...loaded };
     return json(view);
   } catch (err) {
     return pgErrorResponse(

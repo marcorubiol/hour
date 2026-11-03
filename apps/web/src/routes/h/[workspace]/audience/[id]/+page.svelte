@@ -329,14 +329,14 @@
       missingText={t('audience.not_found', locale)}
       failedText={t('audience.load_error', locale)}
       onretry={() => void $query.refetch()}
-      back={lensOn('conversations') ? { href: '/h/conversations?etiqueta=audience', label: t('audience.back', locale) } : null}
+      back={lensOn('conversations') ? { href: '/h/conversations?view=envios', label: t('envios.back', locale) } : null}
       {locale}
     />
   </section>
 {:else}
   <section class="al" data-testid="audience-list">
     <header class="al__mast">
-      <p class="eyebrow"><a href="/h/conversations?etiqueta=audience">{t('audience.view', locale)}</a></p>
+      <p class="eyebrow"><a href="/h/conversations?view=envios">{t('audience.view', locale)}</a></p>
       <h1 class="al__title"><em>{a.name}</em></h1>
       <p class="al__sub">
         <span class="al__status" data-status={a.status} data-testid="audience-status">{t(`audience.status_${a.status}`, locale)}</span>

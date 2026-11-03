@@ -1,54 +1,37 @@
 <script lang="ts">
   /**
-   * Conversations lens — Phase 0.3 item 1, v1 (ADR-044). The difusión work
-   * surface inside the shell: conversation list filtered by the sidebar
-   * selection (ADR-038 union; empty = everything RLS allows), free-text
-   * search over person name/organization, relation filter, and the ADR-040
-   * inline editors via the shared ConversationTable.
+   * Conversations lens (ADR-044; with the shape of a messaging app since
+   * ADR-176). Two views in the header, by the verb: Conversaciones (what goes
+   * and comes back) and Envíos (`?view=envios`, what goes out to many:
+   * MailoutsView, with the Difusión season on top and the audience lists
+   * beside; the old Público chip, `?etiqueta=audience`, redirects there).
    *
-   * "Add conversation" (ADR-051) captures a person + conversation in one step:
-   * POST /api/conversations with inline person fields — the RPC
-   * find-or-creates the person on email, so re-typing a known email links
-   * the existing file instead of duplicating it.
+   * Conversaciones is a list of chats: one row per conversation or bolo
+   * thread (ChatRow), with who, the last word, when, how many unread and
+   * whose turn. Over it, the search and the chips Todo · Te toca · Se enfría
+   * · Equipo with their figure (the panel of ADR-117 folded into them), which
+   * filter the same list without changing the screen (`?turno=nuestro`,
+   * `?temp=fria`, `?etiqueta=team`). «Filtrar ▾» holds the tag, the relation,
+   * the line, the temperature, a mailout and the order, all in the URL. The
+   * order by default is «lo que pide». Todo and Equipo without a filter read
+   * `conversation_feed` (ConversationFeed); the rest, and the selection, the
+   * server's filtered list (ConversationTable in its chat shape).
    *
-   * Selection mode (plan de la lista § 6.2, fase 2): checkboxes over the
-   * filtered list, under every chip but Equipo, and a bar with what is done
-   * ten at a time: «No esta vez», «Etiquetar» (put or take one tag), «Siguiente
-   * paso» and «No pide respuesta», through `POST /api/conversations/bulk`
-   * (each row with the caller's permissions; the toast says how many and
-   * offers «Deshacer»). Under Difusión also «Escribir a N», which creates the
-   * draft (POST /api/mailout) and opens the mailout screen; a mailout belongs
-   * to one project. With the page all picked, «Seleccionar las N que
-   * coinciden» picks the whole filter. Keyboard in the list: arrows, Enter,
-   * `x` picks, Esc leaves.
+   * On a wide screen two panes: the list and the open conversation beside it
+   * (`?abierta=<space>/<id>`, its record as the vistazo draws it; a bolo's
+   * thread as a group, `?grupo=<space>/<performance>[/<facet>]`). Narrower,
+   * a row opens the conversation's page: on a phone, the list is the whole
+   * screen and the conversation opens over it. No swiping rows (decided).
    *
-   * A row of chips in the lens header (ADR-138 § 1 y 2, fase 2; it replaces
-   * the two views of ADR-134): Todas · the active tags of the scope in their
-   * order (sales in its trade word, Difusión / Contratación) · Equipo, what
-   * the team says among itself (ThreadFeed, `thread_feed`, ADR-116). One at a
-   * time, in the URL (`?etiqueta=sales|press|…|team`; none is Todas).
-   * `?view=team` and `?view=threads` redirect to `?etiqueta=team`. Without
-   * Converses there is only Equipo. The tag never decides who sees what.
-   *
-   * The panel follows the chip (plan § 3): Difusión is the whole dashboard of
-   * ADR-117 over the `sales` conversations; Todas, Prensa, Coproducción and
-   * the space's own, the common one (te toca); Equipo, the threads. Todas
-   * lists conversations and threads in one order (phase 3, ConversationFeed
-   * over `conversation_feed`: new first, then te toca, then the latest), and
-   * the search reads both; a block filter turns it back into the table.
-   * Selection and «Escribir a N» only under Difusión (ADR-138 § 7).
-   *
-   * Difusión opens on its dashboard (ADR-117, propuesta A): the
-   * ConversationOverview blocks above the list. Each block is a filter of the
-   * list, carried in the URL (`?turno=`, `?temp=`, `?temporada=actual`) and
-   * shown as a removable chip; «Escribir a estas» preloads the selection.
-   *
-   * Público (ADR-173 § 3): a last chip, only for who carries the audience of
-   * a space on screen (owner, admin or the Público facet); its panel is the
-   * lists (AudiencePanel). Under Difusión the bar also offers «Invitar a N»:
-   * an invitation draft with those professionals, of any project of one
-   * space. `?invitacion=<id>` opens the selection to add professionals to
-   * that draft, and goes back to it.
+   * Selection («Seleccionar» in the header): checkboxes over the filtered
+   * list and a bar with what is done ten at a time (No esta vez, Etiquetar,
+   * Mover a la línea, Siguiente paso, No pide respuesta) through
+   * `POST /api/conversations/bulk`, with «Deshacer». With the Difusión tag,
+   * also «Escribir a N» (a mailout draft, one project) and «Invitar a N» (an
+   * invitation draft, one space). `?invitacion=<id>` opens the selection to
+   * add professionals to that draft; `?seleccionar=1` opens it plain («Nuevo
+   * envío › Difusión»). «Añadir conversación» (ADR-051) is the shell's dialog,
+   * born with the tag filter. The tag never decides who sees what.
    */
 
   import { docTitle } from '$lib/doc-title';
@@ -56,23 +39,25 @@
   import { afterNavigate, goto } from '$app/navigation';
   import { page } from '$app/state';
   import { ApiError, fetchJSON, mutateJSON } from '$lib/api';
-  import BlockHead from '$lib/components/BlockHead.svelte';
   import Button from '$lib/components/Button.svelte';
   import LensHeader from '$lib/components/LensHeader.svelte';
   import LensTitle from '$lib/components/LensTitle.svelte';
   import ConversationTable from '$lib/components/ConversationTable.svelte';
-  import ConversationOverview from '$lib/components/ConversationOverview.svelte';
-  import AudiencePanel from '$lib/components/AudiencePanel.svelte';
+  import MailoutsView from '$lib/components/MailoutsView.svelte';
+  import { rememberConversationsList } from '$lib/conversations-return.svelte';
+  import { parseMailoutType, type MailoutType } from '$lib/mailout-list';
   import { audienceListQueryOptions } from '$lib/audience-query';
   import type { MailoutDetail } from '$lib/mailout';
   import Chip from '$lib/components/Chip.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import { tick, untrack } from 'svelte';
   import { toStore } from 'svelte/store';
-  import { MAILOUT_PICKS, NO_LINE, hasListFilter, parseListFilter, type MailoutPick } from '$lib/conversation-overview';
+  import { MAILOUT_PICKS, NO_LINE, hasListFilter, parseListFilter, type MailoutPick, type OverviewResponse } from '$lib/conversation-overview';
+  import type { ConversationFeedView, FeedConversationView, FeedThreadRow } from '$lib/conversation-feed';
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
+  import { lazy } from '$lib/lazy.svelte';
   import { DEFAULT_ORDER, ORDERS, parseOrden, type Orden } from '$lib/conversation-order';
   import { dayMonth } from '$lib/datetime';
-  import ThreadFeed from '$lib/components/ThreadFeed.svelte';
   import ConversationFeed from '$lib/components/ConversationFeed.svelte';
   import FirstVisitCard from '$lib/components/FirstVisitCard.svelte';
   import Input from '$lib/components/Input.svelte';
@@ -100,13 +85,12 @@
   import { conversationAccessQueryOptions } from '$lib/conversation-access';
   import {
     ALL,
+    TEAM,
     addTagKey,
     canBulkSend,
-    chipHref,
+    isAudienceLink,
     lensChip,
     lensChips,
-    panelHref,
-    panelOf,
     scopeTags,
     tagLabel,
   } from '$lib/conversation-tags';
@@ -152,7 +136,35 @@
   /** The chip travels in the URL, so a link says which one it shows. Without
    *  Converses there is no conversation to show: the lens is Equipo (ADR-134 § 4). */
   let chip = $derived(lensChip(page.url.searchParams, !noAccess));
-  let panel = $derived(panelOf(chip));
+
+  // A record opened from here goes back to the list as it was left (chip, view, filters).
+  $effect(() => rememberConversationsList(page.url));
+
+  // ── The two views (ADR-176): in the URL, so a link says which one it shows ──
+  let envios = $derived(page.url.searchParams.get('view') === 'envios');
+  let mailoutType = $derived(parseMailoutType(page.url.searchParams.get('tipo')));
+  // A link to the old Público chip lands on Envíos, where the lists live now.
+  $effect(() => {
+    if (isAudienceLink(page.url.searchParams)) untrack(() => void goto(viewHref('envios'), { replaceState: true, noScroll: true }));
+  });
+  /** A view's link: the scope stays, the other view's filters go. */
+  function viewHref(view: 'conversations' | 'envios'): string {
+    const scopeParam = page.url.searchParams.get('scope');
+    const next = new URLSearchParams();
+    if (scopeParam) next.set('scope', scopeParam);
+    if (view === 'envios') next.set('view', 'envios');
+    const qs = next.toString();
+    return `/h/conversations${qs ? `?${qs}` : ''}`;
+  }
+  /** A link into Conversaciones with these filters, from Envíos (the season, a mailout's replies). */
+  function conversationsHref(qs: string): string {
+    const base = viewHref('conversations');
+    return `${base}${base.includes('?') ? '&' : '?'}${qs}`;
+  }
+  function mailoutTypeHref(type: MailoutType): string {
+    const base = viewHref('envios');
+    return type === 'todos' ? base : `${base}&tipo=${type}`;
+  }
   // The vocabulary is names, not data; it is asked only by who reads conversations.
   const tagsQuery = createQuery(toStore(() => conversationTagsQueryOptions($accessQuery.data?.read !== false)));
 
@@ -186,10 +198,23 @@
       : [...new Set([...scope.workspaceIds, ...scope.projects.map((p) => p.workspaceId), ...scope.lines.map((l) => l.workspaceId)])],
   );
   let tagNames = $derived($tagsQuery.data ? scopeTags($tagsQuery.data, scopeWorkspaceIds) : []);
-  // Who carries the audience of a space on screen sees the Público chip (ADR-173 § 3).
+  // Who carries the audience of a space on screen sees its lists in Envíos (ADR-173 § 3, ADR-176).
   const audienceQuery = createQuery(toStore(() => audienceListQueryOptions(scopeWorkspaceIds)));
   let canAudience = $derived(Object.values($audienceQuery.data?.access ?? {}).some((a) => a.read));
-  let chips = $derived(lensChips(!noAccess, tagNames, locale, canAudience));
+  let audienceEditable = $derived(
+    scopeWorkspaceIds.filter((w) => $audienceQuery.data?.access[w]?.edit),
+  );
+  // The tag filter (ADR-176): a tag is a filter of the list, in «Filtrar ▾»; `team` is the Equipo chip.
+  let tagFilter = $derived(chip === ALL || chip === TEAM ? null : chip);
+  let tagOptions = $derived([
+    { value: 'any', label: t('conversations.tag_all', locale) },
+    ...lensChips(true, tagNames, locale)
+      .filter((c) => c.chip !== ALL && c.chip !== TEAM)
+      .map((c) => ({ value: c.chip, label: c.label })),
+  ]);
+  function setTag(next: string) {
+    setParams({ etiqueta: next === 'any' ? null : next, envio: null, r: null });
+  }
   // Project pins scope directly; a line pin scopes conversations through its
   // project. The endpoint filters by project_ids ∪ workspace_ids.
   let filterIds = $derived({
@@ -210,9 +235,12 @@
   let qRaw = $state('');
   // `?q=` lleva una búsqueda hecha en otro sitio: una organización del ⌘K con
   // varias conversaciones (o ninguna) abre la lente buscando su nombre.
+  // Derived first: the effect runs when `?q=` changes, not on every navigation
+  // (opening a row beside rewrites the URL, and must not overwrite what is typed).
+  let qFromUrl = $derived(page.url.searchParams.get('q'));
   $effect(() => {
-    const fromUrl = page.url.searchParams.get('q');
-    if (fromUrl !== null) qRaw = fromUrl;
+    const fromUrl = qFromUrl;
+    if (fromUrl !== null) untrack(() => (qRaw = fromUrl));
   });
   let q = $state('');
   $effect(() => {
@@ -282,13 +310,7 @@
 
   // ── Dashboard filters (ADR-117): in the URL, so a block's link is the filter ──
   let lineIds = $derived(scope.lines.map((l) => l.id));
-  // How many season bars the overview will likely draw while it loads (ADR-135):
-  // the pinned lines, or every line the scope reaches.
-  let lineHint = $derived(
-    scope.lines.length > 0
-      ? scope.lines.length
-      : lineIndex.filter((l) => inScope(scope, { workspaceId: l.workspaceId, projectId: l.projectId })).length,
-  );
+
   function lineLabel(linea: string): string {
     if (linea === NO_LINE) return t('overview.no_line', locale);
     return lineIndex.find((l) => l.id === linea)?.name ?? t('overview.unnamed_line', locale);
@@ -323,7 +345,7 @@
     })),
     // A mailout from the panel's link that is not among the ten still names itself.
     ...(listFilter.envio && !($mailoutsQuery.data?.items ?? []).some((m) => m.id === listFilter.envio)
-      ? [{ value: listFilter.envio, label: t('overview.last_mailout', locale) }]
+      ? [{ value: listFilter.envio, label: t('chat.this_mailout', locale) }]
       : []),
   ]);
 
@@ -345,30 +367,180 @@
         .filter(Boolean)
         .join(' · ');
     }
-    if (f.turno === 'nuestro') return t('overview.due', locale);
+    // The temperature is a filter of the sheet (its own chip below); te toca and se enfría, chips of the list.
     if (f.turno === 'suyo') return t('overview.turn_theirs_cap', locale);
-    if (f.temp) return t(TEMP_CHIP[f.temp], locale);
     return f.temporada ? t('overview.this_season', locale) : null;
   }
   let filterChip = $derived(chipLabel(listFilter));
+
+  // ── The list's chips (ADR-176): Todo · Te toca · Se enfría · Equipo, with
+  //    their figure. They filter the same list; none changes the screen. Te
+  //    toca and Se enfría are the panel's blocks of ADR-117 folded into a
+  //    chip (`?turno=nuestro`, `?temp=fria`, the links the Desk already uses);
+  //    Equipo is the bolos' threads (`?etiqueta=team`). ──
+  type ListChip = 'todo' | 'tetoca' | 'enfria' | 'equipo';
+  const LIST_CHIPS: ListChip[] = ['todo', 'tetoca', 'enfria', 'equipo'];
+  const LIST_CHIP_WORD: Record<ListChip, string> = {
+    todo: 'chat.chip_all',
+    tetoca: 'chat.chip_due',
+    enfria: 'chat.chip_cold',
+    equipo: 'conversations.view_team',
+  };
+  let listChip = $derived<ListChip>(
+    chip === TEAM ? 'equipo' : listFilter.turno === 'nuestro' ? 'tetoca' : listFilter.temp === 'fria' ? 'enfria' : 'todo',
+  );
+  /** A chip's link: the scope and the filters stay, the other chips' params go. */
+  function listChipHref(c: ListChip): string {
+    const params = new URLSearchParams(page.url.searchParams);
+    for (const k of ['turno', 'temp', 'view', 'tipo']) params.delete(k);
+    if (c === 'equipo') {
+      for (const k of ['relacion', 'linea', 'envio', 'r', 'temporada', 'orden']) params.delete(k);
+      params.set('etiqueta', TEAM);
+    } else if (params.get('etiqueta') === TEAM) params.delete('etiqueta');
+    if (c === 'tetoca') params.set('turno', 'nuestro');
+    if (c === 'enfria') params.set('temp', 'fria');
+    const qs = params.toString();
+    return `/h/conversations${qs ? `?${qs}` : ''}`;
+  }
+
+  // The figures: the panel's read (one request, ADR-117) for te toca, se
+  // enfría and the total, with the tag filter; the team's, what is new in
+  // the bolos' threads (the same read as the Equipo chip's list).
+  const countsQuery = createQuery(
+    toStore(() => ({
+      queryKey: ['conversation-overview', filterIds.projectIds, filterIds.workspaceIds, lineIds, tagFilter ?? ALL] as const,
+      enabled: !scopeUnresolved && !noAccess,
+      queryFn: ({ signal }: { signal: AbortSignal }) => {
+        const p = new URLSearchParams();
+        if (filterIds.projectIds.length > 0) p.set('project_ids', filterIds.projectIds.join(','));
+        if (filterIds.workspaceIds.length > 0) p.set('workspace_ids', filterIds.workspaceIds.join(','));
+        if (lineIds.length > 0) p.set('line_ids', lineIds.join(','));
+        if (tagFilter) p.set('etiqueta', tagFilter);
+        return fetchJSON<OverviewResponse>(`/api/conversations/overview?${p}`, signal);
+      },
+      placeholderData: (prev: OverviewResponse | undefined) => prev,
+    })),
+  );
+  const teamQuery = createQuery(
+    toStore(() => ({
+      queryKey: ['conversation-feed', filterIds.projectIds, filterIds.workspaceIds, '', 100, TEAM] as const,
+      enabled: !scopeUnresolved,
+      staleTime: 0,
+      queryFn: ({ signal }: { signal: AbortSignal }) => {
+        const p = new URLSearchParams({ etiqueta: TEAM, limit: '100' });
+        if (filterIds.projectIds.length > 0) p.set('project_ids', filterIds.projectIds.join(','));
+        if (filterIds.workspaceIds.length > 0) p.set('workspace_ids', filterIds.workspaceIds.join(','));
+        return fetchJSON<ConversationFeedView>(`/api/conversations/feed?${p}`, signal);
+      },
+    })),
+  );
+  let chipCount = $derived<Record<ListChip, number | null>>({
+    todo: $countsQuery.data?.total ?? null,
+    tetoca: $countsQuery.data?.due.count ?? null,
+    enfria: $countsQuery.data?.cold.count ?? null,
+    equipo: $teamQuery.data
+      ? $teamQuery.data.items.filter((r) => r.kind === 'thread' && r.anchor_kind !== 'conversation' && r.unread_count > 0).length
+      : null,
+  });
+  let shownChips = $derived(noAccess ? (['equipo'] as ListChip[]) : LIST_CHIPS);
+
   /**
-   * Todas without a block filter is the common list (fase 3): conversations
-   * and threads in one order (`conversation_feed`). A block filter (te toca,
-   * a relation, the season…) is about conversations: the table, as under any
-   * other chip.
+   * Todo and Equipo without a filter of the sheet are the common list
+   * (`conversation_feed`): conversations and the bolos' threads in one order.
+   * Te toca, Se enfría, a filter (relation, line, a mailout, the season, an
+   * order) or the selection are about conversations: the server's filtered
+   * list (ConversationTable), drawn with the same chat row.
    */
-  let mixed = $derived(chip === ALL && !hasListFilter(listFilter) && orden === DEFAULT_ORDER && !picking);
+  let mixed = $derived(
+    !picking && (listChip === 'equipo' || (listChip === 'todo' && !hasListFilter(listFilter) && orden === DEFAULT_ORDER)),
+  );
+
+  // ── Two panes on a wide screen (ADR-176; the vistazo of ADR-139 p1 fixed
+  //    in this lens): the list on the left, the open conversation beside it
+  //    (`?abierta=<space>/<id>`). Narrower, a row's link opens its page. ──
+  let wide = $state(false);
+  $effect(() => {
+    const mq = matchMedia('(min-width: 75rem)');
+    wide = mq.matches;
+    const on = () => (wide = mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  });
+  let openRaw = $derived(page.url.searchParams.get('abierta'));
+  let opened = $derived.by(() => {
+    const [ws, id] = (openRaw ?? '').split('/');
+    return ws && id ? { ws, id } : null;
+  });
+  const conversationRecord = lazy(() => import('$lib/components/record/ConversationRecord.svelte'));
+  $effect(() => {
+    if (wide && opened) void conversationRecord.load();
+  });
+  // The pane is a region the keyboard can reach and leave (ADR-176): opened
+  // with Enter, the focus goes into it; Esc or «Cerrar» close it and give the
+  // focus back to the row it came from.
+  let paneEl = $state<HTMLElement>();
+  let openedFrom: HTMLElement | null = null;
+  async function afterOpen(event: MouseEvent) {
+    openedFrom = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+    // `detail` is 0 for a click the keyboard made (Enter on the link).
+    if (event.detail === 0) {
+      await tick();
+      paneEl?.focus({ preventScroll: true });
+    }
+  }
+  function closePane() {
+    setParams({ abierta: null, grupo: null });
+    const back = openedFrom;
+    openedFrom = null;
+    void tick().then(() => back?.focus({ preventScroll: true }));
+  }
+  function openBeside(workspaceId: string, id: string, event: MouseEvent) {
+    const ws = workspaceSlugById.get(workspaceId);
+    if (!wide || !ws || event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+    event.preventDefault();
+    setParams({ abierta: `${ws}/${id}`, grupo: null });
+    void afterOpen(event);
+  }
+  // A bolo's thread opens as a group (BoloGroup, the record lane's): beside on a wide screen.
+  let groupRaw = $derived(page.url.searchParams.get('grupo'));
+  let group = $derived.by(() => {
+    const [ws, performanceId, facetId] = (groupRaw ?? '').split('/');
+    return ws && performanceId ? { ws, performanceId, facetId: facetId || null } : null;
+  });
+  const boloGroup = lazy(() => import('$lib/components/BoloGroup.svelte'));
+  $effect(() => {
+    if (wide && group) void boloGroup.load();
+  });
+  function openThread(th: FeedThreadRow, event: MouseEvent) {
+    const ws = workspaceSlugById.get(th.workspace_id);
+    const performanceId = th.bolo?.performance_id;
+    if (!wide || !ws || !performanceId || th.anchor_kind !== 'bolo') return;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+    event.preventDefault();
+    setParams({ grupo: [ws, performanceId, th.facet_id].filter(Boolean).join('/'), abierta: null });
+    void afterOpen(event);
+  }
+  const openFeedRow = (c: FeedConversationView, e: MouseEvent) => openBeside(c.workspace_id, c.id, e);
+  const openTableRow = (c: ConversationItem, e: MouseEvent) => openBeside(c.workspace_id, c.id, e);
 
   function clearListFilter() {
     const params = new URLSearchParams(page.url.searchParams);
     // A season segment is relation + season: its chip names both, and goes as one.
     if (listFilter.temporada) params.delete('relacion');
-    for (const k of ['turno', 'temp', 'temporada', 'linea', 'envio', 'r']) params.delete(k);
+    for (const k of blockKeys(listFilter)) params.delete(k);
     const qs = params.toString();
     // The chip goes away with the focus on it: the focus goes to the list.
     void goto(`${page.url.pathname}${qs ? `?${qs}` : ''}`, { noScroll: true, keepFocus: true }).then(() =>
       listHeading?.focus({ preventScroll: true }),
     );
+  }
+
+  /** What the removable chip takes off: the block filter it names, never the list's chip. */
+  function blockKeys(f: typeof listFilter): string[] {
+    // A season segment is the season and its line (its relation goes above); the rest are the sheet's own.
+    const keys = f.temporada ? ['temporada', 'linea'] : [];
+    if (f.turno === 'suyo') keys.push('turno');
+    return keys;
   }
 
   // After a filter the focus lands on the list's title, not on `body`: the
@@ -386,23 +558,26 @@
     if (to?.url.hash === '#lista') listHeading?.focus({ preventScroll: true });
   });
 
-  /** A season segment: that relation, in the season (and the pinned lines, or its own line). */
+  /** A season segment, in Envíos: Conversaciones with that relation in the season (and its line). */
   async function filterSeasonRelation(relation: Relation, linea?: string) {
-    await goto(panelHref(chip, `temporada=actual&relacion=${relation}${linea ? `&linea=${linea}` : ''}`), { noScroll: true, keepFocus: true });
+    await goto(conversationsHref(`etiqueta=sales&temporada=actual&relacion=${relation}${linea ? `&linea=${linea}` : ''}`));
     await showList();
   }
   /** A line's name in the season: that line, every relation (ADR-135). */
   async function filterSeasonLine(linea: string) {
-    await goto(panelHref(chip, `temporada=actual&linea=${linea}`), { noScroll: true, keepFocus: true });
+    await goto(conversationsHref(`etiqueta=sales&temporada=actual&linea=${linea}`));
     await showList();
   }
 
-  /** «Escribir a estas»: the cooling list, already picked, ready for «Escribir a N». */
-  async function writeTo(picks: { id: string; project_id: string }[]) {
-    picking = true;
-    picked = picks;
-    await goto(panelHref(chip, 'temp=ronda'), { noScroll: true, keepFocus: true });
-    await showList();
+  // Caliente, Ronda, Parada, Sin fecha: the panel's other filters, in the sheet now (ADR-176).
+  const TEMP_OPTIONS = ['caliente', 'ronda', 'parada', 'sin-fecha'] as const;
+  let tempOptions = $derived([
+    { value: 'any', label: t('chat.temp_any', locale) },
+    ...TEMP_OPTIONS.map((v) => ({ value: v, label: t(TEMP_CHIP[v], locale) })),
+  ]);
+  let tempFilter = $derived(listFilter.temp && listFilter.temp !== 'fria' ? listFilter.temp : 'any');
+  function setTemp(next: string) {
+    setParams({ temp: next === 'any' ? null : next, turno: null });
   }
   let relationOptions = [
     { value: 'any', label: t('conversations.all_relations', locale) },
@@ -418,17 +593,21 @@
     options.find((o) => o.value === value)?.label ?? value;
   let sheetFilters = $derived(
     [
+      tagFilter ? { key: 'etiqueta', label: optionLabel(tagOptions, tagFilter), clear: () => setTag('any') } : null,
       listFilter.relacion && !listFilter.temporada
         ? { key: 'relacion', label: relationLabel(listFilter.relacion, locale), clear: () => setRelation('any') }
         : null,
       listFilter.linea && !listFilter.temporada && scopeLines.length > 0
         ? { key: 'linea', label: optionLabel(lineOptions, listFilter.linea), clear: () => setLine('any') }
         : null,
-      listFilter.envio && canBulkSend(chip)
+      listFilter.envio
         ? { key: 'envio', label: optionLabel(mailoutOptions, listFilter.envio), clear: () => setMailout('none') }
         : null,
-      listFilter.envio && listFilter.r && canBulkSend(chip)
+      listFilter.envio && listFilter.r
         ? { key: 'r', label: t(PICK_WORD[mailoutPick], locale), clear: () => setMailoutPick('todos') }
+        : null,
+      listFilter.temp && listFilter.temp !== 'fria'
+        ? { key: 'temp', label: t(TEMP_CHIP[listFilter.temp], locale), clear: () => setTemp('any') }
         : null,
       orden !== DEFAULT_ORDER ? { key: 'orden', label: t(ORDER_WORD[orden], locale), clear: () => setOrden(DEFAULT_ORDER) } : null,
     ].filter((f) => f !== null),
@@ -442,6 +621,8 @@
       envio: null,
       r: null,
       orden: null,
+      temp: listChip === 'enfria' ? 'fria' : null,
+      etiqueta: listChip === 'equipo' ? TEAM : null,
     });
   }
 
@@ -454,7 +635,7 @@
     workspaceIds: filterIds.workspaceIds,
     q: q || undefined,
     ...listFilter,
-    etiqueta: chip === ALL ? undefined : chip,
+    etiqueta: tagFilter ?? undefined,
     orden,
     lineIds,
     enabled: !scopeUnresolved,
@@ -475,16 +656,18 @@
   function togglePicking() {
     picking = !picking;
     picked = [];
+    if (!picking && selectFromUrl) setParams({ seleccionar: null });
   }
   /** Esc, or «Dejar de seleccionar»: the focus goes back to the list's title. */
   function leavePicking() {
     picking = false;
     picked = [];
+    if (selectFromUrl) setParams({ seleccionar: null });
     void tick().then(() => listHeading?.focus({ preventScroll: true }));
   }
-  // Equipo has no conversations to pick: going there leaves the selection.
+  // Equipo and Envíos have no conversations to pick: going there leaves the selection.
   $effect(() => {
-    if (panel === 'team' || panel === 'audience') untrack(() => {
+    if (listChip === 'equipo' || envios) untrack(() => {
       picking = false;
       picked = [];
     });
@@ -597,6 +780,7 @@
         conversation_ids: picked.map((c) => c.id),
       }),
     onSuccess: (r) => {
+      void queryClient.invalidateQueries({ queryKey: ['mailout-list'] });
       if (r) void goto(`/h/${r.workspace_slug}/mailout/${r.id}`);
     },
     onError: (err) => {
@@ -611,8 +795,10 @@
   // «Añadir profesionales» from an invitation draft: the selection opens, and
   // «Añadir a la invitación» puts the picks next to the ones it had.
   let invitationId = $derived(page.url.searchParams.get('invitacion'));
+  // «Nuevo envío › Difusión» opens the selection once: a derived, so leaving it does not reopen it on the next navigation.
+  let selectFromUrl = $derived(page.url.searchParams.get('seleccionar') === '1');
   $effect(() => {
-    if (invitationId) untrack(() => (picking = true));
+    if (invitationId || selectFromUrl) untrack(() => (picking = true));
   });
   const addToInvitation = createMutation({
     mutationFn: async () => {
@@ -651,6 +837,7 @@
         conversation_ids: picked.map((c) => c.id),
       }),
     onSuccess: (r) => {
+      void queryClient.invalidateQueries({ queryKey: ['mailout-list'] });
       if (r) void goto(`/h/${r.workspace_slug}/mailout/${r.id}`);
     },
     onError: (err) => {
@@ -662,150 +849,269 @@
     },
   });
 
+  // «Nuevo envío» (ADR-176): difusión opens the selection under Difusión
+  // (a mailout is born with its recipients); an invitation is born empty in
+  // a space whose audience the caller edits (`create_invitation`).
+  const newInvitation = createMutation({
+    mutationFn: (workspaceId: string) =>
+      mutateJSON<{ id: string; workspace_slug: string }>('POST', '/api/mailout/invitation', { workspace_id: workspaceId }),
+    onSuccess: (r) => {
+      void queryClient.invalidateQueries({ queryKey: ['mailout-list'] });
+      if (r) void goto(`/h/${r.workspace_slug}/mailout/${r.id}`);
+    },
+    onError: (err) =>
+      addToast({
+        tone: 'danger',
+        title: t('mailout.not_created', locale),
+        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
+      }),
+  });
+  let workspaceName = $derived(new Map(workspaces.map((w) => [w.id, w.name])));
+  let newMailoutItems = $derived([
+    ...(canEdit && !noAccess
+      ? [{ label: t('envios.new_outreach', locale), onclick: () => void goto(conversationsHref('etiqueta=sales&seleccionar=1')) }]
+      : []),
+    ...audienceEditable.map((w) => ({
+      label:
+        audienceEditable.length > 1
+          ? t('envios.new_invitation_in', locale, { space: workspaceName.get(w) ?? '' })
+          : t('envios.new_invitation', locale),
+      onclick: () => $newInvitation.mutate(w),
+    })),
+  ]);
 </script>
 
 <svelte:head>
   <title>{docTitle(t('lens.conversations', locale))}</title>
 </svelte:head>
 
-<section class="conversations" class:conversations--calm={calm.on && panel !== 'team' && panel !== 'audience'} aria-busy={busy}>
-  <LensHeader help={panel === 'team' ? 'team' : 'conversations'}>
+<section class="conversations" class:conversations--calm={calm.on && listChip !== 'equipo' && !envios} aria-busy={busy}>
+  <LensHeader help={envios ? undefined : listChip === 'equipo' ? 'team' : 'conversations'}>
     {#snippet title()}<LensTitle text={t('lens.conversations', locale)} />{/snippet}
-    {#snippet sub()}
-      <!-- The chips (ADR-138 § 2): one at a time, each a link that says where you are. -->
-      {#each chips as c (c.chip)}
-        <a
-          class="lenshead__frag"
-          href={chipHref(c.chip, page.url.searchParams)}
-          aria-current={chip === c.chip ? 'page' : undefined}
-          data-chip={c.chip}>{c.label}</a
+    {#snippet tools()}
+      {#if envios && newMailoutItems.length > 0}
+        <Menu items={newMailoutItems} align="end" label={t('envios.new', locale)} triggerClass="btn--primary btn--s">
+          {#snippet trigger()}{t('envios.new', locale)}<span class="conversations__caret" aria-hidden="true">▾</span>{/snippet}
+        </Menu>
+      {:else if !envios && canEdit && !noAccess}
+        {#if listChip !== 'equipo' && shows('conversations', 'list', calm.on)}
+          <span class="conversations__pick-door" class:conversations__pick-door--idle={!picking}>
+            <Button size="s" variant="secondary" onclick={togglePicking}>
+              {picking ? t('mailout.pick_done', locale) : t('mailout.pick', locale)}
+            </Button>
+          </span>
+        {/if}
+        <Button size="s" onclick={openAdd} label={t('conversations.add', locale)}
+          ><span class="conversations__add-long">{t('conversations.add', locale)}</span><span class="conversations__add-short" aria-hidden="true">+</span></Button
         >
-      {/each}
-      {#if panel !== 'team' && panel !== 'audience' && shows('conversations', 'list', calm.on)}
-        <!-- On a phone the list starts a screen and a half down: a way straight to it (móvil #11). -->
-        <a class="lenshead__frag conversations__skip" href="#lista">{t('overview.go_to_list', locale)}</a>
       {/if}
+    {/snippet}
+    {#snippet sub()}
+      <!-- The two views (ADR-176): by the verb, what goes and comes back, what goes out to many. -->
+      <a class="lenshead__frag" href={viewHref('conversations')} aria-current={envios ? undefined : 'page'} data-view="conversations"
+        >{t('lens.conversations', locale)}</a
+      >
+      <a class="lenshead__frag" href={viewHref('envios')} aria-current={envios ? 'page' : undefined} data-view="envios"
+        >{t('envios.view', locale)}</a
+      >
     {/snippet}
   </LensHeader>
 
-  {#if panel === 'audience'}
-    <!-- The audience has no first-visit card of its own yet. -->
-  {:else if panel === 'team'}
+  {#if envios}
+    <!-- Envíos has no first-visit card of its own yet. -->
+  {:else if listChip === 'equipo'}
     <FirstVisitCard section="team" />
-  {:else if panel === 'sales'}
-    <FirstVisitCard section="conversations" steps={['conv-due', 'conv-season', 'conv-list']} />
   {:else}
     <FirstVisitCard section="conversations" steps={['conv-due', 'conv-list']} />
   {/if}
 
-  {#snippet threads()}
-    <ThreadFeed
-      filters={{ projectIds: filterIds.projectIds, workspaceIds: filterIds.workspaceIds, enabled: !scopeUnresolved }}
-      {workspaceSlugById}
-      {projectNameById}
-      {locale}
-    />
-  {/snippet}
-
-  {#if panel === 'audience'}
-    {#if canAudience}
-      <AudiencePanel workspaceIds={scopeWorkspaceIds} {workspaces} {locale} />
+  {#if envios}
+    {#if !noAccess || canAudience}
+      <MailoutsView
+        filters={{ projectIds: filterIds.projectIds, workspaceIds: filterIds.workspaceIds, lineIds, enabled: !scopeUnresolved }}
+        {scopeWorkspaceIds}
+        {workspaces}
+        {workspaceSlugById}
+        {locale}
+        canRead={!noAccess}
+        {canAudience}
+        type={mailoutType}
+        typeHref={mailoutTypeHref}
+        {conversationsHref}
+        onrelation={filterSeasonRelation}
+        online={filterSeasonLine}
+      />
     {:else if $audienceQuery.isSuccess}
-      <p class="conversations__none">{t('audience.no_access', locale)}</p>
+      <p class="conversations__none">{t('envios.no_access', locale)}</p>
     {/if}
-  {:else if panel === 'team'}
-    {@render threads()}
-  {:else}
-    <ConversationOverview
-      filters={{ projectIds: filterIds.projectIds, workspaceIds: filterIds.workspaceIds, lineIds, enabled: !scopeUnresolved }}
-      {workspaceSlugById}
-      {projectNameById}
-      {locale}
-      {lineHint}
-      {chip}
-      panel={panel === 'sales' && shows('conversations', 'sales', calm.on) ? 'sales' : 'common'}
-      onrelation={filterSeasonRelation}
-      online={filterSeasonLine}
-      onwrite={canEdit && canBulkSend(chip) ? writeTo : undefined}
+  {:else if !shows('conversations', 'list', calm.on)}
+    <!-- Calm (ADR-139 § 5): what is yours to answer, and the rest in one line that leaves calm. -->
+    <ConversationTable
+      filters={{ ...filters, turno: 'nuestro', temp: undefined }}
+      {personHref}
+      {conversationHref}
+      editable={canEdit}
+      {tagNames}
+      chat
+      counted
     />
+    <div class="conversations__calm">
+      <CalmLine text={t('conversations.calm_rest', locale)} action={t('calm.see_all', locale)} onclick={() => calm.set(false)} />
+    </div>
+  {:else}
+    <div class="conversations__panes" class:conversations__panes--two={wide}>
+      <div class="conversations__list" id="lista" data-help-step="conv-list">
+        <h2 class="visually-hidden" tabindex="-1" bind:this={listHeading}>{t('overview.list', locale)}</h2>
+        {#if !noAccess}
+          <div class="conversations__search">
+            <Input
+              toolbar
+              label={t('conversations.search', locale)}
+              type="search"
+              placeholder={t('chat.search_ph', locale)}
+              bind:value={qRaw}
+            />
+          </div>
+        {/if}
+        <div class="conversations__chips">
+          <nav class="conversations__chiprow" aria-label={t('chat.chips_label', locale)}>
+            {#each shownChips as c (c)}
+              <a
+                class="conversations__chip"
+                href={listChipHref(c)}
+                aria-current={listChip === c ? 'page' : undefined}
+                data-chip={c}
+                data-help-step={c === 'tetoca' ? 'conv-due' : undefined}
+                >{t(LIST_CHIP_WORD[c], locale)}{#if chipCount[c] !== null}<span class="conversations__chip-n">{chipCount[c]}</span>{/if}</a
+              >
+            {/each}
+          </nav>
+          {#if listChip !== 'equipo' && !noAccess}
+            <button
+              type="button"
+              class="conversations__filter-open"
+              aria-haspopup="dialog"
+              aria-expanded={filtersOpen}
+              aria-label={sheetFilters.length === 0
+                ? undefined
+                : sheetFilters.length === 1
+                  ? t('conversations.filter_on_one', locale)
+                  : t('conversations.filter_on', locale, { n: sheetFilters.length })}
+              onclick={() => (filtersOpen = true)}
+              >{t('conversations.filter', locale)}{#if sheetFilters.length > 0}<span class="conversations__filter-n" aria-hidden="true"
+                  >{sheetFilters.length}</span
+                >{/if}<span class="conversations__caret" aria-hidden="true">▾</span></button
+            >
+          {/if}
+        </div>
+        {#if filterChip || sheetFilters.length > 0}
+          <div class="conversations__active">
+            {#if filterChip}
+              <Chip selected onRemove={clearListFilter} removeLabel={t('overview.clear_filter', locale)}>{filterChip}</Chip>
+            {/if}
+            {#each sheetFilters as f (f.key)}
+              <Chip onRemove={f.clear} removeLabel={t('conversations.filter_remove', locale, { filter: f.label })}>{f.label}</Chip>
+            {/each}
+          </div>
+        {/if}
 
-    {#if !shows('conversations', 'list', calm.on)}
-      <div class="conversations__calm">
-        <CalmLine text={t('conversations.calm_rest', locale)} action={t('calm.see_all', locale)} onclick={() => calm.set(false)} />
-        {#if canEdit && shows('conversations', 'add', calm.on)}
-          <Button size="s" onclick={openAdd}>{t('conversations.add', locale)}</Button>
+        {#if mixed}
+          <ConversationFeed
+            filters={{ projectIds: filterIds.projectIds, workspaceIds: filterIds.workspaceIds, enabled: !scopeUnresolved }}
+            {q}
+            tag={listChip === 'equipo' ? TEAM : tagFilter}
+            {workspaceSlugById}
+            {projectNameById}
+            showProject={scopeProjectCount > 1}
+            {tagNames}
+            {locale}
+            importEmptyState={canEdit}
+            activeId={wide ? (opened?.id ?? null) : null}
+            onopen={openFeedRow}
+            activeThread={wide && group ? `${group.performanceId}/${group.facetId ?? ''}` : null}
+            onopenthread={openThread}
+          />
+        {:else}
+          <ConversationTable
+            bind:this={table}
+            {filters}
+            {personHref}
+            {conversationHref}
+            importEmptyState={canEdit}
+            projectName={scopeProjectCount > 1 ? (id) => projectNameById.get(id) ?? null : undefined}
+            lineName={scopeLines.length > 1 ? (id) => lineNameById.get(id) ?? null : undefined}
+            editable={canEdit}
+            selectable={picking}
+            bind:selected={picked}
+            {tagNames}
+            hideTag={tagFilter ?? undefined}
+            onpage={(p) => (listPage = p)}
+            onexit={leavePicking}
+            chat
+            counted
+            activeId={wide ? (opened?.id ?? null) : null}
+            onopen={openTableRow}
+          />
         {/if}
       </div>
-    {:else}
-    <div class="conversations__list-head" id="lista" data-help-step="conv-list">
-      <BlockHead title={t('overview.list', locale)} focusable bind:el={listHeading} />
-    </div>
-    <div class="conversations__controls">
-      <div class="conversations__search">
-        <Input
-          toolbar
-          label={t('conversations.search', locale)}
-          type="search"
-          placeholder={t('conversations.search_ph', locale)}
-          bind:value={qRaw}
-        />
-      </div>
-      <!-- In the row on a wide screen; in the sheet on a phone (one set at a time in the DOM). -->
-      {#if !filtersOpen}
-        <span class="conversations__inline">{@render filterFields()}</span>
-      {/if}
-      <button
-        type="button"
-        class="btn--secondary btn--s conversations__filter-open"
-        aria-haspopup="dialog"
-        aria-expanded={filtersOpen}
-        aria-label={sheetFilters.length === 0
-          ? undefined
-          : sheetFilters.length === 1
-            ? t('conversations.filter_on_one', locale)
-            : t('conversations.filter_on', locale, { n: sheetFilters.length })}
-        onclick={() => (filtersOpen = true)}
-        >{t('conversations.filter', locale)}{#if sheetFilters.length > 0}<span class="conversations__filter-n" aria-hidden="true"
-            >{sheetFilters.length}</span
-          >{/if}</button
-      >
-      {#if filterChip || sheetFilters.length > 0}
-        <div class="conversations__active">
-          {#if filterChip}
-            <Chip selected onRemove={clearListFilter} removeLabel={t('overview.clear_filter', locale)}>{filterChip}</Chip>
+
+      {#if wide}
+        <!-- The open conversation beside the list: its record, as the vistazo draws it. -->
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <section
+          class="conversations__pane"
+          data-testid="conversation-pane"
+          bind:this={paneEl}
+          tabindex="-1"
+          aria-label={t(group ? 'chat.pane_group' : 'chat.pane_conversation', locale)}
+          onkeydown={(e) => {
+            if (e.key === 'Escape' && (opened || group) && !e.defaultPrevented && !(e.target as HTMLElement).closest('[role="menu"], [role="dialog"]')) {
+              e.preventDefault();
+              closePane();
+            }
+          }}
+        >
+          {#if opened || group}
+            <div class="conversations__pane-bar">
+              <button type="button" class="block-head__act" aria-keyshortcuts="Escape" onclick={closePane}>{t('peek.close', locale)}</button>
+            </div>
           {/if}
-          {#each sheetFilters as f (f.key)}
-            <span class="conversations__sheet-chip">
-              <Chip onRemove={f.clear} removeLabel={t('conversations.filter_remove', locale, { filter: f.label })}>{f.label}</Chip>
-            </span>
-          {/each}
-        </div>
-      {/if}
-      {#if canEdit}
-        <Button size="s" onclick={openAdd}>{t('conversations.add', locale)}</Button>
-        <Button size="s" variant="secondary" onclick={togglePicking}>
-          {picking ? t('mailout.pick_done', locale) : t('mailout.pick', locale)}
-        </Button>
+          {#if group && boloGroup.component}
+            {#key groupRaw}
+              <boloGroup.component workspaceSlug={group.ws} performanceId={group.performanceId} facetId={group.facetId} inPeek />
+            {/key}
+          {:else if opened && conversationRecord.component}
+            {#key openRaw}
+              <conversationRecord.component workspaceSlug={opened.ws} slug={opened.id} inPeek />
+            {/key}
+          {:else if !opened && !group}
+            <EmptyLine text={t('chat.pick_one', locale)} />
+          {/if}
+        </section>
       {/if}
     </div>
 
     {#snippet filterFields()}
-      <!-- What each relation means lives in the lens's «?» (ADR-145 § 2). -->
-      <Select toolbar label={t('conversations.relation', locale)} options={relationOptions} bind:value={() => relationFilter, setRelation} />
-      {#if scopeLines.length > 0}
-        <Select toolbar label={t('conversations.line', locale)} options={lineOptions} bind:value={() => lineFilter, setLine} />
+      {#if tagOptions.length > 2}
+        <Select label={t('chat.tag', locale)} options={tagOptions} bind:value={() => tagFilter ?? 'any', setTag} />
       {/if}
+      <!-- What each relation means lives in the lens's «?» (ADR-145 § 2). -->
+      <Select label={t('conversations.relation', locale)} options={relationOptions} bind:value={() => relationFilter, setRelation} />
+      {#if scopeLines.length > 0}
+        <Select label={t('conversations.line', locale)} options={lineOptions} bind:value={() => lineFilter, setLine} />
+      {/if}
+      <Select label={t('chat.temp', locale)} options={tempOptions} bind:value={() => tempFilter, setTemp} />
       {#if canBulkSend(chip) && (mailoutOptions.length > 1 || listFilter.envio)}
-        <Select toolbar label={t('conversations.mailout', locale)} options={mailoutOptions} bind:value={() => mailoutFilter, setMailout} />
+        <Select label={t('conversations.mailout', locale)} options={mailoutOptions} bind:value={() => mailoutFilter, setMailout} />
         {#if listFilter.envio}
-          <Select toolbar label={t('conversations.mailout_who', locale)} options={mailoutPickOptions} bind:value={() => mailoutPick, setMailoutPick} />
+          <Select label={t('conversations.mailout_who', locale)} options={mailoutPickOptions} bind:value={() => mailoutPick, setMailoutPick} />
         {/if}
       {/if}
-      <Select toolbar label={t('conversations.order', locale)} options={orderOptions} bind:value={() => orden, setOrden} />
+      <Select label={t('conversations.order', locale)} options={orderOptions} bind:value={() => orden, setOrden} />
     {/snippet}
 
-    <!-- The sheet: a modal dialog (focus kept inside, Esc closes, named by
-         its title); the fields apply as they change, so nothing asks on close. -->
+    <!-- «Filtrar ▾»: a sheet at every width (ADR-176), apart from the chips and in another shape;
+         the fields apply as they change, so nothing asks on close. -->
     <Dialog bind:open={filtersOpen} title={t('conversations.filter', locale)} size="s" keepsDraft>
       {#if filtersOpen}
         <div class="conversations__sheet">{@render filterFields()}</div>
@@ -819,38 +1125,6 @@
         <Button onclick={() => (filtersOpen = false)}>{t('conversations.filters_done', locale)}</Button>
       {/snippet}
     </Dialog>
-
-    {#if mixed}
-      <!-- Todas (fase 3): conversations and threads in one list, one order. -->
-      <ConversationFeed
-        filters={{ projectIds: filterIds.projectIds, workspaceIds: filterIds.workspaceIds, enabled: !scopeUnresolved }}
-        {q}
-        {workspaceSlugById}
-        {projectNameById}
-        {tagNames}
-        {locale}
-        importEmptyState={canEdit}
-      />
-    {:else}
-      <ConversationTable
-        bind:this={table}
-        {filters}
-        {personHref}
-        {conversationHref}
-        importEmptyState={canEdit}
-        bolosColumn={panel === 'sales'}
-        projectName={scopeProjectCount > 1 ? (id) => projectNameById.get(id) ?? null : undefined}
-        lineName={panel === 'sales' && scopeLines.length > 1 ? (id) => lineNameById.get(id) ?? null : undefined}
-        editable={canEdit}
-        selectable={picking}
-        bind:selected={picked}
-        {tagNames}
-        hideTag={chip}
-        onpage={(p) => (listPage = p)}
-        onexit={leavePicking}
-      />
-    {/if}
-    {/if}
 
     {#if picking}
       <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -981,25 +1255,152 @@
       justify-content: space-between;
       gap: var(--space-s) var(--space-m);
     }
+    /* On a phone the selection waits for a wider screen: the head keeps the title and «Añadir». */
+    @media (max-width: 47.999rem) {
+      .conversations__pick-door--idle,
+      .conversations__add-long {
+        display: none;
+      }
+      .conversations .conversations__add-short {
+        display: inline;
+      }
+      /* The chips in one line that scrolls under the thumb, «Filtrar» at its end. */
+      .conversations .conversations__chiprow {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+    }
+    .conversations__add-short {
+      display: none;
+    }
+    .conversations__caret {
+      margin-inline-start: var(--space-2xs);
+    }
 
-    /* Header is now the shared LensHeader (global .lenshead* classes). */
-    .conversations__controls {
+    /* Two panes on a wide screen (ADR-176): the list at its measure, the
+       open conversation beside it, each with its own scroll under the bar. */
+    .conversations__panes--two {
+      display: grid;
+      grid-template-columns: var(--chat-list-inline) minmax(0, 1fr);
+      gap: 0;
+      border-block-start: var(--border);
+    }
+    .conversations__list {
       display: flex;
-      gap: var(--space-m);
-      align-items: end;
-      flex-wrap: wrap;
-    }
-
-    /* One height for the search, the status and the two buttons (diseño M9):
-       the fields take it from `toolbar`, the buttons from here. */
-    .conversations__controls > :global(button) {
-      block-size: var(--control-size-m);
-    }
-
-    .conversations__list-head {
+      flex-direction: column;
+      gap: var(--space-s);
+      min-inline-size: 0;
       scroll-margin-block-start: var(--space-l);
-      margin-block-start: var(--space-m);
     }
+    .conversations__panes--two .conversations__list {
+      padding-block-start: var(--space-m);
+      padding-inline-end: var(--space-m);
+      border-inline-end: var(--border);
+    }
+    .conversations__pane:focus {
+      outline: none;
+    }
+    .conversations__pane-bar {
+      display: flex;
+      justify-content: flex-end;
+    }
+    .conversations__pane {
+      position: sticky;
+      inset-block-start: var(--header-height);
+      align-self: start;
+      max-block-size: calc(100dvh - var(--header-height));
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      padding: var(--space-m) 0 var(--space-xxl) var(--space-l);
+    }
+
+    .conversations__search :global(.field__label) {
+      position: absolute;
+      inline-size: var(--line-hairline);
+      block-size: var(--line-hairline);
+      margin: calc(-1 * var(--line-hairline));
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+    }
+
+    /* The chips with their figure, and «Filtrar ▾» apart, in another shape:
+       a quiet word with its caret, never a chip among chips. */
+    .conversations__chips {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-s);
+    }
+    .conversations__chiprow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2xs);
+      min-inline-size: 0;
+    }
+    .conversations__chip {
+      display: inline-flex;
+      align-items: baseline;
+      gap: var(--space-xs);
+      padding: var(--space-2xs) var(--space-xs);
+      border: var(--border);
+      border-radius: var(--radius-circle);
+      color: var(--text-color);
+      font-size: var(--text-s);
+      text-decoration: none;
+      white-space: nowrap;
+      transition: background-color var(--transition), color var(--transition);
+    }
+    .conversations__chip:hover {
+      background: var(--bg-ultra-light);
+    }
+    .conversations__chip[aria-current] {
+      border-color: var(--text-color);
+      background: var(--text-color);
+      color: var(--bg);
+    }
+    .conversations__chip-n {
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+    .conversations__filter-open {
+      flex-shrink: 0;
+      padding: var(--space-2xs) 0;
+      border: 0;
+      border-block-end: var(--line-hairline) solid var(--border-color-dark);
+      background: none;
+      color: var(--text-muted);
+      font: inherit;
+      font-size: var(--text-s);
+      cursor: pointer;
+    }
+    .conversations__filter-open:hover {
+      color: var(--text-color);
+    }
+    .conversations__filter-n {
+      margin-inline-start: var(--space-xs);
+      font-variant-numeric: tabular-nums;
+    }
+    .conversations__filter-n::before {
+      content: '·';
+      margin-inline-end: var(--space-xs);
+    }
+    .conversations__active {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-xs);
+    }
+    /* In the sheet: one field under another, at the sheet's width. */
+    .conversations__sheet {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-m);
+    }
+    .conversations__sheet > :global(*) {
+      inline-size: 100%;
+    }
+
     .action-bar__more,
     .action-bar__acts {
       display: flex;
@@ -1022,98 +1423,10 @@
       cursor: pointer;
     }
     @media (pointer: coarse) {
-      .action-bar__keep {
+      .action-bar__keep,
+      .conversations__filter-open {
         min-block-size: var(--touch-target);
       }
     }
-
-    .conversations__search {
-      flex: 1;
-      min-inline-size: 16rem;
-      max-inline-size: 28rem;
-    }
-
-    .conversations__skip {
-      display: none;
-    }
-    @media (max-width: 47.999rem) {
-      .conversations__skip {
-        display: inline-flex;
-      }
-    }
-
-    /* The filters (density review § 3). On a wide screen they stay in the
-       row as they were: the wrappers draw nothing and the sheet's door and
-       chips do not exist. */
-    .conversations__inline,
-    .conversations__active {
-      display: contents;
-    }
-    .conversations__filter-open,
-    .conversations__sheet-chip {
-      display: none;
-    }
-    .conversations__filter-n {
-      margin-inline-start: var(--space-xs);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      font-variant-numeric: tabular-nums;
-    }
-    .conversations__filter-n::before {
-      content: '·';
-      margin-inline-end: var(--space-xs);
-    }
-    /* In the sheet: one field under another, at the sheet's width. */
-    .conversations__sheet {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-m);
-    }
-    .conversations__sheet > :global(*) {
-      inline-size: 100%;
-    }
-
-    /* Phone: the search and «Filtrar» on one line, what is on under them,
-       then the two buttons. The search's label is heard, not seen: its
-       placeholder already says what it is. */
-    @media (max-width: 47.999rem) {
-      .conversations__controls {
-        gap: var(--space-s);
-      }
-      .conversations__inline {
-        display: none;
-      }
-      .conversations__filter-open {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-      }
-      /* Wide enough that only «Filtrar» fits beside it: the buttons go under. */
-      .conversations__search {
-        flex: 1 1 60%;
-        min-inline-size: 0;
-        max-inline-size: none;
-      }
-      .conversations__search :global(.field__label) {
-        position: absolute;
-        inline-size: var(--line-hairline);
-        block-size: var(--line-hairline);
-        margin: calc(-1 * var(--line-hairline));
-        overflow: hidden;
-        clip: rect(0, 0, 0, 0);
-        white-space: nowrap;
-      }
-      .conversations__active {
-        display: flex;
-        flex-wrap: wrap;
-        gap: var(--space-xs);
-        flex-basis: 100%;
-      }
-      .conversations__sheet-chip {
-        display: contents;
-      }
-    }
-    /* Touch: the chips and the skip link reach the finger's size through
-       base.css (`.lenshead__frag` takes the target without growing the line). */
   }
 </style>

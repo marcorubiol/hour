@@ -1,6 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
 import { waitForLoaded } from './loaded';
-import { openInFull } from './peek';
 
 /**
  * Scope ⇄ URL sync (ADR-067) — regression suite.
@@ -127,16 +126,31 @@ test('a scope change on a person opened from Conversations lands back on Convers
   await waitForLoaded(page);
   await expect(page.locator('[data-testid="conversation-row"]').first()).toBeVisible();
 
-  // The contact's link (ADR-102: the first link of a row is the organization),
-  // on the first row that has one: a run cut short leaves rows without a person.
+  // Since ADR-176 the lens's chat rows do not link the contact: the person is
+  // reached through the organization's record (ADR-159), whose list still
+  // does. The lens stays the last one visited, which is what this pins. The
+  // first conversation of the space with a contact (a run cut short leaves
+  // rows without a person).
+  const org = await page.evaluate(async () => {
+    const wsBody = (await fetch('/api/workspaces').then((r) => r.json())) as { items: Array<{ id: string; slug: string }> };
+    const ws = wsBody.items.find((w) => w.slug === 'playwright');
+    if (!ws) throw new Error('no fixture workspace');
+    const list = (await fetch(`/api/conversations?etiqueta=sales&workspace_ids=${ws.id}&limit=100`).then((r) => r.json())) as {
+      items: Array<{ person: { slug: string | null } | null; organization: { slug: string } | null }>;
+    };
+    return list.items.find((i) => i.person?.slug && i.organization?.slug)?.organization?.slug ?? null;
+  });
+  expect(org, 'a fixture conversation with a contact').toBeTruthy();
+  await page.goto(`/h/playwright/organization/${encodeURIComponent(org!)}`);
+  await waitForLoaded(page);
+  // From a record's page the contact's link opens the person's page, not the vistazo.
   await page
+    .getByTestId('organization-record')
     .locator('[data-testid="conversation-row"]')
     .filter({ has: page.locator('a.crow-contact') })
     .first()
     .locator('a.crow-contact')
     .click();
-  // The vistazo first (ADR-139 p1), then the page this test is about.
-  await openInFull(page);
   await page.waitForURL(/\/h\/[^/]+\/person\//);
   await waitForLoaded(page);
 

@@ -36,11 +36,14 @@ export interface MailAccountsResponse {
   signatures: Record<MailAccountScope, string>;
 }
 
+/** The longest body a mail sent from Hour takes. */
+export const MAIL_BODY_MAX = 20000;
+
 export const MailSendSchema = v.object({
   conversation_id: v.pipe(v.string(), v.uuid()),
   account_id: v.pipe(v.string(), v.uuid()),
   subject: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(500)),
-  body: v.pipe(v.string(), v.minLength(1), v.maxLength(20000)),
+  body: v.pipe(v.string(), v.minLength(1), v.maxLength(MAIL_BODY_MAX)),
   reply_to_event_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
 });
 

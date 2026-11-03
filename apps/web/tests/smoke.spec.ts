@@ -88,7 +88,8 @@ test.describe('smoke', () => {
     // Conversations.
     await page.goto('/h/conversations?etiqueta=sales');
     await waitForLoaded(page);
-    await expect(page.locator('.status-bar__count')).toContainText(/\d+ conversations/);
+    // The count rides in the list's chip since ADR-176 («All · N»), not a status bar.
+    await expect(page.locator('.conversations__chip[data-chip="todo"] .conversations__chip-n')).toHaveText(/^\d+$/);
     expect(await page.locator('[data-testid="conversation-row"]').count()).toBeGreaterThan(0);
   });
 });

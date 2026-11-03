@@ -7,10 +7,12 @@ import { forgetConversationsRpc } from './forget';
  * ADR-106, fase 4 (ADR-116): «de qué se habla», hoy la vista Equipo de Conversaciones (ADR-134).
  *
  * Lo que fija, con dos logins de verdad:
- *   - el hilo con un mensaje nuevo sale arriba, aunque otro hilo tenga un
- *     mensaje más reciente (propio, que no es nuevo);
+ *   - el hilo con un mensaje nuevo sale arriba; desde ADR-176 el hilo del
+ *     equipo de una conversación no es una fila de Equipo (se lee dentro de
+ *     ella, y una nota lo dice), y en Todo la conversación, con un mensaje
+ *     más reciente pero propio, va debajo del hilo con lo nuevo;
  *   - la fila del bolo abre la función con su tablón; la de la conversación,
- *     la conversación con su hilo del equipo;
+ *     la conversación, con su hilo del equipo dentro;
  *   - abrir y leer quita el «nuevos» de la lista;
  *   - con Mínim, la fixture limitada ve el General del bolo y no ve Diners ni
  *     la conversación.
@@ -146,9 +148,9 @@ test.describe('Conversaciones › Equipo: los hilos del equipo (ADR-116, ADR-134
       'aria-current',
       'page',
     );
-    await expect(page.locator('.lenshead__sub').getByRole('link', { name: 'Team' })).toHaveAttribute('aria-current', 'page');
-    // In English the sales view is «Venues», not «Booking» beside «Books» (ADR-137).
-    await expect(page.locator('.lenshead__sub').getByRole('link', { name: 'Venues' })).toBeVisible();
+    await expect(page.locator('.conversations__chip[data-chip="equipo"]')).toHaveAttribute('aria-current', 'page');
+    // Los chips de la lista (ADR-176): Todo · Te toca · Se enfría · Equipo; la etiqueta pasó a «Filtrar ▾».
+    await expect(page.locator('.conversations__chip[data-chip="todo"]')).toHaveText(/^All/);
 
     // Desk enseña lo nuevo del equipo y enlaza a la vista Equipo.
     await page.goto('/h/desk?scope=s:playwright');
@@ -167,21 +169,37 @@ test.describe('Conversaciones › Equipo: los hilos del equipo (ADR-116, ADR-134
     const top = rows.first();
     await expect(top).toContainText(VENUE);
     await expect(top).toContainText(NEW_BODY);
-    await expect(top.locator('.badge--info')).toBeVisible();
+    await expect(top.locator('.chat__unread')).toBeVisible();
 
-    // La conversación, con un mensaje más reciente pero propio, va debajo.
-    const conv = rows.filter({ hasText: CONV });
-    await expect(conv).toHaveCount(1);
-    await expect(conv.locator('.badge--info')).toHaveCount(0);
-    const index = await rows.evaluateAll((els, name) => els.findIndex((el) => el.textContent?.includes(name)), CONV);
-    expect(index).toBeGreaterThan(0);
+    // El hilo del equipo de la conversación no es una fila de Equipo: vive dentro de ella.
+    await expect(rows.filter({ hasText: CONV })).toHaveCount(0);
+    await expect(page.locator('.cfeed__note')).toBeVisible();
 
-    // A la vista se marca leído (la ficha baja sola hasta el tablón).
+    // En Todo, la conversación (con un mensaje más reciente, pero propio) va debajo del hilo con lo nuevo.
+    await page.goto(`/h/conversations?scope=s:playwright&q=${encodeURIComponent(RUN)}`);
+    const all = page.getByTestId('conversation-feed').getByTestId('feed-row');
+    const conv = all.filter({ hasText: CONV });
+    await expect(conv).toHaveCount(1, { timeout: 30_000 });
+    await expect(conv).toHaveAttribute('data-kind', 'conversation');
+    await expect(conv.locator('.chat__unread')).toHaveCount(0);
+    const fresh = all.filter({ hasText: NEW_BODY });
+    await expect(fresh).toHaveAttribute('data-kind', 'thread');
+    const order = await all.evaluateAll(
+      (els, [a, b]) => [els.findIndex((el) => el.textContent?.includes(a)), els.findIndex((el) => el.textContent?.includes(b))],
+      [NEW_BODY, CONV],
+    );
+    expect(order[0]).toBeGreaterThanOrEqual(0);
+    expect(order[0]).toBeLessThan(order[1]);
+
+    await page.goto('/h/conversations?etiqueta=team');
+    await expect(top).toContainText(NEW_BODY, { timeout: 30_000 });
+
+    // Se abre como grupo al lado (ADR-176, BoloGroup del carril de la ficha) y a la vista se marca leído.
     const read = page.waitForResponse((r) => /\/api\/threads\/[^/]+\/read$/.test(r.url()), { timeout: 30_000 });
-    await top.locator('a').click();
-    await page.waitForURL(new RegExp(`/h/playwright/performance/${perf.slug}#board$`));
-    const board = page.locator('section#board');
-    await expect(board.locator('.msg', { hasText: NEW_BODY })).toBeVisible({ timeout: 30_000 });
+    await top.locator('a.chat__title').click();
+    await expect(page).toHaveURL(/[?&]grupo=playwright%2F/);
+    const group = page.getByTestId('conversation-pane').getByTestId('bolo-group');
+    await expect(group.locator('.msg', { hasText: NEW_BODY })).toBeVisible({ timeout: 30_000 });
     expect((await read).status()).toBe(200);
 
     // De vuelta, la fila ya no dice «nuevos».
@@ -189,17 +207,23 @@ test.describe('Conversaciones › Equipo: los hilos del equipo (ADR-116, ADR-134
     await page.goto('/h/conversations?etiqueta=team&scope=s:playwright');
     const again = page.getByTestId('feed-row').filter({ hasText: VENUE }).filter({ hasText: NEW_BODY });
     await expect(again).toBeVisible({ timeout: 30_000 });
-    await expect(again.locator('.badge--info')).toHaveCount(0);
+    await expect(again.locator('.chat__unread')).toHaveCount(0);
   });
 
-  test('la fila de la conversación abre su hilo del equipo', async ({ page }) => {
+  test('la fila de la conversación abre la conversación, con su hilo del equipo dentro', async ({ page }) => {
     test.setTimeout(60_000);
-    await page.goto('/h/conversations?etiqueta=team');
+    // Más estrecho que 75rem la fila abre la página de la conversación (a lo ancho, el panel de al lado, ADR-176).
+    await page.setViewportSize({ width: 1024, height: 800 });
+    await page.goto(`/h/conversations?scope=s:playwright&q=${encodeURIComponent(RUN)}`);
     const row = page.getByTestId('feed-row').filter({ hasText: CONV });
     await expect(row).toBeVisible({ timeout: 30_000 });
-    await row.locator('a').click();
+    await row.locator('a.chat__title').click();
     await page.waitForURL(new RegExp(`/h/playwright/conversation/${conversationId}#team$`));
-    await expect(page.locator('.conv__aside .inside .msg', { hasText: TEAM_BODY })).toBeVisible({ timeout: 30_000 });
+    // The thread opens with «Solo el equipo» in the field (punto 110), the note in the thread.
+    await expect(page.getByTestId('conversation-thread').locator('.msg--note', { hasText: TEAM_BODY })).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(page.getByTestId('composer-to-team')).toHaveAttribute('aria-pressed', 'true');
   });
 
   test('con Mínim: el General del bolo, ni Diners ni la conversación', async ({ browser }) => {
@@ -216,7 +240,7 @@ test.describe('Conversaciones › Equipo: los hilos del equipo (ADR-116, ADR-134
       await expect(page.getByText(TEAM_BODY)).toHaveCount(0);
       // Sin Converses no hay vista de venta, pero la lente sigue por Equipo: lee el General del bolo.
       await expect(page.getByRole('navigation', { name: 'Sections' }).getByRole('link', { name: 'Conversations' })).toBeVisible();
-      await expect(page.locator('.lenshead__sub').getByRole('link', { name: 'Venues' })).toHaveCount(0);
+      await expect(page.locator('.conversations__chip[data-chip="todo"]')).toHaveCount(0);
     } finally {
       await context.close();
     }

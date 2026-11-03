@@ -5,8 +5,13 @@ const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
 
 /**
- * E2E — conversation inline write path on the Conversations lens (ADR-040/044;
+ * E2E — conversation inline write path of a conversation row (ADR-040/044;
  * moved off the retired /booking wrapper in ADR-056 cleanup).
+ *
+ * Since ADR-176 the Conversations lens draws chat rows with no inline
+ * controls (no relation menu, next step or history button): the inline row
+ * lives on in the record pages' lists. These tests drive it on the fixture's
+ * organization record (ADR-159), whose list is that same ConversationTable.
  *
  * Both tests write to a REAL conversation row (the difusión list). Original
  * values are captured via the API up front and restored in a `finally`
@@ -16,9 +21,9 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  * `updated_at` bumps and audit_log rows appear — the cost of testing a
  * real write.
  *
- * The working row is located by person name (captured up front), not by
- * position — writes can reorder the list (it sorts by next_action_at,
- * then updated_at).
+ * The working row is the one row of the fixture's own organization (a
+ * conversation with only a person gets an organization named after them,
+ * ADR-102), so a write cannot reorder it away.
  */
 
 type RawConversation = {
@@ -30,22 +35,27 @@ type RawConversation = {
   next_action_at: string | null;
   next_action_note: string | null;
   person: { full_name: string | null } | null;
+  organization: { slug: string } | null;
 };
 
-/** Session comes from the shared storageState (tests/auth.setup.ts). */
-async function openConversations(page: Page, searchName?: string) {
-  await page.goto('/h/conversations?etiqueta=sales'); // ADR-067: lens is space-less + cross-space; the table is a chip's (ADR-138 fase 3)
+/**
+ * Session comes from the shared storageState (tests/auth.setup.ts). The
+ * fixture's organization record, whose conversation list carries the inline
+ * row (ConversationTable's normal mode; the lens's chat rows have none).
+ */
+async function openConversations(page: Page) {
+  // Any page of the app, for the API's cookie; the lens is the cheapest.
+  if (!page.url().includes('/h/')) await page.goto('/h/conversations');
+  const slug = (await fetchListRaw(page))[0].organization?.slug;
+  expect(slug, 'the fixture conversation has an organization (ADR-102)').toBeTruthy();
+  await page.goto(`/h/playwright/organization/${encodeURIComponent(slug!)}`);
   await waitForLoaded(page);
-  if (searchName) {
-    // The lens is pins-scoped (unscoped = everything RLS allows) — narrow
-    // to the target person server-side so the row is on the first page.
-    await page.getByPlaceholder('People or organizations…').fill(searchName);
-  }
-  await expect(page.locator('[data-testid="conversation-row"]').first()).toBeVisible();
+  await expect(rowOf(page)).toBeVisible({ timeout: 15_000 });
 }
 
-function rowByName(page: Page, name: string) {
-  return page.locator('[data-testid="conversation-row"]', { hasText: name }).first();
+/** The fixture organization has one conversation: its row. */
+function rowOf(page: Page) {
+  return page.getByTestId('organization-record').locator('[data-testid="conversation-row"]').first();
 }
 
 /** First page of the difusión list (same rows the lens can reach), raw values. */
@@ -192,12 +202,9 @@ test.describe('conversation inline write', () => {
     const original = (await fetchListRaw(page))[0];
     const name = original.person?.full_name;
     expect(name).toBeTruthy();
-    // Narrow the lens to the person server-side (unscoped lens = every
-    // workspace; the row must be on page 1 and unambiguous).
-    await page.getByPlaceholder('People or organizations…').fill(name!);
 
     try {
-      const row = rowByName(page, name!);
+      const row = rowOf(page);
       const trigger = row.locator('button[aria-haspopup="menu"]');
       // Whatever it derives to now (a fresh fixture: «Not contacted»; one
       // revived from a past run keeps its history), «not this time» wins.
@@ -216,10 +223,8 @@ test.describe('conversation inline write', () => {
 
       // PATCH acked above — reload proves the change survives a fresh fetch.
       await page.reload();
-      // Typed before hydration, the search is lost.
       await waitForLoaded(page);
-      await page.getByPlaceholder('People or organizations…').fill(name!);
-      const after = rowByName(page, name!).locator('button[aria-haspopup="menu"]');
+      const after = rowOf(page).locator('button[aria-haspopup="menu"]');
       await expect(after).toContainText('Not this time, until');
       const raw = (await fetchListRaw(page)).find((item) => item.id === original.id);
       expect(raw?.relation).toBe('not_now');
@@ -244,7 +249,6 @@ test.describe('conversation inline write', () => {
     const original = (await fetchListRaw(page))[0];
     const name = original.person?.full_name;
     expect(name).toBeTruthy();
-    await page.getByPlaceholder('People or organizations…').fill(name!);
 
     // The restore goes through the same date-only PATCH contract the UI
     // uses, so normalize up front.
@@ -257,7 +261,7 @@ test.describe('conversation inline write', () => {
       // Set a probe date + note through the dialog. The probe date is far
       // in the past on purpose: the list sorts next_action_at ASC, so the
       // row stays on page 1 where the assertions can still find it.
-      await rowByName(page, name!).locator('button.crow-next').click();
+      await rowOf(page).locator('button.crow-next').click();
       const dialog = page.locator('dialog[open]');
       await expect(dialog).toBeVisible();
       await dialog.getByLabel('Date').fill('2020-01-01');
@@ -267,15 +271,13 @@ test.describe('conversation inline write', () => {
       );
 
       await expect(
-        rowByName(page, name!).locator('.crow-next__note'),
+        rowOf(page).locator('.crow-next__note'),
       ).toContainText('e2e probe');
 
       await page.reload();
-      // Typed before hydration, the search is lost.
       await waitForLoaded(page);
-      await page.getByPlaceholder('People or organizations…').fill(name!);
       await expect(
-        rowByName(page, name!).locator('.crow-next__note'),
+        rowOf(page).locator('.crow-next__note'),
       ).toContainText('e2e probe');
     } finally {
       await restoreConversation(page, original.id, restorePatch);
@@ -306,9 +308,8 @@ test.describe('conversation inline write', () => {
     const original = (await fetchListRaw(page))[0];
     const name = original.person?.full_name;
     expect(name).toBeTruthy();
-    await page.getByPlaceholder('People or organizations…').fill(name!);
 
-    const row = rowByName(page, name!);
+    const row = rowOf(page);
     await row.locator('button[aria-haspopup="menu"]').click();
     await page.getByRole('menuitem', { name: 'Log contact…', exact: true }).click();
 
@@ -346,10 +347,8 @@ test.describe('conversation inline write', () => {
 
     // A fresh fetch: the event and the stamp both survive.
     await page.reload();
-    // Typed before hydration, the search is lost.
     await waitForLoaded(page);
-    await page.getByPlaceholder('People or organizations…').fill(name!);
-    const again = rowByName(page, name!);
+    const again = rowOf(page);
     await expect(again.locator('.crow-when')).toContainText('today');
     await again.locator('.crow-when').click();
     await expect(

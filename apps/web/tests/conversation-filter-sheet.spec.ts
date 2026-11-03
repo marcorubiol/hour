@@ -9,17 +9,21 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  * write to `/api/` is refused before it leaves the browser. The filters live
  * in the URL, so changing one writes nothing.
  *
- *   - on a phone the four selects fold into «Filter», a modal sheet with the
- *     same fields: focus inside, Esc closes and gives the focus back, the
- *     button says how many are on, and each one on is a chip that takes it off;
- *   - a conversation is a two-line row, and a tap on it opens it;
- *   - on a wide screen the selects stay in the row and there is no sheet.
+ *   - «Filter» is a modal sheet with the fields (since ADR-176 at every
+ *     width, the tag among them): focus inside, Esc closes and gives the
+ *     focus back, the button says how many are on, and each one on is a chip
+ *     that takes it off;
+ *   - a conversation is a short chat row (ChatRow, three lines), and a tap on
+ *     it opens its page (on a phone there is no pane beside the list);
+ *   - on a wide screen the selects are not in the row either: the same sheet.
  *
  * Fixture: the `playwright` space. What exists there varies, so a missing
  * row skips rather than fails.
  */
 
 const LIST = '/h/conversations?etiqueta=sales&scope=s:playwright';
+// Without a tag: since ADR-176 the tag is one of the sheet's filters, so `etiqueta=sales` is already «1 on».
+const PLAIN = '/h/conversations?scope=s:playwright';
 
 async function readOnly(page: Page) {
   await page.route('**/api/**', (route) => {
@@ -36,20 +40,22 @@ test.describe('Difusión on a phone', () => {
     test.setTimeout(60_000);
     await page.setViewportSize({ width: 390, height: 844 });
     await readOnly(page);
-    await page.goto(LIST);
+    await page.goto(PLAIN);
     await waitForLoaded(page);
 
     const main = page.getByRole('main');
-    const open = main.getByRole('button', { name: /^Filter/ });
+    const open = main.locator('button.conversations__filter-open');
     await expect(open).toBeVisible();
+    await expect(open).toHaveAccessibleName('Filter');
     await expect(main.getByLabel('Relation', { exact: true })).toBeHidden();
 
     await open.click();
     const sheet = page.getByRole('dialog', { name: 'Filter' });
     await expect(sheet).toBeVisible();
     await expect(open).toHaveAttribute('aria-expanded', 'true');
-    // The first field takes the focus; the page behind is out of reach (a modal dialog).
-    await expect(sheet.getByLabel('Relation', { exact: true })).toBeFocused();
+    // The first field (the Tag, with two tags or more; else the Relation) takes the focus;
+    // the page behind is out of reach (a modal dialog).
+    await expect(sheet.locator('select').first()).toBeFocused();
 
     await sheet.getByLabel('Relation', { exact: true }).selectOption('talking');
     await expect(page).toHaveURL(/relacion=talking/);
@@ -60,13 +66,13 @@ test.describe('Difusión on a phone', () => {
     await expect(open).toBeFocused();
     await expect(open).toHaveAccessibleName('Filter, 1 on');
 
-    await main.getByRole('button', { name: /^Remove «/ }).click();
+    await main.locator('.conversations__active').getByRole('button', { name: /^Remove «/ }).click();
     await expect(page).not.toHaveURL(/relacion=/);
     await expect(open).toHaveAccessibleName('Filter');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 
-  test('a conversation is two lines, and a tap opens it', async ({ page }) => {
+  test('a conversation is a short chat row, and a tap opens its page', async ({ page }) => {
     test.setTimeout(60_000);
     await page.setViewportSize({ width: 390, height: 844 });
     await readOnly(page);
@@ -77,17 +83,20 @@ test.describe('Difusión on a phone', () => {
     if ((await rows.count()) === 0) test.skip(true, 'no conversation in the fixture space');
     const row = rows.first();
     const box = (await row.boundingBox())!;
-    // About 70 px (it was about 170): the title's line and one line under it.
-    expect(box.height).toBeLessThan(90);
+    // Three short lines (ChatRow, ADR-176): who and when, the last word, the context.
+    // The bound is loose on purpose: it was about 170 px before the density review.
+    expect(box.height).toBeLessThan(110);
 
-    // The second line is read, not tapped: a tap there reaches the row's link.
+    // The lower lines are read, not tapped: a tap there reaches the row's link.
+    // On a phone it opens the conversation's page (no pane, no vistazo).
     await row.scrollIntoViewIfNeeded();
     const at = (await row.boundingBox())!;
     await page.mouse.click(at.x + 40, at.y + at.height - 8);
-    await expect(page.getByTestId('peek')).toBeVisible({ timeout: 15_000 });
+    await page.waitForURL(/\/h\/[^/]+\/conversation\/[^/?#]+$/, { timeout: 15_000 });
+    await expect(page.getByTestId('peek')).toBeHidden();
   });
 
-  test('on a wide screen the filters stay in the row', async ({ page }) => {
+  test('on a wide screen the filters are the same sheet (ADR-176)', async ({ page }) => {
     test.setTimeout(60_000);
     await page.setViewportSize({ width: 1440, height: 900 });
     await readOnly(page);
@@ -95,8 +104,15 @@ test.describe('Difusión on a phone', () => {
     await waitForLoaded(page);
 
     const main = page.getByRole('main');
-    await expect(main.getByLabel('Relation', { exact: true })).toBeVisible();
-    await expect(main.getByLabel('Order', { exact: true })).toBeVisible();
-    await expect(main.getByRole('button', { name: /^Filter/ })).toBeHidden();
+    await expect(main.getByLabel('Relation', { exact: true })).toBeHidden();
+    await expect(main.getByLabel('Order', { exact: true })).toBeHidden();
+    const open = main.locator('button.conversations__filter-open');
+    // The tag of the address is one filter on.
+    await expect(open).toHaveAccessibleName('Filter, 1 on');
+    await open.click();
+    const sheet = page.getByRole('dialog', { name: 'Filter' });
+    await expect(sheet.getByLabel('Tag', { exact: true })).toHaveValue('sales');
+    await expect(sheet.getByLabel('Relation', { exact: true })).toBeVisible();
+    await expect(sheet.getByLabel('Order', { exact: true })).toBeVisible();
   });
 });

@@ -63,7 +63,7 @@ test.describe('contact capture', () => {
     // The new conversation shows up in the lens after the invalidation.
     // (Target the lens search by placeholder — 'Search' also matches the
     // global command bar's aria-label.)
-    await page.getByPlaceholder('People or organizations…').fill('ZZZ E2E Contact');
+    await page.getByPlaceholder('Search conversations and team…').fill('ZZZ E2E Contact');
     await expect(page.locator('main')).toContainText(FIXTURE_NAME, {
       timeout: 10_000,
     });

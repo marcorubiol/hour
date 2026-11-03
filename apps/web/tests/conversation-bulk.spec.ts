@@ -9,7 +9,7 @@ import { waitForLoaded } from './loaded';
  * list.md` § 6.1 y 6.2, fase 2).
  *
  * Lo que fija:
- *   - «Select» bajo un chip que no es Difusión, sin «Write to N»;
+ *   - «Select» (en la cabecera, ADR-176) con una etiqueta que no es Difusión, sin «Write to N»;
  *   - el teclado: flechas entre filas, `x` marca, Esc sale;
  *   - «Not this time» a dos, el aviso lo cuenta y «Undo» lo deja como estaba;
  *   - «Tag» pone una etiqueta a las dos sin quitar la que tenían;
@@ -68,14 +68,13 @@ test.describe('bulk actions on the selection', () => {
   });
 
   const rows = (page: Page) => page.locator('main [data-testid="conversation-row"]', { hasText: NAME });
-  // By the relation pill's name: each editable row also mounts the closed «Not this time»
-  // dialog, whose title `hasText` would read in every row.
-  const notNow = (page: Page) => rows(page).filter({ has: page.getByRole('button', { name: /^Not this time/ }) });
+  // By the row's last line: a chat row (ADR-176) with nothing said yet says its relation there.
+  const notNow = (page: Page) => rows(page).filter({ has: page.locator('.chat__last', { hasText: /^Not this time/ }) });
 
   async function open(page: Page, chip = LENS) {
     await page.goto(chip);
     await waitForLoaded(page);
-    await page.getByPlaceholder('People or organizations…').fill(NAME);
+    await page.getByPlaceholder('Search conversations and team…').fill(NAME);
     await expect(rows(page)).toHaveCount(3, { timeout: 30_000 });
   }
 
@@ -129,8 +128,8 @@ test.describe('bulk actions on the selection', () => {
     await bar.getByRole('button', { name: 'Tag' }).click();
     await page.getByRole('menuitem', { name: 'Add Press' }).click();
     await expect(page.locator('.toast-region').getByText('2 conversations tagged')).toBeVisible({ timeout: 20_000 });
-    // Under Venues the rows stay (the tag was added, not swapped) and show Press.
-    await expect(rows(page).filter({ hasText: 'Press' })).toHaveCount(2, { timeout: 20_000 });
+    // Filtered by Venues the rows stay (the tag was added, not swapped) and show Press in their context line.
+    await expect(rows(page).filter({ has: page.locator('.chat__ctx', { hasText: 'Press' }) })).toHaveCount(2, { timeout: 20_000 });
     await expect(rows(page)).toHaveCount(3);
   });
 

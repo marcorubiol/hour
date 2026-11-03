@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ALL,
   AUDIENCE,
+  isAudienceLink,
   SALES,
   TEAM,
   addTagKey,
@@ -11,8 +12,6 @@ import {
   lensChip,
   lensChips,
   otherTagsName,
-  panelHref,
-  panelOf,
   scopeTags,
   tagIdIn,
   tagKeysOf,
@@ -141,12 +140,6 @@ describe('naming a row’s tags off the lens (Desk, ADR-138 fase 3)', () => {
 });
 
 describe('what each chip offers', () => {
-  it('the panel: Difusión whole, Equipo the threads, the rest the common one', () => {
-    expect(panelOf(SALES)).toBe('sales');
-    expect(panelOf(TEAM)).toBe('team');
-    expect(panelOf(ALL)).toBe('common');
-    expect(panelOf('press')).toBe('common');
-  });
   it('bulk send only under Difusión (ADR-138 § 7)', () => {
     expect(canBulkSend(SALES)).toBe(true);
     expect(canBulkSend(ALL)).toBe(false);
@@ -165,10 +158,6 @@ describe('links', () => {
   it('a chip keeps the scope and drops the panel filters', () => {
     expect(chipHref('press', q('scope=s:x&turno=nuestro&etiqueta=sales'))).toBe('/h/conversations?scope=s%3Ax&etiqueta=press');
     expect(chipHref(ALL, q('etiqueta=press&relacion=talking'))).toBe('/h/conversations');
-  });
-  it('a block of the panel carries the chip', () => {
-    expect(panelHref(SALES, 'turno=nuestro#lista')).toBe('?etiqueta=sales&turno=nuestro#lista');
-    expect(panelHref(ALL, 'turno=nuestro#lista')).toBe('?turno=nuestro#lista');
   });
 });
 
@@ -236,20 +225,15 @@ describe('the settings of a space (ADR-138 fase 4)', () => {
   });
 });
 
-describe('Público (ADR-173 § 3)', () => {
+describe('Público (ADR-173 § 3, ADR-176)', () => {
   const q = (s: string) => new URLSearchParams(s);
-  it('es un chip de la URL, también por ?view=audience y sin Converses', () => {
-    expect(lensChip(q('etiqueta=audience'), true)).toBe(AUDIENCE);
-    expect(lensChip(q('view=audience'), true)).toBe(AUDIENCE);
-    expect(lensChip(q('etiqueta=audience'), false)).toBe(AUDIENCE);
-    expect(panelOf(AUDIENCE)).toBe('audience');
-    expect(canBulkSend(AUDIENCE)).toBe(false);
-    expect(addTagKey(AUDIENCE)).toBe(SALES);
-  });
-  it('sale al final, solo para quien lleva el público', () => {
+  it('ya no es un chip: el enlace viejo lleva a Envíos y la lista no lo lee como etiqueta', () => {
+    expect(isAudienceLink(q('etiqueta=audience'))).toBe(true);
+    expect(isAudienceLink(q('view=audience'))).toBe(true);
+    expect(isAudienceLink(q('etiqueta=press'))).toBe(false);
+    expect(lensChip(q('etiqueta=audience'), true)).toBe(ALL);
     expect(lensChips(true, [], 'es').map((c) => c.chip)).toEqual([ALL, TEAM]);
-    expect(lensChips(true, [], 'es', true).map((c) => c.chip)).toEqual([ALL, TEAM, AUDIENCE]);
-    expect(lensChips(false, [], 'es', true).map((c) => c.chip)).toEqual([TEAM, AUDIENCE]);
+    expect(lensChips(false, [], 'es').map((c) => c.chip)).toEqual([TEAM]);
   });
   it('ninguna etiqueta propia puede llamarse así', () => {
     expect(RESERVED_TAG_KEYS).toContain(AUDIENCE);

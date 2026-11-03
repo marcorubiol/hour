@@ -26,7 +26,7 @@ import { TAGGING_EMBED, tagKeysOf, type TaggingEmbed } from '$lib/conversation-t
 import type { ConversationBolo } from '$lib/conversation-relation';
 import { defaultProviderKind, type MailoutEnv } from '$lib/server/mailout';
 
-interface OverviewScope {
+export interface OverviewScope {
   projectIds: string[];
   workspaceIds: string[];
 }
@@ -308,9 +308,9 @@ export async function loadLastMailout(env: SupabaseEnv, jwt: string, scope: Over
   };
 }
 
-type PreviewRecipient = MailoutRecipientLite & { recipient_id: string };
+export type PreviewRecipient = MailoutRecipientLite & { recipient_id: string };
 
-async function withSentAt(env: SupabaseEnv, jwt: string, mailoutId: string, recipients: PreviewRecipient[]) {
+export async function withSentAt(env: SupabaseEnv, jwt: string, mailoutId: string, recipients: PreviewRecipient[]) {
   const sentAt = await pgGet<{ id: string; sent_at: string | null }>(env, 'mailout_recipient', jwt, {
     search: { select: 'id,sent_at', mailout_id: `eq.${mailoutId}` },
   });
@@ -327,7 +327,7 @@ const IDS_PER_READ = 150;
  * reply. Before the split the figures took it from the panel's rows; these
  * are the same rows, narrowed to the mailout's recipients.
  */
-async function loadLastIn(
+export async function loadLastIn(
   env: SupabaseEnv,
   jwt: string,
   scope: OverviewScope,

@@ -9,10 +9,11 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  *
  * 1. «Team» como nombre nuevo no se crea: su clave es la de un chip.
  * 2. `zzz_e2e_tag` («ZZZ E2E tag»): se crea la primera vez y después se
- *    reutiliza (no hay DELETE de etiquetas). Encendida, sale en los chips de
- *    Conversaciones sin recargar la página; se renombra en sitio con
+ *    reutiliza (no hay DELETE de etiquetas). Encendida, sale entre las
+ *    etiquetas de «Filtrar ▾» en Conversaciones (desde ADR-176 la etiqueta es
+ *    un filtro, no un chip) sin recargar la página; se renombra en sitio con
  *    «guardado»; se mueve y vuelve a su sitio.
- * 3. Apagada, deja de salir en los chips. Acaba apagada.
+ * 3. Apagada, deja de salir en el filtro. Acaba apagada.
  *
  * Fixture: el espacio `playwright`. Nunca toca `muk-cia`.
  */
@@ -39,18 +40,24 @@ async function settingsLoaded(page: Page) {
   await expect(page.locator('[data-testid="settings-tags"] [data-tag="sales"]')).toBeVisible({ timeout: 15_000 });
 }
 
-/** To the lens through the frame's selector: a client navigation, no reload. */
-async function chipsOfTheLens(page: Page) {
+/**
+ * To the lens through the frame's selector (a client navigation, no reload),
+ * and its «Filter ▾» open: the options of its Tag select (ADR-176).
+ */
+async function tagOptionsOfTheLens(page: Page) {
   await page.getByRole('navigation', { name: 'Sections' }).getByRole('link', { name: 'Conversations', exact: true }).click();
   await expect(page).toHaveURL(/\/h\/conversations/);
   await waitForLoaded(page);
-  return page.locator('.lenshead__sub [data-chip]');
+  await page.locator('.conversations__filter-open').click();
+  const sheet = page.getByRole('dialog', { name: 'Filter' });
+  await expect(sheet).toBeVisible();
+  return sheet.getByLabel('Tag', { exact: true }).locator('option');
 }
 
 test.describe('conversation tags in settings', () => {
   test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL / PW_TEST_PASSWORD.');
 
-  test('create (not «Team»), on in the chips without reload, rename, order, off', async ({ page }) => {
+  test('create (not «Team»), on in the filter without reload, rename, order, off', async ({ page }) => {
     test.setTimeout(120_000);
     await page.goto(SETTINGS);
     await settingsLoaded(page);
@@ -80,10 +87,12 @@ test.describe('conversation tags in settings', () => {
       }
       await setActive(page, true);
 
-      // On: a chip of the lens, without reloading the page.
-      const chips = await chipsOfTheLens(page);
-      await expect(page.locator(`.lenshead__sub [data-chip="${KEY}"]`)).toBeVisible();
-      await expect(chips.last()).toHaveAttribute('data-chip', 'team');
+      // On: one of the lens's tags, without reloading the page; Team is a chip, never a tag.
+      const options = await tagOptionsOfTheLens(page);
+      await expect(options.filter({ hasText: NAME })).toHaveAttribute('value', KEY);
+      await expect(page.locator('option[value="team"]')).toHaveCount(0);
+      await expect(page.locator('.conversations__chips [data-chip="equipo"]')).toBeVisible();
+      await page.keyboard.press('Escape');
       await page.goBack();
       await settingsLoaded(page);
 
@@ -108,11 +117,12 @@ test.describe('conversation tags in settings', () => {
         await expect.poll(keys).toEqual(before);
       }
 
-      // 3. Off: out of the chips.
+      // 3. Off: out of the filter.
       await setActive(page, false);
-      await chipsOfTheLens(page);
-      await expect(page.locator('.lenshead__sub [data-chip="sales"]')).toBeVisible();
-      await expect(page.locator(`.lenshead__sub [data-chip="${KEY}"]`)).toHaveCount(0);
+      const after = await tagOptionsOfTheLens(page);
+      await expect(after.and(page.locator('[value="sales"]'))).toHaveCount(1);
+      await expect(after.and(page.locator(`[value="${KEY}"]`))).toHaveCount(0);
+      await page.keyboard.press('Escape');
     } finally {
       // Whatever happened, it ends off and with its name.
       await page.goto(SETTINGS);

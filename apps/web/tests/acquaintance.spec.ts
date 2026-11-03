@@ -1,40 +1,62 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { waitForLoaded } from './loaded';
-import { openInFull } from './peek';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
 
 /**
  * E2E · «lo conozco» (ADR-138 § 5): mark a contact from their file, share it,
- * see the mark on the Conversations row, and take it back. Only in the
+ * see the mark on the conversation row, and take it back. The mark rides on
+ * the record lists' rows (the organization's, ADR-159); the lens's chat rows
+ * (ADR-176) do not carry it. Only in the
  * `playwright` space (the list is scoped to it): `muk-cia` is real data.
  *
  * The mark is the caller's own row and unmarking deletes it, so a finished run
  * leaves nothing. A run cut in the middle leaves one private mark of the
  * fixture login on a fixture contact; the next run starts by clearing it.
  */
+/**
+ * A fixture conversation with a contact, on its organization's record
+ * (ADR-159): since ADR-176 the lens's chat rows do not link the contact; the
+ * record's list (ConversationTable's normal mode) still does. Only in the
+ * `playwright` space: `muk-cia` is real data.
+ */
+async function contactRow(page: Page) {
+  await page.goto('/h/conversations?etiqueta=sales&scope=s:playwright');
+  await waitForLoaded(page);
+  const org = await page.evaluate(async () => {
+    const wsBody = (await fetch('/api/workspaces').then((r) => r.json())) as { items: Array<{ id: string; slug: string }> };
+    const ws = wsBody.items.find((w) => w.slug === 'playwright');
+    if (!ws) throw new Error('no fixture workspace');
+    const list = (await fetch(`/api/conversations?etiqueta=sales&workspace_ids=${ws.id}&limit=100`).then((r) => r.json())) as {
+      items: Array<{ person: { slug: string | null } | null; organization: { slug: string } | null }>;
+    };
+    return list.items.find((i) => i.person?.slug && i.organization?.slug)?.organization?.slug ?? null;
+  });
+  expect(org, 'a fixture conversation with a contact').toBeTruthy();
+  await page.goto(`/h/playwright/organization/${encodeURIComponent(org!)}`);
+  await waitForLoaded(page);
+  return page
+    .getByTestId('organization-record')
+    .locator('[data-testid="conversation-row"]')
+    .filter({ has: page.locator('a.crow-contact') })
+    .first();
+}
+
 test.describe('«lo conozco»', () => {
   test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL / PW_TEST_PASSWORD.');
 
   test('person file → I know them → share → the row says so → unmark', async ({ page }) => {
     test.setTimeout(60_000);
 
-    await page.goto('/h/conversations?etiqueta=sales&scope=s:playwright');
-    await waitForLoaded(page);
     // THE FIRST ROW WITH A CONTACT, not the first row: a run cut short leaves
-    // conversations without a person (thread-feed's «E2E Feed Sala …»), and
-    // «What it asks» sorts them first.
-    const row = page
-      .locator('[data-testid="conversation-row"]')
-      .filter({ has: page.locator('a.crow-contact') })
-      .first();
+    // conversations without a person (thread-feed's «E2E Feed Sala …»).
+    const row = await contactRow(page);
     await expect(row).toBeVisible();
 
     const contact = row.locator('a.crow-contact');
+    // From a record's page the person opens on its page (ADR-139 p1), where the switch lives.
     await contact.click();
-    // From the lens the person opens in the vistazo (ADR-139 p1); the switch lives on the page.
-    await openInFull(page);
     await page.waitForURL(/\/h\/[^/]+\/person\//);
     await waitForLoaded(page);
 

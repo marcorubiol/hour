@@ -80,6 +80,8 @@ export interface BoloBoard {
 export interface BoardView extends BoloBoard {
   /** El que mira (sus mensajes se editan y no cuentan como nuevos). */
   me: string;
+  /** El espacio de la función, leído de ella (no de la URL): el de sus enlaces. */
+  workspace_slug: string | null;
   messages: ThreadMessage[];
   /** user_id → nombre, de los autores que el que mira puede ver. */
   authors: Record<string, string>;
@@ -387,6 +389,19 @@ export function feedHref(row: Pick<FeedThread, 'anchor_kind' | 'anchor_id' | 'bo
   if (row.anchor_kind === 'conversation') return `/h/${workspaceSlug}/conversation/${row.anchor_id}#team`;
   const slug = row.bolo?.performance_slug;
   return slug ? `/h/${workspaceSlug}/performance/${slug}#board` : null;
+}
+
+/**
+ * Un hilo de bolo abierto solo, como un grupo (punto 110): la función que abre
+ * su tablón y la faceta (General sin `hilo`). Sin función viva, null.
+ */
+export function groupHref(
+  row: Pick<FeedThread, 'anchor_kind' | 'facet_id' | 'bolo'>,
+  workspaceSlug: string | undefined,
+): string | null {
+  const id = row.bolo?.performance_id;
+  if (!workspaceSlug || row.anchor_kind !== 'bolo' || !id) return null;
+  return `/h/${workspaceSlug}/group/${id}${row.facet_id ? `?hilo=${row.facet_id}` : ''}`;
 }
 
 /** El nombre del hilo dentro de su ancla: la faceta (o General) en un bolo, «Equipo» en una conversación. */

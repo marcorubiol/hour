@@ -3,7 +3,8 @@
    * One row of the Conversations lens (plan `build/plans/2026-10-22-
    * conversations-list.md` § 3; ADR-139 § 4 «una fila de lista compartida»):
    * the same two lines under every chip, for a conversation of the list, a
-   * conversation of «Todas» and a thread of the team (ThreadFeedRow).
+   * conversation of a record's list (a line's module, an organization). The
+   * Conversations lens draws ChatRow since ADR-176.
    *
    *   TURNO     Con quién  •2 ✓ tags         Relación   Bolos        cuándo
    *   desde     contacto, papel · ciudad     lo último                paso

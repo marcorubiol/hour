@@ -1,17 +1,16 @@
 <script lang="ts">
   /**
-   * La vista Público de Conversaciones (ADR-173 § 3; plan del público § 6.1):
-   * las listas de los espacios en pantalla con sus recuentos y las últimas
-   * invitaciones. Como la vista Equipo, lista y abre; lo que se edita (la
-   * lista, su texto, la invitación) tiene su página. «Nueva lista» la crea en
-   * borrador y abre su página.
+   * Las listas del público de los espacios en pantalla con sus recuentos, al
+   * lado de la lista de Envíos (ADR-176; antes la vista Público, ADR-173 § 3).
+   * Lista y abre; lo que se edita (la lista, su texto) tiene su página.
+   * «Nueva lista» la crea en borrador y abre su página. Las invitaciones van
+   * en la lista de Envíos, con la difusión.
    */
   import { createMutation, createQuery } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { goto } from '$app/navigation';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import { t, type Locale } from '$lib/i18n';
-  import { dayMonthYear } from '$lib/datetime';
   import { retryLoad } from '$lib/load-fail';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import Button from '$lib/components/Button.svelte';
@@ -35,7 +34,6 @@
   let byId = $derived(new Map(workspaces.map((w) => [w.id, w])));
   let editable = $derived(workspaceIds.filter((w) => data?.access[w]?.edit));
   let multi = $derived(new Set((data?.items ?? []).map((a) => a.workspace_id)).size > 1 || editable.length > 1);
-  let listName = $derived(new Map((data?.items ?? []).map((a) => [a.id, a.name])));
 
   function href(workspaceId: string, path: string): string {
     return `/h/${byId.get(workspaceId)?.slug ?? ''}/${path}`;
@@ -73,7 +71,7 @@
     <p class="aud__msg">{t('audience.load_error', locale)}</p>
   {:else if data}
     <div>
-      <BlockHead title={t('audience.lists', locale)} count={data.items.length}>
+      <BlockHead title={t('envios.audience_lists', locale)} count={data.items.length}>
         {#if editable.length > 0}
           <Button size="s" onclick={openNew}>{t('audience.new_list', locale)}</Button>
         {/if}
@@ -96,24 +94,6 @@
       {/if}
     </div>
 
-    {#if data.invitations.length > 0}
-      <div>
-        <BlockHead title={t('audience.invitations', locale)} count={data.invitations.length} />
-        <ul class="aud__lists">
-          {#each data.invitations as inv (inv.id)}
-            <li class="aud__list">
-              <a class="aud__name" href={href(inv.workspace_id, `mailout/${inv.id}`)}>{inv.subject || t('mailout.untitled', locale)}</a>
-              <span class="aud__status" data-status={inv.status}>{t(`mailout.s_${inv.status}`, locale)}</span>
-              <span class="aud__counts">
-                {[inv.audience_id ? listName.get(inv.audience_id) : null, dayMonthYear(inv.queued_at ?? inv.created_at)]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </span>
-            </li>
-          {/each}
-        </ul>
-      </div>
-    {/if}
   {/if}
 </section>
 

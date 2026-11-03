@@ -51,12 +51,14 @@
   import { untrack } from 'svelte';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
-  import { dayMonth, dayMonthYear } from '$lib/datetime';
+  import { dayMonth, dayMonthYear, viewerTimeZone } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
   import Checkbox from '$lib/components/Checkbox.svelte';
   import ConversationHistory from '$lib/components/ConversationHistory.svelte';
   import ConversationRow from '$lib/components/ConversationRow.svelte';
+  import ChatRow from '$lib/components/ChatRow.svelte';
+  import { chatWhen } from '$lib/chat-row';
   import Dialog from '$lib/components/Dialog.svelte';
   import ConversationStatusMenu from '$lib/components/ConversationStatusMenu.svelte';
   import NextActionDialog from '$lib/components/NextActionDialog.svelte';
@@ -74,7 +76,7 @@
   import { lastActivity, relationLabel, relationTone } from '$lib/conversation-relation';
   import { boloLabel, nearestBolo, rowLast, rowTurn } from '$lib/conversation-row';
   import ConversationTagList from '$lib/components/ConversationTagList.svelte';
-  import type { WorkspaceTag } from '$lib/conversation-tags';
+  import { SALES, keyLabel, type WorkspaceTag } from '$lib/conversation-tags';
 
   interface Props {
     filters: ConversationFilters;
@@ -115,6 +117,12 @@
     /** The host's head already says how many (a record's BlockHead): the
      *  bar does not say it again (ADR-167 § 2). */
     counted?: boolean;
+    /** The lens's list (ADR-176): each row is a ChatRow, the same as the feed's. */
+    chat?: boolean;
+    /** With `chat`: the conversation open beside the list (two panes). */
+    activeId?: string | null;
+    /** With `chat`: open beside instead of navigating. */
+    onopen?: (item: ConversationItem, event: MouseEvent) => void;
   }
 
   let {
@@ -135,7 +143,26 @@
     onpage,
     onexit,
     counted = false,
+    chat = false,
+    activeId = null,
+    onopen,
   }: Props = $props();
+  const tz = viewerTimeZone();
+
+  /** The chat row's context line: the turn (ours in ink), the relation, the tag, the bolo, project and line. */
+  function chatContext(r: RowView): { text: string; ink?: boolean }[] {
+    const item = r.item;
+    const out: { text: string; ink?: boolean }[] = [];
+    if (r.turn?.word) out.push({ text: r.turn.word, ink: r.turn.tone === 'ours' || r.turn.tone === 'late' });
+    else if (r.last.last) out.push({ text: relationLabel(item.relation, locale) });
+    const tag = (item.tags.length > 0 ? item.tags : [SALES]).find((k) => k !== hideTag);
+    if (tag && tagNames) out.push({ text: keyLabel(tag, tagNames, locale) });
+    if (r.bolo) out.push({ text: boloLabel(r.bolo, locale) });
+    const project = projectName && item.project_id ? projectName(item.project_id) : null;
+    const line = lineName && item.line_id ? lineName(item.line_id) : null;
+    for (const x of [project, line]) if (x) out.push({ text: x });
+    return out;
+  }
 
   type ConversationsResponse = {
     total: number;
@@ -426,8 +453,8 @@
 
   /** The row's own stop: its checkbox while picking, else its title link. */
   function rowStop(li: Element): HTMLElement | null {
-    return li.querySelector<HTMLElement>(selectable ? '.crow__pick input' : '.crow__title[href]') ??
-      li.querySelector<HTMLElement>('.crow__title[href]');
+    return li.querySelector<HTMLElement>(selectable ? '.crow__pick input, .chat__pick input' : '.crow__title[href], .chat__title[href]') ??
+      li.querySelector<HTMLElement>('.crow__title[href], .chat__title[href]');
   }
 
   function onListKey(e: KeyboardEvent) {
@@ -501,6 +528,31 @@
     {@const item = r.item}
     {@const picked = selectable && selectedIds.has(item.id)}
     <li data-testid="conversation-row">
+      {#if chat}
+        <ChatRow
+          href={conversationPath(item)}
+          title={r.title}
+          at={r.lastAt}
+          when={r.lastAt ? chatWhen(r.lastAt, locale, tz) : ''}
+          unread={item.unread_count ?? 0}
+          unreadLabel={item.unread_count ? t(item.unread_count === 1 ? 'threads.unread_one' : 'threads.unread', locale, { n: item.unread_count }) : null}
+          lead={r.last.lead}
+          last={r.last.last ?? (item.relation === 'never' ? t('chat.never', locale) : relationLabel(item.relation, locale))}
+          context={chatContext(r)}
+          active={activeId === item.id}
+          onopen={onopen ? (e) => onopen(item, e) : undefined}
+          {picked}
+          picking={selectable}
+        >
+          {#snippet pick()}
+            <Checkbox
+              checked={selectedIds.has(item.id)}
+              ariaLabel={t('mailout.pick_one', locale, { name: r.title })}
+              onchange={() => togglePick(item)}
+            />
+          {/snippet}
+        </ChatRow>
+      {:else}
       <ConversationRow
         href={conversationPath(item)}
         title={r.title}
@@ -582,6 +634,7 @@
           </button>
         {/snippet}
       </ConversationRow>
+      {/if}
     </li>
   {/each}
 </ul>

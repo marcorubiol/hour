@@ -341,6 +341,8 @@
 
   function refresh() {
     void queryClient.invalidateQueries({ queryKey: ['mailout', id] });
+    // Its row in Envíos (status, recipients, figures) is another read (ADR-176).
+    void queryClient.invalidateQueries({ queryKey: ['mailout-list'] });
   }
 
   // Removing is immediate, so it says who and offers to undo (móvil #6): the
@@ -514,7 +516,7 @@
       missingText={t('mailout.not_found', locale)}
       failedText={t('mailout.load_error', locale)}
       onretry={() => void $query.refetch()}
-      back={lensOn('conversations') ? { href: '/h/conversations', label: t('conversations.back', locale) } : null}
+      back={lensOn('conversations') ? { href: '/h/conversations?view=envios', label: t('envios.back', locale) } : null}
       {locale}
     />
   </section>

@@ -6659,3 +6659,66 @@ E2E contra correo real pediría leer un buzón de prueba.
 rechazó el tercero (`17 3 * * *`, error 10072: Workers Free admite 5 crons por cuenta), así que va dentro de la pasada
 de `*/10 * * * *`, la de las 03:10 a 03:19 UTC. Es idempotente, una pasada doble no rompe nada. Si la cuenta pasa a
 Workers Paid, puede volver a ser un cron propio.
+
+## [2026-11-02] ADR-176 · Conversaciones con forma de mensajería: dos vistas, Envíos y la lista de chats
+
+**Contexto.** Marco (drop 02-11, punto 110): «el diseño general de conversaciones no funciona. no sé dónde mirar, no
+sé qué es conversación y qué no es conversación». El diagnóstico y las tres direcciones están en
+`research/product/2026-11-02-conversaciones-diseno.md` (rama `claude/conversations-design-review`). Marco eligió la
+dirección A, «hablar y enviar», y la segunda vuelta con su modelo mental: «estamos acostumbrados a apps tipo WhatsApp,
+Telegram y demás». Conversación es lo que va y vuelve con alguien; lo que sale a muchos no lo es. Este ADR recoge la
+parte de la lente (la vista Envíos y la lista); la ficha como hilo es de otro carril y lleva su propia enmienda a
+ADR-099.
+
+**Decisión (Marco, 2026-11-02; construido en el carril de la lista).**
+1. **Dos vistas en la cabecera de la lente, por el verbo:** Conversaciones (lo que va y vuelve) y Envíos
+   (`?view=envios`, lo que sale a muchos). La lente sigue siendo una y se llama Conversaciones.
+2. **Envíos:** difusión e invitaciones en una sola lista, lo que va a salir (borradores) y lo último arriba, con a
+   quién, estado y cifras (respuestas, bajas, rebotes), de 20 en 20 (`GET /api/mailout?list=1`; las cifras salen de
+   `mailout_preview`, la misma lectura que tenía «Último envío»). Filtro Todos · Difusión · Invitaciones
+   (`?tipo=`). Las respuestas de un envío se leen en Conversaciones (`?envio=…&r=respuestas`): un envío no es un
+   chat. Arriba, la temporada de Difusión por línea (ADR-135), con «ver las N en Conversaciones»; al lado, las listas
+   del público. «Nuevo envío» pregunta: difusión abre la selección de Conversaciones con la etiqueta de Difusión;
+   invitación crea el borrador en un espacio cuyo público edita quien llama.
+3. **La lista como lista de chats.** Cada fila: monograma y nombre de la organización (ADR-102; un hilo de bolo,
+   monograma de trazo discontinuo, porque es un grupo), cuándo, lo último que se dijo (el asunto mientras
+   `conversation_feed` no traiga el texto), cuántos sin leer, y una línea de contexto: el turno (sólo «te toca» en
+   tinta), el proyecto si el ámbito tiene varios, la etiqueta y la relación o el bolo. La etiqueta deja de ser una
+   píldora en cada fila. El hilo del equipo de una sala no es una fila: sus nuevos se suman a su conversación.
+4. **Chips con cifra encima de la lista: Todo · Te toca · Se enfría · Equipo.** Filtran la misma lista y ninguno
+   cambia la pantalla (`?turno=nuestro`, `?temp=fria`, `?etiqueta=team`, los enlaces que ya usaba el Desk). Etiqueta,
+   relación, línea, temperatura (caliente, ronda, parada, sin fecha), envío y orden van en «Filtrar ▾», aparte y con
+   otra forma, siempre en la URL. Orden por defecto «lo que pide».
+5. **El panel de arriba se pliega en los chips.** Te toca y Se enfría eran cifras que filtraban la lista (ADR-117
+   § 1); ahora son exactamente eso. La temporada se muda a Envíos y «Último envío» desaparece (los envíos tienen su
+   vista). El bloque «Esperan respuesta» con su «No pide respuesta» de fila se va con el panel: esa acción sigue en
+   la ficha y en la selección.
+6. **Escritorio a dos paneles** (desde 75 rem): la lista a su medida y la conversación abierta al lado
+   (`?abierta=<espacio>/<id>`), con la ficha como la dibuja el vistazo. Es el vistazo de ADR-139 p1, fijo en esta
+   lente. Más estrecho, la fila abre la página de la conversación; en el móvil la lista ocupa la pantalla entera y la
+   conversación se abre encima. Sin deslizar filas en el móvil.
+7. **Selección y alta en la cabecera:** «Seleccionar» y «Añadir conversación». Las acciones en bloque no cambian;
+   «Escribir a N» e «Invitar a N» siguen siendo de la etiqueta de Difusión (ADR-138 § 7). En el móvil «Seleccionar»
+   no se ofrece en este corte (la pulsación larga del diseño queda para después) y «Añadir» es «+».
+8. **Redirecciones:** `?etiqueta=audience` y `?view=audience` llevan a Envíos. `?etiqueta=<clave>` sigue filtrando
+   por esa etiqueta; `?etiqueta=team` es el chip Equipo.
+
+**Qué enmienda.**
+- **ADR-134 § 2:** las vistas de la cabecera son Conversaciones · Envíos. § 1 (el nombre de la lente) no cambia.
+- **ADR-138 § 1 y 2:** la fila de chips de etiquetas desaparece; las etiquetas pasan a «Filtrar» y Equipo a chip de la
+  lista. «El panel sigue al chip» se sustituye por «el chip filtra, la pantalla no cambia». § 3 a 7 no cambian: la
+  etiqueta sigue sin decidir permisos.
+- **ADR-117 § 2 y ADR-118, para Conversaciones:** el dashboard se pliega en chips con cifra; la temporada va a
+  Envíos; «Último envío» sale. El Desk no cambia.
+- **ADR-173 § 3:** Público deja de ser una vista; sus listas van a Envíos, al lado de la lista, y sus invitaciones
+  dentro de ella. `GET /api/audience` ya no devuelve las últimas invitaciones.
+- **ADR-139 p1:** en esta lente, en escritorio ancho, el vistazo es el segundo panel fijo y no un diálogo.
+- **No cambian, se apoyan:** ADR-102 (la fila es la organización), ADR-098, ADR-142 (quién lee un hilo de bolo).
+
+**Lo que queda.** La vista previa del texto en la fila (redefinir `conversation_feed` para dar un trozo del último
+evento y del último mensaje del hilo de la sala): migración de función, con el gate de § 34, la firma de la base viva,
+tests RLS y `CACHE_SCHEMA`. Abrir un hilo de bolo como grupo y la selección por pulsación larga en el móvil van con la
+ficha y con su carril.
+
+**Cómo se revierte.** Volver a la cabecera con la fila de chips y a `ConversationOverview` desde git (los componentes
+borrados: `ConversationOverview`, `ThreadFeed`, `ThreadFeedRow`); sin migración. `CACHE_SCHEMA` sube con la vuelta.

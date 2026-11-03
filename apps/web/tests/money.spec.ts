@@ -191,9 +191,11 @@ test.describe('Cuentas without read:money', () => {
     await expect(tabs.getByRole('link', { name: 'Conversations' })).toBeVisible();
     await page.goto('/h/conversations');
     await waitForLoaded(page);
-    const views = page.locator('.lenshead__sub');
-    await expect(views.getByRole('link', { name: 'Team' })).toHaveAttribute('aria-current', 'page');
-    await expect(views.getByRole('link', { name: 'Venues' })).toHaveCount(0);
+    // The list's chips (ADR-176): only Team, active; no All, and no «Filter» with nothing to filter.
+    const chips = page.locator('.conversations__chips');
+    await expect(chips.locator('[data-chip="equipo"]')).toHaveAttribute('aria-current', 'page');
+    await expect(chips.locator('[data-chip="todo"]')).toHaveCount(0);
+    await expect(page.locator('.conversations__filter-open')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Add conversation' })).toHaveCount(0);
 
     // The Desk follows the same flags: neither door is drawn (ADR-124, ADR-127 § 7).

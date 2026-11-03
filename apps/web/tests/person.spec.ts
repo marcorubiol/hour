@@ -1,13 +1,13 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { waitForLoaded } from './loaded';
-import { openInFull } from './peek';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
 
 /**
- * E2E — person file (ADR-045): reach a person from the Conversations lens,
- * read the file, add a note, verify persistence. The note is soft-deleted at
+ * E2E — person file (ADR-045): reach a person from a conversation row (on
+ * the organization's record since ADR-176: the lens's chat rows do not link
+ * the contact), read the file, add a note, verify persistence. The note is soft-deleted at
  * the end via the API (author-scoped), so runs leave no residue beyond audit
  * rows.
  *
@@ -17,6 +17,34 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  * itself the evidence that the toggle was never load-bearing.
  */
 
+/**
+ * A fixture conversation with a contact, on its organization's record
+ * (ADR-159): since ADR-176 the lens's chat rows do not link the contact; the
+ * record's list (ConversationTable's normal mode) still does. Only in the
+ * `playwright` space: `muk-cia` is real data.
+ */
+async function contactRow(page: Page) {
+  await page.goto('/h/conversations?etiqueta=sales&scope=s:playwright');
+  await waitForLoaded(page);
+  const org = await page.evaluate(async () => {
+    const wsBody = (await fetch('/api/workspaces').then((r) => r.json())) as { items: Array<{ id: string; slug: string }> };
+    const ws = wsBody.items.find((w) => w.slug === 'playwright');
+    if (!ws) throw new Error('no fixture workspace');
+    const list = (await fetch(`/api/conversations?etiqueta=sales&workspace_ids=${ws.id}&limit=100`).then((r) => r.json())) as {
+      items: Array<{ person: { slug: string | null } | null; organization: { slug: string } | null }>;
+    };
+    return list.items.find((i) => i.person?.slug && i.organization?.slug)?.organization?.slug ?? null;
+  });
+  expect(org, 'a fixture conversation with a contact').toBeTruthy();
+  await page.goto(`/h/playwright/organization/${encodeURIComponent(org!)}`);
+  await waitForLoaded(page);
+  return page
+    .getByTestId('organization-record')
+    .locator('[data-testid="conversation-row"]')
+    .filter({ has: page.locator('a.crow-contact') })
+    .first();
+}
+
 test.describe('person file', () => {
   test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL / PW_TEST_PASSWORD.');
 
@@ -24,31 +52,16 @@ test.describe('person file', () => {
     test.setTimeout(60_000);
     const marker = `note-e2e-${Date.now()}`;
 
-    // ADR-067: the Conversations lens is space-less and cross-space, so it is
-    // scoped here to the fixture space: this spec WRITES a note on whoever is
+    // Scoped to the fixture space: this spec WRITES a note on whoever is
     // first, and until § 31 (2026-10) that was a real MüK Cia contact.
-    await page.goto('/h/conversations?etiqueta=sales&scope=s:playwright');
-    await waitForLoaded(page);
-    await expect(page.locator('[data-testid="conversation-row"]').first()).toBeVisible();
-
-    // Into the person file via the contact's linked name (ADR-102: the first
-    // link of a row is the organization, which opens the conversation). The
-    // workspace segment on a person URL is browsing context, not ownership —
-    // `person` is a global entity resolved by RLS, so any accessible segment
-    // renders it (verified: the same person opened under two spaces). Don't
-    // pin the URL to one space.
-    // THE FIRST ROW WITH A CONTACT, not the first row: a run cut short leaves
-    // conversations without a person (thread-feed's «E2E Feed Sala …»), and
-    // «What it asks» sorts them first.
-    const firstName = page
-      .locator('[data-testid="conversation-row"]')
-      .filter({ has: page.locator('a.crow-contact') })
-      .first()
-      .locator('a.crow-contact');
+    // Into the person file via the contact's linked name. The workspace
+    // segment on a person URL is browsing context, not ownership — `person`
+    // is a global entity resolved by RLS, so any accessible segment renders
+    // it. Don't pin the URL to one space.
+    const firstName = (await contactRow(page)).locator('a.crow-contact');
     const personName = (await firstName.innerText()).trim();
+    // From a record's page a link opens the page, not the vistazo (ADR-139 p1).
     await firstName.click();
-    // The vistazo first (ADR-139 p1), then the page.
-    await openInFull(page);
     await page.waitForURL(/\/h\/[^/]+\/person\//);
     await expect(page.getByRole('heading', { name: personName, level: 1 })).toBeVisible();
     // The heading is the person page's own, so the list's settled root is

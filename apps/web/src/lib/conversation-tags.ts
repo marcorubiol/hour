@@ -23,10 +23,16 @@ export const TEAM = 'team';
 /** Todas: el chip sin parámetro. */
 export const ALL = 'all';
 /**
- * El público (ADR-173 § 3): las listas de quien se apuntó a las invitaciones,
- * no conversaciones. Lo ve quien lleva el público, también sin Converses.
+ * El público (ADR-173 § 3) fue un chip hasta ADR-176: sus listas viven ahora
+ * en la vista Envíos. La clave sigue reservada y `?etiqueta=audience` lleva
+ * allí (`isAudienceLink`).
  */
 export const AUDIENCE = 'audience';
+
+/** Un enlace viejo a la vista Público (`?etiqueta=audience`, `?view=audience`): va a Envíos. */
+export function isAudienceLink(params: URLSearchParams): boolean {
+  return params.get('etiqueta') === AUDIENCE || params.get('view') === AUDIENCE;
+}
 
 /** La clave de una etiqueta, con el CHECK de `conversation_tag.key`. */
 export const TAG_KEY_RE = /^[a-z][a-z0-9_]{1,31}$/;
@@ -48,10 +54,9 @@ const STANDARD_LABEL: Record<string, string> = {
  * (ADR-138 § 2).
  */
 export function lensChip(params: URLSearchParams, canRead: boolean): LensChip {
-  const raw = params.get('etiqueta') ?? (params.get('view') === AUDIENCE ? AUDIENCE : null);
-  if (raw === AUDIENCE) return AUDIENCE;
+  const raw = params.get('etiqueta');
   if (!canRead) return TEAM;
-  if (!raw || raw === ALL) return ALL;
+  if (!raw || raw === ALL || raw === AUDIENCE) return ALL;
   if (raw === TEAM) return TEAM;
   return TAG_KEY_RE.test(raw) ? raw : ALL;
 }
@@ -68,25 +73,6 @@ export function chipHref(chip: LensChip, params: URLSearchParams): string {
   return `/h/conversations${qs ? `?${qs}` : ''}`;
 }
 
-/**
- * Un enlace del panel (`turno=nuestro#lista`) con el chip delante, para que
- * el bloque y su filtro cuenten lo mismo (ADR-118 § 7: el dominio es el chip).
- */
-export function panelHref(chip: LensChip, qs: string): string {
-  if (chip === ALL || chip === TEAM || chip === AUDIENCE) return `?${qs}`;
-  return `?etiqueta=${chip}${qs.startsWith('#') ? '' : '&'}${qs}`;
-}
-
-/** Qué panel lleva cada chip (plan § 3): el de Difusión, el común o el de los hilos. */
-export type PanelKind = 'sales' | 'common' | 'team' | 'audience';
-
-export function panelOf(chip: LensChip): PanelKind {
-  if (chip === SALES) return 'sales';
-  if (chip === TEAM) return 'team';
-  if (chip === AUDIENCE) return 'audience';
-  return 'common';
-}
-
 /** El envío en bloque es un añadido de venta (ADR-138 § 7: a prensa, más adelante). */
 export function canBulkSend(chip: LensChip): boolean {
   return chip === SALES;
@@ -94,7 +80,7 @@ export function canBulkSend(chip: LensChip): boolean {
 
 /** La etiqueta con la que nace una conversación desde «Añadir»: la del chip, o Difusión. */
 export function addTagKey(chip: LensChip): string {
-  return chip === ALL || chip === TEAM || chip === AUDIENCE ? SALES : chip;
+  return chip === ALL || chip === TEAM ? SALES : chip;
 }
 
 // ── Lo que lleva cada conversación ─────────────────────────────────────────
@@ -230,18 +216,12 @@ export interface ChipOption {
 }
 
 /**
- * La fila de chips (ADR-138 § 1 y 2): Todas, las etiquetas, Equipo y, para
- * quien lleva el público de algún espacio, Público al final (ADR-173 § 3).
- * Sin Converses no hay conversación que leer: solo Equipo (ADR-134 § 4).
+ * La fila de chips (ADR-138 § 1 y 2): Todas, las etiquetas y Equipo. Público
+ * dejó de ser un chip (ADR-176: sus listas, en Envíos). Sin Converses no hay
+ * conversación que leer: solo Equipo (ADR-134 § 4).
  */
-export function lensChips(
-  canRead: boolean,
-  tags: readonly WorkspaceTag[],
-  locale: Locale,
-  audience = false,
-): ChipOption[] {
-  const team = { chip: TEAM, label: t('conversations.view_team', locale) };
-  const tail = audience ? [team, { chip: AUDIENCE, label: t('audience.view', locale) }] : [team];
+export function lensChips(canRead: boolean, tags: readonly WorkspaceTag[], locale: Locale): ChipOption[] {
+  const tail = [{ chip: TEAM, label: t('conversations.view_team', locale) }];
   if (!canRead) return tail;
   return [
     { chip: ALL, label: t('conversations.tag_all', locale) },

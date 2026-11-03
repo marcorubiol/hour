@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
 import { waitForLoaded } from './loaded';
-import { openInFull } from './peek';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
@@ -9,7 +8,8 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  * E2E — ADR-102, fase 2: la conversación es con la organización.
  *
  * 1. Desde la lente, el alta con solo la organización (sin persona) crea la
- *    conversación; la fila la titula la organización, enlazada a la ficha.
+ *    conversación; la fila la titula la organización, enlazada a la ficha
+ *    (en el panel de al lado, a la anchura de escritorio, ADR-176).
  * 2. El campo Organización va primero y autocompleta con las del espacio.
  * 3. El alta de una persona de esa organización en el mismo proyecto ofrece
  *    «Añadir como contacto» y la deja de contacto de la que ya existe.
@@ -52,14 +52,13 @@ test.describe('conversation with the venue', () => {
     await dialog.getByLabel('Organization').fill(ORG);
     await dialog.getByRole('button', { name: 'Add conversation' }).click();
     await expect(dialog).not.toBeVisible({ timeout: 10_000 });
-    await page.getByPlaceholder('People or organizations…').fill(ORG);
+    await page.getByPlaceholder('Search conversations and team…').fill(ORG);
     const link = page.locator('main [data-testid="conversation-row"]').getByRole('link', { name: ORG, exact: true });
     await expect(link).toBeVisible({ timeout: 10_000 });
     await link.click();
-    // The vistazo first (ADR-139 p1), then the page.
-    await openInFull(page);
-    await expect(page).toHaveURL(/\/conversation\//);
-    await expect(page.locator('h1')).toContainText(ORG);
+    // At desktop width the file opens in the pane beside the list (ADR-176), not the vistazo.
+    await expect(page).toHaveURL(/abierta=playwright(%2F|\/)/);
+    await expect(page.getByTestId('conversation-pane').locator('h1')).toContainText(ORG, { timeout: 15_000 });
     await page.goto('/h/conversations');
     await waitForLoaded(page);
 

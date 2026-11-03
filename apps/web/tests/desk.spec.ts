@@ -62,7 +62,7 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
       await expect(changed).toHaveCount(0);
     }
     await expect(page.getByTestId('door-planner')).toHaveAttribute('href', '/h/planner');
-    await expect(page.getByTestId('door-conversations')).toHaveAttribute('href', '/h/conversations?etiqueta=sales');
+    await expect(page.getByTestId('door-conversations')).toHaveAttribute('href', '/h/conversations?view=envios');
 
     // Cuentas exists only with read:money (ADR-117): the door follows the gate.
     const readMoney = await page.evaluate(async () => {

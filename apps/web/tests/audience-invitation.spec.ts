@@ -13,7 +13,7 @@ const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
  *
  * Solo en el espacio `playwright` (nunca `muk-cia`: sus conversaciones son
  * reales). Recorrido: dominios de la difusión y del público verificados (por
- * la API, el simulador) → vista Público → «Nueva lista» → importar un CSV con
+ * la API, el simulador) → vista Envíos, listas del público → «Nueva lista» → importar un CSV con
  * base, fuente y declaración (la primera del espacio queda en revisión: la
  * aprueba la clave de servicio, como haría Marco) → «Escribir una invitación»
  * → «Añadir profesionales» desde Conversaciones con una conversación propia →
@@ -86,7 +86,7 @@ test.describe('audience invitation (simulated)', () => {
 
   test('list → import → invitation to a list and a conversation → delivered → record', async ({ page }) => {
     test.setTimeout(180_000);
-    await page.goto('/h/conversations?etiqueta=audience');
+    await page.goto('/h/conversations?view=envios');
     await waitForLoaded(page);
 
     const workspaces = await api<{ items: { id: string; slug: string }[] }>(page, 'GET', '/api/workspaces');
@@ -107,7 +107,7 @@ test.describe('audience invitation (simulated)', () => {
     let mailoutId: string | null = null;
 
     try {
-      // ── Vista Público: «Nueva lista» ──
+      // ── Envíos, al lado de la lista: «Nueva lista» (ADR-176) ──
       await page.reload();
       await waitForLoaded(page);
       const panel = page.getByTestId('audience-panel');
