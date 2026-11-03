@@ -16,7 +16,12 @@
  *     guardada o la que propone Hour, como el buzón común (ADR-099).
  *   · Pie (no se puede quitar): quién escribe, por qué le llega según su base,
  *     la baja en un clic y la política de privacidad si la hay. En el idioma
- *     del envío, no en el de la pantalla.
+ *     del correo, no en el de la pantalla.
+ *   · Idioma del correo (104, Marco 2026-11-03): el de la suscripción de una
+ *     persona del público (en el que se dio de alta o entró importada); el del
+ *     envío para un profesional o si la fila no lo trae. Cambia lo que pone
+ *     Hour (pie, baja, `{nombre}` de un equipo, fecha, `lang` del HTML); el
+ *     asunto y el cuerpo los escribe quien envía y no se traducen.
  *   · Cabeceras de baja de RFC 8058.
  * Al historial de la conversación va el cuerpo con los campos y la firma, sin
  * el pie: el enlace de baja es de la sala, no del equipo.
@@ -62,6 +67,11 @@ export interface ComposeContext {
   /** La función de la invitación: `{sala}` y `{ciudad}`. */
   venue_name: string | null;
   venue_city: string | null;
+  /**
+   * El idioma de la suscripción (104); null para un profesional. Opcional:
+   * una base sin la migración 20261103100000 no lo trae y se cae al del envío.
+   */
+  subscriber_language?: string | null;
 }
 
 /** Una persona del público, no una conversación (ADR-173 § 10). */
@@ -173,6 +183,18 @@ const COPY: Record<MailoutLanguage, Copy> = {
 
 export function mailoutLanguage(raw: string | null | undefined): MailoutLanguage {
   return (MAILOUT_LANGUAGES as readonly string[]).includes(raw ?? '') ? (raw as MailoutLanguage) : 'es';
+}
+
+/**
+ * El idioma en que sale el correo de un destinatario (104): el de su
+ * suscripción si es del público y es uno de los cuatro; si no, el del envío.
+ */
+export function recipientLanguage(
+  mailoutLang: string | null | undefined,
+  ctx: Pick<ComposeContext, 'audience_subscription_id' | 'subscriber_language'>,
+): MailoutLanguage {
+  const own = isAudienceRecipient(ctx) ? ctx.subscriber_language : null;
+  return (MAILOUT_LANGUAGES as readonly string[]).includes(own ?? '') ? (own as MailoutLanguage) : mailoutLanguage(mailoutLang);
 }
 
 const FIELD_RE = /\{(nombre|sala|ciudad)\}/g;
@@ -303,7 +325,7 @@ export function composeMailout(
   unsubscribeUrl: string,
   template: MailTemplate = NO_TEMPLATE,
 ): ComposedMail {
-  const language = mailoutLanguage(draft.language);
+  const language = recipientLanguage(draft.language, ctx);
   const values = mergeValues(ctx, language);
   // Al público sin nombre se le saluda sin él: no bloquea.
   const nameless = isAudienceRecipient(ctx) && values.nombre === null;

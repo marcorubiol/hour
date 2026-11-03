@@ -6,6 +6,7 @@ import {
   isAudienceRecipient,
   mailoutLanguage,
   MAILOUT_LANGUAGES,
+  recipientLanguage,
   suggestedBasis,
   testSubject,
   unsubscribeHeaders,
@@ -260,5 +261,65 @@ describe('invitaciones (ADR-173 § 10)', () => {
     for (const c of [invitation, subscriber]) {
       expect(composeMailout({ subject: 's', body: 'x', language: 'es' }, c, URL, template).html).toContain('<img');
     }
+  });
+});
+
+describe('el idioma de cada suscripción (104)', () => {
+  const subscriber: ComposeContext = {
+    ...ctx,
+    mailout_kind: 'invitation',
+    address_kind: 'subscriber',
+    basis_kind: 'consent',
+    contact_first_name: null,
+    contact_name: null,
+    organization_name: null,
+    city: null,
+    audience_subscription_id: 's1',
+    audience_name: 'Estrenos',
+    subscriber_name: 'Claire Martin',
+    subscribed_at: '2026-03-14T10:00:00Z',
+    venue_name: 'Teatre Lliure',
+    venue_city: 'Barcelona',
+  };
+  const draft = { subject: 'Estreno en {sala}', body: 'Hola, {nombre}:\n\nOs esperamos.', language: 'es' };
+
+  test('una persona del público: el de su suscripción, no el del envío', () => {
+    expect(recipientLanguage('es', { ...subscriber, subscriber_language: 'fr' })).toBe('fr');
+    expect(recipientLanguage('en', { ...subscriber, subscriber_language: 'ca' })).toBe('ca');
+  });
+
+  test('cae al idioma del envío: sin idioma, con uno desconocido o sin la columna', () => {
+    expect(recipientLanguage('ca', { ...subscriber, subscriber_language: null })).toBe('ca');
+    expect(recipientLanguage('en', { ...subscriber, subscriber_language: 'de' })).toBe('en');
+    expect(recipientLanguage('fr', subscriber)).toBe('fr');
+    expect(recipientLanguage(null, { ...subscriber, subscriber_language: null })).toBe('es');
+  });
+
+  test('un profesional sale siempre en el del envío, aunque la fila traiga otro', () => {
+    expect(recipientLanguage('ca', { ...ctx, subscriber_language: 'fr' })).toBe('ca');
+  });
+
+  test('el pie, la fecha y el lang del HTML van en el suyo; asunto y cuerpo, tal cual', () => {
+    const m = composeMailout(draft, { ...subscriber, subscriber_language: 'fr' }, URL);
+    expect(m.subject).toBe('Estreno en Teatre Lliure');
+    expect(m.text.startsWith('Hola, Claire:\n\nOs esperamos.')).toBe(true);
+    expect(m.text).toContain('Vous recevez ce message car vous vous êtes inscrit à « Estrenos » de MüK Cia le 14 mars 2026.');
+    expect(m.text).toContain(`Se désinscrire : ${URL} Un clic suffit.`);
+    expect(m.text).not.toContain('Te llega porque');
+    expect(m.html).toContain('<html lang="fr">');
+  });
+
+  test('un envío a varias personas: cada una en el suyo', () => {
+    const people: ComposeContext[] = [
+      { ...subscriber, recipient_id: 'a', subscriber_language: 'ca' },
+      { ...subscriber, recipient_id: 'b', subscriber_language: 'en' },
+      { ...subscriber, recipient_id: 'c', subscriber_language: null },
+      { ...ctx, recipient_id: 'd', mailout_kind: 'invitation', venue_name: 'Teatre Lliure' },
+    ];
+    const texts = people.map((p) => composeMailout(draft, p, URL).text);
+    expect(texts[0]).toContain('Donar-te de baixa:');
+    expect(texts[1]).toContain('Unsubscribe:');
+    expect(texts[2]).toContain('Darte de baja:');
+    expect(texts[3]).toContain('daos de baja');
   });
 });

@@ -2051,6 +2051,7 @@
   "mailout.reply_to": "Respuestas a",
   "mailout.reply_to_none": "Las respuestas llegarán a {address}, pero no entrarán en Hour: no hay ningún buzón conectado.",
   "mailout.language": "Idioma del correo",
+  "mailout.language_audience_hint": "A cada persona del público le llega el pie (por qué le llega, la baja) en el idioma en que se apuntó. El asunto y el texto salen tal como los escribes.",
   "mailout.lang_es": "Castellano",
   "mailout.lang_ca": "Catalán",
   "mailout.lang_en": "Inglés",

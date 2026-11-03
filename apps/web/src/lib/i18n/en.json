@@ -2051,6 +2051,7 @@
   "mailout.reply_to": "Replies to",
   "mailout.reply_to_none": "Replies will reach {address}, but they will not come into Hour: no mailbox is connected.",
   "mailout.language": "Email language",
+  "mailout.language_audience_hint": "Each audience member gets the footer (why they get it, how to unsubscribe) in the language they signed up in. The subject and text go out exactly as you write them.",
   "mailout.lang_es": "Spanish",
   "mailout.lang_ca": "Catalan",
   "mailout.lang_en": "English",
