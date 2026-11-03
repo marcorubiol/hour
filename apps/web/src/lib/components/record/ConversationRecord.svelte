@@ -71,7 +71,7 @@
   import { markConversationReadOnOpen, markReadWhenSeen, readAtOpen } from '$lib/thread-reading.svelte';
   import { markConversationRead, type ConversationFeedView } from '$lib/conversation-feed';
   import { THREAD_REFRESH_MS, type ConversationThreadView } from '$lib/threads';
-  import { conversationThreadEntries, senderName, threadDayLabel } from '$lib/conversation-thread';
+  import { conversationThreadEntries, scrollToEdge, senderName, threadDayLabel } from '$lib/conversation-thread';
 
   const locale = appLocale();
   const queryClient = useQueryClient();
@@ -261,7 +261,7 @@
     if (fromFeed) composer?.focus('team');
     void tick().then(() => {
       const fresh = flowEl?.querySelector<HTMLElement>('[data-entry="new"]');
-      if (fresh && !fromFeed) fresh.scrollIntoView({ block: 'start' });
+      if (fresh && !fromFeed) scrollToEdge(fresh, 'start', inPeek);
       else toEnd();
     });
   });
@@ -303,7 +303,7 @@
     const last = flowEl?.lastElementChild as HTMLElement | null;
     if (!last || !footEl) return;
     last.style.scrollMarginBlockEnd = `${footEl.offsetHeight}px`;
-    last.scrollIntoView({ block: 'end' });
+    scrollToEdge(last, 'end', inPeek);
   }
 
   // ── Privada ──
