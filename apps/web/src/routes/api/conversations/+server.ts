@@ -41,7 +41,7 @@ import { PostgrestError, pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabas
 import { pgErrorResponse } from '$lib/server/errors';
 import { TURN_EMBEDS, setLastTurnEmbed, setScope } from '$lib/server/conversation-overview';
 import { loadListPage, loadRowExtras } from '$lib/server/conversation-list';
-import { MAILOUT_PICKS, hasListFilter, parseLinea, type ListFilter } from '$lib/conversation-overview';
+import { MAILOUT_PICKS, ORG_CLASSES, ZONA_MAX, hasListFilter, parseLinea, type ListFilter } from '$lib/conversation-overview';
 import { ORDERS, type Orden } from '$lib/conversation-order';
 import { RELATIONS } from '$lib/conversation-relation';
 import { json } from '$lib/server/http';
@@ -66,6 +66,9 @@ const QuerySchema = v.object({
   r: v.optional(v.picklist(MAILOUT_PICKS)),
   // ADR-138: one derived relation.
   relacion: v.optional(v.picklist(RELATIONS)),
+  // ADR-177: «Filtrar» by area (a city) and by type (a kind of organization, or `solo`).
+  zona: v.optional(v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(ZONA_MAX))),
+  clase: v.optional(v.picklist(ORG_CLASSES)),
   // ADR-138 fase 2: el chip de la lente, la clave de una etiqueta (sin ninguna se lee `sales`).
   etiqueta: v.optional(v.pipe(v.string(), v.regex(TAG_KEY_RE))),
   // Plan de la lista § 4: the lens's order.
@@ -135,7 +138,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       400,
     );
   }
-  const { project_ids, workspace_ids, line_id, organization_id, q, limit, offset, turno, temp, temporada, linea, line_ids, envio, r, relacion, etiqueta, orden, ids_only, lean } =
+  const { project_ids, workspace_ids, line_id, organization_id, q, limit, offset, turno, temp, temporada, linea, line_ids, envio, r, relacion, zona, clase, etiqueta, orden, ids_only, lean } =
     parsed.output;
   const idsOnly = ids_only === '1';
 
@@ -171,13 +174,15 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
     temporada: temporada === 'actual' || undefined,
     linea: parseLinea(linea),
     ...(envio ? { envio, r: r ?? 'todos' } : {}),
+    zona,
+    clase,
   };
   if (hasListFilter(listFilter) || etiqueta || orden) {
     // The derived filters only exist for the global lens: project and line
     // modules keep their own params (line_id).
     if (line_id || organization_id) {
       return json(
-        { error: 'invalid_query', hint: 'turno/temp/temporada/linea/envio/relacion/etiqueta/orden go with project_ids/workspace_ids only.' },
+        { error: 'invalid_query', hint: 'turno/temp/temporada/linea/envio/relacion/zona/clase/etiqueta/orden go with project_ids/workspace_ids only.' },
         400,
       );
     }

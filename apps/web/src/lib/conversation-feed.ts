@@ -140,6 +140,7 @@ export function feedOrderKey(r: FeedRowView): OrderKey {
     lastAt: r.last_at ?? r.created_at,
     title: r.title ?? '',
     nextActionAt: r.next_action_at,
+    city: r.city ?? null,
   };
 }
 

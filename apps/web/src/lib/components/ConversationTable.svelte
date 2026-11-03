@@ -24,6 +24,9 @@
     /** A mailout's batch as a filter (ADR-126 § 9, plan de la lista § 5). */
     envio?: string;
     r?: MailoutPick;
+    /** «Filtrar» by area and type (ADR-177): a city, a kind of organization or `solo`. */
+    zona?: string;
+    clase?: string;
     /** The lens chip's tag key (ADR-138, fase 2); untagged rows read as `sales`. */
     etiqueta?: string;
     /** The lens's order (plan de la lista § 4); a module leaves it out and gets the next step's. */
@@ -209,6 +212,8 @@
       if (f.r) p.set('r', f.r);
     }
     if (f.linea) p.set('linea', f.linea);
+    if (f.zona) p.set('zona', f.zona);
+    if (f.clase) p.set('clase', f.clase);
     if (f.temporada) {
       p.set('temporada', 'actual');
       if (f.lineIds && f.lineIds.length > 0) p.set('line_ids', f.lineIds.join(','));

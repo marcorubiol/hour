@@ -10,6 +10,8 @@
  *   · `paso`: por próximo paso, el más cercano primero (el orden de antes en
  *     Difusión, para quien trabaja por agenda).
  *   · `nombre`: por la sala.
+ *   · `ciudad`: por ciudad, las que no tienen al final, y por la sala
+ *     (ADR-177: el primer día como lista de difusión, por zonas).
  *
  * Los filtros de bloque (te toca, caliente, se enfría) no pasan por aquí:
  * ordenan en el orden de su bloque (ADR-118 § 7).
@@ -17,7 +19,7 @@
  * Sin red, sin reloj y sin textos: cada fila llega ya con su clave.
  */
 
-export const ORDERS = ['pide', 'movimiento', 'paso', 'nombre'] as const;
+export const ORDERS = ['pide', 'movimiento', 'paso', 'nombre', 'ciudad'] as const;
 export type Orden = (typeof ORDERS)[number];
 export const DEFAULT_ORDER: Orden = 'pide';
 
@@ -43,6 +45,8 @@ export interface OrderKey {
   lastAt: string | null;
   title: string;
   nextActionAt: string | null;
+  /** La ciudad que enseña la fila (ADR-177 § 2); sin ella, al final del orden por ciudad. */
+  city?: string | null;
 }
 
 function time(iso: string | null): number | null {
@@ -95,6 +99,9 @@ export function compareOrder(orden: Orden): (a: OrderKey, b: OrderKey) => number
       return (a, b) => asc(a.nextActionAt, b.nextActionAt) || desc(a.lastAt, b.lastAt) || a.id.localeCompare(b.id);
     case 'nombre':
       return (a, b) => names.compare(a.title, b.title) || a.id.localeCompare(b.id);
+    case 'ciudad':
+      return (a, b) =>
+        Number(!a.city) - Number(!b.city) || names.compare(a.city ?? '', b.city ?? '') || names.compare(a.title, b.title) || a.id.localeCompare(b.id);
     default:
       return comparePide;
   }

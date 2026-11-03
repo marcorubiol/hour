@@ -52,7 +52,7 @@
   import Dialog from '$lib/components/Dialog.svelte';
   import { tick, untrack } from 'svelte';
   import { toStore } from 'svelte/store';
-  import { MAILOUT_PICKS, NO_LINE, hasListFilter, parseListFilter, type MailoutPick, type OverviewResponse } from '$lib/conversation-overview';
+  import { MAILOUT_PICKS, NO_LINE, ORG_CLASSES, hasListFilter, parseListFilter, type MailoutPick, type OverviewResponse } from '$lib/conversation-overview';
   import type { ConversationFeedView, FeedConversationView, FeedThreadRow } from '$lib/conversation-feed';
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { lazy } from '$lib/lazy.svelte';
@@ -292,8 +292,28 @@
     movimiento: 'conversations.order_movimiento',
     paso: 'conversations.order_paso',
     nombre: 'conversations.order_nombre',
+    ciudad: 'chat.order_city',
   };
   let orderOptions = ORDERS.map((o) => ({ value: o, label: t(ORDER_WORD[o], locale) }));
+
+  // Zona y Tipo (ADR-177): a city, and a kind of organization or «por libre».
+  // The city is typed (a list of every city of the scope does not exist yet)
+  // and applies on change; the type is a select of the kinds, never «other».
+  let zonaDraft = $state('');
+  $effect(() => {
+    zonaDraft = listFilter.zona ?? '';
+  });
+  function setZona(next: string) {
+    const v = next.trim();
+    if (v !== (listFilter.zona ?? '')) setParams({ zona: v || null });
+  }
+  let claseOptions = $derived([
+    { value: 'any', label: t('chat.any', locale) },
+    ...ORG_CLASSES.map((c) => ({ value: c, label: c === 'solo' ? t('chat.solo', locale) : t(`organization.kind_${c}`, locale) })),
+  ]);
+  function setClase(next: string) {
+    setParams({ clase: next === 'any' ? null : next });
+  }
 
   // The line (plan § 5): alone now, not only with the season.
   let lineFilter = $derived(listFilter.linea ?? 'any');
@@ -644,6 +664,8 @@
       listFilter.temp && listFilter.temp !== 'fria'
         ? { key: 'temp', label: t(TEMP_CHIP[listFilter.temp], locale), clear: () => setTemp('any') }
         : null,
+      listFilter.zona ? { key: 'zona', label: listFilter.zona, clear: () => setZona('') } : null,
+      listFilter.clase ? { key: 'clase', label: optionLabel(claseOptions, listFilter.clase), clear: () => setClase('any') } : null,
       orden !== DEFAULT_ORDER ? { key: 'orden', label: t(ORDER_WORD[orden], locale), clear: () => setOrden(DEFAULT_ORDER) } : null,
     ].filter((f) => f !== null),
   );
@@ -656,6 +678,8 @@
       envio: null,
       r: null,
       orden: null,
+      zona: null,
+      clase: null,
       temp: listChip === 'enfria' ? 'fria' : null,
       etiqueta: listChip === 'equipo' ? TEAM : null,
     });
@@ -1140,6 +1164,12 @@
         <Select label={t('conversations.line', locale)} options={lineOptions} bind:value={() => lineFilter, setLine} />
       {/if}
       <Select label={t('chat.temp', locale)} options={tempOptions} bind:value={() => tempFilter, setTemp} />
+      <Input
+        label={t('chat.zone', locale)}
+        bind:value={zonaDraft}
+        onchange={() => setZona(zonaDraft)}
+      />
+      <Select label={t('chat.kind', locale)} options={claseOptions} bind:value={() => listFilter.clase ?? 'any', setClase} />
       {#if canBulkSend(chip) && (mailoutOptions.length > 1 || listFilter.envio)}
         <Select label={t('conversations.mailout', locale)} options={mailoutOptions} bind:value={() => mailoutFilter, setMailout} />
         {#if listFilter.envio}

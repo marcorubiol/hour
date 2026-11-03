@@ -59,4 +59,13 @@ describe('listPageArgs', () => {
     expect(args).not.toHaveProperty('p_season_line_ids');
     expect(args).not.toHaveProperty('p_season');
   });
+
+  test('zona and tipo (ADR-177) travel as p_city and p_kind; an empty zona does not', () => {
+    expect(listPageArgs({ ...BASE, filter: { zona: ' Girona ', clase: 'solo' }, orden: 'ciudad' })).toMatchObject({
+      p_city: 'Girona',
+      p_kind: 'solo',
+      p_order: 'ciudad',
+    });
+    expect(listPageArgs({ ...BASE, filter: { zona: '  ' } })).not.toHaveProperty('p_city');
+  });
 });

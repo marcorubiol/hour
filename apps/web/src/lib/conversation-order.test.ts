@@ -62,4 +62,13 @@ describe('los otros tres', () => {
   it('nombre: sin distinguir acentos ni mayúsculas', () => {
     expect(ids(sortByOrder(rows, 'nombre'))).toEqual(['a', 'c', 'b']);
   });
+  it('ciudad: por ciudad, las que no tienen al final, y dentro por la sala (ADR-177)', () => {
+    const byCity = [
+      key('sin', { title: 'Abadia' }),
+      key('olot', { title: 'Zeta', city: 'Olot' }),
+      key('girona-b', { title: 'Llum', city: 'girona' }),
+      key('girona-a', { title: 'Auditori', city: 'Girona' }),
+    ];
+    expect(ids(sortByOrder(byCity, 'ciudad'))).toEqual(['girona-a', 'girona-b', 'olot', 'sin']);
+  });
 });
