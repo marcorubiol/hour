@@ -200,6 +200,10 @@ test.describe('Conversaciones › Equipo: los hilos del equipo (ADR-116, ADR-134
     await expect(page).toHaveURL(/[?&]grupo=playwright(%2F|\/)/);
     const group = page.getByTestId('conversation-pane').getByTestId('bolo-group');
     await expect(group.locator('.msg', { hasText: NEW_BODY })).toBeVisible({ timeout: 30_000 });
+    // Quién lo lee, con nombres, y que la sala no está (ADR-177 § 6).
+    await expect(group.getByTestId('group-readers')).toContainText("Only the night's team");
+    await expect(group.getByTestId('group-outside')).toContainText('is not in this group');
+    await expect(group.getByRole('button', { name: 'Send to the team' })).toBeVisible();
     expect((await read).status()).toBe(200);
 
     // De vuelta, la fila ya no dice «nuevos».
@@ -219,7 +223,7 @@ test.describe('Conversaciones › Equipo: los hilos del equipo (ADR-116, ADR-134
     await expect(row).toBeVisible({ timeout: 30_000 });
     await row.locator('a.chat__title').click();
     await page.waitForURL(new RegExp(`/h/playwright/conversation/${conversationId}#team$`));
-    // The thread opens with «Solo el equipo» in the field (punto 110), the note in the thread.
+    // The thread opens with «Nota del equipo» in the field (punto 110), the note in the thread.
     await expect(page.getByTestId('conversation-thread').locator('.msg--note', { hasText: TEAM_BODY })).toBeVisible({
       timeout: 30_000,
     });

@@ -1,6 +1,15 @@
 <script module lang="ts">
   /** Adónde va lo que se escribe al pie de una conversación. */
   export type ComposerTarget = 'mail' | 'team' | 'log';
+
+  type Drafts = Record<ComposerTarget, string>;
+  /**
+   * Lo escrito a medias, por conversación, mientras dure la pestaña: cambiar
+   * de conversación en la lista no lo pierde, y una nota a medias vuelve a
+   * abrir en nota (ADR-177 § 6). En memoria y nada más: un borrador no es un
+   * dato del espacio.
+   */
+  const unsent = new Map<string, Drafts>();
 </script>
 
 <script lang="ts">
@@ -14,14 +23,18 @@
    *    ⌘/Ctrl+Intro envía. Responde al último correo de fuera con su asunto;
    *    «Abrir como correo» lo despliega entero (de, para, asunto, materiales,
    *    textos guardados, firma).
-   *  - «Solo el equipo»: un mensaje del hilo del equipo (ADR-106), que se ve
+   *  - «Nota del equipo»: un mensaje del hilo del equipo (ADR-106), que se ve
    *    intercalado en el hilo. Intro envía, como en un grupo.
-   *  - «Apuntar llamada o nota»: un `conversation_event` que no se manda a
-   *    nadie (ADR-098), con su tipo y su día.
-   * Sin buzón que envíe (o sin email del contacto) el correo dice por qué y el
-   * destino pasa a «Apuntar», mientras no se haya elegido otro a mano.
+   *  - «Apuntar llamada»: un `conversation_event` que no se manda a nadie
+   *    (ADR-098), con su tipo y su día.
+   * Quién lo lee se dice antes de escribir (ADR-177 § 6): cada destino cambia
+   * el color, la frase de encima y el verbo del botón, que nunca es «Enviar» a
+   * secas. Al abrir sale el destino de esta conversación, no el último que se
+   * usó en otra: correo, o lo que se dejó a medias. Sin buzón que envíe (o sin
+   * email del contacto) lo dice y cae al siguiente, la nota, mientras no se
+   * haya elegido otro a mano.
    */
-  import { tick } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
@@ -56,11 +69,12 @@
     workspaceSlug: string;
     /** A quién sale un correo: el contacto principal (`mail_send_authorize`). */
     recipient: { full_name: string; email: string } | null;
+    /** Quién no lee una nota: el contacto principal, o la organización sin él. */
+    outsider: string;
     /** Los buzones del espacio; undefined mientras se leen. */
     mail: MailAccountsResponse | undefined;
     /** El correo al que se responde: el último de fuera, o el que se eligió con «Responder». */
     replyTo: ConversationEventItem | null;
-    target?: ComposerTarget;
     locale: Locale;
     /** Ya salió: el dueño recarga lo suyo y baja al final del hilo. */
     onsent: (target: ComposerTarget) => void;
@@ -70,9 +84,9 @@
     conversation: conv,
     workspaceSlug,
     recipient,
+    outsider,
     mail,
     replyTo,
-    target = $bindable('mail'),
     locale,
     onsent,
   }: Props = $props();
@@ -86,7 +100,19 @@
    * Un borrador por destino: lo escrito para el equipo no se vuelve cuerpo de
    * un correo al cambiar de destino (ni al pulsar «Responder»).
    */
-  let drafts = $state<Record<ComposerTarget, string>>({ mail: '', team: '', log: '' });
+  // El dueño dibuja uno por conversación (`{#key}`): se lee al nacer.
+  const convId = untrack(() => conv.id);
+  let drafts = $state<Drafts>({ mail: '', team: '', log: '', ...unsent.get(convId) });
+  $effect(() => {
+    if (drafts.mail.trim() || drafts.team.trim() || drafts.log.trim()) unsent.set(convId, { ...drafts });
+    else unsent.delete(convId);
+  });
+  /** El de esta conversación: sin permiso, el equipo; si quedó algo a medias, eso; si no, el correo. */
+  let target = $state<ComposerTarget>(
+    untrack(() =>
+      !conv.can_edit ? 'team' : drafts.team.trim() ? 'team' : drafts.log.trim() && !drafts.mail.trim() ? 'log' : 'mail',
+    ),
+  );
   let body = $derived(drafts[target]);
   let field = $state<HTMLTextAreaElement>();
   /** Se eligió destino a mano: la falta de buzón ya no lo mueve. */
@@ -109,6 +135,7 @@
 
   function choose(next: ComposerTarget) {
     chosen = true;
+    fellBack = false;
     target = next;
   }
 
@@ -117,9 +144,13 @@
   let mailBlocked = $derived<'no_mailbox' | 'no_email' | null>(
     !mail ? null : sendable.length === 0 ? 'no_mailbox' : !recipient?.email ? 'no_email' : null,
   );
-  // Sin buzón ni email, el campo pasa a «Apuntar»; nunca con algo escrito.
+  // Sin buzón ni email, el campo cae a la nota; nunca con algo escrito.
+  let fellBack = $state(false);
   $effect(() => {
-    if (mailBlocked && !chosen && target === 'mail' && !drafts.mail.trim()) target = conv.can_edit ? 'log' : 'team';
+    if (mailBlocked && !chosen && target === 'mail' && !drafts.mail.trim()) {
+      target = 'team';
+      fellBack = true;
+    }
   });
 
   let accountPick = $state('');
@@ -348,6 +379,20 @@
     const who = senderName(replyTo?.mail_from);
     return who && who !== name && who.toLowerCase() !== recipient?.email.toLowerCase() ? who : '';
   });
+  /** El verbo del botón: dice qué pasa al pulsarlo (ADR-177 § 6). */
+  let verb = $derived(
+    target === 'mail'
+      ? name
+        ? t('thread.mail_send', locale, { name: firstName(name) })
+        : t('thread.mail_send_none', locale)
+      : target === 'team'
+        ? t('thread.team_send', locale)
+        : t(`thread.log_send_${logKind}`, locale),
+  );
+  /** «Laia», de «Laia Puig»: como se la nombra en un botón. */
+  function firstName(full: string): string {
+    return full.trim().split(/\s+/)[0] ?? full;
+  }
   let placeholder = $derived(
     target === 'mail'
       ? replySender
@@ -360,8 +405,7 @@
 </script>
 
 <form
-  class="composer"
-  class:composer--team={target === 'team'}
+  class="composer composer--{target}"
   onsubmit={submit}
   bind:this={formEl}
   data-testid="thread-composer"
@@ -375,7 +419,7 @@
         data-testid="composer-to-mail"
         onclick={() => focus('mail')}
       >
-        {#if name}{t('thread.to_mail', locale, { name })}{:else}{t('thread.to_mail_none', locale)}{/if}
+        {#if name}{t('thread.to_mail', locale, { name: firstName(name) })}{:else}{t('thread.to_mail_none', locale)}{/if}
       </button>
     {/if}
     <button
@@ -383,7 +427,7 @@
       class="composer__target"
       aria-pressed={target === 'team'}
       data-testid="composer-to-team"
-      onclick={() => focus('team')}>{t('threads.team_only', locale)}</button
+      onclick={() => focus('team')}>{t('thread.to_team', locale)}</button
     >
     {#if conv.can_edit}
       <button
@@ -398,6 +442,24 @@
       >
     {/if}
   </div>
+
+  <!-- Quién lo lee, antes de escribir (ADR-177 § 6). -->
+  <p class="composer__reads" data-testid="composer-reads">
+    {#if target === 'mail'}
+      {#if mailBlocked}
+        {t('thread.mail_off', locale, { reason: t(`record.write_${mailBlocked}`, locale) })}
+      {:else if recipient}
+        {t('thread.mail_reads', locale, { address: recipient.email })}
+      {/if}
+    {:else if target === 'team'}
+      {#if fellBack && mailBlocked}<span class="composer__off"
+          >{t('thread.mail_off', locale, { reason: t(`record.write_${mailBlocked}`, locale) })}</span
+        >{' '}{/if}<strong>{t('thread.team_reads_who', locale, { name: outsider })}</strong>
+      {t('thread.team_reads', locale)}
+    {:else}
+      {t('thread.log_reads', locale)}
+    {/if}
+  </p>
 
   {#if target === 'mail' && full}
     <div class="composer__mail">
@@ -454,9 +516,7 @@
           {full ? t('thread.close_mail', locale) : t('thread.open_as_mail', locale)}
         </Button>
       {/if}
-      <Button size="s" type="submit" loading={busy} disabled={!ready}>
-        {target === 'log' ? t('thread.log_send', locale) : t('mail.send', locale)}
-      </Button>
+      <Button size="s" type="submit" loading={busy} disabled={!ready}>{verb}</Button>
     </span>
   </div>
 
@@ -477,8 +537,9 @@
   <p class="composer__hint" id={ids.hint} data-testid="write-why">
     {#if target === 'mail'}
       {#if mailBlocked}
-        {t(`record.write_${mailBlocked}`, locale)}{#if mailBlocked === 'no_mailbox'}{' · '}<a
-            href={`/h/${workspaceSlug}/settings?section=mail`}>{t('record.write_to_settings', locale)}</a
+        <!-- El porqué ya está encima; aquí, dónde se arregla. -->
+        {#if mailBlocked === 'no_mailbox'}<a href={`/h/${workspaceSlug}/settings?section=mail`}
+            >{t('record.write_to_settings', locale)}</a
           >{/if}
       {:else if from && subject.trim()}
         {t('thread.mail_hint', locale, { address: from.address, subject, mod })}
@@ -531,6 +592,29 @@
       border-color: var(--border-color-dark);
     }
     .composer--team .composer__target[aria-pressed='true'] {
+      color: var(--thread-team-fg);
+      background: var(--thread-team-bg);
+      border-color: var(--thread-team-rule);
+    }
+
+    /* Who reads it, said before writing: the note's in the team's amber, the
+       same as a note in the thread, so the field already looks like what it
+       becomes. */
+    .composer__reads {
+      margin: 0;
+      color: var(--text-muted);
+      font-size: var(--text-s);
+    }
+    .composer__reads strong {
+      font-weight: 500;
+    }
+    .composer--team .composer__reads {
+      color: var(--thread-team-fg);
+    }
+    .composer__off {
+      color: var(--text-muted);
+    }
+    .composer--team .composer__row textarea {
       background: var(--thread-team-bg);
       border-color: var(--thread-team-rule);
     }

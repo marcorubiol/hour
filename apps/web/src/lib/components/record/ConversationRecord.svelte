@@ -279,8 +279,9 @@
   }
 
   // ── El campo del pie ──
+  // El destino es de cada conversación (ADR-177 § 6): lo decide el campo al
+  // nacer, uno por conversación, y no pasa de una a otra.
   let composer = $state<ReturnType<typeof ConversationComposer>>();
-  let target = $state<ComposerTarget>('mail');
   /** «Responder» en un correo: ese; si no, el último de fuera. */
   let replyPick = $state<string | null>(null);
   let lastInbound = $derived(
@@ -376,6 +377,8 @@
     conv?.organization?.slug ? `/h/${workspaceSlug}/organization/${encodeURIComponent(conv.organization.slug)}` : null,
   );
   let contacts = $derived(conv ? currentContacts(conv.contacts).filter((c) => c.person) : []);
+  /** Quién no lee una nota del equipo: el contacto principal, o la organización sin él. */
+  let outsider = $derived(contacts.find((c) => c.is_primary)?.person?.full_name ?? contacts[0]?.person?.full_name ?? title);
   let who = $derived(contacts.map((c) => (c.role ? `${c.person!.full_name} (${c.role})` : c.person!.full_name)).join(', '));
 
   /**
@@ -665,10 +668,10 @@
       {#key conv.id}
       <ConversationComposer
         bind:this={composer}
-        bind:target
         conversation={{ id: conv.id, workspace_id: conv.workspace_id, line_id: conv.line_id, can_edit: conv.can_edit }}
         {workspaceSlug}
         {recipient}
+        {outsider}
         mail={$mailQuery.data}
         {replyTo}
         {locale}

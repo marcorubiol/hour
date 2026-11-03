@@ -107,11 +107,14 @@ test.describe('el hilo del equipo de una conversación (ADR-106)', () => {
     await signIn(page, LIMITED_EMAIL!, LIMITED_PASSWORD!);
 
     await page.goto(`/h/playwright/conversation/${conversationId}`);
-    // Un solo campo al pie (punto 110): «Solo el equipo» es uno de sus destinos.
+    // Un solo campo al pie (punto 110): «Nota del equipo» es uno de sus destinos.
     const composer = page.getByTestId('thread-composer');
     await expect(composer).toBeVisible({ timeout: 30_000 });
     await composer.getByTestId('composer-to-team').click();
     await expect(composer.getByTestId('composer-to-team')).toHaveAttribute('aria-pressed', 'true');
+    // Quién lo lee, antes de escribir (ADR-177 § 6): fuera no lo ve, y el verbo lo dice.
+    await expect(composer.getByTestId('composer-reads')).toContainText("won't see it");
+    await expect(composer.getByRole('button', { name: 'Save note' })).toBeVisible();
     // La línea de audiencia, sin plegar: quien ve esta conversación.
     await expect(composer.getByTestId('write-why')).toContainText(/\d/);
 
