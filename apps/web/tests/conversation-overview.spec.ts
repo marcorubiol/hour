@@ -13,6 +13,8 @@ import { forgetConversationsRpc } from './forget';
  *   - una sala contactada a la que escribimos hace 40 días sin respuesta sale
  *     en «Se enfría» y en la segunda ronda (un filtro de «Filtrar ▾»), y se
  *     puede marcar desde «Seleccionar»;
+ *   - «Ya está» en la fila (ADR-177): un toque la saca de «Nos toca», con
+ *     deshacer y un «cómo» opcional que queda como nota en el hilo;
  *   - el chip del filtro lo quita, y un tramo de la temporada (en Envíos) filtra por relación (ADR-138);
  *   - en el móvil, Envíos: la temporada encima de la lista de envíos.
  *
@@ -110,7 +112,7 @@ test.describe('Te toca y Se enfría en Conversaciones (ADR-117, ADR-176)', () =>
     const row = page.locator('[data-testid="conversation-row"]', { hasText: WARM });
     await expect(row).toHaveCount(1, { timeout: 30_000 });
     // El turno en la línea de contexto, en tinta: nos toca.
-    await expect(row.locator('.chat__ctx .is-ink')).toHaveText('We owe a reply');
+    await expect(row.locator('.chat__ctx .is-ink')).toHaveText('Our turn to reply');
     await expect(page.locator('[data-testid="conversation-row"]', { hasText: COLD })).toHaveCount(0);
   });
 
@@ -127,7 +129,7 @@ test.describe('Te toca y Se enfría en Conversaciones (ADR-117, ADR-176)', () =>
     const row = page.locator('[data-testid="conversation-row"]', { hasText: COLD });
     await expect(row).toHaveCount(1, { timeout: 30_000 });
     // Les toca a ellos: el turno sin tinta.
-    await expect(row.locator('.chat__ctx')).toContainText('Awaiting reply');
+    await expect(row.locator('.chat__ctx')).toContainText('Waiting for their reply');
     await expect(row.locator('.chat__ctx .is-ink')).toHaveCount(0);
 
     // La segunda ronda (la de antes de «Escribir a estas»), desde «Filtrar ▾».
@@ -149,6 +151,35 @@ test.describe('Te toca y Se enfría en Conversaciones (ADR-117, ADR-176)', () =>
     await expect(active).toContainText('No reply to the mailout');
     await active.getByRole('button', { name: 'Remove «No reply to the mailout»' }).click();
     await expect(page).not.toHaveURL(/temp=/);
+  });
+
+  test('ya está: un toque la saca de nos toca, se deshace, y el cómo queda en el hilo', async ({ page }) => {
+    test.setTimeout(90_000);
+    await page.goto('/h/conversations?etiqueta=sales&turno=nuestro');
+    await page.locator('.conversations__search').getByRole('searchbox').fill(WARM);
+    const row = page.locator('[data-testid="conversation-row"]', { hasText: WARM });
+    await expect(row).toHaveCount(1, { timeout: 30_000 });
+
+    // Un toque, y deshacer: sigue pidiendo respuesta.
+    await row.getByRole('button', { name: `${WARM}: done` }).click();
+    const how = row.getByRole('textbox', { name: 'How? (optional)' });
+    await expect(how).toBeVisible({ timeout: 15_000 });
+    await row.getByRole('button', { name: 'Undo' }).click();
+    await expect(page.getByText('Undone.')).toBeVisible({ timeout: 15_000 });
+    await expect(row.getByRole('button', { name: `${WARM}: done` })).toBeVisible({ timeout: 30_000 });
+
+    // Otra vez, con el cómo: sale de Nos toca y la nota queda en su historia.
+    await row.getByRole('button', { name: `${WARM}: done` }).click();
+    await expect(how).toBeVisible({ timeout: 15_000 });
+    await how.fill('by phone');
+    await how.press('Enter');
+    await expect(row).toHaveCount(0, { timeout: 30_000 });
+    const events = await h.pgGet<{ kind: string; body: string | null }>(
+      'conversation_event',
+      jwt,
+      new URLSearchParams({ conversation_id: `eq.${ids[0]}`, kind: 'eq.note', select: 'kind,body' }),
+    );
+    expect(events.rows.map((e) => e.body)).toEqual(['Done: by phone']);
   });
 
   test('un tramo de la temporada, en Envíos, abre Conversaciones filtrada por esa relación', async ({ page }) => {

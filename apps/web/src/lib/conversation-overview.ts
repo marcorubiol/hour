@@ -536,6 +536,8 @@ export interface ConversationOverview {
   total: number;
   /** Las que siguen vivas: sin «no esta vez» ni dormidas. */
   live: number;
+  /** Las que nunca se han contactado (relación `never`): el chip «Sin contactar» cuando dominan (ADR-177). */
+  never: number;
   season: {
     label: string;
     start: string;
@@ -593,6 +595,7 @@ export function buildOverview(
   return {
     total: rows.length,
     live: rows.filter((r) => !['not_now', 'dormant'].includes(relationOf(r, now))).length,
+    never: rows.filter((r) => relationOf(r, now) === 'never').length,
     season: {
       ...season,
       total: inSeasonRows.length,

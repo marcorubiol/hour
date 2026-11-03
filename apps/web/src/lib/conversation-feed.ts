@@ -32,8 +32,12 @@ export interface FeedConversation {
   person: string | null;
   /** Su papel en la conversación (`conversation_contact.role`); desde 20261022200000. */
   contact_role?: string | null;
-  /** La ciudad del contacto, si no la de la organización; desde 20261022200000. */
+  /** La ciudad: la de la organización y, si no tiene, la de su contacto (ADR-177 § 2). */
   city?: string | null;
+  /** El tipo de la organización (`workspace_organization.kind`); sin él, la fila dice sólo la ciudad. */
+  org_kind?: string | null;
+  /** Una organización que es una sola persona y se llama como ella (ADR-177 § 3): se enseña como persona. */
+  solo?: boolean | null;
   /** La relación derivada (`private.relation_of`, la de `relationOf`); desde 20261022200000. */
   relation?: Relation;
   /** Sus claves; vacío se lee Difusión (`tagKeysOf`). */

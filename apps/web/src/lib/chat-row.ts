@@ -29,3 +29,43 @@ export function chatWhen(iso: string, locale: Locale, tz: string, now: Date = ne
   if (days > 1 && days < 7) return localeWeekdayShort(day, tag);
   return localeDayMonthNear(day, today, tag);
 }
+
+/**
+ * Con quién es la fila (ADR-177 § 2 y § 3): la forma de su monograma y las
+ * palabras de al lado del nombre. Una organización que es una sola persona y
+ * se llama como ella se enseña como persona: redonda y «por libre», sin
+ * «organización». Si no, cuadrada, con su tipo; sin tipo (o «otra»), sólo la
+ * ciudad, nunca «otro». La ciudad ya llega elegida (la de la organización y,
+ * si no tiene, la de la persona). La forma nunca va sola: siempre con la
+ * palabra.
+ */
+export interface ChatWho {
+  shape: 'person' | 'organization';
+  /** «sala», «Girona»: van tras el nombre, separadas por «·». */
+  words: string[];
+}
+
+export function chatWho(
+  c: { kind?: string | null; solo?: boolean | null; city?: string | null },
+  locale: Locale,
+): ChatWho {
+  const city = c.city?.trim() || null;
+  if (c.solo) return { shape: 'person', words: [t('chat.solo', locale), ...(city ? [city] : [])] };
+  const kind = c.kind && c.kind !== 'other' ? t(`organization.kind_${c.kind}`, locale).toLocaleLowerCase(LOCALE_TAG[locale]) : null;
+  return { shape: 'organization', words: [kind, city].filter((w): w is string => Boolean(w)) };
+}
+
+/** Dos nombres que son el mismo: sin mayúsculas, espacios de más ni acentos que falten. */
+function sameName(a: string, b: string): boolean {
+  const norm = (s: string) => s.normalize('NFC').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+  return norm(a) === norm(b);
+}
+
+/**
+ * Una organización que es una sola persona (ADR-177 § 3), leída de la
+ * conversación: su único contacto se llama como ella. La lista de chats lo
+ * recibe ya hecho de la base (`solo`); la tabla filtrada lo lee aquí.
+ */
+export function soloOf(org: string | null | undefined, contacts: readonly (string | null | undefined)[]): boolean {
+  return Boolean(org) && contacts.length === 1 && Boolean(contacts[0]) && sameName(org!, contacts[0]!);
+}

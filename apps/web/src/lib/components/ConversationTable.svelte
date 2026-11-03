@@ -58,7 +58,8 @@
   import ConversationHistory from '$lib/components/ConversationHistory.svelte';
   import ConversationRow from '$lib/components/ConversationRow.svelte';
   import ChatRow from '$lib/components/ChatRow.svelte';
-  import { chatWhen } from '$lib/chat-row';
+  import ChatDone from '$lib/components/ChatDone.svelte';
+  import { chatWhen, chatWho, soloOf } from '$lib/chat-row';
   import Dialog from '$lib/components/Dialog.svelte';
   import ConversationStatusMenu from '$lib/components/ConversationStatusMenu.svelte';
   import NextActionDialog from '$lib/components/NextActionDialog.svelte';
@@ -123,6 +124,8 @@
     activeId?: string | null;
     /** With `chat`: open beside instead of navigating. */
     onopen?: (item: ConversationItem, event: MouseEvent) => void;
+    /** With `chat`: after a row's «Ya está» or its undo, the lists read again. */
+    onchange?: () => void;
   }
 
   let {
@@ -146,6 +149,7 @@
     chat = false,
     activeId = null,
     onopen,
+    onchange,
   }: Props = $props();
   const tz = viewerTimeZone();
 
@@ -409,6 +413,21 @@
   }
 
   let rows = $derived(items.map(rowView));
+
+  /** With whom, in words and shape (ADR-177 § 2 y § 3): the organization's city, else its contact's. */
+  function whoOf(item: ConversationItem) {
+    const org = organizationOf(item);
+    const solo = soloOf(org, item.contacts.map((c) => c.person?.full_name));
+    return chatWho({ kind: item.organization?.kind, solo, city: item.organization?.city || item.person?.city || null }, locale);
+  }
+  // «Ya está» in progress: the row keeps it while it can be undone, even after a reload.
+  let holding = $state(new Set<string>());
+  function hold(id: string, on: boolean) {
+    const next = new Set(holding);
+    if (on) next.add(id);
+    else next.delete(id);
+    holding = next;
+  }
   // The bolos' column: always under the sales chip, else only when a row has one.
   let withBolos = $derived(bolosColumn || rows.some((r) => r.bolo !== null));
 
@@ -529,9 +548,12 @@
     {@const picked = selectable && selectedIds.has(item.id)}
     <li data-testid="conversation-row">
       {#if chat}
+        {@const who = whoOf(item)}
         <ChatRow
           href={conversationPath(item)}
           title={r.title}
+          shape={who.shape}
+          words={who.words}
           at={r.lastAt}
           when={r.lastAt ? chatWhen(r.lastAt, locale, tz) : ''}
           unread={item.unread_count ?? 0}
@@ -543,6 +565,7 @@
           onopen={onopen ? (e) => onopen(item, e) : undefined}
           {picked}
           picking={selectable}
+          act={editable && !selectable && (r.turn?.reason === 'reply' || holding.has(item.id)) ? done : undefined}
         >
           {#snippet pick()}
             <Checkbox
@@ -552,6 +575,9 @@
             />
           {/snippet}
         </ChatRow>
+        {#snippet done()}
+          <ChatDone conversationId={item.id} name={r.title} {locale} {onchange} onhold={(on) => hold(item.id, on)} />
+        {/snippet}
       {:else}
       <ConversationRow
         href={conversationPath(item)}

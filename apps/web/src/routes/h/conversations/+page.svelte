@@ -59,6 +59,7 @@
   import { DEFAULT_ORDER, ORDERS, parseOrden, type Orden } from '$lib/conversation-order';
   import { dayMonth } from '$lib/datetime';
   import ConversationFeed from '$lib/components/ConversationFeed.svelte';
+  import { accentVarFor } from '$lib/utils/accent';
   import FirstVisitCard from '$lib/components/FirstVisitCard.svelte';
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
@@ -172,6 +173,15 @@
   let workspaceSlugById = $derived(new Map(workspaces.map((w) => [w.id, w.slug])));
   let projectNameById = $derived(
     new Map(($projectsQuery.data?.items ?? []).map((p) => [p.id, p.name ?? p.slug])),
+  );
+  // A bolo thread is ours: its row wears its show's IdentityMark (ADR-177 § 3).
+  let projectMarkById = $derived(
+    new Map(
+      ($projectsQuery.data?.items ?? []).map((p) => [
+        p.id,
+        { accent: accentVarFor(p), initials: p.initials ?? null, name: p.name ?? p.slug },
+      ]),
+    ),
   );
 
   function personHref(item: ConversationItem): string | null {
@@ -373,30 +383,45 @@
   }
   let filterChip = $derived(chipLabel(listFilter));
 
-  // ── The list's chips (ADR-176): Todo · Te toca · Se enfría · Equipo, with
-  //    their figure. They filter the same list; none changes the screen. Te
-  //    toca and Se enfría are the panel's blocks of ADR-117 folded into a
-  //    chip (`?turno=nuestro`, `?temp=fria`, the links the Desk already uses);
-  //    Equipo is the bolos' threads (`?etiqueta=team`). ──
-  type ListChip = 'todo' | 'tetoca' | 'enfria' | 'equipo';
-  const LIST_CHIPS: ListChip[] = ['todo', 'tetoca', 'enfria', 'equipo'];
+  // ── The list's chips (ADR-176 § 4, amended by ADR-177): Todo · Sin
+  //    contactar · Nos toca · Sin noticias · Equipo, with their figure. They
+  //    filter the same list; none changes the screen. Nos toca and Sin
+  //    noticias are the panel's blocks of ADR-117 folded into a chip
+  //    (`?turno=nuestro`, `?temp=fria`, the links the Desk already uses);
+  //    Sin contactar is the relation `never` (`?relacion=never`), a chip only
+  //    while it is most of the list (the first season: 150 cold contacts);
+  //    Equipo is the bolos' threads (`?etiqueta=team`). A chip at 0 is not
+  //    shown, unless it is the one on. ──
+  type ListChip = 'todo' | 'nunca' | 'tetoca' | 'enfria' | 'equipo';
+  const LIST_CHIPS: ListChip[] = ['todo', 'nunca', 'tetoca', 'enfria', 'equipo'];
   const LIST_CHIP_WORD: Record<ListChip, string> = {
     todo: 'chat.chip_all',
+    nunca: 'chat.chip_never',
     tetoca: 'chat.chip_due',
     enfria: 'chat.chip_cold',
     equipo: 'conversations.view_team',
   };
   let listChip = $derived<ListChip>(
-    chip === TEAM ? 'equipo' : listFilter.turno === 'nuestro' ? 'tetoca' : listFilter.temp === 'fria' ? 'enfria' : 'todo',
+    chip === TEAM
+      ? 'equipo'
+      : listFilter.turno === 'nuestro'
+        ? 'tetoca'
+        : listFilter.temp === 'fria'
+          ? 'enfria'
+          : listFilter.relacion === 'never' && !listFilter.temporada
+            ? 'nunca'
+            : 'todo',
   );
   /** A chip's link: the scope and the filters stay, the other chips' params go. */
   function listChipHref(c: ListChip): string {
     const params = new URLSearchParams(page.url.searchParams);
     for (const k of ['turno', 'temp', 'view', 'tipo']) params.delete(k);
+    if (listChip === 'nunca') params.delete('relacion');
     if (c === 'equipo') {
       for (const k of ['relacion', 'linea', 'envio', 'r', 'temporada', 'orden']) params.delete(k);
       params.set('etiqueta', TEAM);
     } else if (params.get('etiqueta') === TEAM) params.delete('etiqueta');
+    if (c === 'nunca') params.set('relacion', 'never');
     if (c === 'tetoca') params.set('turno', 'nuestro');
     if (c === 'enfria') params.set('temp', 'fria');
     const qs = params.toString();
@@ -436,13 +461,23 @@
   );
   let chipCount = $derived<Record<ListChip, number | null>>({
     todo: $countsQuery.data?.total ?? null,
+    nunca: $countsQuery.data?.never ?? null,
     tetoca: $countsQuery.data?.due.count ?? null,
     enfria: $countsQuery.data?.cold.count ?? null,
     equipo: $teamQuery.data
       ? $teamQuery.data.items.filter((r) => r.kind === 'thread' && r.anchor_kind !== 'conversation' && r.unread_count > 0).length
       : null,
   });
-  let shownChips = $derived(noAccess ? (['equipo'] as ListChip[]) : LIST_CHIPS);
+  /** Sin contactar is a chip while it dominates; any other at 0 is not shown (ADR-177). The one on always is. */
+  function chipShown(c: ListChip): boolean {
+    if (c === listChip || c === 'todo') return true;
+    const n = chipCount[c];
+    if (c === 'nunca') return n !== null && chipCount.todo !== null && n * 2 > chipCount.todo;
+    // Equipo's figure is what is new; the chip goes only when there is no bolo thread at all.
+    if (c === 'equipo') return !$teamQuery.data || $teamQuery.data.items.some((r) => r.kind === 'thread' && r.anchor_kind !== 'conversation');
+    return n !== 0;
+  }
+  let shownChips = $derived(noAccess ? (['equipo'] as ListChip[]) : LIST_CHIPS.filter(chipShown));
 
   /**
    * Todo and Equipo without a filter of the sheet are the common list
@@ -594,7 +629,7 @@
   let sheetFilters = $derived(
     [
       tagFilter ? { key: 'etiqueta', label: optionLabel(tagOptions, tagFilter), clear: () => setTag('any') } : null,
-      listFilter.relacion && !listFilter.temporada
+      listFilter.relacion && !listFilter.temporada && listChip !== 'nunca'
         ? { key: 'relacion', label: relationLabel(listFilter.relacion, locale), clear: () => setRelation('any') }
         : null,
       listFilter.linea && !listFilter.temporada && scopeLines.length > 0
@@ -616,7 +651,7 @@
   function clearSheetFilters() {
     const season = listFilter.temporada;
     setParams({
-      relacion: season ? (listFilter.relacion ?? null) : null,
+      relacion: season || listChip === 'nunca' ? (listFilter.relacion ?? null) : null,
       linea: season ? (listFilter.linea ?? null) : null,
       envio: null,
       r: null,
@@ -1026,6 +1061,9 @@
             {tagNames}
             {locale}
             importEmptyState={canEdit}
+            editable={canEdit}
+            projectMark={(id) => projectMarkById.get(id) ?? null}
+            onchange={refreshLists}
             activeId={wide ? (opened?.id ?? null) : null}
             onopen={openFeedRow}
             activeThread={wide && group ? `${group.performanceId}/${group.facetId ?? ''}` : null}
@@ -1051,6 +1089,7 @@
             counted
             activeId={wide ? (opened?.id ?? null) : null}
             onopen={openTableRow}
+            onchange={refreshLists}
           />
         {/if}
       </div>
