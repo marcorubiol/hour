@@ -6,8 +6,10 @@
    *
    * Lee lo mismo que el tablón de la función (`bolo-board`, una clave y una
    * forma) y escoge su hilo. Quién lo lee no se monta desde aquí: lo da el
-   * acceso al bolo (ADR-142) o la regla de la faceta (ADR-106), así que la
-   * cabecera dice cuántos lo leen y lleva al tablón, donde está el acceso.
+   * acceso al bolo (ADR-142) o la regla de la faceta (ADR-106). La cabecera lo
+   * dice con nombres, y que la sala no está (ADR-177 § 6); el acceso está en
+   * el tablón. Su monograma es el del espectáculo: el grupo es nuestro
+   * (ADR-177 § 3).
    *
    * Sin realtime, como el tablón: se recarga al volver a la pestaña y cada
    * 30 s; lo nuevo se marca leído al llegar al pie.
@@ -24,12 +26,22 @@
   import { lensOn } from '$lib/lenses.svelte';
   import { appLocale, t } from '$lib/i18n';
   import { viewerTimeZone } from '$lib/datetime';
-  import ChatMonogram from '$lib/components/ChatMonogram.svelte';
+  import IdentityMark from '$lib/components/IdentityMark.svelte';
+  import { activeProjectsQueryOptions } from '$lib/nav-queries';
+  import { accentVar, accentVarFor } from '$lib/utils/accent';
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import ThreadBlock from '$lib/components/ThreadBlock.svelte';
   import { markReadWhenSeen, readAtOpen } from '$lib/thread-reading.svelte';
   import { scrollToEdge } from '$lib/conversation-thread';
-  import { THREAD_REFRESH_MS, boloDays, boloPlace, facetName, messagesByThread, type BoardView } from '$lib/threads';
+  import {
+    THREAD_REFRESH_MS,
+    boloDays,
+    boloPlace,
+    facetName,
+    messagesByThread,
+    type BoardView,
+    type ThreadAudience,
+  } from '$lib/threads';
 
   interface Props {
     workspaceSlug: string;
@@ -60,6 +72,33 @@
   let thread = $derived(board?.threads.find((th) => (th.facet_id ?? null) === facetId) ?? null);
   let messages = $derived(thread?.thread_id ? (messagesByThread(board?.messages ?? []).get(thread.thread_id) ?? []) : []);
 
+  // Quién lo lee: la misma clave que la línea de audiencia del hilo.
+  const audienceQuery = createQuery(
+    toStore(() => ({
+      queryKey: ['thread-audience', 'bolo', board?.bolo?.id ?? '', facetId ?? ''] as const,
+      enabled: Boolean(board?.bolo?.id && thread),
+      staleTime: 5 * 60_000,
+      retry: false,
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchJSON<ThreadAudience>(
+          `/api/threads/audience?anchor_kind=bolo&anchor_id=${board!.bolo!.id}&facet_id=${facetId ?? ''}`,
+          signal,
+        ),
+    })),
+  );
+  let audience = $derived($audienceQuery.data ?? null);
+  let readers = $derived(
+    audience?.people
+      .map((p) => p.name)
+      .filter(Boolean)
+      .join(', ') ?? '',
+  );
+
+  // El espectáculo del bolo: su IdentityMark. Quien entra por el bolo no lee
+  // el proyecto (ADR-142): sin él, el color que le da su id y el nombre del hilo.
+  const projectsQuery = createQuery(activeProjectsQueryOptions());
+  let project = $derived(($projectsQuery.data?.items ?? []).find((p) => p.id === board?.bolo?.project_id) ?? null);
+
   const readAt = readAtOpen();
   let since = $derived(board && thread ? readAt(facetId ?? '', thread.thread_id, board.reads) : null);
 
@@ -69,6 +108,7 @@
 
   let name = $derived(thread ? facetName(thread, locale) : '');
   let place = $derived(board?.bolo ? boloPlace(board.bolo) : '');
+  let venue = $derived(board?.bolo?.venue_name ?? null);
   let first = $derived(board?.performances[0] ?? null);
   let days = $derived(
     board && board.performances.length > 0
@@ -122,16 +162,37 @@
         <span aria-hidden="true">‹</span>
       </a>
     {/if}
-    <ChatMonogram name={place || name} group />
+    <IdentityMark
+      accent={project ? accentVarFor(project) : accentVar(board?.bolo?.project_id)}
+      initials={project?.initials}
+      name={project?.name ?? name}
+      size="var(--chat-mono)"
+    />
     <div class="group__who">
       <h1 class="group__title">{title || t('threads.board', locale)}</h1>
-      <p class="group__sub">
-        <span>{t('thread.group_team', locale)}</span>
-        {#if days}<span>{t('thread.bolo', locale)} {days}</span>{/if}
-        {#if boardHref}<span><a href={boardHref}>{t('thread.open_bolo', locale)}</a></span>{/if}
+      <!-- La línea de audiencia no se pliega nunca (ADR-083, enmienda §6). -->
+      <p class="group__readers" data-testid="group-readers">
+        {#if audience}
+          {t(audience.count === 1 ? 'thread.group_who_one' : 'thread.group_who', locale, {
+            n: audience.count,
+            names: readers,
+          })}
+        {:else if $audienceQuery.isError}
+          {t('threads.audience_unknown', locale)}
+        {:else}
+          &nbsp;
+        {/if}
       </p>
     </div>
   </header>
+  {#if board?.bolo}
+    <p class="group__sub" data-testid="group-outside">
+      {#if project}<span>{project.name}</span>{/if}
+      <strong>{venue ? t('thread.group_outside', locale, { venue }) : t('thread.group_outside_none', locale)}</strong>
+      {#if days}<span>{t('thread.bolo', locale)} {days}</span>{/if}
+      {#if boardHref}<span><a href={boardHref}>{t('thread.open_bolo', locale)}</a></span>{/if}
+    </p>
+  {/if}
 
   {#if $boardQuery.isLoading}
     <EmptyLine text={t('conversations.loading', locale)} busy />
@@ -153,6 +214,7 @@
         performances={board.performances}
         {tz}
         look="group"
+        {venue}
         {locale}
         onchange={refresh}
       />
@@ -219,13 +281,26 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+    .group__readers {
+      margin: 0;
+      color: var(--text-muted);
+      font-size: var(--text-s);
+    }
+    /* The band under the head: whose show, and who is NOT here. */
     .group__sub {
       display: flex;
       flex-wrap: wrap;
       gap: 0 var(--space-xs);
       margin: 0;
+      padding: var(--space-2xs) var(--space-s);
       color: var(--text-muted);
+      background: var(--bg-light);
+      border-radius: var(--radius-s);
       font-size: var(--text-s);
+    }
+    .group__sub strong {
+      color: var(--heading-color);
+      font-weight: 500;
     }
     .group__sub > * + *::before {
       content: '·';

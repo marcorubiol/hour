@@ -11,9 +11,9 @@
 -- Según § 34: sin tablas ni datos; DROP y CREATE de tres funciones de lectura
 -- (cambia el tipo de salida, así que no vale CREATE OR REPLACE), con sus
 -- grants de nuevo. Cuerpos copiados de 20261102180100_audience.sql, la última
--- migración que las define. RIESGO: no se ha comparado con
--- pg_get_functiondef de producción; antes del apply, comprobar que el cuerpo
--- vivo de las tres es el de esa migración.
+-- migración que las define. Contrastadas con pg_get_functiondef de producción
+-- el 2026-11-03: firma, SECURITY DEFINER, search_path, proacl y cuerpo
+-- coinciden; el único cambio es la columna nueva. Sin dependientes ni COMMENT.
 -- Rollback: volver a correr el bloque de las tres funciones de
 -- 20261102180100_audience.sql (líneas de «Montaje del correo») y sus grants.
 
@@ -168,6 +168,7 @@ BEGIN
     AND CASE WHEN r.conversation_id IS NOT NULL THEN c.id IS NOT NULL ELSE v_audience END;
   RETURN QUERY SELECT * FROM private.mailout_compose_rows(v_ids);
 END;
+$$;
 
 DO $$
 BEGIN
