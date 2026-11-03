@@ -90,7 +90,6 @@
     isAudienceLink,
     lensChip,
     lensChips,
-    panelOf,
     scopeTags,
     tagLabel,
   } from '$lib/conversation-tags';
@@ -136,7 +135,6 @@
   /** The chip travels in the URL, so a link says which one it shows. Without
    *  Converses there is no conversation to show: the lens is Equipo (ADR-134 § 4). */
   let chip = $derived(lensChip(page.url.searchParams, !noAccess));
-  let panel = $derived(panelOf(chip));
 
   // ── The two views (ADR-176): in the URL, so a link says which one it shows ──
   let envios = $derived(page.url.searchParams.get('view') === 'envios');
@@ -233,9 +231,12 @@
   let qRaw = $state('');
   // `?q=` lleva una búsqueda hecha en otro sitio: una organización del ⌘K con
   // varias conversaciones (o ninguna) abre la lente buscando su nombre.
+  // Derived first: the effect runs when `?q=` changes, not on every navigation
+  // (opening a row beside rewrites the URL, and must not overwrite what is typed).
+  let qFromUrl = $derived(page.url.searchParams.get('q'));
   $effect(() => {
-    const fromUrl = page.url.searchParams.get('q');
-    if (fromUrl !== null) qRaw = fromUrl;
+    const fromUrl = qFromUrl;
+    if (fromUrl !== null) untrack(() => (qRaw = fromUrl));
   });
   let q = $state('');
   $effect(() => {
@@ -340,7 +341,7 @@
     })),
     // A mailout from the panel's link that is not among the ten still names itself.
     ...(listFilter.envio && !($mailoutsQuery.data?.items ?? []).some((m) => m.id === listFilter.envio)
-      ? [{ value: listFilter.envio, label: t('overview.last_mailout', locale) }]
+      ? [{ value: listFilter.envio, label: t('chat.this_mailout', locale) }]
       : []),
   ]);
 
@@ -362,9 +363,8 @@
         .filter(Boolean)
         .join(' · ');
     }
-    // Te toca and Se enfría are chips of the list now (ADR-176), not a filter to take off.
+    // The temperature is a filter of the sheet (its own chip below); te toca and se enfría, chips of the list.
     if (f.turno === 'suyo') return t('overview.turn_theirs_cap', locale);
-    if (f.temp && f.temp !== 'fria') return t(TEMP_CHIP[f.temp], locale);
     return f.temporada ? t('overview.this_season', locale) : null;
   }
   let filterChip = $derived(chipLabel(listFilter));
@@ -404,7 +404,7 @@
   // the bolos' threads (the same read as the Equipo chip's list).
   const countsQuery = createQuery(
     toStore(() => ({
-      queryKey: ['conversation-overview', filterIds.projectIds, filterIds.workspaceIds, lineIds, tagFilter ?? ALL, 'sales'] as const,
+      queryKey: ['conversation-overview', filterIds.projectIds, filterIds.workspaceIds, lineIds, tagFilter ?? ALL] as const,
       enabled: !scopeUnresolved && !noAccess,
       queryFn: ({ signal }: { signal: AbortSignal }) => {
         const p = new URLSearchParams();
@@ -471,11 +471,31 @@
   $effect(() => {
     if (wide && opened) void conversationRecord.load();
   });
+  // The pane is a region the keyboard can reach and leave (ADR-176): opened
+  // with Enter, the focus goes into it; Esc or «Cerrar» close it and give the
+  // focus back to the row it came from.
+  let paneEl = $state<HTMLElement>();
+  let openedFrom: HTMLElement | null = null;
+  async function afterOpen(event: MouseEvent) {
+    openedFrom = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+    // `detail` is 0 for a click the keyboard made (Enter on the link).
+    if (event.detail === 0) {
+      await tick();
+      paneEl?.focus({ preventScroll: true });
+    }
+  }
+  function closePane() {
+    setParams({ abierta: null, grupo: null });
+    const back = openedFrom;
+    openedFrom = null;
+    void tick().then(() => back?.focus({ preventScroll: true }));
+  }
   function openBeside(workspaceId: string, id: string, event: MouseEvent) {
     const ws = workspaceSlugById.get(workspaceId);
     if (!wide || !ws || event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
     event.preventDefault();
     setParams({ abierta: `${ws}/${id}`, grupo: null });
+    void afterOpen(event);
   }
   // A bolo's thread opens as a group (BoloGroup, the record lane's): beside on a wide screen.
   let groupRaw = $derived(page.url.searchParams.get('grupo'));
@@ -494,6 +514,7 @@
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
     event.preventDefault();
     setParams({ grupo: [ws, performanceId, th.facet_id].filter(Boolean).join('/'), abierta: null });
+    void afterOpen(event);
   }
   const openFeedRow = (c: FeedConversationView, e: MouseEvent) => openBeside(c.workspace_id, c.id, e);
   const openTableRow = (c: ConversationItem, e: MouseEvent) => openBeside(c.workspace_id, c.id, e);
@@ -502,7 +523,7 @@
     const params = new URLSearchParams(page.url.searchParams);
     // A season segment is relation + season: its chip names both, and goes as one.
     if (listFilter.temporada) params.delete('relacion');
-    for (const k of f_block_keys(listFilter)) params.delete(k);
+    for (const k of blockKeys(listFilter)) params.delete(k);
     const qs = params.toString();
     // The chip goes away with the focus on it: the focus goes to the list.
     void goto(`${page.url.pathname}${qs ? `?${qs}` : ''}`, { noScroll: true, keepFocus: true }).then(() =>
@@ -511,10 +532,10 @@
   }
 
   /** What the removable chip takes off: the block filter it names, never the list's chip. */
-  function f_block_keys(f: typeof listFilter): string[] {
-    const keys = ['temporada', 'linea', 'envio', 'r'];
+  function blockKeys(f: typeof listFilter): string[] {
+    // A season segment is the season and its line (its relation goes above); the rest are the sheet's own.
+    const keys = f.temporada ? ['temporada', 'linea'] : [];
     if (f.turno === 'suyo') keys.push('turno');
-    if (f.temp && f.temp !== 'fria') keys.push('temp');
     return keys;
   }
 
@@ -575,11 +596,14 @@
       listFilter.linea && !listFilter.temporada && scopeLines.length > 0
         ? { key: 'linea', label: optionLabel(lineOptions, listFilter.linea), clear: () => setLine('any') }
         : null,
-      listFilter.envio && canBulkSend(chip)
+      listFilter.envio
         ? { key: 'envio', label: optionLabel(mailoutOptions, listFilter.envio), clear: () => setMailout('none') }
         : null,
-      listFilter.envio && listFilter.r && canBulkSend(chip)
+      listFilter.envio && listFilter.r
         ? { key: 'r', label: t(PICK_WORD[mailoutPick], locale), clear: () => setMailoutPick('todos') }
+        : null,
+      listFilter.temp && listFilter.temp !== 'fria'
+        ? { key: 'temp', label: t(TEMP_CHIP[listFilter.temp], locale), clear: () => setTemp('any') }
         : null,
       orden !== DEFAULT_ORDER ? { key: 'orden', label: t(ORDER_WORD[orden], locale), clear: () => setOrden(DEFAULT_ORDER) } : null,
     ].filter((f) => f !== null),
@@ -593,6 +617,7 @@
       envio: null,
       r: null,
       orden: null,
+      temp: listChip === 'enfria' ? 'fria' : null,
       etiqueta: listChip === 'equipo' ? TEAM : null,
     });
   }
@@ -627,11 +652,13 @@
   function togglePicking() {
     picking = !picking;
     picked = [];
+    if (!picking && selectFromUrl) setParams({ seleccionar: null });
   }
   /** Esc, or «Dejar de seleccionar»: the focus goes back to the list's title. */
   function leavePicking() {
     picking = false;
     picked = [];
+    if (selectFromUrl) setParams({ seleccionar: null });
     void tick().then(() => listHeading?.focus({ preventScroll: true }));
   }
   // Equipo and Envíos have no conversations to pick: going there leaves the selection.
@@ -749,6 +776,7 @@
         conversation_ids: picked.map((c) => c.id),
       }),
     onSuccess: (r) => {
+      void queryClient.invalidateQueries({ queryKey: ['mailout-list'] });
       if (r) void goto(`/h/${r.workspace_slug}/mailout/${r.id}`);
     },
     onError: (err) => {
@@ -763,8 +791,10 @@
   // «Añadir profesionales» from an invitation draft: the selection opens, and
   // «Añadir a la invitación» puts the picks next to the ones it had.
   let invitationId = $derived(page.url.searchParams.get('invitacion'));
+  // «Nuevo envío › Difusión» opens the selection once: a derived, so leaving it does not reopen it on the next navigation.
+  let selectFromUrl = $derived(page.url.searchParams.get('seleccionar') === '1');
   $effect(() => {
-    if (invitationId || page.url.searchParams.get('seleccionar') === '1') untrack(() => (picking = true));
+    if (invitationId || selectFromUrl) untrack(() => (picking = true));
   });
   const addToInvitation = createMutation({
     mutationFn: async () => {
@@ -803,6 +833,7 @@
         conversation_ids: picked.map((c) => c.id),
       }),
     onSuccess: (r) => {
+      void queryClient.invalidateQueries({ queryKey: ['mailout-list'] });
       if (r) void goto(`/h/${r.workspace_slug}/mailout/${r.id}`);
     },
     onError: (err) => {
@@ -821,6 +852,7 @@
     mutationFn: (workspaceId: string) =>
       mutateJSON<{ id: string; workspace_slug: string }>('POST', '/api/mailout/invitation', { workspace_id: workspaceId }),
     onSuccess: (r) => {
+      void queryClient.invalidateQueries({ queryKey: ['mailout-list'] });
       if (r) void goto(`/h/${r.workspace_slug}/mailout/${r.id}`);
     },
     onError: (err) =>
@@ -1021,7 +1053,25 @@
 
       {#if wide}
         <!-- The open conversation beside the list: its record, as the vistazo draws it. -->
-        <div class="conversations__pane" data-testid="conversation-pane">
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <section
+          class="conversations__pane"
+          data-testid="conversation-pane"
+          bind:this={paneEl}
+          tabindex="-1"
+          aria-label={t(group ? 'chat.pane_group' : 'chat.pane_conversation', locale)}
+          onkeydown={(e) => {
+            if (e.key === 'Escape' && (opened || group) && !e.defaultPrevented && !(e.target as HTMLElement).closest('[role="menu"], [role="dialog"]')) {
+              e.preventDefault();
+              closePane();
+            }
+          }}
+        >
+          {#if opened || group}
+            <div class="conversations__pane-bar">
+              <button type="button" class="block-head__act" aria-keyshortcuts="Escape" onclick={closePane}>{t('peek.close', locale)}</button>
+            </div>
+          {/if}
           {#if group && boloGroup.component}
             {#key groupRaw}
               <boloGroup.component workspaceSlug={group.ws} performanceId={group.performanceId} facetId={group.facetId} inPeek />
@@ -1033,7 +1083,7 @@
           {:else if !opened && !group}
             <EmptyLine text={t('chat.pick_one', locale)} />
           {/if}
-        </div>
+        </section>
       {/if}
     </div>
 
@@ -1243,6 +1293,13 @@
       padding-block-start: var(--space-m);
       padding-inline-end: var(--space-m);
       border-inline-end: var(--border);
+    }
+    .conversations__pane:focus {
+      outline: none;
+    }
+    .conversations__pane-bar {
+      display: flex;
+      justify-content: flex-end;
     }
     .conversations__pane {
       position: sticky;

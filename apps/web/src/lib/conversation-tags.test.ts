@@ -12,8 +12,6 @@ import {
   lensChip,
   lensChips,
   otherTagsName,
-  panelHref,
-  panelOf,
   scopeTags,
   tagIdIn,
   tagKeysOf,
@@ -142,12 +140,6 @@ describe('naming a row’s tags off the lens (Desk, ADR-138 fase 3)', () => {
 });
 
 describe('what each chip offers', () => {
-  it('the panel: Difusión whole, Equipo the threads, the rest the common one', () => {
-    expect(panelOf(SALES)).toBe('sales');
-    expect(panelOf(TEAM)).toBe('team');
-    expect(panelOf(ALL)).toBe('common');
-    expect(panelOf('press')).toBe('common');
-  });
   it('bulk send only under Difusión (ADR-138 § 7)', () => {
     expect(canBulkSend(SALES)).toBe(true);
     expect(canBulkSend(ALL)).toBe(false);
@@ -166,10 +158,6 @@ describe('links', () => {
   it('a chip keeps the scope and drops the panel filters', () => {
     expect(chipHref('press', q('scope=s:x&turno=nuestro&etiqueta=sales'))).toBe('/h/conversations?scope=s%3Ax&etiqueta=press');
     expect(chipHref(ALL, q('etiqueta=press&relacion=talking'))).toBe('/h/conversations');
-  });
-  it('a block of the panel carries the chip', () => {
-    expect(panelHref(SALES, 'turno=nuestro#lista')).toBe('?etiqueta=sales&turno=nuestro#lista');
-    expect(panelHref(ALL, 'turno=nuestro#lista')).toBe('?turno=nuestro#lista');
   });
 });
 

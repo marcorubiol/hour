@@ -329,7 +329,7 @@
       missingText={t('audience.not_found', locale)}
       failedText={t('audience.load_error', locale)}
       onretry={() => void $query.refetch()}
-      back={lensOn('conversations') ? { href: '/h/conversations?view=envios', label: t('audience.back', locale) } : null}
+      back={lensOn('conversations') ? { href: '/h/conversations?view=envios', label: t('envios.back', locale) } : null}
       {locale}
     />
   </section>

@@ -2930,7 +2930,6 @@
   "audience.loading": "Loading…",
   "audience.load_error": "Could not load the audience.",
   "audience.not_found": "This list does not exist or is not yours.",
-  "audience.back": "Back to mailouts",
   "audience.not_saved": "Not saved",
   "audience.saved": "Saved",
   "audience.status_draft": "Draft",
@@ -3132,5 +3131,9 @@
   "thread.group_missing": "This thread is not here, or you do not read it.",
   "thread.mail_placeholder_reply_other": "Replying to {sender}; the email goes to {name}… (Enter makes a new line)",
   "thread.back_list": "Back to the list",
-  "thread.back_home": "Back to Today"
+  "thread.back_home": "Back to Today",
+  "envios.back": "Back to mailouts",
+  "chat.pane_conversation": "Open conversation",
+  "chat.pane_group": "Open gig thread",
+  "chat.this_mailout": "This mailout"
 }

@@ -20,7 +20,6 @@
   import { DASH } from '$lib/glyphs';
   import { t, type Locale } from '$lib/i18n';
   import type { PlannerDoor } from '$lib/desk-bands';
-  import { SALES, chipHref } from '$lib/conversation-tags';
 
   type Door<T> = { value: T | null; errored: boolean };
 
@@ -72,13 +71,14 @@
     {/if}
 
     {#if conversations}
-      <!-- Its figure is Difusión's (bolos en opción, ADR-138 § 3): the door opens
-           that chip, so the door and the lens count the same (ADR-118 § 7).
+      <!-- Its figure is Difusión's season (bolos en opción, ADR-138 § 3): the door
+           opens Envíos, where that season lives since ADR-176, so the door and
+           the lens count the same (ADR-118 § 7).
            The window NAMES the chip (ADR-167 § 2): «0 bolos en opción» beside
            the Board's «1 opción» read as the same count disagreeing, and they
            are two: deals of Difusión in the season here, functions on hold in
            every lane there. -->
-      <a class="door" href={chipHref(SALES, new URLSearchParams())} data-testid="door-conversations">
+      <a class="door" href="/h/conversations?view=envios" data-testid="door-conversations">
         <span class="door__lens">{t('lens.conversations', locale)}<i>{t('conversations.view_sales', locale)} · {seasonLabel}</i></span>
         {#if conversations.errored}
           <span class="door__n stat door__n--na">{DASH}</span><span class="door__txt">{t('desk.door_error', locale)}</span>

@@ -2930,7 +2930,6 @@
   "audience.loading": "Cargando…",
   "audience.load_error": "No se ha podido cargar el público.",
   "audience.not_found": "Esta lista no existe o no es tuya.",
-  "audience.back": "Volver a Envíos",
   "audience.not_saved": "No se ha guardado",
   "audience.saved": "Guardado",
   "audience.status_draft": "Borrador",
@@ -3132,5 +3131,9 @@
   "thread.group_missing": "Este hilo no está, o no lo lees.",
   "thread.mail_placeholder_reply_other": "Respondes a {sender}; el correo va a {name}… (Intro hace salto de línea)",
   "thread.back_list": "Volver a la lista",
-  "thread.back_home": "Volver a Hoy"
+  "thread.back_home": "Volver a Hoy",
+  "envios.back": "Volver a Envíos",
+  "chat.pane_conversation": "Conversación abierta",
+  "chat.pane_group": "Hilo del bolo abierto",
+  "chat.this_mailout": "Este envío"
 }

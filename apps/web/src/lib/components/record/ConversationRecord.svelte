@@ -190,6 +190,8 @@
         view ? markConversationRead(view, id) : view,
       );
       void queryClient.invalidateQueries({ queryKey: ['conversation-feed'] });
+      // The lens's filtered list (te toca, a filter) counts it too: opened beside, it must go off as well (ADR-176).
+      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
     },
   });
 

@@ -2930,7 +2930,6 @@
   "audience.loading": "Carregant…",
   "audience.load_error": "No s'ha pogut carregar el públic.",
   "audience.not_found": "Aquesta llista no existeix o no és teva.",
-  "audience.back": "Tornar a Enviaments",
   "audience.not_saved": "No s'ha desat",
   "audience.saved": "Desat",
   "audience.status_draft": "Esborrany",
@@ -3132,5 +3131,9 @@
   "thread.group_missing": "Aquest fil no hi és, o no el llegeixes.",
   "thread.mail_placeholder_reply_other": "Respons a {sender}; el correu va a {name}… (Intro fa salt de línia)",
   "thread.back_list": "Tornar a la llista",
-  "thread.back_home": "Tornar a Avui"
+  "thread.back_home": "Tornar a Avui",
+  "envios.back": "Tornar a Enviaments",
+  "chat.pane_conversation": "Conversa oberta",
+  "chat.pane_group": "Fil del bolo obert",
+  "chat.this_mailout": "Aquest enviament"
 }

@@ -107,6 +107,18 @@ test.describe('the vistazo (ADR-139 p1)', () => {
     await page.reload();
     await expect(page.getByTestId('conversation-pane').locator('h1')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId('peek')).toHaveCount(0);
+
+    // The keyboard (ADR-176): «Close» empties the pane; Enter on a row opens it
+    // with the focus inside; Esc closes it and gives the focus back to the row.
+    await page.getByTestId('conversation-pane').getByRole('button', { name: 'Close' }).click();
+    await expect(page).not.toHaveURL(/abierta=/);
+    await link.focus();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(/abierta=/);
+    await expect(page.getByTestId('conversation-pane')).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(page).not.toHaveURL(/abierta=/);
+    await expect(link).toBeFocused();
   });
 
   test('Conversations narrower than 75rem: the row opens the conversation page', async ({ page }) => {

@@ -73,24 +73,6 @@ export function chipHref(chip: LensChip, params: URLSearchParams): string {
   return `/h/conversations${qs ? `?${qs}` : ''}`;
 }
 
-/**
- * Un enlace del panel (`turno=nuestro#lista`) con el chip delante, para que
- * el bloque y su filtro cuenten lo mismo (ADR-118 § 7: el dominio es el chip).
- */
-export function panelHref(chip: LensChip, qs: string): string {
-  if (chip === ALL || chip === TEAM) return `?${qs}`;
-  return `?etiqueta=${chip}${qs.startsWith('#') ? '' : '&'}${qs}`;
-}
-
-/** Qué panel lleva cada chip (plan § 3): el de Difusión, el común o el de los hilos. */
-export type PanelKind = 'sales' | 'common' | 'team';
-
-export function panelOf(chip: LensChip): PanelKind {
-  if (chip === SALES) return 'sales';
-  if (chip === TEAM) return 'team';
-  return 'common';
-}
-
 /** El envío en bloque es un añadido de venta (ADR-138 § 7: a prensa, más adelante). */
 export function canBulkSend(chip: LensChip): boolean {
   return chip === SALES;

@@ -23,7 +23,7 @@ export function kindOfType(type: MailoutType): MailoutKind | null {
   return KIND_OF[type];
 }
 
-/** Una página de la vista: veinte, y «Ver más» pide las siguientes. */
+/** Una página de la vista: veinte, y «Ver más» pide las siguientes (`offset`). Nunca más por petición. */
 export const MAILOUT_PAGE = 20;
 
 /** Una fila de Envíos. */

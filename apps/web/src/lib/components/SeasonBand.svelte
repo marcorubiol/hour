@@ -40,10 +40,10 @@
     return p.toString();
   }
 
-  // The key of Difusión's panel: one cache for both.
+  // The key of the lens's figures under the Difusión tag: one cache for both.
   const query = createQuery(
     toStore(() => ({
-      queryKey: ['conversation-overview', filters.projectIds, filters.workspaceIds, filters.lineIds, SALES, 'sales'] as const,
+      queryKey: ['conversation-overview', filters.projectIds, filters.workspaceIds, filters.lineIds, SALES] as const,
       enabled: filters.enabled,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         fetchJSON<OverviewResponse>(`/api/conversations/overview?${params(filters)}`, signal),

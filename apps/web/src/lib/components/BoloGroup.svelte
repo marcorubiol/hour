@@ -79,7 +79,8 @@
       : '',
   );
   let title = $derived([place, name].filter(Boolean).join(' · '));
-  let boardHref = $derived(first?.slug ? `/h/${workspaceSlug}/performance/${first.slug}#board` : null);
+  // The function's own space (the API reads it), not the one in the address.
+  let boardHref = $derived(first?.slug ? `/h/${board?.workspace_slug ?? workspaceSlug}/performance/${first.slug}#board` : null);
   /** Sin la barra de lentes en el móvil, siempre hay vuelta: la lista, el tablón o Hoy. */
   let back = $derived(
     lensOn('conversations')
@@ -93,7 +94,11 @@
   markReadWhenSeen({
     target: () => footEl,
     threads: () => (thread ? [thread] : []),
-    onmarked: refresh,
+    // Read here, its row in the list of chats goes off too (opened beside, ADR-176).
+    onmarked: () => {
+      refresh();
+      void queryClient.invalidateQueries({ queryKey: ['conversation-feed'] });
+    },
   });
 
   // Al abrir, como un chat: al final.

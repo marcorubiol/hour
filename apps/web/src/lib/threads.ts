@@ -80,6 +80,8 @@ export interface BoloBoard {
 export interface BoardView extends BoloBoard {
   /** El que mira (sus mensajes se editan y no cuentan como nuevos). */
   me: string;
+  /** El espacio de la función, leído de ella (no de la URL): el de sus enlaces. */
+  workspace_slug: string | null;
   messages: ThreadMessage[];
   /** user_id → nombre, de los autores que el que mira puede ver. */
   authors: Record<string, string>;

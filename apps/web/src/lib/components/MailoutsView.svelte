@@ -8,7 +8,7 @@
    * un envío se leen en Conversaciones (`?envio=`), no aquí: un envío no es
    * un chat.
    */
-  import { createQuery } from '@tanstack/svelte-query';
+  import { createInfiniteQuery, createQuery } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON } from '$lib/api';
   import { t, type Locale } from '$lib/i18n';
@@ -62,28 +62,36 @@
     online,
   }: Props = $props();
 
-  // «Ver más» grows the page; the key carries it, the previous page stays on screen meanwhile.
-  let limit = $state(MAILOUT_PAGE);
-  $effect(() => {
-    void type;
-    limit = MAILOUT_PAGE;
-  });
+  // Who carries an audience but reads no conversation sees the invitations
+  // alone (ADR-173 § 3): they came with the lists before ADR-176.
+  let shownType = $derived<MailoutType>(canRead ? type : 'invitaciones');
 
-  const query = createQuery(
+  // «Ver más» asks for the next page of 20 (`offset`): each request has a
+  // fixed number of reads (Workers Free), and the pages already read stay.
+  const query = createInfiniteQuery(
     toStore(() => ({
-      queryKey: ['mailout-list', filters.projectIds, filters.workspaceIds, type, limit] as const,
-      enabled: filters.enabled && canRead,
+      queryKey: ['mailout-list', filters.projectIds, filters.workspaceIds, scopeWorkspaceIds, shownType] as const,
+      enabled: filters.enabled && (canRead || canAudience),
       retry: retryLoad,
-      queryFn: ({ signal }: { signal: AbortSignal }) => {
-        const p = new URLSearchParams({ list: '1', tipo: type, limit: String(limit) });
+      initialPageParam: 0,
+      getNextPageParam: (last: MailoutListResponse, all: MailoutListResponse[]) => {
+        const read = all.reduce((n, p) => n + p.items.length, 0);
+        return read < last.total && last.items.length === MAILOUT_PAGE ? read : undefined;
+      },
+      queryFn: ({ signal, pageParam }: { signal: AbortSignal; pageParam: number }) => {
+        const p = new URLSearchParams({ list: '1', tipo: shownType, offset: String(pageParam) });
         if (filters.projectIds.length > 0) p.set('project_ids', filters.projectIds.join(','));
         if (filters.workspaceIds.length > 0) p.set('workspace_ids', filters.workspaceIds.join(','));
+        if (scopeWorkspaceIds.length > 0) p.set('audience_workspace_ids', scopeWorkspaceIds.join(','));
         return fetchJSON<MailoutListResponse>(`/api/mailout?${p}`, signal);
       },
-      placeholderData: (prev: MailoutListResponse | undefined) => prev,
     })),
   );
-  let data = $derived($query.data ?? null);
+  let data = $derived(
+    $query.data
+      ? { items: $query.data.pages.flatMap((p) => p.items), total: $query.data.pages[0]?.total ?? 0 }
+      : null,
+  );
 
   // The list names of the invitations: the same read as the panel beside it.
   const audienceQuery = createQuery(toStore(() => audienceListQueryOptions(scopeWorkspaceIds)));
@@ -116,15 +124,17 @@
     <SeasonBand {filters} {locale} allHref={conversationsHref('etiqueta=sales&temporada=actual')} {onrelation} {online} />
   {/if}
 
-  <div class="envios__body" class:envios__body--solo={!canAudience || !canRead}>
-    {#if canRead}
+  <div class="envios__body" class:envios__body--solo={!canAudience}>
+    {#if canRead || canAudience}
       <section class="envios__main" aria-labelledby="envios-list" data-testid="mailout-list">
         <h2 class="visually-hidden" id="envios-list">{t('envios.list_title', locale)}</h2>
-        <nav class="envios__types" aria-label={t('envios.type_label', locale)}>
-          {#each MAILOUT_TYPES as k (k)}
-            <a class="envios__type" href={typeHref(k)} aria-current={type === k ? 'page' : undefined} data-type={k}>{t(TYPE_WORD[k], locale)}</a>
-          {/each}
-        </nav>
+        {#if canRead}
+          <nav class="envios__types" aria-label={t('envios.type_label', locale)}>
+            {#each MAILOUT_TYPES as k (k)}
+              <a class="envios__type" href={typeHref(k)} aria-current={type === k ? 'page' : undefined} data-type={k}>{t(TYPE_WORD[k], locale)}</a>
+            {/each}
+          </nav>
+        {/if}
 
         {#if $query.isPending}
           <EmptyLine text={t('envios.loading', locale)} busy />
@@ -134,7 +144,7 @@
             <Button size="xs" variant="secondary" onclick={() => void $query.refetch()}>{t('ui.retry', locale)}</Button>
           </p>
         {:else if data && data.items.length === 0}
-          <EmptyLine text={t(type === 'todos' ? 'envios.empty' : 'envios.empty_type', locale)} />
+          <EmptyLine text={t(shownType === 'todos' ? 'envios.empty' : 'envios.empty_type', locale)} />
         {:else if data}
           <ul class="envios__rows">
             {#each data.items as m (m.id)}
@@ -145,8 +155,9 @@
                 <span class="mrow__who">{who(m)}</span>
                 <span class="mrow__state">
                   <span>{t(`mailout.s_${m.status}`, locale)}</span>
-                  {#if f && f.replies > 0}
-                    <a href={conversationsHref(`etiqueta=sales&envio=${m.id}&r=respuestas`)}
+                  {#if f && f.replies > 0 && canRead}
+                    <!-- Who replied, in Conversaciones: a mailout is of Difusión; an invitation's professionals, of any tag. -->
+                    <a href={conversationsHref(`${m.kind === 'outreach' ? 'etiqueta=sales&' : ''}envio=${m.id}&r=respuestas`)}
                       >{t(f.replies === 1 ? 'envios.replies_one' : 'envios.replies', locale, { n: f.replies })}</a
                     >
                   {/if}
@@ -161,9 +172,9 @@
               </li>
             {/each}
           </ul>
-          {#if data.items.length < data.total}
+          {#if $query.hasNextPage}
             <div class="envios__more">
-              <Button size="s" variant="secondary" loading={$query.isFetching} onclick={() => (limit += MAILOUT_PAGE)}
+              <Button size="s" variant="secondary" loading={$query.isFetchingNextPage} onclick={() => void $query.fetchNextPage()}
                 >{t('envios.more', locale, { n: data.total - data.items.length })}</Button
               >
             </div>

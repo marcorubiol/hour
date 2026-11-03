@@ -2930,7 +2930,6 @@
   "audience.loading": "Chargement…",
   "audience.load_error": "Impossible de charger le public.",
   "audience.not_found": "Cette liste n'existe pas ou n'est pas la vôtre.",
-  "audience.back": "Retour aux envois",
   "audience.not_saved": "Non enregistré",
   "audience.saved": "Enregistré",
   "audience.status_draft": "Brouillon",
@@ -3132,5 +3131,9 @@
   "thread.group_missing": "Ce fil n’existe pas, ou tu ne le lis pas.",
   "thread.mail_placeholder_reply_other": "Tu réponds à {sender} ; le mail va à {name}… (Entrée va à la ligne)",
   "thread.back_list": "Retour à la liste",
-  "thread.back_home": "Retour à Aujourd’hui"
+  "thread.back_home": "Retour à Aujourd’hui",
+  "envios.back": "Retour aux envois",
+  "chat.pane_conversation": "Conversation ouverte",
+  "chat.pane_group": "Fil de la date ouvert",
+  "chat.this_mailout": "Cet envoi"
 }

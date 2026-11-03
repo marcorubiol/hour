@@ -11,7 +11,7 @@ import { extractAccessToken } from '$lib/auth';
 import { pgGet, pgPostRpc } from '$lib/supabase';
 import { parseIds, setScope } from '$lib/server/conversation-overview';
 import { loadMailoutRows } from '$lib/server/mailout-list';
-import { MAILOUT_PAGE, kindOfType, parseMailoutType } from '$lib/mailout-list';
+import { kindOfType, parseMailoutType } from '$lib/mailout-list';
 import { pgErrorResponse } from '$lib/server/errors';
 import { jsonNoStore } from '$lib/server/http';
 import { MAILOUT_PG_CODES, readBody } from '$lib/server/mailout/route';
@@ -64,8 +64,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * cuyos destinatarios son todos privadas ajenas no sale.
  *
  * Con `list=1` (la vista Envíos, ADR-176): los dos tipos, borradores
- * incluidos, `tipo=todos|difusion|invitaciones` y `limit` (de 20 en 20),
- * con destinatarios y cifras → { items, total } (`MailoutListResponse`).
+ * incluidos, `tipo=todos|difusion|invitaciones`, `offset` (páginas de 20) y
+ * `audience_workspace_ids` (las invitaciones de esos espacios aunque el
+ * alcance sea un proyecto), con destinatarios y cifras → { items, total }.
  */
 export const GET: RequestHandler = async ({ request, url, platform, locals }) => {
   if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
@@ -78,13 +79,17 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       .map((x) => x.trim())
       .filter((x) => UUID.test(x));
   if (url.searchParams.get('list') === '1') {
-    const limit = Math.min(Math.max(Number(url.searchParams.get('limit')) || MAILOUT_PAGE, 1), 200);
+    const offset = Math.min(Math.max(Math.trunc(Number(url.searchParams.get('offset')) || 0), 0), 10_000);
     try {
       const body = await loadMailoutRows(
         env,
         jwt,
         { projectIds: parseIds(url.searchParams.get('project_ids')), workspaceIds: parseIds(url.searchParams.get('workspace_ids')) },
-        { kind: kindOfType(parseMailoutType(url.searchParams.get('tipo'))), limit },
+        {
+          kind: kindOfType(parseMailoutType(url.searchParams.get('tipo'))),
+          offset,
+          audienceWorkspaceIds: parseIds(url.searchParams.get('audience_workspace_ids')),
+        },
       );
       return jsonNoStore(body);
     } catch (err) {
