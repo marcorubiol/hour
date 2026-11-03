@@ -332,8 +332,9 @@
       resize: vertical;
     }
     /* Ocho hilos son ocho compositores: en reposo, solo la caja. La función y
-       el botón salen al escribir (foco dentro o texto a medias). */
-    .thread__compose:not(:focus-within, .thread__compose--filled) .thread__compose-row {
+       el botón salen al escribir (foco dentro o texto a medias). El grupo es un
+       solo compositor: su botón se ve siempre. */
+    .thread--board .thread__compose:not(:focus-within, .thread__compose--filled) .thread__compose-row {
       display: none;
     }
     .thread__compose-row {
