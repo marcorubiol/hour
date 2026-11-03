@@ -67,6 +67,8 @@
     heading?: 'name' | 'eyebrow';
     /** `board`: un hilo entre los del tablón; `group`: el hilo solo, como un grupo. */
     look?: 'board' | 'group';
+    /** En un grupo, la sala que no lo lee (ADR-177 § 6); null, «la sala». */
+    venue?: string | null;
     locale: Locale;
     onchange: () => void;
   }
@@ -86,6 +88,7 @@
     list = true,
     heading = 'name',
     look = 'board',
+    venue = null,
     locale,
     onchange,
   }: Props = $props();
@@ -181,16 +184,19 @@
       {@render unread()}
     </header>
   {/if}
-  <!-- La línea de audiencia no se pliega nunca (ADR-083, enmienda §6). -->
-  <p class="thread__audience" title={audienceNames || undefined}>
-    {#if audience}
-      {audienceLine(audience, locale)}
-    {:else if $audienceQuery.isError}
-      {t('threads.audience_unknown', locale)}
-    {:else}
-      &nbsp;
-    {/if}
-  </p>
+  <!-- La línea de audiencia no se pliega nunca (ADR-083, enmienda §6). En un
+       grupo la dice su cabecera, con los nombres (ADR-177 § 6). -->
+  {#if look !== 'group'}
+    <p class="thread__audience" title={audienceNames || undefined}>
+      {#if audience}
+        {audienceLine(audience, locale)}
+      {:else if $audienceQuery.isError}
+        {t('threads.audience_unknown', locale)}
+      {:else}
+        &nbsp;
+      {/if}
+    </p>
+  {/if}
 
   {#if !list}
     <!-- Los mensajes van mezclados con el registro, fuera de este bloque. -->
@@ -215,11 +221,22 @@
   {/if}
 
   <form class="thread__compose" class:thread__compose--filled={body.trim() !== ''} onsubmit={send}>
+    {#if look === 'group'}
+      <!-- Quién lo lee, antes de escribir (ADR-177 § 6). -->
+      <p class="thread__reads" id={`${headingId}-reads`} data-testid="group-reads">
+        {#if audience}{audience.count === 1
+            ? t('thread.group_reads_one', locale)
+            : t('thread.group_reads', locale, { n: audience.count })}{' '}{/if}<strong
+          >{venue ? t('thread.group_venue_off', locale, { venue }) : t('thread.group_venue_off_none', locale)}</strong
+        >
+      </p>
+    {/if}
     <textarea
       rows="1"
       maxlength={MESSAGE_MAX}
-      placeholder={t('threads.write_in', locale, { name })}
-      aria-label={t('threads.write_in', locale, { name })}
+      placeholder={look === 'group' ? t('thread.team_placeholder', locale) : t('threads.write_in', locale, { name })}
+      aria-label={look === 'group' ? t('thread.team_placeholder', locale) : t('threads.write_in', locale, { name })}
+      aria-describedby={look === 'group' ? `${headingId}-reads` : undefined}
       bind:value={body}
       bind:this={composer}
       onkeydown={onKey}
@@ -233,7 +250,7 @@
         </select>
       {/if}
       <Button type="submit" size="xs" loading={$postMutation.isPending} disabled={!body.trim()}>
-        {t('threads.send', locale)}
+        {look === 'group' ? t('thread.group_send', locale) : t('threads.send', locale)}
       </Button>
     </div>
   </form>
@@ -286,10 +303,14 @@
       padding-block-start: 0;
       border-block-start: 0;
     }
-    .thread--group .thread__audience {
+    .thread__reads {
       margin: 0;
-      color: var(--text-faint);
-      font-size: var(--text-xs);
+      color: var(--text-muted);
+      font-size: var(--text-s);
+    }
+    .thread__reads strong {
+      color: var(--heading-color);
+      font-weight: 500;
     }
     .thread--group .thread__compose {
       margin-block-start: auto;
