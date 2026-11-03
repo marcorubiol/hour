@@ -39,6 +39,7 @@ const CONV = `E2E Feed Sala ${RUN}`;
 const NEW_BODY = `E2E feed ${RUN}: el rider ya está`;
 const TEAM_BODY = `E2E feed ${RUN}: les llamo el jueves`;
 const DINERS_BODY = `E2E feed ${RUN}: el caché, aparte`;
+const THEIR_BODY = `E2E feed ${RUN}: la sala confirma la hora`;
 
 type Helpers = typeof import('./rls/_helpers');
 const one = <T>(d: T | T[] | null): T => (Array.isArray(d) ? d[0] : d)!;
@@ -219,17 +220,35 @@ test.describe('Conversaciones › Equipo: los hilos del equipo (ADR-116, ADR-134
   test('la fila de la conversación abre la conversación, con su hilo del equipo dentro', async ({ page }) => {
     test.setTimeout(60_000);
     // Más estrecho que 75rem la fila abre la página de la conversación (a lo ancho, el panel de al lado, ADR-176).
-    await page.setViewportSize({ width: 1024, height: 800 });
-    await page.goto(`/h/conversations?scope=s:playwright&q=${encodeURIComponent(RUN)}`);
-    const row = page.getByTestId('feed-row').filter({ hasText: CONV });
-    await expect(row).toBeVisible({ timeout: 30_000 });
-    await row.locator('a.chat__title').click();
-    await page.waitForURL(new RegExp(`/h/playwright/conversation/${conversationId}#team$`));
-    // The thread opens with «Nota del equipo» in the field (punto 110), the note in the thread.
-    await expect(page.getByTestId('conversation-thread').locator('.msg--note', { hasText: TEAM_BODY })).toBeVisible({
-      timeout: 30_000,
+    // The row opens on #team only when what is new is only the team's (ConversationFeed): the admin's
+    // own note is never news to him, so the limited fixture writes one he has not read. Coordinació lets
+    // her see the conversation; Mínim comes back at the end for the next test.
+    await h.grantPreset(adminJwt, 'project', projectId, limitedId, 'coordinacio');
+    const res = await h.pgRpc<{ id: string }>('post_message', limitedJwt, {
+      p_anchor_kind: 'conversation',
+      p_anchor_id: conversationId,
+      p_body: THEIR_BODY,
+      p_facet_id: null,
     });
-    await expect(page.getByTestId('composer-to-team')).toHaveAttribute('aria-pressed', 'true');
+    expect(res.status, res.error).toBe(200);
+    const theirs = one(res.data).id;
+    try {
+      await page.setViewportSize({ width: 1024, height: 800 });
+      await page.goto(`/h/conversations?scope=s:playwright&q=${encodeURIComponent(RUN)}`);
+      const row = page.getByTestId('feed-row').filter({ hasText: CONV });
+      await expect(row).toBeVisible({ timeout: 30_000 });
+      await expect(row.locator('.chat__unread')).toBeVisible();
+      await row.locator('a.chat__title').click();
+      await page.waitForURL(new RegExp(`/h/playwright/conversation/${conversationId}#team$`));
+      // The thread opens with «Nota del equipo» in the field (punto 110), the notes in the thread.
+      const thread = page.getByTestId('conversation-thread');
+      await expect(thread.locator('.msg--note', { hasText: THEIR_BODY })).toBeVisible({ timeout: 30_000 });
+      await expect(thread.locator('.msg--note', { hasText: TEAM_BODY })).toBeVisible();
+      await expect(page.getByTestId('composer-to-team')).toHaveAttribute('aria-pressed', 'true');
+    } finally {
+      await h.pgRpc('delete_message', limitedJwt, { p_message_id: theirs });
+      await h.grantPreset(adminJwt, 'project', projectId, limitedId, 'minim');
+    }
   });
 
   test('con Mínim: el General del bolo, ni Diners ni la conversación', async ({ browser }) => {

@@ -132,7 +132,10 @@ test.describe('conversation tags', () => {
       await expect(page).toHaveURL(/abierta=playwright%2F|abierta=playwright\//);
       // The peek's dialog is always in the page (PeekHost): closed, not absent.
       await expect(page.getByTestId('peek')).toBeHidden();
-      const tags = page.getByTestId('conversation-pane').getByTestId('conversation-tags');
+      // Since 110 the tags live in the record's details (ConversationRecord): «·details ›» opens them.
+      const pane = page.getByTestId('conversation-pane');
+      await pane.getByTestId('conversation-who').click();
+      const tags = page.getByTestId('record-details').getByTestId('conversation-tags');
       await expect(tags.locator('.tag-chip')).toHaveText(['Press'], { timeout: 15_000 });
       await tags.getByRole('button', { name: 'Change' }).click();
       await tags.getByLabel('Venues').check({ force: true });
