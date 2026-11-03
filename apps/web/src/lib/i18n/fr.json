@@ -3011,6 +3011,7 @@
   "audience.basis_relationship": "ancien client",
   "audience.person_invitations": "Invitations reçues",
   "audience.person_no_invitations": "Aucune pour l'instant.",
+  "audience.person_invitations_error": "Impossible de lire ses invitations.",
   "audience.unsubscribe_person": "Désinscrire",
   "audience.erase_person": "Effacer ses données",
   "audience.consent_proof": "Preuve du consentement",

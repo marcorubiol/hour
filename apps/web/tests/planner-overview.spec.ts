@@ -69,25 +69,35 @@ test.describe('the season (ADR-117)', () => {
     expect(await meta.innerText()).not.toMatch(/–/);
   });
 
-  test('THE WINDOW LINE IS IN THE SAME PLACE IN THE FOUR VIEWS', async ({ page }) => {
-    // Marco, 2026-11-02: «al cambiar de vista todo salta». The line is drawn
-    // in Season, Agenda, Month and Board, one line high, saying what each
-    // window is; the Agenda names its horizon and counts nothing (ADR-095).
-    const heights: number[] = [];
-    for (const v of ['', '&view=agenda', '&view=month', '&view=board']) {
-      await open(page, v);
-      const meta = page.locator('.cal__meta--window');
-      await expect(meta, `window line in ${v || 'season'}`).toBeVisible();
-      expect((await meta.innerText()).trim(), `window line in ${v || 'season'}`).not.toBe('');
-      if (v === '&view=agenda') {
-        await expect(meta).toContainText(/from today|open at/i);
-        await expect(meta).not.toContainText(/confirmed|nights? free/i);
+  for (const width of [1440, 390]) {
+    test(`THE WINDOW LINE AND THE VIEW BAR STAY PUT IN THE FOUR VIEWS (${width} px)`, async ({ page }) => {
+      // Marco, 2026-11-02: «al cambiar de vista todo salta». The line is drawn
+      // in Season, Agenda, Month and Board, one line high, saying what each
+      // window is; the Agenda names its horizon and counts nothing (ADR-095).
+      // At 390 the arrows drop to a line of their own under the title, and the
+      // Season keeps that room without them (§ 109): the view bar must not move.
+      await page.setViewportSize({ width, height: 900 });
+      const heights: number[] = [];
+      const bars: number[] = [];
+      for (const v of ['', '&view=agenda', '&view=month', '&view=board']) {
+        const where = `${v || 'season'} at ${width}`;
+        await open(page, v);
+        const meta = page.locator('.cal__meta--window');
+        await expect(meta, `window line in ${where}`).toBeVisible();
+        expect((await meta.innerText()).trim(), `window line in ${where}`).not.toBe('');
+        if (v === '&view=agenda') {
+          await expect(meta).toContainText(/from today|open at/i);
+          await expect(meta).not.toContainText(/confirmed|nights? free/i);
+        }
+        heights.push(Math.round((await meta.boundingBox())?.height ?? -1));
+        bars.push(Math.round((await page.locator('.cal__views').boundingBox())?.y ?? -1));
       }
-      heights.push(Math.round((await meta.boundingBox())?.height ?? -1));
-    }
-    // One line each at 1440: no view wraps or drops it.
-    expect(new Set(heights).size, `heights ${heights.join(', ')}`).toBe(1);
-  });
+      // One line each: no view wraps or drops it…
+      expect(new Set(heights).size, `heights ${heights.join(', ')}`).toBe(1);
+      // …and the view bar is at the same height in all four.
+      expect(new Set(bars).size, `view bar y ${bars.join(', ')}`).toBe(1);
+    });
+  }
 
   test('A DAY OF THE STRIP OPENS THAT DAY', async ({ page }) => {
     await open(page);
@@ -99,9 +109,11 @@ test.describe('the season (ADR-117)', () => {
 
   test('THE SEASON HAS NO WINDOW TO STEP — no arrows, no «now»', async ({ page }) => {
     await open(page);
-    // And nothing is kept for them (ADR-136): they are simply not there.
-    await expect(page.locator('.cal__arw')).toHaveCount(0);
-    await expect(page.locator('.cal__now')).toHaveCount(0);
+    // Only their room is kept (§ 109): nothing to see, nothing to reach.
+    await expect(page.locator('.cal__arw:visible')).toHaveCount(0);
+    await expect(page.locator('.cal__now:visible')).toHaveCount(0);
+    await expect(page.locator('.cal__navkeep')).toHaveAttribute('inert', '');
+    await expect(page.locator('.cal__navkeep')).toHaveAttribute('aria-hidden', 'true');
   });
 
   test('ON A PHONE, WHAT TO DECIDE COMES BEFORE THE STRIP', async ({ page }) => {

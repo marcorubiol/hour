@@ -3176,11 +3176,18 @@
     {/snippet}
     <!-- THE ARROWS GO WITH THE TITLE THEY MOVE (ADR-136): in Day, Agenda,
          Month and Board the title IS the window. The Season's title is its
-         horizon from today, which does not step, so it has none and nothing
-         is kept for them. -->
+         horizon from today, which does not step, so it has none to offer;
+         but their PLACE is kept, invisible and inert (§ 109, nota a ADR-167
+         § 2): on a phone the arrows take a line of their own under the
+         title, and without it the view bar rose 30 px on the way to the
+         Season. Nothing to see, nothing to reach; only the room. -->
     {#snippet titleAside()}
       {#if view !== 'overview'}
         <CalNav {view} {locale} onStepBack={stepBack} onStepNext={stepNext} onNow={goToday} />
+      {:else}
+        <span class="cal__navkeep" aria-hidden="true" inert>
+          <CalNav {view} {locale} onStepBack={stepBack} onStepNext={stepNext} onNow={goToday} />
+        </span>
       {/if}
     {/snippet}
   </LensHeader>
@@ -3985,6 +3992,12 @@
     }
     .cal__fail {
       padding-block: var(--space-l);
+    }
+    /* The Season keeps the arrows' room (§ 109): laid out as the real ones,
+       never seen. */
+    .cal__navkeep {
+      display: contents;
+      visibility: hidden;
     }
   }
 </style>

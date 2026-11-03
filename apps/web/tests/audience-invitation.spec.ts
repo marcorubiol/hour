@@ -231,7 +231,10 @@ test.describe('audience invitation (simulated)', () => {
             if (mailoutId) await serviceDelete(`mailout?id=eq.${mailoutId}`);
             await serviceDelete(`audience?id=eq.${audienceId}`);
           }
-          const addr = encodeURIComponent(`"${PRO}"`);
+          // Sin comillas: en un `eq.` de primer nivel PostgREST no las quita
+          // (solo en `in.(…)` y en `or=(…)`), así que comparaba con `"…"` y el
+          // DELETE borraba 0 filas sin error. Codificado, el `+` no es un espacio.
+          const addr = encodeURIComponent(PRO);
           await serviceDelete(`mail_basis?workspace_id=eq.${workspaceId}&address=eq.${addr}`);
         }
       }

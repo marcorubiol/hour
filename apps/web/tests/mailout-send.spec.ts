@@ -185,7 +185,9 @@ test.describe('mailout (simulated)', () => {
       await forgetConversations(page, [conversationId]);
       if (ownDomain && domainId) await api(page, 'DELETE', `/api/mailout/domains/${domainId}`);
       if (SB_URL && SERVICE_KEY) {
-        const addr = encodeURIComponent(`"${ADDRESS}"`);
+        // Sin comillas: en un `eq.` de primer nivel PostgREST no las quita
+        // (solo en `in.(…)` y en `or=(…)`) y el DELETE borraba 0 filas sin error.
+        const addr = encodeURIComponent(ADDRESS);
         await service(`mail_suppression?workspace_id=eq.${workspaceId}&address=eq.${addr}`, { method: 'DELETE' });
         await service(`mail_basis?workspace_id=eq.${workspaceId}&address=eq.${addr}`, { method: 'DELETE' });
       }
