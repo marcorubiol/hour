@@ -118,14 +118,6 @@
   );
 
   let feed = $derived($feedQuery.data ?? null);
-  // «Ya está» in progress: the row keeps it while it can be undone, even after a reload.
-  let holding = $state(new Set<string>());
-  function hold(id: string, on: boolean) {
-    const next = new Set(holding);
-    if (on) next.add(id);
-    else next.delete(id);
-    holding = next;
-  }
   // A conversation's own team thread lives inside it: never a row of its own.
   let rows = $derived((feed?.items ?? []).filter((r) => r.kind === 'conversation' || r.anchor_kind !== 'conversation'));
 
@@ -215,10 +207,10 @@
               context={contextOf(row)}
               active={activeId === row.id}
               onopen={onopen ? (e) => onopen(row, e) : undefined}
-              act={editable && (row.due === 'reply' || holding.has(row.id)) ? done : undefined}
+              act={editable && onchange && row.due === 'reply' ? done : undefined}
             />
             {#snippet done()}
-              <ChatDone conversationId={row.id} name={row.title ?? ''} {locale} {onchange} onhold={(on) => hold(row.id, on)} />
+              <ChatDone conversationId={row.id} name={row.title ?? ''} {locale} refresh={onchange!} />
             {/snippet}
           {:else}
             <ChatRow

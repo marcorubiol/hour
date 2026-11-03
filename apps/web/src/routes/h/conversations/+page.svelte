@@ -52,7 +52,7 @@
   import Dialog from '$lib/components/Dialog.svelte';
   import { tick, untrack } from 'svelte';
   import { toStore } from 'svelte/store';
-  import { MAILOUT_PICKS, NO_LINE, ORG_CLASSES, hasListFilter, parseListFilter, type MailoutPick, type OverviewResponse } from '$lib/conversation-overview';
+  import { MAILOUT_PICKS, NO_LINE, ORG_CLASSES, ZONA_MAX, hasListFilter, parseListFilter, type MailoutPick, type OverviewResponse } from '$lib/conversation-overview';
   import type { ConversationFeedView, FeedConversationView, FeedThreadRow } from '$lib/conversation-feed';
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { lazy } from '$lib/lazy.svelte';
@@ -60,6 +60,7 @@
   import { dayMonth } from '$lib/datetime';
   import ConversationFeed from '$lib/components/ConversationFeed.svelte';
   import { accentVarFor } from '$lib/utils/accent';
+  import ChatDoneLine from '$lib/components/ChatDoneLine.svelte';
   import FirstVisitCard from '$lib/components/FirstVisitCard.svelte';
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
@@ -438,10 +439,14 @@
     for (const k of ['turno', 'temp', 'view', 'tipo']) params.delete(k);
     if (listChip === 'nunca') params.delete('relacion');
     if (c === 'equipo') {
-      for (const k of ['relacion', 'linea', 'envio', 'r', 'temporada', 'orden']) params.delete(k);
+      for (const k of ['relacion', 'linea', 'envio', 'r', 'temporada', 'orden', 'zona', 'clase']) params.delete(k);
       params.set('etiqueta', TEAM);
     } else if (params.get('etiqueta') === TEAM) params.delete('etiqueta');
-    if (c === 'nunca') params.set('relacion', 'never');
+    if (c === 'nunca') {
+      // A season segment is relation + season: Sin contactar replaces it whole, so the chip on is this one.
+      if (params.has('temporada')) for (const k of ['temporada', 'linea']) params.delete(k);
+      params.set('relacion', 'never');
+    }
     if (c === 'tetoca') params.set('turno', 'nuestro');
     if (c === 'enfria') params.set('temp', 'fria');
     const qs = params.toString();
@@ -479,11 +484,15 @@
       },
     })),
   );
+  // The panel's read knows no area or type (ADR-177): with either on, its
+  // figures would not be the list's, so the chips go without a figure.
+  let placed = $derived(Boolean(listFilter.zona || listFilter.clase));
+  let counts = $derived(placed ? null : ($countsQuery.data ?? null));
   let chipCount = $derived<Record<ListChip, number | null>>({
-    todo: $countsQuery.data?.total ?? null,
-    nunca: $countsQuery.data?.never ?? null,
-    tetoca: $countsQuery.data?.due.count ?? null,
-    enfria: $countsQuery.data?.cold.count ?? null,
+    todo: counts?.total ?? null,
+    nunca: counts?.never ?? null,
+    tetoca: counts?.due.count ?? null,
+    enfria: counts?.cold.count ?? null,
     equipo: $teamQuery.data
       ? $teamQuery.data.items.filter((r) => r.kind === 'thread' && r.anchor_kind !== 'conversation' && r.unread_count > 0).length
       : null,
@@ -492,7 +501,9 @@
   function chipShown(c: ListChip): boolean {
     if (c === listChip || c === 'todo') return true;
     const n = chipCount[c];
-    if (c === 'nunca') return n !== null && chipCount.todo !== null && n * 2 > chipCount.todo;
+    // Whether it dominates is a fact of the scope, not of the area or type picked.
+    const all = $countsQuery.data;
+    if (c === 'nunca') return all?.never !== undefined && all.never * 2 > all.total;
     // Equipo's figure is what is new; the chip goes only when there is no bolo thread at all.
     if (c === 'equipo') return !$teamQuery.data || $teamQuery.data.items.some((r) => r.kind === 'thread' && r.anchor_kind !== 'conversation');
     return n !== 0;
@@ -1074,6 +1085,7 @@
           </div>
         {/if}
 
+        {#if canEdit}<ChatDoneLine {locale} onclose={() => listHeading?.focus({ preventScroll: true })} />{/if}
         {#if mixed}
           <ConversationFeed
             filters={{ projectIds: filterIds.projectIds, workspaceIds: filterIds.workspaceIds, enabled: !scopeUnresolved }}
@@ -1166,6 +1178,7 @@
       <Select label={t('chat.temp', locale)} options={tempOptions} bind:value={() => tempFilter, setTemp} />
       <Input
         label={t('chat.zone', locale)}
+        maxlength={ZONA_MAX}
         bind:value={zonaDraft}
         onchange={() => setZona(zonaDraft)}
       />

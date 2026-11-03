@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chatWhen, chatWho, soloOf } from './chat-row';
+import { chatWhen, chatWho } from './chat-row';
 
 describe('la fila de chat (ADR-176)', () => {
   it('cuándo: la hora hoy, ayer, el día de la semana, después la fecha', () => {
@@ -23,11 +23,5 @@ describe('con quién es la fila (ADR-177 § 2 y § 3)', () => {
   it('una organización que es una sola persona: redonda y «por libre»', () => {
     expect(chatWho({ kind: 'presenter', solo: true, city: 'Lleida' }, 'es')).toEqual({ shape: 'person', words: ['por libre', 'Lleida'] });
     expect(chatWho({ solo: true }, 'ca').words).toEqual(['per lliure']);
-  });
-  it('sola: su único contacto se llama como ella', () => {
-    expect(soloOf('Marta Vidal', ['marta  vidal'])).toBe(true);
-    expect(soloOf('Marta Vidal', ['Marta Vidal', 'Jordi Sastre'])).toBe(false);
-    expect(soloOf('Teatre de la Llum', ['Laia Puig'])).toBe(false);
-    expect(soloOf('Teatre de la Llum', [])).toBe(false);
   });
 });

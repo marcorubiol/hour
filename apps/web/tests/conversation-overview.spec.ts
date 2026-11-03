@@ -160,19 +160,25 @@ test.describe('Te toca y Se enfría en Conversaciones (ADR-117, ADR-176)', () =>
     const row = page.locator('[data-testid="conversation-row"]', { hasText: WARM });
     await expect(row).toHaveCount(1, { timeout: 30_000 });
 
-    // Un toque, y deshacer: sigue pidiendo respuesta.
+    // Un toque: la fila se va; encima de la lista, el cómo y deshacer. Deshacer la devuelve.
+    const line = page.locator('.doneline');
     await row.getByRole('button', { name: `${WARM}: done` }).click();
-    const how = row.getByRole('textbox', { name: 'How? (optional)' });
-    await expect(how).toBeVisible({ timeout: 15_000 });
-    await row.getByRole('button', { name: 'Undo' }).click();
+    await expect(line).toContainText(`${WARM}: done · today`, { timeout: 15_000 });
+    await expect(row).toHaveCount(0, { timeout: 30_000 });
+    await line.getByRole('button', { name: 'Undo' }).click();
     await expect(page.getByText('Undone.')).toBeVisible({ timeout: 15_000 });
     await expect(row.getByRole('button', { name: `${WARM}: done` })).toBeVisible({ timeout: 30_000 });
 
-    // Otra vez, con el cómo: sale de Nos toca y la nota queda en su historia.
+    // Otra vez, con el cómo: Escape lo borra sin guardar; Intro guarda, y la nota queda en su historia.
     await row.getByRole('button', { name: `${WARM}: done` }).click();
-    await expect(how).toBeVisible({ timeout: 15_000 });
+    const how = line.getByRole('textbox', { name: 'How? (optional)' });
+    await expect(how).toBeFocused({ timeout: 15_000 });
+    await how.fill('by fax');
+    await how.press('Escape');
+    await expect(how).toHaveValue('');
     await how.fill('by phone');
     await how.press('Enter');
+    await expect(line).not.toContainText(WARM, { timeout: 15_000 });
     await expect(row).toHaveCount(0, { timeout: 30_000 });
     const events = await h.pgGet<{ kind: string; body: string | null }>(
       'conversation_event',

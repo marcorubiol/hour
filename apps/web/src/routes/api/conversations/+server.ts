@@ -285,14 +285,22 @@ async function lensPage(
   if (o.idsOnly) {
     return { total: page.total, items: page.items.slice(0, MATCHING_MAX).map((r) => ({ id: r.id, project_id: r.project_id })) };
   }
-  const unread = new Map(page.items.map((r) => [r.id, r.unread_count ?? 0]));
+  const byId = new Map(page.items.map((r) => [r.id, r]));
   const items = await readPage(env, jwt, select, page.items.map((r) => r.id));
   return {
     total: page.total,
     limit: o.limit,
     offset: o.offset,
     orden: o.orden,
-    items: await withExtras(env, jwt, items.map((it) => ({ ...it, unread_count: unread.get(it.id) ?? 0 }))),
+    items: await withExtras(
+      env,
+      jwt,
+      items.map((it) => {
+        const r = byId.get(it.id);
+        // The row says with whom by the RPC's one rule (ADR-177): kind, «por libre», city.
+        return { ...it, unread_count: r?.unread_count ?? 0, place: { kind: r?.org_kind ?? null, solo: r?.solo ?? false, city: r?.city ?? null } };
+      }),
+    ),
   };
 }
 

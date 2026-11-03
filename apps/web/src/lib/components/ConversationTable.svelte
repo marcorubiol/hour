@@ -62,7 +62,7 @@
   import ConversationRow from '$lib/components/ConversationRow.svelte';
   import ChatRow from '$lib/components/ChatRow.svelte';
   import ChatDone from '$lib/components/ChatDone.svelte';
-  import { chatWhen, chatWho, soloOf } from '$lib/chat-row';
+  import { chatWhen, chatWho } from '$lib/chat-row';
   import Dialog from '$lib/components/Dialog.svelte';
   import ConversationStatusMenu from '$lib/components/ConversationStatusMenu.svelte';
   import NextActionDialog from '$lib/components/NextActionDialog.svelte';
@@ -419,20 +419,11 @@
 
   let rows = $derived(items.map(rowView));
 
-  /** With whom, in words and shape (ADR-177 § 2 y § 3): the organization's city, else its contact's. */
+  /** With whom, in words and shape (ADR-177 § 2 y § 3), as `conversation_feed` reads it. */
   function whoOf(item: ConversationItem) {
-    const org = organizationOf(item);
-    const solo = soloOf(org, item.contacts.map((c) => c.person?.full_name));
-    return chatWho({ kind: item.organization?.kind, solo, city: item.organization?.city || item.person?.city || null }, locale);
+    return chatWho(item.place ?? { kind: item.organization?.kind, city: item.organization?.city || item.person?.city || null }, locale);
   }
-  // «Ya está» in progress: the row keeps it while it can be undone, even after a reload.
-  let holding = $state(new Set<string>());
-  function hold(id: string, on: boolean) {
-    const next = new Set(holding);
-    if (on) next.add(id);
-    else next.delete(id);
-    holding = next;
-  }
+
   // The bolos' column: always under the sales chip, else only when a row has one.
   let withBolos = $derived(bolosColumn || rows.some((r) => r.bolo !== null));
 
@@ -570,7 +561,7 @@
           onopen={onopen ? (e) => onopen(item, e) : undefined}
           {picked}
           picking={selectable}
-          act={editable && !selectable && (r.turn?.reason === 'reply' || holding.has(item.id)) ? done : undefined}
+          act={editable && !selectable && onchange && r.turn?.reason === 'reply' ? done : undefined}
         >
           {#snippet pick()}
             <Checkbox
@@ -581,7 +572,7 @@
           {/snippet}
         </ChatRow>
         {#snippet done()}
-          <ChatDone conversationId={item.id} name={r.title} {locale} {onchange} onhold={(on) => hold(item.id, on)} />
+          <ChatDone conversationId={item.id} name={r.title} {locale} refresh={onchange!} />
         {/snippet}
       {:else}
       <ConversationRow
