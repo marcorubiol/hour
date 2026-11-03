@@ -6725,3 +6725,47 @@ ficha y con su carril.
 
 **Cómo se revierte.** Volver a la cabecera con la fila de chips y a `ConversationOverview` desde git (los componentes
 borrados: `ConversationOverview`, `ThreadFeed`, `ThreadFeedRow`); sin migración. `CACHE_SCHEMA` sube con la vuelta.
+
+## [2026-11-03] ADR-177 · Hour de un vistazo: la gramática común (de fuera, nuestro, cuándo) y el monograma de persona
+
+**Contexto.** Tras el 110 (ADR-176), Marco pidió aplicar sus conceptos a cada pantalla para que la app se entienda de
+un vistazo. Un informe por pantalla (`build/coordination/app-at-a-glance/`, fuera de git) y una mesa entre su autor y
+una persona usuaria final (`app-at-a-glance/mesa/conclusiones.md`, firmada por la usuaria) lo bajaron a pocas reglas.
+Dato que manda: en `muk-cia` hay 152 conversaciones, casi todas sin contacto ni historia; 123 de 155 organizaciones son
+una persona sola; ninguna tiene tipo ni ciudad (la ciudad está en la persona). Marco validó el conjunto el 2026-11-03.
+
+**Decisión.**
+1. **Tres clases de cosas, iguales en toda la app.** De fuera (sala, festival, ayuntamiento, programadora), nuestro
+   (espacio, espectáculo, línea, el grupo del equipo de un bolo) y cuándo (función o fecha, con el día y el mes). El
+   dinero no es una clase: es el hueco de la cifra en la fila. El bolo lleva el glifo del eje que falte en esa pantalla.
+2. **Palabras antes que glifos.** Cada contacto de fuera lleva tipo y lugar al lado («Teatre de la Llum · sala ·
+   Girona», «Marta Vidal · por libre · Lleida»); sin tipo, sólo la ciudad, nunca «otro». La ciudad se toma de la
+   persona si la organización no la tiene. Una persona de fuera lleva su casa («técnico de Teatre de la Llum»); una del
+   equipo, su papel («luces»).
+3. **Monogramas (Marco).** Redondo = persona; cuadrado = organización, lo nuestro y el cuándo. El color dice nuestro
+   frente a de fuera: personas y organizaciones de fuera en gris; personas del equipo con el color del espacio; lo
+   nuestro con su `IdentityMark`. El grupo del equipo de un bolo lleva el `IdentityMark` de su espectáculo, no trazo
+   discontinuo. Una organización que es una sola persona y se llama como ella se enseña como persona (redonda, «por
+   libre»). La forma nunca va sola: siempre con la palabra.
+4. **Los dos ejes.** El ámbito es dónde estás (barra lateral); el contacto es con quién (fila y ficha). Cada fila
+   enseña el eje que no está fijado. Ficha de sala y ficha de espectáculo son espejo: los mismos bloques, girados. La
+   persona no tiene espejo (ADR-102): su ficha es «dónde sale».
+5. **El turno en palabras distintas:** «Nos toca responder» (a la compañía) frente a «esperando su respuesta»; «Se
+   enfría» pasa a «Sin noticias».
+6. **Quién lo lee, antes de escribir.** Cada destino del cuadro de escribir cambia color, frase y verbo: «Sale por
+   correo a …» con «Enviar correo a Laia»; nota en ámbar con «Laia no lo ve» y «Guardar nota»; nunca «Enviar» a
+   secas. Al abrir, el destino por defecto de esa conversación, no la última pestaña usada. El grupo del bolo dice
+   quién lo lee con nombre y papel, y que la sala no está.
+7. **La barra lateral sin el título «Ámbitos»:** la lista sola («Todo · MaMeMi · Ona»).
+8. **Lo que no cambia:** Hoy conserva sus bandas (ADR-117, 121; sólo cambia la fila de «Te espera»); Cuentas conserva
+   sus cuatro cifras grandes; sin cifra en las pestañas de lente; el dinero se escribe en Cuentas (ADR-043).
+
+**Qué enmienda.**
+- **ADR-176 § 4:** los chips a 0 no se enseñan; «Sin contactar» es chip cuando domina; «Se enfría» pasa a «Sin
+  noticias» y «Te toca» a «Nos toca»; «Filtrar» suma Zona y Tipo, y hay orden por ciudad.
+- **ADR-176 § 5:** «No pide respuesta» vuelve a la fila como «Ya está», de un toque, con deshacer y una línea de
+  «cómo» opcional; en el hilo queda «Núria: ya está · hoy».
+- **ADR-176, monograma (`ChatMonogram`):** de cuadrado único a redondo para persona y cuadrado para organización.
+
+**Queda fuera.** La persona contacto de varias organizaciones a la vez (la programadora de tres festivales) se aparca
+hasta un caso real: hoy `workspace_person.organization_id` es uno. ADR-176 § 2 (la temporada en Envíos) no cambia.
