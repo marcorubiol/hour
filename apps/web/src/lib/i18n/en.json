@@ -1279,8 +1279,6 @@
   "conversations.added_one": "Added to 1 project",
   "conversations.added_other": "Added to {n} projects",
   "conversations.already_in": "already in {n}",
-  "conversations.back": "← Back to booking",
-  "conversations.back@music": "← Back to booking",
   "conversations.change_not_saved": "Change not saved",
   "conversations.close": "Close",
   "conversations.col_contact": "Contact",

@@ -44,6 +44,7 @@
   import LensTitle from '$lib/components/LensTitle.svelte';
   import ConversationTable from '$lib/components/ConversationTable.svelte';
   import MailoutsView from '$lib/components/MailoutsView.svelte';
+  import { rememberConversationsList } from '$lib/conversations-return.svelte';
   import { parseMailoutType, type MailoutType } from '$lib/mailout-list';
   import { audienceListQueryOptions } from '$lib/audience-query';
   import type { MailoutDetail } from '$lib/mailout';
@@ -135,6 +136,9 @@
   /** The chip travels in the URL, so a link says which one it shows. Without
    *  Converses there is no conversation to show: the lens is Equipo (ADR-134 § 4). */
   let chip = $derived(lensChip(page.url.searchParams, !noAccess));
+
+  // A record opened from here goes back to the list as it was left (chip, view, filters).
+  $effect(() => rememberConversationsList(page.url));
 
   // ── The two views (ADR-176): in the URL, so a link says which one it shows ──
   let envios = $derived(page.url.searchParams.get('view') === 'envios');

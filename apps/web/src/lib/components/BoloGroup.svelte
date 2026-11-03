@@ -15,6 +15,7 @@
    * Una pantalla, dos marcos: su página (`/h/[workspace]/group/[performanceId]`)
    * y el segundo panel de la lista (`inPeek`).
    */
+  import { conversationsListHref } from '$lib/conversations-return.svelte';
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { tick } from 'svelte';
@@ -84,7 +85,7 @@
   /** Sin la barra de lentes en el móvil, siempre hay vuelta: la lista, el tablón o Hoy. */
   let back = $derived(
     lensOn('conversations')
-      ? { href: '/h/conversations', label: t('thread.back_list', locale) }
+      ? { href: conversationsListHref(), label: t('thread.back_list', locale) }
       : boardHref
         ? { href: boardHref, label: t('thread.open_bolo', locale) }
         : { href: '/h', label: t('thread.back_home', locale) },

@@ -1245,8 +1245,6 @@
   "conversations.added_one": "Ajouté à 1 projet",
   "conversations.added_other": "Ajouté à {n} projets",
   "conversations.already_in": "déjà dans {n}",
-  "conversations.back": "← Retour à la diffusion",
-  "conversations.back@music": "← Retour au booking",
   "conversations.change_not_saved": "Modification non enregistrée",
   "conversations.close": "Fermer",
   "conversations.col_contact": "Contact",

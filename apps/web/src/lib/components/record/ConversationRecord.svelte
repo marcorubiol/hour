@@ -28,6 +28,7 @@
    *
    * El segmento [slug] admite también el id de la conversación.
    */
+  import { conversationsListHref } from '$lib/conversations-return.svelte';
   import { docTitle } from '$lib/doc-title';
   import { lensOn } from '$lib/lenses.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
@@ -389,7 +390,7 @@
   /** La vuelta de un chat a pantalla entera: la lista, o Hoy sin la lente. */
   let back = $derived(
     lensOn('conversations')
-      ? { href: '/h/conversations', label: t('thread.back_list', locale) }
+      ? { href: conversationsListHref(), label: t('thread.back_list', locale) }
       : { href: '/h', label: t('thread.back_home', locale) },
   );
 
@@ -456,7 +457,7 @@
       missingText={t('mail.conv_not_found', locale)}
       failedText={t('conversations.one_load_error', locale)}
       onretry={() => void $convQuery.refetch()}
-      back={lensOn('conversations') ? { href: '/h/conversations', label: t('conversations.back', locale) } : null}
+      back={lensOn('conversations') ? { href: conversationsListHref(), label: t('thread.back_list', locale) } : null}
       {locale}
     />
   </section>
