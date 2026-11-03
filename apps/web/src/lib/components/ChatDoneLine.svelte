@@ -6,13 +6,15 @@
    * toque, así que ni una recarga ni «Seleccionar» se la llevan. El estado es
    * de `$lib/chat-done.svelte`; esta línea sólo lo dibuja.
    *
-   * Al aparecer, el foco va al «cómo» (la fila que lo tenía se ha ido). Intro
-   * guarda con el «cómo»; Escape lo borra y deja correr el plazo; al cerrar,
-   * el foco vuelve a la lista (`onclose`). La región avisa al lector.
+   * Al aparecer, el foco va al «cómo» (la fila que lo tenía se ha ido), sin
+   * parar el plazo: lo para escribir. Intro guarda con el «cómo»; Escape lo
+   * borra y deja correr el plazo; al cerrar, el foco vuelve a la lista
+   * (`onclose`). La región avisa al lector. Cerrar o recargar la pestaña
+   * envía lo pendiente (`flushDone`).
    */
   import { onDestroy, tick } from 'svelte';
   import { t, type Locale } from '$lib/i18n';
-  import { commitDone, done, holdDone, revertDone, waitDone } from '$lib/chat-done.svelte';
+  import { commitDone, done, flushDone, holdDone, revertDone, waitDone } from '$lib/chat-done.svelte';
 
   interface Props {
     locale: Locale;
@@ -44,6 +46,8 @@
   onDestroy(() => void commitDone());
 </script>
 
+<svelte:window onpagehide={flushDone} />
+
 <div class="doneline" class:is-on={done.pending !== null} role="status" aria-live="polite">
   {#if done.pending}
     <span class="doneline__said">{t('chat.done_said', locale, { name: done.pending.name })}</span>
@@ -55,12 +59,12 @@
       placeholder={t('chat.done_how', locale)}
       aria-label={t('chat.done_how', locale)}
       bind:value={done.pending.how}
-      onfocus={holdDone}
+      oninput={holdDone}
       onblur={(e) => {
         // To «Deshacer», nothing is written; an empty field lets the wait run again.
         if (e.relatedTarget === undoButton) return;
         if (done.pending?.how.trim()) void commitDone();
-        else waitDone();
+        else if (!done.busy) waitDone();
       }}
       onkeydown={(e) => {
         if (e.key === 'Enter') {
@@ -75,7 +79,7 @@
         }
       }}
     />
-    <button bind:this={undoButton} type="button" class="fact-act" onpointerdown={(e) => e.preventDefault()} onclick={() => void undo()}
+    <button bind:this={undoButton} type="button" class="fact-act" disabled={done.busy !== null} onpointerdown={(e) => e.preventDefault()} onclick={() => void undo()}
       >{t('ui.undo', locale)}</button
     >
   {/if}

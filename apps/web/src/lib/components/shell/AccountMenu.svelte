@@ -5,6 +5,7 @@
   import ThemeToggle from '$lib/components/ThemeToggle.svelte';
   import { useTheme } from '$lib/theme.svelte';
   import { clearSession, session } from '$lib/session.svelte';
+  import { commitDone } from '$lib/chat-done.svelte';
   import { appLocale, t } from '$lib/i18n';
   import { createQuery } from '@tanstack/svelte-query';
   import { meQueryOptions } from '$lib/nav-queries';
@@ -67,6 +68,8 @@
 
   async function logout() {
     rememberWorkingScope();
+    // A pending «Ya está» writes its note while the session still exists.
+    await commitDone();
     // Server-side: clears the httpOnly cookies + revokes the refresh
     // token at Supabase. Await so the gates can't race a live cookie.
     try {

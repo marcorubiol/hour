@@ -5,13 +5,14 @@ const toast = vi.fn();
 vi.mock('$lib/api', () => ({ mutateJSON: (...args: unknown[]) => post(...args) }));
 vi.mock('$lib/components/Toast.svelte', () => ({ addToast: (...args: unknown[]) => toast(...args) }));
 
-const { commitDone, done, revertDone, settleDone } = await import('./chat-done.svelte');
+const { commitDone, done, flushDone, holdDone, revertDone, settleDone } = await import('./chat-done.svelte');
 
 const settled = { done: ['c1'], failed: [], undo: [{ id: 'c1', columns: { reply_settled_at: null } }] };
 
 beforeEach(() => {
   post.mockReset();
   toast.mockReset();
+  holdDone();
   done.pending = null;
   done.busy = null;
 });
@@ -35,8 +36,37 @@ describe('«Ya está» (ADR-177)', () => {
     await settleDone('c1', 'X', 'es', vi.fn());
     await revertDone();
     expect(toast).toHaveBeenLastCalledWith(expect.objectContaining({ tone: 'danger' }));
-    // Deshacer nunca escribe la nota.
+    // Deshacer nunca escribe la nota; si falla, lo pendiente se queda y su nota saldrá.
     expect(post).not.toHaveBeenCalledWith('POST', '/api/conversations/c1/events', expect.anything());
+    expect(done.pending?.id).toBe('c1');
+    expect(done.busy).toBeNull();
+  });
+
+  it('dos toques seguidos: el segundo espera y la nota del primero sale', async () => {
+    let release!: (v: unknown) => void;
+    post
+      .mockResolvedValueOnce(settled)
+      .mockImplementationOnce(() => new Promise((r) => (release = r)))
+      .mockResolvedValueOnce({ ...settled, done: ['c2'] });
+    await settleDone('c1', 'A', 'es', vi.fn());
+    const second = settleDone('c2', 'B', 'es', vi.fn());
+    // A third tap while the first note is in flight does nothing.
+    await settleDone('c3', 'C', 'es', vi.fn());
+    release({});
+    await second;
+    expect(post.mock.calls.map((c) => c[1])).toEqual(['/api/conversations/bulk', '/api/conversations/c1/events', '/api/conversations/bulk']);
+    expect(done.pending?.id).toBe('c2');
+  });
+
+  it('al cerrar la pestaña, la nota sale con keepalive', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 201 }));
+    vi.stubGlobal('fetch', fetchMock);
+    post.mockResolvedValueOnce(settled);
+    await settleDone('c1', 'A', 'es', vi.fn());
+    flushDone();
+    expect(fetchMock).toHaveBeenCalledWith('/api/conversations/c1/events', expect.objectContaining({ keepalive: true, method: 'POST' }));
+    expect(done.pending).toBeNull();
+    vi.unstubAllGlobals();
   });
 
   it('una nota que no se guarda avisa', async () => {
