@@ -3125,7 +3125,6 @@
   "thread.org_record": "Organisation record",
   "thread.dir_out": "from us",
   "thread.dir_in": "from them",
-  "thread.group_team": "Team",
   "thread.open_bolo": "Open the gig",
   "thread.group_missing": "This thread is not here, or you do not read it.",
   "thread.mail_placeholder_reply_other": "Replying to {sender}; the email goes to {name}… (Enter makes a new line)",
@@ -3154,8 +3153,9 @@
   "thread.group_outside": "{venue} is not in this group",
   "thread.group_outside_none": "The venue is not in this group",
   "thread.group_reads": "The {n} people on the team read it.",
-  "thread.group_reads_one": "Only you read it.",
+  "thread.group_reads_one": "1 person on the team reads it.",
   "thread.group_venue_off": "{venue} won't see it.",
   "thread.group_venue_off_none": "The venue won't see it.",
-  "thread.group_send": "Send to the team"
+  "thread.group_send": "Send to the team",
+  "thread.team_reads_who_other": "{names} won't see it."
 }

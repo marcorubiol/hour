@@ -3125,7 +3125,6 @@
   "thread.org_record": "Ficha de la organización",
   "thread.dir_out": "de nuestra parte",
   "thread.dir_in": "de su parte",
-  "thread.group_team": "Equipo",
   "thread.open_bolo": "Abrir el bolo",
   "thread.group_missing": "Este hilo no está, o no lo lees.",
   "thread.mail_placeholder_reply_other": "Respondes a {sender}; el correo va a {name}… (Intro hace salto de línea)",
@@ -3154,8 +3153,9 @@
   "thread.group_outside": "{venue} no está en este grupo",
   "thread.group_outside_none": "La sala no está en este grupo",
   "thread.group_reads": "Lo leen las {n} personas del equipo.",
-  "thread.group_reads_one": "Solo lo lees tú.",
+  "thread.group_reads_one": "Lo lee 1 persona del equipo.",
   "thread.group_venue_off": "{venue} no lo ve.",
   "thread.group_venue_off_none": "La sala no lo ve.",
-  "thread.group_send": "Enviar al equipo"
+  "thread.group_send": "Enviar al equipo",
+  "thread.team_reads_who_other": "{names} no lo ven."
 }

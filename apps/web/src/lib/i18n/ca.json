@@ -3125,7 +3125,6 @@
   "thread.org_record": "Fitxa de l’organització",
   "thread.dir_out": "de part nostra",
   "thread.dir_in": "de part seva",
-  "thread.group_team": "Equip",
   "thread.open_bolo": "Obrir el bolo",
   "thread.group_missing": "Aquest fil no hi és, o no el llegeixes.",
   "thread.mail_placeholder_reply_other": "Respons a {sender}; el correu va a {name}… (Intro fa salt de línia)",
@@ -3154,8 +3153,9 @@
   "thread.group_outside": "{venue} no és en aquest grup",
   "thread.group_outside_none": "La sala no és en aquest grup",
   "thread.group_reads": "Ho llegeixen les {n} persones de l'equip.",
-  "thread.group_reads_one": "Només ho llegeixes tu.",
+  "thread.group_reads_one": "Ho llegeix 1 persona de l'equip.",
   "thread.group_venue_off": "{venue} no ho veu.",
   "thread.group_venue_off_none": "La sala no ho veu.",
-  "thread.group_send": "Enviar a l'equip"
+  "thread.group_send": "Enviar a l'equip",
+  "thread.team_reads_who_other": "{names} no ho veuen."
 }

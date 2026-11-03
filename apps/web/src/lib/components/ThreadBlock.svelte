@@ -223,7 +223,7 @@
   <form class="thread__compose" class:thread__compose--filled={body.trim() !== ''} onsubmit={send}>
     {#if look === 'group'}
       <!-- Quién lo lee, antes de escribir (ADR-177 § 6). -->
-      <p class="thread__reads" data-testid="group-reads">
+      <p class="thread__reads" id={`${headingId}-reads`} data-testid="group-reads">
         {#if audience}{audience.count === 1
             ? t('thread.group_reads_one', locale)
             : t('thread.group_reads', locale, { n: audience.count })}{' '}{/if}<strong
@@ -236,6 +236,7 @@
       maxlength={MESSAGE_MAX}
       placeholder={look === 'group' ? t('thread.team_placeholder', locale) : t('threads.write_in', locale, { name })}
       aria-label={look === 'group' ? t('thread.team_placeholder', locale) : t('threads.write_in', locale, { name })}
+      aria-describedby={look === 'group' ? `${headingId}-reads` : undefined}
       bind:value={body}
       bind:this={composer}
       onkeydown={onKey}

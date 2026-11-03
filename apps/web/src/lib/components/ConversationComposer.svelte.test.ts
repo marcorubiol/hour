@@ -92,6 +92,45 @@ describe('ConversationComposer', () => {
     expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('Ojo, la furgo llega tarde');
   });
 
+  it('lo enviado mientras se cambia de conversación no vuelve como borrador', async () => {
+    let release: (r: Response) => void = () => {};
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) =>
+        init?.method === 'POST' && String(url).endsWith('/api/messages')
+          ? new Promise<Response>((r) => (release = r))
+          : new Response('{}', { status: 404 }),
+      ),
+    );
+    const view = render(Harness, { convId: 'c-flight', mail: MAIL });
+    await settle();
+    await fireEvent.click(screen.getByTestId('composer-to-team'));
+    await fireEvent.input(screen.getByRole('textbox'), { target: { value: 'Ya va' } });
+    await settle();
+    await fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' });
+    await settle();
+
+    await view.rerender({ convId: 'c-other', mail: MAIL });
+    await settle();
+    release(new Response(JSON.stringify({ message: { id: 'm1' } }), { status: 201 }));
+    await settle();
+
+    await view.rerender({ convId: 'c-flight', mail: MAIL });
+    await settle();
+    expect(pressed('composer-to-mail')).toBe('true');
+    expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('');
+  });
+
+  it('con varios contactos, la nota nombra a todos', async () => {
+    render(Harness, { convId: 'c-many', mail: MAIL, outsiders: ['Laia Puig', 'Jordi Sastre'] });
+    await settle();
+    await fireEvent.click(screen.getByTestId('composer-to-team'));
+    await settle();
+    expect(reads()).toBe('Laia Puig y Jordi Sastre no lo ven. Se queda en Hour, para el equipo.');
+    const field = screen.getByRole('textbox');
+    expect(field.getAttribute('aria-describedby')).toContain(screen.getByTestId('composer-reads').id);
+  });
+
   it('sin buzón lo dice y cae a la nota', async () => {
     render(Harness, { convId: 'c-nomail', mail: NO_MAIL });
     await settle();

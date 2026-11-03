@@ -377,8 +377,13 @@
     conv?.organization?.slug ? `/h/${workspaceSlug}/organization/${encodeURIComponent(conv.organization.slug)}` : null,
   );
   let contacts = $derived(conv ? currentContacts(conv.contacts).filter((c) => c.person) : []);
-  /** Quién no lee una nota del equipo: el contacto principal, o la organización sin él. */
-  let outsider = $derived(contacts.find((c) => c.is_primary)?.person?.full_name ?? contacts[0]?.person?.full_name ?? title);
+  /** Quién no lee una nota del equipo: sus contactos, el principal primero; sin ellos, la organización. */
+  let outsiders = $derived.by(() => {
+    const names = [...contacts]
+      .sort((a, b) => Number(b.is_primary) - Number(a.is_primary))
+      .map((c) => c.person!.full_name);
+    return names.length > 0 ? names : [title];
+  });
   let who = $derived(contacts.map((c) => (c.role ? `${c.person!.full_name} (${c.role})` : c.person!.full_name)).join(', '));
 
   /**
@@ -671,7 +676,7 @@
         conversation={{ id: conv.id, workspace_id: conv.workspace_id, line_id: conv.line_id, can_edit: conv.can_edit }}
         {workspaceSlug}
         {recipient}
-        {outsider}
+        {outsiders}
         mail={$mailQuery.data}
         {replyTo}
         {locale}

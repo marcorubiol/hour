@@ -3,13 +3,46 @@
   export type ComposerTarget = 'mail' | 'team' | 'log';
 
   type Drafts = Record<ComposerTarget, string>;
+  interface Unsent {
+    drafts: Drafts;
+    /** El asunto tocado a mano, y para qué correo. */
+    subject: { for: string; text: string } | null;
+    /** Abierto como correo. */
+    full: boolean;
+  }
   /**
    * Lo escrito a medias, por conversación, mientras dure la pestaña: cambiar
    * de conversación en la lista no lo pierde, y una nota a medias vuelve a
    * abrir en nota (ADR-177 § 6). En memoria y nada más: un borrador no es un
-   * dato del espacio.
+   * dato del espacio. Es de quien lo escribió: con otra sesión se vacía.
    */
-  const unsent = new Map<string, Drafts>();
+  const unsent = new Map<string, Unsent>();
+  let unsentOwner = '';
+
+  /** Lo de quien mira; si ha cambiado (cerró sesión y entró otro), nada. */
+  function unsentFor(convId: string, who: string): Unsent | undefined {
+    if (who !== unsentOwner) {
+      unsent.clear();
+      unsentOwner = who;
+    }
+    return unsent.get(convId);
+  }
+
+  /**
+   * Salió: ese destino ya no está a medias. Desde el `onSuccess`, que llega
+   * aunque el campo ya no esté (se cambió de conversación con el envío en
+   * curso): lo enviado no puede volver como borrador y salir dos veces.
+   */
+  function forgetUnsent(convId: string, target: ComposerTarget) {
+    const u = unsent.get(convId);
+    if (!u) return;
+    u.drafts[target] = '';
+    if (target === 'mail') {
+      u.subject = null;
+      u.full = false;
+    }
+    if (!u.drafts.mail.trim() && !u.drafts.team.trim() && !u.drafts.log.trim()) unsent.delete(convId);
+  }
 </script>
 
 <script lang="ts">
@@ -40,7 +73,7 @@
   import { fetchJSON, mutateJSON } from '$lib/api';
   import { refreshAfterWrite } from '$lib/query-refresh';
   import { localDayISO } from '$lib/datetime';
-  import { t, type Locale } from '$lib/i18n';
+  import { LOCALE_TAG, t, type Locale } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
   import Field from '$lib/components/Field.svelte';
   import Input from '$lib/components/Input.svelte';
@@ -63,14 +96,15 @@
   import { safeHref } from '$lib/utils/safe-url';
   import { MESSAGE_MAX, audienceLine, type MessageCreate, type ThreadAudience } from '$lib/threads';
   import { senderName } from '$lib/conversation-thread';
+  import { session } from '$lib/session.svelte';
 
   interface Props {
     conversation: { id: string; workspace_id: string; line_id: string | null; can_edit: boolean };
     workspaceSlug: string;
     /** A quién sale un correo: el contacto principal (`mail_send_authorize`). */
     recipient: { full_name: string; email: string } | null;
-    /** Quién no lee una nota: el contacto principal, o la organización sin él. */
-    outsider: string;
+    /** Quién no lee una nota: sus contactos, o la organización sin ellos. */
+    outsiders: string[];
     /** Los buzones del espacio; undefined mientras se leen. */
     mail: MailAccountsResponse | undefined;
     /** El correo al que se responde: el último de fuera, o el que se eligió con «Responder». */
@@ -84,7 +118,7 @@
     conversation: conv,
     workspaceSlug,
     recipient,
-    outsider,
+    outsiders,
     mail,
     replyTo,
     locale,
@@ -94,7 +128,7 @@
   const queryClient = useQueryClient();
   // Página y vistazo pueden dibujar la misma ficha: ids propios de esta.
   const uid = $props.id();
-  const ids = { body: `${uid}-body`, subject: `${uid}-subject`, from: `${uid}-from`, to: `${uid}-to`, hint: `${uid}-hint` };
+  const ids = { body: `${uid}-body`, subject: `${uid}-subject`, from: `${uid}-from`, to: `${uid}-to`, hint: `${uid}-hint`, reads: `${uid}-reads` };
 
   /**
    * Un borrador por destino: lo escrito para el equipo no se vuelve cuerpo de
@@ -102,9 +136,11 @@
    */
   // El dueño dibuja uno por conversación (`{#key}`): se lee al nacer.
   const convId = untrack(() => conv.id);
-  let drafts = $state<Drafts>({ mail: '', team: '', log: '', ...unsent.get(convId) });
+  const saved = unsentFor(convId, session.user?.sub ?? '');
+  let drafts = $state<Drafts>({ mail: '', team: '', log: '', ...saved?.drafts });
   $effect(() => {
-    if (drafts.mail.trim() || drafts.team.trim() || drafts.log.trim()) unsent.set(convId, { ...drafts });
+    if (drafts.mail.trim() || drafts.team.trim() || drafts.log.trim())
+      unsent.set(convId, { drafts: { ...drafts }, subject: subjectEdit, full });
     else unsent.delete(convId);
   });
   /** El de esta conversación: sin permiso, el equipo; si quedó algo a medias, eso; si no, el correo. */
@@ -126,7 +162,7 @@
   /** ⌘ en un Mac, Ctrl en el resto: lo que el atajo de enviar dice. */
   const mod = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent) ? '⌘' : 'Ctrl';
   /** «Abrir como correo»: de, para, asunto, insertar y firma a la vista. */
-  let full = $state(false);
+  let full = $state(saved?.full ?? false);
 
   export function focus(next?: ComposerTarget) {
     if (next) choose(next);
@@ -168,7 +204,7 @@
    * se edita. Lo escrito vale para el correo al que se respondía: con otro,
    * vuelve su asunto (una recarga del hilo no lo pisa, el id es el mismo).
    */
-  let subjectEdit = $state<{ for: string; text: string } | null>(null);
+  let subjectEdit = $state<{ for: string; text: string } | null>(saved?.subject ?? null);
   let subject = $derived(
     subjectEdit && subjectEdit.for === (replyTo?.id ?? '') ? subjectEdit.text : replySubject(replyTo?.subject),
   );
@@ -222,6 +258,7 @@
       }),
     onSuccess: () => {
       addToast({ tone: 'success', title: t('mail.sent', locale), message: subject });
+      forgetUnsent(convId, 'mail');
       drafts.mail = '';
       full = false;
       subjectEdit = null;
@@ -251,6 +288,7 @@
   const postTeam = createMutation({
     mutationFn: (input: MessageCreate) => mutateJSON('POST', '/api/messages', input),
     onSuccess: () => {
+      forgetUnsent(convId, 'team');
       drafts.team = '';
       onsent('team');
     },
@@ -277,6 +315,7 @@
     mutationFn: (event: ConversationEventCreate) =>
       mutateJSON<{ item: ConversationEventItem }>('POST', `/api/conversations/${conv.id}/events`, event),
     onSuccess: (data) => {
+      forgetUnsent(convId, 'log');
       drafts.log = '';
       logDay = localDayISO();
       // Sale ya en el hilo, sin esperar a la recarga (que llega después y manda).
@@ -389,6 +428,10 @@
         ? t('thread.team_send', locale)
         : t(`thread.log_send_${logKind}`, locale),
   );
+  /** «Laia Puig y Jordi Sastre»: una lista en la lengua de quien mira. */
+  function listed(names: string[]): string {
+    return new Intl.ListFormat(LOCALE_TAG[locale], { type: 'conjunction' }).format(names);
+  }
   /** «Laia», de «Laia Puig»: como se la nombra en un botón. */
   function firstName(full: string): string {
     return full.trim().split(/\s+/)[0] ?? full;
@@ -444,7 +487,7 @@
   </div>
 
   <!-- Quién lo lee, antes de escribir (ADR-177 § 6). -->
-  <p class="composer__reads" data-testid="composer-reads">
+  <p class="composer__reads" id={ids.reads} data-testid="composer-reads">
     {#if target === 'mail'}
       {#if mailBlocked}
         {t('thread.mail_off', locale, { reason: t(`record.write_${mailBlocked}`, locale) })}
@@ -454,7 +497,11 @@
     {:else if target === 'team'}
       {#if fellBack && mailBlocked}<span class="composer__off"
           >{t('thread.mail_off', locale, { reason: t(`record.write_${mailBlocked}`, locale) })}</span
-        >{' '}{/if}<strong>{t('thread.team_reads_who', locale, { name: outsider })}</strong>
+        >{' '}{/if}<strong
+        >{outsiders.length > 1
+          ? t('thread.team_reads_who_other', locale, { names: listed(outsiders) })
+          : t('thread.team_reads_who', locale, { name: outsiders[0] ?? '' })}</strong
+      >
       {t('thread.team_reads', locale)}
     {:else}
       {t('thread.log_reads', locale)}
@@ -504,7 +551,7 @@
       maxlength={target === 'team' ? MESSAGE_MAX : target === 'log' ? EVENT_BODY_MAX : MAIL_BODY_MAX}
       {placeholder}
       aria-label={placeholder}
-      aria-describedby={ids.hint}
+      aria-describedby={`${ids.reads} ${ids.hint}`}
       disabled={target === 'mail' && Boolean(mailBlocked)}
       bind:value={drafts[target]}
       bind:this={field}

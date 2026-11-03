@@ -3125,7 +3125,6 @@
   "thread.org_record": "Fiche de l’organisation",
   "thread.dir_out": "de notre part",
   "thread.dir_in": "de leur part",
-  "thread.group_team": "Équipe",
   "thread.open_bolo": "Ouvrir le contrat",
   "thread.group_missing": "Ce fil n’existe pas, ou tu ne le lis pas.",
   "thread.mail_placeholder_reply_other": "Tu réponds à {sender} ; le mail va à {name}… (Entrée va à la ligne)",
@@ -3154,8 +3153,9 @@
   "thread.group_outside": "{venue} n'est pas dans ce groupe",
   "thread.group_outside_none": "La salle n'est pas dans ce groupe",
   "thread.group_reads": "Les {n} personnes de l'équipe le lisent.",
-  "thread.group_reads_one": "Toi seul le lis.",
+  "thread.group_reads_one": "1 personne de l'équipe le lit.",
   "thread.group_venue_off": "{venue} ne le voit pas.",
   "thread.group_venue_off_none": "La salle ne le voit pas.",
-  "thread.group_send": "Envoyer à l'équipe"
+  "thread.group_send": "Envoyer à l'équipe",
+  "thread.team_reads_who_other": "{names} ne le voient pas."
 }

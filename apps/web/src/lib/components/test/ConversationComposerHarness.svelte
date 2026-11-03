@@ -7,8 +7,9 @@
   interface Props {
     convId: string;
     mail: MailAccountsResponse;
+    outsiders?: string[];
   }
-  let { convId, mail }: Props = $props();
+  let { convId, mail, outsiders = ['Laia Puig'] }: Props = $props();
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 </script>
 
@@ -18,7 +19,7 @@
       conversation={{ id: convId, workspace_id: 'w1', line_id: null, can_edit: true }}
       workspaceSlug="muk-cia"
       recipient={{ full_name: 'Laia Puig', email: 'laia@teatrellum.test' }}
-      outsider="Laia Puig"
+      {outsiders}
       {mail}
       replyTo={null}
       locale="es"
