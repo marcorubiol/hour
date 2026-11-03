@@ -64,7 +64,8 @@ test.describe('contact capture', () => {
     // (Target the lens search by placeholder — 'Search' also matches the
     // global command bar's aria-label.)
     await page.getByPlaceholder('Search conversations and team…').fill('ZZZ E2E Contact');
-    await expect(page.locator('main')).toContainText(FIXTURE_NAME, {
+    // The chat row is titled by the organization, not the person (ADR-102).
+    await expect(page.locator('main [data-testid="feed-row"]', { hasText: 'E2E Teatre' })).toBeVisible({
       timeout: 10_000,
     });
 

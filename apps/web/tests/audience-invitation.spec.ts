@@ -205,7 +205,8 @@ test.describe('audience invitation (simulated)', () => {
       await page.goto(`/h/playwright/conversation/${conversationId}`);
       const link = page.getByTestId('event-mailout');
       await expect(link).toBeVisible({ timeout: 15_000 });
-      await expect(link).toContainText(/Estreno de MaMeMi/);
+      // The subject is the line's text; the link only says «open the mailout».
+      await expect(page.getByTestId('thread-mailout').filter({ has: link }).locator('> span')).toContainText(/Estreno de MaMeMi/);
       await link.click();
       await expect(page).toHaveURL(mailoutUrl);
     } finally {

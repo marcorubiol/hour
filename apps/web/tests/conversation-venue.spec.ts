@@ -53,7 +53,7 @@ test.describe('conversation with the venue', () => {
     await dialog.getByRole('button', { name: 'Add conversation' }).click();
     await expect(dialog).not.toBeVisible({ timeout: 10_000 });
     await page.getByPlaceholder('Search conversations and team…').fill(ORG);
-    const link = page.locator('main [data-testid="conversation-row"]').getByRole('link', { name: ORG, exact: true });
+    const link = page.locator('main [data-testid="feed-row"]').getByRole('link', { name: ORG, exact: true });
     await expect(link).toBeVisible({ timeout: 10_000 });
     await link.click();
     // At desktop width the file opens in the pane beside the list (ADR-176), not the vistazo.

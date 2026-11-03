@@ -90,6 +90,7 @@ test.describe('smoke', () => {
     await waitForLoaded(page);
     // The count rides in the list's chip since ADR-176 («All · N»), not a status bar.
     await expect(page.locator('.conversations__chip[data-chip="todo"] .conversations__chip-n')).toHaveText(/^\d+$/);
-    expect(await page.locator('[data-testid="conversation-row"]').count()).toBeGreaterThan(0);
+    // Todo with only a tag is the common feed (ADR-176).
+    await expect(page.locator('[data-testid="feed-row"]').first()).toBeVisible({ timeout: 30_000 });
   });
 });

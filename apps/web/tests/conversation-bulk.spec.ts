@@ -67,6 +67,8 @@ test.describe('bulk actions on the selection', () => {
     if (h) await forgetConversationsRpc(h, jwt, ids);
   });
 
+  // Todo with only a tag is the common feed (ADR-176); «Select» draws the filtered table, whose rows are conversation-row.
+  const feedRows = (page: Page) => page.locator('main [data-testid="feed-row"]', { hasText: NAME });
   const rows = (page: Page) => page.locator('main [data-testid="conversation-row"]', { hasText: NAME });
   // By the row's last line: a chat row (ADR-176) with nothing said yet says its relation there.
   const notNow = (page: Page) => rows(page).filter({ has: page.locator('.chat__last', { hasText: /^Not this time/ }) });
@@ -75,7 +77,7 @@ test.describe('bulk actions on the selection', () => {
     await page.goto(chip);
     await waitForLoaded(page);
     await page.getByPlaceholder('Search conversations and team…').fill(NAME);
-    await expect(rows(page)).toHaveCount(3, { timeout: 30_000 });
+    await expect(feedRows(page)).toHaveCount(3, { timeout: 30_000 });
   }
 
   test('under Press: selection without «Write to»; Esc leaves it', async ({ page }) => {

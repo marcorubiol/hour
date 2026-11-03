@@ -147,7 +147,7 @@ test.describe('Te toca y Se enfría en Conversaciones (ADR-117, ADR-176)', () =>
 
     const active = page.locator('.conversations__active');
     await expect(active).toContainText('No reply to the mailout');
-    await active.getByRole('button', { name: 'Clear the filter' }).click();
+    await active.getByRole('button', { name: 'Remove «No reply to the mailout»' }).click();
     await expect(page).not.toHaveURL(/temp=/);
   });
 

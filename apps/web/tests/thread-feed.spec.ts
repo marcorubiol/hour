@@ -197,7 +197,7 @@ test.describe('Conversaciones › Equipo: los hilos del equipo (ADR-116, ADR-134
     // Se abre como grupo al lado (ADR-176, BoloGroup del carril de la ficha) y a la vista se marca leído.
     const read = page.waitForResponse((r) => /\/api\/threads\/[^/]+\/read$/.test(r.url()), { timeout: 30_000 });
     await top.locator('a.chat__title').click();
-    await expect(page).toHaveURL(/[?&]grupo=playwright%2F/);
+    await expect(page).toHaveURL(/[?&]grupo=playwright(%2F|\/)/);
     const group = page.getByTestId('conversation-pane').getByTestId('bolo-group');
     await expect(group.locator('.msg', { hasText: NEW_BODY })).toBeVisible({ timeout: 30_000 });
     expect((await read).status()).toBe(200);

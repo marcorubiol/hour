@@ -96,9 +96,11 @@ test.describe('mailout (simulated)', () => {
       await page.reload();
       await waitForLoaded(page);
       await page.getByRole('searchbox').fill(ORG);
+      // Todo with only a tag is the feed (ADR-176); «Select» draws the table, whose rows carry the checkbox.
+      await expect(page.locator('[data-testid="feed-row"]', { hasText: ORG })).toHaveCount(1, { timeout: 15_000 });
+      await page.getByRole('button', { name: /^(Select|Seleccionar|Sélectionner)$/ }).click();
       const row = page.locator('[data-testid="conversation-row"]', { hasText: ORG });
       await expect(row).toHaveCount(1, { timeout: 15_000 });
-      await page.getByRole('button', { name: /^(Select|Seleccionar|Sélectionner)$/ }).click();
       // The painted box sits over the input (Checkbox); a click on it is the user's.
       await row.getByRole('checkbox').check({ force: true });
       const write = page.getByRole('button', { name: /Write to 1|Escribir a 1|Escriure a 1|Écrire à 1/ });

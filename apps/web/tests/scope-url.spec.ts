@@ -124,7 +124,7 @@ test('a scope change on a person opened from Conversations lands back on Convers
   // list for a person and changing the scope threw you out of Conversations.
   await page.goto(`/h/conversations?etiqueta=sales&scope=${FIXTURE_SPACE_TOKEN}`);
   await waitForLoaded(page);
-  await expect(page.locator('[data-testid="conversation-row"]').first()).toBeVisible();
+  await expect(page.locator('[data-testid="feed-row"]').first()).toBeVisible();
 
   // Since ADR-176 the lens's chat rows do not link the contact: the person is
   // reached through the organization's record (ADR-159), whose list still
