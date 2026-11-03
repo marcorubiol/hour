@@ -7379,6 +7379,7 @@ export type Database = {
           privacy_url: string
           recipient_id: string
           subscribed_at: string
+          subscriber_language: string
           subscriber_name: string
           venue_city: string
           venue_name: string
@@ -7508,6 +7509,7 @@ export type Database = {
           privacy_url: string
           recipient_id: string
           subscribed_at: string
+          subscriber_language: string
           subscriber_name: string
           venue_city: string
           venue_name: string

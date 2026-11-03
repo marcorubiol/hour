@@ -154,6 +154,44 @@ describe('runMailoutQueue con el simulador', () => {
   });
 });
 
+describe('el idioma de cada suscripción (104)', () => {
+  test('una pasada con el envío en castellano: cada persona del público en el suyo', async () => {
+    const audience = (id: string) =>
+      claimed({ recipient_id: id, conversation_id: null, audience_subscription_id: `s-${id}`, address_kind: 'subscriber', basis_kind: 'consent' });
+    const subscriber = (id: string, lang: string | null) =>
+      context(id, {
+        address_kind: 'subscriber',
+        basis_kind: 'consent',
+        contact_first_name: null,
+        organization_name: null,
+        mailout_kind: 'invitation',
+        audience_subscription_id: `s-${id}`,
+        audience_name: 'Estrenos',
+        subscriber_name: 'Claire',
+        venue_name: 'Teatre Lliure',
+        venue_city: 'Barcelona',
+        subscriber_language: lang,
+      });
+    const { db } = memoryDb(
+      [audience('fr'), audience('en'), audience('none'), claimed({ recipient_id: 'pro' })],
+      [subscriber('fr', 'fr'), subscriber('en', 'en'), subscriber('none', null), context('pro')],
+    );
+    const sendEmail = vi.fn(simulatorProvider().sendEmail);
+    await runMailoutQueue(env, { db, providerFor: () => ({ ...simulatorProvider(), sendEmail }) });
+    const byTo = Object.fromEntries(sendEmail.mock.calls.map(([e]) => [e.tags.recipient, e]));
+    expect(byTo.fr.text).toContain('Se désinscrire : https://hour.test/u/tok1');
+    expect(byTo.fr.html).toContain('<html lang="fr">');
+    expect(byTo.en.text).toContain('Unsubscribe: https://hour.test/u/tok1');
+    expect(byTo.none.text).toContain('Darte de baja:');
+    expect(byTo.pro.text).toContain('daos de baja');
+    // El asunto y el cuerpo los escribe quien envía: no se traducen.
+    for (const id of ['fr', 'en', 'none']) {
+      expect(byTo[id].subject).toBe('MaMeMi para Teatre Lliure');
+      expect(byTo[id].text.startsWith('Hola, Claire:')).toBe(true);
+    }
+  });
+});
+
 describe('la plantilla (ADR-172)', () => {
   const WS = '20000000-0000-4000-8000-000000000001';
   const row = {

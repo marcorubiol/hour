@@ -111,6 +111,7 @@ type EligibleRow = {
   basis_kind: 'consent' | 'relationship';
   confirmed_at: string | null;
   import_id: string | null;
+  language: string;
 };
 
 type CompanyRow = {
@@ -147,7 +148,7 @@ async function invitationAudience(
     pgGet<{ id: string; name: string }>(env, 'audience', jwt, { search: { select: 'id,name', id: `eq.${mailout.audience_id}` } }),
     pgGet<EligibleRow>(env, 'audience_subscription', jwt, {
       search: {
-        select: 'id,address,name,basis_kind,confirmed_at,import_id',
+        select: 'id,address,name,basis_kind,confirmed_at,import_id,language',
         audience_id: `eq.${mailout.audience_id}`,
         status: 'eq.confirmed',
         order: 'confirmed_at.desc.nullslast',
@@ -198,6 +199,7 @@ async function invitationAudience(
         subscribed_at: s.confirmed_at,
         venue_name: performance?.venue_name ?? null,
         venue_city: performance?.city ?? null,
+        subscriber_language: s.language,
       }))
     : [];
   return {

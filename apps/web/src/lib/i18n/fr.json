@@ -2048,6 +2048,7 @@
   "mailout.reply_to": "Réponses à",
   "mailout.reply_to_none": "Les réponses arriveront à {address}, mais elles n'entreront pas dans Hour : aucune boîte n'est connectée.",
   "mailout.language": "Langue du courriel",
+  "mailout.language_audience_hint": "Chaque personne du public reçoit le pied de page (pourquoi elle le reçoit, la désinscription) dans la langue de son inscription. L'objet et le texte partent tels que vous les écrivez.",
   "mailout.lang_es": "Espagnol",
   "mailout.lang_ca": "Catalan",
   "mailout.lang_en": "Anglais",

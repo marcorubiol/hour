@@ -2051,6 +2051,7 @@
   "mailout.reply_to": "Respostes a",
   "mailout.reply_to_none": "Les respostes arribaran a {address}, però no entraran a Hour: no hi ha cap bústia connectada.",
   "mailout.language": "Idioma del correu",
+  "mailout.language_audience_hint": "A cada persona del públic li arriba el peu (per què li arriba, la baixa) en l'idioma en què es va apuntar. L'assumpte i el text surten tal com els escrius.",
   "mailout.lang_es": "Castellà",
   "mailout.lang_ca": "Català",
   "mailout.lang_en": "Anglès",

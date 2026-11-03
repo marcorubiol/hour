@@ -64,6 +64,7 @@
     composeMailout,
     MAILOUT_LANGUAGES,
     MERGE_FIELDS,
+    recipientLanguage,
     suggestedBasis,
     unsubscribeUrl,
     type ComposeContext,
@@ -317,6 +318,8 @@
   );
   let hasTemplate = $derived(Boolean(template.logo || template.image));
   let preview = $derived(current?.ctx ? composeMailout(draft, current.ctx, exampleLink, template) : null);
+  // 104: el pie de una persona del público sale en el idioma de su suscripción.
+  let currentLanguage = $derived(current?.ctx ? recipientLanguage(language, current.ctx) : null);
   let currentFrom = $derived(current?.row.audience_subscription_id ? audienceFromLine : fromLine);
   // Con plantilla si la hay; quien mira puede pasar a solo texto (lo que leen
   // los clientes sin HTML) y volver.
@@ -607,6 +610,9 @@
             <div class="mo__row">
               <Select label={t('mailout.language', locale)} options={languageOptions} bind:value={language} onchange={touch} />
             </div>
+            {#if invitation && m.audience_id}
+              <p class="mo__hint">{t('mailout.language_audience_hint', locale)}</p>
+            {/if}
             <Input label={t('mail.subject', locale)} bind:value={subject} oninput={touch} />
             <Textarea id="mailout-body" label={t('mail.body', locale)} rows={10} maxlength={20000} bind:value={body} oninput={touch} />
             <p class="mo__fields">
@@ -695,6 +701,11 @@
               <span>{t('mail.to', locale)}</span>
               {current.row.display_name ?? ''} &lt;{current.row.address}&gt;
             </p>
+            {#if currentLanguage && currentLanguage !== language}
+              <p class="mail-card__meta" data-testid="mailout-preview-language">
+                <span>{t('mailout.language', locale)}</span> {t(`mailout.lang_${currentLanguage}`, locale)}
+              </p>
+            {/if}
             <p class="mail-preview__subject">{preview.subject || '—'}</p>
             {#if preview.missing.length}
               <p class="mo__warn" role="alert">
