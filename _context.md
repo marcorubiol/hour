@@ -33,8 +33,8 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
 ## Producción (verificado 2026-11-03)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`16e87b79`**, `dirty:false`, builtAt
-  2026-11-03T06:28Z (Hour de un vistazo, ADR-177: la fila de la lista con persona u organización, tipo y lugar, turno, Zona y Tipo, «Ya está» (114); el cuadro de escribir y el grupo del bolo dicen quién lo lee (113); barra lateral sin «Ámbitos» (116); el pie de cada invitación en el idioma de su suscripción (104). Antes, 110, 112 y 109 en móvil; lo anterior, en `CHANGELOG.md`).
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`ded8d3d8`**, `dirty:false`, builtAt
+  2026-11-03T11:52Z («Enviar al equipo» visible siempre en el grupo del bolo; antes, Hour de un vistazo, ADR-177: la fila de la lista con persona u organización, tipo y lugar, turno, Zona y Tipo, «Ya está» (114); el cuadro de escribir y el grupo del bolo dicen quién lo lee (113); barra lateral sin «Ámbitos» (116); el pie de cada invitación en el idioma de su suscripción (104). Antes, 110, 112 y 109 en móvil; lo anterior, en `CHANGELOG.md`).
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free, con keepalive diario
   (`.github/workflows/keepalive.yml`) contra la pausa por inactividad. Pasar a Pro antes de la beta, aún no
