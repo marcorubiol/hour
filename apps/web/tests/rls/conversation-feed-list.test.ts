@@ -239,20 +239,29 @@ describe.skipIf(!envReady())('RLS: la lista desde conversation_feed (plan de la 
 
   test('type, solo and city (ADR-177): each filter gives exactly the rows that carry it', async () => {
     // Dos de las nuestras con tipo y ciudad: una sala en Girona y un festival sin ciudad.
-    const orgs = await pgGet<{ id: string; organization_id: string }>(
+    // Por el mismo camino que la ficha (`update_workspace_organization`): `authenticated` no tiene UPDATE en la tabla.
+    const orgs = await pgGet<{ id: string; organization: { id: string; name: string } }>(
       'conversation',
       admin,
-      new URLSearchParams({ select: 'id,organization_id', id: `in.(${created.slice(0, 2).join(',')})` }),
+      new URLSearchParams({
+        select: 'id,organization:workspace_organization!conversation_workspace_organization_fkey(id,name)',
+        id: `in.(${created.slice(0, 2).join(',')})`,
+      }),
     );
     expect(orgs.status).toBe(200);
-    const orgOf = new Map(orgs.rows.map((r) => [r.id, r.organization_id]));
-    for (const [id, body] of [
-      [created[0]!, { kind: 'theatre', city: 'Girona' }],
-      [created[1]!, { kind: 'festival', city: null }],
+    const orgOf = new Map(orgs.rows.map((r) => [r.id, r.organization]));
+    for (const [id, kind, city] of [
+      [created[0]!, 'theatre', 'Girona'],
+      [created[1]!, 'festival', null],
     ] as const) {
-      const r = await pgPatch('workspace_organization', admin, body, new URLSearchParams({ id: `eq.${orgOf.get(id)}` }));
-      expect(r.status).toBe(200);
-      expect(r.rows, 'the organization patch reached no row').toHaveLength(1);
+      const org = orgOf.get(id)!;
+      const r = await pgRpc('update_workspace_organization', admin, {
+        p_organization_id: org.id,
+        p_name: org.name,
+        p_kind: kind,
+        p_city: city,
+      });
+      expect(r.status, r.error).toBe(200);
     }
 
     const rows = await all(admin);

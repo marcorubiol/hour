@@ -130,7 +130,8 @@ test.describe('conversation tags', () => {
       //    the row opens it in the pane beside the list (ADR-176), not the vistazo.
       await all.locator('a.chat__title').click();
       await expect(page).toHaveURL(/abierta=playwright%2F|abierta=playwright\//);
-      await expect(page.getByTestId('peek')).toHaveCount(0);
+      // The peek's dialog is always in the page (PeekHost): closed, not absent.
+      await expect(page.getByTestId('peek')).toBeHidden();
       const tags = page.getByTestId('conversation-pane').getByTestId('conversation-tags');
       await expect(tags.locator('.tag-chip')).toHaveText(['Press'], { timeout: 15_000 });
       await tags.getByRole('button', { name: 'Change' }).click();

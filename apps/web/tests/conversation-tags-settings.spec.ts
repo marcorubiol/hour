@@ -87,11 +87,11 @@ test.describe('conversation tags in settings', () => {
       }
       await setActive(page, true);
 
-      // On: one of the lens's tags, without reloading the page; Team is a chip, never a tag.
+      // On: one of the lens's tags, without reloading the page; Team is a chip, never a tag. Whether
+      // the Equipo chip is drawn depends on there being a bolo thread (ADR-177), not on this spec.
       const options = await tagOptionsOfTheLens(page);
       await expect(options.filter({ hasText: NAME })).toHaveAttribute('value', KEY);
       await expect(page.locator('option[value="team"]')).toHaveCount(0);
-      await expect(page.locator('.conversations__chips [data-chip="equipo"]')).toBeVisible();
       await page.keyboard.press('Escape');
       await page.goBack();
       await settingsLoaded(page);

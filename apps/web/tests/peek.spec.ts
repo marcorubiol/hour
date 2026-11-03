@@ -98,7 +98,7 @@ test.describe('the vistazo (ADR-139 p1)', () => {
 
     const pane = page.getByTestId('conversation-pane');
     await expect(pane.locator('h1')).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByTestId('peek')).toHaveCount(0);
+    await expect(page.getByTestId('peek')).toBeHidden();
     // The lens keeps its query; the address says which one is open.
     await expect(page).toHaveURL(/\/h\/conversations\?.*scope=s(%3A|:)playwright.*abierta=playwright(%2F|\/)/);
     await expect(link).toHaveAttribute('aria-current', 'true');
@@ -106,7 +106,7 @@ test.describe('the vistazo (ADR-139 p1)', () => {
     // A reload is a shared link: the same one opens beside the list.
     await page.reload();
     await expect(page.getByTestId('conversation-pane').locator('h1')).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByTestId('peek')).toHaveCount(0);
+    await expect(page.getByTestId('peek')).toBeHidden();
 
     // The keyboard (ADR-176): «Close» empties the pane; Enter on a row opens it
     // with the focus inside; Esc closes it and gives the focus back to the row.

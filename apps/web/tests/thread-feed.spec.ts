@@ -203,6 +203,8 @@ test.describe('Conversaciones › Equipo: los hilos del equipo (ADR-116, ADR-134
     // Quién lo lee, con nombres, y que la sala no está (ADR-177 § 6).
     await expect(group.getByTestId('group-readers')).toContainText("Only the night's team");
     await expect(group.getByTestId('group-outside')).toContainText('is not in this group');
+    // At rest the composer is only its box; its button comes out with the focus inside (ThreadBlock).
+    await group.getByRole('textbox', { name: 'Write to the team…' }).focus();
     await expect(group.getByRole('button', { name: 'Send to the team' })).toBeVisible();
     expect((await read).status()).toBe(200);
 
