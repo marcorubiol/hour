@@ -375,7 +375,21 @@ export interface ListFilter {
   r?: MailoutPick;
   /** Una relación (la barra de la temporada filtra con esto, ADR-138). */
   relacion?: Relation;
+  /**
+   * Zona y Tipo de «Filtrar» (ADR-177): una ciudad (la de la organización y,
+   * si no tiene, la de su contacto) y una clase de organización (su tipo, o
+   * `solo`, «por libre»). Los filtra la base (`conversation_feed`, `p_city` y
+   * `p_kind`); el panel no lee ni tipo ni ciudad, así que `applyListFilter`
+   * no los aplica.
+   */
+  zona?: string;
+  clase?: OrgClass;
 }
+
+/** Las clases de «Tipo»: los tipos de organización salvo «otra», y «por libre» (ADR-177 § 2). */
+export const ORG_CLASSES = ['solo', 'theatre', 'festival', 'presenter', 'institution', 'agency', 'company'] as const;
+export type OrgClass = (typeof ORG_CLASSES)[number];
+export const ZONA_MAX = 80;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -391,6 +405,8 @@ export function parseListFilter(params: URLSearchParams): ListFilter {
     temporada,
     linea: parseLinea(params.get('linea')),
     ...mailoutFilter(params),
+    zona: params.get('zona')?.trim().slice(0, ZONA_MAX) || undefined,
+    clase: (ORG_CLASSES as readonly string[]).includes(params.get('clase') ?? '') ? (params.get('clase') as OrgClass) : undefined,
   };
 }
 
@@ -407,7 +423,7 @@ function mailoutFilter(params: URLSearchParams): Pick<ListFilter, 'envio' | 'r'>
 }
 
 export function hasListFilter(f: ListFilter): boolean {
-  return Boolean(f.turno || f.temp || f.temporada || f.envio || f.relacion || f.linea);
+  return Boolean(f.turno || f.temp || f.temporada || f.envio || f.relacion || f.linea || f.zona || f.clase);
 }
 
 /**
@@ -536,6 +552,8 @@ export interface ConversationOverview {
   total: number;
   /** Las que siguen vivas: sin «no esta vez» ni dormidas. */
   live: number;
+  /** Las que nunca se han contactado (relación `never`): el chip «Sin contactar» cuando dominan (ADR-177). */
+  never: number;
   season: {
     label: string;
     start: string;
@@ -593,6 +611,7 @@ export function buildOverview(
   return {
     total: rows.length,
     live: rows.filter((r) => !['not_now', 'dormant'].includes(relationOf(r, now))).length,
+    never: rows.filter((r) => relationOf(r, now) === 'never').length,
     season: {
       ...season,
       total: inSeasonRows.length,

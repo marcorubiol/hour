@@ -59,6 +59,9 @@ interface ListRow {
   last_at: string | null;
   created_at: string;
   relation: string;
+  org_kind: string | null;
+  solo: boolean;
+  city: string | null;
 }
 interface ListPage {
   items: ListRow[];
@@ -234,6 +237,48 @@ describe.skipIf(!envReady())('RLS: la lista desde conversation_feed (plan de la 
     }
   });
 
+  test('type, solo and city (ADR-177): each filter gives exactly the rows that carry it', async () => {
+    // Dos de las nuestras con tipo y ciudad: una sala en Girona y un festival sin ciudad.
+    const orgs = await pgGet<{ id: string; organization_id: string }>(
+      'conversation',
+      admin,
+      new URLSearchParams({ select: 'id,organization_id', id: `in.(${created.slice(0, 2).join(',')})` }),
+    );
+    expect(orgs.status).toBe(200);
+    const orgOf = new Map(orgs.rows.map((r) => [r.id, r.organization_id]));
+    for (const [id, body] of [
+      [created[0]!, { kind: 'theatre', city: 'Girona' }],
+      [created[1]!, { kind: 'festival', city: null }],
+    ] as const) {
+      const r = await pgPatch('workspace_organization', admin, body, new URLSearchParams({ id: `eq.${orgOf.get(id)}` }));
+      expect(r.status).toBe(200);
+      expect(r.rows, 'the organization patch reached no row').toHaveLength(1);
+    }
+
+    const rows = await all(admin);
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    expect(byId.get(created[0]!)).toMatchObject({ org_kind: 'theatre', solo: false, city: 'Girona' });
+    expect(byId.get(created[1]!)).toMatchObject({ org_kind: 'festival', solo: false });
+    for (const r of rows) expect(r.org_kind, r.id).not.toBe('other');
+
+    const kinds = new Set(['solo', ...rows.map((r) => r.org_kind).filter((k): k is string => !!k)]);
+    for (const kind of kinds) {
+      const want = rows.filter((r) => (kind === 'solo' ? r.solo : !r.solo && r.org_kind === kind)).map((r) => r.id);
+      expect((await all(admin, { p_kind: kind })).map((r) => r.id), kind).toEqual(want);
+    }
+    const cities = new Set(rows.map((r) => r.city?.trim().toLowerCase()).filter((c): c is string => !!c));
+    for (const city of cities) {
+      const want = rows.filter((r) => r.city?.trim().toLowerCase() === city).map((r) => r.id);
+      expect((await all(admin, { p_city: ` ${city.toUpperCase()} ` })).map((r) => r.id), city).toEqual(want);
+    }
+
+    // Por ciudad: las mismas filas, las que tienen ciudad antes que las que no.
+    const byCity = await all(admin, { p_order: 'ciudad' });
+    expect(byCity.map((r) => r.id).sort()).toEqual(rows.map((r) => r.id).sort());
+    const firstEmpty = byCity.findIndex((r) => !r.city);
+    if (firstEmpty >= 0) expect(byCity.slice(firstEmpty).every((r) => !r.city)).toBe(true);
+  });
+
   test('the relation on each row is the one of the panel', async () => {
     const env = requireEnv();
     const now = new Date();
@@ -259,6 +304,10 @@ describe.skipIf(!envReady())('RLS: la lista desde conversation_feed (plan de la 
       { p_list: true, p_temp: 'tibia' },
       { p_list: true, p_line: 'linea' },
       { p_list: true, p_mailout_pick: 'todos' },
+      { p_kind: 'theatre' },
+      { p_city: 'Girona' },
+      { p_list: true, p_kind: 'other' },
+      { p_list: true, p_city: '  ' },
     ]) {
       const r = await pgRpc('conversation_feed', admin, args);
       expect(r.status, JSON.stringify(args)).toBe(400);

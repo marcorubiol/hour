@@ -29,6 +29,8 @@
     disabled?: boolean;
     loading?: boolean;
     autocomplete?: HTMLInputAttributes['autocomplete'];
+    /** The longest value the field takes. */
+    maxlength?: number;
     /** id of a <datalist> the input completes from (native suggestions). */
     list?: string;
     autofocus?: boolean;
@@ -56,6 +58,7 @@
     disabled = false,
     loading = false,
     autocomplete,
+    maxlength,
     list,
     autofocus = false,
     oninput,
@@ -87,6 +90,7 @@
     {required}
     disabled={isDisabled}
     {autocomplete}
+    {maxlength}
     {list}
     {autofocus}
     {min}

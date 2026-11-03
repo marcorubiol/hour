@@ -24,6 +24,9 @@
     /** A mailout's batch as a filter (ADR-126 § 9, plan de la lista § 5). */
     envio?: string;
     r?: MailoutPick;
+    /** «Filtrar» by area and type (ADR-177): a city, a kind of organization or `solo`. */
+    zona?: string;
+    clase?: string;
     /** The lens chip's tag key (ADR-138, fase 2); untagged rows read as `sales`. */
     etiqueta?: string;
     /** The lens's order (plan de la lista § 4); a module leaves it out and gets the next step's. */
@@ -58,7 +61,8 @@
   import ConversationHistory from '$lib/components/ConversationHistory.svelte';
   import ConversationRow from '$lib/components/ConversationRow.svelte';
   import ChatRow from '$lib/components/ChatRow.svelte';
-  import { chatWhen } from '$lib/chat-row';
+  import ChatDone from '$lib/components/ChatDone.svelte';
+  import { chatWhen, chatWho } from '$lib/chat-row';
   import Dialog from '$lib/components/Dialog.svelte';
   import ConversationStatusMenu from '$lib/components/ConversationStatusMenu.svelte';
   import NextActionDialog from '$lib/components/NextActionDialog.svelte';
@@ -123,6 +127,8 @@
     activeId?: string | null;
     /** With `chat`: open beside instead of navigating. */
     onopen?: (item: ConversationItem, event: MouseEvent) => void;
+    /** With `chat`: after a row's «Ya está» or its undo, the lists read again. */
+    onchange?: () => void;
   }
 
   let {
@@ -146,6 +152,7 @@
     chat = false,
     activeId = null,
     onopen,
+    onchange,
   }: Props = $props();
   const tz = viewerTimeZone();
 
@@ -205,6 +212,8 @@
       if (f.r) p.set('r', f.r);
     }
     if (f.linea) p.set('linea', f.linea);
+    if (f.zona) p.set('zona', f.zona);
+    if (f.clase) p.set('clase', f.clase);
     if (f.temporada) {
       p.set('temporada', 'actual');
       if (f.lineIds && f.lineIds.length > 0) p.set('line_ids', f.lineIds.join(','));
@@ -409,6 +418,12 @@
   }
 
   let rows = $derived(items.map(rowView));
+
+  /** With whom, in words and shape (ADR-177 § 2 y § 3), as `conversation_feed` reads it. */
+  function whoOf(item: ConversationItem) {
+    return chatWho(item.place ?? { kind: item.organization?.kind, city: item.organization?.city || item.person?.city || null }, locale);
+  }
+
   // The bolos' column: always under the sales chip, else only when a row has one.
   let withBolos = $derived(bolosColumn || rows.some((r) => r.bolo !== null));
 
@@ -529,9 +544,12 @@
     {@const picked = selectable && selectedIds.has(item.id)}
     <li data-testid="conversation-row">
       {#if chat}
+        {@const who = whoOf(item)}
         <ChatRow
           href={conversationPath(item)}
           title={r.title}
+          shape={who.shape}
+          words={who.words}
           at={r.lastAt}
           when={r.lastAt ? chatWhen(r.lastAt, locale, tz) : ''}
           unread={item.unread_count ?? 0}
@@ -543,6 +561,7 @@
           onopen={onopen ? (e) => onopen(item, e) : undefined}
           {picked}
           picking={selectable}
+          act={editable && !selectable && onchange && r.turn?.reason === 'reply' ? done : undefined}
         >
           {#snippet pick()}
             <Checkbox
@@ -552,6 +571,9 @@
             />
           {/snippet}
         </ChatRow>
+        {#snippet done()}
+          <ChatDone conversationId={item.id} name={r.title} {locale} refresh={onchange!} />
+        {/snippet}
       {:else}
       <ConversationRow
         href={conversationPath(item)}

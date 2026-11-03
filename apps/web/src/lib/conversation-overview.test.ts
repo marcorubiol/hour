@@ -382,6 +382,11 @@ describe('buildOverview', () => {
     expect(o).toMatchObject({ total: 4, live: 2 });
   });
 
+  it('«sin contactar» cuenta las que nunca se han contactado (ADR-177)', () => {
+    const o = buildOverview([row('a'), row('b'), row('no', notNow), row('hold', talked('hold'))], NOW);
+    expect(o.never).toBe(2);
+  });
+
   it('cuenta todo y enseña solo las primeras filas de cada bloque', () => {
     const rows = [
       ...Array.from({ length: BLOCK_ROWS + 2 }, (_, i) => row(`due${i}`, inbound(i + 1, `Re: ${i}`))),

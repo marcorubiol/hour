@@ -52,13 +52,15 @@
   import Dialog from '$lib/components/Dialog.svelte';
   import { tick, untrack } from 'svelte';
   import { toStore } from 'svelte/store';
-  import { MAILOUT_PICKS, NO_LINE, hasListFilter, parseListFilter, type MailoutPick, type OverviewResponse } from '$lib/conversation-overview';
+  import { MAILOUT_PICKS, NO_LINE, ORG_CLASSES, ZONA_MAX, hasListFilter, parseListFilter, type MailoutPick, type OverviewResponse } from '$lib/conversation-overview';
   import type { ConversationFeedView, FeedConversationView, FeedThreadRow } from '$lib/conversation-feed';
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { lazy } from '$lib/lazy.svelte';
   import { DEFAULT_ORDER, ORDERS, parseOrden, type Orden } from '$lib/conversation-order';
   import { dayMonth } from '$lib/datetime';
   import ConversationFeed from '$lib/components/ConversationFeed.svelte';
+  import { accentVarFor } from '$lib/utils/accent';
+  import ChatDoneLine from '$lib/components/ChatDoneLine.svelte';
   import FirstVisitCard from '$lib/components/FirstVisitCard.svelte';
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
@@ -173,6 +175,15 @@
   let projectNameById = $derived(
     new Map(($projectsQuery.data?.items ?? []).map((p) => [p.id, p.name ?? p.slug])),
   );
+  // A bolo thread is ours: its row wears its show's IdentityMark (ADR-177 § 3).
+  let projectMarkById = $derived(
+    new Map(
+      ($projectsQuery.data?.items ?? []).map((p) => [
+        p.id,
+        { accent: accentVarFor(p), initials: p.initials ?? null, name: p.name ?? p.slug },
+      ]),
+    ),
+  );
 
   function personHref(item: ConversationItem): string | null {
     const workspaceSlug = workspaceSlugById.get(item.workspace_id);
@@ -282,8 +293,28 @@
     movimiento: 'conversations.order_movimiento',
     paso: 'conversations.order_paso',
     nombre: 'conversations.order_nombre',
+    ciudad: 'chat.order_city',
   };
   let orderOptions = ORDERS.map((o) => ({ value: o, label: t(ORDER_WORD[o], locale) }));
+
+  // Zona y Tipo (ADR-177): a city, and a kind of organization or «por libre».
+  // The city is typed (a list of every city of the scope does not exist yet)
+  // and applies on change; the type is a select of the kinds, never «other».
+  let zonaDraft = $state('');
+  $effect(() => {
+    zonaDraft = listFilter.zona ?? '';
+  });
+  function setZona(next: string) {
+    const v = next.trim();
+    if (v !== (listFilter.zona ?? '')) setParams({ zona: v || null });
+  }
+  let claseOptions = $derived([
+    { value: 'any', label: t('chat.any', locale) },
+    ...ORG_CLASSES.map((c) => ({ value: c, label: c === 'solo' ? t('chat.solo', locale) : t(`organization.kind_${c}`, locale) })),
+  ]);
+  function setClase(next: string) {
+    setParams({ clase: next === 'any' ? null : next });
+  }
 
   // The line (plan § 5): alone now, not only with the season.
   let lineFilter = $derived(listFilter.linea ?? 'any');
@@ -373,30 +404,49 @@
   }
   let filterChip = $derived(chipLabel(listFilter));
 
-  // ── The list's chips (ADR-176): Todo · Te toca · Se enfría · Equipo, with
-  //    their figure. They filter the same list; none changes the screen. Te
-  //    toca and Se enfría are the panel's blocks of ADR-117 folded into a
-  //    chip (`?turno=nuestro`, `?temp=fria`, the links the Desk already uses);
-  //    Equipo is the bolos' threads (`?etiqueta=team`). ──
-  type ListChip = 'todo' | 'tetoca' | 'enfria' | 'equipo';
-  const LIST_CHIPS: ListChip[] = ['todo', 'tetoca', 'enfria', 'equipo'];
+  // ── The list's chips (ADR-176 § 4, amended by ADR-177): Todo · Sin
+  //    contactar · Nos toca · Sin noticias · Equipo, with their figure. They
+  //    filter the same list; none changes the screen. Nos toca and Sin
+  //    noticias are the panel's blocks of ADR-117 folded into a chip
+  //    (`?turno=nuestro`, `?temp=fria`, the links the Desk already uses);
+  //    Sin contactar is the relation `never` (`?relacion=never`), a chip only
+  //    while it is most of the list (the first season: 150 cold contacts);
+  //    Equipo is the bolos' threads (`?etiqueta=team`). A chip at 0 is not
+  //    shown, unless it is the one on. ──
+  type ListChip = 'todo' | 'nunca' | 'tetoca' | 'enfria' | 'equipo';
+  const LIST_CHIPS: ListChip[] = ['todo', 'nunca', 'tetoca', 'enfria', 'equipo'];
   const LIST_CHIP_WORD: Record<ListChip, string> = {
     todo: 'chat.chip_all',
+    nunca: 'chat.chip_never',
     tetoca: 'chat.chip_due',
     enfria: 'chat.chip_cold',
     equipo: 'conversations.view_team',
   };
   let listChip = $derived<ListChip>(
-    chip === TEAM ? 'equipo' : listFilter.turno === 'nuestro' ? 'tetoca' : listFilter.temp === 'fria' ? 'enfria' : 'todo',
+    chip === TEAM
+      ? 'equipo'
+      : listFilter.turno === 'nuestro'
+        ? 'tetoca'
+        : listFilter.temp === 'fria'
+          ? 'enfria'
+          : listFilter.relacion === 'never' && !listFilter.temporada
+            ? 'nunca'
+            : 'todo',
   );
   /** A chip's link: the scope and the filters stay, the other chips' params go. */
   function listChipHref(c: ListChip): string {
     const params = new URLSearchParams(page.url.searchParams);
     for (const k of ['turno', 'temp', 'view', 'tipo']) params.delete(k);
+    if (listChip === 'nunca') params.delete('relacion');
     if (c === 'equipo') {
-      for (const k of ['relacion', 'linea', 'envio', 'r', 'temporada', 'orden']) params.delete(k);
+      for (const k of ['relacion', 'linea', 'envio', 'r', 'temporada', 'orden', 'zona', 'clase']) params.delete(k);
       params.set('etiqueta', TEAM);
     } else if (params.get('etiqueta') === TEAM) params.delete('etiqueta');
+    if (c === 'nunca') {
+      // A season segment is relation + season: Sin contactar replaces it whole, so the chip on is this one.
+      if (params.has('temporada')) for (const k of ['temporada', 'linea']) params.delete(k);
+      params.set('relacion', 'never');
+    }
     if (c === 'tetoca') params.set('turno', 'nuestro');
     if (c === 'enfria') params.set('temp', 'fria');
     const qs = params.toString();
@@ -434,15 +484,31 @@
       },
     })),
   );
+  // The panel's read knows no area or type (ADR-177): with either on, its
+  // figures would not be the list's, so the chips go without a figure.
+  let placed = $derived(Boolean(listFilter.zona || listFilter.clase));
+  let counts = $derived(placed ? null : ($countsQuery.data ?? null));
   let chipCount = $derived<Record<ListChip, number | null>>({
-    todo: $countsQuery.data?.total ?? null,
-    tetoca: $countsQuery.data?.due.count ?? null,
-    enfria: $countsQuery.data?.cold.count ?? null,
+    todo: counts?.total ?? null,
+    nunca: counts?.never ?? null,
+    tetoca: counts?.due.count ?? null,
+    enfria: counts?.cold.count ?? null,
     equipo: $teamQuery.data
       ? $teamQuery.data.items.filter((r) => r.kind === 'thread' && r.anchor_kind !== 'conversation' && r.unread_count > 0).length
       : null,
   });
-  let shownChips = $derived(noAccess ? (['equipo'] as ListChip[]) : LIST_CHIPS);
+  /** Sin contactar is a chip while it dominates; any other at 0 is not shown (ADR-177). The one on always is. */
+  function chipShown(c: ListChip): boolean {
+    if (c === listChip || c === 'todo') return true;
+    const n = chipCount[c];
+    // Whether it dominates is a fact of the scope, not of the area or type picked.
+    const all = $countsQuery.data;
+    if (c === 'nunca') return all?.never !== undefined && all.never * 2 > all.total;
+    // Equipo's figure is what is new; the chip goes only when there is no bolo thread at all.
+    if (c === 'equipo') return !$teamQuery.data || $teamQuery.data.items.some((r) => r.kind === 'thread' && r.anchor_kind !== 'conversation');
+    return n !== 0;
+  }
+  let shownChips = $derived(noAccess ? (['equipo'] as ListChip[]) : LIST_CHIPS.filter(chipShown));
 
   /**
    * Todo and Equipo without a filter of the sheet are the common list
@@ -594,7 +660,7 @@
   let sheetFilters = $derived(
     [
       tagFilter ? { key: 'etiqueta', label: optionLabel(tagOptions, tagFilter), clear: () => setTag('any') } : null,
-      listFilter.relacion && !listFilter.temporada
+      listFilter.relacion && !listFilter.temporada && listChip !== 'nunca'
         ? { key: 'relacion', label: relationLabel(listFilter.relacion, locale), clear: () => setRelation('any') }
         : null,
       listFilter.linea && !listFilter.temporada && scopeLines.length > 0
@@ -609,6 +675,8 @@
       listFilter.temp && listFilter.temp !== 'fria'
         ? { key: 'temp', label: t(TEMP_CHIP[listFilter.temp], locale), clear: () => setTemp('any') }
         : null,
+      listFilter.zona ? { key: 'zona', label: listFilter.zona, clear: () => setZona('') } : null,
+      listFilter.clase ? { key: 'clase', label: optionLabel(claseOptions, listFilter.clase), clear: () => setClase('any') } : null,
       orden !== DEFAULT_ORDER ? { key: 'orden', label: t(ORDER_WORD[orden], locale), clear: () => setOrden(DEFAULT_ORDER) } : null,
     ].filter((f) => f !== null),
   );
@@ -616,11 +684,13 @@
   function clearSheetFilters() {
     const season = listFilter.temporada;
     setParams({
-      relacion: season ? (listFilter.relacion ?? null) : null,
+      relacion: season || listChip === 'nunca' ? (listFilter.relacion ?? null) : null,
       linea: season ? (listFilter.linea ?? null) : null,
       envio: null,
       r: null,
       orden: null,
+      zona: null,
+      clase: null,
       temp: listChip === 'enfria' ? 'fria' : null,
       etiqueta: listChip === 'equipo' ? TEAM : null,
     });
@@ -1015,6 +1085,7 @@
           </div>
         {/if}
 
+        {#if canEdit}<ChatDoneLine {locale} onclose={() => listHeading?.focus({ preventScroll: true })} />{/if}
         {#if mixed}
           <ConversationFeed
             filters={{ projectIds: filterIds.projectIds, workspaceIds: filterIds.workspaceIds, enabled: !scopeUnresolved }}
@@ -1026,6 +1097,9 @@
             {tagNames}
             {locale}
             importEmptyState={canEdit}
+            editable={canEdit}
+            projectMark={(id) => projectMarkById.get(id) ?? null}
+            onchange={refreshLists}
             activeId={wide ? (opened?.id ?? null) : null}
             onopen={openFeedRow}
             activeThread={wide && group ? `${group.performanceId}/${group.facetId ?? ''}` : null}
@@ -1051,6 +1125,7 @@
             counted
             activeId={wide ? (opened?.id ?? null) : null}
             onopen={openTableRow}
+            onchange={refreshLists}
           />
         {/if}
       </div>
@@ -1101,6 +1176,13 @@
         <Select label={t('conversations.line', locale)} options={lineOptions} bind:value={() => lineFilter, setLine} />
       {/if}
       <Select label={t('chat.temp', locale)} options={tempOptions} bind:value={() => tempFilter, setTemp} />
+      <Input
+        label={t('chat.zone', locale)}
+        maxlength={ZONA_MAX}
+        bind:value={zonaDraft}
+        onchange={() => setZona(zonaDraft)}
+      />
+      <Select label={t('chat.kind', locale)} options={claseOptions} bind:value={() => listFilter.clase ?? 'any', setClase} />
       {#if canBulkSend(chip) && (mailoutOptions.length > 1 || listFilter.envio)}
         <Select label={t('conversations.mailout', locale)} options={mailoutOptions} bind:value={() => mailoutFilter, setMailout} />
         {#if listFilter.envio}

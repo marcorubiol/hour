@@ -1,11 +1,14 @@
 <script lang="ts">
   /**
    * Una fila de la lista de Conversaciones con forma de chat (ADR-176): el
-   * monograma de con quién (la organización, ADR-102; un hilo de bolo, con
-   * trazo discontinuo: es un grupo), su nombre y cuándo; lo último que se
-   * dijo y cuántos sin leer; y una línea pequeña de contexto (el turno, sólo
-   * «te toca» en tinta, la etiqueta, el proyecto, el bolo). Tres líneas, la
-   * misma fila para una conversación y para un hilo del equipo.
+   * monograma de con quién (la organización, ADR-102: cuadrado; una persona
+   * sola, redondo, ADR-177 § 3) o, en un hilo de bolo, el `IdentityMark` de su
+   * espectáculo, porque el grupo es nuestro; su nombre con qué es y dónde
+   * («sala · Girona», «por libre · Lleida», ADR-177 § 2) y cuándo; lo último
+   * que se dijo y cuántos sin leer; y una línea pequeña de contexto (el turno,
+   * sólo «nos toca» en tinta, la etiqueta, el proyecto, el bolo) con, al final,
+   * su acción (`act`: «Ya está»). Tres líneas, la misma fila para una
+   * conversación y para un hilo del equipo.
    *
    * El nombre es el enlace de la fila y la cubre entera. `active` marca la
    * que está abierta al lado (escritorio, dos paneles). En modo selección la
@@ -13,11 +16,18 @@
    */
   import type { Snippet } from 'svelte';
   import ChatMonogram from '$lib/components/ChatMonogram.svelte';
+  import IdentityMark from '$lib/components/IdentityMark.svelte';
 
   interface Props {
     href: string | null;
     title: string;
-    /** Un hilo de un bolo: monograma de trazo discontinuo. */
+    /** Persona (redondo) u organización (cuadrado); ADR-177 § 3. */
+    shape?: 'person' | 'organization';
+    /** Qué es y dónde, tras el nombre («sala», «Girona»). */
+    words?: string[];
+    /** Un hilo de un bolo: es nuestro, lleva el `IdentityMark` de su espectáculo. */
+    mark?: { accent: string; initials?: string | null; name: string } | null;
+    /** Sin `mark`, un hilo de bolo aún lleva el monograma de trazo discontinuo. */
     group?: boolean;
     /** ISO del último movimiento y cómo se lee. */
     at?: string | null;
@@ -37,11 +47,16 @@
     picking?: boolean;
     pick?: Snippet;
     picked?: boolean;
+    /** Una acción de la fila, al final de la línea de contexto, por encima del enlace. */
+    act?: Snippet;
   }
 
   let {
     href,
     title,
+    shape = 'organization',
+    words = [],
+    mark = null,
     group = false,
     at = null,
     when = '',
@@ -55,6 +70,7 @@
     picking = false,
     pick,
     picked = false,
+    act,
   }: Props = $props();
 
 </script>
@@ -68,8 +84,15 @@
   data-group={group || undefined}
 >
   {#if picking && pick}<span class="chat__pick">{@render pick()}</span>{/if}
-  <span class="chat__mono"><ChatMonogram name={title} {group} /></span>
+  <span class="chat__mono"
+    >{#if mark}<IdentityMark accent={mark.accent} initials={mark.initials} name={mark.name} size="var(--chat-mono)" />{:else}<ChatMonogram
+        name={title}
+        {shape}
+        {group}
+      />{/if}</span
+  >
   <span class="chat__top">
+    <span class="chat__name">
     {#if href}
       <a class="chat__title" {href} aria-current={active ? 'true' : undefined} data-peek={onopen ? 'off' : undefined} onclick={onopen}
         >{title}</a
@@ -77,6 +100,8 @@
     {:else}
       <span class="chat__title">{title}</span>
     {/if}
+    {#if words.length > 0}<span class="chat__words">{words.join(' · ')}</span>{/if}
+    </span>
     {#if at}<time class="chat__when" datetime={at}>{when}</time>{/if}
   </span>
   <span class="chat__mid">
@@ -87,9 +112,12 @@
         ><span aria-hidden="true">{unread}</span>{#if unreadLabel}<span class="visually-hidden">{unreadLabel}</span>{/if}</span
       >{/if}
   </span>
-  {#if context.length > 0}
-    <span class="chat__ctx">
-      {#each context as c, i (i)}<span class:is-ink={c.ink}>{c.text}</span>{/each}
+  {#if context.length > 0 || act}
+    <span class="chat__foot">
+      <span class="chat__ctx">
+        {#each context as c, i (i)}<span class:is-ink={c.ink}>{c.text}</span>{/each}
+      </span>
+      {#if act}<span class="chat__act">{@render act()}</span>{/if}
     </span>
   {/if}
 </div>
@@ -103,7 +131,7 @@
       grid-template-areas:
         'mono top'
         'mono mid'
-        'mono ctx';
+        'mono foot';
       column-gap: var(--space-s);
       row-gap: var(--space-2xs);
       align-items: baseline;
@@ -123,7 +151,7 @@
       grid-template-areas:
         'pick mono top'
         'pick mono mid'
-        'pick mono ctx';
+        'pick mono foot';
     }
     .chat__pick {
       grid-area: pick;
@@ -163,7 +191,14 @@
     .chat__mid {
       grid-area: mid;
     }
+    .chat__name {
+      display: flex;
+      align-items: baseline;
+      gap: var(--space-xs);
+      min-inline-size: 0;
+    }
     .chat__title {
+      flex-shrink: 1;
       min-inline-size: 0;
       overflow: hidden;
       color: var(--text-color);
@@ -187,6 +222,16 @@
     a.chat__title:focus-visible::after {
       outline: var(--focus-width) solid var(--focus-color);
       outline-offset: calc(-1 * var(--focus-width));
+    }
+    /* Qué es y dónde: la palabra que explica el monograma (ADR-177 § 2). */
+    .chat__words {
+      flex-shrink: 2;
+      min-inline-size: 0;
+      overflow: hidden;
+      font-size: var(--text-s);
+      color: var(--text-faint);
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .chat__when {
       flex-shrink: 0;
@@ -227,8 +272,20 @@
       line-height: 1;
     }
 
+    .chat__foot {
+      grid-area: foot;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--space-s);
+      min-inline-size: 0;
+    }
+    .chat__act {
+      position: relative;
+      z-index: var(--z-raised);
+      flex-shrink: 0;
+    }
     .chat__ctx {
-      grid-area: ctx;
       min-inline-size: 0;
       overflow: hidden;
       font-family: var(--font-mono);

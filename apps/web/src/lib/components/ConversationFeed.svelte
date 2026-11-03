@@ -8,8 +8,10 @@
    * nuevos se suman a los de su conversación y se lee dentro de ella.
    *
    * `tag` acota: una etiqueta (las de la conversación), o `team`, sólo los
-   * hilos de los bolos (el chip Equipo). Solo lectura: se escribe en la
-   * ficha, y abrirla la deja leída. Sin realtime (ADR-083 §2): se recarga al
+   * hilos de los bolos (el chip Equipo). Se escribe en la ficha, y abrirla
+   * la deja leída; desde la fila, sólo «Ya está» (`ChatDone`), a quien edita.
+   * Cada fila dice con quién en palabras (`chatWho`, ADR-177 § 2 y § 3); un
+   * hilo de bolo lleva el `IdentityMark` de su espectáculo. Sin realtime (ADR-083 §2): se recarga al
    * volver a la pestaña y cada 30 s, como los hilos.
    */
 
@@ -17,12 +19,13 @@
   import { toStore } from 'svelte/store';
   import { fetchJSON } from '$lib/api';
   import ChatRow from '$lib/components/ChatRow.svelte';
+  import ChatDone from '$lib/components/ChatDone.svelte';
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import ConversationsImportEmpty from '$lib/components/ConversationsImportEmpty.svelte';
   import Button from '$lib/components/Button.svelte';
   import { viewerTimeZone } from '$lib/datetime';
   import { t, type Locale } from '$lib/i18n';
-  import { chatWhen } from '$lib/chat-row';
+  import { chatWhen, chatWho } from '$lib/chat-row';
   import { eventKindLabel, type ConversationEventKind } from '$lib/conversation';
   import { relationLabel } from '$lib/conversation-relation';
   import { SALES, TEAM, keyLabel, type WorkspaceTag } from '$lib/conversation-tags';
@@ -46,6 +49,12 @@
     locale: Locale;
     /** Who can add one: an empty scope says «Trae tu agenda» instead of «nothing yet». */
     importEmptyState?: boolean;
+    /** Who edits conversations: a row that needs a reply offers «Ya está». */
+    editable?: boolean;
+    /** The identity of a project, for a bolo thread's mark (ADR-177 § 3). */
+    projectMark?: (id: string) => { accent: string; initials?: string | null; name: string } | null;
+    /** After «Ya está» or its undo: the lists read again. */
+    onchange?: () => void;
     /** La conversación abierta al lado (escritorio). */
     activeId?: string | null;
     /** Abrir al lado en vez de navegar; sin ella, el enlace va a la ficha. */
@@ -66,6 +75,9 @@
     tagNames,
     locale,
     importEmptyState = false,
+    editable = false,
+    projectMark,
+    onchange,
     activeId = null,
     onopen,
     activeThread = null,
@@ -180,9 +192,12 @@
         <li data-testid="feed-row" data-kind={row.kind}>
           {#if row.kind === 'conversation'}
             {@const l = lastOf(row)}
+            {@const who = chatWho({ kind: row.org_kind, solo: row.solo, city: row.city }, locale)}
             <ChatRow
               href={href(row)}
               title={row.title ?? '—'}
+              shape={who.shape}
+              words={who.words}
               at={row.last_at}
               when={row.last_at ? chatWhen(row.last_at, locale, tz) : ''}
               unread={row.unread_count}
@@ -192,12 +207,17 @@
               context={contextOf(row)}
               active={activeId === row.id}
               onopen={onopen ? (e) => onopen(row, e) : undefined}
+              act={editable && onchange && row.due === 'reply' ? done : undefined}
             />
+            {#snippet done()}
+              <ChatDone conversationId={row.id} name={row.title ?? ''} {locale} refresh={onchange!} />
+            {/snippet}
           {:else}
             <ChatRow
               href={groupHref(row, workspaceSlugById.get(row.workspace_id)) ?? feedHref(row, workspaceSlugById.get(row.workspace_id))}
               title={[feedTitle(row), feedThreadName(row, locale)].filter(Boolean).join(' · ')}
               group
+              mark={projectMark?.(row.project_id) ?? null}
               at={row.last_message_at}
               when={chatWhen(row.last_message_at, locale, tz)}
               unread={row.unread_count}

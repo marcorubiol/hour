@@ -29,3 +29,29 @@ export function chatWhen(iso: string, locale: Locale, tz: string, now: Date = ne
   if (days > 1 && days < 7) return localeWeekdayShort(day, tag);
   return localeDayMonthNear(day, today, tag);
 }
+
+/**
+ * Con quién es la fila (ADR-177 § 2 y § 3): la forma de su monograma y las
+ * palabras de al lado del nombre. Una organización que es una sola persona y
+ * se llama como ella (`solo`, de `conversation_feed`, la única regla) se
+ * enseña como persona: redonda y «por libre», sin «organización». Si no, cuadrada, con su tipo; sin tipo (o «otra»), sólo la
+ * ciudad, nunca «otro». La ciudad ya llega elegida (la de la organización y,
+ * si no tiene, la de la persona). La forma nunca va sola: siempre con la
+ * palabra.
+ */
+export interface ChatWho {
+  shape: 'person' | 'organization';
+  /** «sala», «Girona»: van tras el nombre, separadas por «·». */
+  words: string[];
+}
+
+export function chatWho(
+  c: { kind?: string | null; solo?: boolean | null; city?: string | null },
+  locale: Locale,
+): ChatWho {
+  const city = c.city?.trim() || null;
+  if (c.solo) return { shape: 'person', words: [t('chat.solo', locale), ...(city ? [city] : [])] };
+  const kind = c.kind && c.kind !== 'other' ? t(`organization.kind_${c.kind}`, locale).toLocaleLowerCase(LOCALE_TAG[locale]) : null;
+  return { shape: 'organization', words: [kind, city].filter((w): w is string => Boolean(w)) };
+}
+

@@ -5631,7 +5631,9 @@ export type Database = {
       }
       conversation_feed: {
         Args: {
+          p_city?: string
           p_ids_only?: boolean
+          p_kind?: string
           p_limit?: number
           p_line?: string
           p_list?: boolean

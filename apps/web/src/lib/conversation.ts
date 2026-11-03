@@ -349,6 +349,12 @@ export interface ConversationItem extends Tables<'conversation'> {
   tags: string[];
   /** New for the caller (`conversation_feed`); absent where the list does not read it. */
   unread_count?: number;
+  /**
+   * With whom, as the lens's list says it (ADR-177 § 2 y 3, `conversation_feed`):
+   * the organization's kind (never `other`), whether it is one person named
+   * like it, and its city (else its contact's). Absent outside the lens.
+   */
+  place?: { kind: string | null; solo: boolean; city: string | null };
   /** Its bolos without money (ADR-138 § 3); absent without `read:performance` or when unread. */
   bolos?: ConversationBolo[];
   /** The last mailout it received (plan de la lista § 3). */

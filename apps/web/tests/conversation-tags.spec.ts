@@ -8,7 +8,7 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  * E2E · etiquetas de conversación, fase 2 (ADR-138 § 1 y 2).
  *
  * 1. Desde ADR-176 la etiqueta es un filtro, no un chip: la fila de chips es
- *    All · Your turn · Cooling · Team, y Press (por la URL) es el valor del
+ *    All · Our turn · No news · Team (those at 0 hidden), y Press (por la URL) es el valor del
  *    select Tag de «Filter ▾» y un chip que se quita. Con «Select» (las
  *    acciones en bloque son de todas, plan de la lista § 6.2) y sin «Write to
  *    N» (el envío es de Difusión) ni temporada.
@@ -67,7 +67,10 @@ test.describe('conversation tags', () => {
       // 1. The chips, Todo active; Press is the Tag filter. Selection, but no bulk send and no season outside Difusión.
       const chips = page.locator('.conversations__chips [data-chip]');
       await expect(chips.first()).toHaveAttribute('data-chip', 'todo');
-      await expect(chips.last()).toHaveAttribute('data-chip', 'equipo');
+      // A chip at 0 is not shown (ADR-177): only All, the one on, may read 0.
+      for (const n of await page.locator('.conversations__chips [data-chip]:not([data-chip="todo"]) .conversations__chip-n').allTextContents()) {
+        expect(n).not.toBe('0');
+      }
       await expect(page.locator('.conversations__chips [data-chip="todo"]')).toHaveAttribute('aria-current', 'page');
       await expect(page.locator('.conversations__chips [data-chip="press"]')).toHaveCount(0);
       await expect(page.locator('.conversations__active')).toContainText('Press');

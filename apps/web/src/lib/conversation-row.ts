@@ -23,6 +23,8 @@ export interface RowTurn {
   /** Desde cuándo, o el día del seguimiento. */
   since: string;
   tone: 'ours' | 'late' | 'theirs';
+  /** Por qué: una respuesta pendiente (la que «Ya está» cierra), un seguimiento, o les toca. */
+  reason: 'reply' | 'follow_up' | 'theirs';
 }
 
 /** El turno de una fila: una respuesta pendiente, un seguimiento vencido o su turno. */
@@ -37,6 +39,7 @@ export function rowTurn(
       word: t('overview.turn_ours_cap', locale),
       since: relativeContactDate(turn.since, locale, now.getTime()),
       tone: turn.days >= LATE_DAYS ? 'late' : 'ours',
+      reason: 'reply',
     };
   }
   if (followUpDue(row, now)) {
@@ -45,10 +48,11 @@ export function rowTurn(
       word: t('overview.follow_up_cap', locale),
       since: dayMonth(day, locale),
       tone: daysSince(day, now) >= LATE_DAYS ? 'late' : 'ours',
+      reason: 'follow_up',
     };
   }
   if (turn) {
-    return { word: t('overview.turn_theirs_cap', locale), since: relativeContactDate(turn.since, locale, now.getTime()), tone: 'theirs' };
+    return { word: t('overview.turn_theirs_cap', locale), since: relativeContactDate(turn.since, locale, now.getTime()), tone: 'theirs', reason: 'theirs' };
   }
   return null;
 }

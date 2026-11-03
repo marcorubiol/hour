@@ -4,7 +4,8 @@
  *
  *   · la página sale de `conversation_feed` en modo lista (fase 3, migración
  *     20261022200000): alcance, etiqueta del chip, búsqueda, filtros (relación,
- *     línea, temporada, turno, temperatura, envío), orden (§ 4; los filtros de
+ *     línea, temporada, turno, temperatura, envío; zona y tipo desde
+ *     20261103120000, ADR-177), orden (§ 4; los filtros de
  *     bloque en el de su bloque), total y ventana, en una llamada. Las reglas
  *     son las de `$lib/conversation-overview` escritas en SQL; el test RLS
  *     `conversation-feed-list.test.ts` compara cada filtro con la lectura del
@@ -64,6 +65,8 @@ export function listPageArgs(query: ListPageQuery): Record<string, unknown> {
     p_temp: f.temp ?? null,
     p_mailout_id: f.envio ?? null,
     p_mailout_pick: f.envio ? (f.r ?? 'todos') : null,
+    p_kind: f.clase ?? null,
+    p_city: f.zona?.trim() || null,
     p_ids_only: Boolean(query.idsOnly),
   };
   return Object.fromEntries(Object.entries(args).filter(([, v]) => v !== null && v !== false));
