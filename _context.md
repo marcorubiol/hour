@@ -33,8 +33,8 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
 ## Producción (verificado 2026-11-03)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`9263105a`**, `dirty:false`, builtAt
-  2026-11-03T04:46Z (Conversaciones como app de mensajería, ADR-176; 112; 109 en móvil; antes, línea de cifras del Planificador en las cuatro vistas; ADR-155 a 175: el público con pantalla, fases 1 a 3: listas, alta con doble confirmación, importación e invitaciones; base «contacto profesional del sector»; Ajustes › Este espacio con datos fiscales como bloque, plantilla del correo por espacio, materiales en la hoja de ruta, calendario «solo lo mío», Planificador con Temporada, caché por esquema, fichas de organización y sala, contrato del bolo, Cuentas para la gestoría, gastos por persona, sala con su organización, fusión de organizaciones, textos guardados; lo anterior, en `CHANGELOG.md`). `main` (`dec8d778`) lleva además el código del 104 y los specs al día; la migración del 104 sin aplicar.
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`16e87b79`**, `dirty:false`, builtAt
+  2026-11-03T06:28Z (Hour de un vistazo, ADR-177: la fila de la lista con persona u organización, tipo y lugar, turno, Zona y Tipo, «Ya está» (114); el cuadro de escribir y el grupo del bolo dicen quién lo lee (113); barra lateral sin «Ámbitos» (116); el pie de cada invitación en el idioma de su suscripción (104). Antes, 110, 112 y 109 en móvil; lo anterior, en `CHANGELOG.md`).
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free, con keepalive diario
   (`.github/workflows/keepalive.yml`) contra la pausa por inactividad. Pasar a Pro antes de la beta, aún no
