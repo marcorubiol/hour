@@ -124,7 +124,6 @@
     <RailPulse now={clockNow} {locale} />
   {/if}
   <div class="side-sec">
-    <div class="side-sec__h">{t('shell.scopes', locale)}</div>
     <button
       type="button"
       class="srow srow--every"
