@@ -9,15 +9,19 @@
  */
 
 import { fetchJSON } from './api';
-import type { BoloLite } from './bolo-pick';
+import type { MoneyBolo } from './money';
 
+/**
+ * Los bolos del proyecto, la fila entera de Cuentas: el selector lee lo suyo
+ * (`BoloLite`) y la ficha del proyecto, el caché (ADR-177 § 4).
+ */
 export function projectBolosQueryOptions(projectId: string, enabled = true) {
   return {
     queryKey: ['money-bolos', 'project', projectId] as const,
     enabled: enabled && Boolean(projectId),
     retry: false,
     queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchJSON<{ items: BoloLite[] }>(
+      fetchJSON<{ items: MoneyBolo[] }>(
         `/api/money/bolos?project_ids=${encodeURIComponent(projectId)}&limit=500`,
         signal,
       ),

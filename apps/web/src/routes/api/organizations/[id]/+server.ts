@@ -2,7 +2,7 @@
  * GET /api/organizations/:key?workspace_id=:workspace — la ficha de una
  * organización (ADR-159): la organización, sus conversaciones de todos los
  * proyectos (lo justo para «Falta»; la lista la lee `/api/conversations` con
- * `organization_id`), sus bolos (`conversations_bolos`, sin dinero) y sus
+ * `organization_id`), sus bolos (`conversations_bolos`, con su caché sólo para quien lee dinero) y sus
  * contactos: los de sus conversaciones y quien la tiene en su dossier, y las
  * salas que programa (`venue.organization_id`, 92, ADR-170). `key`
  * es el id o el slug. RLS decide cada lectura: una conversación privada de
@@ -27,7 +27,7 @@ import * as v from 'valibot';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { conversationRelation, type ConversationDbItem } from '$lib/conversation';
 import { TURN_EMBEDS, loadConversationBolos, setLastTurnEmbed } from '$lib/server/conversation-overview';
-import { ORGANIZATION_KINDS, type OrganizationFile, type OrgConversationContact, type OrgStaff, type OrgVenue } from '$lib/organization-record';
+import { ORGANIZATION_KINDS, type OrgBolo, type OrgProject, type OrganizationFile, type OrgConversationContact, type OrgStaff, type OrgVenue } from '$lib/organization-record';
 import type { OrgMergeLine } from '$lib/organization-merge';
 import { pgErrorResponse } from '$lib/server/errors';
 import { json, UUID_RE } from '$lib/server/http';
@@ -71,7 +71,7 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
 
     const convSearch = new URLSearchParams({
       select:
-        `id,next_action_at,last_contacted_at,custom_fields,not_now_at,not_now_until,first_contacted_at,contacted_undated,regular:conversation_regular,project:project_id(id,slug,name),contacts:conversation_contact(person_id,role,since,until,is_primary,person:workspace_person!conversation_contact_workspace_person_fkey(slug,full_name,email,phone)),${TURN_EMBEDS}`,
+        `id,next_action_at,last_contacted_at,custom_fields,not_now_at,not_now_until,first_contacted_at,contacted_undated,regular:conversation_regular,project:project_id(id,slug,name,accent,initials),contacts:conversation_contact(person_id,role,since,until,is_primary,person:workspace_person!conversation_contact_workspace_person_fkey(slug,full_name,email,phone)),${TURN_EMBEDS}`,
       workspace_id: `eq.${workspaceId}`,
       organization_id: `eq.${o.id}`,
       deleted_at: 'is.null',
@@ -88,7 +88,7 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
       limit: '200',
     });
     type ConvRow = ConversationDbItem & {
-      project: { id: string; slug: string; name: string } | null;
+      project: OrgProject | null;
       contacts: OrgConversationContact[];
     };
     const venueSearch = new URLSearchParams({
@@ -120,7 +120,8 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
 
     // Sin `read:performance` la RPC no devuelve nada, así que un bolo nunca
     // hace fallar la ficha.
-    const bolos = await loadConversationBolos(env, jwt, conversations.data.map((c) => c.id));
+    const bolos = [...(await loadConversationBolos(env, jwt, conversations.data.map((c) => c.id))).values()].flat();
+    const fees = await loadBoloFees(env, jwt, bolos);
 
     const file: OrganizationFile = {
       organization: o,
@@ -133,7 +134,10 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
       contacts: conversations.data.flatMap((c) => c.contacts ?? []),
       staff: staff.data,
       venues: venues.data,
-      bolos: [...bolos.values()].flat(),
+      bolos: bolos.map((b): OrgBolo => {
+        const fee = fees.get(b.bolo_id);
+        return fee ? { ...b, ...fee } : b;
+      }),
       can_merge: admin.data[0] === true,
       merges: merges.data,
     };
@@ -146,6 +150,42 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
     );
   }
 };
+
+/**
+ * El caché de esos bolos (ADR-177 § 4: «bolos con importe»), por la misma
+ * puerta que Cuentas: `list_money_bolos` sólo devuelve filas a quien lee
+ * dinero en su proyecto. Sin ellas, o si falla, la ficha sale sin cifras: el
+ * dinero nunca hace fallar la ficha, y enmascarado y vacío se ven igual.
+ */
+async function loadBoloFees(
+  env: SupabaseEnv,
+  jwt: string,
+  bolos: readonly { bolo_id: string; project_id: string }[],
+): Promise<Map<string, { fee_amount: number | null; fee_currency: string | null }>> {
+  const out = new Map<string, { fee_amount: number | null; fee_currency: string | null }>();
+  if (bolos.length === 0) return out;
+  const wanted = new Set(bolos.map((b) => b.bolo_id));
+  try {
+    const { data } = await pgPostRpc<{ id: string; fee_amount: number | null; fee_currency: string | null }>(
+      env,
+      'list_money_bolos',
+      jwt,
+      {
+        p_project_ids: [...new Set(bolos.map((b) => b.project_id))],
+        // Filtros en unión: sólo los proyectos, o saldría todo el espacio.
+        p_workspace_ids: null,
+        p_line_ids: null,
+        p_from: null,
+        p_to: null,
+        p_limit: 500,
+      },
+    );
+    for (const r of data) if (wanted.has(r.id)) out.set(r.id, { fee_amount: r.fee_amount, fee_currency: r.fee_currency });
+  } catch {
+    // Sin dinero no hay cifra; la ficha sigue.
+  }
+  return out;
+}
 
 const PatchSchema = v.object({
   name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200)),

@@ -1,9 +1,11 @@
 <script lang="ts">
   /**
    * Organization detail (ADR-159): the venue or whoever programs it, the one
-   * a sales conversation is with (ADR-102). Its conversations across the
-   * projects of the space, its bolos, its contacts and its fiscal data, in
-   * the shape of every record (ADR-139 p2): head, «Falta», blocks, Detalles.
+   * a sales conversation is with (ADR-102). «Todo lo que tenemos con ella»
+   * (ADR-177 § 4): one row per project with its colour, each the chat with
+   * it, its bolos with their fee under it; its contacts with role and phone;
+   * its fiscal data. The project's page is its mirror (`MirrorRows`). In the
+   * shape of every record (ADR-139 p2): head, «Falta», blocks, Detalles.
    *
    * One record, two frames (ADR-139 p1 A): the page and the vistazo draw
    * this component. One column on purpose: the vistazo is narrow.
@@ -28,7 +30,7 @@
   import Select from '$lib/components/Select.svelte';
   import Input from '$lib/components/Input.svelte';
   import MissingBand, { type MissingItem } from '$lib/components/MissingBand.svelte';
-  import ConversationTable from '$lib/components/ConversationTable.svelte';
+  import MirrorRows, { type MirrorRow } from '$lib/components/MirrorRows.svelte';
   import FiscalIdentity from '$lib/components/FiscalIdentity.svelte';
   import OrganizationMergeDialog, { type OrgMergeResult } from '$lib/components/OrganizationMergeDialog.svelte';
   import { undoOpen } from '$lib/organization-merge';
@@ -37,7 +39,9 @@
   import type { OrganizationFiscalResponse } from '$lib/fiscal';
   import { ORGANIZATION_KINDS, orgBolos, orgContacts, orgMissing, type OrganizationFile } from '$lib/organization-record';
   import { relativeContactDate } from '$lib/conversation';
-  import { performanceStatusLabel } from '$lib/performance';
+  import { boloLine } from '$lib/sheet-mirror';
+  import { relationLabel, relationTone, type Relation } from '$lib/conversation-relation';
+  import { accentVarFor } from '$lib/utils/accent';
   import { dayMonthYear, dayMonthYearTs, localDayISO } from '$lib/datetime';
   import { spaceCrumb } from '$lib/record-crumbs';
   import { safeHref } from '$lib/utils/safe-url';
@@ -98,9 +102,42 @@
   let contacts = $derived(file ? orgContacts(file.contacts, file.staff, today) : []);
   let bolos = $derived(file ? orgBolos(file.bolos, today) : []);
   let projectOf = $derived(new Map((file?.conversations ?? []).map((c) => [c.id, c.project])));
-  let projectById = $derived(
-    new Map((file?.conversations ?? []).flatMap((c) => (c.project ? [[c.project.id, c.project] as const] : []))),
-  );
+
+  // One row per project (its conversation with this organization, ADR-102 § 3),
+  // the one with the nearest live bolo first; each row is the chat, and under
+  // it its bolos with their fee.
+  let projectRows = $derived.by<MirrorRow[]>(() => {
+    if (!file || !org) return [];
+    const orgName = org.name;
+    const nearest = new Map<string, number>();
+    bolos.forEach((b, i) => {
+      if (!nearest.has(b.conversation_id)) nearest.set(b.conversation_id, i);
+    });
+    return [...file.conversations]
+      .sort((a, b) => (nearest.get(a.id) ?? Infinity) - (nearest.get(b.id) ?? Infinity))
+      .map((c) => ({
+        key: c.id,
+        href: `/h/${workspaceSlug}/conversation/${c.id}`,
+        title: c.project?.name ?? t('conversations.conversation', locale),
+        mark: c.project
+          ? { kind: 'project' as const, accent: accentVarFor(c.project), initials: c.project.initials }
+          : { kind: 'organization' as const },
+        badge: { label: relationLabel(c.relation as Relation, locale), tone: relationTone(c.relation as Relation) },
+        bolos: bolos
+          .filter((b) => b.conversation_id === c.id)
+          .map((b) =>
+            boloLine(
+              { ...b, id: b.bolo_id },
+              {
+                locale,
+                href: b.performance_slug ? `/h/${workspaceSlug}/performance/${b.performance_slug}` : null,
+                // The room, when it is not the organization's own name.
+                where: b.venue_name && b.venue_name !== orgName ? b.venue_name : null,
+              },
+            ),
+          ),
+      }));
+  });
 
   let placeLine = $derived(org ? [org.city, org.country].filter(Boolean).join(', ') : '');
   let kindWord = $derived(org?.kind && org.kind !== 'other' ? t(`organization.kind_${org.kind}`, locale) : '');
@@ -385,48 +422,20 @@
       </p>
     {/each}
 
-    <section class="organization__section" aria-label={t('lens.conversations', locale)}>
-      {#if file.conversations.length > 0}
-        <BlockHead title={t('lens.conversations', locale)} count={file.conversations.length}>
+    <!-- Todo lo que tenemos con ella (ADR-177 § 4): una fila por proyecto con su
+         color, que lleva a su conversación, y debajo sus bolos con importe. -->
+    <section class="organization__section" aria-label={t('organization.projects', locale)} data-testid="organization-projects">
+      {#if projectRows.length > 0}
+        <BlockHead title={t('organization.projects', locale)} count={projectRows.length}>
           <button type="button" class="block-head__act" onclick={() => (addOpen = true)}>{t('person.add_to_project', locale)}</button>
         </BlockHead>
-        <ConversationTable
-          filters={{ organizationId: org.id, workspaceIds: [workspaceId] }}
-          titleBy="project"
-          counted
-          personBase={`/h/${workspaceSlug}/person`}
-          conversationHref={(item) => `/h/${workspaceSlug}/conversation/${item.id}`}
-        />
+        <MirrorRows rows={projectRows} />
       {:else}
-        <EmptyLine label={t('lens.conversations', locale)} text={t('organization.no_conversations', locale)}>
+        <EmptyLine label={t('organization.projects', locale)} text={t('organization.no_conversations', locale)}>
           <button type="button" class="empty-line__act" onclick={() => (addOpen = true)}>{t('person.add_to_project', locale)}</button>
         </EmptyLine>
       {/if}
     </section>
-
-    {#if bolos.length > 0}
-      <section class="organization__section" aria-label={t('conversations.bolos', locale)} data-testid="organization-bolos">
-        <BlockHead title={t('conversations.bolos', locale)} count={bolos.length} />
-        <ul class="organization__rows" role="list">
-          {#each bolos as b (b.bolo_id)}
-            {@const when = b.first_performed_at ? dayMonthYearTs(b.first_performed_at) : t('conversations.bolo_undated', locale)}
-            {@const project = projectById.get(b.project_id)?.name ?? ''}
-            <li>
-              <span class="organization__row-day">{when}</span>
-              <span class="organization__row-main">
-                {#if b.performance_slug}
-                  <a class="organization__row-link" href={`/h/${workspaceSlug}/performance/${b.performance_slug}`}>{project || when}</a>
-                {:else}
-                  {project || when}
-                {/if}
-                {#if b.function_count > 1}<span class="organization__faint">{' · '}{t('perf.bolo_functions_other', locale, { n: b.function_count })}</span>{/if}
-              </span>
-              <span class="organization__row-meta">{performanceStatusLabel(b.status, locale)}</span>
-            </li>
-          {/each}
-        </ul>
-      </section>
-    {/if}
 
     {#if file.venues?.length}
       <!-- The rooms it programs (92, ADR-170): each venue says it, here they meet. -->
@@ -453,8 +462,9 @@
               <span class="organization__row-main">
                 {c.role ?? ''}{#if c.until}{c.role ? ' · ' : ''}{t('organization.contact_until', locale, { date: dayMonthYear(c.until) })}{/if}
               </span>
-              {#if c.reach && c.until === null}
-                <a class="organization__row-meta" href={c.reachHref}>{c.reach}</a>
+              {#if c.until === null}
+                {#if c.phone}<a class="organization__row-meta" href={`tel:${c.phone}`}>{c.phone}</a>{/if}
+                {#if c.email}<a class="organization__row-meta" href={`mailto:${c.email}`}>{c.email}</a>{/if}
               {/if}
             </li>
           {/each}
@@ -556,14 +566,6 @@
       border-block-end: var(--line-hairline) solid var(--border-color-light);
     }
 
-    .organization__row-day {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--tracking-s);
-      color: var(--text-muted);
-      min-inline-size: var(--record-label-inline);
-    }
-
     .organization__row-name {
       min-inline-size: var(--record-label-inline);
       font-size: var(--text-s);
@@ -577,13 +579,6 @@
       color: var(--text-color);
     }
 
-    .organization__row-link {
-      color: inherit;
-      text-decoration: none;
-    }
-
-    .organization__row-link:hover,
-    .organization__row-link:focus-visible,
     .organization__row-name:hover,
     .organization__row-name:focus-visible {
       text-decoration: underline;
@@ -592,10 +587,6 @@
     .organization__row-meta {
       font-size: var(--text-xs);
       color: var(--text-muted);
-    }
-
-    .organization__faint {
-      color: var(--text-faint);
     }
 
     /* Who left: still a link to their file, in the quiet ink. */

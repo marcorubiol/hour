@@ -35,7 +35,7 @@
   type CastMember = {
     id: string;
     role: string;
-    person: { id: string; slug: string | null; full_name: string; email: string | null } | null;
+    person: { id: string; slug: string | null; full_name: string; email: string | null; phone: string | null } | null;
   };
   type Candidate = { person_id: string; slug: string | null; full_name: string };
   type CastResponse = { workspace_id: string; cast: CastMember[]; people: Candidate[] };
@@ -136,6 +136,8 @@
           <li class="cast__row">
             <span class="cast__name">{m.person?.full_name ?? t('perf.cast_unknown_person', locale)}</span>
             <span class="cast__role">{m.role}</span>
+            <!-- Role and phone, as the venue's contacts (ADR-177 § 4: the two records mirror). -->
+            {#if m.person?.phone}<a class="cast__phone" href={`tel:${m.person.phone}`}>{m.person.phone}</a>{/if}
             <Button
               variant="secondary"
               size="s"
@@ -212,6 +214,11 @@
     font-size: var(--text-xs);
     letter-spacing: var(--tracking-s);
     color: var(--text-faint);
+  }
+
+  .cast__phone {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
   }
 
   /* Two field rows and the verb under them (ADR-139 p4). */

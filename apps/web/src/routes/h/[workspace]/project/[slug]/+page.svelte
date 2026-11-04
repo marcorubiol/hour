@@ -34,8 +34,14 @@
   import { toStore } from 'svelte/store';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import YNotes from '$lib/components/YNotes.svelte';
-  import { dayMonthYear, localDayISO } from '$lib/datetime';
-  import { appLocale, t } from '$lib/i18n';
+  import { dayMonthYear, localDayISO, localeDayMonth, localeWeekdayShort } from '$lib/datetime';
+  import { LOCALE_TAG, appLocale, t } from '$lib/i18n';
+  import { fetchJSON } from '$lib/api';
+  import { projectBolosQueryOptions } from '$lib/bolo-queries';
+  import { booksHref } from '$lib/bolo-pick';
+  import { fmtCurrency } from '$lib/money';
+  import { boloLine, bolosBySala, projectFacts } from '$lib/sheet-mirror';
+  import MirrorRows, { type MirrorRow } from '$lib/components/MirrorRows.svelte';
 
   const locale = appLocale();
 
@@ -120,6 +126,63 @@
       : [],
   );
 
+  // ── The mirror of the venue's record (ADR-177 § 4) ───────────────────
+  // Its bolos with their fee, one row per venue, and the facts line with
+  // money. The feed answers only who reads money here (`list_money_bolos`):
+  // without it there are no rows and no line, as everywhere money hides.
+  const today = localDayISO();
+  const bolosQuery = createQuery(toStore(() => projectBolosQueryOptions(project?.id ?? '')));
+  let projectBolos = $derived($bolosQuery.data?.items ?? []);
+
+  let salaRows = $derived.by<MirrorRow[]>(() =>
+    bolosBySala(projectBolos, today).map((g, i) => ({
+      key: g.conversationId ?? `venue-${i}`,
+      href: g.conversationId ? `/h/${workspaceSlug}/conversation/${g.conversationId}` : null,
+      title: g.name || t('perf.bolo_unnamed', locale),
+      mark: { kind: 'organization' as const },
+      // A bolo lives in Cuentas, where the money is written (ADR-043).
+      bolos: g.bolos.map((b) => boloLine(b, { locale, href: booksHref(b.project_id, { boloId: b.id }), where: b.city })),
+    })),
+  );
+
+  // «3 por responder»: the conversations of the project whose turn is ours,
+  // the lens's own filter, counted by the list's total.
+  const oursQuery = createQuery(
+    toStore(() => ({
+      queryKey: ['conversations', { project_ids: project?.id ?? null, turno: 'nuestro', limit: 1 }] as const,
+      enabled: Boolean(project?.id),
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchJSON<{ total: number }>(
+          `/api/conversations?${new URLSearchParams({ project_ids: project!.id, turno: 'nuestro', limit: '1' })}`,
+          signal,
+        ),
+    })),
+  );
+
+  let factsLine = $derived.by<string[]>(() => {
+    const f = projectFacts(projectBolos, today);
+    const out: string[] = [];
+    if (f.firmFunctions > 0) {
+      out.push(
+        f.firmFunctions === 1
+          ? t('project.facts_functions_one', locale)
+          : t('project.facts_functions', locale, { n: f.firmFunctions }),
+      );
+    }
+    if (f.sold.length > 0) {
+      out.push(t('project.facts_sold', locale, { amount: f.sold.map(([c, a]) => fmtCurrency(a, c, locale)).join(' + ') }));
+    }
+    if (f.next) {
+      const tag = LOCALE_TAG[locale];
+      const day = localDayISO(new Date(f.next.at));
+      const when = [`${localeWeekdayShort(day, tag)} ${localeDayMonth(day, tag)}`, f.next.city].filter(Boolean).join(' · ');
+      out.push(t('project.facts_next', locale, { when }));
+    }
+    const ours = $oursQuery.data?.total ?? 0;
+    if (ours > 0) out.push(t('project.facts_to_answer', locale, { n: ours }));
+    return out;
+  });
+
   function formatDate(iso: string | null): string {
     if (!iso) return '';
     return dayMonthYear(iso);
@@ -144,6 +207,8 @@
               → {/if}{#if project.ends_on}{formatDate(project.ends_on)}{/if}</span
           >
         {/if}
+        <!-- «¿Cómo va la gira?» (ADR-177 § 4): the facts line with money. -->
+        {#each factsLine as fact (fact)}<span data-testid="project-fact">{fact}</span>{/each}
       {/if}
     {/snippet}
     {#snippet band()}
@@ -152,6 +217,14 @@
   </RecordHead>
 
   <RelationshipStub projectId={project?.id ?? null} {workspaceSlug} />
+
+  {#if salaRows.length > 0}
+    <!-- The mirror of the venue's projects: one row per venue, its bolos with their fee. -->
+    <section class="project__block" aria-label={t('conversations.bolos', locale)} data-testid="project-bolos">
+      <BlockHead title={t('conversations.bolos', locale)} count={salaRows.reduce((n, r) => n + r.bolos.length, 0)} />
+      <MirrorRows rows={salaRows} />
+    </section>
+  {/if}
 
   {#if project}
     <section class="project__notes" aria-label={t('person.notes', locale)}>

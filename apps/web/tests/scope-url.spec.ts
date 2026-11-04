@@ -127,8 +127,8 @@ test('a scope change on a person opened from Conversations lands back on Convers
   await expect(page.locator('[data-testid="feed-row"]').first()).toBeVisible();
 
   // Since ADR-176 the lens's chat rows do not link the contact: the person is
-  // reached through the organization's record (ADR-159), whose list still
-  // does. The lens stays the last one visited, which is what this pins. The
+  // reached through the organization's record (ADR-159), whose contacts
+  // block does (ADR-177 § 4). The lens stays the last one visited, which is what this pins. The
   // first conversation of the space with a contact (a run cut short leaves
   // rows without a person).
   const org = await page.evaluate(async () => {
@@ -144,13 +144,7 @@ test('a scope change on a person opened from Conversations lands back on Convers
   await page.goto(`/h/playwright/organization/${encodeURIComponent(org!)}`);
   await waitForLoaded(page);
   // From a record's page the contact's link opens the person's page, not the vistazo.
-  await page
-    .getByTestId('organization-record')
-    .locator('[data-testid="conversation-row"]')
-    .filter({ has: page.locator('a.crow-contact') })
-    .first()
-    .locator('a.crow-contact')
-    .click();
+  await page.getByTestId('organization-contacts').locator('a.organization__row-name').first().click();
   await page.waitForURL(/\/h\/[^/]+\/person\//);
   await waitForLoaded(page);
 

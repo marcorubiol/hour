@@ -20,8 +20,8 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
 /**
  * A fixture conversation with a contact, on its organization's record
  * (ADR-159): since ADR-176 the lens's chat rows do not link the contact; the
- * record's list (ConversationTable's normal mode) still does. Only in the
- * `playwright` space: `muk-cia` is real data.
+ * record's contacts block does (ADR-177 § 4: name, role and phone). Only in
+ * the `playwright` space: `muk-cia` is real data.
  */
 async function contactRow(page: Page) {
   await page.goto('/h/conversations?etiqueta=sales&scope=s:playwright');
@@ -38,11 +38,7 @@ async function contactRow(page: Page) {
   expect(org, 'a fixture conversation with a contact').toBeTruthy();
   await page.goto(`/h/playwright/organization/${encodeURIComponent(org!)}`);
   await waitForLoaded(page);
-  return page
-    .getByTestId('organization-record')
-    .locator('[data-testid="conversation-row"]')
-    .filter({ has: page.locator('a.crow-contact') })
-    .first();
+  return page.getByTestId('organization-contacts').locator('li').filter({ has: page.locator('a.organization__row-name') }).first();
 }
 
 test.describe('person file', () => {
@@ -58,7 +54,7 @@ test.describe('person file', () => {
     // segment on a person URL is browsing context, not ownership — `person`
     // is a global entity resolved by RLS, so any accessible segment renders
     // it. Don't pin the URL to one space.
-    const firstName = (await contactRow(page)).locator('a.crow-contact');
+    const firstName = (await contactRow(page)).locator('a.organization__row-name');
     const personName = (await firstName.innerText()).trim();
     // From a record's page a link opens the page, not the vistazo (ADR-139 p1).
     await firstName.click();

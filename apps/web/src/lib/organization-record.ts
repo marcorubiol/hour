@@ -8,6 +8,7 @@
 
 import type { ConversationBolo } from './conversation-relation';
 import type { OrgMergeLine } from './organization-merge';
+import { orderBolos } from './sheet-mirror';
 import { MISSING_MAX, personMissing, type PersonMissing, type PersonMissingConversation } from './record-missing';
 
 /** Los tipos de organización (`workspace_organization_kind_check`). */
@@ -77,6 +78,18 @@ export interface OrgVenue {
   city: string | null;
 }
 
+/** El proyecto de una conversación, con su color (ADR-177 § 4: una fila por espectáculo). */
+export interface OrgProject {
+  id: string;
+  slug: string;
+  name: string;
+  accent: string | null;
+  initials: string | null;
+}
+
+/** Un bolo de la organización, con su importe si quien mira lee dinero. */
+export type OrgBolo = ConversationBolo & { fee_amount?: number | null; fee_currency?: string | null };
+
 /** Lo que lee la ficha: `GET /api/organizations/:key`. */
 export interface OrganizationFile {
   organization: {
@@ -96,12 +109,13 @@ export interface OrganizationFile {
     id: string;
     relation: string;
     next_action_at: string | null;
-    project: { id: string; slug: string; name: string } | null;
+    project: OrgProject | null;
   }>;
   contacts: OrgConversationContact[];
   staff: OrgStaff[];
   venues: OrgVenue[];
-  bolos: ConversationBolo[];
+  /** Con su caché cuando quien mira lee dinero (`list_money_bolos`); sin él, sin cifra. */
+  bolos: OrgBolo[];
   /** «Fusionar con…» (84): only the space's admin. */
   can_merge?: boolean;
   /** The merges this one absorbed, not undone (admin only). */
@@ -117,6 +131,9 @@ export interface OrgContact {
   /** Cómo se le escribe: el correo, si no el teléfono. */
   reach: string | null;
   reachHref: string | null;
+  /** Para llamar: la ficha de la sala sirve para preparar una llamada (ADR-177 § 4). */
+  phone: string | null;
+  email: string | null;
   /** Ya no está: el último día en que fue contacto. Null mientras sigue. */
   until: string | null;
   primary: boolean;
@@ -138,8 +155,11 @@ export function orgContacts(
   today: string,
 ): OrgContact[] {
   const byPerson = new Map<string, OrgContact>();
-  const reachOf = (email: string | null, phone: string | null) =>
-    email ? { reach: email, reachHref: `mailto:${email}` } : phone ? { reach: phone, reachHref: `tel:${phone}` } : { reach: null, reachHref: null };
+  const reachOf = (email: string | null, phone: string | null) => ({
+    phone: phone || null,
+    email: email || null,
+    ...(email ? { reach: email, reachHref: `mailto:${email}` } : phone ? { reach: phone, reachHref: `tel:${phone}` } : { reach: null, reachHref: null }),
+  });
 
   for (const c of conversationContacts) {
     if (!c.person) continue;
@@ -173,6 +193,8 @@ export function orgContacts(
       // Su dossier dice que está ahí: sigue, aunque su conversación acabara.
       prev.until = null;
       prev.role ??= s.title;
+      prev.phone ??= s.phone || null;
+      prev.email ??= s.email || null;
       continue;
     }
     byPerson.set(s.person_id, {
@@ -196,20 +218,9 @@ export function orgContacts(
 
 const DEAD = new Set(['cancelled']);
 
-/**
- * Sus bolos, en el orden en que importan: los que vienen, el más cercano
- * primero; después los pasados, el último primero; los que no tienen fecha,
- * al final. Un cancelado no se cuenta.
- */
-export function orgBolos(bolos: readonly ConversationBolo[], today: string): ConversationBolo[] {
-  const live = bolos.filter((b) => !DEAD.has(b.status));
-  const day = (b: ConversationBolo) => (b.last_performed_at ?? b.first_performed_at)?.slice(0, 10) ?? null;
-  const coming = live.filter((b) => day(b) !== null && day(b)! >= today);
-  const past = live.filter((b) => day(b) !== null && day(b)! < today);
-  const undated = live.filter((b) => day(b) === null);
-  coming.sort((a, b) => a.first_performed_at!.localeCompare(b.first_performed_at!));
-  past.sort((a, b) => day(b)!.localeCompare(day(a)!));
-  return [...coming, ...past, ...undated];
+/** Sus bolos, en el orden en que importan (`orderBolos`, el mismo del espejo). */
+export function orgBolos<B extends ConversationBolo>(bolos: readonly B[], today: string): B[] {
+  return orderBolos(bolos, today);
 }
 
 export type OrgMissing = { kind: 'fiscal' } | PersonMissing;

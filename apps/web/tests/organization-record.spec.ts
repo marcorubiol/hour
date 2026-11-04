@@ -9,7 +9,7 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  *
  * 1. Una conversación con solo la organización; el título de su ficha (el
  *    nombre de la sala) lleva a la ficha de la organización.
- * 2. La ficha: su nombre, la conversación titulada por su proyecto y el
+ * 2. La ficha: su nombre, la fila de su proyecto (el chat con ella) y el
  *    bloque de datos fiscales, que la ficha de conversación ya no tiene.
  * 3. La lectura: por slug o por id, y sin `workspace_id` es un 400.
  *
@@ -69,9 +69,13 @@ test.describe('organization record', () => {
       await expect(page).toHaveURL(new RegExp(`/h/playwright/organization/${found!.organization!.slug}$`));
       const record = page.getByTestId('organization-record');
       await expect(record.locator('h1')).toContainText(ORG);
-      await expect(record.getByTestId('conversation-row').getByRole('link', { name: PROJECT, exact: true })).toBeVisible({
-        timeout: 10_000,
-      });
+      // ADR-177 § 4: una fila por proyecto, que es el chat con ella.
+      const projectRow = record.getByTestId('organization-projects').getByTestId('mirror-row');
+      await expect(projectRow.getByRole('link', { name: PROJECT, exact: true })).toBeVisible({ timeout: 10_000 });
+      await expect(projectRow.getByRole('link', { name: PROJECT, exact: true })).toHaveAttribute(
+        'href',
+        `/h/playwright/conversation/${found!.id}`,
+      );
 
       // 3. La lectura: por id igual que por slug; sin espacio, 400.
       const reads = await page.evaluate(

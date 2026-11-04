@@ -100,6 +100,16 @@ describe('orgContacts', () => {
     expect(out).toHaveLength(1);
     expect(out[0]).toMatchObject({ reach: 'm@x.cat', reachHref: 'mailto:m@x.cat' });
   });
+
+  test('el teléfono va aparte, para llamar (ADR-177 § 4); el dossier lo completa', () => {
+    const staff: OrgStaff[] = [{ person_id: 'm', slug: 'm', full_name: 'M', title: null, email: null, phone: '972 00 00 00' }];
+    const out = orgContacts(
+      [{ ...contact({ person_id: 'm', role: 'técnica' }), person: { slug: 'm', full_name: 'M', email: 'm@x.cat', phone: null } }],
+      staff,
+      TODAY,
+    );
+    expect(out[0]).toMatchObject({ role: 'técnica', phone: '972 00 00 00', email: 'm@x.cat' });
+  });
 });
 
 describe('orgBolos', () => {

@@ -40,12 +40,12 @@ const BodySchema = v.object({
 
 /** The person shape both halves of the response share. */
 const PERSON_SELECT =
-  'person:workspace_person!cast_member_workspace_person_fkey(id:person_id,slug,full_name,email)';
+  'person:workspace_person!cast_member_workspace_person_fkey(id:person_id,slug,full_name,email,phone)';
 
 type CastRow = {
   id: string;
   role: string;
-  person: { id: string; slug: string | null; full_name: string; email: string | null } | null;
+  person: { id: string; slug: string | null; full_name: string; email: string | null; phone: string | null } | null;
 };
 
 type CandidateRow = {
