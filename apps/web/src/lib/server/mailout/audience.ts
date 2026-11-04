@@ -12,6 +12,7 @@
  *     público (`audience_confirmation_context`), vestido con la plantilla del
  *     97 (ADR-172). Sin dominio del público verificado no sale nada.
  *   · `confirmSubscription`: el POST de /c/<token>.
+ *   · `addByHand`: el alta a mano desde la página de una lista (tarea 101).
  * El cron diario de purga está en worker-cron.ts (lo empaqueta wrangler).
  *
  * Frontera (ADR-110, ampliada por ADR-173 § 4): la clave de servicio solo por
@@ -19,6 +20,8 @@
  */
 
 import type { MailSendingProvider } from '$lib/mailout';
+import { addPersonOutcome, type AddPersonResult, type SubscriptionStatus } from '$lib/audience';
+import { pgGet, pgPostRpc } from '$lib/supabase';
 import { mailHtml, mailTemplate } from '$lib/mail-template';
 import { detectLocale, t, type Locale } from '$lib/i18n';
 import { allowRequest } from '$lib/server/rate-limit';
@@ -283,3 +286,63 @@ export async function confirmSubscription(
   return ok === true;
 }
 
+
+/**
+ * Un alta a mano (tarea 101; plan § 4.4): `add_audience_subscription` con el
+ * JWT de quien apunta (editar el público), que deja la suscripción sin
+ * confirmar con el evento `admin`. La base no devuelve el token a quien
+ * apunta (nota a ADR-173, punto 4): si pide confirmación, el token sale de
+ * la RPC de máquina y el correo se manda aquí mismo, para decir en pantalla
+ * si salió. Si no la pide, se lee el estado para decir por qué.
+ */
+export async function addByHand(
+  env: MailoutEnv,
+  jwt: string,
+  audienceId: string,
+  person: { address: string; name?: string | null; language?: string | null },
+  opts: { fetchFn?: typeof fetch; providerFor?: (kind: MailSendingProvider) => SendingProvider } = {},
+): Promise<AddPersonResult | null> {
+  const added = await pgPostRpc<{ subscription_id: string | null; send_confirmation: boolean }>(
+    env,
+    'add_audience_subscription',
+    jwt,
+    {
+      p_audience_id: audienceId,
+      p_address: person.address,
+      p_name: person.name?.trim() || null,
+      p_language: person.language ?? null,
+    },
+  );
+  const row = added.data[0];
+  if (!row?.subscription_id) return null;
+  const id = row.subscription_id;
+  if (!row.send_confirmation) {
+    const sub = await pgGet<{ status: SubscriptionStatus }>(env, 'audience_subscription', jwt, {
+      search: { select: 'status', id: `eq.${id}` },
+    });
+    return { subscription_id: id, outcome: addPersonOutcome(false, null, sub.data[0]?.status ?? null) };
+  }
+  const token = await serviceRpc<string | null>(
+    env,
+    'audience_confirmation_token',
+    { p_subscription_id: id },
+    opts.fetchFn,
+  );
+  // Sin token, el cupo cambió entre las dos llamadas: lo mismo que «ya se le mandó».
+  if (!token) return { subscription_id: id, outcome: 'recent' };
+  let send: 'sent' | 'no_route' | 'failed';
+  try {
+    send = (await sendConfirmation(env, id, token, opts)) ? 'sent' : 'no_route';
+  } catch (err) {
+    console.error(
+      JSON.stringify({
+        level: 'error',
+        kind: 'audience_confirmation_failed',
+        subscription: id,
+        message: err instanceof Error ? err.message : String(err),
+      }),
+    );
+    send = 'failed';
+  }
+  return { subscription_id: id, outcome: addPersonOutcome(true, send, 'pending') };
+}

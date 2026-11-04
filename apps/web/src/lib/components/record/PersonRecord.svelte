@@ -47,6 +47,8 @@
   import { goto } from '$app/navigation';
   import { openPeek } from '$lib/peek.svelte';
   import PersonMergeDialog, { type MergeResult } from '$lib/components/PersonMergeDialog.svelte';
+  import AudienceAlsoLine from '$lib/components/audience/AudienceAlsoLine.svelte';
+  import type { AudienceAlso } from '$lib/audience';
   import { useScopes } from '$lib/stores/scopes.svelte';
   import { undoOpen, type PersonMergeLine, type UnmergedPair } from '$lib/person-merge';
 
@@ -158,6 +160,25 @@
   ]);
 
   let file = $derived($query.data ?? null);
+
+  // «También está apuntada a {lista}» (ADR-173 § 7; tarea 103): solo con
+  // correo; a quien no lee el público del espacio, la RLS no le da ninguna.
+  const alsoQuery = createQuery(
+    toStore(() => {
+      const personId = file?.person.id ?? '';
+      const workspaceId = contextWorkspaceId;
+      return {
+        queryKey: ['audience-also', workspaceId, personId] as const,
+        enabled: Boolean(personId && workspaceId && file?.person.email),
+        meta: { persist: false },
+        queryFn: ({ signal }: { signal: AbortSignal }) =>
+          fetchJSON<{ items: AudienceAlso[] }>(
+            `/api/audience/also?workspace_id=${encodeURIComponent(workspaceId)}&person_id=${encodeURIComponent(personId)}`,
+            signal,
+          ),
+      };
+    }),
+  );
   let loading = $derived($query.isPending);
 
   // ── Note composer ────────────────────────────────────────────────────
@@ -606,6 +627,7 @@
           <li class="person__langs">{file.person.languages.join(' · ')}</li>
         {/if}
       </ul>
+      <AudienceAlsoLine items={$alsoQuery.data?.items ?? []} {workspaceSlug} {locale} />
       {#each file.merges ?? [] as m (m.id)}
         <p class="merged-line" data-testid="person-merged">
           {t('person.merge_line', locale, { name: m.drop_name ?? '—', date: dayMonthYearTs(m.merged_at) })}

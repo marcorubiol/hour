@@ -15,7 +15,11 @@
    *     revisión (la revisa Marco, como el primer envío real).
    *   · Personas: estado, fecha, origen y buscador; por persona, las
    *     invitaciones que recibió, «Dar de baja» y, solo admin, «Borrar sus
-   *     datos» y «Prueba del consentimiento».
+   *     datos» y «Prueba del consentimiento»; «Apuntar a alguien» (alta a
+   *     mano, tarea 101) y, en su ficha, «También está apuntada a» las otras
+   *     listas del espacio (tarea 103).
+   * «Añadir a un borrador» pone la lista en una invitación en borrador que ya
+   * existe, en vez de crear otra (tarea 103).
    * Mientras el envío sea simulado, la lista no se abre a gente real (§ 5.4).
    */
   import { page } from '$app/state';
@@ -36,7 +40,10 @@
     embedCode,
     formUrl,
     readAudienceCsv,
+    draftChoices,
+    type AudienceAlso,
     type AudienceLanguage,
+    type InvitationDraft,
     type CsvRead,
     type ImportBasis,
     type ImportResult,
@@ -53,6 +60,8 @@
   import Select from '$lib/components/Select.svelte';
   import Textarea from '$lib/components/Textarea.svelte';
   import MailoutTestMode from '$lib/components/MailoutTestMode.svelte';
+  import AudienceAddPerson from '$lib/components/audience/AudienceAddPerson.svelte';
+  import AudienceAlsoLine from '$lib/components/audience/AudienceAlsoLine.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
 
   const locale = appLocale();
@@ -191,6 +200,36 @@
     onError: failed,
   });
 
+  // ── Añadir a un borrador (tarea 103) ───────────────────────────────────
+  let draftOpen = $state(false);
+  let draftId = $state<string | null>(null);
+  const drafts = createQuery(
+    toStore(() => ({
+      queryKey: ['audience-drafts', id] as const,
+      enabled: draftOpen,
+      meta: { persist: false },
+      queryFn: ({ signal }: { signal: AbortSignal }) => fetchJSON<{ items: InvitationDraft[] }>(`/api/audience/${id}/drafts`, signal),
+    })),
+  );
+  let draftList = $derived(draftChoices($drafts.data?.items ?? [], id));
+  function openDrafts() {
+    draftId = null;
+    draftOpen = true;
+  }
+  const toDraft = createMutation({
+    mutationFn: (mailoutId: string) => mutateJSON('PUT', `/api/mailout/${mailoutId}/audience`, { audience_id: id }),
+    onSuccess: (_r, mailoutId) => {
+      draftOpen = false;
+      void queryClient.invalidateQueries({ queryKey: ['mailout', mailoutId] });
+      void queryClient.invalidateQueries({ queryKey: ['mailout-list'] });
+      void goto(`/h/${workspaceSlug}/mailout/${mailoutId}`);
+    },
+    onError: failed,
+  });
+
+  // ── Apuntar a alguien (tarea 101) ──────────────────────────────────────
+  let addOpen = $state(false);
+
   // ── Importar ──────────────────────────────────────────────────────────
   let csv = $state<CsvRead | null>(null);
   let filename = $state<string | null>(null);
@@ -275,7 +314,10 @@
       enabled: Boolean(openPerson),
       meta: { persist: false },
       queryFn: ({ signal }: { signal: AbortSignal }) =>
-        fetchJSON<{ invitations: SubscriptionInvitation[] }>(`/api/audience/subscription/${openPerson?.id}`, signal),
+        fetchJSON<{ invitations: SubscriptionInvitation[]; also: AudienceAlso[] }>(
+          `/api/audience/subscription/${openPerson?.id}`,
+          signal,
+        ),
     })),
   );
   function showPerson(p: SubscriptionRow) {
@@ -345,6 +387,7 @@
       {#if canEdit && a.status !== 'archived'}
         <div class="al__acts">
           <Button size="s" loading={$invite.isPending} onclick={() => $invite.mutate()}>{t('audience.write_invitation', locale)}</Button>
+          <Button size="s" variant="secondary" onclick={openDrafts}>{t('audience.add_to_draft', locale)}</Button>
         </div>
       {/if}
     </header>
@@ -521,7 +564,14 @@
 
     <!-- ── Personas ───────────────────────────────────────────────────── -->
     <section class="al__block" aria-labelledby="al-people">
-      <BlockHead id="al-people" title={t('audience.people', locale)} count={d.subscriptions_total} />
+      <BlockHead id="al-people" title={t('audience.people', locale)} count={d.subscriptions_total}>
+        {#if canEdit && a.status !== 'archived' && a.current_text_version}
+          <Button size="s" onclick={() => (addOpen = true)}>{t('audience.add_person', locale)}</Button>
+        {/if}
+      </BlockHead>
+      {#if canEdit && a.status !== 'archived' && !a.current_text_version}
+        <p class="al__hint">{t('audience.add_needs_text', locale)}</p>
+      {/if}
       {#if d.subscriptions_total > d.subscriptions.length}
         <p class="al__hint">{t('audience.people_truncated', locale, { n: d.subscriptions.length, total: d.subscriptions_total })}</p>
       {/if}
@@ -556,6 +606,7 @@
         {t(`audience.sub_${openPerson.status}`, locale)} · {t(`audience.source_${openPerson.source}`, locale)} ·
         {t(`audience.basis_${openPerson.basis_kind}`, locale)}
       </p>
+      <AudienceAlsoLine items={$history.data?.also ?? []} {workspaceSlug} {locale} />
       <h3 class="eyebrow eyebrow--sub">{t('audience.person_invitations', locale)}</h3>
       {#if $history.isLoading}
         <p class="al__hint">{t('audience.loading', locale)}</p>
@@ -593,6 +644,50 @@
           {t('audience.unsubscribe_person', locale)}
         </Button>
       {/if}
+    {/snippet}
+  </Dialog>
+{/if}
+
+{#if d && a}
+  <AudienceAddPerson
+    bind:open={addOpen}
+    audienceId={a.id}
+    listName={a.name}
+    languages={a.languages}
+    defaultLanguage={a.default_language}
+    {locale}
+  />
+
+  <Dialog bind:open={draftOpen} title={t('audience.add_to_draft', locale)} description={a.name} size="s">
+    {#if $drafts.isLoading}
+      <p class="al__hint">{t('audience.loading', locale)}</p>
+    {:else if $drafts.isError}
+      <p class="load-fail" role="alert">
+        <span>{t('audience.load_error', locale)}</span>
+        <Button variant="secondary" size="xs" onclick={() => $drafts.refetch()}>{t('ui.retry', locale)}</Button>
+      </p>
+    {:else if draftList.length === 0}
+      <p class="al__hint" data-testid="audience-drafts-empty">{t('audience.draft_none', locale)}</p>
+    {:else}
+      <fieldset class="al__basis" data-testid="audience-drafts">
+        {#each draftList as m (m.id)}
+          <Radio
+            name="al-draft"
+            value={m.id}
+            bind:group={draftId}
+            label={`${m.subject || t('mailout.untitled', locale)} · ${dayMonthYear(m.created_at)}${
+              m.audience ? ` · ${t('audience.draft_has_list', locale, { list: m.audience.name })}` : ''
+            }`}
+          />
+        {/each}
+      </fieldset>
+      <p class="al__hint">{t('audience.draft_hint', locale)}</p>
+    {/if}
+    {#snippet actions()}
+      <Button variant="quiet" onclick={() => (draftOpen = false)}>{t('create.cancel', locale)}</Button>
+      <Button loading={$toDraft.isPending} disabled={!draftId} onclick={() => draftId && $toDraft.mutate(draftId)}>
+        {t('audience.draft_go', locale)}
+      </Button>
     {/snippet}
   </Dialog>
 {/if}

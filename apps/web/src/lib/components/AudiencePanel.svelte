@@ -3,7 +3,8 @@
    * Las listas del público de los espacios en pantalla con sus recuentos, al
    * lado de la lista de Envíos (ADR-176; antes la vista Público, ADR-173 § 3).
    * Lista y abre; lo que se edita (la lista, su texto) tiene su página.
-   * «Nueva lista» la crea en borrador y abre su página. Las invitaciones van
+   * «Nueva lista» la crea en borrador y abre su página; «Apuntar» da de alta
+   * a mano a una persona en una lista (tarea 101). Las invitaciones van
    * en la lista de Envíos, con la difusión.
    */
   import { createMutation, createQuery } from '@tanstack/svelte-query';
@@ -19,6 +20,8 @@
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { audienceListQueryOptions } from '$lib/audience-query';
+  import AudienceAddPerson from '$lib/components/audience/AudienceAddPerson.svelte';
+  import type { AudienceSummary } from '$lib/audience';
   import type { NavWorkspace } from '$lib/nav';
 
   interface Props {
@@ -37,6 +40,18 @@
 
   function href(workspaceId: string, path: string): string {
     return `/h/${byId.get(workspaceId)?.slug ?? ''}/${path}`;
+  }
+
+  // ── Apuntar a alguien (tarea 101) ─────────────────────────────────────
+  /** Se apunta en una lista que se edita, no archivada y con su texto vigente (lo que confirmará la persona). */
+  function canAdd(a: AudienceSummary): boolean {
+    return Boolean(data?.access[a.workspace_id]?.edit) && a.status !== 'archived' && a.current_text_version !== null;
+  }
+  let addTo = $state<AudienceSummary | null>(null);
+  let addOpen = $state(false);
+  function openAdd(a: AudienceSummary) {
+    addTo = a;
+    addOpen = true;
   }
 
   // ── Nueva lista ───────────────────────────────────────────────────────
@@ -88,6 +103,9 @@
               <span class="aud__counts">
                 {t('audience.counts', locale, { n: a.counts.confirmed, m: a.counts.pending, k: a.counts.unsubscribed })}
               </span>
+              {#if canAdd(a)}
+                <Button size="xs" variant="quiet" onclick={() => openAdd(a)}>{t('audience.add_person', locale)}</Button>
+              {/if}
             </li>
           {/each}
         </ul>
@@ -113,6 +131,17 @@
     </Button>
   {/snippet}
 </Dialog>
+
+{#if addTo}
+  <AudienceAddPerson
+    bind:open={addOpen}
+    audienceId={addTo.id}
+    listName={addTo.name}
+    languages={addTo.languages}
+    defaultLanguage={addTo.default_language}
+    {locale}
+  />
+{/if}
 
 <style>
   @layer components {

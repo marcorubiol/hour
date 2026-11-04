@@ -202,6 +202,84 @@ export const InvitationCreateSchema = v.object({
 
 export const InvitationAudienceSchema = v.object({ audience_id: v.nullable(uuid) });
 
+/** Alta a mano (tarea 101; `add_audience_subscription`): la persona lo pidió en persona; la confirmación lo prueba. */
+export const AudienceAddSchema = v.object({
+  address: v.pipe(v.string(), v.trim(), v.toLowerCase(), v.maxLength(254), v.regex(/^[^@\s]+@[^@\s]+\.[^@\s]+$/)),
+  name: v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(200))),
+  language: v.nullish(v.picklist(AUDIENCE_LANGUAGES)),
+});
+
+/**
+ * Qué pasó con un alta a mano, para la pantalla:
+ *   · `sent`: queda sin confirmar y le ha salido el correo de confirmación.
+ *   · `no_route`: queda sin confirmar, pero no hay por dónde mandarlo (sin
+ *     dominio del público verificado, o un espacio de prueba y una dirección real).
+ *   · `failed`: el proveedor no aceptó el correo; puede volver a intentarse.
+ *   · `confirmed`: ya estaba confirmada; no se le manda nada.
+ *   · `recent`: ya se le mandó una hace menos de 24 horas, o tres en total.
+ */
+export type AddPersonOutcome = 'sent' | 'no_route' | 'failed' | 'confirmed' | 'recent';
+
+/** POST /api/audience/[id]/people. */
+export interface AddPersonResult {
+  subscription_id: string;
+  outcome: AddPersonOutcome;
+}
+
+/**
+ * El resultado a partir de lo que dijo la base: si `add_audience_subscription`
+ * pidió confirmación, lo que pasó al mandarla; si no, por qué no (ya
+ * confirmada, o el cupo de la persona).
+ */
+export function addPersonOutcome(
+  askedConfirmation: boolean,
+  send: 'sent' | 'no_route' | 'failed' | null,
+  status: SubscriptionStatus | null,
+): AddPersonOutcome {
+  if (askedConfirmation) return send ?? 'no_route';
+  return status === 'confirmed' ? 'confirmed' : 'recent';
+}
+
+/** Otra lista del mismo espacio en la que está la misma dirección (ADR-173 § 7). */
+export interface AudienceAlso {
+  audience_id: string;
+  name: string;
+  status: Exclude<SubscriptionStatus, 'unsubscribed'>;
+}
+
+/**
+ * Las otras listas en las que está apuntada una dirección: sin la baja (de
+ * baja ya no está apuntada), sin la lista desde la que se mira, una vez por
+ * lista y por nombre.
+ */
+export function alsoSubscribed(
+  rows: { audience_id: string; status: SubscriptionStatus; audience: { name: string } | null }[],
+  exceptAudienceId: string | null = null,
+): AudienceAlso[] {
+  const seen = new Set<string>();
+  const out: AudienceAlso[] = [];
+  for (const r of rows) {
+    if (r.status === 'unsubscribed' || !r.audience || r.audience_id === exceptAudienceId || seen.has(r.audience_id)) continue;
+    seen.add(r.audience_id);
+    out.push({ audience_id: r.audience_id, name: r.audience.name, status: r.status });
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Una invitación en borrador a la que se puede poner una lista (tarea 103). */
+export interface InvitationDraft {
+  id: string;
+  subject: string | null;
+  created_at: string;
+  /** La lista que ya lleva, si lleva una: una invitación tiene una sola. */
+  audience: { id: string; name: string } | null;
+}
+
+/** Los borradores que se ofrecen: sin el que ya lleva esta lista; lo último arriba. */
+export function draftChoices(drafts: readonly InvitationDraft[], audienceId: string): InvitationDraft[] {
+  return drafts.filter((d) => d.audience?.id !== audienceId).sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
 // ── El CSV de una importación ──────────────────────────────────────────────
 
 /** Una fila reconocida del fichero. */

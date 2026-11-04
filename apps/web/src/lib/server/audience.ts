@@ -6,7 +6,14 @@
 
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { jwtSubject } from '$lib/server/http';
-import type { AudienceAccess, SubscriptionInvitation } from '$lib/audience';
+import {
+  alsoSubscribed,
+  type AudienceAccess,
+  type AudienceAlso,
+  type InvitationDraft,
+  type SubscriptionInvitation,
+  type SubscriptionStatus,
+} from '$lib/audience';
 
 type MembershipRow = {
   workspace_id: string;
@@ -108,4 +115,77 @@ export async function subscriptionInvitations(
 export async function isWorkspaceAdmin(env: SupabaseEnv, jwt: string, workspaceId: string): Promise<boolean> {
   const r = await pgPostRpc<boolean>(env, 'is_workspace_admin', jwt, { ws_id: workspaceId });
   return r.data[0] === true;
+}
+
+/** La lista de una suscripción, por el nombre de su FK compuesta (`audience_id, workspace_id`), como arriba. */
+export const ALSO_SELECT = 'audience_id,status,audience:audience!audience_subscription_audience_fkey(name)';
+
+/**
+ * «También está apuntada a {lista}» (ADR-173 § 7; plan § 2.3): las listas del
+ * espacio en las que está esa dirección, calculado al leer y sin columna que
+ * una la persona del público con un contacto. Con el JWT: quien no lee el
+ * público del espacio no ve ninguna (la RLS), y quien no lee el dossier no
+ * llega con su dirección.
+ */
+export async function alsoSubscribedTo(
+  env: SupabaseEnv,
+  jwt: string,
+  workspaceId: string,
+  address: string,
+  exceptAudienceId: string | null = null,
+): Promise<AudienceAlso[]> {
+  const clean = address.trim().toLowerCase();
+  if (!clean) return [];
+  const { data } = await pgGet<{ audience_id: string; status: SubscriptionStatus; audience: { name: string } | null }>(
+    env,
+    'audience_subscription',
+    jwt,
+    {
+      search: {
+        select: ALSO_SELECT,
+        workspace_id: `eq.${workspaceId}`,
+        // `address` es citext: `eq.` compara sin mayúsculas.
+        address: `eq.${clean}`,
+        status: 'neq.unsubscribed',
+        limit: '50',
+      },
+    },
+  );
+  return alsoSubscribed(data, exceptAudienceId);
+}
+
+/**
+ * Las invitaciones en borrador del espacio de una lista (tarea 103): las que
+ * quien llama lee (la RLS de `mailout`), con la lista que ya llevan.
+ * Ponerles esta la decide `set_invitation_audience`.
+ */
+export async function invitationDrafts(env: SupabaseEnv, jwt: string, workspaceId: string): Promise<InvitationDraft[]> {
+  const { data } = await pgGet<{ id: string; subject: string | null; created_at: string; audience_id: string | null }>(
+    env,
+    'mailout',
+    jwt,
+    {
+      search: {
+        select: 'id,subject,created_at,audience_id',
+        workspace_id: `eq.${workspaceId}`,
+        kind: 'eq.invitation',
+        status: 'eq.draft',
+        order: 'created_at.desc',
+        limit: '50',
+      },
+    },
+  );
+  const listIds = [...new Set(data.map((m) => m.audience_id).filter((x): x is string => Boolean(x)))];
+  const lists = listIds.length
+    ? await pgGet<{ id: string; name: string }>(env, 'audience', jwt, {
+        search: { select: 'id,name', id: `in.(${listIds.join(',')})` },
+      })
+    : { data: [] as { id: string; name: string }[] };
+  const names = new Map(lists.data.map((l) => [l.id, l.name]));
+  return data.map((m) => ({
+    id: m.id,
+    subject: m.subject,
+    created_at: m.created_at,
+    audience: m.audience_id ? { id: m.audience_id, name: names.get(m.audience_id) ?? '' } : null,
+  }));
 }

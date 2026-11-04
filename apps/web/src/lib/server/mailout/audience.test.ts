@@ -1,5 +1,6 @@
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
+  addByHand,
   composeConfirmation,
   confirmSubscription,
   confirmUrl,
@@ -260,5 +261,110 @@ describe('confirming (/c/<token>)', () => {
     let last: boolean | 'busy' = false;
     for (let i = 0; i < 31; i++) last = await confirmSubscription(env, TOKEN, '203.0.113.7', 'UA', fetchFn);
     expect(last).toBe('busy');
+  });
+});
+
+describe('adding a person by hand (task 101)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  /** PostgREST for both keys: the JWT RPC and table reads by global fetch, the service RPCs by fetchFn. */
+  function pgFetch(answers: Record<string, unknown>) {
+    const calls: { path: string; body: Record<string, unknown> | null; auth: string | null }[] = [];
+    const fn = vi.fn(async (url: string, init: RequestInit = {}) => {
+      const path = new URL(url).pathname.replace('/rest/v1/', '');
+      const headers = new Headers(init.headers);
+      calls.push({ path, body: init.body ? JSON.parse(String(init.body)) : null, auth: headers.get('authorization') });
+      return new Response(JSON.stringify(answers[path.replace('rpc/', '')] ?? null), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fn);
+    return { fetchFn: fn as unknown as typeof fetch, calls };
+  }
+
+  const okProvider: SendingProvider = {
+    kind: 'simulator',
+    registerDomain: vi.fn(),
+    checkDomain: vi.fn(),
+    sendEmail: async () => ({ providerMessageId: 'sim-9', rfcMessageId: null, events: [] }),
+  };
+
+  test('asks the base with the JWT, takes the token with the service key and sends the confirmation', async () => {
+    const { fetchFn, calls } = pgFetch({
+      add_audience_subscription: [{ subscription_id: 's1', send_confirmation: true }],
+      audience_confirmation_token: TOKEN,
+      audience_confirmation_context: [ctx()],
+    });
+    const r = await addByHand(ENV, 'user-jwt', 'a1', { address: 'ana@example.test', name: ' Ana ', language: 'ca' }, {
+      fetchFn,
+      providerFor: () => okProvider,
+    });
+    expect(r).toEqual({ subscription_id: 's1', outcome: 'sent' });
+    expect(calls[0]).toMatchObject({
+      path: 'rpc/add_audience_subscription',
+      body: { p_audience_id: 'a1', p_address: 'ana@example.test', p_name: 'Ana', p_language: 'ca' },
+      auth: 'Bearer user-jwt',
+    });
+    expect(calls.map((c) => c.path)).toEqual([
+      'rpc/add_audience_subscription',
+      'rpc/audience_confirmation_token',
+      'rpc/audience_confirmation_context',
+      'rpc/audience_confirmation_sent',
+    ]);
+    expect(calls[1].body).toEqual({ p_subscription_id: 's1' });
+  });
+
+  test('no confirmation asked: says whether she was confirmed or within the quota', async () => {
+    const confirmed = pgFetch({
+      add_audience_subscription: [{ subscription_id: 's1', send_confirmation: false }],
+      audience_subscription: [{ status: 'confirmed' }],
+    });
+    expect(await addByHand(ENV, 'jwt', 'a1', { address: 'a@b.cd' }, { fetchFn: confirmed.fetchFn })).toEqual({
+      subscription_id: 's1',
+      outcome: 'confirmed',
+    });
+    expect(confirmed.calls.map((c) => c.path)).toEqual(['rpc/add_audience_subscription', 'audience_subscription']);
+    vi.unstubAllGlobals();
+    const recent = pgFetch({
+      add_audience_subscription: [{ subscription_id: 's1', send_confirmation: false }],
+      audience_subscription: [{ status: 'pending' }],
+    });
+    expect((await addByHand(ENV, 'jwt', 'a1', { address: 'a@b.cd' }, { fetchFn: recent.fetchFn }))?.outcome).toBe('recent');
+  });
+
+  test('no route and a provider that refuses are told apart, and neither throws', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const noRoute = pgFetch({
+      add_audience_subscription: [{ subscription_id: 's1', send_confirmation: true }],
+      audience_confirmation_token: TOKEN,
+      audience_confirmation_context: [ctx({ provider: null, from_address: null })],
+    });
+    expect((await addByHand(ENV, 'jwt', 'a1', { address: 'a@b.cd' }, { fetchFn: noRoute.fetchFn }))?.outcome).toBe('no_route');
+    vi.unstubAllGlobals();
+    const refused = pgFetch({
+      add_audience_subscription: [{ subscription_id: 's1', send_confirmation: true }],
+      audience_confirmation_token: TOKEN,
+      audience_confirmation_context: [ctx()],
+    });
+    const down = {
+      kind: 'ses',
+      sendEmail: async () => {
+        throw new Error('ses down');
+      },
+    } as unknown as SendingProvider;
+    const r = await addByHand(ENV, 'jwt', 'a1', { address: 'a@b.cd' }, { fetchFn: refused.fetchFn, providerFor: () => down });
+    expect(r?.outcome).toBe('failed');
+    expect(refused.calls.map((c) => c.path)).toContain('rpc/audience_confirmation_failed');
+  });
+
+  test('a token that no longer comes (the quota moved in between) is «recent», and nothing is sent', async () => {
+    const { fetchFn, calls } = pgFetch({
+      add_audience_subscription: [{ subscription_id: 's1', send_confirmation: true }],
+      audience_confirmation_token: null,
+    });
+    expect((await addByHand(ENV, 'jwt', 'a1', { address: 'a@b.cd' }, { fetchFn }))?.outcome).toBe('recent');
+    expect(calls.map((c) => c.path)).toEqual(['rpc/add_audience_subscription', 'rpc/audience_confirmation_token']);
   });
 });

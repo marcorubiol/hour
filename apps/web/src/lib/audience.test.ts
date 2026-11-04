@@ -6,7 +6,17 @@ import ca from './i18n/ca.json';
 import en from './i18n/en.json';
 import fr from './i18n/fr.json';
 import * as v from 'valibot';
-import { embedCode, formUrl, ImportSchema, parseCsv, readAudienceCsv } from './audience';
+import {
+  addPersonOutcome,
+  alsoSubscribed,
+  AudienceAddSchema,
+  draftChoices,
+  embedCode,
+  formUrl,
+  ImportSchema,
+  parseCsv,
+  readAudienceCsv,
+} from './audience';
 
 describe('el CSV de una importación (plan § 3.6)', () => {
   test('reconoce correo, nombre e idioma por su cabecera, en cualquier idioma y con punto y coma', () => {
@@ -80,5 +90,57 @@ describe('la declaración aceptada es la que guarda la base (plan § 3.6)', () =
         expect(sql, `${key}: ${dict[key]}`).toContain(asSql);
       }
     }
+  });
+});
+
+describe('alta a mano (tarea 101)', () => {
+  test('el esquema limpia la dirección y rechaza lo que no es correo o un idioma que no hay', () => {
+    expect(v.parse(AudienceAddSchema, { address: '  Ana@Example.TEST ', name: ' Ana ' })).toEqual({ address: 'ana@example.test', name: 'Ana' });
+    expect(v.safeParse(AudienceAddSchema, { address: 'no-es-correo' }).success).toBe(false);
+    expect(v.safeParse(AudienceAddSchema, { address: `${'a'.repeat(250)}@b.cd` }).success).toBe(false);
+    expect(v.safeParse(AudienceAddSchema, { address: 'a@b.cd', language: 'de' }).success).toBe(false);
+    expect(v.safeParse(AudienceAddSchema, { address: 'a@b.cd', language: 'ca' }).success).toBe(true);
+  });
+
+  test('qué pasó: con confirmación pedida, lo que dijo el envío; sin ella, confirmada o el cupo', () => {
+    expect(addPersonOutcome(true, 'sent', 'pending')).toBe('sent');
+    expect(addPersonOutcome(true, 'failed', 'pending')).toBe('failed');
+    expect(addPersonOutcome(true, null, 'pending')).toBe('no_route');
+    expect(addPersonOutcome(false, null, 'confirmed')).toBe('confirmed');
+    expect(addPersonOutcome(false, null, 'pending')).toBe('recent');
+    expect(addPersonOutcome(false, null, null)).toBe('recent');
+  });
+
+  test('cada resultado tiene su aviso en los cuatro idiomas', () => {
+    for (const dict of [es, ca, en, fr] as Record<string, string>[]) {
+      for (const o of ['sent', 'no_route', 'failed', 'confirmed', 'recent']) expect(dict[`audience.added_${o}`]).toContain('{address}');
+    }
+  });
+});
+
+describe('«también está apuntada a» y «añadir a un borrador» (tarea 103)', () => {
+  test('las otras listas: sin bajas, sin la de origen, una vez cada una y por nombre', () => {
+    const rows = [
+      { audience_id: 'a3', status: 'confirmed' as const, audience: { name: 'Teatro' } },
+      { audience_id: 'a1', status: 'confirmed' as const, audience: { name: 'Origen' } },
+      { audience_id: 'a2', status: 'pending' as const, audience: { name: 'Barcelona' } },
+      { audience_id: 'a4', status: 'unsubscribed' as const, audience: { name: 'Baja' } },
+      { audience_id: 'a2', status: 'pending' as const, audience: { name: 'Barcelona' } },
+      { audience_id: 'a5', status: 'confirmed' as const, audience: null },
+    ];
+    expect(alsoSubscribed(rows, 'a1')).toEqual([
+      { audience_id: 'a2', name: 'Barcelona', status: 'pending' },
+      { audience_id: 'a3', name: 'Teatro', status: 'confirmed' },
+    ]);
+    expect(alsoSubscribed(rows).map((a) => a.audience_id)).toEqual(['a2', 'a1', 'a3']);
+  });
+
+  test('los borradores: sin el que ya lleva esta lista, lo último arriba', () => {
+    const drafts = [
+      { id: 'm1', subject: 'A', created_at: '2026-11-01T10:00:00Z', audience: null },
+      { id: 'm2', subject: 'B', created_at: '2026-11-03T10:00:00Z', audience: { id: 'a1', name: 'Esta' } },
+      { id: 'm3', subject: 'C', created_at: '2026-11-02T10:00:00Z', audience: { id: 'a2', name: 'Otra' } },
+    ];
+    expect(draftChoices(drafts, 'a1').map((d) => d.id)).toEqual(['m3', 'm1']);
   });
 });
