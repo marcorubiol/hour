@@ -27,6 +27,7 @@ no pide migración primero; las migraciones juntas por el gate de § 34.
 - [ ] 121 de un vistazo, ideas sin dibujar: apuntar una llamada desde el móvil sin buscar la conversación; «llego tarde» en la hoja de ruta del técnico, que avise a producción (quién cambia una hora el mismo día).
 - [ ] 122 de un vistazo, seguimiento del 113: en el grupo del bolo, el papel de cada lector (reparto, técnica) al lado de su nombre. Pide `person_id` en `thread_audience` (migración) y cruzarlo con el reparto y el equipo técnico del bolo; hoy salen sólo nombres.
 - [ ] 111 Conversaciones, después del 110: abrir un correo y verlo entero, tal como llegó (con lo citado, el HTML y los adjuntos). Hoy la sincronización guarda sólo el texto sin lo citado (`trimQuoted`), así que pide traerlo de Gmail al abrirlo (Marco, 2026-11-02).
+- [ ] 123 seguridad (hallado en el 111, 2026-11-04): `record_conversation_event` deja a quien edita una conversación escribir un evento `source='email'` con los metadatos que quiera (buzón, id de Gmail, Message-ID). El 111 se protege al leer (`mail_message_ingested`); falta cerrarlo al escribir: que `source='email'` sólo lo escriba la sincronización.
 - Aparcado: 86 (responsable de tarea) hasta que entre Anouk.
 
 ## PRIMERO — nada. `main` == prod y las dos suites están vivas (2026-07-30, noche)
