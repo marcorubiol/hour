@@ -96,6 +96,14 @@ export interface MailDb {
   ): Promise<void>;
 }
 
+/**
+ * Lo que además usa abrir el original (punto 111): saber, sin fiarse de los
+ * metadatos del evento, que ese correo lo registró Hour desde ese buzón.
+ */
+export interface ServiceMailDb extends MailDb {
+  messageIngested(accountId: string, providerMessageId: string, rfcMessageId: string | null): Promise<boolean>;
+}
+
 class MailDbError extends Error {
   constructor(
     public readonly status: number,
@@ -105,7 +113,10 @@ class MailDbError extends Error {
   }
 }
 
-export function serviceMailDb(env: MailEnv & { SUPABASE_SERVICE_ROLE_KEY: string }, fetchFn: typeof fetch = fetch): MailDb {
+export function serviceMailDb(
+  env: MailEnv & { SUPABASE_SERVICE_ROLE_KEY: string },
+  fetchFn: typeof fetch = fetch,
+): ServiceMailDb {
   const key = env.SUPABASE_SERVICE_ROLE_KEY;
   // Las claves nuevas (`sb_secret_…`) van solo en `apikey`; la legada
   // service_role es un JWT y va también como Bearer.
@@ -145,6 +156,12 @@ export function serviceMailDb(env: MailEnv & { SUPABASE_SERVICE_ROLE_KEY: string
         p_account_id: accountId,
         p_message: message,
         ...(createdBy ? { p_created_by: createdBy } : {}),
+      }),
+    messageIngested: (accountId, providerMessageId, rfcMessageId) =>
+      rpc<boolean>('mail_message_ingested', {
+        p_account_id: accountId,
+        p_provider_message_id: providerMessageId,
+        p_rfc_message_id: rfcMessageId,
       }),
     finish: async (accountId, r) => {
       await rpc('mail_sync_finish', {

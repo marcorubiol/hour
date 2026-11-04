@@ -48,6 +48,7 @@
   import ConversationStatusMenu from '$lib/components/ConversationStatusMenu.svelte';
   import NextActionDialog from '$lib/components/NextActionDialog.svelte';
   import MessageItem from '$lib/components/MessageItem.svelte';
+  import MailOriginal from '$lib/components/MailOriginal.svelte';
   import ConversationComposer, { type ComposerTarget } from '$lib/components/ConversationComposer.svelte';
   import ConversationAcquaintances from '$lib/components/ConversationAcquaintances.svelte';
   import ConversationTags from '$lib/components/ConversationTags.svelte';
@@ -278,6 +279,15 @@
     if (next.has(id)) next.delete(id);
     else next.add(id);
     unfolded = next;
+  }
+
+  // ── Abrir el original entero, traído del buzón (punto 111) ──
+  let originals = $state<Set<string>>(new Set());
+  function toggleOriginal(id: string) {
+    const next = new Set(originals);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    originals = next;
   }
 
   // ── El campo del pie ──
@@ -647,6 +657,8 @@
         {:else if x.kind === 'mail'}
           {@const e = x.event}
           {@const folded = x.long && !unfolded.has(e.id)}
+          <!-- El original entero (citas, HTML, adjuntos), traído del buzón al abrirlo (punto 111). -->
+          {@const hasOriginal = Boolean(e.mail_account_id)}
           <li class="letter" class:letter--ours={e.direction === 'outbound'} data-testid="thread-mail">
             <p class="letter__head">
               <span class="letter__who">{mailWho(e)}</span>
@@ -659,12 +671,24 @@
             {:else}
               <p class="letter__text letter__text--none">{t('thread.mail_empty', locale)}</p>
             {/if}
-            <!-- Abrir el original entero (citas, HTML, adjuntos) es el punto 111: va aquí. -->
-            {#if x.long || (e.direction === 'inbound' && conv.can_edit)}
+            {#if originals.has(e.id)}
+              <MailOriginal conversationId={conv.id} eventId={e.id} />
+            {/if}
+            {#if x.long || hasOriginal || (e.direction === 'inbound' && conv.can_edit)}
               <p class="letter__acts">
                 {#if x.long}
                   <button type="button" class="fact-act" aria-expanded={!folded} onclick={() => toggleFold(e.id)}
                     >{folded ? t('thread.unfold', locale) : t('thread.fold', locale)}</button
+                  >
+                {/if}
+                {#if hasOriginal}
+                  <button
+                    type="button"
+                    class="fact-act"
+                    aria-expanded={originals.has(e.id)}
+                    data-testid="mail-original-toggle"
+                    onclick={() => toggleOriginal(e.id)}
+                    >{originals.has(e.id) ? t('mail.original_close', locale) : t('mail.original_open', locale)}</button
                   >
                 {/if}
                 {#if e.direction === 'inbound'}

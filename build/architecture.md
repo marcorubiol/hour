@@ -232,6 +232,16 @@ No crear usuarios insertando en `auth.users`: usar Auth Admin API/Dashboard.
   contactos y no lista el resto del buzón.
 - Proveedores detrás de `MailAdapter` (`$lib/server/mail/provider.ts`); hoy
   Google. Microsoft será otro adaptador.
+- El original de un correo (punto 111) no se guarda: se trae del buzón al
+  abrirlo (`/api/conversations/:id/events/:eventId/original`, `/view`,
+  `/attachments/:partId`; `$lib/server/mail/original.ts`). Dos llaves: el
+  evento leído con el JWT (su RLS) y `mail_message_ingested` con la clave de
+  servicio (ese mensaje de ese buzón lo registró Hour con ese Message-ID),
+  porque `record_conversation_event` deja escribir eventos de correo con
+  metadatos a mano. El HTML se pinta en un iframe `sandbox` sin scripts ni
+  `allow-same-origin`, con su CSP (`default-src 'none'`) además de la heredada
+  de la app; las imágenes remotas sólo en la vista aparte y pedidas. Los
+  adjuntos salen siempre como descarga (`nosniff`, CSP `sandbox`).
 - Cron cada 10 min: `wrangler deploy worker-entry.js` envuelve la salida del
   adaptador de SvelteKit y le añade `scheduled` (`src/worker-cron.ts`).
 - `conversation.private_to`: una conversación privada solo la ve quien la

@@ -38,7 +38,7 @@ export class ProviderAuthError extends Error {
   }
 }
 class CursorExpiredError extends Error {}
-class ProviderError extends Error {
+export class ProviderError extends Error {
   constructor(
     public readonly status: number,
     message: string,
@@ -194,7 +194,8 @@ interface GmailHeader {
   name: string;
   value: string;
 }
-interface GmailPart {
+export interface GmailPart {
+  partId?: string;
   mimeType?: string;
   filename?: string;
   headers?: GmailHeader[];
@@ -464,6 +465,11 @@ export class GmailClient {
 
   getMessage(id: string): Promise<GmailRawMessage> {
     return this.call(`/messages/${encodeURIComponent(id)}?format=full`);
+  }
+
+  /** Los bytes de un adjunto (base64url), por el id que trae su parte. */
+  getAttachment(messageId: string, attachmentId: string): Promise<{ data?: string; size?: number }> {
+    return this.call(`/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}`);
   }
 
   send(raw: string, threadId?: string | null): Promise<{ id: string; threadId?: string }> {

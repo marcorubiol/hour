@@ -361,6 +361,10 @@
     --thread-bubble-max: min(80%, 30rem);
     /* How much of a long mail shows before it unfolds in place. */
     --thread-fold-lines: 6;
+    /* The original of a mail (point 111): its own document in a frame, tall
+       enough to read without leaving the thread, and the reader can pull it. */
+    --thread-original-block: min(70vh, 40rem);
+    --thread-original-bg: var(--white);
 
     /* ============================================================ */
     /* TYPOGRAPHY                                                     */
