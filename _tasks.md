@@ -15,19 +15,12 @@ no pide migración primero; las migraciones juntas por el gate de § 34.
 - [ ] 95 contract: borrar `performance.readiness`, `line.modules`, `line.dossier_url`, `project.dossier_url`,
   `project.poster_url` (destructiva: staging e inspect).
 - [ ] 98 invitar, al público y a profesionales: decidido (ADR-173, ADR-174, ADR-175, `build/plans/2026-11-01-audience.md`); fases 1 a 3 (esquema, alta pública, listas, importación, invitaciones) en producción desde 2026-11-02 (`49ffb30c`). Quedan la fase 4 (envío real por SES) y la 5 (el editor, que es el 99).
-- [ ] 101 público: alta a mano de una persona en una lista (`add_audience_subscription`, ya en la base, sin pantalla).
-- [ ] 102 público: `{obra}`, `{fecha}` y `{hora}` en la invitación (migración pequeña).
-- [ ] 103 público: «añadir a un borrador existente» desde la lista y «también está apuntada a {lista}».
 - [ ] 105 público: la declaración de clientes de `import_audience` más firme («puedo demostrarlo»; migración).
-- [ ] 106 público: tope de unas 16 listas en la vista Público (3 subpeticiones por lista; Workers Free da 50 por petición). Se cae con Workers Paid o con un recuento en una RPC.
 - [ ] 99 editor de correos bonitos, tipo Mailchimp, para las invitaciones al público y a profesionales (Marco, 2026-11-01: va después del público, opción A; 2026-11-02: sirve a los dos orígenes, ADR-174). Candidato Templatical; plan B GrapesJS + grapesjs-mjml (`research/2026-11-email-builder.md`). Hoy sólo existe la plantilla fija por espacio (ADR-172).
 - [ ] 118 de un vistazo: el primer día como lista de difusión («Sin contactar 150», una frase «empieza por una zona» que se va al escribir a alguien, «Seleccionar todas» y «Escribir a N» con un filtro). Después de 119.
 - [ ] 119 Marco: hacer: enseñar la gramática y la lista con las 152 filas reales a Anouk y a alguien de producción, antes del 118.
 - [ ] 120 de un vistazo, después: la fila de chat en «Te espera» de Hoy y en las fichas, con lo último que se dijo; el bolo como historia con la raya de hoy; la hoja de ruta del técnico (su hoja, el día en orden, «Llamar a…», «Cómo llegar»).
 - [ ] 121 de un vistazo, ideas sin dibujar: apuntar una llamada desde el móvil sin buscar la conversación; «llego tarde» en la hoja de ruta del técnico, que avise a producción (quién cambia una hora el mismo día).
-- [ ] 122 de un vistazo, seguimiento del 113: en el grupo del bolo, el papel de cada lector (reparto, técnica) al lado de su nombre. Pide `person_id` en `thread_audience` (migración) y cruzarlo con el reparto y el equipo técnico del bolo; hoy salen sólo nombres.
-- [ ] 111 Conversaciones, después del 110: abrir un correo y verlo entero, tal como llegó (con lo citado, el HTML y los adjuntos). Hoy la sincronización guarda sólo el texto sin lo citado (`trimQuoted`), así que pide traerlo de Gmail al abrirlo (Marco, 2026-11-02).
-- [ ] 123 seguridad (hallado en el 111, 2026-11-04): `record_conversation_event` deja a quien edita una conversación escribir un evento `source='email'` con los metadatos que quiera (buzón, id de Gmail, Message-ID). El 111 se protege al leer (`mail_message_ingested`); falta cerrarlo al escribir: que `source='email'` sólo lo escriba la sincronización.
 - Aparcado: 86 (responsable de tarea) hasta que entre Anouk.
 
 ## PRIMERO — nada. `main` == prod y las dos suites están vivas (2026-07-30, noche)

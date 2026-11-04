@@ -6,6 +6,11 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Noviembre 2026 (en curso)
 
+- «Ver el original» en cada correo de una conversación: el correo entero tal como llegó, con lo citado, el HTML aislado (sin scripts y con las imágenes remotas bloqueadas, que se pueden abrir aparte) y los adjuntos para descargar. Sólo abre lo que la sincronización ató a esa conversación (111, 2026-11-04, `63356312`).
+- Nadie puede apuntar un correo falso en una conversación: los eventos de correo sólo los escribe la sincronización (123, 2026-11-04, `63356312`).
+- En el grupo de un bolo, cada lector lleva su papel al lado del nombre: «Laia (reparto), Pau (técnica)» (122, 2026-11-04, `63356312`).
+- Público: apuntar a una persona a mano en una lista, añadir la lista a una invitación en borrador y ver a qué otras listas está apuntada alguien; la vista Público ya no tiene tope de listas (101, 103, 106, 2026-11-04, `63356312`).
+- Las invitaciones aceptan `{obra}`, `{fecha}` y `{hora}`, con la fecha en el idioma de cada correo y la hora en la de la sala (102, 2026-11-04, `63356312`).
 - La ficha de una sala es todo lo que tenemos con ella: un bloque «Proyectos» con cada espectáculo en su color y sus bolos debajo (fecha, estado, importe), y los contactos con su papel y su teléfono. La ficha del proyecto es su espejo: una línea de hechos («N funciones confirmadas · vendido X € · siguiente: …») y sus bolos por sala (ADR-177, 2026-11-04, `bb5f518e`).
 - Una conversación sin tipo pregunta qué es (Sala · Festival · Institución · Por libre) y se guarda de un toque; desde la selección, «Tipo» lo pone en bloque, con Deshacer. «Por libre» ya se puede guardar como tipo (ADR-177, 2026-11-04, `bb5f518e`).
 - Un rebote o una queja de un destinatario que nunca salió ya no rompe el registro del envío: el evento queda apuntado y la dirección se bloquea igual (2026-11-04, migración `20261104100000`).
