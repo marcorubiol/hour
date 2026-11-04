@@ -114,6 +114,9 @@ describe.skipIf(!envReady())('RLS: la lectura común, conversation_feed (ADR-138
       p_conversation_id: conversationId,
       p_kind: 'email',
       p_direction: 'inbound',
+      // `email` sólo lo escribe la sincronización (123); `import` cuenta igual
+      // para el feed, que sólo descarta lo `manual` propio.
+      p_source: 'import',
       ...args,
     });
     expect(r.status, r.error).toBe(200);
