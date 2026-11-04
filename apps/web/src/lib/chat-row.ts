@@ -50,7 +50,8 @@ export function chatWho(
   locale: Locale,
 ): ChatWho {
   const city = c.city?.trim() || null;
-  if (c.solo) return { shape: 'person', words: [t('chat.solo', locale), ...(city ? [city] : [])] };
+  // `kind = 'solo'` (115) es «por libre» dicho por alguien: el feed ya lo da en `solo`, el resto de lecturas no.
+  if (c.solo || c.kind === 'solo') return { shape: 'person', words: [t('chat.solo', locale), ...(city ? [city] : [])] };
   const kind = c.kind && c.kind !== 'other' ? t(`organization.kind_${c.kind}`, locale).toLocaleLowerCase(LOCALE_TAG[locale]) : null;
   return { shape: 'organization', words: [kind, city].filter((w): w is string => Boolean(w)) };
 }

@@ -3,12 +3,14 @@
  *
  * Una acción de la barra de selección (plan de la lista § 6.2) sobre hasta
  * `BULK_MAX` conversaciones: «no esta vez», siguiente paso, «no pide
- * respuesta», poner o quitar una etiqueta, y el deshacer de cualquiera de
- * ellas. Cada una con el JWT de quien llama: la RLS decide fila a fila y el
- * lote no se aborta por una. Responde 200 con `{ done, failed, undo }`
- * (`$lib/conversation-bulk`); la pantalla parte selecciones más largas.
+ * respuesta», poner o quitar una etiqueta, mover a una línea, el tipo de su
+ * organización (115) y el deshacer de cualquiera de ellas. Cada una con el
+ * JWT de quien llama: la RLS decide fila a fila y el lote no se aborta por
+ * una. Responde 200 con `{ done, failed, undo }` (`$lib/conversation-bulk`);
+ * la pantalla parte selecciones más largas.
  *
- * Auth: Bearer JWT. Sin migración ni `service_role` (`$lib/server/conversation-bulk`).
+ * Auth: Bearer JWT. Sin `service_role` (`$lib/server/conversation-bulk`). El
+ * tipo «por libre» (`solo`) necesita 20261104100000 aplicada.
  */
 
 import type { RequestHandler } from './$types';

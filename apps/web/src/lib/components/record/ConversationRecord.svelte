@@ -65,6 +65,8 @@
     type ConversationPatch,
   } from '$lib/conversation';
   import { turnOf } from '$lib/conversation-overview';
+  import { ASKED_KINDS, needsKind, type AskedKind } from '$lib/organization-record';
+  import { bulkFailedLine, type BulkResult } from '$lib/conversation-bulk';
   import { relationLabel, type ConversationBolo } from '$lib/conversation-relation';
   import { performanceStatusLabel } from '$lib/performance';
   import { conversationPlannerHref, dayKeyInTz } from '$lib/planner';
@@ -386,6 +388,28 @@
   });
   let who = $derived(contacts.map((c) => (c.role ? `${c.person!.full_name} (${c.role})` : c.person!.full_name)).join(', '));
 
+  // ── El tipo que falta (ADR-177 § 2, punto 115): se pregunta al abrirla, un
+  //    toque lo guarda en su organización y la pregunta se va. «Ahora no» la
+  //    calla en esta conversación hasta volver a abrirla. ──
+  let kindHiddenFor = $state<string | null>(null);
+  let askKind = $derived(
+    Boolean(conv?.can_edit && conv.organization && kindHiddenFor !== conv.id && needsKind(conv.place)),
+  );
+  const setKind = createMutation({
+    mutationFn: async (kind: AskedKind) => {
+      const r = await mutateJSON<BulkResult>('POST', '/api/conversations/bulk', { action: 'kind', ids: [conv!.id], kind });
+      if (!r || r.done.length === 0) throw new Error(r ? (bulkFailedLine(r, locale) ?? '') : t('conversations.unexpected_response', locale));
+    },
+    onMutate: () => (kindHiddenFor = conv?.id ?? null),
+    onError: (err) => {
+      kindHiddenFor = null;
+      addToast({ tone: 'danger', title: t('conversations.change_not_saved', locale), message: err instanceof Error ? err.message : String(err) });
+    },
+    onSettled: () => {
+      for (const key of ['conversation', 'conversations', 'conversation-feed', 'organization']) void refreshAfterWrite(queryClient, [key]);
+    },
+  });
+
   /**
    * A quién sale un correo: el contacto principal y nadie más
    * (`mail_send_authorize`). Sin email suyo, el correo dice por qué y no sale.
@@ -586,6 +610,22 @@
               >{t('record.verb_done', locale)}</button
             >
           {/if}
+        </span>
+      </div>
+    {/if}
+    {#if askKind}
+      {@const q = t('chat.kind_ask', locale, { name: conv.organization!.name })}
+      <div class="chat__kind" role="group" aria-label={q} data-testid="conversation-kind-ask">
+        <span class="chat__kind-q">{q}</span>
+        <span class="conv__step-acts">
+          {#each ASKED_KINDS as k (k)}
+            <button type="button" class="missing__act" disabled={$setKind.isPending} onclick={() => $setKind.mutate(k)}
+              >{t(`organization.kind_${k}`, locale)}</button
+            >
+          {/each}
+          <button type="button" class="missing__act chat__kind-later" onclick={() => (kindHiddenFor = conv.id)}
+            >{t('chat.kind_later', locale)}</button
+          >
         </span>
       </div>
     {/if}
@@ -960,6 +1000,22 @@
       display: inline-flex;
       flex-wrap: wrap;
       gap: var(--space-2xs) var(--space-m);
+    }
+    /* La pregunta del tipo (115): una línea bajo los hechos, sin franja de color. */
+    .chat__kind {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: var(--space-2xs) var(--space-m);
+      padding-block: var(--space-xs);
+      border-block-end: var(--line-hairline) solid var(--border-color-light);
+      font-size: var(--text-s);
+    }
+    .chat__kind-q {
+      color: var(--text-muted);
+    }
+    .chat__kind-later {
+      color: var(--text-faint);
     }
     .conv__step-day {
       margin-inline-start: var(--space-xs);

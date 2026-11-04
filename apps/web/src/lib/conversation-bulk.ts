@@ -19,6 +19,7 @@ import * as v from 'valibot';
 import { realIsoDate, realIsoInstant } from './datetime';
 import { t, type Locale } from './i18n';
 import { TAG_KEY_RE } from './conversation-tags';
+import { ASKED_KINDS, ORGANIZATION_KINDS } from './organization-record';
 
 /** Conversaciones por petición: 1 lectura + 2 del vocabulario + una escritura por fila + reintento. */
 export const BULK_MAX = 20;
@@ -46,6 +47,8 @@ export const RestoreItemSchema = v.object({
   ),
   // Vacío vale aquí: deshacer deja sin etiqueta a la que no tenía ninguna.
   tag_ids: v.optional(v.pipe(v.array(Id), v.maxLength(32))),
+  // El tipo de su organización (115): el de antes, `other` si no tenía.
+  org_kind: v.optional(v.picklist(ORGANIZATION_KINDS)),
 });
 export type RestoreItem = v.InferOutput<typeof RestoreItemSchema>;
 
@@ -70,6 +73,8 @@ export const BulkSchema = v.variant('action', [
   }),
   // «Mover a la línea…» (ADR-169, punto 93): una línea de su proyecto, o null para sacarlas de la suya.
   v.object({ action: v.literal('line'), ids: Ids, line_id: v.nullable(Id) }),
+  // «Tipo» (ADR-177 § 2, punto 115): el de la organización de cada una.
+  v.object({ action: v.literal('kind'), ids: Ids, kind: v.picklist(ASKED_KINDS) }),
   // Deshacer: lo de antes, tal como lo devolvió la acción.
   v.object({ action: v.literal('restore'), items: v.pipe(v.array(RestoreItemSchema), v.minLength(1), v.maxLength(BULK_MAX)) }),
 ]);
@@ -110,7 +115,8 @@ export type BulkArgs =
   | { action: 'next_step'; next_action_at: string | null; next_action_note: string | null }
   | { action: 'settle' }
   | { action: 'tag'; key: string; op: 'add' | 'remove' }
-  | { action: 'line'; line_id: string | null };
+  | { action: 'line'; line_id: string | null }
+  | { action: 'kind'; kind: (typeof ASKED_KINDS)[number] };
 
 /** Trozos de `size`, en orden. */
 export function chunk<T>(list: readonly T[], size = BULK_MAX): T[][] {
@@ -171,6 +177,7 @@ const DONE_WORD: Record<Exclude<BulkAction, 'restore'>, string> = {
   settle: 'bulk.done_settle',
   tag: 'bulk.done_tag',
   line: 'bulk.done_line',
+  kind: 'bulk.done_kind',
 };
 
 /** El título del aviso: «23 en no esta vez», «23 etiquetadas»… */

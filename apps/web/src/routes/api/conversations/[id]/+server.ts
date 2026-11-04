@@ -30,6 +30,7 @@ import {
   type ConversationDbItem,
 } from '$lib/conversation';
 import { pgGet, pgPatch, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
+import { isSolo } from '$lib/organization-record';
 import { pgErrorResponse } from '$lib/server/errors';
 import { jwtSubject } from '$lib/server/http';
 import { TURN_EMBEDS, setLastTurnEmbed } from '$lib/server/conversation-overview';
@@ -86,9 +87,24 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
     const row = data[0];
     if (!row) return json({ error: 'not_found' }, 404);
     const sub = jwtSubject(jwt);
-    const [edit, admin] = await Promise.all([
+    // «Por libre» se deduce de sus personas (`isSolo`): solo hace falta leerlas
+    // si la organización no tiene tipo; con uno, ya se sabe que no se pide.
+    const org = row.organization;
+    const askKind = org && (!org.kind || org.kind === 'other');
+    const [edit, admin, people] = await Promise.all([
       pgPostRpc<boolean>(env, 'has_permission', jwt, { p_project_id: row.project_id, p_perm: 'edit:conversation' }),
       pgPostRpc<boolean>(env, 'is_workspace_admin', jwt, { ws_id: row.workspace_id }),
+      askKind
+        ? pgGet<{ full_name: string }>(env, 'workspace_person', jwt, {
+            search: new URLSearchParams({
+              select: 'full_name',
+              workspace_id: `eq.${row.workspace_id}`,
+              organization_id: `eq.${org.id}`,
+              deleted_at: 'is.null',
+              limit: '2',
+            }),
+          })
+        : Promise.resolve({ data: [] as { full_name: string }[] }),
     ]);
     const canEdit = edit.data[0] === true;
     const canSetPrivate =
@@ -96,9 +112,19 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
       (row.private_to !== null
         ? row.private_to === sub
         : row.created_by === sub || admin.data[0] === true);
+    const item = normalizeConversationItem(row);
     return json({
       item: {
-        ...normalizeConversationItem(row),
+        ...item,
+        // Con quién, como lo dice la fila de la lente (ADR-177 § 2 y 3): la
+        // ficha pregunta el tipo si falta (`needsKind`, punto 115).
+        place: org
+          ? {
+              kind: org.kind && org.kind !== 'other' && org.kind !== 'solo' ? org.kind : null,
+              solo: isSolo(org, people.data),
+              city: org.city || item.person?.city || null,
+            }
+          : undefined,
         private: row.private_to !== null,
         can_edit: canEdit,
         can_set_private: canSetPrivate,

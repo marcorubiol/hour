@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { orgBolos, orgContacts, orgMissing, type OrgConversationContact, type OrgStaff } from './organization-record';
+import { isSolo, needsKind, orgBolos, orgContacts, orgMissing, type OrgConversationContact, type OrgStaff } from './organization-record';
 import type { ConversationBolo } from './conversation-relation';
 
 const TODAY = '2026-11-01';
@@ -159,5 +159,21 @@ describe('orgMissing', () => {
       { kind: 'step_due', conversationId: 'c1', day: '2026-10-01' },
       { kind: 'step_due', conversationId: 'c2', day: '2026-10-15' },
     ]);
+  });
+});
+
+describe('pedir el tipo (115)', () => {
+  test('se pide sin tipo o con «otra», nunca a una «por libre»', () => {
+    expect(needsKind({ kind: null, solo: false })).toBe(true);
+    expect(needsKind({ kind: 'other', solo: false })).toBe(true);
+    expect(needsKind({ kind: 'theatre', solo: false })).toBe(false);
+    expect(needsKind({ kind: null, solo: true })).toBe(false);
+    expect(needsKind(null)).toBe(false);
+  });
+  test('«por libre»: el tipo dicho, o una sola persona que se llama como ella', () => {
+    expect(isSolo({ name: 'Marta Vidal', kind: 'other' }, [{ full_name: ' marta vidal ' }])).toBe(true);
+    expect(isSolo({ name: 'Marta Vidal Produccions', kind: 'other' }, [{ full_name: 'Marta Vidal' }])).toBe(false);
+    expect(isSolo({ name: 'Marta Vidal', kind: 'other' }, [{ full_name: 'Marta Vidal' }, { full_name: 'Pau' }])).toBe(false);
+    expect(isSolo({ name: 'La Nau', kind: 'solo' }, [])).toBe(true);
   });
 });

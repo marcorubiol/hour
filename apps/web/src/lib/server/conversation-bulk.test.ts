@@ -264,3 +264,61 @@ describe('line (ADR-169, punto 93)', () => {
     expect(byId.get(id(1))!.line_id).toBeNull();
   });
 });
+
+describe('runConversationBulk · el tipo (115)', () => {
+  const O1 = 'ffffffff-0000-4000-8000-000000000001';
+  const O2 = 'ffffffff-0000-4000-8000-000000000002';
+  function orgPg(orgOf: Record<string, string | null>, opts: { readOnly?: string[] } = {}) {
+    const orgs = new Map([
+      [O1, { id: O1, name: 'Teatre de la Llum', kind: 'other', city: 'Girona', email: 'hola@llum.cat' }],
+      [O2, { id: O2, name: 'Fira X', kind: 'festival', city: null, email: null }],
+    ]);
+    const writes: Record<string, unknown>[] = [];
+    const pg: BulkPg = {
+      async get<T>(_path: string, search: URLSearchParams) {
+        expect(search.get('select')).toContain('organization:workspace_organization');
+        return idsOf(search)
+          .filter((x) => x in orgOf)
+          .map((x) => ({ id: x, workspace_id: WS, organization: orgOf[x] ? { ...orgs.get(orgOf[x]!)! } : null })) as T[];
+      },
+      async patch() {
+        throw new Error('no patch');
+      },
+      async rpc<T>(name: string, args: Record<string, unknown>) {
+        expect(name).toBe('update_workspace_organization');
+        if (opts.readOnly?.includes(args.p_organization_id as string)) throw new PostgrestError(403, '{"code":"42501"}');
+        writes.push(args);
+        orgs.get(args.p_organization_id as string)!.kind = args.p_kind as string;
+        return [] as T[];
+      },
+    };
+    return { pg, orgs, writes };
+  }
+
+  test('one write per organization, the rest of its fields as they were; the one already there is done', async () => {
+    const { pg, writes } = orgPg({ [id(1)]: O1, [id(2)]: O1, [id(3)]: O2, [id(4)]: null });
+    const r = await runConversationBulk(pg, { action: 'kind', ids: [id(1), id(2), id(3), id(4), id(5)], kind: 'festival' }, NOW);
+    expect(writes).toEqual([
+      { p_organization_id: O1, p_name: 'Teatre de la Llum', p_kind: 'festival', p_city: 'Girona', p_email: 'hola@llum.cat' },
+    ]);
+    expect(r.done).toEqual([id(1), id(2), id(3)]);
+    expect(r.failed).toEqual([
+      { id: id(4), reason: 'not_found' },
+      { id: id(5), reason: 'not_found' },
+    ]);
+    expect(r.undo).toEqual([
+      { id: id(1), org_kind: 'other' },
+      { id: id(2), org_kind: 'other' },
+    ]);
+  });
+
+  test('an organization the caller cannot edit is forbidden; the undo puts the kind back', async () => {
+    const { pg, orgs } = orgPg({ [id(1)]: O1, [id(2)]: O2 }, { readOnly: [O2] });
+    const r = await runConversationBulk(pg, { action: 'kind', ids: [id(1), id(2)], kind: 'solo' }, NOW);
+    expect(r.failed).toEqual([{ id: id(2), reason: 'forbidden' }]);
+    expect(orgs.get(O1)!.kind).toBe('solo');
+    const back = await runConversationBulk(pg, { action: 'restore', items: r.undo }, NOW);
+    expect(back.done).toEqual([id(1)]);
+    expect(orgs.get(O1)!.kind).toBe('other');
+  });
+});

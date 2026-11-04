@@ -82,6 +82,7 @@
     type BulkResult,
   } from '$lib/conversation-bulk';
   import type { ConversationItem } from '$lib/conversation';
+  import { ASKED_KINDS } from '$lib/organization-record';
   import { RELATIONS, relationLabel, type Relation } from '$lib/conversation-relation';
   import { appLocale, t } from '$lib/i18n';
   import { conversationAccessQueryOptions } from '$lib/conversation-access';
@@ -776,7 +777,7 @@
   }
 
   function refreshLists() {
-    for (const key of ['conversations', 'conversation-overview', 'conversation-feed', 'line-eng-stats', 'conversation']) {
+    for (const key of ['conversations', 'conversation-overview', 'conversation-feed', 'line-eng-stats', 'conversation', 'organization']) {
       void refreshAfterWrite(queryClient, [key]);
     }
   }
@@ -838,6 +839,11 @@
       })),
     { label: t('bulk.line_none', locale), onclick: () => void bulk({ action: 'line', line_id: null }) },
   ]);
+
+  /** «Tipo» (ADR-177 § 2, punto 115): the kind of each picked conversation's organization. */
+  let kindActions = $derived(
+    ASKED_KINDS.map((k) => ({ label: t(`organization.kind_${k}`, locale), onclick: () => void bulk({ action: 'kind', kind: k }) })),
+  );
 
   // «Invitar a N» (ADR-173 § 10): professionals of any project, of one space.
   let pickedWorkspaces = $derived([
@@ -1267,6 +1273,13 @@
             </Menu>
           {:else}
             <Button size="s" variant="secondary" disabled>{t('bulk.line', locale)}</Button>
+          {/if}
+          {#if picked.length > 0 && !bulkBusy}
+            <Menu items={kindActions} direction="up" align="end" label={t('bulk.kind', locale)}>
+              {#snippet trigger()}{t('bulk.kind', locale)}<span class="action-bar__caret" aria-hidden="true">▾</span>{/snippet}
+            </Menu>
+          {:else}
+            <Button size="s" variant="secondary" disabled>{t('bulk.kind', locale)}</Button>
           {/if}
           <Button size="s" variant="secondary" disabled={picked.length === 0 || bulkBusy} onclick={() => (nextOpen = true)}
             >{t('conversations.col_next_action', locale)}</Button

@@ -18,9 +18,36 @@ export const ORGANIZATION_KINDS = [
   'presenter',
   'agency',
   'institution',
+  // «Por libre» (ADR-177 § 3, 115): dicho por alguien; sin él, `conversation_feed` lo deduce.
+  'solo',
   'other',
 ] as const;
 export type OrganizationKind = (typeof ORGANIZATION_KINDS)[number];
+
+/**
+ * Lo que se pregunta a un contacto sin tipo (ADR-177 § 2, punto 115): en la
+ * conversación, de uno en uno, y en la selección de la lista, en bloque.
+ * «Ayuntamiento» es `institution`: la fila dice lo que se guardó.
+ */
+export const ASKED_KINDS = ['theatre', 'festival', 'institution', 'solo'] as const satisfies readonly OrganizationKind[];
+export type AskedKind = (typeof ASKED_KINDS)[number];
+
+/** Si a la organización le falta el tipo: ni tipo (salvo «otra») ni «por libre». */
+export function needsKind(place: { kind?: string | null; solo?: boolean | null } | null | undefined): boolean {
+  if (!place || place.solo) return false;
+  return !place.kind || place.kind === 'other';
+}
+
+/**
+ * «Por libre» deducido, la regla de `conversation_feed` (ADR-177 § 3): una
+ * sola persona viva de la organización, que se llama como ella sin
+ * mayúsculas ni espacios de más. O el tipo `solo`, dicho por alguien.
+ */
+export function isSolo(org: { name: string; kind?: string | null }, people: readonly { full_name: string }[]): boolean {
+  if (org.kind === 'solo') return true;
+  const norm = (s: string) => s.trim().toLowerCase();
+  return people.length === 1 && norm(people[0].full_name) === norm(org.name);
+}
 
 /** Una persona como contacto de una conversación de la organización. */
 export interface OrgConversationContact {

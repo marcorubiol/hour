@@ -9,7 +9,9 @@
  *   Si el grupo entero falla (un 403 de WITH CHECK, la red), se reintenta una
  *   a una para que el fallo sea solo de la suya;
  * - las etiquetas, por `set_conversation_tags`, una conversación cada vez,
- *   leyendo antes las suyas: se pone o se quita una sin tocar las otras.
+ *   leyendo antes las suyas: se pone o se quita una sin tocar las otras;
+ * - el tipo (115), por `update_workspace_organization`, una vez por
+ *   organización: es de la organización, no de la conversación.
  *
  * Sin migración y sin RPC nueva. Lo que no se lee vuelve `not_found`; lo que
  * se lee y no se edita, `forbidden`. Nunca se escribe una fila que no se pidió:
@@ -47,10 +49,22 @@ interface Row {
   next_action_note: string | null;
   reply_settled_at: string | null;
   tagging?: { tag_id: string }[] | null;
+  organization?: Org | null;
   last_turn?: { direction: string | null; occurred_at: string }[] | null;
 }
 
+interface Org {
+  id: string;
+  name: string;
+  kind: string | null;
+  city: string | null;
+  email: string | null;
+}
+
 type Columns = NonNullable<RestoreItem['columns']>;
+type OrgKind = NonNullable<RestoreItem['org_kind']>;
+
+const ORG_EMBED = 'organization:workspace_organization!conversation_workspace_organization_fkey(id,name,kind,city,email)';
 
 /** Escrituras a la vez, una por conversación (las etiquetas). */
 const PARALLEL = 5;
@@ -89,10 +103,15 @@ class Outcome {
 }
 
 /** Las filas pedidas que quien llama lee; las demás, `not_found`. */
-async function readRows(pg: BulkPg, ids: readonly string[], extra: { tags?: boolean; turn?: boolean }): Promise<Map<string, Row>> {
+async function readRows(
+  pg: BulkPg,
+  ids: readonly string[],
+  extra: { tags?: boolean; turn?: boolean; org?: boolean },
+): Promise<Map<string, Row>> {
   const select = [
     'id,workspace_id,project_id,line_id,not_now_at,not_now_until,next_action_at,next_action_note,reply_settled_at',
     extra.tags ? 'tagging:conversation_tagging(tag_id)' : null,
+    extra.org ? ORG_EMBED : null,
     extra.turn ? TURN_EMBEDS : null,
   ]
     .filter(Boolean)
@@ -261,6 +280,74 @@ async function moveToLine(pg: BulkPg, out: Outcome, rows: Row[], lineId: string 
 }
 
 /**
+ * El tipo de la organización de cada conversación (ADR-177 § 2, punto 115).
+ * Varias conversaciones de una organización son una sola escritura; la que ya
+ * lo tiene cuenta como hecha, sin escribirla ni deshacerla. La RPC pide todos
+ * los campos de la ficha: van los que tiene, así sólo cambia el tipo.
+ */
+async function setKind(pg: BulkPg, out: Outcome, rows: Row[], kind: OrgKind): Promise<void> {
+  const byOrg = new Map<string, { org: Org; ids: string[] }>();
+  for (const r of rows) {
+    const org = r.organization;
+    if (!org) {
+      out.fail(r.id, 'not_found');
+      continue;
+    }
+    const g = byOrg.get(org.id) ?? { org, ids: [] };
+    g.ids.push(r.id);
+    byOrg.set(org.id, g);
+  }
+  await pool([...byOrg.values()], async ({ org, ids }) => {
+    const was = (org.kind ?? 'other') as OrgKind;
+    if (was === kind) return void ids.forEach((id) => out.done.add(id));
+    try {
+      await writeKind(pg, org, kind);
+      for (const id of ids) {
+        out.done.add(id);
+        out.undo.push({ id, org_kind: was });
+      }
+    } catch (err) {
+      for (const id of ids) out.fail(id, reasonOf(err));
+    }
+  });
+}
+
+function writeKind(pg: BulkPg, org: Org, kind: OrgKind): Promise<unknown> {
+  return pg.rpc('update_workspace_organization', {
+    p_organization_id: org.id,
+    p_name: org.name,
+    p_kind: kind,
+    p_city: org.city,
+    p_email: org.email,
+  });
+}
+
+/** Deshacer el tipo: cada organización vuelve al suyo, leída otra vez (la ficha pudo cambiar el resto). */
+async function restoreKinds(pg: BulkPg, out: Outcome, items: RestoreItem[]): Promise<void> {
+  if (items.length === 0) return;
+  const rows = await readRows(pg, items.map((x) => x.id), { org: true });
+  const byOrg = new Map<string, { org: Org; kind: OrgKind; ids: string[] }>();
+  for (const item of items) {
+    const org = rows.get(item.id)?.organization;
+    if (!org) {
+      out.fail(item.id, 'not_found');
+      continue;
+    }
+    const g = byOrg.get(org.id) ?? { org, kind: item.org_kind!, ids: [] };
+    g.ids.push(item.id);
+    byOrg.set(org.id, g);
+  }
+  await pool([...byOrg.values()], async ({ org, kind, ids }) => {
+    try {
+      if ((org.kind ?? 'other') !== kind) await writeKind(pg, org, kind);
+      for (const id of ids) out.done.add(id);
+    } catch (err) {
+      for (const id of ids) out.fail(id, reasonOf(err));
+    }
+  });
+}
+
+/**
  * A restore is a body like any other: one that puts a line back must name a
  * line of the conversation's project, or it would be a way round the guard.
  * The ids whose line is not theirs (or not readable).
@@ -306,11 +393,12 @@ export async function runConversationBulk(pg: BulkPg, req: BulkRequest, now: Dat
     const tags = items.filter((x) => x.tag_ids !== undefined && !linked.has(x.id));
     const colsFailed = new Set(cols.filter((x) => out.failed.has(x.id)).map((x) => x.id));
     await restoreTags(pg, out, tags.filter((x) => !colsFailed.has(x.id)));
+    await restoreKinds(pg, out, items.filter((x) => x.org_kind !== undefined && !linked.has(x.id) && !colsFailed.has(x.id)));
     for (const id of ids) if (!out.done.has(id) && !out.failed.has(id)) out.fail(id, 'error');
     return out.result(ids);
   }
 
-  const rows = await readRows(pg, ids, { tags: req.action === 'tag', turn: req.action === 'settle' });
+  const rows = await readRows(pg, ids, { tags: req.action === 'tag', turn: req.action === 'settle', org: req.action === 'kind' });
   for (const id of ids) if (!rows.has(id)) out.fail(id, 'not_found');
   const seen = ids.filter((id) => rows.has(id)).map((id) => rows.get(id)!);
 
@@ -343,6 +431,9 @@ export async function runConversationBulk(pg: BulkPg, req: BulkRequest, now: Dat
       break;
     case 'line':
       await moveToLine(pg, out, seen, req.line_id);
+      break;
+    case 'kind':
+      await setKind(pg, out, seen, req.kind);
       break;
   }
   return out.result(ids);
