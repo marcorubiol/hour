@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { waitForLoaded } from './loaded';
+import { fixtureLine, fixtureLineHref, type FixtureLine } from './fixture-line';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
@@ -9,9 +10,12 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  * moved off the retired /booking wrapper in ADR-056 cleanup).
  *
  * Since ADR-176 the Conversations lens draws chat rows with no inline
- * controls (no relation menu, next step or history button): the inline row
- * lives on in the record pages' lists. These tests drive it on the fixture's
- * organization record (ADR-159), whose list is that same ConversationTable.
+ * controls (no relation menu, next step or history button), and since
+ * ADR-177 § 4 the organization's record draws one row per project instead
+ * of the table: the inline row lives on in a line's Conversations module
+ * (ADR-056), the same ConversationTable. These tests drive it there, on a
+ * line of the fixture project that the suite finds or creates (lines have
+ * no delete path, so it is stable and reused, like `line-detail.spec.ts`).
  *
  * Both tests write to a REAL conversation row (the difusión list). Original
  * values are captured via the API up front and restored in a `finally`
@@ -38,24 +42,27 @@ type RawConversation = {
   organization: { slug: string } | null;
 };
 
+/** The suite's line in the fixture project: its module carries the inline row. */
+let line: FixtureLine | null = null;
+
 /**
  * Session comes from the shared storageState (tests/auth.setup.ts). The
- * fixture's organization record, whose conversation list carries the inline
- * row (ConversationTable's normal mode; the lens's chat rows have none).
+ * fixture line's page, whose Conversations module carries the inline row
+ * (ConversationTable's normal mode; the lens's chat rows have none).
  */
 async function openConversations(page: Page) {
-  // Any page of the app, for the API's cookie; the lens is the cheapest.
-  if (!page.url().includes('/h/')) await page.goto('/h/conversations');
-  const slug = (await fetchListRaw(page))[0].organization?.slug;
-  expect(slug, 'the fixture conversation has an organization (ADR-102)').toBeTruthy();
-  await page.goto(`/h/playwright/organization/${encodeURIComponent(slug!)}`);
+  expect(line, 'the fixture line exists (beforeAll)').not.toBeNull();
+  await page.goto(fixtureLineHref(line!));
   await waitForLoaded(page);
   await expect(rowOf(page)).toBeVisible({ timeout: 15_000 });
 }
 
-/** The fixture organization has one conversation: its row. */
+/** The fixture conversation's row in the line's module, and only it. */
 function rowOf(page: Page) {
-  return page.getByTestId('organization-record').locator('[data-testid="conversation-row"]').first();
+  return page
+    .locator('#mod-conversations [data-testid="conversation-row"]')
+    .filter({ hasText: 'ZZZ E2E write fixture' })
+    .first();
 }
 
 /** First page of the difusión list (same rows the lens can reach), raw values. */
@@ -159,6 +166,8 @@ test.describe('conversation inline write', () => {
     const page = await browser.newPage();
     await page.goto('/h/conversations');
     const projectId = await fixtureProjectId(page);
+    const fixture = await fixtureLine(page);
+    line = fixture;
     fixtureConversationId = await page.evaluate(async (project_id) => {
       const res = await fetch('/api/conversations', {
         method: 'POST',
@@ -181,6 +190,17 @@ test.describe('conversation inline write', () => {
       if (found.items?.[0]?.id) return found.items[0].id;
       throw new Error(`could not create or find the fixture (${res.status})`);
     }, projectId);
+    // On the line (a row reused from before ADR-177 may have none).
+    const linked = await page.evaluate(
+      ({ id, line_id }) =>
+        fetch(`/api/conversations/${id}`, {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ line_id }),
+        }).then((r) => r.status),
+      { id: fixtureConversationId, line_id: fixture.id },
+    );
+    expect(linked, 'the fixture conversation goes on the fixture line').toBe(200);
     await page.close();
   });
 
