@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Noviembre 2026 (en curso)
 
+- La temporada se cuenta igual en todas partes (Cuentas, Hoy, Conversaciones, la sugerencia de nombre de una línea) y cada espacio elige en qué mes empieza, septiembre por defecto, en Ajustes › Este espacio (78, 2026-11-04, `113b3d24`).
 - «Ver el original» en cada correo de una conversación: el correo entero tal como llegó, con lo citado, el HTML aislado (sin scripts y con las imágenes remotas bloqueadas, que se pueden abrir aparte) y los adjuntos para descargar. Sólo abre lo que la sincronización ató a esa conversación (111, 2026-11-04, `63356312`).
 - Nadie puede apuntar un correo falso en una conversación: los eventos de correo sólo los escribe la sincronización (123, 2026-11-04, `63356312`).
 - En el grupo de un bolo, cada lector lleva su papel al lado del nombre: «Laia (reparto), Pau (técnica)» (122, 2026-11-04, `63356312`).

@@ -11,7 +11,6 @@
 Detalle de cada punto: `build/coordination/STATUS.md` (fuera de git) y los informes de propuestas. Orden sugerido: lo que
 no pide migración primero; las migraciones juntas por el gate de § 34.
 
-- [ ] 78 temporada en una sola función, septiembre por defecto, configurable por espacio.
 - [ ] 95 contract: borrar `performance.readiness`, `line.modules`, `line.dossier_url`, `project.dossier_url`,
   `project.poster_url` (destructiva: staging e inspect).
 - [ ] 98 invitar, al público y a profesionales: decidido (ADR-173, ADR-174, ADR-175, `build/plans/2026-11-01-audience.md`); fases 1 a 3 (esquema, alta pública, listas, importación, invitaciones) en producción desde 2026-11-02 (`49ffb30c`). Quedan la fase 4 (envío real por SES) y la 5 (el editor, que es el 99).
