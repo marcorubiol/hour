@@ -429,8 +429,32 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: el público y sus invit
       );
     const none = Object.fromEntries(reads.map(([t]) => [t, 0]));
 
+    // `audience_counts` (106): los recuentos de GET /api/audience en una sola
+    // llamada, SECURITY INVOKER. Para quien llama, la fila de la lista dice lo
+    // mismo que contar cada estado por PostgREST; sin leer el público, ninguna.
+    const countsRpc = async (jwt: string) => {
+      const r = await pgRpc<{ audience_id: string; confirmed: number; pending: number; unsubscribed: number }[]>(
+        'audience_counts',
+        jwt,
+        { p_workspace_ids: [workspaceId] },
+      );
+      expect(r.status, r.error).toBe(200);
+      return r.data!.find((x) => x.audience_id === listId);
+    };
+    const countsRest = async (jwt: string) =>
+      Object.fromEntries(
+        await Promise.all(
+          (['confirmed', 'pending', 'unsubscribed'] as const).map(async (status) => {
+            const q = new URLSearchParams({ select: 'id', audience_id: `eq.${listId}`, status: `eq.${status}` });
+            return [status, (await pgGet('audience_subscription', jwt, q)).rows.length] as const;
+          }),
+        ),
+      );
+
     // Del mismo espacio, sin la faceta: nada.
     expect(await seen()).toEqual(none);
+    expect(await countsRpc(limitedJwt)).toBeUndefined();
+    expect((await pgRpc('audience_counts', null, { p_workspace_ids: [workspaceId] })).status).not.toBe(200);
     expect((await pgRpc('mailout_preview', limitedJwt, { p_id: inv.row!.id })).status).toBe(403);
     expect((await newList('Limitada', limitedJwt)).status).toBe(403);
 
@@ -454,6 +478,11 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: el público y sus invit
         expect(counted.rows.length).toBe(1);
         const embedded = { select: 'id,n:audience_subscription(count)', id: `eq.${listId}` };
         expect((await pgGet('audience', jwt, new URLSearchParams(embedded))).status).toBe(403);
+      }
+      const rest = await countsRest(adminJwt);
+      expect(rest.pending).toBeGreaterThanOrEqual(1);
+      for (const jwt of [adminJwt, limitedJwt]) {
+        expect(await countsRpc(jwt)).toEqual({ audience_id: listId, ...rest });
       }
       expect((await pgRpc('mailout_preview', limitedJwt, { p_id: inv.row!.id })).status).toBe(200);
       expect((await newList('Limitada', limitedJwt)).status).toBe(403);

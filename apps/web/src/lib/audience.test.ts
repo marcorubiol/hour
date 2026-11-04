@@ -10,6 +10,7 @@ import {
   addPersonOutcome,
   alsoSubscribed,
   AudienceAddSchema,
+  countsByAudience,
   draftChoices,
   embedCode,
   formUrl,
@@ -17,6 +18,22 @@ import {
   parseCsv,
   readAudienceCsv,
 } from './audience';
+
+describe('los recuentos de las listas (106, audience_counts)', () => {
+  test('cada lista con su fila; la que no tiene nadie, ceros; una fila de otra lista no cuela', () => {
+    const counts = countsByAudience(
+      ['a', 'b'],
+      [
+        { audience_id: 'a', confirmed: 3, pending: 1, unsubscribed: 0 },
+        { audience_id: 'z', confirmed: 9, pending: 9, unsubscribed: 9 },
+      ],
+    );
+    expect([...counts]).toEqual([
+      ['a', { confirmed: 3, pending: 1, unsubscribed: 0 }],
+      ['b', { confirmed: 0, pending: 0, unsubscribed: 0 }],
+    ]);
+  });
+});
 
 describe('el CSV de una importación (plan § 3.6)', () => {
   test('reconoce correo, nombre e idioma por su cabecera, en cualquier idioma y con punto y coma', () => {

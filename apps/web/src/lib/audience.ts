@@ -39,6 +39,25 @@ export const AUDIENCE_SELECT =
 /** Cuántas hay en cada estado. */
 export type AudienceCounts = Record<SubscriptionStatus, number>;
 
+/** Una fila de `audience_counts` (106): los recuentos de una lista con alguien. */
+export interface AudienceCountsRow extends AudienceCounts {
+  audience_id: string;
+}
+
+/**
+ * Los recuentos de cada lista, de las filas de `audience_counts`. Una lista
+ * sin nadie no tiene fila: ceros. PostgREST da `bigint` como número.
+ */
+export function countsByAudience(ids: readonly string[], rows: readonly AudienceCountsRow[]): Map<string, AudienceCounts> {
+  const byId = new Map(rows.map((r) => [r.audience_id, r]));
+  return new Map(
+    ids.map((id) => {
+      const r = byId.get(id);
+      return [id, { confirmed: Number(r?.confirmed ?? 0), pending: Number(r?.pending ?? 0), unsubscribed: Number(r?.unsubscribed ?? 0) }];
+    }),
+  );
+}
+
 /** Lo que pide quien entra: ver, editar y, solo admin, la prueba y borrar. */
 export interface AudienceAccess {
   read: boolean;

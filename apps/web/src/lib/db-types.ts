@@ -5490,6 +5490,15 @@ export type Database = {
         Args: { p_subscription_id: string }
         Returns: Json
       }
+      audience_counts: {
+        Args: { p_workspace_ids: string[] }
+        Returns: {
+          audience_id: string
+          confirmed: number
+          pending: number
+          unsubscribed: number
+        }[]
+      }
       audience_form_info: {
         Args: { p_key: string; p_language?: string }
         Returns: {

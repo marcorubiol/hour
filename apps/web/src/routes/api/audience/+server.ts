@@ -3,8 +3,9 @@
  *
  * GET ?workspace_ids=a,b → AudienceListResponse: las listas que quien llama
  *     lee en esos espacios (la RLS: owner, admin o la faceta Público), con sus
- *     recuentos y qué puede hacer en cada espacio (las invitaciones van en la
- *     lista de Envíos, `GET /api/mailout?list=1`, ADR-176).
+ *     recuentos (`audience_counts`, una sola llamada) y qué puede hacer en
+ *     cada espacio (las invitaciones van en la lista de Envíos,
+ *     `GET /api/mailout?list=1`, ADR-176).
  * POST { workspace_id, name, languages?, default_language? } → la lista nueva
  *     en borrador (`create_audience`).
  */
@@ -19,13 +20,11 @@ import { audienceAccess } from '$lib/server/audience';
 import {
   AUDIENCE_SELECT,
   AudienceCreateSchema,
-  type AudienceCounts,
+  countsByAudience,
+  type AudienceCountsRow,
   type AudienceItem,
   type AudienceListResponse,
-  type SubscriptionStatus,
 } from '$lib/audience';
-
-const STATUSES: SubscriptionStatus[] = ['confirmed', 'pending', 'unsubscribed'];
 
 export const GET: RequestHandler = async ({ request, url, platform, locals }) => {
   if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
@@ -41,27 +40,18 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
     const access = await audienceAccess(env, jwt, ids);
     const readable = ids.filter((w) => access[w]?.read);
     if (readable.length === 0) return jsonNoStore({ items: [], access } satisfies AudienceListResponse);
-    const inWs = `in.(${readable.join(',')})`;
-    const lists = await pgGet<AudienceItem>(env, 'audience', jwt, {
-      search: { select: AUDIENCE_SELECT, workspace_id: inWs, status: 'neq.archived', order: 'created_at.asc' },
-    });
-    // Un recuento por lista y estado, con `select=id`. No embebido
-    // (`audience_subscription(count)`): la tabla solo da SELECT por columnas y
-    // PostgREST cuenta el embebido con `*`, que da 403.
-    const counts = await Promise.all(
-      lists.data.map((a) =>
-        Promise.all(
-          STATUSES.map((status) =>
-            pgGet(env, 'audience_subscription', jwt, {
-              search: { select: 'id', audience_id: `eq.${a.id}`, status: `eq.${status}`, limit: '1' },
-              exactCount: true,
-            }).then((r) => [status, r.total ?? 0] as const),
-          ),
-        ),
-      ),
-    );
+    // Las listas y sus recuentos, dos subpeticiones por muchas listas que haya
+    // (106: antes, tres por lista, y Workers Free da 50 por petición). Los
+    // recuentos los da `audience_counts`, que cuenta como quien llama (RLS).
+    const [lists, rows] = await Promise.all([
+      pgGet<AudienceItem>(env, 'audience', jwt, {
+        search: { select: AUDIENCE_SELECT, workspace_id: `in.(${readable.join(',')})`, status: 'neq.archived', order: 'created_at.asc' },
+      }),
+      pgPostRpc<AudienceCountsRow>(env, 'audience_counts', jwt, { p_workspace_ids: readable }),
+    ]);
+    const counts = countsByAudience(lists.data.map((a) => a.id), rows.data);
     return jsonNoStore({
-      items: lists.data.map((a, i) => ({ ...a, counts: Object.fromEntries(counts[i]) as AudienceCounts })),
+      items: lists.data.map((a) => ({ ...a, counts: counts.get(a.id)! })),
       access,
     } satisfies AudienceListResponse);
   } catch (err) {
