@@ -203,10 +203,10 @@ describe.skipIf(!envReady())('conversation_event (ADR-098)', () => {
 
   test('an external reference records once', async () => {
     const ref = `zzz-rls-${RUN}`;
-    const a = await record({ p_kind: 'email', p_source: 'email', p_external_ref: ref });
+    const a = await record({ p_kind: 'email', p_source: 'import', p_external_ref: ref });
     const b = await record({
       p_kind: 'email',
-      p_source: 'email',
+      p_source: 'import',
       p_external_ref: ref,
       p_body: 'a second copy',
     });
@@ -219,6 +219,37 @@ describe.skipIf(!envReady())('conversation_event (ADR-098)', () => {
       new URLSearchParams({ select: 'id', external_ref: `eq.${ref}` }),
     );
     expect(rows.rows).toHaveLength(1);
+  });
+
+  // 123: un correo sólo lo escribe la sincronización (`mail_ingest_message`).
+  test('an editor cannot forge an email event, and can still write a note', async () => {
+    const ref = `zzz-rls-forged-${RUN}`;
+    const forged = await record({
+      p_kind: 'email',
+      p_direction: 'inbound',
+      p_source: 'email',
+      p_external_ref: ref,
+      p_body: `ZZZ ${RUN} forged`,
+      p_metadata: { mailbox: 'someone@example.test', gmail_id: 'x', message_id: '<x@example.test>' },
+    });
+    expect(forged.status).toBe(403);
+    const rows = await pgGet<EventRow>(
+      'conversation_event',
+      jwt,
+      new URLSearchParams({ select: 'id', external_ref: `eq.${ref}` }),
+    );
+    expect(rows.status).toBe(200);
+    expect(rows.rows).toHaveLength(0);
+
+    const note = await record({ p_kind: 'note', p_body: `zzz note after forge ${RUN}` });
+    expect(note.status).toBe(200);
+    expect(one(note.data)!.source).toBe('manual');
+    const r = await pgGet<EventRow>(
+      'conversation_event',
+      jwt,
+      new URLSearchParams({ select: 'id', id: `eq.${one(note.data)!.id}` }),
+    );
+    expect(r.rows).toHaveLength(1);
   });
 
   test('the timeline reads back, most recent first', async () => {

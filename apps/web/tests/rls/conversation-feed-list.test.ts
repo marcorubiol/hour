@@ -125,7 +125,6 @@ describe.skipIf(!envReady())('RLS: la lista desde conversation_feed (plan de la 
       p_conversation_id: id,
       p_kind: 'email',
       p_direction: direction,
-      p_source: 'email',
       p_occurred_at: ago(daysAgo),
       p_metadata: { subject: `RLS list ${RUN}` },
     });

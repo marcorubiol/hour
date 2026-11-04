@@ -114,7 +114,6 @@ describe.skipIf(!envReady())('RLS: la lectura común, conversation_feed (ADR-138
       p_conversation_id: conversationId,
       p_kind: 'email',
       p_direction: 'inbound',
-      p_source: 'email',
       ...args,
     });
     expect(r.status, r.error).toBe(200);

@@ -38,7 +38,7 @@ WhatsApp. Es el límite entre Conversations v1.5 y el log de conversación de S2
 | `occurred_at` | `timestamptz` obligatorio. |
 | `recorded_at` | `timestamptz`, default `now()`. |
 | `kind` | `note \| call \| email \| meeting \| message`. |
-| `source` | `manual \| email \| whatsapp \| import \| integration`. |
+| `source` | `manual \| email \| whatsapp \| import \| integration`. `email` sólo lo escribe la sincronización (`mail_ingest_message`) o un envío; `record_conversation_event` lo rechaza con 42501 (123). |
 | `direction` | `inbound \| outbound \| null`; null solo cuando no aplica. |
 | `body` | Texto nullable; no guarda HTML remoto sin sanear. |
 | `participants` | JSON estructurado con persona local opcional, nombre, dirección y rol; conserva participantes aún no resueltos sin crear personas globales. |
