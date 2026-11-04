@@ -771,6 +771,39 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: el público y sus invit
     expect((await recipients(mixed.row!.id)).rows.length).toBe(2);
   });
 
+  test('102 · el montaje trae la obra, el día, la franja de inicio y el reloj de la función', async () => {
+    const perf = await performance(homeProjectId);
+    const slot = await pgRpc('create_schedule_slot', adminJwt, {
+      p_target_table: 'performance',
+      p_target_id: perf,
+      p_at: '2031-05-10T18:30:00Z',
+      p_kind: 'start',
+    });
+    expect(slot.status, slot.error).toBe(200);
+    const inv = await pgRpc<Mailout>('create_invitation', adminJwt, {
+      p_workspace_id: workspaceId,
+      p_conversation_ids: [conv.pa],
+      p_performance_id: perf,
+    });
+    expect(inv.status, inv.error).toBe(200);
+    mailouts.push(one(inv.data)!.id);
+    const [project, ws] = await Promise.all([
+      pgGet<{ name: string }>('project', adminJwt, new URLSearchParams({ id: `eq.${homeProjectId}`, select: 'name' })),
+      pgGet<{ timezone: string }>('workspace', adminJwt, new URLSearchParams({ id: `eq.${workspaceId}`, select: 'timezone' })),
+    ]);
+    const rows = await pgRpc<
+      { project_name: string | null; performed_at: string | null; performance_start_at: string | null; performance_timezone: string | null }[]
+    >('mailout_compose_preview', adminJwt, { p_id: one(inv.data)!.id });
+    expect(rows.status, rows.error).toBe(200);
+    expect(rows.data!.length).toBe(1);
+    const row = rows.data![0];
+    expect(row.project_name).toBe(project.rows[0].name.trim());
+    expect(row.performed_at).toBe('2031-05-10');
+    expect(new Date(row.performance_start_at!).toISOString()).toBe('2031-05-10T18:30:00.000Z');
+    // Sin sala de la tabla `venue`: el reloj del espacio.
+    expect(row.performance_timezone).toBe(ws.rows[0].timezone);
+  });
+
   test('10 · nadie escribe las tablas nuevas por la API, ni el owner', async () => {
     const text = await pgGet<{ id: string }>('audience_consent_text', adminJwt, new URLSearchParams({ audience_id: `eq.${listId}`, select: 'id', limit: '1' }));
     const sub = await pgGet<{ id: string }>('audience_subscription', adminJwt, new URLSearchParams({ audience_id: `eq.${listId}`, select: 'id', limit: '1' }));

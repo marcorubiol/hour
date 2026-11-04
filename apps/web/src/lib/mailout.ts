@@ -209,6 +209,10 @@ export interface InvitationPerformance {
   performed_at: string;
   venue_name: string | null;
   city: string | null;
+  /** 102: `{obra}` sin proyecto en el envío, `{hora}` y el reloj en que se lee. */
+  project_name: string | null;
+  start_at: string | null;
+  timezone: string | null;
 }
 
 /** GET /api/mailout/[id]. */

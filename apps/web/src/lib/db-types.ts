@@ -7387,7 +7387,11 @@ export type Database = {
           mailout_id: string
           mailout_kind: Database["public"]["Enums"]["mailout_kind"]
           organization_name: string
+          performance_start_at: string
+          performance_timezone: string
+          performed_at: string
           privacy_url: string
+          project_name: string
           recipient_id: string
           subscribed_at: string
           subscriber_language: string
@@ -7517,7 +7521,11 @@ export type Database = {
           mailout_id: string
           mailout_kind: Database["public"]["Enums"]["mailout_kind"]
           organization_name: string
+          performance_start_at: string
+          performance_timezone: string
+          performed_at: string
           privacy_url: string
+          project_name: string
           recipient_id: string
           subscribed_at: string
           subscriber_language: string

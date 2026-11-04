@@ -6,6 +6,9 @@ import {
   isAudienceRecipient,
   mailoutLanguage,
   MAILOUT_LANGUAGES,
+  mergeFieldsFor,
+  performanceDate,
+  performanceTime,
   recipientLanguage,
   suggestedBasis,
   testSubject,
@@ -321,5 +324,73 @@ describe('el idioma de cada suscripción (104)', () => {
     expect(texts[1]).toContain('Unsubscribe:');
     expect(texts[2]).toContain('Darte de baja:');
     expect(texts[3]).toContain('daos de baja');
+  });
+});
+
+describe('{obra}, {fecha} y {hora} (102)', () => {
+  const show: ComposeContext = {
+    ...ctx,
+    mailout_kind: 'invitation',
+    venue_name: 'Teatre Lliure',
+    venue_city: 'Barcelona',
+    project_name: 'MaMeMi',
+    performed_at: '2026-11-14',
+    // 19:30 UTC = 20:30 en Madrid (CET).
+    performance_start_at: '2026-11-14T19:30:00Z',
+    performance_timezone: 'Europe/Madrid',
+  };
+  const draft = { subject: '{obra} en {sala}', body: 'Hola, {nombre}: el {fecha} a las {hora}.', language: 'es' };
+
+  test('rellena los tres en el idioma del correo y el reloj de la sala', () => {
+    const m = composeMailout(draft, show, URL);
+    expect(m.subject).toBe('MaMeMi en Teatre Lliure');
+    expect(m.text.startsWith('Hola, Laia: el sábado, 14 de noviembre a las 20:30.')).toBe(true);
+    expect(m.missing).toEqual([]);
+  });
+
+  test('una persona del público los lee en el idioma de su suscripción', () => {
+    const sub: ComposeContext = {
+      ...show,
+      address_kind: 'subscriber',
+      basis_kind: 'consent',
+      contact_first_name: null,
+      audience_subscription_id: 's1',
+      audience_name: 'Estrenos',
+      subscriber_name: 'Claire',
+      subscriber_language: 'fr',
+    };
+    expect(composeMailout(draft, sub, URL).text.startsWith('Hola, Claire: el samedi 14 novembre a las 20:30.')).toBe(true);
+    expect(composeMailout(draft, { ...sub, subscriber_language: 'ca' }, URL).text).toContain('dissabte, 14 de novembre');
+    expect(composeMailout(draft, { ...sub, subscriber_language: 'en' }, URL).text).toContain('Saturday 14 November');
+  });
+
+  test('la hora es la de la zona de la sala, no la de la compañía', () => {
+    expect(performanceTime('2026-11-14T19:30:00Z', 'America/Mexico_City', 'es')).toBe('13:30');
+    expect(performanceTime('2026-11-14T19:30:00Z', 'Europe/London', 'en')).toBe('19:30');
+    // Sin zona o con una que no existe: la de la compañía por defecto.
+    expect(performanceTime('2026-11-14T19:30:00Z', null, 'es')).toBe('20:30');
+    expect(performanceTime('2026-11-14T19:30:00Z', 'Mars/Olympus', 'es')).toBe('20:30');
+  });
+
+  test('la fecha es un día del calendario: no se mueve con la zona', () => {
+    expect(performanceDate('2026-11-14', 'es')).toBe('sábado, 14 de noviembre');
+    expect(performanceDate('2026-11-14T00:00', 'es')).toBeNull();
+    expect(performanceDate(null, 'es')).toBeNull();
+  });
+
+  test('sin función, sin franja de inicio o sin obra, el campo falta y no sale', () => {
+    const m = composeMailout(draft, { ...show, performed_at: null, performance_start_at: null, project_name: null }, URL);
+    expect(m.missing).toEqual(['obra', 'fecha', 'hora']);
+    // Una base sin la migración no trae las columnas: faltan igual.
+    const old: ComposeContext = { ...ctx, mailout_kind: 'invitation', venue_name: 'Teatre Lliure' };
+    expect(composeMailout(draft, old, URL).missing).toEqual(['obra', 'fecha', 'hora']);
+  });
+
+  test('{obra} vale también en la difusión; {fecha} y {hora} solo se ofrecen en una invitación', () => {
+    const m = composeMailout({ subject: '{obra}', body: 'x', language: 'es' }, { ...ctx, project_name: 'MaMeMi' }, URL);
+    expect(m.subject).toBe('MaMeMi');
+    expect(mergeFieldsFor('outreach')).toEqual(['nombre', 'sala', 'ciudad', 'obra']);
+    expect(mergeFieldsFor('invitation')).toEqual(['nombre', 'sala', 'ciudad', 'obra', 'fecha', 'hora']);
+    expect(fieldsUsed('{hora} {obra} {fecha}')).toEqual(['obra', 'fecha', 'hora']);
   });
 });

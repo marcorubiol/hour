@@ -4,7 +4,7 @@
    *
    * Borrador: De (el dominio verificado de la compañía), a dónde van las
    * respuestas, idioma, asunto y cuerpo con los campos `{nombre}`, `{sala}`,
-   * `{ciudad}`; la vista previa destinatario a destinatario con la firma y el
+   * `{ciudad}`, `{obra}` (y en una invitación `{fecha}` y `{hora}`); la vista previa destinatario a destinatario con la firma y el
    * pie reales (mailout-compose.ts, lo mismo que monta la cola); la lista de
    * destinatarios con su estado, quitar uno y apuntar su base; «Enviarme una
    * prueba» y «Enviar a N» con confirmación. El borrador se guarda solo.
@@ -63,7 +63,7 @@
   import {
     composeMailout,
     MAILOUT_LANGUAGES,
-    MERGE_FIELDS,
+    mergeFieldsFor,
     recipientLanguage,
     suggestedBasis,
     unsubscribeUrl,
@@ -617,7 +617,7 @@
             <Textarea id="mailout-body" label={t('mail.body', locale)} rows={10} maxlength={20000} bind:value={body} oninput={touch} />
             <p class="mo__fields">
               <span>{t('mailout.fields', locale)}</span>
-              {#each MERGE_FIELDS as f (f)}
+              {#each mergeFieldsFor(invitation ? 'invitation' : 'outreach') as f (f)}
                 <button type="button" class="mo__chip" onclick={() => insertField(f)}>{`{${f}}`}</button>
               {/each}
               <span class="mo__saved" aria-live="polite">

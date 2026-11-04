@@ -3,7 +3,7 @@
  * vista previa de la pantalla y la cola del Worker llaman a lo mismo, así que
  * lo que se ve es lo que sale.
  *
- *   · Campos: `{nombre}`, `{sala}`, `{ciudad}`. Un campo que no tiene valor
+ *   · Campos: `{nombre}`, `{sala}`, `{ciudad}`, `{obra}`, `{fecha}`, `{hora}`. Un campo que no tiene valor
  *     para un destinatario se marca y ese correo no sale (nunca vacío).
  *     `{nombre}` de una dirección genérica es «equipo de {sala}».
  *   · Origen (ADR-173 § 10): lo dice la fila, no el envío. Una persona del
@@ -12,6 +12,10 @@
  *     el pie de la difusión según su base, también en una invitación.
  *   · En una invitación, `{sala}` y `{ciudad}` son los de la función a la que
  *     se invita, para los dos orígenes (plan del público § 4.7).
+ *   · `{obra}`, `{fecha}` y `{hora}` (102): la obra del envío (o la de la
+ *     función), el día de la función y su hora de inicio, en el idioma del
+ *     correo y con el reloj de la sala (o el del espacio, si no tiene). La
+ *     pantalla ofrece `{fecha}` y `{hora}` solo en una invitación.
  *   · Firma: la de la compañía (el remitente es la compañía, ADR-110 § 3): la
  *     guardada o la que propone Hour, como el buzón común (ADR-099).
  *   · Pie (no se puede quitar): quién escribe, por qué le llega según su base,
@@ -37,8 +41,13 @@ import { mailHtml, NO_TEMPLATE, type MailTemplate } from './mail-template';
 export const MAILOUT_LANGUAGES = ['es', 'ca', 'en', 'fr'] as const;
 type MailoutLanguage = (typeof MAILOUT_LANGUAGES)[number];
 
-export const MERGE_FIELDS = ['nombre', 'sala', 'ciudad'] as const;
+export const MERGE_FIELDS = ['nombre', 'sala', 'ciudad', 'obra', 'fecha', 'hora'] as const;
 type MergeField = (typeof MERGE_FIELDS)[number];
+
+/** Los campos que la pantalla ofrece: `{fecha}` y `{hora}` son de la función de una invitación. */
+export function mergeFieldsFor(kind: 'outreach' | 'invitation'): readonly MergeField[] {
+  return kind === 'invitation' ? MERGE_FIELDS : MERGE_FIELDS.filter((f) => f !== 'fecha' && f !== 'hora');
+}
 
 export type MailBasisKind = 'consent' | 'relationship' | 'generic' | 'sector';
 
@@ -72,6 +81,16 @@ export interface ComposeContext {
    * una base sin la migración 20261103100000 no lo trae y se cae al del envío.
    */
   subscriber_language?: string | null;
+  /**
+   * 102: la obra (`{obra}`), el día de la función (`YYYY-MM-DD`, `{fecha}`), su
+   * franja de inicio (`{hora}`) y el reloj en que se lee (la sala, si no el
+   * espacio). Opcionales: una base sin la migración 20261104140000 no los trae
+   * y esos campos faltan (el correo que los use no sale).
+   */
+  project_name?: string | null;
+  performed_at?: string | null;
+  performance_start_at?: string | null;
+  performance_timezone?: string | null;
 }
 
 /** Una persona del público, no una conversación (ADR-173 § 10). */
@@ -197,7 +216,7 @@ export function recipientLanguage(
   return (MAILOUT_LANGUAGES as readonly string[]).includes(own ?? '') ? (own as MailoutLanguage) : mailoutLanguage(mailoutLang);
 }
 
-const FIELD_RE = /\{(nombre|sala|ciudad)\}/g;
+const FIELD_RE = /\{(nombre|sala|ciudad|obra|fecha|hora)\}/g;
 
 /** Los campos que usa un texto, sin repetir, en el orden de MERGE_FIELDS. */
 export function fieldsUsed(...texts: string[]): MergeField[] {
@@ -221,10 +240,15 @@ function mergeValues(ctx: ComposeContext, language: MailoutLanguage): Record<Mer
         ? COPY[language].team(org)
         : null
       : ctx.contact_first_name?.trim() || null;
+  const show = {
+    obra: ctx.project_name?.trim() || null,
+    fecha: performanceDate(ctx.performed_at ?? null, language),
+    hora: performanceTime(ctx.performance_start_at ?? null, ctx.performance_timezone ?? null, language),
+  };
   if (ctx.mailout_kind === 'invitation') {
-    return { nombre, sala: ctx.venue_name?.trim() || null, ciudad: ctx.venue_city?.trim() || null };
+    return { nombre, sala: ctx.venue_name?.trim() || null, ciudad: ctx.venue_city?.trim() || null, ...show };
   }
-  return { nombre, sala: org, ciudad: ctx.city?.trim() || null };
+  return { nombre, sala: org, ciudad: ctx.city?.trim() || null, ...show };
 }
 
 /**
@@ -255,6 +279,42 @@ function footerDate(iso: string | null, language: MailoutLanguage): string | nul
     year: 'numeric',
     timeZone: 'Europe/Madrid',
   }).format(d);
+}
+
+/**
+ * `{fecha}`: «sábado, 14 de noviembre», en el idioma del correo. Es un día del
+ * calendario (`performance.performed_at`), no un instante: no se mueve de zona.
+ */
+export function performanceDate(day: string | null, language: MailoutLanguage): string | null {
+  if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+  const d = new Date(`${day}T12:00:00Z`);
+  if (Number.isNaN(d.getTime())) return null;
+  return new Intl.DateTimeFormat(DATE_LOCALE[language], {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    timeZone: 'UTC',
+  }).format(d);
+}
+
+/** `{hora}`: «20:30», la hora de inicio en el reloj de la sala (o del espacio). */
+export function performanceTime(at: string | null, timeZone: string | null, language: MailoutLanguage): string | null {
+  if (!at) return null;
+  const d = new Date(at);
+  if (Number.isNaN(d.getTime())) return null;
+  const format = (zone: string) =>
+    new Intl.DateTimeFormat(DATE_LOCALE[language], {
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+      timeZone: zone,
+    }).format(d);
+  try {
+    return format(timeZone?.trim() || 'Europe/Madrid');
+  } catch {
+    // Una zona que el motor no conoce: la de la compañía por defecto, como el pie.
+    return format('Europe/Madrid');
+  }
 }
 
 /** La firma de la compañía: la guardada, o la que propone Hour. */

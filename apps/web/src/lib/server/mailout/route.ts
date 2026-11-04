@@ -142,6 +142,7 @@ async function invitationAudience(
   mailout: MailoutItem,
   recipients: MailoutRecipientRow[],
   performance: InvitationPerformance | null,
+  projectName: string | null,
 ): Promise<{ audience: InvitationAudience | null; preview: AudiencePreview[] }> {
   if (!mailout.audience_id) return { audience: null, preview: [] };
   const [list, subs, imports, company] = await Promise.all([
@@ -200,6 +201,11 @@ async function invitationAudience(
         venue_name: performance?.venue_name ?? null,
         venue_city: performance?.city ?? null,
         subscriber_language: s.language,
+        // 102: como `private.mailout_compose_rows`.
+        project_name: projectName ?? performance?.project_name ?? null,
+        performed_at: performance?.performed_at ?? null,
+        performance_start_at: performance?.start_at ?? null,
+        performance_timezone: performance?.timezone ?? null,
       }))
     : [];
   return {
@@ -214,7 +220,10 @@ async function invitationAudience(
   };
 }
 
-/** La función de una invitación, con la sala y la ciudad como las monta la cola. */
+/**
+ * La función de una invitación, con la sala, la ciudad, la obra, la hora de
+ * inicio y su reloj (la sala, si no el espacio) como las monta la cola.
+ */
 async function invitationPerformance(
   env: SupabaseEnv,
   jwt: string,
@@ -226,8 +235,20 @@ async function invitationPerformance(
     performed_at: string;
     venue_name: string | null;
     city: string | null;
-    venue: { name: string | null; city: string | null } | null;
-  }>(env, 'performance', jwt, { search: { select: 'id,performed_at,venue_name,city,venue:venue_id(name,city)', id: `eq.${id}` } });
+    venue: { name: string | null; city: string | null; timezone: string | null } | null;
+    project: { name: string | null } | null;
+    workspace: { timezone: string | null } | null;
+    start: { at: string }[] | null;
+  }>(env, 'performance', jwt, {
+    search: {
+      select:
+        'id,performed_at,venue_name,city,venue:venue_id(name,city,timezone),project:project_id(name),workspace:workspace_id(timezone),start:schedule_slot(at)',
+      id: `eq.${id}`,
+      'start.kind': 'eq.start',
+      'start.order': 'sort.asc',
+      'start.limit': '1',
+    },
+  });
   const p = data[0];
   if (!p) return null;
   return {
@@ -235,6 +256,9 @@ async function invitationPerformance(
     performed_at: p.performed_at,
     venue_name: p.venue_name?.trim() || p.venue?.name?.trim() || null,
     city: p.city?.trim() || p.venue?.city?.trim() || null,
+    project_name: p.project?.name?.trim() || null,
+    start_at: p.start?.[0]?.at ?? null,
+    timezone: p.venue?.timezone?.trim() || p.workspace?.timezone || null,
   };
 }
 
@@ -313,7 +337,7 @@ export async function loadDetail(env: MailoutEnv, jwt: string, id: string): Prom
             })
           : Promise.resolve({ data: [] as { id: string; name: string }[] }),
         mine?.read
-          ? invitationAudience(env, jwt, mailout, rows.recipients, performance)
+          ? invitationAudience(env, jwt, mailout, rows.recipients, performance, project.data[0]?.name?.trim() || null)
           : Promise.resolve({ audience: null, preview: [] }),
       ])
     : [{ data: [] as { id: string; name: string }[] }, { audience: null, preview: [] as AudiencePreview[] }];
