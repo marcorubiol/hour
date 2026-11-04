@@ -20,6 +20,7 @@ no pide migración primero; las migraciones juntas por el gate de § 34.
 - [ ] 119 Marco: hacer: enseñar la gramática y la lista con las 152 filas reales a Anouk y a alguien de producción, antes del 118.
 - [ ] 120 de un vistazo, después: la fila de chat en «Te espera» de Hoy y en las fichas, con lo último que se dijo; el bolo como historia con la raya de hoy; la hoja de ruta del técnico (su hoja, el día en orden, «Llamar a…», «Cómo llegar»).
 - [ ] 121 de un vistazo, ideas sin dibujar: apuntar una llamada desde el móvil sin buscar la conversación; «llego tarde» en la hoja de ruta del técnico, que avise a producción (quién cambia una hora el mismo día).
+- [ ] 124 tests: `tests/rls/conversation-event.test.ts` y `conversation-venue.test.ts` borran su buzón de prueba pero dejan en `playwright` los eventos `mail_sync` que crea `mail_ingest_message` (unos 10 por pasada; el 2026-11-04 se borraron 480, backup 41825313016). Que cada test borre sus eventos al acabar.
 - Aparcado: 86 (responsable de tarea) hasta que entre Anouk.
 
 ## PRIMERO — nada. `main` == prod y las dos suites están vivas (2026-07-30, noche)
