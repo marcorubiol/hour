@@ -5,11 +5,11 @@
  * Permiso, en dos llaves:
  *  1. con el JWT de quien mira, el evento (`conversation_event`, su RLS: si ve
  *     el correo en la conversación, puede ver su original, ADR-099 punto 4);
- *  2. con la clave de servicio, que ese mensaje de ese buzón lo registró Hour
- *     (`mail_message_ingested`): los metadatos del evento no bastan, porque
- *     quien edita una conversación puede escribir un evento de correo con los
- *     ids que quiera (migración 20261104130000). Y al bajarlo, su Message-ID
- *     tiene que ser el del evento.
+ *  2. con la clave de servicio, qué mensaje de qué buzón creó ESE evento
+ *     (`mail_event_message`, el vínculo que escribe la sincronización): los
+ *     metadatos del evento no se miran, porque quien edita una conversación
+ *     puede escribir un evento de correo con los ids que quiera (migración
+ *     20261104130000). Y al bajarlo, su Message-ID tiene que ser el registrado.
  * Sólo después se descifra el token del buzón, como al enviar (send.ts).
  */
 
@@ -141,9 +141,26 @@ interface EventRef {
   id: string;
   workspace_id: string;
   source: string;
-  mail_account_id: string | null;
-  provider_message_id: string | null;
-  rfc_message_id: string | null;
+}
+
+/** El mensaje (o el adjunto) ya no está en el buzón: borrado, o el id ya no vale. */
+class OriginalGoneError extends Error {}
+
+/** Una llamada a Gmail por un mensaje concreto: su 404 (o 400 de id) es «ya no está». */
+async function fromMailbox<T>(call: () => Promise<T>): Promise<T> {
+  try {
+    return await call();
+  } catch (err) {
+    if (err instanceof ProviderError && (err.status === 404 || err.status === 400)) throw new OriginalGoneError();
+    throw err;
+  }
+}
+
+/** Los bytes de un adjunto, de su attachmentId o, si es pequeño, de la propia parte. */
+export async function attachmentData(client: GmailClient, raw: GmailRawMessage, part: GmailPart): Promise<string | null> {
+  const attachmentId = part.body?.attachmentId;
+  if (!attachmentId) return part.body?.data ?? null;
+  return (await fromMailbox(() => client.getAttachment(raw.id, attachmentId))).data ?? null;
 }
 
 export type OpenedOriginal =
@@ -165,24 +182,21 @@ export async function openOriginal(
   // 1. ¿Lo ve? Con su JWT: la RLS del evento decide.
   const r = await pgGet<EventRef>(env as unknown as SupabaseEnv, 'conversation_event', jwt, {
     search: {
-      select:
-        'id,workspace_id,source,mail_account_id:metadata->>mail_account_id,provider_message_id:metadata->>provider_message_id,rfc_message_id:metadata->>rfc_message_id',
+      select: 'id,workspace_id,source',
       id: `eq.${eventId}`,
       conversation_id: `eq.${conversationId}`,
     },
   });
   const ev = r.data[0];
   if (!ev) return { ok: false, status: 404, error: 'not_found' };
-  if (ev.source !== 'email' || !ev.mail_account_id || !ev.provider_message_id) {
-    return { ok: false, status: 404, error: 'no_original' };
-  }
+  if (ev.source !== 'email') return { ok: false, status: 404, error: 'no_original' };
 
-  // 2. ¿Lo trajo Hour de ese buzón? Con la clave de servicio, sólo ids.
+  // 2. ¿Qué mensaje de qué buzón creó ESTE evento? Lo escribió la
+  //    sincronización (`mail_message_event`); los metadatos no se miran.
   const db = serviceMailDb(env, fetchFn);
-  if (!(await db.messageIngested(ev.mail_account_id, ev.provider_message_id, ev.rfc_message_id))) {
-    return { ok: false, status: 404, error: 'no_original' };
-  }
-  const account = await db.account(ev.mail_account_id);
+  const msg = await db.eventMessage(ev.id);
+  if (!msg) return { ok: false, status: 404, error: 'no_original' };
+  const account = await db.account(msg.mail_account_id);
   if (!account || account.workspace_id !== ev.workspace_id || account.provider !== 'google') {
     return { ok: false, status: 404, error: 'no_original' };
   }
@@ -200,11 +214,11 @@ export async function openOriginal(
     clientSecret: env.GOOGLE_OAUTH_CLIENT_SECRET,
   });
   const client = new GmailClient(fetchFn, await adapter.accessToken(refreshToken));
-  const raw = await client.getMessage(ev.provider_message_id);
+  const raw = await fromMailbox(() => client.getMessage(msg.provider_message_id));
 
-  // El mensaje es el del evento: mismo Message-ID.
+  // El mensaje es el que se registró: mismo Message-ID.
   const rfc = headerOf(raw.payload, 'Message-ID') ?? headerOf(raw.payload, 'Message-Id');
-  if (ev.rfc_message_id && rfc?.trim() !== ev.rfc_message_id) {
+  if (msg.rfc_message_id && rfc?.trim() !== msg.rfc_message_id) {
     return { ok: false, status: 404, error: 'no_original' };
   }
   return { ok: true, raw, client };
@@ -245,10 +259,9 @@ export async function withOriginal(
     return await handle(opened);
   } catch (err) {
     if (err instanceof ProviderAuthError) return noStore({ error: 'mailbox_revoked' }, 409);
-    // Borrado en Gmail (o ya fuera del buzón): no hay original que traer.
-    if (err instanceof ProviderError && (err.status === 404 || err.status === 400)) {
-      return noStore({ error: 'original_gone' }, 410);
-    }
+    // Borrado en Gmail: no hay original que traer. Sólo el mensaje o el
+    // adjunto; un 400 al renovar el token (`invalid_client`) es un fallo.
+    if (err instanceof OriginalGoneError) return noStore({ error: 'original_gone' }, 410);
     if (err instanceof PostgrestError && (err.status === 401 || err.status === 403)) {
       return noStore({ error: 'not_found' }, 404);
     }

@@ -8,6 +8,7 @@
 import type { RequestHandler } from './$types';
 import { extractAccessToken } from '$lib/auth';
 import {
+  attachmentData,
   attachmentDisposition,
   attachmentPart,
   base64UrlBytes,
@@ -29,9 +30,7 @@ export const GET: RequestHandler = async ({ request, params, platform, locals })
     async ({ raw, client }) => {
       const part = attachmentPart(raw, params.partId);
       if (!part) return jsonNoStore({ error: 'not_found' }, 404);
-      const data = part.body?.attachmentId
-        ? (await client.getAttachment(raw.id, part.body.attachmentId)).data
-        : part.body?.data;
+      const data = await attachmentData(client, raw, part);
       if (!data) return jsonNoStore({ error: 'not_found' }, 404);
       const bytes = base64UrlBytes(data);
       return new Response(bytes, {

@@ -96,12 +96,19 @@ export interface MailDb {
   ): Promise<void>;
 }
 
+/** El mensaje del buzón que creó un evento, según lo que escribió la sincronización. */
+export interface EventMessage {
+  mail_account_id: string;
+  provider_message_id: string;
+  rfc_message_id: string | null;
+}
+
 /**
- * Lo que además usa abrir el original (punto 111): saber, sin fiarse de los
- * metadatos del evento, que ese correo lo registró Hour desde ese buzón.
+ * Lo que además usa abrir el original (punto 111): qué mensaje de qué buzón
+ * creó ESTE evento (`mail_message_event`), sin fiarse de sus metadatos.
  */
 export interface ServiceMailDb extends MailDb {
-  messageIngested(accountId: string, providerMessageId: string, rfcMessageId: string | null): Promise<boolean>;
+  eventMessage(eventId: string): Promise<EventMessage | null>;
 }
 
 class MailDbError extends Error {
@@ -157,12 +164,8 @@ export function serviceMailDb(
         p_message: message,
         ...(createdBy ? { p_created_by: createdBy } : {}),
       }),
-    messageIngested: (accountId, providerMessageId, rfcMessageId) =>
-      rpc<boolean>('mail_message_ingested', {
-        p_account_id: accountId,
-        p_provider_message_id: providerMessageId,
-        p_rfc_message_id: rfcMessageId,
-      }),
+    eventMessage: async (eventId) =>
+      (await rpc<EventMessage[]>('mail_event_message', { p_event_id: eventId }))[0] ?? null,
     finish: async (accountId, r) => {
       await rpc('mail_sync_finish', {
         p_account_id: accountId,

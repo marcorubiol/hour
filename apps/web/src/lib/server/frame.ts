@@ -23,12 +23,15 @@ export function frameableCsp(csp: string): string {
 /**
  * Las cabeceras de seguridad de una respuesta según su ruta: en `/embed`,
  * la CSP abierta a cualquier marco y sin `x-frame-options`; en el resto,
- * tal cual.
+ * tal cual. Una respuesta que ya fija su `referrer-policy` la conserva: la
+ * vista aparte del original de un correo (punto 111) pide `no-referrer`,
+ * más estricta que la de la app.
  */
 export function applyFrameHeaders(pathname: string, headers: Headers, security: Record<string, string>): void {
   const embed = isEmbedPath(pathname);
   for (const [name, value] of Object.entries(security)) {
     if (embed && name === 'x-frame-options') continue;
+    if (name === 'referrer-policy' && headers.has(name)) continue;
     headers.set(name, value);
   }
   if (!embed) return;

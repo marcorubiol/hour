@@ -235,10 +235,11 @@ No crear usuarios insertando en `auth.users`: usar Auth Admin API/Dashboard.
 - El original de un correo (punto 111) no se guarda: se trae del buzón al
   abrirlo (`/api/conversations/:id/events/:eventId/original`, `/view`,
   `/attachments/:partId`; `$lib/server/mail/original.ts`). Dos llaves: el
-  evento leído con el JWT (su RLS) y `mail_message_ingested` con la clave de
-  servicio (ese mensaje de ese buzón lo registró Hour con ese Message-ID),
-  porque `record_conversation_event` deja escribir eventos de correo con
-  metadatos a mano. El HTML se pinta en un iframe `sandbox` sin scripts ni
+  evento leído con el JWT (su RLS) y `mail_event_message` con la clave de
+  servicio: qué mensaje de qué buzón creó ESE evento, según
+  `mail_message_event`, que sólo escribe `mail_ingest_message`. Los metadatos
+  del evento no se miran, porque `record_conversation_event` deja escribir
+  eventos de correo con metadatos a mano. El HTML se pinta en un iframe `sandbox` sin scripts ni
   `allow-same-origin`, con su CSP (`default-src 'none'`) además de la heredada
   de la app; las imágenes remotas sólo en la vista aparte y pedidas. Los
   adjuntos salen siempre como descarga (`nosniff`, CSP `sandbox`).

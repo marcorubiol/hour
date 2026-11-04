@@ -45,3 +45,18 @@ describe('only the audience form for iframes can be framed (plan § 3.2)', () =>
     expect(frameableCsp("default-src 'self';")).toBe("default-src 'self'; frame-ancestors *");
   });
 });
+
+describe('a response keeps its own referrer-policy (111, the original seen apart)', () => {
+  const WITH_REFERRER = { ...SECURITY, 'referrer-policy': 'strict-origin-when-cross-origin' };
+  test('no-referrer set by the response is not overwritten', () => {
+    const h = new Headers({ 'referrer-policy': 'no-referrer' });
+    applyFrameHeaders('/api/conversations/c/events/e/original/view', h, WITH_REFERRER);
+    expect(h.get('referrer-policy')).toBe('no-referrer');
+    expect(h.get('x-frame-options')).toBe('DENY');
+  });
+  test('without one, the app default', () => {
+    const h = new Headers();
+    applyFrameHeaders('/h/conversations', h, WITH_REFERRER);
+    expect(h.get('referrer-policy')).toBe('strict-origin-when-cross-origin');
+  });
+});
