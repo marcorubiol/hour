@@ -20,6 +20,7 @@ import {
   messagesByThread,
   performanceOptions,
   performanceTag,
+  readerLabel,
   teamTimeline,
   threadKey,
   type BoardPerformance,
@@ -46,6 +47,20 @@ describe('facetName', () => {
     const f = { facet_key: 'tecnica', label: 'Tècnica i so', labels: { en: 'Tech & sound' } };
     expect(facetName(f, 'en')).toBe('Tech & sound');
     expect(facetName(f, 'es')).toBe('Tècnica i so');
+  });
+});
+
+describe('readerLabel (122)', () => {
+  const r = (roles?: ('cast' | 'crew')[], name: string | null = 'Laia') => ({ user_id: 'u', name, roles });
+  test('el papel en el bolo al lado del nombre', () => {
+    expect(readerLabel(r(['cast']), 'es')).toBe('Laia (reparto)');
+    expect(readerLabel(r(['crew']), 'es')).toBe('Laia (técnica)');
+    expect(readerLabel(r(['cast', 'crew']), 'es')).toBe('Laia (reparto · técnica)');
+  });
+  test('sin papel, o con la función de antes, sólo el nombre; sin nombre, nadie', () => {
+    expect(readerLabel(r([]), 'es')).toBe('Laia');
+    expect(readerLabel(r(undefined), 'es')).toBe('Laia');
+    expect(readerLabel(r(['cast'], null), 'es')).toBeNull();
   });
 });
 

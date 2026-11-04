@@ -7,8 +7,8 @@
    * Lee lo mismo que el tablón de la función (`bolo-board`, una clave y una
    * forma) y escoge su hilo. Quién lo lee no se monta desde aquí: lo da el
    * acceso al bolo (ADR-142) o la regla de la faceta (ADR-106). La cabecera lo
-   * dice con nombres, y que la sala no está (ADR-177 § 6); el acceso está en
-   * el tablón. Su monograma es el del espectáculo: el grupo es nuestro
+   * dice con nombres y papel (reparto, técnica: 122), y que la sala no está
+   * (ADR-177 § 6); el acceso está en el tablón. Su monograma es el del espectáculo: el grupo es nuestro
    * (ADR-177 § 3).
    *
    * Sin realtime, como el tablón: se recarga al volver a la pestaña y cada
@@ -39,6 +39,7 @@
     boloPlace,
     facetName,
     messagesByThread,
+    readerLabel,
     type BoardView,
     type ThreadAudience,
   } from '$lib/threads';
@@ -87,9 +88,10 @@
     })),
   );
   let audience = $derived($audienceQuery.data ?? null);
+  // Cada nombre con su papel en el bolo (122): «Laia (reparto), Pau (técnica)».
   let readers = $derived(
     audience?.people
-      .map((p) => p.name)
+      .map((p) => readerLabel(p, locale))
       .filter(Boolean)
       .join(', ') ?? '',
   );

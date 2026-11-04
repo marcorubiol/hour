@@ -113,7 +113,18 @@ type AudienceReason =
 export interface ThreadAudience {
   count: number;
   reason: AudienceReason;
-  people: { user_id: string; name: string | null }[];
+  people: AudienceReader[];
+}
+
+/** Su papel en el bolo del hilo: reparto o técnica (122). Vacío en una conversación. */
+export type ReaderRole = 'cast' | 'crew';
+
+export interface AudienceReader {
+  user_id: string;
+  name: string | null;
+  /** Su persona; null si no ha enlazado el perfil. Ausente antes de 20261104120000. */
+  person_id?: string | null;
+  roles?: ReaderRole[];
 }
 
 // ── esquemas de escritura ───────────────────────────────────────────────
@@ -166,6 +177,16 @@ export function audienceLine(audience: Pick<ThreadAudience, 'count' | 'reason'>,
   return audience.count === 1
     ? t('threads.seen_by_one', locale, { why })
     : t('threads.seen_by', locale, { n: audience.count, why });
+}
+
+/**
+ * «Laia (reparto)», «Pau (técnica)», «Marco»: un lector del grupo del bolo con
+ * su papel al lado (ADR-177 § 6). Sin nombre, null: no se nombra a nadie.
+ */
+export function readerLabel(reader: AudienceReader, locale: Locale): string | null {
+  if (!reader.name) return null;
+  const roles = (reader.roles ?? []).map((r) => t(r === 'cast' ? 'thread.role_cast' : 'thread.role_crew', locale));
+  return roles.length > 0 ? t('thread.reader_role', locale, { name: reader.name, roles: roles.join(' · ') }) : reader.name;
 }
 
 /**

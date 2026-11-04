@@ -80,7 +80,7 @@ interface Board {
 interface Audience {
   count: number;
   reason: { kind: string; facet_key?: string };
-  people: { user_id: string; name: string | null }[];
+  people: { user_id: string; name: string | null; person_id?: string | null; roles?: string[] }[];
 }
 
 const one = <T>(data: T | T[] | null): T | undefined => (Array.isArray(data) ? data[0] : (data ?? undefined));
@@ -607,6 +607,18 @@ describe.skipIf(!envReady())('RLS: hilos con facetas (ADR-106)', () => {
 
       const general = await pgRpc<Audience>('thread_audience', limitedJwt, { p_anchor_kind: 'bolo', p_anchor_id: boloId });
       expect(general.data!.reason).toMatchObject({ kind: 'container' });
+    });
+
+    test('14c · thread_audience lleva persona y papel en el bolo (122), y nada más', async () => {
+      const res = await pgRpc<Audience>('thread_audience', adminJwt, { p_anchor_kind: 'bolo', p_anchor_id: boloId });
+      expect(res.status, res.error).toBe(200);
+      for (const p of res.data!.people) {
+        expect(Object.keys(p).sort()).toEqual(['name', 'person_id', 'roles', 'user_id']);
+        expect(p.roles!.every((r) => r === 'cast' || r === 'crew'), JSON.stringify(p.roles)).toBe(true);
+      }
+      const conv = await pgRpc<Audience>('thread_audience', adminJwt, { p_anchor_kind: 'conversation', p_anchor_id: conversationId });
+      expect(conv.status, conv.error).toBe(200);
+      expect(conv.data!.people.every((p) => p.roles!.length === 0), 'una conversación no tiene reparto').toBe(true);
     });
 
     test('17 · thread_read: no leídos por persona, solo la fila propia', async () => {
