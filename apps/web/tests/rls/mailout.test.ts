@@ -787,6 +787,38 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: envío en bloque (ADR-1
       expect((await pgGet('mailout_event', limitedJwt, new URLSearchParams({ recipient_id: `eq.${org.id}` }))).rows.length).toBe(3);
     });
 
+    test('100 · rebote o queja de un destinatario saltado: el evento queda, el estado no cambia, la dirección se excluye', async () => {
+      expect(queued, 'depende del test 6').toBeTruthy();
+      // conv.c: la b no, que el test de ADR-110 la vuelve a poner en cola.
+      const skipped = (await recipients(queued.id)).rows.find((r) => r.conversation_id === conv.c)!;
+      expect(skipped).toMatchObject({ status: 'skipped', skip_reason: 'suppressed' });
+      const ev = (type: string, extra: Record<string, unknown> = {}) =>
+        svc<boolean>('POST', 'rpc/mailout_record_event', {
+          p_payload: { provider_event_id: `skip-${type}-${RUN}-${Math.random()}`, recipient_id: skipped.id, type, ...extra },
+        });
+      const bounce = await ev('bounce', { bounce_type: 'Permanent' });
+      expect(bounce.status, bounce.error).toBe(200);
+      expect(bounce.data).toBe(true);
+      const complaint = await ev('complaint');
+      expect(complaint.status, complaint.error).toBe(200);
+      expect(complaint.data).toBe(true);
+
+      const after = (await recipients(queued.id)).rows.find((r) => r.id === skipped.id)!;
+      expect(after).toMatchObject({ status: 'skipped', skip_reason: 'suppressed' });
+      const events = await pgGet<{ type: string }>(
+        'mailout_event',
+        adminJwt,
+        new URLSearchParams({ recipient_id: `eq.${skipped.id}`, select: 'type', order: 'type' }),
+      );
+      expect(events.rows).toEqual([{ type: 'bounce' }, { type: 'complaint' }]);
+      const sup = await pgGet<{ reason: string }>(
+        'mail_suppression',
+        adminJwt,
+        new URLSearchParams({ address: `eq.${skipped.address}`, select: 'reason' }),
+      );
+      expect(sup.rows).toEqual([{ reason: 'complaint' }]);
+    });
+
     test('ADR-110 § 6: el primer envío real de un espacio espera la revisión de Marco', async () => {
       const ws = await svc<{ mailout_simulator_only: boolean; mailout_reviewed_at: string | null }[]>(
         'GET',
