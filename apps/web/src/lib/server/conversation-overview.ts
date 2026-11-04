@@ -25,6 +25,7 @@ import {
 import { TAGGING_EMBED, tagKeysOf, type TaggingEmbed } from '$lib/conversation-tags';
 import type { ConversationBolo } from '$lib/conversation-relation';
 import { defaultProviderKind, type MailoutEnv } from '$lib/server/mailout';
+import { normalizeStartMonth, seasonStartOf } from '$lib/season-year';
 
 export interface OverviewScope {
   projectIds: string[];
@@ -125,6 +126,23 @@ async function pages<T>(read: (offset: number) => Promise<T[]>): Promise<T[]> {
     out.push(...batch);
     if (batch.length < PAGE) return out;
   }
+}
+
+/**
+ * El mes en que empieza la temporada de cada espacio que quien llama lee
+ * (`workspace.season_start_month`, tarea 78), y el de la pantalla: el del
+ * alcance si todos coinciden, septiembre si no (`seasonStartOf`).
+ */
+export async function loadSeasonStarts(
+  env: SupabaseEnv,
+  jwt: string,
+  scopeWorkspaceIds: readonly string[] = [],
+): Promise<{ starts: Map<string, number>; month: number }> {
+  const search = new URLSearchParams({ select: 'id,season_start_month', deleted_at: 'is.null' });
+  const { data } = await pgGet<{ id: string; season_start_month: number | null }>(env, 'workspace', jwt, { search });
+  const starts = new Map(data.map((w) => [w.id, normalizeStartMonth(w.season_start_month)]));
+  const shown = scopeWorkspaceIds.length > 0 ? data.filter((w) => scopeWorkspaceIds.includes(w.id)) : data;
+  return { starts, month: seasonStartOf(shown) };
 }
 
 /** Los ids de las conversaciones vivas del alcance, sin nada más. */

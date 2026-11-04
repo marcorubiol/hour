@@ -7,6 +7,8 @@
    * accent. On success, refetch the ['lines'] caches before navigating to
    * the new line detail.
    */
+  import { currentSeason, seasonLabel } from '$lib/season-year';
+  import { screenSeasonStart } from '$lib/season-start.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { goto } from '$app/navigation';
   import { ApiError, fetchJSON, mutateJSON } from '$lib/api';
@@ -59,12 +61,13 @@
   let effectiveProjectId = $derived(projectId ?? projSelected);
 
   // Light name suggestion from the template + next year — "Difusión
-  // 2027-28" for booking (a season spans two years), "Tour 2027" else.
+  // 2027-28" for booking (the season after this one, by the month the
+  // space's season starts: `$lib/season-year`), "Tour 2027" else.
   const nextYear = new Date().getFullYear() + 1;
   let nameSuggestion = $derived(
     template.key === 'booking'
       ? t('line.suggest_booking', locale, {
-          season: `${nextYear}-${String((nextYear + 1) % 100).padStart(2, '0')}`,
+          season: seasonLabel(currentSeason(new Date(), screenSeasonStart()).year + 1, screenSeasonStart(), true),
         })
       : `${t(template.nameKey, locale)} ${nextYear}`,
   );

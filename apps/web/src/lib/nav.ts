@@ -46,6 +46,8 @@ export type NavWorkspace = {
   trade?: string | null;
   /** ADR-132 — the lenses this workspace does not use; absent reads as none. */
   lenses_off?: string[] | null;
+  /** Tarea 78 — the month (1..12) its season starts; absent reads as September (`$lib/season-year`). */
+  season_start_month?: number | null;
   /** IANA home timezone — the timeslot-entry fallback when a gig has no
       linked venue (timezone rule, spec § Timezone rule). */
   timezone?: string;

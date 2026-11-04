@@ -9,6 +9,7 @@
 import * as v from 'valibot';
 import { Constants, type Enums } from './db-types';
 import { localDayISO } from './datetime';
+import { DEFAULT_SEASON_START_MONTH, seasonStartFor, seasonYearOf, type SeasonStarts } from './season-year';
 import { appLocale, LOCALE_TAG, t, type Locale } from './i18n';
 
 export type PaymentMethod = Enums<'payment_method'>;
@@ -523,41 +524,33 @@ function isInProgress(status: string): boolean {
 	return status === 'proposed' || status.startsWith('hold');
 }
 
-// ── Temporada: septiembre a agosto por fecha de función (ADR-117 § 3) ──
+// ── Temporada: la de `$lib/season-year` (ADR-117 § 3, tarea 78) ──
 
-/** The season a day belongs to, as its starting year: 2026-10-03 → 2026, 2027-08-31 → 2026. */
-export function seasonOf(day: string): number {
-	const year = Number(day.slice(0, 4));
-	const month = Number(day.slice(5, 7));
-	return month >= 9 ? year : year - 1;
-}
-
-/** `{ from: '2026-09-01', to: '2027-08-31' }`, inclusive days. */
-export function seasonRange(start: number): { from: string; to: string } {
-	return { from: `${start}-09-01`, to: `${start + 1}-08-31` };
+/**
+ * Which season a bolo lives in, as its starting year: the season of its first
+ * function, by the start month of its space. A bolo with no function yet is a
+ * live deal, so it lives in the season of today.
+ */
+export function boloSeason(
+	bolo: Pick<MoneyBolo, 'first_performed_at'> & { project?: { workspace_id: string } | null },
+	today: Date,
+	starts?: SeasonStarts,
+): number {
+	return seasonYearOf(bolo.first_performed_at ?? localDayISO(today), seasonStartFor(starts, bolo.project?.workspace_id));
 }
 
 /**
- * "26-27": the one way the app writes a season, as Desk, Conversations
- * (`currentSeason` in `conversation-overview.ts`) and the line names do.
+ * The seasons there is anything to show for, newest first; today's always
+ * included, by the screen's start month (`seasonStartOf`).
  */
-export function seasonLabel(start: number): string {
-	const two = (y: number) => String(y % 100).padStart(2, '0');
-	return `${two(start)}-${two(start + 1)}`;
-}
-
-/**
- * Which season a bolo lives in: the season of its first function. A bolo with
- * no function yet is a live deal, so it lives in the season of today.
- */
-export function boloSeason(bolo: Pick<MoneyBolo, 'first_performed_at'>, today: Date): number {
-	return seasonOf(bolo.first_performed_at ?? localDayISO(today));
-}
-
-/** The seasons there is anything to show for, newest first; today's always included. */
-export function seasonsOf(bolos: readonly Pick<MoneyBolo, 'first_performed_at'>[], today: Date): number[] {
-	const set = new Set<number>([seasonOf(localDayISO(today))]);
-	for (const b of bolos) set.add(boloSeason(b, today));
+export function seasonsOf(
+	bolos: readonly (Pick<MoneyBolo, 'first_performed_at'> & { project?: { workspace_id: string } | null })[],
+	today: Date,
+	starts?: SeasonStarts,
+	startMonth: number = DEFAULT_SEASON_START_MONTH,
+): number[] {
+	const set = new Set<number>([seasonYearOf(localDayISO(today), startMonth)]);
+	for (const b of bolos) set.add(boloSeason(b, today, starts));
 	return [...set].sort((a, b) => b - a);
 }
 
@@ -652,6 +645,8 @@ export interface MoneyContext {
 	termsByPayer: ReadonlyMap<string, ObservedPayerTerms>;
 	modeOf: (bolo: MoneyBolo) => InvoicingMode;
 	today: Date;
+	/** Each space's season start month (`$lib/season-year`); absent, September. */
+	seasonStarts?: SeasonStarts;
 }
 
 /** Today on the reader's wall clock: at 00:30 in Madrid it is already tomorrow's date, not UTC's. */
@@ -842,7 +837,7 @@ export function moneyPosition(
 			pos.toInvoice += m.fee ?? 0;
 			pos.toInvoiceCount += 1;
 		}
-		if (boloSeason(b, ctx.today) !== season) continue;
+		if (boloSeason(b, ctx.today, ctx.seasonStarts) !== season) continue;
 		pos.seasonCount += 1;
 		if (m.fee === null) continue;
 		if (m.contracted) {

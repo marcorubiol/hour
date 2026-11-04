@@ -4670,6 +4670,7 @@ export type Database = {
           phone: string | null
           previous_slugs: string[]
           privacy_url: string | null
+          season_start_month: number
           settings: Json
           slug: string
           timezone: string
@@ -4706,6 +4707,7 @@ export type Database = {
           phone?: string | null
           previous_slugs?: string[]
           privacy_url?: string | null
+          season_start_month?: number
           settings?: Json
           slug: string
           timezone?: string
@@ -4742,6 +4744,7 @@ export type Database = {
           phone?: string | null
           previous_slugs?: string[]
           privacy_url?: string | null
+          season_start_month?: number
           settings?: Json
           slug?: string
           timezone?: string
@@ -6698,6 +6701,7 @@ export type Database = {
           phone: string | null
           previous_slugs: string[]
           privacy_url: string | null
+          season_start_month: number
           settings: Json
           slug: string
           timezone: string
@@ -8772,6 +8776,7 @@ export type Database = {
           phone: string | null
           previous_slugs: string[]
           privacy_url: string | null
+          season_start_month: number
           settings: Json
           slug: string
           timezone: string

@@ -8,11 +8,13 @@
    * data, what a proforma prints as «Emisor»; the proforma links here
    * (`#fiscal`) when it is missing, and the form opens straight away.
    * And the space's saved texts (ADR-171), for «Insertar texto» in the mail,
-   * and the company logo that heads its mailouts (ADR-172).
+   * and the company logo that heads its mailouts (ADR-172). And the month its
+   * season starts (tarea 78), September by default.
    */
   import RecordHead from '$lib/components/RecordHead.svelte';
   import { t, appLocale } from '$lib/i18n';
   import WorkspaceTrade from './WorkspaceTrade.svelte';
+  import WorkspaceSeason from './WorkspaceSeason.svelte';
   import ConversationPrivacyDefault from './ConversationPrivacyDefault.svelte';
   import FiscalIdentity from '$lib/components/FiscalIdentity.svelte';
   import WorkspaceTexts from './WorkspaceTexts.svelte';
@@ -46,6 +48,7 @@
 </RecordHead>
 
 <WorkspaceTrade {workspaceId} />
+<WorkspaceSeason {workspaceId} />
 <ConversationPrivacyDefault {workspaceId} />
 
 {#if workspaceId}

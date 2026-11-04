@@ -94,7 +94,8 @@
   import { clashesInSeason, seasonWindow } from '$lib/season';
   import { createPlannerEngine } from '$lib/planner-engine.svelte';
   import { seasonAvailabilityQueryOptions } from '$lib/planner-feeds.svelte';
-  import { currentSeason } from '$lib/conversation-overview';
+  import { currentSeason } from '$lib/season-year';
+  import { screenSeasonStart, seasonStarts } from '$lib/season-start.svelte';
   import {
     conversationOverviewQueryOptions,
     lastMailoutQueryOptions,
@@ -110,7 +111,6 @@
     isContracted,
     moneyPosition,
     observedPayerTermsDays,
-    seasonOf as moneySeasonOf,
     type InvoicingMode,
     type MoneyBolo,
     type MoneyInvoiceItem,
@@ -642,8 +642,9 @@
         termsByPayer: observedPayerTermsDays(invoices, invoices.flatMap((i) => i.payments)),
         modeOf: (b) => modeById.get(b.project?.workspace_id ?? '') ?? 'legal',
         today: clockNow,
+        seasonStarts: seasonStarts(),
       },
-      moneySeasonOf(clockNow.toISOString()),
+      currentSeason(clockNow, screenSeasonStart()).year,
     );
     const pos = positions.find((p) => p.currency === 'EUR') ?? positions[0];
     if (!pos) return { owed: money(0, 'EUR'), overdue: money(0, 'EUR'), overdueCount: 0, nothingOwed: true };
@@ -658,7 +659,7 @@
       nothingOwed: positions.every((p) => p.owed === 0),
     };
   });
-  let seasonLabel = $derived(t('overview.season_of', locale, { season: currentSeason(clockNow).label }));
+  let seasonLabel = $derived(t('overview.season_of', locale, { season: currentSeason(clockNow, screenSeasonStart()).label }));
 
   // aria-busy: the containers the pins resolve against and the lists the
   // Desk folds. Read by the E2E (`tests/loaded.ts`) as «the lens has loaded».

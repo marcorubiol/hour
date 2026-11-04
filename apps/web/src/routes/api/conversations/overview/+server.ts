@@ -8,7 +8,8 @@
  *
  * Query: `project_ids`, `workspace_ids` (el alcance de la lista, unión; sin
  * ninguno, todo) y `line_ids` (las líneas fijadas en la barra: acotan la
- * temporada, ADR-117 § 3).
+ * temporada, ADR-117 § 3). La temporada empieza el mes de cada espacio
+ * (`workspace.season_start_month`, tarea 78).
  *
  * ADR-138 fase 2, el dominio es el chip: `etiqueta=<clave>` acota a las
  * conversaciones con esa etiqueta (sin ninguna se lee `sales`). Sin
@@ -21,7 +22,7 @@ import type { RequestHandler } from './$types';
 import { extractAccessToken } from '$lib/auth';
 import { type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
-import { loadOverviewRows, parseIds } from '$lib/server/conversation-overview';
+import { loadOverviewRows, loadSeasonStarts, parseIds } from '$lib/server/conversation-overview';
 import { buildOverview, type OverviewResponse } from '$lib/conversation-overview';
 import { json } from '$lib/server/http';
 import { TAG_KEY_RE, filterByChip } from '$lib/conversation-tags';
@@ -42,9 +43,16 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   if (etiqueta !== null && !TAG_KEY_RE.test(etiqueta)) return json({ error: 'invalid_query' }, 400);
 
   try {
-    const all = await loadOverviewRows(env, jwt, scope);
+    const [all, season] = await Promise.all([
+      loadOverviewRows(env, jwt, scope),
+      loadSeasonStarts(env, jwt, scope.workspaceIds),
+    ]);
     const rows = etiqueta ? filterByChip(all, etiqueta) : all;
-    const body: OverviewResponse = buildOverview(rows, new Date(), { lineIds });
+    const body: OverviewResponse = buildOverview(rows, new Date(), {
+      lineIds,
+      seasonStarts: season.starts,
+      seasonStartMonth: season.month,
+    });
     return json(body);
   } catch (err) {
     return pgErrorResponse(err, { route: 'GET /api/conversations/overview', requestId: locals.requestId });

@@ -11,9 +11,6 @@ import {
 	matchesLedgerFilter,
 	moneyPosition,
 	paymentProposal,
-	seasonLabel,
-	seasonOf,
-	seasonRange,
 	seasonsOf,
 	type MoneyBolo,
 	type MoneyContext,
@@ -89,13 +86,12 @@ function ctx(
 }
 
 describe('season (September to August, by function date)', () => {
-	it('starts in September', () => {
-		expect(seasonOf('2026-09-01')).toBe(2026);
-		expect(seasonOf('2026-08-31')).toBe(2025);
-		expect(seasonOf('2027-08-31T22:00:00Z')).toBe(2026);
-		expect(seasonRange(2026)).toEqual({ from: '2026-09-01', to: '2027-08-31' });
-		expect(seasonLabel(2026)).toBe('26-27');
-		expect(seasonLabel(2099)).toBe('99-00');
+	it('a bolo counts in the season of its own space', () => {
+		const starts = new Map([['w-jan', 1]]);
+		const b = { first_performed_at: '2026-07-10', project: { workspace_id: 'w-jan' } };
+		expect(boloSeason(b, TODAY)).toBe(2025);
+		expect(boloSeason(b, TODAY, starts)).toBe(2026);
+		expect(seasonsOf([b], TODAY, starts, 1)).toEqual([2026]);
 	});
 
 	it('puts a bolo without functions in the season of today', () => {

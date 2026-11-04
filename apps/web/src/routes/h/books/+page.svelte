@@ -55,6 +55,8 @@
   import { DASH } from '$lib/glyphs';
   import { categoryLabel, owedToTeam, type ExpenseItem } from '$lib/expense';
   import ExpenseDialog, { type ExpenseAnchor } from '$lib/components/ExpenseDialog.svelte';
+  import { seasonAt, seasonLabel, seasonYearOf } from '$lib/season-year';
+  import { screenSeasonStart, seasonStarts } from '$lib/season-start.svelte';
   import {
     applyTaxLines,
     attentionItems,
@@ -78,8 +80,6 @@
     PAYMENT_METHODS,
     paymentProposal,
     paymentMethodLabel,
-    seasonLabel,
-    seasonOf,
     seasonsOf,
     totalsByCurrency,
     type AttentionItem,
@@ -255,22 +255,26 @@
 
   let docsByBolo = $derived(groupInvoicesByBolo(invoices));
   let termsByPayer = $derived(observedPayerTermsDays(invoices, invoices.flatMap((i) => i.payments)));
-  let ctx = $derived<MoneyContext>({ invoicesByBolo: docsByBolo, termsByPayer, modeOf: boloMode, today });
+  let ctx = $derived<MoneyContext>({ invoicesByBolo: docsByBolo, termsByPayer, modeOf: boloMode, today, seasonStarts: seasonStarts() });
   let moneyById = $derived(new Map(bolos.map((b) => [b.id, boloMoney(b, ctx)])));
   const moneyOf = (b: MoneyBolo): BoloMoney => moneyById.get(b.id) ?? boloMoney(b, ctx);
 
   // ── Season ────────────────────────────────────────────────────────────
-  let currentSeason = $derived(seasonOf(localDayISO(today)));
-  let seasons = $derived(seasonsOf(bolos, today));
+  // The season starts in the month of the spaces on screen (tarea 78); each
+  // bolo counts in its own space's (`seasonStarts`).
+  let startMonth = $derived(screenSeasonStart());
+  let currentSeason = $derived(seasonYearOf(localDayISO(today), startMonth));
+  let seasons = $derived(seasonsOf(bolos, today, seasonStarts(), startMonth));
   let pickedSeason = $state<number | null>(null);
   let season = $derived(pickedSeason ?? currentSeason);
-  let seasonBolos = $derived(bolos.filter((b) => boloSeason(b, today) === season));
+  let seasonBolos = $derived(bolos.filter((b) => boloSeason(b, today, seasonStarts()) === season));
   function seasonSpan(start: number): string {
-    const m = (y: number, month: number) =>
+    const { start: from, end: to } = seasonAt(start, startMonth);
+    const m = (day: string) =>
       new Intl.DateTimeFormat(localeTag, { month: 'short', year: '2-digit', timeZone: 'UTC' }).format(
-        new Date(Date.UTC(y, month, 1)),
+        new Date(`${day}T00:00:00Z`),
       );
-    return t('books.season_span', locale, { from: m(start, 8), to: m(start + 1, 7) });
+    return t('books.season_span', locale, { from: m(from), to: m(to) });
   }
 
   // ── The radar ─────────────────────────────────────────────────────────
@@ -460,7 +464,7 @@
     const target = bolos.find((b) => b.id === id);
     if (!target) return;
     calm.set(false);
-    const s = boloSeason(target, today);
+    const s = boloSeason(target, today, seasonStarts());
     pickedSeason = s === currentSeason ? null : s;
     filter = 'all';
     tab = 'bolos';
@@ -1092,13 +1096,13 @@
                   }}
                 >
                   {#each seasons as s (s)}
-                    <option value={s}>{t('books.season_sub', locale, { season: seasonLabel(s) })}</option>
+                    <option value={s}>{t('books.season_sub', locale, { season: seasonLabel(s, startMonth) })}</option>
                   {/each}
                 </select>
                 <span class="status-caret" aria-hidden="true">▾</span>
               </label>
             {:else}
-              <span>{t('books.season_sub', locale, { season: seasonLabel(season) })}</span>
+              <span>{t('books.season_sub', locale, { season: seasonLabel(season, startMonth) })}</span>
             {/if}
           </span>
           {#if !seasonEmpty}
@@ -1137,7 +1141,7 @@
           {#each shownPosition as pos, i (pos.currency)}
             {#if i > 0 && isQuietPosition(pos)}
             {#if pos.sold > 0 || pos.holds > 0}
-            <p class="figs__quiet" data-currency={pos.currency}>{t('books.fig_quiet_currency', locale, { amount: fmtMoneyCompact(pos.sold), currency: pos.currency, season: seasonLabel(season) })}{#if pos.holds > 0}{` · ${t('books.fig_holds', locale, { amount: fmtMoneyCompact(pos.holds), n: pos.holdsCount })}`}{/if}</p>
+            <p class="figs__quiet" data-currency={pos.currency}>{t('books.fig_quiet_currency', locale, { amount: fmtMoneyCompact(pos.sold), currency: pos.currency, season: seasonLabel(season, startMonth) })}{#if pos.holds > 0}{` · ${t('books.fig_holds', locale, { amount: fmtMoneyCompact(pos.holds), n: pos.holdsCount })}`}{/if}</p>
             {/if}
             {:else}
             <div class="figs__row" data-currency={pos.currency}>
@@ -1169,7 +1173,7 @@
               </div>
               {#if shows('books', 'other_figures', calm.on)}
               <button type="button" class="fig" data-fig="season" onclick={() => showLedger('all')}>
-                <span class="fig__label eyebrow eyebrow--sub">{t('books.fig_season', locale)} {seasonLabel(season)}</span>
+                <span class="fig__label eyebrow eyebrow--sub">{t('books.fig_season', locale)} {seasonLabel(season, startMonth)}</span>
                 <span class="fig__num stat">{fmtCurrency(pos.collected, pos.currency)}</span>
                 {#if pos.sold > 0}<span class="fig__sub">{t('books.fig_collected_of_sold', locale, { amount: fmtMoneyCompact(pos.sold) })}</span>{/if}
                 {#if pos.sold > 0}
@@ -1198,11 +1202,11 @@
 
       {#if seasonEmpty}
         <div class="mny__empty">
-          <EmptyLine text={t('books.season_empty', locale, { season: seasonLabel(season) })} />
+          <EmptyLine text={t('books.season_empty', locale, { season: seasonLabel(season, startMonth) })} />
           <div class="mny__empty-acts">
             <Button size="xs" onclick={openDeal} disabled={projectIndex.length === 0}>{t('books.new_deal', locale)}</Button>
             {#if previousSeason !== null}
-              <Button size="xs" variant="secondary" onclick={() => (pickedSeason = previousSeason)}>{t('books.season_previous', locale, { season: seasonLabel(previousSeason) })}</Button>
+              <Button size="xs" variant="secondary" onclick={() => (pickedSeason = previousSeason)}>{t('books.season_previous', locale, { season: seasonLabel(previousSeason, startMonth) })}</Button>
             {/if}
           </div>
         </div>

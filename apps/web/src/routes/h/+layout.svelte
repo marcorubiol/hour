@@ -37,6 +37,7 @@
   import PullRefresh from '$lib/components/shell/PullRefresh.svelte';
   import { isReservedWorkspaceSlug } from '$lib/reserved-slugs';
   import { appLocale, setTrade, t, tradeOf } from '$lib/i18n';
+  import { setSeasonStarts } from '$lib/season-start.svelte';
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
   import { lensesOnFor, lensOn, routedLensOf, setLensesOn } from '$lib/lenses.svelte';
   import LensOff from '$lib/components/LensOff.svelte';
@@ -211,10 +212,12 @@
   // ADR-128: the screen speaks the trade of the workspaces it shows. Set
   // here, once, for every lens and dialog; `t()` reads it.
   // ADR-132: and the lenses they use. Both read the same workspaces.
+  // Tarea 78: and the month their season starts (`$lib/season-start.svelte`).
   let onScreen = $derived(workspacesOnScreen(workspaceSlug, pins.pins, wsItems, lineIndex, projectIndex));
   $effect(() => {
     setTrade(tradeOf(onScreen));
     setLensesOn(lensesOnFor(onScreen));
+    setSeasonStarts(onScreen, wsItems);
   });
 
   // A person pin is the one token whose label lives outside the nav caches —

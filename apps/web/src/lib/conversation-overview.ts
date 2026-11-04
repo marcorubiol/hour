@@ -23,7 +23,8 @@
  *   una conversación con respuesta sin nada en 30. En dos grupos (ADR-126 § 8):
  *   las que no contestaron al envío (segunda ronda, en bloque) y las paradas
  *   (las que contestaron alguna vez: una a una).
- * - **La temporada**: de septiembre a agosto por fecha de función; una
+ * - **La temporada**: doce meses por fecha de función desde el mes de inicio
+ *   del espacio (`$lib/season-year`, septiembre por defecto); una
  *   conversación sin funciones es de la temporada en curso (está en difusión).
  *   Cuenta relaciones y, aparte, los bolos de la temporada en opción y firmes
  *   (ADR-138 § 3). Con dos líneas de trabajo o más (contando «sin línea»), una
@@ -43,6 +44,7 @@ import {
   type RelationInput,
 } from './conversation-relation';
 import type { OrderKey } from './conversation-order';
+import { currentSeason, seasonStartFor, type Season, type SeasonStarts } from './season-year';
 
 export { daysSince, hasAnswered, lastActivity };
 
@@ -243,25 +245,25 @@ export function coolingOf(row: TurnRow & Pick<OverviewInput, 'next_action_at'>, 
 
 // ── Temporada ──────────────────────────────────────────────────────────────
 
-export interface Season {
-  /** «26-27» */
-  label: string;
-  start: string;
-  end: string;
+export type { Season };
+
+/**
+ * La temporada en curso de cada espacio (`$lib/season-year`): una fila cuenta
+ * con la de su espacio. Sin meses, septiembre para todos.
+ */
+export type SeasonFor = (workspaceId: string) => Season;
+
+export function seasonFor(now: Date, starts?: SeasonStarts): SeasonFor {
+  const memo = new Map<number, Season>();
+  return (workspaceId) => {
+    const m = seasonStartFor(starts, workspaceId);
+    let s = memo.get(m);
+    if (!s) memo.set(m, (s = currentSeason(now, m)));
+    return s;
+  };
 }
 
-/** La temporada de un día: de septiembre a agosto (ADR-117 § 3). */
-export function seasonOf(day: string): Season {
-  const y = Number(day.slice(0, 4));
-  const startYear = Number(day.slice(5, 7)) >= 9 ? y : y - 1;
-  const yy = (n: number) => String(n % 100).padStart(2, '0');
-  return { label: `${yy(startYear)}-${yy(startYear + 1)}`, start: `${startYear}-09-01`, end: `${startYear + 1}-08-31` };
-}
-
-export function currentSeason(now: Date): Season {
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  return seasonOf(`${now.getFullYear()}-${m}-01`);
-}
+const resolve = (season: Season | SeasonFor): SeasonFor => (typeof season === 'function' ? season : () => season);
 
 /** De la temporada: tiene una función en ella, o no tiene ninguna todavía. */
 export function inSeason(row: Pick<OverviewInput, 'performance_days'>, season: Season): boolean {
@@ -272,13 +274,14 @@ export function inSeason(row: Pick<OverviewInput, 'performance_days'>, season: S
  * Las conversaciones que cuenta la temporada: las de sus fechas y, si hay
  * líneas de difusión fijadas en la barra, solo las de esas líneas.
  */
-export function seasonRows<R extends Pick<OverviewInput, 'performance_days' | 'line_id'>>(
+export function seasonRows<R extends Pick<OverviewInput, 'performance_days' | 'line_id' | 'workspace_id'>>(
   rows: readonly R[],
-  season: Season,
+  season: Season | SeasonFor,
   lineIds: readonly string[] = [],
 ): R[] {
   const lines = new Set(lineIds);
-  return rows.filter((r) => inSeason(r, season) && (lines.size === 0 || (r.line_id !== null && lines.has(r.line_id))));
+  const of = resolve(season);
+  return rows.filter((r) => inSeason(r, of(r.workspace_id)) && (lines.size === 0 || (r.line_id !== null && lines.has(r.line_id))));
 }
 
 export type RelationCounts = Record<Relation, number>;
@@ -294,11 +297,15 @@ export function countByRelation(rows: readonly RelationInput[], now: Date): Rela
  * temporada de un bolo es la de su primera función viva (ADR-131); uno sin
  * funciones todavía es de la temporada en curso, como una conversación.
  */
-function seasonBoloCounts(rows: readonly Pick<OverviewInput, 'bolos'>[], season: Season): BoloCounts {
+function seasonBoloCounts(rows: readonly Pick<OverviewInput, 'bolos' | 'workspace_id'>[], season: Season | SeasonFor): BoloCounts {
+  const of = resolve(season);
   return countBolos(
-    rows.flatMap((r) => r.bolos ?? []).filter(
-      (b) => !b.first_performed_at || (b.first_performed_at >= season.start && b.first_performed_at <= season.end),
-    ),
+    rows.flatMap((r) => {
+      const s = of(r.workspace_id);
+      return (r.bolos ?? []).filter(
+        (b) => !b.first_performed_at || (b.first_performed_at >= s.start && b.first_performed_at <= s.end),
+      );
+    }),
   );
 }
 
@@ -322,7 +329,11 @@ export interface SeasonLine {
  * por nombre) y «sin línea» siempre al final, nunca escondida. Con una sola
  * línea o ninguna no hay reparto (lista vacía): el bloque es una barra.
  */
-export function seasonByLine(rows: readonly OverviewInput[], now: Date, season: Season = currentSeason(now)): SeasonLine[] {
+export function seasonByLine(
+  rows: readonly OverviewInput[],
+  now: Date,
+  season: Season | SeasonFor = seasonFor(now),
+): SeasonLine[] {
   const by = new Map<string | null, (typeof rows)[number][]>();
   for (const r of rows) by.set(r.line_id, [...(by.get(r.line_id) ?? []), r]);
   if (by.size < 2) return [];
@@ -435,8 +446,9 @@ export function applyListFilter<R extends OverviewInput>(
   f: ListFilter,
   now: Date,
   lineIds: readonly string[] = [],
+  starts?: SeasonStarts,
 ): R[] {
-  let out = f.temporada ? seasonRows(rows, currentSeason(now), lineIds) : [...rows];
+  let out = f.temporada ? seasonRows(rows, seasonFor(now, starts), lineIds) : [...rows];
   if (f.linea) out = lineRows(out, f.linea);
   if (f.relacion) out = out.filter((r) => relationOf(r, now) === f.relacion);
   if (f.turno === 'nuestro') out = sortDue(out.filter((r) => dueReason(r, now) !== null), now);
@@ -599,10 +611,17 @@ function blockRow(r: OverviewInput, now: Date): BlockRow {
 export function buildOverview(
   rows: readonly OverviewInput[],
   now: Date,
-  opts: { lineIds?: readonly string[] } = {},
+  opts: {
+    lineIds?: readonly string[];
+    /** El mes de inicio de cada espacio (`workspace.season_start_month`). */
+    seasonStarts?: SeasonStarts;
+    /** El de la pantalla, que rotula la temporada (`seasonStartOf`). */
+    seasonStartMonth?: number;
+  } = {},
 ): ConversationOverview {
-  const season = currentSeason(now);
-  const inSeasonRows = seasonRows(rows, season, opts.lineIds);
+  const season = currentSeason(now, opts.seasonStartMonth);
+  const perSpace = seasonFor(now, opts.seasonStarts);
+  const inSeasonRows = seasonRows(rows, perSpace, opts.lineIds);
 
   const due = applyListFilter(rows, { turno: 'nuestro' }, now);
   const hot = applyListFilter(rows, { temp: 'caliente' }, now);
@@ -616,9 +635,9 @@ export function buildOverview(
       ...season,
       total: inSeasonRows.length,
       counts: countByRelation(inSeasonRows, now),
-      bolos: seasonBoloCounts(inSeasonRows, season),
+      bolos: seasonBoloCounts(inSeasonRows, perSpace),
       answered: inSeasonRows.filter(hasAnswered).length,
-      lines: seasonByLine(inSeasonRows, now, season),
+      lines: seasonByLine(inSeasonRows, now, perSpace),
     },
     due: {
       count: due.length,

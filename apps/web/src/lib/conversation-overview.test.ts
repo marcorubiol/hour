@@ -9,7 +9,6 @@ import {
   buildOverview,
   coolingOf,
   countByRelation,
-  currentSeason,
   daysSince,
   dueReason,
   followUpDue,
@@ -21,12 +20,13 @@ import {
   mailoutPicks,
   overviewOrderKey,
   parseListFilter,
-  seasonOf,
   seasonByLine,
+  seasonFor,
   seasonRows,
   turnOf,
   type OverviewInput,
 } from './conversation-overview';
+import { currentSeason } from './season-year';
 
 // Viernes 16 de octubre de 2026, 10:00, en la hora LOCAL: los días de
 // calendario salen iguales en cualquier zona de quien corre los tests.
@@ -190,12 +190,13 @@ describe('coolingOf', () => {
 });
 
 describe('temporada', () => {
-  it('va de septiembre a agosto', () => {
-    expect(seasonOf('2026-09-01')).toEqual({ label: '26-27', start: '2026-09-01', end: '2027-08-31' });
-    expect(seasonOf('2027-08-31').label).toBe('26-27');
-    expect(seasonOf('2026-08-31').label).toBe('25-26');
-    expect(currentSeason(NOW).label).toBe('26-27');
-    expect(currentSeason(new Date(2027, 0, 5)).label).toBe('26-27');
+  it('cada fila cuenta con la temporada de su espacio', () => {
+    // w2 empieza en enero: una función de mayo de 2026 es de su temporada en curso, no de la de w1.
+    const rows = [row('a', { performance_days: ['2026-05-02'] }), row('b', { workspace_id: 'w2', performance_days: ['2026-05-02'] })];
+    const of = seasonFor(NOW, new Map([['w2', 1]]));
+    expect(seasonRows(rows, of).map((r) => r.id)).toEqual(['b']);
+    expect(applyListFilter(rows, { temporada: true }, NOW, [], new Map([['w2', 1]])).map((r) => r.id)).toEqual(['b']);
+    expect(buildOverview(rows, NOW, { seasonStarts: new Map([['w2', 1]]) }).season.total).toBe(1);
   });
   it('una conversación sin funciones es de la temporada en curso; con funciones, de la de sus fechas', () => {
     const s = currentSeason(NOW);
