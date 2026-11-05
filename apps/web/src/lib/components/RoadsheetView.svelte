@@ -40,6 +40,8 @@
     venueTz = null,
     crumbs = null,
     tools,
+    holder = null,
+    late,
     locale = appLocale(),
   }: {
     sheet: Roadsheet;
@@ -49,6 +51,10 @@
     crumbs?: Crumb[] | null;
     /** What acts on the sheet (the operator's «view as»), at the end of the title row. */
     tools?: Snippet;
+    /** 121 B: whose sheet this is, already said («Hoja de Pau Roca · luces»). Personal link only. */
+    holder?: string | null;
+    /** 121 B: «Llego tarde», after where to go. Personal link only. */
+    late?: Snippet;
     /** The reader's language. Internal sheet: whoever is looking; public
         sheet: the browser's if Hour speaks it, else English. Both are
         `appLocale()`, the default. */
@@ -116,6 +122,17 @@
     return cap(p.label?.trim() || (p.key ? t(momentWordKey(p.key), locale) : ''));
   }
 
+  /** 121 B: «cambiado hoy a las 15:50 · antes 16:00», on the day's clock. */
+  function movedWord(p: Extract<RoadsheetDayPoint, { of: 'moment' }>): string | null {
+    if (!p.moved_from) return null;
+    const before = dualTime(p.moved_from, venueTz, viewerTz).primary;
+    if (!p.moved_at) return t('roadsheet.moved', locale, { before });
+    const when = dualTime(p.moved_at, venueTz, viewerTz);
+    return when.primaryDay === dayKeyInTz(now.toISOString(), dayTz)
+      ? t('roadsheet.moved_today', locale, { time: when.primary, before })
+      : t('roadsheet.moved', locale, { before });
+  }
+
   let address = $derived<Crumb[]>(
     crumbs ?? [...(sheet.project ? [{ label: sheet.project.name }] : []), { label: t('roadsheet.title', locale) }],
   );
@@ -135,6 +152,10 @@
       {#if sheet.city}<span>{[sheet.city, sheet.country].filter(Boolean).join(', ')}</span>{/if}
     {/snippet}
   </RecordHead>
+
+  {#if holder}
+    <p class="rsv__holder" data-testid="roadsheet-holder">{holder}</p>
+  {/if}
 
   {#if sheet.venue || sheet.venue_name}
     <section class="rsv__section" aria-label={t('create.venue', locale)} data-testid="roadsheet-where">
@@ -181,6 +202,8 @@
     </section>
   {/if}
 
+  {@render late?.()}
+
   {#if points.length > 0 || untimedTrips.length > 0}
     <section class="rsv__section" aria-label={t('roadsheet.day', locale)} data-testid="roadsheet-day">
       <BlockHead title={t('roadsheet.day', locale)} />
@@ -209,6 +232,9 @@
                 {pointWord(p)}
                 {#if p.of === 'moment' && p.ends_at}
                   <span class="rsv__muted">{t('ahora.until', locale, { time: hour(p.ends_at, venueTz) })}</span>
+                {/if}
+                {#if p.of === 'moment' && movedWord(p)}
+                  <span class="rsv__moved" data-testid="roadsheet-moved">{movedWord(p)}</span>
                 {/if}
                 {#if p.of === 'stage'}
                   {#if p.stage.arrive_at}<span class="rsv__muted"
@@ -354,6 +380,19 @@
       flex-direction: column;
       gap: var(--space-s);
       padding: 0;
+    }
+
+    /* Whose sheet: a personal link says it under the title. */
+    .rsv__holder {
+      font-size: var(--text-s);
+      color: var(--text-muted);
+    }
+
+    /* A time production moved after a «llego tarde»: said in the hand of a change. */
+    .rsv__moved {
+      display: block;
+      font-size: var(--text-xs);
+      color: var(--tone-warning-fg);
     }
 
     .rsv__venue {

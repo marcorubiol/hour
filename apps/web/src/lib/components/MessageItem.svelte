@@ -40,6 +40,10 @@
    *  - `note`: la nota del equipo intercalada en el hilo de una conversación,
    *    sombreada y con su marca, para que no se confunda con lo de fuera;
    *  - `bubble`: el mensaje de un grupo (el hilo de un bolo), en su lado.
+   *
+   * Una línea del sistema (121 B, ADR-180: «Pau llega tarde · desde su hoja»,
+   * «Núria movió carga de 16:00 a 16:20») va centrada y sin menú, en cualquier
+   * forma: no la escribió nadie del hilo, o es la huella de un cambio de hora.
    */
 
   import { createMutation } from '@tanstack/svelte-query';
@@ -50,6 +54,7 @@
   import Menu from '$lib/components/Menu.svelte';
   import { hourMark, timeInTz } from '$lib/datetime';
   import { MESSAGE_MAX, messageWhen, type ThreadMessage } from '$lib/threads';
+  import { lateLineText } from '$lib/roadsheet-late';
 
   interface Props {
     message: ThreadMessage;
@@ -137,6 +142,14 @@
     <span>{t('threads.new_divider', locale)}</span>
   </li>
 {/if}
+{#if m.system}
+<li class="msg msg--system" data-testid="message-system">
+  <p class="msg__system">
+    {lateLineText(m.system, m.late, author, m.body, locale, viewerTz)} · <time datetime={m.created_at}>{when}</time>
+  </p>
+  {#if m.system === 'late_notice' && m.late?.note}<p class="msg__system-note">{m.late.note}</p>{/if}
+</li>
+{:else}
 <li class="msg msg--{look}" class:msg--mine={mine}>
   {#if look === 'row'}<Avatar size="xs" name={by} />{/if}
   <div class="msg__main">
@@ -192,6 +205,7 @@
     </Menu>
   {/if}
 </li>
+{/if}
 
 <Dialog bind:open={confirmDelete} size="s" title={t('threads.delete_title', locale)} description={t('threads.delete_confirm', locale)}>
   {#snippet actions()}
@@ -224,6 +238,26 @@
       grid-template-columns: auto minmax(0, 1fr) auto;
       gap: var(--space-s);
       align-items: start;
+    }
+    /* Una línea del sistema: centrada, pequeña, en la mano del aviso. */
+    .msg--system {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-2xs);
+      text-align: center;
+    }
+    .msg__system {
+      margin: 0;
+      color: var(--tone-warning-fg);
+      font-size: var(--text-xs);
+    }
+    .msg__system-note {
+      margin: 0;
+      color: var(--text-muted);
+      font-size: var(--text-xs);
+      font-style: italic;
+      overflow-wrap: anywhere;
     }
     .msg__main {
       display: flex;

@@ -18,6 +18,7 @@
   import { createQueries, createQuery } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import BlockHead from '$lib/components/BlockHead.svelte';
+  import LateNoticeBand from '$lib/components/desk/LateNoticeBand.svelte';
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
   import JsonKV, { hasJsonContent } from '$lib/components/JsonKV.svelte';
@@ -267,6 +268,9 @@
     {#if fresh}<span class="ahora__fresh" data-testid="ahora-fresh">{freshLabel}</span>{/if}
     <a class="ahora__exit" href={exitHref} data-sveltekit-replacestate>{t('ahora.exit', locale)}</a>
   </header>
+
+  <!-- 121 B (ADR-180): a late technician, on top while nobody marked «Visto». -->
+  <LateNoticeBand {locale} />
 
   <div class="ahora__body">
     {#if !settled}

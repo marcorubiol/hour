@@ -9,6 +9,10 @@
  *
  * `cache-control: no-store` — revocation must bite on the next request,
  * not when a cache expires.
+ *
+ * 121 B (ADR-180): the moments a «llego tarde» moved carry `moved_from` (one
+ * rule, `annotateMoves`); a personal link also gets `holder` (whose sheet)
+ * and `late` (may they warn today, who receives it, their last notice).
  */
 
 import type { RequestHandler } from './$types';
@@ -25,6 +29,7 @@ import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import type { Json } from '$lib/db-types';
 import { jsonNoStore } from '$lib/server/http';
+import { annotateMoves, type LateMove, type PublicLate, type RoadsheetHolder } from '$lib/roadsheet-late';
 
 const TOKEN = /^[0-9a-f]{40,128}$/i;
 
@@ -53,6 +58,11 @@ type PublicBundle = {
   /** 80b (20261102150000): the day's and the eve's trips, already cut by the
       rule of `tripsOfPerformance`, only for performer and tech_manager. */
   travel?: RoadsheetTrip[];
+  /** 121 B (20261106100000): the times a notice moved, every role. */
+  late_moves?: LateMove[];
+  /** 121 B: only on a personal link of someone still in the team. */
+  holder?: RoadsheetHolder;
+  late?: PublicLate;
 };
 
 export const GET: RequestHandler = async ({ params, platform, locals }) => {
@@ -78,8 +88,12 @@ export const GET: RequestHandler = async ({ params, platform, locals }) => {
       })),
     ];
 
+    const schedule = b.performance.schedule
+      ? annotateMoves(b.performance.schedule, b.late_moves ?? [])
+      : b.performance.schedule;
+
     const bundle: PerformanceBundle = {
-      performance: { ...b.performance, notes: null },
+      performance: { ...b.performance, schedule, notes: null },
       project: b.project,
       venue: b.venue,
       programmer: null,
@@ -93,6 +107,8 @@ export const GET: RequestHandler = async ({ params, platform, locals }) => {
     return jsonNoStore({
       roadsheet: buildRoadsheet(bundle, b.role),
       venue_timezone: b.venue?.timezone ?? null,
+      holder: b.holder ?? null,
+      late: b.late ?? null,
     });
   } catch (err) {
     // ANONYMOUS surface — errors stay fully opaque (matches the sibling

@@ -6898,7 +6898,7 @@ fuera del hilo no ve a qué se contesta. Marco: «sí, hazlo».
 
 **Cómo se revierte.** Revertir el commit; sin datos ni migración.
 
-## [2026-11-05] ADR-182 · «Apuntar llamada» desde la cabecera de Conversaciones (121 A; número provisional, carril 121 A)
+## [2026-11-05] ADR-182 · «Apuntar llamada» desde la cabecera de Conversaciones (121 A)
 
 **Contexto.** Marco, 05-11 (tarea 121, boceto «Hour 121», sección A, con las recomendaciones elegidas): apuntar una
 llamada desde el móvil sin buscar antes la conversación. Hasta ahora sólo se podía desde el cuadro de escribir de una
@@ -6940,3 +6940,46 @@ el registro de llamadas del teléfono (la web no puede).
 **Sin migración.** Ninguna forma de la caché cambia: la búsqueda es una clave nueva y no se guarda en el dispositivo.
 
 **Cómo se revierte.** Revertir el commit: quita el botón, el diálogo, la ruta `call-targets` y sus claves; sin datos.
+## [2026-11-05] ADR-183 · «Llego tarde» en la hoja de ruta del técnico: enlace por persona, aviso sin cambiar horas
+
+**Contexto.** Tarea 121 B. Marco eligió el 2026-11-05 (boceto 121, sección B) la opción recomendada en las cuatro
+preguntas: enlace por persona, el aviso no cambia ninguna hora, producción lo ve en Hoy y en el grupo del bolo, y
+correo a quien produce la función mientras no haya push. La hoja pública es anónima (ADR-047): el token es la
+capacidad, y hasta hoy era por papel, así que la hoja no sabía quién la abría.
+
+**Decisión.**
+1. **Enlace personal = enlace de papel + persona.** `roadsheet_share.person_id` (nullable); los de papel no cambian.
+   `create_roadsheet_share_for_person(función, persona)` pone el papel desde el equipo: equipo técnico de la función,
+   `tech_manager`; reparto, `performer`; fuera, 22023. Se crea desde «Enlaces personales» en la página de la hoja de
+   ruta, uno por persona del equipo. Caduca como los demás (ADR-163 § 2).
+2. **«Llego tarde» sólo en un enlace personal y sólo el día de la función**, en la zona de la sala (si no, la del
+   espacio). Minutos 10, 20, 30, 45+ o «No sé»; una línea opcional de 280 caracteres. Dice quién lo recibe con nombre
+   (ADR-177 § 6) y que no cambia ninguna hora. Después, el aviso queda arriba con su estado («Núria lo ha visto») y
+   «Cambiar», que avisa otra vez.
+3. **Escritura.** `report_roadsheet_late(token, minutos, nota)`, SECURITY DEFINER, la única puerta: el cliente no
+   manda ids; la base resuelve enlace, persona y función y rechaza (42501) un enlace inexistente, revocado,
+   caducado, de papel o de alguien que ya no está en la función; fuera del día, 22023; más de 3 avisos por enlace en
+   una hora, 53400, con la fila del enlace bloqueada. El Worker añade 10 por hora y por IP. Tabla
+   `roadsheet_late_notice` con RLS forzada: anon nada, authenticated sólo SELECT con `read:performance`. Auditada
+   por `write_audit` con `source = 'roadsheet_link'` y sin actor.
+4. **El hito** es el primer momento de la escaleta que aún no ha llegado al avisar; la hora estimada, la del hito
+   más los minutos.
+5. **Producción.** Banda «Llega tarde» arriba de Hoy y de Ahora con el último aviso de cada enlace de las últimas
+   24 h sin «Visto»: «Mover <hito> a HH:MM» (sólo con `edit:performance`; pide confirmación), «Llamar» y «Visto».
+   Producción es quien puede editar la función: Hour no tiene papel de «productor» por función ni por bolo.
+6. **Mover una hora** pasa por el documento de collab (ADR-090 P2: el documento manda), compare-and-set de ese
+   momento solo; los demás no se mueven. Su final sigue donde estaba salvo que el nuevo inicio lo pase (entonces
+   conserva la duración). La base sólo apunta el movimiento que el aviso propone (`record_roadsheet_late_move`), una
+   vez. Todas las hojas enseñan «cambiado hoy a las HH:MM · antes HH:MM» en ese momento mientras su hora sea la que
+   dejó el aviso.
+7. **Grupo del bolo.** El aviso deja una línea de sistema sin autor y el movimiento otra con quien movió
+   (`message.system`, `message.late_notice_id`); la pantalla las dice en el idioma de quien lee y `body` guarda el
+   respaldo en castellano. Sin bolo vivo, no hay línea.
+
+**Lo que no entra.** El correo a producción: Hour no tiene hoy un camino de correo transaccional (SES es un esqueleto,
+ADR-111; el correo de Gmail es el buzón de cada persona). Queda pendiente de ese camino. «Ya he llegado» del boceto
+tampoco: el aviso se cierra con «Visto». No avisa a la sala ni hace push.
+
+**Cómo se revierte.** `build/runbooks/rollback-20261106-roadsheet-late-notice.sql` (borra avisos y líneas, deja los
+enlaces personales como de papel) y revertir el commit del Worker. Orden al desplegar: migración antes que el Worker
+(la lectura de mensajes embebe `late_notice_id`).

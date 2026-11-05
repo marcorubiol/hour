@@ -37,6 +37,7 @@
   import DeskWaiting from '$lib/components/desk/DeskWaiting.svelte';
   import DeskChanged from '$lib/components/desk/DeskChanged.svelte';
   import DeskSeason from '$lib/components/desk/DeskSeason.svelte';
+  import LateNoticeBand from '$lib/components/desk/LateNoticeBand.svelte';
   import AhoraView from '$lib/components/desk/AhoraView.svelte';
   import { AHORA_KEY, ahoraDay, ahoraItems } from '$lib/ahora';
   import { accentVarFor } from '$lib/utils/accent';
@@ -928,6 +929,9 @@
     >
   {/snippet}
   <LensHeader help="desk" {title} tools={taskSpaces.length > 0 ? addTask : undefined} />
+
+  <!-- 121 B (ADR-180): a late technician comes first, while nobody marked «Visto». -->
+  <LateNoticeBand {locale} />
 
   <FirstVisitCard section="desk" steps={['desk-next', 'desk-waits', 'desk-more']} />
 

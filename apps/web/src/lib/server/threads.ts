@@ -25,7 +25,11 @@ import {
   type ThreadMessage,
 } from '$lib/threads';
 
-const MESSAGE_SELECT = 'id,thread_id,author_id,performance_id,body,created_at,edited_at';
+// 121 B (ADR-180): a system line carries its «llego tarde», by the reader's RLS
+// (`read:performance`); a reader without it gets null and the screen says `body`.
+const MESSAGE_SELECT =
+  'id,thread_id,author_id,performance_id,body,created_at,edited_at,system,' +
+  'late:late_notice_id(person_name,minutes,note,milestone_kind,milestone_label,milestone_at,moved_from,moved_to)';
 
 interface ThreadMessages {
   messages: ThreadMessage[];

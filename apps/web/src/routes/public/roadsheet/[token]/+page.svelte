@@ -4,6 +4,9 @@
    * account, no shell: the token is the capability and the server already
    * filtered the projection to the share's pinned role. Renders the same
    * RoadsheetView as the operator page.
+   *
+   * 121 B (ADR-180): a personal link says whose sheet it is and, on the day,
+   * offers «Llego tarde» (RoadsheetLate). A role link has neither.
    */
 
   import { docTitle } from '$lib/doc-title';
@@ -11,13 +14,20 @@
   import { createQuery } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import RoadsheetView from '$lib/components/RoadsheetView.svelte';
+  import RoadsheetLate from '$lib/components/RoadsheetLate.svelte';
   import RecordState from '$lib/components/RecordState.svelte';
   import { ApiError } from '$lib/api';
   import { loadFailKind } from '$lib/load-fail';
   import { appLocale, t } from '$lib/i18n';
   import type { Roadsheet } from '$lib/roadsheet';
+  import type { PublicLate, RoadsheetHolder } from '$lib/roadsheet-late';
 
-  type Response = { roadsheet: Roadsheet; venue_timezone: string | null };
+  type Response = {
+    roadsheet: Roadsheet;
+    venue_timezone: string | null;
+    holder?: RoadsheetHolder | null;
+    late?: PublicLate | null;
+  };
 
   let token = $derived(page.params.token ?? '');
 
@@ -48,6 +58,13 @@
   let venueTz = $derived($query.data?.venue_timezone ?? null);
   let loading = $derived($query.isPending);
   let gone = $derived($query.isError && !sheet && loadFailKind($query.error) === 'missing');
+  let lateState = $derived($query.data?.late ?? null);
+  let holder = $derived.by(() => {
+    const h = $query.data?.holder;
+    if (!h?.name) return null;
+    return t('roadsheet.holder', locale, { name: h.role ? `${h.name} · ${h.role}` : h.name });
+  });
+  let moments = $derived(sheet?.schedule?.moments ?? []);
 </script>
 
 <svelte:head>
@@ -71,7 +88,20 @@
       {locale}
     />
   {:else if sheet}
-    <RoadsheetView {sheet} {venueTz} {locale} />
+    <RoadsheetView {sheet} {venueTz} {locale} {holder}>
+      {#snippet late()}
+        {#if lateState && (lateState.open || lateState.last)}
+          <RoadsheetLate
+            {token}
+            late={lateState}
+            {moments}
+            {venueTz}
+            {locale}
+            onsent={() => void $query.refetch()}
+          />
+        {/if}
+      {/snippet}
+    </RoadsheetView>
   {/if}
 </main>
 

@@ -39,9 +39,11 @@
     type RoadsheetRole,
     type RoadsheetShare,
   } from '$lib/roadsheet';
+  import type { TeamMember } from '$lib/roadsheet-late';
 
   type Response = { roadsheet: Roadsheet; venue_timezone: string | null };
   type Share = RoadsheetShare;
+  type SharesResponse = { items: Share[]; team?: TeamMember[] };
 
   const PUBLIC_ROLES = ['venue', 'performer', 'tech_manager'] as const;
 
@@ -99,14 +101,26 @@
     return {
       queryKey: ['roadsheet-shares', k] as const,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
-        fetchJSON<{ items: Share[] }>(
+        fetchJSON<SharesResponse>(
           `/api/performances/${encodeURIComponent(k.slug)}/roadsheet/shares?ws=${encodeURIComponent(k.ws)}`,
           signal,
         ),
     };
   });
   const sharesQuery = createQuery(sharesOptions);
-  let shares = $derived($sharesQuery.data?.items ?? []);
+  let allShares = $derived($sharesQuery.data?.items ?? []);
+  /** The role links; a personal one is listed by its person (121 B). */
+  let shares = $derived(allShares.filter((s) => !s.person));
+  let team = $derived($sharesQuery.data?.team ?? []);
+  /** Each person's live link, if they have one (the newest that still opens). */
+  let personal = $derived(
+    new Map(
+      allShares
+        .filter((s) => s.person && !shareExpired(s.expires_at))
+        .map((s) => [s.person!.id, s] as const)
+        .reverse(),
+    ),
+  );
 
   let shareRole = $state<(typeof PUBLIC_ROLES)[number]>('tech_manager');
 
@@ -116,6 +130,26 @@
         'POST',
         `/api/performances/${encodeURIComponent(slug)}/roadsheet/shares?ws=${encodeURIComponent(workspaceSlug)}`,
         { role: shareRole },
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['roadsheet-shares'] });
+    },
+    onError: (err) => {
+      addToast({
+        tone: 'danger',
+        title: t('roadsheet.link_not_created', locale),
+        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
+      });
+    },
+  });
+
+  // ── Personal links (121 B, ADR-180): only these show «Llego tarde» ────
+  const createPersonal = createMutation({
+    mutationFn: (personId: string) =>
+      mutateJSON(
+        'POST',
+        `/api/performances/${encodeURIComponent(slug)}/roadsheet/shares?ws=${encodeURIComponent(workspaceSlug)}`,
+        { person_id: personId },
       ),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['roadsheet-shares'] });
@@ -259,6 +293,46 @@
           {/each}
         </ul>
       {/if}
+      {#if team.length > 0}
+        <div class="rs__personal" data-testid="roadsheet-personal-links">
+          <h3 class="rs__personal-head">{t('roadsheet.personal_links', locale)}</h3>
+          <p class="rs__share-hint">{t('roadsheet.personal_links_hint', locale)}</p>
+          <ul class="rs__share-list" role="list">
+            {#each team as m (m.person_id)}
+              {@const own = personal.get(m.person_id)}
+              <li>
+                <span class="rs__share-role">{m.name}</span>
+                <span class="rs__share-date">{m.role ?? ''}{#if own}{m.role ? ' · ' : ''}{expiryWord(own)}{/if}</span>
+                <span class="rs__share-actions">
+                  {#if own}
+                    <Button size="s" variant="secondary" onclick={() => copyShare(own.token)}>
+                      {t('roadsheet.copy_link', locale)}
+                    </Button>
+                    <Button
+                      size="s"
+                      variant="secondary"
+                      tone="warn"
+                      loading={$revokeShare.isPending}
+                      onclick={() => $revokeShare.mutate(own.id)}
+                    >
+                      {t('roadsheet.revoke', locale)}
+                    </Button>
+                  {:else}
+                    <Button
+                      size="s"
+                      variant="secondary"
+                      loading={$createPersonal.isPending && $createPersonal.variables === m.person_id}
+                      onclick={() => $createPersonal.mutate(m.person_id)}
+                    >
+                      {t('roadsheet.personal_create', locale)}
+                    </Button>
+                  {/if}
+                </span>
+              </li>
+            {/each}
+          </ul>
+        </div>
+      {/if}
       <div class="rs__share-create">
         <div class="rs__share-pick">
           <Select id="rs-share-role" label={t('roadsheet.role', locale)} bind:value={shareRole}>
@@ -356,6 +430,18 @@
     .rs__share-actions {
       display: flex;
       gap: var(--space-xs);
+    }
+
+    .rs__personal {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+    }
+
+    .rs__personal-head {
+      font-size: var(--text-s);
+      font-weight: 500;
+      color: var(--heading-color);
     }
 
     .rs__share-create {

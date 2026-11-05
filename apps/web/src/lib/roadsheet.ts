@@ -43,6 +43,7 @@
 
 import type { Json, Tables } from './db-types';
 import type { ScheduleMoment, TimeslotFields } from './schedule-slot';
+import type { MovedMoment } from './roadsheet-late';
 import { localDayISO } from './datetime';
 import { addDaysIso, dayKeyInTz } from './planner';
 import type { TravelStageRow } from './travel-stage';
@@ -307,8 +308,9 @@ export interface Roadsheet {
     loadout_at: string | null;
     wrap_at: string | null;
     /** ADR-090 P3: the whole running order. The public projection carries it
-        too since 20261010180000; a sheet without it falls back to the five. */
-    moments?: ScheduleMoment[];
+        too since 20261010180000; a sheet without it falls back to the five.
+        121 B: a moment a «llego tarde» moved says what it was (`moved_from`). */
+    moments?: MovedMoment<ScheduleMoment>[];
   } | null;
   venue: VenueBlock | null;
   /** ADR-166. On the public sheet since 20261102150000: `get_public_roadsheet`
@@ -447,7 +449,10 @@ export interface RoadsheetShare {
   created_at: string;
   /** The first instant the link no longer opens. */
   expires_at: string;
+  /** 121 B (ADR-180): whose link it is (a role link plus a person). null: a role link. */
+  person?: { id: string; name: string } | null;
 }
+
 
 /** The last day the link opens (`YYYY-MM-DD`, this device's day): the instant before it expires. */
 export function shareLastDay(expiresAt: string): string {
