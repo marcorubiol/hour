@@ -21,6 +21,7 @@ no pide migración primero; las migraciones juntas por el gate de § 34.
 - [ ] 120 de un vistazo, después: la fila de chat en «Te espera» de Hoy y en las fichas, con lo último que se dijo; el bolo como historia con la raya de hoy; la hoja de ruta del técnico (su hoja, el día en orden, «Llamar a…», «Cómo llegar»).
 - [ ] 121 de un vistazo, ideas sin dibujar: apuntar una llamada desde el móvil sin buscar la conversación; «llego tarde» en la hoja de ruta del técnico, que avise a producción (quién cambia una hora el mismo día).
 - [ ] 124 tests: `tests/rls/conversation-event.test.ts` y `conversation-venue.test.ts` borran su buzón de prueba pero dejan en `playwright` los eventos `mail_sync` que crea `mail_ingest_message` (unos 10 por pasada; el 2026-11-04 se borraron 480, backup 41825313016). Que cada test borre sus eventos al acabar.
+- [ ] 125 buscar frente a acotar (Marco, 2026-11-05; enmienda ADR-152, pide ADR): hoy la barra «Buscar o saltar a un proyecto o línea…» y la píldora «Todo» abren la misma paleta vacía y las dos acotan el ámbito; ninguna salta. Como el estándar (Linear, GitHub, Notion): la barra busca de verdad y elegir un proyecto o una línea abre su ficha, con «acotar» como acción secundaria dentro de la paleta; la píldora abre la paleta como filtro, con cabecera «Ver solo…», y se dibuja como control, no como etiqueta suelta (hoy el trazo discontinuo y la cursiva la hacen parecer un estado).
 - Aparcado: 86 (responsable de tarea) hasta que entre Anouk.
 
 ## PRIMERO — nada. `main` == prod y las dos suites están vivas (2026-07-30, noche)
