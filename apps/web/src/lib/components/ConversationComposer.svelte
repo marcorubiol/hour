@@ -594,7 +594,7 @@
         {t('thread.mail_hint_new', locale, { address: from.address })}
       {/if}
     {:else if target === 'team'}
-      {#if $audienceQuery.data}{audienceLine($audienceQuery.data, locale)} · {/if}{t('thread.team_hint', locale)}
+      {#if $audienceQuery.data}{audienceLine($audienceQuery.data, locale)}{' · '}{/if}{t('thread.team_hint', locale)}
     {:else}
       {futureDay ? t('conversations.not_future', locale) : t('thread.log_hint', locale, { mod })}
     {/if}
@@ -702,6 +702,11 @@
       display: inline-flex;
       flex: none;
       gap: var(--space-xs);
+    }
+    /* The send button as tall as the empty field beside it: one row, one
+       height; the field grows upward with the text, the button stays. */
+    .composer__btns > :global(*) {
+      min-block-size: var(--control-size-m);
     }
     /* On a phone the field takes the row; «Abrir como correo» goes under. */
     @container (max-width: 27.999rem) {

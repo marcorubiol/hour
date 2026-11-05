@@ -253,11 +253,14 @@
       gap: var(--space-2xs);
       min-inline-size: 0;
     }
+    /* El nombre de la línea manda: si no caben las cifras a su lado, bajan
+       a la línea de debajo, a la derecha, en vez de cortar el nombre. */
     .season__line-head {
       display: flex;
+      flex-wrap: wrap;
       justify-content: space-between;
       align-items: baseline;
-      gap: var(--space-s);
+      gap: 0 var(--space-s);
       min-inline-size: 0;
     }
     .season__line-name {
@@ -280,6 +283,7 @@
     }
     .season__line-figs {
       flex-shrink: 0;
+      margin-inline-start: auto;
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       letter-spacing: var(--mono-letter-spacing);

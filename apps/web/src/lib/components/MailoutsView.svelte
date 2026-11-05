@@ -250,15 +250,16 @@
       border-block-start: var(--border);
     }
     /* Una fila: el tipo sobre el asunto, a quién, el estado con sus cifras y
-       la fecha al final, alineados en columnas a lo ancho. */
+       la fecha al final, alineados en columnas a lo ancho y en la línea del
+       asunto, no a media altura entre el tipo y el asunto. */
     .mrow {
       display: grid;
       grid-column: 1 / -1;
       grid-template-columns: subgrid;
       grid-template-areas:
-        'kind who state when'
+        'kind . . .'
         'subject who state when';
-      align-items: center;
+      align-items: baseline;
       gap: 0 var(--space-m);
       padding-block: var(--space-s);
       border-block-end: var(--border);
@@ -315,18 +316,23 @@
       font-variant-numeric: tabular-nums;
       text-align: end;
     }
-    /* Estrecho: el tipo y la fecha en una línea, el asunto, y a quién con el estado debajo. */
+    /* Estrecho: el tipo y la fecha en una línea, el asunto, y a quién con el
+       estado en una sola línea debajo, separados como las cifras del estado. */
     @container (max-width: 40rem) {
       .envios__rows {
-        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-columns: auto minmax(0, 1fr) auto;
       }
       .mrow {
         grid-template-areas:
-          'kind when'
-          'subject subject'
-          'who who'
-          'state state';
-        gap: var(--space-2xs) var(--space-s);
+          'kind kind when'
+          'subject subject subject'
+          'who state state';
+        gap: var(--space-2xs) 0;
+      }
+      .mrow__who:not(:empty)::after {
+        content: '·';
+        margin-inline: var(--space-2xs);
+        color: var(--text-faint);
       }
     }
     .envios__more {
