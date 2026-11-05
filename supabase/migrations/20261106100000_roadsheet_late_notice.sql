@@ -6,7 +6,9 @@
 -- que el enlace puede llevar una persona. El técnico avisa; nunca mueve horas.
 --
 --   1. `roadsheet_share.person_id` (nullable): un enlace personal es un enlace
---      de papel más una persona. Los de papel siguen igual.
+--      de papel más una persona. Los de papel siguen igual. Borrar la persona
+--      borra sus enlaces (CASCADE); si sale de la función, su enlace no abre
+--      nada, y mientras sigue, su papel es el de hoy, no el guardado.
 --      `create_roadsheet_share_for_person(p_performance_id, p_person_id)`: el
 --      papel lo pone la base, no el cliente: equipo técnico de la función,
 --      `tech_manager`; reparto, `performer`; si no está en ninguno, 22023.
@@ -31,7 +33,7 @@
 --      pantalla la dice en el idioma de quien lee; `body` es el respaldo.
 --   4. Producción: `roadsheet_late_notices()` (los avisos de las últimas 24 h
 --      sin «Visto», de las funciones que el que llama lee), `mark_roadsheet_late_seen`
---      (`read:performance`), `roadsheet_late_move_plan` y
+--      (`edit:performance`), `roadsheet_late_move_plan` y
 --      `record_roadsheet_late_move` (`edit:performance`). La hora se mueve en el
 --      Worker A TRAVÉS del documento de collab (ADR-090 P2: el documento
 --      manda); la base sólo lo apunta, y sólo el movimiento que el aviso
@@ -54,7 +56,9 @@
 
 -- ── 1 · el enlace personal ───────────────────────────────────────────────────
 ALTER TABLE public.roadsheet_share
-  ADD COLUMN person_id uuid REFERENCES public.person (id) ON DELETE SET NULL;
+  -- CASCADE: borrar la persona mata sus enlaces; con SET NULL se volverían
+  -- enlaces de papel anónimos que nadie ha creado como tales.
+  ADD COLUMN person_id uuid REFERENCES public.person (id) ON DELETE CASCADE;
 CREATE INDEX roadsheet_share_person_idx ON public.roadsheet_share (person_id) WHERE person_id IS NOT NULL;
 COMMENT ON COLUMN public.roadsheet_share.person_id IS
   'ADR-183: the person whose link this is (a role link plus a person). NULL = a role link. Only a personal link can send «llego tarde».';
@@ -455,10 +459,13 @@ BEGIN
            'created_at', n.created_at,
            'person_name', n.person_name,
            'person_role', n.person_role,
-           'phone', coalesce(
-             (SELECT nullif(btrim(wp.phone), '') FROM public.workspace_person wp
-              WHERE wp.workspace_id = n.workspace_id AND wp.person_id = n.person_id AND wp.deleted_at IS NULL LIMIT 1),
-             (SELECT nullif(btrim(pe.phone), '') FROM public.person pe WHERE pe.id = n.person_id)),
+           -- El teléfono, sólo a quien puede leer la ficha de la persona (la
+           -- regla de la RLS de workspace_person, ADR-124); si no, null.
+           'phone', CASE WHEN private.workspace_person_readable_by_caller(n.workspace_id, n.person_id)
+             THEN coalesce(
+               (SELECT nullif(btrim(wp.phone), '') FROM public.workspace_person wp
+                WHERE wp.workspace_id = n.workspace_id AND wp.person_id = n.person_id AND wp.deleted_at IS NULL LIMIT 1),
+               (SELECT nullif(btrim(pe.phone), '') FROM public.person pe WHERE pe.id = n.person_id)) END,
            'minutes', n.minutes,
            'note', n.note,
            'milestone', CASE WHEN n.milestone_at IS NULL THEN NULL ELSE jsonb_build_object(
@@ -494,7 +501,8 @@ $$;
 REVOKE ALL ON FUNCTION public.roadsheet_late_notices() FROM PUBLIC, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.roadsheet_late_notices() TO authenticated;
 
--- «Visto»: el primero que lo marca queda; la hoja del técnico lo dice.
+-- «Visto»: el primero que lo marca queda; la hoja del técnico lo dice. Sólo
+-- quien edita la función: «Visto» es la respuesta de producción.
 CREATE FUNCTION public.mark_roadsheet_late_seen(p_notice_id uuid)
 RETURNS void
 LANGUAGE plpgsql
@@ -508,7 +516,7 @@ BEGIN
     RAISE EXCEPTION 'authentication required' USING ERRCODE = '42501';
   END IF;
   SELECT n.project_id INTO v_project FROM public.roadsheet_late_notice n WHERE n.id = p_notice_id;
-  IF v_project IS NULL OR NOT public.has_permission(v_project, 'read:performance') THEN
+  IF v_project IS NULL OR NOT public.has_permission(v_project, 'edit:performance') THEN
     RAISE EXCEPTION 'not allowed' USING ERRCODE = '42501';
   END IF;
   UPDATE public.roadsheet_late_notice
@@ -597,8 +605,10 @@ REVOKE ALL ON FUNCTION public.record_roadsheet_late_move(uuid, timestamptz, time
 GRANT EXECUTE ON FUNCTION public.record_roadsheet_late_move(uuid, timestamptz, timestamptz) TO authenticated;
 
 -- ── 6 · la hoja pública ──────────────────────────────────────────────────────
--- Cuerpo vivo de 20261105120000; cambia: v_tz y v_person_role en DECLARE, y el
--- `|| jsonb_build_object('late_moves', …) || CASE … holder/late …` del final.
+-- Cuerpo vivo de 20261105120000; cambia: v_tz y v_person_role en DECLARE; un
+-- enlace personal de quien ya no está en la función devuelve NULL y, si sigue,
+-- su papel es el de hoy (v_share.role := v_person_role, antes de v_contacts); y
+-- el `|| jsonb_build_object('late_moves', …) || CASE … holder/late …` del final.
 CREATE OR REPLACE FUNCTION public.get_public_roadsheet(p_token text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -623,11 +633,17 @@ BEGIN
   IF v_share.id IS NULL THEN
     RETURN NULL;
   END IF;
-  v_contacts := v_share.role = 'tech_manager';
-  v_tz := private.performance_timezone(v_share.performance_id);
+  -- Un enlace personal vale lo que la persona en la función hoy: si ya no está,
+  -- nada (como un token inválido); si está, su papel de hoy, no el guardado.
   IF v_share.person_id IS NOT NULL THEN
     v_person_role := private.roadsheet_person_role(v_share.performance_id, v_share.person_id);
+    IF v_person_role IS NULL THEN
+      RETURN NULL;
+    END IF;
+    v_share.role := v_person_role;
   END IF;
+  v_contacts := v_share.role = 'tech_manager';
+  v_tz := private.performance_timezone(v_share.performance_id);
 
   SELECT jsonb_build_object(
     'role', v_share.role,

@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   annotateMoves,
+  canMarkSeen,
   canProposeMove,
   isLateMinutes,
   lateEta,
@@ -103,6 +104,13 @@ describe('canProposeMove', () => {
     expect(canProposeMove({ ...base, milestone: null })).toBe(false);
     expect(canProposeMove({ ...base, minutes: null })).toBe(false);
     expect(canProposeMove({ ...base, moved_to: at('16:20') })).toBe(false);
+  });
+});
+
+describe('canMarkSeen', () => {
+  test('only whoever edits the performance', () => {
+    expect(canMarkSeen({ can_edit: true })).toBe(true);
+    expect(canMarkSeen({ can_edit: false })).toBe(false);
   });
 });
 

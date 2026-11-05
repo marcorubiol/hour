@@ -1,7 +1,7 @@
 /**
  * POST /api/late-notices/:id/seen: «Visto» (121 B, ADR-183). The first who
- * marks it stays, and the technician's sheet says who saw it. Whoever reads
- * the performance may; anything else is the same 403.
+ * marks it stays, and the technician's sheet says who saw it. Whoever edits
+ * the performance may (`edit:performance`); anything else is the same 403.
  */
 
 import type { RequestHandler } from './$types';

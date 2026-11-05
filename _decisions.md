@@ -6965,7 +6965,8 @@ capacidad, y hasta hoy era por papel, así que la hoja no sabía quién la abrí
 4. **El hito** es el primer momento de la escaleta que aún no ha llegado al avisar; la hora estimada, la del hito
    más los minutos.
 5. **Producción.** Banda «Llega tarde» arriba de Hoy y de Ahora con el último aviso de cada enlace de las últimas
-   24 h sin «Visto»: «Mover <hito> a HH:MM» (sólo con `edit:performance`; pide confirmación), «Llamar» y «Visto».
+   24 h sin «Visto»: «Mover <hito> a HH:MM» (sólo con `edit:performance`; pide confirmación), «Llamar» y «Visto»
+   (también sólo con `edit:performance`).
    Producción es quien puede editar la función: Hour no tiene papel de «productor» por función ni por bolo.
 6. **Mover una hora** pasa por el documento de collab (ADR-090 P2: el documento manda), compare-and-set de ese
    momento solo; los demás no se mueven. Su final sigue donde estaba salvo que el nuevo inicio lo pase (entonces
@@ -6980,6 +6981,16 @@ capacidad, y hasta hoy era por papel, así que la hoja no sabía quién la abrí
 ADR-111; el correo de Gmail es el buzón de cada persona). Queda pendiente de ese camino. «Ya he llegado» del boceto
 tampoco: el aviso se cierra con «Visto». No avisa a la sala ni hace push.
 
-**Cómo se revierte.** `build/runbooks/rollback-20261106-roadsheet-late-notice.sql` (borra avisos y líneas, deja los
-enlaces personales como de papel) y revertir el commit del Worker. Orden al desplegar: migración antes que el Worker
+**Seguridad (revisión antes de aplicar, 2026-11-05).**
+- Un enlace personal vale lo que su persona en la función hoy: si ya no está, `get_public_roadsheet` devuelve NULL
+  (como un token inválido); si está, manda su papel de hoy, no el guardado. Borrar la persona borra sus enlaces
+  (`person_id` con `ON DELETE CASCADE`, no `SET NULL`, que los volvería enlaces de papel anónimos).
+- `roadsheet_late_notices()` sólo da el teléfono a quien puede leer la ficha de la persona
+  (`private.workspace_person_readable_by_caller`, ADR-124); a un miembro sólo de proyecto, null.
+- «Visto» (`mark_roadsheet_late_seen`) pide `edit:performance`, no `read:performance`; la banda no enseña el botón a
+  quien no edita.
+- El rollback revoca los enlaces personales antes de quitar la columna.
+
+**Cómo se revierte.** `build/runbooks/rollback-20261106-roadsheet-late-notice.sql` (borra avisos y líneas, revoca
+los enlaces personales) y revertir el commit del Worker. Orden al desplegar: migración antes que el Worker
 (la lectura de mensajes embebe `late_notice_id`).

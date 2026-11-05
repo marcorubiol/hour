@@ -23,6 +23,7 @@
   import { t, type Locale } from '$lib/i18n';
   import { invalidatePerformanceFeeds } from '$lib/plan-create';
   import {
+    canMarkSeen,
     canProposeMove,
     lateClock,
     lateEta,
@@ -110,9 +111,11 @@
               {#if n.phone}
                 <a class="btn--secondary btn--xs" href={telHref(n.phone)}>{t('late.call', locale)}</a>
               {/if}
-              <Button size="xs" variant="quiet" loading={$seen.isPending && $seen.variables === n.id} onclick={() => $seen.mutate(n.id)}>
-                {t('late.seen_button', locale)}
-              </Button>
+              {#if canMarkSeen(n)}
+                <Button size="xs" variant="quiet" loading={$seen.isPending && $seen.variables === n.id} onclick={() => $seen.mutate(n.id)}>
+                  {t('late.seen_button', locale)}
+                </Button>
+              {/if}
             </div>
           </div>
         </li>

@@ -9,7 +9,13 @@
  *     else the space's), and say it on the public sheet;
  *   - refuse a role-only link, another day, a revoked link, an expired link,
  *     a person not in the team, bad minutes, and a fourth notice in an hour;
- *   - never let anon read `roadsheet_late_notice` or call production's RPCs.
+ *   - never let anon read `roadsheet_late_notice` or call production's RPCs;
+ *   - close a personal link once its person leaves the performance (NULL, as
+ *     an unknown token) and give it the person's role of today, not the
+ *     stored one;
+ *   - with the limited fixture: «Visto» needs `edit:performance`, and the
+ *     phone only reaches whoever reads the person's dossier (as a guest, a
+ *     project-only member, it is null).
  *
  * In `zzz-e2e-collab` (`playwright`): performances it creates (today, 2031
  * and three days ago, no venue, so the day is the space's), a `zzz-` team
@@ -23,7 +29,18 @@
  */
 
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { envReady, login, pgGet, pgPatch, pgPost, pgRpc, requireEnv } from './_helpers';
+import {
+  decodeJwt,
+  envReady,
+  limitedEnvReady,
+  login,
+  pgGet,
+  pgPatch,
+  pgPost,
+  pgRpc,
+  requireEnv,
+  requireLimitedEnv,
+} from './_helpers';
 
 const RUN = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const one = <T>(data: T | T[] | null): T | undefined => (Array.isArray(data) ? data[0] : (data ?? undefined));
@@ -49,6 +66,7 @@ describe.skipIf(!envReady())('RLS: «llego tarde» from a personal road sheet li
   let strangerId: string;
   const perfs: Record<'today' | 'later' | 'past', string> = { today: '', later: '', past: '' };
   const crew: string[] = [];
+  const overrides: string[] = [];
   const shares: string[] = [];
   let personal: Share;
   let roleOnly: Share;
@@ -64,21 +82,37 @@ describe.skipIf(!envReady())('RLS: «llego tarde» from a personal road sheet li
     return one(r.data)!.id;
   };
 
-  const addCrew = async (performanceId: string) => {
+  const addCrew = async (performanceId: string, who = personId) => {
     const r = await pgPost<{ id: string }>('crew_assignment', jwt, {
       workspace_id: workspaceId,
       performance_id: performanceId,
-      person_id: personId,
+      person_id: who,
       role: 'luces',
     });
     expect(r.status).toBeLessThan(300);
     crew.push(r.rows[0]!.id);
+    return r.rows[0]!.id;
   };
 
-  const personalLink = async (performanceId: string) => {
+  const dropCrew = async (id: string) => {
+    const r = await pgPatch('crew_assignment', jwt, { deleted_at: new Date().toISOString() }, new URLSearchParams({ id: `eq.${id}` }));
+    expect(r.status).toBeLessThan(300);
+  };
+
+  const newDossier = async (name: string, phone: string | null = null) => {
+    const r = await pgRpc<{ person_id: string }>('create_workspace_person', jwt, {
+      p_workspace_id: workspaceId,
+      p_full_name: name,
+      p_phone: phone,
+    });
+    expect(r.status, r.error).toBe(200);
+    return one(r.data)!.person_id;
+  };
+
+  const personalLink = async (performanceId: string, who = personId) => {
     const r = await pgRpc<Share>('create_roadsheet_share_for_person', jwt, {
       p_performance_id: performanceId,
-      p_person_id: personId,
+      p_person_id: who,
     });
     expect(r.status, r.error).toBe(200);
     const s = one(r.data)!;
@@ -144,6 +178,9 @@ describe.skipIf(!envReady())('RLS: «llego tarde» from a personal road sheet li
   afterAll(async () => {
     if (!jwt) return;
     for (const id of shares) await pgRpc('revoke_roadsheet_share', jwt, { p_share_id: id });
+    for (const id of overrides) {
+      await pgPatch('cast_override', jwt, { deleted_at: new Date().toISOString() }, new URLSearchParams({ id: `eq.${id}` }));
+    }
     for (const id of crew) {
       await pgPatch('crew_assignment', jwt, { deleted_at: new Date().toISOString() }, new URLSearchParams({ id: `eq.${id}` }));
     }
@@ -244,6 +281,107 @@ describe.skipIf(!envReady())('RLS: «llego tarde» from a personal road sheet li
     expect((await pgRpc('roadsheet_late_move_plan', null, { p_notice_id: any })).status).toBeGreaterThanOrEqual(400);
   });
 
+  test('a personal link closes when its person leaves the performance', async () => {
+    const leaver = await newDossier(`Zzz Sale ${RUN}`);
+    const row = await addCrew(perfs.today, leaver);
+    const s = await personalLink(perfs.today, leaver);
+    const before = await pgRpc<Public & { role: string }>('get_public_roadsheet', null, { p_token: s.token });
+    expect(one(before.data)?.role).toBe('tech_manager');
+
+    await dropCrew(row);
+    const after = await pgRpc('get_public_roadsheet', null, { p_token: s.token });
+    expect(after.status).toBe(200);
+    // Same opaque answer as a made-up token.
+    expect(after.data).toBeNull();
+    const madeUp = await pgRpc('get_public_roadsheet', null, { p_token: 'e'.repeat(64) });
+    expect(after.data).toEqual(madeUp.data);
+    expect((await report(s.token)).status).toBeGreaterThanOrEqual(400);
+  });
+
+  test('a personal link carries the person’s role of today, not the stored one', async () => {
+    const mover = await newDossier(`Zzz Cambia ${RUN}`);
+    const row = await addCrew(perfs.today, mover);
+    const s = await personalLink(perfs.today, mover);
+    expect(s.role).toBe('tech_manager');
+
+    // From crew to cast: the link was born tech_manager, the person is now a performer.
+    const co = await pgPost<{ id: string }>('cast_override', jwt, {
+      workspace_id: workspaceId,
+      performance_id: perfs.today,
+      person_id: mover,
+      role: 'zzz-actriz',
+    });
+    expect(co.status).toBeLessThan(300);
+    overrides.push(co.rows[0]!.id);
+    await dropCrew(row);
+
+    type Crew = { person: { email: string | null; phone: string | null } };
+    const pub = one((await pgRpc<Public & { role: string; crew: Crew[] }>('get_public_roadsheet', null, { p_token: s.token })).data)!;
+    expect(pub.role).toBe('performer');
+    expect(pub.holder?.role).toBe('zzz-actriz');
+    // A performer sees no team contacts (ADR-041); the stored tech_manager would.
+    for (const c of pub.crew) expect(c.person.phone ?? c.person.email ?? null).toBeNull();
+  });
+
+  test.skipIf(!limitedEnvReady())('limited fixture: «Visto» needs edit, and the phone needs the dossier', async () => {
+    const limited = requireLimitedEnv();
+    const limitedJwt = await login(limited.email, limited.password);
+    const limitedUserId = String(decodeJwt(limitedJwt).sub);
+    const perm = async (p: string) =>
+      (await pgRpc<boolean>('has_permission', limitedJwt, { p_project_id: projectId, p_perm: p })).data;
+    expect(await perm('read:performance')).toBe(true);
+    expect(await perm('edit:performance')).toBe(false);
+
+    const phoned = await newDossier(`Zzz Tel ${RUN}`, '+34600000000');
+    await addCrew(perfs.today, phoned);
+    const s = await personalLink(perfs.today, phoned);
+    expect((await report(s.token, 10)).status).toBe(200);
+
+    type Open = { id: string; person_name: string; phone: string | null; can_edit: boolean };
+    const mineFor = async (who: string) =>
+      ((await pgRpc<Open[]>('roadsheet_late_notices', who, {})).data ?? []).filter(
+        (n) => n.person_name === `Zzz Tel ${RUN}`,
+      );
+
+    const asAdmin = await mineFor(jwt);
+    expect(asAdmin).toHaveLength(1);
+    expect(asAdmin[0]!.phone).toBe('+34600000000');
+
+    const asLimited = await mineFor(limitedJwt);
+    expect(asLimited).toHaveLength(1);
+    expect(asLimited[0]!.can_edit).toBe(false);
+    const seen = await pgRpc('mark_roadsheet_late_seen', limitedJwt, { p_notice_id: asLimited[0]!.id });
+    expect(seen.status).toBeGreaterThanOrEqual(400);
+    expect((await mineFor(jwt))).toHaveLength(1);
+
+    // As a guest (a project-only member) the notice is there, the phone is not.
+    const ms = await pgGet<{ id: string; workspace_role: string }>(
+      'membership',
+      jwt,
+      new URLSearchParams({
+        level: 'eq.workspace',
+        workspace_id: `eq.${workspaceId}`,
+        user_id: `eq.${limitedUserId}`,
+        select: 'id,workspace_role',
+      }),
+    );
+    expect(ms.rows).toHaveLength(1);
+    const was = ms.rows[0]!;
+    expect(was.workspace_role).not.toBe('guest');
+    const toGuest = await pgRpc('update_workspace_member_role', jwt, { p_membership_id: was.id, p_role: 'guest' });
+    expect(toGuest.status, toGuest.error).toBe(204);
+    try {
+      expect(await perm('read:performance')).toBe(true);
+      const asGuest = await mineFor(limitedJwt);
+      expect(asGuest).toHaveLength(1);
+      expect(asGuest[0]!.phone).toBeNull();
+    } finally {
+      await pgRpc('update_workspace_member_role', jwt, { p_membership_id: was.id, p_role: was.workspace_role });
+    }
+
+    expect((await pgRpc('mark_roadsheet_late_seen', jwt, { p_notice_id: asAdmin[0]!.id })).status).toBeLessThan(300);
+  });
+
   test('production sees the last notice, marks it seen, and the sheet says who', async () => {
     const open = await pgRpc<Array<{ id: string; person_name: string; minutes: number | null; can_edit: boolean }>>(
       'roadsheet_late_notices',
@@ -260,7 +398,7 @@ describe.skipIf(!envReady())('RLS: «llego tarde» from a personal road sheet li
     const direct = await pgGet<{ id: string }>(
       'roadsheet_late_notice',
       jwt,
-      new URLSearchParams({ select: 'id', performance_id: `eq.${perfs.today}` }),
+      new URLSearchParams({ select: 'id', share_id: `eq.${personal.id}` }),
     );
     expect(direct.rows.length).toBe(3);
 
@@ -275,7 +413,7 @@ describe.skipIf(!envReady())('RLS: «llego tarde» from a personal road sheet li
     const direct = await pgGet<{ id: string; milestone_at: string; minutes: number | null }>(
       'roadsheet_late_notice',
       jwt,
-      new URLSearchParams({ select: 'id,milestone_at,minutes', performance_id: `eq.${perfs.today}`, minutes: 'eq.20' }),
+      new URLSearchParams({ select: 'id,milestone_at,minutes', share_id: `eq.${personal.id}`, minutes: 'eq.20' }),
     );
     const n = direct.rows[0]!;
     const plan = await pgRpc<{ from: string; to: string }>('roadsheet_late_move_plan', jwt, { p_notice_id: n.id });

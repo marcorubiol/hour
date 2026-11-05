@@ -1,8 +1,8 @@
 -- Rollback de 20261106100000_roadsheet_late_notice.sql (121 B, ADR-183).
 --
--- Borra los avisos «llego tarde» y sus líneas en los grupos de bolo, y deja
--- los enlaces personales como enlaces de papel (se pierde de quién eran; el
--- enlace sigue abriendo). Antes: backup (`production-migrate.yml`).
+-- Borra los avisos «llego tarde» y sus líneas en los grupos de bolo, y revoca
+-- los enlaces personales (sin la columna serían enlaces de papel anónimos; hay
+-- que volver a mandarlos). Antes: backup (`production-migrate.yml`).
 
 BEGIN;
 
@@ -186,6 +186,11 @@ DROP FUNCTION IF EXISTS private.performance_timezone(uuid);
 DROP FUNCTION IF EXISTS private.roadsheet_person_name(uuid, uuid);
 DROP FUNCTION IF EXISTS private.roadsheet_person_role_word(uuid, uuid);
 DROP FUNCTION IF EXISTS private.roadsheet_person_role(uuid, uuid);
+
+-- Un enlace personal sin su persona sería un enlace de papel anónimo que
+-- nadie creó como tal: se revoca antes de perder de quién era.
+UPDATE public.roadsheet_share SET revoked_at = now()
+WHERE person_id IS NOT NULL AND revoked_at IS NULL;
 
 DROP INDEX IF EXISTS public.roadsheet_share_person_idx;
 ALTER TABLE public.roadsheet_share DROP COLUMN IF EXISTS person_id;

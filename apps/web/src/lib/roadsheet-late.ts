@@ -77,6 +77,7 @@ export interface LateNotice {
   created_at: string;
   person_name: string;
   person_role: string | null;
+  /** Only to whoever may read the person's dossier (ADR-124); else null. */
   phone: string | null;
   minutes: number | null;
   note: string | null;
@@ -92,7 +93,7 @@ export interface LateNotice {
     city: string | null;
     workspace_slug: string;
   };
-  /** May move the time (`edit:performance`). */
+  /** May move the time and mark it seen (`edit:performance`). */
   can_edit: boolean;
 }
 
@@ -123,6 +124,11 @@ export function lateEta(milestoneAt: string | null | undefined, minutes: number 
 /** What «Mover» proposes: only for whoever edits, with a moment and minutes, not yet moved. */
 export function canProposeMove(n: Pick<LateNotice, 'can_edit' | 'milestone' | 'minutes' | 'moved_to'>): boolean {
   return n.can_edit && n.milestone !== null && n.minutes !== null && n.moved_to === null;
+}
+
+/** «Visto» is production's answer: only for whoever edits the performance. */
+export function canMarkSeen(n: Pick<LateNotice, 'can_edit'>): boolean {
+  return n.can_edit;
 }
 
 /**
