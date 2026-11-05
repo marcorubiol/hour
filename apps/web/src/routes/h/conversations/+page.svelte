@@ -1180,7 +1180,7 @@
             }
           }}
         >
-          {#if opened || group}
+          {#if group}
             <div class="conversations__pane-bar">
               <button type="button" class="block-head__act" aria-keyshortcuts="Escape" onclick={closePane}>{t('peek.close', locale)}</button>
             </div>
@@ -1191,7 +1191,7 @@
             {/key}
           {:else if opened && conversationRecord.component}
             {#key openRaw}
-              <conversationRecord.component workspaceSlug={opened.ws} slug={opened.id} inPeek />
+              <conversationRecord.component workspaceSlug={opened.ws} slug={opened.id} inPeek onclose={closePane} />
             {/key}
           {:else if !opened && !group}
             <!-- Nothing open: what waits, said calmly, and the one that waits longest one click away. -->
@@ -1463,7 +1463,7 @@
       min-block-size: 0;
       overflow-y: auto;
       overscroll-behavior: contain;
-      padding: var(--space-m) 0 var(--space-s) var(--space-l);
+      padding: var(--space-m) var(--space-l) var(--space-s);
     }
     /* A conversation in the pane, as a chat: its head on top, the field at
        the foot, always in view, and only the thread between them scrolls. */
@@ -1474,7 +1474,21 @@
     .conversations__pane > :global(.chat > *) {
       flex-shrink: 0;
     }
-    .conversations__pane > :global(.chat > .flow) {
+    .conversations__pane > :global(.chat > .chat__body) {
+      flex: 1;
+      min-block-size: 0;
+      grid-template-rows: minmax(0, 1fr);
+    }
+    .conversations__pane > :global(.chat .chat__main) {
+      min-block-size: 0;
+    }
+    /* The details beside the thread scroll on their own, like the thread. */
+    .conversations__pane > :global(.chat .details:not(.details--over)) {
+      min-block-size: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+    .conversations__pane > :global(.chat .flow) {
       flex: 1;
       min-block-size: 0;
       overflow-y: auto;

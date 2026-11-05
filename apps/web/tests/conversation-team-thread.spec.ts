@@ -107,7 +107,7 @@ test.describe('el hilo del equipo de una conversación (ADR-106)', () => {
     await signIn(page, LIMITED_EMAIL!, LIMITED_PASSWORD!);
 
     await page.goto(`/h/playwright/conversation/${conversationId}`);
-    // Un solo campo al pie (punto 110): «Nota del equipo» es uno de sus destinos.
+    // Un solo campo al pie (punto 110): «Equipo» es uno de sus destinos (ADR-184).
     const composer = page.getByTestId('thread-composer');
     await expect(composer).toBeVisible({ timeout: 30_000 });
     await composer.getByTestId('composer-to-team').click();

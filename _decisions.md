@@ -6994,3 +6994,59 @@ tampoco: el aviso se cierra con «Visto». No avisa a la sala ni hace push.
 **Cómo se revierte.** `build/runbooks/rollback-20261106-roadsheet-late-notice.sql` (borra avisos y líneas, revoca
 los enlaces personales) y revertir el commit del Worker. Orden al desplegar: migración antes que el Worker
 (la lectura de mensajes embebe `late_notice_id`).
+
+## [2026-11-05] ADR-184 · La conversación abierta: el lado dice quién, tres pesos con su glifo, los detalles siempre a un toque y el campo por canales
+
+**Contexto.** Marco, 05-11: «mira cuánto espacio desperdiciado en la parte derecha». El panel de una conversación
+abierta centraba lo apuntado en una columna estrecha, la carta iba a un lado, la nota del equipo a la izquierda y el
+envío a la derecha: cuatro geometrías para un hilo. Cada evento ocupaba tres líneas con su separador de día en mono
+mayúsculas; «TEAM ONLY» en mono en cada nota; la cabecera con tres puertas a los detalles («Details», la línea de
+contactos y «Close» en su propia fila); los hechos en dos líneas con el turno el último; «Te toca responder» y «No
+pide respuesta» cuando la lista ya dice «Nos toca» y «Ya está» (ADR-177 § 5). Boceto en el artifact «Hour, panel de
+una conversación: boceto», con cuatro vueltas: Marco eligió A, pidió que juntase todo lo que se habla (correo,
+mensaje, llamada), que se distinguiera mejor (con glifos y jerarquía), nada en el centro que no se entienda, los
+detalles siempre accesibles (aunque sea por encima) y el campo pensado para cualquier plataforma que pida una
+compañía. Sin migración, API ni forma de caché.
+
+**Decisión.**
+1. **El lado dice quién.** Lo que llegó de fuera, a la izquierda; todo lo nuestro (correo enviado, llamada que
+   hicimos, reunión, apunte, envío, el equipo), a la derecha. El centro es sólo del tiempo: la raya de nuevos y un
+   silencio de una semana o más («2 semanas», «3 meses»). `sideOf` y `THREAD_GAP_DAYS` en `$lib/conversation-thread`.
+2. **Tres pesos.** Lo hablado con ellos (correo del buzón, correo apuntado, llamada, mensaje, reunión): burbuja, el
+   texto en la letra del cuerpo; lo suyo en papel blanco, lo nuestro en un azul muy suave (`--thread-ours-bg`), la
+   esquina de su lado más cerrada. El equipo: burbuja ámbar con el candado y «Nombre, solo el equipo». Lo nuestro
+   sin destinatario (apunte, envío, aviso de un envío): una línea pequeña sin burbuja.
+3. **Glifo y palabra.** Cada entrada empieza por su glifo y por qué fue y de quién: «Llamada de Elena», «Reunión con
+   Elena», «Correo de Marco · apuntado», «Apunte». Sin nombre conocido, sólo la palabra («Llamada»). Los glifos viven
+   en `ThreadIcon` (un trazo, el tamaño del texto; la forma nunca va sola, ADR-177 § 3).
+4. **El tiempo una vez.** Sin separadores de día: la fecha va en cada entrada, y sólo la hora si la anterior es del
+   mismo día y del mismo lado.
+5. **Cabecera de una fila**: la vuelta (móvil), el monograma, el nombre con sus contactos y el proyecto, «Detalles» y
+   «Cerrar» (éste, en la misma fila cuando la ficha va al lado de la lista; sale de la barra del panel). La pregunta
+   del tipo (115) va en la línea de contactos, donde irá la respuesta; en una ficha estrecha, en su propia línea
+   bajo los hechos. **Los hechos en una línea, el turno primero**: «Nos toca responder · hace 2 semanas  Ya está»,
+   el estado (en la voz de la línea, no en la palabra mono de las fichas: `.fact-word` se redefine aquí), los
+   bolos, el siguiente paso y «Privada» apagada.
+6. **Los detalles siempre a un toque.** Con la ficha a 64rem o más, columna fija a la derecha (`--chat-details-inline`,
+   20rem; en su página, pegada al desplazar). Por debajo, «Detalles» en la cabecera los abre encima del hilo, fijos
+   al borde derecho de la ventana (`--chat-details-over`, 22rem; en el móvil, la pantalla entera); «Cerrar» o Esc
+   los quitan y la conversación sigue donde estaba. Sustituye al diálogo de detalles.
+7. **El campo, por canales.** El campo no sabe de correo: dibuja la lista de canales conectados del espacio
+   (`$lib/channels`: nombre y glifo, a qué dato del contacto va, si está conectado). Hoy hay uno, el correo. A la
+   izquierda, «A Laia» y sus canales; a la derecha, tras una raya, «Nosotros»: Equipo y Apuntar, que existen
+   siempre. Un canal sin conector no aparece (Hour no promete lo que no hace); sin la dirección del contacto, sale
+   apagado y dice qué falta (lo de hoy con el correo, `mail_send_authorize`). El botón lleva el glifo del canal y su
+   verbo (ADR-177 § 6). En el móvil, la palabra sólo en el elegido. Telegram, WhatsApp o el que pida una compañía
+   entran con su ficha en `$lib/channels`, su glifo en `ThreadIcon` y su conector; con más de tres hacia fuera, los
+   demás irán en «Más ▾», que acaba en «Conectar un canal…» (boceto), a construir con el segundo canal.
+
+**Qué enmienda.** ADR-176, la ficha como chat: la carta de lado y la línea centrada pasan a burbuja y línea pequeña
+por peso, y la nota del equipo cambia de lado. ADR-177 § 6: los destinos del campo llevan glifo y se agrupan
+(«Correo a Laia» pasa a «A Laia · Correo»; «Nota del equipo», a «Equipo»). `--thread-ours-bg` pasa del crema
+hundido al azul suave también en el grupo del bolo (`MessageItem`, burbujas propias).
+
+**Queda abierto (de Marco).** `--page-width` (1240, una medida para toda la app desde el 31-07) deja a 2000 px el
+panel al lado de la lista en unos 50rem: ahí los detalles se abren encima, nunca al lado. Quitar la medida en la
+vista de dos paneles los pondría al lado; es su regla y no se ha tocado.
+
+**Cómo se revierte.** Revertir el commit del carril: sólo presentación, sin datos ni caché.

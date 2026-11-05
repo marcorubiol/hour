@@ -58,7 +58,9 @@ describe('ConversationComposer', () => {
     await settle();
 
     expect(pressed('composer-to-mail')).toBe('true');
-    expect(screen.getByTestId('composer-to-mail').textContent).toContain('Correo a Laia');
+    // Her channels under «A Laia», each with its word (ADR-184).
+    expect(screen.getByText('A Laia')).toBeTruthy();
+    expect(screen.getByTestId('composer-to-mail').textContent).toContain('Correo');
     expect(reads()).toBe('Sale por correo a laia@teatrellum.test.');
     expect(screen.getByRole('button', { name: 'Enviar correo a Laia' })).toBeTruthy();
 

@@ -8,6 +8,11 @@
  * su sitio, con su texto nuevo (la sincronización ya lo guarda sin lo citado,
  * `trimQuoted`), el asunto sólo cuando cambia, y lo largo enseña el principio
  * y se despliega en el mismo sitio.
+ *
+ * El lado dice quién (ADR-184): lo que llegó de fuera a la izquierda, todo lo
+ * nuestro a la derecha. Sin separadores de día: la fecha va en cada entrada,
+ * y sólo la hora si la anterior es del mismo día y del mismo lado. El centro
+ * es del tiempo: la raya de nuevos y el silencio de una semana o más.
  */
 
 import { dayKeyInTz } from './planner';
@@ -29,19 +34,44 @@ export interface ThreadEvent {
   mailout_note?: string | null;
 }
 
+/** De quién es una entrada: de fuera, a la izquierda; nuestra, a la derecha. */
+export type ThreadSide = 'theirs' | 'ours';
+
+/**
+ * Lo que toda entrada con contenido lleva: su lado y el día que se escribe
+ * encima (`null`: la anterior es del mismo día y del mismo lado, sólo la hora).
+ */
+interface Placed {
+  side: ThreadSide;
+  day: string | null;
+}
+
 export type ThreadEntry<E extends ThreadEvent> =
-  /** Cambia el día: «8 oct», «ayer», «hoy». */
-  | { kind: 'day'; key: string; day: string }
   /** La raya de «N nuevos», donde se dejó de leer al abrir. */
   | { kind: 'new'; key: string; count: number }
-  /** Un correo sincronizado o enviado desde Hour: carta en su lado. */
-  | { kind: 'mail'; key: string; event: E; showSubject: boolean; long: boolean }
-  /** Lo que salió con un envío (ADR-115): tarjeta que lleva a Envíos. */
-  | { kind: 'mailout'; key: string; event: E }
-  /** Lo apuntado a mano (llamada, reunión, nota) y los avisos de un envío: una línea centrada. */
-  | { kind: 'logged'; key: string; event: E }
-  /** Un mensaje del hilo del equipo, intercalado y marcado «Solo el equipo». */
-  | { kind: 'team'; key: string; message: ThreadMessage };
+  /** Un silencio de una semana o más entre dos entradas: «2 semanas». */
+  | { kind: 'gap'; key: string; days: number }
+  /** Un correo sincronizado o enviado desde Hour: entero, con su asunto y el original. */
+  | ({ kind: 'mail'; key: string; event: E; showSubject: boolean; long: boolean } & Placed)
+  /** Lo que salió con un envío (ADR-115): una línea que lleva a Envíos. */
+  | ({ kind: 'mailout'; key: string; event: E } & Placed)
+  /** Lo apuntado a mano (correo, llamada, mensaje, reunión, apunte) y los avisos de un envío. */
+  | ({ kind: 'logged'; key: string; event: E } & Placed)
+  /** Un mensaje del hilo del equipo, intercalado: ámbar, «solo el equipo». */
+  | ({ kind: 'team'; key: string; message: ThreadMessage } & Placed);
+
+/** Desde cuántos días sin nada el hilo lo dice en el centro. */
+export const THREAD_GAP_DAYS = 7;
+
+/** Lo que llegó de fuera va a su lado; lo demás (nuestro, apuntado sin dirección, el equipo) al nuestro. */
+export function sideOf(e: Pick<ThreadEvent, 'direction'>): ThreadSide {
+  return e.direction === 'inbound' ? 'theirs' : 'ours';
+}
+
+/** Días enteros entre dos días (`YYYY-MM-DD`). */
+function daysBetween(a: string, b: string): number {
+  return Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86_400_000);
+}
 
 /** Un correo de verdad, con remitente y texto: lo trajo el buzón o salió por él. */
 export function isMail(e: Pick<ThreadEvent, 'kind' | 'source' | 'mailout_id' | 'mailout_note'>): boolean {
@@ -93,15 +123,17 @@ export function conversationThreadEntries<E extends ThreadEvent>(input: {
   teamReadAt: string | null;
   tz: string;
 }): ThreadEntry<E>[] {
-  type Step = { at: string; order: number; id: string; entry: ThreadEntry<E>; fresh: boolean };
+  type Content = Exclude<ThreadEntry<E>, { kind: 'new' } | { kind: 'gap' }>;
+  type Step = { at: string; order: number; id: string; entry: Content; fresh: boolean };
   const steps: Step[] = [];
   for (const e of input.events) {
     const fresh = input.eventsReadAt !== null && isNewEvent(e, input.eventsReadAt);
     const kind = isMail(e) ? 'mail' : e.kind === 'email' && e.mailout_id && !e.mailout_note ? 'mailout' : 'logged';
-    const entry: ThreadEntry<E> =
+    const placed = { side: sideOf(e), day: null };
+    const entry: Content =
       kind === 'mail'
-        ? { kind, key: e.id, event: e, showSubject: false, long: isLongText(e.body) }
-        : { kind, key: e.id, event: e };
+        ? { kind, key: e.id, event: e, showSubject: false, long: isLongText(e.body), ...placed }
+        : { kind, key: e.id, event: e, ...placed };
     steps.push({ at: e.occurred_at, order: 0, id: e.id, entry, fresh });
   }
   for (const m of input.messages) {
@@ -109,7 +141,7 @@ export function conversationThreadEntries<E extends ThreadEvent>(input: {
       at: m.created_at,
       order: 1,
       id: m.id,
-      entry: { kind: 'team', key: m.id, message: m },
+      entry: { kind: 'team', key: m.id, message: m, side: 'ours', day: null },
       fresh: isUnread(m, input.me, input.teamReadAt),
     });
   }
@@ -118,15 +150,17 @@ export function conversationThreadEntries<E extends ThreadEvent>(input: {
   const fresh = steps.filter((s) => s.fresh).length;
   const firstFresh = steps.findIndex((s) => s.fresh);
   const out: ThreadEntry<E>[] = [];
-  let day = '';
+  let prev: { day: string; side: ThreadSide } | null = null;
   let stem: string | null = null;
   steps.forEach((s, i) => {
-    if (i === firstFresh) out.push({ kind: 'new', key: 'new', count: fresh });
     const d = dayKeyInTz(s.at, input.tz);
-    if (d !== day) {
-      day = d;
-      out.push({ kind: 'day', key: `day-${d}`, day: d });
+    if (prev) {
+      const days = daysBetween(prev.day, d);
+      if (days >= THREAD_GAP_DAYS) out.push({ kind: 'gap', key: `gap-${s.id}`, days });
     }
+    if (i === firstFresh) out.push({ kind: 'new', key: 'new', count: fresh });
+    s.entry.day = prev && prev.day === d && prev.side === s.entry.side ? null : d;
+    prev = { day: d, side: s.entry.side };
     if (s.entry.kind === 'mail') {
       const next = subjectStem(s.entry.event.subject);
       s.entry.showSubject = next !== '' && next !== stem;
@@ -137,6 +171,13 @@ export function conversationThreadEntries<E extends ThreadEvent>(input: {
   return out;
 }
 
+/** Un silencio dicho como se dice: «1 semana», «3 semanas», «2 meses». */
+export function threadGapLabel(days: number, locale: Locale): string {
+  if (days >= 60) return t('thread.gap_months', locale, { n: Math.floor(days / 30) });
+  const weeks = Math.floor(days / 7);
+  return t(weeks === 1 ? 'thread.gap_week' : 'thread.gap_weeks', locale, { n: weeks });
+}
+
 /** El nombre de una cabecera de correo («Laia Puig <laia@…>» → «Laia Puig»); sin nombre, la dirección. */
 export function senderName(from: string | null | undefined): string {
   const s = (from ?? '').trim();
@@ -145,7 +186,7 @@ export function senderName(from: string | null | undefined): string {
   return s;
 }
 
-/** El día de un separador: «hoy», «ayer» o la fecha («8 oct», con año si queda lejos). */
+/** El día de una entrada: «hoy», «ayer» o la fecha («8 oct», con año si queda lejos). */
 export function threadDayLabel(day: string, locale: Locale, today: string = localDayISO()): string {
   if (day === today) return t('thread.today', locale);
   const y = new Date(`${today}T12:00:00`);

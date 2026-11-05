@@ -1,6 +1,7 @@
 <script module lang="ts">
-  /** Adónde va lo que se escribe al pie de una conversación. */
-  export type ComposerTarget = 'mail' | 'team' | 'log';
+  import type { ChannelId } from '$lib/channels';
+  /** Adónde va lo que se escribe al pie de una conversación: un canal hacia fuera, el equipo o apuntarlo. */
+  export type ComposerTarget = ChannelId | 'team' | 'log';
 
   type Drafts = Record<ComposerTarget, string>;
   interface Unsent {
@@ -60,6 +61,8 @@
    *    intercalado en el hilo. Intro envía, como en un grupo.
    *  - «Apuntar llamada»: un `conversation_event` que no se manda a nadie
    *    (ADR-098), con su tipo y su día.
+   * Los destinos hacia fuera son los canales conectados (`$lib/channels`,
+   * ADR-184): hoy, el correo. A la derecha, lo que se queda en casa.
    * Quién lo lee se dice antes de escribir (ADR-177 § 6): cada destino cambia
    * el color, la frase de encima y el verbo del botón, que nunca es «Enviar» a
    * secas. Al abrir sale el destino de esta conversación, no el último que se
@@ -97,6 +100,8 @@
   import { MESSAGE_MAX, audienceLine, type MessageCreate, type ThreadAudience } from '$lib/threads';
   import { senderName } from '$lib/conversation-thread';
   import { session } from '$lib/session.svelte';
+  import { CHANNELS } from '$lib/channels';
+  import ThreadIcon, { type ThreadIconName } from '$lib/components/ThreadIcon.svelte';
 
   interface Props {
     conversation: { id: string; workspace_id: string; line_id: string | null; can_edit: boolean };
@@ -428,6 +433,10 @@
         ? t('thread.team_send', locale)
         : t(`thread.log_send_${logKind}`, locale),
   );
+  /** El glifo del botón, el mismo que su pestaña. */
+  let verbIcon = $derived<ThreadIconName>(
+    target === 'team' ? 'team' : target === 'log' ? 'note' : (CHANNELS.find((c) => c.id === target)?.icon ?? 'mail'),
+  );
   /** «Laia Puig y Jordi Sastre»: una lista en la lengua de quien mira. */
   function listed(names: string[]): string {
     return new Intl.ListFormat(LOCALE_TAG[locale], { type: 'conjunction' }).format(names);
@@ -455,22 +464,27 @@
 >
   <div class="composer__targets" role="group" aria-label={t('thread.target_label', locale)}>
     {#if conv.can_edit}
-      <button
-        type="button"
-        class="composer__target"
-        aria-pressed={target === 'mail'}
-        data-testid="composer-to-mail"
-        onclick={() => focus('mail')}
-      >
-        {#if name}{t('thread.to_mail', locale, { name: firstName(name) })}{:else}{t('thread.to_mail_none', locale)}{/if}
-      </button>
+      <span class="composer__group">{name ? t('thread.to_who', locale, { name: firstName(name) }) : t('thread.to_them', locale)}</span>
+      {#each CHANNELS as ch (ch.id)}
+        <button
+          type="button"
+          class="composer__target"
+          aria-pressed={target === ch.id}
+          data-testid="composer-to-{ch.id}"
+          onclick={() => focus(ch.id)}
+          ><ThreadIcon name={ch.icon} /><span class:visually-hidden--narrow={target !== ch.id}>{t(ch.label, locale)}</span></button
+        >
+      {/each}
+      <span class="composer__sep" aria-hidden="true"></span>
     {/if}
+    <span class="composer__group">{t('thread.to_us', locale)}</span>
     <button
       type="button"
       class="composer__target"
       aria-pressed={target === 'team'}
       data-testid="composer-to-team"
-      onclick={() => focus('team')}>{t('thread.to_team', locale)}</button
+      onclick={() => focus('team')}
+      ><ThreadIcon name="team" /><span class:visually-hidden--narrow={target !== 'team'}>{t('thread.to_team', locale)}</span></button
     >
     {#if conv.can_edit}
       <button
@@ -479,9 +493,7 @@
         aria-pressed={target === 'log'}
         data-testid="composer-to-log"
         onclick={() => focus('log')}
-        ><span class="composer__long">{t('thread.to_log', locale)}</span><span class="composer__short"
-          >{t('thread.to_log_short', locale)}</span
-        ></button
+        ><ThreadIcon name="note" /><span class:visually-hidden--narrow={target !== 'log'}>{t('thread.to_log_short', locale)}</span></button
       >
     {/if}
   </div>
@@ -563,7 +575,7 @@
           {full ? t('thread.close_mail', locale) : t('thread.open_as_mail', locale)}
         </Button>
       {/if}
-      <Button size="s" type="submit" loading={busy} disabled={!ready}>{verb}</Button>
+      <Button size="s" type="submit" loading={busy} disabled={!ready}><ThreadIcon name={verbIcon} />{verb}</Button>
     </span>
   </div>
 
@@ -615,14 +627,28 @@
       align-items: center;
       gap: var(--space-2xs) var(--space-xs);
     }
-    /* The three places a word can go: the chosen one in a soft pill, the
-       others as quiet words beside it. */
+    /* Where a word can go (ADR-184): her channels on the left, what stays
+       at home on the right, a hairline between; each with its glyph. The
+       chosen one on a soft card, the others as quiet words beside it. */
+    .composer__group {
+      color: var(--text-faint);
+      font-size: var(--text-xs);
+    }
+    .composer__sep {
+      align-self: stretch;
+      inline-size: var(--line-hairline);
+      margin-inline: var(--space-xs);
+      background: var(--border-color-dark);
+    }
     .composer__target {
+      display: inline-flex;
+      align-items: baseline;
+      gap: var(--space-xs);
       padding: var(--space-2xs) var(--space-s);
       color: var(--text-muted);
       background: none;
       border: var(--line-hairline) solid transparent;
-      border-radius: var(--radius-circle);
+      border-radius: var(--radius);
       font: inherit;
       font-size: var(--text-s);
       cursor: pointer;
@@ -635,6 +661,7 @@
     }
     .composer__target[aria-pressed='true'] {
       color: var(--heading-color);
+      font-weight: 500;
       background: var(--thread-theirs-bg);
       border-color: var(--border-color-dark);
     }
@@ -642,6 +669,13 @@
       color: var(--thread-team-fg);
       background: var(--thread-team-bg);
       border-color: var(--thread-team-rule);
+    }
+    /* On a phone the row keeps one line: the word only on the chosen one
+       (`.visually-hidden--narrow`, heard everywhere), no group words. */
+    @media (max-width: 47.999rem) {
+      .composer__group {
+        display: none;
+      }
     }
 
     /* Who reads it, said before writing: the note's in the team's amber, the
@@ -665,18 +699,6 @@
       background: var(--thread-team-bg);
       border-color: var(--thread-team-rule);
     }
-    .composer__short {
-      display: none;
-    }
-    @container (max-width: 27.999rem) {
-      .composer__long {
-        display: none;
-      }
-      .composer__short {
-        display: inline;
-      }
-    }
-
     .composer__row {
       display: flex;
       align-items: flex-end;
