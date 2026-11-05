@@ -33,7 +33,7 @@ import {
 import { matchMessage, oldestFirst } from './provider';
 import { syncAccount } from './sync';
 import type { IngestPayload, MailAccountRow, MailDb } from './db';
-import { displayWebsite, effectiveSignature, proposedSignature, withSignature, type SignatureParts } from '../../mail';
+import { displayWebsite, effectiveSignature, proposedSignature, replyQuote, senderName, withSignature, type SignatureParts } from '../../mail';
 
 const KEY_B64 = toBase64Url(new Uint8Array(32).map((_, i) => i + 1));
 const b64url = (s: string) => toBase64Url(new TextEncoder().encode(s));
@@ -333,6 +333,47 @@ describe('outgoing message', () => {
       Uint8Array.from(atob(body.replace(/\r\n/g, '')), (c) => c.charCodeAt(0)),
     );
     expect(decoded).toBe('Hola, Inés:\r\nTe paso el rider.');
+  });
+
+  test('ADR-181: the sender carries a name, encoded, and cannot inject a header', () => {
+    const raw = buildRawMessage({
+      from: 'anouk@muk.test',
+      fromName: 'Anouk Llaurador · MüK Cia\r\nBcc: evil@x.test',
+      to: 'ines@pradillo.test',
+      subject: 's',
+      body: 'b',
+      messageId: '<id@hour.test>',
+    });
+    const head = new TextDecoder()
+      .decode(Uint8Array.from(atob(raw.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0)))
+      .split('\r\n\r\n')[0];
+    const from = head.split('\r\n').find((l) => l.startsWith('From: '))!;
+    expect(from.endsWith(' <anouk@muk.test>')).toBe(true);
+    expect(decodeMimeWords(from.slice(6, from.indexOf(' <anouk')))).toBe('Anouk Llaurador · MüK Cia Bcc: evil@x.test');
+    expect(head).not.toMatch(/^Bcc:/m);
+  });
+});
+
+describe('ADR-181: the everyday mail, its sender and its quote', () => {
+  test('the sender is the person and the company in her mailbox, the company in the shared one', () => {
+    const p = { full_name: 'Marco Rubiol', company_name: 'MüK Cia' };
+    expect(senderName(p, 'personal')).toBe('Marco Rubiol · MüK Cia');
+    expect(senderName(p, 'workspace')).toBe('MüK Cia');
+    expect(senderName({ full_name: ' ', company_name: 'MüK Cia' }, 'personal')).toBe('MüK Cia');
+    expect(senderName({ full_name: null, company_name: null }, 'workspace')).toBeNull();
+    expect(senderName(null, 'personal')).toBeNull();
+  });
+
+  test('a reply quotes what it answers, dated, in the writer\'s language, each line with «> »', () => {
+    const q = replyQuote({ body: 'Nos encaja el 14 de marzo.\n\n¿Nos mandáis el rider?', occurredAt: '2026-11-03T09:14:00Z', author: 'Laia Puig' }, 'es');
+    expect(q).toBe('El mar, 3 nov 2026, 10:14, Laia Puig escribió:\n> Nos encaja el 14 de marzo.\n>\n> ¿Nos mandáis el rider?');
+    expect(replyQuote({ body: 'x', occurredAt: '2026-11-03T09:14:00Z', author: 'Laia' }, 'en')).toMatch(/^On .+, Laia wrote:\n> x$/);
+    expect(replyQuote({ body: 'x', occurredAt: null, author: 'Laia' }, 'ca')).toBe('Laia va escriure:\n> x');
+    expect(replyQuote({ body: '  ', occurredAt: null, author: 'Laia' }, 'es')).toBeNull();
+    const long = Array.from({ length: 40 }, (_, i) => `l${i}`).join('\n');
+    const cut = replyQuote({ body: long, occurredAt: null, author: 'Laia' }, 'es')!.split('\n');
+    expect(cut).toHaveLength(32);
+    expect(cut.at(-1)).toBe('> …');
   });
 });
 

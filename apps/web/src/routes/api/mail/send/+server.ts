@@ -14,8 +14,9 @@ import { ProviderAuthError } from '$lib/server/mail/gmail';
 import { jsonNoStore, jwtSubject } from '$lib/server/http';
 import { sendFromConversation } from '$lib/server/mail/send';
 import { MailSendSchema } from '$lib/mail';
+import { LOCALE_COOKIE, requestLocale } from '$lib/i18n';
 
-export const POST: RequestHandler = async ({ request, url, platform, locals }) => {
+export const POST: RequestHandler = async ({ request, url, platform, locals, cookies }) => {
   if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
   const env = platform.env;
   if (!mailConfigured(env)) return jsonNoStore({ error: 'not_configured' }, 503);
@@ -44,6 +45,7 @@ export const POST: RequestHandler = async ({ request, url, platform, locals }) =
         subject: b.subject,
         body: b.body,
         replyToEventId: b.reply_to_event_id ?? null,
+        locale: requestLocale(cookies.get(LOCALE_COOKIE), request.headers.get('accept-language')),
       },
       url.hostname,
     );

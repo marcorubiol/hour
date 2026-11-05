@@ -6876,3 +6876,24 @@ eligió A, «la carta entera», con lo recomendado. Sin migración ni API.
 la invitación (un .ics servido); marcar en la vista previa lo que sale de un campo.
 
 **Cómo se revierte.** Revertir los commits del carril; sólo presentación y composición, sin datos.
+
+## [2026-11-05] ADR-181 · El correo de cada día lleva nombre en el remitente y cita lo que responde
+
+**Contexto.** Marco, 05-11, al ver los correos: «quiero saber cómo se ven los emails a diario también». El correo uno
+a uno que sale desde una conversación (ADR-099, por el Gmail conectado, texto plano) salía con la dirección sola en
+el remitente, y una respuesta enlazaba el hilo por cabeceras pero no citaba el mensaje al que respondía: quien lo lee
+fuera del hilo no ve a qué se contesta. Marco: «sí, hazlo».
+
+**Decisión.**
+1. **El remitente lleva nombre:** la persona y su compañía en su buzón («Marco Rubiol · MüK Cia»), la compañía en el
+   común (`senderName`); sin nombre que poner, la dirección sola, como antes. Codificado como palabra MIME y sin
+   saltos de línea.
+2. **Una respuesta cita lo que responde,** como un cliente de correo: «El mar, 3 nov 2026, 10:14, Laia Puig escribió:»
+   y cada línea con «> », a lo sumo 30 líneas, en el idioma de quien escribe (`replyQuote`). El autor es el contacto
+   si el correo citado entró, quien escribe si salió de aquí.
+3. **El registro guarda sólo lo escrito,** sin la cita: el historial ya tiene el correo citado.
+4. **Sigue en texto plano.** Es correo de persona a persona; no pasa por la plantilla de los envíos (ADR-180).
+
+**Sin verificar.** Cómo pinta cada cliente el nombre y la cita: no se ha enviado ningún correo real.
+
+**Cómo se revierte.** Revertir el commit; sin datos ni migración.
