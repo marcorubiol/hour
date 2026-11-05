@@ -80,12 +80,11 @@ describe('campos', () => {
 });
 
 describe('firma y pie', () => {
-  test('firma propuesta de la compañía, y el pie con quién, por qué, la baja y sin privacidad si no hay', () => {
+  test('firma propuesta de la compañía; el pie no repite quién (la firma lo dice), por qué, la baja y sin privacidad si no hay', () => {
     const m = composeMailout({ subject: 's', body: 'Cuerpo', language: 'es' }, ctx, URL);
     expect(m.recordBody).toBe('Cuerpo\n\n-- \nMüK Cia\nmamemi.cat');
     const footer = m.text.slice(m.recordBody.length).trim().split('\n');
     expect(footer).toEqual([
-      'MüK Cia · Barcelona · mamemi.cat',
       'Os escribimos porque ya hemos trabajado juntos.',
       `Si no queréis recibir más envíos de MüK Cia, daos de baja aquí: ${URL} Un clic basta.`,
     ]);
@@ -102,12 +101,26 @@ describe('firma y pie', () => {
     expect(m.text).toContain('Política de privacitat: https://mamemi.cat/privacitat');
   });
 
+  test('ADR-180: una firma guardada sin el nombre de la compañía lo devuelve al pie', () => {
+    const lines = footerLines({ ...ctx, company_signature: 'Marco Rubiol\n600 000 000' }, 'es', URL);
+    expect(lines[0]).toBe('MüK Cia · Barcelona · mamemi.cat');
+    expect(footerLines({ ...ctx, company_signature: 'Marco\nmük cia' }, 'es', URL)[0]).not.toContain('Barcelona');
+  });
+
+  test('ADR-180: el pie en HTML lleva la baja y la privacidad con palabras, no la URL', () => {
+    const m = composeMailout({ subject: 's', body: 'Cuerpo', language: 'es' }, { ...ctx, privacy_url: 'https://mamemi.cat/p' }, URL);
+    expect(m.html).toContain(`<a href="${URL}" style="color:#767676;text-decoration:underline;">Daros de baja</a> en un clic`);
+    expect(m.html).toContain('>Privacidad</a>');
+    expect(m.html).not.toContain(`>${URL}</a>`);
+    expect(m.text).toContain(URL);
+  });
+
   test('cada idioma tiene su pie, y el enlace de baja nunca falta', () => {
     for (const lang of MAILOUT_LANGUAGES) {
       for (const basis of ['consent', 'relationship', 'generic', 'sector'] as const) {
         const lines = footerLines({ ...ctx, basis_kind: basis }, lang, URL);
-        expect(lines).toHaveLength(3);
-        expect(lines[2]).toContain(URL);
+        expect(lines).toHaveLength(2);
+        expect(lines[1]).toContain(URL);
       }
     }
   });
@@ -128,14 +141,14 @@ describe('firma y pie', () => {
   });
 
   test('ADR-174: la base del sector dice por qué le llega, en su idioma', () => {
-    expect(footerLines({ ...ctx, basis_kind: 'sector' }, 'es', URL)[1]).toBe(
+    expect(footerLines({ ...ctx, basis_kind: 'sector' }, 'es', URL)[0]).toBe(
       'Os escribimos porque trabajáis en programación o difusión de artes en vivo.',
     );
-    expect(footerLines({ ...ctx, basis_kind: 'sector' }, 'ca', URL)[1]).toContain('arts en viu');
+    expect(footerLines({ ...ctx, basis_kind: 'sector' }, 'ca', URL)[0]).toContain('arts en viu');
   });
 
   test('sin base no inventa una razón', () => {
-    expect(footerLines({ ...ctx, basis_kind: null }, 'es', URL)).toHaveLength(2);
+    expect(footerLines({ ...ctx, basis_kind: null }, 'es', URL)).toHaveLength(1);
   });
 });
 
@@ -218,7 +231,6 @@ describe('invitaciones (ADR-173 § 10)', () => {
   test('el pie del público: la lista y la fecha, su baja y la privacidad', () => {
     const lines = footerLines({ ...subscriber, privacy_url: 'https://mamemi.cat/privacidad' }, 'es', URL);
     expect(lines).toEqual([
-      'MüK Cia · Barcelona · mamemi.cat',
       'Te llega porque te apuntaste a «Estrenos en Cataluña» de MüK Cia el 14 de marzo de 2026.',
       `Darte de baja: ${URL} Un clic basta.`,
       'Política de privacidad: https://mamemi.cat/privacidad',
@@ -226,10 +238,10 @@ describe('invitaciones (ADR-173 § 10)', () => {
   });
 
   test('el pie del público por trato previo, y sin fecha si no la hay', () => {
-    expect(footerLines({ ...subscriber, basis_kind: 'relationship' }, 'ca', URL)[1]).toBe(
+    expect(footerLines({ ...subscriber, basis_kind: 'relationship' }, 'ca', URL)[0]).toBe(
       'Et arriba perquè has estat client de MüK Cia.',
     );
-    expect(footerLines({ ...subscriber, subscribed_at: null }, 'en', URL)[1]).toBe(
+    expect(footerLines({ ...subscriber, subscribed_at: null }, 'en', URL)[0]).toBe(
       'You\'re getting this because you signed up to "Estrenos en Cataluña" from MüK Cia.',
     );
   });
@@ -238,17 +250,17 @@ describe('invitaciones (ADR-173 § 10)', () => {
     for (const lang of MAILOUT_LANGUAGES) {
       for (const basis of ['consent', 'relationship'] as const) {
         const lines = footerLines({ ...subscriber, basis_kind: basis }, lang, URL);
-        expect(lines).toHaveLength(3);
-        expect(lines[2]).toContain(URL);
+        expect(lines).toHaveLength(2);
+        expect(lines[1]).toContain(URL);
       }
     }
   });
 
   test('un profesional de una invitación lleva el pie de la difusión según su base', () => {
-    expect(footerLines({ ...invitation, basis_kind: 'sector' }, 'es', URL)[1]).toBe(
+    expect(footerLines({ ...invitation, basis_kind: 'sector' }, 'es', URL)[0]).toBe(
       'Os escribimos porque trabajáis en programación o difusión de artes en vivo.',
     );
-    expect(footerLines(invitation, 'es', URL)[2]).toContain('daos de baja');
+    expect(footerLines(invitation, 'es', URL)[1]).toContain('daos de baja');
   });
 
   test('el origen lo dice la fila, no el envío', () => {
@@ -302,14 +314,14 @@ describe('el idioma de cada suscripción (104)', () => {
     expect(recipientLanguage('ca', { ...ctx, subscriber_language: 'fr' })).toBe('ca');
   });
 
-  test('el pie, la fecha y el lang del HTML van en el suyo; asunto y cuerpo, tal cual', () => {
+  test('el pie va en el suyo; asunto, cuerpo, sus campos y el lang del HTML, en el del texto (ADR-180)', () => {
     const m = composeMailout(draft, { ...subscriber, subscriber_language: 'fr' }, URL);
     expect(m.subject).toBe('Estreno en Teatre Lliure');
     expect(m.text.startsWith('Hola, Claire:\n\nOs esperamos.')).toBe(true);
     expect(m.text).toContain('Vous recevez ce message car vous vous êtes inscrit à « Estrenos » de MüK Cia le 14 mars 2026.');
     expect(m.text).toContain(`Se désinscrire : ${URL} Un clic suffit.`);
     expect(m.text).not.toContain('Te llega porque');
-    expect(m.html).toContain('<html lang="fr">');
+    expect(m.html).toContain('<html lang="es">');
   });
 
   test('un envío a varias personas: cada una en el suyo', () => {
@@ -348,7 +360,7 @@ describe('{obra}, {fecha} y {hora} (102)', () => {
     expect(m.missing).toEqual([]);
   });
 
-  test('una persona del público los lee en el idioma de su suscripción', () => {
+  test('ADR-180: dentro del texto van en el idioma del texto, aunque la persona esté suscrita en otro', () => {
     const sub: ComposeContext = {
       ...show,
       address_kind: 'subscriber',
@@ -359,9 +371,21 @@ describe('{obra}, {fecha} y {hora} (102)', () => {
       subscriber_name: 'Claire',
       subscriber_language: 'fr',
     };
-    expect(composeMailout(draft, sub, URL).text.startsWith('Hola, Claire: el samedi 14 novembre a las 20:30.')).toBe(true);
-    expect(composeMailout(draft, { ...sub, subscriber_language: 'ca' }, URL).text).toContain('dissabte, 14 de novembre');
-    expect(composeMailout(draft, { ...sub, subscriber_language: 'en' }, URL).text).toContain('Saturday 14 November');
+    expect(composeMailout(draft, sub, URL).text.startsWith('Hola, Claire: el sábado, 14 de noviembre a las 20:30.')).toBe(true);
+    expect(composeMailout(draft, { ...sub, subscriber_language: 'ca' }, URL).text).not.toContain('dissabte');
+    // The footer stays in hers (104).
+    expect(composeMailout(draft, sub, URL).text).toContain('Se désinscrire');
+  });
+
+  test('ADR-180: una invitación lleva el bloque de la función, en el idioma del texto, en el HTML y en el texto plano', () => {
+    const m = composeMailout({ subject: 's', body: 'Hola, {nombre}:\n\nOs esperamos.', language: 'es' }, show, URL);
+    expect(m.text).toContain('MaMeMi\nCuándo: sábado, 14 de noviembre de 2026, 20:30\nDónde: Teatre Lliure, Barcelona\nSe confirma respondiendo a este correo.');
+    expect(m.recordBody).toContain('Cuándo: sábado');
+    expect(m.html).toContain('>Cuándo</td>');
+    expect(m.html.indexOf('Os esperamos')).toBeLessThan(m.html.indexOf('>Cuándo</td>'));
+    // Without a day there is no block; outreach never has one.
+    expect(composeMailout({ subject: 's', body: 'x', language: 'es' }, { ...show, performed_at: null }, URL).text).not.toContain('Cuándo');
+    expect(composeMailout({ subject: 's', body: 'x', language: 'es' }, ctx, URL).text).not.toContain('Cuándo');
   });
 
   test('la hora es la de la zona de la sala, no la de la compañía', () => {

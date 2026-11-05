@@ -37,16 +37,26 @@ function visibleText(html: string): string {
 }
 
 describe('la caja del correo', () => {
-  test('sin logo ni imagen: tablas de 600 px, estilos en línea, sin imágenes ni hojas de estilo', () => {
+  test('sin logo ni imagen: tablas de 600 px y estilos en línea; sólo la hoja corta del modo oscuro (ADR-180)', () => {
     const html = mailHtml(parts);
     expect(html.startsWith('<!doctype html>')).toBe(true);
     expect(html).toContain('<html lang="ca">');
     expect(html).toContain('role="presentation" width="600"');
     expect(html).toContain('max-width:600px');
     expect(html).not.toContain('<img');
-    expect(html).not.toContain('<style');
-    expect(html).not.toContain('class=');
+    // ADR-180: one short sheet for the clients' dark mode; everything else stays inline.
+    expect(html.match(/<style/g)).toHaveLength(1);
+    expect(html).toContain('@media (prefers-color-scheme:dark)');
+    expect(html).toContain('<meta name="color-scheme" content="light dark">');
+    expect(html).not.toMatch(/<link/i);
     expect(html).not.toMatch(/<script/i);
+  });
+
+  test('ADR-180: el texto de previsualización va oculto, al principio', () => {
+    const html = mailHtml({ ...parts, preheader: 'Us escrivim per MaMeMi.' });
+    const pre = html.indexOf('display:none;max-height:0');
+    expect(pre).toBeGreaterThan(html.indexOf('<body'));
+    expect(pre).toBeLessThan(html.indexOf('Hola, Laia:'));
   });
 
   test('lleva el mismo texto que la versión plana: cuerpo, firma y pie, en orden', () => {
@@ -88,7 +98,7 @@ describe('logo', () => {
 });
 
 describe('imagen del espectáculo', () => {
-  test('tras el cuerpo y antes de la firma, a 600 px, enlazada al dossier, con su alt', () => {
+  test('ADR-180: tras la firma, a 600 px, enlazada al dossier, con su alt', () => {
     const html = mailHtml(parts, mailTemplate({ ...row, logo_url: null }, ORIGIN));
     expect(html).toContain(
       `<a href="https://mamemi.cat/dossier.pdf" style="color:#1f1f1f;text-decoration:underline;font-family:`,
@@ -96,8 +106,8 @@ describe('imagen del espectáculo', () => {
     expect(html).toContain(`<img src="${ORIGIN}${IMAGE}" alt="MaMeMi, foto de escena" width="600" height="400"`);
     expect(html).toMatch(/<img[^>]*;width:100%/);
     const img = html.indexOf('<img');
-    expect(img).toBeGreaterThan(html.indexOf('Ens parlem?'));
-    expect(img).toBeLessThan(html.indexOf('mamemi.cat</p>'));
+    expect(img).toBeGreaterThan(html.indexOf('mamemi.cat</p>'));
+    expect(img).toBeLessThan(html.indexOf('MüK Cia · Barcelona'));
   });
 
   test('sin dossier no enlaza; sin alt guardado, el de la compañía', () => {
