@@ -76,7 +76,7 @@ test.describe('bulk actions on the selection', () => {
   async function open(page: Page, chip = LENS) {
     await page.goto(chip);
     await waitForLoaded(page);
-    await page.getByPlaceholder('Search conversations and team…').fill(NAME);
+    await page.getByRole('searchbox', { name: 'Search conversations and team…' }).fill(NAME);
     await expect(feedRows(page)).toHaveCount(3, { timeout: 30_000 });
   }
 

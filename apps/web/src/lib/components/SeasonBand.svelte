@@ -90,7 +90,7 @@
     {#each present(counts) as s (s)}
       <button type="button" class="season__item hit" onclick={() => onrelation(s, linea)}>
         <span class="season__n">{counts[s]}</span>
-        <span class="season__k"><i data-relation={s}></i>{relationLabel(s, locale)}</span>
+        <span class="season__k" data-relation={s}>{relationLabel(s, locale)}</span>
       </button>
     {/each}
   </div>
@@ -102,8 +102,19 @@
       <h2 class="season__title eyebrow" id="sb-head">
         {t('conversations.view_sales', locale)} · {t('overview.season_of', locale, { season: season.label })}
       </h2>
-      <a class="season__all eyebrow" href={allHref}>{t('envios.season_all', locale, { n: season.total })}</a>
+      {#if season.lines.length === 0}
+        <!-- One bar: its figures go up to the head instead of a line of their own. -->
+        <span class="season__line-figs"
+          >{[t('overview.line_figures', locale, { total: season.total, answered: season.answered }), bolosLine(season.bolos, 'overview.season_bolos')]
+            .filter(Boolean)
+            .join(' · ')}</span
+        >
+      {/if}
     </div>
+    <!-- The colours' key, once for every bar: what each tone is. -->
+    <p class="season__key" aria-hidden="true">
+      {#each present(season.counts) as s (s)}<span><i data-relation={s}></i>{relationLabel(s, locale)}</span>{/each}
+    </p>
     {#if season.lines.length > 0}
       <!-- One bar per line, «sin línea» last and never hidden (ADR-135). -->
       <ol class="season__lines">
@@ -128,33 +139,22 @@
       </ol>
     {:else}
       <div class="season__line">
-        <div class="season__line-head">
-          <span></span>
-          <span class="season__line-figs"
-            >{[
-              t('overview.line_figures', locale, { total: season.total, answered: season.answered }),
-              bolosLine(season.bolos, 'overview.season_bolos'),
-            ]
-              .filter(Boolean)
-              .join(' · ')}</span
-          >
-        </div>
         {@render seasonBar(season.counts, countsAria(season.counts))}
       </div>
     {/if}
+    <a class="season__all" href={allHref}>{t('envios.season_all', locale, { n: season.total })}</a>
   </section>
 {/if}
 
 <style>
   @layer components {
+    /* The season, unboxed (diseño 2026-11-05): a section head, the key of
+       its colours once, a thin bar per line with its figures, and the way to
+       its conversations at the foot. */
     .season {
       display: flex;
       flex-direction: column;
       gap: var(--space-s);
-      padding: var(--space-s) var(--space-m);
-      border: var(--border);
-      border-radius: var(--radius-m);
-      background: var(--bg-ultra-light);
     }
     .season__head {
       display: flex;
@@ -166,34 +166,49 @@
     .season__title {
       margin: 0;
     }
-    .season__all {
+    .season__key {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2xs) var(--space-s);
+      margin: 0;
+      font-size: var(--text-xs);
       color: var(--text-muted);
-      text-decoration: none;
+    }
+    .season__key span {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-xs);
+    }
+    .season__all {
+      align-self: start;
+      font-size: var(--text-s);
+      color: var(--text-muted);
+      text-decoration: underline;
+      text-decoration-color: var(--border-color-dark);
+      text-underline-offset: 0.25em;
     }
     .season__all:hover {
       color: var(--text-color);
-      text-decoration: underline;
-      text-underline-offset: 0.25em;
     }
 
     /* Una barra apilada en el tono de cada estado (`--status`, base.css, el
        mismo que sus pastillas), con una sola receta. */
     .season__seg,
-    .season__k i {
-      --seg: color-mix(in oklab, var(--status) 50%, transparent);
+    .season__key i {
+      --seg: color-mix(in oklab, var(--status) 38%, transparent);
     }
     .season__bar {
       display: flex;
       gap: var(--space-2xs);
-      block-size: 0.6rem;
-      border-radius: var(--radius-s);
-      overflow: hidden;
+      block-size: var(--season-bar);
+      margin-block-start: var(--space-xs);
     }
     .season__seg {
       flex-basis: 0;
       min-inline-size: var(--dot-xs);
       padding: 0;
       border: 0;
+      border-radius: var(--radius-xs);
       background: var(--seg);
       cursor: pointer;
     }
@@ -220,19 +235,18 @@
     }
     .season__n {
       font-variant-numeric: tabular-nums;
-      font-size: var(--text-s);
-    }
-    .season__k {
-      display: flex;
-      align-items: center;
-      gap: var(--space-2xs);
       font-size: var(--text-xs);
       color: var(--text-muted);
     }
-    .season__k i {
+    /* Under a bar, its figures as words: the key above says the colour. */
+    .season__k {
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+    }
+    .season__key i {
       display: inline-block;
-      inline-size: 0.6rem;
-      block-size: 0.6rem;
+      inline-size: var(--season-key);
+      block-size: var(--season-key);
       border-radius: var(--radius-xs);
       background: var(--seg);
     }
@@ -284,10 +298,9 @@
     .season__line-figs {
       flex-shrink: 0;
       margin-inline-start: auto;
-      font-family: var(--font-mono);
       font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing);
-      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
+      color: var(--text-faint);
       text-align: end;
     }
     @media (pointer: coarse) {

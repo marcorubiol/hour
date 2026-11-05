@@ -138,24 +138,52 @@
   /** Quién dijo lo último: la regla de toda fila de chat (`chatLast`). */
   const lastOf = (c: FeedConversationView) => chatLast(c, locale);
 
-  /** La línea de contexto: el turno (te toca en tinta), el proyecto, la etiqueta y la relación. */
+  const turnOf = (c: FeedConversationView) => chatTurn({ ...feedTurnRow(c), next_action_at: c.next_action_at }, new Date(), locale);
+
+  /**
+   * Todo, sin acotar a una etiqueta, va en dos secciones (diseño 2026-11-05):
+   * lo que nos toca y lo demás. El turno se dice una vez, en el rótulo, y no
+   * en cada fila; el orden de dentro es el del servidor.
+   */
+  let sectioned = $derived(!tag);
+  let split = $derived.by(() => {
+    const ours: typeof rows = [];
+    const rest: typeof rows = [];
+    for (const r of rows) (sectioned && r.kind === 'conversation' && turnOf(r)?.ink ? ours : rest).push(r);
+    return { ours, rest };
+  });
+  /** El proyecto, sólo cuando las filas son de varios (el ámbito puede tener varios y la lista uno). */
+  let mixedProjects = $derived(new Set(rows.map((r) => r.project_id)).size > 1);
+  /** La etiqueta sólo se nombra en la fila cuando la lista las mezcla. */
+  let mixedTags = $derived(
+    new Set(rows.filter((r) => r.kind === 'conversation').map((r) => (r as FeedConversationView).tags[0] ?? SALES)).size > 1,
+  );
+
+  /**
+   * Lo que la fila añade a su nombre y a lo último: el seguimiento (nos toca
+   * sin que nos hayan escrito), el proyecto si hay varios, la etiqueta si se
+   * mezclan. El turno lo dice la sección; con una etiqueta acotada, el turno
+   * sigue en la fila, en tinta si nos toca.
+   */
   function contextOf(c: FeedConversationView): ChatContext[] {
-    const turn = chatTurn({ ...feedTurnRow(c), next_action_at: c.next_action_at }, new Date(), locale);
+    const turn = turnOf(c);
     const out: ChatContext[] = [];
-    if (turn) out.push({ text: turn.text, ink: turn.ink });
-    if (showProject) {
+    if (turn && (!sectioned || turn.reason === 'follow_up')) out.push({ text: turn.text, ink: turn.ink });
+    if (showProject && mixedProjects) {
       const p = projectNameById.get(c.project_id);
       if (p) out.push({ text: p });
     }
-    if (!tag) out.push({ text: keyLabel(c.tags[0] ?? SALES, tagNames, locale) });
-    if (!turn && c.relation && c.last) out.push({ text: relationLabel(c.relation, locale) });
+    // A search is a cut across tags: there the row says its own.
+    if (!tag && (mixedTags || q !== '')) out.push({ text: keyLabel(c.tags[0] ?? SALES, tagNames, locale) });
+    if (!sectioned && !turn && c.relation && c.last) out.push({ text: relationLabel(c.relation, locale) });
     return out;
   }
 
   function threadContext(th: FeedThreadRow): { text: string }[] {
-    const out = [{ text: t('conversations.view_team', locale) }];
+    // Under the Equipo chip the word is the chip's; in Todo it says what the row is.
+    const out = tag === TEAM ? [] : [{ text: t('conversations.view_team', locale) }];
     if (th.bolo?.first_day) out.push({ text: boloDays(th.bolo.first_day, th.bolo.last_day, locale) });
-    if (showProject) {
+    if (showProject && mixedProjects) {
       const p = projectNameById.get(th.project_id);
       if (p) out.push({ text: p });
     }
@@ -164,6 +192,49 @@
 </script>
 
 <section class="cfeed" aria-busy={$feedQuery.isLoading} aria-label={t('conversations.feed_aria', locale)} data-testid="conversation-feed">
+  {#snippet feedRow(row: (typeof rows)[number])}
+    <li data-testid="feed-row" data-kind={row.kind}>
+      {#if row.kind === 'conversation'}
+        {@const l = lastOf(row)}
+        {@const who = chatWho({ kind: row.org_kind, solo: row.solo, city: row.city }, locale)}
+        <ChatRow
+          href={href(row)}
+          title={row.title ?? '—'}
+          shape={who.shape}
+          words={who.words}
+          at={row.last_at}
+          when={row.last_at ? chatWhen(row.last_at, locale, tz) : ''}
+          unread={row.unread_count}
+          unreadLabel={unreadLabel(row.unread_count)}
+          lead={l.lead}
+          last={l.last}
+          context={contextOf(row)}
+          active={activeId === row.id}
+          onopen={onopen ? (e) => onopen(row, e) : undefined}
+          act={editable && onchange && row.due === 'reply' ? done : undefined}
+        />
+        {#snippet done()}
+          <ChatDone conversationId={row.id} name={row.title ?? ''} {locale} refresh={onchange!} />
+        {/snippet}
+      {:else}
+        <ChatRow
+          href={groupHref(row, workspaceSlugById.get(row.workspace_id)) ?? feedHref(row, workspaceSlugById.get(row.workspace_id))}
+          title={[feedTitle(row), feedThreadName(row, locale)].filter(Boolean).join(' · ')}
+          group
+          mark={projectMark?.(row.project_id) ?? null}
+          at={row.last_message_at}
+          when={chatWhen(row.last_message_at, locale, tz)}
+          unread={row.unread_count}
+          unreadLabel={unreadLabel(row.unread_count)}
+          lead={author(feed!, row)}
+          last={row.last_message.body}
+          context={threadContext(row)}
+          active={activeThread !== null && activeThread === `${row.bolo?.performance_id}/${row.facet_id ?? ''}`}
+          onopen={onopenthread ? (e) => onopenthread(row, e) : undefined}
+        />
+      {/if}
+    </li>
+  {/snippet}
   {#if $feedQuery.isLoading}
     <EmptyLine busy text={t('conversations.loading', locale)} />
   {:else if $feedQuery.isError}
@@ -176,50 +247,21 @@
       <EmptyLine text={t(q ? 'conversations.feed_no_match' : tag === TEAM ? 'chat.team_empty' : 'conversations.feed_empty', locale)} />
     {/if}
   {:else if feed}
-    <ul class="crow-list">
-      {#each rows as row (feedKey(row))}
-        <li data-testid="feed-row" data-kind={row.kind}>
-          {#if row.kind === 'conversation'}
-            {@const l = lastOf(row)}
-            {@const who = chatWho({ kind: row.org_kind, solo: row.solo, city: row.city }, locale)}
-            <ChatRow
-              href={href(row)}
-              title={row.title ?? '—'}
-              shape={who.shape}
-              words={who.words}
-              at={row.last_at}
-              when={row.last_at ? chatWhen(row.last_at, locale, tz) : ''}
-              unread={row.unread_count}
-              unreadLabel={unreadLabel(row.unread_count)}
-              lead={l.lead}
-              last={l.last}
-              context={contextOf(row)}
-              active={activeId === row.id}
-              onopen={onopen ? (e) => onopen(row, e) : undefined}
-              act={editable && onchange && row.due === 'reply' ? done : undefined}
-            />
-            {#snippet done()}
-              <ChatDone conversationId={row.id} name={row.title ?? ''} {locale} refresh={onchange!} />
-            {/snippet}
-          {:else}
-            <ChatRow
-              href={groupHref(row, workspaceSlugById.get(row.workspace_id)) ?? feedHref(row, workspaceSlugById.get(row.workspace_id))}
-              title={[feedTitle(row), feedThreadName(row, locale)].filter(Boolean).join(' · ')}
-              group
-              mark={projectMark?.(row.project_id) ?? null}
-              at={row.last_message_at}
-              when={chatWhen(row.last_message_at, locale, tz)}
-              unread={row.unread_count}
-              unreadLabel={unreadLabel(row.unread_count)}
-              lead={author(feed, row)}
-              last={row.last_message.body}
-              context={threadContext(row)}
-              active={activeThread !== null && activeThread === `${row.bolo?.performance_id}/${row.facet_id ?? ''}`}
-              onopen={onopenthread ? (e) => onopenthread(row, e) : undefined}
-            />
-          {/if}
-        </li>
-      {/each}
+    {#if sectioned && split.ours.length > 0}
+      <h3 class="eyebrow eyebrow--sub cfeed__head" data-testid="feed-section" data-section="ours">
+        <span class="cfeed__head-word">{t('chat.section_ours', locale)}</span> · {split.ours.length}
+      </h3>
+      <ul class="crow-list crow-list--chat">
+        {#each split.ours as row (feedKey(row))}{@render feedRow(row)}{/each}
+      </ul>
+      {#if split.rest.length > 0}
+        <h3 class="eyebrow eyebrow--sub cfeed__head" data-testid="feed-section" data-section="rest">
+          {t('chat.section_rest', locale)}{#if !feed.more}{' '}· {split.rest.length}{/if}
+        </h3>
+      {/if}
+    {/if}
+    <ul class="crow-list crow-list--chat">
+      {#each split.rest as row (feedKey(row))}{@render feedRow(row)}{/each}
     </ul>
     {#if tag === TEAM}
       <p class="cfeed__note">{t('chat.team_note', locale)}</p>
@@ -240,6 +282,18 @@
       margin: var(--space-s) 0 0;
       font-size: var(--text-xs);
       color: var(--text-faint);
+    }
+    /* The section's word: the one place a list speaks in mono capitals. */
+    .cfeed__head {
+      display: block;
+      margin: var(--space-m) 0 var(--space-xs);
+      padding-inline: var(--space-s);
+    }
+    .cfeed__head:first-child {
+      margin-block-start: 0;
+    }
+    .cfeed__head-word {
+      color: var(--text-color);
     }
     .cfeed__more {
       margin-block-start: var(--space-s);

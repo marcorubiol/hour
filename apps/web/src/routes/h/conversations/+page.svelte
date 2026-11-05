@@ -590,6 +590,18 @@
   const openFeedRow = (c: FeedConversationView, e: MouseEvent) => openBeside(c.workspace_id, c.id, e);
   const openTableRow = (c: ConversationItem, e: MouseEvent) => openBeside(c.workspace_id, c.id, e);
 
+  // The pane at rest (diseño 2026-11-05): how many wait on us and the one that
+  // waits longest (the panel's read sorts them, `sortDue`), not a grey line.
+  let dueCount = $derived(chipCount.tetoca);
+  let oldestDue = $derived($countsQuery.data?.due.rows[0] ?? null);
+  function openOldest() {
+    const row = oldestDue;
+    const ws = row ? workspaceSlugById.get(row.workspace_id) : null;
+    if (!row || !ws) return;
+    setParams({ abierta: `${ws}/${row.id}`, grupo: null });
+    void tick().then(() => paneEl?.focus({ preventScroll: true }));
+  }
+
   function clearListFilter() {
     const params = new URLSearchParams(page.url.searchParams);
     // A season segment is relation + season: its chip names both, and goes as one.
@@ -989,13 +1001,16 @@
       {/if}
     {/snippet}
     {#snippet sub()}
-      <!-- The two views (ADR-176): by the verb, what goes and comes back, what goes out to many. -->
-      <a class="lenshead__frag" href={viewHref('conversations')} aria-current={envios ? undefined : 'page'} data-view="conversations"
-        >{t('lens.conversations', locale)}</a
-      >
-      <a class="lenshead__frag" href={viewHref('envios')} aria-current={envios ? 'page' : undefined} data-view="envios"
-        >{t('envios.view', locale)}</a
-      >
+      <!-- The two views (ADR-176): by the verb, what goes and comes back, what goes out to many.
+           One child of the sub line, so it takes no «·»: tabs, a rule under the one you are on. -->
+      <nav class="viewtabs" aria-label={t('chat.views_label', locale)}>
+        <a class="viewtabs__tab" href={viewHref('conversations')} aria-current={envios ? undefined : 'page'} data-view="conversations"
+          >{t('lens.conversations', locale)}</a
+        >
+        <a class="viewtabs__tab" href={viewHref('envios')} aria-current={envios ? 'page' : undefined} data-view="envios"
+          >{t('envios.view', locale)}</a
+        >
+      </nav>
     {/snippet}
   </LensHeader>
 
@@ -1044,30 +1059,29 @@
     <div class="conversations__panes" class:conversations__panes--two={wide}>
       <div class="conversations__list" id="lista" data-help-step="conv-list">
         <h2 class="visually-hidden" tabindex="-1" bind:this={listHeading}>{t('overview.list', locale)}</h2>
-        {#if !noAccess}
-          <div class="conversations__search">
-            <Input
-              toolbar
-              label={t('conversations.search', locale)}
-              type="search"
-              placeholder={t('chat.search_ph', locale)}
-              bind:value={qRaw}
-            />
-          </div>
-        {/if}
         <div class="conversations__chips">
-          <nav class="conversations__chiprow" aria-label={t('chat.chips_label', locale)}>
+          <nav class="listfilter conversations__chiprow" aria-label={t('chat.chips_label', locale)}>
             {#each shownChips as c (c)}
               <a
-                class="conversations__chip"
+                class="listfilter__opt conversations__chip"
                 href={listChipHref(c)}
                 aria-current={listChip === c ? 'page' : undefined}
                 data-chip={c}
                 data-help-step={c === 'tetoca' ? 'conv-due' : undefined}
-                >{t(LIST_CHIP_WORD[c], locale)}{#if chipCount[c] !== null}<span class="conversations__chip-n">{chipCount[c]}</span>{/if}</a
+                >{t(LIST_CHIP_WORD[c], locale)}{#if chipCount[c] !== null}<span class="listfilter__n conversations__chip-n">{chipCount[c]}</span>{/if}</a
               >
             {/each}
           </nav>
+          {#if !noAccess}
+            <!-- Search the list: a word with its glass in the chips' row, no box (the
+                 bar at the top is the app's search); it opens as it takes the focus. -->
+            <label class="conversations__search" class:is-on={qRaw !== ''}>
+              <svg class="conversations__glass" viewBox="0 0 16 16" aria-hidden="true"
+                ><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3 3" /></svg
+              >
+              <input type="search" aria-label={t('chat.search_ph', locale)} placeholder={t('conversations.search', locale)} bind:value={qRaw} />
+            </label>
+          {/if}
           {#if listChip !== 'equipo' && !noAccess}
             <button
               type="button"
@@ -1172,7 +1186,23 @@
               <conversationRecord.component workspaceSlug={opened.ws} slug={opened.id} inPeek />
             {/key}
           {:else if !opened && !group}
-            <EmptyLine text={t('chat.pick_one', locale)} />
+            <!-- Nothing open: what waits, said calmly, and the one that waits longest one click away. -->
+            <div class="conversations__rest" data-testid="pane-summary">
+              {#if dueCount !== null && dueCount > 0}
+                <p class="conversations__rest-big">{t(dueCount === 1 ? 'chat.pane_due_one' : 'chat.pane_due', locale, { n: dueCount })}</p>
+                {#if oldestDue}
+                  <p class="conversations__rest-sub">
+                    {t('chat.pane_oldest', locale, { name: oldestDue.title, date: dayMonth(oldestDue.at) })}
+                  </p>
+                  <button type="button" class="conversations__rest-open" onclick={openOldest}
+                    >{t('chat.pane_open', locale, { name: oldestDue.title })}</button
+                  >
+                {/if}
+              {:else}
+                {#if dueCount === 0}<p class="conversations__rest-big">{t('chat.pane_calm', locale)}</p>{/if}
+                <p class="conversations__rest-sub">{t('chat.pick_one', locale)}</p>
+              {/if}
+            </div>
           {/if}
         </section>
       {/if}
@@ -1370,11 +1400,9 @@
       .conversations .conversations__add-short {
         display: inline;
       }
-      /* The chips in one line that scrolls under the thumb, «Filtrar» at its end. */
-      .conversations .conversations__chiprow {
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        scrollbar-width: none;
+      /* On a phone the search is its glass until it takes the focus. */
+      .conversations__search:not(:focus-within, .is-on) input {
+        inline-size: 0;
       }
     }
     .conversations__add-short {
@@ -1390,7 +1418,6 @@
       display: grid;
       grid-template-columns: var(--chat-list-inline) minmax(0, 1fr);
       gap: 0;
-      border-block-start: var(--border);
     }
     .conversations__list {
       display: flex;
@@ -1421,16 +1448,6 @@
       padding: var(--space-m) 0 var(--space-xxl) var(--space-l);
     }
 
-    .conversations__search :global(.field__label) {
-      position: absolute;
-      inline-size: var(--line-hairline);
-      block-size: var(--line-hairline);
-      margin: calc(-1 * var(--line-hairline));
-      overflow: hidden;
-      clip: rect(0, 0, 0, 0);
-      white-space: nowrap;
-    }
-
     /* The chips with their figure, and «Filtrar ▾» apart, in another shape:
        a quiet word with its caret, never a chip among chips. */
     .conversations__chips {
@@ -1440,35 +1457,66 @@
       gap: var(--space-s);
     }
     .conversations__chiprow {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--space-2xs);
-      min-inline-size: 0;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      scrollbar-width: none;
     }
-    .conversations__chip {
+    /* Search the list: the glass and a word, no box; it grows as it takes the
+       focus or holds a query, and the chips give it their room. */
+    .conversations__search {
       display: inline-flex;
-      align-items: baseline;
+      align-items: center;
       gap: var(--space-xs);
+      flex: 0 1 auto;
+      min-inline-size: 0;
+      margin-inline-start: auto;
       padding: var(--space-2xs) var(--space-xs);
-      border: var(--border);
-      border-radius: var(--radius-circle);
+      border-radius: var(--radius-s);
+      color: var(--text-faint);
+      cursor: text;
+      transition: background-color var(--transition);
+    }
+    .conversations__search:hover {
+      color: var(--text-muted);
+    }
+    .conversations__search:focus-within,
+    .conversations__search.is-on {
+      flex: 1 1 auto;
+      background: var(--bg-light);
+      color: var(--text-muted);
+    }
+    .conversations__glass {
+      flex-shrink: 0;
+      inline-size: 1em;
+      block-size: 1em;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: var(--line-thin);
+    }
+    .conversations__search input {
+      inline-size: 4.5em;
+      min-inline-size: 0;
+      padding: 0;
+      border: 0;
+      background: none;
       color: var(--text-color);
+      font: inherit;
       font-size: var(--text-s);
-      text-decoration: none;
-      white-space: nowrap;
-      transition: background-color var(--transition), color var(--transition);
+      outline: none;
     }
-    .conversations__chip:hover {
-      background: var(--bg-ultra-light);
+    .conversations__search:focus-within input,
+    .conversations__search.is-on input {
+      inline-size: 100%;
     }
-    .conversations__chip[aria-current] {
-      border-color: var(--text-color);
-      background: var(--text-color);
-      color: var(--bg);
+    .conversations__search:focus-within {
+      outline: var(--focus-width) solid var(--focus-color);
+      outline-offset: calc(-1 * var(--focus-width));
     }
-    .conversations__chip-n {
-      font-weight: 500;
-      font-variant-numeric: tabular-nums;
+    .conversations__search input::placeholder {
+      color: var(--text-faint);
+    }
+    .conversations__search input::-webkit-search-cancel-button {
+      appearance: none;
     }
     .conversations__filter-open {
       flex-shrink: 0;
@@ -1507,6 +1555,45 @@
       inline-size: 100%;
     }
 
+    /* The pane at rest: a short digest in the middle of the empty paper. */
+    .conversations__pane:has(.conversations__rest) {
+      display: grid;
+      place-items: center;
+      min-block-size: calc(100dvh - var(--header-height) - var(--space-xxl));
+    }
+    .conversations__rest {
+      max-inline-size: var(--chat-rest-measure);
+    }
+    .conversations__rest p {
+      margin: 0;
+    }
+    .conversations__rest-big {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: var(--text-xl);
+      line-height: var(--display-line-height);
+    }
+    .conversations__rest-sub {
+      margin-block-start: var(--space-xs);
+      color: var(--text-muted);
+      font-size: var(--text-s);
+    }
+    .conversations__rest-open {
+      margin-block-start: var(--space-s);
+      padding: 0;
+      border: 0;
+      background: none;
+      color: var(--text-color);
+      font: inherit;
+      font-size: var(--text-s);
+      text-decoration: underline;
+      text-decoration-color: var(--border-color-dark);
+      text-underline-offset: 0.25em;
+      cursor: pointer;
+    }
+    .conversations__rest-open:hover {
+      text-decoration-color: currentColor;
+    }
     .action-bar__more,
     .action-bar__acts {
       display: flex;

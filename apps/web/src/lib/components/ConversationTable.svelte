@@ -160,13 +160,15 @@
   function chatContext(r: RowView): { text: string; ink?: boolean }[] {
     const item = r.item;
     const out: { text: string; ink?: boolean }[] = [];
-    if (r.turn?.word) out.push({ text: r.turn.word, ink: r.turn.tone === 'ours' || r.turn.tone === 'late' });
-    else if (r.last.last) out.push({ text: relationLabel(item.relation, locale) });
+    // Under «Nos toca» the chip says the turn: the row does not repeat it.
+    if (r.turn?.word) {
+      if (filters.turno !== 'nuestro') out.push({ text: r.turn.word, ink: r.turn.tone === 'ours' || r.turn.tone === 'late' });
+    } else if (r.last.last) out.push({ text: relationLabel(item.relation, locale) });
     const tag = (item.tags.length > 0 ? item.tags : [SALES]).find((k) => k !== hideTag);
-    if (tag && tagNames) out.push({ text: keyLabel(tag, tagNames, locale) });
+    if (tag && tagNames && mixed.tag) out.push({ text: keyLabel(tag, tagNames, locale) });
     if (r.bolo) out.push({ text: boloLabel(r.bolo, locale) });
-    const project = projectName && item.project_id ? projectName(item.project_id) : null;
-    const line = lineName && item.line_id ? lineName(item.line_id) : null;
+    const project = projectName && item.project_id && mixed.project ? projectName(item.project_id) : null;
+    const line = lineName && item.line_id && mixed.line ? lineName(item.line_id) : null;
     for (const x of [project, line]) if (x) out.push({ text: x });
     return out;
   }
@@ -418,6 +420,15 @@
   }
 
   let rows = $derived(items.map(rowView));
+  /**
+   * What the chat row names only when the page mixes it (diseño 2026-11-05):
+   * a tag, project or line every row shares is the list's, not the row's.
+   */
+  let mixed = $derived({
+    tag: new Set(items.map((i) => (i.tags.length > 0 ? i.tags : [SALES]).find((k) => k !== hideTag) ?? '')).size > 1 || Boolean(filters.q),
+    project: new Set(items.map((i) => i.project_id)).size > 1,
+    line: new Set(items.map((i) => i.line_id ?? '')).size > 1,
+  });
 
   /** With whom, in words and shape (ADR-177 § 2 y § 3), as `conversation_feed` reads it. */
   function whoOf(item: ConversationItem) {
@@ -534,6 +545,7 @@
   bind:this={listEl}
   class="crow-list crow-list--relation"
   class:crow-list--bolos={withBolos}
+  class:crow-list--chat={chat}
   aria-busy={busy}
   aria-keyshortcuts={selectable ? 'ArrowUp ArrowDown x Escape' : 'ArrowUp ArrowDown'}
   data-testid="conversation-list"

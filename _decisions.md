@@ -6807,3 +6807,39 @@ lo que se busca en el servidor (`palette-search`).
 recuperar `.lensscope--all` discontinua en cursiva y las claves `palette.aria` y `shell.browse` de la historia.
 
 **Re-evaluar cuando** Marco lo use: si «acotar» desde la búsqueda debería sumar a lo acotado en vez de sustituirlo.
+
+## [2026-11-05] ADR-179 · Conversaciones: el turno se dice una vez (diseño de la lente; enmienda ADR-176 y ADR-177)
+
+**Contexto.** Marco, 05-11: «el diseño de Conversaciones no es una cosa suficientemente buena». Diagnóstico (carril
+`claude/conv-design`, boceto en el artifact «Conversaciones, boceto»): el turno, la razón de la lista, se leía lo
+último, en mono mayúsculas en la tercera línea y repetido en cada fila; mono en mayúsculas en todas partes; filas de
+tres líneas (87 px); la columna derecha con fecha, cifra y «Ya está» en tres alturas; cuatro formas de marcar la
+selección en una pantalla; la ficha vacía sin decir nada; la banda de temporada en caja con la leyenda repetida.
+Marco eligió la dirección A con todo lo recomendado. Sin migración, API ni forma de caché.
+
+**Decisión.**
+1. **Todo va en dos secciones:** «Nos toca · N» y «Lo demás · N» (`ConversationFeed`). El turno se dice en el rótulo;
+   la fila no lo repite (sí el seguimiento, que dice por qué nos toca sin que nos hayan escrito). Bajo el chip «Nos
+   toca» lo dice el chip. Con una etiqueta acotada, el turno sigue en la fila.
+2. **La fila de chat, dos líneas** (`ChatRow`): nombre con qué es y dónde, y cuándo; quién y lo último, y la cifra de
+   nuevos. Columna derecha de dos huecos en la misma vertical. Una tercera línea, en la letra del cuerpo y pequeña,
+   sólo con lo que la lista no dice ya: etiqueta, proyecto o línea sólo si las filas los mezclan (o en una búsqueda),
+   el bolo. Monograma de 2 rem con iniciales en sans.
+3. **«Ya está» en el hueco de la hora:** con puntero, al pasar o al enfocar la fila; en pantalla táctil, siempre. Es
+   un botón callado (`btn--quiet btn--xs`), no una caja.
+4. **Tres papeles de selección, una forma cada uno:** navegar entre lentes, la píldora en tinta (sin cambio); las
+   vistas de una lente, pestaña con raya (`.viewtabs`, base.css); los filtros de una lista, caja suave con su cifra
+   (`.listfilter`, base.css: chips de Conversaciones y tipos de Envíos).
+5. **Mono en mayúsculas sólo en el rótulo de una sección**, nunca dentro de una fila (ADR-145 § 3, llevado a la fila).
+6. **Buscar en la lista** es la lupa con «Buscar» en la fila de los filtros, sin caja; crece al tomar el foco o con
+   texto. En el móvil, la lupa sola. La barra de arriba sigue siendo la búsqueda de la app (ADR-178).
+7. **La ficha vacía resume:** «Nos toca en N.», la que más espera (la primera de `due.rows`, ya ordenada) y «Abrir …»;
+   sin nada pendiente, «Nada nos espera.».
+8. **Envíos:** secciones «Por salir» (borrador, revisión, cola, pausa) y «Enviados»; fila de dos líneas (asunto y
+   fecha o estado; tipo, a quién, estado si no lo dice la sección, cifras). La temporada sin caja: la clave de colores
+   una vez, barras de 6 px de croma más baja, las cifras de cada barra en palabras y «Ver las N» al pie.
+
+**Qué enmienda.** ADR-176 § 3 (la línea de contexto ya no lleva el turno en Todo ni la etiqueta siempre) y § 4 (los
+chips se dibujan como filtro, no como píldora). ADR-177 § 5 en la lista: «Nos toca» es rótulo de sección.
+
+**Cómo se revierte.** Revertir el commit del carril: sólo presentación, sin datos.
