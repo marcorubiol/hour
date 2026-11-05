@@ -4,17 +4,23 @@
    * modelo de una app de mensajería; ADR-099 añadido, ADR-102).
    *
    * Arriba, con quién (la organización y sus contactos) y una línea fija de
-   * hechos: la relación, los bolos, el siguiente paso y a quién le toca. Tocar
-   * la cabecera abre los detalles (contactos, bolos, etiquetas, privacidad,
-   * buzones y el registro en lista), como la ficha de contacto de un chat.
+   * hechos, el turno primero: a quién le toca, la relación, los bolos y el
+   * siguiente paso. Los detalles (contactos, bolos, etiquetas, privacidad,
+   * buzones y el registro en lista) siempre a un toque (ADR-184): columna al
+   * lado cuando la ficha mide 64rem o más; si no, «Detalles» los abre encima
+   * del hilo.
    *
    * En medio, el hilo: lo hablado con fuera (`conversation_event`, ADR-098) y
    * el hilo del equipo (ADR-106) en una sola línea, de lo antiguo a lo nuevo,
-   * lo último abajo (`$lib/conversation-thread`). Cada correo entero en su
-   * sitio, con su texto nuevo y el asunto sólo cuando cambia; lo largo se
-   * despliega en el mismo sitio. Lo de un envío es una tarjeta que lleva a
-   * Envíos; lo apuntado, una línea. Sin «visto», doble check ni «escribiendo»:
-   * el correo no da esa información y fingirla sería inventar.
+   * lo último abajo (`$lib/conversation-thread`). El lado dice quién (de fuera
+   * a la izquierda, lo nuestro a la derecha) y hay tres pesos (ADR-184): lo
+   * hablado con ellos en burbuja (correo, llamada, mensaje, reunión), el
+   * equipo en burbuja ámbar, y lo nuestro sin destinatario (apunte, envío,
+   * aviso) en una línea pequeña. Cada cosa con su glifo y su palabra. Cada
+   * correo entero en su sitio, con su texto nuevo y el asunto sólo cuando
+   * cambia; lo largo se despliega en el mismo sitio. Sin «visto», doble check
+   * ni «escribiendo»: el correo no da esa información y fingirla sería
+   * inventar.
    *
    * Al pie, un solo campo con tres destinos (`ConversationComposer`).
    *
@@ -75,7 +81,15 @@
   import { markConversationReadOnOpen, markReadWhenSeen, readAtOpen } from '$lib/thread-reading.svelte';
   import { markConversationRead, type ConversationFeedView } from '$lib/conversation-feed';
   import { THREAD_REFRESH_MS, type ConversationThreadView } from '$lib/threads';
-  import { conversationThreadEntries, scrollToEdge, senderName, threadDayLabel } from '$lib/conversation-thread';
+  import {
+    conversationThreadEntries,
+    scrollToEdge,
+    senderName,
+    threadDayLabel,
+    threadGapLabel,
+    type ThreadSide,
+  } from '$lib/conversation-thread';
+  import ThreadIcon, { type ThreadIconName } from '$lib/components/ThreadIcon.svelte';
 
   const locale = appLocale();
   const queryClient = useQueryClient();
@@ -88,9 +102,11 @@
     /** Drawn in the vistazo (ADR-139 p1): no document title, no way back to the
         list (the list is beside it), and the lens bar stays. */
     inPeek?: boolean;
+    /** Beside the list: «Cerrar» in the head's own row (ADR-184). */
+    onclose?: () => void;
   }
 
-  let { workspaceSlug, slug, inPeek = false }: Props = $props();
+  let { workspaceSlug, slug, inPeek = false, onclose }: Props = $props();
 
   type Conversation = ConversationItem & { private: boolean; can_edit: boolean; can_set_private: boolean };
 
@@ -470,25 +486,58 @@
       : '',
   );
 
-  // ── Detalles: la ficha de contacto de este chat ──
+  // ── Detalles: la ficha de contacto de este chat, siempre a un toque ──
+  // Con la ficha a 64rem o más, columna al lado; si no, encima del hilo.
+  const DETAILS_BESIDE_REM = 64;
+  let chatW = $state(0);
+  let wide = $derived(
+    typeof document !== 'undefined' &&
+      chatW >= DETAILS_BESIDE_REM * parseFloat(getComputedStyle(document.documentElement).fontSize),
+  );
   let detailsOpen = $state(false);
-
-  // ── Cómo se dice cada cosa del hilo ──
-  const time = (iso: string) => hourMark(timeInTz(iso, tz));
-  function mailWho(e: ConversationEventItem): string {
-    if (e.direction === 'outbound') {
-      const to = senderName(e.mail_to?.[0]);
-      const by = e.created_by && e.created_by === team?.me ? t('thread.you', locale) : senderName(e.mail_from) || t('thread.us', locale);
-      return to ? `${by} · ${t('thread.mail_to', locale, { name: to })}` : `${by} · ${t('thread.mail_word', locale)}`;
-    }
-    return `${senderName(e.mail_from) || recipient?.full_name || ''} · ${t('thread.mail_word', locale)}`;
+  let detailsEl = $state<HTMLElement>();
+  let detailsBtn = $state<HTMLButtonElement>();
+  async function openDetails() {
+    detailsOpen = true;
+    await tick();
+    detailsEl?.focus();
   }
+  function closeDetails() {
+    detailsOpen = false;
+    void tick().then(() => detailsBtn?.focus());
+  }
+
+  // ── Cómo se dice cada cosa del hilo (ADR-184) ──
+  const time = (iso: string) => hourMark(timeInTz(iso, tz));
+  /** Cuándo, encima de cada entrada: el día y la hora, o sólo la hora si sigue el mismo día y el mismo lado. */
+  const stamp = (iso: string, day: string | null) => (day ? `${threadDayLabel(day, locale)} · ${time(iso)}` : time(iso));
+  /** Su nombre de pila, como se la nombra: el contacto principal, o la organización. */
+  let theirName = $derived((recipient?.full_name ?? outsiders[0] ?? title).trim().split(/\s+/)[0] ?? title);
+  /** Quién de los nuestros: quien lo apuntó o lo envió, por su nombre; sin él, nadie (el lado ya dice «nosotros»). */
+  function ourName(e: ConversationEventItem): string {
+    const author = e.created_by ? team?.authors[e.created_by] : '';
+    return (author || senderName(e.mail_from)).trim().split(/\s+/)[0] ?? '';
+  }
+  function whoOf(e: ConversationEventItem, side: ThreadSide): string {
+    return side === 'theirs' ? senderName(e.mail_from).split(/\s+/)[0] || theirName : ourName(e);
+  }
+  /** El glifo de lo hablado o apuntado. */
+  const EVENT_ICON: Record<string, ThreadIconName> = { email: 'mail', call: 'call', message: 'message', meeting: 'meeting', note: 'note' };
+  /** La primera palabra de una entrada: qué fue y de quién («Llamada de Elena», «Reunión con Elena», «Apunte»). */
+  function evLabel(e: ConversationEventItem, side: ThreadSide): string {
+    if (e.kind === 'note') return t('thread.ev_note', locale);
+    if (e.kind === 'meeting') return t('thread.ev_meeting_with', locale, { name: theirName });
+    const name = whoOf(e, side);
+    return name ? t(`thread.ev_${e.kind}_from`, locale, { name }) : eventKindLabel(e.kind, locale);
+  }
+  /** En el registro en lista de los detalles: el tipo y de qué parte. */
   function loggedWhat(e: ConversationEventItem): string {
     if (e.mailout_note) return t(`mailout.note_${e.mailout_note}`, locale);
-    // «Enviado» vale para un correo, no para una llamada: de qué parte vino.
     const kind = eventKindLabel(e.kind, locale);
     return e.direction ? `${kind} · ${t(e.direction === 'outbound' ? 'thread.dir_out' : 'thread.dir_in', locale)}` : kind;
   }
+  /** Lo apuntado que pesa como lo hablado: va en burbuja. Lo demás (apunte, aviso de un envío) es una línea. */
+  const isBubble = (e: ConversationEventItem) => !e.mailout_note && e.kind !== 'note';
 </script>
 
 <svelte:head>
@@ -510,8 +559,21 @@
     />
   </section>
 {:else}
-  <section class="record conv chat" data-chat-open={inPeek ? undefined : ''}>
-    <!-- Con quién: tocar la cabecera abre los detalles, como un chat. -->
+  {#snippet kindAsk(where: 'head' | 'line')}
+    {@const q = t('chat.kind_ask_short', locale)}
+    <span class="chat__kind chat__kind--{where}" role="group" aria-label={t('chat.kind_ask', locale, { name: conv!.organization!.name })} data-testid={where === 'line' ? 'conversation-kind-ask' : undefined}>
+      <span class="chat__kind-q">{q}</span>
+      {#each ASKED_KINDS as k (k)}
+        <button type="button" class="chat__kind-act" disabled={$setKind.isPending} onclick={() => $setKind.mutate(k)}
+          >{t(`organization.kind_${k}`, locale)}</button
+        >
+      {/each}
+      <button type="button" class="chat__kind-later" onclick={() => (kindHiddenFor = conv!.id)}>{t('chat.kind_later', locale)}</button>
+    </span>
+  {/snippet}
+
+  <section class="record conv chat" data-chat-open={inPeek ? undefined : ''} bind:clientWidth={chatW}>
+    <!-- Con quién, en una fila: la vuelta, el nombre, sus contactos y el proyecto, los detalles y cerrar. -->
     <header class="chat__head">
       {#if !inPeek}
         <a class="chat__back" href={back.href} aria-label={back.label}>
@@ -524,27 +586,50 @@
         <h1 class="chat__title">
           {#if orgHref && conv.organization?.name === title}<a class="chat__titlelink" href={orgHref}>{title}</a>{:else}{title}{/if}
         </h1>
-        <button
-          type="button"
-          class="chat__sub"
-          aria-haspopup="dialog"
-          data-testid="conversation-who"
-          onclick={() => (detailsOpen = true)}
-        >
+        <p class="chat__sub">
           {#if who}<span>{who}</span>{/if}
           {#if conv.project}<span class="chat__sub-project">{conv.project.name}</span>{/if}
-          <span class="chat__sub-more">{t('thread.details_more', locale)}</span>
-        </button>
+          {#if askKind}{@render kindAsk('head')}{/if}
+        </p>
       </div>
-      <span class="chat__details">
-        <Button size="s" variant="secondary" onclick={() => (detailsOpen = true)}>{t('record.details', locale)}</Button>
-      </span>
+      {#if !wide}
+        <button
+          type="button"
+          class="chat__details"
+          aria-expanded={detailsOpen}
+          aria-controls="{conv.id}-details"
+          data-testid="conversation-who"
+          bind:this={detailsBtn}
+          onclick={() => (detailsOpen ? closeDetails() : void openDetails())}
+          ><ThreadIcon name="details" /><span class="visually-hidden--narrow">{t('record.details', locale)}</span></button
+        >
+      {/if}
+      {#if onclose}
+        <button type="button" class="block-head__act chat__close" aria-keyshortcuts="Escape" onclick={onclose}
+          >{t('peek.close', locale)}</button
+        >
+      {/if}
     </header>
 
-    <!-- Los hechos, fijos: cómo va, sin abrir nada (ADR-102, franja de estado;
-         la «Falta» de ADR-139 p2 cabe en la misma línea). -->
+    <!-- Los hechos, fijos y en una línea: el turno primero (ADR-184). -->
     <div class="chat__facts" data-testid="conversation-facts">
-      {#if conv.private}<span class="chat__private">{t('mail.private_badge', locale)}</span>{/if}
+      {#if turn?.side === 'ours'}
+        <span class="chat__fact chat__fact--ours" data-testid="conversation-turn">
+          {t('thread.turn_ours', locale, { when: relativeContactDate(turn.since, locale) })}
+          {#if conv.can_edit}
+            <button
+              type="button"
+              class="fact-act"
+              disabled={$patch.isPending}
+              onclick={() => $patch.mutate({ reply_settled_at: turn!.since })}>{t('chat.done', locale)}</button
+            >
+          {/if}
+        </span>
+      {:else if turn?.side === 'theirs'}
+        <span class="chat__fact" data-testid="conversation-turn">
+          {t('thread.turn_theirs', locale, { when: relativeContactDate(turn.since, locale) })}
+        </span>
+      {/if}
       <span class="chat__fact">
         {#if conv.can_edit}
           <ConversationStatusMenu
@@ -562,13 +647,13 @@
       {#each bolos.slice(0, 2) as b (b.bolo_id)}
         {@const when = b.first_performed_at ? dayMonth(b.first_performed_at) : t('conversations.bolo_undated', locale)}
         <span class="chat__fact" data-testid="conversation-fact-bolo">
-          {t('thread.bolo', locale)}
+          <span class="chat__fact-label">{t('thread.bolo', locale)}</span>
           {#if b.performance_slug}<a href={`/h/${workspaceSlug}/performance/${b.performance_slug}`}>{when}</a>{:else}{when}{/if}
           · {performanceStatusLabel(b.status, locale)}
         </span>
       {/each}
       {#if bolos.length > 2}
-        <button type="button" class="fact-act chat__fact" onclick={() => (detailsOpen = true)}
+        <button type="button" class="fact-act chat__fact" onclick={() => void openDetails()}
           >{t('thread.more_bolos', locale, { n: bolos.length - 2 })}</button
         >
       {/if}
@@ -587,23 +672,7 @@
           {hasStep ? stepText : t('record.step_none', locale)}
         {/if}
       </span>
-      {#if turn?.side === 'ours'}
-        <span class="chat__fact chat__fact--ours" data-testid="conversation-turn">
-          {t('thread.turn_ours', locale, { when: relativeContactDate(turn.since, locale) })}
-          {#if conv.can_edit}
-            <button
-              type="button"
-              class="fact-act"
-              disabled={$patch.isPending}
-              onclick={() => $patch.mutate({ reply_settled_at: turn!.since })}>{t('overview.settle', locale)}</button
-            >
-          {/if}
-        </span>
-      {:else if turn?.side === 'theirs'}
-        <span class="chat__fact" data-testid="conversation-turn">
-          {t('thread.turn_theirs', locale, { when: relativeContactDate(turn.since, locale) })}
-        </span>
-      {/if}
+      {#if conv.private}<span class="chat__fact chat__private">{t('mail.private_word', locale)}</span>{/if}
     </div>
     {#if stepOpen && conv.can_edit}
       <div class="conv__step" role="group" aria-label={t('record.step_shortcuts', locale)} bind:this={stepEl}>
@@ -629,137 +698,160 @@
         </span>
       </div>
     {/if}
-    {#if askKind}
-      {@const q = t('chat.kind_ask', locale, { name: conv.organization!.name })}
-      <div class="chat__kind" role="group" aria-label={q} data-testid="conversation-kind-ask">
-        <span class="chat__kind-q">{q}</span>
-        <span class="conv__step-acts">
-          {#each ASKED_KINDS as k (k)}
-            <button type="button" class="missing__act" disabled={$setKind.isPending} onclick={() => $setKind.mutate(k)}
-              >{t(`organization.kind_${k}`, locale)}</button
-            >
+    {#if askKind}<div class="chat__kindline">{@render kindAsk('line')}</div>{/if}
+
+    <div class="chat__body" class:chat__body--wide={wide}>
+      <div class="chat__main">
+        <!-- El hilo: lo de fuera y lo del equipo, en orden, lo último abajo. -->
+        <ol class="flow" aria-label={t('mail.thread', locale)} bind:this={flowEl} data-testid="conversation-thread">
+          {#if $eventsQuery.isLoading}
+            <li><EmptyLine text={t('conversations.loading', locale)} busy /></li>
+          {:else if entries.length === 0}
+            <li class="flow__empty"><EmptyLine text={t('thread.empty', locale)} /></li>
+          {/if}
+          {#each entries as x (x.key)}
+            {#if x.kind === 'gap'}
+              <li class="flow__mark flow__gap">{threadGapLabel(x.days, locale)}</li>
+            {:else if x.kind === 'new'}
+              <li class="flow__mark flow__new" data-entry="new">
+                {t(x.count === 1 ? 'thread.new_one' : 'thread.new_other', locale, { n: x.count })}
+              </li>
+            {:else if x.kind === 'mail'}
+              {@const e = x.event}
+              {@const folded = x.long && !unfolded.has(e.id)}
+              <!-- El original entero (citas, HTML, adjuntos), traído del buzón al abrirlo (punto 111). -->
+              {@const hasOriginal = Boolean(e.mail_account_id)}
+              <li class="bub bub--{x.side} bub--mail" data-testid="thread-mail">
+                <p class="bub__head">
+                  <span class="bub__what"><ThreadIcon name="mail" />{evLabel(e, x.side)}</span>
+                  {#if e.mailbox_scope === 'workspace'}<span class="mb mb--shared" title={e.mailbox_address ?? ''}>{t('mail.via_shared', locale)}</span>{/if}
+                  <time datetime={e.occurred_at}>{stamp(e.occurred_at, x.day)}</time>
+                </p>
+                {#if x.showSubject}<p class="bub__subject">{e.subject}</p>{/if}
+                {#if e.body}
+                  <p class="bub__text" class:bub__text--folded={folded}>{e.body}</p>
+                {:else}
+                  <p class="bub__text bub__text--none">{t('thread.mail_empty', locale)}</p>
+                {/if}
+                {#if originals.has(e.id)}
+                  <MailOriginal conversationId={conv.id} eventId={e.id} />
+                {/if}
+                {#if x.long || hasOriginal || (e.direction === 'inbound' && conv.can_edit)}
+                  <p class="bub__acts">
+                    {#if x.long}
+                      <button type="button" class="fact-act" aria-expanded={!folded} onclick={() => toggleFold(e.id)}
+                        >{folded ? t('thread.unfold', locale) : t('thread.fold', locale)}</button
+                      >
+                    {/if}
+                    {#if hasOriginal}
+                      <button
+                        type="button"
+                        class="fact-act"
+                        aria-expanded={originals.has(e.id)}
+                        data-testid="mail-original-toggle"
+                        onclick={() => toggleOriginal(e.id)}
+                        >{originals.has(e.id) ? t('mail.original_close', locale) : t('mail.original_open', locale)}</button
+                      >
+                    {/if}
+                    {#if e.direction === 'inbound'}
+                      <button type="button" class="fact-act" onclick={() => replyToMail(e)}>{t('mail.reply', locale)}</button>
+                    {/if}
+                  </p>
+                {/if}
+              </li>
+            {:else if x.kind === 'mailout'}
+              {@const e = x.event}
+              <li class="line line--{x.side}" data-testid="thread-mailout">
+                <span
+                  >{e.mailout_kind === 'invitation'
+                    ? t('thread.mailout_invitation', locale, { subject: e.subject ?? '' })
+                    : t('thread.mailout', locale, { subject: e.subject ?? '' })}</span
+                >
+                <a href={`/h/${workspaceSlug}/mailout/${e.mailout_id}`} data-testid="event-mailout">{t('thread.open_mailout', locale)}</a>
+                <time datetime={e.occurred_at}>{stamp(e.occurred_at, x.day)}</time>
+              </li>
+            {:else if x.kind === 'logged' && isBubble(x.event)}
+              {@const e = x.event}
+              <li class="bub bub--{x.side}" data-testid="thread-logged">
+                <p class="bub__head">
+                  <span class="bub__what"><ThreadIcon name={EVENT_ICON[e.kind] ?? 'note'} />{evLabel(e, x.side)}</span>
+                  {#if e.kind === 'email'}<span class="bub__logged">{t('thread.ev_logged', locale)}</span>{/if}
+                  <time datetime={e.occurred_at}>{stamp(e.occurred_at, x.day)}</time>
+                </p>
+                {#if e.body}<p class="bub__text">{e.body}</p>{/if}
+              </li>
+            {:else if x.kind === 'logged'}
+              {@const e = x.event}
+              <li class="line line--{x.side}" data-testid="thread-logged">
+                {#if e.mailout_note}
+                  <span class="line__what"><ThreadIcon name="mailout" />{t(`mailout.note_${e.mailout_note}`, locale)}</span>
+                {:else}
+                  <span class="line__what"><ThreadIcon name="note" />{t('thread.ev_note', locale)}</span>
+                  {#if e.body}<span class="line__text">{e.body}</span>{/if}
+                {/if}
+                <time datetime={e.occurred_at}>{stamp(e.occurred_at, x.day)}</time>
+              </li>
+            {:else if x.kind === 'team' && team}
+              <MessageItem
+                message={x.message}
+                author={(x.message.author_id && team.authors[x.message.author_id]) || ''}
+                mine={x.message.author_id === team.me}
+                mark={t('thread.team_mark', locale)}
+                look="note"
+                stamp={stamp(x.message.created_at, x.day)}
+                {locale}
+                onchange={refreshTeam}
+              />
+            {/if}
           {/each}
-          <button type="button" class="missing__act chat__kind-later" onclick={() => (kindHiddenFor = conv.id)}
-            >{t('chat.kind_later', locale)}</button
-          >
-        </span>
-      </div>
-    {/if}
+          {#if $teamQuery.isError}
+            <li><EmptyLine text={t('threads.team_error', locale)} /></li>
+          {/if}
+        </ol>
 
-    <!-- El hilo: lo de fuera y lo del equipo, en orden, lo último abajo. -->
-    <ol class="flow" aria-label={t('mail.thread', locale)} bind:this={flowEl} data-testid="conversation-thread">
-      {#if $eventsQuery.isLoading}
-        <li><EmptyLine text={t('conversations.loading', locale)} busy /></li>
-      {:else if entries.length === 0}
-        <li class="flow__empty"><EmptyLine text={t('thread.empty', locale)} /></li>
-      {/if}
-      {#each entries as x (x.key)}
-        {#if x.kind === 'day'}
-          <li class="flow__day"><span>{threadDayLabel(x.day, locale)}</span></li>
-        {:else if x.kind === 'new'}
-          <li class="flow__new" data-entry="new">
-            <span>{t(x.count === 1 ? 'thread.new_one' : 'thread.new_other', locale, { n: x.count })}</span>
-          </li>
-        {:else if x.kind === 'mail'}
-          {@const e = x.event}
-          {@const folded = x.long && !unfolded.has(e.id)}
-          <!-- El original entero (citas, HTML, adjuntos), traído del buzón al abrirlo (punto 111). -->
-          {@const hasOriginal = Boolean(e.mail_account_id)}
-          <li class="letter" class:letter--ours={e.direction === 'outbound'} data-testid="thread-mail">
-            <p class="letter__head">
-              <span class="letter__who">{mailWho(e)}</span>
-              {#if e.mailbox_scope === 'workspace'}<span class="mb mb--shared" title={e.mailbox_address ?? ''}>{t('mail.via_shared', locale)}</span>{/if}
-              <time datetime={e.occurred_at}>{time(e.occurred_at)}</time>
-            </p>
-            {#if x.showSubject}<p class="letter__subject">{e.subject}</p>{/if}
-            {#if e.body}
-              <p class="letter__text" class:letter__text--folded={folded}>{e.body}</p>
-            {:else}
-              <p class="letter__text letter__text--none">{t('thread.mail_empty', locale)}</p>
-            {/if}
-            {#if originals.has(e.id)}
-              <MailOriginal conversationId={conv.id} eventId={e.id} />
-            {/if}
-            {#if x.long || hasOriginal || (e.direction === 'inbound' && conv.can_edit)}
-              <p class="letter__acts">
-                {#if x.long}
-                  <button type="button" class="fact-act" aria-expanded={!folded} onclick={() => toggleFold(e.id)}
-                    >{folded ? t('thread.unfold', locale) : t('thread.fold', locale)}</button
-                  >
-                {/if}
-                {#if hasOriginal}
-                  <button
-                    type="button"
-                    class="fact-act"
-                    aria-expanded={originals.has(e.id)}
-                    data-testid="mail-original-toggle"
-                    onclick={() => toggleOriginal(e.id)}
-                    >{originals.has(e.id) ? t('mail.original_close', locale) : t('mail.original_open', locale)}</button
-                  >
-                {/if}
-                {#if e.direction === 'inbound'}
-                  <button type="button" class="fact-act" onclick={() => replyToMail(e)}>{t('mail.reply', locale)}</button>
-                {/if}
-              </p>
-            {/if}
-          </li>
-        {:else if x.kind === 'mailout'}
-          {@const e = x.event}
-          <li class="mailout" data-testid="thread-mailout">
-            <span
-              >{e.mailout_kind === 'invitation'
-                ? t('thread.mailout_invitation', locale, { subject: e.subject ?? '' })
-                : t('thread.mailout', locale, { subject: e.subject ?? '' })}</span
-            >
-            <a href={`/h/${workspaceSlug}/mailout/${e.mailout_id}`} data-testid="event-mailout">{t('thread.open_mailout', locale)}</a>
-            <time datetime={e.occurred_at}>{time(e.occurred_at)}</time>
-          </li>
-        {:else if x.kind === 'logged'}
-          {@const e = x.event}
-          <li class="logged" data-testid="thread-logged">
-            <span class="logged__what">{loggedWhat(e)}</span>
-            <time datetime={e.occurred_at}>{time(e.occurred_at)}</time>
-            {#if e.body}<span class="logged__text">{e.body}</span>{/if}
-          </li>
-        {:else if x.kind === 'team' && team}
-          <MessageItem
-            message={x.message}
-            author={(x.message.author_id && team.authors[x.message.author_id]) || ''}
-            mine={x.message.author_id === team.me}
-            mark={t('threads.team_only', locale)}
-            look="note"
-            timeOnly
+        <div class="chat__foot" bind:this={footEl}>
+          {#key conv.id}
+          <ConversationComposer
+            bind:this={composer}
+            conversation={{ id: conv.id, workspace_id: conv.workspace_id, line_id: conv.line_id, can_edit: conv.can_edit }}
+            {workspaceSlug}
+            {recipient}
+            {outsiders}
+            mail={$mailQuery.data}
+            {replyTo}
             {locale}
-            onchange={refreshTeam}
+            onsent={afterSent}
           />
-        {/if}
-      {/each}
-      {#if $teamQuery.isError}
-        <li><EmptyLine text={t('threads.team_error', locale)} /></li>
-      {/if}
-    </ol>
+          {/key}
+        </div>
+      </div>
 
-    <div class="chat__foot" bind:this={footEl}>
-      {#key conv.id}
-      <ConversationComposer
-        bind:this={composer}
-        conversation={{ id: conv.id, workspace_id: conv.workspace_id, line_id: conv.line_id, can_edit: conv.can_edit }}
-        {workspaceSlug}
-        {recipient}
-        {outsiders}
-        mail={$mailQuery.data}
-        {replyTo}
-        {locale}
-        onsent={afterSent}
-      />
-      {/key}
-    </div>
-  </section>
-
-  <Dialog bind:open={detailsOpen} size="m" title={title}>
-    <!-- Drawn only open: its blocks read on mount (tags, «lo conozco»). -->
-    {#if detailsOpen}
-    <div class="details" data-testid="record-details">
+      {#if wide || detailsOpen}
+        <!-- Los detalles: columna al lado, o encima del hilo hasta «Cerrar» o Esc. -->
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <aside
+          id="{conv.id}-details"
+          class="details"
+          class:details--over={!wide}
+          aria-label={t('record.details', locale)}
+          data-testid="record-details"
+          tabindex="-1"
+          bind:this={detailsEl}
+          onkeydown={(e) => {
+            if (e.key === 'Escape' && !wide && !e.defaultPrevented) {
+              e.preventDefault();
+              e.stopPropagation();
+              closeDetails();
+            }
+          }}
+        >
+          {#if !wide}
+            <div class="details__head">
+              <span class="details__title">{t('record.details', locale)}</span>
+              <button type="button" class="block-head__act" onclick={closeDetails}>{t('peek.close', locale)}</button>
+            </div>
+          {/if}
+    <div class="details__body">
       <div class="details__block">
         <BlockHead title={t('thread.contacts', locale)} level={3} />
         {#if contacts.length === 0}
@@ -874,8 +966,10 @@
         {/if}
       </div>
     </div>
-    {/if}
-  </Dialog>
+        </aside>
+      {/if}
+    </div>
+  </section>
 
   <NextActionDialog
     bind:open={nextOpen}
@@ -909,7 +1003,7 @@
       min-block-size: calc(100dvh - var(--header-height) - var(--space-l) - var(--space-xxl) - var(--shell-foot));
     }
 
-    /* ── Cabecera ── */
+    /* ── Cabecera: una fila ── */
     .chat__head {
       display: flex;
       align-items: center;
@@ -952,48 +1046,50 @@
       text-decoration: underline;
       text-decoration-thickness: var(--line-hairline);
     }
-    /* One line, like a chat's: who, then the project; what does not fit is
-       cut, and «detalles ›» always stays. */
+    /* Who, the project and, while the type is missing, the question of what
+       it is, where the answer will go (ADR-177 § 2). */
     .chat__sub {
       display: flex;
-      gap: var(--space-xs);
-      min-inline-size: 0;
-      padding: 0;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: var(--space-2xs) var(--space-xs);
+      margin: 0;
       color: var(--text-muted);
-      background: none;
-      border: 0;
-      font: inherit;
       font-size: var(--text-s);
-      text-align: start;
-      cursor: pointer;
     }
-    .chat__sub > span {
-      flex: 0 1 auto;
-      min-inline-size: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .chat__sub > span + span::before {
+    .chat__sub > * + *::before {
       content: '·';
       margin-inline-end: var(--space-xs);
       color: var(--text-faint);
     }
-    .chat__sub > .chat__sub-more {
-      display: none;
-      flex: none;
-      color: var(--text-faint);
-    }
     .chat__details {
+      display: inline-flex;
+      flex: none;
+      align-items: baseline;
+      gap: var(--space-xs);
+      padding: var(--space-2xs) var(--space-s);
+      color: var(--text-muted);
+      background: none;
+      border: var(--line-hairline) solid var(--border-color-dark);
+      border-radius: var(--radius);
+      font: inherit;
+      font-size: var(--text-s);
+      cursor: pointer;
+    }
+    .chat__details[aria-expanded='true'] {
+      color: var(--heading-color);
+      background: var(--bg-light);
+    }
+    .chat__close {
       flex: none;
     }
 
-    /* ── Hechos ── */
+    /* ── Hechos: una línea, el turno primero ── */
     .chat__facts {
       display: flex;
       flex-wrap: wrap;
       align-items: baseline;
-      gap: var(--space-2xs) 0;
+      gap: var(--space-2xs) var(--space-l);
       padding-block: var(--space-xs);
       border-block: var(--line-hairline) solid var(--border-color-light);
       font-size: var(--text-s);
@@ -1003,22 +1099,20 @@
       flex-wrap: wrap;
       align-items: baseline;
       gap: var(--space-xs);
-      padding-inline: var(--space-s);
-      border-inline-start: var(--line-hairline) solid var(--border-color-dark);
-    }
-    .chat__fact:first-child,
-    .chat__private + .chat__fact {
-      padding-inline-start: 0;
-      border-inline-start: 0;
+      max-inline-size: 100%;
     }
     .chat__fact-label {
       color: var(--text-muted);
     }
+    /* The state in the line's own voice here, not the records' mono word
+       (ADR-184, after ADR-179 § 5): one voice in a chat's head. */
+    .chat__facts :global(.fact-word) {
+      font-family: inherit;
+      font-size: inherit;
+      letter-spacing: normal;
+    }
     /* A long step («margen · 03 nov 2026») on a phone wraps inside its fact
        instead of running past the edge, where the page cut it. */
-    .chat__fact {
-      max-inline-size: 100%;
-    }
     .chat__fact .fact-act {
       min-inline-size: 0;
       white-space: normal;
@@ -1028,34 +1122,54 @@
       color: var(--heading-color);
       font-weight: 500;
     }
+    .chat__fact--ours .fact-act {
+      font-weight: 400;
+    }
     .chat__fact--due .fact-act {
       color: var(--warning);
     }
     .chat__private {
-      margin-inline-end: var(--space-s);
-      color: var(--heading-color);
-      font-weight: 500;
+      color: var(--text-faint);
     }
     .conv__step-acts {
       display: inline-flex;
       flex-wrap: wrap;
       gap: var(--space-2xs) var(--space-m);
     }
-    /* La pregunta del tipo (115): una línea bajo los hechos, sin franja de color. */
+    /* The type's question (115): quiet words, the answer one touch away. In
+       the head on a wide record; its own line under the facts on a narrow
+       one, where the head has no room. */
     .chat__kind {
-      display: flex;
+      display: inline-flex;
       flex-wrap: wrap;
       align-items: baseline;
-      gap: var(--space-2xs) var(--space-m);
-      padding-block: var(--space-xs);
-      border-block-end: var(--line-hairline) solid var(--border-color-light);
-      font-size: var(--text-s);
+      gap: var(--space-2xs) var(--space-s);
     }
-    .chat__kind-q {
+    .chat__kind-q,
+    .chat__kind-later {
+      color: var(--text-faint);
+    }
+    .chat__kind-act,
+    .chat__kind-later {
+      padding: 0;
       color: var(--text-muted);
+      background: none;
+      border: 0;
+      font: inherit;
+      text-decoration: underline dotted;
+      text-decoration-color: var(--border-color-dark);
+      text-underline-offset: 3px;
+      cursor: pointer;
     }
     .chat__kind-later {
       color: var(--text-faint);
+      text-decoration: none;
+    }
+    .chat__kindline {
+      display: none;
+      padding-block: var(--space-xs);
+      border-block-end: var(--line-hairline) solid var(--border-color-light);
+      font-size: var(--text-s);
     }
     .conv__step-day {
       margin-inline-start: var(--space-xs);
@@ -1065,28 +1179,56 @@
       color: var(--text-faint);
     }
 
-    /* ── El hilo ── */
+    /* ── Cuerpo: el hilo con su campo, y los detalles al lado o encima ── */
+    .chat__body {
+      position: relative;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .chat__body--wide {
+      grid-template-columns: minmax(0, 1fr) var(--chat-details-inline);
+    }
+    .chat__main {
+      display: flex;
+      flex-direction: column;
+      min-inline-size: 0;
+    }
+    .chat__body--wide .chat__main {
+      padding-inline-end: var(--space-l);
+    }
+    /* On its own page the details stay in view while the thread scrolls. */
+    .chat[data-chat-open] .details:not(.details--over) {
+      position: sticky;
+      inset-block-start: var(--header-height);
+      align-self: start;
+      max-block-size: calc(100dvh - var(--header-height));
+      overflow-y: auto;
+    }
+
+    /* ── El hilo (ADR-184): el lado dice quién, el peso cómo llegó ── */
     .flow {
       display: flex;
       flex: 1;
       flex-direction: column;
-      gap: var(--space-s);
+      gap: var(--space-m);
       margin: 0;
-      padding: var(--space-s) 0 var(--space-m);
+      padding: var(--space-m) 0;
       list-style: none;
     }
-    .flow__day,
-    .flow__new {
+    /* The centre is time's: the line of what is new and a silence of a
+       week or more. Nothing else goes in the middle. */
+    .flow__mark {
       display: flex;
       align-items: center;
-      justify-content: center;
       gap: var(--space-s);
-      margin-block: var(--space-xs) 0;
       color: var(--text-faint);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing);
-      text-transform: uppercase;
+      font-size: var(--text-s);
+    }
+    .flow__mark::before,
+    .flow__mark::after {
+      content: '';
+      flex: 1;
+      border-block-start: var(--line-hairline) solid var(--border-color-light);
     }
     .flow__new {
       color: var(--info, var(--text-muted));
@@ -1094,117 +1236,116 @@
     }
     .flow__new::before,
     .flow__new::after {
-      content: '';
-      flex: 1;
-      border-block-start: var(--line-hairline) solid currentColor;
-      opacity: 0.4;
+      border-color: currentColor;
+      opacity: 0.35;
     }
 
-    /* A mail is a letter on its side: theirs on the left, ours on the right. */
-    .letter {
+    /* Weight 1, what was said with them: a bubble on its side. */
+    .bub {
       display: flex;
       flex-direction: column;
       gap: var(--space-2xs);
-      align-self: flex-start;
-      inline-size: var(--thread-letter-max);
-      padding: var(--space-s) var(--space-m);
+      max-inline-size: var(--thread-letter-max);
+      padding: var(--space-xs) var(--space-m) var(--space-s);
       background: var(--thread-theirs-bg);
-      border: var(--line-hairline) solid var(--border-color-light);
-      border-radius: var(--radius-l);
+      border: var(--line-hairline) solid var(--thread-theirs-rule);
+      border-radius: var(--thread-bubble-radius);
     }
-    .letter--ours {
+    .bub--theirs {
+      align-self: flex-start;
+      border-end-start-radius: var(--thread-bubble-tail);
+    }
+    .bub--ours {
       align-self: flex-end;
       background: var(--thread-ours-bg);
+      border-color: var(--thread-ours-rule);
+      border-end-end-radius: var(--thread-bubble-tail);
     }
-    .letter p {
+    .bub--mail {
+      inline-size: var(--thread-letter-max);
+    }
+    .bub p {
       margin: 0;
     }
-    .letter__head {
+    .bub__head {
       display: flex;
       flex-wrap: wrap;
       align-items: baseline;
       gap: var(--space-xs);
       color: var(--text-faint);
-      font-size: var(--text-xs);
-    }
-    .letter__who {
-      color: var(--text-muted);
-    }
-    .letter__head time {
-      margin-inline-start: auto;
-    }
-    .letter__subject {
-      color: var(--heading-color);
       font-size: var(--text-s);
+    }
+    .bub__what {
+      display: inline-flex;
+      align-items: baseline;
+      gap: var(--space-xs);
+      color: var(--text-muted);
       font-weight: 500;
     }
-    .letter__text {
-      font-size: var(--text-s);
+    .bub__head time {
+      margin-inline-start: auto;
+      padding-inline-start: var(--space-m);
+    }
+    .bub__subject {
+      color: var(--heading-color);
+      font-weight: 600;
+    }
+    .bub__text {
+      color: var(--text-color);
+      font-size: var(--text-m);
       white-space: pre-line;
       overflow-wrap: anywhere;
     }
     /* The beginning of a long mail; the rest unfolds right here. */
-    .letter__text--folded {
+    .bub__text--folded {
       display: -webkit-box;
       overflow: hidden;
       -webkit-box-orient: vertical;
       -webkit-line-clamp: var(--thread-fold-lines);
       line-clamp: var(--thread-fold-lines);
     }
-    .letter__text--none {
+    .bub__text--none {
       color: var(--text-faint);
     }
-    .letter__acts {
+    .bub__acts {
       display: flex;
       gap: var(--space-m);
-      font-size: var(--text-xs);
+      font-size: var(--text-s);
     }
 
-    /* What went out with a mailout: a dashed card on our side, to Envíos. */
-    .mailout {
+    /* Weight 3, ours with nobody to read it (a note to self, a mailout, a
+       mailout's notice): one small line on its side, no bubble. */
+    .line {
       display: flex;
       flex-wrap: wrap;
+      align-items: baseline;
+      gap: var(--space-2xs) var(--space-s);
+      max-inline-size: var(--thread-letter-max);
+      color: var(--text-muted);
+      font-size: var(--text-s);
+    }
+    .line--theirs {
+      align-self: flex-start;
+    }
+    .line--ours {
+      align-self: flex-end;
+      justify-content: flex-end;
+    }
+    .line__what {
+      display: inline-flex;
       align-items: baseline;
       gap: var(--space-xs);
-      align-self: flex-end;
-      max-inline-size: var(--thread-letter-max);
-      padding: var(--space-xs) var(--space-s);
+      font-weight: 500;
+    }
+    .line__text {
       color: var(--text-muted);
-      border: var(--line-hairline) dashed var(--thread-mailout-rule);
-      border-radius: var(--radius);
-      font-size: var(--text-s);
-    }
-    .mailout a {
-      color: var(--text-muted);
-    }
-    .mailout time,
-    .logged time {
-      color: var(--text-faint);
-      font-size: var(--text-xs);
-    }
-
-    /* What was logged by hand: one centred line, nobody's side. */
-    .logged {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: baseline;
-      justify-content: center;
-      gap: var(--space-2xs) var(--space-xs);
-      padding-inline: var(--space-l);
-      color: var(--text-muted);
-      font-size: var(--text-s);
-      text-align: center;
-    }
-    .logged__text {
-      flex-basis: 100%;
-      color: var(--text-color);
       white-space: pre-line;
     }
-    .logged__text::before {
-      content: '«';
+    .line a {
+      color: var(--text-muted);
     }
-    .logged__text::after {
-      content: '»';
+    .line time {
+      color: var(--text-faint);
     }
 
     .mb {
@@ -1231,11 +1372,48 @@
       border-block-start: var(--line-hairline) solid var(--border-color-light);
     }
 
-    /* ── Detalles ── */
+    /* ── Detalles: columna al lado, o panel encima del hilo ── */
     .details {
       display: flex;
       flex-direction: column;
       gap: var(--space-l);
+      min-inline-size: 0;
+      padding: var(--space-m) 0 var(--space-m) var(--space-l);
+      border-inline-start: var(--line-hairline) solid var(--border-color-light);
+    }
+    .details:focus {
+      outline: none;
+    }
+    .details__body {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-l);
+    }
+    /* Over the thread, fixed to the window's right edge under the top bar:
+       the conversation stays where it was underneath (Marco, 2026-11-05). */
+    .details--over {
+      position: fixed;
+      inset-block: var(--header-height) var(--shell-foot);
+      inset-inline-end: 0;
+      z-index: var(--z-sticky);
+      inline-size: min(100%, var(--chat-details-over));
+      padding: var(--space-m) var(--space-l);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      background: var(--bg);
+      border-inline-start: var(--line-hairline) solid var(--border-color-dark);
+      box-shadow: var(--box-shadow-3);
+    }
+    .details__head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      padding-block-end: var(--space-s);
+      border-block-end: var(--line-hairline) solid var(--border-color-light);
+    }
+    .details__title {
+      color: var(--heading-color);
+      font-weight: 500;
     }
     .details__block {
       display: flex;
@@ -1317,16 +1495,25 @@
     }
 
     /* A phone (or a narrow vistazo): the head is the way back and the door
-       to the details; the letters take a little more of the row. */
+       to the details; the question of the type gets its own line. */
     @container record (max-width: 47.999rem) {
-      .chat__details {
+      .chat__sub {
+        flex-wrap: nowrap;
+        overflow: hidden;
+        white-space: nowrap;
+      }
+      .chat__sub > * {
+        flex: 0 1 auto;
+        min-inline-size: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .chat__sub > .chat__sub-project,
+      .chat__kind--head {
         display: none;
       }
-      .chat__sub > .chat__sub-more {
-        display: inline;
-      }
-      .chat__sub > .chat__sub-project {
-        display: none;
+      .chat__kindline {
+        display: block;
       }
       /* The facts stay one line, as in a chat's head: it slides sideways. */
       .chat__facts {
@@ -1337,6 +1524,9 @@
       }
       .chat__fact {
         flex-wrap: nowrap;
+      }
+      .chat__fact .fact-act {
+        white-space: nowrap;
       }
       .chat__title {
         font-size: var(--text-m);
@@ -1349,6 +1539,12 @@
     @media (max-width: 47.999rem) {
       .chat__back {
         display: inline-flex;
+      }
+      /* A phone: the details take the whole screen, the chat under them. */
+      .details--over {
+        inline-size: 100%;
+        border-inline-start: 0;
+        box-shadow: none;
       }
     }
   }

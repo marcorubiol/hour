@@ -240,7 +240,7 @@ test.describe('Conversaciones › Equipo: los hilos del equipo (ADR-116, ADR-134
       await expect(row.locator('.chat__unread')).toBeVisible();
       await row.locator('a.chat__title').click();
       await page.waitForURL(new RegExp(`/h/playwright/conversation/${conversationId}#team$`));
-      // The thread opens with «Nota del equipo» in the field (punto 110), the notes in the thread.
+      // The thread opens with «Equipo» chosen in the field (punto 110, ADR-184), the notes in the thread.
       const thread = page.getByTestId('conversation-thread');
       await expect(thread.locator('.msg--note', { hasText: THEIR_BODY })).toBeVisible({ timeout: 30_000 });
       await expect(thread.locator('.msg--note', { hasText: TEAM_BODY })).toBeVisible();

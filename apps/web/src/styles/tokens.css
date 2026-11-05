@@ -350,7 +350,14 @@
        app's two sides, softly); the team's note in a pale amber with its
        rule, never mistaken for something that went out. */
     --thread-theirs-bg: var(--bg-ultra-light);
-    --thread-ours-bg: var(--bg-light);
+    --thread-theirs-rule: var(--border-color-light);
+    /* Ours in a very soft blue (ADR-184): the side says who, the tint says
+       it at a glance without reading the line above. */
+    --thread-ours-bg: color-mix(in oklch, var(--info) 8%, var(--bg-ultra-light));
+    --thread-ours-rule: color-mix(in oklch, var(--info) 18%, transparent);
+    /* A bubble's corner on its own side, the one that points at who said it. */
+    --thread-bubble-radius: calc(var(--radius-l) * 1.4);
+    --thread-bubble-tail: var(--radius-s);
     --thread-team-bg: color-mix(in oklch, var(--tag-amber-bg) 55%, var(--bg));
     --thread-team-rule: color-mix(in oklch, var(--tag-amber-fg) 35%, transparent);
     --thread-team-fg: var(--tag-amber-fg);
@@ -752,6 +759,14 @@
     --chat-mono: 2rem;
     --chat-badge: 1.25rem;
     --chat-list-inline: 26rem;
+    /* A conversation's details (ADR-184): a column beside the thread when the
+       pane is wide enough, a panel over it when it is not. */
+    --chat-details-inline: 20rem;
+    --chat-details-over: 22rem;
+    /* The glyph beside a word in the thread and the field (ADR-184): drawn,
+       one stroke, the size of the text it goes with. */
+    --icon-size: 1.1em;
+    --icon-stroke: 1.6;
     /* La pantalla de un envío (ADR-180): la columna de «Así le llega» y el
        ancho de un móvil en su vista previa. */
     --mail-preview-col: 38rem;

@@ -37,8 +37,9 @@
    *
    * Tres formas (punto 110), un solo dueño de corregir y borrar:
    *  - `row`: la fila del tablón, con su monograma;
-   *  - `note`: la nota del equipo intercalada en el hilo de una conversación,
-   *    sombreada y con su marca, para que no se confunda con lo de fuera;
+   *  - `note`: la nota del equipo intercalada en el hilo de una conversación:
+   *    burbuja ámbar a nuestro lado, con el candado y «solo el equipo», para
+   *    que no se confunda con lo de fuera (ADR-184);
    *  - `bubble`: el mensaje de un grupo (el hilo de un bolo), en su lado.
    *
    * Una línea del sistema (121 B, ADR-183: «Pau llega tarde · desde su hoja»,
@@ -52,8 +53,8 @@
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Menu from '$lib/components/Menu.svelte';
-  import { hourMark, timeInTz } from '$lib/datetime';
   import { MESSAGE_MAX, messageWhen, type ThreadMessage } from '$lib/threads';
+  import ThreadIcon from '$lib/components/ThreadIcon.svelte';
   import { lateLineText } from '$lib/roadsheet-late';
 
   interface Props {
@@ -69,8 +70,8 @@
     /** La raya de «nuevos» va justo delante. */
     newBefore?: boolean;
     look?: 'row' | 'note' | 'bubble';
-    /** Sólo la hora: el día ya lo dice el separador del hilo. */
-    timeOnly?: boolean;
+    /** Cuándo, ya dicho por el hilo («8 oct · 10h14», o sólo la hora); sin él, el del tablón. */
+    stamp?: string;
     locale: Locale;
     onchange: () => void;
   }
@@ -83,7 +84,7 @@
     mark,
     newBefore = false,
     look = 'row',
-    timeOnly = false,
+    stamp,
     locale,
     onchange,
   }: Props = $props();
@@ -91,7 +92,7 @@
   // Un mensaje es un momento: se dice en la zona de quien lo lee.
   const viewerTz = viewerTimeZone();
   let by = $derived(author || t('threads.someone', locale));
-  let when = $derived(timeOnly ? hourMark(timeInTz(m.created_at, viewerTz)) : messageWhen(m.created_at, locale, viewerTz));
+  let when = $derived(stamp ?? messageWhen(m.created_at, locale, viewerTz));
 
   let editing = $state(false);
   let draft = $state('');
@@ -154,8 +155,8 @@
   {#if look === 'row'}<Avatar size="xs" name={by} />{/if}
   <div class="msg__main">
     <p class="msg__head">
-      {#if look === 'note' && mark}<span class="msg__mark">{mark}</span>{/if}
-      {#if !(look === 'bubble' && mine)}<span class="msg__by">{by}</span>{/if}
+      {#if look === 'note'}<span class="msg__by msg__by--note"><ThreadIcon name="team" />{mark ? `${by}, ${mark}` : by}</span
+        >{:else if !(look === 'bubble' && mine)}<span class="msg__by">{by}</span>{/if}
       <time datetime={m.created_at}>{when}</time>
       {#if m.edited_at}<span>{t('threads.edited', locale)}</span>{/if}
       {#if about}<span class="tag-chip" data-tone="blue">{about}</span>{/if}
@@ -285,22 +286,34 @@
       white-space: pre-line;
       overflow-wrap: anywhere;
     }
-    /* La nota del equipo en el hilo de fuera: sombreada, con su raya y su
-       marca en versalita, como «Solo el equipo» del boceto A2. */
+    /* La nota del equipo en el hilo de una conversación (ADR-184): burbuja
+       ámbar a nuestro lado, el candado y quién delante, la hora al final. */
     .msg--note {
       grid-template-columns: minmax(0, 1fr) auto;
       gap: var(--space-xs);
+      align-self: flex-end;
       max-inline-size: var(--thread-letter-max);
-      padding: var(--space-xs) var(--space-s);
+      padding: var(--space-xs) var(--space-s) var(--space-xs) var(--space-m);
       background: var(--thread-team-bg);
-      border-inline-start: var(--line) solid var(--thread-team-rule);
-      border-radius: var(--radius-s);
+      border: var(--line-hairline) solid var(--thread-team-rule);
+      border-radius: var(--thread-bubble-radius);
+      border-end-end-radius: var(--thread-bubble-tail);
     }
-    .msg__mark {
+    .msg--note .msg__head time {
+      margin-inline-start: auto;
+      padding-inline-start: var(--space-m);
+    }
+    .msg__by--note {
+      display: inline-flex;
+      align-items: baseline;
+      gap: var(--space-xs);
       color: var(--thread-team-fg);
-      font-family: var(--font-mono);
-      letter-spacing: var(--mono-letter-spacing);
-      text-transform: uppercase;
+    }
+    .msg--note .msg__head {
+      font-size: var(--text-s);
+    }
+    .msg--note .msg__text {
+      font-size: var(--text-m);
     }
     /* Un grupo: cada mensaje en su lado, el texto en su globo. */
     .msg--bubble {

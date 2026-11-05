@@ -6,6 +6,7 @@ import {
   senderName,
   subjectStem,
   threadDayLabel,
+  threadGapLabel,
   type ThreadEvent,
 } from './conversation-thread';
 import type { ThreadMessage } from './threads';
@@ -40,7 +41,7 @@ describe('conversationThreadEntries', () => {
       messages: [msg('m', '2026-10-12T09:00:00Z')],
       teamReadAt: '2026-10-20T00:00:00Z',
     });
-    expect(out.filter((x) => x.kind !== 'day').map((x) => x.key)).toEqual(['a', 'm', 'b']);
+    expect(out.filter((x) => x.kind !== 'gap').map((x) => x.key)).toEqual(['a', 'm', 'b']);
   });
 
   it('a la misma hora, lo de fuera primero', () => {
@@ -50,17 +51,54 @@ describe('conversationThreadEntries', () => {
       messages: [msg('m', '2026-10-12T08:00:00Z')],
       teamReadAt: '2026-10-20T00:00:00Z',
     });
-    expect(out.filter((x) => x.kind !== 'day').map((x) => x.key)).toEqual(['e', 'm']);
+    expect(out.filter((x) => x.kind !== 'gap').map((x) => x.key)).toEqual(['e', 'm']);
   });
 
-  it('un separador cada vez que cambia el día, en la zona de quien mira', () => {
+  it('la fecha en cada entrada, en la zona de quien mira; sólo la hora si sigue el mismo día y el mismo lado', () => {
     const out = conversationThreadEntries({
       ...base,
-      events: [mail('a', '2026-10-12T21:30:00Z'), mail('b', '2026-10-12T22:30:00Z')],
+      events: [
+        mail('a', '2026-10-12T21:30:00Z'),
+        mail('b', '2026-10-12T22:30:00Z'),
+        mail('c', '2026-10-12T23:00:00Z'),
+        mail('d', '2026-10-12T23:30:00Z', { direction: 'outbound' }),
+      ],
       messages: [],
     });
-    // 23:30 y 00:30 en Madrid: dos días.
-    expect(out.map((x) => x.kind)).toEqual(['day', 'mail', 'day', 'mail']);
+    // 23:30 en Madrid es el 12; 00:30, 01:00 y 01:30 son el 13.
+    expect(out.map((x) => ('day' in x ? x.day : x.kind))).toEqual(['2026-10-12', '2026-10-13', null, '2026-10-13']);
+  });
+
+  it('el lado: lo que llegó a la izquierda; lo nuestro, lo apuntado sin dirección y el equipo a la derecha', () => {
+    const out = conversationThreadEntries({
+      ...base,
+      events: [
+        mail('in', '2026-10-12T08:00:00Z'),
+        mail('out', '2026-10-12T09:00:00Z', { direction: 'outbound' }),
+        mail('meet', '2026-10-12T10:00:00Z', { kind: 'meeting', source: 'manual', direction: null }),
+      ],
+      messages: [msg('m', '2026-10-12T11:00:00Z')],
+      teamReadAt: '2026-10-20T00:00:00Z',
+    });
+    expect(out.map((x) => ('side' in x ? `${x.key}:${x.side}` : x.kind))).toEqual([
+      'in:theirs',
+      'out:ours',
+      'meet:ours',
+      'm:ours',
+    ]);
+  });
+
+  it('un silencio de una semana o más se dice una vez, entre las dos entradas', () => {
+    const out = conversationThreadEntries({
+      ...base,
+      events: [
+        mail('a', '2026-09-25T08:00:00Z'),
+        mail('b', '2026-10-01T08:00:00Z'),
+        mail('c', '2026-10-15T08:00:00Z'),
+      ],
+      messages: [],
+    });
+    expect(out.map((x) => (x.kind === 'gap' ? `gap:${x.days}` : x.key))).toEqual(['a', 'b', 'gap:14', 'c']);
   });
 
   it('el asunto sólo cuando cambia, sin contar «Re:»', () => {
@@ -99,7 +137,7 @@ describe('conversationThreadEntries', () => {
       ],
       messages: [],
     });
-    expect(out.filter((x) => x.kind !== 'day').map((x) => `${x.key}:${x.kind}`)).toEqual([
+    expect(out.filter((x) => x.kind !== 'gap').map((x) => `${x.key}:${x.kind}`)).toEqual([
       'mail:mail',
       'sent:mailout',
       'bounce:logged',
@@ -122,7 +160,7 @@ describe('conversationThreadEntries', () => {
     });
     const i = out.findIndex((x) => x.kind === 'new');
     expect(out[i]).toEqual({ kind: 'new', key: 'new', count: 2 });
-    expect(out.slice(i + 1).find((x) => x.kind !== 'day')?.key).toBe('fresh');
+    expect(out.slice(i + 1).find((x) => x.kind !== 'gap')?.key).toBe('fresh');
   });
 
   it('sin la lectura de fuera todavía, no se pinta raya por lo de fuera', () => {
@@ -168,6 +206,12 @@ describe('las piezas', () => {
     expect(senderName('<laia@llum.cat>')).toBe('laia@llum.cat');
     expect(senderName('laia@llum.cat')).toBe('laia@llum.cat');
     expect(senderName(null)).toBe('');
+  });
+
+  it('threadGapLabel: semanas y, desde dos meses, meses', () => {
+    expect(threadGapLabel(7, 'es')).toBe('1 semana');
+    expect(threadGapLabel(20, 'es')).toBe('2 semanas');
+    expect(threadGapLabel(75, 'es')).toBe('2 meses');
   });
 
   it('threadDayLabel: hoy, ayer, y la fecha', () => {
