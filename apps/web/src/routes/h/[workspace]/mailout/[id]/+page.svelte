@@ -32,7 +32,7 @@
   import { page } from '$app/state';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
-  import { untrack } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { ApiError, fetchJSON, mutateJSON, uploadBlob } from '$lib/api';
   import { shrinkImage } from '$lib/image-shrink';
   import { mailTemplate } from '$lib/mail-template';
@@ -281,6 +281,24 @@
   let audienceMissing = $derived(samples.some((x) => x.state === 'missing_fields'));
   let readyCount = $derived(rows.filter((x) => x.state === 'ready').length + (audienceMissing ? 0 : audienceReady));
   let missingCount = $derived(rows.filter((x) => x.state === 'missing_fields').length + (audienceMissing ? audienceReady : 0));
+  /**
+   * What stands between the draft and sending (ADR-180): a domain for the
+   * professionals, the basis each one still lacks, a subject and a text. The
+   * fields that miss a value are the note above; the rest is here, in one place.
+   */
+  let blockers = $derived.by(() => {
+    if (!d || !editable) return [];
+    const out: { key: string; text: string; href?: string; onclick?: () => void }[] = [];
+    if (!domain && (!invitation || proRows.length > 0)) {
+      out.push({ key: 'domain', text: t('mailout.block_domain', locale), href: `/h/${workspaceSlug}/settings?section=mail` });
+    }
+    const noBasis = rows.filter((x) => x.state === 'no_basis').length;
+    if (noBasis > 0) {
+      out.push({ key: 'basis', text: t(noBasis === 1 ? 'mailout.block_basis_one' : 'mailout.block_basis', locale, { n: noBasis }), onclick: showWho });
+    }
+    if (!subject.trim() || !body.trim()) out.push({ key: 'text', text: t('mailout.block_text', locale) });
+    return out;
+  });
   let counts = $derived(recipientCounts(rows.map((x) => x.state)));
 
   // Vista previa: los que tienen dirección, el que se mira; primero los que
@@ -324,6 +342,22 @@
   // Con plantilla si la hay; quien mira puede pasar a solo texto (lo que leen
   // los clientes sin HTML) y volver.
   let previewChoice = $state<'html' | 'text' | null>(null);
+  // How it reaches them (ADR-180): the width of a desk or a phone, and the
+  // client's dark mode, which the mail's own sheet answers.
+  let previewDevice = $state<'desktop' | 'mobile'>('desktop');
+  let previewScheme = $state<'light' | 'dark'>('light');
+  /** The mail as a dark client paints it: its dark sheet, applied whatever the viewer's theme. */
+  function darkPreview(html: string): string {
+    return html.replace('@media (prefers-color-scheme:dark){', '@media all{');
+  }
+
+  // On a phone the screen is three tabs; wider, all three show (ADR-180).
+  const PANES = ['write', 'preview', 'who'] as const;
+  let pane = $state<(typeof PANES)[number]>('write');
+  function showWho() {
+    pane = 'who';
+    void tick().then(() => document.getElementById('mo-who')?.scrollIntoView({ block: 'start' }));
+  }
   let previewMode = $derived(previewChoice ?? (hasTemplate ? 'html' : 'text'));
   let frameHeight = $state(0);
   function fitFrame(e: Event) {
@@ -562,8 +596,23 @@
       </div>
     {/if}
 
-    <div class="mo__grid">
-      <div class="mo__main">
+    {#if editable}
+      <!-- On a phone the three parts are tabs (ADR-180); wider, they sit side by side. -->
+      <div class="viewtabs mo__tabs" role="tablist" aria-label={t('mailout.tabs_label', locale)}>
+        {#each PANES as p (p)}
+          <button
+            type="button"
+            role="tab"
+            class="viewtabs__tab"
+            aria-selected={pane === p}
+            aria-current={pane === p ? 'true' : undefined}
+            onclick={() => (pane = p)}>{t(`mailout.tab_${p}`, locale)}</button
+          >
+        {/each}
+      </div>
+    {/if}
+    <div class="mo__grid" class:mo__grid--read={!editable} data-pane={editable ? pane : undefined}>
+      <div class="mo__write" data-part="write">
         {#if editable}
           <div class="mo__form">
             {#if d.domains.length === 0 && invitation}
@@ -603,7 +652,11 @@
               {#if d.reply_to}
                 {d.reply_to.address}
               {:else}
-                <span class="mo__warn-inline">{t('mailout.reply_to_none', locale, { address: domain ? senderAddress(localPart, domain.domain) : '' })}</span>
+                <span class="mo__warn-inline"
+                  >{domain
+                    ? t('mailout.reply_to_none', locale, { address: senderAddress(localPart, domain.domain) })
+                    : t('mailout.reply_to_none_nodomain', locale)}</span
+                >
                 <a class="link-arrow" href={`/h/${workspaceSlug}/settings?section=mail`}>{t('mailout.to_settings', locale)}</a>
               {/if}
             </p>
@@ -618,7 +671,7 @@
             <p class="mo__fields">
               <span>{t('mailout.fields', locale)}</span>
               {#each mergeFieldsFor(invitation ? 'invitation' : 'outreach') as f (f)}
-                <button type="button" class="mo__chip" onclick={() => insertField(f)}>{`{${f}}`}</button>
+                <button type="button" class="mo__chip" title={`{${f}}`} onclick={() => insertField(f)}>{f.replace('_', ' ')}</button>
               {/each}
               <span class="mo__saved" aria-live="polite">
                 {$save.isPending ? t('mailout.saving', locale) : dirty ? '' : t('mailout.saved_draft', locale)}
@@ -674,7 +727,10 @@
             </div>
           </div>
         {/if}
+      </div>
 
+      <!-- Así le llega (ADR-180): beside what is written, fixed while the text scrolls. -->
+      <div class="mo__preview" data-part="preview">
         <div class="block-head">
           <h2 class="eyebrow eyebrow--sub">{t('mailout.preview', locale)}</h2>
           {#if previewable.length > 1}
@@ -722,6 +778,26 @@
                 value={previewMode}
                 onchange={(v) => (previewChoice = v as 'html' | 'text')}
               />
+              {#if previewMode === 'html'}
+                <Segmented
+                  ariaLabel={t('mailout.preview_device', locale)}
+                  options={[
+                    { value: 'desktop', label: t('mailout.preview_desktop', locale) },
+                    { value: 'mobile', label: t('mailout.preview_mobile', locale) },
+                  ]}
+                  value={previewDevice}
+                  onchange={(v) => (previewDevice = v as 'desktop' | 'mobile')}
+                />
+                <Segmented
+                  ariaLabel={t('mailout.preview_scheme', locale)}
+                  options={[
+                    { value: 'light', label: t('mailout.preview_light', locale) },
+                    { value: 'dark', label: t('mailout.preview_dark', locale) },
+                  ]}
+                  value={previewScheme}
+                  onchange={(v) => (previewScheme = v as 'light' | 'dark')}
+                />
+              {/if}
             </div>
             {#if previewMode === 'html'}
               <!-- The email itself, as a recipient's client paints it. No scripts
@@ -731,7 +807,8 @@
                 class="mail-frame"
                 title={t('mailout.preview', locale)}
                 sandbox="allow-same-origin"
-                srcdoc={preview.html}
+                srcdoc={previewScheme === 'dark' ? darkPreview(preview.html) : preview.html}
+                data-device={previewDevice}
                 onload={fitFrame}
                 style:block-size={frameHeight ? `${frameHeight}px` : undefined}
               ></iframe>
@@ -744,7 +821,7 @@
         {/if}
       </div>
 
-      <div class="mo__aside">
+      <div class="mo__who" data-part="who" id="mo-who">
         {#snippet recipientList(list: typeof rows, testid: string)}
           <ul class="rcp" data-testid={testid}>
             {#each list as x (x.row.recipient_id)}
@@ -852,13 +929,27 @@
 
     {#if editable}
       <div class="action-bar">
-        <p class="action-bar__note">
-          {#if missingCount}
-            {t(missingCount === 1 ? 'mailout.missing_one' : 'mailout.missing_n', locale, { n: missingCount })}
-          {:else}
-            {t(readyCount === 1 ? 'mailout.ready_one' : 'mailout.ready_other', locale, { n: readyCount })}
+        <div class="action-bar__note">
+          <p class="mo__ready">
+            {#if missingCount}
+              {t(missingCount === 1 ? 'mailout.missing_one' : 'mailout.missing_n', locale, { n: missingCount })}
+            {:else}
+              {t(readyCount === 1 ? 'mailout.ready_one' : 'mailout.ready_other', locale, { n: readyCount })}
+            {/if}
+          </p>
+          <!-- What stands between this and sending, in one place (ADR-180), each with its way. -->
+          {#if blockers.length > 0}
+            <ul class="mo__blockers" data-testid="mailout-blockers">
+              <li class="mo__blockers-lead">{t('mailout.blocked', locale)}</li>
+              {#each blockers as b (b.key)}
+                <li>
+                  {#if b.href}<a href={b.href}>{b.text}</a>{:else if b.onclick}<button type="button" onclick={b.onclick}>{b.text}</button
+                    >{:else}{b.text}{/if}
+                </li>
+              {/each}
+            </ul>
           {/if}
-        </p>
+        </div>
         <Button
           size="s"
           variant="secondary"
@@ -965,24 +1056,71 @@
       margin-inline-start: auto;
     }
 
+    /* Escribir y a quién a la izquierda; «Así le llega» a la derecha, fija
+       mientras baja el texto (ADR-180). Estrecho, una columna; en el móvil,
+       una pestaña cada vez. */
+    .mo {
+      container: mo / inline-size;
+    }
     .mo__grid {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(16rem, 24rem);
-      gap: var(--space-xl);
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas: 'write' 'preview' 'who';
+      gap: var(--space-l);
       align-items: start;
     }
-    @media (max-width: 63.999rem) {
+    @container mo (min-width: 56rem) {
       .mo__grid {
-        grid-template-columns: minmax(0, 1fr);
-        gap: var(--space-l);
+        grid-template-columns: minmax(0, 1fr) minmax(0, var(--mail-preview-col));
+        grid-template-areas:
+          'write preview'
+          'who preview';
+        column-gap: var(--space-xl);
+      }
+      /* Sent or not ours to edit: no form, the recipients start at the top. */
+      .mo__grid--read {
+        grid-template-areas: 'who preview';
+      }
+      .mo__grid--read > .mo__write {
+        display: none;
+      }
+      .mo__preview {
+        position: sticky;
+        inset-block-start: calc(var(--header-height) + var(--space-s));
+        max-block-size: calc(100dvh - var(--header-height) - var(--space-l));
+        overflow-y: auto;
+        overscroll-behavior: contain;
+      }
+      .mo__tabs {
+        display: none;
       }
     }
-    .mo__main,
-    .mo__aside {
+    @container mo (max-width: 55.999rem) {
+      .mo__grid[data-pane] > [data-part] {
+        display: none;
+      }
+      .mo__grid[data-pane='write'] > [data-part='write'],
+      .mo__grid[data-pane='preview'] > [data-part='preview'],
+      .mo__grid[data-pane='who'] > [data-part='who'] {
+        display: flex;
+      }
+    }
+    .mo__write,
+    .mo__preview,
+    .mo__who {
       display: flex;
       flex-direction: column;
       gap: var(--space-s);
       min-inline-size: 0;
+    }
+    .mo__write {
+      grid-area: write;
+    }
+    .mo__preview {
+      grid-area: preview;
+    }
+    .mo__who {
+      grid-area: who;
     }
 
     .mo__form {
@@ -1024,8 +1162,7 @@
       background: var(--tag-neutral-bg);
       border: 0;
       border-radius: var(--radius-s);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
+      font-size: var(--text-s);
       cursor: pointer;
     }
     .mo__chip:hover {
@@ -1072,12 +1209,47 @@
 
     .mo__view {
       display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-xs) var(--space-s);
       margin-block-start: var(--space-s);
+    }
+    .mail-frame[data-device='mobile'] {
+      max-inline-size: var(--mail-preview-mobile);
+    }
+    /* The send bar's note: how many are ready, and what still stands in the way. */
+    .mo__ready {
+      margin: 0;
+    }
+    .mo__blockers {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2xs) var(--space-s);
+      margin: var(--space-2xs) 0 0;
+      padding: 0;
+      list-style: none;
+      font-size: var(--text-s);
+      color: var(--text-muted);
+    }
+    .mo__blockers-lead {
+      color: var(--warning-dark);
+    }
+    .mo__blockers a,
+    .mo__blockers button {
+      padding: 0;
+      border: 0;
+      background: none;
+      color: var(--text-color);
+      font: inherit;
+      text-decoration: underline;
+      text-decoration-color: var(--border-color-dark);
+      text-underline-offset: 0.25em;
+      cursor: pointer;
     }
     /* El correo tal cual: su propio fondo, a todo el ancho de la tarjeta. */
     .mail-frame {
       display: block;
       inline-size: 100%;
+      margin-inline: auto;
       min-block-size: 16rem;
       margin-block-start: var(--space-s);
       border: var(--border);

@@ -752,6 +752,10 @@
     --chat-mono: 2rem;
     --chat-badge: 1.25rem;
     --chat-list-inline: 26rem;
+    /* La pantalla de un envío (ADR-180): la columna de «Así le llega» y el
+       ancho de un móvil en su vista previa. */
+    --mail-preview-col: 38rem;
+    --mail-preview-mobile: 23.4375rem;
     --chat-line-height: 1.35; /* a chat row's two lines, tighter than prose */
     --chat-rest-measure: 32ch; /* the pane at rest: a digest, not a page */
     /* La temporada de Envíos: la barra de cada línea y el cuadro de su clave. */
