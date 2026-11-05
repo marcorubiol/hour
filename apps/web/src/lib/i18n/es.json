@@ -3310,7 +3310,7 @@
   "call.opens": "Todavía no hay conversación con {name}. Se abre una al apuntar la llamada.",
   "call.project": "¿De qué espectáculo?",
   "call.no_projects": "Este espacio no tiene ningún espectáculo activo donde abrirla.",
-  "call.i_called": "La llamé yo",
+  "call.i_called": "Llamé yo",
   "call.they_called": "Me llamó",
   "call.today": "Hoy",
   "call.change": "Cambiar",

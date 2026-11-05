@@ -8,7 +8,7 @@
    *    `GET /api/conversations/call-targets`). Sin texto, con quién se ha
    *    hablado último. Las personas del equipo salen, pero no se eligen: una
    *    llamada interna no es una conversación (eso es el grupo del bolo).
-   * 2. Qué se habló: «La llamé yo / Me llamó», cuándo (ahora, se puede
+   * 2. Qué se habló: «Llamé yo / Me llamó», cuándo (ahora, se puede
    *    cambiar) y la nota. Con varias conversaciones, la última tocada, con
    *    el cambio a la vista. Sin ninguna, «¿De qué espectáculo?»: se abre una
    *    por el mismo `POST /api/conversations` que «Añadir conversación».
