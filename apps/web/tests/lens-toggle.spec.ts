@@ -84,7 +84,7 @@ test.describe('Lenses per space (ADR-132)', () => {
 
     // A written day is a way into the Planner: none while it is off.
     await page.keyboard.press('Meta+k');
-    const palette = page.getByRole('dialog', { name: 'Build a scope' });
+    const palette = page.getByRole('dialog', { name: 'Search' });
     await expect(palette).toBeVisible();
     await palette.getByRole('combobox').or(palette.locator('input')).first().fill('12 march');
     await expect(palette.getByText('Day', { exact: true })).toHaveCount(0);

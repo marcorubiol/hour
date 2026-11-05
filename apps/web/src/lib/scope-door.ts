@@ -12,7 +12,8 @@ import type { PinKind } from '$lib/stores/pins.svelte';
 import type { Scope } from '$lib/stores/scopes.svelte';
 
 export interface ScopeDoor {
-  /** The ⌘K palette, seeded with the pins: «+ añadir», and «Todo»'s door. */
+  /** The palette as a filter («Ver solo…», ADR-178), seeded with the pins:
+      «+ añadir», and «Todo»'s door. The bar and ⌘K open it as a search. */
   openPalette: () => void;
   /** Token → display, over the layout's nav caches (they feed its
       scopeAutoName too). */

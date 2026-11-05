@@ -59,7 +59,7 @@ test.describe('the quick add reads text (ADR-139 § 3)', () => {
     await waitForLoaded(page);
 
     await page.keyboard.press('ControlOrMeta+k');
-    const palette = page.getByRole('dialog', { name: 'Build a scope' });
+    const palette = page.getByRole('dialog', { name: 'Search' });
     await expect(palette).toBeVisible();
     await palette.getByRole('textbox').fill('rehearsal thu 10-14 Mercat');
     await palette.getByRole('option', { name: /New rehearsal/ }).click();

@@ -46,11 +46,11 @@ test.describe('smoke', () => {
     // its label, which is translated.
     await expect(page.locator('a[href="/h/desk"] time')).toBeVisible();
 
-    // ⌘K is the SCOPE BUILDER (Scope v2), not a lens switcher: it lists
-    // spaces / projects / lines from /api/workspaces + /api/projects +
-    // /api/lines (RLS). No Money option lives in here any more.
+    // ⌘K is the SEARCH (ADR-178; the scope pill opens the same palette as a
+    // filter), not a lens switcher: it lists spaces / projects / lines from
+    // /api/workspaces + /api/projects + /api/lines (RLS).
     await page.keyboard.press('Meta+k');
-    const palette = page.getByRole('dialog', { name: 'Build a scope' });
+    const palette = page.getByRole('dialog', { name: 'Search' });
     await expect(palette).toBeVisible();
     await expect(palette.getByRole('option').first()).toBeVisible();
     await page.keyboard.press('Escape');

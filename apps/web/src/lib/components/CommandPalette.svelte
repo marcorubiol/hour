@@ -1,6 +1,13 @@
 <script lang="ts">
   /**
-   * ⌘K — scope builder (Scope v2). Browse the space → project → line tree
+   * ⌘K — the palette, with two doors (ADR-178, amending ADR-152). From the
+   * top bar, ⌘K and the rail it SEARCHES (`mode="search"`): choosing a row
+   * opens its record, and «acotar» beside a space, project, line or person
+   * narrows to it alone. From the scope pill it FILTERS (`mode="filter"`,
+   * headed «Ver solo…»), the scope builder below. What each gesture does per
+   * door is `$lib/palette-mode`.
+   *
+   * The filter (Scope v2): browse the space → project → line tree
    * (→ drills in), or type to filter across all FOUR axes at once — the three
    * containers plus people, who are not a level of that tree but can be
    * narrowed by all the same; stage tokens into a "building" set and Apply
@@ -52,6 +59,7 @@
   import { planAccessQueryOptions } from '$lib/plan-create';
   import { CREATE_LABEL_KEYS, paletteCreates, type PaletteCreate } from '$lib/palette-create';
   import { paletteFindRows, paletteSearchQueryOptions, paletteSearchTerm } from '$lib/palette-search';
+  import { enterAct, rowAct, rowAside, type PaletteMode } from '$lib/palette-mode';
 
   // El mismo par que usa el Planner: el locale detectado y su etiqueta BCP-47.
   const locale = appLocale();
@@ -64,6 +72,8 @@
 
   interface Props {
     open: boolean;
+    /** Search (the bar, ⌘K) or filter (the scope pill): ADR-178. */
+    mode?: PaletteMode;
     /** the currently-applied scope — pre-staged when the palette opens */
     initialTokens?: string[];
     onApplyScope: (tokens: string[]) => void;
@@ -78,6 +88,7 @@
   }
   let {
     open = $bindable(),
+    mode = 'search',
     initialTokens = [],
     onApplyScope,
     onPickAction,
@@ -326,9 +337,13 @@
       .filter(Boolean),
   );
   let placeholder = $derived(
-    examples.length > 0
-      ? t('palette.placeholder_try', locale, { examples: examples.map((e) => `“${e}”`).join(', ') })
-      : t('palette.placeholder', locale),
+    mode === 'search'
+      ? examples.length > 0
+        ? t('palette.search_placeholder_try', locale, { examples: examples.map((e) => `“${e}”`).join(', ') })
+        : t('palette.search_placeholder', locale)
+      : examples.length > 0
+        ? t('palette.placeholder_try', locale, { examples: examples.map((e) => `“${e}”`).join(', ') })
+        : t('palette.placeholder', locale),
   );
 
   function spaceRow(w: NavWorkspace, canDrill: boolean): Row {
@@ -601,6 +616,16 @@
     onApplyScope([...staged]);
     open = false;
   }
+  /** «Acotar» from the search: this one thing alone, whatever was scoped. */
+  function narrow(r: Row) {
+    onApplyScope([r.token]);
+    open = false;
+  }
+  /** The row's own gesture, by door (`rowAct`). */
+  function actRow(r: Row) {
+    if (rowAct(mode, !GOES.has(r.kind)) === 'stage') toggleStage(r.token);
+    else openRow(r);
+  }
 
   // Reset + pre-stage the active scope whenever the palette opens.
   $effect(() => {
@@ -649,20 +674,15 @@
       }
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (e.metaKey || e.ctrlKey) {
-        // ⌘↵ → open the highlighted entity's page
-        if (flatRows[cur]) openRow(flatRows[cur]);
-      } else if (e.shiftKey) {
-        // ⇧↵ → apply the built scope (advanced; the Apply button is the
-        // discoverable path, ⌘↵ being reserved for "open")
-        apply();
-      } else if (flatRows[cur] && GOES.has(flatRows[cur].kind)) {
-        // ↵ on a row that cannot be staged does the one thing it does
-        openRow(flatRows[cur]);
-      } else if (flatRows[cur]) {
-        // ↵ → add / remove from the scope
-        toggleStage(flatRows[cur].token);
-      }
+      const r = flatRows[cur];
+      // ↵ does what the click does; ⌘↵ opens; ⇧↵ narrows (search) or
+      // applies the built scope (filter). See `enterAct`.
+      const act = enterAct(mode, !!r && !GOES.has(r.kind), { meta: e.metaKey || e.ctrlKey, shift: e.shiftKey });
+      if (act === 'apply') apply();
+      else if (!r) return;
+      else if (act === 'open') openRow(r);
+      else if (act === 'narrow') narrow(r);
+      else toggleStage(r.token);
     }
   }
 </script>
@@ -673,10 +693,14 @@
       class="cmdk"
       role="dialog"
       aria-modal="true"
-      aria-label={t('palette.aria', locale)}
+      aria-label={t(mode === 'filter' ? 'palette.filter_head' : 'palette.search_aria', locale)}
       tabindex={-1}
       onmousedown={(e) => e.stopPropagation()}
     >
+      {#if mode === 'filter'}
+        <!-- The pill's door: what it does is narrow, and it says so first. -->
+        <p class="cmdk__head">{t('palette.filter_head', locale)}</p>
+      {/if}
       <div class="cmdk__search">
         <svg viewBox="0 0 14 14" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
           <circle cx="6.2" cy="6.2" r="4.2" />
@@ -687,7 +711,7 @@
           bind:value={query}
           type="text"
           {placeholder}
-          aria-label={t('palette.filter_aria', locale)}
+          aria-label={t(mode === 'filter' ? 'palette.filter_aria' : 'palette.search_aria', locale)}
           oninput={() => {
             drill = null;
             cur = 0;
@@ -724,7 +748,8 @@
           {/if}
           {#each g.rows as r, i (r.token)}
             {@const gi = groupOffsets[gIdx] + i}
-            <div class="cmdk__row" class:cmdk__row--on={gi === cur} class:cmdk__row--staged={isStaged(r.token)}>
+            {@const aside = rowAside(mode, !GOES.has(r.kind))}
+            <div class="cmdk__row" class:cmdk__row--on={gi === cur} class:cmdk__row--staged={mode === 'filter' && isStaged(r.token)}>
               <!-- UN DÍA NO SE FIJA, SE ABRE. La fila principal apila un
                    contenedor en el scope, y eso solo tiene sentido para algo
                    que existe y filtra. Un día es un destino: su fila entera
@@ -736,7 +761,7 @@
                 role="option"
                 aria-selected={gi === cur}
                 onmouseenter={() => (cur = gi)}
-                onclick={() => (GOES.has(r.kind) ? openRow(r) : toggleStage(r.token))}
+                onclick={() => actRow(r)}
               >
                 {#if r.kind === 'create'}
                   <span class="cmdk__dayglyph" aria-hidden="true">+</span>
@@ -756,12 +781,19 @@
                 <span class="cmdk__name">
                   {r.name}{#if r.kind === 'create' && r.path}<span class="cmdk__path">&nbsp;{r.path}</span>{:else if r.path}<span class="cmdk__path">{' · '}{r.path}</span>{/if}
                 </span>
-                {#if isStaged(r.token)}<span class="cmdk__added">✓ {t('palette.added', locale)}</span>{/if}
+                {#if mode === 'filter' && isStaged(r.token)}<span class="cmdk__added">✓ {t('palette.added', locale)}</span>{/if}
               </button>
-              {#if !GOES.has(r.kind)}
-                <button type="button" class="cmdk__open" onclick={() => openRow(r)}>
+              {#if aside === 'open'}
+                <button type="button" class="cmdk__aside" onclick={() => openRow(r)}>
                   {t('palette.open', locale)} <span aria-hidden="true">↗</span>
                 </button>
+              {:else if aside === 'narrow'}
+                <button
+                  type="button"
+                  class="cmdk__aside"
+                  aria-label={t('palette.narrow_aria', locale, { name: r.name })}
+                  onclick={() => narrow(r)}>{t('palette.narrow', locale)}</button
+                >
               {/if}
               {#if r.drill}
                 <button
@@ -776,6 +808,7 @@
         {/each}
       </div>
 
+      {#if mode === 'filter'}
       <div class="cmdk__staged">
         <span class="cmdk__staged-lead">{t('palette.building', locale)}</span>
         {#if staged.length === 0}
@@ -795,14 +828,20 @@
             : t(staged.length > 1 ? 'palette.apply_n_other' : 'palette.apply_n_one', locale, { n: staged.length })}
         </button>
       </div>
+      {/if}
 
       <div class="cmdk__foot">
         <span><b>↑↓</b> {t('picker.hint_move', locale)}</span>
         <span><b>→</b> {t('palette.hint_drill', locale)}</span>
         <span><b>←</b> {t('picker.hint_back', locale)}</span>
-        <span><b>↵</b> {t('palette.hint_toggle', locale)}</span>
-        <span><b>⌘↵</b> {t('palette.open', locale)}</span>
-        <span><b>⇧↵</b> {t('palette.hint_apply', locale)}</span>
+        {#if mode === 'filter'}
+          <span><b>↵</b> {t('palette.hint_toggle', locale)}</span>
+          <span><b>⌘↵</b> {t('palette.open', locale)}</span>
+          <span><b>⇧↵</b> {t('palette.hint_apply', locale)}</span>
+        {:else}
+          <span><b>↵</b> {t('palette.open', locale)}</span>
+          <span><b>⇧↵</b> {t('palette.narrow', locale)}</span>
+        {/if}
         <span class="cmdk__foot-new">
           {t('palette.new', locale)}
           <button type="button" onclick={() => onPickAction('new-space')}>{t('picker.kind_space', locale)}</button>
@@ -846,6 +885,16 @@
     border-radius: var(--radius-xl);
     box-shadow: var(--box-shadow-3);
     overflow: hidden;
+  }
+
+  /* «Ver solo…»: the filter's name, in the voice of the scope dialog's
+     «Ámbito» (a label, not a block head). */
+  .cmdk__head {
+    margin: 0;
+    padding-block: var(--space-s) 0;
+    padding-inline: var(--space-m);
+    font-size: var(--text-xs);
+    color: var(--text-faint);
   }
 
   .cmdk__search {
@@ -977,7 +1026,7 @@
     font-size: var(--text-xs);
     color: var(--success);
   }
-  .cmdk__open {
+  .cmdk__aside {
     flex: none;
     border: 0;
     background: none;
@@ -991,7 +1040,7 @@
     border-radius: var(--radius-s);
     white-space: nowrap;
   }
-  .cmdk__open:hover {
+  .cmdk__aside:hover {
     color: var(--text-color);
     background: color-mix(in oklch, var(--text-color) 8%, transparent);
   }

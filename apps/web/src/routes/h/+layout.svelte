@@ -543,8 +543,11 @@
     if (next) replaceState(next, {});
   });
 
-  // ⌘K scope builder — Apply sets the pins and remembers the scope.
+  // ⌘K — one palette, two doors (ADR-178): the top bar, ⌘K and the rail
+  // SEARCH (a row opens its record, «acotar» is the aside); the scope pill
+  // FILTERS («Ver solo…», the builder, Apply sets the pins).
   let paletteOpen = $state(false);
+  let paletteMode = $state<'search' | 'filter'>('search');
   // What the palette's BUILDING bar starts with. Opening from the scope pill
   // (+ add / + narrow) seeds it with the current filters (you're adding to the
   // scope); opening from the command bar (⌘K, top search, browse & combine)
@@ -556,10 +559,12 @@
   });
   function openPaletteFresh() {
     paletteSeed = [];
+    paletteMode = 'search';
     paletteOpen = true;
   }
   function openPaletteAdd() {
     paletteSeed = [...pins.pins];
+    paletteMode = 'filter';
     paletteOpen = true;
   }
 
@@ -852,6 +857,7 @@
   {#if palette.component}
     <palette.component
       bind:open={paletteOpen}
+      mode={paletteMode}
       initialTokens={paletteSeed}
       {onApplyScope}
       {onPickAction}

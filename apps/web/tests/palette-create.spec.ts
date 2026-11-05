@@ -25,7 +25,7 @@ test.describe('⌘K creates (ADR-139)', () => {
     await waitForLoaded(page);
 
     await page.keyboard.press('ControlOrMeta+k');
-    const palette = page.getByRole('dialog', { name: 'Build a scope' });
+    const palette = page.getByRole('dialog', { name: 'Search' });
     await expect(palette).toBeVisible();
     await palette.getByRole('textbox').fill(`rehearsal ${title}`);
 

@@ -4,8 +4,9 @@
    * amending ADR-145 § 5 and ADR-139 § 6). Same place on every lens, at every
    * width.
    *
-   * - Unscoped it says «Todo», dashed (the shape of «+ acotar»), and opens
-   *   the palette straight away: there is nothing to list yet.
+   * - Unscoped it says «Todo» with its ▾, drawn as the control it is (ADR-178:
+   *   the dashed italic read as a status), and opens the palette as a filter,
+   *   «Ver solo…», straight away: there is nothing to list yet.
    * - Scoped it says the name of what is scoped, never a different level
    *   («Txema Muñoz», «Gota», a line, a person), «+N» for the rest, and a
    *   small ▾. It opens a dialog: a sheet from below on a phone, a popover
@@ -140,16 +141,12 @@
   aria-label={label === null
     ? t('shell.scope_door_aria', locale, { scope: everything })
     : t('shell.scope_pill_aria', locale, { scope: label })}
-  aria-haspopup={label === null ? undefined : 'dialog'}
+  aria-haspopup="dialog"
   aria-expanded={label === null ? undefined : open}
   title={label === null ? t('shell.everything_all', locale) : label}
   onclick={onPill}
 >
-  {#if label === null}
-    {everything}
-  {:else}
-    <span class="lensscope__name">{label}</span><span class="lensscope__caret" aria-hidden="true">▾</span>
-  {/if}
+  <span class="lensscope__name">{label ?? everything}</span><span class="lensscope__caret" aria-hidden="true">▾</span>
 </button>
 
 <dialog
@@ -199,7 +196,9 @@
 <style>
   /* THE PILL. A chip in the body face, one tint above the page, so it reads
      as «what you are looking at» and not as a button calling for a press.
-     Unscoped, the dashed door of «+ acotar», «Todo» in the italic display. */
+     Unscoped, the same control with no tint: «Todo» and its ▾, upright, solid
+     edge (ADR-178; the dashed italic read as a status, not as something to
+     press). */
   .lensscope {
     position: relative;
     display: inline-flex;
@@ -221,7 +220,8 @@
     cursor: pointer;
     transition:
       color var(--transition),
-      border-color var(--transition);
+      border-color var(--transition),
+      background-color var(--transition);
   }
   .lensscope[aria-expanded='true'] {
     border-color: var(--text-muted);
@@ -233,6 +233,7 @@
     }
     .lensscope--all:hover {
       color: var(--text-color);
+      background: var(--bg-light);
     }
   }
   /* The touch target grows past the drawn pill, never the pill itself. */
@@ -242,11 +243,8 @@
     inset: min(0em, calc((2em - var(--touch-target)) / 2));
   }
   .lensscope--all {
-    border-style: dashed;
     background: none;
     color: var(--text-muted);
-    font-family: var(--font-display);
-    font-style: italic;
   }
   .lensscope__name {
     min-inline-size: 0;
