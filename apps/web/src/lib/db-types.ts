@@ -3146,7 +3146,9 @@ export type Database = {
           deleted_at: string | null
           edited_at: string | null
           id: string
+          late_notice_id: string | null
           performance_id: string | null
+          system: string | null
           thread_id: string
           updated_at: string
           workspace_id: string
@@ -3158,7 +3160,9 @@ export type Database = {
           deleted_at?: string | null
           edited_at?: string | null
           id?: string
+          late_notice_id?: string | null
           performance_id?: string | null
+          system?: string | null
           thread_id: string
           updated_at?: string
           workspace_id: string
@@ -3170,12 +3174,21 @@ export type Database = {
           deleted_at?: string | null
           edited_at?: string | null
           id?: string
+          late_notice_id?: string | null
           performance_id?: string | null
+          system?: string | null
           thread_id?: string
           updated_at?: string
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "message_late_notice_id_fkey"
+            columns: ["late_notice_id"]
+            isOneToOne: false
+            referencedRelation: "roadsheet_late_notice"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "message_performance_id_fkey"
             columns: ["performance_id"]
@@ -3898,6 +3911,124 @@ export type Database = {
           },
         ]
       }
+      roadsheet_late_notice: {
+        Row: {
+          created_at: string
+          id: string
+          milestone_at: string | null
+          milestone_kind: string | null
+          milestone_label: string | null
+          milestone_slot_id: string | null
+          minutes: number | null
+          moved_at: string | null
+          moved_by: string | null
+          moved_from: string | null
+          moved_to: string | null
+          note: string | null
+          performance_id: string
+          person_id: string | null
+          person_name: string
+          person_role: string | null
+          project_id: string
+          seen_at: string | null
+          seen_by: string | null
+          share_id: string
+          source: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          milestone_at?: string | null
+          milestone_kind?: string | null
+          milestone_label?: string | null
+          milestone_slot_id?: string | null
+          minutes?: number | null
+          moved_at?: string | null
+          moved_by?: string | null
+          moved_from?: string | null
+          moved_to?: string | null
+          note?: string | null
+          performance_id: string
+          person_id?: string | null
+          person_name: string
+          person_role?: string | null
+          project_id: string
+          seen_at?: string | null
+          seen_by?: string | null
+          share_id: string
+          source?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          milestone_at?: string | null
+          milestone_kind?: string | null
+          milestone_label?: string | null
+          milestone_slot_id?: string | null
+          minutes?: number | null
+          moved_at?: string | null
+          moved_by?: string | null
+          moved_from?: string | null
+          moved_to?: string | null
+          note?: string | null
+          performance_id?: string
+          person_id?: string | null
+          person_name?: string
+          person_role?: string | null
+          project_id?: string
+          seen_at?: string | null
+          seen_by?: string | null
+          share_id?: string
+          source?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roadsheet_late_notice_milestone_slot_id_fkey"
+            columns: ["milestone_slot_id"]
+            isOneToOne: false
+            referencedRelation: "schedule_slot"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roadsheet_late_notice_performance_id_fkey"
+            columns: ["performance_id"]
+            isOneToOne: false
+            referencedRelation: "performance"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roadsheet_late_notice_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "person"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roadsheet_late_notice_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roadsheet_late_notice_share_id_fkey"
+            columns: ["share_id"]
+            isOneToOne: false
+            referencedRelation: "roadsheet_share"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roadsheet_late_notice_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       roadsheet_share: {
         Row: {
           created_at: string
@@ -3905,6 +4036,7 @@ export type Database = {
           expires_at: string
           id: string
           performance_id: string
+          person_id: string | null
           revoked_at: string | null
           role: string
           token: string
@@ -3913,9 +4045,10 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by?: string | null
-          expires_at?: string
+          expires_at: string
           id?: string
           performance_id: string
+          person_id?: string | null
           revoked_at?: string | null
           role: string
           token: string
@@ -3927,6 +4060,7 @@ export type Database = {
           expires_at?: string
           id?: string
           performance_id?: string
+          person_id?: string | null
           revoked_at?: string | null
           role?: string
           token?: string
@@ -3938,6 +4072,13 @@ export type Database = {
             columns: ["performance_id"]
             isOneToOne: false
             referencedRelation: "performance"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roadsheet_share_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "person"
             referencedColumns: ["id"]
           },
           {
@@ -6506,6 +6647,27 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_roadsheet_share_for_person: {
+        Args: { p_performance_id: string; p_person_id: string }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          expires_at: string
+          id: string
+          performance_id: string
+          person_id: string | null
+          revoked_at: string | null
+          role: string
+          token: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "roadsheet_share"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_schedule_slot: {
         Args: {
           p_at: string
@@ -7575,6 +7737,10 @@ export type Database = {
         Returns: string
       }
       mark_help_seen: { Args: { p_key: string }; Returns: Json }
+      mark_roadsheet_late_seen: {
+        Args: { p_notice_id: string }
+        Returns: undefined
+      }
       mark_thread_read: { Args: { p_thread_id: string }; Returns: string }
       merge_workspace_organization: {
         Args: {
@@ -7759,6 +7925,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      record_roadsheet_late_move: {
+        Args: { p_from: string; p_notice_id: string; p_to: string }
+        Returns: undefined
+      }
       regenerate_audience_form_key: {
         Args: { p_id: string }
         Returns: {
@@ -7928,6 +8098,10 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      report_roadsheet_late: {
+        Args: { p_minutes?: number; p_note?: string; p_token: string }
+        Returns: Json
+      }
       request_workspace_alias: {
         Args: { p_alias: string; p_workspace_id: string }
         Returns: {
@@ -7996,6 +8170,8 @@ export type Database = {
         Args: { p_membership_id: string }
         Returns: undefined
       }
+      roadsheet_late_move_plan: { Args: { p_notice_id: string }; Returns: Json }
+      roadsheet_late_notices: { Args: never; Returns: Json }
       set_acquaintance: {
         Args: {
           p_known: boolean
