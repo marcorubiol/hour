@@ -35,7 +35,6 @@ import {
   limitedEnvReady,
   login,
   pgGet,
-  pgPatch,
   pgPost,
   pgRpc,
   requireEnv,
@@ -94,9 +93,20 @@ describe.skipIf(!envReady())('RLS: «llego tarde» from a personal road sheet li
     return r.rows[0]!.id;
   };
 
+  // A hard DELETE, as the `*_delete` policy allows an editor. A soft delete
+  // through PostgREST is a 403 for anyone: the new row (`deleted_at` set) fails
+  // the SELECT policy (`deleted_at IS NULL`), which Postgres checks on UPDATE.
+  const remove = async (table: 'crew_assignment' | 'cast_override', id: string) => {
+    const env = requireEnv();
+    const res = await fetch(`${env.url}/rest/v1/${table}?id=eq.${id}`, {
+      method: 'DELETE',
+      headers: { apikey: env.anon, Authorization: `Bearer ${jwt}`, Prefer: 'return=minimal' },
+    });
+    return res.status;
+  };
+
   const dropCrew = async (id: string) => {
-    const r = await pgPatch('crew_assignment', jwt, { deleted_at: new Date().toISOString() }, new URLSearchParams({ id: `eq.${id}` }));
-    expect(r.status).toBeLessThan(300);
+    expect(await remove('crew_assignment', id)).toBeLessThan(300);
   };
 
   const newDossier = async (name: string, phone: string | null = null) => {
@@ -178,12 +188,8 @@ describe.skipIf(!envReady())('RLS: «llego tarde» from a personal road sheet li
   afterAll(async () => {
     if (!jwt) return;
     for (const id of shares) await pgRpc('revoke_roadsheet_share', jwt, { p_share_id: id });
-    for (const id of overrides) {
-      await pgPatch('cast_override', jwt, { deleted_at: new Date().toISOString() }, new URLSearchParams({ id: `eq.${id}` }));
-    }
-    for (const id of crew) {
-      await pgPatch('crew_assignment', jwt, { deleted_at: new Date().toISOString() }, new URLSearchParams({ id: `eq.${id}` }));
-    }
+    for (const id of overrides) await remove('cast_override', id);
+    for (const id of crew) await remove('crew_assignment', id);
     for (const id of Object.values(perfs)) if (id) await pgRpc('delete_performance', jwt, { p_performance_id: id });
   });
 
