@@ -7045,8 +7045,8 @@ por peso, y la nota del equipo cambia de lado. ADR-177 § 6: los destinos del ca
 («Correo a Laia» pasa a «A Laia · Correo»; «Nota del equipo», a «Equipo»). `--thread-ours-bg` pasa del crema
 hundido al azul suave también en el grupo del bolo (`MessageItem`, burbujas propias).
 
-**Queda abierto (de Marco).** `--page-width` (1240, una medida para toda la app desde el 31-07) deja a 2000 px el
-panel al lado de la lista en unos 50rem: ahí los detalles se abren encima, nunca al lado. Quitar la medida en la
-vista de dos paneles los pondría al lado; es su regla y no se ha tocado.
+**La medida de la página no cambia (Marco, 05-11).** `--page-width` (1240, una medida para toda la app desde el
+31-07) deja a 2000 px el panel al lado de la lista en unos 50rem: ahí los detalles se abren encima, nunca al lado.
+Marco eligió dejarlo así antes que quitar la medida en la vista de dos paneles.
 
 **Cómo se revierte.** Revertir el commit del carril: sólo presentación, sin datos ni caché.
