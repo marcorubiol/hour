@@ -13,7 +13,7 @@ import { pgGet, pgPostRpc, type SupabaseEnv } from '../../supabase';
 import { decryptSecret, importMailKey, refreshTokenAad } from './crypto';
 import { serviceMailDb, type MailEnv } from './db';
 import { googleAdapter } from './gmail';
-import { effectiveSignature, withSignature, type SignatureParts } from '../../mail';
+import { effectiveSignature, replyQuote, senderName, withSignature, type SignatureParts } from '../../mail';
 
 interface SendRequest {
   conversationId: string;
@@ -21,6 +21,8 @@ interface SendRequest {
   subject: string;
   body: string;
   replyToEventId?: string | null;
+  /** The writer's language, for the line over the quote (ADR-181). */
+  locale?: string;
 }
 
 type SendOutcome =
@@ -31,6 +33,10 @@ interface ReplyContext {
   rfc_message_id: string | null;
   provider_thread_id: string | null;
   mail_account_id: string | null;
+  /** What it said and when, to quote it (ADR-181). */
+  body: string | null;
+  occurred_at: string | null;
+  direction: string | null;
 }
 
 export async function sendFromConversation(
@@ -59,7 +65,7 @@ export async function sendFromConversation(
     const r = await pgGet<ReplyContext>(supa, 'conversation_event', jwt, {
       search: {
         select:
-          'rfc_message_id:metadata->>rfc_message_id,provider_thread_id:metadata->>provider_thread_id,mail_account_id:metadata->>mail_account_id',
+          'rfc_message_id:metadata->>rfc_message_id,provider_thread_id:metadata->>provider_thread_id,mail_account_id:metadata->>mail_account_id,body,occurred_at,direction',
         id: `eq.${req.replyToEventId}`,
         conversation_id: `eq.${req.conversationId}`,
       },
@@ -92,12 +98,20 @@ export async function sendFromConversation(
   });
   const parts = sig.data[0];
   const body = withSignature(req.body, parts ? effectiveSignature(parts, account.scope) : null);
+  // ADR-181: a reply quotes what it answers, as a mail client does; the
+  // record keeps only what was written (the history already has the rest).
+  const author =
+    reply?.direction === 'outbound'
+      ? parts?.full_name?.trim() || account.address
+      : target.recipient_name?.trim() || target.recipient_address;
+  const quote = reply ? replyQuote({ body: reply.body, occurredAt: reply.occurred_at, author }, req.locale ?? 'es') : null;
   const sent = await adapter.send(access, {
     from: account.address,
+    fromName: senderName(parts, account.scope),
     to: target.recipient_address,
     toName: target.recipient_name,
     subject: req.subject,
-    body,
+    body: quote ? `${body}\n\n${quote}` : body,
     messageId,
     inReplyTo: reply?.rfc_message_id ?? null,
     references: reply?.rfc_message_id ?? null,

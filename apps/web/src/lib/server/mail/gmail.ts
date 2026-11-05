@@ -358,6 +358,7 @@ function safeHeader(value: string): string {
 /** Un correo RFC 5322 en texto plano UTF-8, codificado base64url para la API. */
 export function buildRawMessage(opts: {
   from: string;
+  fromName?: string | null;
   to: string;
   toName?: string | null;
   subject: string;
@@ -369,8 +370,9 @@ export function buildRawMessage(opts: {
   const to = opts.toName
     ? `${encodeHeaderWord(safeHeader(opts.toName).replace(/"/g, ''))} <${safeHeader(opts.to)}>`
     : safeHeader(opts.to);
+  const fromName = opts.fromName ? safeHeader(opts.fromName).replace(/"/g, '') : '';
   const headers = [
-    `From: ${safeHeader(opts.from)}`,
+    `From: ${fromName ? `${encodeHeaderWord(fromName)} <${safeHeader(opts.from)}>` : safeHeader(opts.from)}`,
     `To: ${to}`,
     `Subject: ${encodeHeaderWord(safeHeader(opts.subject))}`,
     `Message-ID: ${safeHeader(opts.messageId)}`,

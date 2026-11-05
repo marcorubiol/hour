@@ -118,6 +118,68 @@ export function withSignature(body: string, signature: string | null | undefined
 }
 
 /**
+ * El nombre del remitente de un correo uno a uno (ADR-181): la persona y su
+ * compañía en su buzón («Marco Rubiol · MüK Cia»), la compañía en el común.
+ * Sin nombre que poner, null: sale la dirección sola, como antes.
+ */
+export function senderName(p: Pick<SignatureParts, 'full_name' | 'company_name'> | null | undefined, scope: MailAccountScope): string | null {
+  if (!p) return null;
+  const company = p.company_name?.trim() ?? '';
+  const person = p.full_name?.trim() ?? '';
+  const name = scope === 'personal' ? [person, company].filter(Boolean).join(' · ') : company;
+  return name || null;
+}
+
+const QUOTE_HEAD: Record<string, (date: string, name: string) => string> = {
+  es: (d, n) => `El ${d}, ${n} escribió:`,
+  ca: (d, n) => `El ${d}, ${n} va escriure:`,
+  en: (d, n) => `On ${d}, ${n} wrote:`,
+  fr: (d, n) => `Le ${d}, ${n} a écrit :`,
+};
+const QUOTE_HEAD_UNDATED: Record<string, (name: string) => string> = {
+  es: (n) => `${n} escribió:`,
+  ca: (n) => `${n} va escriure:`,
+  en: (n) => `${n} wrote:`,
+  fr: (n) => `${n} a écrit :`,
+};
+const QUOTE_LOCALE: Record<string, string> = { es: 'es-ES', ca: 'ca-ES', en: 'en-GB', fr: 'fr-FR' };
+const QUOTE_MAX_LINES = 30;
+
+/**
+ * La cita del correo al que se responde (ADR-181), como la pone un cliente de
+ * correo: «El lun, 3 nov 2026, 10:14, Laia Puig escribió:» y cada línea con
+ * «> ». Corta: lo nuevo de ese correo, a lo sumo 30 líneas. Sin cuerpo, nada.
+ */
+export function replyQuote(
+  original: { body: string | null; occurredAt: string | null; author: string },
+  locale: string,
+  timeZone = 'Europe/Madrid',
+): string | null {
+  const text = original.body?.trim();
+  if (!text) return null;
+  const lang = QUOTE_HEAD[locale] ? locale : 'es';
+  let date = '';
+  const at = original.occurredAt ? new Date(original.occurredAt) : null;
+  if (at && !Number.isNaN(at.getTime())) {
+    date = new Intl.DateTimeFormat(QUOTE_LOCALE[lang], {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+      timeZone,
+    }).format(at);
+  }
+  const lines = text.split(/\r?\n/);
+  const kept = lines.slice(0, QUOTE_MAX_LINES);
+  if (lines.length > QUOTE_MAX_LINES) kept.push('…');
+  const head = date ? QUOTE_HEAD[lang](date, original.author) : QUOTE_HEAD_UNDATED[lang](original.author);
+  return [head, ...kept.map((l) => (l ? `> ${l}` : '>'))].join('\n');
+}
+
+/**
  * La firma es de la persona en cada compañía; el buzón común firma con la de
  * la compañía (ADR-099, añadido). Lo que devuelve `my_mail_signature`: las dos
  * firmas guardadas (null = la propuesta de Hour) y las piezas de la propuesta.

@@ -45,6 +45,8 @@ export interface MailMessage {
 
 interface OutgoingMail {
   from: string;
+  /** El nombre que acompaña a la dirección del remitente (ADR-181). */
+  fromName?: string | null;
   to: string;
   toName?: string | null;
   subject: string;
