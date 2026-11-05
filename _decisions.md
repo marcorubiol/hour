@@ -5525,6 +5525,10 @@ claves de i18n `shell.narrow`, `shell.save_scope` y `shell.update_scope` están 
 **Re-evaluar cuando** Marco lo use una semana acotado en el teléfono: si una pastilla en la fila del título se nota
 lo bastante como para no olvidar que está acotado (la opción B, la línea fina, era la más explícita).
 
+> **Amended by ADR-178 (2026-11-05), § 2.** «Todo» ya no es la pastilla discontinua en cursiva: es el mismo control
+> que la pastilla acotada, sin tinte y con su ▾, y abre la paleta como filtro («Ver solo…»). La barra de arriba y ⌘K
+> la abren como búsqueda.
+
 ## [2026-10-31] ADR-153 · Hoy: la tarjeta es para lo de hoy (enmienda ADR-150 § 1 y § 2)
 
 **Contexto.** Marco, 31-10 (chat, validado): la tarjeta grande de Hoy es para lo de hoy; si hoy no queda nada, no
@@ -6769,3 +6773,37 @@ una persona sola; ninguna tiene tipo ni ciudad (la ciudad está en la persona). 
 
 **Queda fuera.** La persona contacto de varias organizaciones a la vez (la programadora de tres festivales) se aparca
 hasta un caso real: hoy `workspace_person.organization_id` es uno. ADR-176 § 2 (la temporada en Envíos) no cambia.
+
+## [2026-11-05] ADR-178 · Buscar frente a acotar: la barra busca y la pastilla filtra (enmienda ADR-152)
+
+**Contexto.** Marco, 05-11 (tarea 125): la barra «Busca o salta a un proyecto o línea…» y la pastilla «Todo» abrían
+la misma paleta, vacía, y las dos solo acotaban el ámbito; ninguna saltaba. Elegir un proyecto lo añadía a «Construyendo»
+en vez de abrir su ficha, y abrir era la acción secundaria («abrir ↗» o ⌘↵). Y la pastilla «Todo», discontinua y en
+cursiva, se leía como un estado y no como algo que se pulsa. El estándar (Linear, GitHub, Notion) separa las dos cosas:
+la barra busca y salta; el filtro vive en su propio control. Sin migración ni API; ninguna forma de la caché cambia.
+
+**Decisión.**
+1. **Una paleta, dos puertas** (`CommandPalette`, prop `mode`; lo que hace cada gesto en cada puerta es
+   `$lib/palette-mode`, con test). La barra de arriba, ⌘K y el botón del raíl la abren como **búsqueda**; la pastilla
+   del ámbito («Todo» y «+ añadir» de su diálogo), como **filtro**.
+2. **Búsqueda.** Elegir una fila (clic o ↵) abre su ficha: el espacio, el proyecto, la línea, la persona; contactos,
+   conversaciones, lugares, funciones, bolos, días y «crear» hacen lo que ya hacían. Junto a lo que se puede acotar
+   (espacio, proyecto, línea, persona) va «acotar» como acción secundaria (⇧↵ con el teclado): deja el ámbito en esa
+   sola cosa, sustituyendo lo que hubiera, y cierra. Sin bandeja «Construyendo» ni «Aplicar»: combinar es del filtro.
+   El › para entrar en un espacio o un proyecto sigue igual.
+3. **Filtro.** Encabezado «Ver solo…» (también nombra el diálogo). Por dentro es el constructor de ADR-152 sin cambios:
+   la fila se añade o se quita, «abrir ↗» es la secundaria, ⇧↵ o «Aplicar» lo fijan.
+4. **La pastilla es un control.** Sin acotar, «Todo» va con su ▾, en la letra del cuerpo y derecha, con borde
+   continuo y sin tinte (el tinte queda para cuando acota); `aria-haspopup="dialog"` siempre. Su nombre accesible no
+   cambia («Ámbito: Todo. Acotar»).
+5. **Textos.** El diálogo de búsqueda se llama «Buscar» y su campo dice «Busca un proyecto, una línea, una persona, un
+   contacto…»; el botón del raíl pasa de «explorar y combinar» a «buscar». La clave `palette.aria` («Construir un
+   alcance») se borra; los E2E que la nombraban buscan ahora el diálogo «Search».
+
+**Qué no cambia.** ⌘K, el raíl con sus ámbitos, `?scope=`, el diálogo de la pastilla acotada (ADR-152 § 3 y § 4) y
+lo que se busca en el servidor (`palette-search`).
+
+**Cómo se revierte.** Quitar `mode` de `CommandPalette` (vuelve a ser el constructor siempre) y `$lib/palette-mode`;
+recuperar `.lensscope--all` discontinua en cursiva y las claves `palette.aria` y `shell.browse` de la historia.
+
+**Re-evaluar cuando** Marco lo use: si «acotar» desde la búsqueda debería sumar a lo acotado en vez de sustituirlo.
