@@ -94,7 +94,9 @@ test.describe('log a call from the lens head', () => {
     try {
       const dialog = await openCallDialog(page);
       const row = dialog.getByTestId('call-target').filter({ hasText: NAME }).first();
-      await expect(row).toContainText('1 conversation');
+      // The rows come from GET /api/conversations/call-targets: on a cold
+      // production origin that round trip outruns the 5 s default.
+      await expect(row).toContainText('1 conversation', { timeout: 20_000 });
       await row.click();
       await expect(dialog.getByRole('heading', { name: `Call with ${NAME}` })).toBeVisible();
       await dialog.getByText('They called').click();
@@ -141,19 +143,23 @@ test.describe('log a call from the lens head', () => {
     try {
       const dialog = await openCallDialog(page);
       const row = dialog.getByTestId('call-target').filter({ hasText: NAME }).first();
-      await expect(row).toContainText('no conversation yet');
+      await expect(row).toContainText('no conversation yet', { timeout: 20_000 });
       await row.click();
       await expect(dialog.getByText(`There is no conversation with ${NAME} yet.`)).toBeVisible();
       const show = dialog.getByLabel('Which show?');
       if (await show.evaluate((el) => el.tagName === 'SELECT')) await show.selectOption({ label: PROJECT_LABEL });
       else await dialog.getByText(PROJECT_LABEL, { exact: true }).click();
+      // The conversation is opened by this POST; checking it with another
+      // round trip would spend the 6 s «Undo» window (CREATED_TOAST_MS).
+      const opened = page.waitForResponse(
+        (r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/conversations',
+      );
       await dialog.getByRole('button', { name: 'Open and log' }).click();
+      expect((await opened).status()).toBeLessThan(300);
       await expect(dialog).not.toBeVisible({ timeout: 10_000 });
 
       const toast = page.locator('.toast', { hasText: `Call with ${NAME} logged.` });
-      await expect(toast).toBeVisible();
-      expect(await liveConversations(page)).toHaveLength(1);
-      await toast.getByRole('button', { name: 'Undo' }).click();
+      await toast.getByRole('button', { name: 'Undo' }).click({ timeout: 5_000 });
       await expect(page.locator('.toast', { hasText: 'Undone' })).toBeVisible();
       await expect.poll(async () => (await liveConversations(page)).length).toBe(0);
     } finally {
