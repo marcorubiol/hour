@@ -459,10 +459,14 @@
      segmented options and a lens's link fragments take it here; any other
      control opts in with `.hit` (a component's own position still wins). */
   @media (pointer: coarse) {
-    :where(.hit, .lenshead__frag, .kebab) {
+    :where(.hit, .lenshead__frag, .kebab, .viewtabs__tab, .listfilter__opt) {
       position: relative;
     }
-    :where([class*="btn--"]:not(.btn--none), .seg__opt, .lenshead__frag, .kebab, .hit)::after {
+    /* A lens's link fragment draws its target with ::before: its ::after is
+       the «·» that closes it in the sub line (ADR-167 § 2), which the target
+       used to pull out of the line on a phone. */
+    :where([class*="btn--"]:not(.btn--none), .seg__opt, .kebab, .hit, .viewtabs__tab, .listfilter__opt)::after,
+    :where(.lenshead__frag)::before {
       content: "";
       position: absolute;
       inset-block: min(0px, calc((100% - var(--touch-target)) / 2));
