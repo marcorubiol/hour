@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Noviembre 2026 (en curso)
 
+- Conversaciones, rediseño: la lista en dos secciones, «Nos toca» y «Lo demás», con filas de dos líneas y el turno dicho una vez; «Ya está» al pasar; la ficha vacía dice cuántas nos tocan y abre la que más espera; Envíos en «Por salir» y «Enviados», con la temporada sin caja; vistas como pestaña y filtros en caja suave; el «·» del móvil ya no se sale en las fichas (ADR-179, 2026-11-05, `d0aa0e98`).
 - La barra de arriba y ⌘K buscan de verdad: elegir un proyecto, una línea, una persona o un espacio abre su ficha, con «acotar» al lado; la pastilla «Todo» filtra («Ver solo…») y se dibuja como un control (125, ADR-178, 2026-11-05, `123fe4d3`).
 - Conversaciones, pulido: botones de la cabecera alineados, la fila sin doble recorte, Envíos en la línea del asunto y en tres líneas en el móvil, la banda de temporada sin nombres cortados, el cuadro de escribir a la altura del campo (2026-11-05, `123fe4d3`).
 - Seguridad: un enlace de hoja de ruta ya sólo devuelve lo de su rol. Antes, la función pública daba a cualquier enlace el hotel, la hospitalidad y los teléfonos y correos del equipo y del reparto (nunca el dinero) (120, 2026-11-05, `82096181`).
