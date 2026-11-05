@@ -6843,3 +6843,36 @@ Marco eligió la dirección A con todo lo recomendado. Sin migración, API ni fo
 chips se dibujan como filtro, no como píldora). ADR-177 § 5 en la lista: «Nos toca» es rótulo de sección.
 
 **Cómo se revierte.** Revertir el commit del carril: sólo presentación, sin datos.
+
+## [2026-11-05] ADR-180 · El correo de un envío, la carta entera; y la pantalla con «Así le llega» al lado (enmienda ADR-172 y 104)
+
+**Contexto.** Marco, 05-11: «miremos lo de enviar los emails». Diagnóstico y boceto («Correos de envíos, boceto»):
+la identidad salía dos veces (firma y pie), la baja enseñaba la URL entera, a una persona suscrita en otro idioma el
+campo de fecha le salía en el suyo dentro de una frase en el del texto, la invitación no tenía la función a la vista,
+la imagen cortaba la carta entre la despedida y la firma, sin modo oscuro ni texto de previsualización; y en la
+pantalla la vista previa quedaba unos 700 px bajo el primer campo y lo que impedía enviar estaba repartido. Marco
+eligió A, «la carta entera», con lo recomendado. Sin migración ni API.
+
+**Decisión.**
+1. **La difusión sigue siendo una carta** (texto primero, el texto plano es el correo).
+2. **Quién, una vez:** el pie no repite la compañía si la firma ya la nombra; una firma guardada sin el nombre lo
+   devuelve al pie (`footerWho`).
+3. **La baja con palabras en el HTML** («Daros de baja en un clic · Privacidad», `footerHtml`); el texto plano sigue
+   llevando la URL. Cabeceras de RFC 8058 sin cambio.
+4. **La imagen va tras la firma**, como postdata enlazada al dossier.
+5. **La invitación lleva un bloque de la función** montado de los datos (obra; cuándo, con día y hora; dónde; «Se
+   confirma respondiendo a este correo»), en el HTML y en el texto plano, tras el cuerpo. Sin día, no hay bloque.
+6. **Dos idiomas, cada uno en lo suyo** (enmienda 104): lo que va dentro del texto (sus campos, el bloque de la
+   función, el `lang` del HTML) en el idioma del texto; el pie (por qué le llega, la baja), en el de la suscripción.
+7. **Modo oscuro:** `color-scheme: light dark` y una hoja corta con clases para los clientes que la leen (enmienda
+   ADR-172, que pedía cero hojas: es la única); el logo lleva fondo claro propio en oscuro.
+8. **Texto de previsualización** oculto: la primera frase tras el saludo.
+9. **La pantalla del envío:** escribir y a quién a la izquierda, «Así le llega» a la derecha, fija, con Con
+   plantilla o Solo texto, Escritorio o Móvil y Claro u Oscuro; en el móvil, pestañas Escribir · Vista previa · A
+   quién. La barra de enviar dice lo que falta (dominio, la base de N, asunto y texto), cada cosa con su camino. Los
+   campos se insertan con su nombre legible. «Respuestas a» sin dominio ya no deja una dirección vacía.
+
+**Queda fuera.** La baja por un dominio de la compañía en vez de `hour.zerosense.studio`; «Añadir al calendario» en
+la invitación (un .ics servido); marcar en la vista previa lo que sale de un campo.
+
+**Cómo se revierte.** Revertir los commits del carril; sólo presentación y composición, sin datos.

@@ -36,7 +36,7 @@
  */
 
 import { proposedSignature, withSignature, displayWebsite } from './mail';
-import { mailHtml, NO_TEMPLATE, type MailTemplate } from './mail-template';
+import { mailHtml, NO_TEMPLATE, type MailEvent, type MailFooter, type MailTemplate } from './mail-template';
 
 export const MAILOUT_LANGUAGES = ['es', 'ca', 'en', 'fr'] as const;
 type MailoutLanguage = (typeof MAILOUT_LANGUAGES)[number];
@@ -127,6 +127,15 @@ type Copy = {
   audienceUnsubscribe: (url: string) => string;
   privacy: (url: string) => string;
   test: string;
+  /** El pie en HTML (ADR-180): la baja y la privacidad como enlaces con palabras. */
+  unsubscribeLink: string;
+  audienceUnsubscribeLink: string;
+  unsubscribeTail: string;
+  privacyLink: string;
+  /** El bloque de la función de una invitación (ADR-180), en el idioma del texto. */
+  when: string;
+  where: string;
+  rsvp: string;
 };
 
 const COPY: Record<MailoutLanguage, Copy> = {
@@ -145,6 +154,13 @@ const COPY: Record<MailoutLanguage, Copy> = {
     audienceUnsubscribe: (u) => `Darte de baja: ${u} Un clic basta.`,
     privacy: (u) => `Política de privacidad: ${u}`,
     test: '[Prueba]',
+    unsubscribeLink: 'Daros de baja',
+    audienceUnsubscribeLink: 'Darte de baja',
+    unsubscribeTail: ' en un clic',
+    privacyLink: 'Privacidad',
+    when: 'Cuándo',
+    where: 'Dónde',
+    rsvp: 'Se confirma respondiendo a este correo.',
   },
   ca: {
     team: (s) => (s ? `equip de ${s}` : 'equip'),
@@ -162,6 +178,13 @@ const COPY: Record<MailoutLanguage, Copy> = {
     audienceUnsubscribe: (u) => `Donar-te de baixa: ${u} N'hi ha prou amb un clic.`,
     privacy: (u) => `Política de privacitat: ${u}`,
     test: '[Prova]',
+    unsubscribeLink: 'Doneu-vos de baixa',
+    audienceUnsubscribeLink: 'Donar-te de baixa',
+    unsubscribeTail: ' amb un clic',
+    privacyLink: 'Privacitat',
+    when: 'Quan',
+    where: 'On',
+    rsvp: 'Es confirma responent aquest correu.',
   },
   en: {
     team: (s) => (s ? `${s} team` : 'team'),
@@ -179,6 +202,13 @@ const COPY: Record<MailoutLanguage, Copy> = {
     audienceUnsubscribe: (u) => `Unsubscribe: ${u} One click is enough.`,
     privacy: (u) => `Privacy policy: ${u}`,
     test: '[Test]',
+    unsubscribeLink: 'Unsubscribe',
+    audienceUnsubscribeLink: 'Unsubscribe',
+    unsubscribeTail: ' in one click',
+    privacyLink: 'Privacy',
+    when: 'When',
+    where: 'Where',
+    rsvp: 'Reply to this email to confirm.',
   },
   fr: {
     team: (s) => (s ? `l'équipe de ${s}` : "l'équipe"),
@@ -197,6 +227,13 @@ const COPY: Record<MailoutLanguage, Copy> = {
     audienceUnsubscribe: (u) => `Se désinscrire : ${u} Un clic suffit.`,
     privacy: (u) => `Politique de confidentialité : ${u}`,
     test: '[Test]',
+    unsubscribeLink: 'Se désinscrire',
+    audienceUnsubscribeLink: 'Se désinscrire',
+    unsubscribeTail: ' en un clic',
+    privacyLink: 'Confidentialité',
+    when: 'Quand',
+    where: 'Où',
+    rsvp: 'Confirmez en répondant à ce message.',
   },
 };
 
@@ -348,37 +385,94 @@ export function suggestedBasis(addressKind: 'contact' | 'organization' | null): 
   return addressKind === 'organization' ? 'generic' : 'relationship';
 }
 
+/**
+ * Quién escribe, en el pie, sólo si la firma no lo dice ya (ADR-180): la firma
+ * de la compañía lleva su nombre, y repetirlo debajo eran tres líneas de lo
+ * mismo. Una firma guardada sin el nombre lo devuelve al pie.
+ */
+function footerWho(ctx: ComposeContext): string | null {
+  const company = ctx.company_name.trim();
+  if (company && companySignature(ctx).toLowerCase().includes(company.toLowerCase())) return null;
+  return [ctx.company_name, ctx.company_city, displayWebsite(ctx.company_website)].filter(Boolean).join(' · ') || null;
+}
+
+/** Por qué le llega: la frase del pie según su base y su origen. */
+function footerWhy(ctx: ComposeContext, language: MailoutLanguage): string | null {
+  const copy = COPY[language];
+  if (isAudienceRecipient(ctx)) {
+    return ctx.basis_kind === 'relationship'
+      ? copy.audienceRelationship(ctx.company_name)
+      : copy.audienceConsent(ctx.audience_name ?? '', ctx.company_name, footerDate(ctx.subscribed_at, language));
+  }
+  const sala = ctx.organization_name?.trim() || null;
+  return ctx.basis_kind === 'consent'
+    ? copy.consent
+    : ctx.basis_kind === 'relationship'
+      ? copy.relationship
+      : ctx.basis_kind === 'generic'
+        ? copy.generic(sala)
+        : ctx.basis_kind === 'sector'
+          ? copy.sector
+          : null;
+}
+
+/**
+ * El pie en HTML (ADR-180): quién (si la firma no lo dice) y por qué le llega,
+ * y en una línea «Darse de baja en un clic · Privacidad», con palabras en el
+ * enlace. El texto plano sigue llevando la URL: allí no hay enlaces.
+ */
+export function footerHtml(ctx: ComposeContext, language: MailoutLanguage, unsubscribeUrl: string): MailFooter {
+  const copy = COPY[language];
+  const why = [footerWho(ctx), footerWhy(ctx, language)].filter((l): l is string => Boolean(l));
+  const links: MailFooter['links'] = [
+    {
+      label: isAudienceRecipient(ctx) ? copy.audienceUnsubscribeLink : copy.unsubscribeLink,
+      url: unsubscribeUrl,
+      tail: copy.unsubscribeTail,
+    },
+  ];
+  if (ctx.privacy_url) links.push({ label: copy.privacyLink, url: ctx.privacy_url });
+  return { why, links };
+}
+
+/**
+ * La función de una invitación (ADR-180), montada de los datos y en el idioma
+ * del texto: la obra, cuándo, dónde y cómo confirmar. Sin día, no hay bloque.
+ */
+export function invitationEvent(ctx: ComposeContext, language: MailoutLanguage): MailEvent | null {
+  if (ctx.mailout_kind !== 'invitation') return null;
+  const copy = COPY[language];
+  const day = performanceDate(ctx.performed_at ?? null, language, true);
+  if (!day) return null;
+  const time = performanceTime(ctx.performance_start_at ?? null, ctx.performance_timezone ?? null, language);
+  const place = [ctx.venue_name?.trim(), ctx.venue_city?.trim()].filter(Boolean).join(', ');
+  const rows = [{ label: copy.when, value: time ? `${day}, ${time}` : day }];
+  if (place) rows.push({ label: copy.where, value: place });
+  return { title: ctx.project_name?.trim() || null, rows, note: copy.rsvp };
+}
+
+/** El bloque de la función en texto plano: lo mismo, en líneas. */
+function eventText(ev: MailEvent): string {
+  return [ev.title, ...ev.rows.map((r) => `${r.label}: ${r.value}`), ev.note].filter(Boolean).join('\n');
+}
+
+/** Lo que la bandeja enseña antes de abrir: la primera frase tras el saludo, corta. */
+export function preheaderOf(body: string): string | null {
+  const paras = body.trim().split(/\n{2,}/).map((p) => p.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  const first = paras[0] && /:$/.test(paras[0]) && paras[0].length < 60 ? paras[1] : paras[0];
+  if (!first) return null;
+  return first.length > 110 ? `${first.slice(0, 109).trimEnd()}…` : first;
+}
+
 /** El pie: quién escribe, por qué le llega, la baja y la privacidad. */
 export function footerLines(ctx: ComposeContext, language: MailoutLanguage, unsubscribeUrl: string): string[] {
   const copy = COPY[language];
-  const who = [ctx.company_name, ctx.company_city, displayWebsite(ctx.company_website)].filter(Boolean).join(' · ');
-  if (isAudienceRecipient(ctx)) {
-    const why =
-      ctx.basis_kind === 'relationship'
-        ? copy.audienceRelationship(ctx.company_name)
-        : copy.audienceConsent(ctx.audience_name ?? '', ctx.company_name, footerDate(ctx.subscribed_at, language));
-    return [
-      who,
-      why,
-      copy.audienceUnsubscribe(unsubscribeUrl),
-      ctx.privacy_url ? copy.privacy(ctx.privacy_url) : null,
-    ].filter((l): l is string => Boolean(l));
-  }
-  const sala = ctx.organization_name?.trim() || null;
-  const why =
-    ctx.basis_kind === 'consent'
-      ? copy.consent
-      : ctx.basis_kind === 'relationship'
-        ? copy.relationship
-        : ctx.basis_kind === 'generic'
-          ? copy.generic(sala)
-          : ctx.basis_kind === 'sector'
-            ? copy.sector
-            : null;
+  const who = footerWho(ctx);
+  const why = footerWhy(ctx, language);
   return [
     who,
     why,
-    copy.unsubscribe(ctx.company_name, unsubscribeUrl),
+    isAudienceRecipient(ctx) ? copy.audienceUnsubscribe(unsubscribeUrl) : copy.unsubscribe(ctx.company_name, unsubscribeUrl),
     ctx.privacy_url ? copy.privacy(ctx.privacy_url) : null,
   ].filter((l): l is string => Boolean(l));
 }
@@ -389,8 +483,11 @@ export function composeMailout(
   unsubscribeUrl: string,
   template: MailTemplate = NO_TEMPLATE,
 ): ComposedMail {
+  // Two languages (ADR-180): what sits inside the text (its fields, the
+  // invitation's block) speaks the text's; the footer, the recipient's (104).
   const language = recipientLanguage(draft.language, ctx);
-  const values = mergeValues(ctx, language);
+  const textLanguage = mailoutLanguage(draft.language);
+  const values = mergeValues(ctx, textLanguage);
   // Al público sin nombre se le saluda sin él: no bloquea.
   const nameless = isAudienceRecipient(ctx) && values.nombre === null;
   const missing = fieldsUsed(draft.subject, draft.body).filter((f) => values[f] === null && !(nameless && f === 'nombre'));
@@ -398,9 +495,22 @@ export function composeMailout(
   const body = fillFields(draft.body.trim(), values, nameless);
   const signature = companySignature(ctx);
   const footer = footerLines(ctx, language, unsubscribeUrl);
-  const recordBody = withSignature(body, signature);
+  const event = invitationEvent(ctx, textLanguage);
+  const recordBody = withSignature(event ? `${body}\n\n${eventText(event)}` : body, signature);
   const text = `${recordBody}\n\n${footer.join('\n')}\n`;
-  const html = mailHtml({ language, subject, body, signature, footer }, template);
+  const html = mailHtml(
+    {
+      language: textLanguage,
+      subject,
+      body,
+      signature,
+      footer,
+      event,
+      footerHtml: footerHtml(ctx, language, unsubscribeUrl),
+      preheader: preheaderOf(body),
+    },
+    template,
+  );
   return { subject, text, html, recordBody, missing };
 }
 

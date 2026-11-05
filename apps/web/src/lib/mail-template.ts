@@ -44,6 +44,29 @@ export interface MailParts {
   body: string;
   signature: string;
   footer: string[];
+  /**
+   * La función de una invitación (ADR-180): la obra y unas filas («Cuándo»,
+   * «Dónde»), con la línea de cómo confirmar. Va tras el cuerpo.
+   */
+  event?: MailEvent | null;
+  /**
+   * El pie en HTML (ADR-180): por qué le llega, y la baja y la privacidad como
+   * enlaces con palabras en vez de la URL entera. Sin él, las líneas de `footer`.
+   */
+  footerHtml?: MailFooter | null;
+  /** Lo que la bandeja enseña antes de abrir: la primera frase tras el saludo. */
+  preheader?: string | null;
+}
+
+export interface MailEvent {
+  title: string | null;
+  rows: { label: string; value: string }[];
+  note: string | null;
+}
+
+export interface MailFooter {
+  why: string[];
+  links: { label: string; url: string; tail?: string }[];
 }
 
 /** Lo que guarda la base (`mailout_template`, o la pantalla con sus lecturas). */
@@ -139,27 +162,67 @@ const FAINT = '#767676';
 const RULE = '#e2e2e2';
 const LINK = '#1f1f1f';
 
+/**
+ * El modo oscuro de los clientes que lo leen (ADR-180; Apple Mail, entre
+ * otros): una hoja corta con clases, porque un estilo en línea no sabe del
+ * tema. Los que no la leen pintan el claro de los estilos en línea; las apps
+ * que invierten por su cuenta invierten un fondo blanco y tinta casi negra.
+ * El logo lleva un fondo claro propio en oscuro: uno transparente con trazo
+ * oscuro se perdería.
+ */
+const DARK_SHEET = [
+  '<style>',
+  ':root{color-scheme:light dark;supported-color-schemes:light dark;}',
+  '@media (prefers-color-scheme:dark){',
+  '.m-bg{background:#1c1c1e !important;}',
+  '.m-ink,.m-ink a{color:#ececec !important;}',
+  '.m-muted,.m-muted a{color:#a8a8ad !important;}',
+  '.m-faint,.m-faint a{color:#8e8e93 !important;}',
+  '.m-rule{border-color:#3a3a3c !important;}',
+  '.m-logo{background:#f2f2f2 !important;border-radius:4px;padding:6px 8px;}',
+  '}',
+  '</style>',
+].join('');
+
 /** Un texto con saltos → párrafos con `<br>` y enlaces; todo escapado. */
-function paragraphs(text: string, style: string, linkStyle: string): string {
+function paragraphs(text: string, style: string, linkStyle: string, cls = 'm-ink'): string {
   return text
     .trim()
     .split(/\n{2,}/)
     .filter((p) => p.trim())
     .map((p) => {
       const linked = escapeHtml(p).replace(URL_RE, (u) => `<a href="${u}" style="${linkStyle}">${u}</a>`);
-      return `<p style="${style}">${linked.replace(/\n/g, '<br>')}</p>`;
+      return `<p class="${cls}" style="${style}">${linked.replace(/\n/g, '<br>')}</p>`;
     })
     .join('');
 }
 
-function img(image: MailImage, size: { width: number; height: number | null }, extra = ''): string {
+function img(image: MailImage, size: { width: number; height: number | null }, extra = '', cls = ''): string {
   const height = size.height ? ` height="${size.height}"` : '';
   const style = `display:block;border:0;outline:none;text-decoration:none;max-width:100%;height:auto;${extra}`;
-  return `<img src="${escapeHtml(image.url)}" alt="${escapeHtml(image.alt)}" width="${size.width}"${height} style="${style}">`;
+  return `<img src="${escapeHtml(image.url)}" alt="${escapeHtml(image.alt)}" width="${size.width}"${height}${cls ? ` class="${cls}"` : ''} style="${style}">`;
 }
 
-function row(content: string, style: string): string {
-  return `<tr><td style="${style}">${content}</td></tr>`;
+function row(content: string, style: string, cls = ''): string {
+  return `<tr><td${cls ? ` class="${cls}"` : ''} style="${style}">${content}</td></tr>`;
+}
+
+/** La función de una invitación: la obra en cursiva y unas filas cortas, en una caja con raya. */
+function eventBlock(ev: MailEvent, link: string): string {
+  const title = ev.title
+    ? `<p class="m-ink" style="margin:0 0 8px;font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:20px;line-height:1.25;color:${INK};">${escapeHtml(ev.title)}</p>`
+    : '';
+  const rows = ev.rows
+    .map(
+      (r) =>
+        `<tr><td class="m-faint" style="padding:2px 14px 2px 0;font-family:${FONT};font-size:15px;line-height:1.5;color:${FAINT};vertical-align:top;white-space:nowrap;">${escapeHtml(r.label)}</td>` +
+        `<td class="m-ink" style="padding:2px 0;font-family:${FONT};font-size:15px;line-height:1.5;color:${INK};">${escapeHtml(r.value)}</td></tr>`,
+    )
+    .join('');
+  const note = ev.note
+    ? paragraphs(ev.note, `margin:12px 0 0;font-family:${FONT};font-size:14px;line-height:1.5;color:${MUTED};`, link, 'm-muted')
+    : '';
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="m-rule" style="border:1px solid ${RULE};border-radius:6px;"><tr><td style="padding:14px 16px;">${title}<table role="presentation" cellpadding="0" cellspacing="0" border="0">${rows}</table>${note}</td></tr></table>`;
 }
 
 /**
@@ -174,11 +237,22 @@ export function mailHtml(parts: MailParts, template: MailTemplate = NO_TEMPLATE)
   const out: string[] = [];
 
   if (template.logo) {
-    out.push(row(img(template.logo, displaySize(template.logo, LOGO_MAX, 0.5)), 'padding:0 0 28px;'));
+    out.push(row(img(template.logo, displaySize(template.logo, LOGO_MAX, 0.5), '', 'm-logo'), 'padding:0 0 28px;'));
   }
 
   out.push(row(paragraphs(parts.body, text, link), 'padding:0;'));
 
+  if (parts.event && (parts.event.title || parts.event.rows.length > 0)) {
+    out.push(row(eventBlock(parts.event, link), 'padding:4px 0 20px;'));
+  }
+
+  if (parts.signature.trim()) {
+    const sig = `margin:0;font-family:${FONT};font-size:14px;line-height:1.5;color:${MUTED};`;
+    out.push(row(paragraphs(parts.signature, sig, `color:${MUTED};text-decoration:underline;`, 'm-muted'), 'padding:12px 0 0;'));
+  }
+
+  // The image after the signature (ADR-180): the letter ends where it was
+  // signed, and the picture follows as its postscript, linked to the dossier.
   if (template.image) {
     const size = displaySize(template.image, { width: WIDTH, height: Number.POSITIVE_INFINITY }, 1);
     // A todo el ancho solo si llena la caja: una imagen más estrecha no se estira.
@@ -188,19 +262,31 @@ export function mailHtml(parts: MailParts, template: MailTemplate = NO_TEMPLATE)
     const linked = href
       ? `<a href="${escapeHtml(href)}" style="${link}font-family:${FONT};font-size:14px;">${picture}</a>`
       : picture;
-    out.push(row(linked, 'padding:8px 0 24px;'));
+    out.push(row(linked, 'padding:24px 0 0;'));
   }
 
-  if (parts.signature.trim()) {
-    const sig = `margin:0;font-family:${FONT};font-size:14px;line-height:1.5;color:${MUTED};`;
-    out.push(row(paragraphs(parts.signature, sig, `color:${MUTED};text-decoration:underline;`), `padding:16px 0 0;border-top:1px solid ${RULE};`));
+  const foot = `margin:0 0 4px;font-family:${FONT};font-size:12px;line-height:1.5;color:${FAINT};`;
+  // Air above the footer's rule: a cell's padding sits inside its border.
+  const spacer = row('&nbsp;', 'height:28px;line-height:28px;font-size:0;padding:0;');
+  const footLink = `color:${FAINT};text-decoration:underline;`;
+  if (parts.footerHtml) {
+    const why = parts.footerHtml.why.map((l) => paragraphs(l, foot, footLink, 'm-faint')).join('');
+    const links = parts.footerHtml.links
+      .map((l) => `<a href="${escapeHtml(l.url)}" style="${footLink}">${escapeHtml(l.label)}</a>${escapeHtml(l.tail ?? '')}`)
+      .join(' · ');
+    const linkLine = links ? `<p class="m-faint" style="${foot}">${links}</p>` : '';
+    out.push(spacer);
+    out.push(row(why + linkLine, `padding:16px 0 0;border-top:1px solid ${RULE};`, 'm-rule'));
+  } else if (parts.footer.length) {
+    const lines = parts.footer.map((l) => paragraphs(l, foot, footLink, 'm-faint')).join('');
+    out.push(spacer);
+    out.push(row(lines, `padding:16px 0 0;border-top:1px solid ${RULE};`, 'm-rule'));
   }
 
-  if (parts.footer.length) {
-    const foot = `margin:0 0 4px;font-family:${FONT};font-size:12px;line-height:1.5;color:${FAINT};`;
-    const lines = parts.footer.map((l) => paragraphs(l, foot, `color:${FAINT};text-decoration:underline;`)).join('');
-    out.push(row(lines, 'padding:32px 0 0;'));
-  }
+  // What the inbox shows before opening: hidden in the message itself.
+  const preheader = parts.preheader?.trim()
+    ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;font-size:1px;line-height:1px;color:#ffffff;">${escapeHtml(parts.preheader.trim())}</div>`
+    : '';
 
   return [
     '<!doctype html>',
@@ -209,10 +295,14 @@ export function mailHtml(parts: MailParts, template: MailTemplate = NO_TEMPLATE)
     '<meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width,initial-scale=1">',
     '<meta name="x-apple-disable-message-reformatting">',
+    '<meta name="color-scheme" content="light dark">',
+    '<meta name="supported-color-schemes" content="light dark">',
     `<title>${escapeHtml(parts.subject)}</title>`,
+    DARK_SHEET,
     '</head>',
-    '<body style="margin:0;padding:0;background:#ffffff;">',
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;">',
+    '<body class="m-bg" style="margin:0;padding:0;background:#ffffff;">',
+    preheader,
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="m-bg" style="background:#ffffff;">',
     '<tr><td align="center" style="padding:24px 16px;">',
     `<table role="presentation" width="${WIDTH}" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:${WIDTH}px;">`,
     ...out,
