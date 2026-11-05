@@ -6,6 +6,9 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Noviembre 2026 (en curso)
 
+- «Llego tarde» en la hoja de ruta: cada técnico tiene su enlace y, el día de la función, avisa a producción sin cambiar ninguna hora; el aviso sale arriba de Hoy y en el grupo del bolo, y producción mueve el hito con un toque (121 B, ADR-183, 2026-11-05, `ee5ef4a6`).
+- «Apuntar llamada» desde la cabecera de Conversaciones: con quién, qué se habló, y deshacer; si no hay conversación, la abre (121 A, ADR-182, 2026-11-05, `ee5ef4a6`).
+- Conversaciones en escritorio: la lista y la conversación desplazan cada una por su cuenta, el cuadro de escribir queda siempre a la vista y la conversación abre por lo último (2026-11-05, `6367bcd2`).
 - El correo de cada día, uno a uno desde una conversación, sale con tu nombre en el remitente («Marco Rubiol · MüK Cia») y, al responder, cita lo que respondes; el registro guarda sólo lo escrito (ADR-181, 2026-11-05, `468cc948`).
 - Los correos de los envíos son una carta entera: el pie no repite quién escribe y la baja va con palabras, la imagen tras la firma, la invitación con un bloque de obra, cuándo y dónde, los campos en el idioma del texto, modo oscuro y previsualización. La pantalla de enviar tiene «Así le llega» al lado, en móvil, oscuro y texto, y la barra dice qué falta (ADR-180, 2026-11-05, `2da3123c`).
 - Conversaciones, rediseño: la lista en dos secciones, «Nos toca» y «Lo demás», con filas de dos líneas y el turno dicho una vez; «Ya está» al pasar; la ficha vacía dice cuántas nos tocan y abre la que más espera; Envíos en «Por salir» y «Enviados», con la temporada sin caja; vistas como pestaña y filtros en caja suave; el «·» del móvil ya no se sale en las fichas (ADR-179, 2026-11-05, `d0aa0e98`).
