@@ -313,11 +313,17 @@
 
   /**
    * Al final del hilo, con lo último a la vista y no debajo del pie, que es
-   * fijo: lo último se alinea dejando el alto del pie por debajo.
+   * fijo: lo último se alinea dejando el alto del pie por debajo. En el
+   * segundo panel de la lista el hilo desplaza solo, encima del pie: su final
+   * es su propio fondo.
    */
   function toEnd() {
     const last = flowEl?.lastElementChild as HTMLElement | null;
-    if (!last || !footEl) return;
+    if (!last || !footEl || !flowEl) return;
+    if (flowEl.scrollHeight > flowEl.clientHeight) {
+      flowEl.scrollTop = flowEl.scrollHeight;
+      return;
+    }
     last.style.scrollMarginBlockEnd = `${footEl.offsetHeight}px`;
     scrollToEdge(last, 'end', inPeek);
   }

@@ -1422,10 +1422,19 @@
     }
 
     /* Two panes on a wide screen (ADR-176): the list at its measure, the
-       open conversation beside it, each with its own scroll under the bar. */
+       open conversation beside it, each with its own scroll under the bar.
+       The page fills the screen and does not scroll itself (it gives back
+       the shell's air at the foot), so the pane's field is always in view. */
+    .conversations:has(> .conversations__panes--two) {
+      block-size: calc(100dvh - var(--header-height) - var(--space-l));
+      margin-block-end: calc(-1 * var(--space-xxl));
+    }
     .conversations__panes--two {
+      flex: 1;
+      min-block-size: 0;
       display: grid;
       grid-template-columns: var(--chat-list-inline) minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr);
       gap: 0;
     }
     .conversations__list {
@@ -1436,6 +1445,7 @@
       scroll-margin-block-start: var(--space-l);
     }
     .conversations__panes--two .conversations__list {
+      overflow-y: auto;
       padding-block-start: var(--space-m);
       padding-inline-end: var(--space-m);
       border-inline-end: var(--border);
@@ -1448,13 +1458,27 @@
       justify-content: flex-end;
     }
     .conversations__pane {
-      position: sticky;
-      inset-block-start: var(--header-height);
-      align-self: start;
-      max-block-size: calc(100dvh - var(--header-height));
+      display: flex;
+      flex-direction: column;
+      min-block-size: 0;
       overflow-y: auto;
       overscroll-behavior: contain;
-      padding: var(--space-m) 0 var(--space-xxl) var(--space-l);
+      padding: var(--space-m) 0 var(--space-s) var(--space-l);
+    }
+    /* A conversation in the pane, as a chat: its head on top, the field at
+       the foot, always in view, and only the thread between them scrolls. */
+    .conversations__pane > :global(.chat) {
+      flex: 1;
+      min-block-size: 0;
+    }
+    .conversations__pane > :global(.chat > *) {
+      flex-shrink: 0;
+    }
+    .conversations__pane > :global(.chat > .flow) {
+      flex: 1;
+      min-block-size: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
     }
 
     /* The chips with their figure, and «Filtrar ▾» apart, in another shape:
@@ -1470,6 +1494,13 @@
       overflow-x: auto;
       scrollbar-width: none;
     }
+    /* From a tablet up a chip never gives way: the search shrinks to its
+       glass first. On a phone the chips slide, as they did. */
+    @media (min-width: 48rem) {
+      .conversations__chiprow {
+        flex-shrink: 0;
+      }
+    }
     /* Search the list: the glass and a word, no box; it grows as it takes the
        focus or holds a query, and the chips give it their room. */
     .conversations__search {
@@ -1477,7 +1508,8 @@
       align-items: center;
       gap: var(--space-xs);
       flex: 0 1 auto;
-      min-inline-size: 0;
+      min-inline-size: calc(1em + 2 * var(--space-xs));
+      overflow: hidden;
       margin-inline-start: auto;
       padding: var(--space-2xs) var(--space-xs);
       border-radius: var(--radius-s);
@@ -1568,7 +1600,6 @@
     .conversations__pane:has(.conversations__rest) {
       display: grid;
       place-items: center;
-      min-block-size: calc(100dvh - var(--header-height) - var(--space-xxl));
     }
     .conversations__rest {
       max-inline-size: var(--chat-rest-measure);
