@@ -6,6 +6,8 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Noviembre 2026 (en curso)
 
+- La barra de arriba y ⌘K buscan de verdad: elegir un proyecto, una línea, una persona o un espacio abre su ficha, con «acotar» al lado; la pastilla «Todo» filtra («Ver solo…») y se dibuja como un control (125, ADR-178, 2026-11-05, `123fe4d3`).
+- Conversaciones, pulido: botones de la cabecera alineados, la fila sin doble recorte, Envíos en la línea del asunto y en tres líneas en el móvil, la banda de temporada sin nombres cortados, el cuadro de escribir a la altura del campo (2026-11-05, `123fe4d3`).
 - Seguridad: un enlace de hoja de ruta ya sólo devuelve lo de su rol. Antes, la función pública daba a cualquier enlace el hotel, la hospitalidad y los teléfonos y correos del equipo y del reparto (nunca el dinero) (120, 2026-11-05, `82096181`).
 - La hoja de ruta del técnico: su enlace abre sólo lo suyo, sin caché ni «confirmar», con «Llamar a…», «Cómo llegar» y el día en orden con la raya de ahora; en el móvil la página pública vuelve a tener márgenes (120, 2026-11-05, `82096181`).
 - El bolo como historia: trato, contrato, funciones, factura, vencimiento y cobro en el orden en que pasaron, con la raya de hoy que dice en palabras dónde está el dinero («vencida hace 3 días») y «Apuntar cobro», que lleva a Cuentas (120, 2026-11-05, `82096181`).
