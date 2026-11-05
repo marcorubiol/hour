@@ -74,7 +74,9 @@ describe.skipIf(!envReady())('RLS — public road sheet role matrix (120)', () =
         hospitality: { dietas: `zzz-hospitality-${RUN}` },
         technical: { varas: `zzz-technical-${RUN}` },
       },
-      new URLSearchParams({ id: `eq.${perfId}` }),
+      // Sólo `id` de vuelta: `performance` tiene grant por columnas y `select=*`
+      // daría 403 por la lectura, no por la escritura.
+      new URLSearchParams({ id: `eq.${perfId}`, select: 'id' }),
     );
     expect(patched.status).toBeLessThan(300);
 

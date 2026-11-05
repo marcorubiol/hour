@@ -6,6 +6,11 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Noviembre 2026 (en curso)
 
+- Seguridad: un enlace de hoja de ruta ya sólo devuelve lo de su rol. Antes, la función pública daba a cualquier enlace el hotel, la hospitalidad y los teléfonos y correos del equipo y del reparto (nunca el dinero) (120, 2026-11-05, `82096181`).
+- La hoja de ruta del técnico: su enlace abre sólo lo suyo, sin caché ni «confirmar», con «Llamar a…», «Cómo llegar» y el día en orden con la raya de ahora; en el móvil la página pública vuelve a tener márgenes (120, 2026-11-05, `82096181`).
+- El bolo como historia: trato, contrato, funciones, factura, vencimiento y cobro en el orden en que pasaron, con la raya de hoy que dice en palabras dónde está el dinero («vencida hace 3 días») y «Apuntar cobro», que lleva a Cuentas (120, 2026-11-05, `82096181`).
+- «Te espera» en Hoy y las conversaciones de las fichas de la sala y del proyecto usan la fila de Conversaciones: quién, tipo y ciudad, lo último que se dijo y el turno en palabras (120, 2026-11-05, `82096181`).
+- Las invitaciones tienen `{fecha_completa}`, con el año, además de `{fecha}` sin él; y la espera de «Siguiente» en Hoy sale en gris, no en el azul de la tarjeta (2026-11-05, `82096181`).
 - La temporada se cuenta igual en todas partes (Cuentas, Hoy, Conversaciones, la sugerencia de nombre de una línea) y cada espacio elige en qué mes empieza, septiembre por defecto, en Ajustes › Este espacio (78, 2026-11-04, `113b3d24`).
 - «Ver el original» en cada correo de una conversación: el correo entero tal como llegó, con lo citado, el HTML aislado (sin scripts y con las imágenes remotas bloqueadas, que se pueden abrir aparte) y los adjuntos para descargar. Sólo abre lo que la sincronización ató a esa conversación (111, 2026-11-04, `63356312`).
 - Nadie puede apuntar un correo falso en una conversación: los eventos de correo sólo los escribe la sincronización (123, 2026-11-04, `63356312`).
