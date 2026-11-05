@@ -390,7 +390,13 @@ describe('{obra}, {fecha} y {hora} (102)', () => {
     const m = composeMailout({ subject: '{obra}', body: 'x', language: 'es' }, { ...ctx, project_name: 'MaMeMi' }, URL);
     expect(m.subject).toBe('MaMeMi');
     expect(mergeFieldsFor('outreach')).toEqual(['nombre', 'sala', 'ciudad', 'obra']);
-    expect(mergeFieldsFor('invitation')).toEqual(['nombre', 'sala', 'ciudad', 'obra', 'fecha', 'hora']);
+    expect(mergeFieldsFor('invitation')).toEqual(['nombre', 'sala', 'ciudad', 'obra', 'fecha', 'fecha_completa', 'hora']);
     expect(fieldsUsed('{hora} {obra} {fecha}')).toEqual(['obra', 'fecha', 'hora']);
+  });
+
+  test('{fecha_completa} lleva el año; {fecha} no', () => {
+    expect(performanceDate('2027-03-06', 'es')).toBe('sábado, 6 de marzo');
+    expect(performanceDate('2027-03-06', 'es', true)).toBe('sábado, 6 de marzo de 2027');
+    expect(fieldsUsed('{fecha_completa} y {fecha}')).toEqual(['fecha', 'fecha_completa']);
   });
 });

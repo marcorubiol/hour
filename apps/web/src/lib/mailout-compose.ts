@@ -3,7 +3,7 @@
  * vista previa de la pantalla y la cola del Worker llaman a lo mismo, así que
  * lo que se ve es lo que sale.
  *
- *   · Campos: `{nombre}`, `{sala}`, `{ciudad}`, `{obra}`, `{fecha}`, `{hora}`. Un campo que no tiene valor
+ *   · Campos: `{nombre}`, `{sala}`, `{ciudad}`, `{obra}`, `{fecha}`, `{fecha_completa}`, `{hora}`. Un campo que no tiene valor
  *     para un destinatario se marca y ese correo no sale (nunca vacío).
  *     `{nombre}` de una dirección genérica es «equipo de {sala}».
  *   · Origen (ADR-173 § 10): lo dice la fila, no el envío. Una persona del
@@ -41,12 +41,12 @@ import { mailHtml, NO_TEMPLATE, type MailTemplate } from './mail-template';
 export const MAILOUT_LANGUAGES = ['es', 'ca', 'en', 'fr'] as const;
 type MailoutLanguage = (typeof MAILOUT_LANGUAGES)[number];
 
-export const MERGE_FIELDS = ['nombre', 'sala', 'ciudad', 'obra', 'fecha', 'hora'] as const;
+export const MERGE_FIELDS = ['nombre', 'sala', 'ciudad', 'obra', 'fecha', 'fecha_completa', 'hora'] as const;
 type MergeField = (typeof MERGE_FIELDS)[number];
 
-/** Los campos que la pantalla ofrece: `{fecha}` y `{hora}` son de la función de una invitación. */
+/** Los campos que la pantalla ofrece: `{fecha}`, `{fecha_completa}` y `{hora}` son de la función de una invitación. */
 export function mergeFieldsFor(kind: 'outreach' | 'invitation'): readonly MergeField[] {
-  return kind === 'invitation' ? MERGE_FIELDS : MERGE_FIELDS.filter((f) => f !== 'fecha' && f !== 'hora');
+  return kind === 'invitation' ? MERGE_FIELDS : MERGE_FIELDS.filter((f) => f !== 'fecha' && f !== 'fecha_completa' && f !== 'hora');
 }
 
 export type MailBasisKind = 'consent' | 'relationship' | 'generic' | 'sector';
@@ -216,7 +216,7 @@ export function recipientLanguage(
   return (MAILOUT_LANGUAGES as readonly string[]).includes(own ?? '') ? (own as MailoutLanguage) : mailoutLanguage(mailoutLang);
 }
 
-const FIELD_RE = /\{(nombre|sala|ciudad|obra|fecha|hora)\}/g;
+const FIELD_RE = /\{(nombre|sala|ciudad|obra|fecha_completa|fecha|hora)\}/g;
 
 /** Los campos que usa un texto, sin repetir, en el orden de MERGE_FIELDS. */
 export function fieldsUsed(...texts: string[]): MergeField[] {
@@ -243,6 +243,7 @@ function mergeValues(ctx: ComposeContext, language: MailoutLanguage): Record<Mer
   const show = {
     obra: ctx.project_name?.trim() || null,
     fecha: performanceDate(ctx.performed_at ?? null, language),
+    fecha_completa: performanceDate(ctx.performed_at ?? null, language, true),
     hora: performanceTime(ctx.performance_start_at ?? null, ctx.performance_timezone ?? null, language),
   };
   if (ctx.mailout_kind === 'invitation') {
@@ -282,10 +283,12 @@ function footerDate(iso: string | null, language: MailoutLanguage): string | nul
 }
 
 /**
- * `{fecha}`: «sábado, 14 de noviembre», en el idioma del correo. Es un día del
- * calendario (`performance.performed_at`), no un instante: no se mueve de zona.
+ * `{fecha}`: «sábado, 14 de noviembre», en el idioma del correo; `{fecha_completa}`
+ * le añade el año, para lo que no es de las próximas semanas (Marco, 2026-11-05).
+ * Es un día del calendario (`performance.performed_at`), no un instante: no se
+ * mueve de zona.
  */
-export function performanceDate(day: string | null, language: MailoutLanguage): string | null {
+export function performanceDate(day: string | null, language: MailoutLanguage, withYear = false): string | null {
   if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
   const d = new Date(`${day}T12:00:00Z`);
   if (Number.isNaN(d.getTime())) return null;
@@ -293,6 +296,7 @@ export function performanceDate(day: string | null, language: MailoutLanguage): 
     weekday: 'long',
     day: 'numeric',
     month: 'long',
+    ...(withYear ? { year: 'numeric' as const } : {}),
     timeZone: 'UTC',
   }).format(d);
 }
