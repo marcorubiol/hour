@@ -67,6 +67,11 @@ type MoneyBolo = {
   function_count: number;
   first_performed_at: string | null;
   last_performed_at: string | null;
+  contract_sent_at: string | null;
+  contract_signed_at: string | null;
+  /** Tarea 120: the bolo's history starts here (opened) and here (agreed). */
+  created_at: string;
+  confirmed_at: string | null;
 };
 
 export const GET: RequestHandler = async ({ request, url, platform, locals }) => {

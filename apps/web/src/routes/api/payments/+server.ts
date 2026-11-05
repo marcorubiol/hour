@@ -1,5 +1,5 @@
 /**
- * GET  /api/payments — active payment rows by invoice or workspace/date window.
+ * GET  /api/payments — active payment rows by invoice, bolo or workspace/date window.
  *      `recorded_since` (an instant) + `others=1`: what was RECORDED after it
  *      by anyone but the caller, newest first: the Desk's «cobrado» (ADR-133).
  * POST /api/payments — record an observed payment through the locking RPC.
@@ -17,6 +17,8 @@ import { json } from '$lib/server/http';
 
 const QuerySchema = v.object({
   invoice_id: v.optional(v.pipe(v.string(), v.uuid())),
+  /** Tarea 120: the payments anchored to one bolo (no invoice), for its history. */
+  bolo_id: v.optional(v.pipe(v.string(), v.uuid())),
   workspace_ids: v.optional(v.string()),
   from: v.optional(v.pipe(v.string(), v.isoDate())),
   to: v.optional(v.pipe(v.string(), v.isoDate())),
@@ -49,10 +51,10 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
 
   const parsed = v.safeParse(QuerySchema, Object.fromEntries(url.searchParams.entries()));
   if (!parsed.success) return json({ error: 'invalid_query' }, 400);
-  const { invoice_id, workspace_ids, from, to, recorded_since, others, limit } = parsed.output;
+  const { invoice_id, bolo_id, workspace_ids, from, to, recorded_since, others, limit } = parsed.output;
   const workspaceIds = parseUuidList(workspace_ids);
-  if (!invoice_id && workspaceIds.length === 0) {
-    return json({ error: 'invalid_query', hint: 'Pass invoice_id or workspace_ids.' }, 400);
+  if (!invoice_id && !bolo_id && workspaceIds.length === 0) {
+    return json({ error: 'invalid_query', hint: 'Pass invoice_id, bolo_id or workspace_ids.' }, 400);
   }
 
   const search = new URLSearchParams({
@@ -62,6 +64,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
     limit: String(limit),
   });
   if (invoice_id) search.set('invoice_id', `eq.${invoice_id}`);
+  if (bolo_id) search.set('bolo_id', `eq.${bolo_id}`);
   if (workspaceIds.length > 0) search.set('workspace_id', `in.(${workspaceIds.join(',')})`);
   if (from) search.set('received_on', `gte.${from}`);
   if (to) search.append('received_on', `lte.${to}`);

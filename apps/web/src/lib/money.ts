@@ -483,6 +483,10 @@ export interface MoneyBolo {
 	contract_sent_at?: string | null;
 	/** El contrato volvió firmado (ADR-163). Null: sin firmar. */
 	contract_signed_at?: string | null;
+	/** Cuándo se abrió el trato (tarea 120): el primer día de su historia. */
+	created_at?: string | null;
+	/** Cuándo pasó a contratado por última vez (tarea 120, trigger `bolo_confirmed_at`). Null: aún no, o no se sabe. */
+	confirmed_at?: string | null;
 	project: {
 		id: string;
 		slug: string;

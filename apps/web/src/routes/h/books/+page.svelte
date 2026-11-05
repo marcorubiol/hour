@@ -657,6 +657,8 @@
       payBolo = null;
       void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
       void queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      // The bolo's history reads its own payments (tarea 120).
+      void queryClient.invalidateQueries({ queryKey: ['payments'] });
       const id = (payment as { id?: string } | null)?.id;
       toastCreated({
         locale,
@@ -666,6 +668,7 @@
               await mutateJSON('DELETE', `/api/payments/${id}`);
               await queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
               await queryClient.invalidateQueries({ queryKey: ['invoices'] });
+              await queryClient.invalidateQueries({ queryKey: ['payments'] });
             }
           : undefined,
       });
@@ -1045,6 +1048,13 @@
     const want = pendingAct;
     if (!want || loading) return;
     pendingAct = null;
+    // «Apuntar cobro» under the bolo's history (tarea 120): the payment
+    // dialog, whether or not the bolo is late.
+    if (want.kind === 'pay') {
+      const target = bolos.find((b) => b.id === want.id);
+      if (target) openPay(target);
+      return;
+    }
     const item = attention.find((a) => a.bolo.id === want.id && a.kind === want.kind);
     if (!item) return;
     // Here the verb was already chosen: a late payment is recorded, not chased.

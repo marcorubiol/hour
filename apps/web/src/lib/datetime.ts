@@ -229,7 +229,8 @@ export function timeInTz(iso: string, timeZone: string): string {
   }).format(new Date(iso));
 }
 
-function dayInTz(iso: string, timeZone: string): string {
+/** The day (YYYY-MM-DD) an instant falls on in `timeZone`. */
+export function dayInTz(iso: string, timeZone: string): string {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone,
     year: 'numeric',

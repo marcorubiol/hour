@@ -717,6 +717,7 @@ export type Database = {
       bolo: {
         Row: {
           city: string | null
+          confirmed_at: string | null
           contract_sent_at: string | null
           contract_signed_at: string | null
           conversation_id: string | null
@@ -736,6 +737,7 @@ export type Database = {
         }
         Insert: {
           city?: string | null
+          confirmed_at?: string | null
           contract_sent_at?: string | null
           contract_signed_at?: string | null
           conversation_id?: string | null
@@ -755,6 +757,7 @@ export type Database = {
         }
         Update: {
           city?: string | null
+          confirmed_at?: string | null
           contract_sent_at?: string | null
           contract_signed_at?: string | null
           conversation_id?: string | null
@@ -7050,10 +7053,12 @@ export type Database = {
         Returns: {
           city: string
           collected: number
+          confirmed_at: string
           contract_sent_at: string
           contract_signed_at: string
           conversation_id: string
           country: string
+          created_at: string
           fee_amount: number
           fee_currency: string
           first_performed_at: string

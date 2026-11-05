@@ -123,6 +123,66 @@ test.describe('Cuentas', () => {
     }
   });
 
+  test('the bolo is its history: what happened above the line of today, what is coming below', async ({ page }) => {
+    test.setTimeout(90_000);
+    await page.goto('/h/books');
+    await waitForLoaded(page);
+    const { projectId, boloId } = await ownBolo(page, RADAR, 1000);
+
+    // A function in the past and one ahead, both hung from the deal.
+    const perfIds = await page.evaluate(
+      async ({ projectId, boloId, venue }) => {
+        const ahead = new Date(Date.now() + 40 * 86_400_000).toISOString().slice(0, 10);
+        const ids: string[] = [];
+        for (const [day, status] of [['2025-01-10', 'done'], [ahead, 'confirmed']] as const) {
+          const res = await fetch('/api/performances', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ project_id: projectId, performed_at: day, venue_name: venue, status, bolo_id: boloId }),
+          });
+          if (!res.ok) throw new Error(`create performance ${res.status}`);
+          ids.push(((await res.json()) as { performance: { id: string } }).performance.id);
+        }
+        return ids;
+      },
+      { projectId, boloId, venue: RADAR },
+    );
+
+    try {
+      await page.goto(`/h/desk?peek=bolo/${projectId}/${boloId}`);
+      await waitForLoaded(page);
+      const history = page.getByTestId('bolo-history');
+      await expect(history).toBeVisible({ timeout: 15_000 });
+      const today = history.getByTestId('bolo-today');
+      await expect(today).toContainText('today');
+
+      // The order is the story: the past function, then today, then the
+      // contract still to send and the function ahead.
+      const kinds = await history
+        .locator('li')
+        .evaluateAll((lis) => lis.map((li) => li.getAttribute('data-event') ?? (li.getAttribute('data-testid') === 'bolo-today' ? 'today' : '')));
+      const at = (k: string) => kinds.indexOf(k);
+      expect(at('function')).toBeGreaterThanOrEqual(0);
+      expect(at('function')).toBeLessThan(at('today'));
+      expect(kinds.lastIndexOf('function')).toBeGreaterThan(at('today'));
+      expect(at('contract_unsent')).toBeGreaterThan(at('today'));
+
+      // No bubbles, no «send»: recording a payment says it stays in Hour,
+      // and goes to Cuentas with its dialog open.
+      const write = page.getByTestId('bolo-record-payment');
+      await expect(write).toContainText('nothing leaves Hour');
+      await write.getByRole('link', { name: 'Record a payment' }).click();
+      await expect(page).toHaveURL(/\/h\/books/);
+      await expect(page.locator('dialog[open]').getByLabel('Amount')).toBeVisible({ timeout: 15_000 });
+      await expect(page).not.toHaveURL(/act=/);
+      await page.locator('dialog[open]').getByRole('button', { name: 'Cancel' }).click();
+    } finally {
+      await page.evaluate(async (ids) => {
+        for (const id of ids) await fetch(`/api/performances/${id}`, { method: 'DELETE' });
+      }, perfIds);
+    }
+  });
+
   test('a «Falta» verb from the bolo vistazo lands with its dialog open (`act=`)', async ({ page }) => {
     test.setTimeout(60_000);
     await page.goto('/h/books');

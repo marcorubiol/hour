@@ -8,10 +8,16 @@
    * when you want to record a payment or make the invoice.
    *
    * The shape of every record: RecordHead (address, name, facts), «Falta»,
-   * then its blocks: the contract, the functions, the documents, what came
-   * in, what went out. Money is written in Cuentas (ADR-043), so each «Falta»
-   * verb goes there, to the row, with its dialog open (`act=`); the one
-   * exception is the contract (ADR-163): three steps marked right here.
+   * then its blocks. Here the main one is its HISTORY (tarea 120, ADR-177,
+   * mesa § 8: «¿cuándo nos pagan?»): the deal opened and agreed, the contract,
+   * the functions, the invoice, when it falls due, what came in, in the order
+   * it happened, with a line of today that says where the money stands in
+   * words («vencida hace 3 días»). No bubbles: an invoice is a line of what
+   * happened, not a message. Then what went out (expenses). Money is written
+   * in Cuentas (ADR-043), so each «Falta» verb, and «Apuntar cobro · no sale
+   * de Hour» under the history, go there, to the row, with its dialog open
+   * (`act=`); the one exception is the contract (ADR-163): its steps are
+   * marked right here, on its line of the history.
    *
    * Reads what Cuentas reads, narrowed to the one project (the money feed
    * takes no id): its bolos, its invoices, the bolo's expenses, and the
@@ -35,7 +41,8 @@
   import { booksHref } from '$lib/bolo-pick';
   import { usePins } from '$lib/stores/pins.svelte';
   import { projectBolosQueryOptions } from '$lib/bolo-queries';
-  import { dayLabel, localDayISO } from '$lib/datetime';
+  import { dayLabel, localDayISO, viewerTimeZone } from '$lib/datetime';
+  import { boloHistory, type BoloEvent, type BoloHistoryPayment } from '$lib/bolo-history';
   import { appLocale, t } from '$lib/i18n';
   import { lensOn } from '$lib/lenses.svelte';
   import { planAccessQueryOptions } from '$lib/plan-create';
@@ -44,7 +51,6 @@
     boloStatusLabel,
     contractState,
     fmtFee,
-    invoiceStatusLabel,
     invoicesByBolo,
     observedPayerTermsDays,
     paymentMethodLabel,
@@ -75,6 +81,8 @@
 
   const locale = appLocale();
   const pins = usePins();
+  /** The reader's day: the line of today, and what is past and what is coming. */
+  const today = localDayISO();
 
   const bolosQuery = createQuery(toStore(() => ({ ...projectBolosQueryOptions(projectId), retry: retryLoad })));
   // The project feed carries the whole MoneyBolo row; `BoloLite` is its pick.
@@ -161,13 +169,19 @@
 
   let invoices = $derived($invoicesQuery.data?.items ?? []);
   let docs = $derived(bolo ? (invoicesByBolo(invoices).get(bolo.id) ?? []) : []);
-  let payments = $derived(
-    docs
-      .flatMap((d) => d.payments.map((p) => ({ ...p, doc: d })))
-      .filter((p) => !p.deleted_at)
-      .sort((a, b) => b.received_on.localeCompare(a.received_on)),
-  );
   let expenses = $derived($expensesQuery.data?.items ?? []);
+
+  // What came in against the bolo itself, with no invoice (Cuentas records a
+  // payment there when there is no issued document): the documents bring
+  // their own.
+  const boloPaymentsQuery = createQuery(
+    toStore(() => ({
+      queryKey: ['payments', 'bolo', id] as const,
+      enabled: Boolean(bolo),
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchJSON<{ items: BoloHistoryPayment[] }>(`/api/payments?bolo_id=${encodeURIComponent(id)}`, signal),
+    })),
+  );
 
   let ctx = $derived({
     invoicesByBolo: invoicesByBolo(invoices),
@@ -176,6 +190,50 @@
     today: new Date(),
   });
   let money = $derived(bolo ? boloMoney(bolo, ctx) : null);
+
+  // ── The history (tarea 120) ─────────────────────────────────────────────
+  const timeZone = viewerTimeZone();
+  let history = $derived(
+    bolo && money
+      ? boloHistory({
+          bolo,
+          functions,
+          docs,
+          boloPayments: $boloPaymentsQuery.data?.items ?? [],
+          money,
+          today,
+          timeZone,
+        })
+      : null,
+  );
+  // Until the documents are in, a history would say «nothing due» wrongly.
+  let historyBusy = $derived($invoicesQuery.isLoading || $functionsQuery.isLoading || $boloPaymentsQuery.isLoading);
+  let nowText = $derived.by(() => {
+    const now = history?.now;
+    if (!now) return '';
+    switch (now.kind) {
+      case 'overdue':
+        return t(now.days === 1 ? 'bolo.now_overdue_one' : 'bolo.now_overdue_many', locale, { n: now.days });
+      case 'due_today':
+        return t('bolo.now_due_today', locale);
+      case 'due_in':
+        return t(now.days === 1 ? 'bolo.now_due_in_one' : 'bolo.now_due_in_many', locale, { n: now.days });
+      case 'paid':
+        return t('bolo.now_paid', locale);
+      case 'cancelled':
+        return t('bolo.now_cancelled', locale);
+      default:
+        return '';
+    }
+  });
+  function eventKey(e: BoloEvent): string {
+    return 'id' in e ? `${e.kind}:${e.id}` : e.kind;
+  }
+  // «Apuntar cobro»: money is written in Cuentas (ADR-043), and it does not
+  // leave Hour (it is a note of what came in, not a message to the venue).
+  let canRecordPayment = $derived(
+    lensOn('books') && !!bolo && bolo.status !== 'cancelled' && !!money && money.fee !== null && money.collect !== 'full',
+  );
 
   let title = $derived(bolo ? bolo.venue_name || bolo.city || bolo.project?.name || t('peek.crumb_bolo', locale) : '');
   let crumbs = $derived.by<Crumb[]>(() => {
@@ -191,6 +249,7 @@
   // A verb goes to Cuentas; your scope stays when it already shows the bolo.
   let here = $derived({ pins: pins.pins, workspaceSlug: workspaceSlug || null });
   let rowHref = $derived(booksHref(projectId, { boloId: id }));
+  let payHref = $derived(booksHref(projectId, { boloId: id, act: 'pay', here }));
   let conversationHref = $derived(
     bolo?.conversation_id && workspaceSlug ? `/h/${workspaceSlug}/conversation/${bolo.conversation_id}` : null,
   );
@@ -252,10 +311,6 @@
   // ── The contract (ADR-163): unsent → sent → signed, a date at each step ─
   const queryClient = useQueryClient();
   let contract = $derived(bolo ? contractState(bolo) : 'unsent');
-  let contractDay = $derived.by(() => {
-    const at = contract === 'signed' ? bolo?.contract_signed_at : contract === 'sent' ? bolo?.contract_sent_at : null;
-    return at ? dayLabel(localDayISO(new Date(at))) : null;
-  });
   type ContractDates = { sent_at: string | null; signed_at: string | null };
   const saveContract = createMutation({
     mutationFn: (dates: ContractDates) => mutateJSON('PATCH', `/api/money/bolos/${id}`, { contract: dates }),
@@ -284,11 +339,63 @@
   }
   let contractVerb = $derived(contract === 'unsent' ? 'bolo.contract_mark_sent' : 'bolo.contract_mark_signed');
 
-  const today = localDayISO();
   function fmt(amount: number | string | null, currency: string | null): string {
     return fmtFee(amount === null ? null : Number(amount), currency, locale);
   }
 </script>
+
+{#snippet event(e: BoloEvent, ahead: boolean)}
+  <li class="bolo-history__row" class:is-ahead={ahead} data-event={e.kind}>
+    <span class="bolo-history__when">{e.day ? dayLabel(e.day) : ''}</span>
+    {#if e.kind === 'opened'}
+      <span>{t('bolo.ev_opened', locale)}</span>
+    {:else if e.kind === 'agreed'}
+      <span>{t('bolo.ev_agreed', locale)}</span>
+    {:else if e.kind === 'contract_sent' || e.kind === 'contract_signed' || e.kind === 'contract_unsent'}
+      <span>{t(`bolo.ev_${e.kind}`, locale)}</span>
+      <!-- The contract's steps are marked on its own latest line (ADR-163):
+           the next step, and one step back. -->
+      {#if e.kind === 'contract_unsent' || e.kind === 'contract_signed' || !e.signed}
+        <span class="bolo-record__acts" data-testid="bolo-contract">
+          {#if contract !== 'signed'}
+            <Button size="xs" variant="secondary" loading={$saveContract.isPending} onclick={contractForward}
+              >{t(contractVerb, locale)}</Button
+            >
+          {/if}
+          {#if contract !== 'unsent'}
+            <Button size="xs" variant="quiet" disabled={$saveContract.isPending} onclick={contractBack}
+              >{t('bolo.contract_undo', locale)}</Button
+            >
+          {/if}
+        </span>
+      {/if}
+    {:else if e.kind === 'function'}
+      <span
+        >{t('bolo.ev_function', locale)}{#if e.place}{' · '}{#if e.slug && workspaceSlug}<a
+              href={`/h/${workspaceSlug}/performance/${e.slug}`}>{e.place}</a
+            >{:else}{e.place}{/if}{/if}</span
+      >
+      <span class="fact-word" data-family={performanceStatusFamily(e.status)}>{performanceStatusLabel(e.status, locale)}</span>
+    {:else if e.kind === 'invoice'}
+      <span
+        >{t(e.docType === 'proforma' ? 'bolo.ev_proforma' : 'bolo.ev_invoice', locale)}{#if e.number}<span class="bolo-record__faint"
+            >{` · ${e.number}`}</span
+          >{/if}{#if e.payer}<span class="bolo-record__faint">{` · ${e.payer}`}</span>{/if}</span
+      >
+      <span class="bolo-record__num">{fmt(e.total, e.currency)}</span>
+    {:else if e.kind === 'due'}
+      <span>{t(e.source === 'due' || e.source === 'explicit' ? 'bolo.ev_due' : 'bolo.ev_due_expected', locale)}</span>
+      {#if money}<span class="bolo-record__num">{fmt(money.owed, money.currency)}</span>{/if}
+    {:else if e.kind === 'payment'}
+      <span
+        >{t('bolo.ev_payment', locale)}<span class="bolo-record__faint"
+          >{` · ${paymentMethodLabel(e.method, locale)}`}{#if e.number}{` · ${e.number}`}{/if}</span
+        ></span
+      >
+      <span class="bolo-record__num">{fmt(e.amount, e.currency)}</span>
+    {/if}
+  </li>
+{/snippet}
 
 <article class="record bolo-record" aria-busy={$bolosQuery.isLoading} data-testid="bolo-record">
   {#if $bolosQuery.isLoading || !bolo || !money}
@@ -323,94 +430,36 @@
       {/snippet}
     </RecordHead>
 
-    <section class="bolo-record__section" aria-label={t('bolo.contract', locale)} data-testid="bolo-contract">
-      <BlockHead title={t('bolo.contract', locale)} />
-      <div class="bolo-record__row">
-        <span class="bolo-record__when">{contractDay ?? ''}</span>
-        <span class="fact-word" data-family={contract === 'signed' ? 'confirmed' : contract === 'sent' ? 'hold' : 'proposed'}
-          >{t(`bolo.contract_${contract}`, locale)}</span
-        >
-        <span class="bolo-record__acts">
-          {#if contract !== 'signed'}
-            <Button size="xs" variant="secondary" loading={$saveContract.isPending} onclick={contractForward}
-              >{t(contractVerb, locale)}</Button
-            >
-          {/if}
-          {#if contract !== 'unsent'}
-            <Button size="xs" variant="quiet" disabled={$saveContract.isPending} onclick={contractBack}
-              >{t('bolo.contract_undo', locale)}</Button
-            >
-          {/if}
-        </span>
-      </div>
-    </section>
-
-    <section class="bolo-record__section" aria-label={t('books.sheet_functions', locale)}>
-      <BlockHead title={t('books.sheet_functions', locale)} count={bolo.function_count}>
+    <section class="bolo-record__section" aria-label={t('bolo.history', locale)} data-testid="bolo-history">
+      <BlockHead title={t('bolo.history', locale)}>
         {#if canAddFunction}
           <button type="button" class="block-head__act" onclick={() => (addOpen = true)}>{t('books.add_function', locale)}</button>
         {/if}
       </BlockHead>
-      {#if functions.length > 0}
-        <ul class="bolo-record__rows" role="list">
-          {#each functions as p (p.id)}
-            <li class="bolo-record__row">
-              <span class="bolo-record__when">{dayLabel(p.performed_at)}</span>
-              {#if p.slug && workspaceSlug}
-                <a href={`/h/${workspaceSlug}/performance/${p.slug}`}>{p.venue_name || p.city || title}</a>
-              {:else}
-                <span>{p.venue_name || p.city || title}</span>
-              {/if}
-              <span class="fact-word" data-family={performanceStatusFamily(p.status)}>{performanceStatusLabel(p.status, locale)}</span>
-            </li>
-          {/each}
-        </ul>
-      {:else if $functionsQuery.isLoading}
+      {#if historyBusy || !history}
         <EmptyLine text={t('desk.loading', locale)} busy />
-      {:else if bolo.first_performed_at}
-        <EmptyLine text={dayLabel(bolo.first_performed_at)} />
       {:else}
-        <EmptyLine text={t('books.no_date', locale)} />
+        <ol class="bolo-history" role="list">
+          {#each history.past as e (eventKey(e))}
+            {@render event(e, false)}
+          {/each}
+          <li class="bolo-history__today" data-testid="bolo-today" data-now={history.now.kind}>
+            <span class="bolo-history__when">{t('bolo.today', locale)}</span>
+            {#if nowText}<span class="bolo-history__now">{nowText}</span>{/if}
+          </li>
+          {#each history.future as e (eventKey(e))}
+            {@render event(e, true)}
+          {/each}
+        </ol>
+      {/if}
+      {#if canRecordPayment}
+        <p class="bolo-history__write" data-testid="bolo-record-payment">
+          <a class="link-arrow" href={payHref}>{t('bolo.record_payment', locale)}</a>
+          <span class="bolo-record__faint">{t('bolo.record_payment_note', locale)}</span>
+        </p>
       {/if}
       {#if conversationHref}
         <p class="bolo-record__more"><a class="link-arrow" href={conversationHref}>{t('books.sheet_conversation', locale)}</a></p>
-      {/if}
-    </section>
-
-    {#if space?.invoicing_mode !== 'off'}
-      <section class="bolo-record__section" aria-label={t('books.documents', locale)}>
-        {#if docs.length === 0}
-          <EmptyLine label={t('books.documents', locale)} text={t('books.sheet_no_doc', locale)} busy={$invoicesQuery.isLoading} />
-        {:else}
-          <BlockHead title={t('books.documents', locale)} count={docs.length} />
-          <ul class="bolo-record__rows" role="list">
-            {#each docs as d (d.id)}
-              <li class="bolo-record__row">
-                <span class="bolo-record__when">{dayLabel(d.issued_on)}</span>
-                <span>{d.number ?? invoiceStatusLabel(d.status, locale)}{#if d.payer}<span class="bolo-record__faint">{` · ${d.payer.name}`}</span>{/if}</span>
-                <span class="bolo-record__num">{fmt(d.total, d.currency)}</span>
-                <span class="bolo-record__faint">{invoiceStatusLabel(d.status, locale)}{#if d.status === 'issued' && d.expected_on && d.expected_on >= today}{` · ${t('books.sheet_expected', locale, { date: dayLabel(d.expected_on) })}`}{/if}</span>
-              </li>
-            {/each}
-          </ul>
-        {/if}
-      </section>
-    {/if}
-
-    <section class="bolo-record__section" aria-label={t('peek.bolo_payments', locale)}>
-      {#if payments.length === 0}
-        <EmptyLine label={t('peek.bolo_payments', locale)} text={t('peek.bolo_no_payments', locale)} busy={$invoicesQuery.isLoading} />
-      {:else}
-        <BlockHead title={t('peek.bolo_payments', locale)} count={payments.length} />
-        <ul class="bolo-record__rows" role="list">
-          {#each payments as p (p.id)}
-            <li class="bolo-record__row">
-              <span class="bolo-record__when">{dayLabel(p.received_on)}</span>
-              <span>{paymentMethodLabel(p.method, locale)}{#if p.doc.number}<span class="bolo-record__faint">{` · ${p.doc.number}`}</span>{/if}</span>
-              <span class="bolo-record__num">{fmt(p.amount, p.doc.currency)}</span>
-            </li>
-          {/each}
-        </ul>
       {/if}
     </section>
 
@@ -498,17 +547,73 @@
     .bolo-record__faint {
       color: var(--text-faint);
     }
-    /* A function is a row of the record, not a call to action: ink, and
-       the underline only under the pointer. */
-    .bolo-record__row a {
-      color: var(--text-color);
-      text-decoration: none;
-    }
-    .bolo-record__row a:hover {
-      text-decoration: underline;
-    }
     .bolo-record__more {
       margin: 0;
+    }
+    /* The history (tarea 120): one line per thing that happened, the day in
+       the record's mono column; what is coming reads quieter. */
+    .bolo-history {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .bolo-history__row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: var(--space-2xs) var(--space-s);
+      font-size: var(--text-s);
+    }
+    .bolo-history__row.is-ahead {
+      color: var(--text-muted);
+    }
+    .bolo-history__when {
+      flex: none;
+      min-inline-size: var(--record-label-inline);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--mono-letter-spacing);
+      color: var(--text-faint);
+    }
+    /* A function is a line of the history, not a call to action: ink, and
+       the underline only under the pointer. */
+    .bolo-history__row a {
+      color: inherit;
+      text-decoration: none;
+    }
+    .bolo-history__row a:hover {
+      text-decoration: underline;
+    }
+    .bolo-history__row .bolo-record__num {
+      margin-inline-start: auto;
+    }
+    /* The line of today: ink at 40%, as the planner's «now» (never blue,
+       never red); the words say where the money stands. */
+    .bolo-history__today {
+      display: flex;
+      align-items: baseline;
+      gap: var(--space-s);
+      padding-block-start: var(--space-2xs);
+      border-block-start: var(--line-hairline) solid color-mix(in oklch, var(--text-color) 40%, transparent);
+      font-size: var(--text-s);
+    }
+    .bolo-history__today .bolo-history__when {
+      color: var(--text-muted);
+    }
+    .bolo-history__now {
+      color: var(--text-color);
+      font-weight: 500;
+    }
+    .bolo-history__write {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: var(--space-2xs) var(--space-s);
+      margin: 0;
+      font-size: var(--text-s);
     }
     .bolo-record__acts {
       display: inline-flex;
