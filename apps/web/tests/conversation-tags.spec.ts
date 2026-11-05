@@ -107,8 +107,8 @@ test.describe('conversation tags', () => {
       const row = page.locator('main [data-testid="feed-row"]', { hasText: ORG });
       await expect(row).toHaveCount(1, { timeout: 15_000 });
       await expect(page.getByText('The conversations could not be read.')).toHaveCount(0);
-      // Filtered by its own tag the row does not repeat it in its context line.
-      await expect(row.locator('.chat__ctx')).not.toContainText('Press');
+      // Filtered by its own tag the row does not repeat it (and may have no context line at all, ADR-179).
+      await expect(row.locator('.chat__ctx', { hasText: 'Press' })).toHaveCount(0);
 
       await filterTag(page, 'sales');
       await search(page);
