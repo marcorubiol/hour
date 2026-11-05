@@ -22,6 +22,9 @@ export type RoadsheetDayPoint =
       /** One of the named kinds, or null for a free moment (`label`). */
       key: MomentKey | null;
       label: string | null;
+      /** 121 B: the time before a «llego tarde» moved it, and when it moved. */
+      moved_from?: string | null;
+      moved_at?: string | null;
     }
   | {
       of: 'stage';
@@ -66,6 +69,7 @@ export function roadsheetDay(sheet: Pick<Roadsheet, 'schedule' | 'travel'>): Roa
         ends_at: parsed(m.ends_at) ? m.ends_at : null,
         key: m.kind && MOMENT_KEYS.has(m.kind) ? (m.kind as MomentKey) : null,
         label: m.label,
+        ...(m.moved_from ? { moved_from: m.moved_from, moved_at: m.moved_at ?? null } : {}),
       });
     }
   } else if (s) {

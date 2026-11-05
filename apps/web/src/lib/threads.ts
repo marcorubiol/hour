@@ -15,6 +15,7 @@
 import * as v from 'valibot';
 import { hourMark, localeDayMonth, localeMonthShort, localeWeekdayShort, timeInTz } from './datetime';
 import { LOCALE_TAG, t, type Locale } from './i18n';
+import type { LateLineData } from './roadsheet-late';
 
 /** El tope de la base (`message_body_length`): de 1 a 10.000 tras recortar. */
 export const MESSAGE_MAX = 10_000;
@@ -67,6 +68,10 @@ export interface ThreadMessage {
   body: string;
   created_at: string;
   edited_at: string | null;
+  /** 121 B (ADR-180): a line the system wrote in a bolo group; `body` is its Spanish fallback. */
+  system?: 'late_notice' | 'late_moved' | null;
+  /** Its «llego tarde», when the reader may read the performance (else null: say `body`). */
+  late?: LateLineData | null;
 }
 
 /** Lo que devuelve `bolo_board`. */
