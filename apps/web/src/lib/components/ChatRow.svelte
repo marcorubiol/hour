@@ -239,9 +239,12 @@
       outline: var(--focus-width) solid var(--focus-color);
       outline-offset: calc(-1 * var(--focus-width));
     }
-    /* Qué es y dónde: la palabra que explica el monograma (ADR-177 § 2). */
+    /* Qué es y dónde: la palabra que explica el monograma (ADR-177 § 2).
+       Corta y entera: cede el nombre, que ya lleva su elipsis; sólo unas
+       palabras largas se cortan, pasado su tope. */
     .chat__words {
-      flex-shrink: 2;
+      flex-shrink: 0;
+      max-inline-size: 40%;
       min-inline-size: 0;
       overflow: hidden;
       font-size: var(--text-s);
@@ -296,10 +299,13 @@
       gap: var(--space-s);
       min-inline-size: 0;
     }
+    /* The act speaks at its line's size: «Ya está» no taller than the context
+       beside it, so a row that offers it keeps the others' height. */
     .chat__act {
       position: relative;
       z-index: var(--z-raised);
       flex-shrink: 0;
+      font-size: var(--text-xs);
     }
     .chat__ctx {
       min-inline-size: 0;

@@ -967,7 +967,13 @@
     {#snippet tools()}
       {#if envios && newMailoutItems.length > 0}
         <Menu items={newMailoutItems} align="end" label={t('envios.new', locale)} triggerClass="btn--primary btn--s">
-          {#snippet trigger()}{t('envios.new', locale)}<span class="conversations__caret" aria-hidden="true">▾</span>{/snippet}
+          {#snippet trigger()}<span class="conversations__add-long">{t('envios.new', locale)}</span><span
+              class="conversations__caret conversations__add-long"
+              aria-hidden="true">▾</span
+            ><span
+              class="conversations__add-short"
+              aria-hidden="true">+</span
+            >{/snippet}
         </Menu>
       {:else if !envios && canEdit && !noAccess}
         {#if listChip !== 'equipo' && shows('conversations', 'list', calm.on)}
@@ -1349,6 +1355,11 @@
       align-items: baseline;
       justify-content: space-between;
       gap: var(--space-s) var(--space-m);
+    }
+    /* «Seleccionar» sits in the tools' box like «Añadir»: a flex box, not an
+       inline span on the tools' tall title line, which dropped it a few px. */
+    .conversations__pick-door {
+      display: inline-flex;
     }
     /* On a phone the selection waits for a wider screen: the head keeps the title and «Añadir». */
     @media (max-width: 47.999rem) {

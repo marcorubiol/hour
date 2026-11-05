@@ -1008,6 +1008,16 @@
     .chat__fact-label {
       color: var(--text-muted);
     }
+    /* A long step («margen · 03 nov 2026») on a phone wraps inside its fact
+       instead of running past the edge, where the page cut it. */
+    .chat__fact {
+      max-inline-size: 100%;
+    }
+    .chat__fact .fact-act {
+      min-inline-size: 0;
+      white-space: normal;
+      text-align: start;
+    }
     .chat__fact--ours {
       color: var(--heading-color);
       font-weight: 500;
