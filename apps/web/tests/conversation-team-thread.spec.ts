@@ -138,7 +138,8 @@ test.describe('el hilo del equipo de una conversación (ADR-106)', () => {
     const flow = page.getByTestId('conversation-thread');
     const msg = flow.locator('.msg--note', { hasText: BODY });
     await expect(msg).toBeVisible({ timeout: 30_000 });
-    await expect(msg.locator('.msg__mark')).toHaveText(/solo el equipo|només l'equip|team only|équipe seulement/i);
+    // Marcada en su cabecera, con el candado: «Nombre, solo el equipo» (ADR-184).
+    await expect(msg.locator('.msg__by--note')).toHaveText(/solo el equipo|només l'equip|team only|équipe seulement/i);
     await expect(flow.locator('[data-entry="new"]')).toBeVisible();
   });
 

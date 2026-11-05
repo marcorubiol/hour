@@ -136,6 +136,7 @@ test.describe('conversation tags', () => {
       // in the head opens them over the thread.
       const pane = page.getByTestId('conversation-pane');
       const details = pane.getByTestId('conversation-who');
+      await expect(details.or(page.getByTestId('record-details'))).toBeVisible({ timeout: 15_000 });
       if (await details.isVisible()) await details.click();
       const tags = page.getByTestId('record-details').getByTestId('conversation-tags');
       await expect(tags.locator('.tag-chip')).toHaveText(['Press'], { timeout: 15_000 });

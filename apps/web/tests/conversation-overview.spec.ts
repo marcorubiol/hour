@@ -161,7 +161,9 @@ test.describe('Te toca y Se enfría en Conversaciones (ADR-117, ADR-176)', () =>
     await expect(row).toHaveCount(1, { timeout: 30_000 });
 
     // Un toque: la fila se va; encima de la lista, el cómo y deshacer. Deshacer la devuelve.
+    // Con puntero, «Ya está» espera a que el ratón pase por la fila (ADR-179 § 3).
     const line = page.locator('.doneline');
+    await row.hover();
     await row.getByRole('button', { name: `${WARM}: done` }).click();
     await expect(line).toContainText(`${WARM}: done · today`, { timeout: 15_000 });
     await expect(row).toHaveCount(0, { timeout: 30_000 });
@@ -170,6 +172,7 @@ test.describe('Te toca y Se enfría en Conversaciones (ADR-117, ADR-176)', () =>
     await expect(row.getByRole('button', { name: `${WARM}: done` })).toBeVisible({ timeout: 30_000 });
 
     // Otra vez, con el cómo: Escape lo borra sin guardar; Intro guarda, y la nota queda en su historia.
+    await row.hover();
     await row.getByRole('button', { name: `${WARM}: done` }).click();
     const how = line.getByRole('textbox', { name: 'How? (optional)' });
     await expect(how).toBeFocused({ timeout: 15_000 });

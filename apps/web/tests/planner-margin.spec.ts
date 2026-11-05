@@ -154,6 +154,7 @@ test.describe('el margen del Planner (ADR-138 § 6)', () => {
     // The link lives in the conversation's details (ADR-184): a column beside the thread on a
     // wide record, or opened over it with «Details» in the head.
     const details = page.getByTestId('conversation-who');
+    await expect(details.or(page.getByTestId('record-details'))).toBeVisible({ timeout: 30_000 });
     if (await details.isVisible()) await details.click();
     const link = page.getByTestId('conversation-planner');
     await expect(link).toHaveAttribute('href', `/h/planner?view=agenda&scope=p:${projectId}`);

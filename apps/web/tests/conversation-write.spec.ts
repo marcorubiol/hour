@@ -217,9 +217,19 @@ test.describe('conversation inline write', () => {
   });
 
   test('«not this time» sets with a day to write again, persists and lifts (ADR-138)', async ({ page }) => {
+    // Against production the menu, the dialog and a reload take their time.
+    test.setTimeout(60_000);
     await openConversations(page);
 
-    const original = (await fetchListRaw(page))[0];
+    let original = (await fetchListRaw(page))[0];
+    // A run that died mid-test (a timeout closes the page before its
+    // `finally` restores) leaves the revived fixture in «not this time»:
+    // lift it first, so this run starts from a derived state.
+    if (original.relation === 'not_now') {
+      await restoreConversation(page, original.id, { not_now: null });
+      await openConversations(page);
+      original = (await fetchListRaw(page))[0];
+    }
     const name = original.person?.full_name;
     expect(name).toBeTruthy();
 
