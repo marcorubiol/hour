@@ -6897,3 +6897,46 @@ fuera del hilo no ve a qué se contesta. Marco: «sí, hazlo».
 **Sin verificar.** Cómo pinta cada cliente el nombre y la cita: no se ha enviado ningún correo real.
 
 **Cómo se revierte.** Revertir el commit; sin datos ni migración.
+
+## [2026-11-05] ADR-182 · «Apuntar llamada» desde la cabecera de Conversaciones (121 A; número provisional, carril 121 A)
+
+**Contexto.** Marco, 05-11 (tarea 121, boceto «Hour 121», sección A, con las recomendaciones elegidas): apuntar una
+llamada desde el móvil sin buscar antes la conversación. Hasta ahora sólo se podía desde el cuadro de escribir de una
+ficha abierta: primero encontrar la conversación, luego «Apuntar». Lo que se recuerda al colgar es con quién.
+
+**Decisión.**
+1. **La puerta:** «Apuntar llamada», un botón con palabras (no un glifo) en la cabecera de la lente Conversaciones,
+   sólo allí y en la vista de chats (no en Equipo ni en Envíos), para quien edita conversaciones. En el móvil queda
+   entre el título y el «+»; en escritorio, junto a «Añadir conversación».
+2. **¿Con quién?:** una búsqueda sobre las personas (dossier del espacio, nombre o email) y las organizaciones de los
+   espacios en pantalla (`GET /api/conversations/call-targets`, con la RLS de quien busca), en dos grupos, cada fila
+   con tipo y lugar (ADR-177 § 2: la casa de la persona, «por libre», el tipo de la organización) y cuántas
+   conversaciones tiene y de qué proyectos. Sin texto, las organizaciones de las últimas conversaciones con contacto.
+   Una organización que es una sola persona y se llama como ella sale sólo como esa persona. Las personas del equipo
+   (reparto, técnica o «voy», como `/api/team`) salen pero no se eligen: una llamada interna no es una conversación,
+   va en el grupo del bolo; la fila lo dice.
+3. **Qué conversación:** las de una persona son las suyas como contacto y las de su casa (la conversación es con la
+   organización). Con varias, la última tocada (el último contacto o la última escritura, la más tarde), con el cambio a
+   la vista en el mismo paso. Sin ninguna, el mismo paso pregunta «¿De qué espectáculo?» entre los activos de su
+   espacio (preelegido si hay uno) y la conversación se abre por el `POST /api/conversations` de «Añadir conversación»
+   (con `person_id` u `organization_id`; un 409 con `conversation_id` usa esa). Abrir una pide un proyecto hoy
+   (`create_conversation`), así que el paso existe.
+4. **Qué se guarda:** «La llamé yo / Me llamó», cuándo (ahora; «Cambiar» abre día y hora, y una hora que no ha llegado
+   no se acepta) y la nota. Es el mismo `conversation_event` que apunta el cuadro de escribir (`kind='call'`,
+   `direction`, `occurred_at` sólo si se cambió, si no lo sella el servidor), por el mismo
+   `POST /api/conversations/:id/events`: cuenta para el turno igual. Debajo, «Después: esperando su respuesta» o
+   «nos toca responder», mientras la hora sea ahora.
+5. **Deshacer sin borrar historia:** el historial no se borra (ADR-098, no hay DELETE de un evento), así que la llamada
+   espera el plazo del aviso (`CREATED_TOAST_MS`) antes de escribirse, como la nota de «Ya está» (ADR-177).
+   El aviso dice «Llamada con X apuntada.» con «Deshacer» y «Ver conversación». Deshacer no la escribe y, si se abrió
+   una conversación para ella, la borra; «Ver conversación» la escribe y abre la ficha. Se escribe también al apuntar
+   otra, al salir de la lente y al cerrar sesión; cerrar o recargar la pestaña la envía con `keepalive`
+   (`$lib/call-log-pending`).
+
+**Queda fuera.** El monograma de una persona del equipo con el color del espacio (ADR-177 § 3): `ChatMonogram` sólo
+sabe gris; la fila del equipo sale en gris con «del equipo». La puerta en Hoy (Marco eligió sólo Conversaciones). Leer
+el registro de llamadas del teléfono (la web no puede).
+
+**Sin migración.** Ninguna forma de la caché cambia: la búsqueda es una clave nueva y no se guarda en el dispositivo.
+
+**Cómo se revierte.** Revertir el commit: quita el botón, el diálogo, la ruta `call-targets` y sus claves; sin datos.

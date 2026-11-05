@@ -6,6 +6,7 @@
   import { useTheme } from '$lib/theme.svelte';
   import { clearSession, session } from '$lib/session.svelte';
   import { commitDone } from '$lib/chat-done.svelte';
+  import { commitCall } from '$lib/call-log-pending';
   import { appLocale, t } from '$lib/i18n';
   import { createQuery } from '@tanstack/svelte-query';
   import { meQueryOptions } from '$lib/nav-queries';
@@ -68,8 +69,10 @@
 
   async function logout() {
     rememberWorkingScope();
-    // A pending «Ya está» writes its note while the session still exists.
+    // A pending «Ya está» writes its note, and a pending call (ADR-182) its
+    // event, while the session still exists.
     await commitDone();
+    await commitCall();
     // Server-side: clears the httpOnly cookies + revokes the refresh
     // token at Supabase. Await so the gates can't race a live cookie.
     try {

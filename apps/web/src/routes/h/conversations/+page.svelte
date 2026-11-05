@@ -59,6 +59,7 @@
   import { DEFAULT_ORDER, ORDERS, parseOrden, type Orden } from '$lib/conversation-order';
   import { dayMonth } from '$lib/datetime';
   import ConversationFeed from '$lib/components/ConversationFeed.svelte';
+  import CallLogDialog from '$lib/components/CallLogDialog.svelte';
   import { accentVarFor } from '$lib/utils/accent';
   import ChatDoneLine from '$lib/components/ChatDoneLine.svelte';
   import FirstVisitCard from '$lib/components/FirstVisitCard.svelte';
@@ -731,6 +732,9 @@
     creation.openConversation({ tag: addTagKey(chip) });
   }
 
+  /** «Apuntar llamada» (121 A, ADR-182). */
+  let callOpen = $state(false);
+
   // ── Selection (plan § 10; plan de la lista § 6.2) ─────────────────────
   let table = $state<ReturnType<typeof ConversationTable>>();
   let picked = $state<Pick<ConversationItem, 'id' | 'project_id'>[]>([]);
@@ -994,6 +998,10 @@
               {picking ? t('mailout.pick_done', locale) : t('mailout.pick', locale)}
             </Button>
           </span>
+        {/if}
+        {#if listChip !== 'equipo'}
+          <!-- 121 A (ADR-182): una llamada sin buscar antes la conversación. Palabras, no un glifo. -->
+          <Button size="s" variant="secondary" onclick={() => (callOpen = true)}>{t('call.open', locale)}</Button>
         {/if}
         <Button size="s" onclick={openAdd} label={t('conversations.add', locale)}
           ><span class="conversations__add-long">{t('conversations.add', locale)}</span><span class="conversations__add-short" aria-hidden="true">+</span></Button
@@ -1359,6 +1367,7 @@
       />
     {/if}
   {/if}
+  <CallLogDialog bind:open={callOpen} workspaceIds={scopeWorkspaceIds} {locale} />
 </section>
 
 
