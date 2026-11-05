@@ -148,6 +148,13 @@ describe('buildRoadsheet — tech_manager', () => {
     expect(sheet.notes).toBeNull();
     expect(sheet.contacts).toBeNull();
   });
+
+  it('an asset note is the company’s: only `full` carries it', () => {
+    const b = bundle();
+    b.assets[0].notes = 'v3, the old one had the wrong plot';
+    expect(buildRoadsheet(b, 'tech_manager').assets?.[0].notes).toBeNull();
+    expect(buildRoadsheet(b, 'full').assets?.[0].notes).toBe('v3, the old one had the wrong plot');
+  });
 });
 
 describe('buildRoadsheet — degraded data', () => {

@@ -306,8 +306,8 @@ export interface Roadsheet {
     start_at: string | null;
     loadout_at: string | null;
     wrap_at: string | null;
-    /** ADR-090 P3: the whole running order. Absent on the public sheet,
-        whose projection (`get_public_roadsheet`) still serializes the five. */
+    /** ADR-090 P3: the whole running order. The public projection carries it
+        too since 20261010180000; a sheet without it falls back to the five. */
     moments?: ScheduleMoment[];
   } | null;
   venue: VenueBlock | null;
@@ -429,7 +429,10 @@ export function buildRoadsheet(bundle: PerformanceBundle, role: RoadsheetRole): 
     contacts:
       has('contacts') && bundle.programmer ? { programmer: bundle.programmer } : null,
     notes: has('notes') ? p.notes : null,
-    assets: has('assets') ? assetsBesideMaterials(bundle.assets, materials ?? []) : null,
+    // An asset's note is the company's own (the sheet never draws it): only `full` carries it.
+    assets: has('assets')
+      ? assetsBesideMaterials(bundle.assets, materials ?? []).map((a) => (role === 'full' ? a : { ...a, notes: null }))
+      : null,
     materials,
   };
 }

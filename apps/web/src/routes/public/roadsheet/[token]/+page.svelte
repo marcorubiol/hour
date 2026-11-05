@@ -80,14 +80,14 @@
     .prs {
       max-inline-size: 40rem;
       margin-inline: auto;
-      padding: var(--space-l) var(--space-m) var(--space-2xl);
+      padding: var(--space-l) var(--space-m) var(--space-xxl);
     }
 
     .prs__gone {
       display: flex;
       flex-direction: column;
       gap: var(--space-s);
-      padding-block: var(--space-2xl);
+      padding-block: var(--space-xxl);
       text-align: center;
     }
 

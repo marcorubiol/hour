@@ -6,15 +6,21 @@
    * what `sheet` contains, this only draws non-null sections. Mobile-first
    * (read on a phone in a van), print-friendly (pinned to a dressing-room
    * door).
+   *
+   * 120 (ADR-177): Pau, the technician on his phone, asks «what time do I
+   * load in and whom do I call?». So the sheet opens with where (the
+   * address, «Llamar a Jordi», «Cómo llegar») and then the day in order, an
+   * itinerary: trip stages and running-order moments in one list, with the
+   * «now» line on the day itself. The hours come only from the plan
+   * (`roadsheetDay`).
    */
 
-  import type { Snippet } from 'svelte';
+  import { onMount, type Snippet } from 'svelte';
   import { DASH } from '$lib/glyphs';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import JsonKV, { hasJsonContent } from '$lib/components/JsonKV.svelte';
   import RecordHead from '$lib/components/RecordHead.svelte';
   import type { Crumb } from '$lib/record-crumbs';
-  import ScheduleTable from '$lib/components/ScheduleTable.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import { dayLabel, dualTime, hourMark, viewerTimeZone } from '$lib/datetime';
   import { dayKeyInTz } from '$lib/planner';
@@ -22,6 +28,11 @@
   import { LOCALE_TAG, appLocale, t, type Locale } from '$lib/i18n';
   import { performanceStatusLabel, performanceStatusTone } from '$lib/performance';
   import { materialHost, type Roadsheet, type RoadsheetTrip } from '$lib/roadsheet';
+  import { nowLineIndex, roadsheetDay, type RoadsheetDayPoint } from '$lib/roadsheet-day';
+  import { mapsHref, telHref, venueCall } from '$lib/ahora';
+  import { firstName } from '$lib/acquaintance';
+  import { momentWordKey } from '$lib/month-events';
+  import type { VenueContact } from '$lib/venue';
   import { safeHref } from '$lib/utils/safe-url';
 
   let {
@@ -65,10 +76,56 @@
   }
   const cap = (s: string) => (s ? s[0].toLocaleUpperCase() + s.slice(1) : s);
 
+  // ── Where (120): the address, whom to call, how to get there ──────────
+  let place = $derived(
+    [sheet.venue?.address, sheet.venue?.city ?? sheet.city].filter((x): x is string => Boolean(x)).join(' · '),
+  );
+  /** The venue's technician first, else production, else the main contact (Ahora's rule). */
+  let call = $derived(venueCall(sheet.venue?.contacts));
+  let mapHref = $derived(
+    sheet.venue?.address
+      ? mapsHref([sheet.venue.address, sheet.venue.city ?? sheet.city, sheet.venue.country ?? sheet.country])
+      : mapsHref([sheet.venue?.name ?? sheet.venue_name, sheet.venue?.city ?? sheet.city, sheet.venue?.country ?? sheet.country]),
+  );
+  /** The venue's contacts as stored (`VenueContactSchema`); anything else is skipped. */
+  let venueContacts = $derived(
+    (Array.isArray(sheet.venue?.contacts) ? (sheet.venue!.contacts as unknown[]) : []).filter(
+      (c): c is VenueContact =>
+        !!c && typeof c === 'object' && typeof (c as { name?: unknown }).name === 'string' && (c as VenueContact).name.trim() !== '',
+    ),
+  );
+
+  // ── The day in order (120) ─────────────────────────────────────────────
+  let points = $derived(roadsheetDay(sheet));
+  /** A trip with no hour is not a point: it is named above the list. */
+  let untimedTrips = $derived((sheet.travel ?? []).filter((trip) => trip.stages.length === 0));
+  let dayTz = $derived(venueTz || viewerTz);
+  /** The minute, for the «now» line. Read on load and every 30 s. */
+  let now = $state(new Date());
+  onMount(() => {
+    const id = setInterval(() => (now = new Date()), 30_000);
+    return () => clearInterval(id);
+  });
+  let nowAt = $derived(nowLineIndex(points, now, dayTz));
+
+  function pointWord(p: RoadsheetDayPoint): string {
+    if (p.of === 'stage') {
+      const way = stageRoute(p.stage);
+      return cap(t(`planner.mode_${p.stage.mode}`, locale)) + (way ? ` · ${way}` : '');
+    }
+    return cap(p.label?.trim() || (p.key ? t(momentWordKey(p.key), locale) : ''));
+  }
+
   let address = $derived<Crumb[]>(
     crumbs ?? [...(sheet.project ? [{ label: sheet.project.name }] : []), { label: t('roadsheet.title', locale) }],
   );
 </script>
+
+{#snippet nowLine()}
+  <li class="rsv__now" data-testid="roadsheet-now">
+    {t('roadsheet.now', locale, { time: dualTime(now.toISOString(), venueTz, viewerTz).primary })}
+  </li>
+{/snippet}
 
 <div class="record rsv">
   <RecordHead crumbs={address} title={sheet.title} actions={tools}>
@@ -79,58 +136,95 @@
     {/snippet}
   </RecordHead>
 
-  {#if sheet.schedule}
-    <section class="rsv__section" aria-label={t('perf.schedule', locale)}>
-      <BlockHead title={t('perf.schedule', locale)} />
-      <ScheduleTable slots={sheet.schedule} moments={sheet.schedule.moments ?? null} {venueTz} {viewerTz} {locale} />
-    </section>
-  {/if}
-
   {#if sheet.venue || sheet.venue_name}
-    <section class="rsv__section" aria-label={t('create.venue', locale)}>
-      <BlockHead title={t('create.venue', locale)} />
+    <section class="rsv__section" aria-label={t('create.venue', locale)} data-testid="roadsheet-where">
       <div class="rsv__venue">
-        <strong>{sheet.venue?.name ?? sheet.venue_name}</strong>
-        {#if sheet.venue?.address}<span>{sheet.venue.address}</span>{/if}
-        {#if sheet.city}<span>{[sheet.city, sheet.country].filter(Boolean).join(', ')}</span>{/if}
+        <strong>{place || (sheet.venue?.name ?? sheet.venue_name)}</strong>
+        {#if call}
+          <span class="rsv__muted">{call.name}{call.role ? ` · ${call.role}` : ''}</span>
+        {/if}
         {#if sheet.venue?.capacity}<span class="rsv__muted">{t('venue.capacity_short', locale, { n: sheet.venue.capacity })}</span>{/if}
       </div>
-      {#if hasJsonContent(sheet.venue?.contacts)}
-        <JsonKV value={sheet.venue!.contacts} />
+      {#if call?.phone || mapHref}
+        <div class="rsv__acts">
+          {#if call?.phone}
+            <a class="rsv__act" href={telHref(call.phone)} data-testid="roadsheet-call"
+              >{t('roadsheet.call', locale, { name: firstName(call.name) })}</a
+            >
+          {/if}
+          {#if mapHref}
+            <a class="rsv__act" href={mapHref} target="_blank" rel="noopener noreferrer" data-testid="roadsheet-directions"
+              >{t('roadsheet.directions', locale)}</a
+            >
+          {/if}
+        </div>
+      {/if}
+      {#if venueContacts.length > 0}
+        <ul class="rsv__people" role="list" aria-label={t('venue.contacts', locale)}>
+          {#each venueContacts as c, i (i)}
+            <li>
+              <span class="rsv__role">{c.role ?? ''}</span>
+              <span class="rsv__name">
+                {c.name}
+                {#if c.phone || c.email}
+                  <span class="rsv__contact">
+                    {#if c.phone}<a href={telHref(c.phone)}>{c.phone}</a>{/if}{#if c.phone && c.email}{' · '}{/if}{#if c.email}<a
+                        href={safeHref(`mailto:${c.email}`)}>{c.email}</a
+                      >{/if}
+                  </span>
+                {/if}
+              </span>
+            </li>
+          {/each}
+        </ul>
       {/if}
     </section>
   {/if}
 
-  {#if sheet.travel && sheet.travel.length > 0}
-    <section class="rsv__section" aria-label={t('roadsheet.travel', locale)} data-testid="roadsheet-travel">
-      <BlockHead title={t('roadsheet.travel', locale)} />
-      {#each sheet.travel as trip (trip.id)}
-        <div class="rsv__trip">
-          <p class="rsv__trip-head">
-            <strong>{tripWay(trip)}</strong>
-            <span class="rsv__muted">{dayLabel(tripDay(trip), 'long', LOCALE_TAG[locale])}</span>
-          </p>
-          {#if trip.stages.length > 0}
-            <ul class="rsv__people" role="list">
-              {#each trip.stages as s, i (i)}
-                <li>
-                  <span class="rsv__role">{s.depart_at ? hour(s.depart_at, s.depart_tz ?? trip.tz) : ''}</span>
-                  <span class="rsv__name">
-                    {cap(t(`planner.mode_${s.mode}`, locale))}{stageRoute(s) ? ` · ${stageRoute(s)}` : ''}
-                    {#if s.arrive_at}<span class="rsv__muted"
-                        >{t('ahora.arrives', locale, { time: hour(s.arrive_at, s.arrive_tz ?? trip.tz) })}</span
-                      >{/if}
-                    {#if s.reference}<span class="rsv__contact">{t('ahora.reference', locale)} {s.reference}</span>{/if}
-                  </span>
-                </li>
-              {/each}
-            </ul>
-          {/if}
-          {#if trip.going.length > 0}
-            <p class="rsv__muted">{t('commitment.who_goes', locale)}: {trip.going.join(', ')}</p>
-          {/if}
-        </div>
+  {#if points.length > 0 || untimedTrips.length > 0}
+    <section class="rsv__section" aria-label={t('roadsheet.day', locale)} data-testid="roadsheet-day">
+      <BlockHead title={t('roadsheet.day', locale)} />
+      {#each untimedTrips as trip (trip.id)}
+        <p class="rsv__trip-head" data-testid="roadsheet-travel">
+          <strong>{tripWay(trip)}</strong>
+          <span class="rsv__muted">{dayLabel(tripDay(trip), 'long', LOCALE_TAG[locale])}</span>
+        </p>
       {/each}
+      {#if points.length > 0}
+        <ol class="rsv__day" role="list">
+          {#each points as p, i (i)}
+            {#if nowAt === i}{@render nowLine()}{/if}
+            {@const time = dualTime(p.at, p.of === 'stage' ? p.tz || venueTz : venueTz, viewerTz)}
+            <li
+              class="rsv__point"
+              class:rsv__point--past={nowAt !== null && i < nowAt}
+              class:rsv__point--show={p.of === 'moment' && p.key === 'start'}
+              data-testid={p.of === 'stage' ? 'roadsheet-travel' : 'roadsheet-moment'}
+            >
+              <span class="rsv__at">
+                {time.primary}
+                {#if time.secondary}<span class="rsv__muted">{t('roadsheet.time_yours', locale, { time: time.secondary })}</span>{/if}
+              </span>
+              <span class="rsv__what">
+                {pointWord(p)}
+                {#if p.of === 'moment' && p.ends_at}
+                  <span class="rsv__muted">{t('ahora.until', locale, { time: hour(p.ends_at, venueTz) })}</span>
+                {/if}
+                {#if p.of === 'stage'}
+                  {#if p.stage.arrive_at}<span class="rsv__muted"
+                      >{t('ahora.arrives', locale, { time: hour(p.stage.arrive_at, p.stage.arrive_tz ?? p.trip.tz) })}</span
+                    >{/if}
+                  {#if p.stage.reference}<span class="rsv__contact">{t('ahora.reference', locale)} {p.stage.reference}</span>{/if}
+                  {#if p.trip.going.length > 0}<span class="rsv__muted"
+                      >{t('commitment.who_goes', locale)}: {p.trip.going.join(', ')}</span
+                    >{/if}
+                {/if}
+              </span>
+            </li>
+          {/each}
+          {#if nowAt === points.length}{@render nowLine()}{/if}
+        </ol>
+      {/if}
     </section>
   {/if}
 
@@ -169,7 +263,9 @@
               {/if}
               {#if m.person?.email || m.person?.phone}
                 <span class="rsv__contact">
-                  {[m.person?.email, m.person?.phone].filter(Boolean).join(' · ')}
+                  {#if m.person?.email}{m.person.email}{/if}{#if m.person?.email && m.person?.phone}{' · '}{/if}{#if m.person?.phone}<a
+                      href={telHref(m.person.phone)}>{m.person.phone}</a
+                    >{/if}
                 </span>
               {/if}
             </span>
@@ -191,7 +287,9 @@
               {#if m.notes}<span class="rsv__muted">{m.notes}</span>{/if}
               {#if m.person?.email || m.person?.phone}
                 <span class="rsv__contact">
-                  {[m.person?.email, m.person?.phone].filter(Boolean).join(' · ')}
+                  {#if m.person?.email}{m.person.email}{/if}{#if m.person?.email && m.person?.phone}{' · '}{/if}{#if m.person?.phone}<a
+                      href={telHref(m.person.phone)}>{m.person.phone}</a
+                    >{/if}
                 </span>
               {/if}
               {#if hasJsonContent(m.contact_override)}
@@ -266,10 +364,87 @@
       color: var(--text-color);
     }
 
-    .rsv__trip {
+    /* «Llamar a Jordi» · «Cómo llegar»: two halves, at the thumb's size. */
+    .rsv__acts {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(0, 1fr);
+      gap: var(--space-s);
+    }
+
+    .rsv__act {
       display: flex;
-      flex-direction: column;
-      gap: var(--space-2xs);
+      align-items: center;
+      justify-content: center;
+      min-block-size: calc(var(--touch-target) + var(--space-xl));
+      padding: var(--space-xs) var(--space-s);
+      border: var(--line-hairline) solid var(--border-color-dark);
+      border-radius: var(--radius-m);
+      font-size: var(--text-s);
+      color: var(--heading-color);
+      text-align: center;
+      text-decoration: none;
+    }
+
+    .rsv__act:hover {
+      border-color: var(--heading-color);
+    }
+
+    /* The day, an itinerary: the hour, then what. */
+    .rsv__point {
+      display: grid;
+      grid-template-columns: var(--record-label-inline) minmax(0, 1fr);
+      gap: var(--space-m);
+      align-items: baseline;
+      padding-block: var(--space-s);
+      border-block-end: var(--line-hairline) solid var(--border-color-light);
+    }
+
+    .rsv__at {
+      font-family: var(--font-mono);
+      font-size: var(--text-s);
+      font-variant-numeric: tabular-nums;
+      color: var(--text-muted);
+    }
+
+    .rsv__what {
+      font-size: var(--text-s);
+      color: var(--text-color);
+    }
+
+    .rsv__point--show .rsv__what {
+      font-weight: var(--today-weight);
+      color: var(--heading-color);
+    }
+
+    .rsv__point--past .rsv__at,
+    .rsv__point--past .rsv__what {
+      color: var(--text-faint);
+    }
+
+    /* The «now» line: a hairline with its hour, between what is done and what comes. */
+    .rsv__now {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      padding-block: var(--space-2xs);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      font-variant-numeric: tabular-nums;
+      color: var(--today-ink);
+    }
+
+    .rsv__now::after {
+      content: '';
+      flex: 1;
+      border-block-start: var(--line-hairline) solid var(--today-ink);
+    }
+
+    @media print {
+      .rsv__acts,
+      .rsv__now {
+        display: none;
+      }
     }
 
     .rsv__trip-head {
