@@ -49,6 +49,11 @@
     picked?: boolean;
     /** Una acción de la fila, al final de la línea de contexto, por encima del enlace. */
     act?: Snippet;
+    /**
+     * Dentro de la fila de otra lista («Te espera» de Hoy, las fichas): sin
+     * su relleno ni su fondo al pasar, que pone quien la aloja.
+     */
+    flush?: boolean;
   }
 
   let {
@@ -71,6 +76,7 @@
     pick,
     picked = false,
     act,
+    flush = false,
   }: Props = $props();
 
 </script>
@@ -81,6 +87,7 @@
   class:is-active={active}
   class:is-picked={picked}
   class:chat--picking={picking && !!pick}
+  class:chat--flush={flush}
   data-group={group || undefined}
 >
   {#if picking && pick}<span class="chat__pick">{@render pick()}</span>{/if}
@@ -104,14 +111,16 @@
     </span>
     {#if at}<time class="chat__when" datetime={at}>{when}</time>{/if}
   </span>
-  <span class="chat__mid">
-    <span class="chat__last"
-      >{#if lead}<span class="chat__lead">{lead}{last ? ':' : ''}</span>{#if last}{' '}{/if}{/if}{last ?? ''}</span
-    >
-    {#if unread > 0}<span class="chat__unread" title={unreadLabel ?? undefined}
-        ><span aria-hidden="true">{unread}</span>{#if unreadLabel}<span class="visually-hidden">{unreadLabel}</span>{/if}</span
-      >{/if}
-  </span>
+  {#if lead || last || unread > 0}
+    <span class="chat__mid">
+      <span class="chat__last"
+        >{#if lead}<span class="chat__lead">{lead}{last ? ':' : ''}</span>{#if last}{' '}{/if}{/if}{last ?? ''}</span
+      >
+      {#if unread > 0}<span class="chat__unread" title={unreadLabel ?? undefined}
+          ><span aria-hidden="true">{unread}</span>{#if unreadLabel}<span class="visually-hidden">{unreadLabel}</span>{/if}</span
+        >{/if}
+    </span>
+  {/if}
   {#if context.length > 0 || act}
     <span class="chat__foot">
       <span class="chat__ctx">
@@ -144,6 +153,13 @@
     }
     .chat.is-active {
       background: var(--bg-light);
+    }
+    /* Inside another list's row: that row draws the padding and the lines. */
+    .chat--flush {
+      padding: 0;
+    }
+    .chat--flush:hover {
+      background: none;
     }
 
     .chat--picking {

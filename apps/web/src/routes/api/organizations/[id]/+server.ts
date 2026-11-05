@@ -71,7 +71,7 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
 
     const convSearch = new URLSearchParams({
       select:
-        `id,next_action_at,last_contacted_at,custom_fields,not_now_at,not_now_until,first_contacted_at,contacted_undated,regular:conversation_regular,project:project_id(id,slug,name,accent,initials),contacts:conversation_contact(person_id,role,since,until,is_primary,person:workspace_person!conversation_contact_workspace_person_fkey(slug,full_name,email,phone)),${TURN_EMBEDS}`,
+        `id,next_action_at,next_action_note,reply_settled_at,last_contacted_at,custom_fields,not_now_at,not_now_until,first_contacted_at,contacted_undated,regular:conversation_regular,project:project_id(id,slug,name,accent,initials),contacts:conversation_contact(person_id,role,since,until,is_primary,person:workspace_person!conversation_contact_workspace_person_fkey(slug,full_name,email,phone)),${TURN_EMBEDS}`,
       workspace_id: `eq.${workspaceId}`,
       organization_id: `eq.${o.id}`,
       deleted_at: 'is.null',
@@ -130,6 +130,17 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
         relation: conversationRelation(c),
         next_action_at: c.next_action_at,
         project: c.project,
+        // The chat row of each project (mesa, punto 6): the last thing said and the turn.
+        next_action_note: c.next_action_note ?? null,
+        reply_settled_at: c.reply_settled_at ?? null,
+        not_now_at: c.not_now_at ?? null,
+        not_now_until: c.not_now_until ?? null,
+        last_contacted_at: c.last_contacted_at ?? null,
+        first_contacted_at: c.first_contacted_at ?? null,
+        contacted_undated: c.contacted_undated ?? false,
+        last_turn: c.last_turn ?? null,
+        last_in: c.last_in ?? null,
+        person: c.contacts?.find((x) => x.is_primary)?.person?.full_name ?? null,
       })),
       contacts: conversations.data.flatMap((c) => c.contacts ?? []),
       staff: staff.data,

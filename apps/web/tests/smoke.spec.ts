@@ -76,8 +76,8 @@ test.describe('smoke', () => {
     const countLabel = page.locator('#rel-stub-title .block-head__n');
     await expect(countLabel).toBeVisible();
     await expect(countLabel).toHaveText(/^\d+$/);
-    // The lens's row (ADR-141 § 1), one per conversation.
-    expect(await page.getByTestId('project-conversations').locator('.crow').count()).toBeGreaterThan(0);
+    // The lens's chat row (ADR-141 § 1, mesa punto 6), one per conversation.
+    expect(await page.getByTestId('project-conversations').getByTestId('project-conversation').count()).toBeGreaterThan(0);
 
     // Calendar month grid (the bare /h/planner opens on the Temporada, ADR-117).
     await page.goto('/h/planner?view=month');

@@ -53,6 +53,8 @@
   import { moneyAccessAnyQueryOptions } from '$lib/bolo-queries';
   import { conversationAccessQueryOptions } from '$lib/conversation-access';
   import { otherTagsName, scopeTags } from '$lib/conversation-tags';
+  import { chatLine } from '$lib/chat-row';
+  import type { ConversationItem } from '$lib/conversation';
   import { conversationTagsQueryOptions } from '$lib/conversation-tags-query';
   import { lensOn } from '$lib/lenses.svelte';
   import { taskWorkspaces } from '$lib/workspace-role';
@@ -873,6 +875,16 @@
     const space = scope.isEmpty && i.projectId ? spaceNameByProjectId.get(i.projectId) : null;
     return [space, i.projectName, i.lineName, i.tagName].filter((x) => x && x !== '—').join(' · ');
   };
+  // «Te espera», the chat row (mesa, punto 6; ADR-177 § 8: only this row
+  // changes): with whom in words and the last thing said, from the same read
+  // as the calls (`waitingConversationsQueryOptions`, its rows carry the turn).
+  let conversationById = $derived(
+    new Map((($conversationsQuery.data?.items ?? []) as unknown as ConversationItem[]).map((c) => [c.id, c])),
+  );
+  const deskChat = (i: DeskItem) => {
+    const c = i.conversationId ? conversationById.get(i.conversationId) : undefined;
+    return c ? chatLine(c, clockNow, locale) : null;
+  };
   const conversationHref = (i: DeskItem) => {
     const ws = (i.workspaceId && workspaceSlugById.get(i.workspaceId)) || workspaceSlug;
     return i.conversationId && ws ? `/h/${ws}/conversation/${i.conversationId}` : null;
@@ -969,6 +981,7 @@
           {locale}
           {contextPath}
           {conversationHref}
+          chat={deskChat}
           {money}
           {isGhost}
           ontoggle={(id, done) => $patchTask.mutate({ id, patch: { status: done ? 'done' : 'open' } })}

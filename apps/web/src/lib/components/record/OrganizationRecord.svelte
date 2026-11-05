@@ -40,7 +40,8 @@
   import { ORGANIZATION_KINDS, orgBolos, orgContacts, orgMissing, type OrganizationFile } from '$lib/organization-record';
   import { relativeContactDate } from '$lib/conversation';
   import { boloLine } from '$lib/sheet-mirror';
-  import { relationLabel, relationTone, type Relation } from '$lib/conversation-relation';
+  import { relationLabel, type Relation } from '$lib/conversation-relation';
+  import { chatLine } from '$lib/chat-row';
   import { accentVarFor } from '$lib/utils/accent';
   import { dayMonthYear, dayMonthYearTs, localDayISO } from '$lib/datetime';
   import { spaceCrumb } from '$lib/record-crumbs';
@@ -109,34 +110,49 @@
   let projectRows = $derived.by<MirrorRow[]>(() => {
     if (!file || !org) return [];
     const orgName = org.name;
+    const organization = { name: org.name, kind: org.kind, city: org.city };
     const nearest = new Map<string, number>();
     bolos.forEach((b, i) => {
       if (!nearest.has(b.conversation_id)) nearest.set(b.conversation_id, i);
     });
+    const now = new Date();
     return [...file.conversations]
       .sort((a, b) => (nearest.get(a.id) ?? Infinity) - (nearest.get(b.id) ?? Infinity))
-      .map((c) => ({
-        key: c.id,
-        href: `/h/${workspaceSlug}/conversation/${c.id}`,
-        title: c.project?.name ?? t('conversations.conversation', locale),
-        mark: c.project
-          ? { kind: 'project' as const, accent: accentVarFor(c.project), initials: c.project.initials }
-          : { kind: 'organization' as const },
-        badge: { label: relationLabel(c.relation as Relation, locale), tone: relationTone(c.relation as Relation) },
-        bolos: bolos
-          .filter((b) => b.conversation_id === c.id)
-          .map((b) =>
-            boloLine(
-              { ...b, id: b.bolo_id },
-              {
-                locale,
-                href: b.performance_slug ? `/h/${workspaceSlug}/performance/${b.performance_slug}` : null,
-                // The room, when it is not the organization's own name.
-                where: b.venue_name && b.venue_name !== orgName ? b.venue_name : null,
-              },
+      .map((c) => {
+        const relation = c.relation as Relation;
+        // The chat row (mesa, punto 6): the organization is this record, so the
+        // row says the project, the last thing said and the turn in words.
+        const chat = chatLine(
+          { ...c, relation, organization, person: c.person ? { full_name: c.person } : null },
+          now,
+          locale,
+        );
+        return {
+          key: c.id,
+          href: `/h/${workspaceSlug}/conversation/${c.id}`,
+          title: c.project?.name ?? t('conversations.conversation', locale),
+          mark: c.project
+            ? { kind: 'project' as const, accent: accentVarFor(c.project), initials: c.project.initials }
+            : { kind: 'organization' as const },
+          lead: chat.lead,
+          last: chat.last,
+          // The turn in words; without one, the relation in words.
+          context: [chat.turn ?? { text: relationLabel(relation, locale) }],
+          bolos: bolos
+            .filter((b) => b.conversation_id === c.id)
+            .map((b) =>
+              boloLine(
+                { ...b, id: b.bolo_id },
+                {
+                  locale,
+                  href: b.performance_slug ? `/h/${workspaceSlug}/performance/${b.performance_slug}` : null,
+                  // The room, when it is not the organization's own name.
+                  where: b.venue_name && b.venue_name !== orgName ? b.venue_name : null,
+                },
+              ),
             ),
-          ),
-      }));
+        };
+      });
   });
 
   let placeLine = $derived(org ? [org.city, org.country].filter(Boolean).join(', ') : '');

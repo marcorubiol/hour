@@ -7,6 +7,7 @@
  */
 
 import type { ConversationBolo } from './conversation-relation';
+import type { TurnEvent } from './conversation-overview';
 import type { OrgMergeLine } from './organization-merge';
 import { orderBolos } from './sheet-mirror';
 import { MISSING_MAX, personMissing, type PersonMissing, type PersonMissingConversation } from './record-missing';
@@ -110,6 +111,20 @@ export interface OrganizationFile {
     relation: string;
     next_action_at: string | null;
     project: OrgProject | null;
+    // The chat row of each project (mesa, punto 6; `chatLine`): what the turn
+    // and the last thing said read. Since CACHE_SCHEMA 24.
+    next_action_note: string | null;
+    reply_settled_at: string | null;
+    not_now_at: string | null;
+    not_now_until: string | null;
+    last_contacted_at: string | null;
+    first_contacted_at: string | null;
+    contacted_undated: boolean;
+    /** The last directional email, message or call, not automatic. */
+    last_turn: TurnEvent[] | null;
+    last_in: { occurred_at: string }[] | null;
+    /** The primary contact's name. */
+    person: string | null;
   }>;
   contacts: OrgConversationContact[];
   staff: OrgStaff[];

@@ -389,6 +389,8 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
         projectName: r.projectName || '—',
         projectId: r.projectId,
         verbKey: 'reply',
+        // The conversation it answers: its chat row (who, the last thing said) reads it.
+        conversationId: r.id,
         href: r.href,
         repliedAt: r.at,
         tagName: r.tagName ?? null,

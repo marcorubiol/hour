@@ -1,24 +1,26 @@
 <script lang="ts">
   /**
    * The project page's conversations block (ADR-141 § 1, ADR-102): the lens's
-   * own row (`ConversationRow`), the venue first, in the lens's order «lo que
-   * pide». Ten at most; past that, «ver las N» to the lens scoped to the
-   * project. Read-only: the row is the link to the conversation's file, where
-   * the relation, the step and the bolos are edited.
+   * chat row (`ChatRow`, mesa, punto 6: «la fila de los demás sitios como la
+   * del chat»), the venue first, in the lens's order «lo que pide». Each row
+   * says with whom in words (`chatLine`), the last thing said, the turn in
+   * words and its nearest bolo. Ten at most; past that, «ver las N» to the
+   * lens scoped to the project. Read-only: the row is the link to the
+   * conversation's file, where the relation, the step and the bolos are edited.
    */
 
   import BlockHead from '$lib/components/BlockHead.svelte';
-  import ConversationRow from '$lib/components/ConversationRow.svelte';
+  import ChatRow from '$lib/components/ChatRow.svelte';
   import EmptyLine from '$lib/components/EmptyLine.svelte';
-  import StateBadge from '$lib/components/StateBadge.svelte';
   import { lensOn } from '$lib/lenses.svelte';
   import { createQuery } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { appLocale, t } from '$lib/i18n';
-  import { dayMonth } from '$lib/datetime';
-  import { conversationTitle, relationInputOf, relativeContactDate, type ConversationItem } from '$lib/conversation';
-  import { lastActivity, relationLabel, relationTone } from '$lib/conversation-relation';
-  import { boloLabel, nearestBolo, rowLast, rowTurn } from '$lib/conversation-row';
+  import { viewerTimeZone } from '$lib/datetime';
+  import { conversationTitle, relationInputOf, type ConversationItem } from '$lib/conversation';
+  import { lastActivity, relationLabel } from '$lib/conversation-relation';
+  import { boloLabel, nearestBolo } from '$lib/conversation-row';
+  import { chatLine, chatWhen, type ChatContext } from '$lib/chat-row';
   import { relationStubQueryOptions } from '$lib/relation-stub';
 
   interface Props {
@@ -31,6 +33,7 @@
   let { projectId, workspaceSlug }: Props = $props();
 
   const locale = appLocale();
+  const tz = viewerTimeZone();
 
   // By id, not slug: a slug repeats across spaces (ADR-024). `toStore`
   // re-runs the query when navigation changes the project.
@@ -44,31 +47,25 @@
   const now = new Date();
 
   function rowView(item: ConversationItem) {
-    const relation = relationInputOf(item);
-    const title = conversationTitle(item) || t('conversations.conversation', locale);
-    // The real contact under the venue, not the venue's name again (ADR-102 § 1).
-    const person = item.person && item.person.full_name !== title ? item.person : null;
-    const role = item.contacts.find((c) => c.is_primary)?.role ?? null;
-    const city = item.person?.city || item.organization?.city || null;
-    const contact = person ? [person.full_name, role].filter(Boolean).join(', ') : null;
+    const chat = chatLine(item, now, locale);
+    const bolo = item.bolos ? nearestBolo(item.bolos, now) : null;
+    // The project is this page: the context is the turn, else the relation, and the bolo.
+    const context: ChatContext[] = [chat.turn ?? { text: relationLabel(item.relation, locale) }];
+    if (bolo) context.push({ text: boloLabel(bolo, locale) });
+    const at = lastActivity(relationInputOf(item));
+    const unread = item.unread_count ?? 0;
     return {
       item,
-      title,
-      meta: [contact, city].filter(Boolean).join(' · '),
-      turn: rowTurn({ ...relation, reply_settled_at: item.reply_settled_at, next_action_at: item.next_action_at }, now, locale),
-      bolo: item.bolos ? nearestBolo(item.bolos, now) : null,
-      last: rowLast(
-        { last: relation.last ? (item.last_turn?.[0] ?? null) : null, last_in: relation.last_in, last_mailout: item.last_mailout },
-        locale,
-      ),
-      lastAt: lastActivity(relation),
-      stepDate: item.next_action_at ? dayMonth(item.next_action_at) : null,
-      stepNote: item.next_action_note || null,
+      chat,
+      context,
+      title: conversationTitle(item) || t('conversations.conversation', locale),
+      at,
+      unread,
+      unreadLabel: unread > 0 ? t(unread === 1 ? 'threads.unread_one' : 'threads.unread', locale, { n: unread }) : null,
     };
   }
 
   let rows = $derived(items.map(rowView));
-  let withBolos = $derived(rows.some((r) => r.bolo !== null));
 </script>
 
 <section class="rel-stub" aria-label={t('lens.conversations', locale)} aria-busy={loading}>
@@ -83,39 +80,22 @@
   {:else if errored}
     <p class="load-fail" role="alert">{t('perf.rel_error', locale)}</p>
   {:else if rows.length > 0}
-    <ul class="crow-list crow-list--relation" class:crow-list--bolos={withBolos} data-testid="project-conversations">
+    <ul class="crow-list" data-testid="project-conversations">
       {#each rows as r (r.item.id)}
-        <li>
-          <ConversationRow
+        <li data-testid="project-conversation">
+          <ChatRow
             href={`/h/${workspaceSlug}/conversation/${r.item.id}`}
             title={r.title}
-            turn={r.turn?.word}
-            since={r.turn?.since}
-            tone={r.turn?.tone}
-            unread={r.item.unread_count
-              ? t(r.item.unread_count === 1 ? 'threads.unread_one' : 'threads.unread', locale, { n: r.item.unread_count })
-              : null}
-            where={r.meta || undefined}
-            lead={r.last.lead}
-            last={r.last.last}
-            at={r.lastAt}
-            when={r.lastAt ? relativeContactDate(r.lastAt, locale) : ''}
-          >
-            {#snippet relation()}
-              <StateBadge label={relationLabel(r.item.relation, locale)} tone={relationTone(r.item.relation)} />
-            {/snippet}
-            {#snippet bolos()}
-              {#if r.bolo}{boloLabel(r.bolo, locale)}{/if}
-            {/snippet}
-            {#snippet next()}
-              {#if r.stepDate || r.stepNote}
-                <span class="crow-next">
-                  {#if r.stepDate}<span class="crow-next__date">{r.stepDate}</span>{/if}
-                  {#if r.stepNote}<span class="crow-next__note" title={r.stepNote}>{r.stepNote}</span>{/if}
-                </span>
-              {/if}
-            {/snippet}
-          </ConversationRow>
+            shape={r.chat.shape}
+            words={r.chat.words}
+            at={r.at}
+            when={r.at ? chatWhen(r.at, locale, tz) : ''}
+            unread={r.unread}
+            unreadLabel={r.unreadLabel}
+            lead={r.chat.lead}
+            last={r.chat.last}
+            context={r.context}
+          />
         </li>
       {/each}
     </ul>

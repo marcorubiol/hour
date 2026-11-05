@@ -1,6 +1,6 @@
 <script lang="ts" module>
   import type { BoloLine } from '$lib/sheet-mirror';
-  import type { StatusTone } from '$lib/performance';
+  import type { ChatContext } from '$lib/chat-row';
 
   /** Una fila del espejo: con quién (o qué), y debajo sus bolos. */
   export interface MirrorRow {
@@ -8,10 +8,18 @@
     /** La conversación: el chat es cada fila (ADR-177 § 4, sin «Abrir el chat»). */
     href: string | null;
     title: string;
-    /** Lo nuestro lleva su `IdentityMark`; lo de fuera, el monograma gris (ADR-177 § 3). */
-    mark: { kind: 'project'; accent: string; initials: string | null } | { kind: 'organization' };
-    /** La relación, en palabra. */
-    badge?: { label: string; tone: StatusTone } | null;
+    /**
+     * Lo nuestro lleva su `IdentityMark`; lo de fuera, el monograma gris,
+     * redondo si es una persona (ADR-177 § 3).
+     */
+    mark: { kind: 'project'; accent: string; initials: string | null } | { kind: 'organization'; shape?: 'person' | 'organization' };
+    /** Qué es y dónde, tras el nombre (lo de fuera: «sala · Girona»). */
+    words?: string[];
+    /** Lo último que se dijo (mesa, punto 6): quién y qué. */
+    lead?: string | null;
+    last?: string | null;
+    /** El turno en palabras, o la relación (`chatTurn`). */
+    context?: ChatContext[];
     bolos: BoloLine[];
   }
 </script>
@@ -21,11 +29,10 @@
    * Las filas que comparten la ficha de la organización y la del proyecto
    * (ADR-177 § 4: espejo, los mismos bloques girados). En la de la sala, una
    * fila por proyecto con su color; en la del proyecto, una por sala en gris.
-   * Debajo de cada una, sus bolos: el día, el estado y el importe.
+   * Cada fila es la de chat (`ChatRow`): con quién, lo último que se dijo y
+   * el turno (mesa, punto 6). Debajo, sus bolos: el día, el estado y el importe.
    */
-  import IdentityMark from '$lib/components/IdentityMark.svelte';
-  import ChatMonogram from '$lib/components/ChatMonogram.svelte';
-  import StateBadge from '$lib/components/StateBadge.svelte';
+  import ChatRow from '$lib/components/ChatRow.svelte';
 
   interface Props {
     rows: MirrorRow[];
@@ -38,19 +45,17 @@
 <ul class="mirror" role="list" data-testid={testid}>
   {#each rows as r (r.key)}
     <li class="mirror__row" data-testid="mirror-row">
-      <div class="mirror__head">
-        {#if r.mark.kind === 'project'}
-          <IdentityMark accent={r.mark.accent} initials={r.mark.initials} name={r.title} size="var(--chat-mono)" />
-        {:else}
-          <ChatMonogram name={r.title} />
-        {/if}
-        {#if r.href}
-          <a class="mirror__title" href={r.href}>{r.title}</a>
-        {:else}
-          <span class="mirror__title">{r.title}</span>
-        {/if}
-        {#if r.badge}<StateBadge label={r.badge.label} tone={r.badge.tone} />{/if}
-      </div>
+      <ChatRow
+        flush
+        href={r.href}
+        title={r.title}
+        shape={r.mark.kind === 'organization' ? (r.mark.shape ?? 'organization') : 'organization'}
+        words={r.words ?? []}
+        mark={r.mark.kind === 'project' ? { accent: r.mark.accent, initials: r.mark.initials, name: r.title } : null}
+        lead={r.lead ?? null}
+        last={r.last ?? null}
+        context={r.context ?? []}
+      />
       {#if r.bolos.length > 0}
         <ul class="mirror__bolos" role="list">
           {#each r.bolos as b (b.id)}
@@ -87,38 +92,18 @@
       border-block-end: var(--line-hairline) solid var(--border-color-light);
     }
 
-    .mirror__head {
-      display: flex;
-      align-items: center;
-      gap: var(--space-xs);
-      min-inline-size: 0;
-    }
-
-    .mirror__title {
-      flex: 1;
-      min-inline-size: 0;
-      font-size: var(--text-s);
-      color: var(--text-color);
-      text-decoration: none;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    a.mirror__title:hover,
-    a.mirror__title:focus-visible,
     .mirror__day a:hover,
     .mirror__day a:focus-visible {
       text-decoration: underline;
     }
 
-    /* The bolos hang under the name, aligned with it (past the mark). */
+    /* The bolos hang under the name, aligned with it (past the chat row's mark). */
     .mirror__bolos {
       display: flex;
       flex-direction: column;
       gap: var(--space-2xs);
       margin: 0;
-      padding-inline-start: calc(var(--chat-mono) + var(--space-xs));
+      padding-inline-start: calc(var(--chat-mono) + var(--space-s));
     }
 
     .mirror__bolo {

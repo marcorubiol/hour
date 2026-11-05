@@ -25,11 +25,9 @@
   import Button from '$lib/components/Button.svelte';
   import { viewerTimeZone } from '$lib/datetime';
   import { t, type Locale } from '$lib/i18n';
-  import { chatWhen, chatWho } from '$lib/chat-row';
-  import { eventKindLabel, type ConversationEventKind } from '$lib/conversation';
+  import { chatLast, chatTurn, chatWhen, chatWho, type ChatContext } from '$lib/chat-row';
   import { relationLabel } from '$lib/conversation-relation';
   import { SALES, TEAM, keyLabel, type WorkspaceTag } from '$lib/conversation-tags';
-  import { rowTurn } from '$lib/conversation-row';
   import { feedKey, feedTurnRow, type ConversationFeedView, type FeedConversationView, type FeedThreadRow } from '$lib/conversation-feed';
   import { THREAD_REFRESH_MS, boloDays, feedHref, feedThreadName, feedTitle, groupHref } from '$lib/threads';
 
@@ -137,29 +135,20 @@
     return n > 0 ? t(n === 1 ? 'threads.unread_one' : 'threads.unread', locale, { n }) : null;
   }
 
-  /** Quién dijo lo último: tú, su contacto, o qué fue (una llamada, una reunión). */
-  function lastOf(c: FeedConversationView): { lead: string | null; last: string | null } {
-    if (c.due === 'follow_up') return { lead: t('chat.follow_up', locale), last: c.next_action_note };
-    const ev = c.last;
-    // Nothing said yet: never contacted says so; one contacted by a stamp says its relation.
-    if (!ev) return { lead: null, last: c.relation && c.relation !== 'never' ? relationLabel(c.relation, locale) : t('chat.never', locale) };
-    const kind = ev.kind as ConversationEventKind | null;
-    if (kind && kind !== 'email' && kind !== 'message') return { lead: eventKindLabel(kind, locale), last: ev.subject ?? null };
-    const who = ev.direction === 'outbound' ? t('threads.you', locale) : c.person;
-    return { lead: who, last: ev.subject ?? null };
-  }
+  /** Quién dijo lo último: la regla de toda fila de chat (`chatLast`). */
+  const lastOf = (c: FeedConversationView) => chatLast(c, locale);
 
   /** La línea de contexto: el turno (te toca en tinta), el proyecto, la etiqueta y la relación. */
-  function contextOf(c: FeedConversationView): { text: string; ink?: boolean }[] {
-    const turn = rowTurn({ ...feedTurnRow(c), next_action_at: c.next_action_at }, new Date(), locale);
-    const out: { text: string; ink?: boolean }[] = [];
-    if (turn?.word) out.push({ text: turn.word, ink: turn.tone === 'ours' || turn.tone === 'late' });
+  function contextOf(c: FeedConversationView): ChatContext[] {
+    const turn = chatTurn({ ...feedTurnRow(c), next_action_at: c.next_action_at }, new Date(), locale);
+    const out: ChatContext[] = [];
+    if (turn) out.push({ text: turn.text, ink: turn.ink });
     if (showProject) {
       const p = projectNameById.get(c.project_id);
       if (p) out.push({ text: p });
     }
     if (!tag) out.push({ text: keyLabel(c.tags[0] ?? SALES, tagNames, locale) });
-    if (!turn?.word && c.relation && c.last) out.push({ text: relationLabel(c.relation, locale) });
+    if (!turn && c.relation && c.last) out.push({ text: relationLabel(c.relation, locale) });
     return out;
   }
 

@@ -24,6 +24,8 @@
   import { tick } from 'svelte';
   import { t, type Locale } from '$lib/i18n';
   import type { CalmWaiting, DeskBucket, DeskConcern, DeskItem, DeskRun, Waiting } from '$lib/desk-feed';
+  import ChatRow from '$lib/components/ChatRow.svelte';
+  import type { ChatContext, ChatLine } from '$lib/chat-row';
 
   interface Props {
     waiting: Waiting;
@@ -53,6 +55,11 @@
     deciding?: string | null;
     /** «Liberar» on a «liberar» row (ADR-165 § 1, ADR-167 § 1). */
     ondecide?: (item: DeskItem) => void;
+    /**
+     * A conversation row's chat line (mesa, punto 6; `chatLine`): with whom in
+     * words and the last thing said. Null draws the plain subject.
+     */
+    chat?: (item: DeskItem) => ChatLine | null;
   }
 
   let {
@@ -75,7 +82,21 @@
     onaccept,
     deciding = null,
     ondecide,
+    chat,
   }: Props = $props();
+
+  /**
+   * The chat row's context in Hoy: the verb is already the turn's word
+   * («responder», mesa, punto 6), so the turn joins only when it says what
+   * the verb does not («esperando su respuesta»); then where it belongs.
+   */
+  function chatContext(item: DeskItem, line: ChatLine): ChatContext[] {
+    const out: ChatContext[] = [];
+    if (line.turn?.reason === 'theirs') out.push({ text: line.turn.text });
+    const path = contextPath(item);
+    if (path) out.push({ text: path });
+    return out;
+  }
 
   let all = $state(false);
   let headEl = $state<HTMLElement | null>(null);
@@ -161,12 +182,29 @@
     </li>
   {:else}
     {@const href = subjectHref(item)}
-    <li class="row row--{item.concern}" class:row--over={item.overdue} class:row--proposal={item.isProposal}>
+    {@const line = item.concern === 'conversation' ? (chat?.(item) ?? null) : null}
+    <li class="row row--{item.concern}" class:row--over={item.overdue} class:row--proposal={item.isProposal} class:row--chat={line !== null}>
       {#if item.concern === 'task'}
         <span class="row__verb">{@render task(item)}</span>
       {:else}
         <span class="row__verb">{t(`desk.verb_${item.verbKey}`, locale)}</span>
       {/if}
+      {#if line}
+        <!-- The chat row (mesa, punto 6): with whom in words, the last thing
+             said; the verb on its left is the turn. -->
+        <div class="row__subject" data-testid="desk-chat">
+          <ChatRow
+            flush
+            {href}
+            title={item.subject}
+            shape={line.shape}
+            words={line.words}
+            lead={line.lead}
+            last={line.last}
+            context={chatContext(item, line)}
+          />
+        </div>
+      {:else}
       <span class="row__subject">
         {#if href}<a href={href}>{item.subject}</a>{:else if item.concern === 'task'}<!-- The name is the checkbox's
             label: tapping it ticks, a finger's target the size of the line. --><label for="desk-task-{item.taskId}"
@@ -178,6 +216,7 @@
               .join(' · ')}</span
           >{/if}
       </span>
+      {/if}
       <span class="row__when" class:row__when--over={item.overdue}>{whenOf(item)}</span>
       <span class="row__acts">
         {#if item.concern === 'task'}
