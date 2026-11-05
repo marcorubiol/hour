@@ -43,9 +43,8 @@
       border-radius: var(--radius-m);
       background: var(--bg-light);
       color: var(--text-muted);
-      font-family: var(--font-mono);
       font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing);
+      font-weight: 500;
     }
     .mono--person {
       border-radius: var(--radius-circle);

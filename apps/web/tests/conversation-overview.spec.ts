@@ -111,8 +111,8 @@ test.describe('Te toca y Se enfría en Conversaciones (ADR-117, ADR-176)', () =>
     await page.locator('.conversations__search').getByRole('searchbox').fill(WARM);
     const row = page.locator('[data-testid="conversation-row"]', { hasText: WARM });
     await expect(row).toHaveCount(1, { timeout: 30_000 });
-    // El turno en la línea de contexto, en tinta: nos toca.
-    await expect(row.locator('.chat__ctx .is-ink')).toHaveText('Our turn to reply');
+    // Bajo el chip «Nos toca» el turno lo dice el chip: la fila no lo repite.
+    await expect(row.locator('.chat__ctx .is-ink')).toHaveCount(0);
     await expect(page.locator('[data-testid="conversation-row"]', { hasText: COLD })).toHaveCount(0);
   });
 

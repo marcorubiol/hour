@@ -21,7 +21,7 @@
 
 <button
   type="button"
-  class="fact-act"
+  class="btn--quiet btn--xs"
   disabled={done.busy !== null}
   aria-label={t('chat.done_aria', locale, { name })}
   onclick={() => void settleDone(conversationId, name, locale, refresh)}>{t('chat.done', locale)}</button

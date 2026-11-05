@@ -38,7 +38,7 @@ async function sweep(page: Page) {
 }
 
 async function search(page: Page) {
-  await page.getByPlaceholder('Search conversations and team…').fill(ORG);
+  await page.getByRole('searchbox', { name: 'Search conversations and team…' }).fill(ORG);
 }
 
 /** The Tag of «Filter ▾»: the tag is a filter of the list (ADR-176). */

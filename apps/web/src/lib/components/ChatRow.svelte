@@ -5,10 +5,12 @@
    * sola, redondo, ADR-177 § 3) o, en un hilo de bolo, el `IdentityMark` de su
    * espectáculo, porque el grupo es nuestro; su nombre con qué es y dónde
    * («sala · Girona», «por libre · Lleida», ADR-177 § 2) y cuándo; lo último
-   * que se dijo y cuántos sin leer; y una línea pequeña de contexto (el turno,
-   * sólo «nos toca» en tinta, la etiqueta, el proyecto, el bolo) con, al final,
-   * su acción (`act`: «Ya está»). Tres líneas, la misma fila para una
-   * conversación y para un hilo del equipo.
+   * que se dijo y cuántos sin leer. Dos líneas, como un chat; una tercera,
+   * pequeña y en la letra del cuerpo, sólo con el contexto que la lista no
+   * dice ya (el turno donde no lo dice una sección o un chip, la etiqueta si
+   * la lista las mezcla, el proyecto, el bolo). Su acción (`act`: «Ya está»)
+   * ocupa el hueco de la hora. La misma fila para una conversación y para un
+   * hilo del equipo.
    *
    * El nombre es el enlace de la fila y la cubre entera. `active` marca la
    * que está abierta al lado (escritorio, dos paneles). En modo selección la
@@ -88,6 +90,7 @@
   class:is-picked={picked}
   class:chat--picking={picking && !!pick}
   class:chat--flush={flush}
+  class:chat--act={!!act}
   data-group={group || undefined}
 >
   {#if picking && pick}<span class="chat__pick">{@render pick()}</span>{/if}
@@ -98,8 +101,7 @@
         {group}
       />{/if}</span
   >
-  <span class="chat__top">
-    <span class="chat__name">
+  <span class="chat__name">
     {#if href}
       <a class="chat__title" {href} aria-current={active ? 'true' : undefined} data-peek={onopen ? 'off' : undefined} onclick={onopen}
         >{title}</a
@@ -108,43 +110,45 @@
       <span class="chat__title">{title}</span>
     {/if}
     {#if words.length > 0}<span class="chat__words">{words.join(' · ')}</span>{/if}
-    </span>
-    {#if at}<time class="chat__when" datetime={at}>{when}</time>{/if}
   </span>
-  {#if lead || last || unread > 0}
-    <span class="chat__mid">
-      <span class="chat__last"
-        >{#if lead}<span class="chat__lead">{lead}{last ? ':' : ''}</span>{#if last}{' '}{/if}{/if}{last ?? ''}</span
-      >
-      {#if unread > 0}<span class="chat__unread" title={unreadLabel ?? undefined}
-          ><span aria-hidden="true">{unread}</span>{#if unreadLabel}<span class="visually-hidden">{unreadLabel}</span>{/if}</span
-        >{/if}
-    </span>
+  {#if at}<time class="chat__when" datetime={at}>{when}</time>{/if}
+  {#if act}<span class="chat__act">{@render act()}</span>{/if}
+  {#if lead || last}
+    <span class="chat__last"
+      >{#if lead}<span class="chat__lead">{lead}{last ? ':' : ''}</span>{#if last}{' '}{/if}{/if}{last ?? ''}</span
+    >
   {/if}
-  {#if context.length > 0 || act}
-    <span class="chat__foot">
-      <span class="chat__ctx">
-        {#each context as c, i (i)}<span class:is-ink={c.ink}>{c.text}</span>{/each}
-      </span>
-      {#if act}<span class="chat__act">{@render act()}</span>{/if}
+  {#if unread > 0}<span class="chat__unread" title={unreadLabel ?? undefined}
+      ><span aria-hidden="true">{unread}</span>{#if unreadLabel}<span class="visually-hidden">{unreadLabel}</span>{/if}</span
+    >{/if}
+  {#if context.length > 0}
+    <span class="chat__ctx">
+      {#each context as c, i (i)}<span class:is-ink={c.ink}>{c.text}</span>{/each}
     </span>
   {/if}
 </div>
 
 <style>
   @layer components {
+    /* Two lines, as a messaging app draws a chat (ADR-176; diseño 2026-11-05):
+       who and when; what was said last and how many are new. The right
+       column is two slots on one vertical: the time over the figure. «Ya
+       está» takes the time's slot, on hover or focus where there is a
+       pointer, always on a touch screen. A third, quiet line only when the
+       row has context the list does not already say. */
     .chat {
       position: relative;
       display: grid;
-      grid-template-columns: [mono] auto [body] minmax(0, 1fr);
+      grid-template-columns: [mono] auto [body] minmax(0, 1fr) [side] auto;
       grid-template-areas:
-        'mono top'
-        'mono mid'
-        'mono foot';
+        'mono name when'
+        'mono last count';
       column-gap: var(--space-s);
-      row-gap: var(--space-2xs);
+      row-gap: 0;
       align-items: baseline;
-      padding: var(--space-s);
+      padding: var(--space-xs) var(--space-s);
+      border-radius: var(--radius-m);
+      line-height: var(--chat-line-height);
       transition: background-color var(--transition);
     }
     .chat:hover,
@@ -157,17 +161,17 @@
     /* Inside another list's row: that row draws the padding and the lines. */
     .chat--flush {
       padding: 0;
+      border-radius: 0;
     }
     .chat--flush:hover {
       background: none;
     }
 
     .chat--picking {
-      grid-template-columns: [pick] auto [mono] auto [body] minmax(0, 1fr);
+      grid-template-columns: [pick] auto [mono] auto [body] minmax(0, 1fr) [side] auto;
       grid-template-areas:
-        'pick mono top'
-        'pick mono mid'
-        'pick mono foot';
+        'pick mono name when'
+        'pick mono last count';
     }
     .chat__pick {
       grid-area: pick;
@@ -189,25 +193,12 @@
     .chat__mono {
       grid-area: mono;
       grid-row: 1 / -1;
-      align-self: start;
+      align-self: center;
       display: flex;
     }
 
-    .chat__top,
-    .chat__mid {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: var(--space-s);
-      min-inline-size: 0;
-    }
-    .chat__top {
-      grid-area: top;
-    }
-    .chat__mid {
-      grid-area: mid;
-    }
     .chat__name {
+      grid-area: name;
       display: flex;
       align-items: baseline;
       gap: var(--space-xs);
@@ -238,13 +229,11 @@
     a.chat__title:focus-visible::after {
       outline: var(--focus-width) solid var(--focus-color);
       outline-offset: calc(-1 * var(--focus-width));
+      border-radius: inherit;
     }
-    /* Qué es y dónde: la palabra que explica el monograma (ADR-177 § 2).
-       Corta y entera: cede el nombre, que ya lleva su elipsis; sólo unas
-       palabras largas se cortan, pasado su tope. */
+    /* Qué es y dónde (ADR-177 § 2): cede antes que el nombre. */
     .chat__words {
-      flex-shrink: 0;
-      max-inline-size: 40%;
+      flex-shrink: 3;
       min-inline-size: 0;
       overflow: hidden;
       font-size: var(--text-s);
@@ -252,18 +241,52 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+
+    .chat__when,
+    .chat__act {
+      grid-area: when;
+      justify-self: end;
+    }
     .chat__when {
-      flex-shrink: 0;
       font-size: var(--text-xs);
       color: var(--text-faint);
       font-variant-numeric: tabular-nums;
       white-space: nowrap;
     }
     .is-new .chat__when {
-      color: var(--info-dark);
+      color: var(--text-color);
+    }
+    .chat__act {
+      position: relative;
+      z-index: var(--z-raised);
+      align-self: center;
+    }
+    /* With a pointer the act waits for the row: the time keeps its slot
+       until the row is hovered or holds the focus. */
+    @media (hover: hover) and (pointer: fine) {
+      .chat__act {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity var(--transition);
+      }
+      .chat:hover .chat__act,
+      .chat:focus-within .chat__act {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .chat--act:hover .chat__when,
+      .chat--act:focus-within .chat__when {
+        opacity: 0;
+      }
+    }
+    @media not ((hover: hover) and (pointer: fine)) {
+      .chat--act .chat__when {
+        display: none;
+      }
     }
 
     .chat__last {
+      grid-area: last;
       min-inline-size: 0;
       overflow: hidden;
       font-size: var(--text-s);
@@ -276,7 +299,9 @@
     }
     /* Sin leer: una cifra en un círculo, el único color de la fila. */
     .chat__unread {
-      flex-shrink: 0;
+      grid-area: count;
+      justify-self: end;
+      align-self: center;
       display: inline-grid;
       place-items: center;
       min-inline-size: var(--chat-badge);
@@ -291,32 +316,20 @@
       line-height: 1;
     }
 
-    .chat__foot {
-      grid-area: foot;
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: var(--space-s);
-      min-inline-size: 0;
-    }
-    /* The act speaks at its line's size: «Ya está» no taller than the context
-       beside it, so a row that offers it keeps the others' height. */
-    .chat__act {
-      position: relative;
-      z-index: var(--z-raised);
-      flex-shrink: 0;
-      font-size: var(--text-xs);
-    }
+    /* Context the list does not say already: the body's voice, small and
+       quiet (mono capitals are for a block's head, never inside a row). */
     .chat__ctx {
+      grid-column: body / -1;
+      grid-row: 3;
       min-inline-size: 0;
       overflow: hidden;
-      font-family: var(--font-mono);
       font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing-loose);
-      text-transform: uppercase;
       color: var(--text-faint);
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+    .chat--picking .chat__ctx {
+      grid-column: body / -1;
     }
     .chat__ctx > * + *::before {
       content: '·';

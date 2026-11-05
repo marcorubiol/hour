@@ -52,7 +52,7 @@ test.describe('conversation with the venue', () => {
     await dialog.getByLabel('Organization').fill(ORG);
     await dialog.getByRole('button', { name: 'Add conversation' }).click();
     await expect(dialog).not.toBeVisible({ timeout: 10_000 });
-    await page.getByPlaceholder('Search conversations and team…').fill(ORG);
+    await page.getByRole('searchbox', { name: 'Search conversations and team…' }).fill(ORG);
     const link = page.locator('main [data-testid="feed-row"]').getByRole('link', { name: ORG, exact: true });
     await expect(link).toBeVisible({ timeout: 10_000 });
     await link.click();

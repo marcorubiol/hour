@@ -97,6 +97,11 @@
   const audienceQuery = createQuery(toStore(() => audienceListQueryOptions(scopeWorkspaceIds)));
   let listName = $derived(new Map(($audienceQuery.data?.items ?? []).map((a) => [a.id, a.name])));
 
+  /** What has yet to go out (diseño 2026-11-05): its own section, on top. */
+  const PENDING = new Set(['draft', 'review', 'queued', 'paused']);
+  /** States the section already says: the row does not repeat them. */
+  const QUIET_STATUS = new Set(['done', 'draft']);
+
   const TYPE_WORD: Record<MailoutType, string> = {
     todos: 'envios.type_all',
     difusion: 'envios.type_outreach',
@@ -129,9 +134,9 @@
       <section class="envios__main" aria-labelledby="envios-list" data-testid="mailout-list">
         <h2 class="visually-hidden" id="envios-list">{t('envios.list_title', locale)}</h2>
         {#if canRead}
-          <nav class="envios__types" aria-label={t('envios.type_label', locale)}>
+          <nav class="listfilter envios__types" aria-label={t('envios.type_label', locale)}>
             {#each MAILOUT_TYPES as k (k)}
-              <a class="envios__type" href={typeHref(k)} aria-current={type === k ? 'page' : undefined} data-type={k}>{t(TYPE_WORD[k], locale)}</a>
+              <a class="listfilter__opt envios__type" href={typeHref(k)} aria-current={type === k ? 'page' : undefined} data-type={k}>{t(TYPE_WORD[k], locale)}</a>
             {/each}
           </nav>
         {/if}
@@ -146,32 +151,41 @@
         {:else if data && data.items.length === 0}
           <EmptyLine text={t(shownType === 'todos' ? 'envios.empty' : 'envios.empty_type', locale)} />
         {:else if data}
-          <ul class="envios__rows">
-            {#each data.items as m (m.id)}
-              {@const f = m.figures}
-              <li class="mrow" data-kind={m.kind} data-status={m.status}>
-                <span class="mrow__kind eyebrow eyebrow--sub">{t(m.kind === 'invitation' ? 'envios.kind_invitation' : 'envios.kind_outreach', locale)}</span>
-                <a class="mrow__subject" href={href(m)}>{m.subject || t('mailout.untitled', locale)}</a>
-                <span class="mrow__who">{who(m)}</span>
-                <span class="mrow__state">
-                  <span>{t(`mailout.s_${m.status}`, locale)}</span>
-                  {#if f && f.replies > 0 && canRead}
-                    <!-- Who replied, in Conversaciones: a mailout is of Difusión; an invitation's professionals, of any tag. -->
-                    <a href={conversationsHref(`${m.kind === 'outreach' ? 'etiqueta=sales&' : ''}envio=${m.id}&r=respuestas`)}
-                      >{t(f.replies === 1 ? 'envios.replies_one' : 'envios.replies', locale, { n: f.replies })}</a
-                    >
-                  {/if}
-                  {#if f && f.unsubscribed > 0}
-                    <span>{t(f.unsubscribed === 1 ? 'envios.unsub_one' : 'envios.unsub', locale, { n: f.unsubscribed })}</span>
-                  {/if}
-                  {#if f && f.bounced > 0}
-                    <span class="mrow__warn">{t(f.bounced === 1 ? 'envios.bounced_one' : 'envios.bounced', locale, { n: f.bounced })}</span>
-                  {/if}
-                </span>
-                <span class="mrow__when">{m.queued_at ? dayMonth(m.queued_at) : ''}</span>
-              </li>
-            {/each}
-          </ul>
+          {@const pending = data.items.filter((m) => PENDING.has(m.status))}
+          {@const gone = data.items.filter((m) => !PENDING.has(m.status))}
+          {#each [{ key: 'pending', items: pending }, { key: 'sent', items: gone }] as s (s.key)}
+            {#if s.items.length > 0}
+              <h3 class="eyebrow eyebrow--sub envios__head" data-section={s.key}>
+                <span class="envios__head-word">{t(s.key === 'pending' ? 'envios.section_pending' : 'envios.section_sent', locale)}</span>{#if s.key === 'pending' || !$query.hasNextPage}{' '}· {s.items.length}{/if}
+              </h3>
+              <ul class="envios__rows">
+                {#each s.items as m (m.id)}
+                  {@const f = m.figures}
+                  <li class="mrow" data-kind={m.kind} data-status={m.status}>
+                    <a class="mrow__subject" href={href(m)}>{m.subject || t('mailout.untitled', locale)}</a>
+                    <span class="mrow__when" class:is-ink={!m.queued_at}>{m.queued_at ? dayMonth(m.queued_at) : t(`mailout.s_${m.status}`, locale)}</span>
+                    <span class="mrow__meta">
+                      <span>{t(m.kind === 'invitation' ? 'envios.kind_invitation' : 'envios.kind_outreach', locale)}</span>
+                      {#if who(m)}<span>{who(m)}</span>{/if}
+                      {#if m.queued_at && !QUIET_STATUS.has(m.status)}<span>{t(`mailout.s_${m.status}`, locale)}</span>{/if}
+                      {#if f && f.replies > 0 && canRead}
+                        <!-- Who replied, in Conversaciones: a mailout is of Difusión; an invitation's professionals, of any tag. -->
+                        <a href={conversationsHref(`${m.kind === 'outreach' ? 'etiqueta=sales&' : ''}envio=${m.id}&r=respuestas`)}
+                          >{t(f.replies === 1 ? 'envios.replies_one' : 'envios.replies', locale, { n: f.replies })}</a
+                        >
+                      {/if}
+                      {#if f && f.unsubscribed > 0}
+                        <span>{t(f.unsubscribed === 1 ? 'envios.unsub_one' : 'envios.unsub', locale, { n: f.unsubscribed })}</span>
+                      {/if}
+                      {#if f && f.bounced > 0}
+                        <span class="mrow__warn">{t(f.bounced === 1 ? 'envios.bounced_one' : 'envios.bounced', locale, { n: f.bounced })}</span>
+                      {/if}
+                    </span>
+                  </li>
+                {/each}
+              </ul>
+            {/if}
+          {/each}
           {#if $query.hasNextPage}
             <div class="envios__more">
               <Button size="s" variant="secondary" loading={$query.isFetchingNextPage} onclick={() => void $query.fetchNextPage()}
@@ -219,53 +233,31 @@
       gap: var(--space-s);
       min-inline-size: 0;
     }
-    .envios__types {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--space-2xs);
+    /* Two sections, Por salir and Enviados: the head is the one mono word. */
+    .envios__head {
+      display: block;
+      margin: var(--space-s) 0 0;
     }
-    .envios__type {
-      padding: var(--space-2xs) var(--space-xs);
-      border-radius: var(--radius-s);
-      color: var(--text-muted);
-      font-size: var(--text-s);
-      text-decoration: none;
-      transition: color var(--transition), background-color var(--transition);
-    }
-    .envios__type:hover {
+    .envios__head-word {
       color: var(--text-color);
     }
-    .envios__type[aria-current] {
-      background: var(--bg-light);
-      color: var(--text-color);
-    }
-    /* Las filas comparten columnas (subgrid): a quién, el estado y la fecha
-       caen en la misma vertical en todas. */
     .envios__rows {
-      display: grid;
-      grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr) minmax(0, 1.6fr) auto;
       margin: 0;
       padding: 0;
       list-style: none;
-      border-block-start: var(--border);
     }
-    /* Una fila: el tipo sobre el asunto, a quién, el estado con sus cifras y
-       la fecha al final, alineados en columnas a lo ancho y en la línea del
-       asunto, no a media altura entre el tipo y el asunto. */
+    /* Two lines: the subject and when (or, before it goes out, its state);
+       under it, in one quiet line, what it is, to whom, and its figures. */
     .mrow {
       display: grid;
-      grid-column: 1 / -1;
-      grid-template-columns: subgrid;
+      grid-template-columns: minmax(0, 1fr) auto;
       grid-template-areas:
-        'kind . . .'
-        'subject who state when';
+        'subject when'
+        'meta meta';
       align-items: baseline;
-      gap: 0 var(--space-m);
+      gap: var(--space-2xs) var(--space-m);
       padding-block: var(--space-s);
-      border-block-end: var(--border);
-    }
-    .mrow__kind {
-      grid-area: kind;
+      border-block-start: var(--border);
     }
     .mrow__subject {
       grid-area: subject;
@@ -281,59 +273,38 @@
       text-decoration-color: var(--border-color-dark);
       text-underline-offset: 0.25em;
     }
-    .mrow__who,
-    .mrow__state {
+    .mrow__when {
+      grid-area: when;
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .mrow__when.is-ink {
+      color: var(--text-color);
+    }
+    .mrow__meta {
+      grid-area: meta;
+      min-inline-size: 0;
       font-size: var(--text-s);
       color: var(--text-muted);
     }
-    .mrow__who {
-      grid-area: who;
-    }
-    .mrow__state {
-      grid-area: state;
-    }
-    .mrow__state > :not(:last-child)::after {
+    .mrow__meta > :not(:last-child)::after {
       content: '·';
-      margin-inline: var(--space-2xs);
+      margin-inline: var(--space-xs);
       color: var(--text-faint);
     }
-    .mrow__state a {
+    .mrow__meta a {
       color: inherit;
       text-decoration: underline;
       text-decoration-color: var(--border-color-dark);
       text-underline-offset: 0.25em;
     }
-    .mrow__state a:hover {
+    .mrow__meta a:hover {
       color: var(--text-color);
     }
     .mrow__warn {
       color: var(--warning-dark);
-    }
-    .mrow__when {
-      grid-area: when;
-      font-size: var(--text-s);
-      color: var(--text-muted);
-      font-variant-numeric: tabular-nums;
-      text-align: end;
-    }
-    /* Estrecho: el tipo y la fecha en una línea, el asunto, y a quién con el
-       estado en una sola línea debajo, separados como las cifras del estado. */
-    @container (max-width: 40rem) {
-      .envios__rows {
-        grid-template-columns: auto minmax(0, 1fr) auto;
-      }
-      .mrow {
-        grid-template-areas:
-          'kind kind when'
-          'subject subject subject'
-          'who state state';
-        gap: var(--space-2xs) 0;
-      }
-      .mrow__who:not(:empty)::after {
-        content: '·';
-        margin-inline: var(--space-2xs);
-        color: var(--text-faint);
-      }
     }
     .envios__more {
       padding-block-start: var(--space-xs);
