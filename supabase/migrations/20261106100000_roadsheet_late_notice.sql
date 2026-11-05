@@ -1,4 +1,4 @@
--- 121 B · «Llego tarde» en la hoja de ruta del técnico (ADR-180; Marco, 2026-11-05).
+-- 121 B · «Llego tarde» en la hoja de ruta del técnico (ADR-183; Marco, 2026-11-05).
 --
 -- La hoja pública es anónima: el token es la capacidad (ADR-047). Hasta hoy
 -- el enlace era por papel (`roadsheet_share.role`) y la hoja no sabía quién la
@@ -57,7 +57,7 @@ ALTER TABLE public.roadsheet_share
   ADD COLUMN person_id uuid REFERENCES public.person (id) ON DELETE SET NULL;
 CREATE INDEX roadsheet_share_person_idx ON public.roadsheet_share (person_id) WHERE person_id IS NOT NULL;
 COMMENT ON COLUMN public.roadsheet_share.person_id IS
-  'ADR-180: the person whose link this is (a role link plus a person). NULL = a role link. Only a personal link can send «llego tarde».';
+  'ADR-183: the person whose link this is (a role link plus a person). NULL = a role link. Only a personal link can send «llego tarde».';
 
 -- El papel de una persona en la función: equipo técnico, `tech_manager`;
 -- reparto (el del proyecto menos a quien sustituye un cast_override de esta
@@ -183,7 +183,7 @@ BEGIN
 END;
 $$;
 COMMENT ON FUNCTION public.create_roadsheet_share_for_person(uuid, uuid) IS
-  'ADR-180: a personal road sheet link. The role comes from the team (crew: tech_manager, cast: performer; neither: 22023). edit:performance (42501).';
+  'ADR-183: a personal road sheet link. The role comes from the team (crew: tech_manager, cast: performer; neither: 22023). edit:performance (42501).';
 REVOKE ALL ON FUNCTION public.create_roadsheet_share_for_person(uuid, uuid) FROM PUBLIC, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.create_roadsheet_share_for_person(uuid, uuid) TO authenticated;
 
@@ -222,7 +222,7 @@ CREATE TABLE public.roadsheet_late_notice (
   CONSTRAINT roadsheet_late_notice_seen CHECK (seen_by IS NULL OR seen_at IS NOT NULL)
 );
 COMMENT ON TABLE public.roadsheet_late_notice IS
-  'ADR-180: «llego tarde» from a personal road sheet link. Written only by report_roadsheet_late (anonymous, token-resolved); seen and moved by production through their RPCs. Never changes a time by itself.';
+  'ADR-183: «llego tarde» from a personal road sheet link. Written only by report_roadsheet_late (anonymous, token-resolved); seen and moved by production through their RPCs. Never changes a time by itself.';
 
 CREATE INDEX roadsheet_late_notice_share_idx ON public.roadsheet_late_notice (share_id, created_at DESC);
 CREATE INDEX roadsheet_late_notice_performance_idx ON public.roadsheet_late_notice (performance_id, created_at DESC);
@@ -257,7 +257,7 @@ ALTER TABLE public.message
   ADD CONSTRAINT message_system_notice CHECK ((system IS NULL) = (late_notice_id IS NULL));
 CREATE INDEX message_late_notice_idx ON public.message (late_notice_id) WHERE late_notice_id IS NOT NULL;
 COMMENT ON COLUMN public.message.system IS
-  'ADR-180: a line the system writes in a bolo group (late_notice: no author; late_moved: whoever moved the time). The screen words it from late_notice_id; body is the fallback.';
+  'ADR-183: a line the system writes in a bolo group (late_notice: no author; late_moved: whoever moved the time). The screen words it from late_notice_id; body is the fallback.';
 
 -- Escribe una línea de sistema en el General del bolo de la función, si
 -- cuelga de un bolo vivo. Crea el hilo si falta (como post_message).
@@ -428,7 +428,7 @@ BEGIN
 END;
 $$;
 COMMENT ON FUNCTION public.report_roadsheet_late(text, integer, text) IS
-  'ADR-180: «llego tarde» from a personal road sheet link. Token-only: resolves share, person and performance server-side. 42501: no such live personal link (revoked, expired, role-only, person no longer in the team). 22023: not the performance day in the venue''s zone, or bad minutes/note. 53400: over 3 notices per link per hour.';
+  'ADR-183: «llego tarde» from a personal road sheet link. Token-only: resolves share, person and performance server-side. 42501: no such live personal link (revoked, expired, role-only, person no longer in the team). 22023: not the performance day in the venue''s zone, or bad minutes/note. 53400: over 3 notices per link per hour.';
 REVOKE ALL ON FUNCTION public.report_roadsheet_late(text, integer, text) FROM PUBLIC, service_role;
 GRANT EXECUTE ON FUNCTION public.report_roadsheet_late(text, integer, text) TO anon, authenticated;
 
@@ -611,7 +611,7 @@ DECLARE
   -- 120 · la matriz de ADR-041 (`ROLE_SECTIONS`, `PERSONAL_CONTACTS` en
   -- $lib/roadsheet), ya aquí: lo que el rol no ve no sale de la base.
   v_contacts boolean;
-  -- 121 B (ADR-180): la zona del día y si la persona del enlace sigue en la función.
+  -- 121 B (ADR-183): la zona del día y si la persona del enlace sigue en la función.
   v_tz text;
   v_person_role text;
 BEGIN
@@ -754,7 +754,7 @@ BEGIN
          AND k.first_day <= p.performed_at
          AND greatest(k.first_day, coalesce(k.end_day, k.first_day)) >= p.performed_at - 1), '[]'::jsonb))
      ELSE '{}'::jsonb END
-  -- 121 B (ADR-180): las horas que movió un aviso, para «cambiado hoy · antes HH:MM».
+  -- 121 B (ADR-183): las horas que movió un aviso, para «cambiado hoy · antes HH:MM».
   || jsonb_build_object('late_moves', COALESCE((
        SELECT jsonb_agg(jsonb_build_object(
          'kind', n.milestone_kind, 'label', n.milestone_label,

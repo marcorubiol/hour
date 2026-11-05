@@ -5,7 +5,7 @@
    * filtered the projection to the share's pinned role. Renders the same
    * RoadsheetView as the operator page.
    *
-   * 121 B (ADR-180): a personal link says whose sheet it is and, on the day,
+   * 121 B (ADR-183): a personal link says whose sheet it is and, on the day,
    * offers «Llego tarde» (RoadsheetLate). A role link has neither.
    */
 

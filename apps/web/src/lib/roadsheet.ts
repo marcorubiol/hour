@@ -449,7 +449,7 @@ export interface RoadsheetShare {
   created_at: string;
   /** The first instant the link no longer opens. */
   expires_at: string;
-  /** 121 B (ADR-180): whose link it is (a role link plus a person). null: a role link. */
+  /** 121 B (ADR-183): whose link it is (a role link plus a person). null: a role link. */
   person?: { id: string; name: string } | null;
 }
 

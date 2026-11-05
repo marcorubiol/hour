@@ -68,7 +68,7 @@ export interface ThreadMessage {
   body: string;
   created_at: string;
   edited_at: string | null;
-  /** 121 B (ADR-180): a line the system wrote in a bolo group; `body` is its Spanish fallback. */
+  /** 121 B (ADR-183): a line the system wrote in a bolo group; `body` is its Spanish fallback. */
   system?: 'late_notice' | 'late_moved' | null;
   /** Its «llego tarde», when the reader may read the performance (else null: say `body`). */
   late?: LateLineData | null;

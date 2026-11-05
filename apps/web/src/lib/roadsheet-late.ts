@@ -1,5 +1,5 @@
 /**
- * «LLEGO TARDE» (121 B, ADR-180): the technician warns production from their
+ * «LLEGO TARDE» (121 B, ADR-183): the technician warns production from their
  * own road sheet link, and production sees it on Hoy and in the bolo group.
  * The technician never moves a time: «Mover <moment> a HH:MM» is
  * production's, through the collab doc (ADR-090 P2).

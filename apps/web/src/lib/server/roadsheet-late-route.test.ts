@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { POST as latePOST } from '../../routes/api/public/roadsheet/[token]/late/+server';
 import { POST as sharesPOST } from '../../routes/api/performances/[key]/roadsheet/shares/+server';
 
-// 121 B (ADR-180): the anonymous «llego tarde» route and the personal link.
+// 121 B (ADR-183): the anonymous «llego tarde» route and the personal link.
 
 const env = { PUBLIC_SUPABASE_URL: 'https://db.test', PUBLIC_SUPABASE_ANON_KEY: 'anon' };
 const TOKEN = 'a'.repeat(64);

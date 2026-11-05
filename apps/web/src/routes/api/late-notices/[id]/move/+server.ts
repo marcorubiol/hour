@@ -1,5 +1,5 @@
 /**
- * POST /api/late-notices/:id/move: «Mover <moment> a HH:MM» (121 B, ADR-180),
+ * POST /api/late-notices/:id/move: «Mover <moment> a HH:MM» (121 B, ADR-183),
  * once a person who edits the performance confirmed it.
  *
  * The move is the notice's, never the client's: `roadsheet_late_move_plan`

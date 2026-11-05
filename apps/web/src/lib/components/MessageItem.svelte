@@ -41,7 +41,7 @@
    *    sombreada y con su marca, para que no se confunda con lo de fuera;
    *  - `bubble`: el mensaje de un grupo (el hilo de un bolo), en su lado.
    *
-   * Una línea del sistema (121 B, ADR-180: «Pau llega tarde · desde su hoja»,
+   * Una línea del sistema (121 B, ADR-183: «Pau llega tarde · desde su hoja»,
    * «Núria movió carga de 16:00 a 16:20») va centrada y sin menú, en cualquier
    * forma: no la escribió nadie del hilo, o es la huella de un cambio de hora.
    */

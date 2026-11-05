@@ -1,13 +1,13 @@
 <script lang="ts">
   /**
-   * «Llega tarde» at the top of Hoy and of Ahora (121 B, ADR-180): what a
+   * «Llega tarde» at the top of Hoy and of Ahora (121 B, ADR-183): what a
    * technician sent from their own road sheet, while nobody marked «Visto».
    * Three acts per notice: «Mover <moment> a HH:MM» (only to whoever edits
    * the performance; asks first, moves that one time and no other, through
    * the collab doc), «Llamar» and «Visto». Nothing to show, nothing drawn.
    *
    * Like band 1 it ignores the scope: a late technician is today's, whatever
-   * the sidebar narrows. Without push in Hour (ADR-180), this band and the
+   * the sidebar narrows. Without push in Hour (ADR-183), this band and the
    * line in the bolo group are where production hears it, so it reads again
    * every 30 s.
    */

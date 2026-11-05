@@ -143,7 +143,7 @@
     },
   });
 
-  // ── Personal links (121 B, ADR-180): only these show «Llego tarde» ────
+  // ── Personal links (121 B, ADR-183): only these show «Llego tarde» ────
   const createPersonal = createMutation({
     mutationFn: (personId: string) =>
       mutateJSON(

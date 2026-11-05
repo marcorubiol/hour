@@ -11,7 +11,7 @@
  *        «caducó el …» and lets the date move.
  * POST → { role: venue|performer|tech_manager } → 201 with the new share.
  *
- * 121 B (ADR-180): a link can be someone's. GET also says whose each link
+ * 121 B (ADR-183): a link can be someone's. GET also says whose each link
  * is (`person`) and who in the performance's team can get one (`team`,
  * `roadsheetTeam`); POST { person_id } creates a personal link through
  * `create_roadsheet_share_for_person`, which sets the role from the team

@@ -930,7 +930,7 @@
   {/snippet}
   <LensHeader help="desk" {title} tools={taskSpaces.length > 0 ? addTask : undefined} />
 
-  <!-- 121 B (ADR-180): a late technician comes first, while nobody marked «Visto». -->
+  <!-- 121 B (ADR-183): a late technician comes first, while nobody marked «Visto». -->
   <LateNoticeBand {locale} />
 
   <FirstVisitCard section="desk" steps={['desk-next', 'desk-waits', 'desk-more']} />

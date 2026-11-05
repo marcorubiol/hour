@@ -269,7 +269,7 @@
     <a class="ahora__exit" href={exitHref} data-sveltekit-replacestate>{t('ahora.exit', locale)}</a>
   </header>
 
-  <!-- 121 B (ADR-180): a late technician, on top while nobody marked «Visto». -->
+  <!-- 121 B (ADR-183): a late technician, on top while nobody marked «Visto». -->
   <LateNoticeBand {locale} />
 
   <div class="ahora__body">

@@ -10,7 +10,7 @@
  * `cache-control: no-store` — revocation must bite on the next request,
  * not when a cache expires.
  *
- * 121 B (ADR-180): the moments a «llego tarde» moved carry `moved_from` (one
+ * 121 B (ADR-183): the moments a «llego tarde» moved carry `moved_from` (one
  * rule, `annotateMoves`); a personal link also gets `holder` (whose sheet)
  * and `late` (may they warn today, who receives it, their last notice).
  */

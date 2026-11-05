@@ -1,5 +1,5 @@
 /**
- * GET /api/late-notices: the open «llego tarde» notices (121 B, ADR-180):
+ * GET /api/late-notices: the open «llego tarde» notices (121 B, ADR-183):
  * the last one of each personal link, from the last 24 h, nobody has marked
  * «Visto», of the performances the caller reads. Hoy and Ahora draw them as a
  * band at the top. `roadsheet_late_notices()` decides who sees what and

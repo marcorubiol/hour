@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * «Llego tarde» on the technician's own sheet (121 B, ADR-180). Only on a
+   * «Llego tarde» on the technician's own sheet (121 B, ADR-183). Only on a
    * personal link, and the button only on the day (the base says `open`). It
    * never changes a time: it warns production, who sees it on Hoy and in the
    * bolo group, and may move the time themselves.

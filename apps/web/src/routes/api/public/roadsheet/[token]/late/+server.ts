@@ -1,5 +1,5 @@
 /**
- * POST /api/public/roadsheet/:token/late: «Llego tarde» (121 B, ADR-180).
+ * POST /api/public/roadsheet/:token/late: «Llego tarde» (121 B, ADR-183).
  *
  * ANONYMOUS: the token is the capability, and only a personal link can use
  * it. The body carries the minutes (10, 20, 30, 45 or null for «No sé») and

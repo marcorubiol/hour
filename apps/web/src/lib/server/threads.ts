@@ -25,7 +25,7 @@ import {
   type ThreadMessage,
 } from '$lib/threads';
 
-// 121 B (ADR-180): a system line carries its «llego tarde», by the reader's RLS
+// 121 B (ADR-183): a system line carries its «llego tarde», by the reader's RLS
 // (`read:performance`); a reader without it gets null and the screen says `body`.
 const MESSAGE_SELECT =
   'id,thread_id,author_id,performance_id,body,created_at,edited_at,system,' +

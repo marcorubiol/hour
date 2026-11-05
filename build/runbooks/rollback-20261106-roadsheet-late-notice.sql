@@ -1,4 +1,4 @@
--- Rollback de 20261106100000_roadsheet_late_notice.sql (121 B, ADR-180).
+-- Rollback de 20261106100000_roadsheet_late_notice.sql (121 B, ADR-183).
 --
 -- Borra los avisos «llego tarde» y sus líneas en los grupos de bolo, y deja
 -- los enlaces personales como enlaces de papel (se pierde de quién eran; el

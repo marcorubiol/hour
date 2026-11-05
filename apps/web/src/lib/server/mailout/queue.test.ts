@@ -180,7 +180,7 @@ describe('el idioma de cada suscripción (104)', () => {
     await runMailoutQueue(env, { db, providerFor: () => ({ ...simulatorProvider(), sendEmail }) });
     const byTo = Object.fromEntries(sendEmail.mock.calls.map(([e]) => [e.tags.recipient, e]));
     expect(byTo.fr.text).toContain('Se désinscrire : https://hour.test/u/tok1');
-    // ADR-180: the lang is the text's; the footer stays in hers.
+    // ADR-183: the lang is the text's; the footer stays in hers.
     expect(byTo.fr.html).toContain('<html lang="es">');
     expect(byTo.en.text).toContain('Unsubscribe: https://hour.test/u/tok1');
     expect(byTo.none.text).toContain('Darte de baja:');
