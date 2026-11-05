@@ -386,8 +386,12 @@
     border-radius: var(--radius-l);
     align-content: start;
   }
+  /* La espera no promete tarjeta: a veces no hay ninguna. Gris, no el azul de
+     una propuesta. */
   .card--wait {
     color: var(--text-faint);
+    border-color: var(--border-color-light);
+    background: var(--bg-light);
   }
   /* The pack keeps its glyph and the word after it together, on the text's
      baseline; it never yields to a long name. */
