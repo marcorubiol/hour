@@ -38,8 +38,9 @@
    * Tres formas (punto 110), un solo dueño de corregir y borrar:
    *  - `row`: la fila del tablón, con su monograma;
    *  - `note`: la nota del equipo intercalada en el hilo de una conversación:
-   *    burbuja ámbar a nuestro lado, con el candado y «solo el equipo», para
-   *    que no se confunda con lo de fuera (ADR-184);
+   *    una banda ámbar de lado a lado (ni de ellos ni de lo que les dijimos),
+   *    con el candado y «solo el equipo», y la cita de la entrada de la que
+   *    habla si la lleva en su primera línea («> …», ADR-185);
    *  - `bubble`: el mensaje de un grupo (el hilo de un bolo), en su lado.
    *
    * Una línea del sistema (121 B, ADR-183: «Pau llega tarde · desde su hoja»,
@@ -55,6 +56,7 @@
   import Menu from '$lib/components/Menu.svelte';
   import { MESSAGE_MAX, messageWhen, type ThreadMessage } from '$lib/threads';
   import ThreadIcon from '$lib/components/ThreadIcon.svelte';
+  import { splitCite } from '$lib/conversation-thread';
   import { lateLineText } from '$lib/roadsheet-late';
 
   interface Props {
@@ -92,6 +94,8 @@
   // Un mensaje es un momento: se dice en la zona de quien lo lee.
   const viewerTz = viewerTimeZone();
   let by = $derived(author || t('threads.someone', locale));
+  /** Una nota que cita una entrada del hilo la lleva en su primera línea, «> …» (ADR-185). */
+  let quoted = $derived(look === 'note' ? splitCite(m.body) : { cite: null, text: m.body });
   let when = $derived(stamp ?? messageWhen(m.created_at, locale, viewerTz));
 
   let editing = $state(false);
@@ -185,7 +189,8 @@
         </div>
       </form>
     {:else}
-      <p class="msg__text">{m.body}</p>
+      {#if quoted.cite}<p class="msg__cite">{quoted.cite}</p>{/if}
+      <p class="msg__text">{quoted.text}</p>
     {/if}
   </div>
   {#if mine && !editing}
@@ -286,22 +291,32 @@
       white-space: pre-line;
       overflow-wrap: anywhere;
     }
-    /* La nota del equipo en el hilo de una conversación (ADR-184): burbuja
-       ámbar a nuestro lado, el candado y quién delante, la hora al final. */
+    /* La nota del equipo en el hilo de una conversación (ADR-185): una banda
+       ámbar de lado a lado, con su raya, que no es de ellos ni de lo que les
+       dijimos; quién y el candado delante, la hora al final. */
     .msg--note {
       grid-template-columns: minmax(0, 1fr) auto;
       gap: var(--space-xs);
-      align-self: flex-end;
-      max-inline-size: var(--thread-letter-max);
+      align-self: stretch;
       padding: var(--space-xs) var(--space-s) var(--space-xs) var(--space-m);
       background: var(--thread-team-bg);
-      border: var(--line-hairline) solid var(--thread-team-rule);
-      border-radius: var(--thread-bubble-radius);
-      border-end-end-radius: var(--thread-bubble-tail);
+      border-inline-start: var(--line-thick) solid var(--thread-team-rule);
+      border-radius: var(--radius-s);
     }
     .msg--note .msg__head time {
       margin-inline-start: auto;
       padding-inline-start: var(--space-m);
+    }
+    /* Lo que cita, encima del texto: apagado, con su raya, en una línea. */
+    .msg__cite {
+      margin: 0;
+      padding-inline-start: var(--space-s);
+      overflow: hidden;
+      color: var(--text-muted);
+      border-inline-start: var(--line) solid var(--thread-team-rule);
+      font-size: var(--text-s);
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .msg__by--note {
       display: inline-flex;

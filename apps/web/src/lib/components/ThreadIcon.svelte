@@ -5,7 +5,7 @@
    * § 3: la forma nunca va sola). Un trazo, el tamaño del texto que acompaña,
    * el color del texto. Un canal nuevo trae aquí su glifo.
    */
-  export type ThreadIconName = 'mail' | 'call' | 'message' | 'meeting' | 'team' | 'note' | 'mailout' | 'done' | 'details';
+  export type ThreadIconName = 'mail' | 'call' | 'message' | 'meeting' | 'team' | 'note' | 'mailout' | 'done' | 'details' | 'plus';
 </script>
 
 <script lang="ts">
@@ -35,6 +35,8 @@
     <path d="M3 10v4h3.5l7 4.5v-13L6.5 10H3z" /><path d="M17 9a4.2 4.2 0 0 1 0 6" />
   {:else if name === 'done'}
     <path d="M5 12.5 10 17l9-10" />
+  {:else if name === 'plus'}
+    <path d="M12 5v14M5 12h14" />
   {:else}
     <rect x="3" y="4" width="18" height="16" rx="2" /><path d="M15 4v16" />
   {/if}

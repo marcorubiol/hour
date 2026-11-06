@@ -767,6 +767,9 @@
        one stroke, the size of the text it goes with. */
     --icon-size: 1.1em;
     --icon-stroke: 1.6;
+    /* The words before the choices of «+ Apuntar» (qué, quién, cuándo): one
+       column, so the choices start on one vertical. */
+    --composer-opt-label: 4.5rem;
     /* La pantalla de un envío (ADR-180): la columna de «Así le llega» y el
        ancho de un móvil en su vista previa. */
     --mail-preview-col: 38rem;

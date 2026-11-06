@@ -85,7 +85,6 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import { messageFailed } from '$lib/components/MessageItem.svelte';
   import {
-    CONVERSATION_EVENT_KINDS,
     EVENT_BODY_MAX,
     eventKindLabel,
     occurredAtForDay,
@@ -177,7 +176,18 @@
   function choose(next: ComposerTarget) {
     chosen = true;
     fellBack = false;
+    if (next === 'log' && target !== 'log') beforeLog = target;
     target = next;
+  }
+
+  /**
+   * «Comentar al equipo» desde una entrada del hilo (ADR-185): el campo pasa
+   * al equipo con la cita de esa entrada en su primera línea.
+   */
+  export function cite(line: string) {
+    const rest = drafts.team.startsWith('> ') ? drafts.team.slice(drafts.team.indexOf('\n') + 1 || drafts.team.length) : drafts.team;
+    drafts.team = `${line}\n${rest}`;
+    focus('team');
   }
 
   // ── Correo ──────────────────────────────────────────────────────────────
@@ -306,6 +316,28 @@
   let logKind = $state<ConversationEventKind>('call');
   let logDirection = $state<'outbound' | 'inbound' | ''>('outbound');
   let logDay = $state(localDayISO());
+  /** «Otro día»: el día se elige; si no, es ahora. */
+  let otherDay = $state(false);
+  /** Qué se apunta, en el orden en que más se apunta; cada uno con su glifo, el del hilo. */
+  const LOG_KINDS: ConversationEventKind[] = ['call', 'meeting', 'message', 'email', 'note'];
+  const LOG_ICON: Record<ConversationEventKind, ThreadIconName> = {
+    call: 'call',
+    meeting: 'meeting',
+    message: 'message',
+    email: 'mail',
+    note: 'note',
+  };
+  /** Una reunión es de los dos y un apunte no tiene a nadie delante: sin «quién». */
+  function pickKind(k: ConversationEventKind) {
+    logKind = k;
+    logDirection = k === 'note' || k === 'meeting' ? '' : logDirection || 'outbound';
+  }
+  /** Dejar de apuntar: vuelve a donde se escribía. */
+  let beforeLog: ComposerTarget = 'mail';
+  function cancelLog() {
+    target = beforeLog;
+    void tick().then(() => field?.focus());
+  }
   let futureDay = $derived(logDay > localDayISO());
 
   /** «Llamar» desde el teléfono del contacto: el destino pasa a apuntar la llamada. */
@@ -323,6 +355,8 @@
       forgetUnsent(convId, 'log');
       drafts.log = '';
       logDay = localDayISO();
+      otherDay = false;
+      target = beforeLog;
       // Sale ya en el hilo, sin esperar a la recarga (que llega después y manda).
       const item = data?.item;
       if (item) {
@@ -487,13 +521,13 @@
       ><ThreadIcon name="team" /><span class:visually-hidden--narrow={target !== 'team'}>{t('thread.to_team', locale)}</span></button
     >
     {#if conv.can_edit}
+      <!-- Apuntar no es escribir a nadie: deja constancia de algo que ya pasó (ADR-185). -->
       <button
         type="button"
-        class="composer__target"
+        class="composer__log-btn"
         aria-pressed={target === 'log'}
         data-testid="composer-to-log"
-        onclick={() => focus('log')}
-        ><ThreadIcon name="note" /><span class:visually-hidden--narrow={target !== 'log'}>{t('thread.to_log_short', locale)}</span></button
+        onclick={() => (target === 'log' ? cancelLog() : focus('log'))}><ThreadIcon name="plus" />{t('thread.log_open', locale)}</button
       >
     {/if}
   </div>
@@ -541,18 +575,38 @@
   {/if}
 
   {#if target === 'log'}
-    <div class="composer__log">
-      <select bind:value={logKind} aria-label={t('conversations.event_kind', locale)}>
-        {#each CONVERSATION_EVENT_KINDS as k (k)}
-          <option value={k}>{eventKindLabel(k, locale)}</option>
+    <div class="composer__log" data-testid="composer-log">
+      <div class="composer__opts" role="group" aria-label={t('conversations.event_kind', locale)}>
+        <span class="composer__opt-label">{t('thread.log_what', locale)}</span>
+        {#each LOG_KINDS as k (k)}
+          <button type="button" class="composer__opt" aria-pressed={logKind === k} onclick={() => pickKind(k)}
+            ><ThreadIcon name={LOG_ICON[k]} />{k === 'note' ? t('thread.ev_note', locale) : eventKindLabel(k, locale)}</button
+          >
         {/each}
-      </select>
-      <select bind:value={logDirection} aria-label={t('create.direction', locale)}>
-        <option value="outbound">{t('thread.dir_out', locale)}</option>
-        <option value="inbound">{t('thread.dir_in', locale)}</option>
-        <option value="">{t('thread.direction_none', locale)}</option>
-      </select>
-      <input type="date" bind:value={logDay} max={localDayISO()} aria-label={t('conversations.event_day', locale)} />
+      </div>
+      {#if logKind !== 'note' && logKind !== 'meeting'}
+        <div class="composer__opts" role="group" aria-label={t('create.direction', locale)}>
+          <span class="composer__opt-label">{t('thread.log_who', locale)}</span>
+          <button type="button" class="composer__opt" aria-pressed={logDirection === 'outbound'} onclick={() => (logDirection = 'outbound')}
+            >{t('thread.log_me', locale)}</button
+          >
+          <button type="button" class="composer__opt" aria-pressed={logDirection === 'inbound'} onclick={() => (logDirection = 'inbound')}
+            >{name ? firstName(name) : t('thread.log_them', locale)}</button
+          >
+        </div>
+      {/if}
+      <div class="composer__opts" role="group" aria-label={t('conversations.event_day', locale)}>
+        <span class="composer__opt-label">{t('thread.log_when', locale)}</span>
+        <button type="button" class="composer__opt" aria-pressed={!otherDay} onclick={() => ((otherDay = false), (logDay = localDayISO()))}
+          >{t('thread.log_now', locale)}</button
+        >
+        <button type="button" class="composer__opt" aria-pressed={otherDay} onclick={() => (otherDay = true)}
+          >{t('thread.log_other_day', locale)}</button
+        >
+        {#if otherDay}
+          <input type="date" bind:value={logDay} max={localDayISO()} aria-label={t('conversations.event_day', locale)} />
+        {/if}
+      </div>
     </div>
   {/if}
 
@@ -570,6 +624,9 @@
       onkeydown={onKey}
     ></textarea>
     <span class="composer__btns">
+      {#if target === 'log'}
+        <Button size="s" variant="quiet" onclick={cancelLog}>{t('create.cancel', locale)}</Button>
+      {/if}
       {#if target === 'mail' && !mailBlocked}
         <Button size="s" variant="secondary" onclick={() => (full = !full)}>
           {full ? t('thread.close_mail', locale) : t('thread.open_as_mail', locale)}
@@ -670,6 +727,35 @@
       background: var(--thread-team-bg);
       border-color: var(--thread-team-rule);
     }
+    /* «+ Apuntar», apart at the end of the row: not a place to write to,
+       a record of something that already happened (ADR-185). */
+    .composer__log-btn {
+      display: inline-flex;
+      align-items: baseline;
+      gap: var(--space-xs);
+      margin-inline-start: auto;
+      padding: var(--space-2xs) var(--space-s);
+      color: var(--text-muted);
+      background: none;
+      border: var(--line-hairline) dashed var(--border-color-dark);
+      border-radius: var(--radius);
+      font: inherit;
+      font-size: var(--text-s);
+      cursor: pointer;
+    }
+    .composer__log-btn:hover,
+    .composer__log-btn[aria-pressed='true'] {
+      color: var(--heading-color);
+      border-style: solid;
+    }
+    /* For the team the whole field turns amber, not only its box: what is
+       written here stays home (ADR-185, as a shared inbox's note). */
+    .composer--team {
+      padding: var(--space-s);
+      background: var(--thread-team-bg);
+      border: var(--line-hairline) solid var(--thread-team-rule);
+      border-radius: var(--radius-l);
+    }
     /* On a phone the row keeps one line: the word only on the chosen one
        (`.visually-hidden--narrow`, heard everywhere), no group words. */
     @media (max-width: 47.999rem) {
@@ -747,12 +833,38 @@
       flex-direction: column;
       gap: var(--space-xs);
     }
-    .composer__log {
-      flex-direction: row;
+    /* What is logged, as choices: what it was, who began it, when. */
+    .composer__opts {
+      display: flex;
       flex-wrap: wrap;
+      align-items: baseline;
+      gap: var(--space-2xs) var(--space-xs);
+      font-size: var(--text-s);
     }
-    .composer__log select,
-    .composer__log input {
+    .composer__opt-label {
+      min-inline-size: var(--composer-opt-label);
+      color: var(--text-faint);
+      font-size: var(--text-xs);
+    }
+    .composer__opt {
+      display: inline-flex;
+      align-items: baseline;
+      gap: var(--space-xs);
+      padding: var(--space-2xs) var(--space-s);
+      color: var(--text-muted);
+      background: none;
+      border: var(--line-hairline) solid transparent;
+      border-radius: var(--radius);
+      font: inherit;
+      cursor: pointer;
+    }
+    .composer__opt[aria-pressed='true'] {
+      color: var(--heading-color);
+      font-weight: 500;
+      background: var(--bg-light);
+      border-color: var(--border-color-dark);
+    }
+    .composer__opts input[type='date'] {
       inline-size: auto;
       padding-block: var(--space-2xs);
       font-size: var(--text-s);

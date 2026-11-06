@@ -114,7 +114,7 @@ test.describe('el hilo del equipo de una conversación (ADR-106)', () => {
     await expect(composer.getByTestId('composer-to-team')).toHaveAttribute('aria-pressed', 'true');
     // Quién lo lee, antes de escribir (ADR-177 § 6): fuera no lo ve, y el verbo lo dice.
     await expect(composer.getByTestId('composer-reads')).toContainText("won't see it");
-    await expect(composer.getByRole('button', { name: 'Save note' })).toBeVisible();
+    await expect(composer.getByRole('button', { name: 'Save for the team' })).toBeVisible();
     // La línea de audiencia, sin plegar: quien ve esta conversación.
     await expect(composer.getByTestId('write-why')).toContainText(/\d/);
 

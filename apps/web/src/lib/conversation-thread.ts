@@ -178,6 +178,33 @@ export function threadGapLabel(days: number, locale: Locale): string {
   return t(weeks === 1 ? 'thread.gap_week' : 'thread.gap_weeks', locale, { n: weeks });
 }
 
+/** La marca de una cita en la primera línea de una nota del equipo (ADR-185). */
+const CITE_MARK = '> ';
+/** Cuánto de lo citado cabe en la línea de la cita. */
+export const CITE_MAX = 120;
+
+/**
+ * La cita de una entrada para una nota del equipo: qué fue, cuándo y el
+ * principio de lo que se dijo, en una línea («> Reunión con Elena · 29 sept:
+ * Café en la sala…»). Va en el propio texto de la nota, así que fuera del
+ * hilo (el tablón, un aviso) se lee como texto normal.
+ */
+export function citeLine(label: string, when: string, body: string | null | undefined): string {
+  const said = (body ?? '').replace(/\s+/g, ' ').trim();
+  const head = `${label} · ${when}`;
+  const text = said ? `${head}: ${said}` : head;
+  return CITE_MARK + (text.length > CITE_MAX ? `${text.slice(0, CITE_MAX - 1).trimEnd()}…` : text);
+}
+
+/** Separa la cita (la primera línea con «> ») del resto de la nota. */
+export function splitCite(body: string): { cite: string | null; text: string } {
+  if (!body.startsWith(CITE_MARK)) return { cite: null, text: body };
+  const nl = body.indexOf('\n');
+  const first = nl === -1 ? body : body.slice(0, nl);
+  const rest = nl === -1 ? '' : body.slice(nl + 1).trim();
+  return { cite: first.slice(CITE_MARK.length).trim(), text: rest };
+}
+
 /** El nombre de una cabecera de correo («Laia Puig <laia@…>» → «Laia Puig»); sin nombre, la dirección. */
 export function senderName(from: string | null | undefined): string {
   const s = (from ?? '').trim();

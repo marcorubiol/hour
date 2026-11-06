@@ -7050,3 +7050,42 @@ hundido al azul suave también en el grupo del bolo (`MessageItem`, burbujas pro
 Marco eligió dejarlo así antes que quitar la medida en la vista de dos paneles.
 
 **Cómo se revierte.** Revertir el commit del carril: sólo presentación, sin datos ni caché.
+
+## [2026-11-06] ADR-185 · El equipo en la misma historia, en banda; «+ Apuntar» aparte (enmienda ADR-184)
+
+**Contexto.** Marco, 06-11, sobre lo construido en ADR-184: «la parte del log no acaba de funcionar, y lo del equipo
+tampoco». La nota del equipo iba a nuestro lado, en burbuja ámbar, junto a lo que le dijimos a la sala: el lado
+derecho mezclaba «lo que le dijimos» con «lo que hablamos entre nosotros». «Apuntar» era una pestaña del mismo campo
+que los canales hacia la sala, y no es escribir a nadie. Cuatro opciones en el artifact «Hour, el equipo y lo
+apuntado en una conversación: 4 opciones» (A al margen, B dos pestañas, C colgando de cada entrada, D banda e
+interruptor). Un agente independiente lo miró desde el oficio y las herramientas parecidas (Front, Missive, Help
+Scout, Intercom: una sola línea de tiempo, la nota marcada por color y no por posición; HubSpot: «Log call» y «Log
+meeting» como acción aparte) y recomendó D con dos ajustes; Marco aprobó todo lo recomendado.
+
+**Decisión.**
+1. **El equipo en la misma historia, en banda.** La nota del equipo deja de tener lado: banda ámbar de lado a lado,
+   con su raya, el candado y «Nombre, solo el equipo». Quien vuelve tras semanas lee una sola historia: lo que pasó
+   con la sala y lo que opinó el equipo, en orden.
+2. **Una nota puede citar la entrada de la que habla.** «Comentar al equipo» en cada burbuja (al pasar o al enfocar
+   con puntero; siempre en pantalla táctil) pasa el campo al equipo con la cita en su primera línea («> Reunión con
+   Elena · 29 sept · 11h: Café en la sala…»); en el hilo la cita se dibuja encima del texto, apagada y con su raya.
+   Va en el texto de la nota (`citeLine`, `splitCite`), sin columna nueva: fuera del hilo se lee como texto normal.
+   Si hiciera falta saltar a la entrada citada, entonces una columna `message.cites_event_id`.
+3. **Que nada salga a la sala por error.** No hay interruptor: el destino es la pestaña del campo (como el modo
+   «Note» de Help Scout e Intercom). En el equipo el campo entero se vuelve ámbar y el botón dice «Guardar para el
+   equipo»; hacia la sala, «Enviar correo a Laia».
+4. **«+ Apuntar» aparte.** Sale de las pestañas: un botón al final de la fila abre encima del campo qué fue (llamada,
+   reunión, mensaje, correo, apunte, con su glifo), quién empezó (yo o ella; sin «quién» para una reunión o un
+   apunte), cuándo (ahora u otro día) y qué se dijo; el botón dice «Apuntar llamada». Al apuntar o cancelar, el campo
+   vuelve a donde se escribía. Es el mismo registro que «Apuntar llamada» de la cabecera (ADR-182).
+5. **Lo apuntado, sin forma aparte.** Burbuja normal en el lado de quien empezó, con «· lo apuntó Anouk» (o «·
+   apuntado» si no se sabe quién). Nada de borde discontinuo: se lee como borrador o pendiente, lo contrario de
+   «esto pasó».
+
+**Qué enmienda.** ADR-184 § 2 (la nota del equipo, de burbuja a nuestro lado a banda sin lado) y § 7 (Apuntar deja
+de ser destino del campo). El verbo del equipo pasa de «Guardar nota» a «Guardar para el equipo».
+
+**Sin migración, API ni forma de caché.**
+
+**Cómo se revierte.** Revertir el commit del carril: sólo presentación; las notas con cita se siguen leyendo, con
+su primera línea «> …» como texto.

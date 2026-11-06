@@ -87,6 +87,7 @@
     senderName,
     threadDayLabel,
     threadGapLabel,
+    citeLine,
     type ThreadSide,
   } from '$lib/conversation-thread';
   import ThreadIcon, { type ThreadIconName } from '$lib/components/ThreadIcon.svelte';
@@ -530,6 +531,15 @@
     const name = whoOf(e, side);
     return name ? t(`thread.ev_${e.kind}_from`, locale, { name }) : eventKindLabel(e.kind, locale);
   }
+  /** Quién lo apuntó, por su nombre de pila; vacío si no se sabe. */
+  function loggerOf(e: ConversationEventItem): string {
+    const n = e.created_by ? team?.authors[e.created_by] : '';
+    return (n ?? '').trim().split(/\s+/)[0] ?? '';
+  }
+  /** «Comentar al equipo» (ADR-185): el campo pasa al equipo con la cita de esta entrada. */
+  function commentOn(label: string, iso: string, body: string | null) {
+    composer?.cite(citeLine(label, `${dayMonth(iso)} · ${time(iso)}`, body));
+  }
   /** En el registro en lista de los detalles: el tipo y de qué parte. */
   function loggedWhat(e: ConversationEventItem): string {
     if (e.mailout_note) return t(`mailout.note_${e.mailout_note}`, locale);
@@ -726,6 +736,9 @@
                   <span class="bub__what"><ThreadIcon name="mail" />{evLabel(e, x.side)}</span>
                   {#if e.mailbox_scope === 'workspace'}<span class="mb mb--shared" title={e.mailbox_address ?? ''}>{t('mail.via_shared', locale)}</span>{/if}
                   <time datetime={e.occurred_at}>{stamp(e.occurred_at, x.day)}</time>
+                  {#if team}<button type="button" class="bub__cite" onclick={() => commentOn(evLabel(e, x.side), e.occurred_at, e.subject ? `${e.subject}. ${e.body ?? ''}` : e.body)}
+                      ><ThreadIcon name="team" />{t('thread.comment_team', locale)}</button
+                    >{/if}
                 </p>
                 {#if x.showSubject}<p class="bub__subject">{e.subject}</p>{/if}
                 {#if e.body}
@@ -772,11 +785,16 @@
               </li>
             {:else if x.kind === 'logged' && isBubble(x.event)}
               {@const e = x.event}
+              {@const logger = loggerOf(e)}
               <li class="bub bub--{x.side}" data-testid="thread-logged">
                 <p class="bub__head">
                   <span class="bub__what"><ThreadIcon name={EVENT_ICON[e.kind] ?? 'note'} />{evLabel(e, x.side)}</span>
-                  {#if e.kind === 'email'}<span class="bub__logged">{t('thread.ev_logged', locale)}</span>{/if}
+                  <!-- Lo apuntado lo dice quién lo apuntó, no una forma aparte (ADR-185). -->
+                  <span class="bub__logged">{logger ? t('thread.ev_logged_by', locale, { name: logger }) : t('thread.ev_logged', locale)}</span>
                   <time datetime={e.occurred_at}>{stamp(e.occurred_at, x.day)}</time>
+                  {#if team}<button type="button" class="bub__cite" onclick={() => commentOn(evLabel(e, x.side), e.occurred_at, e.body)}
+                      ><ThreadIcon name="team" />{t('thread.comment_team', locale)}</button
+                    >{/if}
                 </p>
                 {#if e.body}<p class="bub__text">{e.body}</p>{/if}
               </li>
@@ -1285,6 +1303,28 @@
     .bub__head time {
       margin-inline-start: auto;
       padding-inline-start: var(--space-m);
+    }
+    /* «Comentar al equipo»: where there is a pointer it waits for the bubble
+       (hover or focus), on a touch screen it stays; in the team's amber. */
+    .bub__cite {
+      display: inline-flex;
+      align-items: baseline;
+      gap: var(--space-2xs);
+      padding: 0;
+      color: var(--thread-team-fg);
+      background: none;
+      border: 0;
+      font: inherit;
+      cursor: pointer;
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .bub__cite {
+        display: none;
+      }
+      .bub:hover .bub__cite,
+      .bub:focus-within .bub__cite {
+        display: inline-flex;
+      }
     }
     .bub__subject {
       color: var(--heading-color);

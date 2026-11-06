@@ -7,6 +7,9 @@ import {
   subjectStem,
   threadDayLabel,
   threadGapLabel,
+  citeLine,
+  splitCite,
+  CITE_MAX,
   type ThreadEvent,
 } from './conversation-thread';
 import type { ThreadMessage } from './threads';
@@ -206,6 +209,17 @@ describe('las piezas', () => {
     expect(senderName('<laia@llum.cat>')).toBe('laia@llum.cat');
     expect(senderName('laia@llum.cat')).toBe('laia@llum.cat');
     expect(senderName(null)).toBe('');
+  });
+
+  it('citeLine y splitCite: la cita en la primera línea de la nota, y de vuelta', () => {
+    const line = citeLine('Reunión con Elena', '29 sept · 11h', 'Café en la sala.\nVimos el escenario.');
+    expect(line).toBe('> Reunión con Elena · 29 sept · 11h: Café en la sala. Vimos el escenario.');
+    expect(splitCite(`${line}\n¿Cabe la escenografía?`)).toEqual({
+      cite: 'Reunión con Elena · 29 sept · 11h: Café en la sala. Vimos el escenario.',
+      text: '¿Cabe la escenografía?',
+    });
+    expect(splitCite('Sin cita')).toEqual({ cite: null, text: 'Sin cita' });
+    expect(citeLine('Correo de Elena', '3 nov', 'x'.repeat(400)).length).toBe(CITE_MAX + 2);
   });
 
   it('threadGapLabel: semanas y, desde dos meses, meses', () => {

@@ -68,7 +68,7 @@ describe('ConversationComposer', () => {
     await settle();
     expect(reads()).toBe('Laia Puig no lo ve. Se queda en Hour, para el equipo.');
     expect(screen.getByTestId('thread-composer').classList.contains('composer--team')).toBe(true);
-    expect(screen.getByRole('button', { name: 'Guardar nota' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Guardar para el equipo' })).toBeTruthy();
 
     await fireEvent.click(screen.getByTestId('composer-to-log'));
     await settle();
