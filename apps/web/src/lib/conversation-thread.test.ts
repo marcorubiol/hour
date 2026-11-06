@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   conversationThreadEntries,
   isLongText,
+  isNewEvent,
   isMail,
   senderName,
   subjectStem,
@@ -168,6 +169,15 @@ describe('conversationThreadEntries', () => {
     const i = out.findIndex((x) => x.kind === 'new');
     expect(out[i]).toEqual({ kind: 'new', key: 'new', count: 2 });
     expect(out.slice(i + 1).find((x) => x.kind !== 'gap')?.key).toBe('fresh');
+  });
+
+  it('lo que apuntó uno mismo no es nuevo para él; sí para el resto del equipo', () => {
+    const logged = mail('wa', '2026-10-12T10:00:00Z', { kind: 'message', source: 'manual', created_by: 'marco' });
+    const readAt = '2026-10-12T09:00:00Z';
+    expect(isNewEvent(logged, readAt, 'marco')).toBe(false);
+    expect(isNewEvent(logged, readAt, 'anouk')).toBe(true);
+    const out = conversationThreadEntries({ ...base, events: [logged], messages: [], eventsReadAt: readAt });
+    expect(out.some((x) => x.kind === 'new')).toBe(false);
   });
 
   it('sin la lectura de fuera todavía, no se pinta raya por lo de fuera', () => {

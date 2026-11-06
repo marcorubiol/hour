@@ -34,6 +34,8 @@ export interface ThreadEvent {
   subject?: string | null;
   mailout_id?: string | null;
   mailout_note?: string | null;
+  /** Quien lo apuntó o lo envió desde Hour; null si lo trajo la sincronización. */
+  created_by?: string | null;
 }
 
 /** De quién es una entrada: de fuera, a la izquierda; nuestra, a la derecha. */
@@ -105,10 +107,17 @@ export function isLongText(body: string | null | undefined): boolean {
 /**
  * Lo nuevo para quien mira, con las reglas de la lista (`conversation_feed`):
  * un entrante del registro anotado después de su última lectura (sin lectura,
- * después de nacer la conversación), y un mensaje ajeno del equipo posterior a
- * la lectura del hilo.
+ * después de nacer la conversación) que no apuntó uno mismo, y un mensaje
+ * ajeno del equipo posterior a la lectura del hilo.
  */
-export function isNewEvent(e: Pick<ThreadEvent, 'direction' | 'recorded_at'>, readAt: string): boolean {
+export function isNewEvent(
+  e: Pick<ThreadEvent, 'direction' | 'recorded_at' | 'created_by'>,
+  readAt: string,
+  me = '',
+): boolean {
+  // Lo que apuntó uno mismo (la llamada que le hicieron, el WhatsApp que le
+  // mandaron) ya lo sabe: no es nuevo para quien lo apuntó.
+  if (me && e.created_by === me) return false;
   return e.direction === 'inbound' && Date.parse(e.recorded_at) > Date.parse(readAt);
 }
 
@@ -129,7 +138,7 @@ export function conversationThreadEntries<E extends ThreadEvent>(input: {
   type Step = { at: string; order: number; id: string; entry: Content; fresh: boolean };
   const steps: Step[] = [];
   for (const e of input.events) {
-    const fresh = input.eventsReadAt !== null && isNewEvent(e, input.eventsReadAt);
+    const fresh = input.eventsReadAt !== null && isNewEvent(e, input.eventsReadAt, input.me);
     const kind = isMail(e) ? 'mail' : e.kind === 'email' && e.mailout_id && !e.mailout_note ? 'mailout' : 'logged';
     const placed = { side: sideOf(e), day: null };
     const entry: Content =
