@@ -7089,3 +7089,21 @@ de ser destino del campo). El verbo del equipo pasa de «Guardar nota» a «Guar
 
 **Cómo se revierte.** Revertir el commit del carril: sólo presentación; las notas con cita se siguen leyendo, con
 su primera línea «> …» como texto.
+
+## [2026-11-06] ADR-186 · Un mensaje apuntado dice por qué app: «WhatsApp de Elena»
+
+**Contexto.** Marco, 06-11: «quiero que se distinga». Hour no está conectado a WhatsApp; un WhatsApp sólo entra si
+alguien lo apunta, y hasta ahora el registro guardaba «mensaje» sin la app: el hilo decía «Mensaje de Elena» igual
+para un WhatsApp, un SMS o un Telegram.
+
+**Decisión.**
+1. Al apuntar un mensaje («+ Apuntar», ADR-185), una fila más: **por dónde**, WhatsApp, SMS, Telegram u otra, cada
+   una con su glifo (WhatsApp de por defecto, lo que más se usa con una sala).
+2. Se guarda en `conversation_event.metadata.via` por el `p_metadata` que `record_conversation_event` ya aceptaba:
+   **sin migración**. La ruta construye el `metadata`; quien llama sólo manda `via` (`MESSAGE_APPS`), y sólo cuenta
+   para un mensaje. La lectura lo trae como `via` (`CONVERSATION_EVENT_FULL_SELECT`); `CACHE_SCHEMA` sube a 27.
+3. En el hilo, «WhatsApp de Elena», «SMS de Anouk», «Telegram de Elena», con su glifo (los de WhatsApp y Telegram
+   son dibujos propios, no las marcas). «Otra» o un mensaje antiguo sin app siguen como «Mensaje de …».
+4. Cuando un canal se conecte (ADR-184 § 7), su conector escribirá el mismo `metadata.via`: el hilo no cambia.
+
+**Cómo se revierte.** Revertir el commit; los eventos con `metadata.via` se siguen leyendo como «Mensaje».

@@ -9,10 +9,14 @@ import {
   threadGapLabel,
   citeLine,
   splitCite,
+  messageAppIcon,
+  messageAppName,
   CITE_MAX,
   type ThreadEvent,
 } from './conversation-thread';
 import type { ThreadMessage } from './threads';
+import * as v from 'valibot';
+import { ConversationEventCreateSchema } from './conversation';
 
 const TZ = 'Europe/Madrid';
 
@@ -220,6 +224,16 @@ describe('las piezas', () => {
     });
     expect(splitCite('Sin cita')).toEqual({ cite: null, text: 'Sin cita' });
     expect(citeLine('Correo de Elena', '3 nov', 'x'.repeat(400)).length).toBe(CITE_MAX + 2);
+  });
+
+  it('la app de un mensaje: su glifo, su nombre y el esquema que la acepta (ADR-186)', () => {
+    expect(messageAppIcon('whatsapp')).toBe('whatsapp');
+    expect(messageAppIcon('other')).toBe('message');
+    expect(messageAppIcon(null)).toBe('message');
+    expect(messageAppName('telegram', 'es')).toBe('Telegram');
+    expect(messageAppName('other', 'es')).toBe('Otra');
+    expect(v.safeParse(ConversationEventCreateSchema, { kind: 'message', via: 'whatsapp' }).success).toBe(true);
+    expect(v.safeParse(ConversationEventCreateSchema, { kind: 'message', via: 'fax' }).success).toBe(false);
   });
 
   it('threadGapLabel: semanas y, desde dos meses, meses', () => {

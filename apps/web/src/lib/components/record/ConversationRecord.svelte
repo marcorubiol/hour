@@ -88,6 +88,8 @@
     threadDayLabel,
     threadGapLabel,
     citeLine,
+    messageAppIcon,
+    messageAppName,
     type ThreadSide,
   } from '$lib/conversation-thread';
   import ThreadIcon, { type ThreadIconName } from '$lib/components/ThreadIcon.svelte';
@@ -529,6 +531,11 @@
     if (e.kind === 'note') return t('thread.ev_note', locale);
     if (e.kind === 'meeting') return t('thread.ev_meeting_with', locale, { name: theirName });
     const name = whoOf(e, side);
+    // Un mensaje dice por qué app (ADR-186): «WhatsApp de Elena».
+    if (e.kind === 'message' && e.via && e.via !== 'other') {
+      const app = messageAppName(e.via, locale);
+      return name ? t('thread.ev_app_from', locale, { app, name }) : app;
+    }
     return name ? t(`thread.ev_${e.kind}_from`, locale, { name }) : eventKindLabel(e.kind, locale);
   }
   /** Quién lo apuntó, por su nombre de pila; vacío si no se sabe. */
@@ -788,7 +795,7 @@
               {@const logger = loggerOf(e)}
               <li class="bub bub--{x.side}" data-testid="thread-logged">
                 <p class="bub__head">
-                  <span class="bub__what"><ThreadIcon name={EVENT_ICON[e.kind] ?? 'note'} />{evLabel(e, x.side)}</span>
+                  <span class="bub__what"><ThreadIcon name={e.kind === 'message' ? messageAppIcon(e.via) : (EVENT_ICON[e.kind] ?? 'note')} />{evLabel(e, x.side)}</span>
                   <!-- Lo apuntado lo dice quién lo apuntó, no una forma aparte (ADR-185). -->
                   <span class="bub__logged">{logger ? t('thread.ev_logged_by', locale, { name: logger }) : t('thread.ev_logged', locale)}</span>
                   <time datetime={e.occurred_at}>{stamp(e.occurred_at, x.day)}</time>

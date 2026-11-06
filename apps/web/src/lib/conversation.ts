@@ -104,8 +104,19 @@ export function eventDirectionLabel(direction: ConversationEventDirection, local
  * records is always `manual`, and the provenance of a connector is not a field
  * a person can claim. `occurred_at` absent means now, on the SERVER clock.
  */
+/**
+ * Por qué app llegó o salió un mensaje apuntado (ADR-186): el hilo dice
+ * «WhatsApp de Elena» y no un «Mensaje» genérico. Se guarda en
+ * `conversation_event.metadata.via`; cuando un canal se conecte, el conector
+ * escribirá lo mismo.
+ */
+export const MESSAGE_APPS = ['whatsapp', 'sms', 'telegram', 'other'] as const;
+export type MessageApp = (typeof MESSAGE_APPS)[number];
+
 export const ConversationEventCreateSchema = v.object({
   kind: v.picklist(CONVERSATION_EVENT_KINDS),
+  /** Sólo para un mensaje: por qué app. */
+  via: v.optional(v.nullable(v.picklist(MESSAGE_APPS))),
   direction: v.optional(v.nullable(v.picklist(CONVERSATION_EVENT_DIRECTIONS))),
   body: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(EVENT_BODY_MAX)))),
   occurred_at: v.optional(realIsoInstant),
@@ -134,10 +145,12 @@ export type ConversationEventItem = Pick<
   EventMailFields & {
     /** Quien lo apuntó o lo envió desde Hour; null si lo trajo la sincronización. */
     created_by?: string | null;
+    /** Un mensaje: por qué app (ADR-186). */
+    via?: MessageApp | null;
   };
 
-/** La lectura de la ficha: el registro más lo que se enseña de un correo. */
-export const CONVERSATION_EVENT_FULL_SELECT = `${CONVERSATION_EVENT_SELECT},created_by,${EVENT_MAIL_SELECT}`;
+/** La lectura de la ficha: el registro más lo que se enseña de un correo y la app de un mensaje. */
+export const CONVERSATION_EVENT_FULL_SELECT = `${CONVERSATION_EVENT_SELECT},created_by,via:metadata->>via,${EVENT_MAIL_SELECT}`;
 
 /** The database caps a contact's role at 200 characters (ADR-102). */
 export const CONTACT_ROLE_MAX = 200;

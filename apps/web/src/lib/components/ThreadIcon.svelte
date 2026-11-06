@@ -5,7 +5,7 @@
    * § 3: la forma nunca va sola). Un trazo, el tamaño del texto que acompaña,
    * el color del texto. Un canal nuevo trae aquí su glifo.
    */
-  export type ThreadIconName = 'mail' | 'call' | 'message' | 'meeting' | 'team' | 'note' | 'mailout' | 'done' | 'details' | 'plus';
+  export type ThreadIconName = 'mail' | 'call' | 'message' | 'meeting' | 'team' | 'note' | 'mailout' | 'done' | 'details' | 'plus' | 'whatsapp' | 'sms' | 'telegram';
 </script>
 
 <script lang="ts">
@@ -35,6 +35,15 @@
     <path d="M3 10v4h3.5l7 4.5v-13L6.5 10H3z" /><path d="M17 9a4.2 4.2 0 0 1 0 6" />
   {:else if name === 'done'}
     <path d="M5 12.5 10 17l9-10" />
+  {:else if name === 'whatsapp'}
+    <!-- A bubble with a handset: a chat that is also a phone. Not the brand's mark. -->
+    <path d="M20.5 11.5a8 8 0 0 1-11.8 7L3.5 20l1.4-4.7A8 8 0 1 1 20.5 11.5z" /><path
+      d="M9.2 8.6h1.2l.6 1.5-.8.6a4.2 4.2 0 0 0 2.4 2.4l.6-.8 1.5.6v1.2a.8.8 0 0 1-.9.8 6 6 0 0 1-5.4-5.4.8.8 0 0 1 .8-.9z"
+    />
+  {:else if name === 'sms'}
+    <rect x="6.5" y="2.5" width="11" height="19" rx="2.2" /><path d="M9.5 8h5M9.5 11.5h5M11 18h2" />
+  {:else if name === 'telegram'}
+    <path d="M21 4 3 11l6 2.5L19 7l-8 8 .5 5 3-3.5L19 20z" />
   {:else if name === 'plus'}
     <path d="M12 5v14M5 12h14" />
   {:else}

@@ -19,6 +19,8 @@ import { dayKeyInTz } from './planner';
 import { localDayISO, localeDayMonthNear } from './datetime';
 import { LOCALE_TAG, t, type Locale } from './i18n';
 import { isUnread, type ThreadMessage } from './threads';
+import type { MessageApp } from './conversation';
+import type { ThreadIconName } from './components/ThreadIcon.svelte';
 
 /** Lo que el hilo lee de un evento del registro. */
 export interface ThreadEvent {
@@ -176,6 +178,19 @@ export function threadGapLabel(days: number, locale: Locale): string {
   if (days >= 60) return t('thread.gap_months', locale, { n: Math.floor(days / 30) });
   const weeks = Math.floor(days / 7);
   return t(weeks === 1 ? 'thread.gap_week' : 'thread.gap_weeks', locale, { n: weeks });
+}
+
+/** El glifo de la app de un mensaje (ADR-186); sin app, el bocadillo. */
+export function messageAppIcon(via: MessageApp | null | undefined): ThreadIconName {
+  return via === 'whatsapp' || via === 'sms' || via === 'telegram' ? via : 'message';
+}
+
+/** El nombre de la app: las marcas no se traducen; «otra», en la lengua de quien mira. */
+export function messageAppName(via: MessageApp | null | undefined, locale: Locale): string {
+  if (via === 'whatsapp') return 'WhatsApp';
+  if (via === 'sms') return 'SMS';
+  if (via === 'telegram') return 'Telegram';
+  return t('thread.app_other', locale);
 }
 
 /** La marca de una cita en la primera línea de una nota del equipo (ADR-185). */

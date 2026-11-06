@@ -88,10 +88,13 @@
     EVENT_BODY_MAX,
     eventKindLabel,
     occurredAtForDay,
+    MESSAGE_APPS,
     type ConversationEventCreate,
     type ConversationEventItem,
     type ConversationEventKind,
+    type MessageApp,
   } from '$lib/conversation';
+  import { messageAppIcon, messageAppName } from '$lib/conversation-thread';
   import { MAIL_BODY_MAX, insertBlock, materialLine, replySubject, type MailAccountsResponse } from '$lib/mail';
   import { kindLabel, type MaterialItem } from '$lib/material';
   import { sortTexts, workspaceTextsQueryOptions, type WorkspaceText } from '$lib/workspace-texts';
@@ -316,6 +319,8 @@
   let logKind = $state<ConversationEventKind>('call');
   let logDirection = $state<'outbound' | 'inbound' | ''>('outbound');
   let logDay = $state(localDayISO());
+  /** Un mensaje: por qué app (ADR-186). WhatsApp, lo que más se usa con una sala. */
+  let logVia = $state<MessageApp>('whatsapp');
   /** «Otro día»: el día se elige; si no, es ahora. */
   let otherDay = $state(false);
   /** Qué se apunta, en el orden en que más se apunta; cada uno con su glifo, el del hilo. */
@@ -422,6 +427,7 @@
     } else {
       $logEvent.mutate({
         kind: logKind,
+        ...(logKind === 'message' ? { via: logVia } : {}),
         direction: logDirection || null,
         body: drafts.log.trim() || null,
         occurred_at: occurredAtForDay(logDay),
@@ -584,6 +590,16 @@
           >
         {/each}
       </div>
+      {#if logKind === 'message'}
+        <div class="composer__opts" role="group" aria-label={t('thread.log_via', locale)}>
+          <span class="composer__opt-label">{t('thread.log_via', locale)}</span>
+          {#each MESSAGE_APPS as a (a)}
+            <button type="button" class="composer__opt" aria-pressed={logVia === a} onclick={() => (logVia = a)}
+              ><ThreadIcon name={messageAppIcon(a)} />{messageAppName(a, locale)}</button
+            >
+          {/each}
+        </div>
+      {/if}
       {#if logKind !== 'note' && logKind !== 'meeting'}
         <div class="composer__opts" role="group" aria-label={t('create.direction', locale)}>
           <span class="composer__opt-label">{t('thread.log_who', locale)}</span>

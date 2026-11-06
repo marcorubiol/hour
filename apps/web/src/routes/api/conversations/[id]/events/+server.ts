@@ -7,7 +7,7 @@
  *      `conversation_event` inherits the conversation's own frontier, so a
  *      conversation the caller cannot read answers an empty list: never a 404
  *      that would confirm it exists.
- * POST /api/conversations/:id/events — { kind, direction?, body?,
+ * POST /api/conversations/:id/events — { kind, via?, direction?, body?,
  *      occurred_at? } through `record_conversation_event`, gated on
  *      edit:conversation. Without `occurred_at` the server stamps now. A
  *      contact kind moves last_contacted_at in the same transaction.
@@ -112,6 +112,9 @@ export const POST: RequestHandler = async ({ request, params, platform, locals }
         p_kind: event.kind,
         p_direction: event.direction ?? null,
         p_body: event.body || null,
+        // A message says by which app (ADR-186); the route builds the
+        // metadata, a caller never writes it.
+        ...(event.kind === 'message' && event.via ? { p_metadata: { via: event.via } } : {}),
         // Absent → the RPC stamps statement_timestamp(): the server owns now.
         ...(event.occurred_at ? { p_occurred_at: event.occurred_at } : {}),
       },
@@ -127,6 +130,8 @@ export const POST: RequestHandler = async ({ request, params, platform, locals }
       source: row.source,
       direction: row.direction,
       body: row.body,
+      created_by: row.created_by ?? null,
+      via: event.kind === 'message' ? (event.via ?? null) : null,
     };
     return json({ item }, 201);
   } catch (err) {
