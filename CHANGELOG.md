@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Noviembre 2026 (en curso)
 
+- Una conversación abierta se lee como un chat: el lado dice quién habla, cada entrada con su glifo y su palabra («WhatsApp de Elena», «Llamada de Marco»), la fecha en cada una y «2 semanas» en los silencios; la nota del equipo es una banda ámbar en la misma historia, con «Comentar al equipo» en cada burbuja; «+ Apuntar» aparte, y lo apuntado dice quién lo apuntó; lo que apuntas tú no te sale como nuevo (ADR-184, 185 y 186, 2026-11-06, `a7b3a2e1`).
 - «Llego tarde» en la hoja de ruta: cada técnico tiene su enlace y, el día de la función, avisa a producción sin cambiar ninguna hora; el aviso sale arriba de Hoy y en el grupo del bolo, y producción mueve el hito con un toque (121 B, ADR-183, 2026-11-05, `ee5ef4a6`).
 - «Apuntar llamada» desde la cabecera de Conversaciones: con quién, qué se habló, y deshacer; si no hay conversación, la abre (121 A, ADR-182, 2026-11-05, `ee5ef4a6`).
 - Conversaciones en escritorio: la lista y la conversación desplazan cada una por su cuenta, el cuadro de escribir queda siempre a la vista y la conversación abre por lo último (2026-11-05, `6367bcd2`).
