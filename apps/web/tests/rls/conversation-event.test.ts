@@ -9,6 +9,7 @@ import {
   pgRpc,
   requireEnv,
   requireLimitedEnv,
+  serviceDelete,
 } from './_helpers';
 
 /**
@@ -27,6 +28,8 @@ import {
  * email estable (crear una persona por pasada dejaría una global por pasada).
  * Se borra al final; la siguiente pasada la resucita CON sus eventos de antes,
  * así que todo lo que se cuenta aquí se filtra por la marca de esta pasada.
+ * Con la clave de servicio, el final borra también los eventos de la fixture
+ * (el registro es append-only para la API): no se acumulan en `playwright`.
  * Nunca toca `muk-cia`. Va rojo contra un origen sin `20261009100000`.
  */
 const RUN = Date.now().toString(36);
@@ -128,6 +131,7 @@ describe.skipIf(!envReady())('conversation_event (ADR-098)', () => {
 
   afterAll(async () => {
     if (conversationId) {
+      await serviceDelete('conversation_event', new URLSearchParams({ conversation_id: `eq.${conversationId}` }));
       await pgRpc('delete_conversation', jwt, { p_conversation_id: conversationId });
     }
   });

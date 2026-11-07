@@ -239,6 +239,32 @@ export async function pgRpc<T = unknown>(
   return { status: res.status, data, ...(error ? { error } : {}) };
 }
 
+/**
+ * Limpieza con la clave de servicio: DELETE duro por PostgREST, con
+ * `return=minimal` (nada que leer de vuelta). Para lo que la API no deja
+ * borrar, como `conversation_event` (append-only). Devuelve cuántas filas
+ * borró, o `null` sin clave. Si falla, lanza: una limpieza que falla en
+ * silencio es la que deja filas acumulándose.
+ */
+export async function serviceDelete(table: string, params: URLSearchParams): Promise<number | null> {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) return null;
+  const { url, anon } = requireEnv();
+  const u = new URL(`/rest/v1/${table}`, url);
+  u.search = params.toString();
+  const res = await fetch(u.toString(), {
+    method: 'DELETE',
+    headers: {
+      apikey: key.startsWith('eyJ') ? anon : key,
+      Authorization: `Bearer ${key}`,
+      Prefer: 'return=minimal,count=exact',
+    },
+  });
+  if (!res.ok) throw new Error(`serviceDelete ${table}: ${res.status} ${await res.text()}`);
+  const range = res.headers.get('content-range');
+  return range ? Number(range.split('/')[1]) : null;
+}
+
 /** Decode a JWT body (no signature verification — just inspect claims). */
 export function decodeJwt(jwt: string): Record<string, unknown> {
   const [, payload] = jwt.split('.');
