@@ -56,6 +56,9 @@ importers:
         version: 5.90.2(svelte@5.56.6)
       '@templatical/editor':
         specifier: 0.56.1
+        version: 0.56.1(@templatical/renderer@0.56.1)
+      '@templatical/renderer':
+        specifier: 0.56.1
         version: 0.56.1
       '@templatical/types':
         specifier: 0.56.1
@@ -1795,6 +1798,14 @@ packages:
 
   '@templatical/quality@0.56.1':
     resolution: {integrity: sha512-obVc8jHYstk0FtRK2hSdxXU5+t59T5okmwmKJCuZ54t+VXvdLQ4xqXmzlx51Gcft5g0od2M7OxMUK3UsC7Getw==}
+
+  '@templatical/renderer@0.56.1':
+    resolution: {integrity: sha512-TB/3ETEkI2lI5gJxgb1+UPy4GSEJo7gf/FiXPogktqMGTrT2HZh/iruvW/ZDehpNe21JYbi0iB9Twjt7m7rYQw==}
+    peerDependencies:
+      liquidjs: ^10.30.1
+    peerDependenciesMeta:
+      liquidjs:
+        optional: true
 
   '@templatical/types@0.56.1':
     resolution: {integrity: sha512-yHy35wxB38/i8hok+xaVX72A2VcRjisHIsBaIKLREJRZCq1HbALSGYD+Tx2m401lS32aF53Zfyeneaszu6hR7A==}
@@ -5043,9 +5054,10 @@ snapshots:
       '@tanstack/query-core': 5.90.2
       svelte: 5.56.6
 
-  '@templatical/editor@0.56.1':
+  '@templatical/editor@0.56.1(@templatical/renderer@0.56.1)':
     optionalDependencies:
       '@templatical/quality': 0.56.1
+      '@templatical/renderer': 0.56.1
     transitivePeerDependencies:
       - liquidjs
 
@@ -5056,6 +5068,10 @@ snapshots:
     transitivePeerDependencies:
       - liquidjs
     optional: true
+
+  '@templatical/renderer@0.56.1':
+    dependencies:
+      '@templatical/types': 0.56.1
 
   '@templatical/types@0.56.1': {}
 

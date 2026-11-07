@@ -114,6 +114,12 @@ describe('designText', () => {
     );
   });
 
+  test('un campo del editor (ficha) vuelve a ser {campo}', () => {
+    expect(htmlToText('<p>Hola, <span data-merge-tag="{nombre}">nombre</span>: te esperamos en <span data-merge-tag="{sala}">sala</span>.</p>')).toBe(
+      'Hola, {nombre}: te esperamos en {sala}.',
+    );
+  });
+
   test('htmlToText: enlaces, listas, saltos y entidades', () => {
     expect(htmlToText('<p>Ver <a href="https://a.test">el dossier</a> &amp; más</p><ul><li>uno</li><li>dos</li></ul>')).toBe(
       'Ver el dossier (https://a.test) & más\n\n· uno\n· dos',

@@ -145,6 +145,8 @@ function decode(s: string): string {
 /** El HTML de un bloque de texto (TipTap) → texto: párrafos, listas y enlaces «texto (url)». */
 export function htmlToText(html: string): string {
   const text = html
+    // A merge field is a chip in the editor: its token is the attribute, not the label.
+    .replace(/<span\b[^>]*\bdata-merge-tag\s*=\s*["']([^"']+)["'][^>]*>[\s\S]*?<\/span>/gi, '$1')
     .replace(/<a\b[^>]*href\s*=\s*["']([^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi, (_w, href: string, inner: string) => {
       const label = decode(inner.replace(/<[^>]+>/g, '')).trim();
       const url = decode(href).trim();

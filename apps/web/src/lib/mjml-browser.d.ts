@@ -3,5 +3,5 @@ declare module 'mjml-browser' {
   export default function mjml2html(
     mjml: string,
     options?: { validationLevel?: 'strict' | 'soft' | 'skip'; minify?: boolean },
-  ): { html: string; errors: { message: string }[] };
+  ): Promise<{ html: string; errors: { message: string }[] }>;
 }

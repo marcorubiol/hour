@@ -40,7 +40,7 @@
   import { tick, untrack } from 'svelte';
   import { ApiError, fetchJSON, mutateJSON, uploadBlob } from '$lib/api';
   import { shrinkImage } from '$lib/image-shrink';
-  import { mailTemplate } from '$lib/mail-template';
+  import { mailTemplate, NO_TEMPLATE } from '$lib/mail-template';
   import { kindLabel, type MaterialItem } from '$lib/material';
   import Segmented from '$lib/components/Segmented.svelte';
   import { retryLoad } from '$lib/load-fail';
@@ -285,11 +285,14 @@
       : '',
   );
   let draft = $derived({ subject, body, language });
+  /** Only what decides which fields a mail uses: the design's HTML (ADR-192). */
+  let fieldTemplate = $derived({ ...NO_TEMPLATE, design: invitation && designHtml ? { html: designHtml, origin: '' } : null });
   let ctxById = $derived(new Map((d?.compose ?? []).map((c) => [c.recipient_id, c])));
 
   function missingFor(r: MailoutRecipientRow): boolean {
     const c = ctxById.get(r.recipient_id);
-    return c ? composeMailout(draft, c, '').missing.length > 0 : false;
+    // With the design (ADR-192): its fields count too.
+    return c ? composeMailout(draft, c, '', fieldTemplate).missing.length > 0 : false;
   }
 
   let rows = $derived(
@@ -325,7 +328,7 @@
     editable
       ? (d?.audience_preview ?? []).map((c) => {
           const row = sampleRow(c);
-          return { row, ctx: c as ComposeContext, state: (composeMailout(draft, c, '').missing.length ? 'missing_fields' : 'ready') as RecipientState };
+          return { row, ctx: c as ComposeContext, state: (composeMailout(draft, c, '', fieldTemplate).missing.length ? 'missing_fields' : 'ready') as RecipientState };
         })
       : [],
   );

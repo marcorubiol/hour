@@ -39,6 +39,8 @@
   let host = $state<HTMLDivElement | null>(null);
   let layer = $state<HTMLDialogElement | null>(null);
   let status = $state<'loading' | 'ready' | 'failed' | 'compiling'>('loading');
+  /** Compiling failed: the editor stays open and «Listo» can be tried again. */
+  let compileFailed = $state(false);
   // Raw: the instance lives outside Svelte, only the reference is tracked.
   let editor = $state.raw<{ getContent(): unknown; toMjml(): Promise<string>; unmount(): void } | null>(null);
 
@@ -156,13 +158,17 @@
   async function done() {
     if (!editor) return;
     status = 'compiling';
+    compileFailed = false;
     try {
       const [mjml, { default: mjml2html }] = await Promise.all([editor.toMjml(), import('mjml-browser')]);
-      const out = mjml2html(mjml, { validationLevel: 'soft' });
+      // mjml 5 compiles asynchronously.
+      const out = await mjml2html(mjml, { validationLevel: 'soft' });
+      if (!out.html?.trim()) throw new Error('empty mjml output');
       ondone({ content: editor.getContent() as DesignContent, html: out.html });
     } catch (err) {
       console.error(err);
-      status = 'failed';
+      compileFailed = true;
+      status = 'ready';
     }
   }
 </script>
@@ -190,7 +196,9 @@
   {#if status === 'loading'}
     <p class="mde__msg">{t('mailout.design_loading', locale)}</p>
   {:else if status === 'failed'}
-    <p class="mde__msg" role="alert">{t(editor ? 'mailout.design_compile_failed' : 'mailout.design_failed', locale)}</p>
+    <p class="mde__msg" role="alert">{t('mailout.design_failed', locale)}</p>
+  {:else if compileFailed}
+    <p class="mde__msg" role="alert">{t('mailout.design_compile_failed', locale)}</p>
   {/if}
   <div class="mde__host" bind:this={host}></div>
 </dialog>

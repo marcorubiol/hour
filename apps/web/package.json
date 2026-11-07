@@ -24,6 +24,7 @@
     "@sveltejs/vite-plugin-svelte": "^5.0.3",
     "@tanstack/svelte-query": "^5.62.0",
     "@templatical/editor": "0.56.1",
+    "@templatical/renderer": "0.56.1",
     "@templatical/types": "0.56.1",
     "cheerio": "1.0.0-rc.12",
     "idb": "^8.0.3",
