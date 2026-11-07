@@ -543,19 +543,72 @@ describe.skipIf(!envReady())('conversation with the venue (ADR-102, fase 2)', ()
       expect(events).not.toContain(`${RUN}-otherbox`);
     });
 
-    test('an address that is a contact of two conversations enters both', async () => {
-      expect((await ingest(boxA, msg('both', P1.email, noonUtc(-1)))).data).toBe(2);
-      expect(await eventsOf(convA)).toContain(`${RUN}-both`);
-      expect(await eventsOf(convB)).toContain(`${RUN}-both`);
+    // ADR-187: con dos candidatos y sin hilo, uno solo: el de actividad más
+    // reciente, marcado como suposición. Las respuestas siguen al hilo.
+    let guessed: string;
+    const placementOf = async (conv: string, id: string) =>
+      (
+        await pgGet<{ placement: string | null; candidates: string[] | null }>(
+          'conversation_event',
+          jwt,
+          new URLSearchParams({
+            select: 'placement:metadata->>placement,candidates:metadata->candidates',
+            conversation_id: `eq.${conv}`,
+            source: 'eq.email',
+            'metadata->>provider_message_id': `eq.${RUN}-${id}`,
+          }),
+        )
+      ).rows[0];
+
+    test('an address that is a contact of two conversations enters only the most recent, as a guess', async () => {
+      const last = await pgGet<{ id: string; last_contacted_at: string | null }>(
+        'conversation',
+        jwt,
+        new URLSearchParams({ select: 'id,last_contacted_at', id: `in.(${convA},${convB})` }),
+      );
+      const t = (id: string) => {
+        const v = last.rows.find((r) => r.id === id)?.last_contacted_at;
+        return v ? Date.parse(v) : -Infinity;
+      };
+      const expected = t(convA) !== t(convB) ? (t(convA) > t(convB) ? convA : convB) : [convA, convB].sort()[0]!;
+      const other = expected === convA ? convB : convA;
+
+      expect((await ingest(boxA, msg('both', P1.email, noonUtc(-1)))).data).toBe(1);
+      expect(await eventsOf(expected)).toContain(`${RUN}-both`);
+      expect(await eventsOf(other)).not.toContain(`${RUN}-both`);
+      const p = await placementOf(expected, 'both');
+      expect(p?.placement).toBe('guess');
+      expect(p?.candidates).toEqual([expected, other]);
+      guessed = expected;
+    });
+
+    test('a reply in that thread follows it to the same conversation, without a guess', async () => {
+      const other = guessed === convA ? convB : convA;
+      const reply = msg('both-reply', P1.email, noonUtc(-1), { provider_thread_id: `${RUN}-thread-both` });
+      expect((await ingest(boxA, reply)).data).toBe(1);
+      expect(await eventsOf(guessed)).toContain(`${RUN}-both-reply`);
+      expect(await eventsOf(other)).not.toContain(`${RUN}-both-reply`);
+      const p = await placementOf(guessed, 'both-reply');
+      expect(p?.placement ?? null).toBeNull();
+      expect(p?.candidates ?? null).toBeNull();
+    });
+
+    test('a new thread from a contact of one conversation only enters it, without a guess', async () => {
+      // P4 es contacto solo de A.
+      expect((await ingest(boxA, msg('single', P4.email, noonUtc(-1)))).data).toBe(1);
+      expect(await eventsOf(convA)).toContain(`${RUN}-single`);
+      expect(await eventsOf(convB)).not.toContain(`${RUN}-single`);
+      expect((await placementOf(convA, 'single'))?.placement ?? null).toBeNull();
     });
 
     test('what enters a private conversation does not count for the shared mailbox', async () => {
-      const byId = new URLSearchParams({ id: `eq.${convB}` });
+      const byId = new URLSearchParams({ id: `eq.${guessed}` });
       expect((await pgPatch('conversation', jwt, { private_to: me }, byId)).status).toBe(200);
       try {
-        // P1: A (compartida) y B (privada) → dos eventos, uno en el recuento.
-        expect((await ingest(boxA, msg('counted', P1.email, noonUtc(-1)))).data).toBe(1);
-        expect(await eventsOf(convB)).toContain(`${RUN}-counted`);
+        // Respuesta en el hilo de la conversación, ahora privada: entra, y no cuenta.
+        const m = msg('counted', P1.email, noonUtc(-1), { provider_thread_id: `${RUN}-thread-both` });
+        expect((await ingest(boxA, m)).data).toBe(0);
+        expect(await eventsOf(guessed)).toContain(`${RUN}-counted`);
       } finally {
         await pgPatch('conversation', jwt, { private_to: null }, byId);
       }

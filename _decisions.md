@@ -7107,3 +7107,31 @@ para un WhatsApp, un SMS o un Telegram.
 4. Cuando un canal se conecte (ADR-184 § 7), su conector escribirá el mismo `metadata.via`: el hilo no cambia.
 
 **Cómo se revierte.** Revertir el commit; los eventos con `metadata.via` se siguen leyendo como «Mensaje».
+
+## [2026-11-07] ADR-187 · Un correo entra donde toca: hilo, un solo candidato o el más reciente como suposición (127)
+
+**Contexto.** `mail_ingest_message` creaba un evento en cada conversación elegible donde la contraparte era contacto,
+con el cuerpo copiado: la misma persona, contacto de una sala en dos proyectos, veía cada correo en las dos
+conversaciones. Es el primer trozo del diseño de colocación de mensajes (tarea 126, ADR en borrador aparte, todavía en
+iteración con Marco). Marco, 07-11: arreglarlo ya con las reglas 1 a 3 de ese diseño, y con dos o más candidatos, «la
+más reciente».
+
+**Decisión.**
+1. **Hilo:** un correo que sigue un hilo que ya está en una o más conversaciones (mismo `provider_thread_id` en el mismo
+   buzón, o In-Reply-To/References a un correo suyo) entra solo en esas, aunque la contraparte sea contacto de otras
+   por fechas.
+2. **Un solo candidato:** sin hilo, si la contraparte era contacto ese día de una sola conversación, entra ahí.
+3. **Dos o más candidatos sin hilo:** entra en la de actividad más reciente (`last_contacted_at`, sin fecha al final;
+   desempate por id), con `metadata.placement = 'guess'` y `metadata.candidates` (los ids, del más reciente al más
+   antiguo). Se ve y cuenta para el turno; no se duplica. Cuando exista «Por colocar», esas marcas son lo que pregunta.
+   Las respuestas siguen al hilo (regla 1), así que una suposición arrastra su conversación.
+4. La regla «chat atado» del diseño no aplica al correo: no existe atadura.
+
+**Qué enmienda.** ADR-102, añadido 4: la regla de fechas e hilo sigue, pero ya no suma conversaciones; elige.
+
+**Sin cambios de API ni de caché** (la lectura no trae `placement`). Migración
+`20261107100000_mail_ingest_placement` sobre la firma viva; sin datos que migrar (en producción, 1 correo sincronizado,
+ninguno en dos conversaciones).
+
+**Cómo se revierte.** `build/runbooks/rollback-20261107-mail-ingest-placement.sql` vuelve a la definición anterior; los
+eventos que entraron entre medias se quedan donde están.
