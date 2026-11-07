@@ -34,6 +34,7 @@
    *
    * El segmento [slug] admite también el id de la conversación.
    */
+  import { attachmentKey, type AttachmentType } from '$lib/whatsapp-export';
   import { conversationsListHref } from '$lib/conversations-return.svelte';
   import { docTitle } from '$lib/doc-title';
   import { lensOn } from '$lib/lenses.svelte';
@@ -522,6 +523,8 @@
     return (author || senderName(e.mail_from)).trim().split(/\s+/)[0] ?? '';
   }
   function whoOf(e: ConversationEventItem, side: ThreadSide): string {
+    // Un mensaje importado de un chat dice quién lo escribió (un grupo tiene varios, ADR-189).
+    if (side === 'theirs' && e.sender) return e.sender.trim().split(/\s+/)[0] ?? theirName;
     return side === 'theirs' ? senderName(e.mail_from).split(/\s+/)[0] || theirName : ourName(e);
   }
   /** El glifo de lo hablado o apuntado. */
@@ -797,13 +800,25 @@
                 <p class="bub__head">
                   <span class="bub__what"><ThreadIcon name={e.kind === 'message' ? messageAppIcon(e.via) : (EVENT_ICON[e.kind] ?? 'note')} />{evLabel(e, x.side)}</span>
                   <!-- Lo apuntado lo dice quién lo apuntó, no una forma aparte (ADR-185). -->
-                  <span class="bub__logged">{logger ? t('thread.ev_logged_by', locale, { name: logger }) : t('thread.ev_logged', locale)}</span>
+                  {#if e.source === 'whatsapp'}
+                    <!-- Traído de un chat exportado, no apuntado (ADR-189). -->
+                    <span class="bub__logged">{logger ? t('thread.ev_imported_by', locale, { name: logger }) : t('thread.ev_imported', locale)}</span>
+                  {:else}
+                    <span class="bub__logged">{logger ? t('thread.ev_logged_by', locale, { name: logger }) : t('thread.ev_logged', locale)}</span>
+                  {/if}
                   <time datetime={e.occurred_at}>{stamp(e.occurred_at, x.day)}</time>
                   {#if team}<button type="button" class="bub__cite" onclick={() => commentOn(evLabel(e, x.side), e.occurred_at, e.body)}
                       ><ThreadIcon name="team" />{t('thread.comment_team', locale)}</button
                     >{/if}
                 </p>
                 {#if e.body}<p class="bub__text">{e.body}</p>{/if}
+                {#if e.attachments?.length}
+                  <p class="bub__att" data-testid="thread-attachments">
+                    {#each e.attachments as a, i (i)}<span
+                        >{t(attachmentKey(a.type as AttachmentType), locale)}{#if a.name}<span class="bub__att-name"> · {a.name}</span>{/if}</span
+                      >{/each}
+                  </p>
+                {/if}
               </li>
             {:else if x.kind === 'logged'}
               {@const e = x.event}
@@ -1350,6 +1365,18 @@
       -webkit-box-orient: vertical;
       -webkit-line-clamp: var(--thread-fold-lines);
       line-clamp: var(--thread-fold-lines);
+    }
+    /* What came attached to an imported message: its kind and file name, not the file. */
+    .bub__att {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2xs) var(--space-s);
+      color: var(--text-muted);
+      font-size: var(--text-s);
+    }
+    .bub__att-name {
+      color: var(--text-faint);
+      overflow-wrap: anywhere;
     }
     .bub__text--none {
       color: var(--text-faint);

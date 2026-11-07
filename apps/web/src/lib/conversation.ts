@@ -147,10 +147,37 @@ export type ConversationEventItem = Pick<
     created_by?: string | null;
     /** Un mensaje: por qué app (ADR-186). */
     via?: MessageApp | null;
+    /** Un mensaje importado de un chat (ADR-189): quién lo escribió, como se llama en Hour o en el chat. */
+    sender?: string | null;
+    /** Sus adjuntos, por nombre (no se suben). */
+    attachments?: { type: string; name?: string | null }[];
   };
 
-/** La lectura de la ficha: el registro más lo que se enseña de un correo y la app de un mensaje. */
-export const CONVERSATION_EVENT_FULL_SELECT = `${CONVERSATION_EVENT_SELECT},created_by,via:metadata->>via,${EVENT_MAIL_SELECT}`;
+/**
+ * La lectura de la ficha: el registro más lo que se enseña de un correo, la
+ * app de un mensaje y, si colocaba un mensaje de un chat, ese mensaje (el
+ * cuerpo vive en él, ADR-188 § 1).
+ */
+export const CONVERSATION_EVENT_FULL_SELECT = `${CONVERSATION_EVENT_SELECT},created_by,via:metadata->>via,${EVENT_MAIL_SELECT},cm:channel_message(body,sender_name,metadata)`;
+
+/** Lo que trae el embebido del mensaje de un chat. */
+export interface ChannelMessageEmbed {
+  body: string | null;
+  sender_name: string | null;
+  metadata: { attachments?: { type: string; name?: string | null }[] } | null;
+}
+
+/** Un evento leído con su mensaje: el cuerpo, quién y los adjuntos salen del mensaje. */
+export function withChannelMessage<T extends ConversationEventItem>(row: T & { cm?: ChannelMessageEmbed | null }): T {
+  const { cm, ...rest } = row;
+  if (!cm) return rest as unknown as T;
+  return {
+    ...(rest as unknown as T),
+    body: rest.body ?? cm.body,
+    sender: cm.sender_name,
+    attachments: cm.metadata?.attachments ?? [],
+  };
+}
 
 /** The database caps a contact's role at 200 characters (ADR-102). */
 export const CONTACT_ROLE_MAX = 200;

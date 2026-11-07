@@ -60,6 +60,7 @@
   import { dayMonth } from '$lib/datetime';
   import ConversationFeed from '$lib/components/ConversationFeed.svelte';
   import CallLogDialog from '$lib/components/CallLogDialog.svelte';
+  import WhatsAppImportDialog from '$lib/components/WhatsAppImportDialog.svelte';
   import { accentVarFor } from '$lib/utils/accent';
   import ChatDoneLine from '$lib/components/ChatDoneLine.svelte';
   import FirstVisitCard from '$lib/components/FirstVisitCard.svelte';
@@ -735,6 +736,19 @@
   /** «Apuntar llamada» (121 A, ADR-182). */
   let callOpen = $state(false);
 
+  /** «Importar chat» (128, ADR-189). El atajo «Mandar a Hour» del iPhone llega con `?importar`. */
+  let importOpen = $state(false);
+  $effect(() => {
+    if (!page.url.searchParams.has('importar') || !canEdit || noAccess) return;
+    untrack(() => {
+      importOpen = true;
+      const params = new URLSearchParams(page.url.searchParams);
+      params.delete('importar');
+      const qs = params.toString();
+      void goto(`${page.url.pathname}${qs ? `?${qs}` : ''}`, { replaceState: true, noScroll: true, keepFocus: true });
+    });
+  });
+
   // ── Selection (plan § 10; plan de la lista § 6.2) ─────────────────────
   let table = $state<ReturnType<typeof ConversationTable>>();
   let picked = $state<Pick<ConversationItem, 'id' | 'project_id'>[]>([]);
@@ -1002,6 +1016,10 @@
         {#if listChip !== 'equipo'}
           <!-- 121 A (ADR-182): una llamada sin buscar antes la conversación. Palabras, no un glifo. -->
           <Button size="s" variant="secondary" onclick={() => (callOpen = true)}>{t('call.open', locale)}</Button>
+          <!-- 128 (ADR-189): un chat exportado de WhatsApp. En el móvil entra por el atajo (`?importar`). -->
+          <span class="conversations__import-door"
+            ><Button size="s" variant="secondary" onclick={() => (importOpen = true)}>{t('wa_import.open', locale)}</Button></span
+          >
         {/if}
         <Button size="s" onclick={openAdd} label={t('conversations.add', locale)}
           ><span class="conversations__add-long">{t('conversations.add', locale)}</span><span class="conversations__add-short" aria-hidden="true">+</span></Button
@@ -1368,6 +1386,7 @@
     {/if}
   {/if}
   <CallLogDialog bind:open={callOpen} workspaceIds={scopeWorkspaceIds} {locale} />
+  <WhatsAppImportDialog bind:open={importOpen} workspaceIds={scopeWorkspaceIds} {locale} />
 </section>
 
 
@@ -1397,12 +1416,14 @@
     }
     /* «Seleccionar» sits in the tools' box like «Añadir»: a flex box, not an
        inline span on the tools' tall title line, which dropped it a few px. */
-    .conversations__pick-door {
+    .conversations__pick-door,
+    .conversations__import-door {
       display: inline-flex;
     }
     /* On a phone the selection waits for a wider screen: the head keeps the title and «Añadir». */
     @media (max-width: 47.999rem) {
       .conversations__pick-door--idle,
+      .conversations__import-door,
       .conversations__add-long {
         display: none;
       }

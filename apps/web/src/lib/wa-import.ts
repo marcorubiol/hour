@@ -16,6 +16,7 @@
  * La marca de bolo, sólo si esa conversación tiene un único bolo en curso.
  */
 
+import * as v from 'valibot';
 import type { ExportAttachment, ExportMessage } from './whatsapp-export';
 
 /** Lo que trae `POST /api/whatsapp/import-context`. */
@@ -432,4 +433,85 @@ export function chunk<T>(items: T[], size = IMPORT_BATCH): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
   return out;
+}
+
+// ── Lo que la API valida ──────────────────────────────────────────────────
+
+
+const Uuid = v.pipe(v.string(), v.uuid());
+const Fp = v.pipe(v.string(), v.regex(/^[0-9a-f]{32}$/));
+
+export const ImportContextRequestSchema = v.object({
+  workspace_id: Uuid,
+  fingerprints: v.pipe(v.array(Fp), v.maxLength(20000)),
+});
+
+const PlacementSchema = v.object({
+  surface: v.picklist(['conversation', 'bolo_team']),
+  conversation_id: v.optional(Uuid),
+  bolo_id: v.optional(Uuid),
+  state: v.picklist(['placed', 'guess']),
+  reason: v.picklist(['chat_binding', 'single_candidate', 'most_recent', 'person_choice']),
+  candidates: v.optional(v.pipe(v.array(Uuid), v.maxLength(20))),
+});
+
+export const ImportRequestSchema = v.object({
+  workspace_id: Uuid,
+  chat: v.object({
+    id: v.optional(v.nullable(Uuid)),
+    kind: v.picklist(['direct', 'group']),
+    title: v.optional(v.nullable(v.pipe(v.string(), v.maxLength(200)))),
+    bound_bolo_id: v.optional(v.nullable(Uuid)),
+    bound_conversation_id: v.optional(v.nullable(Uuid)),
+    bound_until: v.optional(v.nullable(v.pipe(v.string(), v.isoDate()))),
+  }),
+  members: v.pipe(
+    v.array(
+      v.object({
+        label: v.pipe(v.string(), v.minLength(1), v.maxLength(200)),
+        person_id: v.optional(v.nullable(Uuid)),
+        name: v.pipe(v.string(), v.minLength(1), v.maxLength(200)),
+        is_self: v.boolean(),
+      }),
+    ),
+    v.maxLength(300),
+  ),
+  messages: v.pipe(
+    v.array(
+      v.object({
+        fp: Fp,
+        at: v.pipe(v.string(), v.isoTimestamp()),
+        label: v.pipe(v.string(), v.minLength(1), v.maxLength(200)),
+        body: v.pipe(v.string(), v.maxLength(20000)),
+        attachments: v.pipe(
+          v.array(v.object({ type: v.pipe(v.string(), v.maxLength(20)), name: v.nullable(v.pipe(v.string(), v.maxLength(200))) })),
+          v.maxLength(20),
+        ),
+        edited: v.optional(v.boolean()),
+        placements: v.pipe(v.array(PlacementSchema), v.maxLength(4)),
+      }),
+    ),
+    v.minLength(1),
+    v.maxLength(20000),
+  ),
+});
+
+export type ImportRequest = v.InferOutput<typeof ImportRequestSchema>;
+
+/** Lo que devuelve `POST /api/whatsapp/import`. */
+export interface ImportResult {
+  chat_id: string;
+  created: number;
+  skipped: number;
+  placed: number;
+}
+
+/** Un mensaje de un chat colocado en el tablón de un bolo (`GET /api/whatsapp/bolo/:id`). */
+export interface BoloChatMessage {
+  id: string;
+  occurred_at: string;
+  direction: 'inbound' | 'outbound';
+  sender_name: string;
+  body: string | null;
+  attachments: ExportAttachment[];
 }
