@@ -1003,6 +1003,185 @@ export type Database = {
           },
         ]
       }
+      channel_chat: {
+        Row: {
+          bound_bolo_id: string | null
+          bound_conversation_id: string | null
+          bound_until: string | null
+          channel: string
+          created_at: string
+          excluded: boolean
+          id: string
+          kind: string
+          owner_user_id: string
+          title: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          bound_bolo_id?: string | null
+          bound_conversation_id?: string | null
+          bound_until?: string | null
+          channel?: string
+          created_at?: string
+          excluded?: boolean
+          id?: string
+          kind: string
+          owner_user_id: string
+          title?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          bound_bolo_id?: string | null
+          bound_conversation_id?: string | null
+          bound_until?: string | null
+          channel?: string
+          created_at?: string
+          excluded?: boolean
+          id?: string
+          kind?: string
+          owner_user_id?: string
+          title?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channel_chat_bound_bolo_id_fkey"
+            columns: ["bound_bolo_id"]
+            isOneToOne: false
+            referencedRelation: "bolo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "channel_chat_bound_conversation_id_fkey"
+            columns: ["bound_conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversation"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "channel_chat_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      channel_chat_member: {
+        Row: {
+          chat_id: string
+          is_self: boolean
+          label: string
+          name: string
+          person_id: string | null
+        }
+        Insert: {
+          chat_id: string
+          is_self?: boolean
+          label: string
+          name: string
+          person_id?: string | null
+        }
+        Update: {
+          chat_id?: string
+          is_self?: boolean
+          label?: string
+          name?: string
+          person_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channel_chat_member_chat_id_fkey"
+            columns: ["chat_id"]
+            isOneToOne: false
+            referencedRelation: "channel_chat"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "channel_chat_member_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "person"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      channel_message: {
+        Row: {
+          body: string | null
+          chat_id: string
+          created_at: string
+          created_by: string
+          deleted_at: string | null
+          direction: Database["public"]["Enums"]["conversation_event_direction"]
+          fingerprint: string
+          id: string
+          metadata: Json
+          occurred_at: string
+          sender_label: string
+          sender_name: string
+          sender_person_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          body?: string | null
+          chat_id: string
+          created_at?: string
+          created_by: string
+          deleted_at?: string | null
+          direction: Database["public"]["Enums"]["conversation_event_direction"]
+          fingerprint: string
+          id?: string
+          metadata?: Json
+          occurred_at: string
+          sender_label: string
+          sender_name: string
+          sender_person_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          body?: string | null
+          chat_id?: string
+          created_at?: string
+          created_by?: string
+          deleted_at?: string | null
+          direction?: Database["public"]["Enums"]["conversation_event_direction"]
+          fingerprint?: string
+          id?: string
+          metadata?: Json
+          occurred_at?: string
+          sender_label?: string
+          sender_name?: string
+          sender_person_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channel_message_chat_id_fkey"
+            columns: ["chat_id"]
+            isOneToOne: false
+            referencedRelation: "channel_chat"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "channel_message_sender_person_id_fkey"
+            columns: ["sender_person_id"]
+            isOneToOne: false
+            referencedRelation: "person"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "channel_message_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       collab_snapshot: {
         Row: {
           created_at: string
@@ -1284,6 +1463,7 @@ export type Database = {
       conversation_event: {
         Row: {
           body: string | null
+          channel_message_id: string | null
           conversation_id: string
           created_by: string | null
           direction:
@@ -1303,6 +1483,7 @@ export type Database = {
         }
         Insert: {
           body?: string | null
+          channel_message_id?: string | null
           conversation_id: string
           created_by?: string | null
           direction?:
@@ -1322,6 +1503,7 @@ export type Database = {
         }
         Update: {
           body?: string | null
+          channel_message_id?: string | null
           conversation_id?: string
           created_by?: string | null
           direction?:
@@ -1340,6 +1522,13 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "conversation_event_channel_message_id_fkey"
+            columns: ["channel_message_id"]
+            isOneToOne: false
+            referencedRelation: "channel_message"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "conversation_event_conversation_id_fkey"
             columns: ["conversation_id"]
@@ -3202,6 +3391,86 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "thread"
             referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      message_placement: {
+        Row: {
+          bolo_id: string | null
+          candidates: string[]
+          conversation_id: string | null
+          id: string
+          message_id: string
+          owner_user_id: string
+          placed_at: string
+          placed_by: string | null
+          reason: string
+          removed_at: string | null
+          removed_by: string | null
+          state: string
+          surface: string
+          workspace_id: string
+        }
+        Insert: {
+          bolo_id?: string | null
+          candidates?: string[]
+          conversation_id?: string | null
+          id?: string
+          message_id: string
+          owner_user_id: string
+          placed_at?: string
+          placed_by?: string | null
+          reason: string
+          removed_at?: string | null
+          removed_by?: string | null
+          state?: string
+          surface: string
+          workspace_id: string
+        }
+        Update: {
+          bolo_id?: string | null
+          candidates?: string[]
+          conversation_id?: string | null
+          id?: string
+          message_id?: string
+          owner_user_id?: string
+          placed_at?: string
+          placed_by?: string | null
+          reason?: string
+          removed_at?: string | null
+          removed_by?: string | null
+          state?: string
+          surface?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_placement_bolo_id_fkey"
+            columns: ["bolo_id"]
+            isOneToOne: false
+            referencedRelation: "bolo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_placement_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversation"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_placement_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "channel_message"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_placement_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -7083,6 +7352,15 @@ export type Database = {
         }
         Returns: Json
       }
+      import_whatsapp_chat: {
+        Args: {
+          p_chat: Json
+          p_members: Json
+          p_messages: Json
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
       invite_workspace_person: {
         Args: {
           p_email: string
@@ -7901,6 +8179,7 @@ export type Database = {
         }
         Returns: {
           body: string | null
+          channel_message_id: string | null
           conversation_id: string
           created_by: string | null
           direction:
@@ -9057,6 +9336,14 @@ export type Database = {
         }
       }
       uuid_generate_v7: { Args: never; Returns: string }
+      whatsapp_import_context: {
+        Args: { p_workspace_id: string }
+        Returns: Json
+      }
+      whatsapp_import_lookup: {
+        Args: { p_fingerprints: string[]; p_workspace_id: string }
+        Returns: Json
+      }
       withdraw_mail_basis: {
         Args: { p_address: string; p_workspace_id: string }
         Returns: undefined
