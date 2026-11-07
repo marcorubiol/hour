@@ -7220,3 +7220,67 @@ tarea 128) el sitio se elige al importar o compartir, con estas mismas reglas co
 WhatsApp (128) va detrás de este ADR. **Re-evaluar cuando** haya un segundo canal conectado y una temporada con dos
 proyectos vivos en las mismas salas: cuántas suposiciones se mueven, si el umbral de tanda aguanta, y si la regla 2b
 mete demasiado de lo personal.
+
+## [2026-11-07] ADR-189 · Importar un chat de WhatsApp: se lee en el dispositivo, se coloca por tandas, el núcleo del ADR-188 (tarea 128)
+
+**Contexto.** Fase 1 de la captura de mensajes (investigación https://claude.ai/artifact/TNyuNaqjjUeYtdCEdctKoh):
+el «Exportar chat» de WhatsApp, sin riesgo y válido para cualquier teléfono, mientras la fase 2 (WhatsApp Business en
+coexistencia) espera a que Marco pase el número. Diseño y boceto: https://claude.ai/artifact/4Frz7DNPTCju9i9aXmxefb.
+Marco, 07-11 (vía HOUR COOR): 1a, 2a, 3a; en 4, lo que dice el ADR-188 (el tablón del bolo).
+
+**Decisión.**
+1. **Esquema: el núcleo del ADR-188 ya, recortado (1a).** `channel_chat` (de quien importa: directo o grupo, título,
+   `excluded`, atadura a un bolo con caducidad o a una conversación), `channel_chat_member` (quién es quién, recordado
+   para la siguiente importación), `channel_message` (una vez, con huella única por espacio) y `message_placement`
+   (conversación con marca de bolo opcional, o tablón del bolo; `placed | guess`, motivo y candidatos; auditado, sin
+   cuerpo). La colocación en una conversación es su `conversation_event` (`source='whatsapp'`, `kind='message'`,
+   `metadata.via='whatsapp'`, `channel_message_id`) **sin cuerpo**: el cuerpo vive en el mensaje y la ficha lo lee por
+   el embebido. El turno, «se enfría» y el último contacto no cambian. Quedan para 126 o la fase 2:
+   `channel_account`, `person_handle` (el número se casa con `workspace_person.phone`), mover o quitar colocaciones y
+   «Por colocar».
+2. **Se lee en el dispositivo.** El .zip (iPhone o Android) se abre en el navegador (`$lib/zip-read`, sin librería) y
+   el texto se lee ahí (`$lib/whatsapp-export`): fechas por idioma (día/mes o mes/día deducido del archivo entero, con
+   conmutador si nada lo decide), 12 y 24 horas, multilínea, adjuntos por nombre u omitidos, mensajes del sistema
+   fuera. A Hour viajan las huellas (para saber qué ya está) y al final sólo lo confirmado.
+3. **La huella** es el minuto (UTC), el texto normalizado con el tipo de lo adjunto y el orden entre iguales; sin el
+   autor ni los segundos. El mismo chat exportado por dos personas o desde dos teléfonos no entra dos veces; reimportar
+   sólo trae lo nuevo, y el chat se reconoce por las huellas que comparte, no por su título.
+4. **Quién es quién:** por número (los nueve últimos dígitos), luego por nombre sin acentos (igual, o todas las
+   palabras del export dentro del nombre de Hour, con una sola persona que encaje); lo recordado del mismo chat manda.
+   «Tú» se adivina por el nombre del perfil o se elige. La dirección la pone la base por quién es quién.
+5. **Dónde va: las reglas del ADR-188 por tandas de 3 horas**, como propuesta editable antes de escribir: grupo atado
+   (a su tablón, hasta el día siguiente a la última función; luego sin sitio), un solo candidato, la más reciente como
+   suposición (`guess`, con candidatos), sin sitio. Marca de bolo sólo con un único bolo en curso. Un grupo propone el
+   bolo cuya sala o ciudad nombra su título.
+6. **Lo que no tiene sitio no entra salvo que se marque (2a)**: importar pone un historial entero delante, y años de
+   chat con un contacto que también es amigo no deben quedarse guardados sin mirarlos. Si entra, sin colocación: sólo
+   lo ve quien importó. Enmienda el ADR-188 § 3 sólo para la importación.
+7. **Privacidad:** un chat 1 a 1 con alguien del propio espacio no se importa (la base lo rechaza); un chat directo
+   pide decir quién es la otra persona (un número desconocido no entra; en un grupo, sí, como «número sin nombre»). Lo
+   leen quien lo importó y la audiencia de cada sitio (ADR-188 § 10). Sin IA. Adjuntos: sólo nombre y tipo.
+8. **El grupo atado a un bolo va a su tablón (4)**: un bloque «Grupo de WhatsApp» en el General del bolo, plegado a los
+   últimos, para quien lee el tablón (`GET /api/whatsapp/bolo/:id`).
+9. **La puerta:** «Importar chat» en la cabecera de Conversaciones (escritorio y tableta). En el móvil entra por el
+   atajo «Mandar a Hour» del iPhone (3a): guarda el archivo en Archivos › Hour y abre
+   `/h/conversations?importar`, que abre la hoja; el selector lo muestra en Recientes. Nada nuevo en el servidor (sin
+   token ni subida). Pasos en `build/whatsapp-shortcut.md`.
+10. **Importar espera el plazo de «Deshacer»** (como ADR-182) y se escribe en tandas de 500 por
+    `import_whatsapp_chat`, idempotente. Una pestaña cerrada dentro del plazo no escribe nada: reimportar lo completa.
+11. `conversation_feed`: lo que importó quien mira no le cuenta como no leído (como lo apuntado). `CACHE_SCHEMA` 28.
+
+**Migración** `20261108100000_whatsapp_import` (aditiva; `conversation_feed` con la firma viva de 19 y su cuerpo vivo
+salvo una línea). Rollback: `build/runbooks/rollback-20261108-whatsapp-import.sql` (copia el cuerpo a los eventos antes
+de quitar los mensajes).
+
+**Rechazado.**
+- *Sólo `conversation_event` con el cuerpo copiado* (1b): no recuerda el chat, no guarda lo que no tiene sitio, no
+  tiene tablón y habría que migrarlo en la fase 2.
+- *Lo que no tiene sitio entra siempre* (2b).
+- *Subida con token desde el atajo* (3b): el chat entero en el servidor sin revisar y tokens que crear y revocar.
+- *El grupo a la conversación con marca de bolo* (4b): el técnico no lee la conversación.
+- *Parsear en el servidor*: el chat entero saldría del dispositivo antes de decidir nada.
+
+**Status.** Construido en `claude/wa-import-54cc4b`, sin aplicar ni desplegar. Tests del parser, del zip y de la
+propuesta; RLS (`tests/rls/whatsapp-import.test.ts`) y E2E (`tests/whatsapp-import.spec.ts`) escritos sin correr.
+**Re-evaluar cuando** se use con chats de verdad: cuántas tandas sin sitio se marcan, si el emparejado por nombre
+acierta, y si hace falta la puerta en el móvil sin atajo.
