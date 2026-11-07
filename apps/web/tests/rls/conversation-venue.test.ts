@@ -11,6 +11,7 @@ import {
   requireEnv,
   requireLimitedEnv,
   restoreProjectAccess,
+  serviceDelete,
   setFacets,
   type ProjectAccess,
 } from './_helpers';
@@ -503,6 +504,16 @@ describe.skipIf(!envReady())('conversation with the venue (ADR-102, fase 2)', ()
     });
 
     afterAll(async () => {
+      // Los eventos que dejó `mail_ingest_message` (borrar el buzón se lleva
+      // `mail_message` y `mail_message_event` en cascada, pero no el evento).
+      await serviceDelete(
+        'conversation_event',
+        new URLSearchParams({
+          workspace_id: `eq.${workspaceId}`,
+          source: 'eq.email',
+          'metadata->>provider_message_id': `like.${RUN}-*`,
+        }),
+      );
       for (const box of [boxA, boxB]) if (box) await pgRpc('disconnect_mail_account', jwt, { p_account_id: box });
     });
 
