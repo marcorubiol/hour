@@ -7,7 +7,7 @@ const SB_URL = process.env.PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 /**
- * E2E: la invitación con diseño (tarea 99, ADR-192). Escrito sin correr: lo
+ * E2E: la invitación con diseño (tarea 99, ADR-190). Escrito sin correr: lo
  * corre el coordinador contra un origen desplegado tras aplicar la migración
  * 20261108120000. No sale ningún correo (solo un borrador, sin destinatarios).
  *
@@ -58,7 +58,7 @@ type Detail = {
   };
 };
 
-test.describe('designed invitation (ADR-192)', () => {
+test.describe('designed invitation (ADR-190)', () => {
   test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL / PW_TEST_PASSWORD.');
 
   test('letter → designed in the editor → saved, checked, derived text → back to letter', async ({ page }) => {

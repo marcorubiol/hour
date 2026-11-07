@@ -34,7 +34,7 @@
  * plantilla del espacio (logo, imagen del espectáculo; `mail-template.ts`,
  * ADR-172), que es una pieza aparte: aquí solo se le pasan las piezas.
  *
- * Una invitación diseñada (ADR-192) lleva en la plantilla el HTML de su
+ * Una invitación diseñada (ADR-190) lleva en la plantilla el HTML de su
  * diseño: el correo es ese HTML, con los campos puestos (escapados) y el pie
  * de Hour al final. Su texto plano es el `body`, que el servidor deriva del
  * diseño al guardarlo; sin firma ni bloque de la función (el diseño dice lo
@@ -514,7 +514,7 @@ export function composeMailout(
   const subject = fillFields(draft.subject.trim(), values, nameless);
   const body = fillFields(draft.body.trim(), values, nameless);
   if (design) {
-    // The designed invitation (ADR-192): its HTML with the fields filled in,
+    // The designed invitation (ADR-190): its HTML with the fields filled in,
     // escaped, plus Hour's footer; the text is the body derived from it.
     const footer = footerLines(ctx, language, unsubscribeUrl, true);
     const escaped = Object.fromEntries(

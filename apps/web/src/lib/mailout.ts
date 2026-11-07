@@ -159,7 +159,7 @@ export interface MailoutItem {
   image_alt: string | null;
   image_link_url: string | null;
   /**
-   * ADR-192: el diseño de una invitación (el JSON del editor, la fuente) y su
+   * ADR-190: el diseño de una invitación (el JSON del editor, la fuente) y su
    * HTML compilado. null en los dos: una carta.
    */
   design: DesignContent | null;
@@ -327,7 +327,7 @@ export const MailoutImageSchema = v.object({
   link: v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(2000), v.regex(/^(https?:\/\/[^\s<>"]+)?$/i))),
 });
 
-/** El diseño de una invitación tal como lo manda el editor (ADR-192). */
+/** El diseño de una invitación tal como lo manda el editor (ADR-190). */
 export const MailoutDesignSchema = v.object({
   content: v.looseObject({ blocks: v.array(v.unknown()), settings: v.record(v.string(), v.unknown()) }),
   html: v.pipe(v.string(), v.minLength(1), v.maxLength(DESIGN_HTML_MAX)),
@@ -343,7 +343,7 @@ export const MailoutUpdateSchema = v.object({
   /** Solo cuando cambia: ausente no la toca, null la quita. */
   image: v.optional(v.nullable(MailoutImageSchema)),
   /**
-   * ADR-192, solo cuando cambia: el diseño de una invitación (JSON y HTML
+   * ADR-190, solo cuando cambia: el diseño de una invitación (JSON y HTML
    * compilado en el navegador). Ausente no lo toca; null vuelve a la carta.
    * El servidor comprueba el JSON, limpia el HTML y deriva de él el `body`.
    */

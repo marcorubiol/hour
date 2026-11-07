@@ -1,4 +1,4 @@
--- Rollback de 20261108120000_mailout_design (ADR-192). Borra los diseños
+-- Rollback de 20261108120000_mailout_design (ADR-190). Borra los diseños
 -- guardados: las invitaciones diseñadas en borrador vuelven a carta con su
 -- texto derivado en `body`. Desplegar antes el código sin `design` en
 -- MAILOUT_SELECT, o la pantalla del envío falla.

@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * El editor del correo diseñado de una invitación (tarea 99, ADR-192):
+   * El editor del correo diseñado de una invitación (tarea 99, ADR-190):
    * Templatical (`@templatical/editor`, FSL-1.1-MIT, embebido como permite su
    * licencia) en una capa a toda pantalla. Se carga al abrir, no con la
    * pantalla del envío: pesa unos 200 KB gzip, más el compilador de MJML.
@@ -104,15 +104,16 @@
     let gone = false;
     void (async () => {
       try {
-        const [{ init }, types] = await Promise.all([import('@templatical/editor'), import('@templatical/types')]);
+        const tpl = await import('$lib/templatical');
+        const { init } = tpl;
         if (gone || !host) return;
         const start =
           (content as unknown as Parameters<typeof init>[0]['content']) ??
           (() => {
-            const c = types.createDefaultTemplateContent();
+            const c = tpl.createDefaultTemplateContent();
             c.blocks = [
-              ...(starter.title ? [types.createTitleBlock({ content: starter.title, level: 1 })] : []),
-              ...starter.paragraphs.map((p) => types.createParagraphBlock({ content: p })),
+              ...(starter.title ? [tpl.createTitleBlock({ content: starter.title, level: 1 })] : []),
+              ...starter.paragraphs.map((p) => tpl.createParagraphBlock({ content: p })),
             ];
             return c;
           })();

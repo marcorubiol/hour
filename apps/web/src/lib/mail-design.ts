@@ -1,5 +1,5 @@
 /**
- * El correo diseñado de una invitación (tarea 99, ADR-192). El diseño se hace
+ * El correo diseñado de una invitación (tarea 99, ADR-190). El diseño se hace
  * en el editor de Templatical (`MailDesignEditor.svelte`), que guarda un JSON
  * (la fuente) y lo compila a HTML en el navegador; aquí está lo que la base,
  * el Worker y la pantalla hacen con eso, sin depender de Templatical:
@@ -112,6 +112,21 @@ const META_REFRESH = /<meta\b[^>]*http-equiv\s*=\s*["']?refresh[^>]*>/gi;
 const ON_ATTR = /\s+on[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi;
 const BAD_URL_ATTR = /\s+(href|src|background|action|formaction|xlink:href)\s*=\s*("\s*(?:javascript|vbscript|data):[^"]*"|'\s*(?:javascript|vbscript|data):[^']*'|(?:javascript|vbscript|data):[^\s>]*)/gi;
 const CSS_EXPR = /expression\s*\(|url\s*\(\s*["']?\s*(?:javascript|vbscript):/gi;
+const STYLE_BLOCK = /(<style\b[^>]*>)([\s\S]*?)(<\/style\s*>)/gi;
+const STYLE_ATTR = /(\sstyle\s*=\s*)("[^"]*"|'[^']*')/gi;
+const CSS_IMPORT = /@import\b[^;]*;?/gi;
+const CSS_URL = /url\(\s*(["']?)([^"')]*)\1\s*\)/gi;
+
+/**
+ * Inside CSS only Hour's own images (`/m/…`, made absolute later) may load:
+ * an `@import` or a `url()` elsewhere would fetch from outside when the mail
+ * is opened (ADR-190).
+ */
+function cleanCss(css: string): string {
+  return css
+    .replace(CSS_IMPORT, '')
+    .replace(CSS_URL, (whole, _q: string, target: string) => (/^\/m\//.test(target.trim()) ? whole : 'none'));
+}
 
 /**
  * Lo que un correo no debe llevar, fuera. Es una segunda capa: el HTML lo
@@ -125,7 +140,9 @@ export function sanitizeDesignHtml(html: string): string {
     .replace(META_REFRESH, '')
     .replace(ON_ATTR, '')
     .replace(BAD_URL_ATTR, '')
-    .replace(CSS_EXPR, 'invalid(');
+    .replace(CSS_EXPR, 'invalid(')
+    .replace(STYLE_BLOCK, (_w, open: string, css: string, close: string) => `${open}${cleanCss(css)}${close}`)
+    .replace(STYLE_ATTR, (_w, attr: string, value: string) => `${attr}${cleanCss(value)}`);
 }
 
 // ── Texto plano ────────────────────────────────────────────────────────────

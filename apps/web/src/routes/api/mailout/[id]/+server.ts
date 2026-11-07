@@ -8,7 +8,7 @@
  * PATCH { subject, body, language, mail_domain_id, from_local_part, from_name, image?, design? }
  *     → `update_mailout` (solo en borrador); con `image`, también
  *     `set_mailout_image` (la imagen del espectáculo, ADR-172; null la quita).
- *     Con `design` (ADR-192, solo invitaciones): se comprueba el JSON, se
+ *     Con `design` (ADR-190, solo invitaciones): se comprueba el JSON, se
  *     limpia el HTML y el `body` pasa a ser el texto derivado del diseño;
  *     después `set_mailout_design`. null vuelve a la carta y deja el texto.
  */
@@ -30,7 +30,7 @@ export const PATCH: RequestHandler = (event) =>
   mailoutRoute(event, 'PATCH /api/mailout/[id]', async ({ env, jwt, id }) => {
     const body = await readBody(event.request, MailoutUpdateSchema);
     if (body instanceof Response) return body;
-    // The design (ADR-192): checked, cleaned, and its text becomes the body.
+    // The design (ADR-190): checked, cleaned, and its text becomes the body.
     let design: { content: unknown; html: string; body: string } | null | undefined = undefined;
     if (body.design) {
       const mailout = await readMailout(env, jwt, id);

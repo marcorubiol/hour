@@ -7319,7 +7319,7 @@ propuesta; RLS (`tests/rls/whatsapp-import.test.ts`) y E2E (`tests/whatsapp-impo
 **Re-evaluar cuando** se use con chats de verdad: cuántas tandas sin sitio se marcan, si el emparejado por nombre
 acierta, y si hace falta la puerta en el móvil sin atajo.
 
-## [2026-11-07] ADR-192 · La invitación con diseño: Templatical en el envío, compilado en el navegador, texto derivado y pie de Hour (tarea 99)
+## [2026-11-07] ADR-190 · La invitación con diseño: Templatical en el envío, compilado en el navegador, texto derivado y pie de Hour (tarea 99)
 
 **Contexto.** Tarea 99: correos «bonitos», tipo Mailchimp, para las invitaciones al público y a profesionales
 (ADR-173 § 10, ADR-174 § 3). Boceto del carril («Invitaciones con cartel», https://claude.ai/artifact/UhgwbreoQXiqsCiURaNMPh)
@@ -7333,7 +7333,9 @@ persona.
    destinatarios, público y profesionales (ADR-174 § 3), cada uno desde su identidad.
 2. **El editor es Templatical** (`@templatical/editor` 0.56.1, FSL-1.1-MIT, que permite embeberlo en un producto de
    pago; pasa a MIT a los dos años de cada versión), en una capa a toda pantalla que se carga al abrirla
-   (`MailDesignEditor.svelte`). Cerrado a lo que Hour quiere:
+   (`MailDesignEditor.svelte`). Entra solo por `$lib/templatical.ts`, que lleva el aviso que pide su cláusula de
+   redistribución (copyright y enlace a los términos) como comentario `/*! @license */`, conservado en el chunk que se
+   sirve. Cerrado a lo que Hour quiere:
    - paleta: sección, título, párrafo, imagen, botón, separador, espacio (`DESIGN_BLOCKS`); sin HTML, vídeo, redes,
      menú, tabla ni cuenta atrás;
    - ajustes del documento: fondo, color del texto y de los enlaces, tipografía; ni ancho, ni idioma, ni texto de
@@ -7349,7 +7351,8 @@ persona.
 4. **El servidor no se fía del navegador** (`mail-design.ts`, `PATCH /api/mailout/[id]` con `design`): comprueba el
    JSON (solo los bloques de la paleta, sección sin secciones dentro, imágenes de Hour y de ese espacio, enlaces http(s)
    o mailto, 256 KB), limpia el HTML (fuera scripts, marcos, formularios, `on*`, `javascript:`/`data:`, `<link>`,
-   meta refresh; 90 KB) y **deriva el texto plano del JSON**, que pasa a ser el `body` del envío. Así el texto plano,
+   meta refresh, y en el CSS los `@import` y los `url()` que no son imágenes de Hour; 90 KB) y **deriva el texto plano
+   del JSON**, que pasa a ser el `body` del envío. Así el texto plano,
    los campos que faltan, el historial y la puerta de `queue_mailout` salen de lo mismo que en una carta. Un diseño sin
    texto no se guarda.
 5. **El pie lo pone Hour**, fuera del diseño y sin poder quitarse: la compañía siempre (no hay firma), por qué le

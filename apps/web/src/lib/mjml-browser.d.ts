@@ -1,4 +1,4 @@
-// mjml-browser no trae tipos: lo único que usa Hour (MailDesignEditor, ADR-192).
+// mjml-browser no trae tipos: lo único que usa Hour (MailDesignEditor, ADR-190).
 declare module 'mjml-browser' {
   export default function mjml2html(
     mjml: string,

@@ -1,4 +1,4 @@
--- El correo diseñado de una invitación (tarea 99, ADR-192).
+-- El correo diseñado de una invitación (tarea 99, ADR-190).
 --
 -- Aditiva salvo `mailout_template`, que cambia lo que devuelve (una columna
 -- más) y por eso se borra y se crea (CREATE OR REPLACE no cambia el tipo de
@@ -39,9 +39,9 @@ ALTER TABLE public.mailout
   ADD CONSTRAINT mailout_design_html_length CHECK (design_html IS NULL OR length(design_html) BETWEEN 1 AND 90000);
 
 COMMENT ON COLUMN public.mailout.design IS
-  'ADR-192: the designed invitation, as the Templatical editor saves it (the source). NULL = a letter. Only kind = invitation. Written by set_mailout_design.';
+  'ADR-190: the designed invitation, as the Templatical editor saves it (the source). NULL = a letter. Only kind = invitation. Written by set_mailout_design.';
 COMMENT ON COLUMN public.mailout.design_html IS
-  'ADR-192: the design compiled to HTML in the browser and cleaned by the Worker, merge fields ({nombre}) unfilled, without footer (Hour adds it). NULL with design.';
+  'ADR-190: the design compiled to HTML in the browser and cleaned by the Worker, merge fields ({nombre}) unfilled, without footer (Hour adds it). NULL with design.';
 
 -- ── 2 · Escribir el diseño ──────────────────────────────────────────────────
 CREATE FUNCTION public.set_mailout_design(
@@ -74,7 +74,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.set_mailout_design(uuid, jsonb, text) IS
-  'ADR-192: set or clear (NULL) the design of a draft invitation. Who edits the mailout (mailout_for_caller). The Worker checks blocks and images and derives the plain text first.';
+  'ADR-190: set or clear (NULL) the design of a draft invitation. Who edits the mailout (mailout_for_caller). The Worker checks blocks and images and derives the plain text first.';
 
 REVOKE ALL ON FUNCTION public.set_mailout_design(uuid, jsonb, text) FROM PUBLIC, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.set_mailout_design(uuid, jsonb, text) TO authenticated;
@@ -102,7 +102,7 @@ AS $$
 $$;
 
 COMMENT ON FUNCTION public.mailout_template(uuid[]) IS
-  'ADR-172, ADR-192: the mail template pieces per mailout (company name, workspace logo, show image, design HTML). service_role only: the queue.';
+  'ADR-172, ADR-190: the mail template pieces per mailout (company name, workspace logo, show image, design HTML). service_role only: the queue.';
 
 REVOKE ALL ON FUNCTION public.mailout_template(uuid[]) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.mailout_template(uuid[]) TO service_role;

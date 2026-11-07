@@ -27,7 +27,7 @@
    * previa recorre los dos orígenes con el pie real de cada uno; en borrador,
    * el público es una muestra (sus filas se congelan al poner en cola).
    *
-   * Una invitación puede ser «Con diseño» (ADR-192): el cuerpo deja de
+   * Una invitación puede ser «Con diseño» (ADR-190): el cuerpo deja de
    * escribirse aquí y se diseña en el editor (MailDesignEditor, a toda
    * pantalla); su texto plano lo deriva el servidor y la vista previa enseña
    * el diseño con el pie de Hour. La difusión no tiene ese selector.
@@ -114,7 +114,7 @@
   let imageLink = $state('');
   let imageDirty = $state(false);
   let imageRev = 0;
-  // El diseño de una invitación (ADR-192): se manda solo cuando cambia.
+  // El diseño de una invitación (ADR-190): se manda solo cuando cambia.
   let designContent = $state<DesignContent | null>(null);
   let designHtml = $state<string | null>(null);
   let designDirty = $state(false);
@@ -285,13 +285,13 @@
       : '',
   );
   let draft = $derived({ subject, body, language });
-  /** Only what decides which fields a mail uses: the design's HTML (ADR-192). */
+  /** Only what decides which fields a mail uses: the design's HTML (ADR-190). */
   let fieldTemplate = $derived({ ...NO_TEMPLATE, design: invitation && designHtml ? { html: designHtml, origin: '' } : null });
   let ctxById = $derived(new Map((d?.compose ?? []).map((c) => [c.recipient_id, c])));
 
   function missingFor(r: MailoutRecipientRow): boolean {
     const c = ctxById.get(r.recipient_id);
-    // With the design (ADR-192): its fields count too.
+    // With the design (ADR-190): its fields count too.
     return c ? composeMailout(draft, c, '', fieldTemplate).missing.length > 0 : false;
   }
 
@@ -726,7 +726,7 @@
             {/if}
             <Input label={t('mail.subject', locale)} bind:value={subject} oninput={touch} />
             {#if invitation}
-              <!-- Letter or designed (ADR-192): only an invitation chooses. -->
+              <!-- Letter or designed (ADR-190): only an invitation chooses. -->
               <div class="mo__format" data-testid="mailout-format">
                 <Segmented
                   ariaLabel={t('mailout.format', locale)}

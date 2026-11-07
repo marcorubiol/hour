@@ -34,7 +34,7 @@ export interface MailTemplate {
   /** La imagen del espectáculo, tras el cuerpo; enlaza al dossier si lo hay. */
   image: (MailImage & { href: string | null }) | null;
   /**
-   * El diseño de una invitación (ADR-192): el HTML compilado en el editor y
+   * El diseño de una invitación (ADR-190): el HTML compilado en el editor y
    * el origen con que sus imágenes de Hour se hacen absolutas. Con él, el
    * correo es el diseño más el pie de Hour; sin él, la carta.
    */
@@ -82,7 +82,7 @@ export interface MailTemplateRow {
   image_url: string | null;
   image_alt: string | null;
   image_link_url: string | null;
-  /** ADR-192: el HTML del diseño de una invitación; ausente en una base sin la migración. */
+  /** ADR-190: el HTML del diseño de una invitación; ausente en una base sin la migración. */
   design_html?: string | null;
 }
 
@@ -237,7 +237,7 @@ function eventBlock(ev: MailEvent, link: string): string {
 /**
  * El pie (ADR-180), como filas de la caja de 600 px: aire, raya y las líneas
  * de por qué le llega con la baja y la privacidad. Lo comparten la carta y
- * el diseño de una invitación (ADR-192).
+ * el diseño de una invitación (ADR-190).
  */
 function footerRows(parts: Pick<MailParts, 'footer' | 'footerHtml'>): string[] {
   const foot = `margin:0 0 4px;font-family:${FONT};font-size:12px;line-height:1.5;color:${FAINT};`;
@@ -261,7 +261,7 @@ function footerRows(parts: Pick<MailParts, 'footer' | 'footerHtml'>): string[] {
 
 /**
  * El pie en su propia caja centrada de 600 px, para ponerlo al final de un
- * HTML que no es la carta (el diseño de una invitación, ADR-192).
+ * HTML que no es la carta (el diseño de una invitación, ADR-190).
  */
 export function footerTable(parts: Pick<MailParts, 'footer' | 'footerHtml'>): string {
   const rows = footerRows(parts);

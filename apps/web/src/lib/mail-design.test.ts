@@ -95,6 +95,19 @@ describe('sanitizeDesignHtml', () => {
     expect(clean).toContain('<p>Hola</p>');
   });
 
+  test('sin @import ni url() de fuera en las hojas ni en los estilos en línea', () => {
+    const dirty =
+      '<style>@import url("https://fonts.googleapis.com/css?family=Ubuntu");@import "https://x.test/a.css";.a{background:url(https://x.test/bg.png)}.b{background:url(\'/m/ws/w/mail/a-1x1.jpg\')}</style>' +
+      '<td style="background-image:url(https://x.test/t.png);color:#000">t</td><div style="background:url(/m/ws/w/mail/b-1x1.jpg)">b</div>';
+    const clean = sanitizeDesignHtml(dirty);
+    expect(clean).not.toContain('@import');
+    expect(clean).not.toContain('x.test');
+    expect(clean).not.toContain('googleapis');
+    expect(clean).toContain("url('/m/ws/w/mail/a-1x1.jpg')");
+    expect(clean).toContain('url(/m/ws/w/mail/b-1x1.jpg)');
+    expect(clean).toContain('color:#000');
+  });
+
   test('deja lo de MJML: estilos, tablas y condicionales de Outlook', () => {
     const mjml =
       '<!doctype html><html><head><style type="text/css">.x{color:#000}</style><!--[if mso | IE]><table><tr><td><![endif]--></head><body style="word-spacing:normal;"><table role="presentation"><tr><td><a href="https://a.test">a</a></td></tr></table></body></html>';
@@ -177,7 +190,7 @@ describe('designedHtml', () => {
   });
 });
 
-describe('composeMailout con diseño (ADR-192)', () => {
+describe('composeMailout con diseño (ADR-190)', () => {
   const ctx: ComposeContext = {
     recipient_id: 'r1',
     address_kind: 'subscriber',
