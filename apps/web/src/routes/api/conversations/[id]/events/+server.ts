@@ -23,6 +23,8 @@ import { extractAccessToken } from '$lib/auth';
 import {
   CONVERSATION_EVENT_FULL_SELECT,
   ConversationEventCreateSchema,
+  withChannelMessage,
+  type ChannelMessageEmbed,
   type ConversationEventItem,
 } from '$lib/conversation';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
@@ -55,13 +57,14 @@ export const GET: RequestHandler = async ({ request, params, platform, locals })
     // la ficha pinta la raya de «nuevos» con la misma regla que la lista.
     // Sin fila, null: leída hasta que nació la conversación.
     const [{ data }, { data: reads }] = await Promise.all([
-      pgGet<ConversationEventItem>(env, 'conversation_event', jwt, { search }),
+      pgGet<ConversationEventItem & { cm?: ChannelMessageEmbed | null }>(env, 'conversation_event', jwt, { search }),
       pgGet<{ last_read_at: string }>(env, 'conversation_read', jwt, {
         search: new URLSearchParams({ select: 'last_read_at', conversation_id: `eq.${idParsed.output}`, limit: '1' }),
       }),
     ]);
     // Sin nada que leer (o sin poder leerla ya) no se dice hasta dónde se leyó.
-    return json({ items: data, last_read_at: data.length > 0 ? (reads[0]?.last_read_at ?? null) : null });
+    const items = data.map((row) => withChannelMessage(row));
+    return json({ items, last_read_at: items.length > 0 ? (reads[0]?.last_read_at ?? null) : null });
   } catch (err) {
     return pgErrorResponse(
       err,

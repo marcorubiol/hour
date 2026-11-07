@@ -31,6 +31,7 @@
   import { accentVar, accentVarFor } from '$lib/utils/accent';
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import ThreadBlock from '$lib/components/ThreadBlock.svelte';
+  import BoloChatMessages from '$lib/components/BoloChatMessages.svelte';
   import { markReadWhenSeen, readAtOpen } from '$lib/thread-reading.svelte';
   import { scrollToEdge } from '$lib/conversation-thread';
   import {
@@ -205,6 +206,8 @@
     <EmptyLine text={t('thread.group_missing', locale)} />
   {:else}
     <div class="group__body">
+      <!-- El grupo de WhatsApp atado a este bolo, en su General (ADR-189). -->
+      {#if facetId === null}<BoloChatMessages boloId={board.bolo.id} {locale} />{/if}
       <ThreadBlock
         {thread}
         anchorKind="bolo"
