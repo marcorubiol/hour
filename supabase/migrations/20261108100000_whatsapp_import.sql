@@ -17,7 +17,8 @@
 --   4. `conversation_event.channel_message_id`: la colocación en una
 --      conversación ES su evento (`source='whatsapp'`, `kind='message'`,
 --      `metadata.via='whatsapp'`), sin cuerpo: el cuerpo vive en el mensaje.
---      El turno, «se enfría» y el último contacto no cambian.
+--      Mueve el turno, «se enfría» y el último contacto sólo si es más nuevo
+--      que lo registrado (el máximo; el turno sale del evento más reciente).
 --   5. RLS: un mensaje lo ve quien lo importó y la audiencia de cada sitio
 --      donde está colocado (ADR-188 § 10). Escribe sólo la RPC.
 --   6. `whatsapp_import_lookup` (huellas conocidas, chats propios que las

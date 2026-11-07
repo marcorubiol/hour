@@ -7233,9 +7233,13 @@ Marco, 07-11 (vía HOUR COOR): 1a, 2a, 3a; en 4, lo que dice el ADR-188 (el tabl
    `excluded`, atadura a un bolo con caducidad o a una conversación), `channel_chat_member` (quién es quién, recordado
    para la siguiente importación), `channel_message` (una vez, con huella única por espacio) y `message_placement`
    (conversación con marca de bolo opcional, o tablón del bolo; `placed | guess`, motivo y candidatos; auditado, sin
-   cuerpo). El chat no se audita: su título (el nombre de una persona o de un grupo) no va a `audit_log`. La colocación en una conversación es su `conversation_event` (`source='whatsapp'`, `kind='message'`,
+   cuerpo). El chat no se audita: su título (el nombre de una persona o de un grupo) no va a `audit_log`. La
+   colocación en una conversación es su `conversation_event` (`source='whatsapp'`, `kind='message'`,
    `metadata.via='whatsapp'`, `channel_message_id`) **sin cuerpo**: el cuerpo vive en el mensaje y la ficha lo lee por
-   el embebido. El turno, «se enfría» y el último contacto no cambian. Quedan para 126 o la fase 2:
+   el embebido. Quienes leen el registro lo leen igual que un mensaje apuntado, así que **importar mueve el turno, «se
+   enfría» y el último contacto, pero sólo si lo importado es más nuevo que lo ya registrado en esa conversación**
+   (Marco, 07-11): el último contacto es el máximo (una vez por conversación y tanda) y el turno sale del evento más
+   reciente; lo más antiguo queda en la historia y no mueve nada. Quedan para 126 o la fase 2:
    `channel_account`, `person_handle` (el número se casa con `workspace_person.phone`), mover o quitar colocaciones y
    «Por colocar».
 2. **Se lee en el dispositivo.** El .zip (iPhone o Android) se abre en el navegador (`$lib/zip-read`, sin librería) y
