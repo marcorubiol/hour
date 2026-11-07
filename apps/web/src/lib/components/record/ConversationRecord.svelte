@@ -814,9 +814,9 @@
                 {#if e.body}<p class="bub__text">{e.body}</p>{/if}
                 {#if e.attachments?.length}
                   <p class="bub__att" data-testid="thread-attachments">
-                    {#each e.attachments as a, i (i)}<span
-                        >{t(attachmentKey(a.type as AttachmentType), locale)}{#if a.name}<span class="bub__att-name"> · {a.name}</span>{/if}</span
-                      >{/each}
+                    {#each e.attachments as a, i (i)}
+                      <span>{t(attachmentKey(a.type as AttachmentType), locale)}{#if a.name}{' · '}<span class="bub__att-name">{a.name}</span>{/if}</span>
+                    {/each}
                   </p>
                 {/if}
               </li>

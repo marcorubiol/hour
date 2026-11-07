@@ -58,7 +58,7 @@
           </p>
           {#if m.body}<p class="bchat__text">{m.body}</p>{/if}
           {#each m.attachments as a, i (i)}
-            <p class="bchat__att">{t(attachmentKey(a.type), locale)}{#if a.name} · {a.name}{/if}</p>
+            <p class="bchat__att">{t(attachmentKey(a.type), locale)}{#if a.name}{' · '}{a.name}{/if}</p>
           {/each}
         </li>
       {/each}

@@ -211,7 +211,7 @@
   let lastDay = $derived(messages.at(-1)?.local.slice(0, 10) ?? '');
 
   /** Los bolos para atar un grupo: los que se cruzan con las fechas del chat, primero el que su nombre nombra. */
-  let boloOptions = $derived.by(() => {
+  let rankedBolos = $derived.by(() => {
     const words = (title ?? '').toLowerCase();
     return (ctx?.bolos ?? [])
       .filter((b) => !b.last_day || !firstDay || b.last_day >= firstDay)
@@ -219,11 +219,20 @@
         b,
         named: [b.city, b.venue_name].some((x) => x && words.includes(x.toLowerCase())),
       }))
-      .sort((x, y) => Number(y.named) - Number(x.named) || (x.b.first_day ?? '').localeCompare(y.b.first_day ?? ''))
-      .map(({ b }) => ({
-        value: b.id,
-        label: [b.venue_name ?? b.city, b.first_day ? localeDayMonth(b.first_day, locale) : null, b.project_name].filter(Boolean).join(' · '),
-      }));
+      .sort((x, y) => Number(y.named) - Number(x.named) || (x.b.first_day ?? '').localeCompare(y.b.first_day ?? ''));
+  });
+  let boloOptions = $derived(
+    rankedBolos.map(({ b }) => ({
+      value: b.id,
+      label: [b.venue_name ?? b.city, b.first_day ? localeDayMonth(b.first_day, locale) : null, b.project_name].filter(Boolean).join(' · '),
+    })),
+  );
+  /** El bolo que el nombre del grupo nombra (sala o ciudad): la propuesta para atarlo. */
+  let namedBolo = $derived(rankedBolos[0]?.named ? rankedBolos[0].b.id : null);
+  /** Quien importa ya eligió cómo va el grupo: la propuesta no lo pisa. */
+  let bindTouched = $state(false);
+  $effect(() => {
+    if (kind === 'group' && !bindTouched && bindKind === 'none' && !ownChat && namedBolo) [bindKind, bindId] = ['bolo', namedBolo];
   });
   let conversationOptions = $derived(
     (ctx?.conversations ?? [])
@@ -314,6 +323,7 @@
     overrides = {};
     openSite = null;
     seeded = '';
+    bindTouched = false;
     if (inputEl) inputEl.value = '';
   }
 
@@ -435,7 +445,12 @@
       <ul class="wai__people">
         {#each others as a (a)}
           <li>
-            <Select label={t('wa_import.in_chat', locale, { name: a })} options={personOptions} bind:value={people[a]} />
+            <Select
+              label={t('wa_import.in_chat', locale, { name: a })}
+              options={personOptions}
+              value={people[a] ?? ''}
+              onchange={(e) => (people = { ...people, [a]: (e.currentTarget as HTMLSelectElement).value })}
+            />
           </li>
         {/each}
       </ul>
@@ -457,6 +472,7 @@
           ]}
           bind:value={bindKind}
           onchange={() => {
+            bindTouched = true;
             bindId = '';
             overrides = {};
           }}
