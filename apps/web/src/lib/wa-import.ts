@@ -156,9 +156,17 @@ export function guessSelf(authors: string[], myName: string | null | undefined):
 
 // ── La huella ─────────────────────────────────────────────────────────────
 
-/** Lo que pesa de un mensaje para reconocerlo en otro export: el texto y el tipo de lo adjunto. */
+/**
+ * Lo que pesa de un mensaje para reconocerlo en otro export: el texto (NFC,
+ * los espacios ASCII juntados en uno y sin espacio a los lados) y el tipo de
+ * lo adjunto. Igual que `private.whatsapp_fingerprint` en la base: si cambia
+ * aquí, cambia allí.
+ */
 export function contentKey(body: string, attachments: ExportAttachment[]): string {
-  const text = body.normalize('NFC').replace(/\s+/g, ' ').trim();
+  const text = body
+    .normalize('NFC')
+    .replace(/[ \t\n\v\f\r]+/g, ' ')
+    .replace(/^ +| +$/g, '');
   return `${text}|${attachments.map((a) => a.type).join(',')}`;
 }
 
@@ -173,16 +181,16 @@ async function sha256Hex(s: string): Promise<string> {
  * ni los segundos (Android no los trae), para que el mismo grupo exportado por
  * dos personas, o desde dos teléfonos, no entre dos veces. 32 hex.
  */
-export async function fingerprints(items: { at: string; body: string; attachments: ExportAttachment[] }[]): Promise<string[]> {
+export async function fingerprints(items: { at: string; body: string; attachments: ExportAttachment[] }[]): Promise<{ fp: string; n: number }[]> {
   const seen = new Map<string, number>();
   const keys = items.map((m) => {
     const minute = m.at.slice(0, 16); // YYYY-MM-DDTHH:MM en UTC
     const k = `${minute}|${contentKey(m.body, m.attachments)}`;
     const n = (seen.get(k) ?? 0) + 1;
     seen.set(k, n);
-    return `${k}|${n}`;
+    return { key: `${k}|${n}`, n };
   });
-  return Promise.all(keys.map(async (k) => (await sha256Hex(k)).slice(0, 32)));
+  return Promise.all(keys.map(async ({ key, n }) => ({ fp: (await sha256Hex(key)).slice(0, 32), n })));
 }
 
 /** La hora local del export como instante, en la zona del dispositivo. */
@@ -291,7 +299,10 @@ export function siteKey(site: Site): string {
 /** Un mensaje leído y listo para importar. */
 export interface PreparedMessage extends ExportMessage {
   at: string;
+  /** La huella (sólo para preguntar qué ya está: la base la calcula otra vez). */
   fp: string;
+  /** El orden entre mensajes iguales del mismo minuto, parte de la huella. */
+  n: number;
   known: boolean;
 }
 
@@ -371,7 +382,7 @@ export function summarize(plan: PlannedBurst[]): SiteSummary[] {
 
 /** Lo que viaja de un mensaje a `POST /api/whatsapp/import`. */
 export interface ImportMessagePayload {
-  fp: string;
+  n: number;
   at: string;
   label: string;
   body: string;
@@ -415,7 +426,7 @@ export function payloadOf(plan: PlannedBurst[], bolos: ImportBolo[]): ImportMess
         });
       }
       out.push({
-        fp: m.fp,
+        n: m.n,
         at: m.at,
         label: m.author,
         body: m.body,
@@ -479,7 +490,7 @@ export const ImportRequestSchema = v.object({
   messages: v.pipe(
     v.array(
       v.object({
-        fp: Fp,
+        n: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(10000)),
         at: v.pipe(v.string(), v.isoTimestamp()),
         label: v.pipe(v.string(), v.minLength(1), v.maxLength(200)),
         body: v.pipe(v.string(), v.maxLength(20000)),

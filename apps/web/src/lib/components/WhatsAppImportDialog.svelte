@@ -125,7 +125,7 @@
     let live = true;
     const base = p.messages.map((m) => ({ ...m, at: localToInstant(m.local) }));
     void fingerprints(base).then((fps) => {
-      if (live) prepared = base.map((m, i) => ({ ...m, fp: fps[i], known: false }));
+      if (live) prepared = base.map((m, i) => ({ ...m, fp: fps[i].fp, n: fps[i].n, known: false }));
     });
     return () => {
       live = false;

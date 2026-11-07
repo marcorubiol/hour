@@ -23,7 +23,9 @@
 --   6. `whatsapp_import_lookup` (huellas conocidas, chats propios que las
 --      comparten, personas del equipo), `whatsapp_import_context` (personas,
 --      conversaciones que quien importa edita, contactos con fechas, bolos) e
---      `import_whatsapp_chat` (escribe en tandas de hasta 1000).
+--      `import_whatsapp_chat` (escribe en tandas de hasta 1000). La huella la
+--      calcula la base (`private.whatsapp_fingerprint`); la privacidad de un
+--      chat con una sola persona más, y los topes, también se miran aquí.
 --   7. `conversation_feed`: cuerpo vivo de 20261104170000 (md5 de prosrc
 --      31d7d47c… comprobado contra la base viva el 2026-11-07), misma firma
 --      de 19. Único cambio: lo que importó quien mira (`source='whatsapp'`
@@ -140,9 +142,9 @@ CREATE INDEX message_placement_conversation_idx ON public.message_placement (con
 CREATE INDEX message_placement_bolo_idx ON public.message_placement (bolo_id, surface) WHERE bolo_id IS NOT NULL AND removed_at IS NULL;
 CREATE INDEX message_placement_owner_idx ON public.message_placement (owner_user_id);
 
-CREATE TRIGGER channel_chat_audit
-AFTER INSERT OR DELETE OR UPDATE ON public.channel_chat
-FOR EACH ROW EXECUTE FUNCTION public.write_audit();
+-- El chat NO se audita: `write_audit` copiaría la fila con su título (el
+-- nombre de una persona o de un grupo) a `audit_log`, que leen los admins.
+-- Lo que se audita es la colocación (dónde aparece qué mensaje), sin cuerpo.
 CREATE TRIGGER message_placement_audit
 AFTER INSERT OR DELETE OR UPDATE ON public.message_placement
 FOR EACH ROW EXECUTE FUNCTION public.write_audit();
@@ -259,10 +261,17 @@ BEGIN
   END IF;
 
   RETURN jsonb_build_object(
+    -- Sólo lo que quien llama ya ve: lo suyo y lo colocado donde lee. Lo que
+    -- trajo otro sin colocar no se anuncia; si lo vuelve a importar, la
+    -- huella choca y se escriben sus colocaciones.
     'known', coalesce((
       SELECT jsonb_agg(m.fingerprint)
       FROM public.channel_message m
-      WHERE m.workspace_id = p_workspace_id AND m.fingerprint = ANY (p_fingerprints)
+      WHERE m.workspace_id = p_workspace_id AND m.fingerprint = ANY (p_fingerprints) AND m.deleted_at IS NULL
+        AND (m.created_by = v_caller
+             OR EXISTS (SELECT 1 FROM public.message_placement mp
+                        WHERE mp.message_id = m.id AND mp.removed_at IS NULL
+                          AND private.placement_site_readable(mp.conversation_id, mp.bolo_id, mp.surface, v_caller)))
     ), '[]'::jsonb),
     'chats', coalesce((
       SELECT jsonb_agg(jsonb_build_object(
@@ -370,14 +379,36 @@ COMMENT ON FUNCTION public.whatsapp_import_context(uuid) IS
 REVOKE ALL ON FUNCTION public.whatsapp_import_context(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.whatsapp_import_context(uuid) TO authenticated;
 
--- Escribe una tanda de una importación. Idempotente por huella: lo que ya
--- estaba no se toca (ni se vuelve a colocar). Colocar es publicar
--- (ADR-188 § 10): pide editar la conversación, o leer el tablón del bolo
--- (como post_message). La dirección la dice quién es quién, no el cliente.
+-- La huella de un mensaje, en la base (no se fía de la del cliente; ADR-189 § 3):
+-- el minuto en UTC, el texto en NFC con los espacios ASCII juntados, los tipos
+-- de lo adjunto y el orden entre iguales; SHA-256, 32 hex. `$lib/wa-import`
+-- (`fingerprintKey`) calcula lo mismo en el dispositivo para preguntar qué ya está.
+CREATE FUNCTION private.whatsapp_fingerprint(p_at timestamptz, p_body text, p_types text, p_n integer)
+RETURNS text
+LANGUAGE sql IMMUTABLE
+SET search_path TO 'public', 'pg_temp'
+AS $$
+  SELECT left(encode(extensions.digest(
+    to_char(p_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI') || '|' ||
+    btrim(regexp_replace(normalize(coalesce(p_body, ''), NFC),
+                         '[ ' || chr(9) || chr(10) || chr(11) || chr(12) || chr(13) || ']+', ' ', 'g'), ' ') || '|' ||
+    coalesce(p_types, '') || '|' || p_n::text,
+    'sha256'), 'hex'), 32);
+$$;
+REVOKE ALL ON FUNCTION private.whatsapp_fingerprint(timestamptz, text, text, integer) FROM PUBLIC;
+
+-- Escribe una tanda de una importación. Idempotente por huella, que calcula
+-- la base: lo que ya estaba no se vuelve a guardar, pero las colocaciones de
+-- quien llama se escriben igual (otra persona pudo traerlo antes sin sitio).
+-- Colocar es publicar (ADR-188 § 10): pide editar la conversación, o leer el
+-- tablón del bolo (como post_message). La dirección la dice quién es quién.
+-- Un chat con una sola persona más (sea cual sea `kind`) no puede ser con
+-- alguien del equipo; un chat directo pide que esa persona sea alguien.
+-- El último contacto se mueve una vez por conversación y tanda.
 --   p_chat     {id?, kind, title?, bound_bolo_id?, bound_conversation_id?, bound_until?}
 --   p_members  [{label, person_id?, name, is_self}]
---   p_messages [{fp, at, label, body?, attachments?, edited?,
---                placements: [{surface, conversation_id?, bolo_id?, state, reason, candidates?}]}]
+--   p_messages [{n, at, label, body?, attachments? (≤20), edited?,
+--                placements (≤4): [{surface, conversation_id?, bolo_id?, state, reason, candidates?}]}]
 CREATE FUNCTION public.import_whatsapp_chat(
   p_workspace_id uuid,
   p_chat         jsonb,
@@ -389,6 +420,7 @@ SET search_path TO 'public', 'pg_temp'
 AS $$
 DECLARE
   v_caller   uuid := auth.uid();
+  v_now      timestamptz := now();
   v_chat     public.channel_chat;
   v_chat_id  uuid := nullif(p_chat ->> 'id', '')::uuid;
   v_kind     text := p_chat ->> 'kind';
@@ -400,14 +432,20 @@ DECLARE
   v_m        jsonb;
   v_p        jsonb;
   v_member   public.channel_chat_member;
+  v_other    public.channel_chat_member;
+  v_others   int;
   v_at       timestamptz;
   v_body     text;
+  v_types    text;
+  v_n        int;
   v_fp       text;
-  v_msg_id   uuid;
+  v_msg      public.channel_message;
+  v_new      boolean;
   v_conv     public.conversation;
   v_bolo     public.bolo;
   v_ok_conv  uuid[] := '{}';
   v_ok_bolo  uuid[] := '{}';
+  v_conv_id  uuid;
   v_mark     uuid;
   v_state    text;
   v_reason   text;
@@ -490,36 +528,55 @@ BEGIN
   IF (SELECT count(*) FROM public.channel_chat_member WHERE chat_id = v_chat.id AND is_self) > 1 THEN
     RAISE EXCEPTION 'only one member is you' USING ERRCODE = '22023';
   END IF;
-  -- Un chat 1 a 1 con alguien del propio espacio no se lee (ADR-188 § 8).
-  IF v_kind = 'direct' AND EXISTS (
-       SELECT 1 FROM public.channel_chat_member mb
-       JOIN public.user_profile up ON up.person_id = mb.person_id
-       JOIN public.membership ms ON ms.user_id = up.user_id AND ms.workspace_id = p_workspace_id
-                                AND ms.level = 'workspace' AND ms.accepted_at IS NOT NULL
-       WHERE mb.chat_id = v_chat.id AND NOT mb.is_self) THEN
-    RAISE EXCEPTION 'a direct chat with your own team is talked in Hour' USING ERRCODE = '22023';
+
+  -- Privacidad en la base, no en el cliente (ADR-188 § 8, ADR-189 § 7): con
+  -- una sola persona más, sea cual sea `kind`, no puede ser del equipo; un
+  -- chat directo pide exactamente una persona más y que sea alguien.
+  SELECT count(*) INTO v_others FROM public.channel_chat_member WHERE chat_id = v_chat.id AND NOT is_self;
+  IF v_others = 1 THEN
+    SELECT * INTO v_other FROM public.channel_chat_member WHERE chat_id = v_chat.id AND NOT is_self;
+    IF v_other.person_id IS NOT NULL AND EXISTS (
+         SELECT 1 FROM public.user_profile up
+         JOIN public.membership ms ON ms.user_id = up.user_id AND ms.workspace_id = p_workspace_id
+                                  AND ms.level = 'workspace' AND ms.accepted_at IS NOT NULL
+         WHERE up.person_id = v_other.person_id) THEN
+      RAISE EXCEPTION 'a direct chat with your own team is talked in Hour' USING ERRCODE = '22023';
+    END IF;
+  END IF;
+  IF v_kind = 'direct' AND (v_others <> 1 OR v_other.person_id IS NULL) THEN
+    RAISE EXCEPTION 'a direct chat needs the other person to be someone in Hour' USING ERRCODE = '22023';
   END IF;
 
   FOR v_m IN SELECT * FROM jsonb_array_elements(p_messages) LOOP
-    v_fp := v_m ->> 'fp';
-    IF v_fp IS NULL OR v_fp !~ '^[0-9a-f]{32}$' THEN
-      RAISE EXCEPTION 'a message needs its fingerprint' USING ERRCODE = '22023';
-    END IF;
     v_at := (v_m ->> 'at')::timestamptz;
     IF v_at IS NULL OR v_at > statement_timestamp() + interval '5 minutes' THEN
       RAISE EXCEPTION 'occurred_at is missing or in the future' USING ERRCODE = '22023';
     END IF;
-    v_body := nullif(btrim(coalesce(v_m ->> 'body', '')), '');
-    IF v_body IS NOT NULL AND length(v_body) > 20000 THEN
+    v_n := coalesce((v_m ->> 'n')::int, 0);
+    IF v_n < 1 OR v_n > 10000 THEN
+      RAISE EXCEPTION 'a message needs its order among equals' USING ERRCODE = '22023';
+    END IF;
+    IF jsonb_typeof(coalesce(v_m -> 'attachments', '[]'::jsonb)) <> 'array'
+       OR jsonb_array_length(coalesce(v_m -> 'attachments', '[]'::jsonb)) > 20
+       OR jsonb_typeof(coalesce(v_m -> 'placements', '[]'::jsonb)) <> 'array'
+       OR jsonb_array_length(coalesce(v_m -> 'placements', '[]'::jsonb)) > 4 THEN
+      RAISE EXCEPTION 'at most 20 attachments and 4 placements per message' USING ERRCODE = '22023';
+    END IF;
+    IF length(coalesce(v_m ->> 'body', '')) > 20000 THEN
       RAISE EXCEPTION 'body too long' USING ERRCODE = '22023';
     END IF;
+    v_body := nullif(btrim(coalesce(v_m ->> 'body', '')), '');
+    SELECT coalesce(string_agg(left(a ->> 'type', 20), ',' ORDER BY ord), '') INTO v_types
+    FROM jsonb_array_elements(coalesce(v_m -> 'attachments', '[]'::jsonb)) WITH ORDINALITY AS t(a, ord);
+    v_fp := private.whatsapp_fingerprint(v_at, v_m ->> 'body', v_types, v_n);
+
     SELECT * INTO v_member FROM public.channel_chat_member
     WHERE chat_id = v_chat.id AND label = btrim(left(coalesce(v_m ->> 'label', ''), 200));
     IF v_member.chat_id IS NULL THEN
       RAISE EXCEPTION 'a message from someone not in the chat' USING ERRCODE = '22023';
     END IF;
 
-    v_msg_id := NULL;
+    v_msg := NULL;
     INSERT INTO public.channel_message (
       workspace_id, chat_id, fingerprint, occurred_at, direction,
       sender_label, sender_person_id, sender_name, body, metadata, created_by
@@ -528,8 +585,7 @@ BEGIN
       CASE WHEN v_member.is_self THEN 'outbound' ELSE 'inbound' END::public.conversation_event_direction,
       v_member.label, v_member.person_id, v_member.name, v_body,
       jsonb_strip_nulls(jsonb_build_object(
-        'attachments', CASE WHEN jsonb_typeof(v_m -> 'attachments') = 'array'
-                             AND jsonb_array_length(v_m -> 'attachments') > 0
+        'attachments', CASE WHEN v_types <> ''
                             THEN (SELECT jsonb_agg(jsonb_strip_nulls(jsonb_build_object(
                                            'type', left(a ->> 'type', 20), 'name', left(a ->> 'name', 200))))
                                   FROM jsonb_array_elements(v_m -> 'attachments') a) END,
@@ -537,13 +593,18 @@ BEGIN
       v_caller
     )
     ON CONFLICT (workspace_id, fingerprint) DO NOTHING
-    RETURNING id INTO v_msg_id;
+    RETURNING * INTO v_msg;
 
-    IF v_msg_id IS NULL THEN
+    v_new := v_msg.id IS NOT NULL;
+    IF v_new THEN
+      v_created := v_created + 1;
+    ELSE
+      -- Ya estaba (lo trajo antes quien llama u otra persona): no se vuelve a
+      -- guardar, pero sus colocaciones sí se escriben.
+      SELECT * INTO v_msg FROM public.channel_message
+      WHERE workspace_id = p_workspace_id AND fingerprint = v_fp;
       v_skipped := v_skipped + 1;
-      CONTINUE;
     END IF;
-    v_created := v_created + 1;
 
     FOR v_p IN SELECT * FROM jsonb_array_elements(coalesce(v_m -> 'placements', '[]'::jsonb)) LOOP
       v_state := coalesce(v_p ->> 'state', 'placed');
@@ -554,24 +615,32 @@ BEGIN
       END IF;
 
       IF v_p ->> 'surface' = 'conversation' THEN
-        SELECT * INTO v_conv FROM public.conversation
-        WHERE id = nullif(v_p ->> 'conversation_id', '')::uuid AND workspace_id = p_workspace_id AND deleted_at IS NULL
-        FOR UPDATE;
-        IF v_conv.id IS NULL OR NOT (v_conv.id = ANY (v_ok_conv) OR public.has_permission(v_conv.project_id, 'edit:conversation')) THEN
-          RAISE EXCEPTION 'conversation not found' USING ERRCODE = '42501';
+        v_conv_id := nullif(v_p ->> 'conversation_id', '')::uuid;
+        IF v_conv_id IS NULL OR NOT v_conv_id = ANY (v_ok_conv) THEN
+          SELECT * INTO v_conv FROM public.conversation
+          WHERE id = v_conv_id AND workspace_id = p_workspace_id AND deleted_at IS NULL
+          FOR UPDATE;
+          IF v_conv.id IS NULL OR NOT public.has_permission(v_conv.project_id, 'edit:conversation') THEN
+            RAISE EXCEPTION 'conversation not found' USING ERRCODE = '42501';
+          END IF;
+          v_ok_conv := array_append(v_ok_conv, v_conv.id);
         END IF;
-        v_ok_conv := array_append(v_ok_conv, v_conv.id);
+        -- Ya colocado aquí: nada que hacer.
+        CONTINUE WHEN EXISTS (
+          SELECT 1 FROM public.message_placement mp
+          WHERE mp.message_id = v_msg.id AND mp.surface = 'conversation'
+            AND mp.conversation_id = v_conv_id AND mp.removed_at IS NULL);
         -- La marca de bolo, sólo un bolo de esa conversación.
         v_mark := nullif(v_p ->> 'bolo_id', '')::uuid;
         IF v_mark IS NOT NULL AND NOT EXISTS (
-             SELECT 1 FROM public.bolo b WHERE b.id = v_mark AND b.conversation_id = v_conv.id AND b.deleted_at IS NULL) THEN
+             SELECT 1 FROM public.bolo b WHERE b.id = v_mark AND b.conversation_id = v_conv_id AND b.deleted_at IS NULL) THEN
           v_mark := NULL;
         END IF;
 
         INSERT INTO public.message_placement (
           workspace_id, message_id, owner_user_id, surface, conversation_id, bolo_id, state, reason, candidates, placed_by)
         VALUES (
-          p_workspace_id, v_msg_id, v_caller, 'conversation', v_conv.id, v_mark, v_state, v_reason,
+          p_workspace_id, v_msg.id, v_msg.created_by, 'conversation', v_conv_id, v_mark, v_state, v_reason,
           CASE WHEN v_state = 'guess' AND jsonb_typeof(v_p -> 'candidates') = 'array'
                THEN ARRAY(SELECT x::uuid FROM jsonb_array_elements_text(v_p -> 'candidates') x LIMIT 20)
                ELSE '{}' END,
@@ -581,24 +650,18 @@ BEGIN
           workspace_id, conversation_id, occurred_at, kind, source, direction,
           body, participants, provenance, external_ref, metadata, created_by, channel_message_id
         ) VALUES (
-          p_workspace_id, v_conv.id, v_at, 'message', 'whatsapp',
-          CASE WHEN v_member.is_self THEN 'outbound' ELSE 'inbound' END::public.conversation_event_direction,
+          p_workspace_id, v_conv_id, v_msg.occurred_at, 'message', 'whatsapp', v_msg.direction,
           NULL, '[]'::jsonb,
           jsonb_build_object('connector', 'whatsapp_import'),
-          'wa:' || v_fp || '#' || v_conv.id::text,
+          'wa:' || v_fp || '#' || v_conv_id::text,
           jsonb_strip_nulls(jsonb_build_object(
             'via', 'whatsapp',
-            'chat_id', v_chat.id,
+            'chat_id', v_msg.chat_id,
             'placement', CASE WHEN v_state = 'guess' THEN 'guess' END,
             'bolo_id', v_mark)),
-          v_caller, v_msg_id
+          v_caller, v_msg.id
         )
         ON CONFLICT (workspace_id, source, external_ref) WHERE external_ref IS NOT NULL DO NOTHING;
-
-        UPDATE public.conversation
-        SET last_contacted_at = greatest(coalesce(last_contacted_at, v_at), v_at),
-            first_contacted_at = coalesce(first_contacted_at, v_at)
-        WHERE id = v_conv.id;
 
       ELSIF v_p ->> 'surface' = 'bolo_team' THEN
         SELECT * INTO v_bolo FROM public.bolo
@@ -608,9 +671,12 @@ BEGIN
           RAISE EXCEPTION 'bolo not found' USING ERRCODE = '42501';
         END IF;
         v_ok_bolo := array_append(v_ok_bolo, v_bolo.id);
+        CONTINUE WHEN EXISTS (
+          SELECT 1 FROM public.message_placement mp
+          WHERE mp.message_id = v_msg.id AND mp.surface = 'bolo_team' AND mp.removed_at IS NULL);
         INSERT INTO public.message_placement (
           workspace_id, message_id, owner_user_id, surface, bolo_id, state, reason, placed_by)
-        VALUES (p_workspace_id, v_msg_id, v_caller, 'bolo_team', v_bolo.id, 'placed', v_reason, v_caller);
+        VALUES (p_workspace_id, v_msg.id, v_msg.created_by, 'bolo_team', v_bolo.id, 'placed', v_reason, v_caller);
       ELSE
         RAISE EXCEPTION 'placement surface must be conversation or bolo_team' USING ERRCODE = '22023';
       END IF;
@@ -618,11 +684,24 @@ BEGIN
     END LOOP;
   END LOOP;
 
+  -- El último contacto, una vez por conversación: lo que esta tanda colocó.
+  UPDATE public.conversation c
+  SET last_contacted_at = greatest(coalesce(c.last_contacted_at, e.last_at), e.last_at),
+      first_contacted_at = coalesce(c.first_contacted_at, e.first_at)
+  FROM (
+    SELECT ce.conversation_id, max(ce.occurred_at) AS last_at, min(ce.occurred_at) AS first_at
+    FROM public.conversation_event ce
+    WHERE ce.conversation_id = ANY (v_ok_conv) AND ce.source = 'whatsapp'
+      AND ce.created_by = v_caller AND ce.recorded_at = v_now
+    GROUP BY ce.conversation_id
+  ) e
+  WHERE c.id = e.conversation_id;
+
   RETURN jsonb_build_object('chat_id', v_chat.id, 'created', v_created, 'skipped', v_skipped, 'placed', v_placed);
 END;
 $$;
 COMMENT ON FUNCTION public.import_whatsapp_chat(uuid, jsonb, jsonb, jsonb) IS
-  'ADR-189: writes one batch (up to 1000) of an imported WhatsApp chat. Idempotent by fingerprint. Placing in a conversation needs edit:conversation and writes its conversation_event (source whatsapp, no body, channel_message_id); placing on a bolo board needs reading it (like post_message). A direct chat with a workspace member is refused. Owner, admin or member.';
+  'ADR-189: writes one batch (up to 1000) of an imported WhatsApp chat. The fingerprint is computed here (private.whatsapp_fingerprint); a message already stored is not stored again, but the caller''s placements are written. Placing in a conversation needs edit:conversation and writes its conversation_event (source whatsapp, no body, channel_message_id); placing on a bolo board needs reading it (like post_message). A chat with one other person who is on the team is refused whatever its kind; a direct chat needs that person to be someone. last_contacted_at moves once per conversation and batch. Owner, admin or member.';
 REVOKE ALL ON FUNCTION public.import_whatsapp_chat(uuid, jsonb, jsonb, jsonb) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.import_whatsapp_chat(uuid, jsonb, jsonb, jsonb) TO authenticated;
 

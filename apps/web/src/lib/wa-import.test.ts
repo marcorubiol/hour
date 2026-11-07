@@ -27,6 +27,9 @@ const persons = [
   { person_id: 'elena2', name: 'Elena Soto', phone: null, team: false },
 ];
 
+/** `private.whatsapp_fingerprint` en la base (Supabase local con la migración), para los valores del test de abajo. */
+const DB_FP = '248bff2f073390798a09daa2319ff2f3';
+
 const ctx: ImportContext = {
   me: { person_id: null, name: 'Marco Rubiol' },
   persons,
@@ -94,18 +97,26 @@ describe('guessSelf', () => {
 describe('fingerprints', () => {
   it('same minute and text: the same print, the order tells twins apart', async () => {
     const att = [{ type: 'photo' as const, name: null }];
-    const [a, b, c] = await fingerprints([
+    const [a, b, c] = (await fingerprints([
       { at: '2026-03-13T17:02:15.000Z', body: 'ok', attachments: [] },
       { at: '2026-03-13T17:02:40.000Z', body: 'ok', attachments: [] },
       { at: '2026-03-13T17:03:00.000Z', body: '', attachments: att },
-    ]);
+    ])).map((x) => x.fp);
     expect(a).toMatch(/^[0-9a-f]{32}$/);
     expect(a).not.toBe(b);
     // Omitido en un teléfono y adjunto en el otro: el mismo mensaje.
     const [d] = await fingerprints([{ at: '2026-03-13T17:03:00.000Z', body: ' ', attachments: [{ type: 'photo' as const, name: 'IMG.jpg' }] }]);
-    expect(c).toBe(d);
+    expect(c).toBe(d.fp);
     const [again] = await fingerprints([{ at: '2026-03-13T17:02:59.000Z', body: 'ok', attachments: [] }]);
-    expect(again).toBe(a);
+    expect(again).toEqual({ fp: a, n: 1 });
+  });
+  it('matches private.whatsapp_fingerprint in the database (values computed there)', async () => {
+    // SELECT private.whatsapp_fingerprint('2026-03-13T17:02:15Z', 'Hola  Elena\n', 'photo', 2)
+    const [, second] = await fingerprints([
+      { at: '2026-03-13T17:02:15.000Z', body: 'Hola  Elena\n', attachments: [{ type: 'photo', name: null }] },
+      { at: '2026-03-13T17:02:40.000Z', body: 'Hola Elena', attachments: [{ type: 'photo', name: 'x.jpg' }] },
+    ]);
+    expect(second).toEqual({ fp: DB_FP, n: 2 });
   });
   it('the content key ignores spacing and file names', () => {
     expect(contentKey(' Hola\n  Elena ', [{ type: 'photo', name: 'x.jpg' }])).toBe(contentKey('Hola Elena', [{ type: 'photo', name: null }]));
@@ -155,7 +166,7 @@ describe('candidates and proposals (ADR-188 § 4)', () => {
 });
 
 function msg(local: string, author: string, body: string, known = false): PreparedMessage {
-  return { local, seconds: true, author, body, attachments: [], edited: false, at: new Date(`${local}Z`).toISOString(), fp: `fp-${local}-${author}`, known };
+  return { local, seconds: true, author, body, attachments: [], edited: false, at: new Date(`${local}Z`).toISOString(), fp: `fp-${local}-${author}`, n: 1, known };
 }
 
 describe('planBursts, summarize and payloadOf', () => {

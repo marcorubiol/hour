@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { envReady, limitedEnvReady, login, pgGet, pgRpc, requireEnv, requireLimitedEnv, serviceDelete } from './_helpers';
 
@@ -17,7 +18,10 @@ import { envReady, limitedEnvReady, login, pgGet, pgRpc, requireEnv, requireLimi
  * - lo leen quien lo importó y la audiencia de la conversación; un miembro
  *   sin Converses no ve ni el mensaje ni el chat;
  * - lo que no tiene sitio sólo lo ve quien lo importó;
- * - un chat 1 a 1 con alguien del equipo no entra, y nada en el futuro.
+ * - la huella la calcula la base (la de aquí, `serverFp`, debe coincidir);
+ * - un chat con una sola persona más que es del equipo no entra, sea cual sea
+ *   `kind`; un chat directo pide que esa persona sea alguien; nada en el
+ *   futuro; como mucho 4 colocaciones por mensaje.
  *
  * Fixture: una conversación propia en `playwright` / `zzz-difusion`, que se
  * borra al final. La API no borra chats ni mensajes (fase 1): con la clave de
@@ -31,13 +35,21 @@ const NOWHERE = '00000000-0000-4000-8000-000000000000';
 const FIXTURE_EMAIL = 'zzz-rls-whatsapp@hour.test';
 const FIXTURE_NAME = 'ZZZ RLS WhatsApp Fixture';
 
-/** Una huella de 32 hex, distinta por pasada y por número. */
-const fp = (n: number) =>
-  Array.from(`${RUN}-${n}-wa-import-fingerprint`)
-    .map((c) => c.charCodeAt(0).toString(16))
-    .join('')
-    .padEnd(32, '0')
+/**
+ * La huella como la calcula la base (`private.whatsapp_fingerprint`): minuto
+ * UTC, texto (NFC, espacios ASCII juntados), tipos de lo adjunto y orden.
+ */
+const serverFp = (at: string, body: string, n = 1, types = '') =>
+  createHash('sha256')
+    .update(`${at.slice(0, 16)}|${body.normalize('NFC').replace(/[ \t\n\v\f\r]+/g, ' ').replace(/^ +| +$/g, '')}|${types}|${n}`)
+    .digest('hex')
     .slice(0, 32);
+
+/** Un instante fijo por número en esta pasada (minutos distintos). */
+const BASE = Date.now() - 60 * 60_000;
+const atOf = (n: number) => new Date(BASE + n * 60_000).toISOString();
+const bodyOf = (n: number) => `ZZZ ${RUN} message ${n}`;
+const fp = (n: number) => serverFp(atOf(n), bodyOf(n));
 
 interface ImportResult {
   chat_id: string;
@@ -69,10 +81,10 @@ describe.skipIf(!envReady())('WhatsApp import (ADR-189)', () => {
     });
 
   const msg = (n: number, label: string, placements: unknown[], extra: Record<string, unknown> = {}) => ({
-    fp: fp(n),
-    at: new Date(Date.now() - (10 - n) * 60_000).toISOString(),
+    n: 1,
+    at: atOf(n),
     label,
-    body: `ZZZ ${RUN} message ${n}`,
+    body: bodyOf(n),
     placements,
     ...extra,
   });
@@ -223,13 +235,14 @@ describe.skipIf(!envReady())('WhatsApp import (ADR-189)', () => {
     expect(r.status).toBe(400);
   });
 
-  test('a direct chat with someone of your own team is refused', async () => {
+  test('a chat with only someone of your own team is refused, even sent as a group', async () => {
     const look = await pgRpc<{ team: string[] }>('whatsapp_import_lookup', jwt, { p_workspace_id: workspaceId, p_fingerprints: [] });
     const teammate = one(look.data)?.team[0];
     if (!teammate) return; // Sin nadie del equipo enlazado a su dossier no hay caso.
     const r = await pgRpc('import_whatsapp_chat', jwt, {
       p_workspace_id: workspaceId,
-      p_chat: { kind: 'direct', title: `ZZZ RLS team ${RUN}` },
+      // `group` no lo salva: con una sola persona más, la base lo mira igual.
+      p_chat: { kind: 'group', title: `ZZZ RLS team ${RUN}` },
       p_members: [
         { label: 'ZZZ Compañera', person_id: teammate, name: 'ZZZ Compañera', is_self: false },
         { label: 'ZZZ Yo', name: 'ZZZ Yo', is_self: true },
@@ -237,6 +250,22 @@ describe.skipIf(!envReady())('WhatsApp import (ADR-189)', () => {
       p_messages: [msg(6, 'ZZZ Compañera', [])],
     });
     expect(r.status).toBe(400);
+  });
+
+  test('a direct chat with an unnamed number, or a message with five placements, is refused', async () => {
+    const unnamed = await pgRpc('import_whatsapp_chat', jwt, {
+      p_workspace_id: workspaceId,
+      p_chat: { kind: 'direct', title: `ZZZ RLS unnamed ${RUN}` },
+      p_members: [
+        { label: '+34 600 000 000', name: '+34 600 000 000', is_self: false },
+        { label: 'ZZZ Yo', name: 'ZZZ Yo', is_self: true },
+      ],
+      p_messages: [msg(8, '+34 600 000 000', [])],
+    });
+    expect(unnamed.status).toBe(400);
+    const p = { surface: 'conversation', conversation_id: conversationId, state: 'placed', reason: 'person_choice' };
+    const caps = await importChat([msg(9, 'ZZZ Elena', [p, p, p, p, p])], jwt, { id: chatId });
+    expect(caps.status).toBe(400);
   });
 
   test.skipIf(!limitedEnvReady())('a member without Converses sees neither the messages nor the chat', async () => {

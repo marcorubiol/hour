@@ -5,23 +5,28 @@
 -- NULL), para que la historia de cada conversación no pierda lo importado: el
 -- evento sigue con `source='whatsapp'` y `metadata.via='whatsapp'`, como un
 -- WhatsApp apuntado. Lo que se pierde: lo importado sin sitio y lo colocado
--- en el tablón de un bolo (vivía sólo en `channel_message`), el quién es quién
--- recordado de cada chat y las filas de `audit_log` se quedan.
+-- en el tablón de un bolo (vivía sólo en `channel_message`) y el quién es quién
+-- recordado de cada chat. Las filas de `audit_log` de las colocaciones se quedan.
 --
 -- `conversation_feed` vuelve al cuerpo de 20261104170000 (misma firma de 19,
 -- CREATE OR REPLACE: conserva owner y grants).
 
 BEGIN;
 
+-- Sin auditar este UPDATE: `write_audit_conversation_event` sólo quita el
+-- cuerpo de un correo, y el de un WhatsApp acabaría copiado en `audit_log`.
+ALTER TABLE public.conversation_event DISABLE TRIGGER conversation_event_audit;
 UPDATE public.conversation_event e
 SET body = left(m.body, 20000)
 FROM public.channel_message m
 WHERE e.channel_message_id = m.id AND e.body IS NULL AND m.body IS NOT NULL;
+ALTER TABLE public.conversation_event ENABLE TRIGGER conversation_event_audit;
 
 DROP FUNCTION public.import_whatsapp_chat(uuid, jsonb, jsonb, jsonb);
 DROP FUNCTION public.whatsapp_import_context(uuid);
 DROP FUNCTION public.whatsapp_import_lookup(uuid, text[]);
 DROP FUNCTION private.bolo_days(uuid);
+DROP FUNCTION private.whatsapp_fingerprint(timestamptz, text, text, integer);
 
 DROP INDEX public.conversation_event_channel_message_idx;
 ALTER TABLE public.conversation_event DROP COLUMN channel_message_id;
