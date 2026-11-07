@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { envReady, limitedEnvReady, login, pgGet, pgRpc, requireEnv, requireLimitedEnv } from './_helpers';
+import { envReady, limitedEnvReady, login, pgGet, pgRpc, requireEnv, requireLimitedEnv, serviceDelete } from './_helpers';
 
 /**
  * ADR-189 · Importar un chat de WhatsApp (tarea 128), sobre el núcleo del
@@ -20,9 +20,10 @@ import { envReady, limitedEnvReady, login, pgGet, pgRpc, requireEnv, requireLimi
  * - un chat 1 a 1 con alguien del equipo no entra, y nada en el futuro.
  *
  * Fixture: una conversación propia en `playwright` / `zzz-difusion`, que se
- * borra al final. Los chats y mensajes de cada pasada se quedan (no hay
- * camino de borrado en la fase 1); se reconocen por la marca de la pasada en
- * el título y las huellas son nuevas cada vez. Nunca toca `muk-cia`.
+ * borra al final. La API no borra chats ni mensajes (fase 1): con la clave de
+ * servicio, el final borra los eventos de la fixture y los chats de la pasada
+ * (con sus mensajes y colocaciones), para que no se acumulen en `playwright`.
+ * Las huellas son nuevas cada pasada. Nunca toca `muk-cia`.
  * Va rojo contra un origen sin `20261108100000`.
  */
 const RUN = Date.now().toString(36);
@@ -123,7 +124,12 @@ describe.skipIf(!envReady())('WhatsApp import (ADR-189)', () => {
   });
 
   afterAll(async () => {
-    if (conversationId) await pgRpc('delete_conversation', jwt, { p_conversation_id: conversationId });
+    if (conversationId) {
+      await pgRpc('delete_conversation', jwt, { p_conversation_id: conversationId });
+      await serviceDelete('conversation_event', new URLSearchParams({ conversation_id: `eq.${conversationId}`, source: 'eq.whatsapp' }));
+    }
+    // El chat se lleva sus miembros, mensajes y colocaciones (ON DELETE CASCADE).
+    await serviceDelete('channel_chat', new URLSearchParams({ workspace_id: `eq.${workspaceId}`, title: `like.ZZZ RLS*${RUN}` }));
   });
 
   test('anon can neither look up nor import', async () => {
