@@ -466,6 +466,7 @@ export type Database = {
           source_note: string
           statement_language: string
           statement_text: string
+          statement_version: number
           status: Database["public"]["Enums"]["audience_import_status"]
           updated_at: string
           workspace_id: string
@@ -485,6 +486,7 @@ export type Database = {
           source_note: string
           statement_language: string
           statement_text: string
+          statement_version?: number
           status?: Database["public"]["Enums"]["audience_import_status"]
           updated_at?: string
           workspace_id: string
@@ -504,6 +506,7 @@ export type Database = {
           source_note?: string
           statement_language?: string
           statement_text?: string
+          statement_version?: number
           status?: Database["public"]["Enums"]["audience_import_status"]
           updated_at?: string
           workspace_id?: string
@@ -7079,6 +7082,7 @@ export type Database = {
           p_filename: string
           p_rows: Json
           p_source_note: string
+          p_statement_accepted?: boolean
           p_statement_language?: string
         }
         Returns: Json

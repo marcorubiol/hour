@@ -3047,7 +3047,7 @@
   "audience.import_relationship_hint": "If the venue or a ticketing site sold the tickets, the deal was with them, not you: this basis probably does not apply.",
   "audience.import_source": "Where does this list come from?",
   "audience.import_source_ph": "Our website form with a checkbox, 2022 to 2026",
-  "audience.import_statement_relationship": "They have been customers of {company}.",
+  "audience.import_statement_relationship": "They have been customers of {company}: they bought or hired directly from {company}, not from a venue or a ticketing service. I can prove these people have been customers of {company}.",
   "audience.import_go": "Import {n}",
   "audience.import_done": "{n} imported",
   "audience.import_review": "Awaiting review",

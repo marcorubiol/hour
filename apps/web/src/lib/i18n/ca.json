@@ -3047,7 +3047,7 @@
   "audience.import_relationship_hint": "Si les entrades les va vendre la sala o una ticketera, el tracte va ser amb elles, no amb vosaltres: probablement aquesta base no serveix.",
   "audience.import_source": "D'on surt aquesta llista?",
   "audience.import_source_ph": "Formulari del nostre web amb casella, del 2022 al 2026",
-  "audience.import_statement_relationship": "Han estat clients de {company}.",
+  "audience.import_statement_relationship": "Han estat clients de {company}: van comprar o contractar directament a {company}, no a una sala ni a una ticketera. Puc demostrar que aquestes persones han estat clients de {company}.",
   "audience.import_go": "Importar-ne {n}",
   "audience.import_done": "{n} importades",
   "audience.import_review": "Pendent de revisió",

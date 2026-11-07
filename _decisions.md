@@ -7220,3 +7220,27 @@ tarea 128) el sitio se elige al importar o compartir, con estas mismas reglas co
 WhatsApp (128) va detrás de este ADR. **Re-evaluar cuando** haya un segundo canal conectado y una temporada con dos
 proyectos vivos en las mismas salas: cuántas suposiciones se mueven, si el umbral de tanda aguanta, y si la regla 2b
 mete demasiado de lo personal.
+
+## [2026-11-08] ADR-191 · Importar al público: la declaración la exige la base y la de clientes dice «puedo demostrarlo» (105)
+
+**Contexto.** ADR-173 § 6 y plan del público § 3.6: una importación lleva una base declarada y la declaración
+guardada. En la fase 1, la casilla de la declaración vivía en la pantalla y en el endpoint (`statement_accepted`), pero
+`import_audience` no la recibía: una llamada directa a la RPC importaba sin aceptar nada. Y la declaración de clientes
+(`relationship`) era sólo «Han sido clientes de {compañía}», sin «puedo demostrarlo» y sin decir que el trato fue
+directo, que es lo que el plan marca como dudoso (si vendió la sala o una ticketera, LSSI 21.2 probablemente no aplica).
+
+**Decisión.**
+1. **La base exige la declaración**: `import_audience` lleva `p_statement_accepted boolean DEFAULT false` y sin `true`
+   no importa nada (22023), con las dos bases. La lectura conservadora de la tarea: la de consentimiento ya decía «puedo
+   demostrarlo» pero tampoco se comprobaba en la base.
+2. **Texto de clientes, versión 2**: «Han sido clientes de {compañía}: compraron o contrataron directamente a
+   {compañía}, no a una sala ni a una ticketera. Puedo demostrar que estas personas han sido clientes de {compañía}.»
+   (ca, en, fr en el mismo sentido). El de consentimiento no cambia.
+3. **Se guarda la versión**: `audience_import.statement_version` (1 las de antes, 2 desde esta migración), junto a lo que
+   ya había: quién (`declared_by`), cuándo (`declared_at`) y el texto exacto en su idioma (`statement_text`).
+4. Firma nueva: se borra la vieja en la misma migración (`20261108110000`) para no dejar sobrecarga.
+
+**Pendiente.** La redacción, para el abogado (plan § 3.7, puntos 2 y 4). Si cambia, sube `statement_version`.
+
+**Cómo se revierte.** `build/runbooks/rollback-20261108-audience-import-statement.sql`, después de desplegar la app
+anterior.

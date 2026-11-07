@@ -410,6 +410,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: el público y sus invit
       p_rows: [{ email: SIM('t2i') }],
       p_basis_kind: 'consent',
       p_source_note: 'Formulario de la web con casilla, 2025',
+      p_statement_accepted: true,
     });
     expect(imp.status, imp.error).toBe(200);
     const inv = await invitation({ audience: listId });
@@ -641,7 +642,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: el público y sus invit
       ['set_audience_status', { p_id: listId, p_status: 'closed' }],
       ['regenerate_audience_form_key', { p_id: listId }],
       ['add_audience_subscription', { p_audience_id: listId, p_address: SIM('anon'), p_name: null, p_language: null }],
-      ['import_audience', { p_audience_id: listId, p_filename: 'x.csv', p_rows: [], p_basis_kind: 'consent', p_source_note: 'xxxxxxxxxxxx', p_statement_language: 'es' }],
+      ['import_audience', { p_audience_id: listId, p_filename: 'x.csv', p_rows: [], p_basis_kind: 'consent', p_source_note: 'xxxxxxxxxxxx', p_statement_language: 'es', p_statement_accepted: true }],
       ['unsubscribe_audience_subscription', { p_id: FAKE_ID }],
       ['erase_audience_subscription', { p_id: FAKE_ID }],
       ['audience_consent_proof', { p_subscription_id: FAKE_ID }],
@@ -1028,6 +1029,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: el público y sus invit
         p_rows: [{ email: SIM('ir') }],
         p_basis_kind: 'relationship',
         p_source_note: 'Compradores de la taquilla propia, 2025',
+        p_statement_accepted: true,
       });
       expect(imp.status, imp.error).toBe(200);
       expect(imp.data).toMatchObject({ status: 'review' });
@@ -1090,12 +1092,21 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: el público y sus invit
             p_basis_kind: 'consent',
             p_source_note: 'Formulario de nuestra web con casilla, 2024 a 2026',
             p_statement_language: 'es',
+            p_statement_accepted: true,
             ...extra,
           },
         );
       expect((await call({ p_basis_kind: null })).status).toBe(400);
       expect((await call({ p_basis_kind: 'generic' })).status).toBe(400);
       expect((await call({ p_source_note: 'web' })).status).toBe(400);
+      // La declaración la exige la base, no sólo la pantalla (105, ADR-191): con las dos bases.
+      for (const basis of ['consent', 'relationship']) {
+        expect((await call({ p_basis_kind: basis, p_statement_accepted: false })).status, `${basis} sin aceptar`).toBe(400);
+        expect((await call({ p_basis_kind: basis, p_statement_accepted: null })).status, `${basis} aceptada a null`).toBe(400);
+        expect((await call({ p_basis_kind: basis, p_statement_accepted: undefined })).status, `${basis} sin el parámetro`).toBe(400);
+      }
+      const none = await pgGet('audience_import', adminJwt, new URLSearchParams({ audience_id: `eq.${listId}`, filename: 'eq.lista.csv', select: 'id' }));
+      expect(none.rows, 'ninguna declaración sin aceptar dejó importación').toEqual([]);
 
       // Una persona de baja en la lista: la importación no la vuelve a apuntar.
       const unsub = await pgRpc<{ subscription_id: string }[]>('add_audience_subscription', adminJwt, {
@@ -1124,6 +1135,15 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: el público y sus invit
         new URLSearchParams({ audience_id: `eq.${listId}`, address: `eq.${SIM('i1')}`, select: 'status,source,basis_kind' }),
       );
       expect(imported.rows).toEqual([{ status: 'confirmed', source: 'import', basis_kind: 'consent' }]);
+      // Quién, cuándo, el texto exacto y su versión.
+      const declared = await pgGet<{ declared_by: string; declared_at: string; statement_text: string; statement_version: number }>(
+        'audience_import',
+        adminJwt,
+        new URLSearchParams({ id: `eq.${first.data!.import_id}`, select: 'declared_by,declared_at,statement_text,statement_version' }),
+      );
+      expect(declared.rows[0]).toMatchObject({ declared_by: String(decodeJwt(adminJwt).sub), statement_version: 2 });
+      expect(declared.rows[0].declared_at).toBeTruthy();
+      expect(declared.rows[0].statement_text).toMatch(/Puedo demostrar que estas personas lo aceptaron\.$/);
 
       // La revisión es de Marco (máquina), no de una persona.
       expect((await pgRpc('audience_approve_import', adminJwt, { p_import_id: first.data!.import_id })).status).toBeGreaterThanOrEqual(400);
@@ -1137,9 +1157,17 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: el público y sus invit
       expect(twice.status, 'ya no espera revisión').toBe(400);
 
       // Con una aprobada en el espacio, la siguiente ya no espera.
-      const second = await call({ p_rows: [{ email: SIM('i2') }] });
+      const second = await call({ p_rows: [{ email: SIM('i2') }], p_basis_kind: 'relationship' });
       expect(second.status, second.error).toBe(200);
       expect(second.data).toMatchObject({ status: 'done', imported_count: 1 });
+      // La de clientes: trato directo y «puedo demostrarlo» (105).
+      const rel = await pgGet<{ statement_text: string; statement_version: number }>(
+        'audience_import',
+        adminJwt,
+        new URLSearchParams({ id: `eq.${second.data!.import_id}`, select: 'statement_text,statement_version' }),
+      );
+      expect(rel.rows[0].statement_version).toBe(2);
+      expect(rel.rows[0].statement_text).toMatch(/directamente a .+, no a una sala ni a una ticketera\. Puedo demostrar que estas personas han sido clientes de /);
     });
 
     test('12 y 13 · profesionales: sin base no_basis, con base la suya y la identidad de la difusión; una dirección en los dos orígenes sale como profesional si el profesional sale, y como público si no', async () => {
@@ -1427,7 +1455,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: el público y sus invit
         ['set_audience_status', { p_id: listId, p_status: 'closed' }],
         ['regenerate_audience_form_key', { p_id: listId }],
         ['add_audience_subscription', { p_audience_id: listId, p_address: SIM('ajena') }],
-        ['import_audience', { p_audience_id: listId, p_filename: 'x.csv', p_rows: [{ email: SIM('ajena') }], p_basis_kind: 'consent', p_source_note: 'Una fuente ajena cualquiera' }],
+        ['import_audience', { p_audience_id: listId, p_filename: 'x.csv', p_rows: [{ email: SIM('ajena') }], p_basis_kind: 'consent', p_source_note: 'Una fuente ajena cualquiera', p_statement_accepted: true }],
         ['unsubscribe_audience_subscription', { p_id: subId }],
         ['erase_audience_subscription', { p_id: subId }],
         ['audience_consent_proof', { p_subscription_id: subId }],

@@ -5,6 +5,7 @@
  * La base y la fuente son obligatorias, y la declaración aceptada también:
  * sin ella, 400 aquí y la base ni se llama. `import_audience` salta y cuenta
  * lo que no entra; la primera importación del espacio queda en revisión.
+ * La base también exige la declaración (`p_statement_accepted`, 105, ADR-191).
  */
 
 import type { RequestHandler } from './$types';
@@ -24,6 +25,7 @@ export const POST: RequestHandler = (event) =>
       p_basis_kind: body.basis_kind,
       p_source_note: body.source_note,
       p_statement_language: body.statement_language,
+      p_statement_accepted: body.statement_accepted,
     });
     return jsonNoStore(r.data[0] ?? null);
   });

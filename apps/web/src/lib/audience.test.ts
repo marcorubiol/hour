@@ -97,16 +97,34 @@ describe('enlaces del formulario (plan § 3.2)', () => {
 
 describe('la declaración aceptada es la que guarda la base (plan § 3.6)', () => {
   const sql = readFileSync(
-    join(import.meta.dirname, '..', '..', '..', '..', 'supabase', 'migrations', '20261102180100_audience.sql'),
+    // La versión vigente de import_audience (105, ADR-191).
+    join(import.meta.dirname, '..', '..', '..', '..', 'supabase', 'migrations', '20261108110000_audience_import_statement.sql'),
     'utf8',
   );
+  const dicts = [es, ca, en, fr] as Record<string, string>[];
   test('cada idioma y cada base, palabra por palabra en import_audience', () => {
-    for (const dict of [es, ca, en, fr] as Record<string, string>[]) {
+    for (const dict of dicts) {
       for (const key of ['audience.import_statement_consent', 'audience.import_statement_relationship']) {
-        const asSql = dict[key].replace(/'/g, "''").replace('{company}', "' || v_company || '");
+        const asSql = dict[key].replace(/'/g, "''").replaceAll('{company}', "' || v_company || '");
         expect(sql, `${key}: ${dict[key]}`).toContain(asSql);
       }
     }
+  });
+  test('las dos declaraciones dicen «puedo demostrarlo» y la de clientes, que el trato fue directo (105)', () => {
+    const prove: Record<string, RegExp> = { es: /Puedo demostrar/, ca: /Puc demostrar/, en: /I can prove/, fr: /Je peux prouver/ };
+    const direct: Record<string, RegExp> = { es: /directamente/, ca: /directament/, en: /directly/, fr: /directement/ };
+    ([['es', es], ['ca', ca], ['en', en], ['fr', fr]] as [string, Record<string, string>][]).forEach(([l, dict]) => {
+      expect(dict['audience.import_statement_consent']).toMatch(prove[l]);
+      expect(dict['audience.import_statement_relationship']).toMatch(prove[l]);
+      expect(dict['audience.import_statement_relationship']).toMatch(direct[l]);
+    });
+  });
+  test('la base exige la declaración aceptada y guarda su versión', () => {
+    expect(sql).toMatch(/p_statement_accepted boolean DEFAULT false/);
+    expect(sql).toMatch(/IF p_statement_accepted IS NOT TRUE THEN\s+RAISE EXCEPTION/);
+    expect(sql).toMatch(/statement_version, declared_by, row_count, status/);
+    // Sin sobrecarga: la firma vieja se borra antes de crear la nueva.
+    expect(sql).toContain('DROP FUNCTION public.import_audience(uuid, text, jsonb, public.mail_basis_kind, text, text);');
   });
 });
 
