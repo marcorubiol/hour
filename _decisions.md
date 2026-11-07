@@ -7135,3 +7135,88 @@ ninguno en dos conversaciones).
 
 **Cómo se revierte.** `build/runbooks/rollback-20261107-mail-ingest-placement.sql` vuelve a la definición anterior; los
 eventos que entraron entre medias se quedan donde están.
+
+## [2026-11-07] ADR-188 · Dónde va cada mensaje: guardar una vez, colocar en cero o más sitios (comms, todos los canales; tarea 126)
+
+**Contexto.** Marco, 07-11: «cada persona está atada a diferentes shows, eso significa que cada mensaje tiene que
+estar donde toca; quizá hay mensajes que no están en ningún sitio o algunos mensajes que están en dos bolos». Un
+mensaje llega a una persona, no a un show, y una persona es contacto de varias conversaciones (ADR-102: la
+conversación es con la organización, por proyecto). Hasta el ADR-187 el correo entraba copiado en todas las
+conversaciones donde la contraparte era contacto, y lo que no tocaba a ninguna se tiraba. Con WhatsApp, Telegram y SMS
+eso no aguanta: más volumen, chats sin asunto ni hilo, canales personales. Diseño y boceto en el carril de colocación
+(https://claude.ai/artifact/HqxFwoaN5ir7tsjAqohYH5); Marco cerró las cuatro preguntas el 07-11 (1a, 2b, 3a, 4a).
+El ADR-187 ya aplica este diseño al correo.
+
+**Decisión (Marco, 2026-11-07; sin construir salvo el ADR-187).**
+1. **El mensaje se guarda una vez** (`channel_message`), con su canal, su chat y sus partes; su remitente se resuelve
+   a una persona del espacio por `person_handle` (correo, número, id), o queda «número sin nombre». El cuerpo no se
+   copia por sitio.
+2. **Cero o más colocaciones** (`message_placement`), en dos superficies: en una conversación, con marca de bolo
+   opcional, y en el tablón de un bolo, para grupos atados al bolo. **La marca de bolo no amplía la audiencia**: lo que
+   dice la programadora no sale en el tablón del técnico. Dos bolos de la misma conversación son un sitio con dos
+   marcas, y el mensaje sale una vez. La colocación en una conversación es su `conversation_event` (sin cuerpo,
+   apuntando al mensaje): quien lee el registro (turno, «se enfría», `conversation_feed`) no cambia.
+3. **Sin sitio no es un sitio.** Un mensaje sin colocación viva sale en la ficha de su persona, como vista; nada
+   cuelga de la persona (ADR-092 intacto). No pregunta.
+4. **Reglas, en orden:** (1) hilo o tanda: hereda las colocaciones de lo que sigue; (2) chat atado: va donde está
+   atado; (3) un solo candidato (contacto en esa fecha de una sola conversación viva): va ahí; (4) ningún candidato:
+   sin sitio; (5) dos o más: a la de actividad más reciente, como suposición. Las cuatro primeras son deterministas.
+5. **Lo dudoso se ve ya, como suposición, y «Por colocar» pide confirmarlo** (Marco, 1a). Cuenta para el turno desde
+   que llega: una respuesta de la sala no espera escondida. Confirmar no cambia nada; mover lo cambia de sitio. La
+   sugerencia de la tarjeta sale primero de una regla barata (proyecto, ciudad o fecha de un bolo nombrados) y, si no
+   decide, de un modelo pequeño (del orden de céntimos al mes por compañía). «Por colocar» es un chip con cifra en la
+   cabecera de Conversaciones, solo cuando hay algo; no va al Desk. Al confirmar un chat, Hour ofrece atarlo («lo de
+   Elena, a Kosmos hasta el 15 de marzo»).
+6. **Se coloca la tanda, no el mensaje:** las respuestas siguen a su hilo de correo; en un chat directo, los mensajes
+   a menos de 3 horas entre sí van juntos (umbral a ajustar con el uso).
+7. **Marca de bolo solo si es segura** (Marco, 3a): sola cuando la conversación tiene un único bolo en curso (del
+   trato a la última función, más el margen de ADR-142); con varios, sin marca y sin preguntar. Se añade a mano desde
+   el mensaje.
+8. **Canales personales: entra todo chat con alguien que ya es contacto en Hour, como el correo** (Marco, 2b; amplía
+   ADR-099 §3 a todos los canales). Un chat se saca con «No es de trabajo», y desde entonces no se lee. Un chat 1 a 1
+   con alguien del propio espacio no se lee nunca: lo de dentro se habla en Hour. Un número desconocido en un chat
+   directo no se guarda (Hour solo dice cuántos hay, con «Añadir contacto»); en un grupo que ya entra, sí, como «número
+   sin nombre».
+9. **Un grupo atado a un bolo caduca con el bolo** (Marco, 4a), como la membresía de ADR-142 §2: al acabar el día
+   siguiente a la última función, lo nuevo del grupo vuelve a preguntar «¿a qué bolo?».
+10. **Ver = dueño del canal + audiencia de cada sitio donde está colocado.** Un mensaje sin sitio de un canal personal
+    solo lo ve su dueño; de uno común, quien lo comparte. Colocar es publicar: pide editar el sitio y ser dueño del
+    mensaje o compartir su canal.
+11. **Mover queda en `audit_log`** (quién, qué mensaje, de dónde a dónde, motivo; nunca el cuerpo, ADR-100). Quitar la
+    última colocación lo devuelve a sin sitio; nunca se borra.
+
+**Esquema en borrador** (sin migración): `channel_account` (generaliza `mail_account`: tipo, alcance personal o común,
+dueño), `channel_chat` (id externo, directo o grupo o hilo de correo, `excluded` por «No es de trabajo», atadura a una
+conversación o a un bolo con caducidad), `person_handle` (persona, tipo, valor normalizado, único por espacio),
+`channel_message` (una vez; idempotente por cuenta e id externo), `channel_message_party` (de, para, cc, miembro de
+grupo) y `message_placement` (mensaje, conversación o bolo, superficie, estado `placed | guess`, motivo, candidatos,
+quién y cuándo, retirada). Detalle en la nota del carril (`colocacion-mensajes-diseno.md`).
+
+**Qué enmienda.** ADR-102, añadido 4 (fechas e hilo pasan a ser las reglas 1 y 3, para todos los canales); ADR-099 §3
+(el filtro «solo contactos» vale para todos los canales, con «No es de trabajo» como salida por chat). Generaliza el
+ADR-187 (correo) a todos los canales. No cambian, se apoyan: ADR-083, ADR-092, ADR-093, ADR-099 §4-5, ADR-100,
+ADR-106, ADR-142, ADR-186.
+
+**Rechazado.**
+- *El mensaje vive con la persona y cada conversación lo filtra* (sin colocaciones): no puede decir «esto no es de
+  aquí», repite cada mensaje en todas las conversaciones de la persona y no controla la audiencia mensaje a mensaje.
+- *Duplicar el mensaje por sitio* (el correo antes del ADR-187).
+- *Lo dudoso espera sin publicarse* (1b): si nadie mira la bandeja, el mensaje no existe.
+- *Solo entra el chat que alguien declara de trabajo* (2a): Marco prefiere la regla del correo.
+- *Preguntar la marca de bolo siempre* (3b) y *atar un grupo para siempre* (4b).
+- *«Por colocar» dentro de cada ficha, sin bandeja*: lo que espera es invisible desde la lista.
+- *Una «colocación en persona»*: haría de la persona un contenedor (ADR-092).
+
+**Consecuencia sabida (2b).** Con un canal personal, un chat con alguien que es contacto y también amigo entra entero,
+y si esa persona solo está en una conversación, sus mensajes se colocan solos ahí, a la vista de quien lee esa
+conversación. La salida es «No es de trabajo» en el chat y quitar lo colocado; conviene que la primera vez que un chat
+personal entra, Hour lo diga una vez.
+
+**Supuestos abiertos (carril de captura).** Leer chats sueltos y no la cuenta entera; ids estables de chat y de
+mensaje; traer historial de un contacto nuevo. En el primer escalón (importar el «Exportar chat», compartir a Hour,
+tarea 128) el sitio se elige al importar o compartir, con estas mismas reglas como propuesta.
+
+**Status.** Decidido, sin construir salvo el correo (ADR-187). Comms sigue tras el portón de Marco; la captura de
+WhatsApp (128) va detrás de este ADR. **Re-evaluar cuando** haya un segundo canal conectado y una temporada con dos
+proyectos vivos en las mismas salas: cuántas suposiciones se mueven, si el umbral de tanda aguanta, y si la regla 2b
+mete demasiado de lo personal.
