@@ -13,7 +13,7 @@ import { mailTemplate } from './mail-template';
 
 const WS = '11111111-2222-3333-4444-555555555555';
 const OTHER = '99999999-2222-3333-4444-555555555555';
-const IMG = `/m/ws/${WS}/mail/abc-1200x1500.jpg`;
+const IMG = `/m/ws/${WS}/mail/a1b2c3d4e5f60718-1200x1500.jpg`;
 
 const content = (blocks: Record<string, unknown>[]): DesignContent => ({ blocks, settings: { width: 600 } });
 
@@ -60,7 +60,7 @@ describe('checkDesign', () => {
 
   test('las imágenes son de Hour y de este espacio', () => {
     expect(checkDesign(content([{ type: 'image', src: 'https://evil.test/x.png' }]), WS)).toBe('design_image');
-    expect(checkDesign(content([{ type: 'image', src: `/m/ws/${OTHER}/mail/x-1x1.png` }]), WS)).toBe('design_image');
+    expect(checkDesign(content([{ type: 'image', src: `/m/ws/${OTHER}/mail/c3c3c3c3-1x1.png` }]), WS)).toBe('design_image');
     expect(checkDesign(content([{ type: 'image', src: '' }]), WS)).toBeNull();
     expect(
       checkDesign(content([{ type: 'section', children: [], backgroundImage: { url: 'https://evil.test/bg.jpg' } }]), WS),

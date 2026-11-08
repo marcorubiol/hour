@@ -7352,18 +7352,24 @@ persona.
    comprueba que quien llama edita el envío (`canEditMailout`), lee el cuerpo con tope (400 KB) antes de parsearlo y:
    - comprueba el JSON (`mail-design.ts`): solo los bloques de la paleta, sección sin secciones dentro, imágenes de
      Hour y de ese espacio, enlaces http(s) o mailto; 200 KB **en bytes UTF-8**, que es lo que cuenta la base;
-   - limpia el HTML con un parser y listas blancas (`mail-sanitize.ts`, htmlparser2 8.0.2, que ya traía cheerio):
-     etiquetas, atributos y esquemas por lista; enlaces decodificados y sin espacios ni controles antes de mirar el
-     esquema; `<img>` y fondos solo de `/m/ws/<espacio>/mail/`; CSS sin `@import`, sin `url()` de fuera, sin
-     `expression`, `behavior` ni `position`, sin comentarios ni barras; comentarios solo los condicionales de Outlook
-     de MJML, y solo con las etiquetas, atributos y textos que MJML pone dentro. La salida se escribe entera, bien
-     formada, con un solo `<head>` y un solo `<body>`. Los casos de la revisión de seguridad del 2026-11-08 son tests;
-     el HTML real de MJML con todos los bloques (fixture) sale sin perder nada y limpiarlo dos veces da lo mismo;
+   - limpia el HTML con un parser y listas blancas, nunca listas negras (`mail-sanitize.ts`, htmlparser2 8.0.2, que
+     ya traía cheerio): etiquetas, atributos y esquemas por lista; enlaces decodificados y sin espacios ni controles
+     antes de mirar el esquema; `<img>`, fondos y enlaces a imágenes solo de `/m/ws/<espacio>/mail/<sha>-<w>x<h>.<ext>`
+     de ese espacio; el CSS, en hojas y en línea, con un analizador propio (reglas, `@media`, declaraciones) y una
+     lista blanca de propiedades (las que emite MJML para la paleta: sin `zoom`, `transform`, `clip`, `filter`,
+     `max-height`, `overflow`, `position`, `text-indent`, `opacity`, `visibility` ni `mso-hide`), `url()` leído con un
+     tokenizador y solo de Hour, sin `image-set`, `var()` ni ninguna otra regla `@`, y ningún `<` en la salida;
+     comentarios solo los condicionales de Outlook de MJML, con lo de dentro por lista, emparejados y con sus etiquetas
+     equilibradas en todo el documento (si no cuadran se quitan todos). La salida se escribe entera, bien formada, con
+     un solo `<head>` y un solo `<body>`. Los casos de las dos revisiones de seguridad del 2026-11-08 son tests; el
+     HTML real de MJML con todos los bloques (fixture) sale sin perder nada y limpiarlo dos veces da lo mismo;
    - **deriva el texto plano del JSON**, que pasa a ser el `body` del envío. Así el texto plano, los campos que faltan,
      el historial de la conversación y la puerta de `queue_mailout` salen de lo mismo que en una carta. Un diseño sin
      texto no se guarda;
    - y una sola RPC de máquina, `set_mailout_design` (solo service_role; con el JWT no se puede llamar), guarda diseño,
-     HTML y `body` en una sentencia, antes de `update_mailout`: no queda el cuerpo cambiado sin el diseño.
+     HTML y `body` en una sentencia, antes de `update_mailout`: si este falla, queda sin guardar el asunto o el
+     remitente (el guardado automático lo reintenta), nunca un diseño con otro texto. Un PATCH sin `design` con un
+     diseño puesto vuelve a sacar el `body` del diseño guardado. El cuerpo de la petición se lee del flujo con tope.
    El servidor no comprueba que el HTML corresponda al JSON: con la lista blanca y las imágenes acotadas, un HTML que
    no corresponda solo puede enseñar lo que su autor podía escribir igual, y lo que queda en la conversación sale del
    JSON. **Al montar cada correo se vuelve a limpiar** lo que diga la base (`mailTemplate`, una vez por envío en la
@@ -7371,11 +7377,12 @@ persona.
 5. **El pie lo pone Hour**, fuera del diseño y sin poder quitarse: la compañía siempre (no hay firma), por qué le
    llega, la baja con palabras y la privacidad (`footerTable`, el mismo pie que la carta), más `lang` del idioma del
    texto y el texto de previsualización. Va como último hijo de `<body>`, después del HTML ya limpio y cerrado, así
-   que no puede quedar dentro de un comentario ni de un elemento abierto; sus elementos, `<html>` y `<body>` llevan
-   en línea `display`, `visibility`, `opacity`, alturas y recortes con `!important`, que ganan a cualquier
-   `!important` de una hoja. Queda fuera de alcance que una hoja del diseño tape el pie con otro elemento por encima
-   (sin `position` no tiene cómo) o lo empuje con márgenes negativos. Sin firma ni bloque de la función: el diseño dice lo suyo, con los campos
-   `{obra}`, `{fecha}`, `{hora}`…
+   que no puede quedar dentro de un comentario ni de un elemento abierto; sobre una banda blanca propia, con clases
+   `hour-foot-…` que el diseño no puede llevar ni nombrar en un selector, y con cada elemento fijado en línea con
+   `!important` (que gana a cualquier `!important` de una hoja) en tamaño y alto de letra, color, `display`,
+   `visibility`, alturas, recortes, `zoom`, `transform` y sangrías; `<html>` y `<body>` igual. Medido en Chromium:
+   los ataques de la segunda revisión dejan el pie como sin ellos. Arranca a 10 px, el margen de los bloques de
+   Templatical, alineado con el texto (Marco, 2026-11-08).
 6. **Oscuro:** el diseño no lleva la hoja de ADR-180; cada cliente pinta los colores de quien lo diseñó a su manera.
 7. **Datos** (migración `20261108120000_mailout_design`, preparada, sin aplicar): `mailout.design` (jsonb, la fuente)
    y `mailout.design_html` (lo compilado y limpio, con los campos sin poner), las dos o ninguna; `set_mailout_design`

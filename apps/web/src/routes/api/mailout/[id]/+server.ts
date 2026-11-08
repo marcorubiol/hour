@@ -12,7 +12,11 @@
  *     el envío; se comprueba el JSON, se limpia el HTML y se deriva el texto,
  *     y `set_mailout_design` (solo service_role) guarda diseño y `body` en una
  *     sentencia, antes de `update_mailout`. null vuelve a la carta y deja el
- *     texto. El cuerpo se lee con tope (400 KB) antes de parsearlo.
+ *     texto. Sin `design` y con un diseño puesto, el `body` se vuelve a
+ *     sacar del diseño guardado. El cuerpo se lee del flujo con tope (400 KB).
+ *     Orden: diseño y `body` juntos primero; si después falla `update_mailout`,
+ *     queda sin guardar el asunto o el remitente, nunca un diseño con otro texto,
+ *     y el guardado automático lo reintenta.
  */
 
 import type { RequestHandler } from './$types';
@@ -22,7 +26,7 @@ import * as v from 'valibot';
 import { canEditMailout, loadDetail, MAILOUT_PG_CODES, mailoutRoute, readMailout } from '$lib/server/mailout/route';
 import { MailoutDbError, serviceRpc } from '$lib/server/mailout/db';
 import { MailoutUpdateSchema } from '$lib/mailout';
-import { byteLength, DESIGN_REQUEST_MAX_BYTES, prepareDesign } from '$lib/mail-design';
+import { DESIGN_REQUEST_MAX_BYTES, designText, prepareDesign } from '$lib/mail-design';
 
 export const GET: RequestHandler = (event) =>
   mailoutRoute(event, 'GET /api/mailout/[id]', async ({ env, jwt, id }) => {
@@ -34,8 +38,27 @@ export const GET: RequestHandler = (event) =>
 async function readCapped(request: Request): Promise<v.InferOutput<typeof MailoutUpdateSchema> | Response> {
   const declared = Number(request.headers.get('content-length') ?? '0');
   if (declared > DESIGN_REQUEST_MAX_BYTES) return jsonNoStore({ error: 'design_too_large' }, 413);
-  const raw = await request.text();
-  if (byteLength(raw) > DESIGN_REQUEST_MAX_BYTES) return jsonNoStore({ error: 'design_too_large' }, 413);
+  // Read the stream with the ceiling: without Content-Length, text() would read it all first.
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  const reader = request.body?.getReader();
+  while (reader) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > DESIGN_REQUEST_MAX_BYTES) {
+      await reader.cancel();
+      return jsonNoStore({ error: 'design_too_large' }, 413);
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let at = 0;
+  for (const c of chunks) {
+    bytes.set(c, at);
+    at += c.byteLength;
+  }
+  const raw = new TextDecoder().decode(bytes);
   let json: unknown;
   try {
     json = JSON.parse(raw);
@@ -68,7 +91,12 @@ export const PATCH: RequestHandler = (event) =>
     // The design (ADR-190): only through here. Who edits it, the JSON, the
     // cleaning and the derived text are checked by the Worker; then one
     // machine RPC writes design and body together (the JWT cannot call it).
-    if (body.design !== undefined) {
+    if (body.design === undefined) {
+      // While a design is on, the body is its text: a PATCH without the design
+      // (the subject changed, say) cannot leave another one.
+      const mailout = await readMailout(env, jwt, id);
+      if (mailout?.design) body.body = designText(mailout.design);
+    } else {
       const mailout = await readMailout(env, jwt, id);
       if (!mailout || !(await canEditMailout(env, jwt, mailout)).edit) return jsonNoStore({ error: 'not_found' }, 404);
       if (mailout.status !== 'draft') return jsonNoStore({ error: 'invalid_state' }, 409);

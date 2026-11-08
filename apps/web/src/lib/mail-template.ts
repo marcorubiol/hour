@@ -264,14 +264,16 @@ function footerRows(parts: Pick<MailParts, 'footer' | 'footerHtml'>): string[] {
 
 /**
  * El pie en su propia caja centrada de 600 px, para ponerlo al final de un
- * HTML que no es la carta (el diseño de una invitación, ADR-190).
+ * HTML que no es la carta (el diseño de una invitación, ADR-190). `gutter`,
+ * el margen a cada lado: en un diseño, el de sus bloques, para que el pie
+ * arranque donde arranca el texto.
  */
-export function footerTable(parts: Pick<MailParts, 'footer' | 'footerHtml'>): string {
+export function footerTable(parts: Pick<MailParts, 'footer' | 'footerHtml'>, gutter = 16): string {
   const rows = footerRows(parts);
   if (!rows.length) return '';
   return [
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">',
-    '<tr><td align="center" style="padding:0 16px 24px;">',
+    `<tr><td align="center" style="padding:0 ${gutter}px 24px;">`,
     `<table role="presentation" width="${WIDTH}" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:${WIDTH}px;">`,
     ...rows,
     '</table>',

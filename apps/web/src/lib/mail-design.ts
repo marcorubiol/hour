@@ -215,34 +215,76 @@ export interface DesignedParts {
 /**
  * Lo que blinda lo que pone Hour frente a la hoja del diseño (ADR-190): un
  * estilo en línea con `!important` gana a cualquier `!important` de una hoja,
- * así que el pie y sus antepasados (`html`, `body`) no se pueden esconder,
- * encoger ni recortar desde el CSS del diseño.
+ * y la hoja ya solo admite propiedades de una lista (`mail-sanitize.ts`). Así
+ * el pie y sus antepasados (`html`, `body`) no se pueden esconder, encoger,
+ * recortar ni teñir del color del fondo.
  */
-const SHOWN = 'display:block!important;visibility:visible!important;opacity:1!important;height:auto!important;max-height:none!important;overflow:visible!important;transform:none!important;filter:none!important;clip-path:none!important';
+const SHOWN = 'display:block!important;visibility:visible!important;opacity:1!important;height:auto!important;max-height:none!important;overflow:visible!important;zoom:1!important;transform:none!important;filter:none!important;clip-path:none!important';
+
+/** The margin of Templatical's blocks (10px each side): the footer starts where the text does. */
+const DESIGN_GUTTER = 10;
 
 const FOOT_DISPLAY: Record<string, string> = { table: 'table', tbody: 'table-row-group', tr: 'table-row', td: 'table-cell', p: 'block', a: 'inline' };
+const FOOT_INK = '#767676';
+const FOOT_PAPER = '#ffffff';
 
-/** Every element of the footer: its own declarations made `!important`, and shown. */
+/** What every footer element is pinned to, unless it states its own value. */
+function footerPins(tag: string): [string, string][] {
+  const pins: [string, string][] = [
+    ['display', FOOT_DISPLAY[tag]],
+    ['visibility', 'visible'],
+    ['opacity', '1'],
+    ['position', 'static'],
+    ['max-height', 'none'],
+    ['max-width', 'none'],
+    ['min-width', '0'],
+    ['overflow', 'visible'],
+    ['zoom', '1'],
+    ['transform', 'none'],
+    ['filter', 'none'],
+    ['clip', 'auto'],
+    ['clip-path', 'none'],
+    ['text-indent', '0'],
+    ['letter-spacing', 'normal'],
+    ['word-spacing', 'normal'],
+    ['white-space', 'normal'],
+    ['text-transform', 'none'],
+    ['direction', 'ltr'],
+    ['margin', tag === 'p' ? '0 0 4px' : '0'],
+  ];
+  if (tag !== 'tr' && tag !== 'tbody') pins.push(['color', FOOT_INK]);
+  if (tag === 'p' || tag === 'a' || tag === 'td') pins.push(['font-size', '12px'], ['line-height', '1.5']);
+  if (tag === 'table') pins.push(['background-color', FOOT_PAPER]);
+  return pins;
+}
+
+/** Every element of the footer: its own declarations made `!important`, and pinned; its classes, Hour's. */
 function hardenFooter(html: string): string {
   return html.replace(/<([a-z]+)([^>]*)>/g, (whole, tag: string, attrs: string) => {
-    const display = FOOT_DISPLAY[tag];
-    if (!display) return whole;
-    const own = /\sstyle="([^"]*)"/.exec(attrs)?.[1] ?? '';
-    const decls = own
+    if (!FOOT_DISPLAY[tag]) return whole;
+    const own = (/\sstyle="([^"]*)"/.exec(attrs)?.[1] ?? '')
       .split(';')
       .map((d) => d.trim())
-      .filter(Boolean)
-      .map((d) => (/!important$/.test(d) ? d : `${d}!important`));
-    const style = [...decls, `display:${display}!important`, 'visibility:visible!important', 'opacity:1!important'].join(';');
-    return `<${tag}${attrs.replace(/\sstyle="[^"]*"/, '')} style="${style}">`;
+      .filter(Boolean);
+    const named = new Set(own.map((d) => d.split(':')[0].trim().toLowerCase()));
+    const decls = [
+      ...own.map((d) => (/!important$/.test(d) ? d : `${d}!important`)),
+      ...footerPins(tag)
+        .filter(([k]) => !named.has(k))
+        .map(([k, v]) => `${k}:${v}!important`),
+    ];
+    // Classes the design cannot name: the sanitizer drops any selector or class with `hour-`.
+    const rest = attrs.replace(/\sstyle="[^"]*"/, '').replace(/\sclass="m-([a-z]+)"/, ' class="hour-foot-$1"');
+    return `<${tag}${rest} style="${decls.join(';')}">`;
   });
 }
 
 /**
  * El HTML del diseño, limpio (`sanitizeDesignHtml`: un solo `<head>` y un
- * solo `<body>`, todo cerrado) y con los campos ya puestos y escapados, más
- * lo que pone Hour: `lang`, imágenes absolutas, texto de previsualización y
- * el pie como último hijo de `<body>`, fuera de todo lo del diseño.
+ * solo `<body>`, todo cerrado, sin `<` en el CSS ni en comentarios fuera de
+ * los de Outlook) y con los campos ya puestos y escapados, más lo que pone
+ * Hour: `lang`, imágenes absolutas, texto de previsualización y el pie como
+ * último hijo de `<body>`, fuera de todo lo del diseño.
  */
 export function designedHtml(html: string, parts: DesignedParts): string {
   const lang = escapeHtml(parts.language || 'es');
@@ -252,18 +294,19 @@ export function designedHtml(html: string, parts: DesignedParts): string {
     out = out.replace(/(\s(?:src|href|background)=")\/m\//g, `$1${origin}/m/`);
     out = out.replace(/(url\(\s*["']?)\/m\//gi, `$1${origin}/m/`);
   }
-  // The <html> tag is ours (the sanitizer writes it): set or replace lang.
+  // Anchored on what the sanitizer writes: the opening tags are the first ones,
+  // and `</head><body` appears once.
   out = out.replace(/^(<!doctype html>)?<html([^>]*)>/i, (_w, doctype: string | undefined, attrs: string) => {
     const rest = attrs.replace(/\slang="[^"]*"/, '');
     return `${doctype ?? ''}<html lang="${lang}"${rest} style="${SHOWN}">`;
   });
-  out = out.replace(/<body(\s+style="([^"]*)")?>/, (_w, _a: string, css: string | undefined) => {
-    const preheader = parts.preheader?.trim()
-      ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;font-size:1px;line-height:1px;">${escapeHtml(parts.preheader.trim())}</div>`
-      : '';
-    return `<body style="${css ? `${css};` : ''}${SHOWN};margin:0!important;padding:0!important">${preheader}`;
-  });
-  const footer = hardenFooter(footerTable({ footer: parts.footer, footerHtml: parts.footerHtml }));
+  const preheader = parts.preheader?.trim()
+    ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;font-size:1px;line-height:1px;">${escapeHtml(parts.preheader.trim())}</div>`
+    : '';
+  out = out.replace(/<\/head><body(?: style="([^"]*)")?>/, (_w, css: string | undefined) =>
+    `</head><body style="${css ? `${css};` : ''}${SHOWN};margin:0!important;padding:0!important">${preheader}`,
+  );
+  const footer = hardenFooter(footerTable({ footer: parts.footer, footerHtml: parts.footerHtml }, DESIGN_GUTTER));
   const at = out.lastIndexOf('</body>');
   return at < 0 ? `${out}${footer}` : `${out.slice(0, at)}${footer}${out.slice(at)}`;
 }
