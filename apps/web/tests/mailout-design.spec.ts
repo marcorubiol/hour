@@ -84,7 +84,7 @@ test.describe('designed invitation (ADR-190)', () => {
 
       // ── «Con diseño» abre el editor con la carta dentro ──
       const format = mo.getByTestId('mailout-format');
-      await format.getByText(/^(Designed|Con diseño|Amb disseny|Mis en page)$/).click();
+      await format.locator('label', { hasText: /Designed|Con diseño|Amb disseny|Mis en page/ }).click();
       const editor = page.getByTestId('mail-design-editor');
       await expect(editor).toBeVisible();
       const done = editor.getByRole('button', { name: /^(Done|Listo|Fet|Terminé)$/ });

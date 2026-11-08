@@ -69,17 +69,18 @@ describe.skipIf(!envReady())('note RLS (ADR-093)', () => {
 
   // Prefix-wide sweep (no run tag): a crashed run never reaches afterAll, and
   // every later run carries a different tag — same convention as task.test.ts.
-  async function sweepLeftovers() {
+  // A note is private: each user sweeps their own, so it takes that user's JWT.
+  async function sweepLeftovers(token: string) {
     const { rows } = await pgGet<NoteRow>(
       'note',
-      jwt,
+      token,
       new URLSearchParams({
         select: 'id',
         body: 'like.ZZZ RLS Note%',
         deleted_at: 'is.null',
       }),
     );
-    for (const row of rows) await pgRpc('delete_note', jwt, { p_note_id: row.id });
+    for (const row of rows) await pgRpc('delete_note', token, { p_note_id: row.id });
   }
 
   beforeAll(async () => {
@@ -94,12 +95,12 @@ describe.skipIf(!envReady())('note RLS (ADR-093)', () => {
     expect(rows.length, 'playwright workspace must be reachable').toBe(1);
     playwrightWsId = rows[0].id;
 
-    await sweepLeftovers();
+    await sweepLeftovers(jwt);
   });
 
   afterAll(async () => {
     if (!jwt) return;
-    await sweepLeftovers();
+    await sweepLeftovers(jwt);
   });
 
   test('create_note writes a private note with no anchor (the company)', async () => {
@@ -238,6 +239,13 @@ describe.skipIf(!envReady())('note RLS (ADR-093)', () => {
     beforeAll(async () => {
       const { email, password } = requireLimitedEnv();
       limitedJwt = await login(email, password);
+      // Its own leftovers from a crashed run: the owner's sweep cannot see them,
+      // and the law below reads every note this user can see.
+      await sweepLeftovers(limitedJwt);
+    });
+
+    afterAll(async () => {
+      if (limitedJwt) await sweepLeftovers(limitedJwt);
     });
 
     test('sees NOTHING of the other member notes — this is the law', async () => {
