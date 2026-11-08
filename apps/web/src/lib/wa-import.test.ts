@@ -27,7 +27,10 @@ const persons = [
   { person_id: 'elena2', name: 'Elena Soto', phone: null, team: false },
 ];
 
-/** `private.whatsapp_fingerprint` en la base (Supabase local con la migración), para los valores del test de abajo. */
+/**
+ * `private.whatsapp_fingerprint('2026-03-13T17:02:15Z', 'Hola Elena', 'photo', 2)`, el mismo valor en la Supabase
+ * local y en producción (comprobado el 2026-11-08): la huella del dispositivo es la de la base.
+ */
 const DB_FP = '248bff2f073390798a09daa2319ff2f3';
 
 const ctx: ImportContext = {

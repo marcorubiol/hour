@@ -28,7 +28,7 @@ const PERSON_EMAIL = 'zzz-e2e-whatsapp@hour.test';
 const ME = 'ZZZ Me';
 
 type Live = { id: string; person: { email: string | null } | null };
-type Ev = { source: string; direction: string | null; body: string | null; via: string | null; sender?: string | null };
+type Ev = { source: string; direction: string | null; body: string | null; via: string | null; sender?: string | null; occurred_at?: string };
 
 async function fixtureProjectId(page: Page): Promise<string> {
   return await page.evaluate(async (): Promise<string> => {
@@ -83,7 +83,12 @@ function exportText(mark: string): string {
   ].join('\n');
 }
 
-async function openSheet(page: Page, mark: string) {
+/**
+ * `text` se genera UNA vez por prueba (`exportText`): las horas salen de
+ * «ahora», y regenerarlo para la segunda importación movía los minutos, con
+ * huellas nuevas y «Import (3)» otra vez (rojo del 2026-11-08).
+ */
+async function openSheet(page: Page, text: string) {
   await page.goto('/h/conversations?importar');
   await waitForLoaded(page);
   const dialog = page.locator('dialog[open]');
@@ -91,7 +96,7 @@ async function openSheet(page: Page, mark: string) {
   await dialog.getByTestId('wa-import-file').setInputFiles({
     name: `WhatsApp Chat with ${NAME}.txt`,
     mimeType: 'text/plain',
-    buffer: Buffer.from(exportText(mark), 'utf8'),
+    buffer: Buffer.from(text, 'utf8'),
   });
   await expect(dialog.getByTestId('wa-import-summary')).toBeVisible();
   // The context round trip (who is who, what is known) on a cold origin.
@@ -121,9 +126,10 @@ test.describe('import a WhatsApp chat', () => {
       { projectId, name: NAME, email: PERSON_EMAIL },
     );
     const mark = Date.now().toString(36);
+    const text = exportText(mark);
 
     try {
-      const dialog = await openSheet(page, mark);
+      const dialog = await openSheet(page, text);
       await expect(dialog.getByLabel(`«${NAME}» is`)).toHaveValue(/.+/);
       const sites = dialog.getByTestId('wa-import-sites');
       await expect(sites).toContainText('messages: 3');
@@ -138,13 +144,16 @@ test.describe('import a WhatsApp chat', () => {
       const evs = (await events(page, created)).filter((e) => e.source === 'whatsapp');
       expect(evs.find((e) => e.body?.includes('dates in May'))).toMatchObject({ direction: 'inbound', via: 'whatsapp', sender: NAME });
       expect(evs.find((e) => e.body?.includes('12 to 16 May'))).toMatchObject({ direction: 'outbound' });
+      // Día/mes de un iPhone leído en un navegador en inglés: hoy, no el mes y el día cambiados.
+      const when = evs[0]?.occurred_at ?? '';
+      expect(Math.abs(Date.parse(when) - Date.now())).toBeLessThan(2 * 3_600_000);
 
       await page.goto(`/h/playwright/conversation/${created}`);
       await expect(page.getByTestId('thread-logged').filter({ hasText: 'dates in May' })).toContainText('imported');
       await expect(page.getByTestId('thread-attachments').first()).toContainText('Photo');
 
       // The same file again: everything is already there.
-      const again = await openSheet(page, mark);
+      const again = await openSheet(page, text);
       await expect(again.getByTestId('wa-import-known')).toContainText('Already in Hour: 3');
       await expect(again.getByText('Nothing new')).toBeVisible();
       await expect(again.getByRole('button', { name: 'Import (0)' })).toBeDisabled();
@@ -173,7 +182,7 @@ test.describe('import a WhatsApp chat', () => {
     const mark = `undo-${Date.now().toString(36)}`;
 
     try {
-      const dialog = await openSheet(page, mark);
+      const dialog = await openSheet(page, exportText(mark));
       await dialog.getByRole('button', { name: 'Import (3)' }).click();
       const toast = page.locator('.toast', { hasText: 'Messages imported: 3.' });
       await toast.getByRole('button', { name: 'Undo' }).click();

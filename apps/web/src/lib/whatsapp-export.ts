@@ -16,8 +16,9 @@
  * El export no trae zona horaria: la hora es la del teléfono, y aquí se deja
  * como hora local (`YYYY-MM-DDTHH:MM:SS`); quien importa la convierte con la
  * del dispositivo. Día/mes o mes/día se deduce del archivo entero: un primer
- * campo mayor que 12 lo decide; si nada lo decide, la pista (el idioma del
- * navegador) y la pantalla deja cambiarlo.
+ * campo mayor que 12 lo decide; si nada lo decide, el orden que deja las
+ * fechas en orden y el último mensaje más cerca de hoy (`bestAmbiguousOrder`;
+ * la pista del navegador sólo desempata), y la pantalla deja cambiarlo.
  *
  * Puro: ni red ni DOM. Los tests van con muestras inventadas por formato.
  */
@@ -110,6 +111,35 @@ export function detectOrder(heads: Pick<RawLine, 'a' | 'b'>[], hint: DateOrder =
   return { order: hint === 'ymd' ? 'dmy' : hint, ambiguous: heads.length > 0 };
 }
 
+/**
+ * Con un archivo que no decide (todas las fechas con día y mes ≤ 12), el
+ * orden que mejor encaja: el que deja las fechas en orden (un chat no va
+ * hacia atrás) y, si los dos lo hacen, el que no acaba en el futuro y deja el
+ * último mensaje más cerca de hoy (un chat se exporta cuando se usa). Sólo si
+ * nada de eso decide, la pista del navegador: el formato del export sigue la
+ * región del teléfono, no la del navegador.
+ */
+export function bestAmbiguousOrder(heads: RawLineDate[], hint: DateOrder, today: Date): DateOrder {
+  const score = (order: DateOrder) => {
+    const days = heads.map((h) => toLocal({ ...h, h: 12, mi: 0, s: 0, ampm: null }, order)?.slice(0, 10) ?? null);
+    if (days.some((d) => d === null)) return { ok: false, back: Infinity, future: true, gap: Infinity };
+    let back = 0;
+    for (let i = 1; i < days.length; i++) if (days[i]! < days[i - 1]!) back += 1;
+    const last = Date.parse(`${days[days.length - 1]}T12:00:00Z`);
+    const now = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate(), 12);
+    return { ok: true, back, future: last > now + 86_400_000, gap: Math.abs(now - last) };
+  };
+  const a = score('dmy');
+  const b = score('mdy');
+  if (a.ok !== b.ok) return a.ok ? 'dmy' : 'mdy';
+  if (a.back !== b.back) return a.back < b.back ? 'dmy' : 'mdy';
+  if (a.future !== b.future) return a.future ? 'mdy' : 'dmy';
+  if (a.gap !== b.gap) return a.gap < b.gap ? 'dmy' : 'mdy';
+  return hint === 'mdy' ? 'mdy' : 'dmy';
+}
+
+type RawLineDate = Pick<RawLine, 'a' | 'b' | 'c'>;
+
 /** La pista del orden por el idioma del navegador: mes primero sólo donde se escribe así. */
 export function orderHint(locale: string | undefined): DateOrder {
   return /^en-(US|PH|CA)\b/i.test(locale ?? '') ? 'mdy' : 'dmy';
@@ -117,7 +147,7 @@ export function orderHint(locale: string | undefined): DateOrder {
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
-function toLocal(x: RawLine, order: DateOrder): string | null {
+function toLocal(x: Pick<RawLine, 'a' | 'b' | 'c' | 'h' | 'mi' | 's' | 'ampm'>, order: DateOrder): string | null {
   let d: number, mo: number, y: number;
   if (order === 'ymd') [y, mo, d] = [x.a, x.b, x.c];
   else if (order === 'mdy') [mo, d, y] = [x.a, x.b, x.c];
@@ -203,7 +233,10 @@ function readBody(raw: string): { body: string; attachments: ExportAttachment[];
  * Lee el texto entero de un export. `hint`: el orden de fecha que se toma si
  * ninguna fecha lo decide; `order`: forzarlo (la pantalla deja cambiarlo).
  */
-export function parseWhatsAppExport(text: string, opts: { hint?: DateOrder; order?: DateOrder } = {}): ParsedExport {
+export function parseWhatsAppExport(
+  text: string,
+  opts: { hint?: DateOrder; order?: DateOrder; today?: Date } = {},
+): ParsedExport {
   const lines = text.replace(/^﻿/, '').replace(/\r\n?/g, '\n').split('\n');
   const entries: { head: RawLine; extra: string[] }[] = [];
   for (const line of lines) {
@@ -217,7 +250,9 @@ export function parseWhatsAppExport(text: string, opts: { hint?: DateOrder; orde
     entries.map((e) => e.head),
     opts.hint,
   );
-  const order = opts.order ?? detected.order;
+  const order =
+    opts.order ??
+    (detected.ambiguous ? bestAmbiguousOrder(entries.map((e) => e.head), opts.hint ?? 'dmy', opts.today ?? new Date()) : detected.order);
   const ios = entries.filter((e) => e.head.ios).length >= entries.length / 2;
 
   const messages: ExportMessage[] = [];

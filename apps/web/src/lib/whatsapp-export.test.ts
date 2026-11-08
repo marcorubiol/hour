@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { attachmentType, chatTitleFromFilename, detectOrder, orderHint, parseWhatsAppExport } from './whatsapp-export';
+import { attachmentType, bestAmbiguousOrder, chatTitleFromFilename, detectOrder, orderHint, parseWhatsAppExport } from './whatsapp-export';
 
 // Muestras inventadas: personas, salas y textos de ficción, con la forma exacta
 // de cada teléfono (marcas U+200E, espacio estrecho U+202F, «p. m.»).
@@ -162,9 +162,42 @@ describe('date order', () => {
 
   it('nothing decides: the hint, flagged as ambiguous', () => {
     expect(detectOrder([{ a: 3, b: 4 }], 'mdy')).toEqual({ order: 'mdy', ambiguous: true });
-    const p = parseWhatsAppExport('[3/4/26, 10:00:00] Elena: hola', { hint: 'dmy' });
+    // Visto el 19 de marzo, 3 abr sería futuro: gana 4 mar, diga lo que diga la pista.
+    const p = parseWhatsAppExport('[3/4/26, 10:00:00] Elena: hola', { hint: 'dmy', today: new Date(2026, 2, 19) });
     expect(p.ambiguous).toBe(true);
-    expect(p.messages[0].local).toBe('2026-04-03T10:00:00');
+    expect(p.messages[0].local).toBe('2026-03-04T10:00:00');
+    // Nada distingue (el mismo día en los dos órdenes): la pista.
+    expect(bestAmbiguousOrder([{ a: 5, b: 5, c: 26 }], 'mdy', new Date(2026, 5, 1))).toBe('mdy');
+  });
+
+  // El E2E del 2026-11-08: un iPhone en castellano exporta «8/11/26» y el
+  // navegador en inglés de EE. UU. lo leía como 11 de agosto. El export sigue
+  // la región del teléfono, no la del navegador.
+  it('ambiguous dates: the order that ends nearest today wins over the browser hint', () => {
+    const today = new Date(2026, 10, 8);
+    const p = parseWhatsAppExport('[8/11/26, 05:44:03] Elena: hola\n[8/11/26, 05:49:03] Marco: adiós', { hint: 'mdy', today });
+    expect(p.ambiguous).toBe(true);
+    expect(p.order).toBe('dmy');
+    expect(p.messages[0].local).toBe('2026-11-08T05:44:03');
+  });
+
+  it('ambiguous dates: the order that keeps the chat going forward wins', () => {
+    // 1/2, 5/2, 2/3: día/mes va 1 feb, 5 feb, 2 mar; mes/día iría 2 ene, 2 may, 3 feb (atrás).
+    const heads = [
+      { a: 1, b: 2, c: 26 },
+      { a: 5, b: 2, c: 26 },
+      { a: 2, b: 3, c: 26 },
+    ];
+    expect(bestAmbiguousOrder(heads, 'mdy', new Date(2026, 4, 1))).toBe('dmy');
+    // Y al revés: 2/1, 2/5, 3/2 sólo avanza como mes/día.
+    const us = heads.map((h) => ({ a: h.b, b: h.a, c: h.c }));
+    expect(bestAmbiguousOrder(us, 'dmy', new Date(2026, 4, 1))).toBe('mdy');
+  });
+
+  it('ambiguous dates: an order that ends in the future loses', () => {
+    // 3/10/26 visto el 5 de marzo: 3 oct sería futuro; 10 mar también. El 4 de octubre: 3 oct es ayer.
+    expect(bestAmbiguousOrder([{ a: 10, b: 3, c: 26 }], 'dmy', new Date(2026, 9, 4))).toBe('mdy');
+    expect(bestAmbiguousOrder([{ a: 3, b: 10, c: 26 }], 'mdy', new Date(2026, 9, 4))).toBe('dmy');
   });
 
   it('a forced order wins', () => {
