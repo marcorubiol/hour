@@ -221,6 +221,17 @@ export interface DesignedParts {
  */
 const SHOWN = 'display:block!important;visibility:visible!important;opacity:1!important;height:auto!important;max-height:none!important;overflow:visible!important;zoom:1!important;transform:none!important;filter:none!important;clip-path:none!important';
 
+/**
+ * MJML's reset, which the sanitizer no longer lets a design write (its sheet
+ * may only name MJML's and Templatical's classes, ADR-190): Hour puts it back,
+ * first in the head, so the design's classes still override it.
+ */
+const MJML_RESET =
+  '<style type="text/css">#outlook a{padding:0}body{margin:0;padding:0;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}' +
+  'table,td{border-collapse:collapse;mso-table-lspace:0pt;mso-table-rspace:0pt}' +
+  'img{border:0;height:auto;line-height:100%;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic}' +
+  'p{display:block;margin:13px 0}</style>';
+
 /** The margin of Templatical's blocks (10px each side): the footer starts where the text does. */
 const DESIGN_GUTTER = 10;
 
@@ -254,7 +265,10 @@ function footerPins(tag: string): [string, string][] {
   ];
   if (tag !== 'tr' && tag !== 'tbody') pins.push(['color', FOOT_INK]);
   if (tag === 'p' || tag === 'a' || tag === 'td') pins.push(['font-size', '12px'], ['line-height', '1.5']);
-  if (tag === 'table') pins.push(['background-color', FOOT_PAPER]);
+  // Paper only on the table; everything inside lets it show through.
+  pins.push(['background-color', tag === 'table' ? FOOT_PAPER : 'transparent'], ['background-image', 'none']);
+  pins.push(['outline', 'none'], ['height', 'auto'], ['min-height', '0']);
+  if (tag === 'table') pins.push(['border-spacing', '0'], ['border-collapse', 'collapse'], ['width', '100%']);
   return pins;
 }
 
@@ -267,9 +281,13 @@ function hardenFooter(html: string): string {
       .map((d) => d.trim())
       .filter(Boolean);
     const named = new Set(own.map((d) => d.split(':')[0].trim().toLowerCase()));
+    // No border of the design's making: the rule above the footer is its own border-top.
+    const borders: [string, string][] = named.has('border-top')
+      ? [['border-right', '0'], ['border-bottom', '0'], ['border-left', '0']]
+      : [['border', '0']];
     const decls = [
       ...own.map((d) => (/!important$/.test(d) ? d : `${d}!important`)),
-      ...footerPins(tag)
+      ...[...footerPins(tag), ...borders]
         .filter(([k]) => !named.has(k))
         .map(([k, v]) => `${k}:${v}!important`),
     ];
@@ -296,9 +314,9 @@ export function designedHtml(html: string, parts: DesignedParts): string {
   }
   // Anchored on what the sanitizer writes: the opening tags are the first ones,
   // and `</head><body` appears once.
-  out = out.replace(/^(<!doctype html>)?<html([^>]*)>/i, (_w, doctype: string | undefined, attrs: string) => {
+  out = out.replace(/^(<!doctype html>)?<html([^>]*)><head>/i, (_w, doctype: string | undefined, attrs: string) => {
     const rest = attrs.replace(/\slang="[^"]*"/, '');
-    return `${doctype ?? ''}<html lang="${lang}"${rest} style="${SHOWN}">`;
+    return `${doctype ?? ''}<html lang="${lang}"${rest} style="${SHOWN}"><head>${MJML_RESET}`;
   });
   const preheader = parts.preheader?.trim()
     ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;font-size:1px;line-height:1px;">${escapeHtml(parts.preheader.trim())}</div>`

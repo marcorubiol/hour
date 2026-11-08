@@ -54,7 +54,7 @@ describe('los casos de la revisión de seguridad (2026-11-08)', () => {
   });
 
   test('CSS: sin comentarios ni barras que partan url( o @import, sin position', () => {
-    const out = san('<style>.a{background:u/**/rl(https://x.test/a.png)} .b{background:\\75rl(https://x.test/b.png)} @im/**/port "https://x.test/c.css"; .c{position:fixed;color:red}</style>');
+    const out = san('<style>.a{background:u/**/rl(https://x.test/a.png)} .b{background:\\75rl(https://x.test/b.png)} @im/**/port "https://x.test/c.css"; .mj-c{position:fixed;color:red}</style>');
     expect(out).not.toMatch(/url\([^)]*x\.test/);
     expect(out).not.toMatch(/@import/);
     expect(out).not.toContain('position');
@@ -102,6 +102,65 @@ describe('la segunda verificación (2026-11-08, t1.mts)', () => {
 
   test('un solo <title>', () => {
     expect(san('<title>x</title><p>a</p><title>y</title>').match(/<title>/g)?.length).toBe(1);
+  });
+});
+
+describe('la tercera pasada (2026-11-08, t3.mts y t4.mts)', () => {
+  const img = `/m/ws/${WS}/mail/abcdef12-10x10.png`;
+
+  test.each([
+    ['tipo y combinadores', '<style>body>table:last-child td{background-color:#767676!important}</style>'],
+    ['a con fondo', '<style>a{background-color:#767676!important}</style>'],
+    ['p con fondo', '<style>p{background:#767676!important}</style>'],
+    ['td alto', '<style>body>table:last-child td{height:20000px!important}</style>'],
+    ['borde enorme', '<style>body>table:last-child>tbody>tr>td{border-left:5000px solid #fff!important}</style>'],
+    ['ancho mínimo', '<style>body>table:last-child{width:1px!important}</style>'],
+    ['todo con *', '<style>body>table:last-child *{font:0px/0 a!important}</style>'],
+    ['border-spacing', '<style>body>table:last-child table{border-spacing:0 9000px!important}</style>'],
+    ['clase inventada', '<style>div.k{outline:3000px solid #ffffff}.k{color:red}</style>'],
+  ])('la hoja no alcanza el pie: %s', (_name, sheet) => {
+    expect(san(sheet + '<p>x</p>')).not.toContain('<style');
+  });
+
+  test('una hoja con las clases de MJML se queda', () => {
+    expect(san('<style>.mj-column-per-50{width:50%!important;max-width:50%}</style>')).toContain('.mj-column-per-50{width:50%!important;max-width:50%}');
+  });
+
+  test('a solo admite color y subrayado', () => {
+    const out = san('<style>a{color:#ff0000;text-decoration:none;background-color:#767676;font-size:0}</style>');
+    expect(out).toContain('a{color:#ff0000;text-decoration:none}');
+  });
+
+  test.each([
+    ['outline enorme', 'outline:3000px solid #ffffff'],
+    ['margen negativo', 'margin-bottom:-5000px'],
+    ['alto enorme', 'height:30000px'],
+    ['borde enorme', 'border-left:5000px solid #fff'],
+    ['relleno enorme', 'padding:0 0 0 5000px'],
+    ['border-spacing enorme', 'border-spacing:0 9000px'],
+  ])('en línea, valores fuera de su tope: %s', (_name, css) => {
+    expect(san(`<div style="${css}">x</div>`)).toContain('<div>x</div>');
+  });
+
+  test.each([
+    [`<div style="background:url(${img}) , url('//evil.com/a.png')">a</div>`],
+    [`<div style="background:url(${img})url(//evil.com/x)">b</div>`],
+    [`<div style="background-image:image(&quot;//evil.com/x.png&quot;)">c</div>`],
+    [`<div style="background-image:cross-fade(url(${img}), &quot;//evil.com/y&quot; 50%)">d</div>`],
+    ['<style>@media screen{.mj-a{background:url(//evil.com/m)}} @font-face{src:url(//e)} @supports (x){.mj-c{color:red}}</style>'],
+    ['<style>.mj-a{color:"}";background:url(//evil.com/z)}</style>'],
+    [`<style>.mj-a{background:url(${img}?//evil.com)}</style>`],
+    [`<div style="background:url(&quot;${img}&quot;)x://y">e</div>`],
+    ['<style>.mj-a{font-family:"x://y"}</style><div style="cursor:url(//evil.com/c),auto">f</div>'],
+    ['<style>.mj-a{list-style:url(//evil.com/l)}</style>'],
+  ])('ninguna dirección de fuera: %s', (dirty) => {
+    expect(san(dirty)).not.toMatch(/evil|\/\/e\b|x:\/\//);
+  });
+
+  test('mso-* solo los que escribe MJML', () => {
+    const h = '<!--[if mso]><div style="mso-line-height-rule:exactly;mso-text-raise:-9999px;mso-font-width:1%"><![endif]--><p>x</p><!--[if mso]></div><![endif]-->';
+    expect(san(h)).not.toContain('<!--');
+    expect(san('<td style="mso-line-height-rule:exactly;mso-text-raise:-9999px">x</td>')).toContain('style="mso-line-height-rule:exactly"');
   });
 });
 
@@ -190,6 +249,23 @@ describe('el pie no se puede esconder (ADR-190)', () => {
     expect(foot).toContain('background-color:#ffffff!important');
     expect(foot).toContain('class="hour-foot-faint"');
     expect(foot).not.toContain('class="m-faint"');
+  });
+
+  test('el pie: fondo transparente dentro de su banda blanca, sin bordes salvo su raya, alto automático', () => {
+    const out = designedHtml(san('<p>x</p>'), footer);
+    const foot = out.slice(out.lastIndexOf('<table role="presentation" width="100%"'));
+    for (const tag of ['td', 'p', 'a']) {
+      const el = new RegExp(`<${tag} [^>]*>`).exec(foot)![0];
+      expect(el).toContain('background-color:transparent!important');
+      expect(el).toContain('height:auto!important');
+    }
+    expect(foot).toMatch(/<table [^>]*border-spacing:0!important/);
+    expect(foot).toMatch(/border-top:1px solid #e2e2e2!important[^"]*border-left:0!important/);
+  });
+
+  test('el reset de MJML lo pone Hour, el primero en la cabecera', () => {
+    const out = designedHtml(san('<p>x</p>'), footer);
+    expect(out).toMatch(/<head><style type="text\/css">#outlook a\{padding:0\}body\{margin:0/);
   });
 
   test('el pie arranca donde el texto de los bloques (10 px a cada lado)', () => {

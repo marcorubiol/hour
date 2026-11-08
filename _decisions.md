@@ -7355,10 +7355,13 @@ persona.
    - limpia el HTML con un parser y listas blancas, nunca listas negras (`mail-sanitize.ts`, htmlparser2 8.0.2, que
      ya traía cheerio): etiquetas, atributos y esquemas por lista; enlaces decodificados y sin espacios ni controles
      antes de mirar el esquema; `<img>`, fondos y enlaces a imágenes solo de `/m/ws/<espacio>/mail/<sha>-<w>x<h>.<ext>`
-     de ese espacio; el CSS, en hojas y en línea, con un analizador propio (reglas, `@media`, declaraciones) y una
-     lista blanca de propiedades (las que emite MJML para la paleta: sin `zoom`, `transform`, `clip`, `filter`,
-     `max-height`, `overflow`, `position`, `text-indent`, `opacity`, `visibility` ni `mso-hide`), `url()` leído con un
-     tokenizador y solo de Hour, sin `image-set`, `var()` ni ninguna otra regla `@`, y ningún `<` en la salida;
+     de ese espacio; el CSS, en hojas y en línea, con un analizador propio (reglas, `@media`, declaraciones):
+     selectores solo de las clases que escriben MJML y Templatical (`mj-…`, `tpl-…`) y `a` para el color de los
+     enlaces, sin tipos, combinadores ni `:last-child`, de modo que la hoja del diseño no puede alcanzar el pie (el
+     reset de MJML con `body`, `p`, `img`, `table` lo pone Hour como hoja propia); propiedades por lista, cada una con
+     sus valores acotados (márgenes y rellenos no negativos y con tope, `outline` solo `none`, bordes, alturas, anchos
+     y `border-spacing` con tope, `mso-*` por lista exacta); funciones solo `url()` de Hour y `rgb()`, comillas solo
+     en `url()` y en nombres de fuente, ningún `//` fuera de `url()` y ningún `<` en la salida;
      comentarios solo los condicionales de Outlook de MJML, con lo de dentro por lista, emparejados y con sus etiquetas
      equilibradas en todo el documento (si no cuadran se quitan todos). La salida se escribe entera, bien formada, con
      un solo `<head>` y un solo `<body>`. Los casos de las dos revisiones de seguridad del 2026-11-08 son tests; el
@@ -7380,8 +7383,10 @@ persona.
    que no puede quedar dentro de un comentario ni de un elemento abierto; sobre una banda blanca propia, con clases
    `hour-foot-…` que el diseño no puede llevar ni nombrar en un selector, y con cada elemento fijado en línea con
    `!important` (que gana a cualquier `!important` de una hoja) en tamaño y alto de letra, color, `display`,
-   `visibility`, alturas, recortes, `zoom`, `transform` y sangrías; `<html>` y `<body>` igual. Medido en Chromium:
-   los ataques de la segunda revisión dejan el pie como sin ellos. Arranca a 10 px, el margen de los bloques de
+   `visibility`, alturas, recortes, `zoom`, `transform`, sangrías, fondo (transparente dentro de la banda), bordes
+   (salvo su raya) y `border-spacing`; `<html>` y `<body>` igual. Medido en Chromium: los ataques de las revisiones
+   segunda y tercera (17 casos: tapar con `outline`, teñir el fondo, subirlo con márgenes negativos, alejarlo con
+   bordes, alturas o `border-spacing`) dejan el enlace de baja visible, del mismo tamaño y encima de todo. Arranca a 10 px, el margen de los bloques de
    Templatical, alineado con el texto (Marco, 2026-11-08).
 6. **Oscuro:** el diseño no lleva la hoja de ADR-180; cada cliente pinta los colores de quien lo diseñó a su manera.
 7. **Datos** (migración `20261108120000_mailout_design`, preparada, sin aplicar): `mailout.design` (jsonb, la fuente)

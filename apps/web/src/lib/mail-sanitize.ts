@@ -10,13 +10,15 @@
  *     ya decodificados y sin espacios ni controles; las imágenes, solo las de
  *     Hour (`/m/ws/<espacio>/mail/<sha>-<ancho>x<alto>.<ext>`, ADR-172).
  *   · CSS, en hojas y en `style=`: un pequeño analizador propio (reglas,
- *     `@media`, declaraciones) y una lista blanca de propiedades (las que
- *     emite MJML para los bloques de la paleta). Sin `zoom`, `transform`,
- *     `clip`, `filter`, `max-height`, `position`, `text-indent`, `opacity`,
- *     `visibility` ni `mso-hide`; `url()` leído con un tokenizador, solo de
- *     Hour; sin `image-set`, `var()`, `expression`; ningún `<` en la salida.
- *     Fuera de `@media`, ninguna regla `@`. Ningún selector que nombre las
- *     clases del pie (`hour-…`).
+ *     `@media`, declaraciones). Selectores: solo las clases que escriben MJML
+ *     y Templatical (`mj-…`, `tpl-…`), y `a` para el color de los enlaces;
+ *     nada de tipos, combinadores ni `:last-child`, así que una hoja no llega
+ *     al pie (el reset de MJML lo pone Hour). Propiedades: las que emite MJML
+ *     para la paleta, cada una con sus valores acotados (márgenes y rellenos no
+ *     negativos y con tope, `outline` solo `none`, bordes, alturas y anchos con
+ *     tope, `mso-*` por lista exacta). Funciones: solo `url()` de Hour y
+ *     `rgb()`; comillas solo en `url()` y en nombres de fuente; ningún `//`
+ *     fuera de `url()`; ningún `<` en la salida.
  *   · Comentarios: solo los condicionales de Outlook de MJML, con lo de
  *     dentro por lista, emparejados (`[if !mso]><!` con su `<![endif]`) y con
  *     sus etiquetas equilibradas en todo el documento. Si algo no cuadra se
@@ -92,27 +94,137 @@ function safeHref(raw: string, workspaceId: string | null): string | null {
   return isHourMailImage(url, workspaceId) ? url : null;
 }
 
-// ── CSS: lista blanca ─────────────────────────────────────────────────────
+// ── CSS: lista blanca de propiedades y de valores ──────────────────────────
 
-/** Lo que MJML y los bloques de la paleta escriben (medido sobre el fixture), y nada más. */
-const PROPS = new Set([
-  'background', 'background-color', 'background-image', 'background-position', 'background-repeat', 'background-size',
-  'border', 'border-collapse', 'border-spacing', 'border-radius', 'border-color', 'border-style', 'border-width',
-  'color', 'cursor', 'direction', 'display', 'font', 'font-family', 'font-size', 'font-style', 'font-weight',
-  'height', 'width', 'max-width', 'min-width', 'line-height', 'letter-spacing', 'list-style', 'list-style-type',
-  'margin', 'padding', 'outline', 'table-layout', 'text-align', 'text-decoration', 'text-transform', 'vertical-align',
-  'white-space', 'word-break', 'word-spacing', 'word-wrap', 'overflow-wrap', '-webkit-text-size-adjust',
-  '-ms-text-size-adjust', '-ms-interpolation-mode',
-]);
-
-function propOk(raw: string): boolean {
-  const p = raw.trim().toLowerCase();
-  if (PROPS.has(p)) return true;
-  if (/^(margin|padding)-(top|right|bottom|left)$/.test(p)) return true;
-  if (/^border-(top|right|bottom|left)(-(width|style|color))?$/.test(p)) return true;
-  if (/^border-(top|bottom)-(left|right)-radius$/.test(p)) return true;
-  return /^mso-[a-z-]+$/.test(p) && p !== 'mso-hide';
+/** A value split into tokens at spaces and commas, keeping `url(…)` and `rgb(…)` whole; null if unbalanced. */
+function tokens(value: string): string[] | null {
+  const out: string[] = [];
+  let cur = '';
+  let depth = 0;
+  let quote = '';
+  for (const c of value) {
+    if (quote) {
+      cur += c;
+      if (c === quote) quote = '';
+    } else if (c === '"' || c === "'") {
+      quote = c;
+      cur += c;
+    } else if (c === '(') {
+      depth++;
+      cur += c;
+    } else if (c === ')') {
+      if (--depth < 0) return null;
+      cur += c;
+    } else if (depth === 0 && (/\s/.test(c) || c === ',')) {
+      if (cur) out.push(cur);
+      cur = '';
+    } else cur += c;
+  }
+  if (quote || depth) return null;
+  if (cur) out.push(cur);
+  return out;
 }
+
+type Units = Partial<Record<'px' | '%' | 'em' | 'rem' | 'pt' | '', number>>;
+
+/** A length within its ceiling for its unit (non-negative unless `min` says otherwise). */
+function len(tok: string, units: Units, min = 0): boolean {
+  const m = /^(-?\d{1,5}(?:\.\d{1,4})?)(px|%|em|rem|pt)?$/.exec(tok);
+  if (!m) return false;
+  const n = Number(m[1]);
+  const max = units[(m[2] ?? '') as keyof Units];
+  if (max === undefined && !(n === 0 && !m[2])) return false;
+  return n >= min && n <= (max ?? 0);
+}
+
+function isColor(tok: string): boolean {
+  return (
+    /^#[0-9a-f]{3,8}$/i.test(tok) ||
+    /^rgba?\(\s*\d{1,3}%?\s*,\s*\d{1,3}%?\s*,\s*\d{1,3}%?\s*(,\s*(0|1|0?\.\d{1,3}))?\s*\)$/i.test(tok) ||
+    /^[a-z]{3,20}$/i.test(tok)
+  );
+}
+
+const oneOf = (...words: string[]) => (tok: string) => words.includes(tok.toLowerCase());
+const SPACING: Units = { px: 200, em: 10, rem: 10, '%': 100, pt: 150 };
+const SIZE: Units = { px: 1200, '%': 100, em: 60, rem: 60 };
+const BORDER_W: Units = { px: 10, pt: 8 };
+const RADIUS: Units = { px: 100, '%': 50 };
+const BORDER_STYLE = oneOf('none', 'hidden', 'solid', 'dashed', 'dotted', 'double');
+const POSITION = oneOf('left', 'right', 'top', 'bottom', 'center');
+const REPEAT = oneOf('repeat', 'no-repeat', 'repeat-x', 'repeat-y');
+
+type Check = (toks: string[], workspaceId: string | null) => boolean;
+const each =
+  (ok: (t: string) => boolean, maxCount = 4): Check =>
+  (toks) =>
+    toks.length >= 1 && toks.length <= maxCount && toks.every(ok);
+const word = (...words: string[]): Check => each(oneOf(...words), 1);
+
+const hourUrl = (tok: string, workspaceId: string | null): boolean => {
+  if (!/^url\(/i.test(tok)) return false;
+  const urls = urlsOf(tok);
+  return urls !== null && urls.length === 1 && isHourMailImage(urls[0].trim(), workspaceId);
+};
+
+const margin = each((t) => t === 'auto' || len(t, SPACING));
+const padding = each((t) => len(t, SPACING));
+const border: Check = each((t) => len(t, BORDER_W) || oneOf('thin', '0')(t) || BORDER_STYLE(t) || isColor(t), 3);
+const size = each((t) => oneOf('auto', 'inherit', 'none')(t) || len(t, SIZE), 1);
+
+/**
+ * Each property MJML writes for the palette, with the values it may take.
+ * Nothing negative, nothing huge: a design can neither cover the footer
+ * (no `outline`), nor push it out (no negative margins), nor stretch it.
+ */
+const CHECKS: Record<string, Check> = {
+  margin, 'margin-top': margin, 'margin-right': margin, 'margin-bottom': margin, 'margin-left': margin,
+  padding, 'padding-top': padding, 'padding-right': padding, 'padding-bottom': padding, 'padding-left': padding,
+  'mso-padding-alt': padding,
+  border, 'border-top': border, 'border-right': border, 'border-bottom': border, 'border-left': border,
+  'border-width': each((t) => len(t, BORDER_W)),
+  'border-style': each(BORDER_STYLE),
+  'border-color': each(isColor),
+  'border-radius': each((t) => len(t, RADIUS)),
+  'border-collapse': word('collapse', 'separate'),
+  'border-spacing': each((t) => len(t, BORDER_W), 2),
+  color: each(isColor, 1),
+  'background-color': each(isColor, 1),
+  background: (toks, ws) =>
+    toks.length <= 8 &&
+    toks.every((t) => isColor(t) || hourUrl(t, ws) || POSITION(t) || REPEAT(t) || oneOf('cover', 'contain', 'auto')(t) || t === '/' || len(t, SIZE)),
+  'background-image': (toks, ws) => toks.length === 1 && (toks[0] === 'none' || hourUrl(toks[0], ws)),
+  'background-position': each((t) => POSITION(t) || len(t, SIZE), 2),
+  'background-repeat': each(REPEAT, 1),
+  'background-size': each((t) => oneOf('cover', 'contain', 'auto')(t) || len(t, SIZE), 2),
+  cursor: word('auto', 'pointer', 'default'),
+  direction: word('ltr', 'rtl'),
+  display: word('block', 'inline', 'inline-block', 'none', 'table', 'table-cell', 'table-row', 'table-row-group', 'list-item'),
+  'font-size': each((t) => t === 'inherit' || len(t, { px: 96, pt: 72, em: 6, rem: 6, '%': 600 }), 1),
+  'font-weight': word('normal', 'bold', 'bolder', 'lighter', '100', '200', '300', '400', '500', '600', '700', '800', '900'),
+  'font-style': word('normal', 'italic', 'oblique'),
+  height: size, width: size, 'max-width': size, 'min-width': size,
+  'line-height': each((t) => oneOf('normal', 'inherit')(t) || len(t, { '': 4, px: 120, '%': 400, em: 4, rem: 4 }), 1),
+  'letter-spacing': each((t) => t === 'normal' || len(t, { px: 10, em: 1 }, -2), 1),
+  'word-spacing': each((t) => t === 'normal' || len(t, { px: 10, em: 1 }, -2), 1),
+  'list-style-type': word('disc', 'circle', 'square', 'decimal', 'none', 'lower-alpha', 'upper-alpha', 'lower-roman', 'upper-roman'),
+  outline: word('none', '0'),
+  'table-layout': word('auto', 'fixed'),
+  'text-align': word('left', 'right', 'center', 'justify', 'start', 'end'),
+  'text-decoration': each(oneOf('none', 'underline', 'line-through'), 2),
+  'text-transform': word('none', 'uppercase', 'lowercase', 'capitalize'),
+  'vertical-align': word('top', 'middle', 'bottom', 'baseline', 'text-top', 'text-bottom', 'sub', 'super'),
+  'white-space': word('normal', 'nowrap', 'pre', 'pre-wrap', 'pre-line'),
+  'word-break': word('normal', 'break-all', 'keep-all', 'break-word'),
+  'word-wrap': word('normal', 'break-word', 'anywhere'),
+  'overflow-wrap': word('normal', 'break-word', 'anywhere'),
+  '-webkit-text-size-adjust': word('100%', 'none', 'auto'),
+  '-ms-text-size-adjust': word('100%', 'none', 'auto'),
+  '-ms-interpolation-mode': word('bicubic', 'nearest-neighbor'),
+  'mso-line-height-rule': word('exactly', 'at-least'),
+  'mso-table-lspace': word('0pt', '0'),
+  'mso-table-rspace': word('0pt', '0'),
+};
 
 /** Every `url(…)` of a value, read char by char (quotes of either kind, unquoted); null if malformed. */
 function urlsOf(value: string): string[] | null {
@@ -144,26 +256,42 @@ function urlsOf(value: string): string[] | null {
   return out;
 }
 
-/** Una declaración `prop:valor` si cabe en la lista; si no, null. */
+/** Una declaración `prop:valor` si la propiedad está en la lista y el valor cabe en lo suyo; si no, null. */
 function cleanDecl(decl: string, workspaceId: string | null): string | null {
   const i = decl.indexOf(':');
   if (i <= 0) return null;
   const prop = decl.slice(0, i).trim().toLowerCase();
-  const value = decl.slice(i + 1).trim();
-  if (!value || !propOk(prop)) return null;
-  if (/[<>@\\{}]/.test(value) || /expression\s*\(|image-set|var\s*\(|element\s*\(|attr\s*\(|javascript|vbscript/i.test(value)) return null;
-  const urls = urlsOf(value);
-  if (urls === null || urls.some((u) => !isHourMailImage(u.trim(), workspaceId))) return null;
-  // An address anywhere else in a value is a url() in disguise.
-  if (/:\/\//.test(value.replace(/url\([^)]*\)/gi, ''))) return null;
-  return `${prop}:${value}`;
+  let value = decl.slice(i + 1).trim();
+  const important = /!\s*important$/i.test(value);
+  value = value.replace(/!\s*important$/i, '').trim();
+  if (!value || value.length > 300 || /[<>@\\{};]/.test(value)) return null;
+  if (prop === 'font-family') {
+    // Font names may be quoted; nothing else, and no address.
+    if (!/^[a-zA-Z0-9 ,'"-]+$/.test(value)) return null;
+    return `${prop}:${value}${important ? '!important' : ''}`;
+  }
+  const check = CHECKS[prop];
+  const toks = tokens(value);
+  if (!check || !toks) return null;
+  // Functions: only url() of Hour and rgb()/rgba(); quotes only inside url(); no `//` outside it.
+  for (const t of toks) {
+    // A url() token is that and nothing more: no text glued after its parenthesis.
+    if (/^url\(/i.test(t)) {
+      if (!/^url\([^()]*\)$/i.test(t)) return null;
+      continue;
+    }
+    if (/["']|\/\//.test(t)) return null;
+    if (t.includes('(') && !/^rgba?\(/i.test(t)) return null;
+  }
+  if (!check(toks, workspaceId)) return null;
+  return `${prop}:${value}${important ? '!important' : ''}`;
 }
 
-function cleanDecls(block: string, workspaceId: string | null): string {
+function cleanDecls(block: string, workspaceId: string | null, only?: Set<string>): string {
   return block
     .split(';')
     .map((d) => cleanDecl(d, workspaceId))
-    .filter((d): d is string => d !== null)
+    .filter((d): d is string => d !== null && (!only || only.has(d.slice(0, d.indexOf(':')))))
     .join(';');
 }
 
@@ -187,7 +315,22 @@ function closing(css: string, open: number): number {
   return -1;
 }
 
-const SELECTOR = /^[a-zA-Z0-9\s.#:,*>+~_()-]+$/;
+/**
+ * The selectors a design's sheet may use: the classes MJML and Templatical
+ * write (`mj-…`, `tpl-…`, `moz-text-html`), nothing else. No element types,
+ * no combinators over them, no `:last-child`: the sheet cannot reach the
+ * footer. MJML's own reset (`body`, `p`, `img`, `table, td`) Hour puts back
+ * itself (`MJML_RESET`, `mail-design.ts`).
+ */
+const SELECTOR_PART = [
+  /^\.mj-[a-z0-9-]{1,40}$/,
+  /^\.moz-text-html \.mj-[a-z0-9-]{1,40}$/,
+  /^(table|td)\.mj-[a-z0-9-]{1,40}$/,
+  /^\.tpl-[a-z0-9-]{1,40}$/,
+  /^#outlook a$/,
+];
+/** Links may take the design's colour, and nothing else, from a bare `a`. */
+const LINK_PROPS = new Set(['color', 'text-decoration']);
 const MEDIA = /^[a-zA-Z0-9\s():,.-]+$/;
 
 function cleanRules(css: string, workspaceId: string | null, nested: boolean): string {
@@ -202,7 +345,7 @@ function cleanRules(css: string, workspaceId: string | null, nested: boolean): s
     const inner = css.slice(open + 1, close);
     k = close + 1;
     // A statement at-rule (`@import …;`) before the rule goes with it.
-    const prelude = head.replace(/^[\s\S]*;/, '').trim();
+    const prelude = head.replace(/^[\s\S]*;/, '').trim().replace(/\s+/g, ' ');
     if (prelude.startsWith('@')) {
       const media = /^@media\s+([\s\S]+)$/i.exec(prelude);
       if (!nested && media && MEDIA.test(media[1])) {
@@ -211,9 +354,15 @@ function cleanRules(css: string, workspaceId: string | null, nested: boolean): s
       }
       continue;
     }
-    if (!prelude || !SELECTOR.test(prelude) || /hour-/i.test(prelude)) continue;
+    if (prelude === 'a') {
+      const decls = cleanDecls(inner, workspaceId, LINK_PROPS);
+      if (decls) out.push(`a{${decls}}`);
+      continue;
+    }
+    const parts = prelude.split(',').map((x) => x.trim());
+    if (!parts.length || !parts.every((x) => SELECTOR_PART.some((re) => re.test(x)))) continue;
     const decls = cleanDecls(inner, workspaceId);
-    if (decls) out.push(`${prelude}{${decls}}`);
+    if (decls) out.push(`${parts.join(', ')}{${decls}}`);
   }
   return out.join('\n');
 }
