@@ -418,10 +418,23 @@
   }
   let previewMode = $derived(previewChoice ?? (hasTemplate ? 'html' : 'text'));
   let frameHeight = $state(0);
+  let frameEl = $state<HTMLIFrameElement | null>(null);
   function fitFrame(e: Event) {
     const doc = (e.currentTarget as HTMLIFrameElement).contentDocument;
     frameHeight = doc?.documentElement.scrollHeight ?? 0;
   }
+  // A phone's width makes the mail taller without reloading the frame:
+  // measure again, or the footer is cut off.
+  $effect(() => {
+    void previewDevice;
+    const el = untrack(() => frameEl);
+    if (!el) return;
+    frameHeight = 0;
+    const raf = requestAnimationFrame(() => {
+      frameHeight = el.contentDocument?.documentElement.scrollHeight ?? 0;
+    });
+    return () => cancelAnimationFrame(raf);
+  });
 
   // ── Acciones ──────────────────────────────────────────────────────────
   function failed(err: unknown) {
@@ -898,6 +911,7 @@
                 sandbox="allow-same-origin"
                 srcdoc={previewScheme === 'dark' ? darkPreview(preview.html) : preview.html}
                 data-device={previewDevice}
+                bind:this={frameEl}
                 onload={fitFrame}
                 style:block-size={frameHeight ? `${frameHeight}px` : undefined}
               ></iframe>
