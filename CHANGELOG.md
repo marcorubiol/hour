@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Noviembre 2026 (en curso)
 
+- Invitaciones con diseño: al preparar una invitación eliges Carta o Con diseño, y el diseño se hace en un editor a pantalla completa con siete bloques (columnas, título, párrafo, imagen, botón, separador y espacio), los campos como fichas y la vista previa en móvil y oscuro. El texto plano sale del diseño y el pie con la baja lo pone Hour, sin que el diseño lo pueda tapar. La difusión a programación sigue siendo carta (99, ADR-190, 2026-11-08, `99d34c18`, migración `20261108120000`).
 - Importar WhatsApp: si las fechas del chat no dejan saber si van día/mes o mes/día (un «8/11/26» de un chat corto), gana el orden que deja las fechas avanzando y sin acabar en el futuro; el idioma del navegador sólo desempata. Antes, con el navegador en inglés de EE. UU., un chat de un iPhone en castellano se importaba con las fechas cambiadas (128, 2026-11-08, `fafd2bbf`).
 - Importar un chat de WhatsApp: el «Exportar chat» (.txt o .zip, del iPhone o de Android, también grupos) se lee en tu dispositivo y Hour coloca cada mensaje en su conversación o en el grupo del bolo; reimportar sólo trae lo nuevo, y lo importado mueve el turno y el último contacto sólo si es más reciente. Con un atajo «Mandar a Hour» en el iPhone (128, ADR-189, 2026-11-07, `eaeae4c5`, migración `20261108100000`).
 - Importar al público: la base exige la declaración, y la de clientes dice «puedo demostrarlo» (105, ADR-191, 2026-11-07, `eaeae4c5`, migración `20261108110000`).
