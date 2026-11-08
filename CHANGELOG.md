@@ -6,6 +6,8 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Noviembre 2026 (en curso)
 
+- Importar un chat de WhatsApp: el «Exportar chat» (.txt o .zip, del iPhone o de Android, también grupos) se lee en tu dispositivo y Hour coloca cada mensaje en su conversación o en el grupo del bolo; reimportar sólo trae lo nuevo, y lo importado mueve el turno y el último contacto sólo si es más reciente. Con un atajo «Mandar a Hour» en el iPhone (128, ADR-189, 2026-11-07, `eaeae4c5`, migración `20261108100000`).
+- Importar al público: la base exige la declaración, y la de clientes dice «puedo demostrarlo» (105, ADR-191, 2026-11-07, `eaeae4c5`, migración `20261108110000`).
 - Un correo entrante ya no se copia en todas las conversaciones del remitente: va por su hilo, a su única conversación posible o, si hay varias, a la de actividad más reciente marcado como suposición (127, ADR-187, 2026-11-07, migración `20261107100000`).
 - Una conversación abierta se lee como un chat: el lado dice quién habla, cada entrada con su glifo y su palabra («WhatsApp de Elena», «Llamada de Marco»), la fecha en cada una y «2 semanas» en los silencios; la nota del equipo es una banda ámbar en la misma historia, con «Comentar al equipo» en cada burbuja; «+ Apuntar» aparte, y lo apuntado dice quién lo apuntó; lo que apuntas tú no te sale como nuevo (ADR-184, 185 y 186, 2026-11-06, `a7b3a2e1`).
 - «Llego tarde» en la hoja de ruta: cada técnico tiene su enlace y, el día de la función, avisa a producción sin cambiar ninguna hora; el aviso sale arriba de Hoy y en el grupo del bolo, y producción mueve el hito con un toque (121 B, ADR-183, 2026-11-05, `ee5ef4a6`).
