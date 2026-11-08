@@ -26,6 +26,11 @@
    * conversaciones elegidas, como en el envío, desde la difusión). La vista
    * previa recorre los dos orígenes con el pie real de cada uno; en borrador,
    * el público es una muestra (sus filas se congelan al poner en cola).
+   *
+   * Una invitación puede ser «Con diseño» (ADR-190): el cuerpo deja de
+   * escribirse aquí y se diseña en el editor (MailDesignEditor, a toda
+   * pantalla); su texto plano lo deriva el servidor y la vista previa enseña
+   * el diseño con el pie de Hour. La difusión no tiene ese selector.
    */
   import { docTitle } from '$lib/doc-title';
   import { lensOn } from '$lib/lenses.svelte';
@@ -35,7 +40,7 @@
   import { tick, untrack } from 'svelte';
   import { ApiError, fetchJSON, mutateJSON, uploadBlob } from '$lib/api';
   import { shrinkImage } from '$lib/image-shrink';
-  import { mailTemplate } from '$lib/mail-template';
+  import { mailTemplate, NO_TEMPLATE } from '$lib/mail-template';
   import { kindLabel, type MaterialItem } from '$lib/material';
   import Segmented from '$lib/components/Segmented.svelte';
   import { retryLoad } from '$lib/load-fail';
@@ -49,6 +54,8 @@
   import Textarea from '$lib/components/Textarea.svelte';
   import MailoutTestMode from '$lib/components/MailoutTestMode.svelte';
   import MailoutFigures from '$lib/components/MailoutFigures.svelte';
+  import MailDesignEditor from '$lib/components/MailDesignEditor.svelte';
+  import { designText, type DesignContent } from '$lib/mail-design';
   import { addToast } from '$lib/components/Toast.svelte';
   import {
     recipientCounts,
@@ -107,6 +114,13 @@
   let imageLink = $state('');
   let imageDirty = $state(false);
   let imageRev = 0;
+  // El diseño de una invitación (ADR-190): se manda solo cuando cambia.
+  let designContent = $state<DesignContent | null>(null);
+  let designHtml = $state<string | null>(null);
+  let designDirty = $state(false);
+  let designRev = 0;
+  let editorOpen = $state(false);
+  let askLetter = $state(false);
   let loadedFor = $state('');
   let dirty = $state(false);
 
@@ -124,6 +138,9 @@
     imageAlt = mo.image_alt ?? '';
     imageLink = mo.image_link_url ?? '';
     imageDirty = false;
+    designContent = mo.design ?? null;
+    designHtml = mo.design_html ?? null;
+    designDirty = false;
     dirty = false;
   });
 
@@ -137,10 +154,44 @@
     dirty = true;
   }
 
+  /** Lo que sale del editor: el cuerpo pasa a ser su texto, como lo derivará el servidor. */
+  function designDone(design: { content: DesignContent; html: string }) {
+    designContent = design.content;
+    designHtml = design.html;
+    body = designText(design.content);
+    editorOpen = false;
+    designRev += 1;
+    designDirty = true;
+    dirty = true;
+  }
+
+  /** Volver a carta: el diseño se borra y su texto se queda como cuerpo. */
+  function toLetter() {
+    designContent = null;
+    designHtml = null;
+    askLetter = false;
+    designRev += 1;
+    designDirty = true;
+    dirty = true;
+  }
+
+  /** La carta que había, como primeros bloques de un diseño nuevo. */
+  let designStarter = $derived({
+    title: d?.project?.name ?? null,
+    paragraphs: body
+      .trim()
+      .split(/\n{2,}/)
+      .filter((p) => p.trim())
+      .map((p) => `<p>${p.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</p>`),
+  });
+  let designBlocks = $derived(designContent?.blocks.length ?? 0);
+
   const save = createMutation({
     mutationFn: () => {
       const sendsImage = imageDirty;
       const rev = imageRev;
+      const sendsDesign = designDirty;
+      const dRev = designRev;
       return mutateJSON('PATCH', `/api/mailout/${id}`, {
         subject,
         body,
@@ -151,12 +202,14 @@
         ...(sendsImage
           ? { image: imageUrl ? { url: imageUrl, alt: imageAlt.trim() || null, link: imageLink.trim() || null } : null }
           : {}),
-      }).then(() => (sendsImage ? rev : null));
+        ...(sendsDesign ? { design: designContent && designHtml ? { content: designContent, html: designHtml } : null } : {}),
+      }).then(() => ({ image: sendsImage ? rev : null, design: sendsDesign ? dRev : null }));
     },
-    onSuccess: (sentRev) => {
+    onSuccess: (sent) => {
       dirty = false;
       // Lo que cambió mientras se guardaba sigue pendiente.
-      if (sentRev === imageRev) imageDirty = false;
+      if (sent.image === imageRev) imageDirty = false;
+      if (sent.design === designRev) designDirty = false;
     },
     onError: (err) => failed(err),
   });
@@ -209,7 +262,7 @@
 
   $effect(() => {
     // Leer los campos ata el efecto a ellos: cada cambio reinicia la espera.
-    void [subject, body, language, domainId, localPart, fromName, imageUrl, imageAlt, imageLink];
+    void [subject, body, language, domainId, localPart, fromName, imageUrl, imageAlt, imageLink, designHtml];
     if (!dirty || !editable) return;
     const timer = setTimeout(() => $save.mutate(), 700);
     return () => clearTimeout(timer);
@@ -232,11 +285,14 @@
       : '',
   );
   let draft = $derived({ subject, body, language });
+  /** Only what decides which fields a mail uses: the design's HTML (ADR-190). */
+  let fieldTemplate = $derived({ ...NO_TEMPLATE, design: invitation && designHtml ? { html: designHtml, origin: '' } : null });
   let ctxById = $derived(new Map((d?.compose ?? []).map((c) => [c.recipient_id, c])));
 
   function missingFor(r: MailoutRecipientRow): boolean {
     const c = ctxById.get(r.recipient_id);
-    return c ? composeMailout(draft, c, '').missing.length > 0 : false;
+    // With the design (ADR-190): its fields count too.
+    return c ? composeMailout(draft, c, '', fieldTemplate).missing.length > 0 : false;
   }
 
   let rows = $derived(
@@ -272,7 +328,7 @@
     editable
       ? (d?.audience_preview ?? []).map((c) => {
           const row = sampleRow(c);
-          return { row, ctx: c as ComposeContext, state: (composeMailout(draft, c, '').missing.length ? 'missing_fields' : 'ready') as RecipientState };
+          return { row, ctx: c as ComposeContext, state: (composeMailout(draft, c, '', fieldTemplate).missing.length ? 'missing_fields' : 'ready') as RecipientState };
         })
       : [],
   );
@@ -329,12 +385,14 @@
             image_url: imageUrl || null,
             image_alt: imageAlt.trim() || null,
             image_link_url: imageLink.trim() || null,
+            design_html: invitation ? designHtml : null,
           }
         : null,
       page.url.origin,
     ),
   );
-  let hasTemplate = $derived(Boolean(template.logo || template.image));
+  let designed = $derived(Boolean(invitation && template.design));
+  let hasTemplate = $derived(Boolean(template.logo || template.image || designed));
   let preview = $derived(current?.ctx ? composeMailout(draft, current.ctx, exampleLink, template) : null);
   // 104: el pie de una persona del público sale en el idioma de su suscripción.
   let currentLanguage = $derived(current?.ctx ? recipientLanguage(language, current.ctx) : null);
@@ -360,10 +418,23 @@
   }
   let previewMode = $derived(previewChoice ?? (hasTemplate ? 'html' : 'text'));
   let frameHeight = $state(0);
+  let frameEl = $state<HTMLIFrameElement | null>(null);
   function fitFrame(e: Event) {
     const doc = (e.currentTarget as HTMLIFrameElement).contentDocument;
     frameHeight = doc?.documentElement.scrollHeight ?? 0;
   }
+  // A phone's width makes the mail taller without reloading the frame:
+  // measure again, or the footer is cut off.
+  $effect(() => {
+    void previewDevice;
+    const el = untrack(() => frameEl);
+    if (!el) return;
+    frameHeight = 0;
+    const raf = requestAnimationFrame(() => {
+      frameHeight = el.contentDocument?.documentElement.scrollHeight ?? 0;
+    });
+    return () => cancelAnimationFrame(raf);
+  });
 
   // ── Acciones ──────────────────────────────────────────────────────────
   function failed(err: unknown) {
@@ -667,6 +738,36 @@
               <p class="mo__hint">{t('mailout.language_audience_hint', locale)}</p>
             {/if}
             <Input label={t('mail.subject', locale)} bind:value={subject} oninput={touch} />
+            {#if invitation}
+              <!-- Letter or designed (ADR-190): only an invitation chooses. -->
+              <div class="mo__format" data-testid="mailout-format">
+                <Segmented
+                  ariaLabel={t('mailout.format', locale)}
+                  options={[
+                    { value: 'letter', label: t('mailout.format_letter', locale) },
+                    { value: 'design', label: t('mailout.format_design', locale) },
+                  ]}
+                  value={designContent ? 'design' : 'letter'}
+                  onchange={(v) => {
+                    if (v === 'design' && !designContent) editorOpen = true;
+                    else if (v === 'letter' && designContent) askLetter = true;
+                  }}
+                />
+              </div>
+            {/if}
+            {#if invitation && designContent}
+              <div class="mo__design" data-testid="mailout-design">
+                <h3 class="eyebrow eyebrow--sub">{t('mailout.design_title', locale)}</h3>
+                <p class="mo__hint">{t('mailout.design_summary', locale, { n: designBlocks })}</p>
+                <div class="mo__image-acts">
+                  <Button size="s" variant="secondary" onclick={() => (editorOpen = true)}>{t('mailout.design_edit', locale)}</Button>
+                  <Button size="s" variant="quiet" onclick={() => (askLetter = true)}>{t('mailout.design_to_letter', locale)}</Button>
+                </div>
+                <p class="mo__saved" aria-live="polite">
+                  {$save.isPending ? t('mailout.saving', locale) : dirty ? '' : t('mailout.saved_draft', locale)}
+                </p>
+              </div>
+            {:else}
             <Textarea id="mailout-body" label={t('mail.body', locale)} rows={10} maxlength={20000} bind:value={body} oninput={touch} />
             <p class="mo__fields">
               <span>{t('mailout.fields', locale)}</span>
@@ -725,6 +826,7 @@
                 <a class="link-arrow" href={`/h/${workspaceSlug}/settings?section=space#logo`}>{t('mailout.logo_change', locale)}</a>
               </p>
             </div>
+            {/if}
           </div>
         {/if}
       </div>
@@ -772,7 +874,7 @@
               <Segmented
                 ariaLabel={t('mailout.preview', locale)}
                 options={[
-                  { value: 'html', label: t('mailout.preview_html', locale) },
+                  { value: 'html', label: t(designed ? 'mailout.preview_design' : 'mailout.preview_html', locale) },
                   { value: 'text', label: t('mailout.preview_text', locale) },
                 ]}
                 value={previewMode}
@@ -809,6 +911,7 @@
                 sandbox="allow-same-origin"
                 srcdoc={previewScheme === 'dark' ? darkPreview(preview.html) : preview.html}
                 data-device={previewDevice}
+                bind:this={frameEl}
                 onload={fitFrame}
                 style:block-size={frameHeight ? `${frameHeight}px` : undefined}
               ></iframe>
@@ -1000,6 +1103,26 @@
       </Button>
     {/snippet}
   </Dialog>
+
+  <Dialog bind:open={askLetter} title={t('mailout.design_to_letter_title', locale)} size="s">
+    <p>{t('mailout.design_to_letter_body', locale)}</p>
+    {#snippet actions()}
+      <Button variant="quiet" onclick={() => (askLetter = false)}>{t('create.cancel', locale)}</Button>
+      <Button tone="warn" onclick={toLetter}>{t('mailout.design_to_letter', locale)}</Button>
+    {/snippet}
+  </Dialog>
+
+  {#if editorOpen && editable}
+    <MailDesignEditor
+      content={designContent}
+      starter={designStarter}
+      mailoutId={id}
+      {locale}
+      fields={mergeFieldsFor('invitation')}
+      ondone={designDone}
+      oncancel={() => (editorOpen = false)}
+    />
+  {/if}
 {/if}
 
 <style>
@@ -1181,6 +1304,14 @@
     }
 
     /* La imagen del espectáculo (ADR-172). */
+    .mo__design {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+    }
+    .mo__design h3 {
+      margin: 0;
+    }
     .mo__image {
       display: flex;
       flex-direction: column;

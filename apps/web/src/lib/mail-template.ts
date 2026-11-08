@@ -19,6 +19,8 @@
  * wrangler (la cola).
  */
 
+import { sanitizeMailHtml } from './mail-sanitize';
+
 /** Una imagen ya resuelta: URL absoluta y su texto alternativo. */
 export interface MailImage {
   url: string;
@@ -33,9 +35,15 @@ export interface MailTemplate {
   logo: MailImage | null;
   /** La imagen del espectáculo, tras el cuerpo; enlaza al dossier si lo hay. */
   image: (MailImage & { href: string | null }) | null;
+  /**
+   * El diseño de una invitación (ADR-190): el HTML compilado en el editor y
+   * el origen con que sus imágenes de Hour se hacen absolutas. Con él, el
+   * correo es el diseño más el pie de Hour; sin él, la carta.
+   */
+  design?: { html: string; origin: string } | null;
 }
 
-export const NO_TEMPLATE: MailTemplate = { logo: null, image: null };
+export const NO_TEMPLATE: MailTemplate = { logo: null, image: null, design: null };
 
 /** El texto del correo por piezas: lo mismo que lleva la versión de texto plano. */
 export interface MailParts {
@@ -76,6 +84,8 @@ export interface MailTemplateRow {
   image_url: string | null;
   image_alt: string | null;
   image_link_url: string | null;
+  /** ADR-190: el HTML del diseño de una invitación; ausente en una base sin la migración. */
+  design_html?: string | null;
 }
 
 // ── Medidas ────────────────────────────────────────────────────────────────
@@ -124,6 +134,8 @@ export function mailTemplate(row: MailTemplateRow | null | undefined, origin: st
     image: imageUrl
       ? { url: imageUrl, alt: row.image_alt?.trim() || company, href: mailUrl(row.image_link_url, origin), ...sized(imageUrl) }
       : null,
+    // Cleaned again whatever the base says (ADR-190): what is sent always passed the parser.
+    design: row.design_html?.trim() ? { html: sanitizeMailHtml(row.design_html), origin } : null,
   };
 }
 
@@ -226,6 +238,51 @@ function eventBlock(ev: MailEvent, link: string): string {
 }
 
 /**
+ * El pie (ADR-180), como filas de la caja de 600 px: aire, raya y las líneas
+ * de por qué le llega con la baja y la privacidad. Lo comparten la carta y
+ * el diseño de una invitación (ADR-190).
+ */
+function footerRows(parts: Pick<MailParts, 'footer' | 'footerHtml'>): string[] {
+  const foot = `margin:0 0 4px;font-family:${FONT};font-size:12px;line-height:1.5;color:${FAINT};`;
+  // Air above the footer's rule: a cell's padding sits inside its border.
+  const spacer = row('&nbsp;', 'height:28px;line-height:28px;font-size:0;padding:0;');
+  const footLink = `color:${FAINT};text-decoration:underline;`;
+  if (parts.footerHtml) {
+    const why = parts.footerHtml.why.map((l) => paragraphs(l, foot, footLink, 'm-faint')).join('');
+    const links = parts.footerHtml.links
+      .map((l) => `<a href="${escapeHtml(l.url)}" style="${footLink}">${escapeHtml(l.label)}</a>${escapeHtml(l.tail ?? '')}`)
+      .join(' · ');
+    const linkLine = links ? `<p class="m-faint" style="${foot}">${links}</p>` : '';
+    return [spacer, row(why + linkLine, `padding:16px 0 0;border-top:1px solid ${RULE};`, 'm-rule')];
+  }
+  if (parts.footer.length) {
+    const lines = parts.footer.map((l) => paragraphs(l, foot, footLink, 'm-faint')).join('');
+    return [spacer, row(lines, `padding:16px 0 0;border-top:1px solid ${RULE};`, 'm-rule')];
+  }
+  return [];
+}
+
+/**
+ * El pie en su propia caja centrada de 600 px, para ponerlo al final de un
+ * HTML que no es la carta (el diseño de una invitación, ADR-190). `gutter`,
+ * el margen a cada lado: en un diseño, el de sus bloques, para que el pie
+ * arranque donde arranca el texto.
+ */
+export function footerTable(parts: Pick<MailParts, 'footer' | 'footerHtml'>, gutter = 16): string {
+  const rows = footerRows(parts);
+  if (!rows.length) return '';
+  return [
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">',
+    `<tr><td align="center" style="padding:0 ${gutter}px 24px;">`,
+    `<table role="presentation" width="${WIDTH}" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:${WIDTH}px;">`,
+    ...rows,
+    '</table>',
+    '</td></tr>',
+    '</table>',
+  ].join('');
+}
+
+/**
  * El HTML del correo. El texto es el de la versión plana, por piezas: cuerpo,
  * firma y pie. La plantilla pone el logo arriba y la imagen del espectáculo
  * tras el cuerpo; sin ellas queda el mismo texto en la misma caja.
@@ -265,23 +322,7 @@ export function mailHtml(parts: MailParts, template: MailTemplate = NO_TEMPLATE)
     out.push(row(linked, 'padding:24px 0 0;'));
   }
 
-  const foot = `margin:0 0 4px;font-family:${FONT};font-size:12px;line-height:1.5;color:${FAINT};`;
-  // Air above the footer's rule: a cell's padding sits inside its border.
-  const spacer = row('&nbsp;', 'height:28px;line-height:28px;font-size:0;padding:0;');
-  const footLink = `color:${FAINT};text-decoration:underline;`;
-  if (parts.footerHtml) {
-    const why = parts.footerHtml.why.map((l) => paragraphs(l, foot, footLink, 'm-faint')).join('');
-    const links = parts.footerHtml.links
-      .map((l) => `<a href="${escapeHtml(l.url)}" style="${footLink}">${escapeHtml(l.label)}</a>${escapeHtml(l.tail ?? '')}`)
-      .join(' · ');
-    const linkLine = links ? `<p class="m-faint" style="${foot}">${links}</p>` : '';
-    out.push(spacer);
-    out.push(row(why + linkLine, `padding:16px 0 0;border-top:1px solid ${RULE};`, 'm-rule'));
-  } else if (parts.footer.length) {
-    const lines = parts.footer.map((l) => paragraphs(l, foot, footLink, 'm-faint')).join('');
-    out.push(spacer);
-    out.push(row(lines, `padding:16px 0 0;border-top:1px solid ${RULE};`, 'm-rule'));
-  }
+  out.push(...footerRows(parts));
 
   // What the inbox shows before opening: hidden in the message itself.
   const preheader = parts.preheader?.trim()

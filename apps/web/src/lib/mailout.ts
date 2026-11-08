@@ -6,6 +6,7 @@
 import * as v from 'valibot';
 import type { ComposeContext } from './mailout-compose';
 import type { MailTemplateRow } from './mail-template';
+import { DESIGN_HTML_MAX, type DesignContent } from './mail-design';
 
 export type MailSendingProvider = 'simulator' | 'ses';
 export type MailDomainCheckStatus = 'NOT_STARTED' | 'PENDING' | 'SUCCESS' | 'FAILED' | 'TEMPORARY_FAILURE';
@@ -157,6 +158,12 @@ export interface MailoutItem {
   image_url: string | null;
   image_alt: string | null;
   image_link_url: string | null;
+  /**
+   * ADR-190: el diseño de una invitación (el JSON del editor, la fuente) y su
+   * HTML compilado. null en los dos: una carta.
+   */
+  design: DesignContent | null;
+  design_html: string | null;
   status: MailoutStatus;
   status_reason: string | null;
   queued_at: string | null;
@@ -165,7 +172,7 @@ export interface MailoutItem {
 }
 
 export const MAILOUT_SELECT =
-  'id,workspace_id,kind,project_id,audience_id,audience_mail_domain_id,performance_id,created_by,line_id,mail_domain_id,from_local_part,from_name,from_address,reply_to_address,language,subject,body,image_url,image_alt,image_link_url,status,status_reason,queued_at,finished_at,created_at';
+  'id,workspace_id,kind,project_id,audience_id,audience_mail_domain_id,performance_id,created_by,line_id,mail_domain_id,from_local_part,from_name,from_address,reply_to_address,language,subject,body,image_url,image_alt,image_link_url,design,design_html,status,status_reason,queued_at,finished_at,created_at';
 
 /** Una fila de `mailout_preview`. */
 export interface MailoutRecipientRow {
@@ -295,6 +302,7 @@ export function detailTemplateRow(d: Pick<MailoutDetail, 'mailout' | 'workspace'
     image_url: d.mailout.image_url,
     image_alt: d.mailout.image_alt,
     image_link_url: d.mailout.image_link_url,
+    design_html: d.mailout.design_html,
   };
 }
 
@@ -319,6 +327,12 @@ export const MailoutImageSchema = v.object({
   link: v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(2000), v.regex(/^(https?:\/\/[^\s<>"]+)?$/i))),
 });
 
+/** El diseño de una invitación tal como lo manda el editor (ADR-190). */
+export const MailoutDesignSchema = v.object({
+  content: v.looseObject({ blocks: v.array(v.unknown()), settings: v.record(v.string(), v.unknown()) }),
+  html: v.pipe(v.string(), v.minLength(1), v.maxLength(DESIGN_HTML_MAX)),
+});
+
 export const MailoutUpdateSchema = v.object({
   subject: v.pipe(v.string(), v.maxLength(200)),
   body: v.pipe(v.string(), v.maxLength(20000)),
@@ -328,6 +342,12 @@ export const MailoutUpdateSchema = v.object({
   from_name: fromName,
   /** Solo cuando cambia: ausente no la toca, null la quita. */
   image: v.optional(v.nullable(MailoutImageSchema)),
+  /**
+   * ADR-190, solo cuando cambia: el diseño de una invitación (JSON y HTML
+   * compilado en el navegador). Ausente no lo toca; null vuelve a la carta.
+   * El servidor comprueba el JSON, limpia el HTML y deriva de él el `body`.
+   */
+  design: v.optional(v.nullable(MailoutDesignSchema)),
 });
 
 export const MailoutRecipientsSchema = v.object({

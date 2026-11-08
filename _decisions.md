@@ -7318,3 +7318,101 @@ de quitar los mensajes, sin auditar ese paso para que el cuerpo no acabe en `aud
 propuesta; RLS (`tests/rls/whatsapp-import.test.ts`) y E2E (`tests/whatsapp-import.spec.ts`) escritos sin correr.
 **Re-evaluar cuando** se use con chats de verdad: cuántas tandas sin sitio se marcan, si el emparejado por nombre
 acierta, y si hace falta la puerta en el móvil sin atajo.
+
+## [2026-11-07] ADR-190 · La invitación con diseño: Templatical en el envío, compilado en el navegador, texto derivado y pie de Hour (tarea 99)
+
+**Contexto.** Tarea 99: correos «bonitos», tipo Mailchimp, para las invitaciones al público y a profesionales
+(ADR-173 § 10, ADR-174 § 3). Boceto del carril («Invitaciones con cartel», https://claude.ai/artifact/UhgwbreoQXiqsCiURaNMPh)
+con dos caminos: A, bloques fijos propios dentro de la carta; B, el editor de Templatical incrustado
+(`research/2026-11-email-builder.md`). Marco eligió B (2026-11-07). ADR-180 sigue: a una sala se le escribe como una
+persona.
+
+**Decisión.**
+1. **Solo la invitación elige formato:** «Carta» (por defecto, ADR-180 tal cual) o «Con diseño». La difusión no tiene
+   el selector y la base lo impide (`mailout_design_invitation`). Una invitación diseñada sale diseñada a todos sus
+   destinatarios, público y profesionales (ADR-174 § 3), cada uno desde su identidad.
+2. **El editor es Templatical** (`@templatical/editor` 0.56.1, FSL-1.1-MIT, que permite embeberlo en un producto de
+   pago; pasa a MIT a los dos años de cada versión), en una capa a toda pantalla que se carga al abrirla
+   (`MailDesignEditor.svelte`). Entra solo por `$lib/templatical.ts`, que lleva el aviso que pide su cláusula de
+   redistribución (copyright y enlace a los términos) como comentario `/*! @license */`, conservado en el chunk que se
+   sirve. Cerrado a lo que Hour quiere:
+   - paleta: sección, título, párrafo, imagen, botón, separador, espacio (`DESIGN_BLOCKS`); sin HTML, vídeo, redes,
+     menú, tabla ni cuenta atrás;
+   - ajustes del documento: fondo, color del texto y de los enlaces, tipografía; ni ancho, ni idioma, ni texto de
+     previsualización (los pone Hour); sin fuentes web;
+   - imágenes: se suben por la ruta de ADR-172 (`/api/mailout/[id]/image` → `/m/ws/<espacio>/mail/…`); sin
+     biblioteca; en el diseño van relativas y se hacen absolutas al montar el correo;
+   - campos: los de la carta (`{nombre}`, `{sala}`…), como fichas del editor;
+   - la interfaz, con los tokens de Hour por `var()` (las variables cruzan el Shadow DOM) y en el idioma de la app.
+3. **Se compila en el navegador.** «Listo» pide el MJML a Templatical (`@templatical/renderer`, MIT) y lo pasa a HTML
+   con `mjml-browser` (MIT, con `cheerio` 1.0.0-rc.12). En el Worker no: el plan Free da 10 ms de CPU por petición
+   (la compilación en frío midió unos 15 ms en Node) y añadiría unos 560 KB gzip al Worker. El editor y el compilador
+   solo se descargan al abrir el editor.
+4. **El servidor no se fía del navegador.** El diseño solo entra por `PATCH /api/mailout/[id]` con `design`, que
+   comprueba que quien llama edita el envío (`canEditMailout`), lee el cuerpo con tope (400 KB) antes de parsearlo y:
+   - comprueba el JSON (`mail-design.ts`): solo los bloques de la paleta, sección sin secciones dentro, imágenes de
+     Hour y de ese espacio, enlaces http(s) o mailto; 200 KB **en bytes UTF-8**, que es lo que cuenta la base;
+   - limpia el HTML con un parser y listas blancas, nunca listas negras (`mail-sanitize.ts`, htmlparser2 8.0.2, que
+     ya traía cheerio): etiquetas, atributos y esquemas por lista; enlaces decodificados y sin espacios ni controles
+     antes de mirar el esquema; `<img>`, fondos y enlaces a imágenes solo de `/m/ws/<espacio>/mail/<sha>-<w>x<h>.<ext>`
+     de ese espacio; el CSS, en hojas y en línea, con un analizador propio (reglas, `@media`, declaraciones):
+     selectores solo de las clases que escriben MJML y Templatical (`mj-…`, `tpl-…`) y `a` para el color de los
+     enlaces, sin tipos, combinadores ni `:last-child`, de modo que la hoja del diseño no puede alcanzar el pie (el
+     reset de MJML con `body`, `p`, `img`, `table` lo pone Hour como hoja propia); propiedades por lista, cada una con
+     sus valores acotados (márgenes y rellenos no negativos y con tope, `outline` solo `none`, bordes, alturas, anchos
+     y `border-spacing` con tope, `mso-*` por lista exacta); funciones solo `url()` de Hour y `rgb()`, comillas solo
+     en `url()` y en nombres de fuente, ningún `//` fuera de `url()` y ningún `<` en la salida;
+     comentarios solo los condicionales de Outlook de MJML, con lo de dentro por lista, emparejados y con sus etiquetas
+     equilibradas en todo el documento (si no cuadran se quitan todos). La salida se escribe entera, bien formada, con
+     un solo `<head>` y un solo `<body>`. Los casos de las dos revisiones de seguridad del 2026-11-08 son tests; el
+     HTML real de MJML con todos los bloques (fixture) sale sin perder nada y limpiarlo dos veces da lo mismo;
+   - **deriva el texto plano del JSON**, que pasa a ser el `body` del envío. Así el texto plano, los campos que faltan,
+     el historial de la conversación y la puerta de `queue_mailout` salen de lo mismo que en una carta. Un diseño sin
+     texto no se guarda;
+   - y una sola RPC de máquina, `set_mailout_design` (solo service_role; con el JWT no se puede llamar), guarda diseño,
+     HTML y `body` en una sentencia, antes de `update_mailout`: si este falla, queda sin guardar el asunto o el
+     remitente (el guardado automático lo reintenta), nunca un diseño con otro texto. Un PATCH sin `design` con un
+     diseño puesto vuelve a sacar el `body` del diseño guardado. El cuerpo de la petición se lee del flujo con tope.
+   El servidor no comprueba que el HTML corresponda al JSON: con la lista blanca y las imágenes acotadas, un HTML que
+   no corresponda solo puede enseñar lo que su autor podía escribir igual, y lo que queda en la conversación sale del
+   JSON. **Al montar cada correo se vuelve a limpiar** lo que diga la base (`mailTemplate`, una vez por envío en la
+   cola): lo que sale siempre pasó por el parser.
+5. **El pie lo pone Hour**, fuera del diseño y sin poder quitarse: la compañía siempre (no hay firma), por qué le
+   llega, la baja con palabras y la privacidad (`footerTable`, el mismo pie que la carta), más `lang` del idioma del
+   texto y el texto de previsualización. Va como último hijo de `<body>`, después del HTML ya limpio y cerrado, así
+   que no puede quedar dentro de un comentario ni de un elemento abierto; sobre una banda blanca propia, con clases
+   `hour-foot-…` que el diseño no puede llevar ni nombrar en un selector, y con cada elemento fijado en línea con
+   `!important` (que gana a cualquier `!important` de una hoja) en tamaño y alto de letra, color, `display`,
+   `visibility`, alturas, recortes, `zoom`, `transform`, sangrías, fondo (transparente dentro de la banda), bordes
+   (salvo su raya) y `border-spacing`; `<html>` y `<body>` igual. Medido en Chromium: los ataques de las revisiones
+   segunda y tercera (17 casos: tapar con `outline`, teñir el fondo, subirlo con márgenes negativos, alejarlo con
+   bordes, alturas o `border-spacing`) dejan el enlace de baja visible, del mismo tamaño y encima de todo. Arranca a 10 px, el margen de los bloques de
+   Templatical, alineado con el texto (Marco, 2026-11-08).
+6. **Oscuro:** el diseño no lleva la hoja de ADR-180; cada cliente pinta los colores de quien lo diseñó a su manera.
+7. **Datos** (migración `20261108120000_mailout_design`, preparada, sin aplicar): `mailout.design` (jsonb, la fuente)
+   y `mailout.design_html` (lo compilado y limpio, con los campos sin poner), las dos o ninguna; `set_mailout_design`
+   (solo service_role, solo en borrador, solo invitación, guarda también el `body`); `mailout_template` devuelve `design_html` para
+   la cola (se borra y se crea: cambia lo que devuelve; firma de la base viva). Se aplica **antes** del deploy: la
+   pantalla lee `design` en su SELECT. La cola sin la columna manda la carta con el texto derivado.
+8. **Caché del dispositivo:** el detalle del envío trae el diseño; `CACHE_SCHEMA` 29.
+
+**Rechazado.**
+- *A, bloques fijos propios* (el boceto): Marco eligió B.
+- *Compilar MJML en el Worker:* CPU y tamaño, punto 3.
+- *Guardar solo el HTML:* el JSON es lo que se vuelve a editar y de donde sale el texto plano.
+- *El texto plano del HTML:* sale del JSON, que es estructura; del HTML saldrían restos de maquetación.
+- *Biblioteca de medios, bloques guardados, plantillas por espacio:* otro paso, si se echan de menos.
+
+**Lo que cuesta.** Una dependencia de código disponible no OSI y de un solo mantenedor; su salida es MJML estándar y el
+renderizador es MIT. El diseño desde el dominio de la difusión pesa más en su reputación (ADR-174, «Lo que cuesta»).
+
+**Sin verificar.** Ningún correo real enviado: cómo lo pintan Gmail, Apple Mail y Outlook. La subida de imágenes desde
+el editor (en local no hay R2). El E2E (`tests/mailout-design.spec.ts`) y el RLS (`tests/rls/mailout-design.test.ts`)
+están escritos sin correr: piden la migración aplicada. Los permisos de `set_mailout_design` se comprobaron en la
+Supabase local (JWT 403, service_role sí).
+
+**Cómo se revierte.** Revertir los commits del carril y aplicar `build/runbooks/rollback-20261108-mailout-design.sql`
+(borra los diseños; las invitaciones en borrador vuelven a carta con su texto derivado).
+
+**Re-evaluar cuando** se envíen las primeras invitaciones diseñadas (quejas, rebotes, Promociones), si Templatical se
+para o cambia de licencia, o si Workers pasa a plan de pago (compilar en el servidor).

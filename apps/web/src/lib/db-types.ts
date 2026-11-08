@@ -2833,6 +2833,8 @@ export type Database = {
           body: string | null
           created_at: string
           created_by: string | null
+          design: Json | null
+          design_html: string | null
           finished_at: string | null
           from_address: string | null
           from_local_part: string
@@ -2865,6 +2867,8 @@ export type Database = {
           body?: string | null
           created_at?: string
           created_by?: string | null
+          design?: Json | null
+          design_html?: string | null
           finished_at?: string | null
           from_address?: string | null
           from_local_part?: string
@@ -2897,6 +2901,8 @@ export type Database = {
           body?: string | null
           created_at?: string
           created_by?: string | null
+          design?: Json | null
+          design_html?: string | null
           finished_at?: string | null
           from_address?: string | null
           from_local_part?: string
@@ -5995,6 +6001,8 @@ export type Database = {
           body: string | null
           created_at: string
           created_by: string | null
+          design: Json | null
+          design_html: string | null
           finished_at: string | null
           from_address: string | null
           from_local_part: string
@@ -6527,6 +6535,8 @@ export type Database = {
           body: string | null
           created_at: string
           created_by: string | null
+          design: Json | null
+          design_html: string | null
           finished_at: string | null
           from_address: string | null
           from_local_part: string
@@ -6660,6 +6670,8 @@ export type Database = {
           body: string | null
           created_at: string
           created_by: string | null
+          design: Json | null
+          design_html: string | null
           finished_at: string | null
           from_address: string | null
           from_local_part: string
@@ -7763,6 +7775,8 @@ export type Database = {
           body: string | null
           created_at: string
           created_by: string | null
+          design: Json | null
+          design_html: string | null
           finished_at: string | null
           from_address: string | null
           from_local_part: string
@@ -7996,6 +8010,7 @@ export type Database = {
           image_url: string
           logo_url: string
           mailout_id: string
+          design_html: string
         }[]
       }
       mailout_test_authorize: { Args: { p_id: string }; Returns: string }
@@ -8134,6 +8149,8 @@ export type Database = {
           body: string | null
           created_at: string
           created_by: string | null
+          design: Json | null
+          design_html: string | null
           finished_at: string | null
           from_address: string | null
           from_local_part: string
@@ -8624,6 +8641,8 @@ export type Database = {
           body: string | null
           created_at: string
           created_by: string | null
+          design: Json | null
+          design_html: string | null
           finished_at: string | null
           from_address: string | null
           from_local_part: string
@@ -8718,6 +8737,49 @@ export type Database = {
         Args: { p_account_id: string; p_signature: string }
         Returns: undefined
       }
+      set_mailout_design: {
+        Args: { p_design: Json; p_design_html: string; p_id: string }
+        Returns: {
+          audience_id: string | null
+          audience_mail_domain_id: string | null
+          body: string | null
+          created_at: string
+          created_by: string | null
+          design: Json | null
+          design_html: string | null
+          finished_at: string | null
+          from_address: string | null
+          from_local_part: string
+          from_name: string | null
+          id: string
+          image_alt: string | null
+          image_link_url: string | null
+          image_url: string | null
+          kind: Database["public"]["Enums"]["mailout_kind"]
+          language: string
+          line_id: string | null
+          mail_domain_id: string | null
+          performance_id: string | null
+          project_id: string | null
+          queued_at: string | null
+          queued_by: string | null
+          reply_to_address: string | null
+          reply_to_mail_account_id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["mailout_status"]
+          status_reason: string | null
+          subject: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "mailout"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       set_mailout_image: {
         Args: {
           p_id: string
@@ -8731,6 +8793,8 @@ export type Database = {
           body: string | null
           created_at: string
           created_by: string | null
+          design: Json | null
+          design_html: string | null
           finished_at: string | null
           from_address: string | null
           from_local_part: string
@@ -9063,6 +9127,8 @@ export type Database = {
           body: string | null
           created_at: string
           created_by: string | null
+          design: Json | null
+          design_html: string | null
           finished_at: string | null
           from_address: string | null
           from_local_part: string

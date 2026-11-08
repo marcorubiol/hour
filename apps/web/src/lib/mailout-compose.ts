@@ -33,10 +33,17 @@
  * El texto plano es el correo. El HTML lleva el mismo texto vestido por la
  * plantilla del espacio (logo, imagen del espectáculo; `mail-template.ts`,
  * ADR-172), que es una pieza aparte: aquí solo se le pasan las piezas.
+ *
+ * Una invitación diseñada (ADR-190) lleva en la plantilla el HTML de su
+ * diseño: el correo es ese HTML, con los campos puestos (escapados) y el pie
+ * de Hour al final. Su texto plano es el `body`, que el servidor deriva del
+ * diseño al guardarlo; sin firma ni bloque de la función (el diseño dice lo
+ * suyo), y con la compañía siempre en el pie.
  */
 
 import { proposedSignature, withSignature, displayWebsite } from './mail';
-import { mailHtml, NO_TEMPLATE, type MailEvent, type MailFooter, type MailTemplate } from './mail-template';
+import { escapeHtml, mailHtml, NO_TEMPLATE, type MailEvent, type MailFooter, type MailTemplate } from './mail-template';
+import { designedHtml } from './mail-design';
 
 export const MAILOUT_LANGUAGES = ['es', 'ca', 'en', 'fr'] as const;
 type MailoutLanguage = (typeof MAILOUT_LANGUAGES)[number];
@@ -390,9 +397,9 @@ export function suggestedBasis(addressKind: 'contact' | 'organization' | null): 
  * de la compañía lleva su nombre, y repetirlo debajo eran tres líneas de lo
  * mismo. Una firma guardada sin el nombre lo devuelve al pie.
  */
-function footerWho(ctx: ComposeContext): string | null {
+function footerWho(ctx: ComposeContext, designed = false): string | null {
   const company = ctx.company_name.trim();
-  if (company && companySignature(ctx).toLowerCase().includes(company.toLowerCase())) return null;
+  if (!designed && company && companySignature(ctx).toLowerCase().includes(company.toLowerCase())) return null;
   return [ctx.company_name, ctx.company_city, displayWebsite(ctx.company_website)].filter(Boolean).join(' · ') || null;
 }
 
@@ -421,9 +428,14 @@ function footerWhy(ctx: ComposeContext, language: MailoutLanguage): string | nul
  * y en una línea «Darse de baja en un clic · Privacidad», con palabras en el
  * enlace. El texto plano sigue llevando la URL: allí no hay enlaces.
  */
-export function footerHtml(ctx: ComposeContext, language: MailoutLanguage, unsubscribeUrl: string): MailFooter {
+export function footerHtml(
+  ctx: ComposeContext,
+  language: MailoutLanguage,
+  unsubscribeUrl: string,
+  designed = false,
+): MailFooter {
   const copy = COPY[language];
-  const why = [footerWho(ctx), footerWhy(ctx, language)].filter((l): l is string => Boolean(l));
+  const why = [footerWho(ctx, designed), footerWhy(ctx, language)].filter((l): l is string => Boolean(l));
   const links: MailFooter['links'] = [
     {
       label: isAudienceRecipient(ctx) ? copy.audienceUnsubscribeLink : copy.unsubscribeLink,
@@ -465,9 +477,14 @@ export function preheaderOf(body: string): string | null {
 }
 
 /** El pie: quién escribe, por qué le llega, la baja y la privacidad. */
-export function footerLines(ctx: ComposeContext, language: MailoutLanguage, unsubscribeUrl: string): string[] {
+export function footerLines(
+  ctx: ComposeContext,
+  language: MailoutLanguage,
+  unsubscribeUrl: string,
+  designed = false,
+): string[] {
   const copy = COPY[language];
-  const who = footerWho(ctx);
+  const who = footerWho(ctx, designed);
   const why = footerWhy(ctx, language);
   return [
     who,
@@ -490,9 +507,28 @@ export function composeMailout(
   const values = mergeValues(ctx, textLanguage);
   // Al público sin nombre se le saluda sin él: no bloquea.
   const nameless = isAudienceRecipient(ctx) && values.nombre === null;
-  const missing = fieldsUsed(draft.subject, draft.body).filter((f) => values[f] === null && !(nameless && f === 'nombre'));
+  const design = ctx.mailout_kind === 'invitation' ? (template.design ?? null) : null;
+  const missing = fieldsUsed(draft.subject, draft.body, design?.html ?? '').filter(
+    (f) => values[f] === null && !(nameless && f === 'nombre'),
+  );
   const subject = fillFields(draft.subject.trim(), values, nameless);
   const body = fillFields(draft.body.trim(), values, nameless);
+  if (design) {
+    // The designed invitation (ADR-190): its HTML with the fields filled in,
+    // escaped, plus Hour's footer; the text is the body derived from it.
+    const footer = footerLines(ctx, language, unsubscribeUrl, true);
+    const escaped = Object.fromEntries(
+      Object.entries(values).map(([k, v]) => [k, v === null ? null : escapeHtml(v)]),
+    ) as Record<MergeField, string | null>;
+    const html = designedHtml(fillFields(design.html, escaped, nameless), {
+      language: textLanguage,
+      origin: design.origin,
+      preheader: preheaderOf(body),
+      footer,
+      footerHtml: footerHtml(ctx, language, unsubscribeUrl, true),
+    });
+    return { subject, text: `${body}\n\n${footer.join('\n')}\n`, html, recordBody: body, missing };
+  }
   const signature = companySignature(ctx);
   const footer = footerLines(ctx, language, unsubscribeUrl);
   const event = invitationEvent(ctx, textLanguage);
