@@ -7348,21 +7348,38 @@ persona.
    con `mjml-browser` (MIT, con `cheerio` 1.0.0-rc.12). En el Worker no: el plan Free da 10 ms de CPU por petición
    (la compilación en frío midió unos 15 ms en Node) y añadiría unos 560 KB gzip al Worker. El editor y el compilador
    solo se descargan al abrir el editor.
-4. **El servidor no se fía del navegador** (`mail-design.ts`, `PATCH /api/mailout/[id]` con `design`): comprueba el
-   JSON (solo los bloques de la paleta, sección sin secciones dentro, imágenes de Hour y de ese espacio, enlaces http(s)
-   o mailto, 256 KB), limpia el HTML (fuera scripts, marcos, formularios, `on*`, `javascript:`/`data:`, `<link>`,
-   meta refresh, y en el CSS los `@import` y los `url()` que no son imágenes de Hour; 90 KB) y **deriva el texto plano
-   del JSON**, que pasa a ser el `body` del envío. Así el texto plano,
-   los campos que faltan, el historial y la puerta de `queue_mailout` salen de lo mismo que en una carta. Un diseño sin
-   texto no se guarda.
+4. **El servidor no se fía del navegador.** El diseño solo entra por `PATCH /api/mailout/[id]` con `design`, que
+   comprueba que quien llama edita el envío (`canEditMailout`), lee el cuerpo con tope (400 KB) antes de parsearlo y:
+   - comprueba el JSON (`mail-design.ts`): solo los bloques de la paleta, sección sin secciones dentro, imágenes de
+     Hour y de ese espacio, enlaces http(s) o mailto; 200 KB **en bytes UTF-8**, que es lo que cuenta la base;
+   - limpia el HTML con un parser y listas blancas (`mail-sanitize.ts`, htmlparser2 8.0.2, que ya traía cheerio):
+     etiquetas, atributos y esquemas por lista; enlaces decodificados y sin espacios ni controles antes de mirar el
+     esquema; `<img>` y fondos solo de `/m/ws/<espacio>/mail/`; CSS sin `@import`, sin `url()` de fuera, sin
+     `expression`, `behavior` ni `position`, sin comentarios ni barras; comentarios solo los condicionales de Outlook
+     de MJML, y solo con las etiquetas, atributos y textos que MJML pone dentro. La salida se escribe entera, bien
+     formada, con un solo `<head>` y un solo `<body>`. Los casos de la revisión de seguridad del 2026-11-08 son tests;
+     el HTML real de MJML con todos los bloques (fixture) sale sin perder nada y limpiarlo dos veces da lo mismo;
+   - **deriva el texto plano del JSON**, que pasa a ser el `body` del envío. Así el texto plano, los campos que faltan,
+     el historial de la conversación y la puerta de `queue_mailout` salen de lo mismo que en una carta. Un diseño sin
+     texto no se guarda;
+   - y una sola RPC de máquina, `set_mailout_design` (solo service_role; con el JWT no se puede llamar), guarda diseño,
+     HTML y `body` en una sentencia, antes de `update_mailout`: no queda el cuerpo cambiado sin el diseño.
+   El servidor no comprueba que el HTML corresponda al JSON: con la lista blanca y las imágenes acotadas, un HTML que
+   no corresponda solo puede enseñar lo que su autor podía escribir igual, y lo que queda en la conversación sale del
+   JSON. **Al montar cada correo se vuelve a limpiar** lo que diga la base (`mailTemplate`, una vez por envío en la
+   cola): lo que sale siempre pasó por el parser.
 5. **El pie lo pone Hour**, fuera del diseño y sin poder quitarse: la compañía siempre (no hay firma), por qué le
    llega, la baja con palabras y la privacidad (`footerTable`, el mismo pie que la carta), más `lang` del idioma del
-   texto y el texto de previsualización. Sin firma ni bloque de la función: el diseño dice lo suyo, con los campos
+   texto y el texto de previsualización. Va como último hijo de `<body>`, después del HTML ya limpio y cerrado, así
+   que no puede quedar dentro de un comentario ni de un elemento abierto; sus elementos, `<html>` y `<body>` llevan
+   en línea `display`, `visibility`, `opacity`, alturas y recortes con `!important`, que ganan a cualquier
+   `!important` de una hoja. Queda fuera de alcance que una hoja del diseño tape el pie con otro elemento por encima
+   (sin `position` no tiene cómo) o lo empuje con márgenes negativos. Sin firma ni bloque de la función: el diseño dice lo suyo, con los campos
    `{obra}`, `{fecha}`, `{hora}`…
 6. **Oscuro:** el diseño no lleva la hoja de ADR-180; cada cliente pinta los colores de quien lo diseñó a su manera.
 7. **Datos** (migración `20261108120000_mailout_design`, preparada, sin aplicar): `mailout.design` (jsonb, la fuente)
    y `mailout.design_html` (lo compilado y limpio, con los campos sin poner), las dos o ninguna; `set_mailout_design`
-   (quien edita el envío, solo en borrador, solo invitación); `mailout_template` devuelve también `design_html` para
+   (solo service_role, solo en borrador, solo invitación, guarda también el `body`); `mailout_template` devuelve `design_html` para
    la cola (se borra y se crea: cambia lo que devuelve; firma de la base viva). Se aplica **antes** del deploy: la
    pantalla lee `design` en su SELECT. La cola sin la columna manda la carta con el texto derivado.
 8. **Caché del dispositivo:** el detalle del envío trae el diseño; `CACHE_SCHEMA` 29.
@@ -7378,7 +7395,9 @@ persona.
 renderizador es MIT. El diseño desde el dominio de la difusión pesa más en su reputación (ADR-174, «Lo que cuesta»).
 
 **Sin verificar.** Ningún correo real enviado: cómo lo pintan Gmail, Apple Mail y Outlook. La subida de imágenes desde
-el editor (en local no hay R2). El E2E (`tests/mailout-design.spec.ts`) está escrito sin correr.
+el editor (en local no hay R2). El E2E (`tests/mailout-design.spec.ts`) y el RLS (`tests/rls/mailout-design.test.ts`)
+están escritos sin correr: piden la migración aplicada. Los permisos de `set_mailout_design` se comprobaron en la
+Supabase local (JWT 403, service_role sí).
 
 **Cómo se revierte.** Revertir los commits del carril y aplicar `build/runbooks/rollback-20261108-mailout-design.sql`
 (borra los diseños; las invitaciones en borrador vuelven a carta con su texto derivado).

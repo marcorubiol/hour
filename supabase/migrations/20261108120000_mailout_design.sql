@@ -8,9 +8,10 @@
 --      `design_html` (lo que compiló el navegador, ya limpio por el Worker,
 --      con los campos `{nombre}` sin poner). Las dos o ninguna, y solo en una
 --      invitación: la difusión sigue siendo una carta (ADR-180).
---   2. `set_mailout_design`: la escribe quien edita el envío, solo en
---      borrador. El Worker comprueba los bloques y las imágenes, y deriva el
---      texto plano, que guarda en `body` por `update_mailout`.
+--   2. `set_mailout_design`: solo service_role. El Worker comprueba que quien
+--      llama edita el envío, los bloques y las imágenes, limpia el HTML y
+--      deriva el texto plano; la RPC guarda diseño y `body` a la vez, solo en
+--      borrador y solo en una invitación.
 --   3. `mailout_template` devuelve también `design_html`: la cola monta el
 --      correo diseñado con lo que ya lee. Desplegar antes de aplicar no rompe
 --      la cola (sin la columna, la invitación sale como carta con el texto
@@ -44,10 +45,16 @@ COMMENT ON COLUMN public.mailout.design_html IS
   'ADR-190: the design compiled to HTML in the browser and cleaned by the Worker, merge fields ({nombre}) unfilled, without footer (Hour adds it). NULL with design.';
 
 -- ── 2 · Escribir el diseño ──────────────────────────────────────────────────
+-- Solo service_role: la escribe el Worker después de comprobar que quien
+-- llama edita el envío, el JSON y la limpieza del HTML (ADR-190). Con el JWT
+-- no se puede guardar un HTML sin pasar por esa limpieza. En una sola
+-- sentencia guarda el diseño y el texto derivado (`body`): no queda uno sin
+-- el otro. `p_body` NULL deja el cuerpo como esté (volver a carta).
 CREATE FUNCTION public.set_mailout_design(
   p_id          uuid,
   p_design      jsonb,
-  p_design_html text
+  p_design_html text,
+  p_body        text
 )
 RETURNS public.mailout
 LANGUAGE plpgsql
@@ -55,9 +62,13 @@ SECURITY DEFINER
 SET search_path TO 'public', 'pg_temp'
 AS $$
 DECLARE
-  v_m   public.mailout := private.mailout_for_caller(p_id, true);
+  v_m   public.mailout;
   v_row public.mailout;
 BEGIN
+  SELECT * INTO v_m FROM public.mailout WHERE id = p_id FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'mailout % not found', p_id USING ERRCODE = '42501';
+  END IF;
   IF v_m.status <> 'draft' THEN
     RAISE EXCEPTION 'only a draft can be edited' USING ERRCODE = '22023';
   END IF;
@@ -66,18 +77,19 @@ BEGIN
   END IF;
   UPDATE public.mailout m
   SET design      = p_design,
-      design_html = CASE WHEN p_design IS NULL THEN NULL ELSE p_design_html END
+      design_html = CASE WHEN p_design IS NULL THEN NULL ELSE p_design_html END,
+      body        = coalesce(p_body, m.body)
   WHERE m.id = v_m.id
   RETURNING * INTO v_row;
   RETURN v_row;
 END;
 $$;
 
-COMMENT ON FUNCTION public.set_mailout_design(uuid, jsonb, text) IS
-  'ADR-190: set or clear (NULL) the design of a draft invitation. Who edits the mailout (mailout_for_caller). The Worker checks blocks and images and derives the plain text first.';
+COMMENT ON FUNCTION public.set_mailout_design(uuid, jsonb, text, text) IS
+  'ADR-190: set or clear (NULL) the design of a draft invitation and its derived plain text, in one statement. service_role only: the Worker checks who edits, the blocks and images, and cleans the HTML first.';
 
-REVOKE ALL ON FUNCTION public.set_mailout_design(uuid, jsonb, text) FROM PUBLIC, anon, service_role;
-GRANT EXECUTE ON FUNCTION public.set_mailout_design(uuid, jsonb, text) TO authenticated;
+REVOKE ALL ON FUNCTION public.set_mailout_design(uuid, jsonb, text, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.set_mailout_design(uuid, jsonb, text, text) TO service_role;
 
 -- ── 3 · La cola lee el diseño con la plantilla ──────────────────────────────
 DROP FUNCTION public.mailout_template(uuid[]);

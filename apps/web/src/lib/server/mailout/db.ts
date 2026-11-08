@@ -25,6 +25,7 @@ const SERVICE_RPCS = [
   'mailout_record_failure',
   'mailout_record_event',
   'mailout_approve_review',
+  'set_mailout_design',
   'audience_subscribe',
   'audience_confirmation_token',
   'audience_confirm',

@@ -4,7 +4,7 @@
 -- MAILOUT_SELECT, o la pantalla del envío falla.
 BEGIN;
 
-DROP FUNCTION public.set_mailout_design(uuid, jsonb, text);
+DROP FUNCTION public.set_mailout_design(uuid, jsonb, text, text);
 
 DROP FUNCTION public.mailout_template(uuid[]);
 CREATE FUNCTION public.mailout_template(p_mailout_ids uuid[])

@@ -6,7 +6,6 @@ import {
   htmlToText,
   isSafeLink,
   prepareDesign,
-  sanitizeDesignHtml,
   type DesignContent,
 } from './mail-design';
 import { composeMailout, type ComposeContext } from './mailout-compose';
@@ -75,43 +74,15 @@ describe('checkDesign', () => {
     expect(isSafeLink('')).toBe(true);
   });
 
+  test('el tope cuenta bytes, como la base: con emojis se llega antes', () => {
+    const emoji = content([{ type: 'paragraph', content: '😀'.repeat(60_000) }]);
+    expect(JSON.stringify(emoji).length).toBeLessThan(200_000);
+    expect(checkDesign(emoji, WS)).toBe('design_too_large');
+  });
+
   test('tope de tamaño', () => {
     const big = content([{ type: 'paragraph', content: 'x'.repeat(270_000) }]);
     expect(checkDesign(big, WS)).toBe('design_too_large');
-  });
-});
-
-describe('sanitizeDesignHtml', () => {
-  test('quita scripts, marcos, formularios, on* y javascript:', () => {
-    const dirty =
-      '<html><head><script>alert(1)</script><link rel="stylesheet" href="https://x.test/a.css"><meta http-equiv="refresh" content="0;url=https://x.test"></head>' +
-      '<body><iframe src="https://x.test"></iframe><form action="https://x.test"><input name="a"></form>' +
-      '<a href="javascript:alert(1)" onclick="x()">a</a><img src="data:image/png;base64,AAA" onerror="x()">' +
-      '<td style="background:url(javascript:alert(1))">t</td><p>Hola</p></body></html>';
-    const clean = sanitizeDesignHtml(dirty);
-    for (const bad of ['<script', 'alert(1)</script', '<iframe', '<form', '<input', 'onclick', 'onerror', 'javascript:', 'data:image', '<link', 'refresh']) {
-      expect(clean.toLowerCase()).not.toContain(bad);
-    }
-    expect(clean).toContain('<p>Hola</p>');
-  });
-
-  test('sin @import ni url() de fuera en las hojas ni en los estilos en línea', () => {
-    const dirty =
-      '<style>@import url("https://fonts.googleapis.com/css?family=Ubuntu");@import "https://x.test/a.css";.a{background:url(https://x.test/bg.png)}.b{background:url(\'/m/ws/w/mail/a-1x1.jpg\')}</style>' +
-      '<td style="background-image:url(https://x.test/t.png);color:#000">t</td><div style="background:url(/m/ws/w/mail/b-1x1.jpg)">b</div>';
-    const clean = sanitizeDesignHtml(dirty);
-    expect(clean).not.toContain('@import');
-    expect(clean).not.toContain('x.test');
-    expect(clean).not.toContain('googleapis');
-    expect(clean).toContain("url('/m/ws/w/mail/a-1x1.jpg')");
-    expect(clean).toContain('url(/m/ws/w/mail/b-1x1.jpg)');
-    expect(clean).toContain('color:#000');
-  });
-
-  test('deja lo de MJML: estilos, tablas y condicionales de Outlook', () => {
-    const mjml =
-      '<!doctype html><html><head><style type="text/css">.x{color:#000}</style><!--[if mso | IE]><table><tr><td><![endif]--></head><body style="word-spacing:normal;"><table role="presentation"><tr><td><a href="https://a.test">a</a></td></tr></table></body></html>';
-    expect(sanitizeDesignHtml(mjml)).toBe(mjml);
   });
 });
 

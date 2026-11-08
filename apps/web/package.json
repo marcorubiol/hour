@@ -27,6 +27,8 @@
     "@templatical/renderer": "0.56.1",
     "@templatical/types": "0.56.1",
     "cheerio": "1.0.0-rc.12",
+    "domhandler": "5.0.3",
+    "htmlparser2": "8.0.2",
     "idb": "^8.0.3",
     "mjml-browser": "5.4.1",
     "partyserver": "^0.5.5",

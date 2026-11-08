@@ -19,6 +19,8 @@
  * wrangler (la cola).
  */
 
+import { sanitizeMailHtml } from './mail-sanitize';
+
 /** Una imagen ya resuelta: URL absoluta y su texto alternativo. */
 export interface MailImage {
   url: string;
@@ -132,7 +134,8 @@ export function mailTemplate(row: MailTemplateRow | null | undefined, origin: st
     image: imageUrl
       ? { url: imageUrl, alt: row.image_alt?.trim() || company, href: mailUrl(row.image_link_url, origin), ...sized(imageUrl) }
       : null,
-    design: row.design_html?.trim() ? { html: row.design_html, origin } : null,
+    // Cleaned again whatever the base says (ADR-190): what is sent always passed the parser.
+    design: row.design_html?.trim() ? { html: sanitizeMailHtml(row.design_html), origin } : null,
   };
 }
 

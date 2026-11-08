@@ -19,12 +19,18 @@
  */
 
 import { escapeHtml, footerTable, type MailFooter } from './mail-template';
+import { isHourMailImage, sanitizeMailHtml } from './mail-sanitize';
 
 /** Los bloques que se pueden usar (la paleta del editor y lo que acepta el servidor). */
 export const DESIGN_BLOCKS = ['section', 'title', 'paragraph', 'image', 'button', 'divider', 'spacer'] as const;
 
-/** Tope del JSON guardado (bytes de su texto). */
-export const DESIGN_MAX_BYTES = 262_144;
+/**
+ * Tope del JSON guardado, en bytes UTF-8 de su texto. La base admite 256 KB de
+ * `jsonb::text`, que escribe espacios que `JSON.stringify` no: queda margen.
+ */
+export const DESIGN_MAX_BYTES = 200_000;
+/** Tope del cuerpo entero de un PATCH con diseño, antes de leerlo como JSON. */
+export const DESIGN_REQUEST_MAX_BYTES = 400_000;
 /**
  * Tope del HTML compilado. Gmail recorta hacia los 102 KB; el pie y el texto
  * de previsualización que añade Hour caben en lo que queda.
@@ -52,9 +58,14 @@ export type DesignError =
 const isObject = (x: unknown): x is Json => typeof x === 'object' && x !== null && !Array.isArray(x);
 const str = (x: unknown): string => (typeof x === 'string' ? x : '');
 
+/** Bytes UTF-8 de un texto: la base cuenta bytes, no unidades de JavaScript. */
+export function byteLength(s: string): number {
+  return new TextEncoder().encode(s).length;
+}
+
 /** Una imagen de envío de Hour, de este espacio (ADR-172). */
 export function isOwnMailImage(src: string, workspaceId: string): boolean {
-  return /^\/m\/ws\/[0-9a-f-]{36}\/mail\/[A-Za-z0-9._-]+$/.test(src) && src.startsWith(`/m/ws/${workspaceId}/mail/`);
+  return isHourMailImage(src, workspaceId);
 }
 
 /** Un enlace que un correo puede llevar: vacío, http(s) o mailto. */
@@ -66,7 +77,7 @@ export function isSafeLink(url: string): boolean {
 /** El JSON cumple lo que la pantalla ofrece. null si vale; si no, por qué. */
 export function checkDesign(content: unknown, workspaceId: string): DesignError | null {
   if (!isObject(content) || !Array.isArray(content.blocks) || !isObject(content.settings)) return 'design_shape';
-  if (JSON.stringify(content).length > DESIGN_MAX_BYTES) return 'design_too_large';
+  if (byteLength(JSON.stringify(content)) > DESIGN_MAX_BYTES) return 'design_too_large';
   let count = 0;
   const image = (src: unknown) => str(src) === '' || isOwnMailImage(str(src), workspaceId);
   const background = (bg: unknown) => bg === undefined || bg === null || (isObject(bg) && image(bg.url));
@@ -106,43 +117,13 @@ export function checkDesign(content: unknown, workspaceId: string): DesignError 
 
 // ── Limpiar el HTML compilado ──────────────────────────────────────────────
 
-const DROP_WITH_CONTENT = /<(script|iframe|object|embed|form|textarea|select|svg|math|noscript|template)\b[\s\S]*?<\/\1\s*>/gi;
-const DROP_TAG = /<\/?(script|iframe|object|embed|form|input|button|textarea|select|option|svg|math|noscript|template|base|link|frame|frameset|applet)\b[^>]*>/gi;
-const META_REFRESH = /<meta\b[^>]*http-equiv\s*=\s*["']?refresh[^>]*>/gi;
-const ON_ATTR = /\s+on[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi;
-const BAD_URL_ATTR = /\s+(href|src|background|action|formaction|xlink:href)\s*=\s*("\s*(?:javascript|vbscript|data):[^"]*"|'\s*(?:javascript|vbscript|data):[^']*'|(?:javascript|vbscript|data):[^\s>]*)/gi;
-const CSS_EXPR = /expression\s*\(|url\s*\(\s*["']?\s*(?:javascript|vbscript):/gi;
-const STYLE_BLOCK = /(<style\b[^>]*>)([\s\S]*?)(<\/style\s*>)/gi;
-const STYLE_ATTR = /(\sstyle\s*=\s*)("[^"]*"|'[^']*')/gi;
-const CSS_IMPORT = /@import\b[^;]*;?/gi;
-const CSS_URL = /url\(\s*(["']?)([^"')]*)\1\s*\)/gi;
-
 /**
- * Inside CSS only Hour's own images (`/m/…`, made absolute later) may load:
- * an `@import` or a `url()` elsewhere would fetch from outside when the mail
- * is opened (ADR-190).
+ * El HTML limpio (ADR-190, `mail-sanitize.ts`): parser y listas blancas. Al
+ * guardar se pasa el espacio, y solo valen sus imágenes; al montar el correo
+ * se vuelve a limpiar lo que diga la base, con cualquier imagen de Hour.
  */
-function cleanCss(css: string): string {
-  return css
-    .replace(CSS_IMPORT, '')
-    .replace(CSS_URL, (whole, _q: string, target: string) => (/^\/m\//.test(target.trim()) ? whole : 'none'));
-}
-
-/**
- * Lo que un correo no debe llevar, fuera. Es una segunda capa: el HTML lo
- * compila el editor de alguien con permiso de editar el envío, y los
- * clientes de correo y la vista previa (iframe sin scripts) ya lo neutralizan.
- */
-export function sanitizeDesignHtml(html: string): string {
-  return html
-    .replace(DROP_WITH_CONTENT, '')
-    .replace(DROP_TAG, '')
-    .replace(META_REFRESH, '')
-    .replace(ON_ATTR, '')
-    .replace(BAD_URL_ATTR, '')
-    .replace(CSS_EXPR, 'invalid(')
-    .replace(STYLE_BLOCK, (_w, open: string, css: string, close: string) => `${open}${cleanCss(css)}${close}`)
-    .replace(STYLE_ATTR, (_w, attr: string, value: string) => `${attr}${cleanCss(value)}`);
+export function sanitizeDesignHtml(html: string, workspaceId?: string | null): string {
+  return sanitizeMailHtml(html, { workspaceId });
 }
 
 // ── Texto plano ────────────────────────────────────────────────────────────
@@ -232,28 +213,59 @@ export interface DesignedParts {
 }
 
 /**
- * El HTML compilado (con los campos ya puestos) más lo que pone Hour. El
- * diseño no lleva pie: lo añade esto, al final del cuerpo, con la misma
- * forma que en una carta.
+ * Lo que blinda lo que pone Hour frente a la hoja del diseño (ADR-190): un
+ * estilo en línea con `!important` gana a cualquier `!important` de una hoja,
+ * así que el pie y sus antepasados (`html`, `body`) no se pueden esconder,
+ * encoger ni recortar desde el CSS del diseño.
+ */
+const SHOWN = 'display:block!important;visibility:visible!important;opacity:1!important;height:auto!important;max-height:none!important;overflow:visible!important;transform:none!important;filter:none!important;clip-path:none!important';
+
+const FOOT_DISPLAY: Record<string, string> = { table: 'table', tbody: 'table-row-group', tr: 'table-row', td: 'table-cell', p: 'block', a: 'inline' };
+
+/** Every element of the footer: its own declarations made `!important`, and shown. */
+function hardenFooter(html: string): string {
+  return html.replace(/<([a-z]+)([^>]*)>/g, (whole, tag: string, attrs: string) => {
+    const display = FOOT_DISPLAY[tag];
+    if (!display) return whole;
+    const own = /\sstyle="([^"]*)"/.exec(attrs)?.[1] ?? '';
+    const decls = own
+      .split(';')
+      .map((d) => d.trim())
+      .filter(Boolean)
+      .map((d) => (/!important$/.test(d) ? d : `${d}!important`));
+    const style = [...decls, `display:${display}!important`, 'visibility:visible!important', 'opacity:1!important'].join(';');
+    return `<${tag}${attrs.replace(/\sstyle="[^"]*"/, '')} style="${style}">`;
+  });
+}
+
+/**
+ * El HTML del diseño, limpio (`sanitizeDesignHtml`: un solo `<head>` y un
+ * solo `<body>`, todo cerrado) y con los campos ya puestos y escapados, más
+ * lo que pone Hour: `lang`, imágenes absolutas, texto de previsualización y
+ * el pie como último hijo de `<body>`, fuera de todo lo del diseño.
  */
 export function designedHtml(html: string, parts: DesignedParts): string {
   const lang = escapeHtml(parts.language || 'es');
   let out = html;
   if (parts.origin) {
     const origin = parts.origin.replace(/\/+$/, '');
-    out = out.replace(/(\s(?:src|href|background)\s*=\s*["'])\/m\//gi, `$1${origin}/m/`);
+    out = out.replace(/(\s(?:src|href|background)=")\/m\//g, `$1${origin}/m/`);
     out = out.replace(/(url\(\s*["']?)\/m\//gi, `$1${origin}/m/`);
   }
-  out = /<html\b[^>]*\blang\s*=/i.test(out)
-    ? out.replace(/(<html\b[^>]*\blang\s*=\s*)("[^"]*"|'[^']*'|[^\s>]+)/i, `$1"${lang}"`)
-    : out.replace(/<html\b/i, `<html lang="${lang}"`);
-  const preheader = parts.preheader?.trim()
-    ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;font-size:1px;line-height:1px;">${escapeHtml(parts.preheader.trim())}</div>`
-    : '';
-  const footer = footerTable({ footer: parts.footer, footerHtml: parts.footerHtml });
-  if (/<body\b[^>]*>/i.test(out)) out = out.replace(/<body\b[^>]*>/i, (b) => `${b}${preheader}`);
-  else out = `${preheader}${out}`;
-  return /<\/body>/i.test(out) ? out.replace(/<\/body>/i, `${footer}</body>`) : `${out}${footer}`;
+  // The <html> tag is ours (the sanitizer writes it): set or replace lang.
+  out = out.replace(/^(<!doctype html>)?<html([^>]*)>/i, (_w, doctype: string | undefined, attrs: string) => {
+    const rest = attrs.replace(/\slang="[^"]*"/, '');
+    return `${doctype ?? ''}<html lang="${lang}"${rest} style="${SHOWN}">`;
+  });
+  out = out.replace(/<body(\s+style="([^"]*)")?>/, (_w, _a: string, css: string | undefined) => {
+    const preheader = parts.preheader?.trim()
+      ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;font-size:1px;line-height:1px;">${escapeHtml(parts.preheader.trim())}</div>`
+      : '';
+    return `<body style="${css ? `${css};` : ''}${SHOWN};margin:0!important;padding:0!important">${preheader}`;
+  });
+  const footer = hardenFooter(footerTable({ footer: parts.footer, footerHtml: parts.footerHtml }));
+  const at = out.lastIndexOf('</body>');
+  return at < 0 ? `${out}${footer}` : `${out.slice(0, at)}${footer}${out.slice(at)}`;
 }
 
 /**
@@ -268,8 +280,8 @@ export function prepareDesign(
   const why = checkDesign(design.content, workspaceId);
   if (why) return { error: why };
   const content = design.content as DesignContent;
-  const html = sanitizeDesignHtml(design.html);
-  if (!html.trim() || html.length > DESIGN_HTML_MAX) return { error: 'design_html' };
+  const html = sanitizeDesignHtml(design.html, workspaceId);
+  if (!/<body[^>]*>\s*\S/.test(html) || byteLength(html) > DESIGN_HTML_MAX) return { error: 'design_html' };
   const body = designText(content);
   if (!body) return { error: 'design_empty' };
   if (body.length > maxBody) return { error: 'design_too_large' };
