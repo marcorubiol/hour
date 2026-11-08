@@ -3,6 +3,8 @@ import { waitForLoaded } from './loaded';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
+const SB_URL = process.env.PUBLIC_SUPABASE_URL;
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 /**
  * E2E: «Import chat» (128, ADR-189), the WhatsApp «Export chat» brought into
@@ -10,9 +12,12 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  *
  * THE SUITE OWNS ITS ROW (see conversation-write.spec.ts): a fixture person
  * in the `playwright` workspace, project zzz-e2e-collab, created and
- * soft-deleted here. Each run writes messages with its own mark in the text,
- * so their fingerprints are new every time; the messages themselves stay
- * (phase 1 has no delete path), out of view once the conversation is gone.
+ * soft-deleted here. The conversation comes back from the dead with what it
+ * had, and the API cannot delete what an import writes (phase 1), so with the
+ * service key the spec purges, before and after, the fixture's WhatsApp
+ * events and the chats named after the fixture (their messages and placements
+ * go with them): nothing piles up in `playwright`. Every screen check also
+ * filters by this run's mark.
  *
  * 1. `?importar` (the iPhone shortcut) opens the sheet; a .txt in the
  *    iPhone format is read on the device; the other author is matched to
@@ -61,6 +66,29 @@ async function clean(page: Page) {
   }, live.map((c) => c.id));
 }
 
+async function serviceDelete(path: string): Promise<void> {
+  const res = await fetch(new URL(`/rest/v1/${path}`, SB_URL), {
+    method: 'DELETE',
+    headers: { apikey: SERVICE_KEY!, Authorization: `Bearer ${SERVICE_KEY}` },
+  });
+  if (!res.ok) throw new Error(`DELETE ${path} ${res.status}: ${await res.text()}`);
+}
+
+/**
+ * What imports of this fixture left: its WhatsApp events, then its chats
+ * (named after the file, «WhatsApp Chat with NAME»), whose members, messages
+ * and placements go with them (ON DELETE CASCADE).
+ */
+async function purge(page: Page, conversationId: string) {
+  const ws = await page.evaluate(async () => {
+    type Ws = { id: string; slug: string };
+    return ((await fetch('/api/workspaces').then((r) => r.json())) as { items: Ws[] }).items.find((w) => w.slug === 'playwright')?.id;
+  });
+  if (!ws) throw new Error('no fixture workspace');
+  await serviceDelete(`conversation_event?conversation_id=eq.${conversationId}&source=eq.whatsapp`);
+  await serviceDelete(`channel_chat?workspace_id=eq.${ws}&title=eq.${encodeURIComponent(NAME)}`);
+}
+
 async function events(page: Page, id: string): Promise<Ev[]> {
   return await page.evaluate(async (id) => {
     const res = await fetch(`/api/conversations/${id}/events`);
@@ -68,7 +96,7 @@ async function events(page: Page, id: string): Promise<Ev[]> {
   }, id);
 }
 
-/** An iPhone export of today, a few minutes ago, with this run's mark in every text. */
+/** An iPhone export of today, a few minutes ago, with this run's mark in every text and file name. */
 function exportText(mark: string): string {
   const now = new Date();
   const at = (minAgo: number) => {
@@ -79,7 +107,8 @@ function exportText(mark: string): string {
   return [
     `${at(30)} ${NAME}: E2E ${mark}: do you have dates in May?`,
     `${at(25)} ${ME}: E2E ${mark}: yes, 12 to 16 May.`,
-    `${at(24)} ${NAME}: ‎image omitted`,
+    // An attached file named with the mark: the attachment line can be found by it.
+    `${at(24)} ${NAME}: ‎<attached: 00000012-Rider-${mark}.pdf>`,
   ].join('\n');
 }
 
@@ -107,6 +136,7 @@ async function openSheet(page: Page, text: string) {
 
 test.describe('import a WhatsApp chat', () => {
   test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL / PW_TEST_PASSWORD.');
+  test.skip(!SB_URL || !SERVICE_KEY, 'What an import writes is purged with the service key (.env).');
 
   test('imports into the only candidate, says it is imported, and a second import adds nothing', async ({ page }) => {
     test.setTimeout(120_000);
@@ -125,6 +155,7 @@ test.describe('import a WhatsApp chat', () => {
       },
       { projectId, name: NAME, email: PERSON_EMAIL },
     );
+    await purge(page, created);
     const mark = Date.now().toString(36);
     const text = exportText(mark);
 
@@ -150,15 +181,15 @@ test.describe('import a WhatsApp chat', () => {
       };
       await expect.poll(async () => (await mine()).length, { timeout: 20_000 }).toBe(3);
       const evs = await mine();
-      expect(evs.find((e) => e.body?.includes('dates in May'))).toMatchObject({ direction: 'inbound', via: 'whatsapp', sender: NAME });
-      expect(evs.find((e) => e.body?.includes('12 to 16 May'))).toMatchObject({ direction: 'outbound' });
+      expect(evs.find((e) => e.body?.includes(`${mark}: do you have dates in May?`))).toMatchObject({ direction: 'inbound', via: 'whatsapp', sender: NAME });
+      expect(evs.find((e) => e.body?.includes(`${mark}: yes, 12 to 16 May.`))).toMatchObject({ direction: 'outbound' });
       // Día/mes de un iPhone leído en un navegador en inglés: hoy, no el mes y el día cambiados.
       const when = evs[0]?.occurred_at ?? '';
       expect(Math.abs(Date.parse(when) - Date.now())).toBeLessThan(2 * 3_600_000);
 
       await page.goto(`/h/playwright/conversation/${created}`);
-      await expect(page.getByTestId('thread-logged').filter({ hasText: 'dates in May' })).toContainText('imported');
-      await expect(page.getByTestId('thread-attachments').first()).toContainText('Photo');
+      await expect(page.getByTestId('thread-logged').filter({ hasText: `${mark}: do you have dates in May?` })).toContainText('imported');
+      await expect(page.getByTestId('thread-attachments').filter({ hasText: `Rider-${mark}.pdf` })).toContainText('Document');
 
       // The same file again: everything is already there.
       const again = await openSheet(page, text);
@@ -167,6 +198,7 @@ test.describe('import a WhatsApp chat', () => {
       await expect(again.getByRole('button', { name: 'Import (0)' })).toBeDisabled();
     } finally {
       await clean(page);
+      await purge(page, created);
     }
   });
 
@@ -187,6 +219,7 @@ test.describe('import a WhatsApp chat', () => {
       },
       { projectId, name: NAME, email: PERSON_EMAIL },
     );
+    await purge(page, created);
     const mark = `undo-${Date.now().toString(36)}`;
 
     try {
@@ -199,6 +232,7 @@ test.describe('import a WhatsApp chat', () => {
       expect(evs).toHaveLength(0);
     } finally {
       await clean(page);
+      await purge(page, created);
     }
   });
 });
