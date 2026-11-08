@@ -28,7 +28,7 @@ const PERSON_EMAIL = 'zzz-e2e-whatsapp@hour.test';
 const ME = 'ZZZ Me';
 
 type Live = { id: string; person: { email: string | null } | null };
-type Ev = { source: string; direction: string | null; body: string | null; via: string | null; sender?: string | null; occurred_at?: string };
+type Ev = { source: string; direction: string | null; body: string | null; via: string | null; sender?: string | null; occurred_at?: string; recorded_at?: string };
 
 async function fixtureProjectId(page: Page): Promise<string> {
   return await page.evaluate(async (): Promise<string> => {
@@ -137,11 +137,19 @@ test.describe('import a WhatsApp chat', () => {
       await expect(dialog).not.toBeVisible();
       await expect(page.locator('.toast', { hasText: 'Messages imported: 3.' })).toBeVisible();
 
-      // It writes once «Undo» runs out.
-      await expect
-        .poll(async () => (await events(page, created)).filter((e) => e.source === 'whatsapp').length, { timeout: 20_000 })
-        .toBe(3);
-      const evs = (await events(page, created)).filter((e) => e.source === 'whatsapp');
+      // It writes once «Undo» runs out. The fixture conversation comes back
+      // from the dead WITH the events of earlier runs (create resurrects it),
+      // so only this run counts: the two texts carry its mark, and the photo
+      // was written in the same call (same `recorded_at`). Counting every
+      // WhatsApp event passed at once on the 3 of the run before, read their
+      // August date and closed the page before this import wrote (2026-11-08).
+      const mine = async () => {
+        const all = (await events(page, created)).filter((e) => e.source === 'whatsapp');
+        const stamp = all.find((e) => e.body?.includes(mark))?.recorded_at;
+        return stamp ? all.filter((e) => e.recorded_at === stamp) : [];
+      };
+      await expect.poll(async () => (await mine()).length, { timeout: 20_000 }).toBe(3);
+      const evs = await mine();
       expect(evs.find((e) => e.body?.includes('dates in May'))).toMatchObject({ direction: 'inbound', via: 'whatsapp', sender: NAME });
       expect(evs.find((e) => e.body?.includes('12 to 16 May'))).toMatchObject({ direction: 'outbound' });
       // Día/mes de un iPhone leído en un navegador en inglés: hoy, no el mes y el día cambiados.
