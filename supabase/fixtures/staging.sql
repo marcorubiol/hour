@@ -17,7 +17,7 @@ $$;
 -- new login a personal account and workspace, and since
 -- 20260730164435_bind_auth_user_trigger that trigger is in the migrations, so
 -- a rebuilt staging runs it for each fixture user. This file was written
--- before that and builds its own four spaces with fixed ids; with the
+-- before that and builds its own five spaces with fixed ids; with the
 -- trigger's three on top, the shape check counted 7 and cross-tenant would see
 -- a space nobody seeded. The fixed ids are excluded so a re-run on a loaded
 -- base keeps the fixture's own rows. Workspaces go first: `workspace.account_id`
@@ -25,7 +25,8 @@ $$;
 delete from public.workspace w
 where w.id not in (
     '20000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000002',
-    '20000000-0000-4000-8000-000000000003', '20000000-0000-4000-8000-000000000004'
+    '20000000-0000-4000-8000-000000000003', '20000000-0000-4000-8000-000000000004',
+    '20000000-0000-4000-8000-000000000005'
   )
   and exists (
     select 1
@@ -39,7 +40,8 @@ where w.id not in (
 delete from public.account a
 where a.id not in (
     '10000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000002',
-    '10000000-0000-4000-8000-000000000003', '10000000-0000-4000-8000-000000000004'
+    '10000000-0000-4000-8000-000000000003', '10000000-0000-4000-8000-000000000004',
+    '10000000-0000-4000-8000-000000000005'
   )
   and exists (
     select 1
@@ -54,7 +56,8 @@ values
   ('10000000-0000-4000-8000-000000000001', 'playwright-acc', 'Playwright Account', 'personal', 'playwright@hour.test'),
   ('10000000-0000-4000-8000-000000000002', 'mamemi-acc', 'Synthetic MaMeMi Account', 'team', null),
   ('10000000-0000-4000-8000-000000000003', 'marco-rubiol-acc', 'Synthetic Marco Account', 'personal', null),
-  ('10000000-0000-4000-8000-000000000004', 'demo-acc', 'Invisible Demo Account', 'team', null)
+  ('10000000-0000-4000-8000-000000000004', 'demo-acc', 'Invisible Demo Account', 'team', null),
+  ('10000000-0000-4000-8000-000000000005', 'external-acc', 'External Staging Account', 'personal', 'external@hour.test')
 on conflict (id) do update set name = excluded.name, updated_at = now(), deleted_at = null;
 
 insert into public.account_membership (account_id, user_id, role, accepted_at, revoked_at)
@@ -69,12 +72,20 @@ where email = 'playwright@hour.test'
 on conflict (account_id, user_id) do update
 set role = excluded.role, accepted_at = excluded.accepted_at, revoked_at = null;
 
+insert into public.account_membership (account_id, user_id, role, accepted_at, revoked_at)
+select '10000000-0000-4000-8000-000000000005', id, 'owner', '2026-01-01T00:00:00Z', null
+from auth.users
+where email = 'external@hour.test'
+on conflict (account_id, user_id) do update
+set role = excluded.role, accepted_at = excluded.accepted_at, revoked_at = null;
+
 insert into public.workspace (id, slug, name, kind, account_id, domain, city)
 values
   ('20000000-0000-4000-8000-000000000001', 'playwright', 'Playwright Staging', 'personal', '10000000-0000-4000-8000-000000000001', 'mixed', 'Testville'),
   ('20000000-0000-4000-8000-000000000002', 'muk-cia', 'Synthetic Muk Cia', 'team', '10000000-0000-4000-8000-000000000002', 'theatre', 'Testville'),
   ('20000000-0000-4000-8000-000000000003', 'marco-rubiol', 'Synthetic Marco Workspace', 'personal', '10000000-0000-4000-8000-000000000003', 'other', 'Testville'),
-  ('20000000-0000-4000-8000-000000000004', 'demo', 'Invisible Demo Workspace', 'team', '10000000-0000-4000-8000-000000000004', 'other', 'Testville')
+  ('20000000-0000-4000-8000-000000000004', 'demo', 'Invisible Demo Workspace', 'team', '10000000-0000-4000-8000-000000000004', 'other', 'Testville'),
+  ('20000000-0000-4000-8000-000000000005', 'external-space', 'External Staging Space', 'personal', '10000000-0000-4000-8000-000000000005', 'other', 'Testville')
 on conflict (id) do update
 set name = excluded.name, domain = excluded.domain, city = excluded.city, updated_at = now(), deleted_at = null;
 
@@ -95,7 +106,8 @@ select fixture.workspace_id, 'workspace', users.id, fixture.role::public.members
 from (
   values
     ('playwright@hour.test', '20000000-0000-4000-8000-000000000001'::uuid, 'owner', '2026-01-01T00:00:00Z'::timestamptz),
-    ('limited@hour.test', '20000000-0000-4000-8000-000000000001'::uuid, 'member', '2026-01-04T00:00:00Z'::timestamptz)
+    ('limited@hour.test', '20000000-0000-4000-8000-000000000001'::uuid, 'member', '2026-01-04T00:00:00Z'::timestamptz),
+    ('external@hour.test', '20000000-0000-4000-8000-000000000005'::uuid, 'owner', '2026-01-01T00:00:00Z'::timestamptz)
 ) as fixture(email, workspace_id, role, accepted_at)
 join auth.users users on users.email = fixture.email
 on conflict (workspace_id, user_id) where level = 'workspace' do update

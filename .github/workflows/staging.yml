@@ -108,7 +108,7 @@ jobs:
           # count was 7 and not 4 (_tasks.md § 39).
           echo "fixture shape: $actual"
           echo "$actual" | jq -e \
-            '. == {"users": 3, "workspaces": 4, "conversations": 178}' >/dev/null
+            '. == {"users": 3, "workspaces": 5, "conversations": 178}' >/dev/null
 
       - name: RLS contract
         run: pnpm --filter web test:rls
