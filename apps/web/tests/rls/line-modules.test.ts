@@ -1,5 +1,5 @@
 /**
- * RLS regression — ADR-056 line modules: line.modules + conversation.line_id
+ * RLS regression — ADR-056 line modules: conversation.line_id
  * + the create/delete RPC pairs for expense and asset_version, exercised
  * against the live project as the fixture user and as anon.
  *
@@ -9,19 +9,18 @@
  * would accumulate forever. Conversation/expense/asset fixtures are
  * soft-deleted via their RPCs in `finally` blocks.
  *
- * These tests REQUIRE the 2026-07-12 migrations (conversation.line_id,
- * line.modules, the new RPCs). Red before they apply is expected.
+ * `line.modules` is gone (95, migration 20261110100000): a line draws its
+ * kind's modules (ADR-166), so nothing here reads or writes it.
  */
 
 import { beforeAll, describe, expect, test } from 'vitest';
-import { envReady, login, pgGet, pgPatch, pgRpc, requireEnv } from './_helpers';
+import { envReady, login, pgGet, pgRpc, requireEnv } from './_helpers';
 
 type LineRow = {
   id: string;
   slug: string | null;
   name: string;
   kind: string;
-  modules: string[] | null;
   project_id: string;
   workspace_id: string;
 };
@@ -70,7 +69,7 @@ describe.skipIf(!envReady())('RLS — ADR-056 line modules', () => {
       'line',
       jwt,
       new URLSearchParams({
-        select: 'id,slug,name,kind,modules,project_id,workspace_id',
+        select: 'id,slug,name,kind,project_id,workspace_id',
         project_id: `eq.${projectId}`,
         name: `eq.${FIXTURE_LINE_NAME}`,
         deleted_at: 'is.null',
@@ -84,24 +83,12 @@ describe.skipIf(!envReady())('RLS — ADR-056 line modules', () => {
         p_project_id: projectId,
         p_name: FIXTURE_LINE_NAME,
         p_kind: 'campaign',
-        p_modules: ['conversations', 'planner', 'materials', 'notes'],
       });
       if (created.status !== 200 || !created.data) {
         throw new Error(`create_line fixture failed: ${created.status}`);
       }
       fixtureLine = created.data as LineRow;
     }
-
-    // Crash recovery: a killed run may have left the fixture line's
-    // modules poisoned (lines have no delete path) — reset unconditionally
-    // so test 1's template assertion never inherits stale state.
-    await pgPatch<LineRow>(
-      'line',
-      jwt,
-      { modules: ['conversations', 'planner', 'materials', 'notes'] },
-      new URLSearchParams({ id: `eq.${fixtureLine.id}`, select: 'id' }),
-    );
-    fixtureLine.modules = ['conversations', 'planner', 'materials', 'notes'];
 
     // Crash recovery: soft-delete a leftover fixture conversation.
     const stale = await pgGet<{ id: string }>(
@@ -119,50 +106,10 @@ describe.skipIf(!envReady())('RLS — ADR-056 line modules', () => {
     }
   });
 
-  // ── create_line template shape ──────────────────────────────────────
-  test('create_line returns a slug and the template modules', () => {
-    // The fixture line was created (or found) with the booking template.
+  // ── create_line shape ───────────────────────────────────────────
+  test('create_line returns a slug and the kind', () => {
     expect(fixtureLine.slug).toBeTruthy();
     expect(fixtureLine.kind).toBe('campaign');
-    if (fixtureLine.modules !== null) {
-      expect(fixtureLine.modules).toEqual(['conversations', 'planner', 'materials', 'notes']);
-    }
-  });
-
-  test('line.modules PATCH round-trips for a member and is invisible to anon', async () => {
-    const next = ['notes', 'conversations'];
-    const patched = await pgPatch<LineRow>(
-      'line',
-      jwt,
-      { modules: next },
-      new URLSearchParams({
-        id: `eq.${fixtureLine.id}`,
-        deleted_at: 'is.null',
-        select: 'id,modules',
-      }),
-    );
-    try {
-      expect(patched.status).toBeLessThan(300);
-      expect(patched.rows[0]?.modules).toEqual(next);
-
-      const anon = await pgPatch<LineRow>(
-        'line',
-        null,
-        { modules: ['notes'] },
-        new URLSearchParams({ id: `eq.${fixtureLine.id}`, select: 'id,modules' }),
-      );
-      expect(anon.rows).toHaveLength(0);
-      expect(anon.status).not.toBe(500);
-    } finally {
-      // Restore the fixture's template shape — lines are permanent, a
-      // skipped restore would poison every later run (review 2026-07-12).
-      await pgPatch<LineRow>(
-        'line',
-        jwt,
-        { modules: ['conversations', 'planner', 'materials', 'notes'] },
-        new URLSearchParams({ id: `eq.${fixtureLine.id}`, select: 'id' }),
-      );
-    }
   });
 
   // ── conversation.line_id via create_conversation ────────────────────────

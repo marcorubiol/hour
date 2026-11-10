@@ -188,26 +188,26 @@ ALTER TABLE _seed_perf
   ADD COLUMN wrap_at timestamptz;
 INSERT INTO _seed_perf
   (id, workspace_id, project_id, line_id, bolo_id, performed_at, venue_id, venue_name, city, country, status, slug,
-   created_by, load_in_at, soundcheck_at, start_at, loadout_at, wrap_at, hold_notice_days, readiness, notes)
+   created_by, load_in_at, soundcheck_at, start_at, loadout_at, wrap_at, hold_notice_days, notes)
 VALUES
   -- ── the tail that already happened: Books needs history to have collected
   ('33330001-0000-4000-8000-000000000001', :'ws', :'mm', '22220002-0000-4000-8000-000000000002', '88880001-0000-4000-8000-000000000001', :t0 - 35,
    '11110003-0000-4000-8000-000000000003', 'Kursaal', 'Manresa', 'ES', 'paid', 'kursaal-passat', :'by',
-   :t0 - 35 + time '15:00', :t0 - 35 + time '18:00', :t0 - 35 + time '20:00', :t0 - 35 + time '22:45', :t0 - 35 + time '23:30', NULL, '{"hotel":true,"technical":true}', NULL),
+   :t0 - 35 + time '15:00', :t0 - 35 + time '18:00', :t0 - 35 + time '20:00', :t0 - 35 + time '22:45', :t0 - 35 + time '23:30', NULL, NULL),
   ('33330002-0000-4000-8000-000000000002', :'ws', :'uo', '22220003-0000-4000-8000-000000000003', '88880002-0000-4000-8000-000000000002', :t0 - 21,
    '1111000c-0000-4000-8000-00000000000c', 'La Mutant', 'València', 'ES', 'invoiced', 'mutant-passat', :'by',
-   NULL, :t0 - 21 + time '17:30', :t0 - 21 + time '20:00', NULL, NULL, NULL, '{"hotel":true,"technical":true}', NULL),
+   NULL, :t0 - 21 + time '17:30', :t0 - 21 + time '20:00', NULL, NULL, NULL, NULL),
   ('33330003-0000-4000-8000-000000000003', :'ws', :'mm', NULL, '88880003-0000-4000-8000-000000000003', :t0 - 10,
    '1111000d-0000-4000-8000-00000000000d', 'Sala Ártica', 'Zaragoza', 'ES', 'done', 'artica-passat', :'by',
-   NULL, NULL, :t0 - 10 + time '21:00', NULL, NULL, NULL, '{}', 'Van pagar en efectiu la mateixa nit.'),
+   NULL, NULL, :t0 - 10 + time '21:00', NULL, NULL, NULL, 'Van pagar en efectiu la mateixa nit.'),
 
   -- ── weekend 1 · a two-night run on ONE bolo, with the whole run sheet
   ('33330004-0000-4000-8000-000000000004', :'ws', :'mm', '22220002-0000-4000-8000-000000000002', '88880004-0000-4000-8000-000000000004', :f0,
    '11110001-0000-4000-8000-000000000001', 'Mercat de les Flors', 'Barcelona', 'ES', 'confirmed', 'flors-n1', :'by',
-   :f0 + time '14:00', :f0 + time '17:30', :f0 + time '20:00', :f0 + time '22:30', :f0 + time '23:30', NULL, '{"hotel":true,"technical":false}', 'Càmera fixa al fons de la sala.'),
+   :f0 + time '14:00', :f0 + time '17:30', :f0 + time '20:00', :f0 + time '22:30', :f0 + time '23:30', NULL, 'Càmera fixa al fons de la sala.'),
   ('33330005-0000-4000-8000-000000000005', :'ws', :'mm', '22220002-0000-4000-8000-000000000002', '88880004-0000-4000-8000-000000000004', :f0 + 1,
    '11110001-0000-4000-8000-000000000001', 'Mercat de les Flors', 'Barcelona', 'ES', 'confirmed', 'flors-n2', :'by',
-   NULL, :f0 + 1 + time '16:00', :f0 + 1 + time '18:00', NULL, NULL, NULL, '{"hotel":true,"technical":true}', NULL),
+   NULL, :f0 + 1 + time '16:00', :f0 + 1 + time '18:00', NULL, NULL, NULL, NULL),
 
   -- ── f0+7 · PEOPLE / RELEASE, urgent (one side confirmed, the other a hold
   --    that shares Anouk; notice 14 ⇒ decideBy already past)
@@ -216,153 +216,153 @@ VALUES
    :f0 + 7 + time '16:00', NULL, :f0 + 7 + time '20:30', NULL, NULL, NULL, '{"technical":true}', NULL),
   ('33330007-0000-4000-8000-000000000007', :'ws', :'mm', NULL, NULL, :f0 + 7,
    '11110002-0000-4000-8000-000000000002', 'Teatre Municipal', 'Girona', 'ES', 'hold_1', 'girona-hold', :'by',
-   NULL, NULL, :f0 + 7 + time '20:00', NULL, NULL, 14, '{}', NULL),
+   NULL, NULL, :f0 + 7 + time '20:00', NULL, NULL, 14, NULL),
   ('33330008-0000-4000-8000-000000000008', :'ws', :'uo', '22220003-0000-4000-8000-000000000003', '88880005-0000-4000-8000-000000000005', :f0 + 8,
    'bbbb0003-0000-4000-8000-000000000003', 'Nau Ivanow', 'Barcelona', 'ES', 'confirmed', 'ivanow-n2', :'by',
-   NULL, NULL, :f0 + 8 + time '20:30', NULL, NULL, NULL, '{}', NULL),
+   NULL, NULL, :f0 + 8 + time '20:30', NULL, NULL, NULL, NULL),
 
   -- ── f0+14 · PEOPLE / CHOOSE, urgent (both hold, standard 30-day notice)
   ('33330009-0000-4000-8000-000000000009', :'ws', :'mm', NULL, NULL, :f0 + 14,
    '11110008-0000-4000-8000-000000000008', 'Kampnagel', 'Hamburg', 'DE', 'hold_1', 'kampnagel-hold', :'by',
-   NULL, NULL, :f0 + 14 + time '20:00', NULL, NULL, NULL, '{}', NULL),
+   NULL, NULL, :f0 + 14 + time '20:00', NULL, NULL, NULL, NULL),
   ('3333000a-0000-4000-8000-00000000000a', :'ws', :'uo', NULL, NULL, :f0 + 14,
    '11110007-0000-4000-8000-000000000007', 'Teatro India', 'Roma', 'IT', 'hold_2', 'india-hold', :'by',
-   NULL, NULL, :f0 + 14 + time '21:00', NULL, NULL, NULL, '{}', NULL),
+   NULL, NULL, :f0 + 14 + time '21:00', NULL, NULL, NULL, NULL),
 
   -- ── f0+21 · DOUBLE / RELEASE — one project, two rooms, one already firm
   ('3333000b-0000-4000-8000-00000000000b', :'ws', :'mm', '22220002-0000-4000-8000-000000000002', '88880006-0000-4000-8000-000000000006', :f0 + 21,
    'bbbb0001-0000-4000-8000-000000000001', 'Teatre Principal', 'Terrassa', 'ES', 'confirmed', 'terrassa-n1', :'by',
-   :f0 + 21 + time '15:30', :f0 + 21 + time '18:00', :f0 + 21 + time '20:00', :f0 + 21 + time '22:30', NULL, NULL, '{"hotel":false,"technical":true}', NULL),
+   :f0 + 21 + time '15:30', :f0 + 21 + time '18:00', :f0 + 21 + time '20:00', :f0 + 21 + time '22:30', NULL, NULL, NULL),
   ('3333000c-0000-4000-8000-00000000000c', :'ws', :'mm', NULL, NULL, :f0 + 21,
    '1111000b-0000-4000-8000-00000000000b', 'Azkuna Zentroa', 'Bilbao', 'ES', 'hold_2', 'azkuna-hold', :'by',
-   NULL, NULL, :f0 + 21 + time '19:00', NULL, NULL, 45, '{}', NULL),
+   NULL, NULL, :f0 + 21 + time '19:00', NULL, NULL, 45, NULL),
 
   -- ── f0+28 · POSSIBLE / CHOOSE, urgent — the draft project has no cast, so
   --    the engine refuses to assert people friction and says "possible"
   ('3333000d-0000-4000-8000-00000000000d', :'ws', :'op', NULL, NULL, :f0 + 28,
    '1111000d-0000-4000-8000-00000000000d', 'Sala Ártica', 'Zaragoza', 'ES', 'hold_1', 'artica-hold', :'by',
-   NULL, NULL, :f0 + 28 + time '20:00', NULL, NULL, 120, '{}', NULL),
+   NULL, NULL, :f0 + 28 + time '20:00', NULL, NULL, 120, NULL),
   ('3333000e-0000-4000-8000-00000000000e', :'ws', :'mm', NULL, '88880007-0000-4000-8000-000000000007', :f0 + 28,
    '11110009-0000-4000-8000-000000000009', 'Gessnerallee', 'Zürich', 'CH', 'hold_2', 'gessner-hold', :'by',
-   NULL, NULL, :f0 + 28 + time '20:00', NULL, NULL, 0, '{}', 'Notice 0: un hold que no caduca mai sol.'),
+   NULL, NULL, :f0 + 28 + time '20:00', NULL, NULL, 0, 'Notice 0: un hold que no caduca mai sol.'),
 
   -- ── f0+42 · CONCURRENCE — two holds, known and DISJOINT teams. No crew
   --    here on purpose: one shared regidor would turn this red.
   ('3333000f-0000-4000-8000-00000000000f', :'ws', :'ze', NULL, NULL, :f0 + 42,
    '11110002-0000-4000-8000-000000000002', 'Teatre Municipal', 'Girona', 'ES', 'hold_1', 'zoo-girona-hold', :'by',
-   NULL, NULL, :f0 + 42 + time '19:00', NULL, NULL, 30, '{}', NULL),
+   NULL, NULL, :f0 + 42 + time '19:00', NULL, NULL, 30, NULL),
   ('33330010-0000-4000-8000-000000000010', :'ws', :'uo', NULL, NULL, :f0 + 42,
    '11110003-0000-4000-8000-000000000003', 'Kursaal', 'Manresa', 'ES', 'hold_3', 'kursaal-hold', :'by',
-   NULL, NULL, :f0 + 42 + time '21:00', NULL, NULL, 30, '{}', NULL),
+   NULL, NULL, :f0 + 42 + time '21:00', NULL, NULL, 30, NULL),
 
   -- ── f0+49/50 · DOUBLE / CHOOSE, and the day after a BLACKOUT (Jordi away)
   ('33330011-0000-4000-8000-000000000011', :'ws', :'mm', NULL, NULL, :f0 + 49,
    '1111000d-0000-4000-8000-00000000000d', 'Sala Ártica', 'Zaragoza', 'ES', 'hold_1', 'artica-hold-2', :'by',
-   NULL, NULL, :f0 + 49 + time '20:30', NULL, NULL, 20, '{}', NULL),
+   NULL, NULL, :f0 + 49 + time '20:30', NULL, NULL, 20, NULL),
   ('33330012-0000-4000-8000-000000000012', :'ws', :'mm', NULL, NULL, :f0 + 49,
    '11110002-0000-4000-8000-000000000002', 'Teatre Municipal', 'Girona', 'ES', 'hold_3', 'girona-hold-2', :'by',
-   NULL, NULL, :f0 + 49 + time '20:00', NULL, NULL, 20, '{}', NULL),
+   NULL, NULL, :f0 + 49 + time '20:00', NULL, NULL, 20, NULL),
   ('33330013-0000-4000-8000-000000000013', :'ws', :'mm', '22220002-0000-4000-8000-000000000002', '88880008-0000-4000-8000-000000000008', :f0 + 50,
    '11110003-0000-4000-8000-000000000003', 'Kursaal', 'Manresa', 'ES', 'confirmed', 'kursaal-n1', :'by',
-   :f0 + 50 + time '15:00', :f0 + 50 + time '18:00', :f0 + 50 + time '20:00', :f0 + 50 + time '23:00', NULL, NULL, '{"hotel":true,"technical":true}', NULL),
+   :f0 + 50 + time '15:00', :f0 + 50 + time '18:00', :f0 + 50 + time '20:00', :f0 + 50 + time '23:00', NULL, NULL, NULL),
 
   -- ── f0+56..58 · the première: two firm nights and a third still proposed
   ('33330014-0000-4000-8000-000000000014', :'ws', :'ze', '22220006-0000-4000-8000-000000000006', '88880009-0000-4000-8000-000000000009', :f0 + 56,
    '11110001-0000-4000-8000-000000000001', 'Mercat de les Flors', 'Barcelona', 'ES', 'confirmed', 'zoo-estrena', :'by',
-   :f0 + 56 + time '10:00', :f0 + 56 + time '17:00', :f0 + 56 + time '20:00', :f0 + 56 + time '23:00', :f0 + 56 + time '23:59', NULL, '{"hotel":true,"technical":true}', 'Estrena. Ve tothom.'),
+   :f0 + 56 + time '10:00', :f0 + 56 + time '17:00', :f0 + 56 + time '20:00', :f0 + 56 + time '23:00', :f0 + 56 + time '23:59', NULL, 'Estrena. Ve tothom.'),
   ('33330015-0000-4000-8000-000000000015', :'ws', :'ze', '22220006-0000-4000-8000-000000000006', '88880009-0000-4000-8000-000000000009', :f0 + 57,
    '11110001-0000-4000-8000-000000000001', 'Mercat de les Flors', 'Barcelona', 'ES', 'confirmed', 'zoo-n2', :'by',
    NULL, :f0 + 57 + time '17:00', :f0 + 57 + time '20:00', NULL, NULL, NULL, '{"technical":true}', NULL),
   ('33330016-0000-4000-8000-000000000016', :'ws', :'ze', '22220006-0000-4000-8000-000000000006', NULL, :f0 + 58,
    NULL, NULL, NULL, NULL, 'proposed', 'zoo-n3', :'by',
-   NULL, NULL, NULL, NULL, NULL, NULL, '{}', 'Tercera funció encara sense sala ni hora.'),
+   NULL, NULL, NULL, NULL, NULL, NULL, 'Tercera funció encara sense sala ni hora.'),
 
   -- ── f0+63..68 · the Europe tour: outbound, gig, leg, gig, return
   ('33330017-0000-4000-8000-000000000017', :'ws', :'uo', '22220004-0000-4000-8000-000000000004', '8888000a-0000-4000-8000-00000000000a', :f0 + 64,
    '11110004-0000-4000-8000-000000000004', 'Teatro Maria Matos', 'Lisboa', 'PT', 'confirmed', 'matos-gig', :'by',
-   :f0 + 64 + time '14:00', :f0 + 64 + time '18:00', :f0 + 64 + time '21:00', NULL, NULL, NULL, '{"hotel":true,"technical":true}', NULL),
+   :f0 + 64 + time '14:00', :f0 + 64 + time '18:00', :f0 + 64 + time '21:00', NULL, NULL, NULL, NULL),
   ('33330018-0000-4000-8000-000000000018', :'ws', :'uo', '22220004-0000-4000-8000-000000000004', '8888000b-0000-4000-8000-00000000000b', :f0 + 66,
    '11110005-0000-4000-8000-000000000005', 'Teatro Rivoli', 'Porto', 'PT', 'confirmed', 'rivoli-gig', :'by',
-   :f0 + 66 + time '13:00', :f0 + 66 + time '17:00', :f0 + 66 + time '21:30', NULL, NULL, NULL, '{"hotel":true,"technical":false}', NULL),
+   :f0 + 66 + time '13:00', :f0 + 66 + time '17:00', :f0 + 66 + time '21:30', NULL, NULL, NULL, NULL),
 
   -- ── f0+72 · BLACKOUT-TENTATIVE (Nils has a maybe that week)
   ('33330019-0000-4000-8000-000000000019', :'ws', :'uo', '22220003-0000-4000-8000-000000000003', '8888000c-0000-4000-8000-00000000000c', :f0 + 72,
    'bbbb0002-0000-4000-8000-000000000002', 'Cafe OTO', 'London', 'GB', 'confirmed', 'oto-gig', :'by',
-   :f0 + 72 + time '15:00', NULL, :f0 + 72 + time '20:00', NULL, NULL, NULL, '{"hotel":false,"technical":true}', NULL),
+   :f0 + 72 + time '15:00', NULL, :f0 + 72 + time '20:00', NULL, NULL, NULL, NULL),
 
   -- ── f0+77 · POSSIBLE / CHOOSE, NOT urgent (notice 14 ⇒ decideBy in the future)
   ('3333001a-0000-4000-8000-00000000001a', :'ws', :'op', NULL, NULL, :f0 + 77,
    'bbbb0003-0000-4000-8000-000000000003', 'Nau Ivanow', 'Barcelona', 'ES', 'hold_1', 'ivanow-hold', :'by',
-   NULL, NULL, :f0 + 77 + time '20:00', NULL, NULL, 14, '{}', NULL),
+   NULL, NULL, :f0 + 77 + time '20:00', NULL, NULL, 14, NULL),
   ('3333001b-0000-4000-8000-00000000001b', :'ws', :'mm', NULL, NULL, :f0 + 77,
    '1111000c-0000-4000-8000-00000000000c', 'La Mutant', 'València', 'ES', 'hold_2', 'mutant-hold', :'by',
-   NULL, NULL, :f0 + 77 + time '19:30', NULL, NULL, 14, '{}', NULL),
+   NULL, NULL, :f0 + 77 + time '19:30', NULL, NULL, 14, NULL),
 
   -- ── f0+88 · inside the company-wide blackout
   ('3333001c-0000-4000-8000-00000000001c', :'ws', :'mm', NULL, NULL, :f0 + 88,
    '11110006-0000-4000-8000-000000000006', 'La Villette', 'Paris', 'FR', 'hold_1', 'villette-hold', :'by',
-   NULL, NULL, :f0 + 88 + time '20:30', NULL, NULL, 30, '{}', NULL),
+   NULL, NULL, :f0 + 88 + time '20:30', NULL, NULL, 30, NULL),
 
   -- ── f0+90 · PEOPLE / CHOOSE, NOT urgent
   ('3333001d-0000-4000-8000-00000000001d', :'ws', :'mm', NULL, NULL, :f0 + 90,
    'bbbb0001-0000-4000-8000-000000000001', 'Teatre Principal', 'Terrassa', 'ES', 'hold_1', 'terrassa-hold', :'by',
-   NULL, NULL, :f0 + 90 + time '20:00', NULL, NULL, 30, '{}', NULL),
+   NULL, NULL, :f0 + 90 + time '20:00', NULL, NULL, 30, NULL),
   ('3333001e-0000-4000-8000-00000000001e', :'ws', :'uo', NULL, NULL, :f0 + 90,
    '11110003-0000-4000-8000-000000000003', 'Kursaal', 'Manresa', 'ES', 'hold_2', 'kursaal-hold-2', :'by',
-   NULL, NULL, :f0 + 90 + time '21:00', NULL, NULL, 30, '{}', NULL),
+   NULL, NULL, :f0 + 90 + time '21:00', NULL, NULL, 30, NULL),
 
   -- ── a cancelled gig: it is drawn, and it is not a decision
   ('3333001f-0000-4000-8000-00000000001f', :'ws', :'mm', NULL, NULL, :f0 + 95,
    '1111000d-0000-4000-8000-00000000000d', 'Sala Ártica', 'Zaragoza', 'ES', 'cancelled', 'artica-cancel', :'by',
-   NULL, NULL, :f0 + 95 + time '20:00', NULL, NULL, NULL, '{}', 'La sala va tancar per obres.'),
+   NULL, NULL, :f0 + 95 + time '20:00', NULL, NULL, NULL, 'La sala va tancar per obres.'),
 
   ('33330020-0000-4000-8000-000000000020', :'ws', :'ze', '22220006-0000-4000-8000-000000000006', '88880011-0000-4000-8000-000000000011', :f0 + 105,
    '11110003-0000-4000-8000-000000000003', 'Kursaal', 'Manresa', 'ES', 'confirmed', 'zoo-kursaal', :'by',
-   :f0 + 105 + time '15:00', NULL, :f0 + 105 + time '19:00', NULL, NULL, NULL, '{"hotel":false,"technical":true}', NULL),
+   :f0 + 105 + time '15:00', NULL, :f0 + 105 + time '19:00', NULL, NULL, NULL, NULL),
   ('33330021-0000-4000-8000-000000000021', :'ws', :'mm', '22220002-0000-4000-8000-000000000002', '88880010-0000-4000-8000-000000000010', :f0 + 112,
    'bbbb0001-0000-4000-8000-000000000001', 'Teatre Principal', 'Terrassa', 'ES', 'confirmed', 'terrassa-n2', :'by',
-   NULL, :f0 + 112 + time '18:00', :f0 + 112 + time '20:00', NULL, NULL, NULL, '{"hotel":true,"technical":true}', NULL),
+   NULL, :f0 + 112 + time '18:00', :f0 + 112 + time '20:00', NULL, NULL, NULL, NULL),
 
   -- ── f0+120..127 · the autumn tour: two outbounds and ONE return (the
   --    bracket rule — only the second outbound gets paired)
   ('33330022-0000-4000-8000-000000000022', :'ws', :'mm', '22220001-0000-4000-8000-000000000001', '8888000d-0000-4000-8000-00000000000d', :f0 + 121,
    '11110006-0000-4000-8000-000000000006', 'La Villette', 'Paris', 'FR', 'confirmed', 'villette-gig', :'by',
-   :f0 + 121 + time '13:00', :f0 + 121 + time '17:00', :f0 + 121 + time '20:30', NULL, NULL, NULL, '{"hotel":true,"technical":true}', NULL),
+   :f0 + 121 + time '13:00', :f0 + 121 + time '17:00', :f0 + 121 + time '20:30', NULL, NULL, NULL, NULL),
   ('33330023-0000-4000-8000-000000000023', :'ws', :'mm', '22220001-0000-4000-8000-000000000001', '8888000e-0000-4000-8000-00000000000e', :f0 + 126,
    '11110008-0000-4000-8000-000000000008', 'Kampnagel', 'Hamburg', 'DE', 'confirmed', 'kampnagel-gig', :'by',
-   :f0 + 126 + time '12:00', :f0 + 126 + time '17:00', :f0 + 126 + time '20:00', NULL, NULL, NULL, '{"hotel":true,"technical":true}', NULL),
+   :f0 + 126 + time '12:00', :f0 + 126 + time '17:00', :f0 + 126 + time '20:00', NULL, NULL, NULL, NULL),
 
   ('33330024-0000-4000-8000-000000000024', :'ws', :'uo', '22220003-0000-4000-8000-000000000003', '88880012-0000-4000-8000-000000000012', :f0 + 133,
    'bbbb0003-0000-4000-8000-000000000003', 'Nau Ivanow', 'Barcelona', 'ES', 'confirmed', 'ivanow-n3', :'by',
    NULL, NULL, :f0 + 133 + time '20:30', NULL, NULL, NULL, '{"technical":true}', NULL),
   ('33330025-0000-4000-8000-000000000025', :'ws', :'ze', NULL, NULL, :f0 + 140,
    '11110009-0000-4000-8000-000000000009', 'Gessnerallee', 'Zürich', 'CH', 'proposed', 'zoo-zurich', :'by',
-   NULL, NULL, NULL, NULL, NULL, NULL, '{}', NULL),
+   NULL, NULL, NULL, NULL, NULL, NULL, NULL),
   ('33330026-0000-4000-8000-000000000026', :'ws', :'ze', NULL, NULL, :f0 + 147,
    '11110007-0000-4000-8000-000000000007', 'Teatro India', 'Roma', 'IT', 'proposed', 'zoo-roma', :'by',
-   NULL, NULL, NULL, NULL, NULL, NULL, '{}', NULL),
+   NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 
   -- ── f0+152/153 · Mexico: two functions on one bolo, seven hours away
   ('33330027-0000-4000-8000-000000000027', :'ws', :'uo', '22220005-0000-4000-8000-000000000005', '8888000f-0000-4000-8000-00000000000f', :f0 + 152,
    '1111000a-0000-4000-8000-00000000000a', 'Teatro Juárez', 'Guanajuato', 'MX', 'confirmed', 'juarez-n1', :'by',
-   :f0 + 152 + time '10:00', :f0 + 152 + time '16:00', :f0 + 152 + time '20:00', NULL, NULL, NULL, '{"hotel":true,"technical":false}', NULL),
+   :f0 + 152 + time '10:00', :f0 + 152 + time '16:00', :f0 + 152 + time '20:00', NULL, NULL, NULL, NULL),
   ('33330028-0000-4000-8000-000000000028', :'ws', :'uo', '22220005-0000-4000-8000-000000000005', '8888000f-0000-4000-8000-00000000000f', :f0 + 153,
    '1111000a-0000-4000-8000-00000000000a', 'Teatro Juárez', 'Guanajuato', 'MX', 'confirmed', 'juarez-n2', :'by',
-   NULL, NULL, :f0 + 153 + time '18:00', NULL, NULL, NULL, '{"hotel":true,"technical":true}', NULL),
+   NULL, NULL, :f0 + 153 + time '18:00', NULL, NULL, NULL, NULL),
 
   -- ── the far horizon: the bare 'hold' status, a long-notice hold, a proposal
   ('33330029-0000-4000-8000-000000000029', :'ws', :'mm', NULL, NULL, :f0 + 161,
    '11110002-0000-4000-8000-000000000002', 'Teatre Municipal', 'Girona', 'ES', 'hold', 'girona-hold-3', :'by',
-   NULL, NULL, :f0 + 161 + time '20:00', NULL, NULL, 30, '{}', NULL),
+   NULL, NULL, :f0 + 161 + time '20:00', NULL, NULL, 30, NULL),
   ('3333002a-0000-4000-8000-00000000002a', :'ws', :'uo', NULL, NULL, :f0 + 168,
    '1111000b-0000-4000-8000-00000000000b', 'Azkuna Zentroa', 'Bilbao', 'ES', 'hold_1', 'azkuna-hold-2', :'by',
-   NULL, NULL, :f0 + 168 + time '19:30', NULL, NULL, 60, '{}', NULL),
+   NULL, NULL, :f0 + 168 + time '19:30', NULL, NULL, 60, NULL),
   ('3333002b-0000-4000-8000-00000000002b', :'ws', :'mm', '22220002-0000-4000-8000-000000000002', NULL, :f0 + 175,
    '11110001-0000-4000-8000-000000000001', 'Mercat de les Flors', 'Barcelona', 'ES', 'proposed', 'flors-2027', :'by',
-   NULL, NULL, NULL, NULL, NULL, NULL, '{}', 'Proposta per tancar la temporada.');
+   NULL, NULL, NULL, NULL, NULL, NULL, 'Proposta per tancar la temporada.');
 
-INSERT INTO public.performance (id, workspace_id, project_id, line_id, bolo_id, performed_at, venue_id, venue_name, city, country, status, slug, created_by, hold_notice_days, readiness, notes)
-SELECT id, workspace_id, project_id, line_id, bolo_id, performed_at, venue_id, venue_name, city, country, status, slug, created_by, hold_notice_days, readiness, notes FROM _seed_perf
+INSERT INTO public.performance (id, workspace_id, project_id, line_id, bolo_id, performed_at, venue_id, venue_name, city, country, status, slug, created_by, hold_notice_days, notes)
+SELECT id, workspace_id, project_id, line_id, bolo_id, performed_at, venue_id, venue_name, city, country, status, slug, created_by, hold_notice_days, notes FROM _seed_perf
 ON CONFLICT (id) DO UPDATE SET
   performed_at = EXCLUDED.performed_at,
   status = EXCLUDED.status,
@@ -373,7 +373,6 @@ ON CONFLICT (id) DO UPDATE SET
   city = EXCLUDED.city,
   country = EXCLUDED.country,
   hold_notice_days = EXCLUDED.hold_notice_days,
-  readiness = EXCLUDED.readiness,
   notes = EXCLUDED.notes;
 
 DELETE FROM public.schedule_slot WHERE performance_id IN (SELECT id FROM _seed_perf);

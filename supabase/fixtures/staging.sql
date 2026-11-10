@@ -136,13 +136,13 @@ where m.id = mf.membership_id
   and m.level = 'project'
   and m.project_id = '30000000-0000-4000-8000-000000000001';
 
-insert into public.line (id, workspace_id, project_id, name, kind, slug, modules, created_by)
+insert into public.line (id, workspace_id, project_id, name, kind, slug, created_by)
 values
-  ('40000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001', '30000000-0000-4000-8000-000000000001', 'ZZZ E2E Main Line', 'tour', 'zzz-e2e-main-line', '["planner","notes"]', (select id from auth.users where email = 'playwright@hour.test')),
-  ('40000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000001', '30000000-0000-4000-8000-000000000002', 'ZZZ RLS Foreign Line', 'campaign', 'zzz-rls-foreign-line', '["planner"]', (select id from auth.users where email = 'playwright@hour.test')),
-  ('40000000-0000-4000-8000-000000000003', '20000000-0000-4000-8000-000000000002', '30000000-0000-4000-8000-000000000003', 'Difusión 2026/27', 'campaign', 'difusion-2026-27', '["conversations","planner"]', (select id from auth.users where email = 'playwright@hour.test'))
+  ('40000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001', '30000000-0000-4000-8000-000000000001', 'ZZZ E2E Main Line', 'tour', 'zzz-e2e-main-line', (select id from auth.users where email = 'playwright@hour.test')),
+  ('40000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000001', '30000000-0000-4000-8000-000000000002', 'ZZZ RLS Foreign Line', 'campaign', 'zzz-rls-foreign-line', (select id from auth.users where email = 'playwright@hour.test')),
+  ('40000000-0000-4000-8000-000000000003', '20000000-0000-4000-8000-000000000002', '30000000-0000-4000-8000-000000000003', 'Difusión 2026/27', 'campaign', 'difusion-2026-27', (select id from auth.users where email = 'playwright@hour.test'))
 on conflict (id) do update
-set name = excluded.name, kind = excluded.kind, slug = excluded.slug, modules = excluded.modules, updated_at = now(), deleted_at = null;
+set name = excluded.name, kind = excluded.kind, slug = excluded.slug, updated_at = now(), deleted_at = null;
 
 insert into public.person (id, email, full_name, slug, created_by)
 values (

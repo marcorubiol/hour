@@ -80,8 +80,7 @@ test.describe('line detail: the kind\'s modules', () => {
       await waitForLoaded(page);
     }
 
-    // The campaign kind's stack, in its fixed order (ADR-166). The fixture
-    // line may carry an old `line.modules` from the PATCH era: it is ignored.
+    // The campaign kind's stack, in its fixed order (ADR-166).
     await expect(page.getByRole('heading', { name: LINE_NAME })).toBeVisible({ timeout: 15_000 });
     const order = ['conversations', 'planner', 'tasks', 'materials', 'notes'];
     for (const key of order) await expect(page.locator(`#mod-${key}`)).toBeVisible();

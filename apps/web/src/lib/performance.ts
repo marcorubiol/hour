@@ -366,8 +366,8 @@ export const PerformancePatchSchema = v.object({
   bolo_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
   // `readiness` (ADR-084 § 3) is no longer written (ADR-164 § 2): the hotel
   // is a line of `logistics` (ADR-146 § 4) and the technical rider has its
-  // own place. The column stays in the base, read by nobody; a client that
-  // still sends it is stripped like any unknown key.
+  // own place. The column is gone (95, migration 20261110100000); a client
+  // that still sends it is stripped like any unknown key.
   // Logística, acogida y técnica, escritas línea a línea en «Detalles»
   // (Marco, 2026-10-20; `$lib/kv-lines`). The shape stays open (ADR-023):
   // a flat object of words, plus whatever nested value is already there,

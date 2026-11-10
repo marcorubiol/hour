@@ -22,8 +22,8 @@
  *
  * Auth: Bearer JWT required. RLS denies anon.
  *
- * `line.modules` is neither read nor written (ADR-166): a line draws its
- * kind's modules. POST strips a `modules` field like any unknown one.
+ * A line draws its kind's modules (ADR-166); the old `line.modules` column
+ * is gone (95). POST strips a `modules` field like any unknown one.
  */
 
 import type { RequestHandler } from './$types';

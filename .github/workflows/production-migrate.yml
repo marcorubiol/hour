@@ -188,6 +188,58 @@ jobs:
                      from pg_proc p
                     where p.pronamespace = 'public'::regnamespace and p.proname = 'create_date';"
 
+          # 95 contract (20261110100000): qué sujeta las cinco columnas que
+          # borra. Solo deben salir sus propios default y CHECK; funciones que
+          # las nombran, solo public.create_line (la migración la redefine).
+          echo '### 95: dependientes de las columnas que se borran'
+          run_sql "select c.relname || '.' || a.attname as columna,
+                          pg_describe_object(d.classid, d.objid, d.objsubid) as dependiente, d.deptype
+                     from pg_attribute a
+                     join pg_class c on c.oid = a.attrelid
+                     join pg_depend d on d.refobjid = a.attrelid and d.refobjsubid = a.attnum
+                    where c.relnamespace = 'public'::regnamespace and not a.attisdropped
+                      and ((c.relname = 'performance' and a.attname = 'readiness')
+                        or (c.relname = 'line' and a.attname in ('modules', 'dossier_url'))
+                        or (c.relname = 'project' and a.attname in ('dossier_url', 'poster_url')))
+                    order by 1, 2;"
+
+          echo '### 95: funciones, vistas y policies que las nombran'
+          run_sql "select 'function' as kind, p.oid::regprocedure::text as nombre
+                     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                    where n.nspname not in ('pg_catalog', 'information_schema') and p.prokind = 'f'
+                      and pg_get_functiondef(p.oid) ~* '(readiness|dossier_url|poster_url|\mmodules\M)'
+                   union all
+                   select 'view', schemaname || '.' || viewname from pg_views
+                    where schemaname not in ('pg_catalog', 'information_schema')
+                      and definition ~* '(readiness|dossier_url|poster_url|\mmodules\M)'
+                   union all
+                   select 'policy', tablename || '.' || policyname from pg_policies
+                    where coalesce(qual, '') || coalesce(with_check, '') ~* '(readiness|dossier_url|poster_url|\mmodules\M)'
+                    order by 1, 2;"
+
+          echo '### 95: create_line, sobrecargas y firma viva (debe ser una)'
+          run_sql "select p.oid::regprocedure as firma, md5(pg_get_functiondef(p.oid)) as def_md5,
+                          coalesce(p.proacl::text, '(default)') as acl
+                     from pg_proc p where p.proname = 'create_line';"
+
+          echo '### 95: filas con datos en las columnas que se borran'
+          run_sql "select 'performance.readiness' as columna,
+                          count(*) filter (where readiness <> '{}'::jsonb) as con_datos,
+                          count(*) filter (where readiness <> '{}'::jsonb and deleted_at is null) as vivas
+                     from public.performance
+                   union all
+                   select 'line.modules', count(*) filter (where modules is not null),
+                          count(*) filter (where modules is not null and deleted_at is null) from public.line
+                   union all
+                   select 'line.dossier_url', count(*) filter (where dossier_url is not null),
+                          count(*) filter (where dossier_url is not null and deleted_at is null) from public.line
+                   union all
+                   select 'project.dossier_url', count(*) filter (where dossier_url is not null),
+                          count(*) filter (where dossier_url is not null and deleted_at is null) from public.project
+                   union all
+                   select 'project.poster_url', count(*) filter (where poster_url is not null),
+                          count(*) filter (where poster_url is not null and deleted_at is null) from public.project;"
+
           # ── LOS CHEQUEOS QUE EL ADVISOR LLAMA «ERROR», PREGUNTADOS AQUÍ ──
           #
           # NO SUSTITUYEN AL ADVISOR HOSPEDADO, y decirlo importa más que el
