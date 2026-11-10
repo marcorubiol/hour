@@ -3191,6 +3191,7 @@ export type Database = {
           line_id: string | null
           mail_signature: string | null
           performance_id: string | null
+          planner_view: string | null
           preset: string | null
           project_id: string | null
           roles: string[]
@@ -3214,6 +3215,7 @@ export type Database = {
           line_id?: string | null
           mail_signature?: string | null
           performance_id?: string | null
+          planner_view?: string | null
           preset?: string | null
           project_id?: string | null
           roles?: string[]
@@ -3237,6 +3239,7 @@ export type Database = {
           line_id?: string | null
           mail_signature?: string | null
           performance_id?: string | null
+          planner_view?: string | null
           preset?: string | null
           project_id?: string | null
           roles?: string[]
@@ -8880,6 +8883,10 @@ export type Database = {
       }
       set_my_mail_signature: {
         Args: { p_signature: string; p_workspace_id: string }
+        Returns: undefined
+      }
+      set_my_planner_view: {
+        Args: { p_view: string | null; p_workspace_id: string }
         Returns: undefined
       }
       set_my_view_scope: {

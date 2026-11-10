@@ -127,6 +127,8 @@
     type Conflict,
     type DecisionSide,
     normalizePlannerView,
+    plannerEntryView,
+    plannerViewWrites,
     statusWord as statusWordIn,
   } from '$lib/planner';
   import { buildPersonAttribution, goesNames, keepsRow } from '$lib/people';
@@ -272,10 +274,12 @@
   // died 2026-08-03: every way the window grows now goes through the
   // probes, so the book never mints a month the plan does not contain.
 
-  // ── Projection (ADR-117) ───────────────────────────────────────────────
-  // Explicit ?view= wins; anything else opens the season overview. The
-  // drawing you pick lives in the URL of that visit only: a portada that
-  // remembered the last drawing would stop being the portada on day two.
+  // ── Projection (ADR-117, amended by ADR-192) ───────────────────────────
+  // Explicit ?view= wins; without one, the drawing this person last chose in
+  // the bar in the spaces on screen (`entryView`, their membership), and
+  // without that the season overview. The stored drawing needs the
+  // workspaces feed, so the first paint is the URL's (or the overview) and
+  // the entry effect below moves it once the feed answers.
   let view = $state<PlannerView>(
     resolvePlannerView(new URL(location.href).searchParams.get('view')),
   );
@@ -382,9 +386,11 @@
     // Back/forward between the Planner's own entries moves page.state only.
     void page.state;
     const params = new URL(location.href).searchParams;
-    // No `view` at all is the nav's door (ADR-117): it always opens the
-    // season, even when you arrive from another drawing of this page.
-    const nextView = params.has('view') ? normalizePlannerView(params.get('view')) : 'overview';
+    // No `view` at all is the nav's door (ADR-117): it opens the person's
+    // entry drawing (ADR-192), else the season, even when you arrive from
+    // another drawing of this page.
+    const doorView = untrack(() => entryView) ?? 'overview';
+    const nextView = params.has('view') ? normalizePlannerView(params.get('view')) : doorView;
     if (nextView && nextView !== untrack(() => view)) view = nextView;
 
     const nextLanes = normalizeLaneAxis(params.get('lanes') ?? params.get('group'));
@@ -412,7 +418,10 @@
     const boardWithoutLanes =
       (nextView ?? untrack(() => view)) === 'board' && !params.get('lanes');
 
-    if (legacy || boardWithoutLanes) syncUrl();
+    // A door that opened a stored drawing writes it: the bar says what you see.
+    const doorWritten = !params.has('view') && doorView !== 'overview';
+
+    if (legacy || boardWithoutLanes || doorWritten) syncUrl();
 
     const rawD = params.get('d');
     if (rawD && /^\d{4}-\d{2}-\d{2}$/.test(rawD) && rawD !== untrack(() => dayIso)) dayIso = rawD;
@@ -521,6 +530,42 @@
     for (const l of scope.lines) ids.add(l.workspaceId);
     return ids;
   });
+
+  // ── The drawing each person opens in (ADR-192, task 129) ─────────────
+  // Stored on each workspace membership (`planner_view`, on the workspaces
+  // feed); the spaces on screen are the ones it is read from and written to.
+  let onScreenSpaces = $derived(
+    workspacesOnScreen('', pins.pins, ($workspacesQuery.data?.items ?? []) as NavWorkspace[], lineIndex, projectIndex),
+  );
+  let entryView = $derived(plannerEntryView(onScreenSpaces));
+  /** Entered without a drawing in the address and the feed had not answered
+      yet: the stored drawing is still owed. Paid once, or dropped the moment
+      the person picks a drawing themselves. */
+  let entryOwed = !new URL(location.href).searchParams.has('view');
+  $effect(() => {
+    if (!entryOwed || !$workspacesQuery.data || scopeUnresolved) return;
+    entryOwed = false;
+    const v = entryView;
+    if (v && v !== 'overview' && untrack(() => view) === 'overview') {
+      view = v;
+      syncUrl('replace');
+    }
+  });
+  /** A drawing chosen in the bar (or with 1 to 4): show it, and remember it
+      as the way in for every space on screen. The write never blocks the
+      drawing: the feed's cache moves at once, the PUTs go behind, and a
+      failed one only means the next visit opens where it did before. */
+  function chooseView(v: PlannerView) {
+    entryOwed = false;
+    setView(v);
+    const writes = plannerViewWrites(onScreenSpaces, v);
+    if (writes.length === 0) return;
+    const next = new Map(writes.map((w) => [w.workspace_id, w.planner_view]));
+    queryClient.setQueriesData<{ items: NavWorkspace[] }>({ queryKey: ['workspaces'] }, (d) =>
+      d ? { ...d, items: d.items.map((w) => (next.has(w.id) ? { ...w, planner_view: next.get(w.id) ?? null } : w)) } : d,
+    );
+    for (const w of writes) void mutateJSON('PUT', '/api/me/planner-view', w).catch(() => {});
+  }
   // ── Event feeds — the whole query layer lives in $lib/planner-feeds
   // (grid + team + decisions window + agenda book). Reactive inputs are
   // passed as getters so the option stores keep tracking this page's
@@ -2973,7 +3018,7 @@
       const n = Number(e.key);
       if (n >= 1 && n <= views.length) {
         e.preventDefault();
-        setView(views[n - 1]);
+        chooseView(views[n - 1]);
         return;
       }
       switch (e.key) {
@@ -3450,7 +3495,7 @@
     {laneAxis}
     {canBlackout}
     {locale}
-    onSetView={setView}
+    onSetView={chooseView}
     onSetLaneAxis={setLaneAxis}
     onCreate={canPlan ? () => openCreate() : undefined}
     onFeed={feedWorkspaces.length > 0 ? openFeed : undefined}
