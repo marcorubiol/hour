@@ -17,7 +17,7 @@ $$;
 -- new login a personal account and workspace, and since
 -- 20260730164435_bind_auth_user_trigger that trigger is in the migrations, so
 -- a rebuilt staging runs it for each fixture user. This file was written
--- before that and builds its own four spaces with fixed ids; with the
+-- before that and builds its own five spaces with fixed ids; with the
 -- trigger's three on top, the shape check counted 7 and cross-tenant would see
 -- a space nobody seeded. The fixed ids are excluded so a re-run on a loaded
 -- base keeps the fixture's own rows. Workspaces go first: `workspace.account_id`
