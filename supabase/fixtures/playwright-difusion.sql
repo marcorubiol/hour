@@ -36,7 +36,7 @@ from public.workspace w
 where w.slug = 'playwright' and w.deleted_at is null
 on conflict (id) do update set name = excluded.name, status = excluded.status, updated_at = now(), deleted_at = null;
 
-insert into public.line (id, workspace_id, project_id, name, kind, slug, modules, created_by)
+insert into public.line (id, workspace_id, project_id, name, kind, slug, created_by)
 select
   md5('hour-playwright-difusion-line')::uuid,
   w.id,
@@ -44,12 +44,11 @@ select
   'ZZZ Difusión 2026/27',
   'campaign',
   'zzz-difusion-2026-27',
-  '["conversations","planner"]',
   (select id from auth.users where email = 'playwright@hour.test')
 from public.workspace w
 where w.slug = 'playwright' and w.deleted_at is null
 on conflict (id) do update
-set name = excluded.name, kind = excluded.kind, slug = excluded.slug, modules = excluded.modules, updated_at = now(), deleted_at = null;
+set name = excluded.name, kind = excluded.kind, slug = excluded.slug, updated_at = now(), deleted_at = null;
 
 insert into public.person (id, email, full_name, slug, created_by)
 select

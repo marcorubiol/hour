@@ -2433,12 +2433,10 @@ export type Database = {
           custom_fields: Json
           deleted_at: string | null
           description: string | null
-          dossier_url: string | null
           end_date: string | null
           id: string
           kind: Database["public"]["Enums"]["line_kind"]
           last_navigated_at: string | null
-          modules: Json | null
           name: string
           notes: string | null
           previous_slugs: string[]
@@ -2457,12 +2455,10 @@ export type Database = {
           custom_fields?: Json
           deleted_at?: string | null
           description?: string | null
-          dossier_url?: string | null
           end_date?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["line_kind"]
           last_navigated_at?: string | null
-          modules?: Json | null
           name: string
           notes?: string | null
           previous_slugs?: string[]
@@ -2481,12 +2477,10 @@ export type Database = {
           custom_fields?: Json
           deleted_at?: string | null
           description?: string | null
-          dossier_url?: string | null
           end_date?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["line_kind"]
           last_navigated_at?: string | null
-          modules?: Json | null
           name?: string
           notes?: string | null
           previous_slugs?: string[]
@@ -3791,7 +3785,6 @@ export type Database = {
           performed_at: string
           previous_slugs: string[]
           project_id: string
-          readiness: Json
           series_id: string | null
           slug: string | null
           status: Database["public"]["Enums"]["performance_status"]
@@ -3819,7 +3812,6 @@ export type Database = {
           performed_at: string
           previous_slugs?: string[]
           project_id: string
-          readiness?: Json
           series_id?: string | null
           slug?: string | null
           status?: Database["public"]["Enums"]["performance_status"]
@@ -3847,7 +3839,6 @@ export type Database = {
           performed_at?: string
           previous_slugs?: string[]
           project_id?: string
-          readiness?: Json
           series_id?: string | null
           slug?: string | null
           status?: Database["public"]["Enums"]["performance_status"]
@@ -4126,13 +4117,11 @@ export type Database = {
           custom_fields: Json
           deleted_at: string | null
           description: string | null
-          dossier_url: string | null
           ends_on: string | null
           id: string
           initials: string | null
           name: string
           notes: string | null
-          poster_url: string | null
           previous_slugs: string[]
           slug: string
           starts_on: string | null
@@ -4147,13 +4136,11 @@ export type Database = {
           custom_fields?: Json
           deleted_at?: string | null
           description?: string | null
-          dossier_url?: string | null
           ends_on?: string | null
           id?: string
           initials?: string | null
           name: string
           notes?: string | null
-          poster_url?: string | null
           previous_slugs?: string[]
           slug: string
           starts_on?: string | null
@@ -4168,13 +4155,11 @@ export type Database = {
           custom_fields?: Json
           deleted_at?: string | null
           description?: string | null
-          dossier_url?: string | null
           ends_on?: string | null
           id?: string
           initials?: string | null
           name?: string
           notes?: string | null
-          poster_url?: string | null
           previous_slugs?: string[]
           slug?: string
           starts_on?: string | null
@@ -6637,12 +6622,10 @@ export type Database = {
           custom_fields: Json
           deleted_at: string | null
           description: string | null
-          dossier_url: string | null
           end_date: string | null
           id: string
           kind: Database["public"]["Enums"]["line_kind"]
           last_navigated_at: string | null
-          modules: Json | null
           name: string
           notes: string | null
           previous_slugs: string[]
@@ -6814,7 +6797,6 @@ export type Database = {
           performed_at: string
           previous_slugs: string[]
           project_id: string
-          readiness: Json
           series_id: string | null
           slug: string | null
           status: Database["public"]["Enums"]["performance_status"]
@@ -6861,7 +6843,6 @@ export type Database = {
           performed_at: string
           previous_slugs: string[]
           project_id: string
-          readiness: Json
           series_id: string | null
           slug: string | null
           status: Database["public"]["Enums"]["performance_status"]
@@ -6893,13 +6874,11 @@ export type Database = {
           custom_fields: Json
           deleted_at: string | null
           description: string | null
-          dossier_url: string | null
           ends_on: string | null
           id: string
           initials: string | null
           name: string
           notes: string | null
-          poster_url: string | null
           previous_slugs: string[]
           slug: string
           starts_on: string | null
@@ -9178,13 +9157,11 @@ export type Database = {
           custom_fields: Json
           deleted_at: string | null
           description: string | null
-          dossier_url: string | null
           ends_on: string | null
           id: string
           initials: string | null
           name: string
           notes: string | null
-          poster_url: string | null
           previous_slugs: string[]
           slug: string
           starts_on: string | null
