@@ -83,13 +83,20 @@ export interface OwnMembership {
   preset?: string | null;
   /** ADR-151 — «lo mío / todo»; absent until its migration is applied. */
   view_scope?: string | null;
+  /** ADR-192 — the Planner drawing they open in; absent until its migration is applied. */
+  planner_view?: string | null;
 }
 
-/** Each workspace with the caller's role, package and «lo mío / todo» in it; null where there is no row to say. */
+/** Each workspace with the caller's role, package, «lo mío / todo» and Planner entry in it; null where there is no row to say. */
 export function withMyRole<T extends { id: string }>(
   items: readonly T[],
   memberships: readonly OwnMembership[],
-): (T & { my_role: WorkspaceRole | null; my_preset: string | null; view_scope: string | null })[] {
+): (T & {
+  my_role: WorkspaceRole | null;
+  my_preset: string | null;
+  view_scope: string | null;
+  planner_view: string | null;
+})[] {
   const own = new Map(memberships.map((m) => [m.workspace_id, m]));
   return items.map((w) => {
     const m = own.get(w.id);
@@ -98,6 +105,7 @@ export function withMyRole<T extends { id: string }>(
       my_role: (m?.workspace_role as WorkspaceRole | null | undefined) ?? null,
       my_preset: m?.preset ?? null,
       view_scope: m?.view_scope ?? null,
+      planner_view: m?.planner_view ?? null,
     };
   });
 }

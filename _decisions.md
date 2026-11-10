@@ -7416,3 +7416,41 @@ Supabase local (JWT 403, service_role sí).
 
 **Re-evaluar cuando** se envíen las primeras invitaciones diseñadas (quejas, rebotes, Promociones), si Templatical se
 para o cambia de licencia, o si Workers pasa a plan de pago (compilar en el servidor).
+
+## [2026-11-10] ADR-192 · Cada persona abre el Planificador en su dibujo (tarea 129; enmienda ADR-117 § 2 y ADR-155 § 4)
+
+**Contexto.** ADR-155 dejó para el 23-11 re-evaluar si cada uno debía abrir en su dibujo (opción D). Marco lo adelantó
+el 10-11 y eligió la D: una preferencia junto a `membership.view_scope` (ADR-151). Carril `claude/129-planner-view`.
+
+**Decisión.**
+1. **La vista de entrada es el último dibujo que la persona eligió en la barra** (Temporada, Agenda, Mes, Tablero), por
+   membresía de espacio: `membership.planner_view`, `overview | agenda | month | board | null`. El Día no: es una lupa.
+   `null` es el defecto de siempre, la Temporada; elegir la Temporada guarda `null` (como el defecto de ADR-151 § 3).
+2. **Se guarda al elegir, sin ajuste aparte.** Un clic en la barra o las teclas `1` a `4` escriben; volver atrás,
+   cerrar el Día (que abre la Agenda) o el tour, no. La escritura no bloquea: la caché de `['workspaces']` cambia al
+   momento y los `PUT /api/me/planner-view` van detrás; si fallan, la próxima visita abre donde abría.
+3. **Una dirección con `?view=` manda.** Sin ella (la puerta de la barra lateral, un enlace sin vista, una recarga
+   sin vista) se abre el dibujo guardado y se escribe en la dirección. Hasta que llega la lista de espacios se pinta la
+   Temporada; si llega con otro dibujo guardado y la persona no ha elegido nada, se cambia una vez.
+4. **Varios espacios en pantalla.** El Planificador mira a la vez todos los espacios del ámbito. Elegir escribe en
+   cada espacio en pantalla cuyo valor difiere; leer toma el primero de ellos (orden de la lista) que guarda uno. Sin
+   ámbito, los espacios de la persona coinciden porque se escriben juntos; solo una visita acotada a un espacio los
+   separa, y entonces gana el primero, de forma determinista.
+5. **La Temporada sigue siendo el defecto** de quien no ha elegido nada (ADR-155 § 4); deja de ser obligatoria al
+   entrar. Enmienda ADR-117 § 2: «una portada que recuerda el último dibujo deja de ser portada» se acepta como coste,
+   porque quien quiere la portada la elige una vez y vuelve a ella.
+
+**Migración escrita, sin aplicar:** `supabase/migrations/20261110110000_membership_planner_view.sql` (columna con
+CHECK, `set_my_planner_view(uuid, text)` SECURITY DEFINER sobre la propia membresía, copia de `set_my_view_scope` tal
+como está en la base viva; sin grant de columna: `authenticated` lee `membership` entera). Va al gate de § 34 junto a
+la del 95. Tipos a mano en `db-types.ts`. Mientras no se aplique, `GET /api/workspaces` (`select=*`) no trae
+`planner_view`, todos abren en la Temporada como hoy y el PUT falla en silencio. `CACHE_SCHEMA` 29 → 30.
+
+**Verificado:** `pnpm --filter web check` 0/0 y unitarios (`planner.test.ts`: entrada, escrituras, la URL manda;
+`workspace-role.test.ts`). `tests/rls/planner-view.test.ts` va rojo hasta aplicar la migración. Sin E2E ni capturas.
+
+**Cómo se revierte.** Volver `onSetView` y las teclas a `setView`, quitar `entryView` de la puerta y el efecto de
+entrada del Planificador, y `PUT /api/me/planner-view`; columna y función, con el rollback del fichero de migración.
+
+**Re-evaluar cuando** alguien con dos espacios diga que el Planificador «no abre donde lo dejó» (§ 4), o si hace falta
+un sitio en Ajustes para verlo.

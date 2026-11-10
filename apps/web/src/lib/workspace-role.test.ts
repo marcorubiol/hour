@@ -85,13 +85,13 @@ describe('withMyRole: the caller\'s own membership rows on each workspace', () =
     const items = withMyRole(
       [{ id: 'muk-cia' }, { id: 'mine' }],
       [
-        { workspace_id: 'muk-cia', workspace_role: 'member', preset: 'equip', view_scope: 'all' },
+        { workspace_id: 'muk-cia', workspace_role: 'member', preset: 'equip', view_scope: 'all', planner_view: 'board' },
         { workspace_id: 'mine', workspace_role: 'owner' },
       ],
     );
-    expect(items.map((w) => [w.my_preset, w.view_scope])).toEqual([
-      ['equip', 'all'],
-      [null, null],
+    expect(items.map((w) => [w.my_preset, w.view_scope, w.planner_view])).toEqual([
+      ['equip', 'all', 'board'],
+      [null, null, null],
     ]);
   });
 });

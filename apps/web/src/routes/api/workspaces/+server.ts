@@ -171,9 +171,9 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   // The caller's role, package and «lo mío / todo» in each ($lib/workspace-role,
   // $lib/view-scope): their own workspace rows, which `membership_select` lets
   // them read, never anyone else's. `*` and not a column list on purpose: it
-  // brings `view_scope` once its migration is applied (ADR-151) and does not
-  // fail before; `authenticated` reads the table whole, so `*` asks for
-  // nothing it could not.
+  // brings `view_scope` (ADR-151) and `planner_view` (ADR-192) once their
+  // migrations are applied and does not fail before; `authenticated` reads
+  // the table whole, so `*` asks for nothing it could not.
   const own = new URLSearchParams({
     select: '*',
     level: 'eq.workspace',

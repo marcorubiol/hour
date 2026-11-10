@@ -771,15 +771,62 @@ export function conversationPlannerHref(projectId: string, days: readonly string
 }
 
 /**
- * Projection resolution (ADR-117, superseding ADR-078 §10's chain): an
- * explicit `?view=` wins, and anything else opens the season overview — the
- * Planner's portada. No stored preference and no form-factor default: a
- * dashboard that remembered the last drawing would stop being the portada
- * on the second visit. Unknown values fall through — a mistyped URL never
- * breaks the page.
+ * Projection resolution (ADR-117, amended by ADR-192): an explicit `?view=`
+ * wins; without one, the drawing this person opens in (`entry`, from their
+ * membership, `plannerEntryView`), and without that the season overview, the
+ * Planner's default portada. Unknown values fall through: a mistyped URL
+ * never breaks the page.
  */
-export function resolvePlannerView(urlView: string | null | undefined): PlannerView {
-  return normalizePlannerView(urlView) ?? 'overview';
+export function resolvePlannerView(
+  urlView: string | null | undefined,
+  entry: PlannerEntryView | null = null,
+): PlannerView {
+  return normalizePlannerView(urlView) ?? entry ?? 'overview';
+}
+
+/**
+ * THE DRAWING EACH PERSON OPENS IN (ADR-192, task 129). The four words of the
+ * bar (ADR-155 § 1); the Day is a lens, never a way in. Stored per workspace
+ * membership (`membership.planner_view`), null = the season overview.
+ */
+export type PlannerEntryView = 'overview' | 'agenda' | 'month' | 'board';
+
+export function isPlannerEntryView(v: unknown): v is PlannerEntryView {
+  return v === 'overview' || v === 'agenda' || v === 'month' || v === 'board';
+}
+
+/** A workspace of the feed, with the caller's stored entry drawing there. */
+export interface WithPlannerView {
+  id: string;
+  planner_view?: string | null;
+}
+
+/**
+ * The entry drawing for the spaces on screen: the first of them (feed order)
+ * that stores one. Choosing in the bar writes every space on screen
+ * (`plannerViewWrites`), so they agree unless a pinned visit set one alone;
+ * then the first wins, deterministically. None stored → null (the overview).
+ */
+export function plannerEntryView(onScreen: readonly WithPlannerView[]): PlannerEntryView | null {
+  for (const w of onScreen) if (isPlannerEntryView(w.planner_view)) return w.planner_view;
+  return null;
+}
+
+/**
+ * What choosing `v` in the bar writes: one row per space on screen whose
+ * stored value differs. The overview, the default, is stored as null, so it
+ * follows the default if that ever changes (as `view_scope` does, ADR-151
+ * § 3). The Day is a lens: choosing it writes nothing.
+ */
+export function plannerViewWrites(
+  onScreen: readonly WithPlannerView[],
+  v: PlannerView,
+): { workspace_id: string; planner_view: Exclude<PlannerEntryView, 'overview'> | null }[] {
+  if (!isPlannerEntryView(v)) return [];
+  const value = v === 'overview' ? null : v;
+  const stored = (w: WithPlannerView) =>
+    isPlannerEntryView(w.planner_view) && w.planner_view !== 'overview' ? w.planner_view : null;
+  return onScreen.filter((w) => stored(w) !== value).map((w) => ({ workspace_id: w.id, planner_view: value }));
 }
 
 /**

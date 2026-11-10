@@ -59,6 +59,8 @@ export type NavWorkspace = {
   my_preset?: string | null;
   /** ADR-151 — «lo mío / todo» here (`mine` | `all`); null = the package's default (`$lib/view-scope`). */
   view_scope?: string | null;
+  /** ADR-192 — the Planner drawing the caller opens in here; null = the season overview (`$lib/planner`). */
+  planner_view?: string | null;
 };
 
 /** Row shape of GET /api/projects — the shared ['projects', …] cache. */
