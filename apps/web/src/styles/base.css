@@ -2499,6 +2499,14 @@
     gap: var(--space-2xs) var(--space-s);
     min-inline-size: 0;
   }
+  /* A lens head (the row never wraps, below): the title takes the room the
+     tools leave (basis 0) and never less than its longest word. On a phone a
+     one-word title («Conversaciones») slid under the tools (tarea 130). A
+     title of several words wraps first; only then the scope pill gives way. */
+  .lenshead__titlerow:has(> .lenshead__tools--help) > .lenshead__lead {
+    flex: 1 1 0;
+    min-inline-size: min-content;
+  }
   .lenshead__aside {
     display: inline-flex;
     align-items: center;
@@ -2526,10 +2534,20 @@
      two-line title on a phone sent the «?» alone to a line of its own, and
      the Planner's arrows pulled it down between the title and themselves. */
   .lenshead__tools--help {
-    flex-shrink: 0;
+    flex-shrink: 1;
+    min-inline-size: 0;
     align-self: flex-start;
     block-size: 1em;
     font-size: var(--text-xxl);
+  }
+  /* In a tight lens head the scope pill is what gives way: its name
+     ellipsizes (ScopePill) and the lens's acts and «?» keep their size. */
+  .lenshead__tools--help > * {
+    flex-shrink: 0;
+  }
+  .lenshead__tools--help > .lensscope {
+    flex-shrink: 1;
+    min-inline-size: 0;
   }
   .lenshead__help,
   .lenshead__act {

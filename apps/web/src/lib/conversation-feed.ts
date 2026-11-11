@@ -173,3 +173,28 @@ export function markConversationRead(view: ConversationFeedView, conversationId:
   });
   return changed ? { ...view, items: sortFeed(items) } : view;
 }
+
+/** Las dos secciones de Todo (ADR-179 § 1) con lo que cuenta cada rótulo. */
+export interface FeedSections<R> {
+  ours: R[];
+  rest: R[];
+  /** Conversaciones de «Lo demás»: con las de «Nos toca», el «Todo» del chip. */
+  restConversations: number;
+  /** Grupos del equipo de un bolo en «Lo demás»: filas que el chip «Todo» no cuenta. */
+  groups: number;
+}
+
+/**
+ * Reparte las filas: «Nos toca» son las conversaciones con `due` (`shownTurn`,
+ * la misma regla del chip y de la ficha); lo demás, el resto. El chip «Todo»
+ * cuenta conversaciones, así que el rótulo de «Lo demás» cuenta conversaciones
+ * y dice aparte los grupos del equipo (tarea 130: «Todo 31» frente a 3 + 30).
+ * Sin secciones (una etiqueta acotada), todo va en `rest`.
+ */
+export function feedSections<R extends FeedRowView>(rows: readonly R[], sectioned: boolean): FeedSections<R> {
+  const ours: R[] = [];
+  const rest: R[] = [];
+  for (const r of rows) (sectioned && r.kind === 'conversation' && r.due !== null ? ours : rest).push(r);
+  const groups = rest.filter((r) => r.kind === 'thread').length;
+  return { ours, rest, restConversations: rest.length - groups, groups };
+}

@@ -542,7 +542,7 @@
   });
   const conversationRecord = lazy(() => import('$lib/components/record/ConversationRecord.svelte'));
   $effect(() => {
-    if (wide && opened) void conversationRecord.load();
+    if (wide && shown) void conversationRecord.load();
   });
   // The pane is a region the keyboard can reach and leave (ADR-176): opened
   // with Enter, the focus goes into it; Esc or «Cerrar» close it and give the
@@ -558,6 +558,8 @@
     }
   }
   function closePane() {
+    // The one open by default (at rest) closes for this visit: the summary takes its place.
+    if (!opened && !group) restDismissed = true;
     setParams({ abierta: null, grupo: null });
     const back = openedFrom;
     openedFrom = null;
@@ -593,9 +595,22 @@
   const openTableRow = (c: ConversationItem, e: MouseEvent) => openBeside(c.workspace_id, c.id, e);
 
   // The pane at rest (diseño 2026-11-05): how many wait on us and the one that
-  // waits longest (the panel's read sorts them, `sortDue`), not a grey line.
+  // waits longest (`longestDue`; an older cache without it, the first row).
   let dueCount = $derived(chipCount.tetoca);
-  let oldestDue = $derived($countsQuery.data?.due.rows[0] ?? null);
+  let oldestDue = $derived($countsQuery.data ? ($countsQuery.data.due.longest ?? $countsQuery.data.due.rows[0] ?? null) : null);
+  /**
+   * At rest the pane opens the one that waits longest (tarea 130): the same
+   * row as «Abrir …», without touching the URL. Closed once, the summary
+   * stays for this visit; nothing waiting, the summary as before.
+   */
+  let restDismissed = $state(false);
+  let restOpen = $derived.by(() => {
+    if (opened || group || restDismissed || listChip === 'equipo' || !oldestDue) return null;
+    const ws = workspaceSlugById.get(oldestDue.workspace_id);
+    return ws ? { ws, id: oldestDue.id } : null;
+  });
+  /** What the pane shows: the one opened by hand, or the one at rest. */
+  let shown = $derived(opened ?? restOpen);
   function openOldest() {
     const row = oldestDue;
     const ws = row ? workspaceSlugById.get(row.workspace_id) : null;
@@ -738,6 +753,17 @@
 
   /** «Importar chat» (128, ADR-189). El atajo «Mandar a Hour» del iPhone llega con `?importar`. */
   let importOpen = $state(false);
+
+  /** Lo que ofrece el «+» de la cabecera (tarea 130): la llamada y el chat, fuera de Equipo. */
+  let addItems = $derived([
+    { label: t('conversations.add_item_conversation', locale), onclick: openAdd },
+    ...(listChip !== 'equipo'
+      ? [
+          { label: t('conversations.add_item_call', locale), onclick: () => (callOpen = true) },
+          { label: t('wa_import.open', locale), onclick: () => (importOpen = true) },
+        ]
+      : []),
+  ]);
   $effect(() => {
     if (!page.url.searchParams.has('importar') || !canEdit || noAccess) return;
     untrack(() => {
@@ -1013,17 +1039,13 @@
             </Button>
           </span>
         {/if}
-        {#if listChip !== 'equipo'}
-          <!-- 121 A (ADR-182): una llamada sin buscar antes la conversación. Palabras, no un glifo. -->
-          <Button size="s" variant="secondary" onclick={() => (callOpen = true)}>{t('call.open', locale)}</Button>
-          <!-- 128 (ADR-189): un chat exportado de WhatsApp. En el móvil entra por el atajo (`?importar`). -->
-          <span class="conversations__import-door"
-            ><Button size="s" variant="secondary" onclick={() => (importOpen = true)}>{t('wa_import.open', locale)}</Button></span
-          >
-        {/if}
-        <Button size="s" onclick={openAdd} label={t('conversations.add', locale)}
-          ><span class="conversations__add-long">{t('conversations.add', locale)}</span><span class="conversations__add-short" aria-hidden="true">+</span></Button
-        >
+        <!-- Un solo «+» (tarea 130): conversación, llamada (121 A, ADR-182) e importar chat (128,
+             ADR-189), igual en el móvil. En Equipo sólo la conversación. -->
+        <Menu items={addItems} align="end" label={t('conversations.add_menu_aria', locale)} triggerClass="btn--primary btn--s">
+          {#snippet trigger()}<span class="conversations__plus" aria-hidden="true">+</span><span class="conversations__add-long"
+              >{t('conversations.add_menu', locale)}</span
+            >{/snippet}
+        </Menu>
       {/if}
     {/snippet}
     {#snippet sub()}
@@ -1152,7 +1174,7 @@
             editable={canEdit}
             projectMark={(id) => projectMarkById.get(id) ?? null}
             onchange={refreshLists}
-            activeId={wide ? (opened?.id ?? null) : null}
+            activeId={wide ? (shown?.id ?? null) : null}
             onopen={openFeedRow}
             activeThread={wide && group ? `${group.performanceId}/${group.facetId ?? ''}` : null}
             onopenthread={openThread}
@@ -1175,7 +1197,7 @@
             onexit={leavePicking}
             chat
             counted
-            activeId={wide ? (opened?.id ?? null) : null}
+            activeId={wide ? (shown?.id ?? null) : null}
             onopen={openTableRow}
             onchange={refreshLists}
           />
@@ -1192,7 +1214,7 @@
           tabindex="-1"
           aria-label={t(group ? 'chat.pane_group' : 'chat.pane_conversation', locale)}
           onkeydown={(e) => {
-            if (e.key === 'Escape' && (opened || group) && !e.defaultPrevented && !(e.target as HTMLElement).closest('[role="menu"], [role="dialog"]')) {
+            if (e.key === 'Escape' && (shown || group) && !e.defaultPrevented && !(e.target as HTMLElement).closest('[role="menu"], [role="dialog"]')) {
               e.preventDefault();
               closePane();
             }
@@ -1207,11 +1229,11 @@
             {#key groupRaw}
               <boloGroup.component workspaceSlug={group.ws} performanceId={group.performanceId} facetId={group.facetId} inPeek />
             {/key}
-          {:else if opened && conversationRecord.component}
-            {#key openRaw}
-              <conversationRecord.component workspaceSlug={opened.ws} slug={opened.id} inPeek onclose={closePane} />
+          {:else if shown && conversationRecord.component}
+            {#key `${shown.ws}/${shown.id}`}
+              <conversationRecord.component workspaceSlug={shown.ws} slug={shown.id} inPeek onclose={closePane} />
             {/key}
-          {:else if !opened && !group}
+          {:else if !shown && !group}
             <!-- Nothing open: what waits, said calmly, and the one that waits longest one click away. -->
             <div class="conversations__rest" data-testid="pane-summary">
               {#if dueCount !== null && dueCount > 0}
@@ -1416,14 +1438,12 @@
     }
     /* «Seleccionar» sits in the tools' box like «Añadir»: a flex box, not an
        inline span on the tools' tall title line, which dropped it a few px. */
-    .conversations__pick-door,
-    .conversations__import-door {
+    .conversations__pick-door {
       display: inline-flex;
     }
     /* On a phone the selection waits for a wider screen: the head keeps the title and «Añadir». */
     @media (max-width: 47.999rem) {
       .conversations__pick-door--idle,
-      .conversations__import-door,
       .conversations__add-long {
         display: none;
       }
@@ -1440,6 +1460,9 @@
     }
     .conversations__caret {
       margin-inline-start: var(--space-2xs);
+    }
+    .conversations__plus:not(:last-child) {
+      margin-inline-end: var(--space-2xs);
     }
 
     /* Two panes on a wide screen (ADR-176): the list at its measure, the

@@ -40,7 +40,8 @@ test.describe('organization record', () => {
 
     try {
       // 1. La conversación, solo con la organización.
-      await page.getByRole('button', { name: 'Add conversation' }).click();
+      await page.getByRole('button', { name: /^Add:/ }).click();
+      await page.getByRole('menuitem', { name: 'Conversation' }).click();
       const dialog = page.locator('dialog[open]');
       await dialog.getByLabel(PROJECT).check({ force: true });
       await dialog.getByLabel('Organization').fill(ORG);

@@ -63,7 +63,8 @@ async function clean(page: Page) {
 async function openCallDialog(page: Page) {
   await page.goto('/h/conversations');
   await waitForLoaded(page);
-  await page.getByRole('button', { name: 'Log a call' }).click();
+  await page.getByRole('button', { name: /^Add:/ }).click();
+  await page.getByRole('menuitem', { name: 'Call' }).click();
   const dialog = page.locator('dialog[open]');
   await expect(dialog.getByRole('heading', { name: 'Who with?' })).toBeVisible();
   await dialog.getByRole('searchbox', { name: 'Person or organization' }).fill(NAME);

@@ -2,12 +2,12 @@
  * Lo que pinta una fila de la lista de Conversaciones (plan `build/plans/
  * 2026-10-22-conversations-list.md` § 3): el turno con su palabra, el bolo
  * más cercano y la última línea. Las reglas son las del panel y Desk
- * (`turnOf`, `followUpDue`, ADR-118 § 7); aquí solo se dicen.
+ * (`shownTurn`, ADR-118 § 7); aquí solo se dicen.
  *
  * Sin red: `now` y el idioma se inyectan.
  */
 
-import { daysSince, followUpDue, mailoutOutcome, turnOf, type RowMailout, type TurnRow } from './conversation-overview';
+import { mailoutOutcome, shownTurn, type RowMailout, type TurnRow } from './conversation-overview';
 import { relativeContactDate } from './conversation';
 import type { ConversationBolo } from './conversation-relation';
 import { dayMonth, localDayISO } from './datetime';
@@ -33,28 +33,17 @@ export function rowTurn(
   now: Date,
   locale: Locale,
 ): RowTurn | null {
-  const turn = turnOf(row, now);
-  if (turn?.side === 'ours') {
-    return {
-      word: t('overview.turn_ours_cap', locale),
-      since: relativeContactDate(turn.since, locale, now.getTime()),
-      tone: turn.days >= LATE_DAYS ? 'late' : 'ours',
-      reason: 'reply',
-    };
-  }
-  if (followUpDue(row, now)) {
-    const day = row.next_action_at!.slice(0, 10);
-    return {
-      word: t('overview.follow_up_cap', locale),
-      since: dayMonth(day, locale),
-      tone: daysSince(day, now) >= LATE_DAYS ? 'late' : 'ours',
-      reason: 'follow_up',
-    };
-  }
-  if (turn) {
+  const turn = shownTurn(row, now);
+  if (!turn) return null;
+  if (turn.reason === 'theirs') {
     return { word: t('overview.turn_theirs_cap', locale), since: relativeContactDate(turn.since, locale, now.getTime()), tone: 'theirs', reason: 'theirs' };
   }
-  return null;
+  return {
+    word: t(turn.reason === 'reply' ? 'overview.turn_ours_cap' : 'overview.follow_up_cap', locale),
+    since: turn.reason === 'reply' ? relativeContactDate(turn.since, locale, now.getTime()) : dayMonth(turn.since, locale),
+    tone: turn.days >= LATE_DAYS ? 'late' : 'ours',
+    reason: turn.reason,
+  };
 }
 
 const DEAD = new Set(['cancelled']);

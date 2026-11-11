@@ -173,10 +173,37 @@ export function followUpDue(row: RelationInput & Pick<OverviewInput, 'next_actio
 
 type DueReason = 'reply' | 'follow_up';
 
+/**
+ * El turno que se enseña, la única fuente (tarea 130): la sección «Nos toca» de
+ * la lista, la fila, «Te espera» de Hoy y los hechos de la ficha leen esto.
+ * `reply`: nos escribieron y no hemos contestado. `follow_up`: un siguiente
+ * paso nuestro vencido; si además esperamos su respuesta, `waitingSince` dice
+ * desde cuándo (el caso legítimo de «nos toca» y «esperando» a la vez).
+ * `theirs`: esperando su respuesta, sin nada nuestro vencido.
+ */
+export interface ShownTurn {
+  reason: DueReason | 'theirs';
+  /** `reply`/`theirs`: el último evento (ISO); `follow_up`: el día del paso (YYYY-MM-DD). */
+  since: string;
+  days: number;
+  /** Sólo en `follow_up`: el último evento nuestro, si esperamos su respuesta. */
+  waitingSince: string | null;
+}
+
+export function shownTurn(row: TurnRow & Pick<OverviewInput, 'next_action_at'>, now: Date): ShownTurn | null {
+  const turn = turnOf(row, now);
+  if (turn?.side === 'ours') return { reason: 'reply', since: turn.since, days: turn.days, waitingSince: null };
+  if (followUpDue(row, now)) {
+    const day = row.next_action_at!.slice(0, 10);
+    return { reason: 'follow_up', since: day, days: daysSince(day, now), waitingSince: turn?.since ?? null };
+  }
+  return turn ? { reason: 'theirs', since: turn.since, days: turn.days, waitingSince: null } : null;
+}
+
 /** Por qué te toca, o null: primero una respuesta pendiente, después un seguimiento. */
 export function dueReason(row: TurnRow & Pick<OverviewInput, 'next_action_at'>, now: Date): DueReason | null {
-  if (turnOf(row, now)?.side === 'ours') return 'reply';
-  return followUpDue(row, now) ? 'follow_up' : null;
+  const r = shownTurn(row, now)?.reason;
+  return r === 'reply' || r === 'follow_up' ? r : null;
 }
 
 // ── Temperatura ───────────────────────────────────────────────────────────
@@ -579,7 +606,8 @@ export interface ConversationOverview {
     /** Una por línea, con dos o más (contando «sin línea»); vacía, una sola barra (ADR-135). */
     lines: SeasonLine[];
   };
-  due: Block<DueRow>;
+  /** `longest`: la que más espera (`longestDue`), la que abre el panel en reposo. */
+  due: Block<DueRow> & { longest: DueRow | null };
   /**
    * Las calientes. El panel ya no las pinta (§ 69, fuera «Se mueve»); las lee
    * Hoy, que saca de aquí las respuestas nuevas de «Ha cambiado»
@@ -594,6 +622,42 @@ export interface ConversationOverview {
   cold: Block<ColdRow> & { round: number; stalled: number; picks: { id: string; project_id: string }[] };
   /** Abiertas sin ninguna fecha de contacto: fuera de todo bloque, contadas aparte. */
   undated: number;
+}
+
+function dueRowOf(r: OverviewInput, now: Date): DueRow {
+  const reason = dueReason(r, now)!;
+  const at = reason === 'reply' ? r.last!.occurred_at : r.next_action_at!.slice(0, 10);
+  return {
+    ...blockRow(r, now),
+    reason,
+    at,
+    days: daysSince(at, now),
+    kind: reason === 'reply' ? (r.last!.kind ?? null) : null,
+    subject: reason === 'reply' ? (r.last!.subject ?? null) : null,
+    note: r.next_action_note,
+  };
+}
+
+/**
+ * La que más espera de las que nos tocan (tarea 130: el panel en reposo la
+ * abre): la de más días, sea respuesta o paso vencido; a igualdad, la
+ * respuesta, y después la más antigua. Las filas del bloque no sirven: van
+ * de la más reciente a la más antigua y se cortan en `BLOCK_ROWS`.
+ */
+export function longestDue(due: readonly OverviewInput[], now: Date): DueRow | null {
+  let best: DueRow | null = null;
+  for (const r of due) {
+    const d = dueRowOf(r, now);
+    if (
+      !best ||
+      d.days > best.days ||
+      (d.days === best.days && d.reason === 'reply' && best.reason !== 'reply') ||
+      (d.days === best.days && d.reason === best.reason && Date.parse(d.at) < Date.parse(best.at))
+    ) {
+      best = d;
+    }
+  }
+  return best;
 }
 
 function blockRow(r: OverviewInput, now: Date): BlockRow {
@@ -641,19 +705,8 @@ export function buildOverview(
     },
     due: {
       count: due.length,
-      rows: dueBlockRows(due, now).map((r) => {
-        const reason = dueReason(r, now)!;
-        const at = reason === 'reply' ? r.last!.occurred_at : r.next_action_at!.slice(0, 10);
-        return {
-          ...blockRow(r, now),
-          reason,
-          at,
-          days: daysSince(at, now),
-          kind: reason === 'reply' ? (r.last!.kind ?? null) : null,
-          subject: reason === 'reply' ? (r.last!.subject ?? null) : null,
-          note: r.next_action_note,
-        };
-      }),
+      rows: dueBlockRows(due, now).map((r) => dueRowOf(r, now)),
+      longest: longestDue(due, now),
     },
     hot: {
       count: hot.length,
