@@ -7485,3 +7485,45 @@ desde `bd08dbdf`.
 specs puestos al día sin correr.
 
 **Re-evaluar cuando** alguien eche de menos los ámbitos a la vista (§ 1) o «Apuntar llamada» a un toque (§ 3).
+
+## [2026-11-11] ADR-194 · Revisión UX/UI del 11-11, tanda 2: un camino y un patrón por gesto (tareas 134, 135 y 136; enmienda ADR-130 § 2, ADR-139, ADR-182 § 4, ADR-185 § 4, ADR-176, ADR-138 § 5, ADR-056, ADR-062 y ADR-102)
+
+Marco (chat, 2026-11-11): «todo lo recomendado». Segunda tanda de la revisión (`_tasks.md` § UX/UI 11-11). En `main`
+desde `2a34f3ec`.
+
+1. **Borrar tiene una regla.** Lo que se puede deshacer se va al momento con «Deshacer» en el aviso (notas de persona
+   y del Planificador, borrador de factura, cobro, reparto); el borrado real espera a que acabe el aviso
+   (`lib/undo-remove.svelte.ts`). Lo irreversible o lo que llega a otros pide `ConfirmDialog` (fecha, invitación al
+   bolo, enlaces de calendario y de hoja de ruta, baja de un suscriptor). El botón de dos toques desaparece. La fecha
+   va con diálogo porque esconderla en todas las vistas mientras espera pide tocar cada consulta.
+2. **Apuntar un contacto tiene dos puertas y una pieza** (`ContactLogFields`): «+ Apuntar» del cuadro de escribir y
+   «+ → Llamada» de Conversaciones. Sale «Anotar contacto…» del menú de estado y el formulario del historial
+   (enmienda ADR-182 § 4; «Otro día» admite hora, enmienda ADR-185 § 4).
+3. **Las acciones de cabecera de ficha son botones de raya fina** en `RecordHead` (persona, organización, sala,
+   función, fecha, espacio). El lápiz del espacio pasa a «Editar».
+4. **El estado es una insignia también en la ficha** de función, fecha y bolo, con su menú donde se edita (enmienda
+   ADR-130 § 2 y ADR-139). La conversación conserva su palabra (ADR-184 § 5). Cuentas dice «1.ª opción».
+5. **Dos cortes con nombre** (`lib/breakpoints.ts`: móvil bajo 48rem, dos paneles desde 75rem) y un test que falla con
+   un `@media` sin nombre ni comentario `cut:`. Login (55rem) y raíl (64rem) llevan su razón escrita.
+6. **Una sola alta de función**: «Añadir al plan», abierta con lo que el contexto sabe (línea, bolo, sala). Fuera
+   `PerformanceForm`. Una función nace como opción o confirmada (ADR-095 § 7); «propuesta» sigue en la ficha.
+7. **La ficha de línea usa las filas de la sección** y su diálogo de alta (enmienda ADR-176/179). Ninguna fila escribe
+   en línea: relación, siguiente paso e historial se editan en la ficha de la conversación, y la marca «lo conozco»
+   se ve en la ficha de la persona (enmienda ADR-138 § 5). El módulo Planificador pierde «Lista / Mes» y enlaza al
+   Planificador acotado (enmienda ADR-056).
+8. **Un módulo vacío es una línea** con su acción, y el de solo lectura no se pinta (ADR-145 § 1, extendido a la línea).
+9. **La disciplina del espacio deja de editarse y de mostrarse** (enmienda ADR-062); la columna se queda. «Opciones
+   por orden» se queda en el diálogo del espacio; pendiente llevarla a Ajustes junto a «Oficio».
+10. **Persona y organización se crean desde ⌘K.** Una organización puede nacer sin conversación (enmienda ADR-102):
+    pide la migración `20261111130000_create_workspace_organization` (dos funciones nuevas, sin aplicar). Hasta
+    entonces la interfaz no ofrece «Nueva organización» ni el campo organización (`/api/organizations/can-create`).
+11. **Ajustes**: el control junto a su etiqueta, Facetas partida, firmas y remitentes con nombre propio.
+
+**Verificado:** `check` 0/0 y unitarios 2345 en `2a34f3ec`. Sin E2E ni RLS; siete specs puestos al día sin correr y
+`conversation-write` recompuesto al integrar. `tests/rls/create-workspace-organization.test.ts` irá rojo hasta aplicar.
+
+**Cómo se revierte la migración:** `DROP FUNCTION public.create_workspace_organization(uuid, text, text, text, text);`
+y `DROP FUNCTION public.set_workspace_person_organization(uuid, uuid, uuid);`.
+
+**Re-evaluar cuando** alguien eche de menos editar el siguiente paso desde la fila (§ 7) o la tercera puerta de
+apuntar (§ 2).
