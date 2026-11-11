@@ -169,8 +169,8 @@ test.describe('line detail: the kind\'s modules', () => {
       .click();
     const dialog = page.locator('dialog[open]');
     await dialog.getByLabel(/kind/i).selectOption({ label: 'Dossier' });
-    await dialog.getByLabel(/url/i).fill('https://example.test/zzz-e2e-dossier.pdf');
-    await dialog.getByRole('button', { name: /register|create|add/i }).click();
+    await dialog.getByLabel(/url|link/i).fill('https://example.test/zzz-e2e-dossier.pdf');
+    await dialog.getByRole('button', { name: /^(log|register|create|add)\b/i }).click();
     await expect(dialog).not.toBeVisible({ timeout: 10_000 });
     await expect(page.locator('#mod-materials')).toContainText('Dossier', { timeout: 10_000 });
 

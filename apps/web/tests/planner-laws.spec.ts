@@ -136,9 +136,9 @@ test.describe('planner laws (ADR-095)', () => {
     // follow — so a reader who learns one has learned the other.
     await planner(page, 'month');
     const words = await page.locator('.cal__view').allInnerTexts();
-    // The season (ADR-117) is the portada, so it opens the row. The Day is
+    // The season (ADR-117; «Coming weeks» since ADR-195) is the portada, so it opens the row. The Day is
     // not a word of it (ADR-155): it opens from a day of any drawing.
-    expect(words.map((w) => w.trim().toLowerCase())).toEqual(['season', 'agenda', 'month', 'board']);
+    expect(words.map((w) => w.trim().toLowerCase())).toEqual(['coming weeks', 'agenda', 'month', 'board']);
   });
 
   test('THE DAY IS A LENS: lit while you are in it, and its × goes back to where it was opened', async ({

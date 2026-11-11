@@ -24,11 +24,11 @@ no pide migración primero; las migraciones juntas por el gate de § 34.
 
 ## UX/UI: revisión del 2026-11-11 (Marco: «todo lo recomendado», chat 11-11)
 
-Análisis de producto y 40 propuestas, validadas enteras. Orden: tanda 1 (130 a 132, en producción desde `7c100d13`, ver CHANGELOG), tanda 2 (133 a 136, tras integrar la 1 porque tocan el diccionario y piezas comunes), tanda 3 (137 a 139,
+Análisis de producto y 40 propuestas, validadas enteras. Orden: tanda 1 (130 a 132, en producción desde `7c100d13`, ver CHANGELOG), tanda 2 (133 a 136, en producción desde `ebf4feda`, ver CHANGELOG), tanda 3 (137 a 139,
 con boceto antes y después de la 119). Capturas de partida: espacio `playwright`, datos de test.
 
 - [ ] Marco: hacer: en el panel de Supabase, añadir `https://hour.zerosense.studio/login*` a Redirect URLs y cambiar la plantilla «Reset Password» (`build/runbooks/password-recovery.md`); hasta entonces el enlace de recuperar contraseña cae en la portada. (132, chat 11-11)
-- [~] 133 Vocabulario y textos muertos: en `main` desde `0a7e9ac7` (ADR-195); falta deploy y E2E completo. Marco: decidir: en un espacio de música, el proyecto se llama «proyecto» / «project» (recomendado; unas 90 claves por lengua) o se queda en «espectáculo» como en escena. (chat 11-11)
+- [ ] Marco: decidir: en un espacio de música, el proyecto se llama «proyecto» / «project» (recomendado; unas 90 claves por lengua) o se queda en «espectáculo» como en escena (ADR-195 § 5). (133, chat 11-11)
 - [ ] 140 «Opciones por orden» del espacio pasa a Ajustes › Este espacio, bajo «Oficio», con el valor por defecto según el oficio; el corte del raíl (64rem) con nombre en `lib/breakpoints.ts`; el cajón del móvil como hoja corta colgada del reloj. Restos de los carriles de la tanda 2. (carriles 11-11, sin estimar)
 - [ ] 137 Primer día: quien entra sin espacio ve «Crea tu compañía» y tres pasos (espectáculo, contactos, primera fecha); incluye la ayuda B. Boceto antes. Después de la 119. (chat 11-11)
 - [ ] 138 Importar contactos desde CSV o Excel, sobre el importador de público. Boceto antes. Después de la 119. (chat 11-11)
