@@ -1,8 +1,14 @@
 /**
  * Theme — two orthogonal axes.
  *
- *   theme  → palette / fonts / identity     ('editorial-sobrio', 'serif-quiet', ...)
+ *   theme  → palette / fonts / identity     ('editorial-sobrio', and 'stress')
  *   mode   → luminance scheme               ('light' | 'dark' | 'system')
+ *
+ * ONE STYLE (tarea 132): the account menu offers the mode only. The other
+ * styles it used to list are gone; a browser that saved one of them falls
+ * back to the default, silently, and its key is cleared. `stress` stays: it
+ * is the crash test of the tokens (tokens.css § stress), set by hand and
+ * never offered.
  *
  * 'system' follows `prefers-color-scheme` live (subscribes to changes).
  * Until the user picks anything explicit, the saved mode defaults to
@@ -41,9 +47,20 @@ function readSavedMode(): ThemeMode {
 	return 'system';
 }
 
+/** The styles that exist. Anything else saved is a style that was removed. */
+const THEMES = new Set([DEFAULT_THEME, 'stress']);
+
+/** A saved style that no longer exists is the default; its key goes. */
+export function knownTheme(saved: string | null): string {
+	return saved && THEMES.has(saved) ? saved : DEFAULT_THEME;
+}
+
 function readSavedTheme(): string {
 	if (typeof localStorage === 'undefined') return DEFAULT_THEME;
-	return localStorage.getItem(THEME_KEY) || DEFAULT_THEME;
+	const saved = localStorage.getItem(THEME_KEY);
+	const theme = knownTheme(saved);
+	if (saved && theme !== saved) localStorage.removeItem(THEME_KEY);
+	return theme;
 }
 
 function resolveMode(mode: ThemeMode): ResolvedMode {
@@ -97,7 +114,8 @@ class ThemeStore {
 		startSwap(() => applyMode(resolveMode(mode)));
 	}
 
-	setTheme(theme: string): void {
+	setTheme(next: string): void {
+		const theme = knownTheme(next);
 		this.theme = theme;
 		if (typeof localStorage !== 'undefined') {
 			if (theme === DEFAULT_THEME) localStorage.removeItem(THEME_KEY);

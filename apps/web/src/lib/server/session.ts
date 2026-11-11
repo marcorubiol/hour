@@ -182,6 +182,101 @@ export async function signUp(
   return { ok: true, grant, user: body.user ?? null };
 }
 
+/**
+ * PASSWORD RECOVERY (tarea 132), Worker-mediated like the sign-in: the
+ * browser never talks to Supabase Auth. Supabase sends the mail; its link
+ * comes back to `/login?mode=reset`, and the new password is set here.
+ *
+ * `requestRecovery` answers only whether Supabase took the request: a known
+ * and an unknown address look the same to the caller (no oracle).
+ */
+export async function requestRecovery(
+  env: SessionEnv,
+  email: string,
+  redirectTo: string,
+): Promise<{ ok: true } | { ok: false; reason: 'rate_limited' | 'upstream' }> {
+  let res: Response;
+  try {
+    res = await fetch(`${env.PUBLIC_SUPABASE_URL}/auth/v1/recover?redirect_to=${encodeURIComponent(redirectTo)}`, {
+      method: 'POST',
+      headers: { apikey: env.PUBLIC_SUPABASE_ANON_KEY, 'content-type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+  } catch {
+    return { ok: false, reason: 'upstream' };
+  }
+  if (res.status === 429) return { ok: false, reason: 'rate_limited' };
+  // A 4xx about the address itself is not said either: same answer as a send.
+  if (res.status >= 500) return { ok: false, reason: 'upstream' };
+  return { ok: true };
+}
+
+/**
+ * The link's one-time token, traded for a session. The trade happens when
+ * the person sends the new password, not when the page opens: a mail
+ * scanner that follows the link does not spend it.
+ */
+export async function verifyRecovery(env: SessionEnv, tokenHash: string): Promise<GrantResult> {
+  let res: Response;
+  try {
+    res = await fetch(`${env.PUBLIC_SUPABASE_URL}/auth/v1/verify`, {
+      method: 'POST',
+      headers: { apikey: env.PUBLIC_SUPABASE_ANON_KEY, 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'recovery', token_hash: tokenHash }),
+    });
+  } catch {
+    return { ok: false, reason: 'upstream' };
+  }
+  if (!res.ok) return { ok: false, reason: res.status < 500 ? 'invalid_grant' : 'upstream' };
+  const grant = (await res.json()) as TokenGrant;
+  if (!grant.access_token || !grant.refresh_token) return { ok: false, reason: 'upstream' };
+  return { ok: true, grant };
+}
+
+/** The new password, under the recovery session. A 4xx is a password Supabase refuses (too weak, the same). */
+export async function updatePassword(
+  env: SessionEnv,
+  accessToken: string,
+  password: string,
+): Promise<{ ok: true; user: SupabaseAuthUser | null } | { ok: false; reason: 'rejected' | 'expired' | 'upstream' }> {
+  let res: Response;
+  try {
+    res = await fetch(`${env.PUBLIC_SUPABASE_URL}/auth/v1/user`, {
+      method: 'PUT',
+      headers: {
+        apikey: env.PUBLIC_SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${accessToken}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ password }),
+    });
+  } catch {
+    return { ok: false, reason: 'upstream' };
+  }
+  if (res.status === 401 || res.status === 403) return { ok: false, reason: 'expired' };
+  if (!res.ok) return { ok: false, reason: res.status < 500 ? 'rejected' : 'upstream' };
+  return { ok: true, user: ((await res.json()) as SupabaseAuthUser) ?? null };
+}
+
+/**
+ * A grant built from the tokens the default recovery mail leaves in the
+ * link's fragment (`#access_token=…&refresh_token=…`), for a project whose
+ * mail template has not been switched to the token hash. Its expiry is the
+ * access token's own.
+ */
+export function grantFromTokens(accessToken: string, refreshToken: string): TokenGrant | null {
+  const exp = decodeJwtPayload(accessToken)?.exp;
+  if (typeof exp !== 'number') return null;
+  const expiresIn = Math.floor(exp - Date.now() / 1000);
+  if (expiresIn <= 0) return null;
+  return { access_token: accessToken, refresh_token: refreshToken, expires_in: expiresIn };
+}
+
+/** The session user of a fresh grant (the shape the login answers with). */
+export function grantUser(user: SupabaseAuthUser | null | undefined): SessionUser | null {
+  return user ? sessionUserFromAuthUser(user) : null;
+}
+
 /** Best-effort server-side revocation on logout. Cookie clearing is the
  * real logout; this additionally invalidates the refresh token at Supabase
  * so a previously-exfiltrated copy dies too. */

@@ -3,7 +3,6 @@
   import Avatar from '$lib/components/Avatar.svelte';
   import Menu from '$lib/components/Menu.svelte';
   import ThemeToggle from '$lib/components/ThemeToggle.svelte';
-  import { useTheme } from '$lib/theme.svelte';
   import { clearSession, session } from '$lib/session.svelte';
   import { commitDone } from '$lib/chat-done.svelte';
   import { commitCall } from '$lib/call-log-pending';
@@ -37,7 +36,6 @@
     align = 'end',
   }: Props = $props();
 
-  const theme = useTheme();
   const locale = appLocale();
 
   // Identity: the person's stored name (user_profile.full_name via /api/me),
@@ -48,20 +46,9 @@
     displayNameFor($meQuery.data?.full_name, session.user?.name, session.user?.email),
   );
 
-  // Theme style picker — accordion inside the account menu.
-  type ThemeStyle = { id: string; name: string };
-  const themeStyles: ThemeStyle[] = [
-    { id: 'editorial-sobrio', name: 'Editorial Sober' },
-    { id: 'brutalist-mono', name: 'Brutalist Mono' },
-    { id: 'neon-noctambulo', name: 'Neon Nightshade' },
-    { id: 'serif-quiet', name: 'Serif Quiet' },
-    { id: 'archival-cream', name: 'Archival Cream' },
-  ];
-  let activeThemeStyleId = $derived(theme.theme);
-  let themeStyleExpanded = $state(false);
-  let activeThemeStyle = $derived(
-    themeStyles.find((s) => s.id === activeThemeStyleId) ?? themeStyles[0],
-  );
+  // ONE STYLE, LIGHT AND DARK (tarea 132). The menu offered five styles
+  // named in English, three of which changed nothing (they had no tokens);
+  // what is left is the mode: light, auto, dark.
 
   // No «Notifications» row and no do-not-disturb bell: Hour sends no
   // notification yet, so both pointed at controls that kept nothing. They
@@ -91,7 +78,6 @@
   {align}
   label={t('shell.account_menu', locale)}
   triggerClass="kebab"
-  onclose={() => (themeStyleExpanded = false)}
 >
   {#snippet trigger()}
     <Avatar size="xs" name={userDisplayName || userEmail || workspaceSlug} />
@@ -135,39 +121,9 @@
         {inSettings ? t('shell.dashboard', locale) : t('shell.all_settings', locale)}
       </a>
     </li>
-    <li role="none" class="theme-accordion">
-      <div class="theme-accordion__header">
-        <button
-          type="button"
-          class="theme-accordion__expand"
-          aria-expanded={themeStyleExpanded}
-          onclick={() => (themeStyleExpanded = !themeStyleExpanded)}
-        >
-          <span class="theme-accordion__label">{t('shell.theme_style', locale)}</span>
-          <span class="theme-accordion__current">
-            <span class="theme-accordion__current-name">{activeThemeStyle.name}</span>
-            <span class="theme-accordion__chevron" data-expanded={themeStyleExpanded || undefined} aria-hidden="true">›</span>
-          </span>
-        </button>
-        <ThemeToggle variant="plain" />
-      </div>
-      {#if themeStyleExpanded}
-        <ul class="theme-accordion__list" role="list">
-          {#each themeStyles as ts (ts.id)}
-            <li class="theme-accordion__item">
-              <button
-                type="button"
-                class="theme-accordion__select"
-                aria-pressed={ts.id === activeThemeStyleId}
-                data-active={ts.id === activeThemeStyleId || undefined}
-                onclick={() => theme.setTheme(ts.id)}
-              >
-                {ts.name}
-              </button>
-            </li>
-          {/each}
-        </ul>
-      {/if}
+    <li role="none" class="theme-row">
+      <span class="theme-row__label">{t('shell.theme_mode', locale)}</span>
+      <ThemeToggle variant="plain" />
     </li>
   {/snippet}
 </Menu>
@@ -237,105 +193,15 @@
     outline-offset: -1px;
   }
 
-  :global(.theme-accordion) {
+  :global(.theme-row) {
     display: flex;
-    flex-direction: column;
-    gap: var(--line-hairline);
-  }
-  :global(.theme-accordion__header) {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--line-hairline);
-  }
-  :global(.theme-accordion__expand) {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0;
-    padding-block: var(--space-xs);
-    padding-inline: var(--space-s);
-    background: transparent;
-    border: 0;
-    border-radius: var(--radius-s);
-    font-family: inherit;
-    color: var(--text-color);
-    text-align: start;
-    cursor: pointer;
-    transition: background var(--transition);
-    min-inline-size: 0;
-  }
-  :global(.theme-accordion__expand:hover),
-  :global(.theme-accordion__expand[aria-expanded='true']) {
-    background: var(--bg-light);
-  }
-  :global(.theme-accordion__expand:focus-visible) {
-    outline: var(--focus-width) solid var(--focus-color);
-    outline-offset: -1px;
-  }
-  :global(.theme-accordion__label) {
-    font-size: var(--text-s);
-    color: var(--text-color);
-    line-height: 1.3;
-  }
-  :global(.theme-accordion__current) {
-    display: inline-flex;
     align-items: center;
-    gap: var(--space-xs);
-    max-inline-size: 100%;
-    font-size: var(--text-xs);
-    color: var(--text-muted);
-    line-height: 1.3;
-    min-inline-size: 0;
-  }
-  :global(.theme-accordion__current-name) {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    min-inline-size: 0;
-  }
-  :global(.theme-accordion__chevron) {
-    color: var(--text-faint);
-    line-height: 1;
-    transition: transform var(--transition);
-    flex-shrink: 0;
-  }
-  :global(.theme-accordion__chevron[data-expanded]) {
-    transform: rotate(90deg);
-  }
-  :global(.theme-accordion__list) {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--line-hairline);
+    justify-content: space-between;
+    gap: var(--space-s);
     padding-inline-start: var(--space-s);
   }
-  :global(.theme-accordion__item) {
-    display: flex;
-  }
-  :global(.theme-accordion__select) {
-    flex: 1;
-    padding-block: var(--space-xs);
-    padding-inline: var(--space-s);
-    background: transparent;
-    border: 0;
-    border-radius: var(--radius-s);
-    font-family: inherit;
-    font-size: var(--text-xs);
-    color: var(--text-muted);
-    text-align: start;
-    cursor: pointer;
-    transition: background var(--transition), color var(--transition);
-  }
-  :global(.theme-accordion__select):hover {
-    background: var(--bg-light);
-    color: var(--heading-color);
-  }
-  :global(.theme-accordion__select[data-active]) {
-    background: var(--bg-light);
-    color: var(--heading-color);
-    font-weight: 500;
+  :global(.theme-row__label) {
+    font-size: var(--text-s);
+    color: var(--text-color);
   }
 </style>

@@ -2774,6 +2774,15 @@
     color: var(--text-dark-muted);
   }
 
+  /* A KEY IS A PROMISE OF A KEYBOARD (tarea 132): the hints that name one
+     («esc para cerrar», «↑↓ mover», «⌘↵», the C of calm) are not drawn
+     where the pointer is a finger. The shortcut itself keeps working. */
+  @media (pointer: coarse) {
+    .keys {
+      display: none;
+    }
+  }
+
   .text--xs {
     font-size: var(--text-xs);
   }

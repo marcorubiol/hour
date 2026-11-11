@@ -22,11 +22,17 @@ const FIXTURE_SPACE_TOKEN = 's:playwright';
 const FIXTURE_PROJECT_TOKEN = 'p:019f21d2-7482-77e6-9ad9-27d881cff305';
 
 // The scope is one pill in the lens's title row (ADR-152): «Scope: <name>»
-// when scoped, «Scope: Everything. Narrow» when not. The rail's own row is
-// the bare word «Everything».
+// when scoped, «Scope: Everything. Narrow» when not. Since tarea 132 it is the
+// scope's only door: the rail no longer lists «Everything», the saved scopes
+// or the recents; the pill's dialog does («Clear» is the way back to all).
 const scopedPill = (page: Page) => page.getByRole('button', { name: /^Scope: (?!Everything)/ });
 const everythingPill = (page: Page) => page.getByRole('button', { name: 'Scope: Everything. Narrow' });
-const railEverything = (page: Page) => page.getByRole('button', { name: 'Everything', exact: true });
+const scopeDialog = (page: Page) => page.getByRole('dialog', { name: 'Scope' });
+/** Back to everything, from the pill: what the rail's «Everything» did. */
+async function clearScope(page: Page) {
+  await scopedPill(page).click();
+  await scopeDialog(page).getByRole('button', { name: 'Clear', exact: true }).click();
+}
 
 test('Everything clears ?scope= from the URL after opening a scoped link', async ({ page }) => {
   await page.goto(`/h/desk?scope=${FIXTURE_SPACE_TOKEN}`);
@@ -36,14 +42,14 @@ test('Everything clears ?scope= from the URL after opening a scoped link', async
   await expect(scopedPill(page)).toBeVisible();
   expect(page.url()).toContain('scope=');
 
-  await railEverything(page).click();
+  await clearScope(page);
   await expect(everythingPill(page)).toBeVisible({ timeout: 5000 });
   await expect(scopedPill(page)).toHaveCount(0);
 
   expect(page.url()).not.toContain('scope=');
 });
 
-test('rail-applied saved scope, then Everything, cleans the URL (replaceState staleness)', async ({ page }) => {
+test('pill-applied saved scope, then Everything, cleans the URL (replaceState staleness)', async ({ page }) => {
   // Seed a saved multi-token scope owned by the fixture (space + project).
   await page.addInitScript(
     ([space, project]) => {
@@ -64,16 +70,17 @@ test('rail-applied saved scope, then Everything, cleans the URL (replaceState st
   await page.waitForURL(/\/h\/desk/, { timeout: 10000 });
   await waitForLoaded(page);
 
-  // 2. Everything → the Desk, clean.
-  await railEverything(page).click();
+  // 2. Unscoped, the pill opens its dialog with the saved scope listed.
+  await everythingPill(page).click();
+  await expect(scopeDialog(page).getByRole('heading', { name: 'Saved' })).toBeVisible();
 
-  // 3. Apply the saved scope from the rail → URL gains ?scope=.
-  await page.getByRole('button', { name: /E2E scope/ }).click();
+  // 3. Apply the saved scope from the pill → URL gains ?scope=.
+  await scopeDialog(page).getByRole('button', { name: /E2E scope/ }).click();
   await expect(scopedPill(page)).toBeVisible({ timeout: 15000 });
   await expect(page).toHaveURL(/scope=/, { timeout: 5000 });
 
   // 4. Everything again → the URL must clean (the bug left it scoped).
-  await railEverything(page).click();
+  await clearScope(page);
   await expect(everythingPill(page)).toBeVisible({ timeout: 5000 });
   await expect(scopedPill(page)).toHaveCount(0);
 
@@ -87,7 +94,7 @@ test('a scoped link to the front door keeps its scope on the Desk, and Everythin
   await waitForLoaded(page);
   await expect(scopedPill(page)).toBeVisible();
 
-  await railEverything(page).click();
+  await clearScope(page);
   await expect(everythingPill(page)).toBeVisible({ timeout: 5000 });
   await expect(scopedPill(page)).toHaveCount(0);
 
@@ -148,7 +155,12 @@ test('a scope change on a person opened from Conversations lands back on Convers
   await page.waitForURL(/\/h\/[^/]+\/person\//);
   await waitForLoaded(page);
 
-  await railEverything(page).click();
+  // Off a lens there is no pill (ADR-152) and, since tarea 132, no rail of
+  // scopes: the scope changes from the search, «narrow» on the space's row.
+  await page.getByRole('button', { name: 'Search or jump to a project or line' }).click();
+  const search = page.getByRole('dialog', { name: 'Search' });
+  await search.getByRole('textbox').fill('playwright');
+  await search.getByRole('button', { name: /^Show only .*playwright/i }).first().click();
   await page.waitForURL(/\/h\/conversations/, { timeout: 10000 });
   await expect(page.getByRole('navigation', { name: 'Sections' }).getByRole('link', { name: 'Conversations', exact: true })).toHaveAttribute(
     'aria-current',

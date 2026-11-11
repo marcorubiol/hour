@@ -1,7 +1,8 @@
 <script lang="ts">
   /**
-   * App shell — Scope v2. Scope is PINS in a store, built from the left
-   * rail (Everything + saved scopes + recents) and the ⌘K scope builder —
+   * App shell — Scope v2. Scope is PINS in a store, built from each lens's
+   * scope pill (its saved scopes and recents since tarea 132, when they left
+   * the rail) and the ⌘K scope builder —
    * the manual pin UI (card chips, breadcrumb pin, ScopeStrip) died
    * 2026-07-17. Applying a scope from a non-lens surface lands on /h/desk.
    * The top bar is the ⌘K search · the sections (LensSwitcher, ADR-140,
@@ -543,7 +544,7 @@
     if (next) replaceState(next, {});
   });
 
-  // ⌘K — one palette, two doors (ADR-178): the top bar, ⌘K and the rail
+  // ⌘K — one palette, two doors (ADR-178): the top bar and ⌘K
   // SEARCH (a row opens its record, «acotar» is the aside); the scope pill
   // FILTERS («Ver solo…», the builder, Apply sets the pins).
   let paletteOpen = $state(false);
@@ -639,7 +640,7 @@
   // Below 48rem the rail cannot sit beside the page — it alone is 248px of
   // a 390px screen — so it leaves the flow and the top bar's empty left
   // cell gets the one button that brings it out. Same rail, same contents,
-  // same order: the clock that goes home, calm, the pulse, the scopes. On a
+  // same order: the clock that goes home, calm, the pulse. On a
   // desktop the button is not drawn and `railOpen` is never true.
 
   // ── The shell's clock ───────────────────────────────────────────────
@@ -686,16 +687,8 @@
     railOpen = false;
     if (returnFocus) menuButtonEl?.focus();
   }
-  // Anything that goes somewhere closes it: a scope, the clock, ⌘K.
+  // Anything that goes somewhere closes it: the clock, a line of the pulse.
   afterNavigate(() => closeRail());
-  function applyScopeFromRail(s: Scope) {
-    closeRail();
-    applyScope(s);
-  }
-  function openPaletteFromRail() {
-    closeRail();
-    openPaletteFresh();
-  }
 
   /** Clear from the scope pill = abandoning the working combo too. */
   function clearScope() {
@@ -720,6 +713,7 @@
     save: saveCurrentScope,
     update: updateScope,
     clear: clearScope,
+    apply: applyScope,
   });
 </script>
 
@@ -807,8 +801,6 @@
     </header>
 
     <ScopeRail
-      applyScope={applyScopeFromRail}
-      openPaletteFresh={openPaletteFromRail}
       open={railOpen}
       onclose={() => closeRail({ returnFocus: true })}
       {clockNow}
@@ -824,7 +816,7 @@
           direction="up"
           align="start"
         />
-        <PresenceBadge count={networkPresence?.count ?? null} variant="dots" />
+        <PresenceBadge count={networkPresence?.count ?? null} />
       {/snippet}
     </ScopeRail>
 

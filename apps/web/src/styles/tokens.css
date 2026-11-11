@@ -524,8 +524,10 @@
 
     --sidebar-width: 264px;
     /* The shell's rail (ScopeRail) beside the page on a desktop, border
-       included; the vistazo's veil reads it to leave the top bar clear. */
-    --rail-width: 15.5rem;
+       included; the vistazo's veil reads it to leave the top bar clear.
+       What it holds since tarea 132 sets it: the clock with calm beside it,
+       the pulse's label and its line, you and «N en línea». */
+    --rail-width: 14.5rem;
     --header-height: 0px;
     --scroll-margin: 0px;
     --offset: calc(var(--scroll-margin) + var(--header-height));
@@ -1096,52 +1098,6 @@
     --record-gap: var(--space-xl); /* between the blocks of a record */
     --record-label-inline: 8rem; /* the mono label column of a record's rows */
     --record-missing-inline: 20rem; /* below this the «Falta» list drops under its label */
-  }
-
-  /* ============================================================ */
-  /* THEME — Serif Quiet                                            */
-  /* ============================================================ */
-  /* Proof-of-concept theme. Demonstrates the data-theme axis with  */
-  /* the most visible single change: body type switches from sans   */
-  /* to serif. Everything reads in Newsreader; mono kickers stay    */
-  /* for metadata contrast. Paleta tinted warmer (closer to old-    */
-  /* paper cream) so the serif feels intentional, not accidental.   */
-
-  :root[data-theme="serif-quiet"] {
-    /* Body type → serif. Headings & mono untouched (still Newsreader
-       + JetBrains Mono). The contextual --text-font-family alias is
-       what body consumes, so this single line repaints all sans copy. */
-    --font-sans: var(--font-display);
-    --text-line-height: 1.6;
-    --text-text-wrap: pretty;
-
-    /* Cream slightly warmer — H 75 vs default 85, +chroma so it feels
-       like an aged-paper cream rather than the cool warm-cream default. */
-    --base: oklch(96% 0.014 75);
-
-    /* Slate warmer + slightly darker so it sits as a brown-slate accent
-       on cream, like ink on parchment. */
-    --primary: oklch(38% 0.09 50);
-
-    /* Borders pick up the warmth automatically via --neutral derivation,
-       but we drop chroma on the neutral so the ink doesn't compete with
-       the warm base. */
-    --neutral: oklch(28% 0.008 60);
-  }
-
-  /* Serif Quiet + dark — combine theme × mode. Most of the dark mode
-     overrides still apply; we only retune the few primitives that need
-     to keep the "aged paper" character in inverted luminance. */
-  :root[data-theme="serif-quiet"][data-mode="dark"] {
-    /* Warm dark base — slightly more chroma than the default dark to
-       stay in the aged-paper register even when inverted. */
-    --base: oklch(22% 0.014 75);
-
-    /* Off-cream text instead of cool ink-light, to keep the warm read. */
-    --neutral: oklch(84% 0.012 75);
-
-    /* Slate warm-light so primary remains the same "brown ink" feeling. */
-    --primary: oklch(74% 0.09 50);
   }
 
   /* ============================================================ */
