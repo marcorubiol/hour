@@ -244,7 +244,7 @@
     const noteSlug = slug;
     noteRemovals.remove(noteId, {
       message: t('person.note_deleted', locale),
-      commit: () => mutateJSON('DELETE', `/api/persons/${encodeURIComponent(noteSlug)}/notes/${noteId}`),
+      url: `/api/persons/${encodeURIComponent(noteSlug)}/notes/${noteId}`,
     });
   }
 

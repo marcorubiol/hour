@@ -2520,7 +2520,7 @@
   function deleteNote(id: string) {
     noteRemovals.remove(id, {
       message: t('planner.note_deleted', locale),
-      commit: () => mutateJSON('DELETE', `/api/notes/${encodeURIComponent(id)}`),
+      url: `/api/notes/${encodeURIComponent(id)}`,
     });
   }
 

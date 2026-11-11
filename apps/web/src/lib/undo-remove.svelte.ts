@@ -7,25 +7,33 @@
  * o llega a otras personas, no pasa por aquí: pide `ConfirmDialog`.
  *
  * Cada pantalla crea el suyo al montarse (`undoableRemovals()`), esconde lo
- * que `hidden` tenga y llama a `remove()`. Al salir de la pantalla o cerrar
- * la pestaña se escribe lo pendiente.
+ * que `hidden` tenga y llama a `remove()` con la URL del DELETE.
+ *
+ * Lo que el usuario borró se borra seguro: el DELETE sale al vencer el aviso,
+ * al cerrarlo con ×, al desmontarse la pantalla (navegar), y al esconderse o
+ * cerrarse la pestaña (`visibilitychange` oculto, `pagehide`). Sale con
+ * `keepalive`, y por eso la petición la hace esta pieza y no quien llama: un
+ * `fetch` normal lanzado mientras la página se cierra se cancela con ella
+ * (el bug del 11-11: tres notas borradas seguían vivas). «Deshacer» vale
+ * mientras el aviso está a la vista.
  */
 
 import { addToast, removeToast } from '$lib/components/Toast.svelte';
+import { mutateJSON } from '$lib/api';
 import { CREATED_TOAST_MS } from '$lib/created';
 import { t, type Locale } from '$lib/i18n';
 
 interface Pending {
   timer: ReturnType<typeof setTimeout>;
   toast: number;
-  commit: () => Promise<unknown>;
+  url: string;
 }
 
 export interface UndoableRemovals {
   /** Lo que se ha quitado y aún espera: la pantalla no lo pinta. */
   readonly hidden: ReadonlySet<string>;
-  /** Quita `id` ya; `commit` lo borra de verdad al acabar el aviso. */
-  remove(id: string, opts: { message: string; commit: () => Promise<unknown> }): void;
+  /** Quita `id` ya; `url` recibe el DELETE al acabar el aviso. */
+  remove(id: string, opts: { message: string; url: string }): void;
   /** «Deshacer» del aviso: no se escribe y vuelve a la vista. */
   undo(id: string): void;
   /** Escribe ya todo lo pendiente (al salir). */
@@ -57,7 +65,10 @@ export function undoableRemovals(opts: { locale: Locale; ms?: number; onsettled?
     if (!p) return;
     removeToast(p.toast);
     try {
-      await p.commit();
+      // Sin `await` antes: en `pagehide` la petición tiene que salir en este
+      // turno, el último de la página. `mutateJSON` la manda al instante
+      // salvo que haya una renovación de sesión en vuelo.
+      await mutateJSON('DELETE', p.url, undefined, { keepalive: true });
     } catch (err) {
       show(id);
       addToast({
@@ -77,7 +88,7 @@ export function undoableRemovals(opts: { locale: Locale; ms?: number; onsettled?
     addToast({ tone: 'info', message: t('ui.undone', locale) });
   }
 
-  function remove(id: string, o: { message: string; commit: () => Promise<unknown> }) {
+  function remove(id: string, o: { message: string; url: string }) {
     if (pending.has(id)) return;
     hidden = new Set(hidden).add(id);
     const toast = addToast({
@@ -85,18 +96,28 @@ export function undoableRemovals(opts: { locale: Locale; ms?: number; onsettled?
       message: o.message,
       duration: ms,
       action: { label: t('ui.undo', locale), run: () => undo(id) },
+      // Cerrar el aviso a mano es darlo por bueno: se borra ya.
+      ondismiss: () => void commit(id),
     });
-    pending.set(id, { timer: setTimeout(() => void commit(id), ms), toast, commit: o.commit });
+    pending.set(id, { timer: setTimeout(() => void commit(id), ms), toast, url: o.url });
   }
 
   function flush() {
     for (const id of [...pending.keys()]) void commit(id);
   }
 
+  function onVisibility() {
+    // Pestaña escondida: el aviso ya no está a la vista, y en el móvil puede
+    // no llegar ningún `pagehide` antes de que el sistema la mate.
+    if (document.visibilityState === 'hidden') flush();
+  }
+
   $effect(() => {
     window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onVisibility);
     return () => {
       window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', onVisibility);
       flush();
     };
   });

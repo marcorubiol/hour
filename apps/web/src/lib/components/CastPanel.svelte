@@ -113,7 +113,7 @@
     const project = projectId;
     castRemovals.remove(m.id, {
       message: t('perf.cast_removed', locale, { name: m.person?.full_name ?? t('perf.cast_this_person', locale) }),
-      commit: () => mutateJSON('DELETE', `/api/projects/${project}/cast/${m.id}`),
+      url: `/api/projects/${project}/cast/${m.id}`,
     });
   }
 

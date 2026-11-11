@@ -338,11 +338,14 @@ test.describe('the margin — a private post-it on a day (ADR-093)', () => {
       await expect(note).toBeHidden({ timeout: 15_000 });
     }
 
-    const left = await readNotes(page, day);
-    expect(
-      left.filter((n) => n.body.endsWith(String(stamp))),
-      'a note from this run survived the sweep',
-    ).toHaveLength(0);
+    // The × hides at once; the DELETE waits for the notice and its «Deshacer»
+    // ($lib/undo-remove, ADR-194 § 1). Wait for the base, not the screen.
+    await expect
+      .poll(
+        async () => (await readNotes(page, day)).filter((n) => n.body.endsWith(String(stamp))).length,
+        { message: 'a note from this run survived the sweep', timeout: 20_000 },
+      )
+      .toBe(0);
 
     for (const d of [dateA, dateB]) {
       if (!d) continue;
