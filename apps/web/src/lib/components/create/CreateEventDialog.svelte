@@ -55,8 +55,10 @@
     teamQueryOptions,
     workspacesQueryOptions,
   } from '$lib/nav-queries';
-  import { boloDefault, boloOptions, boloPrefill, type BoloLite } from '$lib/bolo-pick';
-  import { projectBolosQueryOptions } from '$lib/bolo-queries';
+  import { boloDefault, boloOptions, boloPrefill, booksHref, type BoloLite } from '$lib/bolo-pick';
+  import { moneyAccessQueryOptions, projectBolosQueryOptions } from '$lib/bolo-queries';
+  import { lensOn } from '$lib/lenses.svelte';
+  import { usePins } from '$lib/stores/pins.svelte';
   import { HOLD_NOTICE_DEFAULT } from '$lib/performance';
   import { TRAVEL_DIRECTIONS, invalidateDateFeeds } from '$lib/date';
   import { spaceName } from '$lib/utils/identity';
@@ -113,6 +115,9 @@
     /** The pinned scope's project (and line), which always wins. */
     presetProjectId?: string | null;
     presetLineId?: string | null;
+    /** The bolo it hangs from (a bolo's «+ función»): proposed over the
+        one-open-bolo guess, and it brings its venue and city. */
+    presetBoloId?: string | null;
     /** Open on this type (the toolbar's «unavailable» door). */
     presetType?: QuickType | null;
     /** Typed in ⌘K: it is the title, over a leftover draft's. */
@@ -131,6 +136,7 @@
     presetDate = null,
     presetProjectId = null,
     presetLineId = null,
+    presetBoloId = null,
     presetType = null,
     presetTitle = null,
     presetWorkspaceId = null,
@@ -243,6 +249,26 @@
   let bolos = $derived<BoloLite[]>($bolosQuery.data?.items ?? []);
   let bolosOpts = $derived(boloOptions(bolos, locale));
   let showBolo = $derived(sk.more.bolo && bolosOpts.length > 1);
+  // A project without bolos: the feed alone cannot tell «none» from «not
+  // yours», so only then is money access asked, and only who reads money
+  // sees the field, off, saying so and where a bolo is made (Cuentas, in
+  // another tab: the half-written add is not lost).
+  const accessQuery = createQuery(
+    toStore(() =>
+      moneyAccessQueryOptions(
+        d.project,
+        open && d.type === 'performance' && $bolosQuery.isSuccess && bolos.length === 0,
+      ),
+    ),
+  );
+  let showBoloEmpty = $derived(
+    sk.more.bolo && !showBolo && $bolosQuery.isSuccess && $accessQuery.data?.read_money === true,
+  );
+  const pins = usePins();
+  let booksHere = $derived({
+    pins: pins.pins,
+    workspaceSlug: workspaces.find((w) => w.id === project?.workspace_id)?.slug ?? null,
+  });
 
   // «Otros»: its labels are the space's own usage (ADR-078 §8).
   const labelsQuery = createQuery(
@@ -299,6 +325,11 @@
         d.project = presetProjectId;
         d.line = presetLineId ?? '';
       }
+      // A bolo's door says which deal: it is proposed again, over a draft's.
+      if (presetBoloId) {
+        d.bolo = '';
+        seeded.bolo = '';
+      }
       // What was typed to ask for this is written, not deduced: it wins, and
       // it is a draft from now on.
       if (presetTitle?.trim()) {
@@ -345,7 +376,7 @@
     if (!open || d.type !== 'performance' || !d.project || !$bolosQuery.isSuccess) return;
     if (seeded.bolo === d.project) return;
     seeded.bolo = d.project;
-    d.bolo = boloDefault(bolos);
+    d.bolo = presetBoloId && bolos.some((b) => b.id === presetBoloId) ? presetBoloId : boloDefault(bolos);
     if (d.bolo) pickBolo(d.bolo);
   });
 
@@ -993,13 +1024,28 @@
             {#if sk.where === 'place'}
               <Input label={t('create.venue', locale)} bind:value={d.venue} oninput={() => (touched.venue = true)} />
             {/if}
+            {#snippet boloMessage()}
+              {t('perf.bolo_helper_short', locale)}
+              {#if lensOn('books') && d.project}
+                <a href={booksHref(d.project, { newBolo: true, here: booksHere })} target="_blank" rel="noopener"
+                  >{t('perf.bolo_create_link', locale)}</a
+                >
+              {/if}
+            {/snippet}
             {#if showBolo}
               <Select
                 label={t('perf.bolo', locale)}
                 options={bolosOpts}
                 bind:value={d.bolo}
-                helper={t('perf.bolo_helper_short', locale)}
+                message={boloMessage}
                 onchange={(e) => pickBolo((e.currentTarget as HTMLSelectElement).value)}
+              />
+            {:else if showBoloEmpty}
+              <Select
+                label={t('perf.bolo', locale)}
+                options={[{ value: '', label: t('perf.bolo_empty', locale) }]}
+                disabled
+                message={boloMessage}
               />
             {/if}
             <Input label={t('create.city', locale)} bind:value={d.city} oninput={() => (touched.city = true)} />

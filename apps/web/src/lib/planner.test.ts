@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  linePlannerHref,
   addDaysIso,
   addMonths,
   agendaDayKeys,
@@ -1361,5 +1362,11 @@ describe('dueOption (ADR-165 § 2)', () => {
 
   it('a side that is not a hold is not the one to decide', () => {
     expect(dueOption(d(side('a', 'confirmed'), side('b')), () => null).id).toBe('b');
+  });
+});
+
+describe('linePlannerHref (tarea 135)', () => {
+  it('opens the Planner pinned to the line, by its id', () => {
+    expect(linePlannerHref('l1')).toBe('/h/planner?scope=l:l1');
   });
 });

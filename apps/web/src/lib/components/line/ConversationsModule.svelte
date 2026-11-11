@@ -1,32 +1,23 @@
 <script lang="ts">
   /**
-   * Contacts module (ADR-056) — the line's conversations. Mounts the ONE
-   * ConversationTable implementation with a line_id filter (true line
-   * scoping, not project approximation), plus a line-scoped "Add conversation"
-   * that auto-assigns line_id at capture (the module context is the line —
-   * no select needed, unlike the global dialog).
+   * Conversations module (ADR-056): the line's conversations, in the same
+   * two-line rows as the Conversations section (ADR-176, ADR-179): the ONE
+   * ConversationTable in its `chat` shape, with a line_id filter (true line
+   * scoping, not a project approximation).
    *
-   * 409 conversation_exists: uniqueness ignores line_id — the person already
-   * has a conversation in this project that the caller can see (the shared
-   * one, or their own private one; possibly on another line). Someone else's
-   * private one never counts (20261011500000). v1 surfaces it honestly
-   * instead of silently relinking.
+   * «+ conversación» opens the shell's one «Añadir conversación»
+   * (`CreateConversationDialog`, tarea 135) with this project and this line
+   * already checked, instead of a form of its own.
    */
 
-  import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
-  import { refreshAfterWrite } from '$lib/query-refresh';
-  import ConversationTable from '$lib/components/ConversationTable.svelte';
-  import Button from '$lib/components/Button.svelte';
-  import Dialog from '$lib/components/Dialog.svelte';
-  import Input from '$lib/components/Input.svelte';
-  import { addToast } from '$lib/components/Toast.svelte';
-  import { goto } from '$app/navigation';
-  import { toastCreated } from '$lib/created';
-  import { mutateJSON, ApiError } from '$lib/api';
-  import { conversationWhoBody } from '$lib/conversation';
-  import { organizationNames, organizationsQueryOptions } from '$lib/organizations';
-  import { conversationAccessQueryOptions } from '$lib/conversation-access';
+  import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
+  import { fetchJSON } from '$lib/api';
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
+  import ConversationTable from '$lib/components/ConversationTable.svelte';
+  import LineModule from './LineModule.svelte';
+  import { conversationAccessQueryOptions } from '$lib/conversation-access';
+  import { useCreation } from '$lib/stores/creation.svelte';
   import { appLocale, t } from '$lib/i18n';
 
   interface Props {
@@ -39,175 +30,64 @@
       workspace_id: string;
     };
     workspaceSlug: string;
+    title: string;
   }
 
-  let { line, workspaceSlug }: Props = $props();
+  let { line, workspaceSlug, title }: Props = $props();
 
-  const queryClient = useQueryClient();
   const locale = appLocale();
+  const creation = useCreation();
+  const queryClient = useQueryClient();
 
-  // ADR-124: «Añadir» and its directory autocomplete only for whoever edits
-  // conversations somewhere (the API still decides per project).
+  // ADR-124: «+ conversación» only for whoever edits conversations somewhere
+  // (the API still decides per project).
   const accessQuery = createQuery(conversationAccessQueryOptions());
   let canEdit = $derived($accessQuery.data?.edit !== false);
-  const organizationsQuery = createQuery(
-    toStore(() => organizationsQueryOptions($accessQuery.data?.edit === true)),
-  );
-  let orgSuggestions = $derived(organizationNames($organizationsQuery.data?.items ?? [], [line.workspace_id]));
-  const orgListId = `lcm-org-list-${Math.random().toString(36).slice(2, 8)}`;
+
+  // Whether the line has any, for the one empty line. Under the
+  // `conversations` prefix, so any write that refreshes the lists
+  // (`refreshAfterWrite`) asks it again.
+  const countOptions = toStore(() => {
+    const id = line.id;
+    return {
+      queryKey: ['conversations', 'line-any', id] as const,
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchJSON<{ total: number }>(`/api/conversations?line_id=${id}&limit=1`, signal),
+    };
+  });
+  const countQuery = createQuery(countOptions);
 
   let filters = $derived({ lineId: line.id });
 
-  // ── Add conversation (line-scoped) ────────────────────────────────────
-  let addOpen = $state(false);
-  let aName = $state('');
-  let aEmail = $state('');
-  let aOrg = $state('');
-  let aNextAt = $state('');
-  let aNextNote = $state('');
-
-
-  function openAdd() {
-    aName = '';
-    aEmail = '';
-    aOrg = '';
-    aNextAt = '';
-    aNextNote = '';
-    addOpen = true;
+  function add() {
+    creation.openConversation({ projectId: line.project_id, lineId: line.id });
   }
 
-  const addMutation = createMutation({
-    mutationFn: () =>
-      mutateJSON('POST', '/api/conversations', {
-        project_id: line.project_id,
-        // ADR-102: the person is optional; the organization alone is enough.
-        ...conversationWhoBody({ name: aName, email: aEmail, organization: aOrg }),
-        next_action_at: aNextAt || null,
-        next_action_note: aNextNote.trim() || null,
-        line_id: line.id,
-      }),
-    onSuccess: (body) => {
-      addOpen = false;
-      void refreshAfterWrite(queryClient, ['conversations']);
-      void queryClient.invalidateQueries({ queryKey: ['organizations'] });
-      void queryClient.invalidateQueries({ queryKey: ['line-eng-stats'] });
-      const id = (body as { conversation?: { id?: string } } | null)?.conversation?.id;
-      toastCreated({
-        locale,
-        message: t('conversations.added_one', locale),
-        undo: id
-          ? async () => {
-              await mutateJSON('DELETE', `/api/conversations/${id}`);
-              await refreshAfterWrite(queryClient, ['conversations']);
-              await queryClient.invalidateQueries({ queryKey: ['line-eng-stats'] });
-            }
-          : undefined,
-      });
-    },
-    onError: (err) => {
-      if (err instanceof ApiError && err.status === 409) {
-        addOpen = false;
-        // The 409 names the conversation when the clash is the organization's
-        // (POST /api/conversations): then «Abrir» goes to it (ADR-154).
-        const existing = typeof err.body?.conversation_id === 'string' ? err.body.conversation_id : null;
-        addToast({
-          tone: 'warning',
-          title: t('line.conv_exists_title', locale),
-          message: t('line.conv_exists_msg', locale),
-          action: existing
-            ? { label: t('line.conv_exists_open', locale), run: () => void goto(`/h/${workspaceSlug}/conversation/${existing}`) }
-            : undefined,
-        });
-        return;
-      }
-      addToast({
-        tone: 'danger',
-        title: t('line.conv_add_error', locale),
-        message: err instanceof ApiError ? err.message : String(err),
-      });
-    },
-  });
-
-  /** «Who», said under the organization (ADR-139 p7), never as a toast. */
-  let errWho = $state<string | undefined>();
-  $effect(() => {
-    void aName;
-    void aOrg;
-    errWho = undefined;
-  });
-  let addFormEl: HTMLFormElement | undefined = $state();
-
-  /** Runs from the form's submit (Enter, ⌘↵ or the button). */
-  function submitAdd() {
-    if (!aName.trim() && !aOrg.trim()) {
-      errWho = t('line.name_required_msg', locale);
-      document.getElementById(`${orgListId}-input`)?.focus();
-      return;
-    }
-    $addMutation.mutate();
+  /** After a row's «Ya está» or its undo: the line's head counts again. */
+  function refresh() {
+    void queryClient.invalidateQueries({ queryKey: ['line-eng-stats', line.id] });
+    void queryClient.invalidateQueries({ queryKey: ['conversations', 'line-any', line.id] });
   }
 </script>
 
-<div class="lcm">
-  <div class="lcm__bar">
-    {#if canEdit}
-      <Button size="xs" variant="secondary" onclick={openAdd}>{t('conversations.add', locale)}</Button>
-    {/if}
-  </div>
-  <!-- The line's head already counts them (tarea 131): one «N conversaciones», not two. -->
-  <ConversationTable counted {filters} editable={canEdit} personBase={`/h/${workspaceSlug}/person`} conversationHref={(item) => `/h/${workspaceSlug}/conversation/${item.id}`} />
-</div>
+{#snippet action(cls: string)}
+  {#if canEdit}
+    <button type="button" class={cls} onclick={add}>{t('line.add_conversation', locale)}</button>
+  {/if}
+{/snippet}
 
-<Dialog bind:open={addOpen} title={t('conversations.add', locale)} size="s" onclose={() => (addOpen = false)}>
-  <form
-    class="lcm__form"
-    bind:this={addFormEl}
-    onsubmit={(e) => {
-      e.preventDefault();
-      submitAdd();
-    }}
-  >
-    <Input
-      id={`${orgListId}-input`}
-      label={t('conversations.col_organization', locale)}
-      bind:value={aOrg}
-      error={errWho}
-      list={orgListId}
-      autocomplete="off"
+<LineModule {title} empty={$countQuery.isSuccess && $countQuery.data?.total === 0} {action}>
+  {#if $countQuery.isPending}
+    <EmptyLine text={t('desk.loading', locale)} busy />
+  {:else}
+    <!-- The line's head already counts them (tarea 131): one «N conversaciones», not two. -->
+    <ConversationTable
+      counted
+      {filters}
+      editable={canEdit}
+      onchange={refresh}
+      personBase={`/h/${workspaceSlug}/person`}
+      conversationHref={(item) => `/h/${workspaceSlug}/conversation/${item.id}`}
     />
-    <datalist id={orgListId}>
-      {#each orgSuggestions as name (name)}<option value={name}></option>{/each}
-    </datalist>
-    <Input label={t('conversations.full_name', locale)} bind:value={aName} />
-    <Input label={t('conversations.email', locale)} type="email" bind:value={aEmail} />
-    <Input label={t('conversations.col_next_action', locale)} type="date" bind:value={aNextAt} />
-    <Input label={t('conversations.next_note', locale)} bind:value={aNextNote} />
-    <!-- Hidden submit lets Enter inside an input trigger submit. -->
-    <button type="submit" hidden aria-hidden="true"></button>
-  </form>
-  {#snippet actions()}
-    <Button variant="quiet" onclick={() => (addOpen = false)}>{t('create.cancel', locale)}</Button>
-    <Button loading={$addMutation.isPending} onclick={() => addFormEl?.requestSubmit()}
-      >{t('composer.add', locale)}</Button
-    >
-  {/snippet}
-</Dialog>
-
-<style>
-  @layer components {
-    .lcm {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-s);
-    }
-    .lcm__bar {
-      display: flex;
-      justify-content: flex-end;
-    }
-    .lcm__form {
-      display: flex;
-      flex-direction: column;
-      gap: var(--field-gap);
-    }
-  }
-</style>
+  {/if}
+</LineModule>

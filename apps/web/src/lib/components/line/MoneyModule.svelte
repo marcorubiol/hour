@@ -15,10 +15,10 @@
    */
 
   import EmptyLine from '$lib/components/EmptyLine.svelte';
+  import LineModule from './LineModule.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
-  import Button from '$lib/components/Button.svelte';
   import ExpenseDialog from '$lib/components/ExpenseDialog.svelte';
   import Menu from '$lib/components/Menu.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
@@ -46,11 +46,12 @@
       workspace_id: string;
     };
     workspaceSlug: string;
+    title: string;
   }
 
   // workspaceSlug is part of the shared module contract; the deals table no
   // longer links per-function (a bolo has no route), so it is unused here.
-  let { line }: Props = $props();
+  let { line, title }: Props = $props();
 
   type FeeItem = {
     id: string;
@@ -166,6 +167,20 @@
   let expOpen = $state(false);
   const openExpense = () => (expOpen = true);
 
+  // ADR-145 § 1 inside the module: bolos and invoices are only a reading, so
+  // an empty group is not drawn; with nothing in any of the three, the module
+  // is one line with «+ Gasto» (LineModule). One busy line while any reads.
+  let reading = $derived($feesQuery.isLoading || $invoicesQuery.isLoading || $expensesQuery.isLoading);
+  let nothing = $derived(
+    !reading &&
+      !feesError &&
+      !invoicesError &&
+      !expensesError &&
+      fees.length === 0 &&
+      lineInvoices.length === 0 &&
+      expenses.length === 0,
+  );
+
   const removeExpense = createMutation({
     mutationFn: (id: string) => mutateJSON('DELETE', `/api/expenses/${id}`),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['line-expenses', line.id] }),
@@ -179,15 +194,20 @@
   });
 </script>
 
-<section class="lmm">
+{#snippet action(cls: string)}
+  <button type="button" class={cls} onclick={openExpense}>{t('books.add_expense_short', locale)}</button>
+{/snippet}
+
+<LineModule {title} empty={nothing} {action}>
+{#if reading}
+  <EmptyLine text={t('desk.loading', locale)} busy />
+{:else}
+<div class="lmm">
+  {#if feesError || fees.length > 0}
   <section class="lmm__section" aria-label={t('books.fees', locale)}>
     <p class="eyebrow eyebrow--sub lmm__sub">{t('books.fees', locale)}</p>
     {#if feesError}
       <p class="load-fail" role="alert">{feesError}</p>
-    {:else if $feesQuery.isLoading}
-      <EmptyLine text={t('desk.loading', locale)} busy />
-    {:else if fees.length === 0}
-      <EmptyLine text={t('books.no_deals_line', locale)} />
     {:else}
       {#if allFeesNull}
         <EmptyLine text={t('books.fees_hidden', locale)} />
@@ -242,14 +262,13 @@
     {/if}
   </section>
 
+  {/if}
+
+  {#if invoicesError || lineInvoices.length > 0}
   <section class="lmm__section" aria-label={t('books.invoices', locale)}>
     <p class="eyebrow eyebrow--sub lmm__sub">{t('books.invoices', locale)}</p>
     {#if invoicesError}
       <p class="load-fail" role="alert">{invoicesError}</p>
-    {:else if $invoicesQuery.isLoading}
-      <EmptyLine text={t('desk.loading', locale)} busy />
-    {:else if lineInvoices.length === 0}
-      <EmptyLine text={t('books.no_invoices_line', locale)} />
     {:else}
       <ul class="lmm__invoices" role="list">
         {#each lineInvoices as inv (inv.id)}
@@ -264,17 +283,13 @@
     {/if}
   </section>
 
+  {/if}
+
+  {#if expensesError || expenses.length > 0}
   <section class="lmm__section" aria-label={t('books.expenses', locale)}>
-    <header class="lmm__section-head">
-      <p class="eyebrow eyebrow--sub lmm__sub">{t('books.expenses', locale)}</p>
-      <Button size="xs" variant="secondary" onclick={openExpense}>{t('books.add_expense', locale)}</Button>
-    </header>
+    <p class="eyebrow eyebrow--sub lmm__sub">{t('books.expenses', locale)}</p>
     {#if expensesError}
       <p class="load-fail" role="alert">{expensesError}</p>
-    {:else if $expensesQuery.isLoading}
-      <EmptyLine text={t('desk.loading', locale)} busy />
-    {:else if expenses.length === 0}
-      <EmptyLine text={t('books.no_expenses_line', locale)} />
     {:else}
       <div class="table-wrap">
         <table>
@@ -322,7 +337,10 @@
       </p>
     {/if}
   </section>
-</section>
+  {/if}
+</div>
+{/if}
+</LineModule>
 
 <ExpenseDialog
   bind:open={expOpen}
@@ -344,12 +362,6 @@
       gap: var(--space-s);
     }
 
-    .lmm__section-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: var(--space-s);
-    }
 
     /* Sub-eyebrow typography via base.css .eyebrow--sub. */
 

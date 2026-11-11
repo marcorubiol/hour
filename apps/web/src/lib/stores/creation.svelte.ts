@@ -30,6 +30,11 @@ export interface EventPreset {
   type?: QuickType | null;
   /** A lane's project: wins over the scope's. */
   projectId?: string | null;
+  /** The line it goes into (a line's Planner module). `null` = none, said
+      on purpose (a bolo's «+ función»); absent = the scope's. */
+  lineId?: string | null;
+  /** The bolo it hangs from, with its venue and city (a bolo's record). */
+  boloId?: string | null;
   /** Typed in ⌘K: the quick add's title. */
   title?: string | null;
 }
@@ -60,6 +65,9 @@ class CreationStore {
   /** The conversation's «who» (its organization) and the tag it is born with. */
   conversationWho = $state('');
   conversationTag = $state<string | null>(null);
+  /** The project and line a page already is (a line's module). */
+  conversationProjectId = $state<string | null>(null);
+  conversationLineId = $state<string | null>(null);
 
   /** Raw: a page's getters must stay getters, not a proxy's snapshot. */
   eventHost = $state.raw<EventHost | null>(null);
@@ -90,9 +98,16 @@ class CreationStore {
     this.taskOpen = true;
   }
 
-  openConversation(preset?: { who?: string | null; tag?: string | null }) {
+  openConversation(preset?: {
+    who?: string | null;
+    tag?: string | null;
+    projectId?: string | null;
+    lineId?: string | null;
+  }) {
     this.conversationWho = preset?.who?.trim() ?? '';
     this.conversationTag = preset?.tag ?? null;
+    this.conversationProjectId = preset?.projectId ?? null;
+    this.conversationLineId = preset?.lineId ?? null;
     this.conversationOpen = true;
   }
 

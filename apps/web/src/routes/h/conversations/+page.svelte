@@ -1097,7 +1097,6 @@
       {conversationHref}
       editable={canEdit}
       {tagNames}
-      chat
       counted
     />
     <div class="conversations__calm">
@@ -1195,7 +1194,6 @@
             hideTag={tagFilter ?? undefined}
             onpage={(p) => (listPage = p)}
             onexit={leavePicking}
-            chat
             counted
             activeId={wide ? (shown?.id ?? null) : null}
             onopen={openTableRow}

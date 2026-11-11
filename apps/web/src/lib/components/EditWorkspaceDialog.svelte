@@ -1,10 +1,14 @@
 <script lang="ts">
   /**
    * Edit-space dialog (ADR-062) — the masthead pencil opens this. Name +
-   * discipline + home base + color + description, PATCHed via
+   * hold convention + home base + color + description, PATCHed via
    * update_workspace (owner/admin only). Seeds from the current workspace on
    * open; on success invalidates ['workspaces'] so the masthead + rail
    * repaint in place (no navigation — you stay on the portada).
+   *
+   * No discipline (tarea 135): the trade in Ajustes says how Hour speaks, and
+   * the `domain` column stays in the base, unread. Absent keys are left
+   * untouched by the RPC, so a stored one survives.
    *
    * logo_url is intentionally NOT managed here yet (upload flow + CSP img-src
    * ship later); the RPC leaves absent keys untouched, so it survives edits.
@@ -32,16 +36,6 @@
   const queryClient = useQueryClient();
   const locale = appLocale();
 
-  const DOMAIN_OPTIONS = [
-    { value: '', label: t('workspace.domain_none', locale) },
-    { value: 'theatre', label: t('workspace.domain_theatre', locale) },
-    { value: 'dance', label: t('workspace.domain_dance', locale) },
-    { value: 'circus', label: t('workspace.domain_circus', locale) },
-    { value: 'music', label: t('workspace.domain_music', locale) },
-    { value: 'mixed', label: t('workspace.domain_mixed', locale) },
-    { value: 'other', label: t('workspace.domain_other', locale) },
-  ];
-
   /**
    * ADR-002 — which hold convention this space speaks. Only two entries: the
    * simple case is the ABSENT key, not a stored "simple", so the setting has
@@ -54,7 +48,6 @@
 
   let name = $state('');
   let accent = $state<string | null>(null); // null = auto (hash of slug)
-  let domain = $state(''); // '' = no discipline
   let bookingMode = $state(''); // '' = absent = simple
   let city = $state('');
   let description = $state('');
@@ -66,7 +59,6 @@
     if (open && !wasOpen && workspace) {
       name = workspace.name ?? '';
       accent = workspace.accent ?? null;
-      domain = workspace.domain ?? '';
       bookingMode = workspace.booking_mode === 'prioritized' ? 'prioritized' : '';
       city = workspace.city ?? '';
       description = workspace.description ?? '';
@@ -88,7 +80,6 @@
         name: name.trim(),
         description: description.trim(),
         accent,
-        domain: domain || null,
         // '' clears the key back to absent (= simple); see the RPC.
         booking_mode: bookingMode,
         city: city.trim(),
@@ -219,15 +210,6 @@
       error={nameError}
       required
       autocomplete="off"
-      disabled={$save.isPending}
-    />
-
-    <Select
-      label={t('workspace.discipline', locale)}
-      name="space-domain"
-      bind:value={domain}
-      options={DOMAIN_OPTIONS}
-      helper={t('workspace.discipline_help', locale)}
       disabled={$save.isPending}
     />
 

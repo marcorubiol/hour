@@ -1,18 +1,16 @@
 import { test, expect, type Page } from '@playwright/test';
 import { waitForLoaded } from './loaded';
-import { fixtureLine, fixtureLineHref } from './fixture-line';
+import { fixtureLine } from './fixture-line';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
 
 /**
  * E2E · «lo conozco» (ADR-138 § 5): mark a contact from their file, share it,
- * see the mark on the conversation row, and take it back. The mark rides on
- * the inline row of the record lists (ConversationTable); since ADR-177 § 4
- * the organization's record draws one row per project instead, so the row
- * is a line's Conversations module (ADR-056, `fixture-line.ts`). The lens's
- * chat rows (ADR-176) do not carry it. Only in the `playwright` space:
- * `muk-cia` is real data.
+ * and take it back. Since tarea 135 no list draws the mark on a row: a line's
+ * Conversations module draws the lens's chat rows (ADR-176), which never
+ * carried it, so the suite opens the contact's file straight from the API.
+ * Only in the `playwright` space: `muk-cia` is real data.
  *
  * The suite owns its conversation (a venue and a contact with another name,
  * so the row links the contact) and deletes it at the end. The mark is the
@@ -23,8 +21,8 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
 const SALA = 'ZZZ E2E Acq Sala';
 const CONTACT = 'ZZZ E2E Acq Contact';
 
-/** Create (or revive) the suite's conversation on the fixture line; its row there. */
-async function contactRow(page: Page) {
+/** Create (or revive) the suite's conversation on the fixture line; its contact's file. */
+async function contactFile(page: Page) {
   await page.goto('/h/desk');
   const line = await fixtureLine(page);
   const id = await page.evaluate(
@@ -55,26 +53,25 @@ async function contactRow(page: Page) {
     },
     { project_id: line.projectId, line_id: line.id, sala: SALA, contact: CONTACT },
   );
-  await page.goto(fixtureLineHref(line));
-  await waitForLoaded(page);
-  const row = page.locator('#mod-conversations [data-testid="conversation-row"]').filter({ hasText: SALA }).first();
-  return { row, id };
+  const slug = await page.evaluate(async ({ line_id, cid }) => {
+    const list = (await fetch(`/api/conversations?line_id=${line_id}&limit=100`).then((r) => r.json())) as {
+      items: Array<{ id: string; person: { slug: string | null } | null }>;
+    };
+    return list.items.find((i) => i.id === cid)?.person?.slug ?? null;
+  }, { line_id: line.id, cid: id });
+  if (!slug) throw new Error('the fixture contact has no file');
+  return { href: `/h/playwright/person/${slug}`, id };
 }
 
 test.describe('«lo conozco»', () => {
   test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL / PW_TEST_PASSWORD.');
 
-  test('person file → I know them → share → the row says so → unmark', async ({ page }) => {
+  test('person file → I know them → share → unmark', async ({ page }) => {
     test.setTimeout(60_000);
 
-    const { row, id } = await contactRow(page);
+    const { href, id } = await contactFile(page);
     try {
-      await expect(row).toBeVisible({ timeout: 15_000 });
-
-      const contact = row.locator('a.crow-contact');
-      // From a record's page the person opens on its page (ADR-139 p1), where the switch lives.
-      await contact.click();
-      await page.waitForURL(/\/h\/[^/]+\/person\//);
+      await page.goto(href);
       await waitForLoaded(page);
 
       const notes = page.getByRole('region', { name: 'Notes' });
@@ -103,14 +100,7 @@ test.describe('«lo conozco»', () => {
       await expect(known).toHaveAttribute('aria-checked', 'true');
       await expect(share).toHaveAttribute('aria-checked', 'true');
 
-      // The row carries the mark.
-      await page.goBack();
-      await waitForLoaded(page);
-      await expect(row.getByRole('img', { name: 'You know them' })).toBeVisible();
-
       // Unmark from the file: the share switch goes with it.
-      await page.goForward();
-      await waitForLoaded(page);
       await known.click();
       await expect(known).toHaveAttribute('aria-checked', 'false');
       await expect(share).toHaveCount(0);

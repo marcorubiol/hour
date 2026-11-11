@@ -964,3 +964,12 @@ export function statusWord(status: string, locale: Locale): string {
   const word = t(key, locale);
   return word === key ? status.replace(/_/g, ' ') : word;
 }
+
+/**
+ * «Ver en el Planificador» from a line's module (tarea 135): the Planner
+ * pinned to that line (`scope=l:<id>`, the uuid form the shell resolves on
+ * arrival), in whatever drawing the person opens it in.
+ */
+export function linePlannerHref(lineId: string): string {
+  return `/h/planner?scope=l:${lineId}`;
+}

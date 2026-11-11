@@ -7,8 +7,10 @@
    * line's KIND's, in a fixed order (`modulesForKind`, $lib/line-templates).
    * Nobody adds, removes or moves a module; `line.modules` is not read.
    * ADR-145 § 1 on the stack: a module that is only a reading (Road sheets,
-   * a projection of the line's performances) is not drawn while empty; one
-   * where something is written keeps its empty line, the gap is the place.
+   * a projection of the line's performances; Team) is not drawn while empty;
+   * one where something is written keeps one empty line, with its action
+   * (`LineModule`, tarea 135). Each module draws its own head, so its action
+   * sits at the end of it.
    *
    * Header: name + kind metadata + per-kind stats (booking kinds get the
    * funnel + overdue actions; tour kinds get next gig / confirmed / €
@@ -31,7 +33,6 @@
   import { lineKindGlyph, lineKindLabel } from '$lib/utils/line-kind';
   import { accentVar } from '$lib/utils/accent';
   import RecordHead from '$lib/components/RecordHead.svelte';
-  import BlockHead from '$lib/components/BlockHead.svelte';
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import MissingBand from '$lib/components/MissingBand.svelte';
   import { stepsDueBand, type StepsDueRow } from '$lib/steps-due-band';
@@ -50,7 +51,7 @@
   import NotesModule from '$lib/components/line/NotesModule.svelte';
   import MaterialsModule from '$lib/components/line/MaterialsModule.svelte';
   import MoneyModule from '$lib/components/line/MoneyModule.svelte';
-  import TeamModule from '$lib/components/line/TeamModule.svelte';
+  import TeamModule, { linePeopleQueryOptions, teamIsEmpty } from '$lib/components/line/TeamModule.svelte';
   import TasksModule from '$lib/components/line/TasksModule.svelte';
 
   type Line = {
@@ -201,16 +202,25 @@
   // ADR-145 § 1: Road sheets is only a reading (nothing is written there),
   // so with no performance it is not drawn. It sits only in tour kinds, the
   // ones that read `perfStatsQuery`, so it asks the same read.
+  // Team is only a reading too (tarea 135): with nobody in it, neither the
+  // module nor its chip. Same read as the module's (`linePeopleQueryOptions`).
+  const peopleQuery = createQuery(
+    toStore(() => ({
+      ...linePeopleQueryOptions(activeLine?.id ?? ''),
+      enabled: activeLine !== null && kindStack.includes('team'),
+    })),
+  );
   let stack = $derived<ModuleKey[]>(
-    kindStack.filter(
-      (key) =>
-        key !== 'roadsheets' ||
-        blockDrawn({
+    kindStack.filter((key) => {
+      if (key === 'roadsheets')
+        return blockDrawn({
           count: $perfStatsQuery.data?.items.length ?? 0,
           loading: $perfStatsQuery.isPending,
           errored: $perfStatsQuery.isError,
-        }),
-    ),
+        });
+      if (key === 'team') return !($peopleQuery.data && teamIsEmpty($peopleQuery.data));
+      return true;
+    }),
   );
 
   type LineFee = { fee_amount: number | null; status: string };
@@ -398,8 +408,7 @@
       {#each stack as key (key)}
         {@const Module = REGISTRY[key]}
         <section class="line-detail__module" id={`mod-${key}`}>
-          <BlockHead title={moduleLabel(key, locale)} />
-          <Module line={activeLine} {workspaceSlug} />
+          <Module line={activeLine} {workspaceSlug} title={moduleLabel(key, locale)} />
         </section>
       {/each}
     </div>
@@ -524,6 +533,11 @@
       gap: var(--space-s);
       /* Clear the shell bar + the sticky chips row on #hash jumps. */
       scroll-margin-block-start: calc(var(--header-height) + 3rem);
+    }
+    /* A module that is only a reading draws nothing when empty (ADR-145 § 1,
+       LineModule): its section does not hold a gap in the stack. */
+    .line-detail__module:not(:has(*)) {
+      display: none;
     }
 
   }

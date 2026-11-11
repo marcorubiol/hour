@@ -20,6 +20,7 @@
   import { toStore } from 'svelte/store';
   import { env } from '$env/dynamic/public';
   import YNotes from '$lib/components/YNotes.svelte';
+  import LineModule from './LineModule.svelte';
   import { getAccessToken } from '$lib/session.svelte';
   import { appLocale, t } from '$lib/i18n';
 
@@ -33,9 +34,10 @@
       workspace_id: string;
     };
     workspaceSlug: string;
+    title: string;
   }
 
-  let { line }: Props = $props();
+  let { line, title }: Props = $props();
 
   const locale = appLocale();
 
@@ -71,17 +73,19 @@
   const permQuery = createQuery(permOptions);
 </script>
 
-{#if $permQuery.isPending}
-  <EmptyLine text={t('desk.loading', locale)} busy />
-{:else if $permQuery.isError}
-  <EmptyLine text={t('line.notes_perm_error', locale)} />
-{:else if $permQuery.data === true}
-  {#key line.id}
-    <YNotes targetTable="line" targetId={line.id} placeholder={t('line.notes_ph', locale)} rows={6} />
-  {/key}
-{:else}
-  <EmptyLine text={t('line.notes_no_perm', locale)} />
-{/if}
+<LineModule {title}>
+  {#if $permQuery.isPending}
+    <EmptyLine text={t('desk.loading', locale)} busy />
+  {:else if $permQuery.isError}
+    <EmptyLine text={t('line.notes_perm_error', locale)} />
+  {:else if $permQuery.data === true}
+    {#key line.id}
+      <YNotes targetTable="line" targetId={line.id} placeholder={t('line.notes_ph', locale)} rows={6} />
+    {/key}
+  {:else}
+    <EmptyLine text={t('line.notes_no_perm', locale)} />
+  {/if}
+</LineModule>
 
 <style>
   @layer components {

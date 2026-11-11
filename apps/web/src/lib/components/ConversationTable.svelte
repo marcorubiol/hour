@@ -1,5 +1,4 @@
 <script module lang="ts">
-  import StateBadge from '$lib/components/StateBadge.svelte';
   import type { MailoutPick, TempFilter } from '$lib/conversation-overview';
   import type { Relation } from '$lib/conversation-relation';
   import type { Orden } from '$lib/conversation-order';
@@ -38,48 +37,30 @@
 
 <script lang="ts">
   /**
-   * ConversationTable: the Conversations list (plan `build/plans/2026-10-22-
-   * conversations-list.md` § 3), one ConversationRow per conversation, the
-   * same row under every chip and in a project's or line's module. Inline
-   * relation editing (the menu over the pill) and next-action editing (a
-   * dialog), optimistic with rollback and toast (ADR-040). The name stays: it
-   * is the lens's list, no longer a `table` (the card of the phone lost its
-   * semantics in one, móvil 1).
+   * ConversationTable: the Conversations list (ADR-176, ADR-179), one ChatRow
+   * per conversation, the same two-line row as the feed's, in the lens and in
+   * a line's module (tarea 135). The row writes nothing inline: the relation,
+   * the next step and the history are set in the conversation's page; from
+   * the row, only «Ya está» (`ChatDone`), to whoever edits. The name stays:
+   * it is the lens's list, no longer a `table`.
    */
 
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import ConversationsImportEmpty from '$lib/components/ConversationsImportEmpty.svelte';
-  import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
-  import { refreshAfterWrite } from '$lib/query-refresh';
+  import { createQuery } from '@tanstack/svelte-query';
   import { untrack } from 'svelte';
   import { toStore } from 'svelte/store';
-  import { fetchJSON, mutateJSON } from '$lib/api';
-  import { dayMonth, dayMonthYear, viewerTimeZone } from '$lib/datetime';
+  import { fetchJSON } from '$lib/api';
+  import { viewerTimeZone } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
   import Checkbox from '$lib/components/Checkbox.svelte';
-  import ConversationHistory from '$lib/components/ConversationHistory.svelte';
-  import ConversationRow from '$lib/components/ConversationRow.svelte';
   import ChatRow from '$lib/components/ChatRow.svelte';
   import ChatDone from '$lib/components/ChatDone.svelte';
   import { chatWhen, chatWho } from '$lib/chat-row';
-  import Dialog from '$lib/components/Dialog.svelte';
-  import ConversationStatusMenu from '$lib/components/ConversationStatusMenu.svelte';
-  import NextActionDialog from '$lib/components/NextActionDialog.svelte';
-  import { addToast } from '$lib/components/Toast.svelte';
-  import AcquaintanceMark from '$lib/components/AcquaintanceMark.svelte';
-  import { acquaintancesQueryOptions, knownAmong } from '$lib/acquaintance';
-  import {
-    relativeContactDate,
-    conversationPatchColumns,
-    conversationTitle,
-    relationInputOf,
-    type ConversationItem,
-    type ConversationPatch,
-  } from '$lib/conversation';
-  import { lastActivity, relationLabel, relationTone } from '$lib/conversation-relation';
+  import { relationInputOf, type ConversationItem } from '$lib/conversation';
+  import { lastActivity, relationLabel } from '$lib/conversation-relation';
   import { boloLabel, nearestBolo, rowLast, rowTurn } from '$lib/conversation-row';
-  import ConversationTagList from '$lib/components/ConversationTagList.svelte';
   import { SALES, keyLabel, type WorkspaceTag } from '$lib/conversation-tags';
 
   interface Props {
@@ -97,17 +78,15 @@
     /** The picked conversations, across pages and filters. */
     selected?: Pick<ConversationItem, 'id' | 'project_id'>[];
     /**
-     * Whether the relation menu is offered (ADR-124, `permisos.md` § 8). The
-     * caller passes `edit:conversation` in some project; the PATCH still
-     * decides per project.
+     * Whether a row that needs a reply offers «Ya está» (ADR-124,
+     * `permisos.md` § 8). The caller passes `edit:conversation` in some
+     * project; the write still decides per project.
      */
     editable?: boolean;
     /** The tag vocabulary of the scope: when given, each row shows its tags (ADR-138). */
     tagNames?: readonly WorkspaceTag[];
     /** A tag the rows do not repeat: the active chip's. */
     hideTag?: string;
-    /** The sales chip: the bolos have their column even where a page has none (plan § 3.1, 4). */
-    bolosColumn?: boolean;
     /** The project's name, when the scope has several (the meta line says which). */
     projectName?: (id: string) => string | null;
     /** The line's name, when the scope has several. */
@@ -121,13 +100,11 @@
     /** The host's head already says how many (a record's BlockHead): the
      *  bar does not say it again (ADR-167 § 2). */
     counted?: boolean;
-    /** The lens's list (ADR-176): each row is a ChatRow, the same as the feed's. */
-    chat?: boolean;
-    /** With `chat`: the conversation open beside the list (two panes). */
+    /** The conversation open beside the list (two panes). */
     activeId?: string | null;
-    /** With `chat`: open beside instead of navigating. */
+    /** Open beside instead of navigating. */
     onopen?: (item: ConversationItem, event: MouseEvent) => void;
-    /** With `chat`: after a row's «Ya está» or its undo, the lists read again. */
+    /** After a row's «Ya está» or its undo, the lists read again. */
     onchange?: () => void;
   }
 
@@ -142,14 +119,12 @@
     editable = true,
     tagNames,
     hideTag,
-    bolosColumn = false,
     projectName,
     lineName,
     titleBy = 'organization',
     onpage,
     onexit,
     counted = false,
-    chat = false,
     activeId = null,
     onopen,
     onchange,
@@ -238,111 +213,6 @@
   });
 
   const query = createQuery(queryOptions);
-  // «Lo conozco» (ADR-138 § 5): una sola lectura para todas las filas.
-  const acquaintances = createQuery(acquaintancesQueryOptions());
-
-  // ── Inline write path (ADR-040) — cache-anchored optimistic updates ────
-  const queryClient = useQueryClient();
-
-  type PatchInput = { id: string; patch: ConversationPatch };
-
-  const patchMutation = createMutation({
-    mutationFn: async ({ id, patch }: PatchInput) => {
-      const body = await mutateJSON<{ item?: ConversationItem }>(
-        'PATCH',
-        `/api/conversations/${id}`,
-        patch,
-      );
-      if (!body?.item) throw new Error(t('conversations.unexpected_response', locale));
-      return body.item;
-    },
-    onMutate: async ({ id, patch }: PatchInput) => {
-      await queryClient.cancelQueries({ queryKey: ['conversations'] });
-      const pages = queryClient
-        .getQueriesData<ConversationsResponse>({ queryKey: ['conversations'] })
-        .filter(([, d]) => d?.items.some((it) => it.id === id));
-      const optimisticNow = new Date().toISOString();
-      for (const [key, data] of pages) {
-        if (!data) continue;
-        queryClient.setQueryData<ConversationsResponse>(key, {
-          ...data,
-          items: data.items.map((it) => {
-            if (it.id !== id) return it;
-            // «No esta vez» repaints at once; lifting it waits for the
-            // server, which derives what the relation is again.
-            return {
-              ...it,
-              ...conversationPatchColumns(patch, new Date(optimisticNow)),
-              ...(patch.not_now ? { relation: 'not_now' as const } : {}),
-            };
-          }),
-        });
-      }
-      return { pages };
-    },
-    onError: (err, _vars, ctx) => {
-      for (const [key, data] of ctx?.pages ?? []) {
-        queryClient.setQueryData(key, data);
-      }
-      addToast({
-        tone: 'danger',
-        title: t('conversations.change_not_saved', locale),
-        message: t('perf.try_again', locale, {
-          error: err instanceof Error ? err.message : t('perf.unexpected', locale),
-        }),
-      });
-    },
-    onSuccess: (item, _vars, ctx) => {
-      for (const [key] of ctx?.pages ?? []) {
-        const cur = queryClient.getQueryData<ConversationsResponse>(key);
-        if (cur) {
-          queryClient.setQueryData<ConversationsResponse>(key, {
-            ...cur,
-            // The PATCH answers the row without the list's extras: keep them.
-            items: cur.items.map((it) =>
-              it.id === item.id ? { ...it, ...item, unread_count: it.unread_count, bolos: it.bolos, last_mailout: it.last_mailout } : it,
-            ),
-          });
-        }
-      }
-    },
-    onSettled: () => {
-      void refreshAfterWrite(queryClient, ['conversations']);
-      // Line header funnel stats (ADR-056) read the same rows.
-      void queryClient.invalidateQueries({ queryKey: ['line-eng-stats'] });
-      void queryClient.invalidateQueries({ queryKey: ['conversation-overview'] });
-    },
-  });
-
-  function setNotNow(item: ConversationItem, next: { until: string | null } | null) {
-    $patchMutation.mutate({ id: item.id, patch: { not_now: next } });
-  }
-
-  // ── History (ADR-098): the timeline and its quick add ──────────────────
-  // A contact is an event now; recording one moves the last contact on the
-  // server, so the row repaints from the invalidated list, not optimistically.
-  let historyOpen = $state(false);
-  let historyFor = $state<ConversationItem | null>(null);
-
-  function openHistory(item: ConversationItem) {
-    historyFor = item;
-    historyOpen = true;
-  }
-
-  // ── Next action editor (dialog) ─────────────────────────────────────────
-  let dialogOpen = $state(false);
-  let editing = $state<ConversationItem | null>(null);
-
-  function openNextAction(item: ConversationItem) {
-    editing = item;
-    dialogOpen = true;
-  }
-
-  function saveNextAction(patch: Pick<ConversationPatch, 'next_action_at' | 'next_action_note'>) {
-    if (!editing) return;
-    $patchMutation.mutate({ id: editing.id, patch });
-  }
-
   let total = $derived($query.data?.total ?? 0);
   let items = $derived(($query.data?.items ?? []) as ConversationItem[]);
   let loading = $derived($query.isLoading);
@@ -354,13 +224,6 @@
   /** ADR-102: who the conversation is with; before the organization, the dossier's. */
   function organizationOf(item: ConversationItem): string | null {
     return item.organization?.name ?? item.person?.organization_name ?? null;
-  }
-
-  /** The line of the dialogs: the organization, and the primary contact when there is one. */
-  function whoLine(item: ConversationItem): string {
-    const title = conversationTitle(item) || t('conversations.conversation', locale);
-    const person = item.person?.full_name;
-    return person && person !== title ? `${title} · ${person}` : title;
   }
 
   function personPath(item: ConversationItem): string | null {
@@ -376,20 +239,12 @@
     return person ? person.replace(/\/person\/[^/]+$/, `/conversation/${item.id}`) : null;
   }
 
-  /** A bolo opens its function, in the conversation's space. */
-  function performancePath(item: ConversationItem, slug: string | null): string | null {
-    const file = conversationPath(item);
-    return file && slug ? file.replace(/\/conversation\/[^/]+$/, `/performance/${slug}`) : null;
-  }
-
   // ── What a row shows (plan § 3) ────────────────────────────────────────
   const now = new Date();
 
   type RowView = {
     item: ConversationItem;
     title: string;
-    contact: { name: string; role: string | null; href: string | null } | null;
-    meta: string[];
     turn: ReturnType<typeof rowTurn>;
     bolo: ReturnType<typeof nearestBolo>;
     last: ReturnType<typeof rowLast>;
@@ -400,18 +255,9 @@
     const relation = relationInputOf(item);
     const byProject = titleBy === 'project' && item.project?.name;
     const title = (byProject ? item.project!.name : organizationOf(item)) ?? item.person?.full_name ?? '—';
-    // The real contact under the venue, not the venue's name again (an
-    // independent programmer's organization carries their name, ADR-102 § 1).
-    const person = item.person && item.person.full_name !== title ? item.person : null;
-    const role = item.contacts.find((c) => c.is_primary)?.role ?? null;
-    const city = item.person?.city || item.organization?.city || null;
-    const project = !byProject && projectName && item.project_id ? projectName(item.project_id) : null;
-    const line = lineName && item.line_id ? lineName(item.line_id) : null;
     return {
       item,
       title,
-      contact: person ? { name: person.full_name, role, href: personPath(item) } : null,
-      meta: [city, project, line].filter((x): x is string => Boolean(x)),
       turn: rowTurn({ ...relation, reply_settled_at: item.reply_settled_at, next_action_at: item.next_action_at }, now, locale),
       bolo: item.bolos ? nearestBolo(item.bolos, now) : null,
       last: rowLast({ last: relation.last ? (item.last_turn?.[0] ?? null) : null, last_in: relation.last_in, last_mailout: item.last_mailout }, locale),
@@ -434,9 +280,6 @@
   function whoOf(item: ConversationItem) {
     return chatWho(item.place ?? { kind: item.organization?.kind, city: item.organization?.city || item.person?.city || null }, locale);
   }
-
-  // The bolos' column: always under the sales chip, else only when a row has one.
-  let withBolos = $derived(bolosColumn || rows.some((r) => r.bolo !== null));
 
   // ── Selection (envío en bloque) ───────────────────────────────────────
   let selectedIds = $derived(new Set(selected.map((s) => s.id)));
@@ -479,8 +322,8 @@
 
   /** The row's own stop: its checkbox while picking, else its title link. */
   function rowStop(li: Element): HTMLElement | null {
-    return li.querySelector<HTMLElement>(selectable ? '.crow__pick input, .chat__pick input' : '.crow__title[href], .chat__title[href]') ??
-      li.querySelector<HTMLElement>('.crow__title[href], .chat__title[href]');
+    return li.querySelector<HTMLElement>(selectable ? '.chat__pick input' : '.chat__title[href]') ??
+      li.querySelector<HTMLElement>('.chat__title[href]');
   }
 
   function onListKey(e: KeyboardEvent) {
@@ -543,132 +386,46 @@
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <ul
   bind:this={listEl}
-  class="crow-list crow-list--relation"
-  class:crow-list--bolos={withBolos}
-  class:crow-list--chat={chat}
+  class="crow-list crow-list--chat"
   aria-busy={busy}
   aria-keyshortcuts={selectable ? 'ArrowUp ArrowDown x Escape' : 'ArrowUp ArrowDown'}
   data-testid="conversation-list"
   onkeydown={onListKey}
 >
-  {#each rows as r, i (r.item.id)}
+  {#each rows as r (r.item.id)}
     {@const item = r.item}
     {@const picked = selectable && selectedIds.has(item.id)}
+    {@const who = whoOf(item)}
     <li data-testid="conversation-row">
-      {#if chat}
-        {@const who = whoOf(item)}
-        <ChatRow
-          href={conversationPath(item)}
-          title={r.title}
-          shape={who.shape}
-          words={who.words}
-          at={r.lastAt}
-          when={r.lastAt ? chatWhen(r.lastAt, locale, tz) : ''}
-          unread={item.unread_count ?? 0}
-          unreadLabel={item.unread_count ? t(item.unread_count === 1 ? 'threads.unread_one' : 'threads.unread', locale, { n: item.unread_count }) : null}
-          lead={r.last.lead}
-          last={r.last.last ?? (item.relation === 'never' ? t('chat.never', locale) : relationLabel(item.relation, locale))}
-          context={chatContext(r)}
-          active={activeId === item.id}
-          onopen={onopen ? (e) => onopen(item, e) : undefined}
-          {picked}
-          picking={selectable}
-          act={editable && !selectable && onchange && r.turn?.reason === 'reply' ? done : undefined}
-        >
-          {#snippet pick()}
-            <Checkbox
-              checked={selectedIds.has(item.id)}
-              ariaLabel={t('mailout.pick_one', locale, { name: r.title })}
-              onchange={() => togglePick(item)}
-            />
-          {/snippet}
-        </ChatRow>
-        {#snippet done()}
-          <ChatDone conversationId={item.id} name={r.title} {locale} refresh={onchange!} />
-        {/snippet}
-      {:else}
-      <ConversationRow
+      <ChatRow
         href={conversationPath(item)}
         title={r.title}
-        turn={r.turn?.word}
-        since={r.turn?.since}
-        tone={r.turn?.tone}
-        unread={item.unread_count ? t(item.unread_count === 1 ? 'threads.unread_one' : 'threads.unread', locale, { n: item.unread_count }) : null}
+        shape={who.shape}
+        words={who.words}
+        at={r.lastAt}
+        when={r.lastAt ? chatWhen(r.lastAt, locale, tz) : ''}
+        unread={item.unread_count ?? 0}
+        unreadLabel={item.unread_count ? t(item.unread_count === 1 ? 'threads.unread_one' : 'threads.unread', locale, { n: item.unread_count }) : null}
         lead={r.last.lead}
-        last={r.last.last}
+        last={r.last.last ?? (item.relation === 'never' ? t('chat.never', locale) : relationLabel(item.relation, locale))}
+        context={chatContext(r)}
+        active={activeId === item.id}
+        onopen={onopen ? (e) => onopen(item, e) : undefined}
         {picked}
         picking={selectable}
+        act={editable && !selectable && onchange && r.turn?.reason === 'reply' ? done : undefined}
       >
         {#snippet pick()}
-            <Checkbox
-              checked={selectedIds.has(item.id)}
-              ariaLabel={t('mailout.pick_one', locale, { name: r.title })}
-              onchange={() => togglePick(item)}
-            />
-        {/snippet}
-        {#snippet titleAside()}
-          <AcquaintanceMark
-            known={knownAmong($acquaintances.data, item.workspace_id, item.contacts.map((c) => c.person_id))}
-            {locale}
+          <Checkbox
+            checked={selectedIds.has(item.id)}
+            ariaLabel={t('mailout.pick_one', locale, { name: r.title })}
+            onchange={() => togglePick(item)}
           />
-          {#if tagNames}<ConversationTagList tags={item.tags} known={tagNames} hide={hideTag} {locale} />{/if}
         {/snippet}
-        {#snippet meta()}
-          {#if r.contact}
-            {#if r.contact.href}<a class="crow-contact" href={r.contact.href}>{r.contact.name}</a>{:else}{r.contact.name}{/if}{#if r.contact.role},
-              {r.contact.role}{/if}{#if r.meta.length > 0}{' · '}{/if}
-          {/if}{r.meta.join(' · ')}
-        {/snippet}
-        {#snippet relation()}
-          {#if !editable}
-            <StateBadge label={relationLabel(item.relation, locale)} tone={relationTone(item.relation)} />
-          {:else}
-            <ConversationStatusMenu
-              relation={item.relation}
-              notNowUntil={item.not_now_until}
-              {locale}
-              direction={i >= rows.length - 2 && i > 2 ? 'up' : 'down'}
-              onnotnow={(next) => setNotNow(item, next)}
-              onlog={() => openHistory(item)}
-            />
-          {/if}
-        {/snippet}
-        {#snippet bolos()}
-          {#if r.bolo}
-            {@const href = performancePath(item, r.bolo.bolo.performance_slug)}
-            {#if href}<a class="crow-bolo" {href}>{boloLabel(r.bolo, locale)}</a>{:else}{boloLabel(r.bolo, locale)}{/if}
-          {/if}
-        {/snippet}
-        {#snippet whenCell()}
-          <button
-            type="button"
-            class="crow-when"
-            onclick={() => openHistory(item)}
-            title={r.lastAt ? dayMonthYear(r.lastAt) : t('conversations.history', locale)}
-            aria-label={t('conversations.history_aria', locale, { when: relativeContactDate(r.lastAt, locale) })}
-          >
-            <time datetime={r.lastAt ?? undefined}>{relativeContactDate(r.lastAt, locale)}</time>
-          </button>
-        {/snippet}
-        {#snippet next()}
-          <button
-            type="button"
-            class="crow-next"
-            class:crow-next--empty={!item.next_action_at && !item.next_action_note}
-            onclick={() => openNextAction(item)}
-            title={item.next_action_note ?? t('conversations.set_next_action', locale)}
-            aria-label={item.next_action_at || item.next_action_note ? undefined : t('conversations.set_next_action', locale)}
-          >
-            {#if item.next_action_at || item.next_action_note}
-              {#if item.next_action_at}<span class="crow-next__date">{dayMonth(item.next_action_at)}</span>{/if}
-              {#if item.next_action_note}<span class="crow-next__note">{item.next_action_note}</span>{/if}
-            {:else}
-              <span class="crow-next__date">—</span>
-            {/if}
-          </button>
-        {/snippet}
-      </ConversationRow>
-      {/if}
+      </ChatRow>
+      {#snippet done()}
+        <ChatDone conversationId={item.id} name={r.title} {locale} refresh={onchange!} />
+      {/snippet}
     </li>
   {/each}
 </ul>
@@ -708,34 +465,6 @@
   </div>
 {/if}
 
-<Dialog bind:open={historyOpen} title={t('conversations.history', locale)} size="m" onclose={() => (historyFor = null)}>
-  {#if historyFor}
-    <p class="next-action-who">
-      {whoLine(historyFor)}
-    </p>
-    {@const fullPath = conversationPath(historyFor)}
-    {#if fullPath}
-      <p><a class="link-arrow" href={fullPath}>{t('conversations.open_full', locale)}</a></p>
-    {/if}
-    {#key historyFor.id}
-      <ConversationHistory conversationId={historyFor.id} />
-    {/key}
-  {/if}
-  {#snippet actions()}
-    <Button variant="quiet" onclick={() => (historyOpen = false)}>{t('conversations.close', locale)}</Button>
-  {/snippet}
-</Dialog>
-
-<NextActionDialog
-  bind:open={dialogOpen}
-  who={editing ? whoLine(editing) : ''}
-  date={editing?.next_action_at ? editing.next_action_at.slice(0, 10) : ''}
-  note={editing?.next_action_note ?? ''}
-  {locale}
-  onsave={saveNextAction}
-  onclose={() => (editing = null)}
-/>
-
 <style>
   @layer components {
     .status-bar {
@@ -764,77 +493,6 @@
       justify-content: center;
       gap: var(--space-s);
       padding-block: var(--space-m);
-    }
-
-    .crow-contact,
-    .crow-bolo {
-      color: inherit;
-      text-decoration: none;
-    }
-    .crow-contact {
-      color: var(--text-dark-muted);
-    }
-    .crow-contact:hover,
-    .crow-bolo:hover {
-      color: var(--text-color);
-      text-decoration: underline;
-      text-underline-offset: 0.2em;
-    }
-
-    .crow-when {
-      color: inherit;
-      font: inherit;
-      text-align: end;
-    }
-    .crow-when:hover {
-      color: var(--text-color);
-      text-decoration: underline;
-      text-underline-offset: 0.2em;
-    }
-
-    /* The step's look is the list's (base.css, `.crow-next`); here, only
-       what the button adds: the date inks under the pointer. */
-    .crow-next:hover .crow-next__date {
-      color: var(--text-color);
-    }
-
-    .next-action-who {
-      font-size: var(--text-s);
-      color: var(--text-muted);
-    }
-
-    /* Touch: every control of a row reaches the finger's size (móvil #8). */
-    @media (pointer: coarse) {
-      .crow-when,
-      .crow-next,
-      .crow-contact {
-        min-block-size: var(--touch-target);
-      }
-      .crow-next,
-      .crow-contact {
-        display: inline-flex;
-        align-items: center;
-      }
-      .crow-next {
-        min-inline-size: var(--touch-target);
-      }
-    }
-
-    /* Phone (density review § 4): the step closes the second line, only
-       when there is one, its note short. That line is read, not tapped: a
-       tap reaches the row, which opens the conversation, where the step and
-       the contact are set; the keyboard still stops on both. After the
-       touch rules, so it wins them. */
-    @container (max-width: 47.999rem) {
-      .crow-next.crow-next--empty {
-        display: none;
-      }
-      .crow-next,
-      .crow-contact {
-        min-block-size: 0;
-        min-inline-size: 0;
-        pointer-events: none;
-      }
     }
   }
 </style>
