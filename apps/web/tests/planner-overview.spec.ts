@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { waitForLoaded } from './loaded';
+import { forgetPlannerView } from './planner-view';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
@@ -7,8 +8,9 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
 /**
  * THE SEASON IS THE PORTADA (ADR-117). The Planner opens on twelve weeks from
  * today: the strip, what to decide, what is not closed, the holes and who is
- * out, each block drawn when it has something (ADR-145). Read-only: it never writes, so it can run
- * against the fixture space without owning a row.
+ * out, each block drawn when it has something (ADR-145). It owns no row: the
+ * one thing it writes is the E2E user's own entry drawing (ADR-192), and it
+ * leaves that as it found it, null.
  *
  * Runs against a deployed origin or `vite dev` (`PW_BASE_URL`), never `vite
  * preview`.
@@ -24,18 +26,50 @@ async function open(page: Page, query = '') {
 test.describe('the season (ADR-117)', () => {
   test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL / PW_TEST_PASSWORD.');
 
-  test('THE NAV OPENS THE SEASON — and nothing remembers the last drawing', async ({ page }) => {
+  // Every test meets the default (null, the season) and leaves it there: a
+  // drawing picked in the bar is stored for the person (ADR-192), and the
+  // suite is one person.
+  test.beforeEach(async ({ page }) => forgetPlannerView(page.request));
+  test.afterEach(async ({ page }) => forgetPlannerView(page.request));
+
+  test('THE DOOR OPENS THE LAST DRAWING CHOSEN, AND THE ADDRESS STILL RULES (ADR-192)', async ({ page }) => {
+    test.setTimeout(90_000);
+    const views = page.locator('.cal__view');
+    // Nothing chosen yet: the season, the default.
     await open(page);
-    await expect(page.locator('.cal__view--on')).toHaveText(/season|temporada|saison/i);
-    // Pick the month: the choice lives in that visit's URL…
-    await page.locator('.cal__view').nth(2).click();
+    await expect(views.first()).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('.ov')).toBeVisible();
+
+    // Picking the Month in the bar remembers it. The write goes behind the
+    // drawing, so wait for it before leaving the page.
+    const choose = async (index: number, stored: string | null) => {
+      const put = page.waitForResponse(
+        (r) => r.url().includes('/api/me/planner-view') && r.request().method() === 'PUT',
+      );
+      await views.nth(index).click();
+      const res = await put;
+      expect(res.ok(), `PUT /api/me/planner-view answered ${res.status()}`).toBe(true);
+      expect((res.request().postDataJSON() as { planner_view: string | null }).planner_view).toBe(stored);
+    };
+    await choose(2, 'month');
     await expect(page).toHaveURL(/view=month/);
-    await page.reload();
-    await waitForLoaded(page);
-    expect(page.url()).toContain('view=month');
-    // …and the nav's door, with no `view`, is the season again.
+
+    // The door, with no `view`, opens it, and writes it in the address.
     await open(page);
-    await expect(page.locator('.cal__view').first()).toHaveAttribute('aria-pressed', 'true');
+    await expect(views.nth(2)).toHaveAttribute('aria-pressed', 'true');
+    await expect(page).toHaveURL(/view=month/);
+
+    // An address that names a drawing rules, and is not a choice: the door
+    // still opens the Month after it.
+    await open(page, '&view=agenda');
+    await expect(views.nth(1)).toHaveAttribute('aria-pressed', 'true');
+    await open(page);
+    await expect(views.nth(2)).toHaveAttribute('aria-pressed', 'true');
+
+    // Picking the season stores null, the default: the door is the season again.
+    await choose(0, null);
+    await open(page);
+    await expect(views.first()).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('.ov')).toBeVisible();
   });
 
