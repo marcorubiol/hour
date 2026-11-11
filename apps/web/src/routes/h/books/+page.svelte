@@ -1084,6 +1084,12 @@
 <section class="mny" class:mny--calm={calm.on} aria-busy={busy}>
   <LensHeader help={noAccess ? undefined : 'books'}>
     {#snippet title()}<LensTitle text={t('lens.money', locale)} />{/snippet}
+    {#snippet tools()}
+      <!-- The section's act at the end of the title row, as Conversations' «Añadir» (tarea 131). -->
+      {#if !noAccess}
+        <Button size="s" onclick={openDeal} disabled={projectIndex.length === 0}>{t('books.new_deal', locale)}</Button>
+      {/if}
+    {/snippet}
     {#snippet sub()}
       {#if !noAccess}
         <!-- One child, so the sub line's «·» separators stay out of it (as Desk's «+ Tarea»). -->
@@ -1115,9 +1121,6 @@
               <span>{t('books.season_sub', locale, { season: seasonLabel(season, startMonth) })}</span>
             {/if}
           </span>
-          {#if !seasonEmpty}
-            <Button size="xs" variant="secondary" onclick={openDeal} disabled={projectIndex.length === 0}>{t('books.new_deal', locale)}</Button>
-          {/if}
           <Button size="xs" variant="quiet" onclick={openQuarter}>{t('books.quarter_export', locale)}</Button>
         </span>
       {/if}
@@ -1170,10 +1173,14 @@
                 </span>
                 {/if}
               </button>
-              <button type="button" class="fig" data-fig="to_invoice" onclick={() => showLedger('to_invoice')}>
+              <!-- «Por facturar» is what is DONE and not invoiced (ADR-131): a confirmed
+                   fee whose date is ahead, or that has no date, waits beside it, so a 0
+                   with confirmed fees on screen says why (tarea 131). -->
+              <button type="button" class="fig" data-fig="to_invoice" title={t('books.fig_to_invoice_rule', locale)} onclick={() => showLedger('to_invoice')}>
                 <span class="fig__label eyebrow eyebrow--sub">{t('books.fig_to_invoice', locale)}</span>
                 <span class="fig__num stat">{fmtCurrency(pos.toInvoice, pos.currency)}</span>
                 {#if pos.toInvoiceCount > 0}<span class="fig__sub">{t(pos.toInvoiceCount === 1 ? 'books.fig_to_invoice_one' : 'books.fig_to_invoice_many', locale, { n: pos.toInvoiceCount })}</span>{/if}
+                {#if pos.toInvoiceLater > 0}<span class="fig__sub" data-fig-later>{t('books.fig_to_invoice_later', locale, { amount: fmtMoneyCompact(pos.toInvoiceLater) })}{#if pos.undatedCount > 0}{` · ${t(pos.undatedCount === 1 ? 'books.fig_undated_one' : 'books.fig_undated_many', locale, { n: pos.undatedCount })}`}{/if}</span>{/if}
               </button>
               {/if}
               <div class="fig" data-fig="inflow">
@@ -1214,7 +1221,6 @@
         <div class="mny__empty">
           <EmptyLine text={t('books.season_empty', locale, { season: seasonLabel(season, startMonth) })} />
           <div class="mny__empty-acts">
-            <Button size="xs" onclick={openDeal} disabled={projectIndex.length === 0}>{t('books.new_deal', locale)}</Button>
             {#if previousSeason !== null}
               <Button size="xs" variant="secondary" onclick={() => (pickedSeason = previousSeason)}>{t('books.season_previous', locale, { season: seasonLabel(previousSeason, startMonth) })}</Button>
             {/if}
@@ -1631,7 +1637,7 @@
     .mkey { inline-size: 0.75rem; block-size: 0.5rem; border-radius: var(--radius-xs); }
     .mny__subrow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-m); inline-size: 100%; }
     .mny__subleft { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-xs) var(--space-s); }
-    /* The deal button keeps its one line beside a season list that wraps (the phone scale, ADR-145 § 4). */
+    /* The export keeps its one line beside a season list that wraps (the phone scale, ADR-145 § 4). */
     .mny__subrow > :global([class*="btn--"]) { flex: none; white-space: nowrap; }
     /* The season is a native select that reads as the sub line's words; the
        caret is the one sign it opens, laid over its end (ADR-145, fase 2). */
@@ -1723,6 +1729,9 @@
     .book__date { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); white-space: nowrap; }
     .book__fns, .book__city, .book__faint { color: var(--text-faint); }
     .book__toggle { appearance: none; border: 0; background: none; padding: 0; font: inherit; color: var(--text-color); font-weight: 500; cursor: pointer; text-align: start; }
+    /* A long venue wraps inside its cell (tarea 131): the button's nowrap ran a
+       «Teatre Municipal de…» over the fee and widened the page on a phone. */
+    .book__toggle, .book__city { white-space: normal; overflow-wrap: anywhere; }
     .book__toggle:hover { text-decoration: underline; }
     .book__city { font-weight: 400; }
     /* The document is named, not boxed: the row already has two badges' worth of chrome. */
@@ -1735,14 +1744,14 @@
     .book__obra:disabled { cursor: default; }
     .book__dot { inline-size: 0.5rem; block-size: 0.5rem; border-radius: var(--radius-circle); background: var(--c); }
     .book__sheet td { background: color-mix(in oklch, var(--bg-light) 55%, transparent); padding: var(--space-s) var(--space-m) var(--space-m); }
-    .sheet { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-m); font-size: var(--text-s); }
+    .sheet { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-m); font-size: var(--text-s); white-space: normal; }
     .sheet p { margin: 0; }
     .sheet__num { font-family: var(--font-mono); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
     .sheet__col { display: flex; flex-direction: column; gap: var(--space-2xs); min-inline-size: 0; }
     .sheet__h { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: var(--tracking-m); text-transform: uppercase; color: var(--text-faint); }
     .sheet__faint { color: var(--text-muted); font-size: var(--text-xs); }
     .sheet__danger { color: var(--danger); }
-    .sheet__a { color: var(--text-color); text-underline-offset: 0.2em; }
+    .sheet__a { color: var(--text-color); text-underline-offset: 0.2em; white-space: nowrap; }
     .sheet__link { appearance: none; border: 0; background: none; padding: 0; font: inherit; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-color); text-decoration: underline; cursor: pointer; }
     .sheet__acts { grid-column: 1 / -1; display: flex; gap: var(--space-xs); flex-wrap: wrap; }
 
@@ -1771,7 +1780,7 @@
       .radar { grid-template-columns: 1fr; }
       .att__list { grid-template-columns: minmax(0, 1fr) auto; }
       .att__row :global(.btn) { grid-column: 1 / -1; justify-self: stretch; }
-      .ledger__filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+      /* The five filters wrap to a second line rather than run off the edge cut (tarea 131). */
       .book thead { display: none; }
       .book, .book tbody { display: block; }
       .book__row {
@@ -1781,7 +1790,7 @@
         padding-block: var(--space-s); border-block-end: var(--line-hairline) solid var(--border-color-light);
       }
       .book__row td { padding: 0; border: 0; }
-      .book__venue { grid-column: 1; grid-row: 1; }
+      .book__venue { grid-column: 1; grid-row: 1; min-inline-size: 0; }
       .book__row .book__num:nth-of-type(5) { grid-column: 2; grid-row: 1; }
       .book__date { grid-column: 1; grid-row: 2; }
       /* With the phone scale (ADR-145 § 4) a row's amount went mono at 14 and
@@ -1794,7 +1803,7 @@
       .book__status, .book__doc, .book__row .book__num:nth-of-type(6), .book__owed { display: none; }
       .book__group, .book__sheet { display: block; }
       .book__group th, .book__sheet td { display: block; }
-      .sheet { grid-template-columns: 1fr; }
+      .sheet { grid-template-columns: minmax(0, 1fr); overflow-wrap: anywhere; }
       /* The bolo's acts stay a row that wraps, as on a desk: three buttons
          stacked full-width were the loudest thing in the ledger. */
       .sheet__acts { gap: var(--space-s); }

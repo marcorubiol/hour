@@ -220,6 +220,61 @@ describe('boloMoney', () => {
 	});
 });
 
+describe('por facturar waits for the function (tarea 131)', () => {
+	// The test space of 2026-11-11: two confirmed bolos with a fee, no
+	// function and no document read «Por facturar 0 €». That is the rule, not
+	// a bug: what the figure waits for is now counted beside it.
+	const confirmedUndated = [
+		bolo({ id: 'a', status: 'confirmed', fee_amount: 2400, first_performed_at: null, function_count: 0 }),
+		bolo({ id: 'b', status: 'confirmed', fee_amount: 1000, first_performed_at: null, function_count: 0 }),
+	];
+
+	it('a confirmed bolo with no function is not por facturar, it waits', () => {
+		const m = boloMoney(confirmedUndated[0]!, ctx());
+		expect(m.toInvoice).toBe(false);
+		expect(m.toInvoiceLater).toBe(true);
+		expect(matchesLedgerFilter(m, 'to_invoice')).toBe(false);
+	});
+
+	it('counts what waits, and how much of it has no date at all', () => {
+		const future = bolo({ id: 'f', status: 'confirmed', fee_amount: 600, first_performed_at: '2027-01-10T20:00:00Z' });
+		const done = bolo({ id: 'd', status: 'done', fee_amount: 300, first_performed_at: '2026-10-01T20:00:00Z' });
+		const [eur] = moneyPosition([...confirmedUndated, future, done], ctx(), 2026);
+		expect(eur).toMatchObject({
+			toInvoice: 300,
+			toInvoiceCount: 1,
+			toInvoiceLater: 4000,
+			toInvoiceLaterCount: 3,
+			undatedCount: 2,
+			sold: 4300,
+			collected: 0,
+		});
+	});
+
+	it('a function today is still ahead: por facturar starts the day after', () => {
+		const tonight = bolo({ id: 't', status: 'confirmed', first_performed_at: '2026-10-15T20:00:00Z' });
+		const m = boloMoney(tonight, ctx());
+		expect(m.toInvoice).toBe(false);
+		expect(m.toInvoiceLater).toBe(true);
+	});
+
+	it('neither waits nor counts: holds, no fee, invoicing off, an issued document', () => {
+		const hold = bolo({ id: 'h', status: 'hold_1', first_performed_at: null });
+		const noFee = bolo({ id: 'n', status: 'confirmed', fee_amount: null, first_performed_at: null });
+		const off = bolo({ id: 'o', status: 'confirmed', first_performed_at: null });
+		const issued = bolo({ id: 'i', status: 'confirmed', first_performed_at: '2027-01-10T20:00:00Z' });
+		const c = ctx([invoice({ id: 'x', bolo: 'i' })], { modeOf: (b) => (b.id === 'o' ? 'off' : 'legal') });
+		for (const b of [hold, noFee, off, issued]) expect(boloMoney(b, c).toInvoiceLater).toBe(false);
+		const [eur] = moneyPosition([hold, noFee, off, issued], c, 2026);
+		expect(eur).toMatchObject({ toInvoiceLater: 0, toInvoiceLaterCount: 0, undatedCount: 0 });
+	});
+
+	it('a draft does not stop it waiting (a draft is not an invoice, ADR-125 § 4)', () => {
+		const future = bolo({ id: 'f', status: 'confirmed', first_performed_at: '2027-01-10T20:00:00Z' });
+		expect(boloMoney(future, ctx([invoice({ id: 'dr', bolo: 'f', status: 'draft' })])).toInvoiceLater).toBe(true);
+	});
+});
+
 describe('moneyPosition', () => {
 	const bolos = [
 		// last season, invoiced, unpaid, late: still owed this season

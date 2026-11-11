@@ -154,7 +154,8 @@
       <Button size="xs" variant="secondary" onclick={openAdd}>{t('conversations.add', locale)}</Button>
     {/if}
   </div>
-  <ConversationTable {filters} editable={canEdit} personBase={`/h/${workspaceSlug}/person`} conversationHref={(item) => `/h/${workspaceSlug}/conversation/${item.id}`} />
+  <!-- The line's head already counts them (tarea 131): one «N conversaciones», not two. -->
+  <ConversationTable counted {filters} editable={canEdit} personBase={`/h/${workspaceSlug}/person`} conversationHref={(item) => `/h/${workspaceSlug}/conversation/${item.id}`} />
 </div>
 
 <Dialog bind:open={addOpen} title={t('conversations.add', locale)} size="s" onclose={() => (addOpen = false)}>

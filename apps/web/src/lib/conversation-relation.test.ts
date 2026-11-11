@@ -3,6 +3,7 @@ import {
   DORMANT_DAYS,
   RELATIONS,
   countBolos,
+  countConversationsByBolo,
   hasAnswered,
   notNowInForce,
   relationLabel,
@@ -146,5 +147,30 @@ describe('palabras de la relación', () => {
     for (const locale of ['es', 'ca', 'fr', 'en'] as const) {
       for (const r of RELATIONS) expect(relationLabel(r, locale)).not.toBe(`conversations.relation_${r}`);
     }
+  });
+});
+
+describe('countConversationsByBolo (la cabecera de la ficha de línea, tarea 131)', () => {
+  const bolos = (...statuses: string[]) => statuses.map((status) => ({ status }));
+
+  it('veinticuatro conversaciones sin bolos no son veinticuatro opciones ni confirmadas', () => {
+    const items = Array.from({ length: 24 }, () => ({ bolos: [] }));
+    expect(countConversationsByBolo(items)).toEqual({ option: 0, firm: 0 });
+  });
+
+  it('cada conversación cuenta una vez, firme antes que en opción', () => {
+    const items = [
+      { bolos: bolos('hold_1', 'hold_2') },
+      { bolos: bolos('hold', 'confirmed') },
+      { bolos: bolos('done') },
+      { bolos: bolos('proposed', 'cancelled') },
+      { bolos: [] },
+    ];
+    expect(countConversationsByBolo(items)).toEqual({ option: 1, firm: 2 });
+  });
+
+  it('sin los bolos (sin permiso de leer funciones) no lo sabe: null, no cero', () => {
+    expect(countConversationsByBolo([{ bolos: bolos('confirmed') }, {}])).toBeNull();
+    expect(countConversationsByBolo([])).toEqual({ option: 0, firm: 0 });
   });
 });
