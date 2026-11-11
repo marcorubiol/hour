@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { undoableRemovals } from '$lib/undo-remove.svelte';
   import { createMutation, useQueryClient } from '@tanstack/svelte-query';
   import { mutateJSON } from '$lib/api';
   import {
@@ -11,6 +12,7 @@
     payerFiscalState,
     paymentMethodLabel,
     type MoneyInvoiceItem,
+    type PaymentItem,
     type MoneyPayer,
     type PaymentMethod,
   } from '$lib/money';
@@ -122,17 +124,19 @@
     },
   });
 
-  const discardInvoice = createMutation({
-    mutationFn: async (id: string) => mutateJSON('DELETE', `/api/invoices/${id}`),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['invoices'] }),
-    onError: (err) => {
-      addToast({
-        tone: 'danger',
-        title: t('books.draft_not_discarded', locale),
-        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
-      });
-    },
+  // Descartar un borrador se deshace (tarea 134): se va al momento y el
+  // DELETE espera al aviso con «Deshacer» ($lib/undo-remove).
+  const draftRemovals = undoableRemovals({
+    locale,
+    onsettled: () => void queryClient.invalidateQueries({ queryKey: ['invoices'] }),
   });
+  function discardInvoice(id: string) {
+    draftRemovals.remove(id, {
+      message: t('books.draft_discarded', locale),
+      commit: () => mutateJSON('DELETE', `/api/invoices/${id}`),
+    });
+  }
+  let shown = $derived(invoices.filter((i) => !draftRemovals.hidden.has(i.id)));
 
   let paymentOpen = $state(false);
   let paymentInvoice = $state<MoneyInvoiceItem | null>(null);
@@ -216,14 +220,34 @@
     $createPayment.mutate();
   }
 
+  function refreshPayments() {
+    void queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    void queryClient.invalidateQueries({ queryKey: ['payments'] });
+    void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
+    void queryClient.invalidateQueries({ queryKey: ['line-money-fees'] });
+  }
+  // Quitar un cobro se deshace (tarea 134). Se borra ya, porque lo cobrado
+  // de la factura y del bolo se recalcula con él; «Deshacer» lo vuelve a
+  // apuntar con los mismos datos (un cobro no tiene más que eso).
   const deletePayment = createMutation({
-    mutationFn: async (id: string) => mutateJSON('DELETE', `/api/payments/${id}`),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      void queryClient.invalidateQueries({ queryKey: ['payments'] });
-      void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
-      void queryClient.invalidateQueries({ queryKey: ['line-money-fees'] });
-      addToast({ tone: 'info', message: t('books.payment_removed', locale) });
+    mutationFn: async (payment: PaymentItem) => mutateJSON('DELETE', `/api/payments/${payment.id}`),
+    onSuccess: (_data, payment) => {
+      refreshPayments();
+      toastCreated({
+        locale,
+        message: t('books.payment_removed', locale),
+        undo: async () => {
+          await mutateJSON('POST', '/api/payments', {
+            invoice_id: payment.invoice_id,
+            amount: payment.amount,
+            received_on: payment.received_on,
+            method: payment.method,
+            reference: payment.reference,
+            notes: payment.notes,
+          });
+          refreshPayments();
+        },
+      });
     },
     onError: (err) => {
       addToast({
@@ -277,11 +301,11 @@
   }
 </script>
 
-{#if invoices.length === 0}
+{#if shown.length === 0}
   <EmptyLine text={t('books.no_invoices', locale)} />
 {:else}
   <ul class="mny__invoices" role="list">
-    {#each invoices as invoice (invoice.id)}
+    {#each shown as invoice (invoice.id)}
       {@const aging = agingFor(invoice)}
       {@const observed = invoice.payer_organization_id ? termsByPayer.get(invoice.payer_organization_id) : null}
       <li id={`inv-${invoice.id}`} class:expanded={expandedId === invoice.id}>
@@ -337,8 +361,7 @@
                 size="xs"
                 variant="secondary"
                 tone="warn"
-                loading={$discardInvoice.isPending}
-                onclick={() => $discardInvoice.mutate(invoice.id)}
+                onclick={() => discardInvoice(invoice.id)}
               >{t('books.discard', locale)}</Button>
             {/if}
           </span>
@@ -464,7 +487,7 @@
                       variant="secondary"
                       tone="warn"
                       loading={$deletePayment.isPending}
-                      onclick={() => $deletePayment.mutate(payment.id)}
+                      onclick={() => $deletePayment.mutate(payment)}
                     >{t('books.remove', locale)}</Button>
                   </li>
                 {/each}
@@ -709,7 +732,7 @@
       margin-block-start: var(--space-s);
     }
 
-    @media (max-width: 47.5rem) {
+    @media (max-width: 47.999rem) {
       .mny-inv__row {
         grid-template-columns: 1fr auto;
         gap: var(--space-xs) var(--space-s);

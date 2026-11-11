@@ -2277,6 +2277,12 @@
   .record-head__sep {
     color: var(--border-color-dark);
   }
+  /* A verb of a record's head (RecordHead `tools`): the button, and its «i»
+     beside it when the word needs one. */
+  .record-head__tool {
+    display: inline-flex;
+    align-items: center;
+  }
   .record-head__band {
     display: flex;
     flex-direction: column;

@@ -940,7 +940,7 @@
     min-block-size: 100vh;
     background: var(--bg);
   }
-  /* Settings mode slots its own rail between the scopes rail and main, from
+  /* cut: the rail (64rem). Settings mode slots its own rail between the scopes rail and main, from
      1024 up. Under it the rail and that nav left the page a narrow column
      (208px at 768): the sections become a dropdown at the top of the page
      instead (SettingsSectionSelect), and the shell keeps its two columns. */
@@ -949,6 +949,7 @@
       grid-template-columns: auto auto 1fr;
     }
   }
+  /* cut: the rail (64rem), the other side of the rule above. */
   @media (max-width: 63.999rem) {
     .shell__settings-nav {
       display: none;
@@ -1087,7 +1088,7 @@
       margin-inline: auto;
     }
   }
-  /* A tablet with the rail beside it (48–64rem): the sections take most of
+  /* cut: the rail (64rem). A tablet with the rail beside it (48–64rem): the sections take most of
      the bar, so the search keeps what is left, never less than its lens. */
   @media (min-width: 48rem) and (max-width: 63.999rem) {
     .shell__top {

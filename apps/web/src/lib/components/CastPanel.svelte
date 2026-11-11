@@ -14,6 +14,7 @@
    * minimum so the axis has data to draw.
    */
 
+  import { undoableRemovals } from '$lib/undo-remove.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
@@ -56,7 +57,16 @@
   });
   const castQuery = createQuery(castOptions);
 
-  let cast = $derived($castQuery.data?.cast ?? []);
+  // Quitar a alguien del reparto se deshace (tarea 134): sale al momento y
+  // el DELETE espera al aviso con «Deshacer» ($lib/undo-remove).
+  const castRemovals = undoableRemovals({
+    locale,
+    onsettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['project-cast', projectId] });
+      void queryClient.invalidateQueries({ queryKey: ['planner-team'] });
+    },
+  });
+  let cast = $derived(($castQuery.data?.cast ?? []).filter((m) => !castRemovals.hidden.has(m.id)));
   let people = $derived($castQuery.data?.people ?? []);
 
   let workspaceId = $derived($castQuery.data?.workspace_id ?? '');
@@ -99,23 +109,13 @@
     },
   });
 
-  const removeMutation = createMutation({
-    mutationFn: async (memberId: string) => {
-      await mutateJSON('DELETE', `/api/projects/${projectId}/cast/${memberId}`);
-      return memberId;
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['project-cast', projectId] });
-      void queryClient.invalidateQueries({ queryKey: ['planner-team'] });
-    },
-    onError: (err) => {
-      addToast({
-        tone: 'danger',
-        title: t('perf.cast_not_removed', locale),
-        message: err instanceof Error ? err.message : t('composer.toast_fail_msg', locale),
-      });
-    },
-  });
+  function remove(m: CastMember) {
+    const project = projectId;
+    castRemovals.remove(m.id, {
+      message: t('perf.cast_removed', locale, { name: m.person?.full_name ?? t('perf.cast_this_person', locale) }),
+      commit: () => mutateJSON('DELETE', `/api/projects/${project}/cast/${m.id}`),
+    });
+  }
 
   function add(event: SubmitEvent) {
     event.preventDefault();
@@ -145,8 +145,7 @@
               label={t('perf.cast_remove_named', locale, {
                 name: m.person?.full_name ?? t('perf.cast_this_person', locale),
               })}
-              disabled={$removeMutation.isPending}
-              onclick={() => $removeMutation.mutate(m.id)}>{t('perf.cast_remove', locale)}</Button
+              onclick={() => remove(m)}>{t('perf.cast_remove', locale)}</Button
             >
           </li>
         {/each}

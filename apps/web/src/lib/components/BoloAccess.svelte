@@ -13,6 +13,7 @@
    * invitación deja un enlace para copiar y mandar.
    */
 
+  import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
@@ -141,12 +142,22 @@
     );
   }
 
-  async function revokeInvitation(id: string) {
+  // Revocar una invitación mata un enlace que otra persona tiene y no se
+  // deshace: se confirma (tarea 134).
+  let revoking = $state<{ id: string; email: string } | null>(null);
+  let revokeOpen = $state(false);
+  let revokeBusy = $state(false);
+  async function revokeInvitation() {
+    if (!revoking || revokeBusy) return;
+    revokeBusy = true;
     try {
-      await mutateJSON('DELETE', `/api/bolos/${boloId}/access`, { kind: 'invitation', id });
+      await mutateJSON('DELETE', `/api/bolos/${boloId}/access`, { kind: 'invitation', id: revoking.id });
+      revokeOpen = false;
       refresh();
     } catch (err) {
       failed(err, t('bolo_access.not_saved', locale));
+    } finally {
+      revokeBusy = false;
     }
   }
 
@@ -254,7 +265,7 @@
               type="button"
               class="empty-line__act"
               aria-label={t('bolo_access.revoke_invitation_for', locale, { email: inv.email })}
-              onclick={() => revokeInvitation(inv.id)}>{t('bolo_access.revoke_invitation', locale)}</button
+              onclick={() => ((revoking = { id: inv.id, email: inv.email }), (revokeOpen = true))}>{t('bolo_access.revoke_invitation', locale)}</button
             >
           </li>
         {/each}
@@ -323,17 +334,25 @@
   {/snippet}
 </Dialog>
 
-<Dialog
+<ConfirmDialog
   bind:open={removeOpen}
   title={removing ? t('bolo_access.remove_title', locale, { name: nameOf(removing) }) : ''}
-  size="s"
->
-  <p class="access__hint">{t('bolo_access.remove_confirm', locale, { name: removing ? nameOf(removing) : '' })}</p>
-  {#snippet actions()}
-    <Button variant="quiet" onclick={() => (removeOpen = false)}>{t('threads.cancel', locale)}</Button>
-    <Button tone="warn" onclick={confirmRemove} loading={removeBusy}>{t('bolo_access.remove_ok', locale)}</Button>
-  {/snippet}
-</Dialog>
+  body={t('bolo_access.remove_confirm', locale, { name: removing ? nameOf(removing) : '' })}
+  confirm={t('bolo_access.remove_ok', locale)}
+  busy={removeBusy}
+  {locale}
+  onconfirm={confirmRemove}
+/>
+
+<ConfirmDialog
+  bind:open={revokeOpen}
+  title={t('bolo_access.revoke_title', locale)}
+  body={t('bolo_access.revoke_confirm', locale, { email: revoking?.email ?? '' })}
+  confirm={t('bolo_access.revoke_invitation', locale)}
+  busy={revokeBusy}
+  {locale}
+  onconfirm={revokeInvitation}
+/>
 
 <Dialog
   bind:open={extendOpen}

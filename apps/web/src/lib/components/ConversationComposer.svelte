@@ -75,7 +75,6 @@
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import { refreshAfterWrite } from '$lib/query-refresh';
-  import { localDayISO } from '$lib/datetime';
   import { LOCALE_TAG, t, type Locale } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
   import Field from '$lib/components/Field.svelte';
@@ -84,17 +83,9 @@
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { messageFailed } from '$lib/components/MessageItem.svelte';
-  import {
-    EVENT_BODY_MAX,
-    eventKindLabel,
-    occurredAtForDay,
-    MESSAGE_APPS,
-    type ConversationEventCreate,
-    type ConversationEventItem,
-    type ConversationEventKind,
-    type MessageApp,
-  } from '$lib/conversation';
-  import { messageAppIcon, messageAppName } from '$lib/conversation-thread';
+  import { EVENT_BODY_MAX, type ConversationEventCreate, type ConversationEventItem } from '$lib/conversation';
+  import ContactLogFields from '$lib/components/ContactLogFields.svelte';
+  import { callInFuture, contactEvent, freshContactLog, type ContactLog } from '$lib/call-log';
   import { MAIL_BODY_MAX, insertBlock, materialLine, replySubject, type MailAccountsResponse } from '$lib/mail';
   import { kindLabel, type MaterialItem } from '$lib/material';
   import { sortTexts, workspaceTextsQueryOptions, type WorkspaceText } from '$lib/workspace-texts';
@@ -316,40 +307,18 @@
   // ── Apuntar ─────────────────────────────────────────────────────────────
   // «Llamada», saliente, hoy: lo que más se apunta a mano (la difusión que
   // sale por correo ya la trae el buzón).
-  let logKind = $state<ConversationEventKind>('call');
-  let logDirection = $state<'outbound' | 'inbound' | ''>('outbound');
-  let logDay = $state(localDayISO());
-  /** Un mensaje: por qué app (ADR-186). WhatsApp, lo que más se usa con una sala. */
-  let logVia = $state<MessageApp>('whatsapp');
-  /** «Otro día»: el día se elige; si no, es ahora. */
-  let otherDay = $state(false);
-  /** Qué se apunta, en el orden en que más se apunta; cada uno con su glifo, el del hilo. */
-  const LOG_KINDS: ConversationEventKind[] = ['call', 'meeting', 'message', 'email', 'note'];
-  const LOG_ICON: Record<ConversationEventKind, ThreadIconName> = {
-    call: 'call',
-    meeting: 'meeting',
-    message: 'message',
-    email: 'mail',
-    note: 'note',
-  };
-  /** Una reunión es de los dos y un apunte no tiene a nadie delante: sin «quién». */
-  function pickKind(k: ConversationEventKind) {
-    logKind = k;
-    logDirection = k === 'note' || k === 'meeting' ? '' : logDirection || 'outbound';
-  }
+  let log = $state<ContactLog>(freshContactLog());
   /** Dejar de apuntar: vuelve a donde se escribía. */
   let beforeLog: ComposerTarget = 'mail';
   function cancelLog() {
     target = beforeLog;
     void tick().then(() => field?.focus());
   }
-  let futureDay = $derived(logDay > localDayISO());
+  let futureDay = $derived(callInFuture(log));
 
   /** «Llamar» desde el teléfono del contacto: el destino pasa a apuntar la llamada. */
   export function startCall() {
-    logKind = 'call';
-    logDirection = 'outbound';
-    logDay = localDayISO();
+    log = freshContactLog('call');
     focus('log');
   }
 
@@ -359,8 +328,7 @@
     onSuccess: (data) => {
       forgetUnsent(convId, 'log');
       drafts.log = '';
-      logDay = localDayISO();
-      otherDay = false;
+      log = { ...log, edited: false };
       target = beforeLog;
       // Sale ya en el hilo, sin esperar a la recarga (que llega después y manda).
       const item = data?.item;
@@ -401,7 +369,7 @@
     if (busy) return false;
     if (target === 'mail') return !mailBlocked && Boolean(fromAccount) && body.trim() !== '';
     if (target === 'team') return body.trim() !== '';
-    return Boolean(logDay) && !futureDay;
+    return Boolean(log.day) && !futureDay;
   });
 
   async function submit(event?: SubmitEvent) {
@@ -425,13 +393,7 @@
         body: drafts.team.trim(),
       });
     } else {
-      $logEvent.mutate({
-        kind: logKind,
-        ...(logKind === 'message' ? { via: logVia } : {}),
-        direction: logDirection || null,
-        body: drafts.log.trim() || null,
-        occurred_at: occurredAtForDay(logDay),
-      });
+      $logEvent.mutate(contactEvent(log, drafts.log));
     }
   }
 
@@ -471,7 +433,7 @@
         : t('thread.mail_send_none', locale)
       : target === 'team'
         ? t('thread.team_send', locale)
-        : t(`thread.log_send_${logKind}`, locale),
+        : t(`thread.log_send_${log.kind}`, locale),
   );
   /** El glifo del botón, el mismo que su pestaña. */
   let verbIcon = $derived<ThreadIconName>(
@@ -582,47 +544,7 @@
 
   {#if target === 'log'}
     <div class="composer__log" data-testid="composer-log">
-      <div class="composer__opts" role="group" aria-label={t('conversations.event_kind', locale)}>
-        <span class="composer__opt-label">{t('thread.log_what', locale)}</span>
-        {#each LOG_KINDS as k (k)}
-          <button type="button" class="composer__opt" aria-pressed={logKind === k} onclick={() => pickKind(k)}
-            ><ThreadIcon name={LOG_ICON[k]} />{k === 'note' ? t('thread.ev_note', locale) : eventKindLabel(k, locale)}</button
-          >
-        {/each}
-      </div>
-      {#if logKind === 'message'}
-        <div class="composer__opts" role="group" aria-label={t('thread.log_via', locale)}>
-          <span class="composer__opt-label">{t('thread.log_via', locale)}</span>
-          {#each MESSAGE_APPS as a (a)}
-            <button type="button" class="composer__opt" aria-pressed={logVia === a} onclick={() => (logVia = a)}
-              ><ThreadIcon name={messageAppIcon(a)} />{messageAppName(a, locale)}</button
-            >
-          {/each}
-        </div>
-      {/if}
-      {#if logKind !== 'note' && logKind !== 'meeting'}
-        <div class="composer__opts" role="group" aria-label={t('create.direction', locale)}>
-          <span class="composer__opt-label">{t('thread.log_who', locale)}</span>
-          <button type="button" class="composer__opt" aria-pressed={logDirection === 'outbound'} onclick={() => (logDirection = 'outbound')}
-            >{t('thread.log_me', locale)}</button
-          >
-          <button type="button" class="composer__opt" aria-pressed={logDirection === 'inbound'} onclick={() => (logDirection = 'inbound')}
-            >{name ? firstName(name) : t('thread.log_them', locale)}</button
-          >
-        </div>
-      {/if}
-      <div class="composer__opts" role="group" aria-label={t('conversations.event_day', locale)}>
-        <span class="composer__opt-label">{t('thread.log_when', locale)}</span>
-        <button type="button" class="composer__opt" aria-pressed={!otherDay} onclick={() => ((otherDay = false), (logDay = localDayISO()))}
-          >{t('thread.log_now', locale)}</button
-        >
-        <button type="button" class="composer__opt" aria-pressed={otherDay} onclick={() => (otherDay = true)}
-          >{t('thread.log_other_day', locale)}</button
-        >
-        {#if otherDay}
-          <input type="date" bind:value={logDay} max={localDayISO()} aria-label={t('conversations.event_day', locale)} />
-        {/if}
-      </div>
+      <ContactLogFields bind:log them={name ? firstName(name) : null} locale={locale} />
     </div>
   {/if}
 
@@ -848,42 +770,6 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-xs);
-    }
-    /* What is logged, as choices: what it was, who began it, when. */
-    .composer__opts {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: baseline;
-      gap: var(--space-2xs) var(--space-xs);
-      font-size: var(--text-s);
-    }
-    .composer__opt-label {
-      min-inline-size: var(--composer-opt-label);
-      color: var(--text-faint);
-      font-size: var(--text-xs);
-    }
-    .composer__opt {
-      display: inline-flex;
-      align-items: baseline;
-      gap: var(--space-xs);
-      padding: var(--space-2xs) var(--space-s);
-      color: var(--text-muted);
-      background: none;
-      border: var(--line-hairline) solid transparent;
-      border-radius: var(--radius);
-      font: inherit;
-      cursor: pointer;
-    }
-    .composer__opt[aria-pressed='true'] {
-      color: var(--heading-color);
-      font-weight: 500;
-      background: var(--bg-light);
-      border-color: var(--border-color-dark);
-    }
-    .composer__opts input[type='date'] {
-      inline-size: auto;
-      padding-block: var(--space-2xs);
-      font-size: var(--text-s);
     }
     .composer__to {
       margin: 0;

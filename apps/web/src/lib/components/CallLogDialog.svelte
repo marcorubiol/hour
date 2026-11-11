@@ -8,12 +8,13 @@
    *    `GET /api/conversations/call-targets`). Sin texto, con quién se ha
    *    hablado último. Las personas del equipo salen, pero no se eligen: una
    *    llamada interna no es una conversación (eso es el grupo del bolo).
-   * 2. Qué se habló: «Llamé yo / Me llamó», cuándo (ahora, se puede
-   *    cambiar) y la nota. Con varias conversaciones, la última tocada, con
+   * 2. Qué se habló: el formulario de apuntar de siempre
+   *    (`ContactLogFields`, el del cuadro de escribir: quién empezó y cuándo)
+   *    y la nota. Con varias conversaciones, la última tocada, con
    *    el cambio a la vista. Sin ninguna, «¿De qué espectáculo?»: se abre una
    *    por el mismo `POST /api/conversations` que «Añadir conversación».
    *
-   * Lo que se guarda es lo que apunta el cuadro de escribir (`callEvent`),
+   * Lo que se guarda es lo que apunta el cuadro de escribir (`contactEvent`),
    * por el mismo POST: cuenta para el turno igual. Espera el plazo de
    * «Deshacer» antes de escribirse (`$lib/call-log-pending`).
    */
@@ -26,21 +27,22 @@
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
   import Segmented from '$lib/components/Segmented.svelte';
+  import ContactLogFields from '$lib/components/ContactLogFields.svelte';
   import Select from '$lib/components/Select.svelte';
   import Textarea from '$lib/components/Textarea.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { refreshAfterWrite } from '$lib/query-refresh';
   import { EVENT_BODY_MAX } from '$lib/conversation';
-  import { localDayISO, localeDayMonth } from '$lib/datetime';
   import { LOCALE_TAG, t, type Locale } from '$lib/i18n';
   import { paletteSearchTerm } from '$lib/palette-search';
   import { activeProjectsQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
   import {
-    callEvent,
     callInFuture,
     callTargetConversations,
     callTargetWho,
-    localTime,
+    contactEvent,
+    freshContactLog,
+    type ContactLog,
     type CallTarget,
     type CallTargetsResponse,
   } from '$lib/call-log';
@@ -89,10 +91,8 @@
   let target = $state<CallTarget | null>(null);
   let conversationId = $state('');
   let projectId = $state('');
-  let direction = $state<'outbound' | 'inbound'>('outbound');
-  let day = $state(localDayISO());
-  let time = $state('');
-  let edited = $state(false);
+  /** Desde la lente se apunta una llamada (ADR-182, «+ → Llamada»). */
+  let log = $state<ContactLog>(freshContactLog('call'));
   let note = $state('');
   let busy = $state(false);
 
@@ -107,13 +107,12 @@
           .map((p) => ({ value: p.id, label: p.name ?? p.slug }))
       : [],
   );
-  let when = $derived({ day, time, edited });
-  let future = $derived(callInFuture(when));
+  let future = $derived(callInFuture(log));
   let ready = $derived(Boolean(target) && !busy && !future && (conversations.length > 0 ? Boolean(chosen) : Boolean(projectId)));
 
   /** Lo que el turno dirá después: la dirección es la palabra (como el cuadro de escribir). */
   let after = $derived(
-    t(direction === 'outbound' ? 'overview.turn_theirs_cap' : 'overview.turn_ours_cap', locale).toLocaleLowerCase(LOCALE_TAG[locale]),
+    t(log.direction === 'outbound' ? 'overview.turn_theirs_cap' : 'overview.turn_ours_cap', locale).toLocaleLowerCase(LOCALE_TAG[locale]),
   );
 
   let searchEl = $state<HTMLElement>();
@@ -134,11 +133,7 @@
     target = next;
     // La última tocada (el servidor ya las da en ese orden).
     conversationId = next.conversations[0]?.id ?? '';
-    direction = 'outbound';
-    const now = new Date();
-    day = localDayISO(now);
-    time = localTime(now);
-    edited = false;
+    log = freshContactLog('call');
     note = '';
     projectId = '';
   }
@@ -190,7 +185,7 @@
       open = false;
       await holdCall({
         conversationId: id,
-        event: callEvent({ direction, note, ...when }),
+        event: contactEvent(log, note),
         created,
         name: t0.name,
         href: hrefOf(t0.workspace_id, id),
@@ -293,30 +288,11 @@
         {/if}
       {/if}
 
-      <Segmented
-        ariaLabel={t('create.direction', locale)}
-        options={[
-          { value: 'outbound', label: t('call.i_called', locale) },
-          { value: 'inbound', label: t('call.they_called', locale) },
-        ]}
-        bind:value={direction}
-      />
-
-      {#if edited}
-        <div class="call__when">
-          <Input type="date" label={t('conversations.event_day', locale)} bind:value={day} max={localDayISO()} />
-          <Input type="time" label={t('call.time', locale)} bind:value={time} error={future ? t('call.future', locale) : undefined} />
-        </div>
-      {:else}
-        <p class="call__meta">
-          <span>{day === localDayISO() ? t('call.today', locale) : localeDayMonth(day, locale)} · <span class="call__time">{time}</span></span>
-          <Button size="xs" variant="quiet" onclick={() => (edited = true)}>{t('call.change', locale)}</Button>
-        </p>
-      {/if}
+      <ContactLogFields bind:log kinds={['call']} them={target.kind === 'person' ? target.name.split(/\s+/)[0] || null : target.name} {future} {locale} />
 
       <Textarea label={t('call.note', locale)} placeholder={t('thread.log_placeholder', locale)} bind:value={note} rows={3} maxlength={EVENT_BODY_MAX} />
       <p class="call__reads">{t('thread.log_reads', locale)}</p>
-      {#if !edited}<p class="call__hint">{t('call.after', locale, { turn: after })}</p>{/if}
+      {#if !log.edited}<p class="call__hint">{t('call.after', locale, { turn: after })}</p>{/if}
       <button type="submit" hidden aria-hidden="true"></button>
     </form>
   {/if}
@@ -405,22 +381,6 @@
       background: var(--tone-warning-bg);
       color: var(--tone-warning-fg);
       font-size: var(--text-s);
-    }
-    .call__meta {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: var(--space-s);
-      color: var(--text-muted);
-      font-size: var(--text-s);
-    }
-    .call__time {
-      font-variant-numeric: tabular-nums;
-    }
-    .call__when {
-      display: flex;
-      gap: var(--space-s);
-      flex-wrap: wrap;
     }
     .call__reads {
       margin: 0;

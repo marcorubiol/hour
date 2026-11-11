@@ -1781,7 +1781,7 @@ button.ag__head:hover .ag__num {
 .ag__sentinel {
       block-size: var(--line-hairline);
     }
-@media (max-width: 35rem) {
+@media (max-width: 47.999rem) {
       /* No margin column on a phone (its card falls under the day, below),
          so nothing reserves room for it and no rule runs down through the
          rows: the week band is one line again, number · range · tally. */

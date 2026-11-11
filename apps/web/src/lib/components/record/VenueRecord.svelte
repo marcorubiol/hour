@@ -136,10 +136,7 @@
       {locale}
     />
   {:else if file && venue}
-    <RecordHead {crumbs} title={venue.name}>
-      {#snippet actions()}
-        {#if canEdit}<Button variant="secondary" size="xs" onclick={edit}>{t('venue.edit', locale)}</Button>{/if}
-      {/snippet}
+    <RecordHead {crumbs} title={venue.name} tools={canEdit ? [{ label: t('venue.edit', locale), onclick: edit }] : []}>
       {#snippet facts()}
         {#if placeLine}<span>{placeLine}</span>{/if}
         {#if venue!.address}

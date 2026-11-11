@@ -34,6 +34,7 @@
    * born with the tag filter. The tag never decides who sees what.
    */
 
+  import { TWO_PANES_QUERY } from '$lib/breakpoints';
   import { docTitle } from '$lib/doc-title';
   import { createMutation, createQuery } from '@tanstack/svelte-query';
   import { afterNavigate, goto } from '$app/navigation';
@@ -529,7 +530,7 @@
   //    (`?abierta=<space>/<id>`). Narrower, a row's link opens its page. ──
   let wide = $state(false);
   $effect(() => {
-    const mq = matchMedia('(min-width: 75rem)');
+    const mq = matchMedia(TWO_PANES_QUERY);
     wide = mq.matches;
     const on = () => (wide = mq.matches);
     mq.addEventListener('change', on);

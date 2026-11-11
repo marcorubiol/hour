@@ -31,6 +31,7 @@
    * where it was when something is added (the notice says it, with undo).
    */
 
+  import { undoableRemovals } from '$lib/undo-remove.svelte';
   import { docTitle } from '$lib/doc-title';
   import { createMutation, createQueries, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
@@ -1699,7 +1700,16 @@
 
   // ── The Day's foot: notes + next (the design's margin, risen into the
   // flow), and the absence as a line above the drawing. ─────────────────
-  let dayNotes = $derived($dayNotesQuery.data?.items ?? []);
+  // Borrar una nota se deshace (tarea 134): se va al momento y el DELETE
+  // espera al aviso con «Deshacer» ($lib/undo-remove).
+  const noteRemovals = undoableRemovals({
+    locale,
+    onsettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['planner-agenda-notes'] });
+      void queryClient.invalidateQueries({ queryKey: ['planner-day-notes'] });
+    },
+  });
+  let dayNotes = $derived(($dayNotesQuery.data?.items ?? []).filter((n) => !noteRemovals.hidden.has(n.id)));
   let dayNotesAbsent = $derived(Boolean($dayNotesQuery.data?.absent));
   /** The absences covering this day, as sentences — same voice as the
       agenda's away lines: who, until when, how much is left. */
@@ -2447,6 +2457,7 @@
   let notesByDay = $derived.by(() => {
     const map = new Map<string, NoteEvent[]>();
     for (const n of $agendaNotesQuery.data?.items ?? []) {
+      if (noteRemovals.hidden.has(n.id)) continue;
       (map.get(n.on_day) ?? map.set(n.on_day, []).get(n.on_day)!).push(n);
     }
     return map;
@@ -2506,17 +2517,11 @@
       return false;
     }
   }
-  async function deleteNote(id: string) {
-    try {
-      await mutateJSON('DELETE', `/api/notes/${encodeURIComponent(id)}`);
-    } catch (err) {
-      addToast({
-        tone: 'danger',
-        message: err instanceof Error ? err.message : t('planner.note_delete_error', locale),
-      });
-    }
-    void queryClient.invalidateQueries({ queryKey: ['planner-agenda-notes'] });
-    void queryClient.invalidateQueries({ queryKey: ['planner-day-notes'] });
+  function deleteNote(id: string) {
+    noteRemovals.remove(id, {
+      message: t('planner.note_deleted', locale),
+      commit: () => mutateJSON('DELETE', `/api/notes/${encodeURIComponent(id)}`),
+    });
   }
 
   // Band open/collapsed — UI state only (ADR-080 §5: "Deixa-ho obert"

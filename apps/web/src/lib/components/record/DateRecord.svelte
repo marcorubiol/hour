@@ -16,11 +16,12 @@
    * key inside `planner-dates`, so every write that refreshes the date feeds
    * (`invalidateDateFeeds`) refreshes this too.
    */
+  import StateBadge from '$lib/components/StateBadge.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import { loadFailKind, retryLoad } from '$lib/load-fail';
-  import { dateStatusFamily, invalidateDateFeeds } from '$lib/date';
+  import { dateStatusTone, invalidateDateFeeds } from '$lib/date';
   import { closePeek } from '$lib/peek.svelte';
   import { dateFacts } from '$lib/date-record';
   import { dayLabel, localDayISO, viewerTimeZone } from '$lib/datetime';
@@ -175,12 +176,9 @@
       {locale}
     />
   {:else}
-    <RecordHead {crumbs} {title}>
-      {#snippet actions()}
-        <Button variant="secondary" size="xs" onclick={() => (editOpen = true)}>{t('peek.edit', locale)}</Button>
-      {/snippet}
+    <RecordHead {crumbs} {title} tools={[{ label: t('peek.edit', locale), onclick: () => (editOpen = true) }]}>
       {#snippet facts()}
-        <span class="fact-word" data-family={dateStatusFamily(row!.status)}>{t(`edit.status_${row!.status}`, locale).toLowerCase()}</span>
+        <span><StateBadge label={t(`edit.status_${row!.status}`, locale).toLowerCase()} tone={dateStatusTone(row!.status)} /></span>
         <span>{whenText}</span>
         <span class="date-record__hours">{hoursText}</span>
         {#if isTrip && row!.travel_direction}<span>{t(`create.direction_${row!.travel_direction}`, locale)}</span>{/if}

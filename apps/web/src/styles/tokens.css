@@ -41,7 +41,9 @@
      (background-size/-position, mask), which is material (certainty.css or
      the component that draws it). A breakpoint in a media or container
      query is a measure in rem (Marco, 2026-10-19): the root is 16px, so the
-     cut does not move.
+     cut does not move. A screen has two named cuts, mobile (under
+     48rem) and two panes (from 75rem): `$lib/breakpoints`, kept by
+     breakpoints-guard.test.ts; any other @media width says `cut:` and why.
   9. One treatment, one home: the first reuse of a drawing extracts it to
      styles/*.css or a component, and both consume it.
 */

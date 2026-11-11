@@ -8,6 +8,7 @@
    * this component.
    */
 
+  import { undoableRemovals } from '$lib/undo-remove.svelte';
   import { docTitle } from '$lib/doc-title';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import Acquaintance from '$lib/components/Acquaintance.svelte';
@@ -232,23 +233,20 @@
   // shows on the caller's own notes — which, since ADR-093, is all of them.
   let callerId = $derived(session.user?.sub ?? '');
 
-  const deleteNote = createMutation({
-    mutationFn: async (noteId: string) => {
-      await mutateJSON('DELETE', `/api/persons/${encodeURIComponent(slug)}/notes/${noteId}`);
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: ['person', contextWorkspaceId, slug],
-      });
-    },
-    onError: (err) => {
-      addToast({
-        tone: 'danger',
-        title: t('person.note_not_deleted', locale),
-        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
-      });
-    },
+  // Borrar una nota se deshace (tarea 134): se va al momento y el DELETE
+  // espera al aviso con «Deshacer» ($lib/undo-remove).
+  const noteRemovals = undoableRemovals({
+    locale,
+    onsettled: () => void queryClient.invalidateQueries({ queryKey: ['person', contextWorkspaceId, slug] }),
   });
+  let notes = $derived((file?.notes ?? []).filter((n) => !noteRemovals.hidden.has(n.id)));
+  function deleteNote(noteId: string) {
+    const noteSlug = slug;
+    noteRemovals.remove(noteId, {
+      message: t('person.note_deleted', locale),
+      commit: () => mutateJSON('DELETE', `/api/persons/${encodeURIComponent(noteSlug)}/notes/${noteId}`),
+    });
+  }
 
   // ── Add to project (ADR-051): a new conversation for this person ────
   // The picker offers only the projects of the current scope (drop 11-10),
@@ -575,7 +573,15 @@
       {locale}
     />
   {:else if file}
-    <RecordHead {crumbs} title={file.person.full_name}>
+    <RecordHead
+      {crumbs}
+      title={file.person.full_name}
+      tools={[
+        { label: t('person.edit', locale), onclick: openEdit },
+        ...(file.can_invite ? [{ label: t('person.invite', locale, { name: file.person.full_name }), onclick: openInvite }] : []),
+        ...(file.can_merge ? [{ label: t('person.merge', locale), onclick: () => openMerge() }] : []),
+      ]}
+    >
       {#snippet facts()}
         {#if file!.person.title}<span>{file!.person.title}</span>{/if}
         {#if file!.person.organization}
@@ -591,21 +597,7 @@
     </RecordHead>
 
     <section class="person__section" aria-label={t('conversations.col_contact', locale)}>
-      <BlockHead title={t('conversations.col_contact', locale)}>
-        <span class="person__verbs">
-          <button type="button" class="block-head__act" onclick={openEdit}>{t('person.edit', locale)}</button>
-          {#if file.can_invite}
-            <button type="button" class="block-head__act" onclick={openInvite}
-              >{t('person.invite', locale, { name: file.person.full_name })}</button
-            >
-          {/if}
-          {#if file.can_merge}
-            <button type="button" class="block-head__act" onclick={() => openMerge()}
-              >{t('person.merge', locale)}</button
-            >
-          {/if}
-        </span>
-      </BlockHead>
+      <BlockHead title={t('conversations.col_contact', locale)} />
       {#if !file.person.email && !file.person.phone && !file.person.website && file.person.languages.length === 0}
         <EmptyLine text={t('person.no_contact', locale)} />
       {/if}
@@ -691,9 +683,9 @@
           </Button>
         </div>
       </div>
-      {#if file.notes.length > 0}
+      {#if notes.length > 0}
         <ul class="person__notes" role="list">
-          {#each file.notes as n (n.id)}
+          {#each notes as n (n.id)}
             <li>
               <span class="person__note-meta">
                 {dayMonthYearTs(n.created_at)}
@@ -701,8 +693,7 @@
                   <button
                     type="button"
                     class="person__note-delete"
-                    disabled={$deleteNote.isPending}
-                    onclick={() => $deleteNote.mutate(n.id)}
+                    onclick={() => deleteNote(n.id)}
                   >
                     {t('person.note_delete', locale)}
                   </button>
@@ -840,11 +831,6 @@
       gap: var(--space-s);
     }
 
-    .person__verbs {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--space-m);
-    }
 
     .person__hint {
       margin: 0;

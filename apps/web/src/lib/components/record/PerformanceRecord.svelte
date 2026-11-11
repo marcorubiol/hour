@@ -12,6 +12,7 @@
    * completa» lands on the same head, facts, «Falta» and blocks.
    */
 
+  import StateBadge, { stateBadgeClass } from '$lib/components/StateBadge.svelte';
   import { docTitle } from '$lib/doc-title';
   import { goto } from '$app/navigation';
   import { closePeek } from '$lib/peek.svelte';
@@ -43,7 +44,7 @@
     holdDeadlineLabel,
     isHoldStatus,
     isValidHoldNotice,
-    performanceStatusFamily,
+    performanceStatusTone,
     performanceStatusLabel,
     type PerformancePatch,
     type PerformanceStatus,
@@ -793,28 +794,31 @@
       {locale}
     />
   {:else if perf}
-    <RecordHead {crumbs} {title} {titleHref}>
-      {#snippet actions()}
-        <span class="perf__roadsheet-link"
-          ><a class="link-arrow" href={`/h/${workspaceSlug}/performance/${slug}/roadsheet`}>{t('roadsheet.open', locale)}</a
-          ><ConceptHint concept="roadsheet" /></span
-        >
-        {#if canEdit}<Button variant="secondary" size="xs" onclick={openEdit}>{t('perf.edit_details', locale)}</Button>{/if}
-        {#if canInvite}
-          <Button variant="secondary" size="xs" loading={$invite.isPending} onclick={() => $invite.mutate()}
-            >{t('audience.invite_from_performance', locale)}</Button
-          >
-        {/if}
-      {/snippet}
-      <!-- Los hechos, cada uno su editor (ADR-139 p2): el estado como palabra
-           mono con su menú, el cuándo y el dónde abren los datos, el bolo se
+    <RecordHead
+      {crumbs}
+      {title}
+      {titleHref}
+      tools={[
+        {
+          label: t('roadsheet.open', locale),
+          href: `/h/${workspaceSlug}/performance/${slug}/roadsheet`,
+          concept: 'roadsheet' as const,
+        },
+        ...(canEdit ? [{ label: t('perf.edit_details', locale), onclick: openEdit }] : []),
+        ...(canInvite
+          ? [{ label: t('audience.invite_from_performance', locale), loading: $invite.isPending, onclick: () => $invite.mutate() }]
+          : []),
+      ]}
+    >
+      <!-- Los hechos, cada uno su editor (ADR-139 p2): el estado, la insignia
+           de siempre con su menú (ADR-130 § 2, tarea 134), el cuándo y el dónde abren los datos, el bolo se
            elige en sitio. La sala no: es el título. -->
       {#snippet facts()}
         {#if canEdit}
           <Menu
             label={t('perf.status_menu', locale, { status: performanceStatusLabel(perf!.status, locale) })}
-            triggerClass="fact-word"
-            triggerAttrs={{ 'data-family': performanceStatusFamily(perf!.status), 'data-testid': 'perf-status' }}
+            triggerClass={stateBadgeClass(performanceStatusTone(perf!.status))}
+            triggerAttrs={{ 'data-testid': 'perf-status' }}
           >
             {#snippet trigger()}{performanceStatusLabel(perf!.status, locale)}<span class="status-caret" aria-hidden="true">▾</span>{/snippet}
             {#snippet children({ close })}
@@ -838,8 +842,8 @@
             {/snippet}
           </Menu>
         {:else}
-          <span class="fact-word" data-family={performanceStatusFamily(perf!.status)} data-testid="perf-status"
-            >{performanceStatusLabel(perf!.status, locale)}</span
+          <span data-testid="perf-status"
+            ><StateBadge label={performanceStatusLabel(perf!.status, locale)} tone={performanceStatusTone(perf!.status)} /></span
           >
         {/if}
         {#if canEdit}
@@ -1219,11 +1223,6 @@
       align-items: baseline;
     }
 
-    .perf__roadsheet-link {
-      display: inline-flex;
-      align-items: center;
-      font-size: var(--text-s);
-    }
 
     .perf__dialog-hint {
       font-size: var(--text-xs);

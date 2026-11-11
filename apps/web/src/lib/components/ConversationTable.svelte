@@ -58,7 +58,6 @@
   import { appLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
   import Checkbox from '$lib/components/Checkbox.svelte';
-  import ConversationHistory from '$lib/components/ConversationHistory.svelte';
   import ConversationRow from '$lib/components/ConversationRow.svelte';
   import ChatRow from '$lib/components/ChatRow.svelte';
   import ChatDone from '$lib/components/ChatDone.svelte';
@@ -316,17 +315,6 @@
 
   function setNotNow(item: ConversationItem, next: { until: string | null } | null) {
     $patchMutation.mutate({ id: item.id, patch: { not_now: next } });
-  }
-
-  // ── History (ADR-098): the timeline and its quick add ──────────────────
-  // A contact is an event now; recording one moves the last contact on the
-  // server, so the row repaints from the invalidated list, not optimistically.
-  let historyOpen = $state(false);
-  let historyFor = $state<ConversationItem | null>(null);
-
-  function openHistory(item: ConversationItem) {
-    historyFor = item;
-    historyOpen = true;
   }
 
   // ── Next action editor (dialog) ─────────────────────────────────────────
@@ -629,7 +617,6 @@
               {locale}
               direction={i >= rows.length - 2 && i > 2 ? 'up' : 'down'}
               onnotnow={(next) => setNotNow(item, next)}
-              onlog={() => openHistory(item)}
             />
           {/if}
         {/snippet}
@@ -640,15 +627,22 @@
           {/if}
         {/snippet}
         {#snippet whenCell()}
-          <button
-            type="button"
-            class="crow-when"
-            onclick={() => openHistory(item)}
-            title={r.lastAt ? dayMonthYear(r.lastAt) : t('conversations.history', locale)}
-            aria-label={t('conversations.history_aria', locale, { when: relativeContactDate(r.lastAt, locale) })}
-          >
-            <time datetime={r.lastAt ?? undefined}>{relativeContactDate(r.lastAt, locale)}</time>
-          </button>
+          <!-- The history is the conversation's own thread (ADR-184): the
+               last contact leads there, and logging one is done from its
+               composer («+ Apuntar», tarea 134). -->
+          {@const whenHref = conversationPath(item)}
+          {#if whenHref}
+            <a
+              class="crow-when"
+              href={whenHref}
+              title={r.lastAt ? dayMonthYear(r.lastAt) : t('conversations.history', locale)}
+              aria-label={t('conversations.history_aria', locale, { when: relativeContactDate(r.lastAt, locale) })}
+            >
+              <time datetime={r.lastAt ?? undefined}>{relativeContactDate(r.lastAt, locale)}</time>
+            </a>
+          {:else}
+            <time class="crow-when" datetime={r.lastAt ?? undefined}>{relativeContactDate(r.lastAt, locale)}</time>
+          {/if}
         {/snippet}
         {#snippet next()}
           <button
@@ -707,24 +701,6 @@
     </button>
   </div>
 {/if}
-
-<Dialog bind:open={historyOpen} title={t('conversations.history', locale)} size="m" onclose={() => (historyFor = null)}>
-  {#if historyFor}
-    <p class="next-action-who">
-      {whoLine(historyFor)}
-    </p>
-    {@const fullPath = conversationPath(historyFor)}
-    {#if fullPath}
-      <p><a class="link-arrow" href={fullPath}>{t('conversations.open_full', locale)}</a></p>
-    {/if}
-    {#key historyFor.id}
-      <ConversationHistory conversationId={historyFor.id} />
-    {/key}
-  {/if}
-  {#snippet actions()}
-    <Button variant="quiet" onclick={() => (historyOpen = false)}>{t('conversations.close', locale)}</Button>
-  {/snippet}
-</Dialog>
 
 <NextActionDialog
   bind:open={dialogOpen}
@@ -785,6 +761,7 @@
       color: inherit;
       font: inherit;
       text-align: end;
+      text-decoration: none;
     }
     .crow-when:hover {
       color: var(--text-color);
@@ -796,11 +773,6 @@
        what the button adds: the date inks under the pointer. */
     .crow-next:hover .crow-next__date {
       color: var(--text-color);
-    }
-
-    .next-action-who {
-      font-size: var(--text-s);
-      color: var(--text-muted);
     }
 
     /* Touch: every control of a row reaches the finger's size (móvil #8). */

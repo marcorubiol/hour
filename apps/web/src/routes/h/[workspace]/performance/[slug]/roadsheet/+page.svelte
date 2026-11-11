@@ -11,6 +11,7 @@
    * token on the next request.
    */
 
+  import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import { docTitle } from '$lib/doc-title';
   import { page } from '$app/state';
   import { createMutation, createQuery, keepPreviousData, useQueryClient } from '@tanstack/svelte-query';
@@ -132,6 +133,7 @@
         { role: shareRole },
       ),
     onSuccess: () => {
+      revokingId = null;
       void queryClient.invalidateQueries({ queryKey: ['roadsheet-shares'] });
     },
     onError: (err) => {
@@ -163,6 +165,8 @@
     },
   });
 
+  // Revocar un enlace corta a quien lo abre y no se deshace: se confirma (tarea 134).
+  let revokingId = $state<string | null>(null);
   const revokeShare = createMutation({
     mutationFn: (id: string) =>
       mutateJSON(
@@ -283,8 +287,7 @@
                   size="s"
                   variant="secondary"
                   tone="warn"
-                  loading={$revokeShare.isPending}
-                  onclick={() => $revokeShare.mutate(s.id)}
+                  onclick={() => (revokingId = s.id)}
                 >
                   {t('roadsheet.revoke', locale)}
                 </Button>
@@ -312,8 +315,7 @@
                       size="s"
                       variant="secondary"
                       tone="warn"
-                      loading={$revokeShare.isPending}
-                      onclick={() => $revokeShare.mutate(own.id)}
+                      onclick={() => (revokingId = own.id)}
                     >
                       {t('roadsheet.revoke', locale)}
                     </Button>
@@ -365,6 +367,16 @@
     </Button>
   {/snippet}
 </Dialog>
+
+<ConfirmDialog
+  bind:open={() => revokingId !== null, (v) => { if (!v) revokingId = null; }}
+  title={t('roadsheet.revoke_title', locale)}
+  body={t('roadsheet.revoke_confirm', locale)}
+  confirm={t('roadsheet.revoke', locale)}
+  busy={$revokeShare.isPending}
+  {locale}
+  onconfirm={() => revokingId && $revokeShare.mutate(revokingId)}
+/>
 
 <style>
   @layer components {

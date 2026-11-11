@@ -277,11 +277,12 @@ test.describe('date edit path (task 15)', () => {
       const dialog = await editFromPeek(page);
       const del = dialog.getByRole('button', { name: 'Delete', exact: true });
       await del.click();
-      // First press only ARMS it — the row must still be there.
-      await expect(dialog).toBeVisible();
+      // It cannot be undone, so it asks first (tarea 134): the row is still there.
+      const confirm = page.locator('dialog[open]', { hasText: 'Delete this date?' });
+      await expect(confirm).toBeVisible();
       expect(await readDate(page, created.id, day)).toBeTruthy();
 
-      await dialog.getByRole('button', { name: 'Delete for good?' }).click();
+      await confirm.getByRole('button', { name: 'Delete', exact: true }).click();
       await expect(dialog).toBeHidden({ timeout: 10_000 });
       expect(await readDate(page, created.id, day)).toBeNull();
       // What it was looking at is gone: the vistazo goes with it.

@@ -14,7 +14,7 @@
 import { localDayISO } from './datetime';
 import { LOCALE_TAG, t, type Locale } from './i18n';
 import { chatWho, type ChatWho } from './chat-row';
-import type { ConversationEventCreate } from './conversation';
+import type { ConversationEventCreate, ConversationEventKind, MessageApp } from './conversation';
 
 /** Una conversación de con quién se habla, en un proyecto. */
 export interface CallConversation {
@@ -144,6 +144,54 @@ export function callInFuture(when: { day: string; time: string; edited: boolean 
   return at ? Date.parse(at) > now.getTime() : false;
 }
 
+// ── Apuntar un contacto: una pieza para las dos puertas (tarea 134) ──────
+// El cuadro de escribir de una conversación («+ Apuntar», ADR-185 § 4) y la
+// llamada desde la lente («+ → Llamada», ADR-182) apuntan lo mismo con el
+// mismo formulario (`ContactLogFields`): qué fue, por dónde si es un
+// mensaje, quién empezó, cuándo. La nota es el campo de texto de cada puerta.
+
+/** Qué se apunta, en el orden en que más se apunta. */
+export const LOG_KINDS = ['call', 'meeting', 'message', 'email', 'note'] as const satisfies readonly ConversationEventKind[];
+
+export interface ContactLog {
+  kind: ConversationEventKind;
+  /** Un mensaje: por qué app (ADR-186). */
+  via: MessageApp;
+  /** Quién empezó; vacío en una reunión o un apunte, que no tienen «quién». */
+  direction: 'outbound' | 'inbound' | '';
+  day: string;
+  time: string;
+  /** «Otro día»: el día y la hora se eligen; si no, es ahora (lo sella el servidor). */
+  edited: boolean;
+}
+
+/** Lo que más se apunta: una llamada que hice yo, ahora. */
+export function freshContactLog(kind: ConversationEventKind = 'call', now: Date = new Date()): ContactLog {
+  return { kind, via: 'whatsapp', direction: hasWho(kind) ? 'outbound' : '', day: localDayISO(now), time: localTime(now), edited: false };
+}
+
+/** Una reunión es de los dos y un apunte no tiene a nadie delante: sin «quién». */
+export function hasWho(kind: ConversationEventKind): boolean {
+  return kind !== 'note' && kind !== 'meeting';
+}
+
+/** Cambiar qué fue conserva quién empezó si sigue teniendo sentido. */
+export function withKind(log: ContactLog, kind: ConversationEventKind): ContactLog {
+  return { ...log, kind, direction: hasWho(kind) ? log.direction || 'outbound' : '' };
+}
+
+/** El cuerpo del POST `/api/conversations/:id/events`, igual desde las dos puertas. */
+export function contactEvent(log: ContactLog, note: string): ConversationEventCreate {
+  const occurred_at = callOccurredAt(log);
+  return {
+    kind: log.kind,
+    ...(log.kind === 'message' ? { via: log.via } : {}),
+    direction: hasWho(log.kind) ? log.direction || null : null,
+    body: note.trim() || null,
+    ...(occurred_at ? { occurred_at } : {}),
+  };
+}
+
 /** El cuerpo del POST: el mismo que manda el cuadro de escribir para una llamada. */
 export function callEvent(input: {
   direction: 'outbound' | 'inbound';
@@ -152,11 +200,6 @@ export function callEvent(input: {
   time: string;
   edited: boolean;
 }): ConversationEventCreate {
-  const occurred_at = callOccurredAt(input);
-  return {
-    kind: 'call',
-    direction: input.direction,
-    body: input.note.trim() || null,
-    ...(occurred_at ? { occurred_at } : {}),
-  };
+  const { note, ...when } = input;
+  return contactEvent({ ...when, kind: 'call', via: 'whatsapp' }, note);
 }

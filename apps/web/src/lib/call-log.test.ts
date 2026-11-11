@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   byLastTouched,
   callEvent,
+  contactEvent,
+  freshContactLog,
+  hasWho,
+  withKind,
   callInFuture,
   callOccurredAt,
   callTargetConversations,
@@ -136,6 +140,43 @@ describe('callEvent', () => {
       direction: 'outbound',
       body: null,
       occurred_at: new Date(2026, 10, 4, 10, 0).toISOString(),
+    });
+  });
+});
+
+describe('contactEvent: one form for the two doors (tarea 134)', () => {
+  const now = new Date(2026, 10, 5, 11, 24);
+  it('starts as what is logged most: a call I made, now', () => {
+    expect(freshContactLog('call', now)).toEqual({
+      kind: 'call',
+      via: 'whatsapp',
+      direction: 'outbound',
+      day: '2026-11-05',
+      time: '11:24',
+      edited: false,
+    });
+  });
+  it('a meeting or a note has no «who»; switching back keeps the last answer', () => {
+    expect(hasWho('meeting')).toBe(false);
+    expect(hasWho('note')).toBe(false);
+    expect(hasWho('message')).toBe(true);
+    const meeting = withKind({ ...freshContactLog('call', now), direction: 'inbound' }, 'meeting');
+    expect(meeting.direction).toBe('');
+    expect(withKind(meeting, 'call').direction).toBe('outbound');
+    expect(withKind({ ...freshContactLog('call', now), direction: 'inbound' }, 'message').direction).toBe('inbound');
+  });
+  it('a message says its app; any other kind does not', () => {
+    const log = { ...freshContactLog('message', now), via: 'telegram' as const };
+    expect(contactEvent(log, ' ok ')).toEqual({ kind: 'message', via: 'telegram', direction: 'outbound', body: 'ok' });
+    expect(contactEvent({ ...log, kind: 'email' }, '')).toEqual({ kind: 'email', direction: 'outbound', body: null });
+  });
+  it('a note sends no direction even if one was left; another day sends its instant', () => {
+    const log = { ...freshContactLog('note', now), direction: 'inbound' as const, day: '2026-11-03', time: '09:00', edited: true };
+    expect(contactEvent(log, 'x')).toEqual({
+      kind: 'note',
+      direction: null,
+      body: 'x',
+      occurred_at: new Date(2026, 10, 3, 9, 0).toISOString(),
     });
   });
 });

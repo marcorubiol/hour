@@ -243,7 +243,7 @@ test.describe('conversation inline write', () => {
 
       // The menu offers only «Not this time…»: the relation is derived.
       await trigger.click();
-      await expect(page.getByRole('menuitem')).toHaveText(['Not this time…', 'Log contact…']);
+      await expect(page.getByRole('menuitem')).toHaveText(['Not this time…']);
       await page.getByRole('menuitem', { name: 'Not this time…', exact: true }).click();
       const dialog = page.locator('dialog[open]');
       await expect(dialog).toBeVisible();
@@ -327,11 +327,14 @@ test.describe('conversation inline write', () => {
       .toEqual({ at: restorePatch.next_action_at, note: restorePatch.next_action_note });
   });
 
-  test('log contact records an event, the timeline shows it and the row says today', async ({
+  test('a contact logged from the conversation records an event and the row says today', async ({
     page,
   }) => {
     // ADR-098: a contact is an event. Events are append-only and the fixture
     // resurrects WITH its old history, so this run's note carries its own mark.
+    // Logging has two doors since tarea 134 (the composer's «+ Log» and the
+    // lens's «+ → Call»); the row's own «Log contact…» and its history dialog
+    // are gone, and the last-contact cell leads to the conversation.
     const mark = `ZZZ e2e history ${Date.now().toString(36)}`;
     await openConversations(page);
 
@@ -339,27 +342,26 @@ test.describe('conversation inline write', () => {
     const name = original.person?.full_name;
     expect(name).toBeTruthy();
 
-    const row = rowOf(page);
-    await row.locator('button[aria-haspopup="menu"]').click();
-    await page.getByRole('menuitem', { name: 'Log contact…', exact: true }).click();
-
-    const dialog = page.locator('dialog[open]');
-    await expect(dialog.getByRole('heading', { name: 'History' })).toBeVisible();
-    await expect(dialog.getByLabel('Kind')).toHaveValue('email');
-    await expect(dialog.getByLabel('Direction')).toHaveValue('outbound');
-    await dialog.getByLabel('Note').fill(mark);
+    await rowOf(page).locator('a.crow-when').click();
+    await waitForLoaded(page);
+    await page.getByTestId('composer-to-log').click();
+    const form = page.getByTestId('contact-log');
+    await expect(form.getByRole('button', { name: 'Call', pressed: true })).toBeVisible();
+    await expect(form.getByRole('button', { name: 'Me', pressed: true })).toBeVisible();
+    await expect(form.getByRole('button', { name: 'Now', pressed: true })).toBeVisible();
+    await page.getByRole('textbox', { name: 'What was said…' }).fill(mark);
 
     const posted = page.waitForResponse(
       (r) =>
         r.request().method() === 'POST' &&
         r.url().includes(`/api/conversations/${original.id}/events`),
     );
-    await dialog.getByRole('button', { name: 'Record' }).click();
+    await page.getByRole('button', { name: 'Log call' }).click();
     const response = await posted;
     expect(response.status(), 'POST /events should create').toBe(201);
-    // Today travels without an instant: the server owns the clock.
+    // Now travels without an instant: the server owns the clock.
     expect(response.request().postDataJSON()).toEqual({
-      kind: 'email',
+      kind: 'call',
       direction: 'outbound',
       body: mark,
     });
@@ -367,22 +369,8 @@ test.describe('conversation inline write', () => {
     const skew = Math.abs(Date.parse(item.occurred_at) - Date.now());
     expect(skew, 'the server stamped something that is not now').toBeLessThan(60_000);
 
-    const first = dialog.getByRole('list', { name: 'History' }).getByRole('listitem').first();
-    await expect(first).toContainText('Email');
-    await expect(first).toContainText('Sent');
-    await expect(first).toContainText(mark);
-
-    await dialog.getByRole('button', { name: 'Close' }).click();
-    await expect(row.locator('.crow-when')).toContainText('today');
-
     // A fresh fetch: the event and the stamp both survive.
-    await page.reload();
-    await waitForLoaded(page);
-    const again = rowOf(page);
-    await expect(again.locator('.crow-when')).toContainText('today');
-    await again.locator('.crow-when').click();
-    await expect(
-      page.locator('dialog[open]').getByRole('list', { name: 'History' }),
-    ).toContainText(mark);
+    await openConversations(page);
+    await expect(rowOf(page).locator('.crow-when')).toContainText('today');
   });
 });
