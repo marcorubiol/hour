@@ -5,7 +5,8 @@
  * the scope does (the palette, the names of its tokens, save, update, clear)
  * lives in the /h layout, which owns the pins' companions (the nav caches,
  * the saved scope being edited); the layout hands it down here, so the head
- * does not reach into the shell.
+ * does not reach into the shell. Since tarea 132 the pill is the scope's only
+ * door: the rail no longer lists «Todo», the saved scopes or the recents.
  */
 import { getContext, setContext } from 'svelte';
 import type { PinKind } from '$lib/stores/pins.svelte';
@@ -29,6 +30,10 @@ export interface ScopeDoor {
   update: () => void;
   /** Clear = abandoning the working combo too (it enters Recent). */
   clear: () => void;
+  /** A saved or recent scope, applied whole (tarea 132: the rail's lists
+      live in the pill's dialog now). The layout keeps which saved scope is
+      being edited, so applying goes through it. */
+  apply: (s: Scope) => void;
 }
 
 const KEY = Symbol('scope-door');

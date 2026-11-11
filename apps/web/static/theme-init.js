@@ -12,8 +12,11 @@
 (function () {
   try {
     var root = document.documentElement;
-    var theme = localStorage.getItem('hour_theme') || 'editorial-sobrio';
-    if (theme !== 'editorial-sobrio') root.setAttribute('data-theme', theme);
+    // One style (tarea 132): only the crash test `stress` is set by hand; a
+    // style that was removed is not applied, and its key goes.
+    var theme = localStorage.getItem('hour_theme');
+    if (theme === 'stress') root.setAttribute('data-theme', theme);
+    else if (theme) localStorage.removeItem('hour_theme');
     var saved = localStorage.getItem('hour_mode');
     var mode = saved === 'light' || saved === 'dark' ? saved : 'system';
     var dark =

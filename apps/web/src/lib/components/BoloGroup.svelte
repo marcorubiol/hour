@@ -15,8 +15,14 @@
    * 30 s; lo nuevo se marca leído al llegar al pie.
    *
    * Una pantalla, dos marcos: su página (`/h/[workspace]/group/[performanceId]`)
-   * y el segundo panel de la lista (`inPeek`).
+   * y el segundo panel de la lista (`inPeek`). En su página lleva la cabecera
+   * de ficha de todas (`RecordHead`, tarea 132): espacio › espectáculo ›
+   * el bolo, que vuelve al tablón › «Tablón del bolo»; en el panel, la de chat.
    */
+  import RecordHead from '$lib/components/RecordHead.svelte';
+  import { spaceCrumb, type Crumb } from '$lib/record-crumbs';
+  import { isGuestIn } from '$lib/workspace-role';
+  import type { NavWorkspace } from '$lib/nav';
   import { conversationsListHref } from '$lib/conversations-return.svelte';
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
@@ -134,6 +140,24 @@
         : { href: '/h', label: t('thread.back_home', locale) },
   );
 
+  // The record head's address (tarea 132). A guest of the space (here
+  // through the bolo) has no portada of it to go back to: named, not linked.
+  const workspacesQuery = createQuery({
+    queryKey: ['workspaces'],
+    queryFn: ({ signal }) =>
+      fetchJSON<{ items: Pick<NavWorkspace, 'slug' | 'name' | 'my_role'>[] }>('/api/workspaces', signal),
+  });
+  let crumbs = $derived.by<Crumb[]>(() => {
+    const slug = board?.workspace_slug ?? workspaceSlug;
+    const ws = ($workspacesQuery.data?.items ?? []).find((w) => w.slug === slug);
+    const space = spaceCrumb(ws?.name, slug);
+    const out: Crumb[] = [isGuestIn(ws) ? { ...space, href: undefined } : space];
+    if (project) out.push({ label: project.name, href: `/h/${slug}/project/${project.slug}/` });
+    if (board?.bolo) out.push({ label: [t('peek.crumb_bolo', locale), days].filter(Boolean).join(' '), href: boardHref ?? undefined });
+    out.push({ label: t('threads.board', locale) });
+    return out;
+  });
+
   let footEl = $state<HTMLElement>();
   markReadWhenSeen({
     target: () => footEl,
@@ -159,20 +183,7 @@
 </svelte:head>
 
 <section class="record group" data-chat-open={inPeek ? undefined : ''} data-testid="bolo-group">
-  <header class="group__head">
-    {#if !inPeek}
-      <a class="group__back" href={back.href} aria-label={back.label}>
-        <span aria-hidden="true">‹</span>
-      </a>
-    {/if}
-    <IdentityMark
-      accent={project ? accentVarFor(project) : accentVar(board?.bolo?.project_id)}
-      initials={project?.initials}
-      name={project?.name ?? name}
-      size="var(--chat-mono)"
-    />
-    <div class="group__who">
-      <h1 class="group__title">{title || t('threads.board', locale)}</h1>
+  {#snippet readersLine()}
       <!-- La línea de audiencia no se pliega nunca (ADR-083, enmienda §6). -->
       <p class="group__readers" data-testid="group-readers">
         {#if audience}
@@ -186,11 +197,39 @@
           &nbsp;
         {/if}
       </p>
-    </div>
-  </header>
+  {/snippet}
+  {#if inPeek}
+    <header class="group__head">
+      <IdentityMark
+        accent={project ? accentVarFor(project) : accentVar(board?.bolo?.project_id)}
+        initials={project?.initials}
+        name={project?.name ?? name}
+        size="var(--chat-mono)"
+      />
+      <div class="group__who">
+        <h1 class="group__title">{title || t('threads.board', locale)}</h1>
+        {@render readersLine()}
+      </div>
+    </header>
+  {:else}
+    <RecordHead {crumbs} title={title || t('threads.board', locale)}>
+      {#snippet mark()}
+        <IdentityMark
+          accent={project ? accentVarFor(project) : accentVar(board?.bolo?.project_id)}
+          initials={project?.initials}
+          name={project?.name ?? name}
+          size="var(--chat-mono)"
+        />
+      {/snippet}
+      {#snippet facts()}
+        {#if thread}{@render readersLine()}{/if}
+      {/snippet}
+    </RecordHead>
+  {/if}
   {#if board?.bolo}
     <p class="group__sub" data-testid="group-outside">
-      {#if project}<span>{project.name}</span>{/if}
+      <!-- On its own page the show is in the address already. -->
+      {#if project && inPeek}<span>{project.name}</span>{/if}
       <strong>{venue ? t('thread.group_outside', locale, { venue }) : t('thread.group_outside_none', locale)}</strong>
       {#if days}<span>{t('thread.bolo', locale)} {days}</span>{/if}
       {#if boardHref}<span><a href={boardHref}>{t('thread.open_bolo', locale)}</a></span>{/if}
@@ -199,11 +238,10 @@
 
   {#if $boardQuery.isLoading}
     <EmptyLine text={t('conversations.loading', locale)} busy />
-  {:else if $boardQuery.isError || !board?.bolo}
-    <EmptyLine text={t('thread.group_missing', locale)} />
-  {:else if !thread}
+  {:else if $boardQuery.isError || !board?.bolo || !thread}
     <!-- Ausente no es denegado: lo que no lees no se anuncia (ADR-106). -->
     <EmptyLine text={t('thread.group_missing', locale)} />
+    {#if !inPeek}<p class="group__away"><a class="link-arrow" href={back.href}>{back.label}</a></p>{/if}
   {:else}
     <div class="group__body">
       <!-- El grupo de WhatsApp atado a este bolo, en su General (ADR-189). -->
@@ -257,16 +295,9 @@
       padding-block-end: var(--space-s);
       border-block-end: var(--line-hairline) solid var(--border-color-light);
     }
-    .group__back {
-      display: none;
-      align-items: center;
-      justify-content: center;
-      min-inline-size: var(--touch-target);
-      min-block-size: var(--touch-target);
-      margin-inline-start: calc(-1 * var(--space-s));
-      color: var(--heading-color);
-      font-size: var(--text-l);
-      text-decoration: none;
+    .group__away {
+      margin: 0;
+      font-size: var(--text-s);
     }
     .group__who {
       display: flex;
@@ -323,11 +354,6 @@
     @container record (max-width: 47.999rem) {
       .group__title {
         font-size: var(--text-m);
-      }
-    }
-    @media (max-width: 47.999rem) {
-      .group__back {
-        display: inline-flex;
       }
     }
   }

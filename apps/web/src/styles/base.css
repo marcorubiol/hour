@@ -1512,6 +1512,30 @@
     }
     .dialog__actions {
       padding-block-end: max(var(--dialog-padding), env(safe-area-inset-bottom));
+      /* THE FOOT ON A PHONE (tarea 132): three words in a row did not fit
+         390, so each button broke its label in two («Borrar / función…»)
+         and the foot grew over the body. The side action takes its own line,
+         and «Cancelar» and the primary share the one under it, each whole. */
+      flex-wrap: wrap;
+      row-gap: var(--space-xs);
+    }
+    .dialog__actions > * {
+      white-space: nowrap;
+    }
+    .dialog__lead {
+      flex-basis: 100%;
+    }
+    .dialog__actions > :not(.dialog__lead) {
+      flex: 1 1 0;
+    }
+    /* The ask keeps its words on as many lines as they need. */
+    .dialog__lead.dialog__ask {
+      white-space: normal;
+    }
+    /* A field reached with the keyboard (or Tab on the phone's own) stops
+       above the foot, never under it. */
+    .dialog__panel {
+      scroll-padding-block-end: var(--dialog-foot-room);
     }
   }
 
@@ -2790,6 +2814,15 @@
 
   .text--dark-muted {
     color: var(--text-dark-muted);
+  }
+
+  /* A KEY IS A PROMISE OF A KEYBOARD (tarea 132): the hints that name one
+     («esc para cerrar», «↑↓ mover», «⌘↵», the C of calm) are not drawn
+     where the pointer is a finger. The shortcut itself keeps working. */
+  @media (pointer: coarse) {
+    .keys {
+      display: none;
+    }
   }
 
   .text--xs {

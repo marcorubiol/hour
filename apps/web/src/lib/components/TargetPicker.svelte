@@ -346,7 +346,8 @@
     {/each}
   </div>
 
-  <div class="tp__foot">
+  <!-- Keys only: not drawn without a keyboard (tarea 132). -->
+  <div class="tp__foot keys">
     <span><b>↑↓</b> {t('picker.hint_move', locale)}</span>
     <span><b>→</b> {t('picker.hint_in', locale)}</span>
     <span><b>←</b> {t('picker.hint_back', locale)}</span>

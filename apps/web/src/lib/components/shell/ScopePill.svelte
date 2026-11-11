@@ -18,6 +18,7 @@
    * focus back on the pill, unless the dialog hands over to the palette.
    */
   import { tick } from 'svelte';
+  import { sameSet, type Scope } from '$lib/stores/scopes.svelte';
   import ScopeGlyph from '$lib/components/ScopeGlyph.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { copyText } from '$lib/clipboard';
@@ -43,6 +44,36 @@
     person: 'planner.board_person_one',
   };
   const kindLabel = (kind: PinKind) => t(KIND_KEY[kind], locale);
+
+  /** The lists the rail used to hold (tarea 132). The scope on screen is
+      marked in Saved and left out of Recent (it is the tokens above). */
+  let saved = $derived(scopes.saved);
+  let recent = $derived(scopes.recent.filter((r) => !sameSet(r.tokens, pins.pins)));
+  let hasLists = $derived(saved.length > 0 || recent.length > 0);
+  /** Unscoped with nothing to list: the pill is the palette's door, as before. */
+  let opensDialog = $derived(label !== null || hasLists);
+
+  // Rename a saved scope in place.
+  const scopeKey = (sc: Scope) => sc.tokens.join(',');
+  let renaming = $state<string | null>(null);
+  let renameValue = $state('');
+  let renameEl: HTMLInputElement | undefined = $state();
+  async function startRename(sc: Scope) {
+    renaming = scopeKey(sc);
+    renameValue = sc.name;
+    await tick();
+    renameEl?.select();
+  }
+  function commitRename(sc: Scope) {
+    if (renaming !== scopeKey(sc)) return;
+    scopes.rename(sc.tokens, renameValue);
+    renaming = null;
+  }
+
+  function applyScope(sc: Scope) {
+    door.apply(sc);
+    close();
+  }
 
   let pillEl: HTMLButtonElement | undefined = $state();
   let dialogEl: HTMLDialogElement | undefined = $state();
@@ -77,12 +108,13 @@
   }
 
   function onPill() {
-    if (label === null) door.openPalette();
+    if (!opensDialog) door.openPalette();
     else void openDialog();
   }
 
   function handleClose() {
     open = false;
+    renaming = null;
     if (!handoff) pillEl?.focus();
     handoff = false;
   }
@@ -142,7 +174,7 @@
     ? t('shell.scope_door_aria', locale, { scope: everything })
     : t('shell.scope_pill_aria', locale, { scope: label })}
   aria-haspopup="dialog"
-  aria-expanded={label === null ? undefined : open}
+  aria-expanded={opensDialog ? open : undefined}
   title={label === null ? t('shell.everything_all', locale) : label}
   onclick={onPill}
 >
@@ -174,22 +206,72 @@
           >
         </span>
       {/each}
-      <button type="button" class="lensscope__add hit" onclick={add}>{t('shell.add', locale)}</button>
+      <button type="button" class="lensscope__add hit" onclick={add}
+        >{t(label === null ? 'shell.scope_narrow' : 'shell.add', locale)}</button
+      >
     </div>
-    <div class="lensscope__acts">
-      {#if door.exactSaved}
-        <button type="button" class="lensscope__act hit" onclick={() => scopes.remove(pins.pins)}
-          >× {t('shell.delete_scope', locale)}</button
-        >
-      {:else if door.isModified}
-        <button type="button" class="lensscope__act hit" onclick={door.update}>↺ {t('shell.scope_update', locale)}</button>
-        <button type="button" class="lensscope__act hit" onclick={door.save}>☆ {t('shell.save_new_scope', locale)}</button>
-      {:else}
-        <button type="button" class="lensscope__act hit" onclick={door.save}>☆ {t('shell.scope_save', locale)}</button>
-      {/if}
-      <button type="button" class="lensscope__act hit" onclick={copyLink}>{t('shell.copy_link', locale)}</button>
-      <button type="button" class="lensscope__act lensscope__clear hit" onclick={clear}>{t('shell.clear', locale)}</button>
-    </div>
+    {#if saved.length > 0}
+      <div class="lensscope__list">
+        <h3 class="lensscope__listhead">{t('shell.saved', locale)}</h3>
+        {#each saved as sc (scopeKey(sc))}
+          {#if renaming === scopeKey(sc)}
+            <input
+              class="lensscope__rename"
+              aria-label={t('shell.scope_rename_aria', locale)}
+              bind:this={renameEl}
+              bind:value={renameValue}
+              onblur={() => commitRename(sc)}
+              onkeydown={(e) => {
+                if (e.key === 'Enter') commitRename(sc);
+                else if (e.key === 'Escape') {
+                  // Esc leaves the rename, not the dialog.
+                  e.preventDefault();
+                  e.stopPropagation();
+                  renaming = null;
+                }
+              }}
+            />
+          {:else}
+            <button
+              type="button"
+              class="lensscope__row hit"
+              aria-current={sameSet(sc.tokens, pins.pins) ? 'true' : undefined}
+              title={t('shell.rename_hint', locale)}
+              onclick={() => applyScope(sc)}
+              ondblclick={() => void startRename(sc)}>{sc.name}</button
+            >
+          {/if}
+        {/each}
+      </div>
+    {/if}
+    {#if recent.length > 0}
+      <div class="lensscope__list">
+        <h3 class="lensscope__listhead">{t('shell.recent', locale)}</h3>
+        {#each recent as r (r.name + scopeKey(r))}
+          <button type="button" class="lensscope__row hit" onclick={() => applyScope(r)}>{r.name}</button>
+        {/each}
+      </div>
+    {/if}
+    {#if label !== null}
+      <div class="lensscope__acts">
+        {#if door.exactSaved}
+          {@const current = door.exactSaved}
+          <button type="button" class="lensscope__act hit" onclick={() => void startRename(current)}
+            >{t('shell.scope_rename', locale)}</button
+          >
+          <button type="button" class="lensscope__act hit" onclick={() => scopes.remove(pins.pins)}
+            >× {t('shell.delete_scope', locale)}</button
+          >
+        {:else if door.isModified}
+          <button type="button" class="lensscope__act hit" onclick={door.update}>↺ {t('shell.scope_update', locale)}</button>
+          <button type="button" class="lensscope__act hit" onclick={door.save}>☆ {t('shell.save_new_scope', locale)}</button>
+        {:else}
+          <button type="button" class="lensscope__act hit" onclick={door.save}>☆ {t('shell.scope_save', locale)}</button>
+        {/if}
+        <button type="button" class="lensscope__act hit" onclick={copyLink}>{t('shell.copy_link', locale)}</button>
+        <button type="button" class="lensscope__act lensscope__clear hit" onclick={clear}>{t('shell.clear', locale)}</button>
+      </div>
+    {/if}
   </div>
 </dialog>
 
@@ -303,6 +385,58 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-s);
+  }
+  /* The rail's lists, brought here (tarea 132): a small head in the dialog's
+     own label voice, then one row per scope. */
+  .lensscope__list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--line-hairline);
+  }
+  .lensscope__listhead {
+    margin: 0 0 var(--space-2xs);
+    /* On the rows' text, which sits inside their hover ground. */
+    padding-inline: var(--space-xs);
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
+    font-weight: 400;
+    color: var(--text-faint);
+  }
+  .lensscope__row,
+  .lensscope__rename {
+    inline-size: 100%;
+    padding: var(--space-xs);
+    border-radius: var(--radius-m);
+    font-family: var(--font-sans);
+    font-size: var(--text-s);
+    text-align: start;
+  }
+  .lensscope__row {
+    overflow: hidden;
+    border: 0;
+    background: transparent;
+    color: var(--text-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      background var(--transition),
+      color var(--transition);
+  }
+  .lensscope__row:hover {
+    background: color-mix(in oklch, var(--text-color) 5%, transparent);
+    color: var(--text-color);
+  }
+  .lensscope__row[aria-current='true'] {
+    background: var(--bg-ultra-light);
+    color: var(--text-color);
+    box-shadow: 0 0 0 var(--line-hairline) var(--border-color-dark);
+  }
+  .lensscope__rename {
+    border: var(--line-hairline) solid var(--field-border-color-focus);
+    background: var(--bg-ultra-light);
+    color: var(--text-color);
+    outline: none;
   }
   .lensscope__acts {
     display: flex;

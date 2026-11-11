@@ -1,18 +1,25 @@
 <script lang="ts">
   /**
-   * Sign-in page — editorial split layout (design system v0.5, ADR-033).
+   * The door — editorial split layout (design system v0.5, ADR-033): the form
+   * on the left, the brand's promise on the right.
    *
-   * Left column carries the form, right column carries brand promise + a
-   * static "this week" preview card. The preview is hardcoded — it's
-   * illustrative (the design says "v0.4 prototype") and shouldn't carry the
-   * cost of fetching real conversations before auth.
+   * Four modes on one page (tarea 132), so the frame is drawn once:
+   *   signin   the default
+   *   signup   `?mode=signup`, only for whoever arrives with an invitation:
+   *            the link to it is no longer offered to everyone
+   *   recover  `?mode=recover`, «¿Olvidaste la contraseña?»: Supabase mails a
+   *            link back here (`/api/auth/recover`)
+   *   reset    `?mode=reset`, where that link lands: the new password, then in
+   *            (`/api/auth/reset`). The link carries `token_hash` in the query
+   *            (our template) or a session in the fragment (Supabase's default)
+   * No illustrative card and no «Fase 0»: the door says only true things.
    */
 
   import { docTitle } from '$lib/doc-title';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
-  import { chooseLocale, LOCALE_NAME, LOCALE_TAG, LOCALES, loadLocale, t, type Locale } from '$lib/i18n';
+  import { chooseLocale, LOCALE_NAME, LOCALES, loadLocale, t, type Locale } from '$lib/i18n';
   import Segmented from '$lib/components/Segmented.svelte';
   import { ensureSession, setSessionUser, type SessionUser } from '$lib/session.svelte';
   import BrandMark from '$lib/components/BrandMark.svelte';
@@ -29,14 +36,15 @@
     locale = next;
   }
 
-  /** The preview card's illustrative day, in the door's language. */
-  const PREVIEW_DAY = new Date(2026, 4, 18);
-  let previewDay = $derived(
-    `${new Intl.DateTimeFormat(LOCALE_TAG[locale], { weekday: 'short' }).format(PREVIEW_DAY)} · ${new Intl.DateTimeFormat(LOCALE_TAG[locale], { day: 'numeric', month: 'short' }).format(PREVIEW_DAY)}`,
-  );
-
   /** After signing in: Hoy (ADR-137), unless `?next=` says where. */
   const HOME = '/h/desk';
+
+  type Mode = 'signin' | 'signup' | 'recover' | 'reset';
+  let mode = $derived.by<Mode>(() => {
+    const m = page.url.searchParams.get('mode');
+    return m === 'signup' || m === 'recover' || m === 'reset' ? m : 'signin';
+  });
+  let isSignup = $derived(mode === 'signup');
 
   let email = $state('');
   let password = $state('');
@@ -44,7 +52,14 @@
   let submitting = $state(false);
   let errorMsg = $state('');
   let confirmationRequired = $state(false);
-  let isSignup = $derived(page.url.searchParams.get('mode') === 'signup');
+  /** recover: the request went out (the same answer for any address). */
+  let recoverSent = $state(false);
+  /** reset: what the mail's link carried. */
+  let fragmentTokens = $state<{ access_token: string; refresh_token: string } | null>(null);
+  let fragmentError = $state(false);
+  let tokenHash = $derived(page.url.searchParams.get('token_hash'));
+  let resetUsable = $derived(Boolean(tokenHash || fragmentTokens) && !fragmentError);
+
   let nextPath = $derived.by(() => {
     const candidate = page.url.searchParams.get('next');
     // Same-origin path only. Reject protocol-relative ('//host') AND
@@ -53,23 +68,47 @@
     // internal-navigation guard.
     return candidate && /^\/(?![/\\])/.test(candidate) ? candidate : HOME;
   });
-  let alternateHref = $derived(
-    `/login?${new URLSearchParams({
-      ...(isSignup ? {} : { mode: 'signup' }),
+  function modeHref(m: Mode): string {
+    return `/login?${new URLSearchParams({
+      ...(m === 'signin' ? {} : { mode: m }),
       ...(nextPath !== HOME ? { next: nextPath } : {}),
-    }).toString()}`,
-  );
+    }).toString()}`;
+  }
 
   // The button waits for this (see the form's comment below).
   let hydrated = $state(false);
 
   onMount(async () => {
     hydrated = true;
+    if (mode === 'reset') {
+      // Supabase's default link leaves the session (or its error) in the
+      // fragment. Read it once and take it off the address bar.
+      const h = new URLSearchParams(location.hash.slice(1));
+      if (h.get('error') || h.get('error_code')) fragmentError = true;
+      const at = h.get('access_token');
+      const rt = h.get('refresh_token');
+      if (at && rt) fragmentTokens = { access_token: at, refresh_token: rt };
+      if (location.hash) history.replaceState(history.state, '', location.pathname + location.search);
+      // Someone already in who opens a reset link still sets the password.
+      return;
+    }
     // Already signed in (httpOnly cookie — only the server can tell).
     if (await ensureSession()) {
       goto(nextPath, { replaceState: true });
     }
   });
+
+  function errorKey(error: string | undefined): string {
+    if (error === 'rate_limited') return 'login.rate_limited';
+    if (error === 'auth_unavailable') return 'login.auth_unavailable';
+    if (error === 'link_expired') return 'login.link_expired';
+    if (error === 'password_rejected') return 'login.password_rejected';
+    return 'login.invalid_credentials';
+  }
+
+  async function post(url: string, body: unknown): Promise<Response> {
+    return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  }
 
   async function handleSubmit(e: Event) {
     e.preventDefault();
@@ -77,32 +116,48 @@
     submitting = true;
 
     try {
+      if (mode === 'recover') {
+        const res = await post('/api/auth/recover', { email });
+        if (!res.ok) {
+          const body = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(t(body.error === 'rate_limited' ? 'login.rate_limited' : 'login.auth_unavailable', locale));
+        }
+        recoverSent = true;
+        submitting = false;
+        return;
+      }
+      if (mode === 'reset') {
+        const res = await post(
+          '/api/auth/reset',
+          tokenHash ? { token_hash: tokenHash, password } : { ...fragmentTokens, password },
+        );
+        const body = (await res.json().catch(() => ({}))) as { error?: string; user?: SessionUser | null };
+        if (!res.ok) {
+          if (body.error === 'link_expired') fragmentError = true;
+          throw new Error(t(errorKey(body.error), locale));
+        }
+        await setSessionUser(body.user ?? null);
+        goto(nextPath, { replaceState: true });
+        return;
+      }
+
       // Worker-mediated sign-in (Phase 0.9): the password grant runs
       // server-side and the session lands as httpOnly cookies — tokens
       // never touch JS or localStorage.
-      const res = await fetch(isSignup ? '/api/auth/signup' : '/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(
-          isSignup ? { full_name: fullName, email, password } : { email, password },
-        ),
-      });
+      const res = await post(
+        isSignup ? '/api/auth/signup' : '/api/auth/login',
+        isSignup ? { full_name: fullName, email, password } : { email, password },
+      );
 
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
-        const key =
-          body.error === 'rate_limited'
-            ? 'login.rate_limited'
-            : body.error === 'auth_unavailable'
-              ? 'login.auth_unavailable'
-              : 'login.invalid_credentials';
         throw new Error(
           isSignup && body.error === 'signup_rejected'
             ? // Deliberately generic — do not confirm whether the address is
               // already registered (email-enumeration oracle). Point existing
               // users at sign-in without asserting the account exists.
               t('login.signup_rejected', locale)
-            : t(key, locale),
+            : t(errorKey(body.error), locale),
         );
       }
 
@@ -120,14 +175,44 @@
 
       goto(nextPath, { replaceState: true });
     } catch (err) {
-      errorMsg = err instanceof Error ? err.message : t('login.invalid_credentials', locale);
+      // A dead network is not «wrong password» (tarea 132).
+      errorMsg =
+        err instanceof TypeError ? t('ui.no_connection', locale) : err instanceof Error ? err.message : t('login.invalid_credentials', locale);
       submitting = false;
     }
   }
+
+  const KICKER: Record<Mode, string> = {
+    signin: 'login.submit',
+    signup: 'login.signup_kicker',
+    recover: 'login.recover_kicker',
+    reset: 'login.reset_kicker',
+  };
+  const TITLE: Record<Mode, [string, string]> = {
+    signin: ['login.title_signin_a', 'login.title_signin_b'],
+    signup: ['login.title_signup_a', 'login.title_signup_b'],
+    recover: ['login.recover_title_a', 'login.recover_title_b'],
+    reset: ['login.recover_title_a', 'login.recover_title_b'],
+  };
+  const SUB: Record<Mode, string> = {
+    signin: 'login.sub_signin',
+    signup: 'login.sub_signup',
+    recover: 'login.recover_sub',
+    reset: 'login.reset_sub',
+  };
+  let submitLabel = $derived(
+    mode === 'recover'
+      ? t(submitting ? 'login.recover_sending' : 'login.recover_submit', locale)
+      : mode === 'reset'
+        ? t(submitting ? 'login.reset_saving' : 'login.reset_submit', locale)
+        : submitting
+          ? t(isSignup ? 'login.creating' : 'login.signing_in', locale)
+          : t(isSignup ? 'login.create' : 'login.submit', locale),
+  );
 </script>
 
 <svelte:head>
-  <title>{docTitle(t(isSignup ? 'login.signup_kicker' : 'login.submit', locale))}</title>
+  <title>{docTitle(t(KICKER[mode], locale))}</title>
 </svelte:head>
 
 <main class="login" lang={locale}>
@@ -137,97 +222,112 @@
     </header>
 
     <div class="login__center">
-      <span class="eyebrow login__kicker">{t(isSignup ? 'login.signup_kicker' : 'login.submit', locale)}</span>
+      <span class="eyebrow login__kicker">{t(KICKER[mode], locale)}</span>
       <h1 class="login__title">
-        {t(isSignup ? 'login.title_signup_a' : 'login.title_signin_a', locale)}
-        <em>{t(isSignup ? 'login.title_signup_b' : 'login.title_signin_b', locale)}</em>
+        {t(TITLE[mode][0], locale)}
+        <em>{t(TITLE[mode][1], locale)}</em>
       </h1>
-      <p class="login__sub">
-        {t(isSignup ? 'login.sub_signup' : 'login.sub_signin', locale)}
-      </p>
+      <p class="login__sub">{t(SUB[mode], locale)}</p>
 
-      <!-- method="post" is the safety net, not the path: handleSubmit
-           preventDefaults and posts JSON to /api/auth/login. But the button is
-           live in the SSR'd HTML before hydration, and a submit in that window
-           runs the browser's native default — which without this attribute is
-           GET, i.e. the password lands in the query string (history, access
-           logs, Referer). POST keeps it in the body; the route has no form
-           action, so it dead-ends at 405 instead of leaking. And so the 405 is
-           never reached, the button stays disabled until the page has
-           hydrated: on a slow network a person (and the E2E's logins,
-           2026-10-24) pressed it in that window and landed on «405 Method Not
-           Allowed». What was typed before is kept: bind:value reads it in. -->
-      <form class="login__form" method="post" onsubmit={handleSubmit}>
-        {#if isSignup}
-          <label class="login__field">
-            <span class="eyebrow login__label">{t('login.full_name', locale)}</span>
-            <input
-              type="text"
-              name="full_name"
-              autocomplete="name"
-              placeholder={t('login.full_name_placeholder', locale)}
-              required
-              minlength="2"
-              bind:value={fullName}
-            />
-          </label>
-        {/if}
-        <label class="login__field">
-          <span class="eyebrow login__label">{t('login.email', locale)}</span>
-          <!-- svelte-ignore a11y_autofocus -->
-          <input
-            
-            type="email"
-            name="email"
-            autocomplete="email"
-            placeholder={t('login.email_placeholder', locale)}
-            required
-            autofocus={!isSignup}
-            bind:value={email}
-          />
-        </label>
+      {#if mode === 'reset' && hydrated && !resetUsable}
+        <!-- The link spent or expired: say so, and the way to another. -->
+        <p class="login__error" role="alert">{t('login.link_expired', locale)}</p>
+        <p class="login__alternate"><a href={modeHref('recover')}>{t('login.ask_again', locale)}</a></p>
+      {:else if mode === 'recover' && recoverSent}
+        <p class="login__notice" role="status">{t('login.recover_sent', locale, { email })}</p>
+        <p class="login__alternate"><a href={modeHref('signin')}>{t('login.back_signin', locale)}</a></p>
+      {:else}
+        <!-- method="post" is the safety net, not the path: handleSubmit
+             preventDefaults and posts JSON to /api/auth/*. But the button is
+             live in the SSR'd HTML before hydration, and a submit in that window
+             runs the browser's native default — which without this attribute is
+             GET, i.e. the password lands in the query string (history, access
+             logs, Referer). POST keeps it in the body; the route has no form
+             action, so it dead-ends at 405 instead of leaking. And so the 405 is
+             never reached, the button stays disabled until the page has
+             hydrated: on a slow network a person (and the E2E's logins,
+             2026-10-24) pressed it in that window and landed on «405 Method Not
+             Allowed». What was typed before is kept: bind:value reads it in. -->
+        <form class="login__form" method="post" onsubmit={handleSubmit}>
+          {#if isSignup}
+            <label class="login__field">
+              <span class="eyebrow login__label">{t('login.full_name', locale)}</span>
+              <input
+                type="text"
+                name="full_name"
+                autocomplete="name"
+                placeholder={t('login.full_name_placeholder', locale)}
+                required
+                minlength="2"
+                bind:value={fullName}
+              />
+            </label>
+          {/if}
+          {#if mode !== 'reset'}
+            <label class="login__field">
+              <span class="eyebrow login__label">{t('login.email', locale)}</span>
+              <!-- svelte-ignore a11y_autofocus -->
+              <input
+                type="email"
+                name="email"
+                autocomplete="email"
+                placeholder={t('login.email_placeholder', locale)}
+                required
+                autofocus={mode === 'signin' || mode === 'recover'}
+                bind:value={email}
+              />
+            </label>
+          {/if}
 
-        <label class="login__field">
-          <span class="eyebrow login__label">{t('login.password', locale)}</span>
-          <input
-            
-            type="password"
-            name="password"
-            autocomplete={isSignup ? 'new-password' : 'current-password'}
-            placeholder="••••••••"
-            required
-            minlength={isSignup ? 10 : undefined}
-            bind:value={password}
-          />
-        </label>
+          {#if mode !== 'recover'}
+            <!-- No placeholder: dots in an empty field read as a password
+                 already typed (tarea 132). -->
+            <label class="login__field">
+              <span class="eyebrow login__label"
+                >{t(mode === 'reset' ? 'login.reset_kicker' : 'login.password', locale)}</span
+              >
+              <!-- svelte-ignore a11y_autofocus -->
+              <input
+                type="password"
+                name="password"
+                autocomplete={isSignup || mode === 'reset' ? 'new-password' : 'current-password'}
+                required
+                autofocus={mode === 'reset'}
+                minlength={isSignup || mode === 'reset' ? 10 : undefined}
+                bind:value={password}
+              />
+            </label>
+          {/if}
 
-        {#if confirmationRequired}
-          <p class="login__notice" role="status">
-            {t('login.confirm_notice', locale, { email })}
-          </p>
-        {/if}
+          {#if confirmationRequired}
+            <p class="login__notice" role="status">
+              {t('login.confirm_notice', locale, { email })}
+            </p>
+          {/if}
 
-        {#if errorMsg}
-          <p class="login__error" role="alert">{errorMsg}</p>
-        {/if}
+          {#if errorMsg}
+            <p class="login__error" role="alert">{errorMsg}</p>
+          {/if}
 
-        <button class="btn--primary login__submit" type="submit" disabled={!hydrated || submitting}>
-          <span>
-            {submitting
-              ? t(isSignup ? 'login.creating' : 'login.signing_in', locale)
-              : t(isSignup ? 'login.create' : 'login.submit', locale)}
-          </span>
-          <span class="login__submit-arrow" aria-hidden="true">→</span>
-        </button>
-      </form>
-      <p class="login__alternate">
-        {t(isSignup ? 'login.have_account' : 'login.via_invite', locale)}
-        <a href={alternateHref}>{t(isSignup ? 'login.submit' : 'login.create_one', locale)}</a>
-      </p>
+          <button class="btn--primary login__submit" type="submit" disabled={!hydrated || submitting}>
+            <span>{submitLabel}</span>
+            <span class="login__submit-arrow" aria-hidden="true">→</span>
+          </button>
+        </form>
+        <p class="login__alternate">
+          {#if mode === 'signin'}
+            <a href={modeHref('recover')}>{t('login.forgot', locale)}</a>
+          {:else if isSignup}
+            {t('login.have_account', locale)}
+            <a href={modeHref('signin')}>{t('login.submit', locale)}</a>
+          {:else}
+            <a href={modeHref('signin')}>{t('login.back_signin', locale)}</a>
+          {/if}
+        </p>
+      {/if}
     </div>
 
     <footer class="login__foot">
-      <span>{t('login.phase', locale)}</span>
       <Segmented
         options={localeOptions}
         value={locale}
@@ -244,39 +344,6 @@
       <p class="login__quote-text">
         {t('login.quote_a', locale)} <em>{t('login.quote_b', locale)}</em>
       </p>
-      <div class="login__quote-attr">{t('login.quote_attr', locale)}</div>
-    </div>
-
-    <div class="login__preview">
-      <div class="login__preview-head">
-        <span class="login__preview-dot" style="background: var(--accent-1)"></span>
-        <span class="login__preview-name">{t('login.preview_week', locale)}</span>
-        <span class="login__preview-day">{previewDay}</span>
-      </div>
-      <div class="login__preview-item">
-        <span class="login__preview-kind">{t('login.preview_kind_task', locale)}</span>
-        <span class="login__preview-verb">{t('login.preview_confirm', locale)}</span>
-        <span class="login__preview-subj">{t('login.preview_hotel', locale)}</span>
-        <span class="login__preview-proj">mamemi</span>
-      </div>
-      <div class="login__preview-item">
-        <span class="login__preview-kind login__preview-kind--wait">{t('login.preview_kind_wait', locale)}</span>
-        <span class="login__preview-verb">Ruth Schmidli</span>
-        <span class="login__preview-subj">{t('login.preview_fee', locale)}</span>
-        <span class="login__preview-proj">mamemi</span>
-      </div>
-      <div class="login__preview-item">
-        <span class="login__preview-kind login__preview-kind--event">{t('login.preview_kind_event', locale)}</span>
-        <span class="login__preview-verb">{t('login.preview_mix', locale)}</span>
-        <span class="login__preview-subj">{t('login.preview_session', locale)}</span>
-        <span class="login__preview-proj">marco rubiol</span>
-      </div>
-      <div class="login__preview-item">
-        <span class="login__preview-kind login__preview-kind--money">{t('login.preview_kind_money', locale)}</span>
-        <span class="login__preview-verb">{t('login.preview_chase', locale)}</span>
-        <span class="login__preview-subj">{t('login.preview_residency', locale)}</span>
-        <span class="login__preview-proj">marco rubiol</span>
-      </div>
     </div>
   </aside>
 </main>
@@ -295,7 +362,8 @@
       .login {
         grid-template-columns: 1fr;
       }
-      .login__right {
+      /* Over the panel's own `display: grid`, declared further down. */
+      .login .login__right {
         display: none;
       }
     }
@@ -387,12 +455,14 @@
     }
 
     .login__alternate {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-xs);
       margin-block: var(--space-m) 0;
       color: var(--text-faint);
       font-size: var(--text-s);
     }
     .login__alternate a {
-      margin-inline-start: 0.35rem;
       color: var(--text-color);
       text-underline-offset: 0.2em;
     }
@@ -415,7 +485,7 @@
 
     .login__foot {
       display: flex;
-      justify-content: space-between;
+      justify-content: flex-end;
       align-items: center;
       gap: var(--space-s);
       font-size: var(--text-xs);
@@ -423,15 +493,13 @@
       flex-wrap: wrap;
     }
 
-    /* ── right: brand promise + preview ── */
+    /* ── right: brand promise ── */
 
     .login__right {
       background: var(--bg-light);
       border-inline-start: var(--line-hairline) solid var(--border-color-light);
       padding: clamp(var(--space-l), 4vw, var(--space-xxl));
       display: grid;
-      grid-template-rows: 1fr auto;
-      gap: var(--space-s);
       min-block-size: 0;
       position: relative;
       overflow: hidden;
@@ -478,103 +546,6 @@
     .login__quote-text em {
       font-style: italic;
       color: var(--text-muted);
-    }
-
-    .login__quote-attr {
-      margin-block-start: var(--space-m);
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      font-family: var(--font-mono);
-      letter-spacing: var(--tracking-s);
-    }
-
-    .login__preview {
-      background: var(--bg-ultra-light);
-      border: var(--line-hairline) solid var(--border-color-light);
-      border-radius: var(--radius-l);
-      padding: var(--space-m) var(--space-l);
-      box-shadow: var(--box-shadow-2);
-      max-inline-size: 27.5rem;
-    }
-
-    .login__preview-head {
-      display: flex;
-      align-items: center;
-      gap: var(--space-s);
-      margin-block-end: var(--space-m);
-      padding-block-end: var(--space-s);
-      border-block-end: var(--line-hairline) solid var(--border-color-light);
-    }
-
-    .login__preview-dot {
-      inline-size: var(--dot-l);
-      block-size: var(--dot-l);
-      border-radius: 50%;
-    }
-
-    .login__preview-name {
-      font-family: var(--font-display);
-      font-size: var(--text-m);
-      font-weight: 500;
-      letter-spacing: var(--heading-letter-spacing);
-      color: var(--text-color);
-    }
-
-    .login__preview-day {
-      margin-inline-start: auto;
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--tracking-l);
-      text-transform: uppercase;
-      color: var(--text-faint);
-    }
-
-    .login__preview-item {
-      display: grid;
-      grid-template-columns: 4rem auto minmax(0, 1fr) auto;
-      gap: var(--space-s);
-      align-items: baseline;
-      padding-block: var(--space-xs);
-      font-size: var(--text-xs);
-    }
-    .login__preview-item + .login__preview-item {
-      border-block-start: var(--line-hairline) solid var(--border-color-light);
-    }
-
-    .login__preview-kind {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      letter-spacing: var(--tracking-s);
-      text-transform: uppercase;
-    }
-    .login__preview-kind--wait {
-      color: var(--text-faint);
-      font-style: italic;
-    }
-    .login__preview-kind--event {
-      color: var(--success);
-    }
-    .login__preview-kind--money {
-      color: var(--warning);
-    }
-
-    .login__preview-verb {
-      color: var(--text-color);
-      font-weight: 500;
-    }
-    .login__preview-subj {
-      color: var(--text-muted);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .login__preview-proj {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      text-transform: lowercase;
-      letter-spacing: var(--tracking-s);
     }
   }
 </style>
