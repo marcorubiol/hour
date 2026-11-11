@@ -11,10 +11,6 @@
 Detalle de cada punto: `build/coordination/STATUS.md` (fuera de git) y los informes de propuestas. Orden sugerido: lo que
 no pide migración primero; las migraciones juntas por el gate de § 34.
 
-- [ ] 95 contract: borrar `performance.readiness`, `line.modules`, `line.dossier_url`, `project.dossier_url`,
-  `project.poster_url` (destructiva: staging e inspect). Marco, 2026-11-10: hacerlo ya, sin esperar a la beta.
-- [ ] 129 Planner: vista de entrada por persona (Marco, 2026-11-10, opción D): cada membresía guarda la vista del
-  Planner en la que abre, junto a `membership.view_scope`. Migración por § 34, junto con la del 95.
 - [ ] 98 invitar, al público y a profesionales: decidido (ADR-173, ADR-174, ADR-175, `build/plans/2026-11-01-audience.md`); fases 1 a 3 (esquema, alta pública, listas, importación, invitaciones) en producción desde 2026-11-02 (`49ffb30c`). Queda la fase 4 (envío real por SES); la 5, el editor, en producción desde 2026-11-08 (99, ADR-190).
 - [ ] 118 de un vistazo: el primer día como lista de difusión («Sin contactar 150», una frase «empieza por una zona» que se va al escribir a alguien, «Seleccionar todas» y «Escribir a N» con un filtro). Después de 119.
 - [ ] 119 Marco: hacer: enseñar la gramática y la lista con las 152 filas reales a Anouk y a alguien de producción, antes del 118.
@@ -152,7 +148,7 @@ no pide migración primero; las migraciones juntas por el gate de § 34.
 ## Decisiones con coste o autoridad externa
 
 - [ ] Marco: hacer — **Recorrer la app él mismo antes de invitar a Anouk** (Marco, 10-10); después, pasar su email para invitarla a `muk-cia`.
-9. [ ] **Pasar `hour-phase0` a Supabase Pro (25 $/mes) antes de la beta; después el coordinador activa HIBP y corre el advisor.** Marco, 2026-11-02: tampoco Workers Paid por ahora (5 crons por cuenta en Free; la purga del público va dentro del cron de 10 min); se mira junto a este punto. Marco, 2026-10-10: Pro antes de la beta, pero **aún no**; sigue en Free con el keepalive diario. El proyecto está en plan
+9. [ ] **Pasar `hour-phase0` a Supabase Pro (25 $/mes) antes de la beta; después el coordinador activa HIBP y corre el advisor.** Dato 2026-11-10: la base Free se colgó (auth 522, sin conexiones, logs mudos de 18:02 a la mañana siguiente) tras dos tandas RLS enteras seguidas; el panel decía ACTIVE_HEALTHY; volvió con «Restart project». Hasta Pro: una sola tanda RLS entera por gate, reintentos por fichero. Marco, 2026-11-02: tampoco Workers Paid por ahora (5 crons por cuenta en Free; la purga del público va dentro del cron de 10 min); se mira junto a este punto. Marco, 2026-10-10: Pro antes de la beta, pero **aún no**; sigue en Free con el keepalive diario. El proyecto está en plan
    Free y la función requiere Pro. Marco debe decidir el upgrade; después activar
    `password_hibp_enabled` y volver a ejecutar el advisor. **Ojo: el upgrade que
    pide esta tarea resuelve también la § 33**, así que las dos son la misma
