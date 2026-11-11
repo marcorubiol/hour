@@ -1,7 +1,7 @@
 /**
  * Scopes store — saved scopes + recents (Scope v2 nav). A "scope" is a named
  * bundle of pins (the same `s:`/`p:`/`l:` tokens the PinsStore holds). The
- * sidebar surfaces these as one-click destinations; applying one just sets
+ * scope pill's dialog surfaces these (ADR-193 § 1); applying one just sets
  * `pins.pins = scope.tokens`. This is the D-PRE-05 "Master View" / saved-views
  * ceiling made concrete (structure-model.md § persona-fit): named token
  * bundles, never a per-card view builder.
@@ -13,8 +13,8 @@
  *     Every apply only bumps its invisible lastUsedAt; when the list is
  *     full, the least recently USED entry falls, wherever it sits.
  *
- * "Everything" (empty tokens) and the per-space scopes are derived in the
- * sidebar from the live `['workspaces']` cache — not stored here — so a
+ * "Everything" (empty tokens) and the per-space scopes are derived where
+ * they are drawn, from the live `['workspaces']` cache — not stored here — so a
  * renamed/removed space never leaves stale text baked into localStorage.
  * Class + context (not module $state) so SSR never leaks between users.
  */

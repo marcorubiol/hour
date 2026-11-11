@@ -1,14 +1,14 @@
 {
   "name": "Hour",
   "short_name": "Hour",
-  "description": "Live performing arts management — held together, one hour at a time.",
+  "description": "Gestión de compañías de artes en vivo: todo junto, hora a hora.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#f7f5ef",
   "theme_color": "#f7f5ef",
-  "lang": "en",
+  "lang": "es",
   "icons": [
     {
       "src": "/icon.svg",

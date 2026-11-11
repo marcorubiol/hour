@@ -9,8 +9,7 @@
    * is shareable and the sidebar nav stays in sync.
    *
    * Only controls that keep what you set are drawn. Notifications, Billing
-   * and Danger zone are hidden until they save (see SettingsNav); Master
-   * View, the one real switch of Notifications, lives in Profile.
+   * and Danger zone are hidden until they save (see SettingsNav).
    *
    * Each section's markup, local state and section-specific styles live in
    * $lib/components/settings/*Section.svelte. This page keeps the section

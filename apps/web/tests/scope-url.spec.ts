@@ -157,7 +157,7 @@ test('a scope change on a person opened from Conversations lands back on Convers
 
   // Off a lens there is no pill (ADR-152) and, since tarea 132, no rail of
   // scopes: the scope changes from the search, «narrow» on the space's row.
-  await page.getByRole('button', { name: 'Search or jump to a project or line' }).click();
+  await page.getByRole('button', { name: 'Search or jump to a show or line' }).click();
   const search = page.getByRole('dialog', { name: 'Search' });
   await search.getByRole('textbox').fill('playwright');
   await search.getByRole('button', { name: /^Show only .*playwright/i }).first().click();

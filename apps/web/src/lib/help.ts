@@ -50,8 +50,6 @@ export const CONCEPTS = [
   'roadsheet',
   'lines',
   'trade',
-  'reading',
-  'outside',
   'mailboxes',
   'known',
 ] as const;

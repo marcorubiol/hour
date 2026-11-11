@@ -71,7 +71,7 @@ test.describe('line detail: the kind\'s modules', () => {
       const dialog = page.locator('dialog[open]');
       await expect(dialog).toBeVisible();
       await dialog.getByRole('radio', { name: /Booking/ }).click();
-      await dialog.getByLabel('Project').selectOption({ label: 'ZZZ e2e collab' });
+      await dialog.getByLabel('Show').selectOption({ label: 'ZZZ e2e collab' });
       await dialog.getByLabel('Name').fill(LINE_NAME);
       await dialog.getByRole('button', { name: /create/i }).click();
       await page.waitForURL(/\/line\//, { timeout: 15_000 });
@@ -124,7 +124,7 @@ test.describe('line detail: the kind\'s modules', () => {
     // A next step long past: the line's «Falta» names it (ADR-139 § 2). It
     // lives folded under «More».
     await dialog.getByRole('button', { name: /^More/ }).click();
-    await dialog.getByLabel('Next action', { exact: true }).fill('2020-01-06');
+    await dialog.getByLabel('Next step', { exact: true }).fill('2020-01-06');
     await dialog.getByRole('button', { name: 'Add conversation' }).click();
     await expect(dialog).not.toBeVisible({ timeout: 10_000 });
 

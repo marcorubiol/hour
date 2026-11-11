@@ -37,7 +37,7 @@
   <Input label={t('conversations.not_now_back', locale)} type="date" bind:value={until} />
   {#snippet actions()}
     <Button variant="quiet" onclick={() => (open = false)}>{t('create.cancel', locale)}</Button>
-    <Button onclick={save}>{t('blackout.save', locale)}</Button>
+    <Button onclick={save}>{t('ui.save', locale)}</Button>
   {/snippet}
 </Dialog>
 

@@ -158,7 +158,7 @@
   {/if}
 
   {#if sheet.venue || sheet.venue_name}
-    <section class="rsv__section" aria-label={t('create.venue', locale)} data-testid="roadsheet-where">
+    <section class="rsv__section" aria-label={t('perf.venue', locale)} data-testid="roadsheet-where">
       <div class="rsv__venue">
         <strong>{place || (sheet.venue?.name ?? sheet.venue_name)}</strong>
         {#if call}

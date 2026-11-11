@@ -188,7 +188,7 @@
 
   {#snippet actions()}
     <Button variant="quiet" disabled={$save.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
-    <Button loading={$save.isPending} onclick={() => formEl?.requestSubmit()}>{t('blackout.save', locale)}</Button>
+    <Button loading={$save.isPending} onclick={() => formEl?.requestSubmit()}>{t('ui.save', locale)}</Button>
   {/snippet}
 </Dialog>
 

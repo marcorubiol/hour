@@ -189,7 +189,7 @@
   onclick={handleBackdrop}
 >
   <div class="dialog__panel lensscope__panel">
-    <h2 class="lensscope__head" id={headId} tabindex="-1" bind:this={headEl}>{t('planner.lanes_scope', locale)}</h2>
+    <h2 class="lensscope__head" id={headId} tabindex="-1" bind:this={headEl}>{t('shell.scope_title', locale)}</h2>
     <div class="lensscope__toks">
       {#each pins.pins as tok (tok)}
         <span class="tok tok--{door.tokenKind(tok)}">

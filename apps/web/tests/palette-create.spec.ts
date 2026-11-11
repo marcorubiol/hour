@@ -41,7 +41,7 @@ test.describe('⌘K creates (ADR-139)', () => {
     await expect(dialog.getByLabel('What', { exact: true })).toHaveValue(title);
     await expect(dialog.locator('[data-chip="type"]')).toContainText('Rehearsal');
     await dialog.locator('[data-chip="owner"]').click();
-    await dialog.getByLabel('Project', { exact: true }).selectOption({ label: 'ZZZ e2e collab' });
+    await dialog.getByLabel('Show', { exact: true }).selectOption({ label: 'ZZZ e2e collab' });
     await dialog.locator('[data-chip="when"]').click();
     await dialog.getByLabel('Day', { exact: true }).fill(today);
     await dialog.getByRole('button', { name: 'Add', exact: true }).click();
