@@ -22,6 +22,23 @@ no pide migración primero; las migraciones juntas por el gate de § 34.
 - [x] 125 buscar frente a acotar (Marco, 2026-11-05; enmienda ADR-152; hecho en ADR-178, sin E2E): hoy la barra «Buscar o saltar a un proyecto o línea…» y la píldora «Todo» abren la misma paleta vacía y las dos acotan el ámbito; ninguna salta. Como el estándar (Linear, GitHub, Notion): la barra busca de verdad y elegir un proyecto o una línea abre su ficha, con «acotar» como acción secundaria dentro de la paleta; la píldora abre la paleta como filtro, con cabecera «Ver solo…», y se dibuja como control, no como etiqueta suelta (hoy el trazo discontinuo y la cursiva la hacen parecer un estado).
 - Aparcado: 86 (responsable de tarea) hasta que entre Anouk.
 
+## UX/UI: revisión del 2026-11-11 (Marco: «todo lo recomendado», chat 11-11)
+
+Análisis de producto y 40 propuestas, validadas enteras. Orden: tanda 1 (130 a 132, en paralelo, sin ficheros
+comunes), tanda 2 (133 a 136, tras integrar la 1 porque tocan el diccionario y piezas comunes), tanda 3 (137 a 139,
+con boceto antes y después de la 119). Capturas de partida: espacio `playwright`, datos de test.
+
+- [ ] 130 Conversaciones (carril `ux-conversations`): en móvil el título se monta sobre la pastilla «Todo» y «Apuntar llamada»; el turno con una sola fuente (la lista dice «Nos toca» y la ficha «Esperando su respuesta»); la pestaña «Todo» cuadra con «Nos toca» más «Lo demás»; un solo «+» con menú (conversación, llamada, importar chat, también en móvil) en vez de cuatro botones; el panel derecho en reposo abre la que más espera; fuera «Trae tu agenda.». (chat 11-11)
+- [ ] 131 Cuentas (carril `ux-books`): en móvil el bolo abierto desborda, el nombre se monta sobre «sin caché» y el diálogo de gasto va pegado al borde; comprobar «Por facturar 0 €» con bolos confirmados con caché y sin documento; «Nuevo bolo» a la derecha como acción principal; la columna «Función» pasa a «Fecha»; «Pendiente» y «Cobro» fuera si siguen vacías con datos reales; en la ficha de línea, «24 opciones · 24 confirmadas» sin ninguna confirmada. (chat 11-11)
+- [ ] 132 Marco y entrada (carril `ux-shell`): fuera la caja «⌘K · buscar» y «∑ Todo» de la barra lateral (queda la pastilla), barra más estrecha; presencia con texto en escritorio; login sin «Fase 0», sin la tarjeta inventada y sin alta abierta, con «¿Olvidaste la contraseña?»; un solo estilo de tema con claro y oscuro; espacio sin acceso dice que no entras; 404 y errores en el idioma de la app y con salida; pie de diálogo en móvil sin partirse y sin atajos de teclado; las fichas marcan su sección y tienen vuelta (envío, tablón del bolo). (chat 11-11)
+- [ ] 133 Vocabulario y textos muertos: una palabra por cosa (próximo/siguiente paso; ámbito/alcance/foco; lugar/sala/local; proyecto/obra/espectáculo; cobro/pago; apuntar/anotar/registrar; email/correo; blackout/indisponibilidad/no disponible/fuera; sección/lente; Inicio-Fin/Empieza-Acaba; «1.ª opción»/«opción 1»); «Te espera» para lo tuyo y «Nos toca» para la compañía; la «Temporada» del Planificador cambia de nombre; «Invitar al público»; fuera unas 100 claves muertas y la ayuda que explica lo que no existe. Marco: decidir las palabras que ganan, sobre una tabla. (chat 11-11)
+- [ ] 134 Un patrón por gesto: borrar (reversible con «Deshacer», irreversible con diálogo); apuntar un contacto con una sola pieza; acciones de cabecera de ficha iguales; el estado con un solo dibujo; dos puntos de corte de móvil como tokens. (chat 11-11)
+- [ ] 135 Quitar caminos dobles: una sola alta de función («Añadir al plan», fuera `PerformanceForm`); la ficha de línea usa las filas y vistas de la sección (fuera la tabla clásica y su «Lista / Mes»); fuera «Disciplina» y «Opciones por orden» del diálogo del espacio; la ficha de función no pinta bloques que solo dicen que no hay nada (ADR-145 § 1). (chat 11-11)
+- [ ] 136 Ajustes: la descripción junto a su control, Facetas en tres páginas, etiquetas distintas para las dos «Firma»; alta directa de persona y de organización desde ⌘K. (chat 11-11)
+- [ ] 137 Primer día: quien entra sin espacio ve «Crea tu compañía» y tres pasos (espectáculo, contactos, primera fecha); incluye la ayuda B. Boceto antes. Después de la 119. (chat 11-11)
+- [ ] 138 Importar contactos desde CSV o Excel, sobre el importador de público. Boceto antes. Después de la 119. (chat 11-11)
+- [ ] 139 Marco: decidir: el técnico invitado a un bolo aterriza en «Ahora» y no en Hoy (entrada por rol): ahora, o cuando entre un técnico real. (chat 11-11)
+
 ## PRIMERO — nada. `main` == prod y las dos suites están vivas (2026-07-30, noche)
 
 > Esta sección existía para dos cosas y ya no queda ninguna. Se deja el
