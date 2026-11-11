@@ -7527,3 +7527,23 @@ y `DROP FUNCTION public.set_workspace_person_organization(uuid, uuid, uuid);`.
 
 **Re-evaluar cuando** alguien eche de menos editar el siguiente paso desde la fila (§ 7) o la tercera puerta de
 apuntar (§ 2).
+
+## [2026-11-11] ADR-195 · Una palabra por cosa (tarea 133; enmienda ADR-128 § 3 y ADR-155 en el nombre de la Temporada)
+
+Marco (chat, 2026-11-11): la tabla de palabras, «tal cual». En `main` desde `0a7e9ac7`.
+
+1. **En pantalla, una sola palabra por concepto**, en las cuatro lenguas: siguiente paso; ámbito; sala para donde se
+   actúa y lugar para lo demás (`perf.venue` nueva); espectáculo para el proyecto (el código, las rutas y las claves
+   siguen con `project`); cobro lo que entra y pago lo que sale; apuntar; correo; no disponible; sección; Empieza /
+   Acaba; 1.ª opción; «Te espera» para lo de una persona y «Nos toca» para lo de la compañía; «Invitar al público».
+2. **La vista de 12 semanas del Planificador se llama «Próximas semanas»**; «temporada» queda para el año de la
+   compañía (septiembre a agosto, o el mes configurado) en Cuentas, Conversaciones y Ajustes.
+3. **Por lengua:** en inglés «payment» vale para cobro y pago y el verbo es «log»; en francés «e-mail» en todo; «rider»
+   y «admin» se quedan en inglés.
+4. **El diccionario se vigila:** `apps/web/scripts/i18n-orphans.ts` y su test fallan con una clave que nada usa o que
+   falta en una lengua. Fuera 236 claves muertas (de 3.579 a 3.343 por lengua).
+5. **Abierto:** en un espacio de música el proyecto lee «espectáculo» igual que en escena, porque «concierto» ya es la
+   función. Propuesta sin decidir: variante `@music` con «proyecto» / «project».
+
+**Verificado:** `check` 0/0 y unitarios 2359. Sin E2E; cinco specs puestos al día sin correr (`line-detail`,
+`palette-create`, `performance-write`, `money`, `scope-url`).
