@@ -1,10 +1,11 @@
 <script lang="ts">
   /**
-   * Calendar lens — ONE door, two first-class projections (ADR-076):
-   * month grid and agenda list, both over the same fetched rows. The
-   * projection travels in the URL (`?view=month|agenda`, no /h/agenda
-   * alias — ADR-078 §10), persists per device (localStorage) and defaults
-   * by form factor (narrow → agenda, wide → month).
+   * Planner lens: one door, four drawings of the same fetched rows
+   * (ADR-076, ADR-155): the coming weeks (`overview`), agenda, month and
+   * board, plus the day. The drawing travels in the URL (`?view=`, no
+   * /h/agenda alias, ADR-078 §10); without one, the drawing this person
+   * last chose, kept on their membership (ADR-192), and without that the
+   * coming weeks.
    *
    * Event sources: `performance` (performed_at, day-level truth, fetched
    * with ?rosters=1 for the conflict engine) and `date` (rehearsals,

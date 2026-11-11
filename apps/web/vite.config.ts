@@ -101,7 +101,8 @@ export default defineConfig(({ mode }) => {
           manifest: {
             name: 'Hour',
             short_name: 'Hour',
-            description: 'Live performing arts management — Phase 0',
+            description: 'Gestión de compañías de artes en vivo: todo junto, hora a hora.',
+            lang: 'es',
             theme_color: '#9d3f70',
             background_color: '#ffffff',
             display: 'standalone',
@@ -194,7 +195,7 @@ export default defineConfig(({ mode }) => {
           test: {
             name: 'server',
             environment: 'node',
-            include: ['src/**/*.{test,spec}.{js,ts}'],
+            include: ['src/**/*.{test,spec}.{js,ts}', 'scripts/**/*.test.ts'],
             exclude: ['src/**/*.svelte.{test,spec}.{js,ts}'],
           },
         },
