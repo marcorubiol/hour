@@ -64,6 +64,23 @@ describe.skipIf(!envReady())('create_performance with p_bolo_id (ADR-087, § 37)
     expect(homeProjectId, 'fixture project zzz-e2e-collab').toBeTruthy();
     expect(foreignProjectId, 'fixture project zzz-rls-foreign-project').toBeTruthy();
 
+    // A RUN CUT SHORT NEVER REACHES afterAll. One stopped on 2026-11-10 after
+    // its first test left a function on 2027-02-01 in `zzz-e2e-collab`, inside
+    // the Planner's 24-month look-ahead, and the diary law in
+    // `planner-laws.spec.ts` (which needs `playwright` quiet ahead) went red
+    // on it. So every run first sweeps what an earlier one left, by name.
+    const fixtures = `in.(${homeProjectId},${foreignProjectId})`;
+    const leftPerfs = await pgGet<Row>(
+      `performance?select=id&project_id=${fixtures}&deleted_at=is.null&venue_name=like.RLS%20create%20linked*`,
+      jwt,
+    );
+    for (const p of leftPerfs.rows) await pgRpc('delete_performance', jwt, { p_performance_id: p.id });
+    const leftBolos = await pgGet<Row>(
+      `bolo?select=id&project_id=${fixtures}&deleted_at=is.null&venue_name=like.RLS%20create%20linked*`,
+      jwt,
+    );
+    for (const b of leftBolos.rows) await pgRpc('delete_bolo', jwt, { p_bolo_id: b.id });
+
     for (const [projectId, target] of [
       [homeProjectId, 'home'],
       [foreignProjectId, 'foreign'],

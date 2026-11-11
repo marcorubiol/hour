@@ -3436,7 +3436,7 @@
         >
         <!-- THESE TWO COUNT THE MONTH TOO, so they live inside the same gate
              and not after it. Outside, the agenda printed `3 people away · 2
-             trips` under `from 10 aug onwards`, the board under `no end` and
+             trips` under `from 10 aug`, the board under `no end` and
              the Day under a single date — August's numbers on three drawings
              that are not a month. On the board the bands are ON the sheet
              anyway, so the counter was saying twice what one of the two

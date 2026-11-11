@@ -110,6 +110,9 @@ test.describe('the season (ADR-117)', () => {
       // window is; the Agenda names its horizon and counts nothing (ADR-095).
       // At 390 the arrows drop to a line of their own under the title, and the
       // Season keeps that room without them (§ 109): the view bar must not move.
+      // The title must keep to one line too: «From 11 Nov onwards» wrapped at
+      // 390 from every month's 10th on, and the bar dropped 28 px in the
+      // Agenda and the Board only (2026-11-11; now «From 11 Nov», as es/ca).
       await page.setViewportSize({ width, height: 900 });
       const heights: number[] = [];
       const bars: number[] = [];
