@@ -151,25 +151,9 @@
       : [],
   );
 
-  const DOMAIN_KEYS: Record<string, string> = {
-    theatre: 'hall.domain_theatre',
-    dance: 'hall.domain_dance',
-    circus: 'hall.domain_circus',
-    music: 'hall.domain_music',
-    mixed: 'hall.domain_mixed',
-    other: 'hall.domain_space',
-  };
-  // Masthead kicker: discipline · home base — both real fields (ADR-062).
-  // No kind fallback: discipline and personal/team are orthogonal axes, so an
-  // unset domain shows only the city (or nothing) — never a faked label.
-  let spaceKicker = $derived.by(() => {
-    const ws = currentWorkspace;
-    if (!ws) return '';
-    const discipline = ws.domain
-      ? t(DOMAIN_KEYS[ws.domain] ?? 'hall.domain_space', locale)
-      : '';
-    return [discipline, ws.city].filter(Boolean).join(' · ');
-  });
+  // Masthead kicker: the home base, a real field (ADR-062). The discipline
+  // left with tarea 135: the trade in Ajustes is what says how Hour speaks.
+  let spaceKicker = $derived(currentWorkspace?.city ?? '');
 
   // The space is the root of its records: its address is the kind alone,
   // with the space's dot (RecordHead).
