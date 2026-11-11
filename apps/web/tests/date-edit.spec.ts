@@ -284,7 +284,9 @@ test.describe('date edit path (task 15)', () => {
       expect(await readDate(page, created.id, day)).toBeTruthy();
 
       await confirm.getByRole('button', { name: 'Delete', exact: true }).click();
-      await expect(dialog).toBeHidden({ timeout: 10_000 });
+      // By name too: while the confirmation closes, two dialogs are open at once.
+      await expect(confirm).toBeHidden({ timeout: 10_000 });
+      await expect(page.getByRole('dialog', { name: 'Edit date' })).toBeHidden({ timeout: 10_000 });
       expect(await readDate(page, created.id, day)).toBeNull();
       // What it was looking at is gone: the vistazo goes with it.
       await expect(page.getByTestId('peek')).toBeHidden({ timeout: 10_000 });
