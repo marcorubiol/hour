@@ -35,6 +35,7 @@
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import MissingBand from '$lib/components/MissingBand.svelte';
   import { stepsDueBand, type StepsDueRow } from '$lib/steps-due-band';
+  import { countConversationsByBolo, type BoloCounts, type ConversationBolo } from '$lib/conversation-relation';
   import { stepsDue } from '$lib/record-missing';
   import { spaceCrumb, type Crumb } from '$lib/record-crumbs';
   import { fmtMoneyCompact } from '$lib/money';
@@ -136,23 +137,23 @@
   let isBooking = $derived(activeLine !== null && BOOKING_KINDS.has(activeLine.kind));
   let isTour = $derived(activeLine !== null && TOUR_KINDS.has(activeLine.kind));
 
-  type EngStats = { total: number; holds: number; confirmed: number; items: StepsDueRow[] };
+  // The conversation has no stored status since ADR-138 (E4): the API ignores
+  // `status=`, so three reads all came back with the total («24 · 24 · 24»,
+  // tarea 131). One read, and «opciones · confirmadas» counted from each
+  // conversation's bolos, the same rule as the panel and Desk (`countBolos`).
+  type EngRow = StepsDueRow & { bolos?: ConversationBolo[] };
+  type EngStats = { total: number; byBolo: BoloCounts | null; items: EngRow[] };
   const engStatsOptions = toStore(() => {
     const id = activeLine?.id ?? null;
     return {
       queryKey: ['line-eng-stats', id] as const,
       enabled: id !== null && isBooking,
       queryFn: async ({ signal }: { signal: AbortSignal }): Promise<EngStats> => {
-        const base = `/api/conversations?line_id=${id}`;
-        const [all, confirmed, holds] = await Promise.all([
-          fetchJSON<{ total: number; items: StepsDueRow[] }>(
-            `${base}&status=any&limit=${CONVERSATIONS_WHOLE}`,
-            signal,
-          ),
-          fetchJSON<{ total: number }>(`${base}&status=confirmed&limit=1`, signal),
-          fetchJSON<{ total: number }>(`${base}&status=hold&limit=1`, signal),
-        ]);
-        return { total: all.total, confirmed: confirmed.total, holds: holds.total, items: all.items };
+        const all = await fetchJSON<{ total: number; items: EngRow[] }>(
+          `/api/conversations?line_id=${id}&limit=${CONVERSATIONS_WHOLE}`,
+          signal,
+        );
+        return { total: all.total, byBolo: countConversationsByBolo(all.items), items: all.items };
       },
     };
   });
@@ -329,9 +330,11 @@
     {#if isBooking && $engStatsQuery.data}
       {@const st = $engStatsQuery.data}
       <p class="line-detail__stats">
-        <span class="line-detail__stat"><b class:figure--zero={st.total === 0}>{st.total}</b> {t('line.stat_conversations', locale)}</span>
-        <span class="line-detail__stat"><b class:figure--zero={st.holds === 0}>{st.holds}</b> {t('line.stat_holds', locale)}</span>
-        <span class="line-detail__stat"><b class:figure--zero={st.confirmed === 0}>{st.confirmed}</b> {t('line.stat_confirmed', locale)}</span>
+        <span class="line-detail__stat"><b class:figure--zero={st.total === 0}>{st.total}</b> {t(st.total === 1 ? 'line.stat_conversations_one' : 'line.stat_conversations', locale)}</span>
+        {#if st.byBolo}
+          <span class="line-detail__stat"><b class:figure--zero={st.byBolo.option === 0}>{st.byBolo.option}</b> {t(st.byBolo.option === 1 ? 'line.stat_holds_one' : 'line.stat_holds', locale)}</span>
+          <span class="line-detail__stat"><b class:figure--zero={st.byBolo.firm === 0}>{st.byBolo.firm}</b> {t(st.byBolo.firm === 1 ? 'line.stat_confirmed_one' : 'line.stat_confirmed', locale)}</span>
+        {/if}
         {#if overdue > 0}
           <span class="line-detail__stat line-detail__stat--danger"
             ><b>{overdue}</b> {t('line.stat_overdue', locale)}</span
@@ -347,8 +350,8 @@
             {st.next.venue?.name ?? st.next.venue_name ?? ''}
           </span>
         {/if}
-        <span class="line-detail__stat"><b class:figure--zero={st.confirmed === 0}>{st.confirmed}</b> {t('line.stat_confirmed', locale)}</span>
-        <span class="line-detail__stat"><b class:figure--zero={st.holds === 0}>{st.holds}</b> {t('line.stat_holds', locale)}</span>
+        <span class="line-detail__stat"><b class:figure--zero={st.confirmed === 0}>{st.confirmed}</b> {t(st.confirmed === 1 ? 'line.stat_confirmed_one' : 'line.stat_confirmed', locale)}</span>
+        <span class="line-detail__stat"><b class:figure--zero={st.holds === 0}>{st.holds}</b> {t(st.holds === 1 ? 'line.stat_holds_one' : 'line.stat_holds', locale)}</span>
         {#if st.hasFees && st.pipeline > 0}
           <span class="line-detail__stat"
             ><b>{fmtMoneyCompact(st.pipeline)}</b> {t('line.stat_in_progress', locale)}</span

@@ -156,6 +156,25 @@ export interface BoloCounts {
   firm: number;
 }
 
+/**
+ * Las conversaciones de una línea por cómo van sus bolos (tarea 131): firme la
+ * que tiene algún bolo confirmado o hecho; en opción la que tiene alguno en
+ * opción y ninguno firme. Cada conversación cuenta una vez. `null` cuando la
+ * lista no trae los bolos (sin `read:performance`): no se sabe, no es cero.
+ */
+export function countConversationsByBolo(
+  items: readonly { bolos?: readonly Pick<ConversationBolo, 'status'>[] | null }[],
+): BoloCounts | null {
+  if (items.some((it) => it.bolos === undefined || it.bolos === null)) return null;
+  const out: BoloCounts = { option: 0, firm: 0 };
+  for (const it of items) {
+    const c = countBolos(it.bolos ?? []);
+    if (c.firm > 0) out.firm += 1;
+    else if (c.option > 0) out.option += 1;
+  }
+  return out;
+}
+
 /** Lo que el panel y el Desk cuentan de unos bolos: en opción y firmes; los cancelados, no. */
 export function countBolos(bolos: readonly Pick<ConversationBolo, 'status'>[]): BoloCounts {
   const out: BoloCounts = { option: 0, firm: 0 };

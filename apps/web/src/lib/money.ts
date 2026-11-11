@@ -639,6 +639,13 @@ export interface BoloMoney {
 	 * the easiest way never to bill a function).
 	 */
 	toInvoice: boolean;
+	/**
+	 * The same deal BEFORE it is done: contracted, with a fee, invoicing on,
+	 * nothing issued, and its last function still ahead or no function at all.
+	 * «Por facturar» waits for the function (ADR-131); this is what it waits for,
+	 * so the figure can say why it reads 0 with confirmed fees on screen.
+	 */
+	toInvoiceLater: boolean;
 	/** Contracted and no fee yet. */
 	noFee: boolean;
 	collect: CollectState;
@@ -685,13 +692,14 @@ export function boloMoney(b: MoneyBolo, ctx: MoneyContext): BoloMoney {
 	// Performed once the LAST function is past: a bolo of three is not
 	// «por facturar» after its first night (ADR-131).
 	const performed = b.last_performed_at ? b.last_performed_at.slice(0, 10) < todayDay(ctx.today) : false;
-	const toInvoice =
+	const billable =
 		(b.status === 'confirmed' || b.status === 'done') &&
 		fee !== null &&
 		fee > 0 &&
 		ctx.modeOf(b) !== 'off' &&
-		(doc === null || doc.status === 'draft') &&
-		performed;
+		(doc === null || doc.status === 'draft');
+	const toInvoice = billable && performed;
+	const toInvoiceLater = billable && !performed;
 	const target = issued ? Number(issued.total) : fee ?? 0;
 	const collect: CollectState =
 		fee === null && !issued
@@ -714,6 +722,7 @@ export function boloMoney(b: MoneyBolo, ctx: MoneyContext): BoloMoney {
 		overdue,
 		daysLate,
 		toInvoice,
+		toInvoiceLater,
 		noFee: contracted && fee === null,
 		collect,
 	};
@@ -763,6 +772,14 @@ interface MoneyPosition {
 	/** Por facturar (all seasons). */
 	toInvoice: number;
 	toInvoiceCount: number;
+	/**
+	 * Contracted fees that will be «por facturar» once their functions are
+	 * done (all seasons, like `toInvoice`); `undatedCount` of them have no live
+	 * function at all, and never get there until one is added.
+	 */
+	toInvoiceLater: number;
+	toInvoiceLaterCount: number;
+	undatedCount: number;
 	/** Expected in the next 30 days (issued, unpaid, expected date in [today, today+30]). */
 	inflow30: number;
 	inflow30Count: number;
@@ -790,6 +807,9 @@ function emptyPosition(currency: string): MoneyPosition {
 		overdueCount: 0,
 		toInvoice: 0,
 		toInvoiceCount: 0,
+		toInvoiceLater: 0,
+		toInvoiceLaterCount: 0,
+		undatedCount: 0,
 		inflow30: 0,
 		inflow30Count: 0,
 		sold: 0,
@@ -840,6 +860,11 @@ export function moneyPosition(
 		if (m.toInvoice) {
 			pos.toInvoice += m.fee ?? 0;
 			pos.toInvoiceCount += 1;
+		}
+		if (m.toInvoiceLater) {
+			pos.toInvoiceLater += m.fee ?? 0;
+			pos.toInvoiceLaterCount += 1;
+			if (!b.last_performed_at) pos.undatedCount += 1;
 		}
 		if (boloSeason(b, ctx.today, ctx.seasonStarts) !== season) continue;
 		pos.seasonCount += 1;
