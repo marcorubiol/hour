@@ -171,7 +171,7 @@ test.describe('Cuentas', () => {
       // and goes to Cuentas with its dialog open.
       const write = page.getByTestId('bolo-record-payment');
       await expect(write).toContainText('nothing leaves Hour');
-      await write.getByRole('link', { name: 'Record a payment' }).click();
+      await write.getByRole('link', { name: 'Log a payment' }).click();
       await expect(page).toHaveURL(/\/h\/books/);
       await expect(page.locator('dialog[open]').getByLabel('Amount')).toBeVisible({ timeout: 15_000 });
       await expect(page).not.toHaveURL(/act=/);

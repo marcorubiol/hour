@@ -208,7 +208,7 @@
       placeholder={t('line.material_kind_ph', locale)}
       required
     />
-    <Input label="URL" type="url" bind:value={fUrl} placeholder="https://…" required error={urlError} />
+    <Input label={t('line.material_link', locale)} type="url" bind:value={fUrl} placeholder="https://…" required error={urlError} />
     <Input
       label={t('person.notes', locale)}
       bind:value={fNotes}

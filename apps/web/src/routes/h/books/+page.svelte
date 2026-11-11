@@ -1523,7 +1523,7 @@
   </form>
   {#snippet actions()}
     <Button variant="quiet" onclick={() => (feeOpen = false)}>{t('create.cancel', locale)}</Button>
-    <Button onclick={saveFee} loading={$feeMutation.isPending}>{t('blackout.save', locale)}</Button>
+    <Button onclick={saveFee} loading={$feeMutation.isPending}>{t('ui.save', locale)}</Button>
   {/snippet}
 </Dialog>
 
@@ -1584,7 +1584,7 @@
       <Select id="deal-conversation" label={t('books.deal_conversation', locale)} bind:value={dealConversationId} options={dealConversationOptions} onchange={pickDealConversation} />
     {/if}
     <div class="mny__row2">
-      <Input label={t('create.venue', locale)} bind:value={dealVenue} placeholder={t('books.ph_venue', locale)} />
+      <Input label={t('perf.venue', locale)} bind:value={dealVenue} placeholder={t('books.ph_venue', locale)} />
       <Input label={t('create.city', locale)} bind:value={dealCity} placeholder={t('books.ph_city', locale)} />
     </div>
     <div class="mny__row2">

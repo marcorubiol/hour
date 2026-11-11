@@ -68,7 +68,7 @@ test.describe('performance write path', () => {
     await dialog.locator('[data-chip="type"]').click();
     await dialog.getByRole('radio', { name: 'Performance', exact: true }).check();
     await dialog.locator('[data-chip="owner"]').click();
-    await dialog.getByLabel('Project', { exact: true }).selectOption({ label: 'ZZZ e2e collab' });
+    await dialog.getByLabel('Show', { exact: true }).selectOption({ label: 'ZZZ e2e collab' });
     await dialog.locator('[data-chip="when"]').click();
     await dialog.getByLabel('Day', { exact: true }).fill(day);
     await dialog.locator('[data-chip="where"]').click();
@@ -275,7 +275,7 @@ test.describe('the quick add marks what it made (ADR-139 p7)', () => {
     await dialog.locator('[data-chip="type"]').click();
     await dialog.getByRole('radio', { name: 'Rehearsal', exact: true }).check();
     await dialog.locator('[data-chip="owner"]').click();
-    await dialog.getByLabel('Project', { exact: true }).selectOption({ label: 'ZZZ e2e collab' });
+    await dialog.getByLabel('Show', { exact: true }).selectOption({ label: 'ZZZ e2e collab' });
     await dialog.locator('[data-chip="when"]').click();
     await dialog.getByLabel('Day', { exact: true }).fill(today);
     await dialog.getByRole('button', { name: 'Add', exact: true }).click();

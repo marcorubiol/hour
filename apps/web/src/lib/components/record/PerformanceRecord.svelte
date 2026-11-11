@@ -1109,7 +1109,7 @@
   {/if}
   <div class="perf__form-grid" oninput={formErrors.onedit}>
     <Input id="f-day" label={t('perf.date', locale)} type="date" bind:value={fDay} required error={formErrors.of('f-day')} />
-    <Input label={t('create.venue', locale)} bind:value={fVenue} placeholder={t('perf.venue_placeholder', locale)} />
+    <Input label={t('perf.venue', locale)} bind:value={fVenue} placeholder={t('perf.venue_placeholder', locale)} />
     <Input label={t('create.city', locale)} bind:value={fCity} />
     <Input label={t('perf.country', locale)} bind:value={fCountry} placeholder="ES" />
     {#if showHoldNotice}
