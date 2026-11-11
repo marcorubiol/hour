@@ -42,6 +42,11 @@ export function writesSpaceIn(w: WithRole): boolean {
   return w.my_role == null || WRITERS.has(w.my_role);
 }
 
+/** Manages the space (owner or admin): facets per person, its people. */
+export function managesSpaceIn(w: WithRole | null | undefined): boolean {
+  return w?.my_role == null || w.my_role === 'owner' || w.my_role === 'admin';
+}
+
 /** The workspaces, in their order, where tasks can be written. */
 export function taskWorkspaces<T extends WithRole>(workspaces: readonly T[]): T[] {
   return workspaces.filter(writesTasksIn);

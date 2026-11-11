@@ -158,7 +158,7 @@
   });
 </script>
 
-<RecordHead crumbs={[{ label: t('settings.title', locale) }, { label: t('settings.profile_kicker', locale) }]} title={t('settings.nav_profile', locale)}>
+<RecordHead crumbs={[{ label: t('settings.title', locale) }]} title={t('settings.nav_profile', locale)}>
   {#snippet facts()}<span>{t('settings.profile_sub', locale)}</span>{/snippet}
 </RecordHead>
 

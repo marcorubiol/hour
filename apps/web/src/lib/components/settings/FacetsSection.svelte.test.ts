@@ -69,20 +69,34 @@ function stubFetch(payload: FacetsPayload) {
 }
 
 describe('FacetsSection', () => {
-  it('the admin sees the facets, what each package gives and the per-person adjustments', async () => {
+  it('the admin sees the facets, what each package gives and the per-person adjustments, each on its own page', async () => {
     stubFetch(BASE);
-    const { container } = render(Harness);
+    const vocabulary = render(Harness);
     await settle();
+    let container = vocabulary.container;
 
     const rows = [...container.querySelectorAll('[data-facet]')].filter((el) => el.classList.contains('facetset'));
     expect(rows.map((el) => el.getAttribute('data-facet'))).toEqual(['tecnica', 'comidas', 'vestuari']);
     expect(container.querySelector('[data-facet="comidas"].facetset')?.classList.contains('is-off')).toBe(true);
     // An own facet without a level says it cannot be given yet.
     expect(container.querySelector('[data-facet="vestuari"] .set-row__hint')?.textContent).toMatch(/no level/);
+    // The vocabulary page draws neither the packages nor the people.
+    expect(container.querySelector('[data-testid="settings-facets-presets"]')).toBeNull();
+    expect(container.querySelector('[data-testid="settings-facets-grants"]')).toBeNull();
+    cleanup();
+
+    container = render(Harness, { part: 'facet-packages' }).container;
+    await settle();
+    expect(container.querySelector('[data-testid="settings-facets"]')).toBeNull();
 
     const equip = container.querySelector('[data-preset="equip"]')!;
     expect(equip.textContent).toMatch(/Technical sees · Meals sees/);
     expect(container.querySelector('[data-preset="minim"]')?.textContent).toMatch(/No facet/);
+    cleanup();
+
+    container = render(Harness, { part: 'facet-people' }).container;
+    await settle();
+    expect(container.querySelector('[data-testid="settings-facets-presets"]')).toBeNull();
 
     const pau = container.querySelector('[data-membership="m1"]')!;
     expect(pau.textContent).toMatch(/Pau Riera/);
@@ -95,7 +109,7 @@ describe('FacetsSection', () => {
 
   it('choosing a verb saves it in place through the grants endpoint', async () => {
     const calls = stubFetch(BASE);
-    const { container } = render(Harness);
+    const { container } = render(Harness, { part: 'facet-people' });
     await settle();
 
     const edit = container.querySelector(
@@ -127,7 +141,16 @@ describe('FacetsSection', () => {
 
     expect(container.querySelectorAll('.facetset').length).toBe(3);
     expect(container.querySelector('input[type="text"]')).toBeNull();
-    expect(container.querySelector('[data-testid="settings-facets-presets"]')).not.toBeNull();
-    expect(container.querySelector('[data-testid="settings-facets-grants"]')).toBeNull();
+    cleanup();
+
+    const packages = render(Harness, { part: 'facet-packages' }).container;
+    await settle();
+    expect(packages.querySelector('[data-testid="settings-facets-presets"]')).not.toBeNull();
+    cleanup();
+
+    const people = render(Harness, { part: 'facet-people' }).container;
+    await settle();
+    expect(people.querySelector('[data-testid="settings-facets-grants"]')).toBeNull();
+    expect(people.textContent).toMatch(/admin/i);
   });
 });

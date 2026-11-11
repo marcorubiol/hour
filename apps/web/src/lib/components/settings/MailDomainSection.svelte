@@ -109,7 +109,20 @@
     >,
   );
   /** El subdominio que se propone para el público: `publico.` delante del de la difusión. */
-  let audienceSuggestion = $derived(byPurpose.outreach[0] ? `publico.${byPurpose.outreach[0].domain}` : 'publico.mamemi.cat');
+  // A placeholder says what goes in, never a value that looks filled in (136).
+  const DOMAIN_PLACEHOLDER: Record<MailDomainPurpose, string> = {
+    outreach: 'mailout.domain_placeholder',
+    audience: 'mail.domain_audience_placeholder',
+  };
+  // Each sender says whose it is, and the audience one how it is seen (136).
+  const SENDER_LABEL: Record<MailDomainPurpose, string> = {
+    outreach: 'mailout.sender_label_outreach',
+    audience: 'mail.sender_label_audience',
+  };
+  const SENDER_HINT: Record<MailDomainPurpose, string> = {
+    outreach: 'mailout.sender_hint',
+    audience: 'mail.sender_audience_hint',
+  };
 
   const add = createMutation({
     mutationFn: (purpose: MailDomainPurpose) =>
@@ -254,7 +267,7 @@
     <div class="set-row">
       <div class="set-row__lead">
         <label class="set-row__label" for={`md-domain-${purpose}`}>{t('mailout.domain_label', locale)}</label>
-        <div class="set-row__hint">{t(purpose === 'audience' ? 'mail.domain_audience_hint' : 'mailout.domain_hint', locale)}</div>
+        <div class="set-row__hint">{t(purpose === 'audience' ? 'mail.domain_audience_hint' : 'mailout.domain_hint_generic', locale)}</div>
       </div>
       <div class="set-row__ctrl">
         <Field id={`md-domain-${purpose}`}>
@@ -265,7 +278,7 @@
             autocomplete="off"
             spellcheck="false"
             maxlength="253"
-            placeholder={purpose === 'audience' ? audienceSuggestion : 'mamemi.cat'}
+            placeholder={t(DOMAIN_PLACEHOLDER[purpose], locale)}
             bind:value={domainInput[purpose]}
             disabled={$add.isPending || !data?.configured}
           />
@@ -274,8 +287,8 @@
     </div>
     <div class="set-row">
       <div class="set-row__lead">
-        <label class="set-row__label" for={`md-local-${purpose}`}>{t('mailout.sender_label', locale)}</label>
-        <div class="set-row__hint">{t('mailout.sender_hint', locale)}</div>
+        <label class="set-row__label" for={`md-local-${purpose}`}>{t(SENDER_LABEL[purpose], locale)}</label>
+        <div class="set-row__hint">{t(SENDER_HINT[purpose], locale)}</div>
       </div>
       <div class="set-row__ctrl"><div class="md-sender">
         <Field id={`md-name-${purpose}`}>
@@ -331,8 +344,8 @@
 
   <div class="set-row">
     <div class="set-row__lead">
-      <div class="set-row__label">{t('mailout.sender_label', locale)}</div>
-      <div class="set-row__hint">{t('mailout.sender_hint', locale)}</div>
+      <div class="set-row__label">{t(SENDER_LABEL[d.purpose ?? 'outreach'], locale)}</div>
+      <div class="set-row__hint">{t(SENDER_HINT[d.purpose ?? 'outreach'], locale)}</div>
     </div>
     <div class="set-row__ctrl"><div class="md-sender" onfocusout={(ev) => commitSender(ev, d)}>
       {#if canManage}
@@ -352,7 +365,7 @@
               id={`md-local-${d.id}`}
               type="text"
               maxlength="64"
-              aria-label={t('mailout.sender_label', locale)}
+              aria-label={t(SENDER_LABEL[d.purpose ?? 'outreach'], locale)}
               autocomplete="off"
               spellcheck="false"
               value={draftOf(d).local}

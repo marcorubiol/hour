@@ -164,7 +164,7 @@
   );
 </script>
 
-<RecordHead crumbs={[{ label: t('settings.title', locale) }, { label: t('settings.lenses_kicker', locale) }]} title={t('settings.nav_tags', locale)}>
+<RecordHead crumbs={[{ label: t('settings.title', locale) }]} title={t('settings.nav_tags', locale)}>
   {#snippet facts()}<span>{t('settings.tags_sub', locale)}</span>{/snippet}
 </RecordHead>
 
@@ -246,6 +246,7 @@
               id="tag-new"
               type="text"
               maxlength={TAG_LABEL_MAX}
+              placeholder={t('settings.tags_new_placeholder', locale)}
               bind:value={draft}
               oninput={() => (showProblem = false)}
               disabled={$create.isPending}
