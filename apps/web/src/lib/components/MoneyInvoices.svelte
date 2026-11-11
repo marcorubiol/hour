@@ -133,7 +133,7 @@
   function discardInvoice(id: string) {
     draftRemovals.remove(id, {
       message: t('books.draft_discarded', locale),
-      commit: () => mutateJSON('DELETE', `/api/invoices/${id}`),
+      url: `/api/invoices/${id}`,
     });
   }
   let shown = $derived(invoices.filter((i) => !draftRemovals.hidden.has(i.id)));

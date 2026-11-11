@@ -11,6 +11,8 @@
     action?: { label: string; run: () => void };
     /** A second way on, beside it («Abrir»): what was just made, opened. */
     also?: { label: string; run: () => void };
+    /** Closed by hand with ×: whoever is waiting on the notice hears it (`$lib/undo-remove`). */
+    ondismiss?: () => void;
   }
 
   let stack = $state<ToastItem[]>([]);
@@ -75,7 +77,10 @@
         type="button"
         class="toast__dismiss"
         aria-label={t('ui.dismiss', locale)}
-        onclick={() => removeToast(item.id)}
+        onclick={() => {
+          removeToast(item.id);
+          item.ondismiss?.();
+        }}
       >×</button>
     </article>
   {/each}

@@ -261,7 +261,7 @@ test.describe('date edit path (task 15)', () => {
     expect((await readDate(page, created!.id, day))!.kind).toBe('rehearsal');
   });
 
-  test('delete needs two presses, and the sweep leaves nothing behind (ADR-052)', async ({
+  test('delete asks first, and the sweep leaves nothing behind (ADR-052)', async ({
     page,
   }) => {
     test.setTimeout(90_000);
@@ -278,7 +278,8 @@ test.describe('date edit path (task 15)', () => {
       const del = dialog.getByRole('button', { name: 'Delete', exact: true });
       await del.click();
       // It cannot be undone, so it asks first (tarea 134): the row is still there.
-      const confirm = page.locator('dialog[open]', { hasText: 'Delete this date?' });
+      // By its name: the vistazo underneath is an open dialog with the same text.
+      const confirm = page.getByRole('dialog', { name: 'Delete this date?' });
       await expect(confirm).toBeVisible();
       expect(await readDate(page, created.id, day)).toBeTruthy();
 
