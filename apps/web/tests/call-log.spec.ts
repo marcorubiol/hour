@@ -100,7 +100,8 @@ test.describe('log a call from the lens head', () => {
       await expect(row).toContainText('1 conversation', { timeout: 20_000 });
       await row.click();
       await expect(dialog.getByRole('heading', { name: `Call with ${NAME}` })).toBeVisible();
-      await dialog.getByText('They called').click();
+      // The same form as the composer's «+ Log» (tarea 134): who began is «Me» or their name.
+      await dialog.getByTestId('contact-log').getByRole('group', { name: 'Direction' }).getByRole('button').nth(1).click();
       await dialog.getByLabel('What was said').fill('E2E: asks for the rider');
       await dialog.getByRole('button', { name: 'Log call' }).click();
       await expect(dialog).not.toBeVisible({ timeout: 10_000 });

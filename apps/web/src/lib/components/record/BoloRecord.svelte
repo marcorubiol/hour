@@ -32,6 +32,7 @@
    * `read:money`, writing a function is not. The new row shows by itself:
    * the create refreshes every `money-bolos` read, the bolo's window with it.
    */
+  import StateBadge from '$lib/components/StateBadge.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { ApiError, fetchJSON, mutateJSON } from '$lib/api';
@@ -60,7 +61,7 @@
     type MoneyInvoiceItem,
   } from '$lib/money';
   import { categoryLabel, type ExpenseItem } from '$lib/expense';
-  import { performanceStatusFamily, performanceStatusLabel } from '$lib/performance';
+  import { performanceStatusLabel, performanceStatusTone } from '$lib/performance';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { boloMissing } from '$lib/record-missing';
   import { spaceCrumb, type Crumb } from '$lib/record-crumbs';
@@ -380,7 +381,7 @@
               href={`/h/${workspaceSlug}/performance/${e.slug}`}>{e.place}</a
             >{:else}{e.place}{/if}{/if}</span
       >
-      <span class="fact-word" data-family={performanceStatusFamily(e.status)}>{performanceStatusLabel(e.status, locale)}</span>
+      <StateBadge label={performanceStatusLabel(e.status, locale)} tone={performanceStatusTone(e.status)} />
     {:else if e.kind === 'invoice'}
       <span
         >{t(e.docType === 'proforma' ? 'bolo.ev_proforma' : 'bolo.ev_invoice', locale)}{#if e.number}<span class="bolo-record__faint"
@@ -415,7 +416,7 @@
   {:else}
     <RecordHead {crumbs} {title}>
       {#snippet facts()}
-        <span class="fact-word" data-family={performanceStatusFamily(bolo!.status)}>{boloStatusLabel(bolo!.status, locale)}</span>
+        <span><StateBadge label={boloStatusLabel(bolo!.status, locale)} tone={performanceStatusTone(bolo!.status)} /></span>
         {#if payer}
           <span
             >{t('organization.payer', locale)}

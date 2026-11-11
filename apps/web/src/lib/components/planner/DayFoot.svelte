@@ -318,7 +318,7 @@
       letter-spacing: var(--tracking-l);
       margin-inline-start: var(--space-xs);
     }
-    @media (max-width: 40rem) {
+    @media (max-width: 47.999rem) {
       .df {
         grid-template-columns: 1fr;
       }

@@ -66,6 +66,8 @@ test.describe('public road sheet link', () => {
     // Revoke from the operator page.
     const shareRow = page.locator('.rs__share-list li', { hasText: 'venue' }).first();
     await shareRow.getByRole('button', { name: 'Revoke' }).click();
+    // A link someone else holds asks first (tarea 134).
+    await page.locator('dialog[open]').getByRole('button', { name: 'Revoke', exact: true }).click();
     await expect(page.locator('.rs__share-list li', { hasText: 'venue' })).toHaveCount(0, {
       timeout: 10_000,
     });

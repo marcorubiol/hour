@@ -358,6 +358,8 @@
       color: var(--text-color);
     }
 
+    /* cut: the two columns need 26.25 + 27.5 rem (their minimums above) and
+       a margin; under 55rem the quote panel goes and the form stands alone. */
     @media (max-width: 55rem) {
       .login {
         grid-template-columns: 1fr;

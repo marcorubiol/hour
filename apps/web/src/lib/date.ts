@@ -16,7 +16,7 @@
 import * as v from 'valibot';
 import { Constants, type Enums, type Tables } from './db-types';
 import { realIsoInstant } from './datetime';
-import type { StatusFamily } from './performance';
+import type { StatusFamily, StatusTone } from './performance';
 
 const DATE_KINDS = Constants.public.Enums.date_kind;
 export const DATE_STATUSES = Constants.public.Enums.date_status;
@@ -166,4 +166,13 @@ export function dateStatusFamily(status: string): StatusFamily {
   if (status === 'tentative') return 'hold';
   if (status === 'cancelled') return 'released';
   return 'proposed';
+}
+
+/** A date's status → the one status pill's tone (ADR-130 § 2, tarea 134). */
+export function dateStatusTone(status: string): StatusTone {
+  const family = dateStatusFamily(status);
+  if (family === 'confirmed') return 'success';
+  if (family === 'hold') return 'info';
+  if (family === 'released') return 'danger';
+  return 'neutral';
 }

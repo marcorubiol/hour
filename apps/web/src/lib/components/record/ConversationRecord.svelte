@@ -670,7 +670,6 @@
             look="word"
             {locale}
             onnotnow={(not_now) => $patch.mutate({ not_now })}
-            onlog={() => composer?.focus('log')}
           />
         {:else}
           <span class="fact-word">{relationLabel(conv.relation, locale)}</span>

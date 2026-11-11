@@ -23,6 +23,7 @@
    * `starts_at` straight into the input would print UTC in a Madrid form
    * and rewrite every hour by the offset the moment anyone pressed Save.
    */
+  import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { ApiError, fetchJSON, mutateJSON } from '$lib/api';
@@ -83,7 +84,8 @@
   let dEndWall = $state('');
   let dDirection = $state<TravelDirection>('outbound');
   /** Two-step delete: the first press arms, the second writes. */
-  let armed = $state(false);
+  /** Borrar una fecha no se deshace y la quita del calendario de todos: se confirma (tarea 134). */
+  let confirmDelete = $state(false);
   /** The form's own words for what is wrong, under the field (ADR-139 p7). */
   let errStart = $state<string | undefined>();
   let errEnd = $state<string | undefined>();
@@ -217,7 +219,7 @@
     dEndDay = d.ends_at ? d.ends_at.slice(0, 10) : '';
     dStartWall = instantToWallClock(d.starts_at, tz);
     dEndWall = d.ends_at ? instantToWallClock(d.ends_at, tz) : '';
-    armed = false;
+    confirmDelete = false;
   }
 
   /** Keep the picked day when the all-day switch flips — as creation does. */
@@ -254,6 +256,7 @@
   const deleteDate = createMutation({
     mutationFn: () => mutateJSON('DELETE', `/api/dates/${date?.id}`),
     onSuccess: () => {
+      confirmDelete = false;
       open = false;
       invalidateDateFeeds(queryClient);
       addToast({ tone: 'success', message: t('edit.deleted', locale) });
@@ -326,13 +329,6 @@
     $savePatch.mutate(input);
   }
 
-  function pressDelete() {
-    if (!armed) {
-      armed = true;
-      return;
-    }
-    $deleteDate.mutate();
-  }
 
   let pending = $derived($savePatch.isPending || $deleteDate.isPending || committing);
 </script>
@@ -342,7 +338,6 @@
   title={t('edit.date_title', locale)}
   size="m"
   dirty={whoChanged}
-  onclose={() => (armed = false)}
 >
   {#if date}
     <div class="edd">
@@ -465,12 +460,11 @@
     </div>
   {/if}
 
-  <!-- Destructive, quiet until armed. Two presses instead of a
-       window.confirm: the dialog is already a modal, and stacking a second
-       one over it is how a misclick gets confirmed by reflex. -->
+  <!-- Destructive: the quiet word in the warn tone, and what cannot be
+       undone asks first (ConfirmDialog, tarea 134). -->
   {#snippet lead()}
-    <Button variant="quiet" tone={armed ? 'warn' : undefined} disabled={pending} onclick={pressDelete}>
-      {armed ? t('edit.delete_confirm', locale) : t('edit.delete', locale)}
+    <Button variant="quiet" tone="warn" disabled={pending} onclick={() => (confirmDelete = true)}>
+      {t('edit.delete', locale)}
     </Button>
   {/snippet}
   {#snippet actions()}
@@ -480,6 +474,16 @@
     >
   {/snippet}
 </Dialog>
+
+<ConfirmDialog
+  bind:open={confirmDelete}
+  title={t('edit.delete_date_title', locale)}
+  body={t('edit.delete_date_body', locale)}
+  confirm={t('edit.delete', locale)}
+  busy={$deleteDate.isPending}
+  {locale}
+  onconfirm={() => $deleteDate.mutate()}
+/>
 
 <style>
   @layer components {

@@ -116,6 +116,10 @@
   let perfCount = $derived(board?.performances.length ?? 0);
 </script>
 
+<!-- Sin bolo no hay tablón ni nada que escribir en él: el bloque no se pinta
+     (ADR-145 § 1; la franja «Falta» de la ficha ya dice «Sin bolo» a quien
+     puede crearlo). -->
+{#if !(board && !board.bolo)}
 <section id="board" class="board" aria-labelledby="board-title" aria-busy={$boardQuery.isLoading} bind:this={sectionEl}>
   <header class="board__head">
     <BlockHead title={t('threads.board', locale)} id="board-title" concept="board" />
@@ -150,8 +154,6 @@
     <EmptyLine text={t('desk.loading', locale)} busy />
   {:else if $boardQuery.isError && !board}
     <EmptyLine text={t('threads.board_error', locale)} />
-  {:else if board && !board.bolo}
-    <EmptyLine text={t('threads.no_bolo', locale)} />
   {:else if board?.bolo}
     {#if board.truncated}
       <EmptyLine text={t('threads.truncated', locale)} />
@@ -191,6 +193,7 @@
     {/if}
   {/if}
 </section>
+{/if}
 
 <style>
   @layer components {

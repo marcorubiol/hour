@@ -321,7 +321,7 @@
       font-size: var(--text-xs);
       letter-spacing: var(--tracking-m);
     }
-    @media (max-width: 34rem) {
+    @media (max-width: 47.999rem) {
       .invitation-page { background: var(--bg); }
       .invitation-card__terms { grid-template-columns: 1fr; }
     }

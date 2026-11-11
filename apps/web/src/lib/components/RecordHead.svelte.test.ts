@@ -29,6 +29,30 @@ describe('RecordHead', () => {
     expect(nav.querySelectorAll('.record-head__dot')).toHaveLength(1);
   });
 
+  it('says every verb of a record the same way: a hairline button, a link as one too (tarea 134)', async () => {
+    let edited = 0;
+    const { container } = render(RecordHead, {
+      crumbs,
+      title: 'x',
+      tools: [
+        { label: 'Abrir la hoja de ruta', href: '/h/muk-cia/performance/x/roadsheet' },
+        { label: 'Editar', onclick: () => edited++ },
+      ],
+    });
+    const tools = container.querySelector('.lenshead__tools')!;
+    const drawn = [...tools.querySelectorAll('a, button')];
+    expect(drawn.map((el) => el.textContent?.trim())).toEqual(['Abrir la hoja de ruta', 'Editar']);
+    for (const el of drawn) expect(el.className).toMatch(/btn--secondary.*btn--xs|btn--secondary btn--xs/);
+    expect(drawn[0].getAttribute('href')).toBe('/h/muk-cia/performance/x/roadsheet');
+    (drawn[1] as HTMLButtonElement).click();
+    expect(edited).toBe(1);
+  });
+
+  it('draws no tools row when a record has no verb', () => {
+    const { container } = render(RecordHead, { crumbs, title: 'x', tools: [] });
+    expect(container.querySelector('.lenshead__tools')).toBeNull();
+  });
+
   it('draws no address, facts or band when given none', () => {
     const { container } = render(RecordHead, { crumbs: [], title: 'x' });
     expect(container.querySelector('nav')).toBeNull();

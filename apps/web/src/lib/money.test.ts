@@ -194,7 +194,9 @@ describe('esTaxLines / applyTaxLines (generic country-agnostic tax)', () => {
 
 describe('money labels', () => {
 	it('reads a status the way the English screen always did', () => {
-		expect(boloStatusLabel('hold_1', 'en')).toBe('hold 1');
+		// An option says its rank as the function does (tarea 134): «1st hold», «1.ª opción».
+		expect(boloStatusLabel('hold_1', 'en')).toBe('1st hold');
+		expect(boloStatusLabel('hold_1', 'es')).toBe('1.ª opción');
 		expect(boloStatusLabel('confirmed', 'en')).toBe('confirmed');
 		expect(invoiceStatusLabel('draft', 'en')).toBe('draft');
 	});

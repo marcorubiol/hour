@@ -4,7 +4,7 @@
  * no lo ve · Invitar» y el diálogo que deja el enlace para copiar; quien no
  * puede invitar no ve ni el botón ni la propuesta.
  */
-import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import Harness from './test/BoloAccessHarness.svelte';
@@ -129,12 +129,17 @@ describe('BoloAccess', () => {
     expect(screen.queryByText(/va y no lo ve/)).toBeNull();
   });
 
-  it('revocar una invitación la pide por su id', async () => {
+  it('revocar una invitación la pide por su id, tras confirmarla', async () => {
     const calls = stubFetch(BASE);
     render(Harness, { going: GOING });
     await settle();
 
     await fireEvent.click(screen.getByRole('button', { name: 'Revocar la invitación de laia@example.test' }));
+    await settle();
+    // Mata un enlace que otra persona tiene: primero pregunta (tarea 134).
+    expect(calls.find((c) => c.method === 'DELETE')).toBeUndefined();
+    const dialog = screen.getByRole('dialog', { name: '¿Revocar la invitación?' });
+    await fireEvent.click(within(dialog).getByRole('button', { name: 'Revocar' }));
     await settle();
     expect(calls.find((c) => c.method === 'DELETE')?.body).toEqual({ kind: 'invitation', id: 'i1' });
   });

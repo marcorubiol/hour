@@ -147,7 +147,7 @@
     color: var(--bg);
   }
 
-  /* A tablet with the rail beside it: the bar is narrower than the four
+  /* cut: the rail (64rem, as the shell). A tablet with the rail beside it: the bar is narrower than the four
      pills with their desktop air, so they give up half of it. */
   @media (min-width: 48rem) and (max-width: 63.999rem) {
     .lensswitch__home,

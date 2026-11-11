@@ -409,13 +409,14 @@
       {locale}
     />
   {:else if file && org}
-    <RecordHead {crumbs} title={org.name}>
-      {#snippet actions()}
-        <Button variant="secondary" size="xs" onclick={openEdit}>{t('person.edit', locale)}</Button>
-        {#if file!.can_merge}
-          <Button variant="quiet" size="xs" onclick={() => (mergeOpen = true)}>{t('organization.merge', locale)}</Button>
-        {/if}
-      {/snippet}
+    <RecordHead
+      {crumbs}
+      title={org.name}
+      tools={[
+        { label: t('person.edit', locale), onclick: openEdit },
+        ...(file.can_merge ? [{ label: t('organization.merge', locale), onclick: () => (mergeOpen = true) }] : []),
+      ]}
+    >
       {#snippet facts()}
         {#if kindWord}<span>{kindWord}</span>{/if}
         {#if placeLine}<span>{placeLine}</span>{/if}

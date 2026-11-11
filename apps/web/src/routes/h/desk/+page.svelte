@@ -1079,7 +1079,7 @@
     /* A failure is base.css's `.load-fail`, the one voice of the dashboards;
        an empty band is EmptyLine, the one voice of every block. */
 
-    /* Phone and tablet: one column, in DOM order (1, 2, 4, 3): no `order`,
+    /* cut: the rail (64rem, as the shell). Phone and tablet: one column, in DOM order (1, 2, 4, 3): no `order`,
        so the tab and the screen reader go where the eye goes (móvil #2).
        Beside the rail, under 64 rem, two columns left the season's doors
        and the waiting list a word wide (20-10); from 64 rem up, two. */

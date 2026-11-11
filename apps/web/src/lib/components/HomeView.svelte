@@ -173,20 +173,11 @@
      here is controlled by each element's own margin. Width: .shell__content. -->
 <div class="home">
   {#if currentWorkspace}
-    <RecordHead {crumbs} title={spaceName(currentWorkspace.name)}>
-      {#snippet actions()}
-        {#if !guestHere}
-        <button
-          type="button"
-          class="space-head__edit"
-          onclick={() => (editOpen = true)}
-          title={t('hall.edit_space', locale)}
-          aria-label={t('hall.edit_space', locale)}
-        >
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
-        </button>
-        {/if}
-      {/snippet}
+    <RecordHead
+      {crumbs}
+      title={spaceName(currentWorkspace.name)}
+      tools={guestHere ? [] : [{ label: t('person.edit', locale), onclick: () => (editOpen = true), testid: 'space-edit' }]}
+    >
       {#snippet facts()}
         {#if spaceKicker}<span>{spaceKicker}</span>{/if}
       {/snippet}
@@ -249,28 +240,6 @@
 <style>
   @layer components {
     /* ── space portada masthead ── */
-    .space-head__edit {
-      display: inline-grid;
-      place-items: center;
-      flex: none;
-      inline-size: var(--control-size-s);
-      block-size: var(--control-size-s);
-      padding: 0;
-      border: 0;
-      border-radius: var(--radius-s);
-      background: transparent;
-      color: var(--text-faint);
-      cursor: pointer;
-      transition: color var(--transition), background var(--transition);
-    }
-    .space-head__edit:hover:not(:disabled) {
-      color: var(--text-color);
-      background: var(--bg-light);
-    }
-    .space-head__edit:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
     .space-head__about {
       max-inline-size: 40rem;
       margin-block: var(--space-s) 0;

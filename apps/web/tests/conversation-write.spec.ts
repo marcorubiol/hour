@@ -241,7 +241,7 @@ test.describe('conversation write, on its page', () => {
 
       // The menu offers only «Not this time…»: the relation is derived.
       await trigger.click();
-      await expect(page.getByRole('menuitem')).toHaveText(['Not this time…', 'Log contact…']);
+      await expect(page.getByRole('menuitem')).toHaveText(['Not this time…']);
       await page.getByRole('menuitem', { name: 'Not this time…', exact: true }).click();
       const dialog = page.locator('dialog[open]');
       await expect(dialog).toBeVisible();
@@ -321,30 +321,40 @@ test.describe('conversation write, on its page', () => {
       .toEqual({ at: restorePatch.next_action_at, note: restorePatch.next_action_note });
   });
 
-  test('log contact records an event and the history shows it', async ({ page }) => {
+  test('a contact logged from the conversation records an event and the history shows it', async ({
+    page,
+  }) => {
     // ADR-098: a contact is an event. Events are append-only and the fixture
     // resurrects WITH its old history, so this run's note carries its own mark.
+    // Logging has two doors since tarea 134 (the composer's «+ Log» and the
+    // lens's «+ → Call»); the relation menu's «Log contact…» is gone.
     const mark = `ZZZ e2e history ${Date.now().toString(36)}`;
     await openConversation(page);
 
     const original = (await fetchListRaw(page))[0];
     expect(original.person?.full_name).toBeTruthy();
 
-    // «Log contact…» from the relation's menu opens the composer on «Log».
-    await relationMenu(page).click();
-    await page.getByRole('menuitem', { name: 'Log contact…', exact: true }).click();
-    const composer = page.getByTestId('thread-composer');
-    await expect(composer.getByTestId('composer-log')).toBeVisible();
-    await composer.locator('textarea').fill(mark);
+    await page.getByTestId('composer-to-log').click();
+    const form = page.getByTestId('contact-log');
+    await expect(form.getByRole('button', { name: 'Call', pressed: true })).toBeVisible();
+    await expect(form.getByRole('button', { name: 'Me', pressed: true })).toBeVisible();
+    await expect(form.getByRole('button', { name: 'Now', pressed: true })).toBeVisible();
+    await page.getByRole('textbox', { name: 'What was said…' }).fill(mark);
 
     const posted = page.waitForResponse(
       (r) =>
         r.request().method() === 'POST' &&
         r.url().includes(`/api/conversations/${original.id}/events`),
     );
-    await composer.locator('button[type="submit"]').click();
+    await page.getByRole('button', { name: 'Log call' }).click();
     const response = await posted;
     expect(response.status(), 'POST /events should create').toBe(201);
+    // Now travels without an instant: the server owns the clock.
+    expect(response.request().postDataJSON()).toEqual({
+      kind: 'call',
+      direction: 'outbound',
+      body: mark,
+    });
     const { item } = (await response.json()) as { item: { occurred_at: string } };
     const skew = Math.abs(Date.parse(item.occurred_at) - Date.now());
     expect(skew, 'the server stamped something that is not now').toBeLessThan(60_000);

@@ -13,11 +13,12 @@
   /**
    * The row of a performance inside a record (ADR-164 § 1): its day in mono,
    * what names it (a link to its record), a quiet note, and its state as the
-   * mono word of every head (`fact-word`). One list, one treatment: a record
+   * one status pill (`StateBadge`, ADR-130 § 2). One list, one treatment: a record
    * that lists performances draws this, it does not paste the row.
    */
+  import StateBadge from '$lib/components/StateBadge.svelte';
   import { dayLabel } from '$lib/datetime';
-  import { performanceStatusFamily, performanceStatusLabel } from '$lib/performance';
+  import { performanceStatusLabel, performanceStatusTone } from '$lib/performance';
   import type { Locale } from '$lib/i18n';
 
   interface Props {
@@ -37,7 +38,7 @@
         {#if r.href}<a class="perf-rows__link" href={r.href}>{r.title}</a>{:else}{r.title}{/if}
         {#if r.note}<span class="perf-rows__note">{' · '}{r.note}</span>{/if}
       </span>
-      <span class="fact-word" data-family={performanceStatusFamily(r.status)}>{performanceStatusLabel(r.status, locale)}</span>
+      <StateBadge label={performanceStatusLabel(r.status, locale)} tone={performanceStatusTone(r.status)} />
     </li>
   {/each}
 </ul>

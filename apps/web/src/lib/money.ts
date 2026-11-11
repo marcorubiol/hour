@@ -404,6 +404,9 @@ function wordOr(key: string, locale: Locale, fallback: string): string {
 
 /** A bolo's status in the session's language ("hold 1", "confirmed"…). */
 export function boloStatusLabel(status: string, locale: Locale): string {
+	// An option says its rank one way everywhere («1.ª opción», tarea 134):
+	// the bolo reads the function's word, which already carries it.
+	if (status === 'hold' || /^hold_[123]$/.test(status)) return t(`perf.status_${status}`, locale);
 	return wordOr(`books.status_${status}`, locale, status.replace(/_/g, ' '));
 }
 

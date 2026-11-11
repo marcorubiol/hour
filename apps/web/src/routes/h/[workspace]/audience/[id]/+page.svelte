@@ -22,6 +22,7 @@
    * existe, en vez de crear otra (tarea 103).
    * Mientras el envío sea simulado, la lista no se abre a gente real (§ 5.4).
    */
+  import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { untrack } from 'svelte';
@@ -326,9 +327,13 @@
     personOpen = true;
   }
 
+  // Dar de baja y borrar los datos llegan a la persona y no se deshacen: se
+  // confirman (tarea 134).
+  let confirming = $state<'erase' | 'unsubscribe' | null>(null);
   const unsubscribe = createMutation({
     mutationFn: (p: SubscriptionRow) => mutateJSON('POST', `/api/audience/subscription/${p.id}`, {}),
     onSuccess: () => {
+      confirming = null;
       personOpen = false;
       refresh();
     },
@@ -337,6 +342,7 @@
   const erase = createMutation({
     mutationFn: (p: SubscriptionRow) => mutateJSON('DELETE', `/api/audience/subscription/${p.id}`),
     onSuccess: () => {
+      confirming = null;
       personOpen = false;
       refresh();
     },
@@ -637,15 +643,24 @@
     {#snippet actions()}
       {#if openPerson && isAdmin}
         <Button variant="quiet" loading={$loadProof.isPending} onclick={() => openPerson && $loadProof.mutate(openPerson)}>{t('audience.consent_proof', locale)}</Button>
-        <Button variant="quiet" tone="warn" loading={$erase.isPending} onclick={() => openPerson && $erase.mutate(openPerson)}>{t('audience.erase_person', locale)}</Button>
+        <Button variant="quiet" tone="warn" onclick={() => (confirming = 'erase')}>{t('audience.erase_person', locale)}</Button>
       {/if}
       {#if openPerson && canEdit && openPerson.status !== 'unsubscribed'}
-        <Button variant="secondary" loading={$unsubscribe.isPending} onclick={() => openPerson && $unsubscribe.mutate(openPerson)}>
+        <Button variant="secondary" onclick={() => (confirming = 'unsubscribe')}>
           {t('audience.unsubscribe_person', locale)}
         </Button>
       {/if}
     {/snippet}
   </Dialog>
+  <ConfirmDialog
+    bind:open={() => confirming !== null, (v) => { if (!v) confirming = null; }}
+    title={confirming === 'erase' ? t('audience.erase_title', locale) : t('audience.unsubscribe_title', locale)}
+    body={confirming === 'erase' ? t('audience.erase_confirm', locale) : t('audience.unsubscribe_confirm', locale)}
+    confirm={confirming === 'erase' ? t('audience.erase_person', locale) : t('audience.unsubscribe_person', locale)}
+    busy={$erase.isPending || $unsubscribe.isPending}
+    {locale}
+    onconfirm={() => openPerson && (confirming === 'erase' ? $erase.mutate(openPerson) : $unsubscribe.mutate(openPerson))}
+  />
 {/if}
 
 {#if d && a}

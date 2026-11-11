@@ -4,6 +4,7 @@
    * planner toolbar's "⋯" menu. Owns its workspace pick, the shares query
    * and the create/revoke mutations; the page only holds the open flag.
    */
+  import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { ApiError, fetchJSON, mutateJSON } from '$lib/api';
@@ -111,9 +112,13 @@
     },
   });
 
+  // Revocar un enlace corta a quien lo tiene suscrito y no se deshace: se
+  // confirma (tarea 134).
+  let revokingId = $state<string | null>(null);
   const revokeFeed = createMutation({
     mutationFn: (id: string) => mutateJSON('DELETE', `/api/calendar-shares/${id}`),
     onSuccess: () => {
+      revokingId = null;
       void queryClient.invalidateQueries({ queryKey: ['calendar-shares'] });
       addToast({ tone: 'success', message: t('planner.feed_revoked', locale) });
     },
@@ -159,8 +164,7 @@
             variant="secondary"
             tone="warn"
             size="xs"
-            loading={$revokeFeed.isPending}
-            onclick={() => $revokeFeed.mutate(share.id)}
+            onclick={() => (revokingId = share.id)}
           >
             {t('planner.feed_revoke', locale)}
           </Button>
@@ -179,6 +183,16 @@
     </Button>
   {/snippet}
 </Dialog>
+
+<ConfirmDialog
+  bind:open={() => revokingId !== null, (v) => { if (!v) revokingId = null; }}
+  title={t('planner.feed_revoke_title', locale)}
+  body={t('planner.feed_revoke_confirm', locale)}
+  confirm={t('planner.feed_revoke', locale)}
+  busy={$revokeFeed.isPending}
+  {locale}
+  onconfirm={() => revokingId && $revokeFeed.mutate(revokingId)}
+/>
 
 <style>
   @layer components {
