@@ -1,6 +1,7 @@
 import { test as setup, expect } from '@playwright/test';
 import { STORAGE_STATE } from '../playwright.config';
 import { HELP_SEEN } from './help-seen';
+import { forgetPlannerView } from './planner-view';
 
 /**
  * Sign in ONCE for the whole suite and hand the session to every spec.
@@ -68,6 +69,10 @@ setup('authenticate', async ({ page }) => {
       }).catch(() => {});
     }
   }, HELP_SEEN);
+
+  // THE PLANNER OPENS IN THE SEASON FOR EVERY SPEC (ADR-192): a drawing
+  // picked in an earlier run is not this run's starting point.
+  await forgetPlannerView(page.request);
 
   await page.context().storageState({ path: STORAGE_STATE });
 });

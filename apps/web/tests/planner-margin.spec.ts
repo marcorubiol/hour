@@ -159,7 +159,11 @@ test.describe('el margen del Planner (ADR-138 § 6)', () => {
     const link = page.getByTestId('conversation-planner');
     await expect(link).toHaveAttribute('href', `/h/planner?view=agenda&scope=p:${projectId}`);
     await link.click();
-    await expect(page).toHaveURL(/view=agenda/);
+    // A client navigation into a Planner not loaded yet in this page: the
+    // address changes only when its code and load have arrived, which against
+    // production has taken longer than the 5 s of an expect (2026-11-11). It
+    // waits on the test's own budget, as `waitForLoaded` does.
+    await page.waitForURL(/view=agenda/, { timeout: 0 });
     // The shell applies the pin and writes it back in its own form.
     await expect(page).toHaveURL(/scope=p:/);
     await waitForLoaded(page);
