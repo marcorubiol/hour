@@ -7454,3 +7454,34 @@ entrada del Planificador, y `PUT /api/me/planner-view`; columna y función, con 
 
 **Re-evaluar cuando** alguien con dos espacios diga que el Planificador «no abre donde lo dejó» (§ 4), o si hace falta
 un sitio en Ajustes para verlo.
+
+## [2026-11-11] ADR-193 · Revisión UX/UI del 11-11, tanda 1: una puerta por cosa (tareas 130, 131 y 132; enmienda ADR-182 § 1, ADR-152, ADR-178 § 1 y ADR-140)
+
+Marco (chat, 2026-11-11): «todo lo recomendado» sobre las 40 propuestas de la revisión de producto y de interfaz
+(`_tasks.md` § UX/UI 11-11). Esta entrada recoge lo que la primera tanda cambia de decisiones anteriores. En `main`
+desde `bd08dbdf`.
+
+1. **El ámbito tiene una sola puerta: la pastilla** (enmienda ADR-152 «Qué no cambia» y ADR-178 § 1). La barra lateral
+   pierde «∑ Todo», la lista de ámbitos guardados y recientes, y la caja «⌘K · buscar». Guardados y recientes viven en
+   el diálogo de la pastilla: pulsar una fila aplica ese ámbito, y un guardado se renombra ahí. La barra queda con
+   reloj, calma, pulso y cuenta (`--rail-width` de 15.5rem a 14.5rem). La búsqueda se queda solo en la barra superior.
+2. **La presencia se dice con palabras también en escritorio** («2 en línea»), no con puntos (enmienda ADR-140,
+   añadido del 20-10).
+3. **Conversaciones tiene un solo «+»** con menú: Conversación, Llamada e Importar chat, también en el móvil.
+   «Apuntar llamada» deja de ser un botón propio de la cabecera y queda a un toque más (enmienda ADR-182 § 1).
+4. **El turno de una conversación se calcula en un sitio** (`shownTurn`): lista, fila, «Te espera» de Hoy y ficha.
+   Manda la regla de la lista (ADR-126 § 7, ADR-118 § 7): un siguiente paso nuestro vencido cuenta como «nos toca»
+   aunque lo último lo hayamos escrito nosotros, y la ficha lo dice con esas palabras («Nos toca el siguiente paso
+   del 09 nov, mientras esperamos su respuesta»).
+5. **«Por facturar» no cambia de regla** (ADR-131: lo ya hecho sin factura); la cifra dice además lo confirmado que
+   aún no ha pasado y cuántos bolos van sin fecha.
+6. **Un solo estilo de tema**, con claro, auto y oscuro. Quien tenía otro guardado cae en el de defecto.
+7. **Las fichas no marcan su sección en el selector** (ADR-167 § 4 se mantiene): la vuelta la da la miga, que ahora
+   llevan también el envío y el tablón del bolo.
+8. **El login no ofrece el alta** a quien llega sin invitación (`?mode=signup` sigue funcionando) y tiene
+   recuperación de contraseña por el Worker (`build/runbooks/password-recovery.md`).
+
+**Verificado:** `pnpm --filter web check` 0/0 y unitarios 2305 en `bd08dbdf`. Sin E2E ni RLS hasta el deploy; ocho
+specs puestos al día sin correr.
+
+**Re-evaluar cuando** alguien eche de menos los ámbitos a la vista (§ 1) o «Apuntar llamada» a un toque (§ 3).
