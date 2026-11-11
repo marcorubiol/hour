@@ -1,6 +1,6 @@
 <script module lang="ts">
   import type { NavWorkspace } from '$lib/nav';
-  import { settingsSectionsFor } from '$lib/workspace-role';
+  import { managesSpaceIn, settingsSectionsFor } from '$lib/workspace-role';
 
   /**
    * Types and section catalog live in module scope so they can be
@@ -14,6 +14,8 @@
     | 'lenses'
     | 'tags'
     | 'facets'
+    | 'facet-packages'
+    | 'facet-people'
     | 'mail';
 
   type Section = {
@@ -22,6 +24,8 @@
     labelKey: string;
     glyph: string;
     danger?: boolean;
+    /** A page of a section split in several (136): drawn under it, and its crumb. */
+    parent?: SectionId;
   };
 
   export const SECTIONS: Section[] = [
@@ -31,6 +35,8 @@
     { id: 'lenses', labelKey: 'settings.nav_lenses', glyph: '◫' },
     { id: 'tags', labelKey: 'settings.nav_tags', glyph: '#' },
     { id: 'facets', labelKey: 'settings.nav_facets', glyph: '◇' },
+    { id: 'facet-packages', labelKey: 'settings.nav_facet_packages', glyph: '', parent: 'facets' },
+    { id: 'facet-people', labelKey: 'settings.nav_facet_people', glyph: '', parent: 'facets' },
     { id: 'mail', labelKey: 'settings.nav_mail', glyph: '@' },
     // Notifications, Billing and Danger zone are hidden: every control in
     // them kept nothing (a mocked card, switches with no writer, buttons
@@ -40,6 +46,9 @@
   /** What is the person's own in any space, whatever their role in it. */
   export const PERSONAL_SECTIONS: readonly SectionId[] = ['profile'];
 
+  /** What only who manages the space changes: a member would find one line saying so. */
+  export const ADMIN_SECTIONS: readonly SectionId[] = ['facet-people'];
+
   /**
    * The sections the space in the URL offers whoever looks: all of them,
    * except in a space they are a guest of (a bolo invitation), where only
@@ -47,13 +56,31 @@
    */
   export function offeredSections(workspace: Pick<NavWorkspace, 'my_role'> | null | undefined): Section[] {
     const ids = settingsSectionsFor(workspace, SECTIONS.map((s) => s.id), PERSONAL_SECTIONS);
-    return SECTIONS.filter((s) => ids.includes(s.id));
+    const admin = managesSpaceIn(workspace);
+    return SECTIONS.filter((s) => ids.includes(s.id) && (admin || !ADMIN_SECTIONS.includes(s.id)));
   }
 
   /** The ids of sections that were folded into another: old links still land (ADR-156). */
   const FOLDED: Readonly<Record<string, SectionId>> = { privacy: 'space', languages: 'space' };
 
   /** A `?section=` that is not (or no longer) a section, or not one this space offers, lands on Profile. */
+  export function sectionOf(id: SectionId): Section | undefined {
+    return SECTIONS.find((s) => s.id === id);
+  }
+
+  /**
+   * The crumbs above a section's title: «Ajustes», and the section it is a
+   * page of when it has one. The menu has no groups, so the crumb has none (136).
+   */
+  export function settingsCrumbs(id: SectionId, label: (key: string) => string): { label: string }[] {
+    const parent = sectionOf(id)?.parent;
+    const parentSection = parent ? sectionOf(parent) : undefined;
+    return [
+      { label: label('settings.title') },
+      ...(parentSection ? [{ label: label(parentSection.labelKey) }] : []),
+    ];
+  }
+
   export function sectionFrom(param: string | null, offered: readonly Section[] = SECTIONS): SectionId {
     const id = (param && FOLDED[param]) || param;
     return offered.some((s) => s.id === id) ? (id as SectionId) : 'profile';
@@ -106,6 +133,7 @@
             'set-nav__item',
             active === s.id && 'is-active',
             s.danger && 'is-danger',
+            s.parent && 'is-child',
           ]
             .filter(Boolean)
             .join(' ')}
@@ -163,6 +191,10 @@
       color: var(--text-color);
       box-shadow: inset var(--line) 0 0 var(--text-color);
       font-weight: 500;
+    }
+    /* A page of a split section sits under it, one step in. */
+    .set-nav__item.is-child {
+      padding-inline-start: calc(var(--space-s) * 2);
     }
     .set-nav__item.is-danger {
       color: var(--danger);

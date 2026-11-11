@@ -22,7 +22,14 @@
     offeredSections($workspacesQuery.data?.items.find((w) => w.slug === workspaceSlug)),
   );
   let active = $derived(sectionFrom(page.url.searchParams.get('section'), offered));
-  let options = $derived(offered.map((s) => ({ value: s.id, label: t(s.labelKey, locale) })));
+  // A page of a split section says whose page it is: the select has no indent.
+  let options = $derived(
+    offered.map((s) => {
+      const parent = s.parent ? offered.find((o) => o.id === s.parent) : undefined;
+      const label = t(s.labelKey, locale);
+      return { value: s.id, label: parent ? `${t(parent.labelKey, locale)} · ${label}` : label };
+    }),
+  );
 
   function choose(event: Event) {
     const id = (event.currentTarget as HTMLSelectElement).value;

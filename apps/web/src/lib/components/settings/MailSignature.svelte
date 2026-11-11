@@ -100,13 +100,15 @@
       onSuccess: () => saved.show(field),
     });
   }
+  // Two signatures share the page: each field says whose it is (136).
+  let fieldLabel = $derived(scope === 'personal' ? 'mail.signature_personal_label' : 'mail.signature_company_label');
 </script>
 
 {#if workspaceId && parts}
   <section class="set-group">
+    <!-- Each signature names itself: two heads both reading «Firma ·» were one too many (136). -->
     <BlockHead
-      title={t('mail.signature', locale)}
-      count={scope === 'personal'
+      title={scope === 'personal'
         ? t('mail.signature_personal_title', locale, { company })
         : t('mail.signature_company_title', locale, { company })}
     />
@@ -153,7 +155,7 @@
 
       <div class="set-row">
         <div class="set-row__lead">
-          <div class="set-row__label">{t('mail.signature', locale)}</div>
+          <label class="set-row__label" for="sig-text-{scope}">{t(fieldLabel, locale)}</label>
           <div class="set-row__hint">
             {scope === 'personal' ? t('mail.signature_personal_hint', locale) : t('mail.signature_company_hint', locale)}
           </div>
@@ -161,10 +163,9 @@
         <div class="set-row__ctrl">
           {#if canEdit}
             <div class="sig">
-              <Field id="sig-text" stack saved={saved.is('signature')}>
+              <Field id="sig-text-{scope}" stack saved={saved.is('signature')}>
                 <textarea
-                  id="sig-text"
-                  aria-label={t('mail.signature', locale)}
+                  id="sig-text-{scope}"
                   rows="4"
                   maxlength="2000"
                   value={shown}

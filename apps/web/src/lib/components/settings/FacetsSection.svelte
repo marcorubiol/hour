@@ -13,8 +13,12 @@
    * 3. Ajustes por persona (solo admin): cada membresía bajo el espacio, con
    *    las facetas que existen en su nivel; elegir guarda en sitio
    *    (`set_membership_facet`) y dice «guardado» a su lado (ADR-139 p7).
+   *
+   * Cada bloque es su propia página de Ajustes (136): `facets`,
+   * `facet-packages` y `facet-people`, con su dirección; `part` dice cuál.
    */
   import RecordHead from '$lib/components/RecordHead.svelte';
+  import { SECTIONS, settingsCrumbs } from '$lib/components/SettingsNav.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import Button from '$lib/components/Button.svelte';
   import Checkbox from '$lib/components/Checkbox.svelte';
@@ -47,10 +51,13 @@
     type SettingsFacet,
   } from '$lib/workspace-facets';
 
+  type FacetsPart = 'facets' | 'facet-packages' | 'facet-people';
+
   interface Props {
     workspaceId: string | undefined;
+    part?: FacetsPart;
   }
-  let { workspaceId }: Props = $props();
+  let { workspaceId, part = 'facets' }: Props = $props();
 
   const locale = appLocale();
   const queryClient = useQueryClient();
@@ -71,6 +78,12 @@
   let grants = $derived(
     data ? personGrants(data.grants, facets, data.preset_facets, t('settings.facets_unknown_person', locale)) : [],
   );
+
+  const SUBS: Record<FacetsPart, string> = {
+    facets: 'settings.facets_sub',
+    'facet-packages': 'settings.facets_presets_hint',
+    'facet-people': 'settings.facets_grants_hint',
+  };
 
   const saved = new SaveFlash();
   // The threads read the names and the switch: the board and the feed refetch.
@@ -227,10 +240,14 @@
   }
 </script>
 
-<RecordHead crumbs={[{ label: t('settings.title', locale) }, { label: t('settings.lenses_kicker', locale) }]} title={t('settings.nav_facets', locale)}>
-  {#snippet facts()}<span>{t('settings.facets_sub', locale)}</span>{/snippet}
+<RecordHead
+  crumbs={settingsCrumbs(part, (key) => t(key, locale))}
+  title={t(SECTIONS.find((s) => s.id === part)?.labelKey ?? 'settings.nav_facets', locale)}
+>
+  {#snippet facts()}<span>{t(SUBS[part], locale)}</span>{/snippet}
 </RecordHead>
 
+{#if part === 'facets'}
 <section class="set-group" data-testid="settings-facets">
   <BlockHead title={t('settings.facets_group', locale)} />
   <div class="set-group__body">
@@ -322,6 +339,7 @@
               id="facet-new"
               type="text"
               maxlength={FACET_LABEL_MAX}
+              placeholder={t('settings.facets_new_placeholder', locale)}
               bind:value={draft}
               oninput={() => (showProblem = false)}
               disabled={$create.isPending}
@@ -356,10 +374,11 @@
     {/if}
   </div>
 </section>
+{/if}
 
-{#if data}
+{#if part === 'facet-packages' && data}
   <section class="set-group" data-testid="settings-facets-presets">
-    <BlockHead title={t('settings.facets_presets_group', locale)} count={t('settings.facets_presets_hint', locale)} />
+    <BlockHead title={t('settings.facets_presets_group', locale)} />
     <div class="set-group__body">
       {#each presets as p (p.key)}
         <div class="set-row" data-preset={p.key}>
@@ -384,9 +403,13 @@
   </section>
 {/if}
 
-{#if canEdit}
+{#if part === 'facet-people' && data && !canEdit}
+  <p class="set-row__hint">{t('settings.lenses_admin_only', locale)}</p>
+{/if}
+
+{#if part === 'facet-people' && canEdit}
   <section class="set-group" data-testid="settings-facets-grants">
-    <BlockHead title={t('settings.facets_grants_group', locale)} count={t('settings.facets_grants_hint', locale)} />
+    <BlockHead title={t('settings.facets_grants_group', locale)} />
     <div class="set-group__body">
       {#each grants as g (g.membership_id)}
         <div class="set-row facetgrant" data-membership={g.membership_id} role="group" aria-label={g.name}>

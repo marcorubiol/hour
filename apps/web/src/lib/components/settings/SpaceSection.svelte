@@ -43,7 +43,7 @@
   let fromAccount = $derived($fiscalQuery.data?.source === 'account');
 </script>
 
-<RecordHead crumbs={[{ label: t('settings.title', locale) }, { label: t('settings.space_kicker', locale) }]} title={t('settings.nav_space', locale)}>
+<RecordHead crumbs={[{ label: t('settings.title', locale) }]} title={t('settings.nav_space', locale)}>
   {#snippet facts()}<span>{t('settings.space_sub', locale)}</span>{/snippet}
 </RecordHead>
 

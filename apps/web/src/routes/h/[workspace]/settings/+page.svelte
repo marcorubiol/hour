@@ -106,8 +106,8 @@
     <ConversationTagsSection workspaceId={currentWorkspace?.id} />
   {/if}
 
-  {#if active === 'facets'}
-    <FacetsSection workspaceId={currentWorkspace?.id} />
+  {#if active === 'facets' || active === 'facet-packages' || active === 'facet-people'}
+    <FacetsSection workspaceId={currentWorkspace?.id} part={active} />
   {/if}
 
   <!-- "Connections" section killed: 7 providers (Fastmail, Holded,
@@ -156,7 +156,10 @@
 
   .set-page :global(.set-row) {
     display: grid;
-    grid-template-columns: minmax(11.25rem, 1fr) minmax(17.5rem, 1.6fr);
+    /* The control sits beside its label and hint (ADR-139 p4, 136): the lead
+       column stops at 15rem and the control at 40rem, so on a wide page the
+       spare room goes to the right of the row, not between its two halves. */
+    grid-template-columns: minmax(11.25rem, 15rem) minmax(17.5rem, 40rem);
     gap: calc(var(--set-pad) * 1.4);
     align-items: start;
     padding-block: var(--set-pad);
@@ -179,7 +182,6 @@
     color: var(--text-faint);
     line-height: 1.55;
     margin-block-start: var(--space-xs);
-    max-inline-size: 36ch;
   }
   .set-page :global(.set-row__ctrl) {
     display: flex;

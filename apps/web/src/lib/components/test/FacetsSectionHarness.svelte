@@ -3,9 +3,10 @@
   import { QueryClient, QueryClientProvider } from '@tanstack/svelte-query';
   import FacetsSection from '../settings/FacetsSection.svelte';
 
+  let { part = 'facets' }: { part?: 'facets' | 'facet-packages' | 'facet-people' } = $props();
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 </script>
 
 <QueryClientProvider {client}>
-  <FacetsSection workspaceId="a0000000-0000-4000-8000-000000000001" />
+  <FacetsSection workspaceId="a0000000-0000-4000-8000-000000000001" {part} />
 </QueryClientProvider>

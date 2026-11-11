@@ -12,8 +12,8 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  * 2. `zzz_e2e_facet` («ZZZ E2E facet»): se crea la primera vez con el nivel
  *    bolo y después se reutiliza (no hay DELETE de facetas). Se marca y se
  *    desmarca un nivel con «saved»; se renombra en sitio y vuelve.
- * 3. «What each package gives» enseña Minimal sin facetas y Team con
- *    Technical. Acaba apagada.
+ * 3. «What each package gives», en su propia página (136), enseña Minimal
+ *    sin facetas y Team con Technical. Acaba apagada.
  *
  * Fixture: el espacio `playwright`. Nunca toca `muk-cia`.
  */
@@ -83,12 +83,17 @@ test.describe('workspace facets in settings', () => {
       await field.press('Enter');
       await expect(row(page).locator('.set-row__label')).toHaveText(NAME);
 
-      // 3. The packages, read only.
+      // 3. The packages, read only, on their own page.
+      await page.goto('/h/playwright/settings?section=facet-packages');
       const presets = page.getByTestId('settings-facets-presets');
       await expect(presets.locator('[data-preset="minim"]')).toContainText('No facet');
       await expect(presets.locator('[data-preset="equip"]')).toContainText('Technical sees');
       await expect(presets.locator('input')).toHaveCount(0);
     } finally {
+      if (!page.url().includes('section=facets')) {
+        await page.goto(SETTINGS);
+        await settingsLoaded(page);
+      }
       if ((await row(page).count()) > 0) await setActive(page, false);
     }
   });

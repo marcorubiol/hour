@@ -9,7 +9,9 @@
  * actions (ADR-139 «después»), also what goes INTO them: the quick add
  * (`CreateEventDialog`: a performance and every date type), a task (Hoy's
  * `TaskComposer`, in a dialog) and a conversation
- * (`CreateConversationDialog`, the lens's own «Añadir conversación»).
+ * (`CreateConversationDialog`, the lens's own «Añadir conversación»), and
+ * a person or an organization on their own (`CreatePersonDialog`,
+ * `CreateOrganizationDialog`, 136).
  *
  * What a preset leaves out, the shell deduces from the pinned scope
  * (`scopeCreatePresets`). The day is the one thing the shell cannot know: a
@@ -55,6 +57,8 @@ class CreationStore {
   eventOpen = $state(false);
   taskOpen = $state(false);
   conversationOpen = $state(false);
+  personOpen = $state(false);
+  organizationOpen = $state(false);
 
   /** Presets consumed by the dialogs when opening from a scoped surface. */
   lineWorkspaceId = $state<string | null>(null);
@@ -68,6 +72,9 @@ class CreationStore {
   /** The project and line a page already is (a line's module). */
   conversationProjectId = $state<string | null>(null);
   conversationLineId = $state<string | null>(null);
+  /** Typed in ⌘K: the new person's or organization's name (136). */
+  personName = $state('');
+  organizationName = $state('');
 
   /** Raw: a page's getters must stay getters, not a proxy's snapshot. */
   eventHost = $state.raw<EventHost | null>(null);
@@ -109,6 +116,18 @@ class CreationStore {
     this.conversationProjectId = preset?.projectId ?? null;
     this.conversationLineId = preset?.lineId ?? null;
     this.conversationOpen = true;
+  }
+
+  /** A person on their own, without a conversation (136). */
+  openPerson(preset?: { name?: string | null }) {
+    this.personName = preset?.name?.trim() ?? '';
+    this.personOpen = true;
+  }
+
+  /** An organization on its own, without a conversation (136). */
+  openOrganization(preset?: { name?: string | null }) {
+    this.organizationName = preset?.name?.trim() ?? '';
+    this.organizationOpen = true;
   }
 
   /** A page lends its day while mounted; the returned function takes it back. */

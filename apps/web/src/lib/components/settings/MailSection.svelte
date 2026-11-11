@@ -107,7 +107,7 @@
   }
 </script>
 
-<RecordHead crumbs={[{ label: t('settings.title', locale) }, { label: t('mail.kicker', locale) }]} title={t('settings.nav_mail', locale)}>
+<RecordHead crumbs={[{ label: t('settings.title', locale) }]} title={t('settings.nav_mail', locale)}>
   {#snippet facts()}<span>{t('mail.sub', locale)}</span>{/snippet}
 </RecordHead>
 

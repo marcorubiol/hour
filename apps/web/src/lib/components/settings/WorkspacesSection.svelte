@@ -251,7 +251,7 @@
   });
 </script>
 
-<RecordHead crumbs={[{ label: t('settings.title', locale) }, { label: t('settings.ws_kicker', locale) }]} title={t('settings.nav_workspaces', locale)}>
+<RecordHead crumbs={[{ label: t('settings.title', locale) }]} title={t('settings.nav_workspaces', locale)}>
   {#snippet facts()}<span>{t('settings.ws_sub', locale)}</span>{/snippet}
 </RecordHead>
 
@@ -289,7 +289,7 @@
     </div>
 
     <div class="set-access__invite">
-      <Input id="invite-email" label={t('settings.email', locale)} type="email" placeholder="collaborator@example.com" bind:value={inviteEmail} />
+      <Input id="invite-email" label={t('settings.email', locale)} type="email" placeholder={t('settings.invite_email_placeholder', locale)} bind:value={inviteEmail} />
       <Select id="invite-role" label={t('settings.access_ws_role', locale)} bind:value={inviteRole}>
         <option value="guest">{t('settings.access_opt_guest', locale)}</option>
         <option value="viewer">{t('settings.access_opt_viewer', locale)}</option>

@@ -580,6 +580,8 @@
     event: lazy(() => import('$lib/components/create/CreateEventDialog.svelte')),
     task: lazy(() => import('$lib/components/create/CreateTaskDialog.svelte')),
     conversation: lazy(() => import('$lib/components/create/CreateConversationDialog.svelte')),
+    person: lazy(() => import('$lib/components/create/CreatePersonDialog.svelte')),
+    organization: lazy(() => import('$lib/components/create/CreateOrganizationDialog.svelte')),
   };
   $effect(() => {
     if (paletteOpen) void palette.load();
@@ -589,6 +591,8 @@
     if (creation.eventOpen) void dialogs.event.load();
     if (creation.taskOpen) void dialogs.task.load();
     if (creation.conversationOpen) void dialogs.conversation.load();
+    if (creation.personOpen) void dialogs.person.load();
+    if (creation.organizationOpen) void dialogs.organization.load();
   });
   function onPaletteKey(e: KeyboardEvent) {
     if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'k' || !authChecked || blocked) return;
@@ -627,6 +631,8 @@
   function onCreate(c: PaletteCreate) {
     if (c.kind === 'task') creation.openTask({ title: c.title });
     else if (c.kind === 'conversation') creation.openConversation({ who: c.title });
+    else if (c.kind === 'person') creation.openPerson({ name: c.title });
+    else if (c.kind === 'organization') creation.openOrganization({ name: c.title });
     else creation.openEvent({ type: createEventType(c.kind), title: c.title });
   }
   /** Adding stays where you are (ADR-139 p3); the notice's «Abrir» goes to
@@ -902,6 +908,12 @@
       projectId={creation.conversationProjectId}
       lineId={creation.conversationLineId}
     />
+  {/if}
+  {#if dialogs.person.component}
+    <dialogs.person.component bind:open={creation.personOpen} name={creation.personName} />
+  {/if}
+  {#if dialogs.organization.component}
+    <dialogs.organization.component bind:open={creation.organizationOpen} name={creation.organizationName} />
   {/if}
 {/if}
 </svelte:boundary>

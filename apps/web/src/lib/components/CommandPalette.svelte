@@ -58,6 +58,7 @@
   import { conversationAccessQueryOptions } from '$lib/conversation-access';
   import { planAccessQueryOptions } from '$lib/plan-create';
   import { CREATE_LABEL_KEYS, paletteCreates, type PaletteCreate } from '$lib/palette-create';
+  import { organizationCreateQueryOptions } from '$lib/directory-create';
   import { paletteFindRows, paletteSearchQueryOptions, paletteSearchTerm } from '$lib/palette-search';
   import { enterAct, rowAct, rowAside, type PaletteMode } from '$lib/palette-mode';
 
@@ -105,10 +106,15 @@
    */
   const planAccessQuery = createQuery(toStore(() => ({ ...planAccessQueryOptions(), enabled: open })));
   const convAccessQuery = createQuery(toStore(() => ({ ...conversationAccessQueryOptions(), enabled: open })));
+  const orgCreateQuery = createQuery(toStore(() => organizationCreateQueryOptions(open)));
   let can = $derived({
     plan: lensOn('planner') && $planAccessQuery.data?.edit !== false,
     converse: lensOn('conversations') && $convAccessQuery.data?.edit !== false,
     task: canTask,
+    // A person or an organization: where some space takes a project, it takes them too (owner, admin, member).
+    directory: canProject,
+    // Only once the database makes one alone (136); until then, no row that would fail.
+    organization: $orgCreateQuery.data?.available === true,
   });
 
   const workspacesQuery = createQuery(workspacesQueryOptions());
