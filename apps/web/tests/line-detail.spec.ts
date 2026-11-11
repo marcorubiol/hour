@@ -114,14 +114,18 @@ test.describe('line detail: the kind\'s modules', () => {
       }
     }, { email: CONTACT_EMAIL, lineId: line!.id });
 
-    // Capture from the module — no Line select needed: the context IS the line.
-    await page.locator('#mod-conversations').getByRole('button', { name: 'Add conversation' }).click();
+    // Capture from the module (tarea 135): the shell's one «Add conversation»,
+    // opened with this project and this line already checked.
+    await page.locator('#mod-conversations').getByRole('button', { name: '+ conversation' }).click();
     const dialog = page.locator('dialog[open]');
+    await expect(dialog.getByLabel('ZZZ e2e collab')).toBeChecked();
     await dialog.getByLabel('Full name').fill(CONTACT_NAME);
     await dialog.getByLabel('Email').fill(CONTACT_EMAIL);
-    // A next step long past: the line's «Falta» names it (ADR-139 § 2).
+    // A next step long past: the line's «Falta» names it (ADR-139 § 2). It
+    // lives folded under «More».
+    await dialog.getByRole('button', { name: /^More/ }).click();
     await dialog.getByLabel('Next action', { exact: true }).fill('2020-01-06');
-    await dialog.getByRole('button', { name: /^add$/i }).click();
+    await dialog.getByRole('button', { name: 'Add conversation' }).click();
     await expect(dialog).not.toBeVisible({ timeout: 10_000 });
 
     await expect(page.locator('#mod-conversations')).toContainText(CONTACT_NAME, { timeout: 10_000 });
@@ -161,7 +165,7 @@ test.describe('line detail: the kind\'s modules', () => {
     // Materials: register a link, see the row, remove it.
     await page
       .locator('#mod-materials')
-      .getByRole('button', { name: /register material/i })
+      .getByRole('button', { name: '+ material' })
       .click();
     const dialog = page.locator('dialog[open]');
     await dialog.getByLabel(/kind/i).selectOption({ label: 'Dossier' });

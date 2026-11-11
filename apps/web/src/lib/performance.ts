@@ -334,7 +334,7 @@ export const PerformancePatchSchema = v.object({
   performed_at: v.optional(isoDateField),
   // ADR-080 §2 — hold decision notice (NULL = default 30 · 0 = none · N =
   // days before). PATCH-only on purpose: the create RPC doesn't know the
-  // column, so creation sends it via a follow-up PATCH (PerformanceForm).
+  // column, so creation sends it via a follow-up PATCH (`plan-create`).
   hold_notice_days: v.optional(
     v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(365))),
   ),

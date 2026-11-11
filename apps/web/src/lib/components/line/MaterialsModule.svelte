@@ -8,6 +8,7 @@
    */
 
   import EmptyLine from '$lib/components/EmptyLine.svelte';
+  import LineModule from './LineModule.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
@@ -32,9 +33,10 @@
       workspace_id: string;
     };
     workspaceSlug: string;
+    title: string;
   }
 
-  let { line, workspaceSlug }: Props = $props();
+  let { line, title }: Props = $props();
 
   const locale = appLocale();
   const kindOptions = ASSET_KINDS.map((k) => ({ value: k, label: kindLabel(k, locale) }));
@@ -123,17 +125,15 @@
   });
 </script>
 
-<section class="mat" aria-label={t('line.module_materials', locale)}>
-  <header class="mat__head">
-    <Button size="xs" variant="secondary" onclick={openCreate}>{t('line.material_register', locale)}</Button>
-  </header>
+{#snippet action(cls: string)}
+  <button type="button" class={cls} onclick={openCreate}>{t('line.add_material', locale)}</button>
+{/snippet}
 
+<LineModule {title} empty={!errorMsg && !loading && items.length === 0} {action}>
   {#if errorMsg}
     <p class="load-fail" role="alert">{errorMsg}</p>
   {:else if loading}
     <EmptyLine text={t('desk.loading', locale)} busy />
-  {:else if items.length === 0}
-    <EmptyLine text={t('line.material_empty', locale)} />
   {:else}
     <div class="table-wrap">
       <table>
@@ -185,7 +185,7 @@
       </table>
     </div>
   {/if}
-</section>
+</LineModule>
 
 <Dialog
   bind:open={createOpen}
@@ -227,17 +227,6 @@
 
 <style>
   @layer components {
-    .mat {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-s);
-    }
-
-    .mat__head {
-      display: flex;
-      justify-content: flex-end;
-    }
-
     .mat__cell-direction {
       font-family: var(--font-mono);
       font-size: var(--text-xs);

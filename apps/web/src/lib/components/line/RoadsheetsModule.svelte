@@ -1,7 +1,8 @@
 <script lang="ts">
   /**
    * RoadsheetsModule — "Road sheets" module of the line detail stack
-   * (ADR-056). Content-only: the page owns the section frame + heading.
+   * (ADR-056). Only a reading: with no performance it draws nothing (ADR-145
+   * § 1, LineModule).
    *
    * Lists the line's performances (API-ordered by performed_at asc) with a
    * per-row jump into that gig's road sheet. Deliberately NO fee fields —
@@ -9,6 +10,7 @@
    */
 
   import EmptyLine from '$lib/components/EmptyLine.svelte';
+  import LineModule from './LineModule.svelte';
   import { createQuery } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON } from '$lib/api';
@@ -38,9 +40,10 @@
       workspace_id: string;
     };
     workspaceSlug: string;
+    title: string;
   }
 
-  let { line, workspaceSlug }: Props = $props();
+  let { line, workspaceSlug, title }: Props = $props();
 
   const locale = appLocale();
 
@@ -68,48 +71,50 @@
   }
 </script>
 
-{#if errorMsg}
-  <p class="load-fail" role="alert">{errorMsg}</p>
-{:else if loading}
-  <EmptyLine text={t('desk.loading', locale)} busy />
-{:else if items.length === 0}
-  <EmptyLine text={t('line.roadsheets_empty', locale)} />
-{:else}
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>{t('perf.date', locale)}</th>
-          <th>{t('edit.status', locale)}</th>
-          <th>{t('line.where', locale)}</th>
-          <th aria-label={t('line.roadsheet', locale)}></th>
-        </tr>
-      </thead>
-      <tbody>
-        {#each items as p (p.id)}
-          <tr>
-            <td class="rsm__cell-date">{dayLabel(p.performed_at)}</td>
-            <td>
-              <StateBadge
-                label={performanceStatusLabel(p.status, locale)}
-                tone={performanceStatusTone(p.status)}
-              />
-            </td>
-            <td class="rsm__cell-muted">{whereLabel(p)}</td>
-            <td class="rsm__cell-sheet">
-              {#if p.slug}
-                <a class="link-arrow" href={`/h/${workspaceSlug}/performance/${p.slug}/roadsheet`}>
-                  {t('line.roadsheet', locale)} →
-                </a>
-              {:else}
-                <span class="rsm__sheet--unlinked">{t('line.roadsheet', locale)} →</span>
-              {/if}
-            </td>
-          </tr>
-        {/each}
-      </tbody>
-    </table>
-  </div>
+{#if !($performancesQuery.isSuccess && items.length === 0)}
+  <LineModule {title}>
+    {#if errorMsg}
+      <p class="load-fail" role="alert">{errorMsg}</p>
+    {:else if loading}
+      <EmptyLine text={t('desk.loading', locale)} busy />
+    {:else}
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>{t('perf.date', locale)}</th>
+              <th>{t('edit.status', locale)}</th>
+              <th>{t('line.where', locale)}</th>
+              <th aria-label={t('line.roadsheet', locale)}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each items as p (p.id)}
+              <tr>
+                <td class="rsm__cell-date">{dayLabel(p.performed_at)}</td>
+                <td>
+                  <StateBadge
+                    label={performanceStatusLabel(p.status, locale)}
+                    tone={performanceStatusTone(p.status)}
+                  />
+                </td>
+                <td class="rsm__cell-muted">{whereLabel(p)}</td>
+                <td class="rsm__cell-sheet">
+                  {#if p.slug}
+                    <a class="link-arrow" href={`/h/${workspaceSlug}/performance/${p.slug}/roadsheet`}>
+                      {t('line.roadsheet', locale)} →
+                    </a>
+                  {:else}
+                    <span class="rsm__sheet--unlinked">{t('line.roadsheet', locale)} →</span>
+                  {/if}
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+    {/if}
+  </LineModule>
 {/if}
 
 <style>

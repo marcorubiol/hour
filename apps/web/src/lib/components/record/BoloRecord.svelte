@@ -69,7 +69,7 @@
   import MissingBand, { type MissingItem } from '$lib/components/MissingBand.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import EmptyLine from '$lib/components/EmptyLine.svelte';
-  import PerformanceCreateDialog from '$lib/components/PerformanceCreateDialog.svelte';
+  import { useCreation } from '$lib/stores/creation.svelte';
   import ExpenseDialog from '$lib/components/ExpenseDialog.svelte';
 
   interface Props {
@@ -161,7 +161,12 @@
   // Only an explicit «no» hides it (the RPC still gates the write).
   const planAccessQuery = createQuery(toStore(() => ({ ...planAccessQueryOptions(projectId), enabled: Boolean(bolo) })));
   let canAddFunction = $derived(lensOn('planner') && $planAccessQuery.data?.edit !== false);
-  let addOpen = $state(false);
+  // «+ función» opens the shell's one quick add (tarea 135), with the
+  // project, this bolo (and so its room) and no line already said.
+  const creation = useCreation();
+  function addFunction() {
+    creation.openEvent({ type: 'performance', projectId, lineId: null, boloId: id });
+  }
   // «+ Gasto» (ADR-170): the bolo is already chosen. Money is Cuentas'
   // (ADR-043), so it follows that lens; `create_expense` gates on edit:money.
   let canAddExpense = $derived(lensOn('books'));
@@ -433,7 +438,7 @@
     <section class="bolo-record__section" aria-label={t('bolo.history', locale)} data-testid="bolo-history">
       <BlockHead title={t('bolo.history', locale)}>
         {#if canAddFunction}
-          <button type="button" class="block-head__act" onclick={() => (addOpen = true)}>{t('books.add_function', locale)}</button>
+          <button type="button" class="block-head__act" onclick={addFunction}>{t('books.add_function', locale)}</button>
         {/if}
       </BlockHead>
       {#if historyBusy || !history}
@@ -500,10 +505,6 @@
     lockAnchor
     currency={bolo.fee_currency ?? 'EUR'}
   />
-{/if}
-
-{#if canAddFunction}
-  <PerformanceCreateDialog bind:open={addOpen} presetProjectId={projectId} lockProject presetBoloId={id} />
 {/if}
 
 <style>

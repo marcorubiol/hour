@@ -11,6 +11,7 @@
   import { toStore } from 'svelte/store';
   import TaskBoard from '$lib/components/TaskBoard.svelte';
   import TaskComposer from '$lib/components/TaskComposer.svelte';
+  import LineModule from './LineModule.svelte';
   import { fetchJSON } from '$lib/api';
   import { appLocale, t } from '$lib/i18n';
   import type { TaskItem, TaskTarget } from '$lib/task';
@@ -25,9 +26,10 @@
       workspace_id: string;
     };
     workspaceSlug: string;
+    title: string;
   }
 
-  let { line }: Props = $props();
+  let { line, title }: Props = $props();
 
   const locale = appLocale();
 
@@ -56,26 +58,28 @@
   });
 </script>
 
-<div class="ltm">
-  <TaskComposer {locale} {target} lockTarget invalidateKeys={[['line-tasks', line.id]]} />
+<LineModule {title}>
+  <div class="ltm">
+    <TaskComposer {locale} {target} lockTarget invalidateKeys={[['line-tasks', line.id]]} />
 
-  <TaskBoard
-    tasks={openTasks}
-    showContext={false}
-    loading={$tasksQuery.isPending}
-    error={$tasksQuery.isError}
-    emptyText={t('line.tasks_empty', locale)}
-  />
+    <TaskBoard
+      tasks={openTasks}
+      showContext={false}
+      loading={$tasksQuery.isPending}
+      error={$tasksQuery.isError}
+      emptyText=""
+    />
 
-  {#if doneTasks.length > 0}
-    <button type="button" class="ltm__done-toggle" onclick={() => (showDone = !showDone)}>
-      {t(showDone ? 'line.tasks_hide_done' : 'line.tasks_show_done', locale, { n: doneTasks.length })}
-    </button>
-    {#if showDone}
-      <TaskBoard tasks={doneTasks} showContext={false} emptyText="" />
+    {#if doneTasks.length > 0}
+      <button type="button" class="ltm__done-toggle" onclick={() => (showDone = !showDone)}>
+        {t(showDone ? 'line.tasks_hide_done' : 'line.tasks_show_done', locale, { n: doneTasks.length })}
+      </button>
+      {#if showDone}
+        <TaskBoard tasks={doneTasks} showContext={false} emptyText="" />
+      {/if}
     {/if}
-  {/if}
-</div>
+  </div>
+</LineModule>
 
 <style>
   @layer components {

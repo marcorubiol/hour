@@ -1,21 +1,23 @@
 import { test, expect, type Page } from '@playwright/test';
 import { waitForLoaded } from './loaded';
-import { fixtureLine, fixtureLineHref, type FixtureLine } from './fixture-line';
+import { fixtureLine, type FixtureLine } from './fixture-line';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
 
 /**
- * E2E — conversation inline write path of a conversation row (ADR-040/044;
- * moved off the retired /booking wrapper in ADR-056 cleanup).
+ * E2E — the write path of a conversation (ADR-040/044, ADR-098, ADR-138).
  *
  * Since ADR-176 the Conversations lens draws chat rows with no inline
- * controls (no relation menu, next step or history button), and since
- * ADR-177 § 4 the organization's record draws one row per project instead
- * of the table: the inline row lives on in a line's Conversations module
- * (ADR-056), the same ConversationTable. These tests drive it there, on a
- * line of the fixture project that the suite finds or creates (lines have
- * no delete path, so it is stable and reused, like `line-detail.spec.ts`).
+ * controls, and since tarea 135 a line's Conversations module draws the same
+ * chat rows: no list writes a row inline any more. The relation menu, the
+ * next step and «Log contact» live in the conversation's page
+ * (`ConversationRecord`), and these tests drive them there. The fixture
+ * conversation still sits on the fixture line (`fixture-line.ts`).
+ *
+ * UPDATED WITHOUT A RUN (tarea 135): the three tests moved from the line's
+ * inline row to the conversation's page; until a run against a deployed
+ * origin, they are hypotheses.
  *
  * Both tests write to a REAL conversation row (the difusión list). Original
  * values are captured via the API up front and restored in a `finally`
@@ -42,27 +44,24 @@ type RawConversation = {
   organization: { slug: string } | null;
 };
 
-/** The suite's line in the fixture project: its module carries the inline row. */
+/** The suite's line in the fixture project: the fixture conversation sits on it. */
 let line: FixtureLine | null = null;
 
 /**
  * Session comes from the shared storageState (tests/auth.setup.ts). The
- * fixture line's page, whose Conversations module carries the inline row
- * (ConversationTable's normal mode; the lens's chat rows have none).
+ * fixture conversation's page, where its relation, next step and history
+ * are written.
  */
-async function openConversations(page: Page) {
-  expect(line, 'the fixture line exists (beforeAll)').not.toBeNull();
-  await page.goto(fixtureLineHref(line!));
+async function openConversation(page: Page) {
+  expect(fixtureConversationId, 'the fixture conversation exists (beforeAll)').not.toBeNull();
+  await page.goto(`/h/playwright/conversation/${fixtureConversationId}`);
   await waitForLoaded(page);
-  await expect(rowOf(page)).toBeVisible({ timeout: 15_000 });
+  await expect(relationMenu(page)).toBeVisible({ timeout: 15_000 });
 }
 
-/** The fixture conversation's row in the line's module, and only it. */
-function rowOf(page: Page) {
-  return page
-    .locator('#mod-conversations [data-testid="conversation-row"]')
-    .filter({ hasText: 'ZZZ E2E write fixture' })
-    .first();
+/** The relation's word in the page's facts: the menu over «not this time». */
+function relationMenu(page: Page) {
+  return page.locator('main button.fact-word[aria-haspopup="menu"]').first();
 }
 
 /** First page of the difusión list (same rows the lens can reach), raw values. */
@@ -157,7 +156,7 @@ async function patchOk(page: Page, expectedId: string, doClick: () => Promise<vo
   return r;
 }
 
-test.describe('conversation inline write', () => {
+test.describe('conversation write, on its page', () => {
   test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL and PW_TEST_PASSWORD.');
   // Serial: one fixture row, created once, mutated by each test in turn.
   test.describe.configure({ mode: 'serial' });
@@ -219,7 +218,7 @@ test.describe('conversation inline write', () => {
   test('«not this time» sets with a day to write again, persists and lifts (ADR-138)', async ({ page }) => {
     // Against production the menu, the dialog and a reload take their time.
     test.setTimeout(60_000);
-    await openConversations(page);
+    await openConversation(page);
 
     let original = (await fetchListRaw(page))[0];
     // A run that died mid-test (a timeout closes the page before its
@@ -227,15 +226,14 @@ test.describe('conversation inline write', () => {
     // lift it first, so this run starts from a derived state.
     if (original.relation === 'not_now') {
       await restoreConversation(page, original.id, { not_now: null });
-      await openConversations(page);
+      await openConversation(page);
       original = (await fetchListRaw(page))[0];
     }
     const name = original.person?.full_name;
     expect(name).toBeTruthy();
 
     try {
-      const row = rowOf(page);
-      const trigger = row.locator('button[aria-haspopup="menu"]');
+      const trigger = relationMenu(page);
       // Whatever it derives to now (a fresh fixture: «Not contacted»; one
       // revived from a past run keeps its history), «not this time» wins.
       const originalLabel = (await trigger.innerText()).replace('▾', '').trim();
@@ -254,7 +252,7 @@ test.describe('conversation inline write', () => {
       // PATCH acked above — reload proves the change survives a fresh fetch.
       await page.reload();
       await waitForLoaded(page);
-      const after = rowOf(page).locator('button[aria-haspopup="menu"]');
+      const after = relationMenu(page);
       await expect(after).toContainText('Not this time, until');
       const raw = (await fetchListRaw(page)).find((item) => item.id === original.id);
       expect(raw?.relation).toBe('not_now');
@@ -274,7 +272,7 @@ test.describe('conversation inline write', () => {
   });
 
   test('next action date + note save, persist and restore', async ({ page }) => {
-    await openConversations(page);
+    await openConversation(page);
 
     const original = (await fetchListRaw(page))[0];
     const name = original.person?.full_name;
@@ -288,10 +286,9 @@ test.describe('conversation inline write', () => {
     };
 
     try {
-      // Set a probe date + note through the dialog. The probe date is far
-      // in the past on purpose: the list sorts next_action_at ASC, so the
-      // row stays on page 1 where the assertions can still find it.
-      await rowOf(page).locator('button.crow-next').click();
+      // The step's fact opens its shortcuts; «another date or note…» the dialog.
+      await page.getByTestId('conversation-next-step').click();
+      await page.getByRole('button', { name: 'another date or note…' }).click();
       const dialog = page.locator('dialog[open]');
       await expect(dialog).toBeVisible();
       await dialog.getByLabel('Date').fill('2020-01-01');
@@ -300,22 +297,19 @@ test.describe('conversation inline write', () => {
         dialog.getByRole('button', { name: 'Save' }).click(),
       );
 
-      await expect(
-        rowOf(page).locator('.crow-next__note'),
-      ).toContainText('e2e probe');
-
+      // A fresh fetch: the step survives.
       await page.reload();
       await waitForLoaded(page);
-      await expect(
-        rowOf(page).locator('.crow-next__note'),
-      ).toContainText('e2e probe');
+      await expect(page.getByTestId('conversation-next-step')).not.toHaveText('no next step');
+      const raw = (await fetchListRaw(page)).find((i) => i.id === original.id);
+      expect(raw?.next_action_at?.slice(0, 10)).toBe('2020-01-01');
+      expect(raw?.next_action_note).toBe('e2e probe — will be reverted');
     } finally {
       await restoreConversation(page, original.id, restorePatch);
     }
 
-    // Verify the restore against the API (raw values) — after a restore
-    // the row may fall off page 1 (nulls sort last), so the UI row is not
-    // a reliable witness. Dates compare date-only per the editor contract.
+    // Verify the restore against the API (raw values). Dates compare
+    // date-only per the editor contract.
     await expect
       .poll(async () => {
         const items = await fetchListRaw(page);
@@ -327,62 +321,37 @@ test.describe('conversation inline write', () => {
       .toEqual({ at: restorePatch.next_action_at, note: restorePatch.next_action_note });
   });
 
-  test('log contact records an event, the timeline shows it and the row says today', async ({
-    page,
-  }) => {
+  test('log contact records an event and the history shows it', async ({ page }) => {
     // ADR-098: a contact is an event. Events are append-only and the fixture
     // resurrects WITH its old history, so this run's note carries its own mark.
     const mark = `ZZZ e2e history ${Date.now().toString(36)}`;
-    await openConversations(page);
+    await openConversation(page);
 
     const original = (await fetchListRaw(page))[0];
-    const name = original.person?.full_name;
-    expect(name).toBeTruthy();
+    expect(original.person?.full_name).toBeTruthy();
 
-    const row = rowOf(page);
-    await row.locator('button[aria-haspopup="menu"]').click();
+    // «Log contact…» from the relation's menu opens the composer on «Log».
+    await relationMenu(page).click();
     await page.getByRole('menuitem', { name: 'Log contact…', exact: true }).click();
-
-    const dialog = page.locator('dialog[open]');
-    await expect(dialog.getByRole('heading', { name: 'History' })).toBeVisible();
-    await expect(dialog.getByLabel('Kind')).toHaveValue('email');
-    await expect(dialog.getByLabel('Direction')).toHaveValue('outbound');
-    await dialog.getByLabel('Note').fill(mark);
+    const composer = page.getByTestId('thread-composer');
+    await expect(composer.getByTestId('composer-log')).toBeVisible();
+    await composer.locator('textarea').fill(mark);
 
     const posted = page.waitForResponse(
       (r) =>
         r.request().method() === 'POST' &&
         r.url().includes(`/api/conversations/${original.id}/events`),
     );
-    await dialog.getByRole('button', { name: 'Record' }).click();
+    await composer.locator('button[type="submit"]').click();
     const response = await posted;
     expect(response.status(), 'POST /events should create').toBe(201);
-    // Today travels without an instant: the server owns the clock.
-    expect(response.request().postDataJSON()).toEqual({
-      kind: 'email',
-      direction: 'outbound',
-      body: mark,
-    });
     const { item } = (await response.json()) as { item: { occurred_at: string } };
     const skew = Math.abs(Date.parse(item.occurred_at) - Date.now());
     expect(skew, 'the server stamped something that is not now').toBeLessThan(60_000);
 
-    const first = dialog.getByRole('list', { name: 'History' }).getByRole('listitem').first();
-    await expect(first).toContainText('Email');
-    await expect(first).toContainText('Sent');
-    await expect(first).toContainText(mark);
-
-    await dialog.getByRole('button', { name: 'Close' }).click();
-    await expect(row.locator('.crow-when')).toContainText('today');
-
-    // A fresh fetch: the event and the stamp both survive.
+    // A fresh fetch: the event survives, in the page's history.
     await page.reload();
     await waitForLoaded(page);
-    const again = rowOf(page);
-    await expect(again.locator('.crow-when')).toContainText('today');
-    await again.locator('.crow-when').click();
-    await expect(
-      page.locator('dialog[open]').getByRole('list', { name: 'History' }),
-    ).toContainText(mark);
+    await expect(page.locator('main')).toContainText(mark, { timeout: 15_000 });
   });
 });

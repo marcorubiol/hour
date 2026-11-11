@@ -1,20 +1,5 @@
-<script lang="ts">
-  /**
-   * People module (ADR-056 v1) — the line's read-only contact sheet:
-   * your own team on the road plus the venue folks, per performance.
-   * Content-only; the line detail shell owns the module frame and title.
-   *
-   * Zero writes on purpose: every datum here is edited where it already
-   * lives — cast on the project, crew on the performance, contacts on
-   * the venue dialog. This module only gathers them in one place.
-   */
-
-  import EmptyLine from '$lib/components/EmptyLine.svelte';
-  import { createQuery } from '@tanstack/svelte-query';
-  import { toStore } from 'svelte/store';
+<script module lang="ts">
   import { fetchJSON } from '$lib/api';
-  import { dayLabel } from '$lib/datetime';
-  import { appLocale, t } from '$lib/i18n';
 
   type PersonLite = {
     id: string;
@@ -24,7 +9,7 @@
     phone: string | null;
   };
 
-  type LinePeople = {
+  export type LinePeople = {
     cast: Array<{
       id: string;
       role: string;
@@ -56,9 +41,57 @@
     }>;
   };
 
+  /** The line's people: one read, shared with the page that decides whether
+      the module is drawn (ADR-145 § 1, tarea 135). */
+  export function linePeopleQueryOptions(lineId: string) {
+    return {
+      queryKey: ['line-people', lineId] as const,
+      queryFn: ({ signal }: { signal: AbortSignal }) => fetchJSON<LinePeople>(`/api/lines/${lineId}/people`, signal),
+    };
+  }
+
+  /**
+   * Venue contacts arrive as parsed rows that may still be all-empty (blank
+   * editor rows saved on the venue). Keep only contacts with at least one
+   * filled field, then skip venues left with none.
+   */
+  export function venueGroupsOf(people: LinePeople | null) {
+    return (people?.venues ?? [])
+      .map((v) => ({
+        venue: v.venue,
+        contacts: v.contacts.filter((c) => c.name || c.role || c.email || c.phone),
+      }))
+      .filter((g) => g.contacts.length > 0);
+  }
+
+  /** Nobody in any of the three groups: the module is not drawn. */
+  export function teamIsEmpty(people: LinePeople): boolean {
+    return people.cast.length === 0 && people.crew.length === 0 && venueGroupsOf(people).length === 0;
+  }
+</script>
+
+<script lang="ts">
+  /**
+   * People module (ADR-056 v1) — the line's read-only contact sheet:
+   * your own team on the road plus the venue folks, per performance.
+   * Only a reading: with nobody in it, it draws nothing (ADR-145 § 1).
+   *
+   * Zero writes on purpose: every datum here is edited where it already
+   * lives — cast on the project, crew on the performance, contacts on
+   * the venue dialog. This module only gathers them in one place.
+   */
+
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
+  import LineModule from './LineModule.svelte';
+  import { createQuery } from '@tanstack/svelte-query';
+  import { toStore } from 'svelte/store';
+  import { dayLabel } from '$lib/datetime';
+  import { appLocale, t } from '$lib/i18n';
+
   let {
     line,
     workspaceSlug,
+    title,
   }: {
     line: {
       id: string;
@@ -69,155 +102,146 @@
       workspace_id: string;
     };
     workspaceSlug: string;
+    title: string;
   } = $props();
 
   const locale = appLocale();
 
-  const peopleOptions = toStore(() => {
-    const id = line.id;
-    return {
-      queryKey: ['line-people', id] as const,
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
-        fetchJSON<LinePeople>(`/api/lines/${id}/people`, signal),
-    };
-  });
+  const peopleOptions = toStore(() => linePeopleQueryOptions(line.id));
   const peopleQuery = createQuery(peopleOptions);
 
   let people = $derived($peopleQuery.data ?? null);
   let loading = $derived($peopleQuery.isPending);
   let errorMsg = $derived($peopleQuery.error instanceof Error ? $peopleQuery.error.message : '');
 
-  // Venue contacts arrive as parsed rows that may still be all-empty
-  // (blank editor rows saved on the venue). Keep only contacts with at
-  // least one filled field, then skip venues left with none.
-  let venueGroups = $derived.by(() =>
-    (people?.venues ?? [])
-      .map((v) => ({
-        venue: v.venue,
-        contacts: v.contacts.filter((c) => c.name || c.role || c.email || c.phone),
-      }))
-      .filter((g) => g.contacts.length > 0),
-  );
+  let venueGroups = $derived(venueGroupsOf(people));
+  // Only a reading (ADR-145 § 1): a group with nobody is not drawn, and a
+  // module with nobody at all draws nothing.
+  let nobody = $derived(people !== null && teamIsEmpty(people));
 </script>
 
-{#if loading}
-  <EmptyLine text={t('desk.loading', locale)} busy />
-{:else if errorMsg}
-  <p class="load-fail" role="alert">{errorMsg}</p>
-{:else if people}
-  <div class="ppl">
-    <section class="ppl__section" aria-label={t('line.team_own', locale)}>
-      <p class="eyebrow eyebrow--sub ppl__sub">{t('line.team_own', locale)}</p>
+{#if !nobody}
+<LineModule {title}>
+  {#if loading}
+    <EmptyLine text={t('desk.loading', locale)} busy />
+  {:else if errorMsg}
+    <p class="load-fail" role="alert">{errorMsg}</p>
+  {:else if people}
+    <div class="ppl">
       {#if people.cast.length > 0}
-        <ul class="ppl__rows" role="list">
-          {#each people.cast as c (c.id)}
-            <li>
-              <span class="ppl__row-main">
-                {#if c.person?.slug}
-                  <a href={`/h/${workspaceSlug}/person/${c.person.slug}`}>{c.person.full_name}</a>
-                {:else}
-                  {c.person?.full_name ?? '—'}
-                {/if}
-                <span class="ppl__row-role">{c.role}</span>
-              </span>
-              {#if c.person && (c.person.email || c.person.phone)}
-                <span class="ppl__row-contact">
-                  {#if c.person.email}
-                    <a href={`mailto:${c.person.email}`}>{c.person.email}</a>
-                  {/if}
-                  {#if c.person.phone}
-                    <a href={`tel:${c.person.phone}`}>{c.person.phone}</a>
-                  {/if}
-                </span>
-              {/if}
-            </li>
-          {/each}
-        </ul>
-      {:else}
-        <EmptyLine text={t('line.team_own_empty', locale)} />
-      {/if}
-    </section>
-
-    <section class="ppl__section" aria-label={t('line.team_crew', locale)}>
-      <p class="eyebrow eyebrow--sub ppl__sub">{t('line.team_crew', locale)}</p>
-      {#if people.crew.length > 0}
-        <ul class="ppl__rows" role="list">
-          {#each people.crew as c (c.id)}
-            <li>
-              <span class="ppl__row-main">
-                {#if c.person?.slug}
-                  <a href={`/h/${workspaceSlug}/person/${c.person.slug}`}>{c.person.full_name}</a>
-                {:else}
-                  {c.person?.full_name ?? '—'}
-                {/if}
-                <span class="ppl__row-role">{c.role}</span>
-              </span>
-              {#if c.person && (c.person.email || c.person.phone)}
-                <span class="ppl__row-contact">
-                  {#if c.person.email}
-                    <a href={`mailto:${c.person.email}`}>{c.person.email}</a>
-                  {/if}
-                  {#if c.person.phone}
-                    <a href={`tel:${c.person.phone}`}>{c.person.phone}</a>
-                  {/if}
-                </span>
-              {/if}
-              {#if c.performance}
-                {#if c.performance.slug}
-                  <a
-                    class="ppl__row-perf"
-                    href={`/h/${workspaceSlug}/performance/${c.performance.slug}`}
-                  >
-                    {c.performance.venue_name ?? c.performance.city ?? '—'}
-                    · {dayLabel(c.performance.performed_at)}
-                  </a>
-                {:else}
-                  <span class="ppl__row-perf">
-                    {c.performance.venue_name ?? c.performance.city ?? '—'}
-                    · {dayLabel(c.performance.performed_at)}
-                  </span>
-                {/if}
-              {/if}
-            </li>
-          {/each}
-        </ul>
-      {:else}
-        <EmptyLine text={t('line.team_crew_empty', locale)} />
-      {/if}
-    </section>
-
-    <section class="ppl__section" aria-label={t('line.team_venues', locale)}>
-      <p class="eyebrow eyebrow--sub ppl__sub">{t('line.team_venues', locale)}</p>
-      {#if venueGroups.length > 0}
-        {#each venueGroups as g (g.venue.id)}
-          <div class="ppl__venue">
-            <p class="ppl__venue-head">
-              {g.venue.name}
-              {#if g.venue.city}<span class="ppl__venue-city">{g.venue.city}</span>{/if}
-            </p>
-            <ul class="ppl__rows ppl__rows--indent" role="list">
-              {#each g.contacts as c, i (i)}
+        <section class="ppl__section" aria-label={t('line.team_own', locale)}>
+          <p class="eyebrow eyebrow--sub ppl__sub">{t('line.team_own', locale)}</p>
+          {#if people.cast.length > 0}
+            <ul class="ppl__rows" role="list">
+              {#each people.cast as c (c.id)}
                 <li>
                   <span class="ppl__row-main">
-                    {c.name ?? '—'}
-                    {#if c.role}<span class="ppl__row-role">{c.role}</span>{/if}
+                    {#if c.person?.slug}
+                      <a href={`/h/${workspaceSlug}/person/${c.person.slug}`}>{c.person.full_name}</a>
+                    {:else}
+                      {c.person?.full_name ?? '—'}
+                    {/if}
+                    <span class="ppl__row-role">{c.role}</span>
                   </span>
-                  {#if c.email || c.phone}
+                  {#if c.person && (c.person.email || c.person.phone)}
                     <span class="ppl__row-contact">
-                      {#if c.email}<a href={`mailto:${c.email}`}>{c.email}</a>{/if}
-                      {#if c.phone}<a href={`tel:${c.phone}`}>{c.phone}</a>{/if}
+                      {#if c.person.email}
+                        <a href={`mailto:${c.person.email}`}>{c.person.email}</a>
+                      {/if}
+                      {#if c.person.phone}
+                        <a href={`tel:${c.person.phone}`}>{c.person.phone}</a>
+                      {/if}
                     </span>
                   {/if}
                 </li>
               {/each}
             </ul>
-          </div>
-        {/each}
-      {:else}
-        <EmptyLine text={t('line.team_venues_empty', locale)} />
+          {/if}
+        </section>
       {/if}
-    </section>
-  </div>
+
+      {#if people.crew.length > 0}
+        <section class="ppl__section" aria-label={t('line.team_crew', locale)}>
+          <p class="eyebrow eyebrow--sub ppl__sub">{t('line.team_crew', locale)}</p>
+          {#if people.crew.length > 0}
+            <ul class="ppl__rows" role="list">
+              {#each people.crew as c (c.id)}
+                <li>
+                  <span class="ppl__row-main">
+                    {#if c.person?.slug}
+                      <a href={`/h/${workspaceSlug}/person/${c.person.slug}`}>{c.person.full_name}</a>
+                    {:else}
+                      {c.person?.full_name ?? '—'}
+                    {/if}
+                    <span class="ppl__row-role">{c.role}</span>
+                  </span>
+                  {#if c.person && (c.person.email || c.person.phone)}
+                    <span class="ppl__row-contact">
+                      {#if c.person.email}
+                        <a href={`mailto:${c.person.email}`}>{c.person.email}</a>
+                      {/if}
+                      {#if c.person.phone}
+                        <a href={`tel:${c.person.phone}`}>{c.person.phone}</a>
+                      {/if}
+                    </span>
+                  {/if}
+                  {#if c.performance}
+                    {#if c.performance.slug}
+                      <a
+                        class="ppl__row-perf"
+                        href={`/h/${workspaceSlug}/performance/${c.performance.slug}`}
+                      >
+                        {c.performance.venue_name ?? c.performance.city ?? '—'}
+                        · {dayLabel(c.performance.performed_at)}
+                      </a>
+                    {:else}
+                      <span class="ppl__row-perf">
+                        {c.performance.venue_name ?? c.performance.city ?? '—'}
+                        · {dayLabel(c.performance.performed_at)}
+                      </span>
+                    {/if}
+                  {/if}
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </section>
+      {/if}
+
+      {#if venueGroups.length > 0}
+        <section class="ppl__section" aria-label={t('line.team_venues', locale)}>
+          <p class="eyebrow eyebrow--sub ppl__sub">{t('line.team_venues', locale)}</p>
+          {#if venueGroups.length > 0}
+            {#each venueGroups as g (g.venue.id)}
+              <div class="ppl__venue">
+                <p class="ppl__venue-head">
+                  {g.venue.name}
+                  {#if g.venue.city}<span class="ppl__venue-city">{g.venue.city}</span>{/if}
+                </p>
+                <ul class="ppl__rows ppl__rows--indent" role="list">
+                  {#each g.contacts as c, i (i)}
+                    <li>
+                      <span class="ppl__row-main">
+                        {c.name ?? '—'}
+                        {#if c.role}<span class="ppl__row-role">{c.role}</span>{/if}
+                      </span>
+                      {#if c.email || c.phone}
+                        <span class="ppl__row-contact">
+                          {#if c.email}<a href={`mailto:${c.email}`}>{c.email}</a>{/if}
+                          {#if c.phone}<a href={`tel:${c.phone}`}>{c.phone}</a>{/if}
+                        </span>
+                      {/if}
+                    </li>
+                  {/each}
+                </ul>
+              </div>
+            {/each}
+          {/if}
+        </section>
+      {/if}
+    </div>
+  {/if}
+</LineModule>
 {/if}
 
 <style>

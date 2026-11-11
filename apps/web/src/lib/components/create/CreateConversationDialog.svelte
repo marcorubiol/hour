@@ -49,8 +49,12 @@
     who?: string;
     /** The tag it is born with: the lens chip's; null = Difusión. */
     tag?: string | null;
+    /** The project (and line) a page already is: a line's module (tarea
+        135). Checked on open, over what the scope would preselect. */
+    projectId?: string | null;
+    lineId?: string | null;
   }
-  let { open = $bindable(false), who = '', tag = null }: Props = $props();
+  let { open = $bindable(false), who = '', tag = null, projectId = null, lineId = null }: Props = $props();
 
   const locale = appLocale();
   const pins = usePins();
@@ -107,7 +111,13 @@
   // The picker offers only the projects of the current scope (drop 11-10):
   // a space offers its projects, a project or line that project, Everything
   // all of them.
-  let scopedProjects = $derived<RawProject[]>(projectsInScope(scope, $projectsQuery.data?.items ?? []));
+  // A page's own project is offered even outside the pinned scope.
+  let scopedProjects = $derived.by<RawProject[]>(() => {
+    const all = $projectsQuery.data?.items ?? [];
+    const inScope = projectsInScope(scope, all);
+    const own = projectId && !inScope.some((p) => p.id === projectId) ? all.find((p) => p.id === projectId) : null;
+    return own ? [own, ...inScope] : inScope;
+  });
   // Projects grouped under the space (workspace) they belong to — the picker
   // reads as "which spaces (and which project inside them)".
   let projectGroups = $derived.by(() => {
@@ -181,14 +191,16 @@
       // Pre-select when the scope collapses to a single project — otherwise
       // start empty and let the user pick spaces. A single pinned line also
       // preselects that line for its project.
-      aProjectIds =
-        scope.lines.length === 1
+      aProjectIds = projectId
+        ? [projectId]
+        : scope.lines.length === 1
           ? [scope.lines[0].projectId]
           : scopedProjects.length === 1
             ? [scopedProjects[0].id]
             : [];
-      aLineByProject =
-        scope.lines.length === 1
+      aLineByProject = projectId
+        ? { [projectId]: lineId ?? '' }
+        : scope.lines.length === 1
           ? { [scope.lines[0].projectId]: scope.lines[0].id }
           : Object.fromEntries(aProjectIds.map((id) => [id, '']));
       errSpaces = undefined;
@@ -292,6 +304,8 @@
       aProjectIds = [];
       aLineByProject = {};
       void refreshAfterWrite(queryClient, ['conversations']);
+      // A line's head counts its conversations from its own read.
+      void queryClient.invalidateQueries({ queryKey: ['line-eng-stats'] });
       const parts: string[] = [];
       if (r.created)
         parts.push(
@@ -316,6 +330,7 @@
           ? async () => {
               await Promise.all(ids.map((id) => mutateJSON('DELETE', `/api/conversations/${id}`)));
               await refreshAfterWrite(queryClient, ['conversations']);
+              await queryClient.invalidateQueries({ queryKey: ['line-eng-stats'] });
             }
           : undefined,
       });

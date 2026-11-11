@@ -877,9 +877,12 @@
     <dialogs.event.component
       bind:open={creation.eventOpen}
       presetProjectId={creation.event.projectId ?? createPresets.projectId}
-      presetLineId={creation.event.projectId && creation.event.projectId !== createPresets.projectId
-        ? null
-        : createPresets.lineId}
+      presetLineId={creation.event.lineId !== undefined
+        ? creation.event.lineId
+        : creation.event.projectId && creation.event.projectId !== createPresets.projectId
+          ? null
+          : createPresets.lineId}
+      presetBoloId={creation.event.boloId ?? null}
       presetDate={creation.event.date ?? null}
       presetType={creation.event.type ?? null}
       presetTitle={creation.event.title ?? null}
@@ -896,6 +899,8 @@
       bind:open={creation.conversationOpen}
       who={creation.conversationWho}
       tag={creation.conversationTag}
+      projectId={creation.conversationProjectId}
+      lineId={creation.conversationLineId}
     />
   {/if}
 {/if}
