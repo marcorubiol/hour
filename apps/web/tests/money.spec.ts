@@ -256,7 +256,7 @@ test.describe('Cuentas without read:money', () => {
     await expect(chips.locator('[data-chip="equipo"]')).toHaveAttribute('aria-current', 'page');
     await expect(chips.locator('[data-chip="todo"]')).toHaveCount(0);
     await expect(page.locator('.conversations__filter-open')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Add conversation' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^Add:/ })).toHaveCount(0);
 
     // The Desk follows the same flags: neither door is drawn (ADR-124, ADR-127 § 7).
     await page.goto('/h/desk');

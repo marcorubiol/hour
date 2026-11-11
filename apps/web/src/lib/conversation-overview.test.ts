@@ -14,6 +14,7 @@ import {
   followUpDue,
   hasListFilter,
   inSeason,
+  longestDue,
   isHot,
   isUndated,
   mailoutFigures,
@@ -23,6 +24,7 @@ import {
   seasonByLine,
   seasonFor,
   seasonRows,
+  shownTurn,
   turnOf,
   type OverviewInput,
 } from './conversation-overview';
@@ -119,6 +121,66 @@ describe('dueReason', () => {
     expect(dueReason(row('b', { ...outbound(3), next_action_at: day(-2) }), NOW)).toBe('follow_up');
     expect(dueReason(row('c', { next_action_at: day(2) }), NOW)).toBeNull();
     expect(dueReason(row('d', { ...notNow, next_action_at: day(-2) }), NOW)).toBeNull();
+  });
+});
+
+describe('shownTurn: la única fuente del turno (lista, ficha y Hoy)', () => {
+  it('una respuesta pendiente: nos toca responder', () => {
+    expect(shownTurn(row('a', inbound(2)), NOW)).toEqual({ reason: 'reply', since: ago(2), days: 2, waitingSince: null });
+  });
+  it('esperando su respuesta sin nada nuestro vencido', () => {
+    expect(shownTurn(row('a', { ...outbound(6), next_action_at: day(3) }), NOW)).toEqual({
+      reason: 'theirs',
+      since: ago(6),
+      days: 6,
+      waitingSince: null,
+    });
+  });
+  it('un paso nuestro vencido mientras esperamos su respuesta: nos toca, y dice desde cuándo esperamos', () => {
+    const r = row('a', { ...outbound(6), next_action_at: day(-1) });
+    expect(shownTurn(r, NOW)).toEqual({ reason: 'follow_up', since: day(-1), days: 1, waitingSince: ago(6) });
+    // La sección de la lista (`dueReason`) dice lo mismo que la ficha.
+    expect(dueReason(r, NOW)).toBe('follow_up');
+  });
+  it('un paso vencido sin ningún evento: nos toca, sin espera', () => {
+    expect(shownTurn(row('a', { next_action_at: day(0) }), NOW)).toEqual({ reason: 'follow_up', since: day(0), days: 0, waitingSince: null });
+  });
+  it('«no esta vez» o nada dicho: sin turno', () => {
+    expect(shownTurn(row('a', { ...notNow, ...outbound(6), next_action_at: day(-1) }), NOW)).toBeNull();
+    expect(shownTurn(row('b'), NOW)).toBeNull();
+  });
+  it('dueReason es shownTurn sin el suyo, en todos los casos', () => {
+    const rows = [
+      row('a', inbound(1)),
+      row('b', outbound(3)),
+      row('c', { ...outbound(3), next_action_at: day(-2) }),
+      row('d', { ...inbound(1), next_action_at: day(-2) }),
+      row('e'),
+    ];
+    for (const r of rows) {
+      const s = shownTurn(r, NOW)?.reason ?? null;
+      expect(dueReason(r, NOW)).toBe(s === 'theirs' ? null : s);
+    }
+  });
+});
+
+describe('longestDue: the one the pane opens at rest', () => {
+  it('the most days waiting, reply or step, whatever the block order', () => {
+    const due = [row('new', inbound(1)), row('old', inbound(9)), row('step', { ...outbound(20), next_action_at: day(-4) })];
+    expect(longestDue(due, NOW)?.id).toBe('old');
+  });
+  it('a step overdue longer than any reply wins; at equal days, the reply', () => {
+    expect(longestDue([row('r', inbound(2)), row('s', { next_action_at: day(-5) })], NOW)?.id).toBe('s');
+    expect(longestDue([row('s', { next_action_at: day(-3) }), row('r', inbound(3))], NOW)?.id).toBe('r');
+  });
+  it('more than a block of replies: the oldest still found', () => {
+    const due = Array.from({ length: BLOCK_ROWS + 3 }, (_, i) => row(`r${i}`, inbound(i + 1)));
+    expect(longestDue(due, NOW)?.id).toBe(`r${BLOCK_ROWS + 2}`);
+    expect(buildOverview(due, NOW).due.longest?.id).toBe(`r${BLOCK_ROWS + 2}`);
+    expect(buildOverview(due, NOW).due.rows).toHaveLength(BLOCK_ROWS);
+  });
+  it('nothing due, nothing to open', () => {
+    expect(longestDue([], NOW)).toBeNull();
   });
 });
 

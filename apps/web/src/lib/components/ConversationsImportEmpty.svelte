@@ -1,7 +1,8 @@
 <script lang="ts">
   /**
    * ConversationsImportEmpty: what Conversations says the first time, when
-   * the scope has no conversation at all («Trae tu agenda»). One home for the
+   * the scope has no conversation at all. It states, it does not instruct
+   * (ADR-154: «Trae tu agenda.» asked for something Hour cannot do; tarea 130). One home for the
    * table (a view by tag) and the feed (Todas): an empty that only a filter
    * or a search makes says «nothing matches» instead, each in its own place.
    * It speaks in the voice of every other empty (EmptyLine, ADR-139 § 2).
@@ -14,4 +15,4 @@
   let { locale }: { locale: Locale } = $props();
 </script>
 
-<EmptyLine text={t('conversations.empty_title', locale)} />
+<EmptyLine text={t('conversations.empty_none', locale)} />

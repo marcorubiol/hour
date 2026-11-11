@@ -99,7 +99,7 @@ test.describe('Calm — a composition, not a grey (ADR-139 § 5)', () => {
     await open(page, '/h/conversations', true);
     const main = page.getByRole('main');
     await expect(page.locator('#lista')).toHaveCount(0);
-    await expect(main.getByRole('button', { name: 'Add conversation' })).toBeEnabled();
+    await expect(main.getByRole('button', { name: /^Add:/ })).toBeEnabled();
     await expect(main.getByText(/wait outside calm/)).toBeVisible();
   });
 

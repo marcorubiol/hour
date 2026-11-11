@@ -27,7 +27,7 @@ test.describe('contact capture', () => {
 
     await page.goto('/h/conversations'); // ADR-067: lens is space-less + cross-space
     await waitForLoaded(page);
-    await expect(page.getByRole('button', { name: 'Add conversation' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Add:/ })).toBeVisible();
 
     // Crash recovery: a run killed after create but before the tail
     // cleanup would leave the fixture conversation live → next run's
@@ -49,7 +49,8 @@ test.describe('contact capture', () => {
     }, { name: FIXTURE_NAME, email: FIXTURE_EMAIL });
 
     // Capture through the dialog.
-    await page.getByRole('button', { name: 'Add conversation' }).click();
+    await page.getByRole('button', { name: /^Add:/ }).click();
+    await page.getByRole('menuitem', { name: 'Conversation' }).click();
     const dialog = page.locator('dialog[open]');
     // The dialog is multi-space since ADR-057: projects are checkboxes
     // grouped by workspace, not a single select.

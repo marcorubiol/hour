@@ -46,7 +46,8 @@ test.describe('conversation with the venue', () => {
     await sweep();
 
     // 1. La lente: solo la organización. La fila la titula y abre la ficha.
-    await page.getByRole('button', { name: 'Add conversation' }).click();
+    await page.getByRole('button', { name: /^Add:/ }).click();
+    await page.getByRole('menuitem', { name: 'Conversation' }).click();
     let dialog = page.locator('dialog[open]');
     await dialog.getByLabel('ZZZ e2e collab').check({ force: true });
     await dialog.getByLabel('Organization').fill(ORG);
@@ -63,7 +64,8 @@ test.describe('conversation with the venue', () => {
     await waitForLoaded(page);
 
     // 2. El alta: Organización primero, con las del espacio para autocompletar.
-    await page.getByRole('button', { name: 'Add conversation' }).click();
+    await page.getByRole('button', { name: /^Add:/ }).click();
+    await page.getByRole('menuitem', { name: 'Conversation' }).click();
     dialog = page.locator('dialog[open]');
     await dialog.getByLabel('ZZZ e2e collab').check({ force: true });
     const labels = await dialog.locator('.conversations__form-grid').first().locator('label').allTextContents();

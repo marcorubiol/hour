@@ -28,7 +28,7 @@
   import { chatLast, chatTurn, chatWhen, chatWho, type ChatContext } from '$lib/chat-row';
   import { relationLabel } from '$lib/conversation-relation';
   import { SALES, TEAM, keyLabel, type WorkspaceTag } from '$lib/conversation-tags';
-  import { feedKey, feedTurnRow, type ConversationFeedView, type FeedConversationView, type FeedThreadRow } from '$lib/conversation-feed';
+  import { feedKey, feedSections, feedTurnRow, type ConversationFeedView, type FeedConversationView, type FeedThreadRow } from '$lib/conversation-feed';
   import { THREAD_REFRESH_MS, boloDays, feedHref, feedThreadName, feedTitle, groupHref } from '$lib/threads';
 
   interface Props {
@@ -146,12 +146,7 @@
    * en cada fila; el orden de dentro es el del servidor.
    */
   let sectioned = $derived(!tag);
-  let split = $derived.by(() => {
-    const ours: typeof rows = [];
-    const rest: typeof rows = [];
-    for (const r of rows) (sectioned && r.kind === 'conversation' && turnOf(r)?.ink ? ours : rest).push(r);
-    return { ours, rest };
-  });
+  let split = $derived(feedSections(rows, sectioned));
   /** El proyecto, sólo cuando las filas son de varios (el ámbito puede tener varios y la lista uno). */
   let mixedProjects = $derived(new Set(rows.map((r) => r.project_id)).size > 1);
   /** La etiqueta sólo se nombra en la fila cuando la lista las mezcla. */
@@ -256,7 +251,11 @@
       </ul>
       {#if split.rest.length > 0}
         <h3 class="eyebrow eyebrow--sub cfeed__head" data-testid="feed-section" data-section="rest">
-          {t('chat.section_rest', locale)}{#if !feed.more}{' '}· {split.rest.length}{/if}
+          {t('chat.section_rest', locale)}{#if !feed.more}{' '}· {split.restConversations}{#if split.groups > 0}{' '}{t(
+                split.groups === 1 ? 'chat.section_groups_one' : 'chat.section_groups',
+                locale,
+                { n: split.groups },
+              )}{/if}{/if}
         </h3>
       {/if}
     {/if}

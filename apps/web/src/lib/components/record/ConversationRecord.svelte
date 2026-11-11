@@ -72,7 +72,7 @@
     type ConversationItem,
     type ConversationPatch,
   } from '$lib/conversation';
-  import { turnOf } from '$lib/conversation-overview';
+  import { shownTurn } from '$lib/conversation-overview';
   import { ASKED_KINDS, needsKind, type AskedKind } from '$lib/organization-record';
   import { bulkFailedLine, type BulkResult } from '$lib/conversation-bulk';
   import { relationLabel, type ConversationBolo } from '$lib/conversation-relation';
@@ -393,7 +393,12 @@
     },
   });
   let nextOpen = $state(false);
-  let turn = $derived(conv ? turnOf({ ...relationInputOf(conv), reply_settled_at: conv.reply_settled_at }, new Date()) : null);
+  /** El turno de la lista y de Hoy, la misma función (`shownTurn`, tarea 130). */
+  let turn = $derived(
+    conv
+      ? shownTurn({ ...relationInputOf(conv), reply_settled_at: conv.reply_settled_at, next_action_at: conv.next_action_at }, new Date())
+      : null,
+  );
   /** Un siguiente paso vencido se dice en la línea de hechos, sin franja aparte. */
   let stepDue = $derived(
     conv
@@ -633,7 +638,7 @@
 
     <!-- Los hechos, fijos y en una línea: el turno primero (ADR-184). -->
     <div class="chat__facts" data-testid="conversation-facts">
-      {#if turn?.side === 'ours'}
+      {#if turn?.reason === 'reply'}
         <span class="chat__fact chat__fact--ours" data-testid="conversation-turn">
           {t('thread.turn_ours', locale, { when: relativeContactDate(turn.since, locale) })}
           {#if conv.can_edit}
@@ -645,7 +650,14 @@
             >
           {/if}
         </span>
-      {:else if turn?.side === 'theirs'}
+      {:else if turn?.reason === 'follow_up'}
+        <!-- Un paso nuestro vencido: nos toca, aunque esperemos su respuesta (la lista dice lo mismo). -->
+        <span class="chat__fact chat__fact--ours" data-testid="conversation-turn">
+          {turn.waitingSince
+            ? t('thread.turn_follow_up_waiting', locale, { day: dayMonth(turn.since), when: relativeContactDate(turn.waitingSince, locale) })
+            : t('thread.turn_follow_up', locale, { day: dayMonth(turn.since) })}
+        </span>
+      {:else if turn?.reason === 'theirs'}
         <span class="chat__fact" data-testid="conversation-turn">
           {t('thread.turn_theirs', locale, { when: relativeContactDate(turn.since, locale) })}
         </span>

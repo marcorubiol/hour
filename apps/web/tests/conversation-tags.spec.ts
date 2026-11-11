@@ -89,7 +89,8 @@ test.describe('conversation tags', () => {
       await expect(page.getByTestId('block-season')).toHaveCount(0);
 
       // 2. Added under Press, it is born with Press.
-      await page.getByRole('button', { name: 'Add conversation' }).click();
+      await page.getByRole('button', { name: /^Add:/ }).click();
+      await page.getByRole('menuitem', { name: 'Conversation' }).click();
       const dialog = page.locator('dialog[open]');
       await dialog.getByLabel('ZZZ e2e collab').check({ force: true });
       await dialog.getByLabel('Organization').fill(ORG);

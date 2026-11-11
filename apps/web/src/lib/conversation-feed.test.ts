@@ -3,6 +3,7 @@ import {
   compareFeed,
   conversationView,
   feedKey,
+  feedSections,
   feedView,
   markConversationRead,
   sortFeed,
@@ -175,5 +176,33 @@ describe('the unread rule when a conversation is opened', () => {
     );
     expect(before.items.map(feedKey)).toEqual(['c:a', 't:t']);
     expect(markConversationRead(before, 'a').items.map(feedKey)).toEqual(['t:t', 'c:a']);
+  });
+});
+
+describe('feedSections: the two sections count what the Todo chip counts', () => {
+  it('Nos toca are the conversations with a due; the rest counts conversations and names the team groups apart', () => {
+    const rows = feedView(
+      [
+        conv('a', { last: inbound('2026-10-20T10:00:00Z') }),
+        conv('b', { last: outbound('2026-10-15T10:00:00Z'), next_action_at: '2026-10-20' }),
+        conv('c', { last: outbound('2026-10-19T10:00:00Z') }),
+        conv('d'),
+        thread('t1'),
+        thread('t2'),
+      ],
+      NOW,
+    );
+    const s = feedSections(rows, true);
+    expect(s.ours.map((r) => (r.kind === 'conversation' ? r.id : r.thread_id)).sort()).toEqual(['a', 'b']);
+    expect(s.restConversations).toBe(2);
+    expect(s.groups).toBe(2);
+    // «Todo» (conversations) = Nos toca + Lo demás; the groups are said apart.
+    expect(s.ours.length + s.restConversations).toBe(rows.filter((r) => r.kind === 'conversation').length);
+  });
+  it('without sections (a tag in force) everything is the rest', () => {
+    const s = feedSections(feedView([conv('a', { last: inbound('2026-10-20T10:00:00Z') }), thread('t1')], NOW), false);
+    expect(s.ours).toEqual([]);
+    expect(s.restConversations).toBe(1);
+    expect(s.groups).toBe(1);
   });
 });
