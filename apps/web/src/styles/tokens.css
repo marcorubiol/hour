@@ -749,6 +749,9 @@
     --dialog-backdrop: color-mix(in srgb, var(--black) 40%, transparent);
     --dialog-title-size: var(--text-xl);
     --dialog-gutter: var(--space-l);  /* air kept between the paper and the window */
+    /* What a phone's foot (two rows of controls, tarea 132) takes over the
+       body: a focused field scrolls clear of it. */
+    --dialog-foot-room: calc(2 * var(--field-size) + var(--space-xs) + var(--space-s) + var(--dialog-padding));
 
     /* The vistazo (ADR-139 p1): the dialog's paper as a panel on the right,
        over a lens that must stay legible, so its veil is lighter. */

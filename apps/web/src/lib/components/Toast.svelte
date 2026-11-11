@@ -42,6 +42,7 @@
 
 <script lang="ts">
   import { appLocale, t } from '$lib/i18n';
+  import { readableError } from '$lib/error-text';
 
   const locale = appLocale();
 </script>
@@ -51,7 +52,8 @@
     <article class={`toast toast--${item.tone}`}>
       <div class="toast__body">
         {#if item.title}<h3 class="toast__title">{item.title}</h3>{/if}
-        <p class="toast__message">{item.message}</p>
+        <!-- The browser's raw «Failed to fetch» is said in the app's words (tarea 132). -->
+        <p class="toast__message">{readableError(item.message, locale)}</p>
         {#if item.action || item.also}
           <div class="toast__actions">
             {#each [item.action, item.also] as act, i (i)}

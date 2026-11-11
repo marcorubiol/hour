@@ -12,6 +12,35 @@
 
 import { goto } from '$app/navigation';
 import { clearSession, recoverSession, sessionReady } from '$lib/session.svelte';
+import { appLocale, t } from '$lib/i18n';
+
+/**
+ * The network gave no answer (offline, DNS, a dropped connection). fetch's
+ * own TypeError says «Failed to fetch» in the browser's English, and that
+ * text reached toasts as it was (tarea 132): this one says it in the app's
+ * language. Not an ApiError, so `load-fail` still reads it as `failed`.
+ */
+export class NetworkError extends Error {
+  constructor() {
+    super(t('ui.no_connection', appLocale()));
+    this.name = 'NetworkError';
+  }
+}
+
+/** fetch, with a dead network said in words. An abort stays an abort. */
+async function send(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') throw err;
+    throw new NetworkError();
+  }
+}
+
+/** A server failure without a hint of its own: never its raw text («Error 500»). */
+function failedMessage(status: number, hint: string | undefined): string {
+  return hint || (status >= 500 ? t('ui.failed', appLocale()) : `Error ${status}`);
+}
 
 function clearAuthAndBounce(): void {
   clearSession();
@@ -29,8 +58,8 @@ function clearAuthAndBounce(): void {
 async function sendWithSession(url: string, init: RequestInit): Promise<Response> {
   await sessionReady();
   const sentAt = Date.now();
-  const res = await fetch(url, init);
-  if (res.status === 401 && (await recoverSession(sentAt))) return fetch(url, init);
+  const res = await send(url, init);
+  if (res.status === 401 && (await recoverSession(sentAt))) return send(url, init);
   return res;
 }
 
@@ -38,7 +67,7 @@ export async function fetchJSON<T>(url: string, signal?: AbortSignal): Promise<T
   const res = await sendWithSession(url, { signal });
   // Every failure is an ApiError (an Error with the same message as before)
   // so a reader can tell «not there for you» from «broke» by `.status`
-  // (`load-fail.ts`). A network failure stays fetch's own TypeError.
+  // (`load-fail.ts`). A network failure is a NetworkError, in words.
   if (res.status === 401) {
     clearAuthAndBounce();
     throw new ApiError(401, 'Unauthorized');
@@ -49,7 +78,7 @@ export async function fetchJSON<T>(url: string, signal?: AbortSignal): Promise<T
       detail?: string;
       error?: string;
     };
-    throw new ApiError(res.status, body.detail || body.error || `Error ${res.status}`, body);
+    throw new ApiError(res.status, failedMessage(res.status, body.detail || body.error), body);
   }
   return (await res.json()) as T;
 }
@@ -119,7 +148,7 @@ async function sendMutation<T>(url: string, init: RequestInit): Promise<T | null
   if (!res.ok) {
     throw new ApiError(
       res.status,
-      parsed.hint || parsed.detail || parsed.error || `Error ${res.status}`,
+      parsed.hint || failedMessage(res.status, parsed.detail || parsed.error),
       parsed as Record<string, unknown>,
     );
   }

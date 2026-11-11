@@ -80,7 +80,7 @@
         onclick={() => calm.toggle()}
       >
         <!-- The key is a hint for the eye; its name stays «calma», not «calmaC». -->
-        <span>{t('desk.calm', locale)}</span><span class="side-calm__k keys" aria-hidden="true">C</span>
+        <span>{t('desk.calm', locale)}</span><span class="keys" aria-hidden="true"><span class="side-calm__k">C</span></span>
       </button>
       <ConceptHint concept="calm" />
     </span>

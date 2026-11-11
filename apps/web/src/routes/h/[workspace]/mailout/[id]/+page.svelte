@@ -45,6 +45,8 @@
   import Segmented from '$lib/components/Segmented.svelte';
   import { retryLoad } from '$lib/load-fail';
   import RecordState from '$lib/components/RecordState.svelte';
+  import RecordHead from '$lib/components/RecordHead.svelte';
+  import { spaceCrumb, type Crumb } from '$lib/record-crumbs';
   import { dayMonthYear } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
@@ -83,6 +85,17 @@
   const REFRESH_MS = 30_000;
 
   let workspaceSlug = $derived(page.params.workspace ?? '');
+
+  /** The way back (tarea 132): space › project › Envíos › what this is, the
+      record head every other page wears. The kind is the last crumb. */
+  function mailoutCrumbs(kind: string, ws?: { slug: string; name: string } | null, project?: { slug: string; name: string | null } | null): Crumb[] {
+    const slug = ws?.slug ?? workspaceSlug;
+    const out: Crumb[] = [spaceCrumb(ws?.name, slug)];
+    if (project?.slug) out.push({ label: project.name ?? t('picker.kind_project', locale), href: `/h/${slug}/project/${project.slug}/` });
+    if (lensOn('conversations')) out.push({ label: t('envios.view', locale), href: '/h/conversations?view=envios' });
+    out.push({ label: kind });
+    return out;
+  }
   let id = $derived(page.params.id ?? '');
 
   const query = createQuery(
@@ -617,7 +630,7 @@
 
 {#if $query.isLoading || !d || !m}
   <section class="mo">
-    <p class="eyebrow">{t('mailout.title', locale)}</p>
+    <RecordHead crumbs={mailoutCrumbs(t('mailout.title', locale))} title={t('mailout.title', locale)} />
     <RecordState
       loading={$query.isLoading}
       error={$query.error ?? new ApiError(404, 'Not found')}
@@ -630,18 +643,21 @@
   </section>
 {:else}
   <section class="mo" data-testid="mailout">
-    <header class="mo__mast">
-      <p class="eyebrow">
-        {t(invitation ? 'mailout.invitation_title' : 'mailout.title', locale)}{#if d.project?.name}&nbsp;· {d.project.name}{/if}{#if d.performance}&nbsp;·
-          {[dayMonthYear(d.performance.performed_at), d.performance.venue_name, d.performance.city].filter(Boolean).join(', ')}{/if}
-      </p>
-      <h1 class="mo__title"><em>{m.subject || t('mailout.untitled', locale)}</em></h1>
-      <p class="mo__sub">
+    <RecordHead
+      crumbs={mailoutCrumbs(t(invitation ? 'mailout.invitation_title' : 'mailout.title', locale), d.workspace, d.project)}
+      title={m.subject || t('mailout.untitled', locale)}
+    >
+      {#snippet facts()}
         <span class="mo__status" data-status={m.status} data-testid="mailout-status">{t(`mailout.s_${m.status}`, locale)}</span>
         <span>{t(rows.length === 1 ? 'mailout.recipients_one' : 'mailout.recipients_other', locale, { n: rows.length })}</span>
         {#if m.queued_at}<span>{dayMonthYear(m.queued_at)}</span>{/if}
-      </p>
-    </header>
+        {#if d.performance}<span
+            >{[dayMonthYear(d.performance.performed_at), d.performance.venue_name, d.performance.city]
+              .filter(Boolean)
+              .join(', ')}</span
+          >{/if}
+      {/snippet}
+    </RecordHead>
 
     {#if d.simulated}
       <MailoutTestMode title={t('mailout.simulated_title', locale)} body={t('mailout.simulated_send_body', locale)} />
@@ -1131,31 +1147,6 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-m);
-    }
-    .mo__mast {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-xs);
-    }
-    .mo__mast p,
-    .mo__title {
-      margin: 0;
-    }
-    .mo__title em {
-      font-style: italic;
-    }
-    .mo__sub {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: var(--space-xs) var(--space-s);
-      color: var(--text-muted);
-      font-size: var(--text-s);
-    }
-    .mo__sub > * + *::before {
-      content: '·';
-      margin-inline-end: var(--space-s);
-      color: var(--text-faint);
     }
     .mo__status {
       color: var(--heading-color);

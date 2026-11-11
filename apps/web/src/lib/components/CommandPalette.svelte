@@ -718,7 +718,7 @@
           }}
           onkeydown={onInputKey}
         />
-        <span class="cmdk__esc">{t('palette.esc', locale)}</span>
+        <span class="cmdk__esc keys">{t('palette.esc', locale)}</span>
       </div>
 
       <div class="cmdk__list" role="listbox" aria-label={t('palette.results', locale)}>
@@ -831,16 +831,16 @@
       {/if}
 
       <div class="cmdk__foot">
-        <span><b>↑↓</b> {t('picker.hint_move', locale)}</span>
-        <span><b>→</b> {t('palette.hint_drill', locale)}</span>
-        <span><b>←</b> {t('picker.hint_back', locale)}</span>
+        <span class="keys"><b>↑↓</b> {t('picker.hint_move', locale)}</span>
+        <span class="keys"><b>→</b> {t('palette.hint_drill', locale)}</span>
+        <span class="keys"><b>←</b> {t('picker.hint_back', locale)}</span>
         {#if mode === 'filter'}
-          <span><b>↵</b> {t('palette.hint_toggle', locale)}</span>
-          <span><b>⌘↵</b> {t('palette.open', locale)}</span>
-          <span><b>⇧↵</b> {t('palette.hint_apply', locale)}</span>
+          <span class="keys"><b>↵</b> {t('palette.hint_toggle', locale)}</span>
+          <span class="keys"><b>⌘↵</b> {t('palette.open', locale)}</span>
+          <span class="keys"><b>⇧↵</b> {t('palette.hint_apply', locale)}</span>
         {:else}
-          <span><b>↵</b> {t('palette.open', locale)}</span>
-          <span><b>⇧↵</b> {t('palette.narrow', locale)}</span>
+          <span class="keys"><b>↵</b> {t('palette.open', locale)}</span>
+          <span class="keys"><b>⇧↵</b> {t('palette.narrow', locale)}</span>
         {/if}
         <span class="cmdk__foot-new">
           {t('palette.new', locale)}
