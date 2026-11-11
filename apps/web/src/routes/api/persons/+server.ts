@@ -7,6 +7,12 @@
  * The RPC deduplicates by email inside the workspace (same email, same
  * dossier, returned as it is) and gates on `can_write_workspace_person`.
  *
+ * `organization_id` (136, ⌘K «Nueva persona»): the organization the dossier
+ * belongs to, set through `set_workspace_person_organization` when the dossier
+ * has none yet (a deduplicated one keeps its own). The person already exists
+ * if that step fails: the answer says so (`organized: false`), as a
+ * conversation's tags do.
+ *
  * Auth: Bearer JWT required.
  */
 
@@ -24,6 +30,7 @@ const BodySchema = v.object({
   email: v.nullish(v.pipe(v.string(), v.trim(), v.email(), v.maxLength(320))),
   phone: v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(60))),
   title: v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(200))),
+  organization_id: v.nullish(v.pipe(v.string(), v.uuid())),
 });
 
 export const POST: RequestHandler = async ({ request, platform, locals }) => {
@@ -38,7 +45,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
   const b = parsed.output;
 
   try {
-    const { data } = await pgPostRpc<CreatedPerson>(env, 'create_workspace_person', jwt, {
+    const { data } = await pgPostRpc<CreatedPerson & { organization_id?: string | null }>(env, 'create_workspace_person', jwt, {
       p_workspace_id: b.workspace_id,
       p_full_name: b.full_name,
       p_email: b.email ?? null,
@@ -46,7 +53,20 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
       p_title: b.title ?? null,
     });
     if (data.length === 0) return json({ error: 'create_failed' }, 502);
-    return json({ person: data[0] }, 201);
+    const person = data[0];
+    let organized = true;
+    if (b.organization_id && !person.organization_id) {
+      try {
+        await pgPostRpc(env, 'set_workspace_person_organization', jwt, {
+          p_workspace_id: b.workspace_id,
+          p_person_id: person.person_id,
+          p_organization_id: b.organization_id,
+        });
+      } catch {
+        organized = false;
+      }
+    }
+    return json({ person, ...(b.organization_id ? { organized } : {}) }, 201);
   } catch (err) {
     return pgErrorResponse(
       err,

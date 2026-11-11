@@ -10,7 +10,8 @@
  * (`CreateEventDialog`: a performance and every date type), a task (Hoy's
  * `TaskComposer`, in a dialog) and a conversation
  * (`CreateConversationDialog`, the lens's own «Añadir conversación»), and
- * a person on their own (`CreatePersonDialog`, 136).
+ * a person or an organization on their own (`CreatePersonDialog`,
+ * `CreateOrganizationDialog`, 136).
  *
  * What a preset leaves out, the shell deduces from the pinned scope
  * (`scopeCreatePresets`). The day is the one thing the shell cannot know: a
@@ -52,6 +53,7 @@ class CreationStore {
   taskOpen = $state(false);
   conversationOpen = $state(false);
   personOpen = $state(false);
+  organizationOpen = $state(false);
 
   /** Presets consumed by the dialogs when opening from a scoped surface. */
   lineWorkspaceId = $state<string | null>(null);
@@ -62,8 +64,9 @@ class CreationStore {
   /** The conversation's «who» (its organization) and the tag it is born with. */
   conversationWho = $state('');
   conversationTag = $state<string | null>(null);
-  /** Typed in ⌘K: the new person's name (136). */
+  /** Typed in ⌘K: the new person's or organization's name (136). */
   personName = $state('');
+  organizationName = $state('');
 
   /** Raw: a page's getters must stay getters, not a proxy's snapshot. */
   eventHost = $state.raw<EventHost | null>(null);
@@ -104,6 +107,12 @@ class CreationStore {
   openPerson(preset?: { name?: string | null }) {
     this.personName = preset?.name?.trim() ?? '';
     this.personOpen = true;
+  }
+
+  /** An organization on its own, without a conversation (136). */
+  openOrganization(preset?: { name?: string | null }) {
+    this.organizationName = preset?.name?.trim() ?? '';
+    this.organizationOpen = true;
   }
 
   /** A page lends its day while mounted; the returned function takes it back. */

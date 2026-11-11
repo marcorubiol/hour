@@ -7183,6 +7183,42 @@ export type Database = {
           token: string
         }[]
       }
+      create_workspace_organization: {
+        Args: {
+          p_city?: string
+          p_email?: string
+          p_kind?: string
+          p_name: string
+          p_workspace_id: string
+        }
+        Returns: {
+          address: string | null
+          city: string | null
+          country: string | null
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          deleted_at: string | null
+          email: string | null
+          fiscal_identity_id: string | null
+          id: string
+          kind: string
+          name: string
+          notes: string | null
+          phone: string | null
+          previous_slugs: string[]
+          slug: string
+          updated_at: string
+          website: string | null
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workspace_organization"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_workspace_person: {
         Args: {
           p_email?: string
@@ -8922,6 +8958,44 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "roadsheet_share"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_workspace_person_organization: {
+        Args: {
+          p_organization_id: string
+          p_person_id: string
+          p_workspace_id: string
+        }
+        Returns: {
+          city: string | null
+          country: string | null
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          deleted_at: string | null
+          email: string | null
+          first_name: string | null
+          full_name: string
+          languages: string[]
+          last_name: string | null
+          notes: string | null
+          organization_id: string | null
+          person_id: string
+          phone: string | null
+          profile_shared_at: string | null
+          profile_shared_fields: string[]
+          profile_sync_enabled: boolean
+          slug: string
+          title: string | null
+          updated_at: string
+          website: string | null
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workspace_person"
           isOneToOne: true
           isSetofReturn: false
         }
