@@ -600,7 +600,7 @@
   "planner.cast_you_one": "you're going",
   "planner.cast_you": "you",
   "planner.no_cast@music": "no band",
-  "planner.agenda_from": "from {day} onwards",
+  "planner.agenda_from": "from {day}",
   "planner.agenda_from_today": "from today",
   "planner.agenda_open_at": "open at {day}, not today",
   "planner.new_date": "New date",

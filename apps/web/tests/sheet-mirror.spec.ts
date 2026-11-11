@@ -19,7 +19,7 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  *
  * Besides the bolo, the conversation holds one outbound message of ours,
  * written once (the history is append-only). The step is set for the test
- * and cleared after it.
+ * and cleared before and after it.
  *
  * THE SPEC OWNS ITS ROWS, in `playwright`, project `zzz-e2e-collab`: one
  * conversation with the organization «ZZZ E2E Mirror Sala» and one bolo on
@@ -108,6 +108,17 @@ async function ownRows(page: Page): Promise<Owned> {
         });
         if (!res.ok) throw new Error(`record event ${res.status}`);
       }
+
+      // No step at the start. The test sets one and clears it in `finally`,
+      // but a run killed mid-test never gets there: one left «ZZZ E2E mirror
+      // step» overdue, and the row (rightly) said the follow-up instead of
+      // the last thing said.
+      const clear = await fetch(`/api/conversations/${conv.id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ next_action_at: null, next_action_note: null }),
+      });
+      if (!clear.ok) throw new Error(`clear step ${clear.status}`);
       return { conversationId: conv.id, orgSlug: conv.organization.slug };
     },
     { slug: PROJECT_SLUG, sala: SALA, fee: FEE },
