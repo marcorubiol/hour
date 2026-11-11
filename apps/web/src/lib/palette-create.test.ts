@@ -12,7 +12,7 @@ import { buildLineIndex, buildProjectIndex, resolveScope, type NavWorkspace, typ
 import { t } from './i18n';
 import { QUICK_MORE, QUICK_PRIMARY } from './quick-add';
 
-const ALL: CreateCan = { plan: true, converse: true, task: true };
+const ALL: CreateCan = { plan: true, converse: true, task: true, directory: true };
 const kinds = (q: string, can: CreateCan = ALL) => paletteCreates(q, can).map((c) => c.kind);
 
 describe('paletteCreates: what typing finds', () => {
@@ -67,26 +67,56 @@ describe('paletteCreates: what typing finds', () => {
 
 describe('paletteCreates: never what the person cannot make', () => {
   it('without editing the plan, no performance and no date', () => {
-    const can = { plan: false, converse: true, task: true };
+    const can = { plan: false, converse: true, task: true, directory: false };
     expect(kinds('nueva', can)).toEqual(['task', 'conversation']);
     expect(kinds('ensayo', can)).toEqual([]);
     expect(kinds('Mercat', can)).toEqual(['task', 'conversation']);
   });
 
   it('without Converses, no conversation', () => {
-    const can = { plan: true, converse: false, task: true };
+    const can = { plan: true, converse: false, task: true, directory: false };
     expect(kinds('nueva', can)).toEqual(['performance', 'date', 'task']);
     expect(kinds('conversa', can)).toEqual([]);
   });
 
   it('a task wherever a space on screen takes one', () => {
-    expect(kinds('tasca', { plan: false, converse: false, task: true })).toEqual(['task']);
+    expect(kinds('tasca', { plan: false, converse: false, task: true, directory: false })).toEqual(['task']);
   });
 
   it('a guest of a bolo, with nothing of their own on screen, is offered nothing', () => {
-    const guest = { plan: false, converse: false, task: false };
+    const guest = { plan: false, converse: false, task: false, directory: false };
     expect(kinds('tasca comprar', guest)).toEqual([]);
     expect(kinds('Mercat', guest)).toEqual([]);
+  });
+});
+
+describe('paletteCreates: a person (136)', () => {
+  it('a name typed offers it last, with the name as title', () => {
+    const out = paletteCreates('Anna Puig', ALL);
+    expect(out.at(-1)).toEqual({ kind: 'person', title: 'Anna Puig' });
+  });
+
+  it('its words, in the four languages, name it', () => {
+    expect(kinds('nueva persona')).toEqual(['person']);
+    expect(kinds('personne')).toEqual(['person']);
+    expect(paletteCreates('nova persona Anna Puig', ALL)).toEqual([{ kind: 'person', title: 'Anna Puig' }]);
+  });
+
+  it('never where no space takes one from the person', () => {
+    const can = { plan: true, converse: true, task: true, directory: false };
+    expect(kinds('persona', can)).toEqual([]);
+    expect(kinds('Anna Puig', can)).toEqual(['performance', 'date', 'task', 'conversation']);
+  });
+
+  it('nor without Converses: their file is read through the conversations', () => {
+    expect(kinds('persona', { plan: true, converse: false, task: true, directory: true })).toEqual([]);
+  });
+
+  it('opens no quick add, and says its name in every language', () => {
+    expect(createEventType('person')).toBeNull();
+    for (const locale of ['es', 'ca', 'en', 'fr'] as const) {
+      expect(t(CREATE_LABEL_KEYS.person, locale)).not.toBe(CREATE_LABEL_KEYS.person);
+    }
   });
 });
 

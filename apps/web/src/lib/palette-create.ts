@@ -15,7 +15,8 @@
  * Planner off, or no `edit:performance` anywhere) neither a performance nor
  * a date; without Converses (or the lens off) no conversation; a task only
  * where some space on screen takes one (a guest of a bolo writes none,
- * `$lib/workspace-role`).
+ * `$lib/workspace-role`); a person only where some space takes one from the
+ * person (owner, admin or member) and its file can be read (Converses, 136).
  */
 
 import { accentVarFor } from '$lib/utils/accent';
@@ -34,7 +35,8 @@ export type CreateKind =
   | 'press'
   | 'other'
   | 'task'
-  | 'conversation';
+  | 'conversation'
+  | 'person';
 
 export interface PaletteCreate {
   kind: CreateKind;
@@ -49,10 +51,15 @@ export interface CreateCan {
   converse: boolean;
   /** Some space on screen takes a task from the person (not a guest's). */
   task: boolean;
+  /** Some space takes a person from the person (owner, admin or member, 136). */
+  directory: boolean;
 }
 
-/** The four offered for a bare verb or free text, in this order. */
-export const BASE_CREATES: readonly CreateKind[] = ['performance', 'date', 'task', 'conversation'];
+/**
+ * Offered for a bare verb or free text, in this order. A person closes the
+ * list (136): a name typed may be somebody, born without a conversation.
+ */
+export const BASE_CREATES: readonly CreateKind[] = ['performance', 'date', 'task', 'conversation', 'person'];
 
 export const CREATE_LABEL_KEYS: Record<CreateKind, string> = {
   performance: 'palette.new_performance',
@@ -65,6 +72,7 @@ export const CREATE_LABEL_KEYS: Record<CreateKind, string> = {
   other: 'palette.new_other',
   task: 'palette.new_task',
   conversation: 'palette.new_conversation',
+  person: 'palette.new_person',
 };
 
 /**
@@ -72,7 +80,7 @@ export const CREATE_LABEL_KEYS: Record<CreateKind, string> = {
  * on the commonest date, a rehearsal; the type chip is right there.
  */
 export function createEventType(kind: CreateKind): QuickType | null {
-  if (kind === 'task' || kind === 'conversation') return null;
+  if (kind === 'task' || kind === 'conversation' || kind === 'person') return null;
   if (kind === 'date') return 'rehearsal';
   return kind;
 }
@@ -105,6 +113,7 @@ const KIND_WORDS: Record<CreateKind, readonly string[]> = {
   other: ['altres', 'altre', 'otros', 'otro', 'other', 'autre', 'autres'],
   task: ['tasca', 'tarea', 'task', 'todo', 'tache'],
   conversation: ['conversa', 'conversacion', 'conversation', 'contacte', 'contacto', 'contact'],
+  person: ['persona', 'person', 'personne'],
 };
 
 /** A half-typed word counts from three letters; a shorter one must be whole. */
@@ -119,6 +128,9 @@ function kindsNamed(typed: string): CreateKind[] {
 export function allowed(kind: CreateKind, can: CreateCan): boolean {
   if (kind === 'task') return can.task;
   if (kind === 'conversation') return can.converse;
+  // Their file is read through the conversations (directory privacy): who
+  // could not open what they made is not offered to make it.
+  if (kind === 'person') return can.directory && can.converse;
   return can.plan;
 }
 

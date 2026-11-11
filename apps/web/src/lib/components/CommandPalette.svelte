@@ -109,6 +109,8 @@
     plan: lensOn('planner') && $planAccessQuery.data?.edit !== false,
     converse: lensOn('conversations') && $convAccessQuery.data?.edit !== false,
     task: canTask,
+    // A person: where some space takes a project, it takes one too (owner, admin, member).
+    directory: canProject,
   });
 
   const workspacesQuery = createQuery(workspacesQueryOptions());
