@@ -643,11 +643,13 @@
   }
 
   // ── The rail on a phone (base.css § Drawer) ──────────────────────────
-  // Below 48rem the rail cannot sit beside the page — it alone is 248px of
-  // a 390px screen — so it leaves the flow and the top bar's empty left
-  // cell gets the one button that brings it out. Same rail, same contents,
-  // same order: the clock that goes home, calm, the pulse. On a
-  // desktop the button is not drawn and `railOpen` is never true.
+  // Below 48rem the rail cannot sit beside the page (it alone is 232px of
+  // a 390px screen), so it leaves the flow and the top bar's empty left
+  // cell gets the one button that brings it out: the clock. Since tarea 140
+  // it comes out as a short sheet hanging from that clock, as tall as what
+  // it holds. Same rail, same contents, same order: the date that goes
+  // home, calm, the pulse. On a desktop the button is not drawn and
+  // `railOpen` is never true.
 
   // ── The shell's clock ───────────────────────────────────────────────
   // ONE timer for the whole shell: the rail draws it with the date and feeds
@@ -680,10 +682,23 @@
 
   let railOpen = $state(false);
   let menuButtonEl = $state<HTMLButtonElement | null>(null);
+  // Where the sheet hangs: under the door, its first line under the clock's
+  // digits. Measured on opening; the bar is sticky, so it does not move
+  // while the sheet is out.
+  let railSheetTop = $state<string | undefined>();
+  let railSheetStart = $state<string | undefined>();
+  let railWidthAtOpen = 0;
   function openRail() {
+    railWidthAtOpen = window.innerWidth;
+    if (menuButtonEl) {
+      const door = menuButtonEl.getBoundingClientRect();
+      const face = menuButtonEl.querySelector('.clock-face')?.getBoundingClientRect() ?? door;
+      railSheetTop = `${door.bottom}px`;
+      railSheetStart = `${face.left}px`;
+    }
     railOpen = true;
-    // Into the drawer, so the keyboard and a screen reader land where the
-    // eye does: the clock, its first control.
+    // Into the sheet, so the keyboard and a screen reader land where the
+    // eye does: the way home, its first control.
     void tick().then(() =>
       document.getElementById('shell-rail')?.querySelector<HTMLElement>('a, button')?.focus(),
     );
@@ -692,6 +707,16 @@
     if (!railOpen) return;
     railOpen = false;
     if (returnFocus) menuButtonEl?.focus();
+  }
+  // Tab out of the sheet and it folds away, as a menu does: what has focus
+  // is no longer in it, and the keyboard goes on from there.
+  function onRailFocusOut(e: FocusEvent) {
+    if (!railOpen) return;
+    const rail = document.getElementById('shell-rail');
+    const next = e.relatedTarget as Node | null;
+    if (!rail?.contains(e.target as Node) || !next) return;
+    if (rail.contains(next) || menuButtonEl?.contains(next)) return;
+    closeRail();
   }
   // Anything that goes somewhere closes it: the clock, a line of the pulse.
   afterNavigate(() => closeRail());
@@ -727,6 +752,10 @@
      the page dies (remember() persists synchronously to localStorage). -->
 <svelte:window
   onpagehide={() => rememberWorkingScope()}
+  onresize={() => {
+    // A turned phone moves the door; the bar folding on scroll only changes the height.
+    if (window.innerWidth !== railWidthAtOpen) closeRail();
+  }}
   onkeydown={(e) => {
     if (e.key === 'Escape' && railOpen) closeRail({ returnFocus: true });
     onPaletteKey(e);
@@ -742,7 +771,13 @@
   }}
 >
 {#if authChecked && !blocked}
-  <div class="shell" class:shell--settings={inSettings}>
+  <div
+    class="shell"
+    class:shell--settings={inSettings}
+    style:--rail-sheet-top={railSheetTop}
+    style:--rail-sheet-start={railSheetStart}
+    onfocusout={onRailFocusOut}
+  >
     <!-- THE FIRST STOP SKIPS THE CHROME (móvil #8, WCAG 2.4.1): twenty stops of
          search, account, rail and scope stood before the first day. Unseen
          until focused. -->
@@ -756,8 +791,8 @@
            of the rail that already says «here, now». -->
       <div class="shell__left">
         <!-- Only a phone draws it (see .shell__menu): there the rail is a
-             drawer, and its door is the rail's own clock (Marco, 2026-10-10).
-             Inside the drawer the clock still goes home, as on a desktop. -->
+             short sheet hanging from this clock, its door (Marco, 2026-10-10;
+             the sheet, tarea 140). Inside it the date goes home. -->
         <button
           type="button"
           class="shell__menu"
@@ -770,8 +805,8 @@
           <time class="clock-face" datetime={clockTime}>{clockTime}</time>
           <!-- The clock is the door, and nothing said so (móvil #11): the
                caret the app already uses for «this opens» (the status menu,
-               the decisions toggle), after the time so the time stays where
-               the drawer draws it. -->
+               the decisions toggle), after the time, so the sheet's first
+               line starts under the digits. -->
           <span class="shell__menu-caret" aria-hidden="true">{railOpen ? '▴' : '▾'}</span>
         </button>
       </div>
@@ -957,7 +992,7 @@
     min-block-size: 100vh;
     background: var(--bg);
   }
-  /* cut: the rail (64rem). Settings mode slots its own rail between the scopes rail and main, from
+  /* Wide, the rail's cut (64rem, $lib/breakpoints). Settings mode slots its own rail between the scopes rail and main, from
      1024 up. Under it the rail and that nav left the page a narrow column
      (208px at 768): the sections become a dropdown at the top of the page
      instead (SettingsSectionSelect), and the shell keeps its two columns. */
@@ -966,7 +1001,7 @@
       grid-template-columns: auto auto 1fr;
     }
   }
-  /* cut: the rail (64rem), the other side of the rule above. */
+  /* Wide, the other side of the rule above. */
   @media (max-width: 63.999rem) {
     .shell__settings-nav {
       display: none;
@@ -1105,7 +1140,7 @@
       margin-inline: auto;
     }
   }
-  /* cut: the rail (64rem). A tablet with the rail beside it (48–64rem): the sections take most of
+  /* Wide, the rail's cut (64rem, $lib/breakpoints). A tablet with the rail beside it (48–64rem): the sections take most of
      the bar, so the search keeps what is left, never less than its lens. */
   @media (min-width: 48rem) and (max-width: 63.999rem) {
     .shell__top {
@@ -1145,9 +1180,8 @@
      frame it does not have on a desktop. What says it can be pressed is the
      target, not a border: the button spans the whole bar (the negative margin
      cancels the bar's own padding) and is never narrower than 44px, and the
-     face sits where the drawer's clock sits — same inset, same top — so
-     opening the drawer leaves the time exactly where it was. Focus uses the
-     global ring. */
+     face sits at the rail's clock top. The sheet hangs from its foot
+     (base.css § Drawer). Focus uses the global ring. */
   .shell__menu {
     display: none;
     align-items: flex-start;
@@ -1163,7 +1197,7 @@
   }
 
   @media (max-width: 47.999rem) {
-    /* One column: the rail is a drawer now (ScopeRail + base.css § Drawer),
+    /* One column: the rail is a sheet now (ScopeRail + base.css § Drawer),
        out of the flow, so the bar and the page take the whole width. */
     /* The gutter stays the desktop's --space-l, fluid down to 20px: the
        phone's own 14px (--space-m) left the page pressed against the glass
@@ -1184,7 +1218,7 @@
       gap: var(--space-s);
     }
     /* The door's cell takes the bar's whole height, so the face can be
-       placed from the top of the screen exactly as the drawer places it. */
+       placed from the top of the screen exactly as the rail places it. */
     .shell__left {
       display: inline-flex;
       align-self: stretch;

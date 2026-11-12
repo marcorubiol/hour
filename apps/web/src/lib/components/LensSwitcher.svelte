@@ -147,7 +147,7 @@
     color: var(--bg);
   }
 
-  /* cut: the rail (64rem, as the shell). A tablet with the rail beside it: the bar is narrower than the four
+  /* Wide, the rail's cut (64rem, $lib/breakpoints). A tablet with the rail beside it: the bar is narrower than the four
      pills with their desktop air, so they give up half of it. */
   @media (min-width: 48rem) and (max-width: 63.999rem) {
     .lensswitch__home,

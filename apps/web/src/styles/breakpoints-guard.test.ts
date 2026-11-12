@@ -2,17 +2,17 @@
  * The guard of the named cuts ($lib/breakpoints, tarea 134). A media query
  * cannot read a custom property, so the width of every `@media` in a
  * component or a shared stylesheet is written by hand; this test keeps those
- * widths on the two cuts the app has (mobile under 48rem, two panes from
- * 75rem). Any other width is allowed only with its reason written right
- * above it, in a comment that says `cut:` (the rail at 64rem, the login's two
- * columns). Container queries measure their own box and are not cuts of the
+ * widths on the three cuts the app has (mobile under 48rem, wide from 64rem,
+ * the rail's, and two panes from 75rem). Any other width is allowed only with
+ * its reason written right above it, in a comment that says `cut:` (the
+ * login's two columns). Container queries measure their own box and are not cuts of the
  * screen: they are left alone.
  */
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
-import { MOBILE_QUERY, MOBILE_UNDER, TWO_PANES_FROM } from '$lib/breakpoints';
+import { MOBILE_QUERY, MOBILE_UNDER, TWO_PANES_FROM, WIDE_FROM } from '$lib/breakpoints';
 
 const SRC = join(import.meta.dirname, '..');
 
@@ -33,6 +33,8 @@ function walk(dir: string, out: string[] = []): string[] {
 const NAMED = new Set([
   `max-width:${MOBILE_QUERY.match(/max-width:\s*([\d.]+rem)/)![1]}`,
   `min-width:${MOBILE_UNDER}`,
+  `min-width:${WIDE_FROM}`,
+  `max-width:${(parseFloat(WIDE_FROM) - 0.001).toFixed(3)}rem`,
   `min-width:${TWO_PANES_FROM}`,
   `max-width:${(parseFloat(TWO_PANES_FROM) - 0.001).toFixed(3)}rem`,
 ]);
@@ -78,7 +80,14 @@ describe('media query cuts', () => {
 
   test('the named cuts are the ones the script reads', () => {
     expect(NAMED).toEqual(
-      new Set(['max-width:47.999rem', 'min-width:48rem', 'min-width:75rem', 'max-width:74.999rem']),
+      new Set([
+        'max-width:47.999rem',
+        'min-width:48rem',
+        'min-width:64rem',
+        'max-width:63.999rem',
+        'min-width:75rem',
+        'max-width:74.999rem',
+      ]),
     );
   });
 });

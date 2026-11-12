@@ -2712,38 +2712,51 @@
     color: var(--heading-color);
   }
 
-  /* Drawer — the shell's furniture on a phone. Below 48rem a `.drawer` leaves
-     the flow and waits off-canvas at the inline-start edge; `data-open` slides
-     it in over a backdrop. Above 48rem the class adds NOTHING: the element
-     keeps whatever its own component draws, so the desktop never pays for
-     the phone. Inherits the slide of the May `Sidebar` primitive, whose
-     component died with the sidebar era (2b9663e) and left this skeleton.
+  /* Drawer — the shell's furniture on a phone, drawn as a short sheet that
+     hangs from the top bar's clock (tarea 140): as tall as what it holds,
+     the rail's width, and the menu's paper (`.menu`: border, radius, the
+     same shadow), so it reads as the AccountMenu beside it does, a thing
+     that drops from its door, not a screen of its own. The layout measures
+     the door on opening and hands the sheet `--rail-sheet-top` (the door's
+     foot) and `--rail-sheet-start` (where the clock's digits start); the
+     sheet's first line starts under them. Above 48rem the class adds
+     NOTHING: the element keeps whatever its own component draws, so the
+     desktop never pays for the phone.
 
-     Closed, it is `visibility: hidden` and not merely translated: a panel
-     pushed off-screen still takes Tab and is still read aloud. The delay on
-     visibility lets the slide finish before it disappears. */
+     Closed, it is `visibility: hidden` and not merely faded: a panel nobody
+     sees still takes Tab and is still read aloud. The delay on visibility
+     lets the fade finish before it disappears. The backdrop draws nothing:
+     it is the tap outside that closes, as outside a menu. */
   @media (max-width: 47.999rem) {
     .drawer {
       position: fixed;
-      inset-block: 0;
-      inset-inline-start: 0;
+      inset-block-start: calc(var(--rail-sheet-top, 0px) + var(--space-xs));
+      inset-inline-start: max(
+        var(--space-xs),
+        calc(var(--rail-sheet-start, 0px) - var(--line-hairline) - var(--space-m) - var(--space-xs))
+      );
       z-index: var(--z-modal);
-      max-inline-size: calc(100vw - var(--space-xl));
-      block-size: 100dvh;
+      max-inline-size: calc(100vw - var(--space-xs) * 2);
+      max-block-size: calc(
+        100dvh - var(--rail-sheet-top, 0px) - var(--space-xs) * 2 - var(--shell-foot)
+      );
       min-block-size: 0;
       overflow-y: auto;
       overscroll-behavior: contain;
-      transform: translateX(-100%);
+      border: var(--border);
+      border-radius: var(--radius-m);
+      background: var(--bg);
+      box-shadow: var(--box-shadow-2);
+      opacity: 0;
       visibility: hidden;
       transition:
-        transform var(--transition),
+        opacity var(--transition),
         visibility 0s linear var(--transition-duration);
     }
     .drawer[data-open] {
-      transform: none;
+      opacity: 1;
       visibility: visible;
-      box-shadow: var(--box-shadow-3);
-      transition: transform var(--transition);
+      transition: opacity var(--transition);
     }
     .drawer__backdrop {
       position: fixed;
@@ -2751,8 +2764,8 @@
       z-index: calc(var(--z-modal) - 1);
       border: 0;
       padding: 0;
-      background: var(--backdrop);
-      cursor: pointer;
+      background: none;
+      cursor: default;
     }
   }
   /* The backdrop only exists on a phone, whatever state the shell is in. */
