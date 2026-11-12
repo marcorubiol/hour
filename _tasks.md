@@ -28,7 +28,7 @@ Análisis de producto y 40 propuestas, validadas enteras. Orden: tanda 1 (130 a 
 con boceto antes y después de la 119). Capturas de partida: espacio `playwright`, datos de test.
 
 - [ ] Marco: hacer: en el panel de Supabase, añadir `https://hour.zerosense.studio/login*` a Redirect URLs y cambiar la plantilla «Reset Password» (`build/runbooks/password-recovery.md`); hasta entonces el enlace de recuperar contraseña cae en la portada. (132, chat 11-11)
-- [ ] Marco: decidir: en un espacio de música, el proyecto se llama «proyecto» / «project» (recomendado; unas 90 claves por lengua) o se queda en «espectáculo» como en escena (ADR-195 § 5). (133, chat 11-11)
+- [ ] En un espacio de música el proyecto se llama «proyecto» / «project» / «projecte» / «projet» (ADR-196): en `main` desde `6d75145a`, puerta verde; falta el deploy, con OK de Marco, y mirar un espacio de música en pantalla. (133, chat 12-11)
 - [ ] 140 «Opciones por orden» del espacio pasa a Ajustes › Este espacio, bajo «Oficio», con el valor por defecto según el oficio; el corte del raíl (64rem) con nombre en `lib/breakpoints.ts`; el cajón del móvil como hoja corta colgada del reloj. Restos de los carriles de la tanda 2. (carriles 11-11, sin estimar)
 - [ ] 137 Primer día: quien entra sin espacio ve «Crea tu compañía» y tres pasos (espectáculo, contactos, primera fecha); incluye la ayuda B. Boceto antes. Después de la 119. (chat 11-11)
 - [ ] 138 Importar contactos desde CSV o Excel, sobre el importador de público. Boceto antes. Después de la 119. (chat 11-11)
