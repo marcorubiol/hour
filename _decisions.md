@@ -7562,3 +7562,19 @@ leyendo «espectáculo». Cierra el punto abierto de ADR-195 § 5.
    en música, que sigue siendo «concierto» (`@music` de `perf.*`, `planner.kind_show` y similares).
 
 **Verificado:** `check` y unitarios en la puerta de la tarea. Sin E2E ni RLS.
+
+## [2026-11-12] ADR-197 · Las opciones por orden siguen al oficio; el raíl tiene corte con nombre y en el móvil es una hoja corta (tarea 140; enmienda ADR-002 en el valor por defecto)
+
+Marco (chat, 2026-11-11: «todo lo recomendado»; 2026-11-12: seguir con lo pendiente). En `main` desde `29d1fac0`.
+
+1. **«Opciones por orden» vive en Ajustes › Este espacio, bajo «Oficio»**, como interruptor; sale del diálogo del
+   espacio. Sin nada guardado manda el oficio: música por orden (`prioritized`), escena sin orden (`simple`), como
+   reparte ADR-002. `settings.booking_mode` guarda solo la excepción: elegir lo que da el oficio borra la clave, y el
+   espacio sigue al oficio si este cambia. La regla vive en `apps/web/src/lib/booking-mode.ts`. Sin migración.
+2. **El corte del raíl es el tercer corte con nombre:** `WIDE_FROM = '64rem'` en `lib/breakpoints.ts`, vigilado por
+   `breakpoints-guard.test.ts`. La única excepción `cut:` que queda es el login a 55rem.
+3. **En el móvil el raíl es una hoja corta colgada del reloj:** alto según contenido, con el aspecto de un menú, sin
+   oscurecer el fondo. Contiene la fecha, calma y el pulso. Se cierra con Escape, tocando fuera, al navegar, al salir
+   con Tab y al girar el teléfono; no atrapa el foco, lo devuelve al reloj.
+
+**Verificado:** `check` 0/0 y unitarios 2363. Sin E2E y sin verlo en pantalla. `CACHE_SCHEMA` 33.
