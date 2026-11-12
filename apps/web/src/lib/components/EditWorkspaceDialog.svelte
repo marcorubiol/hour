@@ -1,14 +1,15 @@
 <script lang="ts">
   /**
    * Edit-space dialog (ADR-062) — the masthead pencil opens this. Name +
-   * hold convention + home base + color + description, PATCHed via
+   * home base + color + description, PATCHed via
    * update_workspace (owner/admin only). Seeds from the current workspace on
    * open; on success invalidates ['workspaces'] so the masthead + rail
    * repaint in place (no navigation — you stay on the portada).
    *
    * No discipline (tarea 135): the trade in Ajustes says how Hour speaks, and
    * the `domain` column stays in the base, unread. Absent keys are left
-   * untouched by the RPC, so a stored one survives.
+   * untouched by the RPC, so a stored one survives. Nor the hold convention
+   * (tarea 140): «Opciones por orden» lives in Ajustes, under the trade.
    *
    * logo_url is intentionally NOT managed here yet (upload flow + CSP img-src
    * ship later); the RPC leaves absent keys untouched, so it survives edits.
@@ -20,7 +21,6 @@
   import Textarea from './Textarea.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
-  import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import AccentSwatchPicker from '$lib/components/create/AccentSwatchPicker.svelte';
   import type { NavWorkspace } from '$lib/nav';
@@ -36,19 +36,8 @@
   const queryClient = useQueryClient();
   const locale = appLocale();
 
-  /**
-   * ADR-002 — which hold convention this space speaks. Only two entries: the
-   * simple case is the ABSENT key, not a stored "simple", so the setting has
-   * one representation instead of two that mean the same thing.
-   */
-  const BOOKING_MODE_OPTIONS = [
-    { value: '', label: t('workspace.holds_simple', locale) },
-    { value: 'prioritized', label: t('workspace.holds_ranked', locale) },
-  ];
-
   let name = $state('');
   let accent = $state<string | null>(null); // null = auto (hash of slug)
-  let bookingMode = $state(''); // '' = absent = simple
   let city = $state('');
   let description = $state('');
 
@@ -59,7 +48,6 @@
     if (open && !wasOpen && workspace) {
       name = workspace.name ?? '';
       accent = workspace.accent ?? null;
-      bookingMode = workspace.booking_mode === 'prioritized' ? 'prioritized' : '';
       city = workspace.city ?? '';
       description = workspace.description ?? '';
     }
@@ -80,8 +68,6 @@
         name: name.trim(),
         description: description.trim(),
         accent,
-        // '' clears the key back to absent (= simple); see the RPC.
-        booking_mode: bookingMode,
         city: city.trim(),
       };
       const res = await mutateJSON<{ workspace: { id: string; slug: string } }>(
@@ -210,15 +196,6 @@
       error={nameError}
       required
       autocomplete="off"
-      disabled={$save.isPending}
-    />
-
-    <Select
-      label={t('workspace.holds', locale)}
-      name="space-booking-mode"
-      bind:value={bookingMode}
-      options={BOOKING_MODE_OPTIONS}
-      helper={t('workspace.holds_help', locale)}
       disabled={$save.isPending}
     />
 

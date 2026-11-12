@@ -1,7 +1,10 @@
 /**
  * El oficio del espacio (ADR-128): con qué palabras habla la app en él.
  *
- * GET → { trade, can_edit }
+ * GET → { trade, booking_mode, can_edit }: `booking_mode` is the convention the
+ *     space speaks (stored, or its trade's, `$lib/booking-mode`). The setting
+ *     lives under the trade in Ajustes (tarea 140) and is written by
+ *     `PATCH /api/workspaces/[id]`.
  * PUT { trade } → lo cambia un owner/admin por `update_workspace`; a los
  *     demás, 403.
  */
@@ -10,6 +13,7 @@ import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import { TRADES } from '$lib/i18n/trade.svelte';
+import { bookingModeOf } from '$lib/booking-mode';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import { jsonNoStore, UUID_RE } from '$lib/server/http';
@@ -24,14 +28,18 @@ export const GET: RequestHandler = async ({ request, params, platform, locals })
   if (!UUID_RE.test(params.id)) return jsonNoStore({ error: 'invalid_id' }, 400);
   try {
     const [ws, admin] = await Promise.all([
-      pgGet<{ trade: string }>(env, 'workspace', jwt, {
-        search: { select: 'trade', id: `eq.${params.id}` },
+      pgGet<{ trade: string; booking_mode: string | null }>(env, 'workspace', jwt, {
+        search: { select: 'trade,booking_mode:settings->>booking_mode', id: `eq.${params.id}` },
       }),
       pgPostRpc<boolean>(env, 'is_workspace_admin', jwt, { ws_id: params.id }),
     ]);
     const row = ws.data[0];
     if (!row) return jsonNoStore({ error: 'not_found' }, 404);
-    return jsonNoStore({ trade: row.trade, can_edit: admin.data[0] === true });
+    return jsonNoStore({
+      trade: row.trade,
+      booking_mode: bookingModeOf(row),
+      can_edit: admin.data[0] === true,
+    });
   } catch (err) {
     return pgErrorResponse(err, { route: 'GET /api/workspaces/[id]/trade', requestId: locals.requestId });
   }

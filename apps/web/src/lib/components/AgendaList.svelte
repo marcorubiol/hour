@@ -46,6 +46,7 @@
    * the book shows the calendar entire.
    */
   import { createQuery } from '@tanstack/svelte-query';
+  import { bookingModeOf } from '$lib/booking-mode';
   import {
     dateDayKey,
     deducedPhrase,
@@ -285,7 +286,7 @@
   /** ADR-002 — the hold convention, per workspace: `1st hold` only means
       something where the company runs a priority queue. */
   let workspaceModeById = $derived(
-    new Map(($workspacesQuery.data?.items ?? []).map((w) => [w.id, w.booking_mode ?? 'simple'])),
+    new Map(($workspacesQuery.data?.items ?? []).map((w) => [w.id, bookingModeOf(w)])),
   );
 
   // ── Rows per day ───────────────────────────────────────────────────────

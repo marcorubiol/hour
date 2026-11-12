@@ -34,6 +34,7 @@
 
   import { undoableRemovals } from '$lib/undo-remove.svelte';
   import { docTitle } from '$lib/doc-title';
+  import { bookingModeOf } from '$lib/booking-mode';
   import { createMutation, createQueries, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { tick, untrack } from 'svelte';
@@ -497,7 +498,7 @@
     new Map(
       ($workspacesQuery.data?.items ?? []).map((w) => [
         w.id,
-        (w as { booking_mode?: string }).booking_mode ?? 'simple',
+        bookingModeOf(w as { booking_mode?: string; trade?: string }),
       ]),
     ),
   );
