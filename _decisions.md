@@ -7547,3 +7547,18 @@ Marco (chat, 2026-11-11): la tabla de palabras, «tal cual». En `main` desde `0
 
 **Verificado:** `check` 0/0 y unitarios 2359. Sin E2E; cinco specs puestos al día sin correr (`line-detail`,
 `palette-create`, `performance-write`, `money`, `scope-url`).
+
+## [2026-11-12] ADR-196 · En música el proyecto se llama «proyecto» (cierra ADR-195 § 5)
+
+Marco (chat, 2026-11-12): en un espacio de música el proyecto lee «proyecto», y en un espacio de escena sigue
+leyendo «espectáculo». Cierra el punto abierto de ADR-195 § 5.
+
+1. **Las cuatro palabras en música:** «proyecto» (ES), «project» (EN), «projecte» (CA), «projet» (FR). En escena se
+   quedan «espectáculo», «show», «espectacle» y «spectacle».
+2. **Cómo:** variantes `clave@music` (ADR-128) con el género, el número y los artículos ajustados («a l'espectacle»
+   pasa a «al projecte»). 91 variantes nuevas por lengua y 2 corregidas por lengua (`planner.stat_unattributed@music`
+   y `help.concept.lines_body@music`, que nombraban el espectáculo). Las mismas claves en las cuatro lenguas.
+3. **No cambia:** el código, las rutas y los nombres de clave (siguen con `project`); los valores base; la función
+   en música, que sigue siendo «concierto» (`@music` de `perf.*`, `planner.kind_show` y similares).
+
+**Verificado:** `check` y unitarios en la puerta de la tarea. Sin E2E ni RLS.
