@@ -49,7 +49,7 @@
 
 <style>
   @layer components {
-    /* cut: the rail (64rem): from there Settings has its own nav beside the page. */
+    /* Wide, the rail's cut (64rem, $lib/breakpoints): from there Settings has its own nav beside the page. */
     @media (min-width: 64rem) {
       .set-picker {
         display: none;
