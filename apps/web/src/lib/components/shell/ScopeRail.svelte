@@ -14,8 +14,9 @@
   import ConceptHint from '$lib/components/ConceptHint.svelte';
 
   interface Props {
-    /** On a phone the rail is a drawer (base.css § Drawer) and the layout
-        owns whether it is out: the menu button lives in the top bar. On a
+    /** On a phone the rail is a short sheet hanging from the top bar's clock
+        (base.css § Drawer) and the layout owns whether it is out and where
+        it hangs: the door lives in the top bar. On a
         desktop this changes nothing — the rail is always there. */
     open?: boolean;
     onclose?: () => void;
@@ -54,6 +55,7 @@
   <button
     type="button"
     class="drawer__backdrop"
+    tabindex="-1"
     aria-label={t('shell.menu_close', locale)}
     onclick={() => onclose?.()}
   ></button>
@@ -108,15 +110,16 @@
        the header's wordmark exactly (see .side-clock). */
     padding-block: 0 var(--space-l);
     padding-inline: var(--space-m);
-    border-inline-end: var(--line-hairline) solid var(--border-color-light);
-    background: var(--bg-light);
   }
   /* In the flow only where there is room for it. Below 48rem `.drawer`
-     (base.css) places it instead: off-canvas until the menu opens it. These
-     are the only rules the two places disagree on, so they are the only
-     ones fenced — everything inside the rail draws the same in both. */
+     (base.css) places it instead: a short sheet hanging from the top bar's
+     clock, on the menu's paper. These are the only rules the two places
+     disagree on, so they are the only ones fenced; everything inside the
+     rail draws the same in both. */
   @media (min-width: 48rem) {
     .shell__side {
+      border-inline-end: var(--line-hairline) solid var(--border-color-light);
+      background: var(--bg-light);
       grid-column: 1;
       grid-row: 1 / -1;
       position: sticky;
@@ -147,6 +150,24 @@
     gap: var(--space-xs);
     text-decoration: none;
     color: inherit;
+  }
+  /* In the sheet the time is already drawn right above it, on the door:
+     a second face under the first would read as two clocks. The date stays
+     as the way home, on calm's line, and the sheet opens on it. */
+  @media (max-width: 47.999rem) {
+    .shell__side {
+      padding-block: var(--space-m);
+    }
+    .side-clock {
+      align-items: center;
+      padding-block-start: 0;
+    }
+    .side-clock__now {
+      grid-area: 1 / 1;
+    }
+    .side-clock__time {
+      display: none;
+    }
   }
   .side-clock__now:hover .side-clock__time {
     color: var(--text-color);
