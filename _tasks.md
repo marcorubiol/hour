@@ -29,7 +29,7 @@ con boceto antes y después de la 119). Capturas de partida: espacio `playwright
 
 - [ ] Marco: hacer: en el panel de Supabase, añadir `https://hour.zerosense.studio/login*` a Redirect URLs y cambiar la plantilla «Reset Password» (`build/runbooks/password-recovery.md`); hasta entonces el enlace de recuperar contraseña cae en la portada. (132, chat 11-11)
 - [ ] Mirar en pantalla un espacio de música con «proyecto» (ADR-196, en producción desde `69ddd29d`): hoy no hay ninguno en producción, los once son de escena; cuando exista uno, o poniendo `testing` en música un rato con OK de Marco. (chat 12-11)
-- [ ] 140, resto: en la captura contra producción (`68e2ffb0`) la fecha de la hoja del móvil sale cortada; arreglo en `main` (`6369f82c`), puerta verde, falta el deploy con OK de Marco y repetir la captura. Sin mirar: la muesca de iOS y las otras tres lenguas. (chat 12-11)
+- [ ] 140, resto: mirar la hoja del móvil en un iPhone real (la muesca). Lo demás, en producción desde `d9587d87` y visto en captura en las cuatro lenguas. (chat 12-11)
 - [ ] 137 Primer día: quien entra sin espacio ve «Crea tu compañía» y tres pasos (espectáculo, contactos, primera fecha); incluye la ayuda B. Boceto antes. Después de la 119. (chat 11-11)
 - [ ] 138 Importar contactos desde CSV o Excel, sobre el importador de público. Boceto antes. Después de la 119. (chat 11-11)
 - [ ] 139 Marco: decidir: el técnico invitado a un bolo aterriza en «Ahora» y no en Hoy (entrada por rol): ahora, o cuando entre un técnico real. (chat 11-11)
