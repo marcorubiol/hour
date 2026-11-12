@@ -155,11 +155,17 @@
      a second face under the first would read as two clocks. The date stays
      as the way home, on calm's line, and the sheet opens on it. */
   @media (max-width: 47.999rem) {
+    /* As wide as what it holds, never narrower than the rail: the date and
+       calm share one line, and the rail's fixed width cut the date. `.drawer`
+       caps it at the screen. */
     .shell__side {
+      inline-size: max-content;
+      min-inline-size: var(--rail-width);
       padding-block: var(--space-m);
     }
     .side-clock {
       align-items: center;
+      column-gap: var(--space-m);
       padding-block-start: 0;
     }
     .side-clock__now {
