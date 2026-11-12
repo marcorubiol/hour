@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Noviembre 2026 (en curso)
 
+- «Opciones por orden» pasa a Ajustes › Este espacio, bajo «Oficio», y sin nada elegido sigue al oficio (música por orden, escena sin orden); en el móvil, el cajón es una hoja corta que cuelga del reloj; el corte de la barra lateral tiene nombre (140, ADR-197, 2026-11-12, `68e2ffb0`).
 - En un espacio de música el proyecto se llama «proyecto» («project», «projecte», «projet»); en escena sigue siendo «espectáculo» (ADR-196, 2026-11-12, `69ddd29d`).
 - Una palabra por cosa, en las cuatro lenguas: «siguiente paso», «ámbito», «sala» para donde se actúa, «espectáculo», «cobro» y «pago», «apuntar», «correo», «no disponible», «sección», «Empieza / Acaba», «1.ª opción»; «Te espera» es lo tuyo y «Nos toca» lo de la compañía; la vista de doce semanas del Planificador se llama «Próximas semanas» (133, ADR-195, 2026-11-11, `ebf4feda`).
 - Arreglo: lo que borrabas con «Deshacer» (una nota de una persona o de un día, un borrador de factura, alguien del reparto) volvía a aparecer si cerrabas o recargabas la pestaña antes de seis segundos. Ahora se borra también al cerrar o esconder la pestaña, y cerrar el aviso borra al momento (141, 2026-11-11, `db9342a6`).
