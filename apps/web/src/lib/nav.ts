@@ -37,8 +37,8 @@ export type NavWorkspace = {
    * ADR-002 — which hold convention this workspace follows. `simple`
    * (theatre/dance): holds are unranked and two can coexist on one slot.
    * `prioritized` (music): hold 1 has first right to convert, 2 promotes
-   * when 1 releases. Absent reads as `simple` — a company that never said
-   * otherwise is not running a priority queue.
+   * when 1 releases. Absent reads as the trade's own (`$lib/booking-mode`):
+   * music ranks, stage does not.
    */
   booking_mode?: string | null;
   /** ADR-128 — the trade whose words this workspace speaks (`stage` |

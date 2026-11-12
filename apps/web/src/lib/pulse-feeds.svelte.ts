@@ -12,6 +12,7 @@
 import { createQuery } from '@tanstack/svelte-query';
 import { fromStore, toStore } from 'svelte/store';
 import { fetchJSON } from '$lib/api';
+import { bookingModeOf } from '$lib/booking-mode';
 import { dualTime } from '$lib/datetime';
 import {
   dateSlip,
@@ -147,7 +148,7 @@ export function pulseSlipContext(
     workspaceSlug: workspaces[0]?.slug ?? '',
     workspaceSlugById: new Map(workspaces.map((w) => [w.id, w.slug])),
     workspaceTzById: new Map(workspaces.map((w) => [w.id, w.timezone])),
-    workspaceModeById: new Map(workspaces.map((w) => [w.id, w.booking_mode ?? 'simple'])),
+    workspaceModeById: new Map(workspaces.map((w) => [w.id, bookingModeOf(w)])),
     viewerTz,
     kindLabel,
     dualTime,

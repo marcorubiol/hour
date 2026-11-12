@@ -20,6 +20,7 @@
    * this file to fork from the first.
    */
   import { createQuery } from '@tanstack/svelte-query';
+  import { bookingModeOf } from '$lib/booking-mode';
   import type { Attachment } from 'svelte/attachments';
   import { isFreeSpace, longPress } from '$lib/cell-create';
   import { addDaysIso, dayKeyInTz, isoWeek, monthGrid, assignBandLanes } from '$lib/planner';
@@ -252,7 +253,7 @@
    * own project's workspace, never once for the whole view.
    */
   let workspaceModeById = $derived(
-    new Map(($workspacesQuery.data?.items ?? []).map((w) => [w.id, w.booking_mode ?? 'simple'])),
+    new Map(($workspacesQuery.data?.items ?? []).map((w) => [w.id, bookingModeOf(w)])),
   );
 
   /* ── ONE OBJECT, NOT TWO CHIPS (ADR-095 §0) ────────────────────────────

@@ -31,8 +31,8 @@ const PatchBodySchema = v.object({
   logo_url: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2048)))),
   /**
    * ADR-002 — which hold convention this workspace speaks. Empty string
-   * clears the key back to absent, which reads as `simple`; there is no
-   * stored "simple" so the setting has one representation, not two.
+   * clears the key back to absent, which reads as the trade's own
+   * (`$lib/booking-mode`, tarea 140); a stored mode is a departure from it.
    */
   booking_mode: v.optional(v.picklist(['', 'simple', 'prioritized'])),
 });
