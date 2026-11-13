@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { HELP_KEY } from './help';
 import {
+  SPACE_ASKED_KEY,
   START_HIDDEN_KEY,
   START_STEPS,
+  signupSpace,
+  spaceAsk,
+  untouched,
   doneCount,
   primaryStep,
   seesStart,
@@ -199,5 +203,51 @@ describe('startPhase: cuándo se muestra y cuándo se va', () => {
     expect(startPhase({ ...base, rows: rowsOf(partial, later), seen: later })).toBe('none');
     expect(startPhase({ ...base, rows: rowsOf(partial, {}), seen: {} })).toBe('list');
     expect(startPhase({ ...base, rows: rowsOf(full, {}), seen: {} })).toBe('none');
+  });
+});
+
+describe('spaceAsk: el panel del primer día, también sobre el espacio del alta', () => {
+  const mine = { kind: 'personal', my_role: 'owner' as const };
+  const base = { spaces: [mine], seen: {}, ready: true, settled: true, start: empty };
+
+  it('sin ningún espacio, crea uno (como antes)', () => {
+    expect(spaceAsk({ ...base, spaces: [], start: undefined })).toBe('create');
+  });
+  it('solo el espacio del alta, intacto y sin respuesta: lo nombra', () => {
+    expect(spaceAsk(base)).toBe('name');
+  });
+  it('respondido o aplazado, no vuelve', () => {
+    expect(spaceAsk({ ...base, seen: { [SPACE_ASKED_KEY]: SEEN_AT } })).toBe('none');
+  });
+  it('con datos, no sale: ni proyecto, ni contacto, ni fecha, ni equipo', () => {
+    for (const part of [{ project: full.project }, { contact: full.contact }, { date: full.date }, { team: full.team }]) {
+      expect(spaceAsk({ ...base, start: { ...empty, ...part } })).toBe('none');
+    }
+  });
+  it('más de un espacio, uno que no es personal o uno que no es suyo: nada', () => {
+    expect(spaceAsk({ ...base, spaces: [mine, { kind: 'team', my_role: 'admin' }] })).toBe('none');
+    expect(spaceAsk({ ...base, spaces: [{ kind: 'team', my_role: 'owner' }] })).toBe('none');
+    expect(spaceAsk({ ...base, spaces: [{ kind: 'personal', my_role: 'admin' }] })).toBe('none');
+  });
+  it('mientras no se sabe, espera: ni el panel ni la sección', () => {
+    expect(spaceAsk({ ...base, settled: false, ready: false })).toBe('wait');
+    expect(spaceAsk({ ...base, start: undefined })).toBe('wait');
+  });
+  it('si algo falla, la app: sin lo visto o sin la lectura no sale nada solo', () => {
+    expect(spaceAsk({ ...base, ready: false })).toBe('none');
+    expect(spaceAsk({ ...base, start: null })).toBe('none');
+  });
+  it('mientras llegan los espacios, la app como antes', () => {
+    expect(spaceAsk({ ...base, spaces: null })).toBe('none');
+  });
+  it('el espacio del alta: uno solo, personal y suyo', () => {
+    expect(signupSpace([mine])).toBe(mine);
+    expect(signupSpace([])).toBeNull();
+    expect(signupSpace([mine, mine])).toBeNull();
+    expect(untouched(empty)).toBe(true);
+    expect(untouched(full)).toBe(false);
+  });
+  it('la clave cabe en help_seen', () => {
+    expect(HELP_KEY.test(SPACE_ASKED_KEY)).toBe(true);
   });
 });
