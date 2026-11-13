@@ -1,7 +1,17 @@
 import en from './en.json';
-import { currentTrade, DEFAULT_TRADE, type Voice } from './trade.svelte';
+import { currentTrade, DEFAULT_TRADE, voiceHere, type Voice } from './trade.svelte';
 
-export { currentTrade, setTrade, setWorkspaceTrades, tradeFor, tradeOf, TRADES, type Trade, type Voice } from './trade.svelte';
+export {
+  currentTrade,
+  setRecordSpace,
+  setTrade,
+  setWorkspaceTrades,
+  tradeFor,
+  tradeOf,
+  TRADES,
+  type Trade,
+  type Voice,
+} from './trade.svelte';
 
 type Dictionary = Record<string, string>;
 
@@ -74,6 +84,19 @@ export function t(
     }
   }
   return out;
+}
+
+/**
+ * `t()` for a component inside a record (tarea 142 C): the same lookup, in
+ * the voice of the record's space (`setRecordSpace`) instead of the
+ * screen's. A component takes it once, `const t = tHere();`, and its calls
+ * stay as they are. Outside a record it is the screen's voice, so a
+ * component also mounted elsewhere (the planner, the public road sheet)
+ * reads exactly as before. Called while the component initialises.
+ */
+export function tHere(): (key: string, locale?: Locale, params?: Record<string, string | number>) => string {
+  const voice = voiceHere();
+  return (key, locale, params) => t(key, locale, params, voice());
 }
 
 /**

@@ -25,7 +25,7 @@
   import { ApiError, fetchJSON, mutateJSON } from '$lib/api';
   import { copyText } from '$lib/clipboard';
   import { dayMonthLong } from '$lib/datetime';
-  import { LOCALE_TAG, t, type Locale } from '$lib/i18n';
+  import { LOCALE_TAG, type Locale, tHere } from '$lib/i18n';
   import {
     canInvite,
     defaultPreset,
@@ -48,6 +48,7 @@
   }
 
   let { boloId, going = [], tz, locale }: Props = $props();
+  const t = tHere();
 
   const queryClient = useQueryClient();
   let queryKey = $derived(['bolo-access', boloId] as const);

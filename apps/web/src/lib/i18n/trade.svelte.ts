@@ -18,7 +18,14 @@
  * and falls back to the plain key. `mixed` is never stored: it is not in
  * `TRADES` nor in the CHECK. What belongs to one row speaks its own space's
  * trade: `t(key, locale, params, tradeFor(row.workspace_id))`.
+ *
+ * And a record speaks its own space's (tarea 142 C): opened in the vistazo
+ * over a list of mixed trades, the screen's voice is not the record's. The
+ * record names its space once (`setRecordSpace`) and every component it
+ * mounts takes `t` from `tHere()` ($lib/i18n), which speaks that space;
+ * outside a record `tHere()` is the screen's voice, as `t()` is.
  */
+import { getContext, setContext } from 'svelte';
 
 export const TRADES = ['stage', 'music'] as const;
 export type Trade = (typeof TRADES)[number];
@@ -81,4 +88,30 @@ export function setWorkspaceTrades(
  */
 export function tradeFor(workspace: string | null | undefined): Trade {
   return (workspace && trades.get(workspace)) || DEFAULT_TRADE;
+}
+
+const RECORD_SPACE = Symbol('record-space');
+
+/**
+ * A record names the space it belongs to, by id or slug, for itself and
+ * everything it mounts. A getter, so a record that learns its space from
+ * its data (a date, a bolo) speaks it once the data is there. Called while
+ * the component initialises, like any context.
+ */
+export function setRecordSpace(workspace: () => string | null | undefined): void {
+  setContext(RECORD_SPACE, workspace);
+}
+
+/**
+ * The voice where a component sits: its record's space when it has one and
+ * it is known, the screen's otherwise. Called while the component
+ * initialises; the getter it returns is read on every lookup.
+ */
+export function voiceHere(): () => Voice {
+  const workspace = getContext<(() => string | null | undefined) | undefined>(RECORD_SPACE);
+  if (!workspace) return currentTrade;
+  return () => {
+    const ws = workspace();
+    return ws ? tradeFor(ws) : currentTrade();
+  };
 }

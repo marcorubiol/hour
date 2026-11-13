@@ -22,7 +22,7 @@
   import ThreadBlock from '$lib/components/ThreadBlock.svelte';
   import BoloAccess from '$lib/components/BoloAccess.svelte';
   import type { GoingPerson } from '$lib/bolo-access';
-  import { t, type Locale } from '$lib/i18n';
+  import { type Locale, tHere } from '$lib/i18n';
   import { markReadWhenSeen, readAtOpen, scrollWhenNamed } from '$lib/thread-reading.svelte';
   import {
     THREAD_REFRESH_MS,
@@ -50,6 +50,7 @@
   }
 
   let { performanceId, workspaceSlug, tz, workspaceTz, going = [], locale }: Props = $props();
+  const t = tHere();
 
   const queryClient = useQueryClient();
   let queryKey = $derived(['bolo-board', performanceId] as const);

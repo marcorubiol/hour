@@ -36,7 +36,7 @@
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
   import Segmented from '$lib/components/Segmented.svelte';
-  import { t, type Locale } from '$lib/i18n';
+  import { type Locale, tHere } from '$lib/i18n';
   import { organizationsQueryOptions } from '$lib/organizations';
   import {
     orgByName,
@@ -57,6 +57,7 @@
   }
 
   let { open = $bindable(false), workspaceId, workspaceSlug, organization, locale, onmerged }: Props = $props();
+  const t = tHere();
 
   // The same list as the conversation's «Añadir» (one cache for the app).
   const orgsQuery = createQuery(toStore(() => organizationsQueryOptions(open)));

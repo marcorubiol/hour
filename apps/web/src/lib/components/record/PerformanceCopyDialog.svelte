@@ -17,7 +17,7 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import type { Json } from '$lib/db-types';
   import { dayMonthYear } from '$lib/datetime';
-  import { LOCALE_TAG, t, type Locale } from '$lib/i18n';
+  import { LOCALE_TAG, type Locale, tHere } from '$lib/i18n';
   import type { PerformancePatch } from '$lib/performance';
   import {
     COPY_COLUMNS,
@@ -58,6 +58,7 @@
   }
 
   let { open = $bindable(false), perf, workspaceSlug, tz, fallbackTz, locale, oncopied }: Props = $props();
+  const t = tHere();
 
   type Source = {
     performance: {

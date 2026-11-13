@@ -10,7 +10,7 @@
  * sin cifra y la de hechos sin «vendido», nunca con un cero que mienta.
  */
 
-import { t, type Locale } from './i18n';
+import { t, type Locale, type Voice } from './i18n';
 import { dayMonthYearTs } from './datetime';
 import { boloStatusLabel, fmtCurrency, isContracted, totalsByCurrency } from './money';
 
@@ -120,17 +120,20 @@ export interface BoloLine {
   amount: string | null;
 }
 
-/** La línea de un bolo, como la dibujan las dos fichas. `where` lo pone quien sabe qué eje falta. */
+/**
+ * La línea de un bolo, como la dibujan las dos fichas. `where` lo pone quien sabe qué eje falta;
+ * `voice`, la ficha abierta en vista previa, que habla el oficio de su espacio (tarea 142).
+ */
 export function boloLine(
   b: MirrorBolo & { id: string },
-  opts: { locale: Locale; href: string | null; where?: string | null },
+  opts: { locale: Locale; href: string | null; where?: string | null; voice?: Voice },
 ): BoloLine {
   return {
     id: b.id,
-    day: b.first_performed_at ? dayMonthYearTs(b.first_performed_at) : t('conversations.bolo_undated', opts.locale),
+    day: b.first_performed_at ? dayMonthYearTs(b.first_performed_at) : t('conversations.bolo_undated', opts.locale, undefined, opts.voice),
     href: opts.href,
     where: opts.where ?? null,
-    functions: b.function_count > 1 ? t('perf.bolo_functions_other', opts.locale, { n: b.function_count }) : null,
+    functions: b.function_count > 1 ? t('perf.bolo_functions_other', opts.locale, { n: b.function_count }, opts.voice) : null,
     status: boloStatusLabel(b.status, opts.locale),
     amount: typeof b.fee_amount === 'number' ? fmtCurrency(b.fee_amount, b.fee_currency ?? null, opts.locale) : null,
   };

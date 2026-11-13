@@ -49,7 +49,7 @@
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import ChatMonogram from '$lib/components/ChatMonogram.svelte';
   import { dayMonth, dayMonthYear, dayMonthYearTs, hourMark, localDayISO, timeInTz, viewerTimeZone } from '$lib/datetime';
-  import { appLocale, t } from '$lib/i18n';
+  import { appLocale, tHere, setRecordSpace } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import ConversationStatusMenu from '$lib/components/ConversationStatusMenu.svelte';
@@ -111,6 +111,8 @@
   }
 
   let { workspaceSlug, slug, inPeek = false, onclose }: Props = $props();
+  setRecordSpace(() => workspaceSlug);
+  const t = tHere();
 
   type Conversation = ConversationItem & { private: boolean; can_edit: boolean; can_set_private: boolean };
 

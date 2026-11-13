@@ -24,7 +24,7 @@
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import Button from '$lib/components/Button.svelte';
   import MessageItem, { messageFailed, sendOnModEnter } from '$lib/components/MessageItem.svelte';
-  import { t, type Locale } from '$lib/i18n';
+  import { type Locale, tHere } from '$lib/i18n';
   import {
     MESSAGE_MAX,
     audienceLine,
@@ -92,6 +92,7 @@
     locale,
     onchange,
   }: Props = $props();
+  const t = tHere();
 
   let name = $derived(title ?? facetName(thread, locale));
   let headingId = $derived(`thread-${anchorId}-${thread.facet_id ?? 'general'}`);
