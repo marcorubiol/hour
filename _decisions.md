@@ -7596,3 +7596,23 @@ Marco (chat, 2026-11-13): boceto validado («Sí, constrúyela») y los textos d
 5. **Abierto:** un cuarto paso para apuntar quién trabaja en el proyecto.
 
 **Verificado:** `check` 0/0 y unitarios 2380. Sin E2E y sin verlo en pantalla.
+
+## [2026-11-13] ADR-199 · Con oficios mezclados, cada cosa habla el de su espacio y el marco usa palabras neutras (tarea 142; enmienda ADR-129 § 4)
+
+Marco (chat, 2026-11-13): tiene un espacio de música y otro de teatro, mundos separados, y los mira juntos con el
+ámbito en «Todo». En `main` desde `46feef15`; lo de fila, ficha y diálogo, en producción desde `19ef8452`.
+
+1. **El oficio sigue siendo del espacio**, sin schema. No pasa al proyecto: eso solo haría falta para mezclar música
+   y escena dentro de un mismo espacio, y no hay caso.
+2. **Cada fila, cada ficha y cada diálogo hablan el oficio de su espacio**, no el de la pantalla: `tradeFor(espacio)`
+   como voz de `t()`; una ficha lo fija una vez con `setRecordSpace` y sus hijos leen `tHere()`; un diálogo usa
+   `voiceFor` con el espacio elegido dentro.
+3. **La voz de la pantalla vale `mixed`** cuando los espacios a la vista no coinciden (antes, escena). `t()` busca
+   `clave@mixed` y, si no la hay, la clave sola. `mixed` no es un valor de `workspace.trade`.
+4. **Palabras neutras del marco:** «Difusión y contratación»; «fechas confirmadas»; «Funciones y conciertos» y «Nueva
+   función o concierto»; «proyecto»; «reparto o formación»; «fecha» para el día. «Actuación» no se usa: sería una
+   palabra nueva, y es una palabra por cosa (ADR-195). 71 variantes `@mixed` por lengua.
+5. **Fuera:** la hoja de ruta pública y la invitación, que hablan siempre escena (tarea 143, pide migración).
+
+**Verificado:** `check` 0/0 y unitarios 2395; E2E contra `19ef8452` sin rojos de la app. Sin verlo con dos oficios a
+la vista.
