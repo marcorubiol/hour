@@ -2212,6 +2212,39 @@
     }
   }
 
+  /* Welcome: the paper of a section's first-visit card (FirstVisitCard) and
+     of Hoy's start list (StartList, tarea 137): the page's own paper, a step
+     quieter than a card, with its title in italics. One treatment, here. */
+  .welcome {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    padding: var(--space-m);
+    border: var(--border);
+    border-radius: var(--radius-s);
+    background: var(--bg-ultra-light);
+  }
+  .welcome__title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 400;
+    font-size: var(--text-l);
+    color: var(--heading-color);
+  }
+  .welcome__body {
+    margin: 0;
+    max-inline-size: 60ch;
+    color: var(--text-dark-muted);
+    font-size: var(--text-s);
+  }
+  .welcome__acts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    margin: var(--space-2xs) 0 0;
+  }
+
   /* Record — a record's page (ADR-139 § 4): its blocks in one column from
      the lens's own left edge and at the lens's width (both are
      .shell__content's), one rhythm between blocks. A record that keeps two

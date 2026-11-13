@@ -51,6 +51,7 @@
   import { provideScopes, sameSet as scopesSameSet, type Scope } from '$lib/stores/scopes.svelte';
   import { provideCreation } from '$lib/stores/creation.svelte';
   import { lazy } from '$lib/lazy.svelte';
+  import { START_QUERY_KEY } from '$lib/first-day-query';
   import { createEventType, scopeCreatePresets, scopeTaskTarget, type PaletteCreate } from '$lib/palette-create';
   import type { CreatedPerformance } from '$lib/plan-create';
   import {
@@ -195,6 +196,13 @@
   });
 
   let defaultWorkspaceSlug = $derived($workspacesQuery.data?.items[0]?.slug ?? '');
+  // No space at all (tarea 137): every section draws the first-day panel
+  // instead of itself. Only on an answer: loading or failed, nothing changes.
+  let noSpace = $derived($workspacesQuery.isSuccess && ($workspacesQuery.data?.items.length ?? 0) === 0);
+  const newSpacePanel = lazy(() => import('$lib/components/NewSpacePanel.svelte'));
+  $effect(() => {
+    if (noSpace) void newSpacePanel.load();
+  });
   // Settings without a space in the URL: the person's own space, never one
   // they are a guest of (a bolo invitation), where there is nothing of theirs.
   let menuWorkspaceSlug = $derived(
@@ -594,6 +602,22 @@
     if (creation.personOpen) void dialogs.person.load();
     if (creation.organizationOpen) void dialogs.organization.load();
   });
+  // A dialog of adding closes, from any door: what a space has (Hoy's start
+  // list, the empties of the Planner, tarea 137) is read again, so a step
+  // crosses itself out wherever the thing was made.
+  const shellQueryClient = useQueryClient();
+  let adding = $derived(
+    creation.projectOpen ||
+      creation.conversationOpen ||
+      creation.personOpen ||
+      creation.organizationOpen ||
+      creation.eventOpen,
+  );
+  let wasAdding = false;
+  $effect(() => {
+    if (wasAdding && !adding) void shellQueryClient.invalidateQueries({ queryKey: [START_QUERY_KEY] });
+    wasAdding = adding;
+  });
   function onPaletteKey(e: KeyboardEvent) {
     if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'k' || !authChecked || blocked) return;
     e.preventDefault();
@@ -876,7 +900,9 @@
            no control ever looks disabled. A screen reader hears the switch. -->
       <p class="visually-hidden" aria-live="polite">{calmAnnounce}</p>
       <div class="shell__content">
-        {#if routedLens && routedLens !== 'desk' && !lensOn(routedLens)}
+        {#if noSpace}
+          {#if newSpacePanel.component}<newSpacePanel.component />{/if}
+        {:else if routedLens && routedLens !== 'desk' && !lensOn(routedLens)}
           <!-- ADR-132: a lens off in every space on screen, reached by URL. -->
           <LensOff lens={routedLens} workspaces={onScreen} />
         {:else if children}{@render children()}{/if}
@@ -905,7 +931,11 @@
     <dialogs.workspace.component bind:open={creation.workspaceOpen} />
   {/if}
   {#if dialogs.project.component}
-    <dialogs.project.component bind:open={creation.projectOpen} workspaceId={creation.projectWorkspaceId} />
+    <dialogs.project.component
+      bind:open={creation.projectOpen}
+      workspaceId={creation.projectWorkspaceId}
+      stay={creation.projectStay}
+    />
   {/if}
   {#if dialogs.line.component}
     <dialogs.line.component

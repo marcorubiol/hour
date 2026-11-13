@@ -103,37 +103,14 @@
 
 <style>
   @layer components {
-    /* The welcome is the page's own paper, a step quieter than a card: it
-       sits above the dashboard and says what the section answers. */
-    .welcome {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-xs);
-      padding: var(--space-m);
-      border: var(--border);
-      border-radius: var(--radius-s);
-      background: var(--bg-ultra-light);
-    }
-    .welcome__title {
-      margin: 0;
-      font-family: var(--font-display);
-      font-style: italic;
-      font-weight: 400;
-      font-size: var(--text-l);
-      color: var(--heading-color);
-    }
+    /* The paper, the title and the body are the welcome's (base.css § Welcome),
+       shared with Hoy's start list. */
     .welcome__title:focus {
       outline: none;
     }
     .welcome__title:focus-visible {
       outline: var(--focus-width) solid var(--focus-color);
       outline-offset: var(--focus-offset);
-    }
-    .welcome__body {
-      margin: 0;
-      max-inline-size: 60ch;
-      color: var(--text-dark-muted);
-      font-size: var(--text-s);
     }
     /* What each block is: the «i» of the heads, gathered (ADR-145 § 2). The
        term speaks like the block head it names; its text like the card's. */
@@ -169,12 +146,6 @@
     .welcome__line b {
       color: var(--text-color);
       font-weight: 600;
-    }
-    .welcome__acts {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--space-xs);
-      margin: var(--space-2xs) 0 0;
     }
   }
 </style>

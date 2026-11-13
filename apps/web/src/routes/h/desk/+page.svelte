@@ -33,6 +33,8 @@
   import LensHeader from '$lib/components/LensHeader.svelte';
   import LensTitle from '$lib/components/LensTitle.svelte';
   import FirstVisitCard from '$lib/components/FirstVisitCard.svelte';
+  import StartList from '$lib/components/desk/StartList.svelte';
+  import { startTarget, type StartPhase } from '$lib/first-day';
   import DeskNext from '$lib/components/desk/DeskNext.svelte';
   import DeskWaiting from '$lib/components/desk/DeskWaiting.svelte';
   import DeskChanged from '$lib/components/desk/DeskChanged.svelte';
@@ -501,7 +503,10 @@
   let changedState = $derived({ count: changes.length, loading: changedLoading, errored: changedErrored });
   let drawWaits = $derived(calm.on || blockDrawn(waitsState));
   let drawChanged = $derived(blockDrawn(changedState));
-  let deskQuiet = $derived(!calm.on && screenQuiet([waitsState, changedState]));
+  // «Todo al día.» would lie while the start list lives (tarea 137, StartList).
+  let startPhase = $state<StartPhase>('none');
+  let startHolding = $state(false);
+  let deskQuiet = $derived(!calm.on && startPhase === 'none' && screenQuiet([waitsState, changedState]));
   let quietLabel = $derived.by(() => {
     if (!lastVisit) return t('desk.changed_none_first', locale);
     const e = elapsedSince(since, clockNow);
@@ -826,7 +831,12 @@
   // never into a space they are a guest of (a bolo invitation), which would
   // answer 403. Among the spaces on screen (the scope's, or all of them);
   // with none, the button is not drawn.
-  let taskSpaces = $derived(taskWorkspaces(workspacesOnScreen('', pins.pins, workspaces, lineIndex, projectIndex)));
+  let spacesOnScreen = $derived(workspacesOnScreen('', pins.pins, workspaces, lineIndex, projectIndex));
+  let taskSpaces = $derived(taskWorkspaces(spacesOnScreen));
+  // Primer día (tarea 137): the start list of the space just made, in the
+  // welcome's place while it lives; never two cards at once.
+  let startSpace = $derived(startTarget(spacesOnScreen));
+
   let defaultWsId = $derived(
     scope.workspaceIds.length === 1 && taskSpaces.some((w) => w.id === scope.workspaceIds[0])
       ? scope.workspaceIds[0]
@@ -933,7 +943,10 @@
   <!-- 121 B (ADR-183): a late technician comes first, while nobody marked «Visto». -->
   <LateNoticeBand {locale} />
 
-  <FirstVisitCard section="desk" steps={['desk-next', 'desk-waits', 'desk-more']} />
+  <StartList workspace={startSpace} bind:phase={startPhase} bind:holding={startHolding} />
+  {#if startPhase === 'none' && !startHolding}
+    <FirstVisitCard section="desk" steps={['desk-next', 'desk-waits', 'desk-more']} />
+  {/if}
 
   {#if composerOpen && taskSpaces.length > 0 && composer.component}
     <div class="desk__composer" bind:this={composerEl}>

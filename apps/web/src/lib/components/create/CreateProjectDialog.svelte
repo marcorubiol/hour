@@ -4,7 +4,9 @@
    * sidebar. Workspace select (over the shared ['workspaces'] cache;
    * preselected + disabled when the caller passes workspaceId) + name +
    * accent swatch + description. POST /api/projects, refetch the active
-   * projects cache before navigating to the new project page.
+   * projects cache before navigating to the new project page. Opened from
+   * Hoy's start list (`stay`, tarea 137) it does not navigate: the list
+   * crosses the step out and the notice offers «Abrir».
    */
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { goto } from '$app/navigation';
@@ -15,6 +17,7 @@
   import Select from '$lib/components/Select.svelte';
   import Textarea from '$lib/components/Textarea.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
+  import { toastCreated } from '$lib/created';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { spaceWriteWorkspaces } from '$lib/workspace-role';
   import { spaceName } from '$lib/utils/identity';
@@ -25,9 +28,11 @@
     open?: boolean;
     /** Preselects + locks the workspace when the caller already knows it. */
     workspaceId?: string | null;
+    /** Stay where it was opened; the notice's «Abrir» goes to the new project. */
+    stay?: boolean;
   }
 
-  let { open = $bindable(false), workspaceId = null }: Props = $props();
+  let { open = $bindable(false), workspaceId = null, stay = false }: Props = $props();
 
   type CreatedProject = { id: string; slug: string; name: string; workspace_id: string };
 
@@ -88,8 +93,17 @@
       await queryClient.invalidateQueries({ queryKey: ['projects', { status: 'active' }] });
       await queryClient.refetchQueries({ queryKey: ['projects', { status: 'active' }] });
       const wsSlug = workspaces.find((w) => w.id === project.workspace_id)?.slug;
+      const href = wsSlug ? `/h/${wsSlug}/project/${project.slug}/` : null;
       close();
-      if (wsSlug) await goto(`/h/${wsSlug}/project/${project.slug}/`);
+      if (stay) {
+        toastCreated({
+          locale,
+          message: t('project.created', locale),
+          open: href ? () => void goto(href) : undefined,
+        });
+        return;
+      }
+      if (href) await goto(href);
     },
     onError: (err) => {
       addToast({

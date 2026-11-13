@@ -64,6 +64,8 @@ class CreationStore {
   lineWorkspaceId = $state<string | null>(null);
   lineProjectId = $state<string | null>(null);
   projectWorkspaceId = $state<string | null>(null);
+  /** Opened from Hoy's start list (137): it stays where it is, and the notice offers «Abrir». */
+  projectStay = $state(false);
   event = $state<EventPreset>({});
   taskTitle = $state('');
   /** The conversation's «who» (its organization) and the tag it is born with. */
@@ -85,8 +87,9 @@ class CreationStore {
     this.lineOpen = true;
   }
 
-  openProject(preset?: { workspaceId?: string }) {
+  openProject(preset?: { workspaceId?: string; stay?: boolean }) {
     this.projectWorkspaceId = preset?.workspaceId ?? null;
+    this.projectStay = preset?.stay ?? false;
     this.projectOpen = true;
   }
 
