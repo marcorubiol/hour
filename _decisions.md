@@ -7578,3 +7578,21 @@ Marco (chat, 2026-11-11: «todo lo recomendado»; 2026-11-12: seguir con lo pend
    con Tab y al girar el teléfono; no atrapa el foco, lo devuelve al reloj.
 
 **Verificado:** `check` 0/0 y unitarios 2363. Sin E2E y sin verlo en pantalla. `CACHE_SCHEMA` 33.
+
+## [2026-11-13] ADR-198 · El primer día: «¿Cuál es tu proyecto?» y una lista de arranque en Hoy (tarea 137)
+
+Marco (chat, 2026-11-13): boceto validado («Sí, constrúyela») y los textos de la primera pantalla. En `main` desde `9bd50d37`.
+
+1. **Sin ningún espacio, el shell pinta el alta en la página**, en cualquier sección, no en un diálogo
+   (`NewSpacePanel.svelte`). Pide nombre y oficio. Habla de tú y no dice «compañía», que deja fuera a quien hace
+   música: «¿Cuál es tu proyecto?», «Dinos cómo se llama y creamos su espacio», botón «Crear espacio». La frase de
+   debajo sigue al oficio elegido. En francés, de usted, como el resto del diccionario.
+2. **En Hoy, una lista de arranque de tres pasos** (el espectáculo o proyecto, los contactos, la primera fecha), en el
+   sitio de la bienvenida. Cada paso abre el diálogo de alta que ya existe y se tacha solo con los datos del espacio,
+   venga de la puerta que venga. «Más tarde» por paso y «Ocultar» para todo, en `help_seen`. La ven owner o admin.
+3. **Sin schema:** `GET /api/workspaces/[id]/start` hace seis lecturas de una fila con el JWT de quien pregunta. Las
+   reglas, en `lib/first-day.ts`.
+4. **Fuera por ahora:** el importador de contactos (138), invitar con cuenta, y un E2E que cree espacios.
+5. **Abierto:** un cuarto paso para apuntar quién trabaja en el proyecto.
+
+**Verificado:** `check` 0/0 y unitarios 2380. Sin E2E y sin verlo en pantalla.
