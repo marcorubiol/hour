@@ -36,6 +36,12 @@ export const TEAM_ANCHOR = 'team';
 export const START_HIDDEN_KEY = 'card:start';
 /** «Más tarde» de un paso. */
 export const startLaterKey = (step: StartStep): string => `card:start_${step}`;
+/**
+ * Esta persona vio la lista de este espacio con algo pendiente: desde
+ * entonces el equipo, él solo, la mantiene a la vista. Por espacio, con su
+ * id sin guiones (41 caracteres: cabe en `HELP_KEY`).
+ */
+export const startSeenKey = (workspaceId: string): string => `card:start_in_${workspaceId.toLowerCase().replace(/-/g, '')}`;
 
 /** Lo que el espacio ya tiene, como lo responde la API: lo primero de cada cosa, o nada. */
 export interface StartResponse {
@@ -149,12 +155,15 @@ export type StartPhase = 'list' | 'closing' | 'none';
 
 /**
  * Qué pinta Hoy:
- * - `list` mientras quede algún paso pendiente y la persona no la haya
- *   ocultado (y lo visto haya llegado: sin él no sale nada solo);
+ * - `list` mientras quede pendiente alguno de los tres primeros pasos y la
+ *   persona no la haya ocultado (y lo visto haya llegado: sin él no sale
+ *   nada solo). El equipo, él solo, no la levanta: la mantiene a la vista
+ *   solo donde esta persona ya la vio con algo pendiente (`startSeenKey`);
  * - `closing`, la línea de cierre, una vez: cuando en esta visita se vio la
  *   lista con algo pendiente y ya están todos hechos;
  * - `none` en lo demás: todos hechos o aplazados, oculta, sin papel.
- *   Un espacio con datos (MüK Cia) no la ve nunca, ni su cierre.
+ *   Un espacio con datos (MüK Cia) no la ve nunca, ni su cierre, aunque no
+ *   tenga reparto.
  */
 export function startPhase(input: {
   rows: readonly StartRow[] | null;
@@ -163,10 +172,14 @@ export function startPhase(input: {
   sees: boolean;
   /** En esta visita se vio la lista con algo pendiente. */
   sawPending: boolean;
+  /** The space of the list, for `startSeenKey`. */
+  workspaceId: string;
 }): StartPhase {
-  const { rows, seen, ready, sees, sawPending } = input;
+  const { rows, seen, ready, sees, sawPending, workspaceId } = input;
   if (!rows || !ready || !sees || hasSeen(seen, START_HIDDEN_KEY)) return 'none';
-  if (rows.some((r) => r.status === 'pending')) return 'list';
+  const pending = rows.filter((r) => r.status === 'pending');
+  if (pending.some((r) => r.step !== 'team')) return 'list';
+  if (pending.length > 0 && (sawPending || hasSeen(seen, startSeenKey(workspaceId)))) return 'list';
   if (sawPending && rows.every((r) => r.status === 'done')) return 'closing';
   return 'none';
 }

@@ -9,6 +9,7 @@ import {
   startLaterKey,
   startPhase,
   startRows,
+  startSeenKey,
   startState,
   startTarget,
   teamDoor,
@@ -23,11 +24,16 @@ const full: StartResponse = {
   team: { name: 'Anouk', project_slug: 'la-mudanza' },
 };
 const SEEN_AT = '2026-11-13T10:00:00Z';
+const WS = '0197a1b2-c3d4-7e8f-9a0b-1c2d3e4f5a6b';
 
 describe('las claves caben en help_seen sin migración', () => {
   it('ocultar y cada «más tarde» pasan la regla de mark_help_seen', () => {
     expect(HELP_KEY.test(START_HIDDEN_KEY)).toBe(true);
     for (const s of START_STEPS) expect(HELP_KEY.test(startLaterKey(s))).toBe(true);
+  });
+  it('lo visto por espacio también, con un id entero', () => {
+    expect(HELP_KEY.test(startSeenKey(WS))).toBe(true);
+    expect(startSeenKey(WS)).toBe('card:start_in_0197a1b2c3d47e8f9a0b1c2d3e4f5a6b');
   });
 });
 
@@ -126,7 +132,7 @@ describe('quién la ve y en qué espacio', () => {
 });
 
 describe('startPhase: cuándo se muestra y cuándo se va', () => {
-  const base = { seen: {}, ready: true, sees: true, sawPending: false };
+  const base = { seen: {}, ready: true, sees: true, sawPending: false, workspaceId: WS };
   const rowsOf = (res: StartResponse, seen = {}) => startRows(startState(res, 'abc'), seen);
 
   it('sale con algún paso pendiente', () => {
@@ -150,8 +156,32 @@ describe('startPhase: cuándo se muestra y cuándo se va', () => {
       'none',
     );
   });
-  it('el equipo solo, pendiente, mantiene la lista', () => {
-    expect(startPhase({ ...base, rows: rowsOf({ ...full, team: null }) })).toBe('list');
+  it('(a) los tres primeros hechos, sin reparto y nunca vista: no sale (MüK Cia)', () => {
+    expect(startPhase({ ...base, rows: rowsOf({ ...full, team: null }) })).toBe('none');
+  });
+  it('(a) tampoco con los tres primeros aplazados', () => {
+    const seen = {
+      [startLaterKey('project')]: SEEN_AT,
+      [startLaterKey('contacts')]: SEEN_AT,
+      [startLaterKey('date')]: SEEN_AT,
+    };
+    expect(startPhase({ ...base, rows: rowsOf(empty, seen), seen })).toBe('none');
+  });
+  it('(b) un espacio nuevo que hace los tres primeros: la lista sigue por el equipo', () => {
+    const seen = { [startSeenKey(WS)]: SEEN_AT };
+    expect(startPhase({ ...base, rows: rowsOf({ ...full, team: null }, seen), seen })).toBe('list');
+    // In the same visit, before the mark lands.
+    expect(startPhase({ ...base, rows: rowsOf({ ...full, team: null }), sawPending: true })).toBe('list');
+  });
+  it('(b) hasta hacerlo o aplazarlo', () => {
+    const later = { [startSeenKey(WS)]: SEEN_AT, [startLaterKey('team')]: SEEN_AT };
+    expect(startPhase({ ...base, rows: rowsOf({ ...full, team: null }, later), seen: later })).toBe('none');
+    const seen = { [startSeenKey(WS)]: SEEN_AT };
+    expect(startPhase({ ...base, rows: rowsOf(full, seen), seen })).toBe('none');
+  });
+  it('lo visto es de cada espacio', () => {
+    const seen = { [startSeenKey('11111111-2222-3333-4444-555555555555')]: SEEN_AT };
+    expect(startPhase({ ...base, rows: rowsOf({ ...full, team: null }, seen), seen })).toBe('none');
   });
   it('los cuatro hechos en esta visita: la línea de cierre, una vez', () => {
     expect(startPhase({ ...base, rows: rowsOf({ ...full, team: null }), sawPending: true })).toBe('list');

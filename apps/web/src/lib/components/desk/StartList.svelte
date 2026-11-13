@@ -31,6 +31,7 @@
     startLaterKey,
     startPhase,
     startRows,
+    startSeenKey,
     startState,
     teamDoor,
     type StartPhase,
@@ -69,11 +70,15 @@
   let rows = $derived<StartRow[] | null>(made ? startRows(made, help.seen) : null);
   let door = $derived(made ? teamDoor(made) : null);
   let sawPending = $state(false);
+  let workspaceId = $derived(workspace?.id ?? '');
   $effect(() => {
-    if (startPhase({ rows, seen: help.seen, ready: help.ready, sees, sawPending: false }) === 'list') sawPending = true;
+    if (startPhase({ rows, seen: help.seen, ready: help.ready, sees, sawPending: false, workspaceId }) !== 'list') return;
+    sawPending = true;
+    // Seen here with something to do: from now on the team step alone keeps it.
+    markHelpSeen(startSeenKey(workspaceId));
   });
   $effect(() => {
-    phase = startPhase({ rows, seen: help.seen, ready: help.ready, sees, sawPending });
+    phase = startPhase({ rows, seen: help.seen, ready: help.ready, sees, sawPending, workspaceId });
   });
 
   // Its own trade: the one chosen at creation speaks, whatever else is on screen.
