@@ -270,6 +270,9 @@ export interface TaskTarget {
   accent?: string;
   /** line kind (tour / season / …) driving the line glyph + label. */
   lineKind?: string;
+  /** The space it lives at, by id, when the builder has it: its kind word
+      speaks that space's trade (tarea 142). Display only; never posted. */
+  workspaceId?: string | null;
 }
 
 /** Map a target to the single POST /api/tasks parent field it fills. */

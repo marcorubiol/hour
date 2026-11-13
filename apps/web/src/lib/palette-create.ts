@@ -197,11 +197,11 @@ export function scopeCreatePresets(
 export function scopeTaskTarget(scope: Scope, workspaces: readonly NavWorkspace[]): TaskTarget {
   if (scope.lines.length === 1) {
     const l = scope.lines[0];
-    return { kind: 'line', id: l.id, name: l.name, accent: l.accent, lineKind: l.kind };
+    return { kind: 'line', id: l.id, name: l.name, accent: l.accent, lineKind: l.kind, workspaceId: l.workspaceId };
   }
   if (scope.lines.length === 0 && scope.projects.length === 1) {
     const p = scope.projects[0];
-    return { kind: 'project', id: p.id, name: p.name, accent: p.accent };
+    return { kind: 'project', id: p.id, name: p.name, accent: p.accent, workspaceId: p.workspaceId };
   }
   const { workspaceId } = scopeCreatePresets(scope, workspaces.map((w) => w.id));
   const ws = workspaces.find((w) => w.id === workspaceId) ?? workspaces[0];

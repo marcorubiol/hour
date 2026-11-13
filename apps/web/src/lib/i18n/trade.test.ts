@@ -83,7 +83,18 @@ describe('t() with the mixed voice (tarea 142)', () => {
   test('without a @mixed variant it reads the plain key, as stage does', () => {
     expect(t('perf.cast', 'es', undefined, 'mixed')).toBe(t('perf.cast', 'es', undefined, 'stage'));
     setTrade('mixed');
+    expect(t('perf.label', 'es')).toBe('Función');
+  });
+
+  test('the frame speaks the neutral word: both trades named, or the one they share', () => {
+    setTrade('mixed');
+    expect(t('conversations.view_sales', 'es')).toBe('Difusión y contratación');
+    expect(t('picker.performances', 'es')).toBe('Funciones y conciertos');
+    expect(t('hall.projects', 'es')).toBe('Proyectos');
+    setTrade('stage');
     expect(t('conversations.view_sales', 'es')).toBe('Difusión');
+    setTrade('music');
+    expect(t('conversations.view_sales', 'es')).toBe('Contratación');
   });
 
   test('a @mixed variant wins; a locale without one keeps its own plain word', async () => {

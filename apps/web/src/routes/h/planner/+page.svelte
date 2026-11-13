@@ -110,7 +110,7 @@
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { useCalm } from '$lib/stores/calm.svelte';
   import { plannerCalmFacts, shows } from '$lib/calm';
-  import { LOCALE_TAG, appLocale, t, tradeFor, type Voice } from '$lib/i18n';
+  import { LOCALE_TAG, appLocale, t, tradeFor, voiceFor, type Voice } from '$lib/i18n';
   import {
     buildLineIndex,
     buildProjectIndex,
@@ -3826,7 +3826,8 @@
       groupTallyText={boardGroupTallyText}
       sharedWord={t('planner.board_shared', locale)}
       teamWord={t('planner.board_team', locale)}
-      noCastWord={t('planner.no_cast', locale)}
+      noCastWord={(projectId) =>
+        t('planner.no_cast', locale, undefined, voiceFor(projectId ? projectById.get(projectId)?.workspace_id : null))}
       guestWord={t('planner.board_guest', locale)}
       awayWord={t('planner.band_away', locale)}
       tourWord={t('planner.band_tour', locale)}

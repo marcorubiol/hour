@@ -24,7 +24,7 @@
   import ScopeGlyph from '$lib/components/ScopeGlyph.svelte';
   import TargetPicker from '$lib/components/TargetPicker.svelte';
   import { dayMonth } from '$lib/datetime';
-  import { t, type Locale } from '$lib/i18n';
+  import { t, voiceFor, type Locale } from '$lib/i18n';
   import { lineKindLabel } from '$lib/utils/line-kind';
   import { spaceName } from '$lib/utils/identity';
   import { taskTargetFields, type TaskItem, type TasksCache, type TaskTarget, type TaskTargetKind } from '$lib/task';
@@ -32,6 +32,8 @@
   interface EntityLite {
     id: string;
     name: string;
+    /** Its space, by id, when the host has it: the picker row speaks it. */
+    workspaceId?: string | null;
   }
   interface Props {
     locale: Locale;
@@ -116,7 +118,7 @@
   let targetKindLabel = $derived(
     chosen.kind === 'line'
       ? lineKindLabel(chosen.lineKind ?? '', locale)
-      : t(`picker.kind_${chosen.kind}`, locale),
+      : t(`picker.kind_${chosen.kind}`, locale, undefined, voiceFor(chosen.workspaceId)),
   );
 
   const addTask = createMutation({
