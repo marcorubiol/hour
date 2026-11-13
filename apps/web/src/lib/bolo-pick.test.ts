@@ -93,6 +93,20 @@ describe('boloOf', () => {
   });
 });
 
+describe('el oficio del espacio del bolo (tarea 142)', () => {
+  test('un alta con un proyecto de música habla conciertos, la pantalla diga lo que diga', () => {
+    expect(boloLabel(lliure, 'es', 'music')).toBe('Teatre Lliure · Barcelona · 2 conciertos');
+    expect(boloOptions([sevilla], 'es', null, 'music')[1].label).toBe('Sevilla · 1 concierto');
+    expect(boloOf(lliure, 'es', 'music')).toBe('bolo de 2 conciertos');
+    expect(boloOf(sevilla, 'es', 'music')).toBe('bolo de 1 concierto');
+  });
+
+  test('con escena, o sin voz, lo de siempre', () => {
+    expect(boloLabel(lliure, 'es', 'stage')).toBe(boloLabel(lliure, 'es'));
+    expect(boloOf(lliure, 'es', 'stage')).toBe('bolo de 2 funciones');
+  });
+});
+
 describe('boloDefault', () => {
   test('un solo bolo abierto: ese', () => {
     expect(boloDefault([lliure, dead])).toBe('b1');

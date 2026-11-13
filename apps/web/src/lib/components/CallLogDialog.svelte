@@ -33,7 +33,7 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import { refreshAfterWrite } from '$lib/query-refresh';
   import { EVENT_BODY_MAX } from '$lib/conversation';
-  import { LOCALE_TAG, t, type Locale } from '$lib/i18n';
+  import { LOCALE_TAG, t, voiceFor, type Locale } from '$lib/i18n';
   import { paletteSearchTerm } from '$lib/palette-search';
   import { activeProjectsQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
   import {
@@ -89,6 +89,9 @@
 
   // ── 2. Qué se habló ─────────────────────────────────────────────────────
   let target = $state<CallTarget | null>(null);
+  /** The trade of the picked contact's space (tarea 142); the screen's voice while searching. */
+  let voice = $derived(voiceFor(target?.workspace_id));
+  const tr = (key: string, params?: Record<string, string | number>) => t(key, locale, params, voice);
   let conversationId = $state('');
   let projectId = $state('');
   /** Desde la lente se apunta una llamada (ADR-182, «+ → Llamada»). */
@@ -112,7 +115,7 @@
 
   /** Lo que el turno dirá después: la dirección es la palabra (como el cuadro de escribir). */
   let after = $derived(
-    t(log.direction === 'outbound' ? 'overview.turn_theirs_cap' : 'overview.turn_ours_cap', locale).toLocaleLowerCase(LOCALE_TAG[locale]),
+    tr(log.direction === 'outbound' ? 'overview.turn_theirs_cap' : 'overview.turn_ours_cap').toLocaleLowerCase(LOCALE_TAG[locale]),
   );
 
   let searchEl = $state<HTMLElement>();
@@ -166,7 +169,7 @@
     try {
       const data = await mutateJSON<{ conversation?: { id?: string } }>('POST', '/api/conversations', body);
       const id = data?.conversation?.id;
-      if (!id) throw new Error(t('perf.unexpected', locale));
+      if (!id) throw new Error(tr('perf.unexpected'));
       return { id, created: true };
     } catch (err) {
       const clash = err instanceof ApiError && err.status === 409 ? err.body?.conversation_id : null;
@@ -196,8 +199,8 @@
     } catch (err) {
       addToast({
         tone: 'danger',
-        title: t('conversations.not_recorded', locale),
-        message: t('perf.try_again', locale, { error: err instanceof Error ? err.message : t('perf.unexpected', locale) }),
+        title: tr('conversations.not_recorded'),
+        message: tr('perf.try_again', { error: err instanceof Error ? err.message : tr('perf.unexpected') }),
       });
     } finally {
       busy = false;
@@ -214,15 +217,15 @@
 
 <Dialog
   bind:open
-  title={target ? t('call.title_with', locale, { name: target.name }) : t('call.who', locale)}
+  title={target ? tr('call.title_with', { name: target.name }) : tr('call.who')}
   size="m"
 >
   {#if !target}
     <div class="call__search" bind:this={searchEl}>
       <Input
         type="search"
-        label={t('call.search_label', locale)}
-        placeholder={t('call.search_ph', locale)}
+        label={tr('call.search_label')}
+        placeholder={tr('call.search_ph')}
         bind:value={text}
         autocomplete="off"
       />
@@ -253,12 +256,12 @@
         </ul>
       {/if}
     {/snippet}
-    {@render group(t('call.persons', locale), persons)}
-    {@render group(t('call.organizations', locale), organizations)}
+    {@render group(tr('call.persons'), persons)}
+    {@render group(tr('call.organizations'), organizations)}
     {#if $targetsQuery.isSuccess && persons.length === 0 && organizations.length === 0}
-      <p class="call__hint">{term ? t('call.nobody', locale) : t('call.nobody_recent', locale)}</p>
+      <p class="call__hint">{term ? tr('call.nobody') : tr('call.nobody_recent')}</p>
     {:else if !term}
-      <p class="call__hint">{t('call.recent_hint', locale)}</p>
+      <p class="call__hint">{tr('call.recent_hint')}</p>
     {/if}
   {:else}
     <form class="call__what" bind:this={formEl} onsubmit={save}>
@@ -271,40 +274,40 @@
 
       {#if conversations.length > 1}
         <!-- La última tocada, con el cambio a la vista. -->
-        {@const options = conversations.map((c) => ({ value: c.id, label: c.project_name ?? t('conversations.conversation', locale) }))}
+        {@const options = conversations.map((c) => ({ value: c.id, label: c.project_name ?? tr('conversations.conversation') }))}
         {#if options.length <= 3}
-          <Segmented label={t('call.which', locale)} {options} bind:value={conversationId} />
+          <Segmented label={tr('call.which')} {options} bind:value={conversationId} />
         {:else}
-          <Select label={t('call.which', locale)} {options} bind:value={conversationId} />
+          <Select label={tr('call.which')} {options} bind:value={conversationId} />
         {/if}
       {:else if conversations.length === 0}
-        <p class="call__new" role="status">{t('call.opens', locale, { name: target.name })}</p>
+        <p class="call__new" role="status">{tr('call.opens', { name: target.name })}</p>
         {#if projects.length === 0}
-          <p class="call__hint">{t('call.no_projects', locale)}</p>
+          <p class="call__hint">{tr('call.no_projects')}</p>
         {:else if projects.length <= 3}
-          <Segmented label={t('call.project', locale)} options={projects} bind:value={projectId} />
+          <Segmented label={tr('call.project')} options={projects} bind:value={projectId} />
         {:else}
-          <Select label={t('call.project', locale)} options={[{ value: '', label: '' }, ...projects]} bind:value={projectId} />
+          <Select label={tr('call.project')} options={[{ value: '', label: '' }, ...projects]} bind:value={projectId} />
         {/if}
       {/if}
 
       <ContactLogFields bind:log kinds={['call']} them={target.kind === 'person' ? target.name.split(/\s+/)[0] || null : target.name} {future} {locale} />
 
-      <Textarea label={t('call.note', locale)} placeholder={t('thread.log_placeholder', locale)} bind:value={note} rows={3} maxlength={EVENT_BODY_MAX} />
-      <p class="call__reads">{t('thread.log_reads', locale)}</p>
-      {#if !log.edited}<p class="call__hint">{t('call.after', locale, { turn: after })}</p>{/if}
+      <Textarea label={tr('call.note')} placeholder={tr('thread.log_placeholder')} bind:value={note} rows={3} maxlength={EVENT_BODY_MAX} />
+      <p class="call__reads">{tr('thread.log_reads')}</p>
+      {#if !log.edited}<p class="call__hint">{tr('call.after', { turn: after })}</p>{/if}
       <button type="submit" hidden aria-hidden="true"></button>
     </form>
   {/if}
 
   {#snippet lead()}
-    {#if target}<Button variant="quiet" onclick={back}>{t('call.back', locale)}</Button>{/if}
+    {#if target}<Button variant="quiet" onclick={back}>{tr('call.back')}</Button>{/if}
   {/snippet}
   {#snippet actions()}
-    <Button variant="quiet" onclick={() => (open = false)}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" onclick={() => (open = false)}>{tr('create.cancel')}</Button>
     {#if target}
       <Button onclick={() => formEl?.requestSubmit()} loading={busy} disabled={!ready}>
-        {conversations.length === 0 ? t('call.open_and_save', locale) : t('thread.log_send_call', locale)}
+        {conversations.length === 0 ? tr('call.open_and_save') : tr('thread.log_send_call')}
       </Button>
     {/if}
   {/snippet}

@@ -30,7 +30,7 @@
   import { spaceName } from '$lib/utils/identity';
   import { lineKindLabel } from '$lib/utils/line-kind';
   import ScopeGlyph from '$lib/components/ScopeGlyph.svelte';
-  import { t, type Locale } from '$lib/i18n';
+  import { t, voiceFor, type Locale } from '$lib/i18n';
   import type { TaskTarget, TaskTargetKind } from '$lib/task';
 
   interface EntityLite {
@@ -60,8 +60,19 @@
   let cur = $state(0);
   let inputEl = $state<HTMLInputElement | null>(null);
 
+  /** The space browsed into speaks its trade (tarea 142); the top level and
+      a flat search, across every space, speak the screen's voice. */
+  let voice = $derived.by(() => {
+    if (query.trim() || drill === null) return voiceFor(null);
+    const { kind, key } = parsePin(drill);
+    return voiceFor(kind === 'space' ? key : projectIndex.find((p) => p.id === key)?.workspaceId);
+  });
+  const tr = (key: string, params?: Record<string, string | number>) => t(key, locale, params, voice);
+
   interface Row {
     target: TaskTarget;
+    /** Its space, by id: a row's kind speaks that space's trade. */
+    space?: string;
     /** secondary context (workspace / project name) */
     path?: string;
     /** drill token if this row has a deeper level, else null */
@@ -84,6 +95,7 @@
   function projectRow(p: (typeof projectIndex)[number], canDrill: boolean, path: string): Row {
     return {
       target: { kind: 'project', id: p.id, name: p.name, accent: p.accent },
+      space: p.workspaceId,
       path,
       drill: canDrill ? `p:${p.id}` : null,
     };
@@ -119,17 +131,17 @@
         .map((c) => ({ target: { kind: 'conversation', id: c.id, name: c.name }, drill: null }));
       return (
         [
-          { key: 'space', header: t('picker.spaces', locale), rows: spaces },
-          { key: 'project', header: t('picker.projects', locale), rows: projects },
-          { key: 'line', header: t('picker.lines', locale), rows: lines },
-          { key: 'performance', header: t('picker.performances', locale), rows: shows },
-          { key: 'conversation', header: t('picker.conversations', locale), rows: convs },
+          { key: 'space', header: tr('picker.spaces'), rows: spaces },
+          { key: 'project', header: tr('picker.projects'), rows: projects },
+          { key: 'line', header: tr('picker.lines'), rows: lines },
+          { key: 'performance', header: tr('picker.performances'), rows: shows },
+          { key: 'conversation', header: tr('picker.conversations'), rows: convs },
         ] as Group[]
       ).filter((g) => g.rows.length > 0);
     }
     if (drill === null) {
       return [
-        { key: 'space', header: t('picker.spaces', locale), rows: workspaces.map((w) => spaceRow(w, true)) },
+        { key: 'space', header: tr('picker.spaces'), rows: workspaces.map((w) => spaceRow(w, true)) },
       ];
     }
     const { kind, key } = parsePin(drill);
@@ -137,7 +149,7 @@
       return [
         {
           key: 'project',
-          header: t('picker.projects', locale),
+          header: tr('picker.projects'),
           rows: projectIndex.filter((p) => p.workspaceSlug === key).map((p) => projectRow(p, true, '')),
         },
       ];
@@ -145,7 +157,7 @@
     return [
       {
         key: 'line',
-        header: t('picker.lines', locale),
+        header: tr('picker.lines'),
         rows: lineIndex.filter((l) => l.projectId === key).map((l) => lineRow(l, '')),
       },
     ];
@@ -168,21 +180,21 @@
   >(() => {
     if (query.trim())
       return [
-        { label: t('picker.all', locale), up: '', here: false },
-        { label: t('picker.results', locale), up: null, here: true },
+        { label: tr('picker.all'), up: '', here: false },
+        { label: tr('picker.results'), up: null, here: true },
       ];
-    if (drill === null) return [{ label: t('picker.all', locale), up: null, here: true }];
+    if (drill === null) return [{ label: tr('picker.all'), up: null, here: true }];
     const { kind, key } = parsePin(drill);
     if (kind === 'space') {
       const w = workspaces.find((x) => x.slug === key);
       return [
-        { label: t('picker.all', locale), up: '', here: false },
+        { label: tr('picker.all'), up: '', here: false },
         { label: spaceName(w?.name ?? key), up: null, here: true, space: true },
       ];
     }
     const proj = projectIndex.find((p) => p.id === key);
     return [
-      { label: t('picker.all', locale), up: '', here: false },
+      { label: tr('picker.all'), up: '', here: false },
       {
         label: spaceName(proj?.workspaceName ?? ''),
         up: proj ? `s:${proj.workspaceSlug}` : '',
@@ -268,17 +280,17 @@
   const kindLabel = (r: Row) =>
     r.target.kind === 'line'
       ? lineKindLabel(r.target.lineKind ?? '')
-      : t(`picker.kind_${r.target.kind}`, locale);
+      : t(`picker.kind_${r.target.kind}`, locale, undefined, voiceFor(r.space));
 </script>
 
-<div class="tp" role="dialog" aria-label={t('picker.aria', locale)}>
+<div class="tp" role="dialog" aria-label={tr('picker.aria')}>
   <div class="tp__search">
     <input
       bind:this={inputEl}
       bind:value={query}
       type="text"
-      placeholder={t('picker.search', locale)}
-      aria-label={t('picker.search', locale)}
+      placeholder={tr('picker.search')}
+      aria-label={tr('picker.search')}
       oninput={() => {
         drill = null;
         cur = 0;
@@ -302,9 +314,9 @@
     {/each}
   </p>
 
-  <div class="tp__list" role="listbox" aria-label={t('picker.aria', locale)}>
+  <div class="tp__list" role="listbox" aria-label={tr('picker.aria')}>
     {#if flat.length === 0}
-      <p class="tp__empty">{t('picker.no_match', locale)}</p>
+      <p class="tp__empty">{tr('picker.no_match')}</p>
     {/if}
     {#each groups as g, gi (g.key)}
       <p class="tp__group">{g.header}</p>
@@ -337,7 +349,7 @@
             <button
               type="button"
               class="tp__chev"
-              aria-label={t('create.open_target', locale, { name: r.target.name })}
+              aria-label={tr('create.open_target', { name: r.target.name })}
               onclick={() => r.drill && drillTo(r.drill)}>›</button
             >
           {/if}
@@ -348,10 +360,10 @@
 
   <!-- Keys only: not drawn without a keyboard (tarea 132). -->
   <div class="tp__foot keys">
-    <span><b>↑↓</b> {t('picker.hint_move', locale)}</span>
-    <span><b>→</b> {t('picker.hint_in', locale)}</span>
-    <span><b>←</b> {t('picker.hint_back', locale)}</span>
-    <span><b>↵</b> {t('picker.hint_pick', locale)}</span>
+    <span><b>↑↓</b> {tr('picker.hint_move')}</span>
+    <span><b>→</b> {tr('picker.hint_in')}</span>
+    <span><b>←</b> {tr('picker.hint_back')}</span>
+    <span><b>↵</b> {tr('picker.hint_pick')}</span>
   </div>
 </div>
 

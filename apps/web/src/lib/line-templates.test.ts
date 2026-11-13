@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LINE_TEMPLATES, MODULE_KEYS, MODULES_BY_KIND, modulesForKind } from './line-templates';
+import { LINE_TEMPLATES, MODULE_KEYS, MODULES_BY_KIND, moduleLabel, modulesForKind } from './line-templates';
 
 describe('LINE_TEMPLATES', () => {
   it('ships the six ADR-056 templates', () => {
@@ -49,5 +49,13 @@ describe('modulesForKind (ADR-166)', () => {
       expect(new Set(mods).size).toBe(mods.length);
       for (const m of mods) expect(MODULE_KEYS).toContain(m);
     }
+  });
+});
+
+describe('moduleLabel and the trade of the line (tarea 142)', () => {
+  it('a line of a music space says its word, whatever the screen speaks', () => {
+    expect(moduleLabel('conversations', 'es', 'music')).toBe('Contratación');
+    expect(moduleLabel('conversations', 'es', 'stage')).toBe('Difusión');
+    expect(moduleLabel('planner', 'es', 'music')).toBe(moduleLabel('planner', 'es', 'stage'));
   });
 });

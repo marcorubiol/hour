@@ -37,7 +37,7 @@
   import type { Json } from '$lib/db-types';
   import type { KVObject } from '$lib/kv-lines';
   import { dayLabel, dayMonth, localDayISO, timeInTz, viewerTimeZone } from '$lib/datetime';
-  import { LOCALE_TAG, appLocale, tHere, setRecordSpace } from '$lib/i18n';
+  import { LOCALE_TAG, appLocale, tHere, setRecordSpace, tradeFor } from '$lib/i18n';
   import {
     HOLD_NOTICE_DEFAULT,
     PERFORMANCE_MENU_STATUSES,
@@ -428,7 +428,7 @@
   );
   let projectBolos = $derived<BoloLite[]>($projectBolosQuery.data?.items ?? []);
   let currentBolo = $derived(projectBolos.find((b) => b.id === currentBoloId) ?? null);
-  let bolosOptions = $derived(boloOptions(projectBolos, locale, currentBoloId));
+  let bolosOptions = $derived(boloOptions(projectBolos, locale, currentBoloId, tradeFor(workspaceSlug)));
   // El campo solo existe si el enlace se pudo leer Y hay algo que elegir:
   // guardar sin saber el valor actual lo borraría.
   // Y si el bolo actual no está entre las opciones (borrado, fuera del
@@ -877,8 +877,8 @@
         {#if boloReadable && currentBolo && perf!.project}
           <span class="perf__bolo-fact">
             {#if showBoloSelect}
-              <Menu label={t('record.bolo_menu', locale, { bolo: boloOf(currentBolo, locale) })} triggerClass="fact-act">
-                {#snippet trigger()}{boloOf(currentBolo, locale)}<span class="status-caret" aria-hidden="true">▾</span>{/snippet}
+              <Menu label={t('record.bolo_menu', locale, { bolo: boloOf(currentBolo, locale, tradeFor(workspaceSlug)) })} triggerClass="fact-act">
+                {#snippet trigger()}{boloOf(currentBolo, locale, tradeFor(workspaceSlug))}<span class="status-caret" aria-hidden="true">▾</span>{/snippet}
                 {#snippet children({ close })}
                   {#each bolosOptions as o (o.value)}
                     <li role="none">
@@ -905,9 +905,9 @@
                 {/snippet}
               </Menu>
             {:else if lensOn('books')}
-              <a class="lenshead__frag" href={booksHref(perf!.project.id, { boloId: currentBolo.id })}>{boloOf(currentBolo, locale)}</a>
+              <a class="lenshead__frag" href={booksHref(perf!.project.id, { boloId: currentBolo.id })}>{boloOf(currentBolo, locale, tradeFor(workspaceSlug))}</a>
             {:else}
-              {boloOf(currentBolo, locale)}
+              {boloOf(currentBolo, locale, tradeFor(workspaceSlug))}
             {/if}
             <ConceptHint concept="bolo" />
           </span>

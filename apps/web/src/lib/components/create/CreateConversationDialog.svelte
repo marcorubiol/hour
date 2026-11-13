@@ -28,7 +28,7 @@
   import { conversationAccessQueryOptions } from '$lib/conversation-access';
   import { SALES, scopeTags, tagIdIn, tagLabel } from '$lib/conversation-tags';
   import { conversationTagsQueryOptions } from '$lib/conversation-tags-query';
-  import { appLocale, t } from '$lib/i18n';
+  import { appLocale, t, voiceFor } from '$lib/i18n';
   import { organizationNames, organizationsQueryOptions } from '$lib/organizations';
   import { usePins } from '$lib/stores/pins.svelte';
   import { spaceName } from '$lib/utils/identity';
@@ -85,6 +85,12 @@
   // on email; belonging to a space = an conversation in one of its projects).
   // So the target is a SET of projects, grouped by space in the picker.
   let aProjectIds = $state<string[]>([]);
+  /** The trade of the spaces this writes to (tarea 142): the checked
+      projects', mixed if they disagree; the screen's voice until one is. */
+  let voice = $derived(
+    voiceFor(($projectsQuery.data?.items ?? []).filter((p) => aProjectIds.includes(p.id)).map((p) => p.workspace_id)),
+  );
+  const tr = (key: string, params?: Record<string, string | number>) => t(key, locale, params, voice);
   // Optional line per targeted project (ADR-056) — the target is a set of
   // projects, so one global select can't work; each checked project gets its
   // own. Unset key = "No line".
@@ -98,7 +104,7 @@
   // ADR-138 fase 2: the tag it is born with; the chip's, or Difusión.
   let aTag = $state(SALES);
   let tagOptions = $derived(
-    (tagNames.length > 0 ? tagNames : [{ key: SALES, label: null, labels: {} }]).map((x) => ({ value: x.key, label: tagLabel(x, locale) })),
+    (tagNames.length > 0 ? tagNames : [{ key: SALES, label: null, labels: {} }]).map((x) => ({ value: x.key, label: tagLabel(x, locale, voice) })),
   );
   // «Más»: phone, tag and next step, folded; the lid says the tag and the day.
   let aMoreOpen = $state(false);
@@ -127,7 +133,7 @@
       let g = byWs.get(p.workspace_id);
       if (!g) {
         // Chokepoint: the only place this group's space label is built.
-        g = { wsId: p.workspace_id, wsName: spaceName(wsName.get(p.workspace_id) ?? t('workspace.fallback', locale)), projects: [] };
+        g = { wsId: p.workspace_id, wsName: spaceName(wsName.get(p.workspace_id) ?? tr('workspace.fallback')), projects: [] };
         byWs.set(p.workspace_id, g);
       }
       g.projects.push({ id: p.id, name: p.name ?? p.slug });
@@ -246,7 +252,7 @@
         return id ? [id] : undefined;
       };
       const projectName = (id: string) =>
-        ($projectsQuery.data?.items ?? []).find((p) => p.id === id)?.name ?? t('conversations.conversation', locale);
+        ($projectsQuery.data?.items ?? []).find((p) => p.id === id)?.name ?? tr('conversations.conversation');
 
       for (const projectId of targets) {
         const line_id = lineFor[projectId] || null;
@@ -274,7 +280,7 @@
             // Already has a conversation in this project — not an error.
             out.existed += 1;
           } else {
-            out.failed.push(e instanceof Error ? e.message : t('perf.unexpected', locale));
+            out.failed.push(e instanceof Error ? e.message : tr('perf.unexpected'));
           }
         }
       }
@@ -294,6 +300,18 @@
         void queryClient.invalidateQueries({ queryKey: ['organizations'] });
         return;
       }
+      // Said before the reset lets go of the chosen spaces, in their trade.
+      const parts: string[] = [];
+      if (r.created)
+        parts.push(
+          tr(r.created === 1 ? 'conversations.added_one' : 'conversations.added_other', {
+            n: r.created,
+          }),
+        );
+      if (r.existed) parts.push(tr('conversations.already_in', { n: r.existed }));
+      if (r.failed.length) parts.push(tr('conversations.failed_n', { n: r.failed.length }));
+      if (r.untagged) parts.push(tr('conversations.tag_not_set'));
+      const message = `${parts.join(' · ')}.`;
       open = false;
       aName = '';
       aEmail = '';
@@ -306,17 +324,6 @@
       void refreshAfterWrite(queryClient, ['conversations']);
       // A line's head counts its conversations from its own read.
       void queryClient.invalidateQueries({ queryKey: ['line-eng-stats'] });
-      const parts: string[] = [];
-      if (r.created)
-        parts.push(
-          t(r.created === 1 ? 'conversations.added_one' : 'conversations.added_other', locale, {
-            n: r.created,
-          }),
-        );
-      if (r.existed) parts.push(t('conversations.already_in', locale, { n: r.existed }));
-      if (r.failed.length) parts.push(t('conversations.failed_n', locale, { n: r.failed.length }));
-      if (r.untagged) parts.push(t('conversations.tag_not_set', locale));
-      const message = `${parts.join(' · ')}.`;
       if (r.failed.length || r.untagged) {
         addToast({ tone: 'warning', message });
         return;
@@ -338,8 +345,8 @@
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: t('conversations.not_added', locale),
-        message: `${err instanceof Error ? err.message : t('perf.unexpected', locale)}`,
+        title: tr('conversations.not_added'),
+        message: `${err instanceof Error ? err.message : tr('perf.unexpected')}`,
       });
     },
   });
@@ -354,7 +361,7 @@
       }
     },
     onSuccess: () => {
-      addToast({ tone: 'success', message: t('conversations.contact_added', locale, { name: aName.trim() }) });
+      addToast({ tone: 'success', message: tr('conversations.contact_added', { name: aName.trim() }) });
       open = false;
       aJoin = [];
       aJoinPersonId = null;
@@ -363,8 +370,8 @@
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: t('conversations.not_added', locale),
-        message: `${err instanceof Error ? err.message : t('perf.unexpected', locale)}`,
+        title: tr('conversations.not_added'),
+        message: `${err instanceof Error ? err.message : tr('perf.unexpected')}`,
       });
     },
   });
@@ -385,8 +392,8 @@
 
   /** Runs from the form's submit: Enter in any field, ⌘↵ or the button. */
   function submitAdd() {
-    if (aProjectIds.length === 0) errSpaces = t('conversations.pick_space', locale);
-    if (!aName.trim() && !aOrg.trim()) errWho = t('conversations.needs_name', locale);
+    if (aProjectIds.length === 0) errSpaces = tr('conversations.pick_space');
+    if (!aName.trim() && !aOrg.trim()) errWho = tr('conversations.needs_name');
     if (errSpaces || errWho) {
       // «Who» comes first, so its field takes the focus first.
       if (errWho) document.getElementById('conversations-add-org')?.focus();
@@ -396,7 +403,7 @@
   }
 </script>
 
-<Dialog bind:open title={t('conversations.add', locale)} size="m">
+<Dialog bind:open title={tr('conversations.add')} size="m">
   <!-- A form, so Enter in any field adds (ADR-139 p7); the errors are its own. -->
   <form
     class="conversations__add"
@@ -412,38 +419,38 @@
   <div class="conversations__form-grid">
     <Input
       id="conversations-add-org"
-      label={t('conversations.col_organization', locale)}
+      label={tr('conversations.col_organization')}
       bind:value={aOrg}
       error={errWho}
-      placeholder={t('conversations.org_ph', locale)}
+      placeholder={tr('conversations.org_ph')}
       list="conversations-org-list"
       autocomplete="off"
     />
     <datalist id="conversations-org-list">
       {#each orgSuggestions as name (name)}<option value={name}></option>{/each}
     </datalist>
-    <Input label={t('conversations.full_name', locale)} bind:value={aName} />
-    <Input label={t('conversations.email', locale)} type="email" bind:value={aEmail} />
+    <Input label={tr('conversations.full_name')} bind:value={aName} />
+    <Input label={tr('conversations.email')} type="email" bind:value={aEmail} />
   </div>
   {#if aJoin.length > 0}
     <div class="conversations__join" role="status">
       <p>
-        {t('conversations.org_has_conversation', locale, {
-          org: aOrg.trim() || t('conversations.col_organization', locale),
+        {tr('conversations.org_has_conversation', {
+          org: aOrg.trim() || tr('conversations.col_organization'),
           projects: aJoin.map((j) => j.projectName).join(', '),
         })}
       </p>
       <Button size="s" onclick={() => $joinMutation.mutate()} loading={$joinMutation.isPending}>
-        {t('conversations.add_as_contact', locale)}
+        {tr('conversations.add_as_contact')}
       </Button>
     </div>
   {/if}
   <fieldset class="conversations__spaces">
     <legend class="eyebrow eyebrow--sub">
-      {t('picker.projects', locale)} <span class="conversations__field-hint">{t('conversations.spaces_hint', locale)}</span>
+      {tr('picker.projects')} <span class="conversations__field-hint">{tr('conversations.spaces_hint')}</span>
     </legend>
     {#if projectGroups.length === 0}
-      <p class="conversations__field-hint">{t('conversations.no_projects', locale)}</p>
+      <p class="conversations__field-hint">{tr('conversations.no_projects')}</p>
     {:else}
       <div class="conversations__space-groups">
         {#each projectGroups as g (g.wsId)}
@@ -459,8 +466,8 @@
               {#if aProjectIds.includes(p.id) && (linesByProject.get(p.id)?.length ?? 0) > 0}
                 <div class="conversations__line">
                   <Select
-                    label={t('create.line', locale)}
-                    options={[{ value: '', label: t('create.line_none', locale) }, ...(linesByProject.get(p.id) ?? [])]}
+                    label={tr('create.line')}
+                    options={[{ value: '', label: tr('create.line_none') }, ...(linesByProject.get(p.id) ?? [])]}
                     bind:value={aLineByProject[p.id]}
                   />
                 </div>
@@ -475,15 +482,15 @@
   <!-- Closed, the lid still says what it keeps: the tag, and the next step's
        day once there is one. -->
   <div class="conversations__more">
-    <Fold word={t('conversations.add_more', locale)} keeps={addMoreKeeps} bind:open={aMoreOpen}>
+    <Fold word={tr('conversations.add_more')} keeps={addMoreKeeps} bind:open={aMoreOpen}>
       <div class="conversations__form-grid">
-        <Input label={t('conversations.phone', locale)} type="tel" bind:value={aPhone} />
-        <Select label={t('conversations.tag', locale)} options={tagOptions} bind:value={aTag} />
-        <Input label={t('conversations.col_next_action', locale)} type="date" bind:value={aNextAt} />
+        <Input label={tr('conversations.phone')} type="tel" bind:value={aPhone} />
+        <Select label={tr('conversations.tag')} options={tagOptions} bind:value={aTag} />
+        <Input label={tr('conversations.col_next_action')} type="date" bind:value={aNextAt} />
         <Input
-          label={t('conversations.next_note', locale)}
+          label={tr('conversations.next_note')}
           bind:value={aNextNote}
-          placeholder={t('conversations.next_note_ph', locale)}
+          placeholder={tr('conversations.next_note_ph')}
         />
       </div>
     </Fold>
@@ -492,9 +499,9 @@
   <button type="submit" hidden aria-hidden="true"></button>
   </form>
   {#snippet actions()}
-    <Button variant="quiet" onclick={() => (open = false)}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" onclick={() => (open = false)}>{tr('create.cancel')}</Button>
     <Button onclick={() => addFormEl?.requestSubmit()} loading={$addMutation.isPending}
-      >{t('conversations.add', locale)}</Button
+      >{tr('conversations.add')}</Button
     >
   {/snippet}
 </Dialog>

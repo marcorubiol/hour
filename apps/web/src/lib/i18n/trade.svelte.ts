@@ -115,3 +115,16 @@ export function voiceHere(): () => Voice {
     return ws ? tradeFor(ws) : currentTrade();
   };
 }
+
+/**
+ * The voice of a dialog that chooses its space inside (tarea 142 D): that
+ * space's trade once there is one, the screen's voice until then. An alta
+ * opened from «Todo» speaks the space it writes to, not the screen. A dialog
+ * that writes to several spaces at once passes them all: their trade when
+ * they share it, `mixed` when they disagree.
+ */
+export function voiceFor(workspaces: string | readonly string[] | null | undefined): Voice {
+  const ids = (typeof workspaces === 'string' ? [workspaces] : (workspaces ?? [])).filter(Boolean);
+  if (ids.length === 0) return current;
+  return tradeOf(ids.map((id) => ({ trade: tradeFor(id) })));
+}

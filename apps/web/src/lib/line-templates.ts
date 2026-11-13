@@ -16,7 +16,7 @@
  */
 
 import type { Enums } from './db-types';
-import { t, type Locale } from './i18n';
+import { t, type Locale, type Voice } from './i18n';
 
 export const MODULE_KEYS = [
   'planner',
@@ -46,8 +46,9 @@ const MODULE_LABEL_KEYS: Record<ModuleKey, string> = {
   tasks: 'line.module_tasks',
 };
 
-export function moduleLabel(key: ModuleKey, locale: Locale): string {
-  return t(MODULE_LABEL_KEYS[key], locale);
+/** `voice`: the trade of the line's space (tarea 142); without it, the screen's. */
+export function moduleLabel(key: ModuleKey, locale: Locale, voice?: Voice): string {
+  return t(MODULE_LABEL_KEYS[key], locale, undefined, voice);
 }
 
 type LineKind = Enums<'line_kind'>;

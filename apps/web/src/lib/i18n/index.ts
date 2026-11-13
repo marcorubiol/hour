@@ -9,6 +9,7 @@ export {
   tradeFor,
   tradeOf,
   TRADES,
+  voiceFor,
   type Trade,
   type Voice,
 } from './trade.svelte';
