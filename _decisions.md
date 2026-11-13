@@ -7637,3 +7637,26 @@ Marco (chat, 2026-11-13): «Adelante con todo». En `main` desde `f03c6165`.
 
 **Verificado:** `check` 0/0 y unitarios 2422. En producción, el único espacio personal intacto con un solo dueño es
 `950352b3`, de un usuario de pruebas. Sin E2E y sin verlo en pantalla.
+
+## [2026-11-13] ADR-201 · Importar contactos desde una hoja: guarda contactos, no abre conversaciones, y lo importado es directorio (tarea 138)
+
+Marco (chat, 2026-11-13): «Adelante con todo», sobre el boceto y los cambios propuestos. En `main` desde `44cd3449`;
+migración `20261113100000_contact_import` sin aplicar a producción.
+
+1. **Importar guarda contactos y nada más:** la persona en el dossier del espacio, su organización y el vínculo. No
+   abre conversaciones ni toca envíos: 500 filas no llenan Conversaciones de diálogos que nadie ha empezado. La zona,
+   el idioma y el último contacto van a la nota, privada de quien importa (ADR-093).
+2. **Lo importado es directorio, no equipo.** Una persona sin conversación contaba como equipo y la veía cualquier
+   miembro; `private.person_is_team` excluye ahora lo que tiene `import_id`, salvo que algo la haga equipo de verdad
+   (cuenta, reparto, equipo técnico). Importar, consultar y deshacer exigen el permiso de leer Conversaciones
+   (ADR-124), no solo ser miembro.
+3. **Entrada:** «Importar contactos» en el «+» de Conversaciones, junto a «Importar chat» (ADR-193 § 3: un solo «+»),
+   y en ⌘K. CSV, XLSX (primera hoja) o pegado, leídos en el navegador. Tres pasos: Fichero, Columnas, Revisar.
+4. **Duplicados:** mismo correo, misma persona; mismo nombre, misma organización; solo se rellena lo vacío. Tandas de
+   200 filas, 2.000 por importación; una tanda repetida no escribe dos veces.
+5. **Deshacer** durante 7 días, por quien importó o por owner o admin: borra solo lo que nació ahí, sigue sin tocar y
+   no está enlazado en otro sitio; devuelve a vacío lo que rellenó; no borra notas privadas ajenas.
+6. **Abierto:** la nota de una fila con solo organización.
+
+**Verificado:** `check` 0/0 y unitarios 2458; staging reconstruida desde cero con la migración (run 43487613563): RLS
+624 ok, `contact-import` 10/10. Sin aplicar a producción y sin verlo en pantalla.
