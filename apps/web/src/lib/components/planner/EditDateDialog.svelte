@@ -42,7 +42,7 @@
     type DateTypeKey,
   } from '$lib/quick-add';
   import { dayMonthYear, dualTime, instantToWallClock, wallClockToInstant, viewerTimeZone } from '$lib/datetime';
-  import { appLocale, t } from '$lib/i18n';
+  import { appLocale, t, voiceFor } from '$lib/i18n';
   import { allLinesQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
   import {
     DATE_STATUSES,
@@ -107,6 +107,9 @@
 
   let projectId = $derived(date?.project?.id ?? '');
   let workspaceId = $derived(date?.project?.workspace_id ?? '');
+  /** The trade of the date's space (tarea 142); the screen's voice for a date without a project. */
+  let voice = $derived(voiceFor(workspaceId));
+  const tr = (key: string, params?: Record<string, string | number>) => t(key, locale, params, voice);
 
   const workspacesQuery = createQuery(workspacesQueryOptions());
   const linesQuery = createQuery(allLinesQueryOptions());
@@ -117,14 +120,14 @@
   // Only when the space's clock is not yours (ADR-154): the same test as
   // `dualTime`, by name and then by what the clock reads now.
   let timeHint = $derived(
-    dualTime(new Date().toISOString(), entryTz, viewerTz).secondary !== null ? t('create.time_hint_tz', locale, { tz: entryTz }) : '',
+    dualTime(new Date().toISOString(), entryTz, viewerTz).secondary !== null ? tr('create.time_hint_tz', { tz: entryTz }) : '',
   );
 
   let projectLines = $derived(
     ($linesQuery.data?.items ?? []).filter((l) => l.project?.id === projectId),
   );
   let lineOptions = $derived([
-    { value: '', label: t('create.line_none', locale) },
+    { value: '', label: tr('create.line_none') },
     ...projectLines.map((l) => ({ value: l.id, label: l.name })),
   ]);
 
@@ -147,7 +150,7 @@
   }));
   const attachQuery = createQuery(attachOptionsStore);
   let attachOptions = $derived([
-    { value: '', label: t('create.attach_none', locale) },
+    { value: '', label: tr('create.attach_none') },
     ...($attachQuery.data?.items ?? []).map((p) => ({
       value: p.id,
       label: `${dayMonthYear(p.performed_at)} · ${p.venue_name ?? p.city ?? '—'}`,
@@ -174,7 +177,7 @@
   let labelSuggestions = $derived($labelsQuery.data?.labels ?? []);
 
   const statusOptions = $derived(
-    DATE_STATUSES.map((s) => ({ value: s, label: t(`edit.status_${s}`, locale) })),
+    DATE_STATUSES.map((s) => ({ value: s, label: tr(`edit.status_${s}`) })),
   );
 
   /**
@@ -242,13 +245,13 @@
     onSuccess: () => {
       open = false;
       invalidateDateFeeds(queryClient);
-      addToast({ tone: 'success', message: t('edit.saved', locale) });
+      addToast({ tone: 'success', message: tr('edit.saved') });
     },
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: t('edit.not_saved', locale),
-        message: err instanceof ApiError || err instanceof Error ? err.message : t('perf.unexpected', locale),
+        title: tr('edit.not_saved'),
+        message: err instanceof ApiError || err instanceof Error ? err.message : tr('perf.unexpected'),
       });
     },
   });
@@ -259,13 +262,13 @@
       confirmDelete = false;
       open = false;
       invalidateDateFeeds(queryClient);
-      addToast({ tone: 'success', message: t('edit.deleted', locale) });
+      addToast({ tone: 'success', message: tr('edit.deleted') });
     },
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: t('edit.not_deleted', locale),
-        message: err instanceof ApiError || err instanceof Error ? err.message : t('perf.unexpected', locale),
+        title: tr('edit.not_deleted'),
+        message: err instanceof ApiError || err instanceof Error ? err.message : tr('perf.unexpected'),
       });
     },
   });
@@ -277,7 +280,7 @@
       ? dDay && `${dDay}T00:00:00.000Z`
       : dStartWall && wallClockToInstant(dStartWall, entryTz);
     if (!startsAt) {
-      errStart = t('create.pick_start', locale);
+      errStart = tr('create.pick_start');
       return;
     }
     const endsAt = dAllDay
@@ -288,7 +291,7 @@
         ? wallClockToInstant(dEndWall, entryTz)
         : null;
     if (endsAt && endsAt < startsAt) {
-      errEnd = t('create.end_before_start', locale);
+      errEnd = tr('create.end_before_start');
       return;
     }
 
@@ -335,22 +338,22 @@
 
 <Dialog
   bind:open
-  title={t('edit.date_title', locale)}
+  title={tr('edit.date_title')}
   size="m"
   dirty={whoChanged}
 >
   {#if date}
     <div class="edd">
       <Segmented
-        ariaLabel={t('create.type_label', locale)}
-        options={DATE_TYPE_KEYS.map((key) => ({ value: key, label: t(TYPE_LABEL_KEYS[key], locale) }))}
+        ariaLabel={tr('create.type_label')}
+        options={DATE_TYPE_KEYS.map((key) => ({ value: key, label: tr(TYPE_LABEL_KEYS[key]) }))}
         bind:value={kind}
       />
 
       {#if inSeries}
         <!-- A block is N rows sharing a key, never one spanning row: say
              which one this edit touches before it touches it. -->
-        <p class="edd__note">{t('edit.series_note', locale)}</p>
+        <p class="edd__note">{tr('edit.series_note')}</p>
       {/if}
 
       <form
@@ -363,40 +366,40 @@
       >
         <!-- The project is FIXED: the endpoint refuses a rescope, so the
              form states the scope instead of offering to change it. -->
-        <Field id="edd-project" label={t('create.project', locale)} group>
+        <Field id="edd-project" label={tr('create.project')} group>
           <span>{date.project?.name ?? '—'}</span>
         </Field>
 
-        <Select label={t('edit.status', locale)} options={statusOptions} bind:value={status} />
+        <Select label={tr('edit.status')} options={statusOptions} bind:value={status} />
 
         {#if projectLines.length > 0}
-          <Select label={t('create.line', locale)} options={lineOptions} bind:value={dLine} />
+          <Select label={tr('create.line')} options={lineOptions} bind:value={dLine} />
         {/if}
         {#if attachOptions.length > 1}
           <Select
-            label={t('create.attach', locale)}
+            label={tr('create.attach')}
             options={attachOptions}
             bind:value={dPerformance}
           />
         {/if}
 
         {#if kind !== 'day_off'}
-          <Input label={t('create.event_title', locale)} bind:value={dTitle} />
-          <Input label={t('create.venue', locale)} bind:value={dVenue} />
+          <Input label={tr('create.event_title')} bind:value={dTitle} />
+          <Input label={tr('create.venue')} bind:value={dVenue} />
         {/if}
         {#if kind === 'travel_day'}
           <!-- A TRIP HAS TWO ENDS (ADR-089), so the one place becomes two:
                where it leaves from, where it goes. The stages in between are
                written in the day view, under the strip. -->
-          <Input label={t('create.trip_from', locale)} bind:value={dOrigin} autocomplete="off" />
-          <Input label={t('create.trip_to', locale)} bind:value={dCity} autocomplete="off" />
+          <Input label={tr('create.trip_from')} bind:value={dOrigin} autocomplete="off" />
+          <Input label={tr('create.trip_to')} bind:value={dCity} autocomplete="off" />
         {:else}
-          <Input label={t('create.city', locale)} bind:value={dCity} />
+          <Input label={tr('create.city')} bind:value={dCity} />
         {/if}
 
         {#if kind === 'other'}
           <Input
-            label={t('create.label', locale)}
+            label={tr('create.label')}
             bind:value={dLabel}
             list="edd-labels"
             autocomplete="off"
@@ -410,30 +413,30 @@
 
         {#if kind === 'travel_day'}
           <Segmented
-            label={t('create.direction', locale)}
-            options={TRAVEL_DIRECTIONS.map((dir) => ({ value: dir, label: t(`create.direction_${dir}`, locale) }))}
+            label={tr('create.direction')}
+            options={TRAVEL_DIRECTIONS.map((dir) => ({ value: dir, label: tr(`create.direction_${dir}`) }))}
             bind:value={dDirection}
           />
         {/if}
 
         <Checkbox
-          label={t('create.all_day', locale)}
+          label={tr('create.all_day')}
           bind:checked={dAllDay}
           onchange={toggleAllDay}
         />
 
         {#if dAllDay}
-          <Input label={t('create.starts', locale)} type="date" bind:value={dDay} required error={errStart} />
-          <Input label={t('create.ends', locale)} type="date" bind:value={dEndDay} error={errEnd} />
+          <Input label={tr('create.starts')} type="date" bind:value={dDay} required error={errStart} />
+          <Input label={tr('create.ends')} type="date" bind:value={dEndDay} error={errEnd} />
         {:else}
           <Input
-            label={t('create.starts', locale)}
+            label={tr('create.starts')}
             type="datetime-local"
             bind:value={dStartWall}
             required
             error={errStart}
           />
-          <Input label={t('create.ends', locale)} type="datetime-local" bind:value={dEndWall} error={errEnd} />
+          <Input label={tr('create.ends')} type="datetime-local" bind:value={dEndWall} error={errEnd} />
         {/if}
         {#if !dAllDay && timeHint}
           <p class="edd__hint">{timeHint}</p>
@@ -464,22 +467,22 @@
        undone asks first (ConfirmDialog, tarea 134). -->
   {#snippet lead()}
     <Button variant="quiet" tone="warn" disabled={pending} onclick={() => (confirmDelete = true)}>
-      {t('edit.delete', locale)}
+      {tr('edit.delete')}
     </Button>
   {/snippet}
   {#snippet actions()}
-    <Button variant="quiet" onclick={() => (open = false)}>{t('create.cancel', locale)}</Button>
+    <Button variant="quiet" onclick={() => (open = false)}>{tr('create.cancel')}</Button>
     <Button onclick={() => formEl?.requestSubmit()} loading={$savePatch.isPending || committing}
-      >{t('edit.save', locale)}</Button
+      >{tr('edit.save')}</Button
     >
   {/snippet}
 </Dialog>
 
 <ConfirmDialog
   bind:open={confirmDelete}
-  title={t('edit.delete_date_title', locale)}
-  body={t('edit.delete_date_body', locale)}
-  confirm={t('edit.delete', locale)}
+  title={tr('edit.delete_date_title')}
+  body={tr('edit.delete_date_body')}
+  confirm={tr('edit.delete')}
   busy={$deleteDate.isPending}
   {locale}
   onconfirm={() => $deleteDate.mutate()}

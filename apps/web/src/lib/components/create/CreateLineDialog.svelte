@@ -18,7 +18,7 @@
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { LINE_TEMPLATES, moduleLabel, modulesForKind, type LineTemplate } from '$lib/line-templates';
-  import { appLocale, t } from '$lib/i18n';
+  import { appLocale, t, voiceFor } from '$lib/i18n';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { accentVar } from '$lib/utils/accent';
   import AccentSwatchPicker from './AccentSwatchPicker.svelte';
@@ -59,6 +59,10 @@
       .map((p) => ({ value: p.id, label: p.name })),
   );
   let effectiveProjectId = $derived(projectId ?? projSelected);
+  /** The trade of the space this writes to (tarea 142): the chosen project's,
+      or the one the dialog was opened in; the screen's voice until then. */
+  let voice = $derived(voiceFor(projects.find((p) => p.id === effectiveProjectId)?.workspace_id ?? workspaceId));
+  const tr = (key: string, params?: Record<string, string | number>) => t(key, locale, params, voice);
 
   // Light name suggestion from the template + next year — "Difusión
   // 2027-28" for booking (the season after this one, by the month the
@@ -66,10 +70,10 @@
   const nextYear = new Date().getFullYear() + 1;
   let nameSuggestion = $derived(
     template.key === 'booking'
-      ? t('line.suggest_booking', locale, {
+      ? tr('line.suggest_booking', {
           season: seasonLabel(currentSeason(new Date(), screenSeasonStart()).year + 1, screenSeasonStart(), true),
         })
-      : `${t(template.nameKey, locale)} ${nextYear}`,
+      : `${tr(template.nameKey)} ${nextYear}`,
   );
 
   // Live preview of the color Auto would pick; also feeds the selected
@@ -120,13 +124,13 @@
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: t('line.not_created', locale),
+        title: tr('line.not_created'),
         message:
           err instanceof ApiError && err.status === 409
-            ? t('line.name_taken', locale)
+            ? tr('line.name_taken')
             : err instanceof Error
               ? err.message
-              : t('perf.unexpected', locale),
+              : tr('perf.unexpected'),
       });
     },
   });
@@ -148,7 +152,7 @@
     }
     const trimmed = name.trim();
     if (!trimmed) {
-      nameError = t('project.name_empty', locale);
+      nameError = tr('project.name_empty');
       return;
     }
     $create.mutate({
@@ -162,15 +166,15 @@
 
 <Dialog
   bind:open
-  title={t('line.new_title', locale)}
-  description={t('line.new_desc', locale)}
+  title={tr('line.new_title')}
+  description={tr('line.new_desc')}
   size="m"
   onclose={reset}
 >
   <form class="cln__form" bind:this={formEl} onsubmit={submit} style={`--c: ${accentPreview}`}>
     <fieldset class="cln__templates">
-      <legend class="eyebrow eyebrow--sub">{t('line.template', locale)}</legend>
-      <div class="cln__template-grid" role="radiogroup" aria-label={t('line.template_aria', locale)}>
+      <legend class="eyebrow eyebrow--sub">{tr('line.template')}</legend>
+      <div class="cln__template-grid" role="radiogroup" aria-label={tr('line.template_aria')}>
         {#each LINE_TEMPLATES as tpl (tpl.key)}
           {@const isOn = templateKey === tpl.key}
           <button
@@ -181,10 +185,10 @@
             disabled={$create.isPending}
             onclick={() => (templateKey = tpl.key)}
           >
-            <span class="cln__template-name">{t(tpl.nameKey, locale)}</span>
-            <span class="cln__template-desc">{t(tpl.descriptionKey, locale)}</span>
+            <span class="cln__template-name">{tr(tpl.nameKey)}</span>
+            <span class="cln__template-desc">{tr(tpl.descriptionKey)}</span>
             <span class="cln__template-modules">
-              {modulesForKind(tpl.kind).map((m) => moduleLabel(m, locale)).join(' · ')}
+              {modulesForKind(tpl.kind).map((m) => moduleLabel(m, locale, voice)).join(' · ')}
             </span>
           </button>
         {/each}
@@ -193,35 +197,35 @@
 
     {#if !projectId}
       <Select
-        label={t('create.project', locale)}
+        label={tr('create.project')}
         bind:value={projSelected}
         options={projectOptions}
-        placeholder={t('line.pick_project_ph', locale)}
+        placeholder={tr('line.pick_project_ph')}
         required
         disabled={$create.isPending}
       />
     {/if}
 
     <Input
-      label={t('conversations.col_name', locale)}
+      label={tr('conversations.col_name')}
       name="line-name"
       bind:value={name}
       error={nameError}
-      placeholder={t('line.name_ph', locale, { example: nameSuggestion })}
+      placeholder={tr('line.name_ph', { example: nameSuggestion })}
       required
       autocomplete="off"
       disabled={$create.isPending}
     />
 
-    <AccentSwatchPicker bind:accent autoSlug={autoAccentSlug} label={t('line.color', locale)} disabled={$create.isPending} />
+    <AccentSwatchPicker bind:accent autoSlug={autoAccentSlug} label={tr('line.color')} disabled={$create.isPending} />
 
     <!-- Hidden submit lets Enter inside an input trigger submit. -->
     <button type="submit" hidden aria-hidden="true"></button>
   </form>
 
   {#snippet actions()}
-    <Button variant="quiet" disabled={$create.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
-    <Button loading={$create.isPending} onclick={() => formEl?.requestSubmit()}>{t('project.create', locale)}</Button>
+    <Button variant="quiet" disabled={$create.isPending} onclick={close}>{tr('create.cancel')}</Button>
+    <Button loading={$create.isPending} onclick={() => formEl?.requestSubmit()}>{tr('project.create')}</Button>
   {/snippet}
 </Dialog>
 

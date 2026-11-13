@@ -18,7 +18,7 @@
  * Funciones puras: la pantalla las monta, aquí no hay red ni estado.
  */
 
-import { t, type Locale } from '$lib/i18n';
+import { t, type Locale, type Voice } from '$lib/i18n';
 import { parsePin } from '$lib/stores/pins.svelte';
 
 /** Lo que el selector necesita de una fila de `GET /api/money/bolos`. */
@@ -33,14 +33,18 @@ export type BoloLite = {
 /** Un trato muerto no recibe funciones nuevas; si ya era el suyo, se queda. */
 const CLOSED = new Set(['cancelled']);
 
-/** «Teatre Lliure · Barcelona · 2 funciones». La sala va primero: es el bolo. */
-export function boloLabel(bolo: BoloLite, locale: Locale): string {
+/**
+ * «Teatre Lliure · Barcelona · 2 funciones». La sala va primero: es el bolo.
+ * `voice` es el oficio del espacio del bolo (tarea 142): un alta que elige
+ * proyecto lo pasa; sin él, la voz de la pantalla.
+ */
+export function boloLabel(bolo: BoloLite, locale: Locale, voice?: Voice): string {
   const place = [bolo.venue_name, bolo.city].filter(Boolean).join(' · ');
   const count =
     bolo.function_count === 1
-      ? t('perf.bolo_functions_one', locale)
-      : t('perf.bolo_functions_other', locale, { n: bolo.function_count });
-  return `${place || t('perf.bolo_unnamed', locale)} · ${count}`;
+      ? t('perf.bolo_functions_one', locale, undefined, voice)
+      : t('perf.bolo_functions_other', locale, { n: bolo.function_count }, voice);
+  return `${place || t('perf.bolo_unnamed', locale, undefined, voice)} · ${count}`;
 }
 
 /**
@@ -53,12 +57,13 @@ export function boloOptions(
   bolos: readonly BoloLite[],
   locale: Locale,
   currentId: string | null = null,
+  voice?: Voice,
 ): Array<{ value: string; label: string }> {
   return [
-    { value: '', label: t('perf.bolo_none', locale) },
+    { value: '', label: t('perf.bolo_none', locale, undefined, voice) },
     ...bolos
       .filter((b) => !CLOSED.has(b.status) || b.id === currentId)
-      .map((b) => ({ value: b.id, label: boloLabel(b, locale) })),
+      .map((b) => ({ value: b.id, label: boloLabel(b, locale, voice) })),
   ];
 }
 
@@ -82,11 +87,11 @@ export function boloPrefill(
  * (función · proyecto · línea · bolo): «bolo de 2 funciones», o «sin bolo».
  * Solo se dibuja para quien lee dinero; para los demás la ficha calla.
  */
-export function boloOf(bolo: Pick<BoloLite, 'function_count'> | null, locale: Locale): string {
-  if (!bolo) return t('perf.bolo_of_none', locale);
+export function boloOf(bolo: Pick<BoloLite, 'function_count'> | null, locale: Locale, voice?: Voice): string {
+  if (!bolo) return t('perf.bolo_of_none', locale, undefined, voice);
   return bolo.function_count === 1
-    ? t('perf.bolo_of_one', locale)
-    : t('perf.bolo_of_other', locale, { n: bolo.function_count });
+    ? t('perf.bolo_of_one', locale, undefined, voice)
+    : t('perf.bolo_of_other', locale, { n: bolo.function_count }, voice);
 }
 
 /**

@@ -47,7 +47,7 @@
   import { dayKeyInTz } from '$lib/planner';
   import { dayMonthYear, dualTime, viewerTimeZone } from '$lib/datetime';
   import { BLOCK_MAX_DAYS } from '$lib/block';
-  import { appLocale, appLocaleTag, t } from '$lib/i18n';
+  import { appLocale, appLocaleTag, t, voiceFor } from '$lib/i18n';
   import {
     activeProjectsQueryOptions,
     allLinesQueryOptions,
@@ -186,10 +186,14 @@
   let workspaces = $derived($workspacesQuery.data?.items ?? []);
   let projects = $derived($projectsQuery.data?.items ?? []);
   let project = $derived(projects.find((p) => p.id === d.project) ?? null);
+  /** The trade of the space this writes to (tarea 142): the project's, or
+      the unavailability's; the screen's voice until one is chosen. */
+  let voice = $derived(voiceFor(project?.workspace_id ?? d.workspace));
+  const tr = (key: string, params?: Record<string, string | number>) => t(key, locale, params, voice);
   let projectOptions = $derived(projects.map((p) => ({ value: p.id, label: p.name })));
   let projectLines = $derived(($linesQuery.data?.items ?? []).filter((l) => l.project?.id === d.project));
   let lineOptions = $derived([
-    { value: '', label: t('create.line_none', locale) },
+    { value: '', label: tr('create.line_none') },
     ...projectLines.map((l) => ({ value: l.id, label: l.name })),
   ]);
   let showLine = $derived(sk.more.line && !presetLineId && projectLines.length > 0);
@@ -200,7 +204,7 @@
   );
   /** Said only when the space's clock is not yours (ADR-154, `dualTime`'s test). */
   let timeHint = $derived(
-    dualTime(new Date().toISOString(), entryTz, viewerTz).secondary !== null ? t('create.time_hint_tz', locale, { tz: entryTz }) : undefined,
+    dualTime(new Date().toISOString(), entryTz, viewerTz).secondary !== null ? tr('create.time_hint_tz', { tz: entryTz }) : undefined,
   );
 
   // The team, for an unavailability: who can be marked (cast ∪ crew).
@@ -215,7 +219,7 @@
   let teamOfSpace = $derived(($teamQuery.data?.items ?? []).filter((m) => m.workspace_id === d.workspace));
   let workspaceOptions = $derived(workspaces.map((w) => ({ value: w.id, label: spaceName(w.name) })));
   let personOptions = $derived([
-    { value: '', label: t('blackout.person_company', locale) },
+    { value: '', label: tr('blackout.person_company') },
     ...teamOfSpace.map((m) => ({ value: m.person_id, label: m.full_name })),
   ]);
 
@@ -234,7 +238,7 @@
   );
   let nearPerfs = $derived($nearQuery.data?.items ?? []);
   let attachOptions = $derived([
-    { value: '', label: t('create.attach_none', locale) },
+    { value: '', label: tr('create.attach_none') },
     ...nearPerfs.map((p) => ({
       value: p.id,
       label: `${dayMonthYear(p.performed_at)} · ${p.venue_name ?? p.city ?? '—'}`,
@@ -247,7 +251,7 @@
     toStore(() => projectBolosQueryOptions(d.project, open && d.type === 'performance')),
   );
   let bolos = $derived<BoloLite[]>($bolosQuery.data?.items ?? []);
-  let bolosOpts = $derived(boloOptions(bolos, locale));
+  let bolosOpts = $derived(boloOptions(bolos, locale, null, voice));
   let showBolo = $derived(sk.more.bolo && bolosOpts.length > 1);
   // A project without bolos: the feed alone cannot tell «none» from «not
   // yours», so only then is money access asked, and only who reads money
@@ -414,7 +418,7 @@
     const p = nearPerfs.find((x) => x.id === tripGuess!.performance_id);
     if (!p?.city) return '';
     const key = tripGuess.direction === 'return' ? 'qa.trip_hint_return' : 'qa.trip_hint';
-    return t(key, locale, { day: dayMonthYear(p.performed_at), city: p.city });
+    return tr(key, { day: dayMonthYear(p.performed_at), city: p.city });
   });
 
   /** A date linked to a performance takes its city, if it has none. */
@@ -517,21 +521,21 @@
   });
 
   // ── The chips ──────────────────────────────────────────────────────────
-  let typeLabel = $derived(t(TYPE_LABEL_KEYS[d.type], locale));
+  let typeLabel = $derived(tr(TYPE_LABEL_KEYS[d.type]));
   let ownerLabel = $derived.by(() => {
     if (sk.owner === 'person') {
       const who = d.person ? teamOfSpace.find((m) => m.person_id === d.person)?.full_name : null;
-      const name = who ?? t('blackout.person_company', locale);
+      const name = who ?? tr('blackout.person_company');
       const ws = workspaces.length > 1 ? workspaces.find((w) => w.id === d.workspace) : null;
       return ws ? `${name} · ${spaceName(ws.name)}` : name;
     }
     return project?.name ?? '';
   });
-  let whenText = $derived(whenLabel(d.type, d.when, tag, t('block.days_unit', locale)));
+  let whenText = $derived(whenLabel(d.type, d.when, tag, tr('block.days_unit')));
   let whereText = $derived.by(() => {
     if (sk.where === 'trip') {
       if (!d.origin.trim() && !d.city.trim()) return '';
-      const dir = t(`create.direction_${d.direction}`, locale).toLowerCase();
+      const dir = tr(`create.direction_${d.direction}`).toLowerCase();
       return `${d.origin.trim() || '…'} → ${d.city.trim() || '…'} · ${dir}`;
     }
     if (sk.where === 'venue') return d.city.trim();
@@ -545,7 +549,7 @@
   let typeOptions = $derived(
     [...QUICK_PRIMARY, ...QUICK_MORE].map((key) => ({
       value: key as QuickType,
-      label: t(TYPE_LABEL_KEYS[key], locale),
+      label: tr(TYPE_LABEL_KEYS[key]),
       disabled: key === 'unavailable' && !canUnavailable && d.type !== 'unavailable',
     })),
   );
@@ -590,11 +594,11 @@
       kinds.has('when') || kinds.has('time') ? whenText : null,
       kinds.has('where') ? whereText : null,
     ]);
-    return what ? t('qa.understood', locale, { what }) : '';
+    return what ? tr('qa.understood', { what }) : '';
   });
   let unusedNote = $derived(
     reading && reading.text === d.said && reading.p.unused.length
-      ? t('qa.unused_hours', locale, { hours: reading.p.unused.join(', ') })
+      ? tr('qa.unused_hours', { hours: reading.p.unused.join(', ') })
       : '',
   );
   let announced = $state('');
@@ -631,7 +635,7 @@
     mutationFn: async (draft: Draft): Promise<Done> => {
       const plan = planWhen(draft.type, draft.when, entryTz);
       if (plan.shape === 'error') throw new Error(plan.error.key);
-      const what = t(TYPE_LABEL_KEYS[draft.type], locale);
+      const what = tr(TYPE_LABEL_KEYS[draft.type]);
       const first = plan.days[0] ?? draft.when.day;
       const last = plan.shape === 'range' ? plan.to : (plan.days[plan.days.length - 1] ?? first);
       const day = last > first ? `${dayMonthYear(first)} – ${dayMonthYear(last)}` : dayMonthYear(first);
@@ -641,7 +645,7 @@
       }
       if (draft.type === 'performance') {
         const { rows, noticeFailed } = await createPerformances(performanceBody(draft, plan), draft.notice);
-        if (noticeFailed) addToast({ tone: 'warning', message: t('perf.hold_notice_not_saved', locale) });
+        if (noticeFailed) addToast({ tone: 'warning', message: tr('perf.hold_notice_not_saved') });
         const made = rows.map((r) => r.id);
         return { what, day, undo: () => undoPerformances(made, queryClient), perf: rows[0], made };
       }
@@ -656,7 +660,7 @@
       markFresh(done.made);
       toastCreated({
         locale,
-        message: t('create.added', locale, { what: done.what, day: done.day }),
+        message: tr('create.added', { what: done.what, day: done.day }),
         undo: done.undo,
         open: done.perf && onOpenPerformance ? () => onOpenPerformance(done.perf!) : undefined,
       });
@@ -674,8 +678,8 @@
       if (!shown) console.warn('[planner] create failed (feature absent?):', err);
       addToast({
         tone: 'danger',
-        title: t('create.not_created', locale),
-        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
+        title: tr('create.not_created'),
+        message: err instanceof Error ? err.message : tr('perf.unexpected'),
       });
     },
   });
@@ -684,15 +688,15 @@
     checked = true;
     errors = {};
     if (sk.owner === 'project' && !d.project) {
-      errors.project = t('create.pick_project', locale);
+      errors.project = tr('create.pick_project');
       panel = 'owner';
     } else if (sk.owner === 'person' && !d.workspace) {
-      errors.workspace = t('blackout.pick_space', locale);
+      errors.workspace = tr('blackout.pick_space');
       panel = 'owner';
     } else {
       const plan = planWhen(d.type, d.when, entryTz);
       if (plan.shape === 'error') {
-        errors[plan.error.field] = t(plan.error.key, locale, { max: String(BLOCK_MAX_DAYS) });
+        errors[plan.error.field] = tr(plan.error.key, { max: String(BLOCK_MAX_DAYS) });
         panel = 'when';
       } else {
         $save.mutate($state.snapshot(d) as Draft);
@@ -720,25 +724,25 @@
 
   let titlePlaceholder = $derived(
     sk.title === 'venue'
-      ? t('qa.title_venue', locale)
+      ? tr('qa.title_venue')
       : sk.title === 'note'
-        ? t('qa.title_note', locale)
-        : t('qa.title_title', locale, { what: typeLabel }),
+        ? tr('qa.title_note')
+        : tr('qa.title_title', { what: typeLabel }),
   );
   let certaintyOptions = $derived(
-    CERTAINTIES.map((c) => ({ value: c, label: t(c === 'option' ? 'qa.option' : 'qa.confirmed', locale) })),
+    CERTAINTIES.map((c) => ({ value: c, label: tr(c === 'option' ? 'qa.option' : 'qa.confirmed') })),
   );
   let rankOptions = $derived(
     (['', '1', '2', '3'] as const).map((r) => ({
       value: r,
-      label: t(r ? `perf.status_hold_${r}` : 'perf.status_hold', locale),
+      label: tr(r ? `perf.status_hold_${r}` : 'perf.status_hold'),
     })),
   );
   const chipId = (p: Panel) => `${uid}-chip-${p}`;
   const panelId = `${uid}-panel`;
 </script>
 
-<Dialog bind:open title={t('create.title', locale)} size="m" keepsDraft>
+<Dialog bind:open title={tr('create.title')} size="m" keepsDraft>
   <form
     class="qa"
     novalidate
@@ -767,7 +771,7 @@
         type="text"
         autocomplete="off"
         spellcheck="false"
-        aria-label={t('qa.what', locale)}
+        aria-label={tr('qa.what')}
         aria-describedby="{uid}-line-hint"
         placeholder={titlePlaceholder}
         bind:value={d.said}
@@ -777,7 +781,7 @@
         onselect={syncSaid}
       />
     </div>
-    <p id="{uid}-line-hint" class="visually-hidden">{t('qa.line_hint', locale)}</p>
+    <p id="{uid}-line-hint" class="visually-hidden">{tr('qa.line_hint')}</p>
     <p class="visually-hidden" aria-live="polite">{announced}</p>
 
     <div class="qa__chips">
@@ -790,7 +794,7 @@
         aria-controls={panelId}
         onclick={() => toggle('type')}
       >
-        <span class="qa__key">{t('create.type_label', locale)}</span>{typeLabel}
+        <span class="qa__key">{tr('create.type_label')}</span>{typeLabel}
       </button>
 
       <button
@@ -804,8 +808,8 @@
         aria-controls={panelId}
         onclick={() => toggle('owner')}
       >
-        {#if sk.owner === 'person'}<span class="qa__key">{t('qa.who', locale)}</span>{/if}
-        {ownerLabel || t('qa.project_empty', locale)}
+        {#if sk.owner === 'person'}<span class="qa__key">{tr('qa.who')}</span>{/if}
+        {ownerLabel || tr('qa.project_empty')}
       </button>
 
       <button
@@ -818,7 +822,7 @@
         aria-controls={panelId}
         onclick={() => toggle('when')}
       >
-        <span class="qa__key">{t('qa.when', locale)}</span>{whenText}
+        <span class="qa__key">{tr('qa.when')}</span>{whenText}
       </button>
 
       {#if sk.where !== 'none'}
@@ -832,11 +836,11 @@
           aria-controls={panelId}
           onclick={() => toggle('where')}
         >
-          {whereText || t('qa.where_empty', locale)}
+          {whereText || tr('qa.where_empty')}
         </button>
       {/if}
 
-      <Segmented ariaLabel={t('qa.certainty', locale)} options={certaintyOptions} bind:value={d.certainty} />
+      <Segmented ariaLabel={tr('qa.certainty')} options={certaintyOptions} bind:value={d.certainty} />
 
       {#if hasMore}
         <button
@@ -848,7 +852,7 @@
           aria-controls={panelId}
           onclick={() => toggle('more')}
         >
-          {t('qa.more_chip', locale)}
+          {tr('qa.more_chip')}
         </button>
       {/if}
     </div>
@@ -861,17 +865,17 @@
       <div class="qa__panel" id={panelId} role="group" aria-labelledby={chipId(panel)} bind:this={panelEl}>
         {#if panel === 'type'}
           <Segmented
-            label={t('create.type_label', locale)}
+            label={tr('create.type_label')}
             options={typeOptions}
             value={d.type}
             onchange={setType}
-            helper={!canUnavailable ? t('qa.unavailable_absent', locale) : undefined}
+            helper={!canUnavailable ? tr('qa.unavailable_absent') : undefined}
           />
         {:else if panel === 'owner'}
           {#if sk.owner === 'project'}
             <Select
-              label={t('create.project', locale)}
-              placeholder={t('create.project_placeholder', locale)}
+              label={tr('create.project')}
+              placeholder={tr('create.project_placeholder')}
               options={projectOptions}
               bind:value={d.project}
               error={errors.project}
@@ -884,8 +888,8 @@
           {:else}
             {#if workspaces.length > 1}
               <Select
-                label={t('blackout.space', locale)}
-                placeholder={t('blackout.space_placeholder', locale)}
+                label={tr('blackout.space')}
+                placeholder={tr('blackout.space_placeholder')}
                 options={workspaceOptions}
                 bind:value={d.workspace}
                 error={errors.workspace}
@@ -896,7 +900,7 @@
               />
             {/if}
             <Select
-              label={t('blackout.person', locale)}
+              label={tr('blackout.person')}
               options={personOptions}
               bind:value={d.person}
               onchange={() => (touched.person = true)}
@@ -904,18 +908,18 @@
           {/if}
         {:else if panel === 'when'}
           <Input
-            label={sk.when.untilOpen || d.when.until_on ? t('blackout.from', locale) : t('qa.day', locale)}
+            label={sk.when.untilOpen || d.when.until_on ? tr('blackout.from') : tr('qa.day')}
             type="date"
             bind:value={d.when.day}
             error={errors.day}
             onchange={() => (touched.day = true)}
           />
           {#if sk.when.hours && d.when.timed}
-            <Field id="{uid}-start" label={t('qa.hours', locale)} error={errors.end} helper={timeHint}>
+            <Field id="{uid}-start" label={tr('qa.hours')} error={errors.end} helper={timeHint}>
               <input
                 id="{uid}-start"
                 type="time"
-                aria-label={t('qa.start', locale)}
+                aria-label={tr('qa.start')}
                 bind:value={d.when.start}
                 onchange={() => (touched.time = true)}
               />
@@ -923,7 +927,7 @@
               <input
                 id="{uid}-end"
                 type="time"
-                aria-label={t('qa.end', locale)}
+                aria-label={tr('qa.end')}
                 bind:value={d.when.end}
                 onchange={() => (touched.time = true)}
               />
@@ -934,14 +938,14 @@
                   onclick={() => {
                     touched.time = true;
                     d.when.timed = false;
-                  }}>{t('qa.remove_hours', locale)}</button
+                  }}>{tr('qa.remove_hours')}</button
                 >
               {/snippet}
             </Field>
           {/if}
           {#if d.when.until_on}
             <Input
-              label={t('qa.until', locale)}
+              label={tr('qa.until')}
               type="date"
               bind:value={d.when.until}
               min={d.when.day}
@@ -958,22 +962,22 @@
               locale={tag}
               {checked}
               labels={{
-                weekdays: t('qa.weekdays', locale),
-                pickSpan: t('block.pick_span', locale),
-                daysUnit: t('block.days_unit', locale),
-                tooFew: t('block.too_few', locale),
-                tooMany: t('block.too_many', locale, { max: String(BLOCK_MAX_DAYS) }),
-                removed: (n: number) => t('block.removed', locale, { n: String(n) }),
+                weekdays: tr('qa.weekdays'),
+                pickSpan: tr('block.pick_span'),
+                daysUnit: tr('block.days_unit'),
+                tooFew: tr('block.too_few'),
+                tooMany: tr('block.too_many', { max: String(BLOCK_MAX_DAYS) }),
+                removed: (n: number) => tr('block.removed', { n: String(n) }),
               }}
             />
             {#if errors.repeat}<p class="qa__error" role="alert">{errors.repeat}</p>{/if}
           {/if}
           <div class="qa__adds">
             {#if sk.when.hours && !d.when.timed}
-              <button type="button" class="btn--quiet btn--xs" onclick={addHours}>{t('qa.add_hour', locale)}</button>
+              <button type="button" class="btn--quiet btn--xs" onclick={addHours}>{tr('qa.add_hour')}</button>
             {/if}
             {#if !d.when.until_on}
-              <button type="button" class="btn--quiet btn--xs" onclick={addUntil}>{t('qa.add_until', locale)}</button>
+              <button type="button" class="btn--quiet btn--xs" onclick={addUntil}>{tr('qa.add_until')}</button>
             {:else if !sk.when.untilOpen}
               <button
                 type="button"
@@ -983,11 +987,11 @@
                   d.when.until_on = false;
                   d.when.until = '';
                   d.when.repeat = false;
-                }}>{t('qa.remove_until', locale)}</button
+                }}>{tr('qa.remove_until')}</button
               >
             {/if}
             {#if sk.when.repeat && !d.when.repeat}
-              <button type="button" class="btn--quiet btn--xs" onclick={addRepeat}>{t('qa.add_repeat', locale)}</button>
+              <button type="button" class="btn--quiet btn--xs" onclick={addRepeat}>{tr('qa.add_repeat')}</button>
             {:else if sk.when.repeat}
               <button
                 type="button"
@@ -995,46 +999,46 @@
                 onclick={() => {
                   d.when.repeat = false;
                   d.when.exceptions = [];
-                }}>{t('qa.remove_repeat', locale)}</button
+                }}>{tr('qa.remove_repeat')}</button
               >
             {/if}
           </div>
         {:else if panel === 'where'}
           {#if sk.where === 'trip'}
             <Input
-              label={t('create.trip_from', locale)}
+              label={tr('create.trip_from')}
               bind:value={d.origin}
               autocomplete="off"
               oninput={() => (touched.origin = true)}
             />
             <Input
-              label={t('create.trip_to', locale)}
+              label={tr('create.trip_to')}
               bind:value={d.city}
               autocomplete="off"
               helper={tripHint || undefined}
               oninput={() => (touched.city = true)}
             />
             <Segmented
-              label={t('create.direction', locale)}
-              options={TRAVEL_DIRECTIONS.map((dir) => ({ value: dir, label: t(`create.direction_${dir}`, locale) }))}
+              label={tr('create.direction')}
+              options={TRAVEL_DIRECTIONS.map((dir) => ({ value: dir, label: tr(`create.direction_${dir}`) }))}
               bind:value={d.direction}
               onchange={() => (touched.direction = true)}
             />
           {:else}
             {#if sk.where === 'place'}
-              <Input label={t('create.venue', locale)} bind:value={d.venue} oninput={() => (touched.venue = true)} />
+              <Input label={tr('create.venue')} bind:value={d.venue} oninput={() => (touched.venue = true)} />
             {/if}
             {#snippet boloMessage()}
-              {t('perf.bolo_helper_short', locale)}
+              {tr('perf.bolo_helper_short')}
               {#if lensOn('books') && d.project}
                 <a href={booksHref(d.project, { newBolo: true, here: booksHere })} target="_blank" rel="noopener"
-                  >{t('perf.bolo_create_link', locale)}</a
+                  >{tr('perf.bolo_create_link')}</a
                 >
               {/if}
             {/snippet}
             {#if showBolo}
               <Select
-                label={t('perf.bolo', locale)}
+                label={tr('perf.bolo')}
                 options={bolosOpts}
                 bind:value={d.bolo}
                 message={boloMessage}
@@ -1042,21 +1046,21 @@
               />
             {:else if showBoloEmpty}
               <Select
-                label={t('perf.bolo', locale)}
-                options={[{ value: '', label: t('perf.bolo_empty', locale) }]}
+                label={tr('perf.bolo')}
+                options={[{ value: '', label: tr('perf.bolo_empty') }]}
                 disabled
                 message={boloMessage}
               />
             {/if}
-            <Input label={t('create.city', locale)} bind:value={d.city} oninput={() => (touched.city = true)} />
+            <Input label={tr('create.city')} bind:value={d.city} oninput={() => (touched.city = true)} />
           {/if}
         {:else if panel === 'more'}
           {#if sk.more.rank && d.certainty === 'option'}
-            <Segmented label={t('qa.rank', locale)} options={rankOptions} bind:value={d.rank} />
+            <Segmented label={tr('qa.rank')} options={rankOptions} bind:value={d.rank} />
             <Field
               id="{uid}-notice"
-              label={t('perf.hold_notice', locale)}
-              helper={d.notice === 0 ? t('perf.hold_notice_none', locale) : undefined}
+              label={tr('perf.hold_notice')}
+              helper={d.notice === 0 ? tr('perf.hold_notice_none') : undefined}
             >
               <input
                 id="{uid}-notice"
@@ -1068,11 +1072,11 @@
                 bind:value={d.notice}
                 placeholder={String(HOLD_NOTICE_DEFAULT)}
               />
-              {#snippet suffix()}{t('perf.hold_notice_suffix', locale)}{/snippet}
+              {#snippet suffix()}{tr('perf.hold_notice_suffix')}{/snippet}
             </Field>
           {/if}
           {#if sk.more.label}
-            <Input label={t('create.label', locale)} bind:value={d.label} list="{uid}-labels" autocomplete="off" />
+            <Input label={tr('create.label')} bind:value={d.label} list="{uid}-labels" autocomplete="off" />
             <datalist id="{uid}-labels">
               {#each labelSuggestions as suggestion (suggestion)}
                 <option value={suggestion}></option>
@@ -1081,14 +1085,14 @@
           {/if}
           {#if showAttach}
             <Select
-              label={t('create.attach', locale)}
+              label={tr('create.attach')}
               options={attachOptions}
               bind:value={d.performance}
               onchange={(e) => pickAttach((e.currentTarget as HTMLSelectElement).value)}
             />
           {/if}
           {#if showLine}
-            <Select label={t('create.line', locale)} options={lineOptions} bind:value={d.line} />
+            <Select label={tr('create.line')} options={lineOptions} bind:value={d.line} />
           {/if}
         {/if}
       </div>
@@ -1100,13 +1104,13 @@
 
   {#snippet lead()}
     {#if written}
-      <Button variant="quiet" tone="warn" onclick={discard}>{t('qa.discard', locale)}</Button>
+      <Button variant="quiet" tone="warn" onclick={discard}>{tr('qa.discard')}</Button>
     {/if}
   {/snippet}
   {#snippet actions()}
-    <Button variant="quiet" onclick={() => (open = false)}>{t('qa.close', locale)}</Button>
+    <Button variant="quiet" onclick={() => (open = false)}>{tr('qa.close')}</Button>
     <Button onclick={() => void submit()} loading={$save.isPending}>
-      {t('qa.add', locale)}<kbd class="qa__kbd" aria-hidden="true">⌘↵</kbd>
+      {tr('qa.add')}<kbd class="qa__kbd" aria-hidden="true">⌘↵</kbd>
     </Button>
   {/snippet}
 </Dialog>

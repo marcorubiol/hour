@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'vitest';
-import { currentTrade, setTrade, setWorkspaceTrades, t, tradeFor, tradeOf } from './index';
+import { currentTrade, setTrade, setWorkspaceTrades, t, tradeFor, tradeOf, voiceFor } from './index';
 
 afterEach(() => {
   setTrade('stage');
@@ -58,6 +58,24 @@ describe('the trade of one space (tarea 142)', () => {
     setWorkspaceTrades([{ id: 'w-music', slug: 'banda', trade: 'music' }]);
     setTrade('mixed');
     expect(t('perf.cast', 'es', undefined, tradeFor('w-music'))).toBe('Formación');
+  });
+
+  test('a dialog speaks the space chosen inside, the screen until one is (142 D)', () => {
+    setWorkspaceTrades([
+      { id: 'w-music', slug: 'banda', trade: 'music' },
+      { id: 'w-stage', slug: 'cia', trade: 'stage' },
+    ]);
+    setTrade('mixed');
+    expect(voiceFor(null)).toBe('mixed');
+    expect(voiceFor('')).toBe('mixed');
+    expect(voiceFor('w-music')).toBe('music');
+    expect(voiceFor('w-stage')).toBe('stage');
+    expect(voiceFor([])).toBe('mixed');
+    expect(voiceFor(['w-music', 'w-music'])).toBe('music');
+    expect(voiceFor(['w-music', 'w-stage'])).toBe('mixed');
+    setTrade('music');
+    expect(voiceFor(undefined)).toBe('music');
+    expect(voiceFor('w-stage')).toBe('stage');
   });
 });
 

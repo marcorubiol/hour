@@ -1,7 +1,7 @@
 import en from './en.json';
 import { currentTrade, DEFAULT_TRADE, type Voice } from './trade.svelte';
 
-export { currentTrade, setTrade, setWorkspaceTrades, tradeFor, tradeOf, TRADES, type Trade, type Voice } from './trade.svelte';
+export { currentTrade, setTrade, setWorkspaceTrades, tradeFor, tradeOf, voiceFor, TRADES, type Trade, type Voice } from './trade.svelte';
 
 type Dictionary = Record<string, string>;
 

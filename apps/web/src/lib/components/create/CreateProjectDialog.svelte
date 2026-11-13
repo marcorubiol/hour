@@ -21,7 +21,7 @@
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { spaceWriteWorkspaces } from '$lib/workspace-role';
   import { spaceName } from '$lib/utils/identity';
-  import { appLocale, t } from '$lib/i18n';
+  import { appLocale, t, voiceFor } from '$lib/i18n';
   import AccentSwatchPicker from './AccentSwatchPicker.svelte';
 
   interface Props {
@@ -52,6 +52,9 @@
   // where the labels are built.
   let workspaceOptions = $derived(workspaces.map((w) => ({ value: w.id, label: spaceName(w.name) })));
   let effectiveWorkspaceId = $derived(workspaceId ?? wsSelected);
+  /** The trade of the space this writes to (tarea 142); the screen's voice until one is chosen. */
+  let voice = $derived(voiceFor(effectiveWorkspaceId));
+  const tr = (key: string, params?: Record<string, string | number>) => t(key, locale, params, voice);
   let targetWorkspaceName = $derived(
     spaceName(workspaces.find((w) => w.id === effectiveWorkspaceId)?.name ?? ''),
   );
@@ -94,11 +97,13 @@
       await queryClient.refetchQueries({ queryKey: ['projects', { status: 'active' }] });
       const wsSlug = workspaces.find((w) => w.id === project.workspace_id)?.slug;
       const href = wsSlug ? `/h/${wsSlug}/project/${project.slug}/` : null;
+      // Said before close() lets go of the chosen space, in its trade.
+      const message = tr('project.created');
       close();
       if (stay) {
         toastCreated({
           locale,
-          message: t('project.created', locale),
+          message,
           open: href ? () => void goto(href) : undefined,
         });
         return;
@@ -108,13 +113,13 @@
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: t('project.not_created', locale),
+        title: tr('project.not_created'),
         message:
           err instanceof ApiError && err.status === 409
-            ? t('project.name_taken', locale)
+            ? tr('project.name_taken')
             : err instanceof Error
               ? err.message
-              : t('perf.unexpected', locale),
+              : tr('perf.unexpected'),
       });
     },
   });
@@ -136,7 +141,7 @@
     }
     const trimmed = name.trim();
     if (!trimmed) {
-      nameError = t('project.name_empty', locale);
+      nameError = tr('project.name_empty');
       return;
     }
     $create.mutate({
@@ -150,48 +155,48 @@
 
 <Dialog
   bind:open
-  title={t('project.new_title', locale)}
+  title={tr('project.new_title')}
   description={targetWorkspaceName
-    ? t('project.new_desc', locale, { space: targetWorkspaceName })
-    : t('project.new_desc_none', locale)}
+    ? tr('project.new_desc', { space: targetWorkspaceName })
+    : tr('project.new_desc_none')}
   size="s"
   onclose={reset}
 >
   <form class="cpj__form" bind:this={formEl} onsubmit={submit}>
     {#if workspaceId}
-      <Select label={t('workspace.label', locale)} value={workspaceId} options={workspaceOptions} disabled />
+      <Select label={tr('workspace.label')} value={workspaceId} options={workspaceOptions} disabled />
     {:else}
       <Select
-        label={t('workspace.label', locale)}
+        label={tr('workspace.label')}
         bind:value={wsSelected}
         options={workspaceOptions}
-        placeholder={t('workspace.pick_ph', locale)}
+        placeholder={tr('workspace.pick_ph')}
         required
         disabled={$create.isPending}
       />
     {/if}
 
     <Input
-      label={t('conversations.col_name', locale)}
+      label={tr('conversations.col_name')}
       name="project-name"
       bind:value={name}
       error={nameError}
-      placeholder={t('project.name_ph', locale)}
+      placeholder={tr('project.name_ph')}
       required
       autofocus
       autocomplete="off"
       disabled={$create.isPending}
     />
 
-    <AccentSwatchPicker bind:accent autoSlug={autoAccentSlug} label={t('project.color', locale)} disabled={$create.isPending} />
+    <AccentSwatchPicker bind:accent autoSlug={autoAccentSlug} label={tr('project.color')} disabled={$create.isPending} />
 
     <Textarea
-      label={t('project.description', locale)}
+      label={tr('project.description')}
       bind:value={description}
       maxlength={280}
       counter
       rows={3}
-      placeholder={t('project.description_ph', locale)}
+      placeholder={tr('project.description_ph')}
       disabled={$create.isPending}
     />
 
@@ -200,8 +205,8 @@
   </form>
 
   {#snippet actions()}
-    <Button variant="quiet" disabled={$create.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
-    <Button loading={$create.isPending} onclick={() => formEl?.requestSubmit()}>{t('project.create', locale)}</Button>
+    <Button variant="quiet" disabled={$create.isPending} onclick={close}>{tr('create.cancel')}</Button>
+    <Button loading={$create.isPending} onclick={() => formEl?.requestSubmit()}>{tr('project.create')}</Button>
   {/snippet}
 </Dialog>
 

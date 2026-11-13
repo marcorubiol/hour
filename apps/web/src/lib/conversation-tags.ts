@@ -14,7 +14,7 @@
  * entre el esquema (fase 1) y esta pantalla no llevan ninguna.
  */
 
-import { t, type Locale } from '$lib/i18n';
+import { t, type Locale, type Voice } from '$lib/i18n';
 
 /** La etiqueta de venta: su panel es el de Difusión (ADR-117, 135). */
 export const SALES = 'sales';
@@ -181,9 +181,13 @@ export function tagIdIn(vocab: TagVocabulary, workspaceId: string, key: string):
   return workspaceTags(vocab, workspaceId).find((x) => x.key === key)?.id ?? null;
 }
 
-/** El nombre de una etiqueta: el del espacio en tu idioma, el suyo, o la palabra de Hour. */
-export function tagLabel(tag: Pick<WorkspaceTag, 'key' | 'label' | 'labels'>, locale: Locale): string {
-  return tag.labels?.[locale] || tag.label || (STANDARD_LABEL[tag.key] ? t(STANDARD_LABEL[tag.key], locale) : tag.key);
+/**
+ * El nombre de una etiqueta: el del espacio en tu idioma, el suyo, o la
+ * palabra de Hour, en `voice` si se pasa (el oficio del espacio elegido en
+ * un alta, tarea 142) y si no en la voz de la pantalla.
+ */
+export function tagLabel(tag: Pick<WorkspaceTag, 'key' | 'label' | 'labels'>, locale: Locale, voice?: Voice): string {
+  return tag.labels?.[locale] || tag.label || (STANDARD_LABEL[tag.key] ? t(STANDARD_LABEL[tag.key], locale, undefined, voice) : tag.key);
 }
 
 /** El nombre de una clave a secas (una fila de la lista), buscándola en las del alcance. */
