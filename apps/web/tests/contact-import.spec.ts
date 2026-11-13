@@ -109,7 +109,8 @@ test.describe('import contacts from a sheet', () => {
       await confirm.getByRole('button', { name: 'Undo' }).click();
       await expect(page.locator('.toast', { hasText: 'Import undone.' })).toBeVisible();
       expect((await imports(page, workspaceId)).find((i) => i.id === importId)?.status).toBe('undone');
-      await expect.poll(() => found(page, workspaceId, `ZZZ Ana ${mark}`)).not.toContain(ana);
+      // The fixture space is bloated and its search answers in 5 to 6 s: the default 5 s poll is one request.
+      await expect.poll(() => found(page, workspaceId, `ZZZ Ana ${mark}`), { timeout: 30_000 }).not.toContain(ana);
       importId = null;
     } finally {
       if (importId) {

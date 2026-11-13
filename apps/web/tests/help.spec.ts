@@ -58,7 +58,8 @@ test.describe('Contextual help (approach A)', () => {
     await waitForLoaded(page);
 
     const desk = card(page, 'desk');
-    await expect(desk).toBeVisible();
+    // A sole personal space waits for what was seen and the start read before it paints (ADR-200).
+    await expect(desk).toBeVisible({ timeout: 20_000 });
     await expect(desk.getByRole('heading', { name: 'Today' })).toBeVisible();
     await desk.getByRole('button', { name: 'Got it' }).click();
     await expect(desk).toHaveCount(0);
