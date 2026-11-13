@@ -1,8 +1,16 @@
 /**
  * Primer día (tarea 137, ayuda B): la lista de arranque de Hoy en un espacio
- * recién creado. Tres pasos, numerados porque la fecha cuelga del
- * espectáculo, pero sin bloquear el orden: el espectáculo (o el proyecto),
- * los contactos y la primera fecha.
+ * recién creado. Cuatro pasos, numerados porque la fecha y el equipo cuelgan
+ * del espectáculo, pero sin bloquear el orden: el espectáculo (o el
+ * proyecto), los contactos, la primera fecha y quién trabaja contigo.
+ *
+ * El equipo es el reparto o la formación del proyecto (`cast_member`): las
+ * personas apuntadas con su ficha, sin cuenta en Hour. Invitar con cuenta no
+ * es un paso: vive en cada persona y en Ajustes. Cuenta cualquiera del
+ * reparto, también quien creó el espacio: nadie entra en él solo por crear el
+ * espacio o el proyecto, y quien actúa en lo suyo también es equipo. Su
+ * puerta es el reparto de la ficha del primer proyecto (`#team`); sin
+ * proyecto, el paso está pero espera a que lo haya.
  *
  * Un paso se tacha solo con los datos del espacio, venga de la puerta que
  * venga (`GET /api/workspaces/[id]/start`). «Más tarde» y «Ocultar» se
@@ -18,13 +26,22 @@ import { hasSeen, type HelpSeen } from './help';
 import { plannerDayHref } from './planner';
 import type { WorkspaceRole } from './workspace-role';
 
-export const START_STEPS = ['project', 'contacts', 'date'] as const;
+export const START_STEPS = ['project', 'contacts', 'date', 'team'] as const;
 export type StartStep = (typeof START_STEPS)[number];
+
+/** The cast block of a project's page: where the team is seen and written. */
+export const TEAM_ANCHOR = 'team';
 
 /** «Ocultar»: la lista entera, hasta «Volver a ver las ayudas». */
 export const START_HIDDEN_KEY = 'card:start';
 /** «Más tarde» de un paso. */
 export const startLaterKey = (step: StartStep): string => `card:start_${step}`;
+/**
+ * Esta persona vio la lista de este espacio con algo pendiente: desde
+ * entonces el equipo, él solo, la mantiene a la vista. Por espacio, con su
+ * id sin guiones (41 caracteres: cabe en `HELP_KEY`).
+ */
+export const startSeenKey = (workspaceId: string): string => `card:start_in_${workspaceId.toLowerCase().replace(/-/g, '')}`;
 
 /** Lo que el espacio ya tiene, como lo responde la API: lo primero de cada cosa, o nada. */
 export interface StartResponse {
@@ -38,6 +55,8 @@ export interface StartResponse {
     | { kind: 'performance'; slug: string | null; name: string; day: string | null }
     | { kind: 'date'; name: string; day: string | null }
     | null;
+  /** The first person in a project's cast, and the project they are in. */
+  team: { name: string; project_slug: string | null } | null;
 }
 
 /** Lo creado en un paso: su nombre (puede venir vacío) y adónde lleva. */
@@ -54,6 +73,7 @@ export function startState(res: StartResponse, workspaceSlug: string): StartStat
   const at = (path: string) => `/h/${workspaceSlug}/${path}`;
   const c = res.contact;
   const d = res.date;
+  const m = res.team;
   return {
     project: res.project
       ? { id: res.project.id, name: res.project.name, href: at(`project/${res.project.slug}/`) }
@@ -80,7 +100,13 @@ export function startState(res: StartResponse, workspaceSlug: string): StartStat
                 ? plannerDayHref('day', d.day)
                 : null,
         },
+    team: !m ? null : { name: m.name, href: m.project_slug ? at(`project/${m.project_slug}/#${TEAM_ANCHOR}`) : null },
   };
+}
+
+/** The team step's door: the cast of the first project, or none while there is no project. */
+export function teamDoor(state: StartState): string | null {
+  return state.project?.href ? `${state.project.href}#${TEAM_ANCHOR}` : null;
 }
 
 export type StepStatus = 'done' | 'later' | 'pending';
@@ -89,6 +115,8 @@ export interface StartRow {
   step: StartStep;
   status: StepStatus;
   item: StartItem | null;
+  /** Pending but it cannot be done yet: the team waits for a project. */
+  blocked: boolean;
 }
 
 /** Hecho gana a «más tarde»: lo que existe se tacha, aunque se aplazara. */
@@ -96,15 +124,16 @@ export function startRows(state: StartState, seen: HelpSeen): StartRow[] {
   return START_STEPS.map((step) => {
     const item = state[step];
     const status: StepStatus = item ? 'done' : hasSeen(seen, startLaterKey(step)) ? 'later' : 'pending';
-    return { step, status, item };
+    const blocked = !item && step === 'team' && !state.project;
+    return { step, status, item, blocked };
   });
 }
 
 export const doneCount = (rows: readonly StartRow[]): number => rows.filter((r) => r.status === 'done').length;
 
-/** El paso que lleva el botón lleno: el primero pendiente. */
+/** El paso que lleva el botón lleno: el primero pendiente que se puede hacer ya. */
 export function primaryStep(rows: readonly StartRow[]): StartStep | null {
-  return rows.find((r) => r.status === 'pending')?.step ?? null;
+  return rows.find((r) => r.status === 'pending' && !r.blocked)?.step ?? null;
 }
 
 /** La ven owner o admin del espacio, con el papel dicho: sin respuesta, no sale. */
@@ -122,16 +151,70 @@ export function startTarget<T extends { my_role?: WorkspaceRole | null }>(onScre
   return null;
 }
 
+/** El panel «¿Cuál es tu proyecto?» respondido o aplazado: no vuelve a preguntar. */
+export const SPACE_ASKED_KEY = 'card:start_space';
+
+/**
+ * El espacio que el alta deja hecho (`handle_new_user`: personal, con el
+ * nombre de la persona, en escena), si es lo único que tiene: uno solo,
+ * personal y suyo. Es el que el panel nombra en vez de crear otro.
+ */
+export function signupSpace<T extends { kind?: string | null; my_role?: WorkspaceRole | null }>(
+  spaces: readonly T[],
+): T | null {
+  const only = spaces.length === 1 ? spaces[0] : null;
+  return only && only.kind === 'personal' && only.my_role === 'owner' ? only : null;
+}
+
+/** Nada en el espacio: ni proyecto, ni contacto, ni fecha, ni equipo. */
+export const untouched = (res: StartResponse): boolean => !res.project && !res.contact && !res.date && !res.team;
+
+/**
+ * Qué pinta el shell en vez de la sección:
+ * - `create`: ningún espacio; el panel crea uno;
+ * - `name`: solo el espacio del alta, intacto, y sin respuesta ni aplazado;
+ *   el panel le pone nombre y oficio, sin crear otro;
+ * - `wait`: aún no se sabe si es `name` (falta lo visto o la lectura de
+ *   arranque); ni el panel ni la sección, para no pintar uno y luego lo otro;
+ * - `none`: la app. También mientras llegan los espacios, si algo falla,
+ *   con más de un espacio, uno que no es personal o uno personal con datos.
+ */
+export type SpaceAsk = 'create' | 'name' | 'wait' | 'none';
+
+export function spaceAsk(input: {
+  /** `/api/workspaces`, or null while it has not answered. */
+  spaces: readonly { kind?: string | null; my_role?: WorkspaceRole | null }[] | null;
+  seen: HelpSeen;
+  /** Lo visto llegó. */
+  ready: boolean;
+  /** Its read finished, well or not: without it nothing shows by itself. */
+  settled: boolean;
+  /** The start read of the signup space: undefined on the way, null if it failed. */
+  start: StartResponse | null | undefined;
+}): SpaceAsk {
+  const { spaces, seen, ready, settled, start } = input;
+  if (!spaces) return 'none';
+  if (spaces.length === 0) return 'create';
+  if (!signupSpace(spaces)) return 'none';
+  if (!settled) return 'wait';
+  if (!ready || hasSeen(seen, SPACE_ASKED_KEY)) return 'none';
+  if (start === undefined) return 'wait';
+  return start && untouched(start) ? 'name' : 'none';
+}
+
 export type StartPhase = 'list' | 'closing' | 'none';
 
 /**
  * Qué pinta Hoy:
- * - `list` mientras quede algún paso pendiente y la persona no la haya
- *   ocultado (y lo visto haya llegado: sin él no sale nada solo);
+ * - `list` mientras quede pendiente alguno de los tres primeros pasos y la
+ *   persona no la haya ocultado (y lo visto haya llegado: sin él no sale
+ *   nada solo). El equipo, él solo, no la levanta: la mantiene a la vista
+ *   solo donde esta persona ya la vio con algo pendiente (`startSeenKey`);
  * - `closing`, la línea de cierre, una vez: cuando en esta visita se vio la
- *   lista con algo pendiente y ya están los tres hechos;
- * - `none` en lo demás: los tres hechos o aplazados, oculta, sin papel.
- *   Un espacio con datos (MüK Cia) no la ve nunca, ni su cierre.
+ *   lista con algo pendiente y ya están todos hechos;
+ * - `none` en lo demás: todos hechos o aplazados, oculta, sin papel.
+ *   Un espacio con datos (MüK Cia) no la ve nunca, ni su cierre, aunque no
+ *   tenga reparto.
  */
 export function startPhase(input: {
   rows: readonly StartRow[] | null;
@@ -140,10 +223,14 @@ export function startPhase(input: {
   sees: boolean;
   /** En esta visita se vio la lista con algo pendiente. */
   sawPending: boolean;
+  /** The space of the list, for `startSeenKey`. */
+  workspaceId: string;
 }): StartPhase {
-  const { rows, seen, ready, sees, sawPending } = input;
+  const { rows, seen, ready, sees, sawPending, workspaceId } = input;
   if (!rows || !ready || !sees || hasSeen(seen, START_HIDDEN_KEY)) return 'none';
-  if (rows.some((r) => r.status === 'pending')) return 'list';
+  const pending = rows.filter((r) => r.status === 'pending');
+  if (pending.some((r) => r.step !== 'team')) return 'list';
+  if (pending.length > 0 && (sawPending || hasSeen(seen, startSeenKey(workspaceId)))) return 'list';
   if (sawPending && rows.every((r) => r.status === 'done')) return 'closing';
   return 'none';
 }

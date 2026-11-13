@@ -24,6 +24,8 @@ async function load(): Promise<void> {
     help.ready = true;
   } catch {
     // Sin lo visto no sale nada solo; el «?» sigue funcionando.
+  } finally {
+    help.settled = true;
   }
 }
 

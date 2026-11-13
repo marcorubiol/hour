@@ -5,8 +5,10 @@
    * vive: mismo papel (borde fino, fondo elevado, título en cursiva), porque
    * es la bienvenida de este momento. Nunca dos tarjetas a la vez.
    *
-   * Tres pasos numerados, sin bloquear el orden. Cada uno abre el diálogo de
-   * alta que ya existe, desde aquí y sin navegar; se tacha solo con los datos
+   * Cuatro pasos numerados, sin bloquear el orden. Cada uno abre el diálogo
+   * de alta que ya existe, desde aquí y sin navegar, salvo el equipo, que no
+   * tiene diálogo propio: lleva al reparto del primer proyecto y, sin
+   * proyecto, su botón dice que antes hace falta uno. Se tacha solo con los datos
    * del espacio, venga de la puerta que venga, y lo hecho enlaza a lo creado.
    * «Más tarde» por paso y «Ocultar» para todo, en `help_seen`. La regla de
    * cuándo sale y cuándo se va es pura: `$lib/first-day`.
@@ -29,7 +31,9 @@
     startLaterKey,
     startPhase,
     startRows,
+    startSeenKey,
     startState,
+    teamDoor,
     type StartPhase,
     type StartRow,
     type StartStep,
@@ -62,15 +66,19 @@
     holding = wanted && $startQuery.isPending;
   });
 
-  let rows = $derived<StartRow[] | null>(
-    workspace && $startQuery.data ? startRows(startState($startQuery.data, workspace.slug), help.seen) : null,
-  );
+  let made = $derived(workspace && $startQuery.data ? startState($startQuery.data, workspace.slug) : null);
+  let rows = $derived<StartRow[] | null>(made ? startRows(made, help.seen) : null);
+  let door = $derived(made ? teamDoor(made) : null);
   let sawPending = $state(false);
+  let workspaceId = $derived(workspace?.id ?? '');
   $effect(() => {
-    if (startPhase({ rows, seen: help.seen, ready: help.ready, sees, sawPending: false }) === 'list') sawPending = true;
+    if (startPhase({ rows, seen: help.seen, ready: help.ready, sees, sawPending: false, workspaceId }) !== 'list') return;
+    sawPending = true;
+    // Seen here with something to do: from now on the team step alone keeps it.
+    markHelpSeen(startSeenKey(workspaceId));
   });
   $effect(() => {
-    phase = startPhase({ rows, seen: help.seen, ready: help.ready, sees, sawPending });
+    phase = startPhase({ rows, seen: help.seen, ready: help.ready, sees, sawPending, workspaceId });
   });
 
   // Its own trade: the one chosen at creation speaks, whatever else is on screen.
@@ -84,12 +92,13 @@
     if (!workspace) return;
     if (step === 'project') creation.openProject({ workspaceId: workspace.id, stay: true });
     else if (step === 'contacts') creation.openConversation();
-    else creation.openEvent({ projectId: rows?.find((r) => r.step === 'project')?.item?.id ?? null });
+    else if (step === 'date') creation.openEvent({ projectId: made?.project?.id ?? null });
   }
   const ACT_KEY: Record<StartStep, string> = {
     project: 'start.project_act',
     contacts: 'start.contacts_act',
     date: 'start.date_act',
+    team: 'start.team_act',
   };
 </script>
 
@@ -120,9 +129,12 @@
               </p>
             {:else if row.status === 'later'}
               <p class="start__fact">
-                {tr('start.later_note')} · <button type="button" class="fact-act" onclick={() => act(row.step)}
-                  >{tr('start.do_now')}</button
-                >
+                {tr('start.later_note')} ·
+                {#if row.step !== 'team'}<button type="button" class="fact-act" onclick={() => act(row.step)}
+                    >{tr('start.do_now')}</button
+                  >{:else if door}<a class="fact-act" href={door}>{tr('start.do_now')}</a
+                  >{:else}<button type="button" class="fact-act" disabled>{tr('start.team_needs_project')}</button
+                  >{/if}
               </p>
             {:else}
               <p class="start__body">{tr(`start.${row.step}_body`)}</p>
@@ -133,11 +145,23 @@
               <button type="button" class="btn--quiet btn--s" onclick={() => markHelpSeen(startLaterKey(row.step))}
                 >{tr('start.later')}</button
               >
-              <button
-                type="button"
-                class="{primary === row.step ? 'btn--primary' : 'btn--secondary'} btn--s start__act"
-                onclick={() => act(row.step)}>{tr(ACT_KEY[row.step])}</button
-              >
+              {#if row.step !== 'team'}
+                <button
+                  type="button"
+                  class="{primary === row.step ? 'btn--primary' : 'btn--secondary'} btn--s start__act"
+                  onclick={() => act(row.step)}>{tr(ACT_KEY[row.step])}</button
+                >
+              {:else if door}
+                <!-- No dialog of its own: the cast block of the first project's page. -->
+                <a class="{primary === row.step ? 'btn--primary' : 'btn--secondary'} btn--s start__act" href={door}
+                  >{tr(ACT_KEY[row.step])}</a
+                >
+              {:else}
+                <!-- No project yet: the cast hangs from one, and the button says so. -->
+                <button type="button" class="btn--secondary btn--s start__act" disabled
+                  >{tr('start.team_needs_project')}</button
+                >
+              {/if}
             </div>
           {/if}
         </li>
