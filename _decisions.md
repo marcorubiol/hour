@@ -3247,6 +3247,11 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
 >   nada. Está escrito aquí para que la próxima sesión encuentre una decisión y
 >   no una pregunta.
 
+> **Amended by ADR-202 (2026-11-13), solo en § 5.** El pulso sigue el ámbito como todo lo demás: acotado, el raíl y la
+> pieza de Hoy dicen solo lo acotado. Lo tuyo de hoy que queda fuera se cuenta en una línea bajo la pieza, y los
+> avisos (el técnico que llega tarde, una opción que vence hoy) no se acotan. «Calma no lo toca» ya estaba enmendado
+> por ADR-139.
+
 ## [2026-09-26] ADR-097 · Travel v2 P1 contra el catálogo: una sola firma cambia, y cómo se comportan los tramos
 
 - **Contexto.** Marco aprobó el modelo de ADR-089 el 2026-09-26 (rama
@@ -5228,6 +5233,11 @@ acierta, y si hace falta la pantalla encendida (Wake Lock) o el aviso antes de l
 > «Hoy de bolo en X · Abrir Ahora»: es un botón en el pie de la tarjeta de «Lo siguiente», junto a «Hoja de ruta»,
 > mientras Ahora aplica (lo mismo que antes: algo tuyo en las próximas 48 horas). Sigue sin entrar solo.
 
+> **Amended by ADR-202 (2026-11-13), en § 1 y § 2.** Ahora deja de ser una pantalla y no hay botón para entrar: el día
+> de bolo la pieza de Hoy se abre con lo que enseñaba (el día, a quién llamar, carga, hotel, quién va, Llamar, Mapa y
+> Hoja). § 3, § 4 y § 6 siguen: la precarga, las claves de logística y la hoja por rol. Si desaparece también en
+> escritorio está abierto en ADR-202.
+
 ## [2026-10-30] ADR-147 · Hour deja de adivinar quién va (enmienda ADR-092 § 3 y ADR-103)
 
 **Contexto.** Marco, 30-10, mirando Hoy: le preguntaba «¿vas?» por «Départ Manou (navette)», el viaje de otra persona,
@@ -5297,6 +5307,10 @@ del saludo, una fila solo con «+ Tarea», «LO SIGUIENTE», esa línea y la del
 **Re-evaluar cuando** Marco lo use en una gira: si el «+» se encuentra, y si la tarjeta de hoy necesita algo más del
 titular en el escritorio.
 
+> **Amended by ADR-202 (2026-11-13), en el móvil.** § 1: el titular está abierto (la cabecera sin validar; el boceto
+> no tiene título). § 2: la puerta de Ahora desaparece con Ahora. § 3: el «+» queda en la fila del título hasta cerrar
+> la cabecera (propuesto: a la cabecera de «Te espera»).
+
 ## [2026-10-31] ADR-149 · Hoy: la tarjeta es un día, lo siguiente son tres, las decisiones esperan y las puertas sin ceros (enmienda ADR-121 § 1, ADR-127 § 2 y § 7, ADR-148 § 4)
 
 **Contexto.** Revisión de Hoy en el móvil (`build/coordination/hoy-review/proposal.md`, fuera de git, con capturas
@@ -5352,6 +5366,10 @@ seguir el ámbito.
 > **Amended by ADR-150 (2026-10-31), solo en § 1.** La tarjeta ya no es el día: el día es una agenda en orden y la
 > tarjeta es lo de ahora (o lo siguiente) dentro de ella. «Después» sigue.
 
+> **Amended by ADR-202 (2026-11-13), en el móvil.** § 2: «Después» pasa a ser «Coming up», una tira de fichas de día
+> hasta dos semanas o diez fichas. § 4 y § 5: «Ha cambiado» y las puertas de «La temporada» salen del móvil; en
+> escritorio, sin cambios por ahora.
+
 ## [2026-10-31] ADR-150 · Hoy: el día como agenda, lo de ahora abierto como tarjeta (enmienda ADR-149 § 1 y ADR-148 § 4)
 
 **Contexto.** Marco, 31-10, eligió la opción D de `build/coordination/hoy-review/antes-opciones.html` (fuera de git):
@@ -5406,6 +5424,11 @@ estás haciendo, y si una agenda con dos funciones el mismo día necesita marcar
 
 > **Amended by ADR-153 (2026-10-31), en § 1 y § 2.** El día de la agenda es solo hoy: si hoy no queda nada en marcha
 > ni por venir, no hay agenda ni tarjeta, y lo siguiente es la primera fila de «Después», que el titular nombra.
+
+> **Amended by ADR-202 (2026-11-13), en § 1, § 3, § 4 y § 6.** La agenda va dentro de la pieza llena del día, la única
+> superficie llena de la pantalla. La línea grande pone qué y su hora al mismo tamaño, y la cuenta atrás baja a la
+> segunda línea. Las acciones son Llamar, Mapa y Hoja a todo el ancho; sin Ahora. «Después» es «Coming up». Y en
+> «Qué no cambia», la banda 1 ya sigue el ámbito.
 
 ## [2026-10-31] ADR-151 · «Lo mío / Todo» por espacio (enmienda ADR-147 § 2 y § 4)
 
@@ -5529,6 +5552,11 @@ lo bastante como para no olvidar que está acotado (la opción B, la línea fina
 > que la pastilla acotada, sin tinte y con su ▾, y abre la paleta como filtro («Ver solo…»). La barra de arriba y ⌘K
 > la abren como búsqueda.
 
+> **Superseded by ADR-202 (2026-11-13), § 1 a § 4 y «Qué no cambia».** No hay pastilla: buscar y acotar son un solo
+> campo en toda la app, con lo acotado dentro como etiqueta con su ×. Dónde van guardados, recientes, «Guardar» y
+> «Copiar enlace» está abierto en ADR-202. § 5 sigue: lo que hace el ámbito vive en el marco. Y el pulso ya sigue el
+> ámbito.
+
 ## [2026-10-31] ADR-153 · Hoy: la tarjeta es para lo de hoy (enmienda ADR-150 § 1 y § 2)
 
 **Contexto.** Marco, 31-10 (chat, validado): la tarjeta grande de Hoy es para lo de hoy; si hoy no queda nada, no
@@ -5572,6 +5600,9 @@ Las cuatro claves nuevas pueden quedarse o borrarse.
 **Re-evaluar cuando** Marco lo use una gira: si la noche antes de un viaje temprano echa de menos la tarjeta (el
 localizador, la hora de salida grande), y si «Tablón · N nuevos» hace falta en una fila de «Después» para quien solo
 tiene días por venir.
+
+> **Amended by ADR-202 (2026-11-13), solo en § 2.** Sin nada que quede de hoy, lo dice la pieza de Hoy, hueca en su
+> sitio, y nombra lo siguiente aunque también esté en «Coming up». El texto está abierto.
 
 ## [2026-11-01] ADR-154 · La pantalla no dice nada que no encaje con tu momento (enmienda ADR-080 § 3, ADR-145 fase 2 § 3, ADR-149 § 2 y ADR-150 § 6)
 
@@ -6808,6 +6839,9 @@ recuperar `.lensscope--all` discontinua en cursiva y las claves `palette.aria` y
 
 **Re-evaluar cuando** Marco lo use: si «acotar» desde la búsqueda debería sumar a lo acotado en vez de sustituirlo.
 
+> **Superseded by ADR-202 (2026-11-13), en § 1 y § 4.** Una puerta, no dos: buscar y acotar son un solo campo y la
+> pastilla desaparece. La búsqueda y su «acotar» como acción secundaria (§ 2) siguen.
+
 ## [2026-11-05] ADR-179 · Conversaciones: el turno se dice una vez (diseño de la lente; enmienda ADR-176 y ADR-177)
 
 **Contexto.** Marco, 05-11: «el diseño de Conversaciones no es una cosa suficientemente buena». Diagnóstico (carril
@@ -7486,6 +7520,9 @@ specs puestos al día sin correr.
 
 **Re-evaluar cuando** alguien eche de menos los ámbitos a la vista (§ 1) o «Apuntar llamada» a un toque (§ 3).
 
+> **Amended by ADR-202 (2026-11-13), solo en § 1.** La pastilla desaparece: lo acotado va dentro del campo de buscar.
+> Dónde viven guardados y recientes queda abierto en ADR-202.
+
 ## [2026-11-11] ADR-194 · Revisión UX/UI del 11-11, tanda 2: un camino y un patrón por gesto (tareas 134, 135 y 136; enmienda ADR-130 § 2, ADR-139, ADR-182 § 4, ADR-185 § 4, ADR-176, ADR-138 § 5, ADR-056, ADR-062 y ADR-102)
 
 Marco (chat, 2026-11-11): «todo lo recomendado». Segunda tanda de la revisión (`_tasks.md` § UX/UI 11-11). En `main`
@@ -7579,6 +7616,10 @@ Marco (chat, 2026-11-11: «todo lo recomendado»; 2026-11-12: seguir con lo pend
 
 **Verificado:** `check` 0/0 y unitarios 2363. Sin E2E y sin verlo en pantalla. `CACHE_SCHEMA` 33.
 
+> **Superseded by ADR-202 (2026-11-13), solo en § 3.** En el móvil no hay hoja colgada del reloj y el reloj no abre
+> nada: tocarlo lleva a Hoy. La fecha va junto a la hora, calma a la barra de arriba, el pulso es la pieza de Hoy. § 1
+> y § 2 siguen.
+
 ## [2026-11-13] ADR-198 · El primer día: «¿Cuál es tu proyecto?» y una lista de arranque en Hoy (tarea 137)
 
 Marco (chat, 2026-11-13): boceto validado («Sí, constrúyela») y los textos de la primera pantalla. En `main` desde `9bd50d37`.
@@ -7660,3 +7701,101 @@ migración `20261113100000_contact_import` sin aplicar a producción.
 
 **Verificado:** `check` 0/0 y unitarios 2458; staging reconstruida desde cero con la migración (run 43487613563): RLS
 624 ok, `contact-import` 10/10. Sin aplicar a producción y sin verlo en pantalla.
+
+## [2026-11-13] ADR-202 · Hoy en el móvil es el día, el ámbito acota todo y un solo campo para buscar y acotar (tareas 144, 145 y 146; enmienda ADR-096 § 5, ADR-146 § 1 y § 2, ADR-148, ADR-149, ADR-150, ADR-152, ADR-153 § 2, ADR-178 § 1 y § 4, ADR-193 § 1 y ADR-197 § 3)
+
+**Contexto.** Marco, chat 13-11 (cinco vueltas sobre el boceto): Hoy en el móvil decía cinco bloques seguidos, el
+día era el primero de una lista larga y «toda la información se ve demasiado igual». Eligió la B de tres jerarquías
+y cerró el diseño salvo la cabecera y un texto. Boceto final https://claude.ai/artifact/7nR2kWXozyqZPQAPpDtgkV ,
+fuentes en `build/coordination/hoy-movil/` (fuera de git). Las reglas de jerarquía que salen de aquí, para toda la
+app: `build/design-system.md` (147, momento 1). **Sin construir.** Sin migración prevista (lectura del código, sin
+verificar contra la base).
+
+**Decidido por Marco.**
+1. **Hoy en el móvil son tres bloques, en este orden:** el día, lo que viene («Coming up») y lo que espera. «Since…»
+   (Ha cambiado) y «La temporada» salen del móvil (144 a, b). Los bloques no cambian de sitio.
+2. **El día es la única superficie llena de la pantalla** (146, la B). Lo que viene son fichas de calendario; lo que
+   espera va sobre el fondo. La superficie no es blanco ni negro puros: índigo oscuro en claro, una superficie más
+   clara que el fondo en oscuro. **La agenda va dentro de la pieza llena**, no la pieza dentro de la agenda.
+3. **Hoy es siempre la pieza grande.** Sin nada hoy, la pieza queda hueca en su sitio, lo dice y nombra lo siguiente,
+   aunque también salga en lo que viene (146, segunda tanda b).
+4. **La hora al tamaño de la cosa:** qué a la izquierda y su hora a la derecha, al mismo tamaño; la cuenta atrás en la
+   segunda línea. Haciendo algo, la hora grande es hasta cuándo («→ 17h») y debajo cuánto queda.
+5. **«Ahora» deja de ser una pantalla aparte.** El día de bolo la pieza de Hoy se abre con lo que enseñaba ese modo:
+   el día entero, a quién llamar, la carga, el hotel, quién va, y Llamar, Mapa y Hoja a todo el ancho. El botón «Ahora»
+   desaparece (144 c). El técnico invitado aterriza en Hoy (139).
+6. **Lo que viene es una tira de fichas de día** (13-11 noche, b): número grande, día y mes al lado, una ficha por día
+   con algo, dos cosas como mucho y «+1»; hasta dos semanas o diez fichas, y una ficha final «Planner →». En el móvil se
+   desliza a la derecha, con la tercera asomando; en escritorio van una debajo de otra (c). Sin nada en dos semanas, la
+   frase de siempre («Nada hasta…»). Sustituye a «Después»/«After».
+7. **Lo que espera:** una pastilla por tipo con su cifra, que se queda siempre, y debajo las filas de más peso: tres un
+   día normal, cinco un día sin nada (144 a). El tercer bloque no se llama «To do» (146).
+8. **Las puertas son las piezas** (146, 1): cada ficha abre su día en el Planificador; cada pastilla, su lista
+   (llamadas y respuestas en Conversaciones, el cobro en Cuentas, las tareas en la suya). Las cabeceras de bloque no
+   llevan enlace escrito.
+9. **El monograma del proyecto delante de cada cosa** (`IdentityMark` mini) en la pieza llena, el día y las fichas;
+   en la ficha, encima de la palabra. Sustituye a los cuadraditos de color.
+10. **La hora siempre a la vista y relativamente grande** (146, 2). Hora y fecha son una pieza, sin la palabra «Hoy»
+    (segunda tanda a). **El reloj del móvil no abre nada:** fuera el ▾ y la hoja colgada del reloj; tocarlo lleva a
+    Hoy. Lo que llevaba la hoja va a otro sitio: la fecha junto a la hora, calma a la barra de arriba, el pulso es la
+    pieza de Hoy, la cuenta ya está arriba a la derecha. Se pierde ver el pulso sin salir de otra sección.
+11. **Calma es una marca, la misma en todos los temas:** la onda que se aquieta (path
+    `M1.5 8c1.1-3.6 2.9-3.6 4 0c.9 2.3 2.4 2.3 3.3 0H14.5`, viewBox 16, trazo `currentColor`, grosor por tema), en un
+    círculo, lleno cuando está encendida. Fuente: `build/coordination/hoy-movil/calma-marcas.html`.
+12. **Buscar y acotar en un solo campo, en toda la app** (146, 5). Sin acotar, «Search everything»; acotado, lo
+    acotado va dentro como etiqueta con su × y el campo dice «Search» (a 390 px «Search in MaMeMi» se partía). La
+    pastilla de ámbito de la fila del título desaparece en todas las lentes y anchos.
+13. **El ámbito acota siempre y en todas partes** (145): también la agenda, la pieza y lo que viene de Hoy y el pulso
+    del raíl de escritorio. Razón de Marco: quien lleva muchas compañías trabaja acotado a una y espera ver solo esa.
+14. **Lo tuyo fuera del ámbito se cuenta, y los avisos no se acotan** (146, segunda tanda c). Una línea bajo la pieza
+    cuando algo tuyo de hoy queda fuera («1 más hoy fuera de MaMeMi»), contando solo lo de la persona. El técnico que
+    llega tarde y una opción que vence hoy salen siempre (`LateNoticeBand` ya ignora el ámbito).
+15. **El escritorio no cambia en esta tarea** (144), salvo el campo único (§ 12), el ámbito (§ 13 y 14) y las fichas en
+    columna (§ 6). Lo demás «tiene que funcionar también en escritorio, con su adaptación», que Marco no pide ver
+    todavía (146, 4).
+
+**Qué no cambia.** El menú de abajo del móvil (mono, mayúsculas, subrayado y separador tras Hoy, ADR-140). Lo que Ahora
+precarga y lee (ADR-146 § 3, § 4 y § 6): la hoja de ruta de hoy y mañana en la caché, las claves de logística y el
+corte de la hoja por rol. Lo pasado se apaga y la función principal se marca (ADR-150 § 5). Lo vacío no se pinta
+(ADR-145 § 1), con la excepción de § 3. Hour no pregunta quién va (ADR-147). «Lo mío / Todo» por espacio (ADR-151).
+`?scope=` en la URL y su copia canónica.
+
+**Abierto (tu llamada, Marco).** No son reglas hasta que se cierren.
+1. **La cabecera.** Propuesta del boceto, «vamos por el buen camino», sin validar del todo: fila 1, hora con fecha,
+   calma y cuenta; fila 2, el campo a todo el ancho; el «+» baja a la cabecera de lo que espera y el «?» pasa al menú
+   de la cuenta. Choca con 144 (d), que dejaba el título de la lente debajo a todo el ancho: el boceto final no tiene
+   título. Recomendación: la del boceto, sin título; lo que decía el titular (ADR-148 § 1, ADR-153 § 2) ya lo dice la
+   pieza.
+2. **El texto de «Nothing today».** Recomendación: «Hoy, nada» y la línea «Lo siguiente: jueves 19 nov, función? en
+   Vic», que reusa las claves de ADR-153 (`desk.day_none_then`, `desk.day_next`).
+3. **El nombre del tercer bloque.** No es «To do»; hoy «Te espera» / «Waiting for you», que el boceto mantiene.
+   Recomendación: «Te espera», ya en las cuatro lenguas y en ADR-195 § 1 como palabra fijada.
+4. **Cuánto de Ahora cabe en la pieza.** El boceto lleva el día, cuatro hechos (sala, carga, hotel, quién va) y tres
+   acciones. Fuera quedan la escaleta pasada plegada, los tramos con localizador, los detalles plegados y el tablón.
+   Recomendación: lo del boceto, y «Hoja» como puerta a todo lo demás; mirarlo en una gira (re-evaluar).
+5. **Plegables y qué hace calma en Hoy.** Propuesto: solo se pliega lo que espera (las pastillas se quedan, las filas
+   se pliegan, plegado por defecto el día de bolo), y luego que calma sea ese plegado (deja el día, lo que viene y las
+   pastillas). Recomendación: calma como único plegado; un interruptor menos, y ya hace eso en las demás pantallas.
+6. **Guardados y recientes del ámbito, «Guardar» y «Copiar enlace».** Vivían en el diálogo de la pastilla (ADR-193
+   § 1); sin pastilla ni hoja no tienen sitio. Recomendación: primeras filas de la paleta al enfocar el campo vacío, y
+   «Guardar» y «Copiar enlace» como acciones de la etiqueta acotada.
+7. **Ahora en escritorio.** 144 dice que el escritorio no cambia; § 5 quita Ahora como pantalla. Recomendación: Ahora
+   desaparece también en escritorio, porque la pieza de Hoy es la misma en los dos (ADR-150 § 7), y `?mode=ahora` y
+   `hour.ahora` redirigen a Hoy.
+8. **Si el pulso permite contar «lo tuyo fuera del ámbito»** (§ 14). Sin comprobar. Lectura del código: los feeds del
+   pulso (`pulse-feeds.svelte.ts`) se piden sin ámbito y se acotan en el cliente, así que la cifra saldría de la
+   diferencia sin lectura nueva. Comprobarlo al construir.
+9. **El día de bolo, lo que espera.** 144 (a) dice «una línea»; el boceto pinta solo las pastillas. Recomendación: las
+   pastillas, que ya son esa línea.
+10. **Una opción por decidir en lo que viene.** ADR-154 § 4 la quita de «Después» si ya está en «Te espera»; el boceto
+    la pinta en las dos («Show?» en la ficha del 19 y «Decide on L'Atlàntida»). Recomendación: la ficha la lleva con su
+    «?», porque una ficha de calendario dice todo lo de su día; enmendaría ADR-154 § 4.
+
+**Lo que el boceto contradice y manda la cola.** En el teléfono acotado a MaMeMi la tira lleva una ficha de Gota (28
+nov), fuera de orden: manda § 13. Las tiras llegan al 12 dic con la ficha final «after 27 Nov»: manda § 6, dos semanas.
+
+**Para construir.** Tokens que faltan (la superficie llena, tres tamaños display con nombre, el grosor de una marca, el
+ancho de una ficha): `build/design-system.md` § Tokens. `tests/ahora.spec.ts` y los specs de Hoy cambian.
+
+**Re-evaluar cuando** Marco lo use una gira: si la tira choca con el gesto de volver en un iPhone real, si diez fichas
+son muchas, y si perder el pulso desde otra sección (§ 10) se echa de menos.
