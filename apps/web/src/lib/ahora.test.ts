@@ -10,7 +10,6 @@ import { describe, expect, test } from 'vitest';
 import {
   ahoraDay,
   ahoraItems,
-  ahoraRelaunch,
   ahoraRoadsheetRole,
   ahoraState,
   ahoraTimeline,
@@ -248,15 +247,10 @@ describe('hotel, parking and load access: fixed keys in logistics', () => {
   });
 });
 
-describe('the road sheet Ahora asks for, and the way back in', () => {
+describe('the road sheet Hoy\'s piece asks for (ADR-146 § 6)', () => {
   test('the space crew asks for the whole sheet, a guest for the technician’s cut', () => {
     expect(ahoraRoadsheetRole('member')).toBe('full');
     expect(ahoraRoadsheetRole(null)).toBe('full');
     expect(ahoraRoadsheetRole('guest')).toBe('tech_manager');
-  });
-  test('the home-screen app reopens in Ahora only on the day it was left open', () => {
-    expect(ahoraRelaunch(DAY, DAY)).toBe(true);
-    expect(ahoraRelaunch('2026-08-13', DAY)).toBe(false);
-    expect(ahoraRelaunch(null, DAY)).toBe(false);
   });
 });

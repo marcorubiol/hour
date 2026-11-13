@@ -390,9 +390,6 @@ export function ahoraRoadsheetRole(myRole: string | null | undefined): 'full' | 
   return myRole === 'guest' ? 'tech_manager' : 'full';
 }
 
-/** Ahora was open on this day: the home-screen app opens straight in it. */
+/** Where Ahora, a screen until ADR-202 § 5, remembered the day it was left
+    open. Read by nobody now: `/` clears it, and the app opens on Hoy. */
 export const AHORA_KEY = 'hour.ahora';
-
-export function ahoraRelaunch(stored: string | null | undefined, today: string): boolean {
-  return stored === today;
-}

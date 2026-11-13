@@ -1,20 +1,23 @@
 <script lang="ts">
   import Checkbox from '../Checkbox.svelte';
   /**
-   * «TE ESPERA» — band 2 of the Desk (ADR-117). The short list by weight
-   * (`rankWaiting`): at most seven rows, each a verb and its action. «Ver
-   * todo» turns the band into the whole list by days, the Desk feed as it
-   * was minus the agenda (that is the Planner's).
+   * «TE ESPERA», Hoy's third block (ADR-202 § 7, ADR-203 § 3, § 5, § 9). On
+   * the ground of the page, no box: one pill per kind with its figure, which
+   * always stays, and under them the rows of most weight (`rankWaiting`):
+   * three on a normal day, five on a day with nothing, none on a gig day
+   * nor in calm (`$lib/hoy` waitingRowCount; the page says how many).
+   *
+   * THE DOOR IS THE PILL (§ 8): calls and replies open «Te toca» in
+   * Conversaciones, a payment Cuentas, a decision the Planner. Tasks have no
+   * list of their own, so theirs opens the whole list here, by days (the
+   * Desk feed as it was minus the agenda, that is the Planner's).
    *
    * One list at a time, never both: a task drawn twice is two checkboxes
-   * with one name.
-   *
-   * The red is the block's, once (ADR-139 § 6): «3 vencidas» in the head;
-   * a row says «vencido» in its own ink. In calm (`calm`, `calmWaiting`)
-   * the band is today only; the overdue is one line that opens it here,
-   * and the rest one line that leaves calm.
+   * with one name. The red is the block's, once (ADR-139 § 6): «3
+   * vencidas» in the head; a row says «vencido» in its own ink. The «+» of
+   * Hoy lives in this head (ADR-203 § 1), where what it makes appears.
    */
-  import CalmLine from '$lib/components/CalmLine.svelte';
+  import type { Snippet } from 'svelte';
   import { lensOn } from '$lib/lenses.svelte';
   import Button from '$lib/components/Button.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
@@ -23,18 +26,22 @@
   import { relativeContactDate } from '$lib/conversation';
   import { tick } from 'svelte';
   import { t, type Locale } from '$lib/i18n';
-  import type { CalmWaiting, DeskBucket, DeskConcern, DeskItem, DeskRun, Waiting } from '$lib/desk-feed';
+  import type { DeskBucket, DeskConcern, DeskItem, DeskRun, Waiting } from '$lib/desk-feed';
+  import { waitingPills, type WaitingKind } from '$lib/hoy';
   import ChatRow from '$lib/components/ChatRow.svelte';
   import type { ChatContext, ChatLine } from '$lib/chat-row';
 
   interface Props {
+    /** Everything that waits, ranked (`rankWaiting` without a cut). */
     waiting: Waiting;
+    /** How many of its rows to draw under the pills (`waitingRowCount`). */
+    rows: number;
     /** The viewer's day (YYYY-MM-DD). */
     today: string;
-    /** Calm's reading of the same feed (`calmWaiting`); null outside calm. */
-    calm?: CalmWaiting | null;
-    /** The last line's door: leaves calm, where the rest waits. */
-    onleavecalm?: () => void;
+    /** The head's act: Hoy's «+» (ADR-203 § 1). */
+    add?: Snippet;
+    /** What the «+» opens, under the head. */
+    composer?: Snippet;
     feed: DeskBucket[];
     later: { count: number; from: string; until: string } | null;
     loading: boolean;
@@ -64,9 +71,10 @@
 
   let {
     waiting,
+    rows,
     today,
-    calm = null,
-    onleavecalm,
+    add,
+    composer,
     feed,
     later,
     loading,
@@ -108,15 +116,9 @@
     headEl?.focus();
   }
   let laterOpen = $state(false);
-  /** Calm's overdue line, opened in place. */
-  let overdueOpen = $state(false);
   const overdueWord = (n: number) => t(n === 1 ? 'desk.title_overdue_one' : 'desk.title_overdue_many', locale, { n });
-  // With nothing more waiting, calm has nothing to say about the rest
-  // (ADR-154): the line is drawn from one on.
-  let calmRest = $derived(
-    calm && calm.more > 0 ? t(calm.more === 1 ? 'desk.calm_rest_one' : 'desk.calm_rest_many', locale, { n: calm.more }) : '',
-  );
   let feedCount = $derived(feed.reduce((n, b) => n + b.runs.reduce((m, r) => m + r.items.length, 0), 0));
+  let shown = $derived(waiting.rows.slice(0, rows));
 
   // A lens the space does not use (ADR-132) is no destination.
   let LENS_HREF = $derived<Record<DeskConcern, string | null>>({
@@ -125,6 +127,17 @@
     decision: lensOn('planner') ? '/h/planner' : null,
     money: lensOn('books') ? '/h/books' : null,
   });
+  /* Each pill's list (§ 8): «Te toca» for calls and replies, Cuentas for a
+     payment, the Planner for a decision. Tasks: null, the list here. */
+  let PILL_HREF = $derived<Record<WaitingKind, string | null>>({
+    calls: lensOn('conversations') ? '/h/conversations?turno=nuestro' : null,
+    replies: lensOn('conversations') ? '/h/conversations?turno=nuestro' : null,
+    tasks: null,
+    money: LENS_HREF.money,
+    decisions: LENS_HREF.decision,
+  });
+  let pills = $derived(waitingPills(waiting.rows));
+  const pillWord = (kind: WaitingKind, n: number) => t(`desk.pill_${kind}_${n === 1 ? 'one' : 'many'}`, locale);
   const runHref = (run: DeskRun) => run.items[0]?.href ?? LENS_HREF[run.concern];
   const concernLabel = (c: DeskConcern) => t(`desk.concern_${c}`, locale);
   const laterText = (l: NonNullable<typeof later>) =>
@@ -264,15 +277,32 @@
     titleId="desk-waits-h"
     focusable
     bind:el={headEl}
-    count={loading || errored
-      ? null
-      : calm
-        ? calm.today.length || null
-        : waiting.total > waiting.rows.length && !all
-          ? t('desk.waiting_count', locale, { shown: waiting.rows.length, total: waiting.total })
-          : null}
-    alertNote={!loading && !errored && !calm && waiting.overdue > 0 ? overdueWord(waiting.overdue) : null}
-  />
+    count={loading || errored || waiting.total === 0 ? null : waiting.total}
+    alertNote={!loading && !errored && waiting.overdue > 0 ? overdueWord(waiting.overdue) : null}
+  >
+    {#if add}{@render add()}{/if}
+  </BlockHead>
+  {#if composer}{@render composer()}{/if}
+
+  {#if !loading && !errored && pills.length > 0}
+    <!-- One pill per kind and its figure: always there, calm and gig day included. -->
+    <ul class="tallies" data-testid="desk-pills">
+      {#each pills as p (p.kind)}
+        {@const href = PILL_HREF[p.kind]}
+        <li>
+          {#if href}
+            <a class="tally" {href} data-kind={p.kind}><b>{p.n}</b> {pillWord(p.kind, p.n)}</a>
+          {:else if p.kind === 'tasks'}
+            <button type="button" class="tally" data-kind={p.kind} aria-pressed={all} onclick={() => showAll(!all)}
+              ><b>{p.n}</b> {pillWord(p.kind, p.n)}</button
+            >
+          {:else}
+            <span class="tally" data-kind={p.kind}><b>{p.n}</b> {pillWord(p.kind, p.n)}</span>
+          {/if}
+        </li>
+      {/each}
+    </ul>
+  {/if}
 
   {#if loading}
     <ul class="list" aria-hidden="true">
@@ -286,33 +316,6 @@
     </ul>
   {:else if errored}
     <p class="load-fail" role="alert"><span>{t('desk.error', locale)}</span><Button size="xs" variant="secondary" onclick={onretry}>{t('ui.retry', locale)}</Button></p>
-  {:else if calm}
-    <!-- CALM: today, then one line for the overdue (it opens here), then one
-         for everything else (it leaves calm). Nothing is denied. -->
-    {#if calm.today.length > 0}
-      <ul class="list">
-        {#each calm.today as item (item.id)}{@render row(item)}{/each}
-      </ul>
-    {:else if calm.overdue.length === 0}
-      <EmptyLine text={`${t('desk.caughtup_l', locale)} ${t('desk.caughtup_s', locale)}`} />
-    {:else}
-      <EmptyLine text={t('desk.calm_today_none', locale)} />
-    {/if}
-    {#if calm.overdue.length > 0}
-      <CalmLine
-        lead={overdueWord(calm.overdue.length)}
-        action={t(overdueOpen ? 'desk.calm_overdue_hide' : 'desk.calm_overdue_see', locale)}
-        expanded={overdueOpen}
-        controls="desk-calm-overdue"
-        onclick={() => (overdueOpen = !overdueOpen)}
-      />
-      {#if overdueOpen}
-        <ul class="list" id="desk-calm-overdue">
-          {#each calm.overdue as item (item.id)}{@render row(item)}{/each}
-        </ul>
-      {/if}
-    {/if}
-    {#if calmRest}<CalmLine text={calmRest} action={t('calm.see_all', locale)} onclick={() => onleavecalm?.()} />{/if}
   {:else if all}
     <div class="timeline">
       {#each feed as bucket (bucket.sortKey)}
@@ -342,18 +345,17 @@
       {/each}
     </div>
     <button type="button" class="more" onclick={() => showAll(false)}>{t('desk.see_less', locale)}</button>
-  {:else if waiting.rows.length === 0}
-    <!-- Nothing this week, something later: the band is drawn only for its
-         door (ADR-145 § 1; with nothing at all the Desk does not draw it). -->
+  {:else if waiting.total === 0}
+    <!-- Nothing this week: the head stays for its «+», and says so once. -->
     <EmptyLine text={t('desk.all_quiet', locale)} />
-    {#if feedCount > waiting.rows.length}
+    {#if rows > 0 && feedCount > 0}
       <button type="button" class="more" onclick={() => showAll(true)}>{t('desk.see_all', locale)} →</button>
     {/if}
-  {:else}
-    <ul class="list">
-      {#each waiting.rows as item (item.id)}{@render row(item)}{/each}
+  {:else if rows > 0}
+    <ul class="list" data-testid="desk-waiting-rows">
+      {#each shown as item (item.id)}{@render row(item)}{/each}
     </ul>
-    {#if feedCount > waiting.rows.length}
+    {#if feedCount > shown.length}
       <button type="button" class="more" onclick={() => showAll(true)}>{t('desk.see_all', locale)} →</button>
     {/if}
   {/if}
@@ -509,6 +511,51 @@
   }
   .more:hover {
     color: var(--text-color);
+  }
+
+  /* THE PILLS (design-system rules 2 and 9): sunk into the ground, a figure
+     and its word; each its own door. Not named `.pill`: base.css reads any
+     class containing the word as the filter pill. */
+  .tallies {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    margin: 0 0 var(--space-s);
+    padding: 0;
+    list-style: none;
+  }
+  .tally {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--space-xs);
+    padding: var(--space-2xs) var(--space-s);
+    border: 0;
+    border-radius: var(--radius-circle);
+    background: var(--bg-light);
+    color: var(--text-color);
+    font: inherit;
+    font-size: var(--text-s);
+    text-decoration: none;
+    cursor: pointer;
+  }
+  span.tally {
+    cursor: default;
+  }
+  .tally b {
+    font-weight: 600;
+    color: var(--heading-color);
+    font-variant-numeric: tabular-nums;
+  }
+  a.tally:hover,
+  button.tally:hover,
+  button.tally[aria-pressed='true'] {
+    background: var(--bg-hover);
+  }
+  @media (pointer: coarse) {
+    .tally {
+      min-block-size: var(--touch-target);
+      align-items: center;
+    }
   }
 
   /* ── The whole list, by days ── */
