@@ -6,6 +6,8 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Noviembre 2026 (en curso)
 
+- La hoja de ruta pública y la invitación hablan el oficio de su espacio, también en música (143, 2026-11-13, `a7700e08`, migración `20261113110000`).
+- Primer día, corregido: quien se da de alta ve «¿Cuál es tu proyecto?» en su espacio personal y le pone nombre y oficio; la lista de arranque gana un cuarto paso, «Di quién trabaja contigo» (137, ADR-200, 2026-11-13, `a7700e08`).
 - Con un espacio de música y otro de escena a la vista, cada fila, cada ficha y cada diálogo hablan el oficio de su espacio: el concierto es «concierto» y la función «función» en la misma lista (142, 2026-11-13, `19ef8452`; faltan las palabras neutras del marco).
 - Primer día: quien entra sin espacio ve «¿Cuál es tu proyecto?» y crea su espacio con nombre y oficio; en Hoy, una lista de tres pasos (el espectáculo o proyecto, los contactos, la primera fecha) que se tacha sola con los datos (137, ADR-198, 2026-11-13, `0abc7529`).
 - «Opciones por orden» pasa a Ajustes › Este espacio, bajo «Oficio», y sin nada elegido sigue al oficio (música por orden, escena sin orden); en el móvil, el cajón es una hoja corta que cuelga del reloj; el corte de la barra lateral tiene nombre (140, ADR-197, 2026-11-12, `68e2ffb0`).
