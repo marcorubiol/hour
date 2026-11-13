@@ -7616,3 +7616,24 @@ Marco (chat, 2026-11-13): tiene un espacio de música y otro de teatro, mundos s
 
 **Verificado:** `check` 0/0 y unitarios 2395; E2E contra `19ef8452` sin rojos de la app. Sin verlo con dos oficios a
 la vista.
+
+## [2026-11-13] ADR-200 · El primer día, corregido: el alta nombra su espacio personal y la lista lleva al equipo (tarea 137; enmienda ADR-198 § 1 y § 2)
+
+Marco (chat, 2026-11-13): «Adelante con todo». En `main` desde `f03c6165`.
+
+1. **Nadie llega sin espacio.** El alta de un usuario (`handle_new_user`) crea siempre una cuenta y un espacio
+   `personal` con el nombre de la persona, en escena. ADR-198 § 1 daba por hecho lo contrario, y su pantalla no la
+   veía un alta normal.
+2. **«¿Cuál es tu proyecto?» sale también en el espacio personal intacto:** un solo espacio, `personal`, del que la
+   persona es owner, sin proyecto, contacto, fecha ni equipo, y sin haberlo respondido o aplazado (`card:start_space`
+   en `help_seen`). Al responder no crea otro espacio: pone nombre y oficio a ese; el slug no cambia (ADR-067). Lleva
+   «Más tarde», para que nadie quede atrapado. Con cero espacios sigue creando uno.
+3. **Cuarto paso de la lista: «Di quién trabaja contigo».** Apunta a quien trabaja en el proyecto en su reparto o
+   formación, sin invitarle con cuenta. Hecho con cualquier fila viva de `cast_member` del espacio. Su puerta es la
+   ficha del primer proyecto, en el bloque del reparto; sin proyecto, espera.
+4. **El paso del equipo no levanta la lista en un espacio que ya funciona:** la lista sale si falta alguno de los tres
+   primeros pasos; con ellos hechos o aplazados, el equipo solo la mantiene si esa persona ya la vio ahí con algo
+   pendiente (`card:start_in_<espacio>`).
+
+**Verificado:** `check` 0/0 y unitarios 2422. En producción, el único espacio personal intacto con un solo dueño es
+`950352b3`, de un usuario de pruebas. Sin E2E y sin verlo en pantalla.

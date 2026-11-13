@@ -7,6 +7,10 @@
    *
    * 121 B (ADR-183): a personal link says whose sheet it is and, on the day,
    * offers «Llego tarde» (RoadsheetLate). A role link has neither.
+   *
+   * 143: no shell sets the trade here, so the sheet brings its space's and
+   * this screen speaks it (ADR-129 § 4: a screen speaks its spaces' trade).
+   * An answer without it (a base before 20261113110000) speaks stage.
    */
 
   import { docTitle } from '$lib/doc-title';
@@ -18,7 +22,7 @@
   import RecordState from '$lib/components/RecordState.svelte';
   import { ApiError } from '$lib/api';
   import { loadFailKind } from '$lib/load-fail';
-  import { appLocale, t } from '$lib/i18n';
+  import { appLocale, setTrade, t, tradeOf } from '$lib/i18n';
   import type { Roadsheet } from '$lib/roadsheet';
   import type { PublicLate, RoadsheetHolder } from '$lib/roadsheet-late';
 
@@ -27,6 +31,7 @@
     venue_timezone: string | null;
     holder?: RoadsheetHolder | null;
     late?: PublicLate | null;
+    trade?: string | null;
   };
 
   let token = $derived(page.params.token ?? '');
@@ -65,6 +70,10 @@
     return t('roadsheet.holder', locale, { name: h.role ? `${h.name} · ${h.role}` : h.name });
   });
   let moments = $derived(sheet?.schedule?.moments ?? []);
+
+  $effect(() => {
+    setTrade(tradeOf([{ trade: $query.data?.trade }]));
+  });
 </script>
 
 <svelte:head>

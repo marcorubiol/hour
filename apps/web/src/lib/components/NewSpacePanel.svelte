@@ -10,6 +10,14 @@
    * cambia las palabras de todo lo que viene; la frase de debajo ya cambia
    * con él, antes de guardar. Color automático; lo demás, en Ajustes.
    * POST /api/workspaces y, si eligió música, PUT de su oficio.
+   *
+   * Con `workspace`, el espacio que dejó el alta (personal, con el nombre de
+   * la persona, intacto): no crea otro, le pone nombre y oficio (PATCH y PUT;
+   * el slug no cambia, ADR-067). Para la persona es lo mismo, así que los
+   * textos no cambian; solo suma «Más tarde», porque aquí ya hay un espacio
+   * detrás y nadie debe quedar atrapado en la pregunta. Responder o aplazar
+   * marca `SPACE_ASKED_KEY` (también al crear: el creado es personal, y si
+   * no la pregunta volvería).
    */
   import { useQueryClient } from '@tanstack/svelte-query';
   import { goto } from '$app/navigation';
@@ -21,6 +29,14 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import { appLocale, t } from '$lib/i18n';
   import { DEFAULT_TRADE, TRADES, type Trade } from '$lib/i18n/trade.svelte';
+  import { SPACE_ASKED_KEY } from '$lib/first-day';
+  import { markHelpSeen } from '$lib/help-seen.svelte';
+
+  interface Props {
+    /** The signup's own space, to name instead of creating one. */
+    workspace?: { id: string } | null;
+  }
+  let { workspace = null }: Props = $props();
 
   const locale = appLocale();
   const queryClient = useQueryClient();
@@ -48,11 +64,21 @@
     }
     pending = true;
     try {
-      const res = await mutateJSON<{ workspace: { id: string; slug: string } }>('POST', '/api/workspaces', {
-        name: trimmed,
-      });
-      const ws = res?.workspace;
+      let ws: { id: string } | undefined;
+      if (workspace) {
+        await mutateJSON('PATCH', `/api/workspaces/${workspace.id}`, { name: trimmed });
+        ws = workspace;
+      } else {
+        const res = await mutateJSON<{ workspace: { id: string; slug: string } }>('POST', '/api/workspaces', {
+          name: trimmed,
+        });
+        ws = res?.workspace;
+      }
       if (!ws) throw new Error(t('perf.unexpected', locale));
+      // Answered. A created space: before the shell sees it, or it would ask
+      // its name again (it is personal and untouched too). A named one: once
+      // its new name is in the cache, so the panel goes straight to it.
+      if (!workspace) markHelpSeen(SPACE_ASKED_KEY);
       if (trade !== DEFAULT_TRADE) {
         // The space exists already: a trade that did not save is said, and changed in Ajustes.
         await mutateJSON('PUT', `/api/workspaces/${ws.id}/trade`, { trade }).catch(() =>
@@ -62,6 +88,7 @@
       // The shell draws the app once the space is in its cache.
       await queryClient.invalidateQueries({ queryKey: ['workspaces'] });
       await queryClient.refetchQueries({ queryKey: ['workspaces'] });
+      markHelpSeen(SPACE_ASKED_KEY);
       if (page.url.pathname !== '/h/desk') await goto('/h/desk');
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) nameError = t('workspace.name_taken', locale);
@@ -103,6 +130,11 @@
     {#if formError}<p class="newspace__error" role="alert">{formError}</p>{/if}
     <div class="newspace__submit">
       <Button type="submit" loading={pending}>{t('start.space_create', locale)}</Button>
+      {#if workspace}
+        <button type="button" class="btn--quiet" disabled={pending} onclick={() => markHelpSeen(SPACE_ASKED_KEY)}
+          >{t('start.later', locale)}</button
+        >
+      {/if}
     </div>
   </form>
 
@@ -135,6 +167,12 @@
       display: flex;
       flex-direction: column;
       gap: var(--field-gap);
+    }
+    .newspace__submit {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-xs);
+      align-items: center;
     }
     .newspace__error {
       margin: 0;

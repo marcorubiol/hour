@@ -51,7 +51,10 @@
   import { provideScopes, sameSet as scopesSameSet, type Scope } from '$lib/stores/scopes.svelte';
   import { provideCreation } from '$lib/stores/creation.svelte';
   import { lazy } from '$lib/lazy.svelte';
-  import { START_QUERY_KEY } from '$lib/first-day-query';
+  import { START_QUERY_KEY, startQueryOptions } from '$lib/first-day-query';
+  import { SPACE_ASKED_KEY, signupSpace, spaceAsk, untouched } from '$lib/first-day';
+  import { hasSeen } from '$lib/help';
+  import { help, ensureHelp, markHelpSeen } from '$lib/help-seen.svelte';
   import { createEventType, scopeCreatePresets, scopeTaskTarget, type PaletteCreate } from '$lib/palette-create';
   import type { CreatedPerformance } from '$lib/plan-create';
   import {
@@ -196,12 +199,38 @@
   });
 
   let defaultWorkspaceSlug = $derived($workspacesQuery.data?.items[0]?.slug ?? '');
-  // No space at all (tarea 137): every section draws the first-day panel
-  // instead of itself. Only on an answer: loading or failed, nothing changes.
-  let noSpace = $derived($workspacesQuery.isSuccess && ($workspacesQuery.data?.items.length ?? 0) === 0);
+  // The first-day panel (tarea 137): every section draws it instead of
+  // itself with no space at all, or with only the untouched space the
+  // signup left, which it names instead of creating another
+  // (`$lib/first-day` § spaceAsk). Only on an answer: loading or failed,
+  // nothing changes; while it is not known, neither the panel nor the section.
+  let signup = $derived(
+    $workspacesQuery.isSuccess ? signupSpace(($workspacesQuery.data?.items ?? []) as NavWorkspace[]) : null,
+  );
+  $effect(() => {
+    if (signup) void ensureHelp();
+  });
+  let signupAsked = $derived(help.ready && hasSeen(help.seen, SPACE_ASKED_KEY));
+  const signupStartQuery = createQuery(
+    toStore(() => startQueryOptions(signup?.id, Boolean(signup) && help.ready && !signupAsked)),
+  );
+  let ask = $derived(
+    spaceAsk({
+      spaces: $workspacesQuery.isSuccess ? ($workspacesQuery.data?.items ?? []) as NavWorkspace[] : null,
+      seen: help.seen,
+      ready: help.ready,
+      settled: help.settled ?? false,
+      start: $signupStartQuery.isError ? null : $signupStartQuery.data,
+    }),
+  );
+  // A signup space with something in it is a space in use: never asked again.
+  $effect(() => {
+    const start = $signupStartQuery.data;
+    if (signup && help.ready && !signupAsked && start && !untouched(start)) markHelpSeen(SPACE_ASKED_KEY);
+  });
   const newSpacePanel = lazy(() => import('$lib/components/NewSpacePanel.svelte'));
   $effect(() => {
-    if (noSpace) void newSpacePanel.load();
+    if (ask === 'create' || ask === 'name') void newSpacePanel.load();
   });
   // Settings without a space in the URL: the person's own space, never one
   // they are a guest of (a bolo invitation), where there is nothing of theirs.
@@ -911,8 +940,12 @@
            no control ever looks disabled. A screen reader hears the switch. -->
       <p class="visually-hidden" aria-live="polite">{calmAnnounce}</p>
       <div class="shell__content">
-        {#if noSpace}
-          {#if newSpacePanel.component}<newSpacePanel.component />{/if}
+        {#if ask === 'create' || ask === 'name'}
+          {#if newSpacePanel.component}<newSpacePanel.component
+              workspace={ask === 'name' ? signup : null}
+            />{/if}
+        {:else if ask === 'wait'}
+          <!-- Not known yet whether the signup space is untouched: nothing, then one thing. -->
         {:else if routedLens && routedLens !== 'desk' && !lensOn(routedLens)}
           <!-- ADR-132: a lens off in every space on screen, reached by URL. -->
           <LensOff lens={routedLens} workspaces={onScreen} />

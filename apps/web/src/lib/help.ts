@@ -124,6 +124,8 @@ export interface HelpState {
   seen: HelpSeen;
   /** Lo visto ya llegó. Hasta entonces (o si no llega) no sale nada solo. */
   ready: boolean;
+  /** La lectura de lo visto terminó, bien o mal: quien espera por ella deja de esperar. */
+  settled?: boolean;
   /** La tarjeta que el «?» ha vuelto a abrir, si alguna. */
   reopened: string | null;
 }
