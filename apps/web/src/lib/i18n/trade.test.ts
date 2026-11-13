@@ -36,6 +36,12 @@ describe('t() and the trade (ADR-128)', () => {
     expect(tradeOf([{ trade: 'music' }, {}])).toBe('mixed');
     expect(tradeOf([{ trade: 'comedy' }])).toBe('stage');
   });
+
+  test('a screen of one space outside the shell (143): its trade, stage while it is unknown', () => {
+    expect(tradeOf([{ trade: 'music' }])).toBe('music');
+    expect(tradeOf([{ trade: undefined }])).toBe('stage');
+    expect(tradeOf([{ trade: null }])).toBe('stage');
+  });
 });
 
 describe('the trade of one space (tarea 142)', () => {

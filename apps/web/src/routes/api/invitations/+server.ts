@@ -26,6 +26,8 @@ interface InvitationPreview {
   landing_performed_at?: string | null;
   bolo_preset?: 'minim' | 'equip' | null;
   bolo_access_last_day?: string | null;
+  /** 143 (20261113110000): `workspace.trade`, so the invitation speaks it. */
+  workspace_trade?: string | null;
 }
 
 async function invoke(
