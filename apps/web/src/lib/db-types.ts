@@ -8157,6 +8157,7 @@ export type Database = {
           workspace_id: string
           workspace_name: string
           workspace_slug: string
+          workspace_trade: string
         }[]
       }
       queue_mailout: {

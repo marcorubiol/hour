@@ -13,6 +13,9 @@
  * 121 B (ADR-183): the moments a «llego tarde» moved carry `moved_from` (one
  * rule, `annotateMoves`); a personal link also gets `holder` (whose sheet)
  * and `late` (may they warn today, who receives it, their last notice).
+ *
+ * 143 (20261113110000): `trade`, the space's, so the sheet speaks it. A base
+ * without it answers without it, and the page speaks stage.
  */
 
 import type { RequestHandler } from './$types';
@@ -63,6 +66,8 @@ type PublicBundle = {
   /** 121 B: only on a personal link of someone still in the team. */
   holder?: RoadsheetHolder;
   late?: PublicLate;
+  /** 143: `workspace.trade` of the performance's space. */
+  trade?: string;
 };
 
 export const GET: RequestHandler = async ({ params, platform, locals }) => {
@@ -109,6 +114,7 @@ export const GET: RequestHandler = async ({ params, platform, locals }) => {
       venue_timezone: b.venue?.timezone ?? null,
       holder: b.holder ?? null,
       late: b.late ?? null,
+      trade: b.trade ?? null,
     });
   } catch (err) {
     // ANONYMOUS surface — errors stay fully opaque (matches the sibling

@@ -5,7 +5,7 @@
   import { ApiError, fetchJSON, mutateJSON } from '$lib/api';
   import { ensureSession } from '$lib/session.svelte';
   import { spaceName } from '$lib/utils/identity';
-  import { chooseLocale, LOCALE_NAME, LOCALE_TAG, LOCALES, loadLocale, t, type Locale } from '$lib/i18n';
+  import { chooseLocale, LOCALE_NAME, LOCALE_TAG, LOCALES, loadLocale, setTrade, t, tradeOf, type Locale } from '$lib/i18n';
   import Segmented from '$lib/components/Segmented.svelte';
   import { dayMonthLong } from '$lib/datetime';
 
@@ -41,6 +41,8 @@
     landing_performed_at?: string | null;
     bolo_preset?: 'minim' | 'equip' | null;
     bolo_access_last_day?: string | null;
+    /** 143 (20261113110000): el oficio del espacio; sin él, escena. */
+    workspace_trade?: string | null;
   };
 
   type LandingPerformance = { performance: { slug: string | null; performed_at: string } };
@@ -52,6 +54,12 @@
   let errorMessage = $state('');
   let landing = $state<LandingPerformance['performance'] | null>(null);
   let isBolo = $derived(Boolean(invitation?.bolo_id));
+
+  // 143: fuera del shell nadie fija el oficio; la invitación habla el de su
+  // espacio, y escena mientras no lo sabe (ADR-129 § 4).
+  $effect(() => {
+    setTrade(tradeOf([{ trade: invitation?.workspace_trade }]));
+  });
 
   function roleLabel(role: string): string {
     if (MEMBERSHIP_ROLES.has(role)) return t(`invite.role_${role}`, locale);
