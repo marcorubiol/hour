@@ -17,7 +17,7 @@
    */
   import { accentVarFor } from '$lib/utils/accent';
   import Slip from '$lib/components/planner/Slip.svelte';
-  import { appLocale, t } from '$lib/i18n';
+  import { appLocale, t, tradeFor, type Voice } from '$lib/i18n';
   import type { ProjectLite, SlipKind, Slip as SlipVM } from '$lib/month-events';
   import { pct, overlaps, type StripThread } from '$lib/day-strip';
 
@@ -45,7 +45,7 @@
     win: { from: number; to: number };
     /** Now, in fractional hours — only drawn when this IS today. */
     now?: number | null;
-    kindLabel: (kind: SlipKind) => string;
+    kindLabel: (kind: SlipKind, voice?: Voice) => string;
     /** The slip's state line (hold rank, released) — the page's words. */
     stateLabel?: (slip: SlipVM) => string | null;
     stateUrgent?: (slip: SlipVM) => boolean;
@@ -56,8 +56,9 @@
     /** «nothing on this day» */
     emptyLabel?: string;
     axisLabel?: string;
-    /** «no cast on file» — the Board's word, shared on purpose. */
-    noCastWord?: string;
+    /** «no cast on file» — the Board's word, shared on purpose; in the trade
+        of the row's space (tarea 142). */
+    noCastWord?: (voice?: Voice) => string;
     roadSheetWord?: string;
     /**
      * A HOLD WITHOUT AN HOUR IS AN ASKED-FOR DATE, and the drawing cannot
@@ -94,7 +95,7 @@
     hourLabel,
     emptyLabel = t('planner.day_empty', appLocale()),
     axisLabel = t('planner.day_axis', appLocale()),
-    noCastWord = t('planner.no_cast', appLocale()),
+    noCastWord = (voice?: Voice) => t('planner.no_cast', appLocale(), undefined, voice),
     roadSheetWord = t('desk.roadsheet', appLocale()),
     unplaced = [],
     noHourWord = t('planner.no_hour', appLocale()),
@@ -195,7 +196,7 @@
               <span class="ds__foot">
                 {#if t.cast !== null && t.cast !== undefined}
                   <span class="cast-line" class:cast-line--none={t.cast.length === 0}
-                    >{t.cast.length > 0 ? t.cast.join(' · ') : noCastWord}</span
+                    >{t.cast.length > 0 ? t.cast.join(' · ') : noCastWord(t.project ? tradeFor(t.project.workspace_id) : undefined)}</span
                   >
                 {/if}
                 {#if t.roadSheetHref}
@@ -292,7 +293,7 @@
                 <span class="ds__foot">
                   {#if t.cast !== null && t.cast !== undefined}
                     <span class="cast-line" class:cast-line--none={t.cast.length === 0}
-                      >{t.cast.length > 0 ? t.cast.join(' · ') : noCastWord}</span
+                      >{t.cast.length > 0 ? t.cast.join(' · ') : noCastWord(t.project ? tradeFor(t.project.workspace_id) : undefined)}</span
                     >
                   {/if}
                   {#if t.roadSheetHref}

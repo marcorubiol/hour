@@ -23,7 +23,7 @@
   import IdentityMark from '$lib/components/IdentityMark.svelte';
   import JsonKV, { hasJsonContent } from '$lib/components/JsonKV.svelte';
   import { dualTime, hourMark, localeDayMonth, localeWeekdayShort } from '$lib/datetime';
-  import { t, type Locale } from '$lib/i18n';
+  import { t, tradeFor, type Locale } from '$lib/i18n';
   import { addDaysIso, dayKeyInTz } from '$lib/planner';
   import {
     dateSlip,
@@ -142,10 +142,12 @@
     const words = h === 0 ? t('ahora.in_min', locale, { m }) : m === 0 ? t('ahora.in_h', locale, { h }) : t('ahora.in_hm', locale, { h, m });
     return words.replace(/ /g, '\u00a0');
   }
+  /** Tarea 142: a point speaks the trade of its row's space. */
+  let spaceOf = $derived(new Map(items.map((i) => [i.id, i.workspaceId])));
   function pointWord(p: AhoraPoint): string {
     if (p.of === 'stage') return t(`planner.mode_${p.mode}`, locale);
     if (p.label) return p.label;
-    return p.key ? t(momentWordKey(p.key), locale) : '';
+    return p.key ? t(momentWordKey(p.key), locale, undefined, tradeFor(spaceOf.get(p.itemId))) : '';
   }
   const cap = (s: string) => (s ? s[0].toLocaleUpperCase() + s.slice(1) : s);
   function route(p: Extract<AhoraPoint, { of: 'stage' }>): string {

@@ -13,7 +13,7 @@ import * as v from 'valibot';
 import { Constants, type Enums, type Tables } from './db-types';
 import { localDayISO, realIsoDate } from './datetime';
 import { primaryContactPerson } from './conversation';
-import { t, type Locale } from './i18n';
+import { t, tradeFor, type Locale } from './i18n';
 
 type TaskStatus = Enums<'task_status'>;
 
@@ -233,7 +233,7 @@ export function taskContextLabel(task: TaskItem, locale: Locale = 'en'): string 
   if (task.performance) {
     return (
       [task.performance.venue_name, task.performance.city].filter(Boolean).join(', ') ||
-      t('desk.fallback_performance', locale)
+      t('desk.fallback_performance', locale, undefined, tradeFor(task.workspace_id))
     );
   }
   if (task.conversation) {

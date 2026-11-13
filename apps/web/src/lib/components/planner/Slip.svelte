@@ -37,7 +37,7 @@
   import { accentVarFor } from '$lib/utils/accent';
   import type { Slip, SlipKind } from '$lib/month-events';
   import type { ProjectLite } from '$lib/month-events';
-  import { appLocale, t } from '$lib/i18n';
+  import { appLocale, t, tradeFor, type Voice } from '$lib/i18n';
   import { freshMounted, isFresh } from '$lib/fresh.svelte';
 
   /** `to` / `from`, the margin voice, in the session's language. */
@@ -45,8 +45,9 @@
 
   interface Props {
     slip: Slip;
-    /** The kind word — `show`, `rehearsal`, `travel`… Caller owns the words. */
-    kindLabel: (kind: SlipKind) => string;
+    /** The kind word — `show`, `rehearsal`, `travel`… Caller owns the words;
+        the slip hands it the trade of its project's space (tarea 142). */
+    kindLabel: (kind: SlipKind, voice?: Voice) => string;
     /**
      * The state line. A hold says its rank and its deadline in PLAIN TEXT
      * («1st hold · expires Mon»); released says `let go`. A FIRM SHOW SAYS
@@ -178,9 +179,8 @@
      dotted patch that covers the name and stops short of the date beside it
      (diseño B10, the rail's «next»). */
   let held = $derived(slip.cert === 'hold' || slip.cert === 'proposed');
-  let nameIsKind = $derived(
-    !slip.lead && slip.name.trim().toLowerCase() === kindLabel(slip.kind).trim().toLowerCase(),
-  );
+  let kindWord = $derived(kindLabel(slip.kind, slip.project ? tradeFor(slip.project.workspace_id) : undefined));
+  let nameIsKind = $derived(!slip.lead && slip.name.trim().toLowerCase() === kindWord.trim().toLowerCase());
 </script>
 
 <!-- One body, two shells: a thing with a page of its own is a link, one
@@ -225,7 +225,7 @@
         {/if}
       {/if}
       <span class="slip__kind" class:slip__kind--q={held}
-        >{kindLabel(slip.kind)}{#if held}?{/if}</span
+        >{kindWord}{#if held}?{/if}</span
       >
     </span>
     {#if slip.time}

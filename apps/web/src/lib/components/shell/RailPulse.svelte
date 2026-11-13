@@ -36,8 +36,8 @@
    * and calm leaves it alone. Outside calm, nothing changes.
    */
   import { dualTime, hourMark, localeDayMonthNear, localeWeekdayShort, viewerTimeZone } from '$lib/datetime';
-  import { t, type Locale } from '$lib/i18n';
-  import { momentWordKey, type SlipKind } from '$lib/month-events';
+  import { t, tradeFor, type Locale, type Voice } from '$lib/i18n';
+  import { momentWordKey, perfWorkspaceId, type SlipKind } from '$lib/month-events';
   import { dayKeyInTz } from '$lib/planner';
   import { computePulse, type PulseWord } from '$lib/pulse';
   import { createPulseFeeds, pulseSlip, pulseSlipContext } from '$lib/pulse-feeds.svelte';
@@ -79,7 +79,7 @@
   // statement about the day and an empty cache is not one.
   let settled = $derived(feeds.settled);
 
-  const kindLabel = (kind: SlipKind) => t(`planner.kind_${kind}`, locale);
+  const kindLabel = (kind: SlipKind, voice?: Voice) => t(`planner.kind_${kind}`, locale, undefined, voice);
 
   let slipCtx = $derived(pulseSlipContext(feeds.workspaces, viewerTz, kindLabel));
 
@@ -88,8 +88,8 @@
   /** A run-sheet key or a date kind → the words the app already owns.
       `start` has no anchor key of its own; the Desk calls that moment the
       show, and one moment may not have two names. */
-  function wordLabel(word: PulseWord): string {
-    if (word.of === 'step') return t(momentWordKey(word.key), locale);
+  function wordLabel(word: PulseWord, voice?: Voice): string {
+    if (word.of === 'step') return t(momentWordKey(word.key), locale, undefined, voice);
     // A trip's stage says its mode (ADR-146): «tren» until it arrives.
     if (word.of === 'stage') return t(`planner.mode_${word.key}`, locale);
     return word.label ?? kindLabel(word.key as SlipKind);
@@ -101,7 +101,7 @@
     return hourMark(dualTime(iso, tz, viewerTz).primary);
   }
 
-  let doingLabel = $derived(pulse.now.doing ? wordLabel(pulse.now.doing.word) : null);
+  let doingLabel = $derived(pulse.now.doing ? wordLabel(pulse.now.doing.word, tradeFor(perfWorkspaceId(pulse.now.doing.ref.row))) : null);
   let untilLabel = $derived(pulse.now.until ? hour(pulse.now.until.at, pulse.now.until.tz) : null);
   /** Anything but a fact is a claim, and a claim is drawn as one. */
   let nowGuess = $derived(pulse.now.doing ? pulse.now.doing.ref.attribution !== 'explicit' : false);

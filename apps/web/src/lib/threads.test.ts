@@ -1,4 +1,5 @@
-import { describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test } from 'vitest';
+import { setTrade, setWorkspaceTrades } from './i18n';
 import * as v from 'valibot';
 import {
   AudienceQuerySchema,
@@ -47,6 +48,23 @@ describe('facetName', () => {
     const f = { facet_key: 'tecnica', label: 'Tècnica i so', labels: { en: 'Tech & sound' } };
     expect(facetName(f, 'en')).toBe('Tech & sound');
     expect(facetName(f, 'es')).toBe('Tècnica i so');
+  });
+});
+
+afterEach(() => {
+  setTrade('stage');
+  setWorkspaceTrades([]);
+});
+
+describe('tarea 142: la voz de la fila', () => {
+  test('readerLabel y audienceLine dicen el oficio que se les pasa', () => {
+    const r = { user_id: 'u', name: 'Laia', roles: ['cast' as const] };
+    setTrade('mixed');
+    expect(readerLabel(r, 'es', 'music')).toBe('Laia (formación)');
+    expect(readerLabel(r, 'es')).toBe('Laia (reparto)');
+    const container = { count: 2, reason: { kind: 'container' as const, level: 'project' as const } };
+    expect(audienceLine(container, 'es', 'music')).toBe('Lo ven 2, por estar en el proyecto');
+    expect(audienceLine(container, 'es', 'stage')).toBe('Lo ven 2, por estar en el espectáculo');
   });
 });
 
@@ -288,6 +306,7 @@ describe('esquemas', () => {
 
 describe('«de qué se habla» (ADR-116)', () => {
   const bolo = {
+    workspace_id: 'w-stage',
     anchor_kind: 'bolo' as const,
     anchor_id: 'b1',
     facet_key: 'tecnica',
@@ -304,6 +323,7 @@ describe('«de qué se habla» (ADR-116)', () => {
     },
   };
   const conv = {
+    workspace_id: 'w-stage',
     anchor_kind: 'conversation' as const,
     anchor_id: 'c1',
     facet_key: null,
@@ -334,6 +354,16 @@ describe('«de qué se habla» (ADR-116)', () => {
     expect(feedThreadName(bolo, 'es')).toBe('Técnica');
     expect(feedThreadName({ ...bolo, facet_key: null }, 'es')).toBe('General');
     expect(feedThreadName(conv, 'es')).toBe('Equipo');
+  });
+
+  test('tarea 142: el nombre de un hilo habla el oficio de su espacio, no el de la pantalla', () => {
+    setWorkspaceTrades([{ id: 'w-music', slug: 'banda', trade: 'music' }]);
+    setTrade('mixed');
+    const converses = { ...bolo, facet_key: 'converses' };
+    expect(feedThreadName({ ...converses, workspace_id: 'w-music' }, 'es')).toBe('Contratación');
+    expect(feedThreadName(converses, 'es')).toBe('Difusión');
+    setTrade('stage');
+    setWorkspaceTrades([]);
   });
 
   test('de qué se habla: sala y ciudad del bolo, o el nombre de la conversación', () => {

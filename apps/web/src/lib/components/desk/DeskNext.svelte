@@ -34,10 +34,10 @@
   import BlockHead from '$lib/components/BlockHead.svelte';
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { dualTime, hourMark, localeDayMonth, localeDayMonthNear, localeWeekdayShort } from '$lib/datetime';
-  import { LOCALE_TAG, t, type Locale } from '$lib/i18n';
+  import { LOCALE_TAG, t, tradeFor, type Locale, type Voice } from '$lib/i18n';
   import { holdDeadlineLabel } from '$lib/performance';
   import { statusWord } from '$lib/planner';
-  import { momentWordKey, type DateEvent, type PerformanceEvent, type SlipContext, type SlipKind } from '$lib/month-events';
+  import { momentWordKey, perfWorkspaceId, type DateEvent, type PerformanceEvent, type SlipContext, type SlipKind } from '$lib/month-events';
   import { stagePlace } from '$lib/travel-stage';
   import { plannerDayHref } from '$lib/planner';
   import { lensOn } from '$lib/lenses.svelte';
@@ -79,7 +79,7 @@
 
   let { agenda, far = null, after = [], settled, errored, onretry, today, viewerTz, now, boardNew = 0, slipCtx, workspaces, ahoraHref = null, locale }: Props = $props();
 
-  const kindLabel = (kind: SlipKind) => t(`planner.kind_${kind}`, locale);
+  const kindLabel = (kind: SlipKind, voice?: Voice) => t(`planner.kind_${kind}`, locale, undefined, voice);
   const cap = (s: string) => (s ? s[0].toLocaleUpperCase() + s.slice(1) : s);
   const hour = (iso: string, tz: string | null) => hourMark(dualTime(iso, tz, viewerTz).primary);
   const dateWords = (day: string) => `${localeWeekdayShort(day, locale)} ${localeDayMonth(day, locale)}`;
@@ -103,7 +103,7 @@
     if (w.of === 'stage') return t(`planner.mode_${w.mode}`, locale);
     if (w.of === 'date') return w.label || kindLabel((['show', 'rehearsal', 'residency', 'travel_day', 'press', 'day_off'].includes(w.kind) ? w.kind : 'other') as SlipKind);
     if (w.label) return w.label;
-    return w.key ? t(momentWordKey(w.key), locale) : '';
+    return w.key ? t(momentWordKey(w.key), locale, undefined, tradeFor(perfWorkspaceId(p.ref.row))) : '';
   }
   /** Where a point is, small: the venue and city, a stage's route, a date's place. */
   function place(p: AgendaPoint): string {
@@ -217,7 +217,7 @@
     <span class="then__k" class:then__k--none={!label}>{label ?? ''}</span>
     <span class="then__when">{when}</span>
     <svelte:element this={sl.href ? 'a' : 'span'} href={sl.href} class="then__what">
-      {@render mark(item.ref.row.project)}<span class="then__kind">{kindLabel(sl.kind)}{held ? '?' : ''}</span>
+      {@render mark(item.ref.row.project)}<span class="then__kind">{kindLabel(sl.kind, tradeFor(perfWorkspaceId(item.ref.row)))}{held ? '?' : ''}</span>
       <span class:guess={held}>{where}</span>
     </svelte:element>
   </li>

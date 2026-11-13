@@ -92,7 +92,7 @@
     type MoneyPayer,
   } from '$lib/money';
   import { moneyAccessAnyQueryOptions } from '$lib/bolo-queries';
-  import { appLocale, LOCALE_TAG, t } from '$lib/i18n';
+  import { appLocale, LOCALE_TAG, t, tradeFor } from '$lib/i18n';
   import { performanceStatusTone } from '$lib/performance';
   import { plannerDayHref } from '$lib/planner';
   import { lensOn } from '$lib/lenses.svelte';
@@ -327,6 +327,7 @@
   function attentionWhy(item: AttentionItem): string {
     const b = item.bolo;
     const day = b.first_performed_at ? dayLabel(b.first_performed_at) : null;
+    const voice = tradeFor(b.project?.workspace_id);
     switch (item.kind) {
       case 'overdue': {
         const late = t(item.daysLate === 1 ? 'books.att_late_one' : 'books.att_late_many', locale, { n: item.daysLate });
@@ -336,15 +337,15 @@
         return late;
       }
       case 'to_invoice':
-        return day ? t('books.att_to_invoice', locale, { date: day }) : t('books.att_to_invoice_nodate', locale);
+        return day ? t('books.att_to_invoice', locale, { date: day }, voice) : t('books.att_to_invoice_nodate', locale, undefined, voice);
       case 'draft':
-        return day ? t('books.att_draft', locale, { date: day }) : t('books.att_draft_nodate', locale);
+        return day ? t('books.att_draft', locale, { date: day }, voice) : t('books.att_draft_nodate', locale, undefined, voice);
       case 'fiscal':
         return t('books.att_fiscal', locale);
       case 'contract':
         return t(b.contract_sent_at ? 'books.att_contract_sent' : 'books.att_contract_unsent', locale, { date: day ?? DASH });
       case 'no_fee':
-        if (b.status === 'done') return day ? t('books.att_no_fee_done', locale, { date: day }) : t('books.att_no_fee_done_nodate', locale);
+        if (b.status === 'done') return day ? t('books.att_no_fee_done', locale, { date: day }, voice) : t('books.att_no_fee_done_nodate', locale, undefined, voice);
         return day ? t('books.att_no_fee', locale, { date: day }) : t('books.att_no_fee_nodate', locale);
     }
   }
@@ -1398,10 +1399,10 @@
                         <td colspan="8">
                           <div class="sheet">
                             <div class="sheet__col">
-                              <p class="sheet__h">{t('books.sheet_functions', locale)}</p>
+                              <p class="sheet__h">{t('books.sheet_functions', locale, undefined, tradeFor(b.project?.workspace_id))}</p>
                               <p>
                                 {#if b.first_performed_at && lensOn('planner')}<a class="sheet__a" href={plannerDayHref('day', b.first_performed_at.slice(0, 10))}>{dayLabel(b.first_performed_at)}</a>{:else if b.first_performed_at}{dayLabel(b.first_performed_at)}{:else}{t('books.no_date', locale)}{/if}
-                                · {t(b.function_count === 1 ? 'books.sheet_fn_one' : 'books.sheet_fn_many', locale, { n: b.function_count })}
+                                · {t(b.function_count === 1 ? 'books.sheet_fn_one' : 'books.sheet_fn_many', locale, { n: b.function_count }, tradeFor(b.project?.workspace_id))}
                               </p>
                               {#if b.project}<p class="sheet__faint">{b.project.name}</p>{/if}
                               {#if conversationHref(b)}

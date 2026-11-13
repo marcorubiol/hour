@@ -31,11 +31,12 @@
   import type { IdentitySibling } from '$lib/utils/identity';
   import IdentityQuickPanel from '$lib/components/IdentityQuickPanel.svelte';
   import { performanceStatusFamily, statusFootKey } from '$lib/performance';
-  import { appLocale, appLocaleTag, t } from '$lib/i18n';
+  import { appLocale, appLocaleTag, t, tradeFor, type Voice } from '$lib/i18n';
   import { statusWord } from '$lib/planner';
   import { dualTime } from '$lib/datetime';
   import {
     performanceSlip,
+    perfWorkspaceId,
     dateSlip,
     type Slip as SlipVM,
     perfDayKey,
@@ -93,7 +94,7 @@
     /** BCP47/locale tag for weekday + month labels. */
     locale?: string;
     /** i18n hooks — the page passes t()-backed fns; defaults follow the session language. */
-    dateKindLabel?: (kind: string) => string;
+    dateKindLabel?: (kind: string, voice?: Voice) => string;
     createLabel?: (isoDate: string) => string;
     /** «hasta 15 jul · 10 días» / «desde 6 jul · 10 días» — la frase que una
         mitad de tanda le debe a la otra. */
@@ -274,7 +275,7 @@
     kindLabel: (k: string) => dateKindLabel(k),
     statusLabel: (s: string) => statusWord(s, L),
     viewerTimeLabel: (time: string) => t('planner.viewer_time', L, { time }),
-    fallbackName: t('create.type_performance', L),
+    fallbackName: (voice: Voice) => t('create.type_performance', L, undefined, voice),
     dualTime,
     originOf: travelOrigin,
   });
@@ -642,7 +643,7 @@
           // La misma resolución que el resto del mes usa para cualquier slip
           // (`slipCtx.kindLabel`): un bolo dice «show» con la palabra del
           // vocabulario, no con una segunda opinión propia de esta banda.
-          dateKindLabel(sl.kind),
+          dateKindLabel(sl.kind, tradeFor(perfWorkspaceId(p))),
         );
       }
     });
@@ -1207,7 +1208,7 @@
         {#each lead as entry, ei (entry.key)}
           <Slip
             slip={entry.slip}
-            kindLabel={(k) => dateKindLabel(k)}
+            kindLabel={(k, voice) => dateKindLabel(k, voice)}
             stateLabel={slipState}
             stateUrgent={isUrgentHold(entry.slip)}
             showCountry={false}

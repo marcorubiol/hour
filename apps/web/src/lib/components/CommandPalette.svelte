@@ -50,7 +50,7 @@
   import { localeDayMonth, viewerTimeZone } from '$lib/datetime';
   import { openPeek } from '$lib/peek.svelte';
   import type { PeekTarget } from '$lib/peek';
-  import { appLocale, LOCALE_TAG, t } from '$lib/i18n';
+  import { appLocale, LOCALE_TAG, t, tradeFor } from '$lib/i18n';
   import { accentVarFor } from '$lib/utils/accent';
   import { spaceName } from '$lib/utils/identity';
   import { lineKindLabel } from '$lib/utils/line-kind';
@@ -270,6 +270,8 @@
     href?: string;
     /** for a found row without a page (a bolo): the vistazo it opens */
     peek?: PeekTarget;
+    /** for a project: its space, whose trade its kind word speaks (tarea 142) */
+    workspaceId?: string;
   }
   interface Group {
     key: Kind;
@@ -357,7 +359,7 @@
     return { token: `s:${w.slug}`, kind: 'space', name: spaceName(w.name), path: '', drill: canDrill ? `s:${w.slug}` : null };
   }
   function projectRow(p: (typeof projectIndex)[number], canDrill: boolean, path: string): Row {
-    return { token: `p:${p.id}`, kind: 'project', name: p.name, path, drill: canDrill ? `p:${p.id}` : null };
+    return { token: `p:${p.id}`, kind: 'project', name: p.name, path, drill: canDrill ? `p:${p.id}` : null, workspaceId: p.workspaceId };
   }
   function lineRow(l: (typeof lineIndex)[number], path: string): Row {
     return { token: `l:${l.id}`, kind: 'line', name: l.name, path, drill: null, lineKind: l.kind };
@@ -782,7 +784,7 @@
                   <ScopeGlyph kind={r.kind === 'contact' ? 'person' : r.kind} accent={r.kind === 'contact' ? 'var(--text-faint)' : accentFor(r.token)} lineKind={r.lineKind ?? ''} />
                 {/if}
                 {#if r.kind !== 'create'}
-                  <span class="cmdk__kind">{r.kind === 'line' ? lineKindLabel(r.lineKind ?? '', locale) : t(KIND_KEY[r.kind], locale)}</span>
+                  <span class="cmdk__kind">{r.kind === 'line' ? lineKindLabel(r.lineKind ?? '', locale) : t(KIND_KEY[r.kind], locale, undefined, r.workspaceId ? tradeFor(r.workspaceId) : undefined)}</span>
                 {/if}
                 <span class="cmdk__name">
                   {r.name}{#if r.kind === 'create' && r.path}<span class="cmdk__path">&nbsp;{r.path}</span>{:else if r.path}<span class="cmdk__path">{' · '}{r.path}</span>{/if}

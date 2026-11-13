@@ -36,7 +36,7 @@
     activeProjectsQueryOptions,
     allLinesQueryOptions,
   } from '$lib/nav-queries';
-  import { appLocale, t } from '$lib/i18n';
+  import { appLocale, t, tradeFor } from '$lib/i18n';
 
   const locale = appLocale();
   import { accentVar } from '$lib/utils/accent';
@@ -196,7 +196,7 @@
       {#each visibleProjects as unit (unit.id)}
         <article class="pcard pcard--accent" style={`--c: ${unit.accent}`}>
           <div class="pcard__space">
-            <span class="pcard__tag">{t('hall.project_tag', locale)}</span>
+            <span class="pcard__tag">{t('hall.project_tag', locale, undefined, tradeFor(unit.workspaceId))}</span>
           </div>
           <a class="pcard__name" href={projectUrl(unit)}>{unit.name}</a>
           <p class="pcard__meta">{projectStatLabel(unit) || t('hall.no_activity', locale)}</p>
@@ -209,7 +209,7 @@
                 <span class="pcard__go" aria-hidden="true">→</span>
               </button>
             {:else}
-              <EmptyLine text={t('hall.no_lines', locale)} />
+              <EmptyLine text={t('hall.no_lines', locale, undefined, tradeFor(unit.workspaceId))} />
             {/each}
             <div class="pcard__new">
               <button
