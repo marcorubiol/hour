@@ -12,9 +12,9 @@ import { waitForLoaded } from './loaded';
  * técnico de verdad. El spec lo invita a un bolo suyo de `zzz-e2e-collab`
  * con Equip, acepta por la RPC con su JWT y mira el marco con el espacio de la
  * compañía fijado en el ámbito (`?scope=s:playwright`), que es donde es guest:
- *   - Hoy: su función, dentro de tres días, sin tarjeta (la tarjeta es para
- *     hoy, ADR-153): el titular la nombra y es la primera fila de «Después»,
- *     que abre su ficha con el tablón; ni «+» (Nueva tarea) ni Cuentas;
+ *   - Hoy: su función, dentro de tres días: la pieza hueca la nombra como lo
+ *     siguiente (ADR-202 § 3) y abre su ficha con el tablón, y tiene su ficha
+ *     en «Lo que viene»; ni «+» (Nueva tarea) ni Cuentas;
  *   - el Planificador: su función, y ninguna puerta de crear;
  *   - la ficha: el tablón, sin «Editar datos», sin notas que no podría abrir;
  *   - ⌘K: ninguna fila de crear; Ajustes del espacio: solo su perfil.
@@ -161,14 +161,15 @@ test.describe('el marco de un guest de un solo bolo (comms carril 2, fase 3)', (
     const nav = page.getByTestId('lens-nav');
     await expect(nav).not.toContainText(/cuentas|comptes|books|money/i);
     await expect(page.locator('.desk__add')).toHaveCount(0);
-    // No es hoy: sin tarjeta; el titular y «Después» la dicen (ADR-153).
+    // No es hoy: la pieza queda hueca, la nombra como lo siguiente (ADR-202
+    // § 3), y su ficha de «Lo que viene» está en su día (§ 6).
     await expect(page.getByTestId('desk-next')).toHaveCount(0);
-    await expect(page.locator('.desk__day')).toContainText(new RegExp(`${venue}|Manresa`));
-    const after = page.getByTestId('desk-after');
-    await expect(after).toContainText(venue);
+    const hollow = page.getByTestId('desk-hollow');
+    await expect(hollow).toContainText(new RegExp(`${venue}|Manresa`));
+    await expect(page.locator(`[data-testid="desk-tile"][data-day="${inDays(3)}"]`)).toBeVisible();
 
-    // ── su fila de «Después» abre el vistazo (ADR-139); «Abrir entera», la ficha con el tablón ──
-    await after.getByRole('link').first().click();
+    // ── «Lo siguiente» abre el vistazo (ADR-139); «Abrir entera», la ficha con el tablón ──
+    await hollow.getByRole('link').first().click();
     const peek = page.getByTestId('peek');
     await expect(peek).toBeVisible({ timeout: 15_000 });
     await expect(page).toHaveURL(/peek=performance/);
