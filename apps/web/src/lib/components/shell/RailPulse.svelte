@@ -25,10 +25,13 @@
    * every time a query settles, and the rail is furniture: it must be where
    * it was a second ago.
    *
-   * IT NEVER FILTERS BY SCOPE. It sits ABOVE the scope list on purpose: the
-   * lens narrows what you are looking at, and this says what is happening to
-   * you regardless of where you are looking. What it DOES narrow by is the
-   * person axis — you — and only on facts (see $lib/pulse § whose day it is).
+   * IT FOLLOWS THE SCOPE (ADR-202 § 13, tarea 145; until then it never did,
+   * ADR-096 § 5): whoever runs many companies works scoped to one and
+   * expects to see only that one, here too. The rows are read unscoped (one
+   * cache with Hoy) and narrowed by `$lib/hoy` scopePulseInput; while the
+   * scope's containers are still on their way it draws dashes, never «free».
+   * It also narrows by the person axis — you — and only on facts (see
+   * $lib/pulse § whose day it is).
    *
    * Calm touches one thing (enmienda a ADR-096 § 5, Marco 2026-10-20): in
    * calm, NEXT names only what is confirmed, by `$lib/calm` (`railNextShows`),
@@ -44,6 +47,11 @@
   import Slip from '$lib/components/planner/Slip.svelte';
   import { railNextShows } from '$lib/calm';
   import { useCalm } from '$lib/stores/calm.svelte';
+  import { createQuery } from '@tanstack/svelte-query';
+  import { usePins } from '$lib/stores/pins.svelte';
+  import { buildLineIndex, buildProjectIndex, resolveScope, type RawLine } from '$lib/nav';
+  import { activeProjectsQueryOptions, allLinesQueryOptions } from '$lib/nav-queries';
+  import { scopePulseInput } from '$lib/hoy';
 
   interface Props {
     /** The rail's clock, already ticking on the minute — one timer in the
@@ -62,11 +70,22 @@
   const feeds = createPulseFeeds(() => today);
   const calm = useCalm();
 
+  // The scope, as every lens resolves it (the frame's nav caches, one key each).
+  const pins = usePins();
+  const projectsQuery = createQuery(activeProjectsQueryOptions());
+  const linesQuery = createQuery(allLinesQueryOptions());
+  let projectIndex = $derived(buildProjectIndex(feeds.workspaces, $projectsQuery.data?.items ?? []));
+  let lineIndex = $derived(buildLineIndex(feeds.workspaces, ($linesQuery.data?.items as RawLine[]) ?? []));
+  let scope = $derived(resolveScope(pins.pins, feeds.workspaces, lineIndex, projectIndex));
+  let scopeUnresolved = $derived(
+    (pins.lineIds().length > 0 && scope.lines.length !== pins.lineIds().length) ||
+      (pins.projectIds().length > 0 && scope.projects.length !== pins.projectIds().length),
+  );
+
   let pulse = $derived(
     computePulse(
       {
-        performances: feeds.performances,
-        dates: feeds.dates,
+        ...scopePulseInput({ performances: feeds.performances, dates: feeds.dates }, scope),
         viewerTz,
         axis: feeds.axis,
         nextKeeps: (ref) => railNextShows(ref.family, calm.on),
@@ -77,7 +96,7 @@
 
   // Nothing has landed yet: draw the frame, claim nothing. «free» is a
   // statement about the day and an empty cache is not one.
-  let settled = $derived(feeds.settled);
+  let settled = $derived(feeds.settled && !scopeUnresolved);
 
   const kindLabel = (kind: SlipKind, voice?: Voice) => t(`planner.kind_${kind}`, locale, undefined, voice);
 
