@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { columnIndex, firstSheetPath, readXlsx, sharedStrings, sheetKind, sheetRows, xmlText } from './xlsx-read';
+import { zipEntries, zipRead } from './zip-read';
 
 /** Un zip «guardado» (sin comprimir), lo justo para que `zip-read` lo abra. */
 function storedZip(files: Record<string, string>): Uint8Array {
@@ -101,6 +102,21 @@ describe('xlsx-read', () => {
     expect(read.sheet).toBe('Difusión');
     expect(read.sheets).toBe(2);
     expect(read.rows[2][0]).toBe('Marta Soler');
+  });
+
+  test('a huge row number or column reference makes nothing grow', () => {
+    const xml = '<sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>a</t></is></c><c r="ZZZZZZZ1"><v>1</v></c></row><row r="999999999"><c r="A999999999"><v>2</v></c></row></sheetData>';
+    const rows = sheetRows(xml, []);
+    expect(rows).toEqual([['a']]);
+    expect(sheetRows('<row r="1"/><row r="2"/><row r="3"/>', [], 2)).toHaveLength(2);
+    expect(columnIndex('ABCD1')).toBe(-1);
+  });
+
+  test('an entry bigger than the cap once inflated is refused', async () => {
+    const buf = storedZip({ 'a.txt': 'x'.repeat(100) });
+    const entry = zipEntries(buf)[0];
+    await expect(zipRead(buf, entry, 50)).rejects.toThrow('too large');
+    expect((await zipRead(buf, entry, 100)).length).toBe(100);
   });
 
   test('a zip that is not a workbook says so', async () => {

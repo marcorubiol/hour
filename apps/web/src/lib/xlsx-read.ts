@@ -13,6 +13,13 @@ import { zipEntries, zipRead, type ZipEntry } from '$lib/zip-read';
 
 export class XlsxError extends Error {}
 
+/** Tope de cada parte del libro, descomprimida: una hoja de contactos no llega ni de lejos. */
+export const XLSX_MAX_BYTES = 50 * 1024 * 1024;
+/** Filas que se leen como mucho: la cabecera y 2.000 (una más ya se rechaza). */
+export const XLSX_MAX_ROWS = 2002;
+/** Columnas que se leen como mucho por fila. */
+export const XLSX_MAX_COLUMNS = 500;
+
 /** Lo que hay en los primeros bytes: decide cómo se lee el fichero. */
 export function sheetKind(head: Uint8Array): 'zip' | 'xls' | 'text' {
   if (head[0] === 0x50 && head[1] === 0x4b) return 'zip';
@@ -46,9 +53,10 @@ export function sharedStrings(xml: string): string[] {
   return [...xml.matchAll(/<si\b[^>]*>([\s\S]*?)<\/si>|<si\b[^>]*\/>/g)].map((m) => (m[1] ? runsText(m[1]) : ''));
 }
 
-/** «A» → 0, «AB» → 27. */
+/** «A» → 0, «AB» → 27. Más de tres letras (pasado XFD) no es una columna: -1. */
 export function columnIndex(ref: string): number {
   const letters = /^[A-Z]+/i.exec(ref)?.[0].toUpperCase() ?? '';
+  if (letters.length > 3) return -1;
   let n = 0;
   for (const c of letters) n = n * 26 + (c.charCodeAt(0) - 64);
   return n - 1;
@@ -58,17 +66,28 @@ function attr(attrs: string, name: string): string | null {
   return new RegExp(`\\b${name}="([^"]*)"`).exec(attrs)?.[1] ?? null;
 }
 
-/** Las filas de una hoja; las celdas que faltan, vacías. */
-export function sheetRows(xml: string, shared: readonly string[]): string[][] {
+/**
+ * Las filas de una hoja; las celdas que faltan, vacías. Se para en `maxRows`
+ * filas y `maxColumns` columnas: un `r=` o una columna enormes no hacen crecer
+ * nada.
+ */
+export function sheetRows(
+  xml: string,
+  shared: readonly string[],
+  maxRows = XLSX_MAX_ROWS,
+  maxColumns = XLSX_MAX_COLUMNS,
+): string[][] {
   const rows: string[][] = [];
   for (const rm of xml.matchAll(/<row\b([^>]*?)(?:\/>|>([\s\S]*?)<\/row>)/g)) {
     const r = Number(attr(rm[1], 'r'));
     const at = Number.isInteger(r) && r > 0 ? r - 1 : rows.length;
+    if (at >= maxRows) break;
     const row: string[] = [];
     let next = 0;
     for (const cm of (rm[2] ?? '').matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
       const ref = attr(cm[1], 'r');
       const col = ref ? columnIndex(ref) : next;
+      if (col < 0 || col >= maxColumns) continue;
       next = col + 1;
       const type = attr(cm[1], 't');
       const body = cm[2] ?? '';
@@ -118,7 +137,9 @@ export async function readXlsx(buf: Uint8Array): Promise<{ rows: string[][]; she
   const byName = new Map(entries.map((e) => [e.name, e]));
   const text = async (name: string): Promise<string | null> => {
     const e = byName.get(name);
-    return e ? new TextDecoder().decode(await zipRead(buf, e)) : null;
+    if (!e) return null;
+    if (e.size > XLSX_MAX_BYTES) throw new XlsxError('too large');
+    return new TextDecoder().decode(await zipRead(buf, e, XLSX_MAX_BYTES));
   };
   const workbook = await text('xl/workbook.xml');
   if (!workbook) throw new XlsxError('not a workbook');
