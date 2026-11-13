@@ -755,13 +755,15 @@
   /** «Importar chat» (128, ADR-189). El atajo «Mandar a Hour» del iPhone llega con `?importar`. */
   let importOpen = $state(false);
 
-  /** Lo que ofrece el «+» de la cabecera (tarea 130): la llamada y el chat, fuera de Equipo. */
+  /** Lo que ofrece el «+» de la cabecera (tarea 130): la llamada, el chat y los contactos de una hoja, fuera de Equipo. */
   let addItems = $derived([
     { label: t('conversations.add_item_conversation', locale), onclick: openAdd },
     ...(listChip !== 'equipo'
       ? [
           { label: t('conversations.add_item_call', locale), onclick: () => (callOpen = true) },
           { label: t('wa_import.open', locale), onclick: () => (importOpen = true) },
+          // Contactos de una hoja (138): el mismo diálogo que ⌘K, montado en el marco.
+          { label: t('contact_import.title', locale), onclick: () => creation.openImport() },
         ]
       : []),
   ]);
@@ -1040,8 +1042,8 @@
             </Button>
           </span>
         {/if}
-        <!-- Un solo «+» (tarea 130): conversación, llamada (121 A, ADR-182) e importar chat (128,
-             ADR-189), igual en el móvil. En Equipo sólo la conversación. -->
+        <!-- Un solo «+» (tarea 130): conversación, llamada (121 A, ADR-182), importar chat (128,
+             ADR-189) e importar contactos (138), igual en el móvil. En Equipo sólo la conversación. -->
         <Menu items={addItems} align="end" label={t('conversations.add_menu_aria', locale)} triggerClass="btn--primary btn--s">
           {#snippet trigger()}<span class="conversations__plus" aria-hidden="true">+</span><span class="conversations__add-long"
               >{t('conversations.add_menu', locale)}</span

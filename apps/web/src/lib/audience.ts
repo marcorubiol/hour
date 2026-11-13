@@ -322,7 +322,8 @@ const HEADER_WORDS: Record<keyof CsvRead['columns'], string[]> = {
   language: ['language', 'idioma', 'lang', 'langue', 'llengua'],
 };
 
-function plain(s: string): string {
+/** Sin acentos, en minúscula y con los espacios juntos: para casar cabeceras y nombres. */
+export function plain(s: string): string {
   return s
     .trim()
     .toLowerCase()

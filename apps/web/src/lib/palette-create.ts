@@ -37,7 +37,8 @@ export type CreateKind =
   | 'task'
   | 'conversation'
   | 'person'
-  | 'organization';
+  | 'organization'
+  | 'import';
 
 export interface PaletteCreate {
   kind: CreateKind;
@@ -78,6 +79,7 @@ export const CREATE_LABEL_KEYS: Record<CreateKind, string> = {
   conversation: 'palette.new_conversation',
   person: 'palette.new_person',
   organization: 'palette.new_organization',
+  import: 'palette.import_contacts',
 };
 
 /**
@@ -85,7 +87,7 @@ export const CREATE_LABEL_KEYS: Record<CreateKind, string> = {
  * on the commonest date, a rehearsal; the type chip is right there.
  */
 export function createEventType(kind: CreateKind): QuickType | null {
-  if (kind === 'task' || kind === 'conversation' || kind === 'person' || kind === 'organization') return null;
+  if (kind === 'task' || kind === 'conversation' || kind === 'person' || kind === 'organization' || kind === 'import') return null;
   if (kind === 'date') return 'rehearsal';
   return kind;
 }
@@ -120,6 +122,8 @@ const KIND_WORDS: Record<CreateKind, readonly string[]> = {
   conversation: ['conversa', 'conversacion', 'conversation', 'contacte', 'contacto', 'contact'],
   person: ['persona', 'person', 'personne'],
   organization: ['organitzacio', 'organizacion', 'organization', 'organisation', 'entitat', 'entidad', 'empresa'],
+  // Contactos de una hoja (138): sólo cuando se nombra, nunca con un verbo suelto.
+  import: ['importa', 'importar', 'import', 'importer', 'importacio', 'importacion', 'importation', 'hoja', 'full', 'sheet', 'excel', 'csv'],
 };
 
 /** A half-typed word counts from three letters; a shorter one must be whole. */
@@ -138,6 +142,10 @@ export function allowed(kind: CreateKind, can: CreateCan): boolean {
   // could not open what they made is not offered to make it.
   if (kind === 'person') return can.directory && can.converse;
   if (kind === 'organization') return can.directory && can.converse && can.organization;
+  // Lo importado es directorio (ADR-124): la base sólo deja importar a quien lee
+  // Conversaciones en ese espacio (`private.can_import_contacts`). Aquí se ofrece
+  // a quien edita conversaciones en alguno y da de alta personas; el espacio lo decide la base.
+  if (kind === 'import') return can.directory && can.converse;
   return can.plan;
 }
 
@@ -154,7 +162,7 @@ export function paletteCreates(query: string, can: CreateCan): PaletteCreate[] {
 
   const named = i < words.length ? kindsNamed(folded[i]) : [];
   const offer = (kinds: readonly CreateKind[], title: string) =>
-    kinds.filter((k) => allowed(k, can)).map((kind) => ({ kind, title }));
+    kinds.filter((k) => allowed(k, can)).map((kind) => ({ kind, title: kind === 'import' ? '' : title }));
 
   if (named.length > 0) return offer(named, words.slice(i + 1).join(' '));
   return offer(BASE_CREATES, words.slice(verb ? i : 0).join(' '));

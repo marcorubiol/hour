@@ -15,7 +15,7 @@
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
-import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
+import { pgGet, pgPostRpc, PostgrestError, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import { json } from '$lib/server/http';
 
@@ -56,6 +56,17 @@ export const GET: RequestHandler = async ({ url, request, platform, locals }) =>
       order: 'on_day.asc,created_at.asc',
     });
     search.append('on_day', `lte.${to}`);
+    // Lo que trae una importación de contactos (138) vive en la ficha de cada
+    // persona, no en el margen del día en que se importó. Mientras la base no
+    // tenga la columna (migración 20261113100000 sin aplicar), sin el filtro.
+    const imported = new URLSearchParams(search);
+    imported.set('import_id', 'is.null');
+    try {
+      const { data } = await pgGet(env, 'note', jwt, { search: imported });
+      return json({ items: data });
+    } catch (err) {
+      if (!(err instanceof PostgrestError && err.code === '42703')) throw err;
+    }
     const { data } = await pgGet(env, 'note', jwt, { search });
     return json({ items: data });
   } catch (err) {

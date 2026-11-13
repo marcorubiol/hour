@@ -122,6 +122,14 @@ describe('paletteCreates: a person and an organization (136)', () => {
     expect(kinds('Anna Puig', can).slice(-1)).toEqual(['person']);
   });
 
+  it('importing contacts only when named, without a title, where a person could be made (138)', () => {
+    expect(paletteCreates('importar contactos', ALL)).toEqual([{ kind: 'import', title: '' }]);
+    expect(kinds('excel')).toEqual(['import']);
+    expect(kinds('Anna Puig')).not.toContain('import');
+    expect(kinds('importer', { ...ALL, directory: false })).toEqual([]);
+    expect(createEventType('import')).toBeNull();
+  });
+
   it('nor without Converses: their file is read through the conversations', () => {
     expect(kinds('persona', { plan: true, converse: false, task: true, directory: true, organization: true })).toEqual([]);
   });

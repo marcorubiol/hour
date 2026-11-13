@@ -54,20 +54,45 @@ export function zipEntries(buf: Uint8Array): ZipEntry[] {
   return out;
 }
 
-async function inflateRaw(data: Uint8Array): Promise<Uint8Array> {
+async function inflateRaw(data: Uint8Array, max: number): Promise<Uint8Array> {
   const stream = new Blob([data as BlobPart]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
-  return new Uint8Array(await new Response(stream).arrayBuffer());
+  if (!Number.isFinite(max)) return new Uint8Array(await new Response(stream).arrayBuffer());
+  // Con tope: se lee a trozos y se corta en cuanto lo pasa (una bomba de zip
+  // no llega a ocupar la memoria).
+  const reader = stream.getReader();
+  const parts: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.length;
+    if (total > max) {
+      await reader.cancel();
+      throw new ZipError('entry too large');
+    }
+    parts.push(value);
+  }
+  const out = new Uint8Array(total);
+  let p = 0;
+  for (const part of parts) {
+    out.set(part, p);
+    p += part.length;
+  }
+  return out;
 }
 
-/** Los bytes de una entrada. */
-export async function zipRead(buf: Uint8Array, entry: ZipEntry): Promise<Uint8Array> {
+/** Los bytes de una entrada; con `max`, `ZipError` si descomprimida pasa de ahí. */
+export async function zipRead(buf: Uint8Array, entry: ZipEntry, max = Infinity): Promise<Uint8Array> {
   const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
   const p = entry.offset;
   if (view.getUint32(p, true) !== LOCAL) throw new ZipError('broken local header');
   const start = p + 30 + view.getUint16(p + 26, true) + view.getUint16(p + 28, true);
   const data = buf.subarray(start, start + entry.compressedSize);
-  if (entry.method === 0) return data;
-  if (entry.method === 8) return inflateRaw(data);
+  if (entry.method === 0) {
+    if (data.length > max) throw new ZipError('entry too large');
+    return data;
+  }
+  if (entry.method === 8) return inflateRaw(data, max);
   throw new ZipError(`unsupported method ${entry.method}`);
 }
 
