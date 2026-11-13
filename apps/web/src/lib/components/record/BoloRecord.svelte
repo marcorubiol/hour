@@ -44,7 +44,7 @@
   import { projectBolosQueryOptions } from '$lib/bolo-queries';
   import { dayLabel, localDayISO, viewerTimeZone } from '$lib/datetime';
   import { boloHistory, type BoloEvent, type BoloHistoryPayment } from '$lib/bolo-history';
-  import { appLocale, t } from '$lib/i18n';
+  import { appLocale, tHere, setRecordSpace } from '$lib/i18n';
   import { lensOn } from '$lib/lenses.svelte';
   import { planAccessQueryOptions } from '$lib/plan-create';
   import {
@@ -79,6 +79,8 @@
   }
 
   let { projectId, id }: Props = $props();
+  setRecordSpace(() => bolo?.project?.workspace_id);
+  const t = tHere();
 
   const locale = appLocale();
   const pins = usePins();

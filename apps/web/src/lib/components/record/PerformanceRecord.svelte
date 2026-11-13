@@ -37,7 +37,7 @@
   import type { Json } from '$lib/db-types';
   import type { KVObject } from '$lib/kv-lines';
   import { dayLabel, dayMonth, localDayISO, timeInTz, viewerTimeZone } from '$lib/datetime';
-  import { LOCALE_TAG, appLocale, t } from '$lib/i18n';
+  import { LOCALE_TAG, appLocale, tHere, setRecordSpace } from '$lib/i18n';
   import {
     HOLD_NOTICE_DEFAULT,
     PERFORMANCE_MENU_STATUSES,
@@ -174,6 +174,8 @@
   }
 
   let { workspaceSlug, slug, inPeek = false }: Props = $props();
+  setRecordSpace(() => workspaceSlug);
+  const t = tHere();
   // «Crear el bolo» in Cuentas leaves your scope alone when it already shows
   // the project. The bolo links keep `scope=p:`: a click peeks the bolo, and
   // the peek reads its project there (`peekFromLink`).

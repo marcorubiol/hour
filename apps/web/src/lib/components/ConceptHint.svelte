@@ -13,13 +13,14 @@
    * leyenda. Se pone FUERA de un encabezado o un enlace: un botón dentro de
    * un `h2` le cambiaría el nombre, y dentro de un `a` no es válido.
    */
-  import { t, appLocale } from '$lib/i18n';
+  import { appLocale, tHere } from '$lib/i18n';
   import { conceptKeys, type HelpConcept } from '$lib/help';
 
   interface Props {
     concept: HelpConcept;
   }
   let { concept }: Props = $props();
+  const t = tHere();
 
   const locale = appLocale();
   const id = $props.id();

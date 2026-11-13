@@ -49,7 +49,7 @@
   import { usePins } from '$lib/stores/pins.svelte';
   import { buildLineIndex, buildProjectIndex, projectsInScope, resolveScope } from '$lib/nav';
   import { activeProjectsQueryOptions, allLinesQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
-  import { appLocale, t } from '$lib/i18n';
+  import { appLocale, tHere, setRecordSpace, tradeFor } from '$lib/i18n';
 
   interface Props {
     workspaceSlug: string;
@@ -59,6 +59,8 @@
   }
 
   let { workspaceSlug, slug, inPeek = false }: Props = $props();
+  setRecordSpace(() => workspaceSlug);
+  const t = tHere();
 
   const locale = appLocale();
   const queryClient = useQueryClient();
@@ -145,6 +147,7 @@
                 { ...b, id: b.bolo_id },
                 {
                   locale,
+                  voice: tradeFor(workspaceSlug),
                   href: b.performance_slug ? `/h/${workspaceSlug}/performance/${b.performance_slug}` : null,
                   // The room, when it is not the organization's own name.
                   where: b.venue_name && b.venue_name !== orgName ? b.venue_name : null,

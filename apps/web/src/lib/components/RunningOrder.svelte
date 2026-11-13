@@ -40,7 +40,7 @@
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON } from '$lib/api';
-  import { loadAllLocales, LOCALES, t, type Locale } from '$lib/i18n';
+  import { loadAllLocales, LOCALES, type Locale, tHere } from '$lib/i18n';
   import { addToast } from './Toast.svelte';
   import { openCollabDoc } from '$lib/collab-doc';
   import { readSchedule, scheduleArray, writeSchedule } from '$lib/schedule-doc';
@@ -86,6 +86,7 @@
   }
 
   let { target, id, dayIso, tz, viewerTz, locale, name = null }: Props = $props();
+  const t = tHere();
 
   const queryClient = useQueryClient();
   const queryKey = $derived(['schedule', target, id] as const);

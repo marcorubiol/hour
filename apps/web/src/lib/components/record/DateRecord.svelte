@@ -25,7 +25,7 @@
   import { closePeek } from '$lib/peek.svelte';
   import { dateFacts } from '$lib/date-record';
   import { dayLabel, localDayISO, viewerTimeZone } from '$lib/datetime';
-  import { appLocale, t } from '$lib/i18n';
+  import { appLocale, tHere, setRecordSpace } from '$lib/i18n';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { dateMissing, type DateMissing } from '$lib/record-missing';
   import { spaceCrumb, type Crumb } from '$lib/record-crumbs';
@@ -47,6 +47,8 @@
   }
 
   let { id }: Props = $props();
+  setRecordSpace(() => row?.project?.workspace_id);
+  const t = tHere();
 
   const locale = appLocale();
   const queryClient = useQueryClient();

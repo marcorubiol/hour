@@ -40,7 +40,7 @@
   import { spaceCrumb } from '$lib/record-crumbs';
   import { isGuestIn } from '$lib/workspace-role';
   import { workspacesQueryOptions } from '$lib/nav-queries';
-  import { appLocale, t } from '$lib/i18n';
+  import { appLocale, tHere, setRecordSpace } from '$lib/i18n';
 
   interface Props {
     workspaceSlug: string;
@@ -51,6 +51,8 @@
   }
 
   let { workspaceSlug, slug, inPeek = false }: Props = $props();
+  setRecordSpace(() => workspaceSlug);
+  const t = tHere();
 
   const locale = appLocale();
   const workspacesQuery = createQuery(workspacesQueryOptions());

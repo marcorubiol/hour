@@ -32,7 +32,7 @@
   import MissingBand, { type MissingItem } from '$lib/components/MissingBand.svelte';
   import { personMissing } from '$lib/record-missing';
   import { relativeContactDate } from '$lib/conversation';
-  import { appLocale, t } from '$lib/i18n';
+  import { appLocale, tHere, setRecordSpace } from '$lib/i18n';
   import RecordHead from '$lib/components/RecordHead.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import EmptyLine from '$lib/components/EmptyLine.svelte';
@@ -127,6 +127,8 @@
   }
 
   let { workspaceSlug, slug, inPeek = false }: Props = $props();
+  setRecordSpace(() => workspaceSlug);
+  const t = tHere();
 
   const workspacesQuery = createQuery(workspacesQueryOptions());
 
