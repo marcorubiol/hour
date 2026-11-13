@@ -25,6 +25,8 @@
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { spaceCrumb } from '$lib/record-crumbs';
   import CastPanel from '$lib/components/CastPanel.svelte';
+  import { TEAM_ANCHOR } from '$lib/first-day';
+  import { scrollWhenNamed } from '$lib/thread-reading.svelte';
   import ProjectIdentityPopover from '$lib/components/ProjectIdentityPopover.svelte';
   import RelationshipStub from '$lib/components/RelationshipStub.svelte';
   import { projectStepsQueryOptions } from '$lib/relation-stub';
@@ -187,6 +189,11 @@
     if (!iso) return '';
     return dayMonthYear(iso);
   }
+
+  // `#team` (the first day's list, tarea 137): down to the cast once it is
+  // drawn, which is after the project resolves, so the browser cannot.
+  let castEl = $state<HTMLElement>();
+  scrollWhenNamed(`#${TEAM_ANCHOR}`, () => castEl);
 </script>
 
 <svelte:head>
@@ -255,7 +262,7 @@
   </section>
 
   {#if project}
-    <section class="project__block" aria-label={t('project.cast', locale)}>
+    <section class="project__block" id={TEAM_ANCHOR} bind:this={castEl} aria-label={t('project.cast', locale)}>
       <BlockHead title={t('project.cast', locale)} />
       <CastPanel projectId={project.id} />
     </section>
