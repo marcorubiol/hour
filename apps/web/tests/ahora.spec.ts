@@ -1,5 +1,6 @@
 /**
- * AHORA (ADR-146) — the gig day, one screen, a mode of Hoy.
+ * THE GIG DAY ON HOY (ADR-146; Ahora is no longer a screen, ADR-202 § 5):
+ * its piece opens with what that mode showed.
  *
  * The spec owns its day: in the `playwright` workspace, on the fixture
  * project, it plants today a show (a venue with an address and a technical
@@ -55,7 +56,7 @@ function api(page: Page, method: string, path: string, body?: unknown): Promise<
 }
 const idOf = (r: Res, key: string) => ((r.json?.[key] as { id?: string } | undefined)?.id ?? (r.json?.id as string | undefined)) ?? null;
 
-test.describe('Ahora, the gig day (ADR-146)', () => {
+test.describe('The gig day on Hoy (ADR-146, ADR-202 § 5)', () => {
   test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL / PW_TEST_PASSWORD.');
   test.skip(!SB_URL || !SB_ANON, 'Set PUBLIC_SUPABASE_URL / PUBLIC_SUPABASE_ANON_KEY (the running order is planted by RPC).');
   test.describe.configure({ mode: 'serial' });
@@ -160,57 +161,57 @@ test.describe('Ahora, the gig day (ADR-146)', () => {
     await page.close();
   });
 
-  test('IN FROM HOY, OUT WITH «SALIR», AND A RELOAD KEEPS IT', async ({ page }) => {
+  test('THE GIG DAY IS HOY\'S PIECE: THE DAY, FOUR FACTS AND THREE ACTIONS', async ({ page }) => {
     test.setTimeout(90_000);
     await page.clock.setFixedTime(new Date(local('08:30')));
     await page.goto('/h/desk');
     await waitForLoaded(page);
 
-    // Never by itself: Hoy is Hoy until you press the door, which is in the
-    // foot of the card the headline titles (ADR-148), not a line of its own.
+    // Ahora is no longer a screen nor a button (ADR-202 § 5).
     await expect(page.getByTestId('ahora')).toHaveCount(0);
-    // The day is an agenda (ADR-150): at 8h30 the card is the train, in 42
-    // minutes; the show is still there, its row marked as the day's main one.
-    const card = page.getByTestId('desk-next');
-    await expect(page.getByTestId('desk-next-now')).toContainText(/42\s*min/, { timeout: 20_000 });
-    await expect(card).toContainText('K7Q2PX');
+    await expect(page.getByTestId('ahora-enter')).toHaveCount(0);
+    // At 8h30 the piece is the train, in 42 minutes: what and its hour at
+    // one size, the countdown on the second line (§ 4).
+    const piece = page.getByTestId('desk-next');
+    await expect(page.getByTestId('desk-next-now')).toContainText('09h12', { timeout: 20_000 });
+    await expect(piece).toContainText(/42\s*min/);
+    // The day inside the piece: the show is still there, its row the day's main one.
     await expect(page.getByTestId('desk-agenda-main')).toContainText(VENUE);
     await expect(page.getByTestId('desk-agenda-main')).toContainText('20h30');
-    const enter = card.getByTestId('ahora-enter');
-    await expect(enter).toBeVisible({ timeout: 20_000 });
-    await enter.click();
-    await expect(page).toHaveURL(/[?&]mode=ahora\b/);
-
-    const ahora = page.getByTestId('ahora');
-    await expect(ahora).toBeVisible();
-    // The countdown to the train, in minutes, and its reference.
-    await expect(page.getByTestId('ahora-head')).toContainText(/42\s*min/, { timeout: 20_000 });
-    await expect(page.getByTestId('ahora-trip')).toContainText('K7Q2PX');
-    // The venue: its address and the technical contact, deduced from a free role.
-    await expect(page.getByTestId('ahora-venue')).toContainText('Plaça del Vi 1');
-    await expect(page.getByTestId('ahora-contact')).toContainText('Jordi Puig');
-    await expect(page.getByTestId('ahora-venue')).toContainText('Hotel Ultònia');
-    // Doors and curfew are moments with a name, in the app's words.
-    const order = page.getByTestId('ahora-order');
-    await expect(order).toContainText(/doors|puertas|portes/i);
-    await expect(order).toContainText(/curfew|toque de queda|toc de queda|couvre-feu/i);
+    // What Ahora showed, in the piece (ADR-203 § 4): the venue's technical
+    // contact deduced from a free role, the load, the hotel.
+    const facts = page.getByTestId('desk-facts');
+    await expect(facts).toContainText('Jordi Puig', { timeout: 20_000 });
+    await expect(facts).toContainText('c/ Ballesteries');
+    await expect(facts).toContainText('Hotel Ultònia');
     // The thumb's three: a tel: link, a map, the road sheet.
-    await expect(ahora.locator('.ahora__actions a[href^="tel:"]')).toHaveAttribute('href', 'tel:612000000');
-    await expect(ahora.locator('.ahora__actions a[href^="https://maps.apple.com/"]')).toHaveCount(1);
-    await expect(ahora.locator('.ahora__actions a[href$="/roadsheet"]')).toHaveCount(1);
-    // The selector keeps Hoy marked: Ahora is a mode of it, not a fifth lens.
-    await expect(page.locator('a[aria-current="page"][href="/h/desk"]').first()).toBeAttached();
-
-    await page.reload();
-    await expect(page.getByTestId('ahora')).toBeVisible({ timeout: 20_000 });
-
-    await ahora.locator('.ahora__exit').click();
-    await expect(page).not.toHaveURL(/mode=ahora/);
-    await expect(page.getByTestId('ahora')).toHaveCount(0);
-    await expect(page.getByTestId('ahora-enter')).toBeVisible();
+    const acts = page.getByTestId('desk-acts');
+    await expect(acts.locator('a[href^="tel:"]')).toHaveAttribute('href', 'tel:612000000');
+    await expect(acts.locator('a[href^="https://maps.apple.com/"]')).toHaveCount(1);
+    await expect(acts.locator('a[href$="/roadsheet"]')).toHaveCount(1);
+    // A gig day, «Te espera» is its pills only (ADR-203 § 9).
+    await expect(page.getByTestId('desk-waiting-rows')).toHaveCount(0);
   });
 
-  test('ON THE PHONE IT COVERS THE FRAME, THE BAR OF SECTIONS INCLUDED', async ({ browser }) => {
+  test('DOING SOMETHING, THE BIG HOUR IS UNTIL WHEN', async ({ page }) => {
+    test.setTimeout(90_000);
+    // 12h: inside the load-in (11h), which runs until the soundcheck at 17h.
+    await page.clock.setFixedTime(new Date(local('12:00')));
+    await page.goto('/h/desk');
+    await waitForLoaded(page);
+    await expect(page.getByTestId('desk-next-now')).toContainText('→ 17h', { timeout: 20_000 });
+  });
+
+  test('?mode=ahora LANDS ON HOY (ADR-203 § 7)', async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.clock.setFixedTime(new Date(local('14:10')));
+    await page.goto('/h/desk?mode=ahora');
+    await expect(page).not.toHaveURL(/mode=ahora/, { timeout: 20_000 });
+    await expect(page.getByTestId('desk-next')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId('ahora')).toHaveCount(0);
+  });
+
+  test('ON THE PHONE THE ACTIONS RUN THE WHOLE WIDTH OF THE PIECE', async ({ browser }) => {
     test.setTimeout(90_000);
     const context = await browser.newContext({
       storageState: '.playwright/auth.json',
@@ -221,21 +222,17 @@ test.describe('Ahora, the gig day (ADR-146)', () => {
     });
     const page = await context.newPage();
     await page.clock.setFixedTime(new Date(local('14:10')));
-    await page.goto('/h/desk?mode=ahora');
-    const ahora = page.getByTestId('ahora');
-    await expect(page.getByTestId('ahora-head')).toBeVisible({ timeout: 30_000 });
-    const box = await ahora.boundingBox();
-    expect(box?.width).toBe(390);
-    expect(box?.height).toBe(844);
-    // The actions sit at the foot, where the bar of sections was.
-    const actions = await ahora.locator('.ahora__actions').boundingBox();
-    expect(actions && actions.y + actions.height).toBeGreaterThan(800);
-    // What it is on top of cannot be pressed through it.
-    const topmost = await page.evaluate(() => {
-      const el = document.elementFromPoint(195, 830);
-      return el?.closest('[data-testid="ahora"]') !== null;
-    });
-    expect(topmost, 'the bar of sections is under Ahora').toBe(true);
+    await page.goto('/h/desk');
+    const piece = page.getByTestId('desk-next');
+    const acts = page.getByTestId('desk-acts');
+    await expect(acts).toBeVisible({ timeout: 30_000 });
+    const p = await piece.boundingBox();
+    const a = await acts.boundingBox();
+    // One row at the foot of the piece, edge to edge of its padding.
+    expect(a && p && a.width).toBeGreaterThan((p?.width ?? 0) * 0.8);
+    expect(a && p && a.y + a.height).toBeGreaterThan((p?.y ?? 0) + (p?.height ?? 0) - 60);
+    // The bar of sections stays: Ahora no longer covers the frame.
+    await expect(page.locator('.lensswitch-wrap')).toBeVisible();
     await context.close();
   });
 });

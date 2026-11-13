@@ -1,27 +1,25 @@
 <script lang="ts">
   /**
-   * Desk as a dashboard (ADR-117, proposal A; ADR-121). «What asks for my
-   * attention today, of everything», in four bands:
+   * HOY (ADR-117; redrawn by ADR-202 and ADR-203, tareas 144 y 145): three
+   * blocks in a fixed order, the same on every width.
    *
-   *   1 · Lo siguiente  — the rail's NEXT with room ($lib/pulse, same feeds)
-   *   2 · Te espera     — the short list by weight ($lib/desk-feed rankWaiting)
-   *   3 · Ha cambiado   — since your last visit ($lib/desk-bands changesSince)
-   *   4 · La temporada  — one door per lens, in the lens's own arithmetic
+   *   1 · El día        the one filled piece, the agenda inside it ($lib/day-agenda)
+   *   2 · Lo que viene  day tiles, two weeks or ten at most ($lib/hoy comingTiles)
+   *   3 · Te espera     one pill per kind, the rows of most weight ($lib/desk-feed rankWaiting)
    *
-   * Desktop: two columns, what you act on and what is new (1, 2, 3) on the
-   * left and the season's doors (4) on the right. Phone: one column in the
-   * same order as the DOM, 1, 2, 3, 4, so focus and reading follow what is
-   * seen (ADR-149; it was 1, 2, 4, 3).
+   * On a desktop «Ha cambiado» (since your last visit, $lib/desk-bands) and
+   * «La temporada» (one door per lens) stay (ADR-202 § 15); on a phone they
+   * leave (§ 1). Ahora is no longer a screen: on a gig day the piece opens
+   * with what it showed (§ 5), and `?mode=ahora` lands here.
    *
-   * Calm (ADR-139 § 5, `$lib/calm`) is another composition, not a grey: one
-   * column at a reading measure, 1 and today's rows of 2 (`calmWaiting`);
-   * the overdue in one line that opens it, the rest in one line that leaves.
-   * Each band loads and fails on its own; none of them is the page's error.
+   * Calm (ADR-139 § 5, ADR-203 § 5, `$lib/calm`) keeps the day, what comes
+   * and the pills, without rows. Each block loads and fails on its own.
    *
-   * Bands 2–4 follow the scope like every lens; band 1 does not, like the rail
-   * (ADR-096 § 5). The math is pure and tested in $lib; this file fetches,
-   * scopes and hands down. Queries share their keys with the lenses they
-   * summarise (Books, Conversations, the thread feed, the rail) — one cache.
+   * EVERYTHING FOLLOWS THE SCOPE (ADR-202 § 13), the day and what comes too;
+   * a notice never does (§ 14). The math is pure and tested in $lib; this
+   * file fetches, scopes and hands down. Queries share their keys with the
+   * lenses they summarise (Books, Conversations, the thread feed, the rail):
+   * one cache.
    */
   import { docTitle } from '$lib/doc-title';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
@@ -31,24 +29,25 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import { lazy } from '$lib/lazy.svelte';
   import LensHeader from '$lib/components/LensHeader.svelte';
-  import LensTitle from '$lib/components/LensTitle.svelte';
   import FirstVisitCard from '$lib/components/FirstVisitCard.svelte';
   import StartList from '$lib/components/desk/StartList.svelte';
   import { startTarget, type StartPhase } from '$lib/first-day';
-  import DeskNext from '$lib/components/desk/DeskNext.svelte';
+  import DeskDay from '$lib/components/desk/DeskDay.svelte';
+  import DeskComing from '$lib/components/desk/DeskComing.svelte';
   import DeskWaiting from '$lib/components/desk/DeskWaiting.svelte';
   import DeskChanged from '$lib/components/desk/DeskChanged.svelte';
   import DeskSeason from '$lib/components/desk/DeskSeason.svelte';
   import LateNoticeBand from '$lib/components/desk/LateNoticeBand.svelte';
-  import AhoraView from '$lib/components/desk/AhoraView.svelte';
-  import { AHORA_KEY, ahoraDay, ahoraItems } from '$lib/ahora';
+  import { comingTiles, nextAfterToday, outsideToday, scopePulseInput, waitingRowCount } from '$lib/hoy';
+  import { MediaQuery } from 'svelte/reactivity';
+  import { MOBILE_QUERY } from '$lib/breakpoints';
+  import { goto } from '$app/navigation';
   import { accentVarFor } from '$lib/utils/accent';
   import { spaceName } from '$lib/utils/identity';
   import { appLocale, LOCALE_TAG, t, tradeFor } from '$lib/i18n';
-  import { localeDayMonth, localeWeekdayLong, localeWeekdayShort, viewerTimeZone } from '$lib/datetime';
-  import { addDaysIso, dayKeyInTz, plannerDayHref } from '$lib/planner';
+  import { viewerTimeZone } from '$lib/datetime';
+  import { dayKeyInTz, plannerDayHref } from '$lib/planner';
   import { page } from '$app/state';
-  import { peekHref } from '$lib/peek';
   import { usePins } from '$lib/stores/pins.svelte';
   import { useCalm } from '$lib/stores/calm.svelte';
   import { buildLineIndex, buildProjectIndex, resolveScope, workspacesOnScreen, type NavWorkspace, type RawLine } from '$lib/nav';
@@ -65,7 +64,6 @@
   import { taskProjectId, type TaskItem, type TasksCache, type TaskTarget } from '$lib/task';
   import {
     buildDeskFeed,
-    calmWaiting,
     laterSummary,
     overviewReplies,
     rankWaiting,
@@ -84,18 +82,15 @@
     paymentsSinceEarlier,
     plannerDoor,
     sinceInstant,
-    dayThings,
     type RecordedPayment,
   } from '$lib/desk-bands';
   import { shows } from '$lib/calm';
-  import { blockDrawn, screenQuiet } from '$lib/dashboard-blocks';
-  import EmptyLine from '$lib/components/EmptyLine.svelte';
+  import { blockDrawn } from '$lib/dashboard-blocks';
   import { daysAgoLabel } from '$lib/conversation';
-  import { timedStages, upcoming } from '$lib/pulse';
-  import { stagePlace } from '$lib/travel-stage';
-  import { agendaDay, agendaPoints, agendaRows, dayAgenda } from '$lib/day-agenda';
-  import { createPulseFeeds, pulseSlip, pulseSlipContext } from '$lib/pulse-feeds.svelte';
-  import { dateSlip, perfDayKey, performanceSlip, perfWorkspaceId, type DateEvent, type PerformanceEvent, type SlipKind } from '$lib/month-events';
+  import { upcoming } from '$lib/pulse';
+  import { agendaDay, agendaPoints, dayAgenda } from '$lib/day-agenda';
+  import { createPulseFeeds, pulseSlipContext } from '$lib/pulse-feeds.svelte';
+  import { perfDayKey, perfWorkspaceId, type SlipKind } from '$lib/month-events';
   import { clashesInSeason, seasonWindow } from '$lib/season';
   import { createPlannerEngine } from '$lib/planner-engine.svelte';
   import { seasonAvailabilityQueryOptions } from '$lib/planner-feeds.svelte';
@@ -216,36 +211,45 @@
     return p.toString();
   }
 
-  // ── Band 1 · Lo siguiente — the rail's feeds, the rail's answer ────────
+  // ── The day and what comes: the rail's feeds, the rail's answer ────────
   const feeds = createPulseFeeds(() => today);
   /**
-   * The day as an agenda, what is on now opened as the card (ADR-150): today
-   * while anything of it is on or ahead, and only today (ADR-153): with
-   * nothing left of it there is no card, and what comes next is the first
-   * row of «Después». Under it the next three things of other days. The
-   * pulse's own rows and order (`upcoming`), so card, agenda and rail never
-   * disagree.
+   * THE SCOPE NARROWS THE DAY TOO (ADR-202 § 13, tarea 145; it did not,
+   * ADR-096 § 5): the pulse's rows are read unscoped and narrowed here, so
+   * the line under the piece counts what of yours today stays out (§ 14,
+   * ADR-203 § 8) from the difference, with no second read.
    */
-  let pulseInput = $derived({ performances: feeds.performances, dates: feeds.dates, viewerTz, axis: feeds.axis });
-  /* An option waiting for a decision is decided in «Te espera», so it is not
-     also a row of «Después» nor the next thing the title names (ADR-154).
-     The confirmed side of a «liberar» stays: it is going ahead. */
-  let coming = $derived.by(() => {
-    const deciding = decidingIds();
-    return upcoming(pulseInput, clockNow, 12).filter((x) => !(x.ref.of === 'performance' && deciding.has(x.ref.id)));
-  });
+  let rawPulseInput = $derived({ performances: feeds.performances, dates: feeds.dates, viewerTz, axis: feeds.axis });
+  let pulseInput = $derived(scopeUnresolved ? { ...rawPulseInput, performances: [], dates: [] } : scopePulseInput(rawPulseInput, scope));
+  /**
+   * The day as an agenda inside the piece, what is on now opened as its
+   * headline (ADR-150): today while anything of it is on or ahead, and only
+   * today (ADR-153). Then «Coming up», the days after it (ADR-202 § 6). The
+   * pulse's own rows and order (`upcoming`), so the piece, the tiles and the
+   * rail never disagree. An option to decide keeps its tile and its «?» even
+   * when «Te espera» asks it too (ADR-203 § 10, amends ADR-154 § 4).
+   */
+  let coming = $derived(upcoming(pulseInput, clockNow, 40));
+  let tiles = $derived(comingTiles(coming, today));
+  let nextThing = $derived(nextAfterToday(coming, today));
   // Nothing within two weeks: one sentence names what comes (ADR-149).
-  const FAR_DAYS = 14;
-  let farNext = $derived(
-    coming[0] && Date.parse(`${coming[0].day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`) > FAR_DAYS * 86_400_000
-      ? coming[0]
-      : null,
-  );
+  let farNext = $derived(tiles.length === 0 ? nextThing : null);
   let agendaOn = $derived(agendaDay(pulseInput, clockNow));
   let agenda = $derived(agendaOn ? dayAgenda(pulseInput, agendaOn, clockNow) : null);
-  // Two weeks away it is the far line, not «Después».
-  let after = $derived(farNext ? [] : coming.filter((x) => x.day !== agendaOn).slice(0, 3));
-  /** The performance the card's actions are about: the focus, else the day's main one. */
+  let todayPoints = $derived(agendaPoints(pulseInput, today));
+  /** «1 más hoy fuera de MaMeMi»: what of yours today the scope leaves out. */
+  let outsideLine = $derived.by(() => {
+    if (scope.isEmpty || scopeUnresolved || !feeds.axisSettled) return null;
+    const n = outsideToday(rawPulseInput, scope, today);
+    if (n === 0) return null;
+    const names = [
+      ...workspaces.filter((w) => scope.workspaceIds.includes(w.id)).map((w) => spaceName(w.name)),
+      ...scope.projects.map((p) => p.name),
+      ...scope.lines.map((l) => l.name),
+    ];
+    return t(n === 1 ? 'desk.outside_one' : 'desk.outside_many', locale, { n, scope: names.join(', ') });
+  });
+  /** The performance the piece's actions are about: the focus, else the day's main one. */
   let cardPerformanceId = $derived.by(() => {
     if (!agenda) return '';
     const focus = agenda.focus !== null ? agenda.points[agenda.focus] : null;
@@ -255,30 +259,18 @@
   const kindLabel = (kind: SlipKind) => t(`planner.kind_${kind}`, locale);
   let slipCtx = $derived(pulseSlipContext(feeds.workspaces, viewerTz, kindLabel));
 
-  // ── Ahora (ADR-146): a mode of Hoy, in the URL so a reload keeps it ─────
-  let ahoraMode = $derived(page.url.searchParams.get('mode') === 'ahora');
-  function withMode(on: boolean): string {
-    const u = new URL(page.url);
-    if (on) u.searchParams.set('mode', 'ahora');
-    else u.searchParams.delete('mode');
-    return `${u.pathname}${u.search}`;
-  }
-  let ahoraHref = $derived(withMode(true));
-  let exitHref = $derived(withMode(false));
-  let ahoraRows = $derived(
-    feeds.axisSettled ? ahoraItems({ performances: feeds.performances, dates: feeds.dates, viewerTz, axis: feeds.axis }) : [],
-  );
-  let ahoraOn = $derived(ahoraDay(ahoraRows, clockNow, viewerTz));
-  // The home-screen app opens straight in Ahora on the day it was left open
-  // (`/`, `ahoraRelaunch`); back on Hoy, it forgets.
+  // ── Ahora is no longer a screen (ADR-202 § 5, ADR-203 § 7): a link or a
+  //    bookmark with `?mode=ahora` lands on Hoy, whose piece is that day.
   $effect(() => {
-    try {
-      if (ahoraMode) localStorage.setItem(AHORA_KEY, today);
-      else localStorage.removeItem(AHORA_KEY);
-    } catch {
-      /* private window: a relaunch opens Hoy */
-    }
+    if (page.url.searchParams.get('mode') !== 'ahora') return;
+    const u = new URL(page.url);
+    u.searchParams.delete('mode');
+    void goto(`${u.pathname}${u.search}`, { replaceState: true, noScroll: true, keepFocus: true });
   });
+
+  // Phone: Hoy is three blocks; «Ha cambiado» and «La temporada» stay on a
+  // desktop only (ADR-202 § 1 and § 15).
+  const phone = new MediaQuery(MOBILE_QUERY, false);
   // «Tablón · N nuevos» (plan 2026-10-22 § 3.3): the card's performance's
   // board, under the record's own key, so opening it costs nothing more.
   // The signal that was missing on the day of the show; no mail, no push.
@@ -349,7 +341,7 @@
   // not wait for it (it joins them when it lands); one with none stays busy
   // until it answers, never «nothing new» before (`changedBandLoading`).
   const lastMailoutQuery = createQuery(
-    toStore(() => lastMailoutQueryOptions(filterIds, !scopeUnresolved && readConversations)),
+    toStore(() => lastMailoutQueryOptions(filterIds, !scopeUnresolved && readConversations && !phone.current)),
   );
   // Subscribed now (see `waitingLoading`): its readers sit behind `readConversations`.
   void $lastMailoutQuery;
@@ -398,8 +390,17 @@
   );
   let later = $derived(laterSummary(feed));
 
-  let waiting = $derived(rankWaiting(feed, clockNow));
-  let calmWaits = $derived(calm.on ? calmWaiting(feed, clockNow) : null);
+  // Everything that waits, ranked: the pills count it all, the rows draw
+  // its head (ADR-202 § 7): none in calm (ADR-203 § 5) nor on a gig day
+  // (§ 9), five on a day with nothing, three otherwise.
+  let waiting = $derived(rankWaiting(feed, clockNow, { limit: Infinity }));
+  let waitingRows = $derived(
+    waitingRowCount({
+      calm: calm.on,
+      gig: scopedPerfs.some((p) => p.status !== 'cancelled' && perfDayKey(p) === today),
+      empty: todayPoints.length === 0,
+    }),
+  );
 
   // Every store read before any `||`: a `$query` only read past a pending one
   // is not subscribed yet, and a query nobody subscribes to does not fetch.
@@ -425,7 +426,7 @@
   const threadsQuery = createQuery(
     toStore(() => ({
       queryKey: ['thread-feed', filterIds.projectIds, filterIds.workspaceIds] as const,
-      enabled: !scopeUnresolved && readTeam,
+      enabled: !scopeUnresolved && readTeam && !phone.current,
       staleTime: 0,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         fetchJSON<ThreadFeedView>(`/api/threads?${feedParams(filterIds)}`, signal),
@@ -437,7 +438,7 @@
   const paymentsQuery = createQuery(
     toStore(() => ({
       queryKey: ['desk-payments', since, workspaces.map((w) => w.id)] as const,
-      enabled: readMoney && workspaces.length > 0,
+      enabled: readMoney && workspaces.length > 0 && !phone.current,
       retry: false,
       placeholderData: () =>
         paymentsSinceEarlier(
@@ -493,20 +494,18 @@
     });
   });
   // A band with nothing in it is not drawn (ADR-145 § 1). «Te espera» is
-  // there while anything waits (its «Ver todo» opens the rest of the feed);
-  // calm draws its own lines. With both bands quiet, Hoy says so once.
+  // there while anything waits, or while its head carries Hoy's «+»
+  // (ADR-203 § 1): then it says «Todo al día.» itself.
   let waitsState = $derived({
     count: feed.reduce((n, b) => n + b.runs.reduce((m, r) => m + r.items.length, 0), 0),
     loading: waitingLoading,
     errored: waitingErrored,
   });
   let changedState = $derived({ count: changes.length, loading: changedLoading, errored: changedErrored });
-  let drawWaits = $derived(calm.on || blockDrawn(waitsState));
-  let drawChanged = $derived(blockDrawn(changedState));
   // «Todo al día.» would lie while the start list lives (tarea 137, StartList).
   let startPhase = $state<StartPhase>('none');
   let startHolding = $state(false);
-  let deskQuiet = $derived(!calm.on && startPhase === 'none' && screenQuiet([waitsState, changedState]));
+  let drawChanged = $derived(!phone.current && shows('desk', 'changed', calm.on) && blockDrawn(changedState));
   let quietLabel = $derived.by(() => {
     if (!lastVisit) return t('desk.changed_none_first', locale);
     const e = elapsedSince(since, clockNow);
@@ -543,15 +542,6 @@
   // one day, or one to let go. The same queue the Season lists, one engine.
   const sideName = (s: Decision['a']) => s.venue || s.city || s.project;
   const isOption = (status: string) => status !== 'confirmed';
-  // A function, not a $derived: the feed above reads it, and the engine it
-  // reads is declared further down (a function is hoisted, a `let` is not).
-  /** The options «Te espera» asks you to decide (ids of their hold sides). */
-  function decidingIds(): Set<string> {
-    if (!lensOn('planner')) return new Set();
-    return new Set(
-      engine.decisionQueue.decisions.flatMap((d) => [d.a, d.b].filter((s) => isOption(s.status)).map((s) => s.id)),
-    );
-  }
   /** A performance's own page, which a lens opens as its vistazo (ADR-139 p1). */
   function performancePage(id: string): string | null {
     const p = scopedPerfs.find((x) => x.id === id);
@@ -679,55 +669,11 @@
     if (!busy) markHoyContent(restoredFromDevice());
   });
 
-  // ── Header: the day, not the debt (ADR-139 § 6) ───────────────────────
-  // «Hoy, función en Girona»: what today IS, from the pulse's rows (not
-  // scoped, like band 1). What waits and what is overdue are counted where
-  // they are listed, in the head of «Te espera». What has no truth draws a
-  // dash (ADR-096 § 6): loading or failed, the title claims nothing.
-  const KIND_WORDS = new Set(['show', 'rehearsal', 'residency', 'travel_day', 'press', 'other', 'day_off']);
-  let dayTitle = $derived.by(() => {
-    if (!feeds.settled || feeds.errored) return '—';
-    // The rows of the agenda under it, each once: the title counts exactly
-    // what the agenda lists, by the person axis and each space's «lo mío /
-    // todo» (ADR-151).
-    const rows = agendaRows(agendaPoints(pulseInput, today));
-    const things = dayThings({
-      performances: rows.flatMap((r) => (r.of === 'performance' ? [r.row as PerformanceEvent] : [])),
-      dates: rows.flatMap((r) => (r.of === 'date' ? [r.row as DateEvent] : [])),
-    });
-    const first = things[0];
-    // NOTHING LEFT OF TODAY (ADR-153): no card, so the title says it and
-    // names what comes next, the first row of «Después» («Hoy, nada · martes,
-    // función en Girona»). Two weeks away it is the far line's to say.
-    const next = !agendaOn && !farNext ? coming[0] : null;
-    if (next) return t(first ? 'desk.day_done_then' : 'desk.day_none_then', locale, { next: nextWords(next) });
-    if (!first) return t('desk.day_none', locale);
-    const what = first.label ?? t(`planner.kind_${KIND_WORDS.has(first.kind) ? first.kind : 'other'}`, locale);
-    const day = first.where ? t('desk.day_one_at', locale, { what, where: first.where }) : t('desk.day_one', locale, { what });
-    const rest = things.length - 1;
-    return rest === 0 ? day : t(rest === 1 ? 'desk.day_and_one' : 'desk.day_and_many', locale, { day, n: rest });
-  });
-  /** «mañana, tren a Girona», «martes, función en Girona», «lun 9 nov, ensayo». */
-  function nextWords(next: (typeof coming)[number]): string {
-    const n = Math.round((Date.parse(`${next.day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
-    const when =
-      n <= 1
-        ? t('desk.next_tomorrow', locale)
-        : n < 7
-          ? localeWeekdayLong(next.day, locale)
-          : `${localeWeekdayShort(next.day, locale)} ${localeDayMonth(next.day, locale)}`;
-    const sl = pulseSlip(next.ref, next.day, slipCtx);
-    const held = sl.cert === 'hold' || sl.cert === 'proposed' ? '?' : '';
-    const to = (place: string) => `${t('planner.slip_to', locale)} ${place}`;
-    // A trip says how it goes and where to when it has its legs: «tren a Girona».
-    const leg = next.ref.of === 'date' ? timedStages(next.ref.row as DateEvent)[0] : undefined;
-    const legTo = leg ? stagePlace(leg.to_city, leg.to_place) : null;
-    if (leg) return t('desk.day_next', locale, { when, what: [`${t(`planner.mode_${leg.mode}`, locale)}${held}`, legTo ? to(legTo) : null].filter(Boolean).join(' ') });
-    const kind = `${kindLabel(sl.kind)}${held}`;
-    if (sl.lead) return t('desk.day_next', locale, { when, what: `${kind} ${to(sl.name)}` });
-    const where = sl.city || sl.name;
-    return where ? t('desk.day_next_at', locale, { when, what: kind, where }) : t('desk.day_next', locale, { when, what: kind });
-  }
+  // ── Header: the piece says the day (ADR-202 § 3, ADR-203 § 1) ─────────
+  // The lens's title went with the header of the sketch: what it said
+  // (ADR-148 § 1, ADR-153 § 2) the piece says now. The heading stays for a
+  // screen reader; the frame's new header is another lane (tarea 146).
+  let hadToday = $derived(todayPoints.length > 0);
   // ── Task + proposal mutations (TaskBoard contract; optimistic toggle). ──
   // One PATCH for the check (status) and for accepting a proposal (origin).
   const patchTask = createMutation({
@@ -833,6 +779,8 @@
   // with none, the button is not drawn.
   let spacesOnScreen = $derived(workspacesOnScreen('', pins.pins, workspaces, lineIndex, projectIndex));
   let taskSpaces = $derived(taskWorkspaces(spacesOnScreen));
+  // «Te espera» is drawn while anything waits, or for the «+» in its head.
+  let drawWaits = $derived(blockDrawn(waitsState) || (taskSpaces.length > 0 && startPhase === 'none'));
   // Primer día (tarea 137): the start list of the space just made, in the
   // welcome's place while it lives; never two cards at once.
   let startSpace = $derived(startTarget(spacesOnScreen));
@@ -903,31 +851,27 @@
   };
 </script>
 
-<svelte:head><title>{docTitle(t(ahoraMode ? 'ahora.title' : 'lens.desk', locale))}</title></svelte:head>
+<svelte:head><title>{docTitle(t('lens.desk', locale))}</title></svelte:head>
 
-{#if ahoraMode}
-  <AhoraView
-    performances={feeds.performances}
-    dates={feeds.dates}
-    axis={feeds.axis}
-    workspaces={feeds.workspaces}
-    settled={feeds.settled && feeds.axisSettled}
-    updatedAt={feeds.updatedAt || null}
-    now={clockNow}
-    {viewerTz}
-    {slipCtx}
-    {exitHref}
-    {locale}
-  />
-{:else}
 <div class="desk" class:desk--calm={calm.on} aria-busy={busy}>
-  <!-- THE DAY IS THE TITLE, in every width (ADR-154; the greeting went: on a
-       phone it already had, ADR-148). -->
+  <!-- The lens heading, heard and not seen: the piece says the day (ADR-203 § 1). -->
   {#snippet title()}
-    <span class="desk__day"><LensTitle text={dayTitle} /></span>
+    <span class="visually-hidden">{t('lens.desk', locale)}</span>
   {/snippet}
-  <!-- «+»: a task is an occasional gesture, so it waits in the title row, in
-       the ring of the «?» (ADR-148). Without a space to write one in, no «+». -->
+  <LensHeader help="desk" {title} />
+
+  <!-- 121 B (ADR-183): a late technician comes first, while nobody marked
+       «Visto». A notice is never scoped (ADR-202 § 14). -->
+  <LateNoticeBand {locale} />
+
+  <StartList workspace={startSpace} bind:phase={startPhase} bind:holding={startHolding} />
+  {#if startPhase === 'none' && !startHolding}
+    <FirstVisitCard section="desk" steps={['desk-next', 'desk-coming', 'desk-waits']} />
+  {/if}
+
+  <!-- «+»: a task is an occasional gesture; it lives in the head of «Te
+       espera», where what it makes appears (ADR-203 § 1). Without a space to
+       write one in, no «+». -->
   {#snippet addTask()}
     <button
       type="button"
@@ -939,58 +883,62 @@
       onclick={openComposer}><span aria-hidden="true">+</span></button
     >
   {/snippet}
-  <LensHeader help="desk" {title} tools={taskSpaces.length > 0 ? addTask : undefined} />
+  {#snippet composerSlot()}
+    {#if composerOpen && taskSpaces.length > 0 && composer.component}
+      <div class="desk__composer" bind:this={composerEl}>
+        <composer.component
+          {locale}
+          target={composerTarget}
+          performances={composerPerformances}
+          conversations={composerConversations}
+          onCreated={onTaskCreated}
+        />
+      </div>
+    {/if}
+  {/snippet}
 
-  <!-- 121 B (ADR-183): a late technician comes first, while nobody marked «Visto». -->
-  <LateNoticeBand {locale} />
-
-  <StartList workspace={startSpace} bind:phase={startPhase} bind:holding={startHolding} />
-  {#if startPhase === 'none' && !startHolding}
-    <FirstVisitCard section="desk" steps={['desk-next', 'desk-waits', 'desk-more']} />
-  {/if}
-
-  {#if composerOpen && taskSpaces.length > 0 && composer.component}
-    <div class="desk__composer" bind:this={composerEl}>
-      <composer.component
-        {locale}
-        target={composerTarget}
-        performances={composerPerformances}
-        conversations={composerConversations}
-        onCreated={onTaskCreated}
-      />
-    </div>
-  {/if}
-
+  <!-- THREE BLOCKS, IN A FIXED ORDER (ADR-202 § 1): the day, what comes,
+       what waits. On a desktop the news and the season's doors stay (§ 15):
+       the news under them, the doors in their own column. -->
   <div class="desk__grid">
     <div class="desk__col">
       <div class="slot slot--next" data-help-step="desk-next">
-        <DeskNext
+        <DeskDay
           {agenda}
-          far={farNext}
-          {after}
+          todayHad={hadToday}
+          next={nextThing}
+          outside={outsideLine}
           now={clockNow}
           workspaces={feeds.workspaces}
-          settled={feeds.settled}
+          settled={feeds.settled && !scopeUnresolved}
           errored={feeds.errored}
           onretry={retryFailed}
           {today}
           {viewerTz}
+          updatedAt={feeds.updatedAt || null}
           boardNew={nextBoardNew}
           {slipCtx}
-          ahoraHref={ahoraOn ? ahoraHref : null}
           {locale}
         />
       </div>
-      {#if deskQuiet}
-        <EmptyLine text={t('desk.all_quiet', locale)} />
-      {/if}
+      <DeskComing
+        {tiles}
+        far={farNext}
+        settled={feeds.settled && !scopeUnresolved}
+        errored={feeds.errored}
+        {today}
+        {viewerTz}
+        {slipCtx}
+        {locale}
+      />
       {#if drawWaits}
       <div class="slot slot--waits" data-help-step="desk-waits">
         <DeskWaiting
           {waiting}
+          rows={waitingRows}
           {today}
-          calm={calmWaits}
-          onleavecalm={() => calm.set(false)}
+          add={taskSpaces.length > 0 ? addTask : undefined}
+          composer={composerSlot}
           {feed}
           {later}
           loading={waitingLoading}
@@ -1010,10 +958,8 @@
         />
       </div>
       {/if}
-      <!-- What changed is news to act on, so it follows what waits (ADR-149;
-           it sat under the season's doors, last on a phone). -->
-      {#if drawChanged && shows('desk', 'season', calm.on)}
-      <div class="slot slot--changed" data-help-step="desk-more">
+      {#if drawChanged}
+      <div class="slot slot--changed">
         <DeskChanged
           {changes}
           loading={changedLoading}
@@ -1029,10 +975,9 @@
       {/if}
     </div>
 
-    <!-- What calm folds here is said in «Te espera»'s last line, which leaves calm. -->
-    {#if shows('desk', 'season', calm.on)}
+    {#if !phone.current && shows('desk', 'season', calm.on)}
       <div class="desk__col">
-        <div class="slot slot--season" data-help-step="desk-more">
+        <div class="slot slot--season">
           <DeskSeason
             planner={lensOn('planner') ? { value: plannerFig, errored: feeds.errored } : null}
             conversations={readConversations ? { value: convFig, errored: $overviewQuery.isError } : null}
@@ -1045,7 +990,6 @@
     {/if}
   </div>
 </div>
-{/if}
 
 <style>
   @layer components {
@@ -1055,7 +999,7 @@
       gap: var(--space-l);
     }
     .desk__composer {
-      margin-block-start: calc(-1 * var(--space-s));
+      margin-block-end: var(--space-s);
     }
 
     .desk__grid {

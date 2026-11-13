@@ -15,17 +15,18 @@ export type CalmLens = 'desk' | 'planner' | 'conversations' | 'books';
 
 /** Every block a lens draws in its normal mode, and whether calm keeps it. */
 export const CALM_FOCUS = {
+  /* Calm is Hoy's only fold (ADR-203 § 5): it keeps the day, what comes and
+     the pills of «Te espera», without rows. */
   desk: {
-    /** «Lo siguiente»: the day's card. */
-    next: true,
-    /** «Te espera», today's rows only (`calmWaiting`). */
-    waiting_today: true,
-    /** What is overdue: one line that opens it in place, never the list. */
-    overdue_list: false,
-    /** The rest of the week, the «voy», Hour's proposals: a number. */
-    waiting_week: false,
-    /** «Ver todo por días». */
-    see_all: false,
+    /** The day: the filled piece and its agenda. */
+    day: true,
+    /** «Coming up», the day tiles. */
+    coming: true,
+    /** «Te espera», one pill per kind and its figure. */
+    waiting_pills: true,
+    /** «Te espera», the rows under the pills. */
+    waiting_rows: false,
+    /** On a desktop: the season's doors and what changed (ADR-202 § 15). */
     season: false,
     changed: false,
   },

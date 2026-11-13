@@ -273,6 +273,25 @@
     --suggest-edge: color-mix(in oklch, var(--info) 30%, var(--border-color-light));
     --suggest-wash: color-mix(in oklab, var(--info) 6%, var(--bg-ultra-light));
 
+    /* FOCUS — the one filled surface of a screen (ADR-202 § 2, the rules
+       of build/design-system.md § 1 and § 2): the piece of what is on now,
+       Hoy's day. Neither white nor black: a dark indigo on the light theme,
+       a surface lighter than the canvas on the dark one. What sits on it
+       reads its ink; the monogram retints over it (IdentityMark's own
+       contract, `--identity-tint-base`). Derived from the base hues, so a
+       theme moves it by moving them. */
+    --surface-focus: oklch(from var(--primary) 30% 0.025 h);
+    --surface-focus-ink: oklch(from var(--base) 96% c h);
+    --surface-focus-muted: color-mix(in oklch, var(--surface-focus-ink) 72%, transparent);
+    --surface-focus-faint: color-mix(in oklch, var(--surface-focus-ink) 55%, transparent);
+    --surface-focus-rule: color-mix(in oklch, var(--surface-focus-ink) 16%, transparent);
+    --surface-focus-act: color-mix(in oklch, var(--surface-focus-ink) 14%, transparent);
+    --surface-focus-act-hover: color-mix(in oklch, var(--surface-focus-ink) 24%, transparent);
+    --surface-focus-mark-tint: 55%;
+    --surface-focus-mark-ink-l: 0.96;
+    /* The same piece with nothing in it: hollow, its edge only (§ 4). */
+    --surface-hollow-edge: var(--border-color-dark);
+
     /* the kind word — AWAY / ON TOUR */
     --away-word: var(--text-muted);
     /* the subject, in the body voice a band gives it */
@@ -447,6 +466,13 @@
        pages only: the login's title and the invite's hero. */
     --display-l: clamp(2.2rem, 4vw, 2.8rem);
     --display-xl: clamp(2.3rem, 7vw, 4.6rem);
+    /* Three display sizes with a role (ADR-202, design-system § Tokens):
+       the clock of the frame (the largest figure outside the filled piece),
+       the thing and its hour in the filled piece, the number of a day tile.
+       38 · 34 · 30 px at 390. */
+    --display-clock: clamp(2.375rem, 2.25rem + 0.5vw, 2.75rem);
+    --display-piece: clamp(2.125rem, 2rem + 0.5vw, 2.5rem);
+    --display-tile: clamp(1.875rem, 1.75rem + 0.5vw, 2.125rem);
     --h1: clamp(1.8rem, 1.5rem + 1.5vw, 2.4rem); /* 29-38 — masthead. Retuned 2026-07-12 to the size mastheads actually render (person/performance canonical); the old 32-48 was never consumed — every page rolled its own clamp to undershoot it. */
     --h2: var(--text-xxl);
     --h3: clamp(1.2rem, 1.05rem + 0.7vw, 1.5rem);
@@ -516,6 +542,9 @@
        width, from the same left edge, so turning calm on never moves it.
        About the width the Desk's left column already had (1.55fr of 1240). */
     --calm-measure: 45rem;
+    /* A day tile of «Coming up» on a phone (ADR-202 § 6): fixed width, so
+       the third one peeks and the strip says it slides. */
+    --coming-tile-width: 37%;
     /* The first-day panel's form (NewSpacePanel, tarea 137): two fields and a
        sentence, as narrow as a dialog. */
     --newspace-measure: 26rem;
@@ -575,6 +604,9 @@
     --line: 2px;
     --line-thick: 3px;
     --line-bar: 4px;
+    /* The stroke of a drawn mark (calm's wave, design-system rule 14): its
+       own width, so a theme thickens the marks without touching the rules. */
+    --mark-stroke: 1.5px;
 
     --border-size: var(--line-hairline);
     --border-width: var(--border-size);
@@ -1053,6 +1085,9 @@
     --identity-tint: 24%;
     --identity-tint-base: var(--bg);
     --identity-ink-l: 0.9;
+    /* Focus: a surface lighter than the canvas, not a white card. */
+    --surface-focus: oklch(from var(--primary) 34% 0.03 h);
+    --surface-focus-ink: oklch(from var(--base) 95% c h);
     --money-invoiced-ink: 72%;
     --money-open-ink: 30%;
 
@@ -1178,6 +1213,9 @@
     --selection-fg: var(--neutral);
     --identity-tint: 30%;
     --identity-tint-base: var(--bg);
+    --surface-focus: oklch(42% 0.12 45);
+    --surface-focus-ink: oklch(97% 0.02 95);
+    --surface-focus-mark-tint: 70%;
     --identity-ink-l: 0.95;
     --box-shadow-1: 0 0 0 var(--line) color-mix(in oklch, var(--primary) 40%, transparent);
     --box-shadow-2: 0 0 0 var(--line-thick) color-mix(in oklch, var(--primary) 50%, transparent);
@@ -1202,6 +1240,9 @@
     --h3: 2rem;
     --display-l: 4rem;
     --display-xl: 6rem;
+    --display-clock: 3.5rem;
+    --display-piece: 3rem;
+    --display-tile: 2.75rem;
     --tracking-xs: 0.05em;
     --tracking-s: 0.1em;
     --tracking-m: 0.15em;
@@ -1222,6 +1263,8 @@
     --line: 4px;
     --line-thick: 6px;
     --line-bar: 8px;
+    --mark-stroke: 3px;
+    --coming-tile-width: 60%;
     --radius: 18px;
     --radius-xs: 8px;
     --radius-s: 12px;

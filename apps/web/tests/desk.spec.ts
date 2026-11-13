@@ -47,20 +47,17 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
     await page.goto(DESK);
     await waitForLoaded(page);
     const main = page.getByRole('main');
-    await expect(main.getByRole('heading', { name: /^Next up/ })).toBeVisible();
+    // Three blocks in a fixed order (ADR-202 § 1): the day (its piece, full
+    // or hollow, always there), what comes and what waits.
+    await expect(main.getByRole('heading', { name: /^Today/ })).toBeAttached();
+    await expect(page.getByTestId('desk-next').or(page.getByTestId('desk-hollow')).first()).toBeVisible();
+    await expect(main.getByRole('heading', { name: /^Coming up/ })).toBeVisible();
     await expect(main.getByRole('heading', { name: /^The season/ })).toBeVisible();
-    // A band with nothing in it is not drawn (ADR-145 § 1, amends ADR-127 § 4):
-    // «Waiting for you» and «What changed» are there with something in them,
-    // and with both quiet Hoy says so once.
-    const waits = main.getByRole('heading', { name: /^Waiting for you/ });
+    // «Waiting for you» carries Hoy's «+» (ADR-203 § 1): drawn with something
+    // in it or for its «+»; with nothing it says so itself.
+    await expect(main.getByRole('heading', { name: /^Waiting for you/ })).toBeVisible();
     const changed = page.getByTestId('desk-changed');
-    const quiet = main.getByText('All caught up.', { exact: true });
-    await expect(waits.or(changed).or(quiet).first()).toBeVisible();
     if ((await changed.count()) > 0) await expect(changed).not.toContainText(/Nothing new/);
-    if ((await quiet.count()) > 0) {
-      await expect(waits).toHaveCount(0);
-      await expect(changed).toHaveCount(0);
-    }
     await expect(page.getByTestId('door-planner')).toHaveAttribute('href', '/h/planner');
     await expect(page.getByTestId('door-conversations')).toHaveAttribute('href', '/h/conversations?view=envios');
 
@@ -107,17 +104,21 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
     await page.goto(DESK);
     await waitForLoaded(page);
     const waits = page.locator('section.waits');
-    await expect(waits.getByRole('checkbox', { name: TASK_TODAY })).toBeVisible({ timeout: 10_000 });
+    // The tasks pill counts it (ADR-202 § 7); the short list draws three rows
+    // at most, so the task may wait under the pill. Tasks have no list of
+    // their own: their pill opens the whole list here, by days.
+    const tasksPill = waits.locator('[data-kind="tasks"]');
+    await expect(tasksPill).toBeVisible({ timeout: 10_000 });
 
     // One list at a time: the full list replaces the short one, never both.
-    await waits.getByRole('button', { name: /^See all by day/ }).click();
+    await tasksPill.click();
     await expect(waits.getByRole('checkbox', { name: TASK_TODAY })).toHaveCount(1);
     await expect(waits.locator('.bucket--today')).toBeVisible();
     await expect(waits.getByRole('checkbox', { name: TASK_LOOSE })).toHaveCount(1);
     // The swap leaves the focus on the band's heading, not on <body>.
     await expect(waits.getByRole('heading', { name: /^Waiting for you/ })).toBeFocused();
     await waits.getByRole('button', { name: 'See less' }).click();
-    await expect(waits.getByRole('checkbox', { name: TASK_TODAY })).toHaveCount(1);
+    await expect(waits.locator('.timeline')).toHaveCount(0);
 
     await sweep(page, wsId);
   });
@@ -261,6 +262,26 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
     await expect(add).toBeFocused();
   });
 
+  test('the tiles open their day in the Planner; the pills, their lists (ADR-202 § 8)', async ({ page }) => {
+    await page.goto(DESK);
+    await waitForLoaded(page);
+    const tiles = page.getByTestId('desk-tile');
+    if ((await tiles.count()) > 0) {
+      await expect(tiles.first()).toHaveAttribute('href', /^\/h\/planner\?view=day&d=\d{4}-\d{2}-\d{2}$/);
+      expect(await tiles.count()).toBeLessThanOrEqual(10);
+      await expect(page.getByTestId('desk-tile-planner')).toHaveAttribute('href', '/h/planner');
+    }
+    const pills = page.getByTestId('desk-pills');
+    if ((await pills.count()) === 0) return;
+    const calls = pills.locator('[data-kind="calls"], [data-kind="replies"]');
+    if ((await calls.count()) > 0) await expect(calls.first()).toHaveAttribute('href', '/h/conversations?turno=nuestro');
+    const money = pills.locator('[data-kind="money"]');
+    if ((await money.count()) > 0) await expect(money).toHaveAttribute('href', '/h/books');
+    // Three rows at most a normal day, five a day with nothing, none a gig
+    // day (ADR-202 § 7, ADR-203 § 9).
+    expect(await page.locator('[data-testid="desk-waiting-rows"] > li').count()).toBeLessThanOrEqual(5);
+  });
+
   test('the visit is written on the way out, so «since» has a start next time', async ({ page }) => {
     await page.goto(DESK);
     await waitForLoaded(page);
@@ -280,13 +301,12 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
       const el = page.locator(sel).first();
       return (await el.count()) ? ((await el.boundingBox())?.y ?? -1) : -1;
     };
-    // A band with nothing in it is not drawn (ADR-145 § 1): the order holds
-    // among the bands that are there. What changed follows what waits, the
-    // season's doors close the page (ADR-149).
-    const order = (
-      await Promise.all(['section.next', 'section.waits', 'section.changed', 'section.season'].map(top))
-    ).filter((y) => y >= 0);
+    // Three blocks in a fixed order (ADR-202 § 1): the day, what comes, what
+    // waits. «What changed» and «The season» leave the phone.
+    const order = (await Promise.all(['section.day', 'section.coming', 'section.waits'].map(top))).filter((y) => y >= 0);
     expect(order[0]).toBeGreaterThan(0);
+    await expect(page.locator('section.changed')).toHaveCount(0);
+    await expect(page.locator('section.season')).toHaveCount(0);
     expect(order).toEqual([...order].sort((a, b) => a - b));
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);

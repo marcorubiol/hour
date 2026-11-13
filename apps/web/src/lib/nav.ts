@@ -174,7 +174,7 @@ export function lineUrl(line: NavLine): string {
   return `/h/${line.workspaceSlug}/project/${line.projectSlug}/line/${line.slug}`;
 }
 
-type ResolvedScope = {
+export type ResolvedScope = {
   /** workspace ids of pinned spaces */
   workspaceIds: string[];
   /** workspace slugs of pinned spaces */

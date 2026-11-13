@@ -23,43 +23,28 @@ async function open(page: Page, path: string, calm: boolean) {
 test.describe('Calm — a composition, not a grey (ADR-139 § 5)', () => {
   test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL / PW_TEST_PASSWORD.');
 
-  test('Today in calm: one column, today only, the rest in one line that leaves calm', async ({ page }) => {
+  test('Today in calm: the day, what comes and the pills, without rows (ADR-203 § 5)', async ({ page }) => {
     await open(page, '/h/desk', true);
     const main = page.getByRole('main');
-    await expect(main.getByRole('heading', { name: /^Next up/ })).toBeVisible();
+    await expect(page.getByTestId('desk-next').or(page.getByTestId('desk-hollow')).first()).toBeVisible();
+    await expect(main.getByRole('heading', { name: /^Coming up/ })).toBeVisible();
     await expect(main.getByRole('heading', { name: /^Waiting for you/ })).toBeVisible();
+    // The rows fold, the pills stay; no «See all» either.
+    await expect(page.getByTestId('desk-waiting-rows')).toHaveCount(0);
+    await expect(main.getByRole('button', { name: /^See all by day/ })).toHaveCount(0);
     // The right column is folded, not greyed: it is not on the page at all.
     await expect(main.getByRole('heading', { name: /^The season/ })).toHaveCount(0);
     await expect(page.getByTestId('desk-changed')).toHaveCount(0);
-    // «Ver todo por días» is not offered in calm; the line says what waits,
-    // from one on (ADR-154: with nothing more, no line).
-    const rest = main.getByText(/wait outside calm/);
-    if ((await rest.count()) === 0) test.skip(true, 'nothing more waits outside calm today');
-    await expect(rest).toBeVisible();
-    await main.getByRole('button', { name: /^see all/ }).last().click();
-    await expect(main.getByRole('heading', { name: /^The season/ })).toBeVisible();
-    await expect(page.locator('.side-calm')).toHaveAttribute('aria-pressed', 'false');
   });
 
-  test('the title says the day, never the debt, in both modes', async ({ page }) => {
+  test('the piece says the day; the lens title is heard, not seen (ADR-203 § 1)', async ({ page }) => {
     for (const calm of [false, true]) {
       await open(page, '/h/desk', calm);
-      // The day is the title (ADR-154: no greeting before it).
-      const title = (await page.locator('.lenshead__title .desk__day').first().innerText()).trim();
-      expect(title, 'the title counts what is overdue').not.toMatch(/overdue|waiting for you|wait for you/i);
-      expect(title).toMatch(/^(Today|Nothing on the plan today)/);
+      const piece = page.getByTestId('desk-next').or(page.getByTestId('desk-hollow')).first();
+      await expect(piece).toBeVisible();
+      await expect(piece).not.toContainText(/overdue|waiting for you/i);
+      await expect(page.locator('.lenshead__title .visually-hidden')).toHaveText('Today');
     }
-  });
-
-  test('the overdue is counted once, in red, and opens in place', async ({ page }) => {
-    await open(page, '/h/desk', true);
-    const line = page.getByRole('main').locator('.calm-line', { hasText: /overdue/ });
-    if ((await line.count()) === 0) test.skip(true, 'nothing overdue in the fixture today');
-    const toggle = line.getByRole('button');
-    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    await toggle.click();
-    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    await expect(page.locator('#desk-calm-overdue li').first()).toBeVisible();
   });
 
   test('calm never dims a control, and its switch is a stroke, not a black pill', async ({ page }) => {

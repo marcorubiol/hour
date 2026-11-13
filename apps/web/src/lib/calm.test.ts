@@ -8,9 +8,9 @@ describe('calm as focus (ADR-139 § 5): what each lens keeps', () => {
         expect(shows(lens, block as never, false), `${lens}.${block}`).toBe(true);
   });
 
-  it('Hoy keeps the next thing and today; the overdue, the week, the season and the changes fold', () => {
+  it('Hoy keeps the day, what comes and the pills; the rows, the season and the changes fold (ADR-203 § 5)', () => {
     const kept = Object.entries(CALM_FOCUS.desk).filter(([, v]) => v).map(([k]) => k);
-    expect(kept).toEqual(['next', 'waiting_today']);
+    expect(kept).toEqual(['day', 'coming', 'waiting_pills']);
   });
 
   it('the Planner keeps what is confirmed and what you have to decide; options, bands and lists fold', () => {
