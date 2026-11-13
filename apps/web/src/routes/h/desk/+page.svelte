@@ -44,7 +44,7 @@
   import { AHORA_KEY, ahoraDay, ahoraItems } from '$lib/ahora';
   import { accentVarFor } from '$lib/utils/accent';
   import { spaceName } from '$lib/utils/identity';
-  import { appLocale, LOCALE_TAG, t } from '$lib/i18n';
+  import { appLocale, LOCALE_TAG, t, tradeFor } from '$lib/i18n';
   import { localeDayMonth, localeWeekdayLong, localeWeekdayShort, viewerTimeZone } from '$lib/datetime';
   import { addDaysIso, dayKeyInTz, plannerDayHref } from '$lib/planner';
   import { page } from '$app/state';
@@ -851,7 +851,7 @@
   let composerPerformances = $derived(
     feeds.performances.map((p) => ({
       id: p.id,
-      name: [p.venue?.name || p.venue_name || p.project?.name || t('desk.fallback_show', locale), p.city]
+      name: [p.venue?.name || p.venue_name || p.project?.name || t('desk.fallback_show', locale, undefined, tradeFor(perfWorkspaceId(p))), p.city]
         .filter(Boolean)
         .join(' · '),
     })),

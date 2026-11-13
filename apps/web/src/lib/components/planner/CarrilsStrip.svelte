@@ -37,7 +37,7 @@
    */
   import { SvelteSet } from 'svelte/reactivity';
   import Slip from '$lib/components/planner/Slip.svelte';
-  import { appLocale, t } from '$lib/i18n';
+  import { appLocale, t, type Voice } from '$lib/i18n';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
   import type { LaneAxis } from '$lib/carrils';
   import {
@@ -117,7 +117,7 @@
     clashDayLabel: (iso: string) => string;
 
     /* ── the slip's contract, passed straight through ───────────────── */
-    kindLabel: (kind: SlipKind) => string;
+    kindLabel: (kind: SlipKind, voice?: Voice) => string;
     stateLabel: (slip: SlipVM) => string | null;
     stateUrgent?: (slip: SlipVM) => boolean;
 

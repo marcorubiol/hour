@@ -110,7 +110,7 @@
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { useCalm } from '$lib/stores/calm.svelte';
   import { plannerCalmFacts, shows } from '$lib/calm';
-  import { LOCALE_TAG, appLocale, t } from '$lib/i18n';
+  import { LOCALE_TAG, appLocale, t, tradeFor, type Voice } from '$lib/i18n';
   import {
     buildLineIndex,
     buildProjectIndex,
@@ -853,8 +853,8 @@
   }
 
   const KIND_KEYS = new Set(['show', 'rehearsal', 'residency', 'travel_day', 'press', 'other', 'day_off']);
-  function kindLabel(kind: string): string {
-    return KIND_KEYS.has(kind) ? t(`planner.kind_${kind}`, locale) : kind.replace(/_/g, ' ');
+  function kindLabel(kind: string, voice?: Voice): string {
+    return KIND_KEYS.has(kind) ? t(`planner.kind_${kind}`, locale, undefined, voice) : kind.replace(/_/g, ' ');
   }
 
   // ── View models for the two projections ──────────────────────────────
@@ -941,7 +941,7 @@
   let eventSummaryById = $derived.by(() => {
     const m = new Map<string, { label: string; status: string; accent: string | null }>();
     for (const p of scopedPerfs) {
-      const name = p.venue?.name ?? p.venue_name ?? p.city ?? t('create.type_performance', locale);
+      const name = p.venue?.name ?? p.venue_name ?? p.city ?? t('create.type_performance', locale, undefined, tradeFor(perfWorkspaceId(p)));
       m.set(p.id, {
         label: p.project ? `${p.project.name} · ${name}` : name,
         status: statusWord(p.status),
@@ -1418,7 +1418,7 @@
     kindLabel,
     statusLabel: statusWord,
     viewerTimeLabel: (time: string) => t('planner.viewer_time', locale, { time }),
-    fallbackName: t('create.type_performance', locale),
+    fallbackName: (voice: Voice) => t('create.type_performance', locale, undefined, voice),
     dualTime,
   });
   /** The pair's rule for one event of the day — soft while both are
@@ -1769,8 +1769,8 @@
         id: p.id,
         day: localeDayMonth(perfDayKey(p), localeTag),
         kind: held
-          ? `${t('planner.kind_show', locale)}?`
-          : t('planner.kind_show', locale),
+          ? `${t('planner.kind_show', locale, undefined, tradeFor(perfWorkspaceId(p)))}?`
+          : t('planner.kind_show', locale, undefined, tradeFor(perfWorkspaceId(p))),
         name: sl.name,
         city: sl.city ?? null,
         country: p.country ?? null,
@@ -1926,6 +1926,7 @@
         urgent: d.urgent,
         decideBy: d.decideBy,
         people: (d.people ?? []).map((id) => personNames.get(id) ?? '—'),
+        workspaceId: perfWorkspaceId(decisionPerfById.get(d.a.id) ?? {}),
         a: decisionOptionVM(d.a),
         b: decisionOptionVM(d.b),
       };
@@ -1942,7 +1943,8 @@
           initials: perf?.project?.initials ?? null,
         };
       };
-      return { id: c.id, day: c.day, a: side(c.a), b: side(c.b) };
+      const ws = (s: DecisionSide) => perfWorkspaceId(decisionPerfById.get(s.id) ?? {});
+      return { id: c.id, day: c.day, workspaceIds: [ws(c.a), ws(c.b)], a: side(c.a), b: side(c.b) };
     }),
   );
   let urgentCount = $derived(decisionVMs.filter((d) => d.urgent).length);
@@ -3593,7 +3595,7 @@
       threads={dayThreads}
       win={dayWin}
       now={dayNow}
-      kindLabel={(k) => kindLabel(k)}
+      {kindLabel}
       stateLabel={boardSlipState}
       stateUrgent={(sl) => Boolean(sl.hold?.expires && sl.hold.expires <= todayIso)}
       stepLabel={(k) => t(`desk.anchor_${k === 'load_in' ? 'loadin' : k}`, locale)}
@@ -3606,7 +3608,7 @@
       }}
       emptyLabel={t('planner.day_empty', locale)}
       axisLabel={t('planner.day_axis', locale)}
-      noCastWord={t('planner.no_cast', locale)}
+      noCastWord={(voice) => t('planner.no_cast', locale, undefined, voice)}
       roadSheetWord={t('desk.roadsheet', locale)}
       unplaced={dayUnplaced}
       noHourWord={t('planner.no_hour', locale)}
@@ -3731,7 +3733,7 @@
       blackoutsToggleLabel={t('planner.blackouts_toggle', locale)}
       decideLabel={t('planner.agenda_decide', locale)}
       notesLabel={t('planner.agenda_notes', locale)}
-      showWord={t('planner.kind_show', locale)}
+      showWord={(voice) => t('planner.kind_show', locale, undefined, voice)}
       releasedWord={t('planner.released', locale)}
       noHourWord={t('planner.no_hour', locale)}
       allDayWord={t('planner.all_day', locale)}
@@ -3779,7 +3781,7 @@
               .join(' · ') || t('planner.week_nothing', locale)}
       freeNight={engine.isFreeNight}
       castOf={(p) => (p.person_ids || p.commitments ? goesOf(p) : null)}
-      noCastWord={t('planner.no_cast', locale)}
+      noCastWord={(voice) => t('planner.no_cast', locale, undefined, voice)}
       onDayOpen={(iso) => {
         dayIso = iso;
         setView('day');
@@ -3832,7 +3834,7 @@
       emptyLabel={t('planner.empty_month', locale)}
       createLabel={(iso) => t('planner.new_on', locale, { day: dayMonthLong(iso, localeTag) })}
       clashDayLabel={(iso) => t('planner.conn_jump', locale, { day: Number(iso.slice(8, 10)) })}
-      kindLabel={(k) => kindLabel(k)}
+      {kindLabel}
       stateLabel={boardSlipState}
       stateUrgent={(sl) => Boolean(sl.hold?.expires && sl.hold.expires <= todayIso)}
       onDayCreate={canPlan ? openBoardCreate : undefined}

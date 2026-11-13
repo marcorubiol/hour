@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { setTrade, setWorkspaceTrades } from './i18n';
 import * as v from 'valibot';
 import {
   TASK_STATUSES,
@@ -339,6 +340,18 @@ describe('taskContextLabel', () => {
       },
     });
     expect(taskContextLabel(t)).toBe('Anna Puig');
+  });
+});
+
+describe('taskContextLabel — tarea 142', () => {
+  it('a performance with no place speaks the trade of the task\'s own space', () => {
+    setWorkspaceTrades([{ id: WS, slug: 'banda', trade: 'music' }]);
+    setTrade('mixed');
+    const t = item({ performance: { id: 'x', slug: 'g', project_id: PARENT, venue_name: null, city: null } });
+    expect(taskContextLabel(t, 'es')).toBe('Concierto');
+    setWorkspaceTrades([]);
+    expect(taskContextLabel(t, 'es')).toBe('Función');
+    setTrade('stage');
   });
 });
 

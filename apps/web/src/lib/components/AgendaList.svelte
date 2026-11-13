@@ -70,7 +70,7 @@
   import PlannerSteps, { type StepVM } from '$lib/components/planner/PlannerSteps.svelte';
   import { performanceSlip, dateSlip, perfWorkspaceId } from '$lib/month-events';
   import { holdDeadlineLabel, performanceStatusFamily } from '$lib/performance';
-  import { appLocale, appLocaleTag, t } from '$lib/i18n';
+  import { appLocale, appLocaleTag, t, tradeFor, type Voice } from '$lib/i18n';
   import { dateStatusFamily } from '$lib/date';
 
   interface Props {
@@ -101,8 +101,9 @@
     decideLabel?: string;
     /** Header of the right-hand dot-grid notes column. */
     notesLabel?: string;
-    /** «show» — the kind word a performance row carries in its pack. */
-    showWord?: string;
+    /** «show» — the kind word a performance row carries in its pack, in the
+        trade of the row's space (tarea 142). */
+    showWord?: (voice?: Voice) => string;
     /** «let go» — the word a released row carries. */
     releasedWord?: string;
     /** «no hour» — a hold nobody has timed. NEVER a dash. */
@@ -122,7 +123,7 @@
     /** Who goes to a gig — names on file, [] for nobody, null when the feed
         did not say. The Day said it and the diary did not (uso #8). */
     castOf?: (perf: PerformanceEvent) => string[] | null;
-    noCastWord?: string;
+    noCastWord?: (voice?: Voice) => string;
     /**
      * THE VERBS, on the row itself. A hold is a question the diary is asking
      * you; answering it belonged three clicks away in a drawer, so the row
@@ -216,7 +217,7 @@
     blackoutsToggleLabel = t('planner.blackouts_toggle', L),
     decideLabel = t('planner.agenda_decide', L),
     notesLabel = t('planner.agenda_notes', L),
-    showWord = t('planner.kind_show', L),
+    showWord = (voice?: Voice) => t('planner.kind_show', L, undefined, voice),
     releasedWord = t('planner.released', L),
     noHourWord = t('planner.no_hour', L),
     allDayWord = t('planner.all_day', L),
@@ -224,7 +225,7 @@
     weekRange = (from: string, to: string) => `${from} → ${to}`,
     freeNight,
     castOf,
-    noCastWord = t('planner.no_cast', L),
+    noCastWord = (voice?: Voice) => t('planner.no_cast', L, undefined, voice),
     weekTally = (firm: number, held: number, free: number) =>
       [
         firm ? `${firm} ${t(firm === 1 ? 'planner.week_confirmed_one' : 'planner.week_confirmed', L)}` : '',
@@ -333,7 +334,7 @@
     kindLabel: (k: string) => dateKindLabel(k),
     statusLabel: (st: string) => statusWord(st, L),
     viewerTimeLabel: (time: string) => t('planner.viewer_time', L, { time }),
-    fallbackName: t('create.type_performance', L),
+    fallbackName: (voice: Voice) => t('create.type_performance', L, undefined, voice),
     dualTime,
   });
   /** Released says `let go`; a hold says its rank and, if the clock is
@@ -514,7 +515,7 @@
     return `/h/${ws}/performance/${p.slug}`;
   }
   function perfName(p: PerformanceEvent): string {
-    return p.venue?.name ?? p.venue_name ?? p.city ?? p.project?.name ?? t('create.type_performance', L);
+    return p.venue?.name ?? p.venue_name ?? p.city ?? p.project?.name ?? t('create.type_performance', L, undefined, tradeFor(perfWorkspaceId(p)));
   }
   function perfCity(p: PerformanceEvent): string | null {
     return p.venue?.city ?? p.city;
@@ -1188,12 +1189,12 @@
   <Slip
     {slip}
     placing="row"
-    kindLabel={(k) => (k === 'show' ? showWord : dateKindLabel(k))}
+    kindLabel={(k, voice) => (k === 'show' ? showWord(voice) : dateKindLabel(k))}
     stateLabel={slipState}
     stateUrgent={false}
     showCountry={true}
     cast={row.kind === 'perf' ? (castOf?.(row.perf) ?? null) : null}
-    {noCastWord}
+    noCastWord={row.kind === 'perf' ? noCastWord(tradeFor(perfWorkspaceId(row.perf))) : undefined}
     clash={flags.clash}
     clashPeople={flags.people}
     onOpen={row.kind === 'date' && onDateOpen ? () => onDateOpen?.(row.date) : undefined}

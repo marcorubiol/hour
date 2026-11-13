@@ -6,7 +6,7 @@
  */
 import { dayKeyInTz } from '$lib/planner';
 import { hourMark } from '$lib/datetime';
-import { appLocaleTag } from '$lib/i18n';
+import { appLocaleTag, tradeFor, type Voice } from '$lib/i18n';
 import { decideBy, performanceStatusFamily, type StatusFamily } from '$lib/performance';
 import { dateStatusFamily } from '$lib/date';
 import type { ScheduleMoment } from '$lib/schedule-slot';
@@ -459,13 +459,14 @@ export type SlipContext = {
   workspaceTzById: Map<string, string | undefined>;
   viewerTz: string;
   /** Injected so this file stays free of i18n — the caller owns the words. */
-  kindLabel: (kind: SlipKind) => string;
+  kindLabel: (kind: SlipKind, voice?: Voice) => string;
   /** The status word in the title sentence. Raw enum spelling when absent. */
   statusLabel?: (status: string) => string;
   /** «20h30 yours»: the viewer's clock in the title sentence. */
   viewerTimeLabel?: (time: string) => string;
-  /** The name a performance with no venue, city or project falls back to. */
-  fallbackName?: string;
+  /** The name a performance with no venue, city or project falls back to,
+      in the trade of its own space (tarea 142). */
+  fallbackName?: (voice: Voice) => string;
   /** ADR-002 — the workspace's hold convention, resolved PER SLIP. */
   workspaceModeById?: Map<string, string>;
   /** Where a travel leg began — see `Slip.origin`. The DRAWING supplies it,
@@ -499,13 +500,13 @@ function clock(t: string | null): string | null {
  * guest of a bolo reads the performance and not its project (RLS), so the
  * embed is null and only the row says where it is.
  */
-export function perfWorkspaceId(p: Pick<PerformanceEvent, 'project' | 'workspace_id'>): string | null {
+export function perfWorkspaceId(p: { project?: Pick<ProjectLite, 'workspace_id'> | null; workspace_id?: string | null }): string | null {
   return p.project?.workspace_id ?? p.workspace_id ?? null;
 }
 
 export function performanceSlip(p: PerformanceEvent, ctx: SlipContext): Slip {
   const name =
-    p.venue?.name ?? p.venue_name ?? p.city ?? p.project?.name ?? ctx.fallbackName ?? 'Performance';
+    p.venue?.name ?? p.venue_name ?? p.city ?? p.project?.name ?? ctx.fallbackName?.(tradeFor(perfWorkspaceId(p))) ?? 'Performance';
   const at = perfInstant(p);
   // A venue-less gig falls back to its home space's zone — the one its times
   // were entered in — never silently the browser's.

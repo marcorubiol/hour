@@ -14,7 +14,7 @@
 
 import * as v from 'valibot';
 import { hourMark, localeDayMonth, localeMonthShort, localeWeekdayShort, timeInTz } from './datetime';
-import { LOCALE_TAG, t, type Locale } from './i18n';
+import { LOCALE_TAG, t, tradeFor, type Locale, type Voice } from './i18n';
 import type { LateLineData } from './roadsheet-late';
 
 /** El tope de la base (`message_body_length`): de 1 a 10.000 tras recortar. */
@@ -163,35 +163,36 @@ export const AudienceQuerySchema = v.object({
 export function facetName(
   facet: { facet_key: string | null; label: string | null; labels?: Record<string, string> | null },
   locale: Locale,
+  voice?: Voice,
 ): string {
-  if (facet.facet_key === null) return t('threads.general', locale);
-  return facet.labels?.[locale] || facet.label || t(`facet.${facet.facet_key}`, locale);
+  if (facet.facet_key === null) return t('threads.general', locale, undefined, voice);
+  return facet.labels?.[locale] || facet.label || t(`facet.${facet.facet_key}`, locale, undefined, voice);
 }
 
 /** «Lo ven 5, por estar en el bolo» · «… por permiso de Técnica» · «… quien ve esta conversación». */
-export function audienceLine(audience: Pick<ThreadAudience, 'count' | 'reason'>, locale: Locale): string {
+export function audienceLine(audience: Pick<ThreadAudience, 'count' | 'reason'>, locale: Locale, voice?: Voice): string {
   const r = audience.reason;
   const why =
     r.kind === 'facet'
-      ? t('threads.why_facet', locale, { facet: facetName(r, locale) })
+      ? t('threads.why_facet', locale, { facet: facetName(r, locale, voice) }, voice)
       : r.kind === 'conversation'
-        ? t('threads.why_conversation', locale)
+        ? t('threads.why_conversation', locale, undefined, voice)
         : r.level === 'bolo'
-          ? t('threads.why_bolo', locale)
-          : t('threads.why_container', locale);
+          ? t('threads.why_bolo', locale, undefined, voice)
+          : t('threads.why_container', locale, undefined, voice);
   return audience.count === 1
-    ? t('threads.seen_by_one', locale, { why })
-    : t('threads.seen_by', locale, { n: audience.count, why });
+    ? t('threads.seen_by_one', locale, { why }, voice)
+    : t('threads.seen_by', locale, { n: audience.count, why }, voice);
 }
 
 /**
  * «Laia (reparto)», «Pau (técnica)», «Marco»: un lector del grupo del bolo con
  * su papel al lado (ADR-177 § 6). Sin nombre, null: no se nombra a nadie.
  */
-export function readerLabel(reader: AudienceReader, locale: Locale): string | null {
+export function readerLabel(reader: AudienceReader, locale: Locale, voice?: Voice): string | null {
   if (!reader.name) return null;
-  const roles = (reader.roles ?? []).map((r) => t(r === 'cast' ? 'thread.role_cast' : 'thread.role_crew', locale));
-  return roles.length > 0 ? t('thread.reader_role', locale, { name: reader.name, roles: roles.join(' · ') }) : reader.name;
+  const roles = (reader.roles ?? []).map((r) => t(r === 'cast' ? 'thread.role_cast' : 'thread.role_crew', locale, undefined, voice));
+  return roles.length > 0 ? t('thread.reader_role', locale, { name: reader.name, roles: roles.join(' · ') }, voice) : reader.name;
 }
 
 /**
@@ -431,8 +432,12 @@ export function groupHref(
 }
 
 /** El nombre del hilo dentro de su ancla: la faceta (o General) en un bolo, «Equipo» en una conversación. */
-export function feedThreadName(row: Pick<FeedThread, 'anchor_kind' | 'facet_key' | 'label' | 'labels'>, locale: Locale): string {
-  return row.anchor_kind === 'conversation' ? t('threads.team', locale) : facetName(row, locale);
+export function feedThreadName(
+  row: Pick<FeedThread, 'workspace_id' | 'anchor_kind' | 'facet_key' | 'label' | 'labels'>,
+  locale: Locale,
+): string {
+  const voice = tradeFor(row.workspace_id);
+  return row.anchor_kind === 'conversation' ? t('threads.team', locale, undefined, voice) : facetName(row, locale, voice);
 }
 
 /** De qué se habla: la conversación por su nombre; el bolo por sala y ciudad (no tiene título propio). */
