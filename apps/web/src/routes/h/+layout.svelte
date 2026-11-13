@@ -37,7 +37,7 @@
   import ScopeRail from '$lib/components/shell/ScopeRail.svelte';
   import PullRefresh from '$lib/components/shell/PullRefresh.svelte';
   import { isReservedWorkspaceSlug } from '$lib/reserved-slugs';
-  import { appLocale, setTrade, t, tradeOf } from '$lib/i18n';
+  import { appLocale, setTrade, setWorkspaceTrades, t, tradeOf } from '$lib/i18n';
   import { setSeasonStarts } from '$lib/season-start.svelte';
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
   import { lensesOnFor, lensOn, routedLensOf, setLensesOn } from '$lib/lenses.svelte';
@@ -189,7 +189,7 @@
   let rt = $state<RealtimeHandle | null>(null);
   let networkPresence = $state<NetworkPresenceStore | null>(null);
 
-  type WorkspaceLite = { id: string; slug: string; name: string; accent?: string | null };
+  type WorkspaceLite = { id: string; slug: string; name: string; accent?: string | null; trade?: string | null };
   const workspacesQuery = createQuery({
     queryKey: ['workspaces'],
     queryFn: ({ signal }) => fetchJSON<{ items: WorkspaceLite[] }>('/api/workspaces', signal),
@@ -225,6 +225,7 @@
   let onScreen = $derived(workspacesOnScreen(workspaceSlug, pins.pins, wsItems, lineIndex, projectIndex));
   $effect(() => {
     setTrade(tradeOf(onScreen));
+    setWorkspaceTrades(wsItems);
     setLensesOn(lensesOnFor(onScreen));
     setSeasonStarts(onScreen, wsItems);
   });
