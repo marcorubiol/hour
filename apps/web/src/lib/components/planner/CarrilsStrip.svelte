@@ -101,8 +101,9 @@
     sharedWord: string;
     /** The ghost lane's name — the engine says 'team', the page words it. */
     teamWord: string;
-    /** The nocast lane's suffix — «{project} · no cast». */
-    noCastWord: string;
+    /** The nocast lane's suffix — «{project} · no cast» — worded for the
+        lane's project: it speaks that project's space (tarea 142). */
+    noCastWord: (projectId: string | null) => string;
     /** A guest lane without a venue name — «Your bolo» (the engine leaves it empty). */
     guestWord?: string;
     /** The absence band's kind word ('away'). */
@@ -327,7 +328,7 @@
   }
   function laneName(lane: BoardLaneRef): string {
     if (lane.kind === 'ghost') return teamWord;
-    if (lane.kind === 'nocast') return `${lane.name} · ${noCastWord}`;
+    if (lane.kind === 'nocast') return `${lane.name} · ${noCastWord(lane.id)}`;
     if (lane.kind === 'guest') return lane.name || guestWord;
     return lane.name;
   }

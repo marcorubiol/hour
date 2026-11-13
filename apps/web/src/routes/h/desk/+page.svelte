@@ -851,6 +851,7 @@
   let composerPerformances = $derived(
     feeds.performances.map((p) => ({
       id: p.id,
+      workspaceId: perfWorkspaceId(p),
       name: [p.venue?.name || p.venue_name || p.project?.name || t('desk.fallback_show', locale, undefined, tradeFor(perfWorkspaceId(p))), p.city]
         .filter(Boolean)
         .join(' · '),

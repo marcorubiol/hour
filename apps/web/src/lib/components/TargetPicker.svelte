@@ -36,6 +36,8 @@
   interface EntityLite {
     id: string;
     name: string;
+    /** Its space, by id, when the host has it: the row's kind word speaks it. */
+    workspaceId?: string | null;
   }
   interface Props {
     locale: Locale;
@@ -70,9 +72,8 @@
   const tr = (key: string, params?: Record<string, string | number>) => t(key, locale, params, voice);
 
   interface Row {
+    /** Its `workspaceId`, when known, is what the row's kind word speaks. */
     target: TaskTarget;
-    /** Its space, by id: a row's kind speaks that space's trade. */
-    space?: string;
     /** secondary context (workspace / project name) */
     path?: string;
     /** drill token if this row has a deeper level, else null */
@@ -94,8 +95,7 @@
   }
   function projectRow(p: (typeof projectIndex)[number], canDrill: boolean, path: string): Row {
     return {
-      target: { kind: 'project', id: p.id, name: p.name, accent: p.accent },
-      space: p.workspaceId,
+      target: { kind: 'project', id: p.id, name: p.name, accent: p.accent, workspaceId: p.workspaceId },
       path,
       drill: canDrill ? `p:${p.id}` : null,
     };
@@ -125,7 +125,7 @@
         .map((l) => lineRow(l, l.projectName));
       const shows: Row[] = performances
         .filter((s) => hit(s.name))
-        .map((s) => ({ target: { kind: 'performance', id: s.id, name: s.name }, drill: null }));
+        .map((s) => ({ target: { kind: 'performance', id: s.id, name: s.name, workspaceId: s.workspaceId }, drill: null }));
       const convs: Row[] = conversations
         .filter((c) => hit(c.name))
         .map((c) => ({ target: { kind: 'conversation', id: c.id, name: c.name }, drill: null }));
@@ -280,7 +280,7 @@
   const kindLabel = (r: Row) =>
     r.target.kind === 'line'
       ? lineKindLabel(r.target.lineKind ?? '')
-      : t(`picker.kind_${r.target.kind}`, locale, undefined, voiceFor(r.space));
+      : t(`picker.kind_${r.target.kind}`, locale, undefined, voiceFor(r.target.workspaceId));
 </script>
 
 <div class="tp" role="dialog" aria-label={tr('picker.aria')}>

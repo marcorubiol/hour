@@ -130,7 +130,7 @@ function props(over: Record<string, unknown> = {}) {
       `${g.units} projects · ${g.confirmed} confirmed`,
     sharedWord: 'shared',
     teamWord: 'team',
-    noCastWord: 'no cast',
+    noCastWord: () => 'no cast',
     awayWord: 'away',
     untilLabel: (iso: string) => `until ${iso.slice(8)}`,
     emptyLabel: 'Nothing this month.',
