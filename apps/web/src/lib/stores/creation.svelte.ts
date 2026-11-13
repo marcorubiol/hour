@@ -11,7 +11,8 @@
  * `TaskComposer`, in a dialog) and a conversation
  * (`CreateConversationDialog`, the lens's own «Añadir conversación»), and
  * a person or an organization on their own (`CreatePersonDialog`,
- * `CreateOrganizationDialog`, 136).
+ * `CreateOrganizationDialog`, 136), and contacts from a sheet
+ * (`ContactImportDialog`, 138).
  *
  * What a preset leaves out, the shell deduces from the pinned scope
  * (`scopeCreatePresets`). The day is the one thing the shell cannot know: a
@@ -59,6 +60,7 @@ class CreationStore {
   conversationOpen = $state(false);
   personOpen = $state(false);
   organizationOpen = $state(false);
+  importOpen = $state(false);
 
   /** Presets consumed by the dialogs when opening from a scoped surface. */
   lineWorkspaceId = $state<string | null>(null);
@@ -131,6 +133,11 @@ class CreationStore {
   openOrganization(preset?: { name?: string | null }) {
     this.organizationName = preset?.name?.trim() ?? '';
     this.organizationOpen = true;
+  }
+
+  /** Contacts from a sheet (138): Conversaciones' «+» and ⌘K. */
+  openImport() {
+    this.importOpen = true;
   }
 
   /** A page lends its day while mounted; the returned function takes it back. */

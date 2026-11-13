@@ -737,7 +737,6 @@ export interface ContactImportItem {
   id: string;
   workspace_id: string;
   created_by: string | null;
-  created_by_name: string | null;
   filename: string | null;
   row_count: number;
   rows_failed: number;

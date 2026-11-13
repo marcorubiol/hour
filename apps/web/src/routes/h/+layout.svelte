@@ -591,6 +591,7 @@
     conversation: lazy(() => import('$lib/components/create/CreateConversationDialog.svelte')),
     person: lazy(() => import('$lib/components/create/CreatePersonDialog.svelte')),
     organization: lazy(() => import('$lib/components/create/CreateOrganizationDialog.svelte')),
+    import: lazy(() => import('$lib/components/ContactImportDialog.svelte')),
   };
   $effect(() => {
     if (paletteOpen) void palette.load();
@@ -602,6 +603,7 @@
     if (creation.conversationOpen) void dialogs.conversation.load();
     if (creation.personOpen) void dialogs.person.load();
     if (creation.organizationOpen) void dialogs.organization.load();
+    if (creation.importOpen) void dialogs.import.load();
   });
   // A dialog of adding closes, from any door: what a space has (Hoy's start
   // list, the empties of the Planner, tarea 137) is read again, so a step
@@ -612,6 +614,7 @@
       creation.conversationOpen ||
       creation.personOpen ||
       creation.organizationOpen ||
+      creation.importOpen ||
       creation.eventOpen,
   );
   let wasAdding = false;
@@ -652,12 +655,19 @@
   // bolo makes no task, project or line in the company's space.
   let canTask = $derived(taskWorkspaces(onScreen).length > 0);
   let canProject = $derived(spaceWriteWorkspaces(wsItems).length > 0);
+  /** Where contacts can be imported (owner, admin, member), the scope's space first (138). */
+  let importWorkspaceIds = $derived.by(() => {
+    const ids = spaceWriteWorkspaces(wsItems).map((w) => w.id);
+    const first = createPresets.workspaceId;
+    return first && ids.includes(first) ? [first, ...ids.filter((id) => id !== first)] : ids;
+  });
   let canLine = $derived(projectIndex.length > 0);
   function onCreate(c: PaletteCreate) {
     if (c.kind === 'task') creation.openTask({ title: c.title });
     else if (c.kind === 'conversation') creation.openConversation({ who: c.title });
     else if (c.kind === 'person') creation.openPerson({ name: c.title });
     else if (c.kind === 'organization') creation.openOrganization({ name: c.title });
+    else if (c.kind === 'import') creation.openImport();
     else creation.openEvent({ type: createEventType(c.kind), title: c.title });
   }
   /** Adding stays where you are (ADR-139 p3); the notice's «Abrir» goes to
@@ -980,6 +990,10 @@
   {/if}
   {#if dialogs.organization.component}
     <dialogs.organization.component bind:open={creation.organizationOpen} name={creation.organizationName} />
+  {/if}
+  {#if dialogs.import.component}
+    <!-- Contactos de una hoja (138): donde se dan de alta contactos, el espacio del ámbito primero. -->
+    <dialogs.import.component bind:open={creation.importOpen} workspaceIds={importWorkspaceIds} {locale} />
   {/if}
 {/if}
 </svelte:boundary>
