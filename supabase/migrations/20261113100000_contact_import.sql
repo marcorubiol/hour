@@ -14,23 +14,37 @@
 --      PostgREST.
 --   2. `import_id` nullable en `workspace_person`, `workspace_organization` y
 --      `note`, con FK compuesta por espacio a `contact_import`.
---   3. `contact_import_lookup`: qué correos, nombres de persona y nombres de
+--      `note.import_id` sólo lo escribe la importación (trigger).
+--   3. Lo importado es DIRECTORIO, no equipo (ADR-124): `private.person_is_team`
+--      se redefine para que un dossier nacido en una importación no cuente
+--      como equipo por no tener conversación; lo sigue siendo si está en un
+--      reparto, un equipo técnico, una cuenta o lo demás que ya lo hacía equipo.
+--      Su organización deja así de verse por la regla «organización de alguien
+--      del equipo».
+--   4. `contact_import_lookup`: qué correos, nombres de persona y nombres de
 --      organización de la hoja ya están, sólo entre lo que quien llama lee.
---   4. `import_contacts`: escribe una tanda (hasta 500 filas; 2.000 por
---      importación). Cada fila va en su propio bloque: la que falla no para el
---      resto y vuelve con su número y su motivo. Mismo correo, la misma persona;
+--   5. `import_contacts`: escribe una tanda (hasta 500 filas; 2.000 por
+--      importación), con un candado por espacio y repetible: la importación
+--      lleva el id que le da el cliente y cada tanda su número, y una tanda
+--      ya escrita no se vuelve a escribir. Cada fila va en su propio bloque: la
+--      que falla no para el resto y vuelve con su número y un motivo que no
+--      delata lo que quien importa no ve. Mismo correo, la misma persona;
 --      mismo nombre de organización, la misma; de lo que ya existía sólo se
 --      rellena lo vacío. Lo que no lee quien llama no se toca.
---   5. `undo_contact_import`: durante 7 días, quien importó (o el owner o
+--   6. `undo_contact_import`: durante 7 días, quien importó (o el owner o
 --      admin) la deshace: borra (lógico) lo que nació en ella y sigue igual,
 --      devuelve a vacío los campos completados que nadie ha cambiado y deja lo
---      que alguien ha tocado o usa después.
+--      que alguien ha tocado o usa después. Las notas privadas sólo las borra
+--      su autora; si deshace otra persona, se quedan y el resultado lo dice.
 --
--- Quién: owner, admin o member del espacio, el permiso de
--- `create_workspace_organization` (y de las políticas de alta de las dos tablas).
+-- Quién (`private.can_import_contacts`): owner, admin o member del espacio que
+-- además lee Conversaciones en él (`private.reads_conversations_in`, el permiso
+-- del directorio de ADR-124): lo importado es directorio y quien importa tiene
+-- que poder verlo.
 --
--- Aditiva: una tabla, tres columnas nulas, tres funciones. No redefine nada.
--- El Worker desplegado no se entera. Rollback al final del fichero.
+-- Aditiva salvo una redefinición: `private.person_is_team(uuid, uuid)`, misma
+-- firma, cuerpo de 20261018100000_directory_privacy.sql (la única migración que
+-- la define) con una condición más. Rollback al final del fichero.
 
 -- ── 1 · contact_import ──────────────────────────────────────────────────────
 CREATE TABLE public.contact_import (
@@ -49,6 +63,8 @@ CREATE TABLE public.contact_import (
   status                 text NOT NULL DEFAULT 'importing',
   -- Lo completado en fichas que ya existían: [{t: 'p'|'o', id, f, v}].
   filled                 jsonb NOT NULL DEFAULT '[]'::jsonb,
+  -- Los números de tanda ya escritos: reenviar una no la duplica.
+  batches                integer[] NOT NULL DEFAULT '{}',
   last_write_at          timestamptz NOT NULL DEFAULT now(),
   undone_at              timestamptz,
   undone_by              uuid REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -118,7 +134,100 @@ COMMENT ON COLUMN public.workspace_person.import_id IS '138: the contact import 
 COMMENT ON COLUMN public.workspace_organization.import_id IS '138: the contact import this organization was born in (undo removes it while untouched).';
 COMMENT ON COLUMN public.note.import_id IS '138: the contact import that wrote this private note (the sheet''s columns without a field).';
 
--- ── 3 · contact_import_lookup ───────────────────────────────────────────────
+-- `note` se escribe también por PostgREST (INSERT y UPDATE a `authenticated`):
+-- `import_id` lo pone sólo la importación, que corre como su dueño.
+CREATE FUNCTION private.guard_note_import_id() RETURNS trigger
+LANGUAGE plpgsql
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+BEGIN
+  IF current_user IN ('authenticated', 'anon')
+     AND NEW.import_id IS DISTINCT FROM (CASE WHEN TG_OP = 'UPDATE' THEN OLD.import_id END) THEN
+    RAISE EXCEPTION 'import_id is written only by a contact import' USING ERRCODE = '42501';
+  END IF;
+  RETURN NEW;
+END;
+$function$;
+REVOKE ALL ON FUNCTION private.guard_note_import_id() FROM PUBLIC, anon, authenticated;
+CREATE TRIGGER note_guard_import_id BEFORE INSERT OR UPDATE ON public.note
+  FOR EACH ROW EXECUTE FUNCTION private.guard_note_import_id();
+
+-- ── 3 · Quién importa, y lo importado es directorio ─────────────────────────
+CREATE FUNCTION private.can_import_contacts(p_workspace_id uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+  SELECT (SELECT auth.uid()) IS NOT NULL
+    AND private.has_workspace_role(p_workspace_id, ARRAY['owner', 'admin', 'member']::public.membership_role[])
+    AND private.reads_conversations_in(p_workspace_id, (SELECT auth.uid()));
+$$;
+REVOKE ALL ON FUNCTION private.can_import_contacts(uuid) FROM PUBLIC, anon, authenticated, service_role;
+COMMENT ON FUNCTION private.can_import_contacts(uuid) IS
+  '138: who imports contacts into a workspace: owner, admin or member who reads Conversations there (the directory permission, ADR-124).';
+
+-- Cuerpo de 20261018100000_directory_privacy.sql (la única que la define),
+-- misma firma. Lo único nuevo: un dossier sin conversación cuenta como equipo
+-- sólo si NO nació en una importación. Las demás razones de ser equipo siguen.
+CREATE OR REPLACE FUNCTION private.person_is_team(p_workspace_id uuid, p_person_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+  SELECT
+    (
+      NOT EXISTS (
+        SELECT 1
+        FROM public.conversation_contact cc
+        WHERE cc.workspace_id = p_workspace_id AND cc.person_id = p_person_id
+      )
+      -- 138: lo importado es directorio, no equipo.
+      AND NOT EXISTS (
+        SELECT 1
+        FROM public.workspace_person wp
+        WHERE wp.workspace_id = p_workspace_id AND wp.person_id = p_person_id
+          AND wp.import_id IS NOT NULL
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM public.user_profile up
+      JOIN public.membership m
+        ON m.level = 'workspace' AND m.workspace_id = p_workspace_id
+       AND m.user_id = up.user_id AND m.accepted_at IS NOT NULL
+      WHERE up.person_id = p_person_id
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.workspace_invitation i
+      WHERE i.workspace_id = p_workspace_id AND i.person_id = p_person_id
+        AND i.revoked_at IS NULL
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.cast_member x
+      WHERE x.workspace_id = p_workspace_id AND x.person_id = p_person_id AND x.deleted_at IS NULL
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.crew_assignment x
+      WHERE x.workspace_id = p_workspace_id AND x.person_id = p_person_id AND x.deleted_at IS NULL
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.cast_override x
+      WHERE x.workspace_id = p_workspace_id AND x.deleted_at IS NULL
+        AND (x.person_id = p_person_id OR x.replaces_person_id = p_person_id)
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.availability_block x
+      WHERE x.workspace_id = p_workspace_id AND x.person_id = p_person_id AND x.deleted_at IS NULL
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.commitment_person x
+      WHERE x.workspace_id = p_workspace_id AND x.person_id = p_person_id
+    );
+$$;
+
+-- ── 4 · contact_import_lookup ───────────────────────────────────────────────
 -- Lo que ya está, entre lo que quien llama lee: los dossiers con alguno de esos
 -- correos o nombres, y las organizaciones con alguno de esos nombres.
 CREATE FUNCTION public.contact_import_lookup(
@@ -135,9 +244,7 @@ DECLARE
   v_names  text[];
   v_orgs   text[];
 BEGIN
-  IF auth.uid() IS NULL OR NOT private.has_workspace_role(
-    p_workspace_id, ARRAY['owner', 'admin', 'member']::public.membership_role[]
-  ) THEN
+  IF NOT private.can_import_contacts(p_workspace_id) THEN
     RAISE EXCEPTION 'workspace not found' USING ERRCODE = '42501';
   END IF;
   IF coalesce(cardinality(p_emails), 0) > 2000 OR coalesce(cardinality(p_names), 0) > 2000
@@ -202,19 +309,24 @@ END;
 $function$;
 
 COMMENT ON FUNCTION public.contact_import_lookup(uuid, text[], text[], text[]) IS
-  '138: which emails, person names and organization names of a sheet already exist in the workspace, among what the caller reads. Owner, admin or member.';
+  '138: which emails, person names and organization names of a sheet already exist in the workspace, among what the caller reads. Gate: private.can_import_contacts.';
 REVOKE ALL ON FUNCTION public.contact_import_lookup(uuid, text[], text[], text[]) FROM PUBLIC, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.contact_import_lookup(uuid, text[], text[], text[]) TO authenticated;
 
--- ── 4 · import_contacts ─────────────────────────────────────────────────────
+-- ── 5 · import_contacts ─────────────────────────────────────────────────────
 -- Una fila: { line, person?: {match_person_id?, full_name, first_name?,
 -- last_name?, title?, email?, phone?, city?, country?, website?},
 -- organization?: {name, kind?, email?, phone?, city?, country?, website?},
--- note? }. La primera tanda va sin `p_import_id` y crea la importación; las
--- siguientes la nombran. `p_last` la da por terminada.
+-- note? }. El cliente da el id de la importación (la primera tanda la crea) y
+-- el número de cada tanda (0, 1, …): una tanda ya escrita devuelve
+-- `repeated: true` sin escribir nada, así que un reintento tras un corte no
+-- duplica. `p_last` la da por terminada. La nota de una fila con persona es una
+-- nota privada de quien importa; la de una fila con sólo organización va a
+-- `workspace_organization.notes` si está vacía.
 CREATE FUNCTION public.import_contacts(
   p_workspace_id uuid,
   p_import_id    uuid,
+  p_batch        integer,
   p_filename     text,
   p_row_count    integer,
   p_rows         jsonb,
@@ -231,6 +343,7 @@ DECLARE
   v_o         jsonb;
   v_line      integer;
   v_reason    text;
+  v_row_warn  jsonb;
   -- Lo de la fila
   v_oname     text;
   v_okind     text;
@@ -273,10 +386,14 @@ DECLARE
   v_of        integer := 0;
   v_nc        integer := 0;
 BEGIN
-  IF v_caller IS NULL OR NOT private.has_workspace_role(
-    p_workspace_id, ARRAY['owner', 'admin', 'member']::public.membership_role[]
-  ) THEN
+  IF NOT private.can_import_contacts(p_workspace_id) THEN
     RAISE EXCEPTION 'workspace not found' USING ERRCODE = '42501';
+  END IF;
+  -- Una importación a la vez por espacio: dos tandas no compiten por el mismo
+  -- nombre de organización ni por el mismo correo.
+  PERFORM pg_advisory_xact_lock(hashtext('contact_import:' || p_workspace_id::text));
+  IF p_import_id IS NULL OR p_batch IS NULL OR p_batch < 0 OR p_batch > 99 THEN
+    RAISE EXCEPTION 'import id and batch number are required' USING ERRCODE = '22023';
   END IF;
   IF p_rows IS NULL OR jsonb_typeof(p_rows) <> 'array' THEN
     RAISE EXCEPTION 'rows must be an array' USING ERRCODE = '22023';
@@ -286,19 +403,27 @@ BEGIN
     RAISE EXCEPTION 'between 1 and 500 rows per call' USING ERRCODE = '22023';
   END IF;
 
-  IF p_import_id IS NULL THEN
+  SELECT * INTO v_import FROM public.contact_import ci WHERE ci.id = p_import_id FOR UPDATE;
+  IF v_import.id IS NULL THEN
     IF p_row_count IS NULL OR p_row_count < v_rows OR p_row_count > 2000 THEN
       RAISE EXCEPTION 'row_count must be between the rows sent and 2000' USING ERRCODE = '22023';
     END IF;
-    INSERT INTO public.contact_import (workspace_id, created_by, filename, row_count)
-    VALUES (p_workspace_id, v_caller, nullif(btrim(left(coalesce(p_filename, ''), 255)), ''), p_row_count)
+    INSERT INTO public.contact_import (id, workspace_id, created_by, filename, row_count)
+    VALUES (p_import_id, p_workspace_id, v_caller, nullif(btrim(left(coalesce(p_filename, ''), 255)), ''), p_row_count)
     RETURNING * INTO v_import;
   ELSE
-    SELECT * INTO v_import FROM public.contact_import ci
-    WHERE ci.id = p_import_id AND ci.workspace_id = p_workspace_id AND ci.created_by = v_caller
-      AND ci.status = 'importing' AND ci.created_at > now() - interval '1 hour'
-    FOR UPDATE;
-    IF v_import.id IS NULL THEN
+    IF v_import.workspace_id <> p_workspace_id OR v_import.created_by IS DISTINCT FROM v_caller
+       OR v_import.created_at < now() - interval '1 hour' THEN
+      RAISE EXCEPTION 'import not found' USING ERRCODE = '42501';
+    END IF;
+    -- Ya escrita: un reintento no hace nada.
+    IF p_batch = ANY (v_import.batches) THEN
+      RETURN jsonb_build_object(
+        'import_id', v_import.id, 'repeated', true,
+        'persons_created', 0, 'persons_filled', 0, 'organizations_created', 0,
+        'organizations_filled', 0, 'notes_created', 0, 'failed', '[]'::jsonb, 'warnings', '[]'::jsonb);
+    END IF;
+    IF v_import.status <> 'importing' THEN
       RAISE EXCEPTION 'import not found' USING ERRCODE = '42501';
     END IF;
   END IF;
@@ -309,6 +434,7 @@ BEGIN
   FOR v_row IN SELECT value FROM jsonb_array_elements(p_rows) LOOP
     v_line := CASE WHEN (v_row ->> 'line') ~ '^\d{1,6}$' THEN (v_row ->> 'line')::integer END;
     v_reason := NULL;
+    v_row_warn := '[]'::jsonb;
     BEGIN
       v_fill := '[]'::jsonb;
       v_org_id := NULL;
@@ -366,7 +492,7 @@ BEGIN
              AND NOT private.workspace_organization_readable_by_caller(p_workspace_id, v_org.id) THEN
             -- Una organización con ese nombre que quien importa no ve: ni se
             -- enlaza ni se completa. La fila sigue sin ella.
-            v_warnings := v_warnings || jsonb_build_object('line', v_line, 'reason', 'organization_hidden');
+            v_row_warn := v_row_warn || jsonb_build_object('line', v_line, 'reason', 'unavailable');
           ELSE
             v_org_id := v_org.id;
             -- Sólo lo vacío; lo nacido en esta misma importación no se apunta.
@@ -451,7 +577,7 @@ BEGIN
           WHERE wp.workspace_id = p_workspace_id AND wp.person_id = v_match AND wp.deleted_at IS NULL
           FOR UPDATE;
           IF v_wp.person_id IS NULL THEN
-            v_reason := 'hidden';
+            v_reason := 'unavailable';
             RAISE EXCEPTION 'person not found' USING ERRCODE = '42501';
           END IF;
         ELSIF v_pemail IS NOT NULL THEN
@@ -467,7 +593,7 @@ BEGIN
              AND NOT private.workspace_person_readable_by_caller(p_workspace_id, v_wp.person_id) THEN
             -- Alguien con ese correo que quien importa no ve: no se toca ni se
             -- duplica. La fila no entra.
-            v_reason := 'hidden';
+            v_reason := 'unavailable';
             RAISE EXCEPTION 'person not readable' USING ERRCODE = '42501';
           END IF;
           v_person_id := v_wp.person_id;
@@ -512,7 +638,7 @@ BEGIN
             v_fill := v_fill || jsonb_build_object('t', 'p', 'id', v_person_id, 'f', 'organization_id', 'v', v_org_id::text);
           ELSIF v_org_id IS NOT NULL AND v_wp.organization_id IS DISTINCT FROM v_org_id THEN
             -- Una organización por persona (ADR-177): la que tenía se queda.
-            v_warnings := v_warnings || jsonb_build_object('line', v_line, 'reason', 'other_organization');
+            v_row_warn := v_row_warn || jsonb_build_object('line', v_line, 'reason', 'other_organization');
           END IF;
           IF v_wp.import_id IS NOT DISTINCT FROM v_import.id THEN
             -- Nacida en esta importación: nada que devolver al deshacer.
@@ -549,10 +675,18 @@ BEGIN
         END IF;
       END IF;
 
-      -- ── La nota: privada de quien importa (ADR-093), de la persona ──
+      -- ── La nota: privada de quien importa (ADR-093), de la persona; sin
+      --    persona, a las notas de la organización si están vacías ──
       IF v_note IS NOT NULL THEN
-        IF v_person_id IS NULL THEN
-          v_warnings := v_warnings || jsonb_build_object('line', v_line, 'reason', 'note_without_person');
+        IF v_person_id IS NULL AND v_org_id IS NOT NULL
+           AND (v_org_new OR (v_org.notes IS NULL AND v_org.import_id IS DISTINCT FROM v_import.id)) THEN
+          UPDATE public.workspace_organization SET notes = left(v_note, 4000) WHERE id = v_org_id AND notes IS NULL;
+          IF NOT v_org_new THEN
+            v_fill := v_fill || jsonb_build_object('t', 'o', 'id', v_org_id, 'f', 'notes', 'v', left(v_note, 4000));
+            v_org_fill := true;
+          END IF;
+        ELSIF v_person_id IS NULL THEN
+          v_row_warn := v_row_warn || jsonb_build_object('line', v_line, 'reason', 'note_not_saved');
         ELSE
           INSERT INTO public.note (workspace_id, author_id, person_id, on_day, visibility, body, import_id)
           VALUES (p_workspace_id, v_caller, v_person_id, current_date, 'private', left(v_note, 4000), v_import.id);
@@ -567,10 +701,13 @@ BEGIN
       v_pc := v_pc + v_per_new::integer;
       v_pf := v_pf + v_per_fill::integer;
       v_nc := v_nc + v_note_new::integer;
+      v_warnings := v_warnings || v_row_warn;
     EXCEPTION WHEN OTHERS THEN
+      -- Lo que no se ve y lo inesperado salen con el mismo motivo: el detalle
+      -- no sale de la base.
       v_failed := v_failed || jsonb_build_object(
         'line', v_line,
-        'reason', coalesce(v_reason, CASE WHEN SQLSTATE = '22023' THEN 'invalid' ELSE 'error' END)
+        'reason', coalesce(v_reason, CASE WHEN SQLSTATE = '22023' THEN 'invalid' ELSE 'unavailable' END)
       );
     END;
   END LOOP;
@@ -584,12 +721,14 @@ BEGIN
     organizations_filled = ci.organizations_filled + v_of,
     notes_created = ci.notes_created + v_nc,
     filled = ci.filled || v_filled,
+    batches = array_append(ci.batches, p_batch),
     last_write_at = clock_timestamp(),
     status = CASE WHEN p_last THEN 'done' ELSE ci.status END
   WHERE ci.id = v_import.id;
 
   RETURN jsonb_build_object(
     'import_id', v_import.id,
+    'repeated', false,
     'persons_created', v_pc,
     'persons_filled', v_pf,
     'organizations_created', v_oc,
@@ -601,12 +740,12 @@ BEGIN
 END;
 $function$;
 
-COMMENT ON FUNCTION public.import_contacts(uuid, uuid, text, integer, jsonb, boolean) IS
-  '138: one batch (<= 500 rows, <= 2000 per import) of a contact import. Persons, organizations and the link between them, never conversations. Same email = same person, same organization name = same organization, only empty fields are filled; what the caller cannot read is not touched. A failing row does not stop the rest. Owner, admin or member.';
-REVOKE ALL ON FUNCTION public.import_contacts(uuid, uuid, text, integer, jsonb, boolean) FROM PUBLIC, anon, service_role;
-GRANT EXECUTE ON FUNCTION public.import_contacts(uuid, uuid, text, integer, jsonb, boolean) TO authenticated;
+COMMENT ON FUNCTION public.import_contacts(uuid, uuid, integer, text, integer, jsonb, boolean) IS
+  '138: one batch (<= 500 rows, <= 2000 per import) of a contact import. Persons, organizations and the link between them, never conversations. Same email = same person, same organization name = same organization, only empty fields are filled; what the caller cannot read is not touched. A failing row does not stop the rest; a batch already written is not written again. Gate: private.can_import_contacts.';
+REVOKE ALL ON FUNCTION public.import_contacts(uuid, uuid, integer, text, integer, jsonb, boolean) FROM PUBLIC, anon, service_role;
+GRANT EXECUTE ON FUNCTION public.import_contacts(uuid, uuid, integer, text, integer, jsonb, boolean) TO authenticated;
 
--- ── 5 · undo_contact_import ─────────────────────────────────────────────────
+-- ── 6 · undo_contact_import ─────────────────────────────────────────────────
 CREATE FUNCTION public.undo_contact_import(p_import_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER
@@ -620,6 +759,8 @@ DECLARE
   v_n        integer;
   v_restored integer := 0;
   v_notes    integer := 0;
+  v_nkept    integer := 0;
+  v_own      boolean;
   v_persons  integer := 0;
   v_orgs     integer := 0;
   v_pkept    integer := 0;
@@ -630,8 +771,7 @@ BEGIN
   END IF;
   SELECT * INTO v_import FROM public.contact_import ci WHERE ci.id = p_import_id FOR UPDATE;
   IF v_import.id IS NULL OR NOT (
-    (v_import.created_by = v_caller AND private.has_workspace_role(
-       v_import.workspace_id, ARRAY['owner', 'admin', 'member']::public.membership_role[]))
+    (v_import.created_by = v_caller AND private.can_import_contacts(v_import.workspace_id))
     OR private.has_workspace_role(v_import.workspace_id, ARRAY['owner', 'admin']::public.membership_role[])
   ) THEN
     RAISE EXCEPTION 'import not found' USING ERRCODE = '42501';
@@ -643,10 +783,11 @@ BEGIN
     RAISE EXCEPTION 'undo expired' USING ERRCODE = '22023';
   END IF;
   v_cut := v_import.last_write_at;
+  v_own := v_import.created_by = v_caller;
 
   -- 1 · Lo completado vuelve a vacío si sigue siendo lo que puso la importación.
   FOR v_item IN SELECT e.v FROM jsonb_array_elements(v_import.filled) AS e(v) LOOP
-    IF v_item ->> 't' = 'o' AND v_item ->> 'f' IN ('kind', 'email', 'phone', 'city', 'country', 'website') THEN
+    IF v_item ->> 't' = 'o' AND v_item ->> 'f' IN ('kind', 'email', 'phone', 'city', 'country', 'website', 'notes') THEN
       EXECUTE format(
         'UPDATE public.workspace_organization SET %1$I = %2$s
          WHERE workspace_id = $1 AND id = $2 AND deleted_at IS NULL AND %1$I::text = $3',
@@ -667,11 +808,16 @@ BEGIN
     v_restored := v_restored + v_n;
   END LOOP;
 
-  -- 2 · Las notas de la importación que nadie ha reescrito.
-  UPDATE public.note n SET deleted_at = now()
-  WHERE n.workspace_id = v_import.workspace_id AND n.import_id = v_import.id
-    AND n.deleted_at IS NULL AND n.updated_at <= v_cut;
-  GET DIAGNOSTICS v_notes = ROW_COUNT;
+  -- 2 · Las notas de la importación que nadie ha reescrito, sólo si deshace
+  --     su autora: una nota privada ajena no se borra (ADR-093).
+  IF v_own THEN
+    UPDATE public.note n SET deleted_at = now()
+    WHERE n.workspace_id = v_import.workspace_id AND n.import_id = v_import.id
+      AND n.deleted_at IS NULL AND n.updated_at <= v_cut;
+    GET DIAGNOSTICS v_notes = ROW_COUNT;
+  END IF;
+  SELECT count(*) INTO v_nkept FROM public.note n
+  WHERE n.workspace_id = v_import.workspace_id AND n.import_id = v_import.id AND n.deleted_at IS NULL;
 
   -- 3 · Las personas nacidas en ella, sin tocar después y sin uso.
   WITH gone AS (
@@ -698,8 +844,18 @@ BEGIN
                       WHERE pa.workspace_id = wp.workspace_id AND pa.person_id = wp.person_id)
       AND NOT EXISTS (SELECT 1 FROM public.workspace_invitation wi
                       WHERE wi.workspace_id = wp.workspace_id AND wi.person_id = wp.person_id)
+      AND NOT EXISTS (SELECT 1 FROM public.person_merge pm
+                      WHERE pm.keep_person_id = wp.person_id OR pm.drop_person_id = wp.person_id)
+      AND NOT EXISTS (SELECT 1 FROM public.channel_chat_member ccm WHERE ccm.person_id = wp.person_id)
+      AND NOT EXISTS (SELECT 1 FROM public.channel_message cm WHERE cm.sender_person_id = wp.person_id)
+      AND NOT EXISTS (SELECT 1 FROM public.expense e WHERE e.paid_by_person_id = wp.person_id)
+      AND NOT EXISTS (SELECT 1 FROM public.roadsheet_share rs WHERE rs.person_id = wp.person_id)
+      AND NOT EXISTS (SELECT 1 FROM public.roadsheet_late_notice rl WHERE rl.person_id = wp.person_id)
+      -- Una nota que no es de esta importación (las suyas no cuentan: si las
+      -- deja otra persona al deshacer, se quedan con su autora).
       AND NOT EXISTS (SELECT 1 FROM public.note n
-                      WHERE n.workspace_id = wp.workspace_id AND n.person_id = wp.person_id AND n.deleted_at IS NULL)
+                      WHERE n.workspace_id = wp.workspace_id AND n.person_id = wp.person_id AND n.deleted_at IS NULL
+                        AND n.import_id IS DISTINCT FROM v_import.id)
     RETURNING 1
   )
   SELECT count(*) INTO v_persons FROM gone;
@@ -719,6 +875,8 @@ BEGIN
                       WHERE i.workspace_id = o.workspace_id AND i.payer_organization_id = o.id)
       AND NOT EXISTS (SELECT 1 FROM public.venue v
                       WHERE v.workspace_id = o.workspace_id AND v.organization_id = o.id)
+      AND NOT EXISTS (SELECT 1 FROM public.organization_merge om
+                      WHERE om.keep_organization_id = o.id OR om.drop_organization_id = o.id)
     RETURNING 1
   )
   SELECT count(*) INTO v_orgs FROM gone;
@@ -732,6 +890,7 @@ BEGIN
     'persons_removed', v_persons,
     'organizations_removed', v_orgs,
     'notes_removed', v_notes,
+    'notes_kept', v_nkept,
     'fields_restored', v_restored,
     'persons_kept', v_pkept,
     'organizations_kept', v_okept
@@ -740,16 +899,45 @@ END;
 $function$;
 
 COMMENT ON FUNCTION public.undo_contact_import(uuid) IS
-  '138: undo a contact import within 7 days (its author, or the workspace owner or admin). Soft-deletes what was born in it and is untouched and unused, and empties the fields it filled that still hold its value. What someone touched or uses afterwards stays.';
+  '138: undo a contact import within 7 days (its author, or the workspace owner or admin). Soft-deletes what was born in it and is untouched and unused, and empties the fields it filled that still hold its value. What someone touched or uses afterwards stays, and so do the author''s private notes when someone else undoes it.';
 REVOKE ALL ON FUNCTION public.undo_contact_import(uuid) FROM PUBLIC, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.undo_contact_import(uuid) TO authenticated;
 
 -- ── Rollback (después de desplegar la app anterior) ─────────────────────────
 -- Lo importado se queda como contactos normales: las columnas caen, las filas no.
+-- `person_is_team` vuelve al cuerpo de 20261018100000 ANTES de quitar la
+-- columna que nombra (una función sql no registra esa dependencia).
 --   BEGIN;
+--   CREATE OR REPLACE FUNCTION private.person_is_team(p_workspace_id uuid, p_person_id uuid)
+--   RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public', 'pg_temp'
+--   AS $$
+--     SELECT
+--       NOT EXISTS (SELECT 1 FROM public.conversation_contact cc
+--                   WHERE cc.workspace_id = p_workspace_id AND cc.person_id = p_person_id)
+--       OR EXISTS (SELECT 1 FROM public.user_profile up
+--                  JOIN public.membership m ON m.level = 'workspace' AND m.workspace_id = p_workspace_id
+--                   AND m.user_id = up.user_id AND m.accepted_at IS NOT NULL
+--                  WHERE up.person_id = p_person_id)
+--       OR EXISTS (SELECT 1 FROM public.workspace_invitation i
+--                  WHERE i.workspace_id = p_workspace_id AND i.person_id = p_person_id AND i.revoked_at IS NULL)
+--       OR EXISTS (SELECT 1 FROM public.cast_member x
+--                  WHERE x.workspace_id = p_workspace_id AND x.person_id = p_person_id AND x.deleted_at IS NULL)
+--       OR EXISTS (SELECT 1 FROM public.crew_assignment x
+--                  WHERE x.workspace_id = p_workspace_id AND x.person_id = p_person_id AND x.deleted_at IS NULL)
+--       OR EXISTS (SELECT 1 FROM public.cast_override x
+--                  WHERE x.workspace_id = p_workspace_id AND x.deleted_at IS NULL
+--                    AND (x.person_id = p_person_id OR x.replaces_person_id = p_person_id))
+--       OR EXISTS (SELECT 1 FROM public.availability_block x
+--                  WHERE x.workspace_id = p_workspace_id AND x.person_id = p_person_id AND x.deleted_at IS NULL)
+--       OR EXISTS (SELECT 1 FROM public.commitment_person x
+--                  WHERE x.workspace_id = p_workspace_id AND x.person_id = p_person_id);
+--   $$;
 --   DROP FUNCTION public.undo_contact_import(uuid);
---   DROP FUNCTION public.import_contacts(uuid, uuid, text, integer, jsonb, boolean);
+--   DROP FUNCTION public.import_contacts(uuid, uuid, integer, text, integer, jsonb, boolean);
 --   DROP FUNCTION public.contact_import_lookup(uuid, text[], text[], text[]);
+--   DROP FUNCTION private.can_import_contacts(uuid);
+--   DROP TRIGGER note_guard_import_id ON public.note;
+--   DROP FUNCTION private.guard_note_import_id();
 --   ALTER TABLE public.note DROP COLUMN import_id;
 --   ALTER TABLE public.workspace_organization DROP COLUMN import_id;
 --   ALTER TABLE public.workspace_person DROP COLUMN import_id;
