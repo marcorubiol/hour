@@ -30,7 +30,9 @@
   import { fetchJSON } from '$lib/api';
   import { docTitle } from '$lib/doc-title';
   import { lensOn } from '$lib/lenses.svelte';
-  import { appLocale, t } from '$lib/i18n';
+  import { appLocale, t, voiceHere } from '$lib/i18n';
+  /* The voice of where this sits: its record's space, or the screen's (tarea 142). */
+  const voice = voiceHere();
   import { viewerTimeZone } from '$lib/datetime';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
   import { activeProjectsQueryOptions } from '$lib/nav-queries';
@@ -98,7 +100,7 @@
   // Cada nombre con su papel en el bolo (122): «Laia (reparto), Pau (técnica)».
   let readers = $derived(
     audience?.people
-      .map((p) => readerLabel(p, locale))
+      .map((p) => readerLabel(p, locale, voice()))
       .filter(Boolean)
       .join(', ') ?? '',
   );

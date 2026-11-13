@@ -75,7 +75,9 @@
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import { refreshAfterWrite } from '$lib/query-refresh';
-  import { LOCALE_TAG, t, type Locale } from '$lib/i18n';
+  import { LOCALE_TAG, t, voiceHere, type Locale } from '$lib/i18n';
+  /* The voice of where this sits: its record's space, or the screen's (tarea 142). */
+  const voice = voiceHere();
   import Button from '$lib/components/Button.svelte';
   import Field from '$lib/components/Field.svelte';
   import Input from '$lib/components/Input.svelte';
@@ -601,7 +603,7 @@
         {t('thread.mail_hint_new', locale, { address: from.address })}
       {/if}
     {:else if target === 'team'}
-      {#if $audienceQuery.data}{audienceLine($audienceQuery.data, locale)}{' · '}{/if}{t('thread.team_hint', locale)}
+      {#if $audienceQuery.data}{audienceLine($audienceQuery.data, locale, voice())}{' · '}{/if}{t('thread.team_hint', locale)}
     {:else}
       {futureDay ? t('conversations.not_future', locale) : t('thread.log_hint', locale, { mod })}
     {/if}

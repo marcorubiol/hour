@@ -24,7 +24,9 @@
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import Button from '$lib/components/Button.svelte';
   import MessageItem, { messageFailed, sendOnModEnter } from '$lib/components/MessageItem.svelte';
-  import { type Locale, tHere } from '$lib/i18n';
+  import { type Locale, tHere, voiceHere } from '$lib/i18n';
+  /* The voice of where this sits: its record's space, or the screen's (tarea 142). */
+  const voice = voiceHere();
   import {
     MESSAGE_MAX,
     audienceLine,
@@ -190,7 +192,7 @@
   {#if look !== 'group'}
     <p class="thread__audience" title={audienceNames || undefined}>
       {#if audience}
-        {audienceLine(audience, locale)}
+        {audienceLine(audience, locale, voice())}
       {:else if $audienceQuery.isError}
         {t('threads.audience_unknown', locale)}
       {:else}
