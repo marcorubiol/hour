@@ -1296,7 +1296,7 @@
   "create.open_target": "Obre {name}",
   "conversations.add": "Afegeix una conversa",
   "conversations.add_menu": "Afegeix",
-  "conversations.add_menu_aria": "Afegeix: una conversa, una trucada o un xat",
+  "conversations.add_menu_aria": "Afegeix: una conversa, una trucada, un xat o contactes",
   "conversations.add_item_conversation": "Conversa",
   "conversations.add_item_call": "Trucada",
   "conversations.added_one": "Afegit a 1 espectacle",

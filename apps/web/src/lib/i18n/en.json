@@ -1296,7 +1296,7 @@
   "create.open_target": "Open {name}",
   "conversations.add": "Add conversation",
   "conversations.add_menu": "Add",
-  "conversations.add_menu_aria": "Add: a conversation, a call or a chat",
+  "conversations.add_menu_aria": "Add: a conversation, a call, a chat or contacts",
   "conversations.add_item_conversation": "Conversation",
   "conversations.add_item_call": "Call",
   "conversations.added_one": "Added to 1 show",

@@ -1296,7 +1296,7 @@
   "create.open_target": "Abrir {name}",
   "conversations.add": "Añadir conversación",
   "conversations.add_menu": "Añadir",
-  "conversations.add_menu_aria": "Añadir: una conversación, una llamada o un chat",
+  "conversations.add_menu_aria": "Añadir: una conversación, una llamada, un chat o contactos",
   "conversations.add_item_conversation": "Conversación",
   "conversations.add_item_call": "Llamada",
   "conversations.added_one": "Añadido a 1 espectáculo",
