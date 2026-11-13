@@ -5606,6 +5606,9 @@ tiene días por venir.
 
 ## [2026-11-01] ADR-154 · La pantalla no dice nada que no encaje con tu momento (enmienda ADR-080 § 3, ADR-145 fase 2 § 3, ADR-149 § 2 y ADR-150 § 6)
 
+> **Amended by ADR-203 (2026-11-13), solo en § 4.** En «Coming up» la ficha de un día lleva también la opción por
+> decidir, con su «?», aunque esté en «Te espera»: una ficha de calendario dice todo lo de su día.
+
 **Contexto.** Marco, 01-11 (chat, validado punto a punto): el mismo criterio que ADR-153, aplicado al resto de Hoy y
 al Planificador. Una pantalla que cuenta minutos que no importan, da instrucciones donde no hay nada, avisa de un
 choque que solo sale de no saber quién va o repite una opción en dos sitios dice cosas que no encajan con el momento
@@ -7760,7 +7763,7 @@ corte de la hoja por rol. Lo pasado se apaga y la función principal se marca (A
 (ADR-145 § 1), con la excepción de § 3. Hour no pregunta quién va (ADR-147). «Lo mío / Todo» por espacio (ADR-151).
 `?scope=` en la URL y su copia canónica.
 
-**Abierto (tu llamada, Marco).** No son reglas hasta que se cierren.
+**Abierto (tu llamada, Marco).** No son reglas hasta que se cierren. **Cerrados los diez por ADR-203 (2026-11-13), con lo recomendado en cada uno.**
 1. **La cabecera.** Propuesta del boceto, «vamos por el buen camino», sin validar del todo: fila 1, hora con fecha,
    calma y cuenta; fila 2, el campo a todo el ancho; el «+» baja a la cabecera de lo que espera y el «?» pasa al menú
    de la cuenta. Choca con 144 (d), que dejaba el título de la lente debajo a todo el ancho: el boceto final no tiene
@@ -7799,3 +7802,32 @@ ancho de una ficha): `build/design-system.md` § Tokens. `tests/ahora.spec.ts` y
 
 **Re-evaluar cuando** Marco lo use una gira: si la tira choca con el gesto de volver en un iPhone real, si diez fichas
 son muchas, y si perder el pulso desde otra sección (§ 10) se echa de menos.
+
+
+## [2026-11-13] ADR-203 · Hoy en el móvil: los diez puntos abiertos de ADR-202, cerrados (tareas 144, 145 y 146; enmienda ADR-154 § 4)
+
+**Contexto.** ADR-202 dejó diez puntos en «Abierto», cada uno con una recomendación. Marco, chat 13-11, noche: «Todo
+lo que recomiendas». Pasan a ser reglas. **Sin construir.**
+
+**Decidido por Marco.**
+1. **La cabecera es la del boceto, sin título de lente.** Fila 1: hora con fecha, calma y cuenta. Fila 2: el campo a
+   todo el ancho. El «+» baja a la cabecera de «Te espera» y el «?» pasa al menú de la cuenta. Deja sin efecto 144 (d).
+2. **Sin nada hoy, la pieza dice «Hoy, nada» y «Lo siguiente: …»**, con las claves de ADR-153 (`desk.day_none_then`,
+   `desk.day_next`).
+3. **El tercer bloque se llama «Te espera»** / «Waiting for you», la palabra fijada en ADR-195 § 1.
+4. **De Ahora, en la pieza cabe lo del boceto:** el día, cuatro hechos (sala, carga, hotel, quién va) y tres acciones
+   (Llamar, Mapa, Hoja). La escaleta pasada, los tramos con localizador, los detalles plegados y el tablón quedan
+   detrás de «Hoja».
+5. **Calma es el único plegado de Hoy:** deja el día, lo que viene y las pastillas, sin filas. «Te espera» no lleva
+   plegable propio.
+6. **Guardados y recientes del ámbito son las primeras filas de la paleta al enfocar el campo vacío;** «Guardar» y
+   «Copiar enlace» son acciones de la etiqueta acotada.
+7. **Ahora desaparece también en escritorio.** `?mode=ahora` y `hour.ahora` llevan a Hoy.
+8. **La línea «N más hoy fuera de…» sale de la diferencia en el cliente**, sin lectura nueva, si al construir se
+   confirma que los feeds del pulso se piden sin ámbito. Si no, se para y se pregunta.
+9. **El día de bolo, «Te espera» son solo las pastillas.**
+10. **Una opción por decidir sale en su ficha de «Coming up» con su «?»**, aunque también esté en «Te espera».
+    Enmienda ADR-154 § 4.
+
+**Re-evaluar cuando** Marco lo use una gira: si falta el título de la lente en Hoy y si lo que quedó detrás de «Hoja»
+se echa de menos el día de bolo.
