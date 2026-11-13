@@ -516,6 +516,12 @@
        width, from the same left edge, so turning calm on never moves it.
        About the width the Desk's left column already had (1.55fr of 1240). */
     --calm-measure: 45rem;
+    /* The first-day panel's form (NewSpacePanel, tarea 137): two fields and a
+       sentence, as narrow as a dialog. */
+    --newspace-measure: 26rem;
+    /* Hoy's start list (StartList): the ring of each step and its column. */
+    --start-mark: 1rem;
+    --start-mark-col: 1.4rem;
     --sidebar-width: 264px;
     /* The shell's rail (ScopeRail) beside the page on a desktop, border
        included; the vistazo's veil reads it to leave the top bar clear.

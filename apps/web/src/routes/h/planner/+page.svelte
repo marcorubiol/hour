@@ -106,6 +106,8 @@
   import { currentPeek, openPeek } from '$lib/peek.svelte';
   import { usePins } from '$lib/stores/pins.svelte';
   import { useCreation } from '$lib/stores/creation.svelte';
+  import { startQueryOptions } from '$lib/first-day-query';
+  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { useCalm } from '$lib/stores/calm.svelte';
   import { plannerCalmFacts, shows } from '$lib/calm';
   import { LOCALE_TAG, appLocale, t } from '$lib/i18n';
@@ -3103,6 +3105,14 @@
       performances here and makes none (comms carril 2, fase 3). */
   const planAccessQuery = createQuery(planAccessQueryOptions());
   let canPlan = $derived($planAccessQuery.data?.edit !== false);
+  // «Nada en el plan todavía» (tarea 137): one space on screen, and it has no
+  // performance and no date at all (its start read, the one Hoy's list uses).
+  const planStartQuery = createQuery(
+    toStore(() => startQueryOptions(onScreenSpaces.length === 1 ? onScreenSpaces[0].id : null)),
+  );
+  let planNeverUsed = $derived(
+    onScreenSpaces.length === 1 && $planStartQuery.isSuccess && $planStartQuery.data.date === null,
+  );
 
   /** A door without a day proposes the view's (`defaultCreateDay`). */
   function viewCreateDay(): string {
@@ -3474,6 +3484,18 @@
         {/if}
     </p>
   </div>
+  <!-- A SPACE WITH NOTHING IN ITS PLAN SAYS SO, WITH ITS DOOR (tarea 137, the
+       empties that teach): a window can be empty for a plan that is not, so
+       it asks the space, not the drawing. -->
+  {#if planNeverUsed}
+    <EmptyLine text={t('planner.plan_empty', locale)}>
+      {#if canPlan}
+        <button type="button" class="empty-line__act" onclick={() => openCreate()}
+          >{t('planner.plan_empty_add', locale)}&nbsp;<span aria-hidden="true">→</span></button
+        >
+      {/if}
+    </EmptyLine>
+  {/if}
   <!-- THE DRAWER OPENS UNDER THE STRIP THAT NAMES IT — the queue line says
        `3 to decide · 1 urgent`, and what it names unfolds beneath both lines,
        above the controls. Not between them: the window line is a caption of
