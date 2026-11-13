@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, test } from 'vitest';
-import { currentTrade, setTrade, t, tradeOf } from './index';
+import { currentTrade, setTrade, setWorkspaceTrades, t, tradeFor, tradeOf } from './index';
 
-afterEach(() => setTrade('stage'));
+afterEach(() => {
+  setTrade('stage');
+  setWorkspaceTrades([]);
+});
 
 describe('t() and the trade (ADR-128)', () => {
   test('stage reads the plain key; music reads its variant', () => {
@@ -25,11 +28,59 @@ describe('t() and the trade (ADR-128)', () => {
     expect(t('perf.bolo_functions_other', 'es', { n: 3 }, 'music')).toBe('3 conciertos');
   });
 
-  test('one trade for a screen: theirs when they agree, stage otherwise', () => {
+  test('one voice for a screen: their trade when they agree, mixed when not, stage with none', () => {
     expect(tradeOf([])).toBe('stage');
     expect(tradeOf([{ trade: 'music' }, { trade: 'music' }])).toBe('music');
-    expect(tradeOf([{ trade: 'music' }, { trade: 'stage' }])).toBe('stage');
-    expect(tradeOf([{ trade: 'music' }, {}])).toBe('stage');
+    expect(tradeOf([{ trade: 'stage' }, {}])).toBe('stage');
+    expect(tradeOf([{ trade: 'music' }, { trade: 'stage' }])).toBe('mixed');
+    expect(tradeOf([{ trade: 'music' }, {}])).toBe('mixed');
     expect(tradeOf([{ trade: 'comedy' }])).toBe('stage');
+  });
+});
+
+describe('the trade of one space (tarea 142)', () => {
+  test('by id or by slug; stage for a space it does not know', () => {
+    setWorkspaceTrades([
+      { id: 'w-music', slug: 'banda', trade: 'music' },
+      { id: 'w-stage', slug: 'cia', trade: 'stage' },
+      { id: 'w-none', slug: 'old' },
+    ]);
+    expect(tradeFor('w-music')).toBe('music');
+    expect(tradeFor('banda')).toBe('music');
+    expect(tradeFor('cia')).toBe('stage');
+    expect(tradeFor('w-none')).toBe('stage');
+    expect(tradeFor('nobody')).toBe('stage');
+    expect(tradeFor(null)).toBe('stage');
+    expect(tradeFor(undefined)).toBe('stage');
+  });
+
+  test('a row speaks its space whatever the screen speaks', () => {
+    setWorkspaceTrades([{ id: 'w-music', slug: 'banda', trade: 'music' }]);
+    setTrade('mixed');
+    expect(t('perf.cast', 'es', undefined, tradeFor('w-music'))).toBe('Formación');
+  });
+});
+
+describe('t() with the mixed voice (tarea 142)', () => {
+  test('without a @mixed variant it reads the plain key, as stage does', () => {
+    expect(t('perf.cast', 'es', undefined, 'mixed')).toBe(t('perf.cast', 'es', undefined, 'stage'));
+    setTrade('mixed');
+    expect(t('conversations.view_sales', 'es')).toBe('Difusión');
+  });
+
+  test('a @mixed variant wins; a locale without one keeps its own plain word', async () => {
+    const esDict = (await import('./es.json')).default as Record<string, string>;
+    const enDict = (await import('./en.json')).default as Record<string, string>;
+    try {
+      enDict['perf.cast@mixed'] = 'Line-up';
+      expect(t('perf.cast', 'en', undefined, 'mixed')).toBe('Line-up');
+      expect(t('perf.cast', 'es', undefined, 'mixed')).toBe('Reparto');
+      esDict['perf.cast@mixed'] = 'Gente en escena';
+      expect(t('perf.cast', 'es', undefined, 'mixed')).toBe('Gente en escena');
+      expect(t('perf.cast', 'es', undefined, 'music')).toBe('Formación');
+    } finally {
+      delete esDict['perf.cast@mixed'];
+      delete enDict['perf.cast@mixed'];
+    }
   });
 });

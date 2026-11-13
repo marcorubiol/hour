@@ -23,7 +23,7 @@ import en from './en.json';
 import es from './es.json';
 import fr from './fr.json';
 import { LOCALES } from './index';
-import { TRADES } from './trade.svelte';
+import { DEFAULT_TRADE, TRADES } from './trade.svelte';
 
 const SRC = join(import.meta.dirname, '..', '..');
 
@@ -88,16 +88,18 @@ describe('i18n keys', () => {
     }
   });
 
-  /** ADR-128: `key@<trade>` is the trade's wording of `key`. A variant of a
-      key that does not exist, or of a trade the app does not know, is a typo
-      that would never render. */
-  test('every trade variant names a known trade and an existing key', () => {
+  /** ADR-128: `key@<trade>` is the trade's wording of `key`; tarea 142:
+      `key@mixed` is its neutral word for a screen of mixed trades. A variant
+      of a key that does not exist, or of a voice the app does not know (or
+      of stage, which is the plain key), is a typo that would never render. */
+  test('every variant names a known voice and an existing key', () => {
     const dict = en as Record<string, string>;
+    const voices: readonly string[] = [...TRADES.filter((trade) => trade !== DEFAULT_TRADE), 'mixed'];
     const bad = Object.keys(dict)
       .filter((k) => k.includes('@'))
       .filter((k) => {
-        const [base, trade] = k.split('@');
-        return !(base in dict) || !(TRADES as readonly string[]).includes(trade) || trade === TRADES[0];
+        const [base, voice] = k.split('@');
+        return !(base in dict) || !voices.includes(voice);
       });
     expect(bad).toEqual([]);
   });

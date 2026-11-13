@@ -1,7 +1,7 @@
 import en from './en.json';
-import { currentTrade, DEFAULT_TRADE, type Trade } from './trade.svelte';
+import { currentTrade, DEFAULT_TRADE, type Voice } from './trade.svelte';
 
-export { currentTrade, setTrade, tradeOf, TRADES, type Trade } from './trade.svelte';
+export { currentTrade, setTrade, setWorkspaceTrades, tradeFor, tradeOf, TRADES, type Trade, type Voice } from './trade.svelte';
 
 type Dictionary = Record<string, string>;
 
@@ -50,20 +50,22 @@ export function loadAllLocales(): Promise<void[]> {
 export const LOCALE_TAG: Record<Locale, string> = { ca: 'ca-ES', es: 'es-ES', en: 'en-GB', fr: 'fr-FR' };
 
 /**
- * Dictionary lookup with {name} interpolation. The trade's variant
- * (`key@music`, ADR-128) wins when the dictionary has one; otherwise the
- * plain key, which speaks stage. Missing keys fall back to the English
+ * Dictionary lookup with {name} interpolation. The voice's variant
+ * (`key@music`, ADR-128; `key@mixed` for a screen of mixed trades, tarea
+ * 142) wins when the dictionary has one; otherwise the plain key, which
+ * speaks stage. The voice is the screen's unless the caller passes one: a
+ * row passes its own space's, `tradeFor(row.workspace_id)`. Missing keys fall back to the English
  * dictionary, then to the key itself — a sparse locale file never blanks the UI.
  */
 export function t(
   key: string,
   locale: Locale = 'en',
   params?: Record<string, string | number>,
-  trade: Trade = currentTrade(),
+  voice: Voice = currentTrade(),
 ): string {
   const dict: Dictionary = dictionaries[locale] ?? en;
   const fallback: Dictionary = en;
-  const variant = trade === DEFAULT_TRADE ? undefined : `${key}@${trade}`;
+  const variant = voice === DEFAULT_TRADE ? undefined : `${key}@${voice}`;
   let out =
     (variant && dict[variant]) ?? dict[key] ?? (variant && fallback[variant]) ?? fallback[key] ?? key;
   if (params) {
