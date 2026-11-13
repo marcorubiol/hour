@@ -183,12 +183,20 @@ test.describe('Te toca y Se enfría en Conversaciones (ADR-117, ADR-176)', () =>
     await how.press('Enter');
     await expect(line).not.toContainText(WARM, { timeout: 15_000 });
     await expect(row).toHaveCount(0, { timeout: 30_000 });
-    const events = await h.pgGet<{ kind: string; body: string | null }>(
-      'conversation_event',
-      jwt,
-      new URLSearchParams({ conversation_id: `eq.${ids[0]}`, kind: 'eq.note', select: 'kind,body' }),
-    );
-    expect(events.rows.map((e) => e.body)).toEqual(['Done: by phone']);
+    // The line clears before the note's POST lands: poll the thread, do not read it once.
+    await expect
+      .poll(
+        async () => {
+          const events = await h.pgGet<{ kind: string; body: string | null }>(
+            'conversation_event',
+            jwt,
+            new URLSearchParams({ conversation_id: `eq.${ids[0]}`, kind: 'eq.note', select: 'kind,body' }),
+          );
+          return events.rows.map((e) => e.body);
+        },
+        { timeout: 15_000 },
+      )
+      .toEqual(['Done: by phone']);
   });
 
   test('un tramo de la temporada, en Envíos, abre Conversaciones filtrada por esa relación', async ({ page }) => {
