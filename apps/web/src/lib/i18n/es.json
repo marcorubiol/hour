@@ -3573,7 +3573,7 @@
   "contact_import.not_a_sheet": "Esto no se puede leer como una hoja. Guárdala como .xlsx o .csv y vuelve a intentarlo.",
   "contact_import.xls_old": "Es un Excel antiguo (.xls). Guárdalo como .xlsx o .csv y suéltalo otra vez.",
   "contact_import.empty": "La hoja no tiene filas debajo de la cabecera.",
-  "contact_import.too_many": "La hoja tiene {n} filas y el límite es 2.000. Divídela en dos ficheros.",
+  "contact_import.too_many": "La hoja tiene más de 2.000 filas. Divídela en dos ficheros.",
   "contact_import.first_sheet": "Se lee la primera hoja del libro, «{name}».",
   "contact_import.next": "Seguir",
   "contact_import.back": "Atrás",
@@ -3639,7 +3639,7 @@
   "contact_import.err_too_long": "Un nombre de más de 200 letras.",
   "contact_import.issue_bad_email": "Correo mal escrito: entra sin correo y queda en la nota.",
   "contact_import.issue_kind_unread": "«{kind}» no es un tipo de Hour: queda en la nota.",
-  "contact_import.issue_note_without_person": "Sin persona, lo de la nota no entra: las notas son de una persona.",
+  "contact_import.issue_note_to_organization": "Sin persona, la nota va a las notas de la organización, que ve el equipo, si están vacías.",
   "contact_import.issue_other_org": "Otra fila trae otra organización: queda en la nota.",
   "contact_import.decide": "¿«{name}» es la misma persona?",
   "contact_import.ask_same": "La misma",
@@ -3655,7 +3655,7 @@
   "contact_import.r_notes": "Notas privadas, tuyas",
   "contact_import.r_failed": "Filas que no entraron",
   "contact_import.partial": "Una parte no llegó a importarse. Lo importado se queda y se puede deshacer.",
-  "contact_import.warn_hidden": "Alguna organización con ese nombre no es visible para ti: esas filas han entrado sin ella.",
+  "contact_import.warn_hidden": "Algunas filas han entrado sin enlazar con lo que ya había.",
   "contact_import.failed_hint": "Las filas que no entraron se pueden copiar para arreglarlas en la hoja.",
   "contact_import.copy_failed": "Copiar las que no entraron",
   "contact_import.copied": "Copiadas. Pégalas en la hoja para arreglarlas.",
@@ -3677,5 +3677,7 @@
   "contact_import.settings_until": "se deshace hasta el {date}",
   "contact_import.settings_no_undo": "ya no se deshace",
   "contact_import.settings_undone": "deshecha",
-  "contact_import.settings_undo": "Deshacer"
+  "contact_import.settings_undo": "Deshacer",
+  "contact_import.undone_notes_kept": "Las notas privadas de quien importó se quedan, son suyas: {n}.",
+  "contact_import.too_big": "El fichero pasa de 50 MB: no es una hoja de contactos que se pueda leer aquí."
 }

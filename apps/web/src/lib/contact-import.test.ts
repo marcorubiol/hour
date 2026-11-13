@@ -112,7 +112,7 @@ describe('rows', () => {
     expect(rows[0].note).toEqual(['Últ. contacto: 14/03/2025', 'Zona: Catalunya', 'Col J: ok']);
   });
 
-  test('an organization alone keeps its own email and city, and its note has no one to go to', () => {
+  test('an organization alone keeps its own email and city, and its note goes to the organization', () => {
     expect(rows[2]).toMatchObject({
       person: null,
       org: { name: 'Ayuntamiento de Ejemplo', email: 'cultura@example.org', city: 'Lleida' },
@@ -121,7 +121,7 @@ describe('rows', () => {
     expect(rows[2].rawKind).toBeUndefined();
     // «ayto.» se lee: es una institución; el texto con punto se limpia.
     expect(rows[2].org?.kind).toBe('institution');
-    expect(rows[2].issues).toContain('note_without_person');
+    expect(rows[2].issues).toContain('note_to_organization');
   });
 
   test('without a name nor an organization the row does not go in', () => {
@@ -260,21 +260,21 @@ describe('against Hour', () => {
     expect(tallyPlan(plan, { 3: 'other' }).newPersons).toBe(3);
   });
 
-  test('the payload carries the decision, and the note only with a person', () => {
+  test('the payload carries the decision, and the note of an organization alone travels too', () => {
     const rows = payloadRows(plan, { 8: 'same' });
     expect(rows).toHaveLength(5);
     expect(rows.find((r) => r.line === 3)?.person?.match_person_id).toBe('00000000-0000-4000-8000-000000000002');
     expect(rows.find((r) => r.line === 8)?.person?.match_person_id).toBe('00000000-0000-4000-8000-000000000003');
     expect(rows.find((r) => r.line === 2)?.note).toBe('Últ. contacto: 14/03/2025\nZona: Catalunya\nCol J: ok');
-    expect(rows.find((r) => r.line === 4)?.note).toBeUndefined();
+    expect(rows.find((r) => r.line === 4)?.note).toBe('Zona: Catalunya');
     expect(payloadRows(plan).find((r) => r.line === 8)?.person?.match_person_id).toBeUndefined();
   });
 });
 
 describe('batches, results and undo', () => {
-  test('2.000 rows go in four batches of 500', () => {
+  test('2.000 rows go in ten batches of 200', () => {
     const b = batches(Array.from({ length: 2000 }, (_, i) => i));
-    expect(b.map((x) => x.length)).toEqual([500, 500, 500, 500]);
+    expect(b.map((x) => x.length)).toEqual(Array(10).fill(200));
     expect(batches([1, 2, 3], 2)).toEqual([[1, 2], [3]]);
   });
 

@@ -15,8 +15,11 @@ import { parseCsv, plain } from '$lib/audience';
 
 /** Filas de datos por importación (sin la cabecera). */
 export const CONTACT_IMPORT_MAX_ROWS = 2000;
-/** Filas por llamada a `import_contacts`. */
-export const CONTACT_IMPORT_BATCH = 500;
+/**
+ * Filas por llamada a `import_contacts`. 200 y no 500: el `statement_timeout`
+ * de `authenticated` es de 8 s y una fila hace varias escrituras.
+ */
+export const CONTACT_IMPORT_BATCH = 200;
 
 /** Lo que puede ser una columna en Hour. */
 export const IMPORT_FIELDS = [
@@ -246,7 +249,7 @@ export interface OrgPart {
 /** Por qué una fila no entra. */
 export type RowError = 'no_name' | 'too_long';
 /** Lo que entra distinto de como venía. */
-export type RowIssue = 'bad_email' | 'kind_unread' | 'note_without_person' | 'other_org';
+export type RowIssue = 'bad_email' | 'kind_unread' | 'note_to_organization' | 'other_org';
 
 /** Una fila de la hoja, leída. */
 export interface ContactRow {
@@ -353,7 +356,8 @@ export function readRow(sheet: Sheet, mapping: readonly ImportField[], index: nu
     ? compact(person ? { name: orgName, kind } : { name: orgName, kind, email, phone, city, country, website })
     : null;
   if (!person && title) toNoteField('title', title);
-  if (!person && note.length > 0) issues.push('note_without_person');
+  // Sin persona, la nota va a las notas de la organización (las ve el equipo), si están vacías.
+  if (!person && note.length > 0) issues.push('note_to_organization');
   return { line, person, org, note, error: null, issues, ...(rawKind ? { rawKind } : {}) };
 }
 
@@ -618,7 +622,7 @@ export function payloadRows(plan: readonly PlannedContact[], decisions: Readonly
         row.person = decided === 'same' && c.candidate ? { ...c.person, match_person_id: c.candidate.person_id } : { ...c.person };
       }
       if (c.org) row.organization = { ...c.org };
-      if (c.note.length > 0 && c.person) row.note = c.note.join('\n').slice(0, 4000);
+      if (c.note.length > 0) row.note = c.note.join('\n').slice(0, 4000);
       return row;
     });
 }
@@ -674,6 +678,8 @@ export const ContactImportRowSchema = v.object({
 
 export const ContactImportRequestSchema = v.object({
   workspace_id: Uuid,
+  /** El id de la importación lo da el cliente: reenviarla no la duplica. */
+  import_id: Uuid,
   filename: v.nullish(v.pipe(v.string(), v.maxLength(255))),
   rows: v.pipe(v.array(ContactImportRowSchema), v.minLength(1), v.maxLength(CONTACT_IMPORT_MAX_ROWS)),
 });
@@ -688,8 +694,9 @@ export const ContactLookupRequestSchema = v.object({
 });
 
 /** Por qué no ha entrado una fila, según la base. */
-export type FailReason = 'no_name' | 'invalid' | 'hidden' | 'error';
-export type WarnReason = 'organization_hidden' | 'other_organization' | 'note_without_person';
+/** `unavailable` cubre lo que quien importa no ve y lo inesperado: no delata nada. */
+export type FailReason = 'no_name' | 'invalid' | 'unavailable';
+export type WarnReason = 'unavailable' | 'other_organization' | 'note_not_saved';
 
 /** Lo que devuelve `POST /api/contact-imports`, sumadas las tandas. */
 export interface ContactImportResult {
@@ -768,6 +775,8 @@ export interface UndoResult {
   persons_removed: number;
   organizations_removed: number;
   notes_removed: number;
+  /** Notas privadas de quien importó que se quedan porque deshizo otra persona (ADR-093). */
+  notes_kept: number;
   fields_restored: number;
   persons_kept: number;
   organizations_kept: number;

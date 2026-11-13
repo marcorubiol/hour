@@ -3573,7 +3573,7 @@
   "contact_import.not_a_sheet": "Ce fichier ne peut pas être lu comme un tableur. Enregistrez-le en .xlsx ou .csv et réessayez.",
   "contact_import.xls_old": "C’est un ancien fichier Excel (.xls). Enregistrez-le en .xlsx ou .csv et déposez-le à nouveau.",
   "contact_import.empty": "Le tableur n’a aucune ligne sous l’en-tête.",
-  "contact_import.too_many": "Le tableur a {n} lignes et la limite est de 2 000. Divisez-le en deux fichiers.",
+  "contact_import.too_many": "Le tableur a plus de 2 000 lignes. Divisez-le en deux fichiers.",
   "contact_import.first_sheet": "La première feuille du classeur est lue, « {name} ».",
   "contact_import.next": "Continuer",
   "contact_import.back": "Retour",
@@ -3639,7 +3639,7 @@
   "contact_import.err_too_long": "Un nom de plus de 200 lettres.",
   "contact_import.issue_bad_email": "E-mail mal écrit : la ligne entre sans lui, et il reste dans la note.",
   "contact_import.issue_kind_unread": "« {kind} » n’est pas un type de Hour : il reste dans la note.",
-  "contact_import.issue_note_without_person": "Sans personne, la note n’entre pas : les notes appartiennent à une personne.",
+  "contact_import.issue_note_to_organization": "Sans personne, la note va dans les notes de l’organisation, que l’équipe voit, si elles sont vides.",
   "contact_import.issue_other_org": "Une autre ligne apporte une autre organisation : elle reste dans la note.",
   "contact_import.decide": "« {name} » est-elle la même personne ?",
   "contact_import.ask_same": "La même",
@@ -3655,7 +3655,7 @@
   "contact_import.r_notes": "Notes privées, à vous",
   "contact_import.r_failed": "Lignes qui ne sont pas entrées",
   "contact_import.partial": "Une partie n’a pas été importée. Ce qui a été importé reste et peut être annulé.",
-  "contact_import.warn_hidden": "Une organisation de ce nom ne vous est pas visible : ces lignes sont entrées sans elle.",
+  "contact_import.warn_hidden": "Certaines lignes sont entrées sans être liées à ce qui existait déjà.",
   "contact_import.failed_hint": "Les lignes qui ne sont pas entrées peuvent être copiées pour les corriger dans le tableur.",
   "contact_import.copy_failed": "Copier les lignes non entrées",
   "contact_import.copied": "Copiées. Collez-les dans le tableur pour les corriger.",
@@ -3677,5 +3677,7 @@
   "contact_import.settings_until": "annulable jusqu’au {date}",
   "contact_import.settings_no_undo": "n’est plus annulable",
   "contact_import.settings_undone": "annulé",
-  "contact_import.settings_undo": "Annuler"
+  "contact_import.settings_undo": "Annuler",
+  "contact_import.undone_notes_kept": "Les notes privées de la personne qui a importé restent, elles sont à elle : {n}.",
+  "contact_import.too_big": "Le fichier dépasse 50 Mo : ce n’est pas un tableur de contacts lisible ici."
 }

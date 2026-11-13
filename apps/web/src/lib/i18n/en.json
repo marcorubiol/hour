@@ -3573,7 +3573,7 @@
   "contact_import.not_a_sheet": "This cannot be read as a sheet. Save it as .xlsx or .csv and try again.",
   "contact_import.xls_old": "This is an old Excel file (.xls). Save it as .xlsx or .csv and drop it again.",
   "contact_import.empty": "The sheet has no rows below the header.",
-  "contact_import.too_many": "The sheet has {n} rows and the limit is 2,000. Split it into two files.",
+  "contact_import.too_many": "The sheet has more than 2,000 rows. Split it into two files.",
   "contact_import.first_sheet": "The first sheet of the workbook is read, «{name}».",
   "contact_import.next": "Continue",
   "contact_import.back": "Back",
@@ -3639,7 +3639,7 @@
   "contact_import.err_too_long": "A name longer than 200 letters.",
   "contact_import.issue_bad_email": "Badly written email: it goes in without it, and it stays in the note.",
   "contact_import.issue_kind_unread": "«{kind}» is not a Hour type: it stays in the note.",
-  "contact_import.issue_note_without_person": "Without a person, the note does not go in: notes belong to a person.",
+  "contact_import.issue_note_to_organization": "Without a person, the note goes to the organization’s notes, which the team sees, if they are empty.",
   "contact_import.issue_other_org": "Another row brings another organization: it stays in the note.",
   "contact_import.decide": "Is «{name}» the same person?",
   "contact_import.ask_same": "The same",
@@ -3655,7 +3655,7 @@
   "contact_import.r_notes": "Private notes, yours",
   "contact_import.r_failed": "Rows left out",
   "contact_import.partial": "Part of it was not imported. What was imported stays and can be undone.",
-  "contact_import.warn_hidden": "Some organization with that name is not visible to you: those rows went in without it.",
+  "contact_import.warn_hidden": "Some rows went in without being linked to what was already there.",
   "contact_import.failed_hint": "The rows left out can be copied to fix them in the sheet.",
   "contact_import.copy_failed": "Copy the rows left out",
   "contact_import.copied": "Copied. Paste them into the sheet to fix them.",
@@ -3677,5 +3677,7 @@
   "contact_import.settings_until": "can be undone until {date}",
   "contact_import.settings_no_undo": "can no longer be undone",
   "contact_import.settings_undone": "undone",
-  "contact_import.settings_undo": "Undo"
+  "contact_import.settings_undo": "Undo",
+  "contact_import.undone_notes_kept": "The private notes of whoever imported stay, they are theirs: {n}.",
+  "contact_import.too_big": "The file is over 50 MB: it is not a contact sheet that can be read here."
 }

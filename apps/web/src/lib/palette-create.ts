@@ -142,7 +142,9 @@ export function allowed(kind: CreateKind, can: CreateCan): boolean {
   // could not open what they made is not offered to make it.
   if (kind === 'person') return can.directory && can.converse;
   if (kind === 'organization') return can.directory && can.converse && can.organization;
-  // Lo importado se lee por las conversaciones (privacidad del directorio), como una persona.
+  // Lo importado es directorio (ADR-124): la base sólo deja importar a quien lee
+  // Conversaciones en ese espacio (`private.can_import_contacts`). Aquí se ofrece
+  // a quien edita conversaciones en alguno y da de alta personas; el espacio lo decide la base.
   if (kind === 'import') return can.directory && can.converse;
   return can.plan;
 }

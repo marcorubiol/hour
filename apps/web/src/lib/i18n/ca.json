@@ -3573,7 +3573,7 @@
   "contact_import.not_a_sheet": "Això no es pot llegir com un full. Desa’l com a .xlsx o .csv i torna-ho a provar.",
   "contact_import.xls_old": "És un Excel antic (.xls). Desa’l com a .xlsx o .csv i torna’l a deixar anar.",
   "contact_import.empty": "El full no té files sota la capçalera.",
-  "contact_import.too_many": "El full té {n} files i el límit és 2.000. Divideix-lo en dos fitxers.",
+  "contact_import.too_many": "El full té més de 2.000 files. Divideix-lo en dos fitxers.",
   "contact_import.first_sheet": "Es llegeix el primer full del llibre, «{name}».",
   "contact_import.next": "Continuar",
   "contact_import.back": "Enrere",
@@ -3639,7 +3639,7 @@
   "contact_import.err_too_long": "Un nom de més de 200 lletres.",
   "contact_import.issue_bad_email": "Correu mal escrit: hi entra sense correu i queda a la nota.",
   "contact_import.issue_kind_unread": "«{kind}» no és un tipus de Hour: queda a la nota.",
-  "contact_import.issue_note_without_person": "Sense persona, el de la nota no hi entra: les notes són d’una persona.",
+  "contact_import.issue_note_to_organization": "Sense persona, la nota va a les notes de l’organització, que veu l’equip, si són buides.",
   "contact_import.issue_other_org": "Una altra fila porta una altra organització: queda a la nota.",
   "contact_import.decide": "«{name}» és la mateixa persona?",
   "contact_import.ask_same": "La mateixa",
@@ -3655,7 +3655,7 @@
   "contact_import.r_notes": "Notes privades, teves",
   "contact_import.r_failed": "Files que no hi van entrar",
   "contact_import.partial": "Una part no s’ha arribat a importar. El que s’ha importat es queda i es pot desfer.",
-  "contact_import.warn_hidden": "Alguna organització amb aquest nom no és visible per a tu: aquestes files hi han entrat sense ella.",
+  "contact_import.warn_hidden": "Algunes files hi han entrat sense enllaçar amb el que ja hi havia.",
   "contact_import.failed_hint": "Les files que no hi van entrar es poden copiar per arreglar-les al full.",
   "contact_import.copy_failed": "Copiar les que no hi van entrar",
   "contact_import.copied": "Copiades. Enganxa-les al full per arreglar-les.",
@@ -3677,5 +3677,7 @@
   "contact_import.settings_until": "es desfà fins al {date}",
   "contact_import.settings_no_undo": "ja no es desfà",
   "contact_import.settings_undone": "desfeta",
-  "contact_import.settings_undo": "Desfer"
+  "contact_import.settings_undo": "Desfer",
+  "contact_import.undone_notes_kept": "Les notes privades de qui va importar es queden, són seves: {n}.",
+  "contact_import.too_big": "El fitxer passa de 50 MB: no és un full de contactes que es pugui llegir aquí."
 }

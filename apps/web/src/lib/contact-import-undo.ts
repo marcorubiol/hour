@@ -22,6 +22,7 @@ export async function undoContactImport(id: string, locale: Locale, queryClient:
       tone: 'info',
       message: t('contact_import.undone', locale),
       ...(kept > 0 ? { title: t('contact_import.undone_kept', locale, { n: kept }) } : {}),
+      ...(body?.undo?.notes_kept ? { title: t('contact_import.undone_notes_kept', locale, { n: body.undo.notes_kept }) } : {}),
     });
     return true;
   } catch (err) {

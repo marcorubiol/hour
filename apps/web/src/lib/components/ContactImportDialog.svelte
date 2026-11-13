@@ -30,7 +30,7 @@
   import { t, type Locale } from '$lib/i18n';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { spaceName } from '$lib/utils/identity';
-  import { readXlsx, sheetKind } from '$lib/xlsx-read';
+  import { readXlsx, sheetKind, XLSX_MAX_BYTES } from '$lib/xlsx-read';
   import {
     assignColumn,
     columnSample,
@@ -86,13 +86,17 @@
     if (readError) return readError;
     if (!sheet) return '';
     if (sheet.rows.length === 0) return t('contact_import.empty', locale);
-    if (sheet.rows.length > CONTACT_IMPORT_MAX_ROWS) return t('contact_import.too_many', locale, { n: sheet.rows.length });
+    if (sheet.rows.length > CONTACT_IMPORT_MAX_ROWS) return t('contact_import.too_many', locale);
     return '';
   });
 
   async function readFile(file: File) {
     readError = '';
     sheetNote = '';
+    if (file.size > XLSX_MAX_BYTES) {
+      readError = t('contact_import.too_big', locale);
+      return;
+    }
     reading = true;
     try {
       const buf = new Uint8Array(await file.arrayBuffer());
@@ -173,6 +177,9 @@
     lookup = null;
     lookupError = null;
     decisions = {};
+    // Una revisión, una importación: volver a pulsar «Importar» tras un error
+    // reenvía la misma, y la base no escribe dos veces lo ya escrito.
+    importKey = crypto.randomUUID();
     try {
       const found = await mutateJSON<ImportLookup>('POST', '/api/contact-imports/lookup', {
         workspace_id: workspaceId,
@@ -245,6 +252,7 @@
 
   // ── 4. Importar ─────────────────────────────────────────────────────────
   let saving = $state(false);
+  let importKey = $state('');
   let result = $state<ContactImportResult | null>(null);
   let notReady = $state(false);
 
@@ -264,6 +272,7 @@
     try {
       const r = await mutateJSON<ContactImportResult>('POST', '/api/contact-imports', {
         workspace_id: workspaceId,
+        import_id: importKey,
         filename: fileName || null,
         rows: payloadRows(plan, decisions),
       });
@@ -479,7 +488,7 @@
       <div><dt>{t('contact_import.r_failed', locale)}</dt><dd>{failedLines.length}</dd></div>
     </dl>
     {#if result.partial}<p class="cim__error" role="alert">{t('contact_import.partial', locale)}</p>{/if}
-    {#if result.warnings.some((w) => w.reason === 'organization_hidden')}<p class="cim__hint">{t('contact_import.warn_hidden', locale)}</p>{/if}
+    {#if result.warnings.some((w) => w.reason === 'unavailable')}<p class="cim__hint">{t('contact_import.warn_hidden', locale)}</p>{/if}
     {#if failedLines.length > 0}<p class="cim__hint">{t('contact_import.failed_hint', locale)}</p>{/if}
   {/if}
 
@@ -499,7 +508,7 @@
       {:else if step === 'columns'}
         <Button onclick={toReview} disabled={!mappingReady(mapping)}>{t('contact_import.next', locale)}</Button>
       {:else}
-        <Button onclick={save} loading={saving} disabled={!lookup || tally.toImport === 0}>{t('contact_import.import_n', locale, { n: tally.toImport })}</Button>
+        <Button onclick={save} loading={saving} disabled={saving || !lookup || tally.toImport === 0}>{t('contact_import.import_n', locale, { n: tally.toImport })}</Button>
       {/if}
     {/if}
   {/snippet}
