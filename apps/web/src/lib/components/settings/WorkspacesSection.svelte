@@ -16,6 +16,7 @@
   import Select from '$lib/components/Select.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import MergesSection from '$lib/components/settings/MergesSection.svelte';
+  import ImportsSection from '$lib/components/settings/ImportsSection.svelte';
 
   const locale = appLocale();
 
@@ -78,6 +79,10 @@
       ),
   }));
   const accessQuery = createQuery(accessOptions);
+  /** Quién es quién por cuenta, para el historial de importaciones (sólo lo tiene quien ve los accesos). */
+  let memberNames = $derived(
+    new Map(($accessQuery.data?.items ?? []).filter((a) => a.user_id).map((a) => [a.user_id as string, a.display_name])),
+  );
   let accessItems = $derived($accessQuery.data?.items ?? []);
   let activeMembers = $derived(
     accessItems.filter((item) => item.access_kind === 'member' && item.status === 'active'),
@@ -400,6 +405,11 @@
   <!-- Fichas por unir y fusiones recientes, de persona (fase 3) y de
        organización (ADR-171): el mismo admin que ve los accesos. -->
   <MergesSection workspace={currentWorkspace} />
+{/if}
+
+<!-- Importaciones de contactos (138): las propias para cualquiera que importa; todas para el owner o admin. -->
+{#if currentWorkspace}
+  <ImportsSection workspace={currentWorkspace} names={memberNames} />
 {/if}
 
 {#if aliasRequests.length > 0}
