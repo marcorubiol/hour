@@ -5,7 +5,7 @@
    * (`$lib/maps-app.svelte`), so it saves at once, with no request.
    */
   import { onMount } from 'svelte';
-  import Segmented from '$lib/components/Segmented.svelte';
+  import Select from '$lib/components/Select.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import { MAPS_APPS, MAPS_APP_NAME, isMapsApp } from '$lib/ahora';
   import { mapsPref, restoreMapsApp, setMapsApp } from '$lib/maps-app.svelte';
@@ -29,11 +29,14 @@
         <div class="set-row__hint">{t('maps.setting_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
-        <Segmented
+        <Select
           ariaLabel={t('maps.setting_title', locale)}
           {options}
           value={mapsPref.app ?? 'ask'}
-          onchange={(v) => setMapsApp(isMapsApp(v) ? v : null)}
+          onchange={(e) => {
+            const v = (e.currentTarget as HTMLSelectElement).value;
+            setMapsApp(isMapsApp(v) ? v : null);
+          }}
         />
       </div>
     </div>
