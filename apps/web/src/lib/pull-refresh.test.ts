@@ -96,14 +96,13 @@ describe('pullBlocked', () => {
     mount('<main><p id="t">hola</p></main>');
     expect(pullBlocked(document.getElementById('t'), document)).toBe(false);
   });
-  test('a field, a dialog or the drawer own the touch', () => {
-    mount('<input id="i"><div role="dialog"><p id="d">x</p></div><aside class="drawer"><a id="r">r</a></aside>');
+  test('a field or a dialog own the touch', () => {
+    mount('<input id="i"><div role="dialog"><p id="d">x</p></div>');
     expect(pullBlocked(document.getElementById('i'), document)).toBe(true);
     expect(pullBlocked(document.getElementById('d'), document)).toBe(true);
-    expect(pullBlocked(document.getElementById('r'), document)).toBe(true);
   });
   test('an open overlay anywhere blocks the page', () => {
-    mount('<p id="t">x</p><aside class="drawer" data-open></aside>');
+    mount('<p id="t">x</p><dialog open></dialog>');
     expect(pullBlocked(document.getElementById('t'), document)).toBe(true);
   });
   test('an inner vertical scroller keeps its gesture', () => {

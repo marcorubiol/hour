@@ -1,8 +1,8 @@
 /**
  * CALM AS FOCUS (ADR-139 § 5). Calm is another composition of each lens, not
  * a grey: it hides, it never dims. What it hides is said in one line that
- * opens it; no control looks disabled; the switch is a soft stroke, never the
- * darkest mark on the rail. `$lib/calm` is the table of what each lens keeps
+ * opens it; no control looks disabled. The switch is a mark, the wave in a
+ * circle, filled when it is on (ADR-202 § 11). `$lib/calm` is the table of what each lens keeps
  * (unit-tested there); these are the laws you can only see in a browser.
  *
  * Read-only: the spec writes nothing but the browser's own `hour_calm`.
@@ -43,15 +43,15 @@ test.describe('Calm — a composition, not a grey (ADR-139 § 5)', () => {
       const piece = page.getByTestId('desk-next').or(page.getByTestId('desk-hollow')).first();
       await expect(piece).toBeVisible();
       await expect(piece).not.toContainText(/overdue|waiting for you/i);
-      await expect(page.locator('.lenshead__title .visually-hidden')).toHaveText('Today');
+      await expect(page.getByRole('heading', { level: 1, name: 'Today' })).toHaveClass(/visually-hidden/);
     }
   });
 
-  test('calm never dims a control, and its switch is a stroke, not a black pill', async ({ page }) => {
+  test('calm never dims a control, and its mark fills when it is on (ADR-202 § 11)', async ({ page }) => {
     const look = () =>
       page.evaluate(() => {
         const add = document.querySelector('.cal__add')!;
-        const sw = document.querySelector('.side-calm')!;
+        const sw = [...document.querySelectorAll<HTMLElement>('.calmmark')].find((e) => e.offsetParent !== null)!;
         const ink = getComputedStyle(document.querySelector('.shell__content')!).color;
         return {
           addBg: getComputedStyle(add).backgroundColor,
@@ -67,7 +67,8 @@ test.describe('Calm — a composition, not a grey (ADR-139 § 5)', () => {
     expect(on.addBg, '«＋ Date» changed its ground in calm').toBe(off.addBg);
     expect(on.addColor).toBe(off.addColor);
     expect(on.ink, 'calm greyed the content').toBe(off.ink);
-    expect(on.switchBg, 'the switch is painted in the ink').not.toBe(on.ink);
+    expect(off.switchBg, 'off, the mark is an outline').toBe('rgba(0, 0, 0, 0)');
+    expect(on.switchBg, 'on, the circle is filled').not.toBe('rgba(0, 0, 0, 0)');
   });
 
   test('the Planner says what calm hides in one sentence, with the way back', async ({ page }) => {
@@ -77,7 +78,7 @@ test.describe('Calm — a composition, not a grey (ADR-139 § 5)', () => {
     await expect(meta).toContainText(/confirmed/);
     // The «·» between stats sits on the button's wrapper: not in its name.
     await meta.getByRole('button', { name: /^see all/ }).click();
-    await expect(page.locator('.side-calm')).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.getByRole('button', { name: 'Calm', exact: true }).locator('visible=true')).toHaveAttribute('aria-pressed', 'false');
   });
 
   test('Conversations in calm: «Te toca» and «Add conversation»; the list waits outside', async ({ page }) => {

@@ -55,6 +55,9 @@
     next?: PulseNext | null;
     /** «1 más hoy fuera de MaMeMi» (ADR-202 § 14), or null. */
     outside?: string | null;
+    /** The line is a door: it takes the scope off (the frame's field), so
+        what it counts comes into view. Without it, the line is only said. */
+    onclearscope?: () => void;
     settled: boolean;
     errored: boolean;
     onretry: () => void;
@@ -77,6 +80,7 @@
     todayHad = false,
     next = null,
     outside = null,
+    onclearscope,
     settled,
     errored,
     onretry,
@@ -367,7 +371,15 @@
   {/if}
 
   {#if outside && settled && !errored}
-    <p class="day__outside" data-testid="desk-outside">{outside}</p>
+    {#if onclearscope}
+      <p class="day__outside" data-testid="desk-outside">
+        <button type="button" class="day__outside-door" onclick={onclearscope}
+          >{outside}<span class="visually-hidden">. {t('desk.outside_clear', locale)}</span></button
+        >
+      </p>
+    {:else}
+      <p class="day__outside" data-testid="desk-outside">{outside}</p>
+    {/if}
   {/if}
 </section>
 
@@ -550,5 +562,23 @@
     padding-inline: var(--space-xs);
     font-size: var(--text-s);
     color: var(--text-muted);
+  }
+  /* A door that reads as the line it was: the muted text, underlined on
+     hover, as `.link-arrow` does. */
+  .day__outside-door {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+  @media (hover: hover) {
+    .day__outside-door:hover {
+      color: var(--text-color);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
   }
 </style>

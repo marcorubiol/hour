@@ -5,20 +5,19 @@
    * `.lenshead*` family in base.css), so every lens reads identically:
    *
    *   ┌───────────────────────────────────────────────┐
-   *   │  <big title> <aside>       [scope ▾] [+] [?] │  ← titlerow (bordered)
+   *   │  <big title> <aside>                     [+]  │  ← titlerow (bordered)
    *   │  <sub · sub · sub>                             │  ← optional sub line
    *
-   * Each lens passes its own `title` (Desk: "28 need you", Planner: the month)
-   * and, when it has one, a `sub` line of indications/links. Content is
-   * lens-specific; the shell is not. The section switcher is NOT here: it
-   * lives in the shell's frame, the same on every page (ADR-140).
+   * Each lens passes its own `title` (Planner: the month) and, when it has
+   * one, a `sub` line of indications/links. Content is lens-specific; the
+   * shell is not. The section switcher is NOT here: it lives in the shell's
+   * frame, the same on every page (ADR-140). Nor the scope: it is a tag in
+   * the frame's field (ADR-202 § 12). Nor the «?»: it is a row of the
+   * account menu (ADR-203 § 1), which this head tells which card to bring.
    */
   import type { Snippet } from 'svelte';
-  import { t, appLocale } from '$lib/i18n';
-  import { cardKey, type HelpSection } from '$lib/help';
-  import { help, toggleCard } from '$lib/help-seen.svelte';
-  import { scopeDoor } from '$lib/scope-door';
-  import ScopePill from '$lib/components/shell/ScopePill.svelte';
+  import type { HelpSection } from '$lib/help';
+  import { provideHelpSection } from '$lib/help-seen.svelte';
 
   interface Props {
     /** the big display title — whatever the lens wants to say */
@@ -31,20 +30,24 @@
      * heading's name stays the title alone.
      */
     titleAside?: Snippet;
-    /** The section's welcome card (`FirstVisitCard`): its «?» lives here, at the end of the title row. */
+    /** The section's welcome card (`FirstVisitCard`): the account menu's
+        «Ayuda de esta sección» brings it back. */
     help?: HelpSection;
-    /** A lens's own act, in the ring of the «?» and before it (Hoy's «+»,
-        ADR-148): a gesture of the whole page, not of the title. */
+    /** A lens's own act at the end of the title row: a gesture of the whole
+        page, not of the title. */
     tools?: Snippet;
+    /** The title is heard and not seen: Hoy, where the piece says the day
+        and the frame's clock the date (ADR-203 § 1). No title row is drawn. */
+    heard?: boolean;
   }
-  let { title, sub, titleAside, help: section, tools }: Props = $props();
+  let { title, sub, titleAside, help: section, tools, heard = false }: Props = $props();
 
-  // THE SCOPE IS A PILL IN THIS ROW (ADR-152), on every lens and at every
-  // width: «Todo» unscoped, the name of what is scoped otherwise, before the
-  // lens's own act and its «?». Off the /h shell there is no door, no pill.
-  const door = scopeDoor();
+  provideHelpSection(() => section);
 </script>
 
+{#if heard}
+  <h1 class="visually-hidden">{@render title()}</h1>
+{:else}
 <header class="lenshead">
   <div class="lenshead__titlerow">
     <div class="lenshead__lead">
@@ -53,24 +56,12 @@
         <span class="lenshead__aside">{@render titleAside()}</span>
       {/if}
     </div>
-    {#if section || door || tools}
-      <span class="lenshead__tools lenshead__tools--help">
-        {#if door}<ScopePill {door} />{/if}
-        {#if tools}{@render tools()}{/if}
-        {#if section}
-        <button
-          type="button"
-          class="lenshead__help"
-          id={`help-${section}`}
-          aria-label={t('help.section_aria', appLocale())}
-          aria-expanded={help.reopened === cardKey(section)}
-          onclick={() => toggleCard(cardKey(section))}><span aria-hidden="true">?</span></button
-        >
-        {/if}
-      </span>
+    {#if tools}
+      <span class="lenshead__tools lenshead__tools--lens">{@render tools()}</span>
     {/if}
   </div>
   {#if sub}
     <p class="lenshead__sub">{@render sub()}</p>
   {/if}
 </header>
+{/if}

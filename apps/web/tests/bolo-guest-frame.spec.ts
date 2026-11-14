@@ -190,7 +190,7 @@ test.describe('el marco de un guest de un solo bolo (comms carril 2, fase 3)', (
     // ── ⌘K: ninguna fila de crear con la compañía en el ámbito ──
     await page.goto(`/h/desk?${SCOPE}`);
     await waitForLoaded(page);
-    await page.locator('.shell__search').click();
+    await page.locator('.field__open').locator('visible=true').click();
     await page.keyboard.type('tarea comprar');
     const palette = page.locator('.cmdk');
     await expect(palette).toBeVisible();

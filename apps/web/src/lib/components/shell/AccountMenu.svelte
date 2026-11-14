@@ -10,6 +10,8 @@
   import { createQuery } from '@tanstack/svelte-query';
   import { meQueryOptions } from '$lib/nav-queries';
   import { userDisplayName as displayNameFor } from '$lib/utils/identity';
+  import { cardKey } from '$lib/help';
+  import { helpHere, toggleCard } from '$lib/help-seen.svelte';
 
   interface Props {
     /** Current URL's workspace segment — Avatar-name fallback of last resort. */
@@ -78,6 +80,7 @@
   {align}
   label={t('shell.account_menu', locale)}
   triggerClass="kebab"
+  triggerAttrs={{ 'data-help-return': '' }}
 >
   {#snippet trigger()}
     <Avatar size="xs" name={userDisplayName || userEmail || workspaceSlug} />
@@ -121,6 +124,24 @@
         {inSettings ? t('shell.dashboard', locale) : t('shell.all_settings', locale)}
       </a>
     </li>
+    <!-- The section's «?» lives here since ADR-203 § 1: it brings the
+         section's welcome card back (or folds it, if it brought it). -->
+    {#if helpHere.section}
+      {@const key = cardKey(helpHere.section)}
+      <li role="none">
+        <button
+          type="button"
+          role="menuitem"
+          class="menu__item"
+          onclick={() => {
+            close(false);
+            toggleCard(key);
+          }}
+        >
+          {t('help.section_aria', locale)}
+        </button>
+      </li>
+    {/if}
     <li role="none" class="theme-row">
       <span class="theme-row__label">{t('shell.theme_mode', locale)}</span>
       <ThemeToggle variant="plain" />

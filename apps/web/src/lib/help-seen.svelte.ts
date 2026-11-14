@@ -9,9 +9,27 @@
  */
 
 import { mutateJSON } from '$lib/api';
-import type { HelpSeen, HelpState } from '$lib/help';
+import type { HelpSection, HelpSeen, HelpState } from '$lib/help';
 
 export const help = $state<HelpState>({ seen: {}, ready: false, reopened: null });
+
+/**
+ * La sección en pantalla que tiene tarjeta, para la fila «Ayuda de esta
+ * sección» del menú de la cuenta (ADR-203 § 1: el «?» salió de la cabecera).
+ * La declara la cabecera de la lente (`LensHeader`) mientras está montada.
+ */
+export const helpHere = $state<{ section: HelpSection | null }>({ section: null });
+
+/** Llamado al iniciar un componente: declara su sección mientras vive. */
+export function provideHelpSection(get: () => HelpSection | undefined): void {
+  $effect(() => {
+    const section = get() ?? null;
+    helpHere.section = section;
+    return () => {
+      if (helpHere.section === section) helpHere.section = null;
+    };
+  });
+}
 
 let probe: Promise<void> | null = null;
 

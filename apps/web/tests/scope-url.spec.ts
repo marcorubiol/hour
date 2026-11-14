@@ -10,8 +10,9 @@ import { waitForLoaded } from './loaded';
  * their own writes — clearing pins found ''===null and never cleaned the
  * bar. The effects now read `location.href` for truth and keep page.url
  * only as the navigation trigger. These three flows pin that behavior:
- * inbound scoped link → clear; the rail-applied scope → clear (the
- * originally failing sequence); and a scoped link to the front door (/h).
+ * inbound scoped link → clear; a saved scope applied from the palette →
+ * clear (the originally failing sequence); and a scoped link to the front
+ * door (/h).
  *
  * Fixture-owned data only: the seeded saved scope mixes the `playwright`
  * space token with its own project — never a real user's project ids.
@@ -21,17 +22,18 @@ import { waitForLoaded } from './loaded';
 const FIXTURE_SPACE_TOKEN = 's:playwright';
 const FIXTURE_PROJECT_TOKEN = 'p:019f21d2-7482-77e6-9ad9-27d881cff305';
 
-// The scope is one pill in the lens's title row (ADR-152): «Scope: <name>»
-// when scoped, «Scope: Everything. Narrow» when not. Since tarea 132 it is the
-// scope's only door: the rail no longer lists «Everything», the saved scopes
-// or the recents; the pill's dialog does («Clear» is the way back to all).
-const scopedPill = (page: Page) => page.getByRole('button', { name: /^Scope: (?!Everything)/ });
-const everythingPill = (page: Page) => page.getByRole('button', { name: 'Scope: Everything. Narrow' });
-const scopeDialog = (page: Page) => page.getByRole('dialog', { name: 'Scope' });
-/** Back to everything, from the pill: what the rail's «Everything» did. */
+// Search and scope are one field in the frame (ADR-202 § 12). Scoped, what is
+// scoped is a tag inside it, «Scope: <name>», with its ×, and the field says
+// «Search»; unscoped there is no tag and the field says «Search everything».
+// The saved scopes and the recents are the palette's first rows with nothing
+// typed (ADR-203 § 6); «Save» and «Copy link» are acts of the tag's dialog.
+const scopedPill = (page: Page) => page.getByRole('button', { name: /^Scope: / });
+const everythingPill = (page: Page) => page.getByRole('button', { name: 'Search everything', exact: true });
+const tagX = (page: Page) => page.locator('.scopetag').getByRole('button', { name: /^Remove / });
+const searchDialog = (page: Page) => page.getByRole('dialog', { name: 'Search', exact: true });
+/** Back to everything: the tag's ×. */
 async function clearScope(page: Page) {
-  await scopedPill(page).click();
-  await scopeDialog(page).getByRole('button', { name: 'Clear', exact: true }).click();
+  await tagX(page).click();
 }
 
 test('Everything clears ?scope= from the URL after opening a scoped link', async ({ page }) => {
@@ -49,7 +51,7 @@ test('Everything clears ?scope= from the URL after opening a scoped link', async
   expect(page.url()).not.toContain('scope=');
 });
 
-test('pill-applied saved scope, then Everything, cleans the URL (replaceState staleness)', async ({ page }) => {
+test('a saved scope applied from the palette, then the tag’s ×, cleans the URL (replaceState staleness)', async ({ page }) => {
   // Seed a saved multi-token scope owned by the fixture (space + project).
   await page.addInitScript(
     ([space, project]) => {
@@ -70,13 +72,18 @@ test('pill-applied saved scope, then Everything, cleans the URL (replaceState st
   await page.waitForURL(/\/h\/desk/, { timeout: 10000 });
   await waitForLoaded(page);
 
-  // 2. Unscoped, the pill opens its dialog with the saved scope listed.
+  // 2. Unscoped, the field opens the palette: its first rows are the saved scopes.
   await everythingPill(page).click();
-  await expect(scopeDialog(page).getByRole('heading', { name: 'Saved' })).toBeVisible();
+  const palette = searchDialog(page);
+  await expect(palette.locator('.cmdk__group').first()).toHaveText('Saved');
+  const row = palette.getByRole('option', { name: /E2E scope/ });
+  await expect(row).toBeVisible();
 
-  // 3. Apply the saved scope from the pill → URL gains ?scope=.
-  await scopeDialog(page).getByRole('button', { name: /E2E scope/ }).click();
+  // 3. Apply the saved scope from its row → the tag names it, URL gains ?scope=.
+  await row.click();
+  await expect(palette).toBeHidden();
   await expect(scopedPill(page)).toBeVisible({ timeout: 15000 });
+  await expect(page.locator('.field__label')).toHaveText('Search');
   await expect(page).toHaveURL(/scope=/, { timeout: 5000 });
 
   // 4. Everything again → the URL must clean (the bug left it scoped).
@@ -113,7 +120,7 @@ test('Conversations is a scoped lens and copies its canonical scoped URL', async
   );
   await expect(page).toHaveURL(/\/h\/conversations\?scope=s:playwright$/);
 
-  // Copy link lives in what the pill opens: a dialog named «Scope».
+  // Copy link lives in what the tag opens: a dialog named «Scope».
   await scopedPill(page).click();
   const dialog = page.getByRole('dialog', { name: 'Scope' });
   await expect(dialog).toBeVisible();
@@ -155,10 +162,10 @@ test('a scope change on a person opened from Conversations lands back on Convers
   await page.waitForURL(/\/h\/[^/]+\/person\//);
   await waitForLoaded(page);
 
-  // Off a lens there is no pill (ADR-152) and, since tarea 132, no rail of
-  // scopes: the scope changes from the search, «narrow» on the space's row.
-  await page.getByRole('button', { name: 'Search or jump to a show or line' }).click();
-  const search = page.getByRole('dialog', { name: 'Search' });
+  // Off a lens the field is still there (ADR-202 § 12): the scope changes
+  // from its search, «narrow» on the space's row.
+  await page.locator('.field__open').click();
+  const search = searchDialog(page);
   await search.getByRole('textbox').fill('playwright');
   await search.getByRole('button', { name: /^Show only .*playwright/i }).first().click();
   await page.waitForURL(/\/h\/conversations/, { timeout: 10000 });
@@ -203,11 +210,12 @@ for (const [lens, token] of [
   });
 }
 
-// ADR-152: the scope box above the headline is gone at every width; the pill
-// in the title row opens a dialog (a popover from 48 rem, a sheet below)
-// with the tokens and the acts, Esc closes it and the focus comes back.
+// ADR-202 § 12: the scope is a tag in the frame's field at every width; its
+// name opens a dialog (a popover from 48 rem, a sheet below) with the tokens
+// and the acts, Esc closes it and the focus comes back. No pill in the lens's
+// title row.
 for (const width of [1440, 390] as const) {
-  test(`the scope pill opens its dialog and gives the focus back (${width})`, async ({ page }) => {
+  test(`the scope tag opens its dialog and gives the focus back (${width})`, async ({ page }) => {
     const height = width > 400 ? 900 : 844;
     await page.setViewportSize({ width, height });
     await page.goto(`/h/planner?scope=${FIXTURE_SPACE_TOKEN},${FIXTURE_PROJECT_TOKEN}`);
@@ -216,24 +224,28 @@ for (const width of [1440, 390] as const) {
     const pill = scopedPill(page);
     await expect(pill).toHaveAccessibleName(/^Scope: .+ \+1$/);
     await expect(pill).toHaveAttribute('aria-expanded', 'false');
-    // No box above the headline: the pill sits inside the lens's title row.
-    await expect(page.locator('.lenshead__titlerow').getByRole('button', { name: /^Scope: / })).toHaveCount(1);
+    // In the frame's field, never in the lens's title row.
+    await expect(page.locator('.shell__top search').getByRole('button', { name: /^Scope: / })).toHaveCount(1);
+    await expect(page.locator('.lenshead__titlerow').getByRole('button', { name: /^Scope: / })).toHaveCount(0);
+    // Field, tag and label on one line.
+    const field = (await page.locator('.shell__top search').boundingBox())!;
+    expect(field.height).toBeLessThan(60);
 
     await pill.click();
     const dialog = page.getByRole('dialog', { name: 'Scope' });
     await expect(dialog).toBeVisible();
     await expect(pill).toHaveAttribute('aria-expanded', 'true');
     await expect(dialog.getByRole('button', { name: /^Remove / })).toHaveCount(2);
-    for (const act of ['+ add', 'Copy link', 'Clear']) {
+    for (const act of ['+ add', '☆ Save', 'Copy link', 'Clear']) {
       await expect(dialog.getByRole('button', { name: act, exact: true })).toBeVisible();
     }
 
     const box = (await dialog.locator('.dialog__panel').boundingBox())!;
     const pillBox = (await pill.boundingBox())!;
     if (width > 400) {
-      // A popover hanging from the pill, its right edge on the pill's.
+      // A popover hanging from the tag, its left edge on the tag's.
       expect(box.y).toBeGreaterThanOrEqual(pillBox.y + pillBox.height);
-      expect(Math.abs(box.x + box.width - (pillBox.x + pillBox.width))).toBeLessThan(2);
+      expect(Math.abs(box.x - pillBox.x)).toBeLessThan(2);
     } else {
       // A sheet from below, the whole width.
       expect(Math.round(box.y + box.height)).toBe(height);
@@ -244,7 +256,7 @@ for (const width of [1440, 390] as const) {
     await expect(dialog).toBeHidden();
     await expect(pill).toBeFocused();
 
-    // Removing every token leaves «Everything», with the focus on it and the URL clean.
+    // Removing every token leaves the field unscoped, with the focus on it and the URL clean.
     await pill.click();
     await dialog.getByRole('button', { name: /^Remove / }).first().click();
     await expect(pill).toHaveAccessibleName(/^Scope: [^+]+$/);
@@ -254,3 +266,34 @@ for (const width of [1440, 390] as const) {
     await expect(page).not.toHaveURL(/scope=/);
   });
 }
+
+// ADR-203 § 6: «Save» is an act of the tag; what it saves is the palette's
+// first row with the field empty, marked as the scope on screen.
+test('the tag saves the scope, and the palette lists it first', async ({ page }) => {
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem('e2e-scopes-seeded')) return;
+    localStorage.setItem('hour_scopes', JSON.stringify({ saved: [], recent: [] }));
+    sessionStorage.setItem('e2e-scopes-seeded', '1');
+  });
+  await page.goto(`/h/desk?scope=${FIXTURE_SPACE_TOKEN}`);
+  await waitForLoaded(page);
+
+  await scopedPill(page).click();
+  const dialog = page.getByRole('dialog', { name: 'Scope' });
+  await dialog.getByRole('button', { name: '☆ Save', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: 'Rename', exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  await page.locator('.field__open').click();
+  const palette = searchDialog(page);
+  await expect(palette.locator('.cmdk__group').first()).toHaveText('Saved');
+  await expect(palette.getByRole('option').first()).toHaveAttribute('aria-current', 'true');
+  await page.keyboard.press('Escape');
+
+  // Cleared, the field says everything; a saved scope never enters Recent.
+  await clearScope(page);
+  await expect(everythingPill(page)).toBeFocused();
+  await everythingPill(page).click();
+  await expect(palette.locator('.cmdk__group').filter({ hasText: 'Recent' })).toHaveCount(0);
+  await expect(palette.locator('.cmdk__group').first()).toHaveText('Saved');
+});
