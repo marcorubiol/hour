@@ -38,6 +38,7 @@
   import { stagePlace } from '$lib/travel-stage';
   import { timedStages, type PulseNext } from '$lib/pulse';
   import type { AgendaPoint, DayAgenda } from '$lib/day-agenda';
+  import { rowsSayCity } from '$lib/hoy';
   import { countdownParts, freshnessShown, logisticsLines, mapsHref, minutesTo, telHref, venueCall } from '$lib/ahora';
   import { ahoraRoadsheetQuery, roleFor, type AhoraRoadsheet } from '$lib/ahora-feeds.svelte';
   import { teamQueryOptions } from '$lib/nav-queries';
@@ -111,8 +112,9 @@
     if (w.label) return w.label;
     return w.key ? t(momentWordKey(w.key), locale, undefined, tradeFor(perfWorkspaceId(p.ref.row))) : '';
   }
-  /** Where a point is, small: the venue and city, a stage's route, a date's place. */
-  function place(p: AgendaPoint): string {
+  /** Where a point is, small: the venue and city, a stage's route, a date's place.
+   *  `city: false` leaves the city out (the day's rows in one city, `rowsSayCity`). */
+  function place(p: AgendaPoint, city = true): string {
     const w = p.what;
     if (w.of === 'stage') {
       const route = [stagePlace(w.stage.from_city, w.stage.from_place), stagePlace(w.stage.to_city, w.stage.to_place)].filter(Boolean).join(' → ');
@@ -122,7 +124,7 @@
     }
     const sl = pulseSlip(p.ref, agenda?.day ?? today, slipCtx);
     const title = p.ref.of === 'date' ? (p.ref.row as DateEvent).title : null;
-    return [title && title !== word(p) ? title : null, sl.name !== title ? sl.name : null, sl.city && sl.city !== sl.name ? sl.city : null]
+    return [title && title !== word(p) ? title : null, sl.name !== title ? sl.name : null, city && sl.city && sl.city !== sl.name ? sl.city : null]
       .filter(Boolean)
       .join(' · ');
   }
@@ -150,6 +152,13 @@
     if (!focus) return '';
     if (doing) return agenda?.until ? t('desk.piece_left', locale, { dur: duration(minutesTo(agenda.until, now)) }) : '';
     return focus.at ? inWords(minutesTo(focus.at, now)) : '';
+  });
+  /* The rows say their city only when the day goes through more than one:
+     with one, the line under the title already says it. A leg is a route. */
+  let rowsCity = $derived.by(() => {
+    const a = agenda;
+    if (!a) return false;
+    return rowsSayCity(a.points.filter((p) => p.what.of !== 'stage').map((p) => pulseSlip(p.ref, a.day, slipCtx).city));
   });
   let eye = $derived(focus ? [focus.ref.row.project?.name, t(doing ? 'ahora.title' : 'desk.band_next', locale)].filter(Boolean).join(' · ') : '');
 
@@ -302,7 +311,7 @@
         <ol class="piece__day" data-testid="desk-agenda">
           {#each agenda.points as p, i (p.key)}
             {@const href = rowHref(p)}
-            {@const w = place(p)}
+            {@const w = place(p, rowsCity)}
             <li
               class="piece__row"
               class:piece__row--past={agenda.past[i]}
