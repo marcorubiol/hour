@@ -241,6 +241,19 @@ describe('two or more performances today: none weighs more (ADR-207)', () => {
     expect(piecePerformance(a)?.ref.id).toBe('noon');
   });
 
+  it('during its load-in a performance is not on: the first is still ahead', () => {
+    const loadIn = (id: string, h: string, start: string) =>
+      perf(id, TODAY, mamemi, {
+        start_at: at(start),
+        schedule: [
+          { kind: 'load_in', label: null, at: at(h), ends_at: null },
+          { kind: 'start', label: null, at: at(start), ends_at: null },
+        ],
+      });
+    const s = showsDay(day([loadIn('noon', '09', '11'), night], at('10')))!;
+    expect([s.on, s.ahead?.ref.id, s.begun]).toEqual([null, 'noon', false]);
+  });
+
   it('the actions go to the next to start, not to what the focus is', () => {
     const a = day([noon, night], at('09'), [date('reh', at('08'), avi, { ends_at: at('10') })]);
     expect(a.points[a.focus!].ref.of).toBe('date');

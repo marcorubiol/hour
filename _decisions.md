@@ -7937,6 +7937,8 @@ darle más peso a uno que a otro».
      con `@music` y `@mixed`, ADR-196 y ADR-199).
    - Derecha: todas las horas al mismo tamaño («12h · 21h»); con tres o más, la primera y la última («12h … 22h»).
    - Segunda línea: «first in 2 h 10 min»; mientras suena una, «on now, until 14h». Deja de haber «→ 14h» grande.
+     Suena la función misma, desde su hora propia: durante su carga, su prueba u otro momento de escaleta la pieza
+     no dice «on now» ni «Now», sigue con «first in» / «next in» (Marco, 14-11).
    - Las filas pierden la negrita del foco; con varios proyectos, la fila de la hora propia de cada función dice su
      proyecto en vez de la palabra.
    - Map, Sheet, los datos del bolo y el tablón van a la que suena o a la siguiente que empieza, si no a la última

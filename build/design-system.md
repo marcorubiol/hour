@@ -174,7 +174,8 @@ para el grano, la cursiva es la duda; con papel, el grano la acompaña. El monog
 Con una sola función hoy, el titular de la pieza llena es el proyecto (sin proyecto, la sala y si no la ciudad); la
 palabra del momento baja a la segunda línea con la sala. Con dos o más, la pieza no elige: el titular es el proyecto si
 todas son del mismo, si no «N funciones» en el oficio de sus espacios; todas las horas a la derecha, al mismo tamaño;
-las filas sin el peso del foco.
+las filas sin el peso del foco. Debajo, cuándo empieza la siguiente; «on now» solo mientras suena la función misma, no
+su carga ni su prueba.
 - **Por qué:** con varias compañías, de quién es se lee antes que qué es (regla 7); y con dos funciones, dar más peso
   a una miente sobre el día.
 - **Decisión:** Marco, 14-11: «la A pero si hay más de un show no podemos darle más peso a uno que a otro» (ADR-207).

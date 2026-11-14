@@ -66,9 +66,10 @@ export function rowsSayCity(cities: readonly (string | null | undefined)[]): boo
  * `shows` are each performance at its own hour, in time order; `oneProject`,
  * whether they all belong to one (the headline names it, else counts them);
  * `hours`, what the headline draws on the right: every hour with two, the
- * first and the last with more. `on` is the point of a performance you are
- * in; `ahead`, the next performance to start; `begun`, whether any already
- * did («first in» or «next in»). Dates do not count: a rehearsal beside two
+ * first and the last with more. `on` is the performance you are in, at its
+ * own hour (its load-in or soundcheck is not «on»); `ahead`, the next
+ * performance to start; `begun`, whether any already did («first in» or
+ * «next in»). Dates do not count: a rehearsal beside two
  * shows leaves them two. Null with fewer than two.
  */
 export interface ShowsDay {
@@ -85,9 +86,10 @@ export function showsDay(a: DayAgenda): ShowsDay | null {
   if (shows.length < 2) return null;
   const projects = new Set(shows.map((p) => p.ref.row.project?.id ?? null));
   const timed = shows.filter((p) => p.at !== null);
+  // Only the performance itself is on: its load-in or soundcheck is not (Marco, 14-11).
   const cur = a.current !== null ? a.points[a.current] : null;
-  const on = cur?.ref.of === 'performance' ? cur : null;
-  const begun = a.points.some((p, i) => p.ref.of === 'performance' && (a.past[i] || p === on));
+  const on = cur?.own ? cur : null;
+  const begun = shows.some((p) => p === on || a.past[a.points.indexOf(p)]);
   return {
     shows,
     oneProject: projects.size === 1 && !projects.has(null),
