@@ -7917,3 +7917,44 @@ Apple Maps, como en ADR-146. Un clic con modificador (⌘, Ctrl, el botón centr
 
 **Re-evaluar cuando** alguien pida una cuarta app (Citymapper, OsmAnd) o quiera la preferencia en la cuenta para que
 le siga entre aparatos.
+
+
+## [2026-11-14] ADR-207 · El titular de la pieza de Hoy es de quién; con varias funciones, ninguna pesa más (enmienda ADR-202 § 4)
+
+**Contexto.** El titular de la pieza llena decía la palabra del momento («Show», «Soundcheck»): no qué show era. El
+proyecto solo salía en la sobrelínea, en mono pequeño. Y una opción pintaba su «?» derecho, fuera de la cursiva. Carril
+de diseño del 14-11 con tres opciones (A proyecto, B sala, C palabra con el proyecto debajo):
+https://claude.ai/artifact/TT3VSG3qmpdiZsjd9csq3s . Marco eligió la A: «la A pero si hay más de un show no podemos
+darle más peso a uno que a otro».
+
+**Decidido por Marco.**
+1. **Una función hoy (o ninguna): el titular es el proyecto** del foco. Sin proyecto (un invitado que lee por el
+   bolo), la sala y, si no, la ciudad, como el Planificador. A la derecha, la hora como antes (y «→ 17h» haciendo algo).
+   La segunda línea es la palabra del momento, con su «?» si es una opción, y la sala · ciudad. La sobrelínea, el
+   monograma y «Now» / «Next up», sin el nombre del proyecto.
+2. **Dos o más funciones hoy: ninguna pesa más.** Las fechas que no son función no cuentan.
+   - Titular: el proyecto si todas son del mismo; si no, «N funciones» en el oficio de sus espacios (`desk.shows_n`
+     con `@music` y `@mixed`, ADR-196 y ADR-199).
+   - Derecha: todas las horas al mismo tamaño («12h · 21h»); con tres o más, la primera y la última («12h … 22h»).
+   - Segunda línea: «first in 2 h 10 min»; mientras suena una, «on now, until 14h». Deja de haber «→ 14h» grande.
+     Suena la función misma, desde su hora propia: durante su carga, su prueba u otro momento de escaleta la pieza
+     no dice «on now» ni «Now», sigue con «first in» / «next in» (Marco, 14-11).
+   - Las filas pierden la negrita del foco; con varios proyectos, la fila de la hora propia de cada función dice su
+     proyecto en vez de la palabra.
+   - Map, Sheet, los datos del bolo y el tablón van a la que suena o a la siguiente que empieza, si no a la última
+     (`piecePerformance` en `$lib/hoy`). Cada fila abre su ficha.
+   - Una opción entre varias: cursiva y «?» solo en su fila; el titular no.
+3. **Una opción se inclina entera:** `.guess` en el titular cuando el foco es una opción, y en cada fila un solo
+   `.guess` que abraza palabra, «?» y sitio. La regla pasa a `build/design-system.md` (reglas 18 y 19).
+
+**Cómo.** `showsDay` y `piecePerformance` en `$lib/hoy` (puros, con tests); `AgendaPoint.own` marca la hora propia de
+cada función en `$lib/day-agenda`. La forma de los datos no cambia: sin migración y sin subir `CACHE_SCHEMA`.
+
+**Decidido en la construcción, sin dibujo** (a revisar con Marco): con una función ya pasada, la segunda línea dice
+«next in» en vez de «first in»; una función sin hora no suma hora a la derecha; con varios proyectos, los momentos de
+escaleta (carga, prueba de sonido) y las fechas siguen diciendo su palabra, solo la fila de la hora propia de la
+función dice el proyecto; el recuento de la segunda línea («2 shows · Madrid») cuando el titular es el proyecto,
+como en el dibujo.
+
+**Enmienda a ADR-202 § 4.** «Qué a la izquierda» pasa a «de quién a la izquierda»; la hora al tamaño de la cosa no
+cambia. Fuera: la pieza hueca (`nextWords`) sigue sin nombrar el proyecto; el Planificador y «Coming up», igual.

@@ -236,6 +236,26 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
     await expect(page.locator('#who-goes')).toBeVisible();
   });
 
+  // ADR-207: the headline says whose, an option leans whole (word, «?» and
+  // place in one italic), and with several shows none weighs more.
+  test('the piece: whose in the headline, an option leans whole, several shows weigh the same', async ({ page }) => {
+    await page.goto(DESK);
+    await waitForLoaded(page);
+    const card = page.getByTestId('desk-next');
+    test.skip((await card.count()) === 0, 'Nothing today to draw the piece for.');
+    const what = card.getByTestId('desk-next-what');
+    await expect(what).not.toHaveText(/^(Performance|Show|Concert)\??$/);
+    for (const g of await card.locator('.piece__rowwhat .guess').all()) await expect(g).toContainText('?');
+    if (await what.evaluate((el) => el.classList.contains('guess'))) {
+      await expect(what).not.toContainText('?');
+      await expect(card.locator('.piece__sub .guess')).toContainText('?');
+    }
+    if (/^\d+ (performances|shows|performances and shows)$/.test((await what.innerText()).trim())) {
+      await expect(what).not.toHaveClass(/guess/);
+      await expect(card.locator('.piece__row--on')).toHaveCount(0);
+    }
+  });
+
   // ADR-133: «cobrado» reads payments recorded since the visit, by others only.
   test('the payments feed answers «recorded since, by others»', async ({ page }) => {
     await page.goto(DESK);

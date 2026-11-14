@@ -16,7 +16,7 @@
  */
 import { inScope, type ResolvedScope } from './nav';
 import { perfWorkspaceId, type DateEvent, type PerformanceEvent } from './month-events';
-import { agendaPoints, agendaRows } from './day-agenda';
+import { agendaPoints, agendaRows, type AgendaPoint, type DayAgenda } from './day-agenda';
 import type { PulseInputRows, PulseNext } from './pulse';
 import type { DeskItem } from './desk-feed';
 import { localeDayMonthNear, localeWeekdayLong, localeWeekdayShort } from './datetime';
@@ -59,6 +59,60 @@ export function outsideToday(input: PulseInputRows, scope: ResolvedScope, today:
 export function rowsSayCity(cities: readonly (string | null | undefined)[]): boolean {
   const seen = new Set(cities.map((c) => (c ?? '').trim().toLocaleLowerCase()).filter(Boolean));
   return seen.size > 1;
+}
+
+/**
+ * TWO OR MORE PERFORMANCES TODAY (ADR-207): the piece picks none of them.
+ * `shows` are each performance at its own hour, in time order; `oneProject`,
+ * whether they all belong to one (the headline names it, else counts them);
+ * `hours`, what the headline draws on the right: every hour with two, the
+ * first and the last with more. `on` is the performance you are in, at its
+ * own hour (its load-in or soundcheck is not «on»); `ahead`, the next
+ * performance to start; `begun`, whether any already did («first in» or
+ * «next in»). Dates do not count: a rehearsal beside two
+ * shows leaves them two. Null with fewer than two.
+ */
+export interface ShowsDay {
+  shows: AgendaPoint[];
+  oneProject: boolean;
+  hours: AgendaPoint[];
+  on: AgendaPoint | null;
+  ahead: AgendaPoint | null;
+  begun: boolean;
+}
+
+export function showsDay(a: DayAgenda): ShowsDay | null {
+  const shows = a.points.filter((p) => p.own);
+  if (shows.length < 2) return null;
+  const projects = new Set(shows.map((p) => p.ref.row.project?.id ?? null));
+  const timed = shows.filter((p) => p.at !== null);
+  // Only the performance itself is on: its load-in or soundcheck is not (Marco, 14-11).
+  const cur = a.current !== null ? a.points[a.current] : null;
+  const on = cur?.own ? cur : null;
+  const begun = shows.some((p) => p === on || a.past[a.points.indexOf(p)]);
+  return {
+    shows,
+    oneProject: projects.size === 1 && !projects.has(null),
+    hours: timed.length > 2 ? [timed[0], timed[timed.length - 1]] : timed,
+    on,
+    ahead: shows.find((p) => !a.past[a.points.indexOf(p)] && p !== on) ?? null,
+    begun,
+  };
+}
+
+/**
+ * The performance the piece's actions (Map, Sheet, the facts, the board) are
+ * about. One today: the focus when it is one, else the day's main event.
+ * Several (ADR-207): the one on now or the next to start, else the last.
+ */
+export function piecePerformance(a: DayAgenda): AgendaPoint | null {
+  const shows = a.points.filter((p) => p.own);
+  if (shows.length > 1) {
+    const alive = new Set(a.points.filter((p, i) => !a.past[i] && p.ref.of === 'performance').map((p) => p.ref.id));
+    return shows.find((p) => alive.has(p.ref.id)) ?? shows[shows.length - 1];
+  }
+  const focus = a.focus !== null ? a.points[a.focus] : null;
+  return focus?.ref.of === 'performance' ? focus : (a.points.find((p) => p.main) ?? null);
 }
 
 /** How far «Coming up» reaches, and how much it draws (ADR-202 § 6). */

@@ -6,14 +6,17 @@ import {
   nextAfterToday,
   nextWhen,
   outsideToday,
+  piecePerformance,
   pulseRowInScope,
   rowsSayCity,
   scopePulseInput,
+  showsDay,
   waitingPills,
   waitingRowCount,
 } from './hoy';
 import { resolveScope, type NavLine, type NavProject, type NavWorkspace } from './nav';
 import { upcoming } from './pulse';
+import { dayAgenda } from './day-agenda';
 import type { DateEvent, PerformanceEvent } from './month-events';
 import type { DeskItem } from './desk-feed';
 
@@ -199,5 +202,61 @@ describe('the day\'s rows say their city only across cities', () => {
   it('rows without a city do not count', () => {
     expect(rowsSayCity([null, undefined, '', 'Girona'])).toBe(false);
     expect(rowsSayCity([])).toBe(false);
+  });
+});
+
+describe('two or more performances today: none weighs more (ADR-207)', () => {
+  const at = (h: string) => `${TODAY}T${h}:00:00Z`;
+  const day = (performances: PerformanceEvent[], now: string, dates: DateEvent[] = []) =>
+    dayAgenda({ performances, dates, viewerTz: TZ }, TODAY, new Date(now));
+  const noon = perf('noon', TODAY, mamemi, { start_at: at('11') });
+  const night = perf('night', TODAY, mamemi, { start_at: at('20') });
+
+  it('one performance, the focus speaks; a rehearsal beside it does not count', () => {
+    expect(showsDay(day([night], at('09'), [date('reh', at('10'))]))).toBeNull();
+  });
+
+  it('two of one project: their hours, the first ahead, nothing begun', () => {
+    const s = showsDay(day([night, noon], at('09')))!;
+    expect(s.shows.map((p) => p.ref.id)).toEqual(['noon', 'night']);
+    expect(s.oneProject).toBe(true);
+    expect(s.hours.map((p) => p.ref.id)).toEqual(['noon', 'night']);
+    expect([s.on, s.ahead?.ref.id, s.begun]).toEqual([null, 'noon', false]);
+  });
+
+  it('two projects: not one project', () => {
+    expect(showsDay(day([noon, perf('other', TODAY, avi, { start_at: at('20') })], at('09')))!.oneProject).toBe(false);
+  });
+
+  it('three or more: the first and the last hour', () => {
+    const s = showsDay(day([noon, night, perf('mid', TODAY, mamemi, { start_at: at('16') })], at('09')))!;
+    expect(s.shows).toHaveLength(3);
+    expect(s.hours.map((p) => p.ref.id)).toEqual(['noon', 'night']);
+  });
+
+  it('while one is on: it is the one on, it has begun, and the actions follow it', () => {
+    const a = day([noon, night], at('12'));
+    const s = showsDay(a)!;
+    expect([s.on?.ref.id, s.begun]).toEqual(['noon', true]);
+    expect(piecePerformance(a)?.ref.id).toBe('noon');
+  });
+
+  it('during its load-in a performance is not on: the first is still ahead', () => {
+    const loadIn = (id: string, h: string, start: string) =>
+      perf(id, TODAY, mamemi, {
+        start_at: at(start),
+        schedule: [
+          { kind: 'load_in', label: null, at: at(h), ends_at: null },
+          { kind: 'start', label: null, at: at(start), ends_at: null },
+        ],
+      });
+    const s = showsDay(day([loadIn('noon', '09', '11'), night], at('10')))!;
+    expect([s.on, s.ahead?.ref.id, s.begun]).toEqual([null, 'noon', false]);
+  });
+
+  it('the actions go to the next to start, not to what the focus is', () => {
+    const a = day([noon, night], at('09'), [date('reh', at('08'), avi, { ends_at: at('10') })]);
+    expect(a.points[a.focus!].ref.of).toBe('date');
+    expect(piecePerformance(a)?.ref.id).toBe('noon');
   });
 });

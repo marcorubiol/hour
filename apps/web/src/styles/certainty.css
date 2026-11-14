@@ -26,6 +26,12 @@
     also has a BOX may add the dotted outline offset off its edge — that is
     geometry the box owns, and CarrilsStrip's `.board__slot--inf` is where
     it lives. Everything else opts in with `class="guess"`.
+
+    AN OPTION LEANS with the same italic (design-system rule 18, ADR-207):
+    a hold or a proposal, drawn without paper for the grain, says its doubt
+    in its words. One `.guess` holds the word, its «?» and its place, so
+    the «?» never stands upright beside a leaning word. The slip's own kind
+    word (`.slip__kind--q`) is that rule inside the slip.
   */
   .guess {
     font-style: italic;
