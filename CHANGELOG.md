@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Noviembre 2026 (en curso)
 
+- «Abrir mapas con», en Ajustes › Perfil, es ahora un desplegable en vez de tres botones; la pieza hueca de Hoy dice el año de lo siguiente cuando no está cerca; fuera el motor muerto de «Ahora» (151 y 152, 2026-11-14, `9bf89797`). Sin migración. De paso, limpieza del espacio `playwright` en producción, tras el backup 43595639030: 2.899 conversaciones, 2.370 personas y 2.160 organizaciones borradas; quedan 99, 1.008 y 1.009.
 - «Lo que viene» en el móvil son cuatro fichas de día como mucho y una última, «Planner →», que abre el Planificador; en escritorio, hasta diez (ADR-205, 2026-11-14, `4cf7b2c4`).
 - «Mapa» abre la app de mapas que prefieres: la primera vez pregunta con «Abrir con» (Apple Maps, Google Maps o Waze) y recuerda la elección en ese dispositivo; se cambia en Ajustes › Perfil, «Abrir mapas con», y la hoja de ruta dice «Abre en X · Cambiar» (ADR-206, 2026-11-14, `4cf7b2c4`).
 - Arreglo: con un solo espacio personal, la página se montaba dos veces en cada carga completa, así que «Ha cambiado» salía vacío y abrir con `?importar` perdía el diálogo. Una sección ya pintada ya no se quita por una espera, y Hoy solo da por vista tu visita si llegó a enseñarte los cambios (2026-11-14, `652db702`).

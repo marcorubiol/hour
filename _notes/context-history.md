@@ -865,3 +865,11 @@ Líneas de suites antiguas:
 - Suites contra `63356312` (2026-11-04): RLS 562, con 3 rojos en `conversation-feed` por el 123, arreglados en `abd1a42b` y 9/9; E2E 174 ok, 4 rojos, 17 saltados: 3 intermitentes verdes al repetir; `open-speed:123` (frío 12,3 s frente a 9 s) sigue rojo, con la red inestable ese día.
 - E2E del 115 y el 117 contra `bb5f518e` (2026-11-04): 21/21 (sheet-mirror, conversation-write, acquaintance, organization-record, person, scope-url, tags). RLS 559/559 tras la migración del 100.
 - Últimas suites contra producción, contra `16e87b79` (2026-11-03): RLS 558/558 (el test del feed, corregido en `a5c2b567`); E2E 167 ok, 8 rojos, 17 saltados, 3 sin correr; 5 rojos intermitentes por red o tiempo, verdes al repetir; los otros, specs atrasados, puestos al día en `a5c2b567` y `70673fc2` y verdes contra producción. Los specs del público necesitan `.env` además de `.env.test`. No prestar `.playwright/auth.json` a otro carril mientras corre la suite. Por `hour-web.marco-rubiol.workers.dev`.
+
+## Producción hasta el SHA `4cf7b2c4` (sacado de `_context.md` el 2026-11-14)
+
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`4cf7b2c4`**, `dirty:false`, builtAt
+  2026-11-14T11:58Z, Worker 91ff14b2. Lleva los cuatro deploys del 14-11 (`CHANGELOG.md`), sin migraciones: Hoy
+  (`c10bab29`), el marco (`c4257ecf`), remontaje y presencia (`652db702`), ADR-205/206 (`4cf7b2c4`).
+- Última suite entera: contra `652db702`, 0 rojos estables (los de una caída de red, verdes al repetir). Contra
+  `4cf7b2c4`, E2E de 7 specs: 25 ok, 1 saltado, `help:83` verde al repetir. RLS completa: 608/609 el 10-11.

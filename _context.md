@@ -33,11 +33,12 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
 ## Producción (verificado 2026-11-14)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`4cf7b2c4`**, `dirty:false`, builtAt
-  2026-11-14T11:58Z, Worker 91ff14b2. Lleva los cuatro deploys del 14-11 (`CHANGELOG.md`), sin migraciones: Hoy
-  (`c10bab29`), el marco (`c4257ecf`), remontaje y presencia (`652db702`), ADR-205/206 (`4cf7b2c4`).
-- Última suite entera: contra `652db702`, 0 rojos estables (los de una caída de red, verdes al repetir). Contra
-  `4cf7b2c4`, E2E de 7 specs: 25 ok, 1 saltado, `help:83` verde al repetir. RLS completa: 608/609 el 10-11.
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`9bf89797`**, `dirty:false`, builtAt
+  2026-11-14T14:29Z, Worker 650859d0. Cinco deploys del 14-11 (`CHANGELOG.md`), sin migraciones; el último: mapas
+  como desplegable, 151 y 152.
+- Última suite, contra `9bf89797`, E2E de 9 specs (desk, ahora, smoke, calm, help, roadsheet-technician, settings,
+  tags y facetas): 40 ok, 1 saltado (`desk:224`), 1 rojo estable: `smoke:30`, porque `zzz-difusion`
+  quedó sin conversaciones tras la limpieza de `playwright`. RLS completa: 608/609 el 10-11.
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free con keepalive diario
   (`keepalive.yml`); Pro antes de la beta (`_tasks.md § 9`). Si falla tras días sin uso: `dig <ref>.supabase.co`.
