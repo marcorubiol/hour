@@ -78,11 +78,11 @@ export function cssLengthPx(value: string, rootPx: number): number {
   return m[2] === 'rem' || m[2] === 'em' ? n * rootPx : n;
 }
 
-/** Where a pull may not start: a dialog or the drawer, a field, a toggle. */
+/** Where a pull may not start: a dialog, a field, a toggle. */
 const OWN_GESTURE =
-  'dialog, [role="dialog"], [aria-modal="true"], .drawer, input, textarea, select, [contenteditable]:not([contenteditable="false"])';
+  'dialog, [role="dialog"], [aria-modal="true"], input, textarea, select, [contenteditable]:not([contenteditable="false"])';
 /** Open somewhere on screen, it owns every touch. */
-const OPEN_OVERLAY = 'dialog[open], [aria-modal="true"], .drawer[data-open]';
+const OPEN_OVERLAY = 'dialog[open], [aria-modal="true"]';
 
 /**
  * Whether a touch on `target` belongs to something else: an open overlay,

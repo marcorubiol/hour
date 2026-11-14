@@ -28,6 +28,7 @@
   import { fetchJSON, mutateJSON, ApiError } from '$lib/api';
   import { addToast } from '$lib/components/Toast.svelte';
   import { lazy } from '$lib/lazy.svelte';
+  import { scopeDoor } from '$lib/scope-door';
   import LensHeader from '$lib/components/LensHeader.svelte';
   import FirstVisitCard from '$lib/components/FirstVisitCard.svelte';
   import StartList from '$lib/components/desk/StartList.svelte';
@@ -237,6 +238,9 @@
   let agendaOn = $derived(agendaDay(pulseInput, clockNow));
   let agenda = $derived(agendaOn ? dayAgenda(pulseInput, agendaOn, clockNow) : null);
   let todayPoints = $derived(agendaPoints(pulseInput, today));
+  // The line of what the scope leaves out takes the scope off (ADR-202 § 14):
+  // the frame's field owns clearing it, the line borrows its door.
+  const door = scopeDoor();
   /** «1 más hoy fuera de MaMeMi»: what of yours today the scope leaves out. */
   let outsideLine = $derived.by(() => {
     if (scope.isEmpty || scopeUnresolved || !feeds.axisSettled) return null;
@@ -855,10 +859,8 @@
 
 <div class="desk" class:desk--calm={calm.on} aria-busy={busy}>
   <!-- The lens heading, heard and not seen: the piece says the day (ADR-203 § 1). -->
-  {#snippet title()}
-    <span class="visually-hidden">{t('lens.desk', locale)}</span>
-  {/snippet}
-  <LensHeader help="desk" {title} />
+  {#snippet title()}{t('lens.desk', locale)}{/snippet}
+  <LensHeader help="desk" heard {title} />
 
   <!-- 121 B (ADR-183): a late technician comes first, while nobody marked
        «Visto». A notice is never scoped (ADR-202 § 14). -->
@@ -908,6 +910,7 @@
           todayHad={hadToday}
           next={nextThing}
           outside={outsideLine}
+          onclearscope={door?.clear}
           now={clockNow}
           workspaces={feeds.workspaces}
           settled={feeds.settled && !scopeUnresolved}

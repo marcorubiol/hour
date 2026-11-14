@@ -1,12 +1,11 @@
 /**
- * The scope's door, for the lens head (ADR-152, amending ADR-145 § 5). The
- * scope is one pill in each lens's title row (`ScopePill`, drawn by
- * `LensHeader`): «Todo» unscoped, the name of what is scoped otherwise. What
- * the scope does (the palette, the names of its tokens, save, update, clear)
- * lives in the /h layout, which owns the pins' companions (the nav caches,
- * the saved scope being edited); the layout hands it down here, so the head
- * does not reach into the shell. Since tarea 132 the pill is the scope's only
- * door: the rail no longer lists «Todo», the saved scopes or the recents.
+ * The scope's door (ADR-202 § 12, superseding ADR-152's pill). The scope is
+ * a tag inside the frame's one field (`ShellField` › `ScopeTag`): the name of
+ * what is scoped and its ×. What the scope does (the palette as a filter,
+ * the names of its tokens, save, update, clear) lives in the /h layout,
+ * which owns the pins' companions (the nav caches, the saved scope being
+ * edited); the layout hands it down here, so nothing reaches into the shell.
+ * Hoy's «N más hoy fuera de…» borrows `clear` (ADR-202 § 14).
  */
 import { getContext, setContext } from 'svelte';
 import type { PinKind } from '$lib/stores/pins.svelte';
@@ -14,7 +13,7 @@ import type { Scope } from '$lib/stores/scopes.svelte';
 
 export interface ScopeDoor {
   /** The palette as a filter («Ver solo…», ADR-178), seeded with the pins:
-      «+ añadir», and «Todo»'s door. The bar and ⌘K open it as a search. */
+      the tag's «+ añadir». The field and ⌘K open it as a search. */
   openPalette: () => void;
   /** Token → display, over the layout's nav caches (they feed its
       scopeAutoName too). */
@@ -30,10 +29,6 @@ export interface ScopeDoor {
   update: () => void;
   /** Clear = abandoning the working combo too (it enters Recent). */
   clear: () => void;
-  /** A saved or recent scope, applied whole (tarea 132: the rail's lists
-      live in the pill's dialog now). The layout keeps which saved scope is
-      being edited, so applying goes through it. */
-  apply: (s: Scope) => void;
 }
 
 const KEY = Symbol('scope-door');
@@ -48,9 +43,10 @@ export function scopeDoor(): ScopeDoor | undefined {
 }
 
 /**
- * What the pill says: the name of the first thing scoped, never a different
+ * What the tag says: the name of the first thing scoped, never a different
  * level («Txema Muñoz», «Gota», a line, a person), and «+N» for the rest
- * («Txema Muñoz +1»). Null when nothing is scoped (the pill says «Todo»).
+ * («Txema Muñoz +1»). Null when nothing is scoped (no tag; the field says
+ * «Buscar en todo»).
  */
 export function scopePillLabel(tokens: readonly string[], label: (tok: string) => string): string | null {
   if (tokens.length === 0) return null;

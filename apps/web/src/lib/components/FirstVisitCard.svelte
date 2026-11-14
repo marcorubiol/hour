@@ -3,7 +3,7 @@
    * FirstVisitCard: la tarjeta de bienvenida de una sección (ayuda contextual,
    * enfoque A). Dentro de la página, arriba, la primera vez: qué responde la
    * sección, «Entendido» y, si hay pasos, «Enséñame». Sale una vez por persona
-   * (`help_seen`) y vuelve con el «?» de la cabecera (`LensHeader`).
+   * (`help_seen`) y vuelve con el «?» del menú de la cuenta (ADR-203 § 1).
    *
    * «Enséñame» es el `Spotlight`: tres pasos como mucho sobre los bloques
    * marcados con `data-help-step`. Un paso cuyo bloque no está dibujado se
@@ -63,8 +63,14 @@
   function done() {
     tour = null;
     markHelpSeen(key);
-    // Back to the «?» that brings it back, so the keyboard is not dropped on the body.
-    tick().then(() => document.getElementById(`help-${section}`)?.focus({ preventScroll: true }));
+    // Back to the account menu, whose «?» brings it back (ADR-203 § 1), so
+    // the keyboard is not dropped on the body: the one on screen (the top
+    // bar's on a phone, the rail's beside it).
+    tick().then(() =>
+      [...document.querySelectorAll<HTMLElement>('[data-help-return]')]
+        .find((el) => el.offsetParent !== null)
+        ?.focus({ preventScroll: true }),
+    );
   }
 </script>
 

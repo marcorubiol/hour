@@ -1,16 +1,16 @@
 <script lang="ts">
   /**
-   * App shell — Scope v2. Scope is PINS in a store, built from each lens's
-   * scope pill (its saved scopes and recents since tarea 132, when they left
-   * the rail) and the ⌘K scope builder —
-   * the manual pin UI (card chips, breadcrumb pin, ScopeStrip) died
-   * 2026-07-17. Applying a scope from a non-lens surface lands on /h/desk.
-   * The top bar is the ⌘K search · the sections (LensSwitcher, ADR-140,
-   * against the right edge since the 20-10 amendment). The account menu and
-   * the presence live at the foot of the rail; on a phone the bar is the
-   * rail's door · the search · the account, and the sections go to a bar
-   * at the foot. The rail's clock is the way home: the Desk
-   * (ADR-137, /h redirects).
+   * App shell — Scope v2. Scope is PINS in a store, built from the frame's
+   * one field (ADR-202 § 12: what is scoped is a tag inside it, the saved
+   * scopes and the recents are the palette's first rows) and the ⌘K scope
+   * builder — the manual pin UI (card chips, breadcrumb pin, ScopeStrip)
+   * died 2026-07-17. Applying a scope from a non-lens surface lands on /h/desk.
+   * The top bar is the field · the sections (LensSwitcher, ADR-140, against
+   * the right edge since the 20-10 amendment). The account menu and the
+   * presence live at the foot of the rail. On a phone there is no rail: the
+   * bar is two rows (ADR-203 § 1), the clock with the date, calm and the
+   * account, then the field the whole width; the sections go to a bar at the
+   * foot. The clock is the way home: Hoy (ADR-137, /h redirects).
    *
    * Settings stays a "mode" of the shell: when inside /settings a slim
    * <SettingsNav> aside returns, so the settings surface is unaffected.
@@ -28,16 +28,18 @@
   import { afterNavigate, goto, replaceState } from '$app/navigation';
   import { env } from '$env/dynamic/public';
   import type { Snippet } from 'svelte';
-  import { onDestroy, onMount, tick, untrack } from 'svelte';
+  import { onDestroy, onMount, untrack } from 'svelte';
   import { toStore } from 'svelte/store';
   import SettingsNav from '$lib/components/SettingsNav.svelte';
   import PresenceBadge from '$lib/components/PresenceBadge.svelte';
   import BrandMark from '$lib/components/BrandMark.svelte';
   import AccountMenu from '$lib/components/shell/AccountMenu.svelte';
   import ScopeRail from '$lib/components/shell/ScopeRail.svelte';
+  import ShellField from '$lib/components/shell/ShellField.svelte';
+  import CalmMark from '$lib/components/shell/CalmMark.svelte';
   import PullRefresh from '$lib/components/shell/PullRefresh.svelte';
   import { isReservedWorkspaceSlug } from '$lib/reserved-slugs';
-  import { appLocale, setTrade, setWorkspaceTrades, t, tradeOf } from '$lib/i18n';
+  import { appLocale, LOCALE_TAG, setTrade, setWorkspaceTrades, t, tradeOf } from '$lib/i18n';
   import { setSeasonStarts } from '$lib/season-start.svelte';
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
   import { lensesOnFor, lensOn, routedLensOf, setLensesOn } from '$lib/lenses.svelte';
@@ -46,9 +48,9 @@
   import PeekHost from '$lib/components/peek/PeekHost.svelte';
   import { provideCalm } from '$lib/stores/calm.svelte';
   import { providePins, parsePin, type PinKind } from '$lib/stores/pins.svelte';
-  import { provideScopeDoor } from '$lib/scope-door';
+  import { provideScopeDoor, type ScopeDoor } from '$lib/scope-door';
   import { scopeUrlToWrite } from '$lib/scope-url';
-  import { provideScopes, sameSet as scopesSameSet, type Scope } from '$lib/stores/scopes.svelte';
+  import { provideScopes, sameSet as scopesSameSet } from '$lib/stores/scopes.svelte';
   import { provideCreation } from '$lib/stores/creation.svelte';
   import { lazy } from '$lib/lazy.svelte';
   import { START_QUERY_KEY, startQueryOptions } from '$lib/first-day-query';
@@ -151,7 +153,7 @@
   const pins = providePins();
   const scopes = provideScopes();
   const creation = provideCreation();
-  // Calm lives in the shell (the toggle sits by the clock); the Desk consumes it.
+  // Calm lives in the shell (its mark sits by the clock, or by the account on a phone); each lens consumes it.
   const calm = provideCalm();
   let calmRestored = $state(false);
   let calmSeen: boolean | null = null;
@@ -238,7 +240,7 @@
     workspaceSlug || homeWorkspace(($workspacesQuery.data?.items ?? []) as NavWorkspace[])?.slug || '',
   );
 
-  // ── Scope model (pins → resolved scope) for the scope pill + sidebar ──
+  // ── Scope model (pins → resolved scope) for the field's tag and the palette ──
   const projectsQuery = createQuery(activeProjectsQueryOptions());
   const linesQuery = createQuery(allLinesQueryOptions());
   let wsItems = $derived(($workspacesQuery.data?.items ?? []) as unknown as NavWorkspace[]);
@@ -375,19 +377,6 @@
    *  in place. */
   function landOnScopedLens() {
     if (!routedLens) void goto(`/h/${lensOn(lens.current) ? lens.current : 'desk'}`);
-  }
-
-  function applyScope(s: Scope) {
-    rememberWorkingScope(s.tokens);
-    pins.set(s.tokens);
-    // A scope click must SHOW the scoped view: from a lens, the lens just
-    // refilters in place; from anywhere else it lands on a lens.
-    landOnScopedLens();
-    // If it's a saved scope, it becomes the base being edited; else no base.
-    editingBaseTokens = scopes.saved.some((x) => scopesSameSet(x.tokens, s.tokens))
-      ? [...s.tokens]
-      : null;
-    if (s.tokens.length) scopes.remember(s.name, s.tokens);
   }
 
   function saveCurrentScope() {
@@ -582,15 +571,16 @@
     if (next) replaceState(next, {});
   });
 
-  // ⌘K — one palette, two doors (ADR-178): the top bar and ⌘K
-  // SEARCH (a row opens its record, «acotar» is the aside); the scope pill
-  // FILTERS («Ver solo…», the builder, Apply sets the pins).
+  // ⌘K — one palette, two doors (ADR-178): the frame's field and ⌘K
+  // SEARCH (a row opens its record, «acotar» is the aside; with nothing
+  // typed, the saved scopes and the recents come first, ADR-203 § 6); the
+  // scope tag's «+ añadir» FILTERS («Ver solo…», the builder, Apply sets
+  // the pins).
   let paletteOpen = $state(false);
   let paletteMode = $state<'search' | 'filter'>('search');
-  // What the palette's BUILDING bar starts with. Opening from the scope pill
-  // (+ add / + narrow) seeds it with the current filters (you're adding to the
-  // scope); opening from the command bar (⌘K, top search, browse & combine)
-  // starts EMPTY — a fresh scope from zero. Reset on close so ⌘K is always
+  // What the palette's BUILDING bar starts with. Opening from the scope tag
+  // (+ add) seeds it with the current filters (you're adding to the scope);
+  // opening from the field or ⌘K starts EMPTY — a fresh scope from zero. Reset on close so ⌘K is always
   // fresh regardless of the previous open.
   let paletteSeed = $state<string[]>([]);
   $effect(() => {
@@ -706,20 +696,11 @@
     if (perf.slug) await goto(`/h/${ws}/performance/${perf.slug}`);
   }
 
-  // ── The rail on a phone (base.css § Drawer) ──────────────────────────
-  // Below 48rem the rail cannot sit beside the page (it alone is 232px of
-  // a 390px screen), so it leaves the flow and the top bar's empty left
-  // cell gets the one button that brings it out: the clock. Since tarea 140
-  // it comes out as a short sheet hanging from that clock, as tall as what
-  // it holds. Same rail, same contents, same order: the date that goes
-  // home, calm, the pulse. On a desktop the button is not drawn and
-  // `railOpen` is never true.
-
   // ── The shell's clock ───────────────────────────────────────────────
   // ONE timer for the whole shell: the rail draws it with the date and feeds
-  // the pulse from it; on a phone the top bar draws the same face as the
-  // rail's door. Re-renders exactly on the minute (it shows HH:MM), which
-  // also rolls the date over at midnight.
+  // the pulse from it; on a phone, where there is no rail, the top bar draws
+  // it with the date beside it (ADR-202 § 10). Re-renders exactly on the
+  // minute (it shows HH:MM), which also rolls the date over at midnight.
   let clockNow = $state(new Date());
   $effect(() => {
     let timer: ReturnType<typeof setTimeout>;
@@ -744,56 +725,22 @@
     }).format(clockNow),
   );
 
-  let railOpen = $state(false);
-  let menuButtonEl = $state<HTMLButtonElement | null>(null);
-  // Where the sheet hangs: under the door, its first line under the clock's
-  // digits. Measured on opening; the bar is sticky, so it does not move
-  // while the sheet is out.
-  let railSheetTop = $state<string | undefined>();
-  let railSheetStart = $state<string | undefined>();
-  let railWidthAtOpen = 0;
-  function openRail() {
-    railWidthAtOpen = window.innerWidth;
-    if (menuButtonEl) {
-      const door = menuButtonEl.getBoundingClientRect();
-      const face = menuButtonEl.querySelector('.clock-face')?.getBoundingClientRect() ?? door;
-      railSheetTop = `${door.bottom}px`;
-      railSheetStart = `${face.left}px`;
-    }
-    railOpen = true;
-    // Into the sheet, so the keyboard and a screen reader land where the
-    // eye does: the way home, its first control.
-    void tick().then(() =>
-      document.getElementById('shell-rail')?.querySelector<HTMLElement>('a, button')?.focus(),
-    );
-  }
-  function closeRail({ returnFocus = false } = {}) {
-    if (!railOpen) return;
-    railOpen = false;
-    if (returnFocus) menuButtonEl?.focus();
-  }
-  // Tab out of the sheet and it folds away, as a menu does: what has focus
-  // is no longer in it, and the keyboard goes on from there.
-  function onRailFocusOut(e: FocusEvent) {
-    if (!railOpen) return;
-    const rail = document.getElementById('shell-rail');
-    const next = e.relatedTarget as Node | null;
-    if (!rail?.contains(e.target as Node) || !next) return;
-    if (rail.contains(next) || menuButtonEl?.contains(next)) return;
-    closeRail();
-  }
-  // Anything that goes somewhere closes it: the clock, a line of the pulse.
-  afterNavigate(() => closeRail());
+  // The phone's clock is a piece with the date (ADR-202 § 10, design-system
+  // rule 5): the weekday over the day and month, in two lines beside it.
+  let clockWeekday = $derived(new Intl.DateTimeFormat(LOCALE_TAG[locale], { weekday: 'long' }).format(clockNow));
+  let clockDay = $derived(
+    `${clockNow.getDate()} ${new Intl.DateTimeFormat(LOCALE_TAG[locale], { month: 'short' }).format(clockNow).replace(/\.$/, '')}`,
+  );
 
-  /** Clear from the scope pill = abandoning the working combo too. */
+  /** Clear from the scope tag = abandoning the working combo too. */
   function clearScope() {
     rememberWorkingScope();
     pins.set([]);
   }
 
-  // THE SCOPE IS A PILL IN THE LENS'S TITLE ROW (ADR-152): the lens head
-  // draws it, and what it does lives here, beside the pins' companions.
-  provideScopeDoor({
+  // THE SCOPE IS A TAG IN THE FRAME'S FIELD (ADR-202 § 12): the field draws
+  // it, and what it does lives here, beside the pins' companions.
+  const scopeDoorValue: ScopeDoor = {
     openPalette: openPaletteAdd,
     tokenLabel,
     tokenAccent,
@@ -808,23 +755,13 @@
     save: saveCurrentScope,
     update: updateScope,
     clear: clearScope,
-    apply: applyScope,
-  });
+  };
+  provideScopeDoor(scopeDoorValue);
 </script>
 
 <!-- Tab close / hard navigation away: the working combo registers before
      the page dies (remember() persists synchronously to localStorage). -->
-<svelte:window
-  onpagehide={() => rememberWorkingScope()}
-  onresize={() => {
-    // A turned phone moves the door; the bar folding on scroll only changes the height.
-    if (window.innerWidth !== railWidthAtOpen) closeRail();
-  }}
-  onkeydown={(e) => {
-    if (e.key === 'Escape' && railOpen) closeRail({ returnFocus: true });
-    onPaletteKey(e);
-  }}
-/>
+<svelte:window onpagehide={() => rememberWorkingScope()} onkeydown={onPaletteKey} />
 
 <!-- ADR-158: a crash while painting data restored from the device (a shape
      CACHE_SCHEMA should have caught) wipes it and reloads once. Any other
@@ -835,13 +772,7 @@
   }}
 >
 {#if authChecked && !blocked}
-  <div
-    class="shell"
-    class:shell--settings={inSettings}
-    style:--rail-sheet-top={railSheetTop}
-    style:--rail-sheet-start={railSheetStart}
-    onfocusout={onRailFocusOut}
-  >
+  <div class="shell" class:shell--settings={inSettings}>
     <!-- THE FIRST STOP SKIPS THE CHROME (móvil #8, WCAG 2.4.1): twenty stops of
          search, account, rail and scope stood before the first day. Unseen
          until focused. -->
@@ -853,41 +784,19 @@
            can never change and can never be acted on. The door it was is not
            lost: the CLOCK is the way home now, which is the object at the top
            of the rail that already says «here, now». -->
-      <div class="shell__left">
-        <!-- Only a phone draws it (see .shell__menu): there the rail is a
-             short sheet hanging from this clock, its door (Marco, 2026-10-10;
-             the sheet, tarea 140). Inside it the date goes home. -->
-        <button
-          type="button"
-          class="shell__menu"
-          bind:this={menuButtonEl}
-          aria-label={t(railOpen ? 'shell.menu_close' : 'shell.menu_open', locale)}
-          aria-controls="shell-rail"
-          aria-expanded={railOpen}
-          onclick={() => (railOpen ? closeRail() : openRail())}
-        >
-          <time class="clock-face" datetime={clockTime}>{clockTime}</time>
-          <!-- The clock is the door, and nothing said so (móvil #11): the
-               caret the app already uses for «this opens» (the status menu,
-               the decisions toggle), after the time, so the sheet's first
-               line starts under the digits. -->
-          <span class="shell__menu-caret" aria-hidden="true">{railOpen ? '▴' : '▾'}</span>
-        </button>
-      </div>
+      <!-- THE CLOCK, ON A PHONE (ADR-202 § 10): the time big, the weekday
+           and the date beside it as one piece, and no word «Hoy». It opens
+           nothing; pressing it goes to Hoy. Beside the rail it is the rail's. -->
+      <a class="shell__now" href="/h/desk" aria-label={t('lens.desk', locale)}>
+        <time class="shell__clock" datetime={clockTime}>{clockTime}</time>
+        <span class="shell__date" aria-hidden="true"><b>{clockWeekday}</b><span>{clockDay}</span></span>
+      </a>
 
-      <button
-        type="button"
-        class="shell__search"
-        onclick={openPaletteFresh}
-        aria-label={t('shell.search_aria', locale)}
-      >
-        <svg viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
-          <circle cx="6.2" cy="6.2" r="4.2" />
-          <path d="M9.4 9.4 12 12" />
-        </svg>
-        <span class="shell__search-label">{t('shell.search_label', locale)}</span>
-        <kbd class="kbd">⌘K</kbd>
-      </button>
+      <!-- Search and scope, one field (ADR-202 § 12): the whole width on a
+           phone, the bar's left on a desktop. -->
+      <div class="shell__search">
+        <ShellField door={scopeDoorValue} onopen={openPaletteFresh} />
+      </div>
 
       <!-- The sections (ADR-140), against the right edge of the page since
            the 20-10 amendment. On a phone the same nav leaves the bar and is
@@ -896,22 +805,18 @@
         <LensSwitcher />
       </div>
 
-      <!-- You, in the top bar only on a phone: beside the rail you live at
-           its foot (the `me` snippet below). Never both on screen. -->
+      <!-- Calm and you, in the top bar only on a phone: beside the rail they
+           live in it (the clock's calm, the `me` snippet below). Never both
+           on screen. -->
       <div class="shell__right">
+        <CalmMark />
         <PresenceBadge count={networkPresence?.count ?? null} />
 
         <AccountMenu {workspaceSlug} {menuWorkspaceSlug} {inSettings} {rememberWorkingScope} />
       </div>
     </header>
 
-    <ScopeRail
-      open={railOpen}
-      onclose={() => closeRail({ returnFocus: true })}
-      {clockNow}
-      {clockTime}
-      {inSettings}
-    >
+    <ScopeRail {clockNow} {clockTime} {inSettings}>
       {#snippet me()}
         <AccountMenu
           {workspaceSlug}
@@ -1147,18 +1052,14 @@
     backdrop-filter: blur(8px); /* material */
   }
 
-  /* The door and you: a phone's only (see the media query below). */
-  .shell__left {
-    grid-area: door;
-    justify-self: start;
+  /* The clock and you: a phone's only (see the media query below). */
+  .shell__now,
+  .shell__right {
     display: none;
-    align-items: center;
-    min-inline-size: 0;
   }
   .shell__right {
     grid-area: me;
     justify-self: end;
-    display: none;
     align-items: center;
     gap: var(--space-s);
     min-inline-size: 0;
@@ -1170,56 +1071,16 @@
     min-inline-size: 0;
   }
 
-
+  /* The field's cell: the bar's left on a desktop, never wider than a
+     search wants to be; the whole width on a phone (below). */
   .shell__search {
     grid-area: search;
-    justify-self: start;
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-s);
+    display: grid;
     inline-size: min(24rem, 100%);
     min-inline-size: 0;
-    /* It measures itself: it says what it is while there is room, and
-       keeps the lens alone at the end (container queries below). */
-    container: shellsearch / inline-size;
-    padding-block: var(--space-xs);
-    padding-inline: var(--space-m) var(--space-s);
-    border: var(--line-hairline) solid var(--border-color-dark);
-    border-radius: var(--radius-circle);
-    background: var(--bg-ultra-light);
-    color: var(--text-faint);
-    cursor: text;
-    font-family: inherit;
-    transition: border-color var(--transition);
-  }
-  .shell__search:hover {
-    border-color: var(--text-muted);
-  }
-  .shell__search-label {
-    flex: 1;
-    min-inline-size: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    text-align: start;
-    font-size: var(--text-s);
-    color: var(--text-faint);
-  }
-  @container shellsearch (max-width: 14rem) {
-    .shell__search .kbd {
-      display: none;
-    }
-  }
-  @container shellsearch (max-width: 7rem) {
-    .shell__search-label {
-      display: none;
-    }
-    .shell__search svg {
-      margin-inline: auto;
-    }
   }
   /* Wide, the rail's cut (64rem, $lib/breakpoints). A tablet with the rail beside it (48–64rem): the sections take most of
-     the bar, so the search keeps what is left, never less than its lens. */
+     the bar, so the field keeps what is left, never less than its lens. */
   @media (min-width: 48rem) and (max-width: 63.999rem) {
     .shell__top {
       gap: var(--space-s);
@@ -1254,52 +1115,41 @@
     }
   }
 
-  /* The rail's door on a phone: the clock, bare, as the rail draws it — no
-     frame it does not have on a desktop. What says it can be pressed is the
-     target, not a border: the button spans the whole bar (the negative margin
-     cancels the bar's own padding) and is never narrower than 44px, and the
-     face sits at the rail's clock top. The sheet hangs from its foot
-     (base.css § Drawer). Focus uses the global ring. */
-  .shell__menu {
-    display: none;
-    align-items: flex-start;
-    align-self: stretch;
-    min-inline-size: 2.75rem;
-    min-block-size: 2.75rem;
-    margin-block: calc(-1 * var(--space-s));
-    padding-block: calc((var(--header-height) - var(--text-xl)) / 2) 0;
-    padding-inline: var(--space-xs);
-    border: 0;
-    background: none;
-    cursor: pointer;
-  }
-
   @media (max-width: 47.999rem) {
-    /* One column: the rail is a sheet now (ScopeRail + base.css § Drawer),
-       out of the flow, so the bar and the page take the whole width. */
+    /* One column, and no rail: on a phone the frame is this bar and the
+       sections at the foot (ADR-202 § 10, the sheet that hung from the clock
+       is gone). The bar is two rows (ADR-203 § 1): the clock with the date,
+       calm and you; then the field the whole width. Its height is true by
+       construction, so every sticky offset that reads it stays true. */
     /* The gutter stays the desktop's --space-l, fluid down to 20px: the
        phone's own 14px (--space-m) left the page pressed against the glass
        while its controls were 44px slabs (Marco, 24-10). */
     .shell {
+      --shell-field-size: max(var(--control-size-m), var(--touch-target));
+      --header-height: calc(var(--display-clock) + var(--shell-field-size) + 3 * var(--space-s));
       grid-template-columns: minmax(0, 1fr);
     }
-    /* Door · search · you. The search takes what is left instead of
-       floating as a lone icon, and says what it is until it runs out of
-       room. ⌘K is a keyboard's promise; a phone has none. Installed to the
-       home screen with viewport-fit=cover, the status bar's inset is the
-       bar's (zero under the default status bar style). */
+    /* Installed to the home screen with viewport-fit=cover, the status
+       bar's inset is the bar's (zero under the default status bar style). */
     .shell__top {
-      padding-block-start: max(var(--space-s), env(safe-area-inset-top));
+      padding-block: max(var(--space-s), env(safe-area-inset-top)) var(--space-s);
       grid-column: 1 / -1;
-      grid-template-columns: auto minmax(0, 1fr) auto;
-      grid-template-areas: 'door search me';
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-rows: var(--display-clock) var(--shell-field-size);
+      grid-template-areas:
+        'now me'
+        'search search';
       gap: var(--space-s);
     }
-    /* The door's cell takes the bar's whole height, so the face can be
-       placed from the top of the screen exactly as the rail places it. */
-    .shell__left {
+    .shell__now {
+      grid-area: now;
+      justify-self: start;
       display: inline-flex;
-      align-self: stretch;
+      align-items: center;
+      gap: var(--space-s);
+      min-inline-size: 0;
+      color: inherit;
+      text-decoration: none;
     }
     .shell__right {
       display: inline-flex;
@@ -1309,27 +1159,32 @@
     .shell__lenses {
       display: contents;
     }
-    .shell__menu {
-      display: flex;
-    }
-    .shell__menu-caret {
-      align-self: center;
-      margin-inline-start: var(--space-xs);
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-    }
     .shell__search {
-      justify-self: stretch;
       inline-size: auto;
-      min-inline-size: 0;
     }
-    .shell__search-label {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .shell__search .kbd {
-      display: none;
-    }
+  }
+  /* The time, the frame's largest display figure outside the filled piece
+     (design-system rule 5), and the weekday over the date in the margin's
+     voice, one line each: a long weekday («miércoles») never folds. */
+  .shell__clock {
+    font-family: var(--font-display);
+    font-size: var(--display-clock);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    color: var(--heading-color);
+  }
+  .shell__date {
+    display: grid;
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--mono-letter-spacing-loose);
+    line-height: var(--display-line-height);
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--text-faint);
+  }
+  .shell__date b {
+    font-weight: 500;
+    color: var(--heading-color);
   }
 </style>

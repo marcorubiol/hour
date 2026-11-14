@@ -2,28 +2,24 @@
   /**
    * The rail: the clock (the way home), calm, the pulse, and you at its foot
    * (ADR-140, enmienda del 20-10). Since tarea 132 it holds nothing else: the
-   * search lives in the top bar (ADR-178) and the scope only in each lens's
-   * pill (ADR-152), which now also keeps the saved scopes and the recents
-   * that used to be listed here, with «∑ Todo». Narrower for it
+   * search and the scope live in the frame's one field (ADR-202 § 12), whose
+   * palette lists the saved scopes and the recents. Narrower for it
    * (`--rail-width`).
+   *
+   * Only beside the page, from 48 rem. On a phone there is no rail since
+   * ADR-202 § 10: the clock and calm went to the top bar, the pulse is Hoy's
+   * piece, and the sheet that hung from the clock is gone.
    */
   import type { Snippet } from 'svelte';
   import { appLocale, LOCALE_TAG, t } from '$lib/i18n';
-  import { useCalm } from '$lib/stores/calm.svelte';
+  import CalmMark from './CalmMark.svelte';
   import RailPulse from './RailPulse.svelte';
   import ConceptHint from '$lib/components/ConceptHint.svelte';
 
   interface Props {
-    /** On a phone the rail is a short sheet hanging from the top bar's clock
-        (base.css § Drawer) and the layout owns whether it is out and where
-        it hangs: the door lives in the top bar. On a
-        desktop this changes nothing — the rail is always there. */
-    open?: boolean;
-    onclose?: () => void;
     /** THE SHELL'S ONE CLOCK, ticking in the layout: on a phone the same
-        time is drawn in the top bar as the door to this drawer, and two
-        timers could disagree about the minute. `clockTime` is its HH:MM,
-        formatted once for both faces. */
+        time is drawn in the top bar, and two timers could disagree about
+        the minute. `clockTime` is its HH:MM, formatted once for both. */
     clockNow: Date;
     clockTime: string;
     /** In Settings the pulse (Ahora / Siguiente) says nothing about what is
@@ -31,14 +27,11 @@
     inSettings?: boolean;
     /** You, at the foot of the rail (ADR-140, enmienda del 20-10): the
         account menu and the presence, as Linear, Slack or Notion put them.
-        The layout owns both, so it hands them in. A phone does not draw it
-        here: there the rail is a drawer, and you stay in the top bar. */
+        The layout owns both, so it hands them in. */
     me?: Snippet;
   }
 
-  let { open = false, onclose, clockNow, clockTime, inSettings = false, me }: Props = $props();
-
-  const calm = useCalm();
+  let { clockNow, clockTime, inSettings = false, me }: Props = $props();
 
   // Session locale — feeds both Intl (rail clock) and the dictionary (lens
   // labels). /h is client-only (ssr = false), so navigator is safe at init.
@@ -51,39 +44,20 @@
   );
 </script>
 
-{#if open}
-  <button
-    type="button"
-    class="drawer__backdrop"
-    tabindex="-1"
-    aria-label={t('shell.menu_close', locale)}
-    onclick={() => onclose?.()}
-  ></button>
-{/if}
-<aside id="shell-rail" class="shell__side drawer" data-open={open || undefined} aria-label={t('shell.rail_aria', locale)}>
+<aside id="shell-rail" class="shell__side" aria-label={t('shell.rail_aria', locale)}>
   <div class="side-clock">
     <!-- THE CLOCK IS THE WAY HOME. It took the door the wordmark used to
          hold: «here, now» is already what it says, and a clock you can press
          to get back to the top of the app is a smaller promise than a logo
          that navigates. -->
     <a class="side-clock__now" href="/h/desk" aria-label={t('lens.desk', locale)}>
-      <time class="side-clock__time clock-face" datetime={clockTime}>{clockTime}</time>
+      <time class="side-clock__time" datetime={clockTime}>{clockTime}</time>
       <p class="side-clock__date">{clockDate}</p>
     </a>
     <!-- Calm and its «i» are one thing at the clock's other end. -->
     <span class="side-calm-row">
-      <button
-        type="button"
-        class="side-calm"
-        class:is-on={calm.on}
-        aria-pressed={calm.on}
-        title={t('desk.calm', locale)}
-        aria-keyshortcuts="C"
-        onclick={() => calm.toggle()}
-      >
-        <!-- The key is a hint for the eye; its name stays «calma», not «calmaC». -->
-        <span>{t('desk.calm', locale)}</span><span class="keys" aria-hidden="true"><span class="side-calm__k">C</span></span>
-      </button>
+      <!-- The mark, the same as the phone's top bar (ADR-202 § 11). -->
+      <CalmMark />
       <ConceptHint concept="calm" />
     </span>
   </div>
@@ -100,7 +74,7 @@
 
 <style>
   /* ── the rail: clock, calm, pulse, you (tarea 132). The scopes it listed
-     since Scope v2 live in the lens's pill now. */
+     since Scope v2 live in the frame's field and its palette now. */
   .shell__side {
     inline-size: var(--rail-width);
     display: flex;
@@ -111,11 +85,12 @@
     padding-block: 0 var(--space-l);
     padding-inline: var(--space-m);
   }
-  /* In the flow only where there is room for it. Below 48rem `.drawer`
-     (base.css) places it instead: a short sheet hanging from the top bar's
-     clock, on the menu's paper. These are the only rules the two places
-     disagree on, so they are the only ones fenced; everything inside the
-     rail draws the same in both. */
+  /* Only where there is room for it: on a phone there is no rail. */
+  @media (max-width: 47.999rem) {
+    .shell__side {
+      display: none;
+    }
+  }
   @media (min-width: 48rem) {
     .shell__side {
       border-inline-end: var(--line-hairline) solid var(--border-color-light);
@@ -151,61 +126,8 @@
     text-decoration: none;
     color: inherit;
   }
-  /* In the sheet the time is already drawn right above it, on the door:
-     a second face under the first would read as two clocks. The date stays
-     as the way home, on calm's line, and the sheet opens on it. */
-  @media (max-width: 47.999rem) {
-    /* As wide as what it holds, never narrower than the rail: the date and
-       calm share one line, and the rail's fixed width cut the date. `.drawer`
-       caps it at the screen. */
-    .shell__side {
-      inline-size: max-content;
-      min-inline-size: var(--rail-width);
-      padding-block: var(--space-m);
-    }
-    .side-clock {
-      align-items: center;
-      column-gap: var(--space-m);
-      padding-block-start: 0;
-    }
-    .side-clock__now {
-      grid-area: 1 / 1;
-    }
-    .side-clock__time {
-      display: none;
-    }
-  }
   .side-clock__now:hover .side-clock__time {
     color: var(--text-color);
-  }
-  /* Calm toggle — the mode control lives by the clock (spec § Desk · Calm).
-     outline = available / a firmer stroke = active, so it reads as a control. */
-  .side-calm {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-xs);
-    padding-block: var(--space-2xs);
-    padding-inline: var(--space-m);
-    border: var(--line-hairline) solid var(--border-color-dark);
-    border-radius: var(--radius-circle);
-    /* NO FILL WHEN IT IS OFF (Marco, 2026-07-31). The outline alone says
-       «available»; a fill on a control that is not doing anything reads as a
-       state. `.is-on` takes only the rail's soft selected ground. */
-    background: none;
-    /* Desk lens button shape (sans, --space-2xs/--space-m, radius-circle) but
-       a micro-label one step under the smallest named step — 9px is the
-       Planner's own margin voice, and this is furniture beside a clock. */
-    font-family: var(--font-sans);
-    font-size: var(--text-2xs);
-    text-transform: uppercase;
-    letter-spacing: var(--tracking-s);
-    color: var(--text-muted);
-    cursor: pointer;
-    white-space: nowrap;
-    transition:
-      color var(--transition),
-      background var(--transition),
-      border-color var(--transition);
   }
   .side-calm-row {
     grid-area: 1 / 2;
@@ -213,39 +135,19 @@
     position: relative;
     display: inline-flex;
     align-items: center;
+    gap: var(--space-2xs);
   }
-  .side-calm:hover {
-    color: var(--text-color);
-    border-color: var(--text-muted);
-  }
-  /* ON IS A SOFT STROKE, NOT A BLACK PILL (ADR-139 § 5): the switch to
-     quiet must not be the loudest mark on the rail. The edge firms up, the
-     word takes ink, and the ground is the rail's own selected scope's
-     (`.srow.is-on`). The mode shows in the page's composition, not here. */
-  .side-calm.is-on {
-    background: var(--bg-ultra-light);
-    border-color: var(--text-muted);
-    color: var(--text-color);
-  }
-  .side-calm.is-on .side-calm__k {
-    opacity: 1;
-  }
-  .side-calm__k {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    inline-size: 1.35em;
-    block-size: 1.35em;
-    border: var(--line-hairline) solid currentColor;
-    border-radius: var(--radius-s);
-    /* The key stays mono even though the label is now sans. */
+  /* The rail's HH:MM, under the date's line. One step down the scale from
+     --text-xl: here the clock states the day, it does not head the page.
+     (The phone's clock is the top bar's, in the display face: ADR-202 § 10.) */
+  .side-clock__time {
     font-family: var(--font-mono);
-    font-size: 0.85em;
-    opacity: 0.6;
-    text-transform: none;
+    font-size: var(--text-l);
+    font-weight: 400;
+    line-height: 1;
+    letter-spacing: var(--tracking-xs);
+    color: var(--heading-color);
   }
-  /* The face itself is `.clock-face` (base.css): the top bar draws the same
-     time on a phone, and one face cannot have two type rules. */
   /* One line, always: a locale whose date outgrows the rail is cut, not
      folded. */
   .side-clock__date {

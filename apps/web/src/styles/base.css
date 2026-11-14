@@ -2487,7 +2487,7 @@
      Planner · Conversations · Money) and of every record's page, which
      wears it through RecordHead (ADR-139 § 4). Every lens renders it via LensHeader,
      so they share these exact classes and layout:
-       • a big display title on a bordered row, its «?» at the end (the
+       • a big display title on a bordered row, a lens act at its end (the
          section switcher is in the shell's frame, ADR-140);
        • below, a small ·-separated line of indications/links (the "sub").
      Global (not component-scoped) so page-provided title/sub content styles
@@ -2522,8 +2522,8 @@
   /* A lens head (the row never wraps, below): the title takes the room the
      tools leave (basis 0) and never less than its longest word. On a phone a
      one-word title («Conversaciones») slid under the tools (tarea 130). A
-     title of several words wraps first; only then the scope pill gives way. */
-  .lenshead__titlerow:has(> .lenshead__tools--help) > .lenshead__lead {
+     title of several words wraps first. */
+  .lenshead__titlerow:has(> .lenshead__tools--lens) > .lenshead__lead {
     flex: 1 1 0;
     min-inline-size: min-content;
   }
@@ -2541,35 +2541,29 @@
       flex-basis: 100%;
     }
   }
-  /* The section's «?» (it brings its welcome card back) at the row's end:
-     the same ring as a concept's «i», a step larger, in the sans voice. */
+  /* A lens's own act at the row's end (the «+» of a list): the same ring as
+     a concept's «i», a step larger, in the sans voice. The scope and the
+     section's «?» left the row (ADR-202 § 12, ADR-203 § 1). */
   .lenshead__tools {
     display: inline-flex;
     align-items: center;
     gap: var(--space-s);
   }
-  /* A lens's «?» stays at the end of the title's FIRST line: the row never
-     wraps (the title wraps inside its column), and the «?» stands in a box
+  /* A lens's act stays at the end of the title's FIRST line: the row never
+     wraps (the title wraps inside its column), and the act stands in a box
      one title line tall, centred in it as on a one-line row. Without this, a
-     two-line title on a phone sent the «?» alone to a line of its own, and
-     the Planner's arrows pulled it down between the title and themselves. */
-  .lenshead__tools--help {
+     two-line title on a phone sent it alone to a line of its own. */
+  .lenshead__tools--lens {
     flex-shrink: 1;
     min-inline-size: 0;
     align-self: flex-start;
     block-size: 1em;
     font-size: var(--text-xxl);
   }
-  /* In a tight lens head the scope pill is what gives way: its name
-     ellipsizes (ScopePill) and the lens's acts and «?» keep their size. */
-  .lenshead__tools--help > * {
+  /* The lens's acts keep their size. */
+  .lenshead__tools--lens > * {
     flex-shrink: 0;
   }
-  .lenshead__tools--help > .lensscope {
-    flex-shrink: 1;
-    min-inline-size: 0;
-  }
-  .lenshead__help,
   .lenshead__act {
     position: relative;
     display: inline-grid;
@@ -2589,14 +2583,11 @@
       color var(--transition),
       border-color var(--transition);
   }
-  .lenshead__help:hover,
-  .lenshead__help[aria-expanded='true'],
   .lenshead__act:hover,
   .lenshead__act[aria-expanded='true'] {
     color: var(--text-color);
     border-color: var(--text-muted);
   }
-  .lenshead__help::before,
   .lenshead__act::before {
     content: '';
     position: absolute;
@@ -2668,7 +2659,7 @@
       flex-wrap: wrap;
       row-gap: var(--space-s);
     }
-    .lenshead__titlerow:has(> .lenshead__tools--help) {
+    .lenshead__titlerow:has(> .lenshead__tools--lens) {
       flex-wrap: nowrap;
     }
   }
@@ -2731,82 +2722,6 @@
     container-type: inline-size;
   }
 
-  /* Clock face — the shell's HH:MM. Drawn in the rail under the date, and on
-     a phone also in the top bar, where it is the door to the rail. One type
-     rule for both, so the two can never look like two clocks. One step down
-     the scale from --text-xl: the clock states the day, it does not head the
-     page. */
-  .clock-face {
-    font-family: var(--font-mono);
-    font-size: var(--text-l);
-    font-weight: 400;
-    line-height: 1;
-    letter-spacing: var(--tracking-xs);
-    color: var(--heading-color);
-  }
-
-  /* Drawer — the shell's furniture on a phone, drawn as a short sheet that
-     hangs from the top bar's clock (tarea 140): as tall as what it holds,
-     the rail's width, and the menu's paper (`.menu`: border, radius, the
-     same shadow), so it reads as the AccountMenu beside it does, a thing
-     that drops from its door, not a screen of its own. The layout measures
-     the door on opening and hands the sheet `--rail-sheet-top` (the door's
-     foot) and `--rail-sheet-start` (where the clock's digits start); the
-     sheet's first line starts under them. Above 48rem the class adds
-     NOTHING: the element keeps whatever its own component draws, so the
-     desktop never pays for the phone.
-
-     Closed, it is `visibility: hidden` and not merely faded: a panel nobody
-     sees still takes Tab and is still read aloud. The delay on visibility
-     lets the fade finish before it disappears. The backdrop draws nothing:
-     it is the tap outside that closes, as outside a menu. */
-  @media (max-width: 47.999rem) {
-    .drawer {
-      position: fixed;
-      inset-block-start: calc(var(--rail-sheet-top, 0px) + var(--space-xs));
-      inset-inline-start: max(
-        var(--space-xs),
-        calc(var(--rail-sheet-start, 0px) - var(--line-hairline) - var(--space-m) - var(--space-xs))
-      );
-      z-index: var(--z-modal);
-      max-inline-size: calc(100vw - var(--space-xs) * 2);
-      max-block-size: calc(
-        100dvh - var(--rail-sheet-top, 0px) - var(--space-xs) * 2 - var(--shell-foot)
-      );
-      min-block-size: 0;
-      overflow-y: auto;
-      overscroll-behavior: contain;
-      border: var(--border);
-      border-radius: var(--radius-m);
-      background: var(--bg);
-      box-shadow: var(--box-shadow-2);
-      opacity: 0;
-      visibility: hidden;
-      transition:
-        opacity var(--transition),
-        visibility 0s linear var(--transition-duration);
-    }
-    .drawer[data-open] {
-      opacity: 1;
-      visibility: visible;
-      transition: opacity var(--transition);
-    }
-    .drawer__backdrop {
-      position: fixed;
-      inset: 0;
-      z-index: calc(var(--z-modal) - 1);
-      border: 0;
-      padding: 0;
-      background: none;
-      cursor: default;
-    }
-  }
-  /* The backdrop only exists on a phone, whatever state the shell is in. */
-  @media (min-width: 48rem) {
-    .drawer__backdrop {
-      display: none;
-    }
-  }
 }
 
 /* ============================================================ */

@@ -1,11 +1,13 @@
 <script lang="ts">
   /**
    * ⌘K — the palette, with two doors (ADR-178, amending ADR-152). From the
-   * top bar, ⌘K and the rail it SEARCHES (`mode="search"`): choosing a row
+   * frame's field and ⌘K it SEARCHES (`mode="search"`): choosing a row
    * opens its record, and «acotar» beside a space, project, line or person
-   * narrows to it alone. From the scope pill it FILTERS (`mode="filter"`,
-   * headed «Ver solo…»), the scope builder below. What each gesture does per
-   * door is `$lib/palette-mode`.
+   * narrows to it alone; with nothing typed, its first rows are the saved
+   * scopes and the recents, applied whole (ADR-203 § 6). From the scope
+   * tag's «+ añadir» it FILTERS (`mode="filter"`, headed «Ver solo…»), the
+   * scope builder below. What each gesture does per door is
+   * `$lib/palette-mode`.
    *
    * The filter (Scope v2): browse the space → project → line tree
    * (→ drills in), or type to filter across all FOUR axes at once — the three
@@ -43,7 +45,8 @@
     lineUrl,
     type NavWorkspace,
   } from '$lib/nav';
-  import { parsePin, personPin } from '$lib/stores/pins.svelte';
+  import { parsePin, personPin, usePins } from '$lib/stores/pins.svelte';
+  import { sameSet, useScopes } from '$lib/stores/scopes.svelte';
   import { parseDayQuery } from '$lib/day-query';
   import { dayKeyInTz, plannerDayHref } from '$lib/planner';
   import { lensOn } from '$lib/lenses.svelte';
@@ -73,7 +76,7 @@
 
   interface Props {
     open: boolean;
-    /** Search (the bar, ⌘K) or filter (the scope pill): ADR-178. */
+    /** Search (the field, ⌘K) or filter (the scope tag's «+ añadir»): ADR-178. */
     mode?: PaletteMode;
     /** the currently-applied scope — pre-staged when the palette opens */
     initialTokens?: string[];
@@ -233,6 +236,7 @@
    * tiene: inventarle otra ventana para escribir una fecha sería la segunda.
    */
   type Kind =
+    | 'scope'
     | 'space'
     | 'project'
     | 'line'
@@ -247,7 +251,7 @@
     | 'create';
   /** Las filas que se abren y no se fijan: un día, un «crear» y lo que busca
       `palette-search`. Ninguna entra en el ámbito. */
-  const GOES = new Set<Kind>(['day', 'create', 'contact', 'organization', 'conversation', 'venue', 'performance', 'bolo']);
+  const GOES = new Set<Kind>(['scope', 'day', 'create', 'contact', 'organization', 'conversation', 'venue', 'performance', 'bolo']);
   /** The glyph of a found row: what it is, not a scope (`ScopeGlyph` draws scopes). */
   const FOUND_GLYPH: Record<'organization' | 'conversation' | 'venue' | 'performance' | 'bolo', string> = {
     organization: '⌂',
@@ -272,6 +276,10 @@
     peek?: PeekTarget;
     /** for a project: its space, whose trade its kind word speaks (tarea 142) */
     workspaceId?: string;
+    /** for a saved or recent scope: what it scopes, applied whole */
+    tokens?: string[];
+    /** for a saved scope: it is the scope on screen */
+    current?: boolean;
   }
   interface Group {
     key: Kind;
@@ -284,7 +292,7 @@
 
   /** The row's small kind word, in the session's language. A «crear» row
       has none: its name already says «nueva …». */
-  const KIND_KEY: Record<Exclude<Kind, 'create'>, string> = {
+  const KIND_KEY: Record<Exclude<Kind, 'create' | 'scope'>, string> = {
     space: 'picker.kind_space',
     project: 'picker.kind_project',
     line: 'picker.kind_line',
@@ -368,6 +376,38 @@
   function personRow(p: PersonEntry, path: string): Row {
     return { token: personPin(p.person_id), kind: 'person', name: p.full_name, path, drill: null };
   }
+
+  /**
+   * The saved scopes and the recents (ADR-203 § 6, from the scope pill's
+   * dialog that is gone): the first rows of the search with nothing typed.
+   * The scope on screen is marked among the saved and left out of the
+   * recents (it is the tag in the field).
+   */
+  const pins = usePins();
+  const scopes = useScopes();
+  function scopeRow(sc: { name: string; tokens: string[] }, group: 'saved' | 'recent'): Row {
+    return {
+      token: `${group}:${sc.tokens.join(',')}`,
+      kind: 'scope',
+      name: sc.name,
+      path: '',
+      drill: null,
+      tokens: [...sc.tokens],
+      current: group === 'saved' && sameSet(sc.tokens, pins.pins),
+    };
+  }
+  let scopeGroups = $derived<Group[]>(
+    mode === 'search'
+      ? ([
+          { key: 'scope', header: t('shell.saved', locale), rows: scopes.saved.map((sc) => scopeRow(sc, 'saved')) },
+          {
+            key: 'scope',
+            header: t('shell.recent', locale),
+            rows: scopes.recent.filter((r) => !sameSet(r.tokens, pins.pins)).map((r) => scopeRow(r, 'recent')),
+          },
+        ] as Group[]).filter((g) => g.rows.length > 0)
+      : [],
+  );
 
   // Results grouped under section headers (Spaces / Projects / Working lines).
   // Filter mode surfaces all three; browsing shows just the current level's.
@@ -470,7 +510,10 @@
       ).filter((g) => g.rows.length > 0 || g.note);
     }
     if (drill === null) {
-      return [{ key: 'space', header: t('picker.spaces', locale), rows: workspaces.map((w) => spaceRow(w, true)) }];
+      return [
+        ...scopeGroups,
+        { key: 'space', header: t('picker.spaces', locale), rows: workspaces.map((w) => spaceRow(w, true)) },
+      ];
     }
     const { kind, key } = parsePin(drill);
     if (kind === 'space') {
@@ -521,6 +564,11 @@
 
   function openRow(r: Row) {
     if (r.kind === 'create') return runCreate(r);
+    if (r.kind === 'scope') {
+      onApplyScope(r.tokens ?? []);
+      open = false;
+      return;
+    }
     if (r.peek) {
       open = false;
       openPeek(r.peek);
@@ -749,7 +797,7 @@
           <p class="cmdk__empty">{t('picker.no_match', locale)}</p>
         {/if}
 
-        {#each groups as g, gIdx (g.key)}
+        {#each groups as g, gIdx (`${g.key}:${g.header}`)}
           <p class="cmdk__group">{g.header}</p>
           {#if g.rows.length === 0 && g.note}
             <p class="cmdk__note">{g.note}</p>
@@ -768,11 +816,16 @@
                 class="cmdk__main"
                 role="option"
                 aria-selected={gi === cur}
+                aria-current={r.current ? 'true' : undefined}
                 onmouseenter={() => (cur = gi)}
                 onclick={() => actRow(r)}
               >
                 {#if r.kind === 'create'}
                   <span class="cmdk__dayglyph" aria-hidden="true">+</span>
+                {:else if r.kind === 'scope'}
+                  <!-- A scope: the glyph of the first thing it scopes. -->
+                  {@const first = r.tokens?.[0] ?? ''}
+                  <ScopeGlyph kind={parsePin(first).kind} accent={accentFor(first)} lineKind={lineKindFor(first)} />
                 {:else if r.kind === 'day'}
                   <!-- No es `ScopeGlyph`: eso dibuja SCOPES, y un día no lo es
                        (ver `Kind`). Añadirle un caso sería estirar su
@@ -783,7 +836,7 @@
                 {:else}
                   <ScopeGlyph kind={r.kind === 'contact' ? 'person' : r.kind} accent={r.kind === 'contact' ? 'var(--text-faint)' : accentFor(r.token)} lineKind={r.lineKind ?? ''} />
                 {/if}
-                {#if r.kind !== 'create'}
+                {#if r.kind !== 'create' && r.kind !== 'scope'}
                   <span class="cmdk__kind">{r.kind === 'line' ? lineKindLabel(r.lineKind ?? '', locale) : t(KIND_KEY[r.kind], locale, undefined, r.workspaceId ? tradeFor(r.workspaceId) : undefined)}</span>
                 {/if}
                 <span class="cmdk__name">
@@ -1005,6 +1058,10 @@
     cursor: pointer;
     font-family: inherit;
     color: var(--text-color);
+  }
+  /* The saved scope on screen: its name in ink's weight, as the tag says it. */
+  .cmdk__main[aria-current='true'] .cmdk__name {
+    font-weight: 500;
   }
   .cmdk__kind {
     flex: none;
