@@ -273,5 +273,47 @@ describe.skipIf(!envReady() || !limitedEnvReady())(
       expect(await seesPerson(limited, priv.person_id!)).toBe(false);
       await remove(admin, priv.id);
     });
+
+    test('create_workspace_person with a taken email returns the dossier only to who reads it (149)', async () => {
+      await setSetting(false);
+      const shared = await create(admin, SHARED);
+      const held = await pgGet<{ email: string }>('workspace_person', admin, new URLSearchParams({
+        workspace_id: `eq.${workspaceId}`,
+        person_id: `eq.${shared.person_id}`,
+        select: 'email',
+      }));
+      const email = held.rows[0]!.email;
+      expect(email).toBeTruthy();
+      const again = (as: string) => pgRpc<{ person_id: string; full_name: string }>('create_workspace_person', as, {
+        p_workspace_id: workspaceId,
+        p_full_name: `ZZZ RLS Dir Probe ${RUN}`,
+        p_email: email,
+      });
+
+      // Without Converses: refused, no dossier data and no duplicate.
+      await setFacets(admin, snapshot.membershipId, { converses: null });
+      expect(await seesPerson(limited, shared.person_id!)).toBe(false);
+      const refused = await again(limited);
+      expect(refused.status).toBe(403);
+      expect(refused.error).toContain('42501');
+      expect(JSON.stringify(refused.data ?? null)).not.toContain(shared.person_id!);
+      const holders = await pgGet('workspace_person', admin, new URLSearchParams({
+        workspace_id: `eq.${workspaceId}`,
+        email: `eq.${email}`,
+        select: 'person_id',
+      }));
+      expect(holders.rows).toHaveLength(1);
+
+      // Who reads it gets the existing dossier, as before.
+      const byAdmin = await again(admin);
+      expect(byAdmin.status, byAdmin.error).toBe(200);
+      expect(one(byAdmin.data)!.person_id).toBe(shared.person_id);
+      await setFacets(admin, snapshot.membershipId, { converses: 'view' });
+      const byReader = await again(limited);
+      expect(byReader.status, byReader.error).toBe(200);
+      expect(one(byReader.data)!.person_id).toBe(shared.person_id);
+
+      await remove(admin, shared.id);
+    });
   },
 );
