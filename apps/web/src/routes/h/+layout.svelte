@@ -810,9 +810,15 @@
            on screen. -->
       <div class="shell__right">
         <CalmMark />
-        <PresenceBadge count={networkPresence?.count ?? null} />
-
-        <AccountMenu {workspaceSlug} {menuWorkspaceSlug} {inSettings} {rememberWorkingScope} />
+        <!-- Presence is a dot on the monogram here, the figure inside the
+             menu (ADR-204); the rail's foot keeps the words. -->
+        <AccountMenu
+          {workspaceSlug}
+          {menuWorkspaceSlug}
+          {inSettings}
+          {rememberWorkingScope}
+          presence={networkPresence?.count ?? null}
+        />
       </div>
     </header>
 

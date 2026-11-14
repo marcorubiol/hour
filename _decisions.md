@@ -7525,6 +7525,9 @@ specs puestos al día sin correr.
 
 > **Amended by ADR-202 (2026-11-13), solo en § 1.** La pastilla desaparece: lo acotado va dentro del campo de buscar.
 > Dónde viven guardados y recientes queda abierto en ADR-202.
+>
+> **Amended by ADR-204 (2026-11-14), solo en § 2 y solo en el móvil.** En la cabecera del móvil la presencia es un
+> punto sobre la cuenta y la cifra va dentro del menú de la cuenta. El pie del raíl sigue con las palabras.
 
 ## [2026-11-11] ADR-194 · Revisión UX/UI del 11-11, tanda 2: un camino y un patrón por gesto (tareas 134, 135 y 136; enmienda ADR-130 § 2, ADR-139, ADR-182 § 4, ADR-185 § 4, ADR-176, ADR-138 § 5, ADR-056, ADR-062 y ADR-102)
 
@@ -7831,3 +7834,26 @@ lo que recomiendas». Pasan a ser reglas. **Sin construir.**
 
 **Re-evaluar cuando** Marco lo use una gira: si falta el título de la lente en Hoy y si lo que quedó detrás de «Hoja»
 se echa de menos el día de bolo.
+
+
+## [2026-11-14] ADR-204 · La presencia en el móvil es un punto sobre la cuenta (enmienda ADR-193 § 2, solo en el móvil)
+
+**Contexto.** ADR-203 § 1 deja la fila 1 de la cabecera del móvil en hora con fecha, calma y cuenta, pero el «● 2 en
+línea» seguía entre calma y la cuenta: una cuarta pieza. Era la duda 1 del carril del marco. Marco, chat 14-11, «La A»
+sobre el artefacto de tres opciones (https://claude.ai/artifact/YEkwMXYMs5ZHPS1VYMfuP2).
+
+**Decidido por Marco.**
+1. **La fila 1 queda en tres piezas.** El «N en línea» sale de la cabecera del móvil.
+2. **Con alguien más conectado, un punto en `--success` sobre el avatar de la cuenta**, abajo a la derecha, con un aro
+   del color del fondo. Con nadie más, sin punto. Vive en el `Avatar` (`signal`), no en la cabecera.
+3. **La cifra va dentro del menú de la cuenta**, bajo la cabecera con el nombre y antes de «Todos los ajustes», con el
+   mismo punto y las mismas palabras que el raíl. Es texto, no una fila pulsable. Con nadie más, sin línea.
+4. **El punto no es solo color:** el nombre accesible del disparador lleva la cifra («Abrir el menú de la cuenta, 2 en
+   línea»).
+5. **Escritorio no cambia:** el pie del raíl sigue con las palabras (ADR-193 § 2).
+
+**De paso.** La ayuda de la presencia decía «en este espacio», pero la cifra suma todos los espacios de la persona
+(`NetworkPresenceStore`), ella incluida. Ahora dice «en tus espacios», en las cuatro lenguas.
+
+**Re-evaluar cuando** Marco lo use con el equipo conectado: si el punto sobre su propio avatar se lee como «estoy en
+línea» en vez de «hay alguien más».

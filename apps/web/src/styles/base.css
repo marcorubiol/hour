@@ -1396,6 +1396,30 @@
     --avatar-color: var(--tone-danger-fg);
   }
 
+  /* The avatar's signal (ADR-204): a dot on its lower edge, ringed in the
+     colour behind it so it reads as cut out of the circle. The ring follows
+     the surface: the bar's paper, or the trigger's own when it is pressed. */
+  .avatar-signal {
+    --avatar-signal-ring: var(--bg);
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+  }
+  .avatar-signal__dot {
+    position: absolute;
+    inset-inline-end: calc(var(--line) * -1);
+    inset-block-end: calc(var(--line) * -1);
+    inline-size: var(--dot-l);
+    block-size: var(--dot-l);
+    border-radius: var(--radius-50);
+    background: var(--success);
+    box-shadow: 0 0 0 var(--line) var(--avatar-signal-ring);
+  }
+  .kebab:hover .avatar-signal,
+  .kebab[aria-expanded='true'] .avatar-signal {
+    --avatar-signal-ring: var(--bg-light);
+  }
+
   /* Dialog skeleton — native <dialog>. The element itself stays transparent
      and only acts as the centered container that captures backdrop clicks
      (e.target === dialog when the click lands on the ::backdrop). The

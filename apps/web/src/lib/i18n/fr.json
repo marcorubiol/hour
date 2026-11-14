@@ -1177,7 +1177,7 @@
   "perf.cast_role": "Rôle",
   "perf.cast_role_placeholder": "interprète, lumière, son…",
   "perf.presence_online_other": "{n} en ligne",
-  "perf.presence_others": "{n} personnes connectées dans cet espace",
+  "perf.presence_others": "{n} personnes connectées dans vos espaces",
   "roadsheet.title": "Feuille de route",
   "roadsheet.day": "La journée",
   "roadsheet.now": "maintenant {time}",

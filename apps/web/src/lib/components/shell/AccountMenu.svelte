@@ -2,6 +2,7 @@
   import { goto } from '$app/navigation';
   import Avatar from '$lib/components/Avatar.svelte';
   import Menu from '$lib/components/Menu.svelte';
+  import PresenceBadge from '$lib/components/PresenceBadge.svelte';
   import ThemeToggle from '$lib/components/ThemeToggle.svelte';
   import { clearSession, session } from '$lib/session.svelte';
   import { commitDone } from '$lib/chat-done.svelte';
@@ -27,6 +28,11 @@
         bar, up from the foot of the rail (ADR-140, enmienda del 20-10). */
     direction?: 'up' | 'down';
     align?: 'start' | 'end';
+    /** The network presence count, the phone's top bar only (ADR-204): with
+        someone else on, a dot on the monogram, the figure in the trigger's
+        name and a line in the menu. The rail does not pass it: its foot
+        keeps the words (ADR-193 § 2). */
+    presence?: number | null;
   }
 
   let {
@@ -36,9 +42,19 @@
     rememberWorkingScope,
     direction = 'down',
     align = 'end',
+    presence = null,
   }: Props = $props();
 
   const locale = appLocale();
+
+  // Alone is not news (ADR-154): the count includes you.
+  let someoneElse = $derived(presence !== null && presence > 1);
+  // The dot is colour only: the trigger says it in words too.
+  let triggerLabel = $derived(
+    someoneElse
+      ? `${t('shell.account_menu', locale)}, ${t('perf.presence_online_other', locale, { n: presence ?? 0 })}`
+      : t('shell.account_menu', locale),
+  );
 
   // Identity: the person's stored name (user_profile.full_name via /api/me),
   // then the session's auth-metadata name, then the email local-part.
@@ -78,12 +94,12 @@
 <Menu
   {direction}
   {align}
-  label={t('shell.account_menu', locale)}
+  label={triggerLabel}
   triggerClass="kebab"
   triggerAttrs={{ 'data-help-return': '' }}
 >
   {#snippet trigger()}
-    <Avatar size="xs" name={userDisplayName || userEmail || workspaceSlug} />
+    <Avatar size="xs" name={userDisplayName || userEmail || workspaceSlug} signal={someoneElse} />
   {/snippet}
   {#snippet children({ close })}
     <li role="presentation" class="menu-header">
@@ -113,6 +129,12 @@
         </svg>
       </button>
     </li>
+    <!-- Who else is on, as text (ADR-204): not a menu item, nothing to press. -->
+    {#if someoneElse}
+      <li role="presentation" class="menu-presence">
+        <PresenceBadge count={presence} />
+      </li>
+    {/if}
     <li role="none">
       <a
         role="menuitem"
@@ -212,6 +234,13 @@
   :global(.menu-header__logout:focus-visible) {
     outline: var(--focus-width) solid var(--focus-color);
     outline-offset: -1px;
+  }
+
+  :global(.menu-presence) {
+    padding-block: var(--space-2xs) var(--space-s);
+    padding-inline: var(--space-s);
+    border-block-end: var(--line-hairline) solid var(--border-color-light);
+    margin-block-end: var(--space-xs);
   }
 
   :global(.theme-row) {

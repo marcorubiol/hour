@@ -1213,7 +1213,7 @@
   "perf.cast_role": "Role",
   "perf.cast_role_placeholder": "performer, lighting, sound…",
   "perf.presence_online_other": "{n} online",
-  "perf.presence_others": "{n} users online in this workspace",
+  "perf.presence_others": "{n} people online across your workspaces",
   "roadsheet.title": "Road sheet",
   "roadsheet.day": "The day",
   "roadsheet.now": "now {time}",
