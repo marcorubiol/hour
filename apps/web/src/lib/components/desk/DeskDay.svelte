@@ -31,7 +31,7 @@
   import Button from '$lib/components/Button.svelte';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
   import MapLink from '$lib/components/MapLink.svelte';
-  import { dualTime, hourMark, localeDayMonth, localeWeekdayLong, localeWeekdayShort } from '$lib/datetime';
+  import { dualTime, hourMark, localeDayMonth, localeWeekdayShort } from '$lib/datetime';
   import { LOCALE_TAG, t, tradeFor, type Locale, type Voice } from '$lib/i18n';
   import { holdDeadlineLabel } from '$lib/performance';
   import { dayKeyInTz, statusWord } from '$lib/planner';
@@ -39,7 +39,7 @@
   import { stagePlace } from '$lib/travel-stage';
   import { timedStages, type PulseNext } from '$lib/pulse';
   import type { AgendaPoint, DayAgenda } from '$lib/day-agenda';
-  import { rowsSayCity } from '$lib/hoy';
+  import { nextWhen, rowsSayCity } from '$lib/hoy';
   import { countdownParts, freshnessShown, logisticsLines, mapsHref, minutesTo, telHref, venueCall } from '$lib/ahora';
   import { ahoraRoadsheetQuery, roleFor, type AhoraRoadsheet } from '$lib/ahora-feeds.svelte';
   import { teamQueryOptions } from '$lib/nav-queries';
@@ -252,13 +252,7 @@
   // ── The hollow piece: «Hoy, nada» and «Lo siguiente: …» (ADR-203 § 2) ──
   /** «mañana, tren a Girona», «martes, función? en Vic», «jue 19 nov, ensayo». */
   function nextWords(n: PulseNext): string {
-    const days = Math.round((Date.parse(`${n.day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
-    const when =
-      days <= 1
-        ? t('desk.next_tomorrow', locale)
-        : days < 7
-          ? localeWeekdayLong(n.day, locale)
-          : `${localeWeekdayShort(n.day, locale)} ${localeDayMonth(n.day, locale)}`;
+    const when = nextWhen(n.day, today, locale);
     const sl = pulseSlip(n.ref, n.day, slipCtx);
     const held = sl.cert === 'hold' || sl.cert === 'proposed' ? '?' : '';
     const to = (p: string) => `${t('planner.slip_to', locale)} ${p}`;
