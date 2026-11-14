@@ -108,6 +108,8 @@ test.describe('Te toca y Se enfría en Conversaciones (ADR-117, ADR-176)', () =>
     // La cifra es la de la lista filtrada (una página de 50 como mucho).
     await expect(rows).toHaveCount(Math.min(n, 50), { timeout: 30_000 });
 
+    // En reposo el buscador es su lupa (157): se abre al tomar el foco.
+    await page.locator('.conversations__search').click();
     await page.locator('.conversations__search').getByRole('searchbox').fill(WARM);
     const row = page.locator('[data-testid="conversation-row"]', { hasText: WARM });
     await expect(row).toHaveCount(1, { timeout: 30_000 });
@@ -125,6 +127,8 @@ test.describe('Te toca y Se enfría en Conversaciones (ADR-117, ADR-176)', () =>
     await cold.click();
     await expect(page).toHaveURL(/temp=fria/);
     await expect(cold).toHaveAttribute('aria-current', 'page');
+    // En reposo el buscador es su lupa (157): se abre al tomar el foco.
+    await page.locator('.conversations__search').click();
     await page.locator('.conversations__search').getByRole('searchbox').fill(COLD);
     const row = page.locator('[data-testid="conversation-row"]', { hasText: COLD });
     await expect(row).toHaveCount(1, { timeout: 30_000 });
@@ -156,6 +160,8 @@ test.describe('Te toca y Se enfría en Conversaciones (ADR-117, ADR-176)', () =>
   test('ya está: un toque la saca de nos toca, se deshace, y el cómo queda en el hilo', async ({ page }) => {
     test.setTimeout(90_000);
     await page.goto('/h/conversations?etiqueta=sales&turno=nuestro');
+    // En reposo el buscador es su lupa (157): se abre al tomar el foco.
+    await page.locator('.conversations__search').click();
     await page.locator('.conversations__search').getByRole('searchbox').fill(WARM);
     const row = page.locator('[data-testid="conversation-row"]', { hasText: WARM });
     await expect(row).toHaveCount(1, { timeout: 30_000 });
