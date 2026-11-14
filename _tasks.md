@@ -40,6 +40,7 @@ con boceto antes y después de la 119). Capturas de partida: espacio `playwright
 - [ ] 154 `roadsheet-share:17` intermitente: responde 201 con token pero la fila no aparece en 5 s; solo en tandas largas. Causa sin verificar. (14-11)
 - [ ] 155 `device-cache:98` intermitente con la red inestable. Causa sin verificar. (14-11)
 - [ ] 156 «Mapa» (ADR-206): la preferencia de app de mapas vive en el dispositivo (`hour_maps_app`); subirla a la cuenta pide migración. Aparcado: solo si molesta. (14-11)
+- [ ] 160, resto: el titular de Hoy (ADR-207) está en producción desde `6084f7e4`, pero su spec (`desk:241`) y `desk:224` se saltan porque el usuario del E2E no tiene tarjeta del día; no se ha visto en producción ni con tres o más funciones el mismo día. Dar al usuario del E2E una función de hoy (fixture que se borre sola) o mirarlo Marco en un día de bolo. (14-11)
 - [ ] 159 Hoy: desde la tarjeta principal del día, acceso al hilo del equipo de ese bolo, con su cifra de no leídos, junto a «Quién va», Mapa y Hoja (Marco, chat 14-11: quien va de bolo vive en Hoy; «el del equipo», no la conversación con la sala). Dibujo primero; toca `DeskDay`, detrás de la 160.
 
 ## PRIMERO — nada. `main` == prod y las dos suites están vivas (2026-07-30, noche)
