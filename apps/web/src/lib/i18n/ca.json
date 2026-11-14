@@ -1213,7 +1213,7 @@
   "perf.cast_role": "Rol",
   "perf.cast_role_placeholder": "intèrpret, llums, so…",
   "perf.presence_online_other": "{n} en línia",
-  "perf.presence_others": "{n} persones connectades en aquest espai",
+  "perf.presence_others": "{n} persones connectades als teus espais",
   "roadsheet.title": "Full de ruta",
   "roadsheet.day": "El dia",
   "roadsheet.now": "ara {time}",

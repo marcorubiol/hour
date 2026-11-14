@@ -1,7 +1,7 @@
 <script lang="ts">
   /**
-   * Presence badge — surfaces the live "N online" count from the workspace
-   * presence channel into the shell topbar. Backed by Supabase Realtime
+   * Presence badge — surfaces the live "N online" count from the network
+   * presence (every space you belong to) into the shell. Backed by Supabase Realtime
    * presence (no DB writes); `count` is distinct users, not connections —
    * one user with two tabs still reads as 1.
    *
@@ -13,9 +13,13 @@
    * here is not news (ADR-154). With someone else, the badge animates in via
    * opacity transition.
    *
-   * The same at every width (tarea 132): at the foot of the rail, beside the
-   * monogram, the dots alone (ADR-140, enmienda del 20-10) said nothing to
-   * anyone who did not already know; now it says «2 en línea», as the phone.
+   * At the foot of the rail, beside the monogram, it says «2 en línea»
+   * (tarea 132: the dots alone said nothing to anyone who did not already
+   * know). On a phone the bar has no room for it: there the monogram carries
+   * a dot and this badge is a line inside the account menu (ADR-204).
+   *
+   * The figure is the whole network (NetworkPresenceStore: every space you
+   * belong to, you included), and the title says so.
    */
 
   import { appLocale, t } from '$lib/i18n';
