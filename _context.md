@@ -33,11 +33,11 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
 ## Producción (verificado 2026-11-14)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`9bf89797`**, `dirty:false`, builtAt
-  2026-11-14T14:29Z, Worker 650859d0. Cinco deploys del 14-11 (`CHANGELOG.md`), sin migraciones.
-- Última suite (14-11): RLS entera contra producción 625/629; `money-payer-organization` y `thread-feed` verdes al
-  repetir, `audience.test.ts` con 4 rojos al repetir (causa en diagnóstico). E2E entero contra `9bf89797`: 195 ok
-  tras repetir y 1 rojo estable, `conversation-overview:93` (4 tests sin correr, causa en diagnóstico).
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`6084f7e4`**, `dirty:false`, builtAt
+  2026-11-14T16:22Z, Worker d5db2855. Seis deploys del 14-11 (`CHANGELOG.md`), sin migraciones.
+- Última suite (14-11): contra `6084f7e4`, E2E de `desk`, `conversation-overview`, `smoke`, `calm` y `help`: 29 ok y
+  2 saltados por datos (`desk:224` y `desk:241`: sin tarjeta, ADR-207 no se dibujó); `conversation-overview` entero
+  verde tras ajustar el spec. RLS `audience.test.ts` 19/19 dos veces. RLS entera: 625/629 el 14-11.
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free con keepalive diario
   (`keepalive.yml`); Pro antes de la beta (`_tasks.md § 9`). Si falla tras días sin uso: `dig <ref>.supabase.co`.
