@@ -34,16 +34,15 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 ## Producción (verificado 2026-11-14)
 
 - Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`9bf89797`**, `dirty:false`, builtAt
-  2026-11-14T14:29Z, Worker 650859d0. Cinco deploys del 14-11 (`CHANGELOG.md`), sin migraciones; el último: mapas
-  como desplegable, 151 y 152.
-- Última suite, contra `9bf89797`, E2E de 9 specs (desk, ahora, smoke, calm, help, roadsheet-technician, settings,
-  tags y facetas): 40 ok, 1 saltado (`desk:224`), 1 rojo estable: `smoke:30`, porque `zzz-difusion`
-  quedó sin conversaciones tras la limpieza de `playwright`. RLS completa: 608/609 el 10-11.
+  2026-11-14T14:29Z, Worker 650859d0. Cinco deploys del 14-11 (`CHANGELOG.md`), sin migraciones.
+- Última suite (14-11): RLS entera contra producción 625/629; `money-payer-organization` y `thread-feed` verdes al
+  repetir, `audience.test.ts` con 4 rojos al repetir (causa en diagnóstico). E2E entero contra `9bf89797`: 195 ok
+  tras repetir y 1 rojo estable, `conversation-overview:93` (4 tests sin correr, causa en diagnóstico).
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free con keepalive diario
   (`keepalive.yml`); Pro antes de la beta (`_tasks.md § 9`). Si falla tras días sin uso: `dig <ref>.supabase.co`.
-- **Última migración aplicada: `20261113100000`** (138; backup 43499278801, plan 43499765472, apply 43499977264).
-  Antes, `20261113110000` (143; apply 43485737983). Las anteriores, en `_notes/context-history.md`. Las migraciones
+- **Última migración aplicada: `20261114100000`** (149; backup 43606973594, plan 43607266766, apply 43607392836).
+  Antes, `20261113100000` (138). Las anteriores, en `_notes/context-history.md`. Las migraciones
   van por `production-migrate.yml` (backup, plan, apply; usa `--include-all`). **Al redefinir una función,
   copiar la firma de la base viva (`pg_get_functiondef`): otra firma crea una sobrecarga y PostgREST responde 300.**
 - `hour-staging`: ref `slccyknqpgmzhyiyclsq`, `eu-west-1`; se pausa sin uso.
@@ -59,7 +58,8 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
   `platform.env`, así que no hay Supabase). No prestar `.playwright/auth.json` a otro carril mientras corre la suite.
 - Trampas: el login admite 10 intentos por 5 min por IP (un setup colgado 30 s es eso: esperar 5 min); la red local
   se cae a media suite: ante muchos rojos, buscar `ERR_INTERNET_DISCONNECTED` y repetir con `--last-failed`.
-  Intermitentes: `help:62`, `roadsheet-share:17`, `device-cache:98`, `conversation-filter-sheet:39`. En
+  Intermitentes: `help:62`, `roadsheet-share:17`, `device-cache:98`, `conversation-filter-sheet:39`,
+  `bolo-guest-frame:148`, `lens-toggle:68`. En
   `playwright`, `/api/search` tarda 5 o 6 s (tarea 150) y algunos specs se saltan por datos.
 - Si Playwright pide otra revisión de Chromium, `PW_CHROMIUM` apuntando a una instalada, p. ej.
   `~/Library/Caches/ms-playwright/chromium-1228/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing`.
