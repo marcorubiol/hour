@@ -1553,15 +1553,8 @@
       overflow-x: auto;
       scrollbar-width: none;
     }
-    /* From a tablet up a chip never gives way: the search shrinks to its
-       glass first. On a phone the chips slide, as they did. */
-    @media (min-width: 48rem) {
-      .conversations__chiprow {
-        flex-shrink: 0;
-      }
-    }
     /* Search the list: the glass and a word, no box; it grows as it takes the
-       focus or holds a query, and the chips give it their room. */
+       focus or holds a query. */
     .conversations__search {
       display: inline-flex;
       align-items: center;
@@ -1584,6 +1577,21 @@
       flex: 1 1 auto;
       background: var(--bg-light);
       color: var(--text-muted);
+    }
+    /* From a tablet up the search gives way before a chip: at rest its shrink
+       outweighs the chips', so it folds to its glass first and only then the
+       chips slide, and «Filtrar» is never cut. With the focus or a query it
+       keeps room to read what is typed, and the chips give it theirs. On a
+       phone the chips slide, as they did. */
+    @media (min-width: 48rem) {
+      .conversations__search {
+        flex-shrink: 1000;
+      }
+      .conversations__search:focus-within,
+      .conversations__search.is-on {
+        flex-shrink: 0;
+        min-inline-size: calc(9em + 3 * var(--space-xs));
+      }
     }
     .conversations__glass {
       flex-shrink: 0;

@@ -1180,6 +1180,12 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: el público y sus invit
       const res = await pgRpc<Mailout>('queue_mailout', adminJwt, { p_id: m.id });
       expect(res.status, res.error).toBe(200);
       invShared = one(res.data)!;
+      // El cron de cada minuto reclama la cola de todos los espacios: hasta el
+      // claim del test 15, estos destinatarios esperan una hora.
+      const parked = await svc('PATCH', `mailout_recipient?mailout_id=eq.${m.id}&status=eq.queued`, {
+        next_attempt_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+      });
+      expect(parked.status, parked.error).toBe(200);
       expect(invShared.from_address).toBe(`difusion@inv-${RUN}.example.test`);
 
       const rows = (await recipients(m.id)).rows;
@@ -1235,6 +1241,10 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: el público y sus invit
         invitation_daily_cap: (await used(true)) + 1,
       });
       try {
+        // Los que el test 12 apartó del cron vuelven a la cola justo antes del claim.
+        await svc('PATCH', `mailout_recipient?mailout_id=eq.${invShared.id}&status=eq.queued`, {
+          next_attempt_at: new Date(Date.now() - 3600 * 1000).toISOString(),
+        });
         const first = await svc<{ recipient_id: string; conversation_id: string | null; audience_subscription_id: string | null; from_address: string; tenant_name: string }[]>(
           'POST',
           'rpc/mailout_claim',
