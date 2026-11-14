@@ -66,8 +66,9 @@ test.describe('Contextual help (approach A)', () => {
 
     await page.reload();
     await waitForLoaded(page);
-    // Settled: the dashboard is drawn and the card did not come back.
-    await expect(page.getByRole('main').getByRole('heading', { level: 1 })).toBeVisible();
+    // Settled: the dashboard is drawn and the card did not come back. Hoy's
+    // title is heard, not seen (ADR-203 § 1): its piece is what paints.
+    await expect(page.getByTestId('desk-next').or(page.getByTestId('desk-hollow')).first()).toBeVisible();
     await expect(desk).toHaveCount(0);
   });
 
