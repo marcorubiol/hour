@@ -5238,6 +5238,9 @@ acierta, y si hace falta la pantalla encendida (Wake Lock) o el aviso antes de l
 > Hoja). § 3, § 4 y § 6 siguen: la precarga, las claves de logística y la hoja por rol. Si desaparece también en
 > escritorio está abierto en ADR-202.
 
+> **Amended by ADR-206 (2026-11-14), solo en el enlace del mapa.** «Mapa» y «Cómo llegar» abren la app de mapas que
+> prefiere el dispositivo (Apple Maps, Google Maps o Waze); Apple solo es lo de antes de elegir y sin JS.
+
 ## [2026-10-30] ADR-147 · Hour deja de adivinar quién va (enmienda ADR-092 § 3 y ADR-103)
 
 **Contexto.** Marco, 30-10, mirando Hoy: le preguntaba «¿vas?» por «Départ Manou (navette)», el viaje de otra persona,
@@ -7857,3 +7860,37 @@ sobre el artefacto de tres opciones (https://claude.ai/artifact/YEkwMXYMs5ZHPS1V
 
 **Re-evaluar cuando** Marco lo use con el equipo conectado: si el punto sobre su propio avatar se lee como «estoy en
 línea» en vez de «hay alguien más».
+
+## [2026-11-14] ADR-206 · «Mapa» abre la app de mapas que prefiere el dispositivo (enmienda ADR-146, solo en el enlace del mapa)
+
+**Contexto.** Desde ADR-146 el enlace del mapa era siempre Apple Maps (`maps.apple.com/?q=`): en un Android, o en un
+iPhone con Google Maps o Waze, abría la app equivocada o la web. Marco, chat 14-11: «Cuando aprieto en maps, quiero
+que me abra en mi app preferida». Entre tres vías (preguntar la primera vez, un ajuste, o las dos) eligió: «La 1, pero
+que sea una cosa que se guarde cuando hacemos la 2».
+
+**Decidido por Marco.**
+1. **La primera vez se pregunta.** Sin preferencia guardada, «Mapa» (la pieza de Hoy) y «Cómo llegar» (la hoja de
+   ruta, también la pública) abren una hoja corta, «Abrir con»: Apple Maps, Google Maps, Waze. El marco es `Dialog`,
+   que en el móvil ya es una hoja desde abajo; se carga al pulsar, no va en la carga de Hoy.
+2. **Lo elegido se guarda y abre el mapa en el mismo gesto.** Cada opción es un enlace real a su app (iOS bloquea una
+   apertura que llega después de una espera); al pulsarla guarda la preferencia y cierra la hoja. Las siguientes
+   veces el botón es un enlace directo a la app guardada, sin hoja.
+3. **Se guarda en el dispositivo, no en la cuenta.** `localStorage`, clave `hour_maps_app` (`$lib/maps-app.svelte`),
+   sin migración ni esquema y sin tocar la caché de consultas (`CACHE_SCHEMA` no sube). Así vale igual en la hoja de
+   ruta pública, sin cuenta, y cada aparato guarda lo suyo.
+4. **Se cambia en Ajustes y en la hoja de ruta.** En Ajustes, Perfil, «Abrir mapas con»: Preguntar, Apple Maps,
+   Google Maps, Waze; «Preguntar» borra la preferencia. En la hoja de ruta, con una app guardada, una línea discreta
+   bajo los botones: «Abre en Waze · Cambiar», que abre la misma hoja con la actual marcada. La hoja de elegir dice en
+   una línea que se recuerda en el dispositivo y dónde se cambia (Ajustes en Hoy; «Cambiar» en la hoja de ruta).
+
+**Los enlaces** (`mapsHref(parts, app)` en `$lib/ahora.ts`, con tests): Apple `https://maps.apple.com/?q=`, Google
+`https://www.google.com/maps/search/?api=1&query=`, Waze `https://waze.com/ul?q=…&navigate=yes`. Los tres son
+enlaces universales: abren la app si está instalada y la web si no.
+
+**Mejora progresiva.** Antes de hidratar, sin JS o en un navegador sin `<dialog>`, el botón sigue siendo un enlace a
+Apple Maps, como en ADR-146. Un clic con modificador (⌘, Ctrl, el botón central) sigue el enlace que enseña.
+
+**Enmienda a ADR-146.** Solo en el enlace del mapa: ya no es siempre Apple Maps. El resto de ADR-146 no cambia.
+
+**Re-evaluar cuando** alguien pida una cuarta app (Citymapper, OsmAnd) o quiera la preferencia en la cuenta para que
+le siga entre aparatos.
