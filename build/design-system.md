@@ -70,6 +70,7 @@ En la pieza llena, qué y cuándo van al mismo tamaño, qué a la izquierda y la
 la segunda línea. Mientras haces algo, la hora grande es hasta cuándo («→ 17h») y debajo, cuánto queda.
 - **Por qué:** la hora es la mitad del hecho, no un detalle; y una cuenta atrás grande mete prisa.
 - **Decisión:** 146, pedido de Marco: «la hora al tamaño de la cosa, no solo la cuenta atrás».
+- **Enmienda (ADR-207):** a la izquierda va de quién es, no qué es; la palabra baja a la segunda línea (regla 19).
 
 ### 7. El monograma del proyecto delante de cada cosa. DECIDIDO
 
@@ -155,6 +156,28 @@ expresa en tokens: color, tipografía, grosor de trazo, radios, cómo es la supe
 - **Por qué:** 4 a 8 temas de verdad distintos solo son posibles si ninguno toca la composición.
 - **Estado:** principio propuesto en la 147 (13-11), sin cerrar por Marco. Las reglas 1 a 16 ya están escritas para
   cumplirlo.
+
+### 18. Una opción se inclina: cursiva y «?», juntos. DECIDIDO
+
+Una opción (`hold` o `proposed`) dice su duda en sus palabras: la palabra lleva «?» y va en cursiva, y la cursiva
+abraza palabra, «?» y sitio en un solo trazo. El «?» nunca queda derecho al lado de una palabra inclinada. Sin papel
+para el grano, la cursiva es la duda; con papel, el grano la acompaña. El monograma no se inclina: es un símbolo.
+- **Cómo:** `class="guess"` (`certainty.css`), un solo elemento para palabra, «?» y sitio; dentro del slip,
+  `.slip__kind--q`. No se pega `font-style` en un componente.
+- **En la pieza de Hoy:** con una función, el titular y la línea de debajo; con dos o más, solo la fila de la opción
+  (ADR-207).
+- **Por qué:** una duda, una forma, en cualquier tamaño (del raíl a 9 px a la pieza a 39 px).
+- **Decisión:** la regla vivía en `Slip.svelte`; Marco eligió el arreglo de la pieza de Hoy el 14-11 (ADR-207).
+
+### 19. La pieza dice de quién es; con varias funciones, ninguna pesa más. DECIDIDO
+
+Con una sola función hoy, el titular de la pieza llena es el proyecto (sin proyecto, la sala y si no la ciudad); la
+palabra del momento baja a la segunda línea con la sala. Con dos o más, la pieza no elige: el titular es el proyecto si
+todas son del mismo, si no «N funciones» en el oficio de sus espacios; todas las horas a la derecha, al mismo tamaño;
+las filas sin el peso del foco.
+- **Por qué:** con varias compañías, de quién es se lee antes que qué es (regla 7); y con dos funciones, dar más peso
+  a una miente sobre el día.
+- **Decisión:** Marco, 14-11: «la A pero si hay más de un show no podemos darle más peso a uno que a otro» (ADR-207).
 
 ## Contra los cinco principios (`03_AGENCY/_area-methød/code/philosophy.md`)
 

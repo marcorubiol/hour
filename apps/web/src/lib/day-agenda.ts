@@ -47,6 +47,8 @@ export interface AgendaPoint {
   hard: boolean;
   /** The day's main event: the first performance's own hour. */
   main: boolean;
+  /** Its performance's own hour, one point per performance (ADR-207). */
+  own: boolean;
 }
 
 export interface DayAgenda {
@@ -84,11 +86,12 @@ function performancePoints(p: PerformanceEvent, ref: PulseRef, viewerTz: string)
   if (moments.length === 0) {
     // A gig with no hour on file is still the day's: one untimed line.
     return [
-      { key: `p:${p.id}`, ref, what: { of: 'moment', key: 'start', label: null }, at: null, tz: ref.tz, from: startOf(day, zone), to: endOf(day, zone), hard: true, main: true },
+      { key: `p:${p.id}`, ref, what: { of: 'moment', key: 'start', label: null }, at: null, tz: ref.tz, from: startOf(day, zone), to: endOf(day, zone), hard: true, main: true, own: true },
     ];
   }
   const startAt = moments.find((m) => m.key === 'start')?.at ?? p.start_at ?? null;
   const mainAt = startAt && moments.some((m) => m.at === startAt) ? startAt : moments[0].at;
+  const own = moments.findIndex((m) => m.at === mainAt);
   return moments.map((m, i) => {
     const next = moments[i + 1];
     const from = Date.parse(m.at);
@@ -102,7 +105,8 @@ function performancePoints(p: PerformanceEvent, ref: PulseRef, viewerTz: string)
       from,
       to: terminal ? from : next ? Date.parse(next.at) : Math.max(endOf(dayKeyInTz(m.at, zone), zone), from),
       hard: Boolean(next) || terminal,
-      main: m.at === mainAt,
+      main: i === own,
+      own: i === own,
     };
   });
 }
@@ -128,16 +132,17 @@ function datePoints(d: DateEvent, ref: PulseRef, day: string, viewerTz: string):
           to: Math.max(to, from),
           hard: Number.isFinite(arrive) || Boolean(nextDepart),
           main: false,
+          own: false,
         };
       });
   }
   const what: AgendaWhat = { of: 'date', kind: d.kind, label: d.label ?? null };
   if (d.all_day) {
-    return [{ key: `d:${d.id}`, ref, what, at: null, tz: ref.tz, from: startOf(day, zone), to: endOf(day, zone), hard: true, main: false }];
+    return [{ key: `d:${d.id}`, ref, what, at: null, tz: ref.tz, from: startOf(day, zone), to: endOf(day, zone), hard: true, main: false, own: false }];
   }
   const from = Date.parse(d.starts_at);
   const to = d.ends_at ? Date.parse(d.ends_at) : endOf(dayKeyInTz(d.starts_at, zone), zone);
-  return [{ key: `d:${d.id}`, ref, what, at: d.starts_at, tz: ref.tz, from, to: Math.max(to, from), hard: Boolean(d.ends_at), main: false }];
+  return [{ key: `d:${d.id}`, ref, what, at: d.starts_at, tz: ref.tz, from, to: Math.max(to, from), hard: Boolean(d.ends_at), main: false, own: false }];
 }
 
 /**

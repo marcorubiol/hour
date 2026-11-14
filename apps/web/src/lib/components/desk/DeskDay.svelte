@@ -3,13 +3,18 @@
    * THE DAY, Hoy's first block (ADR-202 § 2 to § 5, ADR-203 § 2 and § 4): the
    * one filled surface of the screen, with the day's agenda inside it.
    *
-   *   ┌ MMI MaMeMi · Lo siguiente ────────────┐
-   *   │ Prensa                            16h │  what and its hour, one size
-   *   │ Ràdio Girona                en 2 h 10 │  where, and the countdown
+   *   ┌ MMI Lo siguiente ─────────────────────┐
+   *   │ MaMeMi                            16h │  whose and its hour, one size
+   *   │ Prensa · Ràdio Girona       en 2 h 10 │  what, where, and the countdown
    *   │ ───────────────────────────────────── │
    *   │ 10h   Ensayo · Sala 2                 │  the day, gone by dimmed
    *   │ 16h   Prensa · Ràdio Girona           │  the focus marked
    *   └───────────────────────────────────────┘
+   *
+   * TWO OR MORE PERFORMANCES TODAY, none weighs more (ADR-207): the headline
+   * is their project, or «2 funciones»; every hour on the right at one size
+   * («12h · 21h»), and under it when the first starts. The rows lose the
+   * focus's weight and, with several projects, a show's row says whose.
    *
    * Doing something, the big hour is until when («→ 17h») and under it how
    * much is left. ON A GIG DAY it opens with what Ahora used to show
@@ -39,7 +44,7 @@
   import { stagePlace } from '$lib/travel-stage';
   import { timedStages, type PulseNext } from '$lib/pulse';
   import type { AgendaPoint, DayAgenda } from '$lib/day-agenda';
-  import { nextWhen, rowsSayCity } from '$lib/hoy';
+  import { nextWhen, piecePerformance, rowsSayCity, showsDay } from '$lib/hoy';
   import { countdownParts, freshnessShown, logisticsLines, mapsHref, minutesTo, telHref, venueCall } from '$lib/ahora';
   import { ahoraRoadsheetQuery, roleFor, type AhoraRoadsheet } from '$lib/ahora-feeds.svelte';
   import { teamQueryOptions } from '$lib/nav-queries';
@@ -119,20 +124,18 @@
   }
   /** Where a point is, small: the venue and city, a stage's route, a date's place.
    *  `city: false` leaves the city out (the day's rows in one city, `rowsSayCity`). */
-  function place(p: AgendaPoint, city = true): string {
+  function placeParts(p: AgendaPoint, city = true): string[] {
     const w = p.what;
+    const some = (xs: (string | null | undefined)[]) => xs.filter((x): x is string => Boolean(x));
     if (w.of === 'stage') {
       const route = [stagePlace(w.stage.from_city, w.stage.from_place), stagePlace(w.stage.to_city, w.stage.to_place)].filter(Boolean).join(' → ');
-      return [route, w.stage.arrive_at ? t('ahora.arrives', locale, { time: hour(w.stage.arrive_at, w.stage.arrive_tz ?? p.tz) }) : null]
-        .filter(Boolean)
-        .join(' · ');
+      return some([route, w.stage.arrive_at ? t('ahora.arrives', locale, { time: hour(w.stage.arrive_at, w.stage.arrive_tz ?? p.tz) }) : null]);
     }
     const sl = pulseSlip(p.ref, agenda?.day ?? today, slipCtx);
     const title = p.ref.of === 'date' ? (p.ref.row as DateEvent).title : null;
-    return [title && title !== word(p) ? title : null, sl.name !== title ? sl.name : null, city && sl.city && sl.city !== sl.name ? sl.city : null]
-      .filter(Boolean)
-      .join(' · ');
+    return some([title && title !== word(p) ? title : null, sl.name !== title ? sl.name : null, city && sl.city && sl.city !== sl.name ? sl.city : null]);
   }
+  const place = (p: AgendaPoint, city = true) => placeParts(p, city).join(' · ');
   /* A hold says what it is in the house word («1.ª opción · vence lun»). */
   function holdLabel(p: AgendaPoint): string | null {
     const sl = pulseSlip(p.ref, agenda?.day ?? today, slipCtx);
@@ -143,16 +146,30 @@
 
   let focus = $derived(agenda && agenda.focus !== null ? agenda.points[agenda.focus] : null);
   let doing = $derived(agenda?.headline === 'doing');
-  /* THE HOUR AT THE SIZE OF THE THING (ADR-202 § 4): what on the left, its
-     hour on the right; doing something, until when. */
-  let what = $derived(focus ? cap(word(focus)) + (focus.ref.tentative ? '?' : '') : '');
+  /** Two or more performances today (ADR-207), else null: the focus speaks. */
+  let shows = $derived(agenda ? showsDay(agenda) : null);
+  /* THE HOUR AT THE SIZE OF THE THING (ADR-202 § 4, ADR-207): whose on the
+     left (the project; without one, the venue, else the city), its hour on
+     the right; doing something, until when. The word of the moment goes
+     down to the second line, with its «?» and where. */
+  let lead = $derived.by(() => {
+    if (!focus) return { what: '', sub: [] as string[] };
+    const w = cap(word(focus)) + (focus.ref.tentative ? '?' : '');
+    const parts = placeParts(focus);
+    const name = focus.ref.row.project?.name;
+    if (name) return { what: name, sub: [w, ...parts] };
+    const sl = focus.ref.of === 'performance' ? pulseSlip(focus.ref, agenda?.day ?? today, slipCtx) : null;
+    const by = sl ? sl.name || sl.city || '' : '';
+    return by ? { what: by, sub: [w, ...parts.filter((x) => x !== by)] } : { what: w, sub: parts };
+  });
+  let what = $derived(lead.what);
   let at = $derived.by(() => {
     if (!focus) return '';
     if (doing && agenda?.until) return `→ ${hour(agenda.until, focus.tz)}`;
     return focus.at ? hour(focus.at, focus.tz) : t('planner.all_day', locale);
   });
-  /* The second line: where, and how long (the countdown, or what is left). */
-  let where = $derived(focus ? [place(focus), holdLabel(focus)].filter(Boolean).join(' · ') : '');
+  /* The second line: what and where, and how long (the countdown, or what is left). */
+  let where = $derived(focus ? [...lead.sub, holdLabel(focus)].filter(Boolean).join(' · ') : '');
   let left = $derived.by(() => {
     if (!focus) return '';
     if (doing) return agenda?.until ? t('desk.piece_left', locale, { dur: duration(minutesTo(agenda.until, now)) }) : '';
@@ -165,12 +182,41 @@
     if (!a) return false;
     return rowsSayCity(a.points.filter((p) => p.what.of !== 'stage').map((p) => pulseSlip(p.ref, a.day, slipCtx).city));
   });
-  let eye = $derived(focus ? [focus.ref.row.project?.name, t(doing ? 'ahora.title' : 'desk.band_next', locale)].filter(Boolean).join(' · ') : '');
+  /* SEVERAL SHOWS (ADR-207): the headline is the day, not one of them. */
+  /** The shows speak their spaces' trade (ADR-199): one, its own; several, the neutral word. */
+  let showsVoice = $derived.by((): Voice => {
+    const voices = new Set((shows?.shows ?? []).map((p) => tradeFor(perfWorkspaceId(p.ref.row))));
+    return voices.size === 1 ? [...voices][0] : 'mixed';
+  });
+  /** «2 funciones», «2 shows». */
+  const showsCount = (s: NonNullable<typeof shows>) => t('desk.shows_n', locale, { n: s.shows.length }, showsVoice);
+  let showsWhat = $derived(shows ? (shows.oneProject ? shows.shows[0].ref.row.project!.name : showsCount(shows)) : '');
+  let showsAt = $derived(
+    shows ? shows.hours.map((p) => hour(p.at!, p.tz)).join(shows.shows.length > 2 ? ' … ' : ' · ') || t('planner.all_day', locale) : '',
+  );
+  let showsWhere = $derived.by(() => {
+    const s = shows;
+    if (!s || !agenda) return '';
+    const cities = new Set(s.shows.map((p) => pulseSlip(p.ref, agenda.day, slipCtx).city).filter(Boolean));
+    return [s.oneProject ? showsCount(s) : null, ...cities].filter(Boolean).join(' · ');
+  });
+  let showsLeft = $derived.by(() => {
+    const s = shows;
+    if (!s) return '';
+    if (s.on) return agenda?.until ? t('desk.shows_on_until', locale, { time: hour(agenda.until, s.on.tz) }) : t('desk.shows_on', locale);
+    const m = s.ahead?.at ? minutesTo(s.ahead.at, now) : 0;
+    return m > 0 ? t(s.begun ? 'desk.shows_next' : 'desk.shows_first', locale, { dur: duration(m) }, showsVoice) : '';
+  });
+  let eye = $derived(
+    shows ? (shows.on ? t('ahora.title', locale) : cap(t('desk.next_today', locale))) : focus ? t(doing ? 'ahora.title' : 'desk.band_next', locale) : '',
+  );
+  /** The overline's monogram: the focus's project, or the one project of the day's shows. */
+  let eyeProject = $derived(shows ? (shows.oneProject ? shows.shows[0].ref.row.project : null) : focus?.ref.row.project);
 
-  /* The piece's actions and facts are the performance's: the focus when it
-     is one, else the day's main event (on the train, the venue is where you
-     are going). */
-  let actionPoint = $derived(focus?.ref.of === 'performance' ? focus : (agenda?.points.find((p) => p.main) ?? null));
+  /* The piece's actions and facts are the performance's (`piecePerformance`):
+     the focus when it is one, else the day's main event (on the train, the
+     venue is where you are going); with several, the one on or next. */
+  let actionPoint = $derived(agenda ? piecePerformance(agenda) : null);
   let actionPerf = $derived(actionPoint ? (actionPoint.ref.row as PerformanceEvent) : null);
   let actionSlip = $derived(actionPoint && agenda ? pulseSlip(actionPoint.ref, agenda.day, slipCtx) : null);
   /** A gig day: the day has a performance (its main event). */
@@ -293,17 +339,22 @@
       <span class="piece__sub"><span class="ghost-line" style:inline-size="40%">&nbsp;</span></span>
     </div>
   {:else if agenda && focus}
+    {@const sub = shows ? showsWhere : where}
+    {@const rest = shows ? showsLeft : left}
+    {@const leans = !shows && focus.ref.tentative}
     <div class="piece" class:piece--gig={gig} data-testid="desk-next">
-      <span class="piece__eye">{@render mark(focus.ref.row.project)}{eye}</span>
-      <!-- The headline is read again when the minute ticks: polite, never twice a minute. -->
+      <span class="piece__eye">{@render mark(eyeProject)}{eye}</span>
+      <!-- The headline is read again when the minute ticks: polite, never twice a minute.
+           An option leans, the headline and the line under it (design-system
+           rule 18); with several shows the headline is the day's: only a row leans. -->
       <div class="piece__lead" aria-live="polite" data-testid="desk-next-now">
-        <span class="piece__what">{what}</span>
-        <span class="piece__at">{at}</span>
+        <span class="piece__what" class:guess={leans} data-testid="desk-next-what">{shows ? showsWhat : what}</span>
+        <span class="piece__at">{shows ? showsAt : at}</span>
       </div>
-      {#if where || left}
+      {#if sub || rest}
         <div class="piece__sub">
-          <span class:guess={focus.ref.tentative}>{where}</span>
-          {#if left}<span class="piece__left">{left}</span>{/if}
+          <span class:guess={leans}>{sub}</span>
+          {#if rest}<span class="piece__left">{rest}</span>{/if}
         </div>
       {/if}
       {#if fresh}<span class="piece__fresh" data-testid="desk-fresh">{fresh}</span>{/if}
@@ -313,15 +364,19 @@
           {#each agenda.points as p, i (p.key)}
             {@const href = rowHref(p)}
             {@const w = place(p, rowsCity)}
+            <!-- Several projects' shows (ADR-207): a show's own row says whose, not «Show». -->
+            {@const label = shows && !shows.oneProject && p.own && p.ref.row.project ? p.ref.row.project.name : cap(word(p))}
             <li
               class="piece__row"
               class:piece__row--past={agenda.past[i]}
-              class:piece__row--on={i === agenda.focus}
+              class:piece__row--on={!shows && i === agenda.focus}
               data-testid={p.main ? 'desk-agenda-main' : undefined}
             >
               <span class="piece__h">{p.at ? hour(p.at, p.tz) : t('planner.all_day', locale)}</span>
               <svelte:element this={href ? 'a' : 'span'} {href} class="piece__rowwhat">
-                {@render mark(p.ref.row.project)}{cap(word(p))}{p.ref.tentative ? '?' : ''}{#if w}{' · '}<span class:guess={p.ref.tentative}>{w}</span>{/if}
+                {@render mark(p.ref.row.project)}<span class:guess={p.ref.tentative}
+                  >{label}{p.ref.tentative ? '?' : ''}{#if w}{' · '}{w}{/if}</span
+                >
               </svelte:element>
             </li>
           {/each}

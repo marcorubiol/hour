@@ -39,7 +39,7 @@
   import DeskChanged from '$lib/components/desk/DeskChanged.svelte';
   import DeskSeason from '$lib/components/desk/DeskSeason.svelte';
   import LateNoticeBand from '$lib/components/desk/LateNoticeBand.svelte';
-  import { COMING_TILES, COMING_TILES_PHONE, comingTiles, nextAfterToday, outsideToday, scopePulseInput, waitingRowCount } from '$lib/hoy';
+  import { COMING_TILES, COMING_TILES_PHONE, comingTiles, nextAfterToday, outsideToday, piecePerformance, scopePulseInput, waitingRowCount } from '$lib/hoy';
   import { MediaQuery } from 'svelte/reactivity';
   import { MOBILE_QUERY } from '$lib/breakpoints';
   import { goto } from '$app/navigation';
@@ -263,13 +263,8 @@
     ];
     return t(n === 1 ? 'desk.outside_one' : 'desk.outside_many', locale, { n, scope: names.join(', ') });
   });
-  /** The performance the piece's actions are about: the focus, else the day's main one. */
-  let cardPerformanceId = $derived.by(() => {
-    if (!agenda) return '';
-    const focus = agenda.focus !== null ? agenda.points[agenda.focus] : null;
-    const p = focus?.ref.of === 'performance' ? focus : agenda.points.find((x) => x.main);
-    return p?.ref.id ?? '';
-  });
+  /** The performance the piece's actions are about (`piecePerformance`). */
+  let cardPerformanceId = $derived(agenda ? (piecePerformance(agenda)?.ref.id ?? '') : '');
   const kindLabel = (kind: SlipKind) => t(`planner.kind_${kind}`, locale);
   let slipCtx = $derived(pulseSlipContext(feeds.workspaces, viewerTz, kindLabel));
 
