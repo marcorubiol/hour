@@ -44,7 +44,7 @@ test.describe('smoke', () => {
     // THE WAY HOME IS THE CLOCK (2026-07-31), and home is the Desk. Located by
     // the door itself (`a[href="/h/desk"]` wrapping the clock) rather than by
     // its label, which is translated.
-    await expect(page.locator('a[href="/h/desk"] time')).toBeVisible();
+    await expect(page.locator('a[href="/h/desk"] time:visible')).toBeVisible();
 
     // ⌘K is the SEARCH (ADR-178; the scope pill opens the same palette as a
     // filter), not a lens switcher: it lists spaces / projects / lines from

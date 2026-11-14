@@ -13,7 +13,7 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  *     lenses, on every view of the Planner, on a record and on Settings. It
  *     cannot move under the cursor because no page draws it;
  *   - you (the account menu) live at the foot of the rail beside it, and in
- *     the top bar only on a phone, where the rail is a drawer;
+ *     the top bar only on a phone, where there is no rail (ADR-202 § 10);
  *   - off a lens it marks the lens you came from, and says so to a reader,
  *     without claiming to be the page;
  *   - on a phone (390) it is a bar at the foot of the screen, and the end of
@@ -130,6 +130,12 @@ test.describe('the sections in the frame (ADR-140)', () => {
     await expect(account()).toHaveCount(1);
     await expect(page.locator('header').getByRole('button', { name: 'Open account menu' })).toBeVisible();
     expect((await account().boundingBox())!.y).toBeLessThan(60);
+    // No rail on a phone: the clock goes to Hoy and opens nothing (ADR-202 § 10).
+    await expect(page.locator('#shell-rail')).toBeHidden();
+    const clock = page.locator('.shell__now');
+    await expect(clock).toHaveAccessibleName('Today');
+    await expect(clock).toHaveAttribute('href', '/h/desk');
+    await expect(clock).not.toHaveAttribute('aria-expanded', /.*/);
   });
 
   test('off a lens, no lens is marked, and the way back is one click', async ({ page }) => {

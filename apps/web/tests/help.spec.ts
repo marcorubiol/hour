@@ -36,6 +36,14 @@ async function seeAll(page: Page) {
   }, HELP_SEEN);
 }
 
+/** The account menu on screen (the rail's beside it, the top bar's on a phone). */
+const accountMenu = (page: Page) => page.getByRole('button', { name: 'Open account menu' }).locator('visible=true');
+/** The section's «?» is a row of the account menu since ADR-203 § 1. */
+async function askHelp(page: Page) {
+  await accountMenu(page).click();
+  await page.getByRole('menuitem', { name: 'About this section' }).click();
+}
+
 const card = (page: Page, section: string) =>
   page.locator(`[data-testid="first-visit-card"][data-section="${section}"]`);
 
@@ -71,21 +79,20 @@ test.describe('Contextual help (approach A)', () => {
     await expect(desk).toHaveCount(0);
   });
 
-  test('the «?» brings it back, and «Got it» closes it again', async ({ page }) => {
+  test('the account menu’s «?» brings it back, and «Got it» closes it again', async ({ page }) => {
     await page.goto(DESK);
     await waitForLoaded(page);
     const desk = card(page, 'desk');
     await expect(desk).toHaveCount(0);
 
-    const ask = page.getByRole('button', { name: 'About this section' });
-    await ask.click();
+    await askHelp(page);
     await expect(desk).toBeVisible();
-    await expect(ask).toHaveAttribute('aria-expanded', 'true');
     await expect(desk.getByRole('heading', { name: 'Today' })).toBeFocused();
 
     await desk.getByRole('button', { name: 'Got it' }).click();
     await expect(desk).toHaveCount(0);
-    await expect(ask).toBeFocused();
+    // Back to the menu that brings it back.
+    await expect(accountMenu(page)).toBeFocused();
   });
 
   test('«Show me» walks the Planner’s steps and then the card is seen', async ({ page }) => {
@@ -141,7 +148,7 @@ test.describe('Contextual help (approach A)', () => {
     await page.goto(CONVERSATIONS);
     await waitForLoaded(page);
     await expect(page.getByRole('button', { name: 'What is Relation' })).toHaveCount(0);
-    await page.getByRole('button', { name: 'About this section' }).click();
+    await askHelp(page);
     const terms = card(page, 'conversations').getByTestId('help-terms');
     await expect(terms).toContainText('Not this time:');
     await expect(terms).toContainText('Not contacted:');
@@ -154,8 +161,10 @@ test.describe('Contextual help (approach A)', () => {
     // The four lenses carry no «i» in their heads (ADR-145 § 2).
     await expect(page.getByRole('main').locator('.block-head .hint')).toHaveCount(0);
 
-    const ask = page.getByRole('button', { name: 'About this section' });
-    await ask.focus();
+    // By keyboard: the account menu, then its row.
+    await accountMenu(page).focus();
+    await page.keyboard.press('Enter');
+    await page.getByRole('menuitem', { name: 'About this section' }).focus();
     await page.keyboard.press('Enter');
     const desk = card(page, 'desk');
     const terms = desk.getByTestId('help-terms');
