@@ -60,9 +60,12 @@ test.describe('Calm — a composition, not a grey (ADR-139 § 5)', () => {
           switchBg: getComputedStyle(sw).backgroundColor,
         };
       });
+    // The month draws after the page settles: wait for the act being measured.
     await open(page, '/h/planner?view=month', false);
+    await expect(page.locator('.cal__add')).toBeVisible();
     const off = await look();
     await open(page, '/h/planner?view=month', true);
+    await expect(page.locator('.cal__add')).toBeVisible();
     const on = await look();
     expect(on.addBg, '«＋ Date» changed its ground in calm').toBe(off.addBg);
     expect(on.addColor).toBe(off.addColor);

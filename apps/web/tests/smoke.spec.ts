@@ -65,8 +65,10 @@ test.describe('smoke', () => {
 
     await page.goto('/h/desk');
     await waitForLoaded(page);
-    // Lens headers were unified to the shared LensHeader (.lenshead) in a6cd10e.
-    await expect(page.locator('.lenshead').first()).toBeVisible();
+    // Today's title is heard, not seen (ADR-203 § 1): no title row is drawn,
+    // the piece of the day is what the page shows.
+    await expect(page.getByRole('heading', { level: 1, name: 'Today' })).toBeAttached();
+    await expect(page.getByTestId('desk-next').or(page.getByTestId('desk-hollow')).first()).toBeVisible();
 
     // Project detail proves the read path: session survived, RLS let the
     // conversations through, the count renders. Entities stay space-scoped.
