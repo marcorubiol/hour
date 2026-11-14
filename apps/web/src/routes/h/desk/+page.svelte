@@ -157,8 +157,15 @@
   }
   const lastVisit = readVisit();
   const since = sinceInstant(lastVisit, new Date());
+  // A visit counts once Hoy has shown what changed: leaving before that (a
+  // remount, a quick tap away) keeps the last visit, so nothing unseen is lost.
+  let shown = false;
+  $effect(() => {
+    if (feeds.settled) shown = true;
+  });
   $effect(() => {
     const save = () => {
+      if (!shown) return;
       try {
         localStorage.setItem(VISIT_KEY, new Date().toISOString());
       } catch {

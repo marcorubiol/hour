@@ -250,4 +250,44 @@ describe('spaceAsk: el panel del primer día, también sobre el espacio del alta
   it('la clave cabe en help_seen', () => {
     expect(HELP_KEY.test(SPACE_ASKED_KEY)).toBe(true);
   });
+
+  // The shell's order of arrival: the spaces and what was seen come in either
+  // order, and the section, once drawn, is never taken off by a wait (the
+  // remount lost Hoy's last visit and the open WhatsApp import). `painted`
+  // latches as the shell's effect does: the first `none` draws the section.
+  describe('el orden de llegada no desmonta la sección', () => {
+    type Input = Parameters<typeof spaceAsk>[0];
+    const nothing: Input = { spaces: null, seen: {}, ready: false, settled: false, start: undefined };
+    const run = (steps: Partial<Input>[]) => {
+      let input = nothing;
+      let painted = false;
+      return steps.map((step) => {
+        input = { ...input, ...step };
+        const ask = spaceAsk({ ...input, painted });
+        if (ask === 'none') painted = true;
+        return ask;
+      });
+    };
+    const spaces = { spaces: [mine] };
+    const seenCard = { ready: true, settled: true, seen: { [SPACE_ASKED_KEY]: SEEN_AT } };
+    const freshCard = { ready: true, settled: true, seen: {} };
+
+    it('los espacios antes que lo visto: la sección se queda', () => {
+      expect(run([{}, spaces, seenCard])).toEqual(['none', 'none', 'none']);
+    });
+    it('lo visto antes que los espacios: la sección se queda', () => {
+      expect(run([{}, seenCard, spaces])).toEqual(['none', 'none', 'none']);
+    });
+    it('el primer día, en los dos órdenes: la sección y luego el panel, sin hueco', () => {
+      expect(run([{}, spaces, freshCard, { start: empty }])).toEqual(['none', 'none', 'none', 'name']);
+      expect(run([{}, freshCard, spaces, { start: empty }])).toEqual(['none', 'none', 'none', 'name']);
+    });
+    it('con los espacios ya en la mano (la caché del dispositivo), espera antes de pintar', () => {
+      const cached: Input = { ...nothing, ...spaces };
+      expect(spaceAsk(cached)).toBe('wait');
+      expect(spaceAsk({ ...cached, ...freshCard })).toBe('wait');
+      expect(spaceAsk({ ...cached, ...freshCard, start: empty })).toBe('name');
+      expect(spaceAsk({ ...cached, ...seenCard })).toBe('none');
+    });
+  });
 });

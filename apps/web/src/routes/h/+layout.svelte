@@ -216,6 +216,9 @@
   const signupStartQuery = createQuery(
     toStore(() => startQueryOptions(signup?.id, Boolean(signup) && help.ready && !signupAsked)),
   );
+  // Once the section is on screen, a wait never takes it off: the spaces and
+  // what was seen arrive in either order, and a remount loses its state.
+  let painted = $state(false);
   let ask = $derived(
     spaceAsk({
       spaces: $workspacesQuery.isSuccess ? ($workspacesQuery.data?.items ?? []) as NavWorkspace[] : null,
@@ -223,8 +226,12 @@
       ready: help.ready,
       settled: help.settled ?? false,
       start: $signupStartQuery.isError ? null : $signupStartQuery.data,
+      painted,
     }),
   );
+  $effect(() => {
+    if (authChecked && !blocked && ask === 'none') painted = true;
+  });
   // A signup space with something in it is a space in use: never asked again.
   $effect(() => {
     const start = $signupStartQuery.data;

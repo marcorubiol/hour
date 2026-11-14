@@ -175,7 +175,11 @@ export const untouched = (res: StartResponse): boolean => !res.project && !res.c
  * - `name`: solo el espacio del alta, intacto, y sin respuesta ni aplazado;
  *   el panel le pone nombre y oficio, sin crear otro;
  * - `wait`: aún no se sabe si es `name` (falta lo visto o la lectura de
- *   arranque); ni el panel ni la sección, para no pintar uno y luego lo otro;
+ *   arranque); ni el panel ni la sección, para no pintar uno y luego lo otro.
+ *   Solo antes de pintar la sección: una sección ya pintada no se quita por
+ *   una espera (`painted`), porque espacios y lo visto llegan en cualquier
+ *   orden y desmontarla pierde su estado (un diálogo abierto, la última
+ *   visita de Hoy). Solo una respuesta, el panel, la sustituye;
  * - `none`: la app. También mientras llegan los espacios, si algo falla,
  *   con más de un espacio, uno que no es personal o uno personal con datos.
  */
@@ -191,14 +195,17 @@ export function spaceAsk(input: {
   settled: boolean;
   /** The start read of the signup space: undefined on the way, null if it failed. */
   start: StartResponse | null | undefined;
+  /** The section is already on screen: a wait never takes it away. */
+  painted?: boolean;
 }): SpaceAsk {
-  const { spaces, seen, ready, settled, start } = input;
+  const { spaces, seen, ready, settled, start, painted = false } = input;
+  const wait: SpaceAsk = painted ? 'none' : 'wait';
   if (!spaces) return 'none';
   if (spaces.length === 0) return 'create';
   if (!signupSpace(spaces)) return 'none';
-  if (!settled) return 'wait';
+  if (!settled) return wait;
   if (!ready || hasSeen(seen, SPACE_ASKED_KEY)) return 'none';
-  if (start === undefined) return 'wait';
+  if (start === undefined) return wait;
   return start && untouched(start) ? 'name' : 'none';
 }
 
