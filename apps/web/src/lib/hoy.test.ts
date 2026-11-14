@@ -5,6 +5,7 @@ import {
   nextAfterToday,
   outsideToday,
   pulseRowInScope,
+  rowsSayCity,
   scopePulseInput,
   waitingPills,
   waitingRowCount,
@@ -154,5 +155,18 @@ describe('«Te espera»: pills and rows (ADR-202 § 7, ADR-203 § 5 and § 9)', 
     expect(waitingRowCount({ calm: false, gig: false, empty: true })).toBe(5);
     expect(waitingRowCount({ calm: false, gig: true, empty: false })).toBe(0);
     expect(waitingRowCount({ calm: true, gig: false, empty: true })).toBe(0);
+  });
+});
+
+describe('the day\'s rows say their city only across cities', () => {
+  it('one city, the rows keep quiet: the piece already says it', () => {
+    expect(rowsSayCity(['Girona', 'Girona', null, 'girona '])).toBe(false);
+  });
+  it('more than one city, every row says it', () => {
+    expect(rowsSayCity(['Barcelona', 'Girona'])).toBe(true);
+  });
+  it('rows without a city do not count', () => {
+    expect(rowsSayCity([null, undefined, '', 'Girona'])).toBe(false);
+    expect(rowsSayCity([])).toBe(false);
   });
 });

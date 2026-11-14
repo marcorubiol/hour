@@ -46,6 +46,18 @@ export function outsideToday(input: PulseInputRows, scope: ResolvedScope, today:
     .length;
 }
 
+/**
+ * Do the day's rows inside the piece say their city? Only when the day goes
+ * through more than one: with one city, the piece's line under the title
+ * already says it, and at 390 «qué · sala · ciudad» broke in two. `cities`
+ * are the rows' own cities (a leg is a route, not a city: it does not count);
+ * empty ones are left out, and «Girona» and «girona » are one city.
+ */
+export function rowsSayCity(cities: readonly (string | null | undefined)[]): boolean {
+  const seen = new Set(cities.map((c) => (c ?? '').trim().toLocaleLowerCase()).filter(Boolean));
+  return seen.size > 1;
+}
+
 /** How far «Coming up» reaches, and how much it draws (ADR-202 § 6). */
 export const COMING_DAYS = 14;
 export const COMING_TILES = 10;

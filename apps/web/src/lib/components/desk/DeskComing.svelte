@@ -5,7 +5,8 @@
    * one tile per day with something, two things a tile and «+N»; two weeks
    * or ten tiles at most (`$lib/hoy` comingTiles) and a last tile «Planner
    * →». On a phone the strip slides sideways, the third tile peeking; on a
-   * desktop the tiles go one under the other (§ 6 c).
+   * desktop the tiles go one under the other (§ 6 c) and «Planner →» is a
+   * low quiet row at their foot, lighter than any tile with something.
    *
    * THE DOOR IS THE TILE (§ 8, design-system rule 10): each opens its day in
    * the Planner; the block's head carries no written link. An option to
@@ -208,14 +209,25 @@
     font-size: var(--text-xs);
     color: var(--text-muted);
   }
+  /* The end door on a desktop: a low quiet row at the column's foot, the
+     voice of a block's action (`.block-head__act`), not a tile. */
   .tile--end {
-    display: grid;
-    grid-template-columns: none;
-    place-content: center;
-    text-align: center;
+    display: flex;
+    align-items: center;
+    padding-block: var(--space-2xs);
+    border-color: transparent;
     background: transparent;
-    border-style: dashed;
-    font-size: var(--text-m);
+    font-size: var(--text-s);
+    color: var(--text-muted);
+  }
+  a.tile--end:hover {
+    border-color: transparent;
+    color: var(--text-color);
+  }
+  @media (pointer: coarse) {
+    .tile--end {
+      min-block-size: var(--touch-target);
+    }
   }
   .coming__far {
     color: inherit;
@@ -254,10 +266,21 @@
       gap: var(--space-xs);
       padding: var(--space-s);
     }
-    /* Over the word, not beside it: beside it split the word at 390. */
+    /* On the strip the end door stays a tile: dashed, its word centred. */
     .tile--end {
-      align-content: center;
+      display: grid;
+      place-content: center;
+      text-align: center;
+      padding: var(--space-s);
+      border-color: var(--border-color-light);
+      border-style: dashed;
+      font-size: var(--text-m);
+      color: var(--text-color);
     }
+    a.tile--end:hover {
+      border-color: var(--border-color-dark);
+    }
+    /* Over the word, not beside it: beside it split the word at 390. */
     .tile__what {
       flex-direction: column;
       align-items: flex-start;
