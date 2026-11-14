@@ -3,8 +3,8 @@
    * «COMING UP», Hoy's second block (ADR-202 § 6, replaces «Después»): a
    * strip of day tiles. The big number, the weekday and the month beside it,
    * one tile per day with something, two things a tile and «+N»; two weeks
-   * or ten tiles at most (`$lib/hoy` comingTiles) and a last tile «Planner
-   * →». On a phone the strip slides sideways, the third tile peeking; on a
+   * or ten tiles at most, four on a phone (`$lib/hoy` comingTiles, ADR-205),
+   * and a last tile «Planner →». On a phone the strip slides sideways, the third tile peeking; on a
    * desktop the tiles go one under the other (§ 6 c) and «Planner →» is a
    * low quiet row at their foot, lighter than any tile with something.
    *

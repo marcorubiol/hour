@@ -4,7 +4,7 @@
    * blocks in a fixed order, the same on every width.
    *
    *   1 · El día        the one filled piece, the agenda inside it ($lib/day-agenda)
-   *   2 · Lo que viene  day tiles, two weeks or ten at most ($lib/hoy comingTiles)
+   *   2 · Lo que viene  day tiles, two weeks or ten at most, four on a phone ($lib/hoy comingTiles)
    *   3 · Te espera     one pill per kind, the rows of most weight ($lib/desk-feed rankWaiting)
    *
    * On a desktop «Ha cambiado» (since your last visit, $lib/desk-bands) and
@@ -39,7 +39,7 @@
   import DeskChanged from '$lib/components/desk/DeskChanged.svelte';
   import DeskSeason from '$lib/components/desk/DeskSeason.svelte';
   import LateNoticeBand from '$lib/components/desk/LateNoticeBand.svelte';
-  import { comingTiles, nextAfterToday, outsideToday, scopePulseInput, waitingRowCount } from '$lib/hoy';
+  import { COMING_TILES, COMING_TILES_PHONE, comingTiles, nextAfterToday, outsideToday, scopePulseInput, waitingRowCount } from '$lib/hoy';
   import { MediaQuery } from 'svelte/reactivity';
   import { MOBILE_QUERY } from '$lib/breakpoints';
   import { goto } from '$app/navigation';
@@ -235,10 +235,13 @@
    * today (ADR-153). Then «Coming up», the days after it (ADR-202 § 6). The
    * pulse's own rows and order (`upcoming`), so the piece, the tiles and the
    * rail never disagree. An option to decide keeps its tile and its «?» even
-   * when «Te espera» asks it too (ADR-203 § 10, amends ADR-154 § 4).
+   * when «Te espera» asks it too (ADR-203 § 10, amends ADR-154 § 4). On a
+   * phone, four tiles and then «Planner →»; the desktop column keeps ten
+   * (ADR-205).
    */
   let coming = $derived(upcoming(pulseInput, clockNow, 40));
-  let tiles = $derived(comingTiles(coming, today));
+  // `phone` is declared further down: read it inside the closure.
+  let tiles = $derived.by(() => comingTiles(coming, today, phone.current ? COMING_TILES_PHONE : COMING_TILES));
   let nextThing = $derived(nextAfterToday(coming, today));
   // Nothing within two weeks: one sentence names what comes (ADR-149).
   let farNext = $derived(tiles.length === 0 ? nextThing : null);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   COMING_TILES,
+  COMING_TILES_PHONE,
   comingTiles,
   nextAfterToday,
   outsideToday,
@@ -127,6 +128,25 @@ describe('«Coming up»: one tile per day (ADR-202 § 6)', () => {
     const performances = Array.from({ length: 13 }, (_, i) => perf(`p${i}`, `2026-11-${String(14 + i).padStart(2, '0')}`));
     const tiles = comingTiles(upcoming({ performances, dates: [], viewerTz: TZ }, NOW, 40), TODAY);
     expect(tiles).toHaveLength(COMING_TILES);
+  });
+
+  it('four on a phone (ADR-205): the first four days with something, in order, each whole', () => {
+    const performances = Array.from({ length: 6 }, (_, i) => perf(`p${i}`, `2026-11-${String(14 + i * 2).padStart(2, '0')}`));
+    const dates = [date('d1', '2026-11-14T08:00:00Z'), date('d2', '2026-11-14T09:00:00Z')];
+    const coming = upcoming({ performances, dates, viewerTz: TZ }, NOW, 40);
+    const tiles = comingTiles(coming, TODAY, COMING_TILES_PHONE);
+    expect(COMING_TILES_PHONE).toBe(4);
+    expect(tiles.map((t) => t.day)).toEqual(['2026-11-14', '2026-11-16', '2026-11-18', '2026-11-20']);
+    // The cut drops whole days, not things inside a tile: its «+N» stays.
+    expect(tiles[0].more).toBe(1);
+    // What is cut is still there for the desktop column and the Planner door.
+    expect(comingTiles(coming, TODAY).map((t) => t.day)).toHaveLength(6);
+  });
+
+  it('with four days or fewer, the phone draws them all', () => {
+    const performances = [perf('a', '2026-11-15'), perf('b', '2026-11-20')];
+    const tiles = comingTiles(upcoming({ performances, dates: [], viewerTz: TZ }, NOW, 40), TODAY, COMING_TILES_PHONE);
+    expect(tiles.map((t) => t.day)).toEqual(['2026-11-15', '2026-11-20']);
   });
 
   it('the hollow piece names the first thing after today, however far', () => {

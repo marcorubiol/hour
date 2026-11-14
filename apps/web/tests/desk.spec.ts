@@ -309,6 +309,10 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
     await expect(page.locator('section.changed')).toHaveCount(0);
     await expect(page.locator('section.season')).toHaveCount(0);
     expect(order).toEqual([...order].sort((a, b) => a - b));
+    // «Coming up» on a phone: four day tiles at most, then «Planner →» (ADR-205).
+    const tiles = page.getByTestId('desk-tile');
+    expect(await tiles.count()).toBeLessThanOrEqual(4);
+    if ((await tiles.count()) > 0) await expect(page.getByTestId('desk-tile-planner')).toHaveAttribute('href', '/h/planner');
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);
   });
