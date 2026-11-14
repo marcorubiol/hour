@@ -8,7 +8,8 @@
  *   is what lets Hoy count what of yours today stays outside (§ 14, ADR-203
  *   § 8) without a second read.
  * - WHAT COMES is a strip of day tiles: one tile per day with something, two
- *   things a tile and «+N», two weeks or ten tiles at most (§ 6).
+ *   things a tile and «+N», two weeks or ten tiles at most (§ 6); four on a
+ *   phone (ADR-205), then the door to the Planner.
  * - WHAT WAITS opens with one pill per kind and its figure, and under them
  *   the rows of most weight: three on a normal day, five on a day with
  *   nothing, none on a gig day nor in calm (§ 7, ADR-203 § 5 and § 9).
@@ -61,6 +62,8 @@ export function rowsSayCity(cities: readonly (string | null | undefined)[]): boo
 /** How far «Coming up» reaches, and how much it draws (ADR-202 § 6). */
 export const COMING_DAYS = 14;
 export const COMING_TILES = 10;
+/** On a phone, four day tiles and then «Planner →» (ADR-205). */
+export const COMING_TILES_PHONE = 4;
 export const COMING_PER_TILE = 2;
 
 export interface ComingTile {
@@ -76,10 +79,12 @@ const dayDiff = (day: string, today: string) =>
 
 /**
  * The tiles of «Coming up»: the days after today with something, within two
- * weeks, ten at most. `coming` is the pulse's own order (`upcoming`), so a
- * tile, the piece and the rail never disagree about what comes first.
+ * weeks, `max` at most (ten on a desktop, four on a phone, ADR-205). What
+ * falls past `max` is not lost: the strip's last tile, «Planner →», is its
+ * door. `coming` is the pulse's own order (`upcoming`), so a tile, the piece
+ * and the rail never disagree about what comes first.
  */
-export function comingTiles(coming: readonly PulseNext[], today: string): ComingTile[] {
+export function comingTiles(coming: readonly PulseNext[], today: string, max = COMING_TILES): ComingTile[] {
   const tiles: ComingTile[] = [];
   const byDay = new Map<string, PulseNext[]>();
   for (const x of coming) {
@@ -90,7 +95,7 @@ export function comingTiles(coming: readonly PulseNext[], today: string): Coming
     else byDay.set(x.day, [x]);
   }
   for (const day of [...byDay.keys()].sort()) {
-    if (tiles.length >= COMING_TILES) break;
+    if (tiles.length >= max) break;
     const all = byDay.get(day)!;
     tiles.push({ day, items: all.slice(0, COMING_PER_TILE), more: Math.max(0, all.length - COMING_PER_TILE) });
   }

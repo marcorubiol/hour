@@ -7806,6 +7806,9 @@ ancho de una ficha): `build/design-system.md` § Tokens. `tests/ahora.spec.ts` y
 **Re-evaluar cuando** Marco lo use una gira: si la tira choca con el gesto de volver en un iPhone real, si diez fichas
 son muchas, y si perder el pulso desde otra sección (§ 10) se echa de menos.
 
+> **Amended by ADR-205 (2026-11-14), solo en § 6.** En el móvil la tira lleva como mucho cuatro fichas de día y
+> después la ficha final «Planner →». El escritorio sigue con hasta diez.
+
 
 ## [2026-11-13] ADR-203 · Hoy en el móvil: los diez puntos abiertos de ADR-202, cerrados (tareas 144, 145 y 146; enmienda ADR-154 § 4)
 
@@ -7857,3 +7860,22 @@ sobre el artefacto de tres opciones (https://claude.ai/artifact/YEkwMXYMs5ZHPS1V
 
 **Re-evaluar cuando** Marco lo use con el equipo conectado: si el punto sobre su propio avatar se lee como «estoy en
 línea» en vez de «hay alguien más».
+
+
+## [2026-11-14] ADR-205 · Lo que viene en el móvil son cuatro fichas y la puerta al Planificador (enmienda ADR-202 § 6, solo en el móvil)
+
+**Contexto.** ADR-202 § 6 deja la tira de «Coming up» en hasta dos semanas o diez fichas de día, con una ficha final
+«Planner →». Marco, mirando producción en su móvil, chat 14-11: «el coming up debería tener 3 o 4 máximo y después
+ofrecer ir al planner».
+
+**Decidido por Marco.**
+1. **En el móvil la tira lleva como mucho cuatro fichas de día:** las cuatro primeras con algo dentro de las dos
+   semanas, y después la ficha final «Planner →». Él dijo «3 o 4»; se fija 4 (`COMING_TILES_PHONE` en `$lib/hoy`).
+2. **Con cuatro días o menos con algo, se pintan los que haya** y la ficha final igual.
+3. **Lo que queda fuera no se cuenta en la ficha final:** «Planner →» es su puerta, sin cifra ni texto nuevo.
+
+**Qué no cambia.** Una ficha por día, dos cosas como mucho y «+N». Sin nada en dos semanas, «Nada hasta…». El
+escritorio: Marco solo habló del móvil, y la página ya sabe si es un teléfono (`MOBILE_QUERY`), así que la columna
+sigue con hasta diez sin complicación. La lectura no cambia (`upcoming(…, 40)`), ni la caché.
+
+**Re-evaluar cuando** Marco lo use una semana con la agenda llena: si cuatro son pocas o si tres bastan.
