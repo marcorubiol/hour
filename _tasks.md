@@ -40,6 +40,8 @@ con boceto antes y después de la 119). Capturas de partida: espacio `playwright
 - [ ] 154 `roadsheet-share:17` intermitente: responde 201 con token pero la fila no aparece en 5 s; solo en tandas largas. Causa sin verificar. (14-11)
 - [ ] 155 `device-cache:98` intermitente con la red inestable. Causa sin verificar. (14-11)
 - [ ] 156 «Mapa» (ADR-206): la preferencia de app de mapas vive en el dispositivo (`hour_maps_app`); subirla a la cuenta pide migración. Aparcado: solo si molesta. (14-11)
+- [ ] 159 Hoy: desde la tarjeta principal del día, acceso al hilo del equipo de ese bolo, con su cifra de no leídos, junto a «Quién va», Mapa y Hoja (Marco, chat 14-11: quien va de bolo vive en Hoy; «el del equipo», no la conversación con la sala). Dibujo primero; toca `DeskDay`, detrás de la 160.
+- [ ] 160 Hoy: el titular de la tarjeta es el proyecto, el «?» de una opción va en cursiva y con varias funciones ninguna pesa más (ADR-207, opción A elegida por Marco el 14-11, artefacto https://claude.ai/artifact/TT3VSG3qmpdiZsjd9csq3s). En `claude/hoy-title`, sin integrar. Sin ver: tres o más funciones.
 - [ ] 157 `conversation-overview:93` rojo estable: el buscador de Conversaciones no llega a ser visible y deja 4 tests sin correr. Causa en diagnóstico (14-11).
 - [ ] 158 `audience.test.ts` con 4 rojos al repetir solo (dos timeouts de 30 s y dos aserciones que dependen de ellos). Causa en diagnóstico (14-11).
 
