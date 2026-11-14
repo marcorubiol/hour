@@ -49,7 +49,8 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
     const main = page.getByRole('main');
     // Three blocks in a fixed order (ADR-202 § 1): the day (its piece, full
     // or hollow, always there), what comes and what waits.
-    await expect(main.getByRole('heading', { name: /^Today/ })).toBeAttached();
+    // The lens title (h1) also says «Today» (ADR-203 § 1): the day is its h2.
+    await expect(main.getByRole('heading', { level: 2, name: /^Today/ })).toBeAttached();
     await expect(page.getByTestId('desk-next').or(page.getByTestId('desk-hollow')).first()).toBeVisible();
     await expect(main.getByRole('heading', { name: /^Coming up/ })).toBeVisible();
     await expect(main.getByRole('heading', { name: /^The season/ })).toBeVisible();
