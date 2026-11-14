@@ -30,6 +30,7 @@
   import { toStore } from 'svelte/store';
   import Button from '$lib/components/Button.svelte';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
+  import MapLink from '$lib/components/MapLink.svelte';
   import { dualTime, hourMark, localeDayMonth, localeWeekdayLong, localeWeekdayShort } from '$lib/datetime';
   import { LOCALE_TAG, t, tradeFor, type Locale, type Voice } from '$lib/i18n';
   import { holdDeadlineLabel } from '$lib/performance';
@@ -203,15 +204,17 @@
         ].filter((f): f is { k: string; v: string } => f !== null)
       : [],
   );
-  let map = $derived.by(() => {
+  /** Where «Mapa» goes; the link picks the app (ADR-206). */
+  let mapParts = $derived.by(() => {
     if (sheet) {
       const v = sheet.venue;
-      return mapsHref(v?.address ? [v.address, v.city ?? sheet.city] : [v?.name ?? sheet.venue_name, v?.city ?? sheet.city]);
+      return v?.address ? [v.address, v.city ?? sheet.city] : [v?.name ?? sheet.venue_name, v?.city ?? sheet.city];
     }
-    if (focus?.what.of === 'stage') return mapsHref([stagePlace(focus.what.stage.to_city, focus.what.stage.to_place)]);
-    if (actionPerf) return mapsHref([actionPerf.venue_name, actionPerf.city]);
-    return null;
+    if (focus?.what.of === 'stage') return [stagePlace(focus.what.stage.to_city, focus.what.stage.to_place)];
+    if (actionPerf) return [actionPerf.venue_name, actionPerf.city];
+    return [];
   });
+  let map = $derived(mapsHref(mapParts) !== null);
   let roadsheet = $derived(actionSlip?.href ? `${actionSlip.href}/roadsheet` : null);
   // Without its project (read through a bolo: a guest) nobody here edits «quién va».
   let whoHref = $derived(gig && actionSlip?.href && actionPerf?.project ? `${actionSlip.href}#who-goes` : null);
@@ -350,7 +353,7 @@
         <!-- At the thumb (design-system rule 13): one row, the whole width, equal parts. -->
         <nav class="piece__acts" aria-label={t('ahora.actions', locale)} data-testid="desk-acts">
           {#if call?.phone}<a class="piece__act" href={telHref(call.phone)} aria-label={t('ahora.call_aria', locale, { name: call.name })}>{t('ahora.call', locale)}</a>{/if}
-          {#if map}<a class="piece__act" href={map} target="_blank" rel="noopener">{t('ahora.map', locale)}</a>{/if}
+          {#if map}<MapLink class="piece__act" parts={mapParts} changeIn="settings">{t('ahora.map', locale)}</MapLink>{/if}
           {#if roadsheet}<a class="piece__act" href={roadsheet} aria-label={t('desk.roadsheet', locale)}>{t('ahora.sheet', locale)} ↗</a>{/if}
         </nav>
       {/if}
@@ -540,7 +543,8 @@
     grid-auto-columns: minmax(0, 1fr);
     gap: var(--space-s);
   }
-  .piece__act {
+  /* `:global`: «Mapa» is a MapLink, whose <a> this file does not own. */
+  .piece__acts :global(.piece__act) {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -548,12 +552,13 @@
     padding-block: var(--space-xs);
     border-radius: var(--radius-l);
     background: var(--surface-focus-act);
+    color: inherit;
     font-size: var(--text-m);
     font-weight: 500;
     text-decoration: none;
     white-space: nowrap;
   }
-  .piece__act:hover {
+  .piece__acts :global(.piece__act:hover) {
     background: var(--surface-focus-act-hover);
   }
 

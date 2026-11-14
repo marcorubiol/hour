@@ -16,6 +16,7 @@ import {
   countdownParts,
   freshnessShown,
   FRESH_MS,
+  isMapsApp,
   logisticsLines,
   mapsHref,
   minutesTo,
@@ -212,6 +213,18 @@ describe('who to call at the venue', () => {
     expect(telHref('+34 612 00 00 00')).toBe('tel:+34612000000');
     expect(mapsHref(['Plaça del Vi 1', 'Girona'])).toBe('https://maps.apple.com/?q=Pla%C3%A7a%20del%20Vi%201%2C%20Girona');
     expect(mapsHref([null, ''])).toBeNull();
+  });
+  test('maps links in each app, Apple by default (ADR-206)', () => {
+    const at = ['Plaça del Vi 1', 'Girona'];
+    const q = 'Pla%C3%A7a%20del%20Vi%201%2C%20Girona';
+    expect(mapsHref(at, 'apple')).toBe(`https://maps.apple.com/?q=${q}`);
+    expect(mapsHref(at, 'google')).toBe(`https://www.google.com/maps/search/?api=1&query=${q}`);
+    expect(mapsHref(at, 'waze')).toBe(`https://waze.com/ul?q=${q}&navigate=yes`);
+    expect(mapsHref(at)).toBe(mapsHref(at, 'apple'));
+    expect(mapsHref(['  '], 'waze')).toBeNull();
+    expect(isMapsApp('google')).toBe(true);
+    expect(isMapsApp('here')).toBe(false);
+    expect(isMapsApp(null)).toBe(false);
   });
 });
 

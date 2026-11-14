@@ -316,10 +316,31 @@ export function telHref(phone: string): string {
   return `tel:${phone.replace(/[^\d+]/g, '')}`;
 }
 
-/** Apple Maps opens the app on an iPhone and the web elsewhere (ADR-146). */
-export function mapsHref(parts: readonly (string | null | undefined)[]): string | null {
+/** The map apps «Mapa» can open (ADR-206). Their names are brands: no translation. */
+export const MAPS_APPS = ['apple', 'google', 'waze'] as const;
+export type MapsApp = (typeof MAPS_APPS)[number];
+export const MAPS_APP_NAME: Readonly<Record<MapsApp, string>> = {
+  apple: 'Apple Maps',
+  google: 'Google Maps',
+  waze: 'Waze',
+};
+
+export function isMapsApp(value: unknown): value is MapsApp {
+  return typeof value === 'string' && (MAPS_APPS as readonly string[]).includes(value);
+}
+
+/**
+ * A search for a place in the map app of the person's choice (ADR-206;
+ * Apple when none, as ADR-146 had it). Each is the app's universal link: it
+ * opens the app when it is installed and the web when it is not.
+ */
+export function mapsHref(parts: readonly (string | null | undefined)[], app: MapsApp = 'apple'): string | null {
   const q = parts.filter((p): p is string => typeof p === 'string' && p.trim() !== '').join(', ');
-  return q ? `https://maps.apple.com/?q=${encodeURIComponent(q)}` : null;
+  if (!q) return null;
+  const e = encodeURIComponent(q);
+  if (app === 'google') return `https://www.google.com/maps/search/?api=1&query=${e}`;
+  if (app === 'waze') return `https://waze.com/ul?q=${e}&navigate=yes`;
+  return `https://maps.apple.com/?q=${e}`;
 }
 
 // ── Hotel, parking, load access: fixed keys in `logistics` ───────────────

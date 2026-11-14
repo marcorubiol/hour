@@ -14,6 +14,7 @@
   import { resetHelp } from '$lib/help-seen.svelte';
   import { SaveFlash } from '$lib/save-flash.svelte';
   import ViewScopeSetting from './ViewScopeSetting.svelte';
+  import MapsAppSetting from './MapsAppSetting.svelte';
 
   const locale = appLocale();
 
@@ -282,6 +283,8 @@
 </section>
 
 <ViewScopeSetting />
+
+<MapsAppSetting />
 
 <!-- LOCATION & TIMEZONE group killed: timezone derives from
      browser automatically, week-starts-on default to Monday is

@@ -196,7 +196,16 @@ test.describe('the technician’s road sheet (120)', () => {
     await expect(page.getByTestId('roadsheet-call')).toHaveAttribute('href', 'tel:612000000');
     await expect(page.getByTestId('roadsheet-call')).toContainText('Jordi');
     await expect(page.getByTestId('roadsheet-call')).not.toContainText('Sastre');
+    // With no map app saved the href is Apple's (no JS, ADR-146) and the
+    // first tap asks which app (ADR-206): three real links, no Settings.
     await expect(page.getByTestId('roadsheet-directions')).toHaveAttribute('href', /^https:\/\/maps\.apple\.com\/\?q=Pl\.%20del%20Vi%201/);
+    await page.getByTestId('roadsheet-directions').click();
+    const chooser = page.getByTestId('maps-chooser');
+    await expect(chooser).toBeVisible();
+    await expect(page.getByTestId('maps-choose-google')).toHaveAttribute('href', /^https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=Pl\.%20del%20Vi%201/);
+    await expect(page.getByTestId('maps-choose-waze')).toHaveAttribute('href', /^https:\/\/waze\.com\/ul\?q=Pl\.%20del%20Vi%201/);
+    await page.keyboard.press('Escape');
+    await expect(chooser).toBeHidden();
 
     // The day in order: the drive, the load-in, now, the show, the load-out.
     const day = page.getByTestId('roadsheet-day');

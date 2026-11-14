@@ -29,7 +29,9 @@
   import { performanceStatusLabel, performanceStatusTone } from '$lib/performance';
   import { materialHost, type Roadsheet, type RoadsheetTrip } from '$lib/roadsheet';
   import { nowLineIndex, roadsheetDay, type RoadsheetDayPoint } from '$lib/roadsheet-day';
-  import { mapsHref, telHref, venueCall } from '$lib/ahora';
+  import { MAPS_APP_NAME, mapsHref, telHref, venueCall } from '$lib/ahora';
+  import { mapsPref } from '$lib/maps-app.svelte';
+  import MapLink from '$lib/components/MapLink.svelte';
   import { firstName } from '$lib/acquaintance';
   import { momentWordKey } from '$lib/month-events';
   import type { VenueContact } from '$lib/venue';
@@ -88,11 +90,15 @@
   );
   /** The venue's technician first, else production, else the main contact (Ahora's rule). */
   let call = $derived(venueCall(sheet.venue?.contacts));
-  let mapHref = $derived(
+  /** Where «Cómo llegar» goes; the link picks the app this device prefers (ADR-206). */
+  let mapParts = $derived(
     sheet.venue?.address
-      ? mapsHref([sheet.venue.address, sheet.venue.city ?? sheet.city, sheet.venue.country ?? sheet.country])
-      : mapsHref([sheet.venue?.name ?? sheet.venue_name, sheet.venue?.city ?? sheet.city, sheet.venue?.country ?? sheet.country]),
+      ? [sheet.venue.address, sheet.venue.city ?? sheet.city, sheet.venue.country ?? sheet.country]
+      : [sheet.venue?.name ?? sheet.venue_name, sheet.venue?.city ?? sheet.city, sheet.venue?.country ?? sheet.country],
   );
+  let mapHref = $derived(mapsHref(mapParts));
+  /** «Cambiar»: there are no Settings on a public sheet, so the choice changes here. */
+  let mapLink: ReturnType<typeof MapLink> | undefined = $state();
   /** The venue's contacts as stored (`VenueContactSchema`); anything else is skipped. */
   let venueContacts = $derived(
     (Array.isArray(sheet.venue?.contacts) ? (sheet.venue!.contacts as unknown[]) : []).filter(
@@ -174,11 +180,17 @@
             >
           {/if}
           {#if mapHref}
-            <a class="rsv__act" href={mapHref} target="_blank" rel="noopener noreferrer" data-testid="roadsheet-directions"
-              >{t('roadsheet.directions', locale)}</a
+            <MapLink bind:this={mapLink} class="rsv__act" parts={mapParts} changeIn="here" testid="roadsheet-directions"
+              >{t('roadsheet.directions', locale)}</MapLink
             >
           {/if}
         </div>
+        {#if mapHref && mapsPref.app}
+          <p class="rsv__maps" data-testid="roadsheet-maps-app">
+            {t('maps.opens_in', locale, { app: MAPS_APP_NAME[mapsPref.app] })}
+            <button type="button" class="rsv__maps-change" onclick={() => mapLink?.choose()}>{t('maps.change', locale)}</button>
+          </p>
+        {/if}
       {/if}
       {#if venueContacts.length > 0}
         <ul class="rsv__people" role="list" aria-label={t('venue.contacts', locale)}>
@@ -411,7 +423,8 @@
       gap: var(--space-s);
     }
 
-    .rsv__act {
+    /* `:global`: «Cómo llegar» is a MapLink, whose <a> this file does not own. */
+    .rsv__acts :global(.rsv__act) {
       display: flex;
       align-items: center;
       justify-content: center;
@@ -425,8 +438,27 @@
       text-decoration: none;
     }
 
-    .rsv__act:hover {
+    .rsv__acts :global(.rsv__act:hover) {
       border-color: var(--heading-color);
+    }
+
+    /* «Abre en Waze · Cambiar», under the buttons, only once an app is saved. */
+    .rsv__maps {
+      margin-block: var(--space-xs) 0;
+      font-size: var(--text-s);
+      color: var(--text-faint);
+    }
+
+    .rsv__maps-change {
+      min-block-size: var(--touch-target);
+      padding: 0;
+      border: 0;
+      background: none;
+      font: inherit;
+      color: var(--text-muted);
+      text-decoration: underline;
+      text-underline-offset: var(--link-underline-offset);
+      cursor: pointer;
     }
 
     /* The day, an itinerary: the hour, then what. */
@@ -481,6 +513,7 @@
 
     @media print {
       .rsv__acts,
+      .rsv__maps,
       .rsv__now {
         display: none;
       }

@@ -184,7 +184,8 @@ test.describe('The gig day on Hoy (ADR-146, ADR-202 § 5)', () => {
     await expect(facts).toContainText('Jordi Puig', { timeout: 20_000 });
     await expect(facts).toContainText('c/ Ballesteries');
     await expect(facts).toContainText('Hotel Ultònia');
-    // The thumb's three: a tel: link, a map, the road sheet.
+    // The thumb's three: a tel: link, a map (Apple until this device picks
+    // an app, ADR-206), the road sheet.
     const acts = page.getByTestId('desk-acts');
     await expect(acts.locator('a[href^="tel:"]')).toHaveAttribute('href', 'tel:612000000');
     await expect(acts.locator('a[href^="https://maps.apple.com/"]')).toHaveCount(1);
