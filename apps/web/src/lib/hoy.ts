@@ -19,6 +19,8 @@ import { perfWorkspaceId, type DateEvent, type PerformanceEvent } from './month-
 import { agendaPoints, agendaRows } from './day-agenda';
 import type { PulseInputRows, PulseNext } from './pulse';
 import type { DeskItem } from './desk-feed';
+import { localeDayMonthNear, localeWeekdayLong, localeWeekdayShort } from './datetime';
+import { t, type Locale } from './i18n';
 
 /** Does a pulse row fall inside the scope (container pins only, `inScope`)? */
 export function pulseRowInScope(scope: ResolvedScope, row: PerformanceEvent | DateEvent): boolean {
@@ -105,6 +107,17 @@ export function comingTiles(coming: readonly PulseNext[], today: string, max = C
 /** The first thing after today, however far: what the hollow piece names (ADR-202 § 3). */
 export function nextAfterToday(coming: readonly PulseNext[], today: string): PulseNext | null {
   return coming.find((x) => x.day > today) ?? null;
+}
+
+/**
+ * When the hollow piece's next thing is: «mañana», «martes» within the week,
+ * «jue 19 nov» further, and the year when it is not near (`localeDayMonthNear`).
+ */
+export function nextWhen(day: string, today: string, locale: Locale): string {
+  const days = Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
+  if (days <= 1) return t('desk.next_tomorrow', locale);
+  if (days < 7) return localeWeekdayLong(day, locale);
+  return `${localeWeekdayShort(day, locale)} ${localeDayMonthNear(day, today, locale)}`;
 }
 
 /** The kinds «Te espera» counts in its pills, in the order they are drawn. */

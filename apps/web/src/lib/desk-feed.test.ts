@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildDeskFeed,
-  calmWaiting,
-  CALM_ROWS,
   dayBucket,
   invoiceHref,
   laterSummary,
@@ -344,38 +342,6 @@ describe('rankWaiting — «Te espera» by weight (ADR-117)', () => {
       'en',
     );
     expect(rankWaiting(feed, NOW).rows.map((r) => r.id)).toEqual(['task-van']);
-  });
-
-  it('calm lists today only; the overdue is counted apart, the rest is a number', () => {
-    const feed = buildDeskFeed(
-      {
-        conversations: [conv('late', { next_action_at: actionAt(-1) })],
-        tasks: [
-          task('a', { due_at: actionAt(0) }),
-          task('ai', { origin: 'ai', due_at: actionAt(0) }),
-          task('b', { due_at: actionAt(3) }),
-          task('old', { due_at: actionAt(-2) }),
-        ],
-      },
-      NOW,
-      'en',
-    );
-    const c = calmWaiting(feed, NOW);
-    expect(c.today.map((r) => r.id)).toEqual(['task-a']);
-    expect(c.overdue.map((r) => r.id)).toEqual(['conv-late', 'task-old']);
-    // the week's task and Hour's proposal wait outside calm
-    expect(c.more).toBe(2);
-  });
-
-  it('calm draws at most five of today; the overflow joins the number', () => {
-    const feed = buildDeskFeed(
-      { conversations: [], tasks: Array.from({ length: 8 }, (_, i) => task(`t${i}`, { due_at: actionAt(0) })) },
-      NOW,
-      'en',
-    );
-    const c = calmWaiting(feed, NOW);
-    expect(c.today).toHaveLength(CALM_ROWS);
-    expect(c.more).toBe(8 - CALM_ROWS);
   });
 
   it('at most seven rows, the total says how many qualified', () => {

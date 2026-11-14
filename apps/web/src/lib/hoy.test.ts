@@ -4,6 +4,7 @@ import {
   COMING_TILES_PHONE,
   comingTiles,
   nextAfterToday,
+  nextWhen,
   outsideToday,
   pulseRowInScope,
   rowsSayCity,
@@ -153,6 +154,16 @@ describe('«Coming up»: one tile per day (ADR-202 § 6)', () => {
     const coming = upcoming({ performances: [perf('far', '2026-12-12')], dates: [], viewerTz: TZ }, NOW, 40);
     expect(comingTiles(coming, TODAY)).toEqual([]);
     expect(nextAfterToday(coming, TODAY)?.ref.id).toBe('far');
+  });
+
+  it('the hollow piece says the year of a next thing that is not near, in the four languages', () => {
+    const today = '2026-11-14';
+    expect(nextWhen('2026-11-15', today, 'es')).toBe('mañana');
+    expect(nextWhen('2026-11-26', today, 'en')).toBe('Thu 26 Nov');
+    expect(nextWhen('2031-01-15', today, 'es')).toBe('mié 15 ene 2031');
+    expect(nextWhen('2031-01-15', today, 'ca')).toBe('dc 15 gen 2031');
+    expect(nextWhen('2031-01-15', today, 'en')).toBe('Wed 15 Jan 2031');
+    expect(nextWhen('2031-01-15', today, 'fr')).toBe('mer 15 janv 2031');
   });
 });
 
