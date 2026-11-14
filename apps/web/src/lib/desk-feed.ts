@@ -592,8 +592,7 @@ export function waitingDay(item: Pick<DeskItem, 'day'>, now: Date): string | nul
  * today, the rest of this week — and the «voy · no voy» of the next two weeks
  * after them; inside a tier, by `weightOf`, then by day. The anytime tail and
  * what lies past this week stay in the day list, except a task already inside
- * its warning, which joins the week. Calm reads the same tiers through
- * `calmWaiting` (ADR-139 § 5).
+ * its warning, which joins the week.
  *
  * With a `window` (the Planner's margin, ADR-138 § 6) the tiers are the
  * window's days instead: every dated row whose `waitingDay` falls inside it,
@@ -641,37 +640,6 @@ function rankTiered(
       : a.tier - b.tier || weightOf(a.item) - weightOf(b.item) || a.day.localeCompare(b.day),
   );
   return tiered;
-}
-
-/** How many of today's rows calm draws; the rest of today joins the line. */
-export const CALM_ROWS = 5;
-
-export interface CalmWaiting {
-  /** Today's rows, by weight, at most `CALM_ROWS`. */
-  today: DeskItem[];
-  /** What is overdue: never listed in calm, said in one line that opens it. */
-  overdue: DeskItem[];
-  /** Everything else «Te espera» holds outside calm: the week, the «voy», today's overflow, Hour's proposals. */
-  more: number;
-}
-
-/**
- * «Te espera» in calm (ADR-139 § 5, the July spec restored): only today, a
- * short list; what is overdue is not listed but counted, in one line that
- * opens it in place; the rest is a number that leaves calm. The tiers and
- * weights are `rankWaiting`'s, so nothing is decided twice. Hour's own
- * proposals wait outside: calm is what you have to do today.
- */
-export function calmWaiting(feed: readonly DeskBucket[], now: Date): CalmWaiting {
-  const today: DeskItem[] = [];
-  const overdue: DeskItem[] = [];
-  let more = 0;
-  for (const { tier, item } of rankTiered(feed, now, {})) {
-    if (!item.isProposal && tier === 0) overdue.push(item);
-    else if (!item.isProposal && tier === 1 && today.length < CALM_ROWS) today.push(item);
-    else more++;
-  }
-  return { today, overdue, more };
 }
 
 /** The margin's rows by the day they wait on (`waitingDay`), in `rankWaiting`'s order. */
