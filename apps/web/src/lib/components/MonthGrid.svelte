@@ -23,7 +23,7 @@
   import { bookingModeOf } from '$lib/booking-mode';
   import type { Attachment } from 'svelte/attachments';
   import { isFreeSpace, longPress } from '$lib/cell-create';
-  import { addDaysIso, dayKeyInTz, isoWeek, monthGrid, assignBandLanes } from '$lib/planner';
+  import { dayKeyInTz, assignBandLanes } from '$lib/planner';
   import { dayMonthLong, weekdayLabels, localeMonthShort, localeDayMonth, localeWeekdayShort, viewerTimeZone } from '$lib/datetime';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
   import { accentVarFor } from '$lib/utils/accent';
@@ -57,9 +57,22 @@
   import Slip from '$lib/components/planner/Slip.svelte';
 
   interface Props {
-    year: number;
-    /** 1-12, same contract as $lib/planner. */
-    month: number;
+    /** THE CONTINUOUS MONTH (ADR-209): weeks Monday→Sunday across several
+        months, no page break (`monthSpanWeeks`). Every day is a door. */
+    rows: string[][];
+    /** The month on screen — the grid's name for a screen reader. */
+    shownMonth: { year: number; month: number };
+    /** Free runs of three nights or more (`gapWindows`): hatched, and
+        named on their first day. */
+    gaps?: Array<{ from: string; to: string; nights: number }>;
+    gapLabel?: (nights: number) => string;
+    gapShortLabel?: (nights: number) => string;
+    /** The paper's foot came into view: the page adds a month. */
+    onReachEnd?: () => void;
+    /** The month that holds the reader's eye changed (scrolling). */
+    onMonthShown?: (m: { year: number; month: number }) => void;
+    /** The picked day's door, on a phone: «Día →». */
+    openDayWord?: string;
     /** Already scope-filtered rows — the grid only buckets and renders. */
     performances: PerformanceEvent[];
     dates: DateEvent[];
@@ -115,8 +128,6 @@
     stateLabel?: (status: string) => string | null;
     /** «more» — the word after the +N door on a full cell. */
     moreLabel?: string;
-    /** «week 27» — the gutter's own label. */
-    isoWeekLabel?: (n: number) => string;
     /** «let go» — the word a released slip carries. */
     releasedLabel?: string;
     /** «expires Mon» — the deadline phrase, given the decide-by ISO day. */
@@ -134,8 +145,14 @@
   const L = appLocale();
 
   let {
-    year,
-    month,
+    rows,
+    shownMonth,
+    gaps = [],
+    gapLabel = (n: number) => `${n} ${t('planner.stat_free', L)}`,
+    gapShortLabel = (n: number) => t('planner.month_gap_short', L, { n }),
+    onReachEnd,
+    onMonthShown,
+    openDayWord = t('planner.view_day', L),
     performances,
     dates,
     workspaceSlug,
@@ -161,7 +178,6 @@
       return key ? t(key, L) : null;
     },
     moreLabel = t('planner.more_n', L),
-    isoWeekLabel = (n: number) => `${t('planner.week_n', L)} ${n}`,
     releasedLabel = t('planner.released', L),
     expiresLabel = (iso: string) => t('planner.expires_on', L, { day: `${iso.slice(8, 10)}/${iso.slice(5, 7)}` }),
     awayWord = t('planner.band_away', L),
@@ -315,6 +331,8 @@
     return best && best !== (d.city ?? null) ? best : null;
   }
   const CELL_CAP = 3;
+  /** On a phone: two monograms and a «+N» (ADR-209). */
+  const CELL_CAP_NARROW = 2;
 
   /**
    * The cell's contents in ONE ordered list, because a cap that only counts
@@ -431,9 +449,105 @@
     return Boolean(sl.hold?.expires && sl.hold.expires <= todayIso);
   }
 
-  let weeks = $derived(monthGrid(year, month));
-  let label = $derived(formatMonthLabel(year, month, locale));
+  let weeks = $derived(rows.map((w) => w.map((iso) => ({ iso }))));
+  let label = $derived(formatMonthLabel(shownMonth.year, shownMonth.month, locale));
   let wkLabels = $derived(weekdayLabels(locale));
+
+  /* ── THE PAPER RUNS ON (ADR-209) ─────────────────────────────────────
+     Months follow each other without a page break. What separates them is
+     the GROUND (every other month a step darker, `--month-alt-ground`) and
+     the NAME: the 1st carries the month instead of its number, long where
+     the cell gives room, short where it does not. */
+  const MONTH_LONG = $derived(new Intl.DateTimeFormat(locale, { month: 'long', timeZone: 'UTC' }));
+  function monthWords(iso: string): { long: string; short: string } {
+    const long = MONTH_LONG.format(new Date(`${iso}T00:00:00Z`));
+    return { long: `${long.charAt(0).toUpperCase()}${long.slice(1)}`, short: localeMonthShort(iso, locale) };
+  }
+  /** Every other month on the darker ground: even months, so a month keeps
+      its tone however the paper grows. */
+  function altMonth(iso: string): boolean {
+    return Number(iso.slice(5, 7)) % 2 === 0;
+  }
+  /** Each free night of a hole, and the length on its first one. */
+  let gapByDay = $derived.by(() => {
+    const m = new Map<string, number>();
+    for (const g of gaps) {
+      for (let d = g.from, i = 0; d <= g.to; d = nextIso(d), i++) m.set(d, i === 0 ? g.nights : 0);
+    }
+    return m;
+  });
+  function nextIso(iso: string): string {
+    const d = new Date(`${iso}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + 1);
+    return d.toISOString().slice(0, 10);
+  }
+
+  /* ON A PHONE THE DAY IS READ UNDER ITS WEEK (ADR-209). A cell there is
+     ~50px: room for two monograms and a «+1», never for a card. Tapping a
+     day selects it, and the day is drawn whole under its week row; the
+     door to the Day is there. Opens on today. */
+  let narrow = $state(false);
+  $effect(() => {
+    if (typeof matchMedia === 'undefined') return;
+    const mq = matchMedia('(max-width: 47.999rem)');
+    narrow = mq.matches;
+    const on = () => (narrow = mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  });
+  let picked = $state<string | null>(todayIso);
+  function pick(iso: string) {
+    picked = picked === iso ? null : iso;
+  }
+  function openOrPick(iso: string) {
+    if (narrow) pick(iso);
+    else onDayOpen?.(iso);
+  }
+  function pickedEntries(iso: string) {
+    return cellSlips(performancesByDay.get(iso) ?? [], groupDates(datesByDay.get(iso) ?? []));
+  }
+
+  /* THE FOOT ASKS FOR MORE, AND THE EYE NAMES THE MONTH. A sentinel under the
+     last week asks the page for another month before the reader gets there;
+     the week under the reading line (a third down the viewport, below the
+     stuck toolbar) names the month on screen by its Thursday, as ISO does. */
+  let footEl = $state<HTMLElement>();
+  $effect(() => {
+    if (!footEl || !onReachEnd || typeof IntersectionObserver === 'undefined') return;
+    const reach = onReachEnd;
+    const io = new IntersectionObserver((es) => es.some((e) => e.isIntersecting) && reach(), {
+      rootMargin: '0px 0px 300px 0px',
+    });
+    io.observe(footEl);
+    return () => io.disconnect();
+  });
+  $effect(() => {
+    if (!gridEl || !onMonthShown) return;
+    const grid = gridEl;
+    const tell = onMonthShown;
+    let raf = 0;
+    const read = () => {
+      raf = 0;
+      const bar = document.querySelector('.cal__toolbar');
+      const edge = bar ? bar.getBoundingClientRect().bottom : 0;
+      const y = edge + (window.innerHeight - edge) / 3;
+      for (const wk of grid.querySelectorAll<HTMLElement>('.cal__wk')) {
+        const r = wk.getBoundingClientRect();
+        if (r.bottom < y) continue;
+        const thu = wk.dataset.thu;
+        if (thu) tell({ year: Number(thu.slice(0, 4)), month: Number(thu.slice(5, 7)) });
+        return;
+      }
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(read);
+    };
+    document.addEventListener('scroll', onScroll, { capture: true, passive: true });
+    return () => {
+      document.removeEventListener('scroll', onScroll, { capture: true });
+      if (raf) cancelAnimationFrame(raf);
+    };
+  });
 
   // Off-grid buckets (the page's padded dates window can fetch an event a
   // day outside the grid) simply find no cell.
@@ -946,20 +1060,20 @@
      hoja van a la misma puerta que su «+» (`$lib/cell-create`). Las dos
      mitades de la celda —la fila del número y el contenido— responden igual,
      como ya comparten el hover. */
-  type GridDay = { iso: string; inMonth: boolean };
+  type GridDay = { iso: string };
   function createHere(e: MouseEvent, day: GridDay) {
-    if (!day.inMonth || !onDayCreate || !isFreeSpace(e.target, e.currentTarget as Element)) return;
+    if (!onDayCreate || !isFreeSpace(e.target, e.currentTarget as Element)) return;
     window.getSelection()?.removeAllRanges();
     onDayCreate(day.iso);
   }
   /** The second press of a double click would select the nearest word. */
   function keepSelection(e: MouseEvent, day: GridDay) {
-    if (day.inMonth && onDayCreate && e.detail > 1 && isFreeSpace(e.target, e.currentTarget as Element)) {
+    if (onDayCreate && e.detail > 1 && isFreeSpace(e.target, e.currentTarget as Element)) {
       e.preventDefault();
     }
   }
   function cellPress(day: GridDay): Attachment<HTMLElement> | undefined {
-    if (!day.inMonth || !onDayCreate) return undefined;
+    if (!onDayCreate) return undefined;
     const create = onDayCreate;
     return longPress(() => create(day.iso));
   }
@@ -1008,6 +1122,7 @@
   role="group"
   tabindex="-1"
   aria-label={label}
+  data-help-step="planner-grid"
   bind:this={gridEl}
 >
   <!-- THE WEEKDAY AXIS NEVER GOES. It costs fourteen pixels once for the whole
@@ -1015,7 +1130,6 @@
        the best working day — so without the names you cannot tell which column
        is Saturday except by counting from a number. The axis is the reading. -->
   <div class="cal__wkh">
-    <span></span>
     {#each wkLabels as wd (wd)}
       <span class="cal__weekday">{wd}</span>
     {/each}
@@ -1024,12 +1138,9 @@
     {@const wlc = weekLaneCount(week)}
     {@const bands = weekBands(week)}
     {@const series = weekSeries(week)}
-    <!-- A ROW OF THE MONTH IS A WEEK, and each week is its own block: a gutter
-         that counts it, then its seven days. -->
-    <div class="cal__wk" style="--wf: {weekFill(week)}">
-      <div class="cal__wkg">
-        <span class="cal__wkn">{isoWeekLabel(isoWeek(week[0].iso))}</span>
-      </div>
+    <!-- A ROW OF THE MONTH IS A WEEK, with no gutter and no number
+         (ADR-209): the week is the stronger rule above its Monday. -->
+    <div class="cal__wk" style="--wf: {weekFill(week)}" data-thu={week[3].iso}>
       <!-- ONE GRID PER WEEK, THREE BANDS OF ROWS: the day numbers on row 1,
            the runs of days under them, and the day cells on the last row —
            all of them placed, none of them auto-flowed. A run belongs
@@ -1048,11 +1159,15 @@
           {@const clashes = clashesByDay?.get(day.iso) ?? []}
           <div
             class="cal__num"
-            class:cal__day--out={!day.inMonth}
             class:cal__day--today={day.iso === todayIso}
+            class:cal__day--alt={altMonth(day.iso)}
+            class:cal__day--gap={gapByDay.has(day.iso)}
+            class:cal__day--past={day.iso < todayIso}
+            class:cal__day--sel={narrow && picked === day.iso}
+            data-month-start={day.iso.endsWith('-01') ? day.iso.slice(0, 7) : undefined}
             data-hover={hoverDay === day.iso ? '' : undefined}
             style="grid-row: 1; grid-column: {di + 1}"
-            data-day={day.inMonth ? day.iso : undefined}
+            data-day={day.iso}
             onmouseenter={() => (hoverDay = day.iso)}
             onmouseleave={() => (hoverDay = hoverDay === day.iso ? null : hoverDay)}
             onmousedown={(e) => keepSelection(e, day)}
@@ -1069,18 +1184,22 @@
               <!-- THREE SLOTS, ALWAYS, so the middle one is a real centre and
                    not «whatever is left». A quiet day draws no mark but keeps
                    its column. -->
-              {#if day.inMonth && onDayOpen}
+              <!-- THE 1ST CARRIES ITS MONTH, not its number (ADR-209). -->
+              {#snippet dayWord()}{#if day.iso.endsWith('-01')}{@const mw = monthWords(day.iso)}<span
+                    class="cal__mname cal__mname--l">{mw.long}</span
+                  ><span class="cal__mname cal__mname--s">{mw.short}</span>{:else}{Number(day.iso.slice(8, 10))}{/if}{/snippet}
+              {#if onDayOpen}
                 <button
                   type="button"
                   class="cal__day-num"
                   title={openDayLabel(day.iso)}
                   aria-label={openDayLabel(day.iso)}
-                  onclick={() => onDayOpen?.(day.iso)}>{Number(day.iso.slice(8, 10))}</button
+                  onclick={() => openOrPick(day.iso)}>{@render dayWord()}</button
                 >
               {:else}
-                <span class="cal__day-num">{Number(day.iso.slice(8, 10))}</span>
+                <span class="cal__day-num">{@render dayWord()}</span>
               {/if}
-              {#if day.inMonth && onDayCreate}
+              {#if onDayCreate}
                 <button
                   type="button"
                   class="cal__new"
@@ -1098,7 +1217,7 @@
                     data-severity={c.severity}
                     aria-label={c.title}
                     aria-expanded={openClash === `${day.iso}:${i}`}
-                    onclick={() => toggleClash(day.iso, i)}>!</button
+                    onclick={() => toggleClash(day.iso, i)}></button
                   >
                 {/each}
               </span>
@@ -1191,23 +1310,38 @@
            not on this sheet and mean it. -->
       <div
         class="cal__day"
-        class:cal__day--out={!day.inMonth}
         class:cal__day--today={day.iso === todayIso}
+        class:cal__day--alt={altMonth(day.iso)}
+        class:cal__day--gap={gapByDay.has(day.iso)}
+        class:cal__day--past={day.iso < todayIso}
+        class:cal__day--sel={narrow && picked === day.iso}
         style="grid-row: {runRows + 2} / {runLanes + 3}; grid-column: {di + 1}"
-        data-day={day.inMonth ? day.iso : undefined}
+        data-day={day.iso}
         onmouseenter={() => (hoverDay = day.iso)}
         onmouseleave={() => (hoverDay = hoverDay === day.iso ? null : hoverDay)}
         onmousedown={(e) => keepSelection(e, day)}
         ondblclick={(e) => createHere(e, day)}
         {@attach cellPress(day)}
+        onclick={(e) => {
+          if (narrow && !(e.target as HTMLElement).closest('button, a')) pick(day.iso);
+        }}
         role="presentation"
       >
+        {#if gapByDay.get(day.iso)}
+          {@const n = gapByDay.get(day.iso) ?? 0}
+          <span class="cal__gap"
+            ><span class="cal__gap--l">{gapLabel(n)}</span><span class="cal__gap--s">{gapShortLabel(n)}</span></span
+          >
+        {/if}
         <!-- Three, then a door. The cap is what lets a quiet week look short:
              the row is as tall as its fullest day, and without it that day can
              hold nine things. -->
         {#each lead as entry, ei (entry.key)}
+          <!-- MONOGRAMS ALWAYS (ADR-209): with the city where the cell gives
+               room, the monogram alone (stacked) where it does not. -->
           <Slip
             slip={entry.slip}
+            placing="compact"
             kindLabel={(k, voice) => dateKindLabel(k, voice)}
             stateLabel={slipState}
             stateUrgent={isUrgentHold(entry.slip)}
@@ -1223,16 +1357,20 @@
                cell is read there, not added to (it opened the quick add). -->
           <button
             type="button"
-            class="cal__more"
+            class="cal__more cal__more--l"
             data-testid="month-more"
             disabled={!onDayOpen}
             onclick={() => onDayOpen?.(day.iso)}>+{overflow} {moreLabel}</button
           >
         {/if}
+        <!-- Two and «+1» on a phone: the third slip steps aside (CSS). -->
+        {#if entries.length > CELL_CAP_NARROW}
+          <span class="cal__more cal__more--s" aria-hidden="true">+{entries.length - CELL_CAP_NARROW}</span>
+        {/if}
         <!-- The steps of the day are the margin's, not the sheet's: one quiet
              number in the door's own voice, and the door is the Day. -->
-        {#if day.inMonth && onDayOpen && stepsByDay?.get(day.iso)}
-          <button type="button" class="cal__more" data-testid="month-steps" data-day={day.iso} onclick={() => onDayOpen?.(day.iso)}
+        {#if onDayOpen && stepsByDay?.get(day.iso)}
+          <button type="button" class="cal__more cal__more--steps" data-testid="month-steps" data-day={day.iso} onclick={() => onDayOpen?.(day.iso)}
             >{stepsLabel(stepsByDay.get(day.iso) ?? 0)}</button
           >
         {/if}
@@ -1291,7 +1429,34 @@
       {/if}
       </div>
     </div>
+    {#if narrow && picked && week.some((d) => d.iso === picked)}
+      {@const iso = picked}
+      {@const list = pickedEntries(iso)}
+      <!-- The picked day, whole, under its week (ADR-209). -->
+      <div class="cal__pick" data-testid="month-pick">
+        <h3 class="cal__pick-h">
+          {localeWeekdayShort(iso, locale)} {Number(iso.slice(8, 10))} {localeMonthShort(iso, locale)}
+          {#if onDayOpen}
+            <button type="button" class="cal__pick-go" onclick={() => onDayOpen?.(iso)}
+              aria-label={openDayLabel(iso)}
+              >{stepsByDay?.get(iso) ? `${stepsLabel(stepsByDay.get(iso) ?? 0)} · ` : ''}{openDayWord} →</button
+            >
+          {/if}
+        </h3>
+        {#each list as entry (entry.key)}
+          <Slip
+            slip={entry.slip}
+            placing="row"
+            kindLabel={(k, voice) => dateKindLabel(k, voice)}
+            stateLabel={slipState}
+            stateUrgent={isUrgentHold(entry.slip)}
+            onOpen={entry.dateRow && onDateOpen ? () => onDateOpen?.(entry.dateRow!) : undefined}
+          />
+        {/each}
+      </div>
+    {/if}
   {/each}
+  <div class="cal__foot" bind:this={footEl} aria-hidden="true"></div>
 </div>
 
 {#if markPop}
@@ -1340,10 +1505,9 @@
     }
 
     .cal__grid {
-      /* Wide enough for «SEMANA 44» on one line at the fluid margin voice's
-         top step (9.5px) plus the gutter's own air. */
-      --cal-wk-gutter: 4.375rem;
-      --cal-cell-h: 8rem;
+      /* A compact card is one line (ADR-209): three of them and the number
+         make a full day. */
+      --cal-cell-h: 5.5rem;
       /* The air between a card and the column rule beside it. One number,
          because the day cell and the run that crosses it have to agree —
          they are siblings of the week grid, not parent and child. */
@@ -1356,43 +1520,16 @@
     }
     .cal__wkh {
       display: grid;
-      grid-template-columns: var(--cal-wk-gutter) repeat(7, minmax(0, 1fr));
+      grid-template-columns: repeat(7, minmax(0, 1fr));
       margin-block-start: var(--space-s);
       border-block-end: var(--line-hairline) solid var(--border-color-light);
     }
+    /* THE WEEK IS A RULE, NOT A COLUMN (ADR-209): the line above each
+       Monday is one step stronger than the day rules. */
     .cal__wk {
       display: grid;
-      grid-template-columns: var(--cal-wk-gutter) minmax(0, 1fr);
-      border-block-end: var(--line-hairline) solid var(--border-color-light);
-    }
-    .cal__wk:last-child {
-      border-block-end: 0;
-    }
-    /* The gutter counts the week WITHOUT WORDS. */
-    .cal__wkg {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: var(--space-2xs);
-      padding: var(--space-s) var(--space-s) var(--space-s) 0;
-      border-inline-end: var(--line-hairline) solid var(--border-color-light);
-      /* The gutter spans the WHOLE week block — the run strip, the days and
-         the foot bands are three rows in column 2, and without this the
-         gutter would take one of them and the days would fall to column 1. */
-      grid-column: 1;
-      grid-row: 1 / -1;
-    }
-    .cal__wkn {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      letter-spacing: var(--tracking-m);
-      text-transform: uppercase;
-      /* «Semana 44» is one label: the fluid margin voice must not break it
-         in the gutter. */
-      white-space: nowrap;
-      /* One step above the marks it labels: the number is read, the marks are
-         seen. */
-      color: var(--text-muted);
+      grid-template-columns: minmax(0, 1fr);
+      border-block-start: var(--line-hairline) solid var(--border-color-dark);
     }
     /* The seven days. The 1px rules ARE the grid — a background-image column
        ruling, so a cell can never be pushed out of alignment by a border. */
@@ -1861,7 +1998,6 @@
        lleguen hasta abajo del día — el pie de la semana es parte del día que
        mide, no una tira suelta debajo del mes. */
     .cal__wkbody {
-      grid-column: 2;
       min-inline-size: 0;
       background-image: linear-gradient(to right, var(--border-color-light) 0 1px, transparent 1px);
       background-size: calc(100% / 7) 100%;
@@ -1980,40 +2116,112 @@
       cursor: default;
       color: var(--text-faint);
     }
-    /* A DAY OUTSIDE THE MONTH KEEPS ITS NUMBER, ATTENUATED — Marco,
-       2026-08-01, and it reverses a law of the design that this file carried
-       until today («the missing number is the whole of the mark»).
-
-       That law was right about the CONTENT and wrong about the number. What
-       it was defending against is fading a venue behind a tint — a weaker
-       claim is not fainter ink, and an August gig is not a weaker claim. But
-       the number is not a claim at all: it is the ORIENTATION, and a run of
-       five blank cells at the head of a sheet asks the reader to count. So
-       the content keeps its full ink and the number takes the faintest step
-       the app has — the same token as the `+`, which is the register of
-       «findable, never read». */
-    .cal__day--out .cal__day-num {
-      color: var(--border-color-dark);
+    /* ── THE MONTH'S OWN MARKS (ADR-209) ─────────────────────────────── */
+    /* Every other month on a ground one step darker. The day rules are drawn
+       under the cells (`.cal__wkbody`), so a toned cell draws its own. */
+    .cal__day--alt {
+      background-color: var(--month-alt-ground);
+      box-shadow: inset var(--line-hairline) 0 0 var(--border-color-light);
     }
-    /* LO QUE NO ES DE ESTA HOJA SE LEE COMO NO SIENDO DE ESTA HOJA.
-       El número del día ya lo decía —los del mes vecino van en tinta de
-       borde— y lo que caía dentro seguía a plena voz: una función del 4 de
-       diciembre gritaba en la hoja de noviembre (Marco, en pantalla,
-       2026-08-30).
-       Y ES OTRO EJE, no el de la certeza. La ley «un reclamo más débil no es
-       tinta más pálida» gobierna la duda: una opción no es un confirmado
-       desvaído, y por eso el board tuvo que quitar su `.62 opacity`. Esto no
-       dice «quizá no pase»: dice «esto no es de esta hoja», que es exactamente
-       lo que el número ya dice bajando de tinta. El sangrado del mes vecino es
-       CONTEXTO, y el contexto puede bajar la voz.
-       Y va con `:global()` a propósito: las entradas son componentes `<Slip>`,
-       así que el CSS con ámbito de este fichero no las alcanza — el primer
-       intento fue `> :not(.cal__day-head)` y Svelte lo dejó sin efecto, cosa
-       que solo se vio midiendo la opacidad en la página. */
-    .cal__day--out :global(.slip),
-    .cal__day--out .cal__more,
-    .cal__day--out .cal__marks {
+    /* A hole to sell: hatched in ink, over whichever ground the month has. */
+    .cal__day--gap {
+      background-image: repeating-linear-gradient(135deg, var(--gap-hatch) 0 1px, transparent 1px 6px);
+    }
+    .cal__gap {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-m);
+      text-transform: uppercase;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    .cal__gap--s,
+    .cal__mname--s,
+    .cal__more--s {
+      display: none;
+    }
+    /* On a phone the short label may take two lines: «4 / libres». */
+    .cal__gap--s {
+      white-space: normal;
+    }
+    /* A day already lived stays a door, in its own ink; only what is on it
+       steps back (the number keeps 4.5:1). */
+    .cal__day--past :global(.slip) {
       opacity: 0.62;
+    }
+    .cal__day--sel {
+      outline: var(--line-hairline) solid var(--text-color);
+      outline-offset: calc(-1 * var(--line-hairline));
+    }
+    .cal__mname {
+      font-family: var(--font-display);
+      font-size: var(--text-m);
+      color: var(--text-color);
+    }
+    /* The cell decides what it can say: below a phone's cell, the short
+       month, two monograms and «+N», no steps (the day under the week says
+       them), one dot. */
+    @container (max-width: 5rem) {
+      .cal__gap--l,
+      .cal__more--l,
+      .cal__more--steps,
+      .cal__day > :global(.slip:nth-child(n + 3)) {
+        display: none;
+      }
+      .cal__gap--s,
+      .cal__more--s {
+        display: inline;
+      }
+    }
+    .cal__num {
+      container-type: inline-size;
+    }
+    @container (max-width: 5rem) {
+      .cal__mname--l {
+        display: none;
+      }
+      .cal__mname--s {
+        display: inline;
+      }
+      .cal__mark + .cal__mark {
+        display: none;
+      }
+    }
+    @media (max-width: 47.999rem) {
+      /* On a phone a tap on the day picks it; the slips are read under the
+         week, where they are whole. */
+      .cal__day :global(.slip) {
+        pointer-events: none;
+      }
+    }
+    .cal__pick {
+      display: grid;
+      gap: var(--space-2xs);
+      padding: var(--space-s) 0;
+      border-block-start: var(--line-hairline) solid var(--border-color-light);
+    }
+    .cal__pick-h {
+      display: flex;
+      align-items: baseline;
+      gap: var(--space-s);
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: var(--text-m);
+      font-weight: 400;
+    }
+    .cal__pick-go {
+      margin-inline-start: auto;
+      padding: 0;
+      border: 0;
+      background: none;
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-l);
+      text-transform: uppercase;
+      color: var(--text-muted);
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 2px;
     }
 
     /* TODAY IS INK AND A WASH — never a filled pill. The pill was the loudest
@@ -2023,7 +2231,7 @@
        the same law governs all four drawings: today is the cell's 4% wash and
        one step of weight on its number. */
     .cal__day--today {
-      background: var(--today-wash);
+      background-color: var(--today-wash);
     }
     .cal__day--today .cal__day-num {
       font-size: var(--text-m);
@@ -2116,22 +2324,22 @@
       gap: var(--space-2xs);
       margin-inline-start: auto;
     }
+    /* THE CLASH IS A DOT (ADR-209): the same red point the Agenda will
+       carry, small enough never to reach the next day's number. */
     .cal__grid :global(.cal__mark) {
       --mark-fg: var(--info);
       flex: none;
-      padding: 0 0 0 var(--line-hairline);
+      inline-size: var(--dot-m);
+      block-size: var(--dot-m);
+      padding: 0;
       border: 0;
-      background: none;
-      font-family: var(--font-mono);
-      font-size: var(--text-s);
-      font-weight: 500;
-      line-height: 1;
-      color: var(--mark-fg);
+      border-radius: 50%;
+      background: var(--mark-fg);
       cursor: pointer;
     }
     .cal__grid :global(.cal__mark:hover) {
-      text-decoration: underline;
-      text-underline-offset: 2px;
+      outline: var(--line-hairline) solid var(--mark-fg);
+      outline-offset: var(--line-hairline);
     }
     /* Red is a REAL clash of people, and nothing else earns it. */
     .cal__grid :global(.cal__mark[data-severity='people']),

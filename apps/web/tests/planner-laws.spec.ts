@@ -132,13 +132,13 @@ test.describe('planner laws (ADR-095)', () => {
   });
 
   test('THE VIEW WORDS KEEP THE DESIGN’S ORDER', async ({ page }) => {
-    // It never changes with the state, and it is the order the keys 1 2 3 4
+    // It never changes with the state, and it is the order the keys 1 2 3
     // follow — so a reader who learns one has learned the other.
     await planner(page, 'month');
     const words = await page.locator('.cal__view').allInnerTexts();
-    // The season (ADR-117; «Coming weeks» since ADR-195) is the portada, so it opens the row. The Day is
-    // not a word of it (ADR-155): it opens from a day of any drawing.
-    expect(words.map((w) => w.trim().toLowerCase())).toEqual(['coming weeks', 'agenda', 'month', 'board']);
+    // Three drawings of the same rows (ADR-209: the coming weeks are the
+    // Month now). The Day is not a word of it (ADR-155): it opens from a day.
+    expect(words.map((w) => w.trim().toLowerCase())).toEqual(['agenda', 'month', 'board']);
   });
 
   test('THE DAY IS A LENS: lit while you are in it, and its × goes back to where it was opened', async ({
@@ -213,14 +213,14 @@ test.describe('planner laws (ADR-095)', () => {
     );
   });
 
-  test('THE VIEW WORDS START AT THE SAME PLACE IN ALL FIVE VIEWS, and the title does not jump', async ({
+  test('THE VIEW WORDS START AT THE SAME PLACE IN ALL FOUR VIEWS, and the title does not jump', async ({
     page,
   }) => {
     // ADR-136: nothing is reserved before the words for a drawing that has no
-    // window. The row starts at the toolbar's own edge, Season included, and
-    // the title (with or without its arrows) keeps its height.
+    // window. The row starts at the toolbar's own edge, and the title keeps
+    // its height.
     const seen: { view: string; gap: number; titleTop: number; rowH: number }[] = [];
-    for (const v of ['overview', 'day', 'agenda', 'month', 'board'] as const) {
+    for (const v of ['day', 'agenda', 'month', 'board'] as const) {
       await planner(page, v);
       seen.push({
         view: v,
@@ -279,39 +279,6 @@ test.describe('planner laws (ADR-095)', () => {
     await expect(page.locator('.cal__legend-item')).toHaveCount(0);
   });
 
-  test('A DAY OUTSIDE THE MONTH KEEPS ITS NUMBER, AND ONLY THE NUMBER FADES', async ({
-    page,
-  }) => {
-    // REVERSED on 2026-08-01, by Marco. The old law said the missing number
-    // WAS the mark. It was right about the content and wrong about the
-    // number: a venue in August is not a weaker claim and must not be fainter
-    // ink — but the number is not a claim at all, it is the orientation, and
-    // five blank cells at the head of a sheet ask the reader to count.
-    await planner(page, 'month');
-    const out = await page.evaluate(() => {
-      const num = (sel: string) => {
-        const el = document.querySelector(sel);
-        return el ? { text: (el.textContent ?? '').trim(), color: getComputedStyle(el).color } : null;
-      };
-      return {
-        outside: num('.cal__day--out .cal__day-num'),
-        inside: num('.cal__day:not(.cal__day--out) .cal__day-num'),
-        // The CONTENT of an out-of-month day is never dimmed — only the number.
-        dimmedContent: [...document.querySelectorAll('.cal__day--out')].filter(
-          (c) => parseFloat(getComputedStyle(c).opacity) < 1,
-        ).length,
-      };
-    });
-    expect(out.outside?.text, 'an out-of-month day lost its number').toBeTruthy();
-    expect(out.dimmedContent, 'an out-of-month cell faded its content').toBe(0);
-    // Alpha: the outside number is the faintest thing in the header.
-    const alpha = (c: string | undefined) =>
-      Number(/\/\s*([\d.]+)\s*\)/.exec(c ?? '')?.[1] ?? '1');
-    expect(alpha(out.outside?.color), 'the outside number is not attenuated').toBeLessThan(
-      alpha(out.inside?.color),
-    );
-  });
-
   test('THE CELL CAPS AT THREE, AND THE REST IS A DOOR', async ({ page }) => {
     // Without the cap the row height is set by the fullest day, so a quiet week
     // could never look short — which is half of what a month is for.
@@ -333,9 +300,9 @@ test.describe('planner laws (ADR-095)', () => {
       [...document.querySelectorAll<HTMLButtonElement>('.cal__view')].filter((b) => b.disabled).length,
     );
     expect(inert).toBe(0);
-    // Four words: the season and three drawings; the Day opens from a day
+    // Three words, three drawings (ADR-209); the Day opens from a day
     // (ADR-155).
-    await expect(page.locator('.cal__view')).toHaveCount(4);
+    await expect(page.locator('.cal__view')).toHaveCount(3);
   });
 
   /* ONE TEST PER VIEW. The five used to share one test: ten full loads of the
@@ -343,7 +310,7 @@ test.describe('planner laws (ADR-095)', () => {
      (measured 2026-10-24: 27.5 s for the ten, alone), so the law went red
      whenever the network was a little slower, at whichever load the budget
      ran out on. Each view is its own claim and gets its own budget. */
-  for (const view of ['overview', 'day', 'month', 'agenda', 'board']) {
+  for (const view of ['day', 'month', 'agenda', 'board']) {
     test(`THE VIEWS SURVIVE A RELOAD — the state is in the URL (${view})`, async ({ page }) => {
       await planner(page, view);
       await page.reload();
@@ -432,11 +399,13 @@ test.describe('the sheet', () => {
     // It used to fork into `!` and `?` by whether a clock was running, which
     // read as two kinds of problem where there is one seen at two moments.
     // WHEN it is due is the hold chip's job, in words, inside the slip.
+    // Since ADR-209 the mark is a dot with no glyph at all: the same point
+    // in every day, its colour the only grade.
     await planner(page, 'month');
     const glyphs = await page.evaluate(() => [
       ...new Set([...document.querySelectorAll('.cal__mark')].map((el) => el.textContent?.trim())),
     ]);
-    expect(glyphs.filter((g) => g !== '!'), 'a second glyph is a second meaning').toEqual([]);
+    expect(glyphs.filter((g) => g !== ''), 'a glyph is a second meaning').toEqual([]);
   });
 
   test('A RUN OF DAYS IS ONE ELEMENT, and it carries each day’s own hours', async ({ page }) => {
@@ -506,7 +475,8 @@ test.describe('the clash', () => {
             const num = wk.querySelectorAll('.cal__num')[i];
             const mark = num?.querySelector('.cal__mark');
             return {
-              markRed: mark ? getComputedStyle(mark).color : null,
+              // A dot since ADR-209: its colour is its ground.
+              markRed: mark ? getComputedStyle(mark).backgroundColor : null,
               ruleRed: rules.map((r) => getComputedStyle(r).borderLeftColor),
             };
           })

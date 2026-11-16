@@ -14,6 +14,7 @@ import {
   dueOption,
   isoWeek,
   monthGrid,
+  monthSpanWeeks,
   nightsFree,
   normalizePlannerView,
   performanceRoster,
@@ -63,7 +64,6 @@ describe('normalizePlannerView', () => {
     ['month', 'month'],
     ['agenda', 'agenda'],
     ['board', 'board'],
-    ['overview', 'overview'],
   ])('%s passes through', (raw, want) => {
     expect(normalizePlannerView(raw)).toBe(want);
   });
@@ -72,6 +72,10 @@ describe('normalizePlannerView', () => {
     // ADR-095 §9: legacy tokens are translated ONCE on entry and never
     // written back. `carrils` was the Catalan name ADR-080 §7 gave the board.
     expect(normalizePlannerView('carrils')).toBe('board');
+  });
+
+  it('the coming weeks are the Month now (ADR-209)', () => {
+    expect(normalizePlannerView('overview')).toBe('month');
   });
 
   it('anything else is null, so the caller falls through to its default', () => {
@@ -1137,18 +1141,34 @@ describe('awayBands', () => {
   });
 });
 
+describe('monthSpanWeeks (ADR-209)', () => {
+  it('runs Monday to Sunday from the week of the first 1st to the week of the last day', () => {
+    const w = monthSpanWeeks({ year: 2026, month: 11 }, { year: 2027, month: 1 });
+    expect(w[0][0]).toBe('2026-10-26');
+    expect(w[w.length - 1][6]).toBe('2027-01-31');
+    expect(w.every((r) => r.length === 7)).toBe(true);
+    expect(w.flat()).toContain('2026-12-01');
+  });
+
+  it('one month alone is that month and its edges', () => {
+    const w = monthSpanWeeks({ year: 2026, month: 2 }, { year: 2026, month: 2 });
+    expect(w[0][0]).toBe('2026-01-26');
+    expect(w[w.length - 1][6]).toBe('2026-03-01');
+  });
+});
+
 describe('resolvePlannerView (ADR-117)', () => {
   it('an explicit view wins', () => {
     expect(resolvePlannerView('agenda')).toBe('agenda');
     expect(resolvePlannerView('month')).toBe('month');
-    expect(resolvePlannerView('overview')).toBe('overview');
+    expect(resolvePlannerView('overview')).toBe('month');
     expect(resolvePlannerView('carrils')).toBe('board');
   });
 
-  it('no view, or an unknown one, opens the season overview', () => {
-    expect(resolvePlannerView(null)).toBe('overview');
-    expect(resolvePlannerView(undefined)).toBe('overview');
-    expect(resolvePlannerView('week')).toBe('overview');
+  it('no view, or an unknown one, opens the Month (ADR-209)', () => {
+    expect(resolvePlannerView(null)).toBe('month');
+    expect(resolvePlannerView(undefined)).toBe('month');
+    expect(resolvePlannerView('week')).toBe('month');
   });
 
   it('without a view in the address, the stored entry drawing opens (ADR-192)', () => {
@@ -1163,7 +1183,7 @@ describe('resolvePlannerView (ADR-117)', () => {
 });
 
 describe('plannerEntryView (ADR-192)', () => {
-  it('nothing stored opens the overview (null)', () => {
+  it('nothing stored opens the default (null)', () => {
     expect(plannerEntryView([])).toBeNull();
     expect(plannerEntryView([{ id: 'a' }, { id: 'b', planner_view: null }])).toBeNull();
   });
@@ -1177,25 +1197,29 @@ describe('plannerEntryView (ADR-192)', () => {
     expect(plannerEntryView([{ id: 'a', planner_view: 'day' }, { id: 'b', planner_view: 'agenda' }])).toBe('agenda');
     expect(plannerEntryView([{ id: 'a', planner_view: 'week' }])).toBeNull();
   });
+
+  it('a stored overview opens the Month (ADR-209)', () => {
+    expect(plannerEntryView([{ id: 'a', planner_view: 'overview' }])).toBe('month');
+  });
 });
 
 describe('plannerViewWrites (ADR-192)', () => {
   const spaces = [
-    { id: 'a', planner_view: 'month' },
+    { id: 'a', planner_view: 'agenda' },
     { id: 'b', planner_view: null },
   ];
 
   it('choosing a drawing writes every space on screen that stores another', () => {
-    expect(plannerViewWrites(spaces, 'month')).toEqual([{ workspace_id: 'b', planner_view: 'month' }]);
+    expect(plannerViewWrites(spaces, 'agenda')).toEqual([{ workspace_id: 'b', planner_view: 'agenda' }]);
     expect(plannerViewWrites(spaces, 'board')).toEqual([
       { workspace_id: 'a', planner_view: 'board' },
       { workspace_id: 'b', planner_view: 'board' },
     ]);
   });
 
-  it('the overview, the default, is stored as null', () => {
-    expect(plannerViewWrites(spaces, 'overview')).toEqual([{ workspace_id: 'a', planner_view: null }]);
-    expect(plannerViewWrites([{ id: 'c', planner_view: 'overview' }], 'overview')).toEqual([]);
+  it('the Month, the default, is stored as null; a stored overview already is it', () => {
+    expect(plannerViewWrites(spaces, 'month')).toEqual([{ workspace_id: 'a', planner_view: null }]);
+    expect(plannerViewWrites([{ id: 'c', planner_view: 'overview' }], 'month')).toEqual([]);
   });
 
   it('the Day writes nothing', () => {

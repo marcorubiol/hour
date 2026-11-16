@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cellMark, clashesInSeason, gapWindows, mondayOf, seasonWindow, unclosed } from './season';
+import { clashesInSeason, gapWindows, mondayOf, seasonWindow, unclosed } from './season';
 
 describe('seasonWindow', () => {
   it('draws twelve Monday rows and counts from today', () => {
@@ -90,32 +90,6 @@ describe('unclosed', () => {
     expect(unclosed(perf, { home: null, travelCovered: false }).travelGuess).toBe(false);
     // Never a fact.
     expect(unclosed(perf, { home: 'Barcelona', travelCovered: false }).missing).toEqual([]);
-  });
-});
-
-describe('cellMark', () => {
-  it('draws a proposal as an option, like every other drawing', () => {
-    expect(cellMark([{ day: 'd', family: 'proposed', kind: 'perf' }])).toBe('option');
-  });
-  it('firm beats option beats any other date', () => {
-    expect(cellMark([])).toBeNull();
-    expect(cellMark([{ day: 'd', family: 'confirmed', kind: 'date' }])).toBe('date');
-    expect(
-      cellMark([
-        { day: 'd', family: 'confirmed', kind: 'date' },
-        { day: 'd', family: 'hold', kind: 'perf' },
-      ]),
-    ).toBe('option');
-    expect(
-      cellMark([
-        { day: 'd', family: 'hold', kind: 'perf' },
-        { day: 'd', family: 'confirmed', kind: 'perf' },
-      ]),
-    ).toBe('firm');
-  });
-
-  it('travel is not a mark of its own', () => {
-    expect(cellMark([{ day: 'd', family: 'confirmed', kind: 'travel' }])).toBeNull();
   });
 });
 

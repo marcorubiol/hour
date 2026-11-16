@@ -142,12 +142,6 @@ test.describe('el margen del Planner (ADR-138 § 6)', () => {
     await expect(page.getByTestId('planner-steps')).toContainText(VENUE, { timeout: 15_000 });
   });
 
-  test('la Temporada, un número en la casilla del día', async ({ page }) => {
-    test.setTimeout(60_000);
-    await open(page, `/h/planner?view=overview&scope=s:playwright`);
-    await expect(page.locator(`.d[data-day="${day}"]`).getByTestId('season-steps')).toBeVisible({ timeout: 15_000 });
-  });
-
   test('desde la conversación, «Ver en el Planner» abre la Agenda con el proyecto fijado', async ({ page }) => {
     test.setTimeout(60_000);
     await open(page, `/h/playwright/conversation/${convId}`);

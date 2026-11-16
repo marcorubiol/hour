@@ -200,25 +200,6 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
     await sweep(page, wsId);
   });
 
-  // ADR-133: the Planner door counts the Season's «Clashes», by the same rule.
-  test('the Planner door says the clashes the Season counts', async ({ page }) => {
-    test.setTimeout(60_000);
-    await page.goto('/h/planner?scope=s:playwright&view=overview');
-    await waitForLoaded(page);
-    // The Season counts its clashes in its «Clashes» block, drawn only with
-    // something in it (ADR-145 § 1; the census line is gone, fase 2).
-    await expect(page.locator('.ov__strip')).toBeVisible({ timeout: 15_000 });
-    const head = page.locator('.ov .block-head', { hasText: /^Clashes/ });
-    const n = (await head.count()) > 0 ? Number(await head.locator('.block-head__n').innerText()) : 0;
-
-    await page.goto(DESK);
-    await waitForLoaded(page);
-    const door = page.getByTestId('door-planner');
-    await expect(door.locator('.door__n')).toHaveText(/^\d+$/, { timeout: 15_000 });
-    if (n > 0) await expect(door).toContainText(`${n} ${n === 1 ? 'clash' : 'clashes'}`);
-    else await expect(door).not.toContainText('clash');
-  });
-
   // ADR-133: a show on the card opens «Who goes» in its sheet. Since ADR-150
   // the card is the moment (what you do now), so it draws no cast line.
   test('«Next up» on a show: «Who goes» to the sheet', async ({ page }) => {

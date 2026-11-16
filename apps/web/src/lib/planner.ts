@@ -52,6 +52,30 @@ export function monthGrid(year: number, month: number): PlannerDay[][] {
   return weeks;
 }
 
+/**
+ * THE CONTINUOUS MONTH (ADR-209): every week from the one holding the 1st of
+ * `from` to the one holding the last day of `to`, Monday first, no page
+ * break between months. Each day knows its month; none is «outside».
+ */
+export function monthSpanWeeks(
+  from: { year: number; month: number },
+  to: { year: number; month: number },
+): string[][] {
+  const first = new Date(Date.UTC(from.year, from.month - 1, 1));
+  const last = new Date(Date.UTC(to.year, to.month, 0));
+  const cursor = new Date(Date.UTC(from.year, from.month - 1, 1 - ((first.getUTCDay() + 6) % 7)));
+  const weeks: string[][] = [];
+  while (cursor <= last) {
+    const week: string[] = [];
+    for (let i = 0; i < 7; i++) {
+      week.push(isoOf(cursor));
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+    weeks.push(week);
+  }
+  return weeks;
+}
+
 /** Month arithmetic that survives year boundaries. Month is 1-12. */
 export function addMonths(
   year: number,
@@ -729,7 +753,7 @@ function makeBand(
  * is a week · Board — a row is an entity, and its `lanes` dial only ever
  * relabels the entity.
  */
-export type PlannerView = 'overview' | 'day' | 'month' | 'agenda' | 'board';
+export type PlannerView = 'day' | 'month' | 'agenda' | 'board';
 
 /**
  * Legacy view tokens, translated ONCE on entry and never written back — a
@@ -739,11 +763,14 @@ export type PlannerView = 'overview' | 'day' | 'month' | 'agenda' | 'board';
  */
 const VIEW_ALIASES: Record<string, PlannerView> = {
   carrils: 'board',
+  // «Próximas semanas» stopped being a view (ADR-209): its strip is the
+  // continuous Month, and a link or a stored entry that names it lands there.
+  overview: 'month',
 };
 
 /** A token from a URL or from storage → a view, or null if it is neither. */
 export function normalizePlannerView(v: string | null | undefined): PlannerView | null {
-  if (v === 'overview' || v === 'day' || v === 'month' || v === 'agenda' || v === 'board') return v;
+  if (v === 'day' || v === 'month' || v === 'agenda' || v === 'board') return v;
   return (v && VIEW_ALIASES[v]) || null;
 }
 
@@ -771,28 +798,35 @@ export function conversationPlannerHref(projectId: string, days: readonly string
 }
 
 /**
- * Projection resolution (ADR-117, amended by ADR-192): an explicit `?view=`
- * wins; without one, the drawing this person opens in (`entry`, from their
- * membership, `plannerEntryView`), and without that the season overview, the
- * Planner's default portada. Unknown values fall through: a mistyped URL
- * never breaks the page.
+ * Projection resolution (ADR-117, amended by ADR-192 and ADR-209): an
+ * explicit `?view=` wins; without one, the drawing this person opens in
+ * (`entry`, from their membership, `plannerEntryView`), and without that the
+ * Month, which took over the coming weeks. Unknown values fall through: a
+ * mistyped URL never breaks the page.
  */
 export function resolvePlannerView(
   urlView: string | null | undefined,
   entry: PlannerEntryView | null = null,
 ): PlannerView {
-  return normalizePlannerView(urlView) ?? entry ?? 'overview';
+  return normalizePlannerView(urlView) ?? entry ?? 'month';
 }
 
 /**
- * THE DRAWING EACH PERSON OPENS IN (ADR-192, task 129). The four words of the
- * bar (ADR-155 § 1); the Day is a lens, never a way in. Stored per workspace
- * membership (`membership.planner_view`), null = the season overview.
+ * THE DRAWING EACH PERSON OPENS IN (ADR-192, task 129). The three words of
+ * the bar (ADR-209); the Day is a lens, never a way in. Stored per workspace
+ * membership (`membership.planner_view`), null = the default, the Month. A
+ * stored `overview` (before ADR-209) reads as the Month.
  */
-export type PlannerEntryView = 'overview' | 'agenda' | 'month' | 'board';
+export type PlannerEntryView = 'agenda' | 'month' | 'board';
 
 export function isPlannerEntryView(v: unknown): v is PlannerEntryView {
-  return v === 'overview' || v === 'agenda' || v === 'month' || v === 'board';
+  return v === 'agenda' || v === 'month' || v === 'board';
+}
+
+/** A stored value as an entry drawing: the old `overview` is the Month. */
+function storedEntry(v: string | null | undefined): PlannerEntryView | null {
+  const n = typeof v === 'string' ? normalizePlannerView(v) : null;
+  return isPlannerEntryView(n) ? n : null;
 }
 
 /** A workspace of the feed, with the caller's stored entry drawing there. */
@@ -805,27 +839,32 @@ export interface WithPlannerView {
  * The entry drawing for the spaces on screen: the first of them (feed order)
  * that stores one. Choosing in the bar writes every space on screen
  * (`plannerViewWrites`), so they agree unless a pinned visit set one alone;
- * then the first wins, deterministically. None stored → null (the overview).
+ * then the first wins, deterministically. None stored → null (the default).
  */
 export function plannerEntryView(onScreen: readonly WithPlannerView[]): PlannerEntryView | null {
-  for (const w of onScreen) if (isPlannerEntryView(w.planner_view)) return w.planner_view;
+  for (const w of onScreen) {
+    const v = storedEntry(w.planner_view);
+    if (v) return v;
+  }
   return null;
 }
 
 /**
  * What choosing `v` in the bar writes: one row per space on screen whose
- * stored value differs. The overview, the default, is stored as null, so it
+ * stored value differs. The Month, the default, is stored as null, so it
  * follows the default if that ever changes (as `view_scope` does, ADR-151
  * § 3). The Day is a lens: choosing it writes nothing.
  */
 export function plannerViewWrites(
   onScreen: readonly WithPlannerView[],
   v: PlannerView,
-): { workspace_id: string; planner_view: Exclude<PlannerEntryView, 'overview'> | null }[] {
+): { workspace_id: string; planner_view: Exclude<PlannerEntryView, 'month'> | null }[] {
   if (!isPlannerEntryView(v)) return [];
-  const value = v === 'overview' ? null : v;
-  const stored = (w: WithPlannerView) =>
-    isPlannerEntryView(w.planner_view) && w.planner_view !== 'overview' ? w.planner_view : null;
+  const value = v === 'month' ? null : v;
+  const stored = (w: WithPlannerView) => {
+    const s = storedEntry(w.planner_view);
+    return s === 'month' ? null : s;
+  };
   return onScreen.filter((w) => stored(w) !== value).map((w) => ({ workspace_id: w.id, planner_view: value }));
 }
 

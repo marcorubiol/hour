@@ -264,6 +264,11 @@
     --today-ink: var(--text-color);
     --today-weight: 600;
     --today-wash: color-mix(in oklch, var(--text-color) 4%, transparent);
+    /* THE MONTH CONTINUES (ADR-209): one month on the paper, the next a
+       ground one step darker, alternating. Lighter than today's wash, and
+       the free nights' hatch is ink, not ground, so the two never meet. */
+    --month-alt-ground: color-mix(in oklch, var(--text-color) 3%, transparent);
+    --gap-hatch: color-mix(in oklch, var(--text-color) 14%, transparent);
 
     /* SUGGESTED — what Hour puts in front of you that is not yours yet: the
        next thing's card, a proposal, a «¿vas?». A semantic tone on --info,
