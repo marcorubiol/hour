@@ -499,6 +499,10 @@
   function pick(iso: string) {
     picked = picked === iso ? null : iso;
   }
+  /** The column of a month's 1st in this week, or -1 (the ink stair). */
+  function firstCol(week: readonly { iso: string }[]): number {
+    return week.findIndex((d) => d.iso.endsWith('-01'));
+  }
   function openOrPick(iso: string) {
     if (narrow) pick(iso);
     else onDayOpen?.(iso);
@@ -1141,6 +1145,8 @@
     {@const wlc = weekLaneCount(week)}
     {@const bands = weekBands(week)}
     {@const series = weekSeries(week)}
+    {@const m1 = firstCol(week)}
+    {@const m0 = wi > 0 ? firstCol(weeks[wi - 1]) : -1}
     <!-- A ROW OF THE MONTH IS A WEEK, with no gutter and no number
          (ADR-209): the week is the stronger rule above its Monday. -->
     <div class="cal__wk" style="--wf: {weekFill(week)}" data-mon={week[0].iso}>
@@ -1156,7 +1162,12 @@
            la banda y una ausencia se leía como algo pegado por debajo del mes
            en vez de como parte de los días que mide (Marco, en pantalla,
            2026-08-29). La regla sube aquí: no se duplica, se muda. -->
-      <div class="cal__wkbody">
+      <div
+        class="cal__wkbody"
+        class:cal__wkbody--m1={m1 >= 0}
+        class:cal__wkbody--m0={m0 > 0}
+        style="--m1: {m1}; --m0: {m0}"
+      >
       <div class="cal__wkc">
         {#each week as day, di (day.iso)}
           {@const clashes = clashesByDay?.get(day.iso) ?? []}
@@ -2207,8 +2218,36 @@
     .cal__mname {
       font-family: var(--font-display);
       font-size: var(--text-l);
+      font-weight: var(--month-name-weight);
       line-height: 1;
       color: var(--text-color);
+    }
+    /* THE BORDER BETWEEN TWO MONTHS IS A STAIR IN INK (Marco, 16-11: «el
+       primer día de mes que tiene el nombre se debería destacar»): over the
+       new month's days in the week of its 1st, down the 1st's left edge, and
+       over the days of the next week that still sit under the old month.
+       Lines over the tone and the hatch, never a ground: neither is covered,
+       and the cell keeps its width. */
+    .cal__wkbody {
+      position: relative;
+    }
+    .cal__wkbody--m1::before,
+    .cal__wkbody--m0::after {
+      content: '';
+      position: absolute;
+      inset-block-start: 0;
+      border-block-start: var(--line-hairline) solid var(--month-rule);
+      pointer-events: none;
+    }
+    .cal__wkbody--m1::before {
+      inset-block-end: 0;
+      inset-inline: calc(100% / 7 * var(--m1)) 0;
+      /* A 1st on a Monday has the sheet's edge for its left side. */
+      border-inline-start: calc(min(var(--m1), 1) * var(--line-hairline)) solid var(--month-rule);
+    }
+    .cal__wkbody--m0::after {
+      inset-inline-start: 0;
+      inline-size: calc(100% / 7 * var(--m0));
     }
     /* The cell decides what it can say: below a phone's cell, the short
        month, two monograms and «+N», no steps (the day under the week says
