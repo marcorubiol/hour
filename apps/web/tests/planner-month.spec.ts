@@ -113,9 +113,10 @@ test.describe('the month (ADR-209)', () => {
       for (const v of ['&view=agenda', '&view=month', '&view=board']) {
         const where = `${v} at ${width}`;
         await open(page, v);
-        const meta = page.locator('.cal__meta--window, .pstat__line');
-        await expect(meta, `window line in ${where}`).toBeVisible();
-        expect((await meta.innerText()).trim(), `window line in ${where}`).not.toBe('');
+        // The Agenda may have nothing to say (no count, nothing to decide):
+        // its line is still there, one line tall, so the bar never moves.
+        const meta = page.locator('.pstat__line');
+        await expect(meta, `status line in ${where}`).toHaveCount(1);
         heights.push(Math.round((await meta.boundingBox())?.height ?? -1));
         bars.push(Math.round((await page.locator('.cal__views').boundingBox())?.y ?? -1));
       }

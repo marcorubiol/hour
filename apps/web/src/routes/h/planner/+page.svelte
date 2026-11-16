@@ -1950,10 +1950,13 @@
     return closedGapWindows(days, engine.occupiedDays, new Set([...monthTourDays, ...engine.unsellableDays]));
   });
   /** «Choques»: the clashes that are not a choice between two holds (a pair
-      the queue holds is said there, once), from today to the paper's end. */
-  let monthClashes = $derived.by(() => {
-    if (view !== 'month') return [];
-    return clashesInSeason(conflicts, eventDayById, decisionQueue.decisions, { from: todayIso, to: gridTo }).flatMap(
+      the queue holds is said there, once), from today to the end of what the
+      drawing has loaded: the Month's paper, the Agenda's and the Board's
+      window (they share it). */
+  let statusClashes = $derived.by(() => {
+    if (view === 'day') return [];
+    const to = view === 'month' ? gridTo : agendaToIso;
+    return clashesInSeason(conflicts, eventDayById, decisionQueue.decisions, { from: todayIso, to }).flatMap(
       ({ day, conflict }, i) => {
         const vm = clashVM(conflict);
         if (!vm) return [];
@@ -1963,10 +1966,6 @@
     );
   });
   let clashesOpen = $state(false);
-  let horizonTitle = $derived.by(() => {
-    const s = t('planner.agenda_from', locale, { day: localeDayMonth(agendaFromIso, localeTag) });
-    return `${s.charAt(0).toUpperCase()}${s.slice(1)}`;
-  });
 
   // ── Inline decision bands for the agenda book (ADR-080 §4 surfaced at
   // the day) — the SAME derived queue the DecisionBand renders, indexed by
@@ -2388,12 +2387,18 @@
     return `${localeWeekdayShort(iso, localeTag)} ${localeDayMonth(iso, localeTag)}`;
   }
 
-  let monthTitle = $derived(monthName(ym.year, ym.month, localeTag));
-  // Capitalized "Julio 2026" — LensTitle then keeps the month italic and the
-  // year upright (the title rule). (Month names are lowercase in es/ca.)
-  let monthLabel = $derived(
-    `${monthTitle.charAt(0).toUpperCase()}${monthTitle.slice(1)} ${ym.year}`,
+  /* THE TITLE IS THE MONTH, its year small beside it (ADR-209 head): the
+     Month's is the month on screen; the Agenda and the Board name the month
+     their window opens at (where it opens is said on the status line). */
+  let titleYm = $derived(
+    view === 'agenda' || view === 'board'
+      ? { year: Number(agendaFromIso.slice(0, 4)), month: Number(agendaFromIso.slice(5, 7)) }
+      : ym,
   );
+  let titleMonth = $derived.by(() => {
+    const m = monthName(titleYm.year, titleYm.month, localeTag);
+    return `${m.charAt(0).toUpperCase()}${m.slice(1)}`;
+  });
 
   /* ON THE CONTINUOUS MONTH THE ARROWS MOVE YOU (ADR-209), as on the
      diary: ‹ › take the reader to the 1st of the month before or after the
@@ -2990,13 +2995,17 @@
             syncUrl();
           }}
         />
-      {:else if view === 'agenda' || view === 'board'}<LensTitle text={horizonTitle} />
-      {:else}<LensTitle text={monthLabel} />{/if}
+      {:else}<span class="cal__month">{titleMonth}</span> <small class="cal__yr">{titleYm.year}</small>{/if}
     {/snippet}
-    <!-- THE ARROWS GO WITH THE TITLE THEY MOVE (ADR-136): in Day, Agenda,
-         Month and Board the title IS the window. -->
+    <!-- Only the Day keeps ‹ › beside its title (CalNav says why). -->
     {#snippet titleAside()}
-      <CalNav {view} {locale} onStepBack={stepBack} onStepNext={stepNext} onNow={goToday} />
+      {#if view === 'day'}<CalNav {view} {locale} onStepBack={stepBack} onStepNext={stepNext} />{/if}
+    {/snippet}
+    <!-- The head's acts at the end of the title row, as drawn. «Temporada»
+         (fase 4) goes here, before «Hoy». The button is `Now` in English,
+         not `Today`: a view is called Today. -->
+    {#snippet tools()}
+      <button type="button" class="cal__now hit" onclick={goToday}>{t('planner.now', locale)}</button>
     {/snippet}
   </LensHeader>
 
@@ -3075,38 +3084,11 @@
              month's: the numbers were July's window computed over a feed that
              starts today, so a July with nine occupied days announced `0
              confirmed · 31 nights free`. Caught on screen, 2026-07-31. -->
-        <!-- A WINDOW WITH NO END NAMES WHERE IT BEGINS, AND SAYS SO. The
-             agenda cannot count — its horizon grows as you scroll — but it can
-             say what it IS: a book opened at a day. Without this the band went
-             silent when the counters were gated, which is honest and mute; the
-             law asks for honest and legible. -->
-        <!-- BAND 3 · THE META, and it opens with the GRAIN. `weeks 27 → 31` is
-             the one thing that says a row of the month is a WEEK without
-             announcing it: the range proves what a row is. The Day has no
-             range to give — a day counts itself — and the agenda's horizon
-             grows, so neither prints one. -->
-        <!-- Weeks range: BOUNDED drawings only — the board grew a horizon
-             and what grows is never counted. -->
-        <!-- THE AGENDA NAMES ITS HORIZON AND COUNTS NOTHING (ADR-095: a
-             window with no end is never counted). Its title is the day the
-             book opens at; the line says whether that day is today, and that
-             the book has no last page. -->
-        {#if view === 'agenda' && shows('planner', 'census', calm.on)}
-          <span class="cal__stat cal__stat--soft"
-            >{agendaFromIso === todayIso
-              ? t('planner.agenda_from_today', locale)
-              : t('planner.agenda_open_at', locale, { day: localeDayMonth(agendaFromIso, localeTag) })}</span
-          >
-          <span class="cal__stat cal__stat--soft">{t('planner.board_no_end', locale)}</span>
-        {/if}
-        <!-- The board names its grain and its horizon: a window that grows
-             names where it begins and says NO END — what grows is never
-             counted (law: el horizonte del tablero). Lanes from the one
-             writer (boardLaneCount); folding is furniture and the meta
-             does not chase it. -->
+        <!-- THE AGENDA AND THE BOARD COUNT NOTHING (ADR-095: a window with no
+             end is never counted) and no longer name their horizon: the
+             line keeps por decidir, urgente and choques (ADR-209 § 8). The
+             Board keeps its lanes, the one figure it draws whole. -->
         {#if view === 'board' && shows('planner', 'census', calm.on)}
-          <span class="cal__stat cal__stat--soft">{t('planner.board_no_end', locale)}</span>
-          <span class="cal__stat cal__stat--soft">{t('planner.board_grain', locale)}</span>
           <span class="cal__stat cal__stat--soft"
             >{t('planner.board_lanes_n', locale, {
               n: String(boardLaneCount(boardBase.groups, boardShut)),
@@ -3186,17 +3168,16 @@
           >
         {/if}
   {/snippet}
-  <div class="cal__facts">
-  <!-- THE MONTH SAYS IT IN ONE LINE (ADR-209): por decidir, choques and the
-       count, the status line the three drawings will share. The Agenda and
-       the Board keep their two lines until their own phase. -->
-  {#if view === 'month'}
+  <div class="cal__facts" class:cal__facts--day={view === 'day'}>
+  <!-- THE THREE DRAWINGS SAY IT IN ONE LINE (ADR-209 § 8): por decidir,
+       choques and what each drawing counts. The Day keeps its two lines. -->
+  {#if view !== 'day'}
     <PlannerStatus
       {locale}
       decide={!decisionsAbsent && decisionVMs.length > 0 ? { n: decisionVMs.length, urgent: urgentCount } : null}
       {decisionsOpen}
       onDecide={() => setDecisionsOpen(!decisionsOpen)}
-      clashes={monthClashes.map((c) => ({ key: c.key, when: spokenDay(c.day), body: c.body, day: c.day }))}
+      clashes={statusClashes.map((c) => ({ key: c.key, when: spokenDay(c.day), body: c.body, day: c.day }))}
       {clashesOpen}
       onClashes={() => (clashesOpen = !clashesOpen)}
       onClashDay={(iso) => {
@@ -3294,6 +3275,8 @@
     onFeed={feedWorkspaces.length > 0 ? openFeed : undefined}
     onBlackout={openBlackout}
     onCloseDay={closeDay}
+    onStepBack={stepBack}
+    onStepNext={stepNext}
   />
 
 
@@ -3591,6 +3574,36 @@
      título. Hereda la tipografía entera —`LensTitle` aplica sus reglas dentro—
      y solo añade el subrayado al pasar, el MISMO que el número del día en el
      mes: dos sitios, un tratamiento, un significado. */
+  /* THE HEAD AS DRAWN (ADR-209, 16-11): the month upright, its year small in
+     mono, and a strong rule under the row instead of the hairline. */
+  .cal :global(.lenshead__titlerow) {
+    border-block-end-color: var(--text-color);
+  }
+  .cal__month {
+    font-style: normal;
+  }
+  .cal__yr {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-style: normal;
+    letter-spacing: var(--tracking-l);
+    color: var(--text-muted);
+  }
+  .cal__now {
+    padding: var(--space-2xs) var(--space-m);
+    border: var(--line-hairline) solid var(--border-color-dark);
+    border-radius: var(--radius-circle);
+    background: none;
+    color: var(--text-muted);
+    font-family: var(--font-sans);
+    font-size: var(--text-s);
+    font-style: normal;
+    line-height: 1.1;
+    cursor: pointer;
+  }
+  .cal__now:hover {
+    color: var(--text-color);
+  }
   .cal__daytitle {
     margin: 0;
     padding: 0;
@@ -3684,6 +3697,10 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-xs);
+    }
+    /* The Day's two lines keep the rule that closes them; the status line of
+       the three drawings sits straight on the bar, as drawn. */
+    .cal__facts--day {
       padding-block-end: var(--space-s);
       border-block-end: var(--line-hairline) solid var(--border-color-light);
     }

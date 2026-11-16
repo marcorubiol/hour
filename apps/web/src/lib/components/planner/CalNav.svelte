@@ -1,26 +1,25 @@
 <script lang="ts">
   /**
-   * The window's controls — ‹ › Now — beside the title they move (ADR-136).
-   * The title of Day, Agenda, Month and Board IS the window («October 2026»,
-   * «Mon 20 Oct», «From 18 Oct»), so its three verbs ride with it. The Season
-   * is a horizon from today with nothing to step: the page renders this
-   * there invisible and inert, only to keep its room (§ 109), so the view
-   * bar does not move when the arrows drop under the title on a phone.
+   * ‹ ›, only where scrolling does not already move you (ADR-209 head, the
+   * drawing of 16-11): the Agenda and the Month are scrolled, «Hoy» brings
+   * you back. The Day travels to the next day that holds something, which no
+   * scroll does, so its arrows stay beside its title until the seven-day
+   * strip replaces them. The Board pans sideways, which a plain wheel does
+   * not, so its arrows ride quietly with its dial.
    */
   import { t, type Locale } from '$lib/i18n';
   import type { PlannerView } from '$lib/planner';
 
   interface Props {
-    view: PlannerView;
+    view: Extract<PlannerView, 'day' | 'board'>;
     locale: Locale;
     /** `shift` = una muesca literal, no un salto a plan: el mismo gesto que
         `Shift+← →` en el Planner, con el ratón. La pantalla no lo anuncia
         (ADR-154): es un atajo para quien lo sabe. */
     onStepBack: (shift?: boolean) => void;
     onStepNext: (shift?: boolean) => void;
-    onNow: () => void;
   }
-  let { view, locale, onStepBack, onStepNext, onNow }: Props = $props();
+  let { view, locale, onStepBack, onStepNext }: Props = $props();
 
   /* THE ARROWS SAY WHAT THEY DO IN THIS DRAWING (uso #15): in the Day they
      travel to the next day that HOLDS something, not to tomorrow, and the
@@ -34,13 +33,8 @@
   );
 </script>
 
-<!-- Small on purpose — 28px squares and a 12px pill — because the thing they
-     must not do is compete with the title beside them: the title says where
-     you are, these only move it.
-
-     And the button is `Now`, NOT `Today`: a view is called Today, and the
-     same word for two acts is the one defect here that can lose somebody
-     their place without telling them why. -->
+<!-- Small on purpose, 28px squares: the thing they must not do is compete
+     with the title: the title says where you are, these only move it. -->
 <button
   type="button"
   class="cal__arw hit"
@@ -55,12 +49,11 @@
   title={t(stepKeys.next, locale)}
   onclick={(e) => onStepNext(e.shiftKey)}>›</button
 >
-<button type="button" class="cal__now hit" onclick={onNow}>{t('planner.now', locale)}</button>
 
 <style>
   @layer components {
-    /* Sizes verbatim from the prototype: 28px squares, 13px glyph; the pill
-       at 12px with 5/12 padding, `var(--radius)` for the squares. On a coarse
+    /* Sizes verbatim from the prototype: 28px squares, 13px glyph,
+       `var(--radius)` for the squares. On a coarse
        pointer, a finger's target (móvil #5) that reaches past the square
        without growing it (`.hit`, base.css). */
     .cal__arw {
@@ -82,21 +75,6 @@
     .cal__arw:hover {
       color: var(--text-color);
       border-color: var(--text-faint);
-    }
-    .cal__now {
-      padding: var(--space-xs) var(--space-s);
-      border: var(--line-hairline) solid var(--border-color-light);
-      border-radius: var(--radius-circle);
-      background: var(--bg-ultra-light);
-      color: var(--text-faint);
-      font-family: inherit;
-      font-size: var(--text-s);
-      font-style: normal;
-      line-height: 1.1;
-      cursor: pointer;
-    }
-    .cal__now:hover {
-      color: var(--text-color);
     }
   }
 </style>
