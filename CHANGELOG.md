@@ -6,6 +6,8 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Noviembre 2026 (en curso)
 
+- El Planificador, con una cabecera común: en Agenda, Mes y Tablero el título es el mes con el año pequeño, «Hoy» va a la derecha y la línea de estado queda encima de la barra de vistas; las flechas ‹ › salen de Agenda y Mes y quedan discretas en el Tablero y junto al título en el Día. El Mes cierra su rejilla, las fichas pierden la caja y una opción va con contorno y «?» (162, ADR-209, 2026-11-16, `459af592`). Sin migración.
+- Desde ⌘K se dan de alta un gasto, un trato, una llamada y una nota privada, con el diálogo de cada cosa y sin pasar por su pantalla (163, fase 1, 2026-11-16, `459af592`). Sin migración.
 - El Planificador en tres dibujos, primera fase: la barra dice Agenda · Mes · Tablero, fuera «Próximas semanas», el Mes es continuo y sin columna de semana, con una línea de estado bajo el título que dice qué decidir, qué choca y cuántas hay (ADR-209, 2026-11-16, `b4bfd8f8`). Sin migración.
 - El monograma es una ficha de tres: la casilla mide siempre 5:3 (20 × 12 en las fichas pequeñas) y en Conversaciones la columna del monograma pasa a 53 px para todas las filas (161, ADR-210, 2026-11-16, `b4bfd8f8`). Sin migración.
 - La marca de calma es ahora el reloj sin cifras (dos guiones y los dos puntos) en vez de la onda, y al entrar en calma el reloj de la app enseña `--:--` un segundo y la hora vuelve; la hora no se quita nunca (ADR-208, 2026-11-16, `ff38e955`). Sin migración.
