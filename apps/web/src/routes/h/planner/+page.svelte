@@ -3084,38 +3084,11 @@
              month's: the numbers were July's window computed over a feed that
              starts today, so a July with nine occupied days announced `0
              confirmed · 31 nights free`. Caught on screen, 2026-07-31. -->
-        <!-- A WINDOW WITH NO END NAMES WHERE IT BEGINS, AND SAYS SO. The
-             agenda cannot count — its horizon grows as you scroll — but it can
-             say what it IS: a book opened at a day. Without this the band went
-             silent when the counters were gated, which is honest and mute; the
-             law asks for honest and legible. -->
-        <!-- BAND 3 · THE META, and it opens with the GRAIN. `weeks 27 → 31` is
-             the one thing that says a row of the month is a WEEK without
-             announcing it: the range proves what a row is. The Day has no
-             range to give — a day counts itself — and the agenda's horizon
-             grows, so neither prints one. -->
-        <!-- Weeks range: BOUNDED drawings only — the board grew a horizon
-             and what grows is never counted. -->
-        <!-- THE AGENDA NAMES ITS HORIZON AND COUNTS NOTHING (ADR-095: a
-             window with no end is never counted). Its title is the day the
-             book opens at; the line says whether that day is today, and that
-             the book has no last page. -->
-        {#if view === 'agenda' && shows('planner', 'census', calm.on)}
-          <span class="cal__stat cal__stat--soft"
-            >{agendaFromIso === todayIso
-              ? t('planner.agenda_from_today', locale)
-              : t('planner.agenda_open_at', locale, { day: localeDayMonth(agendaFromIso, localeTag) })}</span
-          >
-          <span class="cal__stat cal__stat--soft">{t('planner.board_no_end', locale)}</span>
-        {/if}
-        <!-- The board names its grain and its horizon: a window that grows
-             names where it begins and says NO END — what grows is never
-             counted (law: el horizonte del tablero). Lanes from the one
-             writer (boardLaneCount); folding is furniture and the meta
-             does not chase it. -->
+        <!-- THE AGENDA AND THE BOARD COUNT NOTHING (ADR-095: a window with no
+             end is never counted) and no longer name their horizon: the
+             line keeps por decidir, urgente and choques (ADR-209 § 8). The
+             Board keeps its lanes, the one figure it draws whole. -->
         {#if view === 'board' && shows('planner', 'census', calm.on)}
-          <span class="cal__stat cal__stat--soft">{t('planner.board_no_end', locale)}</span>
-          <span class="cal__stat cal__stat--soft">{t('planner.board_grain', locale)}</span>
           <span class="cal__stat cal__stat--soft"
             >{t('planner.board_lanes_n', locale, {
               n: String(boardLaneCount(boardBase.groups, boardShut)),
