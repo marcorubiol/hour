@@ -135,11 +135,13 @@ test.describe('the month (ADR-209)', () => {
       expect(next).toBeTruthy();
       // The week of the 15th of the next month, just under the strip: well
       // past the head at rest. Twice: the strip only sticks once scrolled.
+      // Instant: the page scrolls smoothly by default, and the second pass
+      // must measure where the first one landed.
       for (let i = 0; i < 2; i++) {
         await page.evaluate((iso) => {
           const el = document.querySelector(`.cal__grid .cal__num[data-day="${iso}"]`)!;
           const foot = document.querySelector('.cal__wkh')!.getBoundingClientRect().bottom;
-          window.scrollBy(0, el.getBoundingClientRect().top - foot - 2);
+          window.scrollBy({ top: el.getBoundingClientRect().top - foot - 2, behavior: 'instant' });
         }, `${next}-15`);
       }
       await expect(page).toHaveURL(new RegExp(`ym=${next}`));
