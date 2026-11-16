@@ -13,6 +13,7 @@
   import type { Snippet } from 'svelte';
   import { appLocale, LOCALE_TAG, t } from '$lib/i18n';
   import CalmMark from './CalmMark.svelte';
+  import ClockFigures from './ClockFigures.svelte';
   import RailPulse from './RailPulse.svelte';
   import ConceptHint from '$lib/components/ConceptHint.svelte';
 
@@ -51,7 +52,7 @@
          to get back to the top of the app is a smaller promise than a logo
          that navigates. -->
     <a class="side-clock__now" href="/h/desk" aria-label={t('lens.desk', locale)}>
-      <time class="side-clock__time" datetime={clockTime}>{clockTime}</time>
+      <time class="side-clock__time" datetime={clockTime}><ClockFigures time={clockTime} /></time>
       <p class="side-clock__date">{clockDate}</p>
     </a>
     <!-- Calm and its «i» are one thing at the clock's other end. -->

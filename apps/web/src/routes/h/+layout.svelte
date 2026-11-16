@@ -37,6 +37,7 @@
   import ScopeRail from '$lib/components/shell/ScopeRail.svelte';
   import ShellField from '$lib/components/shell/ShellField.svelte';
   import CalmMark from '$lib/components/shell/CalmMark.svelte';
+  import ClockFigures from '$lib/components/shell/ClockFigures.svelte';
   import PullRefresh from '$lib/components/shell/PullRefresh.svelte';
   import { isReservedWorkspaceSlug } from '$lib/reserved-slugs';
   import { appLocale, LOCALE_TAG, setTrade, setWorkspaceTrades, t, tradeOf } from '$lib/i18n';
@@ -795,7 +796,7 @@
            and the date beside it as one piece, and no word «Hoy». It opens
            nothing; pressing it goes to Hoy. Beside the rail it is the rail's. -->
       <a class="shell__now" href="/h/desk" aria-label={t('lens.desk', locale)}>
-        <time class="shell__clock" datetime={clockTime}>{clockTime}</time>
+        <time class="shell__clock" datetime={clockTime}><ClockFigures time={clockTime} /></time>
         <span class="shell__date" aria-hidden="true"><b>{clockWeekday}</b><span>{clockDay}</span></span>
       </a>
 

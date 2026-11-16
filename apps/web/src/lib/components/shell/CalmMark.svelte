@@ -1,7 +1,7 @@
 <script lang="ts">
   /**
-   * Calm as a mark (ADR-202 § 11, design-system rule 14): the wave that
-   * settles, in a circle; an outline when it is off, the circle filled with
+   * Calm as a mark (ADR-208, design-system rule 14): the clock without its
+   * figures, in a circle; an outline when it is off, the circle filled with
    * the mark in negative when it is on. The same mark in every theme: a theme
    * changes its stroke (`--mark-stroke`) and its inks, never the drawing.
    * One home for it: the phone's top bar and the desktop rail both draw this.
@@ -23,7 +23,7 @@
   aria-keyshortcuts="C"
   onclick={() => calm.toggle()}
 >
-  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 8c1.1-3.6 2.9-3.6 4 0c.9 2.3 2.4 2.3 3.3 0H14.5" /></svg>
+  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.2 8h3.2M10.6 8h3.2" /><circle cx="8" cy="5.6" r="1" /><circle cx="8" cy="10.4" r="1" /></svg>
 </button>
 
 <style>
@@ -70,5 +70,9 @@
     stroke-width: var(--mark-stroke);
     stroke-linecap: round;
     stroke-linejoin: round;
+  }
+  .calmmark circle {
+    fill: currentColor;
+    stroke: none;
   }
 </style>

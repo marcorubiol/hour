@@ -126,11 +126,12 @@ pieza.
 
 ### 14. Calma es una marca, la misma en todos los temas. DECIDIDO
 
-La onda que se aquieta (path `M1.5 8c1.1-3.6 2.9-3.6 4 0c.9 2.3 2.4 2.3 3.3 0H14.5`, viewBox 16), en trazo
+El reloj sin cifras (dos guiones `M2.2 8h3.2M10.6 8h3.2` y los dos puntos, viewBox 16; ADR-208, antes la onda), en
 `currentColor`, dentro de un círculo: apagada, contorno; encendida, círculo lleno con la marca en negativo. El grosor
 del trazo es una variable del tema. En el móvil, calma va en la barra de arriba.
 - **Por qué:** una palabra cambia con el idioma y el tema; una marca no. Y un tema punk la engorda sin redibujarla.
-- **Decisión:** 13-11 noche (a); calma a la barra de arriba, en el DECIDIDO de quitar la hoja del reloj.
+- **Decisión:** 13-11 noche (a); calma a la barra de arriba, en el DECIDIDO de quitar la hoja del reloj. El dibujo, 16-11
+  (ADR-208): al entrar en calma el reloj de la app pasa un segundo por `--:--` y la hora vuelve.
 - Qué hace calma en Hoy (dejar el día, lo que viene y las pastillas, sin filas) está PROPUESTO.
 
 ### 15. Buscar y acotar, un solo campo. DECIDIDO

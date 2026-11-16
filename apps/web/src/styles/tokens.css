@@ -604,7 +604,7 @@
     --line: 2px;
     --line-thick: 3px;
     --line-bar: 4px;
-    /* The stroke of a drawn mark (calm's wave, design-system rule 14): its
+    /* The stroke of a drawn mark (calm's clock without figures, design-system rule 14): its
        own width, so a theme thickens the marks without touching the rules. */
     --mark-stroke: 1.5px;
 
