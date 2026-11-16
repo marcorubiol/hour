@@ -510,7 +510,8 @@
   /* THE FOOT ASKS FOR MORE, AND THE EYE NAMES THE MONTH. A sentinel under the
      last week asks the page for another month before the reader gets there;
      the week under the reading line (a third down the viewport, below the
-     stuck toolbar) names the month on screen by its Thursday, as ISO does. */
+     weekday axis, the foot of the stuck strip) names the month on screen by
+     its Thursday, as ISO does. */
   let footEl = $state<HTMLElement>();
   $effect(() => {
     if (!footEl || !onReachEnd || typeof IntersectionObserver === 'undefined') return;
@@ -533,8 +534,7 @@
     let raf = 0;
     const read = () => {
       raf = 0;
-      const bar = document.querySelector('.cal__toolbar');
-      const edge = bar ? bar.getBoundingClientRect().bottom : 0;
+      const edge = grid.querySelector('.cal__wkh')?.getBoundingClientRect().bottom ?? 0;
       const y = edge + (window.innerHeight - edge) / 3;
       for (const wk of grid.querySelectorAll<HTMLElement>('.cal__wk')) {
         const r = wk.getBoundingClientRect();
@@ -1535,6 +1535,13 @@
       grid-template-columns: repeat(7, minmax(0, 1fr));
       margin-block-start: var(--space-s);
       border-block-start: var(--line-hairline) solid var(--border-color-light);
+      /* THE AXIS STAYS, under the stuck title (Marco, 16-11): mid-month the
+         title says which month and the axis which column is Saturday. The
+         page measures where it sticks; the weeks pass under it. */
+      position: sticky;
+      inset-block-start: var(--month-axis-top, var(--header-height));
+      z-index: 2;
+      background-color: var(--bg);
     }
     .cal__wkh,
     .cal__wkbody {

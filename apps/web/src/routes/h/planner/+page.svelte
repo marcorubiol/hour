@@ -2403,13 +2403,16 @@
   /* ON THE CONTINUOUS MONTH THE ARROWS MOVE YOU (ADR-209), as on the
      diary: ‹ › take the reader to the 1st of the month before or after the
      one on screen, and the paper grows to hold it when it has to. */
-  /** Lands an element just under the stuck toolbar (`scrollIntoView` reads
-      the margin; the bar's height is measured, never guessed). */
+  /** Lands an element just under the Month's pinned strip, whose foot is the
+      weekday axis (`scrollIntoView` reads the margin; the strip is measured,
+      never guessed), so neither the 1st nor today's row lands under it. */
   function landUnderBar(el: HTMLElement) {
-    const bar = document.querySelector<HTMLElement>('.cal__toolbar');
-    const edge = bar ? (parseFloat(getComputedStyle(bar).top) || 0) + bar.offsetHeight : 0;
-    el.style.scrollMarginBlockStart = `${Math.round(edge)}px`;
-    el.scrollIntoView({ behavior: 'instant', block: 'start' });
+    const bar = document.querySelector<HTMLElement>('.cal__wkh');
+    const edge = bar ? (parseFloat(getComputedStyle(bar).top) || 0) + bar.getBoundingClientRect().height : 0;
+    // The whole week lands, its rule above the Monday included.
+    const week = el.closest<HTMLElement>('.cal__wk') ?? el;
+    week.style.scrollMarginBlockStart = `${Math.ceil(edge)}px`;
+    week.scrollIntoView({ behavior: 'instant', block: 'start' });
   }
   async function showMonth(m: Ym, at?: string) {
     if (ymKey(m) < ymKey(mesFrom)) mesFrom = m;
@@ -2446,6 +2449,25 @@
     ym = m;
     syncUrl();
   }
+  /* MID-MONTH, THE MONTH IS STILL SAID (Marco, 16-11). In the Month the
+     title row and the weekday axis stay stuck as one strip, and the rest of
+     the head scrolls away. The axis sticks under the title row, whose height
+     is measured, never guessed (a title can wrap, a theme can change the
+     scale), and tucks a hairline under its rule: two stuck layers meeting
+     edge to edge left a sub-pixel seam the weeks showed through. */
+  let calEl = $state<HTMLElement>();
+  $effect(() => {
+    if (view !== 'month' || !calEl || typeof ResizeObserver === 'undefined') return;
+    const el = calEl;
+    const head = el.querySelector<HTMLElement>('.lenshead');
+    if (!head) return;
+    const ro = new ResizeObserver(() => {
+      const h = head.getBoundingClientRect().height;
+      el.style.setProperty('--month-axis-top', `calc(var(--header-height) + ${h}px - var(--line-hairline))`);
+    });
+    ro.observe(head);
+    return () => ro.disconnect();
+  });
   // Agenda "Avui" scrolls the book to today's day header instead of moving
   // the single-month window (which the agenda no longer uses).
   /**
@@ -2960,7 +2982,7 @@
   <title>{docTitle(t('lens.planner', locale))}</title>
 </svelte:head>
 
-<section class="cal" aria-busy={busy}>
+<section class="cal" class:cal--pinned={view === 'month'} aria-busy={busy} bind:this={calEl}>
   <LensHeader help="planner">
     {#snippet title()}
       {#if view === 'day'}
@@ -3578,6 +3600,23 @@
      mono, and a strong rule under the row instead of the hairline. */
   .cal :global(.lenshead__titlerow) {
     border-block-end-color: var(--text-color);
+  }
+  /* THE MONTH'S STRIP: the title row sticks under the frame, and the
+     weekday axis under it (MonthGrid, at `--month-axis-top`). Its air above
+     is lent and paid back, so at rest nothing moves. The bar of views scrolls
+     away here, and with no stacking of its own it passes under the strip. */
+  .cal--pinned :global(.lenshead) {
+    position: sticky;
+    inset-block-start: var(--header-height);
+    z-index: calc(var(--z-sticky) - 1);
+    margin-block-start: calc(-1 * var(--space-s));
+    padding-block-start: var(--space-s);
+    background: var(--bg);
+  }
+  .cal--pinned :global(.cal__toolbar) {
+    position: relative;
+    inset-block-start: 0;
+    z-index: auto;
   }
   .cal__month {
     font-style: normal;
