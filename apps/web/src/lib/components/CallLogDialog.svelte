@@ -17,6 +17,9 @@
    * Lo que se guarda es lo que apunta el cuadro de escribir (`contactEvent`),
    * por el mismo POST: cuenta para el turno igual. Espera el plazo de
    * «Deshacer» antes de escribirse (`$lib/call-log-pending`).
+   *
+   * Lo monta el marco una vez (163): el «+» de Conversaciones y ⌘K lo abren
+   * por el almacén de altas, con los espacios en pantalla.
    */
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
@@ -53,9 +56,11 @@
     /** Los espacios en pantalla: donde se busca. */
     workspaceIds: string[];
     locale: Locale;
+    /** Typed in ⌘K: who with (163). */
+    search?: string;
   }
 
-  let { open = $bindable(false), workspaceIds, locale }: Props = $props();
+  let { open = $bindable(false), workspaceIds, locale, search = '' }: Props = $props();
 
   const queryClient = useQueryClient();
   const workspacesQuery = createQuery(workspacesQueryOptions());
@@ -124,8 +129,8 @@
   let wasOpen = false;
   $effect(() => {
     if (open && !wasOpen) {
-      text = '';
-      term = '';
+      text = search;
+      term = paletteSearchTerm(search);
       target = null;
     }
     wasOpen = open;

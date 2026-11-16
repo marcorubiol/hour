@@ -16,7 +16,12 @@
  * a date; without Converses (or the lens off) no conversation; a task only
  * where some space on screen takes one (a guest of a bolo writes none,
  * `$lib/workspace-role`); a person or an organization only where some space
- * takes one from the person (owner, admin or member, 136).
+ * takes one from the person (owner, admin or member, 136); an expense or a
+ * deal only to who reads money with Cuentas on, a call only to who edits
+ * conversations, a private note only where the Planner (its margin) is on.
+ *
+ * Those four (163) are offered when named, never for free text: a name typed
+ * is a person, a conversation or a date far more often than an expense.
  */
 
 import { accentVarFor } from '$lib/utils/accent';
@@ -38,7 +43,11 @@ export type CreateKind =
   | 'conversation'
   | 'person'
   | 'organization'
-  | 'import';
+  | 'import'
+  | 'expense'
+  | 'deal'
+  | 'call'
+  | 'note';
 
 export interface PaletteCreate {
   kind: CreateKind;
@@ -57,6 +66,10 @@ export interface CreateCan {
   directory: boolean;
   /** The database makes an organization on its own (migration 20261111130000, 136). */
   organization: boolean;
+  /** Cuentas is on and the person reads money somewhere: an expense, a deal. */
+  money: boolean;
+  /** The Planner, where a note is read, is on (ADR-093). */
+  note: boolean;
 }
 
 /**
@@ -80,6 +93,10 @@ export const CREATE_LABEL_KEYS: Record<CreateKind, string> = {
   person: 'palette.new_person',
   organization: 'palette.new_organization',
   import: 'palette.import_contacts',
+  expense: 'books.add_expense',
+  deal: 'books.new_deal',
+  call: 'thread.log_send_call',
+  note: 'palette.new_note',
 };
 
 /**
@@ -87,9 +104,20 @@ export const CREATE_LABEL_KEYS: Record<CreateKind, string> = {
  * on the commonest date, a rehearsal; the type chip is right there.
  */
 export function createEventType(kind: CreateKind): QuickType | null {
-  if (kind === 'task' || kind === 'conversation' || kind === 'person' || kind === 'organization' || kind === 'import') return null;
-  if (kind === 'date') return 'rehearsal';
-  return kind;
+  switch (kind) {
+    case 'date':
+      return 'rehearsal';
+    case 'performance':
+    case 'rehearsal':
+    case 'travel_day':
+    case 'residency':
+    case 'day_off':
+    case 'press':
+    case 'other':
+      return kind;
+    default:
+      return null;
+  }
 }
 
 /** Lowercased and stripped of diacritics: «Conversación» → «conversacion». */
@@ -124,6 +152,10 @@ const KIND_WORDS: Record<CreateKind, readonly string[]> = {
   organization: ['organitzacio', 'organizacion', 'organization', 'organisation', 'entitat', 'entidad', 'empresa'],
   // Contactos de una hoja (138): sólo cuando se nombra, nunca con un verbo suelto.
   import: ['importa', 'importar', 'import', 'importer', 'importacio', 'importacion', 'importation', 'hoja', 'full', 'sheet', 'excel', 'csv'],
+  expense: ['gasto', 'despesa', 'expense', 'depense', 'frais'],
+  deal: ['trato', 'tracte', 'deal', 'bolo', 'contrat'],
+  call: ['llamada', 'trucada', 'call', 'appel'],
+  note: ['nota', 'note'],
 };
 
 /** A half-typed word counts from three letters; a shorter one must be whole. */
@@ -146,6 +178,10 @@ export function allowed(kind: CreateKind, can: CreateCan): boolean {
   // Conversaciones en ese espacio (`private.can_import_contacts`). Aquí se ofrece
   // a quien edita conversaciones en alguno y da de alta personas; el espacio lo decide la base.
   if (kind === 'import') return can.directory && can.converse;
+  if (kind === 'expense' || kind === 'deal') return can.money;
+  // A call is written into a conversation (ADR-182).
+  if (kind === 'call') return can.converse;
+  if (kind === 'note') return can.note;
   return can.plan;
 }
 

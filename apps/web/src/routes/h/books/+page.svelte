@@ -28,7 +28,6 @@
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
-  import { CONVERSATIONS_WHOLE, conversationTitle, type ConversationItem } from '$lib/conversation';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import CalmLine from '$lib/components/CalmLine.svelte';
   import { useCalm } from '$lib/stores/calm.svelte';
@@ -54,12 +53,12 @@
   import { dayLabel, localDayISO } from '$lib/datetime';
   import { DASH } from '$lib/glyphs';
   import { categoryLabel, owedToTeam, type ExpenseItem } from '$lib/expense';
-  import ExpenseDialog, { type ExpenseAnchor } from '$lib/components/ExpenseDialog.svelte';
   import { seasonAt, seasonLabel, seasonYearOf } from '$lib/season-year';
   import { screenSeasonStart, seasonStarts } from '$lib/season-start.svelte';
   import {
     applyTaxLines,
     attentionItems,
+    boloInScope,
     boloMoney,
     boloSeason,
     boloStatusLabel,
@@ -72,7 +71,6 @@
     invoicesByBolo as groupInvoicesByBolo,
     invoiceStatusLabel,
     isQuietPosition,
-    lastBoloFee,
     LEDGER_FILTERS,
     matchesLedgerFilter,
     moneyPosition,
@@ -91,7 +89,8 @@
     type MoneyInvoiceItem,
     type MoneyPayer,
   } from '$lib/money';
-  import { moneyAccessAnyQueryOptions } from '$lib/bolo-queries';
+  import { moneyAccessAnyQueryOptions, SCOPE_BOLOS_CAP as BOLOS_CAP, scopeBolosQueryOptions } from '$lib/bolo-queries';
+  import { useCreation } from '$lib/stores/creation.svelte';
   import { appLocale, LOCALE_TAG, t, tradeFor } from '$lib/i18n';
   import { performanceStatusTone } from '$lib/performance';
   import { plannerDayHref } from '$lib/planner';
@@ -101,16 +100,14 @@
     buildLineIndex,
     buildProjectIndex,
     resolveScope,
-    type NavLine,
     type NavWorkspace,
     type RawLine,
   } from '$lib/nav';
   import { activeProjectsQueryOptions, allLinesQueryOptions } from '$lib/nav-queries';
-  import { spaceName } from '$lib/utils/identity';
   import { goto, replaceState } from '$app/navigation';
   import { peekFromLink } from '$lib/peek';
   import { openPeek } from '$lib/peek.svelte';
-  import { tick, untrack } from 'svelte';
+  import { tick } from 'svelte';
   import {
     QUARTER_COLUMNS,
     defaultQuarter,
@@ -156,8 +153,6 @@
     buildLineIndex(($workspacesQuery.data?.items ?? []) as unknown as NavWorkspace[], ($linesQuery.data?.items as RawLine[]) ?? []),
   );
   let scope = $derived(resolveScope(pins.pins, ($workspacesQuery.data?.items ?? []) as unknown as NavWorkspace[], lineIndex, projectIndex));
-  let lineById = $derived(new Map(lineIndex.map((l) => [l.id, l])));
-  let directProjectIds = $derived(new Set(scope.projects.map((p) => p.id)));
   let scopeUnresolved = $derived(
     (pins.lineIds().length > 0 && scope.lines.length !== pins.lineIds().length) ||
       (pins.projectIds().length > 0 && scope.projects.length !== pins.projectIds().length),
@@ -179,19 +174,10 @@
   // The feeds' ceilings. Past them the oldest rows drop silently (the
   // invoices come newest first, and the oldest are the most overdue), so the
   // page says so instead (`capped` below). Desk reads the same URLs.
-  const BOLOS_CAP = 500;
   const INVOICES_CAP = 200;
   // The bolos feed comes whole (up to 500) and the season is cut here: por
   // cobrar and por facturar must see every season, the season figure only one.
-  const bolosOptions = toStore(() => {
-    const k = { ...filterIds, unresolved: scopeUnresolved, gated: noAccess };
-    return {
-      queryKey: ['money-bolos', { p: k.projectIds, w: k.workspaceIds }] as const,
-      enabled: !k.unresolved && !k.gated,
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
-        fetchJSON<{ items: MoneyBolo[] }>(`/api/money/bolos?${feedParams(k, { limit: String(BOLOS_CAP) })}`, signal),
-    };
-  });
+  const bolosOptions = toStore(() => scopeBolosQueryOptions(filterIds, !scopeUnresolved && !noAccess));
   const invoicesOptions = toStore(() => {
     const k = { ...filterIds, unresolved: scopeUnresolved, gated: noAccess };
     return {
@@ -225,15 +211,7 @@
   const expensesQuery = createQuery(expensesOptions);
   const payersQuery = createQuery(payersOptions);
 
-  function boloInScope(b: MoneyBolo): boolean {
-    if (scope.isEmpty) return true;
-    const ws = b.project?.workspace_id;
-    if (ws && scope.workspaceIds.includes(ws)) return true;
-    if (b.project && directProjectIds.has(b.project.id)) return true;
-    if (b.line_id && scope.lineIds.includes(b.line_id)) return true;
-    return false;
-  }
-  let bolos = $derived(($bolosQuery.data?.items ?? []).filter(boloInScope));
+  let bolos = $derived(($bolosQuery.data?.items ?? []).filter((b) => boloInScope(scope, b)));
   let invoices = $derived($invoicesQuery.data?.items ?? []);
   let expenses = $derived($expensesQuery.data?.items ?? []);
   let payers = $derived($payersQuery.data?.items ?? []);
@@ -769,36 +747,10 @@
   }
 
   // ── Add expense (money out) — anchored to a deal or a line (ADR-087) ────
-  // The dialog is the shared one (ADR-170); here it offers every anchor in scope.
-  let expOpen = $state(false);
-  let expAnchor = $state<string | undefined>(undefined);
-  let expCurrency = $state('EUR');
-  let scopedLines = $derived.by(() => {
-    const seen = new Map<string, NavLine>();
-    for (const b of bolos) {
-      if (b.line_id && !seen.has(b.line_id)) {
-        const line = lineById.get(b.line_id);
-        if (line) seen.set(b.line_id, line);
-      }
-    }
-    return [...seen.values()];
-  });
-  let expenseAnchors = $derived<ExpenseAnchor[]>([
-    ...scopedLines.map((l) => ({
-      value: `line:${l.id}`,
-      label: t('books.anchor_line', locale, { name: l.name, project: l.projectName }),
-      workspaceId: l.workspaceId,
-    })),
-    ...bolos.map((b) => ({
-      value: `bolo:${b.id}`,
-      label: t('books.anchor_deal', locale, { where: [b.venue_name, b.city].filter(Boolean).join(', ') || b.project?.name || DASH }),
-      workspaceId: b.project?.workspace_id ?? '',
-    })),
-  ]);
+  // The dialog is the shell's (163): the anchors are the scope's, as here.
+  const creation = useCreation();
   function openExpense(b?: MoneyBolo) {
-    expAnchor = b ? `bolo:${b.id}` : undefined;
-    expCurrency = b?.fee_currency ?? currencies[0] ?? 'EUR';
-    expOpen = true;
+    creation.openExpense({ anchor: b ? `bolo:${b.id}` : undefined, currency: b?.fee_currency ?? currencies[0] ?? 'EUR' });
   }
 
   // ── Se debe al equipo (79, ADR-170): advances not yet given back ──────
@@ -826,129 +778,10 @@
       }),
   });
 
-  // ── New deal — create a bolo by hand (ADR-087) ─────────────────────────
-  // The backfill covers existing gigs; this is how a deal is recorded going
-  // forward (its functions are scheduled later in Planner).
-  let dealOpen = $state(false);
-  let dealProjectId = $state('');
-  let dealVenue = $state('');
-  let dealCity = $state('');
-  let dealFee = $state('');
-  let dealCurrency = $state('EUR');
-  // La conversación de la que nace el trato, opcional (ADR-138 § 3, ADR-102):
-  // las del proyecto elegido, y al elegir una, su sala rellena lo vacío.
-  let dealConversationId = $state('');
-  const dealConversationsQuery = createQuery(
-    toStore(() => ({
-      queryKey: ['conversations', { project_ids: dealProjectId, limit: CONVERSATIONS_WHOLE, lean: 1 }] as const,
-      enabled: dealOpen && Boolean(dealProjectId),
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
-        fetchJSON<{ items: ConversationItem[] }>(
-          `/api/conversations?project_ids=${encodeURIComponent(dealProjectId)}&limit=${CONVERSATIONS_WHOLE}&lean=1`,
-          signal,
-        ),
-    })),
-  );
-  let dealConversations = $derived($dealConversationsQuery.data?.items ?? []);
-  let dealConversationOptions = $derived([
-    { value: '', label: t('books.deal_no_conversation', locale) },
-    ...dealConversations
-      .map((c) => ({ value: c.id, label: conversationTitle(c) }))
-      .filter((o) => o.label)
-      .sort((a, b) => a.label.localeCompare(b.label, locale)),
-  ]);
-  // Otro proyecto, otras conversaciones: la elegida no viaja.
-  $effect(() => {
-    void dealProjectId;
-    dealConversationId = '';
-  });
-  function pickDealConversation() {
-    const c = dealConversations.find((x) => x.id === dealConversationId);
-    if (!c?.organization) return;
-    if (!dealVenue.trim()) dealVenue = c.organization.name;
-    if (!dealCity.trim() && c.organization.city) dealCity = c.organization.city;
+  // ── New deal — a bolo by hand (ADR-087), the shell's dialog (163) ───────
+  function openDeal(projectId?: string) {
+    creation.openDeal({ projectId: projectId ?? scope.projects[0]?.id ?? null, currency: currencies[0] ?? 'EUR' });
   }
-  // El caché del último bolo de la obra, como relleno editable (ADR-168):
-  // propuesto, nunca impuesto. Se lee del feed de esa obra (la misma clave
-  // que el libro cuando el ámbito es esa obra sola, así que a menudo ya está).
-  const dealProjectBolosQuery = createQuery(
-    toStore(() => {
-      const k = { projectIds: dealProjectId ? [dealProjectId] : [], workspaceIds: [] as string[] };
-      return {
-        queryKey: ['money-bolos', { p: k.projectIds, w: k.workspaceIds }] as const,
-        enabled: dealOpen && Boolean(dealProjectId),
-        queryFn: ({ signal }: { signal: AbortSignal }) =>
-          fetchJSON<{ items: MoneyBolo[] }>(`/api/money/bolos?${feedParams(k, { limit: String(BOLOS_CAP) })}`, signal),
-      };
-    }),
-  );
-  let dealFeeProposal = $derived(
-    dealProjectId ? lastBoloFee($dealProjectBolosQuery.data?.items ?? [], dealProjectId) : null,
-  );
-  // What the field was last filled with: while the person has not typed over
-  // it, another obra's proposal replaces it; once they have, it is theirs.
-  let dealFeeFilled = $state<string | null>(null);
-  $effect(() => {
-    const proposal = dealFeeProposal;
-    if (!dealOpen) return;
-    untrack(() => {
-      const untouched = String(dealFee).trim() === '' || String(dealFee) === dealFeeFilled;
-      if (!untouched) return;
-      dealFee = proposal ? String(proposal.amount) : '';
-      if (proposal) dealCurrency = proposal.currency;
-      dealFeeFilled = proposal ? dealFee : null;
-    });
-  });
-  let dealFeeIsProposal = $derived(dealFeeFilled !== null && String(dealFee) === dealFeeFilled);
-
-  let dealOptions = $derived(
-    projectIndex.map((p) => ({ value: p.id, label: `${p.name} · ${spaceName(p.workspaceName)}` })),
-  );
-  function openDeal() {
-    dealProjectId = scope.projects[0]?.id ?? projectIndex[0]?.id ?? '';
-    dealVenue = '';
-    dealCity = '';
-    dealFee = '';
-    dealFeeFilled = null;
-    dealCurrency = currencies[0] ?? 'EUR';
-    formErrors.clear();
-    dealOpen = true;
-  }
-  function submitDeal() {
-    if ($createBolo.isPending) return;
-    formErrors.clear();
-    if (!dealProjectId) formErrors.set('deal-project', t('books.pick_project', locale));
-    const trimmed = String(dealFee).trim();
-    const fee = trimmed === '' ? null : Number(trimmed);
-    if (fee !== null && (Number.isNaN(fee) || fee < 0)) formErrors.set('deal-fee', t('books.fee_invalid_short', locale));
-    if (formErrors.any) return void formErrors.focusFirst();
-    $createBolo.mutate();
-  }
-  const createBolo = createMutation({
-    mutationFn: async () => {
-      if (!dealProjectId) throw new Error(t('books.pick_project', locale));
-      const trimmed = String(dealFee).trim();
-      const fee = trimmed === '' ? null : Number(trimmed);
-      if (fee !== null && (Number.isNaN(fee) || fee < 0)) throw new Error(t('books.fee_invalid_short', locale));
-      const body = await mutateJSON<{ bolo?: unknown }>('POST', '/api/money/bolos', {
-        project_id: dealProjectId,
-        venue_name: dealVenue.trim() || null,
-        city: dealCity.trim() || null,
-        fee_amount: fee,
-        fee_currency: dealCurrency.trim() || 'EUR',
-        conversation_id: dealConversationId || null,
-      });
-      if (!body?.bolo) throw new Error(t('books.unexpected_response', locale));
-      return body.bolo;
-    },
-    onSuccess: () => {
-      dealOpen = false;
-      void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
-      void queryClient.invalidateQueries({ queryKey: ['conversation-bolos'] });
-      addToast({ tone: 'success', message: t('books.deal_created', locale) });
-    },
-    onError: (err) => addToast({ tone: 'danger', title: t('books.deal_not_created', locale), message: err instanceof Error ? err.message : t('perf.unexpected', locale) }),
-  });
 
   // ── El trimestre para la gestoría (ADR-168) ─────────────────────────────
   // Facturas emitidas y cobros del trimestre elegido, del ámbito de la lente,
@@ -1018,8 +851,7 @@
     const want = new URL(location.href).searchParams.get('new_bolo');
     if (!want || newBoloHandled || !projectIndex.some((p) => p.id === want)) return;
     newBoloHandled = true;
-    openDeal();
-    dealProjectId = want;
+    openDeal(want);
     const url = new URL(location.href);
     url.searchParams.delete('new_bolo');
     replaceState(url, {});
@@ -1088,7 +920,7 @@
     {#snippet tools()}
       <!-- The section's act at the end of the title row, as Conversations' «Añadir» (tarea 131). -->
       {#if !noAccess}
-        <Button size="s" onclick={openDeal} disabled={projectIndex.length === 0}>{t('books.new_deal', locale)}</Button>
+        <Button size="s" onclick={() => openDeal()} disabled={projectIndex.length === 0}>{t('books.new_deal', locale)}</Button>
       {/if}
     {/snippet}
     {#snippet sub()}
@@ -1464,7 +1296,7 @@
                 {#each expenseTotals as [currency, amount] (currency)}<span>− {fmtMoney(amount)} {currency}</span>{/each}
               </p>
             {/if}
-            <Button size="xs" variant="secondary" onclick={() => openExpense()} disabled={expenseAnchors.length === 0}>{t('books.add_expense', locale)}</Button>
+            <Button size="xs" variant="secondary" onclick={() => openExpense()} disabled={bolos.length === 0}>{t('books.add_expense', locale)}</Button>
           </div>
           {#if expensesError}
             {@render failed('books.err_expenses', () => $expensesQuery.refetch())}
@@ -1578,28 +1410,6 @@
   {/snippet}
 </Dialog>
 
-<Dialog bind:open={dealOpen} title={t('books.new_deal', locale)} size="m" description={t('books.deal_desc', locale)}>
-  <form class="mny__pay-form" novalidate oninput={formErrors.onedit} onchange={formErrors.onedit} onsubmit={(e) => { e.preventDefault(); submitDeal(); }}>
-    <Select id="deal-project" label={t('books.project_obra', locale)} bind:value={dealProjectId} options={dealOptions} required error={formErrors.of('deal-project')} />
-    {#if dealConversations.length > 0}
-      <Select id="deal-conversation" label={t('books.deal_conversation', locale)} bind:value={dealConversationId} options={dealConversationOptions} onchange={pickDealConversation} />
-    {/if}
-    <div class="mny__row2">
-      <Input label={t('perf.venue', locale)} bind:value={dealVenue} placeholder={t('books.ph_venue', locale)} />
-      <Input label={t('create.city', locale)} bind:value={dealCity} placeholder={t('books.ph_city', locale)} />
-    </div>
-    <div class="mny__row2">
-      <Input id="deal-fee" label={t('books.fee', locale)} type="number" step="0.01" bind:value={dealFee} placeholder={t('books.ph_fee_later', locale)} helper={dealFeeIsProposal ? t('books.fee_proposed', locale) : undefined} error={formErrors.of('deal-fee')} />
-      <Input label={t('books.currency', locale)} bind:value={dealCurrency} placeholder="EUR" />
-    </div>
-    <button type="submit" hidden aria-hidden="true"></button>
-  </form>
-  {#snippet actions()}
-    <Button variant="quiet" onclick={() => (dealOpen = false)}>{t('create.cancel', locale)}</Button>
-    <Button onclick={submitDeal} loading={$createBolo.isPending}>{t('books.create_deal', locale)}</Button>
-  {/snippet}
-</Dialog>
-
 <Dialog bind:open={quarterOpen} title={t('books.quarter_export', locale)} size="s" description={t('books.quarter_desc', locale)}>
   <form class="mny__pay-form" novalidate onsubmit={(e) => { e.preventDefault(); void downloadQuarter(); }}>
     <Select id="quarter-pick" label={t('books.quarter_pick', locale)} bind:value={quarterPick} options={quarterOptions} required />
@@ -1611,7 +1421,6 @@
   {/snippet}
 </Dialog>
 
-<ExpenseDialog bind:open={expOpen} anchors={expenseAnchors} anchor={expAnchor} currency={expCurrency} />
 
 <style>
   @layer components {

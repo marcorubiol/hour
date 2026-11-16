@@ -12,7 +12,9 @@
  * (`CreateConversationDialog`, the lens's own «Añadir conversación»), and
  * a person or an organization on their own (`CreatePersonDialog`,
  * `CreateOrganizationDialog`, 136), and contacts from a sheet
- * (`ContactImportDialog`, 138).
+ * (`ContactImportDialog`, 138). Since 163, what used to be made only on its
+ * own screen: an expense and a deal (Cuentas'), a call (Conversaciones') and
+ * a private note (the Planner's margin, ADR-093).
  *
  * What a preset leaves out, the shell deduces from the pinned scope
  * (`scopeCreatePresets`). The day is the one thing the shell cannot know: a
@@ -61,6 +63,10 @@ class CreationStore {
   personOpen = $state(false);
   organizationOpen = $state(false);
   importOpen = $state(false);
+  expenseOpen = $state(false);
+  dealOpen = $state(false);
+  callOpen = $state(false);
+  noteOpen = $state(false);
 
   /** Presets consumed by the dialogs when opening from a scoped surface. */
   lineWorkspaceId = $state<string | null>(null);
@@ -79,6 +85,14 @@ class CreationStore {
   /** Typed in ⌘K: the new person's or organization's name (136). */
   personName = $state('');
   organizationName = $state('');
+  /** An expense's anchor (`bolo:<id>`, `line:<id>`), currency and description; absent, the dialog's own. */
+  expense = $state<{ anchor?: string; currency?: string; description?: string }>({});
+  /** A deal's project (Cuentas' scope, `?new_bolo=`), currency and venue. */
+  deal = $state<{ projectId?: string | null; currency?: string; venue?: string }>({});
+  /** Typed in ⌘K: who the call was with. */
+  callSearch = $state('');
+  /** The note's text and its day (YYYY-MM-DD). */
+  note = $state<{ body: string; day: string | null }>({ body: '', day: null });
 
   /** Raw: a page's getters must stay getters, not a proxy's snapshot. */
   eventHost = $state.raw<EventHost | null>(null);
@@ -138,6 +152,30 @@ class CreationStore {
   /** Contacts from a sheet (138): Conversaciones' «+» and ⌘K. */
   openImport() {
     this.importOpen = true;
+  }
+
+  /** An expense (Cuentas' «Añadir gasto», 163): the anchors are the scope's. */
+  openExpense(preset: { anchor?: string; currency?: string; description?: string | null } = {}) {
+    this.expense = { ...preset, description: preset.description?.trim() || undefined };
+    this.expenseOpen = true;
+  }
+
+  /** A deal, a bolo by hand (Cuentas' «Nuevo bolo», 163). */
+  openDeal(preset: { projectId?: string | null; currency?: string; venue?: string | null } = {}) {
+    this.deal = { ...preset, venue: preset.venue?.trim() || undefined };
+    this.dealOpen = true;
+  }
+
+  /** A call (Conversaciones' «+ → Llamada», 163). */
+  openCall(preset?: { search?: string | null }) {
+    this.callSearch = preset?.search?.trim() ?? '';
+    this.callOpen = true;
+  }
+
+  /** A private note (ADR-093, 163): on the host's day, else today. */
+  openNote(preset?: { body?: string | null; day?: string | null }) {
+    this.note = { body: preset?.body?.trim() ?? '', day: preset?.day ?? this.eventHost?.day() ?? null };
+    this.noteOpen = true;
   }
 
   /** A page lends its day while mounted; the returned function takes it back. */
