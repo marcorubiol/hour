@@ -1,8 +1,8 @@
 /**
- * The season overview's arithmetic (ADR-117) — pure, no words, `today`
- * injected. The Planner's portada answers «how is the calendar shaped» over a
- * horizon of twelve weeks from today; this module turns rows the page already
- * holds into that shape. Every label is a key; the page translates.
+ * The season's arithmetic (ADR-117) — pure, no words, `today` injected. Born
+ * for the Planner's old portada; since ADR-209 the Month draws its holes and
+ * lists its clashes with it, and the Desk's Planner door counts its twelve
+ * weeks. `unclosed` waits for the Agenda's «falta» (ADR-209, next phase).
  */
 import { addDaysIso } from '$lib/planner';
 
@@ -10,8 +10,6 @@ import { addDaysIso } from '$lib/planner';
 export const SEASON_WEEKS = 12;
 /** A hole shorter than this is a rest, not something to sell. */
 export const GAP_MIN_NIGHTS = 3;
-/** «Sin cerrar» looks this far ahead: what is close enough to need closing. */
-export const UNCLOSED_WEEKS = 8;
 
 interface SeasonWindow {
   /** First day the season counts: today. */
@@ -79,6 +77,23 @@ export function gapWindows(
   return out;
 }
 
+/**
+ * The holes the Month draws (ADR-209): `gapWindows` over the loaded days,
+ * less a run that reaches the last of them. That one has no known end: it is
+ * the plan running out at the edge of what is loaded, not a hole with a
+ * length («106 noches libres»). When the paper grows and something lands
+ * after it, it comes back with its two ends.
+ */
+export function closedGapWindows(
+  days: string[],
+  occupied: Iterable<string>,
+  away: Iterable<string> = [],
+  min = GAP_MIN_NIGHTS,
+): GapWindow[] {
+  const last = days[days.length - 1];
+  return gapWindows(days, occupied, away, min).filter((g) => g.to !== last);
+}
+
 /** What a confirmed gig can still be missing. `travel` is a guess (see below). */
 type UnclosedKey = 'time' | 'cast';
 
@@ -132,32 +147,6 @@ export function unclosed(
   return { missing, travelGuess };
 }
 
-type CellMark = 'firm' | 'option' | 'date' | null;
-
-export interface SeasonCellIn {
-  day: string;
-  /** `performanceStatusFamily` / `dateStatusFamily` of the row. */
-  family: string;
-  kind: 'perf' | 'date' | 'travel';
-}
-
-/**
- * One cell's dominant mark. A firm gig outranks an option, an option outranks
- * any other date: the cell is a few pixels wide and says the strongest thing
- * that is true of the day. Travel is not a mark — it rides the cell as its
- * own tick, because a gig day can also be a travel day.
- */
-export function cellMark(rows: SeasonCellIn[]): CellMark {
-  let mark: CellMark = null;
-  for (const r of rows) {
-    if (r.kind === 'perf' && r.family === 'confirmed') return 'firm';
-    // A proposal is drawn as an option everywhere else (grain, `?`): here too.
-    if (r.kind === 'perf' && (r.family === 'hold' || r.family === 'proposed')) mark = 'option';
-    else if (r.kind === 'date' && mark === null) mark = 'date';
-  }
-  return mark;
-}
-
 /** What the season overview needs of a conflict ($lib/planner `Conflict`). */
 interface SeasonConflictIn {
   severity: string;
@@ -172,8 +161,9 @@ interface SeasonConflictIn {
  * `double` and `concurrence` (the queue's, never a mark), and any pair the
  * decisions queue already holds (said there, once).
  *
- * The Planner's Season draws the list and the Desk's Planner door counts it:
- * one rule, so the door says what the lens says. Sorted by day, stable.
+ * The Month's status line lists it (ADR-209) and the Desk's Planner door
+ * counts it: one rule, so the door says what the lens says. Sorted by day,
+ * stable.
  */
 export function clashesInSeason<C extends SeasonConflictIn>(
   conflicts: readonly C[],

@@ -264,6 +264,11 @@
     --today-ink: var(--text-color);
     --today-weight: 600;
     --today-wash: color-mix(in oklch, var(--text-color) 4%, transparent);
+    /* THE MONTH CONTINUES (ADR-209): one month on the paper, the next a
+       ground one step darker, alternating. Lighter than today's wash, and
+       the free nights' hatch is ink, not ground, so the two never meet. */
+    --month-alt-ground: color-mix(in oklch, var(--text-color) 3%, transparent);
+    --gap-hatch: color-mix(in oklch, var(--text-color) 14%, transparent);
 
     /* SUGGESTED — what Hour puts in front of you that is not yours yet: the
        next thing's card, a proposal, a «¿vas?». A semantic tone on --info,
@@ -1045,6 +1050,9 @@
     /* Borders — bumped opacity so they stay perceptible on warm dark bg */
     --border-color-dark: color-mix(in oklch, var(--neutral) 22%, transparent);
     --border-color-light: color-mix(in oklch, var(--neutral) 12%, transparent);
+    /* The alternate month's ground needs a step more on a dark canvas to be
+       seen (ADR-209); it stays a wash, under the free nights' hatch (14%). */
+    --month-alt-ground: color-mix(in oklch, var(--text-color) 6%, transparent);
 
     /* Status — L raised so badges read; saturation dropped ~15-20pp so
        they don't vibrate against dark bg (Material recommendation). */

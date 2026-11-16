@@ -11,7 +11,7 @@ import { resolvePlannerView } from './planner';
 describe('resolvePlannerView (board, ADR-080 §7)', () => {
   it('accepts the board from the URL, and never defaults to it', () => {
     expect(resolvePlannerView('board')).toBe('board');
-    expect(resolvePlannerView(null)).toBe('overview');
+    expect(resolvePlannerView(null)).toBe('month');
   });
 });
 

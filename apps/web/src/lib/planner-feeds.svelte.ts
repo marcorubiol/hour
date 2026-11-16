@@ -10,7 +10,7 @@
  * inside `toStore`, so the queries keep tracking the page's `$state`/
  * `$derived` across the module boundary.
  */
-import { createQuery, type QueryClient } from '@tanstack/svelte-query';
+import { createQuery, keepPreviousData, type QueryClient } from '@tanstack/svelte-query';
 import { toStore } from 'svelte/store';
 import { fetchJSON } from '$lib/api';
 import { addDaysIso, type PlannerView } from '$lib/planner';
@@ -24,8 +24,8 @@ export type { TeamItem };
 export type DecisionPerfItem = PerformanceEvent & { hold_notice_days?: number | null };
 
 /**
- * The season's blocks (ADR-117): the Planner's Season and the Desk's Planner
- * door read the same key, so the door's «choques» weigh the same absences.
+ * The season's blocks (ADR-117): the Desk's Planner door reads them, so its
+ * «choques» weigh the absences of its twelve weeks.
  * No workspace filter, graceful absence: the other blackout feeds' contract.
  */
 export function seasonAvailabilityQueryOptions(from: string, to: string, enabled = true) {
@@ -208,15 +208,11 @@ interface PlannerFeedInputs {
   selectedDay: () => string;
   /** Viewer-tz day key for "today" — constant for the page's lifetime. */
   todayIso: string;
-  /** The season overview's strip (ADR-117): Monday of this week → twelve
-      weeks on. Constant for the page's lifetime, like today. */
-  seasonFrom: string;
-  seasonTo: string;
 }
 
 /** Views that read a window of their own instead of the month grid's. */
 function onOwnWindow(view: PlannerView): boolean {
-  return view === 'agenda' || view === 'board' || view === 'overview';
+  return view === 'agenda' || view === 'board';
 }
 
 export function createPlannerFeeds(inputs: PlannerFeedInputs) {
@@ -237,9 +233,14 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
       // Agenda has its own multi-month feed (below); don't double-fetch the
       // grid window while it is showing.
       enabled: !onOwnWindow(inputs.view()) && !k.unresolved,
+      // THE MONTH GROWS AS YOU SCROLL (ADR-209): the window it had stays on
+      // the paper while the wider one arrives, and it can pass one page of 200.
+      placeholderData: keepPreviousData,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
-        fetchJSON<{ items: PerformanceEvent[] }>(
-          `/api/performances?status=any&rosters=1&notice=1&${feedParams(k, k.from, k.to)}`,
+        pagedFeed<PerformanceEvent>(
+          (from) => `/api/performances?status=any&rosters=1&notice=1&${feedParams(k, from, k.to)}`,
+          (p) => p.performed_at.slice(0, 10),
+          k.from,
           signal,
         ),
     };
@@ -253,9 +254,12 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
     return {
       queryKey: ['planner-dates', k] as const,
       enabled: !onOwnWindow(inputs.view()) && !k.unresolved,
+      placeholderData: keepPreviousData,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
-        fetchJSON<{ items: DateEvent[] }>(
-          `/api/dates?spans=1&${feedParams(k, addDaysIso(k.from, -1), addDaysIso(k.to, 1))}`,
+        pagedFeed<DateEvent>(
+          (from) => `/api/dates?spans=1&${feedParams(k, addDaysIso(from, -1), addDaysIso(k.to, 1))}`,
+          (d) => d.starts_at.slice(0, 10),
+          k.from,
           signal,
         ),
     };
@@ -463,55 +467,7 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
     };
   });
 
-  // ── Season feeds (ADR-117) — the overview's twelve weeks. Paged like the
-  // book (the window is wider than one page of 200 at a busy company). The
-  // performances join the `calendar-performances` family on purpose: the
-  // overview confirms a hold in place, and the decide mutation's optimistic
-  // write and invalidate reach every member of that family. ──────────────
-  const seasonKey = $derived({
-    from: inputs.seasonFrom,
-    to: inputs.seasonTo,
-    unresolved: inputs.scopeUnresolved(),
-    ...inputs.filterIds(),
-  });
-  const seasonPerfOptions = toStore(() => {
-    const k = seasonKey;
-    return {
-      queryKey: ['calendar-performances', { window: 'season', ...k }] as const,
-      enabled: inputs.view() === 'overview' && !k.unresolved,
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
-        pagedFeed<PerformanceEvent>(
-          (from) => `/api/performances?status=any&rosters=1&notice=1&${feedParams(k, from, k.to)}`,
-          (p) => p.performed_at.slice(0, 10),
-          k.from,
-          signal,
-        ),
-    };
-  });
-  const seasonDatesOptions = toStore(() => {
-    const k = seasonKey;
-    return {
-      queryKey: ['planner-season-dates', k] as const,
-      enabled: inputs.view() === 'overview' && !k.unresolved,
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
-        pagedFeed<DateEvent>(
-          // Same ±1-day pad as the other dates feeds (tz bucketing at edges).
-          (from) => `/api/dates?spans=1&${feedParams(k, addDaysIso(from, -1), addDaysIso(k.to, 1))}`,
-          (d) => d.starts_at.slice(0, 10),
-          k.from,
-          signal,
-        ),
-    };
-  });
-  const seasonAvailabilityOptions = toStore(() => {
-    const k = seasonKey;
-    return seasonAvailabilityQueryOptions(k.from, k.to, inputs.view() === 'overview' && !k.unresolved);
-  });
-
   return {
-    seasonPerfQuery: createQuery(seasonPerfOptions),
-    seasonDatesQuery: createQuery(seasonDatesOptions),
-    seasonAvailabilityQuery: createQuery(seasonAvailabilityOptions),
     perfQuery: createQuery(perfOptions),
     datesQuery: createQuery(datesOptions),
     availabilityQuery: createQuery(availabilityOptions),

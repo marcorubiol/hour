@@ -76,7 +76,8 @@ test.describe('Calm — a composition, not a grey (ADR-139 § 5)', () => {
 
   test('the Planner says what calm hides in one sentence, with the way back', async ({ page }) => {
     await open(page, '/h/planner?view=month', true);
-    const meta = page.locator('.cal__meta--window');
+    // The Month says it in its status line (ADR-209).
+    const meta = page.locator('.cal__meta--window, .pstat__line');
     await expect(meta).not.toContainText('calm · confirmed only');
     await expect(meta).toContainText(/confirmed/);
     // The «·» between stats sits on the button's wrapper: not in its name.

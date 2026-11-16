@@ -41,10 +41,6 @@ export const CALM_FOCUS = {
     blackouts: false,
     /** The census strip: one sentence instead. */
     census: false,
-    /** The Season's key under the strip. */
-    legend: false,
-    /** The Season's «Sin cerrar», «Huecos», «Fuera». */
-    season_lists: false,
     /** The agenda's week tallies beyond what is confirmed. */
     week_options: false,
   },
@@ -90,16 +86,16 @@ export interface PlannerCalmFacts {
 }
 
 /**
- * What the Planner says about its window in calm. The Season and the Month
- * count a bounded window, so they say both figures; the Day, the Agenda and
+ * What the Planner says about its window in calm. The Month counts a
+ * bounded window (the month on screen), so it says both figures; the Day, the Agenda and
  * the Board count nothing (a view counts what it draws, or nothing), so they
  * only say that the options wait outside.
  */
 export function plannerCalmFacts(
-  view: 'overview' | 'day' | 'agenda' | 'month' | 'board',
+  view: 'day' | 'agenda' | 'month' | 'board',
   stats: { confirmed: number; holds: number },
 ): PlannerCalmFacts {
-  if (view === 'overview' || view === 'month') return { confirmed: stats.confirmed, options: stats.holds };
+  if (view === 'month') return { confirmed: stats.confirmed, options: stats.holds };
   return { confirmed: null, options: null };
 }
 

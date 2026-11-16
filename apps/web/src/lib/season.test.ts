@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cellMark, clashesInSeason, gapWindows, mondayOf, seasonWindow, unclosed } from './season';
+import { clashesInSeason, closedGapWindows, gapWindows, mondayOf, seasonWindow, unclosed } from './season';
 
 describe('seasonWindow', () => {
   it('draws twelve Monday rows and counts from today', () => {
@@ -51,6 +51,36 @@ describe('gapWindows', () => {
   });
 });
 
+describe('closedGapWindows (ADR-209)', () => {
+  const nov = Array.from({ length: 30 }, (_, i) => `2026-11-${String(i + 1).padStart(2, '0')}`);
+  const dec = Array.from({ length: 31 }, (_, i) => `2026-12-${String(i + 1).padStart(2, '0')}`);
+
+  it('a run that reaches the last loaded day has no end, so it is not drawn', () => {
+    const gaps = closedGapWindows(nov, ['2026-11-10', '2026-11-19']);
+    expect(gaps).toEqual([
+      { from: '2026-11-01', to: '2026-11-09', nights: 9 },
+      { from: '2026-11-11', to: '2026-11-18', nights: 8 },
+    ]);
+  });
+
+  it('as the paper grows, the run comes back with its two ends, and the new tail stays open', () => {
+    const occupied = ['2026-11-10', '2026-11-19', '2026-12-04'];
+    expect(closedGapWindows([...nov, ...dec], occupied)).toEqual([
+      { from: '2026-11-01', to: '2026-11-09', nights: 9 },
+      { from: '2026-11-11', to: '2026-11-18', nights: 8 },
+      { from: '2026-11-20', to: '2026-12-03', nights: 14 },
+    ]);
+  });
+
+  it('whatever the window, an open tail is never counted', () => {
+    for (const n of [5, 30, 61]) {
+      const days = [...nov, ...dec].slice(0, n);
+      const gaps = closedGapWindows(days, ['2026-11-02']);
+      expect(gaps.every((g) => g.to !== days[days.length - 1])).toBe(true);
+    }
+  });
+});
+
 describe('unclosed', () => {
   it('a closed gig is missing nothing', () => {
     const v = unclosed(
@@ -90,32 +120,6 @@ describe('unclosed', () => {
     expect(unclosed(perf, { home: null, travelCovered: false }).travelGuess).toBe(false);
     // Never a fact.
     expect(unclosed(perf, { home: 'Barcelona', travelCovered: false }).missing).toEqual([]);
-  });
-});
-
-describe('cellMark', () => {
-  it('draws a proposal as an option, like every other drawing', () => {
-    expect(cellMark([{ day: 'd', family: 'proposed', kind: 'perf' }])).toBe('option');
-  });
-  it('firm beats option beats any other date', () => {
-    expect(cellMark([])).toBeNull();
-    expect(cellMark([{ day: 'd', family: 'confirmed', kind: 'date' }])).toBe('date');
-    expect(
-      cellMark([
-        { day: 'd', family: 'confirmed', kind: 'date' },
-        { day: 'd', family: 'hold', kind: 'perf' },
-      ]),
-    ).toBe('option');
-    expect(
-      cellMark([
-        { day: 'd', family: 'hold', kind: 'perf' },
-        { day: 'd', family: 'confirmed', kind: 'perf' },
-      ]),
-    ).toBe('firm');
-  });
-
-  it('travel is not a mark of its own', () => {
-    expect(cellMark([{ day: 'd', family: 'confirmed', kind: 'travel' }])).toBeNull();
   });
 });
 

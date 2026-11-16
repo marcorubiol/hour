@@ -1,7 +1,8 @@
 import { expect, type APIRequestContext } from '@playwright/test';
 
 /**
- * THE E2E USER OPENS THE PLANNER IN THE SEASON, UNTIL A SPEC SAYS OTHERWISE.
+ * THE E2E USER OPENS THE PLANNER IN THE DEFAULT, UNTIL A SPEC SAYS OTHERWISE
+ * (the Month since ADR-209; the season before).
  *
  * ADR-192 made the drawing the Planner opens in a stored preference
  * (`membership.planner_view`), written whenever a drawing is picked in the
@@ -10,7 +11,7 @@ import { expect, type APIRequestContext } from '@playwright/test';
  * next (2026-11-11: the season specs went red after the overview spec's
  * click). The auth setup calls this once per run, and a spec that picks a
  * drawing calls it again when it is done, so the state every spec meets is
- * the default: null, the season.
+ * the default: null, the Month.
  */
 export async function forgetPlannerView(request: APIRequestContext): Promise<void> {
   const res = await request.get('/api/workspaces');

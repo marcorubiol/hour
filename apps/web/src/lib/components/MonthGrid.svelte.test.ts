@@ -13,6 +13,7 @@ import MonthGrid from './MonthGrid.svelte';
 import { focusedDay, LONG_PRESS_MS } from '$lib/cell-create';
 import { dayMonthLong } from '$lib/datetime';
 import { t } from '$lib/i18n';
+import { monthSpanWeeks } from '$lib/planner';
 
 const DAY = '2026-11-14';
 
@@ -22,8 +23,8 @@ function mount(over: Record<string, unknown> = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { enabled: false } } });
   const r = render(MonthGrid, {
     props: {
-      year: 2026,
-      month: 11,
+      rows: monthSpanWeeks({ year: 2026, month: 11 }, { year: 2026, month: 12 }),
+      shownMonth: { year: 2026, month: 11 },
       performances: [],
       dates: [],
       workspaceSlug: 'muk-cia',
@@ -69,13 +70,24 @@ describe('MonthGrid — crear en el día de la celda', () => {
     expect(onDayOpen).toHaveBeenCalledWith(DAY);
   });
 
-  it('a day of the neighbouring month is not a door', async () => {
-    const { container, onDayCreate } = mount();
-    // November 2026 starts on a Sunday: the sheet opens with 26–31 October.
-    const out = container.querySelector<HTMLElement>('.cal__day.cal__day--out')!;
-    expect(out.dataset.day).toBeUndefined();
-    await fireEvent.dblClick(out);
-    expect(onDayCreate).not.toHaveBeenCalled();
+  it('the paper runs on: every day is a door, and the 1st carries its month (ADR-209)', async () => {
+    const { headOf, cellOf, onDayCreate } = mount();
+    // November 2026 starts on a Sunday: the paper opens with 26–31 October,
+    // days like any other, and December follows without a break.
+    await fireEvent.dblClick(cellOf('2026-10-27'));
+    expect(onDayCreate).toHaveBeenLastCalledWith('2026-10-27');
+    expect(headOf('2026-12-01').dataset.monthStart).toBe('2026-12');
+    expect(headOf('2026-12-01').textContent).toMatch(/Diciembre/);
+    expect(headOf('2026-12-01').classList.contains('cal__day--alt')).toBe(true);
+    expect(headOf('2026-11-30').classList.contains('cal__day--alt')).toBe(false);
+  });
+
+  it('a hole is hatched over its nights and named on the first one', () => {
+    const { cellOf } = mount({ gaps: [{ from: '2026-11-24', to: '2026-11-27', nights: 4 }], gapLabel: (n: number) => `${n} noches libres` });
+    expect(cellOf('2026-11-24').textContent).toMatch(/4 noches libres/);
+    expect(cellOf('2026-11-26').classList.contains('cal__day--gap')).toBe(true);
+    expect(cellOf('2026-11-26').textContent).not.toMatch(/libres/);
+    expect(cellOf('2026-11-28').classList.contains('cal__day--gap')).toBe(false);
   });
 
   it('the keyboard: a focused day carries the day `N` opens', () => {

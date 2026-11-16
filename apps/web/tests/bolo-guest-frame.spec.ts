@@ -185,7 +185,7 @@ test.describe('el marco de un guest de un solo bolo (comms carril 2, fase 3)', (
     await page.goto(`/h/planner?${SCOPE}`);
     await waitForLoaded(page);
     await expect(page.getByRole('main')).toContainText(venue.slice(0, 12));
-    await expect(page.locator('.cal__add, .ov__add')).toHaveCount(0);
+    await expect(page.locator('.cal__add')).toHaveCount(0);
 
     // ── ⌘K: ninguna fila de crear con la compañía en el ámbito ──
     await page.goto(`/h/desk?${SCOPE}`);

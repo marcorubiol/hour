@@ -7976,3 +7976,68 @@ habitual para quien percibe mal el paso del tiempo (TDAH).
 
 **Descartado.** Calma sin hora mientras dure, y `10:--` (solo la hora, sin minutos): con una función a las 20:30 los
 minutos importan.
+
+## [2026-11-16] ADR-209 · El Planificador en tres dibujos: fuera «Próximas semanas», el Mes continuo (enmienda ADR-117 § 2, ADR-155 § 4 y ADR-195 § 2)
+
+**Contexto.** Marco, en el carril de diseño «Mejoras visuales del planificador» (16-11): «le hemos dado un peso a las
+semanas demasiado grande», «veo mucho la palabra week», en el teléfono «se ven las cosas peor», y «reducir vistas es
+algo que deberíamos plantearnos muy seriamente; así reduciríamos a tres: agenda, mes y tablero». Dibujo validado:
+https://claude.ai/artifact/FwnfMuB2nNmJbnbnW5ckRN («el concepto de todo me gusta»). Caso de prueba: unas 30 funciones
+al mes de varias compañías que se solapan. Esta entrada es también la decisión pendiente de `_tasks.md` sobre cuántas
+vistas tiene el Planificador (re-evaluar del 23-11).
+
+**Decidido por Marco (16-11).**
+1. **La barra son tres dibujos: Agenda, Mes, Tablero.** «Próximas semanas» deja de ser vista; su tira es el Mes
+   continuo. Día y Temporada son zoom, fuera de la barra. Enmienda ADR-117 § 2 y ADR-155 § 1 y § 4: no hay portada.
+2. **La palabra «semana» no aparece en ningún rótulo.** Fuera la columna de semana (Mes, Próximas semanas) y las
+   bandas de semana (Agenda). La semana es una raya más fuerte antes del lunes, como ya hace el Tablero.
+3. **Agenda:** solo días con algo, de arriba abajo; la ciudad como palabra fuerte, sala y hora debajo; el viaje es un
+   tramo entre dos días; noches libres solo desde tres seguidas; mes fijo arriba; lo que falta por cerrar en las dos
+   próximas semanas, en ámbar junto a la función; en el móvil los pasos vencidos de un día se pliegan en una línea.
+4. **Mes:** continuo, no paginado, sin columna de semana. Monogramas siempre: con ciudad en escritorio, apilados en
+   el móvil (dos y «+N»). Meses separados por tono (uno de cada dos sobre un fondo un punto más oscuro) y el día 1
+   lleva el nombre del mes en vez del número («Diciembre» en escritorio, «dic» en el móvil). Huecos de tres noches o
+   más, rayados y rotulados donde están. En el móvil, el día pulsado se lee entero.
+5. **Tablero:** un solo nivel de filas. El dial elige si la fila es la compañía o la persona; lo otro es el monograma
+   de la tarjeta; el nombre en una franja encima de la fila, igual en escritorio y en móvil. Por persona, cada
+   persona una vez, dos confirmadas en la misma celda es el choque, y lo que no tiene reparto escrito va en una
+   última fila «sin reparto».
+6. **Día:** panel al lado en escritorio (junto a Agenda y Mes), hoja en el móvil; arriba la tira de los siete días
+   de su semana con monogramas, que sustituye a ‹ ›; debajo una fila por cosa con su tira horaria, o «sin hora».
+7. **Temporada:** los doce meses del año de la compañía, desde septiembre por defecto y configurable por espacio.
+   En renglones (Marco, 16-11, `_tasks.md` § 162): cada mes una tira de 31 días con una fila por compañía y su
+   monograma, días numerados encima, recuento con palabras; las franjas dentro del cuadrado, descartadas. Huecos
+   rayados. Se entra con «Temporada» junto a «Hoy» en los tres dibujos y se sale con ×. Pulsar un mes abre el Mes. Enmienda ADR-195 § 2: el nombre «Próximas semanas» deja de hacer falta y
+   «Temporada» nombra el año de la compañía, lo que ese ADR le reservaba.
+8. **Línea de estado** bajo el título, igual en los tres dibujos: por decidir, choques y recuento. Hereda «Por
+   decidir» y «Choques» de Próximas semanas; «Huecos» pasa al Mes y «Sin cerrar» a la Agenda.
+9. **La línea de la hora actual no se pierde** (Marco, añadido al encargo): las maquetas no la dibujan por olvido.
+
+ADR-192 (cada persona abre en su dibujo) sigue valiendo con tres dibujos.
+
+**Construido en esta fase (rama `claude/planner-month`).**
+- Barra de tres palabras; teclas `1` a `3`. `?view=overview` y un `planner_view = 'overview'` guardado caen en el Mes
+  (alias, sin migración: el CHECK de la columna sigue admitiendo el valor). Sin vista guardada se abre el Mes, que
+  se guarda como `null` (el defecto, como lo era la Temporada).
+- Mes continuo (`monthSpanWeeks`): abre tres meses desde el de `ym` y crece un mes cada vez que el pie se acerca, hasta
+  24. `ym` pasa a ser el mes que domina la pantalla (título, recuento y dirección, por `replaceState`); ‹ › llevan
+  al día 1 del mes anterior o siguiente y amplían el papel si hace falta; «Hoy» lleva a hoy. Los feeds del mes
+  paginan como los del libro y conservan el papel anterior mientras llega el nuevo (`CACHE_SCHEMA` 33 → 34).
+- Celdas en la colocación compacta del Slip (monograma y ciudad; el monograma solo bajo 3,75 rem), tope de tres y
+  «+N más»; en el móvil dos y «+N», y los pasos van al día pulsado. Tono `--month-alt-ground` en los meses pares;
+  huecos con `--gap-hatch` y rotulados en su primera noche («4 noches libres», «4 libres»), por `gapWindows` desde
+  hoy, con giras y cierres firmes fuera, y solo con dos extremos conocidos. El choque es un punto (rojo para
+  personas y ausencias), uno solo en una celda estrecha.
+- `PlannerStatus.svelte`: la línea de estado (por decidir abre el DecisionBand de siempre; choques abre la lista de
+  `clashesInSeason` de hoy al final del papel; el recuento es el del mes en pantalla). Solo la usa el Mes.
+- Fuera `SeasonOverview.svelte`, sus feeds y 25 claves de diccionario; `cellMark` y `UNCLOSED_WEEKS` de `$lib/season`.
+- No se toca: la Agenda (sus bandas de semana siguen), el Tablero (con su línea de la hora), el Día, el monograma.
+
+**Queda para las fases siguientes.** Agenda (con «Sin cerrar» y las bandas fuera: hasta entonces «Sin cerrar» y
+«No disponible» no se listan en ninguna parte), Día al lado y su tira, Temporada, Tablero de un nivel, y la línea de
+estado en Agenda y Tablero.
+
+**Falta decidir (Marco).** «Por tono» por afinar: en oscuro el tono del mes alterno se ve poco. La versión 5 del
+dibujo de la Temporada (números de día y recuento) está por ver antes de su fase.
+
+**Cómo se revierte.** Revertir la rama: vuelve `SeasonOverview.svelte` con sus feeds y claves; ninguna migración.

@@ -81,7 +81,7 @@ test.describe('smoke', () => {
     // The lens's chat row (ADR-141 § 1, mesa punto 6), one per conversation.
     expect(await page.getByTestId('project-conversations').getByTestId('project-conversation').count()).toBeGreaterThan(0);
 
-    // Calendar month grid (the bare /h/planner opens on the Temporada, ADR-117).
+    // Calendar month grid (the bare /h/planner opens on it since ADR-209).
     await page.goto('/h/planner?view=month');
     await waitForLoaded(page);
     await expect(page.locator('.cal__grid')).toBeVisible();

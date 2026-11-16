@@ -1,11 +1,10 @@
 <script lang="ts">
   /**
-   * Planner lens: one door, four drawings of the same fetched rows
-   * (ADR-076, ADR-155): the coming weeks (`overview`), agenda, month and
-   * board, plus the day. The drawing travels in the URL (`?view=`, no
-   * /h/agenda alias, ADR-078 §10); without one, the drawing this person
-   * last chose, kept on their membership (ADR-192), and without that the
-   * coming weeks.
+   * Planner lens: one door, three drawings of the same fetched rows
+   * (ADR-076, ADR-209): agenda, month and board, plus the day. The drawing
+   * travels in the URL (`?view=`, no /h/agenda alias, ADR-078 §10); without
+   * one, the drawing this person last chose, kept on their membership
+   * (ADR-192), and without that the month.
    *
    * Event sources: `performance` (performed_at, day-level truth, fetched
    * with ?rosters=1 for the conflict engine) and `date` (rehearsals,
@@ -126,7 +125,7 @@
     defaultCreateDay,
     daysCoveredBy,
     dayKeyInTz,
-    monthGrid,
+    monthSpanWeeks,
     resolvePlannerView,
     type PlannerView,
     type Conflict,
@@ -150,21 +149,8 @@
   import type { StepVM } from '$lib/components/planner/PlannerSteps.svelte';
   import { createPlannerFeeds, primeAgendaWindow } from '$lib/planner-feeds.svelte';
   import { createPlannerEngine } from '$lib/planner-engine.svelte';
-  import SeasonOverview, {
-    type SeasonAwayVM,
-    type SeasonCellVM,
-    type SeasonGapVM,
-    type SeasonUnclosedVM,
-  } from '$lib/components/planner/SeasonOverview.svelte';
-  import {
-    UNCLOSED_WEEKS,
-    cellMark,
-    clashesInSeason,
-    gapWindows,
-    seasonWindow,
-    unclosed as unclosedOf,
-    type SeasonCellIn,
-  } from '$lib/season';
+  import PlannerStatus from '$lib/components/planner/PlannerStatus.svelte';
+  import { clashesInSeason, closedGapWindows } from '$lib/season';
   import { normalizeLaneAxis, resolveLaneAxis, type LaneAxis } from '$lib/carrils';
   import type { AvailabilityItem } from '$lib/availability';
   import { dayMonthLong, localeDayMonth, localeDayMonthNear, localeWeekdayShort, dualTime, viewerTimeZone } from '$lib/datetime';
@@ -210,9 +196,25 @@
   let ym = $state({ year: now.getFullYear(), month: now.getMonth() + 1 });
   let todayIso = dayKeyInTz(now.toISOString(), viewerTz);
 
-  let weeks = $derived(monthGrid(ym.year, ym.month));
-  let gridFrom = $derived(weeks[0][0].iso);
-  let gridTo = $derived(weeks[weeks.length - 1][6].iso);
+  /* THE MONTH IS CONTINUOUS (ADR-209): `ym` is the month on screen (the
+     title, the census, the address), and the paper is a run of months
+     around it, `mesFrom` → `mesTo`, that grows as you scroll and never
+     pages. The Day reads the same window: it drags it to its own month. */
+  type Ym = { year: number; month: number };
+  const ymKey = (m: Ym) => m.year * 12 + m.month;
+  /** Months loaded at once when the paper opens or jumps somewhere new. */
+  const MONTH_SPAN = 3;
+  /** And the most it ever holds: past this the scroll stops asking. */
+  const MONTH_SPAN_MAX = 24;
+  let mesFrom = $state<Ym>({ year: now.getFullYear(), month: now.getMonth() + 1 });
+  let mesTo = $state<Ym>(addMonths(now.getFullYear(), now.getMonth() + 1, MONTH_SPAN - 1));
+  function openMonthsAt(m: Ym) {
+    mesFrom = m;
+    mesTo = addMonths(m.year, m.month, MONTH_SPAN - 1);
+  }
+  let gridWeeks = $derived(monthSpanWeeks(mesFrom, mesTo));
+  let gridFrom = $derived(gridWeeks[0][0]);
+  let gridTo = $derived(gridWeeks[gridWeeks.length - 1][6]);
 
   // The visible month's own days (agenda range + masthead stats window).
   let monthFirst = $derived(`${ym.year}-${String(ym.month).padStart(2, '0')}-01`);
@@ -279,12 +281,12 @@
   // died 2026-08-03: every way the window grows now goes through the
   // probes, so the book never mints a month the plan does not contain.
 
-  // ── Projection (ADR-117, amended by ADR-192) ───────────────────────────
+  // ── Projection (ADR-117, amended by ADR-192 and ADR-209) ───────────────
   // Explicit ?view= wins; without one, the drawing this person last chose in
   // the bar in the spaces on screen (`entryView`, their membership), and
-  // without that the season overview. The stored drawing needs the
-  // workspaces feed, so the first paint is the URL's (or the overview) and
-  // the entry effect below moves it once the feed answers.
+  // without that the Month. The stored drawing needs the workspaces feed, so
+  // the first paint is the URL's (or the Month) and the entry effect below
+  // moves it once the feed answers.
   let view = $state<PlannerView>(
     resolvePlannerView(new URL(location.href).searchParams.get('view')),
   );
@@ -336,7 +338,7 @@
     if (view === 'board') url.searchParams.set('lanes', laneAxis);
     else url.searchParams.delete('lanes');
     // A horizon has no month: the two book-window drawings carry no ym.
-    if (view === 'agenda' || view === 'board' || view === 'overview') url.searchParams.delete('ym');
+    if (view === 'agenda' || view === 'board') url.searchParams.delete('ym');
     else url.searchParams.set('ym', `${ym.year}-${String(ym.month).padStart(2, '0')}`);
     if (view === 'day') url.searchParams.set('d', dayIso ?? todayIso);
     else url.searchParams.delete('d');
@@ -392,9 +394,9 @@
     void page.state;
     const params = new URL(location.href).searchParams;
     // No `view` at all is the nav's door (ADR-117): it opens the person's
-    // entry drawing (ADR-192), else the season, even when you arrive from
+    // entry drawing (ADR-192), else the Month, even when you arrive from
     // another drawing of this page.
-    const doorView = untrack(() => entryView) ?? 'overview';
+    const doorView = untrack(() => entryView) ?? 'month';
     const nextView = params.has('view') ? normalizePlannerView(params.get('view')) : doorView;
     if (nextView && nextView !== untrack(() => view)) view = nextView;
 
@@ -424,7 +426,7 @@
       (nextView ?? untrack(() => view)) === 'board' && !params.get('lanes');
 
     // A door that opened a stored drawing writes it: the bar says what you see.
-    const doorWritten = !params.has('view') && doorView !== 'overview';
+    const doorWritten = !params.has('view') && doorView !== 'month';
 
     if (legacy || boardWithoutLanes || doorWritten) syncUrl();
 
@@ -439,6 +441,9 @@
       const cur = untrack(() => ym);
       if (month >= 1 && month <= 12 && (year !== cur.year || month !== cur.month)) {
         ym = { year, month };
+        // A month the paper does not hold opens the paper there.
+        const k = year * 12 + month;
+        if (k < ymKey(untrack(() => mesFrom)) || k > ymKey(untrack(() => mesTo))) openMonthsAt({ year, month });
       }
     }
   });
@@ -551,7 +556,7 @@
     if (!entryOwed || !$workspacesQuery.data || scopeUnresolved) return;
     entryOwed = false;
     const v = entryView;
-    if (v && v !== 'overview' && untrack(() => view) === 'overview') {
+    if (v && v !== 'month' && untrack(() => view) === 'month') {
       view = v;
       syncUrl('replace');
     }
@@ -575,12 +580,7 @@
   // (grid + team + decisions window + agenda book). Reactive inputs are
   // passed as getters so the option stores keep tracking this page's
   // state; called synchronously so the query-client context resolves. ──
-  /** The overview's horizon (ADR-117): twelve weeks from today. */
-  const season = seasonWindow(todayIso);
   const {
-    seasonPerfQuery,
-    seasonDatesQuery,
-    seasonAvailabilityQuery,
     perfQuery,
     datesQuery,
     availabilityQuery,
@@ -602,16 +602,12 @@
     teamWorkspaceIds: () => ($workspacesQuery.data?.items ?? []).map((w) => w.id),
     selectedDay: () => dayIso ?? todayIso,
     todayIso,
-    seasonFrom: season.weeks[0][0],
-    seasonTo: season.to,
   });
 
   // isLoading (isPending && isFetching) — a disabled query is pending but
   // not loading, so an unresolved selection reads as empty, not stuck.
   let loading = $derived(
-    view === 'overview'
-      ? $seasonPerfQuery.isLoading || $seasonDatesQuery.isLoading
-      : view === 'agenda' || view === 'board'
+    view === 'agenda' || view === 'board'
       ? $agendaPerfQuery.isLoading || $agendaDatesQuery.isLoading
       : $perfQuery.isLoading || $datesQuery.isLoading,
   );
@@ -634,19 +630,10 @@
         $agendaAvailabilityQuery,
         $agendaNotesQuery,
         $dayNotesQuery,
-        $seasonPerfQuery,
-        $seasonDatesQuery,
-        $seasonAvailabilityQuery,
       ].some((q) => q.isLoading),
   );
   let errorMsg = $derived(
-    view === 'overview'
-      ? $seasonPerfQuery.error instanceof Error
-        ? $seasonPerfQuery.error.message
-        : $seasonDatesQuery.error instanceof Error
-          ? $seasonDatesQuery.error.message
-          : ''
-      : view === 'agenda' || view === 'board'
+    view === 'agenda' || view === 'board'
       ? $agendaPerfQuery.error instanceof Error
         ? $agendaPerfQuery.error.message
         : $agendaDatesQuery.error instanceof Error
@@ -695,22 +682,12 @@
      honest end — so switching between the two drawings keeps the loaded
      stretch. Month/Carrils-era single-month feeds stay for Month alone. */
   let onBookWindow = $derived(view === 'agenda' || view === 'board');
-  // The overview reads its own twelve weeks (ADR-117) through the same switch.
-  let onSeason = $derived(view === 'overview');
   let activePerfRows = $derived(
-    onSeason
-      ? ($seasonPerfQuery.data?.items ?? [])
-      : onBookWindow
-        ? ($agendaPerfQuery.data?.items ?? [])
-        : ($perfQuery.data?.items ?? []),
+    onBookWindow ? ($agendaPerfQuery.data?.items ?? []) : ($perfQuery.data?.items ?? []),
   );
   /** The rows as the server sent them — the ones an edit opens. */
   let sourceDateRows = $derived(
-    onSeason
-      ? ($seasonDatesQuery.data?.items ?? [])
-      : onBookWindow
-        ? ($agendaDatesQuery.data?.items ?? [])
-        : ($datesQuery.data?.items ?? []),
+    onBookWindow ? ($agendaDatesQuery.data?.items ?? []) : ($datesQuery.data?.items ?? []),
   );
   /* A DATE OF SEVERAL DAYS OCCUPIES ALL OF THEM (Marco, 2026-10-18): laid out
      one row per day here, once, so every drawing, the census and the gaps
@@ -718,11 +695,7 @@
      whatever talks to the server goes through `spanSourceId`. */
   let activeDateRows = $derived(expandDateSpans(sourceDateRows, viewerTz));
   let activeBlackoutRows = $derived(
-    onSeason
-      ? ($seasonAvailabilityQuery.data?.items ?? [])
-      : onBookWindow
-        ? ($agendaAvailabilityQuery.data?.items ?? [])
-        : ($availabilityQuery.data?.items ?? []),
+    onBookWindow ? ($agendaAvailabilityQuery.data?.items ?? []) : ($availabilityQuery.data?.items ?? []),
   );
 
   // ── The person axis (scope, never a display filter) ───────────────────
@@ -798,7 +771,7 @@
   let shownDates = $derived(scopedDates.filter(dateDrawn));
 
   // ── The engine (conflicts, derived tours, census, decisions queue) lives
-  // in $lib/planner-engine so the season overview reads the same answers.
+  // in $lib/planner-engine, one answer for every drawing.
   // Over the UNFILTERED scoped rows: calm never hides a real clash. ──────
   const engine = createPlannerEngine({
     scopedPerfs: () => scopedPerfs,
@@ -807,11 +780,8 @@
     rawDates: () => activeDateRows,
     allBlackouts: () => allBlackouts,
     visibleBlackouts: () => visibleBlackouts,
-    // The census counts what the drawing draws: the month, or the season.
-    window: () =>
-      view === 'overview'
-        ? { first: season.from, last: season.to, days: season.days }
-        : { first: monthFirst, last: monthLast, days: monthDays },
+    // The census counts the month on screen (ADR-209: the paper runs on).
+    window: () => ({ first: monthFirst, last: monthLast, days: monthDays }),
     decisionPerfs: () => decisionPerfs,
     companyClosures: () =>
       allBlackouts.filter(
@@ -1596,6 +1566,8 @@
     const m = Number(selectedDay.slice(5, 7));
     const cur = untrack(() => ym);
     if (y !== cur.year || m !== cur.month) ym = { year: y, month: m };
+    const k = y * 12 + m;
+    if (k < ymKey(untrack(() => mesFrom)) || k > ymKey(untrack(() => mesTo))) openMonthsAt({ year: y, month: m });
   });
 
   /** The Day's title IS its date — the whole day, spelled out. */
@@ -1835,9 +1807,7 @@
       ? { from: selectedDay, to: selectedDay }
       : view === 'agenda'
         ? { from: agendaFromIso, to: agendaToIso }
-        : view === 'overview'
-          ? { from: season.weeks[0][0], to: season.to }
-          : { from: gridFrom, to: gridTo },
+        : { from: gridFrom, to: gridTo },
   );
   let stepRows = $derived(
     view === 'board'
@@ -1949,272 +1919,49 @@
   );
   let urgentCount = $derived(decisionVMs.filter((d) => d.urgent).length);
 
-  /* ── THE SEASON (ADR-117) — the portada's view models. Every row here is
-     the engine's answer over the season window (the source-switch reads the
-     season feeds while view === 'overview'); this block only shapes it for
-     SeasonOverview and translates. Off the overview it computes nothing. ── */
-  let workspaceCityById = $derived(
-    new Map(
-      ($workspacesQuery.data?.items ?? []).map((w) => [w.id, (w as { city?: string | null }).city ?? null]),
-    ),
-  );
-  /* A TOUR IS THE WHOLE STRETCH BETWEEN ITS TWO LEGS, gig days included
-     (revisión del Planner, 2026-10-18). The bands keep only the nights with
-     nothing of their own — right for the month, which draws the gig there —
-     so a tour of three gigs in a row had no mark, no line in «Fuera», and its
-     middle gig asked «¿viaje?». The Season reads the trips. */
-  let seasonTrips = $derived(view === 'overview' ? engine.trips : []);
-  let seasonTourDays = $derived(
+  /* ── THE MONTH'S HOLES AND CLASHES (ADR-209) — what «Próximas semanas»
+     listed, said where it is now. Huecos: free runs of three nights or more
+     (`gapWindows`, the one rule), hatched in the month from today on. A tour
+     is the whole stretch between its two legs, gig days included (revisión
+     del Planner, 2026-10-18), and the company's firm closures are not for
+     sale either (`engine.unsellableDays`). ── */
+  let monthTourDays = $derived(
     daysCoveredBy(
-      seasonTrips
+      engine.trips
         .filter((tr) => addDaysIso(tr.out, 1) <= addDaysIso(tr.back, -1))
         .map((tr) => ({ from: addDaysIso(tr.out, 1), to: addDaysIso(tr.back, -1) })),
     ),
   );
-  /* THE STRIP HATCHES WHAT CLOSES THE COMPANY, and a maybe more faintly
-     (revisión del Planner, 2026-10-18). One person away hatched the whole
-     week as if the company were shut, and a provisional absence looked
-     settled. A person's absence is said in «Fuera», and in «Choques» when it
-     costs a gig. Firm wins when a firm and a provisional closure overlap. */
-  let seasonBlockDays = $derived.by(() => {
-    const out = new Map<string, 'firm' | 'tent'>();
-    if (view !== 'overview') return out;
-    for (const b of visibleBlackouts) {
-      if (b.person_id) continue;
-      const from = b.starts_on < season.weeks[0][0] ? season.weeks[0][0] : b.starts_on;
-      const to = b.ends_on > season.to ? season.to : b.ends_on;
-      const kind = b.certainty === 'tentative' ? 'tent' : 'firm';
-      for (let d = from; d <= to; d = addDaysIso(d, 1)) {
-        if (out.get(d) !== 'firm') out.set(d, kind);
-      }
-    }
-    return out;
+  /** The last day whose rows are really in: while a wider window loads, its
+      new weeks have no rows yet, and a hole drawn there would be a lie. */
+  let settledTo = $state('');
+  $effect(() => {
+    if (view !== 'month') return;
+    if ($perfQuery.isSuccess && !$perfQuery.isPlaceholderData && $datesQuery.isSuccess && !$datesQuery.isPlaceholderData)
+      settledTo = gridTo;
   });
-  const MONTH_SHORT = new Intl.DateTimeFormat(localeTag, { month: 'short', timeZone: 'UTC' });
-  let seasonWeeks = $derived.by((): SeasonCellVM[][] => {
-    const perfsByDay = new Map<string, PerformanceEvent[]>();
-    const datesByDay = new Map<string, DateEvent[]>();
-    if (view === 'overview') {
-      for (const p of shownPerfs) {
-        if (p.status === 'cancelled') continue;
-        const day = perfDayKey(p);
-        (perfsByDay.get(day) ?? perfsByDay.set(day, []).get(day)!).push(p);
-      }
-      for (const d of shownDates) {
-        if (d.status === 'cancelled') continue;
-        const day = dateDayKey(d, viewerTz);
-        (datesByDay.get(day) ?? datesByDay.set(day, []).get(day)!).push(d);
-      }
-    }
-    return season.weeks.map((week) =>
-      week.map((iso): SeasonCellVM => {
-        const perfs = perfsByDay.get(iso) ?? [];
-        const dates = datesByDay.get(iso) ?? [];
-        const rows: SeasonCellIn[] = [
-          ...perfs.map((p) => ({ day: iso, family: performanceStatusFamily(p.status), kind: 'perf' as const })),
-          ...dates.map((d) => ({
-            day: iso,
-            family: dateStatusFamily(d.status),
-            kind: d.kind === 'travel_day' ? ('travel' as const) : ('date' as const),
-          })),
-        ];
-        const gigs = perfs
-          .map((p) => ({ p, firm: performanceStatusFamily(p.status) === 'confirmed' }))
-          // Released is gone from a horizon forward; everything else is drawn,
-          // proposals included, in the voice of an option.
-          .filter(({ p }) => performanceStatusFamily(p.status) !== 'released')
-          .sort((a, b) => Number(b.firm) - Number(a.firm));
-        const travel = dates.find((d) => d.kind === 'travel_day');
-        const other = dates.find((d) => d.kind !== 'travel_day');
-        return {
-          iso,
-          past: iso < todayIso,
-          today: iso === todayIso,
-          monthWord: iso.endsWith('-01') ? MONTH_SHORT.format(new Date(`${iso}T00:00:00Z`)) : null,
-          mark: cellMark(rows),
-          // THE APP'S ONE CARD, placed small (ADR-095 §0). No link: the whole
-          // cell is the door to its day, and a link inside a button is two
-          // doors in one place.
-          slips: gigs.slice(0, 2).map(({ p }) => ({ ...performanceSlip(p, slipCtxPage), href: null })),
-          more: Math.max(0, gigs.length - 2),
-          dateWord: other ? kindLabel(other.kind) : null,
-          travel: travel
-            ? travel.travel_direction === 'return'
-              ? 'back'
-              : 'out'
-            : null,
-          tour: seasonTourDays.has(iso),
-          away: seasonBlockDays.get(iso) ?? null,
-          clash: seasonClashDays.has(iso),
-          decide: seasonDecideDays.has(iso),
-          steps: stepCounts.get(iso) ?? 0,
-        };
-      }),
-    );
+  let monthGaps = $derived.by(() => {
+    if (view !== 'month' || !settledTo) return [];
+    const days: string[] = [];
+    const last = settledTo < gridTo ? settledTo : gridTo;
+    for (let d = todayIso > gridFrom ? todayIso : gridFrom; d <= last; d = addDaysIso(d, 1)) days.push(d);
+    // Only holes with two ends: an open tail is the plan running out.
+    return closedGapWindows(days, engine.occupiedDays, new Set([...monthTourDays, ...engine.unsellableDays]));
   });
-
-  /** Confirmed gigs in the «sin cerrar» horizon, and what each is missing. */
-  let seasonFirmAhead = $derived.by(() => {
-    if (view !== 'overview') return [];
-    const until = addDaysIso(todayIso, UNCLOSED_WEEKS * 7 - 1);
-    return scopedPerfs
-      .filter((p) => {
-        const day = perfDayKey(p);
-        return performanceStatusFamily(p.status) === 'confirmed' && day >= todayIso && day <= until;
-      })
-      .sort((a, b) => (perfDayKey(a) < perfDayKey(b) ? -1 : 1));
-  });
-  let seasonUnclosed = $derived.by((): SeasonUnclosedVM[] => {
-    const out: SeasonUnclosedVM[] = [];
-    for (const p of seasonFirmAhead) {
-      const day = perfDayKey(p);
-      // A trip is «covered» when a tour band holds the day or a travel leg of
-      // the same project sits within a day of it.
-      const travelCovered =
-        seasonTrips.some((tr) => tr.project_id === p.project?.id && day >= tr.out && day <= tr.back) ||
-        scopedDates.some((d) => {
-          if (d.kind !== 'travel_day' || d.status === 'cancelled') return false;
-          if (d.project?.id !== p.project?.id) return false;
-          const dd = dateDayKey(d, viewerTz);
-          return dd >= addDaysIso(day, -1) && dd <= addDaysIso(day, 1);
-        });
-      const v = unclosedOf(
-        {
-          start_at: p.start_at,
-          person_ids: p.person_ids,
-          commitments: p.commitments,
-          city: p.venue?.city ?? p.city,
-        },
-        {
-          home: workspaceCityById.get(perfWorkspaceId(p) ?? '') ?? null,
-          travelCovered,
-        },
-      );
-      if (v.missing.length === 0 && !v.travelGuess) continue;
-      const ws = workspaceSlugById.get(perfWorkspaceId(p) ?? '') ?? null;
-      out.push({
-        id: p.id,
-        day,
-        venue: p.venue?.name ?? p.venue_name ?? p.city ?? '—',
-        city: p.venue?.city ?? p.city,
-        href: p.slug && ws ? `/h/${ws}/performance/${p.slug}` : null,
-        missing: v.missing.map((k) =>
-          k === 'time' ? 'planner.season_miss_time' : 'planner.season_miss_cast',
-        ),
-        travelGuess: v.travelGuess,
-        soon: day <= addDaysIso(todayIso, 13),
-      });
-    }
-    return out;
-  });
-  let seasonGaps = $derived.by((): SeasonGapVM[] => {
-    if (view !== 'overview') return [];
-    // A hole to sell skips the company's firm closures as it skips a tour.
-    const windows = gapWindows(
-      season.days,
-      engine.occupiedDays,
-      new Set([...seasonTourDays, ...engine.unsellableDays]),
-    );
-    const people = blackoutVMs.filter((b) => !b.company);
-    return windows.map((g) => ({
-      ...g,
-      away: people
-        .filter((b) => b.from <= g.to && b.to >= g.from)
-        .map((b) => ({
-          key: b.id,
-          who: b.subject ?? b.label,
-          from: b.from < g.from ? g.from : b.from,
-          to: b.to > g.to ? g.to : b.to,
-          tentative: b.tentative,
-        })),
-    }));
-  });
-  let seasonAway = $derived.by((): SeasonAwayVM[] => {
-    if (view !== 'overview') return [];
-    const touches = (from: string, to: string) => to >= todayIso && from <= season.to;
-    const out: SeasonAwayVM[] = [];
-    for (const b of blackoutVMs) {
-      if (!touches(b.from, b.to)) continue;
-      out.push({
-        key: `b:${b.id}`,
-        from: b.from,
-        to: b.to,
-        who: b.subject ?? b.label,
-        what: b.note ?? null,
-        tentative: b.tentative,
-        guess: false,
-        legs: null,
-      });
-    }
-    for (const tr of seasonTrips) {
-      if (!touches(tr.out, tr.back)) continue;
-      const from = addDaysIso(tr.out, 1) <= addDaysIso(tr.back, -1) ? addDaysIso(tr.out, 1) : tr.out;
-      out.push({
-        key: `t:${tr.project_id}:${tr.out}`,
-        from,
-        to: from === tr.out ? tr.back : addDaysIso(tr.back, -1),
-        who: t('planner.away', locale, { project: projectNameById.get(tr.project_id) ?? '—' }),
-        what: tourPlaceFor({ from, project_id: tr.project_id }),
-        tentative: false,
-        guess: true,
-        legs: deducedPhrase({
-          word: t('planner.tour_inferred', locale),
-          legs: t('planner.tour_legs', locale, {
-            out: localeDayMonth(tr.out, localeTag),
-            back: localeDayMonth(tr.back, localeTag),
-          }),
-        }),
-      });
-    }
-    return out.sort((x, y) => (x.from < y.from ? -1 : x.from > y.from ? 1 : 0));
-  });
-  /** The clashes that are not a choice between two holds: an absence, or a
-      person in two places on a date. A pair the queue already holds is said
-      there, once. */
-  let seasonClashes = $derived.by(() => {
-    if (view !== 'overview') return [];
-    return clashesInSeason(conflicts, eventDayById, decisionQueue.decisions, { from: todayIso, to: season.to }).flatMap(
+  /** «Choques»: the clashes that are not a choice between two holds (a pair
+      the queue holds is said there, once), from today to the paper's end. */
+  let monthClashes = $derived.by(() => {
+    if (view !== 'month') return [];
+    return clashesInSeason(conflicts, eventDayById, decisionQueue.decisions, { from: todayIso, to: gridTo }).flatMap(
       ({ day, conflict }, i) => {
         const vm = clashVM(conflict);
         if (!vm) return [];
         const what = vm.rows.map((r) => r.label).join(' · ');
-        return [{ key: `${day}:${i}`, day, title: vm.title, body: what ? `${vm.body} · ${what}` : vm.body }];
+        return [{ key: `${day}:${i}`, day, body: what ? `${vm.body} · ${what}` : vm.body }];
       },
     );
   });
-  /** THE RED DOT IS WHAT «CHOQUES» COUNTS, AND NOTHING ELSE (revisión del
-      Planner, 2026-10-18). It also lit the days of a decision between two
-      holds, which the census sends to «por decidir»: the eye counted three
-      clashes where the figure said one. Those days carry the decision's own
-      mark (`decide`), and a day can carry both. */
-  let seasonClashDays = $derived(new Set(seasonClashes.map((c) => c.day)));
-  let seasonDecideDays = $derived(new Set(decisionVMs.map((d) => d.day)));
-  let seasonFacts = $derived.by(() => {
-    let perfs = 0;
-    if (view === 'overview') {
-      for (const p of scopedPerfs) {
-        if (p.status === 'cancelled') continue;
-        const day = perfDayKey(p);
-        if (day >= todayIso && day <= season.to) perfs++;
-      }
-    }
-    return {
-      perfs,
-      confirmed: stats.confirmed,
-      holds: stats.holds,
-      // What the overview lists as a clash, counted once: not `possible`.
-      clashes: seasonClashes.length,
-      unclosed: seasonUnclosed.filter((u) => u.missing.length > 0).length,
-      free: stats.free,
-    };
-  });
-  /* A HORIZON'S TITLE IS ITS HORIZON (ADR-095 §9: the title is the date;
-     diseño B1, uso #15). The Season was titled «Temporada» over a tab that
-     said «Temporada», and the Agenda and the Board were titled with a month
-     they do not end at. The meta keeps what the title does not say. */
-  let seasonTitle = $derived(
-    `${localeDayMonth(season.from, localeTag)} → ${localeDayMonth(season.to, localeTag)}`,
-  );
+  let clashesOpen = $state(false);
   let horizonTitle = $derived.by(() => {
     const s = t('planner.agenda_from', locale, { day: localeDayMonth(agendaFromIso, localeTag) });
     return `${s.charAt(0).toUpperCase()}${s.slice(1)}`;
@@ -2672,14 +2419,51 @@
     `${monthTitle.charAt(0).toUpperCase()}${monthTitle.slice(1)} ${ym.year}`,
   );
 
+  /* ON THE CONTINUOUS MONTH THE ARROWS MOVE YOU (ADR-209), as on the
+     diary: ‹ › take the reader to the 1st of the month before or after the
+     one on screen, and the paper grows to hold it when it has to. */
+  /** Lands an element just under the stuck toolbar (`scrollIntoView` reads
+      the margin; the bar's height is measured, never guessed). */
+  function landUnderBar(el: HTMLElement) {
+    const bar = document.querySelector<HTMLElement>('.cal__toolbar');
+    const edge = bar ? (parseFloat(getComputedStyle(bar).top) || 0) + bar.offsetHeight : 0;
+    el.style.scrollMarginBlockStart = `${Math.round(edge)}px`;
+    el.scrollIntoView({ behavior: 'instant', block: 'start' });
+  }
+  async function showMonth(m: Ym, at?: string) {
+    if (ymKey(m) < ymKey(mesFrom)) mesFrom = m;
+    else if (ymKey(m) > ymKey(mesTo)) mesTo = m;
+    ym = m;
+    syncUrl();
+    await tick();
+    const key = `${m.year}-${String(m.month).padStart(2, '0')}`;
+    const el =
+      (at ? document.querySelector<HTMLElement>(`.cal__grid .cal__num[data-day="${at}"]`) : null) ??
+      document.querySelector<HTMLElement>(`.cal__grid [data-month-start="${key}"]`);
+    if (el) landUnderBar(el);
+  }
   function prevMonth() {
-    ym = addMonths(ym.year, ym.month, -1);
+    void showMonth(addMonths(ym.year, ym.month, -1));
   }
   function nextMonth() {
-    ym = addMonths(ym.year, ym.month, 1);
+    void showMonth(addMonths(ym.year, ym.month, 1));
   }
   function thisMonth() {
-    ym = { year: now.getFullYear(), month: now.getMonth() + 1 };
+    const m = { year: now.getFullYear(), month: now.getMonth() + 1 };
+    if (ymKey(m) < ymKey(mesFrom) || ymKey(m) > ymKey(mesTo)) openMonthsAt(m);
+    void showMonth(m, todayIso);
+  }
+  /** The paper reached its foot: one more month, up to the cap. */
+  function growMonths() {
+    if (ymKey(mesTo) - ymKey(mesFrom) + 1 >= MONTH_SPAN_MAX) return;
+    mesTo = addMonths(mesTo.year, mesTo.month, 1);
+  }
+  /** The month that holds the reader's eye: the title, the census, the
+      address. Replaces the entry: scrolling is not a new page. */
+  function onMonthShown(m: Ym) {
+    if (m.year === ym.year && m.month === ym.month) return;
+    ym = m;
+    syncUrl();
   }
   // Agenda "Avui" scrolls the book to today's day header instead of moving
   // the single-month window (which the agenda no longer uses).
@@ -2744,8 +2528,6 @@
    * line instead of minting empty months.
    */
   function stepBack(shift = false) {
-    // The season is a horizon from today: nothing to step.
-    if (view === 'overview') return;
     if (view === 'day') {
       if (shift) return stepDayByOne(-1);
       void stepDayToPlanned(-1);
@@ -2754,7 +2536,6 @@
     else prevMonth();
   }
   function stepNext(shift = false) {
-    if (view === 'overview') return;
     if (view === 'day') {
       if (shift) return stepDayByOne(1);
       void stepDayToPlanned(1);
@@ -2974,7 +2755,6 @@
   }
 
   function goToday() {
-    if (view === 'overview') return;
     if (view === 'agenda') scrollToToday();
     else if (view === 'day') {
       dayIso = todayIso;
@@ -2985,8 +2765,9 @@
 
   /* ── THE KEYBOARD (ADR-095) ───────────────────────────────────────────
      Views by number, in the SAME ORDER AS THE WORDS ON SCREEN — that is the
-     rule, not the specific digits: the Day left the row (ADR-155), so the
-     keys are 1 to 4 and `Esc` closes the Day, as its × does.
+     rule, not the specific digits: the Day left the row (ADR-155) and the
+     coming weeks left the Planner (ADR-209), so the keys are 1 to 3 and
+     `Esc` closes the Day, as its × does.
 
      `T` today · `← →` move the window · `N` a new date on the day you are
      looking at. `N` IS THE ONLY KEY THAT WRITES, and it goes through the same
@@ -3025,7 +2806,7 @@
       }
 
       // The SAME order as the words on screen (CalToolbar's VIEW_ORDER).
-      const views: PlannerView[] = ['overview', 'agenda', 'month', 'board'];
+      const views: PlannerView[] = ['agenda', 'month', 'board'];
       const n = Number(e.key);
       if (n >= 1 && n <= views.length) {
         e.preventDefault();
@@ -3120,7 +2901,6 @@
   function viewCreateDay(): string {
     if (view === 'day') return defaultCreateDay(todayIso, { selected: selectedDay });
     if (view === 'month') return defaultCreateDay(todayIso, { shown: { from: monthFirst, to: monthLast } });
-    if (view === 'overview') return defaultCreateDay(todayIso, { shown: { from: season.weeks[0][0], to: season.to } });
     return defaultCreateDay(todayIso, { shown: view === 'agenda' ? agendaShownDays() : boardShownDays() });
   }
   /** The agenda's days on screen: the rows (or shut chapters) between the
@@ -3234,33 +3014,21 @@
             syncUrl();
           }}
         />
-      {:else if view === 'overview'}<LensTitle text={seasonTitle} />
       {:else if view === 'agenda' || view === 'board'}<LensTitle text={horizonTitle} />
       {:else}<LensTitle text={monthLabel} />{/if}
     {/snippet}
     <!-- THE ARROWS GO WITH THE TITLE THEY MOVE (ADR-136): in Day, Agenda,
-         Month and Board the title IS the window. The Season's title is its
-         horizon from today, which does not step, so it has none to offer;
-         but their PLACE is kept, invisible and inert (§ 109, nota a ADR-167
-         § 2): on a phone the arrows take a line of their own under the
-         title, and without it the view bar rose 30 px on the way to the
-         Season. Nothing to see, nothing to reach; only the room. -->
+         Month and Board the title IS the window. -->
     {#snippet titleAside()}
-      {#if view !== 'overview'}
-        <CalNav {view} {locale} onStepBack={stepBack} onStepNext={stepNext} onNow={goToday} />
-      {:else}
-        <span class="cal__navkeep" aria-hidden="true" inert>
-          <CalNav {view} {locale} onStepBack={stepBack} onStepNext={stepNext} onNow={goToday} />
-        </span>
-      {/if}
+      <CalNav {view} {locale} onStepBack={stepBack} onStepNext={stepNext} onNow={goToday} />
     {/snippet}
   </LensHeader>
 
-  <!-- The welcome speaks of the Season, so its tour goes there first. -->
+  <!-- The welcome speaks of the Month, so its tour goes there first. -->
   <FirstVisitCard
     section="planner"
-    steps={['planner-strip', 'planner-decide', 'planner-lists']}
-    onbeforetour={() => setView('overview')}
+    steps={['planner-grid', 'planner-status', 'planner-views']}
+    onbeforetour={() => setView('month')}
   />
 
 
@@ -3286,44 +3054,7 @@
 
        The second line is always there (nota a ADR-167): an empty Day keeps
        its height with nothing in it. -->
-  <div class="cal__facts">
-  <p class="cal__meta cal__meta--queue">
-      <!-- Stats strip (ADR-080 §6 calls it the pulse strip; the pulse is now
-           the rail block, ADR-096) — every figure maps to fetched rows; a
-           segment whose feed is absent (or count is zero) drops instead of
-           lying. The shared .lenshead__sub inserts the · between items. -->
-      <!-- CALM QUIETS VOLUME, NOT OBLIGATIONS. This control was gated on
-             `!calm.on`, so the one line on the page that says «you have to
-             decide something» disappeared in the mode people leave switched
-             on — which is why Marco never saw the drawer and reported it as
-             unbuilt. Calm already removes the counters' noise; the call to
-             make is not noise. -->
-        {#if !decisionsAbsent && decisionVMs.length > 0 && view !== 'overview'}
-          <button
-            type="button"
-            class="cal__stat cal__stat--decide"
-            aria-expanded={decisionsOpen}
-            aria-controls="cal-decisions"
-            onclick={() => setDecisionsOpen(!decisionsOpen)}
-          >
-            {t('planner.stat_decide', locale, { n: decisionVMs.length })}{#if urgentCount > 0}{' · '}{urgentCount ===
-              1
-                ? t('planner.stat_urgent_one', locale)
-                : t('planner.stat_urgent', locale, { m: urgentCount })}{/if}<i
-              class="cal__stat-chev"
-              aria-hidden="true">{decisionsOpen ? '▴' : '▾'}</i
-            >
-          </button>
-        {/if}
-    </p>
-  <!-- THE QUEUE LINE WITH NOTHING TO SAY IS NOT DRAWN (ADR-167 § 2). THE
-       WINDOW LINE ALWAYS IS (nota a ADR-167, 2026-11-02, Marco: «al cambiar
-       de vista todo salta»): every view says what its window is, so the line
-       sits in the same place at the same height in Season, Agenda, Month and
-       Board, and the tabs under it never move. What changes is what it says.
-       A census line is there while it loads (its figures say «–»), so the
-       rows landing move nothing. -->
-    <p class="cal__meta cal__meta--window">
+  {#snippet windowFacts()}
         <!-- CALM IS ONE SENTENCE, NOT A WORD MORE (ADR-139 § 5; it was
              «calma · solo confirmados» in front of the whole census, ADR-095
              §3). The line still says what calm hides, because a filter you
@@ -3380,12 +3111,6 @@
              grows, so neither prints one. -->
         <!-- Weeks range: BOUNDED drawings only — the board grew a horizon
              and what grows is never counted. -->
-        <!-- THE SEASON COUNTS ITS OWN WINDOW, AND ONLY WHAT NO BLOCK SAYS
-             (ADR-145 fase 2 took out «0 por decidir · 0 choques · 0 sin
-             cerrar», which the blocks below already say). Confirmed, options
-             and nights free over the visible season are the census the engine
-             already holds (its window is the season's in this view), and no
-             block prints them: «Sin cerrar» counts the first weeks only. -->
         <!-- THE AGENDA NAMES ITS HORIZON AND COUNTS NOTHING (ADR-095: a
              window with no end is never counted). Its title is the day the
              book opens at; the line says whether that day is today, and that
@@ -3436,7 +3161,7 @@
              and counts them (2026-11-02). The agenda and the board have no
              last day, so they name where they begin and count
              nothing. -->
-        {#if (view === 'month' || view === 'overview') && shows('planner', 'census', calm.on)}
+        {#if view === 'month' && shows('planner', 'census', calm.on)}
         <span class="cal__stat"
           ><b>{fig(stats.confirmed)}</b>
           {t(figOne(stats.confirmed) ? 'planner.stat_confirmed_one' : 'planner.stat_confirmed', locale)}</span
@@ -3484,7 +3209,68 @@
             >{t('planner.stat_unattributed', locale, { n: String(statUnattributed) })}</span
           >
         {/if}
+  {/snippet}
+  <div class="cal__facts">
+  <!-- THE MONTH SAYS IT IN ONE LINE (ADR-209): por decidir, choques and the
+       count, the status line the three drawings will share. The Agenda and
+       the Board keep their two lines until their own phase. -->
+  {#if view === 'month'}
+    <PlannerStatus
+      {locale}
+      decide={!decisionsAbsent && decisionVMs.length > 0 ? { n: decisionVMs.length, urgent: urgentCount } : null}
+      {decisionsOpen}
+      onDecide={() => setDecisionsOpen(!decisionsOpen)}
+      clashes={monthClashes.map((c) => ({ key: c.key, when: spokenDay(c.day), body: c.body, day: c.day }))}
+      {clashesOpen}
+      onClashes={() => (clashesOpen = !clashesOpen)}
+      onClashDay={(iso) => {
+        dayIso = iso;
+        setView('day');
+      }}
+    >
+      {@render windowFacts()}
+    </PlannerStatus>
+  {:else}
+  <p class="cal__meta cal__meta--queue">
+      <!-- Stats strip (ADR-080 §6 calls it the pulse strip; the pulse is now
+           the rail block, ADR-096) — every figure maps to fetched rows; a
+           segment whose feed is absent (or count is zero) drops instead of
+           lying. The shared .lenshead__sub inserts the · between items. -->
+      <!-- CALM QUIETS VOLUME, NOT OBLIGATIONS. This control was gated on
+             `!calm.on`, so the one line on the page that says «you have to
+             decide something» disappeared in the mode people leave switched
+             on — which is why Marco never saw the drawer and reported it as
+             unbuilt. Calm already removes the counters' noise; the call to
+             make is not noise. -->
+        {#if !decisionsAbsent && decisionVMs.length > 0}
+          <button
+            type="button"
+            class="cal__stat cal__stat--decide"
+            aria-expanded={decisionsOpen}
+            aria-controls="cal-decisions"
+            onclick={() => setDecisionsOpen(!decisionsOpen)}
+          >
+            {t('planner.stat_decide', locale, { n: decisionVMs.length })}{#if urgentCount > 0}{' · '}{urgentCount ===
+              1
+                ? t('planner.stat_urgent_one', locale)
+                : t('planner.stat_urgent', locale, { m: urgentCount })}{/if}<i
+              class="cal__stat-chev"
+              aria-hidden="true">{decisionsOpen ? '▴' : '▾'}</i
+            >
+          </button>
+        {/if}
     </p>
+  <!-- THE QUEUE LINE WITH NOTHING TO SAY IS NOT DRAWN (ADR-167 § 2). THE
+       WINDOW LINE ALWAYS IS (nota a ADR-167, 2026-11-02, Marco: «al cambiar
+       de vista todo salta»): every view says what its window is, so the line
+       sits in the same place at the same height in Season, Agenda, Month and
+       Board, and the tabs under it never move. What changes is what it says.
+       A census line is there while it loads (its figures say «–»), so the
+       rows landing move nothing. -->
+    <p class="cal__meta cal__meta--window">
+      {@render windowFacts()}
+    </p>
+  {/if}
   </div>
   <!-- A SPACE WITH NOTHING IN ITS PLAN SAYS SO, WITH ITS DOOR (tarea 137, the
        empties that teach): a window can be empty for a plan that is not, so
@@ -3503,7 +3289,7 @@
        above the controls. Not between them: the window line is a caption of
        the drawing, and a drawer opening through the middle of a caption
        would push half of it away from what it captions. -->
-  {#if !errorMsg && !decisionsAbsent && view !== 'overview'}
+  {#if !errorMsg && !decisionsAbsent}
     <DecisionBand
       decisions={decisionVMs}
       concurrences={concurrenceVMs}
@@ -3543,39 +3329,6 @@
       <span>{t('planner.load_error', locale)}</span>
       <Button variant="secondary" size="xs" onclick={retryFailed}>{t('ui.retry', locale)}</Button>
     </p>
-  {:else if view === 'overview'}
-    <SeasonOverview
-      {locale}
-      {localeTag}
-      {loading}
-      facts={seasonFacts}
-      weeks={seasonWeeks}
-      decisions={decisionVMs}
-      concurrences={concurrenceVMs}
-      {decisionsAbsent}
-      clashes={seasonClashes}
-      unclosed={seasonUnclosed}
-      firmAhead={seasonFirmAhead.length}
-      gaps={seasonGaps}
-      away={seasonAway}
-      pendingId={decisionPendingId}
-      onConfirm={(id) => $decideMutation.mutate({ id, status: 'confirmed' })}
-      onDay={(iso) => {
-        dayIso = iso;
-        setView('day');
-      }}
-      onWeek={(monday) => {
-        // The week's Thursday names its month (ISO), so a week straddling
-        // two months opens the one that holds most of it.
-        const thu = addDaysIso(monday, 3);
-        ym = { year: Number(thu.slice(0, 4)), month: Number(thu.slice(5, 7)) };
-        setView('month');
-      }}
-      onGap={openAgendaAt}
-      onCreate={canPlan ? () => openCreate() : undefined}
-      calm={calm.on}
-      onLeaveCalm={() => calm.set(false)}
-    />
   {:else if view === 'day'}
     <!-- A CLASH IS ABOUT WHAT IS *IN* THE DAY, so it goes above the drawing:
          a rule on two rows says THAT they relate, never why — the why is a
@@ -3675,8 +3428,14 @@
     />
   {:else if view === 'month'}
     <MonthGrid
-      year={ym.year}
-      month={ym.month}
+      rows={gridWeeks}
+      shownMonth={ym}
+      gaps={monthGaps}
+      gapLabel={(n) => `${n} ${t('planner.stat_free', locale)}`}
+      gapShortLabel={(n) => t('planner.month_gap_short', locale, { n })}
+      onReachEnd={growMonths}
+      {onMonthShown}
+      openDayWord={t('planner.view_day', locale)}
       performances={shownPerfs}
       dates={shownDates}
       workspaceSlug={defaultWorkspaceSlug}
@@ -3704,7 +3463,6 @@
         const key = statusFootKey(status);
         return key ? t(key, locale) : null;
       }}
-      isoWeekLabel={(n) => `${t('planner.week_n', locale)} ${n}`}
       moreLabel={t('planner.more_n', locale)}
       releasedLabel={t('planner.released', locale)}
       expiresLabel={(iso) => holdDeadlineLabel(iso, todayIso, locale, localeTag, true)}
@@ -4069,12 +3827,6 @@
     }
     .cal__fail {
       padding-block: var(--space-l);
-    }
-    /* The Season keeps the arrows' room (§ 109): laid out as the real ones,
-       never seen. */
-    .cal__navkeep {
-      display: contents;
-      visibility: hidden;
     }
   }
 </style>
