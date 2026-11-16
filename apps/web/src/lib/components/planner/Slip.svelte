@@ -640,7 +640,7 @@
       gap: var(--space-xs);
     }
 
-    /* ══ THE COMPACT PLACING · the season's strip ══════════════════════
+    /* ══ THE COMPACT PLACING · the month cell (was the season's strip) ════════════════════════
        Twelve weeks on one screen give a day ~80px, and the strip answers
        «whose, and where» (ADR-117): monogram + place, ONE line. It used to
        draw its own box for this, with its own option voice and a ground
@@ -686,10 +686,37 @@
       line-height: 1.15;
       color: var(--text-color);
     }
-    .slip[data-placing='compact'][data-kind='show'] .slip__n,
-    .slip[data-placing='compact'][data-kind='show'] .slip__c {
-      font-family: var(--font-display);
-      font-size: var(--text-xs);
+    /* THE MONTH DRAWS IT AS A LINE (ADR-209, the drawing of 16-11): the
+       month passes `ground="bare"`, so the cell is the paper and the slip is
+       the monogram and the place, in the body voice, at the number's size.
+       An option says it on the monogram (an outline, no fill) and in the
+       place, which leans and asks: «Girona?». */
+    .slip[data-placing='compact'] .slip__n,
+    .slip[data-placing='compact'] .slip__c {
+      font-family: var(--font-sans);
+      font-size: var(--text-s);
+    }
+    .slip[data-placing='compact'][data-family='hold'] .slip__c::after,
+    .slip[data-placing='compact'][data-family='proposed'] .slip__c::after {
+      content: '?';
+    }
+    /* The leaning `?` flies past its box, and the box clips (ellipsis). */
+    .slip[data-placing='compact'][data-family='hold'] .slip__c,
+    .slip[data-placing='compact'][data-family='proposed'] .slip__c {
+      padding-inline-end: 0.18em;
+    }
+    .slip[data-placing='compact'][data-ground='bare'][data-family='hold'] :global(.mark__chip),
+    .slip[data-placing='compact'][data-ground='bare'][data-family='proposed'] :global(.mark__chip) {
+      background: none;
+      outline: var(--line-hairline) dashed var(--_fg);
+      outline-offset: calc(-1 * var(--line-hairline));
+      box-shadow: none;
+    }
+    .slip[data-placing='compact'][data-ground='bare'] {
+      padding: 0;
+    }
+    .slip[data-placing='compact'][data-ground='bare'][data-clash] {
+      padding-inline-start: var(--space-2xs);
     }
     /* Too narrow for a place that can be read: the monogram alone, never
        «Giro…». The title still says everything. */
