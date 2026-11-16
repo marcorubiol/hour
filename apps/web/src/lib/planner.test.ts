@@ -15,6 +15,7 @@ import {
   isoWeek,
   monthGrid,
   monthSpanWeeks,
+  monthUnderStrip,
   nightsFree,
   normalizePlannerView,
   performanceRoster,
@@ -1138,6 +1139,47 @@ describe('awayBands', () => {
     expect(bands).toEqual([
       { from: '2026-07-31', to: '2026-08-01', project_id: 'proj-a', out: '2026-07-30', back: '2026-08-02' },
     ]);
+  });
+});
+
+describe('monthUnderStrip (the title of the continuous month)', () => {
+  // Nov–Jan 2026/27, Monday first. Rows of `h` px from `y0`.
+  const weeks = (h: number, y0 = 0) =>
+    monthSpanWeeks({ year: 2026, month: 11 }, { year: 2027, month: 1 }).map((w, i) => ({
+      monday: w[0],
+      top: y0 + i * h,
+      bottom: y0 + (i + 1) * h,
+    }));
+  const at = (ws: ReturnType<typeof weeks>, monday: string) => ws.find((w) => w.monday === monday)!;
+
+  for (const h of [45, 64]) {
+    it(`today's week right under the strip names today's month (${h} px rows)`, () => {
+      const ws = weeks(h, 100);
+      const foot = at(ws, '2026-11-16').top;
+      expect(monthUnderStrip(ws, foot, '2026-11-16')).toEqual({ year: 2026, month: 11 });
+    });
+    it(`the next month's 1st just under the strip names the new month (${h} px rows)`, () => {
+      const ws = weeks(h, 100);
+      // Mon 28 Dec … Sun 3 Jan holds 1 Jan (a Friday; its Thursday is in December).
+      const foot = at(ws, '2026-12-28').top + 1;
+      expect(monthUnderStrip(ws, foot, '2026-11-16')).toEqual({ year: 2027, month: 1 });
+    });
+    it(`a week half behind the strip gives way to the next (${h} px rows)`, () => {
+      const ws = weeks(h, 100);
+      const w = at(ws, '2026-12-21');
+      expect(monthUnderStrip(ws, w.top + h * 0.6)).toEqual({ year: 2027, month: 1 });
+      expect(monthUnderStrip(ws, w.top + h * 0.4)).toEqual({ year: 2026, month: 12 });
+    });
+  }
+  it('a week across two months holding today says today’s month, not the 1st’s', () => {
+    const ws = weeks(45);
+    const foot = at(ws, '2026-11-30').top;
+    expect(monthUnderStrip(ws, foot, '2026-11-30')).toEqual({ year: 2026, month: 11 });
+    expect(monthUnderStrip(ws, foot)).toEqual({ year: 2026, month: 12 });
+  });
+  it('no weeks, no month; past the paper, the last week', () => {
+    expect(monthUnderStrip([], 0)).toBeNull();
+    expect(monthUnderStrip(weeks(45), 99_999)).toEqual({ year: 2027, month: 1 });
   });
 });
 

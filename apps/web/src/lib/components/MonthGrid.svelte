@@ -23,7 +23,7 @@
   import { bookingModeOf } from '$lib/booking-mode';
   import type { Attachment } from 'svelte/attachments';
   import { isFreeSpace, longPress } from '$lib/cell-create';
-  import { dayKeyInTz, assignBandLanes } from '$lib/planner';
+  import { dayKeyInTz, assignBandLanes, monthUnderStrip } from '$lib/planner';
   import { dayMonthLong, weekdayLabels, localeMonthShort, localeDayMonth, localeWeekdayShort, viewerTimeZone } from '$lib/datetime';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
   import { accentVarFor } from '$lib/utils/accent';
@@ -499,6 +499,10 @@
   function pick(iso: string) {
     picked = picked === iso ? null : iso;
   }
+  /** The column of a month's 1st in this week, or -1 (the ink stair). */
+  function firstCol(week: readonly { iso: string }[]): number {
+    return week.findIndex((d) => d.iso.endsWith('-01'));
+  }
   function openOrPick(iso: string) {
     if (narrow) pick(iso);
     else onDayOpen?.(iso);
@@ -509,8 +513,9 @@
 
   /* THE FOOT ASKS FOR MORE, AND THE EYE NAMES THE MONTH. A sentinel under the
      last week asks the page for another month before the reader gets there;
-     the week under the reading line (a third down the viewport, below the
-     stuck toolbar) names the month on screen by its Thursday, as ISO does. */
+     the first week read under the stuck strip names the month on screen
+     (`monthUnderStrip`: a week holding a 1st names the new month, the week
+     holding today names today's). */
   let footEl = $state<HTMLElement>();
   $effect(() => {
     if (!footEl || !onReachEnd || typeof IntersectionObserver === 'undefined') return;
@@ -533,16 +538,13 @@
     let raf = 0;
     const read = () => {
       raf = 0;
-      const bar = document.querySelector('.cal__toolbar');
-      const edge = bar ? bar.getBoundingClientRect().bottom : 0;
-      const y = edge + (window.innerHeight - edge) / 3;
-      for (const wk of grid.querySelectorAll<HTMLElement>('.cal__wk')) {
+      const foot = grid.querySelector('.cal__wkh')?.getBoundingClientRect().bottom ?? 0;
+      const weeks = [...grid.querySelectorAll<HTMLElement>('.cal__wk')].map((wk) => {
         const r = wk.getBoundingClientRect();
-        if (r.bottom < y) continue;
-        const thu = wk.dataset.thu;
-        if (thu) tell({ year: Number(thu.slice(0, 4)), month: Number(thu.slice(5, 7)) });
-        return;
-      }
+        return { monday: wk.dataset.mon ?? '', top: r.top, bottom: r.bottom };
+      });
+      const m = monthUnderStrip(weeks, foot, todayIso);
+      if (m) tell(m);
     };
     const onScroll = () => {
       if (!raf) raf = requestAnimationFrame(read);
@@ -1143,9 +1145,11 @@
     {@const wlc = weekLaneCount(week)}
     {@const bands = weekBands(week)}
     {@const series = weekSeries(week)}
+    {@const m1 = firstCol(week)}
+    {@const m0 = wi > 0 ? firstCol(weeks[wi - 1]) : -1}
     <!-- A ROW OF THE MONTH IS A WEEK, with no gutter and no number
          (ADR-209): the week is the stronger rule above its Monday. -->
-    <div class="cal__wk" style="--wf: {weekFill(week)}" data-thu={week[3].iso}>
+    <div class="cal__wk" style="--wf: {weekFill(week)}" data-mon={week[0].iso}>
       <!-- ONE GRID PER WEEK, THREE BANDS OF ROWS: the day numbers on row 1,
            the runs of days under them, and the day cells on the last row —
            all of them placed, none of them auto-flowed. A run belongs
@@ -1158,7 +1162,12 @@
            la banda y una ausencia se leía como algo pegado por debajo del mes
            en vez de como parte de los días que mide (Marco, en pantalla,
            2026-08-29). La regla sube aquí: no se duplica, se muda. -->
-      <div class="cal__wkbody">
+      <div
+        class="cal__wkbody"
+        class:cal__wkbody--m1={m1 >= 0}
+        class:cal__wkbody--m0={m0 > 0}
+        style="--m1: {m1}; --m0: {m0}"
+      >
       <div class="cal__wkc">
         {#each week as day, di (day.iso)}
           {@const clashes = clashesByDay?.get(day.iso) ?? []}
@@ -1535,6 +1544,13 @@
       grid-template-columns: repeat(7, minmax(0, 1fr));
       margin-block-start: var(--space-s);
       border-block-start: var(--line-hairline) solid var(--border-color-light);
+      /* THE AXIS STAYS, under the stuck title (Marco, 16-11): mid-month the
+         title says which month and the axis which column is Saturday. The
+         page measures where it sticks; the weeks pass under it. */
+      position: sticky;
+      inset-block-start: var(--month-axis-top, var(--header-height));
+      z-index: 2;
+      background-color: var(--bg);
     }
     .cal__wkh,
     .cal__wkbody {
@@ -1624,8 +1640,13 @@
     }
     /* The subject is the thing you are reading, so it is TEXT, not a label:
        the one field on the band drawn in the body voice. */
+    /* The name GIVES WAY with an ellipsis rather than push the rule out of
+       the sheet: the container steps below are measured for a short name,
+       and «playwright staging» on a three-day band at 390 sent the arrow
+       past the grid's right edge. */
     .cal__band-n {
-      flex: none;
+      flex: 0 1 auto;
+      min-inline-size: 0;
       font-size: var(--text-xs);
       color: var(--away-subject);
       overflow: hidden;
@@ -2197,8 +2218,36 @@
     .cal__mname {
       font-family: var(--font-display);
       font-size: var(--text-l);
+      font-weight: var(--month-name-weight);
       line-height: 1;
       color: var(--text-color);
+    }
+    /* THE BORDER BETWEEN TWO MONTHS IS A STAIR IN INK (Marco, 16-11: «el
+       primer día de mes que tiene el nombre se debería destacar»): over the
+       new month's days in the week of its 1st, down the 1st's left edge, and
+       over the days of the next week that still sit under the old month.
+       Lines over the tone and the hatch, never a ground: neither is covered,
+       and the cell keeps its width. */
+    .cal__wkbody {
+      position: relative;
+    }
+    .cal__wkbody--m1::before,
+    .cal__wkbody--m0::after {
+      content: '';
+      position: absolute;
+      inset-block-start: 0;
+      border-block-start: var(--line-hairline) solid var(--month-rule);
+      pointer-events: none;
+    }
+    .cal__wkbody--m1::before {
+      inset-block-end: 0;
+      inset-inline: calc(100% / 7 * var(--m1)) 0;
+      /* A 1st on a Monday has the sheet's edge for its left side. */
+      border-inline-start: calc(min(var(--m1), 1) * var(--line-hairline)) solid var(--month-rule);
+    }
+    .cal__wkbody--m0::after {
+      inset-inline-start: 0;
+      inline-size: calc(100% / 7 * var(--m0));
     }
     /* The cell decides what it can say: below a phone's cell, the short
        month, two monograms and «+N», no steps (the day under the week says

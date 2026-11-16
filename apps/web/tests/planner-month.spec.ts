@@ -125,6 +125,50 @@ test.describe('the month (ADR-209)', () => {
     });
   }
 
+  for (const width of [1440, 390]) {
+    test(`MID-MONTH THE MONTH IS STILL SAID: title and weekday axis stuck as one strip (${width} px)`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await open(page, '&view=month');
+      const next = await page.locator('.cal__grid [data-month-start]').nth(1).getAttribute('data-month-start');
+      expect(next).toBeTruthy();
+      // The week of the 15th of the next month, just under the strip: well
+      // past the head at rest. Twice: the strip only sticks once scrolled.
+      for (let i = 0; i < 2; i++) {
+        await page.evaluate((iso) => {
+          const el = document.querySelector(`.cal__grid .cal__num[data-day="${iso}"]`)!;
+          const foot = document.querySelector('.cal__wkh')!.getBoundingClientRect().bottom;
+          window.scrollBy(0, el.getBoundingClientRect().top - foot - 2);
+        }, `${next}-15`);
+      }
+      await expect(page).toHaveURL(new RegExp(`ym=${next}`));
+      const strip = await page.evaluate(() => {
+        const r = (s: string) => document.querySelector(s)!.getBoundingClientRect();
+        return { head: r('.cal .lenshead'), axis: r('.cal__wkh'), views: r('.cal__views') };
+      });
+      // The title row is on screen, the axis right under it, no seam between.
+      expect(strip.head.top).toBeGreaterThanOrEqual(0);
+      expect(Math.abs(strip.axis.top - strip.head.bottom), 'a seam between title and axis').toBeLessThanOrEqual(2);
+      // The rest of the head went with the scroll.
+      expect(strip.views.bottom).toBeLessThanOrEqual(strip.head.bottom);
+      await expect(page.locator('.lenshead__title')).toContainText(
+        new Date(`${next}-01T12:00:00Z`).toLocaleString('en', { month: 'long', timeZone: 'UTC' }),
+      );
+      // «Now» lands today's row under the strip, not behind it.
+      await page.locator('.cal__now').click();
+      const today = await page.evaluate(() => ({
+        row: document.querySelector('.cal__day--today')!.getBoundingClientRect().top,
+        axis: document.querySelector('.cal__wkh')!.getBoundingClientRect().bottom,
+      }));
+      expect(today.row).toBeGreaterThanOrEqual(today.axis - 1);
+      // …and the title says today's month, whatever the rows' height.
+      await expect(page.locator('.lenshead__title')).toContainText(
+        new Date().toLocaleString('en', { month: 'long' }),
+      );
+    });
+  }
+
   test('ON A PHONE: no sideways scroll, two monograms, and the picked day read under its week', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await open(page, '&view=month');

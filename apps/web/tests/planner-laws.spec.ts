@@ -127,9 +127,9 @@ test.describe('planner laws (ADR-095)', () => {
     expect(head.meta).toBeLessThan(head.views);
     expect(head.titlePx).toBeGreaterThan(head.viewPx);
     expect(head.viewPx).toBeGreaterThan(head.metaPx);
-    // …the three words at one size, the lit one in ink and underlined: the
-    // drawing of 16-11 (ADR-209 head).
-    expect(head.viewOffPx).toBe(head.viewPx);
+    // …and the lit word keeps a STEP over its sisters (Marco, 16-11), in ink
+    // and underlined as the drawing of 16-11 has it.
+    expect(head.viewOffPx, 'the view axis lost its step').toBeLessThan(head.viewPx);
     expect(head.litRule, 'the lit word lost its rule').toBeGreaterThan(0);
   });
 
