@@ -11,6 +11,7 @@ import { Constants, type Enums } from './db-types';
 import { localDayISO } from './datetime';
 import { DEFAULT_SEASON_START_MONTH, seasonStartFor, seasonYearOf, type SeasonStarts } from './season-year';
 import { appLocale, LOCALE_TAG, t, type Locale } from './i18n';
+import type { ResolvedScope } from './nav';
 
 export type PaymentMethod = Enums<'payment_method'>;
 export const PAYMENT_METHODS = Constants.public.Enums.payment_method;
@@ -1106,4 +1107,20 @@ export function matchesLedgerFilter(m: BoloMoney, filter: LedgerFilter): boolean
 		default:
 			return true;
 	}
+}
+
+/**
+ * A bolo is in the scope when its space, its project or its line is pinned.
+ * A pinned line narrows to its own bolos, not its project's (unlike `inScope`,
+ * which reaches a line's project): Cuentas and the expense's anchors read this.
+ */
+export function boloInScope(
+  scope: Pick<ResolvedScope, 'isEmpty' | 'workspaceIds' | 'projects' | 'lineIds'>,
+  b: Pick<MoneyBolo, 'line_id' | 'project'>,
+): boolean {
+  if (scope.isEmpty) return true;
+  const ws = b.project?.workspace_id;
+  if (ws && scope.workspaceIds.includes(ws)) return true;
+  if (b.project && scope.projects.some((p) => p.id === b.project!.id)) return true;
+  return Boolean(b.line_id && scope.lineIds.includes(b.line_id));
 }

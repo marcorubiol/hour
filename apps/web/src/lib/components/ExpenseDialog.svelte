@@ -1,13 +1,3 @@
-<script module lang="ts">
-  /** Where an expense hangs: a bolo or a line (ADR-087), and its space. */
-  export interface ExpenseAnchor {
-    /** `bolo:<id>` or `line:<id>`. */
-    value: string;
-    label: string;
-    workspaceId: string;
-  }
-</script>
-
 <script lang="ts">
   /**
    * The one «+ Gasto» (ADR-170): Cuentas, the line's Money module, the bolo's
@@ -22,6 +12,7 @@
    */
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
+  import { untrack } from 'svelte';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
@@ -31,7 +22,7 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import { toastCreated } from '$lib/created';
   import { localDayISO } from '$lib/datetime';
-  import { categoryLabel, EXPENSE_CATEGORIES } from '$lib/expense';
+  import { categoryLabel, EXPENSE_CATEGORIES, type ExpenseAnchor } from '$lib/expense';
   import { FormErrors } from '$lib/form-errors.svelte';
   import { appLocale, t } from '$lib/i18n';
   import { teamQueryOptions } from '$lib/nav-queries';
@@ -46,9 +37,11 @@
     /** The anchor is the host's (a bolo's record): it is shown, not chosen. */
     lockAnchor?: boolean;
     currency?: string;
+    /** Typed in ⌘K: what it was (163). */
+    description?: string;
   }
 
-  let { open = $bindable(false), anchors, anchor, lockAnchor = false, currency = 'EUR' }: Props = $props();
+  let { open = $bindable(false), anchors, anchor, lockAnchor = false, currency = 'EUR', description = '' }: Props = $props();
 
   const locale = appLocale();
   const queryClient = useQueryClient();
@@ -66,20 +59,29 @@
   let payerText = $state('');
   let payer = $state<PersonOption | null>(null);
 
-  // Each opening starts clean, on the host's anchor.
+  // Each opening starts clean, on the host's anchor. Only the opening: a feed
+  // that answers again does not wipe what is being typed.
   $effect(() => {
     if (!open) return;
-    eAmount = '';
-    eCurrency = currency;
-    eDescription = '';
-    eCategory = 'other';
-    eIncurredOn = localDayISO();
-    eCounterparty = '';
-    eNotes = '';
-    eAnchor = anchor ?? anchors[0]?.value ?? '';
-    payerText = '';
-    payer = null;
-    formErrors.clear();
+    untrack(() => {
+      eAmount = '';
+      eCurrency = currency;
+      eDescription = description;
+      eCategory = 'other';
+      eIncurredOn = localDayISO();
+      eCounterparty = '';
+      eNotes = '';
+      eAnchor = '';
+      payerText = '';
+      payer = null;
+      formErrors.clear();
+    });
+  });
+  // The anchors may answer after the dialog opened (the shell's, 163).
+  $effect(() => {
+    if (open && !anchors.some((a) => a.value === eAnchor)) {
+      eAnchor = untrack(() => (anchor && anchors.some((a) => a.value === anchor) ? anchor : (anchors[0]?.value ?? '')));
+    }
   });
 
   let workspaceId = $derived(anchors.find((a) => a.value === eAnchor)?.workspaceId ?? '');

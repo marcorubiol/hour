@@ -619,6 +619,10 @@
     person: lazy(() => import('$lib/components/create/CreatePersonDialog.svelte')),
     organization: lazy(() => import('$lib/components/create/CreateOrganizationDialog.svelte')),
     import: lazy(() => import('$lib/components/ContactImportDialog.svelte')),
+    expense: lazy(() => import('$lib/components/create/CreateExpenseDialog.svelte')),
+    deal: lazy(() => import('$lib/components/create/CreateDealDialog.svelte')),
+    call: lazy(() => import('$lib/components/CallLogDialog.svelte')),
+    note: lazy(() => import('$lib/components/create/CreateNoteDialog.svelte')),
   };
   $effect(() => {
     if (paletteOpen) void palette.load();
@@ -631,6 +635,10 @@
     if (creation.personOpen) void dialogs.person.load();
     if (creation.organizationOpen) void dialogs.organization.load();
     if (creation.importOpen) void dialogs.import.load();
+    if (creation.expenseOpen) void dialogs.expense.load();
+    if (creation.dealOpen) void dialogs.deal.load();
+    if (creation.callOpen) void dialogs.call.load();
+    if (creation.noteOpen) void dialogs.note.load();
   });
   // A dialog of adding closes, from any door: what a space has (Hoy's start
   // list, the empties of the Planner, tarea 137) is read again, so a step
@@ -695,6 +703,10 @@
     else if (c.kind === 'person') creation.openPerson({ name: c.title });
     else if (c.kind === 'organization') creation.openOrganization({ name: c.title });
     else if (c.kind === 'import') creation.openImport();
+    else if (c.kind === 'expense') creation.openExpense({ description: c.title });
+    else if (c.kind === 'deal') creation.openDeal({ projectId: createPresets.projectId, venue: c.title });
+    else if (c.kind === 'call') creation.openCall({ search: c.title });
+    else if (c.kind === 'note') creation.openNote({ body: c.title });
     else creation.openEvent({ type: createEventType(c.kind), title: c.title });
   }
   /** Adding stays where you are (ADR-139 p3); the notice's «Abrir» goes to
@@ -946,6 +958,41 @@
   {#if dialogs.import.component}
     <!-- Contactos de una hoja (138): donde se dan de alta contactos, el espacio del ámbito primero. -->
     <dialogs.import.component bind:open={creation.importOpen} workspaceIds={importWorkspaceIds} {locale} />
+  {/if}
+  {#if dialogs.expense.component}
+    <dialogs.expense.component
+      bind:open={creation.expenseOpen}
+      scope={createScope}
+      lines={lineIndex}
+      anchor={creation.expense.anchor}
+      currency={creation.expense.currency}
+      description={creation.expense.description}
+    />
+  {/if}
+  {#if dialogs.deal.component}
+    <dialogs.deal.component
+      bind:open={creation.dealOpen}
+      projectId={creation.deal.projectId}
+      currency={creation.deal.currency}
+      venue={creation.deal.venue}
+    />
+  {/if}
+  {#if dialogs.call.component}
+    <!-- Una llamada (163): los espacios en pantalla, como el «+» de Conversaciones. -->
+    <dialogs.call.component
+      bind:open={creation.callOpen}
+      workspaceIds={onScreen.map((w) => w.id)}
+      search={creation.callSearch}
+      {locale}
+    />
+  {/if}
+  {#if dialogs.note.component}
+    <dialogs.note.component
+      bind:open={creation.noteOpen}
+      scope={createScope}
+      body={creation.note.body}
+      day={creation.note.day}
+    />
   {/if}
 {/if}
 </svelte:boundary>

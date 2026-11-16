@@ -53,7 +53,7 @@
   import { useCalm } from '$lib/stores/calm.svelte';
   import { buildLineIndex, buildProjectIndex, resolveScope, workspacesOnScreen, type NavWorkspace, type RawLine } from '$lib/nav';
   import { workspacesQueryOptions, activeProjectsQueryOptions, allLinesQueryOptions } from '$lib/nav-queries';
-  import { moneyAccessAnyQueryOptions } from '$lib/bolo-queries';
+  import { moneyAccessAnyQueryOptions, scopeBolosQueryOptions } from '$lib/bolo-queries';
   import { conversationAccessQueryOptions } from '$lib/conversation-access';
   import { otherTagsName, scopeTags } from '$lib/conversation-tags';
   import { chatLine } from '$lib/chat-row';
@@ -113,7 +113,6 @@
     moneyPosition,
     observedPayerTermsDays,
     type InvoicingMode,
-    type MoneyBolo,
     type MoneyInvoiceItem,
   } from '$lib/money';
 
@@ -315,13 +314,7 @@
     })),
   );
   const bolosQuery = createQuery(
-    toStore(() => ({
-      queryKey: ['money-bolos', { p: filterIds.projectIds, w: filterIds.workspaceIds }] as const,
-      enabled: readMoney && !scopeUnresolved,
-      retry: false,
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
-        fetchJSON<{ items: MoneyBolo[] }>(`/api/money/bolos?${feedParams(filterIds, { limit: '500' })}`, signal),
-    })),
+    toStore(() => ({ ...scopeBolosQueryOptions(filterIds, readMoney && !scopeUnresolved), retry: false })),
   );
 
   let conversations = $derived(($conversationsQuery.data?.items ?? []) as Conversation[]);

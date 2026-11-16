@@ -65,6 +65,7 @@
     type Slip as SlipVM,
   } from '$lib/month-events';
   import AgendaList, { type AgendaDecision, type NoteDraft } from '$lib/components/AgendaList.svelte';
+  import { noteFallback as noteFallbackOf, noteFallbackBody } from '$lib/note';
   import DecisionBand, {
     decisionText,
     type ConcurrenceVM,
@@ -2219,31 +2220,10 @@
   // empty and the writer is simply not passed down (no write UI over a
   // missing table — same convention as blackouts).
   let notesAbsent = $derived(Boolean($agendaNotesQuery.data?.absent));
-  /**
-   * Where an anchorless note falls (_tasks §23): exactly one pinned
-   * container → that container; anything else → «the company», which is a
-   * workspace-anchored note in the pinned space or the default one. The
-   * margin writer only asks when the day itself offers a choice; this is
-   * the answer for every other day.
-   */
-  let noteFallback = $derived.by(
-    (): { label: string; project_id?: string; line_id?: string; workspace_id?: string } => {
-      const solo =
-        scope.projects.length + scope.lines.length + scope.workspaceIds.length === 1;
-      if (solo && scope.projects.length === 1) {
-        const p = scope.projects[0];
-        return { label: p.name, project_id: p.id };
-      }
-      if (solo && scope.lines.length === 1) {
-        const l = scope.lines[0];
-        return { label: l.name, line_id: l.id };
-      }
-      const wss = ($workspacesQuery.data?.items ?? []) as NavWorkspace[];
-      const pinned = solo ? wss.find((w) => w.id === scope.workspaceIds[0]) : undefined;
-      const home = pinned ?? wss.find((w) => w.slug === defaultWorkspaceSlug) ?? wss[0];
-      if (home) return { label: spaceName(home.name), workspace_id: home.id };
-      return { label: t('planner.note_company', locale) };
-    },
+  /** Where an anchorless note falls (`$lib/note`): the margin writer only
+      asks when the day itself offers a choice; this answers every other day. */
+  let noteFallback = $derived(
+    noteFallbackOf(scope, ($workspacesQuery.data?.items ?? []) as NavWorkspace[], locale),
   );
   async function createNote(draft: NoteDraft): Promise<boolean> {
     const anchored = Boolean(draft.performance_id || draft.date_id);
@@ -2253,11 +2233,7 @@
         on_day: draft.on_day,
         ...(draft.performance_id ? { performance_id: draft.performance_id } : {}),
         ...(draft.date_id ? { date_id: spanSourceId(draft.date_id) } : {}),
-        ...(!anchored && noteFallback.project_id ? { project_id: noteFallback.project_id } : {}),
-        ...(!anchored && noteFallback.line_id ? { line_id: noteFallback.line_id } : {}),
-        ...(!anchored && !noteFallback.project_id && !noteFallback.line_id && noteFallback.workspace_id
-          ? { workspace_id: noteFallback.workspace_id }
-          : {}),
+        ...(anchored ? {} : noteFallbackBody(noteFallback)),
       });
       void queryClient.invalidateQueries({ queryKey: ['planner-agenda-notes'] });
       void queryClient.invalidateQueries({ queryKey: ['planner-day-notes'] });

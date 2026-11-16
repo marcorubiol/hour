@@ -7,6 +7,9 @@
 import * as v from 'valibot';
 import { Constants, type Enums, type Tables } from './db-types';
 import { t, type Locale } from './i18n';
+import { DASH } from './glyphs';
+import type { MoneyBolo } from './money';
+import type { NavLine } from './nav';
 
 /** All categories in schema enum order (runtime mirror of the DB enum). */
 export const EXPENSE_CATEGORIES = Constants.public.Enums.expense_category;
@@ -137,4 +140,36 @@ export function owedToTeam(expenses: readonly ExpenseItem[]): OwedToPerson[] {
   }
   const top = (r: OwedToPerson) => r.totals[0]?.[1] ?? 0;
   return out.sort((a, b) => top(b) - top(a) || (a.name ?? '').localeCompare(b.name ?? ''));
+}
+
+/** Where an expense hangs: a bolo or a line (ADR-087), and its space. */
+export interface ExpenseAnchor {
+  /** `bolo:<id>` or `line:<id>`. */
+  value: string;
+  label: string;
+  workspaceId: string;
+}
+
+/**
+ * What an expense can hang from, among the bolos on screen: the lines they
+ * belong to, then the bolos themselves. Cuentas and the shell (163) offer these.
+ */
+export function expenseAnchors(bolos: MoneyBolo[], lineById: Map<string, NavLine>, locale: Locale): ExpenseAnchor[] {
+  const lines = new Map<string, NavLine>();
+  for (const b of bolos) {
+    const line = b.line_id ? lineById.get(b.line_id) : undefined;
+    if (line && !lines.has(line.id)) lines.set(line.id, line);
+  }
+  return [
+    ...[...lines.values()].map((l) => ({
+      value: `line:${l.id}`,
+      label: t('books.anchor_line', locale, { name: l.name, project: l.projectName }),
+      workspaceId: l.workspaceId,
+    })),
+    ...bolos.map((b) => ({
+      value: `bolo:${b.id}`,
+      label: t('books.anchor_deal', locale, { where: [b.venue_name, b.city].filter(Boolean).join(', ') || b.project?.name || DASH }),
+      workspaceId: b.project?.workspace_id ?? '',
+    })),
+  ];
 }

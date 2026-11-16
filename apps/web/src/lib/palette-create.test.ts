@@ -12,7 +12,7 @@ import { buildLineIndex, buildProjectIndex, resolveScope, type NavWorkspace, typ
 import { t } from './i18n';
 import { QUICK_MORE, QUICK_PRIMARY } from './quick-add';
 
-const ALL: CreateCan = { plan: true, converse: true, task: true, directory: true, organization: true };
+const ALL: CreateCan = { plan: true, converse: true, task: true, directory: true, organization: true, money: true, note: true };
 const kinds = (q: string, can: CreateCan = ALL) => paletteCreates(q, can).map((c) => c.kind);
 
 describe('paletteCreates: what typing finds', () => {
@@ -67,24 +67,24 @@ describe('paletteCreates: what typing finds', () => {
 
 describe('paletteCreates: never what the person cannot make', () => {
   it('without editing the plan, no performance and no date', () => {
-    const can = { plan: false, converse: true, task: true, directory: false, organization: true };
+    const can = { plan: false, converse: true, task: true, directory: false, organization: true, money: true, note: true };
     expect(kinds('nueva', can)).toEqual(['task', 'conversation']);
     expect(kinds('ensayo', can)).toEqual([]);
     expect(kinds('Mercat', can)).toEqual(['task', 'conversation']);
   });
 
   it('without Converses, no conversation', () => {
-    const can = { plan: true, converse: false, task: true, directory: false, organization: true };
+    const can = { plan: true, converse: false, task: true, directory: false, organization: true, money: true, note: true };
     expect(kinds('nueva', can)).toEqual(['performance', 'date', 'task']);
     expect(kinds('conversa', can)).toEqual([]);
   });
 
   it('a task wherever a space on screen takes one', () => {
-    expect(kinds('tasca', { plan: false, converse: false, task: true, directory: false, organization: true })).toEqual(['task']);
+    expect(kinds('tasca', { plan: false, converse: false, task: true, directory: false, organization: true, money: true, note: true })).toEqual(['task']);
   });
 
   it('a guest of a bolo, with nothing of their own on screen, is offered nothing', () => {
-    const guest = { plan: false, converse: false, task: false, directory: false, organization: true };
+    const guest = { plan: false, converse: false, task: false, directory: false, organization: true, money: true, note: true };
     expect(kinds('tasca comprar', guest)).toEqual([]);
     expect(kinds('Mercat', guest)).toEqual([]);
   });
@@ -111,13 +111,13 @@ describe('paletteCreates: a person and an organization (136)', () => {
   });
 
   it('never where no space takes one from the person', () => {
-    const can = { plan: true, converse: true, task: true, directory: false, organization: true };
+    const can = { plan: true, converse: true, task: true, directory: false, organization: true, money: true, note: true };
     expect(kinds('persona', can)).toEqual([]);
     expect(kinds('Anna Puig', can)).toEqual(['performance', 'date', 'task', 'conversation']);
   });
 
   it('no organization while the database cannot make one alone', () => {
-    const can = { ...ALL, organization: false };
+    const can = { ...ALL, organization: false, money: true, note: true };
     expect(kinds('organización', can)).toEqual([]);
     expect(kinds('Anna Puig', can).slice(-1)).toEqual(['person']);
   });
@@ -131,7 +131,7 @@ describe('paletteCreates: a person and an organization (136)', () => {
   });
 
   it('nor without Converses: their file is read through the conversations', () => {
-    expect(kinds('persona', { plan: true, converse: false, task: true, directory: true, organization: true })).toEqual([]);
+    expect(kinds('persona', { plan: true, converse: false, task: true, directory: true, organization: true, money: true, note: true })).toEqual([]);
   });
 
   it('opens no quick add, and each says its name in every language', () => {
@@ -141,6 +141,44 @@ describe('paletteCreates: a person and an organization (136)', () => {
       expect(t(CREATE_LABEL_KEYS.person, locale)).not.toBe(CREATE_LABEL_KEYS.person);
       expect(t(CREATE_LABEL_KEYS.organization, locale)).not.toBe(CREATE_LABEL_KEYS.organization);
     }
+  });
+});
+
+describe('paletteCreates: an expense, a deal, a call and a note (163)', () => {
+  it('named in the four languages, with what follows as title', () => {
+    expect(paletteCreates('gasto gasolina', ALL)).toEqual([{ kind: 'expense', title: 'gasolina' }]);
+    expect(kinds('despesa')).toEqual(['expense']);
+    expect(kinds('frais')).toEqual(['expense']);
+    expect(paletteCreates('nuevo bolo Mercat de les Flors', ALL)).toEqual([{ kind: 'deal', title: 'Mercat de les Flors' }]);
+    expect(kinds('tracte')).toEqual(['deal']);
+    expect(kinds('deal')).toEqual(['deal']);
+    expect(paletteCreates('llamada Anna', ALL)).toEqual([{ kind: 'call', title: 'Anna' }]);
+    expect(kinds('trucada')).toEqual(['call']);
+    expect(kinds('appel')).toEqual(['call']);
+    expect(paletteCreates('nota pedir rider', ALL)).toEqual([{ kind: 'note', title: 'pedir rider' }]);
+    expect(kinds('note')).toEqual(['note']);
+  });
+
+  it('never for free text or a bare verb', () => {
+    for (const q of ['Anna Puig', 'nueva', 'Mercat de les Flors']) {
+      for (const k of ['expense', 'deal', 'call', 'note'] as const) expect(kinds(q), q).not.toContain(k);
+    }
+  });
+
+  it('who does not read money sees neither an expense nor a deal', () => {
+    const can = { ...ALL, money: false };
+    expect(kinds('gasto', can)).toEqual([]);
+    expect(kinds('bolo', can)).toEqual([]);
+    expect(kinds('llamada', can)).toEqual(['call']);
+  });
+
+  it('a call only to who edits conversations; a note only with the Planner on', () => {
+    expect(kinds('llamada', { ...ALL, converse: false })).toEqual([]);
+    expect(kinds('nota', { ...ALL, note: false })).toEqual([]);
+  });
+
+  it('open no quick add', () => {
+    for (const k of ['expense', 'deal', 'call', 'note'] as const) expect(createEventType(k)).toBeNull();
   });
 });
 

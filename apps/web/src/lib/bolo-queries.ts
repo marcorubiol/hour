@@ -28,6 +28,25 @@ export function projectBolosQueryOptions(projectId: string, enabled = true) {
   };
 }
 
+/** The ceiling of the scope's feed: past it the oldest rows drop (Cuentas says so). */
+export const SCOPE_BOLOS_CAP = 500;
+
+/**
+ * Los bolos del ámbito, el feed de Cuentas: Hoy y el gasto desde el marco (163)
+ * leen la misma URL con la misma clave, una respuesta.
+ */
+export function scopeBolosQueryOptions(k: { projectIds: string[]; workspaceIds: string[] }, enabled = true) {
+  const params = new URLSearchParams({ limit: String(SCOPE_BOLOS_CAP) });
+  if (k.projectIds.length > 0) params.set('project_ids', k.projectIds.join(','));
+  if (k.workspaceIds.length > 0) params.set('workspace_ids', k.workspaceIds.join(','));
+  return {
+    queryKey: ['money-bolos', { p: k.projectIds, w: k.workspaceIds }] as const,
+    enabled,
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
+      fetchJSON<{ items: MoneyBolo[] }>(`/api/money/bolos?${params}`, signal),
+  };
+}
+
 /**
  * ¿Lee dinero en este proyecto? Solo para distinguir «sin bolos» de «no te
  * toca» cuando el feed viene vacío. Un fallo cuenta como «no».

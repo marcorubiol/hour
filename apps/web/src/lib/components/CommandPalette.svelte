@@ -60,6 +60,7 @@
   import ScopeGlyph from '$lib/components/ScopeGlyph.svelte';
   import { conversationAccessQueryOptions } from '$lib/conversation-access';
   import { planAccessQueryOptions } from '$lib/plan-create';
+  import { moneyAccessAnyQueryOptions } from '$lib/bolo-queries';
   import { CREATE_LABEL_KEYS, paletteCreates, type PaletteCreate } from '$lib/palette-create';
   import { organizationCreateQueryOptions } from '$lib/directory-create';
   import { paletteFindRows, paletteSearchQueryOptions, paletteSearchTerm } from '$lib/palette-search';
@@ -110,6 +111,7 @@
   const planAccessQuery = createQuery(toStore(() => ({ ...planAccessQueryOptions(), enabled: open })));
   const convAccessQuery = createQuery(toStore(() => ({ ...conversationAccessQueryOptions(), enabled: open })));
   const orgCreateQuery = createQuery(toStore(() => organizationCreateQueryOptions(open)));
+  const moneyAccessQuery = createQuery(toStore(() => ({ ...moneyAccessAnyQueryOptions(), enabled: open })));
   let can = $derived({
     plan: lensOn('planner') && $planAccessQuery.data?.edit !== false,
     converse: lensOn('conversations') && $convAccessQuery.data?.edit !== false,
@@ -118,6 +120,10 @@
     directory: canProject,
     // Only once the database makes one alone (136); until then, no row that would fail.
     organization: $orgCreateQuery.data?.available === true,
+    // Who does not read money sees neither an expense nor a deal (163).
+    money: lensOn('books') && $moneyAccessQuery.data?.read_money !== false,
+    // A private note is read in the Planner's margin (ADR-093).
+    note: lensOn('planner'),
   });
 
   const workspacesQuery = createQuery(workspacesQueryOptions());

@@ -60,7 +60,6 @@
   import { DEFAULT_ORDER, ORDERS, parseOrden, type Orden } from '$lib/conversation-order';
   import { dayMonth } from '$lib/datetime';
   import ConversationFeed from '$lib/components/ConversationFeed.svelte';
-  import CallLogDialog from '$lib/components/CallLogDialog.svelte';
   import WhatsAppImportDialog from '$lib/components/WhatsAppImportDialog.svelte';
   import { accentVarFor } from '$lib/utils/accent';
   import ChatDoneLine from '$lib/components/ChatDoneLine.svelte';
@@ -749,9 +748,6 @@
     creation.openConversation({ tag: addTagKey(chip) });
   }
 
-  /** «Apuntar llamada» (121 A, ADR-182). */
-  let callOpen = $state(false);
-
   /** «Importar chat» (128, ADR-189). El atajo «Mandar a Hour» del iPhone llega con `?importar`. */
   let importOpen = $state(false);
 
@@ -760,7 +756,7 @@
     { label: t('conversations.add_item_conversation', locale), onclick: openAdd },
     ...(listChip !== 'equipo'
       ? [
-          { label: t('conversations.add_item_call', locale), onclick: () => (callOpen = true) },
+          { label: t('conversations.add_item_call', locale), onclick: () => creation.openCall() },
           { label: t('wa_import.open', locale), onclick: () => (importOpen = true) },
           // Contactos de una hoja (138): el mismo diálogo que ⌘K, montado en el marco.
           { label: t('contact_import.title', locale), onclick: () => creation.openImport() },
@@ -1408,7 +1404,6 @@
       />
     {/if}
   {/if}
-  <CallLogDialog bind:open={callOpen} workspaceIds={scopeWorkspaceIds} {locale} />
   <WhatsAppImportDialog bind:open={importOpen} workspaceIds={scopeWorkspaceIds} {locale} />
 </section>
 
