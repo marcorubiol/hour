@@ -103,7 +103,7 @@
       flex-direction: column;
       gap: var(--space-2xs);
       margin: 0;
-      padding-inline-start: calc(var(--chat-mono) + var(--space-s));
+      padding-inline-start: calc(var(--chat-mark) + var(--space-s));
     }
 
     .mirror__bolo {

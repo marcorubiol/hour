@@ -139,7 +139,7 @@
     .chat {
       position: relative;
       display: grid;
-      grid-template-columns: [mono] auto [body] minmax(0, 1fr) [side] auto;
+      grid-template-columns: [mono] var(--chat-mark) [body] minmax(0, 1fr) [side] auto;
       grid-template-areas:
         'mono name when'
         'mono last count';
@@ -168,7 +168,7 @@
     }
 
     .chat--picking {
-      grid-template-columns: [pick] auto [mono] auto [body] minmax(0, 1fr) [side] auto;
+      grid-template-columns: [pick] auto [mono] var(--chat-mark) [body] minmax(0, 1fr) [side] auto;
       grid-template-areas:
         'pick mono name when'
         'pick mono last count';
@@ -190,11 +190,14 @@
       cursor: pointer;
     }
 
+    /* One column for every row (ADR-210): a project's 5:3 tile fills it, a
+       person's or an organisation's square sits centred in it. */
     .chat__mono {
       grid-area: mono;
       grid-row: 1 / -1;
       align-self: center;
       display: flex;
+      justify-content: center;
     }
 
     .chat__name {

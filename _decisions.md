@@ -8041,3 +8041,38 @@ estado en Agenda y Tablero.
 dibujo de la Temporada (números de día y recuento) está por ver antes de su fase.
 
 **Cómo se revierte.** Revertir la rama: vuelve `SeasonOverview.svelte` con sus feeds y claves; ninguna migración.
+
+## [2026-11-16] ADR-210 · El monograma es una ficha de tres: una casilla 5:3 en mono, igual en todos los tamaños (enmienda ADR-081 § 1, ADR-176 § 3 vía ADR-179 § 2 y ADR-177 § 3)
+
+**Contexto.** Marco, sesión «Estandarizar monograma» (16-11, tarea 161): el monograma tenía tres siluetas, porque la
+altura era fija y el ancho lo ponían las letras (una letra, un cuadrado; tres, una pastilla), y en una columna los
+nombres no arrancaban en la misma vertical. Cinco opciones dibujadas en
+https://claude.ai/artifact/RbkKihW7DFnfXPKhJFWUSD; Marco eligió la 3, «ficha de tres».
+
+**Decidido por Marco (16-11).**
+1. **Una casilla 5:3** (ancho = alto × 5/3), pensada para tres caracteres en mono; lo que no la llena se centra. La
+   misma medida y proporción en todos los tamaños y con 1, 2 o 3 caracteres. `MONOGRAM_MAX` sigue en 3: ningún dato
+   cambia.
+2. **La variante sin letras (`bare`) también es 5:3.** Enmienda ADR-081 § 1: «misma silueta» era un cuadrado; ahora
+   es la ficha.
+3. **En Conversaciones la ficha crece con la fila:** 32 de alto y unos 53 de ancho (`--chat-mark`). Todas las filas,
+   con proyecto o sin él, comparten esa columna; la raya entre filas y el sangrado de los bolos salen de ese ancho.
+   El monograma de una persona u organización (`ChatMonogram`) se queda 32 × 32, centrado en la columna. Enmienda
+   ADR-179 § 2 («monograma de 2 rem con iniciales en sans», que concretaba ADR-176 § 3): el del proyecto es la ficha
+   en mono.
+4. **Enmienda ADR-177 § 3:** «cuadrado = organización, lo nuestro y el cuándo» pasa a «cuadrado = organización; la
+   ficha 5:3 = lo nuestro». Redondo sigue siendo persona.
+
+**Construido (rama `claude/mark-five-three`).**
+- `IdentityMark`: chip y celda del espacio con `inline-size: calc(var(--_m) * 5 / 3)`, sin ancho mínimo ni relleno;
+  `--font-mono` a 500, sin tracking y `text-transform: none` (quien lo aloja ya no puede pasar «MdA» a «MDA»).
+  Cuerpo `--_m × 0,54`; en mini, `min(--text-2xs, --_m × 0,75)`, porque × 0,54 daría 6,5 px y `--text-2xs` sube a
+  11 en táctil y a 12 en «stress». Mini por token: `--mark-mini: 0.75rem` (12 × 20), que el guard ya ve.
+- La dirección (espacio y proyecto) son dos fichas: 2 × 5:3 (40 en mini). **Donde no cabe, el sitio pide sólo el
+  proyecto;** la ficha no encoge. Hoy no se pinta en ningún sitio, así que no hay código para esa regla.
+- `run="down"`: la ficha gira sola porque está escrita en propiedades lógicas (12 de ancho y 20 de alto en mini).
+- `CarrilsStrip`: el hueco de la marca del tablero sale de la ficha (`--mark-mini × 5/3`) en vez de 22 px a mano.
+- `MonthGrid`: fuera `--mark: 0.875rem` y `.cal__markbtn`, restos sin uso.
+- `planner-laws.spec`: la ley del mini comprueba 5:3 y que todas las fichas midan lo mismo.
+
+**Cómo se revierte.** Revertir la rama: sólo CSS y un spec, sin migración ni forma de caché.

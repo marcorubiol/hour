@@ -2355,18 +2355,6 @@
       cursor: default;
     }
 
-    /* Monogram as its own click zone inside the event link (ADR-081): opens
-       the identity editor instead of following the chip's href. */
-    .cal__grid :global(.cal__markbtn) {
-      all: unset;
-      display: inline-flex;
-      cursor: pointer;
-      border-radius: calc(var(--mark, 0.875rem) * 0.28);
-    }
-    .cal__grid :global(.cal__markbtn:focus-visible) {
-      outline: var(--focus-width) solid var(--focus-color);
-      outline-offset: 1px;
-    }
     .cal__markpop {
       position: fixed;
       z-index: var(--z-sticky);
@@ -2400,7 +2388,6 @@
       --chip-radius: var(--radius-none);
       /* Flat by default; only the settled gig earns lift (see below). */
       --chip-shadow: none;
-      --mark: 0.875rem;
       display: flex;
       flex-direction: column;
       gap: var(--line-hairline);
@@ -2495,11 +2482,6 @@
     .cal__grid :global(.cal__event-hit:focus-visible) {
       outline: var(--focus-width) solid var(--focus-ring, var(--text-color));
       outline-offset: -2px;
-    }
-    /* The monogram keeps its own click through the hit layer. */
-    .cal__grid :global(.cal__event--openable .cal__markbtn) {
-      position: relative;
-      z-index: var(--z-raised);
     }
 
     /* The settled gig is the day's anchor: it leads the cell AND lifts off

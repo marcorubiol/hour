@@ -80,6 +80,10 @@ lado.
 - **Por qué:** con varias compañías a la vez, de quién es cada cosa se lee antes que qué es. El color agrupa; el
   monograma identifica (lo dice ya `tokens.css`, accents).
 - **Decisión:** 146, quinta vuelta; Marco cerró el diseño con ella.
+- **La ficha de tres (ADR-210):** el monograma es siempre una casilla 5:3 (ancho = alto × 5/3) en mono, la misma con
+  1, 2 o 3 caracteres y en todos los tamaños; lo que no la llena se centra. Mini: 12 × 20 (`--mark-mini`); en
+  Conversaciones, 32 × 53 (`--chat-mark`), y la columna de todas las filas mide eso. La dirección (espacio y
+  proyecto) son dos fichas; donde no caben, el sitio pide sólo el proyecto: la ficha no encoge.
 
 ### 8. La ficha de día: número grande, día y mes al lado. DECIDIDO
 
