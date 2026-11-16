@@ -6,6 +6,8 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Noviembre 2026 (en curso)
 
+- El Planificador en tres dibujos, primera fase: la barra dice Agenda · Mes · Tablero, fuera «Próximas semanas», el Mes es continuo y sin columna de semana, con una línea de estado bajo el título que dice qué decidir, qué choca y cuántas hay (ADR-209, 2026-11-16, `b4bfd8f8`). Sin migración.
+- El monograma es una ficha de tres: la casilla mide siempre 5:3 (20 × 12 en las fichas pequeñas) y en Conversaciones la columna del monograma pasa a 53 px para todas las filas (161, ADR-210, 2026-11-16, `b4bfd8f8`). Sin migración.
 - La marca de calma es ahora el reloj sin cifras (dos guiones y los dos puntos) en vez de la onda, y al entrar en calma el reloj de la app enseña `--:--` un segundo y la hora vuelve; la hora no se quita nunca (ADR-208, 2026-11-16, `ff38e955`). Sin migración.
 - Hoy: el titular de la tarjeta del día es el proyecto, el «?» de una opción va en cursiva con su palabra y su sala, y con varias funciones el mismo día ninguna pesa más (160, ADR-207, 2026-11-14, `6084f7e4`). Conversaciones: con el foco o una consulta, el buscador se abre y los chips le ceden sitio, y «Filtrar» no se corta (157, 2026-11-14, `6084f7e4`). Sin migración.
 - Dar de alta a una persona con un correo que ya existe y que no puedes ver responde «no creada» en vez de devolver su ficha (149, 2026-11-14, migración `20261114100000`). Sin cambio de Worker.
