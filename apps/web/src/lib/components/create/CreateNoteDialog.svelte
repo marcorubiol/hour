@@ -4,12 +4,15 @@
    * (ADR-093) written from any screen. The margin gives the day it sits on;
    * here the day is asked, on the host's view day (the Planner's) or today.
    * What it is about falls as on a day with nothing to anchor it
-   * (`$lib/note`), and it says where. POST /api/notes; «Deshacer» deletes it.
+   * (`$lib/note`), and it says where. POST /api/notes; «Deshacer» deletes it,
+   * and outside the Planner «Abrir» goes to its day there.
    *
    * Mounted once by the /h shell, opened through the creation store.
    */
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { untrack } from 'svelte';
+  import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import { mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
@@ -23,6 +26,7 @@
   import type { NavWorkspace, ResolvedScope } from '$lib/nav';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { noteFallback, noteFallbackBody } from '$lib/note';
+  import { plannerDayHref } from '$lib/planner';
 
   interface Props {
     open?: boolean;
@@ -72,7 +76,11 @@
       open = false;
       void refresh();
       const id = res?.note?.id;
+      // Inside the Planner the note is already on screen: no «Abrir».
+      const day = onDay;
+      const away = !page.url.pathname.startsWith('/h/planner');
       toastCreated({
+        open: away ? () => void goto(plannerDayHref('day', day)) : undefined,
         locale,
         message: t('note.saved', locale),
         undo: id
