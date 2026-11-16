@@ -77,6 +77,23 @@ export function gapWindows(
   return out;
 }
 
+/**
+ * The holes the Month draws (ADR-209): `gapWindows` over the loaded days,
+ * less a run that reaches the last of them. That one has no known end: it is
+ * the plan running out at the edge of what is loaded, not a hole with a
+ * length («106 noches libres»). When the paper grows and something lands
+ * after it, it comes back with its two ends.
+ */
+export function closedGapWindows(
+  days: string[],
+  occupied: Iterable<string>,
+  away: Iterable<string> = [],
+  min = GAP_MIN_NIGHTS,
+): GapWindow[] {
+  const last = days[days.length - 1];
+  return gapWindows(days, occupied, away, min).filter((g) => g.to !== last);
+}
+
 /** What a confirmed gig can still be missing. `travel` is a guess (see below). */
 type UnclosedKey = 'time' | 'cast';
 

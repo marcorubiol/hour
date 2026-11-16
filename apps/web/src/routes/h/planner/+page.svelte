@@ -150,7 +150,7 @@
   import { createPlannerFeeds, primeAgendaWindow } from '$lib/planner-feeds.svelte';
   import { createPlannerEngine } from '$lib/planner-engine.svelte';
   import PlannerStatus from '$lib/components/planner/PlannerStatus.svelte';
-  import { clashesInSeason, gapWindows } from '$lib/season';
+  import { clashesInSeason, closedGapWindows } from '$lib/season';
   import { normalizeLaneAxis, resolveLaneAxis, type LaneAxis } from '$lib/carrils';
   import type { AvailabilityItem } from '$lib/availability';
   import { dayMonthLong, localeDayMonth, localeDayMonthNear, localeWeekdayShort, dualTime, viewerTimeZone } from '$lib/datetime';
@@ -1945,12 +1945,8 @@
     const days: string[] = [];
     const last = settledTo < gridTo ? settledTo : gridTo;
     for (let d = todayIso > gridFrom ? todayIso : gridFrom; d <= last; d = addDaysIso(d, 1)) days.push(d);
-    // A run that reaches the paper's last loaded day has no known end: it is
-    // the plan running out, not a hole with a length (it shows once the
-    // paper grows past it).
-    return gapWindows(days, engine.occupiedDays, new Set([...monthTourDays, ...engine.unsellableDays])).filter(
-      (g) => g.to < last,
-    );
+    // Only holes with two ends: an open tail is the plan running out.
+    return closedGapWindows(days, engine.occupiedDays, new Set([...monthTourDays, ...engine.unsellableDays]));
   });
   /** «Choques»: the clashes that are not a choice between two holds (a pair
       the queue holds is said there, once), from today to the paper's end. */

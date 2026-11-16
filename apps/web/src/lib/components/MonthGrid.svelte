@@ -514,6 +514,11 @@
   let footEl = $state<HTMLElement>();
   $effect(() => {
     if (!footEl || !onReachEnd || typeof IntersectionObserver === 'undefined') return;
+    // A NEW OBSERVER PER PAPER: one only reports a CHANGE of crossing, so a
+    // foot still in view after a month was added never asked again and the
+    // paper stopped growing at the reader's feet. Re-made with every `rows`,
+    // its first report is the current one.
+    void rows;
     const reach = onReachEnd;
     const io = new IntersectionObserver((es) => es.some((e) => e.isIntersecting) && reach(), {
       rootMargin: '0px 0px 300px 0px',
