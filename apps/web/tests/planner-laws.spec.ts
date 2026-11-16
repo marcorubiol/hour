@@ -108,13 +108,13 @@ test.describe('planner laws (ADR-095)', () => {
       return {
         title: top('.lenshead__title'),
         views: top('.cal__views'),
-        meta: top('.cal__meta'),
+        meta: top('.cal__meta, .pstat__line'),
         titlePx: px('.lenshead__title'),
         // THE LIT WORD, not the first one: 21px is the view band's scale and
         // it belongs to the word that is true, not to all four.
         viewPx: px('.cal__view--on'),
         viewOffPx: px('.cal__view:not(.cal__view--on)'),
-        metaPx: px('.cal__meta'),
+        metaPx: px('.cal__meta, .pstat__line'),
       };
     });
     // ANSWER → REPORT → CONTROLS. The window states the date, the machine
