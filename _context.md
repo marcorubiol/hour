@@ -31,11 +31,12 @@ aprueba, el sistema ejecuta y deja auditoría. UI manual e IA leen y escriben lo
 fixtures. Sin billing ni self-service. Modelo ya multi-workspace y multi-account. La beta externa espera a cerrar lo
 de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
-## Producción (verificado 2026-11-14)
+## Producción (verificado 2026-11-16)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`6084f7e4`**, `dirty:false`, builtAt
-  2026-11-14T16:22Z, Worker d5db2855. Seis deploys del 14-11 (`CHANGELOG.md`), sin migraciones.
-- Última suite (14-11): contra `6084f7e4`, E2E de `desk`, `conversation-overview`, `smoke`, `calm` y `help`: 29 ok y
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`ff38e955`**, `dirty:false`, builtAt
+  2026-11-16T15:21Z, Worker dcbba18d. Deploy del 16-11: la marca de calma (ADR-208), sin migración; contra él, E2E de
+  `calm` y `smoke` 9/9. Antes, `6084f7e4` (seis deploys del 14-11, `CHANGELOG.md`).
+- Última suite amplia (14-11): contra `6084f7e4`, E2E de `desk`, `conversation-overview`, `smoke`, `calm` y `help`: 29 ok y
   2 saltados por datos (`desk:224` y `desk:241`: sin tarjeta, ADR-207 no se dibujó); `conversation-overview` entero
   verde tras ajustar el spec. RLS `audience.test.ts` 19/19 dos veces. RLS entera: 625/629 el 14-11.
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.

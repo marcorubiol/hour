@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Noviembre 2026 (en curso)
 
+- La marca de calma es ahora el reloj sin cifras (dos guiones y los dos puntos) en vez de la onda, y al entrar en calma el reloj de la app enseña `--:--` un segundo y la hora vuelve; la hora no se quita nunca (ADR-208, 2026-11-16, `ff38e955`). Sin migración.
 - Hoy: el titular de la tarjeta del día es el proyecto, el «?» de una opción va en cursiva con su palabra y su sala, y con varias funciones el mismo día ninguna pesa más (160, ADR-207, 2026-11-14, `6084f7e4`). Conversaciones: con el foco o una consulta, el buscador se abre y los chips le ceden sitio, y «Filtrar» no se corta (157, 2026-11-14, `6084f7e4`). Sin migración.
 - Dar de alta a una persona con un correo que ya existe y que no puedes ver responde «no creada» en vez de devolver su ficha (149, 2026-11-14, migración `20261114100000`). Sin cambio de Worker.
 - «Abrir mapas con», en Ajustes › Perfil, es ahora un desplegable en vez de tres botones; la pieza hueca de Hoy dice el año de lo siguiente cuando no está cerca; fuera el motor muerto de «Ahora» (151 y 152, 2026-11-14, `9bf89797`). Sin migración. De paso, limpieza del espacio `playwright` en producción, tras el backup 43595639030: 2.899 conversaciones, 2.370 personas y 2.160 organizaciones borradas; quedan 99, 1.008 y 1.009. La limpieza se llevó el fixture de difusión y se recargó.
