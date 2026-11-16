@@ -248,10 +248,13 @@ test.describe('planner laws (ADR-095)', () => {
     const title = (await page.locator('h1, .lenshead__title').first().innerText()).trim();
     const month = title.split(/\s+/)[0];
     const repeats = await page.evaluate((m) => {
-      const head = document.querySelector('.cal, main');
-      if (!head) return 0;
+      // The head is the title and the bar; the grid below names its own
+      // months (the 1st's cell), and that is not the date said twice.
+      const head = document.querySelectorAll('.lenshead, .cal__toolbar');
+      if (!head.length) return 0;
       let n = 0;
-      for (const el of head.querySelectorAll<HTMLElement>('button, span, h1, h2')) {
+      const all = new Set([...head].flatMap((h) => [...h.querySelectorAll<HTMLElement>('button, span, h1, h2')]));
+      for (const el of all) {
         if (el.children.length === 0 && (el.textContent ?? '').trim().startsWith(m)) n++;
       }
       return n;
