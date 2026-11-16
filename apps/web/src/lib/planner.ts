@@ -76,6 +76,27 @@ export function monthSpanWeeks(
   return weeks;
 }
 
+/**
+ * THE MONTH THE CONTINUOUS MONTH IS AT (Marco, 16-11): the month of the first
+ * week read under the stuck strip (`foot`, the strip's underside), whatever
+ * height the rows have. A week counts once more than half of it is under the
+ * strip. A week holding a 1st names the new month, so the title turns when
+ * the new month's first week arrives; the week holding `today` names
+ * today's month, so «Now» says the month of today. `weeks` in paper order,
+ * each with its Monday's ISO day and its box on screen.
+ */
+export function monthUnderStrip(
+  weeks: readonly { monday: string; top: number; bottom: number }[],
+  foot: number,
+  today?: string,
+): { year: number; month: number } | null {
+  if (weeks.length === 0) return null;
+  const week = weeks.find((w) => (w.top + w.bottom) / 2 > foot) ?? weeks[weeks.length - 1];
+  const sunday = addDaysIso(week.monday, 6);
+  const iso = today && today >= week.monday && today <= sunday ? today : sunday;
+  return { year: Number(iso.slice(0, 4)), month: Number(iso.slice(5, 7)) };
+}
+
 /** Month arithmetic that survives year boundaries. Month is 1-12. */
 export function addMonths(
   year: number,

@@ -133,11 +133,15 @@ test.describe('the month (ADR-209)', () => {
       await open(page, '&view=month');
       const next = await page.locator('.cal__grid [data-month-start]').nth(1).getAttribute('data-month-start');
       expect(next).toBeTruthy();
-      // The 15th of the next month, mid-screen: well past the head at rest.
-      await page.evaluate((iso) => {
-        const el = document.querySelector(`.cal__grid .cal__num[data-day="${iso}"]`)!;
-        window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - window.innerHeight * 0.4);
-      }, `${next}-15`);
+      // The week of the 15th of the next month, just under the strip: well
+      // past the head at rest. Twice: the strip only sticks once scrolled.
+      for (let i = 0; i < 2; i++) {
+        await page.evaluate((iso) => {
+          const el = document.querySelector(`.cal__grid .cal__num[data-day="${iso}"]`)!;
+          const foot = document.querySelector('.cal__wkh')!.getBoundingClientRect().bottom;
+          window.scrollBy(0, el.getBoundingClientRect().top - foot - 2);
+        }, `${next}-15`);
+      }
       await expect(page).toHaveURL(new RegExp(`ym=${next}`));
       const strip = await page.evaluate(() => {
         const r = (s: string) => document.querySelector(s)!.getBoundingClientRect();
@@ -158,6 +162,10 @@ test.describe('the month (ADR-209)', () => {
         axis: document.querySelector('.cal__wkh')!.getBoundingClientRect().bottom,
       }));
       expect(today.row).toBeGreaterThanOrEqual(today.axis - 1);
+      // …and the title says today's month, whatever the rows' height.
+      await expect(page.locator('.lenshead__title')).toContainText(
+        new Date().toLocaleString('en', { month: 'long' }),
+      );
     });
   }
 

@@ -23,7 +23,7 @@
   import { bookingModeOf } from '$lib/booking-mode';
   import type { Attachment } from 'svelte/attachments';
   import { isFreeSpace, longPress } from '$lib/cell-create';
-  import { dayKeyInTz, assignBandLanes } from '$lib/planner';
+  import { dayKeyInTz, assignBandLanes, monthUnderStrip } from '$lib/planner';
   import { dayMonthLong, weekdayLabels, localeMonthShort, localeDayMonth, localeWeekdayShort, viewerTimeZone } from '$lib/datetime';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
   import { accentVarFor } from '$lib/utils/accent';
@@ -509,9 +509,9 @@
 
   /* THE FOOT ASKS FOR MORE, AND THE EYE NAMES THE MONTH. A sentinel under the
      last week asks the page for another month before the reader gets there;
-     the week under the reading line (a third down the viewport, below the
-     weekday axis, the foot of the stuck strip) names the month on screen by
-     its Thursday, as ISO does. */
+     the first week read under the stuck strip names the month on screen
+     (`monthUnderStrip`: a week holding a 1st names the new month, the week
+     holding today names today's). */
   let footEl = $state<HTMLElement>();
   $effect(() => {
     if (!footEl || !onReachEnd || typeof IntersectionObserver === 'undefined') return;
@@ -534,15 +534,13 @@
     let raf = 0;
     const read = () => {
       raf = 0;
-      const edge = grid.querySelector('.cal__wkh')?.getBoundingClientRect().bottom ?? 0;
-      const y = edge + (window.innerHeight - edge) / 3;
-      for (const wk of grid.querySelectorAll<HTMLElement>('.cal__wk')) {
+      const foot = grid.querySelector('.cal__wkh')?.getBoundingClientRect().bottom ?? 0;
+      const weeks = [...grid.querySelectorAll<HTMLElement>('.cal__wk')].map((wk) => {
         const r = wk.getBoundingClientRect();
-        if (r.bottom < y) continue;
-        const thu = wk.dataset.thu;
-        if (thu) tell({ year: Number(thu.slice(0, 4)), month: Number(thu.slice(5, 7)) });
-        return;
-      }
+        return { monday: wk.dataset.mon ?? '', top: r.top, bottom: r.bottom };
+      });
+      const m = monthUnderStrip(weeks, foot, todayIso);
+      if (m) tell(m);
     };
     const onScroll = () => {
       if (!raf) raf = requestAnimationFrame(read);
@@ -1145,7 +1143,7 @@
     {@const series = weekSeries(week)}
     <!-- A ROW OF THE MONTH IS A WEEK, with no gutter and no number
          (ADR-209): the week is the stronger rule above its Monday. -->
-    <div class="cal__wk" style="--wf: {weekFill(week)}" data-thu={week[3].iso}>
+    <div class="cal__wk" style="--wf: {weekFill(week)}" data-mon={week[0].iso}>
       <!-- ONE GRID PER WEEK, THREE BANDS OF ROWS: the day numbers on row 1,
            the runs of days under them, and the day cells on the last row —
            all of them placed, none of them auto-flowed. A run belongs
@@ -1631,8 +1629,13 @@
     }
     /* The subject is the thing you are reading, so it is TEXT, not a label:
        the one field on the band drawn in the body voice. */
+    /* The name GIVES WAY with an ellipsis rather than push the rule out of
+       the sheet: the container steps below are measured for a short name,
+       and «playwright staging» on a three-day band at 390 sent the arrow
+       past the grid's right edge. */
     .cal__band-n {
-      flex: none;
+      flex: 0 1 auto;
+      min-inline-size: 0;
       font-size: var(--text-xs);
       color: var(--away-subject);
       overflow: hidden;
