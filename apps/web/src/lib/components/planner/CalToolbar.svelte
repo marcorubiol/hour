@@ -186,19 +186,24 @@
       padding: 0;
       cursor: pointer;
       font-family: var(--font-display);
-      /* THE THREE WORDS AT ONE SIZE, the lit one in ink and underlined: the
-         drawing of 16-11 (ADR-209 head), which supersedes the size step. */
-      font-size: var(--text-l);
+      /* THE LIT WORD KEEPS A STEP OVER ITS SISTERS (Marco, 16-11: «me
+         gustaba que fueran más pequeñas cuando no estaban seleccionadas»):
+         the others at the body's step, the lit one at the view band's, in
+         ink and underlined as the drawing of 16-11 has it. */
+      font-size: var(--text-m);
       font-weight: 400;
       line-height: 1.1;
       color: var(--text-faint);
       border-block-end: var(--line-thin) solid transparent;
-      transition: color var(--duration-fast);
+      transition:
+        color var(--duration-fast),
+        font-size var(--duration-fast);
     }
     .cal__view:hover {
       color: var(--text-muted);
     }
     .cal__view--on {
+      font-size: var(--text-l);
       color: var(--text-color);
       border-block-end-color: var(--text-color);
     }
