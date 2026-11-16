@@ -612,6 +612,9 @@
     /* The stroke of a drawn mark (calm's clock without figures, design-system rule 14): its
        own width, so a theme thickens the marks without touching the rules. */
     --mark-stroke: 1.5px;
+    /* The project monogram's dense tile (IdentityMark `mini`): its height;
+       the width is always × 5/3 (ADR-210), so 12 by 20. */
+    --mark-mini: 0.75rem;
 
     --border-size: var(--line-hairline);
     --border-width: var(--border-size);
@@ -799,6 +802,10 @@
        la cifra de sin leer, y el ancho de la lista cuando la conversación
        abierta va al lado (escritorio, dos paneles). */
     --chat-mono: 2rem;
+    /* The row's mark column: as wide as a project's 5:3 tile at
+       `--chat-mono` (ADR-210), for every row, so names, the rule between
+       rows and a bolo's indent start on one vertical. */
+    --chat-mark: calc(var(--chat-mono) * 5 / 3);
     --chat-badge: 1.25rem;
     --chat-list-inline: 26rem;
     /* A conversation's details (ADR-184): a column beside the thread when the

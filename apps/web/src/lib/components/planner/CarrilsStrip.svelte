@@ -1140,14 +1140,12 @@
       gap: var(--space-xs);
       min-inline-size: 0;
     }
-    /* The 22px mark slot — the monogram's, kept even when empty so names
-       align down the column whatever kind of lane they head. */
+    /* The mark slot: the mini tile's own width (ADR-210), kept even when
+       empty so names align down the column whatever kind of lane they head. */
     /* Cap height, not the box's top edge: a 14px chip against a 15px serif
        needs three pixels to sit on the line the eye reads the word from. */
     .board__mark {
-      /* A floor, not a width: a three-letter monogram («ZEC») is wider than
-         the slot and ran into the name at 390 (ADR-167 § 2). */
-      min-inline-size: 1.375rem;
+      min-inline-size: calc(var(--mark-mini) * 5 / 3);
       flex: none;
       display: inline-flex;
       align-items: flex-start;

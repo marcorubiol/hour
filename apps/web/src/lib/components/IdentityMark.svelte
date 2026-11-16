@@ -20,8 +20,16 @@
    *   - compact (default) — tint + monogram. Dense chips, list rows.
    *   - full               — tint + monogram + name. Legends, headers.
    *   - bare               — tint only, no letters. The anti-dot fallback for
-   *                          contexts too tight for text (same silhouette, so
+   *                          contexts too tight for text (same 5:3 tile, so
    *                          it never regresses to a foreign circle).
+   *
+   * ── A TILE FOR THREE (Marco, 2026-11-16, ADR-210) ───────────────────────
+   * One measure and one proportion at every size and for 1, 2 or 3
+   * characters: a 5:3 cell (width = height × 5/3) drawn for three letters
+   * in mono, what does not fill it is centred. The letters never set the
+   * width, so a column of monograms starts its names on one vertical. Where
+   * a tile and its address (2 × 5:3) do not fit, the surface asks for the
+   * project alone; the tile never shrinks.
    *
    * ── ONE MARK, TWO LEVELS (Marco, 2026-08-09) ────────────────────────────
    * There is no such thing as a SPACE mark anywhere in this app: a space is
@@ -56,7 +64,8 @@
     /** Base tile size; overridable per context via the `--mark` var. */
     size?: string;
     /**
-     * THE DENSE TREATMENT — 12px tall, a 3px corner, and NO RING.
+     * THE DENSE TREATMENT — `--mark-mini` tall (12 by 20), a flat corner,
+     * and NO RING.
      *
      * It is one named treatment and not three props because the three always
      * travel together, and the ring is the reason: at this size a 1px ring
@@ -117,7 +126,6 @@
   {/if}
   <span
     class="mark__chip"
-    class:mark__chip--bare={variant === 'bare'}
     role="img"
     aria-label={label}
   >{text}</span>
@@ -145,79 +153,69 @@
       min-inline-size: 0;
     }
 
-    .mark__chip {
-      flex: none;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      block-size: var(--_m);
-      min-inline-size: var(--_m);
-      padding-inline: calc(var(--_m) * 0.22);
-      border-radius: calc(var(--_m) * 0.28);
-      background: var(--_bg);
-      color: var(--_fg);
-      box-shadow: 0 0 0 var(--line-hairline) var(--_bd) inset;
-      font-size: calc(var(--_m) * 0.5);
-      font-weight: 600;
-      line-height: 1;
-      letter-spacing: var(--tracking-xs);
-      font-variant-numeric: tabular-nums;
-      white-space: nowrap;
-    }
-
-    /* ── mini · the dense treatment (see the `mini` prop) ─────────────── */
-    .mark--mini {
-      /* 12, down from the prototype's 13: at 13 the chip was the tallest
-         thing on a head line whose other two tokens are 9px, so the tile —
-         the least specific field there — set the line's height. At 12 it sits
-         flush and the tint still carries.
-         THE FLOOR IS HERE. One step further (11/7.5) and a three-letter
-         monogram like `MdA` stops being scannable, and this tile is the ONE
-         token a whole board can be read by: the moment its letters go it is a
-         coloured dot again, which is the thing IdentityMark was built to
-         replace. */
-      --_m: 12px;
-    }
-    .mark--mini .mark__chip {
-      padding-inline: var(--space-2xs);
-      /* A flatter corner, not just a smaller one: 3 on 12 reads squarer than
-         the proportional 3.4, and at this size a rounder tile loses the
-         letters to its own curve. */
-      border-radius: var(--radius-xs);
-      box-shadow: none;
-      font-size: var(--text-2xs);
-      font-weight: 500;
-      letter-spacing: var(--tracking-xs);
-    }
-
-    /* bare = same silhouette, no glyph. Keep it square (min = block). */
-    .mark__chip--bare {
-      padding-inline: 0;
-      inline-size: var(--_m);
-    }
-
-    /* ── the address · space cell + project cell, ONE box ─────────────
-       The space is a NEUTRAL tile: hue belongs to the project, and a second
-       tinted cell would make the address read as two subjects. It is open on
-       the right (square corner, no divider of its own) so the pair closes as
-       one shape — and so a space without a project is a cell still waiting. */
+    /* ── the tile · 5:3, three characters wide (ADR-210) ──────────────
+       Both cells are the same tile, a box the letters never size (`bare`
+       included: no letters, same tile). Mono at 500, one of the two
+       JetBrains Mono weights we load; no tracking; and its own case, so a
+       host that sets capitals cannot turn `MdA` into `MDA`. */
+    .mark__chip,
     .mark__space {
       flex: none;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       block-size: var(--_m);
-      min-inline-size: var(--_m);
-      padding-inline: calc(var(--_m) * 0.22);
+      inline-size: calc(var(--_m) * 5 / 3);
+      font-family: var(--font-mono);
+      font-size: calc(var(--_m) * 0.54);
+      font-weight: 500;
+      line-height: 1;
+      letter-spacing: 0;
+      text-transform: none;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .mark__chip {
+      border-radius: calc(var(--_m) * 0.28);
+      background: var(--_bg);
+      color: var(--_fg);
+      box-shadow: 0 0 0 var(--line-hairline) var(--_bd) inset;
+    }
+
+    /* ── mini · the dense treatment (see the `mini` prop) ─────────────── */
+    .mark--mini {
+      /* 12 tall, so 20 wide. At 13 the chip was the tallest thing on a head
+         line whose other tokens are 9px, so the tile set the line's height.
+         THE FLOOR IS HERE: this tile is the ONE token a whole board can be
+         read by, and the moment its letters go it is a coloured dot again. */
+      --_m: var(--mark-mini);
+    }
+    .mark--mini .mark__chip,
+    .mark--mini .mark__space {
+      /* Not height × 0.54 (6.5 at 12): the smallest text step, capped where
+         three mono letters (0.6em each) still fit the 20 wide tile when that
+         step grows on touch, on a narrow screen and in the stress theme. */
+      font-size: min(var(--text-2xs), calc(var(--_m) * 0.75));
+    }
+    .mark--mini .mark__chip {
+      /* A flatter corner, not just a smaller one: at this size a rounder
+         tile loses the letters to its own curve. */
+      border-radius: var(--radius-xs);
+      box-shadow: none;
+    }
+
+    /* ── the address · space cell + project cell, ONE box ─────────────
+       The space is a NEUTRAL tile: hue belongs to the project, and a second
+       tinted cell would make the address read as two subjects. It is open on
+       the right (square corner, no divider of its own) so the pair closes as
+       one shape — and so a space without a project is a cell still waiting.
+       Two tiles side by side: 2 × 5:3. */
+    .mark__space {
       border-start-start-radius: calc(var(--_m) * 0.28);
       border-end-start-radius: calc(var(--_m) * 0.28);
       background: color-mix(in oklch, var(--text-color) 7%, var(--bg-ultra-light));
       color: var(--text-faint);
-      font-size: calc(var(--_m) * 0.46);
-      font-weight: 500;
-      line-height: 1;
-      letter-spacing: var(--tracking-s);
-      white-space: nowrap;
+      font-size: calc(var(--_m) * 0.5);
     }
     /* The two cells touch: an address is one object, so no gap between its
        halves — the gap the mark keeps is for the NAME beside it. */
@@ -232,11 +230,8 @@
       border-end-start-radius: 0;
     }
     .mark--mini .mark__space {
-      padding-inline: var(--space-2xs);
       border-start-start-radius: var(--radius-xs);
       border-end-start-radius: var(--radius-xs);
-      font-size: var(--text-2xs);
-      letter-spacing: var(--tracking-xs);
     }
     .mark--mini.mark--addr .mark__chip {
       border-start-start-radius: 0;
@@ -259,9 +254,9 @@
        true once the axis flips.
 
        The tile needs no new geometry: its box is written in logical
-       properties, so `block-size` becomes its width and the inline padding
-       becomes its height the moment the writing mode turns. A vertical pill
-       of the same 12px, by construction. */
+       properties, so `block-size` becomes its width and the 5:3
+       `inline-size` its height the moment the writing mode turns. The same
+       tile stood on end (12 across, 20 down in mini), by construction. */
     .mark--down {
       flex-direction: column-reverse;
       align-items: center;

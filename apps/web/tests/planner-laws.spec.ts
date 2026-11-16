@@ -430,28 +430,40 @@ test.describe('the sheet', () => {
 test.describe('the monogram', () => {
   test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL / PW_TEST_PASSWORD.');
 
-  test('THE PLANNER’S MONOGRAM IS THE DENSE TREATMENT — small, square, no ring', async ({
+  test('THE PLANNER’S MONOGRAM IS THE DENSE TREATMENT — small, one 5:3 tile, no ring', async ({
     page,
   }) => {
     // At 13px a 1px inset ring takes 15% of the tile and closes on the
     // letters until `MM` reads as a smudge. The tint alone carries the
-    // identity at this size, which is the whole job.
+    // identity at this size, which is the whole job. And the tile is one
+    // measure (ADR-210): 5:3 whatever the letters, so every mini on the
+    // screen is the same box.
     for (const view of ['month', 'agenda']) {
       await planner(page, view);
       const marks = await page.evaluate(() =>
         [...document.querySelectorAll('.mark--mini .mark__chip')].map((el) => {
           const cs = getComputedStyle(el);
+          const box = el.getBoundingClientRect();
           return {
-            h: Math.round(el.getBoundingClientRect().height),
+            h: box.height,
+            w: box.width,
             radius: parseFloat(cs.borderTopLeftRadius),
             ring: cs.boxShadow,
           };
         }),
       );
       for (const m of marks) {
-        expect(m.h, `${view}: the tile grew`).toBeLessThanOrEqual(12);
+        expect(Math.round(m.h), `${view}: the tile grew`).toBeLessThanOrEqual(12);
+        expect(
+          Math.abs(m.w - Math.round((m.h * 5) / 3)),
+          `${view}: the tile is not 5:3 (${m.w} × ${m.h})`,
+        ).toBeLessThanOrEqual(1);
         expect(m.radius, `${view}: the corner is too round for this size`).toBeLessThanOrEqual(3);
         expect(m.ring, `${view}: the ring came back`).toBe('none');
+      }
+      if (marks.length > 1) {
+        const ws = marks.map((m) => Math.round(m.w));
+        expect(Math.max(...ws) - Math.min(...ws), `${view}: two minis of different widths`).toBeLessThanOrEqual(1);
       }
     }
   });
