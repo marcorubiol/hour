@@ -8128,8 +8128,8 @@ el ámbar de la Agenda (ADR-209 § 3) y la tira «Falta» de la ficha de la func
   y el feed de la Agenda. `CACHE_SCHEMA` 34 → 35.
 - `help.concept.unclosed` pasa a «Falta» y su texto deja de nombrar hotel y técnica.
 
-**Falta decidir (Marco).** El panel del Día al lado (fase 3) ocupará la columna que hoy lleva el margen. La regla en
-calma de la Agenda: el ámbar se sigue diciendo (solo el punto de Hoy se calla).
+**Calma (Marco, 16-11).** En calma el ámbar de la Agenda se sigue diciendo: lo que falta es obligación, no volumen;
+solo el punto de Hoy se calla. El panel del Día al lado (fase 3) ocupará la columna que hoy lleva el margen.
 
 **Cómo se revierte.** Revertir la rama: vuelven el diario de bandas y `agenda-chunks`; `CACHE_SCHEMA` sube otra vez
 al revertir; ninguna migración.
