@@ -9,6 +9,7 @@
    */
   import Button from '$lib/components/Button.svelte';
   import Menu from '$lib/components/Menu.svelte';
+  import CalNav from './CalNav.svelte';
   import { t, type Locale } from '$lib/i18n';
   import type { LaneAxis } from '$lib/carrils';
   import type { PlannerView } from '$lib/planner';
@@ -30,6 +31,9 @@
     onBlackout: () => void;
     /** Leave the Day for the drawing it was opened from (ADR-155). */
     onCloseDay: () => void;
+    /** The Board's pan, with its dial (CalNav says why only there). */
+    onStepBack: (shift?: boolean) => void;
+    onStepNext: (shift?: boolean) => void;
   }
 
   /** The order the design fixes, and the order the keys follow: three
@@ -49,6 +53,8 @@
     onReadMarks,
     onBlackout,
     onCloseDay,
+    onStepBack,
+    onStepNext,
   }: Props = $props();
 
 </script>
@@ -120,6 +126,7 @@
           onclick={() => onSetLaneAxis(g)}>{t(`planner.lanes_${g}`, locale)}</button
         >
       {/each}
+      <span class="cal__pan"><CalNav view="board" {locale} {onStepBack} {onStepNext} /></span>
     </span>
   {/if}
 
@@ -179,30 +186,21 @@
       padding: 0;
       cursor: pointer;
       font-family: var(--font-display);
-      /* THE LIT WORD KEEPS A STEP OVER ITS SISTERS, and the step is SIZE.
-         All four at 21px made the row of controls weigh as much as the date
-         above it, and then the only thing saying which drawing you were in
-         was a 1.5px rule — the quietest signal on the band carrying the most
-         important fact on it.
-         21px is the view band's named scale (window 29 · view 21 · meta 9.5),
-         so it belongs to the word that is TRUE, not to all four. */
-      font-size: var(--text-m);
+      /* THE THREE WORDS AT ONE SIZE, the lit one in ink and underlined: the
+         drawing of 16-11 (ADR-209 head), which supersedes the size step. */
+      font-size: var(--text-l);
       font-weight: 400;
       line-height: 1.1;
       color: var(--text-faint);
-      transition:
-        color var(--duration-fast),
-        font-size var(--duration-fast);
+      border-block-end: var(--line-thin) solid transparent;
+      transition: color var(--duration-fast);
     }
     .cal__view:hover {
       color: var(--text-muted);
     }
-    /* Size and ink, and nothing else. The underline was a third signal for a
-       fact already said twice — and a rule under one word in a row of four
-       reads as a tab, which is the shape this axis stopped being. */
     .cal__view--on {
-      font-size: var(--text-l);
       color: var(--text-color);
+      border-block-end-color: var(--text-color);
     }
     /* THE DAY IS THE LIT WORD while you are in it, in the lit word's own
        size and ink, and its × is the dial's quiet voice: a way out, not a
@@ -253,6 +251,13 @@
          the phrase closes at `--space-xs`, a third of the list's spacing. */
       margin-inline-start: calc(var(--space-xs) - var(--space-s));
       align-self: baseline;
+    }
+    /* The Board's ‹ ›: metadata's neighbours, not the title's. */
+    .cal__pan {
+      display: inline-flex;
+      gap: var(--space-2xs);
+      margin-inline-start: var(--space-s);
+      align-self: center;
     }
     .cal__dial-by,
     .cal__dial-v {

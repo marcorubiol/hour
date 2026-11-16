@@ -108,13 +108,15 @@ test.describe('planner laws (ADR-095)', () => {
       return {
         title: top('.lenshead__title'),
         views: top('.cal__views'),
-        meta: top('.cal__meta'),
+        meta: top('.pstat__line'),
         titlePx: px('.lenshead__title'),
-        // THE LIT WORD, not the first one: 21px is the view band's scale and
-        // it belongs to the word that is true, not to all four.
         viewPx: px('.cal__view--on'),
         viewOffPx: px('.cal__view:not(.cal__view--on)'),
-        metaPx: px('.cal__meta'),
+        metaPx: px('.pstat__line'),
+        litRule: (() => {
+          const on = drawn('.cal__view--on');
+          return on ? parseFloat(getComputedStyle(on).borderBottomWidth) : -1;
+        })(),
       };
     });
     // ANSWER → REPORT → CONTROLS. The window states the date, the machine
@@ -125,10 +127,10 @@ test.describe('planner laws (ADR-095)', () => {
     expect(head.meta).toBeLessThan(head.views);
     expect(head.titlePx).toBeGreaterThan(head.viewPx);
     expect(head.viewPx).toBeGreaterThan(head.metaPx);
-    // …and the lit word keeps a STEP over its sisters. All four at one size
-    // made a row of controls weigh as much as the date above it, and left a
-    // 1.5px rule as the only thing saying which drawing you were in.
-    expect(head.viewOffPx, 'the view axis lost its step').toBeLessThan(head.viewPx);
+    // …the three words at one size, the lit one in ink and underlined: the
+    // drawing of 16-11 (ADR-209 head).
+    expect(head.viewOffPx).toBe(head.viewPx);
+    expect(head.litRule, 'the lit word lost its rule').toBeGreaterThan(0);
   });
 
   test('THE VIEW WORDS KEEP THE DESIGN’S ORDER', async ({ page }) => {
@@ -160,57 +162,53 @@ test.describe('planner laws (ADR-095)', () => {
     await expect(page).toHaveURL(/view=agenda/);
   });
 
-  test('THE WINDOW’S CONTROLS RIDE WITH THE TITLE, and they are the smallest things there', async ({
+  test('THE HEAD AS DRAWN: «Hoy» at the end of the title row, ‹ › only where scrolling cannot move you', async ({
     page,
   }) => {
-    // ADR-136: `‹ › Now` move the window the title names, so they sit beside
-    // it — and small: the title says where you are, they only move it.
-    await planner(page, 'month');
+    // ADR-209 head (16-11): the Agenda and the Month are scrolled, so no
+    // arrows; the Board pans with its dial; the Day keeps them by its title.
+    await planner(page, 'agenda');
+    await expect(page.locator('.cal__arw')).toHaveCount(0);
+    await expect(page.locator('.lenshead__tools .cal__now')).toHaveCount(1);
+    await planner(page, 'board');
+    await expect(page.locator('.cal__dial .cal__arw')).toHaveCount(2);
+    await expect(page.locator('.lenshead__aside .cal__arw')).toHaveCount(0);
+    await planner(page, 'day');
     await expect(page.locator('.lenshead__aside .cal__arw')).toHaveCount(2);
-    await expect(page.locator('.lenshead__aside .cal__now')).toHaveCount(1);
-    // Nothing of the window is left in the row of views.
-    await expect(page.locator('.cal__toolbar .cal__arw, .cal__toolbar .cal__now')).toHaveCount(0);
+    await planner(page, 'month');
+    await expect(page.locator('.cal__arw')).toHaveCount(0);
+    await expect(page.locator('.lenshead__tools .cal__now')).toHaveCount(1);
 
     const geom = await page.evaluate(() => {
       const r = (s: string) => document.querySelector(s)?.getBoundingClientRect() ?? null;
       const title = r('.lenshead__title');
-      const arw = r('.cal__arw');
       const now = r('.cal__now');
       const add = r('.cal__add');
       const keb = r('.cal__kebab');
-      // Focus follows the eye: title and arrows first, then the view words.
+      // Focus follows the eye: the title row first, then the view words.
       const focusable = [...document.querySelectorAll<HTMLElement>('.cal button')].filter(
         (b) => b.offsetParent !== null && b.tabIndex >= 0,
       );
       const idx = (sel: string) => focusable.findIndex((b) => b.matches(sel));
       return {
         titleRight: title?.right ?? -1,
-        arwLeft: arw?.left ?? -1,
         nowLeft: now?.left ?? -1,
-        arwH: Math.round(arw?.height ?? -1),
         nowH: Math.round(now?.height ?? -1),
         addH: Math.round(add?.height ?? -1),
         kebH: Math.round(keb?.height ?? -1),
         titleH: Math.round(title?.height ?? -1),
-        arwFocus: idx('.cal__arw'),
+        nowFocus: idx('.cal__now'),
         viewFocus: idx('.cal__view'),
       };
     });
-    // Order: title, arrows, then Now.
-    expect(geom.titleRight).toBeLessThanOrEqual(geom.arwLeft);
-    expect(geom.arwLeft).toBeLessThan(geom.nowLeft);
-    expect(geom.arwFocus).toBeGreaterThanOrEqual(0);
-    expect(geom.arwFocus, 'the arrows come before the view words in tab order').toBeLessThan(
-      geom.viewFocus,
-    );
+    expect(geom.titleRight).toBeLessThan(geom.nowLeft);
+    expect(geom.nowFocus).toBeGreaterThanOrEqual(0);
+    expect(geom.nowFocus, '«Hoy» comes before the view words in tab order').toBeLessThan(geom.viewFocus);
     // ONE HEIGHT for the small controls, and none of them towers over the title.
-    expect(geom.arwH).toBe(28);
     expect(geom.addH).toBe(28);
     expect(geom.kebH).toBe(28);
     expect(geom.nowH).toBeLessThanOrEqual(28);
-    expect(geom.arwH, 'a control outgrew the title it operates on').toBeLessThanOrEqual(
-      geom.titleH + 6,
-    );
+    expect(geom.nowH, 'a control outgrew the title it sits by').toBeLessThanOrEqual(geom.titleH + 6);
   });
 
   test('THE VIEW WORDS START AT THE SAME PLACE IN ALL FOUR VIEWS, and the title does not jump', async ({

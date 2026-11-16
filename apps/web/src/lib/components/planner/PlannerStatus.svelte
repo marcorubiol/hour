@@ -7,8 +7,8 @@
    * word opens the page's DecisionBand (its one writer), the clash word the
    * list of clashes right here, each row a door to its day.
    *
-   * Built for the three drawings; in this phase only the Month uses it. The
-   * count is the drawing's own (`children`): each view says what it counts.
+   * The same line in the three drawings, above their bar. The count is the
+   * drawing's own (`children`): each view says what it counts.
    */
   import type { Snippet } from 'svelte';
   import { t, type Locale } from '$lib/i18n';
