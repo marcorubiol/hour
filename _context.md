@@ -33,12 +33,15 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
 ## Producción (verificado 2026-11-16)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`459af592`**, `dirty:false`, builtAt
-  2026-11-16T18:29Z. Deploy del 16-11 (repaso del Mes, cabecera común del Planificador, altas de ⌘K: gasto, trato,
-  llamada y nota), sin migración. Lo entregado, en `CHANGELOG.md`.
-- Última suite (16-11, contra `459af592`): E2E de 16 specs (Planificador, Hoy, calma, Cuentas, ⌘K, guest): 90 ok,
-  2 saltados por datos (`desk:205`, `desk:222`), 0 rojos tras repetir y ajustar un spec; `--timeout=90000` (red lenta,
-  26 min). RLS entera: 625/629 (14-11).
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`226bf90f`**, `dirty:false`, builtAt
+  2026-11-16T19:50Z. Deploy del 16-11 (el Mes con el título y la fila de días fijos al desplazar, y el título que nombra
+  la semana bajo la franja; la barra Agenda · Mes · Tablero con la vista elegida mayor; el día 1 destacado y la
+  frontera entre meses en escalera de raya fina), sobre `459af592`, sin migración. Lo entregado, en `CHANGELOG.md`.
+- Última suite (16-11, contra `226bf90f`): E2E entera, 209 tests con `--timeout=90000` (29,5 min): 188 ok, 18 saltados
+  por datos, 3 rojos. Dos eran de red (`person-merge-invitation:36` y `whatsapp-import:205` pasaron al repetir;
+  `open-speed:123` pasó sola) y uno era un spec atrasado: `planner-month` «MID-MONTH» (1440 y 390) desplazaba dos veces
+  con la página en scroll suave y la segunda pasada medía antes de moverse; corregido con scroll instantáneo y verde.
+  RLS entera: 625/629 (14-11).
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free con keepalive diario
   (`keepalive.yml`); Pro antes de la beta (`_tasks.md § 9`). Si falla tras días sin uso: `dig <ref>.supabase.co`.

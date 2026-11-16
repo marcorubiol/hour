@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Noviembre 2026 (en curso)
 
+- El Mes dice en qué mes estás: al desplazar, el título y la fila de los días quedan fijos arriba y el resto de la cabecera se va con el papel; el título nombra el mes de la primera semana bajo la franja (la semana del día 1 dice el mes nuevo, la de hoy el de hoy). La barra Agenda · Mes · Tablero pone la vista elegida más grande, con su subrayado, y las otras más pequeñas; el día 1 pesa un punto más y la frontera entre meses es una escalera de raya fina (162, ADR-209, 2026-11-16, `226bf90f`). Sin migración.
 - El Planificador, con una cabecera común: en Agenda, Mes y Tablero el título es el mes con el año pequeño, «Hoy» va a la derecha y la línea de estado queda encima de la barra de vistas; las flechas ‹ › salen de Agenda y Mes y quedan discretas en el Tablero y junto al título en el Día. El Mes cierra su rejilla, las fichas pierden la caja y una opción va con contorno y «?» (162, ADR-209, 2026-11-16, `459af592`). Sin migración.
 - Desde ⌘K se dan de alta un gasto, un trato, una llamada y una nota privada, con el diálogo de cada cosa y sin pasar por su pantalla (163, fase 1, 2026-11-16, `459af592`). Sin migración.
 - El Planificador en tres dibujos, primera fase: la barra dice Agenda · Mes · Tablero, fuera «Próximas semanas», el Mes es continuo y sin columna de semana, con una línea de estado bajo el título que dice qué decidir, qué choca y cuántas hay (ADR-209, 2026-11-16, `b4bfd8f8`). Sin migración.
