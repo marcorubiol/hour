@@ -33,11 +33,13 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
 ## Producción (verificado 2026-11-16)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`ff38e955`**, `dirty:false`, builtAt
-  2026-11-16T15:21Z, Worker dcbba18d. Deploy del 16-11 (ADR-208), sin migración; contra él, E2E de `calm` y `smoke`
-  9/9. Lo entregado, en `CHANGELOG.md`.
-- Última suite amplia (14-11, contra `6084f7e4`): E2E de `desk`, `conversation-overview`, `smoke`, `calm` y `help`,
-  29 ok y 2 saltados por datos (`desk:224` y `desk:241`). RLS entera: 625/629.
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`b4bfd8f8`**, `dirty:false`, builtAt
+  2026-11-16T17:21Z, Worker 864287de. Deploy del 16-11 (ADR-209 fase 1 y ADR-210), sin migración. Lo entregado, en
+  `CHANGELOG.md`.
+- Última suite (16-11, contra `b4bfd8f8`): E2E de `planner-month`, `planner-laws`, `lens-toggle`,
+  `conversation-overview`, `desk`, `calm`, `help`, `smoke` y `bolo-guest-frame`, 0 rojos estables y 2 saltados por
+  datos (`desk:205`, `desk:222`); los `planner-*` con `--timeout=90000` (red lenta). RLS entera: 625/629
+  (14-11).
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free con keepalive diario
   (`keepalive.yml`); Pro antes de la beta (`_tasks.md § 9`). Si falla tras días sin uso: `dig <ref>.supabase.co`.
