@@ -819,26 +819,30 @@ export function conversationPlannerHref(projectId: string, days: readonly string
 }
 
 /**
- * Projection resolution (ADR-117, amended by ADR-192 and ADR-209): an
- * explicit `?view=` wins; without one, the drawing this person opens in
+ * Projection resolution (ADR-117, amended by ADR-192, ADR-209 and ADR-211):
+ * an explicit `?view=` wins; without one, the drawing this person opens in
  * (`entry`, from their membership, `plannerEntryView`), and without that the
- * Month, which took over the coming weeks. Unknown values fall through: a
- * mistyped URL never breaks the page.
+ * default, the Agenda. Unknown values fall through: a mistyped URL never
+ * breaks the page.
  */
 export function resolvePlannerView(
   urlView: string | null | undefined,
   entry: PlannerEntryView | null = null,
 ): PlannerView {
-  return normalizePlannerView(urlView) ?? entry ?? 'month';
+  return normalizePlannerView(urlView) ?? entry ?? PLANNER_DEFAULT_VIEW;
 }
 
 /**
  * THE DRAWING EACH PERSON OPENS IN (ADR-192, task 129). The three words of
  * the bar (ADR-209); the Day is a lens, never a way in. Stored per workspace
- * membership (`membership.planner_view`), null = the default, the Month. A
- * stored `overview` (before ADR-209) reads as the Month.
+ * membership (`membership.planner_view`), null = the default. A stored
+ * `overview` (before ADR-209) reads as the Month.
  */
 export type PlannerEntryView = 'agenda' | 'month' | 'board';
+
+/** Where the Planner opens with nothing stored: the Agenda (ADR-211 § 4; it
+    was the Month while the new Agenda was being built, ADR-209). */
+export const PLANNER_DEFAULT_VIEW: PlannerEntryView = 'agenda';
 
 export function isPlannerEntryView(v: unknown): v is PlannerEntryView {
   return v === 'agenda' || v === 'month' || v === 'board';
@@ -872,19 +876,19 @@ export function plannerEntryView(onScreen: readonly WithPlannerView[]): PlannerE
 
 /**
  * What choosing `v` in the bar writes: one row per space on screen whose
- * stored value differs. The Month, the default, is stored as null, so it
+ * stored value differs. The default (`PLANNER_DEFAULT_VIEW`) is stored as null, so it
  * follows the default if that ever changes (as `view_scope` does, ADR-151
  * § 3). The Day is a lens: choosing it writes nothing.
  */
 export function plannerViewWrites(
   onScreen: readonly WithPlannerView[],
   v: PlannerView,
-): { workspace_id: string; planner_view: Exclude<PlannerEntryView, 'month'> | null }[] {
+): { workspace_id: string; planner_view: PlannerEntryView | null }[] {
   if (!isPlannerEntryView(v)) return [];
-  const value = v === 'month' ? null : v;
+  const value = v === PLANNER_DEFAULT_VIEW ? null : v;
   const stored = (w: WithPlannerView) => {
     const s = storedEntry(w.planner_view);
-    return s === 'month' ? null : s;
+    return s === PLANNER_DEFAULT_VIEW ? null : s;
   };
   return onScreen.filter((w) => stored(w) !== value).map((w) => ({ workspace_id: w.id, planner_view: value }));
 }

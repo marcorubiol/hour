@@ -36,9 +36,11 @@
     viewerTz: string;
     slipCtx: SlipContext;
     locale: Locale;
+    /** The «Falta algo» dot (ADR-211 § 3); off in calm (ADR-203 § 5). */
+    dots?: boolean;
   }
 
-  let { tiles, far = null, settled, errored, today, viewerTz, slipCtx, locale }: Props = $props();
+  let { tiles, far = null, settled, errored, today, viewerTz, slipCtx, locale, dots = true }: Props = $props();
 
   const kindLabel = (kind: SlipKind, voice?: Voice) => t(`planner.kind_${kind}`, locale, undefined, voice);
   const hour = (iso: string, tz: string | null) => hourMark(dualTime(iso, tz, viewerTz).primary);
@@ -90,6 +92,14 @@
                 <span class="tile__wd">{localeWeekdayShort(tile.day, locale)}</span>
                 <span class="tile__mo">{localeMonthShort(tile.day, locale)}</span>
               </span>
+              <!-- A DOT AND NO WORD (ADR-211 § 3): a day ready says nothing, a
+                   day that needs something says only that; the record says what. -->
+              {#if dots && tile.missing}<span
+                  class="missing-dot tile__dot"
+                  role="img"
+                  aria-label={t('desk.tile_missing', locale)}
+                  data-testid="desk-tile-missing"
+                ></span>{/if}
               <ul class="tile__things">
                 {#each tile.items as item (item.ref.of + item.ref.id)}{@render thing(item, tile.day)}{/each}
               </ul>
@@ -149,6 +159,19 @@
   }
   a.tile:hover {
     border-color: var(--border-color-dark);
+  }
+  /* The dot sits in the tile's top corner, out of the flow; the «+N» of a
+     desktop tile drops to the foot of its column to leave it the corner. */
+  .tile {
+    position: relative;
+  }
+  .tile__dot {
+    position: absolute;
+    inset-block-start: var(--space-s);
+    inset-inline-end: var(--space-s);
+  }
+  .tile__more {
+    align-self: end;
   }
   .tile--wait {
     min-block-size: var(--control-size-m);

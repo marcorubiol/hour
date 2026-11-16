@@ -2,7 +2,7 @@
  * The season's arithmetic (ADR-117) — pure, no words, `today` injected. Born
  * for the Planner's old portada; since ADR-209 the Month draws its holes and
  * lists its clashes with it, and the Desk's Planner door counts its twelve
- * weeks. `unclosed` waits for the Agenda's «falta» (ADR-209, next phase).
+ * weeks. What a gig still needs is `$lib/record-missing` (ADR-211 § 3).
  */
 import { addDaysIso } from '$lib/planner';
 
@@ -92,59 +92,6 @@ export function closedGapWindows(
 ): GapWindow[] {
   const last = days[days.length - 1];
   return gapWindows(days, occupied, away, min).filter((g) => g.to !== last);
-}
-
-/** What a confirmed gig can still be missing. `travel` is a guess (see below). */
-type UnclosedKey = 'time' | 'cast';
-
-interface UnclosedInput {
-  start_at: string | null;
-  /** Roster from `?rosters=1`; null/undefined = the feed did not say. */
-  person_ids?: string[] | null;
-  /** ADR-103 — a «voy» counts as somebody going even with no roster row. */
-  commitments?: Array<{ state: string }> | null;
-  city: string | null;
-}
-
-interface UnclosedVerdict {
-  /** Facts: each one is a field that is empty. */
-  missing: UnclosedKey[];
-  /** A deduction, never a fact: the gig is away from home and nothing says
-      how the company gets there. Drawn as `.guess`, never counted. */
-  travelGuess: boolean;
-}
-
-/** Lowercased, accent-free, trimmed — so «Girona» and «girona » are one city. */
-function cityKey(city: string | null | undefined): string {
-  return (city ?? '')
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .trim()
-    .toLowerCase();
-}
-
-/**
- * What a confirmed gig is missing.
- *
- * `travel` cannot be a fact yet: there are no coordinates on `venue`/`place`,
- * so «this gig needs a trip» is only readable as «its city is not the home
- * city, and there is no travel leg or tour band that reaches it». A text
- * heuristic — so it comes back as `travelGuess`, the page draws it in the
- * inference voice, and it never enters the «sin cerrar» count.
- * `home` null (the space has no city on file) means no guess at all.
- */
-export function unclosed(
-  perf: UnclosedInput,
-  ctx: { home: string | null; travelCovered: boolean },
-): UnclosedVerdict {
-  const missing: UnclosedKey[] = [];
-  if (!perf.start_at) missing.push('time');
-  const going = (perf.commitments ?? []).some((c) => c.state === 'going');
-  if (Array.isArray(perf.person_ids) && perf.person_ids.length === 0 && !going) missing.push('cast');
-  const home = cityKey(ctx.home);
-  const city = cityKey(perf.city);
-  const travelGuess = Boolean(home && city && home !== city && !ctx.travelCovered);
-  return { missing, travelGuess };
 }
 
 /** What the season overview needs of a conflict ($lib/planner `Conflict`). */

@@ -46,6 +46,7 @@
     deducedPhrase,
     formatMonthLabel,
     perfInstant,
+    travelOriginFinder,
     type ProjectLite,
     type PerformanceEvent,
     type DateEvent,
@@ -282,6 +283,8 @@
      the row height is set by the fullest day, and that day can hold nine
      things — so a quiet week could never look short, which is half of what
      the month is for. */
+  /* Where a leg began: the one finder ($lib/month-events), the Agenda's too. */
+  let travelOrigin = $derived(travelOriginFinder(performances, dates, viewerTz));
   let slipCtx = $derived({
     workspaceSlug,
     workspaceSlugById,
@@ -296,40 +299,6 @@
     originOf: travelOrigin,
   });
 
-  /* WHERE YOU WERE IS WHERE THE SHEET LAST PUT YOU (see `Slip.origin`).
-     The nearest event BEFORE this travel day that names a city. It reads the
-     whole loaded window, not the visible month, so a leg on the 1st still
-     knows it left from wherever the 28th was. Null when nothing precedes —
-     an absent origin is a real answer and stays absent. */
-  let placedDays = $derived.by(() => {
-    const out: Array<{ day: string; city: string; project: string | null }> = [];
-    for (const p of performances) {
-      const city = p.venue?.city ?? p.city;
-      if (city) out.push({ day: perfDayKey(p), city, project: p.project?.id ?? null });
-    }
-    for (const d of dates) {
-      // A travel day names where it is GOING, so it cannot say where you were.
-      if (d.kind === 'travel_day' || !d.city) continue;
-      out.push({ day: dateDayKey(d, viewerTz), city: d.city, project: d.project?.id ?? null });
-    }
-    return out.sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
-  });
-  function travelOrigin(d: DateEvent): string | null {
-    const day = dateDayKey(d, viewerTz);
-    // THE PROJECT'S OWN LAST PLACE, not the sheet's. Two companies share this
-    // calendar: on a night MaMeMi is in London and Última òrbita is in
-    // Barcelona, «where were you» has two answers and only one of them is
-    // this leg's. Unscoped, MaMeMi's flight home read as leaving from the
-    // city it was flying to, and the line simply vanished.
-    const mine = d.project?.id ?? null;
-    let best: string | null = null;
-    for (const p of placedDays) {
-      if (p.day >= day) break;
-      if (mine && p.project !== mine) continue;
-      best = p.city;
-    }
-    return best && best !== (d.city ?? null) ? best : null;
-  }
   const CELL_CAP = 3;
   /** On a phone: two monograms and a «+N» (ADR-209). */
   const CELL_CAP_NARROW = 2;

@@ -57,7 +57,7 @@ test.describe('planner laws (ADR-095)', () => {
     await planner(page, 'month');
     const broken = await page.evaluate(() => {
       const bad: string[] = [];
-      for (const el of document.querySelectorAll<HTMLElement>('.slip__t, .ag__time, .ds__hr')) {
+      for (const el of document.querySelectorAll<HTMLElement>('.slip__t, .ag__hh, .ds__hr')) {
         const cs = getComputedStyle(el);
         const line = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.2;
         // More than one line box means the hour wrapped.
@@ -75,7 +75,7 @@ test.describe('planner laws (ADR-095)', () => {
     await planner(page, 'agenda');
     const clipped = await page.evaluate(() => {
       const bad: string[] = [];
-      for (const el of document.querySelectorAll<HTMLElement>('.ag__title, .ds__n')) {
+      for (const el of document.querySelectorAll<HTMLElement>('.ag__city, .ag__ven, .ds__n')) {
         const cs = getComputedStyle(el);
         if (cs.textOverflow === 'ellipsis' && cs.whiteSpace === 'nowrap') {
           bad.push(el.textContent?.slice(0, 30) ?? '');
@@ -371,7 +371,7 @@ test.describe('the sheet', () => {
     for (const view of ['month', 'agenda']) {
       await planner(page, view);
       const colons = await page.evaluate(() =>
-        [...document.querySelectorAll('.slip__t, .ag__time')]
+        [...document.querySelectorAll('.slip__t, .ag__hh')]
           .map((el) => el.textContent?.trim() ?? '')
           .filter((s) => /\d:\d/.test(s)),
       );

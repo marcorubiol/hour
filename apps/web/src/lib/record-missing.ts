@@ -40,6 +40,8 @@ export type PerformanceMissing =
   | { kind: 'nobody_going' }
   /** It hangs from no bolo: there is nowhere for its money to live. */
   | { kind: 'no_bolo' }
+  /** Confirmed, upcoming, and nobody wrote when it starts (ADR-211 § 3). */
+  | { kind: 'no_time' }
   /** Confirmed, close, and the road sheet has no link for anybody yet. */
   | { kind: 'roadsheet_unshared' };
 
@@ -48,13 +50,16 @@ export interface PerformanceMissingInput {
   /** The performance day, YYYY-MM-DD (or an instant whose date part is it). */
   day: string;
   hold_notice_days: number | null;
-  /** The explicit roster (cast, overrides, crew): `performanceRoster`. */
-  roster: readonly string[];
+  /** The explicit roster (cast, overrides, crew): `performanceRoster`, or a
+      feed's `person_ids`; null when the reader cannot know. */
+  roster: readonly string[] | null;
   commitments: readonly Commitment[] | null | undefined;
   /** Whether it hangs from a bolo; null when the reader cannot know. */
   hasBolo: boolean | null;
   /** How many live road sheet links; null when the reader cannot know. */
   roadsheetLinks: number | null;
+  /** When the performance starts; undefined when the reader cannot know. */
+  start_at?: string | null;
 }
 
 export function performanceMissing(input: PerformanceMissingInput, today: string): PerformanceMissing[] {
@@ -68,21 +73,65 @@ export function performanceMissing(input: PerformanceMissingInput, today: string
     if (by && by <= addDaysIso(today, DEADLINE_WEEKDAY_DAYS)) out.push({ kind: 'hold_deadline', day: by });
   }
 
-  // Lo que bloquea, en orden (ADR-139 § 2): sin bolo, la hoja sin compartir
-  // y nadie va. Hotel y técnica ya no son marcas que pedir (ADR-164 § 2).
+  // Lo que bloquea, en orden (ADR-139 § 2): sin bolo, sin hora, la hoja sin
+  // compartir y nadie va. Hotel y técnica ya no son marcas que pedir (ADR-164
+  // § 2); «sin hora» viene de la «Sin cerrar» de la temporada (ADR-211 § 3).
   if (input.hasBolo === false) out.push({ kind: 'no_bolo' });
 
   const confirmedAhead = input.status === 'confirmed' && upcoming;
+  if (confirmedAhead && input.start_at === null) out.push({ kind: 'no_time' });
   if (confirmedAhead && input.roadsheetLinks === 0 && day <= addDaysIso(today, ROADSHEET_SHARE_DAYS)) {
     out.push({ kind: 'roadsheet_unshared' });
   }
 
   if (confirmedAhead) {
     const going = (input.commitments ?? []).some((c) => c.state === 'going');
-    if (input.roster.length === 0 && !going) out.push({ kind: 'nobody_going' });
+    if (input.roster?.length === 0 && !going) out.push({ kind: 'nobody_going' });
   }
 
   return out.slice(0, MISSING_MAX);
+}
+
+/**
+ * How far ahead «Falta» is a signal and not only a strip on the record: the
+ * dot on Hoy's tiles and the amber of the Agenda (ADR-211 § 3).
+ */
+export const MISSING_SOON_DAYS = 14;
+
+/** A feed row as the signal reads it (`?rosters=1&notice=1&missing=1`). */
+export interface MissingRow {
+  status: string;
+  performed_at: string;
+  start_at: string | null;
+  hold_notice_days?: number | null;
+  person_ids?: readonly string[];
+  commitments?: readonly Commitment[] | null;
+  has_bolo?: boolean | null;
+  roadsheet_links?: number | null;
+}
+
+/**
+ * THE ONE RULE (ADR-211 § 3): what a performance in the next two weeks still
+ * needs, the record's own list. Hoy's dot, the Agenda's amber and the
+ * record's «Falta» can never disagree, because they are this. Empty outside
+ * the window; a fact the feed did not bring asks for nothing.
+ */
+export function missingSoon(row: MissingRow, today: string): PerformanceMissing[] {
+  const day = row.performed_at.slice(0, 10);
+  if (day < today || day > addDaysIso(today, MISSING_SOON_DAYS)) return [];
+  return performanceMissing(
+    {
+      status: row.status,
+      day,
+      hold_notice_days: row.hold_notice_days ?? null,
+      roster: row.person_ids ?? null,
+      commitments: row.commitments,
+      hasBolo: row.has_bolo ?? null,
+      roadsheetLinks: row.roadsheet_links ?? null,
+      start_at: row.start_at,
+    },
+    today,
+  );
 }
 
 // ── Conversación ───────────────────────────────────────────────────────────

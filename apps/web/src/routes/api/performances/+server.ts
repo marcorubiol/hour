@@ -23,6 +23,9 @@
  *     asks for it, so the absence only reaches the decisions fetch (which
  *     degrades gracefully client-side) and the detail bundle (which
  *     retries without the column — $lib/server/performance-bundle).
+ * Plus an opt-in «Falta» projection (ADR-211 § 3):
+ *   - ?missing=1 → the rows near today gain `has_bolo` and `roadsheet_links`,
+ *     each behind its own door ($lib/server/missing-facts).
  *
  * Embeds `venue` (city/date rendering) and `project` (accent + slug for
  * calendar coloring and links) without a second round-trip.
@@ -44,6 +47,7 @@ import { PerformanceCreateSchema } from '$lib/performance';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import { fetchPerformanceRosters } from '$lib/server/rosters';
+import { fetchMissingFacts, type MissingFacts } from '$lib/server/missing-facts';
 import { COMMITMENTS_EMBED } from '$lib/people';
 import {
   EMPTY_TIMESLOTS,
@@ -79,6 +83,7 @@ const QuerySchema = v.object({
   to: v.optional(v.pipe(v.string(), v.isoDate())),
   rosters: v.optional(v.picklist(['0', '1']), '0'),
   notice: v.optional(v.picklist(['0', '1']), '0'),
+  missing: v.optional(v.picklist(['0', '1']), '0'),
   limit: v.optional(
     v.pipe(
       v.string(),
@@ -176,7 +181,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       400,
     );
   }
-  const { project_id, project_ids, workspace_ids, line_id, status, from, to, rosters, notice, limit } =
+  const { project_id, project_ids, workspace_ids, line_id, status, from, to, rosters, notice, missing, limit } =
     parsed.output;
 
   const projectIds = parseUuidList(project_ids);
@@ -234,14 +239,13 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
 
   try {
     const { data: rows } = await pgGet<PerformanceDbItem>(env, 'performance', jwt, { search });
-    const data: PerformanceItem[] = rows.map(withSchedule);
-    if (rosters !== '1') return json({ items: data });
-
-    const personIdsByPerformance = await fetchPerformanceRosters(
-      env,
-      jwt,
-      data.map((p) => ({ id: p.id, project_id: p.project_id })),
-    );
+    const base: PerformanceItem[] = rows.map(withSchedule);
+    const [facts, personIdsByPerformance] = await Promise.all([
+      missing === '1' ? fetchMissingFacts(env, jwt, base) : ({} as Record<string, MissingFacts>),
+      rosters === '1' ? fetchPerformanceRosters(env, jwt, base.map((p) => ({ id: p.id, project_id: p.project_id }))) : null,
+    ]);
+    const data = base.map((p) => (facts[p.id] ? { ...p, ...facts[p.id] } : p));
+    if (!personIdsByPerformance) return json({ items: data });
     return json({
       items: data.map((p) => ({ ...p, person_ids: personIdsByPerformance[p.id] ?? [] })),
     });

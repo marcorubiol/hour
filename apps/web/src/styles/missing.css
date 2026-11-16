@@ -1,0 +1,31 @@
+/*
+  «Falta» as a signal (ADR-211 § 3): what a performance in the next two
+  weeks still needs, said where the eye already is. One rule
+  (`missingSoon`, $lib/record-missing), two placings, one ink:
+
+    · a DOT, where there is no room for a word: Hoy's small tile. Its name
+      for a screen reader is «Falta algo»; the drawing says nothing else.
+    · a WORD, beside the performance it is about: the Agenda's row, in the
+      record's own words, mono caps, a size below the line it glosses.
+
+  The host decides where it sits; this file decides how it looks.
+*/
+
+@layer components {
+  .missing-dot {
+    display: inline-block;
+    flex: none;
+    inline-size: var(--dot-l);
+    block-size: var(--dot-l);
+    border-radius: var(--radius-50);
+    background: var(--missing-ink);
+  }
+  .missing-word {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    font-style: normal;
+    letter-spacing: var(--mono-letter-spacing-loose);
+    text-transform: uppercase;
+    color: var(--missing-ink);
+  }
+}

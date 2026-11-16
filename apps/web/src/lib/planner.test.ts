@@ -1207,10 +1207,10 @@ describe('resolvePlannerView (ADR-117)', () => {
     expect(resolvePlannerView('carrils')).toBe('board');
   });
 
-  it('no view, or an unknown one, opens the Month (ADR-209)', () => {
-    expect(resolvePlannerView(null)).toBe('month');
-    expect(resolvePlannerView(undefined)).toBe('month');
-    expect(resolvePlannerView('week')).toBe('month');
+  it('no view, or an unknown one, opens the Agenda (ADR-211)', () => {
+    expect(resolvePlannerView(null)).toBe('agenda');
+    expect(resolvePlannerView(undefined)).toBe('agenda');
+    expect(resolvePlannerView('week')).toBe('agenda');
   });
 
   it('without a view in the address, the stored entry drawing opens (ADR-192)', () => {
@@ -1247,20 +1247,21 @@ describe('plannerEntryView (ADR-192)', () => {
 
 describe('plannerViewWrites (ADR-192)', () => {
   const spaces = [
-    { id: 'a', planner_view: 'agenda' },
+    { id: 'a', planner_view: 'month' },
     { id: 'b', planner_view: null },
   ];
 
   it('choosing a drawing writes every space on screen that stores another', () => {
-    expect(plannerViewWrites(spaces, 'agenda')).toEqual([{ workspace_id: 'b', planner_view: 'agenda' }]);
+    expect(plannerViewWrites(spaces, 'month')).toEqual([{ workspace_id: 'b', planner_view: 'month' }]);
     expect(plannerViewWrites(spaces, 'board')).toEqual([
       { workspace_id: 'a', planner_view: 'board' },
       { workspace_id: 'b', planner_view: 'board' },
     ]);
   });
 
-  it('the Month, the default, is stored as null; a stored overview already is it', () => {
-    expect(plannerViewWrites(spaces, 'month')).toEqual([{ workspace_id: 'a', planner_view: null }]);
+  it('the Agenda, the default (ADR-211), is stored as null; a stored overview is the Month', () => {
+    expect(plannerViewWrites(spaces, 'agenda')).toEqual([{ workspace_id: 'a', planner_view: null }]);
+    expect(plannerViewWrites([{ id: 'c', planner_view: 'agenda' }], 'agenda')).toEqual([]);
     expect(plannerViewWrites([{ id: 'c', planner_view: 'overview' }], 'month')).toEqual([]);
   });
 

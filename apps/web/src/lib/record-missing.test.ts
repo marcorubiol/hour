@@ -6,6 +6,7 @@ import {
   conversationMissing,
   dateMissing,
   lineMissing,
+  missingSoon,
   performanceMissing,
   personMissing,
   stepShortcuts,
@@ -106,6 +107,41 @@ describe('performanceMissing', () => {
       TODAY,
     );
     expect(many).toEqual([{ kind: 'no_bolo' }, { kind: 'roadsheet_unshared' }, { kind: 'nobody_going' }]);
+  });
+
+  it('confirmed with no start says so after the bolo; unknown start or a hold asks nothing', () => {
+    expect(performanceMissing(perf({ start_at: null, hasBolo: false }), TODAY)).toEqual([{ kind: 'no_bolo' }, { kind: 'no_time' }]);
+    expect(performanceMissing(perf({ start_at: undefined }), TODAY)).toEqual([]);
+    expect(performanceMissing(perf({ start_at: null, status: 'hold', day: addDaysIso(TODAY, 40) }), TODAY)).toEqual([]);
+  });
+
+  it('a roster the reader cannot know asks for nobody', () => {
+    expect(performanceMissing(perf({ roster: null }), TODAY)).toEqual([]);
+  });
+});
+
+describe('missingSoon · the one rule of the dot, the amber and the strip', () => {
+  const row = (over: Record<string, unknown> = {}) => ({
+    status: 'confirmed',
+    performed_at: addDaysIso(TODAY, 5),
+    start_at: '2026-10-25T19:00:00Z',
+    person_ids: ['p1'],
+    has_bolo: true,
+    roadsheet_links: 1,
+    ...over,
+  });
+  it('a ready performance asks for nothing', () => {
+    expect(missingSoon(row(), TODAY)).toEqual([]);
+  });
+  it('fourteen days and no further, today included, the past never', () => {
+    expect(missingSoon(row({ has_bolo: false, performed_at: TODAY }), TODAY)).toEqual([{ kind: 'no_bolo' }]);
+    expect(missingSoon(row({ has_bolo: false, performed_at: addDaysIso(TODAY, 14) }), TODAY)).toEqual([{ kind: 'no_bolo' }]);
+    expect(missingSoon(row({ has_bolo: false, performed_at: addDaysIso(TODAY, 15) }), TODAY)).toEqual([]);
+    expect(missingSoon(row({ has_bolo: false, performed_at: addDaysIso(TODAY, -1) }), TODAY)).toEqual([]);
+  });
+  it('confirmed with no hour counts; the facts the feed did not bring do not', () => {
+    expect(missingSoon(row({ start_at: null }), TODAY)).toEqual([{ kind: 'no_time' }]);
+    expect(missingSoon(row({ person_ids: undefined, has_bolo: undefined, roadsheet_links: undefined }), TODAY)).toEqual([]);
   });
 });
 

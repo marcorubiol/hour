@@ -16,7 +16,7 @@ describe('calm as focus (ADR-139 § 5): what each lens keeps', () => {
   it('the Planner keeps what is confirmed and what you have to decide; options, bands and lists fold', () => {
     expect(shows('planner', 'decide', true)).toBe(true);
     expect(shows('planner', 'confirmed', true)).toBe(true);
-    for (const b of ['options', 'blackouts', 'census', 'week_options'] as const)
+    for (const b of ['options', 'blackouts', 'census'] as const)
       expect(shows('planner', b, true), b).toBe(false);
   });
 

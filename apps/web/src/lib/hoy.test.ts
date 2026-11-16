@@ -128,6 +128,24 @@ describe('«Coming up»: one tile per day (ADR-202 § 6)', () => {
     expect(tiles[0].more).toBe(1);
   });
 
+  it('the dot: some performance of the day still needs something, by the record\'s rule (ADR-211 § 3)', () => {
+    const performances = [
+      perf('ok', '2026-11-14', mamemi, { person_ids: ['p'], has_bolo: true }),
+      perf('nobolo', '2026-11-15', mamemi, { has_bolo: false }),
+      perf('nohour', '2026-11-16', mamemi, { start_at: null }),
+      perf('hold', '2026-11-17', mamemi, { status: 'hold', start_at: null, hold_notice_days: 0 }),
+    ];
+    const dates = [date('trip', '2026-11-18T08:00:00Z', avi, { kind: 'travel_day' })];
+    const tiles = comingTiles(upcoming({ performances, dates, viewerTz: TZ }, NOW, 40), TODAY);
+    expect(tiles.map((t) => [t.day, t.missing])).toEqual([
+      ['2026-11-14', false],
+      ['2026-11-15', true],
+      ['2026-11-16', true],
+      ['2026-11-17', false],
+      ['2026-11-18', false],
+    ]);
+  });
+
   it('ten tiles at most', () => {
     const performances = Array.from({ length: 13 }, (_, i) => perf(`p${i}`, `2026-11-${String(14 + i).padStart(2, '0')}`));
     const tiles = comingTiles(upcoming({ performances, dates: [], viewerTz: TZ }, NOW, 40), TODAY);
