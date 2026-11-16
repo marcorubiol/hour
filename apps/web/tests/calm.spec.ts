@@ -1,8 +1,8 @@
 /**
  * CALM AS FOCUS (ADR-139 § 5). Calm is another composition of each lens, not
  * a grey: it hides, it never dims. What it hides is said in one line that
- * opens it; no control looks disabled. The switch is a mark, the wave in a
- * circle, filled when it is on (ADR-202 § 11). `$lib/calm` is the table of what each lens keeps
+ * opens it; no control looks disabled. The switch is a mark, the clock without
+ * figures in a circle, filled when it is on (ADR-208). `$lib/calm` is the table of what each lens keeps
  * (unit-tested there); these are the laws you can only see in a browser.
  *
  * Read-only: the spec writes nothing but the browser's own `hour_calm`.

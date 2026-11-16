@@ -7958,3 +7958,21 @@ como en el dibujo.
 
 **Enmienda a ADR-202 § 4.** «Qué a la izquierda» pasa a «de quién a la izquierda»; la hora al tamaño de la cosa no
 cambia. Fuera: la pieza hueca (`nextWords`) sigue sin nombrar el proyecto; el Planificador y «Coming up», igual.
+
+## [2026-11-16] ADR-208 · La marca de calma es el reloj sin cifras, y al entrar en calma el reloj pasa por él (enmienda ADR-202 § 11)
+
+**Contexto.** La marca de calma era una onda que se aquieta (ADR-202 § 11). Marco quiso una marca que viniera de la
+hora, que es la marca de la app (el reloj del raíl y de la barra del móvil). Se miraron unas treinta, en cuatro rondas
+(dos puntos, reloj de arena tumbado, péndulo, cruces con la onda). Marco planteó que en calma el reloj de la app se
+quedara sin cifras. En contra: calma es el modo de trabajo, donde más se mira la hora, y un reloj a la vista es la ayuda
+habitual para quien percibe mal el paso del tiempo (TDAH).
+
+**Decidido por Marco (16-11, chat).**
+1. **La marca de calma es el reloj sin cifras:** dos guiones y los dos puntos (`-:-`), en el mismo círculo y con los
+   mismos dos estados (contorno, lleno en negativo). Sustituye a la onda. El grosor sigue siendo `--mark-stroke`.
+2. **La hora no se quita nunca.** Al entrar en calma por una pulsación (el botón o la tecla `c`), el reloj de la app
+   enseña `--:--` un segundo y la hora vuelve. Al salir de calma y al restaurar el estado guardado, nada.
+3. **El reloj no cambia de ancho** mientras pasa: las cifras y los guiones comparten celda (`ClockFigures.svelte`).
+
+**Descartado.** Calma sin hora mientras dure, y `10:--` (solo la hora, sin minutos): con una función a las 20:30 los
+minutos importan.

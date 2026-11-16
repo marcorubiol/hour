@@ -13,12 +13,20 @@
 import { getContext, setContext } from 'svelte';
 
 const STORAGE_KEY = 'hour_calm';
+const BLANK_MS = 1000;
 
 class CalmStore {
   on = $state(false);
+  /** Entering calm, the shell's clock goes without its figures for a moment
+      and the hour comes back (ADR-208): the hour is never taken away. Only a
+      press does it; restoring from storage does not. */
+  blank = $state(false);
 
   toggle(): void {
     this.set(!this.on);
+    if (!this.on) return;
+    this.blank = true;
+    setTimeout(() => (this.blank = false), BLANK_MS);
   }
 
   set(next: boolean): void {
