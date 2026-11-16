@@ -1098,7 +1098,6 @@
   role="group"
   tabindex="-1"
   aria-label={label}
-  data-help-step="planner-grid"
   bind:this={gridEl}
 >
   <!-- THE WEEKDAY AXIS NEVER GOES. It costs fourteen pixels once for the whole

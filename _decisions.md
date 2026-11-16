@@ -8088,7 +8088,9 @@ el ámbar de la Agenda (ADR-209 § 3) y la tira «Falta» de la ficha de la func
 1. **La Agenda son los días con algo, de arriba abajo** (ADR-209 § 3). Un día tiene fila si tiene una función o una
    fecha que no es viaje, o un paso, una decisión o una nota en su margen. Cada cosa es una línea: monograma, la
    ciudad como palabra fuerte con la sala debajo (en una fecha, su tipo y su título), y la hora de la función al
-   final; una opción va en cursiva con «?». **El viaje es un tramo** entre dos días (raya discontinua y
+   final; una opción va en cursiva con «?». En escritorio, una tercera línea dice quién va (`styles/cast.css`:
+   nombres en mono pequeño, «sin reparto» si no hay nadie, nada si el feed no lo dice; Marco, 16-11); en el
+   móvil la fila se queda en dos líneas. **El viaje es un tramo** entre dos días (raya discontinua y
    «viaje · origen → destino · hora»), no una fila. **Tres noches libres o más** son una línea en su primera
    noche, con la regla del Mes (`closedGapWindows` desde hoy). **La semana es una raya más fuerte** encima de la
    primera fila de una semana nueva; el cambio de mes es su nombre. «Semana» no se dice: fuera bandas, recuentos
@@ -8110,7 +8112,8 @@ el ámbar de la Agenda (ADR-209 § 3) y la tira «Falta» de la ficha de la func
    en la ficha del día (cuenta también lo que el «+N» esconde), con nombre accesible «Falta algo»; en calma no se
    dibuja (`coming_missing`, como «Te espera», ADR-203 § 5). Una casa: `styles/missing.css` y `--missing-ink`
    (el ámbar de estado).
-4. **Sin vista guardada, el Planificador abre en la Agenda** (`PLANNER_DEFAULT_VIEW`; ADR-209 decía el Mes hasta
+4. **La tarjeta de primera visita habla de la Agenda** y su recorrido empieza en ella (la lista, la línea de
+   estado, la barra). **Sin vista guardada, el Planificador abre en la Agenda** (`PLANNER_DEFAULT_VIEW`; ADR-209 decía el Mes hasta
    esta fase). El defecto se guarda como `null`; elegir el Mes ahora guarda `month`. Quien tenía el Mes por
    defecto (null) pasa a abrir en la Agenda; sin migración.
 
@@ -8125,9 +8128,8 @@ el ámbar de la Agenda (ADR-209 § 3) y la tira «Falta» de la ficha de la func
   y el feed de la Agenda. `CACHE_SCHEMA` 34 → 35.
 - `help.concept.unclosed` pasa a «Falta» y su texto deja de nombrar hotel y técnica.
 
-**Falta decidir (Marco).** El panel del Día al lado (fase 3) ocupará la columna que hoy lleva el margen. El reparto
-ya no se dice en la fila de la Agenda (el dibujo no lo lleva; vuelve en el Día). La regla en calma de la Agenda:
-el ámbar se sigue diciendo (solo el punto de Hoy se calla).
+**Falta decidir (Marco).** El panel del Día al lado (fase 3) ocupará la columna que hoy lleva el margen. La regla en
+calma de la Agenda: el ámbar se sigue diciendo (solo el punto de Hoy se calla).
 
 **Cómo se revierte.** Revertir la rama: vuelven el diario de bandas y `agenda-chunks`; `CACHE_SCHEMA` sube otra vez
 al revertir; ninguna migración.

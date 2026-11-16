@@ -3086,11 +3086,11 @@
     {/snippet}
   </LensHeader>
 
-  <!-- The welcome speaks of the Month, so its tour goes there first. -->
+  <!-- The welcome speaks of the Agenda, where the Planner opens (ADR-211), so its tour goes there first. -->
   <FirstVisitCard
     section="planner"
-    steps={['planner-grid', 'planner-status', 'planner-views']}
-    onbeforetour={() => setView('month')}
+    steps={['planner-agenda', 'planner-status', 'planner-views']}
+    onbeforetour={() => setView('agenda')}
   />
 
 
@@ -3527,6 +3527,8 @@
       gaps={agendaGaps}
       gapLabel={(n) => `${n} ${t('planner.stat_free', locale)}`}
       missingOf={agendaMissing}
+      castOf={(p) => (p.person_ids || p.commitments ? goesOf(p) : null)}
+      noCastWord={(voice) => t('planner.no_cast', locale, undefined, voice)}
       twoPlacesLabel={t('planner.agenda_two_places', locale)}
       stepsFoldLabel={(n) => `${n === 1 ? t('planner.steps_one', locale) : t('planner.steps_n', locale, { n })} ›`}
       onReachEnd={probePlanAhead}

@@ -74,7 +74,7 @@
   import IdentityMark from '$lib/components/IdentityMark.svelte';
   import PlannerSteps, { type StepVM } from '$lib/components/planner/PlannerSteps.svelte';
   import { performanceStatusFamily } from '$lib/performance';
-  import { appLocale, appLocaleTag, t, type Voice } from '$lib/i18n';
+  import { appLocale, appLocaleTag, t, tradeFor, type Voice } from '$lib/i18n';
 
   interface Props {
     /** Ordered ISO days across the whole agenda span (multi-month). */
@@ -106,6 +106,10 @@
     gapLabel?: (nights: number) => string;
     /** The one rule of «Falta» (ADR-211 § 3), already windowed and worded. */
     missingOf?: (perf: PerformanceEvent) => AgendaMissing;
+    /** Who goes: names on file, [] for nobody, null when the feed did not
+        say (then nothing is drawn). Desktop only (Marco, 16-11). */
+    castOf?: (perf: PerformanceEvent) => string[] | null;
+    noCastWord?: (voice?: Voice) => string;
     /** «alguien está en dos sitios». */
     twoPlacesLabel?: string;
     /** «14 pasos ›» — the phone's folded steps. */
@@ -172,6 +176,8 @@
     gaps = [],
     gapLabel = (n: number) => `${n} ${t('planner.stat_free', L)}`,
     missingOf,
+    castOf,
+    noCastWord = (voice?: Voice) => t('planner.no_cast', L, undefined, voice),
     twoPlacesLabel = t('planner.agenda_two_places', L),
     stepsFoldLabel = (n: number) => `${t('planner.steps_n', L, { n })} ›`,
     onConfirm,
@@ -532,7 +538,7 @@
   });
 </script>
 
-<div class="ag" class:ag--loading={loading} class:ag--bare={!marginUsed}>
+<div class="ag" class:ag--loading={loading} class:ag--bare={!marginUsed} data-help-step="planner-agenda">
   {#if onReachStart}
     <button
       type="button"
@@ -600,6 +606,7 @@
             {@const sl = row.slip}
             {@const miss = row.kind === 'perf' ? missingOf?.(row.perf) : undefined}
             {@const sub = under(row)}
+            {@const cast = row.kind === 'perf' && !phone.current ? (castOf?.(row.perf) ?? null) : null}
             {@const open = row.kind === 'date' && onDateOpen ? () => onDateOpen?.(row.date) : undefined}
             <div
               class="ag__it"
@@ -629,6 +636,13 @@
                         class="missing-word"
                         data-testid="agenda-missing">{w}</span
                       >{/each}</span
+                  >
+                {/if}
+                <!-- WHO GOES, the third line (Marco, 16-11; `styles/cast.css`),
+                     on a desktop: the phone keeps the row to two lines. -->
+                {#if cast && row.kind === 'perf'}
+                  <span class="ag__cast cast-line" class:cast-line--none={cast.length === 0}
+                    >{cast.length > 0 ? cast.join(' · ') : noCastWord(tradeFor(perfWorkspaceId(row.perf)))}</span
                   >
                 {/if}
               </svelte:element>
@@ -756,6 +770,12 @@
     .ag > * {
       grid-column: 1;
       min-inline-size: 0;
+    }
+    /* EVERY RULE OF THE LIST IS ONE MEASURE: the month's and the free run's
+       run to the margin's edge, as the days' do. */
+    .ag > .ag__month,
+    .ag > .ag__free {
+      grid-column: 1 / -1;
     }
     .ag--bare {
       --ag-margin: 0;
@@ -971,6 +991,9 @@
       color: var(--text-muted);
       overflow-wrap: anywhere;
     }
+    .ag__cast {
+      margin-block-start: var(--space-2xs);
+    }
     .ag__ven .missing-word {
       white-space: nowrap;
     }
@@ -1092,6 +1115,8 @@
       position: absolute;
       inset-block-end: 0;
       inset-inline-start: 0;
+      /* An absolute grid child takes its column's area as its box: the date's. */
+      grid-column: 1;
       padding: 0;
       border: 0;
     }
