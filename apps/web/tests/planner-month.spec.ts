@@ -86,6 +86,14 @@ test.describe('the month (ADR-209)', () => {
     expect(new Date(`${first}T00:00:00Z`).getUTCDay()).toBe(1);
     // «week» is not a label of the Month.
     expect(await page.locator('.cal__grid').innerText()).not.toMatch(/\bweek\b/i);
+    // The sheet is closed on the left: the axis and every week carry the edge.
+    const openLeft = await page.evaluate(
+      () =>
+        [...document.querySelectorAll('.cal__wkh, .cal__wkbody')].filter(
+          (el) => parseFloat(getComputedStyle(el).borderLeftWidth) < 1,
+        ).length,
+    );
+    expect(openLeft, 'a week of the Month is open on the left').toBe(0);
   });
 
   test('THE STATUS LINE COUNTS THE MONTH ON SCREEN', async ({ page }) => {

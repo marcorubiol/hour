@@ -1135,8 +1135,8 @@
        the best working day — so without the names you cannot tell which column
        is Saturday except by counting from a number. The axis is the reading. -->
   <div class="cal__wkh">
-    {#each wkLabels as wd (wd)}
-      <span class="cal__weekday">{wd}</span>
+    {#each wkLabels as wd, i (i)}
+      <span class="cal__weekday"><span class="cal__wd--l">{wd}</span><span class="cal__wd--s">{wd.slice(0, 1)}</span></span>
     {/each}
   </div>
   {#each weeks as week, wi (wi)}
@@ -1347,6 +1347,7 @@
           <Slip
             slip={entry.slip}
             placing="compact"
+            ground="bare"
             kindLabel={(k, voice) => dateKindLabel(k, voice)}
             stateLabel={slipState}
             stateUrgent={isUrgentHold(entry.slip)}
@@ -1511,8 +1512,9 @@
 
     .cal__grid {
       /* A compact card is one line (ADR-209): three of them and the number
-         make a full day. */
-      --cal-cell-h: 5.5rem;
+         make a full day. Lines and not boxes since the drawing of 16-11, so
+         the full day is three lines of the body's small step and its foot. */
+      --cal-cell-h: 4rem;
       /* The air between a card and the column rule beside it. One number,
          because the day cell and the run that crosses it have to agree —
          they are siblings of the week grid, not parent and child. */
@@ -1523,11 +1525,24 @@
       flex-direction: column;
       transition: opacity var(--transition);
     }
+    /* THE SHEET IS CLOSED ON BOTH SIDES (the drawing, 16-11): the column
+       rules sit on each day's right edge, so the first column had none on
+       its left and the month read open there. The axis and every week carry
+       the left edge; the axis shares the day rules, so its words sit in the
+       columns they name. Its foot is the first week's own top rule. */
     .cal__wkh {
       display: grid;
       grid-template-columns: repeat(7, minmax(0, 1fr));
       margin-block-start: var(--space-s);
-      border-block-end: var(--line-hairline) solid var(--border-color-light);
+      border-block-start: var(--line-hairline) solid var(--border-color-light);
+    }
+    .cal__wkh,
+    .cal__wkbody {
+      border-inline-start: var(--line-hairline) solid var(--border-color-light);
+      background-image: linear-gradient(to right, var(--border-color-light) 0 1px, transparent 1px);
+      background-size: calc(100% / 7) 100%;
+      background-position: -1px 0;
+      background-repeat: repeat-x;
     }
     /* THE WEEK IS A RULE, NOT A COLUMN (ADR-209): the line above each
        Monday is one step stronger than the day rules. */
@@ -2004,10 +2019,6 @@
        mide, no una tira suelta debajo del mes. */
     .cal__wkbody {
       min-inline-size: 0;
-      background-image: linear-gradient(to right, var(--border-color-light) 0 1px, transparent 1px);
-      background-size: calc(100% / 7) 100%;
-      background-position: -1px 0;
-      background-repeat: repeat-x;
     }
     .cal__wkc {
       display: grid;
@@ -2022,8 +2033,10 @@
     /* The weekday axis is a LABEL, not a header bar: a filled band turns the
        row into a table chrome the month does not have. One hairline under it
        is the whole of the separation. */
+    /* Its inset is the day number's, so the word and the number under it
+       start on one line. A phone's cell takes the initial (the drawing). */
     .cal__weekday {
-      padding: var(--space-xs) var(--space-s);
+      padding: var(--space-xs);
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
       letter-spacing: var(--tracking-xl);
@@ -2047,6 +2060,7 @@
          (Marco asked to see this exact case before trusting it. He was
          right to: 2026-07-31, day 9, two gigs and a clash.) */
       padding: var(--line-hairline) var(--cal-cell-pad) var(--space-s);
+      row-gap: var(--space-2xs);
       overflow: hidden;
     }
 
@@ -2122,11 +2136,11 @@
       color: var(--text-faint);
     }
     /* ── THE MONTH'S OWN MARKS (ADR-209) ─────────────────────────────── */
-    /* Every other month on a ground one step darker. The day rules are drawn
-       under the cells (`.cal__wkbody`), so a toned cell draws its own. */
+    /* Every other month on a ground one step darker. The ground is
+       translucent, so the day rules under it (`.cal__wkbody`) show through:
+       a rule of its own doubled them. */
     .cal__day--alt {
       background-color: var(--month-alt-ground);
-      box-shadow: inset var(--line-hairline) 0 0 var(--border-color-light);
     }
     /* A hole to sell: hatched in ink, over whichever ground the month has. */
     .cal__day--gap {
@@ -2142,8 +2156,17 @@
     }
     .cal__gap--s,
     .cal__mname--s,
-    .cal__more--s {
+    .cal__more--s,
+    .cal__wd--s {
       display: none;
+    }
+    @media (max-width: 47.999rem) {
+      .cal__wd--l {
+        display: none;
+      }
+      .cal__wd--s {
+        display: inline;
+      }
     }
     /* On a phone the short label may take two lines: «4 / libres». */
     .cal__gap--s {
@@ -2154,13 +2177,27 @@
     .cal__day--past :global(.slip) {
       opacity: 0.62;
     }
-    .cal__day--sel {
-      outline: var(--line-hairline) solid var(--text-color);
-      outline-offset: calc(-1 * var(--line-hairline));
+    /* ONE FRAME ROUND THE PICKED DAY. Its number and its contents are two
+       cells of the week's grid, and an outline on each drew two boxes with a
+       rule between them; each draws its three sides. */
+    .cal__num.cal__day--sel {
+      box-shadow:
+        inset 0 var(--line-hairline) var(--text-color),
+        inset var(--line-hairline) 0 var(--text-color),
+        inset calc(-1 * var(--line-hairline)) 0 var(--text-color);
     }
+    .cal__day.cal__day--sel {
+      box-shadow:
+        inset 0 calc(-1 * var(--line-hairline)) var(--text-color),
+        inset var(--line-hairline) 0 var(--text-color),
+        inset calc(-1 * var(--line-hairline)) 0 var(--text-color);
+    }
+    /* The month's name is a step OVER the numbers, not beside them: it is
+       what the eye finds when the month changes (the drawing, 16-11). */
     .cal__mname {
       font-family: var(--font-display);
-      font-size: var(--text-m);
+      font-size: var(--text-l);
+      line-height: 1;
       color: var(--text-color);
     }
     /* The cell decides what it can say: below a phone's cell, the short
@@ -2238,18 +2275,23 @@
     .cal__day--today {
       background-color: var(--today-wash);
     }
+    /* And underlined, as the drawing marks it: the wash alone is 4%. */
     .cal__day--today .cal__day-num {
-      font-size: var(--text-m);
       font-weight: var(--today-weight);
       color: var(--today-ink);
+      text-decoration: underline;
+      text-decoration-thickness: var(--line-hairline);
+      text-underline-offset: 3px;
     }
 
+    /* The number is the size of what the day holds, not over it: in the
+       drawing it is a margin figure and the places are the reading. */
     .cal__day-num {
       padding: 0;
       border: 0;
       background: none;
       font-family: var(--font-mono);
-      font-size: var(--text-m);
+      font-size: var(--text-s);
       line-height: 1;
       color: var(--text-muted);
       font-variant-numeric: tabular-nums;
@@ -2297,7 +2339,6 @@
       grid-template-columns: 1fr auto 1fr;
       align-items: center;
       gap: var(--space-xs);
-      margin-block-end: var(--space-xs);
       min-block-size: 1rem;
     }
     .cal__day-head > :first-child {
