@@ -72,6 +72,10 @@ export type PerformanceEvent = {
   person_ids?: string[];
   /** ADR-103 — each person's «voy / no voy» on it. */
   commitments?: Commitment[] | null;
+  /** ADR-211 § 3 — on `?missing=1`, near today only: whether it hangs from
+      a bolo and its live road sheet links; null when the reader cannot see. */
+  has_bolo?: boolean | null;
+  roadsheet_links?: number | null;
 };
 
 export type DateEvent = {
@@ -553,6 +557,43 @@ export function performanceSlip(p: PerformanceEvent, ctx: SlipContext): Slip {
         ? `${base} · ${time.primary} (${ctx.viewerTimeLabel ? ctx.viewerTimeLabel(time.secondary) : `${time.secondary} yours`})`
         : `${base} · ${time.primary}`
       : base,
+  };
+}
+
+/**
+ * WHERE YOU WERE IS WHERE THE SHEET LAST PUT YOU (see `Slip.origin`): the
+ * nearest event BEFORE a travel day that names a city, of the trip's own
+ * project (two companies share a calendar, and «where were you» has one
+ * answer per company). Reads the whole loaded window. Null when nothing
+ * precedes: an absent origin is a real answer. The Month and the Agenda ask
+ * this one finder.
+ */
+export function travelOriginFinder(
+  performances: readonly PerformanceEvent[],
+  dates: readonly DateEvent[],
+  viewerTz: string,
+): (d: DateEvent) => string | null {
+  const placed: Array<{ day: string; city: string; project: string | null }> = [];
+  for (const p of performances) {
+    const city = p.venue?.city ?? p.city;
+    if (city) placed.push({ day: perfDayKey(p), city, project: p.project?.id ?? null });
+  }
+  for (const d of dates) {
+    // A travel day names where it is GOING, so it cannot say where you were.
+    if (d.kind === 'travel_day' || !d.city) continue;
+    placed.push({ day: dateDayKey(d, viewerTz), city: d.city, project: d.project?.id ?? null });
+  }
+  placed.sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
+  return (d) => {
+    const day = dateDayKey(d, viewerTz);
+    const mine = d.project?.id ?? null;
+    let best: string | null = null;
+    for (const p of placed) {
+      if (p.day >= day) break;
+      if (mine && p.project !== mine) continue;
+      best = p.city;
+    }
+    return best && best !== (d.city ?? null) ? best : null;
   };
 }
 

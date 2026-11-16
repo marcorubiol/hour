@@ -206,7 +206,7 @@ is a lens, a module, or both:
 | Concern / surface               | Global read surface     | Module (line page)? | Note |
 |---------------------------------|-------------------------|---------------------|------|
 | **Desk** (the now)              | **digest** (not a lens) | no                  | cross-concern, ranked by urgency; the home; owns no data — a query over the others + tasks; no per-line form |
-| Planner                         | lens                    | yes                 | Season (the portada) · Agenda · Month · Board, Day as a lens (ADR-155); distinct from Desk (now/triage vs planning) |
+| Planner                         | lens                    | yes                 | Agenda (where it opens) · Month · Board, Day and Season as zoom (ADR-209, ADR-211); distinct from Desk (now/triage vs planning) |
 | Conversations                   | lens                    | yes                 | your booking network — **people AND organizations** (a theatre is a contact, not a person); persons + conversations; comms folds in later |
 | Money                           | lens                    | yes                 | fees, invoices, expenses |
 | Team                            | — (module only)         | yes                 | cast + crew executing the line — **distinct from Conversations** (Conversations = who you book with; Team = who does the show) |
@@ -250,8 +250,8 @@ The nav layer is **one home + three lenses**:
   **Ahora** (ADR-146) is a *mode* of the Desk, not a fifth lens: `/h/desk?mode=ahora`, the gig day of the
   person across their spaces (now and next with a countdown, the trip's stages, the venue, who to call, the
   rest of the running order, today's crew). The selector keeps Desk marked; on a phone it covers the frame.
-- **Planner** — planning / conflict-detection. A ⌘K lens. Its row reads Season | Agenda · Month · Board
-  (ADR-155): the Season is the portada (ADR-117), the other three are drawings of the same rows, and the
+- **Planner** — planning / conflict-detection. A ⌘K lens. Its row reads Agenda · Month · Board (ADR-209):
+  three drawings of the same rows, no portada; with nothing stored it opens in the Agenda (ADR-211). The
   Day is not a word of the row but the lens on one day, opened from a day of any drawing and closed back
   to it (`?view=day`).
 - **Conversations** — your booking network: persons + conversations. **Not "People"** — the lens holds

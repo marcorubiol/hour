@@ -703,6 +703,7 @@
             hold_notice_days: perf.hold_notice_days,
             roster: performanceRoster(bundle),
             commitments: perf.commitments,
+            start_at: perf.start_at,
             hasBolo: boloReadable ? currentBoloId !== null : null,
             // An expired link opens nothing (ADR-163 § 2): it does not count.
             roadsheetLinks: $sharesQuery.isSuccess
@@ -741,6 +742,12 @@
             : perf?.project && lensOn('books')
               ? [{ label: t('perf.bolo_create_link', locale), href: booksHref(perf.project.id, { newBolo: true, here: booksHere }) }]
               : [],
+        };
+      case 'no_time':
+        return {
+          id: 'no_time',
+          text: t('record.missing_no_time', locale),
+          verbs: [{ label: t('record.verb_add', locale), href: '#running-order' }],
         };
       case 'roadsheet_unshared':
         return {
@@ -973,14 +980,16 @@
 
     <!-- ADR-090 P3: the same running order as the Planner's day, in place
          of the fixed five. One way to write an hour in the whole app. -->
-    <RunningOrder
-      target="performance"
-      id={perf.id}
-      dayIso={perf.performed_at.slice(0, 10)}
-      tz={perf.venue?.timezone ?? workspaceTz ?? viewerTz}
-      {viewerTz}
-      {locale}
-    />
+    <div id="running-order">
+      <RunningOrder
+        target="performance"
+        id={perf.id}
+        dayIso={perf.performed_at.slice(0, 10)}
+        tz={perf.venue?.timezone ?? workspaceTz ?? viewerTz}
+        {viewerTz}
+        {locale}
+      />
+    </div>
 
     <!-- ADR-106: el tablón del bolo. Sin bolo dice que no hay; sin dinero
          siempre (la puerta es la función, no Cuentas). -->

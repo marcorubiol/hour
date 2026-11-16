@@ -8076,3 +8076,60 @@ https://claude.ai/artifact/RbkKihW7DFnfXPKhJFWUSD; Marco eligió la 3, «ficha d
 - `planner-laws.spec`: la ley del mini comprueba 5:3 y que todas las fichas midan lo mismo.
 
 **Cómo se revierte.** Revertir la rama: sólo CSS y un spec, sin migración ni forma de caché.
+
+## [2026-11-16] ADR-211 · La Agenda nueva y una sola regla de «Falta» (fase 2 de la tarea 162 y tarea 164; enmienda ADR-095 § 0 en la fila de la Agenda, ADR-192 en el valor por defecto y ADR-209 § 1)
+
+**Contexto.** Fase 2 del Planificador en tres dibujos (ADR-209, `_tasks.md § 162`): la Agenda del dibujo validado
+(https://claude.ai/artifact/FwnfMuB2nNmJbnbnW5ckRN) sustituye al diario de bandas de semana. Con ella, la tarea 164
+(Marco, 16-11): un punto ámbar en las fichas pequeñas de «Lo que viene» en Hoy, con una sola regla para ese punto,
+el ámbar de la Agenda (ADR-209 § 3) y la tira «Falta» de la ficha de la función.
+
+**Decidido.**
+1. **La Agenda son los días con algo, de arriba abajo** (ADR-209 § 3). Un día tiene fila si tiene una función o una
+   fecha que no es viaje, o un paso, una decisión o una nota en su margen. Cada cosa es una línea: monograma, la
+   ciudad como palabra fuerte con la sala debajo (en una fecha, su tipo y su título), y la hora de la función al
+   final; una opción va en cursiva con «?». En escritorio, una tercera línea dice quién va (`styles/cast.css`:
+   nombres en mono pequeño, «sin reparto» si no hay nadie, nada si el feed no lo dice; Marco, 16-11); en el
+   móvil la fila se queda en dos líneas. **El viaje es un tramo** entre dos días (raya discontinua y
+   «viaje · origen → destino · hora»), no una fila. **Tres noches libres o más** son una línea en su primera
+   noche, con la regla del Mes (`closedGapWindows` desde hoy). **La semana es una raya más fuerte** encima de la
+   primera fila de una semana nueva; el cambio de mes es su nombre. «Semana» no se dice: fuera bandas, recuentos
+   por semana y meses plegables. **El mes queda fijo arriba**: la fila del título se pega como en el Mes y nombra el
+   mes de la primera fila bajo ella; la barra de vistas se va con el papel. Alguien con dos confirmadas el mismo
+   día (o confirmado durante una ausencia): raya roja junto a las cosas del día y «alguien está en dos sitios».
+   En el móvil los pasos de un día se pliegan en una línea («14 pasos ›») que se abre. Se conservan el margen de
+   escritorio (pasos, decisiones, notas), el verbo «confirmar» de las opciones, la carga hacia atrás a propósito y
+   el final del plan.
+2. **La fila de la Agenda no es el Slip** (enmienda ADR-095 § 0 solo aquí): el dibujo ordena distinto (la ciudad
+   primero, la hora en columna), así que la Agenda pinta los campos del Slip (`performanceSlip` / `dateSlip`, el
+   mismo normalizador) en su propio orden. Un objeto de datos, dos colocaciones.
+3. **«Falta» es una regla** (`missingSoon`, `$lib/record-missing`): la de `performanceMissing` (opción que vence
+   esta semana, sin bolo, hoja de ruta sin compartir, nadie va) más **«confirmada sin hora»** (`no_time`, que
+   antes solo miraba `unclosed` de `$lib/season`, borrado). Ventana: de hoy a 14 días. Hotel, técnica, el
+   «¿viaje?» supuesto y las fechas que no son función no cuentan; «sin bolo» cuenta; un dato que el lector no ve
+   no pide nada. La ficha suma «Sin hora» a su tira con el verbo «añadir» (lleva a la escaleta). En la Agenda,
+   con las palabras de la ficha en ámbar junto a la sala, y «sin hora» en la columna de la hora. En Hoy, un punto
+   en la ficha del día (cuenta también lo que el «+N» esconde), con nombre accesible «Falta algo»; en calma no se
+   dibuja (`coming_missing`, como «Te espera», ADR-203 § 5). Una casa: `styles/missing.css` y `--missing-ink`
+   (el ámbar de estado).
+4. **La tarjeta de primera visita habla de la Agenda** y su recorrido empieza en ella (la lista, la línea de
+   estado, la barra). **Sin vista guardada, el Planificador abre en la Agenda** (`PLANNER_DEFAULT_VIEW`; ADR-209 decía el Mes hasta
+   esta fase). El defecto se guarda como `null`; elegir el Mes ahora guarda `month`. Quien tenía el Mes por
+   defecto (null) pasa a abrir en la Agenda; sin migración.
+
+**Construido (rama `claude/planner-agenda`).**
+- `AgendaList.svelte` reescrito sobre `$lib/agenda-items` (puro, con tests); fuera `$lib/agenda-chunks` y las
+  claves de semana, del conmutador de ausencias y de dirección de viaje. `travelOriginFinder` en
+  `$lib/month-events`, el mismo para Mes y Agenda.
+- La fila del pulso traía reparto (`?rosters=1`) y aviso de opción (`?notice=1`), no el bolo ni los enlaces de la
+  hoja. `GET /api/performances?missing=1` añade `has_bolo` y `roadsheet_links` a las filas de ayer a 15 días
+  (`$lib/server/missing-facts`), cada uno por su puerta: `list_performance_bolo_links` (`read:money`) y
+  `list_roadsheet_shares` (`edit:performance`, una llamada por función confirmada en la ventana). Lo piden el pulso
+  y el feed de la Agenda. `CACHE_SCHEMA` 34 → 35.
+- `help.concept.unclosed` pasa a «Falta» y su texto deja de nombrar hotel y técnica.
+
+**Calma (Marco, 16-11).** En calma el ámbar de la Agenda se sigue diciendo: lo que falta es obligación, no volumen;
+solo el punto de Hoy se calla. El panel del Día al lado (fase 3) ocupará la columna que hoy lleva el margen.
+
+**Cómo se revierte.** Revertir la rama: vuelven el diario de bandas y `agenda-chunks`; `CACHE_SCHEMA` sube otra vez
+al revertir; ninguna migración.

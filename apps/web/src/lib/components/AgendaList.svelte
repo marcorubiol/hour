@@ -6,7 +6,7 @@
    * *shows* the tension, it never duplicates the write UI.
    */
   export type AgendaDecision = {
-    /** The two performance ids in tension — both rows are wrapped. */
+    /** The two performance ids in tension. */
     ids: [string, string];
     /** Localized reason ("… a dues reserves el mateix dia", "Sense dades…"). */
     reason: string;
@@ -24,54 +24,57 @@
     performance_id?: string;
     date_id?: string;
   };
+
+  /** What a performance still needs, as the row says it (ADR-211 § 3). */
+  export type AgendaMissing = { noTime: boolean; words: string[] };
 </script>
 
 <script lang="ts">
   /**
-   * Agenda projection of the Calendar lens (ADR-076) — the same fetched
-   * rows as the month grid, regrouped as a continuous multi-month BOOK:
-   * a serif month divider opens each month, every day of the span gets a
-   * row (empty days a hairline, kept ones their events), and the reader
-   * scrolls to summon more months (an end sentinel asks the page to extend
-   * the span; a top "earlier" action prepends with scroll-anchoring).
+   * THE AGENDA (ADR-211, the drawing of ADR-209 § 3): a list from top to
+   * bottom of the days with something. Each day is a row: its weekday and
+   * number, then one line per thing — the monogram, the CITY as the strong
+   * word with the venue under it, the hour at the end. A trip is a leg
+   * between two days, not a row; three free nights or more are one line; the
+   * week is a stronger rule above its first row, and «semana» is said nowhere.
+   * What a performance in the next two weeks still needs is said beside it in
+   * amber, in the record's own words.
    *
-   * Each day: a weekday+number header column, one row per event
-   * (meta[time·status | kind badge] · title · place · project chip),
-   * clash banners leading a conflicted day, contested holds wrapped under
-   * a reason band, and the blackout/festival rail on the right.
-   *
-   * The page owns the feeds, the conflict/decision engines, the i18n and
-   * the multi-month span; this component is pure presentation. Days are
-   * given whole (`days`) — the "days with events" inclusion rule is gone,
-   * the book shows the calendar entire.
+   * The structure is `$lib/agenda-items` (pure, tested). The page owns the
+   * feeds, the engines, the words and the span; this draws. The margin
+   * (steps, calls to make, my notes) is the old diary's, kept: on a phone the
+   * day's steps fold into one line that opens.
    */
   import { createQuery } from '@tanstack/svelte-query';
+  import { MediaQuery, SvelteSet } from 'svelte/reactivity';
   import { bookingModeOf } from '$lib/booking-mode';
   import {
     dateDayKey,
+    dateSlip,
     deducedPhrase,
+    performanceSlip,
     perfDayKey,
+    perfWorkspaceId,
+    travelOriginFinder,
     type AwayBandVM,
     type BlackoutBandVM,
     type ClashVM,
     type DateEvent,
     type NoteEvent,
     type PerformanceEvent,
+    type Slip,
   } from '$lib/month-events';
-  import { assignBandLanes, dayKeyInTz, statusWord } from '$lib/planner';
-  import { agendaChunks, dayMarked, emptyTailMonths, type AgendaDayStats } from '$lib/agenda-chunks';
+  import { dayKeyInTz, statusWord } from '$lib/planner';
+  import { agendaItems, quietTail } from '$lib/agenda-items';
   import { awayRest, coversDay } from '$lib/away';
-  import { SvelteMap } from 'svelte/reactivity';
+  import { MOBILE_QUERY } from '$lib/breakpoints';
   import { dualTime, hourMark, localeDayMonth, localeWeekdayShort, viewerTimeZone } from '$lib/datetime';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { accentVarFor } from '$lib/utils/accent';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
-  import Slip from '$lib/components/planner/Slip.svelte';
   import PlannerSteps, { type StepVM } from '$lib/components/planner/PlannerSteps.svelte';
-  import { performanceSlip, dateSlip, perfWorkspaceId } from '$lib/month-events';
-  import { holdDeadlineLabel, performanceStatusFamily } from '$lib/performance';
+  import { performanceStatusFamily } from '$lib/performance';
   import { appLocale, appLocaleTag, t, tradeFor, type Voice } from '$lib/i18n';
-  import { dateStatusFamily } from '$lib/date';
 
   interface Props {
     /** Ordered ISO days across the whole agenda span (multi-month). */
@@ -87,60 +90,39 @@
     clashesByDay?: Map<string, ClashVM[]>;
     /** Contested holds per day (ADR-080 §4) — reason + the two perf ids. */
     decisionsByDay?: Map<string, AgendaDecision[]>;
-    /** Today's day key (viewer tz) — the accented number. */
+    /** Today's day key (viewer tz). */
     todayIso?: string;
-    /** BCP47/locale tag for the day-header/divider labels. */
+    /** BCP47/locale tag for the day and month labels. */
     locale?: string;
-    /** i18n hooks — the page passes t()-backed fns/strings. */
-    dateKindLabel?: (kind: string) => string;
-    viewerTimeLabel?: (time: string) => string;
+    dateKindLabel?: (kind: string, voice?: Voice) => string;
     statusLabel?: (status: string) => string;
-    travelDirLabel?: (dir: string) => string;
     emptyLabel?: string;
-    blackoutsToggleLabel?: string;
-    decideLabel?: string;
-    /** Header of the right-hand dot-grid notes column. */
-    notesLabel?: string;
-    /** «show» — the kind word a performance row carries in its pack, in the
-        trade of the row's space (tarea 142). */
-    showWord?: (voice?: Voice) => string;
-    /** «let go» — the word a released row carries. */
-    releasedWord?: string;
-    /** «no hour» — a hold nobody has timed. NEVER a dash. */
+    /** «sin hora» — said in amber when a confirmed performance lacks it. */
     noHourWord?: string;
-    /** «all day» — a row that lasts the day, which is not the same as no hour. */
-    allDayWord?: string;
-    /** Scroll nears the foot → the page grows the book forward (it probes
-        and jumps to the next planned month, or answers with `endLabel`). */
-    /** «week 29», «2 confirmed · 4 options · 1 night free», «5 days free»,
-        «show» — the diary's own summary vocabulary. */
-    weekLabel?: (n: number) => string;
-    weekRange?: (from: string, to: string) => string;
-    weekTally?: (firm: number, held: number, free: number) => string;
-    /** The census's rule for a free night (today on, not on tour, nothing of
-        the company's own). Without it a night is free when it has no rows. */
-    freeNight?: (day: string) => boolean;
-    /** Who goes to a gig — names on file, [] for nobody, null when the feed
-        did not say. The Day said it and the diary did not (uso #8). */
+    /** «a» — a trip whose origin nobody knows goes «viaje · a Bilbao». */
+    toWord?: string;
+    /** The free runs the Month hatches (`gapWindows`), named here. */
+    gaps?: ReadonlyArray<{ from: string; nights: number }>;
+    gapLabel?: (nights: number) => string;
+    /** The one rule of «Falta» (ADR-211 § 3), already windowed and worded. */
+    missingOf?: (perf: PerformanceEvent) => AgendaMissing;
+    /** Who goes: names on file, [] for nobody, null when the feed did not
+        say (then nothing is drawn). Desktop only (Marco, 16-11). */
     castOf?: (perf: PerformanceEvent) => string[] | null;
     noCastWord?: (voice?: Voice) => string;
-    /**
-     * THE VERBS, on the row itself. A hold is a question the diary is asking
-     * you; answering it belonged three clicks away in a drawer, so the row
-     * that poses the question could not resolve it.
-     */
+    /** «alguien está en dos sitios». */
+    twoPlacesLabel?: string;
+    /** «14 pasos ›» — the phone's folded steps. */
+    stepsFoldLabel?: (n: number) => string;
+    /** THE VERB, on the row: confirming a hold is a question the list asks. */
     onConfirm?: (perfId: string) => void;
-    /** Performance id with a write in flight. */
     pendingId?: string | null;
     confirmLabel?: string;
-    /** «until», «5 days left», «back tomorrow» — the absence's own words. */
     awayUntilWord?: string;
     awayLeftWord?: string;
     awayLeftOneWord?: string;
     awayBackWord?: string;
-    /** The day's own number is a door to that day's drawing — the same door
-        the month's number is. A diary tells you a date has weight; the next
-        question is always what that day looks like. */
+    /** The day's number is a door to that day. */
     onDayOpen?: (isoDate: string) => void;
     /** «to decide» — the margin card's own eyebrow. */
     decideCardLabel?: string;
@@ -149,52 +131,29 @@
     /** The next steps that wait on each day (ADR-138 § 6): the margin, never the rows. */
     stepsByDay?: Map<string, StepVM[]>;
     stepsLabel?: string;
-    /** Absent ⇒ the margin only reads (pre-migration DB hides the writer). */
+    /** Absent ⇒ the margin only reads. */
     onNoteCreate?: (draft: NoteDraft) => Promise<boolean>;
     onNoteDelete?: (id: string) => void;
-    /** Where an anchorless note falls — «the company» or the pinned scope. */
     noteFallbackLabel?: string;
-    /** That fallback is a SPACE (not a project/line): it comes down already
-        lowercase, so the anchor's mono-caps register must stand aside. */
     noteFallbackIsSpace?: boolean;
     notePlaceholder?: string;
     noteAddLabel?: string;
     noteDeleteLabel?: string;
+    /** Scroll nears the foot → the page grows the list forward. */
     onReachEnd?: () => void;
-    /** The past, on request: fired by the head's «earlier» line and by the
-        overpull gesture at the very top. Absent (page at its floor) ⇒ both
-        disappear — an act that can do nothing is not drawn. Awaited, so
-        the door can wear «loading…» while the jump is in flight. */
+    /** The past, on request (the head's line and the overpull). */
     onReachStart?: () => void | Promise<void>;
-    /** «↑ earlier months» — the head line's own words. */
     earlierLabel?: string;
-    /** «loading…» — the door's promised/in-flight state. */
     loadingLabel?: string;
-    /** «nothing further back» — shown at the head instead of the door once
-        the page knows the past holds nothing (or the floor is reached). */
     noEarlierLabel?: string;
-    /** The book's tail went quiet: the sentinel is off, and the page is
-        asked to look ahead ONCE — jump the gap to the next planned month,
-        or declare the plan finished by passing `endLabel`. */
+    /** The list's tail went quiet: the page looks ahead once. */
     onPlanEnds?: () => void;
-    /** «nothing more planned» — the book's honest end, printed only when
-        the page's look-ahead came back empty. */
     endLabel?: string;
-    /** Beyond the book's horizon there is still something: its date and the
-        way there (uso #11 — «nothing more» was absolute while a gig sat in
-        2031). */
     endBeyond?: { label: string; onGo: () => void };
-    /** Jump to the DecisionBand (where the pick/release actions live). */
-    onDecideJump?: () => void;
-    /**
-     * Date row click — opens the page's edit dialog. Absent ⇒ the rows
-     * stay inert divs, as the book has always rendered them. A gig row
-     * keeps its link: a performance has a page, a date does not.
-     */
+    /** A date's row opens the page's edit dialog. */
     onDateOpen?: (d: DateEvent) => void;
   }
 
-  /** Defaults in the session's language; the page passes its own t(). */
   const L = appLocale();
 
   let {
@@ -210,30 +169,20 @@
     locale = appLocaleTag(),
     todayIso = dayKeyInTz(new Date().toISOString(), viewerTimeZone()),
     dateKindLabel = (kind: string) => kind.replace(/_/g, ' '),
-    viewerTimeLabel = (time: string) => t('planner.viewer_time', L, { time }),
     statusLabel = (status: string) => statusWord(status, L),
-    travelDirLabel = (dir: string) => t(`planner.travel_${dir}`, L),
     emptyLabel = t('planner.empty_month', L),
-    blackoutsToggleLabel = t('planner.blackouts_toggle', L),
-    decideLabel = t('planner.agenda_decide', L),
-    notesLabel = t('planner.agenda_notes', L),
-    showWord = (voice?: Voice) => t('planner.kind_show', L, undefined, voice),
-    releasedWord = t('planner.released', L),
     noHourWord = t('planner.no_hour', L),
-    allDayWord = t('planner.all_day', L),
-    weekLabel = (n: number) => `${t('planner.week_n', L)} ${n}`,
-    weekRange = (from: string, to: string) => `${from} → ${to}`,
-    freeNight,
+    toWord = t('planner.slip_to', L),
+    gaps = [],
+    gapLabel = (n: number) => `${n} ${t('planner.stat_free', L)}`,
+    missingOf,
     castOf,
     noCastWord = (voice?: Voice) => t('planner.no_cast', L, undefined, voice),
-    weekTally = (firm: number, held: number, free: number) =>
-      [
-        firm ? `${firm} ${t(firm === 1 ? 'planner.week_confirmed_one' : 'planner.week_confirmed', L)}` : '',
-        held ? `${held} ${t(held === 1 ? 'planner.week_option_one' : 'planner.week_options', L)}` : '',
-        free ? `${free} ${t(free === 1 ? 'planner.week_free_one' : 'planner.week_free', L)}` : '',
-      ]
-        .filter(Boolean)
-        .join(' · ') || t('planner.week_nothing', L),
+    twoPlacesLabel = t('planner.agenda_two_places', L),
+    stepsFoldLabel = (n: number) => `${t('planner.steps_n', L, { n })} ›`,
+    onConfirm,
+    pendingId = null,
+    confirmLabel = t('planner.dec_confirm_short', L),
     awayUntilWord = t('planner.away_until', L),
     awayLeftWord = t('planner.away_left', L, { n: '{n}' }),
     awayLeftOneWord = t('planner.away_left_one', L),
@@ -250,9 +199,6 @@
     notePlaceholder = t('planner.note_placeholder', L),
     noteAddLabel = t('planner.note_add', L),
     noteDeleteLabel = t('planner.note_delete', L),
-    onConfirm,
-    pendingId = null,
-    confirmLabel = t('planner.dec_confirm_short', L),
     onReachEnd,
     onReachStart,
     earlierLabel = t('planner.agenda_earlier', L),
@@ -261,446 +207,180 @@
     onPlanEnds,
     endLabel,
     endBeyond,
-    onDecideJump,
     onDateOpen,
   }: Props = $props();
 
-  /**
-   * The shell a date row renders as. `svelte:element` swaps the tag; the
-   * button-only attributes ride as a spread so a plain div never carries a
-   * stray type="button". IdentityMark is a span, so unlike the month chip
-   * there is no nested interactive content to work around here.
-   */
-  function rowShellProps(d: DateEvent): Record<string, unknown> {
-    return onDateOpen ? { type: 'button', onclick: () => onDateOpen(d) } : {};
-  }
-
   const viewerTz = viewerTimeZone();
+  const phone = new MediaQuery(MOBILE_QUERY, false);
 
   const workspacesQuery = createQuery(workspacesQueryOptions());
-  let workspaceSlugById = $derived(
-    new Map(($workspacesQuery.data?.items ?? []).map((w) => [w.id, w.slug])),
-  );
-  let workspaceTzById = $derived(
-    new Map(($workspacesQuery.data?.items ?? []).map((w) => [w.id, w.timezone])),
-  );
-  /** ADR-002 — the hold convention, per workspace: `1st hold` only means
-      something where the company runs a priority queue. */
-  let workspaceModeById = $derived(
-    new Map(($workspacesQuery.data?.items ?? []).map((w) => [w.id, bookingModeOf(w)])),
-  );
-
-  // ── Rows per day ───────────────────────────────────────────────────────
-  type Row =
-    | { kind: 'perf'; sort: string; perf: PerformanceEvent }
-    | { kind: 'date'; sort: string; date: DateEvent };
-
-  let rowsByDay = $derived.by(() => {
-    const map = new Map<string, Row[]>();
-    const push = (key: string, row: Row) => {
-      (map.get(key) ?? map.set(key, []).get(key)!).push(row);
-    };
-    for (const p of performances) {
-      push(perfDayKey(p), { kind: 'perf', sort: perfSortKey(p), perf: p });
-    }
-    for (const d of dates) {
-      push(dateDayKey(d, viewerTz), { kind: 'date', sort: dateSortKey(d), date: d });
-    }
-    for (const rows of map.values()) {
-      /* TIMED FIRST, then the un-timed — the running order of the day.
-         It used to be the other way round: the empty sort key sorted before
-         every clock, so a hold nobody had timed opened the day above the gig
-         that actually happens at 20h. A day reads forwards. */
-      rows.sort((a, b) => {
-        const ra = a.sort ? 0 : 1;
-        const rb = b.sort ? 0 : 1;
-        if (ra !== rb) return ra - rb;
-        return a.sort < b.sort ? -1 : a.sort > b.sort ? 1 : 0;
-      });
-    }
-    return map;
-  });
-
-  // The book shows every day of the span — no inclusion filter.
-  /* ONE NORMALISER FOR THE WHOLE PLANNER. The diary hands its two primitives
-     to the same `performanceSlip` / `dateSlip` the month uses, so a field can
-     never mean one thing here and another there. */
+  let workspaces = $derived($workspacesQuery.data?.items ?? []);
   let slipCtx = $derived({
     workspaceSlug,
-    workspaceSlugById,
-    workspaceTzById,
-    workspaceModeById,
+    workspaceSlugById: new Map(workspaces.map((w) => [w.id, w.slug])),
+    workspaceTzById: new Map(workspaces.map((w) => [w.id, w.timezone])),
+    workspaceModeById: new Map(workspaces.map((w) => [w.id, bookingModeOf(w)])),
     viewerTz,
-    kindLabel: (k: string) => dateKindLabel(k),
-    statusLabel: (st: string) => statusWord(st, L),
+    kindLabel: (k: string, voice?: Voice) => dateKindLabel(k, voice),
+    statusLabel,
     viewerTimeLabel: (time: string) => t('planner.viewer_time', L, { time }),
     fallbackName: (voice: Voice) => t('create.type_performance', L, undefined, voice),
     dualTime,
-  });
-  /** Released says `let go`; a hold says its rank and, if the clock is
-      running, when. A firm gig and a proposal both say nothing — the
-      geometry carries them (ADR-095 §4). */
-  function slipState(sl: ReturnType<typeof dateSlip>): string | null {
-    if (sl.cert === 'released') return releasedWord;
-    if (sl.cert === 'hold' && sl.hold) {
-      const rank = sl.hold.rank ? statusLabel(`hold_${sl.hold.rank}`) : statusLabel('hold');
-      return sl.hold.expires
-        ? `${rank} · ${holdDeadlineLabel(sl.hold.expires, todayIso, L, locale, true)}`
-        : rank;
-    }
-    return null;
-  }
-  /** The pair a clash names — the same test the month uses, so the rule and
-      the day mark can never disagree about how bad it is. */
-  function clashOf(row: Row): { clash: 'none' | 'soft' | 'hard'; people: boolean } {
-    const id = row.kind === 'perf' ? row.perf.id : row.date.id;
-    const day = row.kind === 'perf' ? perfDayKey(row.perf) : dateDayKey(row.date, viewerTz);
-    const list = clashesByDay?.get(day) ?? [];
-    const mine = list.filter((c) => c.event_ids?.includes(id));
-    if (mine.length === 0) return { clash: 'none', people: false };
-    const confirmed =
-      row.kind === 'perf' && performanceStatusFamily(row.perf.status) === 'confirmed';
-    return {
-      clash: confirmed ? 'hard' : 'soft',
-      people: mine.some((c) => c.severity === 'people' || c.severity === 'blackout'),
-    };
-  }
-
-  let shownDays = $derived(days);
-
-  /* ── MONTH > WEEK > DAY — every level a door (Marco, 2026-08-03) ───────
-     The book's structure lives in $lib/agenda-chunks, pure and tested;
-     this file only hands it the day facts and holds the reader's toggles.
-     What died here: the run-of-quiet-days line (an open week now prints
-     every day it has, and the collapsed week above does the run's old
-     job), and the day-walked month divider — which a free week straddling
-     the month turn could swallow whole, hanging May's weeks under April.
-     Session state only, like every open/closed in this book (ADR-080 §5). */
-  const monthOverride = new SvelteMap<string, boolean>();
-  const weekOverride = new SvelteMap<string, boolean>();
-
-  /* `Now` RESETS THE BOOK (Marco, 2026-08-03): the page snaps the span's
-     start back to today, and the diary notices its first day JUMPING
-     FORWARD — loading only ever moves it back — and returns to its
-     first-load shape: doors to their defaults, the past's line hidden
-     until it is asked for again. */
-  let prevStart = '';
-  $effect(() => {
-    const start = days[0] ?? '';
-    if (prevStart && start > prevStart) {
-      earlierRevealed = false;
-      monthOverride.clear();
-      weekOverride.clear();
-    }
-    prevStart = start;
+    originOf: travelOriginFinder(performances, dates, viewerTz),
   });
 
-  /** The day's facts, in the chunker's vocabulary. `free` is a night the
-      trade can sell (no rows); `marked` is a clash, a note or a step — not a
-      booking, but reason enough to keep the day's containers open. Away
-      bands count for neither: they are about a person, not the calendar. */
-  function dayStats(day: string): AgendaDayStats {
-    const rows = rowsByDay.get(day) ?? [];
-    let firm = 0;
-    let held = 0;
-    for (const r of rows) {
-      if (r.kind !== 'perf') continue;
-      const f = performanceStatusFamily(r.perf.status);
-      if (f === 'confirmed') firm++;
-      else if (f === 'hold' || f === 'proposed') held++;
-    }
-    return {
-      free: rows.length === 0,
-      sellable: freeNight ? freeNight(day) : rows.length === 0,
-      marked: dayMarked({
-        clashes: clashesByDay?.get(day),
-        notes: notesByDay?.get(day),
-        steps: stepsByDay?.get(day),
-      }),
-      firm,
-      held,
-    };
+  // ── What each day holds ──────────────────────────────────────────────
+  type Row =
+    | { kind: 'perf'; sort: string; perf: PerformanceEvent; slip: Slip }
+    | { kind: 'date'; sort: string; date: DateEvent; slip: Slip };
+
+  /** Timed first, by the clock; then the un-timed: the day reads forwards. */
+  function byClock(a: Row, b: Row): number {
+    if (!a.sort !== !b.sort) return a.sort ? -1 : 1;
+    return a.sort < b.sort ? -1 : a.sort > b.sort ? 1 : 0;
+  }
+  /* THE SORT KEY STAYS ON THE WIRE CLOCK: `9h` sorts above `20h30` by
+     codepoint, so the printed hour cannot order the day. */
+  /* A PERFORMANCE SAYS WHEN IT STARTS (the drawing): the get-in is the
+     Day's business, and a row that printed it read as the show's hour. */
+  function perfSort(p: PerformanceEvent): string {
+    if (!p.start_at) return '';
+    const tz = p.venue?.timezone ?? slipCtx.workspaceTzById.get(perfWorkspaceId(p) ?? '') ?? null;
+    return dualTime(p.start_at, tz, viewerTz).primary;
+  }
+  function hourOf(row: Row): string | null {
+    if (row.kind === 'date') return row.slip.time?.primary ?? null;
+    return row.sort ? hourMark(row.sort) : null;
+  }
+  function dateSort(d: DateEvent): string {
+    return d.all_day ? '' : dualTime(d.starts_at, d.venue?.timezone, viewerTz).primary;
   }
 
-  let chunks = $derived(
-    agendaChunks({ days: shownDays, todayIso, dayStats, monthOverride, weekOverride }),
+  let byDay = $derived.by(() => {
+    const rows = new Map<string, Row[]>();
+    const legs = new Map<string, Row[]>();
+    const push = (m: Map<string, Row[]>, key: string, row: Row) => (m.get(key) ?? m.set(key, []).get(key)!).push(row);
+    for (const p of performances) {
+      push(rows, perfDayKey(p), { kind: 'perf', sort: perfSort(p), perf: p, slip: performanceSlip(p, slipCtx) });
+    }
+    for (const d of dates) {
+      const row: Row = { kind: 'date', sort: dateSort(d), date: d, slip: dateSlip(d, slipCtx) };
+      push(d.kind === 'travel_day' ? legs : rows, dateDayKey(d, viewerTz), row);
+    }
+    for (const list of rows.values()) list.sort(byClock);
+    for (const list of legs.values()) list.sort(byClock);
+    return { rows, legs };
+  });
+  let legById = $derived(new Map([...byDay.legs.values()].flat().map((r) => [r.slip.id, r])));
+
+  let writingDay = $state<string | null>(null);
+  /** A day gets a row when something is on it that is not a trip: a thing,
+      a step, a call to make or a note — the margin is part of the day. */
+  function kept(day: string): boolean {
+    return Boolean(
+      byDay.rows.get(day)?.length ||
+        stepsByDay?.get(day)?.length ||
+        decisionsByDay?.get(day)?.length ||
+        notesByDay?.get(day)?.length ||
+        writingDay === day,
+    );
+  }
+  let items = $derived(
+    agendaItems({ days, kept, legs: (d) => (byDay.legs.get(d) ?? []).map((r) => r.slip.id), gaps }),
   );
+  let keptDays = $derived(items.flatMap((i) => (i.t === 'day' ? [i.day] : [])));
 
-  /* ── THE BOOK STOPS GROWING WHERE THE PLAN STOPS (Marco, 2026-08-03) ──
-     A collapsed chapter is ~36px, so the end sentinel never left its own
-     800px reach and one scroll milled out months of quiet future. When the
-     tail goes quiet the sentinel goes OFF and the page is asked to look
-     ahead once — jump the gap to the next planned month, or come back with
-     `endLabel` and the book ends with a sentence instead of a treadmill.
-     Deliberate travel (the ‹ › arrows) still walks past the end. */
-  let endStop = $derived(emptyTailMonths(shownDays, todayIso, dayStats) >= 1);
+  /* THE LIST STOPS GROWING WHERE THE PLAN STOPS: a quiet last month turns
+     the sentinel off and the page looks ahead once. */
+  let endStop = $derived(quietTail(days, todayIso, (d) => kept(d) || byDay.legs.has(d)));
   $effect(() => {
     void days.length;
     if (endStop) onPlanEnds?.();
   });
 
-  // ── Render items per day: loose rows, with contested holds folded into a
-  // band at the position of their first member (both members must be
-  // present — a status filter can hide one, then it just reads as a row). ─
-  type ContestGroup = { dec: AgendaDecision; a: Row; b: Row };
-  type RenderItem = { contest: ContestGroup } | { row: Row };
-
-  function dayItems(day: string): RenderItem[] {
-    const rows = rowsByDay.get(day) ?? [];
-    const decs = decisionsByDay?.get(day);
-    if (!decs || decs.length === 0) return rows.map((row) => ({ row }));
-
-    const rowByPerf = new Map<string, Row>();
-    for (const r of rows) if (r.kind === 'perf') rowByPerf.set(r.perf.id, r);
-
-    const grouped = new Set<string>();
-    const firstMember = new Map<string, ContestGroup>();
-    for (const dec of decs) {
-      if (grouped.has(dec.ids[0]) || grouped.has(dec.ids[1])) continue;
-      const a = rowByPerf.get(dec.ids[0]);
-      const b = rowByPerf.get(dec.ids[1]);
-      if (!a || !b) continue;
-      const g: ContestGroup = { dec, a, b };
-      grouped.add(dec.ids[0]);
-      grouped.add(dec.ids[1]);
-      firstMember.set(rows.indexOf(a) <= rows.indexOf(b) ? dec.ids[0] : dec.ids[1], g);
-    }
-    if (grouped.size === 0) return rows.map((row) => ({ row }));
-
-    const out: RenderItem[] = [];
-    for (const r of rows) {
-      const pid = r.kind === 'perf' ? r.perf.id : null;
-      if (pid && grouped.has(pid)) {
-        const g = firstMember.get(pid);
-        if (g) out.push({ contest: g });
-        continue;
-      }
-      out.push({ row: r });
-    }
-    return out;
+  // ── The row's words ──────────────────────────────────────────────────
+  /** The strong word is the city; the venue (or, for a date, its kind and
+      title) goes under it. A slip never prints the same place twice. */
+  function strong(sl: Slip): string {
+    return sl.city ?? sl.name;
+  }
+  function under(row: Row): string | null {
+    const sl = row.slip;
+    if (row.kind === 'perf') return sl.city ? sl.name : null;
+    const raw = dateKindLabel(row.date.kind === 'other' && row.date.label ? row.date.label : row.date.kind);
+    const kind = raw.charAt(0).toUpperCase() + raw.slice(1);
+    const what = sl.city ? sl.name : null;
+    if (what && what.toLowerCase() !== raw.toLowerCase()) return `${kind} · ${what}`;
+    // A date named by its kind («día libre») does not say it twice.
+    return strong(sl).toLowerCase() === raw.toLowerCase() ? null : kind;
+  }
+  function legText(row: Row): string {
+    const d = (row as Extract<Row, { kind: 'date' }>).date;
+    const sl = row.slip;
+    const dest = d.destination_city ?? d.city ?? sl.name;
+    const where = sl.origin ? `${sl.origin} → ${dest}` : `${toWord} ${dest}`;
+    return [dateKindLabel(d.kind), where, sl.time?.primary].filter(Boolean).join(' · ');
+  }
+  function held(sl: Slip): boolean {
+    return sl.cert === 'hold' || sl.cert === 'proposed';
+  }
+  /** A person booked twice, or across an absence, on a firm row: the one
+      clash the list draws (the drawing's «alguien está en dos sitios»). */
+  function personClash(day: string): boolean {
+    const list = clashesByDay?.get(day) ?? [];
+    return (byDay.rows.get(day) ?? []).some(
+      (r) =>
+        r.kind === 'perf' &&
+        performanceStatusFamily(r.perf.status) === 'confirmed' &&
+        list.some((c) => c.event_ids?.includes(r.perf.id) && (c.severity === 'people' || c.severity === 'blackout')),
+    );
   }
 
-  // ── Time rendering (timezone rule — same as MonthGrid) ────────────────
-  function perfTz(p: PerformanceEvent): string | null {
-    return p.venue?.timezone ?? workspaceTzById.get(perfWorkspaceId(p) ?? '') ?? null;
-  }
-  function perfInstant(p: PerformanceEvent): string | null {
-    return p.load_in_at ?? p.start_at;
-  }
-  function perfDual(p: PerformanceEvent): { primary: string; secondary: string | null } | null {
-    const at = perfInstant(p);
-    if (!at) return null;
-    const t = dualTime(at, perfTz(p), viewerTz);
-    return { primary: t.primary, secondary: t.secondary };
-  }
-  /* THE SORT KEY STAYS ON THE WIRE CLOCK. `hourMark` is a reading, not an
-     ordering: `9h` sorts above `20h30` by codepoint, so the day's running
-     order would invert the moment the hour lost its leading zero. Formatting
-     happens where it is printed and nowhere else. */
-  function perfSortKey(p: PerformanceEvent): string {
-    return perfDual(p)?.primary ?? '';
-  }
-  function dateDual(d: DateEvent): { primary: string; secondary: string | null } | null {
-    if (d.all_day) return null;
-    const t = dualTime(d.starts_at, d.venue?.timezone, viewerTz);
-    return { primary: t.primary, secondary: t.secondary };
-  }
-  function dateSortKey(d: DateEvent): string {
-    return dateDual(d)?.primary ?? '';
-  }
-
-  function perfHref(p: PerformanceEvent): string | null {
-    if (!p.slug) return null;
-    const ws = workspaceSlugById.get(perfWorkspaceId(p) ?? '') ?? workspaceSlug;
-    return `/h/${ws}/performance/${p.slug}`;
-  }
-  function perfName(p: PerformanceEvent): string {
-    return p.venue?.name ?? p.venue_name ?? p.city ?? p.project?.name ?? t('create.type_performance', L, undefined, tradeFor(perfWorkspaceId(p)));
-  }
-  function perfCity(p: PerformanceEvent): string | null {
-    return p.venue?.city ?? p.city;
-  }
-  function dateText(d: DateEvent): string {
-    // `other` names itself with its custom label (badge), so the body shows
-    // the real title (+ place) — e.g. "Mescla · Tamarit", badge "ESTUDI".
-    if (d.kind === 'other') {
-      return [d.title ?? d.label, d.city].filter(Boolean).join(' · ') || dateKindLabel(d.kind);
-    }
-    if (d.kind === 'day_off') {
-      const base = dateKindLabel(d.kind);
-      return d.city ? `${base} · ${d.city}` : (d.title ?? base);
-    }
-    return d.title ?? d.city ?? dateKindLabel(d.kind);
-  }
-  // The meta badge: `other` shows its custom label (custom_fields.label,
-  // ADR-078 §8) uppercased; every other kind shows the kind name.
-  function dateBadge(d: DateEvent): string {
-    if (d.kind === 'other' && d.label) return d.label;
-    return dateKindLabel(d.kind);
-  }
-  function travelText(d: DateEvent): string {
-    const place = d.city ?? d.title ?? d.venue_name ?? dateKindLabel(d.kind);
-    const dir = d.travel_direction ? travelDirLabel(d.travel_direction) : null;
-    return dir ? `✈ ${place} · ${dir}` : `✈ ${place}`;
-  }
-
-  // ── Day header + month divider labels ──────────────────────────────────
   function headWeekday(iso: string): string {
     return localeWeekdayShort(iso, locale).toLowerCase();
   }
-  function monthDivName(iso: string): string {
-    const raw = new Date(`${iso}T00:00:00Z`).toLocaleDateString(locale, {
-      month: 'long',
-      timeZone: 'UTC',
-    });
+  function monthName(iso: string): string {
+    const raw = new Date(`${iso}T00:00:00Z`).toLocaleDateString(locale, { month: 'long', timeZone: 'UTC' });
     return raw.charAt(0).toUpperCase() + raw.slice(1);
   }
-  function monthDivYear(iso: string): string {
-    return iso.slice(0, 4);
-  }
 
-  // ── Blackout rail — shared lane system for capsules + away threads. ───
-  type RailItem = {
-    from: string;
-    to: string;
-    away: boolean;
-    company: boolean;
-    tentative: boolean;
-    label: string;
-    /** Only a tour has one: that it was deduced, and from which trips (§ 38). */
-    deduced?: string;
-  };
-  let railItems = $derived.by((): RailItem[] => [
-    ...blackouts.map((b) => ({
-      from: b.from,
-      to: b.to,
-      away: false,
-      company: b.company,
-      tentative: b.tentative,
-      label: b.label,
-    })),
-    ...aways.map((a) => ({
-      from: a.from,
-      to: a.to,
-      away: true,
-      company: false,
-      tentative: false,
-      label: a.label,
-      deduced: deducedPhrase(a.deduced),
-    })),
-  ]);
-  let railLanes = $derived(assignBandLanes(railItems));
-  /** First shown day covering each item — where its vertical name lives. */
-  let railLabelDay = $derived(
-    railItems.map((it) => shownDays.find((d) => d >= it.from && d <= it.to) ?? it.from),
-  );
-
-  // Narrow frames (<~560px) collapse the rail to threads by default; the
-  // pill expands the named panel as an overlay (ADR-078 / converged mock).
-  let narrow = $state(false);
-  let panelOpen = $state(false);
-  $effect(() => {
-    const mq = matchMedia('(max-width: 35rem)');
-    const apply = () => {
-      narrow = mq.matches;
-      if (!mq.matches) panelOpen = false;
-    };
-    apply();
-    mq.addEventListener('change', apply);
-    return () => mq.removeEventListener('change', apply);
-  });
-
-  let railMode = $derived(narrow ? (panelOpen ? 'panel' : 'threads') : 'side');
-  let capW = $derived(railMode === 'threads' ? 3 : railMode === 'panel' ? 20 : 22);
-  let laneGap = $derived(railMode === 'threads' ? 4 : 7);
-  // The NOTES column (dot grid) lives on the right at wide sizes; the rail
-  // floats OVER it (ADR mock — "blackouts encima"), so content reserves
-  // nothing there. Narrow collapses the notes away and the rail reserves
-  // a thread strip inside the content like before.
-  let notesW = $derived(narrow ? 0 : 240);
-  /** Content reserve — 0 at side (rail over notes); threads/panel reserve. */
-  let reservedW = $derived.by(() => {
-    const n = railLanes.laneCount;
-    if (n === 0 || railMode === 'side') return 0;
-    const w = railMode === 'panel' ? 3 : capW;
-    const g = railMode === 'panel' ? 4 : laneGap;
-    return g + n * (w + g);
-  });
-
-  /**
-   * The absence, as a sentence for one day: «Mia away · until 20 jul · 5 days
-   * left», and «back tomorrow» on the last one. Derived from the same rail
-   * items — nothing new is fetched, and when the rail is off they are still
-   * here, because an absence is a fact about the day and not a decoration.
-   */
-  /**
-   * THE CALL, IN THE MARGIN OF THE DAY THAT CAUSES IT.
-   *
-   * The drawer at the head of the page lists every call in the window; this
-   * says the same thing where it happens, beside the two rows it is about.
-   * They are not a duplicate: the drawer is the QUEUE (what is left to
-   * decide, in order) and this is the ANNOTATION (why this day is loud).
-   *
-   * The margin only exists on days that have one. An empty margin is worse
-   * than no margin — it makes the page look half-loaded, which is exactly
-   * why the notes column came out.
-   */
+  // ── The margin: calls to make, steps, my notes ───────────────────────
   function marginCards(day: string) {
     const decs = decisionsByDay?.get(day) ?? [];
     if (decs.length === 0) return [];
-    const rows = rowsByDay.get(day) ?? [];
-    const byId = new Map(rows.filter((r) => r.kind === 'perf').map((r) => [r.perf.id, r]));
+    const byId = new Map((byDay.rows.get(day) ?? []).filter((r) => r.kind === 'perf').map((r) => [r.perf.id, r]));
     return decs.map((d, i) => ({
       key: `${day}:${i}`,
       reason: d.reason,
       severity: d.severity,
-      sides: d.ids
-        .map((id) => byId.get(id))
-        .filter(Boolean)
-        .map((r) => {
-          const sl = performanceSlip(r!.perf, slipCtx);
-          return { id: sl.id, name: sl.name, time: sl.time?.primary ?? null, project: sl.project };
-        }),
+      sides: d.ids.flatMap((id) => {
+        const r = byId.get(id);
+        return r ? [{ id, name: r.slip.name, time: r.slip.time?.primary ?? null, project: r.slip.project }] : [];
+      }),
     }));
   }
-
-  /* ── THE POST-IT'S WRITER (ADR-093) ────────────────────────────────────
-     A note is about SOMETHING (§1): a day with one entry pre-fills that
-     anchor, a day with several asks which, and an empty day says where it
-     will fall — the page's fallback (pinned scope → the company). The
-     component only ever answers with an entry of the day it can see;
-     resolving the fallback into ids is the page's business. */
-  type NoteAnchorOption = { key: string; label: string; performance_id?: string; date_id?: string };
-  function noteAnchorOptions(day: string): NoteAnchorOption[] {
-    const out: NoteAnchorOption[] = [];
-    for (const r of rowsByDay.get(day) ?? []) {
-      if (r.kind === 'perf') {
-        const sl = performanceSlip(r.perf, slipCtx);
-        out.push({ key: `p:${r.perf.id}`, label: sl.name, performance_id: r.perf.id });
-      } else {
-        const sl = dateSlip(r.date, slipCtx);
-        out.push({ key: `d:${r.date.id}`, label: sl.name, date_id: r.date.id });
-      }
-    }
-    return out;
-  }
-  let writingDay = $state<string | null>(null);
-  /* THE MARGIN IS DRAWN WHEN THE WINDOW USES IT (ADR-167 § 2). A column is
-     still a column all the way down, so the choice is the diary's, never the
-     day's: one card, step or note in the window and the margin and its rule
-     are there for every day; none, and the diary takes the whole measure
-     instead of ruling off 15rem of nothing. The `＋` stays on each day. */
+  /* THE MARGIN IS DRAWN WHEN THE WINDOW USES IT (ADR-167 § 2): one card,
+     step or note in the window and the column is there for every day. */
   let marginUsed = $derived(
     writingDay !== null ||
-      shownDays.some(
-        (d) =>
-          (stepsByDay?.get(d)?.length ?? 0) > 0 ||
-          (decisionsByDay?.get(d)?.length ?? 0) > 0 ||
-          (notesByDay?.get(d)?.length ?? 0) > 0,
+      keptDays.some(
+        (d) => (stepsByDay?.get(d)?.length ?? 0) > 0 || (decisionsByDay?.get(d)?.length ?? 0) > 0 || (notesByDay?.get(d)?.length ?? 0) > 0,
       ),
   );
+  /** On a phone the day's steps are one line until it is opened. */
+  const stepsOpen = new SvelteSet<string>();
+
+  /* THE POST-IT'S WRITER (ADR-093): a day with one entry pre-fills that
+     anchor, a day with several asks which, an empty day says where it falls. */
+  type NoteAnchorOption = { key: string; label: string; performance_id?: string; date_id?: string };
+  function noteAnchorOptions(day: string): NoteAnchorOption[] {
+    return (byDay.rows.get(day) ?? []).map((r) =>
+      r.kind === 'perf'
+        ? { key: `p:${r.perf.id}`, label: r.slip.name, performance_id: r.perf.id }
+        : { key: `d:${r.date.id}`, label: r.slip.name, date_id: r.date.id },
+    );
+  }
   let noteDraft = $state('');
-  /** '' = the fallback (company/scope); otherwise a NoteAnchorOption key. */
   let noteAnchorKey = $state('');
   let notePending = $state(false);
   function openNoteWriter(day: string) {
@@ -737,75 +417,43 @@
     }
   }
 
-  /** The words this view lends the shared grammar ($lib/away). */
-  let awayWords = $derived({
-    until: awayUntilWord,
-    back: awayBackWord,
-    left: awayLeftWord,
-    leftOne: awayLeftOneWord,
-  });
+  // ── An absence is a sentence at the foot of the first row it covers ──
+  let railItems = $derived([
+    ...blackouts.map((b) => ({ from: b.from, to: b.to, label: b.label, tentative: b.tentative, deduced: undefined as string | undefined })),
+    ...aways.map((a) => ({ from: a.from, to: a.to, label: a.label, tentative: false, deduced: deducedPhrase(a.deduced) })),
+  ]);
+  let railLabelDay = $derived(railItems.map((it) => keptDays.find((d) => d >= it.from && d <= it.to) ?? null));
+  let awayWords = $derived({ until: awayUntilWord, back: awayBackWord, left: awayLeftWord, leftOne: awayLeftOneWord });
   function awayLines(day: string) {
-    const out: Array<{ key: string; who: string; rest: string; tentative: boolean }> = [];
-    railItems.forEach((item, i) => {
-      if (!coversDay(day, item.from, item.to)) return;
-      // ONCE PER STRETCH (diseño M2): seven days of «away until 29 Nov · 6
-      // days left», «5 days left»… said one thing seven times. The sentence
-      // lands on the first shown day of the absence; the rail carries it on.
-      if (railLabelDay[i] !== day) return;
-      out.push({
-        key: `${i}:${day}`,
-        // `label` and not `subject`: the naming that already carries the verb
-        // («Mia Serra — away»). The Day view read `subject` and printed «Mia
-        // Serra until 20 Aug», a sentence about nothing.
-        who: item.label,
-        // A tour ends by saying it was deduced and from which two trips:
-        // the same words as the month's band, in this view's sentence.
-        rest:
-          awayRest(day, item.to, awayWords, (iso) => localeDayMonth(iso, locale)) +
-          (item.deduced ? ` · ${item.deduced}` : ''),
-        tentative: Boolean(item.tentative),
-      });
-    });
-    return out;
+    return railItems.flatMap((item, i) =>
+      coversDay(day, item.from, item.to) && railLabelDay[i] === day
+        ? [
+            {
+              key: `${i}:${day}`,
+              who: item.label,
+              rest: awayRest(day, item.to, awayWords, (iso) => localeDayMonth(iso, locale)) + (item.deduced ? ` · ${item.deduced}` : ''),
+              tentative: Boolean(item.tentative),
+            },
+          ]
+        : [],
+    );
   }
 
-  function railSegs(day: string): Array<{ item: RailItem; lane: number; i: number }> {
-    const out: Array<{ item: RailItem; lane: number; i: number }> = [];
-    railItems.forEach((item, i) => {
-      if (day >= item.from && day <= item.to) {
-        out.push({ item, lane: railLanes.lanes[i], i });
-      }
-    });
-    return out;
-  }
+  /* `Now` RESETS THE LIST: the page snaps the span's start forward to today
+     (loading only ever moves it back), and the past's line hides again. */
+  let prevStart = '';
+  $effect(() => {
+    const start = days[0] ?? '';
+    if (prevStart && start > prevStart) earlierRevealed = false;
+    prevStart = start;
+  });
 
-  /* ── THE DIARY LOADS FORWARDS BY ITSELF, AND BACKWARDS ON PURPOSE ─────
-     One sentinel below the last day: come within 800px of the foot and the
-     page is asked for another month — you are travelling that way, and the
-     next month should already be there when you arrive.
-
-     THE HEAD HAS NO SENTINEL ANY MORE, and this is the second reversal of
-     that decision, so here is the whole of it. Backwards began as a button;
-     the button became a sentinel on the argument that one gesture — keep
-     reading — should work in both directions. But UP is not the mirror of
-     DOWN. Above the book sits the page's chrome, so the same flick means
-     «more past» on one day and «let me out» on another, and the diary
-     cannot tell which; with an anchored prepend the trap completes itself —
-     every approach to the top inserts a month above the reader and pins
-     them where they were, so the top RECEDES as you reach for it. The
-     runaway of 2026-08-02 (822 days on one flick) was patched with gates
-     and floors, and the gates treated the symptom: the disease was that
-     reaching the top and loading the past were one gesture.
-
-     So backwards is an ACT again, in two forms: the quiet line at the head
-     of the book («↑ earlier months»), and the overpull — already at the
-     very top, a second deliberate pull asks for one month (below). Reaching
-     the top now costs nothing and loads nothing. */
+  /* ── THE LIST LOADS FORWARDS BY ITSELF, AND BACKWARDS ON PURPOSE ──────
+     One sentinel below the last row asks for another month 800px early.
+     Backwards is an ACT (ADR of 2026-08-02): the quiet line at the head, or
+     the overpull — already at the very top, a second deliberate pull. */
   let endSentinel = $state<HTMLElement>();
   const REACH_END = 800;
-  /* The callback re-measures instead of trusting its entry: an observer
-     delivers the state it SAW, later — stale by one layout whenever the
-     span just changed. One layout read, and it cannot lie. */
   function watch(el: HTMLElement | undefined, fire: (() => void) | undefined, reach: number) {
     if (!el || !fire) return;
     const io = new IntersectionObserver(
@@ -823,35 +471,18 @@
     return watch(endSentinel, onReachEnd, REACH_END);
   });
 
-  /* ── THE OVERPULL · a second gesture at the top asks for one month ────
-     The flick that ARRIVES at the top must not count: on a trackpad its
-     momentum tail keeps emitting upward deltas after the page has stopped,
-     which is exactly the auto-load this replaces. A deliberate second pull
-     is a NEW gesture, and the seam between two gestures is a pause in the
-     event stream — so the counter only arms after a quiet gap, and a tail
-     (continuous, ~16ms apart) never arms it. One month per pull: the
-     anchored prepend leaves the reader below the new month, so the next
-     pull travels through it before it can ask again. */
+  /* THE OVERPULL: the flick that arrives at the top does not count (its
+     momentum tail keeps emitting); a new gesture after a quiet gap arms it,
+     and the load fires when the wheel goes quiet — a wheel has no mouseup. */
   const OVERPULL_PX = 120;
   const GESTURE_GAP_MS = 160;
-  /** Quiet on the wheel stream for this long = the hand came off. The
-      browser exposes NO touch state for wheel gestures — no mouseup, no
-      contact phase — so a resting hand and a lifted one emit exactly the
-      same silence, and quiet-time is the only release there is. 400ms
-      keeps a mid-gesture breather from firing; a deliberate half-second
-      hold still will, and cannot not. */
   const RELEASE_QUIET_MS = 400;
   let pullArmed = false;
   let pullAcc = 0;
   let lastPullAt = 0;
   let pullTimer: ReturnType<typeof setTimeout> | undefined;
-  /** The «↑ earlier months» line hides until the reader tries to scroll
-      past the top (Marco, 2026-08-03) — the gesture that needs the door is
-      the one that draws it. Session-sticky once shown. */
   let earlierRevealed = $state(false);
-  /** Threshold crossed, hand still on the wheel — the load is PROMISED. */
   let pullPending = $state(false);
-  /** The jump itself is in flight (released, or the line was clicked). */
   let pullLoading = $state(false);
   async function fireEarlier() {
     if (!onReachStart || pullLoading) return;
@@ -862,13 +493,6 @@
       pullLoading = false;
     }
   }
-  /* THE LOAD WAITS FOR THE HAND TO COME OFF (Marco, 2026-08-04). Firing
-     mid-gesture moved the book under fingers that were still pulling —
-     and with the primed jump landing whole months at once, that read as
-     the page misbehaving. Crossing the threshold now only PROMISES the
-     load (the line turns to «loading…»); the fetch fires when the stream
-     goes quiet, because a wheel has no mouseup — quiet IS the release.
-     Pulling back down before the quiet cancels the promise. */
   $effect(() => {
     if (!onReachStart) return;
     const release = () => {
@@ -879,7 +503,6 @@
       void fireEarlier();
     };
     const onWheel = (e: WheelEvent) => {
-      // deltaMode 1 = lines (a notched wheel on some browsers) → ~16px each.
       const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
       const gap = performance.now() - lastPullAt;
       lastPullAt = performance.now();
@@ -887,18 +510,18 @@
         pullArmed = false;
         pullAcc = 0;
         if (pullPending) {
-          pullPending = false; // the reader pulled back — promise cancelled
+          pullPending = false;
           clearTimeout(pullTimer);
         }
         return;
       }
       if (!pullArmed) {
-        if (gap < GESTURE_GAP_MS) return; // the arriving flick's tail
+        if (gap < GESTURE_GAP_MS) return;
         pullArmed = true;
         pullAcc = 0;
-        earlierRevealed = true; // the attempt itself summons the door
+        earlierRevealed = true;
       } else if (gap > GESTURE_GAP_MS && !pullPending) {
-        pullAcc = 0; // a new pull, still deliberate — it starts fresh
+        pullAcc = 0;
       }
       pullAcc += -dy;
       if (pullAcc >= OVERPULL_PX) pullPending = true;
@@ -915,366 +538,268 @@
   });
 </script>
 
-<div
-  class="ag"
-  class:ag--loading={loading}
-  class:ag--bare={!marginUsed}
->
-  <!-- THE NOTES COLUMN AND THE ABSENCE RAIL ARE GONE (Marco, 2026-08-03).
+<div class="ag" class:ag--loading={loading} class:ag--bare={!marginUsed} data-help-step="planner-agenda">
+  {#if onReachStart}
+    <button
+      type="button"
+      class="ag__earlier"
+      class:ag__earlier--in={earlierRevealed}
+      disabled={pullLoading}
+      onclick={() => void fireEarlier()}>{pullPending || pullLoading ? loadingLabel : earlierLabel}</button
+    >
+  {:else if noEarlierLabel}
+    <p class="ag__end">{noEarlierLabel}</p>
+  {/if}
 
-       The notes column reserved 240px of every diary to draw a dot grid and
-       the word NOTES. There is nothing to put in it: the `note` table is
-       ADR-093's, committed and not applied, so the column was a promise the
-       app could not keep — and an empty margin is worse than no margin,
-       because it makes the page look like it failed to load. It comes back
-       when it has something to hold.
-
-       The rail drew each absence as a vertical capsule off to the right, with
-       the person's name set sideways. It was already redundant the moment an
-       absence became a SENTENCE inside the day it affects — «Mia away · until
-       20 jul · 5 days left» — and what was left was a stray `MEMI` running
-       vertically down the margin of a day that had nothing to do with it. Two
-       drawings of one fact, and the one that survives is the one you can
-       read. -->
-  {#if shownDays.length === 0}
+  {#if items.length === 0 && !loading}
     <p class="ag__empty">{emptyLabel}</p>
-  {:else}
-    <!-- THE HEAD IS AN ACT, NOT AN EDGE. This line is the past's door, and
-         the overpull gesture is its shortcut — the same callback, two ways
-         in. It HIDES until the reader tries to scroll past the top: the
-         gesture that needs it is the one that draws it. Still in the DOM
-         (focus reveals it — the keyboard's way up), and it vanishes with
-         the callback at the page's floor. -->
-    {#if onReachStart}
-      <button
-        type="button"
-        class="ag__earlier"
-        class:ag__earlier--in={earlierRevealed}
-        disabled={pullLoading}
-        onclick={() => void fireEarlier()}
-        >{pullPending || pullLoading ? loadingLabel : earlierLabel}</button
-      >
-    {:else if noEarlierLabel}
-      <!-- The head's honest end: the past was asked for and holds nothing
-           (or the floor is reached). A fact, not a door. -->
-      <p class="ag__end">{noEarlierLabel}</p>
-    {/if}
+  {/if}
 
-    {#each chunks as ch (ch.key)}
-      {#if ch.t === 'month'}
-        <!-- THE CHAPTER HEAD IS A DOOR. Shut, it carries the month's whole
-             shape on its own line — the same three counts its week bands
-             would have said — and the word that opens it. An empty month
-             arrives shut in both directions, so two years of quiet history
-             prepend as chapter heads, not as 850px each. `data-month` is
-             the page's scroll target when the days inside are not drawn. -->
-        <h2 class="ag__monthdiv" data-month={ch.mk}>
-          <button
-            type="button"
-            class="ag__monthdiv-btn"
-            aria-expanded={!ch.collapsed}
-            onclick={() => monthOverride.set(ch.mk, ch.collapsed)}
-          >
-            <span class="ag__monthdiv-name">{monthDivName(ch.day)}</span>
-            <span class="ag__monthdiv-year">{monthDivYear(ch.day)}</span>
-            <!-- No door word: «show» is what this trade calls a gig, so the
-                 verb read as a noun. The whole head is the handle; the tally
-                 alone is the shut month's sentence. -->
-            {#if ch.collapsed}
-              <span class="ag__monthdiv-t">{weekTally(ch.firm, ch.held, ch.free)}</span>
-            {/if}
-          </button>
-        </h2>
-      {:else if ch.t === 'week'}
-        <!-- THE WEEK'S OWN LINE — and a door. Shut, the band IS the fact
-             («7 nights free» needs no seven rows under it); open, it prints
-             every day it has, empty ones included — the run line died for
-             this. A straddling week appears once per month it touches. -->
-        <button
-          type="button"
-          class="ag__week"
-          class:ag__week--shut={!ch.open}
-          aria-expanded={ch.open}
-          onclick={() => weekOverride.set(ch.key, !ch.open)}
+  {#each items as it (it.key)}
+    {#if it.t === 'month'}
+      <h2 class="ag__month" data-month={it.day.slice(0, 7)}>
+        {monthName(it.day)} <small class="ag__month-yr">{it.day.slice(0, 4)}</small>
+      </h2>
+    {:else if it.t === 'free'}
+      <p class="ag__free" data-day={it.day} data-testid="agenda-free">{gapLabel(it.nights)}</p>
+    {:else if it.t === 'leg'}
+      {@const leg = legById.get(it.id)}
+      {#if leg}
+        <svelte:element
+          this={onDateOpen ? 'button' : 'p'}
+          class="ag__leg"
+          data-day={it.day}
+          data-testid="agenda-leg"
+          {...onDateOpen && leg.kind === 'date' ? { type: 'button', onclick: () => onDateOpen?.(leg.date) } : {}}
         >
-          <span class="ag__week-n">{weekLabel(ch.n)}</span>
-          <span class="ag__week-r">{weekRange(ch.from, ch.to)}</span>
-          <span class="ag__week-t">{weekTally(ch.firm, ch.held, ch.free)}</span>
-        </button>
-      {:else}
-        {@const day = ch.day}
-      {@const items = dayItems(day)}
-      {@const banners = clashesByDay?.get(day) ?? []}
-      {@const empty = items.length === 0 && banners.length === 0}
+          {#if leg.slip.project}<IdentityMark
+              mini
+              accent={accentVarFor(leg.slip.project)}
+              name={leg.slip.project.name}
+              initials={leg.slip.project.initials}
+            />{/if}
+          <span>{legText(leg)}</span>
+        </svelte:element>
+      {/if}
+    {:else}
+      {@const day = it.day}
+      {@const rows = byDay.rows.get(day) ?? []}
+      {@const clashed = personClash(day)}
+      {@const steps = stepsByDay?.get(day) ?? []}
       <section
         class="ag__day"
-        class:ag__day--empty={empty}
+        class:ag__day--week={it.weekTurn}
         class:ag__day--today={day === todayIso}
         data-day={day}
+        data-testid="agenda-day"
       >
-        <!-- TWO BRANCHES, NOT `<svelte:element>`: a real `<button>` carries
-             the role, the keyboard and the focus ring for free, and a
-             dynamic tag cannot be checked for any of the three. -->
-        {#if onDayOpen}
-          <button type="button" class="ag__head" onclick={() => onDayOpen?.(day)}>
-            <span class="ag__wd">{headWeekday(day)}</span>
-            <span class="ag__num">{Number(day.slice(8, 10))}</span>
-          </button>
-        {:else}
-          <header class="ag__head">
-            <span class="ag__wd">{headWeekday(day)}</span>
-            <span class="ag__num">{Number(day.slice(8, 10))}</span>
-          </header>
-        {/if}
-        <div class="ag__rows">
-          <!-- NO BANNER BOXES. A clash used to print a grey slab per pair
-               above the day — «! No team data — could clash.» twice over —
-               while the two rows it was about sat underneath saying nothing.
-               The rule down the pair says WHICH two, in place, and the margin
-               card says what to do about it. Three tellings became one. -->
-          {#each items as it, ii (ii)}
-            {#if 'contest' in it}
-              <!-- THE PAIR STAYS TOGETHER AND SAYS NOTHING EXTRA. It used to
-                   wear a grey head — «? No team data — they could clash.» with
-                   a `DECIDE ↑` — which is now the THIRD telling of one fact:
-                   the dotted rule marks exactly the two rows, and the margin
-                   card beside them says why and what to do. The wrapper keeps
-                   the two rows adjacent; the words are gone. -->
-              <div class="ag__pair">
-                {@render eventRow(it.contest.a)}
-                {@render eventRow(it.contest.b)}
-              </div>
-            {:else}
-              {@render eventRow(it.row)}
-            {/if}
+        <svelte:element
+          this={onDayOpen ? 'button' : 'header'}
+          class="ag__head"
+          {...onDayOpen ? { type: 'button', onclick: () => onDayOpen?.(day) } : {}}
+        >
+          <span class="ag__wd">{headWeekday(day)}</span>
+          <span class="ag__num">{Number(day.slice(8, 10))}</span>
+        </svelte:element>
+        <div class="ag__rows" class:ag__rows--clash={clashed}>
+          {#each rows as row (row.slip.id)}
+            {@const sl = row.slip}
+            {@const miss = row.kind === 'perf' ? missingOf?.(row.perf) : undefined}
+            {@const sub = under(row)}
+            {@const cast = row.kind === 'perf' && !phone.current ? (castOf?.(row.perf) ?? null) : null}
+            {@const open = row.kind === 'date' && onDateOpen ? () => onDateOpen?.(row.date) : undefined}
+            <div
+              class="ag__it"
+              class:ag__it--held={held(sl)}
+              class:ag__it--gone={sl.cert === 'released'}
+              data-family={sl.cert}
+              data-testid="agenda-row"
+              title={sl.title}
+            >
+              <span class="ag__mark"
+                >{#if sl.project}<IdentityMark
+                    mini
+                    accent={accentVarFor(sl.project)}
+                    name={sl.project.name}
+                    initials={sl.project.initials}
+                  />{/if}</span
+              >
+              <svelte:element
+                this={sl.href ? 'a' : open ? 'button' : 'span'}
+                class="ag__what"
+                {...sl.href ? { href: sl.href } : open ? { type: 'button', onclick: open } : {}}
+              >
+                <span class="ag__city">{strong(sl)}{#if held(sl)}?{/if}</span>
+                {#if sub || miss?.words.length}
+                  <span class="ag__ven"
+                    >{sub ?? ''}{#each miss?.words ?? [] as w, wi (w)}{sub || wi ? ' · ' : ''}<span
+                        class="missing-word"
+                        data-testid="agenda-missing">{w}</span
+                      >{/each}</span
+                  >
+                {/if}
+                <!-- WHO GOES, the third line (Marco, 16-11; `styles/cast.css`),
+                     on a desktop: the phone keeps the row to two lines. -->
+                {#if cast && row.kind === 'perf'}
+                  <span class="ag__cast cast-line" class:cast-line--none={cast.length === 0}
+                    >{cast.length > 0 ? cast.join(' · ') : noCastWord(tradeFor(perfWorkspaceId(row.perf)))}</span
+                  >
+                {/if}
+              </svelte:element>
+              <span class="ag__hh">
+                {#if hourOf(row)}{hourOf(row)}{:else if miss?.noTime}<span class="missing-word" data-testid="agenda-missing"
+                    >{noHourWord}</span
+                  >{/if}
+                {#if row.kind === 'perf' && onConfirm && held(sl)}
+                  <button
+                    type="button"
+                    class="ag__do"
+                    disabled={pendingId === row.perf.id}
+                    onclick={() => onConfirm?.(row.perf.id)}>{confirmLabel}</button
+                  >
+                {/if}
+              </span>
+            </div>
           {/each}
-          <!-- AN ABSENCE IS A LINE INSIDE THE DAY IT AFFECTS, not a capsule
-               in a rail off to the side. The rail draws a shape you have to
-               decode against a legend; the line says the sentence — who,
-               until when, and how much of it is left — in the day where it
-               matters, which is where you are already looking.
-
-               AND IT GOES AT THE FOOT (Marco, 2026-08-10). Over the rows it
-               read as a heading — as if the day were ABOUT the absence — and
-               on an empty day it was the only thing there, at the top, which
-               made a quiet day look like an event. The board already sits
-               its band on the row's floor; the diary does the same. An
-               absence is the condition the day ends under. -->
-          {#if awayLines(day).length > 0}
-            <div class="ag__aways">
-              {#each awayLines(day) as a (a.key)}
-                <p class="away-line ag__away" class:away-line--tent={a.tentative}>
-                  <span class="away-line__who">{a.who}</span>{a.rest}
+          {#if clashed}<p class="ag__clash">{twoPlacesLabel}</p>{/if}
+          {#each awayLines(day) as a (a.key)}
+            <p class="away-line ag__away" class:away-line--tent={a.tentative}>
+              <span class="away-line__who">{a.who}</span>{a.rest}
+            </p>
+          {/each}
+        </div>
+        <!-- A div, not an <aside>: a landmark inside <main> nobody reaches (axe). -->
+        <div class="ag__marg">
+          {#if steps.length > 0}
+            {#if phone.current && !stepsOpen.has(day)}
+              <button type="button" class="ag__fold" aria-expanded="false" onclick={() => stepsOpen.add(day)}
+                >{stepsFoldLabel(steps.length)}</button
+              >
+            {:else}
+              <PlannerSteps {steps} label={stepsLabel} />
+            {/if}
+          {/if}
+          {#each marginCards(day) as card (card.key)}
+            <div class="ag__card" data-severity={card.severity}>
+              <p class="ag__card-eyebrow">{decideCardLabel}</p>
+              <p class="ag__card-say">{card.reason}</p>
+              {#each card.sides as side (side.id)}
+                <p class="ag__card-side">
+                  {#if side.project}<IdentityMark
+                      mini
+                      accent={accentVarFor(side.project)}
+                      name={side.project.name}
+                      initials={side.project.initials}
+                    />{/if}
+                  <span class="ag__card-venue">{side.name}</span>
+                  {#if side.time}<span class="ag__card-time">{side.time}</span>{/if}
                 </p>
               {/each}
             </div>
-          {/if}
-        </div>
-          <!-- THE MARGIN IS A COLUMN OF THE DIARY, not a thing that appears.
-               It was drawn only on days that had a call, so the page's right
-               edge moved from day to day and the rule that separates reading
-               from annotating came and went. What had to go was the DECORATION
-               it used to hold — a dot grid and the word NOTES over nothing —
-               not the column. An empty margin is fine; a jumping one is not. -->
-          <!-- A div, not an <aside>: a complementary landmark inside <main> is
-               a landmark nobody can reach as one (axe, móvil #12). -->
-          <div class="ag__marg">
-            {#if stepsByDay?.get(day)?.length}<PlannerSteps steps={stepsByDay.get(day) ?? []} label={stepsLabel} />{/if}
-            {#each marginCards(day) as card (card.key)}
-                <div class="ag__card" data-severity={card.severity}>
-                  <p class="ag__card-eyebrow">{decideCardLabel}</p>
-                  <p class="ag__card-say">{card.reason}</p>
-                  {#each card.sides as side (side.id)}
-                    <p class="ag__card-side">
-                      {#if side.project}<IdentityMark
-                          mini
-                          accent={accentVarFor(side.project)}
-                          name={side.project.name}
-                          initials={side.project.initials}
-                        />{/if}
-                      <span class="ag__card-venue">{side.name}</span>
-                      {#if side.time}<span class="ag__card-time">{side.time}</span>{/if}
-                    </p>
-                  {/each}
-                </div>
-            {/each}
-            <!-- THE POST-ITS (ADR-093). Mine, always private: serif italic —
-                 marginalia voice, a hand in the margin, not the machine — and
-                 the delete waits under the pointer like every verb here. -->
-            {#each notesByDay?.get(day) ?? [] as n (n.id)}
-              <div class="ag__note">
-                <p class="ag__note-body">{n.body}</p>
-                {#if onNoteDelete}
-                  <button
-                    type="button"
-                    class="ag__note-x"
-                    aria-label={noteDeleteLabel}
-                    onclick={() => onNoteDelete?.(n.id)}>×</button
-                  >
-                {/if}
-              </div>
-            {/each}
-            {#if onNoteCreate}
-              {#if writingDay === day}
-                {@const opts = noteAnchorOptions(day)}
-                <div class="ag__note ag__note--edit">
-                  <!-- svelte-ignore a11y_autofocus — the writer exists because
-                       the reader just asked to write; focus IS the answer. -->
-                  <textarea
-                    class="ag__note-input"
-                    rows="2"
-                    autofocus
-                    placeholder={notePlaceholder}
-                    bind:value={noteDraft}
-                    disabled={notePending}
-                    onkeydown={(e) => noteKeydown(e, day)}
-                  ></textarea>
-                  {#if opts.length > 1}
-                    <select class="ag__note-anchor" bind:value={noteAnchorKey} disabled={notePending}>
-                      {#each opts as o (o.key)}<option value={o.key}>{o.label}</option>{/each}
-                      <option value="" class:ag__note-anchor--space={noteFallbackIsSpace}
-                        >{noteFallbackLabel}</option
-                      >
-                    </select>
-                  {:else}
-                    <p
-                      class="ag__note-anchorword"
-                      class:ag__note-anchor--space={!opts[0] && noteFallbackIsSpace}
-                    >{opts[0]?.label ?? noteFallbackLabel}</p>
-                  {/if}
-                </div>
-              {:else}
-                <button
-                  type="button"
-                  class="ag__note-add"
-                  aria-label={noteAddLabel}
-                  onclick={() => openNoteWriter(day)}>＋</button
+          {/each}
+          {#each notesByDay?.get(day) ?? [] as n (n.id)}
+            <div class="ag__note">
+              <p class="ag__note-body">{n.body}</p>
+              {#if onNoteDelete}
+                <button type="button" class="ag__note-x" aria-label={noteDeleteLabel} onclick={() => onNoteDelete?.(n.id)}
+                  >×</button
                 >
               {/if}
+            </div>
+          {/each}
+          {#if onNoteCreate}
+            {#if writingDay === day}
+              {@const opts = noteAnchorOptions(day)}
+              <div class="ag__note ag__note--edit">
+                <!-- svelte-ignore a11y_autofocus — the writer exists because
+                     the reader just asked to write; focus IS the answer. -->
+                <textarea
+                  class="ag__note-input"
+                  rows="2"
+                  autofocus
+                  placeholder={notePlaceholder}
+                  bind:value={noteDraft}
+                  disabled={notePending}
+                  onkeydown={(e) => noteKeydown(e, day)}
+                ></textarea>
+                {#if opts.length > 1}
+                  <select class="ag__note-anchor" bind:value={noteAnchorKey} disabled={notePending}>
+                    {#each opts as o (o.key)}<option value={o.key}>{o.label}</option>{/each}
+                    <option value="" class:ag__note-anchor--space={noteFallbackIsSpace}>{noteFallbackLabel}</option>
+                  </select>
+                {:else}
+                  <p class="ag__note-anchorword" class:ag__note-anchor--space={!opts[0] && noteFallbackIsSpace}>
+                    {opts[0]?.label ?? noteFallbackLabel}
+                  </p>
+                {/if}
+              </div>
+            {:else}
+              <button type="button" class="ag__note-add" aria-label={noteAddLabel} onclick={() => openNoteWriter(day)}
+                >＋</button
+              >
             {/if}
-          </div>
+          {/if}
+        </div>
       </section>
-      {/if}
-    {/each}
-
-    <!-- The sentinel yields to the VERDICT, not just to a quiet tail: with
-         content in today's month the tail is never quiet, yet the plan can
-         still be finished — the line must win over the sentinel then. -->
-    {#if endLabel}
-      <p class="ag__end">
-        {endLabel}{#if endBeyond}{' · '}<button type="button" class="ag__beyond" onclick={endBeyond.onGo}
-            >{endBeyond.label} ›</button
-          >{/if}
-      </p>
-    {:else if onReachEnd && !endStop}
-      <div class="ag__sentinel" bind:this={endSentinel} aria-hidden="true"></div>
     {/if}
+  {/each}
+
+  {#if endLabel}
+    <p class="ag__end">
+      {endLabel}{#if endBeyond}{' · '}<button type="button" class="ag__beyond" onclick={endBeyond.onGo}
+          >{endBeyond.label} ›</button
+        >{/if}
+    </p>
+  {:else if onReachEnd && !endStop}
+    <div class="ag__sentinel" bind:this={endSentinel} aria-hidden="true"></div>
   {/if}
 </div>
 
-{#snippet eventRow(row: Row)}
-  <!-- THE DIARY DRAWS THE MONTH'S SLIP. It used to draw `ag__row`, a
-       hand-built lookalike that had already drifted: no country code, a
-       different released treatment, its own hold wording, no clash rule, and
-       a verbs column that was reserved and never filled. That is exactly the
-       history ADR-095 §0 exists to end — «three implementations of one card
-       is how the month came to print a country code the board could not».
-       One object, one vocabulary; the diary only asks for the `row` PLACING,
-       where the clock sits under the pack so hours align down the page. -->
-  {@const slip =
-    row.kind === 'perf'
-      ? performanceSlip(row.perf, slipCtx)
-      : dateSlip(row.date, slipCtx)}
-  {@const flags = clashOf(row)}
-  <Slip
-    {slip}
-    placing="row"
-    kindLabel={(k, voice) => (k === 'show' ? showWord(voice) : dateKindLabel(k))}
-    stateLabel={slipState}
-    stateUrgent={false}
-    showCountry={true}
-    cast={row.kind === 'perf' ? (castOf?.(row.perf) ?? null) : null}
-    noCastWord={row.kind === 'perf' ? noCastWord(tradeFor(perfWorkspaceId(row.perf))) : undefined}
-    clash={flags.clash}
-    clashPeople={flags.people}
-    onOpen={row.kind === 'date' && onDateOpen ? () => onDateOpen?.(row.date) : undefined}
-  >
-    {#snippet actions()}
-      {#if row.kind === 'perf' && onConfirm}
-        {@const fam = performanceStatusFamily(row.perf.status)}
-        {#if fam === 'hold' || fam === 'proposed'}
-          <button
-            type="button"
-            class="ag__do"
-            disabled={pendingId === row.perf.id}
-            onclick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onConfirm?.(row.perf.id);
-            }}>{confirmLabel}</button
-          >
-        {/if}
-      {/if}
-    {/snippet}
-  </Slip>
-{/snippet}
-
-
 <style>
   @layer components {
-.ag {
-      /* One neutral availability accent for every person (never per-person
-         hues); company blackouts sink to ink. */
-      --ag-black-accent: var(--cal-accent, var(--warning));
-      /* THE MARGIN'S WIDTH, said once. The rule down it, the day's third
-         column and every band that stops short of it (week, month head, the
-         book's two ends) read this, so a phone that has no margin sets it to
-         nothing in one place and the bands take the whole measure. */
+    /* THE LIST AND ITS MARGIN. The reading column keeps the drawing's measure
+       (`--agenda-measure`): where the Day will open beside it (ADR-209 § 6),
+       the margin holds the day's steps, calls and notes meanwhile. */
+    .ag {
       --ag-margin: 15rem;
-      position: relative;
       display: grid;
-      grid-template-columns: 1fr var(--ag-notes-w, 0);
+      grid-template-columns: minmax(0, var(--agenda-measure)) var(--ag-margin);
       align-content: start;
       transition: opacity var(--transition);
-      /* ONE CONTINUOUS RULE DOWN THE MARGIN, drawn by the diary and not by each
-     day. On the day it worked, but only days that render rows have a margin
-     box — and most of this page is week bands and collapsed runs, so the line
-     came in dashes wherever something happened and vanished in between. A
-     column is a column all the way down or it is not a column, which is what
-     Marco kept reporting as «no existe». */
-  background-image: linear-gradient(to right, var(--border-color-dark) 0 1px, transparent 1px);
-  background-size: 1px 100%;
-  background-position: right var(--ag-margin) top;
-  background-repeat: no-repeat;
-}
-/* The book stacks in column 1; the notes margin spans every row in 2. */
-    .ag > :not(.ag__notes) {
+    }
+    .ag > * {
       grid-column: 1;
       min-inline-size: 0;
     }
-.ag--loading {
+    /* EVERY RULE OF THE LIST IS ONE MEASURE: the month's and the free run's
+       run to the margin's edge, as the days' do. */
+    .ag > .ag__month,
+    .ag > .ag__free {
+      grid-column: 1 / -1;
+    }
+    .ag--bare {
+      --ag-margin: 0;
+    }
+    .ag--loading {
       opacity: 0.6;
     }
-.ag__empty {
+    .ag__empty {
       padding-block: var(--space-xl);
       text-align: center;
       font-family: var(--font-display);
       font-style: italic;
       color: var(--text-faint);
     }
-/* Top «↑ earlier months» — margin voice, centred on the book's text column
-   (the --ag-margin stops at the margin rule, same as the week bands). Hidden and
-   heightless until summoned by the overpull's first armed gesture, or by
-   keyboard focus; never display:none, so it stays reachable by tab. */
+
+    /* «↑ earlier months»: hidden and heightless until the overpull summons
+       it or the keyboard focuses it; never display:none. */
     .ag__earlier {
       max-block-size: 0;
       padding-block: 0;
       opacity: 0;
       overflow: hidden;
       pointer-events: none;
-      /* Tucked under the row above; the reveal slides it out from beneath. */
       transform: translateY(-0.5rem);
-      padding-inline-end: var(--ag-margin);
       border: 0;
       background: none;
       text-align: center;
@@ -1304,6 +829,16 @@
     .ag__earlier:disabled {
       cursor: default;
     }
+    .ag__end {
+      margin: 0;
+      padding-block: var(--space-s);
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-l);
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
     .ag__beyond {
       font: inherit;
       letter-spacing: inherit;
@@ -1316,514 +851,461 @@
       text-decoration: underline;
       text-underline-offset: 2px;
     }
-/* The book's honest ends — «nothing more planned» · «nothing further
-   back». Margin voice, centred on the text column like the door above. */
-    .ag__end {
-      margin: 0;
-      padding-block: var(--space-s);
-      padding-inline-end: var(--ag-margin);
-      text-align: center;
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      letter-spacing: var(--tracking-l);
-      text-transform: uppercase;
-      color: var(--text-faint);
-      overflow: hidden;
-      /* Mounted by an {#if}, so it POPPED. It slides out from beneath the
-         row above instead — same motion as the door it often replaces. */
-      animation: ag-endrise var(--duration-slow) ease-out;
-    }
-    @keyframes ag-endrise {
-      from {
-        max-block-size: 0;
-        padding-block: 0;
-        opacity: 0;
-        transform: translateY(-0.5rem);
-      }
-      to {
-        max-block-size: 3rem;
-        padding-block: var(--space-s);
-        opacity: 1;
-        transform: none;
-      }
+
+    /* A landing (`Now`, ‹ ›) goes under the stuck title row. */
+    .ag__day,
+    .ag__month,
+    .ag__leg,
+    .ag__free {
+      scroll-margin-block-start: var(--month-axis-top, calc(var(--header-height) + 3rem));
     }
 
-    /* ── Serif month divider — the book's chapter head. ── */
-    /* ── THE WEEK'S BAND · number, range, shape ───────────────────────
-       All mono, all margin voice: this is the machine reporting on a stretch
-       of the diary, not a thing that happens in it. The tally goes right, so
-       seven days of shape line up down the page and can be scanned without
-       reading a word of them. */
-    /* A DOOR, whole-row: the band was a <div>, now a bare <button>. */
-    .ag__week {
-      display: flex;
-      align-items: baseline;
-      gap: var(--space-s);
-      inline-size: 100%;
-      padding: var(--space-s) 0 var(--space-2xs);
-      border: 0;
-      border-block-start: var(--line-hairline) solid var(--border-color-light);
-      background: none;
-      text-align: start;
-      cursor: pointer;
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      letter-spacing: var(--tracking-l);
-      text-transform: uppercase;
-      color: var(--text-faint);
-      /* Stops BEFORE the margin's rule: the tally belongs to the days, not
-     to the column that annotates them — and --ag-margin exactly is where the
-     rule itself is drawn, so without the extra step the words touch it. */
-  padding-inline-end: calc(var(--ag-margin) + var(--space-s));
-}
-.ag__week-n {
-      color: var(--text-muted);
-    }
-.ag__week-t {
-      margin-inline-start: auto;
-      text-align: end;
-    }
-/* SHUT IS A VISIBLE STATE, NOT AN INFERENCE (Marco, 2026-08-03). Two
-   identical bands in a row read as a stuttered heading — one is a drawer,
-   the other the title of the days on show, and nothing said which. The
-   code is the house's own, learned from the dead run line: DOTTED holds
-   folded days, SOLID heads visible ones. The drawer also breathes a step
-   more and its number drops to the faint ink of the rest of its line. */
-.ag__week--shut {
-      border-block-start-style: dotted;
-      padding-block: var(--space-s);
-    }
-.ag__week--shut .ag__week-n {
-      color: var(--text-faint);
-    }
-.ag__week:hover .ag__week-n {
-      color: var(--text-color);
-    }
-.ag__week:hover .ag__week-t {
-      color: var(--text-muted);
-    }
-.ag__monthdiv {
-      margin-block: var(--space-l) var(--space-2xs);
-      font-weight: 400;
-    }
-.ag__monthdiv:first-child {
-      margin-block-start: var(--space-2xs);
-    }
-/* The chapter head is the door's handle — full row, bare button. */
-.ag__monthdiv-btn {
-      display: flex;
-      align-items: baseline;
-      gap: var(--space-s);
-      inline-size: 100%;
-      padding: 0;
-      padding-inline: var(--space-xs) calc(var(--ag-margin) + var(--space-s));
-      border: 0;
-      background: none;
-      text-align: start;
-      cursor: pointer;
-      font: inherit;
-    }
-/* The shut month's shape — margin voice, ending where its bands would. */
-.ag__monthdiv-t {
-      margin-inline-start: auto;
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      letter-spacing: var(--tracking-l);
-      text-transform: uppercase;
-      color: var(--text-faint);
-      text-align: end;
-    }
-.ag__monthdiv-btn:hover .ag__monthdiv-t,
-.ag__monthdiv-btn:hover .ag__monthdiv-year {
-      color: var(--text-muted);
-    }
-.ag__monthdiv-name {
+    /* The month turn: its name, as the title says it. */
+    .ag__month {
+      margin: var(--space-l) 0 0;
+      padding-block-end: var(--space-2xs);
+      border-block-end: var(--line-hairline) solid var(--month-rule);
       font-family: var(--font-display);
       font-size: var(--text-xl);
+      font-weight: 400;
       color: var(--text-color);
     }
-.ag__monthdiv-year {
+    .ag__month-yr {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing-loose);
-      color: var(--text-faint);
+      letter-spacing: var(--tracking-l);
+      color: var(--text-muted);
     }
-/* A landing (`Now`, the ‹ › steps) goes under TWO stuck bars now — the
-   shell's and the toolbar's. `scrollIntoView` reads this; the line page
-   set the precedent for the shape of the calc. */
-    .ag__day,
-    .ag__monthdiv,
-    .ag__end {
-      scroll-margin-block-start: calc(var(--header-height) + 3rem);
-    }
-/* ── Day group: header column + rows, a ledger rule beneath. ── */
+
+    /* ── THE DAY · its date, its things, its margin ── */
     .ag__day {
-      position: relative;
       display: grid;
-      /* Three columns: the date, the day, and a margin that only draws when
-         the day has a call to make. `auto` collapses to nothing on the days
-         that do not — no reserved emptiness. */
-      grid-template-columns: 6rem minmax(0, 1fr) var(--ag-margin);
-      align-items: start;
+      grid-column: 1 / -1;
+      grid-template-columns: subgrid;
       border-block-end: var(--line-hairline) solid var(--border-color-light);
     }
-.ag__day--empty {
-      min-block-size: 2.5rem;
+    .ag__day > :not(.ag__marg) {
+      grid-column: 1;
     }
-.ag__head {
+    /* The date and the things share the reading column. */
+    .ag__day {
+      --ag-date: 4.5rem;
+    }
+    .ag__head,
+    .ag__rows {
+      grid-row: 1;
+    }
+    .ag__head {
       display: flex;
       flex-direction: column;
-      padding: var(--space-s) 0 var(--space-xs) var(--space-xs);
+      align-self: start;
+      inline-size: var(--ag-date);
+      padding: var(--space-s) 0;
+      border: 0;
+      background: none;
+      text-align: start;
+      color: inherit;
     }
-.ag__day--empty .ag__head {
-      padding-block: var(--space-xs);
+    button.ag__head {
+      cursor: pointer;
     }
-.ag__wd {
+    .ag__rows {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-s);
+      margin-inline-start: var(--ag-date);
+      padding-block: var(--space-s);
+      min-inline-size: 0;
+    }
+    /* THE WEEK IS A RULE (ADR-209 § 2): stronger above its first row. */
+    .ag__day--week {
+      border-block-start: var(--line-thin) solid var(--month-rule);
+    }
+    .ag__wd {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       letter-spacing: var(--mono-letter-spacing-loose);
       text-transform: uppercase;
-      color: var(--text-faint);
-    }
-.ag__num {
-      font-family: var(--font-display);
-      font-size: var(--text-xxl);
-      line-height: 1.05;
-      color: var(--text-color);
-      font-variant-numeric: tabular-nums;
-      margin-block-start: var(--space-2xs);
-    }
-.ag__day--empty .ag__num {
-      font-size: var(--text-l);
       color: var(--text-muted);
     }
-.ag__day--today .ag__wd,
+    .ag__num {
+      font-family: var(--font-display);
+      font-size: var(--text-xxl);
+      line-height: 1;
+      color: var(--text-color);
+      font-variant-numeric: tabular-nums;
+    }
+    .ag__day--today .ag__wd,
     .ag__day--today .ag__num {
       color: var(--today-ink);
       font-weight: var(--today-weight);
     }
-.ag__rows {
-      /* STRETCHED, so that «at the foot» has a floor to sit on. The day is a
-         grid with `align-items: start`, so this cell used to be exactly as
-         tall as its own content — and on a day with no rows at all that made
-         the foot and the head the same place: the absence stood where a
-         heading stands, which is what the move was meant to stop. */
-      align-self: stretch;
+    button.ag__head:hover .ag__num {
+      text-decoration: underline;
+      text-decoration-thickness: var(--line-hairline);
+      text-underline-offset: 4px;
+    }
+
+    /* ── ONE THING · monogram, the city over the venue, the hour ── */
+    .ag__it {
+      display: grid;
+      grid-template-columns: calc(var(--mark-mini) * 5 / 3) minmax(0, 1fr) auto;
+      column-gap: var(--space-s);
+      align-items: baseline;
+    }
+    .ag__mark {
+      display: flex;
+      align-self: start;
+      padding-block-start: var(--space-2xs);
+    }
+    .ag__what {
       display: flex;
       flex-direction: column;
-      padding-block: var(--space-s);
-      padding-inline-end: calc(var(--ag-rail-reserve) + var(--space-s));
+      min-inline-size: 0;
+      padding: 0;
+      border: 0;
+      background: none;
+      font: inherit;
+      text-align: start;
+      color: inherit;
+      text-decoration: none;
+    }
+    button.ag__what {
+      cursor: pointer;
+    }
+    .ag__city {
+      font-family: var(--font-display);
+      font-size: var(--text-l);
+      line-height: 1.15;
+      color: var(--text-color);
+      overflow-wrap: anywhere;
+    }
+    a.ag__what:hover .ag__city,
+    button.ag__what:hover .ag__city {
+      text-decoration: underline;
+      text-decoration-thickness: var(--line-hairline);
+      text-underline-offset: 3px;
+    }
+    .ag__ven {
+      font-size: var(--text-s);
+      color: var(--text-muted);
+      overflow-wrap: anywhere;
+    }
+    .ag__cast {
+      margin-block-start: var(--space-2xs);
+    }
+    .ag__ven .missing-word {
+      white-space: nowrap;
+    }
+    .ag__hh {
+      display: flex;
+      flex-direction: column;
+      align-items: end;
+      gap: var(--space-2xs);
+      font-family: var(--font-mono);
+      font-size: var(--text-s);
+      color: var(--text-color);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    /* AN OPTION IS A QUESTION: the city leans and quiets, with its «?». */
+    .ag__it--held .ag__city {
+      font-style: italic;
+      color: var(--text-muted);
+    }
+    .ag__it--gone .ag__city {
+      color: var(--text-faint);
+      text-decoration: line-through;
+    }
+    /* SOMEBODY IN TWO PLACES: a red rule down the day's things and the
+       sentence under them. The one clash that takes red (ADR-095). */
+    .ag__rows--clash {
+      padding-inline-start: var(--space-s);
+      border-inline-start: var(--line-thin) solid var(--danger);
+    }
+    .ag__clash {
+      margin: 0;
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-xl);
+      text-transform: uppercase;
+      color: var(--danger);
+    }
+    .ag__away {
+      padding: 0;
+    }
+
+    /* A TRIP IS A LEG BETWEEN TWO DAYS: a dashed thread down the date
+       column and the way in mono, in the margin's voice. */
+    .ag__leg {
+      display: flex;
+      align-items: center;
+      gap: var(--space-s);
+      margin: 0 0 0 calc(var(--space-m));
+      padding: var(--space-xs) 0 var(--space-xs) calc(var(--ag-date) - var(--space-m));
+      border: 0;
+      border-inline-start: var(--line-thin) dashed var(--text-faint);
+      background: none;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--mono-letter-spacing);
+      color: var(--text-muted);
+      text-align: start;
+    }
+    button.ag__leg {
+      cursor: pointer;
+    }
+    button.ag__leg:hover {
+      color: var(--text-color);
+    }
+    /* Three free nights or more: one line, where they begin. */
+    .ag__free {
+      margin: 0;
+      padding: var(--space-s) 0 var(--space-s) var(--ag-date);
+      border-block-end: var(--line-hairline) solid var(--border-color-light);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--tracking-l);
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+    .ag__free,
+    .ag__leg {
+      --ag-date: 4.5rem;
+    }
+
+    /* THE VERB WAITS TO BE NEEDED, under the pointer. */
+    .ag__do {
+      padding: 0;
+      border: 0;
+      background: none;
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-l);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity var(--duration-fast);
+    }
+    .ag__it:hover .ag__do,
+    .ag__do:focus-visible {
+      opacity: 1;
+    }
+    .ag__do:hover {
+      color: var(--text-color);
+    }
+    .ag__do:disabled {
+      cursor: default;
+      opacity: 0.4;
+    }
+
+    /* ── THE MARGIN ── */
+    .ag__marg {
+      position: relative;
+      grid-column: 2;
+      grid-row: 1;
+      padding: var(--space-s) 0 var(--space-s) var(--space-s);
+      border-inline-start: var(--line-hairline) solid var(--border-color-dark);
+    }
+    /* A margin that holds only the `＋` takes no column: it waits at the foot
+       of the date, where nothing else is written. */
+    .ag--bare .ag__marg,
+    .ag__marg:not(:has(> :not(.ag__note-add))) {
+      position: absolute;
+      inset-block-end: 0;
+      inset-inline-start: 0;
+      /* An absolute grid child takes its column's area as its box: the date's. */
+      grid-column: 1;
+      padding: 0;
+      border: 0;
+    }
+    .ag__day {
+      position: relative;
+    }
+    .ag__fold {
+      padding: 0;
+      border: 0;
+      background: none;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--tracking-l);
+      text-transform: uppercase;
+      color: var(--danger);
+      cursor: pointer;
+    }
+    .ag__card {
+      padding-block-start: var(--space-2xs);
+      border-block-start: var(--line-thin) solid var(--info);
+    }
+    .ag__card[data-severity='people'] {
+      border-block-start-color: var(--danger);
+    }
+    .ag__card + .ag__card,
+    .ag__card + .ag__note {
+      margin-block-start: var(--space-s);
+    }
+    .ag__card-eyebrow {
+      margin: 0 0 var(--space-2xs);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-xl);
+      text-transform: uppercase;
+      color: var(--info);
+    }
+    .ag__card[data-severity='people'] .ag__card-eyebrow {
+      color: var(--danger);
+    }
+    .ag__card-say {
+      margin: 0 0 var(--space-xs);
+      font-size: var(--text-s);
+      line-height: 1.35;
+      color: var(--text-color);
+    }
+    .ag__card-side {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      margin: 0 0 var(--space-2xs);
       min-inline-size: 0;
     }
-    /* The foot itself: after the rows when there are rows, and pushed down to
-       the day's floor when there are none. */
-    .ag__aways {
-      margin-block-start: auto;
+    .ag__card-venue {
+      font-size: var(--text-s);
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
-.ag__day:not(.ag__day--empty) .ag__rows {
-      border-inline-start: var(--line-hairline) solid var(--border-color-light);
+    .ag__card-time {
+      margin-inline-start: auto;
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
     }
-.ag__day--empty .ag__rows {
-      padding-block: var(--space-xs);
-      min-block-size: 0;
+
+    /* THE POST-IT (ADR-093): serif italic, a hand in the margin. */
+    .ag__note {
+      position: relative;
+      padding-block: var(--space-2xs);
     }
-/* An openable date row is a <button>: undo the widget defaults the
-       grid layout above assumes (font, centred text, intrinsic width,
-/* NO VIEW TRUNCATES A NAME (ADR-095). A row is allowed to grow, and
-       «Teatre Nacional de Cataluny…» is a name you cannot look up. The
-       ellipsis was not arbitrary — the name used to be `nowrap` with VISIBLE
-       overflow and printed over the row's actions — but wrapping fixes that
-       too: inside a `minmax(0, 1fr)` column a wrapped name cannot leave its
-/* ── THE ROW · three columns (ADR-095) ────────────────────────────
-       identity (fixed) · the name · a slot reserved for the verbs, so the row
-/* One hour, one size, one colour. It used to grow and darken when a date
-       became firm, so certainty was said twice in the clock on top of every
-/* RELEASED — the fourth certainty (ADR-095 §0). Kept as memory: struck
-       through at the faintest ink, in the row exactly as on the month slip.
-       Without this rule a released row inherits the plain title, which is the
-/* THE CITY SITS UNDER THE NAME — one line for what it is, one for where
-       it is — and it is QUIETER: the name is the assertion, the place is the
-       gloss. It used to ride inline behind the name, where it inherited the
-/* THE VERB WAITS TO BE NEEDED. It is the only thing on a diary row that
-   writes, so it stays in the margin voice and appears under the pointer — a
-   column of `CONFIRM` down a page of options reads as a demand, and most of
-   what you do here is read. */
-/* The absence's line is `.away-line` (styles/absence.css) — one voice for
-   every view. What belongs to the DIARY is only where it sits: at the foot
-   of the day's rows, on the rows' own indent. */
-.ag__away {
-  padding: var(--space-2xs) var(--space-xs) var(--line-hairline);
-}
-
-button.ag__head {
-  padding: 0;
-  border: 0;
-  background: none;
-  text-align: start;
-  cursor: pointer;
-}
-button.ag__head:hover .ag__num {
-  color: var(--text-color);
-}
-
-.ag--bare {
-  --ag-margin: 0;
-  background-image: none;
-}
-/* A margin that holds only the `＋` takes no line and no column: the verb
-   waits at the day's corner, on its date line (ADR-167 § 2). On a bare
-   diary that is every day; on a phone, every day with nothing to annotate,
-   where it used to be a loose `＋` on a line of its own under each day. */
-.ag--bare .ag__marg,
-.ag__marg:not(:has(> :not(.ag__note-add))) {
-  position: absolute;
-  inset-block-start: 0;
-  inset-inline-end: 0;
-  padding: 0;
-}
-.ag__marg {
-  padding: var(--space-xs) 0 var(--space-xs) var(--space-s);
-  /* THE SAME 9% NEUTRAL THAT WAS INVISIBLE ON THE CARD IS INVISIBLE HERE,
-     and for the same reason plus one: a SHORT VERTICAL hairline reads far
-     weaker than a long horizontal one, so the day dividers get away with 9%
-     and this does not. The column measured 240px wide on every day and Marco
-     still reported it missing — because the only thing that says a column is
-     there is the line down its edge. */
-}
-/* An accent RULE along the top, not a box: the app draws no dashed
-   containers, and a filled card here would outweigh the two rows it is
-   annotating. */
-.ag__card {
-  padding-block-start: var(--space-2xs);
-  border-block-start: var(--line-thin) solid var(--info);
-}
-.ag__card[data-severity='people'] {
-  border-block-start-color: var(--danger);
-}
-.ag__card + .ag__card {
-  margin-block-start: var(--space-s);
-}
-.ag__card-eyebrow {
-  margin: 0 0 var(--space-2xs);
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  letter-spacing: var(--tracking-xl);
-  text-transform: uppercase;
-  color: var(--info);
-}
-.ag__card[data-severity='people'] .ag__card-eyebrow {
-  color: var(--danger);
-}
-.ag__card-say {
-  margin: 0 0 var(--space-xs);
-  font-size: var(--text-s);
-  line-height: 1.35;
-  color: var(--text-color);
-}
-.ag__card-side {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  margin: 0 0 var(--space-2xs);
-  min-inline-size: 0;
-}
-.ag__card-venue {
-  font-size: var(--text-s);
-  color: var(--text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ag__card-time {
-  margin-inline-start: auto;
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  color: var(--text-faint);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-/* ── THE POST-IT (ADR-093) · marginalia voice ──────────────────────────
-   Serif italic, a hand writing in the margin — the cards above are the
-   machine annotating; this is the reader. No box, no fill: the margin IS
-   the paper. */
-.ag__note {
-  position: relative;
-  padding-block: var(--space-2xs);
-}
-.ag__card + .ag__note {
-  margin-block-start: var(--space-s);
-}
-.ag__note-body {
-  margin: 0;
-  padding-inline-end: var(--space-s); /* room for the × */
-  font-family: var(--font-display);
-  font-style: italic;
-  font-size: var(--text-s);
-  line-height: 1.4;
-  color: var(--text-muted);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-.ag__note-x {
-  position: absolute;
-  inset-inline-end: 0;
-  inset-block-start: var(--space-2xs);
-  padding: 0;
-  border: 0;
-  background: none;
-  font-size: var(--text-xs);
-  line-height: 1;
-  color: var(--text-faint);
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity var(--duration-fast);
-}
-.ag__note:hover .ag__note-x,
-.ag__note-x:focus-visible {
-  opacity: 1;
-}
-.ag__note-x:hover {
-  color: var(--text-color);
-}
-/* The writer: a bare seam, not a widget. Same voice as the note it becomes. */
-.ag__note-input {
-  display: block;
-  inline-size: 100%;
-  padding: 0;
-  border: 0;
-  background: none;
-  resize: none;
-  font-family: var(--font-display);
-  font-style: italic;
-  font-size: var(--text-s);
-  line-height: 1.4;
-  color: var(--text-color);
-}
-.ag__note-input:focus {
-  outline: none;
-}
-.ag__note-input::placeholder {
-  color: var(--text-faint);
-}
-/* The anchor line under the box — margin voice, like the card eyebrow.
-   A word when the day answered it, a select when the day asks. */
-.ag__note-anchor,
-.ag__note-anchorword {
-  margin: var(--space-2xs) 0 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  letter-spacing: var(--tracking-xl);
-  text-transform: uppercase;
-  color: var(--text-faint);
-}
-.ag__note-anchor {
-  cursor: pointer;
-  max-inline-size: 100%;
-}
-/* The label register is caps — except when the anchor IS a space, which is
-   written lowercase. The letter-spacing stays; only the case steps aside. */
-.ag__note-anchor--space {
-  text-transform: none;
-}
-/* `＋` waits to be needed, like the verbs on the rows. */
-.ag__note-add {
-  min-inline-size: var(--touch-target);
-  min-block-size: var(--touch-target);
-  padding: 0;
-  border: 0;
-  background: none;
-  font-size: var(--text-s);
-  line-height: 1;
-  color: var(--text-faint);
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity var(--duration-fast);
-}
-.ag__day:hover .ag__note-add,
-.ag__note-add:focus-visible {
-  opacity: 1;
-}
-.ag__note-add:hover {
-  color: var(--text-color);
-}
-
-.ag__pair {
-  display: contents;
-}
-
-.ag__do {
-  padding: 0;
-  border: 0;
-  background: none;
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  letter-spacing: var(--tracking-l);
-  text-transform: uppercase;
-  color: var(--text-faint);
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity var(--duration-fast);
-}
-:global(.slip:hover) .ag__do,
-.ag__do:focus-visible {
-  opacity: 1;
-}
-.ag__do:hover {
-  color: var(--text-color);
-}
-.ag__do:disabled {
-  cursor: default;
-  opacity: 0.4;
-}
-
-.ag__sentinel {
+    .ag__note-body {
+      margin: 0;
+      padding-inline-end: var(--space-s);
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: var(--text-s);
+      line-height: 1.4;
+      color: var(--text-muted);
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    .ag__note-x {
+      position: absolute;
+      inset-inline-end: 0;
+      inset-block-start: var(--space-2xs);
+      padding: 0;
+      border: 0;
+      background: none;
+      font-size: var(--text-xs);
+      line-height: 1;
+      color: var(--text-faint);
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity var(--duration-fast);
+    }
+    .ag__note:hover .ag__note-x,
+    .ag__note-x:focus-visible {
+      opacity: 1;
+    }
+    .ag__note-x:hover {
+      color: var(--text-color);
+    }
+    .ag__note-input {
+      display: block;
+      inline-size: 100%;
+      padding: 0;
+      border: 0;
+      background: none;
+      resize: none;
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: var(--text-s);
+      line-height: 1.4;
+      color: var(--text-color);
+    }
+    .ag__note-input:focus {
+      outline: none;
+    }
+    .ag__note-input::placeholder {
+      color: var(--text-faint);
+    }
+    .ag__note-anchor,
+    .ag__note-anchorword {
+      margin: var(--space-2xs) 0 0;
+      padding: 0;
+      border: 0;
+      background: none;
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-xl);
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+    .ag__note-anchor {
+      cursor: pointer;
+      max-inline-size: 100%;
+    }
+    .ag__note-anchor--space {
+      text-transform: none;
+    }
+    .ag__note-add {
+      min-inline-size: var(--touch-target);
+      min-block-size: var(--touch-target);
+      padding: 0;
+      border: 0;
+      background: none;
+      font-size: var(--text-s);
+      line-height: 1;
+      color: var(--text-faint);
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity var(--duration-fast);
+    }
+    .ag__day:hover .ag__note-add,
+    .ag__note-add:focus-visible {
+      opacity: 1;
+    }
+    .ag__note-add:hover {
+      color: var(--text-color);
+    }
+    .ag__sentinel {
       block-size: var(--line-hairline);
     }
-@media (max-width: 47.999rem) {
-      /* No margin column on a phone (its card falls under the day, below),
-         so nothing reserves room for it and no rule runs down through the
-         rows: the week band is one line again, number · range · tally. */
+
+    @media (max-width: 47.999rem) {
+      /* No margin column on a phone: the annotation falls under its day. */
       .ag {
         --ag-margin: 0;
-        background-image: none;
       }
-      /* When the tally is long (two counts and the free nights) it drops
-         whole to a second line, still right-aligned, instead of breaking
-         a word per line. */
-      .ag__week {
-        flex-wrap: wrap;
-        row-gap: var(--space-2xs);
+      .ag__day,
+      .ag__free,
+      .ag__leg {
+        --ag-date: 3.5rem;
       }
-      /* With no rule to stop short of, the tallies end on the page's edge,
-         the same edge the toolbar's last button ends on. */
-      .ag__week,
-      .ag__monthdiv-btn {
-        padding-inline-end: 0;
-      }
-      .ag__week > span {
-        white-space: nowrap;
-      }
-      .ag__day {
-        grid-template-columns: 4.25rem 1fr;
-      }
-      /* On a phone the margin has nowhere to go: the annotation falls under
-         the day it annotates rather than squeezing the reading to a gutter. */
       .ag__marg {
-        grid-column: 1 / -1;
-        padding-inline-start: 4.25rem;
-        border-inline-start: 0;
+        grid-column: 1;
+        grid-row: 2;
+        padding: 0 0 var(--space-s) var(--ag-date);
+        border: 0;
       }
       .ag__marg:empty {
         display: none;
       }
-      /* No hover on glass: the `＋` is simply there. */
       .ag__note-add {
         opacity: 1;
       }
     }
-}
+  }
 </style>

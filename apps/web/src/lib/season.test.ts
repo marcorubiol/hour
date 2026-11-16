@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clashesInSeason, closedGapWindows, gapWindows, mondayOf, seasonWindow, unclosed } from './season';
+import { clashesInSeason, closedGapWindows, gapWindows, mondayOf, seasonWindow } from './season';
 
 describe('seasonWindow', () => {
   it('draws twelve Monday rows and counts from today', () => {
@@ -78,48 +78,6 @@ describe('closedGapWindows (ADR-209)', () => {
       const gaps = closedGapWindows(days, ['2026-11-02']);
       expect(gaps.every((g) => g.to !== days[days.length - 1])).toBe(true);
     }
-  });
-});
-
-describe('unclosed', () => {
-  it('a closed gig is missing nothing', () => {
-    const v = unclosed(
-      { start_at: '2026-11-01T19:00:00Z', person_ids: ['p'], city: 'Girona' },
-      { home: 'Girona', travelCovered: false },
-    );
-    expect(v).toEqual({ missing: [], travelGuess: false });
-  });
-
-  it('names each empty field; hotel and technical are not fields any more (ADR-164 § 2)', () => {
-    const v = unclosed(
-      { start_at: null, person_ids: [], city: 'Girona' },
-      { home: 'Girona', travelCovered: false },
-    );
-    expect(v.missing).toEqual(['time', 'cast']);
-  });
-
-  it('an unknown roster is not an empty one; a «voy» is somebody going', () => {
-    expect(
-      unclosed({ start_at: 'x', city: null }, { home: null, travelCovered: false }).missing,
-    ).toEqual([]);
-    expect(
-      unclosed(
-        { start_at: 'x', person_ids: [], commitments: [{ state: 'going' }], city: null },
-        { home: null, travelCovered: false },
-      ).missing,
-    ).toEqual([]);
-  });
-
-  it('travel is only ever a guess: another city, nothing covering it', () => {
-    const perf = { start_at: 'x', person_ids: ['p'], city: 'Lisboa' };
-    expect(unclosed(perf, { home: 'Barcelona', travelCovered: false }).travelGuess).toBe(true);
-    expect(unclosed(perf, { home: 'Barcelona', travelCovered: true }).travelGuess).toBe(false);
-    // Same city, any spelling.
-    expect(unclosed({ ...perf, city: 'gíróna ' }, { home: 'Girona', travelCovered: false }).travelGuess).toBe(false);
-    // No home on file: no guess at all.
-    expect(unclosed(perf, { home: null, travelCovered: false }).travelGuess).toBe(false);
-    // Never a fact.
-    expect(unclosed(perf, { home: 'Barcelona', travelCovered: false }).missing).toEqual([]);
   });
 });
 

@@ -273,6 +273,12 @@
        than the numbers, and the border between two months an ink stair. */
     --month-name-weight: 500;
     --month-rule: var(--text-color);
+    /* «FALTA» (ADR-211 § 3): what a performance in the next two weeks still
+       needs: Hoy's dot, the Agenda's word. The status amber, so dark follows. */
+    --missing-ink: var(--warning);
+    /* THE AGENDA'S MEASURE (ADR-211): the drawing's reading column; the Day
+       will open beside it (ADR-209 § 6), the margin sits there meanwhile. */
+    --agenda-measure: 46rem;
 
     /* SUGGESTED — what Hour puts in front of you that is not yours yet: the
        next thing's card, a proposal, a «¿vas?». A semantic tone on --info,

@@ -25,18 +25,17 @@ async function open(page: Page, query = '') {
 test.describe('the month (ADR-209)', () => {
   test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL / PW_TEST_PASSWORD.');
 
-  // Every test meets the default (null, the Month) and leaves it there.
+  // Every test meets the default (null, the Agenda since ADR-211) and leaves it there.
   test.beforeEach(async ({ page }) => forgetPlannerView(page.request));
   test.afterEach(async ({ page }) => forgetPlannerView(page.request));
 
   test('THE DOOR OPENS THE LAST DRAWING CHOSEN, AND THE ADDRESS STILL RULES (ADR-192)', async ({ page }) => {
     test.setTimeout(90_000);
     const views = page.locator('.cal__view');
-    // Nothing chosen yet: the Month, the default.
+    // Nothing chosen yet: the Agenda, the default (ADR-211 § 4).
     await open(page);
     await expect(views).toHaveCount(3);
-    await expect(views.nth(1)).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.locator('.cal__grid')).toBeVisible();
+    await expect(views.nth(0)).toHaveAttribute('aria-pressed', 'true');
 
     const choose = async (index: number, stored: string | null) => {
       const put = page.waitForResponse(
@@ -47,24 +46,25 @@ test.describe('the month (ADR-209)', () => {
       expect(res.ok(), `PUT /api/me/planner-view answered ${res.status()}`).toBe(true);
       expect((res.request().postDataJSON() as { planner_view: string | null }).planner_view).toBe(stored);
     };
-    await choose(0, 'agenda');
-    await expect(page).toHaveURL(/view=agenda/);
+    await choose(1, 'month');
+    await expect(page).toHaveURL(/view=month/);
+    await expect(page.locator('.cal__grid')).toBeVisible();
 
     // The door, with no `view`, opens it, and writes it in the address.
     await open(page);
-    await expect(views.nth(0)).toHaveAttribute('aria-pressed', 'true');
-    await expect(page).toHaveURL(/view=agenda/);
+    await expect(views.nth(1)).toHaveAttribute('aria-pressed', 'true');
+    await expect(page).toHaveURL(/view=month/);
 
     // An address that names a drawing rules, and is not a choice.
     await open(page, '&view=board');
     await expect(views.nth(2)).toHaveAttribute('aria-pressed', 'true');
     await open(page);
-    await expect(views.nth(0)).toHaveAttribute('aria-pressed', 'true');
-
-    // Picking the Month stores null, the default.
-    await choose(1, null);
-    await open(page);
     await expect(views.nth(1)).toHaveAttribute('aria-pressed', 'true');
+
+    // Picking the Agenda stores null, the default.
+    await choose(0, null);
+    await open(page);
+    await expect(views.nth(0)).toHaveAttribute('aria-pressed', 'true');
   });
 
   test('A LINK TO THE COMING WEEKS OPENS THE MONTH, WITHOUT ERROR', async ({ page }) => {

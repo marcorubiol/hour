@@ -64,7 +64,8 @@
     dateSlip,
     type Slip as SlipVM,
   } from '$lib/month-events';
-  import AgendaList, { type AgendaDecision, type NoteDraft } from '$lib/components/AgendaList.svelte';
+  import AgendaList, { type AgendaDecision, type AgendaMissing, type NoteDraft } from '$lib/components/AgendaList.svelte';
+  import { missingSoon } from '$lib/record-missing';
   import { noteFallback as noteFallbackOf, noteFallbackBody } from '$lib/note';
   import DecisionBand, {
     decisionText,
@@ -128,6 +129,7 @@
     dayKeyInTz,
     monthSpanWeeks,
     resolvePlannerView,
+    PLANNER_DEFAULT_VIEW,
     type PlannerView,
     type Conflict,
     type DecisionSide,
@@ -285,8 +287,8 @@
   // ── Projection (ADR-117, amended by ADR-192 and ADR-209) ───────────────
   // Explicit ?view= wins; without one, the drawing this person last chose in
   // the bar in the spaces on screen (`entryView`, their membership), and
-  // without that the Month. The stored drawing needs the workspaces feed, so
-  // the first paint is the URL's (or the Month) and the entry effect below
+  // without that the Agenda. The stored drawing needs the workspaces feed, so
+  // the first paint is the URL's (or the Agenda) and the entry effect below
   // moves it once the feed answers.
   let view = $state<PlannerView>(
     resolvePlannerView(new URL(location.href).searchParams.get('view')),
@@ -395,9 +397,9 @@
     void page.state;
     const params = new URL(location.href).searchParams;
     // No `view` at all is the nav's door (ADR-117): it opens the person's
-    // entry drawing (ADR-192), else the Month, even when you arrive from
-    // another drawing of this page.
-    const doorView = untrack(() => entryView) ?? 'month';
+    // entry drawing (ADR-192), else the default (the Agenda, ADR-211), even
+    // when you arrive from another drawing of this page.
+    const doorView = untrack(() => entryView) ?? PLANNER_DEFAULT_VIEW;
     const nextView = params.has('view') ? normalizePlannerView(params.get('view')) : doorView;
     if (nextView && nextView !== untrack(() => view)) view = nextView;
 
@@ -427,7 +429,7 @@
       (nextView ?? untrack(() => view)) === 'board' && !params.get('lanes');
 
     // A door that opened a stored drawing writes it: the bar says what you see.
-    const doorWritten = !params.has('view') && doorView !== 'month';
+    const doorWritten = !params.has('view') && doorView !== PLANNER_DEFAULT_VIEW;
 
     if (legacy || boardWithoutLanes || doorWritten) syncUrl();
 
@@ -557,7 +559,7 @@
     if (!entryOwed || !$workspacesQuery.data || scopeUnresolved) return;
     entryOwed = false;
     const v = entryView;
-    if (v && v !== 'month' && untrack(() => view) === 'month') {
+    if (v && v !== PLANNER_DEFAULT_VIEW && untrack(() => view) === PLANNER_DEFAULT_VIEW) {
       view = v;
       syncUrl('replace');
     }
@@ -1949,6 +1951,33 @@
     // Only holes with two ends: an open tail is the plan running out.
     return closedGapWindows(days, engine.occupiedDays, new Set([...monthTourDays, ...engine.unsellableDays]));
   });
+  /** The Agenda names the same holes (ADR-211 § 1): from today, over what
+      its window has loaded, by the same rule. */
+  let agendaGaps = $derived.by(() => {
+    if (view !== 'agenda') return [];
+    return closedGapWindows(
+      agendaDays.filter((d) => d >= todayIso),
+      engine.occupiedDays,
+      new Set([...monthTourDays, ...engine.unsellableDays]),
+    );
+  });
+  /** «Falta», the one rule (ADR-211 § 3): the record's words beside the
+      performance, the missing hour in the hour's own column. */
+  function agendaMissing(p: PerformanceEvent): AgendaMissing {
+    const kinds = missingSoon(p, todayIso).map((m) => m.kind);
+    return {
+      noTime: kinds.includes('no_time'),
+      words: kinds
+        .filter((k) => k !== 'no_time')
+        .map((k) => t(MISSING_WORD[k], locale)),
+    };
+  }
+  const MISSING_WORD = {
+    hold_deadline: 'record.missing_hold',
+    no_bolo: 'record.missing_no_bolo',
+    roadsheet_unshared: 'record.missing_roadsheet',
+    nobody_going: 'record.missing_nobody_going',
+  } as const;
   /** «Choques»: the clashes that are not a choice between two holds (a pair
       the queue holds is said there, once), from today to the end of what the
       drawing has loaded: the Month's paper, the Agenda's and the Board's
@@ -2388,13 +2417,33 @@
   }
 
   /* THE TITLE IS THE MONTH, its year small beside it (ADR-209 head): the
-     Month's is the month on screen; the Agenda and the Board name the month
-     their window opens at (where it opens is said on the status line). */
-  let titleYm = $derived(
-    view === 'agenda' || view === 'board'
-      ? { year: Number(agendaFromIso.slice(0, 4)), month: Number(agendaFromIso.slice(5, 7)) }
-      : ym,
-  );
+     Month's is the month on screen, and so is the Agenda's (the row under
+     the stuck title, ADR-211 § 1); the Board names the month its window
+     opens at. */
+  let agendaTopDay = $state<string | null>(null);
+  let titleYm = $derived.by(() => {
+    if (view !== 'agenda' && view !== 'board') return ym;
+    const at = (view === 'agenda' && agendaTopDay) || agendaFromIso;
+    return { year: Number(at.slice(0, 4)), month: Number(at.slice(5, 7)) };
+  });
+  $effect(() => {
+    if (view !== 'agenda') return;
+    void agendaDays.length;
+    let raf = 0;
+    const read = () => {
+      raf = 0;
+      agendaTopDay = visibleAgendaDay(true);
+    };
+    const on = () => {
+      if (!raf) raf = requestAnimationFrame(read);
+    };
+    window.addEventListener('scroll', on, { passive: true });
+    void tick().then(on);
+    return () => {
+      window.removeEventListener('scroll', on);
+      cancelAnimationFrame(raf);
+    };
+  });
   let titleMonth = $derived.by(() => {
     const m = monthName(titleYm.year, titleYm.month, localeTag);
     return `${m.charAt(0).toUpperCase()}${m.slice(1)}`;
@@ -2457,7 +2506,7 @@
      edge to edge left a sub-pixel seam the weeks showed through. */
   let calEl = $state<HTMLElement>();
   $effect(() => {
-    if (view !== 'month' || !calEl || typeof ResizeObserver === 'undefined') return;
+    if ((view !== 'month' && view !== 'agenda') || !calEl || typeof ResizeObserver === 'undefined') return;
     const el = calEl;
     const head = el.querySelector<HTMLElement>('.lenshead');
     if (!head) return;
@@ -2506,11 +2555,8 @@
     await tick();
     // The reset guarantees today's row: the book starts at today, and
     // today's month and week always default open.
-    const at = () => document.querySelector(`[data-day="${todayIso}"]`);
-    // Today's month and week default open, but the reader can shut them by
-    // hand — then the day row does not exist and the chapter head is the
-    // honest landing (`data-month` on the divider).
-    const el = at() ?? document.querySelector(`[data-month="${todayIso.slice(0, 7)}"]`);
+    // Only days with something have a row: a quiet today lands on the next.
+    const el = firstAgendaPlaceFrom(todayIso);
     if (!el) return;
     // `scrollIntoView`, not `scrollBy`: only it reads the day's
     // scroll-margin, and the day must land BELOW the stuck chrome.
@@ -2728,8 +2774,12 @@
     // The reading edge is the STUCK toolbar's underside, not the viewport's
     // 0: a row can sit behind the chrome with bottom > 0, and taking it as
     // "where the reader is" makes the next ‹ › step a no-op.
-    const bar = document.querySelector('.cal__toolbar');
-    const edge = bar ? bar.getBoundingClientRect().bottom : 0;
+    // The Agenda's title row sticks and its toolbar scrolls away (ADR-211):
+    // the edge is whichever of the two is lower.
+    const edge = Math.max(
+      0,
+      ...['.cal__toolbar', '.cal .lenshead'].map((sel) => document.querySelector(sel)?.getBoundingClientRect().bottom ?? 0),
+    );
     // A DAY ON SCREEN BEATS ITS CHAPTER HEAD. A pull that brings in earlier
     // days of the month already open inserts them under that month's head:
     // anchored to the head, the reader's own row was pushed down by every
@@ -2751,10 +2801,15 @@
   /** The element a place resolves to: its day row, or — when the month is
       shut and the row does not exist — its chapter head. */
   function agendaPlaceEl(place: string): Element | null {
-    return (
-      document.querySelector(`[data-day="${place}"]`) ??
-      document.querySelector(`[data-month="${place.slice(0, 7)}"]`)
-    );
+    return firstAgendaPlaceFrom(place);
+  }
+  /** The Agenda draws only days with something (ADR-211): a place is the
+      first line on or after it, a day, a trip or a free run. */
+  function firstAgendaPlaceFrom(place: string): HTMLElement | null {
+    for (const el of document.querySelectorAll<HTMLElement>('[data-day]')) {
+      if ((el.dataset.day ?? '') >= place) return el;
+    }
+    return null;
   }
 
   function goToday() {
@@ -2982,7 +3037,7 @@
   <title>{docTitle(t('lens.planner', locale))}</title>
 </svelte:head>
 
-<section class="cal" class:cal--pinned={view === 'month'} aria-busy={busy} bind:this={calEl}>
+<section class="cal" class:cal--pinned={view === 'month' || view === 'agenda'} aria-busy={busy} bind:this={calEl}>
   <LensHeader help="planner">
     {#snippet title()}
       {#if view === 'day'}
@@ -3031,11 +3086,11 @@
     {/snippet}
   </LensHeader>
 
-  <!-- The welcome speaks of the Month, so its tour goes there first. -->
+  <!-- The welcome speaks of the Agenda, where the Planner opens (ADR-211), so its tour goes there first. -->
   <FirstVisitCard
     section="planner"
-    steps={['planner-grid', 'planner-status', 'planner-views']}
-    onbeforetour={() => setView('month')}
+    steps={['planner-agenda', 'planner-status', 'planner-views']}
+    onbeforetour={() => setView('agenda')}
   />
 
 
@@ -3466,16 +3521,16 @@
       locale={localeTag}
       dateKindLabel={kindLabel}
       statusLabel={agendaStatusLabel}
-      viewerTimeLabel={(time) => t('planner.viewer_time', locale, { time })}
-      travelDirLabel={(dir) => t(`planner.travel_${dir}`, locale)}
       emptyLabel={t('planner.empty_month', locale)}
-      blackoutsToggleLabel={t('planner.blackouts_toggle', locale)}
-      decideLabel={t('planner.agenda_decide', locale)}
-      notesLabel={t('planner.agenda_notes', locale)}
-      showWord={(voice) => t('planner.kind_show', locale, undefined, voice)}
-      releasedWord={t('planner.released', locale)}
       noHourWord={t('planner.no_hour', locale)}
-      allDayWord={t('planner.all_day', locale)}
+      toWord={t('planner.slip_to', locale)}
+      gaps={agendaGaps}
+      gapLabel={(n) => `${n} ${t('planner.stat_free', locale)}`}
+      missingOf={agendaMissing}
+      castOf={(p) => (p.person_ids || p.commitments ? goesOf(p) : null)}
+      noCastWord={(voice) => t('planner.no_cast', locale, undefined, voice)}
+      twoPlacesLabel={t('planner.agenda_two_places', locale)}
+      stepsFoldLabel={(n) => `${n === 1 ? t('planner.steps_one', locale) : t('planner.steps_n', locale, { n })} ›`}
       onReachEnd={probePlanAhead}
       onReachStart={agendaFromIso <= agendaFloorIso || pastExhausted ? undefined : loadAllEarlier}
       earlierLabel={t('planner.agenda_earlier', locale)}
@@ -3494,33 +3549,6 @@
             },
           }
         : undefined}
-      weekLabel={(n) => `${t('planner.week_n', locale)} ${n}`}
-      weekRange={(from, to) =>
-        // One day is a day, not a range («18 oct → 18 oct», móvil #12).
-        from === to
-          ? localeDayMonth(from, localeTag)
-          : `${localeDayMonth(from, localeTag)} → ${localeDayMonth(to, localeTag)}`}
-      weekTally={(firm, held, free) =>
-        // The week's tally is a census too: a dash until its rows are in.
-        !figuresKnown
-          ? DASH
-          : [
-              firm
-                ? `${firm} ${t(firm === 1 ? 'planner.week_confirmed_one' : 'planner.week_confirmed', locale)}`
-                : '',
-              // ONE IS NOT «1 OPTIONS». The month's gutter kept its counts in a
-              // tooltip, so nobody had ever read them as a sentence.
-              // Calm: the options are off the paper, and off the week's sum.
-              held && shows('planner', 'week_options', calm.on)
-                ? `${held} ${t(held === 1 ? 'planner.week_option_one' : 'planner.week_options', locale)}`
-                : '',
-              free ? `${free} ${t(free === 1 ? 'planner.week_free_one' : 'planner.week_free', locale)}` : '',
-            ]
-              .filter(Boolean)
-              .join(' · ') || t('planner.week_nothing', locale)}
-      freeNight={engine.isFreeNight}
-      castOf={(p) => (p.person_ids || p.commitments ? goesOf(p) : null)}
-      noCastWord={(voice) => t('planner.no_cast', locale, undefined, voice)}
       onDayOpen={(iso) => {
         dayIso = iso;
         setView('day');
@@ -3533,7 +3561,6 @@
       onConfirm={(id) => $decideMutation.mutate({ id, status: 'confirmed' })}
       pendingId={decisionPendingId}
       confirmLabel={t('planner.dec_confirm_short', locale)}
-      onDecideJump={jumpToDecisions}
       onDateOpen={openDate}
       {notesByDay}
       stepsByDay={stepVMsByDay}

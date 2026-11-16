@@ -227,7 +227,8 @@ test.describe('date edit path (task 15)', () => {
     // `complementary`, the diary in `main`; the day the pulse and the diary
     // agree is exactly the day the distinction matters.
     const diary = page.locator('main');
-    const row = diary.locator('.slip', { hasText: title });
+    // THE AGENDA DRAWS ITS OWN ROW (ADR-211): the date opens from its words.
+    const row = diary.getByTestId('agenda-row').filter({ hasText: title }).locator('.ag__what');
     await expect(row).toBeVisible();
     await row.click();
 
@@ -252,7 +253,8 @@ test.describe('date edit path (task 15)', () => {
     // `main` again, and for a sharper reason than above: this one carries
     // `.first()`, so a pulse slip would not have failed — it would have been
     // CLICKED, and the pulse's slip is a link to the day, not the dialog.
-    await diary.locator('.slip[data-kind="travel_day"]', { hasText: 'Testville' }).first().click();
+    // A trip is a leg between two days now (ADR-211), and the leg opens it.
+    await diary.getByTestId('agenda-leg').filter({ hasText: 'Testville' }).first().click();
     const back = await editFromPeek(page);
     await back.getByRole('radio', { name: 'Rehearsal', exact: true }).check();
     await back.getByRole('button', { name: 'Save changes' }).click();

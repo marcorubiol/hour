@@ -22,6 +22,8 @@ export const CALM_FOCUS = {
     day: true,
     /** «Coming up», the day tiles. */
     coming: true,
+    /** The tile's amber dot, «Falta algo» (ADR-211 § 3, like «Te espera»'s rows). */
+    coming_missing: false,
     /** «Te espera», one pill per kind and its figure. */
     waiting_pills: true,
     /** «Te espera», the rows under the pills. */
@@ -41,8 +43,6 @@ export const CALM_FOCUS = {
     blackouts: false,
     /** The census strip: one sentence instead. */
     census: false,
-    /** The agenda's week tallies beyond what is confirmed. */
-    week_options: false,
   },
   conversations: {
     /** «Te toca»: the replies and the steps due. */

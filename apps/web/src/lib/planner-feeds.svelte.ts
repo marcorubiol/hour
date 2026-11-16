@@ -135,7 +135,7 @@ export async function primeAgendaWindow(
     const [p, d, n] = await Promise.all([
       pagedFeed<PerformanceEvent>(
         (from) =>
-          `/api/performances?status=any&rosters=1&notice=1&${feedParams(filterIds, from, t)}`,
+          `/api/performances?status=any&rosters=1&notice=1&missing=1&${feedParams(filterIds, from, t)}`,
         (r) => r.performed_at.slice(0, 10),
         f,
         signal,
@@ -377,7 +377,7 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
       enabled: (inputs.view() === 'agenda' || inputs.view() === 'board') && !k.unresolved,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         pagedFeed<PerformanceEvent>(
-          (from) => `/api/performances?status=any&rosters=1&notice=1&${feedParams(k, from, k.to)}`,
+          (from) => `/api/performances?status=any&rosters=1&notice=1&missing=1&${feedParams(k, from, k.to)}`,
           (p) => p.performed_at.slice(0, 10),
           k.from,
           signal,

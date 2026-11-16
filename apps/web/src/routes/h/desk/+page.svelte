@@ -931,6 +931,7 @@
         {viewerTz}
         {slipCtx}
         {locale}
+        dots={shows('desk', 'coming_missing', calm.on)}
       />
       {#if drawWaits}
       <div class="slot slot--waits" data-help-step="desk-waits">
