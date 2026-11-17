@@ -33,11 +33,11 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
 ## Producción (verificado 2026-11-17)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`48c1d394`**, `dirty:false`, builtAt
-  2026-11-17T07:22Z. Deploy del 17-11 (la Agenda nueva, una sola regla de «Falta» y el punto ámbar de Hoy; el
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`f050ccbc`**, `dirty:false`, builtAt
+  2026-11-17T09:25Z. Deploy del 17-11 sobre `48c1d394` (dos retoques visuales: el ＋ de la Agenda en su propia fila y la barra opaca sobre la cabecera fija; antes, la Agenda nueva, una sola regla de «Falta» y el punto ámbar de Hoy; el
   Planificador abre en la Agenda sin vista guardada; ADR-211; `CACHE_SCHEMA` 35), sin migración. Lo entregado, en
   `CHANGELOG.md`.
-- Última suite (17-11, contra `48c1d394`): E2E de 214 specs: 187 ok, 23 saltados por datos, 0 rojos tras repetir;
+- Última suite completa (17-11, contra `48c1d394`; contra `f050ccbc` solo `planner-agenda`, `planner-month` y `planner-laws`: 36 ok, 5 saltados por datos, 0 rojos): E2E de 214 specs: 187 ok, 23 saltados por datos, 0 rojos tras repetir;
   `--timeout=90000` (26 min). Dos rojos eran specs atrasados y se corrigieron (`planner-laws:550` y
   `note-margin:232`: la Agenda solo dibuja días con algo, y el espacio `playwright` no tiene nada desde hoy hasta
   2031); `bolo-access:142` fue intermitente y pasó al repetir. Los specs de «Falta» ámbar (`planner-agenda`) y del
