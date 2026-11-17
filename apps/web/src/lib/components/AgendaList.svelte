@@ -586,8 +586,12 @@
       {@const rows = byDay.rows.get(day) ?? []}
       {@const clashed = personClash(day)}
       {@const steps = stepsByDay?.get(day) ?? []}
+      {@const cards = marginCards(day)}
+      {@const lone =
+        steps.length === 0 && cards.length === 0 && !notesByDay?.get(day)?.length && writingDay !== day}
       <section
         class="ag__day"
+        class:ag__day--lone={lone}
         class:ag__day--week={it.weekTurn}
         class:ag__day--today={day === todayIso}
         data-day={day}
@@ -679,7 +683,7 @@
               <PlannerSteps {steps} label={stepsLabel} />
             {/if}
           {/if}
-          {#each marginCards(day) as card (card.key)}
+          {#each cards as card (card.key)}
             <div class="ag__card" data-severity={card.severity}>
               <p class="ag__card-eyebrow">{decideCardLabel}</p>
               <p class="ag__card-say">{card.reason}</p>
@@ -1109,19 +1113,22 @@
       border-inline-start: var(--line-hairline) solid var(--border-color-dark);
     }
     /* A margin that holds only the `＋` takes no column: it waits at the foot
-       of the date, where nothing else is written. */
-    .ag--bare .ag__marg,
-    .ag__marg:not(:has(> :not(.ag__note-add))) {
-      position: absolute;
-      inset-block-end: 0;
-      inset-inline-start: 0;
-      /* An absolute grid child takes its column's area as its box: the date's. */
+       of the date, in a row of its own under the date's, which the things
+       span. Pinned to the day's foot instead, a day of one or two lines (a
+       phone's, always) put it on the number (Marco, 17-11). */
+    .ag__day--lone > .ag__rows {
+      grid-row: 1 / span 2;
+    }
+    .ag__day--lone > .ag__marg {
       grid-column: 1;
+      grid-row: 2;
+      align-self: end;
+      justify-self: start;
+      /* It borrows the date's air below the number: the day grows by the
+         ＋ alone, and only where the things are shorter than the date. */
+      margin-block-start: calc(-1 * var(--space-s));
       padding: 0;
       border: 0;
-    }
-    .ag__day {
-      position: relative;
     }
     .ag__fold {
       padding: 0;

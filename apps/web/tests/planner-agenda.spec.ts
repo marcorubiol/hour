@@ -79,4 +79,25 @@ test.describe('the agenda (ADR-211)', () => {
     expect(after, 'the title row left the screen').toBeGreaterThanOrEqual(0);
     expect(after).toBeLessThanOrEqual(before);
   });
+
+  test('THE ＋ OF A DAY NEVER SITS ON ITS NUMBER (390 px)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await agenda(page);
+    const adds = page.locator('[data-testid="agenda-day"] .ag__note-add');
+    test.skip((await adds.count()) === 0, 'no day with a ＋ in the window');
+    const hits = await page.evaluate(() =>
+      [...document.querySelectorAll<HTMLElement>('[data-testid="agenda-day"]')].flatMap((d) => {
+        const add = d.querySelector<HTMLElement>('.ag__note-add');
+        const num = d.querySelector('.ag__num');
+        if (!add || !num) return [];
+        const n = num.getBoundingClientRect();
+        // The glyph's box, not the 44 px target: the target may reach the date's air.
+        const r = document.createRange();
+        r.selectNodeContents(add);
+        const g = r.getBoundingClientRect();
+        return g.top < n.bottom && g.bottom > n.top && g.left < n.right && g.right > n.left ? [d.dataset.day] : [];
+      }),
+    );
+    expect(hits, 'days whose ＋ is drawn on the number').toEqual([]);
+  });
 });
