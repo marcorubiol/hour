@@ -559,26 +559,34 @@ test.describe('the diary', () => {
     // «nothing further back» (honestly) and this went red as a lie about the
     // app. So it plants one date 20 days back (always within the two months
     // the gesture may fetch) and takes it away after.
-    const past = new Date(Date.now() - 20 * 86_400_000).toLocaleDateString('en-CA', {
-      timeZone: 'Europe/Madrid',
-    });
-    const made = await page.request.post('/api/dates', {
-      data: {
-        project_id: DIARY_PROJECT_ID,
-        kind: 'rehearsal',
-        starts_at: `${past}T09:00:00.000Z`,
-        ends_at: null,
-        all_day: false,
-        title: 'E2E Diary past',
-        venue_name: null,
-        city: null,
-        status: 'tentative',
-        line_id: null,
-        performance_id: null,
-      },
-    });
-    expect(made.status(), 'the past could not be planted').toBe(201);
-    plantedPastId = ((await made.json()) as { date: { id: string } }).date.id;
+    // The agenda draws only days with something (ADR-211): the diary is as
+    // tall as the plan, and the space may hold nothing from today on. With
+    // no row at rest the page does not overflow, scrollY is 0 by geometry
+    // and the browser does not anchor at the top. So it plants its own rows
+    // on both sides: six in the week ahead (they make the page taller than
+    // the window) and six 20 to 25 days back (the past the pull can fetch).
+    for (const back of [-6, -5, -4, -3, -2, -1, 20, 21, 22, 23, 24, 25]) {
+      const past = new Date(Date.now() - back * 86_400_000).toLocaleDateString('en-CA', {
+        timeZone: 'Europe/Madrid',
+      });
+      const made = await page.request.post('/api/dates', {
+        data: {
+          project_id: DIARY_PROJECT_ID,
+          kind: 'rehearsal',
+          starts_at: `${past}T09:00:00.000Z`,
+          ends_at: null,
+          all_day: false,
+          title: 'E2E Diary past',
+          venue_name: null,
+          city: null,
+          status: 'tentative',
+          line_id: null,
+          performance_id: null,
+        },
+      });
+      expect(made.status(), 'the past could not be planted').toBe(201);
+      plantedPastIds.push(((await made.json()) as { date: { id: string } }).date.id);
+    }
     await growsOneMonth(page);
   });
 
@@ -587,12 +595,9 @@ test.describe('the diary', () => {
   // ran the clock out (the look-ahead waits with `timeout: 0`) killed the
   // DELETE too, and every such red left one «E2E Diary past» behind (five on
   // 2026-11-01). Playwright gives `afterEach` a fresh timeout after a timeout.
-  let plantedPastId: string | null = null;
+  const plantedPastIds: string[] = [];
   test.afterEach(async ({ page }) => {
-    if (!plantedPastId) return;
-    const id = plantedPastId;
-    plantedPastId = null;
-    await page.request.delete(`/api/dates/${id}`);
+    for (const id of plantedPastIds.splice(0)) await page.request.delete(`/api/dates/${id}`);
   });
 
   async function growsOneMonth(page: Page) {
@@ -637,7 +642,9 @@ test.describe('the diary', () => {
     // Counted against the first day the diary opened with, not against the
     // total: the tail grows on its own (the look ahead) and is not this
     // gesture's doing.
-    const earlier = (await days()).filter((d) => d < start[0]).length;
+    // An empty opening (nothing from today on) has no first day: everything is earlier.
+    const first = start[0] ?? '9999-12-31';
+    const earlier = (await days()).filter((d) => d < first).length;
     expect(earlier, 'scrolling up loaded nothing').toBeGreaterThan(0);
     expect(earlier, 'one gesture fetched more than two months').toBeLessThan(70);
     // …and the reader was pinned to their row rather than thrown backwards.
