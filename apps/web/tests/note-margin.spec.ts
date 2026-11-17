@@ -205,7 +205,7 @@ test.describe('the margin — a private post-it on a day (ADR-093)', () => {
     const cell = dayCell(page);
     await expect(cell, 'the diary did not draw the fixture day').toBeVisible();
     await expect(
-      cell.locator('.slip', { hasText: title }),
+      cell.getByTestId('agenda-row').filter({ hasText: title }),
       `the diary never drew «${title}»`,
     ).toBeVisible();
   }
@@ -244,7 +244,8 @@ test.describe('the margin — a private post-it on a day (ADR-093)', () => {
       await page.reload();
     }
     await waitForLoaded(page);
-    await expect(page.locator('main [data-day]').first()).toBeVisible();
+    // No row to wait for: the agenda draws only days with something (ADR-211),
+    // and the fixture space may have nothing from today on.
     day = await pickEmptyDay(page);
 
     const madeA = await createFixtureDate(page, titleA, day);
@@ -256,7 +257,7 @@ test.describe('the margin — a private post-it on a day (ADR-093)', () => {
     const cell = dayCell(page);
     // The premise, asserted instead of assumed: this day holds exactly one
     // entry, so the branch under test is the one that actually runs.
-    await expect(cell.locator('.slip'), 'the day did not end up with one entry').toHaveCount(1);
+    await expect(cell.getByTestId('agenda-row'), 'the day did not end up with one entry').toHaveCount(1);
 
     await openWriter(page);
     // A word, not a picker: with one option there is nothing to choose.
@@ -282,7 +283,7 @@ test.describe('the margin — a private post-it on a day (ADR-093)', () => {
     await page.reload();
     await waitForEntry(page, titleB);
     // Two entries and the note the first test left — the slips are the two.
-    await expect(dayCell(page).locator('.slip')).toHaveCount(2);
+    await expect(dayCell(page).getByTestId('agenda-row')).toHaveCount(2);
 
     await openWriter(page);
     const select = dayCell(page).locator('select.ag__note-anchor');
