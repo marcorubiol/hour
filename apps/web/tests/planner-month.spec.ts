@@ -152,6 +152,14 @@ test.describe('the month (ADR-209)', () => {
       // The title row is on screen, the axis right under it, no seam between.
       expect(strip.head.top).toBeGreaterThanOrEqual(0);
       expect(Math.abs(strip.axis.top - strip.head.bottom), 'a seam between title and axis').toBeLessThanOrEqual(2);
+      // Nothing passes between the frame and the strip: the head meets the
+      // bar, and over a pinned head the bar's paper is solid, not frosted.
+      const frame = await page.evaluate(() => {
+        const bar = document.querySelector('.shell__top')!;
+        return { paper: getComputedStyle(bar, '::before').backgroundColor, bottom: bar.getBoundingClientRect().bottom };
+      });
+      expect(strip.head.top, 'a gap between the bar and the title').toBeLessThanOrEqual(frame.bottom);
+      expect(frame.paper, 'the bar is see-through over the stuck strip').not.toMatch(/\/\s*0?\.\d|rgba\(.*,\s*0?\.\d+\)/);
       // The rest of the head went with the scroll.
       expect(strip.views.bottom).toBeLessThanOrEqual(strip.head.bottom);
       await expect(page.locator('.lenshead__title')).toContainText(

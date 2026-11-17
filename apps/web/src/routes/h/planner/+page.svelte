@@ -2503,7 +2503,8 @@
      the head scrolls away. The axis sticks under the title row, whose height
      is measured, never guessed (a title can wrap, a theme can change the
      scale), and tucks a hairline under its rule: two stuck layers meeting
-     edge to edge left a sub-pixel seam the weeks showed through. */
+     edge to edge left a sub-pixel seam the weeks showed through. The title
+     row tucks under the bar the same way (`--pin-top`). */
   let calEl = $state<HTMLElement>();
   $effect(() => {
     if ((view !== 'month' && view !== 'agenda') || !calEl || typeof ResizeObserver === 'undefined') return;
@@ -2512,7 +2513,7 @@
     if (!head) return;
     const ro = new ResizeObserver(() => {
       const h = head.getBoundingClientRect().height;
-      el.style.setProperty('--month-axis-top', `calc(var(--header-height) + ${h}px - var(--line-hairline))`);
+      el.style.setProperty('--month-axis-top', `calc(var(--pin-top) + ${h}px - var(--line-hairline))`);
     });
     ro.observe(head);
     return () => ro.disconnect();
@@ -3037,7 +3038,13 @@
   <title>{docTitle(t('lens.planner', locale))}</title>
 </svelte:head>
 
-<section class="cal" class:cal--pinned={view === 'month' || view === 'agenda'} aria-busy={busy} bind:this={calEl}>
+<section
+  class="cal"
+  class:cal--pinned={view === 'month' || view === 'agenda'}
+  data-pinned-head={view === 'month' || view === 'agenda' ? '' : undefined}
+  aria-busy={busy}
+  bind:this={calEl}
+>
   <LensHeader help="planner">
     {#snippet title()}
       {#if view === 'day'}
@@ -3632,9 +3639,14 @@
      weekday axis under it (MonthGrid, at `--month-axis-top`). Its air above
      is lent and paid back, so at rest nothing moves. The bar of views scrolls
      away here, and with no stacking of its own it passes under the strip. */
+  .cal--pinned {
+    /* A hairline under the bar's foot, which paints over it: edge to edge,
+       the columns showed through the sub-pixel seam (Marco, 17-11). */
+    --pin-top: calc(var(--header-height) - var(--line-hairline));
+  }
   .cal--pinned :global(.lenshead) {
     position: sticky;
-    inset-block-start: var(--header-height);
+    inset-block-start: var(--pin-top);
     z-index: calc(var(--z-sticky) - 1);
     margin-block-start: calc(-1 * var(--space-s));
     padding-block-start: var(--space-s);
