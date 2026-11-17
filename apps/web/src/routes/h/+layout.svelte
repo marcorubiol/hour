@@ -1112,6 +1112,14 @@
     background: color-mix(in oklch, var(--bg) 88%, transparent);
     backdrop-filter: blur(8px); /* material */
   }
+  /* A page that pins an opaque head flush under the bar (`data-pinned-head`:
+     the Planner's title strip) gets solid paper here: what scrolls past that
+     head goes on under the bar, and through the frost it showed as a band of
+     rows between the field and the head (Marco, 17-11). */
+  .shell:has(:global([data-pinned-head])) .shell__top::before {
+    background: var(--bg);
+    backdrop-filter: none;
+  }
 
   /* The clock and you: a phone's only (see the media query below). */
   .shell__now,
