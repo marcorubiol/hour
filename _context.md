@@ -31,17 +31,18 @@ aprueba, el sistema ejecuta y deja auditoría. UI manual e IA leen y escriben lo
 fixtures. Sin billing ni self-service. Modelo ya multi-workspace y multi-account. La beta externa espera a cerrar lo
 de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
-## Producción (verificado 2026-11-16)
+## Producción (verificado 2026-11-17)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`226bf90f`**, `dirty:false`, builtAt
-  2026-11-16T19:50Z. Deploy del 16-11 (el Mes con el título y la fila de días fijos al desplazar, y el título que nombra
-  la semana bajo la franja; la barra Agenda · Mes · Tablero con la vista elegida mayor; el día 1 destacado y la
-  frontera entre meses en escalera de raya fina), sobre `459af592`, sin migración. Lo entregado, en `CHANGELOG.md`.
-- Última suite (16-11, contra `226bf90f`): E2E entera, 209 tests con `--timeout=90000` (29,5 min): 188 ok, 18 saltados
-  por datos, 3 rojos. Dos eran de red (`person-merge-invitation:36` y `whatsapp-import:205` pasaron al repetir;
-  `open-speed:123` pasó sola) y uno era un spec atrasado: `planner-month` «MID-MONTH» (1440 y 390) desplazaba dos veces
-  con la página en scroll suave y la segunda pasada medía antes de moverse; corregido con scroll instantáneo y verde.
-  RLS entera: 625/629 (14-11).
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`48c1d394`**, `dirty:false`, builtAt
+  2026-11-17T07:22Z. Deploy del 17-11 (la Agenda nueva, una sola regla de «Falta» y el punto ámbar de Hoy; el
+  Planificador abre en la Agenda sin vista guardada; ADR-211; `CACHE_SCHEMA` 35), sin migración. Lo entregado, en
+  `CHANGELOG.md`.
+- Última suite (17-11, contra `48c1d394`): E2E de 214 specs: 187 ok, 23 saltados por datos, 0 rojos tras repetir;
+  `--timeout=90000` (26 min). Dos rojos eran specs atrasados y se corrigieron (`planner-laws:550` y
+  `note-margin:232`: la Agenda solo dibuja días con algo, y el espacio `playwright` no tiene nada desde hoy hasta
+  2031); `bolo-access:142` fue intermitente y pasó al repetir. Los specs de «Falta» ámbar (`planner-agenda`) y del
+  punto de Hoy se saltan sin datos en `playwright`: se vieron a mano plantando funciones y borrándolas. RLS entera:
+  625/629 (14-11).
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free con keepalive diario
   (`keepalive.yml`); Pro antes de la beta (`_tasks.md § 9`). Si falla tras días sin uso: `dig <ref>.supabase.co`.
