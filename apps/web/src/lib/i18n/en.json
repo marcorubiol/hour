@@ -3687,5 +3687,6 @@
   "pass.box_team_date": "Who goes",
   "pass.box_place": "Where",
   "pass.line_no_place": "No place yet",
-  "pass.label_date": "Date pass"
+  "pass.label_date": "Date pass",
+  "pass.put_place": "Add a place"
 }

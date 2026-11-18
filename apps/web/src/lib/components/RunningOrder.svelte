@@ -78,6 +78,7 @@
   import {
     fillDay,
     templateAt,
+    templateClockAt,
     templateFor,
     hangPlaces,
     weaveStops,
@@ -459,22 +460,26 @@
   let offer = $derived(canAsk && hasStart ? templateFor(order.map((s) => s.kind)) : []);
   let fillOpen = $state(false);
   let fillDismissed = $state(false);
-  let fillClocks = $state<string[]>([]);
+  let fillClocks = $state<Record<string, string>>({});
   let fillBad = $state(false);
   function openFill() {
     const start = order.find((s) => s.kind === 'start');
     if (!start) return;
-    fillClocks = offer.map((m) => clockText(templateAt(start.at, m), tz));
+    fillClocks = Object.fromEntries(offer.map((m) => [m.kind, clockText(templateAt(start.at, m), tz)]));
     fillBad = false;
     fillOpen = true;
   }
   function doFill(e: SubmitEvent) {
     e.preventDefault();
     if (waiting) return;
+    const start = order.find((s) => s.kind === 'start');
+    if (!start) return;
     const moments: { kind: string; at: string }[] = [];
-    for (const [i, m] of offer.entries()) {
-      const clock = parseClock(fillClocks[i] ?? '');
-      const at = clock ? instantFor(dayIso, clock, tz, order) : null;
+    // By kind, not by place: another hand may have written one of them
+    // meanwhile, and the offer shrinks under the open form.
+    for (const m of offer) {
+      const clock = parseClock(fillClocks[m.kind] ?? '');
+      const at = clock ? templateClockAt(templateAt(start.at, m), clock, tz) : null;
       if (!at) {
         fillBad = true;
         return;
@@ -537,7 +542,7 @@
         <form class="ro__ask" onsubmit={doFill} data-testid="ro-fill">
           <p class="ro__ask-body">{t('pass.fill_body', locale)}</p>
           <span class="ro__fill">
-            {#each offer as m, i (m.kind)}
+            {#each offer as m (m.kind)}
               <label class="ro__fill-one">
                 <span class="ro__fill-w">{kindWord(m.kind)}</span>
                 <input
@@ -545,7 +550,7 @@
                   aria-invalid={fillBad}
                   inputmode="numeric"
                   autocomplete="off"
-                  bind:value={fillClocks[i]}
+                  bind:value={fillClocks[m.kind]}
                   disabled={waiting}
                 />
               </label>

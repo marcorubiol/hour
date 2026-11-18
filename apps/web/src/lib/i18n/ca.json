@@ -3687,5 +3687,6 @@
   "pass.box_team_date": "Qui hi va",
   "pass.box_place": "On",
   "pass.line_no_place": "Sense lloc",
-  "pass.label_date": "Passi de la data"
+  "pass.label_date": "Passi de la data",
+  "pass.put_place": "Posar lloc"
 }
