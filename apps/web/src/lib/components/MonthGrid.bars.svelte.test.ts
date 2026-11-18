@@ -117,6 +117,15 @@ describe('MonthGrid — lo que dura es una barra', () => {
     expect(runs[0].style.gridColumn.replace(/\s/g, '')).toBe('1/4');
   });
 
+  it('each day of the run is its own door, and the picked day lists its row', async () => {
+    const opened: string[] = [];
+    const { container } = mount({ onDateOpen: (d: DateEvent) => opened.push(d.id) });
+    const doors = container.querySelectorAll<HTMLButtonElement>('.cal__run .cal__bar-door');
+    expect(doors).toHaveLength(3);
+    await fireEvent.click(doors[2]);
+    expect(opened).toEqual(['r3']);
+  });
+
   it('a tour is a bar with «gira» and its place; the deduction stays in the title', () => {
     const { container } = mount();
     const [bar] = container.querySelectorAll<HTMLElement>('[data-testid="month-bar-tour"]');

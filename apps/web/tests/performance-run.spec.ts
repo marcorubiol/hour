@@ -109,7 +109,7 @@ test.describe('a performance that lasts several days (ADR-084 §1)', () => {
       );
       return {
         bands: runs.length,
-        link: runs[0]?.tagName === 'A',
+        links: runs[0]?.querySelectorAll('a.cal__bar-door').length ?? 0,
         lines: runs[0] ? Math.round(runs[0].getBoundingClientRect().height / parseFloat(getComputedStyle(runs[0]).lineHeight)) : 0,
         cards: [...document.querySelectorAll('.cal__day .slip')].filter((el) =>
           (el.textContent ?? '').includes(v),
@@ -117,8 +117,8 @@ test.describe('a performance that lasts several days (ADR-084 §1)', () => {
       };
     }, venue);
     expect(seen.bands, 'the run is one element').toBe(1);
-    // Una función TIENE página: la barra es un enlace a su primer día.
-    expect(seen.link, 'a gig run is a link, not a button').toBe(true);
+    // Una función TIENE página: cada día de la barra es un enlace a su día.
+    expect(seen.links, 'each day of a gig run is a link, not a button').toBe(3);
     expect(seen.lines, 'and it is one line: the hours are the Day’s').toBeLessThanOrEqual(1);
     expect(seen.cards, 'and it does not ALSO draw as loose cards').toBe(0);
   });

@@ -316,6 +316,9 @@
   function cellSlips(
     perfs: PerformanceEvent[],
     groups: DateEvent[][],
+    /** The picked day under its week lists the run's row of that day too:
+        there it is the day read whole, not the sheet. */
+    withRuns = false,
   ): Array<{
     key: string;
     slip: SlipVM;
@@ -335,14 +338,14 @@
       // UNA vez sobre los días que cubre. Sin esto se dibujaría dos veces.
       // Y la ley que esto NO rompe: dos funciones DISTINTAS el mismo día
       // siguen siendo dos cards — solo se va la que comparte serie.
-      if (isRun(p.series_id)) continue;
+      if (!withRuns && isRun(p.series_id)) continue;
       const slip = performanceSlip(p, slipCtx);
       out.push({ key: p.id, slip, sortAt: perfInstant(p) ?? '~' });
     }
     for (const g of groups) {
       // A multi-day run left the cell: it is the week's band now, drawn once
       // over the days it covers with each day's own hours under it.
-      if (isSeriesBand(g)) continue;
+      if (!withRuns && isSeriesBand(g)) continue;
       out.push({
         key: g[0].id,
         slip: dateSlip(g[0], slipCtx),
@@ -476,7 +479,7 @@
     else onDayOpen?.(iso);
   }
   function pickedEntries(iso: string) {
-    return cellSlips(performancesByDay.get(iso) ?? [], groupDates(datesByDay.get(iso) ?? []));
+    return cellSlips(performancesByDay.get(iso) ?? [], groupDates(datesByDay.get(iso) ?? []), true);
   }
 
   /* THE FOOT ASKS FOR MORE, AND THE EYE NAMES THE MONTH. A sentinel under the
@@ -1231,8 +1234,17 @@
           {@const style = `grid-row: ${bar.lane + 2}; grid-column: ${bar.colStart} / ${bar.colEnd}`}
           {#if bar.kind === 'run'}
             {@const s = bar.run}
-            {@const door = s.cells.find((c) => c.filled && (c.href || c.open))}
-            {#snippet runBody()}
+            <!-- EACH DAY OF THE BAR IS ITS OWN DOOR. The bar is one line, but a
+                 run is per-day rows: a press on Friday opens Friday's row —
+                 a link for a gig (it has a page), the dialog for a date. -->
+            <span
+              class="cal__bar cal__run"
+              class:cal__bar--cutl={s.cutLeft}
+              class:cal__bar--cutr={s.cutRight}
+              data-family={s.cert}
+              {style}
+              title={s.title}
+            >
               {#if s.project}
                 <IdentityMark
                   mini
@@ -1243,38 +1255,24 @@
               {/if}
               <b class="cal__bar-n">{s.label}</b>
               {#if s.city}<span class="cal__bar-p">{s.city}</span>{/if}
-            {/snippet}
-            {#if door?.href}
-              <a
-                class="cal__bar cal__run"
-                class:cal__bar--cutl={s.cutLeft}
-                class:cal__bar--cutr={s.cutRight}
-                data-family={s.cert}
-                {style}
-                href={door.href}
-                title={s.title}>{@render runBody()}</a
-              >
-            {:else if door?.open}
-              <button
-                type="button"
-                class="cal__bar cal__run"
-                class:cal__bar--cutl={s.cutLeft}
-                class:cal__bar--cutr={s.cutRight}
-                data-family={s.cert}
-                {style}
-                onclick={door.open}
-                title={s.title}>{@render runBody()}</button
-              >
-            {:else}
-              <span
-                class="cal__bar cal__run"
-                class:cal__bar--cutl={s.cutLeft}
-                class:cal__bar--cutr={s.cutRight}
-                data-family={s.cert}
-                {style}
-                title={s.title}>{@render runBody()}</span
-              >
-            {/if}
+              <span class="cal__bar-doors" style="grid-template-columns: repeat({s.cells.length}, minmax(0, 1fr))">
+                {#each s.cells as c (c.iso)}
+                  {#if c.filled && c.href}
+                    <a class="cal__bar-door" href={c.href} aria-label="{s.label} · {c.iso}" title="{s.title} · {c.iso}"></a>
+                  {:else if c.filled && c.open}
+                    <button
+                      type="button"
+                      class="cal__bar-door"
+                      aria-label="{s.label} · {c.iso}"
+                      title="{s.title} · {c.iso}"
+                      onclick={c.open}
+                    ></button>
+                  {:else}
+                    <span></span>
+                  {/if}
+                {/each}
+              </span>
+            </span>
           {:else if bar.kind === 'band'}
             {@const b = bar.band}
             <span
@@ -1547,14 +1545,26 @@
       white-space: nowrap;
       overflow: hidden;
     }
-    a.cal__bar,
-    button.cal__bar {
+    .cal__run {
+      position: relative;
+    }
+    .cal__bar-doors {
+      position: absolute;
+      inset: 0;
+      display: grid;
+    }
+    .cal__bar-door {
+      padding: 0;
+      border: 0;
+      background: none;
       cursor: pointer;
     }
-    a.cal__bar:hover .cal__bar-n,
-    button.cal__bar:hover .cal__bar-n {
-      text-decoration: underline;
-      text-underline-offset: 2px;
+    .cal__bar-door:hover {
+      background: color-mix(in oklch, var(--text-color) 6%, transparent);
+    }
+    .cal__bar-door:focus-visible {
+      outline: var(--focus-width) solid var(--focus-color);
+      outline-offset: calc(-1 * var(--focus-width));
     }
     .cal__bar :global(.mark) {
       flex: none;
@@ -2219,7 +2229,7 @@
       cursor: pointer;
     }
     .cal__grid :global(.cal__event-hit:focus-visible) {
-      outline: var(--focus-width) solid var(--focus-ring, var(--text-color));
+      outline: var(--focus-width) solid var(--focus-color);
       outline-offset: -2px;
     }
 
