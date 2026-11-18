@@ -44,6 +44,9 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
   punto de Hoy se saltan sin datos en `playwright`: se vieron a mano plantando funciones y borrándolas. RLS entera:
   625/629 (14-11).
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
+  La integración Git de Workers Builds en `hour-web` está desconectada (Marco, 2026-11-18): fallaba en cada push
+  sin `PUBLIC_SENTRY_DSN` y, de pasar, habría subido versiones sin el DSN. El único deploy es el manual; en los PR,
+  la puerta es el CI de GitHub (`web` y `collab`).
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free con keepalive diario
   (`keepalive.yml`); Pro antes de la beta (`_tasks.md § 9`). Si falla tras días sin uso: `dig <ref>.supabase.co`.
 - **Última migración aplicada: `20261114100000`** (149; backup 43606973594, plan 43607266766, apply 43607392836).

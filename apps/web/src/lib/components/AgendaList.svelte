@@ -636,9 +636,9 @@
                 <span class="ag__city">{strong(sl)}{#if held(sl)}?{/if}</span>
                 {#if sub || miss?.words.length}
                   <span class="ag__ven"
-                    >{sub ?? ''}{#each miss?.words ?? [] as w, wi (w)}{sub || wi ? ' · ' : ''}<span
-                        class="missing-word"
-                        data-testid="agenda-missing">{w}</span
+                    >{sub ?? ''}{#each miss?.words ?? [] as w, wi (w)}{#if sub || wi}{' '}{/if}<span class="ag__miss"
+                        >{#if sub || wi}·&nbsp;{/if}<span class="missing-word" data-testid="agenda-missing">{w}</span
+                        ></span
                       >{/each}</span
                   >
                 {/if}
@@ -998,7 +998,10 @@
     .ag__cast {
       margin-block-start: var(--space-2xs);
     }
-    .ag__ven .missing-word {
+    /* The «·» travels with its word: when the amber wraps at 390 px the
+       separator goes down with it instead of hanging at the end of the
+       venue («La Fàbrica ·»). The break is the plain space before it. */
+    .ag__miss {
       white-space: nowrap;
     }
     .ag__hh {
