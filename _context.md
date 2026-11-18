@@ -31,18 +31,18 @@ aprueba, el sistema ejecuta y deja auditoría. UI manual e IA leen y escriben lo
 fixtures. Sin billing ni self-service. Modelo ya multi-workspace y multi-account. La beta externa espera a cerrar lo
 de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
-## Producción (verificado 2026-11-17)
+## Producción (verificado 2026-11-18)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`f050ccbc`**, `dirty:false`, builtAt
-  2026-11-17T09:25Z. Deploy del 17-11 sobre `48c1d394` (dos retoques visuales: el ＋ de la Agenda en su propia fila y la barra opaca sobre la cabecera fija; antes, la Agenda nueva, una sola regla de «Falta» y el punto ámbar de Hoy; el
-  Planificador abre en la Agenda sin vista guardada; ADR-211; `CACHE_SCHEMA` 35), sin migración. Lo entregado, en
-  `CHANGELOG.md`.
-- Última suite completa (17-11, contra `48c1d394`; contra `f050ccbc` solo `planner-agenda`, `planner-month` y `planner-laws`: 36 ok, 5 saltados por datos, 0 rojos): E2E de 214 specs: 187 ok, 23 saltados por datos, 0 rojos tras repetir;
-  `--timeout=90000` (26 min). Dos rojos eran specs atrasados y se corrigieron (`planner-laws:550` y
-  `note-margin:232`: la Agenda solo dibuja días con algo, y el espacio `playwright` no tiene nada desde hoy hasta
-  2031); `bolo-access:142` fue intermitente y pasó al repetir. Los specs de «Falta» ámbar (`planner-agenda`) y del
-  punto de Hoy se saltan sin datos en `playwright`: se vieron a mano plantando funciones y borrándolas. RLS entera:
-  625/629 (14-11).
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`6f89e149`**, `dirty:false`, builtAt
+  2026-11-18T18:00Z. Deploy del 18-11 con los PR 2 a 6: el Mes nuevo («Quién falta», lo que dura es una barra, la
+  ficha con el tipo en tinta; 165 y 166), el Mes y la barra de vistas en el móvil, el «·» de la Agenda a 390 px y la
+  nota del equipo en la ficha de organización (138). `CACHE_SCHEMA` 35, sin migración. Lo entregado, en `CHANGELOG.md`.
+- Última suite completa (18-11, contra `6f89e149`): E2E de 218 specs: 193 ok, 19 saltados por datos, 6 rojos; al
+  repetir, `open-speed:123` y `roadsheet-share:17` pasaron (intermitentes) y los cuatro restantes eran specs
+  atrasados, corregidos en `7a223cfc`: «Quién falta» comparte la clase `.cal__now` con «Hoy» (`planner-laws:165`,
+  `planner-month:145`) y el spec del «·» comparaba la parte de arriba de dos cajas de distinto alto
+  (`planner-agenda:124`). Tras el arreglo, `planner-agenda`, `planner-laws` y `planner-month`: 44/44.
+  `--timeout=90000` (43 min). RLS entera: 625/629 (14-11).
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
   La integración Git de Workers Builds en `hour-web` está desconectada (Marco, 2026-11-18): fallaba en cada push
   sin `PUBLIC_SENTRY_DSN` y, de pasar, habría subido versiones sin el DSN. El único deploy es el manual; en los PR,
