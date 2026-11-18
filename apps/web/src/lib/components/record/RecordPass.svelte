@@ -186,6 +186,13 @@
             {#if onEditPlace}<button type="button" class="pass__edit" aria-label={editPlaceLabel} onclick={onEditPlace}>{place}</button
               >{:else}{place}{/if}
           </span>
+        {:else if !place && !placeEdit && onEditPlace}
+          <!-- No place yet: the same door, with a verb instead of a name. -->
+          <span class="pass__place">
+            <button type="button" class="pass__edit pass__edit--open" data-testid="pass-put-place" onclick={onEditPlace}
+              >{t('pass.put_place', locale)}</button
+            >
+          </span>
         {/if}
       </div>
     </div>
@@ -395,6 +402,14 @@
       .pass__edit:hover {
         text-decoration: underline;
       }
+    }
+    /* «Poner lugar»: a place still to write reads as one, in the piece's
+       amber like «sin hora». */
+    .pass__edit--open {
+      color: var(--warning-light);
+      text-decoration: underline;
+      text-decoration-thickness: var(--line-hairline);
+      text-underline-offset: 3px;
     }
 
     .pass__saved {

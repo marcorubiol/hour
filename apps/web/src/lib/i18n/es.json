@@ -3683,5 +3683,6 @@
   "pass.talk_title": "Hablar con…",
   "threads.count": "{n} mensajes",
   "threads.empty_short": "sin mensajes",
-  "threads.pick": "Elegir el hilo"
+  "threads.pick": "Elegir el hilo",
+  "pass.put_place": "Poner lugar"
 }

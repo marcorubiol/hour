@@ -3683,5 +3683,6 @@
   "pass.talk_title": "Parler avec…",
   "threads.count": "{n} messages",
   "threads.empty_short": "aucun message",
-  "threads.pick": "Choisir le fil"
+  "threads.pick": "Choisir le fil",
+  "pass.put_place": "Ajouter un lieu"
 }

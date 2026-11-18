@@ -5,6 +5,7 @@ import {
   hangPlaces,
   showInstant,
   templateAt,
+  templateClockAt,
   templateFor,
   tripStops,
   weaveStops,
@@ -104,6 +105,13 @@ describe('the template («Rellenar el día»)', () => {
     );
     expect(next.map((s) => s.kind ?? s.label)).toEqual(['load_in', 'x', 'start', 'loadout']);
     expect(next[1]).toBe(order[0]);
+  });
+
+  test('a show after midnight keeps its proposed hours on the evening before', () => {
+    const start = '2026-11-21T00:00:00.000Z'; // 1h in Madrid
+    const loadIn = templateAt(start, DAY_TEMPLATE[0]!);
+    expect(templateClockAt(loadIn, { h: 20, m: 0 }, 'Europe/Madrid')).toBe(loadIn);
+    expect(templateClockAt(loadIn, { h: 19, m: 30 }, 'Europe/Madrid')).toBe('2026-11-20T18:30:00.000Z');
   });
 
   test('a show hour typed on the venue clock', () => {
