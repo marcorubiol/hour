@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { waitForLoaded } from './loaded';
+import { clearAgenda, plantAgenda, type PlantedAgenda } from './agenda-fixture';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
@@ -9,8 +10,9 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  * leg between days, three free nights are one line, the week is a rule and
  * never a word, the month stays said while you scroll, and what a
  * performance of the next two weeks still needs is said beside it in amber.
- * Reads only; the data is whatever the fixture space holds, so the laws that
- * need a case skip without one.
+ * The `playwright` space is empty from today on, so the spec plants its own
+ * fortnight (`agenda-fixture.ts`: performances, one trip) and takes it back
+ * after; the skips stay only as a guard against a plant the API refused.
  *
  * Runs against a deployed origin (`PW_BASE_URL`), never `vite preview`.
  */
@@ -22,6 +24,24 @@ async function agenda(page: Page) {
 
 test.describe('the agenda (ADR-211)', () => {
   test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL / PW_TEST_PASSWORD.');
+
+  let made: PlantedAgenda | null = null;
+
+  test.beforeAll(async ({ browser }) => {
+    test.setTimeout(120_000);
+    const page = await browser.newPage();
+    await page.goto('/h/desk');
+    made = await plantAgenda(page);
+    await page.close();
+  });
+
+  test.afterAll(async ({ browser }) => {
+    test.setTimeout(120_000);
+    const page = await browser.newPage();
+    await page.goto('/h/desk');
+    await clearAgenda(page, made);
+    await page.close();
+  });
 
   test('ONLY DAYS WITH SOMETHING, AND «WEEK» IS SAID NOWHERE', async ({ page }) => {
     await agenda(page);

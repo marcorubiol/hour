@@ -565,7 +565,13 @@ test.describe('the diary', () => {
     // and the browser does not anchor at the top. So it plants its own rows
     // on both sides: six in the week ahead (they make the page taller than
     // the window) and six 20 to 25 days back (the past the pull can fetch).
-    for (const back of [-6, -5, -4, -3, -2, -1, 20, 21, 22, 23, 24, 25]) {
+    await plantDiary(page, [-6, -5, -4, -3, -2, -1, 20, 21, 22, 23, 24, 25]);
+    await growsOneMonth(page);
+  });
+
+  /** One rehearsal per offset (days BEHIND today; negative is ahead), taken away by the `afterEach` below. */
+  async function plantDiary(page: Page, backs: number[]) {
+    for (const back of backs) {
       const past = new Date(Date.now() - back * 86_400_000).toLocaleDateString('en-CA', {
         timeZone: 'Europe/Madrid',
       });
@@ -587,8 +593,7 @@ test.describe('the diary', () => {
       expect(made.status(), 'the past could not be planted').toBe(201);
       plantedPastIds.push(((await made.json()) as { date: { id: string } }).date.id);
     }
-    await growsOneMonth(page);
-  });
+  }
 
   // THE PLANTED PAST IS TAKEN AWAY IN ITS OWN SLOT. It used to go in a
   // `finally` inside the test, which shares the test's timeout: a red that
@@ -655,6 +660,14 @@ test.describe('the diary', () => {
   test('`NOW` LANDS ON TODAY', async ({ page }) => {
     // A long smooth journey across a diary that is loading while it runs can
     // be cut short by one anchoring correction — measured 5.760px short.
+    //
+    // TODAY IS THE SPEC'S OWN, like the past above. `playwright` holds
+    // nothing from today on, the agenda draws only days with something, and
+    // with no row today this skipped on every deploy. So it plants today,
+    // the week ahead (the page must overflow for a journey to exist) and a
+    // past 20 to 25 days back for the pull to bring in, all removed by the
+    // `afterEach`.
+    await plantDiary(page, [0, -1, -2, -3, -4, -5, -6, 20, 21, 22, 23, 24, 25]);
     await planner(page, 'agenda');
     // History first, then `Now`: the journey only exists once the past has
     // been loaded. Waited on as the door closing (see the law above), not on
