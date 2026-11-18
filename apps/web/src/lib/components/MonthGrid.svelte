@@ -1589,8 +1589,17 @@
        de unas palabras produce un borde y una fase rota.
        Marco lo zanjó mirándolo: «limpia el background de las letras y déjame
        ver las líneas verticales, prefiero eso». La pauta cruza, y ya está. */
+    /* THE WORD GIVES WAY TOO, LAST (2026-11-18). The container steps below
+       drop the span and then the name, but the word was `flex: none`: on a
+       phone a one- or two-day absence is 49 or 98px wide and «UNAVAILABLE»
+       alone is ~80, so the word and the rule ran past the Sunday column, the
+       page scrolled sideways by 35px at 390 and dragged the fixed lens bar
+       with it. The word now ends in an ellipsis rather than leave the sheet;
+       the band's `title` keeps all of it. */
     .cal__band-k {
-      flex: none;
+      flex: 0 1 auto;
+      min-inline-size: 0;
+      overflow: hidden;
       display: inline-flex;
       align-items: center;
       gap: var(--space-xs);
@@ -1598,8 +1607,13 @@
     /* La palabra y su `?` se inclinan juntas, calcado de `.slip__kind--q`. */
     .cal__band-w--q {
       font-style: italic;
+      /* The leaning `?` flies out of its box, and the box now clips. */
+      padding-inline-end: 0.18em;
     }
     .cal__band-w {
+      min-inline-size: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
       letter-spacing: var(--tracking-m);
@@ -1613,7 +1627,9 @@
        and «playwright staging» on a three-day band at 390 sent the arrow
        past the grid's right edge. */
     .cal__band-n {
-      flex: 0 1 auto;
+      /* It gives way BEFORE the word: shrinking side by side, a Sunday at
+         1440 read «UNAVAILAB… Anouk V…» instead of «UNAVAILABLE Anouk…». */
+      flex: 0 999 auto;
       min-inline-size: 0;
       font-size: var(--text-xs);
       color: var(--away-subject);
@@ -1719,6 +1735,14 @@
     }
     @container absband (max-width: 6.875rem) {
       .cal__band-n {
+        display: none;
+      }
+    }
+    /* One day on a phone (~49px): a word cut to «U…» says nothing, so the
+       rule and its terminus say it alone, like the cell's short forms; the
+       day picked under the week and the `title` name it. */
+    @container absband (max-width: 4rem) {
+      .cal__band-k {
         display: none;
       }
     }

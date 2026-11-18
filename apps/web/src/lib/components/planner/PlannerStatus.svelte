@@ -103,6 +103,29 @@
       margin-inline-end: var(--space-s);
       color: var(--border-color-dark);
     }
+    /* ON A PHONE THE LINE IS ONE LINE, AND IT SCROLLS (2026-11-18). The law
+       is that the bar under it never moves between the three drawings
+       (`planner-month.spec`), and a wrapping line broke it as soon as the
+       Month had something to count: at 390 the asks fit on one line in the
+       Agenda, the Month's census wrapped to three, and the bar jumped 211 →
+       249 → 230 px from one tap to the next. The asks come first and stay in
+       view; the census runs on to the right and fades at the edge. */
+    @media (max-width: 47.999rem) {
+      .pstat__line {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+        mask-image: linear-gradient(to right, black calc(100% - 1.5rem), transparent);
+      }
+      .pstat__line::-webkit-scrollbar {
+        display: none;
+      }
+      .pstat__line :global(.cal__stat--soft) {
+        white-space: nowrap;
+      }
+    }
     .pstat__line :global(.cal__stat b) {
       font-family: var(--font-mono);
       font-weight: 400;

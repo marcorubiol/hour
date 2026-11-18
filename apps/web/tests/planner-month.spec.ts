@@ -186,6 +186,21 @@ test.describe('the month (ADR-209)', () => {
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
     expect(overflow).toBeLessThanOrEqual(0);
+    // NO BAND WRITES PAST ITS OWN DAYS (2026-11-18): a one- or two-day
+    // absence at 390 printed «UNAVAILABLE» and its rule 35px past Sunday.
+    // The page check above only catches it when the band sits on a Sunday;
+    // this one holds every band, wherever it falls in the week.
+    const spill = await page.evaluate(() =>
+      [...document.querySelectorAll<HTMLElement>('.cal__band')].flatMap((band) => {
+        const edge = band.getBoundingClientRect().right;
+        return [...band.querySelectorAll<HTMLElement>(':scope > *')]
+          .filter((c) => getComputedStyle(c).display !== 'none')
+          .map((c) => c.getBoundingClientRect().right - edge)
+          .filter((d) => d > 1)
+          .map((d) => `${band.title}: ${Math.round(d)}px`);
+      }),
+    );
+    expect(spill, 'a band whose words or rule leave its days').toEqual([]);
     // No cell draws more than two slips.
     const most = await page.evaluate(() =>
       Math.max(

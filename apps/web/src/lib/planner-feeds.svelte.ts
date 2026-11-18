@@ -24,6 +24,29 @@ export type { TeamItem };
 export type DecisionPerfItem = PerformanceEvent & { hold_notice_days?: number | null };
 
 /**
+ * GRACEFUL ABSENCE, BUT A CANCELLED FETCH IS NOT AN ABSENT FEED.
+ * Every Planner feed degrades to `{ items: [], absent: true }` when its
+ * endpoint fails (a pre-migration DB, contract § Graceful absence), and lets
+ * `Unauthorized` through so the session bounce happens. The catch also caught
+ * TanStack's own cancellation: opening the Month or the Agenda aborts the
+ * fetches of the window it leaves, and each abort printed «feed absent» in the
+ * console on every load (seen 2026-11-18 at 390 and 1440), burying a real
+ * absence among false ones and answering a cancelled query with data that
+ * hides the blackout entry points. An aborted signal rethrows, so the query
+ * library sees the cancellation it asked for.
+ */
+export function absentFeed<T>(
+  label: string,
+  err: unknown,
+  signal: AbortSignal,
+): { items: T[]; absent: true } {
+  if (signal.aborted) throw err;
+  if (err instanceof Error && err.message === 'Unauthorized') throw err;
+  console.warn(`[calendar] ${label} feed absent:`, err);
+  return { items: [] as T[], absent: true };
+}
+
+/**
  * The season's blocks (ADR-117): the Desk's Planner door reads them, so its
  * «choques» weigh the absences of its twelve weeks.
  * No workspace filter, graceful absence: the other blackout feeds' contract.
@@ -39,9 +62,7 @@ export function seasonAvailabilityQueryOptions(from: string, to: string, enabled
           signal,
         );
       } catch (err) {
-        if (err instanceof Error && err.message === 'Unauthorized') throw err;
-        console.warn('[calendar] season availability feed absent:', err);
-        return { items: [] as AvailabilityItem[], absent: true };
+        return absentFeed<AvailabilityItem>('season availability', err, signal);
       }
     },
   };
@@ -282,9 +303,7 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
             signal,
           );
         } catch (err) {
-          if (err instanceof Error && err.message === 'Unauthorized') throw err;
-          console.warn('[calendar] availability feed absent:', err);
-          return { items: [] as AvailabilityItem[], absent: true };
+          return absentFeed<AvailabilityItem>('availability', err, signal);
         }
       },
     };
@@ -349,9 +368,7 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
           }
           return { items };
         } catch (err) {
-          if (err instanceof Error && err.message === 'Unauthorized') throw err;
-          console.warn('[calendar] decisions feed absent:', err);
-          return { items: [] as DecisionPerfItem[], absent: true };
+          return absentFeed<DecisionPerfItem>('decisions', err, signal);
         }
       },
     };
@@ -411,9 +428,7 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
             signal,
           );
         } catch (err) {
-          if (err instanceof Error && err.message === 'Unauthorized') throw err;
-          console.warn('[calendar] agenda availability feed absent:', err);
-          return { items: [] as AvailabilityItem[], absent: true };
+          return absentFeed<AvailabilityItem>('agenda availability', err, signal);
         }
       },
     };
@@ -437,9 +452,7 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
             signal,
           );
         } catch (err) {
-          if (err instanceof Error && err.message === 'Unauthorized') throw err;
-          console.warn('[calendar] notes feed absent:', err);
-          return { items: [] as NoteEvent[], absent: true };
+          return absentFeed<NoteEvent>('notes', err, signal);
         }
       },
     };
@@ -459,9 +472,7 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
             signal,
           );
         } catch (err) {
-          if (err instanceof Error && err.message === 'Unauthorized') throw err;
-          console.warn('[calendar] day notes feed absent:', err);
-          return { items: [] as NoteEvent[], absent: true };
+          return absentFeed<NoteEvent>('day notes', err, signal);
         }
       },
     };
