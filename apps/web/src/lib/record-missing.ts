@@ -327,6 +327,51 @@ export function dateMissing(input: DateMissingInput, today: string): DateMissing
   return out.slice(0, MISSING_MAX);
 }
 
+/** The boxes of a date's stub (the shrunk «pase», ADR-215), in this order. */
+export type DateReadinessId = 'hours' | 'stages' | 'team' | 'place';
+
+export interface DateReadinessBox {
+  id: DateReadinessId;
+  done: boolean;
+}
+
+export interface DateReadinessInput {
+  kind: string;
+  status: string;
+  /** The date's first day, YYYY-MM-DD. */
+  day: string;
+  /** It has an hour (not all day). */
+  timed: boolean;
+  /** How many stages the trip has; null when not read (or not a trip). */
+  stages: number | null;
+  /** Somebody said «voy»; null when the reader cannot know. */
+  going: boolean | null;
+  /** It says where (a room, a city, a trip's end). */
+  place: boolean;
+}
+
+/**
+ * The shrunk stub of what is not a show (brief `ficha-pase`, phase 4): three
+ * boxes, the hour, who goes and where. A trip asks for its stages instead of
+ * an hour (its day IS its stages, ADR-089). A day off asks for nothing (there
+ * is nothing to get ready); neither does a past, cancelled or done date. Who
+ * goes is whoever said «voy» (ADR-147): a reader who cannot know draws no box.
+ */
+export function dateReadiness(input: DateReadinessInput, today: string): DateReadinessBox[] {
+  if (input.status === 'cancelled' || input.status === 'done') return [];
+  if (input.kind === 'day_off') return [];
+  if (input.day.slice(0, 10) < today) return [];
+  const out: DateReadinessBox[] = [];
+  if (input.kind === 'travel_day') {
+    if (input.stages !== null) out.push({ id: 'stages', done: input.stages > 0 });
+  } else {
+    out.push({ id: 'hours', done: input.timed });
+  }
+  if (input.going !== null) out.push({ id: 'team', done: input.going });
+  out.push({ id: 'place', done: input.place });
+  return out;
+}
+
 // ── Bolo ───────────────────────────────────────────────────────────────────
 
 /**

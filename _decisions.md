@@ -8202,3 +8202,21 @@ Encargo: `build/coordination/ficha-pase/brief.md`; respuesta 4 de Marco (18-11):
 
 **Cómo se revierte.** Revertir el PR: el tablón vuelve a ser un bloque de la ficha. Sin esquema ni API;
 `CACHE_SCHEMA` no cambia (misma clave y misma respuesta).
+
+## [2026-11-18] ADR-215 · Lo que no es un show usa el mismo pase, encogido (fase 4 del pase)
+Encargo: `build/coordination/ficha-pase/brief.md`, «No es un show».
+
+1. **`DateRecord` dibuja `RecordPass`**: la pieza llena con el tipo y cuánto falta («Ensayo · en 3 días»), el estado
+   como etiqueta que abre el menú de estados de la fecha, la hora (o el día cuando no tiene; un viaje sin hora no
+   dice «sin hora» en ámbar, `timeOptional`), el proyecto y el lugar (en un viaje, origen → destino), y «Mapa» solo
+   con lugar. Sin Llamar, Hoja ni Hablar: una fecha no tiene sala con contactos, hoja de ruta ni tablón.
+2. **Tres casillas** (`dateReadiness`, junto a `dateMissing`): la hora, quién va (un «voy», ADR-147) y dónde. Un viaje
+   pide sus tramos en lugar de la hora. Un día libre, una fecha pasada, cancelada o hecha: sin talón. Las líneas con
+   verbo siguen en tres como máximo; «Por confirmar» (de `dateMissing`) va primero.
+3. **El día, parada a parada** con el mismo `RunningOrder placing="stops"`, sin paradas añadidas ni tarjeta de la
+   hora: una fecha no tiene función. Los viajes conservan sus tramos (`TravelStages`).
+4. La línea de datos bajo el título se queda solo con la dirección de un viaje (ida, vuelta); la fecha, la hora, el
+   lugar y el estado están en la pieza. `MissingBand` deja de dibujarse en la ficha de una fecha.
+
+**Cómo se revierte.** Revertir el PR: vuelven la línea de datos y `MissingBand`. Sin esquema ni API; `CACHE_SCHEMA`
+no cambia.

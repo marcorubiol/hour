@@ -12,29 +12,36 @@
    * and who goes. Those blocks save in place, as on a performance's page
    * (ADR-139 p7); the dialog keeps its own «Guardar».
    *
+   * THE SHRUNK «PASE» (ADR-215, brief `ficha-pase` phase 4): the same piece
+   * as a performance's page (`RecordPass`), the state as its tag, the hour
+   * (or the day, when it has none), the project and the place; a stub of
+   * three boxes (the hour, or a trip's stages; who goes; where), and the day
+   * as stops (`RunningOrder placing="stops"`). No hotel, no technical, no
+   * road sheet. A trip keeps its stages.
+   *
    * Reads the row by id (`GET /api/dates/:id`, the list's own select) under a
    * key inside `planner-dates`, so every write that refreshes the date feeds
    * (`invalidateDateFeeds`) refreshes this too.
    */
-  import StateBadge from '$lib/components/StateBadge.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import { loadFailKind, retryLoad } from '$lib/load-fail';
-  import { dateStatusTone, invalidateDateFeeds } from '$lib/date';
+  import { DATE_STATUSES, dateStatusTone, invalidateDateFeeds } from '$lib/date';
+  import RecordPass, { passToneVar, type PassAct, type PassBox, type PassLine } from './RecordPass.svelte';
+  import Menu from '$lib/components/Menu.svelte';
+  import { daysBetween } from '$lib/away';
+  import { mapsHref } from '$lib/ahora';
   import { closePeek } from '$lib/peek.svelte';
   import { dateFacts } from '$lib/date-record';
   import { dayLabel, localDayISO, viewerTimeZone } from '$lib/datetime';
   import { appLocale, tHere, setRecordSpace } from '$lib/i18n';
   import { workspacesQueryOptions } from '$lib/nav-queries';
-  import { dateMissing, type DateMissing } from '$lib/record-missing';
+  import { MISSING_MAX, dateMissing, dateReadiness, type DateMissing, type DateReadinessBox } from '$lib/record-missing';
   import { spaceCrumb, type Crumb } from '$lib/record-crumbs';
   import type { DateEvent } from '$lib/month-events';
   import RecordHead from '$lib/components/RecordHead.svelte';
   import RecordState from '$lib/components/RecordState.svelte';
-  import MissingBand, { type MissingItem } from '$lib/components/MissingBand.svelte';
-  import BlockHead from '$lib/components/BlockHead.svelte';
-  import Button from '$lib/components/Button.svelte';
   import RunningOrder from '$lib/components/RunningOrder.svelte';
   import TravelStages, { stagesQuery } from '$lib/components/planner/TravelStages.svelte';
   import WhoGoes from '$lib/components/planner/WhoGoes.svelte';
@@ -86,15 +93,6 @@
     return out;
   });
 
-  let whenText = $derived.by(() => {
-    if (!info) return '';
-    const days = info.first === info.last ? dayLabel(info.first) : `${dayLabel(info.first)} – ${dayLabel(info.last)}`;
-    return days;
-  });
-  let hoursText = $derived(
-    !info ? '' : info.start ? (info.end ? `${info.start}–${info.end}` : info.start) : t('peek.all_day', locale),
-  );
-
   // ── Falta ──────────────────────────────────────────────────────────────
   // A trip's stages: the same cache entry TravelStages and the Day read.
   const stages = createQuery(toStore(() => ({ ...stagesQuery(id), enabled: isTrip, retry: false })));
@@ -127,7 +125,7 @@
 
   let stagesEl: HTMLElement | undefined = $state();
 
-  function missingItem(m: DateMissing): MissingItem {
+  function missingItem(m: DateMissing): PassLine {
     switch (m.kind) {
       case 'date_tentative':
         return {
@@ -154,7 +152,71 @@
         };
     }
   }
-  let missingItems = $derived(missing.map(missingItem));
+  // ── El pase encogido (ADR-215) ─────────────────────────────────────────
+  let going = $derived((row?.commitments ?? []).some((c) => c.state === 'going'));
+  let readiness = $derived<DateReadinessBox[]>(
+    row && info
+      ? dateReadiness(
+          {
+            kind: row.kind,
+            status: row.status,
+            day: info.first,
+            timed: info.start !== null,
+            stages: isTrip && $stages.isSuccess ? $stages.data.stages.length : null,
+            going: row.project ? going : null,
+            place: Boolean(info.place || info.trip?.to || row.city || row.venue_name),
+          },
+          today,
+        )
+      : [],
+  );
+  const BOX_LABEL: Record<DateReadinessBox['id'], string> = {
+    hours: 'pass.box_hours',
+    stages: 'pass.box_stages',
+    team: 'pass.box_team_date',
+    place: 'pass.box_place',
+  };
+  let passBoxes = $derived<PassBox[]>(readiness.map((b) => ({ id: b.id, label: t(BOX_LABEL[b.id], locale), done: b.done })));
+
+  function boxLine(b: DateReadinessBox): PassLine {
+    switch (b.id) {
+      case 'hours':
+        return { id: 'hours', text: t('record.missing_no_time', locale), verbs: [{ label: t('peek.edit', locale), onclick: () => (editOpen = true) }] };
+      case 'stages':
+        return missingItem({ kind: 'trip_no_stages' });
+      case 'team':
+        return { id: 'team', text: t('record.missing_nobody_going', locale), verbs: [{ label: t('record.verb_sign_up', locale), href: '#who-goes' }] };
+      case 'place':
+        return { id: 'place', text: t('pass.line_no_place', locale), verbs: [{ label: t('peek.edit', locale), onclick: () => (editOpen = true) }] };
+    }
+  }
+  let passLines = $derived<PassLine[]>(
+    [
+      ...missing.filter((m) => m.kind === 'date_tentative').map(missingItem),
+      ...readiness.filter((b) => !b.done).map(boxLine),
+    ].slice(0, MISSING_MAX),
+  );
+
+  let passWhen = $derived.by(() => {
+    if (!info) return '';
+    const d = daysBetween(today, info.first);
+    if (d === 0) return t('pass.when_today', locale);
+    if (d === 1) return t('pass.when_tomorrow', locale);
+    if (d === -1) return t('pass.when_yesterday', locale);
+    return t(d > 0 ? 'pass.when_in' : 'pass.when_ago', locale, { n: Math.abs(d) });
+  });
+  let passTime = $derived(info?.start ? (info.end ? `${info.start}–${info.end}` : info.start) : null);
+  let passPlace = $derived(
+    info?.trip ? [info.trip.from, info.trip.to].filter(Boolean).join(' → ') : (info?.place ?? ''),
+  );
+  let passDate = $derived(
+    info ? (info.first === info.last ? dayLabel(info.first, 'short') : `${dayLabel(info.first, 'short')} – ${dayLabel(info.last, 'short')}`) : '',
+  );
+  let mapParts = $derived(row ? [row.venue_name, row.city] : []);
+  let passActs = $derived<PassAct[]>(
+    !isTrip && mapsHref(mapParts) !== null ? [{ id: 'map', label: t('ahora.map', locale), map: mapParts }] : [],
+  );
+  const STATUS_MENU = DATE_STATUSES;
 
   // ── Editar: the dialog of always, over the vistazo ─────────────────────
   let editOpen = $state(false);
@@ -180,16 +242,55 @@
   {:else}
     <RecordHead {crumbs} {title} tools={[{ label: t('peek.edit', locale), onclick: () => (editOpen = true) }]}>
       {#snippet facts()}
-        <span><StateBadge label={t(`edit.status_${row!.status}`, locale).toLowerCase()} tone={dateStatusTone(row!.status)} /></span>
-        <span>{whenText}</span>
-        <span class="date-record__hours">{hoursText}</span>
         {#if isTrip && row!.travel_direction}<span>{t(`create.direction_${row!.travel_direction}`, locale)}</span>{/if}
-        {#if info?.place}<span>{info.place}</span>{/if}
-      {/snippet}
-      {#snippet band()}
-        <MissingBand items={missingItems} {locale} />
       {/snippet}
     </RecordHead>
+
+    <!-- El pase encogido (ADR-215): la pieza, el estado como etiqueta y un
+         talón de tres casillas. Sin hotel, técnica ni hoja. -->
+    <RecordPass
+      {locale}
+      project={row.project ? { slug: row.project.slug, name: row.project.name, accent: row.project.accent ?? null } : null}
+      eyebrow={`${kindWord} · ${passWhen}`}
+      date={passDate}
+      time={passTime}
+      timeOptional={isTrip}
+      show={row.project?.name ?? null}
+      place={passPlace}
+      onEditDate={() => (editOpen = true)}
+      onEditPlace={() => (editOpen = true)}
+      editDateLabel={t('record.edit_when', locale)}
+      editPlaceLabel={t('record.edit_where', locale)}
+      acts={passActs}
+      boxes={passBoxes}
+      lines={passLines}
+      label={t('pass.label_date', locale)}
+    >
+      {#snippet tag()}
+        <Menu
+          label={t('perf.status_menu', locale, { status: t(`edit.status_${row!.status}`, locale) })}
+          triggerClass="pass__tag"
+          triggerAttrs={{ 'data-testid': 'date-status', style: `--pass-tone: ${passToneVar(dateStatusTone(row!.status))}` }}
+        >
+          {#snippet trigger()}{t(`edit.status_${row!.status}`, locale)}<span class="status-caret" aria-hidden="true">▾</span>{/snippet}
+          {#snippet children({ close })}
+            {#each STATUS_MENU as s (s)}
+              <li role="none">
+                <button
+                  type="button"
+                  role="menuitem"
+                  class="menu__item{s === row!.status ? ' menu__item--active' : ''}"
+                  onclick={() => {
+                    close();
+                    if (s !== row!.status) $patch.mutate(s);
+                  }}>{t(`edit.status_${s}`, locale)}</button
+                >
+              </li>
+            {/each}
+          {/snippet}
+        </Menu>
+      {/snippet}
+    </RecordPass>
 
     {#if row.performance_id && workspaceSlug}
       <p class="date-record__of">
@@ -211,11 +312,20 @@
         />
       </section>
     {:else}
-      <RunningOrder target="date" {id} dayIso={info?.first ?? row.starts_at.slice(0, 10)} tz={row.venue?.timezone || tz} {viewerTz} {locale} />
+      <RunningOrder
+        target="date"
+        {id}
+        dayIso={info?.first ?? row.starts_at.slice(0, 10)}
+        tz={row.venue?.timezone || tz}
+        {viewerTz}
+        {locale}
+        placing="stops"
+        title={t('pass.day_title', locale)}
+      />
     {/if}
 
     {#if row.project}
-      <section class="date-record__section" aria-label={t('peek.who_goes', locale)}>
+      <section class="date-record__section" id="who-goes" aria-label={t('peek.who_goes', locale)}>
         <WhoGoes
           target="date"
           {id}
@@ -232,11 +342,6 @@
 
 <style>
   @layer components {
-    .date-record__hours {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing);
-    }
     .date-record__of {
       display: flex;
       align-items: baseline;

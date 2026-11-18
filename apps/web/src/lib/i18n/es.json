@@ -3683,5 +3683,10 @@
   "pass.talk_title": "Hablar con…",
   "threads.count": "{n} mensajes",
   "threads.empty_short": "sin mensajes",
-  "threads.pick": "Elegir el hilo"
+  "threads.pick": "Elegir el hilo",
+  "pass.box_stages": "Tramos",
+  "pass.box_team_date": "Quién va",
+  "pass.box_place": "Dónde",
+  "pass.line_no_place": "Sin lugar",
+  "pass.label_date": "Pase de la fecha"
 }

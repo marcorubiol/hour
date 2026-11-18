@@ -3683,5 +3683,10 @@
   "pass.talk_title": "Talk with…",
   "threads.count": "{n} messages",
   "threads.empty_short": "no messages",
-  "threads.pick": "Pick the thread"
+  "threads.pick": "Pick the thread",
+  "pass.box_stages": "Legs",
+  "pass.box_team_date": "Who goes",
+  "pass.box_place": "Where",
+  "pass.line_no_place": "No place yet",
+  "pass.label_date": "Date pass"
 }

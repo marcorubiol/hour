@@ -116,6 +116,10 @@
     placeEdit?: Snippet | null;
     /** «Guardado», said for a moment after a change saved itself. */
     saved?: boolean;
+    /** No hour is no news (a trip): the date rules without the amber «sin hora». */
+    timeOptional?: boolean;
+    /** The piece's name for assistive tech (a performance's by default). */
+    label?: string | null;
     acts?: readonly PassAct[];
     boxes: readonly PassBox[];
     /** Open boxes with their verbs; only for whoever can settle them. */
@@ -138,6 +142,8 @@
     dateEdit = null,
     placeEdit = null,
     saved = false,
+    timeOptional = false,
+    label = null,
     acts = [],
     boxes,
     lines = [],
@@ -146,7 +152,7 @@
   let doneCount = $derived(boxes.filter((b) => b.done).length);
 </script>
 
-<section class="pass" aria-label={t('pass.label', locale)} data-testid="record-pass">
+<section class="pass" aria-label={label ?? t('pass.label', locale)} data-testid="record-pass">
   <div class="pass__piece">
     <div class="pass__eyeline">
       <span class="pass__eye">
@@ -172,7 +178,7 @@
           </span>
           <span class="pass__time" data-testid="pass-time">{time}</span>
         {:else}
-          <span class="pass__date pass__date--open" data-testid="pass-no-time">{t('pass.no_time', locale)}</span>
+          {#if !timeOptional}<span class="pass__date pass__date--open" data-testid="pass-no-time">{t('pass.no_time', locale)}</span>{/if}
           <span class="pass__time pass__time--date">
             {#if onEditDate}<button type="button" class="pass__edit" aria-label={editDateLabel} onclick={onEditDate}>{date}</button
               >{:else}{date}{/if}

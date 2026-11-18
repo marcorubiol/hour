@@ -3683,5 +3683,10 @@
   "pass.talk_title": "Parler avec…",
   "threads.count": "{n} messages",
   "threads.empty_short": "aucun message",
-  "threads.pick": "Choisir le fil"
+  "threads.pick": "Choisir le fil",
+  "pass.box_stages": "Étapes",
+  "pass.box_team_date": "Qui y va",
+  "pass.box_place": "Où",
+  "pass.line_no_place": "Sans lieu",
+  "pass.label_date": "Fiche de la date"
 }

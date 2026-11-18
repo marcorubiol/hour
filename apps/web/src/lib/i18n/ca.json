@@ -3683,5 +3683,10 @@
   "pass.talk_title": "Parlar amb…",
   "threads.count": "{n} missatges",
   "threads.empty_short": "sense missatges",
-  "threads.pick": "Triar el fil"
+  "threads.pick": "Triar el fil",
+  "pass.box_stages": "Trams",
+  "pass.box_team_date": "Qui hi va",
+  "pass.box_place": "On",
+  "pass.line_no_place": "Sense lloc",
+  "pass.label_date": "Passi de la data"
 }
