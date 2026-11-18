@@ -117,7 +117,7 @@
         overflow-y: hidden;
         overscroll-behavior-x: contain;
         scrollbar-width: none;
-        mask-image: linear-gradient(to right, #000 calc(100% - 1.5rem), transparent);
+        mask-image: linear-gradient(to right, black calc(100% - 1.5rem), transparent);
       }
       .pstat__line::-webkit-scrollbar {
         display: none;
