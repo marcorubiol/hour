@@ -143,7 +143,6 @@
   "planner.load_error": "The calendar could not be loaded.",
   "planner.open_day": "Open {day}",
   "planner.pick_day": "Go to another day",
-  "planner.run_from": "from {day}",
   "planner.lid_empty": "empty",
   "planner.note_private": "private",
   "planner.agenda_notes": "Notes",
@@ -367,10 +366,6 @@
   "planner.stat_decide": "{n} to decide",
   "planner.stat_urgent": "{m} urgent",
   "planner.stat_urgent_one": "1 urgent",
-  "planner.stat_away": "{z} people unavailable",
-  "planner.stat_away_one": "1 person unavailable",
-  "planner.stat_trips": "{w} trips",
-  "planner.stat_trips_one": "1 trip",
   "planner.stat_unattributed": "{n} by show, not by cast",
   "planner.stat_unattributed@music": "{n} by project, not by band",
   "planner.stat_unattributed@mixed": "{n} by project, not by cast or band",
@@ -486,7 +481,6 @@
   "planner.marks_held": "asked for, not confirmed",
   "planner.marks_clash": "there is a call to make",
   "planner.stat_holds_one": "hold",
-  "planner.stat_free_one": "night free",
   "planner.stat_free": "nights free",
   "planner.week_confirmed": "confirmed",
   "planner.week_confirmed_one": "confirmed",
@@ -3640,5 +3634,10 @@
   "calm.mark_aria": "Calm",
   "desk.outside_clear": "Clear the scope",
   "planner.month_gap_short": "{n} free",
-  "help.card.planner_step_3": "Agenda, Month and Board: three ways of drawing the same thing. Tap a day in any of them to open it whole."
+  "help.card.planner_step_3": "Agenda, Month and Board: three ways of drawing the same thing. Tap a day in any of them to open it whole.",
+  "planner.who_out": "Who's out",
+  "planner.bar_tour": "tour",
+  "planner.bar_closed": "company closed",
+  "planner.bar_closed_short": "closed",
+  "planner.bar_more_absent": "+{n} more"
 }

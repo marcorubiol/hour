@@ -82,12 +82,11 @@ describe('MonthGrid — crear en el día de la celda', () => {
     expect(headOf('2026-11-30').classList.contains('cal__day--alt')).toBe(false);
   });
 
-  it('a hole is hatched over its nights and named on the first one', () => {
+  it('a hole is named on its first night and not hatched (tarea 165)', () => {
     const { cellOf } = mount({ gaps: [{ from: '2026-11-24', to: '2026-11-27', nights: 4 }], gapLabel: (n: number) => `${n} noches libres` });
     expect(cellOf('2026-11-24').textContent).toMatch(/4 noches libres/);
-    expect(cellOf('2026-11-26').classList.contains('cal__day--gap')).toBe(true);
     expect(cellOf('2026-11-26').textContent).not.toMatch(/libres/);
-    expect(cellOf('2026-11-28').classList.contains('cal__day--gap')).toBe(false);
+    expect(cellOf('2026-11-26').className).not.toMatch(/gap/);
   });
 
   it('the keyboard: a focused day carries the day `N` opens', () => {

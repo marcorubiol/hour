@@ -108,7 +108,6 @@
   "planner.load_error": "Le calendrier n’a pas pu être chargé.",
   "planner.open_day": "Ouvrir le {day}",
   "planner.pick_day": "Aller à un autre jour",
-  "planner.run_from": "depuis le {day}",
   "planner.lid_empty": "vide",
   "planner.note_private": "privée",
   "planner.agenda_notes": "Notes",
@@ -332,10 +331,6 @@
   "planner.stat_decide": "{n} à trancher",
   "planner.stat_urgent": "{m} urgentes",
   "planner.stat_urgent_one": "1 urgente",
-  "planner.stat_away": "{z} personnes indisponibles",
-  "planner.stat_away_one": "1 personne indisponible",
-  "planner.stat_trips": "{w} voyages",
-  "planner.stat_trips_one": "1 voyage",
   "planner.stat_unattributed": "{n} par spectacle, sans distribution",
   "planner.stat_unattributed@music": "{n} par projet, sans musiciens",
   "planner.stat_unattributed@mixed": "{n} par projet, sans distribution ni musiciens",
@@ -451,7 +446,6 @@
   "planner.marks_held": "demandé, non confirmé",
   "planner.marks_clash": "il y a un choix à faire",
   "planner.stat_holds_one": "option",
-  "planner.stat_free_one": "soir libre",
   "planner.stat_free": "soirs libres",
   "planner.week_confirmed": "confirmées",
   "planner.week_confirmed_one": "confirmée",
@@ -3640,5 +3634,10 @@
   "calm.mark_aria": "Calme",
   "desk.outside_clear": "Retirer le périmètre",
   "planner.month_gap_short": "{n} libres",
-  "help.card.planner_step_3": "Agenda, Mois et Tableau : trois façons de dessiner la même chose. Touchez un jour dans l’une d’elles pour l’ouvrir en entier."
+  "help.card.planner_step_3": "Agenda, Mois et Tableau : trois façons de dessiner la même chose. Touchez un jour dans l’une d’elles pour l’ouvrir en entier.",
+  "planner.who_out": "Qui manque",
+  "planner.bar_tour": "tournée",
+  "planner.bar_closed": "compagnie fermée",
+  "planner.bar_closed_short": "fermé",
+  "planner.bar_more_absent": "+{n} de plus"
 }

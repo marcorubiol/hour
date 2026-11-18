@@ -10,14 +10,16 @@
   import type { ClashVM } from '$lib/month-events';
 
   interface Props {
-    c: ClashVM;
+    /** Every clash of the day: the day carries one mark, and it opens all of
+        them (tarea 165). */
+    list: ClashVM[];
     /** Bottom rows open upward — the grid's overflow would clip a downward card. */
     up: boolean;
     /** Weekend columns anchor to the cell's right edge. */
     flip: boolean;
   }
 
-  let { c, up, flip }: Props = $props();
+  let { list, up, flip }: Props = $props();
 </script>
 
 <div
@@ -25,25 +27,29 @@
   class:cal__clashcard--up={up}
   class:cal__clashcard--flip={flip}
   role="dialog"
-  aria-label={c.title}
+  aria-label={list.map((c) => c.title).join(' · ')}
 >
-  <p class="cal__clashcard-head">
-    <span class="cal__mark cal__mark--static" data-severity={c.severity}
-      >!</span
-    >
-    {c.title}
-  </p>
-  <p class="cal__clashcard-body">{c.body}</p>
-  {#each c.rows as row, ri (ri)}
-    <p class="cal__clashcard-row">
-      <span
-        class="cal__clashcard-dot"
-        style={row.accent ? `--c: ${row.accent}` : undefined}
-        aria-hidden="true"
-      ></span>
-      <span class="cal__clashcard-label">{row.label}</span>
-      <span class="cal__clashcard-status">{row.status}</span>
-    </p>
+  {#each list as c, ci (ci)}
+    <div class="cal__clashcard-one">
+      <p class="cal__clashcard-head">
+        <span class="cal__mark cal__mark--static" data-severity={c.severity}
+          >!</span
+        >
+        {c.title}
+      </p>
+      <p class="cal__clashcard-body">{c.body}</p>
+      {#each c.rows as row, ri (ri)}
+        <p class="cal__clashcard-row">
+          <span
+            class="cal__clashcard-dot"
+            style={row.accent ? `--c: ${row.accent}` : undefined}
+            aria-hidden="true"
+          ></span>
+          <span class="cal__clashcard-label">{row.label}</span>
+          <span class="cal__clashcard-status">{row.status}</span>
+        </p>
+      {/each}
+    </div>
   {/each}
 </div>
 
@@ -66,6 +72,15 @@
       flex-direction: column;
       gap: var(--space-xs);
       white-space: normal;
+    }
+    .cal__clashcard-one {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+    }
+    .cal__clashcard-one + .cal__clashcard-one {
+      padding-block-start: var(--space-xs);
+      border-block-start: var(--line-hairline) solid var(--border-color-light);
     }
     .cal__clashcard--up {
       top: auto;

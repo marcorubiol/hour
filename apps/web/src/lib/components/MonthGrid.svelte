@@ -23,7 +23,7 @@
   import { bookingModeOf } from '$lib/booking-mode';
   import type { Attachment } from 'svelte/attachments';
   import { isFreeSpace, longPress } from '$lib/cell-create';
-  import { dayKeyInTz, assignBandLanes, monthUnderStrip } from '$lib/planner';
+  import { dayKeyInTz, monthUnderStrip } from '$lib/planner';
   import { dayMonthLong, weekdayLabels, localeMonthShort, localeDayMonth, localeWeekdayShort, viewerTimeZone } from '$lib/datetime';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
   import { accentVarFor } from '$lib/utils/accent';
@@ -101,19 +101,26 @@
     aways?: AwayBandVM[];
     /** Conflicts per ISO day — the day marks + clash-card popovers. */
     clashesByDay?: Map<string, ClashVM[]>;
-    /** How many next steps wait on each day (ADR-138 § 6): a number that
-        opens the Day, never a card on the sheet. */
-    stepsByDay?: Map<string, number>;
-    stepsLabel?: (n: number) => string;
+    /**
+     * «QUIÉN FALTA» (tarea 165): the people's absences are not on the sheet
+     * until the reader asks. Off, a person's blackout draws nothing; on, it
+     * is a bar with the person's name over the days they are out. A company
+     * closure is not a person and draws either way.
+     */
+    showAbsences?: boolean;
+    /** The confirmed gigs a person with a written absence was booked on:
+        their monogram takes the red edge while «Quién falta» is on. */
+    absenceHitIds?: ReadonlySet<string>;
+    /** «compañía cerrada» / «cerrado» — the closure bar, long and short. */
+    closedWord?: string;
+    closedShortWord?: string;
+    /** «+2 más» — the absences past the week's cap. */
+    moreAbsentLabel?: (n: number) => string;
     /** BCP47/locale tag for weekday + month labels. */
     locale?: string;
     /** i18n hooks — the page passes t()-backed fns; defaults follow the session language. */
     dateKindLabel?: (kind: string, voice?: Voice) => string;
     createLabel?: (isoDate: string) => string;
-    /** «hasta 15 jul · 10 días» / «desde 6 jul · 10 días» — la frase que una
-        mitad de tanda le debe a la otra. */
-    runUntilLabel?: (isoDate: string, days: number) => string;
-    runFromLabel?: (isoDate: string, days: number) => string;
     /** Qué dice el número del día, que ES la puerta al Día. Sin nombre, un
         número en una esquina no se lee como control ni lo anuncia un lector
         de pantalla. */
@@ -133,13 +140,8 @@
     releasedLabel?: string;
     /** «expires Mon» — the deadline phrase, given the decide-by ISO day. */
     expiresLabel?: (isoDay: string) => string;
-    /** The kind word a band carries: an absence says «away», a tour says
-        «on tour». They are two different claims and never the same word —
-        an absence is a fact somebody wrote down, a tour is inferred. */
-    awayWord?: string;
+    /** The word a tour's bar opens with: «gira». */
     tourWord?: string;
-    /** «until 20 jul» — a band that opened before this week. */
-    untilLabel?: (day: string) => string;
   }
 
   /** Defaults in the session's language; the page passes its own t(). */
@@ -164,16 +166,15 @@
     blackouts = [],
     aways = [],
     clashesByDay,
-    stepsByDay,
-    stepsLabel = (n: number) => (n === 1 ? t('planner.steps_one', L) : t('planner.steps_n', L, { n })),
+    showAbsences = false,
+    absenceHitIds,
+    closedWord = t('planner.bar_closed', L),
+    closedShortWord = t('planner.bar_closed_short', L),
+    moreAbsentLabel = (n: number) => t('planner.bar_more_absent', L, { n }),
     locale = appLocaleTag(),
     dateKindLabel = (kind: string) => kind.replace(/_/g, ' '),
     createLabel = (iso: string) => t('planner.new_on', L, { day: dayMonthLong(iso, appLocaleTag()) }),
     openDayLabel = (iso: string) => t('planner.open_day', L, { day: `${localeWeekdayShort(iso, appLocaleTag())} ${localeDayMonth(iso, appLocaleTag())}` }),
-    runUntilLabel = (iso: string, n: number) =>
-      `${t('planner.band_until', L, { day: iso })} · ${n} ${t('block.days_unit', L)}`,
-    runFromLabel = (iso: string, n: number) =>
-      `${t('planner.run_from', L, { day: iso })} · ${n} ${t('block.days_unit', L)}`,
     stateLabel = (status: string) => {
       const key = statusFootKey(status);
       return key ? t(key, L) : null;
@@ -181,9 +182,7 @@
     moreLabel = t('planner.more_n', L),
     releasedLabel = t('planner.released', L),
     expiresLabel = (iso: string) => t('planner.expires_on', L, { day: `${iso.slice(8, 10)}/${iso.slice(5, 7)}` }),
-    awayWord = t('planner.band_away', L),
-    tourWord = t('planner.band_tour', L),
-    untilLabel = (day: string) => t('planner.band_until', L, { day }),
+    tourWord = t('planner.bar_tour', L),
   }: Props = $props();
 
   // ── Identity quick-edit (ADR-081): a monogram click opens the editor at a
@@ -668,11 +667,6 @@
         la tanda no tiene ahí (Marco, 2026-08-30). */
     cutLeft: boolean;
     cutRight: boolean;
-    /** CADA MITAD NOMBRA EL EXTREMO QUE NO ENSEÑA: la de arriba no ve el
-        final y dice «hasta»; la de abajo no ve el principio y dice «desde». Y
-        las dos dicen cuántos días son, que es lo que ninguna de las dos puede
-        contar sola. */
-    note: string | null;
     cells: SeriesCell[];
   };
   /** Una fila de tanda, ya normalizada: el mínimo que la banda dibuja. */
@@ -768,11 +762,6 @@
         colEnd: b + 2,
         cutLeft: cutL,
         cutRight: cutR,
-        note: cutR
-          ? runUntilLabel(all[all.length - 1], all.length)
-          : cutL
-            ? runFromLabel(all[0], all.length)
-            : null,
         project: g.project,
         kindWord: g.kindWord,
         label: head.name,
@@ -810,7 +799,7 @@
    * for a BAND, which must keep its height across the days it spans; a run is
    * one element on one row, and the days it does not cross owe it nothing.
    */
-  function runRowsOver(series: WeekSeries[], di: number): number {
+  function runRowsOver(series: readonly { lane: number; colStart: number; colEnd: number }[], di: number): number {
     let n = 0;
     for (const s of series) {
       if (s.colStart <= di + 1 && di + 1 < s.colEnd) n = Math.max(n, s.lane + 1);
@@ -819,7 +808,7 @@
   }
 
   /** How many run rows the week needs at all — one more than its last lane. */
-  function runRowCount(series: WeekSeries[]): number {
+  function runRowCount(series: readonly { lane: number }[]): number {
     let n = 0;
     for (const s of series) n = Math.max(n, s.lane + 1);
     return n;
@@ -833,133 +822,169 @@
      the month, and the foot of a drawing three screens tall is where nobody
      who needs teaching will ever arrive. */
 
-  type BandSlot =
-    | { kind: 'blackout'; band: BlackoutBandVM; from: string; to: string }
-    | { kind: 'away'; band: AwayBandVM; from: string; to: string };
+  /* ── ONE RULE FOR WHAT LASTS (tarea 165, the drawing of 16-11) ────────
+     «Lo que pasa en un día es una línea dentro del día. Lo que dura es una
+     barra que cruza los días, siempre en el mismo sitio: debajo de los
+     números y encima de las líneas.»
 
-  // Every band gets ONE stable lane for its whole span (Marco 2026-07-19):
-  // a multi-day band must sit on the same row across all its days and never
-  // reorder when a neighbouring day carries an extra band — otherwise a
-  // continuing band appears to "jump lanes" (the day-21 black hole).
-  // Blackouts listed before aways so aways settle into the lower lanes.
-  let laneBands = $derived.by(() => {
-    const combined: BandSlot[] = [
-      ...blackouts.map((b) => ({ kind: 'blackout' as const, band: b, from: b.from, to: b.to })),
-      ...aways.map((a) => ({ kind: 'away' as const, band: a, from: a.from, to: a.to })),
-    ];
-    const { lanes } = assignBandLanes(combined);
-    return { combined, lanes };
-  });
-
-  /**
-   * A BAND IS ONE ELEMENT THAT SPANS COLUMNS (ADR-095), not N slices glued
-   * edge to edge — and it lives at the FOOT of its week, which is where the
-   * design puts absences and tours.
-   *
-   * Before this it was a per-cell lane system: every day of the week reserved
-   * an empty slot for every lane so the pieces would line up, and the label
-   * was reprinted on the first day of each week. That kept seven copies of one
-   * fact in the DOM and could never draw a terminus — an arrowhead only means
-   * something on an element that has an end.
-   *
-   * Clipping is per ISO week because a band that runs past Sunday does not end
-   * there: it loses its arrowhead and says `until <date>` instead, so the
-   * geometry never claims something the calendar cannot show.
-   */
+     There used to be four kinds of band, each with its own drawing and its
+     own words, at two different heights: the run of days with its per-day
+     hours under the numbers, and absences and tours at the FOOT of the week
+     with dates, arrows and «inferred · out · back». Now every one of them is
+     the same one-line bar in the same rows: a run of days, a tour, a company
+     closure and — only while «Quién falta» is on — a person's absence. The
+     bar says once what it is, where it starts; its length says how long. A
+     bar that comes from last week enters cut on the left, one that goes on
+     leaves cut on the right. */
   type WeekBand = {
     key: string;
-    kind: 'blackout' | 'away';
+    kind: 'closed' | 'absence' | 'tour';
     colStart: number;
     colEnd: number;
-    /**
-     * THREE FIELDS IN THREE VOICES, never one composed sentence. `word` is
-     * what kind of band this is (mono, the margin voice), `subject` is who or
-     * where (text, full ink — it is the thing you are reading), `span` is when
-     * (mono again, quietest).
-     *
-     * It was `away · MaMeMi` in one 9px mono string, which drew the SUBJECT —
-     * the only part you actually look for — at the size and weight of its own
-     * label. The design's band has had the three-part shape from the start.
-     */
-    word: string;
+    /** Who (a person), where (a tour), or whose (a closure). */
     subject: string;
-    span: string | null;
-    /**
-     * A tour's provenance (§ 38), in the span's voice: the slot where an
-     * absence prints its dates. Null for an absence: somebody wrote that one.
-     */
-    deduced: { word: string; legs: string } | null;
-    /**
-     * Tours travel with their project: at one column wide the coloured
-     * monogram is the only thing that survives.
-     *
-     * ALREADY RESOLVED. `AwayBandVM.accent` is the CSS value the page built
-     * with `accentVarFor`; running it through that helper a SECOND time was a
-     * real defect — `var(--accent-7)` is not a shape it recognises, so it fell
-     * back to hashing the slug, and the synthetic object had no slug. The
-     * tour's monogram came out a different colour from the same project's
-     * monogram on the gig beside it. Marco saw it.
-     */
+    /** The whole sentence: the title keeps what the bar no longer prints. */
+    label: string;
+    tentative: boolean;
+    /** The person was booked on a confirmed gig inside the absence. */
+    hit: boolean;
     accent: string | null;
     initials: string | null;
     projectName: string | null;
-    label: string;
-    note?: string | null;
-    tentative: boolean;
-    /** The band continues past this week's edge — no terminus on that side. */
     cutLeft: boolean;
     cutRight: boolean;
-    lane: number;
   };
-  /** «15 jul → 20 jul», or «until 20 jul» when the band opened before this
-      week: an arrowhead cannot claim a start the sheet is not showing. */
-  function bandSpan(from: string, to: string, cutLeft: boolean): string {
-    const d = (iso: string) => `${Number(iso.slice(8, 10))} ${localeMonthShort(iso, locale)}`;
-    return cutLeft ? untilLabel(d(to)) : `${d(from)} → ${d(to)}`;
-  }
+  /* ONE CLOSURE, NOT FIVE. A company that wrote down «maintenance», «a
+     workshop» and «a festival» over the same fortnight is closed over that
+     fortnight: overlapping or touching closures of one company draw as one
+     bar, and the title keeps every reason. Seen on real data (the demo
+     space, 9–19 Nov: five bars stacked over one week). It is «not sure»
+     only if every closure in it is. */
+  let closures = $derived.by((): BlackoutBandVM[] => {
+    const list = blackouts.filter((b) => b.company).sort((a, b) => (a.from < b.from ? -1 : a.from > b.from ? 1 : 0));
+    const out: BlackoutBandVM[] = [];
+    for (const b of list) {
+      const prev = out.findLast((o) => o.subject === b.subject);
+      if (prev && b.from <= nextIso(prev.to)) {
+        if (b.to > prev.to) prev.to = b.to;
+        prev.tentative = prev.tentative && b.tentative;
+        prev.note = [prev.note, b.note].filter(Boolean).join(' · ') || null;
+      } else {
+        out.push({ ...b });
+      }
+    }
+    return out;
+  });
   function weekBands(week: { iso: string }[]): WeekBand[] {
     const first = week[0].iso;
     const last = week[6].iso;
     const out: WeekBand[] = [];
-    const { combined, lanes } = laneBands;
-    combined.forEach((slot, i) => {
-      if (slot.to < first || slot.from > last) return;
-      const from = slot.from < first ? first : slot.from;
-      const to = slot.to > last ? last : slot.to;
-      const colStart = week.findIndex((d) => d.iso === from) + 1;
-      const colEnd = week.findIndex((d) => d.iso === to) + 2;
-      if (colStart < 1 || colEnd < 2) return;
-      const isBlackout = slot.kind === 'blackout';
-      const cutLeft = slot.from < first;
-      const bo = slot.band as BlackoutBandVM;
-      const aw = slot.band as AwayBandVM;
+    const clip = (from: string, to: string) => {
+      if (to < first || from > last) return null;
+      const a = week.findIndex((d) => d.iso === (from < first ? first : from)) + 1;
+      const b = week.findIndex((d) => d.iso === (to > last ? last : to)) + 2;
+      return a < 1 || b < 2 ? null : { a, b, cutLeft: from < first, cutRight: to > last };
+    };
+    [...closures, ...blackouts.filter((b) => !b.company)].forEach((bo, i) => {
+      if (!bo.company && !showAbsences) return;
+      const c = clip(bo.from, bo.to);
+      if (!c) return;
       out.push({
-        key: `${slot.kind}:${i}:${first}`,
-        kind: slot.kind,
-        colStart,
-        colEnd,
-        word: isBlackout ? awayWord : tourWord,
-        // An absence names a PERSON; a tour names a PLACE — and when nobody
-        // wrote the place down it names the project instead of inventing one.
-        subject: isBlackout ? (bo.subject ?? bo.label) : (aw.place ?? aw.projectName ?? ''),
-        // A tour prints no range of its own. What goes in that slot instead is
-        // WHERE IT CAME FROM (§ 38): nobody wrote it down, so the band says it
-        // was deduced and names the two trips. «No podemos añadir cosas
-        // nosotros sin decirlo» (Marco, 2026-08-30). The italic only hinted.
-        span: isBlackout ? bandSpan(slot.from, slot.to, cutLeft) : null,
-        deduced: isBlackout ? null : aw.deduced,
-        accent: isBlackout ? null : aw.accent,
-        initials: isBlackout ? null : aw.initials,
-        projectName: isBlackout ? null : aw.projectName,
-        label: isBlackout ? slot.band.label : `${aw.label} · ${deducedPhrase(aw.deduced)}`,
-        note: isBlackout ? bo.note : null,
-        tentative: isBlackout ? bo.tentative : false,
-        cutLeft,
-        cutRight: slot.to > last,
-        lane: lanes[i] ?? 0,
+        key: `bo:${bo.id ?? i}:${first}`,
+        kind: bo.company ? 'closed' : 'absence',
+        colStart: c.a,
+        colEnd: c.b,
+        subject: bo.subject ?? bo.label,
+        label: bo.note ? `${bo.label} · ${bo.note}` : bo.label,
+        tentative: bo.tentative,
+        hit: Boolean(bo.hit) && !bo.tentative,
+        accent: null,
+        initials: null,
+        projectName: null,
+        cutLeft: c.cutLeft,
+        cutRight: c.cutRight,
       });
     });
-    return out.sort((a, b) => a.lane - b.lane || a.colStart - b.colStart);
+    aways.forEach((aw, i) => {
+      const c = clip(aw.from, aw.to);
+      if (!c) return;
+      out.push({
+        key: `tour:${aw.project_id}:${i}:${first}`,
+        kind: 'tour',
+        colStart: c.a,
+        colEnd: c.b,
+        // A tour names its PLACE; when nobody wrote it down, nothing is invented.
+        subject: aw.place ?? '',
+        // That it was deduced, and from which two trips, stays in the title.
+        label: `${aw.label}${aw.place ? ` · ${aw.place}` : ''} · ${deducedPhrase(aw.deduced)}`,
+        tentative: false,
+        hit: false,
+        accent: aw.accent,
+        initials: aw.initials,
+        projectName: aw.projectName,
+        cutLeft: c.cutLeft,
+        cutRight: c.cutRight,
+      });
+    });
+    return out.sort((a, b) => a.colStart - b.colStart || b.colEnd - a.colEnd);
+  }
+
+  /** Two absences a week, then «+N más» (Marco, «Sí, las siete», 16-11): a big
+      cast with many absences would otherwise stack five bars over the week. */
+  const ABSENCE_CAP = 2;
+
+  type Bar =
+    | { kind: 'run'; key: string; lane: number; colStart: number; colEnd: number; run: WeekSeries }
+    | { kind: 'band'; key: string; lane: number; colStart: number; colEnd: number; band: WeekBand }
+    | { kind: 'more'; key: string; lane: number; colStart: number; colEnd: number; n: number; title: string };
+
+  /**
+   * LANES ARE PACKED, NOT STACKED: two bars that do not share a day share a
+   * row. The work of the company (closures, runs, tours) packs first; the
+   * absences pack in the rows under it, so «who is out» never slips between
+   * a residency and the tour beside it.
+   */
+  function packLanes(list: Bar[], from: number): number {
+    const rows: Array<Array<[number, number]>> = [];
+    for (const b of list) {
+      let lane = rows.findIndex((r) => r.every(([a, z]) => b.colEnd <= a || b.colStart >= z));
+      if (lane === -1) lane = rows.push([]) - 1;
+      rows[lane].push([b.colStart, b.colEnd]);
+      b.lane = from + lane;
+    }
+    return from + rows.length;
+  }
+
+  function weekBars(week: { iso: string }[]): Bar[] {
+    const bands = weekBands(week);
+    const work: Bar[] = [
+      ...bands
+        .filter((b) => b.kind === 'closed')
+        .map((band): Bar => ({ kind: 'band', key: band.key, lane: 0, colStart: band.colStart, colEnd: band.colEnd, band })),
+      ...weekSeries(week).map((run): Bar => ({ kind: 'run', key: run.key, lane: 0, colStart: run.colStart, colEnd: run.colEnd, run })),
+      ...bands
+        .filter((b) => b.kind === 'tour')
+        .map((band): Bar => ({ kind: 'band', key: band.key, lane: 0, colStart: band.colStart, colEnd: band.colEnd, band })),
+    ];
+    const next = packLanes(work, 0);
+    const absent = bands.filter((b) => b.kind === 'absence');
+    const shown: Bar[] = absent
+      .slice(0, ABSENCE_CAP)
+      .map((band): Bar => ({ kind: 'band', key: band.key, lane: 0, colStart: band.colStart, colEnd: band.colEnd, band }));
+    const rest = absent.slice(ABSENCE_CAP);
+    if (rest.length > 0) {
+      shown.push({
+        kind: 'more',
+        key: `more:${week[0].iso}`,
+        lane: 0,
+        colStart: Math.min(...rest.map((b) => b.colStart)),
+        colEnd: Math.max(...rest.map((b) => b.colEnd)),
+        n: rest.length,
+        title: rest.map((b) => b.label).join('\n'),
+      });
+    }
+    packLanes(shown, next);
+    return [...work, ...shown];
   }
 
   /** Lanes in use across a whole week row — every cell reserves this many
@@ -1004,27 +1029,6 @@
     return WEEK_FILL[max];
   }
 
-  function weekLaneCount(week: { iso: string }[]): number {
-    const { combined, lanes } = laneBands;
-    let max = -1;
-    for (const day of week) {
-      combined.forEach((c, i) => {
-        if (day.iso >= c.from && day.iso <= c.to) max = Math.max(max, lanes[i]);
-      });
-    }
-    return max + 1;
-  }
-
-  /** The band occupying each lane on a given day (null = reserved spacer). */
-  function laneSlotsOn(iso: string, count: number): (BandSlot | null)[] {
-    const slots: (BandSlot | null)[] = new Array(count).fill(null);
-    const { combined, lanes } = laneBands;
-    combined.forEach((c, i) => {
-      if (iso >= c.from && iso <= c.to && lanes[i] < count) slots[lanes[i]] = c;
-    });
-    return slots;
-  }
-
   /* THE HOVERED DAY, in state and not in CSS. A cell is TWO grid items — the
      number row and the contents, with any run of days between them — so no
      single element can carry a `:hover` that means «this day» without also
@@ -1054,13 +1058,23 @@
     return longPress(() => create(day.iso));
   }
 
-  // ── Clash-card popover — one open at a time, keyed day:index. ──────────
+  // ── Clash-card popover — one open at a time, keyed by day. ──────────────
   let openClash = $state<string | null>(null);
   let gridEl: HTMLElement | undefined = $state();
 
-  function toggleClash(iso: string, i: number) {
-    const key = `${iso}:${i}`;
-    openClash = openClash === key ? null : key;
+  function toggleClash(iso: string) {
+    openClash = openClash === iso ? null : iso;
+  }
+  /** Red before blue: a person double-booked or booked across an absence
+      outranks a tentative absence, which outranks a maybe. */
+  const SEVERITY_RANK: Record<ClashVM['severity'], number> = {
+    people: 0,
+    blackout: 1,
+    'blackout-tentative': 2,
+    possible: 3,
+  };
+  function worstSeverity(list: ClashVM[]): ClashVM['severity'] {
+    return list.reduce((w, c) => (SEVERITY_RANK[c.severity] < SEVERITY_RANK[w] ? c.severity : w), list[0].severity);
   }
 
   $effect(() => {
@@ -1110,9 +1124,7 @@
     {/each}
   </div>
   {#each weeks as week, wi (wi)}
-    {@const wlc = weekLaneCount(week)}
-    {@const bands = weekBands(week)}
-    {@const series = weekSeries(week)}
+    {@const bars = weekBars(week)}
     {@const m1 = firstCol(week)}
     {@const m0 = wi > 0 ? firstCol(weeks[wi - 1]) : -1}
     <!-- A ROW OF THE MONTH IS A WEEK, with no gutter and no number
@@ -1143,7 +1155,6 @@
             class="cal__num"
             class:cal__day--today={day.iso === todayIso}
             class:cal__day--alt={altMonth(day.iso)}
-            class:cal__day--gap={gapByDay.has(day.iso)}
             class:cal__day--past={day.iso < todayIso}
             class:cal__day--sel={narrow && picked === day.iso}
             data-month-start={day.iso.endsWith('-01') ? day.iso.slice(0, 7) : undefined}
@@ -1191,91 +1202,115 @@
               {:else}
                 <span></span>
               {/if}
+              <!-- ONE MARK A DAY, AT MOST (tarea 165): its colour is the worst
+                   of the day's clashes, and it opens all of them. Six red and
+                   blue dots on one number said less than one. -->
               <span class="cal__marks">
-                {#each clashes as c, i (i)}
+                {#if clashes.length > 0}
                   <button
                     type="button"
                     class="cal__mark"
-                    data-severity={c.severity}
-                    aria-label={c.title}
-                    aria-expanded={openClash === `${day.iso}:${i}`}
-                    onclick={() => toggleClash(day.iso, i)}></button
+                    data-severity={worstSeverity(clashes)}
+                    aria-label={clashes.map((c) => c.title).join(' · ')}
+                    aria-expanded={openClash === day.iso}
+                    onclick={() => toggleClash(day.iso)}></button
                   >
-                {/each}
+                {/if}
               </span>
             </span>
-            {#each clashes as c, i (i)}
-              {#if openClash === `${day.iso}:${i}`}
-                <!-- Bottom rows open upward: a downward card would run off
-                     the foot of the sheet. -->
-                <ClashCard {c} up={wi >= weeks.length - 2} flip={di >= 5} />
-              {/if}
-            {/each}
+            {#if openClash === day.iso}
+              <!-- Bottom rows open upward: a downward card would run off
+                   the foot of the sheet. -->
+              <ClashCard list={clashes} up={wi >= weeks.length - 2} flip={di >= 5} />
+            {/if}
           </div>
         {/each}
-        {#each series as s (s.key)}
-          <div
-            class="cal__run"
-            class:cal__run--cutl={s.cutLeft}
-            class:cal__run--cutr={s.cutRight}
-            data-family={s.cert}
-            style="grid-row: {s.lane + 2}; grid-column: {s.colStart} / {s.colEnd}; --run-cols: {s.cells
-              .length}{s.project ? `; --c: ${accentVarFor(s.project)}` : ''}"
-            title={s.title}
-          >
-              <span class="cal__run-h">
-                <span class="cal__run-k">
-                  {#if s.project}
-                    <IdentityMark
-                      mini
-                      accent={accentVarFor(s.project)}
-                      name={s.project.name}
-                      initials={s.project.initials}
-                    />
-                  {/if}
-                  <span class="cal__run-w">{s.kindWord}</span>
-                </span>
-                <b>{s.label}</b>
-                {#if s.city}<span class="cal__run-c">{s.city}</span>{/if}
-                {#if s.note}<span class="cal__run-n">{s.note}</span>{/if}
-              </span>
-              <!-- Each day's OWN hours. This strip is the whole reason a run
-                   is stored as per-day rows rather than a span. -->
-              <span
-                class="cal__run-g"
-                style="grid-template-columns: repeat({s.cells.length}, minmax(0, 1fr))"
+        <!-- THE BARS: everything that lasts, under the numbers and over the
+             day's lines, one line each. -->
+        {#each bars as bar (bar.key)}
+          {@const style = `grid-row: ${bar.lane + 2}; grid-column: ${bar.colStart} / ${bar.colEnd}`}
+          {#if bar.kind === 'run'}
+            {@const s = bar.run}
+            {@const door = s.cells.find((c) => c.filled && (c.href || c.open))}
+            {#snippet runBody()}
+              {#if s.project}
+                <IdentityMark
+                  mini
+                  accent={accentVarFor(s.project)}
+                  name={s.project.name}
+                  initials={s.project.initials}
+                />
+              {/if}
+              <b class="cal__bar-n">{s.label}</b>
+              {#if s.city}<span class="cal__bar-p">{s.city}</span>{/if}
+            {/snippet}
+            {#if door?.href}
+              <a
+                class="cal__bar cal__run"
+                class:cal__bar--cutl={s.cutLeft}
+                class:cal__bar--cutr={s.cutRight}
+                data-family={s.cert}
+                {style}
+                href={door.href}
+                title={s.title}>{@render runBody()}</a
               >
-                {#each s.cells as c (c.iso)}
-                  {#if c.filled && c.href}
-                    <!-- Una función tiene página: enlace, no botón. -->
-                    <a class="cal__run-d" href={c.href} title={c.iso}>
-                      {#each c.hours as h, hi (hi)}
-                        <i>{h?.primary ?? '·'}{#if h?.end}<u>–{h.end}</u>{/if}</i>
-                      {/each}
-                    </a>
-                  {:else if c.filled && c.open}
-                    <button type="button" class="cal__run-d" onclick={c.open} title={c.iso}>
-                      {#each c.hours as h, hi (hi)}
-                        <i>{h?.primary ?? '·'}{#if h?.end}<u>–{h.end}</u>{/if}</i>
-                      {/each}
-                    </button>
-                  {:else}
-                    <span class="cal__run-d" class:cal__run-d--off={!c.filled}>
-                      {#if c.filled}
-                        {#each c.hours as h, hi (hi)}
-                          <i>{h?.primary ?? '·'}{#if h?.end}<u>–{h.end}</u>{/if}</i>
-                        {/each}
-                      {:else}<i>–</i>{/if}
-                    </span>
-                  {/if}
-                {/each}
-              </span>
-            </div>
+            {:else if door?.open}
+              <button
+                type="button"
+                class="cal__bar cal__run"
+                class:cal__bar--cutl={s.cutLeft}
+                class:cal__bar--cutr={s.cutRight}
+                data-family={s.cert}
+                {style}
+                onclick={door.open}
+                title={s.title}>{@render runBody()}</button
+              >
+            {:else}
+              <span
+                class="cal__bar cal__run"
+                class:cal__bar--cutl={s.cutLeft}
+                class:cal__bar--cutr={s.cutRight}
+                data-family={s.cert}
+                {style}
+                title={s.title}>{@render runBody()}</span
+              >
+            {/if}
+          {:else if bar.kind === 'band'}
+            {@const b = bar.band}
+            <span
+              class="cal__bar cal__bar--{b.kind}"
+              class:cal__bar--cutl={b.cutLeft}
+              class:cal__bar--cutr={b.cutRight}
+              class:cal__bar--tent={b.tentative}
+              class:cal__bar--hit={b.hit}
+              data-testid="month-bar-{b.kind}"
+              style="{style}{b.accent ? `; --c: ${b.accent}` : ''}"
+              title={b.label}
+            >
+              {#if b.kind === 'tour'}
+                {#if b.accent}
+                  <IdentityMark mini accent={b.accent} name={b.projectName} initials={b.initials} />
+                {/if}
+                <span class="cal__bar-w">{tourWord}</span>
+                {#if b.subject}<span class="cal__bar-p">{b.subject}</span>{/if}
+              {:else if b.kind === 'closed'}
+                <span class="cal__bar-w cal__bar-w--l">{closedWord}{#if b.tentative}?{/if}</span><span
+                  class="cal__bar-w cal__bar-w--s">{closedShortWord}{#if b.tentative}?{/if}</span
+                >
+              {:else}
+                <span class="cal__bar-n">{b.subject}{#if b.tentative}?{/if}</span>
+              {/if}
+            </span>
+          {:else}
+            <span class="cal__bar cal__bar--more" data-testid="month-bar-more" {style} title={bar.title}
+              >{moreAbsentLabel(bar.n)}</span
+            >
+          {/if}
         {/each}
     {#each week as day, di (day.iso)}
       {@const perfs = performancesByDay.get(day.iso) ?? []}
-      {@const runRows = runRowsOver(series, di)}
-      {@const runLanes = runRowCount(series)}
+      {@const runRows = runRowsOver(bars, di)}
+      {@const runLanes = runRowCount(bars)}
       {@const dateGroups = groupDates(datesByDay.get(day.iso) ?? [])}
       {@const entries = cellSlips(perfs, dateGroups)}
       {@const overflow = entries.length - CELL_CAP}
@@ -1294,7 +1329,6 @@
         class="cal__day"
         class:cal__day--today={day.iso === todayIso}
         class:cal__day--alt={altMonth(day.iso)}
-        class:cal__day--gap={gapByDay.has(day.iso)}
         class:cal__day--past={day.iso < todayIso}
         class:cal__day--sel={narrow && picked === day.iso}
         style="grid-row: {runRows + 2} / {runLanes + 3}; grid-column: {di + 1}"
@@ -1331,6 +1365,7 @@
             showCountry={false}
             clash={cf.on[ei] ? (cf.hard[ei] ? 'hard' : 'soft') : 'none'}
             clashPeople={cf.people[ei]}
+            absent={showAbsences && Boolean(absenceHitIds?.has(entry.slip.id))}
             onMarkOpen={openMark}
             onOpen={entry.dateRow && onDateOpen ? () => onDateOpen?.(entry.dateRow!) : undefined}
           />
@@ -1350,66 +1385,10 @@
         {#if entries.length > CELL_CAP_NARROW}
           <span class="cal__more cal__more--s" aria-hidden="true">+{entries.length - CELL_CAP_NARROW}</span>
         {/if}
-        <!-- The steps of the day are the margin's, not the sheet's: one quiet
-             number in the door's own voice, and the door is the Day. -->
-        {#if onDayOpen && stepsByDay?.get(day.iso)}
-          <button type="button" class="cal__more cal__more--steps" data-testid="month-steps" data-day={day.iso} onclick={() => onDayOpen?.(day.iso)}
-            >{stepsLabel(stepsByDay.get(day.iso) ?? 0)}</button
-          >
-        {/if}
 
       </div>
     {/each}
       </div>
-      {#if bands.length > 0}
-        <!-- The foot of the week: absences and tours, each ONE element measured
-             over the days it covers. -->
-        <div class="cal__wkb">
-          {#each bands as b (b.key)}
-            <span
-              class="cal__band"
-              class:cal__band--away={b.kind === 'away'}
-              class:cal__band--tent={b.tentative}
-              class:grain={b.tentative}
-              class:cal__band--cutl={b.cutLeft}
-              class:cal__band--cutr={b.cutRight}
-              style="grid-column: {b.colStart} / {b.colEnd}"
-              title={b.note ? `${b.label} · ${b.note}` : b.label}
-            >
-              <span class="cal__band-k">
-                {#if b.accent}
-                  <IdentityMark
-                    mini
-                    accent={b.accent}
-                    name={b.projectName}
-                    initials={b.initials}
-                  />
-                {/if}
-                <!-- UNA OPCIÓN PREGUNTA, igual que en la tarjeta: allí el
-                     `SHOW` de un hold se dibuja `SHOW?` y se inclina
-                     (`Slip § slip__kind--q`). La banda tiene que hablar el
-                     mismo idioma o son dos vocabularios para una duda. -->
-                <span class="cal__band-w" class:cal__band-w--q={b.tentative}
-                  >{b.word}{#if b.tentative}?{/if}</span
-                >
-              </span>
-              {#if b.subject}<span class="cal__band-n" class:guess={b.kind === 'away'}
-                  >{b.subject}</span
-                >{/if}
-              {#if b.span}<em class="cal__band-s">{b.span}</em>{/if}
-              {#if b.deduced}<em class="cal__band-s cal__band-d"
-                  ><span>{b.deduced.word}</span><span class="cal__band-dl"
-                    >&nbsp;· {b.deduced.legs}</span
-                  ></em
-                >{/if}
-              <!-- The rule with its terminus. It is not drawn when the band runs
-                   past the week's edge: an arrowhead there would claim an end
-                   the calendar cannot show. -->
-              <span class="cal__band-r"></span>
-            </span>
-          {/each}
-        </div>
-      {/if}
       </div>
     </div>
     {#if narrow && picked && week.some((d) => d.iso === picked)}
@@ -1422,7 +1401,7 @@
           {#if onDayOpen}
             <button type="button" class="cal__pick-go" onclick={() => onDayOpen?.(iso)}
               aria-label={openDayLabel(iso)}
-              >{stepsByDay?.get(iso) ? `${stepsLabel(stepsByDay.get(iso) ?? 0)} · ` : ''}{openDayWord} →</button
+              >{openDayWord} →</button
             >
           {/if}
         </h3>
@@ -1430,6 +1409,7 @@
           <Slip
             slip={entry.slip}
             placing="row"
+            absent={showAbsences && Boolean(absenceHitIds?.has(entry.slip.id))}
             kindLabel={(k, voice) => dateKindLabel(k, voice)}
             stateLabel={slipState}
             stateUrgent={isUrgentHold(entry.slip)}
@@ -1537,369 +1517,92 @@
     }
     /* The seven days. The 1px rules ARE the grid — a background-image column
        ruling, so a cell can never be pushed out of alignment by a border. */
-    /* THE FOOT OF THE WEEK · absences and tours. */
-    .cal__wkb {
-      /* Ya no necesita `grid-column: 2`: vive dentro de `.cal__wkbody`, que es
-         la columna de contenido. Antes era hermana del gutter y sin esto la
-         banda dibujaba bajo el número de semana (visto en pantalla el
-         2026-07-31); el envoltorio lo resuelve por posición. */
-      display: grid;
-      grid-template-columns: repeat(7, minmax(0, 1fr));
-      gap: var(--space-2xs) 0;
-      /* Aire ARRIBA y ninguno abajo (Marco, 2026-08-30): la banda se separa de
-         las cards que la preceden y se apoya en el borde de la semana, que es
-         donde acaba el día que mide. */
-      padding: var(--space-xs) 0 0;
-    }
-    /* THE RULE BELONGS TO THE BAND, NOT TO THE ROW. A `border-block-start` on
-       the container drew a hairline the full width of the week whenever ANY
-       band existed — a line that measures seven days for a fact that lasts
-       two. The band's own top border spans exactly the columns it covers,
-       which is the whole point of measuring it. */
-    .cal__band {
-      display: flex;
-      /* TODAS LAS PALABRAS EN EL MISMO SUELO. Con `center` cada trozo se
-         centraba en SU caja, y las tres voces de la banda tienen cuerpos
-         distintos —`AWAY` a 9px mono, el sujeto a 10.5px, el tramo a 9px—, así
-         que ninguna se apoyaba donde las otras y el conjunto no leía ni
-         centrado ni alineado (Marco, en pantalla, 2026-08-29). La línea base
-         es lo que comparten, y es lo que hay que alinear. */
-      align-items: baseline;
-      gap: var(--space-s);
-      min-inline-size: 0;
-      padding: var(--line-hairline) var(--space-xs) var(--space-2xs);
-      border-block-start: var(--line-hairline) solid var(--border-color-light);
-      overflow: visible;
-      white-space: nowrap;
-    }
-    /* UNA AUSENCIA NO LLEVA TAPA (Marco, 2026-08-30). El `--away` de estas
-       clases son las GIRAS, no las ausencias: lo que rotula «AWAY» es un
-       `blackout`, que no tiene clase propia. La línea de arriba le ponía un
-       techo que la leía como una fila más del mes; lo que la banda tiene que
-       decir ya lo dice su propia regla con terminus, a la derecha. */
-    .cal__band:not(.cal__band--away) {
-      border-block-start: 0;
-    }
-    /* SIN PAPEL BAJO LAS PALABRAS, y es una decisión, no una omisión.
-       Cuando las verticales pasaron a llegar hasta el pie, cruzaban por detrás
-       del texto; el arreglo fue una tira de papel que las rompiera donde hay
-       algo que leer. Se fue por dos vueltas: opaca se comía el grano, y con
-       grano propio quedaba peor todavía — `.grain::after` lleva una máscara
-       diagonal pensada para una caja grande, y en una tira estrecha alrededor
-       de unas palabras produce un borde y una fase rota.
-       Marco lo zanjó mirándolo: «limpia el background de las letras y déjame
-       ver las líneas verticales, prefiero eso». La pauta cruza, y ya está. */
-    /* THE WORD GIVES WAY TOO, LAST (2026-11-18). The container steps below
-       drop the span and then the name, but the word was `flex: none`: on a
-       phone a one- or two-day absence is 49 or 98px wide and «UNAVAILABLE»
-       alone is ~80, so the word and the rule ran past the Sunday column, the
-       page scrolled sideways by 35px at 390 and dragged the fixed lens bar
-       with it. The word now ends in an ellipsis rather than leave the sheet;
-       the band's `title` keeps all of it. */
-    .cal__band-k {
-      flex: 0 1 auto;
-      min-inline-size: 0;
-      overflow: hidden;
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-xs);
-    }
-    /* La palabra y su `?` se inclinan juntas, calcado de `.slip__kind--q`. */
-    .cal__band-w--q {
-      font-style: italic;
-      /* The leaning `?` flies out of its box, and the box now clips. */
-      padding-inline-end: 0.18em;
-    }
-    .cal__band-w {
-      min-inline-size: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      letter-spacing: var(--tracking-m);
-      text-transform: uppercase;
-      color: var(--away-word);
-    }
-    /* The subject is the thing you are reading, so it is TEXT, not a label:
-       the one field on the band drawn in the body voice. */
-    /* The name GIVES WAY with an ellipsis rather than push the rule out of
-       the sheet: the container steps below are measured for a short name,
-       and «playwright staging» on a three-day band at 390 sent the arrow
-       past the grid's right edge. */
-    .cal__band-n {
-      /* It gives way BEFORE the word: shrinking side by side, a Sunday at
-         1440 read «UNAVAILAB… Anouk V…» instead of «UNAVAILABLE Anouk…». */
-      flex: 0 999 auto;
-      min-inline-size: 0;
-      font-size: var(--text-xs);
-      color: var(--away-subject);
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .cal__band-s {
-      flex: none;
-      font-family: var(--font-mono);
-      font-style: normal;
-      font-size: var(--text-2xs);
-      letter-spacing: var(--tracking-l);
-      text-transform: uppercase;
-      color: var(--away-phrase);
-    }
-    /* A rule with a terminus — never a box. An absence is a stretch of days,
-       and a box says «a thing that happened», which is what it is not. */
-    .cal__band-r {
-      /* La regla NO tiene línea base: es una caja vacía con un borde arriba, y
-         alineada por baseline se colgaría por su borde inferior. Se centra
-         ella sola — el suelo es de las palabras. */
-      align-self: center;
-      flex: 1;
-      min-inline-size: 0.75rem;
-      position: relative;
-      block-size: 0;
-      border-block-start: var(--line-hairline) solid var(--away-rule);
-    }
-    .cal__band-r::after {
-      content: '';
-      position: absolute;
-      inset-inline-end: -1px;
-      inset-block-start: -2.5px;
-      inline-size: var(--dot-m);
-      block-size: var(--dot-m);
-      border-block-start: var(--line-hairline) solid var(--away-terminus);
-      border-inline-end: var(--line-hairline) solid var(--away-terminus);
-      transform: rotate(45deg);
-    }
-    /* Runs past the week's edge: no terminus on that side. */
-    .cal__band--cutr .cal__band-r::after {
-      display: none;
-    }
-    /* ON TOUR is QUIETER THAN AN ABSENCE: an absence is a fact somebody wrote
-       down, this is deduced from two travel legs, and they cannot weigh the
-       same.
-       PERO LA DIFERENCIA NO ES EL TRAZO, Y ASÍ ESTABA MAL. La gira iba de
-       puntos «porque pesa menos», y una ausencia TENTATIVA también va de
-       puntos — porque duda. Dos significados con un material, separados solo
-       por 4 puntos de tinta (20% contra 16%), que a ojo no es nada: Marco leyó
-       la gira como algo sin confirmar, que es justo lo que no es.
-       `certainty.css` ya tiene los dos ejes separados y avisa de esto — «no
-       deben tomarse prestado el material el uno al otro»: `.grain` es la duda
-       sobre el HECHO, `.guess` es la duda sobre la ATRIBUCIÓN, y su voz es la
-       cursiva. Una gira es exactamente un `guess`: nadie la escribió, se
-       dedujo. Así que va con regla CONTINUA y en cursiva, y lo que la mantiene
-       más callada es la tinta, no el trazo. */
-    .cal__band--away .cal__band-n {
-      font-size: var(--text-xs);
-      color: var(--away-phrase);
-    }
-    .cal__band--away .cal__band-w {
-      color: var(--away-phrase);
-    }
-    .cal__band--away .cal__band-r {
-      border-block-start-color: var(--away-rule-derived);
-    }
-    .cal__band--away .cal__band-r::after {
-      display: none;
-    }
-    /* LA GIRA DICE QUE LA DEDUJIMOS, Y DE QUÉ DOS VIAJES (§ 38). Va en la voz
-       del tramo, el hueco donde una ausencia imprime sus fechas, porque es lo
-       mismo: de dónde sale esta banda.
-       Una banda estrecha suelta lo que no cabe ENTERO, en este orden: primero
-       los viajes (la hoja ya los dibuja como las dos cards a cada lado de la
-       banda, y el tooltip y las líneas de la agenda y el día los dicen), luego
-       la palabra. El lugar no se suelta nunca: es el sujeto, lo que se lee,
-       como el nombre de una tanda.
-       Contenedor de sí misma, como `.cal__run`: la pregunta es el ancho de
-       ESTA banda, no el de la celda. MEDIDO a 1600 con «Barcelona» de lugar y
-       los viajes más largos de los tres idiomas (ca, «anada 27 febr · tornada
-       28 febr»): marca y tipo 66 · lugar 50 · palabra 50 · viajes 214 ·
-       regla 12 · huecos de 9. Contra el ancho de contenido de la banda:
-
-         419 = 66 + 50 + 50 + 214 + 12 + 3×9   todo
-         205 = 66 + 50 + 50       + 12 + 3×9   sin los viajes
-
-       Por debajo de 205 solo queda lo de antes, y lo dice el tooltip. */
-    .cal__band--away {
-      container: tourband / inline-size;
-    }
-    /* AN ABSENCE'S BAND MEASURES ITSELF TOO (móvil: a two-day band on a phone
-       printed its span and arrow 90px past the screen and gave the page a
-       sideways scroll). Below what the word, the name and the span need, the
-       span goes; below the name's, the name. The title keeps all of it. */
-    .cal__band:not(.cal__band--away) {
-      container: absband / inline-size;
-    }
-    @container absband (max-width: 12.5rem) {
-      .cal__band-s {
-        display: none;
-      }
-    }
-    @container absband (max-width: 6.875rem) {
-      .cal__band-n {
-        display: none;
-      }
-    }
-    /* One day on a phone (~49px): a word cut to «U…» says nothing, so the
-       rule and its terminus say it alone, like the cell's short forms; the
-       day picked under the week and the `title` name it. */
-    @container absband (max-width: 4rem) {
-      .cal__band-k {
-        display: none;
-      }
-    }
-    @container tourband (max-width: 26.125rem) {
-      .cal__band-dl {
-        display: none;
-      }
-    }
-    @container tourband (max-width: 12.75rem) {
-      .cal__band-d {
-        display: none;
-      }
-    }
-    /* An absence that is settled is ink; one that is not is faint and leans —
-       the certainty axis, same as everywhere else. La tapa discontinua que
-       había aquí murió con la línea superior (arriba): la duda la dicen ahora
-       la cursiva, el grano y la regla de puntos de la derecha. */
-    .cal__band--tent .cal__band-n {
-      color: var(--away-phrase);
-      /* CON CURSIVA, y el intento de quitarla fue un error mío corregido por
-         Marco el 2026-08-30. El razonamiento era que la cursiva pertenece a
-         `.guess` —la inferencia— y que una tentativa no se dedujo. Cierto en
-         la teoría del token y falso en la app: LA TARJETA YA INCLINA SUS
-         OPCIONES (`Slip § slip__kind--q`), así que una banda tentativa que no
-         se inclina habla otro idioma que la card del mismo día. Manda el
-         vocabulario que ya está en pantalla, no el mapa de ejes.
-         La gira sigue distinguiéndose por lo demás: regla continua, sin grano
-         y sin `?`. */
-      font-style: italic;
-      /* EL HUECO SE MIDE ENTRE CAJAS Y LA CURSIVA VUELA FUERA DE LA SUYA.
-         Con `gap: 9px` la caja está separada, pero la última letra inclinada
-         —la «l» de «marco rubiol»— cae encima del `3 DEC` que viene detrás y
-         se lee como un RECORTE: Marco lo vio así y preguntó si el nombre
-         estaba cortado. No lo estaba (`scrollWidth == clientWidth` a 900,
-         1024, 1280 y 1600); lo que fallaba era el aire, no el texto.
-         Va en `em` porque el que vuela es el glifo: si el cuerpo cambia, el
-         vuelo cambia con él. Y solo en la cursiva — la redonda no lo necesita
-         y no debe pagarlo. */
-      padding-inline-end: 0.18em;
-    }
-    /* Dotted AND one ink lighter — the board says doubt this way and the
-       month said it half-way, keeping the settled 45% under a dotted rule. */
-    .cal__band--tent .cal__band-r {
-      border-block-start-style: dotted;
-      border-block-start-color: var(--away-rule-tent);
-    }
-    .cal__band--tent .cal__band-r::after {
-      border-color: var(--away-terminus-tent);
-    }
-
-    /* The day NUMBER is its own cell on row 1 of the week's grid, so a run of
-       days can sit between it and the day's contents. It also means the
-       numbers line up across a week whose days hold different things. */
     .cal__num {
       position: relative;
       min-inline-size: 0;
       padding: var(--space-xs) var(--space-xs) var(--space-2xs);
     }
 
-    /* ── THE RUN · one band, its days' hours under it ─────────────────── */
-    /* The same box as a slip — a run IS a slip with a longer life, and giving
-       it its own shape is how a fifth vocabulary gets invented. SAME MEANS
-       SAME: the slip's edge (the ink mixed 15% into the line colour, not the
-       9% hairline this box used to wear), the slip's 3px corner, and the
-       slip's own 5px of air on both sides — the run ran to the column rules
-       and printed its border over them, which is the one thing no other card
-       in the sheet does (Marco, 2026-08-10). */
-    .cal__run {
-      /* Contenedor de sí misma: la nota de arriba se pregunta por el ancho de
-         LA TANDA, no el de la celda — una tanda de cuatro días y otra de dos
-         viven en la misma semana y no pueden responder lo mismo. */
-      container-type: inline-size;
-      position: relative;
-      isolation: isolate;
+    /* ── THE BAR · everything that lasts, one line (tarea 165) ──────────
+       A run of days, a tour, a company closure and a person's absence draw
+       the same object in the same rows: under the numbers, over the day's
+       lines. The bar says once what it is, where it starts, and its length
+       says how long. Its air is the cell's own, so a bar and a line on the
+       day beside it begin on the same edge. */
+    .cal__bar {
       display: flex;
-      flex-direction: column;
+      align-items: center;
+      gap: var(--space-xs);
       min-inline-size: 0;
-      /* 1px over, so a run and a card on the day beside it begin at the same
-         line — the cell's own top padding is 1px too. 2px under, so the run
-         and the first card below it are the 3px apart that two cards are. */
       margin: var(--line-hairline) var(--cal-cell-pad) var(--space-2xs);
-      padding: var(--space-2xs) var(--space-xs);
-      background: var(--bg-ultra-light);
-      border: var(--line-hairline) solid color-mix(in oklch, var(--text-color) 15%, var(--border-color-light));
+      padding: var(--line-hairline) var(--space-xs);
+      border: var(--line-hairline) solid transparent;
       border-radius: var(--radius-xs);
+      font: inherit;
+      font-size: var(--text-xs);
+      line-height: 1.3;
+      color: var(--text-color);
+      text-align: start;
+      text-decoration: none;
+      white-space: nowrap;
+      overflow: hidden;
     }
-    /* UNA TANDA QUE SIGUE NO SE CIERRA POR ESE LADO (Marco, 2026-08-30).
-       La banda se recorta por semana ISO, así que una tanda de diez días son
-       dos dibujos; cerrarlos por los cuatro costados afirma dos finales que no
-       existen. El de arriba queda abierto a la derecha y el de abajo a la
-       izquierda, y por ese lado se va también el margen: una caja abierta que
-       no llega al borde de la celda parece rota, no continuada. */
-    /* La frase va al otro extremo de la cabecera, en voz de margen: es una
-       nota sobre la tanda, no una segunda medida de ella.
-       Y SE VA CUANDO NO CABE, porque EL NOMBRE MANDA (Marco, 2026-08-30). Una
-       mitad de dos días no da para las dos cosas y el título salía cortado —
-       «Reside…»—, que es peor que no saber cuántos días dura: el nombre es lo
-       que identifica la tanda; la nota solo la sitúa.
-       El umbral está MEDIDO sobre la residencia de enero, no elegido: la
-       cabecera pide 76 (marca + tipo) + 118 (nombre) + 43 (ciudad) + 118
-       (nota), más 12 de padding y tres huecos de 8 = 391. Por debajo de eso
-       algo tiene que irse, y se va la nota. */
-    /* EL ORDEN EN QUE SE SUELTA LO QUE NO CABE, y no es una preferencia mía:
-       lo copia de la tarjeta, que ya lo tenía resuelto —«un gloss es lo PRIMERO
-       que se va, y nunca la hora»— y de la regla que este mismo fichero escribe
-       para la banda a una columna: «lo único que sobrevive es el monograma».
-       Nada se recorta a medias; se suelta entero.
-
-       MEDIDO sobre la residencia de enero, a 1600: monograma 15 · palabra de
-       tipo 57 · nombre 118 · ciudad 43 · nota 118 · padding 12 · huecos de 8.
-       De ahí salen los tres umbrales, sumando lo que queda en cada escalón:
-
-         391 = 76 + 118 + 43 + 118 + 12 + 3×8   todo
-         265 = 76 + 118 + 43      + 12 + 2×8   sin nota
-         214 = 76 + 118           + 12 + 1×8   sin ciudad
-         153 = 15 + 118           + 12 + 1×8   solo el monograma
-
-       Por debajo de 153 el nombre se recorta, y ahí ya no queda nada que dar
-       sin borrar la identidad de la tanda. */
-    @container (max-width: 24.4375rem) {
-      .cal__run-n {
-        display: none;
-      }
+    a.cal__bar,
+    button.cal__bar {
+      cursor: pointer;
     }
-    /* La ciudad es el gloss de la tanda: dice DÓNDE, y el nombre dice QUÉ. */
-    @container (max-width: 16.5625rem) {
-      .cal__run-c {
-        display: none;
-      }
+    a.cal__bar:hover .cal__bar-n,
+    button.cal__bar:hover .cal__bar-n {
+      text-decoration: underline;
+      text-underline-offset: 2px;
     }
-    /* Y al final solo el monograma, que en un glifo dice de quién es. */
-    @container (max-width: 13.375rem) {
-      .cal__run-w {
-        display: none;
-      }
-    }
-    .cal__run-n {
-      margin-inline-start: auto;
+    .cal__bar :global(.mark) {
       flex: none;
+    }
+    .cal__bar-n {
+      font-weight: 400;
+      min-inline-size: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .cal__bar-p {
+      min-inline-size: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: var(--text-2xs);
+      color: var(--text-muted);
+    }
+    .cal__bar-w {
+      flex: 0 1 auto;
+      min-inline-size: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
-      letter-spacing: var(--mono-letter-spacing-loose);
+      letter-spacing: var(--tracking-l);
       text-transform: uppercase;
-      color: var(--text-faint);
-      white-space: nowrap;
     }
-    .cal__run--cutr {
+    /* A BAR THAT GOES ON IS OPEN ON THAT SIDE (Marco, 2026-08-30): closing
+       both halves of a ten-day run claims two ends that do not exist. The
+       margin goes with the edge, so the open side meets the column rule. */
+    .cal__bar--cutr {
       margin-inline-end: 0;
-      border-inline-end: 0;
+      border-inline-end-width: 0;
       border-start-end-radius: 0;
       border-end-end-radius: 0;
     }
-    .cal__run--cutl {
+    .cal__bar--cutl {
       margin-inline-start: 0;
-      border-inline-start: 0;
+      border-inline-start-width: 0;
       border-start-start-radius: 0;
       border-end-start-radius: 0;
+    }
+
+    /* The work that lasts: the slip's own paper and edge, because a run IS a
+       slip with a longer life. */
+    .cal__run {
+      background: var(--bg-ultra-light);
+      border-color: color-mix(in oklch, var(--text-color) 15%, var(--border-color-light));
     }
     /* …and the same certainty grammar, so a tentative run says «not sure» at
        exactly the volume a tentative gig does. */
@@ -1908,123 +1611,75 @@
       border-style: dashed;
       border-color: color-mix(in oklch, var(--text-color) 13%, var(--border-color-light));
     }
+    .cal__run[data-family='hold'] .cal__bar-n,
+    .cal__run[data-family='proposed'] .cal__bar-n {
+      font-style: italic;
+      color: var(--text-muted);
+    }
     .cal__run[data-family='released'] {
       border-style: dotted;
       background: transparent;
     }
-    .cal__run[data-family='released'] b {
+    .cal__run[data-family='released'] .cal__bar-n {
       text-decoration: line-through;
       color: var(--text-faint);
     }
-    /* THE DAY BOUNDARIES CROSS THE BAND. The seven column rules are painted
-       on `.cal__wkc`, behind everything, so a band that spans days covered
-       them and read as one box floating over the week instead of a run
-       measured in days. Drawn back on top — same hairline, same pitch, no
-       pointer events — the band is visibly four days long without a word.
-       (Marco's experiment, 2026-07-31.) */
-    /* The pitch is the COLUMN's, not the box's: now that the run sits 5px
-       inside its columns, dividing its own width by `--run-cols` puts the
-       rules a couple of pixels off the verticals they are meant to continue.
-       `100%` here is the run's padding box — its border box less the two 1px
-       edges — so the column is that plus the two margins and the two borders,
-       and the first rule starts one border and one margin to the left. */
-    .cal__run::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      background-image: linear-gradient(
-        to right,
-        var(--border-color-light) 0 1px,
-        transparent 1px
+
+    /* A tour wears its company's colour: a tinted ground and a stronger edge
+       where it starts. It was deduced from two trips, and the title says so. */
+    .cal__bar--tour {
+      --c: var(--text-muted);
+      background: color-mix(in oklch, var(--c) 14%, var(--bg));
+      border-inline-start: var(--line-thick) solid var(--c);
+    }
+    .cal__bar--tour.cal__bar--cutl {
+      border-inline-start-width: 0;
+    }
+
+    /* The company is closed: the hatch is kept for this and only this, and it
+       draws whichever question you are asking — it affects them all. */
+    .cal__bar--closed {
+      background: repeating-linear-gradient(
+        135deg,
+        var(--bg) 0 4px,
+        var(--border-color-light) 4px 5px
       );
-      background-size: calc((100% + 2px + var(--cal-cell-pad) * 2) / var(--run-cols, 1)) 100%;
-      background-position: calc(-1 * var(--line-hairline) - var(--cal-cell-pad)) 0;
-      background-repeat: repeat-x;
+      border-color: var(--border-color-light);
+      color: var(--text-muted);
     }
-    .cal__run-h {
-      display: flex;
-      align-items: center;
-      /* The hours sit directly under this line, so the two need a hairline of
-         air or the name and its own clock read as one wrapped sentence. */
-      margin-block-end: var(--space-2xs);
-      gap: var(--space-xs);
-      min-inline-size: 0;
-      white-space: nowrap;
-      overflow: hidden;
-      line-height: 1.1;
+    .cal__bar-w--s {
+      display: none;
     }
-    .cal__run-k {
-      flex: none;
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-xs);
+    .cal__bar--closed.cal__bar--tent {
+      border-style: dashed;
+      border-color: var(--text-muted);
+      font-style: italic;
     }
-    .cal__run-w {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      letter-spacing: var(--tracking-l);
-      text-transform: uppercase;
-      color: var(--text-faint);
+
+    /* A person who is out: their name on a quiet ground. Not sure yet, and
+       the bar leans, dashes and asks «?». Booked on a confirmed gig, and it
+       goes red (Marco, «Sí, en rojo», 16-11). */
+    .cal__bar--absence {
+      background: var(--border-color-light);
+      border-color: var(--border-color-light);
     }
-    .cal__run-h b {
-      font-weight: 400;
-      font-size: var(--text-xs);
-      color: var(--text-color);
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .cal__run-c {
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-      white-space: nowrap;
-    }
-    /* EVERY HOUR HANGS AT THE RIGHT OF THE DAY IT BELONGS TO — the same edge
-       as the day column above it, so the strip reads as a row of the grid and
-       not as a sentence. */
-    .cal__run-g {
-      display: grid;
-      align-items: center;
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      line-height: 1.15;
-      /* Full ink. These hours are the ONLY thing the band says that its own
-         title does not — the whole argument for storing a run as per-day rows
-         is that the 8th is 10–18 and the 10th is 10–13. At muted they read as
-         a caption on the name above them. */
-      color: var(--text-color);
-      font-variant-numeric: tabular-nums;
-    }
-    .cal__run-d {
-      padding: 0 var(--space-xs) 0 0;
-      border: 0;
+    .cal__bar--absence.cal__bar--tent {
       background: none;
-      font: inherit;
-      color: inherit;
-      text-align: right;
-      white-space: nowrap;
-      overflow: hidden;
+      border-style: dashed;
+      border-color: var(--text-muted);
+      color: var(--text-muted);
+      font-style: italic;
     }
-    button.cal__run-d {
-      cursor: pointer;
+    .cal__bar--absence.cal__bar--hit {
+      border-color: var(--danger);
+      color: var(--danger);
+      background: color-mix(in oklch, var(--danger) 10%, var(--bg));
     }
-    button.cal__run-d:hover {
-      color: var(--text-color);
-      text-decoration: underline;
-      text-underline-offset: 2px;
-    }
-    /* A session is a LINE. Two sessions in one day are two lines — never one
-       line with a separator, which is how an hour got clipped in a 72px cell. */
-    .cal__run-d i {
-      display: block;
-      font-style: normal;
-    }
-    .cal__run-d u {
-      text-decoration: none;
-    }
-    .cal__run-d--off {
-      color: var(--text-faint);
-      opacity: 0.6;
+    .cal__bar--more {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-m);
+      color: var(--text-muted);
     }
 
     /* Las siete verticales viven AQUÍ y no en la fila de celdas, para que
@@ -2155,10 +1810,8 @@
     .cal__day--alt {
       background-color: var(--month-alt-ground);
     }
-    /* A hole to sell: hatched in ink, over whichever ground the month has. */
-    .cal__day--gap {
-      background-image: repeating-linear-gradient(135deg, var(--gap-hatch) 0 1px, transparent 1px 6px);
-    }
+    /* A hole to sell is SAID, not hatched (tarea 165): its length, in the
+       margin voice, where it starts. The hatch is the closed company's. */
     .cal__gap {
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
@@ -2174,8 +1827,17 @@
       display: none;
     }
     @media (max-width: 47.999rem) {
-      .cal__wd--l {
+      .cal__wd--l,
+      .cal__bar-w--l,
+      .cal__bar-p {
         display: none;
+      }
+      .cal__bar-w--s {
+        display: inline;
+      }
+      .cal__bar {
+        padding-inline: var(--space-2xs);
+        gap: var(--space-2xs);
       }
       .cal__wd--s {
         display: inline;
@@ -2242,12 +1904,10 @@
       inline-size: calc(100% / 7 * var(--m0));
     }
     /* The cell decides what it can say: below a phone's cell, the short
-       month, two monograms and «+N», no steps (the day under the week says
-       them), one dot. */
+       month, two monograms and «+N». */
     @container (max-width: 5rem) {
       .cal__gap--l,
       .cal__more--l,
-      .cal__more--steps,
       .cal__day > :global(.slip:nth-child(n + 3)) {
         display: none;
       }
@@ -2265,9 +1925,6 @@
       }
       .cal__mname--s {
         display: inline;
-      }
-      .cal__mark + .cal__mark {
-        display: none;
       }
     }
     @media (max-width: 47.999rem) {

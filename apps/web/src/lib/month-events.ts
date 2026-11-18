@@ -151,6 +151,9 @@ export type BlackoutBandVM = {
    */
   subject?: string;
   note?: string | null;
+  /** A person's firm absence over a confirmed gig they were booked on: the
+      Month's «Quién falta» bar goes red (Marco, «Sí, en rojo», 16-11). */
+  hit?: boolean;
 };
 
 /**

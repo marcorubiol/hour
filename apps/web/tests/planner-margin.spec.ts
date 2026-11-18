@@ -132,14 +132,11 @@ test.describe('el margen del Planner (ADR-138 § 6)', () => {
     await expect(page).toHaveURL(new RegExp(`peek=conversation%2F[^&]+%2F${convId}`));
   });
 
-  test('el Mes dice un número en ese día, que abre el Día', async ({ page }) => {
+  test('el Mes ya no cuenta pasos: son de la Agenda y de Hoy (tarea 165)', async ({ page }) => {
     test.setTimeout(60_000);
     await open(page, `/h/planner?view=month&ym=${day.slice(0, 7)}&scope=s:playwright`);
-    const count = page.locator(`[data-testid="month-steps"][data-day="${day}"]`);
-    await expect(count).toHaveText(/^\d+ (steps|pasos|passos|étapes)$/, { timeout: 15_000 });
-    await count.click();
-    await expect(page).toHaveURL(new RegExp(`view=day.*d=${day}|d=${day}.*view=day`));
-    await expect(page.getByTestId('planner-steps')).toContainText(VENUE, { timeout: 15_000 });
+    await expect(page.locator(`.cal__day[data-day="${day}"]`)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('month-steps')).toHaveCount(0);
   });
 
   test('desde la conversación, «Ver en el Planner» abre la Agenda con el proyecto fijado', async ({ page }) => {

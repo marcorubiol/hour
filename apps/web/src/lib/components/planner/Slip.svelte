@@ -92,6 +92,12 @@
      */
     clashPeople?: boolean;
     /**
+     * SOMEBODY ON THIS GIG WROTE DOWN THAT THEY ARE OUT (the Month's «Quién
+     * falta», tarea 165). The monogram takes a red edge, the same red as the
+     * absence bar it answers to. Only drawn while the reader asked who is out.
+     */
+    absent?: boolean;
+    /**
      * WHERE THIS SLIP IS BEING DRAWN — and the ONLY thing that differs
      * between the four placings (ADR-095 §0).
      *
@@ -156,6 +162,7 @@
     onOpen,
     clash = 'none',
     clashPeople = false,
+    absent = false,
     placing = 'cell',
     ground = 'card',
     guess = false,
@@ -290,6 +297,7 @@
     data-size={size === 'l' ? 'l' : undefined}
     data-clash={clash === 'none' ? undefined : clash}
     data-clash-people={clash !== 'none' && clashPeople ? '' : undefined}
+    data-absent={absent ? '' : undefined}
     data-fresh={fresh ? '' : undefined}
     style={slip.project ? `--c: ${accentVarFor(slip.project)}` : undefined}
     href={slip.href}
@@ -307,6 +315,7 @@
     data-size={size === 'l' ? 'l' : undefined}
     data-clash={clash === 'none' ? undefined : clash}
     data-clash-people={clash !== 'none' && clashPeople ? '' : undefined}
+    data-absent={absent ? '' : undefined}
     data-fresh={fresh ? '' : undefined}
     style={slip.project ? `--c: ${accentVarFor(slip.project)}` : undefined}
     title={slip.title}
@@ -323,6 +332,7 @@
     data-size={size === 'l' ? 'l' : undefined}
     data-clash={clash === 'none' ? undefined : clash}
     data-clash-people={clash !== 'none' && clashPeople ? '' : undefined}
+    data-absent={absent ? '' : undefined}
     data-fresh={fresh ? '' : undefined}
     style={slip.project ? `--c: ${accentVarFor(slip.project)}` : undefined}
     bind:this={el}
@@ -422,12 +432,16 @@
        16h»), three tokens in one act of reading. Whatever the step was
        protecting, it was not a hierarchy anybody uses: you do not read the
        hour before you know what kind of thing it belongs to. */
+    /* THE KIND IS SEEN FIRST, so it takes full ink (tarea 166): it is a
+       closed set you recognise at a glance — show, rehearsal, travel — and
+       the place is the datum you read after it. Same size, same place; only
+       the ink moved. */
     .slip__kind {
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
       letter-spacing: var(--tracking-l);
       text-transform: uppercase;
-      color: var(--text-muted);
+      color: var(--text-color);
       white-space: nowrap;
     }
     /* An option LEANS: the kind word and its `?` are italic wherever they are
@@ -650,8 +664,10 @@
        for an option, the same leaning name. What it drops is what the cell
        cannot say at that size (kind word, hour, state, gloss); the title
        keeps all of it.
-       The place is the CITY when there is one (a tour reads by towns), the
-       name otherwise: `cityUnder` already keeps the two from repeating. */
+       The place is the NAME (tarea 166): the venue when there is one, else
+       the city, else the work — `performanceSlip` already resolves it in that
+       order. The city under it is the card's second line, and the strip has
+       one line: it no longer swaps the venue for its town. */
     .slip[data-placing='compact'] {
       flex-direction: row;
       align-items: center;
@@ -671,11 +687,10 @@
     .slip[data-placing='compact'] .slip__state,
     .slip[data-placing='compact'] .slip__tz,
     .slip[data-placing='compact'] .slip__acts,
-    .slip[data-placing='compact']:has(.slip__c) .slip__n {
+    .slip[data-placing='compact'] .slip__c {
       display: none;
     }
-    .slip[data-placing='compact'] .slip__n,
-    .slip[data-placing='compact'] .slip__c {
+    .slip[data-placing='compact'] .slip__n {
       display: block;
       min-width: 0;
       margin: 0;
@@ -691,18 +706,17 @@
        the monogram and the place, in the body voice, at the number's size.
        An option says it on the monogram (an outline, no fill) and in the
        place, which leans and asks: «Girona?». */
-    .slip[data-placing='compact'] .slip__n,
-    .slip[data-placing='compact'] .slip__c {
+    .slip[data-placing='compact'] .slip__n {
       font-family: var(--font-sans);
       font-size: var(--text-s);
     }
-    .slip[data-placing='compact'][data-family='hold'] .slip__c::after,
-    .slip[data-placing='compact'][data-family='proposed'] .slip__c::after {
+    .slip[data-placing='compact'][data-family='hold'] .slip__n::after,
+    .slip[data-placing='compact'][data-family='proposed'] .slip__n::after {
       content: '?';
     }
     /* The leaning `?` flies past its box, and the box clips (ellipsis). */
-    .slip[data-placing='compact'][data-family='hold'] .slip__c,
-    .slip[data-placing='compact'][data-family='proposed'] .slip__c {
+    .slip[data-placing='compact'][data-family='hold'] .slip__n,
+    .slip[data-placing='compact'][data-family='proposed'] .slip__n {
       padding-inline-end: 0.18em;
     }
     .slip[data-placing='compact'][data-ground='bare'][data-family='hold'] :global(.mark__chip),
@@ -721,8 +735,7 @@
     /* Too narrow for a place that can be read: the monogram alone, never
        «Giro…». The title still says everything. */
     @container (max-width: 3.75rem) {
-      .slip[data-placing='compact'] .slip__n,
-      .slip[data-placing='compact'] .slip__c {
+      .slip[data-placing='compact'] .slip__n {
         display: none;
       }
     }
@@ -764,14 +777,11 @@
        value for one state. And it leans — an option is written in italic
        wherever its name appears. */
     .slip[data-family='hold'] .slip__n,
-    .slip[data-family='proposed'] .slip__n,
-    .slip[data-placing='compact'][data-family='hold'] .slip__c,
-    .slip[data-placing='compact'][data-family='proposed'] .slip__c {
+    .slip[data-family='proposed'] .slip__n {
       color: var(--text-muted);
       font-style: italic;
     }
-    .slip[data-family='proposed'] .slip__n,
-    .slip[data-placing='compact'][data-family='proposed'] .slip__c {
+    .slip[data-family='proposed'] .slip__n {
       color: var(--text-faint);
     }
 
@@ -826,6 +836,10 @@
     }
     .slip[data-clash-people] {
       --clash-ink: var(--danger);
+    }
+    /* Somebody on it is out: the monogram's edge in the alarm red. */
+    .slip[data-absent] :global(.mark__chip) {
+      box-shadow: 0 0 0 var(--line-thin) var(--danger);
     }
     .slip[data-clash='hard'] {
       border-inline-start-style: solid;

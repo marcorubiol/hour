@@ -409,21 +409,29 @@ test.describe('the sheet', () => {
     expect(glyphs.filter((g) => g !== ''), 'a glyph is a second meaning').toEqual([]);
   });
 
-  test('A RUN OF DAYS IS ONE ELEMENT, and it carries each day’s own hours', async ({ page }) => {
-    // The whole argument for storing a rehearsal block as per-day rows. The
-    // month used to draw the group as a chip in the first day and leave the
-    // others an orphan time box with no name attached to it.
+  test('ONE MARK A DAY AT MOST (tarea 165)', async ({ page }) => {
+    await planner(page, 'month');
+    const most = await page.evaluate(() =>
+      Math.max(0, ...[...document.querySelectorAll('.cal__num')].map((n) => n.querySelectorAll('.cal__mark').length)),
+    );
+    expect(most, 'six dots on one number said less than one').toBeLessThanOrEqual(1);
+  });
+
+  test('A RUN OF DAYS IS ONE BAR, named, on one line (tarea 165)', async ({ page }) => {
+    // The month used to draw the group as a chip in the first day and leave
+    // the others an orphan time box; then as a band with each day's hours.
+    // Since the drawing of 16-11 whatever lasts is one line: the hours are
+    // the Day's.
     await planner(page, 'month');
     const runs = await page.evaluate(() =>
-      [...document.querySelectorAll('.cal__run')].map((el) => ({
-        span: getComputedStyle(el).gridColumnStart + '/' + getComputedStyle(el).gridColumnEnd,
-        days: el.querySelectorAll('.cal__run-d').length,
-        named: (el.querySelector('.cal__run-h b')?.textContent ?? '').length > 0,
+      [...document.querySelectorAll<HTMLElement>('.cal__run')].map((el) => ({
+        named: (el.querySelector('.cal__bar-n')?.textContent ?? '').length > 0,
+        lines: Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight)),
       })),
     );
     for (const r of runs) {
-      expect(r.days, 'a run with fewer than two day cells is not a run').toBeGreaterThan(1);
-      expect(r.named, 'a run drew its hours and never its name').toBe(true);
+      expect(r.named, 'a run that never says its name').toBe(true);
+      expect(r.lines, 'a run is one line').toBeLessThanOrEqual(1);
     }
   });
 });
