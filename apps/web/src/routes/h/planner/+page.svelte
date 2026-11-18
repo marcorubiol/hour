@@ -873,6 +873,7 @@
           : (personName ?? '—'),
         note: b.note,
         hit: absenceHits.blocks.has(b.id),
+        workspaceId: b.workspace_id,
       };
     }),
   );

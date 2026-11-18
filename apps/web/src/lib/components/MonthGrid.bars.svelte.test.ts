@@ -139,6 +139,16 @@ describe('MonthGrid — lo que dura es una barra', () => {
     expect(texts(container, '[data-testid="month-bar-closed"]')[0]).toMatch(/compañía cerrada/);
   });
 
+  it('overlapping closures of one company are one bar; another company with the same name is its own', () => {
+    const shut = (id: string, from: string, to: string, ws: string): BlackoutBandVM => ({
+      ...closure, id, from, to, workspaceId: ws,
+    });
+    const { container } = mount({
+      blackouts: [shut('s1', '2026-11-09', '2026-11-12', 'w1'), shut('s2', '2026-11-11', '2026-11-14', 'w1'), shut('s3', '2026-11-10', '2026-11-11', 'w2')],
+    });
+    expect(container.querySelectorAll('[data-testid="month-bar-closed"]')).toHaveLength(2);
+  });
+
   it('absences are off the sheet until «Quién falta» is on', () => {
     const { container } = mount();
     expect(container.querySelector('[data-testid="month-bar-absence"]')).toBeNull();

@@ -154,6 +154,8 @@ export type BlackoutBandVM = {
   /** A person's firm absence over a confirmed gig they were booked on: the
       Month's «Quién falta» bar goes red (Marco, «Sí, en rojo», 16-11). */
   hit?: boolean;
+  /** Whose closure: two companies with the same name are still two. */
+  workspaceId?: string;
 };
 
 /**

@@ -867,7 +867,8 @@
     const list = blackouts.filter((b) => b.company).sort((a, b) => (a.from < b.from ? -1 : a.from > b.from ? 1 : 0));
     const out: BlackoutBandVM[] = [];
     for (const b of list) {
-      const prev = out.findLast((o) => o.subject === b.subject);
+      const whose = (o: BlackoutBandVM) => o.workspaceId ?? o.subject;
+      const prev = out.findLast((o) => whose(o) === whose(b));
       if (prev && b.from <= nextIso(prev.to)) {
         if (b.to > prev.to) prev.to = b.to;
         prev.tentative = prev.tentative && b.tentative;
