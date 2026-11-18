@@ -126,17 +126,19 @@
   let perfCount = $derived(board?.performances.length ?? 0);
 
   // ── la hoja: un hilo a la vez, elegido arriba ───────────────────────────
-  /** El elegido a mano; sin elegir, el primero con nuevos, si no el primero. */
+  /** El elegido: a mano, o al llegar el tablón el primero con nuevos, si no el primero. */
   let picked = $state<string | null>(null);
+  // The first choice is made once, when the board arrives, and kept: were it
+  // read live, marking the shown thread read would hand the sheet to the next
+  // unread one, and that one would be marked too, never seen.
+  $effect(() => {
+    if (picked !== null || !board) return;
+    const first = board.threads.find((th) => th.unread_count > 0) ?? board.threads[0];
+    if (first) picked = threadKey(first);
+  });
   let shown = $derived.by(() => {
     if (!board) return null;
-    const all = board.threads;
-    return (
-      all.find((th) => threadKey(th) === picked) ??
-      all.find((th) => th.unread_count > 0) ??
-      all[0] ??
-      null
-    );
+    return board.threads.find((th) => threadKey(th) === picked) ?? board.threads[0] ?? null;
   });
   function pick(th: BoardThread) {
     picked = threadKey(th);

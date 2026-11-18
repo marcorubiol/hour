@@ -3687,5 +3687,6 @@
   "pass.box_team_date": "Quién va",
   "pass.box_place": "Dónde",
   "pass.line_no_place": "Sin lugar",
-  "pass.label_date": "Pase de la fecha"
+  "pass.label_date": "Pase de la fecha",
+  "pass.put_place": "Poner lugar"
 }

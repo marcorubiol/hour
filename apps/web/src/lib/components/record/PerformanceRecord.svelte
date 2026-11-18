@@ -890,7 +890,7 @@
 
   // A trip of the same project that day lends its ends as stops, read-only,
   // with a link to it (Marco's answer 3, 18-11). Same feed as the Planner's.
-  type TripRow = { id: string; kind: string; stages?: TripStage[] };
+  type TripRow = { id: string; kind: string; status: string; stages?: TripStage[] };
   const tripsQuery = createQuery(
     toStore(() => ({
       queryKey: ['performance-day-trips', perf?.project?.id ?? '', dayIso] as const,
@@ -905,7 +905,7 @@
   );
   let tripExtras = $derived<TripStop[]>(
     ($tripsQuery.data?.items ?? [])
-      .filter((d) => d.kind === 'travel_day')
+      .filter((d) => d.kind === 'travel_day' && d.status !== 'cancelled')
       .flatMap((d) => tripStops(d.id, d.stages ?? [], (iso) => dayOf(iso, dayTz) === dayIso)),
   );
 

@@ -22,7 +22,7 @@
  * Pure: no clock, no network. The screen says the words.
  */
 
-import { wallClockToInstant } from './datetime';
+import { instantToWallClock, wallClockToInstant } from './datetime';
 import type { ScheduleSlotInput } from './schedule-slot';
 
 /** A stop the page adds: never written, never dragged. */
@@ -135,6 +135,33 @@ export function templateFor(kinds: ReadonlyArray<string | null>): TemplateMoment
 /** The proposed instant of a template moment: the show's start plus its offset. */
 export function templateAt(startIso: string, m: TemplateMoment): string {
   return new Date(ms(startIso) + m.offset * 60_000).toISOString();
+}
+
+/**
+ * The instant of a template moment once its clock is (re)typed: the instant
+ * at that wall clock nearest to the proposed one. A show at 1h lands its
+ * load-in the evening before, and an hour left as proposed stays exactly
+ * that instant, never moved to another day.
+ */
+export function templateClockAt(
+  proposedIso: string,
+  clock: { h: number; m: number },
+  tz: string,
+): string | null {
+  const day = instantToWallClock(proposedIso, tz).slice(0, 10);
+  const shift = (d: string, n: number) => {
+    const x = new Date(`${d}T12:00:00Z`);
+    x.setUTCDate(x.getUTCDate() + n);
+    return x.toISOString().slice(0, 10);
+  };
+  const hm = `${String(clock.h).padStart(2, '0')}:${String(clock.m).padStart(2, '0')}`;
+  const target = ms(proposedIso);
+  let best: string | null = null;
+  for (const n of [-1, 0, 1]) {
+    const at = wallClockToInstant(`${shift(day, n)}T${hm}`, tz);
+    if (at !== null && (best === null || Math.abs(ms(at) - target) < Math.abs(ms(best) - target))) best = at;
+  }
+  return best;
 }
 
 /**
