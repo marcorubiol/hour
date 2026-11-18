@@ -140,9 +140,17 @@
     if (!board) return null;
     return board.threads.find((th) => threadKey(th) === picked) ?? board.threads[0] ?? null;
   });
+  /** The threads the sheet has shown, kept mounted (their drafts with them). */
+  let visited = $state<string[]>([]);
+  $effect(() => {
+    const key = shown ? threadKey(shown) : null;
+    if (key !== null && !visited.includes(key)) visited = [...visited, key];
+  });
+  // Picking a tab only shows the thread: no focus in its composer. A focused
+  // composer grows its «Enviar» row, and losing it to the next tab shrank the
+  // sheet under the finger (from below, on a phone), so the tap missed.
   function pick(th: BoardThread) {
     picked = threadKey(th);
-    focusKey = threadKey(th);
   }
 </script>
 
@@ -222,24 +230,26 @@
           </button>
         {/each}
       </div>
-      {#if shown}
-        {#key threadKey(shown)}
+      <!-- Each thread once seen stays mounted, hidden when another is picked:
+           a half-written message survives a look at another tab. -->
+      {#each board.threads.filter((th) => visited.includes(threadKey(th))) as th (threadKey(th))}
+        <div hidden={!shown || threadKey(th) !== threadKey(shown)}>
           <ThreadBlock
-            thread={shown}
+            thread={th}
             anchorKind="bolo"
             anchorId={board.bolo.id}
-            messages={messagesOf(shown)}
+            messages={messagesOf(th)}
             authors={board.authors}
             me={board.me}
-            newSince={newSince(board, threadKey(shown), shown.thread_id)}
+            newSince={newSince(board, threadKey(th), th.thread_id)}
             performances={board.performances}
-            autofocus={focusKey === threadKey(shown)}
+            autofocus={focusKey === threadKey(th)}
             {tz}
             {locale}
             onchange={refresh}
           />
-        {/key}
-      {/if}
+        </div>
+      {/each}
     {:else}
     {#each layout.open as th (threadKey(th))}
       <ThreadBlock
