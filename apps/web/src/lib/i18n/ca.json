@@ -988,6 +988,7 @@
   "organization.projects": "Espectacles",
   "organization.projects@music": "Projectes",
   "organization.contacts": "Contactes",
+  "organization.notes": "Nota de l'equip",
   "organization.no_contacts": "Sense contactes.",
   "organization.no_conversations": "Sense converses.",
   "organization.contact_until": "fins al {date}",

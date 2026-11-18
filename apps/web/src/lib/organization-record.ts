@@ -105,6 +105,9 @@ export interface OrganizationFile {
     phone: string | null;
     website: string | null;
     address: string | null;
+    /** The team's note on it (138): an import row with only an organization lands here. Optional: a cached file
+     *  from before the field has none. */
+    notes?: string | null;
   };
   conversations: Array<{
     id: string;
