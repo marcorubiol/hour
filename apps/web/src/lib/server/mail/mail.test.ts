@@ -64,7 +64,11 @@ describe('crypto', () => {
     const other = await importMailKey(toBase64Url(new Uint8Array(32).fill(9)));
     const sealed = await encryptSecret(key, 'secret', 'aad');
     const [v, iv, ct] = sealed.split('.');
-    const flipped = `${v}.${iv}.${ct.slice(0, -2)}${ct.slice(-2) === 'AA' ? 'AB' : 'AA'}`;
+    // Flip the FIRST character: all six of its bits are ciphertext. The last
+    // one of an unpadded base64url string carries padding bits, so swapping
+    // `AB`/`AC`/`AD` for `AA` decoded to the same bytes and the tamper
+    // went unnoticed (red on PR #2; 85 of 20,000 runs measured).
+    const flipped = `${v}.${iv}.${ct[0] === 'A' ? 'B' : 'A'}${ct.slice(1)}`;
     await expect(decryptSecret(key, flipped, 'aad')).rejects.toThrow();
     await expect(decryptSecret(other, sealed, 'aad')).rejects.toThrow();
     await expect(decryptSecret(key, 'v2.' + iv + '.' + ct, 'aad')).rejects.toThrow();
