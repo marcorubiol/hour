@@ -1520,6 +1520,28 @@
     --dialog-max-width: 48rem;
   }
 
+  /* A SHEET OVER THE VISTAZO (ADR-216): opened from inside the panel on the
+     right, the paper takes that same column, under the top bar, the lens
+     still in sight on its left. A desktop only: on a phone it is the sheet
+     from below, as every dialog. */
+  @media (min-width: 48rem) {
+    .dialog--side {
+      margin-block: var(--header-height) 0;
+      margin-inline: auto 0;
+      block-size: calc(100dvh - var(--header-height));
+      max-block-size: calc(100dvh - var(--header-height));
+      inline-size: min(100%, var(--peek-inline));
+    }
+    .dialog--side .dialog__panel {
+      inline-size: 100%;
+      block-size: 100%;
+      max-block-size: none;
+      border-block: 0;
+      border-inline-end: 0;
+      border-radius: 0;
+    }
+  }
+
   /* A phone: the paper is a sheet from below, the whole width, the foot
      clear of the home indicator. */
   @media (max-width: 47.999rem) {

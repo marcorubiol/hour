@@ -8220,3 +8220,20 @@ Encargo: `build/coordination/ficha-pase/brief.md`, «No es un show».
 
 **Cómo se revierte.** Revertir el PR: vuelven la línea de datos y `MissingBand`. Sin esquema ni API; `CACHE_SCHEMA`
 no cambia.
+
+## [2026-11-18] ADR-216 · El pase en el vistazo de escritorio (fase 5 del pase)
+Encargo: `build/coordination/ficha-pase/brief.md`, «Escritorio»; lámina «La ficha en escritorio» del lienzo.
+
+1. **La misma columna, sin copia.** El vistazo de la derecha (`Peek`, ADR-139 p1) ya dibuja `PerformanceRecord` y
+   `DateRecord`, que se miden sobre sí mismos (`container: record`), así que el pase entra tal cual: pieza llena,
+   talón y paradas, como en el teléfono.
+2. **Las paradas no dejan margen vacío.** La lista de horas ensancha su columna de hora a `11ch` cuando el contenedor
+   pasa de 30rem; en el vistazo (36rem) eso dejaba la línea de paradas metida hacia dentro. Con `placing="stops"` la
+   columna de hora mide siempre lo que su hora más ancha, así la línea cae en el mismo sitio en el teléfono, en el
+   vistazo y en la página. La escaleta de siempre (Planificador, viajes) no cambia.
+3. **«Hablar» desde el vistazo se abre en su misma columna.** `Dialog` gana `placing="side"`: en escritorio el papel
+   ocupa la columna del vistazo, bajo la barra, con Hoy todavía a la vista a la izquierda; en el teléfono sigue siendo
+   la hoja desde abajo. Desde la página completa, «Hablar» sigue centrado.
+
+**Cómo se revierte.** Revertir el PR: vuelven la columna de hora de 11ch y el diálogo centrado. Sin esquema ni API;
+`CACHE_SCHEMA` no cambia.

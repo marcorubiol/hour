@@ -50,6 +50,10 @@
     children?: Snippet;
     actions?: Snippet;
     lead?: Snippet;
+    /** Where the paper sits on a desktop: centred (the default), or `side`,
+        the vistazo's own column on the right, for a sheet opened from inside
+        it (ADR-216). A phone keeps its sheet from below either way. */
+    placing?: 'center' | 'side';
   }
 
   let {
@@ -64,6 +68,7 @@
     children,
     actions,
     lead,
+    placing = 'center',
   }: Props = $props();
 
   const locale = appLocale();
@@ -193,7 +198,7 @@
     if (el instanceof HTMLElement && !el.closest('.field') && claimInvalidFocus()) el.focus();
   }
 
-  let dialogClasses = $derived(`dialog dialog--${size}`);
+  let dialogClasses = $derived(`dialog dialog--${size}${placing === 'side' ? ' dialog--side' : ''}`);
 </script>
 
 <dialog
