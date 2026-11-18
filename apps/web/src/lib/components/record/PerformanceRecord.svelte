@@ -877,6 +877,14 @@
 
   // A trip of the same project that day lends its ends as stops, read-only,
   // with a link to it (Marco's answer 3, 18-11). Same feed as the Planner's.
+  /** The API's window is on UTC days and the stops on the venue's: a day
+      either side, then the stages are kept by the venue's day (tripStops).
+      The limit is the API's own default: a project's three days fit. */
+  const shiftDay = (iso: string, n: number) => {
+    const d = new Date(`${iso}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  };
   type TripRow = { id: string; kind: string; status: string; stages?: TripStage[] };
   const tripsQuery = createQuery(
     toStore(() => ({
@@ -885,7 +893,7 @@
       retry: false,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         fetchJSON<{ items: TripRow[] }>(
-          `/api/dates?project_ids=${perf!.project!.id}&from=${dayIso}&to=${dayIso}&spans=1&stages=1&limit=20`,
+          `/api/dates?project_ids=${perf!.project!.id}&from=${shiftDay(dayIso, -1)}&to=${shiftDay(dayIso, 1)}&spans=1&stages=1&limit=200`,
           signal,
         ),
     })),
