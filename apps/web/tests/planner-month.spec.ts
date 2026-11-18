@@ -101,8 +101,24 @@ test.describe('the month (ADR-209)', () => {
     const line = page.locator('.pstat__line');
     await expect(line).toBeVisible();
     await expect(line).toContainText(/confirmed/i);
-    await expect(line).toContainText(/nights? free/i);
+    // Four figures and no more (tarea 165): the nights free are said on the
+    // sheet, the people away are «Who's out», the trips are on their days.
+    await expect(line).not.toContainText(/nights? free|unavailable|trips?\b/i);
     expect(await line.innerText()).not.toMatch(/–/);
+  });
+
+  test('«WHO’S OUT» IS OFF UNTIL ASKED, AND REMEMBERED ON THE DEVICE (tarea 165)', async ({ page }) => {
+    await page.addInitScript(() => localStorage.removeItem('hour:planner:who-out'));
+    await open(page, '&view=month');
+    const who = page.getByTestId('month-who-out');
+    await expect(who).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.getByTestId('month-bar-absence')).toHaveCount(0);
+    await who.click();
+    await expect(who).toHaveAttribute('aria-pressed', 'true');
+    expect(await page.evaluate(() => localStorage.getItem('hour:planner:who-out'))).toBe('on');
+    await who.click();
+    await expect(who).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.getByTestId('month-bar-absence')).toHaveCount(0);
   });
 
   for (const width of [1440, 390]) {
@@ -191,7 +207,7 @@ test.describe('the month (ADR-209)', () => {
     // The page check above only catches it when the band sits on a Sunday;
     // this one holds every band, wherever it falls in the week.
     const spill = await page.evaluate(() =>
-      [...document.querySelectorAll<HTMLElement>('.cal__band')].flatMap((band) => {
+      [...document.querySelectorAll<HTMLElement>('.cal__bar')].flatMap((band) => {
         const edge = band.getBoundingClientRect().right;
         return [...band.querySelectorAll<HTMLElement>(':scope > *')]
           .filter((c) => getComputedStyle(c).display !== 'none')

@@ -753,8 +753,7 @@
 
   let allBlackouts = $derived(activeBlackoutRows);
   // The bands/rail show the scope's workspaces only; the engine reads all.
-  // Calm hides the blackout bands/lanes entirely (and, via statAwayPersons,
-  // the "away" stat) — but the conflict engine reads allBlackouts, so a real
+  // Calm hides the blackout bands/lanes entirely — but the conflict engine reads allBlackouts, so a real
   // clash against an unavailability still surfaces.
   let visibleBlackouts = $derived(
     !shows('planner', 'blackouts', calm.on)
@@ -830,6 +829,26 @@
     return KIND_KEYS.has(kind) ? t(`planner.kind_${kind}`, locale, undefined, voice) : kind.replace(/_/g, ' ');
   }
 
+  /* WHO IS OUT AND HAD A SHOW (tarea 165, Marco «Sí, en rojo», 16-11): a
+     firm absence of a PERSON over a confirmed gig they were booked on. The
+     engine already found the collision; this keeps the two halves of it —
+     the absence, whose bar goes red, and the gig, whose monogram does. */
+  let absenceHits = $derived.by(() => {
+    const confirmedPerf = new Set(
+      scopedPerfs.filter((p) => performanceStatusFamily(p.status) === 'confirmed').map((p) => p.id),
+    );
+    const blocks = new Set<string>();
+    const perfs = new Set<string>();
+    for (const c of conflicts) {
+      if (c.severity !== 'blackout' || c.person_ids.length === 0 || !c.availability_block_id) continue;
+      const hit = c.event_ids.filter((id) => confirmedPerf.has(id));
+      if (hit.length === 0) continue;
+      blocks.add(c.availability_block_id);
+      for (const id of hit) perfs.add(id);
+    }
+    return { blocks, perfs };
+  });
+
   // ── View models for the two projections ──────────────────────────────
   let blackoutVMs = $derived.by((): BlackoutBandVM[] =>
     visibleBlackouts.map((b) => {
@@ -853,6 +872,8 @@
           ? spaceName(workspaceNameById.get(b.workspace_id) ?? '—')
           : (personName ?? '—'),
         note: b.note,
+        hit: absenceHits.blocks.has(b.id),
+        workspaceId: b.workspace_id,
       };
     }),
   );
@@ -2301,6 +2322,27 @@
       // Storage disabled — in-session state still works.
     }
   }
+  /* «QUIÉN FALTA» (tarea 165): the people's absences are off the Month until
+     asked for. Per device, like the decisions drawer: it is how this reader
+     likes the sheet, not a fact about the company. */
+  const WHO_OUT_STORAGE_KEY = 'hour:planner:who-out';
+  let whoOut = $state.raw(
+    (() => {
+      try {
+        return localStorage.getItem(WHO_OUT_STORAGE_KEY) === 'on';
+      } catch {
+        return false;
+      }
+    })(),
+  );
+  function toggleWhoOut() {
+    whoOut = !whoOut;
+    try {
+      localStorage.setItem(WHO_OUT_STORAGE_KEY, whoOut ? 'on' : 'off');
+    } catch {
+      // Storage disabled — in-session state still works.
+    }
+  }
   function jumpToDecisions() {
     setDecisionsOpen(true);
     document.getElementById('cal-decisions')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -2355,16 +2397,6 @@
   // segments whose feed is absent simply drop. ──────────────────────────
   // «Next» left the head (Marco, 2026-10-18): the rail says it, and two
   // «next» on one screen with two rules read as an error (diseño M8).
-  // Distinct persons with a blackout overlapping the visible month
-  // (person-level blocks of the scope's workspaces — company closures are
-  // not a person count).
-  let statAwayPersons = $derived.by(() => {
-    const ids = new Set<string>();
-    for (const b of visibleBlackouts) {
-      if (b.person_id && b.starts_on <= monthLast && b.ends_on >= monthFirst) ids.add(b.person_id);
-    }
-    return ids.size;
-  });
   /**
    * Rows the person filter kept WITHOUT naming the person: company dates of
    * a project the pinned person is on file for, with nobody named on them
@@ -2383,16 +2415,6 @@
     let n = 0;
     for (const p of shownPerfs) if (perfPersonVerdict(p) === 'unattributed') n++;
     for (const d of shownDates) if (datePersonVerdict(d) === 'unattributed') n++;
-    return n;
-  });
-
-  let statTrips = $derived.by(() => {
-    let n = 0;
-    for (const d of scopedDates) {
-      if (d.kind !== 'travel_day' || d.status === 'cancelled') continue;
-      const day = dateDayKey(d, viewerTz);
-      if (day >= monthFirst && day <= monthLast) n++;
-    }
     return n;
   });
 
@@ -3089,6 +3111,17 @@
          (fase 4) goes here, before «Hoy». The button is `Now` in English,
          not `Today`: a view is called Today. -->
     {#snippet tools()}
+      {#if view === 'month' && shows('planner', 'blackouts', calm.on)}
+        <!-- Calm already takes every absence off the sheet; the button would
+             switch on nothing. Off by default; dark while on, so the layer is seen to be on. -->
+        <button
+          type="button"
+          class="cal__now cal__whoout hit"
+          aria-pressed={whoOut}
+          data-testid="month-who-out"
+          onclick={toggleWhoOut}>{t('planner.who_out', locale)}</button
+        >
+      {/if}
       <button type="button" class="cal__now hit" onclick={goToday}>{t('planner.now', locale)}</button>
     {/snippet}
   </LensHeader>
@@ -3214,33 +3247,11 @@
           ><b>{fig(stats.holds)}</b>
           {t(figOne(stats.holds) ? 'planner.stat_holds_one' : 'planner.stat_holds', locale)}</span
         >
-        <!-- The number about the business, not the calendar. It counts the
-             WINDOW and never the drawing, so calm does not move it. -->
-        <span class="cal__stat"
-          ><b>{fig(stats.free)}</b>
-          {t(figOne(stats.free) ? 'planner.stat_free_one' : 'planner.stat_free', locale)}</span
-        >
-        <!-- THESE TWO COUNT THE MONTH TOO, so they live inside the same gate
-             and not after it. Outside, the agenda printed `3 people away · 2
-             trips` under `from 10 aug`, the board under `no end` and
-             the Day under a single date — August's numbers on three drawings
-             that are not a month. On the board the bands are ON the sheet
-             anyway, so the counter was saying twice what one of the two
-             sayings had wrong. The Season has its own «Fuera» block. -->
-        {#if view === 'month' && figuresKnown && statAwayPersons > 0}
-          <span class="cal__stat cal__stat--soft"
-            >{statAwayPersons === 1
-              ? t('planner.stat_away_one', locale)
-              : t('planner.stat_away', locale, { z: statAwayPersons })}</span
-          >
-        {/if}
-        {#if view === 'month' && figuresKnown && statTrips > 0}
-          <span class="cal__stat cal__stat--soft"
-            >{statTrips === 1
-              ? t('planner.stat_trips_one', locale)
-              : t('planner.stat_trips', locale, { w: statTrips })}</span
-          >
-        {/if}
+        <!-- FOUR FIGURES AND NO MORE (tarea 165, Marco «Sí, las siete»):
+             por decidir and choques lead the line, and the month counts what
+             is confirmed and what is an option. Nights free, people away and
+             trips left it: the gaps are said on the sheet where they start,
+             the absences are «Quién falta», the trips are on their days. -->
         {/if}
         <!-- NOT a window count: it counts the rows actually DRAWN, so it is
              true on every view, horizon or no horizon. -->
@@ -3492,16 +3503,15 @@
       blackouts={blackoutVMs}
       aways={awayVMs}
       {clashesByDay}
-      stepsByDay={stepCounts}
-      stepsLabel={(n) => (n === 1 ? t('planner.steps_one', locale) : t('planner.steps_n', locale, { n }))}
+      showAbsences={whoOut}
+      absenceHitIds={absenceHits.perfs}
+      closedWord={t('planner.bar_closed', locale)}
+      closedShortWord={t('planner.bar_closed_short', locale)}
+      moreAbsentLabel={(n) => t('planner.bar_more_absent', locale, { n })}
       locale={localeTag}
       dateKindLabel={kindLabel}
       createLabel={(iso) => t('planner.new_on', locale, { day: dayMonthLong(iso, localeTag) })}
       openDayLabel={(iso) => t('planner.open_day', locale, { day: spokenDay(iso) })}
-      runUntilLabel={(iso, n) =>
-        `${t('planner.band_until', locale, { day: localeDayMonth(iso, localeTag) })} · ${n} ${t('block.days_unit', locale)}`}
-      runFromLabel={(iso, n) =>
-        `${t('planner.run_from', locale, { day: localeDayMonth(iso, localeTag) })} · ${n} ${t('block.days_unit', locale)}`}
       stateLabel={(status) => {
         const key = statusFootKey(status);
         return key ? t(key, locale) : null;
@@ -3509,9 +3519,7 @@
       moreLabel={t('planner.more_n', locale)}
       releasedLabel={t('planner.released', locale)}
       expiresLabel={(iso) => holdDeadlineLabel(iso, todayIso, locale, localeTag, true)}
-      awayWord={t('planner.band_away', locale)}
-      tourWord={t('planner.band_tour', locale)}
-      untilLabel={(day) => t('planner.band_until', locale, { day })}
+      tourWord={t('planner.bar_tour', locale)}
     />
   {:else if view === 'agenda'}
     <AgendaList
@@ -3681,6 +3689,12 @@
   }
   .cal__now:hover {
     color: var(--text-color);
+  }
+  /* «Quién falta» on: dark, so the layer is seen to be on (the drawing). */
+  .cal__whoout[aria-pressed='true'] {
+    background: var(--text-color);
+    border-color: var(--text-color);
+    color: var(--bg);
   }
   .cal__daytitle {
     margin: 0;

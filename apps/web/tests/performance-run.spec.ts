@@ -98,7 +98,7 @@ test.describe('a performance that lasts several days (ADR-084 §1)', () => {
     expect([...series][0], 'and it must not be null').toBeTruthy();
   });
 
-  test('the month draws it as ONE band, not three cards', async ({ page }) => {
+  test('the month draws it as ONE bar, not three cards (tarea 165: one line, no hours)', async ({ page }) => {
     test.setTimeout(90_000);
     await page.goto(`/h/planner?view=month&ym=2031-05&scope=${FIXTURE_SPACE_TOKEN}`);
     await waitForLoaded(page);
@@ -109,17 +109,17 @@ test.describe('a performance that lasts several days (ADR-084 §1)', () => {
       );
       return {
         bands: runs.length,
-        days: runs[0]?.querySelectorAll('.cal__run-d').length ?? 0,
-        links: runs[0]?.querySelectorAll('a.cal__run-d').length ?? 0,
+        links: runs[0]?.querySelectorAll('a.cal__bar-door').length ?? 0,
+        lines: runs[0] ? Math.round(runs[0].getBoundingClientRect().height / parseFloat(getComputedStyle(runs[0]).lineHeight)) : 0,
         cards: [...document.querySelectorAll('.cal__day .slip')].filter((el) =>
           (el.textContent ?? '').includes(v),
         ).length,
       };
     }, venue);
     expect(seen.bands, 'the run is one element').toBe(1);
-    expect(seen.days, 'and it carries a cell per day').toBe(3);
-    // Una función TIENE página, así que cada día de la banda es un enlace.
+    // Una función TIENE página: cada día de la barra es un enlace a su día.
     expect(seen.links, 'each day of a gig run is a link, not a button').toBe(3);
+    expect(seen.lines, 'and it is one line: the hours are the Day’s').toBeLessThanOrEqual(1);
     expect(seen.cards, 'and it does not ALSO draw as loose cards').toBe(0);
   });
 });

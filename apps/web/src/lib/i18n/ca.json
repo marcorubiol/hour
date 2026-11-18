@@ -143,7 +143,6 @@
   "planner.load_error": "No s'ha pogut carregar el calendari.",
   "planner.open_day": "Obre el dia {day}",
   "planner.pick_day": "Vés a un altre dia",
-  "planner.run_from": "des de {day}",
   "planner.lid_empty": "buit",
   "planner.note_private": "privada",
   "planner.agenda_notes": "Notes",
@@ -367,10 +366,6 @@
   "planner.stat_decide": "{n} per decidir",
   "planner.stat_urgent": "{m} urgents",
   "planner.stat_urgent_one": "1 urgent",
-  "planner.stat_away": "{z} persones no disponibles",
-  "planner.stat_away_one": "1 persona no disponible",
-  "planner.stat_trips": "{w} viatges",
-  "planner.stat_trips_one": "1 viatge",
   "planner.stat_unattributed": "{n} per espectacle, sense repartiment",
   "planner.stat_unattributed@music": "{n} per projecte, sense formació",
   "planner.stat_unattributed@mixed": "{n} per projecte, sense repartiment ni formació",
@@ -486,7 +481,6 @@
   "planner.marks_held": "demanat, sense confirmar",
   "planner.marks_clash": "hi ha una trucada a fer",
   "planner.stat_holds_one": "opció",
-  "planner.stat_free_one": "nit lliure",
   "planner.stat_free": "nits lliures",
   "planner.week_confirmed": "confirmats",
   "planner.week_confirmed_one": "confirmat",
@@ -3640,5 +3634,10 @@
   "calm.mark_aria": "Calma",
   "desk.outside_clear": "Treure l’àmbit",
   "planner.month_gap_short": "{n} lliures",
-  "help.card.planner_step_3": "Agenda, Mes i Tauler: tres maneres de dibuixar el mateix. Toca un dia a qualsevol per obrir-lo sencer."
+  "help.card.planner_step_3": "Agenda, Mes i Tauler: tres maneres de dibuixar el mateix. Toca un dia a qualsevol per obrir-lo sencer.",
+  "planner.who_out": "Qui falta",
+  "planner.bar_tour": "gira",
+  "planner.bar_closed": "companyia tancada",
+  "planner.bar_closed_short": "tancat",
+  "planner.bar_more_absent": "+{n} més"
 }
