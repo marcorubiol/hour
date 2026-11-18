@@ -100,4 +100,21 @@ test.describe('the agenda (ADR-211)', () => {
     );
     expect(hits, 'days whose ＋ is drawn on the number').toEqual([]);
   });
+
+  test('THE «·» GOES DOWN WITH ITS AMBER WORD, never hangs at a line end (390 px)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await agenda(page);
+    const words = page.getByTestId('agenda-missing');
+    test.skip((await words.count()) === 0, 'nothing missing in the window');
+    // Each separator and its word share one line box: a wrap moves both.
+    const split = await page.evaluate(() =>
+      [...document.querySelectorAll<HTMLElement>('.ag__miss')].filter((el) => {
+        const r = document.createRange();
+        r.selectNodeContents(el);
+        const tops = new Set([...r.getClientRects()].map((b) => Math.round(b.top)));
+        return tops.size > 1;
+      }).length,
+    );
+    expect(split, 'separators split from their word').toBe(0);
+  });
 });
