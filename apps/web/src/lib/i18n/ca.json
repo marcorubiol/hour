@@ -3640,5 +3640,21 @@
   "planner.bar_tour": "gira",
   "planner.bar_closed": "companyia tancada",
   "planner.bar_closed_short": "tancat",
-  "planner.bar_more_absent": "+{n} més"
+  "planner.bar_more_absent": "+{n} més",
+  "pass.label": "Pas de la funció",
+  "pass.no_time": "sense hora",
+  "pass.ready": "A punt per sortir",
+  "pass.ready_count": "{n} de {m}",
+  "pass.box_done": "fet",
+  "pass.box_open": "falta",
+  "pass.box_status": "Estat",
+  "pass.box_hours": "Hores",
+  "pass.box_team": "Equip",
+  "pass.box_sheet": "Full",
+  "pass.line_status": "Sense confirmar",
+  "pass.when_today": "avui",
+  "pass.when_tomorrow": "demà",
+  "pass.when_yesterday": "ahir",
+  "pass.when_in": "d'aquí a {n} dies",
+  "pass.when_ago": "fa {n} dies"
 }

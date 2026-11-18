@@ -12,7 +12,6 @@
    * completa» lands on the same head, facts, «Falta» and blocks.
    */
 
-  import StateBadge, { stateBadgeClass } from '$lib/components/StateBadge.svelte';
   import { docTitle } from '$lib/doc-title';
   import { goto } from '$app/navigation';
   import { closePeek } from '$lib/peek.svelte';
@@ -68,9 +67,18 @@
   import { spaceCrumb, type Crumb } from '$lib/record-crumbs';
   import { isGuestIn } from '$lib/workspace-role';
   import Fold from '$lib/components/Fold.svelte';
-  import MissingBand, { type MissingItem } from '$lib/components/MissingBand.svelte';
+  import RecordPass, { passToneVar, type PassAct, type PassBox, type PassLine } from './RecordPass.svelte';
+  import { daysBetween } from '$lib/away';
+  import { mapsHref, telHref, venueCall } from '$lib/ahora';
   import { hasJsonContent } from '$lib/components/JsonKV.svelte';
-  import { performanceMissing, type PerformanceMissing } from '$lib/record-missing';
+  import {
+    MISSING_MAX,
+    performanceMissing,
+    performanceReadiness,
+    type PerformanceMissing,
+    type PerformanceMissingInput,
+    type ReadinessBox,
+  } from '$lib/record-missing';
   import { shareExpired, type RoadsheetShare } from '$lib/roadsheet';
 
   type PersonEmbed = {
@@ -694,28 +702,28 @@
   );
 
   const today = localDayISO();
-  let missing = $derived<PerformanceMissing[]>(
+  let missingInput = $derived<PerformanceMissingInput | null>(
     perf && bundle
-      ? performanceMissing(
-          {
-            status: perf.status,
-            day: perf.performed_at,
-            hold_notice_days: perf.hold_notice_days,
-            roster: performanceRoster(bundle),
-            commitments: perf.commitments,
-            start_at: perf.start_at,
-            hasBolo: boloReadable ? currentBoloId !== null : null,
-            // An expired link opens nothing (ADR-163 § 2): it does not count.
-            roadsheetLinks: $sharesQuery.isSuccess
-              ? $sharesQuery.data.items.filter((l) => !shareExpired(l.expires_at)).length
-              : null,
-          },
-          today,
-        )
-      : [],
+      ? {
+          status: perf.status,
+          day: perf.performed_at,
+          hold_notice_days: perf.hold_notice_days,
+          roster: performanceRoster(bundle),
+          commitments: perf.commitments,
+          start_at: perf.start_at,
+          hasBolo: boloReadable ? currentBoloId !== null : null,
+          // An expired link opens nothing (ADR-163 § 2): it does not count.
+          roadsheetLinks: $sharesQuery.isSuccess
+            ? $sharesQuery.data.items.filter((l) => !shareExpired(l.expires_at)).length
+            : null,
+        }
+      : null,
   );
+  let missing = $derived<PerformanceMissing[]>(missingInput ? performanceMissing(missingInput, today) : []);
+  // El talón del pase: las casillas, derivadas de lo mismo que «Falta».
+  let readiness = $derived<ReadinessBox[]>(missingInput ? performanceReadiness(missingInput, today) : []);
 
-  function missingItem(m: PerformanceMissing): MissingItem {
+  function missingItem(m: PerformanceMissing): PassLine {
     switch (m.kind) {
       case 'hold_deadline':
         return {
@@ -758,6 +766,68 @@
     }
   }
   let missingItems = $derived(missing.map(missingItem));
+
+  // ── El pase (brief ficha-pase, fase 1) ─────────────────────────────────
+  const BOX_LABEL: Record<ReadinessBox['id'], string> = {
+    status: 'pass.box_status',
+    hours: 'pass.box_hours',
+    team: 'pass.box_team',
+    sheet: 'pass.box_sheet',
+  };
+  let passBoxes = $derived<PassBox[]>(readiness.map((b) => ({ id: b.id, label: t(BOX_LABEL[b.id], locale), done: b.done })));
+
+  /** One line per open box, with its verb, then what the stub has no box for
+      («sin bolo»); never more than `MISSING_MAX` (ADR-139 § 2). */
+  function boxLine(b: ReadinessBox): PassLine | null {
+    switch (b.id) {
+      case 'status':
+        if (b.holdDay) return missingItem({ kind: 'hold_deadline', day: b.holdDay });
+        return {
+          id: 'status',
+          text: t('pass.line_status', locale),
+          verbs: [{ label: t('record.verb_confirm', locale), onclick: () => changeStatus('confirmed'), disabled: $patchMutation.isPending }],
+        };
+      case 'hours':
+        return missingItem({ kind: 'no_time' });
+      case 'team':
+        return missingItem({ kind: 'nobody_going' });
+      case 'sheet':
+        return missingItem({ kind: 'roadsheet_unshared' });
+    }
+  }
+  let passLines = $derived<PassLine[]>(
+    canEdit
+      ? [
+          ...readiness.filter((b) => !b.done).flatMap((b) => boxLine(b) ?? []),
+          ...missing.filter((m) => m.kind === 'no_bolo').map(missingItem),
+        ].slice(0, MISSING_MAX)
+      : [],
+  );
+
+  let passWhen = $derived.by(() => {
+    if (!perf) return '';
+    const d = daysBetween(today, perf.performed_at.slice(0, 10));
+    if (d === 0) return t('pass.when_today', locale);
+    if (d === 1) return t('pass.when_tomorrow', locale);
+    if (d === -1) return t('pass.when_yesterday', locale);
+    return t(d > 0 ? 'pass.when_in' : 'pass.when_ago', locale, { n: Math.abs(d) });
+  });
+  let passPlace = $derived(
+    [perf?.venue?.name ?? perf?.venue_name, placeLine].filter(Boolean).join(' · '),
+  );
+  let passActs = $derived.by<PassAct[]>(() => {
+    if (!perf) return [];
+    const out: PassAct[] = [];
+    const call = venueCall(perf.venue?.contacts);
+    if (call?.phone) {
+      out.push({ id: 'call', label: t('ahora.call', locale), href: telHref(call.phone), ariaLabel: t('ahora.call_aria', locale, { name: call.name }) });
+    }
+    const v = perf.venue;
+    const mapParts = v?.address ? [v.address, v.city ?? perf.city] : [v?.name ?? perf.venue_name, v?.city ?? perf.city];
+    if (mapsHref(mapParts) !== null) out.push({ id: 'map', label: t('ahora.map', locale), map: mapParts });
+    out.push({ id: 'sheet', label: t('ahora.sheet', locale), href: `/h/${workspaceSlug}/performance/${slug}/roadsheet`, ariaLabel: t('roadsheet.open', locale) });
+    return out;
+  });
 
   // «Detalles»: lo de consulta, plegado. Cerrado, dice lo que guarda.
   let detailsOpen = $state(false);
@@ -823,59 +893,6 @@
            de siempre con su menú (ADR-130 § 2, tarea 134), el cuándo y el dónde abren los datos, el bolo se
            elige en sitio. La sala no: es el título. -->
       {#snippet facts()}
-        {#if canEdit}
-          <Menu
-            label={t('perf.status_menu', locale, { status: performanceStatusLabel(perf!.status, locale) })}
-            triggerClass={stateBadgeClass(performanceStatusTone(perf!.status))}
-            triggerAttrs={{ 'data-testid': 'perf-status' }}
-          >
-            {#snippet trigger()}{performanceStatusLabel(perf!.status, locale)}<span class="status-caret" aria-hidden="true">▾</span>{/snippet}
-            {#snippet children({ close })}
-              <!-- «Facturado» y «cobrado» son del bolo: se leen en el trigger si
-                   la función ya los tiene, no se ofrecen (Marco, 2026-10-20). -->
-              {#each PERFORMANCE_MENU_STATUSES as s (s)}
-                <li role="none">
-                  <button
-                    type="button"
-                    role="menuitem"
-                    class="menu__item{s === perf!.status ? ' menu__item--active' : ''}"
-                    onclick={() => {
-                      close();
-                      changeStatus(s);
-                    }}
-                  >
-                    {performanceStatusLabel(s, locale)}
-                  </button>
-                </li>
-              {/each}
-            {/snippet}
-          </Menu>
-        {:else}
-          <span data-testid="perf-status"
-            ><StateBadge label={performanceStatusLabel(perf!.status, locale)} tone={performanceStatusTone(perf!.status)} /></span
-          >
-        {/if}
-        {#if canEdit}
-          <span
-            ><button type="button" class="fact-act" aria-label={t('record.edit_when', locale)} onclick={openEdit}
-              >{dayLabel(perf!.performed_at, 'short')}</button
-            ></span
-          >
-        {:else}
-          <span>{dayLabel(perf!.performed_at, 'short')}</span>
-        {/if}
-        {#if startTime}<span class="perf__time">{startTime}</span>{/if}
-        {#if placeLine}
-          {#if canEdit}
-            <span
-              ><button type="button" class="fact-act" aria-label={t('record.edit_where', locale)} onclick={openEdit}
-                >{placeLine}</button
-              ></span
-            >
-          {:else}
-            <span>{placeLine}</span>
-          {/if}
-        {/if}
         {#if withWhom}
           <span data-testid="perf-with"
             >{t('perf.with', locale)} <a class="lenshead__frag" href={withWhom.href}>{withWhom.name}</a></span
@@ -920,11 +937,64 @@
           </span>
         {/if}
       {/snippet}
-      {#snippet band()}
-        <!-- «Falta» is a list of what to do here: only for whoever can. -->
-        <MissingBand items={canEdit ? missingItems : []} {locale} />
-      {/snippet}
     </RecordHead>
+
+    <!-- El pase (brief ficha-pase, fase 1): la pieza llena con la hora, el
+         estado como etiqueta, el talón «Listo N de M» y las acciones. Sustituye
+         a la línea de datos y a «Falta»; lo demás de la ficha sigue igual. -->
+    <RecordPass
+      {locale}
+      project={perf.project}
+      eyebrow={`${t('perf.label', locale)} · ${passWhen}`}
+      date={dayLabel(perf.performed_at, 'short')}
+      time={startTime}
+      show={perf.project?.name ?? null}
+      place={passPlace}
+      onEditDate={canEdit ? openEdit : null}
+      onEditPlace={canEdit ? openEdit : null}
+      editDateLabel={t('record.edit_when', locale)}
+      editPlaceLabel={t('record.edit_where', locale)}
+      acts={passActs}
+      boxes={passBoxes}
+      lines={passLines}
+    >
+      {#snippet tag()}
+        {#if canEdit}
+          <Menu
+            label={t('perf.status_menu', locale, { status: performanceStatusLabel(perf!.status, locale) })}
+            triggerClass="pass__tag"
+            triggerAttrs={{ 'data-testid': 'perf-status', style: `--pass-tone: ${passToneVar(performanceStatusTone(perf!.status))}` }}
+          >
+            {#snippet trigger()}{performanceStatusLabel(perf!.status, locale)}<span class="status-caret" aria-hidden="true">▾</span>{/snippet}
+            {#snippet children({ close })}
+              <!-- «Facturado» y «cobrado» son del bolo: se leen en el trigger si
+                   la función ya los tiene, no se ofrecen (Marco, 2026-10-20). -->
+              {#each PERFORMANCE_MENU_STATUSES as s (s)}
+                <li role="none">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    class="menu__item{s === perf!.status ? ' menu__item--active' : ''}"
+                    onclick={() => {
+                      close();
+                      changeStatus(s);
+                    }}
+                  >
+                    {performanceStatusLabel(s, locale)}
+                  </button>
+                </li>
+              {/each}
+            {/snippet}
+          </Menu>
+        {:else}
+          <span
+            class="pass__tag"
+            data-testid="perf-status"
+            style={`--pass-tone: ${passToneVar(performanceStatusTone(perf!.status))}`}>{performanceStatusLabel(perf!.status, locale)}</span
+          >
+        {/if}
+      {/snippet}
+    </RecordPass>
 
     <!-- ADR-103: «quién va», con el reparto al lado. Sube: es lo que se
          decide (ADR-139 p2); `#who-goes` es donde cae la línea de choques
@@ -1224,11 +1294,6 @@
 
 <style>
   @layer components {
-    .perf__time {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing);
-    }
     .perf__bolo-fact {
       display: inline-flex;
       align-items: baseline;

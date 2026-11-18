@@ -3640,5 +3640,21 @@
   "planner.bar_tour": "gira",
   "planner.bar_closed": "compañía cerrada",
   "planner.bar_closed_short": "cerrado",
-  "planner.bar_more_absent": "+{n} más"
+  "planner.bar_more_absent": "+{n} más",
+  "pass.label": "Pase de la función",
+  "pass.no_time": "sin hora",
+  "pass.ready": "Listo para salir",
+  "pass.ready_count": "{n} de {m}",
+  "pass.box_done": "hecho",
+  "pass.box_open": "falta",
+  "pass.box_status": "Estado",
+  "pass.box_hours": "Horas",
+  "pass.box_team": "Equipo",
+  "pass.box_sheet": "Hoja",
+  "pass.line_status": "Sin confirmar",
+  "pass.when_today": "hoy",
+  "pass.when_tomorrow": "mañana",
+  "pass.when_yesterday": "ayer",
+  "pass.when_in": "en {n} días",
+  "pass.when_ago": "hace {n} días"
 }
