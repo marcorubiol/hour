@@ -959,6 +959,7 @@
   "organization.projects": "Spectacles",
   "organization.projects@music": "Projets",
   "organization.contacts": "Contacts",
+  "organization.notes": "Note de l'équipe",
   "organization.no_contacts": "Aucun contact.",
   "organization.no_conversations": "Aucune conversation.",
   "organization.contact_until": "jusqu’au {date}",

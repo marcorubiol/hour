@@ -494,6 +494,15 @@
       {/if}
     </section>
 
+    {#if org.notes?.trim()}
+      <!-- The team's note (138, Marco 18-11): kept where the import put it
+           (`workspace_organization.notes`) and, until now, drawn nowhere. -->
+      <section class="organization__section" aria-label={t('organization.notes', locale)} data-testid="organization-notes">
+        <BlockHead title={t('organization.notes', locale)} />
+        <p class="organization__note">{org.notes}</p>
+      </section>
+    {/if}
+
     <div class="organization__section" bind:this={fiscalEl} id="fiscal">
       {#key fiscalStart}
         <FiscalIdentity
@@ -614,6 +623,13 @@
     .organization__gone .organization__row-name,
     .organization__gone .organization__row-main {
       color: var(--text-muted);
+    }
+
+    .organization__note {
+      margin: 0;
+      font-size: var(--text-s);
+      white-space: pre-line;
+      overflow-wrap: anywhere;
     }
 
     .organization__details li {

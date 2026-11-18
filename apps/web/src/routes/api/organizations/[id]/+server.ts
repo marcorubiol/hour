@@ -51,7 +51,7 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
 
   try {
     const orgSearch = new URLSearchParams({
-      select: 'id,workspace_id,slug,name,kind,city,country,email,phone,website,address',
+      select: 'id,workspace_id,slug,name,kind,city,country,email,phone,website,address,notes',
       workspace_id: `eq.${workspaceId}`,
       deleted_at: 'is.null',
       limit: '1',

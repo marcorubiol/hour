@@ -994,6 +994,7 @@
   "organization.projects": "Shows",
   "organization.projects@music": "Projects",
   "organization.contacts": "Contacts",
+  "organization.notes": "Team note",
   "organization.no_contacts": "No contacts.",
   "organization.no_conversations": "No conversations.",
   "organization.contact_until": "until {date}",
