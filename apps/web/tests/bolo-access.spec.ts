@@ -118,10 +118,13 @@ test.describe('el acceso al bolo (comms carril 2, fase 2)', () => {
     test.setTimeout(60_000);
     await page.goto(`/h/playwright/performance/${perf!.slug}`);
     await waitForLoaded(page);
-    const board = page.locator('section.board');
+    // El tablón vive en la hoja de «Hablar» (ADR-214).
+    await page.getByTestId('pass-talk').click();
+    const board = page.locator('dialog[open] section.board');
     await board.getByRole('button', { name: /add someone|añadir a alguien|afegir algú|ajouter quelqu/i }).click();
 
-    const dialog = page.locator('dialog[open]');
+    // Encima de la hoja: el último diálogo abierto.
+    const dialog = page.locator('dialog[open]').last();
     await dialog.locator('input[type=email]').fill(LIMITED_EMAIL!);
     await dialog.getByRole('radio', { name: /minimal|mínimo|mínim/i }).check();
     const created = page.waitForResponse(
@@ -165,7 +168,8 @@ test.describe('el acceso al bolo (comms carril 2, fase 2)', () => {
     test.skip(!inviteUrl, 'needs the previous tests');
     await page.goto(`/h/playwright/performance/${perf!.slug}`);
     await waitForLoaded(page);
-    const access = page.locator('section.board .access');
+    await page.getByTestId('pass-talk').click();
+    const access = page.locator('dialog[open] section.board .access');
     const row = access.locator('.access__row').first();
     await expect(row).toBeVisible();
     await expect(access.locator('.access__row--pending')).toHaveCount(0);
@@ -175,7 +179,7 @@ test.describe('el acceso al bolo (comms carril 2, fase 2)', () => {
     const removed = page.waitForResponse(
       (r) => r.url().includes(`/api/bolos/${boloId}/access`) && r.request().method() === 'DELETE',
     );
-    await page.locator('dialog[open]').getByRole('button', { name: /^(remove|quitar|treure|retirer)$/i }).click();
+    await page.locator('dialog[open]').last().getByRole('button', { name: /^(remove|quitar|treure|retirer)$/i }).click();
     expect((await removed).status()).toBe(204);
     await expect(access.locator('.access__row')).toHaveCount(0);
   });

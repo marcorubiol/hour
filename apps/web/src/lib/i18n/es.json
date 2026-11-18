@@ -3677,5 +3677,11 @@
   "pass.change_venue": "Cambiar de sala…",
   "pass.change_venue_title": "Cambiar de sala",
   "pass.done": "Listo",
-  "pass.saved": "Guardado"
+  "pass.saved": "Guardado",
+  "pass.talk": "Hablar",
+  "pass.talk_new": "Hablar, {n} nuevos",
+  "pass.talk_title": "Hablar con…",
+  "threads.count": "{n} mensajes",
+  "threads.empty_short": "sin mensajes",
+  "threads.pick": "Elegir el hilo"
 }
