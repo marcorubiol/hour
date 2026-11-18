@@ -3677,5 +3677,6 @@
   "pass.change_venue": "Cambiar de sala…",
   "pass.change_venue_title": "Cambiar de sala",
   "pass.done": "Listo",
-  "pass.saved": "Guardado"
+  "pass.saved": "Guardado",
+  "pass.put_place": "Poner lugar"
 }

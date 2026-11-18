@@ -3677,5 +3677,6 @@
   "pass.change_venue": "Change venue…",
   "pass.change_venue_title": "Change venue",
   "pass.done": "Done",
-  "pass.saved": "Saved"
+  "pass.saved": "Saved",
+  "pass.put_place": "Add a place"
 }

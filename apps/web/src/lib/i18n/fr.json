@@ -3677,5 +3677,6 @@
   "pass.change_venue": "Changer de salle…",
   "pass.change_venue_title": "Changer de salle",
   "pass.done": "OK",
-  "pass.saved": "Enregistré"
+  "pass.saved": "Enregistré",
+  "pass.put_place": "Ajouter un lieu"
 }
