@@ -3640,5 +3640,21 @@
   "planner.bar_tour": "tour",
   "planner.bar_closed": "company closed",
   "planner.bar_closed_short": "closed",
-  "planner.bar_more_absent": "+{n} more"
+  "planner.bar_more_absent": "+{n} more",
+  "pass.label": "Performance pass",
+  "pass.no_time": "no start time",
+  "pass.ready": "Ready to go",
+  "pass.ready_count": "{n} of {m}",
+  "pass.box_done": "done",
+  "pass.box_open": "missing",
+  "pass.box_status": "Status",
+  "pass.box_hours": "Times",
+  "pass.box_team": "Team",
+  "pass.box_sheet": "Sheet",
+  "pass.line_status": "Not confirmed",
+  "pass.when_today": "today",
+  "pass.when_tomorrow": "tomorrow",
+  "pass.when_yesterday": "yesterday",
+  "pass.when_in": "in {n} days",
+  "pass.when_ago": "{n} days ago"
 }

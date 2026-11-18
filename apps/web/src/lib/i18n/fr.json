@@ -3640,5 +3640,21 @@
   "planner.bar_tour": "tournée",
   "planner.bar_closed": "compagnie fermée",
   "planner.bar_closed_short": "fermé",
-  "planner.bar_more_absent": "+{n} de plus"
+  "planner.bar_more_absent": "+{n} de plus",
+  "pass.label": "Pass de la représentation",
+  "pass.no_time": "sans heure",
+  "pass.ready": "Prêt à partir",
+  "pass.ready_count": "{n} sur {m}",
+  "pass.box_done": "fait",
+  "pass.box_open": "manque",
+  "pass.box_status": "Statut",
+  "pass.box_hours": "Horaires",
+  "pass.box_team": "Équipe",
+  "pass.box_sheet": "Feuille",
+  "pass.line_status": "Pas confirmé",
+  "pass.when_today": "aujourd'hui",
+  "pass.when_tomorrow": "demain",
+  "pass.when_yesterday": "hier",
+  "pass.when_in": "dans {n} jours",
+  "pass.when_ago": "il y a {n} jours"
 }

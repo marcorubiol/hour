@@ -8,6 +8,7 @@ import {
   lineMissing,
   missingSoon,
   performanceMissing,
+  performanceReadiness,
   personMissing,
   stepShortcuts,
   stepsDue,
@@ -117,6 +118,68 @@ describe('performanceMissing', () => {
 
   it('a roster the reader cannot know asks for nobody', () => {
     expect(performanceMissing(perf({ roster: null }), TODAY)).toEqual([]);
+  });
+});
+
+describe('performanceReadiness · the stub of the pass', () => {
+  const box = (id: string, done: boolean, verb: string) => ({ id, done, verb });
+  const ready = (over: Partial<PerformanceMissingInput> = {}) => performanceReadiness(perf({ start_at: '2026-11-19T19:00:00Z', ...over }), TODAY);
+
+  it('a ready confirmed performance: four boxes, all done', () => {
+    expect(ready()).toEqual([
+      box('status', true, 'confirm'),
+      box('hours', true, 'add_time'),
+      box('team', true, 'sign_up'),
+      box('sheet', true, 'share'),
+    ]);
+  });
+
+  it('each missing thing is an open box with its verb', () => {
+    const open = ready({ day: addDaysIso(TODAY, 3), start_at: null, roster: [], roadsheetLinks: 0 });
+    expect(open).toEqual([
+      box('status', true, 'confirm'),
+      box('hours', false, 'add_time'),
+      box('team', false, 'sign_up'),
+      box('sheet', false, 'share'),
+    ]);
+  });
+
+  it('a «voy» fills the team box without a roster', () => {
+    const b = ready({ roster: [], commitments: [{ person_id: 'p2', state: 'going' }] });
+    expect(b.find((x) => x.id === 'team')?.done).toBe(true);
+  });
+
+  it('a hold: status is open (with its deadline when close), team and sheet are not asked yet', () => {
+    const b = ready({ status: 'hold', day: addDaysIso(TODAY, 35), roster: [], roadsheetLinks: null });
+    expect(b).toEqual([{ ...box('status', false, 'confirm'), holdDay: addDaysIso(TODAY, 5) }, box('hours', true, 'add_time')]);
+    expect(ready({ status: 'proposed' })[0]).toEqual(box('status', false, 'confirm'));
+  });
+
+  it('a box the reader cannot know is not drawn', () => {
+    const ids = (over: Partial<PerformanceMissingInput>) => ready(over).map((x) => x.id);
+    expect(ids({ roster: null })).toEqual(['status', 'hours', 'sheet']);
+    expect(ids({ roadsheetLinks: null })).toEqual(['status', 'hours', 'team']);
+    expect(performanceReadiness(perf(), TODAY).map((x) => x.id)).toEqual(['status', 'team', 'sheet']); // start_at undefined
+  });
+
+  it('an unshared sheet is a box only within the share window; with a link it is done at any distance', () => {
+    const far = addDaysIso(TODAY, ROADSHEET_SHARE_DAYS + 1);
+    expect(ready({ day: far, roadsheetLinks: 0 }).map((x) => x.id)).toEqual(['status', 'hours', 'team']);
+    expect(ready({ day: far, roadsheetLinks: 2 }).at(-1)).toEqual(box('sheet', true, 'share'));
+    expect(ready({ day: addDaysIso(TODAY, ROADSHEET_SHARE_DAYS), roadsheetLinks: 0 }).at(-1)).toEqual(box('sheet', false, 'share'));
+  });
+
+  it('cancelled and past performances have no stub; today still does', () => {
+    expect(ready({ status: 'cancelled' })).toEqual([]);
+    expect(ready({ day: addDaysIso(TODAY, -1) })).toEqual([]);
+    expect(ready({ day: TODAY })).not.toEqual([]);
+  });
+
+  it('agrees with «Falta»: whatever it asks of a confirmed one is an open box', () => {
+    const input = perf({ day: addDaysIso(TODAY, 7), roster: [], roadsheetLinks: 0, start_at: null });
+    const open = performanceReadiness(input, TODAY).filter((b) => !b.done).map((b) => b.id);
+    expect(open).toEqual(['hours', 'team', 'sheet']);
+    expect(performanceMissing(input, TODAY).map((m) => m.kind)).toEqual(['no_time', 'roadsheet_unshared', 'nobody_going']);
   });
 });
 

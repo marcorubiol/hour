@@ -8133,3 +8133,25 @@ solo el punto de Hoy se calla. El panel del Día al lado (fase 3) ocupará la co
 
 **Cómo se revierte.** Revertir la rama: vuelven el diario de bandas y `agenda-chunks`; `CACHE_SCHEMA` sube otra vez
 al revertir; ninguna migración.
+
+## [2026-11-18] ADR-212 · La ficha de la función es un «pase»: la pieza llena y el talón «Listo N de M» (fase 1; amplía ADR-139 p2 y ADR-211 § 3)
+Encargo y dibujo: `build/coordination/ficha-pase/brief.md` (Marco, 18-11).
+
+1. **La pieza y el talón sustituyen a la línea de datos y a «Falta»** en la ficha de la función (`RecordPass.svelte`).
+   La pieza es la única superficie `--surface-focus` de la pantalla (ADR-209): monograma, «Función · en N días», el
+   **estado como etiqueta** que abre el menú de estados de siempre (mismo `data-testid="perf-status"`), la hora en
+   Newsreader con la fecha encima en mono, el espectáculo, la sala y la ciudad, y las acciones (Llamar, Mapa, Hoja,
+   solo con dato). Sin hora manda la fecha y «sin hora» va en ámbar. La fecha y el lugar siguen abriendo «Editar
+   datos» hasta la fase 2. «Con <organización>» y el bolo se quedan en la línea bajo el título.
+2. **`performanceReadiness`** (`record-missing.ts`) deriva las casillas de lo que la página ya lee: Estado
+   (confirmada), Horas (`start_at`), Equipo (roster o un «voy») y Hoja (enlace vivo). Es la misma lectura que
+   `performanceMissing`: lo que un lector no puede saber llega `null` y su casilla no se dibuja; Equipo y Hoja solo
+   se piden a una confirmada, y Hoja solo dentro de `ROADSHEET_SHARE_DAYS`. Cancelada o pasada: sin talón.
+3. **Hotel y Técnica quedan fuera de la barra** hasta que tengan estructura (Marco, 18-11): son JSON libres y una
+   casilla verde por cualquier texto engaña.
+4. **El tope de «Falta» sigue en tres líneas** (`MISSING_MAX`): la barra enseña todas las casillas; las líneas con
+   verbo, tres. Cada casilla abierta tiene su línea; «sin bolo» (que no es casilla) cuenta en el mismo tope.
+5. **«Hablar» no está en esta fase** (fase 3, con la hoja del tablón y el contador de sin leer).
+
+**Cómo se revierte.** Revertir el PR: vuelven la línea de datos y `MissingBand` en la ficha. Sin esquema ni API;
+`CACHE_SCHEMA` no cambia.

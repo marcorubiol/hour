@@ -92,6 +92,63 @@ export function performanceMissing(input: PerformanceMissingInput, today: string
   return out.slice(0, MISSING_MAX);
 }
 
+// ── El talón: «Listo para salir, N de M» ───────────────────────────────────
+
+/** The boxes of a performance's stub (the «pase», ADR-139 p2), in this order. */
+export type ReadinessId = 'status' | 'hours' | 'team' | 'sheet';
+
+/** The word that settles a box; the page says it (i18n) and wires what it does. */
+export type ReadinessVerb = 'confirm' | 'add_time' | 'sign_up' | 'share';
+
+export interface ReadinessBox {
+  id: ReadinessId;
+  done: boolean;
+  verb: ReadinessVerb;
+  /** `status` of a hold whose decide-by day is close: the day, for the line's meta. */
+  holdDay?: string;
+}
+
+/**
+ * The stub's boxes: «Estado» (confirmed), «Horas» (somebody wrote when it
+ * starts), «Equipo» (a roster or a «voy») and «Hoja» (the road sheet has a
+ * live link). Derived from what the page already reads; nothing is stored.
+ *
+ * It is the same reading as `performanceMissing` (one rule, ADR-211 § 3): a
+ * box a reader cannot know (`roster`/`roadsheetLinks` arrive `null`,
+ * `start_at` undefined) is not drawn, as «Falta» asks nothing of it. Team and
+ * sheet are asked only of a confirmed one (a hold is not that far yet), and
+ * the sheet only within `ROADSHEET_SHARE_DAYS`; with a link it is a done box
+ * at any distance. Hotel and technical are NOT boxes: they are free JSON
+ * that can only be «empty or not» (ADR-164 § 2; brief, question 2).
+ *
+ * A cancelled or past performance has no stub: nothing is «about to leave».
+ */
+export function performanceReadiness(input: PerformanceMissingInput, today: string): ReadinessBox[] {
+  if (input.status === 'cancelled') return [];
+  const day = input.day.slice(0, 10);
+  if (day < today) return [];
+  const out: ReadinessBox[] = [];
+
+  const hold = performanceMissing(input, today).find((m) => m.kind === 'hold_deadline');
+  const confirmed = input.status === 'confirmed';
+  const statusDone = input.status !== 'proposed' && !isHoldStatus(input.status);
+  out.push({ id: 'status', done: statusDone, verb: 'confirm', ...(hold ? { holdDay: hold.day } : {}) });
+
+  if (input.start_at !== undefined) out.push({ id: 'hours', done: input.start_at !== null, verb: 'add_time' });
+
+  if (confirmed && input.roster !== null) {
+    const going = (input.commitments ?? []).some((c) => c.state === 'going');
+    out.push({ id: 'team', done: input.roster.length > 0 || going, verb: 'sign_up' });
+  }
+
+  if (confirmed && input.roadsheetLinks !== null) {
+    if (input.roadsheetLinks > 0) out.push({ id: 'sheet', done: true, verb: 'share' });
+    else if (day <= addDaysIso(today, ROADSHEET_SHARE_DAYS)) out.push({ id: 'sheet', done: false, verb: 'share' });
+  }
+
+  return out;
+}
+
 /**
  * How far ahead «Falta» is a signal and not only a strip on the record: the
  * dot on Hoy's tiles and the amber of the Agenda (ADR-211 § 3).
