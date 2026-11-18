@@ -182,7 +182,7 @@ test.describe('the month (ADR-209)', () => {
         new Date(`${next}-01T12:00:00Z`).toLocaleString('en', { month: 'long', timeZone: 'UTC' }),
       );
       // «Now» lands today's row under the strip, not behind it.
-      await page.locator('.cal__now').click();
+      await page.locator('.cal__now:not(.cal__whoout)').click();
       const today = await page.evaluate(() => ({
         row: document.querySelector('.cal__day--today')!.getBoundingClientRect().top,
         axis: document.querySelector('.cal__wkh')!.getBoundingClientRect().bottom,

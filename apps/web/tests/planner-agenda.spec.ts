@@ -131,8 +131,10 @@ test.describe('the agenda (ADR-211)', () => {
       [...document.querySelectorAll<HTMLElement>('.ag__miss')].filter((el) => {
         const r = document.createRange();
         r.selectNodeContents(el);
-        const tops = new Set([...r.getClientRects()].map((b) => Math.round(b.top)));
-        return tops.size > 1;
+        // The «·» box is taller than the word's, so tops differ on one line:
+        // a wrap is a box that starts below where the first one ends.
+        const [first, ...rest] = [...r.getClientRects()];
+        return rest.some((b) => b.top >= first.bottom - 1);
       }).length,
     );
     expect(split, 'separators split from their word').toBe(0);

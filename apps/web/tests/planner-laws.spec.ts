@@ -169,7 +169,7 @@ test.describe('planner laws (ADR-095)', () => {
     // arrows; the Board pans with its dial; the Day keeps them by its title.
     await planner(page, 'agenda');
     await expect(page.locator('.cal__arw')).toHaveCount(0);
-    await expect(page.locator('.lenshead__tools .cal__now')).toHaveCount(1);
+    await expect(page.locator('.lenshead__tools .cal__now:not(.cal__whoout)')).toHaveCount(1);
     await planner(page, 'board');
     await expect(page.locator('.cal__dial .cal__arw')).toHaveCount(2);
     await expect(page.locator('.lenshead__aside .cal__arw')).toHaveCount(0);
@@ -177,12 +177,12 @@ test.describe('planner laws (ADR-095)', () => {
     await expect(page.locator('.lenshead__aside .cal__arw')).toHaveCount(2);
     await planner(page, 'month');
     await expect(page.locator('.cal__arw')).toHaveCount(0);
-    await expect(page.locator('.lenshead__tools .cal__now')).toHaveCount(1);
+    await expect(page.locator('.lenshead__tools .cal__now:not(.cal__whoout)')).toHaveCount(1);
 
     const geom = await page.evaluate(() => {
       const r = (s: string) => document.querySelector(s)?.getBoundingClientRect() ?? null;
       const title = r('.lenshead__title');
-      const now = r('.cal__now');
+      const now = r('.cal__now:not(.cal__whoout)');
       const add = r('.cal__add');
       const keb = r('.cal__kebab');
       // Focus follows the eye: the title row first, then the view words.
@@ -197,7 +197,7 @@ test.describe('planner laws (ADR-095)', () => {
         addH: Math.round(add?.height ?? -1),
         kebH: Math.round(keb?.height ?? -1),
         titleH: Math.round(title?.height ?? -1),
-        nowFocus: idx('.cal__now'),
+        nowFocus: idx('.cal__now:not(.cal__whoout)'),
         viewFocus: idx('.cal__view'),
       };
     });
@@ -686,7 +686,7 @@ test.describe('the diary', () => {
     await page.mouse.move(800, 500);
     await page.mouse.wheel(0, -600);
     await expect(door, 'the pull was never answered').toHaveCount(0, { timeout: 0 });
-    await page.click('.cal__now');
+    await page.click('.cal__now:not(.cal__whoout)');
     const measure = () =>
       page.evaluate(() => {
         const el = document.querySelector('[data-day].is-today, [data-day]');
