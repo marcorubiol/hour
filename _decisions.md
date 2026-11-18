@@ -8155,3 +8155,32 @@ Encargo y dibujo: `build/coordination/ficha-pase/brief.md` (Marco, 18-11).
 
 **Cómo se revierte.** Revertir el PR: vuelven la línea de datos y `MissingBand` en la ficha. Sin esquema ni API;
 `CACHE_SCHEMA` no cambia.
+
+## [2026-11-18] ADR-213 · El día, parada a parada, y adiós a «Editar datos» (fase 2 del pase; excepción a ADR-090 por un toque explícito)
+Encargo: `build/coordination/ficha-pase/brief.md`; respuestas de Marco a sus preguntas 1 y 3 (18-11).
+
+1. **El plan de trabajo se dibuja como paradas en la ficha** (`RunningOrder`, eje `placing="stops"`; el Planificador
+   sigue con `list`). Las filas son las de siempre, en el orden de la mano (ADR-090 P3), con la hora a la izquierda,
+   un punto en una línea y la función como parada grande. La página teje paradas suyas, de solo lectura
+   (`$lib/pass-stops`): la salida y la llegada de un viaje del mismo proyecto ese día (la primera salida y la última
+   llegada del día, con enlace al viaje), la función con raya mientras ninguna fila es la función, y la noche (el
+   hotel) cuando la logística lo dice. Cada dato cuelga de su parada: la dirección, la carga y el aparcamiento en la
+   llegada (si no hay viaje, en la carga; si no, en la función), con «Mapa»; el contacto de la sala en la carga (si
+   no, en la función), con «Llamar a …».
+2. **Sin horas.** Sin filas, la línea es punteada y una tarjeta pide solo la hora de la función («Poner la hora»), que
+   se escribe como su fila. Las paradas que tienen hora (las del viaje) van en su orden; las demás llevan raya.
+3. **«Rellenar el día» (excepción a ADR-090, «nunca cinco huecos de relleno»).** Con la hora de la función puesta, se
+   ofrece rellenar lo que falte de montaje (5 h antes), prueba (2 h antes) y desmontaje (2 h después). No escribe
+   nada hasta que la persona lo pulsa, y antes enseña las horas para cambiarlas. Se puede descartar («ahora no»).
+   Las horas son fijas: «como en tus últimos bolos» no tiene datos detrás todavía.
+4. **Sin diálogo «Editar datos».** La fecha y el lugar se cambian en la pieza: la fecha con su campo, la sala, la
+   ciudad y el país con los suyos cuando la función no está vinculada a una sala; cada cambio se guarda al hacerlo y
+   la pieza dice «Guardado». Lo que no cabe en una fila (la sala vinculada, guardar como sala, editar la sala y el
+   directorio) espera detrás de «Cambiar de sala…». El bolo, si no cuelga de ninguno, se elige desde su línea de
+   «Falta» en un diálogo pequeño (con uno, sigue cambiándose desde su dato bajo el título). El aviso de una reserva
+   se cambia en el pliegue de detalles. «Copiar de otra función» y «Borrar función…» van al pie.
+5. Consulta nueva `performance-day-trips` (`/api/dates?stages=1` del día y el proyecto): `CACHE_SCHEMA` 35 → 36.
+   Sin esquema ni API nuevos.
+
+**Cómo se revierte.** Revertir el PR: vuelven la lista de horas, el diálogo «Editar datos» y la eliminación dentro de
+él; `CACHE_SCHEMA` vuelve a subir.

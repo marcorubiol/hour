@@ -10,6 +10,14 @@
    * One record, two frames (ADR-139 p1 A): the page `/h/<space>/performance/
    * <slug>` and the vistazo over a lens draw THIS component, so «abrir
    * completa» lands on the same head, facts, «Falta» and blocks.
+   *
+   * The «pase» (brief `ficha-pase`; ADR-212, ADR-213): the piece and its
+   * stub, then the day stop by stop (the running order, `placing="stops"`,
+   * with a trip's ends, the show without an hour and the night woven in, and
+   * the address and the contact hung on their stop). No «Edit details»: the
+   * date and the place change in place on the piece, each saving itself;
+   * only what does not fit a row (the linked venue, the directory) waits
+   * behind «Cambiar de sala…», and the bolo behind its own small dialog.
    */
 
   import { docTitle } from '$lib/doc-title';
@@ -25,14 +33,12 @@
   import VenueEditDialog, { type VenueEditable } from '$lib/components/VenueEditDialog.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Field from '$lib/components/Field.svelte';
-  import Input from '$lib/components/Input.svelte';
   import Menu from '$lib/components/Menu.svelte';
   import ProductionStub from '$lib/components/ProductionStub.svelte';
   import PerformanceCopyDialog from './PerformanceCopyDialog.svelte';
   import RunningOrder from '$lib/components/RunningOrder.svelte';
   import YNotes from '$lib/components/YNotes.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
-  import { FormErrors } from '$lib/form-errors.svelte';
   import type { Json } from '$lib/db-types';
   import type { KVObject } from '$lib/kv-lines';
   import { dayLabel, dayMonth, localDayISO, timeInTz, viewerTimeZone } from '$lib/datetime';
@@ -69,7 +75,10 @@
   import Fold from '$lib/components/Fold.svelte';
   import RecordPass, { passToneVar, type PassAct, type PassBox, type PassLine } from './RecordPass.svelte';
   import { daysBetween } from '$lib/away';
-  import { mapsHref, telHref, venueCall } from '$lib/ahora';
+  import { logisticsLines, mapsHref, telHref, venueCall } from '$lib/ahora';
+  import MapLink from '$lib/components/MapLink.svelte';
+  import { tripStops, type ExtraStop, type TripStage, type TripStop } from '$lib/pass-stops';
+  import { dayOf } from '$lib/running-order';
   import { hasJsonContent } from '$lib/components/JsonKV.svelte';
   import {
     MISSING_MAX,
@@ -229,6 +238,8 @@
     },
     onSuccess: (body, patch) => {
       dialogOpen = false;
+      boloDialogOpen = false;
+      markSaved();
       // The row the PATCH answers goes into the cache now: reopening «Edit
       // details» before the refetch lands must not fill the form from the old
       // row (a «save as venue» would read «None» and unlink it on the next
@@ -305,50 +316,81 @@
 
   const locale = appLocale();
 
+  /** «Cambiar de sala…»: the linked venue and the directory (ADR-213). */
   let dialogOpen = $state(false);
-  let fDay = $state('');
   let fVenue = $state('');
   let fCity = $state('');
   let fCountry = $state('');
   let fVenueId = $state('');
   // «Save as venue» is kept as an intent and done by «Save» (ADR-139 p7).
   let fSaveAsVenue = $state(false);
-  // ADR-080 §2 — hold decision notice; the field only exists in the dialog
-  // while the gig's status is hold*. null = empty = standard default.
+  // ADR-080 §2 — hold decision notice, in place while the gig is hold*.
+  // null = empty = standard default.
   let fHoldNotice = $state<number | null>(null);
+  let holdNoticeBad = $state(false);
   // ADR-087 · § 36 — el bolo del que cuelga; '' = sin bolo.
   let fBolo = $state('');
+  let boloDialogOpen = $state(false);
 
-  function openEdit() {
+  function openVenueDialog() {
     if (!perf) return;
-    fDay = perf.performed_at.slice(0, 10);
     fVenue = perf.venue_name ?? '';
     fCity = perf.city ?? '';
     fCountry = perf.country ?? '';
     fVenueId = perf.venue_id ?? '';
     fSaveAsVenue = false;
-    fHoldNotice = perf.hold_notice_days;
-    fBolo = currentBoloId ?? '';
     dialogOpen = true;
   }
 
-  // ADR-139 p7: what is wrong is said under its field, never as a toast.
-  const formErrors = new FormErrors();
+  function openBolo() {
+    fBolo = currentBoloId ?? '';
+    boloDialogOpen = true;
+  }
 
-  async function saveEdit() {
-    formErrors.clear();
-    if (!fDay) formErrors.set('f-day', t('perf.needs_date', locale));
-    // Same validation rule as PerformanceForm (isValidHoldNotice — THE
-    // technique for this field): the input's min/max/step are hints, not
-    // enforcement, and one bad digit must not 400 the whole PATCH and
-    // lose every other edit in the dialog. Empty (null) stays valid —
-    // "back to the standard default".
-    if (showHoldNotice && !isValidHoldNotice(fHoldNotice)) {
-      formErrors.set('f-hold-notice', t('perf.hold_notice_invalid', locale));
-    }
-    if (formErrors.any) return void formErrors.focusFirst();
-    // The venue asked for with «Save as venue» is made now, then linked in
-    // the same PATCH; if it cannot be made, nothing else is written either.
+  // ── Each change saves itself (ADR-139 p4, p7; ADR-213) ─────────────────
+  let saved = $state(false);
+  let savedTimer: ReturnType<typeof setTimeout> | undefined;
+  function markSaved() {
+    saved = true;
+    clearTimeout(savedTimer);
+    savedTimer = setTimeout(() => (saved = false), 2000);
+  }
+  /** One field, one PATCH: «Guardado» on the piece, a failure in a toast. */
+  function savePatch(patch: PerformancePatch) {
+    $patchMutation.mutate(patch);
+  }
+
+  let editingDate = $state(false);
+  let editingPlace = $state(false);
+  function onDateChange(value: string) {
+    if (!perf || !value || value === perf.performed_at.slice(0, 10)) return;
+    savePatch({ performed_at: value });
+  }
+  /** A text field of the place, saved when it changes; empty is null. */
+  function onPlaceChange(field: 'venue_name' | 'city' | 'country', value: string) {
+    if (!perf) return;
+    const next = value.trim() || null;
+    if (next === (perf[field] ?? null)) return;
+    savePatch({ [field]: next });
+  }
+  function onHoldNoticeChange() {
+    holdNoticeBad = !isValidHoldNotice(fHoldNotice);
+    if (holdNoticeBad || !perf || fHoldNotice === perf.hold_notice_days) return;
+    savePatch({ hold_notice_days: fHoldNotice });
+  }
+  $effect(() => {
+    if (perf) fHoldNotice = perf.hold_notice_days;
+  });
+
+  /** Focus a field the moment it appears (the date opened in place). */
+  function focusNow(node: HTMLInputElement) {
+    node.focus();
+  }
+
+  // «Cambiar de sala…»: the venue asked for with «Save as venue» is made
+  // now, then linked in the same PATCH; if it cannot be made, nothing else
+  // is written either.
+  async function saveVenue() {
     let venueId = fVenueId || null;
     if (fSaveAsVenue && !venueId && fVenue.trim()) {
       try {
@@ -358,17 +400,17 @@
       }
     }
     $patchMutation.mutate({
-      performed_at: fDay,
       venue_name: fVenue.trim() || null,
       city: fCity.trim() || null,
       country: fCountry.trim() || null,
       venue_id: venueId,
-      // ADR-080 §2 — only while the field is on screen (hold* status);
-      // emptied field = null = back to the standard default.
-      ...(showHoldNotice ? { hold_notice_days: fHoldNotice } : {}),
-      // § 36 — solo si el campo está en pantalla y cambió (ver boloPatch).
-      ...(showBoloSelect ? boloPatch(currentBoloId, fBolo) : {}),
     });
+  }
+
+  function saveBolo() {
+    const next = boloPatch(currentBoloId, fBolo);
+    if ('bolo_id' in next) $patchMutation.mutate(next);
+    else boloDialogOpen = false;
   }
 
   let bundle = $derived($query.data ?? null);
@@ -746,7 +788,7 @@
           id: 'no_bolo',
           text: t('record.missing_no_bolo', locale),
           verbs: showBoloSelect
-            ? [{ label: t('record.verb_pick', locale), onclick: openEdit }]
+            ? [{ label: t('record.verb_pick', locale), onclick: openBolo }]
             : perf?.project && lensOn('books')
               ? [{ label: t('perf.bolo_create_link', locale), href: booksHref(perf.project.id, { newBolo: true, here: booksHere }) }]
               : [],
@@ -829,6 +871,54 @@
     return out;
   });
 
+  // ── El día, parada a parada (ADR-213) ──────────────────────────────────
+  let dayTz = $derived(perf?.venue?.timezone ?? workspaceTz ?? viewerTz);
+  let dayIso = $derived(perf?.performed_at.slice(0, 10) ?? '');
+
+  // A trip of the same project that day lends its ends as stops, read-only,
+  // with a link to it (Marco's answer 3, 18-11). Same feed as the Planner's.
+  type TripRow = { id: string; kind: string; stages?: TripStage[] };
+  const tripsQuery = createQuery(
+    toStore(() => ({
+      queryKey: ['performance-day-trips', perf?.project?.id ?? '', dayIso] as const,
+      enabled: Boolean(perf?.project?.id && dayIso),
+      retry: false,
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchJSON<{ items: TripRow[] }>(
+          `/api/dates?project_ids=${perf!.project!.id}&from=${dayIso}&to=${dayIso}&spans=1&stages=1&limit=20`,
+          signal,
+        ),
+    })),
+  );
+  let tripExtras = $derived<TripStop[]>(
+    ($tripsQuery.data?.items ?? [])
+      .filter((d) => d.kind === 'travel_day')
+      .flatMap((d) => tripStops(d.id, d.stages ?? [], (iso) => dayOf(iso, dayTz) === dayIso)),
+  );
+
+  let logistics = $derived(logisticsLines(perf?.logistics));
+  let hotelLine = $derived(logistics.hotel ?? null);
+  let dayExtras = $derived<ExtraStop[]>([
+    ...tripExtras,
+    // The show without an hour: a stop with a dash (the running order drops
+    // it once a row is the show).
+    { key: 'show', kind: 'show', at: null },
+    ...(hotelLine ? [{ key: 'night', kind: 'night' as const, at: null }] : []),
+  ]);
+
+  // What hangs on the stops: the address and the load access on the arrival,
+  // the contact on the load-in (`hangPlaces`).
+  let dayAddress = $derived(
+    [perf?.venue?.address, logistics.load_access, logistics.parking].filter(Boolean).join(' · ') || null,
+  );
+  let dayMap = $derived(
+    perf?.venue?.address ? [perf.venue.address, perf.venue.city ?? perf.city] : null,
+  );
+  let dayCall = $derived(venueCall(perf?.venue?.contacts));
+  let dayContact = $derived(
+    dayCall ? [dayCall.name, dayCall.role].filter(Boolean).join(', ') : null,
+  );
+
   // «Detalles»: lo de consulta, plegado. Cerrado, dice lo que guarda.
   let detailsOpen = $state(false);
   let copyOpen = $state(false);
@@ -883,7 +973,6 @@
           href: `/h/${workspaceSlug}/performance/${slug}/roadsheet`,
           concept: 'roadsheet' as const,
         },
-        ...(canEdit ? [{ label: t('perf.edit_details', locale), onclick: openEdit }] : []),
         ...(canInvite
           ? [{ label: t('audience.invite_from_performance', locale), loading: $invite.isPending, onclick: () => $invite.mutate() }]
           : []),
@@ -950,8 +1039,11 @@
       time={startTime}
       show={perf.project?.name ?? null}
       place={passPlace}
-      onEditDate={canEdit ? openEdit : null}
-      onEditPlace={canEdit ? openEdit : null}
+      onEditDate={canEdit ? () => (editingDate = true) : null}
+      onEditPlace={canEdit ? () => (editingPlace = true) : null}
+      dateEdit={editingDate ? dateEdit : null}
+      placeEdit={editingPlace ? placeEdit : null}
+      {saved}
       editDateLabel={t('record.edit_when', locale)}
       editPlaceLabel={t('record.edit_where', locale)}
       acts={passActs}
@@ -996,6 +1088,109 @@
       {/snippet}
     </RecordPass>
 
+
+    {#snippet dateEdit()}
+      <input
+        class="pass__in"
+        type="date"
+        aria-label={t('perf.date', locale)}
+        value={perf!.performed_at.slice(0, 10)}
+        use:focusNow
+        onchange={(e) => onDateChange(e.currentTarget.value)}
+        onblur={() => (editingDate = false)}
+        onkeydown={(e) => {
+          if (e.key === 'Escape' || e.key === 'Enter') editingDate = false;
+        }}
+      />
+    {/snippet}
+
+    {#snippet placeEdit()}
+      {#if perf!.venue}
+        <span class="perf__place-linked">{passPlace}</span>
+      {:else}
+        <span class="perf__place-fields">
+          <label class="perf__place-field"
+            ><span>{t('perf.venue', locale)}</span><input
+              class="pass__in"
+              value={perf!.venue_name ?? ''}
+              placeholder={t('perf.venue_placeholder', locale)}
+              onchange={(e) => onPlaceChange('venue_name', e.currentTarget.value)}
+            /></label
+          >
+          <label class="perf__place-field"
+            ><span>{t('create.city', locale)}</span><input
+              class="pass__in"
+              value={perf!.city ?? ''}
+              onchange={(e) => onPlaceChange('city', e.currentTarget.value)}
+            /></label
+          >
+          <label class="perf__place-field perf__place-field--short"
+            ><span>{t('perf.country', locale)}</span><input
+              class="pass__in"
+              value={perf!.country ?? ''}
+              placeholder="ES"
+              onchange={(e) => onPlaceChange('country', e.currentTarget.value)}
+            /></label
+          >
+        </span>
+      {/if}
+      <span class="perf__place-acts">
+        <button type="button" class="pass__btn" onclick={openVenueDialog}>{t('pass.change_venue', locale)}</button>
+        <button type="button" class="pass__btn" onclick={() => (editingPlace = false)}>{t('pass.done', locale)}</button>
+      </span>
+    {/snippet}
+
+    {#snippet dayStop(stop: ExtraStop)}
+      {#if stop.kind === 'show'}
+        <span class="hours__w perf__stop-show">{t('desk.anchor_show', locale)}</span>
+      {:else if stop.kind === 'night'}
+        <span class="hours__w">{t('pass.stop_hotel', locale)}</span>
+        {#if hotelLine}<span class="hours__n">{hotelLine}</span>{/if}
+      {:else}
+        {@const trip = stop as TripStop}
+        <span class="hours__w"
+          >{trip.place
+            ? t(trip.kind === 'depart' ? 'pass.stop_depart' : 'pass.stop_arrive', locale, { place: trip.place })
+            : t(trip.kind === 'depart' ? 'pass.stop_depart_bare' : 'pass.stop_arrive_bare', locale)}</span
+        >
+        <a class="hours__n perf__stop-link" href={`/h/planner?peek=date/${trip.tripId}`}>{t('pass.stop_trip', locale)}</a>
+      {/if}
+    {/snippet}
+
+    {#snippet addressHang()}
+      <span class="hours__n">{dayAddress}</span>
+      {#if dayMap}
+        <span class="perf__hang-acts"><MapLink class="perf__hang-act" parts={dayMap} changeIn="settings">{t('ahora.map', locale)}</MapLink></span>
+      {/if}
+    {/snippet}
+
+    {#snippet contactHang()}
+      <span class="hours__n">{dayContact}</span>
+      {#if dayCall?.phone}
+        <span class="perf__hang-acts"
+          ><a class="perf__hang-act" href={telHref(dayCall.phone)}>{t('pass.call_name', locale, { name: dayCall.name })}</a></span
+        >
+      {/if}
+    {/snippet}
+    <!-- El día, parada a parada (ADR-213): the running order as stops, the
+         show the big one, a trip's ends and the night woven in, and the
+         address and the contact hung on their stop. One way to write an
+         hour in the whole app (ADR-090 P3). -->
+    <div id="running-order">
+      <RunningOrder
+        target="performance"
+        id={perf.id}
+        dayIso={perf.performed_at.slice(0, 10)}
+        tz={perf.venue?.timezone ?? workspaceTz ?? viewerTz}
+        {viewerTz}
+        {locale}
+        placing="stops"
+        title={t(perf.start_at ? 'pass.day_title' : 'pass.day_title_open', locale)}
+        extras={dayExtras}
+        extra={dayStop}
+        hangs={{ address: dayAddress ? addressHang : undefined, contact: dayContact ? contactHang : undefined }}
+      />
+    </div>
     <!-- ADR-103: «quién va», con el reparto al lado. Sube: es lo que se
          decide (ADR-139 p2); `#who-goes` es donde cae la línea de choques
          del Día (uso #12) y el «apuntar» de «Falta». -->
@@ -1048,19 +1243,6 @@
       </section>
     {/if}
 
-    <!-- ADR-090 P3: the same running order as the Planner's day, in place
-         of the fixed five. One way to write an hour in the whole app. -->
-    <div id="running-order">
-      <RunningOrder
-        target="performance"
-        id={perf.id}
-        dayIso={perf.performed_at.slice(0, 10)}
-        tz={perf.venue?.timezone ?? workspaceTz ?? viewerTz}
-        {viewerTz}
-        {locale}
-      />
-    </div>
-
     <!-- ADR-106: el tablón del bolo. Sin bolo dice que no hay; sin dinero
          siempre (la puerta es la función, no Cuentas). -->
     <BoloBoard
@@ -1092,26 +1274,28 @@
          las fechas y los materiales. Quién programa es un hecho de la
          cabecera («Con…», ADR-164 § 3). -->
     <Fold word={t('record.details', locale)} keeps={detailsKeeps} bind:open={detailsOpen} id="details" testid="record-details">
-      {#if canEdit && perf.project}
-        <!-- ADR-169 (punto 83): la técnica, la logística, la acogida y el
-             plan de trabajo de otra función, sin pisar nada sin preguntar. -->
-        <div class="perf__copy">
-          <Button variant="quiet" size="s" onclick={() => (copyOpen = true)}
-            >{t('perf_copy.open', locale)}</Button
-          >
-        </div>
-        <PerformanceCopyDialog
-          bind:open={copyOpen}
-          perf={{ ...perf, project_id: perf.project.id }}
-          {workspaceSlug}
-          tz={perf.venue?.timezone ?? workspaceTz ?? viewerTz}
-          fallbackTz={workspaceTz ?? viewerTz}
-          {locale}
-          oncopied={() => {
-            void queryClient.invalidateQueries({ queryKey: ['performance'] });
-            void queryClient.invalidateQueries({ queryKey: ['schedule'] });
-          }}
-        />
+      {#if canEdit && showHoldNotice}
+        <!-- ADR-080 §2 — discreet, hold-only, saved when it changes. Empty =
+             default 30 (the placeholder says it), 0 = no notice. -->
+        <Field
+          id="f-hold-notice"
+          label={t('perf.hold_notice', locale)}
+          helper={fHoldNotice === 0 ? t('perf.hold_notice_none', locale) : undefined}
+          error={holdNoticeBad ? t('perf.hold_notice_invalid', locale) : undefined}
+        >
+          <input
+            id="f-hold-notice"
+            type="number"
+            min="0"
+            max="365"
+            step="1"
+            inputmode="numeric"
+            bind:value={fHoldNotice}
+            onchange={onHoldNoticeChange}
+            placeholder={String(HOLD_NOTICE_DEFAULT)}
+          />
+          {#snippet suffix()}{t('perf.hold_notice_suffix', locale)}{/snippet}
+        </Field>
       {/if}
       <ProductionStub
         venue={perf.venue}
@@ -1157,6 +1341,31 @@
         </section>
       {/if}
     </Fold>
+
+    {#if canEdit}
+      <!-- Al pie (ADR-213): copiar de otra función (ADR-169) y borrar la que
+           se creó por error (ADR-052). -->
+      <footer class="perf__foot" data-testid="perf-foot">
+        {#if perf.project}
+          <button type="button" class="perf__foot-act" onclick={() => (copyOpen = true)}>{t('perf_copy.open', locale)}</button>
+          <PerformanceCopyDialog
+            bind:open={copyOpen}
+            perf={{ ...perf, project_id: perf.project.id }}
+            {workspaceSlug}
+            tz={perf.venue?.timezone ?? workspaceTz ?? viewerTz}
+            fallbackTz={workspaceTz ?? viewerTz}
+            {locale}
+            oncopied={() => {
+              void queryClient.invalidateQueries({ queryKey: ['performance'] });
+              void queryClient.invalidateQueries({ queryKey: ['schedule'] });
+            }}
+          />
+        {/if}
+        <button type="button" class="perf__foot-act perf__foot-act--warn" onclick={() => (confirmDeleteOpen = true)}
+          >{t('perf.delete', locale)}</button
+        >
+      </footer>
+    {/if}
   {/if}
 </article>
 
@@ -1170,53 +1379,10 @@
   {/if}
 {/snippet}
 
-<Dialog bind:open={dialogOpen} title={t('perf.edit_title', locale)} size="m">
-  {#if showBoloSelect}
-    <!-- ADR-087 · § 36 — el mismo campo que el alta, en el mismo orden: el
-         trato antes que la fecha. Mover de bolo no toca sala ni ciudad. -->
-    <Select
-      label={t('perf.bolo', locale)}
-      options={bolosOptions}
-      bind:value={fBolo}
-      message={boloMessage}
-    />
-  {:else if showBoloEmpty}
-    <Select
-      label={t('perf.bolo', locale)}
-      options={[{ value: '', label: t('perf.bolo_empty', locale) }]}
-      disabled
-      message={boloMessage}
-    />
-  {/if}
-  <div class="perf__form-grid" oninput={formErrors.onedit}>
-    <Input id="f-day" label={t('perf.date', locale)} type="date" bind:value={fDay} required error={formErrors.of('f-day')} />
-    <Input label={t('perf.venue', locale)} bind:value={fVenue} placeholder={t('perf.venue_placeholder', locale)} />
-    <Input label={t('create.city', locale)} bind:value={fCity} />
-    <Input label={t('perf.country', locale)} bind:value={fCountry} placeholder="ES" />
-    {#if showHoldNotice}
-      <!-- ADR-080 §2 — discreet, hold-only. Empty = default 30 (the
-           placeholder says it), 0 = no notice. -->
-      <Field
-        id="f-hold-notice"
-        label={t('perf.hold_notice', locale)}
-        helper={fHoldNotice === 0 ? t('perf.hold_notice_none', locale) : undefined}
-        error={formErrors.of('f-hold-notice')}
-      >
-        <input
-          id="f-hold-notice"
-          type="number"
-          min="0"
-          max="365"
-          step="1"
-          inputmode="numeric"
-          bind:value={fHoldNotice}
-          placeholder={String(HOLD_NOTICE_DEFAULT)}
-          aria-describedby={fHoldNotice === 0 ? 'f-hold-notice-msg' : undefined}
-        />
-        {#snippet suffix()}{t('perf.hold_notice_suffix', locale)}{/snippet}
-      </Field>
-    {/if}
-  </div>
+<!-- «Cambiar de sala…» (ADR-213): only what does not fit a row, the linked
+     venue and the directory. The date, the room's name and the city change
+     in place on the piece. -->
+<Dialog bind:open={dialogOpen} title={t('pass.change_venue_title', locale)} size="m">
   <div class="perf__venue-link">
     <Select id="f-venue-entity" label={t('perf.linked_venue', locale)} bind:value={fVenueId}>
       <option value="">{t('perf.linked_venue_none', locale)}</option>
@@ -1239,14 +1405,28 @@
     <DirectoryPicker workspaceId={perf.workspace_id} {locale} onadopt={onDirectoryAdopt} />
     <p class="perf__dialog-hint">{t('directory.hint', locale)}</p>
   {/if}
-  {#snippet lead()}
-    <Button variant="quiet" tone="warn" onclick={() => (confirmDeleteOpen = true)}>
-      {t('perf.delete', locale)}
-    </Button>
-  {/snippet}
   {#snippet actions()}
     <Button variant="quiet" onclick={() => (dialogOpen = false)}>{t('create.cancel', locale)}</Button>
-    <Button onclick={saveEdit} loading={$patchMutation.isPending || $promoteVenue.isPending}>{t('edit.save', locale)}</Button>
+    <Button onclick={saveVenue} loading={$patchMutation.isPending || $promoteVenue.isPending}>{t('edit.save', locale)}</Button>
+  {/snippet}
+</Dialog>
+
+<!-- ADR-087 · § 36: el bolo del que cuelga, elegido desde «Falta» cuando no
+     cuelga de ninguno (con uno, se cambia desde su dato en la cabecera). -->
+<Dialog bind:open={boloDialogOpen} title={t('perf.bolo', locale)} size="s">
+  {#if showBoloSelect}
+    <Select label={t('perf.bolo', locale)} options={bolosOptions} bind:value={fBolo} message={boloMessage} />
+  {:else if showBoloEmpty}
+    <Select
+      label={t('perf.bolo', locale)}
+      options={[{ value: '', label: t('perf.bolo_empty', locale) }]}
+      disabled
+      message={boloMessage}
+    />
+  {/if}
+  {#snippet actions()}
+    <Button variant="quiet" onclick={() => (boloDialogOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button onclick={saveBolo} loading={$patchMutation.isPending}>{t('edit.save', locale)}</Button>
   {/snippet}
 </Dialog>
 
@@ -1305,12 +1485,6 @@
       color: var(--text-faint);
     }
 
-    /* The dialog's fields are rows, one under the other (ADR-139 p4). */
-    .perf__form-grid {
-      display: flex;
-      flex-direction: column;
-      margin-block-start: var(--space-s);
-    }
 
     /* Wraps: at phone width the select was squeezed to its caret by the
        two buttons beside it. */
@@ -1326,9 +1500,87 @@
     }
 
 
-    .perf__copy {
+    /* Al pie: two quiet verbs, the second one in the warning ink. */
+    .perf__foot {
       display: flex;
-      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: var(--space-s) var(--space-l);
+      margin-block-start: var(--space-l);
+      padding-block-start: var(--space-m);
+      border-block-start: var(--line-hairline) solid var(--border-color-light);
+    }
+    .perf__foot-act {
+      padding: 0;
+      border: 0;
+      background: none;
+      font: inherit;
+      font-size: var(--text-s);
+      color: var(--text-muted);
+      text-decoration: underline;
+      text-decoration-thickness: var(--line-hairline);
+      text-underline-offset: 3px;
+      cursor: pointer;
+    }
+    .perf__foot-act:hover {
+      color: var(--text-color);
+    }
+    .perf__foot-act--warn {
+      color: var(--danger);
+    }
+
+    /* The place, changed in place on the piece. */
+    .perf__place-fields {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-s) var(--space-m);
+    }
+    .perf__place-field {
+      display: grid;
+      flex: 1 1 10rem;
+      gap: var(--space-2xs);
+      font-size: var(--text-xs);
+      color: var(--surface-focus-muted);
+    }
+    .perf__place-field--short {
+      flex: 0 1 4rem;
+    }
+    .perf__place-field :global(input) {
+      font-size: var(--text-m);
+      color: var(--surface-focus-ink);
+    }
+    .perf__place-linked {
+      font-size: var(--text-m);
+    }
+    .perf__place-acts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-s);
+    }
+
+    /* What hangs on a stop: a line of text and, when there is data, a verb. */
+    .perf__hang-acts {
+      display: flex;
+      gap: var(--space-s);
+    }
+    .perf__hang-acts :global(.perf__hang-act) {
+      display: inline-flex;
+      align-items: center;
+      padding: var(--space-2xs) var(--space-s);
+      border: var(--line-hairline) solid var(--border-color-dark);
+      border-radius: var(--radius);
+      font-size: var(--text-s);
+      color: var(--text-color);
+      text-decoration: none;
+    }
+    .perf__hang-acts :global(.perf__hang-act:hover) {
+      background: var(--bg-hover);
+    }
+    .perf__stop-show {
+      font-family: var(--font-display);
+      font-size: var(--text-l);
+    }
+    .perf__stop-link {
+      color: var(--text-muted);
     }
 
     .perf__section {

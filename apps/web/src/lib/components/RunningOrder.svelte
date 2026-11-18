@@ -11,9 +11,16 @@
    * under the strip (the only place that holds both parents: a rehearsal has
    * no page), and the performance's own page, where it replaces the fixed
    * five-slot table. There is one way to write an hour in the whole app, and
-   * this is it. Nothing varies by place yet, so there is no placing axis; when
-   * something does, it is a prop here (the `Slip`'s `placing`/`ground` rule),
-   * never a copy.
+   * this is it. What varies by place is ONE axis, `placing` (the `Slip`'s
+   * rule), never a copy:
+   *
+   * - `list` (the Planner's day): the hours list, as it always was.
+   * - `stops` (the record's «pase», ADR-213): the same rows as stops on a
+   *   line, the show the big one, with the page's read-only stops woven in
+   *   (`extras`: a trip's departure and arrival, the show without an hour,
+   *   the night) and the page's facts hung under their stop (`hangs`). An
+   *   editor of a performance gets the card that asks for the show's hour,
+   *   and once it has one, «Rellenar el día» (`$lib/pass-stops`).
    *
    * WHAT IT DRAWS: only what somebody wrote down, the strip's law. No
    * estimated durations, no placeholder five. An empty order is one line.
@@ -36,7 +43,7 @@
    * gates on the edit permission) and reads the rows from `GET
    * /api/schedule`.
    */
-  import { tick } from 'svelte';
+  import { tick, type Snippet } from 'svelte';
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON } from '$lib/api';
@@ -68,6 +75,16 @@
     slotWord,
     type RunningOrderTarget,
   } from '$lib/running-order';
+  import {
+    fillDay,
+    templateAt,
+    templateFor,
+    hangPlaces,
+    weaveStops,
+    type ExtraStop,
+    type HangAt,
+    type StopItem,
+  } from '$lib/pass-stops';
 
   interface Props {
     target: RunningOrderTarget;
@@ -83,9 +100,37 @@
     locale: Locale;
     /** Whose order this is, when the day holds more than one. */
     name?: string | null;
+    /** Where it is drawn: the Planner's list, or the record's stops (ADR-213). */
+    placing?: 'list' | 'stops';
+    /** `stops`: the page's own stops, read-only, woven in by time. */
+    extras?: readonly ExtraStop[];
+    /** `stops`: what an extra stop says (the page knows its words and links). */
+    extra?: Snippet<[ExtraStop]>;
+    /** `stops`: the page's facts, each hung under its stop (`hangPlaces`):
+        the address under the arrival, the contact under the load-in. */
+    hangs?: { address?: Snippet; contact?: Snippet };
+    /** `stops`: the lid's word, when it is not the running order's. */
+    title?: string | null;
+    /** Called once the doc says the rows moved (the page refetches itself). */
+    onwritten?: () => void;
   }
 
-  let { target, id, dayIso, tz, viewerTz, locale, name = null }: Props = $props();
+  let {
+    target,
+    id,
+    dayIso,
+    tz,
+    viewerTz,
+    locale,
+    name = null,
+    placing = 'list',
+    extras = [],
+    extra,
+    hangs = {},
+    title = null,
+    onwritten,
+  }: Props = $props();
+  let stops = $derived(placing === 'stops');
   const t = tHere();
 
   const queryClient = useQueryClient();
@@ -168,6 +213,7 @@
   function settle() {
     // The strip, the agenda, Desk and the performance page read the order
     // from their own feeds.
+    onwritten?.();
     for (const key of [
       queryKey,
       ['planner-performances'],
@@ -341,14 +387,109 @@
 
   let listId = $derived(`ro-words-${id}`);
   let lidWord = $derived(
-    name ? `${t('planner.ro_title', locale)} · ${name}` : t('planner.ro_title', locale),
+    title ?? (name ? `${t('planner.ro_title', locale)} · ${name}` : t('planner.ro_title', locale)),
   );
+
+  // ── The stops (placing `stops`, ADR-213) ─────────────────────────────
+  let hasStart = $derived(order.some((s) => s.kind === 'start'));
+  /** The show's dashed stop only while no row is the show. */
+  let shown = $derived(extras.filter((e) => e.kind !== 'show' || !hasStart));
+  let items = $derived<StopItem[]>(
+    stops ? weaveStops(order, shown) : order.map((_, index) => ({ type: 'row' as const, index })),
+  );
+  /** Where each fact hangs, by the kinds the day has (`hangPlaces`). */
+  let hangAt = $derived.by(() => {
+    const out = new Map<HangAt, Snippet[]>();
+    if (!stops) return out;
+    const places = hangPlaces(
+      order.map((s) => s.kind),
+      shown.some((e) => e.kind === 'arrive'),
+    );
+    for (const [what, at] of [
+      ['address', places.address],
+      ['contact', places.contact],
+    ] as const) {
+      const snippet = hangs[what];
+      if (snippet) out.set(at, [...(out.get(at) ?? []), snippet]);
+    }
+    return out;
+  });
+  /** The rows that carry a hang: the first of each kind. */
+  let hangRow = $derived.by(() => {
+    const at = new Map<number, Snippet[]>();
+    for (const k of ['load_in', 'start'] as const) {
+      const list = hangAt.get(k);
+      const i = order.findIndex((s) => s.kind === k);
+      if (list && i >= 0) at.set(i, list);
+    }
+    return at;
+  });
+  /** The extras that carry a hang: the last arrival, the show's dashed stop. */
+  function extraHangs(stop: ExtraStop): Snippet[] {
+    if (stop.kind === 'show') return hangAt.get('show') ?? [];
+    if (stop.kind === 'arrive') {
+      const last = shown.filter((e) => e.kind === 'arrive').at(-1);
+      return last?.key === stop.key ? (hangAt.get('arrive') ?? []) : [];
+    }
+    return [];
+  }
+  /** No moment has an hour yet: the line is dotted and the card asks for one. */
+  let noHours = $derived(stops && order.length === 0);
+  let canAsk = $derived(stops && canEdit && target === 'performance');
+
+  // «Pon la hora de la función»: one hour, the show's, written as its row.
+  let sClock = $state('');
+  let sBad = $state(false);
+  function putShow(e: SubmitEvent) {
+    e.preventDefault();
+    const clock = parseClock(sClock);
+    sBad = clock === null;
+    if (!clock || waiting) return;
+    const at = instantFor(dayIso, clock, tz, order);
+    if (!at) {
+      sBad = true;
+      return;
+    }
+    if (write(placeByTime(order, { kind: 'start', label: null, at, ends_at: null, notes: null }))) sClock = '';
+  }
+
+  // «Rellenar el día» (ADR-213, an exception to ADR-090 by the person's
+  // touch only): the moments the day lacks, each with its proposed hour,
+  // editable before anything is written.
+  let offer = $derived(canAsk && hasStart ? templateFor(order.map((s) => s.kind)) : []);
+  let fillOpen = $state(false);
+  let fillDismissed = $state(false);
+  let fillClocks = $state<string[]>([]);
+  let fillBad = $state(false);
+  function openFill() {
+    const start = order.find((s) => s.kind === 'start');
+    if (!start) return;
+    fillClocks = offer.map((m) => clockText(templateAt(start.at, m), tz));
+    fillBad = false;
+    fillOpen = true;
+  }
+  function doFill(e: SubmitEvent) {
+    e.preventDefault();
+    if (waiting) return;
+    const moments: { kind: string; at: string }[] = [];
+    for (const [i, m] of offer.entries()) {
+      const clock = parseClock(fillClocks[i] ?? '');
+      const at = clock ? instantFor(dayIso, clock, tz, order) : null;
+      if (!at) {
+        fillBad = true;
+        return;
+      }
+      moments.push({ kind: m.kind, at });
+    }
+    if (write(fillDay(order, moments, placeByTime))) fillOpen = false;
+  }
+
 </script>
 
 <!-- Empty and not yours to write: no lid (ADR-154). While it loads, or when
      the read fails, it is drawn, so an editor's lid does not jump in. -->
-{#if canEdit || order.length > 0 || $feed.isPending || $feed.isError}
-<section class="hours" aria-busy={$feed.isPending}>
+{#if canEdit || order.length > 0 || $feed.isPending || $feed.isError || (stops && shown.length > 0)}
+<section class="hours" class:ro--stops={stops} class:ro--open={noHours} aria-busy={$feed.isPending} data-placing={placing}>
   <button type="button" class="lid" aria-expanded={open} onclick={() => (open = !open)}>
     <span class="lid__w">{lidWord}</span>
     <span class="lid__n"
@@ -370,8 +511,80 @@
            the small one under each is the reader's. -->
       <p class="ro__zone">{t('planner.ro_zones', locale, { tz, yours: viewerTz })}</p>
     {/if}
+    {#if canAsk && !hasStart && !$feed.isPending}
+      <!-- Sin horas (ADR-213): the card asks for ONE hour, the show's. -->
+      <form class="ro__ask" onsubmit={putShow} data-testid="ro-ask-time">
+        <p class="ro__ask-title">{t('pass.ask_time', locale)}</p>
+        <p class="ro__ask-body">{t('pass.ask_time_body', locale)}</p>
+        <span class="ro__ask-row">
+          <input
+            class="hours__in hours__in--clock"
+            aria-label={t('pass.show_time', locale)}
+            aria-invalid={sBad}
+            placeholder="20h30"
+            inputmode="numeric"
+            autocomplete="off"
+            bind:value={sClock}
+            disabled={waiting}
+          />
+          <button type="submit" class="ro__ask-go" disabled={waiting || !sClock.trim()}>{t('pass.put_time', locale)}</button>
+        </span>
+        {#if sBad}<span class="hours__hint" role="status">{t('planner.ro_bad_clock', locale)}</span>{/if}
+      </form>
+    {:else if offer.length > 0 && !fillDismissed}
+      <!-- «Rellenar el día»: proposed, never written until pressed. -->
+      {#if fillOpen}
+        <form class="ro__ask" onsubmit={doFill} data-testid="ro-fill">
+          <p class="ro__ask-body">{t('pass.fill_body', locale)}</p>
+          <span class="ro__fill">
+            {#each offer as m, i (m.kind)}
+              <label class="ro__fill-one">
+                <span class="ro__fill-w">{kindWord(m.kind)}</span>
+                <input
+                  class="hours__in hours__in--clock"
+                  aria-invalid={fillBad}
+                  inputmode="numeric"
+                  autocomplete="off"
+                  bind:value={fillClocks[i]}
+                  disabled={waiting}
+                />
+              </label>
+            {/each}
+          </span>
+          <span class="ro__ask-row">
+            <button type="submit" class="ro__ask-go" disabled={waiting}>{t('pass.fill', locale)}</button>
+            <button type="button" class="hours__act" onclick={() => (fillOpen = false)}>{t('planner.ro_cancel', locale)}</button>
+          </span>
+          {#if fillBad}<span class="hours__hint" role="status">{t('planner.ro_bad_clock', locale)}</span>{/if}
+        </form>
+      {:else}
+        <p class="ro__offer">
+          <button type="button" class="ro__ask-go ro__ask-go--quiet" onclick={openFill} data-testid="ro-fill-open"
+            >{t('pass.fill', locale)}</button
+          >
+          <button type="button" class="hours__act hours__act--quiet" onclick={() => (fillDismissed = true)}
+            >{t('pass.fill_not_now', locale)}</button
+          >
+        </p>
+      {/if}
+    {/if}
     <ol class="hours__list" bind:this={listEl}>
-      {#each order as s, i (s.id ?? i)}
+      {#each items as item (item.type === 'row' ? (order[item.index]?.id ?? `row-${item.index}`) : `x-${item.stop.key}`)}
+        {#if item.type === 'extra'}
+          <li class="hours__row ro__extra" data-stop={item.stop.kind}>
+            <div class="ro__xline">
+              <span class="hours__at"
+                >{#if item.stop.at}{clockText(item.stop.at, tz)}{:else if item.stop.kind === 'night'}{t('pass.night', locale)}{:else}–{/if}</span
+              >
+              <span class="hours__body">{@render extra?.(item.stop)}</span>
+            </div>
+            {#if extraHangs(item.stop).length > 0}
+              <div class="ro__hang">{#each extraHangs(item.stop) as h, k (k)}{@render h()}{/each}</div>
+            {/if}
+          </li>
+        {:else}
+        {@const i = item.index}
+        {@const s = order[i]}
         {@const tomorrow = dayOf(s.at, tz) !== dayIso}
         {@const alt = viewerClock(s.at)}
         {@const off = outOfTime(order, i)}
@@ -449,6 +662,7 @@
         {:else}
           <li
             class="hours__row"
+            class:ro__show={s.kind === 'start'}
             class:ro__row--drop={dragOver === i && dragFrom !== null && dragFrom !== i}
             class:ro__row--dragging={dragFrom === i}
             data-index={i}
@@ -487,7 +701,11 @@
               </span>
               {#if canEdit}<span class="ro__grip" aria-hidden="true"></span>{/if}
             </svelte:element>
+            {#if hangRow.get(i)}
+              <div class="ro__hang">{#each hangRow.get(i) ?? [] as h, k (k)}{@render h()}{/each}</div>
+            {/if}
           </li>
+        {/if}
         {/if}
       {/each}
 
@@ -536,7 +754,7 @@
             </span>
           </form>
         </li>
-      {:else if order.length === 0 && !$feed.isPending}
+      {:else if order.length === 0 && !$feed.isPending && !stops}
         <li class="hours__row hours__row--empty">{t('planner.ro_empty', locale)}</li>
       {/if}
     </ol>
@@ -601,6 +819,179 @@
       .ro__grip {
         display: none;
       }
+    }
+
+    /* ── STOPS (placing `stops`, ADR-213): the same rows on a line ───────
+       The hour on the left, quiet and right-aligned; a dot on the line;
+       what happens to the right. The line is the list's own background, a
+       hairline at the dot's centre: solid while the day has hours, dotted
+       while it has none. The show is the big stop. */
+    .ro--stops {
+      --stop-ink: var(--text-muted);
+      --stop-line: var(--border-color-dark);
+      /* Where the dot's centre sits, from the top of a row. */
+      --stop-mid: calc(var(--space-xs) + 0.7em);
+    }
+    /* The line, row by row: a hairline in the moment's column (an absolute
+       grid child takes its column as containing block), from the first
+       dot to the last one. */
+    .ro--stops .hours__row {
+      position: relative;
+    }
+    .ro--stops .hours__row::before {
+      content: '';
+      position: absolute;
+      grid-column: 2 / 3;
+      inset-block: 0;
+      inset-inline-start: calc(0.375rem - var(--line-hairline) / 2);
+      inline-size: var(--line-hairline);
+      background: var(--stop-line);
+    }
+    .ro--stops.ro--open .hours__row::before {
+      background: repeating-linear-gradient(to bottom, var(--stop-line) 0 3px, transparent 3px 6px);
+    }
+    .ro--stops .hours__list > .hours__row:first-child::before {
+      inset-block-start: var(--stop-mid);
+    }
+    .ro--stops .hours__row:not(.hours__row--add):has(+ .hours__row--add)::before,
+    .ro--stops .hours__list > .hours__row:not(.hours__row--add):last-child::before {
+      inset-block-end: auto;
+      block-size: var(--stop-mid);
+    }
+    .ro--stops .hours__list > .hours__row:only-child::before,
+    .ro--stops .hours__row--add::before {
+      display: none;
+    }
+    .ro--stops .hours__row + .hours__row {
+      border-block-start: 0;
+    }
+    .ro--stops .hours__at {
+      justify-self: end;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+    }
+    /* An extra stop's line: the read row's columns, never a button. */
+    .ro__xline {
+      display: grid;
+      grid-column: 1 / -1;
+      grid-template-columns: subgrid;
+      align-items: baseline;
+      padding-block: var(--space-xs);
+    }
+    .ro--stops .hours__line > .hours__body,
+    .ro--stops .ro__xline > .hours__body,
+    .ro--stops .ro__hang {
+      position: relative;
+      padding-inline-start: 1.5rem;
+    }
+    .ro--stops .hours__line > .hours__body::before,
+    .ro--stops .ro__xline > .hours__body::before {
+      content: '';
+      position: absolute;
+      inset-inline-start: 0;
+      inset-block-start: 0.35em;
+      inline-size: 0.75rem;
+      block-size: 0.75rem;
+      border: var(--line-hairline) solid var(--stop-ink);
+      border-radius: var(--radius-50);
+      background: var(--bg);
+    }
+    .ro--stops .ro__hang {
+      grid-column: 2 / 3;
+      display: grid;
+      gap: var(--space-2xs);
+      padding-block-end: var(--space-xs);
+    }
+    .ro--stops .ro__show .hours__at {
+      font-weight: 600;
+      color: var(--text-color);
+    }
+    .ro--stops .ro__show .hours__line > .hours__body::before,
+    .ro--stops .ro__extra[data-stop='show'] .hours__body::before {
+      inset-inline-start: -0.125rem;
+      inset-block-start: 0.3em;
+      inline-size: 1rem;
+      block-size: 1rem;
+      border-color: var(--text-color);
+      background: var(--text-color);
+    }
+    .ro--stops .ro__show .hours__w {
+      font-family: var(--font-display);
+      font-size: var(--text-l);
+    }
+    .ro--stops .ro__extra[data-stop='night'] .hours__body::before {
+      border-color: var(--missing-ink);
+    }
+
+    /* The card that asks for the show's hour, and «Rellenar el día». */
+    .ro__ask {
+      display: grid;
+      gap: var(--space-xs);
+      margin-block: var(--space-s);
+      padding: var(--space-m);
+      border: var(--line-hairline) solid var(--border-color-light);
+      border-radius: var(--radius-l);
+    }
+    .ro__ask-title {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: var(--text-l);
+      line-height: 1.2;
+    }
+    .ro__ask-body {
+      margin: 0;
+      font-size: var(--text-s);
+      color: var(--text-muted);
+    }
+    .ro__ask-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: var(--space-s) var(--space-m);
+    }
+    .ro__ask-go {
+      min-block-size: var(--touch-target);
+      padding: var(--space-xs) var(--space-m);
+      border: var(--line-hairline) solid var(--text-color);
+      border-radius: var(--radius);
+      background: var(--text-color);
+      color: var(--bg);
+      font: inherit;
+      font-size: var(--text-s);
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .ro__ask-go:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+    .ro__ask-go--quiet {
+      min-block-size: 0;
+      padding: var(--space-2xs) var(--space-s);
+      background: transparent;
+      border-color: var(--border-color-dark);
+      color: var(--text-color);
+    }
+    .ro__offer {
+      display: flex;
+      align-items: baseline;
+      gap: var(--space-m);
+      margin: var(--space-xs) 0;
+    }
+    .ro__fill {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-s) var(--space-l);
+    }
+    .ro__fill-one {
+      display: inline-flex;
+      align-items: baseline;
+      gap: var(--space-xs);
+      font-size: var(--text-s);
+    }
+    .ro__fill-w {
+      color: var(--text-muted);
     }
   }
 </style>

@@ -214,14 +214,13 @@ test.describe('performance write path', () => {
     if (!fixture.wsId) test.skip(true, 'playwright workspace not resolved');
     if (fixture.items.length === 0) test.skip(true, 'no fixture gig for this run');
 
-    // Delete the first one through the UI: edit dialog → danger zone →
-    // confirm dialog → lands on the planner.
+    // Delete the first one through the UI: the foot's verb → confirm
+    // dialog → lands on the planner.
     const first = fixture.items[0];
     await page.goto(`/h/playwright/performance/${first.slug ?? first.id}`);
     await waitForLoaded(page);
-    await page.getByRole('button', { name: 'Edit details' }).click();
-    const edit = page.locator('dialog[open]').filter({ hasText: 'Edit performance' });
-    await edit.getByRole('button', { name: 'Delete performance…' }).click();
+    // ADR-213: no «Edit details»; «Delete performance…» sits at the foot.
+    await page.getByTestId('perf-foot').getByRole('button', { name: 'Delete performance…' }).click();
     const confirm = page
       .locator('dialog[open]')
       .filter({ hasText: 'There is no undo from the app.' });

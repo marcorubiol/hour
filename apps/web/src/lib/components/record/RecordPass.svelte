@@ -103,6 +103,12 @@
     onEditPlace?: (() => void) | null;
     editDateLabel?: string;
     editPlaceLabel?: string;
+    /** Drawn instead of the date while it is being changed in place (ADR-213). */
+    dateEdit?: Snippet | null;
+    /** Drawn under the lead while the place is being changed in place. */
+    placeEdit?: Snippet | null;
+    /** «Guardado», said for a moment after a change saved itself. */
+    saved?: boolean;
     acts?: readonly PassAct[];
     boxes: readonly PassBox[];
     /** Open boxes with their verbs; only for whoever can settle them. */
@@ -122,6 +128,9 @@
     onEditPlace = null,
     editDateLabel,
     editPlaceLabel,
+    dateEdit = null,
+    placeEdit = null,
+    saved = false,
     acts = [],
     boxes,
     lines = [],
@@ -138,12 +147,18 @@
             ><IdentityMark mini accent={accentVarFor(project)} name={project.name} /></span
           >{/if}{eyebrow}
       </span>
-      <span class="pass__tag-slot">{@render tag()}</span>
+      <span class="pass__tag-slot"
+        >{#if saved}<span class="pass__saved" role="status" data-testid="pass-saved">{t('pass.saved', locale)}</span
+          >{/if}{@render tag()}</span
+      >
     </div>
 
     <div class="pass__lead">
       <div class="pass__when">
-        {#if time}
+        {#if dateEdit}
+          <span class="pass__date">{@render dateEdit()}</span>
+          <span class="pass__time" class:pass__time--date={!time} data-testid={time ? 'pass-time' : 'pass-no-time'}>{time ?? date}</span>
+        {:else if time}
           <span class="pass__date">
             {#if onEditDate}<button type="button" class="pass__edit" aria-label={editDateLabel} onclick={onEditDate}>{date}</button
               >{:else}{date}{/if}
@@ -159,7 +174,7 @@
       </div>
       <div class="pass__where">
         {#if show}<span class="pass__show">{show}</span>{/if}
-        {#if place}
+        {#if place && !placeEdit}
           <span class="pass__place">
             {#if onEditPlace}<button type="button" class="pass__edit" aria-label={editPlaceLabel} onclick={onEditPlace}>{place}</button
               >{:else}{place}{/if}
@@ -167,6 +182,10 @@
         {/if}
       </div>
     </div>
+
+    {#if placeEdit}
+      <div class="pass__place-edit" data-testid="pass-place-edit">{@render placeEdit()}</div>
+    {/if}
 
     {#if acts.length > 0}
       <nav class="pass__acts" aria-label={t('ahora.actions', locale)} data-testid="pass-acts">
@@ -359,6 +378,55 @@
       .pass__edit:hover {
         text-decoration: underline;
       }
+    }
+
+    .pass__saved {
+      margin-inline-end: var(--space-s);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--mono-letter-spacing-loose);
+      text-transform: uppercase;
+      color: var(--surface-focus-muted);
+    }
+    .pass__tag-slot {
+      display: inline-flex;
+      align-items: center;
+    }
+    /* Changing the place in place: bare fields on the piece's own ink. */
+    .pass__place-edit {
+      display: grid;
+      gap: var(--space-s);
+      padding-block-start: var(--space-s);
+      border-block-start: var(--line-hairline) solid var(--surface-focus-rule);
+    }
+    .pass__place-edit :global(.pass__in),
+    .pass__date :global(.pass__in) {
+      min-inline-size: 0;
+      padding: 0 0 var(--line-hairline);
+      border: 0;
+      border-block-end: var(--line-hairline) solid var(--surface-focus-rule);
+      background: none;
+      color: inherit;
+      font: inherit;
+      color-scheme: dark;
+    }
+    .pass__place-edit :global(.pass__in:focus),
+    .pass__date :global(.pass__in:focus) {
+      outline: none;
+      border-block-end-color: var(--surface-focus-muted);
+    }
+    .pass__place-edit :global(.pass__btn) {
+      padding: var(--space-2xs) var(--space-s);
+      border: var(--line-hairline) solid var(--surface-focus-rule);
+      border-radius: var(--radius);
+      background: var(--surface-focus-act);
+      color: inherit;
+      font: inherit;
+      font-size: var(--text-s);
+      cursor: pointer;
+    }
+    .pass__place-edit :global(.pass__btn:hover) {
+      background: var(--surface-focus-act-hover);
     }
 
     .pass__acts {
