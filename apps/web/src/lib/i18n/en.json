@@ -2739,7 +2739,6 @@
   "peek.kind_person": "person",
   "peek.kind_organization": "organization",
   "peek.edit": "Edit",
-  "peek.all_day": "all day",
   "peek.date_not_found": "This date does not exist or you cannot see it.",
   "peek.date_load_error": "The date could not be loaded.",
   "peek.date_of_performance": "Performance",

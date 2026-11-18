@@ -2739,7 +2739,6 @@
   "peek.kind_person": "persona",
   "peek.kind_organization": "organización",
   "peek.edit": "Editar",
-  "peek.all_day": "todo el día",
   "peek.date_not_found": "Esta fecha no existe o no puedes verla.",
   "peek.date_load_error": "No se ha podido cargar la fecha.",
   "peek.date_of_performance": "Función",
