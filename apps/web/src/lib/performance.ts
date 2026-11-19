@@ -321,6 +321,9 @@ export const PerformanceSeriesCreateSchema = v.object({
 
 export type PerformanceSeriesCreate = v.InferOutput<typeof PerformanceSeriesCreateSchema>;
 
+/** ADR-225: longest «nota para quien recibe la hoja» (the column's CHECK). */
+export const SHARED_NOTE_MAX = 2000;
+
 /**
  * PATCH /api/performances/:key body. Whitelist of the operational fields
  * (status lifecycle, day, denormalized venue trio, conversation/line
@@ -364,6 +367,26 @@ export const PerformancePatchSchema = v.object({
    * es una decisión de producto abierta, no un descuido.
    */
   bolo_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
+  /**
+   * ADR-225 — la nota para quien recibe la hoja (todos los enlaces). Es
+   * `performance.notes` la que sigue interna y fuera de este PATCH. Vacía = null.
+   */
+  shared_note: v.optional(
+    v.nullable(
+      v.pipe(
+        v.string(),
+        v.trim(),
+        v.maxLength(SHARED_NOTE_MAX),
+        v.transform((s) => (s === '' ? null : s)),
+      ),
+    ),
+  ),
+  /**
+   * ADR-225 — la persona de esta función a quien llama la sala; null = el
+   * contacto público del espacio. Que sea del equipo lo comprueba el endpoint
+   * (la base lo vuelve a comprobar al servir la hoja).
+   */
+  venue_contact_person_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
   // `readiness` (ADR-084 § 3) is no longer written (ADR-164 § 2): the hotel
   // is a line of `logistics` (ADR-146 § 4) and the technical rider has its
   // own place. The column is gone (95, migration 20261110100000); a client

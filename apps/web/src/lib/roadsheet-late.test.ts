@@ -179,6 +179,24 @@ describe('roadsheetTeam', () => {
   test('a row without a person is skipped', () => {
     expect(roadsheetTeam([{ role: 'luces', person: null }], [], [])).toEqual([]);
   });
+
+  test('has_phone says whether the venue could call them, never the number (ADR-225)', () => {
+    const team = roadsheetTeam(
+      [
+        { role: 'luces', person: { id: 'pau', full_name: 'Pau', phone: '+34600' } },
+        { role: 'sonido', person: { id: 'joan', full_name: 'Joan', phone: null }, contact_override: { phone: '+34611' } },
+        { role: 'regidor', person: { id: 'eva', full_name: 'Eva', phone: ' ' }, contact_override: {} },
+      ],
+      [],
+      [],
+    );
+    expect(team.map((m) => [m.person_id, m.has_phone])).toEqual([
+      ['pau', true],
+      ['joan', true],
+      ['eva', false],
+    ]);
+    expect(JSON.stringify(team)).not.toContain('+34');
+  });
 });
 
 describe('lateLineText', () => {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildRoadsheet,
+  companyContactFor,
   isRoadsheetRole,
   materialHost,
   roadsheetRoleFor,
@@ -154,6 +155,75 @@ describe('buildRoadsheet — tech_manager', () => {
     b.assets[0].notes = 'v3, the old one had the wrong plot';
     expect(buildRoadsheet(b, 'tech_manager').assets?.[0].notes).toBeNull();
     expect(buildRoadsheet(b, 'full').assets?.[0].notes).toBe('v3, the old one had the wrong plot');
+  });
+});
+
+describe('shared note and company contact (ADR-225)', () => {
+  const contact = { kind: 'company', name: 'La Cia', phone: '+34900000000' } as const;
+  const withSharing = (): PerformanceBundle => ({
+    ...bundle(),
+    performance: { ...bundle().performance, shared_note: 'Parking behind the hall' },
+    company_contact: contact,
+  });
+
+  it('every role, `full` included, gets the shared note; the internal notes stay full-only', () => {
+    for (const role of ROADSHEET_ROLES) {
+      const sheet = buildRoadsheet(withSharing(), role);
+      expect(sheet.shared_note).toBe('Parking behind the hall');
+      expect(sheet.notes).toBe(role === 'full' ? 'internal: promoter prefers email' : null);
+    }
+  });
+
+  it('a blank or absent note is null, never an empty block', () => {
+    expect(buildRoadsheet(bundle(), 'venue').shared_note).toBeNull();
+    const b = withSharing();
+    b.performance.shared_note = '  \n ';
+    expect(buildRoadsheet(b, 'performer').shared_note).toBeNull();
+  });
+
+  it('the venue and the full sheet get the company contact; the other roles never do', () => {
+    expect(buildRoadsheet(withSharing(), 'venue').company_contact).toEqual(contact);
+    expect(buildRoadsheet(withSharing(), 'full').company_contact).toEqual(contact);
+    expect(buildRoadsheet(withSharing(), 'performer').company_contact).toBeNull();
+    expect(buildRoadsheet(withSharing(), 'tech_manager').company_contact).toBeNull();
+  });
+
+  it('the venue gets one number and nobody else’s: the team stays names only', () => {
+    const sheet = buildRoadsheet(withSharing(), 'venue');
+    const out = JSON.stringify(sheet);
+    expect(out).toContain('+34900000000');
+    for (const private_ of ['+34611111111', '+34622222222', '+34699999999', 'marc@x.example']) {
+      expect(out).not.toContain(private_);
+    }
+    expect(sheet.contacts).toBeNull();
+  });
+
+  it('no contact given: null, not a crash', () => {
+    expect(buildRoadsheet(bundle(), 'venue').company_contact).toBeNull();
+  });
+});
+
+describe('companyContactFor — who the venue calls (ADR-225)', () => {
+  const team = [
+    { person_id: 'pau', name: ' Pau Roca ' },
+    { person_id: 'eva', name: 'Eva' },
+  ];
+  const phones = new Map([['pau', ' +34600 ']]);
+  const ws = { name: 'La Cia', phone: '+34900' };
+
+  it('the chosen person, when they are in the team and have a phone', () => {
+    expect(companyContactFor('pau', team, phones, ws)).toEqual({ kind: 'person', name: 'Pau Roca', phone: '+34600' });
+  });
+  it('the company when nobody is chosen', () => {
+    expect(companyContactFor(null, team, phones, ws)).toEqual({ kind: 'company', name: 'La Cia', phone: '+34900' });
+  });
+  it('the company when the chosen person left the team or has no phone', () => {
+    expect(companyContactFor('gone', team, phones, ws)?.kind).toBe('company');
+    expect(companyContactFor('eva', team, phones, ws)?.kind).toBe('company');
+  });
+  it('nobody when there is no phone at all', () => {
+    expect(companyContactFor('eva', team, phones, { name: 'La Cia', phone: ' ' })).toBeNull();
+    expect(companyContactFor(null, team, phones, { name: 'La Cia', phone: null })).toBeNull();
   });
 });
 

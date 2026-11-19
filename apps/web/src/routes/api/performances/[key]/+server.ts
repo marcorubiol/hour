@@ -18,8 +18,9 @@ import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import { PerformancePatchSchema } from '$lib/performance';
-import { fetchPerformanceBundle, isUuid } from '$lib/server/performance-bundle';
-import { pgGet, pgPatch, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
+import { fetchPerformanceBundle, isUuid, SHARING_COLS } from '$lib/server/performance-bundle';
+import { roadsheetTeam } from '$lib/roadsheet-late';
+import { PostgrestError, pgGet, pgPatch, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import { rezoneScheduleInDoc } from '$lib/server/collab-schedule';
 import { decodeJwtPayload } from '$lib/server/session';
@@ -80,6 +81,10 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
  * of being silently dropped. The response still derives the five fields
  * from the rows. RLS enforces has_permission(project_id, 'edit:performance')
  * on UPDATE.
+ *
+ * ADR-225: also `shared_note` (the note every shared link carries; `notes`
+ * stays internal) and `venue_contact_person_id` (who the venue calls; 400
+ * `not_in_team` unless that person is in the performance's team).
  *
  * PostgREST mutations can't filter through embedded joins, so slug keys
  * resolve to an id first.
@@ -225,26 +230,54 @@ export const PATCH: RequestHandler = async ({ request, params, url, platform, lo
         ? { from: clockBefore, to: clockAfter }
         : null;
 
+    // ADR-225: the venue's contact must be someone of this performance's team
+    // (the same rule the shares endpoint lists, and the one the base applies
+    // when it serves the sheet). The FK alone would accept any person.
+    if (patch.venue_contact_person_id) {
+      const bundle = await fetchPerformanceBundle(env, jwt, id, null);
+      const team = bundle
+        ? roadsheetTeam(bundle.performance.crew_assignment, bundle.cast_members, bundle.performance.cast_override)
+        : [];
+      if (!team.some((m) => m.person_id === patch.venue_contact_person_id)) {
+        return json(
+          { error: 'not_in_team', hint: "venue_contact_person_id must be someone of the performance's team." },
+          400,
+        );
+      }
+    }
+
     const search = new URLSearchParams();
     search.set('id', `eq.${id}`);
     search.set('deleted_at', 'is.null');
-    search.set(
-      'select',
-      [
-        'id,workspace_id,project_id,line_id,conversation_id,slug,performed_at,status',
-        'venue_id,venue_name,city,country',
-        SCHEDULE_SLOT_EMBED,
-        'logistics,hospitality,technical,notes,custom_fields',
-        'created_by,created_at,updated_at,deleted_at,previous_slugs,hold_notice_days',
-      ].join(','),
-    );
-    const { data } = await pgPatch<Record<string, unknown> & { schedule_slot: ScheduleSlotRow[] }>(
-      env,
-      'performance',
-      jwt,
-      patch,
-      { search },
-    );
+    const setSelect = (withSharing: boolean) =>
+      search.set(
+        'select',
+        [
+          'id,workspace_id,project_id,line_id,conversation_id,slug,performed_at,status',
+          'venue_id,venue_name,city,country',
+          SCHEDULE_SLOT_EMBED,
+          'logistics,hospitality,technical,notes,custom_fields',
+          'created_by,created_at,updated_at,deleted_at,previous_slugs,hold_notice_days',
+          ...(withSharing ? [SHARING_COLS] : []),
+        ].join(','),
+      );
+    setSelect(true);
+    type PatchedRow = Record<string, unknown> & { schedule_slot: ScheduleSlotRow[] };
+    let withSharing = true;
+    let data: PatchedRow[];
+    try {
+      ({ data } = await pgPatch<PatchedRow>(env, 'performance', jwt, patch, { search }));
+    } catch (err) {
+      // 42703: a database without 20261119140000 (ADR-225) cannot return the
+      // two new columns; the failed request wrote nothing, so the same patch
+      // goes again without them in the answer. A patch that names them is a
+      // real failure there: the feature does not exist yet.
+      const touchesSharing = 'shared_note' in patch || 'venue_contact_person_id' in patch;
+      if (!(err instanceof PostgrestError && err.code === '42703') || touchesSharing) throw err;
+      withSharing = false;
+      setSelect(false);
+      ({ data } = await pgPatch<PatchedRow>(env, 'performance', jwt, patch, { search }));
+    }
     if (data.length === 0) return json({ error: 'not_found' }, 404);
 
     // Relinked to a venue in another zone: the running order keeps its wall
@@ -271,7 +304,7 @@ export const PATCH: RequestHandler = async ({ request, params, url, platform, lo
         rezoned = { moved: r.applied > 0, failed: false };
         if (r.applied > 0 && r.materialized) {
           // Read the row again so its five fields already say the new hours.
-          const fresh = await pgGet<Record<string, unknown> & { schedule_slot: ScheduleSlotRow[] }>(
+          const fresh = await pgGet<PatchedRow>(
             env,
             'performance',
             jwt,
@@ -294,7 +327,9 @@ export const PATCH: RequestHandler = async ({ request, params, url, platform, lo
     }
 
     return json({
-      performance: withTimeslots(data[0]),
+      performance: withTimeslots(
+        withSharing ? data[0] : { ...data[0], shared_note: null, venue_contact_person_id: null },
+      ),
       // The screen says the hours were moved to the new venue's clock, or
       // that they could not be.
       ...(rezoned.moved && rezone ? { schedule_rezoned: rezone } : {}),

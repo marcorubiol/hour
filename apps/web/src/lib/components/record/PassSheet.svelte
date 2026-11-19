@@ -11,6 +11,7 @@
    *             ┄┄┄ stub: «Hoja de Pau Roca · luces» / «Hoja para la sala»
    *             [Llamar a Pere] [Mapa]
    *   «Llego tarde» (personal link, on the day)
+   *   the note for whoever receives the sheet (every role, ADR-225)
    *   EL DÍA, PARADA A PARADA — a vertical line of stops, the show the big one
    *   folds: contacts · logistics · hospitality · technical and materials ·
    *   who goes (team) / who comes (venue) · programmer · notes
@@ -112,9 +113,27 @@
   let mapHref = $derived(mapsHref(mapParts));
   /** «Cambiar»: there are no Settings on a public sheet, so the choice changes here. */
   let mapLink: ReturnType<typeof MapLink> | undefined = $state();
+  /**
+   * Whom the call act dials. The venue's own technician (`call`) makes no
+   * sense on the venue's sheet: there the call is the company's (ADR-225), a
+   * person by first name and the company by its name. Every other role keeps
+   * the venue's contact.
+   */
+  let companyCall = $derived(sheet.role === 'venue' ? sheet.company_contact : null);
   let acts = $derived.by<PassAct[]>(() => {
     const out: PassAct[] = [];
-    if (call?.phone) {
+    if (sheet.role === 'venue') {
+      if (companyCall?.phone) {
+        out.push({
+          id: 'call',
+          label: t('roadsheet.call', locale, {
+            name: companyCall.kind === 'person' ? firstName(companyCall.name) : companyCall.name,
+          }),
+          href: telHref(companyCall.phone),
+          testid: 'roadsheet-company-call',
+        });
+      }
+    } else if (call?.phone) {
       out.push({
         id: 'call',
         label: t('roadsheet.call', locale, { name: firstName(call.name) }),
@@ -246,6 +265,14 @@
 
   {#if late}
     <div class="ps__late">{@render late()}</div>
+  {/if}
+
+  <!-- ADR-225: what the company wants said to whoever opens the sheet. Quiet, before the day. -->
+  {#if sheet.shared_note}
+    <section class="ps__shared" aria-label={t('pass.shared_note', locale)} data-testid="roadsheet-shared-note">
+      <h2 class="ps__label">{t('pass.shared_note', locale)}</h2>
+      <p class="ps__shared-text">{sheet.shared_note}</p>
+    </section>
   {/if}
 
   {#if points.length > 0 || untimedTrips.length > 0}
@@ -478,6 +505,25 @@
       letter-spacing: var(--mono-letter-spacing-loose);
       text-transform: uppercase;
       color: var(--text-faint);
+    }
+
+    /* The shared note: a quiet block, the text in the body's ink on a faint ground. */
+    .ps__shared {
+      display: block;
+      padding: var(--space-s) var(--space-m);
+      border-inline-start: calc(var(--border-width) * 2) solid var(--border-color-dark);
+      background: var(--bg-light);
+    }
+    .ps__shared .ps__label {
+      margin-block-end: var(--space-2xs);
+    }
+    .ps__shared-text {
+      margin: 0;
+      font-size: var(--text-s);
+      line-height: 1.5;
+      color: var(--text-color);
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
     }
 
     .ps__trip-head {

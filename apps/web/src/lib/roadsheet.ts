@@ -32,6 +32,12 @@
  *     line, which the public sheet reads (`get_public_roadsheet`): the
  *     rider and the plot are what a venue needs, so every role gets them.
  *     Only what the company sends out, never what it received.
+ *   - `shared_note` (ADR-225) is the note «para quien recibe la hoja»: written
+ *     to be read by whoever opens the link, so EVERY role gets it, `full`
+ *     included. It is not `notes`, which stays internal.
+ *   - `company_contact` (ADR-225) is the one number the venue may call: the
+ *     company's public contact, or the one person an editor chose for this
+ *     performance. Venue + full only; the other roles have their own people.
  *   - `travel` (ADR-166) is the travelling party's: full + performer +
  *     tech_manager, never the venue. The trips of the performance's day and
  *     its eve, of the same project (`tripsOfPerformance`), with their timed
@@ -63,7 +69,8 @@ type RoadsheetSection =
   | 'contacts'
   | 'notes'
   | 'assets'
-  | 'materials';
+  | 'materials'
+  | 'company_contact';
 
 export const ROLE_SECTIONS: Record<RoadsheetRole, readonly RoadsheetSection[]> = {
   full: [
@@ -79,8 +86,9 @@ export const ROLE_SECTIONS: Record<RoadsheetRole, readonly RoadsheetSection[]> =
     'notes',
     'assets',
     'materials',
+    'company_contact',
   ],
-  venue: ['schedule', 'venue', 'technical', 'cast', 'crew', 'materials'],
+  venue: ['schedule', 'venue', 'technical', 'cast', 'crew', 'materials', 'company_contact'],
   performer: ['schedule', 'venue', 'travel', 'logistics', 'hospitality', 'cast', 'crew', 'materials'],
   tech_manager: ['schedule', 'venue', 'travel', 'logistics', 'technical', 'cast', 'crew', 'assets', 'materials'],
 };
@@ -92,6 +100,18 @@ export interface RoadsheetPerson {
   full_name: string;
   email?: string | null;
   phone?: string | null;
+}
+
+/**
+ * Who the venue calls (ADR-225): `kind: 'company'` is the workspace's public
+ * contact; `kind: 'person'` is the one team member an editor chose for this
+ * performance. Only name and phone ever travel: never the email, never anyone
+ * else's number.
+ */
+export interface CompanyContact {
+  kind: 'company' | 'person';
+  name: string;
+  phone: string;
 }
 
 interface CrewEntry {
@@ -273,7 +293,10 @@ export interface PerformanceBundle {
     | 'city'
     | 'country'
     | 'notes'
-  > &
+  > & {
+    /** ADR-225: the note for whoever receives the sheet. Absent = not read / not set. */
+    shared_note?: string | null;
+  } &
     // ADR-090: derived from `schedule_slot` by the bundle.
     TimeslotFields & {
     /** ADR-090 P3: the whole order. Absent from the public projection. */
@@ -292,6 +315,8 @@ export interface PerformanceBundle {
   materials?: RoadsheetMaterial[];
   /** The trips of the day and its eve (`tripsOfPerformance`); absent = not read. */
   travel?: RoadsheetTrip[];
+  /** ADR-225: who the venue calls; absent or null = nobody to call. */
+  company_contact?: CompanyContact | null;
 }
 
 export interface Roadsheet {
@@ -327,6 +352,10 @@ export interface Roadsheet {
   crew: CrewEntry[] | null;
   contacts: { programmer: RoadsheetPerson } | null;
   notes: string | null;
+  /** ADR-225: the note for whoever receives the sheet, every role. */
+  shared_note: string | null;
+  /** ADR-225: who the venue calls; venue and full only. */
+  company_contact: CompanyContact | null;
   assets: AssetEntry[] | null;
   /** 88: the links the company sends out. The same section as `assets` on screen. */
   materials?: RoadsheetMaterial[] | null;
@@ -354,6 +383,29 @@ export function roadsheetRoleFor(
 ): RoadsheetRole {
   if (requested !== 'full') return requested;
   return workspaceRole && INTERNAL_ROLES.has(workspaceRole) ? 'full' : 'tech_manager';
+}
+
+/**
+ * WHO THE VENUE CALLS (ADR-225), the same rule `get_public_roadsheet` applies
+ * for the venue link, for the screens that read the performance as an editor
+ * (the operator's «ver como» and the full sheet). The chosen person counts
+ * only while they are in `team` and have a phone; otherwise the company's
+ * public contact (`workspace.name` + `workspace.phone`); with no phone at
+ * all, nobody (null). `phones` maps a person id to the number a venue may
+ * get: their per-gig override, else the company's dossier.
+ */
+export function companyContactFor(
+  chosenPersonId: string | null | undefined,
+  team: readonly { person_id: string; name: string }[],
+  phones: ReadonlyMap<string, string>,
+  workspace: { name: string | null; phone: string | null },
+): CompanyContact | null {
+  const chosen = chosenPersonId ? team.find((m) => m.person_id === chosenPersonId) : undefined;
+  const phone = chosen ? phones.get(chosen.person_id)?.trim() : undefined;
+  if (chosen && chosen.name.trim() && phone) return { kind: 'person', name: chosen.name.trim(), phone };
+  const companyPhone = workspace.phone?.trim();
+  const companyName = workspace.name?.trim();
+  return companyPhone && companyName ? { kind: 'company', name: companyName, phone: companyPhone } : null;
 }
 
 function stripPerson(p: RoadsheetPerson | null): RoadsheetPerson | null {
@@ -431,6 +483,8 @@ export function buildRoadsheet(bundle: PerformanceBundle, role: RoadsheetRole): 
     contacts:
       has('contacts') && bundle.programmer ? { programmer: bundle.programmer } : null,
     notes: has('notes') ? p.notes : null,
+    shared_note: p.shared_note?.trim() ? p.shared_note : null,
+    company_contact: has('company_contact') ? (bundle.company_contact ?? null) : null,
     // An asset's note is the company's own (the sheet never draws it): only `full` carries it.
     assets: has('assets')
       ? assetsBesideMaterials(bundle.assets, materials ?? []).map((a) => (role === 'full' ? a : { ...a, notes: null }))

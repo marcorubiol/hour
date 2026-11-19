@@ -3749,5 +3749,17 @@
   "roadsheet.hint_venue": "Horaris, tècnica i materials",
   "roadsheet.hint_performer": "A més: viatge i hotel",
   "roadsheet.hint_tech_manager": "A més: viatge, rider i telèfons",
-  "roadsheet.personal_heading": "A una persona · pot avisar «Arribo tard»"
+  "roadsheet.personal_heading": "A una persona · pot avisar «Arribo tard»",
+  "pass.shared_note": "Nota per a qui rep el full",
+  "pass.shared_note_hint": "Surt a tots els enllaços compartits.",
+  "pass.shared_note_placeholder": "Alguna cosa que qui obri el full hagi de saber",
+  "roadsheet.venue_calls": "La sala truca a: {name}",
+  "roadsheet.venue_calls_none": "La sala no veurà cap telèfon",
+  "roadsheet.venue_calls_label": "La sala truca a",
+  "roadsheet.calls_title": "A qui truca la sala",
+  "roadsheet.calls_hint": "A l'enllaç de la sala només surt aquest nom i aquest telèfon; els dels altres no.",
+  "roadsheet.calls_company": "{name} · {phone}",
+  "roadsheet.calls_company_plain": "La companyia",
+  "roadsheet.calls_no_phone": "{name} · sense telèfon",
+  "roadsheet.calls_not_saved": "No s'ha pogut desar a qui truca la sala"
 }

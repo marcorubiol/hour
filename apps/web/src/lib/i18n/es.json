@@ -3749,5 +3749,17 @@
   "roadsheet.hint_venue": "Horarios, técnica y materiales",
   "roadsheet.hint_performer": "Además: viaje y hotel",
   "roadsheet.hint_tech_manager": "Además: viaje, rider y teléfonos",
-  "roadsheet.personal_heading": "A una persona · puede avisar «Llego tarde»"
+  "roadsheet.personal_heading": "A una persona · puede avisar «Llego tarde»",
+  "pass.shared_note": "Nota para quien recibe la hoja",
+  "pass.shared_note_hint": "Sale en todos los enlaces compartidos.",
+  "pass.shared_note_placeholder": "Algo que quien abra la hoja deba saber",
+  "roadsheet.venue_calls": "La sala llama a: {name}",
+  "roadsheet.venue_calls_none": "La sala no verá ningún teléfono",
+  "roadsheet.venue_calls_label": "La sala llama a",
+  "roadsheet.calls_title": "A quién llama la sala",
+  "roadsheet.calls_hint": "En el enlace de la sala sale solo este nombre y este teléfono; los de los demás no.",
+  "roadsheet.calls_company": "{name} · {phone}",
+  "roadsheet.calls_company_plain": "La compañía",
+  "roadsheet.calls_no_phone": "{name} · sin teléfono",
+  "roadsheet.calls_not_saved": "No se pudo guardar a quién llama la sala"
 }

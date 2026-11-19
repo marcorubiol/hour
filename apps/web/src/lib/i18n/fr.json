@@ -3749,5 +3749,17 @@
   "roadsheet.hint_venue": "Horaires, technique et matériel",
   "roadsheet.hint_performer": "En plus : voyage et hôtel",
   "roadsheet.hint_tech_manager": "En plus : voyage, rider et téléphones",
-  "roadsheet.personal_heading": "À une personne · peut signaler «J’arrive en retard»"
+  "roadsheet.personal_heading": "À une personne · peut signaler «J’arrive en retard»",
+  "pass.shared_note": "Note pour qui reçoit la feuille",
+  "pass.shared_note_hint": "Elle figure sur tous les liens partagés.",
+  "pass.shared_note_placeholder": "Tout ce que celui qui ouvre la feuille doit savoir",
+  "roadsheet.venue_calls": "La salle appelle : {name}",
+  "roadsheet.venue_calls_none": "La salle ne verra aucun numéro",
+  "roadsheet.venue_calls_label": "La salle appelle",
+  "roadsheet.calls_title": "Qui la salle appelle",
+  "roadsheet.calls_hint": "Le lien de la salle n'affiche que ce nom et ce numéro, jamais ceux des autres.",
+  "roadsheet.calls_company": "{name} · {phone}",
+  "roadsheet.calls_company_plain": "La compagnie",
+  "roadsheet.calls_no_phone": "{name} · sans téléphone",
+  "roadsheet.calls_not_saved": "Impossible d'enregistrer qui la salle appelle"
 }

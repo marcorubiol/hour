@@ -8438,3 +8438,49 @@ Segunda fase de «el pase es la hoja de ruta». El documento de la hoja deja de 
    diálogo; entonces se retira esa página.
 
 **Cómo se revierte.** Revertir el commit (restaura `RoadsheetView`); sin esquema, API ni datos; `CACHE_SCHEMA` no cambia.
+
+## [2026-11-19] ADR-225 · La sala puede llamar a la compañía y toda hoja lleva una nota para quien la recibe (fase 3 de ADR-222)
+Tercera fase de «el pase es la hoja de ruta». Dos decisiones de Marco (19-11, al contestar las preguntas de la propuesta):
+la sala necesita un teléfono al que llamar, y hace falta una nota que salga en todos los enlaces sin ser las notas internas.
+
+1. **A quién llama la sala.** En el enlace de rol `venue`, «Llamar a …» deja de ser el técnico de la propia sala (no tiene
+   sentido en su hoja) y es la compañía: por defecto su contacto público (`workspace.name` + `workspace.phone`, que ya
+   existían); por función, un editor puede elegir a **una persona de su equipo** (`performance.venue_contact_person_id`),
+   y entonces la sala ve el nombre de pila y el teléfono de esa persona, y solo de esa. Se elige en «Compartir», en la fila
+   de la sala («La sala llama a: …» · «Cambiar»). Sin teléfono en ninguno de los dos, no hay botón.
+2. **Excepción de privacidad, deliberada y estrecha.** Hasta ahora la sala veía de la compañía nombres y papeles, nunca un
+   teléfono (ADR-041). Desde aquí le llega **un** nombre y **un** teléfono: el del contacto público del espacio (público
+   ya) o el de la persona que un editor eligió para esa función. Nada más cambia: ni el correo de esa persona ni el
+   teléfono de nadie más llegan a la sala, y los otros roles (intérprete, dirección técnica) no cambian. La base no se fía
+   del cliente: la elección solo vale mientras la persona siga en el equipo de la función (`private.roadsheet_person_role`,
+   la regla de los enlaces personales) y tenga nombre y teléfono; si no, la sala recibe el contacto de la compañía. Un
+   `venue_contact_person_id` escrito saltándose la API (la FK no mira el equipo) no saca a nadie ajeno. El teléfono es el
+   override de la fila de equipo (`crew_assignment.contact_override.phone`, ADR-023) y, si no, el de la ficha de la persona
+   en el espacio (lo que el editor ve al elegir), no el de `person`, que la persona no ha compartido con el espacio (las
+   filas de equipo y reparto de `get_public_roadsheet` leen `person.phone`, sin tocar; es una diferencia ya existente).
+3. **La nota para quien recibe la hoja** (`performance.shared_note`, ≤ 2000). Sale en el pase en lectura de **todos** los
+   enlaces, debajo de la pieza y antes de «El día», con su etiqueta mono. Se escribe en el pase, bajo «Notas», con una
+   línea («Sale en todos los enlaces compartidos.»): campo simple que se guarda por PATCH al salir (no es el documento
+   colaborativo de las notas). `performance.notes` sigue siendo interna y solo la lleva el rol `full`.
+4. **Datos y permisos.** Migración `20261119140000_roadsheet_contact_shared_note.sql`: las dos columnas (CHECK de largo,
+   FK `ON DELETE SET NULL` con su índice) y `get_public_roadsheet` con dos añadidos sobre el cuerpo vivo de
+   `20261113110000` (`performance.shared_note` en todos los roles y `company_contact` `{kind, name, phone}` solo en `venue`).
+   Sin políticas RLS nuevas: `performance` tiene RLS por fila y las columnas la heredan. **Pero el SELECT de
+   `authenticated` sobre `performance` es por columnas** (20260720172431; la trampa de 20260829120000), de modo que la
+   migración las añade al grant. El PATCH (`PerformancePatchSchema`) acepta `shared_note` (recorta; vacío = null) y
+   `venue_contact_person_id` (uuid o null; 400 `not_in_team` si no es del equipo de la función, el mismo `team` de
+   `/roadsheet/shares`); sin permiso nuevo (`edit:performance`). La vista previa del operador y la hoja `full` calculan el
+   mismo contacto (`companyContactFor`). `GET /roadsheet/shares` dice a quién llama la sala, el contacto público y, por
+   persona del equipo, solo si tiene teléfono (`has_phone`), nunca el número. Sube `CACHE_SCHEMA` a 38 (la respuesta de la
+   función y la de los enlaces ganan campos).
+5. **Orden de despliegue: indiferente.** El código tolera una base sin la migración: el endpoint público devuelve la hoja
+   sin nota ni contacto (la RPC es jsonb y los campos faltan: null); el GET y el PATCH de la función caen a una lectura sin
+   las columnas ante `42703` y responden `shared_note` y `venue_contact_person_id` a null; `GET /roadsheet/shares` ya
+   tolera un fallo de lectura del equipo. Solo un PATCH que nombre las columnas falla (la función aún no existe). Lo normal:
+   migración primero, luego el código; al revés, la nota y el contacto aparecen en cuanto se aplica.
+
+**Cómo se revierte.** Revertir el commit (el editor deja de ofrecer los dos campos y la sala vuelve a llamar al técnico de la
+sala) y aplicar `build/runbooks/rollback-20261119-roadsheet-contact-shared-note.sql`: restaura el cuerpo anterior de
+`get_public_roadsheet` y borra las dos columnas con su índice y su grant, **perdiendo** las notas compartidas y los
+contactos elegidos (el script dice cómo copiarlos antes). El código desplegado tolera la base sin ellas, así que el orden
+tampoco importa al revertir. Pendiente de ADR-222: la fase 4 (limpieza de la página del operador).

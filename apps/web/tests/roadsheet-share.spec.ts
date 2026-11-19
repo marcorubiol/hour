@@ -46,6 +46,8 @@ test.describe('public road sheet link', () => {
 
     // Create a venue-role link; capture the token from the API response.
     const venueRow = dialog.getByTestId('roadsheet-role-venue');
+    // ADR-225: the venue's row says whom the venue will call (the company by default).
+    await expect(venueRow.getByTestId('roadsheet-venue-calls')).toBeVisible();
     const [response] = await Promise.all([
       page.waitForResponse(
         (r) => r.url().includes('/roadsheet/shares') && r.request().method() === 'POST',

@@ -16,12 +16,17 @@
  *
  * 143 (20261113110000): `trade`, the space's, so the sheet speaks it. A base
  * without it answers without it, and the page speaks stage.
+ *
+ * 225 (20261119140000, ADR-225): `performance.shared_note` for every role and
+ * `company_contact` {kind, name, phone} for the venue link alone. Absent on a
+ * base that has not had the migration: null, nothing breaks.
  */
 
 import type { RequestHandler } from './$types';
 import {
   buildRoadsheet,
   type CastEntry,
+  type CompanyContact,
   type PerformanceBundle,
   type RoadsheetPerson,
   type RoadsheetMaterial,
@@ -68,6 +73,11 @@ type PublicBundle = {
   late?: PublicLate;
   /** 143: `workspace.trade` of the performance's space. */
   trade?: string;
+  /** 225 (20261119140000): who the venue calls; only on the venue link, null
+      when there is no phone to give. `performance.shared_note` rides in the
+      `performance` object for every role. A base without the migration sends
+      neither, and the sheet simply has no note and nobody to call. */
+  company_contact?: CompanyContact | null;
 };
 
 export const GET: RequestHandler = async ({ params, platform, locals }) => {
@@ -107,6 +117,7 @@ export const GET: RequestHandler = async ({ params, platform, locals }) => {
       assets: b.assets,
       materials: (b.materials ?? []).map(({ kind, url, uploaded_at, scope }) => ({ kind, url, uploaded_at, scope })),
       ...(b.travel ? { travel: b.travel } : {}),
+      company_contact: b.company_contact ?? null,
     };
 
     return jsonNoStore({

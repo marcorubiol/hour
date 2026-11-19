@@ -3749,5 +3749,17 @@
   "roadsheet.hint_venue": "Schedule, tech and materials",
   "roadsheet.hint_performer": "Also: travel and hotel",
   "roadsheet.hint_tech_manager": "Also: travel, rider and phone numbers",
-  "roadsheet.personal_heading": "To one person · can say «I’m running late»"
+  "roadsheet.personal_heading": "To one person · can say «I’m running late»",
+  "pass.shared_note": "Note for whoever receives the sheet",
+  "pass.shared_note_hint": "It appears on every shared link.",
+  "pass.shared_note_placeholder": "Anything whoever opens the sheet should know",
+  "roadsheet.venue_calls": "The venue calls: {name}",
+  "roadsheet.venue_calls_none": "The venue will not see any phone number",
+  "roadsheet.venue_calls_label": "The venue calls",
+  "roadsheet.calls_title": "Who the venue calls",
+  "roadsheet.calls_hint": "The venue's link shows only this name and phone number, never anyone else's.",
+  "roadsheet.calls_company": "{name} · {phone}",
+  "roadsheet.calls_company_plain": "The company",
+  "roadsheet.calls_no_phone": "{name} · no phone",
+  "roadsheet.calls_not_saved": "Could not save who the venue calls"
 }

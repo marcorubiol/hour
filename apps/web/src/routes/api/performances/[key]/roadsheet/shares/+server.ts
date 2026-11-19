@@ -17,13 +17,19 @@
  * `create_roadsheet_share_for_person`, which sets the role from the team
  * (crew: tech_manager, cast: performer). Only a personal link shows
  * «Llego tarde».
+ *
+ * ADR-225: GET also says whom the venue's link calls, for the dialog that
+ * lets an editor change it: `venue_contact_person_id` (null = the company),
+ * the company's public contact (`company`, name and phone), and per team
+ * member only whether they have a phone (`has_phone`), never the number.
+ * This endpoint is for editors (`edit:performance`), as the dialog is.
  */
 
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import { fetchPerformanceBundle, resolvePerformanceId } from '$lib/server/performance-bundle';
-import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
+import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { roadsheetTeam, type TeamMember } from '$lib/roadsheet-late';
 import { pgErrorResponse } from '$lib/server/errors';
 import { json } from '$lib/server/http';
@@ -43,21 +49,37 @@ function mapShare(s: ShareRow, team: readonly TeamMember[] = []): RoadsheetShare
   return { id: s.id, token: s.token, role: s.role, created_at: s.created_at, expires_at: s.expires_at, person };
 }
 
+/** What the venue's link calls, as the dialog needs it (ADR-225). */
+type VenueCallInfo = {
+  team: TeamMember[];
+  venue_contact_person_id: string | null;
+  company: { name: string; phone: string | null } | null;
+};
+
 /**
  * The performance's team, as the caller reads it (RLS), for the personal
- * links. Secondary to the list: if it cannot be read, the links still list
- * (without names) and the failure goes to the log.
+ * links, plus whom the venue's link calls (ADR-225). Secondary to the list:
+ * if it cannot be read, the links still list (without names) and the failure
+ * goes to the log.
  */
 async function readTeam(
   env: SupabaseEnv,
   jwt: string,
   performanceId: string,
   requestId: string | null | undefined,
-): Promise<TeamMember[]> {
+): Promise<VenueCallInfo> {
   try {
     const bundle = await fetchPerformanceBundle(env, jwt, performanceId, null);
-    if (!bundle) return [];
-    return roadsheetTeam(bundle.performance.crew_assignment, bundle.cast_members, bundle.performance.cast_override);
+    if (!bundle) return { team: [], venue_contact_person_id: null, company: null };
+    const p = bundle.performance;
+    const { data } = await pgGet<{ name: string; phone: string | null }>(env, 'workspace', jwt, {
+      search: new URLSearchParams({ select: 'name,phone', id: `eq.${p.workspace_id}`, limit: '1' }),
+    });
+    return {
+      team: roadsheetTeam(p.crew_assignment, bundle.cast_members, p.cast_override),
+      venue_contact_person_id: p.venue_contact_person_id ?? null,
+      company: data[0] ? { name: data[0].name, phone: data[0].phone?.trim() || null } : null,
+    };
   } catch (error) {
     console.error(
       JSON.stringify({
@@ -68,7 +90,7 @@ async function readTeam(
         message: error instanceof Error ? error.message : String(error),
       }),
     );
-    return [];
+    return { team: [], venue_contact_person_id: null, company: null };
   }
 }
 
@@ -90,11 +112,16 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
     const id = await resolvePerformanceId(env, jwt, params.key, url.searchParams.get('ws'));
     if (!id) return json({ error: 'not_found' }, 404);
 
-    const [{ data }, team] = await Promise.all([
+    const [{ data }, info] = await Promise.all([
       pgPostRpc<ShareRow>(env, 'list_roadsheet_shares', jwt, { p_performance_id: id }),
       readTeam(env, jwt, id, locals.requestId),
     ]);
-    return json({ items: data.filter(Boolean).map((s) => mapShare(s, team)), team });
+    return json({
+      items: data.filter(Boolean).map((s) => mapShare(s, info.team)),
+      team: info.team,
+      venue_contact_person_id: info.venue_contact_person_id,
+      company: info.company,
+    });
   } catch (err) {
     return pgErrorResponse(
       err,
