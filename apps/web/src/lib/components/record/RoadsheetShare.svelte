@@ -17,6 +17,7 @@
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
+  import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { copyText } from '$lib/clipboard';
   import { dayMonth, localDayISO } from '$lib/datetime';
@@ -34,7 +35,14 @@
 
   type Share = RoadsheetShare;
   /** The shape under `['roadsheet-shares', {ws, slug}]` everywhere it is read. */
-  type SharesResponse = { items: Share[]; team?: TeamMember[] };
+  type SharesResponse = {
+    items: Share[];
+    team?: TeamMember[];
+    /** ADR-226: whom the venue's link calls; null = the company. */
+    venue_contact_person_id?: string | null;
+    /** ADR-226: the company's public contact (the default call). */
+    company?: { name: string; phone: string | null } | null;
+  };
 
   const PUBLIC_ROLES = ['venue', 'performer', 'tech_manager'] as const;
 
@@ -74,6 +82,56 @@
   /** The role links; a personal one is listed by its person (121 B). */
   let roleShares = $derived(allShares.filter((s) => !s.person));
   let team = $derived($sharesQuery.data?.team ?? []);
+
+  // ── Whom the venue calls (ADR-226) ─────────────────────────────────────
+  // The same rule the base applies to the venue's link: the chosen person
+  // while they are in the team and have a phone, else the company's public
+  // contact, else nobody (no phone to give).
+  let company = $derived($sharesQuery.data?.company ?? null);
+  let chosenId = $derived($sharesQuery.data?.venue_contact_person_id ?? null);
+  let chosen = $derived(team.find((m) => m.person_id === chosenId) ?? null);
+  let venueCallName = $derived(
+    chosen?.has_phone ? chosen.name : company?.phone ? company.name : null,
+  );
+  let callsOpen = $state(false);
+  let callsValue = $state('');
+  function openCalls() {
+    callsValue = chosen ? chosen.person_id : '';
+    callsOpen = true;
+  }
+  let callOptions = $derived([
+    {
+      value: '',
+      label: company
+        ? t(company.phone ? 'roadsheet.calls_company' : 'roadsheet.calls_no_phone', locale, {
+            name: company.name,
+            phone: company.phone ?? '',
+          })
+        : t('roadsheet.calls_company_plain', locale),
+    },
+    ...team.map((m) => ({
+      value: m.person_id,
+      label: m.has_phone
+        ? m.name
+        : t('roadsheet.calls_no_phone', locale, { name: m.name }),
+    })),
+  ]);
+  const saveCalls = createMutation({
+    mutationFn: () =>
+      mutateJSON(
+        'PATCH',
+        `/api/performances/${encodeURIComponent(slug)}?ws=${encodeURIComponent(workspaceSlug)}`,
+        { venue_contact_person_id: callsValue || null },
+      ),
+    onSuccess: () => {
+      callsOpen = false;
+      refresh();
+      void queryClient.invalidateQueries({ queryKey: ['performance'] });
+      // The operator's preview (`['roadsheet', { ws, slug, role }]`) draws the contact too.
+      void queryClient.invalidateQueries({ queryKey: ['roadsheet'] });
+    },
+    onError: failed('roadsheet.calls_not_saved'),
+  });
 
   /** The rows: the three public roles always, then any other role that holds a link. */
   let roles = $derived.by<string[]>(() => {
@@ -204,6 +262,16 @@
             </Button>
           {/if}
         </div>
+        {#if r === 'venue' && loaded}
+          <p class="rsh__calls" data-testid="roadsheet-venue-calls">
+            <span class="rsh__calls-word">
+              {venueCallName
+                ? t('roadsheet.venue_calls', locale, { name: venueCallName })
+                : t('roadsheet.venue_calls_none', locale)}
+            </span>
+            <Button size="xs" variant="quiet" onclick={openCalls}>{t('roadsheet.change', locale)}</Button>
+          </p>
+        {/if}
         {#each linksOf(r) as s (s.id)}
           <p class="rsh__link">
             <span class="rsh__when" class:rsh__gone={shareExpired(s.expires_at)}>{expiryWord(s)}</span>
@@ -277,6 +345,17 @@
   {/snippet}
 </Dialog>
 
+<Dialog open={callsOpen} onclose={() => (callsOpen = false)} title={t('roadsheet.calls_title', locale)} size="s">
+  <p class="rsh__calls-hint">{t('roadsheet.calls_hint', locale)}</p>
+  <Select label={t('roadsheet.venue_calls_label', locale)} options={callOptions} bind:value={callsValue} />
+  {#snippet actions()}
+    <Button variant="quiet" onclick={() => (callsOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button onclick={() => $saveCalls.mutate()} loading={$saveCalls.isPending}>
+      {t('edit.save', locale)}
+    </Button>
+  {/snippet}
+</Dialog>
+
 <ConfirmDialog
   bind:open={() => revokingId !== null, (v) => { if (!v) revokingId = null; }}
   title={t('roadsheet.revoke_title', locale)}
@@ -339,6 +418,22 @@
       flex-wrap: wrap;
       gap: var(--space-xs);
       font-size: var(--text-xs);
+    }
+
+    /* «La sala llama a: …», quiet, under the venue's row. */
+    .rsh__calls {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: var(--space-xs);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+    }
+
+    .rsh__calls-hint {
+      margin-block: var(--space-s);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
     }
 
     .rsh__when {

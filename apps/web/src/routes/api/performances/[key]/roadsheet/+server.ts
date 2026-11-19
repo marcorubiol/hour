@@ -20,6 +20,10 @@
  * the same rule as `get_public_roadsheet`, so «view as» shows what the
  * public link shows.
  *
+ * ADR-226: `shared_note` for every role; `company_contact` (who the venue
+ * calls) for venue and full, computed here from the workspace's public
+ * contact and the chosen person, as the base does for the venue link.
+ *
  * Auth: Bearer JWT required (the signed anonymous link is D6, not built).
  */
 
@@ -28,16 +32,19 @@ import { extractAccessToken } from '$lib/auth';
 import {
   ROLE_SECTIONS,
   buildRoadsheet,
+  companyContactFor,
   isRoadsheetRole,
   roadsheetRoleFor,
   tripsOfPerformance,
   type CastEntry,
+  type CompanyContact,
   type PerformanceBundle,
   type RoadsheetMaterial,
   type RoadsheetTrip,
   type TripRow,
 } from '$lib/roadsheet';
 import { COMMITMENTS_EMBED } from '$lib/people';
+import { roadsheetTeam } from '$lib/roadsheet-late';
 import { addDaysIso } from '$lib/planner';
 import { STAGE_SELECT } from '$lib/travel-stage';
 import {
@@ -87,6 +94,7 @@ function toProjectionBundle(result: PerformanceBundleResult): PerformanceBundle 
       wrap_at: p.wrap_at,
       schedule: p.schedule,
       notes: p.notes,
+      shared_note: p.shared_note,
       logistics: p.logistics,
       hospitality: p.hospitality,
       technical: p.technical,
@@ -126,6 +134,41 @@ function toProjectionBundle(result: PerformanceBundleResult): PerformanceBundle 
       uploaded_at: a.uploaded_at,
     })),
   };
+}
+
+/**
+ * ADR-226: who the venue would call, as the operator's preview and the full
+ * sheet show it. The workspace's public contact is read here (the bundle has
+ * no workspace row); the chosen person and their phones come from the bundle
+ * itself, by the same rule the base applies to the venue link.
+ */
+async function readCompanyContact(
+  env: SupabaseEnv,
+  jwt: string,
+  result: PerformanceBundleResult,
+): Promise<CompanyContact | null> {
+  const p = result.performance;
+  const { data } = await pgGet<{ name: string; phone: string | null }>(env, 'workspace', jwt, {
+    search: new URLSearchParams({ select: 'name,phone', id: `eq.${p.workspace_id}`, limit: '1' }),
+  });
+  const team = roadsheetTeam(p.crew_assignment, result.cast_members, p.cast_override);
+  // A crew row's per-gig override wins over the dossier's phone (ADR-023).
+  const phones = new Map<string, string>();
+  const put = (id: string | undefined, phone: string | null | undefined) => {
+    const v = phone?.trim();
+    if (id && v && !phones.has(id)) phones.set(id, v);
+  };
+  for (const c of p.crew_assignment) {
+    const o = c.contact_override as { phone?: unknown } | null;
+    put(c.person?.id, typeof o?.phone === 'string' ? o.phone : null);
+  }
+  for (const c of p.crew_assignment) put(c.person?.id, c.person?.phone);
+  for (const o of p.cast_override) put(o.person?.id, o.person?.phone);
+  for (const m of result.cast_members) put(m.person?.id, m.person?.phone);
+  return companyContactFor(p.venue_contact_person_id, team, phones, {
+    name: data[0]?.name ?? null,
+    phone: data[0]?.phone ?? null,
+  });
 }
 
 /**
@@ -268,6 +311,9 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
     }
     if (ROLE_SECTIONS[role].includes('materials')) {
       bundle.materials = await readMaterials(env, jwt, result.performance);
+    }
+    if (ROLE_SECTIONS[role].includes('company_contact')) {
+      bundle.company_contact = await readCompanyContact(env, jwt, result);
     }
     const sheet = buildRoadsheet(bundle, role);
     // The viewer needs the venue timezone for dual-time display even when

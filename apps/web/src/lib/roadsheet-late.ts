@@ -214,7 +214,19 @@ export function lateLineText(
     .join(' · ');
 }
 
-type TeamRow = { role: string | null; person: { id: string; full_name: string } | null };
+type TeamRow = {
+  role: string | null;
+  person: { id: string; full_name: string; phone?: string | null } | null;
+  /** Crew rows only: the per-gig override of the person's contact (`phone`). */
+  contact_override?: unknown;
+};
+
+/** The phone a crew row's per-gig override names, if any (ADR-023 convention). */
+function overridePhone(value: unknown): string | null {
+  if (!value || typeof value !== 'object') return null;
+  const phone = (value as { phone?: unknown }).phone;
+  return typeof phone === 'string' && phone.trim() ? phone.trim() : null;
+}
 
 /** Someone of the performance's team who can get a personal link. */
 export interface TeamMember {
@@ -223,6 +235,12 @@ export interface TeamMember {
   /** Their role in the company's words («luces»). */
   role: string | null;
   kind: 'crew' | 'cast';
+  /**
+   * ADR-226: whether the venue could call them (a phone in the company's
+   * dossier, or the crew override). A flag, never the number: the shares
+   * dialog only needs to say «sin teléfono».
+   */
+  has_phone: boolean;
 }
 
 /**
@@ -238,8 +256,16 @@ export function roadsheetTeam(
 ): TeamMember[] {
   const out = new Map<string, TeamMember>();
   const add = (row: TeamRow, kind: TeamMember['kind']) => {
-    if (!row.person || out.has(row.person.id)) return;
-    out.set(row.person.id, { person_id: row.person.id, name: row.person.full_name, role: row.role?.trim() || null, kind });
+    if (!row.person) return;
+    const has_phone = Boolean(overridePhone(row.contact_override) || row.person.phone?.trim());
+    // The same person twice keeps the first row's role, but a phone on any of
+    // their rows counts: the base reads the override of whichever row has one.
+    const existing = out.get(row.person.id);
+    if (existing) {
+      existing.has_phone ||= has_phone;
+      return;
+    }
+    out.set(row.person.id, { person_id: row.person.id, name: row.person.full_name, role: row.role?.trim() || null, kind, has_phone });
   };
   for (const row of crew) add(row, 'crew');
   const replaced = new Set(overrides.map((o) => o.replaces_person?.id).filter((x): x is string => Boolean(x)));

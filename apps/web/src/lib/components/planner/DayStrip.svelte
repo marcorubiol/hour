@@ -31,7 +31,6 @@
             the project-team inference is never drawn here. */
         cast?: string[] | null;
         /** The document this row acts through — shows only. */
-        roadSheetHref?: string | null;
         /** The pair's rule: soft while both are options, hard once one is ink. */
         clash?: 'soft' | 'hard' | null;
         clashPeople?: boolean;
@@ -59,7 +58,6 @@
     /** «no cast on file» — the Board's word, shared on purpose; in the trade
         of the row's space (tarea 142). */
     noCastWord?: (voice?: Voice) => string;
-    roadSheetWord?: string;
     /**
      * A HOLD WITHOUT AN HOUR IS AN ASKED-FOR DATE, and the drawing cannot
      * give it a place — no hour, no position. But it COUNTS, and the day's
@@ -75,7 +73,6 @@
       city: string | null;
       project: ProjectLite | null;
       cast?: string[] | null;
-      roadSheetHref?: string | null;
       clash?: 'soft' | 'hard' | null;
       clashPeople?: boolean;
       slip: SlipVM;
@@ -96,7 +93,6 @@
     emptyLabel = t('planner.day_empty', appLocale()),
     axisLabel = t('planner.day_axis', appLocale()),
     noCastWord = (voice?: Voice) => t('planner.no_cast', appLocale(), undefined, voice),
-    roadSheetWord = t('desk.roadsheet', appLocale()),
     unplaced = [],
     noHourWord = t('planner.no_hour', appLocale()),
   }: Props = $props();
@@ -189,18 +185,14 @@
               clashPeople={t.clashPeople ?? false}
             />
             <!-- THE FOOT: who is inside the thread (data or the honest word,
-                 never the inference) and the road-sheet door. The door sat in
-                 the card's corner and a longer head («SHOW LOAD-IN 14h») ran
-                 under it; on the foot it cannot cover anything. -->
-            {#if (t.cast !== null && t.cast !== undefined) || t.roadSheetHref}
+                 never the inference). The road-sheet door left the Day
+                 (ADR-225): «Compartir» lives in the pase. -->
+            {#if (t.cast !== null && t.cast !== undefined)}
               <span class="ds__foot">
                 {#if t.cast !== null && t.cast !== undefined}
                   <span class="cast-line" class:cast-line--none={t.cast.length === 0}
                     >{t.cast.length > 0 ? t.cast.join(' · ') : noCastWord(t.project ? tradeFor(t.project.workspace_id) : undefined)}</span
                   >
-                {/if}
-                {#if t.roadSheetHref}
-                  <a class="ds__rs" href={t.roadSheetHref}>{roadSheetWord} ↗</a>
                 {/if}
               </span>
             {/if}
@@ -289,15 +281,12 @@
                 clash={t.clash ?? 'none'}
                 clashPeople={t.clashPeople ?? false}
               />
-              {#if (t.cast !== null && t.cast !== undefined) || t.roadSheetHref}
+              {#if (t.cast !== null && t.cast !== undefined)}
                 <span class="ds__foot">
                   {#if t.cast !== null && t.cast !== undefined}
                     <span class="cast-line" class:cast-line--none={t.cast.length === 0}
                       >{t.cast.length > 0 ? t.cast.join(' · ') : noCastWord(t.project ? tradeFor(t.project.workspace_id) : undefined)}</span
                     >
-                  {/if}
-                  {#if t.roadSheetHref}
-                    <a class="ds__rs" href={t.roadSheetHref}>{roadSheetWord} ↗</a>
                   {/if}
                 </span>
               {/if}
@@ -352,19 +341,6 @@
     }
     /* The document this row acts through — a quiet door, far right of the
        kind word. */
-    .ds__rs {
-      margin-inline-start: auto;
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      letter-spacing: var(--tracking-l);
-      text-transform: uppercase;
-      color: var(--text-faint);
-      text-decoration: none;
-      white-space: nowrap;
-    }
-    .ds__rs:hover {
-      color: var(--text-color);
-    }
     /* Who is on file. The honest absence is quieter than a name. */
     /* The line's voice is `.cast-line` (styles/cast.css); here, its place. */
     .ds__foot {

@@ -268,12 +268,11 @@
     if (!agenda || !focus || shows) return undefined;
     return pulseSlip(focus.ref, agenda.day, slipCtx).href ?? actionSlip?.href ?? undefined;
   });
-  let roadsheet = $derived(actionSlip?.href ? `${actionSlip.href}/roadsheet` : null);
   // Without its project (read through a bolo: a guest) nobody here edits «quién va».
   let whoHref = $derived(gig && actionSlip?.href && actionPerf?.project ? `${actionSlip.href}#who-goes` : null);
   /* «Tablón · 3 nuevos» (plan 2026-10-22 § 3.3): only when it has news. */
   let boardHref = $derived(actionSlip?.href && boardNew > 0 ? `${actionSlip.href}#board` : null);
-  let acts = $derived(Boolean(call?.phone || map || roadsheet));
+  let acts = $derived(Boolean(call?.phone || map));
 
   // ── Freshness (ADR-146 § 3): one line, only without a network or with
   //    what is on screen over an hour old.
@@ -412,7 +411,6 @@
         <nav class="piece__acts" aria-label={t('ahora.actions', locale)} data-testid="desk-acts">
           {#if call?.phone}<a class="piece__act" href={telHref(call.phone)} aria-label={t('ahora.call_aria', locale, { name: call.name })}>{t('ahora.call', locale)}</a>{/if}
           {#if map}<MapLink class="piece__act" parts={mapParts} changeIn="settings">{t('ahora.map', locale)}</MapLink>{/if}
-          {#if roadsheet}<a class="piece__act" href={roadsheet} aria-label={t('desk.roadsheet', locale)}>{t('ahora.sheet', locale)} ↗</a>{/if}
         </nav>
       {/if}
     </div>

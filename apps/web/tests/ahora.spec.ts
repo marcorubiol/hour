@@ -184,12 +184,14 @@ test.describe('The gig day on Hoy (ADR-146, ADR-202 § 5)', () => {
     await expect(facts).toContainText('Jordi Puig', { timeout: 20_000 });
     await expect(facts).toContainText('c/ Ballesteries');
     await expect(facts).toContainText('Hotel Ultònia');
-    // The thumb's three: a tel: link, a map (Apple until this device picks
-    // an app, ADR-206), the road sheet.
+    // The thumb's two, in equal parts: a tel: link and a map (Apple until this
+    // device picks an app, ADR-206). The road sheet left Hoy (ADR-225): it is
+    // «Compartir» inside the pase.
     const acts = page.getByTestId('desk-acts');
     await expect(acts.locator('a[href^="tel:"]')).toHaveAttribute('href', 'tel:612000000');
     await expect(acts.locator('a[href^="https://maps.apple.com/"]')).toHaveCount(1);
-    await expect(acts.locator('a[href$="/roadsheet"]')).toHaveCount(1);
+    await expect(acts.locator('a[href$="/roadsheet"]')).toHaveCount(0);
+    await expect(acts.locator('a')).toHaveCount(2);
     // A gig day, «Te espera» is its pills only (ADR-203 § 9).
     await expect(page.getByTestId('desk-waiting-rows')).toHaveCount(0);
   });

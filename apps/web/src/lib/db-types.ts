@@ -3786,10 +3786,12 @@ export type Database = {
           previous_slugs: string[]
           project_id: string
           series_id: string | null
+          shared_note: string | null
           slug: string | null
           status: Database["public"]["Enums"]["performance_status"]
           technical: Json
           updated_at: string
+          venue_contact_person_id: string | null
           venue_id: string | null
           venue_name: string | null
           workspace_id: string
@@ -3813,10 +3815,12 @@ export type Database = {
           previous_slugs?: string[]
           project_id: string
           series_id?: string | null
+          shared_note?: string | null
           slug?: string | null
           status?: Database["public"]["Enums"]["performance_status"]
           technical?: Json
           updated_at?: string
+          venue_contact_person_id?: string | null
           venue_id?: string | null
           venue_name?: string | null
           workspace_id: string
@@ -3840,10 +3844,12 @@ export type Database = {
           previous_slugs?: string[]
           project_id?: string
           series_id?: string | null
+          shared_note?: string | null
           slug?: string | null
           status?: Database["public"]["Enums"]["performance_status"]
           technical?: Json
           updated_at?: string
+          venue_contact_person_id?: string | null
           venue_id?: string | null
           venue_name?: string | null
           workspace_id?: string
@@ -3875,6 +3881,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "performance_venue_contact_person_id_fkey"
+            columns: ["venue_contact_person_id"]
+            isOneToOne: false
+            referencedRelation: "person"
             referencedColumns: ["id"]
           },
           {

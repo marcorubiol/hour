@@ -46,6 +46,7 @@
   import {
     HOLD_NOTICE_DEFAULT,
     PERFORMANCE_MENU_STATUSES,
+    SHARED_NOTE_MAX,
     holdDeadlineLabel,
     isHoldStatus,
     isValidHoldNotice,
@@ -116,6 +117,10 @@
       city: string | null;
       country: string | null;
       notes: string | null;
+      /** ADR-226: the note every shared link carries; null on a base without the column. */
+      shared_note?: string | null;
+      /** ADR-226: who the venue calls (a person of the team); null = the company. */
+      venue_contact_person_id?: string | null;
       hold_notice_days: number | null;
       /** `custom_fields.preparation` is the hand things' state (ADR-221). */
       custom_fields?: Json;
@@ -388,6 +393,33 @@
   $effect(() => {
     if (perf) fHoldNotice = perf.hold_notice_days;
   });
+
+  // ADR-226 — «Nota para quien recibe la hoja»: a plain field, saved through
+  // the PATCH when it loses focus (not the live notes doc: this one is not
+  // collaborative). Empty is null; the draft follows the row until it is edited.
+  let fSharedNote = $state('');
+  let sharedNoteFocused = $state(false);
+  /** What was sent and has not come back yet. While it is out, the draft is
+      the person's: a failed save must not put the old text over it (they
+      come back to the field and leaving it saves again). */
+  let sharedNoteSent = $state<{ value: string | null } | null>(null);
+  $effect(() => {
+    if (!perf) return;
+    const row = perf.shared_note ?? null;
+    if (sharedNoteSent && sharedNoteSent.value === row) sharedNoteSent = null;
+    if (!sharedNoteFocused && !sharedNoteSent) fSharedNote = row ?? '';
+  });
+  function onSharedNoteBlur() {
+    sharedNoteFocused = false;
+    if (!perf) return;
+    const next = fSharedNote.trim() || null;
+    if (next === (perf.shared_note ?? null)) {
+      sharedNoteSent = null;
+      return;
+    }
+    sharedNoteSent = { value: next };
+    savePatch({ shared_note: next });
+  }
 
   /** Focus a field the moment it appears (the date opened in place). */
   function focusNow(node: HTMLInputElement) {
@@ -1256,6 +1288,25 @@
           placeholder={t('perf.notes_placeholder', locale)}
           {locale}
         />
+        <!-- ADR-226: the other note. It leaves the house: every shared link
+             carries it (the notes above never do). -->
+        <Field
+          id="f-shared-note"
+          label={t('pass.shared_note', locale)}
+          helper={t('pass.shared_note_hint', locale)}
+          stack
+        >
+          <textarea
+            id="f-shared-note"
+            rows="3"
+            maxlength={SHARED_NOTE_MAX}
+            placeholder={t('pass.shared_note_placeholder', locale)}
+            bind:value={fSharedNote}
+            onfocus={() => (sharedNoteFocused = true)}
+            onblur={onSharedNoteBlur}
+            data-testid="pass-shared-note"
+          ></textarea>
+        </Field>
       </section>
     {/if}
 

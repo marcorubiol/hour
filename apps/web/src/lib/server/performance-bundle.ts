@@ -13,7 +13,7 @@
  * indistinguishable by design.
  */
 
-import { pgGet, type SupabaseEnv } from '$lib/supabase';
+import { PostgrestError, pgGet, type SupabaseEnv } from '$lib/supabase';
 import type { Json, Tables } from '$lib/db-types';
 import { primaryContactPerson } from '$lib/conversation';
 import { COMMITMENTS_EMBED, type Commitment } from '$lib/people';
@@ -228,9 +228,17 @@ const PERFORMANCE_COLS = [
   'updated_at',
 ].join(',');
 
-function detailSelect(): string {
+/**
+ * ADR-226: the note for whoever receives the sheet and the venue's contact
+ * person. A database without migration 20261119150000 does not have them:
+ * the read falls back to the columns above and answers null for both.
+ */
+export const SHARING_COLS = 'shared_note,venue_contact_person_id';
+
+function detailSelect(withSharing = true): string {
   return [
     PERFORMANCE_COLS,
+    ...(withSharing ? [SHARING_COLS] : []),
     'venue:venue_id(id,slug,name,city,country,address,capacity,timezone,contacts)',
     'line:line_id(id,slug,name,kind)',
     'project:project_id(id,slug,name,accent)',
@@ -256,9 +264,9 @@ export async function fetchPerformanceBundle(
 ): Promise<PerformanceBundleResult | null> {
   if (!isUuid(key) && !workspaceSlug) return null;
 
-  const fetchRow = async () => {
+  const fetchRow = async (withSharing: boolean) => {
     const search = new URLSearchParams();
-    const select = detailSelect();
+    const select = detailSelect(withSharing);
 
     if (isUuid(key)) {
       search.set('select', select);
@@ -280,10 +288,21 @@ export async function fetchPerformanceBundle(
     search.set('limit', '1');
 
     const { data } = await pgGet<PerformanceDbDetail>(env, 'performance', jwt, { search });
-    return data[0] ? normalizePerformance(data[0]) : null;
+    if (!data[0]) return null;
+    return normalizePerformance(
+      withSharing ? data[0] : { ...data[0], shared_note: null, venue_contact_person_id: null },
+    );
   };
 
-  const performance: PerformanceDetail | null = await fetchRow();
+  let performance: PerformanceDetail | null;
+  try {
+    performance = await fetchRow(true);
+  } catch (err) {
+    // 42703: the database has not had 20261119150000 yet («una base sin ella
+    // responde sin ella»); anything else is a real failure.
+    if (!(err instanceof PostgrestError && err.code === '42703')) throw err;
+    performance = await fetchRow(false);
+  }
   if (performance === null) return null;
 
   const castSearch = new URLSearchParams();
