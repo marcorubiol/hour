@@ -2739,7 +2739,6 @@
   "peek.kind_person": "personne",
   "peek.kind_organization": "organisation",
   "peek.edit": "Modifier",
-  "peek.all_day": "toute la journée",
   "peek.date_not_found": "Cette date n’existe pas ou vous ne pouvez pas la voir.",
   "peek.date_load_error": "La date n’a pas pu être chargée.",
   "peek.date_of_performance": "Représentation",
@@ -3684,5 +3683,10 @@
   "threads.count": "{n} messages",
   "threads.empty_short": "aucun message",
   "threads.pick": "Choisir le fil",
+  "pass.box_stages": "Étapes",
+  "pass.box_team_date": "Qui y va",
+  "pass.box_place": "Où",
+  "pass.line_no_place": "Sans lieu",
+  "pass.label_date": "Fiche de la date",
   "pass.put_place": "Ajouter un lieu"
 }

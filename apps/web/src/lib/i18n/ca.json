@@ -2739,7 +2739,6 @@
   "peek.kind_person": "persona",
   "peek.kind_organization": "organització",
   "peek.edit": "Edita",
-  "peek.all_day": "tot el dia",
   "peek.date_not_found": "Aquesta data no existeix o no la pots veure.",
   "peek.date_load_error": "No s’ha pogut carregar la data.",
   "peek.date_of_performance": "Funció",
@@ -3684,5 +3683,10 @@
   "threads.count": "{n} missatges",
   "threads.empty_short": "sense missatges",
   "threads.pick": "Triar el fil",
+  "pass.box_stages": "Trams",
+  "pass.box_team_date": "Qui hi va",
+  "pass.box_place": "On",
+  "pass.line_no_place": "Sense lloc",
+  "pass.label_date": "Passi de la data",
   "pass.put_place": "Posar lloc"
 }

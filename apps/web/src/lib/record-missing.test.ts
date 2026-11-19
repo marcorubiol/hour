@@ -15,6 +15,7 @@ import {
   type ConversationMissingInput,
   type PerformanceMissingInput,
 } from './record-missing';
+import { dateReadiness } from './record-missing';
 import { addDaysIso } from './planner';
 import { invoicesByBolo, type MoneyBolo } from './money';
 
@@ -472,5 +473,40 @@ describe('boloMissing', () => {
 
   it('with invoicing off, nothing to invoice', () => {
     expect(boloMissing(bolo(), { ...ctx, modeOf: () => 'off' as const })).toEqual([]);
+  });
+});
+
+describe('dateReadiness', () => {
+  const test = it;
+  const base = { kind: 'rehearsal', status: 'confirmed', day: '2026-11-21', timed: true, stages: null, going: true, place: true };
+  const ids = (b: { id: string; done: boolean }[]) => b.map((x) => `${x.id}:${x.done ? 'done' : 'open'}`);
+
+  test('three boxes: the hour, who goes and where', () => {
+    expect(ids(dateReadiness(base, '2026-11-18'))).toEqual(['hours:done', 'team:done', 'place:done']);
+    expect(ids(dateReadiness({ ...base, timed: false, going: false, place: false }, '2026-11-18'))).toEqual([
+      'hours:open',
+      'team:open',
+      'place:open',
+    ]);
+  });
+
+  test('a trip asks for its stages, not an hour', () => {
+    expect(ids(dateReadiness({ ...base, kind: 'travel_day', stages: 0 }, '2026-11-18'))).toEqual([
+      'stages:open',
+      'team:done',
+      'place:done',
+    ]);
+    expect(ids(dateReadiness({ ...base, kind: 'travel_day', stages: null }, '2026-11-18'))).toEqual(['team:done', 'place:done']);
+  });
+
+  test('what the reader cannot know is not drawn', () => {
+    expect(ids(dateReadiness({ ...base, going: null }, '2026-11-18'))).toEqual(['hours:done', 'place:done']);
+  });
+
+  test('a day off, a past, cancelled or done date has no stub', () => {
+    expect(dateReadiness({ ...base, kind: 'day_off' }, '2026-11-18')).toEqual([]);
+    expect(dateReadiness(base, '2026-11-22')).toEqual([]);
+    expect(dateReadiness({ ...base, status: 'cancelled' }, '2026-11-18')).toEqual([]);
+    expect(dateReadiness({ ...base, status: 'done' }, '2026-11-18')).toEqual([]);
   });
 });
