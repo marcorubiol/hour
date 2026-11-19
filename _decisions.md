@@ -8315,3 +8315,32 @@ origen desplegado con este cambio.
 
 **Cómo se revierte.** Revertir el commit y `build/runbooks/rollback-20261119-reserve-today-slug.sql`. Sin cambio de
 API; `CACHE_SCHEMA` no cambia.
+
+## [2026-11-19] ADR-221 · «Qué preparamos para una función»: la lista es de la compañía y lo abierto no se pinta de naranja (enmienda ADR-211 § 3 y ADR-212 «Listo N de M»)
+Encargo: `ficha-pase/lista-preparacion.md` (Marco, 19-11: «lo quiero todo»), dibujo `W-lista-compania`. Cuatro fases en serie;
+esta entrada fija la decisión entera y la fase 1 va construida.
+
+1. **Sin premio ni deuda.** Fuera el contador «N de M» y «Listo para salir»: el talón del pase se titula «Por cerrar».
+   Una cosa abierta es neutra (casilla de línea discontinua, fila con la tinta de la pieza y un fondo tenue). Sin verdes ni
+   felicitaciones; sin nada abierto no hay lista.
+2. **El ámbar es solo para lo que vence.** Una cosa abierta con prisa (de serie: la opción cuya fecha límite cae en la
+   semana, y la hoja de ruta a 14 días: `isUrgentMissing`) lleva casilla y fila en ámbar, sube arriba y dice el motivo
+   («La función es en 2 días»). «Sin hora», «Poner lugar», «Sin bolo», «Equipo» ya no son ámbar.
+3. **Todo lo abierto a la vista:** sin tope de tres líneas en el pase de una función (`MISSING_MAX` sigue para persona,
+   línea, conversación y fecha).
+4. **Fuera del pase.** En Hoy, el punto de la ficha pequeña es gris y discontinuo («N por cerrar» para lector de pantalla)
+   y la ficha ancha dice «N por cerrar» en gris; en la Agenda las palabras de lo abierto van en gris. Solo lo urgente va en
+   ámbar y dice qué y cuándo («En 2 días: compartir la hoja»). Sustituye el «Falta» ámbar de ADR-211 § 3; la regla única
+   (`missingSoon`) no cambia, solo cuenta todo y marca lo urgente.
+5. **La lista (fases 2 a 4, por construir).** Una lista por **proyecto** (Marco, 19-11, sobre la propuesta de una sola por
+   compañía), decidida en los ajustes del proyecto y válida para todas sus funciones. Cosas de la app (estado, hora, quién
+   va, hoja; no se borran, pero **todas se pueden apagar**, también «confirmada» y «hora») y cosas a mano (nombre y casilla;
+   crear, renombrar, borrar). Cada cosa: nombre, encendida, orden y días de prisa (vacío: nunca). Al ser por proyecto,
+   desaparece «en qué proyectos no se pide». La excepción es un dato, solo en cosas a mano: «Hecho» o «Aquí no hace falta»
+   en esa función; la app nunca pregunta. Datos propuestos sin migración: la lista en el JSON de ajustes del proyecto (el
+   constructor comprueba que exista y quién lo edita) y el estado de cada cosa en `performance.custom_fields`; si no
+   basta, migración con rollback y puerta RLS. Un proyecto sin lista usa la de serie.
+6. **Lo que no es un show** (`DateRecord`) conserva sus tres casillas automáticas, con el mismo trato de color y sin lista
+   configurable por ahora.
+
+**Cómo se revierte.** Fase 1: revertir el commit; sin esquema ni API; `CACHE_SCHEMA` no cambia.

@@ -26,7 +26,7 @@
   };
 
   /** What a performance still needs, as the row says it (ADR-211 § 3). */
-  export type AgendaMissing = { noTime: boolean; words: string[] };
+  export type AgendaMissing = { noTime: boolean; words: { text: string; urgent: boolean }[] };
 </script>
 
 <script lang="ts">
@@ -37,8 +37,8 @@
    * word with the venue under it, the hour at the end. A trip is a leg
    * between two days, not a row; three free nights or more are one line; the
    * week is a stronger rule above its first row, and «semana» is said nowhere.
-   * What a performance in the next two weeks still needs is said beside it in
-   * amber, in the record's own words.
+   * What a performance in the next two weeks still has open is said beside it
+   * in the record's own words, grey; amber only when it has hurry.
    *
    * The structure is `$lib/agenda-items` (pure, tested). The page owns the
    * feeds, the engines, the words and the span; this draws. The margin
@@ -636,8 +636,8 @@
                 <span class="ag__city">{strong(sl)}{#if held(sl)}?{/if}</span>
                 {#if sub || miss?.words.length}
                   <span class="ag__ven"
-                    >{sub ?? ''}{#each miss?.words ?? [] as w, wi (w)}{#if sub || wi}{' '}{/if}<span class="ag__miss"
-                        >{#if sub || wi}·&nbsp;{/if}<span class="missing-word" data-testid="agenda-missing">{w}</span
+                    >{sub ?? ''}{#each miss?.words ?? [] as w, wi (w.text)}{#if sub || wi}{' '}{/if}<span class="ag__miss"
+                        >{#if sub || wi}·&nbsp;{/if}<span class="missing-word" class:missing-word--urgent={w.urgent} data-testid="agenda-missing">{w.text}</span
                         ></span
                       >{/each}</span
                   >

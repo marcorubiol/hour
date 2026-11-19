@@ -16,7 +16,7 @@
  */
 import { inScope, type ResolvedScope } from './nav';
 import { perfWorkspaceId, type DateEvent, type PerformanceEvent } from './month-events';
-import { missingSoon } from './record-missing';
+import { isUrgentMissing, missingSoon, type PerformanceMissing } from './record-missing';
 import { agendaPoints, agendaRows, type AgendaPoint, type DayAgenda } from './day-agenda';
 import type { PulseInputRows, PulseNext } from './pulse';
 import type { DeskItem } from './desk-feed';
@@ -129,9 +129,14 @@ export interface ComingTile {
   items: PulseNext[];
   /** What the tile does not draw: its «+N». */
   more: number;
-  /** Some performance of the day still needs something (ADR-211 § 3, the
-      record's «Falta»): the tile's amber dot. Its hidden items count too. */
+  /** Some performance of the day still has something open (ADR-211 § 3,
+      amended by the lista de preparación): `open` counts them, hidden items
+      too; `missing` is `open > 0`. */
   missing: boolean;
+  open: number;
+  /** The first open thing with hurry (a hold's deadline, an unshared road
+      sheet), the only thing the tile paints in amber; null says none. */
+  urgent: PerformanceMissing | null;
 }
 
 const dayDiff = (day: string, today: string) =>
@@ -157,11 +162,14 @@ export function comingTiles(coming: readonly PulseNext[], today: string, max = C
   for (const day of [...byDay.keys()].sort()) {
     if (tiles.length >= max) break;
     const all = byDay.get(day)!;
+    const gaps = all.flatMap((x) => (x.ref.of === 'performance' ? missingSoon(x.ref.row as PerformanceEvent, today) : []));
     tiles.push({
       day,
       items: all.slice(0, COMING_PER_TILE),
       more: Math.max(0, all.length - COMING_PER_TILE),
-      missing: all.some((x) => x.ref.of === 'performance' && missingSoon(x.ref.row as PerformanceEvent, today).length > 0),
+      missing: gaps.length > 0,
+      open: gaps.length,
+      urgent: gaps.find(isUrgentMissing) ?? null,
     });
   }
   return tiles;

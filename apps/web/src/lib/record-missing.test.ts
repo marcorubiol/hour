@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  MISSING_MAX,
   ROADSHEET_SHARE_DAYS,
   boloMissing,
   conversationMissing,
@@ -8,6 +7,7 @@ import {
   lineMissing,
   missingSoon,
   performanceMissing,
+  isUrgentMissing,
   performanceReadiness,
   personMissing,
   stepShortcuts,
@@ -98,12 +98,17 @@ describe('performanceMissing', () => {
     expect(performanceMissing(perf({ status: 'cancelled', hasBolo: false, roster: [] }), TODAY)).toEqual([]);
   });
 
-  it(`never says more than ${MISSING_MAX}, what blocks before what prepares`, () => {
+  it('says everything that is open (no cap), what blocks before what prepares', () => {
     const all = performanceMissing(
       perf({ day: addDaysIso(TODAY, 7), roster: [], hasBolo: false, roadsheetLinks: 0, status: 'hold', hold_notice_days: 3 }),
       TODAY,
     );
     expect(all).toEqual([{ kind: 'hold_deadline', day: addDaysIso(TODAY, 4) }, { kind: 'no_bolo' }]);
+    const five = performanceMissing(
+      perf({ day: addDaysIso(TODAY, 7), roster: [], hasBolo: false, roadsheetLinks: 0, start_at: null }),
+      TODAY,
+    );
+    expect(five.map((m) => m.kind)).toEqual(['no_bolo', 'no_time', 'roadsheet_unshared', 'nobody_going']);
     const many = performanceMissing(
       perf({ day: addDaysIso(TODAY, 7), roster: [], hasBolo: false, roadsheetLinks: 0 }),
       TODAY,
@@ -123,7 +128,7 @@ describe('performanceMissing', () => {
 });
 
 describe('performanceReadiness · the stub of the pass', () => {
-  const box = (id: string, done: boolean, verb: string) => ({ id, done, verb });
+  const box = (id: string, done: boolean, verb: string, urgent = false) => ({ id, done, verb, urgent });
   const ready = (over: Partial<PerformanceMissingInput> = {}) => performanceReadiness(perf({ start_at: '2026-11-19T19:00:00Z', ...over }), TODAY);
 
   it('a ready confirmed performance: four boxes, all done', () => {
@@ -141,7 +146,7 @@ describe('performanceReadiness · the stub of the pass', () => {
       box('status', true, 'confirm'),
       box('hours', false, 'add_time'),
       box('team', false, 'sign_up'),
-      box('sheet', false, 'share'),
+      box('sheet', false, 'share', true),
     ]);
   });
 
@@ -152,7 +157,7 @@ describe('performanceReadiness · the stub of the pass', () => {
 
   it('a hold: status is open (with its deadline when close), team and sheet are not asked yet', () => {
     const b = ready({ status: 'hold', day: addDaysIso(TODAY, 35), roster: [], roadsheetLinks: null });
-    expect(b).toEqual([{ ...box('status', false, 'confirm'), holdDay: addDaysIso(TODAY, 5) }, box('hours', true, 'add_time')]);
+    expect(b).toEqual([{ ...box('status', false, 'confirm', true), holdDay: addDaysIso(TODAY, 5) }, box('hours', true, 'add_time')]);
     expect(ready({ status: 'proposed' })[0]).toEqual(box('status', false, 'confirm'));
   });
 
@@ -167,7 +172,16 @@ describe('performanceReadiness · the stub of the pass', () => {
     const far = addDaysIso(TODAY, ROADSHEET_SHARE_DAYS + 1);
     expect(ready({ day: far, roadsheetLinks: 0 }).map((x) => x.id)).toEqual(['status', 'hours', 'team']);
     expect(ready({ day: far, roadsheetLinks: 2 }).at(-1)).toEqual(box('sheet', true, 'share'));
-    expect(ready({ day: addDaysIso(TODAY, ROADSHEET_SHARE_DAYS), roadsheetLinks: 0 }).at(-1)).toEqual(box('sheet', false, 'share'));
+    expect(ready({ day: addDaysIso(TODAY, ROADSHEET_SHARE_DAYS), roadsheetLinks: 0 }).at(-1)).toEqual(box('sheet', false, 'share', true));
+  });
+
+  it('only a closing deadline is urgent: a hold in the week and a sheet in its window; the rest is neutral', () => {
+    const b = ready({ day: addDaysIso(TODAY, 3), start_at: null, roster: [], roadsheetLinks: 0 });
+    expect(b.filter((x) => x.urgent).map((x) => x.id)).toEqual(['sheet']);
+    expect(ready({ status: 'hold', day: addDaysIso(TODAY, 40) })[0].urgent).toBe(false);
+    expect(isUrgentMissing({ kind: 'no_time' })).toBe(false);
+    expect(isUrgentMissing({ kind: 'roadsheet_unshared' })).toBe(true);
+    expect(isUrgentMissing({ kind: 'hold_deadline', day: TODAY })).toBe(true);
   });
 
   it('cancelled and past performances have no stub; today still does', () => {

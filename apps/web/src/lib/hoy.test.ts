@@ -137,13 +137,15 @@ describe('«Coming up»: one tile per day (ADR-202 § 6)', () => {
     ];
     const dates = [date('trip', '2026-11-18T08:00:00Z', avi, { kind: 'travel_day' })];
     const tiles = comingTiles(upcoming({ performances, dates, viewerTz: TZ }, NOW, 40), TODAY);
-    expect(tiles.map((t) => [t.day, t.missing])).toEqual([
-      ['2026-11-14', false],
-      ['2026-11-15', true],
-      ['2026-11-16', true],
-      ['2026-11-17', false],
-      ['2026-11-18', false],
+    expect(tiles.map((t) => [t.day, t.missing, t.open])).toEqual([
+      ['2026-11-14', false, 0],
+      ['2026-11-15', true, 1],
+      ['2026-11-16', true, 1],
+      ['2026-11-17', false, 0],
+      ['2026-11-18', false, 0],
     ]);
+    // Open is neutral: none of these has hurry (hold deadline, unshared sheet).
+    expect(tiles.every((t) => t.urgent === null)).toBe(true);
   });
 
   it('ten tiles at most', () => {
