@@ -181,9 +181,11 @@
     };
   });
   // The wide head's label: «Hoy · miércoles 18 nov» (drawing S).
-  const headDay = new Intl.DateTimeFormat(LOCALE_TAG[locale], { weekday: 'long', day: 'numeric', month: 'short' })
-    .format(new Date())
-    .replace(/\.+$/, '');
+  let headDay = $derived(
+    new Intl.DateTimeFormat(LOCALE_TAG[locale], { weekday: 'long', day: 'numeric', month: 'short', timeZone: viewerTz })
+      .format(clockNow)
+      .replace(/\.+$/, ''),
+  );
   const sinceLabel = new Intl.DateTimeFormat(LOCALE_TAG[locale], {
     weekday: 'short',
     day: 'numeric',
