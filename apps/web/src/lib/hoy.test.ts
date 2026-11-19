@@ -13,6 +13,7 @@ import {
   rowsSayCity,
   scopePulseInput,
   showsDay,
+  waitingDrawsPills,
   waitingPills,
   waitingRowCount,
 } from './hoy';
@@ -205,6 +206,15 @@ describe('«Coming up»: one tile per day (ADR-202 § 6)', () => {
     const calm = comingOpen(comingTiles(coming, TODAY, Infinity, () => readPreparation(null)));
     expect(calm).toEqual({ urgent: null, urgentDay: null, rest: 3 });
     expect(comingOpen([])).toEqual({ urgent: null, urgentDay: null, rest: 0 });
+  });
+
+  it('«Te espera» without pills when three things or fewer are all rows (ADR-228)', () => {
+    expect(waitingDrawsPills(2, 3)).toBe(false);
+    expect(waitingDrawsPills(3, 3)).toBe(false);
+    expect(waitingDrawsPills(3, 5)).toBe(false);
+    expect(waitingDrawsPills(4, 5)).toBe(true);
+    // Rows folded (calm, a gig day): the pills are the only count.
+    expect(waitingDrawsPills(2, 0)).toBe(true);
   });
 
   it('ten tiles at most', () => {

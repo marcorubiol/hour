@@ -1748,6 +1748,11 @@
     const items = ($decisionsPerfQuery.data?.items ?? [])
       .filter((p) => {
         if (perfDayKey(p) <= selectedDay) return false;
+        // THE SAME ROWS AS THE PAPER (ADR-228): the decisions window is read
+        // by the pins' containers only, so a line pin or the person filter
+        // let «Siguiente» name gigs the month and Hoy leave out (19-11:
+        // Zaragoza and Santander). The scope and the person, as `scopedPerfs`.
+        if (!perfInScope(p) || !keepsRow(personScope, perfPersonVerdict(p), perfWorkspaceId(p))) return false;
         const fam = performanceStatusFamily(p.status);
         // Calm: «Después» is what is settled, like the paper above it.
         if (!shows('planner', 'options', calm.on)) return fam === 'confirmed';
@@ -3245,16 +3250,22 @@
              last day, so they name where they begin and count
              nothing. -->
         {#if view === 'month' && shows('planner', 'census', calm.on)}
-        <span class="cal__stat"
+        <!-- A FIGURE AT ZERO IS NOT SAID (ADR-228): «0 opciones» counted an
+             absence. Unknown figures still print their dash. -->
+        {#if !(figuresKnown && stats.confirmed === 0)}
+        <span class="cal__stat" data-testid="planner-stat-confirmed"
           ><b>{fig(stats.confirmed)}</b>
           {t(figOne(stats.confirmed) ? 'planner.stat_confirmed_one' : 'planner.stat_confirmed', locale)}</span
         >
+        {/if}
         <!-- `1 holds` was printing on every single-hold month. The design's own
              word for this counter is `option`, and it agrees in number. -->
-        <span class="cal__stat"
+        {#if !(figuresKnown && stats.holds === 0)}
+        <span class="cal__stat" data-testid="planner-stat-holds"
           ><b>{fig(stats.holds)}</b>
           {t(figOne(stats.holds) ? 'planner.stat_holds_one' : 'planner.stat_holds', locale)}</span
         >
+        {/if}
         <!-- FOUR FIGURES AND NO MORE (tarea 165, Marco «Sí, las siete»):
              por decidir and choques lead the line, and the month counts what
              is confirmed and what is an option. Nights free, people away and
@@ -3611,6 +3622,7 @@
       weekdayWord={(iso) => localeWeekdayShort(iso, localeTag)}
       monthWord={boardMonthWord}
       laneTallyText={boardLaneTallyText}
+      emptyLanesWord={(n, open) => t(`planner.board_empty_lanes${open ? '_hide' : ''}${n === 1 ? '_one' : ''}`, locale, { n })}
       groupTallyText={boardGroupTallyText}
       sharedWord={t('planner.board_shared', locale)}
       teamWord={t('planner.board_team', locale)}
