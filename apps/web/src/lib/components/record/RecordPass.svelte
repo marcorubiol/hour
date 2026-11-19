@@ -273,7 +273,7 @@
             {#each lines as line (line.id)}
               {#if line.hand}
                 {@const hand = line.hand}
-                <li class="stub__line stub__line--hand" data-missing={line.id} data-hand="true">
+                <li class="stub__line stub__line--hand" class:stub__line--urgent={line.urgent} data-missing={line.id} data-hand="true">
                   <button
                     type="button"
                     class="stub__hand-text"
@@ -288,6 +288,7 @@
                     data-testid="pass-hand-check"
                     onclick={hand.onDone}
                   ></button>
+                  {#if line.reason}<span class="stub__reason stub__reason--hand">{line.reason}</span>{/if}
                   {#if expanded === line.id}
                     <span class="stub__hand-more">
                       <button type="button" class="missing__act stub__verb" disabled={hand.busy} onclick={hand.onDone}
@@ -760,6 +761,13 @@
       .stub__reopen:hover {
         text-decoration: underline;
       }
+    }
+    .stub__reason--hand {
+      flex-basis: 100%;
+      order: 1;
+    }
+    .stub__hand-more {
+      order: 2;
     }
     .stub__reason {
       display: block;
