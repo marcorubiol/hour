@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   COMING_TILES,
   COMING_TILES_PHONE,
+  comingOpen,
   comingTiles,
   nextAfterToday,
   nextWhen,
@@ -176,7 +177,34 @@ describe('«Coming up»: one tile per day (ADR-202 § 6)', () => {
     const never = comingTiles(coming, TODAY, 10, () => readPreparation(null));
     expect(never[0].urgent).toBeNull();
     const hurry = comingTiles(coming, TODAY, 10, () => readPreparation({ items: [{ id: 'hours', on: true, days: 10 }] }));
-    expect(hurry[0].urgent).toEqual({ what: 'hours', day: '2026-11-16' });
+    expect(hurry[0].urgent).toMatchObject({ what: 'hours', day: '2026-11-16' });
+    expect(hurry[0].urgent?.item?.ref.id).toBe('nohour');
+  });
+
+  it('one amber a screen (ADR-227): only what falls due first; the rest, a grey figure of performances', () => {
+    const list = readPreparation({ items: [{ id: 'hours', on: true, days: 10 }] });
+    const performances = [
+      perf('a', '2026-11-16', mamemi, { start_at: null }),
+      perf('b', '2026-11-15', mamemi, { start_at: null }),
+      perf('c', '2026-11-26', mamemi, { start_at: null }),
+      perf('ok', '2026-11-17', mamemi, { person_ids: ['p'], has_bolo: true }),
+    ];
+    const coming = upcoming({ performances, dates: [], viewerTz: TZ }, NOW, 40);
+    const tiles = comingTiles(coming, TODAY, Infinity, () => list);
+    expect(tiles.map((t) => [t.day, t.openShows])).toEqual([
+      ['2026-11-15', 1],
+      ['2026-11-16', 1],
+      ['2026-11-17', 0],
+      ['2026-11-26', 1],
+    ]);
+    const open = comingOpen(tiles);
+    expect(open.urgentDay).toBe('2026-11-15');
+    expect(open.urgent?.item?.ref.id).toBe('b');
+    expect(open.rest).toBe(2);
+    // Nothing with hurry: no amber, and the figure counts them all.
+    const calm = comingOpen(comingTiles(coming, TODAY, Infinity, () => readPreparation(null)));
+    expect(calm).toEqual({ urgent: null, urgentDay: null, rest: 3 });
+    expect(comingOpen([])).toEqual({ urgent: null, urgentDay: null, rest: 0 });
   });
 
   it('ten tiles at most', () => {

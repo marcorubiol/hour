@@ -135,6 +135,9 @@ export interface ComingTile {
       too; `missing` is `open > 0`. */
   missing: boolean;
   open: number;
+  /** How many performances of the day have something open (ADR-227): what
+      «N funciones más con cosas por cerrar» counts. */
+  openShows: number;
   /** The nearest open thing with hurry (a hold's deadline, or a thing inside
       the days its project gave it), the only thing the tile paints in amber;
       null says none. `day` is the one to count to: the hold's deadline, else
@@ -147,6 +150,9 @@ export interface TileUrgent {
   day: string;
   /** The project's own thing, by its name. */
   name?: string;
+  /** The performance it belongs to: its place titles the amber line and its
+      pase is the line's door (ADR-227). */
+  item?: PulseNext;
 }
 
 const URGENT_WHAT = {
@@ -188,21 +194,24 @@ export function comingTiles(
     const gaps: PerformanceMissing[] = [];
     const urgents: TileUrgent[] = [];
     let handOpen = 0;
+    let openShows = 0;
     for (const x of all) {
       if (x.ref.of !== 'performance') continue;
+      const before = gaps.length + handOpen;
       const row = x.ref.row as PerformanceEvent;
       const list = row.project?.id ? listOf?.(row.project.id) : undefined;
       const perfDay = row.performed_at.slice(0, 10);
       for (const m of missingSoon(row, today, list)) {
         gaps.push(m);
         if (m.kind !== 'no_bolo' && isUrgentMissing(m, { day: perfDay, today, list })) {
-          urgents.push({ what: URGENT_WHAT[m.kind], day: m.kind === 'hold_deadline' ? m.day : perfDay });
+          urgents.push({ what: URGENT_WHAT[m.kind], day: m.kind === 'hold_deadline' ? m.day : perfDay, item: x });
         }
       }
       for (const m of manualOpenSoon(row, today, list)) {
         handOpen += 1;
-        if (isUrgentThing(m.id, perfDay, today, list)) urgents.push({ what: 'hand', day: perfDay, name: m.name });
+        if (isUrgentThing(m.id, perfDay, today, list)) urgents.push({ what: 'hand', day: perfDay, name: m.name, item: x });
       }
+      if (gaps.length + handOpen > before) openShows += 1;
     }
     tiles.push({
       day,
@@ -210,10 +219,36 @@ export function comingTiles(
       more: Math.max(0, all.length - COMING_PER_TILE),
       missing: gaps.length + handOpen > 0,
       open: gaps.length + handOpen,
+      openShows,
       urgent: urgents.sort((a, b) => a.day.localeCompare(b.day))[0] ?? null,
     });
   }
   return tiles;
+}
+
+/**
+ * ONE AMBER A SCREEN (ADR-227, amends ADR-211 § 3 and ADR-221 § 8): of all
+ * the tiles, only the thing that falls due first is named, on its own tile
+ * and in one line under the strip; every other performance with something
+ * open is a figure in grey («N funciones más con cosas por cerrar»). `tiles`
+ * are all the tiles of the two weeks, not only the drawn ones, so the grey
+ * figure is the same on a phone and on a desktop. `urgentDay` is the tile
+ * that carries the amber; `rest`, the performances open besides the urgent
+ * one (all of them when nothing has hurry).
+ */
+export interface ComingOpen {
+  urgent: TileUrgent | null;
+  urgentDay: string | null;
+  rest: number;
+}
+
+export function comingOpen(tiles: readonly ComingTile[]): ComingOpen {
+  let best: ComingTile | null = null;
+  for (const tile of tiles) {
+    if (tile.urgent && (!best || tile.urgent.day < best.urgent!.day)) best = tile;
+  }
+  const shows = tiles.reduce((n, tile) => n + tile.openShows, 0);
+  return { urgent: best?.urgent ?? null, urgentDay: best?.day ?? null, rest: Math.max(0, shows - (best ? 1 : 0)) };
 }
 
 /** The first thing after today, however far: what the hollow piece names (ADR-202 § 3). */
