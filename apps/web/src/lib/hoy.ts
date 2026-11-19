@@ -292,6 +292,17 @@ export function waitingPills(items: readonly Pick<DeskItem, 'concern' | 'verbKey
 }
 
 /**
+ * Does «Te espera» draw its pills (ADR-229)? With three things or fewer and
+ * every one of them drawn as a row, the pills and the rows said the same
+ * twice: only the rows. With rows folded (calm, a gig day) or more than three
+ * things, the pills stay: they are the only count of what is not drawn.
+ */
+export const WAITING_PILLS_FROM = 4;
+export function waitingDrawsPills(total: number, rows: number): boolean {
+  return total >= WAITING_PILLS_FROM || rows < total;
+}
+
+/**
  * How many rows «Te espera» draws under its pills: none in calm (ADR-203
  * § 5) nor on a gig day (§ 9), five on a day with nothing, three otherwise.
  */

@@ -10,6 +10,7 @@
   The way back, when the page has one, goes under both failures.
 -->
 <script lang="ts">
+  import { backThroughHistory } from '$lib/back';
   import Button from '$lib/components/Button.svelte';
   import { loadFailKind } from '$lib/load-fail';
   import { t, type Locale } from '$lib/i18n';
@@ -24,7 +25,8 @@
     /** «This performance could not be loaded.» */
     failedText: string;
     onretry: () => void;
-    back?: { href: string; label: string } | null;
+    /** The way back. With `history`, it steps back through the history and `href` is where it falls with nothing to step to. */
+    back?: { href: string; label: string; history?: boolean } | null;
     locale: Locale;
   }
 
@@ -45,7 +47,7 @@
         <Button variant="secondary" size="xs" onclick={onretry}>{t('ui.retry', locale)}</Button>
       </p>
     {/if}
-    {#if back}<p class="record-state__line"><a class="link-arrow" href={back.href}>{back.label}</a></p>{/if}
+    {#if back}<p class="record-state__line"><a class="link-arrow" href={back.href} onclick={back.history ? backThroughHistory : undefined}>{back.label}</a></p>{/if}
   </div>
 {/if}
 

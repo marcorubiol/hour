@@ -8521,3 +8521,38 @@ está abierto en otro hilo; queda para cuando se libere.
 **Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`. Textos nuevos en los cuatro idiomas; sale `desk.tile_open`.
 
 **Cómo se revierte.** Revertir el commit.
+
+## [2026-11-19] ADR-228 · «Volver» vuelve adonde estabas (fase 3 de ADR-223)
+
+**Contexto.** La salida de la página completa del pase decía «Volver al planificador» y llevaba siempre al Planificador, aunque se viniera de Hoy o de un enlace.
+
+**Decisión.** «Volver» usa el historial cuando la entrada anterior es de la app (las navegaciones por enlace de la app desde que cargó la página, `$lib/back`; el índice de `history.state` no sirve, SvelteKit lo inicia con una marca de tiempo); si no la hay (enlace directo, pestaña nueva) cae en Hoy (`/h/today`). El rótulo es «← Volver», sin nombrar sitio. Un clic con modificador (nueva pestaña) sigue yendo al enlace. El vistazo no cambia: ya se cierra sobre la lente (`closePeek`). La ficha de una fecha no tiene página completa, así que no cambia nada ahí.
+
+**Alcance honesto.** Hoy «Volver» solo se dibuja en el estado de error o de «no existe» de la página del pase (`RecordState`); el pase cargado no lleva flecha propia (usa las migas). No he añadido una flecha nueva: si se quiere una fija en la cabecera del pase, es otra decisión de diseño.
+
+**Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`. Texto `perf.back_planner` sustituido por `perf.back` en los cuatro idiomas.
+
+## [2026-11-19] ADR-229 · Lo vacío no se dibuja, y nombres claros (fase 3 de la revisión TDAH; enmienda ADR-208 y ADR-202 § 7)
+
+Encargo `revision-tdah/brief.md`, fase 3 (Marco, 19-11).
+
+1. **Una cifra a cero no se dice.** En el Mes, «0 confirmadas» y «0 opciones» desaparecen; la cifra que no se sabe aún
+   sigue con su guion.
+2. **El Tablero pliega los carriles sin nada.** Un carril sin ninguna fecha ni ausencia (`silence: 'dash'`) no se dibuja;
+   al pie, una línea «N sin fechas» los abre y «Plegar N sin fechas» los cierra. Un espacio o proyecto abierto que se
+   queda sin carriles tampoco se dibuja. Un grupo cerrado no cambia: su tapa ya los cuenta. El contador de carriles de la
+   barra sigue contándolos todos.
+3. **«Te espera» sin pastillas cuando no hacen falta** (`waitingDrawsPills`, `$lib/hoy`): con tres cosas o menos y todas
+   dibujadas como filas, las pastillas repetían lo mismo; solo filas. Con las filas plegadas (calma, día de función) o con
+   cuatro o más, las pastillas siguen. En Hoy, el título, las palabras, la última frase y el contexto de una fila de
+   conversación van enteros en dos líneas antes del «…» (la lista de Conversaciones no cambia).
+4. **Calma con su nombre** (enmienda ADR-208): el botón dice «Calma», con el radio de los botones, y se rellena al
+   activarse. Su comportamiento no cambia.
+5. **«Ir a hoy».** El botón del Planificador que salta a hoy dice «Ir a hoy» (`planner.now`), para que no haya dos «Hoy».
+6. **«Siguiente» del Día era un error.** Leía la ventana de decisiones (`decisionsPerfQuery`), que solo filtra por los
+   contenedores del ámbito, sin el filtro de persona ni la línea: el 19-11 nombraba Zaragoza (20) y Santander (21), dos
+   funciones de Gota que el Mes y Hoy dejan fuera. Ahora pasa el mismo filtro que el papel (`perfInScope` y `keepsRow`).
+
+**Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`. Textos en los cuatro idiomas.
+
+**Cómo se revierte.** Revertir el commit.

@@ -27,7 +27,7 @@
   import { tick } from 'svelte';
   import { t, type Locale } from '$lib/i18n';
   import type { DeskBucket, DeskConcern, DeskItem, DeskRun, Waiting } from '$lib/desk-feed';
-  import { waitingPills, type WaitingKind } from '$lib/hoy';
+  import { waitingDrawsPills, waitingPills, type WaitingKind } from '$lib/hoy';
   import ChatRow from '$lib/components/ChatRow.svelte';
   import type { ChatContext, ChatLine } from '$lib/chat-row';
 
@@ -284,8 +284,9 @@
   </BlockHead>
   {#if composer}{@render composer()}{/if}
 
-  {#if !loading && !errored && pills.length > 0}
-    <!-- One pill per kind and its figure: always there, calm and gig day included. -->
+  {#if !loading && !errored && pills.length > 0 && waitingDrawsPills(waiting.total, rows)}
+    <!-- One pill per kind and its figure, calm and gig day included; with
+         three things or fewer all drawn as rows, only the rows (ADR-229). -->
     <ul class="tallies" data-testid="desk-pills">
       {#each pills as p (p.kind)}
         {@const href = PILL_HREF[p.kind]}
@@ -418,8 +419,23 @@
   .row__subject a {
     color: inherit;
     text-decoration: none;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  }
+  /* WHOLE TEXT IN TWO LINES BEFORE AN ELLIPSIS (ADR-229): «Teatre d…» said
+     nothing. The chat row's one-line cut is the list's; here it wraps. */
+  .row__subject :global(.chat__name) {
+    flex-wrap: wrap;
+    column-gap: var(--space-xs);
+  }
+  .row__subject :global(.chat__title),
+  .row__subject :global(.chat__words),
+  .row__subject :global(.chat__last),
+  .row__subject :global(.chat__ctx) {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
   .row__subject label {
     font: inherit;

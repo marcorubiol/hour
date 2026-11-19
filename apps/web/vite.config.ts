@@ -129,7 +129,12 @@ export default defineConfig(({ mode }) => {
             // as it is used (the `_app/immutable` rule below), so the SW
             // installs in a moment and a second open reads its code from the
             // device. Offline still works for what has been opened before.
-            globPatterns: ['*.{svg,png,webmanifest}'],
+            //
+            // theme-init.js too (19-11): it is the synchronous <script> at the
+            // top of app.html's <head>, so the page paints nothing until it
+            // arrives. Not precached, every open fetched it from the network
+            // (measured 130-718 ms on a slow line) before anything else.
+            globPatterns: ['*.{svg,png,webmanifest}', 'theme-init.js'],
             // NO navigateFallback. In generateSW mode Workbox's
             // NavigationRoute serves the fallback for EVERY navigation
             // (precache-first), not just offline ones — with an active SW
@@ -166,7 +171,10 @@ export default defineConfig(({ mode }) => {
                 handler: 'NetworkFirst',
                 options: {
                   cacheName: 'pages',
-                  networkTimeoutSeconds: 5,
+                  // 3 s, not 5 (19-11): on a phone whose radio is slow to
+                  // wake, every second here is a blank screen. Past 3 s the
+                  // last copy of the page opens and the app catches up.
+                  networkTimeoutSeconds: 3,
                 },
               },
               // Google's font stylesheet is render-blocking and its HTTP

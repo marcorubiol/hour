@@ -1,11 +1,11 @@
 <script lang="ts">
   /**
-   * Calm as a mark (ADR-208, design-system rule 14): the clock without its
-   * figures, in a circle; an outline when it is off, the circle filled with
-   * the mark in negative when it is on. The same mark in every theme: a theme
-   * changes its stroke (`--mark-stroke`) and its inks, never the drawing.
-   * One home for it: the phone's top bar and the desktop rail both draw this.
-   * The `c` key toggles it too (the /h layout).
+   * Calm with its name (ADR-229, amends ADR-208): «-:-» was the mode that
+   * helps most and nobody knew what it was until they pressed it. Now a small
+   * button that says «Calma»: an outline when it is off, filled when it is
+   * on. Its behaviour does not change. One home for it: the phone's top bar
+   * and the desktop rail both draw this. The `c` key toggles it too (the /h
+   * layout).
    */
   import { appLocale, t } from '$lib/i18n';
   import { useCalm } from '$lib/stores/calm.svelte';
@@ -14,17 +14,9 @@
   const locale = appLocale();
 </script>
 
-<button
-  type="button"
-  class="calmmark"
-  aria-pressed={calm.on}
-  aria-label={t('calm.mark_aria', locale)}
-  title={t('calm.mark_aria', locale)}
-  aria-keyshortcuts="C"
-  onclick={() => calm.toggle()}
+<button type="button" class="calmmark" aria-pressed={calm.on} aria-keyshortcuts="C" onclick={() => calm.toggle()}
+  >{t('calm.mark_aria', locale)}</button
 >
-  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.2 8h3.2M10.6 8h3.2" /><circle cx="8" cy="5.6" r="1" /><circle cx="8" cy="10.4" r="1" /></svg>
-</button>
 
 <style>
   .calmmark {
@@ -32,20 +24,22 @@
     display: inline-grid;
     place-items: center;
     flex: none;
-    inline-size: var(--control-size-s);
     block-size: var(--control-size-s);
-    padding: 0;
+    padding: 0 var(--space-s);
     border: var(--line-hairline) solid var(--border-color-dark);
-    border-radius: var(--radius-circle);
+    border-radius: var(--radius);
     background: none;
     color: var(--text-muted);
+    font-size: var(--text-s);
+    line-height: 1;
+    white-space: nowrap;
     cursor: pointer;
     transition:
       color var(--transition),
       background var(--transition),
       border-color var(--transition);
   }
-  /* The finger's target grows past the drawn circle, never the circle. */
+  /* The finger's target grows past the drawn box, never the box. */
   .calmmark::before {
     content: '';
     position: absolute;
@@ -61,18 +55,5 @@
     background: var(--heading-color);
     border-color: var(--heading-color);
     color: var(--bg);
-  }
-  .calmmark svg {
-    inline-size: 1rem;
-    block-size: 1rem;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: var(--mark-stroke);
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
-  .calmmark circle {
-    fill: currentColor;
-    stroke: none;
   }
 </style>

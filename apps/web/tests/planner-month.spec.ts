@@ -232,4 +232,15 @@ test.describe('the month (ADR-209)', () => {
     await cell.click({ position: { x: 4, y: 4 } });
     await expect(page.getByTestId('month-pick')).toBeVisible();
   });
+
+  test('a figure at zero is not said, and «Go to today» is not a second «Today» (ADR-229)', async ({ page }) => {
+    await open(page, '&view=month');
+    // The playwright space has confirmed gigs: its figure is said…
+    await expect(page.getByTestId('planner-stat-confirmed')).toBeVisible();
+    // …and no census figure is ever a zero.
+    for (const t of await page.locator('[data-testid^="planner-stat-"]').allTextContents()) {
+      expect(t.trim()).not.toMatch(/^0\b/);
+    }
+    await expect(page.locator('.cal__now:not(.cal__whoout)')).toHaveText('Go to today');
+  });
 });
