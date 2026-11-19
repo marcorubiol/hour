@@ -2620,7 +2620,7 @@
   "help.event.first_mail_synced": "Aquest correu l’ha portat Hour d’una bústia connectada, perquè l’adreça és d’un contacte. El veu qui veu aquesta conversa.",
   "perf.not_found": "Aquesta funció no existeix o no la pots veure.",
   "perf.load_error": "No s'ha pogut carregar aquesta funció.",
-  "perf.back_planner": "← Torna al planificador",
+  "perf.back": "← Torna",
   "person.not_found": "Aquesta persona no existeix o no la pots veure.",
   "person.load_error": "No s'ha pogut carregar aquesta persona.",
   "conversations.one_load_error": "No s'ha pogut carregar aquesta conversa.",

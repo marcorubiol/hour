@@ -1173,7 +1173,7 @@
       missingText={t('perf.not_found', locale)}
       failedText={t('perf.load_error', locale)}
       onretry={() => void $query.refetch()}
-      back={lensOn('planner') ? { href: '/h/planner', label: t('perf.back_planner', locale) } : null}
+      back={{ href: '/h/today', label: t('perf.back', locale), history: true }}
       {locale}
     />
   {:else if perf}

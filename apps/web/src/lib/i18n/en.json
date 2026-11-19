@@ -2620,7 +2620,7 @@
   "help.event.first_mail_synced": "Hour brought this email in from a connected mailbox, because the address belongs to a contact. Whoever sees this conversation sees it.",
   "perf.not_found": "This performance does not exist or you cannot see it.",
   "perf.load_error": "This performance could not be loaded.",
-  "perf.back_planner": "← Back to the planner",
+  "perf.back": "← Back",
   "person.not_found": "This person does not exist or you cannot see them.",
   "person.load_error": "This person could not be loaded.",
   "conversations.one_load_error": "This conversation could not be loaded.",
