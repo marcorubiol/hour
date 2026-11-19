@@ -8565,7 +8565,7 @@ Encargo `revision-tdah/brief.md`, fase 3 (Marco, 19-11).
 
 **«Editar» sale de la cabecera de la ficha de fechas** (ensayos, viajes), como pidió Marco el 19-11. No se pierde nada: los lápices de la fecha y del lugar del pase abren el mismo diálogo (título, tipo, serie, borrar).
 
-**Dónde se aparta del dibujo.** No tengo el lienzo de la vista Día (opción A, 18-11) en el repo: la pieza reutiliza el relleno y el tamaño de la pieza de Hoy (`--surface-focus`, `--display-piece`) y puede necesitar retoque de Marco. No lleva monograma del proyecto.
+**El dibujo.** La pieza sigue la lámina C de la revisión TDAH («Día, propuesta», aprobada por Marco): oscura como la de Hoy, con el monograma del proyecto y qué es («Ensayo?» si es opción), el nombre y la hora (o «sin hora»), la línea de abajo, las paradas en lectura y dos botones a `--radius`: «Poner hora» (solo sin hora) y «Abrir», los dos al pase. No está hecho aquí lo que esa lámina pide para días con muchas cosas (líneas agrupadas y filtros: fase 8 de la revisión TDAH) ni «+ Nota del día · + Fecha» ni «También hoy / Después».
 
 **Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`. E2E tocados: `date-edit.spec.ts` y `peek.spec.ts` (el lápiz de la fecha sustituye a «Edit»).
 

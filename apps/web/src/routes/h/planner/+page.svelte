@@ -58,6 +58,7 @@
     type ClashVM,
     type DateEvent,
     type NoteEvent,
+    type ProjectLite,
     type PerformanceEvent,
     performanceSlip,
     perfWorkspaceId,
@@ -1537,6 +1538,10 @@
       /** The pase it opens (ADR-230), the hour it says and the line under it. */
       href: string | null;
       sub: string;
+      eyebrow: string;
+      timed: boolean;
+      project: ProjectLite | null;
+      guess: boolean;
     }> = [];
     const clockOf = (venueTz: string | null | undefined, wsId: string | undefined) =>
       venueTz || (wsId ? workspaceTzById.get(wsId) : undefined) || viewerTz;
@@ -1549,7 +1554,11 @@
         tz: clockOf(p.venue?.timezone, perfWorkspaceId(p) ?? undefined),
         from: p.start_at ?? p.performed_at,
         href: performanceSlip(p, slipCtxPage).href ?? null,
-        sub: [kindLabel(performanceSlip(p, slipCtxPage).kind), performanceSlip(p, slipCtxPage).city].filter(Boolean).join(' · '),
+        sub: performanceSlip(p, slipCtxPage).city ?? '',
+        eyebrow: `${kindLabel(performanceSlip(p, slipCtxPage).kind)}${performanceSlip(p, slipCtxPage).cert === 'hold' || performanceSlip(p, slipCtxPage).cert === 'proposed' ? '?' : ''}`,
+        timed: Boolean(p.start_at),
+        project: p.project ?? null,
+        guess: performanceSlip(p, slipCtxPage).cert === 'hold' || performanceSlip(p, slipCtxPage).cert === 'proposed',
       });
     }
     for (const d of shownDates) {
@@ -1571,7 +1580,11 @@
           // is OFFERED as the new stage's destination (Marco, 2026-10-10).
           suggestVenue: tonightsVenue(d.project?.id ?? null),
           href: peekHref({ kind: 'date', id: d.id }, page.url),
-          sub: [kindLabel(sl.kind), sl.city].filter(Boolean).join(' · '),
+          sub: sl.city ?? '',
+          eyebrow: kindLabel(sl.kind),
+          timed: true,
+          project: d.project ?? null,
+          guess: false,
         });
         continue;
       }
@@ -1583,7 +1596,11 @@
         tz: clockOf(d.venue?.timezone, d.project?.workspace_id),
         from: d.starts_at,
         href: peekHref({ kind: 'date', id: spanSourceId(d.id) }, page.url),
-        sub: [kindLabel(dateSlip(d, slipCtxPage).kind), d.city].filter(Boolean).join(' · '),
+        sub: d.city ?? '',
+        eyebrow: `${kindLabel(dateSlip(d, slipCtxPage).kind)}${dateSlip(d, slipCtxPage).cert === 'hold' || dateSlip(d, slipCtxPage).cert === 'proposed' ? '?' : ''}`,
+        timed: !d.all_day,
+        project: d.project ?? null,
+        guess: dateSlip(d, slipCtxPage).cert === 'hold' || dateSlip(d, slipCtxPage).cert === 'proposed',
       });
     }
     return out.sort((a, b) => a.from.localeCompare(b.from));
@@ -3456,9 +3473,15 @@
     {#each dayOrders as o (o.id)}
       <DayPiece
         href={o.href}
+        project={o.project}
+        eyebrow={o.eyebrow}
         what={o.name}
-        at={hourMark(dualTime(o.from, o.tz, viewerTz).primary)}
+        at={o.timed ? hourMark(dualTime(o.from, o.tz, viewerTz).primary) : null}
+        noHourWord={t('planner.no_hour', locale)}
         sub={o.sub}
+        guess={o.guess}
+        setHourLabel={t('planner.day_set_hour', locale)}
+        openLabel={t('planner.day_open', locale)}
       >
         {#if o.target === 'trip'}
           <TravelStages
