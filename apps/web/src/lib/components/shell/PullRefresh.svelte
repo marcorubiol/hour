@@ -26,8 +26,11 @@
   }
   let { locale }: Props = $props();
 
-  /** The longest the mark waits for the answers before it goes. */
-  const SETTLE_CAP_MS = 10_000;
+  /** The longest the mark stays (19-11). It used to wait for every active
+      query, up to 10 s: Hoy's slowest read (the conversations, about 2 s on
+      the server) held the ring half-way down and the pull felt stuck. The
+      answers keep landing in place after it goes. */
+  const MARK_CAP_MS = 1_200;
 
   const queryClient = useQueryClient();
 
@@ -55,14 +58,16 @@
     distance = threshold();
     announce = t('pull.refreshing', locale);
     const done = queryClient.refetchQueries({ type: 'active' });
-    await Promise.race([done, new Promise((r) => setTimeout(r, SETTLE_CAP_MS))]);
+    await Promise.race([done, new Promise((r) => setTimeout(r, MARK_CAP_MS))]);
+    refreshing = false;
+    distance = 0;
+    // What happened is said once every answer is in, mark gone or not.
+    await done;
     const failed = queryClient
       .getQueryCache()
       .findAll({ type: 'active' })
       .some((q) => q.state.status === 'error');
     announce = t(failed ? 'pull.failed' : 'pull.done', locale);
-    refreshing = false;
-    distance = 0;
   }
 
   onMount(() => {
