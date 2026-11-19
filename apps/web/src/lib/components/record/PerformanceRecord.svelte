@@ -1047,6 +1047,7 @@
       time={startTime}
       show={perf.project?.name ?? null}
       place={passPlace}
+      placeHref={titleHref}
       onEditDate={canEdit ? () => (editingDate = true) : null}
       onEditPlace={canEdit ? () => (editingPlace = true) : null}
       dateEdit={editingDate ? dateEdit : null}
