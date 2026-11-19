@@ -82,7 +82,7 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
  * from the rows. RLS enforces has_permission(project_id, 'edit:performance')
  * on UPDATE.
  *
- * ADR-225: also `shared_note` (the note every shared link carries; `notes`
+ * ADR-226: also `shared_note` (the note every shared link carries; `notes`
  * stays internal) and `venue_contact_person_id` (who the venue calls; 400
  * `not_in_team` unless that person is in the performance's team).
  *
@@ -230,7 +230,7 @@ export const PATCH: RequestHandler = async ({ request, params, url, platform, lo
         ? { from: clockBefore, to: clockAfter }
         : null;
 
-    // ADR-225: the venue's contact must be someone of this performance's team
+    // ADR-226: the venue's contact must be someone of this performance's team
     // (the same rule the shares endpoint lists, and the one the base applies
     // when it serves the sheet). The FK alone would accept any person.
     if (patch.venue_contact_person_id) {
@@ -268,7 +268,7 @@ export const PATCH: RequestHandler = async ({ request, params, url, platform, lo
     try {
       ({ data } = await pgPatch<PatchedRow>(env, 'performance', jwt, patch, { search }));
     } catch (err) {
-      // 42703: a database without 20261119140000 (ADR-225) cannot return the
+      // 42703: a database without 20261119150000 (ADR-226) cannot return the
       // two new columns; the failed request wrote nothing, so the same patch
       // goes again without them in the answer. A patch that names them is a
       // real failure there: the feature does not exist yet.

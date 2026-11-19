@@ -158,7 +158,7 @@ describe('buildRoadsheet — tech_manager', () => {
   });
 });
 
-describe('shared note and company contact (ADR-225)', () => {
+describe('shared note and company contact (ADR-226)', () => {
   const contact = { kind: 'company', name: 'La Cia', phone: '+34900000000' } as const;
   const withSharing = (): PerformanceBundle => ({
     ...bundle(),
@@ -203,7 +203,7 @@ describe('shared note and company contact (ADR-225)', () => {
   });
 });
 
-describe('companyContactFor — who the venue calls (ADR-225)', () => {
+describe('companyContactFor — who the venue calls (ADR-226)', () => {
   const team = [
     { person_id: 'pau', name: ' Pau Roca ' },
     { person_id: 'eva', name: 'Eva' },

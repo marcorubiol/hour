@@ -20,7 +20,7 @@
  * the same rule as `get_public_roadsheet`, so «view as» shows what the
  * public link shows.
  *
- * ADR-225: `shared_note` for every role; `company_contact` (who the venue
+ * ADR-226: `shared_note` for every role; `company_contact` (who the venue
  * calls) for venue and full, computed here from the workspace's public
  * contact and the chosen person, as the base does for the venue link.
  *
@@ -137,7 +137,7 @@ function toProjectionBundle(result: PerformanceBundleResult): PerformanceBundle 
 }
 
 /**
- * ADR-225: who the venue would call, as the operator's preview and the full
+ * ADR-226: who the venue would call, as the operator's preview and the full
  * sheet show it. The workspace's public contact is read here (the bundle has
  * no workspace row); the chosen person and their phones come from the bundle
  * itself, by the same rule the base applies to the venue link.

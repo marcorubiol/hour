@@ -321,7 +321,7 @@ export const PerformanceSeriesCreateSchema = v.object({
 
 export type PerformanceSeriesCreate = v.InferOutput<typeof PerformanceSeriesCreateSchema>;
 
-/** ADR-225: longest «nota para quien recibe la hoja» (the column's CHECK). */
+/** ADR-226: longest «nota para quien recibe la hoja» (the column's CHECK). */
 export const SHARED_NOTE_MAX = 2000;
 
 /**
@@ -368,7 +368,7 @@ export const PerformancePatchSchema = v.object({
    */
   bolo_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
   /**
-   * ADR-225 — la nota para quien recibe la hoja (todos los enlaces). Es
+   * ADR-226 — la nota para quien recibe la hoja (todos los enlaces). Es
    * `performance.notes` la que sigue interna y fuera de este PATCH. Vacía = null.
    */
   shared_note: v.optional(
@@ -382,7 +382,7 @@ export const PerformancePatchSchema = v.object({
     ),
   ),
   /**
-   * ADR-225 — la persona de esta función a quien llama la sala; null = el
+   * ADR-226 — la persona de esta función a quien llama la sala; null = el
    * contacto público del espacio. Que sea del equipo lo comprueba el endpoint
    * (la base lo vuelve a comprobar al servir la hoja).
    */

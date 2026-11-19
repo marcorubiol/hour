@@ -180,7 +180,7 @@ describe('roadsheetTeam', () => {
     expect(roadsheetTeam([{ role: 'luces', person: null }], [], [])).toEqual([]);
   });
 
-  test('has_phone says whether the venue could call them, never the number (ADR-225)', () => {
+  test('has_phone says whether the venue could call them, never the number (ADR-226)', () => {
     const team = roadsheetTeam(
       [
         { role: 'luces', person: { id: 'pau', full_name: 'Pau', phone: '+34600' } },

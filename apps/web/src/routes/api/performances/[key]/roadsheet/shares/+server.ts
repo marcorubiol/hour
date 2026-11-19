@@ -18,7 +18,7 @@
  * (crew: tech_manager, cast: performer). Only a personal link shows
  * «Llego tarde».
  *
- * ADR-225: GET also says whom the venue's link calls, for the dialog that
+ * ADR-226: GET also says whom the venue's link calls, for the dialog that
  * lets an editor change it: `venue_contact_person_id` (null = the company),
  * the company's public contact (`company`, name and phone), and per team
  * member only whether they have a phone (`has_phone`), never the number.
@@ -49,7 +49,7 @@ function mapShare(s: ShareRow, team: readonly TeamMember[] = []): RoadsheetShare
   return { id: s.id, token: s.token, role: s.role, created_at: s.created_at, expires_at: s.expires_at, person };
 }
 
-/** What the venue's link calls, as the dialog needs it (ADR-225). */
+/** What the venue's link calls, as the dialog needs it (ADR-226). */
 type VenueCallInfo = {
   team: TeamMember[];
   venue_contact_person_id: string | null;
@@ -58,7 +58,7 @@ type VenueCallInfo = {
 
 /**
  * The performance's team, as the caller reads it (RLS), for the personal
- * links, plus whom the venue's link calls (ADR-225). Secondary to the list:
+ * links, plus whom the venue's link calls (ADR-226). Secondary to the list:
  * if it cannot be read, the links still list (without names) and the failure
  * goes to the log.
  */

@@ -1,5 +1,5 @@
--- 225 · Contacto de la compañía para la sala y nota para quien recibe la hoja
--- (ADR-225, fase 3 de «el pase es la hoja de ruta»; Marco, 2026-11-19).
+-- 226 · Contacto de la compañía para la sala y nota para quien recibe la hoja
+-- (ADR-226, fase 3 de «el pase es la hoja de ruta»; Marco, 2026-11-19).
 --
 -- Dos datos nuevos de la función y lo que la hoja pública hace con ellos:
 --
@@ -48,7 +48,7 @@
 -- ellas (42703). Sin la migración, la nota y el contacto simplemente no existen.
 --
 -- Antes de aplicar, comparar con `pg_get_functiondef` de la base viva: el
--- cuerpo de `get_public_roadsheet` debe ser el de aquí sin las líneas marcadas «225».
+-- cuerpo de `get_public_roadsheet` debe ser el de aquí sin las líneas marcadas «226».
 -- Rollback: build/runbooks/rollback-20261119-roadsheet-contact-shared-note.sql.
 
 -- ── 1 · las columnas ─────────────────────────────────────────────────────────
@@ -58,9 +58,9 @@ ALTER TABLE public.performance
   ADD CONSTRAINT performance_shared_note_length CHECK (shared_note IS NULL OR char_length(shared_note) <= 2000);
 
 COMMENT ON COLUMN public.performance.shared_note IS
-  'ADR-225: nota para quien recibe la hoja de ruta; sale en todos los enlaces compartidos. No es performance.notes (interna).';
+  'ADR-226: nota para quien recibe la hoja de ruta; sale en todos los enlaces compartidos. No es performance.notes (interna).';
 COMMENT ON COLUMN public.performance.venue_contact_person_id IS
-  'ADR-225: la persona del equipo a quien llama la sala en esta función; NULL = el contacto público del espacio. Solo vale mientras siga en el equipo.';
+  'ADR-226: la persona del equipo a quien llama la sala en esta función; NULL = el contacto público del espacio. Solo vale mientras siga en el equipo.';
 
 -- La FK se indexa como el resto (advisor_rls_and_fk_indexes): el ON DELETE SET NULL
 -- de `person` busca por aquí.
@@ -114,7 +114,7 @@ BEGIN
       'id', p.id, 'slug', p.slug, 'performed_at', p.performed_at,
       'status', p.status, 'venue_name', p.venue_name, 'city', p.city,
       'country', p.country,
-      -- 225 (ADR-225): la nota para quien recibe la hoja, en todos los roles.
+      -- 226 (ADR-226): la nota para quien recibe la hoja, en todos los roles.
       'shared_note', p.shared_note,
       'logistics', CASE WHEN v_share.role IN ('performer', 'tech_manager')
                         THEN p.logistics ELSE '{}'::jsonb END,
@@ -245,7 +245,7 @@ BEGIN
        WHERE n.performance_id = p.id AND n.moved_at IS NOT NULL), '[]'::jsonb))
   -- 143 (ADR-129 § 7): el oficio del espacio, para que la hoja hable el suyo.
   || jsonb_build_object('trade', (SELECT w.trade FROM public.workspace w WHERE w.id = p.workspace_id))
-  -- 225 (ADR-225): a quién llama la sala. Solo en el enlace de sala. Una persona
+  -- 226 (ADR-226): a quién llama la sala. Solo en el enlace de sala. Una persona
   -- elegida para esta función (si sigue en su equipo, con nombre y teléfono) o,
   -- si no, el contacto público de la compañía (workspace.name + workspace.phone);
   -- sin teléfono en ninguno de los dos, null. Nunca el correo ni el teléfono

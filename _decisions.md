@@ -8439,7 +8439,7 @@ Segunda fase de «el pase es la hoja de ruta». El documento de la hoja deja de 
 
 **Cómo se revierte.** Revertir el commit (restaura `RoadsheetView`); sin esquema, API ni datos; `CACHE_SCHEMA` no cambia.
 
-## [2026-11-19] ADR-225 · La sala puede llamar a la compañía y toda hoja lleva una nota para quien la recibe (fase 3 de ADR-222)
+## [2026-11-19] ADR-226 · La sala puede llamar a la compañía y toda hoja lleva una nota para quien la recibe (fase 3 de ADR-222)
 Tercera fase de «el pase es la hoja de ruta». Dos decisiones de Marco (19-11, al contestar las preguntas de la propuesta):
 la sala necesita un teléfono al que llamar, y hace falta una nota que salga en todos los enlaces sin ser las notas internas.
 
@@ -8462,7 +8462,7 @@ la sala necesita un teléfono al que llamar, y hace falta una nota que salga en 
    enlaces, debajo de la pieza y antes de «El día», con su etiqueta mono. Se escribe en el pase, bajo «Notas», con una
    línea («Sale en todos los enlaces compartidos.»): campo simple que se guarda por PATCH al salir (no es el documento
    colaborativo de las notas). `performance.notes` sigue siendo interna y solo la lleva el rol `full`.
-4. **Datos y permisos.** Migración `20261119140000_roadsheet_contact_shared_note.sql`: las dos columnas (CHECK de largo,
+4. **Datos y permisos.** Migración `20261119150000_roadsheet_contact_shared_note.sql`: las dos columnas (CHECK de largo,
    FK `ON DELETE SET NULL` con su índice) y `get_public_roadsheet` con dos añadidos sobre el cuerpo vivo de
    `20261113110000` (`performance.shared_note` en todos los roles y `company_contact` `{kind, name, phone}` solo en `venue`).
    Sin políticas RLS nuevas: `performance` tiene RLS por fila y las columnas la heredan. **Pero el SELECT de

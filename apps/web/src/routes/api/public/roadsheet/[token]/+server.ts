@@ -17,7 +17,7 @@
  * 143 (20261113110000): `trade`, the space's, so the sheet speaks it. A base
  * without it answers without it, and the page speaks stage.
  *
- * 225 (20261119140000, ADR-225): `performance.shared_note` for every role and
+ * 226 (20261119150000, ADR-226): `performance.shared_note` for every role and
  * `company_contact` {kind, name, phone} for the venue link alone. Absent on a
  * base that has not had the migration: null, nothing breaks.
  */
@@ -73,7 +73,7 @@ type PublicBundle = {
   late?: PublicLate;
   /** 143: `workspace.trade` of the performance's space. */
   trade?: string;
-  /** 225 (20261119140000): who the venue calls; only on the venue link, null
+  /** 226 (20261119150000): who the venue calls; only on the venue link, null
       when there is no phone to give. `performance.shared_note` rides in the
       `performance` object for every role. A base without the migration sends
       neither, and the sheet simply has no note and nobody to call. */

@@ -32,10 +32,10 @@
  *     line, which the public sheet reads (`get_public_roadsheet`): the
  *     rider and the plot are what a venue needs, so every role gets them.
  *     Only what the company sends out, never what it received.
- *   - `shared_note` (ADR-225) is the note «para quien recibe la hoja»: written
+ *   - `shared_note` (ADR-226) is the note «para quien recibe la hoja»: written
  *     to be read by whoever opens the link, so EVERY role gets it, `full`
  *     included. It is not `notes`, which stays internal.
- *   - `company_contact` (ADR-225) is the one number the venue may call: the
+ *   - `company_contact` (ADR-226) is the one number the venue may call: the
  *     company's public contact, or the one person an editor chose for this
  *     performance. Venue + full only; the other roles have their own people.
  *   - `travel` (ADR-166) is the travelling party's: full + performer +
@@ -103,7 +103,7 @@ export interface RoadsheetPerson {
 }
 
 /**
- * Who the venue calls (ADR-225): `kind: 'company'` is the workspace's public
+ * Who the venue calls (ADR-226): `kind: 'company'` is the workspace's public
  * contact; `kind: 'person'` is the one team member an editor chose for this
  * performance. Only name and phone ever travel: never the email, never anyone
  * else's number.
@@ -294,7 +294,7 @@ export interface PerformanceBundle {
     | 'country'
     | 'notes'
   > & {
-    /** ADR-225: the note for whoever receives the sheet. Absent = not read / not set. */
+    /** ADR-226: the note for whoever receives the sheet. Absent = not read / not set. */
     shared_note?: string | null;
   } &
     // ADR-090: derived from `schedule_slot` by the bundle.
@@ -315,7 +315,7 @@ export interface PerformanceBundle {
   materials?: RoadsheetMaterial[];
   /** The trips of the day and its eve (`tripsOfPerformance`); absent = not read. */
   travel?: RoadsheetTrip[];
-  /** ADR-225: who the venue calls; absent or null = nobody to call. */
+  /** ADR-226: who the venue calls; absent or null = nobody to call. */
   company_contact?: CompanyContact | null;
 }
 
@@ -352,9 +352,9 @@ export interface Roadsheet {
   crew: CrewEntry[] | null;
   contacts: { programmer: RoadsheetPerson } | null;
   notes: string | null;
-  /** ADR-225: the note for whoever receives the sheet, every role. */
+  /** ADR-226: the note for whoever receives the sheet, every role. */
   shared_note: string | null;
-  /** ADR-225: who the venue calls; venue and full only. */
+  /** ADR-226: who the venue calls; venue and full only. */
   company_contact: CompanyContact | null;
   assets: AssetEntry[] | null;
   /** 88: the links the company sends out. The same section as `assets` on screen. */
@@ -386,7 +386,7 @@ export function roadsheetRoleFor(
 }
 
 /**
- * WHO THE VENUE CALLS (ADR-225), the same rule `get_public_roadsheet` applies
+ * WHO THE VENUE CALLS (ADR-226), the same rule `get_public_roadsheet` applies
  * for the venue link, for the screens that read the performance as an editor
  * (the operator's «ver como» and the full sheet). The chosen person counts
  * only while they are in `team` and have a phone; otherwise the company's

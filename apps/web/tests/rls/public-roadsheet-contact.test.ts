@@ -1,7 +1,7 @@
 /**
  * RLS — the public road sheet carries the shared note to every role and the
  * company contact to the venue alone
- * (`20261119140000_roadsheet_contact_shared_note`, ADR-225).
+ * (`20261119150000_roadsheet_contact_shared_note`, ADR-226).
  *
  * `get_public_roadsheet` runs as anon with the token, straight against
  * PostgREST: what it returns is what any link holder reads. Here:
@@ -39,7 +39,7 @@ type Bundle = {
   crew: Array<{ person: { phone: string | null; email: string | null } }>;
 };
 
-describe.skipIf(!envReady())('RLS — public road sheet: shared note and company contact (ADR-225)', () => {
+describe.skipIf(!envReady())('RLS — public road sheet: shared note and company contact (ADR-226)', () => {
   let jwt: string;
   let perfId: string;
   let workspaceId: string;

@@ -38,9 +38,9 @@
   type SharesResponse = {
     items: Share[];
     team?: TeamMember[];
-    /** ADR-225: whom the venue's link calls; null = the company. */
+    /** ADR-226: whom the venue's link calls; null = the company. */
     venue_contact_person_id?: string | null;
-    /** ADR-225: the company's public contact (the default call). */
+    /** ADR-226: the company's public contact (the default call). */
     company?: { name: string; phone: string | null } | null;
   };
 
@@ -83,7 +83,7 @@
   let roleShares = $derived(allShares.filter((s) => !s.person));
   let team = $derived($sharesQuery.data?.team ?? []);
 
-  // ── Whom the venue calls (ADR-225) ─────────────────────────────────────
+  // ── Whom the venue calls (ADR-226) ─────────────────────────────────────
   // The same rule the base applies to the venue's link: the chosen person
   // while they are in the team and have a phone, else the company's public
   // contact, else nobody (no phone to give).

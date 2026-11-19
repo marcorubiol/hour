@@ -11,7 +11,7 @@
    *             ┄┄┄ stub: «Hoja de Pau Roca · luces» / «Hoja para la sala»
    *             [Llamar a Pere] [Mapa]
    *   «Llego tarde» (personal link, on the day)
-   *   the note for whoever receives the sheet (every role, ADR-225)
+   *   the note for whoever receives the sheet (every role, ADR-226)
    *   EL DÍA, PARADA A PARADA — a vertical line of stops, the show the big one
    *   folds: contacts · logistics · hospitality · technical and materials ·
    *   who goes (team) / who comes (venue) · programmer · notes
@@ -115,7 +115,7 @@
   let mapLink: ReturnType<typeof MapLink> | undefined = $state();
   /**
    * Whom the call act dials. The venue's own technician (`call`) makes no
-   * sense on the venue's sheet: there the call is the company's (ADR-225), a
+   * sense on the venue's sheet: there the call is the company's (ADR-226), a
    * person by first name and the company by its name. Every other role keeps
    * the venue's contact.
    */
@@ -267,7 +267,7 @@
     <div class="ps__late">{@render late()}</div>
   {/if}
 
-  <!-- ADR-225: what the company wants said to whoever opens the sheet. Quiet, before the day. -->
+  <!-- ADR-226: what the company wants said to whoever opens the sheet. Quiet, before the day. -->
   {#if sheet.shared_note}
     <section class="ps__shared" aria-label={t('pass.shared_note', locale)} data-testid="roadsheet-shared-note">
       <h2 class="ps__label">{t('pass.shared_note', locale)}</h2>

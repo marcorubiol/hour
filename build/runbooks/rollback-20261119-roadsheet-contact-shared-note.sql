@@ -1,4 +1,4 @@
--- Rollback de 20261119140000_roadsheet_contact_shared_note (ADR-225).
+-- Rollback de 20261119150000_roadsheet_contact_shared_note (ADR-226).
 -- `get_public_roadsheet` vuelve al cuerpo de 20261113110000 (sin `shared_note` ni
 -- `company_contact`) y se borran las dos columnas de `performance` (con su
 -- índice, su CHECK y su grant). PIERDE los datos: las notas compartidas y los

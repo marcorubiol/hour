@@ -229,8 +229,8 @@ const PERFORMANCE_COLS = [
 ].join(',');
 
 /**
- * ADR-225: the note for whoever receives the sheet and the venue's contact
- * person. A database without migration 20261119140000 does not have them:
+ * ADR-226: the note for whoever receives the sheet and the venue's contact
+ * person. A database without migration 20261119150000 does not have them:
  * the read falls back to the columns above and answers null for both.
  */
 export const SHARING_COLS = 'shared_note,venue_contact_person_id';
@@ -298,7 +298,7 @@ export async function fetchPerformanceBundle(
   try {
     performance = await fetchRow(true);
   } catch (err) {
-    // 42703: the database has not had 20261119140000 yet («una base sin ella
+    // 42703: the database has not had 20261119150000 yet («una base sin ella
     // responde sin ella»); anything else is a real failure.
     if (!(err instanceof PostgrestError && err.code === '42703')) throw err;
     performance = await fetchRow(false);

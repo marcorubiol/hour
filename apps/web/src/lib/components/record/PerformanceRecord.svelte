@@ -117,9 +117,9 @@
       city: string | null;
       country: string | null;
       notes: string | null;
-      /** ADR-225: the note every shared link carries; null on a base without the column. */
+      /** ADR-226: the note every shared link carries; null on a base without the column. */
       shared_note?: string | null;
-      /** ADR-225: who the venue calls (a person of the team); null = the company. */
+      /** ADR-226: who the venue calls (a person of the team); null = the company. */
       venue_contact_person_id?: string | null;
       hold_notice_days: number | null;
       /** `custom_fields.preparation` is the hand things' state (ADR-221). */
@@ -394,7 +394,7 @@
     if (perf) fHoldNotice = perf.hold_notice_days;
   });
 
-  // ADR-225 — «Nota para quien recibe la hoja»: a plain field, saved through
+  // ADR-226 — «Nota para quien recibe la hoja»: a plain field, saved through
   // the PATCH when it loses focus (not the live notes doc: this one is not
   // collaborative). Empty is null; the draft follows the row until it is edited.
   let fSharedNote = $state('');
@@ -1288,7 +1288,7 @@
           placeholder={t('perf.notes_placeholder', locale)}
           {locale}
         />
-        <!-- ADR-225: the other note. It leaves the house: every shared link
+        <!-- ADR-226: the other note. It leaves the house: every shared link
              carries it (the notes above never do). -->
         <Field
           id="f-shared-note"

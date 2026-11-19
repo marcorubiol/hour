@@ -236,7 +236,7 @@ export interface TeamMember {
   role: string | null;
   kind: 'crew' | 'cast';
   /**
-   * ADR-225: whether the venue could call them (a phone in the company's
+   * ADR-226: whether the venue could call them (a phone in the company's
    * dossier, or the crew override). A flag, never the number: the shares
    * dialog only needs to say «sin teléfono».
    */
