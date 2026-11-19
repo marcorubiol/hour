@@ -118,7 +118,18 @@ export default defineConfig(({ mode }) => {
             ],
           },
           workbox: {
-            globPatterns: ['**/*.{js,css,svg,png,webmanifest}'],
+            // A SHORT PRECACHE (19-11). It used to be every js/css/png of the
+            // build: 443 files, 7 MB, each fetched with a cache-busting
+            // revision, so the install never reused what the page had just
+            // downloaded. Measured against production: after 15 s on a fast
+            // line the SW was still installing (52 of 443) and controlled
+            // nothing; on a phone, every deploy restarted that download
+            // alongside the open, which sat on a blank screen. Now only the
+            // icons and the manifest are precached; the app's code is cached
+            // as it is used (the `_app/immutable` rule below), so the SW
+            // installs in a moment and a second open reads its code from the
+            // device. Offline still works for what has been opened before.
+            globPatterns: ['*.{svg,png,webmanifest}'],
             // NO navigateFallback. In generateSW mode Workbox's
             // NavigationRoute serves the fallback for EVERY navigation
             // (precache-first), not just offline ones — with an active SW
@@ -136,6 +147,19 @@ export default defineConfig(({ mode }) => {
             // this server-rendered app doesn't even precache).
             navigateFallback: null,
             runtimeCaching: [
+              // The app's code and styles: hashed names that never change
+              // content, so cache-first, kept a month. A deploy brings new
+              // names; the old ones age out.
+              {
+                urlPattern: ({ url, sameOrigin }: { url: URL; sameOrigin: boolean }) =>
+                  sameOrigin && url.pathname.startsWith('/_app/immutable/'),
+                handler: 'CacheFirst',
+                options: {
+                  cacheName: 'app-immutable',
+                  cacheableResponse: { statuses: [200] },
+                  expiration: { maxEntries: 800, maxAgeSeconds: 30 * 24 * 3600, purgeOnQuotaError: true },
+                },
+              },
               {
                 urlPattern: ({ request }: { request: Request }) =>
                   request.mode === 'navigate',
