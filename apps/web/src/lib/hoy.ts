@@ -123,6 +123,9 @@ export const COMING_TILES = 10;
 /** On a phone, four day tiles and then «Planner →» (ADR-205). */
 export const COMING_TILES_PHONE = 4;
 export const COMING_PER_TILE = 2;
+/** How many things the count of what is open reads (ADR-227): the two weeks
+    of someone with fifteen companies, not the 40 the strip reads. */
+export const COMING_COUNT_CAP = 300;
 
 export interface ComingTile {
   day: string;
