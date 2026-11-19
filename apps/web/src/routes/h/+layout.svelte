@@ -26,6 +26,7 @@
 
   import { page } from '$app/state';
   import { afterNavigate, goto, replaceState } from '$app/navigation';
+  import { noteNavigation } from '$lib/back';
   import { env } from '$env/dynamic/public';
   import type { Snippet } from 'svelte';
   import { onDestroy, onMount, untrack } from 'svelte';
@@ -559,8 +560,9 @@
   // The first afterNavigate fires once SvelteKit's root exists (on a client
   // load, after the first mount returns): from then on shallow routing works.
   let routerReady = $state(false);
-  afterNavigate(() => {
+  afterNavigate((nav) => {
     routerReady = true;
+    noteNavigation(nav);
   });
   $effect(() => {
     if (!scopeSurface) return;

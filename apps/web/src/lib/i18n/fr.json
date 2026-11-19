@@ -2620,7 +2620,7 @@
   "help.event.first_mail_synced": "Hour a récupéré cet e-mail dans une boîte connectée, parce que l’adresse est celle d’un contact. Il est visible par qui voit cette conversation.",
   "perf.not_found": "Cette représentation n'existe pas ou vous ne pouvez pas la voir.",
   "perf.load_error": "Impossible de charger cette représentation.",
-  "perf.back_planner": "← Retour au planning",
+  "perf.back": "← Retour",
   "person.not_found": "Cette personne n'existe pas ou vous ne pouvez pas la voir.",
   "person.load_error": "Impossible de charger cette personne.",
   "conversations.one_load_error": "Impossible de charger cette conversation.",

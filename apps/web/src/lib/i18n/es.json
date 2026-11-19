@@ -2620,7 +2620,7 @@
   "help.event.first_mail_synced": "Este correo lo ha traído Hour de un buzón conectado, porque la dirección es de un contacto. Lo ve quien ve esta conversación.",
   "perf.not_found": "Esta función no existe o no la puedes ver.",
   "perf.load_error": "No se ha podido cargar esta función.",
-  "perf.back_planner": "← Volver al planificador",
+  "perf.back": "← Volver",
   "person.not_found": "Esta persona no existe o no la puedes ver.",
   "person.load_error": "No se ha podido cargar esta persona.",
   "conversations.one_load_error": "No se ha podido cargar esta conversación.",
