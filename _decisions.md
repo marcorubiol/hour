@@ -8494,3 +8494,30 @@ sala) y aplicar `build/runbooks/rollback-20261119-roadsheet-contact-shared-note.
 `get_public_roadsheet` y borra las dos columnas con su índice y su grant, **perdiendo** las notas compartidas y los
 contactos elegidos (el script dice cómo copiarlos antes). El código desplegado tolera la base sin ellas, así que el orden
 tampoco importa al revertir. Pendiente de ADR-222: la fase 4 (limpieza de la página del operador).
+
+## [2026-11-19] ADR-227 · «Lo que viene»: un solo ámbar por pantalla y el sitio manda (fase 1 de la revisión TDAH; enmienda ADR-211 § 3 y ADR-221 § 4)
+
+**Contexto.** Con la hoja de ruta a 14 días (`ROADSHEET_SHARE_DAYS`), la columna de «Lo que viene» en escritorio enseñaba
+siete líneas ámbar iguales, una por función: cumplía «ámbar solo para lo que vence» sobre el papel, pero en la pantalla
+volvía a ser el naranja fijo que asusta. Y cada tarjeta titulaba con el tipo («función», «viaje»), que se repite, mientras
+el sitio y la hora, que es lo que cambia, iban en pequeño. Encargo `revision-tdah/brief.md` (Marco, 19-11), lámina A.
+
+**Decisión.**
+1. **El sitio manda.** Cada cosa de una tarjeta titula con su sitio (o «a Donostia» en un viaje); debajo, en pequeño, la
+   sigla, el tipo y la hora, o «sin hora» en gris. En el móvil y en el escritorio.
+2. **Un solo ámbar.** De todas las funciones de las dos semanas, solo la que vence antes (`comingOpen`, `$lib/hoy`: la
+   fecha de la prisa más cercana) lleva ámbar: borde de su tarjeta y su nombre corto («Hoja sin enviar»). Las demás
+   tarjetas no dicen nada de lo que falta: fuera el punto gris de la ficha pequeña y el «N por cerrar» de la ancha.
+3. **Dos líneas bajo la tira.** Una ámbar con cuándo, dónde, qué y su verbo («Pasado mañana, Donostia: compartir la hoja ·
+   Compartir»), que abre el pase. Una gris con el punto discontinuo: «N funciones más con cosas por cerrar · ver», que abre
+   la Agenda; sin nada urgente, «N funciones con cosas por cerrar». La cifra cuenta funciones, no cosas, y sale de todas
+   las de las dos semanas, no solo de las tarjetas dibujadas, así que el móvil y el escritorio dicen lo mismo. Sin nada
+   abierto no hay línea. En calma, ninguna de las dos (ADR-203 § 5).
+4. **En el móvil, la tarjeta mide lo que dice:** sin la mitad vacía que dejaba la más alta de la tira.
+
+**Pendiente.** El verbo abre el pase, no el diálogo «Compartir» directamente: eso toca `PerformanceRecord.svelte`, que
+está abierto en otro hilo; queda para cuando se libere.
+
+**Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`. Textos nuevos en los cuatro idiomas; sale `desk.tile_open`.
+
+**Cómo se revierte.** Revertir el commit.

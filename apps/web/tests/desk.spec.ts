@@ -293,6 +293,25 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
     expect(await page.locator('[data-testid="desk-waiting-rows"] > li').count()).toBeLessThanOrEqual(5);
   });
 
+  // ADR-227: one amber a screen. At most one tile carries it, with the line
+  // under the strip that names it and opens its pase; the rest is grey and
+  // opens the Agenda. No per-tile «por cerrar» any more.
+  test('«Coming up» has one amber at most, and the rest is one grey line (ADR-227)', async ({ page }) => {
+    await page.goto(DESK);
+    await waitForLoaded(page);
+    await expect(page.getByTestId('desk-tile-missing')).toHaveCount(await page.getByTestId('desk-coming-urgent').count());
+    expect(await page.getByTestId('desk-tile-missing').count()).toBeLessThanOrEqual(1);
+    const urgent = page.getByTestId('desk-coming-urgent');
+    if ((await urgent.count()) > 0) {
+      await expect(urgent.locator('a')).toHaveAttribute('href', /^\/h\/(?:[\w-]+\/performance\/[\w-]+|today\?peek=)/);
+    }
+    const rest = page.getByTestId('desk-coming-open');
+    if ((await rest.count()) > 0) {
+      await expect(rest).toContainText(/to close/);
+      await expect(rest.locator('a')).toHaveAttribute('href', '/h/planner?view=agenda');
+    }
+  });
+
   test('the visit is written on the way out, so «since» has a start next time', async ({ page }) => {
     await page.goto(DESK);
     await waitForLoaded(page);

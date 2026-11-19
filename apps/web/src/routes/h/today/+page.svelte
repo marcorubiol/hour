@@ -39,7 +39,7 @@
   import DeskChanged from '$lib/components/desk/DeskChanged.svelte';
   import DeskSeason from '$lib/components/desk/DeskSeason.svelte';
   import LateNoticeBand from '$lib/components/desk/LateNoticeBand.svelte';
-  import { COMING_TILES, COMING_TILES_PHONE, comingTiles, nextAfterToday, outsideToday, piecePerformance, scopePulseInput, waitingRowCount } from '$lib/hoy';
+  import { COMING_COUNT_CAP, COMING_TILES, COMING_TILES_PHONE, comingOpen, comingTiles, nextAfterToday, outsideToday, piecePerformance, scopePulseInput, waitingRowCount } from '$lib/hoy';
   import { MediaQuery } from 'svelte/reactivity';
   import { MOBILE_QUERY, WIDE_QUERY } from '$lib/breakpoints';
   import { goto } from '$app/navigation';
@@ -252,7 +252,14 @@
     new Map(($projectsQuery.data?.items ?? []).map((p) => [p.id, readPreparation(p.preparation)] as const)),
   );
   const listOf = (projectId: string) => preparationByProject.get(projectId);
-  let tiles = $derived.by(() => comingTiles(coming, today, phone.current ? COMING_TILES_PHONE : COMING_TILES, listOf));
+  // Every tile of the two weeks counts what is open (ADR-227), however many
+  // things they hold (`coming` stops at 40, a day of fifteen shows passes it).
+  // The pulse's order is not the days' (zones, a trip sorted by a later
+  // stage), so the walk cannot stop at a day: a wide cap, and `comingTiles`
+  // keeps the window. The strip draws ten, four on a phone.
+  let allTiles = $derived.by(() => comingTiles(upcoming(pulseInput, clockNow, COMING_COUNT_CAP), today, Infinity, listOf));
+  let tiles = $derived.by(() => allTiles.slice(0, phone.current ? COMING_TILES_PHONE : COMING_TILES));
+  let tilesOpen = $derived(comingOpen(allTiles));
   let nextThing = $derived(nextAfterToday(coming, today));
   // Nothing within two weeks: one sentence names what comes (ADR-149).
   let farNext = $derived(tiles.length === 0 ? nextThing : null);
@@ -983,6 +990,7 @@
       <div class="desk__slot" data-slot="coming">
       <DeskComing
         {tiles}
+        open={tilesOpen}
         far={farNext}
         settled={feeds.settled && !scopeUnresolved}
         errored={feeds.errored}

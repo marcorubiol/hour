@@ -8,6 +8,17 @@
    * desktop the tiles go one under the other (§ 6 c) and «Planner →» is a
    * low quiet row at their foot, lighter than any tile with something.
    *
+   * THE PLACE LEADS (ADR-227): each thing is titled by where it happens
+   * («Donostia», «a Donostia» on a trip); the kind and the hour go under it,
+   * small, and «sin hora» in grey when it has none.
+   *
+   * ONE AMBER A SCREEN (ADR-227, amends ADR-211 § 3 and ADR-221 § 8): only
+   * the tile with the thing that falls due first carries amber (its border
+   * and «Hoja sin enviar»). Under the strip, one amber line says when, where,
+   * what and its verb, which opens the pase; one grey line counts the other
+   * performances with something open and opens the Agenda. Nothing open, no
+   * line. Off in calm (ADR-203 § 5).
+   *
    * THE DOOR IS THE TILE (§ 8, design-system rule 10): on a phone a tile
    * with one thing opens that thing's pase, with several its day in the
    * Planner (ADR-223); on a desktop the number opens the day, each row its pase; the block's head carries no written link. An option to
@@ -24,11 +35,13 @@
   import { plannerDayHref } from '$lib/planner';
   import { pulseSlip } from '$lib/pulse-feeds.svelte';
   import type { PulseNext } from '$lib/pulse';
-  import type { ComingTile } from '$lib/hoy';
+  import type { ComingOpen, ComingTile, TileUrgent } from '$lib/hoy';
   import { accentVarFor } from '$lib/utils/accent';
 
   interface Props {
     tiles: ComingTile[];
+    /** What is open in the two weeks (`comingOpen`): the one amber and the grey figure. */
+    open?: ComingOpen;
     /** The next thing when it is more than two weeks away, or null. */
     far?: PulseNext | null;
     settled: boolean;
@@ -37,27 +50,54 @@
     viewerTz: string;
     slipCtx: SlipContext;
     locale: Locale;
-    /** The «Falta algo» dot (ADR-211 § 3); off in calm (ADR-203 § 5). */
+    /** What is open, amber or grey (ADR-227); off in calm (ADR-203 § 5). */
     dots?: boolean;
     /** From 64rem (the Desk's two columns): a day per card, each thing a row that opens its own record. */
     wide?: boolean;
   }
 
-  let { tiles, far = null, settled, errored, today, viewerTz, slipCtx, locale, dots = true, wide = false }: Props = $props();
+  let {
+    tiles,
+    open = { urgent: null, urgentDay: null, rest: 0 },
+    far = null,
+    settled,
+    errored,
+    today,
+    viewerTz,
+    slipCtx,
+    locale,
+    dots = true,
+    wide = false,
+  }: Props = $props();
 
   const kindLabel = (kind: SlipKind, voice?: Voice) => t(`planner.kind_${kind}`, locale, undefined, voice);
   const hour = (iso: string, tz: string | null) => hourMark(dualTime(iso, tz, viewerTz).primary);
   const dayDiff = (day: string) =>
     Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
-  /** What a tile says of what is open (lista de preparación): «3 por cerrar»
-      in grey; only a thing with hurry is named, with when («En 2 días:
-      compartir la hoja»). */
-  function openWords(tile: ComingTile): string {
-    const u = tile.urgent;
-    if (!u) return t('desk.tile_open', locale, { n: tile.open });
-    // The hurry counts to its own day: a hold's deadline, else the performance's.
+  /** Where a thing happens: its city, else its name; a trip, «a Donostia». */
+  function placeOf(item: PulseNext, day: string): string {
+    const sl = pulseSlip(item.ref, day, slipCtx);
+    return sl.lead ? `${t('planner.slip_to', locale)} ${sl.name}` : sl.city || sl.name;
+  }
+  /** The tile's own amber words: what, short («Hoja sin enviar»). */
+  function urgentShort(u: TileUrgent): string {
+    if (u.what === 'hand') return u.name ?? '';
+    return t(`desk.urgent_short_${u.what}`, locale);
+  }
+  /** «Pasado mañana, Donostia: compartir la hoja» — when counts to its own
+      day: a hold's deadline, else the performance's. */
+  function urgentLine(u: TileUrgent): string {
     const n = dayDiff(u.day);
-    const when = n < 0 && u.what === 'hold' ? t('desk.when_overdue', locale) : n <= 0 ? t('desk.when_today', locale) : n === 1 ? t('desk.when_tomorrow', locale) : t('desk.when_days', locale, { n });
+    const when =
+      n < 0 && u.what === 'hold'
+        ? t('desk.when_overdue', locale)
+        : n <= 0
+          ? t('desk.when_today', locale)
+          : n === 1
+            ? t('desk.when_tomorrow', locale)
+            : n === 2
+              ? t('desk.when_after_tomorrow', locale)
+              : t('desk.when_days', locale, { n });
     const what =
       u.what === 'hand'
         ? (u.name ?? '')
@@ -65,8 +105,23 @@
             { roadsheet: 'desk.urgent_roadsheet', hold: 'desk.urgent_hold', hours: 'desk.urgent_hours', team: 'desk.urgent_team' }[u.what],
             locale,
           );
-    return t('desk.tile_urgent', locale, { when, what });
+    const where = u.item ? placeOf(u.item, u.item.day) : '';
+    return where ? t('desk.urgent_line', locale, { when, where, what }) : t('desk.tile_urgent', locale, { when, what });
   }
+  /** The amber line's verb, the pase's own («Compartir», «Decidir»). */
+  const urgentVerb = (u: TileUrgent) => t(`desk.urgent_verb_${u.what}`, locale);
+  let urgentHref = $derived.by(() => {
+    const it = open.urgent?.item;
+    return it ? (pulseSlip(it.ref, it.day, slipCtx).href ?? undefined) : undefined;
+  });
+  let restWords = $derived(
+    t(
+      `desk.open_${open.urgent ? 'more' : 'all'}${open.rest === 1 ? '_one' : ''}`,
+      locale,
+      { n: open.rest },
+    ),
+  );
+  let showOpen = $derived(dots && settled && tiles.length > 0 && (open.urgent !== null || open.rest > 0));
   let planner = $derived(lensOn('planner'));
   /** A tile's day in the Planner, else its first thing's record. */
   function dayHref(tile: ComingTile): string | undefined {
@@ -81,28 +136,35 @@
     }
     return dayHref(tile);
   }
+  /** Does this tile carry the screen's one amber? */
+  const amberOn = (tile: ComingTile) => dots && open.urgentDay === tile.day && tile.urgent !== null;
   let farHref = $derived.by(() => {
     if (!far) return undefined;
     return pulseSlip(far.ref, far.day, slipCtx).href ?? (planner ? plannerDayHref('day', far.day) : undefined);
   });
 </script>
 
-{#snippet thing(item: PulseNext, day: string)}
+<!-- One thing: its place on top; under it, small, the monogram, the kind and
+     the hour, or «sin hora» in grey. -->
+{#snippet body(item: PulseNext, day: string)}
   {@const sl = pulseSlip(item.ref, day, slipCtx)}
   {@const held = sl.cert === 'hold' || sl.cert === 'proposed'}
-  {@const where = sl.lead ? `${t('planner.slip_to', locale)} ${sl.name}` : sl.city || sl.name}
-  <li class="tile__thing">
-    <!-- In a narrow tile the monogram goes over the word, not beside it (rule 7). -->
-    <span class="tile__what"
-      >{#if item.ref.row.project}<IdentityMark
-          mini
-          accent={accentVarFor(item.ref.row.project)}
-          name={item.ref.row.project.name}
-          initials={item.ref.row.project.initials}
-        />{/if}<span class:guess={held}>{kindLabel(sl.kind, tradeFor(perfWorkspaceId(item.ref.row)))}{held ? '?' : ''}</span></span
-    >
-    <small class="tile__meta">{[item.at ? hour(item.at, item.ref.tz) : null, where].filter(Boolean).join(' · ')}</small>
-  </li>
+  <span class="tile__place">{placeOf(item, day)}</span>
+  <small class="tile__meta"
+    >{#if item.ref.row.project}<IdentityMark
+        mini
+        accent={accentVarFor(item.ref.row.project)}
+        name={item.ref.row.project.name}
+        initials={item.ref.row.project.initials}
+      />{/if}<span class:guess={held}>{kindLabel(sl.kind, tradeFor(perfWorkspaceId(item.ref.row)))}{held ? '?' : ''}</span>
+    · {#if item.at}{hour(item.at, item.ref.tz)}{:else}<span class="tile__nohour">{t('planner.no_hour', locale)}</span>{/if}</small
+  >
+{/snippet}
+
+{#snippet amber(tile: ComingTile)}
+  {#if amberOn(tile) && tile.urgent}<p class="tile__falta" data-testid="desk-tile-missing">
+      <span class="missing-dot missing-dot--s missing-dot--urgent" aria-hidden="true"></span>{urgentShort(tile.urgent)}
+    </p>{/if}
 {/snippet}
 
 {#if !errored}
@@ -118,7 +180,7 @@
           {#if wide}
           {@const href = dayHref(tile)}
           <li class="coming__cell">
-            <div class="tile tile--card" data-testid="desk-tile" data-day={tile.day}>
+            <div class="tile tile--card" class:tile--urgent={amberOn(tile)} data-testid="desk-tile" data-day={tile.day}>
               <svelte:element this={href ? 'a' : 'span'} {href} class="tile__date">
                 <span class="tile__n">{Number(tile.day.slice(8, 10))}</span>
                 <span class="tile__wd">{localeWeekdayShort(tile.day, locale)}</span>
@@ -126,53 +188,41 @@
               </svelte:element>
               <ul class="tile__things tile__things--rows">
                 {#each tile.items as item (item.ref.of + item.ref.id)}
-                  {@const sl = pulseSlip(item.ref, tile.day, slipCtx)}
-                  {@const held = sl.cert === 'hold' || sl.cert === 'proposed'}
-                  {@const where = sl.lead ? `${t('planner.slip_to', locale)} ${sl.name}` : sl.city || sl.name}
-                  {@const door = sl.href ?? href}
+                  {@const door = pulseSlip(item.ref, tile.day, slipCtx).href ?? href}
                   <li class="tile__row">
                     <svelte:element this={door ? 'a' : 'span'} href={door} class="tile__rowlink" data-testid="desk-tile-row">
-                      <span class="tile__what"
-                        >{#if item.ref.row.project}<IdentityMark
-                            mini
-                            accent={accentVarFor(item.ref.row.project)}
-                            name={item.ref.row.project.name}
-                            initials={item.ref.row.project.initials}
-                          />{/if}<span class:guess={held}>{kindLabel(sl.kind, tradeFor(perfWorkspaceId(item.ref.row)))}{held ? '?' : ''}</span></span
-                      >
-                      <small class="tile__meta">{[item.at ? hour(item.at, item.ref.tz) : null, where].filter(Boolean).join(' · ')}</small>
+                      {@render body(item, tile.day)}
                     </svelte:element>
                   </li>
                 {/each}
               </ul>
               {#if tile.more > 0}<span class="tile__more">{t('desk.coming_more', locale, { n: tile.more })}</span>{/if}
-              {#if dots && tile.missing}<p class="tile__falta" class:tile__falta--urgent={tile.urgent} data-testid="desk-tile-missing">
-                  <span class="missing-dot missing-dot--s" class:missing-dot--urgent={tile.urgent} aria-hidden="true"></span>{openWords(tile)}
-                </p>{/if}
+              {@render amber(tile)}
             </div>
           </li>
           {:else}
           {@const href = tileHref(tile)}
           <li class="coming__cell">
-            <svelte:element this={href ? 'a' : 'div'} {href} class="tile" data-testid="desk-tile" data-day={tile.day}>
+            <svelte:element
+              this={href ? 'a' : 'div'}
+              {href}
+              class="tile"
+              class:tile--urgent={amberOn(tile)}
+              data-testid="desk-tile"
+              data-day={tile.day}
+            >
               <span class="tile__date">
                 <span class="tile__n">{Number(tile.day.slice(8, 10))}</span>
                 <span class="tile__wd">{localeWeekdayShort(tile.day, locale)}</span>
                 <span class="tile__mo">{localeMonthShort(tile.day, locale)}</span>
               </span>
-              <!-- A DOT AND NO WORD (ADR-211 § 3): a day ready says nothing, a
-                   day that needs something says only that; the record says what. -->
-              {#if dots && tile.missing}<span
-                  class="missing-dot tile__dot"
-                  class:missing-dot--urgent={tile.urgent}
-                  role="img"
-                  aria-label={openWords(tile)}
-                  data-testid="desk-tile-missing"
-                ></span>{/if}
               <ul class="tile__things">
-                {#each tile.items as item (item.ref.of + item.ref.id)}{@render thing(item, tile.day)}{/each}
+                {#each tile.items as item (item.ref.of + item.ref.id)}
+                  <li class="tile__thing">{@render body(item, tile.day)}</li>
+                {/each}
               </ul>
               {#if tile.more > 0}<span class="tile__more">{t('desk.coming_more', locale, { n: tile.more })}</span>{/if}
+              {@render amber(tile)}
             </svelte:element>
           </li>
           {/if}
@@ -183,6 +233,24 @@
           </li>
         {/if}
       </ol>
+      {#if showOpen}
+        <div class="coming__open">
+          {#if open.urgent}
+            <p class="coming__line coming__line--urgent" data-testid="desk-coming-urgent">
+              <span class="missing-dot missing-dot--s missing-dot--urgent" aria-hidden="true"></span><span
+                >{urgentLine(open.urgent)}{#if urgentHref}{' · '}<a href={urgentHref}>{urgentVerb(open.urgent)}</a>{/if}</span
+              >
+            </p>
+          {/if}
+          {#if open.rest > 0}
+            <p class="coming__line" data-testid="desk-coming-open">
+              <span class="missing-dot missing-dot--s" aria-hidden="true"></span><span
+                >{restWords}{#if planner}{' · '}<a href="/h/planner?view=agenda">{t('desk.open_see', locale)}</a>{/if}</span
+              >
+            </p>
+          {/if}
+        </div>
+      {/if}
     {:else if far}
       <!-- Far away is still «the next thing»: one sentence (ADR-149). -->
       {@const sl = pulseSlip(far.ref, far.day, slipCtx)}
@@ -230,15 +298,10 @@
   a.tile:hover {
     border-color: var(--border-color-dark);
   }
-  /* The dot sits in the tile's top corner, out of the flow; the «+N» of a
-     desktop tile drops to the foot of its column to leave it the corner. */
-  .tile {
-    position: relative;
-  }
-  .tile__dot {
-    position: absolute;
-    inset-block-start: var(--space-s);
-    inset-inline-end: var(--space-s);
+  /* The screen's one amber (ADR-227): the tile of what falls due first. */
+  .tile--urgent,
+  a.tile--urgent:hover {
+    border-color: var(--missing-ink);
   }
   .tile__more {
     align-self: end;
@@ -292,15 +355,22 @@
     font-size: var(--text-s);
     overflow-wrap: anywhere;
   }
-  .tile__what {
+  /* The place leads (ADR-227): whole, in two lines before an ellipsis. */
+  .tile__place {
+    font-size: var(--text-m);
+    color: var(--heading-color);
+    overflow-wrap: anywhere;
+  }
+  .tile__meta {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--space-xs);
-  }
-  .tile__meta {
+    column-gap: var(--space-2xs);
     font-size: var(--text-xs);
     color: var(--text-muted);
+  }
+  .tile__nohour {
+    color: var(--text-faint);
   }
   /* WIDE (the Desk's two columns): a card per day; the day's number at the
      left (it opens the day), each thing a row: the monogram and what it is,
@@ -323,36 +393,58 @@
     grid-area: more;
     align-self: start;
   }
+  .tile--card .tile__falta {
+    grid-area: falta;
+  }
   .tile__things--rows {
     gap: var(--space-2xs);
   }
   .tile__rowlink {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--space-s);
+    display: grid;
+    gap: var(--space-2xs);
     padding-block: var(--space-2xs);
     color: inherit;
     text-decoration: none;
   }
-  a.tile__rowlink:hover .tile__what {
+  a.tile__rowlink:hover .tile__place {
     text-decoration: underline;
     text-underline-offset: 3px;
   }
-  .tile__rowlink .tile__meta {
-    text-align: end;
-  }
   .tile__falta {
-    grid-area: falta;
+    grid-column: 2 / -1;
+    display: flex;
+    align-items: center;
     margin: 0;
-    font-family: var(--font-mono);
     font-size: var(--text-xs);
-    letter-spacing: var(--mono-letter-spacing-loose);
-    text-transform: uppercase;
+    color: var(--missing-ink);
+  }
+  /* Under the strip: the one amber line with its verb, and the grey figure
+     of the rest with the Agenda's door (ADR-227). */
+  .coming__open {
+    display: grid;
+    gap: var(--space-2xs);
+    margin-block-start: var(--space-s);
+  }
+  .coming__line {
+    margin: 0;
+    font-size: var(--text-s);
     color: var(--text-muted);
   }
-  .tile__falta--urgent {
+  /* Inline, so a line that breaks in two keeps its dot on the first. */
+  .coming__line .missing-dot {
+    vertical-align: 0.05em;
+    margin-inline-end: var(--space-xs);
+  }
+  .coming__line--urgent {
     color: var(--missing-ink);
+  }
+  .coming__line a {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .coming__line a:hover {
+    color: var(--text-color);
   }
   /* The end door on a desktop: a low quiet row at the column's foot, the
      voice of a block's action (`.block-head__act`), not a tile. */
@@ -397,6 +489,8 @@
       padding-inline: var(--shell-gutter);
       scroll-padding-inline: var(--shell-gutter);
       scrollbar-width: none;
+      /* Each tile as tall as what it says (ADR-227): no empty half. */
+      align-items: flex-start;
     }
     .coming__strip::-webkit-scrollbar {
       display: none;
@@ -411,6 +505,9 @@
       gap: var(--space-xs);
       padding: var(--space-s);
     }
+    .tile__falta {
+      grid-column: 1 / -1;
+    }
     /* On the strip the end door stays a tile: dashed, its word centred. */
     .tile--end {
       display: grid;
@@ -424,12 +521,6 @@
     }
     a.tile--end:hover {
       border-color: var(--border-color-dark);
-    }
-    /* Over the word, not beside it: beside it split the word at 390. */
-    .tile__what {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: var(--space-2xs);
     }
   }
 </style>
