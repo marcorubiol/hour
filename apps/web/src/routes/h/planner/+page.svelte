@@ -1581,10 +1581,10 @@
           suggestVenue: tonightsVenue(d.project?.id ?? null),
           href: peekHref({ kind: 'date', id: d.id }, page.url),
           sub: sl.city ?? '',
-          eyebrow: kindLabel(sl.kind),
+          eyebrow: `${kindLabel(sl.kind)}${sl.cert === 'hold' || sl.cert === 'proposed' ? '?' : ''}`,
           timed: !d.all_day,
           project: d.project ?? null,
-          guess: false,
+          guess: sl.cert === 'hold' || sl.cert === 'proposed',
         });
         continue;
       }
