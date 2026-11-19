@@ -3678,5 +3678,11 @@
   "pass.change_venue_title": "Change venue",
   "pass.done": "Done",
   "pass.saved": "Saved",
+  "pass.talk": "Talk",
+  "pass.talk_new": "Talk, {n} new",
+  "pass.talk_title": "Talk with…",
+  "threads.count": "{n} messages",
+  "threads.empty_short": "no messages",
+  "threads.pick": "Pick the thread",
   "pass.put_place": "Add a place"
 }

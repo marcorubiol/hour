@@ -115,18 +115,20 @@ test.describe('el tablón del bolo (ADR-106)', () => {
 
     await page.goto(`/h/playwright/performance/${perfs[0].slug}`);
     await waitForLoaded(page);
-    const board = page.locator('section.board');
+    // «Hablar» abre el tablón como hoja, sin salir de la ficha (ADR-214).
+    await page.getByTestId('pass-talk').click();
+    const board = page.locator('dialog[open] section.board');
     await expect(board).toBeVisible();
 
-    // Un bolo recién creado no tiene mensajes: todos sus hilos van plegados,
-    // una línea cada uno. Diners ni plegado: ausente, no bloqueado.
-    await expect(board.locator('.board__folded [data-facet="general"]')).toBeVisible();
-    const foldedTecnica = board.locator('.board__folded [data-facet="tecnica"]');
-    await expect(foldedTecnica).toBeVisible();
+    // Arriba, los hilos que quien mira puede leer, para elegir. Diners ni
+    // aparece: ausente, no bloqueado.
+    await expect(board.locator('.board__pick [data-facet="general"]')).toBeVisible();
+    const tabTecnica = board.locator('.board__pick [data-facet="tecnica"]');
+    await expect(tabTecnica).toBeVisible();
     await expect(board.locator('[data-facet="diners"]'), 'Diners: ausente, no bloqueado').toHaveCount(0);
 
-    // Al pulsar su nombre en la línea, el hilo se abre con el compositor ya enfocado.
-    await foldedTecnica.click();
+    // Al elegirlo, el hilo se abre debajo con el compositor ya enfocado.
+    await tabTecnica.click();
     const tecnica = board.locator('article[data-facet="tecnica"]');
     await expect(tecnica.locator('.thread__compose textarea')).toBeFocused();
     // La línea de audiencia va en el hilo abierto, sin plegar.
@@ -161,12 +163,15 @@ test.describe('el tablón del bolo (ADR-106)', () => {
     test.skip(!messageId, 'needs the message of the previous test');
     await page.goto(`/h/playwright/performance/${perfs[1].slug}`);
     await waitForLoaded(page);
-    const board = page.locator('section.board');
+    // «Hablar» dice cuántos nuevos hay antes de abrirlo.
+    await expect(page.getByTestId('pass-talk-count')).toBeVisible({ timeout: 15_000 });
+    await page.getByTestId('pass-talk').click();
+    const board = page.locator('dialog[open] section.board');
     const tecnica = board.locator('article[data-facet="tecnica"]');
+    // El hilo con nuevos es el que se abre; Diners, vacío, es otra pestaña.
     await expect(tecnica.locator('.msg', { hasText: BODY })).toBeVisible();
     await expect(tecnica.locator('.thread__new')).toBeVisible();
-    // Con nuevos, arriba del todo; Diners, vacío, plegado al final.
     await expect(board.locator('article').first()).toHaveAttribute('data-facet', 'tecnica');
-    await expect(board.locator('.board__folded [data-facet="diners"]')).toBeVisible();
+    await expect(board.locator('.board__pick [data-facet="diners"]')).toBeVisible();
   });
 });

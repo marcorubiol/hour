@@ -58,6 +58,7 @@
   import DirectoryPicker from '$lib/components/DirectoryPicker.svelte';
   import WhoGoes from '$lib/components/planner/WhoGoes.svelte';
   import BoloBoard from '$lib/components/BoloBoard.svelte';
+  import { THREAD_REFRESH_MS, boardUnread, type BoardView } from '$lib/threads';
   import ConceptHint from '$lib/components/ConceptHint.svelte';
   import type { Commitment } from '$lib/people';
   import { performanceRoster } from '$lib/planner';
@@ -860,6 +861,18 @@
   let passActs = $derived.by<PassAct[]>(() => {
     if (!perf) return [];
     const out: PassAct[] = [];
+    // «Hablar» (ADR-214): only with a bolo behind it (no bolo, no board).
+    if (boardView?.bolo) {
+      out.push({
+        id: 'talk',
+        label: t('pass.talk', locale),
+        lead: true,
+        count: boardNew,
+        ariaLabel: boardNew > 0 ? t('pass.talk_new', locale, { n: boardNew }) : undefined,
+        onclick: () => (talkOpen = true),
+        testid: 'pass-talk',
+      });
+    }
     const call = venueCall(perf.venue?.contacts);
     if (call?.phone) {
       out.push({ id: 'call', label: t('ahora.call', locale), href: telHref(call.phone), ariaLabel: t('ahora.call_aria', locale, { name: call.name }) });
@@ -926,6 +939,30 @@
   let dayContact = $derived(
     dayCall ? [dayCall.name, dayCall.role].filter(Boolean).join(', ') : null,
   );
+
+  // ── Hablar (ADR-214): el tablón del bolo, en una hoja ──────────────────
+  // The same key and request as the board itself (and as Hoy's «Tablón · N
+  // nuevos»), so the count and the sheet share one answer.
+  const boardQuery = createQuery(
+    toStore(() => ({
+      queryKey: ['bolo-board', perf?.id ?? ''] as const,
+      enabled: Boolean(perf?.id),
+      staleTime: 0,
+      refetchInterval: THREAD_REFRESH_MS,
+      queryFn: ({ signal }: { signal: AbortSignal }) => fetchJSON<BoardView>(`/api/boards/${perf!.id}`, signal),
+    })),
+  );
+  let boardView = $derived($boardQuery.data ?? null);
+  let boardNew = $derived(boardUnread(boardView));
+  let talkOpen = $state(false);
+  // A link to the board (`#board`: Hoy's «Tablón», a thread row, an
+  // invitation's landing) opens the sheet once the board is there.
+  let talkFromHash = false;
+  $effect(() => {
+    if (talkFromHash || !boardView?.bolo) return;
+    talkFromHash = true;
+    if (typeof location !== 'undefined' && location.hash === '#board') talkOpen = true;
+  });
 
   // «Detalles»: lo de consulta, plegado. Cerrado, dice lo que guarda.
   let detailsOpen = $state(false);
@@ -1251,17 +1288,6 @@
       </section>
     {/if}
 
-    <!-- ADR-106: el tablón del bolo. Sin bolo dice que no hay; sin dinero
-         siempre (la puerta es la función, no Cuentas). -->
-    <BoloBoard
-      performanceId={perf.id}
-      {workspaceSlug}
-      tz={perf.venue?.timezone ?? workspaceTz ?? viewerTz}
-      workspaceTz={workspaceTz ?? viewerTz}
-      going={goingPeople}
-      {locale}
-    />
-
     <!-- The notes are a live doc only an editor opens (`lib/do/auth.ts`,
          `edit:performance`): whoever cannot write them cannot read them
          either, so they are not drawn (a guest of a bolo: their board is
@@ -1418,6 +1444,24 @@
     <Button onclick={saveVenue} loading={$patchMutation.isPending || $promoteVenue.isPending}>{t('edit.save', locale)}</Button>
   {/snippet}
 </Dialog>
+
+<!-- «Hablar» (ADR-214; ADR-106): el tablón del bolo como hoja, sin salir de
+     la ficha. En el teléfono, el diálogo ya es una hoja desde abajo. -->
+{#if perf}
+  <Dialog bind:open={talkOpen} title={t('pass.talk_title', locale)} size="l">
+    {#if talkOpen}
+      <BoloBoard
+        performanceId={perf.id}
+        {workspaceSlug}
+        tz={perf.venue?.timezone ?? workspaceTz ?? viewerTz}
+        workspaceTz={workspaceTz ?? viewerTz}
+        going={goingPeople}
+        {locale}
+        placing="sheet"
+      />
+    {/if}
+  </Dialog>
+{/if}
 
 <!-- ADR-087 · § 36: el bolo del que cuelga, elegido desde «Falta» cuando no
      cuelga de ninguno (con uno, se cambia desde su dato en la cabecera). -->

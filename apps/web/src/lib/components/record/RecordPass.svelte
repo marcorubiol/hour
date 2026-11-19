@@ -33,6 +33,13 @@
     href?: string;
     /** «Mapa» is a link that picks the map app (`MapLink`). */
     map?: readonly (string | null | undefined)[];
+    /** «Hablar»: a button that opens the board's sheet (ADR-214). */
+    onclick?: () => void;
+    /** Unread messages, said beside the word; 0 says nothing. */
+    count?: number;
+    /** The one light act of the row (only «Hablar»). */
+    lead?: boolean;
+    testid?: string;
   }
 
   /** The tone's dot on the tag, read off the status tone (never a hex). */
@@ -199,6 +206,16 @@
         {#each acts as a (a.id)}
           {#if a.map}
             <MapLink class="pass__act" parts={a.map} changeIn="settings" ariaLabel={a.ariaLabel}>{a.label}</MapLink>
+          {:else if a.onclick}
+            <button
+              type="button"
+              class="pass__act"
+              class:pass__act--lead={a.lead}
+              aria-label={a.ariaLabel}
+              data-testid={a.testid}
+              onclick={a.onclick}
+              >{a.label}{#if a.count}<span class="pass__count" data-testid="pass-talk-count">{a.count}</span>{/if}</button
+            >
           {:else}
             <a class="pass__act" href={a.href} aria-label={a.ariaLabel}>{a.label}</a>
           {/if}
@@ -469,6 +486,31 @@
     }
     .pass__acts :global(.pass__act:hover) {
       background: var(--surface-focus-act-hover);
+    }
+    button.pass__act {
+      gap: var(--space-xs);
+      border: 0;
+      font: inherit;
+      font-size: var(--text-m);
+      font-weight: 500;
+      cursor: pointer;
+    }
+    /* «Hablar»: the one light act on the dark piece (the drawing's). */
+    .pass__acts .pass__act--lead,
+    .pass__acts .pass__act--lead:hover {
+      background: var(--surface-focus-ink);
+      color: var(--surface-focus);
+    }
+    .pass__count {
+      display: inline-grid;
+      place-items: center;
+      min-inline-size: 1.25rem;
+      padding-inline: var(--space-2xs);
+      border-radius: var(--radius-xs);
+      background: var(--surface-focus);
+      color: var(--surface-focus-ink);
+      font-size: var(--text-xs);
+      font-variant-numeric: tabular-nums;
     }
 
     /* THE STUB: boxes with their names; the open ones amber, a line each. */

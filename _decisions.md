@@ -8184,3 +8184,21 @@ Encargo: `build/coordination/ficha-pase/brief.md`; respuestas de Marco a sus pre
 
 **Cómo se revierte.** Revertir el PR: vuelven la lista de horas, el diálogo «Editar datos» y la eliminación dentro de
 él; `CACHE_SCHEMA` vuelve a subir.
+
+## [2026-11-18] ADR-214 · «Hablar»: el tablón del bolo como hoja de la ficha (fase 3 del pase; amplía ADR-106)
+Encargo: `build/coordination/ficha-pase/brief.md`; respuesta 4 de Marco (18-11): solo los hilos del equipo.
+
+1. **«Hablar» es la acción clara del pase**, la primera de la fila, con el número de mensajes sin leer (la misma
+   cuenta que «Tablón · N nuevos» de Hoy, `boardUnread`, y la misma consulta `bolo-board`). Sin bolo no hay tablón y
+   el botón no se dibuja.
+2. **El tablón se abre como hoja** (`Dialog`, que en el teléfono ya es una hoja desde abajo), sin salir de la ficha, y
+   deja de estar como bloque en la página. `BoloBoard` gana el eje `placing` (`page` | `sheet`): en la hoja, arriba se
+   elige el hilo (General y una pestaña por faceta que quien mira puede leer, cada una con sus nuevos) y debajo va uno
+   solo, que siempre dice quién lo lee (la línea de audiencia de `ThreadBlock`). Se abre el primero con nuevos, si no
+   el General. Solo se marca leído el hilo que se ve.
+3. **Los enlaces al tablón (`#board`)** —el «Tablón» de Hoy, una fila de hilos, el aterrizaje de una invitación—
+   abren la hoja al llegar.
+4. Nadie de fuera del espacio: la hoja enseña los hilos que existen (pregunta 4, fuera de este encargo).
+
+**Cómo se revierte.** Revertir el PR: el tablón vuelve a ser un bloque de la ficha. Sin esquema ni API;
+`CACHE_SCHEMA` no cambia (misma clave y misma respuesta).

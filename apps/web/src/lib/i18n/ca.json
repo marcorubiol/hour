@@ -3678,5 +3678,11 @@
   "pass.change_venue_title": "Canviar de sala",
   "pass.done": "Fet",
   "pass.saved": "Desat",
+  "pass.talk": "Parlar",
+  "pass.talk_new": "Parlar, {n} nous",
+  "pass.talk_title": "Parlar amb…",
+  "threads.count": "{n} missatges",
+  "threads.empty_short": "sense missatges",
+  "threads.pick": "Triar el fil",
   "pass.put_place": "Posar lloc"
 }

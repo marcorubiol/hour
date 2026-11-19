@@ -176,8 +176,11 @@ test.describe('el marco de un guest de un solo bolo (comms carril 2, fase 3)', (
     await peek.getByTestId('peek-full').click();
     await page.waitForURL(new RegExp(`/h/playwright/performance/${perf!.slug}`));
     await waitForLoaded(page);
+    // El tablón, en la hoja de «Hablar» (ADR-214).
+    await page.getByTestId('pass-talk').click();
     await expect(page.locator('section.board')).toBeVisible();
     await expect(page.locator('section.board')).toContainText(`Montaje a las 10 (${RUN}).`);
+    await page.keyboard.press('Escape');
     await expect(page.getByRole('button', { name: /edit details|editar datos|editar dades|modifier/i })).toHaveCount(0);
     await expect(page.locator('.ynotes')).toHaveCount(0);
 

@@ -11,6 +11,11 @@
    * mientras se ve. Lo nuevo se marca leído cuando el tablón está a la vista;
    * la raya de «nuevos» se queda donde estaba al abrir la ficha
    * (`thread-reading.svelte.ts`, lo mismo que el hilo de una conversación).
+   *
+   * DOS SITIOS, UN EJE (`placing`, ADR-214): `page` es el bloque de siempre,
+   * todos los hilos uno bajo otro; `sheet` es «Hablar» del pase: la hoja que
+   * se abre sin salir de la ficha, con los hilos arriba para elegir (cada uno
+   * con sus nuevos) y uno solo debajo, que siempre dice quién lo lee.
    */
 
   import BlockHead from '$lib/components/BlockHead.svelte';
@@ -47,9 +52,12 @@
         a quien va y no lo ve (comms carril 2, fase 2). */
     going?: readonly GoingPerson[];
     locale: Locale;
+    /** `page`: el bloque de la ficha; `sheet`: la hoja de «Hablar» (ADR-214). */
+    placing?: 'page' | 'sheet';
   }
 
-  let { performanceId, workspaceSlug, tz, workspaceTz, going = [], locale }: Props = $props();
+  let { performanceId, workspaceSlug, tz, workspaceTz, going = [], locale, placing = 'page' }: Props = $props();
+  let sheet = $derived(placing === 'sheet');
   const t = tHere();
 
   const queryClient = useQueryClient();
@@ -105,7 +113,8 @@
   let sectionEl = $state<HTMLElement>();
   markReadWhenSeen({
     target: () => sectionEl,
-    threads: () => board?.threads ?? [],
+    // En la hoja solo se ve un hilo: solo ese se marca leído.
+    threads: () => (sheet ? (shown ? [shown] : []) : (board?.threads ?? [])),
     onmarked: refresh,
   });
   scrollWhenNamed('#board', () => (board ? sectionEl : undefined));
@@ -115,15 +124,51 @@
   }
 
   let perfCount = $derived(board?.performances.length ?? 0);
+
+  // ── la hoja: un hilo a la vez, elegido arriba ───────────────────────────
+  /** El elegido: a mano, o al llegar el tablón el primero con nuevos, si no el primero. */
+  let picked = $state<string | null>(null);
+  // The first choice is made once, when the board arrives, and kept: were it
+  // read live, marking the shown thread read would hand the sheet to the next
+  // unread one, and that one would be marked too, never seen.
+  $effect(() => {
+    if (picked !== null || !board) return;
+    const first = board.threads.find((th) => th.unread_count > 0) ?? board.threads[0];
+    if (first) picked = threadKey(first);
+  });
+  let shown = $derived.by(() => {
+    if (!board) return null;
+    return board.threads.find((th) => threadKey(th) === picked) ?? board.threads[0] ?? null;
+  });
+  /** The threads the sheet has shown, kept mounted (their drafts with them). */
+  let visited = $state<string[]>([]);
+  $effect(() => {
+    const key = shown ? threadKey(shown) : null;
+    if (key !== null && !visited.includes(key)) visited = [...visited, key];
+  });
+  // Picking a tab only shows the thread: no focus in its composer. A focused
+  // composer grows its «Enviar» row, and losing it to the next tab shrank the
+  // sheet under the finger (from below, on a phone), so the tap missed.
+  function pick(th: BoardThread) {
+    picked = threadKey(th);
+  }
 </script>
 
 <!-- Sin bolo no hay tablón ni nada que escribir en él: el bloque no se pinta
      (ADR-145 § 1; la franja «Falta» de la ficha ya dice «Sin bolo» a quien
      puede crearlo). -->
 {#if !(board && !board.bolo)}
-<section id="board" class="board" aria-labelledby="board-title" aria-busy={$boardQuery.isLoading} bind:this={sectionEl}>
+<section
+  id={sheet ? undefined : 'board'}
+  class="board"
+  class:board--sheet={sheet}
+  aria-labelledby={sheet ? undefined : 'board-title'}
+  aria-label={sheet ? t('threads.board', locale) : undefined}
+  aria-busy={$boardQuery.isLoading}
+  bind:this={sectionEl}
+>
   <header class="board__head">
-    <BlockHead title={t('threads.board', locale)} id="board-title" concept="board" />
+    {#if !sheet}<BlockHead title={t('threads.board', locale)} id="board-title" concept="board" />{/if}
     <!-- Ni la sala ni «1 función»: la ficha ya dice dónde (su título) y de
          qué bolo cuelga (sus hechos). Solo cuando el tablón es de varias
          funciones lo dice, y cuáles (ADR-139 p2). -->
@@ -159,6 +204,53 @@
     {#if board.truncated}
       <EmptyLine text={t('threads.truncated', locale)} />
     {/if}
+    {#if sheet}
+      <!-- Arriba se elige el hilo; cada uno dice sus nuevos, o quién escribió. -->
+      <div class="board__pick" role="tablist" aria-label={t('threads.pick', locale)}>
+        {#each board.threads as th (threadKey(th))}
+          {@const on = shown !== null && threadKey(shown) === threadKey(th)}
+          <button
+            type="button"
+            role="tab"
+            class="board__tab"
+            aria-selected={on}
+            data-facet={th.facet_key ?? 'general'}
+            onclick={() => pick(th)}
+          >
+            <span class="board__tab-name">{facetName(th, locale)}</span>
+            <span class="board__tab-meta" class:board__tab-meta--new={th.unread_count > 0}
+              >{th.unread_count > 0
+                ? th.unread_count === 1
+                  ? t('threads.unread_one', locale)
+                  : t('threads.unread', locale, { n: th.unread_count })
+                : th.message_count > 0
+                  ? t('threads.count', locale, { n: th.message_count })
+                  : t('threads.empty_short', locale)}</span
+            >
+          </button>
+        {/each}
+      </div>
+      <!-- Each thread once seen stays mounted, hidden when another is picked:
+           a half-written message survives a look at another tab. -->
+      {#each board.threads.filter((th) => visited.includes(threadKey(th))) as th (threadKey(th))}
+        <div hidden={!shown || threadKey(th) !== threadKey(shown)}>
+          <ThreadBlock
+            thread={th}
+            anchorKind="bolo"
+            anchorId={board.bolo.id}
+            messages={messagesOf(th)}
+            authors={board.authors}
+            me={board.me}
+            newSince={newSince(board, threadKey(th), th.thread_id)}
+            performances={board.performances}
+            autofocus={focusKey === threadKey(th)}
+            {tz}
+            {locale}
+            onchange={refresh}
+          />
+        </div>
+      {/each}
+    {:else}
     {#each layout.open as th (threadKey(th))}
       <ThreadBlock
         thread={th}
@@ -192,6 +284,7 @@
         </EmptyLine>
       </div>
     {/if}
+    {/if}
   {/if}
 </section>
 {/if}
@@ -224,6 +317,45 @@
       margin: 0;
       padding: 0;
       list-style: none;
+    }
+    /* La hoja: los hilos como pestañas a `--radius`, nunca pastillas. */
+    .board__pick {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(0, 1fr);
+      gap: var(--space-2xs);
+      padding: var(--space-2xs);
+      border-radius: var(--radius);
+      background: var(--bg-light);
+      overflow-x: auto;
+    }
+    .board__tab {
+      display: grid;
+      justify-items: center;
+      gap: var(--line-hairline);
+      min-inline-size: 6rem;
+      padding: var(--space-xs) var(--space-s);
+      border: var(--line-hairline) solid transparent;
+      border-radius: var(--radius);
+      background: none;
+      font: inherit;
+      color: var(--text-color);
+      cursor: pointer;
+    }
+    .board__tab[aria-selected='true'] {
+      border-color: var(--border-color-dark);
+      background: var(--bg-ultra-light);
+    }
+    .board__tab-name {
+      font-size: var(--text-s);
+      font-weight: 500;
+    }
+    .board__tab-meta {
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+    }
+    .board__tab-meta--new {
+      color: var(--missing-ink);
     }
     .board__perfs .link-arrow {
       font-family: var(--font-mono);

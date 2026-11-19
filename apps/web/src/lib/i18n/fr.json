@@ -3678,5 +3678,11 @@
   "pass.change_venue_title": "Changer de salle",
   "pass.done": "OK",
   "pass.saved": "Enregistré",
+  "pass.talk": "Parler",
+  "pass.talk_new": "Parler, {n} nouveaux",
+  "pass.talk_title": "Parler avec…",
+  "threads.count": "{n} messages",
+  "threads.empty_short": "aucun message",
+  "threads.pick": "Choisir le fil",
   "pass.put_place": "Ajouter un lieu"
 }
