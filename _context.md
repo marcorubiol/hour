@@ -33,20 +33,24 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
 ## Producción (verificado 2026-11-19)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`0380d7ed`**, `dirty:false`, builtAt
-  2026-11-18T19:28Z. Deploy del 18-11 con el PR 8: la ficha de la función como pase, fase 1 (la pieza llena y el talón
-  «Listo N de M», ADR-212). `CACHE_SCHEMA` 35, sin migración. Lo entregado, en `CHANGELOG.md`.
-- Última suite completa (18 y 19-11, contra `0380d7ed`): E2E de 218 specs. La primera pasada cayó a media suite por
-  la red (`ERR_NAME_NOT_RESOLVED`); repetida desde `help.spec.ts`: 137 ok, 6 saltados y 2 rojos por tiempo
-  (`mailout-send:58`, `settings-overflow:31` a 390 px) que pasaron al repetirlos solos. Sin rojos del pase.
-  `--timeout=90000`. RLS entera: 625/629 (14-11).
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`247b0322`**, `dirty:false`, builtAt
+  2026-11-19T12:07Z. Deploys del 19-11 con los PR 13 a 22: el pase corregido y Hoy en escritorio con su rejilla
+  (ADR-217, ADR-218), la ruta `/h/today` (ADR-220), la lista de preparación fases 1 a 4 (ADR-221) y el enlace a la sala
+  desde el pase. `CACHE_SCHEMA` 37. Lo entregado, en `CHANGELOG.md`.
+- Última suite completa (19-11, contra `247b0322`): E2E de 219 specs, sin rojos que se queden. La pasada se cortó en
+  la 198 y se retomó (24/24); `person:47`, `planner-month:125` y `roadsheet-share:17` cayeron y pasaron al repetirlos.
+  `--timeout=90000`. RLS entera: 628/629 (19-11); el rojo (`money-v3` o `conversation-feed-list`, distinto cada vez)
+  pasa al repetirlo solo.
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
   La integración Git de Workers Builds en `hour-web` está desconectada (Marco, 2026-11-18): fallaba en cada push
   sin `PUBLIC_SENTRY_DSN` y, de pasar, habría subido versiones sin el DSN. El único deploy es el manual; en los PR,
   la puerta es el CI de GitHub (`web` y `collab`).
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free con keepalive diario
   (`keepalive.yml`); Pro antes de la beta (`_tasks.md § 9`). Si falla tras días sin uso: `dig <ref>.supabase.co`.
-- **Última migración aplicada: `20261119100000`** (`today` reservada, ADR-220; backup 44472377606, plan 44472381560, apply 44473051185, lanzados desde la rama del PR 15). La anterior: `20261114100000` (149).
+- **Última migración aplicada: `20261119130000`** (quién cierra una cosa de la lista de preparación; backup
+  44511459886, plan 44512039115, apply 44518374143, lanzados desde la rama del PR 21). Antes, el mismo día:
+  `20261119110000` y `20261119120000` (la lista por proyecto y su estado por función, ADR-221) y `20261119100000`
+  (`today` reservada, ADR-220). La anterior: `20261114100000` (149).
   Las anteriores, en `_notes/context-history.md`. Las migraciones van por `production-migrate.yml` (backup, plan, apply; usa `--include-all`). **Al redefinir una función,
   copiar la firma de la base viva (`pg_get_functiondef`): otra firma crea una sobrecarga y PostgREST responde 300.**
 - `hour-staging`: ref `slccyknqpgmzhyiyclsq`, `eu-west-1`; se pausa sin uso.
@@ -62,7 +66,7 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
   `platform.env`, así que no hay Supabase). No prestar `.playwright/auth.json` a otro carril mientras corre la suite.
 - Trampas: el login admite 10 intentos por 5 min por IP (un setup colgado 30 s es eso: esperar 5 min); la red local
   se cae a media suite: ante muchos rojos, buscar `ERR_INTERNET_DISCONNECTED` y repetir con `--last-failed`.
-  Intermitentes: `help:62`, `roadsheet-share:17`, `device-cache:98`, `conversation-filter-sheet:39`,
+  Intermitentes: `help:62`, `help:99`, `roadsheet-share:17`, `device-cache:98`, `conversation-filter-sheet:39`,
   `bolo-guest-frame:148`, `lens-toggle:68`. En `playwright`, `/api/search` tarda 5 o 6 s (tarea 150) y algunos specs se saltan por datos.
 - Si Playwright pide otra revisión de Chromium, `PW_CHROMIUM` apuntando a una instalada, p. ej.
   `~/Library/Caches/ms-playwright/chromium-1228/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing`.
