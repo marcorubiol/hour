@@ -3650,6 +3650,7 @@
   "pass.urgent_days": "La función es en {n} días",
   "desk.tile_open": "{n} por cerrar",
   "desk.tile_urgent": "{when}: {what}",
+  "desk.when_overdue": "Vencida",
   "desk.when_today": "Hoy",
   "desk.when_tomorrow": "Mañana",
   "desk.when_days": "En {n} días",

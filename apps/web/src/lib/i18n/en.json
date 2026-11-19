@@ -3650,6 +3650,7 @@
   "pass.urgent_days": "The show is in {n} days",
   "desk.tile_open": "{n} to close",
   "desk.tile_urgent": "{when}: {what}",
+  "desk.when_overdue": "Overdue",
   "desk.when_today": "Today",
   "desk.when_tomorrow": "Tomorrow",
   "desk.when_days": "In {n} days",

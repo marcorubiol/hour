@@ -54,8 +54,9 @@
   function openWords(tile: ComingTile): string {
     const u = tile.urgent;
     if (!u) return t('desk.tile_open', locale, { n: tile.open });
-    const n = dayDiff(tile.day);
-    const when = n <= 0 ? t('desk.when_today', locale) : n === 1 ? t('desk.when_tomorrow', locale) : t('desk.when_days', locale, { n });
+    // A hold's hurry counts to its decide-by day, not to the performance's.
+    const n = dayDiff(u.kind === 'hold_deadline' ? u.day : tile.day);
+    const when = n < 0 && u.kind === 'hold_deadline' ? t('desk.when_overdue', locale) : n <= 0 ? t('desk.when_today', locale) : n === 1 ? t('desk.when_tomorrow', locale) : t('desk.when_days', locale, { n });
     const what = u.kind === 'roadsheet_unshared' ? t('desk.urgent_roadsheet', locale) : t('desk.urgent_hold', locale);
     return t('desk.tile_urgent', locale, { when, what });
   }

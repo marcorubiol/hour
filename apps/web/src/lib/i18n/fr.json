@@ -3650,6 +3650,7 @@
   "pass.urgent_days": "La date est dans {n} jours",
   "desk.tile_open": "{n} à boucler",
   "desk.tile_urgent": "{when} : {what}",
+  "desk.when_overdue": "Échue",
   "desk.when_today": "Aujourd'hui",
   "desk.when_tomorrow": "Demain",
   "desk.when_days": "Dans {n} jours",
