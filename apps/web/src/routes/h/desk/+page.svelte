@@ -41,7 +41,7 @@
   import LateNoticeBand from '$lib/components/desk/LateNoticeBand.svelte';
   import { COMING_TILES, COMING_TILES_PHONE, comingTiles, nextAfterToday, outsideToday, piecePerformance, scopePulseInput, waitingRowCount } from '$lib/hoy';
   import { MediaQuery } from 'svelte/reactivity';
-  import { MOBILE_QUERY } from '$lib/breakpoints';
+  import { MOBILE_QUERY, WIDE_QUERY } from '$lib/breakpoints';
   import { goto } from '$app/navigation';
   import { accentVarFor } from '$lib/utils/accent';
   import { spaceName } from '$lib/utils/identity';
@@ -279,6 +279,8 @@
   // Phone: Hoy is three blocks; «Ha cambiado» and «La temporada» stay on a
   // desktop only (ADR-202 § 1 and § 15).
   const phone = new MediaQuery(MOBILE_QUERY, false);
+  /** From 64rem the Desk is the pass's grid: the day at the left, the reading column at the right. */
+  const wide = new MediaQuery(WIDE_QUERY, false);
   // «Tablón · N nuevos» (plan 2026-10-22 § 3.3): the card's performance's
   // board, under the record's own key, so opening it costs nothing more.
   // The signal that was missing on the day of the show; no mail, no push.
@@ -901,8 +903,8 @@
        what waits. On a desktop the news and the season's doors stay (§ 15):
        the news under them, the doors in their own column. -->
   <div class="desk__grid">
-    <div class="desk__col">
-      <div class="slot slot--next" data-help-step="desk-next">
+    <div class="desk__col desk__col--pass">
+      <div class="slot slot--next" data-slot="day" data-help-step="desk-next">
         <DeskDay
           {agenda}
           todayHad={hadToday}
@@ -922,19 +924,8 @@
           {locale}
         />
       </div>
-      <DeskComing
-        {tiles}
-        far={farNext}
-        settled={feeds.settled && !scopeUnresolved}
-        errored={feeds.errored}
-        {today}
-        {viewerTz}
-        {slipCtx}
-        {locale}
-        dots={shows('desk', 'coming_missing', calm.on)}
-      />
       {#if drawWaits}
-      <div class="slot slot--waits" data-help-step="desk-waits">
+      <div class="slot slot--waits" data-slot="waits" data-help-step="desk-waits">
         <DeskWaiting
           {waiting}
           rows={waitingRows}
@@ -960,8 +951,24 @@
         />
       </div>
       {/if}
+    </div>
+    <div class="desk__col desk__col--read">
+      <div class="desk__slot" data-slot="coming">
+      <DeskComing
+        {tiles}
+        far={farNext}
+        settled={feeds.settled && !scopeUnresolved}
+        errored={feeds.errored}
+        {today}
+        {viewerTz}
+        {slipCtx}
+        {locale}
+        dots={shows('desk', 'coming_missing', calm.on)}
+        wide={wide.current}
+      />
+      </div>
       {#if drawChanged}
-      <div class="slot slot--changed">
+      <div class="slot slot--changed" data-slot="changed">
         <DeskChanged
           {changes}
           loading={changedLoading}
@@ -971,25 +978,24 @@
           {sinceLabel}
           {workspaceSlugById}
           {tagNames}
+          folded={wide.current}
           {locale}
         />
       </div>
       {/if}
-    </div>
-
-    {#if !phone.current && shows('desk', 'season', calm.on)}
-      <div class="desk__col">
-        <div class="slot slot--season">
+      {#if !phone.current && shows('desk', 'season', calm.on)}
+        <div class="slot slot--season" data-slot="season">
           <DeskSeason
             planner={lensOn('planner') ? { value: plannerFig, errored: feeds.errored } : null}
             conversations={readConversations ? { value: convFig, errored: $overviewQuery.isError } : null}
             money={readMoney ? { value: moneyFig, errored: $invoicesQuery.isError || $bolosQuery.isError } : null}
             {seasonLabel}
+            folded={wide.current}
             {locale}
           />
         </div>
-      </div>
-    {/if}
+      {/if}
+    </div>
   </div>
 </div>
 
@@ -1004,10 +1010,14 @@
       margin-block-end: var(--space-s);
     }
 
+    /* The pass's grid (the same as the record's `.pass-grid`): the day's piece
+       at the size of a phone's, then the reading column, aligned left and
+       never wider than 1.000 px. */
     .desk__grid {
       display: grid;
-      grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
-      gap: var(--space-l) var(--space-xl);
+      grid-template-columns: var(--pass-width) minmax(0, var(--read-width));
+      column-gap: var(--pass-gap);
+      max-inline-size: var(--pass-grid-max);
       align-items: start;
     }
     .desk__col {
@@ -1022,6 +1032,28 @@
     .desk--calm .desk__grid {
       grid-template-columns: minmax(0, 1fr);
       max-inline-size: var(--calm-measure);
+    }
+
+    /* The two columns are one in the order of the eye (day, what comes, what
+       waits, what changed, the season): the DOM groups them by column, so
+       the order is said here, for the phone's one column and for calm. */
+    .desk [data-slot='day'] {
+      order: 1;
+    }
+    .desk [data-slot='coming'] {
+      order: 2;
+    }
+    .desk [data-slot='waits'] {
+      order: 3;
+    }
+    .desk [data-slot='changed'] {
+      order: 4;
+    }
+    .desk [data-slot='season'] {
+      order: 5;
+    }
+    .desk--calm .desk__col {
+      display: contents;
     }
 
     /* The chrome every band shares: the eyebrow, its count or door, the
@@ -1048,6 +1080,7 @@
         display: flex;
         flex-direction: column;
         align-items: stretch;
+        max-inline-size: none;
       }
       .desk__col {
         display: contents;

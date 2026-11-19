@@ -8259,3 +8259,22 @@ coincidía con el dibujo.
    escritorio llega en el PR siguiente.
 
 **Cómo se revierte.** Revertir el PR. Sin esquema ni API; `CACHE_SCHEMA` no cambia.
+
+## [2026-11-19] ADR-218 · Una rejilla para el pase y para Hoy en escritorio
+Encargo: `brief.md`, «Escritorio» y «Hoy en escritorio» (19-11).
+
+1. **Una rejilla, dos sitios.** Pase fijo (`--pass-width`, 380 px), 56 px de aire (`--pass-gap`) y una columna de
+   lectura de 500 px como máximo (`--read-width`), alineado a la izquierda y con tope de 1.000 px
+   (`--pass-grid-max`). En la ficha es `.pass-grid` (base.css), que pasa a dos columnas cuando el propio registro
+   mide 900 px (`@container record`); por debajo y dentro del vistazo, una columna de 480 px como máximo. En Hoy es
+   `.desk__grid`, desde 64rem (el corte ancho de la app).
+2. **Ficha, por columnas.** Izquierda: pase, quién va, notas. Derecha: el día, los pliegues y, al pie, copiar y borrar.
+3. **Hoy.** Izquierda: la pieza «Lo siguiente» y «Te espera». Derecha: «Lo que viene» en vertical, un día por ficha
+   (la cifra abre el día; cada renglón abre su pase; «Falta» en ámbar al pie), y «Ha cambiado» y «La temporada» como
+   pliegues que dicen qué guardan. Sin carrusel en escritorio. En una columna el orden sigue siendo el del ojo
+   (día, lo que viene, te espera, ha cambiado, temporada), dicho con `order` porque el DOM agrupa por columna.
+
+**Pendiente de esta rejilla:** «+ Añadir» arriba a la derecha y las cifras de «Te espera» en una fila de cuatro no
+están hechos (la lista de «Te espera» se queda como está).
+
+**Cómo se revierte.** Revertir el commit. Sin esquema ni API; `CACHE_SCHEMA` no cambia.

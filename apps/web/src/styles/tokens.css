@@ -491,6 +491,10 @@
     /* The pass (brief ficha-pase): a ticket of a phone's width that never
        stretches, its hour at 68 px, its day (no hour) at 56, its show at 30. */
     --pass-width: 23.75rem;
+    /* The reading column beside it (500 px at most), the air between them (56) and the whole grid's cap (1.000). */
+    --read-width: 31.25rem;
+    --pass-gap: 3.5rem;
+    --pass-grid-max: 62.5rem;
     --display-pass: 4.25rem;
     --display-pass-day: 3.5rem;
     --display-pass-show: 1.875rem;

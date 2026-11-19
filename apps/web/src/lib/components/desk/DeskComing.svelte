@@ -38,9 +38,11 @@
     locale: Locale;
     /** The «Falta algo» dot (ADR-211 § 3); off in calm (ADR-203 § 5). */
     dots?: boolean;
+    /** From 64rem (the Desk's two columns): a day per card, each thing a row that opens its own record. */
+    wide?: boolean;
   }
 
-  let { tiles, far = null, settled, errored, today, viewerTz, slipCtx, locale, dots = true }: Props = $props();
+  let { tiles, far = null, settled, errored, today, viewerTz, slipCtx, locale, dots = true, wide = false }: Props = $props();
 
   const kindLabel = (kind: SlipKind, voice?: Voice) => t(`planner.kind_${kind}`, locale, undefined, voice);
   const hour = (iso: string, tz: string | null) => hourMark(dualTime(iso, tz, viewerTz).primary);
@@ -85,6 +87,40 @@
       <ol class="coming__strip" data-testid="desk-coming">
         {#each tiles as tile (tile.day)}
           {@const href = tileHref(tile)}
+          {#if wide}
+          <li class="coming__cell">
+            <div class="tile tile--card" data-testid="desk-tile" data-day={tile.day}>
+              <svelte:element this={href ? 'a' : 'span'} {href} class="tile__date">
+                <span class="tile__n">{Number(tile.day.slice(8, 10))}</span>
+                <span class="tile__wd">{localeWeekdayShort(tile.day, locale)}</span>
+                <span class="tile__mo">{localeMonthShort(tile.day, locale)}</span>
+              </svelte:element>
+              <ul class="tile__things tile__things--rows">
+                {#each tile.items as item (item.ref.of + item.ref.id)}
+                  {@const sl = pulseSlip(item.ref, tile.day, slipCtx)}
+                  {@const held = sl.cert === 'hold' || sl.cert === 'proposed'}
+                  {@const where = sl.lead ? `${t('planner.slip_to', locale)} ${sl.name}` : sl.city || sl.name}
+                  {@const door = sl.href ?? href}
+                  <li class="tile__row">
+                    <svelte:element this={door ? 'a' : 'span'} href={door} class="tile__rowlink" data-testid="desk-tile-row">
+                      <span class="tile__what"
+                        >{#if item.ref.row.project}<IdentityMark
+                            mini
+                            accent={accentVarFor(item.ref.row.project)}
+                            name={item.ref.row.project.name}
+                            initials={item.ref.row.project.initials}
+                          />{/if}<span class:guess={held}>{kindLabel(sl.kind, tradeFor(perfWorkspaceId(item.ref.row)))}{held ? '?' : ''}</span></span
+                      >
+                      <small class="tile__meta">{[item.at ? hour(item.at, item.ref.tz) : null, where].filter(Boolean).join(' · ')}</small>
+                    </svelte:element>
+                  </li>
+                {/each}
+              </ul>
+              {#if tile.more > 0}<span class="tile__more">{t('desk.coming_more', locale, { n: tile.more })}</span>{/if}
+              {#if dots && tile.missing}<p class="tile__falta" data-testid="desk-tile-missing">{t('desk.tile_missing', locale)}</p>{/if}
+            </div>
+          </li>
+          {:else}
           <li class="coming__cell">
             <svelte:element this={href ? 'a' : 'div'} {href} class="tile" data-testid="desk-tile" data-day={tile.day}>
               <span class="tile__date">
@@ -106,6 +142,7 @@
               {#if tile.more > 0}<span class="tile__more">{t('desk.coming_more', locale, { n: tile.more })}</span>{/if}
             </svelte:element>
           </li>
+          {/if}
         {/each}
         {#if planner}
           <li class="coming__cell">
@@ -231,6 +268,54 @@
   .tile__meta {
     font-size: var(--text-xs);
     color: var(--text-muted);
+  }
+  /* WIDE (the Desk's two columns): a card per day; the day's number at the
+     left (it opens the day), each thing a row: the monogram and what it is,
+     and, at the right, the hour and the place. «Falta» in amber at the foot. */
+  .tile--card {
+    grid-template-columns: 6rem minmax(0, 1fr);
+    grid-template-areas: 'date things' '. more' '. falta';
+    row-gap: var(--space-2xs);
+  }
+  .tile--card .tile__date {
+    grid-area: date;
+    color: inherit;
+    text-decoration: none;
+  }
+  .tile--card .tile__things {
+    grid-area: things;
+  }
+  .tile--card .tile__more {
+    grid-area: more;
+    align-self: start;
+  }
+  .tile__things--rows {
+    gap: var(--space-2xs);
+  }
+  .tile__rowlink {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-s);
+    padding-block: var(--space-2xs);
+    color: inherit;
+    text-decoration: none;
+  }
+  a.tile__rowlink:hover .tile__what {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .tile__rowlink .tile__meta {
+    text-align: end;
+  }
+  .tile__falta {
+    grid-area: falta;
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--mono-letter-spacing-loose);
+    text-transform: uppercase;
+    color: var(--missing-ink);
   }
   /* The end door on a desktop: a low quiet row at the column's foot, the
      voice of a block's action (`.block-head__act`), not a tile. */

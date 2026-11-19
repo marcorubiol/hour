@@ -9,6 +9,7 @@
   import FirstTimeNote from '$lib/components/FirstTimeNote.svelte';
   import Button from '$lib/components/Button.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
+  import Fold from '$lib/components/Fold.svelte';
   import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { t, type Locale } from '$lib/i18n';
   import { lensOn } from '$lib/lenses.svelte';
@@ -31,10 +32,16 @@
     workspaceSlugById: Map<string, string>;
     /** The tags of the scope, to name a reply's when it is not Difusión (ADR-138). */
     tagNames?: readonly WorkspaceTag[];
+    /** On a wide screen: a fold at the foot of the reading column, saying what it keeps. */
+    folded?: boolean;
     locale: Locale;
   }
 
-  let { changes, loading, errored, onretry, quietLabel, sinceLabel, workspaceSlugById, tagNames = [], locale }: Props = $props();
+  let { changes, loading, errored, onretry, quietLabel, sinceLabel, workspaceSlugById, tagNames = [], folded = false, locale }: Props = $props();
+  let foldOpen = $state(false);
+  let keeps = $derived(
+    loading ? '' : changes.length > 0 ? t('desk.fold_changed_n', locale, { n: changes.length }) : quietLabel,
+  );
 
   // The way into Conversations, on the chip the band's news share (ADR-138
   // fase 3): threads only, Equipo; replies under one tag, that tag; a mix, Todas.
@@ -94,10 +101,7 @@
   }
 </script>
 
-<section class="dband changed" aria-labelledby="desk-changed-h" aria-busy={loading} data-testid="desk-changed">
-  <BlockHead id="desk-changed-h" title={t('desk.changed_since', locale, { when: sinceLabel })}>
-    {#if lensChip !== null}<a class="block-head__act" href={chipHref(lensChip, new URLSearchParams())} data-testid="desk-to-conversations" data-chip={lensChip}>{lensLabel} →</a>{/if}
-  </BlockHead>
+{#snippet changedBody()}
   <FirstTimeNote event="first_team_thread" when={!loading && changes.some((c) => c.kind === 'thread')} />
   {#if loading}
     <ul class="feed" aria-hidden="true">
@@ -144,6 +148,20 @@
       <EmptyLine text={quietLabel} />
     {/if}
     {#if errored}<p class="load-fail" role="alert"><span>{t('desk.changed_error', locale)}</span><Button size="xs" variant="secondary" onclick={onretry}>{t('ui.retry', locale)}</Button></p>{/if}
+  {/if}
+{/snippet}
+
+<section class="dband changed" aria-labelledby="desk-changed-h" aria-busy={loading} data-testid="desk-changed">
+  {#if folded}
+    <Fold word={t('desk.changed_since', locale, { when: sinceLabel })} {keeps} bind:open={foldOpen} id="desk-changed-h" testid="desk-changed-fold">
+      {@render changedBody()}
+      {#if lensChip !== null}<a class="block-head__act" href={chipHref(lensChip, new URLSearchParams())} data-testid="desk-to-conversations" data-chip={lensChip}>{lensLabel} →</a>{/if}
+    </Fold>
+  {:else}
+  <BlockHead id="desk-changed-h" title={t('desk.changed_since', locale, { when: sinceLabel })}>
+    {#if lensChip !== null}<a class="block-head__act" href={chipHref(lensChip, new URLSearchParams())} data-testid="desk-to-conversations" data-chip={lensChip}>{lensLabel} →</a>{/if}
+  </BlockHead>
+  {@render changedBody()}
   {/if}
 </section>
 

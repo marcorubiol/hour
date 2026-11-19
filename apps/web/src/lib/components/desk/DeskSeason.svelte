@@ -17,6 +17,7 @@
    * (ADR-132) has no door either.
    */
   import BlockHead from '$lib/components/BlockHead.svelte';
+  import Fold from '$lib/components/Fold.svelte';
   import { DASH } from '$lib/glyphs';
   import { t, type Locale } from '$lib/i18n';
   import type { PlannerDoor } from '$lib/desk-bands';
@@ -31,16 +32,24 @@
     /** null: no read:money, the door does not exist. */
     money: Door<{ owed: string; overdue: string; overdueCount: number; nothingOwed: boolean }> | null;
     seasonLabel: string;
+    /** On a wide screen the season is a fold at the foot of the reading column, saying what it keeps. */
+    folded?: boolean;
     locale: Locale;
   }
 
-  let { planner, conversations, money, seasonLabel, locale }: Props = $props();
+  let { planner, conversations, money, seasonLabel, folded = false, locale }: Props = $props();
+  let keeps = $derived(
+    [
+      planner?.value ? t('desk.fold_season_confirmed', locale, { n: planner.value.confirmed }) : null,
+      conversations?.value ? t('desk.fold_season_holds', locale, { n: conversations.value.holds }) : null,
+    ]
+      .filter(Boolean)
+      .join(' · '),
+  );
+  let foldOpen = $state(false);
 </script>
 
-<section class="dband season" aria-labelledby="desk-season-h">
-  <!-- No common window over the doors: each one says its own, in its lens's
-       words (the Planner's twelve weeks, Conversations' season). -->
-  <BlockHead id="desk-season-h" title={t('desk.band_season', locale)} />
+{#snippet doorsBody()}
 
   <div class="doors">
     {#if planner}
@@ -113,6 +122,17 @@
       </a>
     {/if}
   </div>
+{/snippet}
+
+<section class="dband season" aria-labelledby="desk-season-h" data-testid="desk-season">
+  {#if folded}
+    <Fold word={t('desk.band_season', locale)} {keeps} bind:open={foldOpen} id="desk-season-h" testid="desk-season-fold">
+      {@render doorsBody()}
+    </Fold>
+  {:else}
+  <BlockHead id="desk-season-h" title={t('desk.band_season', locale)} />
+  {@render doorsBody()}
+  {/if}
 </section>
 
 <style>
