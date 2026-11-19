@@ -67,14 +67,15 @@
   import { usePins } from '$lib/stores/pins.svelte';
   import { lensOn } from '$lib/lenses.svelte';
   import { performanceBoloQueryOptions, projectBolosQueryOptions } from '$lib/bolo-queries';
-  import { teamQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
+  import { projectPreparationQueryOptions, teamQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
+  import { readManual, readManualStates, readPreparation, thingRank, type ManualEstado, type Preparation } from '$lib/preparation';
   import { goingPersonIds, type GoingPerson } from '$lib/bolo-access';
   import RecordHead from '$lib/components/RecordHead.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import { spaceCrumb, type Crumb } from '$lib/record-crumbs';
   import { isGuestIn } from '$lib/workspace-role';
   import Fold from '$lib/components/Fold.svelte';
-  import RecordPass, { passToneVar, type PassAct, type PassBox, type PassLine } from './RecordPass.svelte';
+  import RecordPass, { passToneVar, type PassAct, type PassBox, type PassClosed, type PassLine } from './RecordPass.svelte';
   import { daysBetween } from '$lib/away';
   import { logisticsLines, mapsHref, telHref, venueCall } from '$lib/ahora';
   import MapLink from '$lib/components/MapLink.svelte';
@@ -82,7 +83,7 @@
   import { dayOf } from '$lib/running-order';
   import { hasJsonContent } from '$lib/components/JsonKV.svelte';
   import {
-    isUrgentMissing,
+    isUrgentThing,
     performanceMissing,
     performanceReadiness,
     type PerformanceMissing,
@@ -113,6 +114,8 @@
       country: string | null;
       notes: string | null;
       hold_notice_days: number | null;
+      /** `custom_fields.preparation` is the hand things' state (ADR-221). */
+      custom_fields?: Json;
       load_in_at: string | null;
       soundcheck_at: string | null;
       start_at: string | null;
@@ -744,6 +747,37 @@
     }),
   );
 
+  // ── «Qué preparamos»: lo hecho a mano (ADR-221, fase 3) ─────────────────
+  const handMutation = createMutation({
+    mutationFn: async (v: { thing: string; estado: ManualEstado | null }) =>
+      mutateJSON<{ preparation: unknown }>('PUT', `/api/performances/${encodeURIComponent(perf?.id ?? '')}/preparation`, v),
+    onSuccess: (body) => {
+      // The answer is the performance's whole state: into the cache now, so the
+      // row closes before the refetch lands.
+      queryClient.setQueryData<Bundle>(['performance', { ws: workspaceSlug, slug }], (old) =>
+        old
+          ? {
+              ...old,
+              performance: {
+                ...old.performance,
+                custom_fields: { ...((old.performance.custom_fields as Record<string, unknown> | null) ?? {}), preparation: (body?.preparation ?? {}) as Json },
+              },
+            }
+          : old,
+      );
+      void queryClient.invalidateQueries({ queryKey: ['performance'] });
+      void queryClient.invalidateQueries({ queryKey: ['planner-performances'] });
+    },
+    onError: (err) => {
+      addToast({
+        tone: 'danger',
+        title: t('edit.not_saved', locale),
+        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
+      });
+    },
+  });
+  const closeHand = (thing: string, estado: ManualEstado | null) => $handMutation.mutate({ thing, estado });
+
   const today = localDayISO();
   let missingInput = $derived<PerformanceMissingInput | null>(
     perf && bundle
@@ -762,9 +796,14 @@
         }
       : null,
   );
-  let missing = $derived<PerformanceMissing[]>(missingInput ? performanceMissing(missingInput, today) : []);
+  /** «Qué preparamos» of this performance's project (ADR-221), read on its
+      own (any status); until it arrives, or if it cannot be read (a guest
+      through a bolo), it is the default. */
+  const preparationQuery = createQuery(toStore(() => projectPreparationQueryOptions(perf?.project?.id)));
+  let preparation = $derived<Preparation>(readPreparation($preparationQuery.data?.project.preparation));
+  let missing = $derived<PerformanceMissing[]>(missingInput ? performanceMissing(missingInput, today, preparation) : []);
   // El talón del pase: las casillas, derivadas de lo mismo que «Falta».
-  let readiness = $derived<ReadinessBox[]>(missingInput ? performanceReadiness(missingInput, today) : []);
+  let readiness = $derived<ReadinessBox[]>(missingInput ? performanceReadiness(missingInput, today, preparation) : []);
 
   function missingItem(m: PerformanceMissing): PassLine {
     switch (m.kind) {
@@ -817,9 +856,32 @@
     team: 'pass.box_team',
     sheet: 'pass.box_sheet',
   };
-  let passBoxes = $derived<PassBox[]>(
-    readiness.map((b) => ({ id: b.id, label: t(BOX_LABEL[b.id], locale), done: b.done, urgent: b.urgent })),
+  let manualReading = $derived(
+    readManual(preparation, readManualStates((perf?.custom_fields as { preparation?: unknown } | null)?.preparation)),
   );
+  /** The boxes of the bar, in the project's order: the app's and the project's own. A hand
+      thing closed as «aquí no hace falta» has no box (ADR-221). */
+  let passBoxes = $derived.by<PassBox[]>(() => {
+    // A hand thing is asked only of a confirmed performance that is not past (as the app's).
+    const perfDay = perf?.performed_at.slice(0, 10) ?? today;
+    const hand = perf && perf.status === 'confirmed' && perfDay >= today;
+    const boxes: (PassBox & { rank: number })[] = readiness.map((b) => ({
+      id: b.id,
+      label: t(BOX_LABEL[b.id], locale),
+      done: b.done,
+      urgent: b.urgent,
+      rank: thingRank(preparation, b.id),
+    }));
+    if (hand) {
+      for (const m of manualReading.open) {
+        boxes.push({ id: m.id, label: m.name, done: false, urgent: isUrgentThing(m.id, perfDay, today, preparation), rank: thingRank(preparation, m.id) });
+      }
+      for (const m of manualReading.closed) {
+        if (m.state.estado === 'hecho') boxes.push({ id: m.id, label: m.name, done: true, rank: thingRank(preparation, m.id) });
+      }
+    }
+    return boxes.sort((x, y) => x.rank - y.rank).map(({ rank: _rank, ...b }) => b);
+  });
 
   /** «La función es en 2 días»: why a thing with hurry has it. */
   function urgentReason(): string | undefined {
@@ -849,14 +911,61 @@
         return missingItem({ kind: 'roadsheet_unshared' });
     }
   }
+  /** The project's own things still open: a box and the text that opens «Hecho» / «Aquí no hace falta». */
+  let handLines = $derived<PassLine[]>(
+    perf && perf.status === 'confirmed' && perf.performed_at.slice(0, 10) >= today
+      ? manualReading.open.map((m) => ({
+          id: m.id,
+          text: m.name,
+          verbs: [],
+          urgent: isUrgentThing(m.id, perf!.performed_at.slice(0, 10), today, preparation),
+          hand: {
+            onDone: () => closeHand(m.id, 'hecho'),
+            onNa: () => closeHand(m.id, 'no_aplica'),
+            busy: $handMutation.isPending,
+          },
+        }))
+      : [],
+  );
+  /** «Hoy», «ayer», «hace 3 días»: when a thing was closed, in the reader's days. */
+  function closedWhen(iso: string | null): string | undefined {
+    if (!iso) return undefined;
+    const at = new Date(iso);
+    if (Number.isNaN(at.getTime())) return undefined;
+    const day = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}`;
+    const d = daysBetween(day, today);
+    if (d <= 0) return t('pass.when_today', locale);
+    if (d === 1) return t('pass.when_yesterday', locale);
+    return t('pass.when_ago', locale, { n: d });
+  }
+  let passClosed = $derived<PassClosed[]>(
+    canEdit
+      ? manualReading.closed.map((m) => ({
+          id: m.id,
+          text: m.name,
+          meta: m.state.estado === 'no_aplica' ? t('pass.hand_na_short', locale) : closedWhen(m.state.cuando),
+          onReopen: () => closeHand(m.id, null),
+          busy: $handMutation.isPending,
+        }))
+      : [],
+  );
+  /** The list's thing a line belongs to («sin bolo» is none: it ranks last). */
+  const LINE_THING: Record<string, string> = { hold_deadline: 'status', no_time: 'hours', nobody_going: 'team', roadsheet_unshared: 'sheet' };
+  const lineThing = (id: string) => LINE_THING[id] ?? id;
+  let urgentIds = $derived(new Set(readiness.filter((b) => b.urgent && b.id !== 'status').map((b) => b.id as string)));
   let passLines = $derived<PassLine[]>(
     canEdit
       ? [
           ...readiness.filter((b) => !b.done).flatMap((b) => boxLine(b) ?? []),
           ...missing.filter((m) => m.kind === 'no_bolo').map(missingItem),
         ]
-          .map((l) => (l.id === 'roadsheet_unshared' ? { ...l, urgent: true, reason: urgentReason() } : l))
+          // Hurry: a hold's deadline, or a thing inside the days its project gave it.
           .map((l) => (l.id === 'hold_deadline' ? { ...l, urgent: true } : l))
+          .map((l) => (urgentIds.has(lineThing(l.id)) ? { ...l, urgent: true, reason: urgentReason() } : l))
+          // The project's order (the app's by `thingRank`, the project's own by theirs);
+          // «sin bolo» is not on the list: it goes last.
+          .concat(handLines.map((l) => (l.urgent ? { ...l, reason: urgentReason() } : l)))
+          .sort((a, b) => thingRank(preparation, lineThing(a.id)) - thingRank(preparation, lineThing(b.id)))
           .sort((a, b) => Number(Boolean(b.urgent)) - Number(Boolean(a.urgent)))
       : [],
   );
@@ -1058,6 +1167,7 @@
       acts={passActs}
       boxes={passBoxes}
       lines={passLines}
+      closed={passClosed}
     >
       {#snippet tag()}
         {#if canEdit}

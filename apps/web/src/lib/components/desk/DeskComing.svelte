@@ -54,10 +54,16 @@
   function openWords(tile: ComingTile): string {
     const u = tile.urgent;
     if (!u) return t('desk.tile_open', locale, { n: tile.open });
-    // A hold's hurry counts to its decide-by day, not to the performance's.
-    const n = dayDiff(u.kind === 'hold_deadline' ? u.day : tile.day);
-    const when = n < 0 && u.kind === 'hold_deadline' ? t('desk.when_overdue', locale) : n <= 0 ? t('desk.when_today', locale) : n === 1 ? t('desk.when_tomorrow', locale) : t('desk.when_days', locale, { n });
-    const what = u.kind === 'roadsheet_unshared' ? t('desk.urgent_roadsheet', locale) : t('desk.urgent_hold', locale);
+    // The hurry counts to its own day: a hold's deadline, else the performance's.
+    const n = dayDiff(u.day);
+    const when = n < 0 && u.what === 'hold' ? t('desk.when_overdue', locale) : n <= 0 ? t('desk.when_today', locale) : n === 1 ? t('desk.when_tomorrow', locale) : t('desk.when_days', locale, { n });
+    const what =
+      u.what === 'hand'
+        ? (u.name ?? '')
+        : t(
+            { roadsheet: 'desk.urgent_roadsheet', hold: 'desk.urgent_hold', hours: 'desk.urgent_hours', team: 'desk.urgent_team' }[u.what],
+            locale,
+          );
     return t('desk.tile_urgent', locale, { when, what });
   }
   let planner = $derived(lensOn('planner'));

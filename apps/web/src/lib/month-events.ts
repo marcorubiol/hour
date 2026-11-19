@@ -68,6 +68,8 @@ export type PerformanceEvent = {
    * the deadline is the one thing on a held card that is not a maybe.
    */
   hold_notice_days?: number | null;
+  /** The hand things' state (`custom_fields.preparation`, ADR-221); the feed brings it with `?missing=1`. */
+  prep?: unknown;
   /** Present only on ?rosters=1 fetches (conflict engine feed). */
   person_ids?: string[];
   /** ADR-103 — each person's «voy / no voy» on it. */

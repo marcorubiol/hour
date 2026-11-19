@@ -1,3 +1,4 @@
+import { addManualThing, readPreparation } from './preparation';
 import { describe, expect, it } from 'vitest';
 import {
   COMING_TILES,
@@ -146,6 +147,36 @@ describe('«Coming up»: one tile per day (ADR-202 § 6)', () => {
     ]);
     // Open is neutral: none of these has hurry (hold deadline, unshared sheet).
     expect(tiles.every((t) => t.urgent === null)).toBe(true);
+  });
+
+  it('the tile follows its project\'s preparation list (ADR-221): what is off does not count', () => {
+    const performances = [perf('nohour', '2026-11-16', mamemi, { start_at: null })];
+    const coming = upcoming({ performances, dates: [], viewerTz: TZ }, NOW, 40);
+    const off = readPreparation({ items: [{ id: 'hours', on: false }] });
+    expect(comingTiles(coming, TODAY).map((t) => t.open)).toEqual([1]);
+    expect(comingTiles(coming, TODAY, 10, () => off).map((t) => [t.missing, t.open])).toEqual([[false, 0]]);
+  });
+
+  it('the project\'s own open things count in the tile (ADR-221, fase 3), and a closed one does not', () => {
+    const list = addManualThing(readPreparation(null), 'Rider', 'm_rider001');
+    const performances = [
+      perf('open', '2026-11-16', mamemi, { prep: null }),
+      perf('done', '2026-11-17', mamemi, { prep: { m_rider001: { estado: 'hecho' } } }),
+    ];
+    const coming = upcoming({ performances, dates: [], viewerTz: TZ }, NOW, 40);
+    expect(comingTiles(coming, TODAY, 10, () => list).map((t) => [t.day, t.open])).toEqual([
+      ['2026-11-16', 1],
+      ['2026-11-17', 0],
+    ]);
+  });
+
+  it('the tile is amber only for a thing inside its days, and says which and when (ADR-221, fase 4)', () => {
+    const performances = [perf('nohour', '2026-11-16', mamemi, { start_at: null })];
+    const coming = upcoming({ performances, dates: [], viewerTz: TZ }, NOW, 40);
+    const never = comingTiles(coming, TODAY, 10, () => readPreparation(null));
+    expect(never[0].urgent).toBeNull();
+    const hurry = comingTiles(coming, TODAY, 10, () => readPreparation({ items: [{ id: 'hours', on: true, days: 10 }] }));
+    expect(hurry[0].urgent).toEqual({ what: 'hours', day: '2026-11-16' });
   });
 
   it('ten tiles at most', () => {

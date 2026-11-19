@@ -161,7 +161,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   const search = new URLSearchParams();
   search.set(
     'select',
-    'id,slug,name,status,workspace_id,starts_on,ends_on,updated_at,accent,initials,description',
+    'id,slug,name,status,workspace_id,starts_on,ends_on,updated_at,accent,initials,description,custom_fields',
   );
   search.set('deleted_at', 'is.null');
   if (status !== 'any') search.set('status', `eq.${status}`);
@@ -169,8 +169,11 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   search.set('limit', String(limit));
 
   try {
-    const { data } = await pgGet<ProjectItem>(env, 'project', jwt, { search });
-    return json({ items: data });
+    const { data } = await pgGet<ProjectItem & { custom_fields: { preparation?: unknown } | null }>(env, 'project', jwt, { search });
+    // «Qué preparamos» (ADR-221) travels as `preparation`; the rest of
+    // `custom_fields` stays on the server.
+    const items = data.map(({ custom_fields, ...p }) => ({ ...p, preparation: custom_fields?.preparation ?? null }));
+    return json({ items });
   } catch (err) {
     return pgErrorResponse(
       err,

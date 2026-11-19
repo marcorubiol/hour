@@ -16,7 +16,8 @@
  */
 import { inScope, type ResolvedScope } from './nav';
 import { perfWorkspaceId, type DateEvent, type PerformanceEvent } from './month-events';
-import { isUrgentMissing, missingSoon, type PerformanceMissing } from './record-missing';
+import type { Preparation } from './preparation';
+import { isUrgentMissing, isUrgentThing, manualOpenSoon, missingSoon, type PerformanceMissing } from './record-missing';
 import { agendaPoints, agendaRows, type AgendaPoint, type DayAgenda } from './day-agenda';
 import type { PulseInputRows, PulseNext } from './pulse';
 import type { DeskItem } from './desk-feed';
@@ -134,10 +135,26 @@ export interface ComingTile {
       too; `missing` is `open > 0`. */
   missing: boolean;
   open: number;
-  /** The first open thing with hurry (a hold's deadline, an unshared road
-      sheet), the only thing the tile paints in amber; null says none. */
-  urgent: PerformanceMissing | null;
+  /** The nearest open thing with hurry (a hold's deadline, or a thing inside
+      the days its project gave it), the only thing the tile paints in amber;
+      null says none. `day` is the one to count to: the hold's deadline, else
+      the performance's. */
+  urgent: TileUrgent | null;
 }
+
+export interface TileUrgent {
+  what: 'hold' | 'roadsheet' | 'hours' | 'team' | 'hand';
+  day: string;
+  /** The project's own thing, by its name. */
+  name?: string;
+}
+
+const URGENT_WHAT = {
+  hold_deadline: 'hold',
+  roadsheet_unshared: 'roadsheet',
+  no_time: 'hours',
+  nobody_going: 'team',
+} as const;
 
 const dayDiff = (day: string, today: string) =>
   Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
@@ -149,7 +166,13 @@ const dayDiff = (day: string, today: string) =>
  * door. `coming` is the pulse's own order (`upcoming`), so a tile, the piece
  * and the rail never disagree about what comes first.
  */
-export function comingTiles(coming: readonly PulseNext[], today: string, max = COMING_TILES): ComingTile[] {
+export function comingTiles(
+  coming: readonly PulseNext[],
+  today: string,
+  max = COMING_TILES,
+  /** The preparation list of a project (ADR-221); none says «everything». */
+  listOf?: (projectId: string) => Preparation | undefined,
+): ComingTile[] {
   const tiles: ComingTile[] = [];
   const byDay = new Map<string, PulseNext[]>();
   for (const x of coming) {
@@ -162,14 +185,32 @@ export function comingTiles(coming: readonly PulseNext[], today: string, max = C
   for (const day of [...byDay.keys()].sort()) {
     if (tiles.length >= max) break;
     const all = byDay.get(day)!;
-    const gaps = all.flatMap((x) => (x.ref.of === 'performance' ? missingSoon(x.ref.row as PerformanceEvent, today) : []));
+    const gaps: PerformanceMissing[] = [];
+    const urgents: TileUrgent[] = [];
+    let handOpen = 0;
+    for (const x of all) {
+      if (x.ref.of !== 'performance') continue;
+      const row = x.ref.row as PerformanceEvent;
+      const list = row.project?.id ? listOf?.(row.project.id) : undefined;
+      const perfDay = row.performed_at.slice(0, 10);
+      for (const m of missingSoon(row, today, list)) {
+        gaps.push(m);
+        if (m.kind !== 'no_bolo' && isUrgentMissing(m, { day: perfDay, today, list })) {
+          urgents.push({ what: URGENT_WHAT[m.kind], day: m.kind === 'hold_deadline' ? m.day : perfDay });
+        }
+      }
+      for (const m of manualOpenSoon(row, today, list)) {
+        handOpen += 1;
+        if (isUrgentThing(m.id, perfDay, today, list)) urgents.push({ what: 'hand', day: perfDay, name: m.name });
+      }
+    }
     tiles.push({
       day,
       items: all.slice(0, COMING_PER_TILE),
       more: Math.max(0, all.length - COMING_PER_TILE),
-      missing: gaps.length > 0,
-      open: gaps.length,
-      urgent: gaps.find(isUrgentMissing) ?? null,
+      missing: gaps.length + handOpen > 0,
+      open: gaps.length + handOpen,
+      urgent: urgents.sort((a, b) => a.day.localeCompare(b.day))[0] ?? null,
     });
   }
   return tiles;

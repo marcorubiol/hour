@@ -8343,4 +8343,37 @@ esta entrada fija la decisión entera y la fase 1 va construida.
 6. **Lo que no es un show** (`DateRecord`) conserva sus tres casillas automáticas, con el mismo trato de color y sin lista
    configurable por ahora.
 
-**Cómo se revierte.** Fase 1: revertir el commit; sin esquema ni API; `CACHE_SCHEMA` no cambia.
+**Fase 2 (hecha, borrador): la lista por proyecto y sus ajustes.** La lista vive en `project.custom_fields.preparation`
+(`{ items: [{ id, on }] }`, `$lib/preparation`); `update_project` aprende la clave `preparation` (migración
+`20261119110000_project_preparation.sql`, aditiva, mismo permiso; `null` borra la lista). `GET /api/projects` la devuelve como
+`preparation` (sube `CACHE_SCHEMA` a 37). Sin lista, o dañada, es la de serie; una lectura tolerante descarta ids
+desconocidos y añade encendidas las cosas nuevas de la app. Los ajustes son una sección del diálogo «Editar proyecto»
+(interruptor y subir/bajar por cosa, sin arrastrar). Pase, punto/línea de Hoy y palabras de la Agenda la respetan: una cosa
+apagada no es casilla ni pide nada, y las casillas siguen el orden del proyecto; «sin bolo» no está en la lista y se pide
+siempre.
+
+**Fase 3 (hecha, borrador): las cosas a mano.** Cada proyecto puede añadir, renombrar, borrar, encender, apagar y ordenar cosas
+suyas (id `m_…`, nombre de hasta 60 caracteres, hasta 20 en la lista) en «Editar proyecto». El estado de cada una en cada
+función vive en `performance.custom_fields.preparation` (`{ estado: 'hecho' | 'no_aplica', por, cuando }`), escrito por la
+RPC `set_performance_preparation` (migración `20261119120000_performance_preparation.sql`, aditiva: función nueva, permiso
+`edit:performance`, `por` y `cuando` los pone la base) tras `PUT /api/performances/[key]/preparation`. En el pase: una
+casilla por cosa abierta y una casilla en la barra, en el orden del proyecto; tocar el texto abre «Hecho» y «Aquí no hace
+falta» (esta cierra solo esa función y no deja casilla en la barra); la línea callada «Cerrado: …» dice lo cerrado y cada
+cosa de ella lo reabre. Se piden solo a una función confirmada y no pasada. Hoy cuenta las cosas a mano abiertas en «N por
+cerrar» y la Agenda las nombra, en gris (el feed lleva `prep` con `?missing=1`). Borrar una cosa de la lista no borra lo
+marcado en funciones pasadas: deja de leerse. **Pendiente:** la línea de lo cerrado dice cuándo pero no quién (`por` se
+guarda como id de usuario y el equipo se lista por persona); y la línea «Cerrado» se queda aunque no quede nada abierto,
+porque es lo único que permite reabrir.
+
+**Fase 4 (hecha, borrador): los plazos de prisa.** Cada cosa lleva `days` en la lista: cuántos días antes de la función corre
+prisa (vacío = nunca; la hoja de ruta, sin tocar, 14; «Estado» no lleva días, su prisa es la fecha límite de la opción). Una
+cosa abierta es ámbar solo dentro de sus días: casilla, fila (arriba, con el motivo «La función es en 2 días») y, en Hoy, la
+línea «En 2 días: poner la hora» (cuenta hasta la fecha límite si es una opción, vencida dice «Vencida»; en la Agenda, la
+palabra en ámbar). Los días solo marcan la prisa; cuándo se pide cada cosa no cambia (la hoja, desde 14 días antes).
+Editable en «Editar proyecto» (número por cosa; sin migración: `days` va en el JSON de la lista).
+
+**Cómo se revierte.** Fase 1: revertir el commit; sin esquema ni API; `CACHE_SCHEMA` no cambia. Fase 2: revertir el commit y
+aplicar `build/runbooks/rollback-20261119-project-preparation.sql` (restaura el cuerpo anterior de `update_project`; las
+listas guardadas se quedan en `custom_fields` sin efecto). Fase 3: revertir el commit y aplicar
+`build/runbooks/rollback-20261119-performance-preparation.sql` (borra la función; lo marcado se queda sin que nadie lo lea).
+Fase 4: revertir el commit; sin esquema.

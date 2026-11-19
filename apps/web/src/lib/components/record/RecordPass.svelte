@@ -20,6 +20,18 @@
     urgent?: boolean;
     reason?: string;
     verbs: PassVerb[];
+    /** A thing of the project's own (ADR-221): a box instead of a verb, and
+        the text opens «Hecho» / «Aquí no hace falta». */
+    hand?: { onDone: () => void; onNa: () => void; busy?: boolean };
+  }
+
+  /** A hand thing already closed here: its name, who and when (or «aquí no»), and the way back. */
+  export interface PassClosed {
+    id: string;
+    text: string;
+    meta?: string;
+    onReopen: () => void;
+    busy?: boolean;
   }
 
   export interface PassVerb {
@@ -139,6 +151,8 @@
     boxes: readonly PassBox[];
     /** Open boxes with their verbs; only for whoever can settle them. */
     lines?: readonly PassLine[];
+    /** What was closed by hand, said quietly under the list. */
+    closed?: readonly PassClosed[];
   }
 
   let {
@@ -164,7 +178,11 @@
     acts = [],
     boxes,
     lines = [],
+    closed = [],
   }: Props = $props();
+
+  /** The hand row whose «Hecho» / «Aquí no hace falta» is open (one at a time). */
+  let expanded = $state<string | null>(null);
 
   let day = $derived(dayParts(dayIso, locale));
   let dayEnd = $derived(dayIsoEnd && dayIsoEnd !== dayIso ? dayParts(dayIsoEnd, locale) : null);
@@ -256,30 +274,77 @@
         {#if lines.length > 0}
           <ul class="stub__lines" role="list" data-testid="record-missing">
             {#each lines as line (line.id)}
-              <li class="stub__line" class:stub__line--urgent={line.urgent} data-missing={line.id}>
-                <span class="stub__text"
-                  >{line.text}{#if line.meta}<span class="stub__meta">{line.meta}</span>{/if}{#if line.reason}<span class="stub__reason"
-                      >{line.reason}</span
-                    >{/if}</span
-                >
-                {#if line.verbs.length > 0}
-                  <span class="stub__verbs">
-                    {#each line.verbs as v, i (i)}
-                      {#if v.href}
-                        <a class="missing__act stub__verb" href={v.href} aria-label={v.ariaLabel}>{v.label}</a>
-                      {:else}
-                        <button type="button" class="missing__act stub__verb" disabled={v.disabled} aria-label={v.ariaLabel} onclick={v.onclick}
-                          >{v.label}</button
-                        >
-                      {/if}
-                    {/each}
-                  </span>
-                {/if}
-              </li>
+              {#if line.hand}
+                {@const hand = line.hand}
+                <li class="stub__line stub__line--hand" class:stub__line--urgent={line.urgent} data-missing={line.id} data-hand="true">
+                  <button
+                    type="button"
+                    class="stub__hand-text"
+                    aria-expanded={expanded === line.id}
+                    onclick={() => (expanded = expanded === line.id ? null : line.id)}>{line.text}</button
+                  >
+                  <button
+                    type="button"
+                    class="stub__check"
+                    aria-label={t('pass.hand_done_aria', locale, { name: line.text })}
+                    disabled={hand.busy}
+                    data-testid="pass-hand-check"
+                    onclick={hand.onDone}
+                  ></button>
+                  {#if line.reason}<span class="stub__reason stub__reason--hand">{line.reason}</span>{/if}
+                  {#if expanded === line.id}
+                    <span class="stub__hand-more">
+                      <button type="button" class="missing__act stub__verb" disabled={hand.busy} onclick={hand.onDone}
+                        >{t('pass.hand_done', locale)}</button
+                      >
+                      <button type="button" class="stub__verb stub__verb--quiet" disabled={hand.busy} onclick={hand.onNa}
+                        >{t('pass.hand_na', locale)}</button
+                      >
+                    </span>
+                  {/if}
+                </li>
+              {:else}
+                <li class="stub__line" class:stub__line--urgent={line.urgent} data-missing={line.id}>
+                  <span class="stub__text"
+                    >{line.text}{#if line.meta}<span class="stub__meta">{line.meta}</span>{/if}{#if line.reason}<span class="stub__reason"
+                        >{line.reason}</span
+                      >{/if}</span
+                  >
+                  {#if line.verbs.length > 0}
+                    <span class="stub__verbs">
+                      {#each line.verbs as v, i (i)}
+                        {#if v.href}
+                          <a class="missing__act stub__verb" href={v.href} aria-label={v.ariaLabel}>{v.label}</a>
+                        {:else}
+                          <button type="button" class="missing__act stub__verb" disabled={v.disabled} aria-label={v.ariaLabel} onclick={v.onclick}
+                            >{v.label}</button
+                          >
+                        {/if}
+                      {/each}
+                    </span>
+                  {/if}
+                </li>
+              {/if}
             {/each}
           </ul>
         {/if}
       </div>
+    {/if}
+
+    {#if closed.length > 0}
+      <p class="stub__closed pass__closed" data-testid="pass-closed">
+        <span class="stub__closed-head">{t('pass.closed', locale)}</span>
+        {#each closed as c, i (c.id)}
+          {#if i > 0}<span aria-hidden="true"> · </span>{/if}
+          <button
+            type="button"
+            class="stub__reopen"
+            disabled={c.busy}
+            aria-label={t('pass.hand_reopen_aria', locale, { name: c.text })}
+            onclick={c.onReopen}>{c.text}{#if c.meta}<span class="stub__closed-meta"> ({c.meta})</span>{/if}</button
+          >
+        {/each}
+      </p>
     {/if}
 
     {#if acts.length > 0}
@@ -616,6 +681,98 @@
       background: color-mix(in oklch, var(--warning-light) 16%, transparent);
       color: var(--warning-light);
     }
+    .stub__line--hand {
+      flex-wrap: wrap;
+    }
+    .stub__hand-text {
+      appearance: none;
+      flex: 1;
+      min-inline-size: 0;
+      padding: 0;
+      border: 0;
+      background: none;
+      color: inherit;
+      font: inherit;
+      text-align: start;
+      cursor: pointer;
+      text-underline-offset: 3px;
+    }
+    @media (hover: hover) {
+      .stub__hand-text:hover {
+        text-decoration: underline;
+      }
+    }
+    /* The box: a square with a line, ticked by marking it. A target of 44 px
+       around a 1.25 rem square. */
+    .stub__check {
+      appearance: none;
+      flex: none;
+      inline-size: 1.5rem;
+      block-size: 1.5rem;
+      margin: 0.25rem;
+      border: var(--line-hairline) solid var(--surface-focus-muted);
+      border-radius: var(--radius-xs);
+      background: none;
+      cursor: pointer;
+    }
+    .stub__check:hover {
+      background: var(--surface-focus-act);
+    }
+    .stub__hand-more {
+      display: flex;
+      flex-basis: 100%;
+      gap: var(--space-xs);
+    }
+    .stub__hand-more :global(.stub__verb) {
+      flex: 1;
+      justify-content: center;
+    }
+    /* «Aquí no hace falta» is the quiet one of the two: a line, no fill. */
+    .stub__verbs :global(.stub__verb--quiet),
+    .stub__hand-more :global(.stub__verb--quiet) {
+      appearance: none;
+      display: inline-flex;
+      align-items: center;
+      min-block-size: 2.25rem;
+      padding: var(--space-2xs) var(--space-s);
+      border: var(--line-hairline) solid var(--surface-focus-rule);
+      border-radius: var(--radius);
+      background: none;
+      color: inherit;
+      font: inherit;
+      font-size: var(--text-s);
+      cursor: pointer;
+    }
+    .stub__closed {
+      margin: 0;
+      font-size: var(--text-xs);
+      color: var(--surface-focus-muted);
+    }
+    .stub__closed-head::after {
+      content: ' ';
+    }
+    .stub__reopen {
+      appearance: none;
+      padding: 0;
+      border: 0;
+      background: none;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+      text-underline-offset: 3px;
+    }
+    @media (hover: hover) {
+      .stub__reopen:hover {
+        text-decoration: underline;
+      }
+    }
+    .stub__reason--hand {
+      flex-basis: 100%;
+      order: 1;
+    }
+    .stub__hand-more {
+      order: 2;
+    }
     .stub__reason {
       display: block;
       font-size: var(--text-xs);
@@ -634,7 +791,8 @@
       gap: var(--space-2xs);
     }
     /* The verb is a light button on the dark piece, at the radius of buttons. */
-    .stub__verbs :global(.stub__verb) {
+    .stub__verbs :global(.stub__verb),
+    .stub__hand-more :global(.stub__verb:not(.stub__verb--quiet)) {
       appearance: none;
       display: inline-flex;
       align-items: center;
@@ -651,7 +809,8 @@
       white-space: nowrap;
       cursor: pointer;
     }
-    .stub__verbs :global(.stub__verb:disabled) {
+    .stub__verbs :global(.stub__verb:disabled),
+    .stub__hand-more :global(.stub__verb:disabled) {
       opacity: 0.5;
       cursor: default;
     }

@@ -65,7 +65,8 @@
     type Slip as SlipVM,
   } from '$lib/month-events';
   import AgendaList, { type AgendaDecision, type AgendaMissing, type NoteDraft } from '$lib/components/AgendaList.svelte';
-  import { isUrgentMissing, missingSoon } from '$lib/record-missing';
+  import { readPreparation } from '$lib/preparation';
+  import { isUrgentMissing, isUrgentThing, manualOpenSoon, missingSoon } from '$lib/record-missing';
   import { noteFallback as noteFallbackOf, noteFallbackBody } from '$lib/note';
   import DecisionBand, {
     decisionText,
@@ -1984,13 +1985,22 @@
   });
   /** «Falta», the one rule (ADR-211 § 3): the record's words beside the
       performance, the missing hour in the hour's own column. */
+  /** Each project's preparation list (ADR-221), from the projects already read. */
+  let preparationByProject = $derived(
+    new Map(($projectsQuery.data?.items ?? []).map((p) => [p.id, readPreparation(p.preparation)] as const)),
+  );
   function agendaMissing(p: PerformanceEvent): AgendaMissing {
-    const open = missingSoon(p, todayIso);
+    const list = p.project?.id ? preparationByProject.get(p.project.id) : undefined;
+    const open = missingSoon(p, todayIso, list);
     return {
       noTime: open.some((m) => m.kind === 'no_time'),
-      words: open
-        .filter((m) => m.kind !== 'no_time')
-        .map((m) => ({ text: t(MISSING_WORD[m.kind as keyof typeof MISSING_WORD], locale), urgent: isUrgentMissing(m) })),
+      words: [
+        ...open
+          .filter((m) => m.kind !== 'no_time')
+          .map((m) => ({ text: t(MISSING_WORD[m.kind as keyof typeof MISSING_WORD], locale), urgent: isUrgentMissing(m, { day: p.performed_at.slice(0, 10), today: todayIso, list }) })),
+        // The project's own things, by their name (ADR-221).
+        ...manualOpenSoon(p, todayIso, list).map((m) => ({ text: m.name, urgent: isUrgentThing(m.id, p.performed_at.slice(0, 10), todayIso, list) })),
+      ],
     };
   }
   const MISSING_WORD = {
