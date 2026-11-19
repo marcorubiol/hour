@@ -1582,7 +1582,7 @@
           href: peekHref({ kind: 'date', id: d.id }, page.url),
           sub: sl.city ?? '',
           eyebrow: kindLabel(sl.kind),
-          timed: true,
+          timed: !d.all_day,
           project: d.project ?? null,
           guess: false,
         });
