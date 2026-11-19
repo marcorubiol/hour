@@ -843,6 +843,14 @@
     .ro--stops .hours__row {
       position: relative;
     }
+    /* The hour column is as wide as its widest hour at any width, so the
+       line sits at the same place on a phone, in the vistazo on the right
+       and on the page (ADR-216): the stops read as one column, never as a
+       table with an empty margin on its left. */
+    .ro--stops .hours__list {
+      grid-template-columns: max-content minmax(0, 1fr) auto;
+      column-gap: var(--space-s);
+    }
     .ro--stops .hours__row::before {
       content: '';
       position: absolute;

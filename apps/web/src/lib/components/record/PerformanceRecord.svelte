@@ -1448,7 +1448,7 @@
 <!-- «Hablar» (ADR-214; ADR-106): el tablón del bolo como hoja, sin salir de
      la ficha. En el teléfono, el diálogo ya es una hoja desde abajo. -->
 {#if perf}
-  <Dialog bind:open={talkOpen} title={t('pass.talk_title', locale)} size="l">
+  <Dialog bind:open={talkOpen} title={t('pass.talk_title', locale)} size="l" placing={inPeek ? 'side' : 'center'}>
     {#if talkOpen}
       <BoloBoard
         performanceId={perf.id}
