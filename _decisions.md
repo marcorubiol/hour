@@ -8278,3 +8278,21 @@ Encargo: `brief.md`, «Escritorio» y «Hoy en escritorio» (19-11).
 están hechos (la lista de «Te espera» se queda como está).
 
 **Cómo se revierte.** Revertir el commit. Sin esquema ni API; `CACHE_SCHEMA` no cambia.
+
+## [2026-11-19] ADR-219 · Hoy es una sola vista; la pieza vacía habla de la agenda (enmienda ADR-203 § 2)
+
+**Contexto.** Marco, 19-11: ¿deben ser Desk y Hoy dos vistas? ¿Y es honesto llamar «Hoy» a una pantalla que enseña
+trabajo por hacer?
+
+**Decidido por Marco.**
+1. **Una sola vista, y se llama Hoy.** «Hoy» nombra el punto de partida, no un filtro: tu día delante y, debajo, todo
+   lo que te espera. La versión estricta (solo el día, lo que viene y las cifras) ya existe y es calma (ADR-203 § 5).
+   «Te espera» no se recorta a lo fechado hoy.
+2. **La pieza vacía habla solo de la agenda:** «Hoy, nada en la agenda» y «Hoy, nada más en la agenda», en las cuatro
+   lenguas (`desk.piece_none`, `desk.piece_done`). «Hoy, nada» encima de una lista de trabajo se contradecía.
+3. **«Ha cambiado» y «La temporada» en escritorio** ya son pliegues al pie (ADR-218 § 3); no se tocan aquí.
+
+**Pendiente.** La ruta pasa de `/h/desk` a `/h/today` con redirección desde la vieja, en un PR aparte: pide reservar
+`today` como slug en la base y en `reserved-slugs.ts`.
+
+**Cómo se revierte.** Revertir el commit: vuelven los dos textos. Sin esquema ni API; `CACHE_SCHEMA` no cambia.
