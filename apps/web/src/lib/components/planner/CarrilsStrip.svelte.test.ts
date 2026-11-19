@@ -165,8 +165,9 @@ describe('CarrilsStrip — the board grid', () => {
     expect(rail.querySelector('.board__rail-n')!.textContent).toBe('mük cia');
     // A space is an address, not a subject: no monogram anywhere in the rail.
     expect(rail.querySelector('.mark')).toBeNull();
-    // It spans exactly its lanes' rows: three lanes → rows 2..5 (head is 1).
-    expect(rail.style.gridRow).toBe('2 / 5');
+    // It spans exactly its drawn lanes' rows: three lanes, one with nothing
+    // folded away (ADR-228) → rows 2..4 (head is 1).
+    expect(rail.style.gridRow).toBe('2 / 4');
     expect(rail.style.gridColumn).toBe('1');
   });
 
@@ -189,16 +190,21 @@ describe('CarrilsStrip — the board grid', () => {
     }
   });
 
-  it('the three silences are three different words, each said by its own lane', () => {
+  it('the three silences are three different words, each said by its own lane', async () => {
     const { container } = render(CarrilsStrip, props());
-    const tallies = [...container.querySelectorAll('.board__tally')].map((n) =>
-      n.textContent?.trim(),
-    );
+    const read = () => [...container.querySelectorAll('.board__tally')].map((n) => n.textContent?.trim());
     // p1 played (two gig units: one confirmed, one option), p2 was touched
-    // by an absence but played nowhere, p3 has nothing at all.
-    expect(tallies).toContain('1 confirmed · 1 options · 0 not cast');
-    expect(tallies).toContain('no dates');
-    expect(tallies).toContain('—');
+    // by an absence but played nowhere, p3 has nothing at all — and a lane
+    // with nothing folds into one line at the foot (ADR-228).
+    expect(read()).toContain('1 confirmed · 1 options · 0 not cast');
+    expect(read()).toContain('no dates');
+    expect(read()).not.toContain('—');
+    const fold = container.querySelector('[data-testid="board-empty-lanes"]') as HTMLButtonElement;
+    expect(fold.textContent?.trim()).toBe('1 without dates');
+    expect(fold.getAttribute('aria-expanded')).toBe('false');
+    await fireEvent.click(fold);
+    expect(read()).toContain('—');
+    expect(fold.getAttribute('aria-expanded')).toBe('true');
   });
 
   it('the cell renders THE Slip — data-family certainty, the grain on the held one', () => {

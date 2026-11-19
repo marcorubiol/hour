@@ -145,6 +145,9 @@
         rows can never disagree (one writer). Still furniture: session
         state, never the URL (ADR-094 §4). */
     shut: SvelteSet<string>;
+    /** «3 sin fechas» (ADR-228): the line the lanes with nothing fold into;
+        `open`, the words once they are drawn. */
+    emptyLanesWord?: (n: number, open: boolean) => string;
     /** The book feeds are in flight — an empty board must not say «quiet». */
     loading?: boolean;
   }
@@ -162,6 +165,7 @@
     weekdayWord,
     monthWord,
     laneTallyText,
+    emptyLanesWord = (n: number, open: boolean) => (open ? `Hide ${n} without dates` : `${n} without dates`),
     groupTallyText,
     sharedWord,
     teamWord,
@@ -253,6 +257,25 @@
     return m;
   });
 
+  /**
+   * LANES WITH NOTHING FOLD INTO ONE LINE (ADR-228): a lane with no date at
+   * all (`silence: 'dash'`, not even an absence) is not drawn; «N sin fechas»
+   * at the foot opens them. A space or project left with no lane is not
+   * drawn either. A shut group keeps its lanes: its lid counts them.
+   */
+  let emptyOpen = $state(false);
+  let emptyKeys = $derived(new Set([...tallies].filter(([, ta]) => ta.silence === 'dash').map(([k]) => k)));
+  let emptyCount = $derived(
+    groups.filter((g) => !shut.has(g.key)).reduce((n, g) => n + g.lanes.filter((l) => emptyKeys.has(l.key)).length, 0),
+  );
+  let drawnGroups = $derived(
+    emptyOpen
+      ? groups
+      : groups
+          .map((g) => (shut.has(g.key) ? g : { ...g, lanes: g.lanes.filter((l) => !emptyKeys.has(l.key)) }))
+          .filter((g) => shut.has(g.key) || g.lanes.length > 0),
+  );
+
   /** Each visible lane's grid ROW — the away bands are absolutely
       positioned INTO their grid area, so this map must mirror the template
       below exactly: row 1 is the head, every group adds its band row, every
@@ -276,7 +299,7 @@
         beside its lanes — so it records the span the rail must cover. */
     const rail = new Map<string, { from: number; to: number }>();
     let r = 1;
-    for (const g of groups) {
+    for (const g of drawnGroups) {
       // A SPACE runs down the rail; a PROJECT keeps its band, because a
       // project is a subject and a space is an address. Shut, everything
       // lies flat — there is no height left to run along.
@@ -300,7 +323,7 @@
       // project needs it as much as a space. It just goes down bare.
       rail.set(g.key, { from, to: r + 1 });
     }
-    return { lane, group, rail };
+    return { lane, group, rail, last: r };
   });
   let laneRow = $derived(rows.lane);
 
@@ -360,6 +383,7 @@
   $effect(() => {
     void columns;
     void groups;
+    void drawnGroups;
     const board = boardEl;
     if (!board) return;
     const today = board.querySelector<HTMLElement>('.board__head:not(.gap).today');
@@ -400,6 +424,7 @@
   $effect(() => {
     void columns;
     void groups;
+    void drawnGroups;
     void shut.size; // a fold reshapes the rows — the pin must re-measure
     const board = boardEl;
     if (!board) return;
@@ -546,7 +571,7 @@
         </span>
       {/each}
 
-      {#each groups as group (group.key)}
+      {#each drawnGroups as group (group.key)}
         {@const isShut = shut.has(group.key)}
         <!-- ══ the group band · a LID ═══════════════════════════════════
              The sticky label is a button; folded, it still says what it
@@ -742,6 +767,19 @@
           {/each}
         {/if}
       {/each}
+
+      {#if emptyCount > 0}
+        <!-- The lanes with nothing, one line at the foot (ADR-228). -->
+        <button
+          type="button"
+          class="board__empties"
+          style:grid-row={rows.last + 1}
+          style:grid-column="1 / 3"
+          aria-expanded={emptyOpen}
+          data-testid="board-empty-lanes"
+          onclick={() => (emptyOpen = !emptyOpen)}>{emptyLanesWord(emptyCount, emptyOpen)}</button
+        >
+      {/if}
 
       <!-- ══ the absence bands · ONE drawn sentence per segment ═════════
            Absolutely positioned INTO their grid area (grid-row × the
@@ -1377,6 +1415,21 @@
       flex: none;
     }
 
+    .board__empties {
+      justify-self: start;
+      padding: var(--space-xs) var(--space-s);
+      border: 0;
+      background: none;
+      font-size: var(--text-s);
+      color: var(--text-muted);
+      cursor: pointer;
+      text-align: start;
+    }
+    .board__empties:hover {
+      color: var(--text-color);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
     .board__empty {
       padding-block: var(--space-l);
       font-size: var(--text-s);
