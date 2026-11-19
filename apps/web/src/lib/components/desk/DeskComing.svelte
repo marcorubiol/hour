@@ -46,6 +46,19 @@
 
   const kindLabel = (kind: SlipKind, voice?: Voice) => t(`planner.kind_${kind}`, locale, undefined, voice);
   const hour = (iso: string, tz: string | null) => hourMark(dualTime(iso, tz, viewerTz).primary);
+  const dayDiff = (day: string) =>
+    Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
+  /** What a tile says of what is open (lista de preparación): «3 por cerrar»
+      in grey; only a thing with hurry is named, with when («En 2 días:
+      compartir la hoja»). */
+  function openWords(tile: ComingTile): string {
+    const u = tile.urgent;
+    if (!u) return t('desk.tile_open', locale, { n: tile.open });
+    const n = dayDiff(tile.day);
+    const when = n <= 0 ? t('desk.when_today', locale) : n === 1 ? t('desk.when_tomorrow', locale) : t('desk.when_days', locale, { n });
+    const what = u.kind === 'roadsheet_unshared' ? t('desk.urgent_roadsheet', locale) : t('desk.urgent_hold', locale);
+    return t('desk.tile_urgent', locale, { when, what });
+  }
   let planner = $derived(lensOn('planner'));
   /** A tile's door: its day in the Planner, else its first thing's record. */
   function tileHref(tile: ComingTile): string | undefined {
@@ -117,7 +130,9 @@
                 {/each}
               </ul>
               {#if tile.more > 0}<span class="tile__more">{t('desk.coming_more', locale, { n: tile.more })}</span>{/if}
-              {#if dots && tile.missing}<p class="tile__falta" data-testid="desk-tile-missing">{t('desk.tile_missing', locale)}</p>{/if}
+              {#if dots && tile.missing}<p class="tile__falta" class:tile__falta--urgent={tile.urgent} data-testid="desk-tile-missing">
+                  <span class="missing-dot missing-dot--s" class:missing-dot--urgent={tile.urgent} aria-hidden="true"></span>{openWords(tile)}
+                </p>{/if}
             </div>
           </li>
           {:else}
@@ -132,8 +147,9 @@
                    day that needs something says only that; the record says what. -->
               {#if dots && tile.missing}<span
                   class="missing-dot tile__dot"
+                  class:missing-dot--urgent={tile.urgent}
                   role="img"
-                  aria-label={t('desk.tile_missing', locale)}
+                  aria-label={openWords(tile)}
                   data-testid="desk-tile-missing"
                 ></span>{/if}
               <ul class="tile__things">
@@ -271,7 +287,8 @@
   }
   /* WIDE (the Desk's two columns): a card per day; the day's number at the
      left (it opens the day), each thing a row: the monogram and what it is,
-     and, at the right, the hour and the place. «Falta» in amber at the foot. */
+     and, at the right, the hour and the place. «N por cerrar» at the foot,
+     grey; amber only for what has hurry. */
   .tile--card {
     grid-template-columns: 6rem minmax(0, 1fr);
     grid-template-areas: 'date things' '. more' '. falta';
@@ -315,6 +332,9 @@
     font-size: var(--text-xs);
     letter-spacing: var(--mono-letter-spacing-loose);
     text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .tile__falta--urgent {
     color: var(--missing-ink);
   }
   /* The end door on a desktop: a low quiet row at the column's foot, the

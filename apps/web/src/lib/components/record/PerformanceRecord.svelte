@@ -82,7 +82,7 @@
   import { dayOf } from '$lib/running-order';
   import { hasJsonContent } from '$lib/components/JsonKV.svelte';
   import {
-    MISSING_MAX,
+    isUrgentMissing,
     performanceMissing,
     performanceReadiness,
     type PerformanceMissing,
@@ -817,10 +817,21 @@
     team: 'pass.box_team',
     sheet: 'pass.box_sheet',
   };
-  let passBoxes = $derived<PassBox[]>(readiness.map((b) => ({ id: b.id, label: t(BOX_LABEL[b.id], locale), done: b.done })));
+  let passBoxes = $derived<PassBox[]>(
+    readiness.map((b) => ({ id: b.id, label: t(BOX_LABEL[b.id], locale), done: b.done, urgent: b.urgent })),
+  );
+
+  /** «La función es en 2 días»: why a thing with hurry has it. */
+  function urgentReason(): string | undefined {
+    if (!perf) return undefined;
+    const d = daysBetween(today, perf.performed_at.slice(0, 10));
+    if (d <= 0) return t('pass.urgent_today', locale);
+    return d === 1 ? t('pass.urgent_tomorrow', locale) : t('pass.urgent_days', locale, { n: d });
+  }
 
   /** One line per open box, with its verb, then what the stub has no box for
-      («sin bolo»); never more than `MISSING_MAX` (ADR-139 § 2). */
+      («sin bolo»). All that is open, none hidden; the ones with hurry first,
+      in amber with their reason. */
   function boxLine(b: ReadinessBox): PassLine | null {
     switch (b.id) {
       case 'status':
@@ -843,7 +854,10 @@
       ? [
           ...readiness.filter((b) => !b.done).flatMap((b) => boxLine(b) ?? []),
           ...missing.filter((m) => m.kind === 'no_bolo').map(missingItem),
-        ].slice(0, MISSING_MAX)
+        ]
+          .map((l) => (l.id === 'roadsheet_unshared' ? { ...l, urgent: true, reason: urgentReason() } : l))
+          .map((l) => (l.id === 'hold_deadline' ? { ...l, urgent: true } : l))
+          .sort((a, b) => Number(Boolean(b.urgent)) - Number(Boolean(a.urgent)))
       : [],
   );
 

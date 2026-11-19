@@ -37,12 +37,12 @@ test.describe('Calm — a composition, not a grey (ADR-139 § 5)', () => {
     await expect(page.getByTestId('desk-changed')).toHaveCount(0);
   });
 
-  test('the tile\'s «Falta algo» dot is not drawn in calm (ADR-211 § 3)', async ({ page }) => {
+  test('the tile\'s «por cerrar» dot is not drawn in calm (ADR-211 § 3)', async ({ page }) => {
     await open(page, '/h/desk', false);
     const dots = page.getByTestId('desk-tile-missing');
     test.skip((await dots.count()) === 0, 'nothing missing in the next two weeks');
     await expect(dots.first()).toHaveAttribute('role', 'img');
-    await expect(dots.first()).toHaveAttribute('aria-label', 'Something missing');
+    await expect(dots.first()).toHaveAttribute('aria-label', /to close|:/);
     await open(page, '/h/desk', true);
     await expect(page.getByTestId('desk-tile').first()).toBeVisible();
     await expect(page.getByTestId('desk-tile-missing')).toHaveCount(0);
