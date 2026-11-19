@@ -8439,6 +8439,16 @@ Segunda fase de «el pase es la hoja de ruta». El documento de la hoja deja de 
 
 **Cómo se revierte.** Revertir el commit (restaura `RoadsheetView`); sin esquema, API ni datos; `CACHE_SCHEMA` no cambia.
 
+## [2026-11-19] ADR-225 · «Hoja ↗» sale de Hoy y del Día (fase 2 de ADR-223; la hoja es «Compartir» en el pase)
+
+**Contexto.** Con «Compartir» dentro del pase (ADR-222) y el enlace público dibujando el pase (ADR-224), la hoja de ruta ya no es un sitio al que ir desde Hoy ni desde el Día: tenerlo allí repetía la puerta y confundía qué abre cada toque (ADR-223).
+
+**Decisión.** Se quita «Hoja ↗» de la pieza de Hoy y de la tira del Día (`DeskDay.svelte`, `DayStrip.svelte`, y los datos `roadSheetHref` del Planificador). La pieza se queda con Llamar y Mapa, a partes iguales. La página interna `/h/<espacio>/performance/<slug>/roadsheet` no cambia (el pase la sigue usando).
+
+**Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`. Se borra el texto `desk.roadsheet` de los cuatro idiomas (`ahora.sheet` lo sigue usando el pase).
+
+**Cómo se revierte.** Revertir el commit.
+
 ## [2026-11-19] ADR-226 · La sala puede llamar a la compañía y toda hoja lleva una nota para quien la recibe (fase 3 de ADR-222)
 Tercera fase de «el pase es la hoja de ruta». Dos decisiones de Marco (19-11, al contestar las preguntas de la propuesta):
 la sala necesita un teléfono al que llamar, y hace falta una nota que salga en todos los enlaces sin ser las notas internas.

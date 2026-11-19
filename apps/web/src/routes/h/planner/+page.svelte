@@ -1466,7 +1466,6 @@
         // Data or the honest word — the project-team inference is not drawn
         // here (design law: four people affirmed at a radio at 10h).
         cast: goesOf(p),
-        roadSheetHref: p.slug && ws ? `/h/${ws}/performance/${p.slug}/roadsheet` : null,
         clash: cl?.clash ?? null,
         clashPeople: cl?.people ?? false,
       };
@@ -1490,7 +1489,6 @@
         project: d.project,
         slip: sl,
         cast: null,
-        roadSheetHref: null,
         clash: cl?.clash ?? null,
         clashPeople: cl?.people ?? false,
       };
@@ -3426,7 +3424,6 @@
       emptyLabel={t('planner.day_empty', locale)}
       axisLabel={t('planner.day_axis', locale)}
       noCastWord={(voice) => t('planner.no_cast', locale, undefined, voice)}
-      roadSheetWord={t('desk.roadsheet', locale)}
       unplaced={dayUnplaced}
       noHourWord={t('planner.no_hour', locale)}
     />
