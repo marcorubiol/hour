@@ -399,14 +399,25 @@
   // collaborative). Empty is null; the draft follows the row until it is edited.
   let fSharedNote = $state('');
   let sharedNoteFocused = $state(false);
+  /** What was sent and has not come back yet. While it is out, the draft is
+      the person's: a failed save must not put the old text over it (they
+      come back to the field and leaving it saves again). */
+  let sharedNoteSent = $state<{ value: string | null } | null>(null);
   $effect(() => {
-    if (perf && !sharedNoteFocused) fSharedNote = perf.shared_note ?? '';
+    if (!perf) return;
+    const row = perf.shared_note ?? null;
+    if (sharedNoteSent && sharedNoteSent.value === row) sharedNoteSent = null;
+    if (!sharedNoteFocused && !sharedNoteSent) fSharedNote = row ?? '';
   });
   function onSharedNoteBlur() {
     sharedNoteFocused = false;
     if (!perf) return;
     const next = fSharedNote.trim() || null;
-    if (next === (perf.shared_note ?? null)) return;
+    if (next === (perf.shared_note ?? null)) {
+      sharedNoteSent = null;
+      return;
+    }
+    sharedNoteSent = { value: next };
     savePatch({ shared_note: next });
   }
 

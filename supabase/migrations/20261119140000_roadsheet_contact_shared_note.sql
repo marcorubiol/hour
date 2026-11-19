@@ -271,6 +271,7 @@ BEGIN
                    FROM public.crew_assignment ca
                    WHERE ca.performance_id = p.id AND ca.person_id = p.venue_contact_person_id
                      AND ca.deleted_at IS NULL
+                     AND nullif(btrim(ca.contact_override->>'phone'), '') IS NOT NULL
                    ORDER BY ca.created_at LIMIT 1),
                   (SELECT nullif(btrim(wp.phone), '')
                    FROM public.workspace_person wp
