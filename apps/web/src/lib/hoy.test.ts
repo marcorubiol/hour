@@ -207,6 +207,13 @@ describe('«Coming up»: one tile per day (ADR-202 § 6)', () => {
     expect(comingOpen([])).toEqual({ urgent: null, urgentDay: null, rest: 0 });
   });
 
+  it('the walk can stop at a day (ADR-227): what counts the two weeks needs no cap', () => {
+    const performances = Array.from({ length: 6 }, (_, i) => perf(`p${i}`, `2026-11-${String(14 + i * 3).padStart(2, '0')}`));
+    const all = upcoming({ performances, dates: [], viewerTz: TZ }, NOW, Infinity);
+    expect(all).toHaveLength(6);
+    expect(upcoming({ performances, dates: [], viewerTz: TZ }, NOW, Infinity, '2026-11-20').map((x) => x.ref.id)).toEqual(['p0', 'p1', 'p2']);
+  });
+
   it('ten tiles at most', () => {
     const performances = Array.from({ length: 13 }, (_, i) => perf(`p${i}`, `2026-11-${String(14 + i).padStart(2, '0')}`));
     const tiles = comingTiles(upcoming({ performances, dates: [], viewerTz: TZ }, NOW, 40), TODAY);

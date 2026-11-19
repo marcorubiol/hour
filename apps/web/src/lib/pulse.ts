@@ -489,9 +489,11 @@ export function computePulse(input: PulseInput, now: Date): Pulse {
 /**
  * The next `n` things, in the order NEXT names them: NEXT, then NEXT with
  * that one gone, and so on. One rule, so Hoy's card, its «Después» and the
- * rail never disagree about what comes first (ADR-149).
+ * rail never disagree about what comes first (ADR-149). `until` (an ISO
+ * day) stops the walk at the first thing past it, so a count over a window
+ * («Lo que viene», ADR-227) needs no cap of its own.
  */
-export function upcoming(input: PulseInput, now: Date, n: number): PulseNext[] {
+export function upcoming(input: PulseInput, now: Date, n: number, until?: string): PulseNext[] {
   const out: PulseNext[] = [];
   const seen = new Set<string>();
   const keeps = input.nextKeeps;
@@ -500,7 +502,8 @@ export function upcoming(input: PulseInput, now: Date, n: number): PulseNext[] {
       { ...input, nextKeeps: (ref) => !seen.has(`${ref.of}:${ref.id}`) && (!keeps || keeps(ref)) },
       now,
     ).next;
-    if (!next) break;
+    // The pulse walks forward in time: past `until`, nothing else is inside.
+    if (!next || (until !== undefined && next.day > until)) break;
     seen.add(`${next.ref.of}:${next.ref.id}`);
     out.push(next);
   }

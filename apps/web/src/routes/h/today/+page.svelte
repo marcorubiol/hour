@@ -39,7 +39,7 @@
   import DeskChanged from '$lib/components/desk/DeskChanged.svelte';
   import DeskSeason from '$lib/components/desk/DeskSeason.svelte';
   import LateNoticeBand from '$lib/components/desk/LateNoticeBand.svelte';
-  import { COMING_TILES, COMING_TILES_PHONE, comingOpen, comingTiles, nextAfterToday, outsideToday, piecePerformance, scopePulseInput, waitingRowCount } from '$lib/hoy';
+  import { COMING_DAYS, COMING_TILES, COMING_TILES_PHONE, comingOpen, comingTiles, nextAfterToday, outsideToday, piecePerformance, scopePulseInput, waitingRowCount } from '$lib/hoy';
   import { MediaQuery } from 'svelte/reactivity';
   import { MOBILE_QUERY, WIDE_QUERY } from '$lib/breakpoints';
   import { goto } from '$app/navigation';
@@ -47,7 +47,7 @@
   import { spaceName } from '$lib/utils/identity';
   import { appLocale, LOCALE_TAG, t, tradeFor } from '$lib/i18n';
   import { viewerTimeZone } from '$lib/datetime';
-  import { dayKeyInTz, plannerDayHref } from '$lib/planner';
+  import { addDaysIso, dayKeyInTz, plannerDayHref } from '$lib/planner';
   import { page } from '$app/state';
   import { usePins } from '$lib/stores/pins.svelte';
   import { useCalm } from '$lib/stores/calm.svelte';
@@ -252,9 +252,11 @@
     new Map(($projectsQuery.data?.items ?? []).map((p) => [p.id, readPreparation(p.preparation)] as const)),
   );
   const listOf = (projectId: string) => preparationByProject.get(projectId);
-  // Every tile of the two weeks counts what is open (ADR-227); the strip draws
-  // ten, four on a phone.
-  let allTiles = $derived.by(() => comingTiles(coming, today, Infinity, listOf));
+  // Every tile of the two weeks counts what is open (ADR-227), however many
+  // things they hold (`coming` stops at 40); the strip draws ten, four on a phone.
+  let allTiles = $derived.by(() =>
+    comingTiles(upcoming(pulseInput, clockNow, Infinity, addDaysIso(today, COMING_DAYS)), today, Infinity, listOf),
+  );
   let tiles = $derived.by(() => allTiles.slice(0, phone.current ? COMING_TILES_PHONE : COMING_TILES));
   let tilesOpen = $derived(comingOpen(allTiles));
   let nextThing = $derived(nextAfterToday(coming, today));
