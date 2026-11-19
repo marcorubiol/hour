@@ -2401,6 +2401,8 @@
   "planner.season_clashes": "clashes",
   "planner.season_clash_one": "clash",
   "desk.add_task": "New task",
+  "desk.add_short": "Add",
+  "desk.head_today": "Today · {day}",
   "desk.title_overdue_one": "1 overdue",
   "desk.title_overdue_many": "{n} overdue",
   "desk.band_next": "Next up",
