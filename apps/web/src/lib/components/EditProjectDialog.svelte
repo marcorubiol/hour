@@ -13,7 +13,8 @@
   import Textarea from './Textarea.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Switch from '$lib/components/Switch.svelte';
-  import { activeProjectsQueryOptions } from '$lib/nav-queries';
+  import { projectPreparationQueryOptions } from '$lib/nav-queries';
+  import { toStore } from 'svelte/store';
   import { moveThing, preparationPatch, readPreparation, type Preparation } from '$lib/preparation';
   import Input from '$lib/components/Input.svelte';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
@@ -41,9 +42,13 @@
   let description = $state('');
   // «Qué preparamos para una función» (ADR-221): the project's list, from the
   // projects already read; sent only if it was changed here.
-  const projectsQuery = createQuery(activeProjectsQueryOptions());
+  const preparationQuery = createQuery(toStore(() => ({ ...projectPreparationQueryOptions(project?.id), enabled: open && Boolean(project?.id) })));
   let prep = $state<Preparation>(readPreparation(null));
   let prepSeed = '';
+  /** The list is seeded once per open, when the project's own list arrives:
+      until then the controls are off and nothing of it is sent, so a default
+      shown too early can never overwrite what is saved. */
+  let prepReady = $state(false);
   const prepKey = (l: Preparation) => l.map((x) => `${x.id}:${x.on ? 1 : 0}`).join(',');
   let prepChanged = $derived(prepKey(prep) !== prepSeed);
   const THING_LABEL = {
@@ -61,10 +66,16 @@
       accent = project.accent ?? null;
       initials = project.initials ?? '';
       description = project.description ?? '';
-      prep = readPreparation($projectsQuery.data?.items.find((p) => p.id === project.id)?.preparation);
-      prepSeed = prepKey(prep);
+      prepReady = false;
     }
     wasOpen = open;
+  });
+  $effect(() => {
+    if (open && project && !prepReady && $preparationQuery.isSuccess && $preparationQuery.data.project.id === project.id) {
+      prep = readPreparation($preparationQuery.data.project.preparation);
+      prepSeed = prepKey(prep);
+      prepReady = true;
+    }
   });
 
   let previewAccent = $derived(accentVarFor({ slug: project?.slug ?? null, accent }));
@@ -89,7 +100,7 @@
         description: description.trim(),
         accent,
         initials: initials.trim(),
-        ...(prepChanged ? { preparation: preparationPatch(prep) } : {}),
+        ...(prepReady && prepChanged ? { preparation: preparationPatch(prep) } : {}),
       };
       const res = await mutateJSON<{ project: { id: string; slug: string } }>(
         'PATCH',
@@ -101,6 +112,7 @@
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['projects'] });
+      await queryClient.invalidateQueries({ queryKey: ['project-preparation'] });
       if (project) await queryClient.invalidateQueries({ queryKey: ['project', project.slug] });
       // Calendar chips read the perf/date feeds — refetch so they repaint too.
       await queryClient.invalidateQueries({ queryKey: ['planner-performances'] });
@@ -217,20 +229,20 @@
                 type="button"
                 class="epj__move"
                 aria-label={t('prep.move_up', locale, { name: t(THING_LABEL[thing.id], locale) })}
-                disabled={i === 0 || $save.isPending}
+                disabled={!prepReady || i === 0 || $save.isPending}
                 onclick={() => (prep = moveThing(prep, i, i - 1))}>↑</button
               >
               <button
                 type="button"
                 class="epj__move"
                 aria-label={t('prep.move_down', locale, { name: t(THING_LABEL[thing.id], locale) })}
-                disabled={i === prep.length - 1 || $save.isPending}
+                disabled={!prepReady || i === prep.length - 1 || $save.isPending}
                 onclick={() => (prep = moveThing(prep, i, i + 1))}>↓</button
               >
               <Switch
                 checked={thing.on}
                 label={t('prep.ask', locale, { name: t(THING_LABEL[thing.id], locale) })}
-                disabled={$save.isPending}
+                disabled={!prepReady || $save.isPending}
                 testid={`prep-switch-${thing.id}`}
                 onchange={(next) => (prep = prep.map((x) => (x.id === thing.id ? { ...x, on: next } : x)))}
               />

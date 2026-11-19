@@ -15,7 +15,7 @@ import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import type { Tables } from '$lib/db-types';
-import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
+import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import { json } from '$lib/server/http';
 import { APP_THINGS } from '$lib/preparation';
@@ -107,5 +107,31 @@ export const PATCH: RequestHandler = async ({ request, params, platform, locals 
         passUpstream: [],
       },
     );
+  }
+};
+
+/**
+ * GET /api/projects/[id]
+ *
+ * The project's «Qué preparamos para una función» list (ADR-221), whatever
+ * its status: the pass and the settings read it for a project the active
+ * list may not hold (draft, archived, past the list's limit). `preparation`
+ * is null when the project has none (the default list). RLS scopes the read.
+ */
+export const GET: RequestHandler = async ({ request, params, platform, locals }) => {
+  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  const env = platform.env as unknown as SupabaseEnv;
+  const jwt = extractAccessToken(request);
+  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+  const id = params.id ?? '';
+  if (!UUID_RE.test(id)) return json({ error: 'invalid_id' }, 400);
+  try {
+    const search = new URLSearchParams({ select: 'id,custom_fields', id: `eq.${id}`, deleted_at: 'is.null', limit: '1' });
+    const { data } = await pgGet<{ id: string; custom_fields: { preparation?: unknown } | null }>(env, 'project', jwt, { search });
+    const row = data[0];
+    if (!row) return json({ error: 'not_found' }, 404);
+    return json({ project: { id: row.id, preparation: row.custom_fields?.preparation ?? null } });
+  } catch (err) {
+    return pgErrorResponse(err, { route: 'GET /api/projects/[id]', requestId: locals.requestId }, { passUpstream: [401, 403] });
   }
 };

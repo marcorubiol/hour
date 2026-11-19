@@ -67,7 +67,7 @@
   import { usePins } from '$lib/stores/pins.svelte';
   import { lensOn } from '$lib/lenses.svelte';
   import { performanceBoloQueryOptions, projectBolosQueryOptions } from '$lib/bolo-queries';
-  import { activeProjectsQueryOptions, teamQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
+  import { projectPreparationQueryOptions, teamQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
   import { readPreparation, type Preparation } from '$lib/preparation';
   import { goingPersonIds, type GoingPerson } from '$lib/bolo-access';
   import RecordHead from '$lib/components/RecordHead.svelte';
@@ -217,7 +217,6 @@
   const query = createQuery(queryOptions);
 
   const wsQuery = createQuery(workspacesQueryOptions());
-  const projectsQuery = createQuery(activeProjectsQueryOptions());
   let activeWorkspaceName = $derived(
     $wsQuery.data?.items.find((w) => w.slug === workspaceSlug)?.name ?? workspaceSlug,
   );
@@ -764,11 +763,11 @@
         }
       : null,
   );
-  /** «Qué preparamos» of this performance's project (ADR-221); until the
-      projects are read (or for a project not in them) it is the default. */
-  let preparation = $derived<Preparation>(
-    readPreparation($projectsQuery.data?.items.find((p) => p.id === perf?.project?.id)?.preparation),
-  );
+  /** «Qué preparamos» of this performance's project (ADR-221), read on its
+      own (any status); until it arrives, or if it cannot be read (a guest
+      through a bolo), it is the default. */
+  const preparationQuery = createQuery(toStore(() => projectPreparationQueryOptions(perf?.project?.id)));
+  let preparation = $derived<Preparation>(readPreparation($preparationQuery.data?.project.preparation));
   let missing = $derived<PerformanceMissing[]>(missingInput ? performanceMissing(missingInput, today, preparation) : []);
   // El talón del pase: las casillas, derivadas de lo mismo que «Falta».
   let readiness = $derived<ReadinessBox[]>(missingInput ? performanceReadiness(missingInput, today, preparation) : []);

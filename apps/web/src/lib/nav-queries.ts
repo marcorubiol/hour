@@ -38,6 +38,21 @@ export function activeProjectsQueryOptions() {
   };
 }
 
+/**
+ * A project's «Qué preparamos para una función» list (ADR-221), read on its
+ * own: the active list does not hold a draft or archived project, nor one past
+ * its limit. `preparation` is null when the project has none.
+ */
+export function projectPreparationQueryOptions(projectId: string | null | undefined) {
+  return {
+    queryKey: ['project-preparation', projectId ?? ''] as const,
+    enabled: Boolean(projectId),
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
+      fetchJSON<{ project: { id: string; preparation: unknown } }>(`/api/projects/${projectId}`, signal),
+    staleTime: NAV_STALE_TIME,
+  };
+}
+
 export function allLinesQueryOptions() {
   return {
     queryKey: ['lines', 'all'] as const,
