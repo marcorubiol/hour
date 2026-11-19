@@ -8392,3 +8392,23 @@ Fase 4: revertir el commit; sin esquema.
 **Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`. Los E2E que leían la puerta de la tarjeta (`desk.spec.ts`, `pulse.spec.ts`) se reescriben.
 
 **Cómo se revierte.** Revertir el commit.
+## [2026-11-19] ADR-222 · El pase es la hoja de ruta: compartir vive en el pase (fase 1; enmienda ADR-212, ADR-047 y ADR-183 en el dónde)
+Encargo de Marco, 19-11: el pase de la función (`PerformanceRecord`) y la hoja de ruta deben ser una sola cosa. Cuatro
+fases en serie; esta entrada fija la dirección entera y la fase 1 va construida.
+
+1. **El pase es el único registro.** No hay dos documentos (la ficha y la hoja) que se parecen: la hoja de ruta es el
+   pase visto por quien no tiene cuenta.
+2. **Fase 1 (hecha, borrador): compartir vive en el pase.** La acción «Hoja» pasa a «Compartir» y abre un diálogo
+   («Compartir esta función») con `RoadsheetShare`: una fila por rol (sala, intérprete, dirección técnica) con una línea
+   callada de lo que ve, un solo botón («Crear enlace» o «Copiar enlace»), «caduca el …» con «Cambiar» y «Revocar» (con
+   confirmación); y, debajo, un enlace personal por persona del equipo (los únicos que pueden avisar «Llego tarde»). El
+   verbo «compartir» de «Falta» abre el mismo diálogo. Al pie, «Ver la hoja de ruta» lleva a la página de siempre, donde
+   queda la vista previa por rol. Quien no puede editar la función (un invitado de bolo) no recibe el editor, que
+   respondería 403: conserva el enlace a la hoja. Un solo componente (`RoadsheetShare`) sirve al diálogo y a la página de la
+   hoja; la consulta es la misma (`['roadsheet-shares', {ws, slug}]`, `{ items, team? }`). Se pierde el selector de rol que
+   permitía crear un segundo enlace vivo del mismo rol; los enlaces ya existentes se siguen listando y revocando todos.
+3. **Pendiente.** Fase 2: el enlace público dibuja el pase en lectura. Fase 3: un contacto de compañía para la sala y una
+   nota compartida. Fase 4: se retiran `RoadsheetView` y la página del operador.
+
+**Cómo se revierte.** Revertir el commit; sin esquema, API ni datos; `CACHE_SCHEMA` no cambia (misma clave y misma forma de
+respuesta).
