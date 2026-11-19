@@ -81,9 +81,9 @@ test.describe('tasks — Desk feed + line module', () => {
     expect(wsId, 'playwright workspace reachable').not.toBeNull();
     await sweepTasks(page, wsId!);
 
-    // The composer waits behind «+» (ADR-117, ADR-148). The scoped URL makes
+    // The composer waits behind «+» (ADR-117, ADR-148; «+ Add» on a desktop). The scoped URL makes
     // the fixture workspace its explicit default: assert that before writing.
-    await page.getByRole('button', { name: 'New task', exact: true }).click();
+    await page.getByRole('button', { name: /^(New task|Add)$/ }).click();
     const title = page.getByRole('textbox', { name: /new task/i });
     const composer = page.locator('form').filter({ has: title });
     await title.fill(TASK_FREE);
