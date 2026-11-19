@@ -63,7 +63,8 @@
       until then the controls are off and nothing of it is sent, so a default
       shown too early can never overwrite what is saved. */
   let prepReady = $state(false);
-  const prepKey = (l: Preparation) => l.map((x) => `${x.id}:${x.on ? 1 : 0}:${isManualThing(x) ? x.name : ''}`).join('|');
+  // The whole list, days included (`undefined` default and `null` never differ: JSON drops the first).
+  const prepKey = (l: Preparation) => JSON.stringify(l.map((x) => ({ ...x, days: x.days === undefined ? 'default' : x.days })));
   let newThing = $state('');
   const thingName = (x: PreparationThing): string => (isManualThing(x) ? x.name : t(THING_LABEL[x.id], locale));
   function addThing() {
