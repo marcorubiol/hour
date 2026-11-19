@@ -2630,6 +2630,7 @@
   "mailout.load_error": "No s'ha pogut carregar aquest enviament.",
   "roadsheet.not_found": "Aquest full de ruta no existeix o no el pots veure.",
   "roadsheet.load_error": "No s'ha pogut carregar el full de ruta.",
+  "roadsheet.links_load_error": "No s'han pogut carregar els enllaços.",
   "record.missing": "Falta",
   "record.details": "Detalls",
   "record.edit_when": "Canviar la data",

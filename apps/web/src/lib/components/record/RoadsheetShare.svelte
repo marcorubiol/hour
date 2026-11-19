@@ -68,6 +68,9 @@
     }),
   );
   let allShares = $derived($sharesQuery.data?.items ?? []);
+  /** The links are known. Until then «no link» is not a fact: creating would
+      mint a second token for a role that already has a live one. */
+  let loaded = $derived($sharesQuery.isSuccess);
   /** The role links; a personal one is listed by its person (121 B). */
   let roleShares = $derived(allShares.filter((s) => !s.person));
   let team = $derived($sharesQuery.data?.team ?? []);
@@ -170,6 +173,12 @@
 </script>
 
 <div class="rsh" data-testid="roadsheet-share">
+  {#if $sharesQuery.isError && !loaded}
+    <p class="rsh__failed" role="alert" data-testid="roadsheet-share-failed">
+      {t('roadsheet.links_load_error', locale)}
+      <Button size="xs" variant="quiet" onclick={() => void $sharesQuery.refetch()}>{t('ui.retry', locale)}</Button>
+    </p>
+  {/if}
   <ul class="rsh__list" role="list">
     {#each roles as r (r)}
       {@const live = liveOf(r)}
@@ -188,6 +197,7 @@
               size="s"
               variant="secondary"
               loading={$createShare.isPending && $createShare.variables === r}
+              disabled={!loaded}
               onclick={() => $createShare.mutate(r)}
             >
               {t('roadsheet.create_link', locale)}
@@ -228,6 +238,7 @@
                   size="s"
                   variant="secondary"
                   loading={$createPersonal.isPending && $createPersonal.variables === m.person_id}
+                  disabled={!loaded}
                   onclick={() => $createPersonal.mutate(m.person_id)}
                 >
                   {t('roadsheet.personal_create', locale)}
@@ -312,6 +323,14 @@
     .rsh__hint {
       font-size: var(--text-xs);
       color: var(--text-faint);
+    }
+
+    .rsh__failed {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
     }
 
     .rsh__link {

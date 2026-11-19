@@ -2630,6 +2630,7 @@
   "mailout.load_error": "No se ha podido cargar este envío.",
   "roadsheet.not_found": "Esta hoja de ruta no existe o no la puedes ver.",
   "roadsheet.load_error": "No se ha podido cargar la hoja de ruta.",
+  "roadsheet.links_load_error": "No se han podido cargar los enlaces.",
   "record.missing": "Falta",
   "record.details": "Detalles",
   "record.edit_when": "Cambiar la fecha",
