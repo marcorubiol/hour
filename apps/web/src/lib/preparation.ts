@@ -37,7 +37,7 @@ export type AppThing = (typeof APP_THINGS)[number];
 
 /** A hand thing's id: `m_` and a few lowercase letters or digits. */
 export const MANUAL_ID_RE = /^m_[a-z0-9]{4,16}$/;
-/** What the list can hold, and how long a name is. */
+/** What the whole list can hold (the app's four count), and how long a name is. */
 export const PREPARATION_MAX = 20;
 export const MANUAL_NAME_MAX = 60;
 
@@ -103,7 +103,7 @@ export function readPreparation(raw: unknown): Preparation {
     if (isAppThing(id)) {
       seen.add(id);
       out.push({ id, on, ...withDays });
-    } else if (MANUAL_ID_RE.test(id) && out.length < PREPARATION_MAX) {
+    } else if (MANUAL_ID_RE.test(id) && out.filter(isManualThing).length < PREPARATION_MAX - APP_THINGS.length) {
       const name = cleanManualName((it as { name?: unknown }).name);
       if (!name) continue;
       seen.add(id);

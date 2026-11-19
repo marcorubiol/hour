@@ -324,22 +324,23 @@
             {/each}
           </ul>
         {/if}
-        {#if closed.length > 0}
-          <p class="stub__closed" data-testid="pass-closed">
-            <span class="stub__closed-head">{t('pass.closed', locale)}</span>
-            {#each closed as c, i (c.id)}
-              {#if i > 0}<span aria-hidden="true"> · </span>{/if}
-              <button
-                type="button"
-                class="stub__reopen"
-                disabled={c.busy}
-                aria-label={t('pass.hand_reopen_aria', locale, { name: c.text })}
-                onclick={c.onReopen}>{c.text}{#if c.meta}<span class="stub__closed-meta"> ({c.meta})</span>{/if}</button
-              >
-            {/each}
-          </p>
-        {/if}
       </div>
+    {/if}
+
+    {#if closed.length > 0}
+      <p class="stub__closed pass__closed" data-testid="pass-closed">
+        <span class="stub__closed-head">{t('pass.closed', locale)}</span>
+        {#each closed as c, i (c.id)}
+          {#if i > 0}<span aria-hidden="true"> · </span>{/if}
+          <button
+            type="button"
+            class="stub__reopen"
+            disabled={c.busy}
+            aria-label={t('pass.hand_reopen_aria', locale, { name: c.text })}
+            onclick={c.onReopen}>{c.text}{#if c.meta}<span class="stub__closed-meta"> ({c.meta})</span>{/if}</button
+          >
+        {/each}
+      </p>
     {/if}
 
     {#if acts.length > 0}

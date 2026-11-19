@@ -165,3 +165,12 @@ describe('days of hurry (ADR-221, fase 4)', () => {
     expect(readPreparation(preparationPatch(l))).toEqual(l);
   });
 });
+
+describe('the list never reads as more than it can be saved as', () => {
+  it('twenty hand things and no app ones read as 20 in all, so saving it back is accepted', () => {
+    const items = Array.from({ length: 20 }, (_, i) => ({ id: `m_cap${String(i).padStart(5, '0')}`, name: `c${i}`, on: true }));
+    const l = readPreparation({ items });
+    expect(l).toHaveLength(PREPARATION_MAX);
+    expect(preparationPatch(l).items).toHaveLength(PREPARATION_MAX);
+  });
+});
