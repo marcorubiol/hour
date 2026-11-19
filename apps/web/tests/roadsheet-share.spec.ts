@@ -6,8 +6,9 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
 
 /**
  * E2E — public road sheet links (ADR-047, D6): create a link from the
- * operator road sheet, open it logged-OUT in a fresh context, verify the
- * role-filtered document renders, revoke, verify the link dies.
+ * pass's «Compartir» dialog (ADR-222), open it logged-OUT in a fresh context,
+ * verify the role-filtered document renders, revoke, verify the link dies.
+ * The same component also serves the operator road sheet page.
  * Self-cleaning: the share ends revoked (revocation is an assertion).
  */
 
@@ -17,7 +18,7 @@ test.describe('public road sheet link', () => {
   test('create → anonymous open → revoke → dead', async ({ page, browser }) => {
     test.setTimeout(90_000);
 
-    await page.goto('/h/playwright/performance/zzz-e2e-1/roadsheet');
+    await page.goto('/h/playwright/performance/zzz-e2e-1');
     await waitForLoaded(page);
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 
@@ -35,20 +36,28 @@ test.describe('public road sheet link', () => {
     await waitForLoaded(page);
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 
+    // «Compartir» opens the dialog with one row per role.
+    await page.getByTestId('pass-share').click();
+    const dialog = page.locator('dialog[open]');
+    for (const r of ['venue', 'performer', 'tech_manager']) {
+      await expect(dialog.getByTestId(`roadsheet-role-${r}`)).toBeVisible();
+    }
+    await expect(dialog.getByTestId('pass-share-sheet')).toHaveAttribute('href', /\/roadsheet$/);
+
     // Create a venue-role link; capture the token from the API response.
-    await page.locator('.rs__share-pick select').selectOption('venue');
+    const venueRow = dialog.getByTestId('roadsheet-role-venue');
     const [response] = await Promise.all([
       page.waitForResponse(
         (r) => r.url().includes('/roadsheet/shares') && r.request().method() === 'POST',
       ),
-      page.getByRole('button', { name: 'Create link' }).click(),
+      venueRow.getByRole('button', { name: 'Create link' }).click(),
     ]);
     expect(response.status()).toBe(201);
     const { share } = (await response.json()) as {
       share: { id: string; token: string; role: string };
     };
     expect(share.token).toMatch(/^[0-9a-f]{64}$/);
-    await expect(page.locator('.rs__share-list li', { hasText: 'venue' })).toBeVisible();
+    await expect(venueRow.getByRole('button', { name: 'Copy link' })).toBeVisible();
 
     // Open the public URL with NO session — the whole point of a public
     // link. storageState must be emptied explicitly: browser.newContext()
@@ -63,12 +72,12 @@ test.describe('public road sheet link', () => {
     // see free-text notes by matrix).
     await expect(anonPage.locator('[aria-label="Notes"]')).toHaveCount(0);
 
-    // Revoke from the operator page.
-    const shareRow = page.locator('.rs__share-list li', { hasText: 'venue' }).first();
-    await shareRow.getByRole('button', { name: 'Revoke' }).click();
-    // A link someone else holds asks first (tarea 134).
-    await page.locator('dialog[open]').getByRole('button', { name: 'Revoke', exact: true }).click();
-    await expect(page.locator('.rs__share-list li', { hasText: 'venue' })).toHaveCount(0, {
+    // Revoke from the same dialog.
+    await venueRow.getByRole('button', { name: 'Revoke' }).first().click();
+    // A link someone else holds asks first (tarea 134): the confirm is the
+    // topmost open dialog.
+    await page.locator('dialog[open]').last().getByRole('button', { name: 'Revoke', exact: true }).click();
+    await expect(venueRow.getByRole('button', { name: 'Create link' })).toBeVisible({
       timeout: 10_000,
     });
 

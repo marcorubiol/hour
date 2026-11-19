@@ -1173,7 +1173,6 @@
   "roadsheet.role_venue": "salle",
   "roadsheet.role_performer": "interprète",
   "roadsheet.role_tech_manager": "direction technique",
-  "roadsheet.role": "Rôle",
   "roadsheet.public_links": "Liens publics",
   "roadsheet.public_links_hint": "Toute personne disposant d'un lien voit la feuille de route de ce rôle, sans compte. Le révoquer le coupe immédiatement.",
   "roadsheet.copy_link": "Copier le lien",
@@ -3316,8 +3315,6 @@
   "roadsheet.holder": "Feuille de {name}",
   "roadsheet.moved_today": "changé aujourd’hui à {time} · avant {before}",
   "roadsheet.moved": "changé · avant {before}",
-  "roadsheet.personal_links": "Liens personnels",
-  "roadsheet.personal_links_hint": "Un par membre de l’équipe. Seule sa feuille affiche « J’arrive en retard », le jour de la représentation.",
   "roadsheet.personal_create": "Créer son lien",
   "late.button": "J’arrive en retard",
   "late.how_late": "Combien de retard ?",
@@ -3732,5 +3729,14 @@
   "pass.box_place": "Où",
   "pass.line_no_place": "Sans lieu",
   "pass.label_date": "Fiche de la date",
-  "pass.put_place": "Ajouter un lieu"
+  "pass.put_place": "Ajouter un lieu",
+  "pass.share": "Partager",
+  "pass.share_title": "Partager cette représentation",
+  "pass.share_hint": "Qui ouvre le lien voit la feuille de route en lecture seule, sans compte, avec ce qui le concerne.",
+  "pass.share_open_sheet": "Voir la feuille de route",
+  "roadsheet.change": "Modifier",
+  "roadsheet.hint_venue": "Horaires, technique et matériel",
+  "roadsheet.hint_performer": "En plus : voyage et hôtel",
+  "roadsheet.hint_tech_manager": "En plus : voyage, rider et téléphones",
+  "roadsheet.personal_heading": "À une personne · peut signaler «J’arrive en retard»"
 }

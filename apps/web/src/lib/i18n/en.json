@@ -1209,7 +1209,6 @@
   "roadsheet.role_venue": "venue",
   "roadsheet.role_performer": "performer",
   "roadsheet.role_tech_manager": "tech manager",
-  "roadsheet.role": "Role",
   "roadsheet.public_links": "Public links",
   "roadsheet.public_links_hint": "Anyone with a link sees that role's road sheet, no account needed. Revoking kills the link immediately.",
   "roadsheet.copy_link": "Copy link",
@@ -3316,8 +3315,6 @@
   "roadsheet.holder": "{name}’s sheet",
   "roadsheet.moved_today": "changed today at {time} · was {before}",
   "roadsheet.moved": "changed · was {before}",
-  "roadsheet.personal_links": "Personal links",
-  "roadsheet.personal_links_hint": "One per team member. Only their own sheet shows «I’m running late», on the day of the show.",
   "roadsheet.personal_create": "Create their link",
   "late.button": "I’m running late",
   "late.how_late": "How late?",
@@ -3732,5 +3729,14 @@
   "pass.box_place": "Where",
   "pass.line_no_place": "No place yet",
   "pass.label_date": "Date pass",
-  "pass.put_place": "Add a place"
+  "pass.put_place": "Add a place",
+  "pass.share": "Share",
+  "pass.share_title": "Share this show",
+  "pass.share_hint": "Whoever opens the link sees the road sheet read-only, no account, with what concerns them.",
+  "pass.share_open_sheet": "See the road sheet",
+  "roadsheet.change": "Change",
+  "roadsheet.hint_venue": "Schedule, tech and materials",
+  "roadsheet.hint_performer": "Also: travel and hotel",
+  "roadsheet.hint_tech_manager": "Also: travel, rider and phone numbers",
+  "roadsheet.personal_heading": "To one person · can say «I’m running late»"
 }
