@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  closerFirstName,
   DEFAULT_PREPARATION,
   MANUAL_NAME_MAX,
   PREPARATION_MAX,
@@ -117,15 +118,23 @@ describe('the project\'s own things (ADR-221, fase 3)', () => {
 
   it('readManualStates keeps only well-formed hand entries', () => {
     const s = readManualStates({
-      m_rider001: { estado: 'hecho', por: 'u1', cuando: '2026-11-18T10:00:00Z' },
+      m_rider001: { estado: 'hecho', por: 'u1', nombre: 'Nil Ferrer', cuando: '2026-11-18T10:00:00Z' },
       m_hotel001: { estado: 'no_aplica' },
       m_bad00001: { estado: 'quizá' },
       status: { estado: 'hecho' },
     });
     expect(Object.keys(s)).toEqual(['m_rider001', 'm_hotel001']);
-    expect(s.m_hotel001).toEqual({ estado: 'no_aplica', por: null, cuando: null });
+    expect(s.m_rider001.nombre).toBe('Nil Ferrer');
+    expect(s.m_hotel001).toEqual({ estado: 'no_aplica', por: null, nombre: null, cuando: null });
     expect(readManualStates(null)).toEqual({});
     expect(readManualStates([1])).toEqual({});
+  });
+
+  it('closerFirstName: the first word, nothing without a name', () => {
+    expect(closerFirstName('Nil Ferrer')).toBe('Nil');
+    expect(closerFirstName('  Anouk ')).toBe('Anouk');
+    expect(closerFirstName(null)).toBeUndefined();
+    expect(closerFirstName('   ')).toBeUndefined();
   });
 
   it('readManual: open in the list\'s order, closed apart, off says nothing', () => {
