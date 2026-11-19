@@ -17,6 +17,7 @@ import {
   monthSpanWeeks,
   monthUnderStrip,
   nightsFree,
+  boardOffPhone,
   normalizePlannerView,
   performanceRoster,
   plannerDayHref,
@@ -84,6 +85,16 @@ describe('normalizePlannerView', () => {
     expect(normalizePlannerView('')).toBeNull();
     expect(normalizePlannerView(null)).toBeNull();
     expect(normalizePlannerView(undefined)).toBeNull();
+  });
+});
+
+describe('boardOffPhone (ADR-230)', () => {
+  it('turns the Board into the Agenda on a phone', () => {
+    expect(boardOffPhone('board', true)).toBe('agenda');
+  });
+  it('leaves every other view, and the Board off a phone, alone', () => {
+    expect(boardOffPhone('board', false)).toBe('board');
+    for (const v of ['day', 'agenda', 'month'] as const) expect(boardOffPhone(v, true)).toBe(v);
   });
 });
 

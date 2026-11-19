@@ -13,6 +13,7 @@ import type { AvailabilityItem } from './availability';
 import type { DateRow } from './date';
 import { decideBy, isHoldStatus, performanceStatusFamily } from './performance';
 import { t, type Locale } from './i18n';
+import { MOBILE_QUERY } from './breakpoints';
 
 interface PlannerDay {
   /** ISO date, YYYY-MM-DD. */
@@ -791,8 +792,22 @@ const VIEW_ALIASES: Record<string, PlannerView> = {
 
 /** A token from a URL or from storage → a view, or null if it is neither. */
 export function normalizePlannerView(v: string | null | undefined): PlannerView | null {
-  if (v === 'day' || v === 'month' || v === 'agenda' || v === 'board') return v;
-  return (v && VIEW_ALIASES[v]) || null;
+  if (v === 'day' || v === 'month' || v === 'agenda' || v === 'board') return boardOffPhone(v);
+  const alias = (v && VIEW_ALIASES[v]) || null;
+  return alias && boardOffPhone(alias);
+}
+
+/**
+ * THE BOARD IS NOT OFFERED ON A PHONE (ADR-230): a sheet of lanes by weeks
+ * needs a width a phone has not got. An address or a stored drawing that
+ * says Board opens the Agenda there; the bar does not draw the word.
+ * `phone` defaults to the screen's own answer (false outside a browser).
+ */
+export function boardOffPhone<V extends PlannerView>(v: V, phone = onPhone()): V | 'agenda' {
+  return phone && v === 'board' ? 'agenda' : v;
+}
+function onPhone(): boolean {
+  return typeof matchMedia === 'function' && matchMedia(MOBILE_QUERY).matches;
 }
 
 /**
@@ -869,7 +884,7 @@ export interface WithPlannerView {
 export function plannerEntryView(onScreen: readonly WithPlannerView[]): PlannerEntryView | null {
   for (const w of onScreen) {
     const v = storedEntry(w.planner_view);
-    if (v) return v;
+    if (v) return boardOffPhone(v);
   }
   return null;
 }

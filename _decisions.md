@@ -8556,3 +8556,26 @@ Encargo `revision-tdah/brief.md`, fase 3 (Marco, 19-11).
 **Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`. Textos en los cuatro idiomas.
 
 **Cómo se revierte.** Revertir el commit.
+
+## [2026-11-19] ADR-230 · Menos marco en el móvil (fase 4 de la revisión TDAH; enmienda ADR-096 y ADR-202 § 12)
+
+Encargo `revision-tdah/brief.md`, fase 4 (Marco, 19-11). En el teléfono el marco se comía la pantalla antes de la
+primera cosa útil.
+
+1. **El buscador es un icono cuando no hay ámbito** (enmienda ADR-202 § 12). Sin nada acotado, el campo de la barra
+   superior se queda en la lupa dentro de un círculo, entre la hora y tú, y la barra baja a una sola fila. Abre la misma
+   paleta y su nombre accesible sigue siendo «Buscar en todo». Con ámbito vuelve a ser el campo: la etiqueta es lo que
+   dice el ámbito. Desde 48 rem no cambia nada.
+2. **La línea de estado del Planificador solo cuando pide algo.** En el teléfono, si no hay nada que decidir ni choques,
+   la línea no se dibuja (igual en las tres vistas, así la barra de vistas no se mueve entre ellas).
+3. **El Tablero sale del teléfono** (respuesta de Marco, 19-11). En el teléfono la barra ofrece Agenda y Mes; una
+   dirección con `view=board` abre la Agenda (`boardOffPhone`, `$lib/planner`). Lo guardado no se toca: en el escritorio
+   el Tablero sigue donde estaba.
+4. **El Mes abre en la semana de hoy.** En el teléfono, al abrir el mes de hoy, la página baja hasta la fila de esta
+   semana (una vez, sin animación); las semanas pasadas quedan arriba.
+5. **Hoy sin el pulso en el carril** (enmienda ADR-096). Hoy ya es el pulso; el del carril izquierdo repetía lo mismo al
+   lado. En las otras lentes sigue.
+
+**Sin cambios de datos.** Sin esquema, API, textos nuevos ni `CACHE_SCHEMA`. No toca el service worker.
+
+**Cómo se revierte.** Revertir el commit.

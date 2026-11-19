@@ -18,8 +18,9 @@ import { expect, test, type Page } from '@playwright/test';
 const EMAIL = process.env.PW_TEST_EMAIL ?? '';
 const PASSWORD = process.env.PW_TEST_PASSWORD ?? '';
 
-/** Every lens carries the shell, and therefore the pulse. */
-const LENSES = ['/h/planner', '/h/today', '/h/conversations', '/h/books'];
+/** Every lens carries the shell, and therefore the pulse, but Hoy: its
+    piece already says now and next (ADR-230). */
+const LENSES = ['/h/planner', '/h/conversations', '/h/books'];
 
 async function pulseBox(page: Page) {
   return page.evaluate(() => {
@@ -45,6 +46,9 @@ test.describe('the rail pulse (ADR-096)', () => {
       await expect(page.locator('.pulse')).toContainText(/now/i);
       await expect(page.locator('.pulse')).toContainText(/next|següent|siguiente/i);
     }
+    await page.goto('/h/today');
+    await expect(page.getByTestId('desk-next').or(page.getByTestId('desk-hollow')).first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('.pulse')).toHaveCount(0);
   });
 
   test('IT DOES NOT MOVE WHEN THE ANSWER LANDS', async ({ page }) => {

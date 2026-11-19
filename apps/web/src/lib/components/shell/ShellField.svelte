@@ -10,6 +10,11 @@
    * first rows with nothing typed are the saved scopes and the recents
    * (ADR-203 § 6). The field's own button takes every press the tag does not:
    * its hit area spans the whole field, and the tag sits above it.
+   *
+   * ON A PHONE, NOTHING SCOPED, AN ICON (ADR-230): the field took a whole row
+   * on every screen. It shrinks to the glass in a circle beside calm and you;
+   * it opens the same palette, and its label stays its name. Scoped, it is
+   * the field again: the tag is what says the scope.
    */
   import { appLocale, t } from '$lib/i18n';
   import { usePins } from '$lib/stores/pins.svelte';
@@ -25,14 +30,14 @@
   let openEl: HTMLButtonElement | undefined = $state();
 </script>
 
-<search class="field">
+<search class="field" class:field--scoped={scoped}>
   <svg class="field__glass" viewBox="0 0 14 14" aria-hidden="true">
     <circle cx="6.2" cy="6.2" r="4.2" />
     <path d="M9.4 9.4 12 12" />
   </svg>
   {#if scoped}<ScopeTag {door} onclear={() => openEl?.focus()} />{/if}
   <button bind:this={openEl} type="button" class="field__open" aria-keyshortcuts="Meta+K" onclick={onopen}>
-    <span class="field__label">{t(scoped ? 'shell.search' : 'shell.search_everything', locale)}</span>
+    <span class="field__label" class:visually-hidden--narrow={!scoped}>{t(scoped ? 'shell.search' : 'shell.search_everything', locale)}</span>
     <kbd class="kbd keys field__kbd" aria-hidden="true">⌘K</kbd>
   </button>
 </search>
@@ -115,6 +120,23 @@
   @media (max-width: 47.999rem) {
     .field__kbd {
       display: none;
+    }
+    .field:not(.field--scoped) {
+      justify-content: center;
+      inline-size: var(--control-size-s);
+      block-size: var(--control-size-s);
+      padding: 0;
+      gap: 0;
+      background: none;
+      color: var(--text-muted);
+    }
+    /* The finger's target grows past the drawn circle, never the circle. */
+    .field:not(.field--scoped) .field__open::before {
+      inset: min(0em, calc((var(--control-size-s) - var(--touch-target)) / 2));
+    }
+    .field:not(.field--scoped) .field__open {
+      flex: none;
+      cursor: pointer;
     }
   }
 </style>
