@@ -18,7 +18,7 @@
  * `performance.custom_fields.preparation`, by thing id, written through
  * `set_performance_preparation`:
  *
- *   { "m_k3j9x2ab": { "estado": "hecho" | "no_aplica", "por": <user id>, "cuando": <instant> } }
+ *   { "m_k3j9x2ab": { "estado": "hecho" | "no_aplica", "por": <user id>, "nombre": <name>, "cuando": <instant> } }
  *
  * Deleting a thing from the list does not delete what was marked in past
  * performances: that state just stops being read.
@@ -191,8 +191,16 @@ export interface ManualState {
   estado: ManualEstado;
   /** The user that closed it. */
   por: string | null;
+  /** Their name when they closed it (a snapshot; absent in what was closed before). */
+  nombre: string | null;
   /** When (an instant). */
   cuando: string | null;
+}
+
+/** Who closed it, for the quiet line: the first word of the name («Nil»), or undefined. */
+export function closerFirstName(nombre: string | null): string | undefined {
+  const first = nombre?.trim().split(/\s+/)[0];
+  return first || undefined;
 }
 
 /** `performance.custom_fields.preparation`, read forgivingly: only well-formed hand entries. */
@@ -201,11 +209,12 @@ export function readManualStates(raw: unknown): Record<string, ManualState> {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
   for (const [id, v] of Object.entries(raw)) {
     if (!MANUAL_ID_RE.test(id) || !v || typeof v !== 'object') continue;
-    const e = v as { estado?: unknown; por?: unknown; cuando?: unknown };
+    const e = v as { estado?: unknown; por?: unknown; nombre?: unknown; cuando?: unknown };
     if (e.estado !== 'hecho' && e.estado !== 'no_aplica') continue;
     out[id] = {
       estado: e.estado,
       por: typeof e.por === 'string' ? e.por : null,
+      nombre: typeof e.nombre === 'string' && e.nombre.trim() ? e.nombre.trim() : null,
       cuando: typeof e.cuando === 'string' ? e.cuando : null,
     };
   }

@@ -68,7 +68,7 @@
   import { lensOn } from '$lib/lenses.svelte';
   import { performanceBoloQueryOptions, projectBolosQueryOptions } from '$lib/bolo-queries';
   import { projectPreparationQueryOptions, teamQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
-  import { readManual, readManualStates, readPreparation, thingRank, type ManualEstado, type Preparation } from '$lib/preparation';
+  import { closerFirstName, readManual, readManualStates, readPreparation, thingRank, type ManualEstado, type Preparation } from '$lib/preparation';
   import { goingPersonIds, type GoingPerson } from '$lib/bolo-access';
   import RecordHead from '$lib/components/RecordHead.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
@@ -943,7 +943,13 @@
       ? manualReading.closed.map((m) => ({
           id: m.id,
           text: m.name,
-          meta: m.state.estado === 'no_aplica' ? t('pass.hand_na_short', locale) : closedWhen(m.state.cuando),
+          meta: [
+            m.state.estado === 'no_aplica' ? t('pass.hand_na_short', locale) : undefined,
+            closerFirstName(m.state.nombre),
+            m.state.estado === 'no_aplica' ? undefined : closedWhen(m.state.cuando),
+          ]
+            .filter(Boolean)
+            .join(', '),
           onReopen: () => closeHand(m.id, null),
           busy: $handMutation.isPending,
         }))
