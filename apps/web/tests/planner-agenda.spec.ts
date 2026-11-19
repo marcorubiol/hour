@@ -30,7 +30,7 @@ test.describe('the agenda (ADR-211)', () => {
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
     const page = await browser.newPage();
-    await page.goto('/h/desk');
+    await page.goto('/h/today');
     made = await plantAgenda(page);
     await page.close();
   });
@@ -38,7 +38,7 @@ test.describe('the agenda (ADR-211)', () => {
   test.afterAll(async ({ browser }) => {
     test.setTimeout(120_000);
     const page = await browser.newPage();
-    await page.goto('/h/desk');
+    await page.goto('/h/today');
     await clearAgenda(page, made);
     await page.close();
   });
@@ -66,7 +66,7 @@ test.describe('the agenda (ADR-211)', () => {
     expect(await legs.first().innerText()).toMatch(/→|\s/);
   });
 
-  test('«FALTA» IS AMBER, AND ONLY IN THE NEXT TWO WEEKS', async ({ page }) => {
+  test('WHAT IS OPEN IS GREY, AMBER ONLY WITH HURRY, AND ONLY IN THE NEXT TWO WEEKS', async ({ page }) => {
     await agenda(page);
     const words = page.getByTestId('agenda-missing');
     test.skip((await words.count()) === 0, 'nothing missing in the window');
@@ -76,7 +76,9 @@ test.describe('the agenda (ADR-211)', () => {
     const today = new Date().toISOString().slice(0, 10);
     const last = new Date(Date.now() + 15 * 86_400_000).toISOString().slice(0, 10);
     for (const d of days) expect(d >= today && d <= last, `amber on ${d}`).toBe(true);
-    const ink = await words.first().evaluate((el) => {
+    const urgent = page.locator('[data-testid="agenda-missing"].missing-word--urgent');
+    test.skip((await urgent.count()) === 0, 'nothing with hurry in the window');
+    const ink = await urgent.first().evaluate((el) => {
       const probe = document.createElement('span');
       probe.style.color = 'var(--missing-ink)';
       el.appendChild(probe);

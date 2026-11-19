@@ -3,7 +3,7 @@
    * /h/[workspace]/ — the space portada: a space masthead (name · about ·
    * stats) over this space's agenda + projects. HomeView is portada-only
    * since 2026-07-17 (the cross-space digest died with the hall; /h greets
-   * and its door goes to /h/desk).
+   * and its door goes to /h/today).
    *
    * A space you do not belong to (or that does not exist: the two are not
    * told apart, ADR-106) says so, with the way back to Hoy (tarea 132): it
@@ -45,7 +45,7 @@
     missingText={t('space.missing', locale)}
     failedText={t('ui.failed', locale)}
     onretry={() => void $workspacesQuery.refetch()}
-    back={{ href: '/h/desk', label: t('ui.back_today', locale) }}
+    back={{ href: '/h/today', label: t('ui.back_today', locale) }}
     {locale}
   />
 {:else if known}
@@ -57,7 +57,7 @@
     missingText={t('space.missing', locale)}
     failedText={t('ui.failed', locale)}
     onretry={() => void $workspacesQuery.refetch()}
-    back={{ href: '/h/desk', label: t('ui.back_today', locale) }}
+    back={{ href: '/h/today', label: t('ui.back_today', locale) }}
     {locale}
   />
 {:else}

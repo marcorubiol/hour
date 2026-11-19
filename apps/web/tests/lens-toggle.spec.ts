@@ -15,6 +15,7 @@
  */
 import { expect, test, type Page } from '@playwright/test';
 import { waitForLoaded } from './loaded';
+import { unfold } from './fold';
 
 const EMAIL = process.env.PW_TEST_EMAIL ?? '';
 const PASSWORD = process.env.PW_TEST_PASSWORD ?? '';
@@ -53,22 +54,22 @@ test.describe('Lenses per space (ADR-132)', () => {
 
   test.beforeAll(async ({ browser }) => {
     const page = await browser.newPage();
-    await page.goto(`/h/desk${SCOPE}`);
+    await page.goto(`/h/today${SCOPE}`);
     id = await wsId(page);
     await page.close();
   });
 
   test.afterAll(async ({ browser }) => {
     const page = await browser.newPage();
-    await page.goto(`/h/desk${SCOPE}`);
+    await page.goto(`/h/today${SCOPE}`);
     await setLensesOff(page, id, []);
     await page.close();
   });
 
   test('a lens off leaves the switcher, the Desk and ⌘K', async ({ page }) => {
-    await page.goto(`/h/desk${SCOPE}`);
+    await page.goto(`/h/today${SCOPE}`);
     await setLensesOff(page, id, ['planner', 'books']);
-    await page.goto(`/h/desk${SCOPE}`);
+    await page.goto(`/h/today${SCOPE}`);
     await waitForLoaded(page);
 
     const nav = page.getByRole('navigation', { name: 'Sections' });
@@ -77,6 +78,7 @@ test.describe('Lenses per space (ADR-132)', () => {
     await expect(nav.getByRole('link', { name: 'Planner' })).toHaveCount(0);
     await expect(nav.getByRole('link', { name: 'Books' })).toHaveCount(0);
 
+    await unfold(page, 'desk-season-fold');
     await expect(page.getByTestId('door-conversations')).toBeVisible();
     await expect(page.getByTestId('door-planner')).toHaveCount(0);
     await expect(page.getByTestId('door-books')).toHaveCount(0);
@@ -92,9 +94,10 @@ test.describe('Lenses per space (ADR-132)', () => {
 
     // Back on: everything returns.
     await setLensesOff(page, id, []);
-    await page.goto(`/h/desk${SCOPE}`);
+    await page.goto(`/h/today${SCOPE}`);
     await waitForLoaded(page);
     await expect(nav.getByRole('link', { name: 'Planner' })).toBeVisible();
+    await unfold(page, 'desk-season-fold');
     await expect(page.getByTestId('door-planner')).toBeVisible();
     await page.keyboard.press('Meta+k');
     await palette.getByRole('combobox').or(palette.locator('input')).first().fill('12 march');
@@ -103,7 +106,7 @@ test.describe('Lenses per space (ADR-132)', () => {
   });
 
   test('by URL, the lens says it is off and who turns it on', async ({ page }) => {
-    await page.goto(`/h/desk${SCOPE}`);
+    await page.goto(`/h/today${SCOPE}`);
     await setLensesOff(page, id, ['books']);
     await page.goto(`/h/books${SCOPE}`);
     await waitForLoaded(page);
@@ -122,7 +125,7 @@ test.describe('Lenses per space (ADR-132)', () => {
   });
 
   test('Settings turns a lens back on', async ({ page }) => {
-    await page.goto(`/h/desk${SCOPE}`);
+    await page.goto(`/h/today${SCOPE}`);
     await setLensesOff(page, id, ['books']);
     await page.goto('/h/playwright/settings?section=lenses');
     const group = page.getByTestId('settings-lenses');

@@ -20,7 +20,11 @@ import { followUpDue, turnOf, type TurnRow } from './conversation-overview';
 import { relationOf } from './conversation-relation';
 import { attentionItems, type AttentionItem, type MoneyBolo, type MoneyContext } from './money';
 
-/** The strip never says more than this (ADR-139 § 2). */
+/**
+ * The strips of a person, a line, a conversation and a date never say more
+ * than this (ADR-139 § 2). A performance's pass does NOT cap: it shows all
+ * that is open (lista de preparación, fase 1).
+ */
 export const MISSING_MAX = 3;
 
 /**
@@ -89,10 +93,20 @@ export function performanceMissing(input: PerformanceMissingInput, today: string
     if (input.roster?.length === 0 && !going) out.push({ kind: 'nobody_going' });
   }
 
-  return out.slice(0, MISSING_MAX);
+  return out;
 }
 
-// ── El talón: «Listo para salir, N de M» ───────────────────────────────────
+/**
+ * Does an open thing have hurry (the only thing that wears amber)? A hold
+ * whose decide-by day is within the week, and a road sheet within its share
+ * days: the two «plazos» that are built in. Everything else is open and
+ * neutral until the company gives it a deadline (lista de preparación, fase 4).
+ */
+export function isUrgentMissing(m: PerformanceMissing): boolean {
+  return m.kind === 'hold_deadline' || m.kind === 'roadsheet_unshared';
+}
+
+// ── El talón: «Por cerrar» ─────────────────────────────────────────────────
 
 /** The boxes of a performance's stub (the «pase», ADR-139 p2), in this order. */
 export type ReadinessId = 'status' | 'hours' | 'team' | 'sheet';
@@ -104,12 +118,15 @@ export interface ReadinessBox {
   id: ReadinessId;
   done: boolean;
   verb: ReadinessVerb;
+  /** Open and in its deadline: the only state that is drawn in amber. */
+  urgent: boolean;
   /** `status` of a hold whose decide-by day is close: the day, for the line's meta. */
   holdDay?: string;
 }
 
 /**
- * The stub's boxes: «Estado» (confirmed), «Horas» (somebody wrote when it
+ * The stub's boxes (no count, no prize: open is neutral, amber only with
+ * hurry, `urgent`): «Estado» (confirmed), «Horas» (somebody wrote when it
  * starts), «Equipo» (a roster or a «voy») and «Hoja» (the road sheet has a
  * live link). Derived from what the page already reads; nothing is stored.
  *
@@ -132,18 +149,18 @@ export function performanceReadiness(input: PerformanceMissingInput, today: stri
   const hold = performanceMissing(input, today).find((m) => m.kind === 'hold_deadline');
   const confirmed = input.status === 'confirmed';
   const statusDone = input.status !== 'proposed' && !isHoldStatus(input.status);
-  out.push({ id: 'status', done: statusDone, verb: 'confirm', ...(hold ? { holdDay: hold.day } : {}) });
+  out.push({ id: 'status', done: statusDone, verb: 'confirm', urgent: !statusDone && Boolean(hold), ...(hold ? { holdDay: hold.day } : {}) });
 
-  if (input.start_at !== undefined) out.push({ id: 'hours', done: input.start_at !== null, verb: 'add_time' });
+  if (input.start_at !== undefined) out.push({ id: 'hours', done: input.start_at !== null, verb: 'add_time', urgent: false });
 
   if (confirmed && input.roster !== null) {
     const going = (input.commitments ?? []).some((c) => c.state === 'going');
-    out.push({ id: 'team', done: input.roster.length > 0 || going, verb: 'sign_up' });
+    out.push({ id: 'team', done: input.roster.length > 0 || going, verb: 'sign_up', urgent: false });
   }
 
   if (confirmed && input.roadsheetLinks !== null) {
-    if (input.roadsheetLinks > 0) out.push({ id: 'sheet', done: true, verb: 'share' });
-    else if (day <= addDaysIso(today, ROADSHEET_SHARE_DAYS)) out.push({ id: 'sheet', done: false, verb: 'share' });
+    if (input.roadsheetLinks > 0) out.push({ id: 'sheet', done: true, verb: 'share', urgent: false });
+    else if (day <= addDaysIso(today, ROADSHEET_SHARE_DAYS)) out.push({ id: 'sheet', done: false, verb: 'share', urgent: true });
   }
 
   return out;

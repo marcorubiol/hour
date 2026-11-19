@@ -206,8 +206,8 @@ test.describe('venue linking', () => {
     try {
       await page.reload();
       await waitForLoaded(page);
-      const title = page.locator('h1 a.record-head__titlelink');
-      await expect(title).toHaveText('ZZZ E2E Venue', { timeout: 10_000 });
+      const title = page.getByTestId('pass-venue-link');
+      await expect(title).toContainText('ZZZ E2E Venue', { timeout: 10_000 });
       await title.click();
 
       await expect(page).toHaveURL(/\/h\/playwright\/venue\/[^/]+$/);

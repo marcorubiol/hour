@@ -57,7 +57,7 @@ test.describe('Month — create on the cell’s day (ADR-139, después)', () => 
 
   test.afterAll(async ({ browser }) => {
     const page = await browser.newPage();
-    await page.goto('/h/desk');
+    await page.goto('/h/today');
     const left = await page.evaluate(
       async ({ mark, day, last }) => {
         const r = await fetch(`/api/performances?status=any&from=${day}&to=${last}&limit=200`);
@@ -122,7 +122,7 @@ test.describe('Month — create on the cell’s day (ADR-139, después)', () => 
 
   test('«+N more» on a full cell opens that Day, not the quick add', async ({ page }) => {
     test.setTimeout(90_000);
-    await page.goto('/h/desk');
+    await page.goto('/h/today');
     const stamp = Date.now();
     await page.evaluate(
       async ({ project, day, base }) => {

@@ -81,9 +81,9 @@ describe('withPeek / peekHref', () => {
   });
 
   it('a link to a peek stays on the page it is drawn on', () => {
-    const href = peekHref({ kind: 'date', id: DATE }, url('/h/desk'));
-    expect(href.startsWith('/h/desk?')).toBe(true);
-    expect(peekFromLink(url(href), url('/h/desk'))).toEqual({ kind: 'date', id: DATE });
+    const href = peekHref({ kind: 'date', id: DATE }, url('/h/today'));
+    expect(href.startsWith('/h/today?')).toBe(true);
+    expect(peekFromLink(url(href), url('/h/today'))).toEqual({ kind: 'date', id: DATE });
   });
 });
 
@@ -150,7 +150,7 @@ describe('peekFromLink', () => {
   });
 
   it('a ?peek= link on another page is that page, not a peek here', () => {
-    expect(peekFromLink(url(`/h/desk?peek=date/${DATE}`), lens)).toBeNull();
+    expect(peekFromLink(url(`/h/today?peek=date/${DATE}`), lens)).toBeNull();
     expect(peekFromLink(url(`/h/planner?peek=date/${DATE}`), lens)).toEqual({ kind: 'date', id: DATE });
   });
 });
@@ -161,7 +161,7 @@ describe('peekOpensFrom', () => {
   const bolo: PeekTarget = { kind: 'bolo', projectId: PROJECT, id: BOLO };
 
   it('from every lens, a record opens in the vistazo', () => {
-    for (const path of ['/h/desk', '/h/planner', '/h/conversations', '/h/books']) {
+    for (const path of ['/h/today', '/h/planner', '/h/conversations', '/h/books']) {
       expect(isLensPath(path)).toBe(true);
       expect(peekOpensFrom(perf, path, false)).toBe(true);
     }

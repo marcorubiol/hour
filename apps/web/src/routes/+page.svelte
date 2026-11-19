@@ -7,7 +7,7 @@
   import { AHORA_KEY } from '$lib/ahora';
 
   onMount(async () => {
-    // The landing is the Desk (/h/desk, ADR-137), always: Hour no longer
+    // The landing is the Desk (/h/today, ADR-137), always: Hour no longer
     // remembers the last page (ADR-165). Ahora is no longer a screen
     // (ADR-202 § 5): the day it was left open, the app opens on Hoy too, and
     // the key it left behind goes.
@@ -21,7 +21,7 @@
     const probe = ensureSession();
     // The landing's code (the /h frame and the lens) loads alongside the
     // probe and the device read, not after them.
-    const target = '/h/desk';
+    const target = '/h/today';
     void preloadCode(target).catch(() => {});
     if (await cachedSessionUser()) {
       goto(target, { replaceState: true });

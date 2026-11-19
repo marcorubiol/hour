@@ -55,7 +55,7 @@ test.describe('the quick add reads text (ADR-139 § 3)', () => {
   });
 
   test('⌘K → New rehearsal: the rest of the line is read too', async ({ page }) => {
-    await page.goto('/h/desk?scope=s:playwright');
+    await page.goto('/h/today?scope=s:playwright');
     await waitForLoaded(page);
 
     await page.keyboard.press('ControlOrMeta+k');

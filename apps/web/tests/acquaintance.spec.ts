@@ -23,7 +23,7 @@ const CONTACT = 'ZZZ E2E Acq Contact';
 
 /** Create (or revive) the suite's conversation on the fixture line; its contact's file. */
 async function contactFile(page: Page) {
-  await page.goto('/h/desk');
+  await page.goto('/h/today');
   const line = await fixtureLine(page);
   const id = await page.evaluate(
     async ({ project_id, line_id, sala, contact }) => {

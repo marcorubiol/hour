@@ -52,7 +52,7 @@
 
 <nav class="lensswitch-wrap" aria-label={t('lens.nav_aria', locale)} data-testid="lens-nav">
   <a
-    href="/h/desk"
+    href="/h/today"
     class="lensswitch__home"
     class:is-on={active === 'desk'}
     aria-current={active === 'desk' ? 'page' : undefined}

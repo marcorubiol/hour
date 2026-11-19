@@ -75,7 +75,7 @@ test.describe('the sections in the frame (ADR-140)', () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await readOnly(page);
 
-    const first = await boxOf(page, `/h/desk${SCOPE}`);
+    const first = await boxOf(page, `/h/today${SCOPE}`);
     await expect(sections(page).getByRole('link', { name: 'Today' })).toHaveAttribute('aria-current', 'page');
 
     const paths = [
@@ -110,7 +110,7 @@ test.describe('the sections in the frame (ADR-140)', () => {
     const account = () => page.getByRole('button', { name: 'Open account menu' });
 
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto(`/h/desk${SCOPE}`);
+    await page.goto(`/h/today${SCOPE}`);
     await waitForLoaded(page);
     // One account on screen, inside the rail, near its foot; none in the bar.
     await expect(account()).toHaveCount(1);
@@ -134,7 +134,7 @@ test.describe('the sections in the frame (ADR-140)', () => {
     await expect(page.locator('#shell-rail')).toBeHidden();
     const clock = page.locator('.shell__now');
     await expect(clock).toHaveAccessibleName('Today');
-    await expect(clock).toHaveAttribute('href', '/h/desk');
+    await expect(clock).toHaveAttribute('href', '/h/today');
     await expect(clock).not.toHaveAttribute('aria-expanded', /.*/);
   });
 

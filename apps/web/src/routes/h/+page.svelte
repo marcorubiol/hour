@@ -1,1 +1,1 @@
-<!-- Redirect stub: +page.ts sends /h to /h/desk (ADR-137) -->
+<!-- Redirect stub: +page.ts sends /h to /h/today (ADR-137, ADR-220) -->

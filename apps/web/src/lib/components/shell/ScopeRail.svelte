@@ -51,7 +51,7 @@
          hold: «here, now» is already what it says, and a clock you can press
          to get back to the top of the app is a smaller promise than a logo
          that navigates. -->
-    <a class="side-clock__now" href="/h/desk" aria-label={t('lens.desk', locale)}>
+    <a class="side-clock__now" href="/h/today" aria-label={t('lens.desk', locale)}>
       <time class="side-clock__time" datetime={clockTime}><ClockFigures time={clockTime} /></time>
       <p class="side-clock__date">{clockDate}</p>
     </a>

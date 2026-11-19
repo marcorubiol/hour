@@ -38,13 +38,13 @@ test.describe('smoke', () => {
     // ADR-137: ONE FRONT DOOR. `/h` was the Hall, a page before the Desk; it
     // forwards to the Desk now, with the lens bar on screen from the start.
     await page.goto('/h');
-    await page.waitForURL(/\/h\/desk\/?$/);
+    await page.waitForURL(/\/h\/today\/?$/);
     await waitForLoaded(page);
     await expect(page.getByRole('navigation', { name: /sections/i })).toBeVisible();
     // THE WAY HOME IS THE CLOCK (2026-07-31), and home is the Desk. Located by
-    // the door itself (`a[href="/h/desk"]` wrapping the clock) rather than by
+    // the door itself (`a[href="/h/today"]` wrapping the clock) rather than by
     // its label, which is translated.
-    await expect(page.locator('a[href="/h/desk"] time:visible')).toBeVisible();
+    await expect(page.locator('a[href="/h/today"] time:visible')).toBeVisible();
 
     // ⌘K is the SEARCH (ADR-178; the scope pill opens the same palette as a
     // filter), not a lens switcher: it lists spaces / projects / lines from
@@ -63,7 +63,7 @@ test.describe('smoke', () => {
     // Books opens on its collection radar (ADR-117): the ledger is always there.
     await expect(page.locator('#mny-ledger')).toBeVisible();
 
-    await page.goto('/h/desk');
+    await page.goto('/h/today');
     await waitForLoaded(page);
     // Today's title is heard, not seen (ADR-203 § 1): no title row is drawn,
     // the piece of the day is what the page shows.

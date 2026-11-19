@@ -65,7 +65,7 @@
     type Slip as SlipVM,
   } from '$lib/month-events';
   import AgendaList, { type AgendaDecision, type AgendaMissing, type NoteDraft } from '$lib/components/AgendaList.svelte';
-  import { missingSoon } from '$lib/record-missing';
+  import { isUrgentMissing, missingSoon } from '$lib/record-missing';
   import { noteFallback as noteFallbackOf, noteFallbackBody } from '$lib/note';
   import DecisionBand, {
     decisionText,
@@ -1852,7 +1852,7 @@
     const ws = tk ? workspaceSlugById.get(tk.workspace_id) : undefined;
     if (tk?.conversation && ws && lensOn('conversations')) return `/h/${ws}/conversation/${tk.conversation.id}`;
     if (tk?.performance?.slug && ws) return `/h/${ws}/performance/${tk.performance.slug}`;
-    return '/h/desk';
+    return '/h/today';
   }
   function stepVM(item: DeskItem): StepVM {
     const project = item.projectId ? rawProjectById.get(item.projectId) : undefined;
@@ -1985,12 +1985,12 @@
   /** «Falta», the one rule (ADR-211 § 3): the record's words beside the
       performance, the missing hour in the hour's own column. */
   function agendaMissing(p: PerformanceEvent): AgendaMissing {
-    const kinds = missingSoon(p, todayIso).map((m) => m.kind);
+    const open = missingSoon(p, todayIso);
     return {
-      noTime: kinds.includes('no_time'),
-      words: kinds
-        .filter((k) => k !== 'no_time')
-        .map((k) => t(MISSING_WORD[k], locale)),
+      noTime: open.some((m) => m.kind === 'no_time'),
+      words: open
+        .filter((m) => m.kind !== 'no_time')
+        .map((m) => ({ text: t(MISSING_WORD[m.kind as keyof typeof MISSING_WORD], locale), urgent: isUrgentMissing(m) })),
     };
   }
   const MISSING_WORD = {

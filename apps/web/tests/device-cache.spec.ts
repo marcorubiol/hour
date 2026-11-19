@@ -80,7 +80,7 @@ async function login(page: Page, email: string, password: string) {
   await page.locator('input[type=email]').fill(email);
   await page.locator('input[type=password]').fill(password);
   await page.getByRole('button', { name: /sign in/i }).click();
-  await page.waitForURL(/\/h\/desk\/?$/);
+  await page.waitForURL(/\/h\/today\/?$/);
 }
 
 async function loaded(page: Page, timeout?: number) {
@@ -117,7 +117,7 @@ test.describe('device cache', () => {
       await route.continue();
       probeAnswered = true;
     });
-    await reopened.goto('/h/desk');
+    await reopened.goto('/h/today');
     await loaded(reopened, 3_000);
     expect(probeAnswered, 'the content painted before the session probe answered').toBe(false);
     await reopened.close();
@@ -128,7 +128,7 @@ test.describe('device cache', () => {
     await page.waitForURL(/\/login\/?$/);
     expect(await readRecord(page)).toBeNull();
     // Without a cache and without a session, /h goes to the login.
-    await page.goto('/h/desk');
+    await page.goto('/h/today');
     await page.waitForURL(/\/login\/?$/);
 
     // A second user on the same browser: only their own data is kept.

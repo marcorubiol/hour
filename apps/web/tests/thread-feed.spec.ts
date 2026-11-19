@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { unfold } from './fold';
 import { existsSync } from 'node:fs';
 import { loadEnvFile } from 'node:process';
 import { forgetConversationsRpc } from './forget';
@@ -49,7 +50,7 @@ async function signIn(page: Page, email: string, password: string) {
   await page.locator('input[type=email]').fill(email);
   await page.locator('input[type=password]').fill(password);
   await page.getByRole('button', { name: /sign in/i }).click();
-  await page.waitForURL(/\/h\/desk\/?$/, { timeout: 60_000 });
+  await page.waitForURL(/\/h\/today\/?$/, { timeout: 60_000 });
 }
 
 test.describe('Conversaciones › Equipo: los hilos del equipo (ADR-116, ADR-134)', () => {
@@ -154,8 +155,9 @@ test.describe('Conversaciones › Equipo: los hilos del equipo (ADR-116, ADR-134
     await expect(page.locator('.conversations__chip[data-chip="todo"]')).toHaveText(/^All/);
 
     // Desk enseña lo nuevo del equipo y enlaza a la vista Equipo.
-    await page.goto('/h/desk?scope=s:playwright');
+    await page.goto('/h/today?scope=s:playwright');
     const changed = page.getByTestId('desk-changed');
+    await unfold(page, 'desk-changed-fold');
     await expect(changed).toContainText(VENUE, { timeout: 30_000 });
     // Su enlace lleva a la lente en el chip que comparten sus novedades
     // (ADR-138 fase 3): Equipo si solo hay hilos, Todas si hay de todo.

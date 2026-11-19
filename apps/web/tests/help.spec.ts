@@ -15,7 +15,7 @@ import { HELP_SEEN } from './help-seen';
 
 const EMAIL = process.env.PW_TEST_EMAIL ?? '';
 const PASSWORD = process.env.PW_TEST_PASSWORD ?? '';
-const DESK = '/h/desk?scope=s:playwright';
+const DESK = '/h/today?scope=s:playwright';
 const PLANNER = '/h/planner?scope=s:playwright';
 const CONVERSATIONS = '/h/conversations?scope=s:playwright';
 

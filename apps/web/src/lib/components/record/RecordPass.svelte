@@ -6,6 +6,8 @@
     id: string;
     label: string;
     done: boolean;
+    /** Open and with hurry: the only box drawn in amber. */
+    urgent?: boolean;
   }
 
   /** One thing the stub still asks for, with the verb that settles it. */
@@ -14,6 +16,9 @@
     text: string;
     /** A quiet fact after the text: a day, since when. */
     meta?: string;
+    /** Open and with hurry: amber row, with `reason` under the text. */
+    urgent?: boolean;
+    reason?: string;
     verbs: PassVerb[];
   }
 
@@ -68,8 +73,8 @@
    *   SÁB 21 NOV                                  Gota
    *   20h30                                 Teatre Municipal / Girona
    *   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ perforación ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-   *   LISTO PARA SALIR                                         3 DE 4
-   *   ▬▬ Estado  ▬▬ Horas  ▬▬ Equipo  ▭ Hoja
+   *   POR CERRAR
+   *   ▬▬ Estado  ▬▬ Horas  ▬▬ Equipo  ┄┄ Hoja
    *   [ Hoja de ruta, sin compartir                  [Compartir] ]
    *   [Hablar 3] [Llamar] [Mapa] [Hoja]
    *
@@ -81,7 +86,9 @@
    * is a tag that opens the menu to change it. Without an hour the date
    * rules («Vie 11», and «Diciembre · sin hora» in amber above it). The stub
    * is cut from the piece by a perforation and lives on its ink: a segment
-   * per box, the open ones amber, a row with its verb for each of them.
+   * per box (open ones dashed, in neutral; amber only for what has hurry), a
+   * row with its verb for each open one. No count and no prize: lo que falta
+   * no es una deuda (lista de preparación).
    *
    * It draws what it is given and derives nothing: boxes and lines come from
    * `performanceReadiness` / `performanceMissing` (`$lib/record-missing`).
@@ -111,6 +118,8 @@
     show: string | null;
     /** The room and the city, `·` between them: each is a line. */
     place: string;
+    /** A linked venue: the place opens its record (ADR-164), and is changed in the details. */
+    placeHref?: string | null;
     /** Set for whoever edits: the date and the place open the details. */
     onEditDate?: (() => void) | null;
     onEditPlace?: (() => void) | null;
@@ -142,6 +151,7 @@
     time,
     show,
     place,
+    placeHref = null,
     onEditDate = null,
     onEditPlace = null,
     editDateLabel,
@@ -156,7 +166,6 @@
     lines = [],
   }: Props = $props();
 
-  let doneCount = $derived(boxes.filter((b) => b.done).length);
   let day = $derived(dayParts(dayIso, locale));
   let dayEnd = $derived(dayIsoEnd && dayIsoEnd !== dayIso ? dayParts(dayIsoEnd, locale) : null);
   /** «sáb 21 nov» (a span: «sáb 21 nov – lun 23 nov»), the mono line over the hour. */
@@ -204,7 +213,9 @@
         {#if show}<span class="pass__show">{show}</span>{/if}
         {#if placeLines.length > 0 && !placeEdit}
           <span class="pass__place">
-            {#if onEditPlace}<button type="button" class="pass__edit" aria-label={editPlaceLabel} onclick={onEditPlace}
+            {#if placeHref}<a class="pass__edit" href={placeHref} data-testid="pass-venue-link"
+                >{#each placeLines as l, i (i)}<span class="pass__place-line">{l}</span>{/each}</a
+              >{:else if onEditPlace}<button type="button" class="pass__edit" aria-label={editPlaceLabel} onclick={onEditPlace}
                 >{#each placeLines as l, i (i)}<span class="pass__place-line">{l}</span>{/each}</button
               >{:else}{#each placeLines as l, i (i)}<span class="pass__place-line">{l}</span>{/each}{/if}
           </span>
@@ -229,11 +240,10 @@
       <div class="stub" data-testid="pass-stub">
         <p class="stub__head">
           <span class="stub__title">{t('pass.ready', locale)}</span>
-          <span class="stub__count" data-testid="pass-count">{t('pass.ready_count', locale, { n: doneCount, m: boxes.length })}</span>
         </p>
         <ul class="stub__boxes" role="list">
           {#each boxes as b (b.id)}
-            <li class="stub__box" class:stub__box--done={b.done} data-box={b.id} data-done={b.done}>
+            <li class="stub__box" class:stub__box--done={b.done} class:stub__box--urgent={b.urgent} data-box={b.id} data-done={b.done}>
               <span class="stub__mark" aria-hidden="true"></span>
               <span class="stub__name">{b.label}</span>
               <span class="visually-hidden">{t(b.done ? 'pass.box_done' : 'pass.box_open', locale)}</span>
@@ -243,9 +253,11 @@
         {#if lines.length > 0}
           <ul class="stub__lines" role="list" data-testid="record-missing">
             {#each lines as line (line.id)}
-              <li class="stub__line" data-missing={line.id}>
+              <li class="stub__line" class:stub__line--urgent={line.urgent} data-missing={line.id}>
                 <span class="stub__text"
-                  >{line.text}{#if line.meta}<span class="stub__meta">{line.meta}</span>{/if}</span
+                  >{line.text}{#if line.meta}<span class="stub__meta">{line.meta}</span>{/if}{#if line.reason}<span class="stub__reason"
+                      >{line.reason}</span
+                    >{/if}</span
                 >
                 {#if line.verbs.length > 0}
                   <span class="stub__verbs">
@@ -382,8 +394,10 @@
       text-transform: uppercase;
       color: var(--surface-focus-muted);
     }
+    /* «Sin hora» is open, not alarming: the ink of the date, with no amber
+       (amber is for what has hurry). */
     .pass__date--open {
-      color: var(--warning-light);
+      color: var(--surface-focus-ink);
     }
     .pass__time {
       font-family: var(--font-display);
@@ -428,15 +442,20 @@
       cursor: pointer;
       text-underline-offset: 3px;
     }
+    /* The linked venue reads as the place, like the edit door: underlined on hover. */
+    a.pass__edit {
+      display: block;
+      text-decoration: none;
+    }
     @media (hover: hover) {
       .pass__edit:hover {
         text-decoration: underline;
       }
     }
-    /* «Poner lugar»: a place still to write reads as one, in the piece's
-       amber like «sin hora». */
+    /* «Poner lugar»: a place still to write reads as one, underlined, in the
+       piece's ink. */
     .pass__edit--open {
-      color: var(--warning-light);
+      color: var(--surface-focus-ink);
       text-decoration: underline;
       text-decoration-thickness: var(--line-hairline);
       text-underline-offset: 3px;
@@ -515,8 +534,9 @@
       inset-inline-end: -0.5rem;
     }
 
-    /* THE STUB: «listo para salir N de M», a segment per box with its name
-       under it, and a row for each open one, in amber, with its verb. */
+    /* THE STUB: «por cerrar», a segment per box with its name under it, and
+       a row for each open one with its verb. Open is neutral (dashed line,
+       the piece's ink, a faint fill); amber only for what has hurry. */
     .stub {
       display: grid;
       gap: var(--space-xs);
@@ -532,11 +552,6 @@
       letter-spacing: var(--mono-letter-spacing-loose);
       text-transform: uppercase;
       color: var(--surface-focus-muted);
-    }
-    .stub__count {
-      font-variant-numeric: tabular-nums;
-      font-weight: 600;
-      color: var(--surface-focus-ink);
     }
     .stub__boxes {
       display: grid;
@@ -555,14 +570,18 @@
     }
     .stub__mark {
       block-size: 0.375rem;
-      border: var(--line-hairline) solid var(--warning-light);
+      border: var(--line-hairline) dashed var(--surface-focus-faint);
       border-radius: var(--radius-xs);
+    }
+    .stub__box--urgent .stub__mark {
+      border-style: solid;
+      border-color: var(--warning-light);
     }
     .stub__box--done .stub__mark {
       border-color: var(--surface-focus-ink);
       background: var(--surface-focus-ink);
     }
-    .stub__box:not(.stub__box--done) {
+    .stub__box--urgent {
       color: var(--warning-light);
     }
     .stub__name {
@@ -585,9 +604,17 @@
       padding: var(--space-xs);
       padding-inline-start: var(--space-s);
       border-radius: var(--radius);
-      background: color-mix(in oklch, var(--warning-light) 16%, transparent);
+      background: color-mix(in oklch, var(--surface-focus-ink) 8%, transparent);
       font-size: var(--text-s);
+      color: var(--surface-focus-ink);
+    }
+    .stub__line--urgent {
+      background: color-mix(in oklch, var(--warning-light) 16%, transparent);
       color: var(--warning-light);
+    }
+    .stub__reason {
+      display: block;
+      font-size: var(--text-xs);
     }
     .stub__meta {
       margin-inline-start: var(--space-s);

@@ -4,7 +4,7 @@
    * one field (ADR-202 § 12: what is scoped is a tag inside it, the saved
    * scopes and the recents are the palette's first rows) and the ⌘K scope
    * builder — the manual pin UI (card chips, breadcrumb pin, ScopeStrip)
-   * died 2026-07-17. Applying a scope from a non-lens surface lands on /h/desk.
+   * died 2026-07-17. Applying a scope from a non-lens surface lands on /h/today.
    * The top bar is the field · the sections (LensSwitcher, ADR-140, against
    * the right edge since the 20-10 amendment). The account menu and the
    * presence live at the foot of the rail. On a phone there is no rail: the
@@ -43,7 +43,7 @@
   import { appLocale, LOCALE_TAG, setTrade, setWorkspaceTrades, t, tradeOf } from '$lib/i18n';
   import { setSeasonStarts } from '$lib/season-start.svelte';
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
-  import { lensesOnFor, lensOn, routedLensOf, setLensesOn } from '$lib/lenses.svelte';
+  import { lensesOnFor, lensHref, lensOn, routedLensOf, setLensesOn } from '$lib/lenses.svelte';
   import LensOff from '$lib/components/LensOff.svelte';
   import LensSwitcher from '$lib/components/LensSwitcher.svelte';
   import PeekHost from '$lib/components/peek/PeekHost.svelte';
@@ -384,7 +384,7 @@
    *  (or Desk, the home). On a lens route it stays put: the lens refilters
    *  in place. */
   function landOnScopedLens() {
-    if (!routedLens) void goto(`/h/${lensOn(lens.current) ? lens.current : 'desk'}`);
+    if (!routedLens) void goto(lensHref(lensOn(lens.current) ? lens.current : 'desk'));
   }
 
   function saveCurrentScope() {
@@ -807,7 +807,7 @@
       <!-- THE CLOCK, ON A PHONE (ADR-202 § 10): the time big, the weekday
            and the date beside it as one piece, and no word «Hoy». It opens
            nothing; pressing it goes to Hoy. Beside the rail it is the rail's. -->
-      <a class="shell__now" href="/h/desk" aria-label={t('lens.desk', locale)}>
+      <a class="shell__now" href="/h/today" aria-label={t('lens.desk', locale)}>
         <time class="shell__clock" datetime={clockTime}><ClockFigures time={clockTime} /></time>
         <span class="shell__date" aria-hidden="true"><b>{clockWeekday}</b><span>{clockDay}</span></span>
       </a>

@@ -12,6 +12,9 @@ describe('isReservedWorkspaceSlug', () => {
     expect(isReservedWorkspaceSlug('gig')).toBe(true);
     expect(isReservedWorkspaceSlug('conversation')).toBe(true);
     expect(isReservedWorkspaceSlug('roadsheet')).toBe(true);
+    // The home's address (ADR-220) and the one it had: neither can be a space's.
+    expect(isReservedWorkspaceSlug('today')).toBe(true);
+    expect(isReservedWorkspaceSlug('desk')).toBe(true);
   });
 
   it('is case-insensitive', () => {

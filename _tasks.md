@@ -11,6 +11,7 @@
 Detalle de cada punto: `build/coordination/STATUS.md` (fuera de git) y los informes de propuestas. Orden sugerido: lo que
 no pide migración primero; las migraciones juntas por el gate de § 34.
 
+- [ ] 167 lista de preparación por compañía («Qué preparamos para una función», ADR-221; decisión en `ficha-pase/lista-preparacion.md`, dibujo W): fase 1 pintura (sin naranja fijo ni contador, Hoy y Agenda) en PR; fase 2 la lista por proyecto y sus ajustes; fase 3 cosas a mano (casillas, «Hecho»/«Aquí no hace falta»); fase 4 plazos de prisa por cosa. En serie, un PR por fase; las fases 2-4 pueden pedir migración (con rollback). Marco, 19-11: la lista es por proyecto y todas las cosas, también «confirmada» y «hora», se pueden apagar. (Marco, 19-11)
 - [ ] 98 invitar, al público y a profesionales: decidido (ADR-173, ADR-174, ADR-175, `build/plans/2026-11-01-audience.md`); fases 1 a 3 (esquema, alta pública, listas, importación, invitaciones) en producción desde 2026-11-02 (`49ffb30c`). Queda la fase 4 (envío real por SES); la 5, el editor, en producción desde 2026-11-08 (99, ADR-190).
 - [ ] 118 de un vistazo: el primer día como lista de difusión («Sin contactar 150», una frase «empieza por una zona» que se va al escribir a alguien, «Seleccionar todas» y «Escribir a N» con un filtro). Después de 119.
 - [ ] 119 Marco: hacer: enseñar la gramática y la lista con las 152 filas reales a Anouk y a alguien de producción, antes del 118.
@@ -27,7 +28,7 @@ no pide migración primero; las migraciones juntas por el gate de § 34.
 Análisis de producto y 40 propuestas, validadas enteras. Orden: tanda 1 (130 a 132, en producción desde `7c100d13`, ver CHANGELOG), tanda 2 (133 a 136, en producción desde `ebf4feda`, ver CHANGELOG), tanda 3 (137 a 139,
 con boceto antes y después de la 119). Capturas de partida: espacio `playwright`, datos de test.
 
-- [ ] Marco: hacer: en el panel de Supabase, añadir `https://hour.zerosense.studio/login*` a Redirect URLs y cambiar la plantilla «Reset Password» (`build/runbooks/password-recovery.md`); hasta entonces el enlace de recuperar contraseña cae en la portada. (132, chat 11-11)
+- [x] Supabase, recuperar contraseña (132): hecho el 18-11 en el panel. La *Site URL* ya era `https://hour.zerosense.studio` y Redirect URLs ya tenía `https://hour.zerosense.studio/**`, que cubre `/login?mode=reset`. La plantilla «Reset Password» pasa al enlace con `token_hash` y a castellano. Sin probar con un correo real.
 - [ ] Mirar en pantalla un espacio de música con «proyecto» (ADR-196, en producción desde `69ddd29d`): hoy no hay ninguno en producción, los once son de escena; cuando exista uno, o poniendo `testing` en música un rato con OK de Marco. (chat 12-11)
 - [ ] 140, resto: mirar la hoja del móvil en un iPhone real (la muesca). Lo demás, en producción desde `d9587d87` y visto en captura en las cuatro lenguas. (chat 12-11)
 - [ ] 142, resto: verlo con un espacio de música y otro de escena a la vista (el usuario de pruebas solo tiene escena; Marco puede con `testing` en música y `muk-cia`). `testing` se queda en música hasta mirar esto; después vuelve a escena (Marco, 18-11). Todo en producción desde `551206e1` (ADR-199). Sin cubrir: la escaleta montada en el Planificador y el panel rápido de identidad del mes, sin palabra neutra decidida. (chat 13-11)

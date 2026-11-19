@@ -46,7 +46,7 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
   la puerta es el CI de GitHub (`web` y `collab`).
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free con keepalive diario
   (`keepalive.yml`); Pro antes de la beta (`_tasks.md § 9`). Si falla tras días sin uso: `dig <ref>.supabase.co`.
-- **Última migración aplicada: `20261114100000`** (149; backup 43606973594, plan 43607266766, apply 43607392836).
+- **Última migración aplicada: `20261119100000`** (`today` reservada, ADR-220; backup 44472377606, plan 44472381560, apply 44473051185, lanzados desde la rama del PR 15). La anterior: `20261114100000` (149).
   Las anteriores, en `_notes/context-history.md`. Las migraciones van por `production-migrate.yml` (backup, plan, apply; usa `--include-all`). **Al redefinir una función,
   copiar la firma de la base viva (`pg_get_functiondef`): otra firma crea una sobrecarga y PostgREST responde 300.**
 - `hour-staging`: ref `slccyknqpgmzhyiyclsq`, `eu-west-1`; se pausa sin uso.

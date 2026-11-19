@@ -36,7 +36,7 @@ const RESERVED_WORKSPACE_SLUGS = [
   // claimable. `calendar` (pre-Planner rename) and `people` (ADR-065 chose
   // Conversations over "People") are reserved-but-rejected — held so the names
   // can never be taken from under a revisit.
-  'house', 'room', 'run', 'gig', 'desk', 'plaza',
+  'house', 'room', 'run', 'gig', 'desk', 'today', 'plaza',
   'roadsheet', 'conversation', 'conversations', 'person', 'venue', 'asset',
   'invoice', 'calendar', 'planner', 'agenda', 'money', 'books', 'comms', 'archive', 'people',
 

@@ -21,7 +21,7 @@ test.describe('⌘K creates (ADR-139)', () => {
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
-    await page.goto('/h/desk?scope=s:playwright');
+    await page.goto('/h/today?scope=s:playwright');
     await waitForLoaded(page);
 
     await page.keyboard.press('ControlOrMeta+k');
@@ -48,7 +48,7 @@ test.describe('⌘K creates (ADR-139)', () => {
     await expect(dialog).toBeHidden({ timeout: 10_000 });
 
     // Still on Desk: the notice says it, and «Undo» takes it back.
-    await expect(page).toHaveURL(/\/h\/desk/);
+    await expect(page).toHaveURL(/\/h\/today/);
     const toast = page.locator('.toast').filter({ hasText: 'Added to the plan' });
     await expect(toast).toBeVisible();
     await toast.getByRole('button', { name: 'Undo', exact: true }).click();

@@ -55,7 +55,7 @@
   interface Props {
     /** Today in order, with its focus (`dayAgenda`); null with nothing left of today. */
     agenda: DayAgenda | null;
-    /** Today had something, all of it gone by: «Hoy, nada más». */
+    /** Today had something, all of it gone by: «Hoy, nada más en la agenda». */
     todayHad?: boolean;
     /** The first thing after today, however far: what the hollow piece names. */
     next?: PulseNext | null;
@@ -295,7 +295,7 @@
       : t('ahora.fresh_day', locale, { day: `${localeWeekdayShort(d, locale)} ${localeDayMonth(d, locale)}`, time });
   });
 
-  // ── The hollow piece: «Hoy, nada» and «Lo siguiente: …» (ADR-203 § 2) ──
+  // ── The hollow piece: «Hoy, nada en la agenda» and «Lo siguiente: …» (ADR-203 § 2) ──
   /** «mañana, tren a Girona», «martes, función? en Vic», «jue 19 nov, ensayo». */
   function nextWords(n: PulseNext): string {
     const when = nextWhen(n.day, today, locale);

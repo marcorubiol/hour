@@ -43,7 +43,7 @@ async function signIn(page: Page, email: string, password: string) {
   await page.locator('input[type=email]').fill(email);
   await page.locator('input[type=password]').fill(password);
   await page.getByRole('button', { name: /sign in/i }).click();
-  await page.waitForURL(/\/h\/desk\/?/, { timeout: 60_000 });
+  await page.waitForURL(/\/h\/today\/?/, { timeout: 60_000 });
 }
 
 /** In three days: a row of «Después» (not the far line, within 14), never the card (ADR-153). */
@@ -156,7 +156,7 @@ test.describe('el marco de un guest de un solo bolo (comms carril 2, fase 3)', (
     await signIn(page, GUEST_EMAIL, GUEST_PASSWORD!);
 
     // ── Hoy, con el espacio de la compañía en el ámbito ──
-    await page.goto(`/h/desk?${SCOPE}`);
+    await page.goto(`/h/today?${SCOPE}`);
     await waitForLoaded(page);
     const nav = page.getByTestId('lens-nav');
     await expect(nav).not.toContainText(/cuentas|comptes|books|money/i);
@@ -191,7 +191,7 @@ test.describe('el marco de un guest de un solo bolo (comms carril 2, fase 3)', (
     await expect(page.locator('.cal__add')).toHaveCount(0);
 
     // ── ⌘K: ninguna fila de crear con la compañía en el ámbito ──
-    await page.goto(`/h/desk?${SCOPE}`);
+    await page.goto(`/h/today?${SCOPE}`);
     await waitForLoaded(page);
     await page.locator('.field__open').locator('visible=true').click();
     await page.keyboard.type('tarea comprar');

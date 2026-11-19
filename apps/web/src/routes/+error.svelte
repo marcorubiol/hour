@@ -24,12 +24,12 @@
 </svelte:head>
 
 <main class="app-error" lang={locale} data-testid="app-error" data-status={page.status}>
-  <a class="app-error__brand" href="/h/desk" aria-label={t('ui.back_today', locale)}><BrandMark size="m" /></a>
+  <a class="app-error__brand" href="/h/today" aria-label={t('ui.back_today', locale)}><BrandMark size="m" /></a>
   <div class="app-error__body">
     <h1 class="app-error__title">{title}</h1>
     <p class="app-error__text">{t(missing ? 'error.body_missing' : 'error.body_failed', locale)}</p>
     <p class="app-error__acts">
-      <a class="link-arrow" href="/h/desk">{t('ui.back_today', locale)}</a>
+      <a class="link-arrow" href="/h/today">{t('ui.back_today', locale)}</a>
       {#if !missing}
         <button type="button" class="btn--secondary btn--s" onclick={() => location.reload()}
           >{t('error.reload', locale)}</button

@@ -5,7 +5,7 @@
  * TTFB, CLS). What it cannot know is when Hoy has drawn its data: this adds
  * `hoy.content`, the milliseconds from the document's start to the Desk's
  * first `aria-busy` false, the same law the E2E waits for. Only for an open
- * that lands on Hoy (the home-screen app's `/`, or `/h/desk` itself): after a
+ * that lands on Hoy (the home-screen app's `/`, or `/h/today` itself): after a
  * client-side navigation the document's clock means nothing.
  *
  * It is a number on the transaction, with one flag (whether the frame
@@ -14,7 +14,7 @@
 
 import { getActiveSpan, getRootSpan, setMeasurement } from '@sentry/sveltekit';
 
-const LANDS_ON_HOY = new Set(['/', '/h', '/h/desk']);
+const LANDS_ON_HOY = new Set(['/', '/h', '/h/today']);
 let marked = false;
 
 export function markHoyContent(fromDevice: boolean): void {
