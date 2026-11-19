@@ -91,6 +91,8 @@
     type ReadinessBox,
   } from '$lib/record-missing';
   import { shareExpired, type RoadsheetShare } from '$lib/roadsheet';
+  import type { TeamMember } from '$lib/roadsheet-late';
+  import RoadsheetShareList from './RoadsheetShare.svelte';
 
   type PersonEmbed = {
     id: string;
@@ -739,7 +741,7 @@
         enabled: perf?.status === 'confirmed',
         retry: false,
         queryFn: ({ signal }: { signal: AbortSignal }) =>
-          fetchJSON<{ items: RoadsheetShare[] }>(
+          fetchJSON<{ items: RoadsheetShare[]; team?: TeamMember[] }>(
             `/api/performances/${encodeURIComponent(k.slug)}/roadsheet/shares?ws=${encodeURIComponent(k.ws)}`,
             signal,
           ),
@@ -843,7 +845,12 @@
         return {
           id: 'roadsheet_unshared',
           text: t('record.missing_roadsheet', locale),
-          verbs: [{ label: t('record.verb_share', locale), href: `/h/${workspaceSlug}/performance/${slug}/roadsheet` }],
+          verbs: [
+            // An editor shares from the pass; whoever cannot manage links keeps the road sheet page.
+            canEdit
+              ? { label: t('record.verb_share', locale), onclick: () => (shareOpen = true) }
+              : { label: t('record.verb_share', locale), href: `/h/${workspaceSlug}/performance/${slug}/roadsheet` },
+          ],
         };
     }
   }
@@ -1009,7 +1016,14 @@
     const v = perf.venue;
     const mapParts = v?.address ? [v.address, v.city ?? perf.city] : [v?.name ?? perf.venue_name, v?.city ?? perf.city];
     if (mapsHref(mapParts) !== null) out.push({ id: 'map', label: t('ahora.map', locale), map: mapParts });
-    out.push({ id: 'sheet', label: t('ahora.sheet', locale), href: `/h/${workspaceSlug}/performance/${slug}/roadsheet`, ariaLabel: t('roadsheet.open', locale) });
+    // «Compartir» (ADR-222): sharing lives in the pass. Whoever cannot edit the
+    // performance cannot manage links (the editor would answer 403): for them
+    // it stays a plain link to the road sheet page.
+    if (canEdit) {
+      out.push({ id: 'sheet', label: t('pass.share', locale), onclick: () => (shareOpen = true), testid: 'pass-share' });
+    } else {
+      out.push({ id: 'sheet', label: t('ahora.sheet', locale), href: `/h/${workspaceSlug}/performance/${slug}/roadsheet`, ariaLabel: t('roadsheet.open', locale) });
+    }
     return out;
   });
 
@@ -1084,6 +1098,8 @@
   let boardView = $derived($boardQuery.data ?? null);
   let boardNew = $derived(boardUnread(boardView));
   let talkOpen = $state(false);
+  /** «Compartir» (ADR-222): the road sheet's links, as a dialog over the pass. */
+  let shareOpen = $state(false);
   // A link to the board (`#board`: Hoy's «Tablón», a thread row, an
   // invitation's landing) opens the sheet once the board is there.
   let talkFromHash = false;
@@ -1601,6 +1617,20 @@
   </Dialog>
 {/if}
 
+<!-- «Compartir» (ADR-222): los enlaces de la hoja de ruta, sin salir del pase.
+     La vista previa por rol sigue en su página hasta la fase 2. -->
+{#if perf && canEdit}
+  <Dialog bind:open={shareOpen} title={t('pass.share_title', locale)} size="s" placing={inPeek ? 'side' : 'center'}>
+    {#if shareOpen}
+      <p class="perf__share-hint">{t('pass.share_hint', locale)}</p>
+      <RoadsheetShareList {workspaceSlug} {slug} {locale} />
+      <p class="perf__share-sheet">
+        <a href={`/h/${workspaceSlug}/performance/${slug}/roadsheet`} data-testid="pass-share-sheet">{t('pass.share_open_sheet', locale)}</a>
+      </p>
+    {/if}
+  </Dialog>
+{/if}
+
 <!-- ADR-087 · § 36: el bolo del que cuelga, elegido desde «Falta» cuando no
      cuelga de ninguno (con uno, se cambia desde su dato en la cabecera). -->
 <Dialog bind:open={boloDialogOpen} title={t('perf.bolo', locale)} size="s">
@@ -1748,6 +1778,21 @@
     .perf__place-linked {
       font-size: var(--text-m);
     }
+    .perf__share-hint {
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      margin-block-end: var(--space-s);
+    }
+
+    .perf__share-sheet {
+      margin-block-start: var(--space-m);
+      font-size: var(--text-xs);
+    }
+
+    .perf__share-sheet a {
+      color: var(--text-muted);
+    }
+
     .perf__place-acts {
       display: flex;
       flex-wrap: wrap;
