@@ -1017,6 +1017,7 @@
       display: grid;
       grid-template-columns: var(--pass-width) minmax(0, var(--read-width));
       column-gap: var(--pass-gap);
+      row-gap: var(--space-l);
       max-inline-size: var(--pass-grid-max);
       align-items: start;
     }

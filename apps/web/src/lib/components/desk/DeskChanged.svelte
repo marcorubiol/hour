@@ -40,7 +40,7 @@
   let { changes, loading, errored, onretry, quietLabel, sinceLabel, workspaceSlugById, tagNames = [], folded = false, locale }: Props = $props();
   let foldOpen = $state(false);
   let keeps = $derived(
-    loading ? '' : changes.length > 0 ? t('desk.fold_changed_n', locale, { n: changes.length }) : quietLabel,
+    loading ? '' : errored ? t('desk.changed_error', locale) : changes.length > 0 ? t('desk.fold_changed_n', locale, { n: changes.length }) : quietLabel,
   );
 
   // The way into Conversations, on the chip the band's news share (ADR-138
