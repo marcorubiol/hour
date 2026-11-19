@@ -31,18 +31,15 @@ aprueba, el sistema ejecuta y deja auditoría. UI manual e IA leen y escriben lo
 fixtures. Sin billing ni self-service. Modelo ya multi-workspace y multi-account. La beta externa espera a cerrar lo
 de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
-## Producción (verificado 2026-11-18)
+## Producción (verificado 2026-11-19)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`6f89e149`**, `dirty:false`, builtAt
-  2026-11-18T18:00Z. Deploy del 18-11 con los PR 2 a 6: el Mes nuevo («Quién falta», lo que dura es una barra, la
-  ficha con el tipo en tinta; 165 y 166), el Mes y la barra de vistas en el móvil, el «·» de la Agenda a 390 px y la
-  nota del equipo en la ficha de organización (138). `CACHE_SCHEMA` 35, sin migración. Lo entregado, en `CHANGELOG.md`.
-- Última suite completa (18-11, contra `6f89e149`): E2E de 218 specs: 193 ok, 19 saltados por datos, 6 rojos; al
-  repetir, `open-speed:123` y `roadsheet-share:17` pasaron (intermitentes) y los cuatro restantes eran specs
-  atrasados, corregidos en `7a223cfc`: «Quién falta» comparte la clase `.cal__now` con «Hoy» (`planner-laws:165`,
-  `planner-month:145`) y el spec del «·» comparaba la parte de arriba de dos cajas de distinto alto
-  (`planner-agenda:124`). Tras el arreglo, `planner-agenda`, `planner-laws` y `planner-month`: 44/44.
-  `--timeout=90000` (43 min). RLS entera: 625/629 (14-11).
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`0380d7ed`**, `dirty:false`, builtAt
+  2026-11-18T19:28Z. Deploy del 18-11 con el PR 8: la ficha de la función como pase, fase 1 (la pieza llena y el talón
+  «Listo N de M», ADR-212). `CACHE_SCHEMA` 35, sin migración. Lo entregado, en `CHANGELOG.md`.
+- Última suite completa (18 y 19-11, contra `0380d7ed`): E2E de 218 specs. La primera pasada cayó a media suite por
+  la red (`ERR_NAME_NOT_RESOLVED`); repetida desde `help.spec.ts`: 137 ok, 6 saltados y 2 rojos por tiempo
+  (`mailout-send:58`, `settings-overflow:31` a 390 px) que pasaron al repetirlos solos. Sin rojos del pase.
+  `--timeout=90000`. RLS entera: 625/629 (14-11).
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
   La integración Git de Workers Builds en `hour-web` está desconectada (Marco, 2026-11-18): fallaba en cada push
   sin `PUBLIC_SENTRY_DSN` y, de pasar, habría subido versiones sin el DSN. El único deploy es el manual; en los PR,
