@@ -8295,12 +8295,14 @@ esta entrada fija la decisión entera y la fase 1 va construida.
    y la ficha ancha dice «N por cerrar» en gris; en la Agenda las palabras de lo abierto van en gris. Solo lo urgente va en
    ámbar y dice qué y cuándo («En 2 días: compartir la hoja»). Sustituye el «Falta» ámbar de ADR-211 § 3; la regla única
    (`missingSoon`) no cambia, solo cuenta todo y marca lo urgente.
-5. **La lista (fases 2 a 4, por construir).** Una lista por espacio de trabajo, decidida en sus ajustes y válida para todas
-   sus funciones: cosas de la app (estado, hora, quién va, hoja; no se borran, sí se apagan) y cosas a mano (nombre y
-   casilla; crear, renombrar, borrar). Cada cosa: nombre, encendida, orden, proyectos donde no se pide y días de prisa
-   (vacío: nunca). La excepción es un dato, solo en cosas a mano: «Hecho» o «Aquí no hace falta» en esa función; la app
-   nunca pregunta. Datos propuestos sin migración: la lista en `workspace.settings` y el estado de cada cosa en
-   `performance.custom_fields`; si no basta, migración con rollback y puerta RLS.
+5. **La lista (fases 2 a 4, por construir).** Una lista por **proyecto** (Marco, 19-11, sobre la propuesta de una sola por
+   compañía), decidida en los ajustes del proyecto y válida para todas sus funciones. Cosas de la app (estado, hora, quién
+   va, hoja; no se borran, pero **todas se pueden apagar**, también «confirmada» y «hora») y cosas a mano (nombre y casilla;
+   crear, renombrar, borrar). Cada cosa: nombre, encendida, orden y días de prisa (vacío: nunca). Al ser por proyecto,
+   desaparece «en qué proyectos no se pide». La excepción es un dato, solo en cosas a mano: «Hecho» o «Aquí no hace falta»
+   en esa función; la app nunca pregunta. Datos propuestos sin migración: la lista en el JSON de ajustes del proyecto (el
+   constructor comprueba que exista y quién lo edita) y el estado de cada cosa en `performance.custom_fields`; si no
+   basta, migración con rollback y puerta RLS. Un proyecto sin lista usa la de serie.
 6. **Lo que no es un show** (`DateRecord`) conserva sus tres casillas automáticas, con el mismo trato de color y sin lista
    configurable por ahora.
 
