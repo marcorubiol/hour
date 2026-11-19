@@ -214,8 +214,11 @@
         {#if placeLines.length > 0 && !placeEdit}
           <span class="pass__place">
             {#if placeHref}<a class="pass__edit" href={placeHref} data-testid="pass-venue-link"
-                >{#each placeLines as l, i (i)}<span class="pass__place-line">{l}</span>{/each}</a
-              >{:else if onEditPlace}<button type="button" class="pass__edit" aria-label={editPlaceLabel} onclick={onEditPlace}
+                ><span class="pass__place-line">{placeLines[0]}</span></a
+              >{#if onEditPlace}<button type="button" class="pass__edit" aria-label={editPlaceLabel} onclick={onEditPlace}
+                  >{#if placeLines.length > 1}{#each placeLines.slice(1) as l, i (i)}<span class="pass__place-line">{l}</span
+                    >{/each}{:else}<span class="pass__place-line">{editPlaceLabel}</span>{/if}</button
+                >{:else}{#each placeLines.slice(1) as l, i (i)}<span class="pass__place-line">{l}</span>{/each}{/if}{:else if onEditPlace}<button type="button" class="pass__edit" aria-label={editPlaceLabel} onclick={onEditPlace}
                 >{#each placeLines as l, i (i)}<span class="pass__place-line">{l}</span>{/each}</button
               >{:else}{#each placeLines as l, i (i)}<span class="pass__place-line">{l}</span>{/each}{/if}
           </span>
@@ -442,8 +445,9 @@
       cursor: pointer;
       text-underline-offset: 3px;
     }
-    /* The linked venue reads as the place, like the edit door: underlined on hover. */
-    a.pass__edit {
+    /* A linked venue: its name opens its record, the city below stays the
+       door to change the place; both underline on hover. */
+    .pass__place:has(a) .pass__edit {
       display: block;
       text-decoration: none;
     }
