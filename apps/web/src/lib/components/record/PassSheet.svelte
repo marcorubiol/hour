@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * PassSheet — the pass in READ MODE (ADR-223, «el pase es la hoja de ruta»).
+   * PassSheet — the pass in READ MODE (ADR-224, «el pase es la hoja de ruta»).
    * What a person with no account opens from a link, and what the operator's
    * «view as» shows: the same filled piece as the record's, drawn only from a
    * road sheet projection the server already cut to the reader's role. It

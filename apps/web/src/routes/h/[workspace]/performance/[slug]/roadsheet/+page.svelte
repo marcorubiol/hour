@@ -5,7 +5,7 @@
    * The role pills are an OPERATOR PREVIEW — filtering happens server-side
    * per request, so switching roles refetches; the browser never holds
    * hidden sections. The document body is the pass in read mode (PassSheet,
-   * ADR-223), exactly what a public link draws.
+   * ADR-224), exactly what a public link draws.
    *
    * Public links (ADR-047): each link pins one public role; anyone with
    * the URL sees that role's projection, no account. Revocation kills the

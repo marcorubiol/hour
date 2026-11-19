@@ -155,7 +155,7 @@
     lines?: readonly PassLine[];
     /** What was closed by hand, said quietly under the list. */
     closed?: readonly PassClosed[];
-    /** READ MODE (ADR-223): the pass of someone with no account. Nothing on the
+    /** READ MODE (ADR-224): the pass of someone with no account. Nothing on the
         piece is tappable or asks for anything; the stub is `stubLine`, a mono
         line that says whose sheet this is, instead of the boxes. */
     read?: boolean;

@@ -3,7 +3,7 @@
    * Public road sheet (ADR-047, D6) — the page behind a signed link. No
    * account, no shell: the token is the capability and the server already
    * filtered the projection to the share's pinned role. Draws the pass in read
-   * mode (PassSheet, ADR-223), the same as the operator's «view as».
+   * mode (PassSheet, ADR-224), the same as the operator's «view as».
    *
    * 121 B (ADR-183): a personal link says whose sheet it is and, on the day,
    * offers «Llego tarde» (RoadsheetLate). A role link has neither.

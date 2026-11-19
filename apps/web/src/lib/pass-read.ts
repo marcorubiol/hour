@@ -1,5 +1,5 @@
 /**
- * THE PASS IN READ MODE (ADR-223): the small pure pieces both the record's
+ * THE PASS IN READ MODE (ADR-224): the small pure pieces both the record's
  * pass (`PerformanceRecord`) and the public road sheet (`PassSheet`) draw
  * from, so the eyebrow, the figure and the folds' one-line summaries are
  * written once. No clock here: `today` and `tz` are parameters.

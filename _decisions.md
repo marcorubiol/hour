@@ -8399,7 +8399,7 @@ fases en serie; esta entrada fija la dirección entera y la fase 1 va construida
 **Cómo se revierte.** Revertir el commit; sin esquema, API ni datos; `CACHE_SCHEMA` no cambia (misma clave y misma forma de
 respuesta).
 
-## [2026-11-19] ADR-223 · El enlace público y la vista previa dibujan el pase en lectura (fase 2 de ADR-222)
+## [2026-11-19] ADR-224 · El enlace público y la vista previa dibujan el pase en lectura (fase 2 de ADR-222)
 Segunda fase de «el pase es la hoja de ruta». El documento de la hoja deja de ser un componente propio.
 
 1. **Un solo dibujo en lectura.** `PassSheet` (`components/record/`) dibuja el pase en modo lectura a partir de la misma

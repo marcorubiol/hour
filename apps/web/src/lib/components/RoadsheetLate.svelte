@@ -175,7 +175,7 @@
       padding: 0;
     }
 
-    /* The thumb's act, neutral (ADR-223: amber is for what is urgent, and
+    /* The thumb's act, neutral (ADR-224: amber is for what is urgent, and
        the read pass has nothing urgent on it): a line, at the radius of buttons. */
     .late__go {
       min-block-size: var(--touch-target);
