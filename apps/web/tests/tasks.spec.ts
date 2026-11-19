@@ -27,7 +27,7 @@ const LINE_NAME = 'ZZZ E2E Modules';
 
 /** Give the context an origin before in-page fetches (ADR-067: Desk is space-less). */
 async function openApp(page: Page) {
-  await page.goto('/h/desk?scope=s:playwright');
+  await page.goto('/h/today?scope=s:playwright');
 }
 
 async function playwrightWsId(page: Page): Promise<string | null> {

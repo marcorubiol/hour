@@ -4,7 +4,7 @@ import { test, expect, type BrowserContext, type Page } from '@playwright/test';
  * OPENING HOY ON A PHONE, AS A CAP (ADR-157).
  *
  * A phone-sized Chromium (390 wide, CPU ×4, slow 4G: 150 ms, 1.6 Mbps down)
- * opens /h/desk three ways, three times each, and the median of each must
+ * opens /h/today three ways, three times each, and the median of each must
  * stay under its cap:
  *   - cold: a fresh profile, signed in, with nothing cached;
  *   - warm: a reopen with the device cache (ADR-144) good;
@@ -54,7 +54,7 @@ async function phone(page: Page) {
 async function openHoy(context: BrowserContext): Promise<number> {
   const page = await context.newPage();
   await phone(page);
-  await page.goto('/h/desk', { waitUntil: 'commit' });
+  await page.goto('/h/today', { waitUntil: 'commit' });
   const handle = await page.waitForFunction(
     () => {
       const main = document.querySelector('main');

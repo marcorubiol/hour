@@ -1,6 +1,6 @@
 /**
  * Desk feed (ADR-063/065/068/069/070 · converged design 2026-07-18; the
- * dashboard of ADR-117) — the pure builder behind /h/desk's «Te espera».
+ * dashboard of ADR-117) — the pure builder behind /h/today's «Te espera».
  * FOUR concerns grouped in day buckets, in a FIXED within-day type order:
  *
  *     tasks → conversations → decisions → money
@@ -10,7 +10,7 @@
  * The agenda is the Planner's (ADR-117 § 2): the Desk no longer draws the
  * week's rehearsals and gigs; «Lo siguiente» carries the next one.
  *
- * The theorem (spec § /h/desk): only TASKS are stored; every other row is a
+ * The theorem (spec § /h/today): only TASKS are stored; every other row is a
  * CALL computed from entity state — an overdue invoice → a "remind" call, a
  * conversation past its next action → a "reply" call — that DISAPPEARS when
  * the state changes. Nothing to tick, nothing to clean. So this module never

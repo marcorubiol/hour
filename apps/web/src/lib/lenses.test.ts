@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isToggleLens, lensesOnFor, lensOn, routedLensOf, setLensesOn, TOGGLE_LENSES } from './lenses.svelte';
+import { isToggleLens, lensesOnFor, lensHref, lensOn, routedLensOf, setLensesOn, TOGGLE_LENSES } from './lenses.svelte';
 
 describe('lensesOnFor (ADR-132)', () => {
   it('turns every lens on while no workspace has answered', () => {
@@ -43,7 +43,9 @@ describe('lensOn', () => {
 
 describe('routedLensOf (ADR-140)', () => {
   it('reads the four lens routes, with or without the slash', () => {
-    expect(routedLensOf('/h/desk')).toBe('desk');
+    expect(routedLensOf('/h/today')).toBe('desk');
+    // The address it had redirects (ADR-220): it is no lens route.
+    expect(routedLensOf('/h/desk')).toBeNull();
     expect(routedLensOf('/h/planner/')).toBe('planner');
     expect(routedLensOf('/h/conversations')).toBe('conversations');
     expect(routedLensOf('/h/books')).toBe('books');
@@ -55,5 +57,13 @@ describe('routedLensOf (ADR-140)', () => {
     expect(routedLensOf('/h/muk-cia/performance/x')).toBeNull();
     expect(routedLensOf('/h/muk-cia/settings')).toBeNull();
     expect(routedLensOf('/h/muk-cia/planner')).toBeNull();
+  });
+});
+
+describe('lensHref (ADR-220)', () => {
+  it('is the lens name, except the home, which lives at /h/today', () => {
+    expect(lensHref('desk')).toBe('/h/today');
+    expect(lensHref('planner')).toBe('/h/planner');
+    expect(routedLensOf(lensHref('desk'))).toBe('desk');
   });
 });

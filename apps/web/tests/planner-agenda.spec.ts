@@ -30,7 +30,7 @@ test.describe('the agenda (ADR-211)', () => {
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
     const page = await browser.newPage();
-    await page.goto('/h/desk');
+    await page.goto('/h/today');
     made = await plantAgenda(page);
     await page.close();
   });
@@ -38,7 +38,7 @@ test.describe('the agenda (ADR-211)', () => {
   test.afterAll(async ({ browser }) => {
     test.setTimeout(120_000);
     const page = await browser.newPage();
-    await page.goto('/h/desk');
+    await page.goto('/h/today');
     await clearAgenda(page, made);
     await page.close();
   });

@@ -137,7 +137,15 @@ const legacyVocabRedirects: Handle = async ({ event, resolve }) => {
 
   // Lens rename (ADR-065): /h/[ws]/agenda → the Desk, space-less since ADR-067.
   if (/^\/h\/[^/]+\/agenda\/?$/.test(path)) {
-    const dest = new URL('/h/desk', event.url);
+    const dest = new URL('/h/today', event.url);
+    dest.search = event.url.search;
+    return Response.redirect(dest.toString(), 301);
+  }
+
+  // The home's address says what it is (ADR-220): /h/desk → /h/today, query
+  // kept. Client-side: routes/h/desk/+page.ts.
+  if (/^\/h\/desk\/?$/.test(path)) {
+    const dest = new URL('/h/today', event.url);
     dest.search = event.url.search;
     return Response.redirect(dest.toString(), 301);
   }
@@ -147,7 +155,7 @@ const legacyVocabRedirects: Handle = async ({ event, resolve }) => {
   // bookmarks, the mail OAuth bounce), query kept. 302, not 301: it is the
   // app's front door, not a renamed route. Client-side: routes/h/+page.ts.
   if (/^\/h\/?$/.test(path)) {
-    const dest = new URL('/h/desk', event.url);
+    const dest = new URL('/h/today', event.url);
     dest.search = event.url.search;
     return Response.redirect(dest.toString(), 302);
   }

@@ -24,7 +24,7 @@ test.describe('Calm — a composition, not a grey (ADR-139 § 5)', () => {
   test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL / PW_TEST_PASSWORD.');
 
   test('Today in calm: the day, what comes and the pills, without rows (ADR-203 § 5)', async ({ page }) => {
-    await open(page, '/h/desk', true);
+    await open(page, '/h/today', true);
     const main = page.getByRole('main');
     await expect(page.getByTestId('desk-next').or(page.getByTestId('desk-hollow')).first()).toBeVisible();
     await expect(main.getByRole('heading', { name: /^Coming up/ })).toBeVisible();
@@ -38,19 +38,19 @@ test.describe('Calm — a composition, not a grey (ADR-139 § 5)', () => {
   });
 
   test('the tile\'s «Falta algo» dot is not drawn in calm (ADR-211 § 3)', async ({ page }) => {
-    await open(page, '/h/desk', false);
+    await open(page, '/h/today', false);
     const dots = page.getByTestId('desk-tile-missing');
     test.skip((await dots.count()) === 0, 'nothing missing in the next two weeks');
     await expect(dots.first()).toHaveAttribute('role', 'img');
     await expect(dots.first()).toHaveAttribute('aria-label', 'Something missing');
-    await open(page, '/h/desk', true);
+    await open(page, '/h/today', true);
     await expect(page.getByTestId('desk-tile').first()).toBeVisible();
     await expect(page.getByTestId('desk-tile-missing')).toHaveCount(0);
   });
 
   test('the piece says the day; the lens title is heard, not seen (ADR-203 § 1)', async ({ page }) => {
     for (const calm of [false, true]) {
-      await open(page, '/h/desk', calm);
+      await open(page, '/h/today', calm);
       const piece = page.getByTestId('desk-next').or(page.getByTestId('desk-hollow')).first();
       await expect(piece).toBeVisible();
       await expect(piece).not.toContainText(/overdue|waiting for you/i);
@@ -113,7 +113,7 @@ test.describe('Calm — a composition, not a grey (ADR-139 § 5)', () => {
   });
 
   test('switching calm is heard, not only seen', async ({ page }) => {
-    await open(page, '/h/desk', false);
+    await open(page, '/h/today', false);
     // El de calma, no el del alta rápida (⌘K), que también vive en la página.
     const announce = page.locator('[aria-live="polite"].visually-hidden').filter({ hasText: /^Calm (on|off)/ });
     await page.locator('body').press('c');

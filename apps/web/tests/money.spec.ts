@@ -149,7 +149,7 @@ test.describe('Cuentas', () => {
     );
 
     try {
-      await page.goto(`/h/desk?peek=bolo/${projectId}/${boloId}`);
+      await page.goto(`/h/today?peek=bolo/${projectId}/${boloId}`);
       await waitForLoaded(page);
       const history = page.getByTestId('bolo-history');
       await expect(history).toBeVisible({ timeout: 15_000 });
@@ -239,7 +239,7 @@ test.describe('Cuentas without read:money', () => {
     await page.locator('input[type=email]').fill(LIMITED_EMAIL!);
     await page.locator('input[type=password]').fill(LIMITED_PASSWORD!);
     await page.getByRole('button', { name: /sign in/i }).click();
-    await page.waitForURL(/\/h\/desk\/?$/, { timeout: 60_000 });
+    await page.waitForURL(/\/h\/today\/?$/, { timeout: 60_000 });
 
     await page.goto('/h/planner');
     await waitForLoaded(page);
@@ -259,7 +259,7 @@ test.describe('Cuentas without read:money', () => {
     await expect(page.getByRole('button', { name: /^Add:/ })).toHaveCount(0);
 
     // The Desk follows the same flags: neither door is drawn (ADR-124, ADR-127 § 7).
-    await page.goto('/h/desk');
+    await page.goto('/h/today');
     await waitForLoaded(page);
     await expect(page.getByTestId('door-planner')).toBeVisible();
     await expect(page.getByTestId('door-conversations')).toHaveCount(0);

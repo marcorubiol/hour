@@ -19,7 +19,7 @@ const EMAIL = process.env.PW_TEST_EMAIL ?? '';
 const PASSWORD = process.env.PW_TEST_PASSWORD ?? '';
 
 /** Every lens carries the shell, and therefore the pulse. */
-const LENSES = ['/h/planner', '/h/desk', '/h/conversations', '/h/books'];
+const LENSES = ['/h/planner', '/h/today', '/h/conversations', '/h/books'];
 
 async function pulseBox(page: Page) {
   return page.evaluate(() => {

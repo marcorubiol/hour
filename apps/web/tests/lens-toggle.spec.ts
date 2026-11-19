@@ -53,22 +53,22 @@ test.describe('Lenses per space (ADR-132)', () => {
 
   test.beforeAll(async ({ browser }) => {
     const page = await browser.newPage();
-    await page.goto(`/h/desk${SCOPE}`);
+    await page.goto(`/h/today${SCOPE}`);
     id = await wsId(page);
     await page.close();
   });
 
   test.afterAll(async ({ browser }) => {
     const page = await browser.newPage();
-    await page.goto(`/h/desk${SCOPE}`);
+    await page.goto(`/h/today${SCOPE}`);
     await setLensesOff(page, id, []);
     await page.close();
   });
 
   test('a lens off leaves the switcher, the Desk and ⌘K', async ({ page }) => {
-    await page.goto(`/h/desk${SCOPE}`);
+    await page.goto(`/h/today${SCOPE}`);
     await setLensesOff(page, id, ['planner', 'books']);
-    await page.goto(`/h/desk${SCOPE}`);
+    await page.goto(`/h/today${SCOPE}`);
     await waitForLoaded(page);
 
     const nav = page.getByRole('navigation', { name: 'Sections' });
@@ -92,7 +92,7 @@ test.describe('Lenses per space (ADR-132)', () => {
 
     // Back on: everything returns.
     await setLensesOff(page, id, []);
-    await page.goto(`/h/desk${SCOPE}`);
+    await page.goto(`/h/today${SCOPE}`);
     await waitForLoaded(page);
     await expect(nav.getByRole('link', { name: 'Planner' })).toBeVisible();
     await expect(page.getByTestId('door-planner')).toBeVisible();
@@ -103,7 +103,7 @@ test.describe('Lenses per space (ADR-132)', () => {
   });
 
   test('by URL, the lens says it is off and who turns it on', async ({ page }) => {
-    await page.goto(`/h/desk${SCOPE}`);
+    await page.goto(`/h/today${SCOPE}`);
     await setLensesOff(page, id, ['books']);
     await page.goto(`/h/books${SCOPE}`);
     await waitForLoaded(page);
@@ -122,7 +122,7 @@ test.describe('Lenses per space (ADR-132)', () => {
   });
 
   test('Settings turns a lens back on', async ({ page }) => {
-    await page.goto(`/h/desk${SCOPE}`);
+    await page.goto(`/h/today${SCOPE}`);
     await setLensesOff(page, id, ['books']);
     await page.goto('/h/playwright/settings?section=lenses');
     const group = page.getByTestId('settings-lenses');

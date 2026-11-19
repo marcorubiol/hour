@@ -50,11 +50,11 @@ setup('authenticate', async ({ page }) => {
   await page.getByRole('button', { name: /sign in/i }).click();
 
   // ADR-137: sign-in lands on the Desk, the one front door.
-  await page.waitForURL(/\/h\/desk\/?$/);
+  await page.waitForURL(/\/h\/today\/?$/);
   // THE WAY HOME IS THE CLOCK (2026-07-31), and home is the Desk. Located by
-  // the door itself (`a[href="/h/desk"]` wrapping the clock) rather than by
+  // the door itself (`a[href="/h/today"]` wrapping the clock) rather than by
   // its label, which is translated.
-  await expect(page.locator('a[href="/h/desk"] time:visible')).toBeVisible();
+  await expect(page.locator('a[href="/h/today"] time:visible')).toBeVisible();
 
   // THE WELCOME CARDS AND FIRST-TIME NOTES STAY OUT OF EVERY OTHER SPEC:
   // they add a heading or a line inside the blocks the specs read.

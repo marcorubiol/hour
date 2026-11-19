@@ -66,7 +66,7 @@ test.describe('The gig day on Hoy (ADR-146, ADR-202 § 5)', () => {
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
     const page = await browser.newPage();
-    await page.goto('/h/desk');
+    await page.goto('/h/today');
     const me = await api(page, 'GET', '/api/me');
     const personId = (me.json?.person_id as string | null) ?? null;
     const wss = await api(page, 'GET', '/api/workspaces');
@@ -155,7 +155,7 @@ test.describe('The gig day on Hoy (ADR-146, ADR-202 § 5)', () => {
 
   test.afterAll(async ({ browser }) => {
     const page = await browser.newPage();
-    await page.goto('/h/desk');
+    await page.goto('/h/today');
     if (made.perf) await api(page, 'DELETE', `/api/performances/${made.perf}`);
     if (made.date) await api(page, 'DELETE', `/api/dates/${made.date}`);
     await page.close();
@@ -164,7 +164,7 @@ test.describe('The gig day on Hoy (ADR-146, ADR-202 § 5)', () => {
   test('THE GIG DAY IS HOY\'S PIECE: THE DAY, FOUR FACTS AND THREE ACTIONS', async ({ page }) => {
     test.setTimeout(90_000);
     await page.clock.setFixedTime(new Date(local('08:30')));
-    await page.goto('/h/desk');
+    await page.goto('/h/today');
     await waitForLoaded(page);
 
     // Ahora is no longer a screen nor a button (ADR-202 § 5).
@@ -198,7 +198,7 @@ test.describe('The gig day on Hoy (ADR-146, ADR-202 § 5)', () => {
     test.setTimeout(90_000);
     // 12h: inside the load-in (11h), which runs until the soundcheck at 17h.
     await page.clock.setFixedTime(new Date(local('12:00')));
-    await page.goto('/h/desk');
+    await page.goto('/h/today');
     await waitForLoaded(page);
     await expect(page.getByTestId('desk-next-now')).toContainText('→ 17h', { timeout: 20_000 });
   });
@@ -206,7 +206,7 @@ test.describe('The gig day on Hoy (ADR-146, ADR-202 § 5)', () => {
   test('?mode=ahora LANDS ON HOY (ADR-203 § 7)', async ({ page }) => {
     test.setTimeout(60_000);
     await page.clock.setFixedTime(new Date(local('14:10')));
-    await page.goto('/h/desk?mode=ahora');
+    await page.goto('/h/today?mode=ahora');
     await expect(page).not.toHaveURL(/mode=ahora/, { timeout: 20_000 });
     await expect(page.getByTestId('desk-next')).toBeVisible({ timeout: 20_000 });
     await expect(page.getByTestId('ahora')).toHaveCount(0);
@@ -223,7 +223,7 @@ test.describe('The gig day on Hoy (ADR-146, ADR-202 § 5)', () => {
     });
     const page = await context.newPage();
     await page.clock.setFixedTime(new Date(local('14:10')));
-    await page.goto('/h/desk');
+    await page.goto('/h/today');
     const piece = page.getByTestId('desk-next');
     const acts = page.getByTestId('desk-acts');
     await expect(acts).toBeVisible({ timeout: 30_000 });

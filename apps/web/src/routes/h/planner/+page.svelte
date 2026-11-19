@@ -1852,7 +1852,7 @@
     const ws = tk ? workspaceSlugById.get(tk.workspace_id) : undefined;
     if (tk?.conversation && ws && lensOn('conversations')) return `/h/${ws}/conversation/${tk.conversation.id}`;
     if (tk?.performance?.slug && ws) return `/h/${ws}/performance/${tk.performance.slug}`;
-    return '/h/desk';
+    return '/h/today';
   }
   function stepVM(item: DeskItem): StepVM {
     const project = item.projectId ? rawProjectById.get(item.projectId) : undefined;

@@ -9,7 +9,7 @@ async function login(page: Page) {
   await page.locator('input[type=password]').fill(PASSWORD!);
   await page.getByRole('button', { name: /sign in/i }).click();
   // ADR-137: sign-in lands on the Desk.
-  await page.waitForURL(/\/h\/desk\/?$/);
+  await page.waitForURL(/\/h\/today\/?$/);
   // The Desk names the tab: the Hall used to keep the login's «Sign in» (ADR-130 § 5).
   await expect(page).toHaveTitle(/^[^·—]+ · Hour$/);
 }

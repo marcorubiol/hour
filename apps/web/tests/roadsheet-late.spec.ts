@@ -83,7 +83,7 @@ test.describe('«llego tarde» from his own road sheet (121 B)', () => {
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
     const page = await browser.newPage();
-    await page.goto('/h/desk');
+    await page.goto('/h/today');
     await waitForLoaded(page);
     const wss = await api(page, 'GET', '/api/workspaces');
     const ws = (wss.json?.items as { id: string; slug: string }[]).find((w) => w.slug === 'playwright');
@@ -136,7 +136,7 @@ test.describe('«llego tarde» from his own road sheet (121 B)', () => {
 
   test.afterAll(async ({ browser }) => {
     const page = await browser.newPage();
-    await page.goto('/h/desk');
+    await page.goto('/h/today');
     for (const s of [made.personal, made.role]) {
       if (made.perf && s) await api(page, 'DELETE', `/api/performances/${made.perf}/roadsheet/shares/${s.id}?ws=playwright`);
     }
@@ -189,7 +189,7 @@ test.describe('«llego tarde» from his own road sheet (121 B)', () => {
     browser,
   }) => {
     test.setTimeout(90_000);
-    await page.goto('/h/desk');
+    await page.goto('/h/today');
     await waitForLoaded(page);
     const band = page.getByTestId('late-band');
     const item = band.locator('li').filter({ hasText: PERSON });

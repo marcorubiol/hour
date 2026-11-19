@@ -130,7 +130,7 @@ test.describe('sheet mirror', () => {
 
   test('the venue shows the project with its bolo and fee; the project mirrors it', async ({ page }) => {
     test.setTimeout(90_000);
-    await page.goto('/h/desk');
+    await page.goto('/h/today');
     const owned = await ownRows(page);
     const href = `/h/playwright/conversation/${owned.conversationId}`;
 
@@ -179,7 +179,7 @@ test.describe('sheet mirror', () => {
       await expect(chatRow).toContainText(NOTE);
 
       // 3. Hoy: the «Te espera» row is the chat row, the verb on its left.
-      await page.goto('/h/desk');
+      await page.goto('/h/today');
       await waitForLoaded(page);
       const waits = page.locator('section.waits');
       const seeAll = waits.getByRole('button', { name: /^See all by day/ });

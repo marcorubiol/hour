@@ -37,7 +37,7 @@
   }
 
   /** After signing in: Hoy (ADR-137), unless `?next=` says where. */
-  const HOME = '/h/desk';
+  const HOME = '/h/today';
 
   type Mode = 'signin' | 'signup' | 'recover' | 'reset';
   let mode = $derived.by<Mode>(() => {

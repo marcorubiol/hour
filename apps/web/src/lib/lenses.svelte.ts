@@ -43,6 +43,11 @@ export function lensOn(lens: Lens): boolean {
   return lens === 'desk' || on.has(lens);
 }
 
+/** A lens's address: its own name, except the home, which lives at /h/today (ADR-220). */
+export function lensHref(lens: Lens): string {
+  return `/h/${lens === 'desk' ? 'today' : lens}`;
+}
+
 /**
  * The lens a path shows, if it is one. ADR-067: lens routes are space-less,
  * the space segment appears only on entity URLs. One reading for the shell
@@ -50,6 +55,8 @@ export function lensOn(lens: Lens): boolean {
  * never disagree on «am I in a section».
  */
 export function routedLensOf(pathname: string): Lens | null {
-  const m = pathname.match(/^\/h\/(desk|planner|conversations|books)\/?$/);
-  return (m?.[1] as Lens | undefined) ?? null;
+  // The home's address is /h/today (ADR-220); its lens keeps the name `desk`.
+  const m = pathname.match(/^\/h\/(today|planner|conversations|books)\/?$/);
+  if (!m) return null;
+  return m[1] === 'today' ? 'desk' : (m[1] as Lens);
 }

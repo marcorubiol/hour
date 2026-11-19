@@ -1,7 +1,7 @@
 /**
  * WHAT A PHONE DOWNLOADS TO OPEN HOY, AS A CAP (ADR-157).
  *
- * The initial load of `/h/desk`: SvelteKit's entry, the three route nodes on
+ * The initial load of `/h/today`: SvelteKit's entry, the three route nodes on
  * the way (root layout, the /h frame, the Desk page), every chunk and
  * stylesheet they import statically, and the dictionary of the language the
  * phone speaks (es; English always ships). Measured in brotli,
@@ -33,7 +33,7 @@ const WEB = join(import.meta.dirname, '..', '..');
 const CLIENT = join(WEB, '.svelte-kit', 'output', 'client');
 const MANIFEST = join(CLIENT, '.vite', 'manifest.json');
 const NODES = join(WEB, '.svelte-kit', 'generated', 'client-optimized', 'nodes');
-const ROUTE_FILES = ['src/routes/+layout.svelte', 'src/routes/h/+layout.svelte', 'src/routes/h/desk/+page.svelte'];
+const ROUTE_FILES = ['src/routes/+layout.svelte', 'src/routes/h/+layout.svelte', 'src/routes/h/today/+page.svelte'];
 const DICTIONARY = 'src/lib/i18n/es.json';
 
 type Chunk = { file: string; imports?: string[]; css?: string[]; isEntry?: boolean };

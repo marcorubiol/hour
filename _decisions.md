@@ -8292,7 +8292,26 @@ trabajo por hacer?
    lenguas (`desk.piece_none`, `desk.piece_done`). «Hoy, nada» encima de una lista de trabajo se contradecía.
 3. **«Ha cambiado» y «La temporada» en escritorio** ya son pliegues al pie (ADR-218 § 3); no se tocan aquí.
 
-**Pendiente.** La ruta pasa de `/h/desk` a `/h/today` con redirección desde la vieja, en un PR aparte: pide reservar
-`today` como slug en la base y en `reserved-slugs.ts`.
+**La ruta:** ADR-220.
 
 **Cómo se revierte.** Revertir el commit: vuelven los dos textos. Sin esquema ni API; `CACHE_SCHEMA` no cambia.
+
+## [2026-11-19] ADR-220 · La casa vive en `/h/today` (enmienda ADR-137 § 3 en la ruta)
+
+**Contexto.** Marco, 19-11, tras ADR-219: si la vista se llama Hoy, que la dirección diga `desk` es el último resto
+del nombre viejo.
+
+**Decisión.**
+1. **La ruta es `/h/today`.** `/h/desk` redirige con su query: 301 en `hooks.server.ts` para una carga completa y
+   `routes/h/desk/+page.ts` para una navegación dentro de la app. `/h` sigue entrando en la casa (ADR-137 § 1).
+2. **El código sigue diciendo `desk`:** la lente (`routedLensOf` lee `today` y devuelve `desk`), los componentes, las
+   claves de texto y las de caché. Renombrarlo todo no cambia nada que se vea.
+3. **`today` queda reservada como nombre de espacio,** en `reserved-slugs.ts` y en `is_reserved_slug` (migración
+   `20261119100000`, aditiva; el 19-11 ningún espacio de producción usa `today`). `desk` sigue reservada.
+
+**Orden al publicar.** La migración antes o a la vez que el deploy; con el deploy sin la migración, un alias `today`
+pasaría la base y no resolvería (nadie lo usa hoy). Los specs del E2E ya nombran `/h/today`: se corren contra el
+origen desplegado con este cambio.
+
+**Cómo se revierte.** Revertir el commit y `build/runbooks/rollback-20261119-reserve-today-slug.sql`. Sin cambio de
+API; `CACHE_SCHEMA` no cambia.

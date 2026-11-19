@@ -13,18 +13,18 @@ test.describe('document title', () => {
   test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL and PW_TEST_PASSWORD.');
 
   test('each dashboard names itself, also by client navigation', async ({ page }) => {
-    for (const path of ['/h/desk', '/h/planner', '/h/conversations', '/h/books']) {
+    for (const path of ['/h/today', '/h/planner', '/h/conversations', '/h/books']) {
       await page.goto(path);
       await expect(page).toHaveTitle(/^[^·—]+ · Hour$/);
     }
 
     // Client-side: the lens switcher is a nav of links; each hop retitles.
-    await page.goto('/h/desk');
+    await page.goto('/h/today');
     await expect(page).toHaveTitle(/^(Today|Hoy|Avui|Aujourd’hui|Aujourd'hui) · Hour$/);
     const lenses = page.getByRole('navigation', { name: /sections|secciones|seccions/i }).getByRole('link');
     const hrefs = await lenses.evaluateAll((els) => els.map((el) => el.getAttribute('href') ?? ''));
     let previous = await page.title();
-    for (const href of hrefs.filter((h) => !h.endsWith('/desk'))) {
+    for (const href of hrefs.filter((h) => !h.endsWith('/today'))) {
       await lenses.and(page.locator(`[href="${href}"]`)).click();
       await page.waitForURL((u) => u.pathname === href);
       await expect(page).not.toHaveTitle(previous);

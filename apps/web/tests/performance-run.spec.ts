@@ -53,7 +53,7 @@ test.describe('a performance that lasts several days (ADR-084 §1)', () => {
 
   test.afterAll(async ({ browser }) => {
     const page = await browser.newPage();
-    await page.goto('/h/desk');
+    await page.goto('/h/today');
     for (const id of made) {
       await page.evaluate((i) => fetch(`/api/performances/${i}`, { method: 'DELETE' }), id);
     }

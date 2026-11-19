@@ -13,7 +13,7 @@ const PASSWORD = process.env.PW_TEST_PASSWORD ?? '';
 const RUN_TAG = Date.now().toString(36);
 const TASK_TODAY = `ZZZ E2E Desk Today ${RUN_TAG}`;
 const TASK_LOOSE = `ZZZ E2E Desk Loose ${RUN_TAG}`;
-const DESK = '/h/desk?scope=s:playwright';
+const DESK = '/h/today?scope=s:playwright';
 const SB_URL = process.env.PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const PROPOSAL_ADD = `ZZZ E2E Desk Proposal Add ${RUN_TAG}`;

@@ -37,7 +37,7 @@ async function clearScope(page: Page) {
 }
 
 test('Everything clears ?scope= from the URL after opening a scoped link', async ({ page }) => {
-  await page.goto(`/h/desk?scope=${FIXTURE_SPACE_TOKEN}`);
+  await page.goto(`/h/today?scope=${FIXTURE_SPACE_TOKEN}`);
   await waitForLoaded(page);
 
   // The scope pill names the scope once the caches resolve and the token applies.
@@ -69,7 +69,7 @@ test('a saved scope applied from the palette, then the tag’s ×, cleans the UR
 
   // 1. Enter by the front door: /h is the Desk (ADR-137).
   await page.goto('/h');
-  await page.waitForURL(/\/h\/desk/, { timeout: 10000 });
+  await page.waitForURL(/\/h\/today/, { timeout: 10000 });
   await waitForLoaded(page);
 
   // 2. Unscoped, the field opens the palette: its first rows are the saved scopes.
@@ -97,7 +97,7 @@ test('a saved scope applied from the palette, then the tag’s ×, cleans the UR
 test('a scoped link to the front door keeps its scope on the Desk, and Everything cleans it', async ({ page }) => {
   await page.goto(`/h?scope=${FIXTURE_SPACE_TOKEN}`);
   // /h forwards with its query (ADR-137): the scope arrives on the Desk.
-  await page.waitForURL(/\/h\/desk\?scope=s:playwright/, { timeout: 10000 });
+  await page.waitForURL(/\/h\/today\?scope=s:playwright/, { timeout: 10000 });
   await waitForLoaded(page);
   await expect(scopedPill(page)).toBeVisible();
 
@@ -181,7 +181,7 @@ test('a scope change on a person opened from Conversations lands back on Convers
 // inside SvelteKit's first mount, before the router had its root: replaceState
 // threw «reading '$set'» and the app stayed blank. Every lens, both kinds of pin.
 for (const [lens, token] of [
-  ['desk', FIXTURE_SPACE_TOKEN],
+  ['today', FIXTURE_SPACE_TOKEN],
   ['conversations', FIXTURE_PROJECT_TOKEN],
   ['planner', FIXTURE_SPACE_TOKEN],
   ['books', FIXTURE_PROJECT_TOKEN],
@@ -275,7 +275,7 @@ test('the tag saves the scope, and the palette lists it first', async ({ page })
     localStorage.setItem('hour_scopes', JSON.stringify({ saved: [], recent: [] }));
     sessionStorage.setItem('e2e-scopes-seeded', '1');
   });
-  await page.goto(`/h/desk?scope=${FIXTURE_SPACE_TOKEN}`);
+  await page.goto(`/h/today?scope=${FIXTURE_SPACE_TOKEN}`);
   await waitForLoaded(page);
 
   await scopedPill(page).click();
@@ -296,4 +296,10 @@ test('the tag saves the scope, and the palette lists it first', async ({ page })
   await everythingPill(page).click();
   await expect(palette.locator('.cmdk__group').filter({ hasText: 'Recent' })).toHaveCount(0);
   await expect(palette.locator('.cmdk__group').first()).toHaveText('Saved');
+});
+
+// ADR-220: the home lives at /h/today; the address it had sends you there, query kept.
+test('/h/desk redirects to /h/today and keeps the scope', async ({ page }) => {
+  await page.goto('/h/desk?scope=s:playwright');
+  await page.waitForURL(/\/h\/today\?scope=s:playwright/, { timeout: 10000 });
 });

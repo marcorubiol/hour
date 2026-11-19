@@ -89,7 +89,7 @@
       await queryClient.invalidateQueries({ queryKey: ['workspaces'] });
       await queryClient.refetchQueries({ queryKey: ['workspaces'] });
       markHelpSeen(SPACE_ASKED_KEY);
-      if (page.url.pathname !== '/h/desk') await goto('/h/desk');
+      if (page.url.pathname !== '/h/today') await goto('/h/today');
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) nameError = t('workspace.name_taken', locale);
       else formError = `${t('workspace.not_created', locale)}. ${err instanceof Error ? err.message : t('perf.unexpected', locale)}`;

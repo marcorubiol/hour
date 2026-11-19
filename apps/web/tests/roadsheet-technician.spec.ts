@@ -69,7 +69,7 @@ test.describe('the technician’s road sheet (120)', () => {
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
     const page = await browser.newPage();
-    await page.goto('/h/desk');
+    await page.goto('/h/today');
     await waitForLoaded(page);
     const wss = await api(page, 'GET', '/api/workspaces');
     const ws = (wss.json?.items as { id: string; slug: string }[]).find((w) => w.slug === 'playwright');
@@ -160,7 +160,7 @@ test.describe('the technician’s road sheet (120)', () => {
 
   test.afterAll(async ({ browser }) => {
     const page = await browser.newPage();
-    await page.goto('/h/desk');
+    await page.goto('/h/today');
     if (made.perf && made.share) {
       await api(page, 'DELETE', `/api/performances/${made.perf}/roadsheet/shares/${made.share}?ws=playwright`);
     }
