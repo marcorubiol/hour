@@ -192,7 +192,7 @@
           <span class="pass__time" data-testid="pass-time">{time}</span>
         {:else}
           <span class="pass__date" class:pass__date--open={!timeOptional} data-testid={timeOptional ? undefined : 'pass-no-time'}
-            >{day.month}{#if !timeOptional} · {t('pass.no_time', locale)}{/if}</span
+            >{day.month}{#if dayEnd} – {dayEnd.short}{/if}{#if !timeOptional} · {t('pass.no_time', locale)}{/if}</span
           >
           <span class="pass__time pass__time--date">
             {#if onEditDate}<button type="button" class="pass__edit" aria-label={editDateLabel} onclick={onEditDate}>{day.big}</button
@@ -205,8 +205,8 @@
         {#if placeLines.length > 0 && !placeEdit}
           <span class="pass__place">
             {#if onEditPlace}<button type="button" class="pass__edit" aria-label={editPlaceLabel} onclick={onEditPlace}
-                >{#each placeLines as l (l)}<span class="pass__place-line">{l}</span>{/each}</button
-              >{:else}{#each placeLines as l (l)}<span class="pass__place-line">{l}</span>{/each}{/if}
+                >{#each placeLines as l, i (i)}<span class="pass__place-line">{l}</span>{/each}</button
+              >{:else}{#each placeLines as l, i (i)}<span class="pass__place-line">{l}</span>{/each}{/if}
           </span>
         {:else if placeLines.length === 0 && !placeEdit && onEditPlace}
           <!-- No place yet: the same door, with a verb instead of a name. -->
