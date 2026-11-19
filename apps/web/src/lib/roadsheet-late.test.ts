@@ -243,4 +243,16 @@ describe('words', () => {
     expect(lateMinutesWord(45, 'es')).toBe('45 min o más');
     expect(lateMinutesWord(null, 'es')).toBe('sin saber cuánto');
   });
+
+  test('a phone on a later row of the same person counts; the role stays the first', () => {
+    const team = roadsheetTeam(
+      [
+        { role: 'luces', person: { id: 'pau', full_name: 'Pau', phone: null } },
+        { role: 'sonido', person: { id: 'pau', full_name: 'Pau', phone: null }, contact_override: { phone: '+34611' } },
+      ],
+      [],
+      [],
+    );
+    expect(team.map((m) => [m.person_id, m.role, m.has_phone])).toEqual([['pau', 'luces', true]]);
+  });
 });

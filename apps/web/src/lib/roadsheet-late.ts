@@ -256,8 +256,15 @@ export function roadsheetTeam(
 ): TeamMember[] {
   const out = new Map<string, TeamMember>();
   const add = (row: TeamRow, kind: TeamMember['kind']) => {
-    if (!row.person || out.has(row.person.id)) return;
+    if (!row.person) return;
     const has_phone = Boolean(overridePhone(row.contact_override) || row.person.phone?.trim());
+    // The same person twice keeps the first row's role, but a phone on any of
+    // their rows counts: the base reads the override of whichever row has one.
+    const existing = out.get(row.person.id);
+    if (existing) {
+      existing.has_phone ||= has_phone;
+      return;
+    }
     out.set(row.person.id, { person_id: row.person.id, name: row.person.full_name, role: row.role?.trim() || null, kind, has_phone });
   };
   for (const row of crew) add(row, 'crew');

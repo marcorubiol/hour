@@ -127,6 +127,8 @@
       callsOpen = false;
       refresh();
       void queryClient.invalidateQueries({ queryKey: ['performance'] });
+      // The operator's preview (`['roadsheet', { ws, slug, role }]`) draws the contact too.
+      void queryClient.invalidateQueries({ queryKey: ['roadsheet'] });
     },
     onError: failed('roadsheet.calls_not_saved'),
   });
