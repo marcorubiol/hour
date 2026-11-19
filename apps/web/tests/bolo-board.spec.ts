@@ -127,10 +127,12 @@ test.describe('el tablón del bolo (ADR-106)', () => {
     await expect(tabTecnica).toBeVisible();
     await expect(board.locator('[data-facet="diners"]'), 'Diners: ausente, no bloqueado').toHaveCount(0);
 
-    // Al elegirlo, el hilo se abre debajo con el compositor ya enfocado.
+    // Al elegirlo, el hilo se abre debajo sin enfocar el compositor: un
+    // compositor enfocado crece y encogía la hoja bajo el dedo (fase 3).
     await tabTecnica.click();
     const tecnica = board.locator('article[data-facet="tecnica"]');
-    await expect(tecnica.locator('.thread__compose textarea')).toBeFocused();
+    await expect(tecnica.locator('.thread__compose textarea')).toBeVisible();
+    await expect(tecnica.locator('.thread__compose textarea')).not.toBeFocused();
     // La línea de audiencia va en el hilo abierto, sin plegar.
     await expect(tecnica.locator('.thread__audience')).toContainText(/\d/);
 
