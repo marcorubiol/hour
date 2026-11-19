@@ -9,11 +9,11 @@
  * tz-sensitive Date).
  */
 
-import type { AvailabilityItem } from './availability';
-import type { DateRow } from './date';
-import { decideBy, isHoldStatus, performanceStatusFamily } from './performance';
-import { t, type Locale } from './i18n';
-import { MOBILE_QUERY } from './breakpoints';
+import type { AvailabilityItem } from "./availability";
+import type { DateRow } from "./date";
+import { decideBy, isHoldStatus, performanceStatusFamily } from "./performance";
+import { t, type Locale } from "./i18n";
+import { MOBILE_QUERY } from "./breakpoints";
 
 interface PlannerDay {
   /** ISO date, YYYY-MM-DD. */
@@ -64,7 +64,9 @@ export function monthSpanWeeks(
 ): string[][] {
   const first = new Date(Date.UTC(from.year, from.month - 1, 1));
   const last = new Date(Date.UTC(to.year, to.month, 0));
-  const cursor = new Date(Date.UTC(from.year, from.month - 1, 1 - ((first.getUTCDay() + 6) % 7)));
+  const cursor = new Date(
+    Date.UTC(from.year, from.month - 1, 1 - ((first.getUTCDay() + 6) % 7)),
+  );
   const weeks: string[][] = [];
   while (cursor <= last) {
     const week: string[] = [];
@@ -92,7 +94,8 @@ export function monthUnderStrip(
   today?: string,
 ): { year: number; month: number } | null {
   if (weeks.length === 0) return null;
-  const week = weeks.find((w) => (w.top + w.bottom) / 2 > foot) ?? weeks[weeks.length - 1];
+  const week =
+    weeks.find((w) => (w.top + w.bottom) / 2 > foot) ?? weeks[weeks.length - 1];
   const sunday = addDaysIso(week.monday, 6);
   const iso = today && today >= week.monday && today <= sunday ? today : sunday;
   return { year: Number(iso.slice(0, 4)), month: Number(iso.slice(5, 7)) };
@@ -126,11 +129,15 @@ export function addDaysIso(iso: string, delta: number): string {
  */
 export function defaultCreateDay(
   todayIso: string,
-  view: { selected?: string | null; shown?: { from: string; to: string } | null },
+  view: {
+    selected?: string | null;
+    shown?: { from: string; to: string } | null;
+  },
 ): string {
   if (view.selected) return view.selected;
   const shown = view.shown;
-  if (!shown || (todayIso >= shown.from && todayIso <= shown.to)) return todayIso;
+  if (!shown || (todayIso >= shown.from && todayIso <= shown.to))
+    return todayIso;
   return shown.from;
 }
 
@@ -163,11 +170,11 @@ export function isoWeek(iso: string): number {
  * en-CA formats as YYYY-MM-DD natively.
  */
 export function dayKeyInTz(isoTimestamp: string, timeZone: string): string {
-  return new Intl.DateTimeFormat('en-CA', {
+  return new Intl.DateTimeFormat("en-CA", {
     timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
   }).format(new Date(isoTimestamp));
 }
 
@@ -229,7 +236,7 @@ interface RosterBundle {
  * roster on half a fact.
  */
 export function performanceRoster(bundle: RosterBundle): string[] {
-  const overrides: RosterParts['overrides'] = [];
+  const overrides: RosterParts["overrides"] = [];
   for (const o of bundle.performance.cast_override) {
     if (!o.person) continue;
     overrides.push({
@@ -247,12 +254,12 @@ export function performanceRoster(bundle: RosterBundle): string[] {
 }
 
 type ConflictSeverity =
-  | 'people'
-  | 'double'
-  | 'possible'
-  | 'blackout'
-  | 'blackout-tentative'
-  | 'concurrence';
+  | "people"
+  | "double"
+  | "possible"
+  | "blackout"
+  | "blackout-tentative"
+  | "concurrence";
 
 /**
  * Day-precision projection of a performance or date row. `day` is bucketed
@@ -270,7 +277,7 @@ export interface PlannerEvent {
   project_id: string;
   workspace_id: string;
   /** 'performance' opts into double/concurrence; date rows/legacy callers omit it. */
-  kind?: 'performance' | 'date';
+  kind?: "performance" | "date";
   /** performance_status — read only when kind is 'performance'. */
   status?: string;
 }
@@ -291,7 +298,7 @@ export interface Conflict {
  */
 export type BlackoutInput = Pick<
   AvailabilityItem,
-  'id' | 'workspace_id' | 'person_id' | 'starts_on' | 'ends_on' | 'certainty'
+  "id" | "workspace_id" | "person_id" | "starts_on" | "ends_on" | "certainty"
 >;
 
 /** Most severe first — the output ordering of `conflictsFor` (ADR-080 §3:
@@ -300,14 +307,16 @@ const SEVERITY_RANK: Record<ConflictSeverity, number> = {
   people: 0,
   double: 1,
   blackout: 2,
-  'blackout-tentative': 3,
+  "blackout-tentative": 3,
   possible: 4,
   concurrence: 5,
 };
 
 /** hold* performance — the only shape the status-aware severities read. */
 function isHoldPerf(e: PlannerEvent): boolean {
-  return e.kind === 'performance' && e.status !== undefined && isHoldStatus(e.status);
+  return (
+    e.kind === "performance" && e.status !== undefined && isHoldStatus(e.status)
+  );
 }
 
 /**
@@ -356,7 +365,9 @@ export function conflictsFor(
   blackouts: BlackoutInput[],
   committed: Record<string, string[]> = {},
 ): Conflict[] {
-  const onEvent = (id: string) => [...new Set([...(rosters[id] ?? []), ...(committed[id] ?? [])])];
+  const onEvent = (id: string) => [
+    ...new Set([...(rosters[id] ?? []), ...(committed[id] ?? [])]),
+  ];
   const out: Conflict[] = [];
 
   // Pairwise same-day clashes, grouped by day so the scan is n² per day.
@@ -371,13 +382,17 @@ export function conflictsFor(
       for (let j = i + 1; j < dayEvents.length; j++) {
         const a = dayEvents[i];
         const b = dayEvents[j];
-        const bothPerfs = a.kind === 'performance' && b.kind === 'performance';
+        const bothPerfs = a.kind === "performance" && b.kind === "performance";
         if (a.project_id === b.project_id) {
           // Two performances of ONE project on one day with a hold in
           // play is the double-booking the same-project silence was
           // hiding (ADR-080 §3); perf+travel+rehearsal stays silent.
           if (bothPerfs && (isHoldPerf(a) || isHoldPerf(b))) {
-            out.push({ severity: 'double', event_ids: [a.id, b.id], person_ids: [] });
+            out.push({
+              severity: "double",
+              event_ids: [a.id, b.id],
+              person_ids: [],
+            });
           }
           continue;
         }
@@ -387,11 +402,19 @@ export function conflictsFor(
           const setB = new Set(rosterB);
           const shared = [...new Set(rosterA)].filter((id) => setB.has(id));
           if (shared.length > 0) {
-            out.push({ severity: 'people', event_ids: [a.id, b.id], person_ids: shared });
+            out.push({
+              severity: "people",
+              event_ids: [a.id, b.id],
+              person_ids: shared,
+            });
           } else if (bothPerfs && isHoldPerf(a) && isHoldPerf(b)) {
             // Known, disjoint teams, both still options — the quiet
             // "same day, no people friction" read (ADR-080 §3).
-            out.push({ severity: 'concurrence', event_ids: [a.id, b.id], person_ids: [] });
+            out.push({
+              severity: "concurrence",
+              event_ids: [a.id, b.id],
+              person_ids: [],
+            });
           }
           // Both rosters known and disjoint otherwise: no conflict —
           // that's the point.
@@ -402,8 +425,16 @@ export function conflictsFor(
           const shared = onEvent(a.id).filter((id) => setB.has(id));
           out.push(
             shared.length > 0
-              ? { severity: 'people', event_ids: [a.id, b.id], person_ids: shared }
-              : { severity: 'possible', event_ids: [a.id, b.id], person_ids: [] },
+              ? {
+                  severity: "people",
+                  event_ids: [a.id, b.id],
+                  person_ids: shared,
+                }
+              : {
+                  severity: "possible",
+                  event_ids: [a.id, b.id],
+                  person_ids: [],
+                },
           );
         }
       }
@@ -424,7 +455,8 @@ export function conflictsFor(
           : roster.includes(block.person_id);
       if (!involved) continue;
       out.push({
-        severity: block.certainty === 'tentative' ? 'blackout-tentative' : 'blackout',
+        severity:
+          block.certainty === "tentative" ? "blackout-tentative" : "blackout",
         event_ids: [e.id],
         person_ids: block.person_id ? [block.person_id] : [],
         availability_block_id: block.id,
@@ -432,7 +464,9 @@ export function conflictsFor(
     }
   }
 
-  return out.sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]);
+  return out.sort(
+    (a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity],
+  );
 }
 
 /**
@@ -461,7 +495,7 @@ export interface DecisionPerformance {
 /** One side of a decision card — the perf ref the band renders. */
 export type DecisionSide = Pick<
   DecisionPerformance,
-  'id' | 'project' | 'venue' | 'city' | 'time' | 'status'
+  "id" | "project" | "venue" | "city" | "time" | "status"
 >;
 
 /**
@@ -476,9 +510,9 @@ export interface Decision {
   day: string;
   /** YYYY-MM — the queue spans months (window, not visible month). */
   month: string;
-  level: 'people' | 'double';
+  level: "people" | "double";
   /** 'choose' = A o B · 'release' = one side already confirmed (ADR-080 §5). */
-  kind: 'choose' | 'release';
+  kind: "choose" | "release";
   a: DecisionSide;
   b: DecisionSide;
   /** Shared person ids ('people' level only) — the caller maps to names. */
@@ -509,7 +543,7 @@ function decisionSide(p: DecisionPerformance): DecisionSide {
 }
 
 function pairId(day: string, aId: string, bId: string): string {
-  return `${day}:${[aId, bId].sort().join('+')}`;
+  return `${day}:${[aId, bId].sort().join("+")}`;
 }
 
 /**
@@ -541,14 +575,14 @@ export function decisionsFor(input: {
   today: string;
 }): { decisions: Decision[]; concurrences: Concurrence[] } {
   const { performances, rosters, today } = input;
-  const alive = performances.filter((p) => p.status !== 'cancelled');
+  const alive = performances.filter((p) => p.status !== "cancelled");
   const byId = new Map(alive.map((p) => [p.id, p]));
   const events: PlannerEvent[] = alive.map((p) => ({
     id: p.id,
     day: p.day,
     project_id: p.project_id,
     workspace_id: p.workspace_id,
-    kind: 'performance',
+    kind: "performance",
     status: p.status,
   }));
 
@@ -560,7 +594,7 @@ export function decisionsFor(input: {
     const b = byId.get(c.event_ids[1]);
     if (!a || !b) continue;
 
-    if (c.severity === 'concurrence') {
+    if (c.severity === "concurrence") {
       concurrences.push({
         id: pairId(a.day, a.id, b.id),
         day: a.day,
@@ -572,13 +606,13 @@ export function decisionsFor(input: {
     }
     // 'possible' (a roster nobody entered) is a missing fact, not a call to
     // make: not knowing who goes asserts no clash (ADR-147, ADR-154).
-    if (c.severity !== 'people' && c.severity !== 'double') continue;
+    if (c.severity !== "people" && c.severity !== "double") continue;
     const holdA = isHoldStatus(a.status);
     const holdB = isHoldStatus(b.status);
     if (!holdA && !holdB) continue;
 
-    const confirmedA = performanceStatusFamily(a.status) === 'confirmed';
-    const confirmedB = performanceStatusFamily(b.status) === 'confirmed';
+    const confirmedA = performanceStatusFamily(a.status) === "confirmed";
+    const confirmedB = performanceStatusFamily(b.status) === "confirmed";
     const release = (confirmedA && holdB) || (confirmedB && holdA);
 
     let by: string | null = null;
@@ -593,10 +627,10 @@ export function decisionsFor(input: {
       day: a.day,
       month: a.day.slice(0, 7),
       level: c.severity,
-      kind: release ? 'release' : 'choose',
+      kind: release ? "release" : "choose",
       a: decisionSide(a),
       b: decisionSide(b),
-      ...(c.severity === 'people' ? { people: c.person_ids } : {}),
+      ...(c.severity === "people" ? { people: c.person_ids } : {}),
       urgent: by !== null && today >= by,
       decideBy: by,
     });
@@ -617,8 +651,12 @@ export function decisionsFor(input: {
  * first, by its own notice (`decideBy` of each hold side, the same day for
  * both, so the longer notice wins). Without a notice on either, `a`.
  */
-export function dueOption(d: Pick<Decision, 'a' | 'b' | 'day'>, noticeOf: (id: string) => number | null | undefined): DecisionSide {
-  const by = (s: DecisionSide) => (isHoldStatus(s.status) ? decideBy(d.day, noticeOf(s.id)) : null);
+export function dueOption(
+  d: Pick<Decision, "a" | "b" | "day">,
+  noticeOf: (id: string) => number | null | undefined,
+): DecisionSide {
+  const by = (s: DecisionSide) =>
+    isHoldStatus(s.status) ? decideBy(d.day, noticeOf(s.id)) : null;
   const [ba, bb] = [by(d.a), by(d.b)];
   if (bb !== null && (ba === null || bb < ba)) return d.b;
   return d.a;
@@ -685,40 +723,63 @@ interface TourTrip {
  * with nothing of their own.
  */
 export function tourTrips(
-  dates: Array<Pick<DateRow, 'id' | 'project_id' | 'line_id' | 'kind' | 'travel_direction' | 'starts_at'>>,
+  dates: Array<
+    Pick<
+      DateRow,
+      | "id"
+      | "project_id"
+      | "line_id"
+      | "kind"
+      | "travel_direction"
+      | "starts_at"
+    >
+  >,
 ): TourTrip[] {
-  type Travel = { day: string; direction: 'outbound' | 'return' };
-  const groups = new Map<string, { project_id: string; line_id: string | null; travels: Travel[] }>();
+  type Travel = { day: string; direction: "outbound" | "return" };
+  const groups = new Map<
+    string,
+    { project_id: string; line_id: string | null; travels: Travel[] }
+  >();
   for (const d of dates) {
-    if (d.kind !== 'travel_day') continue;
-    if (d.travel_direction !== 'outbound' && d.travel_direction !== 'return') continue;
-    const key = `${d.project_id}::${d.line_id ?? ''}`;
+    if (d.kind !== "travel_day") continue;
+    if (d.travel_direction !== "outbound" && d.travel_direction !== "return")
+      continue;
+    const key = `${d.project_id}::${d.line_id ?? ""}`;
     let group = groups.get(key);
     if (!group) {
       group = { project_id: d.project_id, line_id: d.line_id, travels: [] };
       groups.set(key, group);
     }
-    group.travels.push({ day: d.starts_at.slice(0, 10), direction: d.travel_direction });
+    group.travels.push({
+      day: d.starts_at.slice(0, 10),
+      direction: d.travel_direction,
+    });
   }
   const trips: TourTrip[] = [];
   for (const group of groups.values()) {
     // Chronological; a same-day outbound sorts before its return.
     const sorted = [...group.travels].sort((a, b) =>
       a.day === b.day
-        ? (a.direction === 'outbound' ? -1 : 1) - (b.direction === 'outbound' ? -1 : 1)
+        ? (a.direction === "outbound" ? -1 : 1) -
+          (b.direction === "outbound" ? -1 : 1)
         : a.day < b.day
           ? -1
           : 1,
     );
     let openDay: string | null = null;
     for (const t of sorted) {
-      if (t.direction === 'outbound') {
+      if (t.direction === "outbound") {
         // The LAST outbound before a return is the one that trip belongs to.
         openDay = t.day;
         continue;
       }
       if (openDay === null) continue; // unpaired return — no trip
-      trips.push({ project_id: group.project_id, line_id: group.line_id, out: openDay, back: t.day });
+      trips.push({
+        project_id: group.project_id,
+        line_id: group.line_id,
+        out: openDay,
+        back: t.day,
+      });
       openDay = null;
     }
   }
@@ -726,7 +787,17 @@ export function tourTrips(
 }
 
 export function awayBands(
-  dates: Array<Pick<DateRow, 'id' | 'project_id' | 'line_id' | 'kind' | 'travel_direction' | 'starts_at'>>,
+  dates: Array<
+    Pick<
+      DateRow,
+      | "id"
+      | "project_id"
+      | "line_id"
+      | "kind"
+      | "travel_direction"
+      | "starts_at"
+    >
+  >,
   ownEventDays: Record<string, string[]> = {},
 ): AwayBand[] {
   const bands: AwayBand[] = [];
@@ -736,10 +807,16 @@ export function awayBands(
     // Contiguous runs of in-between days that carry no own event.
     let runStart: string | null = null;
     let prev: string | null = null;
-    for (let day = addDaysIso(trip.out, 1); day < trip.back; day = addDaysIso(day, 1)) {
+    for (
+      let day = addDaysIso(trip.out, 1);
+      day < trip.back;
+      day = addDaysIso(day, 1)
+    ) {
       if (eventDays.has(day)) {
         if (runStart !== null && prev !== null) {
-          bands.push(makeBand(runStart, prev, trip.project_id, trip.line_id, pair));
+          bands.push(
+            makeBand(runStart, prev, trip.project_id, trip.line_id, pair),
+          );
         }
         runStart = null;
         prev = null;
@@ -775,7 +852,7 @@ function makeBand(
  * is a week · Board — a row is an entity, and its `lanes` dial only ever
  * relabels the entity.
  */
-export type PlannerView = 'day' | 'month' | 'agenda' | 'board';
+export type PlannerView = "day" | "month" | "agenda" | "board";
 
 /**
  * Legacy view tokens, translated ONCE on entry and never written back — a
@@ -784,17 +861,23 @@ export type PlannerView = 'day' | 'month' | 'agenda' | 'board';
  * English one, with the visible labels translated instead.
  */
 const VIEW_ALIASES: Record<string, PlannerView> = {
-  carrils: 'board',
+  carrils: "board",
   // «Próximas semanas» stopped being a view (ADR-209): its strip is the
   // continuous Month, and a link or a stored entry that names it lands there.
-  overview: 'month',
+  overview: "month",
 };
 
 /** A token from a URL or from storage → a view, or null if it is neither. */
-export function normalizePlannerView(v: string | null | undefined): PlannerView | null {
-  if (v === 'day' || v === 'month' || v === 'agenda' || v === 'board') return boardOffPhone(v);
-  const alias = (v && VIEW_ALIASES[v]) || null;
-  return alias && boardOffPhone(alias);
+export function normalizePlannerView(
+  v: string | null | undefined,
+): PlannerView | null {
+  const n = plannerViewToken(v);
+  return n && boardOffPhone(n);
+}
+/** The token as written, without the phone's say: what storage holds. */
+function plannerViewToken(v: string | null | undefined): PlannerView | null {
+  if (v === "day" || v === "month" || v === "agenda" || v === "board") return v;
+  return (v && VIEW_ALIASES[v]) || null;
 }
 
 /**
@@ -803,11 +886,14 @@ export function normalizePlannerView(v: string | null | undefined): PlannerView 
  * says Board opens the Agenda there; the bar does not draw the word.
  * `phone` defaults to the screen's own answer (false outside a browser).
  */
-export function boardOffPhone<V extends PlannerView>(v: V, phone = onPhone()): V | 'agenda' {
-  return phone && v === 'board' ? 'agenda' : v;
+export function boardOffPhone<V extends PlannerView>(
+  v: V,
+  phone = onPhone(),
+): V | "agenda" {
+  return phone && v === "board" ? "agenda" : v;
 }
 function onPhone(): boolean {
-  return typeof matchMedia === 'function' && matchMedia(MOBILE_QUERY).matches;
+  return typeof matchMedia === "function" && matchMedia(MOBILE_QUERY).matches;
 }
 
 /**
@@ -816,7 +902,7 @@ function onPhone(): boolean {
  * Scope is not in it: it rides in the pins, which the shell writes to the
  * bar on arrival, like every other door between lenses.
  */
-export function plannerDayHref(view: 'day' | 'agenda', day: string): string {
+export function plannerDayHref(view: "day" | "agenda", day: string): string {
   return `/h/planner?view=${view}&d=${day}`;
 }
 
@@ -828,9 +914,13 @@ export function plannerDayHref(view: 'day' | 'agenda', day: string): string {
  * The scope is the project: the Planner has no bolo nor conversation pin
  * (ADR-092).
  */
-export function conversationPlannerHref(projectId: string, days: readonly string[], todayIso: string): string {
+export function conversationPlannerHref(
+  projectId: string,
+  days: readonly string[],
+  todayIso: string,
+): string {
   const first = days.filter((d) => d >= todayIso).sort()[0];
-  return `/h/planner?view=agenda${first ? `&d=${first}` : ''}&scope=p:${projectId}`;
+  return `/h/planner?view=agenda${first ? `&d=${first}` : ""}&scope=p:${projectId}`;
 }
 
 /**
@@ -853,19 +943,19 @@ export function resolvePlannerView(
  * membership (`membership.planner_view`), null = the default. A stored
  * `overview` (before ADR-209) reads as the Month.
  */
-export type PlannerEntryView = 'agenda' | 'month' | 'board';
+export type PlannerEntryView = "agenda" | "month" | "board";
 
 /** Where the Planner opens with nothing stored: the Agenda (ADR-211 § 4; it
     was the Month while the new Agenda was being built, ADR-209). */
-export const PLANNER_DEFAULT_VIEW: PlannerEntryView = 'agenda';
+export const PLANNER_DEFAULT_VIEW: PlannerEntryView = "agenda";
 
 export function isPlannerEntryView(v: unknown): v is PlannerEntryView {
-  return v === 'agenda' || v === 'month' || v === 'board';
+  return v === "agenda" || v === "month" || v === "board";
 }
 
 /** A stored value as an entry drawing: the old `overview` is the Month. */
 function storedEntry(v: string | null | undefined): PlannerEntryView | null {
-  const n = typeof v === 'string' ? normalizePlannerView(v) : null;
+  const n = typeof v === "string" ? plannerViewToken(v) : null;
   return isPlannerEntryView(n) ? n : null;
 }
 
@@ -881,7 +971,9 @@ export interface WithPlannerView {
  * (`plannerViewWrites`), so they agree unless a pinned visit set one alone;
  * then the first wins, deterministically. None stored → null (the default).
  */
-export function plannerEntryView(onScreen: readonly WithPlannerView[]): PlannerEntryView | null {
+export function plannerEntryView(
+  onScreen: readonly WithPlannerView[],
+): PlannerEntryView | null {
   for (const w of onScreen) {
     const v = storedEntry(w.planner_view);
     if (v) return boardOffPhone(v);
@@ -905,7 +997,9 @@ export function plannerViewWrites(
     const s = storedEntry(w.planner_view);
     return s === PLANNER_DEFAULT_VIEW ? null : s;
   };
-  return onScreen.filter((w) => stored(w) !== value).map((w) => ({ workspace_id: w.id, planner_view: value }));
+  return onScreen
+    .filter((w) => stored(w) !== value)
+    .map((w) => ({ workspace_id: w.id, planner_view: value }));
 }
 
 /**
@@ -917,9 +1011,10 @@ export function plannerViewWrites(
  * ISO-date compare, both ends inclusive (two ranges sharing a single day
  * still stack).
  */
-export function assignBandLanes(
-  bands: Array<{ from: string; to: string }>,
-): { lanes: number[]; laneCount: number } {
+export function assignBandLanes(bands: Array<{ from: string; to: string }>): {
+  lanes: number[];
+  laneCount: number;
+} {
   // Greedy interval packing — MUST walk in start order: the free-lane test
   // compares each range's `from` against a lane's last placed `to`.
   const order = bands
@@ -946,7 +1041,8 @@ export function assignBandLanes(
   // rank each packed lane by the longest range it carries, shortest on top.
   // A pure relabel — bands sharing a lane never overlap, so moving a whole
   // lane keeps every range collision-free and one stable lane per span.
-  const span = (i: number) => Date.parse(bands[i].to) - Date.parse(bands[i].from);
+  const span = (i: number) =>
+    Date.parse(bands[i].to) - Date.parse(bands[i].from);
   const laneMax = new Array<number>(laneCount).fill(-1);
   bands.forEach((_, i) => {
     if (span(i) > laneMax[rawLane[i]]) laneMax[rawLane[i]] = span(i);
@@ -997,7 +1093,9 @@ export function nightsFree(
  * (ADR-078 §6), and this is the one place that inference is allowed to move
  * a number: not because it invents a fact, but because it withdraws a claim.
  */
-export function daysCoveredBy(bands: Array<{ from: string; to: string }>): Set<string> {
+export function daysCoveredBy(
+  bands: Array<{ from: string; to: string }>,
+): Set<string> {
   const out = new Set<string>();
   for (const b of bands) {
     let d = b.from;
@@ -1030,7 +1128,14 @@ export function agendaDayKeys(
   );
 }
 
-const STATE_WORDS = new Set(['proposed', 'invoiced', 'paid', 'done', 'cancelled', 'tentative']);
+const STATE_WORDS = new Set([
+  "proposed",
+  "invoiced",
+  "paid",
+  "done",
+  "cancelled",
+  "tentative",
+]);
 
 /**
  * A performance's or a date's status as a word in the reader's language.
@@ -1039,9 +1144,11 @@ const STATE_WORDS = new Set(['proposed', 'invoiced', 'paid', 'done', 'cancelled'
  * word keeps its raw spelling, underscores as spaces.
  */
 export function statusWord(status: string, locale: Locale): string {
-  const key = STATE_WORDS.has(status) ? `planner.state_${status}` : `perf.status_${status}`;
+  const key = STATE_WORDS.has(status)
+    ? `planner.state_${status}`
+    : `perf.status_${status}`;
   const word = t(key, locale);
-  return word === key ? status.replace(/_/g, ' ') : word;
+  return word === key ? status.replace(/_/g, " ") : word;
 }
 
 /**
