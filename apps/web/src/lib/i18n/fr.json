@@ -2396,6 +2396,8 @@
   "planner.season_clashes": "conflits",
   "planner.season_clash_one": "conflit",
   "desk.add_task": "Nouvelle tâche",
+  "desk.add_short": "Ajouter",
+  "desk.head_today": "Aujourd’hui · {day}",
   "desk.title_overdue_one": "1 en retard",
   "desk.title_overdue_many": "{n} en retard",
   "desk.band_next": "À venir",

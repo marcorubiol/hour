@@ -180,6 +180,10 @@
       save();
     };
   });
+  // The wide head's label: «Hoy · miércoles 18 nov» (drawing S).
+  const headDay = new Intl.DateTimeFormat(LOCALE_TAG[locale], { weekday: 'long', day: 'numeric', month: 'short' })
+    .format(new Date())
+    .replace(/\.+$/, '');
   const sinceLabel = new Intl.DateTimeFormat(LOCALE_TAG[locale], {
     weekday: 'short',
     day: 'numeric',
@@ -902,6 +906,21 @@
   <!-- THREE BLOCKS, IN A FIXED ORDER (ADR-202 § 1): the day, what comes,
        what waits. On a desktop the news and the season's doors stay (§ 15):
        the news under them, the doors in their own column. -->
+  {#if wide.current && taskSpaces.length > 0}
+    <!-- Wide: the composer is one «+ Añadir» at the top right, on the line of
+         the day's label (drawing S); what it opens sits under that line. -->
+    <div class="desk__head">
+      <p class="eyebrow eyebrow--sub desk__label">{t('desk.head_today', locale, { day: headDay })}</p>
+      <button
+        type="button"
+        class="btn--secondary desk__addwide"
+        bind:this={addBtn}
+        aria-expanded={composerOpen}
+        onclick={openComposer}><span aria-hidden="true">+</span> {t('desk.add_short', locale)}</button
+      >
+    </div>
+    {@render composerSlot()}
+  {/if}
   <div class="desk__grid">
     <div class="desk__col desk__col--pass">
       <div class="slot slot--next" data-slot="day" data-help-step="desk-next">
@@ -930,8 +949,8 @@
           {waiting}
           rows={waitingRows}
           {today}
-          add={taskSpaces.length > 0 ? addTask : undefined}
-          composer={composerSlot}
+          add={taskSpaces.length > 0 && !wide.current ? addTask : undefined}
+          composer={wide.current ? undefined : composerSlot}
           {feed}
           {later}
           loading={waitingLoading}
@@ -1008,6 +1027,19 @@
     }
     .desk__composer {
       margin-block-end: var(--space-s);
+    }
+    .desk__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      max-inline-size: var(--pass-grid-max);
+    }
+    .desk__label {
+      margin: 0;
+    }
+    .desk--calm .desk__head,
+    .desk--calm .desk__composer {
+      max-inline-size: var(--calm-measure);
     }
 
     /* The pass's grid (the same as the record's `.pass-grid`): the day's piece

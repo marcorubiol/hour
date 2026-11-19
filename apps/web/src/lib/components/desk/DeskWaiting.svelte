@@ -517,24 +517,33 @@
      and its word; each its own door. Not named `.pill`: base.css reads any
      class containing the word as the filter pill. */
   .tallies {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: var(--space-xs);
     margin: 0 0 var(--space-s);
     padding: 0;
     list-style: none;
   }
+  .tallies > li {
+    display: flex;
+    min-inline-size: 0;
+  }
+  /* A tile: the figure in the display serif over its word (drawing S), four
+     to a row; a fifth kind, rare, wraps to a second row. */
   .tally {
-    display: inline-flex;
-    align-items: baseline;
-    gap: var(--space-xs);
-    padding: var(--space-2xs) var(--space-s);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    inline-size: 100%;
+    padding: var(--space-xs) var(--space-s);
     border: 0;
-    border-radius: var(--radius-circle);
+    border-radius: var(--radius-m);
     background: var(--bg-light);
-    color: var(--text-color);
+    color: var(--text-muted);
     font: inherit;
-    font-size: var(--text-s);
+    font-size: var(--text-xs);
+    text-align: start;
     text-decoration: none;
     cursor: pointer;
   }
@@ -542,7 +551,10 @@
     cursor: default;
   }
   .tally b {
-    font-weight: 600;
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
+    font-weight: 400;
+    line-height: 1.2;
     color: var(--heading-color);
     font-variant-numeric: tabular-nums;
   }
@@ -554,7 +566,6 @@
   @media (pointer: coarse) {
     .tally {
       min-block-size: var(--touch-target);
-      align-items: center;
     }
   }
 
