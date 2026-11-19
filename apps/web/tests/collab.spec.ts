@@ -262,12 +262,13 @@ test.describe('collaborative notes (Yjs over the RoadsheetCollab DO)', () => {
     const b = await openAsClient(browser, path);
     const addA = a.locator('.hours .hours__row--add');
     // The editor writes only once its doc has synced: the field says when.
-    await expect(addA.getByLabel(/hour|hora/i)).toBeEnabled({ timeout: 15_000 });
-    await expect(b.locator('.hours .hours__row--add').getByLabel(/hour|hora/i)).toBeEnabled({
+    await expect(addA.getByTestId('ro-add-open')).toBeEnabled({ timeout: 15_000 });
+    await expect(b.locator('.hours .hours__row--add').getByTestId('ro-add-open')).toBeEnabled({
       timeout: 15_000,
     });
 
     // A adds a moment; B sees it without reloading.
+    await addA.getByTestId('ro-add-open').click();
     await addA.getByLabel(/hour|hora/i).fill('14h');
     await addA.getByLabel(/moment/i).fill(marker);
     await addA.locator('button[type=submit]').click();

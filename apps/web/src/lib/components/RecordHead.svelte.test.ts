@@ -19,6 +19,22 @@ describe('RecordHead', () => {
     expect(container.querySelector('header')!.className).toContain('lenshead');
   });
 
+  it('slim: the address and the verbs on one line, the h1 only for assistive tech', () => {
+    const { container } = render(RecordHead, {
+      crumbs,
+      title: 'Teatre Municipal de Girona',
+      slim: true,
+      tools: [{ label: 'Invitar', onclick: () => {} }],
+    });
+    const header = container.querySelector('header')!;
+    expect(header.className).toContain('record-head--slim');
+    expect(header.className).not.toContain('lenshead');
+    const h1 = container.querySelector('h1')!;
+    expect(h1.className).toContain('visually-hidden');
+    expect(container.querySelector('.lenshead__titlerow')).toBeNull();
+    expect(container.querySelector('.record-head__slimtools')!.textContent).toContain('Invitar');
+  });
+
   it('ends the address with the kind, unlinked and current; the ancestry links', () => {
     const { container } = render(RecordHead, { crumbs, title: 'Teatre Municipal de Girona' });
     const nav = container.querySelector('nav.record-head__crumbs')!;

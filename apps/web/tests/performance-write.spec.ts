@@ -96,10 +96,13 @@ test.describe('performance write path', () => {
     // of the app's languages, so the spec does not depend on the locale.
     const order = page.locator('.hours');
     const add = order.locator('.hours__row--add');
+    // The last stop of the line opens its form (and closes it once written).
+    await add.getByTestId('ro-add-open').click();
     await add.getByLabel(/hour|hora/i).fill('11');
     await add.getByLabel(/moment/i).fill('load-in');
     await add.locator('button[type=submit]').click();
     await expect(order.locator('.hours__line')).toHaveCount(1, { timeout: 10_000 });
+    await add.getByTestId('ro-add-open').click();
     await add.getByLabel(/hour|hora/i).fill('19h30');
     await add.getByLabel(/moment/i).fill('show');
     await add.locator('button[type=submit]').click();

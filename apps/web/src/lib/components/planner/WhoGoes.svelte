@@ -48,6 +48,9 @@
     editable?: boolean;
     /** Bindable: words drawn but not written yet (deferred only). */
     changed?: boolean;
+    /** The pass's quiet row: the names in one line and a button; the list
+        and the picker open only when the button is pressed. */
+    compact?: boolean;
     locale: Locale;
   }
 
@@ -61,6 +64,7 @@
     deferred = false,
     editable = true,
     changed = $bindable(false),
+    compact = false,
     locale,
   }: Props = $props();
 
@@ -166,18 +170,40 @@
       until their «voy» is written (deferred: until the dialog saves). */
   let picked = $state(new Map<string, string>());
   const nameOf = (personId: string) => names.get(personId) ?? picked.get(personId) ?? '—';
+
+  // The compact row: «Marco, Pau y Nil · Laia no va».
+  let editing = $state(false);
+  let goingLine = $derived.by(() => {
+    const going = [...rosterIds, ...rows.filter((r) => r.word === 'going').map((r) => r.personId)].map(nameOf);
+    const out = rows.filter((r) => r.word === 'not_going').map((r) => t('commitment.line_not_going', locale, { name: nameOf(r.personId) }));
+    const list = new Intl.ListFormat(locale, { style: 'long', type: 'conjunction' });
+    return [going.length > 0 ? list.format(going) : '', ...out].filter(Boolean).join(' · ');
+  });
 </script>
 
 <!-- Somebody can always be added (ADR-107), so the section is always there. -->
 {#if (showRoster && rosterIds.length > 0) || rows.length > 0 || (editable && workspaceId)}
-<section class="who" aria-label={t('commitment.who_goes', locale)}>
-  <!-- On a performance's page it is one of the record's blocks (ADR-139 § 4);
-       in a date's dialog, a small head of its own. -->
-  {#if target === 'performance'}
+<section class="who" class:who--compact={compact} aria-label={t('commitment.who_goes', locale)}>
+  {#if compact}
+    <div class="who__line" data-testid="who-line">
+      <div class="who__said">
+        <h3 class="who__h">{t('commitment.who_goes', locale)}</h3>
+        <p class="who__names">{goingLine || t('commitment.none_yet', locale)}</p>
+      </div>
+      {#if editable}
+        <button type="button" class="who__change" aria-expanded={editing} onclick={() => (editing = !editing)}
+          >{goingLine ? t('commitment.change', locale) : `+ ${t('commitment.going', locale)}`}</button
+        >
+      {/if}
+    </div>
+  {:else if target === 'performance'}
+    <!-- On a performance's page it is one of the record's blocks (ADR-139 § 4);
+         in a date's dialog, a small head of its own. -->
     <BlockHead title={t('commitment.who_goes', locale)} concept="cast" />
   {:else}
     <h3 class="who__h">{t('commitment.who_goes', locale)}</h3>
   {/if}
+  {#if !compact || editing}
   <ul class="who__list">
     {#if showRoster}
       {#each rosterIds as personId (personId)}
@@ -247,6 +273,8 @@
   </div>
   {/if}
 
+  {/if}
+
   {#if refused}
     <p class="who__err" role="alert">{t('commitment.refused', locale)}</p>
   {/if}
@@ -259,6 +287,40 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-2xs);
+    }
+    /* The quiet row of the pass: the names in one line, one button. */
+    .who__line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-s);
+    }
+    .who__said {
+      display: grid;
+      gap: var(--space-2xs);
+      min-inline-size: 0;
+    }
+    .who__names {
+      margin: 0;
+      font-size: var(--text-m);
+    }
+    .who__change {
+      flex: none;
+      min-block-size: 2.25rem;
+      padding: var(--space-2xs) var(--space-m);
+      border: var(--line-hairline) solid var(--border-color-dark);
+      border-radius: var(--radius);
+      background: transparent;
+      color: var(--text-color);
+      font: inherit;
+      font-size: var(--text-s);
+      cursor: pointer;
+    }
+    .who__change:hover {
+      border-color: var(--text-color);
+    }
+    .who--compact {
+      gap: var(--space-s);
     }
     .who__h {
       font-family: var(--font-mono);

@@ -488,6 +488,16 @@
     --display-clock: clamp(2.375rem, 2.25rem + 0.5vw, 2.75rem);
     --display-piece: clamp(2.125rem, 2rem + 0.5vw, 2.5rem);
     --display-tile: clamp(1.875rem, 1.75rem + 0.5vw, 2.125rem);
+    /* The pass (brief ficha-pase): a ticket of a phone's width that never
+       stretches, its hour at 68 px, its day (no hour) at 56, its show at 30. */
+    --pass-width: 23.75rem;
+    /* The reading column beside it (500 px at most), the air between them (56) and the whole grid's cap (1.000). */
+    --read-width: 31.25rem;
+    --pass-gap: 3.5rem;
+    --pass-grid-max: 62.5rem;
+    --display-pass: 4.25rem;
+    --display-pass-day: 3.5rem;
+    --display-pass-show: 1.875rem;
     --h1: clamp(1.8rem, 1.5rem + 1.5vw, 2.4rem); /* 29-38 — masthead. Retuned 2026-07-12 to the size mastheads actually render (person/performance canonical); the old 32-48 was never consumed — every page rolled its own clamp to undershoot it. */
     --h2: var(--text-xxl);
     --h3: clamp(1.2rem, 1.05rem + 0.7vw, 1.5rem);

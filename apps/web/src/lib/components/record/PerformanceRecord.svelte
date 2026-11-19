@@ -1008,71 +1008,20 @@
       {locale}
     />
   {:else if perf}
+    <!-- Una sola cabecera: la pieza del pase ya dice qué es y de quién, así
+         que aquí solo quedan las migas y «Invitar al público». «Abrir la hoja
+         de ruta» es el botón Hoja del pase; el bolo y «Con…» van al pliegue. -->
     <RecordHead
+      slim
       {crumbs}
       {title}
-      {titleHref}
-      tools={[
-        {
-          label: t('roadsheet.open', locale),
-          href: `/h/${workspaceSlug}/performance/${slug}/roadsheet`,
-          concept: 'roadsheet' as const,
-        },
-        ...(canInvite
-          ? [{ label: t('audience.invite_from_performance', locale), loading: $invite.isPending, onclick: () => $invite.mutate() }]
-          : []),
-      ]}
-    >
-      <!-- Los hechos, cada uno su editor (ADR-139 p2): el estado, la insignia
-           de siempre con su menú (ADR-130 § 2, tarea 134), el cuándo y el dónde abren los datos, el bolo se
-           elige en sitio. La sala no: es el título. -->
-      {#snippet facts()}
-        {#if withWhom}
-          <span data-testid="perf-with"
-            >{t('perf.with', locale)} <a class="lenshead__frag" href={withWhom.href}>{withWhom.name}</a></span
-          >
-        {/if}
-        {#if boloReadable && currentBolo && perf!.project}
-          <span class="perf__bolo-fact">
-            {#if showBoloSelect}
-              <Menu label={t('record.bolo_menu', locale, { bolo: boloOf(currentBolo, locale, tradeFor(workspaceSlug)) })} triggerClass="fact-act">
-                {#snippet trigger()}{boloOf(currentBolo, locale, tradeFor(workspaceSlug))}<span class="status-caret" aria-hidden="true">▾</span>{/snippet}
-                {#snippet children({ close })}
-                  {#each bolosOptions as o (o.value)}
-                    <li role="none">
-                      <button
-                        type="button"
-                        role="menuitem"
-                        class="menu__item{o.value === (currentBoloId ?? '') ? ' menu__item--active' : ''}"
-                        onclick={() => {
-                          close();
-                          const next = boloPatch(currentBoloId, o.value);
-                          if ('bolo_id' in next) $patchMutation.mutate(next);
-                        }}>{o.label}</button
-                      >
-                    </li>
-                  {/each}
-                  {#if lensOn('books')}
-                    <li class="menu-separator" role="separator"></li>
-                    <li role="none">
-                      <a role="menuitem" class="menu__item" href={booksHref(perf!.project!.id, { boloId: currentBolo!.id })}
-                        >{t('record.bolo_in_books', locale)}</a
-                      >
-                    </li>
-                  {/if}
-                {/snippet}
-              </Menu>
-            {:else if lensOn('books')}
-              <a class="lenshead__frag" href={booksHref(perf!.project.id, { boloId: currentBolo.id })}>{boloOf(currentBolo, locale, tradeFor(workspaceSlug))}</a>
-            {:else}
-              {boloOf(currentBolo, locale, tradeFor(workspaceSlug))}
-            {/if}
-            <ConceptHint concept="bolo" />
-          </span>
-        {/if}
-      {/snippet}
-    </RecordHead>
+      tools={canInvite
+        ? [{ label: t('audience.invite_from_performance', locale), loading: $invite.isPending, onclick: () => $invite.mutate() }]
+        : []}
+    />
 
+    <div class="pass-grid">
+      <div class="pass-grid__left">
     <!-- El pase (brief ficha-pase, fase 1): la pieza llena con la hora, el
          estado como etiqueta, el talón «Listo N de M» y las acciones. Sustituye
          a la línea de datos y a «Falta»; lo demás de la ficha sigue igual. -->
@@ -1080,7 +1029,7 @@
       {locale}
       project={perf.project}
       eyebrow={`${t('perf.label', locale)} · ${passWhen}`}
-      date={dayLabel(perf.performed_at, 'short')}
+      dayIso={perf.performed_at.slice(0, 10)}
       time={startTime}
       show={perf.project?.name ?? null}
       place={passPlace}
@@ -1133,6 +1082,201 @@
       {/snippet}
     </RecordPass>
 
+
+    <!-- ADR-103: «quién va», con el reparto al lado. Sube: es lo que se
+         decide (ADR-139 p2); `#who-goes` es donde cae la línea de choques
+         del Día (uso #12) y el «apuntar» de «Falta». -->
+    <!-- Read-only and empty (a guest of a bolo, nobody said anything yet):
+         nothing to read and nothing to do, so no block. -->
+    {#if canEdit || hasTeam || (perf.commitments?.length ?? 0) > 0}
+      <section class="perf__section" id="who-goes" data-slot="who">
+        <WhoGoes
+          target="performance"
+          id={perf.id}
+          workspaceId={perf.workspace_id}
+          commitments={perf.commitments}
+          roster={performanceRoster(bundle!)}
+          showRoster={false}
+          compact
+          editable={canEdit}
+          {locale}
+        />
+      </section>
+    {/if}
+
+    <!-- The notes are a live doc only an editor opens (`lib/do/auth.ts`,
+         `edit:performance`): whoever cannot write them cannot read them
+         either, so they are not drawn (a guest of a bolo: their board is
+         the place to talk). -->
+    {#if canEdit}
+      <section class="perf__section" aria-label={t('perf.notes', locale)} data-slot="notes">
+        <BlockHead title={t('perf.notes', locale)} />
+        <YNotes
+          targetTable="performance"
+          targetId={perf.id}
+          placeholder={t('perf.notes_placeholder', locale)}
+          {locale}
+        />
+      </section>
+    {/if}
+
+      </div>
+      <div class="pass-grid__right">
+    <!-- El día, parada a parada (ADR-213): the running order as stops, the
+         show the big one, a trip's ends and the night woven in, and the
+         address and the contact hung on their stop. One way to write an
+         hour in the whole app (ADR-090 P3). -->
+    <div id="running-order" data-slot="day">
+      <RunningOrder
+        target="performance"
+        id={perf.id}
+        dayIso={perf.performed_at.slice(0, 10)}
+        tz={perf.venue?.timezone ?? workspaceTz ?? viewerTz}
+        {viewerTz}
+        {locale}
+        placing="stops"
+        title={t(perf.start_at ? 'pass.day_title' : 'pass.day_title_open', locale)}
+        extras={dayExtras}
+        extra={dayStop}
+        hangs={{ address: dayAddress ? addressHang : undefined, contact: dayContact ? contactHang : undefined }}
+      />
+    </div>
+    <!-- Lo de consulta, plegado (ADR-139 p2): la sala por dentro,
+         las fechas y los materiales. Quién programa es un hecho de la
+         cabecera («Con…», ADR-164 § 3). -->
+    <div data-slot="folds">
+    <Fold word={t('record.details', locale)} keeps={detailsKeeps} bind:open={detailsOpen} id="details" testid="record-details">
+      <!-- El dato del bolo y «Con…», que antes iban en la cabecera. -->
+      {#if withWhom || (boloReadable && currentBolo && perf.project)}
+        <p class="perf__bolo-line" data-testid="perf-bolo-line">{@render boloFacts()}</p>
+      {/if}
+    {#if hasTeam}
+      <ul class="perf__people" role="list" aria-label={t('perf.team', locale)}>
+        {#each bundle!.cast_members as m (m.id)}
+          <li>
+            <span class="perf__person-role">{t('perf.role_cast', locale)} · {m.role}</span>
+            <span class="perf__person-name">{m.person?.full_name ?? '—'}</span>
+          </li>
+        {/each}
+        {#each perf.cast_override as o (o.id)}
+          <li>
+            <span class="perf__person-role">{t('perf.role_cast', locale)} · {o.role}</span>
+            <span class="perf__person-name">
+              {o.person?.full_name ?? '—'}
+              {#if o.replaces_person}
+                <span class="perf__person-note">
+                  {t('perf.replaces', locale, { name: o.replaces_person.full_name })}{#if o.reason} · {o.reason}{/if}
+                </span>
+              {/if}
+            </span>
+          </li>
+        {/each}
+        {#each perf.crew_assignment as c (c.id)}
+          <li>
+            <span class="perf__person-role">{t('perf.role_crew', locale)} · {c.role}</span>
+            <span class="perf__person-name">
+              {c.person?.full_name ?? '—'}
+              {#if c.notes}<span class="perf__person-note">{c.notes}</span>{/if}
+            </span>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+      {#if canEdit && showHoldNotice}
+        <!-- ADR-080 §2 — discreet, hold-only, saved when it changes. Empty =
+             default 30 (the placeholder says it), 0 = no notice. -->
+        <Field
+          id="f-hold-notice"
+          label={t('perf.hold_notice', locale)}
+          helper={fHoldNotice === 0 ? t('perf.hold_notice_none', locale) : undefined}
+          error={holdNoticeBad ? t('perf.hold_notice_invalid', locale) : undefined}
+        >
+          <input
+            id="f-hold-notice"
+            type="number"
+            min="0"
+            max="365"
+            step="1"
+            inputmode="numeric"
+            bind:value={fHoldNotice}
+            onchange={onHoldNoticeChange}
+            placeholder={String(HOLD_NOTICE_DEFAULT)}
+          />
+          {#snippet suffix()}{t('perf.hold_notice_suffix', locale)}{/snippet}
+        </Field>
+      {/if}
+      <ProductionStub
+        venue={perf.venue}
+        venueName={perf.venue_name}
+        city={perf.city}
+        country={perf.country}
+        logistics={perf.logistics}
+        hospitality={perf.hospitality}
+        technical={perf.technical}
+        {viewerTz}
+        fallbackTz={workspaceTz}
+        withSchedule={false}
+        {locale}
+        saveJson={canEdit ? saveJson : undefined}
+      />
+
+      {#if perf.date.length > 0}
+        <section class="perf__section" aria-label={t('perf.related_dates', locale)}>
+          <BlockHead title={t('perf.dates', locale)} level={3} />
+          <ul class="perf__dates" role="list">
+            {#each perf.date as d (d.id)}
+              <li>
+                <span class="perf__date-when">{formatDateRow(d)}</span>
+                <span class="perf__date-kind">{enumWord('perf.date_kind_', d.kind)}</span>
+                <span class="perf__date-title">{d.title ?? ''}</span>
+              </li>
+            {/each}
+          </ul>
+        </section>
+      {/if}
+
+      {#if perf.asset_version.length > 0}
+        <section class="perf__section" aria-label={t('perf.assets', locale)}>
+          <BlockHead title={t('perf.assets', locale)} level={3} />
+          <ul class="perf__assets" role="list">
+            {#each perf.asset_version as a (a.id)}
+              <li>
+                <span class="perf__asset-dir">{enumWord('perf.asset_dir_', a.direction)}</span>
+                <span class="perf__asset-kind">{enumWord('perf.asset_kind_', a.kind)}</span>
+              </li>
+            {/each}
+          </ul>
+        </section>
+      {/if}
+    </Fold>
+    </div>
+
+    {#if canEdit}
+      <!-- Al pie (ADR-213): copiar de otra función (ADR-169) y borrar la que
+           se creó por error (ADR-052). -->
+      <footer class="perf__foot" data-testid="perf-foot" data-slot="foot">
+        {#if perf.project}
+          <button type="button" class="perf__foot-act" onclick={() => (copyOpen = true)}>{t('perf_copy.open', locale)}</button>
+          <PerformanceCopyDialog
+            bind:open={copyOpen}
+            perf={{ ...perf, project_id: perf.project.id }}
+            {workspaceSlug}
+            tz={perf.venue?.timezone ?? workspaceTz ?? viewerTz}
+            fallbackTz={workspaceTz ?? viewerTz}
+            {locale}
+            oncopied={() => {
+              void queryClient.invalidateQueries({ queryKey: ['performance'] });
+              void queryClient.invalidateQueries({ queryKey: ['schedule'] });
+            }}
+          />
+        {/if}
+        <button type="button" class="perf__foot-act perf__foot-act--warn" onclick={() => (confirmDeleteOpen = true)}
+          >{t('perf.delete', locale)}</button
+        >
+      </footer>
+    {/if}
+      </div>
+    </div>
 
     {#snippet dateEdit()}
       <input
@@ -1217,191 +1361,54 @@
         >
       {/if}
     {/snippet}
-    <!-- El día, parada a parada (ADR-213): the running order as stops, the
-         show the big one, a trip's ends and the night woven in, and the
-         address and the contact hung on their stop. One way to write an
-         hour in the whole app (ADR-090 P3). -->
-    <div id="running-order">
-      <RunningOrder
-        target="performance"
-        id={perf.id}
-        dayIso={perf.performed_at.slice(0, 10)}
-        tz={perf.venue?.timezone ?? workspaceTz ?? viewerTz}
-        {viewerTz}
-        {locale}
-        placing="stops"
-        title={t(perf.start_at ? 'pass.day_title' : 'pass.day_title_open', locale)}
-        extras={dayExtras}
-        extra={dayStop}
-        hangs={{ address: dayAddress ? addressHang : undefined, contact: dayContact ? contactHang : undefined }}
-      />
-    </div>
-    <!-- ADR-103: «quién va», con el reparto al lado. Sube: es lo que se
-         decide (ADR-139 p2); `#who-goes` es donde cae la línea de choques
-         del Día (uso #12) y el «apuntar» de «Falta». -->
-    <!-- Read-only and empty (a guest of a bolo, nobody said anything yet):
-         nothing to read and nothing to do, so no block. -->
-    {#if canEdit || hasTeam || (perf.commitments?.length ?? 0) > 0}
-      <section class="perf__section" id="who-goes">
-        <WhoGoes
-          target="performance"
-          id={perf.id}
-          workspaceId={perf.workspace_id}
-          commitments={perf.commitments}
-          roster={performanceRoster(bundle!)}
-          showRoster={false}
-          editable={canEdit}
-          {locale}
-        />
-        {#if hasTeam}
-          <ul class="perf__people" role="list" aria-label={t('perf.team', locale)}>
-            {#each bundle!.cast_members as m (m.id)}
-              <li>
-                <span class="perf__person-role">{t('perf.role_cast', locale)} · {m.role}</span>
-                <span class="perf__person-name">{m.person?.full_name ?? '—'}</span>
-              </li>
-            {/each}
-            {#each perf.cast_override as o (o.id)}
-              <li>
-                <span class="perf__person-role">{t('perf.role_cast', locale)} · {o.role}</span>
-                <span class="perf__person-name">
-                  {o.person?.full_name ?? '—'}
-                  {#if o.replaces_person}
-                    <span class="perf__person-note">
-                      {t('perf.replaces', locale, { name: o.replaces_person.full_name })}{#if o.reason} · {o.reason}{/if}
-                    </span>
-                  {/if}
-                </span>
-              </li>
-            {/each}
-            {#each perf.crew_assignment as c (c.id)}
-              <li>
-                <span class="perf__person-role">{t('perf.role_crew', locale)} · {c.role}</span>
-                <span class="perf__person-name">
-                  {c.person?.full_name ?? '—'}
-                  {#if c.notes}<span class="perf__person-note">{c.notes}</span>{/if}
-                </span>
-              </li>
-            {/each}
-          </ul>
-        {/if}
-      </section>
-    {/if}
-
-    <!-- The notes are a live doc only an editor opens (`lib/do/auth.ts`,
-         `edit:performance`): whoever cannot write them cannot read them
-         either, so they are not drawn (a guest of a bolo: their board is
-         the place to talk). -->
-    {#if canEdit}
-      <section class="perf__section" aria-label={t('perf.notes', locale)}>
-        <BlockHead title={t('perf.notes', locale)} />
-        <YNotes
-          targetTable="performance"
-          targetId={perf.id}
-          placeholder={t('perf.notes_placeholder', locale)}
-          {locale}
-        />
-      </section>
-    {/if}
-
-    <!-- Lo de consulta, plegado (ADR-139 p2): la sala por dentro,
-         las fechas y los materiales. Quién programa es un hecho de la
-         cabecera («Con…», ADR-164 § 3). -->
-    <Fold word={t('record.details', locale)} keeps={detailsKeeps} bind:open={detailsOpen} id="details" testid="record-details">
-      {#if canEdit && showHoldNotice}
-        <!-- ADR-080 §2 — discreet, hold-only, saved when it changes. Empty =
-             default 30 (the placeholder says it), 0 = no notice. -->
-        <Field
-          id="f-hold-notice"
-          label={t('perf.hold_notice', locale)}
-          helper={fHoldNotice === 0 ? t('perf.hold_notice_none', locale) : undefined}
-          error={holdNoticeBad ? t('perf.hold_notice_invalid', locale) : undefined}
-        >
-          <input
-            id="f-hold-notice"
-            type="number"
-            min="0"
-            max="365"
-            step="1"
-            inputmode="numeric"
-            bind:value={fHoldNotice}
-            onchange={onHoldNoticeChange}
-            placeholder={String(HOLD_NOTICE_DEFAULT)}
-          />
-          {#snippet suffix()}{t('perf.hold_notice_suffix', locale)}{/snippet}
-        </Field>
-      {/if}
-      <ProductionStub
-        venue={perf.venue}
-        venueName={perf.venue_name}
-        city={perf.city}
-        country={perf.country}
-        logistics={perf.logistics}
-        hospitality={perf.hospitality}
-        technical={perf.technical}
-        {viewerTz}
-        fallbackTz={workspaceTz}
-        withSchedule={false}
-        {locale}
-        saveJson={canEdit ? saveJson : undefined}
-      />
-
-      {#if perf.date.length > 0}
-        <section class="perf__section" aria-label={t('perf.related_dates', locale)}>
-          <BlockHead title={t('perf.dates', locale)} level={3} />
-          <ul class="perf__dates" role="list">
-            {#each perf.date as d (d.id)}
-              <li>
-                <span class="perf__date-when">{formatDateRow(d)}</span>
-                <span class="perf__date-kind">{enumWord('perf.date_kind_', d.kind)}</span>
-                <span class="perf__date-title">{d.title ?? ''}</span>
-              </li>
-            {/each}
-          </ul>
-        </section>
-      {/if}
-
-      {#if perf.asset_version.length > 0}
-        <section class="perf__section" aria-label={t('perf.assets', locale)}>
-          <BlockHead title={t('perf.assets', locale)} level={3} />
-          <ul class="perf__assets" role="list">
-            {#each perf.asset_version as a (a.id)}
-              <li>
-                <span class="perf__asset-dir">{enumWord('perf.asset_dir_', a.direction)}</span>
-                <span class="perf__asset-kind">{enumWord('perf.asset_kind_', a.kind)}</span>
-              </li>
-            {/each}
-          </ul>
-        </section>
-      {/if}
-    </Fold>
-
-    {#if canEdit}
-      <!-- Al pie (ADR-213): copiar de otra función (ADR-169) y borrar la que
-           se creó por error (ADR-052). -->
-      <footer class="perf__foot" data-testid="perf-foot">
-        {#if perf.project}
-          <button type="button" class="perf__foot-act" onclick={() => (copyOpen = true)}>{t('perf_copy.open', locale)}</button>
-          <PerformanceCopyDialog
-            bind:open={copyOpen}
-            perf={{ ...perf, project_id: perf.project.id }}
-            {workspaceSlug}
-            tz={perf.venue?.timezone ?? workspaceTz ?? viewerTz}
-            fallbackTz={workspaceTz ?? viewerTz}
-            {locale}
-            oncopied={() => {
-              void queryClient.invalidateQueries({ queryKey: ['performance'] });
-              void queryClient.invalidateQueries({ queryKey: ['schedule'] });
-            }}
-          />
-        {/if}
-        <button type="button" class="perf__foot-act perf__foot-act--warn" onclick={() => (confirmDeleteOpen = true)}
-          >{t('perf.delete', locale)}</button
-        >
-      </footer>
-    {/if}
   {/if}
 </article>
+
+{#snippet boloFacts()}
+  {#if withWhom}
+    <span data-testid="perf-with"
+      >{t('perf.with', locale)} <a class="lenshead__frag" href={withWhom.href}>{withWhom.name}</a></span
+    >
+  {/if}
+  {#if boloReadable && currentBolo && perf!.project}
+    <span class="perf__bolo-fact">
+      {#if showBoloSelect}
+        <Menu label={t('record.bolo_menu', locale, { bolo: boloOf(currentBolo, locale, tradeFor(workspaceSlug)) })} triggerClass="fact-act">
+          {#snippet trigger()}{boloOf(currentBolo, locale, tradeFor(workspaceSlug))}<span class="status-caret" aria-hidden="true">▾</span>{/snippet}
+          {#snippet children({ close })}
+            {#each bolosOptions as o (o.value)}
+              <li role="none">
+                <button
+                  type="button"
+                  role="menuitem"
+                  class="menu__item{o.value === (currentBoloId ?? '') ? ' menu__item--active' : ''}"
+                  onclick={() => {
+                    close();
+                    const next = boloPatch(currentBoloId, o.value);
+                    if ('bolo_id' in next) $patchMutation.mutate(next);
+                  }}>{o.label}</button
+                >
+              </li>
+            {/each}
+            {#if lensOn('books')}
+              <li class="menu-separator" role="separator"></li>
+              <li role="none">
+                <a role="menuitem" class="menu__item" href={booksHref(perf!.project!.id, { boloId: currentBolo!.id })}
+                  >{t('record.bolo_in_books', locale)}</a
+                >
+              </li>
+            {/if}
+          {/snippet}
+        </Menu>
+      {:else if lensOn('books')}
+        <a class="lenshead__frag" href={booksHref(perf!.project.id, { boloId: currentBolo.id })}>{boloOf(currentBolo, locale, tradeFor(workspaceSlug))}</a>
+      {:else}
+        {boloOf(currentBolo, locale, tradeFor(workspaceSlug))}
+      {/if}
+      <ConceptHint concept="bolo" />
+    </span>
+  {/if}
+{/snippet}
 
 {#snippet boloMessage()}
   {t('perf.bolo_helper_short', locale)}
@@ -1526,6 +1533,13 @@
 
 <style>
   @layer components {
+    .perf__bolo-line {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-xs) var(--space-m);
+      margin: 0;
+      font-size: var(--text-s);
+    }
     .perf__bolo-fact {
       display: inline-flex;
       align-items: baseline;

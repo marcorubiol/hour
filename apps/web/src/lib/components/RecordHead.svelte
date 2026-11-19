@@ -64,14 +64,17 @@
     facts?: Snippet;
     /** The strip under the facts (phase 2: what is missing, with its verb). */
     band?: Snippet;
+    /** Only the address and the verbs, on one line: for a page whose piece
+        already says what it is (the pass), so the head is not said twice. */
+    slim?: boolean;
   }
 
-  let { crumbs, title, titleHref = null, mark, tools = [], actions, facts, band }: Props = $props();
+  let { crumbs, title, titleHref = null, mark, tools = [], actions, facts, band, slim = false }: Props = $props();
 
   const locale = appLocale();
 </script>
 
-<header class="lenshead record-head">
+<header class={slim ? 'record-head record-head--slim' : 'lenshead record-head'}>
   {#if crumbs.length > 0}
     <nav class="record-head__crumbs" aria-label={t('shell.breadcrumb', locale)}>
       {#each crumbs as c, i (i)}
@@ -88,6 +91,28 @@
       {/each}
     </nav>
   {/if}
+  {#if slim}
+    <!-- The piece says the name in its own way; the page still has its h1. -->
+    {#if title}<h1 class="visually-hidden">{title}</h1>{/if}
+    {#if tools.length > 0 || actions}
+      <span class="record-head__slimtools">
+        {#each tools as tool (tool.label)}
+          {#if tool.href}
+            <span class="record-head__tool"
+              ><a class="btn--secondary btn--xs" href={tool.href} data-testid={tool.testid}>{tool.label}</a
+              >{#if tool.concept}<ConceptHint concept={tool.concept} />{/if}</span
+            >
+          {:else}
+            <span class="record-head__tool" data-testid={tool.testid}
+              ><Button variant="secondary" size="xs" loading={tool.loading} onclick={tool.onclick}>{tool.label}</Button
+              >{#if tool.concept}<ConceptHint concept={tool.concept} />{/if}</span
+            >
+          {/if}
+        {/each}
+        {#if actions}{@render actions()}{/if}
+      </span>
+    {/if}
+  {:else}
   <div class="lenshead__titlerow">
     <div class="lenshead__lead">
       {#if mark}{@render mark()}{/if}
@@ -118,4 +143,5 @@
   </div>
   {#if facts}<div class="lenshead__sub">{@render facts()}</div>{/if}
   {#if band}<div class="record-head__band">{@render band()}</div>{/if}
+  {/if}
 </header>

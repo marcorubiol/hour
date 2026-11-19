@@ -8237,3 +8237,44 @@ Encargo: `build/coordination/ficha-pase/brief.md`, «Escritorio»; lámina «La 
 
 **Cómo se revierte.** Revertir el PR: vuelven la columna de hora de 11ch y el diálogo centrado. Sin esquema ni API;
 `CACHE_SCHEMA` no cambia.
+
+## [2026-11-19] ADR-217 · El pase se corrige: una cabecera, tamaño de móvil y talón dentro de la pieza
+Encargo: `build/coordination/ficha-pase/brief.md`, «Corrección del 19-11». Marco vio el pase en producción y no
+coincidía con el dibujo.
+
+1. **Una sola cabecera.** `RecordHead` gana `slim`: solo las migas y los verbos en una línea; el `h1` queda para
+   lectores de pantalla (la pieza dice el nombre a su manera). «Abrir la hoja de ruta» es el botón Hoja del pase.
+   El bolo y «Con…» pasan al pliegue de detalles, junto con el equipo de la función.
+2. **El pase no se estira.** `--pass-width` (380 px, en `tokens.css`); por debajo, todo el ancho. Botones a 44 px.
+   La cifra es la hora (`--display-pass`, 68 px) con la fecha corta en mono encima; sin hora, «Vie 11»
+   (`--display-pass-day`, 56 px) con «Diciembre · sin hora» en ámbar. Nunca la fecha larga con año (`dayParts`).
+   El espectáculo a `--display-pass-show` (30 px), con sala y ciudad debajo, una línea cada una.
+3. **El talón, dentro de la pieza oscura**, cortado por una perforación con dos muescas: segmentos de 6 px por
+   casilla y una fila ámbar por lo que falta, con el verbo en un botón claro.
+4. **El día, sin sección propia.** Con `placing="stops"` no hay tapa plegable: un rótulo en mono y, pegada, la línea.
+   «Añadir un momento…» es la última parada. «Poner la hora» lleva la hora propuesta (20h30) y siempre está activo.
+5. **Quién va, una fila callada** bajo el pase (`WhoGoes compact`): los nombres en una línea y un botón que abre la
+   lista y el selector de siempre.
+6. **Orden en una columna** (`.pass-grid`, base.css): pase, quién va, el día, notas, pliegues, pie. La rejilla de
+   escritorio llega en el PR siguiente.
+
+**Cómo se revierte.** Revertir el PR. Sin esquema ni API; `CACHE_SCHEMA` no cambia.
+
+## [2026-11-19] ADR-218 · Una rejilla para el pase y para Hoy en escritorio
+Encargo: `brief.md`, «Escritorio» y «Hoy en escritorio» (19-11).
+
+1. **Una rejilla, dos sitios.** Pase fijo (`--pass-width`, 380 px), 56 px de aire (`--pass-gap`) y una columna de
+   lectura de 500 px como máximo (`--read-width`), alineado a la izquierda y con tope de 1.000 px
+   (`--pass-grid-max`). En la ficha es `.pass-grid` (base.css), que pasa a dos columnas cuando el propio registro
+   mide 900 px (`@container record`); por debajo y dentro del vistazo, una columna de 480 px como máximo. En Hoy es
+   `.desk__grid`, desde 64rem (el corte ancho de la app).
+2. **Ficha, por columnas.** Izquierda: pase, quién va, notas. Derecha: el día, los pliegues y, al pie, copiar y borrar.
+3. **Hoy.** Izquierda: la pieza «Lo siguiente» y «Te espera». Derecha: «Lo que viene» en vertical, un día por ficha
+   (la cifra abre el día; cada renglón abre su pase; «Falta» en ámbar al pie), y «Ha cambiado» y «La temporada» como
+   pliegues que dicen qué guardan. Sin carrusel en escritorio. En una columna el orden sigue siendo el del ojo
+   (día, lo que viene, te espera, ha cambiado, temporada), dicho con `order` porque el DOM agrupa por columna.
+
+**Pendiente de esta rejilla:** «+ Añadir» arriba a la derecha y las cifras de «Te espera» en una fila de cuatro no
+están hechos (la lista de «Te espera» se queda como está).
+
+**Cómo se revierte.** Revertir el commit. Sin esquema ni API; `CACHE_SCHEMA` no cambia.
