@@ -77,6 +77,9 @@ export type RawProject = {
   /** Stored identity monogram (ADR-081); absent until the migration lands. */
   initials?: string | null;
   description?: string | null;
+  /** «Qué preparamos para una función» (ADR-221): the stored list, as
+      `readPreparation` reads it; absent is the default list. */
+  preparation?: unknown;
 };
 
 export type NavProject = {

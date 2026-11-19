@@ -7,11 +7,14 @@
    * project on open; on success invalidates the projects caches so every
    * IdentityMark across the app repaints in place.
    */
-  import { createMutation, useQueryClient } from '@tanstack/svelte-query';
+  import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { ApiError, mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
   import Textarea from './Textarea.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
+  import Switch from '$lib/components/Switch.svelte';
+  import { activeProjectsQueryOptions } from '$lib/nav-queries';
+  import { moveThing, preparationPatch, readPreparation, type Preparation } from '$lib/preparation';
   import Input from '$lib/components/Input.svelte';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
@@ -36,6 +39,19 @@
   let accent = $state<string | null>(null); // null = auto (hash of slug)
   let initials = $state('');
   let description = $state('');
+  // «Qué preparamos para una función» (ADR-221): the project's list, from the
+  // projects already read; sent only if it was changed here.
+  const projectsQuery = createQuery(activeProjectsQueryOptions());
+  let prep = $state<Preparation>(readPreparation(null));
+  let prepSeed = '';
+  const prepKey = (l: Preparation) => l.map((x) => `${x.id}:${x.on ? 1 : 0}`).join(',');
+  let prepChanged = $derived(prepKey(prep) !== prepSeed);
+  const THING_LABEL = {
+    status: 'prep.thing_status',
+    hours: 'prep.thing_hours',
+    team: 'prep.thing_team',
+    sheet: 'prep.thing_sheet',
+  } as const;
 
   // Seed once per open transition (plain latch — writing it can't re-trigger).
   let wasOpen = false;
@@ -45,6 +61,8 @@
       accent = project.accent ?? null;
       initials = project.initials ?? '';
       description = project.description ?? '';
+      prep = readPreparation($projectsQuery.data?.items.find((p) => p.id === project.id)?.preparation);
+      prepSeed = prepKey(prep);
     }
     wasOpen = open;
   });
@@ -71,6 +89,7 @@
         description: description.trim(),
         accent,
         initials: initials.trim(),
+        ...(prepChanged ? { preparation: preparationPatch(prep) } : {}),
       };
       const res = await mutateJSON<{ project: { id: string; slug: string } }>(
         'PATCH',
@@ -183,6 +202,44 @@
       disabled={$save.isPending}
     />
 
+    <section class="epj__prep" aria-labelledby="epj-prep-title" data-testid="project-preparation">
+      <span class="eyebrow" id="epj-prep-title">{t('prep.title', locale)}</span>
+      <p class="epj__help">{t('prep.help', locale)}</p>
+      <ul class="epj__things" role="list">
+        {#each prep as thing, i (thing.id)}
+          <li class="epj__thing" data-thing={thing.id}>
+            <span class="epj__thing-name" class:epj__thing-name--off={!thing.on}>
+              {t(THING_LABEL[thing.id], locale)}
+              <small>{t('prep.by_app', locale)}</small>
+            </span>
+            <span class="epj__thing-acts">
+              <button
+                type="button"
+                class="epj__move"
+                aria-label={t('prep.move_up', locale, { name: t(THING_LABEL[thing.id], locale) })}
+                disabled={i === 0 || $save.isPending}
+                onclick={() => (prep = moveThing(prep, i, i - 1))}>↑</button
+              >
+              <button
+                type="button"
+                class="epj__move"
+                aria-label={t('prep.move_down', locale, { name: t(THING_LABEL[thing.id], locale) })}
+                disabled={i === prep.length - 1 || $save.isPending}
+                onclick={() => (prep = moveThing(prep, i, i + 1))}>↓</button
+              >
+              <Switch
+                checked={thing.on}
+                label={t('prep.ask', locale, { name: t(THING_LABEL[thing.id], locale) })}
+                disabled={$save.isPending}
+                testid={`prep-switch-${thing.id}`}
+                onchange={(next) => (prep = prep.map((x) => (x.id === thing.id ? { ...x, on: next } : x)))}
+              />
+            </span>
+          </li>
+        {/each}
+      </ul>
+    </section>
+
     <button type="submit" hidden aria-hidden="true"></button>
   </form>
 
@@ -210,6 +267,65 @@
       display: flex;
       align-items: center;
       min-block-size: 2.4em;
+    }
+
+    .epj__prep {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+    }
+    .epj__help {
+      margin: 0;
+      font-size: var(--text-s);
+      color: var(--text-muted);
+    }
+    .epj__things {
+      display: grid;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .epj__thing {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-s);
+      padding-block: var(--space-xs);
+      border-block-start: var(--line-hairline) solid var(--border-color-light);
+    }
+    .epj__thing-name {
+      display: grid;
+      font-size: var(--text-m);
+    }
+    .epj__thing-name--off {
+      color: var(--text-muted);
+    }
+    .epj__thing-name small {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--mono-letter-spacing-loose);
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .epj__thing-acts {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-xs);
+    }
+    .epj__move {
+      appearance: none;
+      min-inline-size: 2.25rem;
+      min-block-size: 2.25rem;
+      border: var(--line-hairline) solid var(--border-color-dark);
+      border-radius: var(--radius);
+      background: none;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+    }
+    .epj__move:disabled {
+      opacity: var(--disabled-opacity);
+      cursor: default;
     }
 
     .epj__collision {

@@ -8343,4 +8343,15 @@ esta entrada fija la decisión entera y la fase 1 va construida.
 6. **Lo que no es un show** (`DateRecord`) conserva sus tres casillas automáticas, con el mismo trato de color y sin lista
    configurable por ahora.
 
-**Cómo se revierte.** Fase 1: revertir el commit; sin esquema ni API; `CACHE_SCHEMA` no cambia.
+**Fase 2 (hecha, borrador): la lista por proyecto y sus ajustes.** La lista vive en `project.custom_fields.preparation`
+(`{ items: [{ id, on }] }`, `$lib/preparation`); `update_project` aprende la clave `preparation` (migración
+`20261119110000_project_preparation.sql`, aditiva, mismo permiso; `null` borra la lista). `GET /api/projects` la devuelve como
+`preparation` (sube `CACHE_SCHEMA` a 37). Sin lista, o dañada, es la de serie; una lectura tolerante descarta ids
+desconocidos y añade encendidas las cosas nuevas de la app. Los ajustes son una sección del diálogo «Editar proyecto»
+(interruptor y subir/bajar por cosa, sin arrastrar). Pase, punto/línea de Hoy y palabras de la Agenda la respetan: una cosa
+apagada no es casilla ni pide nada, y las casillas siguen el orden del proyecto; «sin bolo» no está en la lista y se pide
+siempre.
+
+**Cómo se revierte.** Fase 1: revertir el commit; sin esquema ni API; `CACHE_SCHEMA` no cambia. Fase 2: revertir el commit y
+aplicar `build/runbooks/rollback-20261119-project-preparation.sql` (restaura el cuerpo anterior de `update_project`; las
+listas guardadas se quedan en `custom_fields` sin efecto).

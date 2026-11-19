@@ -16,6 +16,7 @@
  */
 import { inScope, type ResolvedScope } from './nav';
 import { perfWorkspaceId, type DateEvent, type PerformanceEvent } from './month-events';
+import type { Preparation } from './preparation';
 import { isUrgentMissing, missingSoon, type PerformanceMissing } from './record-missing';
 import { agendaPoints, agendaRows, type AgendaPoint, type DayAgenda } from './day-agenda';
 import type { PulseInputRows, PulseNext } from './pulse';
@@ -149,7 +150,13 @@ const dayDiff = (day: string, today: string) =>
  * door. `coming` is the pulse's own order (`upcoming`), so a tile, the piece
  * and the rail never disagree about what comes first.
  */
-export function comingTiles(coming: readonly PulseNext[], today: string, max = COMING_TILES): ComingTile[] {
+export function comingTiles(
+  coming: readonly PulseNext[],
+  today: string,
+  max = COMING_TILES,
+  /** The preparation list of a project (ADR-221); none says «everything». */
+  listOf?: (projectId: string) => Preparation | undefined,
+): ComingTile[] {
   const tiles: ComingTile[] = [];
   const byDay = new Map<string, PulseNext[]>();
   for (const x of coming) {
@@ -162,7 +169,11 @@ export function comingTiles(coming: readonly PulseNext[], today: string, max = C
   for (const day of [...byDay.keys()].sort()) {
     if (tiles.length >= max) break;
     const all = byDay.get(day)!;
-    const gaps = all.flatMap((x) => (x.ref.of === 'performance' ? missingSoon(x.ref.row as PerformanceEvent, today) : []));
+    const gaps = all.flatMap((x) => {
+      if (x.ref.of !== 'performance') return [];
+      const row = x.ref.row as PerformanceEvent;
+      return missingSoon(row, today, row.project?.id ? listOf?.(row.project.id) : undefined);
+    });
     tiles.push({
       day,
       items: all.slice(0, COMING_PER_TILE),

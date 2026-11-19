@@ -1,3 +1,4 @@
+import { readPreparation } from './preparation';
 import { describe, expect, it } from 'vitest';
 import {
   COMING_TILES,
@@ -146,6 +147,14 @@ describe('«Coming up»: one tile per day (ADR-202 § 6)', () => {
     ]);
     // Open is neutral: none of these has hurry (hold deadline, unshared sheet).
     expect(tiles.every((t) => t.urgent === null)).toBe(true);
+  });
+
+  it('the tile follows its project\'s preparation list (ADR-221): what is off does not count', () => {
+    const performances = [perf('nohour', '2026-11-16', mamemi, { start_at: null })];
+    const coming = upcoming({ performances, dates: [], viewerTz: TZ }, NOW, 40);
+    const off = readPreparation({ items: [{ id: 'hours', on: false }] });
+    expect(comingTiles(coming, TODAY).map((t) => t.open)).toEqual([1]);
+    expect(comingTiles(coming, TODAY, 10, () => off).map((t) => [t.missing, t.open])).toEqual([[false, 0]]);
   });
 
   it('ten tiles at most', () => {

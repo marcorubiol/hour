@@ -65,6 +65,7 @@
     type Slip as SlipVM,
   } from '$lib/month-events';
   import AgendaList, { type AgendaDecision, type AgendaMissing, type NoteDraft } from '$lib/components/AgendaList.svelte';
+  import { readPreparation } from '$lib/preparation';
   import { isUrgentMissing, missingSoon } from '$lib/record-missing';
   import { noteFallback as noteFallbackOf, noteFallbackBody } from '$lib/note';
   import DecisionBand, {
@@ -1984,8 +1985,12 @@
   });
   /** «Falta», the one rule (ADR-211 § 3): the record's words beside the
       performance, the missing hour in the hour's own column. */
+  /** Each project's preparation list (ADR-221), from the projects already read. */
+  let preparationByProject = $derived(
+    new Map(($projectsQuery.data?.items ?? []).map((p) => [p.id, readPreparation(p.preparation)] as const)),
+  );
   function agendaMissing(p: PerformanceEvent): AgendaMissing {
-    const open = missingSoon(p, todayIso);
+    const open = missingSoon(p, todayIso, p.project?.id ? preparationByProject.get(p.project.id) : undefined);
     return {
       noTime: open.some((m) => m.kind === 'no_time'),
       words: open

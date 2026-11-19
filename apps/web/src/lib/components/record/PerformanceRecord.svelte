@@ -67,7 +67,8 @@
   import { usePins } from '$lib/stores/pins.svelte';
   import { lensOn } from '$lib/lenses.svelte';
   import { performanceBoloQueryOptions, projectBolosQueryOptions } from '$lib/bolo-queries';
-  import { teamQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
+  import { activeProjectsQueryOptions, teamQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
+  import { readPreparation, type Preparation } from '$lib/preparation';
   import { goingPersonIds, type GoingPerson } from '$lib/bolo-access';
   import RecordHead from '$lib/components/RecordHead.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
@@ -216,6 +217,7 @@
   const query = createQuery(queryOptions);
 
   const wsQuery = createQuery(workspacesQueryOptions());
+  const projectsQuery = createQuery(activeProjectsQueryOptions());
   let activeWorkspaceName = $derived(
     $wsQuery.data?.items.find((w) => w.slug === workspaceSlug)?.name ?? workspaceSlug,
   );
@@ -762,9 +764,14 @@
         }
       : null,
   );
-  let missing = $derived<PerformanceMissing[]>(missingInput ? performanceMissing(missingInput, today) : []);
+  /** «Qué preparamos» of this performance's project (ADR-221); until the
+      projects are read (or for a project not in them) it is the default. */
+  let preparation = $derived<Preparation>(
+    readPreparation($projectsQuery.data?.items.find((p) => p.id === perf?.project?.id)?.preparation),
+  );
+  let missing = $derived<PerformanceMissing[]>(missingInput ? performanceMissing(missingInput, today, preparation) : []);
   // El talón del pase: las casillas, derivadas de lo mismo que «Falta».
-  let readiness = $derived<ReadinessBox[]>(missingInput ? performanceReadiness(missingInput, today) : []);
+  let readiness = $derived<ReadinessBox[]>(missingInput ? performanceReadiness(missingInput, today, preparation) : []);
 
   function missingItem(m: PerformanceMissing): PassLine {
     switch (m.kind) {

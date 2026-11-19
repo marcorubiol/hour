@@ -52,6 +52,7 @@
   import { usePins } from '$lib/stores/pins.svelte';
   import { useCalm } from '$lib/stores/calm.svelte';
   import { buildLineIndex, buildProjectIndex, resolveScope, workspacesOnScreen, type NavWorkspace, type RawLine } from '$lib/nav';
+  import { readPreparation } from '$lib/preparation';
   import { workspacesQueryOptions, activeProjectsQueryOptions, allLinesQueryOptions } from '$lib/nav-queries';
   import { moneyAccessAnyQueryOptions, scopeBolosQueryOptions } from '$lib/bolo-queries';
   import { conversationAccessQueryOptions } from '$lib/conversation-access';
@@ -240,7 +241,12 @@
    */
   let coming = $derived(upcoming(pulseInput, clockNow, 40));
   // `phone` is declared further down: read it inside the closure.
-  let tiles = $derived.by(() => comingTiles(coming, today, phone.current ? COMING_TILES_PHONE : COMING_TILES));
+  /** Each project's preparation list (ADR-221), from the projects already read. */
+  let preparationByProject = $derived(
+    new Map(($projectsQuery.data?.items ?? []).map((p) => [p.id, readPreparation(p.preparation)] as const)),
+  );
+  const listOf = (projectId: string) => preparationByProject.get(projectId);
+  let tiles = $derived.by(() => comingTiles(coming, today, phone.current ? COMING_TILES_PHONE : COMING_TILES, listOf));
   let nextThing = $derived(nextAfterToday(coming, today));
   // Nothing within two weeks: one sentence names what comes (ADR-149).
   let farNext = $derived(tiles.length === 0 ? nextThing : null);

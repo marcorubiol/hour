@@ -18,6 +18,7 @@ import { addDaysIso } from './planner';
 import type { Commitment } from './people';
 import { followUpDue, turnOf, type TurnRow } from './conversation-overview';
 import { relationOf } from './conversation-relation';
+import { thingOn, thingRank, type AppThing, type Preparation } from './preparation';
 import { attentionItems, type AttentionItem, type MoneyBolo, type MoneyContext } from './money';
 
 /**
@@ -66,7 +67,22 @@ export interface PerformanceMissingInput {
   start_at?: string | null;
 }
 
-export function performanceMissing(input: PerformanceMissingInput, today: string): PerformanceMissing[] {
+/** The list's thing each open item belongs to; «sin bolo» is not on the list
+    (it has no box): it is always asked. */
+const THING_OF: Record<PerformanceMissing['kind'], AppThing | null> = {
+  hold_deadline: 'status',
+  no_time: 'hours',
+  nobody_going: 'team',
+  roadsheet_unshared: 'sheet',
+  no_bolo: null,
+};
+
+/**
+ * What a performance still has open. `list` is its project's preparation
+ * list (ADR-221): a thing turned off there asks for nothing; without it,
+ * everything is asked.
+ */
+export function performanceMissing(input: PerformanceMissingInput, today: string, list?: Preparation | null): PerformanceMissing[] {
   if (input.status === 'cancelled') return [];
   const day = input.day.slice(0, 10);
   const upcoming = day >= today;
@@ -93,7 +109,7 @@ export function performanceMissing(input: PerformanceMissingInput, today: string
     if (input.roster?.length === 0 && !going) out.push({ kind: 'nobody_going' });
   }
 
-  return out;
+  return list ? out.filter((m) => THING_OF[m.kind] === null || thingOn(list, THING_OF[m.kind]!)) : out;
 }
 
 /**
@@ -140,7 +156,7 @@ export interface ReadinessBox {
  *
  * A cancelled or past performance has no stub: nothing is «about to leave».
  */
-export function performanceReadiness(input: PerformanceMissingInput, today: string): ReadinessBox[] {
+export function performanceReadiness(input: PerformanceMissingInput, today: string, list?: Preparation | null): ReadinessBox[] {
   if (input.status === 'cancelled') return [];
   const day = input.day.slice(0, 10);
   if (day < today) return [];
@@ -163,7 +179,10 @@ export function performanceReadiness(input: PerformanceMissingInput, today: stri
     else if (day <= addDaysIso(today, ROADSHEET_SHARE_DAYS)) out.push({ id: 'sheet', done: false, verb: 'share', urgent: true });
   }
 
-  return out;
+  // The project's list: what it turned off is not a box, and the rest go in
+  // its order (a stable sort: the default list is the order above).
+  if (!list) return out;
+  return out.filter((b) => thingOn(list, b.id)).sort((a, b) => thingRank(list, a.id) - thingRank(list, b.id));
 }
 
 /**
@@ -190,7 +209,7 @@ export interface MissingRow {
  * record's «Falta» can never disagree, because they are this. Empty outside
  * the window; a fact the feed did not bring asks for nothing.
  */
-export function missingSoon(row: MissingRow, today: string): PerformanceMissing[] {
+export function missingSoon(row: MissingRow, today: string, list?: Preparation | null): PerformanceMissing[] {
   const day = row.performed_at.slice(0, 10);
   if (day < today || day > addDaysIso(today, MISSING_SOON_DAYS)) return [];
   return performanceMissing(
@@ -205,6 +224,7 @@ export function missingSoon(row: MissingRow, today: string): PerformanceMissing[
       start_at: row.start_at,
     },
     today,
+    list,
   );
 }
 

@@ -17,6 +17,7 @@ import {
 } from './record-missing';
 import { dateReadiness } from './record-missing';
 import { addDaysIso } from './planner';
+import { readPreparation } from './preparation';
 import { invoicesByBolo, type MoneyBolo } from './money';
 
 // ── Función ────────────────────────────────────────────────────────────────
@@ -522,5 +523,42 @@ describe('dateReadiness', () => {
     expect(dateReadiness(base, '2026-11-22')).toEqual([]);
     expect(dateReadiness({ ...base, status: 'cancelled' }, '2026-11-18')).toEqual([]);
     expect(dateReadiness({ ...base, status: 'done' }, '2026-11-18')).toEqual([]);
+  });
+});
+
+describe('the project\'s preparation list (ADR-221, fase 2)', () => {
+  const open = perf({ day: addDaysIso(TODAY, 3), start_at: null, roster: [], roadsheetLinks: 0 });
+  const ids = (l: ReturnType<typeof readPreparation>) => performanceReadiness(open, TODAY, l).map((b) => b.id);
+
+  it('without a list, or with the default, nothing changes', () => {
+    expect(ids(readPreparation(null))).toEqual(['status', 'hours', 'team', 'sheet']);
+    expect(performanceReadiness(open, TODAY).map((b) => b.id)).toEqual(['status', 'hours', 'team', 'sheet']);
+  });
+
+  it('a thing turned off is not a box (not even «confirmada» or «hora») and asks for nothing', () => {
+    const l = readPreparation({ items: [{ id: 'hours', on: false }, { id: 'status', on: false }] });
+    expect(ids(l)).toEqual(['team', 'sheet']);
+    expect(performanceMissing(open, TODAY, l).map((m) => m.kind)).toEqual(['roadsheet_unshared', 'nobody_going']);
+    expect(missingSoon({ status: 'confirmed', performed_at: open.day, start_at: null, person_ids: [], roadsheet_links: 0 }, TODAY, l).map((m) => m.kind)).toEqual([
+      'roadsheet_unshared',
+      'nobody_going',
+    ]);
+  });
+
+  it('the boxes follow the project\'s order', () => {
+    expect(ids(readPreparation({ items: [{ id: 'sheet', on: true }, { id: 'team', on: true }] }))).toEqual(['sheet', 'team', 'status', 'hours']);
+  });
+
+  it('«sin bolo» is not on the list: it is asked whatever the list says', () => {
+    const off = readPreparation({ items: ['status', 'hours', 'team', 'sheet'].map((id) => ({ id, on: false })) });
+    expect(performanceMissing(perf({ hasBolo: false }), TODAY, off)).toEqual([{ kind: 'no_bolo' }]);
+    expect(performanceReadiness(open, TODAY, off)).toEqual([]);
+  });
+
+  it('a hold with its deadline turned off in status is not urgent anywhere', () => {
+    const l = readPreparation({ items: [{ id: 'status', on: false }] });
+    const hold = perf({ status: 'hold', day: addDaysIso(TODAY, 35) });
+    expect(performanceMissing(hold, TODAY, l)).toEqual([]);
+    expect(performanceReadiness(hold, TODAY, l).map((b) => b.id)).not.toContain('status');
   });
 });

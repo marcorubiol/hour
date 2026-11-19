@@ -1,7 +1,8 @@
 /**
  * PATCH /api/projects/[id]
  *
- * Edit a project's identity/content (name, description, accent, initials) via
+ * Edit a project's identity/content (name, description, accent, initials) and its
+ * preparation list (ADR-221) via
  * the `update_project` SECURITY DEFINER RPC — owner/admin/member of the
  * project's workspace (ADR-081). Only fields present in the body are patched;
  * a present field with '' / null clears it (nullable columns). slug/status are
@@ -17,6 +18,7 @@ import type { Tables } from '$lib/db-types';
 import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import { json } from '$lib/server/http';
+import { APP_THINGS } from '$lib/preparation';
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
@@ -28,6 +30,18 @@ const PatchBodySchema = v.object({
   // Monogram: 0..3 non-space chars, mixed case kept. '' / null clears.
   initials: v.optional(
     v.nullable(v.pipe(v.string(), v.trim(), v.regex(/^\S{0,3}$/, 'monogram: up to 3 non-space chars'))),
+  ),
+  // «Qué preparamos para una función» (ADR-221): the project's list; null
+  // clears it (back to the default).
+  preparation: v.optional(
+    v.nullable(
+      v.object({
+        items: v.pipe(
+          v.array(v.object({ id: v.picklist(APP_THINGS), on: v.boolean() })),
+          v.maxLength(APP_THINGS.length),
+        ),
+      }),
+    ),
   ),
 });
 
