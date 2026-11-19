@@ -65,6 +65,26 @@ export function dayLabel(
 }
 
 /**
+ * The day in the pieces the pass draws, UTC-anchored like dayLabel and never
+ * with a year: «sáb 21 nov» (`short`), «Sáb 21» (`big`) and «Noviembre»
+ * (`month`). A pass is read within days of its day; the year is never news.
+ */
+export function dayParts(
+  iso: string,
+  locale: string = appLocaleTag(),
+): { short: string; big: string; month: string } {
+  const d = new Date(`${iso.slice(0, 10)}T00:00:00Z`);
+  const fmt = (o: Intl.DateTimeFormatOptions) => d.toLocaleDateString(locale, { ...o, timeZone: 'UTC' });
+  const up = (s: string) => s.charAt(0).toLocaleUpperCase(locale) + s.slice(1);
+  const strip = (s: string) => s.replace(/\.$/, '').replace(/\.,/, ',');
+  return {
+    short: strip(fmt({ weekday: 'short', day: 'numeric', month: 'short' })),
+    big: up(`${strip(fmt({ weekday: 'short' }))} ${fmt({ day: 'numeric' })}`),
+    month: up(fmt({ month: 'long' })),
+  };
+}
+
+/**
  * "09 Jul" — day + month, no weekday/year. Same UTC-anchored contract as
  * dayLabel. For tight metadata columns (next-action dates, agenda rows).
  */

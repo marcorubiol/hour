@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  dayParts,
   dayMonthLong,
   dualTime,
   hourMark,
@@ -177,5 +178,15 @@ describe('dayMonthLong — the day as a control says it', () => {
     expect(dayMonthLong('2026-11-14', 'en-GB')).toBe('14 November');
     expect(dayMonthLong('2026-11-14', 'fr-FR')).toBe('14 novembre');
     expect(dayMonthLong('2026-11-01T23:30:00Z', 'es-ES')).toBe('1 de noviembre');
+  });
+});
+
+describe('dayParts', () => {
+  it('writes the day for the pass without the year, UTC-anchored', () => {
+    const d = dayParts('2026-12-11T23:30:00Z', 'es');
+    expect(d.big).toBe('Vie 11');
+    expect(d.month).toBe('Diciembre');
+    expect(d.short).not.toMatch(/2026/);
+    expect(d.short).toMatch(/11/);
   });
 });

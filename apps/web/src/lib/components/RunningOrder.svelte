@@ -316,7 +316,13 @@
     if (write(placeByTime(order, slot))) {
       aClock = '';
       aWord = '';
+      adding = false;
     }
+  }
+  async function openAdd() {
+    adding = true;
+    await tick();
+    listEl?.querySelector<HTMLInputElement>('.hours__row--add input')?.focus();
   }
 
   // ── Editing one moment: the row becomes its form, in its place. ────────
@@ -439,8 +445,12 @@
   let canAsk = $derived(stops && canEdit && target === 'performance');
 
   // «Pon la hora de la función»: one hour, the show's, written as its row.
-  let sClock = $state('');
+  /** The hour proposed on the card: written, so the button is always ready. */
+  const SHOW_CLOCK = '20h30';
+  let sClock = $state(SHOW_CLOCK);
   let sBad = $state(false);
+  /** `stops`: the last stop's form is closed until it is asked for. */
+  let adding = $state(false);
   function putShow(e: SubmitEvent) {
     e.preventDefault();
     const clock = parseClock(sClock);
@@ -451,7 +461,7 @@
       sBad = true;
       return;
     }
-    if (write(placeByTime(order, { kind: 'start', label: null, at, ends_at: null, notes: null }))) sClock = '';
+    if (write(placeByTime(order, { kind: 'start', label: null, at, ends_at: null, notes: null }))) sClock = SHOW_CLOCK;
   }
 
   // «Rellenar el día» (ADR-213, an exception to ADR-090 by the person's
@@ -495,14 +505,20 @@
      the read fails, it is drawn, so an editor's lid does not jump in. -->
 {#if canEdit || order.length > 0 || $feed.isPending || $feed.isError || (stops && shown.length > 0)}
 <section class="hours" class:ro--stops={stops} class:ro--open={noHours} aria-busy={$feed.isPending} data-placing={placing}>
-  <button type="button" class="lid" aria-expanded={open} onclick={() => (open = !open)}>
-    <span class="lid__w">{lidWord}</span>
-    <span class="lid__n"
-      >{order.length === 0 ? t('planner.lid_empty', locale) : order.length}<span class="lid__sign" aria-hidden="true">{open ? '▴' : '▾'}</span></span
-    >
-  </button>
+  {#if stops}
+    <!-- On the record the day is not a section with a lid: a word, and the
+         line right under it (the drawing's «El día, parada a parada»). -->
+    <h2 class="ro__label">{lidWord}</h2>
+  {:else}
+    <button type="button" class="lid" aria-expanded={open} onclick={() => (open = !open)}>
+      <span class="lid__w">{lidWord}</span>
+      <span class="lid__n"
+        >{order.length === 0 ? t('planner.lid_empty', locale) : order.length}<span class="lid__sign" aria-hidden="true">{open ? '▴' : '▾'}</span></span
+      >
+    </button>
+  {/if}
 
-  {#if open}
+  {#if open || stops}
     <datalist id={listId}>
       {#each offered as [k, w] (k)}<option value={w}></option>{/each}
     </datalist>
@@ -532,7 +548,7 @@
             bind:value={sClock}
             disabled={waiting}
           />
-          <button type="submit" class="ro__ask-go" disabled={waiting || !sClock.trim()}>{t('pass.put_time', locale)}</button>
+          <button type="submit" class="ro__ask-go" disabled={waiting}>{t('pass.put_time', locale)}</button>
         </span>
         {#if sBad}<span class="hours__hint" role="status">{t('planner.ro_bad_clock', locale)}</span>{/if}
       </form>
@@ -714,7 +730,17 @@
         {/if}
       {/each}
 
-      {#if canEdit}
+      {#if canEdit && stops && !adding}
+        <!-- «Añadir un momento…»: the last stop of the line, not a loose row. -->
+        <li class="hours__row hours__row--add ro__add-stop">
+          <span class="hours__at" aria-hidden="true"></span>
+          <span class="hours__body">
+            <button type="button" class="ro__add-open" data-testid="ro-add-open" disabled={waiting} onclick={openAdd}
+              >{t('pass.add_moment', locale)}</button
+            >
+          </span>
+        </li>
+      {:else if canEdit}
         <li class="hours__row hours__row--add">
           <form class="hours__form" onsubmit={add}>
             <span class="hours__at hours__at--edit">
@@ -866,13 +892,13 @@
     .ro--stops .hours__list > .hours__row:first-child::before {
       inset-block-start: var(--stop-mid);
     }
-    .ro--stops .hours__row:not(.hours__row--add):has(+ .hours__row--add)::before,
+    .ro--stops .ro__add-stop::before,
     .ro--stops .hours__list > .hours__row:not(.hours__row--add):last-child::before {
       inset-block-end: auto;
       block-size: var(--stop-mid);
     }
     .ro--stops .hours__list > .hours__row:only-child::before,
-    .ro--stops .hours__row--add::before {
+    .ro--stops .hours__row--add:not(.ro__add-stop)::before {
       display: none;
     }
     .ro--stops .hours__row + .hours__row {
@@ -932,6 +958,54 @@
     .ro--stops .ro__show .hours__w {
       font-family: var(--font-display);
       font-size: var(--text-l);
+    }
+    /* The day has no section of its own: a mono word, the line right under
+       it, no big gap above (the pass's right column starts with it). */
+    .ro__label {
+      margin: 0 0 var(--space-s);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      font-weight: 400;
+      letter-spacing: var(--mono-letter-spacing-loose);
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+    /* «Añadir un momento…»: the last stop of the line, with its own hollow dot. */
+    .ro--stops .ro__add-stop {
+      display: grid;
+      grid-column: 1 / -1;
+      grid-template-columns: subgrid;
+      align-items: baseline;
+      padding-block: var(--space-xs);
+    }
+    .ro--stops .ro__add-stop .hours__body {
+      position: relative;
+      padding-inline-start: 1.5rem;
+    }
+    .ro--stops .ro__add-stop .hours__body::before {
+      content: '';
+      position: absolute;
+      inset-inline-start: 0;
+      inset-block-start: 0.35em;
+      inline-size: 0.75rem;
+      block-size: 0.75rem;
+      border: var(--line-hairline) solid var(--stop-ink);
+      border-radius: var(--radius-50);
+      background: var(--bg);
+    }
+    .ro__add-open {
+      appearance: none;
+      padding: 0;
+      border: 0;
+      background: none;
+      font: inherit;
+      color: var(--text-color);
+      text-align: start;
+      cursor: pointer;
+    }
+    .ro__add-open:hover {
+      text-decoration: underline;
+      text-underline-offset: 3px;
     }
     .ro--stops .ro__extra[data-stop='night'] .hours__body::before {
       border-color: var(--missing-ink);

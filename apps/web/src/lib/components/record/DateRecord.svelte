@@ -34,7 +34,7 @@
   import { mapsHref } from '$lib/ahora';
   import { closePeek } from '$lib/peek.svelte';
   import { dateFacts } from '$lib/date-record';
-  import { dayLabel, localDayISO, viewerTimeZone } from '$lib/datetime';
+  import { localDayISO, viewerTimeZone } from '$lib/datetime';
   import { appLocale, tHere, setRecordSpace } from '$lib/i18n';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { MISSING_MAX, dateMissing, dateReadiness, type DateMissing, type DateReadinessBox } from '$lib/record-missing';
@@ -209,9 +209,6 @@
   let passPlace = $derived(
     info?.trip ? [info.trip.from, info.trip.to].filter(Boolean).join(' → ') : (info?.place ?? ''),
   );
-  let passDate = $derived(
-    info ? (info.first === info.last ? dayLabel(info.first, 'short') : `${dayLabel(info.first, 'short')} – ${dayLabel(info.last, 'short')}`) : '',
-  );
   let mapParts = $derived(row ? [row.venue_name, row.city] : []);
   let passActs = $derived<PassAct[]>(
     !isTrip && mapsHref(mapParts) !== null ? [{ id: 'map', label: t('ahora.map', locale), map: mapParts }] : [],
@@ -240,19 +237,19 @@
       {locale}
     />
   {:else}
-    <RecordHead {crumbs} {title} tools={[{ label: t('peek.edit', locale), onclick: () => (editOpen = true) }]}>
-      {#snippet facts()}
-        {#if isTrip && row!.travel_direction}<span>{t(`create.direction_${row!.travel_direction}`, locale)}</span>{/if}
-      {/snippet}
-    </RecordHead>
+    <RecordHead slim {crumbs} {title} tools={[{ label: t('peek.edit', locale), onclick: () => (editOpen = true) }]} />
+
+    <div class="pass-grid">
+      <div class="pass-grid__left">
 
     <!-- El pase encogido (ADR-215): la pieza, el estado como etiqueta y un
          talón de tres casillas. Sin hotel, técnica ni hoja. -->
     <RecordPass
       {locale}
       project={row.project ? { slug: row.project.slug, name: row.project.name, accent: row.project.accent ?? null } : null}
-      eyebrow={`${kindWord} · ${passWhen}`}
-      date={passDate}
+      eyebrow={`${kindWord}${isTrip && row.travel_direction ? ` · ${t(`create.direction_${row.travel_direction}`, locale)}` : ''} · ${passWhen}`}
+      dayIso={info?.first ?? row.starts_at.slice(0, 10)}
+      dayIsoEnd={info?.last ?? null}
       time={passTime}
       timeOptional={isTrip}
       show={row.project?.name ?? null}
@@ -293,12 +290,28 @@
     </RecordPass>
 
     {#if row.performance_id && workspaceSlug}
-      <p class="date-record__of">
+      <p class="date-record__of" data-slot="of">
         <span class="eyebrow eyebrow--sub">{t('peek.date_of_performance', locale)}</span>
         <a class="link-arrow" href={`/h/${workspaceSlug}/performance/${row.performance_id}`}>{t('peek.see_performance', locale)}</a>
       </p>
     {/if}
 
+    {#if row.project}
+      <section class="date-record__section" id="who-goes" data-slot="who" aria-label={t('peek.who_goes', locale)}>
+        <WhoGoes
+          target="date"
+          {id}
+          workspaceId={row.project.workspace_id}
+          commitments={row.commitments}
+          compact
+          {locale}
+        />
+      </section>
+    {/if}
+
+      </div>
+      <div class="pass-grid__right">
+        <div data-slot="day">
     {#if isTrip}
       <!-- What defines a trip, its stages: before only in the Day. -->
       <section class="date-record__section" aria-label={t('peek.stages', locale)} bind:this={stagesEl}>
@@ -324,17 +337,9 @@
       />
     {/if}
 
-    {#if row.project}
-      <section class="date-record__section" id="who-goes" aria-label={t('peek.who_goes', locale)}>
-        <WhoGoes
-          target="date"
-          {id}
-          workspaceId={row.project.workspace_id}
-          commitments={row.commitments}
-          {locale}
-        />
-      </section>
-    {/if}
+        </div>
+      </div>
+    </div>
 
     <EditDateDialog bind:open={editOpen} date={row} inSeries={Boolean(row.series_id)} />
   {/if}
