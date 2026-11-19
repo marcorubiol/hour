@@ -1,7 +1,7 @@
 /**
  * THE DAY OF A ROAD SHEET, IN ORDER (120, ADR-177): the technician's
  * itinerary. Pure and clock free (`now` is a parameter); the sheet
- * (`RoadsheetView.svelte`) translates and draws. Apart from `$lib/roadsheet`
+ * (`record/PassSheet.svelte`) translates and draws. Apart from `$lib/roadsheet`
  * so the endpoint's module stays free of the calendar vocabulary.
  */
 

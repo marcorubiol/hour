@@ -2,8 +2,8 @@
   /**
    * Public road sheet (ADR-047, D6) — the page behind a signed link. No
    * account, no shell: the token is the capability and the server already
-   * filtered the projection to the share's pinned role. Renders the same
-   * RoadsheetView as the operator page.
+   * filtered the projection to the share's pinned role. Draws the pass in read
+   * mode (PassSheet, ADR-223), the same as the operator's «view as».
    *
    * 121 B (ADR-183): a personal link says whose sheet it is and, on the day,
    * offers «Llego tarde» (RoadsheetLate). A role link has neither.
@@ -17,7 +17,7 @@
   import { page } from '$app/state';
   import { createQuery } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
-  import RoadsheetView from '$lib/components/RoadsheetView.svelte';
+  import PassSheet from '$lib/components/record/PassSheet.svelte';
   import RoadsheetLate from '$lib/components/RoadsheetLate.svelte';
   import RecordState from '$lib/components/RecordState.svelte';
   import { ApiError } from '$lib/api';
@@ -97,7 +97,7 @@
       {locale}
     />
   {:else if sheet}
-    <RoadsheetView {sheet} {venueTz} {locale} {holder}>
+    <PassSheet {sheet} {venueTz} {locale} {holder}>
       {#snippet late()}
         {#if lateState && (lateState.open || lateState.last)}
           <RoadsheetLate
@@ -110,16 +110,22 @@
           />
         {/if}
       {/snippet}
-    </RoadsheetView>
+    </PassSheet>
   {/if}
 </main>
 
 <style>
   @layer components {
+    /* One column, never wider than a pass's 480 px; the pass itself is 380. */
     .prs {
-      max-inline-size: 40rem;
+      display: grid;
+      justify-items: center;
+      max-inline-size: 30rem;
       margin-inline: auto;
       padding: var(--space-l) var(--space-m) var(--space-xxl);
+    }
+    .prs > :global(*) {
+      min-inline-size: 0;
     }
 
     .prs__gone {

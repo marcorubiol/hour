@@ -41,7 +41,7 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import type { Json } from '$lib/db-types';
   import type { KVObject } from '$lib/kv-lines';
-  import { dayLabel, dayMonth, localDayISO, timeInTz, viewerTimeZone } from '$lib/datetime';
+  import { dayLabel, dayMonth, localDayISO, viewerTimeZone } from '$lib/datetime';
   import { LOCALE_TAG, appLocale, tHere, setRecordSpace, tradeFor } from '$lib/i18n';
   import {
     HOLD_NOTICE_DEFAULT,
@@ -77,6 +77,7 @@
   import Fold from '$lib/components/Fold.svelte';
   import RecordPass, { passToneVar, type PassAct, type PassBox, type PassClosed, type PassLine } from './RecordPass.svelte';
   import { daysBetween } from '$lib/away';
+  import { passFigure, passWhenWord } from '$lib/pass-read';
   import { logisticsLines, mapsHref, telHref, venueCall } from '$lib/ahora';
   import MapLink from '$lib/components/MapLink.svelte';
   import { tripStops, type ExtraStop, type TripStage, type TripStop } from '$lib/pass-stops';
@@ -726,9 +727,7 @@
 
   // ── Hechos y «Falta» (ADR-139 p2 A) ────────────────────────────────────
   // La hora de la función, en el reloj de la sala (regla de zona horaria).
-  let startTime = $derived(
-    perf?.start_at ? timeInTz(perf.start_at, perf.venue?.timezone ?? workspaceTz ?? viewerTz) : null,
-  );
+  let startTime = $derived(passFigure(perf?.start_at, perf?.venue?.timezone ?? workspaceTz ?? viewerTz));
 
   // Los enlaces de la hoja de ruta: la misma lectura (y caché) que su página.
   // Solo los ve quien edita la función; para el resto la respuesta es un
@@ -983,14 +982,7 @@
       : [],
   );
 
-  let passWhen = $derived.by(() => {
-    if (!perf) return '';
-    const d = daysBetween(today, perf.performed_at.slice(0, 10));
-    if (d === 0) return t('pass.when_today', locale);
-    if (d === 1) return t('pass.when_tomorrow', locale);
-    if (d === -1) return t('pass.when_yesterday', locale);
-    return t(d > 0 ? 'pass.when_in' : 'pass.when_ago', locale, { n: Math.abs(d) });
-  });
+  let passWhen = $derived(perf ? passWhenWord(today, perf.performed_at, locale) : '');
   let passPlace = $derived(
     [perf?.venue?.name ?? perf?.venue_name, placeLine].filter(Boolean).join(' · '),
   );

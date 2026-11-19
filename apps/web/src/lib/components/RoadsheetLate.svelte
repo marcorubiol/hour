@@ -175,20 +175,22 @@
       padding: 0;
     }
 
-    /* The thumb's act, in amber: the same height as «Llamar» and «Cómo llegar». */
+    /* The thumb's act, neutral (ADR-223: amber is for what is urgent, and
+       the read pass has nothing urgent on it): a line, at the radius of buttons. */
     .late__go {
-      min-block-size: calc(var(--touch-target) + var(--space-xl));
+      min-block-size: var(--touch-target);
       padding: var(--space-xs) var(--space-s);
-      border: var(--line-hairline) solid var(--tone-warning-accent);
-      border-radius: var(--radius-m);
-      background: var(--tone-warning-bg);
-      color: var(--tone-warning-fg);
-      font-size: var(--text-s);
-      font-weight: var(--today-weight);
+      border: var(--line-hairline) solid var(--border-color-dark);
+      border-radius: var(--radius);
+      background: none;
+      color: var(--heading-color);
+      font-size: var(--text-m);
+      font-weight: 500;
+      cursor: pointer;
     }
 
     .late__go:hover {
-      border-color: var(--tone-warning-fg);
+      border-color: var(--heading-color);
     }
 
     .late__form,
@@ -197,10 +199,10 @@
       flex-direction: column;
       gap: var(--space-s);
       padding: var(--space-m);
-      border: var(--line-hairline) solid var(--tone-warning-accent);
-      border-radius: var(--radius-m);
-      background: var(--tone-warning-bg);
-      color: var(--tone-warning-fg);
+      border: var(--line-hairline) solid var(--border-color-light);
+      border-radius: var(--radius-l);
+      background: var(--bg-ultra-light);
+      color: var(--text-color);
       font-size: var(--text-s);
     }
 

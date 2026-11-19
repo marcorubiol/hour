@@ -4,7 +4,8 @@
    *
    * The role pills are an OPERATOR PREVIEW — filtering happens server-side
    * per request, so switching roles refetches; the browser never holds
-   * hidden sections. The document body is the shared RoadsheetView.
+   * hidden sections. The document body is the pass in read mode (PassSheet,
+   * ADR-223), exactly what a public link draws.
    *
    * Public links (ADR-047): each link pins one public role; anyone with
    * the URL sees that role's projection, no account. Revocation kills the
@@ -20,7 +21,8 @@
   import RecordState from '$lib/components/RecordState.svelte';
   import Pill from '$lib/components/Pill.svelte';
   import RoadsheetShare from '$lib/components/record/RoadsheetShare.svelte';
-  import RoadsheetView from '$lib/components/RoadsheetView.svelte';
+  import PassSheet from '$lib/components/record/PassSheet.svelte';
+  import RecordHead from '$lib/components/RecordHead.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { spaceCrumb, type Crumb } from '$lib/record-crumbs';
@@ -92,18 +94,20 @@
       {locale}
     />
   {:else if sheet}
-    <RoadsheetView {sheet} {venueTz} {locale} {crumbs}>
-      {#snippet tools()}
-      <nav class="rs__roles" aria-label={t('roadsheet.preview_as', locale)}>
-        <span class="rs__roles-label">{t('roadsheet.view_as', locale)}</span>
-        {#each ROADSHEET_ROLES as r (r)}
-          <Pill size="sm" active={role === r} onclick={() => (role = r)}>
-            {roleWord(r)}
-          </Pill>
-        {/each}
-      </nav>
+    <RecordHead slim {crumbs} title={sheet.title}>
+      {#snippet actions()}
+        <nav class="rs__roles" aria-label={t('roadsheet.preview_as', locale)}>
+          <span class="rs__roles-label">{t('roadsheet.view_as', locale)}</span>
+          {#each ROADSHEET_ROLES as r (r)}
+            <Pill size="sm" active={role === r} onclick={() => (role = r)}>
+              {roleWord(r)}
+            </Pill>
+          {/each}
+        </nav>
       {/snippet}
-    </RoadsheetView>
+    </RecordHead>
+
+    <PassSheet {sheet} {venueTz} {locale} heading={false} />
 
     <section class="rs__share" aria-label={t('roadsheet.public_links', locale)}>
       <BlockHead title={t('roadsheet.public_links', locale)} />

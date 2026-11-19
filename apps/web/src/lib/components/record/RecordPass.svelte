@@ -57,6 +57,8 @@
     /** The one light act of the row (only «Hablar»). */
     lead?: boolean;
     testid?: string;
+    /** «Mapa» only: where the chooser says the choice changes (default: Settings). */
+    changeIn?: 'settings' | 'here';
   }
 
   /** The tone's dot on the tag, read off the status tone (never a hex). */
@@ -153,6 +155,14 @@
     lines?: readonly PassLine[];
     /** What was closed by hand, said quietly under the list. */
     closed?: readonly PassClosed[];
+    /** READ MODE (ADR-223): the pass of someone with no account. Nothing on the
+        piece is tappable or asks for anything; the stub is `stubLine`, a mono
+        line that says whose sheet this is, instead of the boxes. */
+    read?: boolean;
+    stubLine?: string | null;
+    stubTestid?: string;
+    /** The «Mapa» link, so the page can open its chooser from «Cambiar». */
+    mapLink?: ReturnType<typeof MapLink> | undefined;
   }
 
   let {
@@ -179,6 +189,10 @@
     boxes,
     lines = [],
     closed = [],
+    read = false,
+    stubLine = null,
+    stubTestid,
+    mapLink = $bindable(),
   }: Props = $props();
 
   /** The hand row whose «Hecho» / «Aquí no hace falta» is open (one at a time). */
@@ -192,7 +206,7 @@
   let placeLines = $derived(place.split(' · ').filter(Boolean));
 </script>
 
-<section class="pass" aria-label={label ?? t('pass.label', locale)} data-testid="record-pass">
+<section class="pass" class:pass--read={read} aria-label={label ?? t('pass.label', locale)} data-testid="record-pass">
   <div class="pass__piece">
     <div class="pass__eyeline">
       <span class="pass__eye">
@@ -253,6 +267,12 @@
 
     {#if placeEdit}
       <div class="pass__place-edit" data-testid="pass-place-edit">{@render placeEdit()}</div>
+    {/if}
+
+    {#if stubLine}
+      <!-- Read mode: the stub is one mono line, cut from the piece like the other. -->
+      <div class="pass__perf" aria-hidden="true"></div>
+      <p class="pass__stubline" data-testid={stubTestid}>{stubLine}</p>
     {/if}
 
     {#if boxes.length > 0}
@@ -351,7 +371,7 @@
       <nav class="pass__acts" aria-label={t('ahora.actions', locale)} data-testid="pass-acts">
         {#each acts as a (a.id)}
           {#if a.map}
-            <MapLink class="pass__act" parts={a.map} changeIn="settings" ariaLabel={a.ariaLabel}>{a.label}</MapLink>
+            <MapLink bind:this={mapLink} class="pass__act" parts={a.map} changeIn={a.changeIn ?? 'settings'} testid={a.testid} ariaLabel={a.ariaLabel}>{a.label}</MapLink>
           {:else if a.onclick}
             <button
               type="button"
@@ -363,7 +383,7 @@
               >{a.label}{#if a.count}<span class="pass__count" data-testid="pass-talk-count">{a.count}</span>{/if}</button
             >
           {:else}
-            <a class="pass__act" href={a.href} aria-label={a.ariaLabel}>{a.label}</a>
+            <a class="pass__act" href={a.href} aria-label={a.ariaLabel} data-testid={a.testid}>{a.label}</a>
           {/if}
         {/each}
       </nav>
@@ -601,6 +621,21 @@
     }
     .pass__perf::after {
       inset-inline-end: -0.5rem;
+    }
+
+    /* Read mode's stub: whose sheet this is, in mono, on the piece's ink. */
+    .pass__stubline {
+      margin: 0;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--mono-letter-spacing-loose);
+      text-transform: uppercase;
+      color: var(--surface-focus-muted);
+    }
+    /* A read piece with a stub line has its acts right under it, no rule. */
+    .pass__stubline + .pass__acts {
+      padding-block-start: 0;
+      border-block-start: 0;
     }
 
     /* THE STUB: «por cerrar», a segment per box with its name under it, and
@@ -861,6 +896,33 @@
     .pass__acts .pass__act--lead:hover {
       background: var(--surface-focus-ink);
       color: var(--surface-focus);
+    }
+    /* PRINT, read mode: the piece goes on white, in dark ink, with a thin
+       outline; no buttons (a pinned sheet has nothing to tap). The piece's
+       own tokens are redefined, so every line on it follows. */
+    @media print {
+      .pass--read {
+        inline-size: 100%;
+      }
+      .pass--read .pass__piece {
+        --surface-focus: Canvas;
+        --surface-focus-ink: CanvasText;
+        --surface-focus-muted: color-mix(in srgb, CanvasText 70%, Canvas);
+        --surface-focus-faint: color-mix(in srgb, CanvasText 50%, Canvas);
+        --surface-focus-rule: color-mix(in srgb, CanvasText 35%, Canvas);
+        --identity-tint-base: Canvas;
+        border: var(--line-hairline) solid CanvasText;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .pass--read .pass__perf::before,
+      .pass--read .pass__perf::after {
+        background: Canvas;
+        border: var(--line-hairline) solid CanvasText;
+      }
+      .pass--read .pass__acts {
+        display: none;
+      }
     }
     .pass__count {
       display: inline-grid;
