@@ -213,6 +213,9 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       // ADR-103 — each person's «voy / no voy» on a gig.
       COMMITMENTS_EMBED,
       ...(notice === '1' ? ['hold_notice_days'] : []),
+      // «Qué preparamos» (ADR-221): only the hand things' state, not the rest
+      // of custom_fields; Hoy's count and the Agenda read it with `missing`.
+      ...(missing === '1' ? ['prep:custom_fields->preparation'] : []),
       'venue:venue_id(id,name,city,country,timezone)',
       'project:project_id(id,slug,name,accent,initials,workspace_id)',
     ].join(','),

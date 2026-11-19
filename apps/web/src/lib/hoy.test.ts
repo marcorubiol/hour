@@ -1,4 +1,4 @@
-import { readPreparation } from './preparation';
+import { addManualThing, readPreparation } from './preparation';
 import { describe, expect, it } from 'vitest';
 import {
   COMING_TILES,
@@ -155,6 +155,19 @@ describe('«Coming up»: one tile per day (ADR-202 § 6)', () => {
     const off = readPreparation({ items: [{ id: 'hours', on: false }] });
     expect(comingTiles(coming, TODAY).map((t) => t.open)).toEqual([1]);
     expect(comingTiles(coming, TODAY, 10, () => off).map((t) => [t.missing, t.open])).toEqual([[false, 0]]);
+  });
+
+  it('the project\'s own open things count in the tile (ADR-221, fase 3), and a closed one does not', () => {
+    const list = addManualThing(readPreparation(null), 'Rider', 'm_rider001');
+    const performances = [
+      perf('open', '2026-11-16', mamemi, { prep: null }),
+      perf('done', '2026-11-17', mamemi, { prep: { m_rider001: { estado: 'hecho' } } }),
+    ];
+    const coming = upcoming({ performances, dates: [], viewerTz: TZ }, NOW, 40);
+    expect(comingTiles(coming, TODAY, 10, () => list).map((t) => [t.day, t.open])).toEqual([
+      ['2026-11-16', 1],
+      ['2026-11-17', 0],
+    ]);
   });
 
   it('ten tiles at most', () => {

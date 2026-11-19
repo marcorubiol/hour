@@ -15,7 +15,19 @@
   import Switch from '$lib/components/Switch.svelte';
   import { projectPreparationQueryOptions } from '$lib/nav-queries';
   import { toStore } from 'svelte/store';
-  import { moveThing, preparationPatch, readPreparation, type Preparation } from '$lib/preparation';
+  import {
+    MANUAL_NAME_MAX,
+    PREPARATION_MAX,
+    addManualThing,
+    isManualThing,
+    moveThing,
+    preparationPatch,
+    readPreparation,
+    removeManualThing,
+    renameManualThing,
+    type Preparation,
+    type PreparationThing,
+  } from '$lib/preparation';
   import Input from '$lib/components/Input.svelte';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
@@ -49,7 +61,13 @@
       until then the controls are off and nothing of it is sent, so a default
       shown too early can never overwrite what is saved. */
   let prepReady = $state(false);
-  const prepKey = (l: Preparation) => l.map((x) => `${x.id}:${x.on ? 1 : 0}`).join(',');
+  const prepKey = (l: Preparation) => l.map((x) => `${x.id}:${x.on ? 1 : 0}:${isManualThing(x) ? x.name : ''}`).join('|');
+  let newThing = $state('');
+  const thingName = (x: PreparationThing): string => (isManualThing(x) ? x.name : t(THING_LABEL[x.id], locale));
+  function addThing() {
+    prep = addManualThing(prep, newThing);
+    newThing = '';
+  }
   let prepChanged = $derived(prepKey(prep) !== prepSeed);
   const THING_LABEL = {
     status: 'prep.thing_status',
@@ -221,27 +239,50 @@
         {#each prep as thing, i (thing.id)}
           <li class="epj__thing" data-thing={thing.id}>
             <span class="epj__thing-name" class:epj__thing-name--off={!thing.on}>
-              {t(THING_LABEL[thing.id], locale)}
-              <small>{t('prep.by_app', locale)}</small>
+              {#if isManualThing(thing)}
+                <input
+                  class="epj__thing-input"
+                  value={thing.name}
+                  maxlength={MANUAL_NAME_MAX}
+                  aria-label={t('prep.rename', locale, { name: thing.name })}
+                  disabled={!prepReady || $save.isPending}
+                  data-testid={`prep-name-${thing.id}`}
+                  onchange={(e) => (prep = renameManualThing(prep, thing.id, e.currentTarget.value))}
+                />
+                <small>{t('prep.by_hand', locale)}</small>
+              {:else}
+                {thingName(thing)}
+                <small>{t('prep.by_app', locale)}</small>
+              {/if}
             </span>
             <span class="epj__thing-acts">
               <button
                 type="button"
                 class="epj__move"
-                aria-label={t('prep.move_up', locale, { name: t(THING_LABEL[thing.id], locale) })}
+                aria-label={t('prep.move_up', locale, { name: thingName(thing) })}
                 disabled={!prepReady || i === 0 || $save.isPending}
                 onclick={() => (prep = moveThing(prep, i, i - 1))}>↑</button
               >
               <button
                 type="button"
                 class="epj__move"
-                aria-label={t('prep.move_down', locale, { name: t(THING_LABEL[thing.id], locale) })}
+                aria-label={t('prep.move_down', locale, { name: thingName(thing) })}
                 disabled={!prepReady || i === prep.length - 1 || $save.isPending}
                 onclick={() => (prep = moveThing(prep, i, i + 1))}>↓</button
               >
+              {#if isManualThing(thing)}
+                <button
+                  type="button"
+                  class="epj__move"
+                  aria-label={t('prep.delete', locale, { name: thing.name })}
+                  disabled={!prepReady || $save.isPending}
+                  data-testid={`prep-delete-${thing.id}`}
+                  onclick={() => (prep = removeManualThing(prep, thing.id))}>✕</button
+                >
+              {/if}
               <Switch
                 checked={thing.on}
-                label={t('prep.ask', locale, { name: t(THING_LABEL[thing.id], locale) })}
+                label={t('prep.ask', locale, { name: thingName(thing) })}
                 disabled={!prepReady || $save.isPending}
                 testid={`prep-switch-${thing.id}`}
                 onchange={(next) => (prep = prep.map((x) => (x.id === thing.id ? { ...x, on: next } : x)))}
@@ -250,6 +291,28 @@
           </li>
         {/each}
       </ul>
+      <div class="epj__add">
+        <input
+          class="epj__thing-input epj__add-input"
+          bind:value={newThing}
+          maxlength={MANUAL_NAME_MAX}
+          placeholder={t('prep.add_ph', locale)}
+          aria-label={t('prep.add_ph', locale)}
+          disabled={!prepReady || prep.length >= PREPARATION_MAX || $save.isPending}
+          data-testid="prep-add-input"
+          onkeydown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              addThing();
+            }
+          }}
+        />
+        <Button
+          variant="quiet"
+          disabled={!prepReady || !newThing.trim() || prep.length >= PREPARATION_MAX || $save.isPending}
+          onclick={addThing}>{t('prep.add', locale)}</Button
+        >
+      </div>
     </section>
 
     <button type="submit" hidden aria-hidden="true"></button>
@@ -323,6 +386,24 @@
       display: inline-flex;
       align-items: center;
       gap: var(--space-xs);
+    }
+    .epj__thing-input {
+      min-inline-size: 0;
+      padding: var(--space-2xs) 0;
+      border: 0;
+      border-block-end: var(--line-hairline) solid var(--border-color-dark);
+      background: none;
+      color: inherit;
+      font: inherit;
+      font-size: var(--text-m);
+    }
+    .epj__add {
+      display: flex;
+      align-items: end;
+      gap: var(--space-s);
+    }
+    .epj__add-input {
+      flex: 1;
     }
     .epj__move {
       appearance: none;

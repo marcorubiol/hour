@@ -5,6 +5,7 @@ import {
   conversationMissing,
   dateMissing,
   lineMissing,
+  manualOpenSoon,
   missingSoon,
   performanceMissing,
   isUrgentMissing,
@@ -17,7 +18,7 @@ import {
 } from './record-missing';
 import { dateReadiness } from './record-missing';
 import { addDaysIso } from './planner';
-import { readPreparation } from './preparation';
+import { addManualThing, readPreparation } from './preparation';
 import { invoicesByBolo, type MoneyBolo } from './money';
 
 // ── Función ────────────────────────────────────────────────────────────────
@@ -560,5 +561,29 @@ describe('the project\'s preparation list (ADR-221, fase 2)', () => {
     const hold = perf({ status: 'hold', day: addDaysIso(TODAY, 35) });
     expect(performanceMissing(hold, TODAY, l)).toEqual([]);
     expect(performanceReadiness(hold, TODAY, l).map((b) => b.id)).not.toContain('status');
+  });
+});
+
+describe('manualOpenSoon · the project\'s own things on a feed row (ADR-221, fase 3)', () => {
+  const list = addManualThing(addManualThing(readPreparation(null), 'Rider', 'm_rider001'), 'Hotel', 'm_hotel001');
+  const row = (over: Record<string, unknown> = {}) => ({
+    status: 'confirmed',
+    performed_at: addDaysIso(TODAY, 5),
+    start_at: '2026-11-19T19:00:00Z',
+    prep: null,
+    ...over,
+  });
+
+  it('a confirmed performance in the window asks for what is not closed, in order', () => {
+    expect(manualOpenSoon(row(), TODAY, list).map((m) => m.name)).toEqual(['Rider', 'Hotel']);
+    expect(manualOpenSoon(row({ prep: { m_rider001: { estado: 'hecho' } } }), TODAY, list).map((m) => m.name)).toEqual(['Hotel']);
+    expect(manualOpenSoon(row({ prep: { m_rider001: { estado: 'no_aplica' }, m_hotel001: { estado: 'hecho' } } }), TODAY, list)).toEqual([]);
+  });
+
+  it('asks nothing of a hold, a past or far one, or a row that did not bring its state', () => {
+    expect(manualOpenSoon(row({ status: 'hold' }), TODAY, list)).toEqual([]);
+    expect(manualOpenSoon(row({ performed_at: addDaysIso(TODAY, -1) }), TODAY, list)).toEqual([]);
+    expect(manualOpenSoon(row({ performed_at: addDaysIso(TODAY, 15) }), TODAY, list)).toEqual([]);
+    expect(manualOpenSoon({ status: 'confirmed', performed_at: addDaysIso(TODAY, 5), start_at: null }, TODAY, list)).toEqual([]);
   });
 });

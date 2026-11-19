@@ -18,7 +18,7 @@ import type { Tables } from '$lib/db-types';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import { json } from '$lib/server/http';
-import { APP_THINGS } from '$lib/preparation';
+import { APP_THINGS, MANUAL_ID_RE, MANUAL_NAME_MAX, PREPARATION_MAX } from '$lib/preparation';
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
@@ -37,8 +37,17 @@ const PatchBodySchema = v.object({
     v.nullable(
       v.object({
         items: v.pipe(
-          v.array(v.object({ id: v.picklist(APP_THINGS), on: v.boolean() })),
-          v.maxLength(APP_THINGS.length),
+          v.array(
+            v.union([
+              v.object({ id: v.picklist(APP_THINGS), on: v.boolean() }),
+              v.object({
+                id: v.pipe(v.string(), v.regex(MANUAL_ID_RE)),
+                name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(MANUAL_NAME_MAX)),
+                on: v.boolean(),
+              }),
+            ]),
+          ),
+          v.maxLength(PREPARATION_MAX),
         ),
       }),
     ),

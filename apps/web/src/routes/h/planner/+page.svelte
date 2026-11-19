@@ -66,7 +66,7 @@
   } from '$lib/month-events';
   import AgendaList, { type AgendaDecision, type AgendaMissing, type NoteDraft } from '$lib/components/AgendaList.svelte';
   import { readPreparation } from '$lib/preparation';
-  import { isUrgentMissing, missingSoon } from '$lib/record-missing';
+  import { isUrgentMissing, manualOpenSoon, missingSoon } from '$lib/record-missing';
   import { noteFallback as noteFallbackOf, noteFallbackBody } from '$lib/note';
   import DecisionBand, {
     decisionText,
@@ -1990,12 +1990,17 @@
     new Map(($projectsQuery.data?.items ?? []).map((p) => [p.id, readPreparation(p.preparation)] as const)),
   );
   function agendaMissing(p: PerformanceEvent): AgendaMissing {
-    const open = missingSoon(p, todayIso, p.project?.id ? preparationByProject.get(p.project.id) : undefined);
+    const list = p.project?.id ? preparationByProject.get(p.project.id) : undefined;
+    const open = missingSoon(p, todayIso, list);
     return {
       noTime: open.some((m) => m.kind === 'no_time'),
-      words: open
-        .filter((m) => m.kind !== 'no_time')
-        .map((m) => ({ text: t(MISSING_WORD[m.kind as keyof typeof MISSING_WORD], locale), urgent: isUrgentMissing(m) })),
+      words: [
+        ...open
+          .filter((m) => m.kind !== 'no_time')
+          .map((m) => ({ text: t(MISSING_WORD[m.kind as keyof typeof MISSING_WORD], locale), urgent: isUrgentMissing(m) })),
+        // The project's own things, by their name, neutral (ADR-221).
+        ...manualOpenSoon(p, todayIso, list).map((m) => ({ text: m.name, urgent: false })),
+      ],
     };
   }
   const MISSING_WORD = {

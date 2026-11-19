@@ -18,7 +18,7 @@ import { addDaysIso } from './planner';
 import type { Commitment } from './people';
 import { followUpDue, turnOf, type TurnRow } from './conversation-overview';
 import { relationOf } from './conversation-relation';
-import { thingOn, thingRank, type AppThing, type Preparation } from './preparation';
+import { readManual, readManualStates, thingOn, thingRank, type AppThing, type ManualOpen, type Preparation } from './preparation';
 import { attentionItems, type AttentionItem, type MoneyBolo, type MoneyContext } from './money';
 
 /**
@@ -201,6 +201,8 @@ export interface MissingRow {
   commitments?: readonly Commitment[] | null;
   has_bolo?: boolean | null;
   roadsheet_links?: number | null;
+  /** The hand things' state (`custom_fields.preparation`, ADR-221). */
+  prep?: unknown;
 }
 
 /**
@@ -226,6 +228,19 @@ export function missingSoon(row: MissingRow, today: string, list?: Preparation |
     today,
     list,
   );
+}
+
+/**
+ * The hand things (ADR-221, fase 3) a confirmed performance in the next two
+ * weeks has still open, in the project's order: the same window as
+ * `missingSoon`, which counts the app's things. A row that did not bring its
+ * state (`prep` absent) asks for nothing, as a fact the feed did not bring.
+ */
+export function manualOpenSoon(row: MissingRow, today: string, list: Preparation | null | undefined): ManualOpen[] {
+  if (row.status !== 'confirmed' || row.prep === undefined) return [];
+  const day = row.performed_at.slice(0, 10);
+  if (day < today || day > addDaysIso(today, MISSING_SOON_DAYS)) return [];
+  return readManual(list, readManualStates(row.prep)).open;
 }
 
 // ── Conversación ───────────────────────────────────────────────────────────

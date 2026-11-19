@@ -17,7 +17,7 @@
 import { inScope, type ResolvedScope } from './nav';
 import { perfWorkspaceId, type DateEvent, type PerformanceEvent } from './month-events';
 import type { Preparation } from './preparation';
-import { isUrgentMissing, missingSoon, type PerformanceMissing } from './record-missing';
+import { isUrgentMissing, manualOpenSoon, missingSoon, type PerformanceMissing } from './record-missing';
 import { agendaPoints, agendaRows, type AgendaPoint, type DayAgenda } from './day-agenda';
 import type { PulseInputRows, PulseNext } from './pulse';
 import type { DeskItem } from './desk-feed';
@@ -169,17 +169,21 @@ export function comingTiles(
   for (const day of [...byDay.keys()].sort()) {
     if (tiles.length >= max) break;
     const all = byDay.get(day)!;
-    const gaps = all.flatMap((x) => {
-      if (x.ref.of !== 'performance') return [];
+    const gaps: PerformanceMissing[] = [];
+    let handOpen = 0;
+    for (const x of all) {
+      if (x.ref.of !== 'performance') continue;
       const row = x.ref.row as PerformanceEvent;
-      return missingSoon(row, today, row.project?.id ? listOf?.(row.project.id) : undefined);
-    });
+      const list = row.project?.id ? listOf?.(row.project.id) : undefined;
+      gaps.push(...missingSoon(row, today, list));
+      handOpen += manualOpenSoon(row, today, list).length;
+    }
     tiles.push({
       day,
       items: all.slice(0, COMING_PER_TILE),
       more: Math.max(0, all.length - COMING_PER_TILE),
-      missing: gaps.length > 0,
-      open: gaps.length,
+      missing: gaps.length + handOpen > 0,
+      open: gaps.length + handOpen,
       urgent: gaps.find(isUrgentMissing) ?? null,
     });
   }

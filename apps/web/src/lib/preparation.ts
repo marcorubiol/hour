@@ -1,21 +1,32 @@
 /**
- * «Qué preparamos para una función»: the list of a project (ADR-221, fase 2).
+ * «Qué preparamos para una función»: the list of a project (ADR-221, fases 2-3).
  *
  * The list is decided once, in the project's settings, and holds for all its
- * performances. Phase 2 has the four things the app knows by itself (it closes
- * them when the data exists: confirmed, an hour, who goes, a shared road
- * sheet): each can be turned off and the order is the project's. Phase 3 adds
- * the things written by hand.
+ * performances. It has two kinds of thing:
  *
- * Stored in `project.custom_fields.preparation` (JSON, no schema change),
- * written through `update_project`:
+ *   · of the APP (`status`, `hours`, `team`, `sheet`): the app closes them by
+ *     itself when the data exists. They cannot be deleted, only turned off.
+ *   · BY HAND (`m_…`): the project's own, a name and a box ("Enviar el rider").
+ *     Created, renamed and deleted in the settings; closed per performance.
  *
- *   { "items": [ { "id": "status", "on": true }, … ] }
+ * Stored in `project.custom_fields.preparation` (JSON), written through
+ * `update_project`:
+ *
+ *   { "items": [ { "id": "status", "on": true }, { "id": "m_k3j9x2ab", "name": "Enviar el rider", "on": true } ] }
+ *
+ * The state of a hand thing in each performance lives in
+ * `performance.custom_fields.preparation`, by thing id, written through
+ * `set_performance_preparation`:
+ *
+ *   { "m_k3j9x2ab": { "estado": "hecho" | "no_aplica", "por": <user id>, "cuando": <instant> } }
+ *
+ * Deleting a thing from the list does not delete what was marked in past
+ * performances: that state just stops being read.
  *
  * No list (or a damaged one) is the default: the four, in this order, on.
  * Reading is forgiving: an unknown id is dropped, a repeated one counts once,
- * and an app thing the list lacks (the app grew one) is appended on, so an old
- * list never hides a thing it did not know about.
+ * a hand thing without a name is dropped, and an app thing the list lacks (the
+ * app grew one) is appended on.
  *
  * Pure, without network or clock.
  */
@@ -24,54 +35,165 @@
 export const APP_THINGS = ['status', 'hours', 'team', 'sheet'] as const;
 export type AppThing = (typeof APP_THINGS)[number];
 
-export interface PreparationThing {
+/** A hand thing's id: `m_` and a few lowercase letters or digits. */
+export const MANUAL_ID_RE = /^m_[a-z0-9]{4,16}$/;
+/** What the list can hold, and how long a name is. */
+export const PREPARATION_MAX = 20;
+export const MANUAL_NAME_MAX = 60;
+
+export interface AppPreparationThing {
   id: AppThing;
   on: boolean;
 }
-
+export interface ManualPreparationThing {
+  id: string;
+  name: string;
+  on: boolean;
+}
+export type PreparationThing = AppPreparationThing | ManualPreparationThing;
 export type Preparation = readonly PreparationThing[];
+
+export const isManualThing = (x: PreparationThing): x is ManualPreparationThing => 'name' in x;
 
 export const DEFAULT_PREPARATION: Preparation = APP_THINGS.map((id) => ({ id, on: true }));
 
 const isAppThing = (id: unknown): id is AppThing => typeof id === 'string' && (APP_THINGS as readonly string[]).includes(id);
 
+/** A name as stored: trimmed, one line, at most `MANUAL_NAME_MAX`. */
+export const cleanManualName = (name: unknown): string =>
+  typeof name === 'string' ? name.replace(/\s+/g, ' ').trim().slice(0, MANUAL_NAME_MAX) : '';
+
+/** A fresh hand-thing id; `random` is injectable for tests. */
+export function newManualId(random: () => number = Math.random): string {
+  let s = '';
+  while (s.length < 8) s += Math.floor(random() * 36).toString(36);
+  return `m_${s}`;
+}
+
 /** The list a project's `custom_fields` (or the API's `preparation`) says. */
 export function readPreparation(raw: unknown): Preparation {
   const items = (raw as { items?: unknown } | null | undefined)?.items;
   if (!Array.isArray(items)) return DEFAULT_PREPARATION;
-  const seen = new Set<AppThing>();
+  const seen = new Set<string>();
   const out: PreparationThing[] = [];
   for (const it of items) {
     const id = (it as { id?: unknown } | null)?.id;
-    if (!isAppThing(id) || seen.has(id)) continue;
-    seen.add(id);
-    out.push({ id, on: (it as { on?: unknown }).on !== false });
+    if (typeof id !== 'string' || seen.has(id)) continue;
+    const on = (it as { on?: unknown }).on !== false;
+    if (isAppThing(id)) {
+      seen.add(id);
+      out.push({ id, on });
+    } else if (MANUAL_ID_RE.test(id) && out.length < PREPARATION_MAX) {
+      const name = cleanManualName((it as { name?: unknown }).name);
+      if (!name) continue;
+      seen.add(id);
+      out.push({ id, name, on });
+    }
   }
   for (const id of APP_THINGS) if (!seen.has(id)) out.push({ id, on: true });
   return out;
 }
 
-/** Whether a thing of the app is asked for (everything is, with no list). */
-export function thingOn(list: Preparation | null | undefined, id: AppThing): boolean {
+/** Whether a thing is asked for (everything of the app is, with no list). */
+export function thingOn(list: Preparation | null | undefined, id: string): boolean {
   return (list ?? DEFAULT_PREPARATION).find((x) => x.id === id)?.on !== false;
 }
 
 /** The position of a thing in the list (the order of the pass). */
-export function thingRank(list: Preparation | null | undefined, id: AppThing): number {
-  const i = (list ?? DEFAULT_PREPARATION).findIndex((x) => x.id === id);
-  return i < 0 ? APP_THINGS.length : i;
+export function thingRank(list: Preparation | null | undefined, id: string): number {
+  const l = list ?? DEFAULT_PREPARATION;
+  const i = l.findIndex((x) => x.id === id);
+  return i < 0 ? l.length : i;
 }
 
 /** What goes to `update_project`: the list as stored. */
-export function preparationPatch(list: Preparation): { items: PreparationThing[] } {
-  return { items: list.map((x) => ({ id: x.id, on: x.on })) };
+export function preparationPatch(list: Preparation): { items: ({ id: string; on: boolean } | { id: string; name: string; on: boolean })[] } {
+  return { items: list.map((x) => (isManualThing(x) ? { id: x.id, name: x.name, on: x.on } : { id: x.id, on: x.on })) };
 }
 
-/** A list moved: the thing at `from` goes to `to` (clamped); the list is unchanged if either is out. */
+/** A list moved: the thing at `from` goes to `to`; the list is unchanged if either is out. */
 export function moveThing(list: Preparation, from: number, to: number): Preparation {
   if (from < 0 || from >= list.length || to < 0 || to >= list.length || from === to) return list;
   const next = [...list];
   const [it] = next.splice(from, 1);
   next.splice(to, 0, it);
   return next;
+}
+
+/** A hand thing added at the end (ignored when the name is empty or the list is full). */
+export function addManualThing(list: Preparation, name: string, id = newManualId()): Preparation {
+  const clean = cleanManualName(name);
+  if (!clean || list.length >= PREPARATION_MAX || list.some((x) => x.id === id)) return list;
+  return [...list, { id, name: clean, on: true }];
+}
+
+/** A hand thing renamed (an empty name leaves it). App things have a fixed name. */
+export function renameManualThing(list: Preparation, id: string, name: string): Preparation {
+  const clean = cleanManualName(name);
+  if (!clean) return list;
+  return list.map((x) => (isManualThing(x) && x.id === id ? { ...x, name: clean } : x));
+}
+
+/** A hand thing deleted; the app's cannot be. */
+export function removeManualThing(list: Preparation, id: string): Preparation {
+  return list.filter((x) => !(isManualThing(x) && x.id === id));
+}
+
+// ── The state of each hand thing in a performance ──────────────────────────
+
+export type ManualEstado = 'hecho' | 'no_aplica';
+
+export interface ManualState {
+  estado: ManualEstado;
+  /** The user that closed it. */
+  por: string | null;
+  /** When (an instant). */
+  cuando: string | null;
+}
+
+/** `performance.custom_fields.preparation`, read forgivingly: only well-formed hand entries. */
+export function readManualStates(raw: unknown): Record<string, ManualState> {
+  const out: Record<string, ManualState> = {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  for (const [id, v] of Object.entries(raw)) {
+    if (!MANUAL_ID_RE.test(id) || !v || typeof v !== 'object') continue;
+    const e = v as { estado?: unknown; por?: unknown; cuando?: unknown };
+    if (e.estado !== 'hecho' && e.estado !== 'no_aplica') continue;
+    out[id] = {
+      estado: e.estado,
+      por: typeof e.por === 'string' ? e.por : null,
+      cuando: typeof e.cuando === 'string' ? e.cuando : null,
+    };
+  }
+  return out;
+}
+
+export interface ManualOpen {
+  id: string;
+  name: string;
+}
+export interface ManualClosed extends ManualOpen {
+  state: ManualState;
+}
+export interface ManualReading {
+  /** On and not closed: a box and a row, in the list's order. */
+  open: ManualOpen[];
+  /** Closed (done, or «aquí no hace falta»): the quiet line. */
+  closed: ManualClosed[];
+}
+
+/**
+ * What the hand things of a project's list say for one performance. A thing
+ * turned off asks nothing and says nothing; a closed one is not open.
+ */
+export function readManual(list: Preparation | null | undefined, states: Record<string, ManualState>): ManualReading {
+  const open: ManualOpen[] = [];
+  const closed: ManualClosed[] = [];
+  for (const x of list ?? []) {
+    if (!isManualThing(x) || !x.on) continue;
+    const state = states[x.id];
+    if (state) closed.push({ id: x.id, name: x.name, state });
+    else open.push({ id: x.id, name: x.name });
+  }
+  return { open, closed };
 }
