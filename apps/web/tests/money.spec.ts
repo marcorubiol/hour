@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { waitForLoaded } from './loaded';
+import { unfold } from './fold';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
@@ -261,6 +262,7 @@ test.describe('Cuentas without read:money', () => {
     // The Desk follows the same flags: neither door is drawn (ADR-124, ADR-127 § 7).
     await page.goto('/h/today');
     await waitForLoaded(page);
+    await unfold(page, 'desk-season-fold');
     await expect(page.getByTestId('door-planner')).toBeVisible();
     await expect(page.getByTestId('door-conversations')).toHaveCount(0);
     await expect(page.getByTestId('door-books')).toHaveCount(0);
