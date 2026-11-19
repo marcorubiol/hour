@@ -497,7 +497,7 @@ export function upcoming(input: PulseInput, now: Date, n: number, until?: string
   const out: PulseNext[] = [];
   const seen = new Set<string>();
   const keeps = input.nextKeeps;
-  const stop = until === undefined ? undefined : new Date(Date.parse(`${until}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+  const stop = until === undefined ? undefined : new Date(Date.parse(`${until}T00:00:00Z`) + 2 * 86_400_000).toISOString().slice(0, 10);
   while (out.length < n) {
     const next = computePulse(
       { ...input, nextKeeps: (ref) => !seen.has(`${ref.of}:${ref.id}`) && (!keeps || keeps(ref)) },
@@ -506,8 +506,8 @@ export function upcoming(input: PulseInput, now: Date, n: number, until?: string
     if (!next) break;
     seen.add(`${next.ref.of}:${next.ref.id}`);
     // The pulse walks forward in time, but each `day` is in its own zone, so
-    // the days are monotonic only to a day: a thing just past `until` is
-    // skipped, and the walk stops two days past it.
+    // the days are monotonic only to two days (UTC+14 against UTC−12): a
+    // thing just past `until` is skipped, and the walk stops three days past it.
     if (until !== undefined && next.day > until) {
       if (next.day > stop!) break;
       continue;
