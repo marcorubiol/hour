@@ -1,16 +1,35 @@
 /**
  * «Volver» on a record's whole page (ADR-228, fase 3 de ADR-223): back goes
- * where you were, not to a fixed place. SvelteKit writes the entry's index
- * in `history.state`; above 0 there is an entry under this one that is the
- * app's (the lens you came from, a vistazo's page). With none (a pasted
- * link, a new tab) it falls to the fallback, Hoy.
+ * where you were, not to a fixed place. The app counts its own link
+ * navigations since the document loaded (`noteNavigation`, fed by the /h
+ * layout): above 0 there is an entry under this one that is the app's (the
+ * lens you came from). With none (a pasted link, a new tab, a reload) it
+ * falls to the fallback, Hoy. `history.state`'s index is no help: SvelteKit
+ * starts it at a timestamp, not at 0.
+ *
+ * Only link clicks count (they always push an entry); `goto` may replace
+ * the entry, so it counts for nothing and the fallback stays the safe side.
+ * A Back or Forward (popstate) moves the count by its `delta`.
  */
-const HISTORY_INDEX = 'sveltekit:history';
+let depth = 0;
+
+export interface NavigationNote {
+  type: string;
+  delta?: number;
+}
+
+export function noteNavigation(nav: NavigationNote): void {
+  if (nav.type === 'link') depth += 1;
+  else if (nav.type === 'popstate' && typeof nav.delta === 'number') depth = Math.max(0, depth + nav.delta);
+}
 
 export function hasAppEntryBefore(): boolean {
-  if (typeof history === 'undefined') return false;
-  const index = (history.state as Record<string, unknown> | null)?.[HISTORY_INDEX];
-  return typeof index === 'number' && index > 0;
+  return depth > 0;
+}
+
+/** For tests. */
+export function resetNavigationDepth(): void {
+  depth = 0;
 }
 
 /** Click handler for a «Volver» link whose `href` is the fallback: it

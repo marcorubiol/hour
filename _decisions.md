@@ -8526,7 +8526,7 @@ está abierto en otro hilo; queda para cuando se libere.
 
 **Contexto.** La salida de la página completa del pase decía «Volver al planificador» y llevaba siempre al Planificador, aunque se viniera de Hoy o de un enlace.
 
-**Decisión.** «Volver» usa el historial cuando la entrada anterior es de la app (`history.state['sveltekit:history'] > 0`, `$lib/back`); si no la hay (enlace directo, pestaña nueva) cae en Hoy (`/h/today`). El rótulo es «← Volver», sin nombrar sitio. Un clic con modificador (nueva pestaña) sigue yendo al enlace. El vistazo no cambia: ya se cierra sobre la lente (`closePeek`). La ficha de una fecha no tiene página completa, así que no cambia nada ahí.
+**Decisión.** «Volver» usa el historial cuando la entrada anterior es de la app (las navegaciones por enlace de la app desde que cargó la página, `$lib/back`; el índice de `history.state` no sirve, SvelteKit lo inicia con una marca de tiempo); si no la hay (enlace directo, pestaña nueva) cae en Hoy (`/h/today`). El rótulo es «← Volver», sin nombrar sitio. Un clic con modificador (nueva pestaña) sigue yendo al enlace. El vistazo no cambia: ya se cierra sobre la lente (`closePeek`). La ficha de una fecha no tiene página completa, así que no cambia nada ahí.
 
 **Alcance honesto.** Hoy «Volver» solo se dibuja en el estado de error o de «no existe» de la página del pase (`RecordState`); el pase cargado no lleva flecha propia (usa las migas). No he añadido una flecha nueva: si se quiere una fija en la cabecera del pase, es otra decisión de diseño.
 
