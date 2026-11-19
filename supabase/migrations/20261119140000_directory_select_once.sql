@@ -38,6 +38,10 @@
 -- `person_only_in_foreign_private` y `reads_conversations_in` siguen sin
 -- permiso para `authenticated`.
 --
+-- Ensayo en producción el 19-11 (dentro de una transacción deshecha, como
+-- Marco): `workspace_person` 166 filas en 627 → 260 ms; `workspace_organization`
+-- 153 filas en 553 → 248 ms. Lo que queda es `person_is_team` por fila.
+--
 -- Cómo se valida: `pnpm --filter web test:rls` entero en el Mac, en especial
 -- tests/rls/directory-privacy.test.ts (equipo, directorio con y sin
 -- Converses, privadas ajenas, salas de dinero), que fija la regla que esta
@@ -226,11 +230,11 @@ GRANT EXECUTE ON FUNCTION private.organization_open_for_caller(uuid, uuid) TO au
 ALTER POLICY workspace_person_select ON public.workspace_person
   USING (
     deleted_at IS NULL
-    AND workspace_id = ANY ((SELECT private.caller_member_workspaces()))
+    AND workspace_id = ANY (((SELECT private.caller_member_workspaces()))::uuid[])
     AND (
       private.person_team_for_caller(workspace_id, person_id)
       OR (
-        workspace_id = ANY ((SELECT private.caller_conversation_workspaces()))
+        workspace_id = ANY (((SELECT private.caller_conversation_workspaces()))::uuid[])
         AND private.person_open_for_caller(workspace_id, person_id)
       )
     )
@@ -239,11 +243,11 @@ ALTER POLICY workspace_person_select ON public.workspace_person
 ALTER POLICY workspace_organization_select ON public.workspace_organization
   USING (
     deleted_at IS NULL
-    AND workspace_id = ANY ((SELECT private.caller_member_workspaces()))
+    AND workspace_id = ANY (((SELECT private.caller_member_workspaces()))::uuid[])
     AND (
       private.organization_supported_for_caller(workspace_id, id)
       OR (
-        workspace_id = ANY ((SELECT private.caller_conversation_workspaces()))
+        workspace_id = ANY (((SELECT private.caller_conversation_workspaces()))::uuid[])
         AND private.organization_open_for_caller(workspace_id, id)
       )
     )
