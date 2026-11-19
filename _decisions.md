@@ -8398,3 +8398,29 @@ fases en serie; esta entrada fija la dirección entera y la fase 1 va construida
 
 **Cómo se revierte.** Revertir el commit; sin esquema, API ni datos; `CACHE_SCHEMA` no cambia (misma clave y misma forma de
 respuesta).
+
+## [2026-11-19] ADR-224 · El enlace público y la vista previa dibujan el pase en lectura (fase 2 de ADR-222)
+Segunda fase de «el pase es la hoja de ruta». El documento de la hoja deja de ser un componente propio.
+
+1. **Un solo dibujo en lectura.** `PassSheet` (`components/record/`) dibuja el pase en modo lectura a partir de la misma
+   proyección `Roadsheet` que el servidor ya filtra por rol (`ROLE_SECTIONS`; `/api/public/roadsheet/:token` y
+   `/api/performances/[slug]/roadsheet`, sin cambios). Lo usan la página pública (`/public/roadsheet/<token>`, misma
+   dirección, permiso y caducidad) y la vista previa por rol de la página del operador («Ver como»). Nada se oculta en el
+   cliente: cada pliegue sale solo si su dato no es nulo. `RoadsheetView` se borra (ya nada lo usa).
+2. **La pieza es la del registro.** `RecordPass` gana un modo `read` (sin etiqueta tocable, sin «se guarda solo», sin
+   casillas): el talón es una línea mono, «Hoja de Pau Roca · luces» en el enlace personal y «Hoja para la sala» (o el rol)
+   en los demás; los actos son «Llamar a …» y «Mapa» (más «Llego tarde» debajo, en el enlace personal y el día). El
+   «Función · en 3 días» y la cifra de la hora salen de `$lib/pass-read`, que el registro también usa. El día va como
+   línea de paradas de solo lectura (línea «ahora», horas movidas, dos zonas, viajes), con la función como parada grande.
+   Debajo, pliegues con una línea de lo que guardan: contactos de la sala, logística, hospitalidad, técnica y materiales,
+   «Quién va» (equipo) o «Quién viene» (sala), programador y notas (solo rol `full`). Al imprimir, la pieza va en blanco y
+   los pliegues abiertos, sin botones.
+3. **Lo que no entra:** «Por cerrar», Hablar, notas privadas, bolo y programa, dinero, nada editable. Un solo ámbar en la
+   lectura: el aviso de hora movida. «Llego tarde» deja de ser ámbar (nada urgente que decir antes de pulsarlo).
+4. **Anchos:** una columna, la pieza de 380 px y nunca se estira (tope 480 px en la página).
+5. **Compartir:** el pie del diálogo pasa a «Ver como lo ve cada uno» (misma clave, mismo destino).
+6. **Pendiente.** Fase 3: un contacto de compañía para la sala y una nota compartida (migración, `get_public_roadsheet`,
+   RLS, `CACHE_SCHEMA`). Fase 4: la ruta de la página del operador redirige al pase cuando la vista previa viva en el
+   diálogo; entonces se retira esa página.
+
+**Cómo se revierte.** Revertir el commit (restaura `RoadsheetView`); sin esquema, API ni datos; `CACHE_SCHEMA` no cambia.
