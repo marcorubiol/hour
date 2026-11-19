@@ -100,6 +100,7 @@
   import DayStrip from '$lib/components/planner/DayStrip.svelte';
   import DayFoot, { type DayNextVM } from '$lib/components/planner/DayFoot.svelte';
   import { performanceThread, dateThread, stripWindow, hourOf } from '$lib/day-strip';
+  import DayPiece from '$lib/components/planner/DayPiece.svelte';
   import RunningOrder from '$lib/components/RunningOrder.svelte';
   import TravelStages, { stagesQuery, type StagesFeed } from '$lib/components/planner/TravelStages.svelte';
   import { ORDERED_DATE_KINDS, type RunningOrderTarget } from '$lib/running-order';
@@ -157,7 +158,8 @@
   import { clashesInSeason, closedGapWindows } from '$lib/season';
   import { normalizeLaneAxis, resolveLaneAxis, type LaneAxis } from '$lib/carrils';
   import type { AvailabilityItem } from '$lib/availability';
-  import { dayMonthLong, localeDayMonth, localeDayMonthNear, localeWeekdayShort, dualTime, viewerTimeZone } from '$lib/datetime';
+  import { dayMonthLong, hourMark, localeDayMonth, localeDayMonthNear, localeWeekdayShort, dualTime, viewerTimeZone } from '$lib/datetime';
+  import { peekHref } from '$lib/peek';
   import {
     holdDeadlineLabel,
     isHoldStatus,
@@ -1532,6 +1534,9 @@
       country?: string | null;
       workspaceId?: string | null;
       suggestVenue?: { venueId: string; name: string } | null;
+      /** The pase it opens (ADR-230), the hour it says and the line under it. */
+      href: string | null;
+      sub: string;
     }> = [];
     const clockOf = (venueTz: string | null | undefined, wsId: string | undefined) =>
       venueTz || (wsId ? workspaceTzById.get(wsId) : undefined) || viewerTz;
@@ -1543,6 +1548,8 @@
         name: performanceSlip(p, slipCtxPage).name,
         tz: clockOf(p.venue?.timezone, perfWorkspaceId(p) ?? undefined),
         from: p.start_at ?? p.performed_at,
+        href: performanceSlip(p, slipCtxPage).href ?? null,
+        sub: [kindLabel(performanceSlip(p, slipCtxPage).kind), performanceSlip(p, slipCtxPage).city].filter(Boolean).join(' · '),
       });
     }
     for (const d of shownDates) {
@@ -1563,6 +1570,8 @@
           // THE SHOW OF THE DAY IS WHERE THE TRIP ENDS, most days: its venue
           // is OFFERED as the new stage's destination (Marco, 2026-10-10).
           suggestVenue: tonightsVenue(d.project?.id ?? null),
+          href: peekHref({ kind: 'date', id: d.id }, page.url),
+          sub: [kindLabel(sl.kind), sl.city].filter(Boolean).join(' · '),
         });
         continue;
       }
@@ -1573,6 +1582,8 @@
         name: dateSlip(d, slipCtxPage).name,
         tz: clockOf(d.venue?.timezone, d.project?.workspace_id),
         from: d.starts_at,
+        href: peekHref({ kind: 'date', id: spanSourceId(d.id) }, page.url),
+        sub: [kindLabel(dateSlip(d, slipCtxPage).kind), d.city].filter(Boolean).join(' · '),
       });
     }
     return out.sort((a, b) => a.from.localeCompare(b.from));
@@ -3443,29 +3454,28 @@
          be written, on the day. A name on the lid only when the day holds
          more than one order: with one, the strip above already says whose. -->
     {#each dayOrders as o (o.id)}
-      {#if o.target === 'trip'}
-        <TravelStages
-          id={o.id}
-          dayIso={selectedDay}
-          tz={o.tz}
-          {locale}
-          origin={o.origin}
-          spaceCountry={o.country}
-          workspaceId={o.workspaceId}
-          suggestVenue={o.suggestVenue}
-          name={dayOrders.length > 1 ? o.name : null}
-        />
-      {:else}
-        <RunningOrder
-          target={o.target}
-          id={o.id}
-          dayIso={selectedDay}
-          tz={o.tz}
-          {viewerTz}
-          {locale}
-          name={dayOrders.length > 1 ? o.name : null}
-        />
-      {/if}
+      <DayPiece
+        href={o.href}
+        what={o.name}
+        at={hourMark(dualTime(o.from, o.tz, viewerTz).primary)}
+        sub={o.sub}
+      >
+        {#if o.target === 'trip'}
+          <TravelStages
+            id={o.id}
+            dayIso={selectedDay}
+            tz={o.tz}
+            {locale}
+            origin={o.origin}
+            spaceCountry={o.country}
+            workspaceId={o.workspaceId}
+            suggestVenue={o.suggestVenue}
+            readonly
+          />
+        {:else}
+          <RunningOrder target={o.target} id={o.id} dayIso={selectedDay} tz={o.tz} {viewerTz} {locale} readonly />
+        {/if}
+      </DayPiece>
     {/each}
     <!-- THE ABSENCE IS THE DAY'S FOOTING (Marco, 2026-08-10). Above the
          drawing it floated on its own, far from anything, and Marco could

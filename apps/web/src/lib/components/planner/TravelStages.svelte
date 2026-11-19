@@ -91,6 +91,8 @@
     suggestVenue?: { venueId: string; name: string } | null;
     /** Whose stages these are, when the day holds more than one list. */
     name?: string | null;
+    /** Draw the stages, write none (the Day shows; the trip's pase writes, ADR-230). */
+    readonly?: boolean;
   }
 
   let {
@@ -103,6 +105,7 @@
     workspaceId = null,
     suggestVenue = null,
     name = null,
+    readonly = false,
   }: Props = $props();
 
   const queryClient = useQueryClient();
@@ -133,7 +136,7 @@
         .filter((c): c is string => Boolean(c)),
     ),
   ]);
-  let canEdit = $derived($feed.data?.can_edit ?? false);
+  let canEdit = $derived(!readonly && ($feed.data?.can_edit ?? false));
 
   const modeWord = (m: string) => t(`planner.mode_${m}`, locale);
 

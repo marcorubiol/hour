@@ -8556,3 +8556,17 @@ Encargo `revision-tdah/brief.md`, fase 3 (Marco, 19-11).
 **Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`. Textos en los cuatro idiomas.
 
 **Cómo se revierte.** Revertir el commit.
+
+## [2026-11-19] ADR-230 · El Día enseña, el pase escribe (fase 4 de ADR-223; enmienda ADR-090 P3 «las horas se escriben en el día»)
+
+**Contexto.** Las horas de una función o de un ensayo se escribían en dos sitios: bajo la tira del Día (`RunningOrder`) y en el pase. Con la regla «tocas una cosa, se abre su pase» (ADR-223) el Día pasa a enseñar y el pase a escribir.
+
+**Decisión.** Bajo la tira del Día, cada función y cada fecha con orden o con tramos se dibuja como una pieza corta (`DayPiece`, 23,75 rem (380 px, `--pass-width`) y no se estira, como Hoy y el pase): qué es, su hora, dónde, y debajo sus paradas en lectura. Tocar la pieza abre su pase (vistazo). `RunningOrder` y `TravelStages` ganan `readonly` y el Día los monta así; se editan en el pase (y, para un viaje, en su ficha). Se quedan en el Día las notas, las ausencias y los choques: son del día, no de una cosa. Enmienda ADR-090 P3: las horas se escriben en el pase; el Día las enseña. Con un solo show el Día y el pase se parecen; no se redirige.
+
+**«Editar» sale de la cabecera de la ficha de fechas** (ensayos, viajes), como pidió Marco el 19-11. No se pierde nada: los lápices de la fecha y del lugar del pase abren el mismo diálogo (título, tipo, serie, borrar).
+
+**Dónde se aparta del dibujo.** No tengo el lienzo de la vista Día (opción A, 18-11) en el repo: la pieza reutiliza el relleno y el tamaño de la pieza de Hoy (`--surface-focus`, `--display-piece`) y puede necesitar retoque de Marco. No lleva monograma del proyecto.
+
+**Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`. E2E tocados: `date-edit.spec.ts` y `peek.spec.ts` (el lápiz de la fecha sustituye a «Edit»).
+
+**Cómo se revierte.** Revertir el commit.
