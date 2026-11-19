@@ -8,8 +8,9 @@
    * desktop the tiles go one under the other (§ 6 c) and «Planner →» is a
    * low quiet row at their foot, lighter than any tile with something.
    *
-   * THE DOOR IS THE TILE (§ 8, design-system rule 10): each opens its day in
-   * the Planner; the block's head carries no written link. An option to
+   * THE DOOR IS THE TILE (§ 8, design-system rule 10): on a phone a tile
+   * with one thing opens that thing's pase, with several its day in the
+   * Planner (ADR-223); on a desktop the number opens the day, each row its pase; the block's head carries no written link. An option to
    * decide keeps its tile with its «?» even when «Te espera» asks it too
    * (ADR-203 § 10). With nothing in two weeks, the sentence of always.
    */
@@ -67,10 +68,18 @@
     return t('desk.tile_urgent', locale, { when, what });
   }
   let planner = $derived(lensOn('planner'));
-  /** A tile's door: its day in the Planner, else its first thing's record. */
-  function tileHref(tile: ComingTile): string | undefined {
+  /** A tile's day in the Planner, else its first thing's record. */
+  function dayHref(tile: ComingTile): string | undefined {
     if (planner) return plannerDayHref('day', tile.day);
     return pulseSlip(tile.items[0].ref, tile.day, slipCtx).href ?? undefined;
+  }
+  /** A phone tile's door (ADR-223): one thing, its pase; several, the day,
+      the only screen that shows them together. */
+  function tileHref(tile: ComingTile): string | undefined {
+    if (tile.items.length === 1 && tile.more === 0) {
+      return pulseSlip(tile.items[0].ref, tile.day, slipCtx).href ?? dayHref(tile);
+    }
+    return dayHref(tile);
   }
   let farHref = $derived.by(() => {
     if (!far) return undefined;
@@ -106,8 +115,8 @@
     {:else if tiles.length > 0}
       <ol class="coming__strip" data-testid="desk-coming">
         {#each tiles as tile (tile.day)}
-          {@const href = tileHref(tile)}
           {#if wide}
+          {@const href = dayHref(tile)}
           <li class="coming__cell">
             <div class="tile tile--card" data-testid="desk-tile" data-day={tile.day}>
               <svelte:element this={href ? 'a' : 'span'} {href} class="tile__date">
@@ -143,6 +152,7 @@
             </div>
           </li>
           {:else}
+          {@const href = tileHref(tile)}
           <li class="coming__cell">
             <svelte:element this={href ? 'a' : 'div'} {href} class="tile" data-testid="desk-tile" data-day={tile.day}>
               <span class="tile__date">

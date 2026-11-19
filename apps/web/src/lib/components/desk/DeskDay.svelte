@@ -261,6 +261,13 @@
     return [];
   });
   let map = $derived(mapsHref(mapParts) !== null);
+  /** The headline's door (ADR-223): the pase of the thing that rules the piece, the
+      focus when it has one, else the day's main performance. With several shows the
+      headline is the day's, not one of them: no door. */
+  let headHref = $derived.by(() => {
+    if (!agenda || !focus || shows) return undefined;
+    return pulseSlip(focus.ref, agenda.day, slipCtx).href ?? actionSlip?.href ?? undefined;
+  });
   let roadsheet = $derived(actionSlip?.href ? `${actionSlip.href}/roadsheet` : null);
   // Without its project (read through a bolo: a guest) nobody here edits «quién va».
   let whoHref = $derived(gig && actionSlip?.href && actionPerf?.project ? `${actionSlip.href}#who-goes` : null);
@@ -348,7 +355,9 @@
            An option leans, the headline and the line under it (design-system
            rule 18); with several shows the headline is the day's: only a row leans. -->
       <div class="piece__lead" aria-live="polite" data-testid="desk-next-now">
-        <span class="piece__what" class:guess={leans} data-testid="desk-next-what">{shows ? showsWhat : what}</span>
+        <svelte:element this={headHref ? 'a' : 'span'} href={headHref} class="piece__what" class:guess={leans} data-testid="desk-next-what"
+          >{shows ? showsWhat : what}</svelte:element
+        >
         <span class="piece__at">{shows ? showsAt : at}</span>
       </div>
       {#if sub || rest}
@@ -498,6 +507,15 @@
   }
   .piece__what {
     text-wrap: balance;
+  }
+  /* The headline is a door without looking like a link: same ink, an underline only under the finger or the pointer. */
+  a.piece__what {
+    text-decoration: none;
+  }
+  a.piece__what:hover,
+  a.piece__what:focus-visible {
+    text-decoration: underline;
+    text-underline-offset: 4px;
   }
   .piece__at {
     font-variant-numeric: tabular-nums;

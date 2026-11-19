@@ -10,10 +10,12 @@
  * the keys follow the clock across midnight.
  */
 import { createQuery } from '@tanstack/svelte-query';
+import { page } from '$app/state';
 import { fromStore, toStore } from 'svelte/store';
 import { fetchJSON } from '$lib/api';
 import { bookingModeOf } from '$lib/booking-mode';
 import { dualTime } from '$lib/datetime';
+import { peekHref } from '$lib/peek';
 import {
   dateSlip,
   performanceSlip,
@@ -158,13 +160,23 @@ export function pulseSlipContext(
 /**
  * The slip of a pulse row.
  *
- * A DATE HAS NO PAGE, BUT IT HAS A DAY: `dateSlip` returns `href: null`
- * correctly (on the month and the diary a date opens its edit dialog, and
- * those views own that dialog). The rail and the Desk do not, so a date sends
- * you to the day that holds it, a real address the Planner already answers;
- * no address at all while the space does not use the Planner (ADR-132).
+ * A DATE HAS NO PAGE, BUT IT HAS A PASE (ADR-223, «tocas una cosa, se abre su
+ * pase»): `dateSlip` returns `href: null` correctly (on the month and the
+ * diary a date opens its edit dialog, and those views own that dialog). The
+ * rail and the Desk do not, so a date opens its vistazo over the page you are
+ * on (`?peek=date/<id>`), with or without the Planner lens: the feed only
+ * carries the dates the person can read. Without a current address (a render
+ * outside the app) it falls back to the day in the Planner, as before.
  */
 export function pulseSlip(ref: PulseRef, day: string, ctx: SlipContext): Slip {
   if (ref.of === 'performance') return performanceSlip(ref.row as PerformanceEvent, ctx);
-  return { ...dateSlip(ref.row as DateEvent, ctx), href: lensOn('planner') ? plannerDayHref('day', day) : null };
+  const slip = dateSlip(ref.row as DateEvent, ctx);
+  let here: URL | null = null;
+  try {
+    here = page.url;
+  } catch {
+    here = null;
+  }
+  if (here) return { ...slip, href: peekHref({ kind: 'date', id: ref.row.id }, here) };
+  return { ...slip, href: lensOn('planner') ? plannerDayHref('day', day) : null };
 }

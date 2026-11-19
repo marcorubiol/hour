@@ -8378,6 +8378,20 @@ listas guardadas se quedan en `custom_fields` sin efecto). Fase 3: revertir el c
 `build/runbooks/rollback-20261119-performance-preparation.sql` (borra la función; lo marcado se queda sin que nadie lo lea).
 Fase 4: revertir el commit; sin esquema.
 
+## [2026-11-19] ADR-223 · Una regla para navegar: tocas una cosa, se abre su pase; tocas una fecha, se abre el día
+
+**Contexto.** Marco no sabía cuándo un toque abre el Día del Planificador y cuándo la ficha. En Hoy convivían tres respuestas: la tarjeta del móvil iba siempre al Día, el renglón del escritorio a la ficha y la pieza no se tocaba; ensayos y viajes iban al Día aunque tienen ficha (`?peek=date/<id>`).
+
+**Decisión (aprobada por Marco el 19-11, «la regla entera»).** *Tocas una cosa* (función, ensayo, viaje, cualquier otra fecha), *se abre su pase* como vistazo (`PeekHost`, ADR-139), a pantalla entera en el móvil. *Tocas una fecha* (la cifra del día), *se abre el Día*. Al cerrar el pase se vuelve adonde se estaba. Las fases siguientes (Hoja fuera de Hoy y del Día, «volver», el Día que enseña y el pase que escribe) están en `build/coordination/navegacion/` y en el encargo del proyecto.
+
+**Fase 1 (hecha, borrador): Hoy abre el pase.**
+- Tarjeta de «Lo que viene» en el móvil: con una sola cosa, su pase; con varias, el Día (es la única pantalla que las enseña juntas; decisión del encargo, no de Marco). Escritorio sin cambios: la cifra al Día, cada renglón a su pase.
+- Pieza de Hoy: el titular abre el pase de lo que manda (el punto en foco, si no la función principal del día). Con varias funciones el titular es del día y no es enlace. Llamar, Mapa y Hoja siguen como botones propios.
+- `pulseSlip`: una fecha devuelve `?peek=date/<id>` sobre la página en que se está (con la lente Planificador o sin ella: el feed solo trae lo que la persona puede leer); sin dirección actual, el Día como antes.
+
+**Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`. Los E2E que leían la puerta de la tarjeta (`desk.spec.ts`, `pulse.spec.ts`) se reescriben.
+
+**Cómo se revierte.** Revertir el commit.
 ## [2026-11-19] ADR-222 · El pase es la hoja de ruta: compartir vive en el pase (fase 1; enmienda ADR-212, ADR-047 y ADR-183 en el dónde)
 Encargo de Marco, 19-11: el pase de la función (`PerformanceRecord`) y la hoja de ruta deben ser una sola cosa. Cuatro
 fases en serie; esta entrada fija la dirección entera y la fase 1 va construida.

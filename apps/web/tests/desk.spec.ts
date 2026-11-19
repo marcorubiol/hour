@@ -266,12 +266,19 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
     await expect(add).toBeFocused();
   });
 
-  test('the tiles open their day in the Planner; the pills, their lists (ADR-202 § 8)', async ({ page }) => {
+  // ADR-223, «tocas una cosa, se abre su pase; tocas una fecha, se abre el día»:
+  // a phone tile with one thing opens its pase, with several the Day; on a
+  // desktop the number opens the Day and each row its pase.
+  test('the tiles open their pase or their day; the pills, their lists (ADR-223, ADR-202 § 8)', async ({ page }) => {
     await page.goto(DESK);
     await waitForLoaded(page);
     const tiles = page.getByTestId('desk-tile');
     if ((await tiles.count()) > 0) {
-      await expect(tiles.first()).toHaveAttribute('href', /^\/h\/planner\?view=day&d=\d{4}-\d{2}-\d{2}$/);
+      const door = tiles.first().locator('a[href]').first();
+      const href = (await tiles.first().getAttribute('href')) ?? (await door.getAttribute('href'));
+      expect(href).toMatch(
+        /^\/h\/(?:[\w-]+\/performance\/[\w-]+|planner\?view=day&d=\d{4}-\d{2}-\d{2}|today\?peek=date\/[0-9a-f-]{36})$/,
+      );
       expect(await tiles.count()).toBeLessThanOrEqual(10);
       await expect(page.getByTestId('desk-tile-planner')).toHaveAttribute('href', '/h/planner');
     }

@@ -99,11 +99,11 @@ test.describe('the rail pulse (ADR-096)', () => {
     if ((await slip.count()) === 0) test.skip(true, 'nothing ahead for this fixture');
     const href = await slip.first().getAttribute('href');
     expect(href, 'the next thing is not reachable').toBeTruthy();
-    expect(href!).toMatch(/^\/h\/(?:[\w-]+\/performance\/[\w-]+|planner\?view=day&d=\d{4}-\d{2}-\d{2})$/);
+    expect(href!).toMatch(/^\/h\/(?:[\w-]+\/performance\/[\w-]+|planner\?view=day&d=\d{4}-\d{2}-\d{2}|[\w/-]+\?(?:[^#]*&)?peek=date\/[0-9a-f-]{36})$/);
 
     await slip.first().click();
     // A performance opens in the vistazo over this lens (ADR-139 p1); a day is the Planner.
-    if (/\/performance\//.test(href!)) await expect(page.getByTestId('peek')).toBeVisible({ timeout: 20_000 });
+    if (/\/performance\/|peek=date/.test(href!)) await expect(page.getByTestId('peek')).toBeVisible({ timeout: 20_000 });
     else await expect(page).toHaveURL(/\/h\/planner/, { timeout: 20_000 });
   });
 
