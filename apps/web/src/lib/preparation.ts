@@ -41,14 +41,26 @@ export const MANUAL_ID_RE = /^m_[a-z0-9]{4,16}$/;
 export const PREPARATION_MAX = 20;
 export const MANUAL_NAME_MAX = 60;
 
+/**
+ * How many days before the performance an open thing has hurry (the only thing
+ * drawn in amber, fase 4). `days` absent is the default (the road sheet: 14,
+ * the day it starts to be asked; the rest: never); `null` is «never»; a number
+ * is the project's own. Only the performance's day is counted, so «0» is «the
+ * same day». «Estado» takes no days: its hurry is the hold's own deadline.
+ */
+export const SHEET_HURRY_DAYS = 14;
+export const HURRY_DAYS_MAX = 365;
+
 export interface AppPreparationThing {
   id: AppThing;
   on: boolean;
+  days?: number | null;
 }
 export interface ManualPreparationThing {
   id: string;
   name: string;
   on: boolean;
+  days?: number | null;
 }
 export type PreparationThing = AppPreparationThing | ManualPreparationThing;
 export type Preparation = readonly PreparationThing[];
@@ -58,6 +70,12 @@ export const isManualThing = (x: PreparationThing): x is ManualPreparationThing 
 export const DEFAULT_PREPARATION: Preparation = APP_THINGS.map((id) => ({ id, on: true }));
 
 const isAppThing = (id: unknown): id is AppThing => typeof id === 'string' && (APP_THINGS as readonly string[]).includes(id);
+
+/** A `days` as stored: a whole number 0..365, `null` for never, `undefined` for absent or damaged (the default). */
+function readDays(raw: unknown): number | null | undefined {
+  if (raw === null) return null;
+  return typeof raw === 'number' && Number.isInteger(raw) && raw >= 0 && raw <= HURRY_DAYS_MAX ? raw : undefined;
+}
 
 /** A name as stored: trimmed, one line, at most `MANUAL_NAME_MAX`. */
 export const cleanManualName = (name: unknown): string =>
@@ -80,14 +98,16 @@ export function readPreparation(raw: unknown): Preparation {
     const id = (it as { id?: unknown } | null)?.id;
     if (typeof id !== 'string' || seen.has(id)) continue;
     const on = (it as { on?: unknown }).on !== false;
+    const days = readDays((it as { days?: unknown }).days);
+    const withDays = days === undefined || id === 'status' ? {} : { days };
     if (isAppThing(id)) {
       seen.add(id);
-      out.push({ id, on });
+      out.push({ id, on, ...withDays });
     } else if (MANUAL_ID_RE.test(id) && out.length < PREPARATION_MAX) {
       const name = cleanManualName((it as { name?: unknown }).name);
       if (!name) continue;
       seen.add(id);
-      out.push({ id, name, on });
+      out.push({ id, name, on, ...withDays });
     }
   }
   for (const id of APP_THINGS) if (!seen.has(id)) out.push({ id, on: true });
@@ -107,8 +127,32 @@ export function thingRank(list: Preparation | null | undefined, id: string): num
 }
 
 /** What goes to `update_project`: the list as stored. */
-export function preparationPatch(list: Preparation): { items: ({ id: string; on: boolean } | { id: string; name: string; on: boolean })[] } {
-  return { items: list.map((x) => (isManualThing(x) ? { id: x.id, name: x.name, on: x.on } : { id: x.id, on: x.on })) };
+export function preparationPatch(list: Preparation): {
+  items: { id: string; on: boolean; name?: string; days?: number | null }[];
+} {
+  return {
+    items: list.map((x) => ({
+      id: x.id,
+      ...(isManualThing(x) ? { name: x.name } : {}),
+      on: x.on,
+      ...(x.days !== undefined ? { days: x.days } : {}),
+    })),
+  };
+}
+
+/** The days before the performance a thing has hurry: a number, or null for never. */
+export function thingDays(list: Preparation | null | undefined, id: string): number | null {
+  const x = (list ?? DEFAULT_PREPARATION).find((t) => t.id === id);
+  if (x && x.days !== undefined) return x.days;
+  return id === 'sheet' ? SHEET_HURRY_DAYS : null;
+}
+
+/** A thing's hurry set (`null` for never; the app's «Estado» takes none). */
+export function setThingDays(list: Preparation, id: string, days: number | null): Preparation {
+  if (id === 'status') return list;
+  const d = days === null ? null : Math.min(HURRY_DAYS_MAX, Math.max(0, Math.trunc(days)));
+  if (d !== null && !Number.isFinite(d)) return list;
+  return list.map((x) => (x.id === id ? { ...x, days: d } : x));
 }
 
 /** A list moved: the thing at `from` goes to `to`; the list is unchanged if either is out. */

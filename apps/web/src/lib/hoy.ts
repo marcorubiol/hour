@@ -17,7 +17,7 @@
 import { inScope, type ResolvedScope } from './nav';
 import { perfWorkspaceId, type DateEvent, type PerformanceEvent } from './month-events';
 import type { Preparation } from './preparation';
-import { isUrgentMissing, manualOpenSoon, missingSoon, type PerformanceMissing } from './record-missing';
+import { isUrgentMissing, isUrgentThing, manualOpenSoon, missingSoon, type PerformanceMissing } from './record-missing';
 import { agendaPoints, agendaRows, type AgendaPoint, type DayAgenda } from './day-agenda';
 import type { PulseInputRows, PulseNext } from './pulse';
 import type { DeskItem } from './desk-feed';
@@ -135,10 +135,26 @@ export interface ComingTile {
       too; `missing` is `open > 0`. */
   missing: boolean;
   open: number;
-  /** The first open thing with hurry (a hold's deadline, an unshared road
-      sheet), the only thing the tile paints in amber; null says none. */
-  urgent: PerformanceMissing | null;
+  /** The nearest open thing with hurry (a hold's deadline, or a thing inside
+      the days its project gave it), the only thing the tile paints in amber;
+      null says none. `day` is the one to count to: the hold's deadline, else
+      the performance's. */
+  urgent: TileUrgent | null;
 }
+
+export interface TileUrgent {
+  what: 'hold' | 'roadsheet' | 'hours' | 'team' | 'hand';
+  day: string;
+  /** The project's own thing, by its name. */
+  name?: string;
+}
+
+const URGENT_WHAT = {
+  hold_deadline: 'hold',
+  roadsheet_unshared: 'roadsheet',
+  no_time: 'hours',
+  nobody_going: 'team',
+} as const;
 
 const dayDiff = (day: string, today: string) =>
   Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
@@ -170,13 +186,23 @@ export function comingTiles(
     if (tiles.length >= max) break;
     const all = byDay.get(day)!;
     const gaps: PerformanceMissing[] = [];
+    const urgents: TileUrgent[] = [];
     let handOpen = 0;
     for (const x of all) {
       if (x.ref.of !== 'performance') continue;
       const row = x.ref.row as PerformanceEvent;
       const list = row.project?.id ? listOf?.(row.project.id) : undefined;
-      gaps.push(...missingSoon(row, today, list));
-      handOpen += manualOpenSoon(row, today, list).length;
+      const perfDay = row.performed_at.slice(0, 10);
+      for (const m of missingSoon(row, today, list)) {
+        gaps.push(m);
+        if (m.kind !== 'no_bolo' && isUrgentMissing(m, { day: perfDay, today, list })) {
+          urgents.push({ what: URGENT_WHAT[m.kind], day: m.kind === 'hold_deadline' ? m.day : perfDay });
+        }
+      }
+      for (const m of manualOpenSoon(row, today, list)) {
+        handOpen += 1;
+        if (isUrgentThing(m.id, perfDay, today, list)) urgents.push({ what: 'hand', day: perfDay, name: m.name });
+      }
     }
     tiles.push({
       day,
@@ -184,7 +210,7 @@ export function comingTiles(
       more: Math.max(0, all.length - COMING_PER_TILE),
       missing: gaps.length + handOpen > 0,
       open: gaps.length + handOpen,
-      urgent: gaps.find(isUrgentMissing) ?? null,
+      urgent: urgents.sort((a, b) => a.day.localeCompare(b.day))[0] ?? null,
     });
   }
   return tiles;

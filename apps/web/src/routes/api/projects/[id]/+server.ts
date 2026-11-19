@@ -18,9 +18,12 @@ import type { Tables } from '$lib/db-types';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import { json } from '$lib/server/http';
-import { APP_THINGS, MANUAL_ID_RE, MANUAL_NAME_MAX, PREPARATION_MAX } from '$lib/preparation';
+import { APP_THINGS, HURRY_DAYS_MAX, MANUAL_ID_RE, MANUAL_NAME_MAX, PREPARATION_MAX } from '$lib/preparation';
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+// Days before the performance a thing has hurry; null is «never», absent the default.
+const HurryDays = v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(HURRY_DAYS_MAX))));
 
 const PatchBodySchema = v.object({
   name: v.optional(v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(80))),
@@ -39,11 +42,12 @@ const PatchBodySchema = v.object({
         items: v.pipe(
           v.array(
             v.union([
-              v.object({ id: v.picklist(APP_THINGS), on: v.boolean() }),
+              v.object({ id: v.picklist(APP_THINGS), on: v.boolean(), days: HurryDays }),
               v.object({
                 id: v.pipe(v.string(), v.regex(MANUAL_ID_RE)),
                 name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(MANUAL_NAME_MAX)),
                 on: v.boolean(),
+                days: HurryDays,
               }),
             ]),
           ),

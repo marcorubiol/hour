@@ -8,6 +8,8 @@ import {
   newManualId,
   preparationPatch,
   readManual,
+  setThingDays,
+  thingDays,
   readManualStates,
   readPreparation,
   removeManualThing,
@@ -134,5 +136,32 @@ describe('the project\'s own things (ADR-221, fase 3)', () => {
     const r = readManual(l, readManualStates({ m_hotel001: { estado: 'no_aplica', por: 'u', cuando: '2026-11-18T10:00:00Z' } }));
     expect(r.open).toEqual([{ id: 'm_rider001', name: 'Rider' }]);
     expect(r.closed.map((c) => [c.id, c.state.estado])).toEqual([['m_hotel001', 'no_aplica']]);
+  });
+});
+
+describe('days of hurry (ADR-221, fase 4)', () => {
+  it('absent is the default (sheet 14, the rest never); null is never; a number is the project\'s', () => {
+    expect(thingDays(null, 'sheet')).toBe(14);
+    expect(thingDays(null, 'hours')).toBeNull();
+    const l = readPreparation({ items: [{ id: 'sheet', on: true, days: null }, { id: 'hours', on: true, days: 5 }] });
+    expect(thingDays(l, 'sheet')).toBeNull();
+    expect(thingDays(l, 'hours')).toBe(5);
+  });
+
+  it('a damaged value is the default; «estado» takes no days', () => {
+    const l = readPreparation({ items: [{ id: 'sheet', on: true, days: -3 }, { id: 'hours', on: true, days: 2.5 }, { id: 'status', on: true, days: 4 }] });
+    expect(thingDays(l, 'sheet')).toBe(14);
+    expect(thingDays(l, 'hours')).toBeNull();
+    expect(l.find((x) => x.id === 'status')).toEqual({ id: 'status', on: true });
+  });
+
+  it('setThingDays clamps, accepts null, leaves «estado»; the patch keeps what was set and reads back', () => {
+    let l = setThingDays(DEFAULT_PREPARATION, 'hours', 9999);
+    expect(thingDays(l, 'hours')).toBe(365);
+    l = setThingDays(l, 'sheet', null);
+    expect(setThingDays(l, 'status', 3)).toBe(l);
+    expect(preparationPatch(l).items.find((x) => x.id === 'sheet')).toEqual({ id: 'sheet', on: true, days: null });
+    expect(preparationPatch(DEFAULT_PREPARATION).items[0]).toEqual({ id: 'status', on: true });
+    expect(readPreparation(preparationPatch(l))).toEqual(l);
   });
 });

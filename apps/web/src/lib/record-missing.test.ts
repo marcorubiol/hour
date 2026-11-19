@@ -9,6 +9,7 @@ import {
   missingSoon,
   performanceMissing,
   isUrgentMissing,
+  isUrgentThing,
   performanceReadiness,
   personMissing,
   stepShortcuts,
@@ -181,9 +182,10 @@ describe('performanceReadiness · the stub of the pass', () => {
     const b = ready({ day: addDaysIso(TODAY, 3), start_at: null, roster: [], roadsheetLinks: 0 });
     expect(b.filter((x) => x.urgent).map((x) => x.id)).toEqual(['sheet']);
     expect(ready({ status: 'hold', day: addDaysIso(TODAY, 40) })[0].urgent).toBe(false);
-    expect(isUrgentMissing({ kind: 'no_time' })).toBe(false);
-    expect(isUrgentMissing({ kind: 'roadsheet_unshared' })).toBe(true);
-    expect(isUrgentMissing({ kind: 'hold_deadline', day: TODAY })).toBe(true);
+    const day = addDaysIso(TODAY, 3);
+    expect(isUrgentMissing({ kind: 'no_time' }, { day, today: TODAY })).toBe(false);
+    expect(isUrgentMissing({ kind: 'roadsheet_unshared' }, { day, today: TODAY })).toBe(true);
+    expect(isUrgentMissing({ kind: 'hold_deadline', day: TODAY }, { day, today: TODAY })).toBe(true);
   });
 
   it('cancelled and past performances have no stub; today still does', () => {
@@ -585,5 +587,39 @@ describe('manualOpenSoon · the project\'s own things on a feed row (ADR-221, fa
     expect(manualOpenSoon(row({ performed_at: addDaysIso(TODAY, -1) }), TODAY, list)).toEqual([]);
     expect(manualOpenSoon(row({ performed_at: addDaysIso(TODAY, 15) }), TODAY, list)).toEqual([]);
     expect(manualOpenSoon({ status: 'confirmed', performed_at: addDaysIso(TODAY, 5), start_at: null }, TODAY, list)).toEqual([]);
+  });
+});
+
+describe('the hurry of each thing (ADR-221, fase 4)', () => {
+  const within = (n: number) => addDaysIso(TODAY, n);
+  const open = (n: number, list: ReturnType<typeof readPreparation>) =>
+    performanceReadiness(perf({ day: within(n), start_at: null, roster: [], roadsheetLinks: 0 }), TODAY, list).filter((b) => b.urgent).map((b) => b.id);
+
+  it('by default only the road sheet has hurry (its 14 days); hours and team never', () => {
+    expect(open(3, readPreparation(null))).toEqual(['sheet']);
+  });
+
+  it('a thing has hurry inside the days its project gave it, and not before', () => {
+    const l = readPreparation({ items: [{ id: 'hours', on: true, days: 5 }, { id: 'team', on: true, days: 2 }] });
+    expect(open(5, l)).toEqual(['hours', 'sheet']);
+    expect(open(6, l)).toEqual(['sheet']);
+    expect(open(2, l)).toEqual(['hours', 'team', 'sheet']);
+  });
+
+  it('null days is never, even for the road sheet', () => {
+    expect(open(1, readPreparation({ items: [{ id: 'sheet', on: true, days: null }] }))).toEqual([]);
+  });
+
+  it('the sheet\'s days can be shorter than the 14 it is asked in', () => {
+    const l = readPreparation({ items: [{ id: 'sheet', on: true, days: 3 }] });
+    expect(open(3, l)).toEqual(['sheet']);
+    expect(open(4, l)).toEqual([]);
+  });
+
+  it('isUrgentThing counts the performance\'s own day; a hand thing too', () => {
+    const l = addManualThing(readPreparation(null), 'Rider', 'm_rider001').map((x) => (x.id === 'm_rider001' ? { ...x, days: 7 } : x));
+    expect(isUrgentThing('m_rider001', within(7), TODAY, l)).toBe(true);
+    expect(isUrgentThing('m_rider001', within(8), TODAY, l)).toBe(false);
+    expect(isUrgentThing('hours', within(0), TODAY, l)).toBe(false);
   });
 });

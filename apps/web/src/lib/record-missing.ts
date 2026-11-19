@@ -18,7 +18,7 @@ import { addDaysIso } from './planner';
 import type { Commitment } from './people';
 import { followUpDue, turnOf, type TurnRow } from './conversation-overview';
 import { relationOf } from './conversation-relation';
-import { readManual, readManualStates, thingOn, thingRank, type AppThing, type ManualOpen, type Preparation } from './preparation';
+import { readManual, readManualStates, thingDays, thingOn, thingRank, type AppThing, type ManualOpen, type Preparation } from './preparation';
 import { attentionItems, type AttentionItem, type MoneyBolo, type MoneyContext } from './money';
 
 /**
@@ -112,14 +112,30 @@ export function performanceMissing(input: PerformanceMissingInput, today: string
   return list ? out.filter((m) => THING_OF[m.kind] === null || thingOn(list, THING_OF[m.kind]!)) : out;
 }
 
+/** Whole days from `today` to `day` (YYYY-MM-DD), negative when `day` is past. */
+const daysUntil = (day: string, today: string) =>
+  Math.round((Date.parse(`${day.slice(0, 10)}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
+
 /**
- * Does an open thing have hurry (the only thing that wears amber)? A hold
- * whose decide-by day is within the week, and a road sheet within its share
- * days: the two «plazos» that are built in. Everything else is open and
- * neutral until the company gives it a deadline (lista de preparación, fase 4).
+ * Does an open thing have hurry (the only thing that wears amber)? A thing has
+ * it when its performance is within the days the project gave it (`days`,
+ * ADR-221 fase 4): none says never; the road sheet's default is 14. «Estado»
+ * (a hold) has the hold's own deadline instead: see `isUrgentMissing`.
  */
-export function isUrgentMissing(m: PerformanceMissing): boolean {
-  return m.kind === 'hold_deadline' || m.kind === 'roadsheet_unshared';
+export function isUrgentThing(id: string, day: string, today: string, list?: Preparation | null): boolean {
+  const days = thingDays(list, id);
+  return days !== null && daysUntil(day, today) <= days;
+}
+
+/**
+ * Does an open item have hurry? A hold whose decide-by day is close, always
+ * (`performanceMissing` only says it within the week); the others by the days
+ * of their thing in the project's list. `day` is the performance's.
+ */
+export function isUrgentMissing(m: PerformanceMissing, ctx: { day: string; today: string; list?: Preparation | null }): boolean {
+  if (m.kind === 'hold_deadline') return true;
+  const thing = THING_OF[m.kind];
+  return thing !== null && isUrgentThing(thing, ctx.day, ctx.today, ctx.list);
 }
 
 // ── El talón: «Por cerrar» ─────────────────────────────────────────────────
@@ -167,16 +183,16 @@ export function performanceReadiness(input: PerformanceMissingInput, today: stri
   const statusDone = input.status !== 'proposed' && !isHoldStatus(input.status);
   out.push({ id: 'status', done: statusDone, verb: 'confirm', urgent: !statusDone && Boolean(hold), ...(hold ? { holdDay: hold.day } : {}) });
 
-  if (input.start_at !== undefined) out.push({ id: 'hours', done: input.start_at !== null, verb: 'add_time', urgent: false });
+  if (input.start_at !== undefined) out.push({ id: 'hours', done: input.start_at !== null, verb: 'add_time', urgent: input.start_at === null && isUrgentThing('hours', day, today, list) });
 
   if (confirmed && input.roster !== null) {
     const going = (input.commitments ?? []).some((c) => c.state === 'going');
-    out.push({ id: 'team', done: input.roster.length > 0 || going, verb: 'sign_up', urgent: false });
+    out.push({ id: 'team', done: input.roster.length > 0 || going, verb: 'sign_up', urgent: !(input.roster.length > 0 || going) && isUrgentThing('team', day, today, list) });
   }
 
   if (confirmed && input.roadsheetLinks !== null) {
     if (input.roadsheetLinks > 0) out.push({ id: 'sheet', done: true, verb: 'share', urgent: false });
-    else if (day <= addDaysIso(today, ROADSHEET_SHARE_DAYS)) out.push({ id: 'sheet', done: false, verb: 'share', urgent: true });
+    else if (day <= addDaysIso(today, ROADSHEET_SHARE_DAYS)) out.push({ id: 'sheet', done: false, verb: 'share', urgent: isUrgentThing('sheet', day, today, list) });
   }
 
   // The project's list: what it turned off is not a box, and the rest go in

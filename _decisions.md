@@ -8365,7 +8365,15 @@ marcado en funciones pasadas: deja de leerse. **Pendiente:** la línea de lo cer
 guarda como id de usuario y el equipo se lista por persona); y la línea «Cerrado» se queda aunque no quede nada abierto,
 porque es lo único que permite reabrir.
 
+**Fase 4 (hecha, borrador): los plazos de prisa.** Cada cosa lleva `days` en la lista: cuántos días antes de la función corre
+prisa (vacío = nunca; la hoja de ruta, sin tocar, 14; «Estado» no lleva días, su prisa es la fecha límite de la opción). Una
+cosa abierta es ámbar solo dentro de sus días: casilla, fila (arriba, con el motivo «La función es en 2 días») y, en Hoy, la
+línea «En 2 días: poner la hora» (cuenta hasta la fecha límite si es una opción, vencida dice «Vencida»; en la Agenda, la
+palabra en ámbar). Los días solo marcan la prisa; cuándo se pide cada cosa no cambia (la hoja, desde 14 días antes).
+Editable en «Editar proyecto» (número por cosa; sin migración: `days` va en el JSON de la lista).
+
 **Cómo se revierte.** Fase 1: revertir el commit; sin esquema ni API; `CACHE_SCHEMA` no cambia. Fase 2: revertir el commit y
 aplicar `build/runbooks/rollback-20261119-project-preparation.sql` (restaura el cuerpo anterior de `update_project`; las
 listas guardadas se quedan en `custom_fields` sin efecto). Fase 3: revertir el commit y aplicar
 `build/runbooks/rollback-20261119-performance-preparation.sql` (borra la función; lo marcado se queda sin que nadie lo lea).
+Fase 4: revertir el commit; sin esquema.

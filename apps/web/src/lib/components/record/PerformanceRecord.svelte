@@ -83,7 +83,7 @@
   import { dayOf } from '$lib/running-order';
   import { hasJsonContent } from '$lib/components/JsonKV.svelte';
   import {
-    isUrgentMissing,
+    isUrgentThing,
     performanceMissing,
     performanceReadiness,
     type PerformanceMissing,
@@ -863,7 +863,8 @@
       thing closed as «aquí no hace falta» has no box (ADR-221). */
   let passBoxes = $derived.by<PassBox[]>(() => {
     // A hand thing is asked only of a confirmed performance that is not past (as the app's).
-    const hand = perf && perf.status === 'confirmed' && perf.performed_at.slice(0, 10) >= today;
+    const perfDay = perf?.performed_at.slice(0, 10) ?? today;
+    const hand = perf && perf.status === 'confirmed' && perfDay >= today;
     const boxes: (PassBox & { rank: number })[] = readiness.map((b) => ({
       id: b.id,
       label: t(BOX_LABEL[b.id], locale),
@@ -872,7 +873,9 @@
       rank: thingRank(preparation, b.id),
     }));
     if (hand) {
-      for (const m of manualReading.open) boxes.push({ id: m.id, label: m.name, done: false, rank: thingRank(preparation, m.id) });
+      for (const m of manualReading.open) {
+        boxes.push({ id: m.id, label: m.name, done: false, urgent: isUrgentThing(m.id, perfDay, today, preparation), rank: thingRank(preparation, m.id) });
+      }
       for (const m of manualReading.closed) {
         if (m.state.estado === 'hecho') boxes.push({ id: m.id, label: m.name, done: true, rank: thingRank(preparation, m.id) });
       }
@@ -915,6 +918,7 @@
           id: m.id,
           text: m.name,
           verbs: [],
+          urgent: isUrgentThing(m.id, perf!.performed_at.slice(0, 10), today, preparation),
           hand: {
             onDone: () => closeHand(m.id, 'hecho'),
             onNa: () => closeHand(m.id, 'no_aplica'),
@@ -948,17 +952,19 @@
   /** The list's thing a line belongs to («sin bolo» is none: it ranks last). */
   const LINE_THING: Record<string, string> = { hold_deadline: 'status', no_time: 'hours', nobody_going: 'team', roadsheet_unshared: 'sheet' };
   const lineThing = (id: string) => LINE_THING[id] ?? id;
+  let urgentIds = $derived(new Set(readiness.filter((b) => b.urgent && b.id !== 'status').map((b) => b.id as string)));
   let passLines = $derived<PassLine[]>(
     canEdit
       ? [
           ...readiness.filter((b) => !b.done).flatMap((b) => boxLine(b) ?? []),
           ...missing.filter((m) => m.kind === 'no_bolo').map(missingItem),
         ]
-          .map((l) => (l.id === 'roadsheet_unshared' ? { ...l, urgent: true, reason: urgentReason() } : l))
+          // Hurry: a hold's deadline, or a thing inside the days its project gave it.
           .map((l) => (l.id === 'hold_deadline' ? { ...l, urgent: true } : l))
+          .map((l) => (urgentIds.has(lineThing(l.id)) ? { ...l, urgent: true, reason: urgentReason() } : l))
           // The project's order (the app's by `thingRank`, the project's own by theirs);
           // «sin bolo» is not on the list: it goes last.
-          .concat(handLines)
+          .concat(handLines.map((l) => (l.urgent ? { ...l, reason: urgentReason() } : l)))
           .sort((a, b) => thingRank(preparation, lineThing(a.id)) - thingRank(preparation, lineThing(b.id)))
           .sort((a, b) => Number(Boolean(b.urgent)) - Number(Boolean(a.urgent)))
       : [],

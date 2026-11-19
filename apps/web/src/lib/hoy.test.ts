@@ -170,6 +170,15 @@ describe('«Coming up»: one tile per day (ADR-202 § 6)', () => {
     ]);
   });
 
+  it('the tile is amber only for a thing inside its days, and says which and when (ADR-221, fase 4)', () => {
+    const performances = [perf('nohour', '2026-11-16', mamemi, { start_at: null })];
+    const coming = upcoming({ performances, dates: [], viewerTz: TZ }, NOW, 40);
+    const never = comingTiles(coming, TODAY, 10, () => readPreparation(null));
+    expect(never[0].urgent).toBeNull();
+    const hurry = comingTiles(coming, TODAY, 10, () => readPreparation({ items: [{ id: 'hours', on: true, days: 10 }] }));
+    expect(hurry[0].urgent).toEqual({ what: 'hours', day: '2026-11-16' });
+  });
+
   it('ten tiles at most', () => {
     const performances = Array.from({ length: 13 }, (_, i) => perf(`p${i}`, `2026-11-${String(14 + i).padStart(2, '0')}`));
     const tiles = comingTiles(upcoming({ performances, dates: [], viewerTz: TZ }, NOW, 40), TODAY);

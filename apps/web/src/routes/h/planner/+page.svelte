@@ -66,7 +66,7 @@
   } from '$lib/month-events';
   import AgendaList, { type AgendaDecision, type AgendaMissing, type NoteDraft } from '$lib/components/AgendaList.svelte';
   import { readPreparation } from '$lib/preparation';
-  import { isUrgentMissing, manualOpenSoon, missingSoon } from '$lib/record-missing';
+  import { isUrgentMissing, isUrgentThing, manualOpenSoon, missingSoon } from '$lib/record-missing';
   import { noteFallback as noteFallbackOf, noteFallbackBody } from '$lib/note';
   import DecisionBand, {
     decisionText,
@@ -1997,9 +1997,9 @@
       words: [
         ...open
           .filter((m) => m.kind !== 'no_time')
-          .map((m) => ({ text: t(MISSING_WORD[m.kind as keyof typeof MISSING_WORD], locale), urgent: isUrgentMissing(m) })),
-        // The project's own things, by their name, neutral (ADR-221).
-        ...manualOpenSoon(p, todayIso, list).map((m) => ({ text: m.name, urgent: false })),
+          .map((m) => ({ text: t(MISSING_WORD[m.kind as keyof typeof MISSING_WORD], locale), urgent: isUrgentMissing(m, { day: p.performed_at.slice(0, 10), today: todayIso, list }) })),
+        // The project's own things, by their name (ADR-221).
+        ...manualOpenSoon(p, todayIso, list).map((m) => ({ text: m.name, urgent: isUrgentThing(m.id, p.performed_at.slice(0, 10), todayIso, list) })),
       ],
     };
   }

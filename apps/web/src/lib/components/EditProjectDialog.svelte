@@ -25,6 +25,8 @@
     readPreparation,
     removeManualThing,
     renameManualThing,
+    setThingDays,
+    thingDays,
     type Preparation,
     type PreparationThing,
   } from '$lib/preparation';
@@ -255,6 +257,27 @@
                 <small>{t('prep.by_app', locale)}</small>
               {/if}
             </span>
+            {#if thing.id !== 'status'}
+              <label class="epj__hurry">
+                <span>{t('prep.hurry', locale)}</span>
+                <input
+                  type="number"
+                  class="epj__hurry-input"
+                  min="0"
+                  max="365"
+                  inputmode="numeric"
+                  value={thingDays(prep, thing.id) ?? ''}
+                  placeholder={t('prep.hurry_never', locale)}
+                  disabled={!prepReady || $save.isPending}
+                  data-testid={`prep-days-${thing.id}`}
+                  onchange={(e) => {
+                    const raw = e.currentTarget.value.trim();
+                    prep = setThingDays(prep, thing.id, raw === '' ? null : Number(raw));
+                  }}
+                />
+                <span>{t('prep.hurry_days', locale)}</span>
+              </label>
+            {/if}
             <span class="epj__thing-acts">
               <button
                 type="button"
@@ -386,6 +409,24 @@
       display: inline-flex;
       align-items: center;
       gap: var(--space-xs);
+    }
+    .epj__hurry {
+      display: inline-flex;
+      align-items: baseline;
+      gap: var(--space-2xs);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+    }
+    .epj__hurry-input {
+      inline-size: 4rem;
+      padding: var(--space-2xs) 0;
+      border: 0;
+      border-block-end: var(--line-hairline) solid var(--border-color-dark);
+      background: none;
+      color: var(--text-color);
+      font: inherit;
+      font-size: var(--text-s);
+      text-align: end;
     }
     .epj__thing-input {
       min-inline-size: 0;
