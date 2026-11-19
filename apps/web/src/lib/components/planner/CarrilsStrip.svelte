@@ -145,7 +145,7 @@
         rows can never disagree (one writer). Still furniture: session
         state, never the URL (ADR-094 §4). */
     shut: SvelteSet<string>;
-    /** «3 sin fechas» (ADR-228): the line the lanes with nothing fold into;
+    /** «3 sin fechas» (ADR-229): the line the lanes with nothing fold into;
         `open`, the words once they are drawn. */
     emptyLanesWord?: (n: number, open: boolean) => string;
     /** The book feeds are in flight — an empty board must not say «quiet». */
@@ -258,7 +258,7 @@
   });
 
   /**
-   * LANES WITH NOTHING FOLD INTO ONE LINE (ADR-228): a lane with no date at
+   * LANES WITH NOTHING FOLD INTO ONE LINE (ADR-229): a lane with no date at
    * all (`silence: 'dash'`, not even an absence) is not drawn; «N sin fechas»
    * at the foot opens them. A space or project left with no lane is not
    * drawn either. A shut group keeps its lanes: its lid counts them.
@@ -769,7 +769,7 @@
       {/each}
 
       {#if emptyCount > 0}
-        <!-- The lanes with nothing, one line at the foot (ADR-228). -->
+        <!-- The lanes with nothing, one line at the foot (ADR-229). -->
         <button
           type="button"
           class="board__empties"

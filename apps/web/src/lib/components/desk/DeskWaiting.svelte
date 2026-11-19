@@ -286,7 +286,7 @@
 
   {#if !loading && !errored && pills.length > 0 && waitingDrawsPills(waiting.total, rows)}
     <!-- One pill per kind and its figure, calm and gig day included; with
-         three things or fewer all drawn as rows, only the rows (ADR-228). -->
+         three things or fewer all drawn as rows, only the rows (ADR-229). -->
     <ul class="tallies" data-testid="desk-pills">
       {#each pills as p (p.kind)}
         {@const href = PILL_HREF[p.kind]}
@@ -420,7 +420,7 @@
     color: inherit;
     text-decoration: none;
   }
-  /* WHOLE TEXT IN TWO LINES BEFORE AN ELLIPSIS (ADR-228): «Teatre d…» said
+  /* WHOLE TEXT IN TWO LINES BEFORE AN ELLIPSIS (ADR-229): «Teatre d…» said
      nothing. The chat row's one-line cut is the list's; here it wraps. */
   .row__subject :global(.chat__name) {
     flex-wrap: wrap;

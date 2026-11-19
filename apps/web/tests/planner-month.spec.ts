@@ -233,7 +233,7 @@ test.describe('the month (ADR-209)', () => {
     await expect(page.getByTestId('month-pick')).toBeVisible();
   });
 
-  test('a figure at zero is not said, and «Go to today» is not a second «Today» (ADR-228)', async ({ page }) => {
+  test('a figure at zero is not said, and «Go to today» is not a second «Today» (ADR-229)', async ({ page }) => {
     await open(page, '&view=month');
     // The playwright space has confirmed gigs: its figure is said…
     await expect(page.getByTestId('planner-stat-confirmed')).toBeVisible();

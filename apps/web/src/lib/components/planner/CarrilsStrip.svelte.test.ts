@@ -166,7 +166,7 @@ describe('CarrilsStrip — the board grid', () => {
     // A space is an address, not a subject: no monogram anywhere in the rail.
     expect(rail.querySelector('.mark')).toBeNull();
     // It spans exactly its drawn lanes' rows: three lanes, one with nothing
-    // folded away (ADR-228) → rows 2..4 (head is 1).
+    // folded away (ADR-229) → rows 2..4 (head is 1).
     expect(rail.style.gridRow).toBe('2 / 4');
     expect(rail.style.gridColumn).toBe('1');
   });
@@ -195,7 +195,7 @@ describe('CarrilsStrip — the board grid', () => {
     const read = () => [...container.querySelectorAll('.board__tally')].map((n) => n.textContent?.trim());
     // p1 played (two gig units: one confirmed, one option), p2 was touched
     // by an absence but played nowhere, p3 has nothing at all — and a lane
-    // with nothing folds into one line at the foot (ADR-228).
+    // with nothing folds into one line at the foot (ADR-229).
     expect(read()).toContain('1 confirmed · 1 options · 0 not cast');
     expect(read()).toContain('no dates');
     expect(read()).not.toContain('—');

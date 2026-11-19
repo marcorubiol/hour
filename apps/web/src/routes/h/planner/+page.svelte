@@ -1748,7 +1748,7 @@
     const items = ($decisionsPerfQuery.data?.items ?? [])
       .filter((p) => {
         if (perfDayKey(p) <= selectedDay) return false;
-        // THE SAME ROWS AS THE PAPER (ADR-228): the decisions window is read
+        // THE SAME ROWS AS THE PAPER (ADR-229): the decisions window is read
         // by the pins' containers only, so a line pin or the person filter
         // let «Siguiente» name gigs the month and Hoy leave out (19-11:
         // Zaragoza and Santander). The scope and the person, as `scopedPerfs`.
@@ -3250,7 +3250,7 @@
              last day, so they name where they begin and count
              nothing. -->
         {#if view === 'month' && shows('planner', 'census', calm.on)}
-        <!-- A FIGURE AT ZERO IS NOT SAID (ADR-228): «0 opciones» counted an
+        <!-- A FIGURE AT ZERO IS NOT SAID (ADR-229): «0 opciones» counted an
              absence. Unknown figures still print their dash. -->
         {#if !(figuresKnown && stats.confirmed === 0)}
         <span class="cal__stat" data-testid="planner-stat-confirmed"

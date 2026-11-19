@@ -8532,7 +8532,7 @@ está abierto en otro hilo; queda para cuando se libere.
 
 **Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`. Texto `perf.back_planner` sustituido por `perf.back` en los cuatro idiomas.
 
-## [2026-11-19] ADR-228 · Lo vacío no se dibuja, y nombres claros (fase 3 de la revisión TDAH; enmienda ADR-208 y ADR-202 § 7)
+## [2026-11-19] ADR-229 · Lo vacío no se dibuja, y nombres claros (fase 3 de la revisión TDAH; enmienda ADR-208 y ADR-202 § 7)
 
 Encargo `revision-tdah/brief.md`, fase 3 (Marco, 19-11).
 

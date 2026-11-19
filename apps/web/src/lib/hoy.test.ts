@@ -208,7 +208,7 @@ describe('«Coming up»: one tile per day (ADR-202 § 6)', () => {
     expect(comingOpen([])).toEqual({ urgent: null, urgentDay: null, rest: 0 });
   });
 
-  it('«Te espera» without pills when three things or fewer are all rows (ADR-228)', () => {
+  it('«Te espera» without pills when three things or fewer are all rows (ADR-229)', () => {
     expect(waitingDrawsPills(2, 3)).toBe(false);
     expect(waitingDrawsPills(3, 3)).toBe(false);
     expect(waitingDrawsPills(3, 5)).toBe(false);

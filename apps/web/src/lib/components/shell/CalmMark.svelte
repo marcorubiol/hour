@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * Calm with its name (ADR-228, amends ADR-208): «-:-» was the mode that
+   * Calm with its name (ADR-229, amends ADR-208): «-:-» was the mode that
    * helps most and nobody knew what it was until they pressed it. Now a small
    * button that says «Calma»: an outline when it is off, filled when it is
    * on. Its behaviour does not change. One home for it: the phone's top bar
