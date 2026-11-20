@@ -8682,3 +8682,64 @@ día tiene para ti, no quién eres.
 los cuatro idiomas. Arregla también `desk.spec` («See all»), que no se había actualizado con ADR-229.
 
 **Cómo se revierte.** Revertir el commit.
+
+## [2026-11-20] ADR-235 · «Te han convocado: Voy / No puedo» (fase 7 de la revisión TDAH; enmienda ADR-202 § 7)
+
+Encargo `revision-tdah/brief.md`, fase 7.
+
+1. **Una fila en «Te espera».** Si la lista de quién va de una función de los próximos catorce días te nombra y no has
+   dicho ni «voy» ni «no puedo», «Te espera» tiene hoy una fila «contestar · Girona · vie 24 jul, 20h30», con «Te han
+   convocado» y la compañía debajo. Dos botones en la fila: «Voy» y «No puedo». Contestar la cierra; el nombre abre la
+   función. Pura en `buildDeskFeed` (`convocations`, `$lib/desk-feed`); qué funciones, en la página de Hoy.
+2. **El mismo camino de siempre.** Contestar es `setCommitment` (`$lib/commitments`, el «voy» de ADR-147/151), con la
+   palabra propia que esa RPC ya permite. Sin escritura nueva, sin RLS nueva.
+3. **Solo funciones.** Las fechas (viajes, ensayos) aún no tienen lista de quién va en el feed; cuando la tengan, entran
+   por el mismo `convocations`.
+
+**Queda para después.** «Añadir a mi calendario» y «Días que no puedo» a un sitio visible del Planificador: tocan la
+página del Planificador, que comparte ficheros con otros hilos; van en un PR aparte.
+
+**Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`. Textos en los cuatro idiomas.
+
+**Cómo se revierte.** Revertir el commit.
+
+## [2026-11-20] ADR-236 · Agenda: «N por cerrar» y un solo ámbar (fase 2 de la revisión TDAH; enmienda ADR-211 § 3)
+
+Encargo `revision-tdah/brief.md`, fase 2, lámina C.
+
+1. **«N por cerrar» en gris.** Cada función de la Agenda que tiene cosas abiertas en sus dos semanas dice «3 por cerrar»
+   con el punto discontinuo, en vez de la lista («sin trato · hoja sin compartir»). La lista entera sigue en su pase.
+2. **Un solo ámbar.** De todas las funciones que dibuja la Agenda, solo la primera cosa que vence se nombra, en ámbar y
+   con cuándo: «HOJA SIN COMPARTIR · EN 3 DÍAS», y «+2 más» en gris si esa función tiene más. Es la regla de ADR-227
+   para Hoy, aplicada a la Agenda. Pura en `$lib/agenda-missing`.
+3. **Sin «＋» bajo cada día en el móvil.** Queda el «+ fecha» de arriba. En el escritorio, el «＋» de la nota sigue
+   apareciendo al pasar por el día.
+4. «Sin hora» sigue en la columna de la hora, como antes.
+
+**Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`. Textos en los cuatro idiomas. `planner-agenda.spec`
+comprueba que hay un solo ámbar y que en el móvil no hay «＋».
+
+**Cómo se revierte.** Revertir el commit.
+
+## [2026-11-20] ADR-237 · Muchas cosas en un día: hasta tres enteras, desde la cuarta líneas (fase 8 de la revisión TDAH; amplía ADR-207)
+
+Encargo `revision-tdah/brief.md`, fase 8, lámina D, columnas 3 y 4. El corte está en tres (Marco, 19-11:
+«quiero coger tu recomendación en todo»). `DRAWN_WHOLE = 3` en `$lib/hoy`, el mismo número en Hoy y en el Día.
+
+1. **Hoy.** Con más de tres funciones hoy, la pieza cuenta el día: «15 funciones», de la primera a la última hora, y
+   debajo «3 en marcha · 9 ciudades». Dentro de la pieza, «Lo que queda de hoy · N» en líneas: lo que ya pasó se va,
+   y «ver las 15» abre el Día. Amplía el modo de varias funciones de ADR-207 (`manyDay`), no lo duplica.
+2. **«Lo que viene».** Una tarjeta de un día con más de tres cosas dice «15 funciones · 9 ciudades» en vez de dos y
+   «+13», y abre el Día.
+3. **El Día.** Con más de tres funciones, las piezas con su orden del día dejan paso a líneas agrupadas en mañana
+   (antes de las 14h), tarde (antes de las 20h), noche y sin hora, con tres filtros: Todas, Te necesitan y Voy yo.
+   «Te necesitan» es una opción por confirmar o algo por cerrar en sus dos semanas (la regla de ADR-211). «Voy yo» es
+   la lista de quién va o tu «voy». Lo hecho (empezó hace más de dos horas) queda atenuado. Una línea abre su pase.
+   Pura en `$lib/day-lines`.
+
+**Queda para después.** Que la pieza nombre solo las funciones que te necesitan («alguien llega tarde», «3 nuevos» del
+tablón): Hoy no lee todavía esas señales por función. Mientras tanto, lo que queda de hoy va completo, en líneas.
+
+**Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`. Textos en los cuatro idiomas.
+
+**Cómo se revierte.** Revertir el commit.

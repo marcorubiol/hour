@@ -118,3 +118,36 @@ describe('Te espera on a gig day: one line (ADR-234)', () => {
     expect(screen.getByText('Teatro Arriaga')).toBeTruthy();
   });
 });
+
+describe('Te espera: «Voy / No puedo» (ADR-235)', () => {
+  afterEach(cleanup);
+
+  it('a convocation answers on the row', async () => {
+    const call = item({ id: 'voy-p1', subject: 'Girona · Fri 24 Jul', verbKey: 'answer', concern: 'decision', convocation: 'p1' });
+    const onanswer = vi.fn();
+    render(DeskWaiting, {
+      waiting: { rows: [call], total: 1, asking: 1, overdue: 0 },
+      rows: 3,
+      today: '2026-11-20',
+      feed: [],
+      later: null,
+      loading: false,
+      errored: false,
+      onretry: () => {},
+      locale: 'en',
+      contextPath: () => '',
+      conversationHref: () => null,
+      money: (n: number) => String(n),
+      isGhost: () => false,
+      ontoggle: () => {},
+      onremove: () => {},
+      onaccept: () => {},
+      onanswer,
+    });
+    expect(screen.getByText(/You're called/)).toBeTruthy();
+    await fireEvent.click(screen.getByRole('button', { name: "I'm going" }));
+    expect(onanswer).toHaveBeenCalledWith(call, 'going');
+    await fireEvent.click(screen.getByRole('button', { name: "Can't make it" }));
+    expect(onanswer).toHaveBeenCalledWith(call, 'not_going');
+  });
+});

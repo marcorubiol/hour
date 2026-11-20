@@ -419,3 +419,27 @@ describe('buildDeskFeed — the Planner’s decisions wait too (ADR-149)', () =>
     expect(rankWaiting(feed, NOW, { concerns: ['task', 'conversation'] }).rows).toHaveLength(0);
   });
 });
+
+describe('buildDeskFeed — «Te han convocado» (ADR-235)', () => {
+  it('a convocation waits today, as an answer that opens the performance', () => {
+    const feed = buildDeskFeed(
+      {
+        conversations: [],
+        tasks: [],
+        convocations: [
+          { id: 'perf1', subject: 'Girona · vie 24 jul, 20h30', projectId: 'p1', projectName: 'MaMeMi', workspaceId: 'w1', href: '/h/x/perf1' },
+        ],
+      },
+      NOW,
+      'es',
+    );
+    const w = rankWaiting(feed, NOW);
+    expect(w.rows).toHaveLength(1);
+    const row = w.rows[0];
+    expect(row.verbKey).toBe('answer');
+    expect(row.convocation).toBe('perf1');
+    expect(row.day).toBe(isoDay(0));
+    expect(row.overdue).toBe(false);
+    expect(row.href).toBe('/h/x/perf1');
+  });
+});

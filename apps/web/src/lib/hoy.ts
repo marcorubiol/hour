@@ -103,6 +103,34 @@ export function showsDay(a: DayAgenda): ShowsDay | null {
 }
 
 /**
+ * MANY THINGS IN A DAY (ADR-237): up to three, each is drawn whole; from the
+ * fourth, lines. `DRAWN_WHOLE` is that cut, the same on Hoy's piece and on
+ * the tiles of «Coming up».
+ */
+export const DRAWN_WHOLE = 3;
+
+/**
+ * A day of more than three performances (ADR-237): the piece counts the day
+ * («15 funciones · 3 en marcha · 9 ciudades») and below it, only what is
+ * left of today, in lines; what is done goes. `on` counts the performances
+ * that have started and are not over; `left`, every point (performances and
+ * dates) not past yet. Null with three or fewer.
+ */
+export interface ManyDay {
+  count: number;
+  on: number;
+  left: AgendaPoint[];
+}
+
+export function manyDay(a: DayAgenda, now: Date): ManyDay | null {
+  const shows = a.points.filter((p) => p.own);
+  if (shows.length <= DRAWN_WHOLE) return null;
+  const t = now.getTime();
+  const on = shows.filter((p) => !a.past[a.points.indexOf(p)] && p.at !== null && Date.parse(p.at) <= t).length;
+  return { count: shows.length, on, left: a.points.filter((_, i) => !a.past[i]) };
+}
+
+/**
  * The performance the piece's actions (Map, Sheet, the facts, the board) are
  * about. One today: the focus when it is one, else the day's main event.
  * Several (ADR-207): the one on now or the next to start, else the last.
@@ -129,6 +157,8 @@ export const COMING_COUNT_CAP = 300;
 
 export interface ComingTile {
   day: string;
+  /** Everything of the day, in the pulse's order: what a tile of many counts (ADR-237). */
+  all: PulseNext[];
   /** At most `COMING_PER_TILE`, in the pulse's order. */
   items: PulseNext[];
   /** What the tile does not draw: its «+N». */
@@ -218,6 +248,7 @@ export function comingTiles(
     }
     tiles.push({
       day,
+      all,
       items: all.slice(0, COMING_PER_TILE),
       more: Math.max(0, all.length - COMING_PER_TILE),
       missing: gaps.length + handOpen > 0,
