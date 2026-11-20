@@ -151,7 +151,8 @@ test.describe('the vistazo (ADR-139 p1)', () => {
     const peek = page.getByTestId('peek');
     await expect(peek).toBeVisible({ timeout: 15_000 });
     await expect(peek.getByTestId('date-record')).toBeVisible();
-    await expect(peek.getByRole('button', { name: 'Edit', exact: true })).toBeVisible({ timeout: 15_000 });
+    // The pase edits in place: the pencil on the date, no «Edit» in the head (ADR-233).
+    await expect(peek.getByRole('button', { name: 'Change the date' }).first()).toBeVisible({ timeout: 15_000 });
     // No page, so no «Open in full».
     await expect(peek.getByTestId('peek-full')).toHaveCount(0);
     await expect(page).toHaveURL(/peek=date%2F[0-9a-f-]{36}/);

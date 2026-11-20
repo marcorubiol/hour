@@ -493,6 +493,8 @@
   "planner.released": "let go",
   "planner.expires_on": "expires {day}",
   "planner.no_hour": "no hour",
+  "planner.day_set_hour": "Set the hour",
+  "planner.day_open": "Open",
   "planner.all_day": "all day",
   "planner.view_day": "Day",
   "planner.day_close": "Close the day",
