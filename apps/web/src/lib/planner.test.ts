@@ -88,7 +88,7 @@ describe('normalizePlannerView', () => {
   });
 });
 
-describe('boardOffPhone (ADR-230)', () => {
+describe('boardOffPhone (ADR-231)', () => {
   it('turns the Board into the Agenda on a phone', () => {
     expect(boardOffPhone('board', true)).toBe('agenda');
   });

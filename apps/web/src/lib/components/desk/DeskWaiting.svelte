@@ -69,9 +69,9 @@
      * words and the last thing said. Null draws the plain subject.
      */
     chat?: (item: DeskItem) => ChatLine | null;
-    /** Set aside by the viewer («Ahora no», ADR-231), soonest back first. */
+    /** Set aside by the viewer («Ahora no», ADR-232), soonest back first. */
     aside?: { item: DeskItem; until: string }[];
-    /** What has waited more than a month (ADR-231), oldest first. */
+    /** What has waited more than a month (ADR-232), oldest first. */
     old?: DeskItem[];
     /** «Ahora no» until a day, or back now with null. Without it, no «ahora no». */
     onaside?: (item: DeskItem, until: string | null) => void;
@@ -253,7 +253,7 @@
       <span class="row__when" class:row__when--over={item.overdue}>{whenOf(item)}</span>
       <span class="row__acts">
         {#if onaside}
-          <!-- «Ahora no» (ADR-231): the row leaves for a few days, only for
+          <!-- «Ahora no» (ADR-232): the row leaves for a few days, only for
                whoever sets it aside; nothing is deleted. -->
           <Menu
             align="end"
@@ -394,7 +394,7 @@
   {/if}
 
   {#if !loading && !errored && rows > 0 && (aside.length > 0 || old.length > 0)}
-    <!-- The two folds at the foot (ADR-231): what you set aside, and what has
+    <!-- The two folds at the foot (ADR-232): what you set aside, and what has
          waited more than a month. Folded; neither counts in the head. -->
     <div class="folds">
       {#if aside.length > 0}
@@ -587,7 +587,7 @@
   .row__remove:hover {
     color: var(--danger);
   }
-  /* «Ahora no» (ADR-231): a word in the verb's mono, faint; on a mouse it
+  /* «Ahora no» (ADR-232): a word in the verb's mono, faint; on a mouse it
      shows with the row, like the ×. Its button is the Menu's. */
   .row__acts :global(.row__aside) {
     padding: 0;
@@ -820,7 +820,7 @@
       grid-template-areas: 'verb subject when';
     }
     /* «Ahora no» and a task's × are small: under the when, at the end, beside
-       the subject's second line rather than on a line of their own (ADR-231).
+       the subject's second line rather than on a line of their own (ADR-232).
        A row with a real button («Liberar») keeps its own line. */
     .row:has(.row__acts > :global(*)):not(:has(.row__act)) {
       grid-template-areas: 'verb subject when' 'verb subject acts';

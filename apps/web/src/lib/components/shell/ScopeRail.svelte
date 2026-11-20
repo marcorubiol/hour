@@ -67,7 +67,7 @@
        two can never disagree about what minute it is. It is not filtered by
        the scope — see RailPulse. -->
   <!-- On Hoy the piece already says now and what comes next: the rail does
-       not say it twice (ADR-230). -->
+       not say it twice (ADR-231). -->
   {#if !inSettings && !/^\/h\/today\/?$/.test(page.url.pathname)}
     <RailPulse now={clockNow} {locale} />
   {/if}

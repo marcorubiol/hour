@@ -1,5 +1,5 @@
 /**
- * «AHORA NO» Y LO ANTIGUO EN «TE ESPERA» (revisión TDAH, fase 5; ADR-231).
+ * «AHORA NO» Y LO ANTIGUO EN «TE ESPERA» (revisión TDAH, fase 5; ADR-232).
  *
  * Two ways a row leaves the head of the block without being deleted:
  *

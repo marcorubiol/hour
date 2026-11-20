@@ -28,6 +28,8 @@
     helper?: string;
     disabled?: boolean;
     onchange?: (value: V) => void;
+    /** A `data-testid` for each option (its label), when a spec must reach it. */
+    optionTestid?: (value: V) => string;
   }
 
   let {
@@ -40,6 +42,7 @@
     helper,
     disabled = false,
     onchange,
+    optionTestid,
   }: Props = $props();
 
   let groupId = $derived(id ?? `seg-${Math.random().toString(36).slice(2, 8)}`);
@@ -61,7 +64,7 @@
     aria-describedby={label && helper ? `${groupId}-msg` : undefined}
   >
     {#each options as opt (opt.value)}
-      <label class="seg__opt">
+      <label class="seg__opt" data-testid={optionTestid?.(opt.value)}>
         <input
           class="seg__input"
           type="radio"

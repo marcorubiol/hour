@@ -802,7 +802,7 @@ function plannerViewToken(v: string | null | undefined): PlannerView | null {
 }
 
 /**
- * THE BOARD IS NOT OFFERED ON A PHONE (ADR-230): a sheet of lanes by weeks
+ * THE BOARD IS NOT OFFERED ON A PHONE (ADR-231): a sheet of lanes by weeks
  * needs a width a phone has not got. An address or a stored drawing that
  * says Board opens the Agenda there; the bar does not draw the word.
  * `phone` defaults to the screen's own answer (false outside a browser).

@@ -1,5 +1,5 @@
 /**
- * Lo apartado de «Te espera», en la sesión (ADR-231): una lectura por
+ * Lo apartado de «Te espera», en la sesión (ADR-232): una lectura por
  * arranque de `GET /api/me/set-aside`, como lo visto de la ayuda. Apartar y
  * traer escriben en la sesión al momento y en la base después; si la
  * escritura falla, la fila vuelve a su sitio y la página lo dice.

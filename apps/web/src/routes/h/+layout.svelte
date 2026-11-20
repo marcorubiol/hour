@@ -815,7 +815,7 @@
       </a>
 
       <!-- Search and scope, one field (ADR-202 § 12): the bar's left on a
-           desktop. On a phone (ADR-230) an icon beside the clock while
+           desktop. On a phone (ADR-231) an icon beside the clock while
            nothing is scoped; scoped, the whole width, because the tag must
            stay in sight. -->
       <div class="shell__search">
@@ -1235,7 +1235,7 @@
     .shell__search {
       inline-size: auto;
     }
-    /* NOTHING SCOPED, ONE ROW (ADR-230): the field is an icon beside calm
+    /* NOTHING SCOPED, ONE ROW (ADR-231): the field is an icon beside calm
        and you (ShellField draws it), and the bar loses its second row. */
     .shell:not(.shell--scoped) {
       --header-height: calc(var(--display-clock) + 2 * var(--space-s));

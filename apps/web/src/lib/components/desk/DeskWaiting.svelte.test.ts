@@ -57,7 +57,7 @@ function setup(onaside = vi.fn()) {
   return { here, away, onaside };
 }
 
-describe('Te espera: «Ahora no» and the old (ADR-231)', () => {
+describe('Te espera: «Ahora no» and the old (ADR-232)', () => {
   afterEach(cleanup);
   it('a row is set aside for the span picked, counted from today', async () => {
     const { here, onaside } = setup();

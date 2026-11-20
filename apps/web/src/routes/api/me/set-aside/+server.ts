@@ -1,5 +1,5 @@
 /**
- * «Ahora no» en «Te espera» (ADR-231): lo que quien llama ha apartado y el
+ * «Ahora no» en «Te espera» (ADR-232): lo que quien llama ha apartado y el
  * día en que vuelve cada cosa. Es por persona, no por espacio ni por navegador.
  *
  * GET  /api/me/set-aside: `{ items }`, la fila propia de `desk_set_aside` (o `{}`).

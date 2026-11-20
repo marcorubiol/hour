@@ -399,7 +399,7 @@
     );
   });
 
-  // «Ahora no» and the old (ADR-231): what the viewer set aside, and what has
+  // «Ahora no» and the old (ADR-232): what the viewer set aside, and what has
   // waited more than a month, leave the feed before anything counts it.
   void ensureSetAside();
   let fullFeed = $derived(

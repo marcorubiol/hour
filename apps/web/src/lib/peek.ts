@@ -132,6 +132,8 @@ export function peekFromLink(href: URL, here: URL): PeekTarget | null {
   if (href.searchParams.has(PEEK_PARAM)) {
     return href.pathname === here.pathname ? parsePeek(href.searchParams.get(PEEK_PARAM)) : null;
   }
+  // `?share=1` asks the pass to open «Compartir» (ADR-230): it goes to the page.
+  if (href.searchParams.has('share')) return null;
   const record = RECORD_PATH.exec(href.pathname);
   // A link to a block of a page (`#board`, `#team`, `#who-goes`) names a
   // place in the page: it goes there, where the block has its room.

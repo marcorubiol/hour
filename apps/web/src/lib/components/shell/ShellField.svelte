@@ -11,7 +11,7 @@
    * (ADR-203 § 6). The field's own button takes every press the tag does not:
    * its hit area spans the whole field, and the tag sits above it.
    *
-   * ON A PHONE, NOTHING SCOPED, AN ICON (ADR-230): the field took a whole row
+   * ON A PHONE, NOTHING SCOPED, AN ICON (ADR-231): the field took a whole row
    * on every screen. It shrinks to the glass in a circle beside calm and you;
    * it opens the same palette, and its label stays its name. Scoped, it is
    * the field again: the tag is what says the scope.

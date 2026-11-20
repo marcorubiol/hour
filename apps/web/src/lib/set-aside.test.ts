@@ -6,7 +6,7 @@ const item = (id: string, day: string | null): DeskItem => ({ id, day }) as Desk
 const bucket = (sortKey: number, ...runs: DeskItem[][]): DeskBucket =>
   ({ sortKey, runs: runs.map((items) => ({ concern: 'task', items })) }) as DeskBucket;
 
-describe('set aside and old (ADR-231)', () => {
+describe('set aside and old (ADR-232)', () => {
   const today = '2026-11-20';
 
   it('counts calendar days across months and years', () => {

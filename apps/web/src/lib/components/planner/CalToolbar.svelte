@@ -200,7 +200,7 @@
         color var(--duration-fast),
         font-size var(--duration-fast);
     }
-    /* The Board is not offered on a phone (ADR-230, `boardOffPhone`). */
+    /* The Board is not offered on a phone (ADR-231, `boardOffPhone`). */
     @media (max-width: 47.999rem) {
       .cal__view--board {
         display: none;

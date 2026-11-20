@@ -527,7 +527,7 @@
     };
   });
 
-  /* ON A PHONE THE MONTH OPENS ON THIS WEEK (ADR-230): the paper starts at
+  /* ON A PHONE THE MONTH OPENS ON THIS WEEK (ADR-231): the paper starts at
      the month's first week, so on the 19th the reader landed on two weeks
      already gone. Once per mount, the week holding today is brought up under
      the stuck strip; the weeks gone stay above, a scroll away. */

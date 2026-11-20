@@ -1,4 +1,4 @@
--- «Ahora no» en «Te espera» (revisión TDAH, fase 5; ADR-231).
+-- «Ahora no» en «Te espera» (revisión TDAH, fase 5; ADR-232).
 --
 -- Cada fila de «Te espera» se puede apartar unos días sin borrarla: no se
 -- toca la conversación, la tarea ni la factura (lo que la hace salir sigue

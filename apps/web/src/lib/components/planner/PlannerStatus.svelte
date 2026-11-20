@@ -30,7 +30,7 @@
     $props();
 </script>
 
-<!-- ON A PHONE THE LINE IS ONLY FOR ASKS (ADR-230): with nothing to decide
+<!-- ON A PHONE THE LINE IS ONLY FOR ASKS (ADR-231): with nothing to decide
      and no clash it is not drawn there; the count stays on a desktop. The
      same in the three drawings, so the bar under it does not jump. -->
 <div class="pstat" class:pstat--quiet={!decide && clashes.length === 0} data-help-step="planner-status">
