@@ -408,7 +408,7 @@
     {/if}
   {/if}
 
-  {#if !loading && !errored && rows > 0 && (aside.length > 0 || old.length > 0)}
+  {#if !loading && !errored && (rows > 0 || (folded && waiting.total === 0)) && (aside.length > 0 || old.length > 0)}
     <!-- The two folds at the foot (ADR-232): what you set aside, and what has
          waited more than a month. Folded; neither counts in the head. -->
     <div class="folds">

@@ -16,13 +16,16 @@ import type { SetAside } from '$lib/set-aside';
 export const setAside = $state<{ items: SetAside; ready: boolean }>({ items: {}, ready: false });
 
 let probe: Promise<void> | null = null;
+/** Keys written in this session: the first read must not bring back their old value. */
+const touched = new Set<string>();
 
 async function load(): Promise<void> {
   try {
     const res = await fetch('/api/me/set-aside');
     if (!res.ok) return;
     const body = (await res.json()) as { items?: SetAside };
-    setAside.items = { ...(body.items ?? {}), ...setAside.items };
+    const read = Object.fromEntries(Object.entries(body.items ?? {}).filter(([k]) => !touched.has(k)));
+    setAside.items = { ...read, ...setAside.items };
     setAside.ready = true;
   } catch {
     // Nada apartado: cada fila sigue en su sitio.
@@ -40,15 +43,21 @@ export function ensureSetAside(): Promise<void> {
  * escritura falla, después de devolver la fila a como estaba.
  */
 export async function putAside(key: string, until: string | null): Promise<void> {
-  const before = setAside.items;
-  const next = { ...before };
-  if (until) next[key] = until;
-  else delete next[key];
-  setAside.items = next;
+  touched.add(key);
+  const had = setAside.items[key];
+  write(key, until);
   try {
     await mutateJSON('POST', '/api/me/set-aside', { key, until });
   } catch (err) {
-    setAside.items = before;
+    // Only this key goes back: another write may have landed meanwhile.
+    if ((setAside.items[key] ?? null) === until) write(key, had ?? null);
     throw err;
   }
+}
+
+function write(key: string, until: string | null): void {
+  const next = { ...setAside.items };
+  if (until) next[key] = until;
+  else delete next[key];
+  setAside.items = next;
 }

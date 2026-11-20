@@ -829,7 +829,10 @@
   let spacesOnScreen = $derived(workspacesOnScreen('', pins.pins, workspaces, lineIndex, projectIndex));
   let taskSpaces = $derived(taskWorkspaces(spacesOnScreen));
   // «Te espera» is drawn while anything waits, or for the «+» in its head.
-  let drawWaits = $derived(blockDrawn(waitsState) || (taskSpaces.length > 0 && startPhase === 'none'));
+  // What is set aside or old keeps the block (its folds are the way back), without counting (ADR-232).
+  let drawWaits = $derived(
+    blockDrawn(waitsState) || (taskSpaces.length > 0 && startPhase === 'none') || split.aside.length > 0 || split.old.length > 0,
+  );
   // Primer día (tarea 137): the start list of the space just made, in the
   // welcome's place while it lives; never two cards at once.
   let startSpace = $derived(startTarget(spacesOnScreen));

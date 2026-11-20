@@ -288,13 +288,17 @@
   let yours = $derived(stop && onPerf && !doing && Date.parse(stop.at) > now.getTime() ? stop : null);
   let yoursWord = $derived.by(() => {
     if (!yours || !actionPerf) return '';
-    return cap(yours.label || (yours.key ? t(momentWordKey(yours.key), locale, undefined, tradeFor(perfWorkspaceId(actionPerf))) : ''));
+    const w = cap(yours.label || (yours.key ? t(momentWordKey(yours.key), locale, undefined, tradeFor(perfWorkspaceId(actionPerf))) : ''));
+    // An option still leans: its «?» stays (design-system rule 18).
+    return w && focus?.ref.tentative ? `${w}?` : w;
   });
 
   let headEye = $derived(yours ? t('desk.you_at_eye', locale) : eye);
   let headWhat = $derived(yours ? yoursWord || what : shows ? showsWhat : what);
   let headAt = $derived(yours && actionPoint ? hour(yours.at, actionPoint.tz) : shows ? showsAt : at);
-  let headSub = $derived(yours && actionPoint ? place(actionPoint) : shows ? showsWhere : where);
+  let headSub = $derived(
+    yours && actionPoint ? [place(actionPoint), holdLabel(actionPoint)].filter(Boolean).join(' · ') : shows ? showsWhere : where,
+  );
   let headRest = $derived(yours ? inWords(minutesTo(yours.at, now)) : shows ? showsLeft : left);
 
   /* «Mañana · sales a las 10h hacia Getxo» (ADR-234): inside the piece once
@@ -389,7 +393,7 @@
   {:else if agenda && focus}
     {@const sub = headSub}
     {@const rest = headRest}
-    {@const leans = !shows && !yours && focus.ref.tentative}
+    {@const leans = !shows && focus.ref.tentative}
     <div class="piece" class:piece--gig={gig} data-testid="desk-next">
       <span class="piece__eye" data-testid={yours ? 'desk-you-at' : undefined}>{@render mark(yours ? actionPerf?.project : eyeProject)}{headEye}</span>
       <!-- The headline is read again when the minute ticks: polite, never twice a minute.

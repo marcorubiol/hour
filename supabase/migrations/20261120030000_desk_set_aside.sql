@@ -75,6 +75,10 @@ BEGIN
   VALUES (v_caller, '{}'::jsonb)
   ON CONFLICT (user_id) DO NOTHING;
 
+  -- Two calls at once (two devices) must not each write back what they read:
+  -- the row is locked, so the second reads what the first wrote.
+  PERFORM 1 FROM public.desk_set_aside WHERE user_id = v_caller FOR UPDATE;
+
   SELECT COALESCE(jsonb_object_agg(e.key, e.value), '{}'::jsonb)
     INTO v_items
     FROM public.desk_set_aside s, jsonb_each(s.items) e
