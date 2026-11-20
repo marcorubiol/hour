@@ -92,9 +92,11 @@
     type PerformanceMissingInput,
     type ReadinessBox,
   } from '$lib/record-missing';
-  import { shareExpired, type RoadsheetShare } from '$lib/roadsheet';
+  import { ROADSHEET_ROLES, shareExpired, type RoadsheetRole, type RoadsheetShare } from '$lib/roadsheet';
   import type { TeamMember } from '$lib/roadsheet-late';
   import RoadsheetShareList from './RoadsheetShare.svelte';
+  import RoadsheetPreview from './RoadsheetPreview.svelte';
+  import Segmented from '$lib/components/Segmented.svelte';
 
   type PersonEmbed = {
     id: string;
@@ -877,10 +879,8 @@
           id: 'roadsheet_unshared',
           text: t('record.missing_roadsheet', locale),
           verbs: [
-            // An editor shares from the pass; whoever cannot manage links keeps the road sheet page.
-            canEdit
-              ? { label: t('record.verb_share', locale), onclick: () => (shareOpen = true) }
-              : { label: t('record.verb_share', locale), href: `/h/${workspaceSlug}/performance/${slug}/roadsheet` },
+            // «Compartir» opens for everyone: the links for an editor, the preview for whoever cannot manage them.
+            { label: t('record.verb_share', locale), onclick: () => (shareOpen = true) },
           ],
         };
     }
@@ -1040,14 +1040,10 @@
     const v = perf.venue;
     const mapParts = v?.address ? [v.address, v.city ?? perf.city] : [v?.name ?? perf.venue_name, v?.city ?? perf.city];
     if (mapsHref(mapParts) !== null) out.push({ id: 'map', label: t('ahora.map', locale), map: mapParts });
-    // «Compartir» (ADR-222): sharing lives in the pass. Whoever cannot edit the
-    // performance cannot manage links (the editor would answer 403): for them
-    // it stays a plain link to the road sheet page.
-    if (canEdit) {
-      out.push({ id: 'sheet', label: t('pass.share', locale), onclick: () => (shareOpen = true), testid: 'pass-share' });
-    } else {
-      out.push({ id: 'sheet', label: t('ahora.sheet', locale), href: `/h/${workspaceSlug}/performance/${slug}/roadsheet`, ariaLabel: t('roadsheet.open', locale) });
-    }
+    // «Compartir» (ADR-222, ADR-230): sharing lives in the pass. The dialog
+    // opens for everyone; whoever cannot edit the performance cannot manage
+    // links (the endpoint would answer 403), so it shows them only the preview.
+    out.push({ id: 'sheet', label: t('pass.share', locale), onclick: () => (shareOpen = true), testid: 'pass-share' });
     return out;
   });
 
@@ -1124,6 +1120,26 @@
   let talkOpen = $state(false);
   /** «Compartir» (ADR-222): the road sheet's links, as a dialog over the pass. */
   let shareOpen = $state(false);
+  /** The role being previewed inside «Compartir». */
+  let shareRole = $state<RoadsheetRole>('full');
+  /** The preview in place of the links. */
+  let shareView = $state(false);
+  /** Whoever cannot edit has no links to manage: the preview is all there is. */
+  let sharePreviewing = $derived(!canEdit || shareView);
+  /** The word for a road sheet role; the raw value with spaces if unknown. */
+  function shareRoleWord(r: string): string {
+    const key = `roadsheet.role_${r}`;
+    const word = t(key, locale);
+    return word === key ? r.replace(/_/g, ' ') : word;
+  }
+  // `?share=1` (the old road sheet page's redirect, a link to «Compartir»)
+  // opens the dialog once the pass is there. The param stays, like `#board`.
+  let shareFromUrl = false;
+  $effect(() => {
+    if (shareFromUrl || !perf || inPeek) return;
+    shareFromUrl = true;
+    if (typeof location !== 'undefined' && new URLSearchParams(location.search).get('share') === '1') shareOpen = true;
+  });
   // A link to the board (`#board`: Hoy's «Tablón», a thread row, an
   // invitation's landing) opens the sheet once the board is there.
   let talkFromHash = false;
@@ -1660,16 +1676,40 @@
   </Dialog>
 {/if}
 
-<!-- «Compartir» (ADR-222): los enlaces de la hoja de ruta, sin salir del pase.
-     La vista previa por rol sigue en su página hasta la fase 2. -->
-{#if perf && canEdit}
-  <Dialog bind:open={shareOpen} title={t('pass.share_title', locale)} size="s" placing={inPeek ? 'side' : 'center'}>
+<!-- «Compartir» (ADR-222, ADR-230): los enlaces de la hoja de ruta y la vista
+     previa por rol, sin salir del pase. Quien no puede editar sólo ve la vista
+     previa (gestionar enlaces le daría 403). -->
+{#if perf}
+  <Dialog
+    bind:open={shareOpen}
+    title={t('pass.share_title', locale)}
+    size={sharePreviewing ? 'm' : 's'}
+    placing={inPeek ? 'side' : 'center'}
+    onclose={() => ((shareView = false), (shareRole = 'full'))}
+  >
     {#if shareOpen}
-      <p class="perf__share-hint">{t('pass.share_hint', locale)}</p>
-      <RoadsheetShareList {workspaceSlug} {slug} {locale} />
-      <p class="perf__share-sheet">
-        <a href={`/h/${workspaceSlug}/performance/${slug}/roadsheet`} data-testid="pass-share-sheet">{t('pass.share_open_sheet', locale)}</a>
-      </p>
+      {#if sharePreviewing}
+        {#if canEdit}
+          <p class="perf__share-back">
+            <button type="button" class="link-arrow" data-testid="pass-share-links" onclick={() => (shareView = false)}>
+              {t('pass.share_back', locale)}
+            </button>
+          </p>
+        {/if}
+        <RoadsheetPreview {workspaceSlug} {slug} {locale} bind:role={shareRole} />
+      {:else}
+        <p class="perf__share-hint">{t('pass.share_hint', locale)}</p>
+        <RoadsheetShareList {workspaceSlug} {slug} {locale} />
+        <div class="perf__share-view">
+          <span class="perf__share-view-label">{t('roadsheet.view_as', locale)}</span>
+          <Segmented
+            options={ROADSHEET_ROLES.map((r) => ({ value: r, label: shareRoleWord(r) }))}
+            ariaLabel={t('roadsheet.preview_as', locale)}
+            onchange={(r) => ((shareRole = r), (shareView = true))}
+            optionTestid={(r) => `pass-share-role-${r}`}
+          />
+        </div>
+      {/if}
     {/if}
   </Dialog>
 {/if}
@@ -1827,13 +1867,31 @@
       margin-block-end: var(--space-s);
     }
 
-    .perf__share-sheet {
+    .perf__share-view {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
       margin-block-start: var(--space-m);
+    }
+
+    .perf__share-view-label {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--tracking-s);
+      color: var(--text-faint);
+    }
+
+    .perf__share-back {
       font-size: var(--text-xs);
     }
 
-    .perf__share-sheet a {
+    .perf__share-back button {
+      padding: 0;
+      border: 0;
+      background: none;
+      font: inherit;
       color: var(--text-muted);
+      cursor: pointer;
     }
 
     .perf__place-acts {

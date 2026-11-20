@@ -150,6 +150,16 @@ const legacyVocabRedirects: Handle = async ({ event, resolve }) => {
     return Response.redirect(dest.toString(), 301);
   }
 
+  // La hoja de ruta del operador vive en «Compartir», dentro del pase (ADR-230):
+  // /h/[ws]/performance/[slug]/roadsheet → el pase con `?share=1`, que abre el
+  // diálogo. Client-side: routes/h/[workspace]/performance/[slug]/roadsheet/+page.ts.
+  const roadsheetPageMatch = path.match(/^(\/h\/[^/]+\/performance\/[^/]+)\/roadsheet\/?$/);
+  if (roadsheetPageMatch) {
+    const dest = new URL(roadsheetPageMatch[1], event.url);
+    dest.search = '?share=1';
+    return Response.redirect(dest.toString(), 301);
+  }
+
   // One front door (ADR-137): /h was the Hall, a page before the Desk. It is
   // the Desk now; /h stays as the entry everyone already links to (login,
   // bookmarks, the mail OAuth bounce), query kept. 302, not 301: it is the

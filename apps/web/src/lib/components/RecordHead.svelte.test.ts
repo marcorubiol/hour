@@ -51,15 +51,15 @@ describe('RecordHead', () => {
       crumbs,
       title: 'x',
       tools: [
-        { label: 'Abrir la hoja de ruta', href: '/h/muk-cia/performance/x/roadsheet' },
+        { label: 'Compartir la hoja de ruta', href: '/h/muk-cia/performance/x?share=1' },
         { label: 'Editar', onclick: () => edited++ },
       ],
     });
     const tools = container.querySelector('.lenshead__tools')!;
     const drawn = [...tools.querySelectorAll('a, button')];
-    expect(drawn.map((el) => el.textContent?.trim())).toEqual(['Abrir la hoja de ruta', 'Editar']);
+    expect(drawn.map((el) => el.textContent?.trim())).toEqual(['Compartir la hoja de ruta', 'Editar']);
     for (const el of drawn) expect(el.className).toMatch(/btn--secondary.*btn--xs|btn--secondary btn--xs/);
-    expect(drawn[0].getAttribute('href')).toBe('/h/muk-cia/performance/x/roadsheet');
+    expect(drawn[0].getAttribute('href')).toBe('/h/muk-cia/performance/x?share=1');
     (drawn[1] as HTMLButtonElement).click();
     expect(edited).toBe(1);
   });

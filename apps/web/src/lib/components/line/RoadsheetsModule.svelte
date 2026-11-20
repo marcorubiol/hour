@@ -101,7 +101,7 @@
                 <td class="rsm__cell-muted">{whereLabel(p)}</td>
                 <td class="rsm__cell-sheet">
                   {#if p.slug}
-                    <a class="link-arrow" href={`/h/${workspaceSlug}/performance/${p.slug}/roadsheet`}>
+                    <a class="link-arrow" href={`/h/${workspaceSlug}/performance/${p.slug}?share=1`}>
                       {t('line.roadsheet', locale)} →
                     </a>
                   {:else}
