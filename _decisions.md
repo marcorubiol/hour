@@ -8659,7 +8659,7 @@ aparte, como lo visto de la ayuda). No toca el service worker.
 
 **Cómo se revierte.** Revertir el commit; si la migración se aplicó, el rollback de arriba.
 
-## [2026-11-20] ADR-233 · La pieza es tu día (fase 6 de la revisión TDAH; enmienda ADR-202 § 3 y § 7)
+## [2026-11-20] ADR-234 · La pieza es tu día (fase 6 de la revisión TDAH; enmienda ADR-202 § 3 y § 7)
 
 Encargo `revision-tdah/brief.md`, fase 6, lámina D (columnas 1 y 2). Una sola Hoy para todos: lo que cambia es lo que tu
 día tiene para ti, no quién eres.

@@ -49,7 +49,7 @@
     today: string;
     viewerTz: string;
     slipCtx: SlipContext;
-    /** The viewer's person (`/api/me`): «estás a las» on the tiles (ADR-233). */
+    /** The viewer's person (`/api/me`): «estás a las» on the tiles (ADR-234). */
     me?: string | null;
     locale: Locale;
     /** What is open, amber or grey (ADR-227); off in calm (ADR-203 § 5). */
@@ -75,7 +75,7 @@
 
   const kindLabel = (kind: SlipKind, voice?: Voice) => t(`planner.kind_${kind}`, locale, undefined, voice);
   const hour = (iso: string, tz: string | null) => hourMark(dualTime(iso, tz, viewerTz).primary);
-  /** «estás a las 14h» when the list names you (ADR-233): the day's first stop. */
+  /** «estás a las 14h» when the list names you (ADR-234): the day's first stop. */
   const stopOf = (item: PulseNext) => (item.ref.of === 'performance' ? yourStop(item.ref.row as PerformanceEvent, me) : null);
   const dayDiff = (day: string) =>
     Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);

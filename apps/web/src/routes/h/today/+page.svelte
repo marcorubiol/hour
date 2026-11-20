@@ -262,7 +262,7 @@
   let allTiles = $derived.by(() => comingTiles(upcoming(pulseInput, clockNow, COMING_COUNT_CAP), today, Infinity, listOf));
   let tiles = $derived.by(() => allTiles.slice(0, phone.current ? COMING_TILES_PHONE : COMING_TILES));
   let tilesOpen = $derived(comingOpen(allTiles));
-  // «Tu hora» (ADR-233): whose the viewer is, to know when a list names them.
+  // «Tu hora» (ADR-234): whose the viewer is, to know when a list names them.
   const meQuery = createQuery(meQueryOptions());
   let me = $derived($meQuery.data?.person_id ?? null);
   let nextThing = $derived(nextAfterToday(coming, today));

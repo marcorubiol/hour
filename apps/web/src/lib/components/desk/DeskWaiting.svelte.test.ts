@@ -87,7 +87,7 @@ describe('Te espera: «Ahora no» and the old (ADR-232)', () => {
   });
 });
 
-describe('Te espera on a gig day: one line (ADR-233)', () => {
+describe('Te espera on a gig day: one line (ADR-234)', () => {
   afterEach(cleanup);
   it('says how many and opens to the rows', async () => {
     const here = item({ id: 'conv-here', subject: 'Teatro Arriaga' });

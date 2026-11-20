@@ -351,7 +351,7 @@ describe('two or more performances today: none weighs more (ADR-207)', () => {
   });
 });
 
-describe('«tu hora»: the first stop of the day when the list names you (ADR-233)', () => {
+describe('«tu hora»: the first stop of the day when the list names you (ADR-234)', () => {
   const perf = (over: Record<string, unknown> = {}) =>
     ({
       id: 'p',

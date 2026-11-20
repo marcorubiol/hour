@@ -75,7 +75,7 @@
     old?: DeskItem[];
     /** «Ahora no» until a day, or back now with null. Without it, no «ahora no». */
     onaside?: (item: DeskItem, until: string | null) => void;
-    /** A gig day (ADR-233): the block is one line, «Te espera · 4 · ver», until opened. */
+    /** A gig day (ADR-234): the block is one line, «Te espera · 4 · ver», until opened. */
     folded?: boolean;
   }
 
@@ -312,7 +312,7 @@
 
 <section class="dband waits" aria-labelledby="desk-waits-h" aria-busy={loading}>
   {#if line}
-  <!-- A GIG DAY (ADR-233): the day is the piece; what waits is one line. -->
+  <!-- A GIG DAY (ADR-234): the day is the piece; what waits is one line. -->
   <p class="waits__line" data-testid="desk-waits-line">
     <span id="desk-waits-h">{t('desk.band_waiting', locale)}</span> · {waiting.total} ·
     <button type="button" class="waits__open" onclick={() => (unfold = true)}>{t('desk.open_see', locale)}</button>

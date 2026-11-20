@@ -312,7 +312,7 @@ export function waitingRowCount(day: { calm: boolean; gig: boolean; empty: boole
 }
 
 /**
- * «TU HORA» (revisión TDAH, fase 6; ADR-233): when the list of who goes names
+ * «TU HORA» (revisión TDAH, fase 6; ADR-234): when the list of who goes names
  * you, the hour that matters is the first stop of the performance's day, the
  * same for everyone who goes (Marco, 19-11: «la primera parada del día»).
  * Named = your «voy», or the roster when the feed brings it. Not named, or a

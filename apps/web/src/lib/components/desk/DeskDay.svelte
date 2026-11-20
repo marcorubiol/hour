@@ -79,7 +79,7 @@
     slipCtx: SlipContext;
     /** For the road sheet's role (the preloaded cut, ADR-146 § 6). */
     workspaces: readonly NavWorkspace[];
-    /** The viewer's person (`/api/me`): «tu hora» when the list names them (ADR-233). */
+    /** The viewer's person (`/api/me`): «tu hora» when the list names them (ADR-234). */
     me?: string | null;
     locale: Locale;
   }
@@ -278,7 +278,7 @@
   let boardHref = $derived(actionSlip?.href && boardNew > 0 ? `${actionSlip.href}#board` : null);
   let acts = $derived(Boolean(call?.phone || map));
 
-  /* «TU HORA» (ADR-233): the list of who goes names you, so the big hour is the
+  /* «TU HORA» (ADR-234): the list of who goes names you, so the big hour is the
      first stop of the day, «Estás a las», until it comes. Not with several
      shows (the headline is the day's), nor once something is under way. */
   let stop = $derived(!shows && actionPerf && actionPoint ? yourStop(actionPerf, me) : null);
@@ -297,7 +297,7 @@
   let headSub = $derived(yours && actionPoint ? place(actionPoint) : shows ? showsWhere : where);
   let headRest = $derived(yours ? inWords(minutesTo(yours.at, now)) : shows ? showsLeft : left);
 
-  /* «Mañana · sales a las 10h hacia Getxo» (ADR-233): inside the piece once
+  /* «Mañana · sales a las 10h hacia Getxo» (ADR-234): inside the piece once
      nothing of today is still ahead, or today has no hours. */
   let tomorrowLine = $derived.by(() => {
     if (!agenda || !next || next.day !== plusDays(today, 1)) return '';
@@ -339,7 +339,7 @@
     const sl = pulseSlip(n.ref, n.day, slipCtx);
     const held = sl.cert === 'hold' || sl.cert === 'proposed' ? '?' : '';
     const to = (p: string) => `${t('planner.slip_to', locale)} ${p}`;
-    /* «Mañana · …» inside the piece (ADR-233) says its hour; the hollow piece
+    /* «Mañana · …» inside the piece (ADR-234) says its hour; the hollow piece
        draws it on the right. */
     const said = (what: string, where?: string) => {
       if (!tomorrow) return where ? t('desk.day_next_at', locale, { when, what, where }) : t('desk.day_next', locale, { when, what });
@@ -358,7 +358,7 @@
     return w ? said(kind, w) : said(kind);
   }
   let nextHref = $derived(next ? (pulseSlip(next.ref, next.day, slipCtx).href ?? undefined) : undefined);
-  /** What comes names you: «estás a las 16h» instead of its own hour (ADR-233). */
+  /** What comes names you: «estás a las 16h» instead of its own hour (ADR-234). */
   let nextStop = $derived(next && next.ref.of === 'performance' ? yourStop(next.ref.row as PerformanceEvent, me) : null);
 
   /** A row's own address: its record, else the day in the Planner. */
@@ -568,7 +568,7 @@
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
-  /* NOTHING TODAY, A SMALLER PIECE (ADR-233, amending ADR-202 § 3): still in
+  /* NOTHING TODAY, A SMALLER PIECE (ADR-234, amending ADR-202 § 3): still in
      its place and hollow, but what waits and what comes lead the screen. */
   .piece--hollow .piece__lead {
     color: var(--heading-color);
