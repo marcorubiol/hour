@@ -26,7 +26,7 @@
   };
 
   /** What a performance still needs, as the row says it (ADR-211 § 3). */
-  export type AgendaMissing = { noTime: boolean; words: { text: string; urgent: boolean }[] };
+  export type AgendaMissing = { noTime: boolean; words: { text: string; urgent: boolean; dot?: boolean }[] };
 </script>
 
 <script lang="ts">
@@ -637,7 +637,8 @@
                 {#if sub || miss?.words.length}
                   <span class="ag__ven"
                     >{sub ?? ''}{#each miss?.words ?? [] as w, wi (w.text)}{#if sub || wi}{' '}{/if}<span class="ag__miss"
-                        >{#if sub || wi}·&nbsp;{/if}<span class="missing-word" class:missing-word--urgent={w.urgent} data-testid="agenda-missing">{w.text}</span
+                        >{#if sub || wi}·&nbsp;{/if}<span class="missing-word" class:missing-word--urgent={w.urgent} data-testid="agenda-missing"
+                          >{#if w.dot}<i class="missing-dot missing-dot--s" aria-hidden="true"></i>{/if}{w.text}</span
                         ></span
                       >{/each}</span
                   >
@@ -737,7 +738,8 @@
                   </p>
                 {/if}
               </div>
-            {:else}
+            {:else if !phone.current}
+              <!-- Not on a phone (ADR-236): «+ fecha» above is the one «+». -->
               <button type="button" class="ag__note-add" aria-label={noteAddLabel} onclick={() => openNoteWriter(day)}
                 >＋</button
               >

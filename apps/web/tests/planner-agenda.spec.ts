@@ -78,6 +78,8 @@ test.describe('the agenda (ADR-211)', () => {
     for (const d of days) expect(d >= today && d <= last, `amber on ${d}`).toBe(true);
     const urgent = page.locator('[data-testid="agenda-missing"].missing-word--urgent');
     test.skip((await urgent.count()) === 0, 'nothing with hurry in the window');
+    // One amber in the whole Agenda (ADR-236): the first thing that falls due.
+    await expect(urgent).toHaveCount(1);
     const ink = await urgent.first().evaluate((el) => {
       const probe = document.createElement('span');
       probe.style.color = 'var(--missing-ink)';
@@ -102,25 +104,10 @@ test.describe('the agenda (ADR-211)', () => {
     expect(after).toBeLessThanOrEqual(before);
   });
 
-  test('THE ＋ OF A DAY NEVER SITS ON ITS NUMBER (390 px)', async ({ page }) => {
+  test('NO ＋ UNDER EACH DAY ON A PHONE (390 px, ADR-236): «+ fecha» above is the one', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await agenda(page);
-    const adds = page.locator('[data-testid="agenda-day"] .ag__note-add');
-    test.skip((await adds.count()) === 0, 'no day with a ＋ in the window');
-    const hits = await page.evaluate(() =>
-      [...document.querySelectorAll<HTMLElement>('[data-testid="agenda-day"]')].flatMap((d) => {
-        const add = d.querySelector<HTMLElement>('.ag__note-add');
-        const num = d.querySelector('.ag__num');
-        if (!add || !num) return [];
-        const n = num.getBoundingClientRect();
-        // The glyph's box, not the 44 px target: the target may reach the date's air.
-        const r = document.createRange();
-        r.selectNodeContents(add);
-        const g = r.getBoundingClientRect();
-        return g.top < n.bottom && g.bottom > n.top && g.left < n.right && g.right > n.left ? [d.dataset.day] : [];
-      }),
-    );
-    expect(hits, 'days whose ＋ is drawn on the number').toEqual([]);
+    await expect(page.locator('[data-testid="agenda-day"] .ag__note-add')).toHaveCount(0);
   });
 
   test('THE «·» GOES DOWN WITH ITS AMBER WORD, never hangs at a line end (390 px)', async ({ page }) => {

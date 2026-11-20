@@ -68,6 +68,7 @@
   import AgendaList, { type AgendaDecision, type AgendaMissing, type NoteDraft } from '$lib/components/AgendaList.svelte';
   import { readPreparation } from '$lib/preparation';
   import { isUrgentMissing, isUrgentThing, manualOpenSoon, missingSoon } from '$lib/record-missing';
+  import { agendaWords, daysTo, firstDue } from '$lib/agenda-missing';
   import { noteFallback as noteFallbackOf, noteFallbackBody } from '$lib/note';
   import DecisionBand, {
     decisionText,
@@ -2020,18 +2021,47 @@
   let preparationByProject = $derived(
     new Map(($projectsQuery.data?.items ?? []).map((p) => [p.id, readPreparation(p.preparation)] as const)),
   );
-  function agendaMissing(p: PerformanceEvent): AgendaMissing {
+  /** What a performance has open, each with its hurry and the day it falls due. */
+  function agendaOpen(p: PerformanceEvent) {
     const list = p.project?.id ? preparationByProject.get(p.project.id) : undefined;
+    const day = p.performed_at.slice(0, 10);
     const open = missingSoon(p, todayIso, list);
     return {
       noTime: open.some((m) => m.kind === 'no_time'),
-      words: [
+      items: [
         ...open
           .filter((m) => m.kind !== 'no_time')
-          .map((m) => ({ text: t(MISSING_WORD[m.kind as keyof typeof MISSING_WORD], locale), urgent: isUrgentMissing(m, { day: p.performed_at.slice(0, 10), today: todayIso, list }) })),
+          .map((m) => ({
+            text: t(MISSING_WORD[m.kind as keyof typeof MISSING_WORD], locale),
+            urgent: isUrgentMissing(m, { day, today: todayIso, list }),
+            due: m.kind === 'hold_deadline' ? m.day : day,
+          })),
         // The project's own things, by their name (ADR-221).
-        ...manualOpenSoon(p, todayIso, list).map((m) => ({ text: m.name, urgent: isUrgentThing(m.id, p.performed_at.slice(0, 10), todayIso, list) })),
+        ...manualOpenSoon(p, todayIso, list).map((m) => ({ text: m.name, urgent: isUrgentThing(m.id, day, todayIso, list), due: day })),
       ],
+    };
+  }
+  /** One amber in the Agenda (ADR-236, `$lib/agenda-missing`). */
+  let agendaFirstDue = $derived(
+    view === 'agenda' ? firstDue(shownPerfs.filter((p) => p.status !== 'cancelled').map((p) => ({ id: p.id, items: agendaOpen(p).items }))) : null,
+  );
+  function dueWhen(due: string): string {
+    const n = daysTo(due, todayIso);
+    if (n < 0) return t('desk.when_overdue', locale);
+    if (n === 0) return t('desk.when_today', locale);
+    if (n === 1) return t('desk.when_tomorrow', locale);
+    if (n === 2) return t('desk.when_after_tomorrow', locale);
+    return t('desk.when_days', locale, { n });
+  }
+  function agendaMissing(p: PerformanceEvent): AgendaMissing {
+    const open = agendaOpen(p);
+    return {
+      noTime: open.noTime,
+      words: agendaWords(p.id, open.items, agendaFirstDue, {
+        when: dueWhen,
+        toClose: (n) => t('planner.to_close', locale, { n }),
+        more: (n) => t('planner.to_close_more', locale, { n }),
+      }),
     };
   }
   const MISSING_WORD = {

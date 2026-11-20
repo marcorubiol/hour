@@ -8702,3 +8702,21 @@ página del Planificador, que comparte ficheros con otros hilos; van en un PR ap
 **Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`. Textos en los cuatro idiomas.
 
 **Cómo se revierte.** Revertir el commit.
+
+## [2026-11-20] ADR-236 · Agenda: «N por cerrar» y un solo ámbar (fase 2 de la revisión TDAH; enmienda ADR-211 § 3)
+
+Encargo `revision-tdah/brief.md`, fase 2, lámina C.
+
+1. **«N por cerrar» en gris.** Cada función de la Agenda que tiene cosas abiertas en sus dos semanas dice «3 por cerrar»
+   con el punto discontinuo, en vez de la lista («sin trato · hoja sin compartir»). La lista entera sigue en su pase.
+2. **Un solo ámbar.** De todas las funciones que dibuja la Agenda, solo la primera cosa que vence se nombra, en ámbar y
+   con cuándo: «HOJA SIN COMPARTIR · EN 3 DÍAS», y «+2 más» en gris si esa función tiene más. Es la regla de ADR-227
+   para Hoy, aplicada a la Agenda. Pura en `$lib/agenda-missing`.
+3. **Sin «＋» bajo cada día en el móvil.** Queda el «+ fecha» de arriba. En el escritorio, el «＋» de la nota sigue
+   apareciendo al pasar por el día.
+4. «Sin hora» sigue en la columna de la hora, como antes.
+
+**Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`. Textos en los cuatro idiomas. `planner-agenda.spec`
+comprueba que hay un solo ámbar y que en el móvil no hay «＋».
+
+**Cómo se revierte.** Revertir el commit.
