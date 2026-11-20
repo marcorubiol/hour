@@ -553,6 +553,13 @@ con boceto antes y después de la 119). Capturas de partida: espacio `playwright
 
 - [ ] **Modo «Ahora», después de la v1** (ADR-146, v1 en producción el 30-10): hotel y aparcamiento estructurados, billetes y rider en PDF, «qué ha cambiado», escribir sin red, aviso 30 min antes de la llamada. Re-evaluar dónde va el botón en el móvil tras usarlo en gira.
 
+- [ ] **Sincronizar con Google Calendar y Apple Calendar, cada persona con su cuenta** (Marco, 2026-11-20: «seguro que va a entrar»; ADR-240). Idea: los eventos de Hour (bolos confirmados, ensayos, viajes, lo que te convocan) se reflejan en el calendario de la persona a la que van dirigidos, no en uno por espacio; cada usuario conecta su propia cuenta y elige qué entra. Investigación: `research/product/16-integration-ecosystem.md` §2 (Google Calendar API v3 + OAuth como fase 1; Apple por suscripción `.ics`). Hoy solo existe `calendar_share` (ADR-054): feed `.ics` de lectura **por espacio**, token en claro (ADR-047) y sin caducidad. Sin diseñar ni estimar; antes de construir, resolver:
+  - [ ] **Google (push, y lectura de disponibilidad si se quiere):** reutilizar el OAuth de Google de Buzones (Ajustes → Buzones) o pedir un consentimiento propio de Calendar con el alcance mínimo; decidir si cuenta para la verificación de la app de Google (ver la tarea de la auditoría CASA, que es de Gmail: Calendar no es un permiso restringido, comprobarlo).
+  - [ ] **Apple:** `.ics` de suscripción **por usuario** (qué te toca a ti en todos tus espacios), con token revocable y caducidad; es de solo lectura y Apple refresca cuando quiere (horas). CalDAV de escritura queda fuera.
+  - [ ] **Quién es el destinatario de un evento:** función/convocatoria enlazada a la persona (ADR-235) y no solo «el bolo del espacio»; qué ve cada uno (sin tarifas, sin notas internas, como en ADR-054).
+  - [ ] **Plan:** el recorte de investigación y ADR de precios dice que Google Calendar sync entra en STANDARD; confirmar con Marco que sigue así y qué ve el plan gratuito (¿solo `.ics`?).
+  - [ ] **Seguridad y datos:** tokens de acceso cifrados, desconectar borra lo creado en el calendario externo, RLS y migración (toca permisos: RLS entera + E2E contra el desplegado).
+
 ## Deuda aceptada / observar en uso
 
 - [ ] **Los datos fiscales de una organización no se pueden retirar (visto el 2026-10-13, tests de la fase 4 de ADR-102).** Un borrado blando por PostgREST da 42501 (la fila borrada ya no pasa la policy de SELECT), `service_role` no tiene grant sobre `fiscal_identity` y no hay RPC para retirarla. La limpieza de `money-v3.test.ts` y de `money-payer-organization.test.ts` no borraba nada sin decirlo. Cuando haga falta: una RPC `retire_fiscal_identity` con `can_edit_workspace_money`. (chat 13-10, sin estimar)
