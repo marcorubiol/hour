@@ -101,6 +101,8 @@ export interface DeskItem {
   tagName: string | null;
   /** A «liberar» row: the option it confirms or releases in place (ADR-165 § 1). */
   option: DeskOption | null;
+  /** «Te han convocado» (ADR-234): the performance whose «Voy / No puedo» the row answers. */
+  convocation?: string | null;
 }
 
 export interface DeskRun {
@@ -136,6 +138,8 @@ interface DeskFeedInput {
    * day it must be decided by, else on the day of the gig.
    */
   decisions?: DeskDecisionInput[];
+  /** «Te han convocado» (ADR-234): unanswered calls to the viewer, already scoped. */
+  convocations?: DeskConvocationInput[];
 }
 
 export interface DeskDecisionInput {
@@ -155,6 +159,23 @@ export interface DeskDecisionInput {
   /** A release: the option to let go, which the row confirms or releases in
       place (ADR-165 § 1). */
   option?: DeskOption | null;
+}
+
+/**
+ * «TE HAN CONVOCADO» (revisión TDAH, fase 7; ADR-234): a performance whose
+ * list of who goes names the viewer, who has not said «voy» or «no puedo».
+ * It waits today, whatever its day, until answered; answering closes it.
+ */
+export interface DeskConvocationInput {
+  /** The performance. */
+  id: string;
+  /** Ready words: «Donostia · sáb 21 nov, 16h». */
+  subject: string;
+  projectId: string | null;
+  projectName: string;
+  workspaceId: string | null;
+  /** Its pase. */
+  href: string | null;
 }
 
 /** One performance a row acts on: its id and the status it has now (the undo). */
@@ -508,6 +529,26 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
         overdue,
         href: d.href,
         option: d.kind === 'release' ? (d.option ?? null) : null,
+      }),
+    );
+  }
+
+  // ── «Te han convocado» (ADR-234): today, until answered.
+  for (const c of input.convocations ?? []) {
+    push(
+      todayISO,
+      'decision',
+      0,
+      blankItem({
+        id: `voy-${c.id}`,
+        concern: 'decision',
+        subject: c.subject,
+        projectName: c.projectName || '—',
+        projectId: c.projectId,
+        workspaceId: c.workspaceId,
+        verbKey: 'answer',
+        href: c.href,
+        convocation: c.id,
       }),
     );
   }

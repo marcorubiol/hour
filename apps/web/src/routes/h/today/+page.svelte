@@ -46,7 +46,9 @@
   import { accentVarFor } from '$lib/utils/accent';
   import { spaceName } from '$lib/utils/identity';
   import { appLocale, LOCALE_TAG, t, tradeFor } from '$lib/i18n';
-  import { viewerTimeZone } from '$lib/datetime';
+  import { dualTime, hourMark, localeDayMonth, localeWeekdayShort, viewerTimeZone } from '$lib/datetime';
+  import { setCommitment } from '$lib/commitments';
+  import { plusDays } from '$lib/set-aside';
   import { dayKeyInTz, plannerDayHref } from '$lib/planner';
   import { page } from '$app/state';
   import { usePins } from '$lib/stores/pins.svelte';
@@ -70,6 +72,7 @@
     overviewReplies,
     rankWaiting,
     type DeskConvInput,
+    type DeskConvocationInput,
     type DeskDecisionInput,
     type DeskItem,
     type DeskOption,
@@ -414,6 +417,7 @@
         showToday: scopedPerfs.some((p) => p.status !== 'cancelled' && perfDayKey(p) === today),
         replies,
         decisions: lensOn('planner') ? deskDecisions() : [],
+        convocations: convocations(),
       },
       clockNow,
       locale,
@@ -596,6 +600,46 @@
     const p = scopedPerfs.find((x) => x.id === id);
     const ws = p && workspaceSlugById.get(perfWorkspaceId(p) ?? '');
     return p?.slug && ws ? `/h/${ws}/performance/${p.slug}` : null;
+  }
+  /**
+   * «Te han convocado» (ADR-235): the next two weeks' performances whose list
+   * of who goes names you, and you have not said «voy» nor «no puedo».
+   */
+  function convocations(): DeskConvocationInput[] {
+    if (!me) return [];
+    const until = plusDays(today, 14);
+    return scopedPerfs
+      .filter((p) => {
+        const day = perfDayKey(p);
+        return (
+          p.status !== 'cancelled' &&
+          day >= today &&
+          day <= until &&
+          (p.person_ids ?? []).includes(me!) &&
+          !(p.commitments ?? []).some((c) => c.person_id === me)
+        );
+      })
+      .map((p) => {
+        const day = perfDayKey(p);
+        const at = p.start_at ? hourMark(dualTime(p.start_at, p.venue?.timezone ?? null, viewerTz).primary) : null;
+        const when = `${localeWeekdayShort(day, locale)} ${localeDayMonth(day, locale)}${at ? `, ${at}` : ''}`;
+        return {
+          id: p.id,
+          subject: `${p.city || p.venue_name || p.project?.name || ''} · ${when}`,
+          projectId: p.project?.id ?? null,
+          projectName: p.project?.name ?? '',
+          workspaceId: perfWorkspaceId(p) ?? null,
+          href: performancePage(p.id),
+        };
+      });
+  }
+  async function answer(item: DeskItem, state: 'going' | 'not_going') {
+    if (!item.convocation || !me) return;
+    try {
+      await setCommitment(queryClient, 'performance', item.convocation, me, state);
+    } catch (err) {
+      addToast({ tone: 'danger', title: t('desk.toast_change_failed', locale), message: err instanceof ApiError ? err.message : t('perf.unexpected', locale) });
+    }
   }
   function deskDecisions(): DeskDecisionInput[] {
     const notice = new Map(scopedPerfs.map((p) => [p.id, p.hold_notice_days]));
@@ -1016,6 +1060,7 @@
           aside={split.aside}
           old={split.old}
           onaside={setAside.ready ? setRowAside : undefined}
+          onanswer={answer}
         />
       </div>
       {/if}

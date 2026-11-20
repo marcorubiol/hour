@@ -8682,3 +8682,23 @@ día tiene para ti, no quién eres.
 los cuatro idiomas. Arregla también `desk.spec` («See all»), que no se había actualizado con ADR-229.
 
 **Cómo se revierte.** Revertir el commit.
+
+## [2026-11-20] ADR-235 · «Te han convocado: Voy / No puedo» (fase 7 de la revisión TDAH; enmienda ADR-202 § 7)
+
+Encargo `revision-tdah/brief.md`, fase 7.
+
+1. **Una fila en «Te espera».** Si la lista de quién va de una función de los próximos catorce días te nombra y no has
+   dicho ni «voy» ni «no puedo», «Te espera» tiene hoy una fila «contestar · Girona · vie 24 jul, 20h30», con «Te han
+   convocado» y la compañía debajo. Dos botones en la fila: «Voy» y «No puedo». Contestar la cierra; el nombre abre la
+   función. Pura en `buildDeskFeed` (`convocations`, `$lib/desk-feed`); qué funciones, en la página de Hoy.
+2. **El mismo camino de siempre.** Contestar es `setCommitment` (`$lib/commitments`, el «voy» de ADR-147/151), con la
+   palabra propia que esa RPC ya permite. Sin escritura nueva, sin RLS nueva.
+3. **Solo funciones.** Las fechas (viajes, ensayos) aún no tienen lista de quién va en el feed; cuando la tengan, entran
+   por el mismo `convocations`.
+
+**Queda para después.** «Añadir a mi calendario» y «Días que no puedo» a un sitio visible del Planificador: tocan la
+página del Planificador, que comparte ficheros con otros hilos; van en un PR aparte.
+
+**Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`. Textos en los cuatro idiomas.
+
+**Cómo se revierte.** Revertir el commit.

@@ -77,6 +77,8 @@
     onaside?: (item: DeskItem, until: string | null) => void;
     /** A gig day (ADR-234): the block is one line, «Te espera · 4 · ver», until opened. */
     folded?: boolean;
+    /** «Te han convocado» (ADR-235): «Voy» or «No puedo», right on the row. */
+    onanswer?: (item: DeskItem, state: 'going' | 'not_going') => void;
   }
 
   let {
@@ -105,6 +107,7 @@
     old = [],
     onaside,
     folded = false,
+    onanswer,
   }: Props = $props();
 
   /** Opened on a gig day: the three rows of a normal day. */
@@ -251,8 +254,8 @@
             label: tapping it ticks, a finger's target the size of the line. --><label for="desk-task-{item.taskId}"
             >{item.subject}</label
           >{:else}{item.subject}{/if}
-        {#if contextPath(item) || item.amount != null}<span class="row__ctx"
-            >{[contextPath(item), item.amount != null ? money(item.amount, item.currency) : null]
+        {#if item.convocation || contextPath(item) || item.amount != null}<span class="row__ctx"
+            >{[item.convocation ? t('desk.convoked', locale) : null, contextPath(item), item.amount != null ? money(item.amount, item.currency) : null]
               .filter(Boolean)
               .join(' · ')}</span
           >{/if}
@@ -272,7 +275,19 @@
             {#snippet trigger()}{t('desk.aside', locale)}{/snippet}
           </Menu>
         {/if}
-        {#if item.concern === 'task'}
+        {#if item.convocation && onanswer}
+          <!-- Convoked (ADR-235): the answer is two words, here. -->
+          <button
+            type="button"
+            class="row__act btn--primary btn--xs"
+            data-testid="desk-voy"
+            onclick={() => onanswer(item, 'going')}>{t('desk.voy', locale)}</button
+          ><button
+            type="button"
+            class="row__act row__act--quiet btn--secondary btn--xs"
+            onclick={() => onanswer(item, 'not_going')}>{t('desk.no_puedo', locale)}</button
+          >
+        {:else if item.concern === 'task'}
           <button
             type="button"
             class="row__remove"
