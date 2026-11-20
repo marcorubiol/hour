@@ -192,8 +192,8 @@ test.describe('The gig day on Hoy (ADR-146, ADR-202 § 5)', () => {
     await expect(acts.locator('a[href^="https://maps.apple.com/"]')).toHaveCount(1);
     await expect(acts.locator('a[href*="/roadsheet"]')).toHaveCount(0);
     await expect(acts.locator('a')).toHaveCount(2);
-    // A gig day, «Te espera» is its pills only (ADR-203 § 9).
-    await expect(page.getByTestId('desk-waiting-rows')).toHaveCount(0);
+    // A gig day, «Te espera» keeps its rows: only calm hides them (ADR-238).
+    await expect(page.getByTestId('desk-waits-line')).toHaveCount(0);
   });
 
   test('DOING SOMETHING, THE BIG HOUR IS UNTIL WHEN', async ({ page }) => {

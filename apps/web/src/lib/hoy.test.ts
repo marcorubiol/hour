@@ -276,11 +276,10 @@ describe('«Te espera»: pills and rows (ADR-202 § 7, ADR-203 § 5 and § 9)', 
     ]);
   });
 
-  it('three rows a normal day, five a day with nothing, none on a gig day or in calm', () => {
-    expect(waitingRowCount({ calm: false, gig: false, empty: false })).toBe(3);
-    expect(waitingRowCount({ calm: false, gig: false, empty: true })).toBe(5);
-    expect(waitingRowCount({ calm: false, gig: true, empty: false })).toBe(0);
-    expect(waitingRowCount({ calm: true, gig: false, empty: true })).toBe(0);
+  it('three rows a normal day or a gig day (ADR-238), five a day with nothing, none in calm', () => {
+    expect(waitingRowCount({ calm: false, empty: false })).toBe(3);
+    expect(waitingRowCount({ calm: false, empty: true })).toBe(5);
+    expect(waitingRowCount({ calm: true, empty: true })).toBe(0);
   });
 });
 

@@ -445,13 +445,12 @@
   }
 
   // Everything that waits, ranked: the pills count it all, the rows draw
-  // its head (ADR-202 § 7): none in calm (ADR-203 § 5) nor on a gig day
-  // (§ 9), five on a day with nothing, three otherwise.
+  // its head (ADR-202 § 7): none in calm (ADR-203 § 5), five on a day with
+  // nothing, three otherwise, a gig day included (ADR-238).
   let waiting = $derived(rankWaiting(feed, clockNow, { limit: Infinity }));
   let waitingRows = $derived(
     waitingRowCount({
       calm: calm.on,
-      gig: scopedPerfs.some((p) => p.status !== 'cancelled' && perfDayKey(p) === today),
       empty: todayPoints.length === 0,
     }),
   );
@@ -1062,7 +1061,6 @@
           onaccept={(id) => $patchTask.mutate({ id, patch: { origin: 'manual' } })}
           {deciding}
           ondecide={decide}
-          folded={!calm.on && scopedPerfs.some((p) => p.status !== 'cancelled' && perfDayKey(p) === today)}
           aside={split.aside}
           old={split.old}
           onaside={setAside.ready ? setRowAside : undefined}

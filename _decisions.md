@@ -8743,3 +8743,22 @@ tablón): Hoy no lee todavía esas señales por función. Mientras tanto, lo que
 **Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`. Textos en los cuatro idiomas.
 
 **Cómo se revierte.** Revertir el commit.
+
+## [2026-11-20] ADR-238 · «Te espera» no se pliega fuera de Calma, y en el teléfono respira (enmienda ADR-234 § 5 y ADR-203 § 9)
+
+Marco, 20-11: «Cuando no está en modo calma, está el waiting for you, que lo podemos plegar y desplegar, creo que no
+hace falta porque para eso tenemos el modo calma, para no enseñarlo. Y después mírate el formato teléfono […] queda
+demasiado estrecho».
+
+1. **Sin pliegue.** En día de función, «Te espera» ya no es la línea «Te espera · 4 · ver» (ADR-234 § 5) ni solo sus
+   pastillas (ADR-203 § 9): dibuja sus filas como un día normal. Lo único que lo esconde es Calma. `waitingRowCount`
+   pierde `gig`. Los pliegues «Apartado» y «Antiguo» (ADR-232) siguen: son lo que tú apartaste, no el bloque.
+2. **En el teléfono, el nombre a todo lo ancho.** La fila es el verbo a la izquierda y, a su lado, el nombre entero;
+   debajo, el contexto, el cuándo y los botones. Antes el cuándo era una tercera columna y el nombre se partía en tres
+   líneas estrechas.
+3. **Las pastillas en el teléfono son palabras en una línea** («1 reply · 1 task»), no cuatro baldosas de un cuarto de
+   ancho: una sola pastilla era una cajita con «1» encima de «reply».
+
+**Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`.
+
+**Cómo se revierte.** Revertir el commit.
