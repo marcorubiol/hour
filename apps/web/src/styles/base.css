@@ -2908,7 +2908,7 @@
     input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="button"], [type="submit"], [type="reset"]),
     textarea,
     select {
-      font-size: max(1rem, 1em);
+      font-size: max(var(--text-field-min), 1em);
     }
   }
 }

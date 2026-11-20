@@ -468,6 +468,7 @@
     --text-xs: clamp(0.6076rem, 0.5962rem + 0.049vw, 0.64rem); /* 9.7-10.2 — eyebrows, badges */
     --text-s: clamp(0.7292rem, 0.7042rem + 0.106vw, 0.8rem); /* 11.7-12.8 — dense rows, lens labels, secondary */
     --text-m: clamp(0.875rem, 0.831rem + 0.188vw, 1rem); /* 14-16 — default body (anchor) */
+    --text-field-min: 1rem; /* 16 — a field on a touch screen: under it iOS zooms in (base.css) */
     --text-l: clamp(1.05rem, 0.9796rem + 0.3vw, 1.25rem); /* 16.8-20 — card titles */
     --text-xl: clamp(1.26rem, 1.1535rem + 0.454vw, 1.5625rem); /* 20.2-25 — wordmark, clock, h4 */
     /* A dashboard figure in the display face: the lead one of a block (the
