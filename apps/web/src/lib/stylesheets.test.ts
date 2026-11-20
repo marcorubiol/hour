@@ -22,7 +22,7 @@ describe('stylesheetsSettled', () => {
 
   it('waits for a stylesheet still on its way, then resolves on its load', async () => {
     trackStylesheets(document);
-    const link = addLink('https://example.test/a.css');
+    const link = addLink('/a.css');
     let done = false;
     const wait = stylesheetsSettled(document)!;
     expect(wait).toBeInstanceOf(Promise);
@@ -36,14 +36,19 @@ describe('stylesheetsSettled', () => {
 
   it('a stylesheet that failed does not hold the next navigation', () => {
     trackStylesheets(document);
-    const link = addLink('https://example.test/broken.css');
+    const link = addLink('/broken.css');
     link.dispatchEvent(new Event('error'));
+    expect(stylesheetsSettled(document)).toBeUndefined();
+  });
+
+  it('does not wait for a stylesheet from another origin (the web fonts)', () => {
+    addLink('https://fonts.googleapis.com/css2?family=Inter');
     expect(stylesheetsSettled(document)).toBeUndefined();
   });
 
   it('gives up after the timeout', async () => {
     vi.useFakeTimers();
-    addLink('https://example.test/slow.css');
+    addLink('/slow.css');
     const wait = stylesheetsSettled(document, 100)!;
     vi.advanceTimersByTime(100);
     await expect(wait).resolves.toBeUndefined();

@@ -28,4 +28,12 @@
     var path = location.pathname;
     if (path === '/' || path === '/h' || path.indexOf('/h/') === 0) root.setAttribute('data-boot', '');
   } catch (e) {}
+  // The web fonts, without holding the first paint (app.html says why).
+  try {
+    var fonts = document.createElement('link');
+    fonts.rel = 'stylesheet';
+    fonts.href =
+      'https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400..600&family=Inter:wght@400..600&family=JetBrains+Mono:wght@400;500&display=swap';
+    document.head.appendChild(fonts);
+  } catch (e) {}
 })();
