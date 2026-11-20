@@ -794,7 +794,7 @@
   }}
 >
 {#if authChecked && !blocked}
-  <div class="shell" class:shell--settings={inSettings}>
+  <div class="shell" class:shell--settings={inSettings} class:shell--scoped={pins.pins.length > 0}>
     <!-- THE FIRST STOP SKIPS THE CHROME (móvil #8, WCAG 2.4.1): twenty stops of
          search, account, rail and scope stood before the first day. Unseen
          until focused. -->
@@ -814,8 +814,10 @@
         <span class="shell__date" aria-hidden="true"><b>{clockWeekday}</b><span>{clockDay}</span></span>
       </a>
 
-      <!-- Search and scope, one field (ADR-202 § 12): the whole width on a
-           phone, the bar's left on a desktop. -->
+      <!-- Search and scope, one field (ADR-202 § 12): the bar's left on a
+           desktop. On a phone (ADR-231) an icon beside the clock while
+           nothing is scoped; scoped, the whole width, because the tag must
+           stay in sight. -->
       <div class="shell__search">
         <ShellField door={scopeDoorValue} onopen={openPaletteFresh} />
       </div>
@@ -1232,6 +1234,16 @@
     }
     .shell__search {
       inline-size: auto;
+    }
+    /* NOTHING SCOPED, ONE ROW (ADR-231): the field is an icon beside calm
+       and you (ShellField draws it), and the bar loses its second row. */
+    .shell:not(.shell--scoped) {
+      --header-height: calc(var(--display-clock) + 2 * var(--space-s));
+    }
+    .shell:not(.shell--scoped) .shell__top {
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      grid-template-rows: var(--display-clock);
+      grid-template-areas: 'now search me';
     }
   }
   /* The time, the frame's largest display figure outside the filled piece

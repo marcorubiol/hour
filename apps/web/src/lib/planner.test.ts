@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   linePlannerHref,
   addDaysIso,
@@ -17,6 +17,7 @@ import {
   monthSpanWeeks,
   monthUnderStrip,
   nightsFree,
+  boardOffPhone,
   normalizePlannerView,
   performanceRoster,
   plannerDayHref,
@@ -84,6 +85,28 @@ describe('normalizePlannerView', () => {
     expect(normalizePlannerView('')).toBeNull();
     expect(normalizePlannerView(null)).toBeNull();
     expect(normalizePlannerView(undefined)).toBeNull();
+  });
+});
+
+describe('boardOffPhone (ADR-231)', () => {
+  it('turns the Board into the Agenda on a phone', () => {
+    expect(boardOffPhone('board', true)).toBe('agenda');
+  });
+  it('leaves every other view, and the Board off a phone, alone', () => {
+    expect(boardOffPhone('board', false)).toBe('board');
+    for (const v of ['day', 'agenda', 'month'] as const) expect(boardOffPhone(v, true)).toBe(v);
+  });
+  it('a stored Board is still the Board to storage: choosing the Agenda writes it', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true }));
+    try {
+      expect(normalizePlannerView('board')).toBe('agenda');
+      expect(plannerEntryView([{ id: 'w', planner_view: 'board' }])).toBe('agenda');
+      expect(plannerViewWrites([{ id: 'w', planner_view: 'board' }], 'agenda')).toEqual([
+        { workspace_id: 'w', planner_view: null },
+      ]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

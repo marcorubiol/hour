@@ -53,7 +53,7 @@
   import { useCalm } from '$lib/stores/calm.svelte';
   import { buildLineIndex, buildProjectIndex, resolveScope, workspacesOnScreen, type NavWorkspace, type RawLine } from '$lib/nav';
   import { readPreparation } from '$lib/preparation';
-  import { workspacesQueryOptions, activeProjectsQueryOptions, allLinesQueryOptions } from '$lib/nav-queries';
+  import { workspacesQueryOptions, activeProjectsQueryOptions, allLinesQueryOptions, meQueryOptions } from '$lib/nav-queries';
   import { moneyAccessAnyQueryOptions, scopeBolosQueryOptions } from '$lib/bolo-queries';
   import { conversationAccessQueryOptions } from '$lib/conversation-access';
   import { otherTagsName, scopeTags } from '$lib/conversation-tags';
@@ -90,6 +90,8 @@
   import { blockDrawn } from '$lib/dashboard-blocks';
   import { daysAgoLabel } from '$lib/conversation';
   import { upcoming } from '$lib/pulse';
+  import { splitWaiting } from '$lib/set-aside';
+  import { ensureSetAside, putAside, setAside } from '$lib/set-aside.svelte';
   import { agendaDay, agendaPoints, dayAgenda } from '$lib/day-agenda';
   import { createPulseFeeds, pulseSlipContext } from '$lib/pulse-feeds.svelte';
   import { perfDayKey, perfWorkspaceId, type SlipKind } from '$lib/month-events';
@@ -260,6 +262,9 @@
   let allTiles = $derived.by(() => comingTiles(upcoming(pulseInput, clockNow, COMING_COUNT_CAP), today, Infinity, listOf));
   let tiles = $derived.by(() => allTiles.slice(0, phone.current ? COMING_TILES_PHONE : COMING_TILES));
   let tilesOpen = $derived(comingOpen(allTiles));
+  // «Tu hora» (ADR-234): whose the viewer is, to know when a list names them.
+  const meQuery = createQuery(meQueryOptions());
+  let me = $derived($meQuery.data?.person_id ?? null);
   let nextThing = $derived(nextAfterToday(coming, today));
   // Nothing within two weeks: one sentence names what comes (ADR-149).
   let farNext = $derived(tiles.length === 0 ? nextThing : null);
@@ -397,7 +402,10 @@
     );
   });
 
-  let feed = $derived(
+  // «Ahora no» and the old (ADR-232): what the viewer set aside, and what has
+  // waited more than a month, leave the feed before anything counts it.
+  void ensureSetAside();
+  let fullFeed = $derived(
     buildDeskFeed(
       {
         conversations: (readConversations ? scopedConversations : []) as DeskConvInput[],
@@ -411,7 +419,25 @@
       locale,
     ),
   );
+  let split = $derived(splitWaiting(fullFeed, setAside.items, today));
+  let feed = $derived(split.feed);
   let later = $derived(laterSummary(feed));
+
+  async function setRowAside(item: DeskItem, until: string | null) {
+    try {
+      await putAside(item.id, until);
+    } catch (err) {
+      addToast({ tone: 'danger', title: t('desk.toast_change_failed', locale), message: err instanceof ApiError ? err.message : t('perf.unexpected', locale) });
+      return;
+    }
+    if (!until) return;
+    addToast({
+      tone: 'info',
+      message: t('desk.aside_done', locale, { name: item.subject }),
+      duration: UNDO_MS,
+      action: { label: t('desk.undo', locale), run: () => void setRowAside(item, null) },
+    });
+  }
 
   // Everything that waits, ranked: the pills count it all, the rows draw
   // its head (ADR-202 § 7): none in calm (ADR-203 § 5) nor on a gig day
@@ -803,7 +829,10 @@
   let spacesOnScreen = $derived(workspacesOnScreen('', pins.pins, workspaces, lineIndex, projectIndex));
   let taskSpaces = $derived(taskWorkspaces(spacesOnScreen));
   // «Te espera» is drawn while anything waits, or for the «+» in its head.
-  let drawWaits = $derived(blockDrawn(waitsState) || (taskSpaces.length > 0 && startPhase === 'none'));
+  // What is set aside or old keeps the block (its folds are the way back), without counting (ADR-232).
+  let drawWaits = $derived(
+    blockDrawn(waitsState) || (taskSpaces.length > 0 && startPhase === 'none') || split.aside.length > 0 || split.old.length > 0,
+  );
   // Primer día (tarea 137): the start list of the space just made, in the
   // welcome's place while it lives; never two cards at once.
   let startSpace = $derived(startTarget(spacesOnScreen));
@@ -955,6 +984,7 @@
           updatedAt={feeds.updatedAt || null}
           boardNew={nextBoardNew}
           {slipCtx}
+          {me}
           {locale}
         />
       </div>
@@ -982,6 +1012,10 @@
           onaccept={(id) => $patchTask.mutate({ id, patch: { origin: 'manual' } })}
           {deciding}
           ondecide={decide}
+          folded={!calm.on && scopedPerfs.some((p) => p.status !== 'cancelled' && perfDayKey(p) === today)}
+          aside={split.aside}
+          old={split.old}
+          onaside={setAside.ready ? setRowAside : undefined}
         />
       </div>
       {/if}
@@ -997,6 +1031,7 @@
         {today}
         {viewerTz}
         {slipCtx}
+        {me}
         {locale}
         dots={shows('desk', 'coming_missing', calm.on)}
         wide={wide.current}

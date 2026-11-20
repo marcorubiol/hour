@@ -11,6 +11,7 @@
    * piece, and the sheet that hung from the clock is gone.
    */
   import type { Snippet } from 'svelte';
+  import { page } from '$app/state';
   import { appLocale, LOCALE_TAG, t } from '$lib/i18n';
   import CalmMark from './CalmMark.svelte';
   import ClockFigures from './ClockFigures.svelte';
@@ -65,7 +66,9 @@
   <!-- THE PULSE reads the clock's own tick: one timer in the rail, and the
        two can never disagree about what minute it is. It is not filtered by
        the scope — see RailPulse. -->
-  {#if !inSettings}
+  <!-- On Hoy the piece already says now and what comes next: the rail does
+       not say it twice (ADR-231). -->
+  {#if !inSettings && !/^\/h\/today\/?$/.test(page.url.pathname)}
     <RailPulse now={clockNow} {locale} />
   {/if}
   {#if me}

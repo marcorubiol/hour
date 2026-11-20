@@ -15,7 +15,7 @@
  *   nothing, none on a gig day nor in calm (§ 7, ADR-203 § 5 and § 9).
  */
 import { inScope, type ResolvedScope } from './nav';
-import { perfWorkspaceId, type DateEvent, type PerformanceEvent } from './month-events';
+import { dayMoments, perfWorkspaceId, type DateEvent, type DayMoment, type PerformanceEvent } from './month-events';
 import type { Preparation } from './preparation';
 import { isUrgentMissing, isUrgentThing, manualOpenSoon, missingSoon, type PerformanceMissing } from './record-missing';
 import { agendaPoints, agendaRows, type AgendaPoint, type DayAgenda } from './day-agenda';
@@ -309,4 +309,24 @@ export function waitingDrawsPills(total: number, rows: number): boolean {
 export function waitingRowCount(day: { calm: boolean; gig: boolean; empty: boolean }): number {
   if (day.calm || day.gig) return 0;
   return day.empty ? 5 : 3;
+}
+
+/**
+ * «TU HORA» (revisión TDAH, fase 6; ADR-234): when the list of who goes names
+ * you, the hour that matters is the first stop of the performance's day, the
+ * same for everyone who goes (Marco, 19-11: «la primera parada del día»).
+ * Named = your «voy», or the roster when the feed brings it. Not named, or a
+ * day with no hours: null, and the piece speaks as before.
+ */
+export function yourStop(
+  p: Pick<PerformanceEvent, 'commitments' | 'person_ids'> & Parameters<typeof dayMoments>[0],
+  me: string | null | undefined,
+): DayMoment | null {
+  if (!me) return null;
+  const named =
+    (p.commitments ?? []).some((c) => c.person_id === me && c.state === 'going') || (p.person_ids ?? []).includes(me);
+  if (!named) return null;
+  const timed = dayMoments(p).filter((m) => Boolean(m.at));
+  if (timed.length === 0) return null;
+  return timed.reduce((a, b) => (Date.parse(b.at) < Date.parse(a.at) ? b : a));
 }

@@ -8608,3 +8608,77 @@ el pase con el diálogo abierto; `ahora.spec.ts` sigue exigiendo que Hoy no llev
 
 **Cómo se revierte.** Revertir el commit: la página vuelve con su código, las claves y los enlaces planos; el hook
 y el `+page.ts` de redirección se van con él.
+
+## [2026-11-19] ADR-231 · Menos marco en el móvil (fase 4 de la revisión TDAH; enmienda ADR-096 y ADR-202 § 12)
+
+Encargo `revision-tdah/brief.md`, fase 4 (Marco, 19-11). En el teléfono el marco se comía la pantalla antes de la
+primera cosa útil.
+
+1. **El buscador es un icono cuando no hay ámbito** (enmienda ADR-202 § 12). Sin nada acotado, el campo de la barra
+   superior se queda en la lupa dentro de un círculo, entre la hora y tú, y la barra baja a una sola fila. Abre la misma
+   paleta y su nombre accesible sigue siendo «Buscar en todo». Con ámbito vuelve a ser el campo: la etiqueta es lo que
+   dice el ámbito. Desde 48 rem no cambia nada.
+2. **La línea de estado del Planificador solo cuando pide algo.** En el teléfono, si no hay nada que decidir ni choques,
+   la línea no se dibuja (igual en las tres vistas, así la barra de vistas no se mueve entre ellas).
+3. **El Tablero sale del teléfono** (respuesta de Marco, 19-11). En el teléfono la barra ofrece Agenda y Mes; una
+   dirección con `view=board` abre la Agenda (`boardOffPhone`, `$lib/planner`). Lo guardado no se toca: en el escritorio
+   el Tablero sigue donde estaba.
+4. **El Mes abre en la semana de hoy.** En el teléfono, al abrir el mes de hoy, la página baja hasta la fila de esta
+   semana (una vez, sin animación); las semanas pasadas quedan arriba.
+5. **Hoy sin el pulso en el carril** (enmienda ADR-096). Hoy ya es el pulso; el del carril izquierdo repetía lo mismo al
+   lado. En las otras lentes sigue.
+
+**Sin cambios de datos.** Sin esquema, API, textos nuevos ni `CACHE_SCHEMA`. No toca el service worker.
+
+**Cómo se revierte.** Revertir el commit.
+
+## [2026-11-20] ADR-232 · «Ahora no» y «Antiguo» en «Te espera» (fase 5 de la revisión TDAH; enmienda ADR-202 § 7)
+
+Encargo `revision-tdah/brief.md`, fase 5 (Marco, 19-11). Una lista que solo crece riñe; una persona con TDAH necesita
+poder decir «hoy no» sin borrar nada.
+
+1. **«Ahora no».** Cada fila de «Te espera» lleva «ahora no» (con el ratón sale al pasar por la fila; en el teléfono
+   está siempre, pequeño, bajo la fecha). Abre tres plazos: hasta mañana, tres días, una semana. La fila se va de la
+   cabeza del bloque, de las pastillas, de la cuenta y de «Ver todo por días», y vuelve sola el día elegido.
+2. **Es de quien aparta.** No se toca la conversación, la tarea ni la factura: para el resto del equipo la fila sigue
+   donde estaba. Por eso no se reutiliza el «no esta vez» de Conversaciones (`not_now_until`), que cierra la relación
+   para todo el espacio. Dato nuevo: `desk_set_aside` (una fila por persona, `{ id de la fila: día en que vuelve }`),
+   solo legible por su dueño y escrita solo por `set_aside_desk_item`. Migración `20261120030000_desk_set_aside`,
+   rollback `build/runbooks/rollback-20261120-desk-set-aside.sql`, RLS en `tests/rls/desk-set-aside.test.ts`.
+3. **«Apartado · N»** al pie, plegado: cada fila dice cuándo vuelve y tiene «Traer ya». Al apartar, el aviso trae
+   «Deshacer».
+4. **«Antiguo · N».** Lo que lleva más de un mes esperando (su día, antes de hoy menos 30) baja a un pliegue al pie y
+   sale de la cuenta y de las «vencidas» de la cabecera. Abierto, son las filas de siempre.
+5. Los dos pliegues no se dibujan en calma ni en día de función (cuando el bloque no dibuja filas).
+
+**Sin la tabla, la página es la de antes**: la lectura falla en silencio, no hay nada apartado y no se ofrece «ahora no»; así el código puede
+llegar a producción antes que la migración. No cambia lo que guarda la caché (`CACHE_SCHEMA` igual: lo apartado se lee
+aparte, como lo visto de la ayuda). No toca el service worker.
+
+**Queda para la fase 5b**: lo que falta de la lista de preparación, agrupado por tarea, como fila de «Te espera».
+
+**Cómo se revierte.** Revertir el commit; si la migración se aplicó, el rollback de arriba.
+
+## [2026-11-20] ADR-234 · La pieza es tu día (fase 6 de la revisión TDAH; enmienda ADR-202 § 3 y § 7)
+
+Encargo `revision-tdah/brief.md`, fase 6, lámina D (columnas 1 y 2). Una sola Hoy para todos: lo que cambia es lo que tu
+día tiene para ti, no quién eres.
+
+1. **Tu hora.** Si la lista de quién va te nombra (tu «voy», o el reparto cuando el dato llega), la hora grande es la
+   primera parada del día de esa función, la misma para todos los que van (Marco, 19-11: «la primera parada del día»).
+   La cabecera dice «Estás a las», el titular es esa parada («Montaje») y debajo, dónde y cuánto falta. Solo mientras la
+   pieza está en la función y esa parada no ha llegado: un tren antes sigue siendo el titular, y con varias funciones
+   el titular es el día (ADR-207). Pura en `yourStop` (`$lib/hoy`).
+2. **«estás a las 16h»** en las fichas de «Lo que viene» y en la línea «Lo siguiente» de la pieza hueca, en vez de la
+   hora de la función, cuando la lista te nombra.
+3. **«Mañana · …» dentro de la pieza** cuando ya no queda nada de hoy por delante o lo de hoy no tiene horas: «Mañana ·
+   sales a las 10h hacia Getxo» si mañana empieza con un viaje, si no qué es, dónde y a qué hora.
+4. **Sin nada hoy, una pieza más pequeña** (enmienda ADR-202 § 3, «hoy es siempre la pieza grande»): sigue en su sitio
+   y hueca, pero el titular baja de tamaño para que mande lo que espera.
+5. **En día de función, «Te espera» es una línea** (enmienda ADR-202 § 7): «Te espera · 4 · ver». «ver» la abre con las
+   tres filas de un día normal. En calma no cambia (sigue sin filas).
+
+**Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA` (`/api/me` ya estaba en la caché de la sesión). Textos en
+los cuatro idiomas. Arregla también `desk.spec` («See all»), que no se había actualizado con ADR-229.
+
+**Cómo se revierte.** Revertir el commit.

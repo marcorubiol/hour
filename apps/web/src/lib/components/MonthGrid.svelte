@@ -527,6 +527,21 @@
     };
   });
 
+  /* ON A PHONE THE MONTH OPENS ON THIS WEEK (ADR-231): the paper starts at
+     the month's first week, so on the 19th the reader landed on two weeks
+     already gone. Once per mount, the week holding today is brought up under
+     the stuck strip; the weeks gone stay above, a scroll away. */
+  let openedOnToday = false;
+  $effect(() => {
+    if (openedOnToday || !narrow || !gridEl) return;
+    const week = gridEl.querySelector<HTMLElement>(`.cal__wk:has([data-day="${todayIso}"])`);
+    if (!week) return;
+    openedOnToday = true;
+    const strip = gridEl.querySelector('.cal__wkh')?.getBoundingClientRect().bottom ?? 0;
+    const delta = week.getBoundingClientRect().top - strip;
+    if (delta > 1) window.scrollBy({ top: delta, behavior: 'instant' as ScrollBehavior });
+  });
+
   // Off-grid buckets (the page's padded dates window can fetch an event a
   // day outside the grid) simply find no cell.
   // Gigs lead the cell (they render before dates), and inside them the

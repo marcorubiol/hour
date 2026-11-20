@@ -96,6 +96,7 @@
         type="button"
         class="cal__view hit"
         class:cal__view--on={view === v}
+        class:cal__view--board={v === 'board'}
         aria-pressed={view === v}
         onclick={() => onSetView(v)}>{t(`planner.view_${v}`, locale)}</button
       >
@@ -198,6 +199,12 @@
       transition:
         color var(--duration-fast),
         font-size var(--duration-fast);
+    }
+    /* The Board is not offered on a phone (ADR-231, `boardOffPhone`). */
+    @media (max-width: 47.999rem) {
+      .cal__view--board {
+        display: none;
+      }
     }
     .cal__view:hover {
       color: var(--text-muted);

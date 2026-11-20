@@ -126,11 +126,14 @@ test.describe('the month (ADR-209)', () => {
       await page.setViewportSize({ width, height: 900 });
       const heights: number[] = [];
       const bars: number[] = [];
-      for (const v of ['&view=agenda', '&view=month', '&view=board']) {
+      // The Board is not offered on a phone (ADR-231): there, the two drawings.
+      for (const v of width > 400 ? ['&view=agenda', '&view=month', '&view=board'] : ['&view=agenda', '&view=month']) {
         const where = `${v} at ${width}`;
         await open(page, v);
         // The Agenda may have nothing to say (no count, nothing to decide):
-        // its line is still there, one line tall, so the bar never moves.
+        // its line is still there, one line tall, so the bar never moves. On
+        // a phone with nothing to ask it is not drawn at all (ADR-231), the
+        // same in every drawing.
         const meta = page.locator('.pstat__line');
         await expect(meta, `status line in ${where}`).toHaveCount(1);
         heights.push(Math.round((await meta.boundingBox())?.height ?? -1));
@@ -242,5 +245,12 @@ test.describe('the month (ADR-209)', () => {
       expect(t.trim()).not.toMatch(/^0\b/);
     }
     await expect(page.locator('.cal__now:not(.cal__whoout)')).toHaveText('Go to today');
+  });
+
+  test('on a phone the Board is not offered, and an address that asks for it opens the Agenda (ADR-231)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await open(page, '&view=board');
+    await expect(page.locator('.cal__view--on')).toHaveText('Agenda');
+    await expect(page.locator('.cal__view--board')).toBeHidden();
   });
 });

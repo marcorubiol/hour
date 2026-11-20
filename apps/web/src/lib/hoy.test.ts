@@ -1,6 +1,7 @@
 import { addManualThing, readPreparation } from './preparation';
 import { describe, expect, it } from 'vitest';
 import {
+  yourStop,
   COMING_TILES,
   COMING_TILES_PHONE,
   comingOpen,
@@ -347,5 +348,31 @@ describe('two or more performances today: none weighs more (ADR-207)', () => {
     const a = day([noon, night], at('09'), [date('reh', at('08'), avi, { ends_at: at('10') })]);
     expect(a.points[a.focus!].ref.of).toBe('date');
     expect(piecePerformance(a)?.ref.id).toBe('noon');
+  });
+});
+
+describe('«tu hora»: the first stop of the day when the list names you (ADR-234)', () => {
+  const perf = (over: Record<string, unknown> = {}) =>
+    ({
+      id: 'p',
+      performed_at: '2026-11-21T19:00:00Z',
+      start_at: '2026-11-21T19:00:00Z',
+      load_in_at: '2026-11-21T15:00:00Z',
+      soundcheck_at: '2026-11-21T17:30:00Z',
+      commitments: [{ person_id: 'me', state: 'going' }],
+      ...over,
+    }) as unknown as Parameters<typeof yourStop>[0];
+
+  it('named by your «voy»: the earliest hour of the running order', () => {
+    expect(yourStop(perf(), 'me')?.at).toBe('2026-11-21T15:00:00Z');
+  });
+  it('named by the roster too', () => {
+    expect(yourStop(perf({ commitments: [], person_ids: ['me'] }), 'me')?.at).toBe('2026-11-21T15:00:00Z');
+  });
+  it('not named, «no voy», nobody, or no hours: nothing', () => {
+    expect(yourStop(perf(), 'other')).toBeNull();
+    expect(yourStop(perf({ commitments: [{ person_id: 'me', state: 'not_going' }] }), 'me')).toBeNull();
+    expect(yourStop(perf(), null)).toBeNull();
+    expect(yourStop(perf({ start_at: null, load_in_at: null, soundcheck_at: null }), 'me')).toBeNull();
   });
 });
