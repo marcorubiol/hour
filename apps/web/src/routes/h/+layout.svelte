@@ -56,6 +56,7 @@
   import { provideCreation } from '$lib/stores/creation.svelte';
   import { lazy } from '$lib/lazy.svelte';
   import { START_QUERY_KEY, startQueryOptions } from '$lib/first-day-query';
+  import { bootDone } from '$lib/boot';
   import { SPACE_ASKED_KEY, signupSpace, spaceAsk, untouched } from '$lib/first-day';
   import { hasSeen } from '$lib/help';
   import { help, ensureHelp, markHelpSeen } from '$lib/help-seen.svelte';
@@ -233,6 +234,12 @@
   );
   $effect(() => {
     if (authChecked && !blocked && ask === 'none') painted = true;
+  });
+  // The boot skeleton (app.html) stays until the frame has drawn: Hoy, the
+  // open's landing, lets it go itself once its blocks have data; any other
+  // page as soon as the frame is on screen.
+  $effect(() => {
+    if (authChecked && !blocked && !page.url.pathname.startsWith('/h/today')) bootDone();
   });
   // A signup space with something in it is a space in use: never asked again.
   $effect(() => {

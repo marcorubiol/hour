@@ -23,5 +23,9 @@
       mode === 'dark' ||
       (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
     if (dark) root.setAttribute('data-mode', 'dark');
+    // An app open (the home-screen icon lands on `/`, a reload on /h): the
+    // boot skeleton shows until the frame has something to draw ($lib/boot).
+    var path = location.pathname;
+    if (path === '/' || path === '/h' || path.indexOf('/h/') === 0) root.setAttribute('data-boot', '');
   } catch (e) {}
 })();
