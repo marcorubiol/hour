@@ -404,16 +404,50 @@ export function pulseRef(r: PulseRow): PulseRef {
   };
 }
 
+/** Every row the pulse reads, reduced to its segments and naming moment. */
+function pulseEntries(input: PulseInput): Entry[] {
+  const viewerTz = input.viewerTz;
+  return pulseRows(input).map((r) =>
+    r.of === 'performance'
+      ? performanceEntry(r.row, viewerTz, r.attribution)
+      : dateEntry(r.row, viewerTz, r.attribution),
+  );
+}
+
+/**
+ * Where a row stands in the order NEXT names things, or null when it is not
+ * ahead: its naming moment; with no hour, the end of its day (an untimed gig
+ * today must not fall silently behind a clock it never had), unless it is
+ * happening right now, which is the NOW row's business.
+ */
+function nextKeyOf(entry: Entry, t: number): number | null {
+  let key: number;
+  if (entry.at) {
+    key = Date.parse(entry.at);
+  } else {
+    if (entry.segments.some((s) => s.from <= t && t < s.to)) return null;
+    key = endOfDayKey(entry.day, entry.tz);
+  }
+  return Number.isFinite(key) && key > t ? key : null;
+}
+
+function toNext(entry: Entry, today: string): PulseNext {
+  return {
+    ref: entry.ref,
+    word: entry.word,
+    at: entry.at,
+    day: entry.day,
+    call: entry.call,
+    today: entry.day === today,
+  };
+}
+
 export function computePulse(input: PulseInput, now: Date): Pulse {
   const t = now.getTime();
   const viewerTz = input.viewerTz;
   const today = dayKeyInTz(now.toISOString(), viewerTz);
 
-  const entries: Entry[] = pulseRows(input).map((r) =>
-    r.of === 'performance'
-      ? performanceEntry(r.row, viewerTz, r.attribution)
-      : dateEntry(r.row, viewerTz, r.attribution),
-  );
+  const entries = pulseEntries(input);
 
   // ── NOW ──────────────────────────────────────────────────────────────
   // The innermost segment wins: a rehearsal inside a residency is what you
@@ -452,37 +486,21 @@ export function computePulse(input: PulseInput, now: Date): Pulse {
     untilIso && dayKeyInTz(untilIso, viewerTz) === today ? { at: untilIso, tz: boundaryTz } : null;
 
   // ── NEXT ─────────────────────────────────────────────────────────────
-  // A row with no hour is still ahead until its day is out — an untimed gig
-  // today must not fall silently behind a clock it never had. But a row that
-  // is happening RIGHT NOW is the NOW row's business, not this one's.
+  // The first row still ahead (`nextKeyOf`); of two at the same instant, the
+  // one the feeds bring first.
   let next: Entry | null = null;
   let nextKey = Number.POSITIVE_INFINITY;
   for (const entry of entries) {
     if (input.nextKeeps && !input.nextKeeps(entry.ref)) continue;
-    let key: number;
-    if (entry.at) {
-      key = Date.parse(entry.at);
-    } else {
-      if (entry.segments.some((s) => s.from <= t && t < s.to)) continue;
-      key = endOfDayKey(entry.day, entry.tz);
-    }
-    if (!Number.isFinite(key) || key <= t || key >= nextKey) continue;
+    const key = nextKeyOf(entry, t);
+    if (key === null || key >= nextKey) continue;
     next = entry;
     nextKey = key;
   }
 
   return {
     now: { doing: doing ? { word: doing.word, ref: doing.ref } : null, until },
-    next: next
-      ? {
-          ref: next.ref,
-          word: next.word,
-          at: next.at,
-          day: next.day,
-          call: next.call,
-          today: next.day === today,
-        }
-      : null,
+    next: next ? toNext(next, today) : null,
   };
 }
 
@@ -492,17 +510,25 @@ export function computePulse(input: PulseInput, now: Date): Pulse {
  * rail never disagree about what comes first (ADR-149).
  */
 export function upcoming(input: PulseInput, now: Date, n: number): PulseNext[] {
-  const out: PulseNext[] = [];
+  // The rows are read ONCE and put in NEXT's order. It used to ask
+  // `computePulse` for NEXT again per thing, each time rebuilding every row
+  // (its zone, the end of its day): with a season on file, tens of thousands
+  // of zone lookups per paint of Hoy. Same answer: the sort is stable, so two
+  // rows at one instant keep the feeds' order, as NEXT picks them; a row the
+  // feeds bring twice is named once.
+  const t = now.getTime();
+  const today = dayKeyInTz(now.toISOString(), input.viewerTz);
+  const ahead: Array<{ entry: Entry; key: number }> = [];
   const seen = new Set<string>();
-  const keeps = input.nextKeeps;
-  while (out.length < n) {
-    const next = computePulse(
-      { ...input, nextKeeps: (ref) => !seen.has(`${ref.of}:${ref.id}`) && (!keeps || keeps(ref)) },
-      now,
-    ).next;
-    if (!next) break;
-    seen.add(`${next.ref.of}:${next.ref.id}`);
-    out.push(next);
+  for (const entry of pulseEntries(input)) {
+    if (input.nextKeeps && !input.nextKeeps(entry.ref)) continue;
+    const key = nextKeyOf(entry, t);
+    if (key === null) continue;
+    const id = `${entry.ref.of}:${entry.ref.id}`;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    ahead.push({ entry, key });
   }
-  return out;
+  ahead.sort((a, b) => a.key - b.key);
+  return ahead.slice(0, Math.max(0, n)).map(({ entry }) => toNext(entry, today));
 }

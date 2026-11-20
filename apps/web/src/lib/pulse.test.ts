@@ -417,4 +417,30 @@ describe('upcoming: NEXT again and again (ADR-149)', () => {
     const list = upcoming({ ...input, nextKeeps: (ref) => ref.of === 'performance' }, at('04:00:00'), 10);
     expect(list.map((x) => x.ref.id)).toEqual(['p-show', 'p-four', 'p-six']);
   });
+
+  // The list is built in one pass over the rows; this is what it must equal:
+  // NEXT, then NEXT with that one gone, to the end.
+  test('upcoming equals asking NEXT once per thing: ties, untimed rows, what is on now', () => {
+    const untimed = perf({ id: 'p-untimed', start_at: null });
+    const tieA = date({ id: 'd-tie-a', starts_at: `${DAY}T10:00:00Z` });
+    const tieB = perf({ id: 'p-tie-b', start_at: `${DAY}T10:00:00Z` });
+    const past = date({ id: 'd-past', starts_at: `${DAY}T01:00:00Z`, ends_at: `${DAY}T02:00:00Z` });
+    const allDay = date({ id: 'd-all-day', starts_at: `${DAY}T00:00:00Z`, all_day: true });
+    const busy = {
+      performances: [six, untimed, show, tieB, four],
+      dates: [reh, allDay, noon, tieA, past, train],
+      viewerTz: TZ,
+    };
+    for (const hour of ['04:00:00', '10:00:00', '11:30:00', '21:00:00']) {
+      const now = at(hour);
+      const reference: string[] = [];
+      for (;;) {
+        const next = computePulse({ ...busy, nextKeeps: (ref) => !reference.includes(ref.id) }, now).next;
+        if (!next) break;
+        reference.push(next.ref.id);
+      }
+      expect(upcoming(busy, now, 300).map((x) => x.ref.id)).toEqual(reference);
+      expect(upcoming(busy, now, 3).map((x) => x.ref.id)).toEqual(reference.slice(0, 3));
+    }
+  });
 });

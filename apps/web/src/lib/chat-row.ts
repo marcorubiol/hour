@@ -9,11 +9,10 @@ import { eventKindLabel, type ConversationEventKind, type ConversationItem } fro
 import { relationLabel, type Relation } from './conversation-relation';
 import type { TurnEvent, TurnRow } from './conversation-overview';
 import { rowTurn, type RowTurn } from './conversation-row';
+import { zoneDay } from './zone-format';
 
 function dayInZone(iso: string, tz: string): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(
-    new Date(iso),
-  );
+  return zoneDay(new Date(iso), tz);
 }
 
 const DAY_MS = 86_400_000;
