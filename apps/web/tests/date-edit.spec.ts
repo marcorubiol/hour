@@ -113,14 +113,15 @@ async function createFixtureDate(
 
 /**
  * THE DATE OPENS IN ITS VISTAZO (ADR-139 p1): pressing a date shows it, and
- * «Edit» there opens the dialog this file is about. The dialog is the
+ * the pencil on its date (ADR-233: the head has no «Edit» now) opens the
+ * dialog this file is about. The dialog is the
  * `.dialog` one: the vistazo is a <dialog> of its own, open under it.
  */
 async function editFromPeek(page: Page) {
   const peek = page.getByTestId('peek');
   await expect(peek).toBeVisible();
   await expect(peek.getByTestId('date-record')).toBeVisible();
-  await peek.getByRole('button', { name: 'Edit', exact: true }).click();
+  await peek.getByRole('button', { name: 'Change the date' }).first().click();
   const dialog = page.locator('dialog.dialog[open]');
   await expect(dialog).toBeVisible();
   return dialog;

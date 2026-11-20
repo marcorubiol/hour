@@ -114,6 +114,8 @@
     title?: string | null;
     /** Called once the doc says the rows moved (the page refetches itself). */
     onwritten?: () => void;
+    /** Draw the hours, write none (the Day shows; the pase writes, ADR-233). */
+    readonly?: boolean;
   }
 
   let {
@@ -130,6 +132,7 @@
     hangs = {},
     title = null,
     onwritten,
+    readonly = false,
   }: Props = $props();
   let stops = $derived(placing === 'stops');
   const t = tHere();
@@ -145,7 +148,7 @@
   }));
   const feed = createQuery(feedStore);
 
-  let canEdit = $derived($feed.data?.can_edit ?? false);
+  let canEdit = $derived(!readonly && ($feed.data?.can_edit ?? false));
 
   // ── The live doc: opened for an editor, closed when this order goes ────
   /** The doc, once it has synced with the server: only then is it written. */

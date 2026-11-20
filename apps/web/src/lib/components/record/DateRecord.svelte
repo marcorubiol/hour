@@ -237,7 +237,7 @@
       {locale}
     />
   {:else}
-    <RecordHead slim {crumbs} {title} tools={[{ label: t('peek.edit', locale), onclick: () => (editOpen = true) }]} />
+    <RecordHead slim {crumbs} {title} />
 
     <div class="pass-grid">
       <div class="pass-grid__left">

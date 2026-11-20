@@ -8557,6 +8557,20 @@ Encargo `revision-tdah/brief.md`, fase 3 (Marco, 19-11).
 
 **Cómo se revierte.** Revertir el commit.
 
+## [2026-11-19] ADR-233 · El Día enseña, el pase escribe (fase 4 de ADR-223; enmienda ADR-090 P3 «las horas se escriben en el día»)
+
+**Contexto.** Las horas de una función o de un ensayo se escribían en dos sitios: bajo la tira del Día (`RunningOrder`) y en el pase. Con la regla «tocas una cosa, se abre su pase» (ADR-223) el Día pasa a enseñar y el pase a escribir.
+
+**Decisión.** Bajo la tira del Día, cada función y cada fecha con orden o con tramos se dibuja como una pieza corta (`DayPiece`, 23,75 rem (380 px, `--pass-width`) y no se estira, como Hoy y el pase): qué es, su hora, dónde, y debajo sus paradas en lectura. Tocar la pieza abre su pase (vistazo). `RunningOrder` y `TravelStages` ganan `readonly` y el Día los monta así; se editan en el pase (y, para un viaje, en su ficha). Se quedan en el Día las notas, las ausencias y los choques: son del día, no de una cosa. Enmienda ADR-090 P3: las horas se escriben en el pase; el Día las enseña. Con un solo show el Día y el pase se parecen; no se redirige.
+
+**«Editar» sale de la cabecera de la ficha de fechas** (ensayos, viajes), como pidió Marco el 19-11. No se pierde nada: los lápices de la fecha y del lugar del pase abren el mismo diálogo (título, tipo, serie, borrar).
+
+**El dibujo.** La pieza sigue la lámina C de la revisión TDAH («Día, propuesta», aprobada por Marco): oscura como la de Hoy, con el monograma del proyecto y qué es («Ensayo?» si es opción), el nombre y la hora (o «sin hora»), la línea de abajo, las paradas en lectura y dos botones a `--radius`: «Poner hora» (solo sin hora) y «Abrir», los dos al pase. No está hecho aquí lo que esa lámina pide para días con muchas cosas (líneas agrupadas y filtros: fase 8 de la revisión TDAH) ni «+ Nota del día · + Fecha» ni «También hoy / Después».
+
+**Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`. E2E tocados: `date-edit.spec.ts` y `peek.spec.ts` (el lápiz de la fecha sustituye a «Edit»).
+
+**Cómo se revierte.** Revertir el commit.
+
 ## [2026-11-20] ADR-230 · La vista previa por rol vive en «Compartir» y la página de la hoja redirige al pase (fase 4 de ADR-222)
 Cuarta fase de «el pase es la hoja de ruta». Marco decidió (20-11) que la vista previa por rol deje de ser una página
 del operador y viva dentro de «Compartir», en el pase.
