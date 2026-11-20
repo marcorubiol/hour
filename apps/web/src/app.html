@@ -22,6 +22,31 @@
          synchronous static <script src> runs before first paint just the
          same. Source: static/theme-init.js. -->
     <script src="%sveltekit.assets%/theme-init.js"></script>
+    <!-- THE BOOT SKELETON (20-11-2026, Marco: «sino parece que está rota»).
+         From the first paint of an app open (`/` and `/h`, marked by
+         theme-init.js as data-boot) until the frame has something to show,
+         the shape of Hoy breathes in place of a blank screen. Inline and
+         self-contained: on an /h open no stylesheet has arrived yet.
+         `$lib/boot` takes it away. -->
+    <style>
+      #boot { display: none; }
+      html[data-boot] #boot {
+        display: block; position: fixed; inset: 0; z-index: 2147483000;
+        background: #f7f5ef; --b: rgba(0, 0, 0, 0.07); padding: max(24px, env(safe-area-inset-top)) 20px 24px;
+        transition: opacity 160ms ease-out; pointer-events: none;
+      }
+      html[data-boot][data-mode='dark'] #boot { background: #1a1a1a; --b: rgba(255, 255, 255, 0.08); }
+      html[data-boot-leaving] #boot { opacity: 0; }
+      #boot > div { max-width: 1000px; margin: 0 auto; }
+      #boot i { display: block; background: var(--b); border-radius: 6px; animation: boot 1.4s ease-in-out infinite; }
+      #boot .r { display: flex; gap: 12px; align-items: center; }
+      #boot .t { flex: 1; height: 120px; }
+      #boot nav { position: fixed; left: 0; right: 0; bottom: 0; height: 64px; display: flex; justify-content: space-around; align-items: center; border-top: 1px solid var(--b); }
+      #boot nav i { width: 64px; height: 10px; }
+      @media (min-width: 48rem) { #boot nav { display: none; } }
+      @keyframes boot { 50% { opacity: 0.45; } }
+      @media (prefers-reduced-motion: reduce) { #boot i { animation: none; } }
+    </style>
     <link rel="icon" type="image/svg+xml" href="%sveltekit.assets%/icon.svg" />
     <!-- iOS ignores SVG touch icons and the manifest icons: without this PNG
          (opaque, 180×180) «Añadir a pantalla de inicio» uses a screenshot.
@@ -40,6 +65,18 @@
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">
+    <div id="boot" aria-hidden="true">
+      <div>
+        <div class="r"><i style="width:150px;height:44px"></i><i style="width:64px;height:16px"></i><span style="flex:1"></span><i style="width:76px;height:36px"></i></div>
+        <i style="height:46px;margin-top:20px;border-radius:23px"></i>
+        <i style="height:150px;margin-top:40px;border-radius:14px"></i>
+        <i style="width:110px;height:12px;margin-top:40px"></i>
+        <div class="r" style="margin-top:16px"><i class="t"></i><i class="t"></i><i class="t"></i></div>
+        <i style="width:160px;height:12px;margin-top:40px"></i>
+        <i style="height:56px;margin-top:16px"></i>
+      </div>
+      <nav><i></i><i></i><i></i><i></i></nav>
+    </div>
     <div style="display: contents">%sveltekit.body%</div>
   </body>
 </html>

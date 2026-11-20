@@ -111,6 +111,7 @@
   } from '$lib/waiting-feeds';
   import { boardUnread, type BoardView, type ThreadFeedView } from '$lib/threads';
   import { restoredFromDevice } from '$lib/offline';
+  import { bootDone } from '$lib/boot';
   import { markHoyContent } from '$lib/vitals';
   import {
     invoicesByBolo,
@@ -760,6 +761,11 @@
   // The first time it has drawn its data, a real phone's timing (ADR-157).
   $effect(() => {
     if (!busy) markHoyContent(restoredFromDevice());
+  });
+  // The open's skeleton (app.html, $lib/boot) gives way to the day's blocks
+  // once they have data: from the device cache at once, else from the network.
+  $effect(() => {
+    if (!busy) bootDone();
   });
 
   // ── Header: the piece says the day (ADR-202 § 3, ADR-203 § 1) ─────────

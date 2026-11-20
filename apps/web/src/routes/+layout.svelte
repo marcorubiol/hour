@@ -3,12 +3,13 @@
   import { QueryClient, QueryClientProvider } from '@tanstack/svelte-query';
   import { browser } from '$app/environment';
   import { onMount, type Snippet } from 'svelte';
-  import { onNavigate } from '$app/navigation';
+  import { afterNavigate, onNavigate } from '$app/navigation';
   import Toast from '$lib/components/Toast.svelte';
   import { bindQueryCache, prewarmDB, registerServiceWorker } from '$lib/offline';
   import { provideTheme } from '$lib/theme.svelte';
   import { isEmbedPath } from '$lib/public-route';
   import { stylesheetsSettled, trackStylesheets } from '$lib/stylesheets';
+  import { bootDeadline, bootDone } from '$lib/boot';
 
   interface Props {
     children: Snippet;
@@ -61,6 +62,15 @@
   // navigation waits for the stylesheets still on their way.
   if (browser) trackStylesheets();
   onNavigate(() => stylesheetsSettled());
+
+  // The boot skeleton (app.html): the /h frame takes it away when it has
+  // something to draw; a landing anywhere else (the login, a public page)
+  // takes it away at once. Never longer than `BOOT_MAX_MS` either way.
+  if (browser) bootDeadline();
+  afterNavigate(({ to }) => {
+    const path = to?.url.pathname ?? '';
+    if (path !== '/' && path !== '/h' && !path.startsWith('/h/')) bootDone();
+  });
 
   // Offline scaffold — register SW + open the IndexedDB schema. Both are
   // idempotent and browser-only; helpers have their own guards (Playwright,
