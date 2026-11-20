@@ -388,26 +388,72 @@ export async function grantPreset(
 }
 
 /**
- * Deja una membresía de proyecto como la foto: el paquete (o, si era una fila
- * de antes de la fase 3 sin paquete, Mínim o Coordinació según su acceso al
- * contenedor) y después, con override, solo las facetas que el paquete no deja
- * como estaban (un override igual al paquete lo fijaría para siempre). Los
- * metadatos siguen al paquete.
+ * Estado fijo de la fixture (`playwright`, proyecto `zzz-e2e-collab`): el
+ * usuario limitado tiene el paquete Mínim y ninguna faceta suelta, y el espacio
+ * es miembro del espacio, y el espacio crea las conversaciones nuevas como privadas (el valor por defecto de la
+ * columna). Los tests vuelven aquí al empezar y al acabar, en vez de a una
+ * «línea base» capturada al empezar: si un run muere a medias o dos runs se
+ * pisan, la foto ya estaría sucia y el siguiente la daría por buena.
  */
-export async function restoreProjectAccess(
+export const FIXTURE_PROJECT_PRESET: Preset = 'minim';
+export const FIXTURE_NEW_CONVERSATIONS_PRIVATE = true;
+/** Rol del usuario limitado en el espacio `playwright`. */
+export const FIXTURE_WORKSPACE_ROLE = 'member';
+
+/** Deja el rol de espacio del limitado en el fijo; falla si la RPC falla. */
+export async function resetWorkspaceRole(jwt: string, membershipId: string): Promise<void> {
+  const res = await pgRpc('update_workspace_member_role', jwt, {
+    p_membership_id: membershipId,
+    p_role: FIXTURE_WORKSPACE_ROLE,
+  });
+  if (res.status >= 300) throw new Error(`update_workspace_member_role: ${res.status} ${res.error}`);
+}
+
+/**
+ * Deja la membresía de proyecto en el estado fijo de la fixture: quita todas
+ * sus facetas (las del paquete, los overrides y las propias del espacio) y
+ * vuelve a dar Mínim, que repone solo las del paquete. Devuelve el acceso que
+ * queda. Si no había membresía, el paquete la crea.
+ */
+export async function resetProjectAccess(
   jwt: string,
   projectId: string,
   userId: string,
-  snapshot: ProjectAccess,
-): Promise<void> {
-  const preset = (snapshot.preset ??
-    (snapshot.containerVerb === 'edit' ? 'coordinacio' : 'minim')) as Preset;
-  await grantPreset(jwt, 'project', projectId, userId, preset);
-  const now = await projectAccess(jwt, projectId, userId);
-  const diff = PROJECT_FACETS.filter((key) => (now.facets[key] ?? null) !== (snapshot.facets[key] ?? null));
-  await setFacets(
+): Promise<ProjectAccess> {
+  const membershipId = await grantPreset(jwt, 'project', projectId, userId, FIXTURE_PROJECT_PRESET);
+  const rows = await pgGet<{ facet_id: string }>(
+    'membership_facet',
     jwt,
-    snapshot.membershipId,
-    Object.fromEntries(diff.map((key) => [key, snapshot.facets[key] ?? null])),
+    new URLSearchParams({ membership_id: `eq.${membershipId}`, select: 'facet_id' }),
   );
+  for (const row of rows.rows) {
+    const res = await pgRpc('set_membership_facet', jwt, {
+      p_membership_id: membershipId,
+      p_facet_id: row.facet_id,
+      p_verb: null,
+    });
+    if (res.status >= 300) {
+      throw new Error(`set_membership_facet ${row.facet_id}=null: ${res.status} ${res.error}`);
+    }
+  }
+  await grantPreset(jwt, 'project', projectId, userId, FIXTURE_PROJECT_PRESET);
+  return projectAccess(jwt, projectId, userId);
+}
+
+/** Lo mismo al acabar, sin devolver nada (ver `resetProjectAccess`). */
+export async function restoreProjectAccess(jwt: string, projectId: string, userId: string): Promise<void> {
+  await resetProjectAccess(jwt, projectId, userId);
+}
+
+/** Deja `workspace.new_conversations_private` en el valor fijo de la fixture. */
+export async function resetNewConversationsPrivate(jwt: string, workspaceId: string): Promise<void> {
+  const res = await pgPatch<{ new_conversations_private: boolean }>(
+    'workspace',
+    jwt,
+    { new_conversations_private: FIXTURE_NEW_CONVERSATIONS_PRIVATE },
+    new URLSearchParams({ id: `eq.${workspaceId}` }),
+  );
+  if (res.rows[0]?.new_conversations_private !== FIXTURE_NEW_CONVERSATIONS_PRIVATE) {
+    throw new Error(`reset new_conversations_private: ${res.status}`);
+  }
 }

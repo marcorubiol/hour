@@ -23,7 +23,7 @@
  *
  * Espacio `playwright`, proyecto `zzz-e2e-collab`; nunca toca `muk-cia` (todo
  * va acotado al espacio). Autolimpiante: borra sus conversaciones, su bolo y
- * sus mensajes, y deja el acceso de la limitada como estaba. Va rojo contra un
+ * sus mensajes, y deja el acceso de la limitada en su estado fijo. Va rojo contra un
  * origen sin 20261021100000.
  */
 
@@ -38,10 +38,10 @@ import {
   pgGet,
   pgPatch,
   pgRpc,
-  projectAccess,
   requireEnv,
   requireExternalEnv,
   requireLimitedEnv,
+  resetProjectAccess,
   restoreProjectAccess,
   type ProjectAccess,
 } from './_helpers';
@@ -349,11 +349,11 @@ describe.skipIf(!envReady())('RLS: la lectura común, conversation_feed (ADR-138
       limited = await login(lim.email, lim.password);
       limitedJwtRef = limited;
       limitedSub = String(decodeJwt(limited).sub);
-      snapshot = await projectAccess(admin, projectId, limitedSub);
+      snapshot = await resetProjectAccess(admin, projectId, limitedSub);
     });
 
     afterAll(async () => {
-      if (snapshot) await restoreProjectAccess(admin, projectId, limitedSub, snapshot);
+      if (snapshot) await restoreProjectAccess(admin, projectId, limitedSub);
     });
 
     for (const preset of ['minim', 'equip', 'coordinacio'] as const) {

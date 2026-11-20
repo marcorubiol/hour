@@ -22,7 +22,7 @@ import { beforeAll, describe, expect, test } from 'vitest';
 import {
   decodeJwt,
   envReady,
-  projectAccess,
+  resetProjectAccess,
   restoreProjectAccess,
   setFacets,
   type ProjectAccess,
@@ -265,7 +265,7 @@ describe.skipIf(!envReady())('RLS — contact_import / import_contacts / undo_co
         new URLSearchParams({ select: 'id', workspace_id: `eq.${workspaceId}`, slug: 'eq.zzz-e2e-collab', deleted_at: 'is.null', limit: '1' }),
       );
       projectId = p.rows[0]!.id;
-      snapshot = await projectAccess(jwt, projectId, limitedSub);
+      snapshot = await resetProjectAccess(jwt, projectId, limitedSub);
       const m = await pgGet<{ id: string; workspace_role: string }>(
         'membership',
         jwt,
@@ -314,7 +314,7 @@ describe.skipIf(!envReady())('RLS — contact_import / import_contacts / undo_co
           expect(await sees()).toBe(0);
         });
       } finally {
-        await restoreProjectAccess(jwt, projectId, limitedSub, snapshot);
+        await restoreProjectAccess(jwt, projectId, limitedSub);
         await undo(jwt, mine.data!.import_id);
       }
     });
@@ -340,7 +340,7 @@ describe.skipIf(!envReady())('RLS — contact_import / import_contacts / undo_co
       } finally {
         await undo(jwt, mine.data!.import_id);
         if (theirs.status === 200) await undo(limitedJwt, theirs.data!.import_id);
-        await restoreProjectAccess(jwt, projectId, limitedSub, snapshot);
+        await restoreProjectAccess(jwt, projectId, limitedSub);
       }
     });
 
@@ -358,7 +358,7 @@ describe.skipIf(!envReady())('RLS — contact_import / import_contacts / undo_co
         expect(left.rows).toHaveLength(1);
         await pgRpc('delete_note', limitedJwt, { p_note_id: left.rows[0].id });
       } finally {
-        await restoreProjectAccess(jwt, projectId, limitedSub, snapshot);
+        await restoreProjectAccess(jwt, projectId, limitedSub);
       }
     });
 

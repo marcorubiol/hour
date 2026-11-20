@@ -48,6 +48,16 @@ policies go through SECURITY DEFINER RPCs (see ADR-043/045/047/049/050).
 owner/admin a bypass for any project permission, so tests are decoupled
 from RBAC details. The limited fixture is the complementary RBAC regression.
 
+**Fixed fixture state (2026-11-20)**: the RLS suite and the E2E specs that
+touch the limited user reset it to known values at the start and at the end,
+never to a baseline captured at the start (a run that died, or two runs at
+once, made that baseline dirty): in `zzz-e2e-collab` the limited user has the
+Mínim preset and no facet rows of its own, its workspace role is `member`, and
+`workspace.new_conversations_private` is `true`. See `resetProjectAccess`,
+`resetWorkspaceRole` and `resetNewConversationsPrivate` in
+`tests/rls/_helpers.ts`. Facet settings touched by tests go back to Hour's
+name, on, no own sort; `zzz_e2e_facet` goes back to bolo only.
+
 **Fixture hygiene**: every spec is self-cleaning now. Since ADR-052 the
 performance-write spec deletes its own gigs (one through the UI confirm
 dialog, the rest via `DELETE /api/performances/:id`) — the old

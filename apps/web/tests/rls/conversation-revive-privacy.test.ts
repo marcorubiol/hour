@@ -7,9 +7,10 @@ import {
   pgGet,
   pgPatch,
   pgRpc,
-  projectAccess,
   requireEnv,
   requireLimitedEnv,
+  resetNewConversationsPrivate,
+  resetProjectAccess,
   restoreProjectAccess,
   setFacets,
 } from './_helpers';
@@ -45,7 +46,6 @@ describe.skipIf(!envReady())('reviving a deleted conversation keeps privacy (ADR
   let me: string;
   let workspaceId: string;
   let projectId: string;
-  let originalSetting: boolean | undefined;
   const live: { id: string; jwt: () => string }[] = [];
 
   async function setSetting(value: boolean) {
@@ -95,17 +95,11 @@ describe.skipIf(!envReady())('reviving a deleted conversation keeps privacy (ADR
     if (p.rows.length === 0) throw new Error('zzz-e2e-collab missing in playwright');
     projectId = p.rows[0]!.id;
     workspaceId = p.rows[0]!.workspace_id;
-    const ws = await pgGet<{ new_conversations_private: boolean }>(
-      'workspace',
-      jwt,
-      new URLSearchParams({ id: `eq.${workspaceId}`, select: 'new_conversations_private' }),
-    );
-    originalSetting = ws.rows[0]?.new_conversations_private;
   });
 
   afterAll(async () => {
     for (const c of [...live]) await remove(c.jwt(), c.id).catch(() => undefined);
-    if (originalSetting !== undefined) await setSetting(originalSetting);
+    if (workspaceId) await resetNewConversationsPrivate(jwt, workspaceId);
   });
 
   test('the space setting decides private_to when a deleted conversation comes back', async () => {
@@ -133,7 +127,7 @@ describe.skipIf(!envReady())('reviving a deleted conversation keeps privacy (ADR
       const limited = requireLimitedEnv();
       const other = await login(limited.email, limited.password);
       const otherSub = String(decodeJwt(other).sub);
-      const membership = await projectAccess(jwt, projectId, otherSub);
+      const membership = await resetProjectAccess(jwt, projectId, otherSub);
       try {
         await setFacets(jwt, membership.membershipId, { converses: 'edit' });
 
@@ -167,7 +161,7 @@ describe.skipIf(!envReady())('reviving a deleted conversation keeps privacy (ADR
         // Se borra privada suya: la próxima pasada, cada uno recupera la suya.
         await remove(other, back.id);
       } finally {
-        await restoreProjectAccess(jwt, projectId, otherSub, membership);
+        await restoreProjectAccess(jwt, projectId, otherSub);
       }
     },
   );

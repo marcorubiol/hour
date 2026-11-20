@@ -7,9 +7,10 @@ import {
   pgGet,
   pgPatch,
   pgRpc,
-  projectAccess,
   requireEnv,
   requireLimitedEnv,
+  resetNewConversationsPrivate,
+  resetProjectAccess,
   restoreProjectAccess,
   setFacets,
   type ProjectAccess,
@@ -24,7 +25,7 @@ import {
  * editar lo demás; quien la creó y el admin, sí (para sí mismos).
  *
  * Fixture: `playwright`, proyecto `zzz-e2e-collab`, personas `zzz-rls-guard-*`.
- * Deja las conversaciones borradas y el acceso del limitado como estaba. Va
+ * Deja las conversaciones borradas y el acceso del limitado en su estado fijo. Va
  * rojo contra un origen sin `20261018110000`.
  */
 // Un sufijo por pasada, como en directory-privacy: nombres fijos chocan (409)
@@ -54,7 +55,6 @@ describe.skipIf(!envReady() || !limitedEnvReady())(
     let workspaceId: string;
     let projectId: string;
     let snapshot: ProjectAccess;
-    let originalSetting: boolean | undefined;
     const live: { id: string; jwt: () => string }[] = [];
     let created = 0;
 
@@ -121,19 +121,13 @@ describe.skipIf(!envReady() || !limitedEnvReady())(
       if (p.rows.length === 0) throw new Error('zzz-e2e-collab missing in playwright');
       projectId = p.rows[0]!.id;
       workspaceId = p.rows[0]!.workspace_id;
-      const ws = await pgGet<{ new_conversations_private: boolean }>(
-        'workspace',
-        admin,
-        new URLSearchParams({ id: `eq.${workspaceId}`, select: 'new_conversations_private' }),
-      );
-      originalSetting = ws.rows[0]?.new_conversations_private;
-      snapshot = await projectAccess(admin, projectId, limitedSub);
+      snapshot = await resetProjectAccess(admin, projectId, limitedSub);
     });
 
     afterAll(async () => {
       for (const c of [...live]) await remove(c.jwt(), c.id).catch(() => undefined);
-      if (originalSetting !== undefined) await setSetting(originalSetting);
-      await restoreProjectAccess(admin, projectId, limitedSub, snapshot);
+      if (workspaceId) await resetNewConversationsPrivate(admin, workspaceId);
+      await restoreProjectAccess(admin, projectId, limitedSub);
     });
 
     test('a Converses editor cannot make the company\'s conversation private; the creator and the admin can', async () => {

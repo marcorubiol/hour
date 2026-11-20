@@ -8,9 +8,9 @@ import {
   pgPatch,
   pgPost,
   pgRpc,
-  projectAccess,
   requireEnv,
   requireLimitedEnv,
+  resetProjectAccess,
   type ProjectAccess,
 } from './_helpers';
 
@@ -29,7 +29,8 @@ import {
  *
  * Fixture: `playwright`, proyecto `zzz-e2e-collab`. Nunca toca `muk-cia`. La
  * propia `zzz_rls_facets` se reutiliza entre pasadas (no hay DELETE en
- * `facet`); los ajustes estándar vuelven a como estaban.
+ * `facet`); los ajustes estándar vuelven al fijo (nombre de Hour, encendida,
+ * sin orden) al empezar y al acabar.
  */
 const KEY = 'zzz_rls_facets';
 const RUN = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -58,7 +59,8 @@ describe.skipIf(!envReady() || !limitedEnvReady())('workspace facets in settings
   let own: Facet;
   let diners: string;
   let tecnica: string;
-  let before: Map<string, Setting | undefined>;
+  /** Ajuste fijo de una estándar en la fixture: el nombre de Hour, encendida, sin orden propio. */
+  const DEFAULT_SETTING = { label: null, active: true, sort: null };
   let limitedAccess: ProjectAccess | null = null;
 
   async function settingOf(jwt: string, facetId: string): Promise<Setting | undefined> {
@@ -120,10 +122,8 @@ describe.skipIf(!envReady() || !limitedEnvReady())('workspace facets in settings
     const std = await pgGet<Facet>('facet', admin, new URLSearchParams({ workspace_id: 'is.null', select: 'id,key' }));
     diners = std.rows.find((x) => x.key === 'diners')!.id;
     tecnica = std.rows.find((x) => x.key === 'tecnica')!.id;
-    before = new Map([
-      [diners, await settingOf(admin, diners)],
-      [tecnica, await settingOf(admin, tecnica)],
-    ]);
+    // Se empieza del ajuste fijo, no de lo que dejara una pasada cortada.
+    for (const id of [diners, tecnica]) await writeSetting(admin, id, DEFAULT_SETTING);
 
     own = (
       await pgGet<Facet>(
@@ -147,7 +147,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())('workspace facets in settings
       expect((await pgPost('facet_level', admin, { facet_id: own.id, level: 'project' })).status).toBe(201);
     }
 
-    limitedAccess = await projectAccess(admin, projectId, limitedSub).catch(() => null);
+    limitedAccess = await resetProjectAccess(admin, projectId, limitedSub).catch(() => null);
   });
 
   afterAll(async () => {
@@ -162,9 +162,8 @@ describe.skipIf(!envReady() || !limitedEnvReady())('workspace facets in settings
         }).catch(() => undefined);
       }
     }
-    for (const [id, s] of before ?? []) {
-      const back = s ? { label: s.label, active: s.active, sort: s.sort } : { label: null, active: true, sort: null };
-      await writeSetting(admin, id, back).catch(() => undefined);
+    for (const id of [diners, tecnica]) {
+      if (id) await writeSetting(admin, id, DEFAULT_SETTING).catch(() => undefined);
     }
   });
 

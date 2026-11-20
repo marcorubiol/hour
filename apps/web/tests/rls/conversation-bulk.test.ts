@@ -9,9 +9,10 @@ import {
   pgGet,
   pgPatch,
   pgRpc,
-  projectAccess,
   requireEnv,
   requireLimitedEnv,
+  resetNewConversationsPrivate,
+  resetProjectAccess,
   restoreProjectAccess,
   setFacets,
   type ProjectAccess,
@@ -34,7 +35,7 @@ import {
  *
  * Fixture: `playwright`, proyecto `zzz-e2e-collab`. Nunca toca `muk-cia`.
  * Autolimpiante: borra sus conversaciones y deja el acceso del limitado y el
- * ajuste del espacio como estaban.
+ * ajuste del espacio en su estado fijo (ver `_helpers`).
  */
 const RUN = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
@@ -54,7 +55,6 @@ describe.skipIf(!envReady() || !limitedEnvReady())('conversation bulk actions (l
   let workspaceId: string;
   let projectId: string;
   let snapshot: ProjectAccess;
-  let originalSetting: boolean | undefined;
   let tags: Record<string, string> = {};
   let shared = '';
   let other = '';
@@ -125,13 +125,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())('conversation bulk actions (l
     if (p.rows.length === 0) throw new Error('zzz-e2e-collab missing in playwright');
     projectId = p.rows[0]!.id;
     workspaceId = p.rows[0]!.workspace_id;
-    const ws = await pgGet<{ new_conversations_private: boolean }>(
-      'workspace',
-      admin,
-      new URLSearchParams({ id: `eq.${workspaceId}`, select: 'new_conversations_private' }),
-    );
-    originalSetting = ws.rows[0]?.new_conversations_private;
-    snapshot = await projectAccess(admin, projectId, limitedSub);
+    snapshot = await resetProjectAccess(admin, projectId, limitedSub);
     const vocab = await pgGet<{ id: string; key: string }>(
       'conversation_tag',
       admin,
@@ -154,8 +148,8 @@ describe.skipIf(!envReady() || !limitedEnvReady())('conversation bulk actions (l
     for (const id of [shared, other, mine]) {
       if (id) await pgRpc('delete_conversation', admin, { p_conversation_id: id }).catch(() => undefined);
     }
-    if (originalSetting !== undefined) await setSetting(originalSetting);
-    if (snapshot) await restoreProjectAccess(admin, projectId, limitedSub, snapshot);
+    if (workspaceId) await resetNewConversationsPrivate(admin, workspaceId);
+    if (snapshot) await restoreProjectAccess(admin, projectId, limitedSub);
   });
 
   test('who reads without editing: forbidden for the shared one, not_found for a private one; nothing changes', async () => {

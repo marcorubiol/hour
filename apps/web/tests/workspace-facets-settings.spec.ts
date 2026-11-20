@@ -11,7 +11,10 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  *    `technical`, que sí se crearía: la clave sale del nombre, no del idioma.)
  * 2. `zzz_e2e_facet` («ZZZ E2E facet»): se crea la primera vez con el nivel
  *    bolo y después se reutiliza (no hay DELETE de facetas). Se marca y se
- *    desmarca un nivel con «saved»; se renombra en sitio y vuelve.
+ *    desmarca un nivel con «saved»; se renombra en sitio y vuelve. Antes y
+ *    después se deja en su estado fijo (solo bolo, con su nombre): si una
+ *    pasada cortada dejó «line» marcado, marcarlo no cambiaba nada y el
+ *    «saved» no llegaba.
  * 3. «What each package gives», en su propia página (136), enseña Minimal
  *    sin facetas y Team con Technical. Acaba apagada.
  *
@@ -35,6 +38,27 @@ async function setActive(page: Page, on: boolean) {
     await sw.click();
     await expect(sw).toHaveAttribute('aria-checked', String(on));
   }
+}
+
+/**
+ * Estado fijo de `zzz_e2e_facet`: solo el nivel bolo y su nombre. Lo que una
+ * pasada cortada pudo dejar (el nivel línea marcado o el nombre cambiado) se
+ * deshace aquí. La faceta tiene que estar encendida.
+ */
+async function resetOwn(page: Page) {
+  const line = row(page).getByLabel('line', { exact: true });
+  if (await line.isChecked()) {
+    await line.uncheck({ force: true });
+    await expect(row(page).locator('.set-row__hint')).not.toContainText('line');
+  }
+  const field = row(page).locator(`input[type="text"]`);
+  if ((await field.inputValue()) !== NAME) {
+    await field.fill(NAME);
+    await field.press('Enter');
+    await expect(row(page).locator('.set-row__label')).toHaveText(NAME);
+  }
+  // Que el «saved» de este arreglo se haya ido: el del paso siguiente tiene que ser suyo.
+  await expect(row(page)).not.toContainText('saved', { timeout: 10_000 });
 }
 
 test.describe('workspace facets in settings', () => {
@@ -63,6 +87,7 @@ test.describe('workspace facets in settings', () => {
         await expect(row(page)).toBeVisible({ timeout: 10_000 });
       }
       await setActive(page, true);
+      await resetOwn(page);
       await expect(row(page).locator('.set-row__hint')).toContainText('deal');
 
       // A level ticked and unticked, «saved» beside it.
@@ -94,7 +119,11 @@ test.describe('workspace facets in settings', () => {
         await page.goto(SETTINGS);
         await settingsLoaded(page);
       }
-      if ((await row(page).count()) > 0) await setActive(page, false);
+      if ((await row(page).count()) > 0) {
+        await setActive(page, true);
+        await resetOwn(page);
+        await setActive(page, false);
+      }
     }
   });
 });

@@ -7,9 +7,10 @@ import {
   pgGet,
   pgPatch,
   pgRpc,
-  projectAccess,
   requireEnv,
   requireLimitedEnv,
+  resetNewConversationsPrivate,
+  resetProjectAccess,
   restoreProjectAccess,
   setFacets,
   type ProjectAccess,
@@ -85,7 +86,6 @@ describe.skipIf(!envReady() || !limitedEnvReady())('the payer is the organizatio
   let me: string;
   let workspaceId: string;
   let projectId: string;
-  let originalSetting: boolean | undefined;
   let membership: ProjectAccess | undefined;
   let otherSub: string;
   let shared: ConversationRow | undefined;
@@ -165,15 +165,8 @@ describe.skipIf(!envReady() || !limitedEnvReady())('the payer is the organizatio
     projectId = p.rows[0]!.id;
     workspaceId = p.rows[0]!.workspace_id;
 
-    const ws = await pgGet<{ new_conversations_private: boolean }>(
-      'workspace',
-      jwt,
-      new URLSearchParams({ id: `eq.${workspaceId}`, select: 'new_conversations_private' }),
-    );
-    originalSetting = ws.rows[0]?.new_conversations_private;
-
     // The other person edits money in the project, without being an admin.
-    membership = await projectAccess(jwt, projectId, otherSub);
+    membership = await resetProjectAccess(jwt, projectId, otherSub);
     await setFacets(jwt, membership.membershipId, { diners: 'edit' });
 
     await setSetting(false);
@@ -191,7 +184,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())('the payer is the organizatio
     // El acceso de la fixture compartida se devuelve lo primero: si el resto de
     // la limpieza se queda sin tiempo, los ficheros siguientes no deben
     // heredar a la limitada editando dinero (staging, run 38456825114).
-    if (membership) await restoreProjectAccess(jwt, projectId, otherSub, membership);
+    if (membership) await restoreProjectAccess(jwt, projectId, otherSub);
     for (const id of invoices) {
       // Issued ones go back to draft first: delete_invoice only takes drafts.
       await pgRpc('update_invoice', jwt, { p_invoice_id: id, p_patch: { status: 'draft' } }).catch(() => undefined);
@@ -208,7 +201,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())('the payer is the organizatio
     // la fila borrada ya no pasa la política de lectura) y la clave de
     // servicio no tiene grant en `fiscal_identity`. La pasada siguiente la
     // reutiliza y la reescribe.
-    if (originalSetting !== undefined) await setSetting(originalSetting);
+    if (workspaceId) await resetNewConversationsPrivate(jwt, workspaceId);
   });
 
   test('list_money_payer_organizations: a private conversation\'s organization is only its owner\'s', async () => {

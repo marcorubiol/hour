@@ -7,9 +7,10 @@ import {
   pgGet,
   pgPatch,
   pgRpc,
-  projectAccess,
   requireEnv,
   requireLimitedEnv,
+  resetNewConversationsPrivate,
+  resetProjectAccess,
   restoreProjectAccess,
   setFacets,
   type ProjectAccess,
@@ -33,7 +34,7 @@ import {
  * cualquiera (§ 1), así que solo mira lo que crea cada pasada.
  *
  * Fixture: `playwright`, proyecto `zzz-e2e-collab`, personas `zzz-rls-dir-*-<pasada>`.
- * Deja las conversaciones borradas y el acceso del limitado como estaba. Va
+ * Deja las conversaciones borradas y el acceso del limitado en su estado fijo. Va
  * rojo contra un origen sin `20261018100000`.
  */
 // Un sufijo por pasada: las conversaciones se borran en blando y una sala no
@@ -66,7 +67,6 @@ describe.skipIf(!envReady() || !limitedEnvReady())(
     let workspaceId: string;
     let projectId: string;
     let snapshot: ProjectAccess;
-    let originalSetting: boolean | undefined;
     const live: { id: string; jwt: () => string }[] = [];
     let created = 0;
     const casts: string[] = [];
@@ -159,20 +159,14 @@ describe.skipIf(!envReady() || !limitedEnvReady())(
       if (p.rows.length === 0) throw new Error('zzz-e2e-collab missing in playwright');
       projectId = p.rows[0]!.id;
       workspaceId = p.rows[0]!.workspace_id;
-      const ws = await pgGet<{ new_conversations_private: boolean }>(
-        'workspace',
-        admin,
-        new URLSearchParams({ id: `eq.${workspaceId}`, select: 'new_conversations_private' }),
-      );
-      originalSetting = ws.rows[0]?.new_conversations_private;
-      snapshot = await projectAccess(admin, projectId, limitedSub);
+      snapshot = await resetProjectAccess(admin, projectId, limitedSub);
     });
 
     afterAll(async () => {
       for (const id of casts) await pgRpc('remove_cast_member', admin, { p_cast_member_id: id }).catch(() => undefined);
       for (const c of [...live]) await remove(c.jwt(), c.id).catch(() => undefined);
-      if (originalSetting !== undefined) await setSetting(originalSetting);
-      await restoreProjectAccess(admin, projectId, limitedSub, snapshot);
+      if (workspaceId) await resetNewConversationsPrivate(admin, workspaceId);
+      await restoreProjectAccess(admin, projectId, limitedSub);
     });
 
     test('without Converses the limited reads no directory, and the screen flag says so', async () => {

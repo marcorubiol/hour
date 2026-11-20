@@ -14,7 +14,7 @@
  *
  * En el espacio `playwright` (nunca `muk-cia`), proyecto `zzz-e2e-collab`,
  * todas las direcciones del simulador. Cada ejecución es dueña de sus filas y
- * las limpia; el acceso de la fixture limitada se restaura como estaba.
+ * las limpia; el acceso de la fixture limitada vuelve a su estado fijo.
  */
 
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -26,9 +26,9 @@ import {
   pgGet,
   pgPatch,
   pgRpc,
-  projectAccess,
   requireEnv,
   requireLimitedEnv,
+  resetProjectAccess,
   restoreProjectAccess,
   setFacets,
   type ProjectAccess,
@@ -113,7 +113,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: envío en bloque, fase 
     );
     projectId = projects.rows[0].id;
     workspaceId = projects.rows[0].workspace_id;
-    limitedSnapshot = await projectAccess(adminJwt, projectId, limitedUserId);
+    limitedSnapshot = await resetProjectAccess(adminJwt, projectId, limitedUserId);
     await setFacets(adminJwt, limitedSnapshot.membershipId, { converses: 'view' });
 
     await conversation('a', SIM('a'));
@@ -155,7 +155,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: envío en bloque, fase 
       await svc('DELETE', `mail_suppression?workspace_id=eq.${workspaceId}&address=${list}`);
       await svc('DELETE', `mail_basis?workspace_id=eq.${workspaceId}&address=${list}`);
     }
-    if (limitedSnapshot) await restoreProjectAccess(adminJwt, projectId, limitedUserId, limitedSnapshot);
+    if (limitedSnapshot) await restoreProjectAccess(adminJwt, projectId, limitedUserId);
   });
 
   test('compose_preview: quien edita ve los campos de cada destinatario, la privada suya incluida', async () => {

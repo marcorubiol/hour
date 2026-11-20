@@ -8,7 +8,7 @@
  * `zzz-rls-foreign-project`, donde no). Cada fichero es dueño de sus filas:
  * crea sus bolos, funciones y conversación, y los borra al final; sus mensajes
  * se borran (blando) y los hilos quedan colgando de bolos borrados, que nadie
- * lee. El acceso de la fixture limitada se restaura como estaba.
+ * lee. El acceso de la fixture limitada vuelve a su estado fijo.
  *
  * Lo que prueba:
  *   - lectura: General por el acceso al contenedor; faceta por verla en la
@@ -33,10 +33,10 @@ import {
   pgPatch,
   pgPost,
   pgRpc,
-  projectAccess,
   requireEnv,
   requireExternalEnv,
   requireLimitedEnv,
+  resetProjectAccess,
   restoreProjectAccess,
   standardFacetIds,
   type ProjectAccess,
@@ -465,11 +465,11 @@ describe.skipIf(!envReady())('RLS: hilos con facetas (ADR-106)', () => {
       limitedJwt = await login(limited.email, limited.password);
       limitedJwtRef = limitedJwt;
       limitedUserId = String(decodeJwt(limitedJwt).sub);
-      snapshot = await projectAccess(adminJwt, homeProjectId, limitedUserId);
+      snapshot = await resetProjectAccess(adminJwt, homeProjectId, limitedUserId);
     });
 
     afterAll(async () => {
-      if (snapshot) await restoreProjectAccess(adminJwt, homeProjectId, limitedUserId, snapshot);
+      if (snapshot) await restoreProjectAccess(adminJwt, homeProjectId, limitedUserId);
     });
 
     /** ¿Lee y escribe la limitada en este hilo del bolo de su proyecto? */

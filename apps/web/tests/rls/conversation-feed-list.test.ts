@@ -35,9 +35,9 @@ import {
   pgGet,
   pgPatch,
   pgRpc,
-  projectAccess,
   requireEnv,
   requireLimitedEnv,
+  resetProjectAccess,
   restoreProjectAccess,
   type ProjectAccess,
 } from './_helpers';
@@ -337,11 +337,11 @@ describe.skipIf(!envReady())('RLS: la lista desde conversation_feed (plan de la 
       const lim = requireLimitedEnv();
       limited = await login(lim.email, lim.password);
       limitedSub = String(decodeJwt(limited).sub);
-      snapshot = await projectAccess(admin, projectId, limitedSub);
+      snapshot = await resetProjectAccess(admin, projectId, limitedSub);
     });
 
     afterAll(async () => {
-      if (snapshot) await restoreProjectAccess(admin, projectId, limitedSub, snapshot);
+      if (snapshot) await restoreProjectAccess(admin, projectId, limitedSub);
     });
 
     for (const preset of ['minim', 'coordinacio'] as const) {

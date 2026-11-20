@@ -8,10 +8,11 @@ import {
   pgGet,
   pgPatch,
   pgRpc,
-  projectAccess,
   requireEnv,
   requireExternalEnv,
   requireLimitedEnv,
+  resetNewConversationsPrivate,
+  resetProjectAccess,
   restoreProjectAccess,
   setFacets,
   type ProjectAccess,
@@ -33,7 +34,7 @@ import {
  * alguien sin acceso al proyecto: la identidad externa.
  *
  * Fixture: `playwright`, proyecto `zzz-e2e-collab`. Autolimpiante: borra lo que
- * crea y deja el acceso del limitado y el ajuste del espacio como estaban. Va
+ * crea y deja el acceso del limitado y el ajuste del espacio en su estado fijo. Va
  * rojo contra un origen sin `20261020100000`.
  */
 const RUN = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -74,7 +75,6 @@ describe.skipIf(!envReady() || !limitedEnvReady())('conversation_bolos and «not
   let workspaceId: string;
   let projectId: string;
   let snapshot: ProjectAccess;
-  let originalSetting: boolean | undefined;
   let shared = '';
   let mine = '';
   const bolos: string[] = [];
@@ -149,13 +149,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())('conversation_bolos and «not
     if (p.rows.length === 0) throw new Error('zzz-e2e-collab missing in playwright');
     projectId = p.rows[0]!.id;
     workspaceId = p.rows[0]!.workspace_id;
-    const ws = await pgGet<{ new_conversations_private: boolean }>(
-      'workspace',
-      admin,
-      new URLSearchParams({ id: `eq.${workspaceId}`, select: 'new_conversations_private' }),
-    );
-    originalSetting = ws.rows[0]?.new_conversations_private;
-    snapshot = await projectAccess(admin, projectId, limitedSub);
+    snapshot = await resetProjectAccess(admin, projectId, limitedSub);
 
     await setSetting(false);
     shared = await createConversation('Shared');
@@ -172,8 +166,8 @@ describe.skipIf(!envReady() || !limitedEnvReady())('conversation_bolos and «not
     for (const id of [shared, mine]) {
       if (id) await pgRpc('delete_conversation', admin, { p_conversation_id: id }).catch(() => undefined);
     }
-    if (originalSetting !== undefined) await setSetting(originalSetting);
-    if (snapshot) await restoreProjectAccess(admin, projectId, limitedSub, snapshot);
+    if (workspaceId) await resetNewConversationsPrivate(admin, workspaceId);
+    if (snapshot) await restoreProjectAccess(admin, projectId, limitedSub);
   });
 
   test('who reads the conversation sees its bolos with date and status, never fee nor payer', async () => {

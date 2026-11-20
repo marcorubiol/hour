@@ -7,9 +7,10 @@ import {
   pgGet,
   pgPatch,
   pgRpc,
-  projectAccess,
   requireEnv,
   requireLimitedEnv,
+  resetNewConversationsPrivate,
+  resetProjectAccess,
   restoreProjectAccess,
   setFacets,
   type ProjectAccess,
@@ -33,7 +34,7 @@ import {
  * Fixture: `playwright`, proyecto `zzz-e2e-collab` y un proyecto
  * `zzz-rls-select-once-gone`, borrado entre pasadas (lo revive y lo vuelve a
  * borrar la clave de servicio). Deja las conversaciones borradas y el acceso
- * del limitado como estaba.
+ * del limitado en su estado fijo.
  */
 const RUN = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 const GONE_SLUG = 'zzz-rls-select-once-gone';
@@ -80,7 +81,6 @@ describe.skipIf(!envReady() || !limitedEnvReady() || !SERVICE)(
     let projectId: string;
     let goneProjectId: string | null = null;
     let snapshot: ProjectAccess;
-    let originalSetting: boolean | undefined;
     const live: string[] = [];
     let created = 0;
 
@@ -152,13 +152,7 @@ describe.skipIf(!envReady() || !limitedEnvReady() || !SERVICE)(
       if (p.rows.length === 0) throw new Error('zzz-e2e-collab missing in playwright');
       projectId = p.rows[0]!.id;
       workspaceId = p.rows[0]!.workspace_id;
-      const ws = await pgGet<{ new_conversations_private: boolean }>(
-        'workspace',
-        admin,
-        new URLSearchParams({ id: `eq.${workspaceId}`, select: 'new_conversations_private' }),
-      );
-      originalSetting = ws.rows[0]?.new_conversations_private;
-      snapshot = await projectAccess(admin, projectId, limitedSub);
+      snapshot = await resetProjectAccess(admin, projectId, limitedSub);
       await setSetting(false);
     });
 
@@ -166,8 +160,8 @@ describe.skipIf(!envReady() || !limitedEnvReady() || !SERVICE)(
       if (goneProjectId) await setProjectDeleted(goneProjectId, false).catch(() => undefined);
       for (const id of [...live]) await pgRpc('delete_conversation', admin, { p_conversation_id: id }).catch(() => undefined);
       if (goneProjectId) await setProjectDeleted(goneProjectId, true).catch(() => undefined);
-      if (originalSetting !== undefined) await setSetting(originalSetting);
-      await restoreProjectAccess(admin, projectId, limitedSub, snapshot);
+      if (workspaceId) await resetNewConversationsPrivate(admin, workspaceId);
+      await restoreProjectAccess(admin, projectId, limitedSub);
     });
 
     test('with Converses it is seen, without it is not, and seeing is what has_permission says', async () => {

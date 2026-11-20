@@ -9,10 +9,11 @@ import {
   pgPatch,
   pgPost,
   pgRpc,
-  projectAccess,
   requireEnv,
   requireExternalEnv,
   requireLimitedEnv,
+  resetNewConversationsPrivate,
+  resetProjectAccess,
   restoreProjectAccess,
   setFacets,
   type ProjectAccess,
@@ -36,7 +37,7 @@ import {
  * Fixture: `playwright`, proyecto `zzz-e2e-collab`, personas
  * `zzz-rls-acq-*-<pasada>`. Deja borradas las conversaciones, quitadas las
  * marcas que puede quitar, el acceso del limitado y el ajuste del espacio
- * como estaban, y al externo fuera del espacio. La marca del exmiembro se
+ * en su estado fijo, y al externo fuera del espacio. La marca del exmiembro se
  * queda en la tabla, invisible, colgando de un dossier de prueba. Va rojo
  * contra un origen sin `20261020110000`.
  */
@@ -69,7 +70,6 @@ describe.skipIf(!envReady() || !limitedEnvReady())('«lo conozco» is personal a
   let workspaceId: string;
   let projectId: string;
   let snapshot: ProjectAccess;
-  let originalSetting: boolean | undefined;
   const live: { id: string; jwt: () => string }[] = [];
   const marks: { jwt: () => string; personId: string }[] = [];
 
@@ -161,13 +161,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())('«lo conozco» is personal a
     if (p.rows.length === 0) throw new Error('zzz-e2e-collab missing in playwright');
     projectId = p.rows[0]!.id;
     workspaceId = p.rows[0]!.workspace_id;
-    const ws = await pgGet<{ new_conversations_private: boolean }>(
-      'workspace',
-      admin,
-      new URLSearchParams({ id: `eq.${workspaceId}`, select: 'new_conversations_private' }),
-    );
-    originalSetting = ws.rows[0]?.new_conversations_private;
-    snapshot = await projectAccess(admin, projectId, limitedSub);
+    snapshot = await resetProjectAccess(admin, projectId, limitedSub);
   });
 
   afterAll(async () => {
@@ -179,8 +173,8 @@ describe.skipIf(!envReady() || !limitedEnvReady())('«lo conozco» is personal a
       }).catch(() => undefined);
     }
     for (const c of [...live]) await remove(c.jwt(), c.id).catch(() => undefined);
-    if (originalSetting !== undefined) await setSetting(originalSetting);
-    await restoreProjectAccess(admin, projectId, limitedSub, snapshot);
+    if (workspaceId) await resetNewConversationsPrivate(admin, workspaceId);
+    await restoreProjectAccess(admin, projectId, limitedSub);
   });
 
   test('own mark yes, someone else unshared no; shared, whoever reads the dossier; unmarking deletes', async () => {

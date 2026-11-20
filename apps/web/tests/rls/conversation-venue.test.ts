@@ -7,9 +7,10 @@ import {
   pgGet,
   pgPatch,
   pgRpc,
-  projectAccess,
   requireEnv,
   requireLimitedEnv,
+  resetNewConversationsPrivate,
+  resetProjectAccess,
   restoreProjectAccess,
   serviceDelete,
   setFacets,
@@ -119,7 +120,6 @@ describe.skipIf(!envReady())('conversation with the venue (ADR-102, fase 2)', ()
   let me: string;
   let projectId: string;
   let workspaceId: string;
-  let originalSetting: boolean | undefined;
   const made = new Set<string>();
 
   const create = (args: Record<string, unknown>, as: string = jwt) =>
@@ -202,21 +202,13 @@ describe.skipIf(!envReady())('conversation with the venue (ADR-102, fase 2)', ()
     workspaceId = p.rows[0]!.workspace_id;
 
     // Las conversaciones de esta pasada nacen compartidas; se restaura al final.
-    const ws = await pgGet<{ new_conversations_private: boolean }>(
-      'workspace',
-      jwt,
-      new URLSearchParams({ select: 'new_conversations_private', id: `eq.${workspaceId}` }),
-    );
-    originalSetting = ws.rows[0]?.new_conversations_private;
     await pgPatch('workspace', jwt, { new_conversations_private: false }, new URLSearchParams({ id: `eq.${workspaceId}` }));
     await sweep();
   });
 
   afterAll(async () => {
     for (const id of made) await bury(id);
-    if (originalSetting !== undefined) {
-      await pgPatch('workspace', jwt, { new_conversations_private: originalSetting }, new URLSearchParams({ id: `eq.${workspaceId}` }));
-    }
+    if (workspaceId) await resetNewConversationsPrivate(jwt, workspaceId);
   });
 
   test('a conversation is created with an organization and no person', async () => {
@@ -374,7 +366,7 @@ describe.skipIf(!envReady())('conversation with the venue (ADR-102, fase 2)', ()
       const limited = requireLimitedEnv();
       other = await login(limited.email, limited.password);
       otherSub = String(decodeJwt(other).sub);
-      membership = await projectAccess(jwt, projectId, otherSub);
+      membership = await resetProjectAccess(jwt, projectId, otherSub);
       await setFacets(jwt, membership.membershipId, { converses: 'edit' });
     });
 
@@ -383,7 +375,7 @@ describe.skipIf(!envReady())('conversation with the venue (ADR-102, fase 2)', ()
         await pgPatch('conversation', other, { private_to: null }, new URLSearchParams({ id: `eq.${theirs}` }));
         await pgRpc('delete_conversation', other, { p_conversation_id: theirs });
       }
-      if (membership) await restoreProjectAccess(jwt, projectId, otherSub, membership);
+      if (membership) await restoreProjectAccess(jwt, projectId, otherSub);
     });
 
     test('a private one of someone else does not count: each gets theirs, and two shared cannot coexist', async () => {

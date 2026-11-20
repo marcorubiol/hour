@@ -13,6 +13,7 @@
 
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import {
+  FIXTURE_WORKSPACE_ROLE,
   decodeJwt,
   envReady,
   grantPreset,
@@ -20,11 +21,12 @@ import {
   login,
   pgGet,
   pgRpc,
-  projectAccess,
   requireEnv,
   requireLimitedEnv,
+  resetProjectAccess,
   restoreProjectAccess,
   setFacets,
+  resetWorkspaceRole,
   type ProjectAccess,
 } from './_helpers';
 
@@ -61,7 +63,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS — limited performer fi
 
   async function restoreMembership() {
     if (!membership) return;
-    await restoreProjectAccess(adminJwt, projectId, limitedUserId, membership);
+    await restoreProjectAccess(adminJwt, projectId, limitedUserId);
   }
 
   /** Quita la membresía de la fixture en el proyecto ajeno, si la hay. */
@@ -97,10 +99,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS — limited performer fi
 
   async function restoreWorkspaceMembership() {
     if (!workspaceMembership) return;
-    await pgRpc('update_workspace_member_role', adminJwt, {
-      p_membership_id: workspaceMembership.id,
-      p_role: workspaceMembership.workspace_role,
-    });
+    await resetWorkspaceRole(adminJwt, workspaceMembership.id);
   }
 
   async function deleteFixtureNote() {
@@ -138,6 +137,10 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS — limited performer fi
     );
     expect(workspaceMemberships.rows).toHaveLength(1);
     workspaceMembership = workspaceMemberships.rows[0];
+    if (workspaceMembership.workspace_role !== FIXTURE_WORKSPACE_ROLE) {
+      await resetWorkspaceRole(adminJwt, workspaceMembership.id);
+      workspaceMembership = { ...workspaceMembership, workspace_role: FIXTURE_WORKSPACE_ROLE };
+    }
 
     const projects = await pgGet<{ id: string }>(
       'project',
@@ -152,7 +155,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS — limited performer fi
     expect(projects.rows).toHaveLength(1);
     projectId = projects.rows[0].id;
 
-    membership = await projectAccess(adminJwt, projectId, limitedUserId);
+    membership = await resetProjectAccess(adminJwt, projectId, limitedUserId);
 
     const foreign = await pgGet<{ id: string }>(
       'project',

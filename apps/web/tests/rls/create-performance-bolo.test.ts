@@ -15,7 +15,7 @@
  *
  * Todo en el workspace `playwright` (`zzz-e2e-collab` y
  * `zzz-rls-foreign-project`). Autolimpiante: cada fila creada se borra y la
- * membresía de `limited` vuelve a como estaba.
+ * membresía de `limited` vuelve a su estado fijo.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -26,9 +26,9 @@ import {
   login,
   pgGet,
   pgRpc,
-  projectAccess,
   requireEnv,
   requireLimitedEnv,
+  resetProjectAccess,
   restoreProjectAccess,
   setFacets,
   type ProjectAccess,
@@ -189,12 +189,12 @@ describe.skipIf(!envReady())('create_performance with p_bolo_id (ADR-087, § 37)
       const limited = requireLimitedEnv();
       limitedJwt = await login(limited.email, limited.password);
       limitedUserId = String(decodeJwt(limitedJwt).sub);
-      membership = await projectAccess(jwt, homeProjectId, limitedUserId);
+      membership = await resetProjectAccess(jwt, homeProjectId, limitedUserId);
     });
 
     afterAll(async () => {
       if (!membership) return;
-      await restoreProjectAccess(jwt, homeProjectId, limitedUserId, membership);
+      await restoreProjectAccess(jwt, homeProjectId, limitedUserId);
     });
 
     it('a performer without edit:performance is refused, bolo or not', async () => {
