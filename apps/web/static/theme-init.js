@@ -37,3 +37,39 @@
     document.head.appendChild(fonts);
   } catch (e) {}
 })();
+
+// A stale page reloads itself (20-11-2026, «la aplicación no me abre»).
+//
+// The service worker serves an app open (`/`, `/h…`) from the page it saved
+// last time and fetches the new one behind it (stale-while-revalidate). That
+// saved page was fetched in the background, so the code it names was never
+// downloaded; after another deploy those hashed files are gone from the
+// server and the open stops on the skeleton. When a module of the app fails
+// to load, reload once: by then the service worker holds the current page.
+// At most once every 30 s, so an offline open does not loop.
+(function () {
+  var KEY = 'hour_stale_reload';
+  function moduleFailed(reason) {
+    var m = String((reason && (reason.message || reason)) || '');
+    return /dynamically imported module|Importing a module script failed|_app\/immutable/i.test(m);
+  }
+  function reloadOnce() {
+    try {
+      var last = Number(sessionStorage.getItem(KEY)) || 0;
+      if (Date.now() - last < 30000) return false;
+      sessionStorage.setItem(KEY, String(Date.now()));
+    } catch (e) {
+      return false;
+    }
+    location.reload();
+    return true;
+  }
+  // Vite's preload helper: a route's code or its CSS failed to load.
+  window.addEventListener('vite:preloadError', function (e) {
+    if (reloadOnce()) e.preventDefault();
+  });
+  // The start script's own imports (entry/start, entry/app).
+  window.addEventListener('unhandledrejection', function (e) {
+    if (moduleFailed(e.reason)) reloadOnce();
+  });
+})();
