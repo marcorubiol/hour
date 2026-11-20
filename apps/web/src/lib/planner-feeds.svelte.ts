@@ -13,7 +13,7 @@
 import { createQuery, keepPreviousData, type QueryClient } from '@tanstack/svelte-query';
 import { toStore } from 'svelte/store';
 import { fetchJSON } from '$lib/api';
-import { addDaysIso, type PlannerView } from '$lib/planner';
+import { addDaysIso, addMonths, type PlannerView } from '$lib/planner';
 import { teamQueryOptions } from '$lib/nav-queries';
 import type { AvailabilityItem } from '$lib/availability';
 import type { DateEvent, NoteEvent, PerformanceEvent } from '$lib/month-events';
@@ -210,6 +210,85 @@ export async function primeAgendaWindow(
   });
 }
 
+/** A window of the book under a scope: what its four reads are keyed by. */
+export interface AgendaFeedKey {
+  from: string;
+  to: string;
+  unresolved: boolean;
+  projectIds: string[];
+  workspaceIds: string[];
+}
+
+/**
+ * The Agenda's four reads for one window, key and fetch, with no `enabled`:
+ * the page adds its own, and the frame's warm-up (`$lib/lens-warm`) asks for
+ * the same keys before the Planner is opened, so its first paint finds them.
+ */
+export function agendaFeedOptions(k: AgendaFeedKey) {
+  return {
+    performances: {
+      queryKey: ['planner-agenda-performances', k] as const,
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        pagedFeed<PerformanceEvent>(
+          (from) => `/api/performances?status=any&rosters=1&notice=1&missing=1&${feedParams(k, from, k.to)}`,
+          (p) => p.performed_at.slice(0, 10),
+          k.from,
+          signal,
+        ),
+    },
+    dates: {
+      queryKey: ['planner-agenda-dates', k] as const,
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        pagedFeed<DateEvent>(
+          // Same ±1-day pad as the grid dates feed (tz bucketing at edges).
+          (from) => `/api/dates?spans=1&${feedParams(k, addDaysIso(from, -1), addDaysIso(k.to, 1))}`,
+          (d) => d.starts_at.slice(0, 10),
+          k.from,
+          signal,
+        ),
+    },
+    availability: {
+      queryKey: ['planner-agenda-availability', { from: k.from, to: k.to }] as const,
+      queryFn: async ({ signal }: { signal: AbortSignal }) => {
+        try {
+          return await fetchJSON<{ items: AvailabilityItem[]; absent?: boolean }>(
+            `/api/availability?from=${k.from}&to=${k.to}&limit=500`,
+            signal,
+          );
+        } catch (err) {
+          return absentFeed<AvailabilityItem>('agenda availability', err, signal);
+        }
+      },
+    },
+    notes: {
+      queryKey: ['planner-agenda-notes', { from: k.from, to: k.to }] as const,
+      queryFn: async ({ signal }: { signal: AbortSignal }) => {
+        try {
+          return await fetchJSON<{ items: NoteEvent[]; absent?: boolean }>(`/api/notes?from=${k.from}&to=${k.to}`, signal);
+        } catch (err) {
+          return absentFeed<NoteEvent>('notes', err, signal);
+        }
+      },
+    },
+  };
+}
+
+/**
+ * The window the Agenda opens on with no day in the address: from today to
+ * the end of the month after this one. The page seeds its book with it and
+ * the warm-up asks for it; one rule, or the keys would not meet.
+ */
+export function agendaSeedWindow(now: Date, todayIso: string): { from: string; end: { year: number; month: number }; to: string } {
+  const end = addMonths(now.getFullYear(), now.getMonth() + 1, 0);
+  return { from: todayIso, end, to: agendaWindowEnd(end) };
+}
+
+/** The last day of the book when it ends in `end`'s month. */
+export function agendaWindowEnd(end: { year: number; month: number }): string {
+  const next = addMonths(end.year, end.month, 1);
+  return addDaysIso(`${next.year}-${String(next.month).padStart(2, '0')}-01`, -1);
+}
+
 interface PlannerFeedInputs {
   /** Active projection — the agenda swaps the grid feeds for its own. */
   view: () => PlannerView;
@@ -390,47 +469,22 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
   const agendaPerfOptions = toStore(() => {
     const k = agendaFeedKey;
     return {
-      queryKey: ['planner-agenda-performances', k] as const,
+      ...agendaFeedOptions(k).performances,
       enabled: (inputs.view() === 'agenda' || inputs.view() === 'board') && !k.unresolved,
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
-        pagedFeed<PerformanceEvent>(
-          (from) => `/api/performances?status=any&rosters=1&notice=1&missing=1&${feedParams(k, from, k.to)}`,
-          (p) => p.performed_at.slice(0, 10),
-          k.from,
-          signal,
-        ),
     };
   });
   const agendaDatesOptions = toStore(() => {
     const k = agendaFeedKey;
     return {
-      queryKey: ['planner-agenda-dates', k] as const,
+      ...agendaFeedOptions(k).dates,
       enabled: (inputs.view() === 'agenda' || inputs.view() === 'board') && !k.unresolved,
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
-        pagedFeed<DateEvent>(
-          // Same ±1-day pad as the grid dates feed (tz bucketing at edges).
-          (from) => `/api/dates?spans=1&${feedParams(k, addDaysIso(from, -1), addDaysIso(k.to, 1))}`,
-          (d) => d.starts_at.slice(0, 10),
-          k.from,
-          signal,
-        ),
     };
   });
   const agendaAvailabilityOptions = toStore(() => {
     const k = agendaFeedKey;
     return {
-      queryKey: ['planner-agenda-availability', { from: k.from, to: k.to }] as const,
+      ...agendaFeedOptions(k).availability,
       enabled: (inputs.view() === 'agenda' || inputs.view() === 'board') && !k.unresolved,
-      queryFn: async ({ signal }: { signal: AbortSignal }) => {
-        try {
-          return await fetchJSON<{ items: AvailabilityItem[]; absent?: boolean }>(
-            `/api/availability?from=${k.from}&to=${k.to}&limit=500`,
-            signal,
-          );
-        } catch (err) {
-          return absentFeed<AvailabilityItem>('agenda availability', err, signal);
-        }
-      },
     };
   });
 
@@ -443,18 +497,8 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
   const agendaNotesOptions = toStore(() => {
     const k = agendaFeedKey;
     return {
-      queryKey: ['planner-agenda-notes', { from: k.from, to: k.to }] as const,
+      ...agendaFeedOptions(k).notes,
       enabled: inputs.view() === 'agenda',
-      queryFn: async ({ signal }: { signal: AbortSignal }) => {
-        try {
-          return await fetchJSON<{ items: NoteEvent[]; absent?: boolean }>(
-            `/api/notes?from=${k.from}&to=${k.to}`,
-            signal,
-          );
-        } catch (err) {
-          return absentFeed<NoteEvent>('notes', err, signal);
-        }
-      },
     };
   });
 

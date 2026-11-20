@@ -89,7 +89,7 @@
     type MoneyInvoiceItem,
     type MoneyPayer,
   } from '$lib/money';
-  import { moneyAccessAnyQueryOptions, SCOPE_BOLOS_CAP as BOLOS_CAP, scopeBolosQueryOptions } from '$lib/bolo-queries';
+  import { moneyAccessAnyQueryOptions, SCOPE_BOLOS_CAP as BOLOS_CAP, scopeBolosQueryOptions, scopeExpensesQueryOptions } from '$lib/bolo-queries';
   import { useCreation } from '$lib/stores/creation.svelte';
   import { appLocale, LOCALE_TAG, t, tradeFor } from '$lib/i18n';
   import { performanceStatusTone } from '$lib/performance';
@@ -187,15 +187,7 @@
         fetchJSON<{ items: MoneyInvoiceItem[] }>(`/api/invoices?${feedParams(k, { limit: String(INVOICES_CAP) })}`, signal),
     };
   });
-  const expensesOptions = toStore(() => {
-    const k = { ...filterIds, unresolved: scopeUnresolved, gated: noAccess };
-    return {
-      queryKey: ['expenses', { p: k.projectIds, w: k.workspaceIds }] as const,
-      enabled: !k.unresolved && !k.gated,
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
-        fetchJSON<{ items: ExpenseItem[] }>(`/api/expenses?${feedParams(k)}`, signal),
-    };
-  });
+  const expensesOptions = toStore(() => scopeExpensesQueryOptions(filterIds, !scopeUnresolved && !noAccess));
   const payersOptions = toStore(() => {
     const k = { ...filterIds, unresolved: scopeUnresolved, gated: noAccess };
     return {

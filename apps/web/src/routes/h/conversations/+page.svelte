@@ -60,6 +60,7 @@
   import { DEFAULT_ORDER, ORDERS, parseOrden, type Orden } from '$lib/conversation-order';
   import { dayMonth } from '$lib/datetime';
   import ConversationFeed from '$lib/components/ConversationFeed.svelte';
+  import { conversationFeedQueryOptions } from '$lib/conversation-feed-query';
   import WhatsAppImportDialog from '$lib/components/WhatsAppImportDialog.svelte';
   import { accentVarFor } from '$lib/utils/accent';
   import ChatDoneLine from '$lib/components/ChatDoneLine.svelte';
@@ -476,15 +477,8 @@
   );
   const teamQuery = createQuery(
     toStore(() => ({
-      queryKey: ['conversation-feed', filterIds.projectIds, filterIds.workspaceIds, '', 100, TEAM] as const,
+      ...conversationFeedQueryOptions(filterIds, { tag: TEAM }),
       enabled: !scopeUnresolved,
-      staleTime: 0,
-      queryFn: ({ signal }: { signal: AbortSignal }) => {
-        const p = new URLSearchParams({ etiqueta: TEAM, limit: '100' });
-        if (filterIds.projectIds.length > 0) p.set('project_ids', filterIds.projectIds.join(','));
-        if (filterIds.workspaceIds.length > 0) p.set('workspace_ids', filterIds.workspaceIds.join(','));
-        return fetchJSON<ConversationFeedView>(`/api/conversations/feed?${p}`, signal);
-      },
     })),
   );
   // The panel's read knows no area or type (ADR-177): with either on, its

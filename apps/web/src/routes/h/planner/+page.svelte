@@ -156,7 +156,7 @@
   import { lensOn } from '$lib/lenses.svelte';
   import { taskProjectId } from '$lib/task';
   import type { StepVM } from '$lib/components/planner/PlannerSteps.svelte';
-  import { createPlannerFeeds, primeAgendaWindow } from '$lib/planner-feeds.svelte';
+  import { agendaSeedWindow, agendaWindowEnd, createPlannerFeeds, primeAgendaWindow } from '$lib/planner-feeds.svelte';
   import { createPlannerEngine } from '$lib/planner-engine.svelte';
   import PlannerStatus from '$lib/components/planner/PlannerStatus.svelte';
   import { clashesInSeason, closedGapWindows } from '$lib/season';
@@ -266,16 +266,15 @@
       ? raw
       : null;
   })();
-  const agendaSeedEnd = addMonths(now.getFullYear(), now.getMonth() + 1, 0);
+  // One rule with the frame's warm-up, which asks for this window before the Planner opens.
+  const agendaSeedEnd = agendaSeedWindow(now, todayIso).end;
   let agendaFromIso = $state(agendaOpenIso ?? todayIso);
   let agendaEnd = $state(
     agendaOpenIso && agendaOpenIso.slice(0, 7) > firstOfMonth(agendaSeedEnd).slice(0, 7)
       ? { year: Number(agendaOpenIso.slice(0, 4)), month: Number(agendaOpenIso.slice(5, 7)) }
       : agendaSeedEnd,
   );
-  let agendaToIso = $derived(
-    addDaysIso(firstOfMonth(addMonths(agendaEnd.year, agendaEnd.month, 1)), -1),
-  );
+  let agendaToIso = $derived(agendaWindowEnd(agendaEnd));
   // Every ISO day across the span — the agenda renders ALL of them (empty
   // days included), so this replaces the "days with events" rule entirely.
   let agendaDays = $derived.by(() => {
