@@ -1680,7 +1680,10 @@
      previa por rol, sin salir del pase. Quien no puede editar sólo ve la vista
      previa (gestionar enlaces le daría 403). -->
 {#if perf}
+  <!-- keepsDraft: nothing here is a draft (links act at once, the role is a
+       view), so a role picked must not raise the «discard?» guard. -->
   <Dialog
+    keepsDraft
     bind:open={shareOpen}
     title={t('pass.share_title', locale)}
     size={sharePreviewing ? 'm' : 's'}
