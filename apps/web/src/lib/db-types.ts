@@ -7598,6 +7598,13 @@ export type Database = {
           performance_id: string
         }[]
       }
+      list_roadsheet_share_counts: {
+        Args: { p_performance_ids: string[] }
+        Returns: {
+          live_count: number
+          performance_id: string
+        }[]
+      }
       list_roadsheet_shares: {
         Args: { p_performance_id: string }
         Returns: {
@@ -8106,6 +8113,7 @@ export type Database = {
         }
         Returns: Json
       }
+      money_access_any: { Args: never; Returns: boolean }
       my_mail_signature: {
         Args: { p_workspace_id: string }
         Returns: {
