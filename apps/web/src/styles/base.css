@@ -2897,3 +2897,18 @@
     margin-inline: auto;
   }
 }
+
+/* NO ZOOM ON A FIELD (20-11-2026, Marco: tocar usuario y contraseña amplió
+   la página y se quedó ampliada al entrar). iOS zooms into any field whose
+   text is under 16 px, and the phone scale puts fields at ~14 px. On a touch
+   screen every field is at least 16 px; pinch-zoom stays the user's. In
+   `overrides` so a component's own field size does not slip under it. */
+@layer overrides {
+  @media (pointer: coarse) {
+    input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="button"], [type="submit"], [type="reset"]),
+    textarea,
+    select {
+      font-size: max(var(--text-field-min), 1em);
+    }
+  }
+}
