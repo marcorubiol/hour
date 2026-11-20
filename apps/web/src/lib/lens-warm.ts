@@ -10,7 +10,7 @@
  * data or is too slow to spare it.
  *
  * NOTHING HERE HAS A KEY OF ITS OWN. Every read comes from the same builder
- * the section uses (`agendaFeedOptions`, `conversationFeedQueryOptions`,
+ * the section uses (`agendaFeedOptions`, `gridFeedOptions`, `decisionsFeedOptions`, `conversationFeedQueryOptions`,
  * `scopeExpensesQueryOptions`, `planAccessQueryOptions`), under the scope the
  * pins give: a warm-up under another key would be a request thrown away. What
  * is warmed is what each section paints first; the rest still arrives when the
@@ -22,8 +22,14 @@ import { scopeExpensesQueryOptions } from './bolo-queries';
 import { conversationFeedQueryOptions } from './conversation-feed-query';
 import { TEAM } from './conversation-tags';
 import { planAccessQueryOptions } from './plan-create';
-import type { PlannerView } from './planner';
-import { agendaFeedOptions, agendaSeedWindow } from './planner-feeds.svelte';
+import { PLANNER_DEFAULT_VIEW, type PlannerView } from './planner';
+import {
+  agendaFeedOptions,
+  agendaSeedWindow,
+  decisionsFeedOptions,
+  gridFeedOptions,
+  monthSeedWindow,
+} from './planner-feeds.svelte';
 
 /** An answer newer than this is not asked for again by the warm-up. */
 export const WARM_FRESH_MS = 5 * 60_000;
@@ -41,7 +47,7 @@ export interface LensWarmInput {
   books: boolean;
   /** The scope's filter, as every section builds it from the pins. */
   filterIds: { projectIds: string[]; workspaceIds: string[] };
-  /** The drawing the Planner opens in for this person; null is the Agenda. */
+  /** The drawing the Planner opens in for this person; null is the default. */
   plannerView: PlannerView | null;
   now: Date;
   /** Today in the viewer's zone. */
@@ -52,15 +58,23 @@ export interface LensWarmInput {
 export function lensWarmReads(input: LensWarmInput): WarmRead[] {
   const reads: WarmRead[] = [];
   if (input.planner) {
-    const view = input.plannerView ?? 'agenda';
-    // The Agenda and the Board read the book's window; the Month and the Day
-    // read their own, which depends on where the person left them.
+    const view = input.plannerView ?? PLANNER_DEFAULT_VIEW;
+    const scope = { unresolved: false, ...input.filterIds };
+    // Each drawing reads its own window: the book for the Agenda and the
+    // Board, the run of months for the Month. Only the one the person opens
+    // in is asked.
     if (view === 'agenda' || view === 'board') {
       const { from, to } = agendaSeedWindow(input.now, input.todayIso);
-      const feeds = agendaFeedOptions({ from, to, unresolved: false, ...input.filterIds });
+      const feeds = agendaFeedOptions({ from, to, ...scope });
       reads.push(feeds.performances, feeds.dates, feeds.availability);
       if (view === 'agenda') reads.push(feeds.notes);
+    } else if (view === 'month') {
+      const { from, to } = monthSeedWindow(input.now);
+      const feeds = gridFeedOptions({ from, to, ...scope });
+      reads.push(feeds.performances, feeds.dates, feeds.availability);
     }
+    // What is pending a decision, whatever the drawing.
+    reads.push(decisionsFeedOptions(scope, input.todayIso));
     reads.push(planAccessQueryOptions());
   }
   if (input.conversations) {

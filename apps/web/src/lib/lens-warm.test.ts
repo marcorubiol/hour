@@ -3,7 +3,13 @@ import { describe, expect, test, vi } from 'vitest';
 import { scopeExpensesQueryOptions } from './bolo-queries';
 import { conversationFeedQueryOptions } from './conversation-feed-query';
 import { lensWarmReads, lineSparesData, warmLenses, type LensWarmInput } from './lens-warm';
-import { agendaFeedOptions, agendaSeedWindow } from './planner-feeds.svelte';
+import {
+  agendaFeedOptions,
+  agendaSeedWindow,
+  decisionsFeedOptions,
+  gridFeedOptions,
+  monthSeedWindow,
+} from './planner-feeds.svelte';
 
 const now = new Date('2026-11-20T10:00:00Z');
 const base: LensWarmInput = {
@@ -52,6 +58,7 @@ describe('lensWarmReads: what the frame asks before the first tap', () => {
 
   test('the Month reads its own window: the book is not asked for it; the Board has no notes', () => {
     expect(keys({ ...base, plannerView: 'month' }).some((k) => k.includes('planner-agenda'))).toBe(false);
+    expect(keys(base).some((k) => k.includes('"planner-performances"'))).toBe(false);
     const board = keys({ ...base, plannerView: 'board' });
     expect(board.some((k) => k.includes('planner-agenda-performances'))).toBe(true);
     expect(board.some((k) => k.includes('planner-agenda-notes'))).toBe(false);
@@ -120,5 +127,26 @@ describe('warmLenses', () => {
     const queryFn = vi.fn(async () => 1);
     await warmLenses(c, [{ queryKey: ['a'], queryFn }], () => true);
     expect(queryFn).not.toHaveBeenCalled();
+  });
+});
+
+describe('lensWarmReads: the Month and what is pending', () => {
+  test('a person who opens in the Month gets the Month’s window, under its own keys', () => {
+    const { from, to } = monthSeedWindow(now);
+    expect(from <= '2026-11-01').toBe(true);
+    expect(to >= '2027-01-31').toBe(true);
+    const grid = gridFeedOptions({ from, to, unresolved: false, ...base.filterIds });
+    const got = keys({ ...base, plannerView: 'month' });
+    for (const read of [grid.performances, grid.dates, grid.availability]) {
+      expect(got).toContain(JSON.stringify(read.queryKey));
+    }
+  });
+
+  test('the decisions window is asked whatever the drawing', () => {
+    const key = JSON.stringify(decisionsFeedOptions({ unresolved: false, ...base.filterIds }, '2026-11-20').queryKey);
+    for (const plannerView of [null, 'agenda', 'board', 'month'] as const) {
+      expect(keys({ ...base, plannerView })).toContain(key);
+    }
+    expect(keys({ ...base, planner: false })).not.toContain(key);
   });
 });
