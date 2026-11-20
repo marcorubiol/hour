@@ -8557,7 +8557,7 @@ Encargo `revision-tdah/brief.md`, fase 3 (Marco, 19-11).
 
 **Cómo se revierte.** Revertir el commit.
 
-## [2026-11-19] ADR-230 · El Día enseña, el pase escribe (fase 4 de ADR-223; enmienda ADR-090 P3 «las horas se escriben en el día»)
+## [2026-11-19] ADR-231 · El Día enseña, el pase escribe (fase 4 de ADR-223; enmienda ADR-090 P3 «las horas se escriben en el día»)
 
 **Contexto.** Las horas de una función o de un ensayo se escribían en dos sitios: bajo la tira del Día (`RunningOrder`) y en el pase. Con la regla «tocas una cosa, se abre su pase» (ADR-223) el Día pasa a enseñar y el pase a escribir.
 
@@ -8570,3 +8570,41 @@ Encargo `revision-tdah/brief.md`, fase 3 (Marco, 19-11).
 **Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`. E2E tocados: `date-edit.spec.ts` y `peek.spec.ts` (el lápiz de la fecha sustituye a «Edit»).
 
 **Cómo se revierte.** Revertir el commit.
+
+## [2026-11-20] ADR-230 · La vista previa por rol vive en «Compartir» y la página de la hoja redirige al pase (fase 4 de ADR-222)
+Cuarta fase de «el pase es la hoja de ruta». Marco decidió (20-11) que la vista previa por rol deje de ser una página
+del operador y viva dentro de «Compartir», en el pase.
+
+**Contexto.** Tras ADR-224 la página `/h/<espacio>/performance/<slug>/roadsheet` solo hacía tres cosas: las pastillas
+«Ver como», el pase en lectura para ese rol y la lista de enlaces (que ya estaba también en «Compartir»). Un editor
+tenía dos sitios para compartir; quien no puede editar tenía un enlace plano a esa página.
+
+**Decisión.**
+1. **`RoadsheetPreview`** (`components/record/`): el selector «Ver como» (el `Segmented` de la app, no pastillas) y el
+   `PassSheet` del rol elegido. Misma consulta que la página (`['roadsheet', { ws, slug, role }]`, mismo endpoint,
+   `keepPreviousData`, el estado de carga y el reintento de `RecordState`). El servidor sigue cortando por rol: cambiar de
+   rol vuelve a pedir; el navegador nunca guarda secciones ocultas.
+2. **En «Compartir».** Un editor ve los enlaces y, debajo, una fila «Ver como» con los cuatro roles; elegir uno pone la
+   vista previa en lugar de los enlaces, con «‹ Enlaces» para volver. Con vista previa el diálogo pasa de tamaño `s` a
+   `m`. Quien no puede editar abre el mismo diálogo pero solo ve la vista previa (gestionar enlaces le daría 403): el
+   bloque del diálogo ya no depende de `canEdit`, solo la lista de enlaces. Los dos enlaces planos que había para ellos
+   (el verbo de «Falta» y el acto «Hoja» del pase) son ahora el botón que abre el diálogo.
+3. **Por la dirección.** `/h/<espacio>/performance/<slug>?share=1` abre «Compartir» al cargar el pase (se lee una vez
+   cuando la función está cargada, como `#board`; el parámetro se queda). Un enlace con `share` no abre el vistazo
+   (`peekFromLink`): va a la página.
+4. **La página antigua redirige.** `/roadsheet` pasa a 301 hacia el pase con `?share=1`: en una carga completa, en
+   `hooks.server.ts` (la app no renderiza en servidor bajo `/h`, como `/h/desk`); dentro de la app, en el `+page.ts` de
+   la ruta. `RoadsheetsModule` enlaza ya al pase con `?share=1`.
+5. **Se borra** el código y los estilos de la página, incluidos sus estilos de impresión: la vista previa en el diálogo no
+   se imprime; el enlace público sigue imprimiéndose como antes. Claves de texto retiradas (cuatro idiomas):
+   `roadsheet.open`, `roadsheet.back`, `roadsheet.back@music`, `roadsheet.public_links`, `roadsheet.public_links_hint`,
+   `ahora.sheet`, `pass.share_open_sheet`; nueva `pass.share_back`.
+
+**Lo que no cambia.** Sin esquema, API, permisos ni migración. `CACHE_SCHEMA` se queda: la clave de consulta y la
+respuesta son las mismas. El enlace público y sus roles, ni tocados. `Segmented` gana un `optionTestid` opcional.
+
+**Pruebas.** `roadsheet-share.spec.ts` comprueba «Ver como» → vista previa → «‹ Enlaces» y que la página antigua cae en
+el pase con el diálogo abierto; `ahora.spec.ts` sigue exigiendo que Hoy no lleve enlace a la hoja. E2E no corrido aquí.
+
+**Cómo se revierte.** Revertir el commit: la página vuelve con su código, las claves y los enlaces planos; el hook
+y el `+page.ts` de redirección se van con él.

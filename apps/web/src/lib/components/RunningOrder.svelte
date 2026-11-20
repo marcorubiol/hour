@@ -114,7 +114,7 @@
     title?: string | null;
     /** Called once the doc says the rows moved (the page refetches itself). */
     onwritten?: () => void;
-    /** Draw the hours, write none (the Day shows; the pase writes, ADR-230). */
+    /** Draw the hours, write none (the Day shows; the pase writes, ADR-231). */
     readonly?: boolean;
   }
 

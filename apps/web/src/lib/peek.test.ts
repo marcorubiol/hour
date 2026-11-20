@@ -136,6 +136,8 @@ describe('peekFromLink', () => {
 
   it('leaves alone what is not a record: a road sheet, a project, Settings, another site', () => {
     expect(peekFromLink(url('/h/muk-cia/performance/girona/roadsheet'), lens)).toBeNull();
+    // «Compartir» is a dialog of the pass's page, not of the peek (ADR-230).
+    expect(peekFromLink(url('/h/muk-cia/performance/girona?share=1'), lens)).toBeNull();
     expect(peekFromLink(url('/h/muk-cia/project/sirena/'), lens)).toBeNull();
     expect(peekFromLink(url('/h/muk-cia/settings'), lens)).toBeNull();
     expect(peekFromLink(new URL('https://elsewhere.test/h/muk-cia/performance/girona'), lens)).toBeNull();
