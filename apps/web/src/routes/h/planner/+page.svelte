@@ -135,6 +135,7 @@
     dayKeyInTz,
     monthSpanWeeks,
     resolvePlannerView,
+    type PlannerEntryView,
     PLANNER_DEFAULT_VIEW,
     type PlannerView,
     type Conflict,
@@ -303,8 +304,25 @@
   // without that the Agenda. The stored drawing needs the workspaces feed, so
   // the first paint is the URL's (or the Agenda) and the entry effect below
   // moves it once the feed answers.
+  // …unless the frame already holds that feed (it does on any arrival from
+  // another section): then the first paint is the stored drawing itself.
+  // Mounting as the Agenda for an instant asked for the Agenda's whole window
+  // on behalf of a person who opens in the Month.
+  const bootClient = useQueryClient();
+  function cachedEntryView(): PlannerEntryView | null {
+    const ws = (bootClient.getQueryData<{ items: NavWorkspace[] }>(['workspaces'])?.items ?? []) as NavWorkspace[];
+    if (ws.length === 0) return null;
+    const projects = bootClient.getQueryData<{ items: Parameters<typeof buildProjectIndex>[1] }>(activeProjectsQueryOptions().queryKey)?.items ?? [];
+    const lines = bootClient.getQueryData<{ items: RawLine[] }>(allLinesQueryOptions().queryKey)?.items ?? [];
+    return plannerEntryView(
+      workspacesOnScreen('', pins.pins, ws, buildLineIndex(ws, lines), buildProjectIndex(ws, projects)),
+    );
+  }
   let view = $state<PlannerView>(
-    resolvePlannerView(new URL(location.href).searchParams.get('view')),
+    (() => {
+      const urlView = new URL(location.href).searchParams.get('view');
+      return resolvePlannerView(urlView, urlView ? null : cachedEntryView());
+    })(),
   );
   // The Board's lane axis (ADR-094, ADR-095 §9) — same persistence chain
   // as the projection: ?lanes= → localStorage → 'scope'. The dial says
@@ -572,7 +590,8 @@
     if (!entryOwed || !$workspacesQuery.data || scopeUnresolved) return;
     entryOwed = false;
     const v = entryView;
-    if (v && v !== PLANNER_DEFAULT_VIEW && untrack(() => view) === PLANNER_DEFAULT_VIEW) {
+    const shown = untrack(() => view);
+    if (v && v !== PLANNER_DEFAULT_VIEW && (shown === PLANNER_DEFAULT_VIEW || shown === v)) {
       view = v;
       syncUrl('replace');
     }

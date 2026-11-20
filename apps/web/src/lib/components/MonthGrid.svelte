@@ -21,6 +21,8 @@
    */
   import { createQuery } from '@tanstack/svelte-query';
   import { bookingModeOf } from '$lib/booking-mode';
+  import { untrack } from 'svelte';
+  import { slide } from 'svelte/transition';
   import type { Attachment } from 'svelte/attachments';
   import { isFreeSpace, longPress } from '$lib/cell-create';
   import { dayKeyInTz, monthUnderStrip } from '$lib/planner';
@@ -466,7 +468,20 @@
     mq.addEventListener('change', on);
     return () => mq.removeEventListener('change', on);
   });
-  let picked = $state<string | null>(todayIso);
+  /* THE DAY OPENS, IT DOES NOT APPEAR (Marco, 20-11-2026: «que haya un
+     poquito de efecto, ahora va a cero»). The picked day unfolds under its
+     week and folds back when another week takes it; inside one week the day
+     only changes, nothing moves. Today is picked a moment after the paper is
+     up, so arriving at the Month shows it opening too. Short, and not at all
+     for a reader who asked for less motion. */
+  let picked = $state<string | null>(null);
+  $effect(() => {
+    untrack(() => {
+      if (picked === null) picked = todayIso;
+    });
+  });
+  const calmMotion = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const PICK_UNFOLD = { duration: calmMotion ? 0 : 200 };
   function pick(iso: string) {
     picked = picked === iso ? null : iso;
   }
@@ -1409,7 +1424,7 @@
       {@const iso = picked}
       {@const list = pickedEntries(iso)}
       <!-- The picked day, whole, under its week (ADR-209). -->
-      <div class="cal__pick" data-testid="month-pick">
+      <div class="cal__pick" data-testid="month-pick" transition:slide={PICK_UNFOLD}>
         <h3 class="cal__pick-h">
           {localeWeekdayShort(iso, locale)} {Number(iso.slice(8, 10))} {localeMonthShort(iso, locale)}
           {#if onDayOpen}
