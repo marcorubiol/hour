@@ -10,6 +10,7 @@
 
 import { fetchJSON } from './api';
 import type { MoneyBolo } from './money';
+import type { ExpenseItem } from './expense';
 
 /**
  * Los bolos del proyecto, la fila entera de Cuentas: el selector lee lo suyo
@@ -44,6 +45,19 @@ export function scopeBolosQueryOptions(k: { projectIds: string[]; workspaceIds: 
     enabled,
     queryFn: ({ signal }: { signal: AbortSignal }) =>
       fetchJSON<{ items: MoneyBolo[] }>(`/api/money/bolos?${params}`, signal),
+  };
+}
+
+/** Los gastos del ámbito: Cuentas y el calentamiento del marco (`$lib/lens-warm`), una clave. */
+export function scopeExpensesQueryOptions(k: { projectIds: string[]; workspaceIds: string[] }, enabled = true) {
+  const params = new URLSearchParams();
+  if (k.projectIds.length > 0) params.set('project_ids', k.projectIds.join(','));
+  if (k.workspaceIds.length > 0) params.set('workspace_ids', k.workspaceIds.join(','));
+  return {
+    queryKey: ['expenses', { p: k.projectIds, w: k.workspaceIds }] as const,
+    enabled,
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
+      fetchJSON<{ items: ExpenseItem[] }>(`/api/expenses?${params}`, signal),
   };
 }
 

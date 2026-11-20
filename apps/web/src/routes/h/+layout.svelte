@@ -83,7 +83,9 @@
   import { fetchJSON } from '$lib/api';
   import { useAhoraPreload } from '$lib/ahora-feeds.svelte';
   import { viewerTimeZone } from '$lib/datetime';
-  import { dayKeyInTz } from '$lib/planner';
+  import { dayKeyInTz, plannerEntryView } from '$lib/planner';
+  import { lensWarmReads, lineSparesData, warmLenses } from '$lib/lens-warm';
+  import { moneyAccessAnyQueryOptions } from '$lib/bolo-queries';
   import {
     adoptCachedUser,
     clearSession,
@@ -605,6 +607,31 @@
         // A failure here is only a tab that loads its code when pressed, as before.
         await preloadCode(lensHref(id)).catch(() => {});
       }
+      // Then their data ($lib/lens-warm), one read at a time: the first tap
+      // on a section finds what it paints first. Only with the scope
+      // resolved (the keys carry it), the page in view and a line that can
+      // spare it.
+      if (cancelled || !untrack(() => navCachesSettled) || document.visibilityState !== 'visible') return;
+      if (!lineSparesData(navigator)) return;
+      const on = untrack(() => routedLens);
+      const scope = untrack(() => createScope);
+      const now = new Date();
+      await warmLenses(
+        shellQueryClient,
+        lensWarmReads({
+          planner: on !== 'planner' && lensOn('planner'),
+          conversations: on !== 'conversations' && lensOn('conversations'),
+          books:
+            on !== 'books' &&
+            lensOn('books') &&
+            shellQueryClient.getQueryData<{ read_money: boolean }>(moneyAccessAnyQueryOptions().queryKey)?.read_money === true,
+          filterIds: { projectIds: scope.projectIds, workspaceIds: scope.workspaceIds },
+          plannerView: plannerEntryView(untrack(() => onScreen)),
+          now,
+          todayIso: dayKeyInTz(now.toISOString(), viewerTimeZone()),
+        }),
+        () => cancelled,
+      );
     }, 2_500);
     return () => {
       cancelled = true;

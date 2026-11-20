@@ -156,7 +156,14 @@
   import { lensOn } from '$lib/lenses.svelte';
   import { taskProjectId } from '$lib/task';
   import type { StepVM } from '$lib/components/planner/PlannerSteps.svelte';
-  import { createPlannerFeeds, primeAgendaWindow } from '$lib/planner-feeds.svelte';
+  import {
+    MONTH_SPAN,
+    agendaSeedWindow,
+    agendaWindowEnd,
+    createPlannerFeeds,
+    monthSeedWindow,
+    primeAgendaWindow,
+  } from '$lib/planner-feeds.svelte';
   import { createPlannerEngine } from '$lib/planner-engine.svelte';
   import PlannerStatus from '$lib/components/planner/PlannerStatus.svelte';
   import { clashesInSeason, closedGapWindows } from '$lib/season';
@@ -212,12 +219,12 @@
      pages. The Day reads the same window: it drags it to its own month. */
   type Ym = { year: number; month: number };
   const ymKey = (m: Ym) => m.year * 12 + m.month;
-  /** Months loaded at once when the paper opens or jumps somewhere new. */
-  const MONTH_SPAN = 3;
   /** And the most it ever holds: past this the scroll stops asking. */
   const MONTH_SPAN_MAX = 24;
-  let mesFrom = $state<Ym>({ year: now.getFullYear(), month: now.getMonth() + 1 });
-  let mesTo = $state<Ym>(addMonths(now.getFullYear(), now.getMonth() + 1, MONTH_SPAN - 1));
+  // One rule with the frame's warm-up, which asks for this window before the Planner opens.
+  const monthSeed = monthSeedWindow(now);
+  let mesFrom = $state<Ym>(monthSeed.mesFrom);
+  let mesTo = $state<Ym>(monthSeed.mesTo);
   function openMonthsAt(m: Ym) {
     mesFrom = m;
     mesTo = addMonths(m.year, m.month, MONTH_SPAN - 1);
@@ -266,16 +273,15 @@
       ? raw
       : null;
   })();
-  const agendaSeedEnd = addMonths(now.getFullYear(), now.getMonth() + 1, 0);
+  // One rule with the frame's warm-up, which asks for this window before the Planner opens.
+  const agendaSeedEnd = agendaSeedWindow(now, todayIso).end;
   let agendaFromIso = $state(agendaOpenIso ?? todayIso);
   let agendaEnd = $state(
     agendaOpenIso && agendaOpenIso.slice(0, 7) > firstOfMonth(agendaSeedEnd).slice(0, 7)
       ? { year: Number(agendaOpenIso.slice(0, 4)), month: Number(agendaOpenIso.slice(5, 7)) }
       : agendaSeedEnd,
   );
-  let agendaToIso = $derived(
-    addDaysIso(firstOfMonth(addMonths(agendaEnd.year, agendaEnd.month, 1)), -1),
-  );
+  let agendaToIso = $derived(agendaWindowEnd(agendaEnd));
   // Every ISO day across the span — the agenda renders ALL of them (empty
   // days included), so this replaces the "days with events" rule entirely.
   let agendaDays = $derived.by(() => {

@@ -17,7 +17,6 @@
 
   import { createQuery, keepPreviousData } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
-  import { fetchJSON } from '$lib/api';
   import ChatRow from '$lib/components/ChatRow.svelte';
   import ChatDone from '$lib/components/ChatDone.svelte';
   import EmptyLine from '$lib/components/EmptyLine.svelte';
@@ -29,6 +28,7 @@
   import { relationLabel } from '$lib/conversation-relation';
   import { SALES, TEAM, keyLabel, type WorkspaceTag } from '$lib/conversation-tags';
   import { feedKey, feedSections, feedTurnRow, type ConversationFeedView, type FeedConversationView, type FeedThreadRow } from '$lib/conversation-feed';
+  import { FEED_PAGE, conversationFeedQueryOptions } from '$lib/conversation-feed-query';
   import { THREAD_REFRESH_MS, boloDays, feedHref, feedThreadName, feedTitle, groupHref } from '$lib/threads';
 
   interface Props {
@@ -83,7 +83,7 @@
   }: Props = $props();
 
   const tz = viewerTimeZone();
-  const PAGE = 100;
+  const PAGE = FEED_PAGE;
   let limit = $state(PAGE);
   // Otra búsqueda, otro alcance u otra etiqueta empiezan por la primera página.
   let scopeKey = $derived(JSON.stringify([filters.projectIds, filters.workspaceIds, q, tag]));
@@ -92,26 +92,14 @@
     limit = PAGE;
   });
 
-  function params(): string {
-    const p = new URLSearchParams();
-    if (filters.projectIds.length > 0) p.set('project_ids', filters.projectIds.join(','));
-    if (filters.workspaceIds.length > 0) p.set('workspace_ids', filters.workspaceIds.join(','));
-    if (tag) p.set('etiqueta', tag);
-    if (q) p.set('q', q);
-    p.set('limit', String(limit));
-    return p.toString();
-  }
-
   const feedQuery = createQuery(
     toStore(() => ({
-      queryKey: ['conversation-feed', filters.projectIds, filters.workspaceIds, q, limit, tag] as const,
+      // One builder for key and URL ($lib/conversation-feed-query): the frame warms this read.
+      ...conversationFeedQueryOptions(filters, { q, limit, tag }),
       enabled: filters.enabled,
-      staleTime: 0,
       refetchInterval: THREAD_REFRESH_MS,
       // «Ver más» no vacía la lista mientras llega la página siguiente.
       placeholderData: keepPreviousData,
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
-        fetchJSON<ConversationFeedView>(`/api/conversations/feed?${params()}`, signal),
     })),
   );
 
