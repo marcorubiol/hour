@@ -90,6 +90,8 @@
   import { blockDrawn } from '$lib/dashboard-blocks';
   import { daysAgoLabel } from '$lib/conversation';
   import { upcoming } from '$lib/pulse';
+  import { splitWaiting } from '$lib/set-aside';
+  import { ensureSetAside, putAside, setAside } from '$lib/set-aside.svelte';
   import { agendaDay, agendaPoints, dayAgenda } from '$lib/day-agenda';
   import { createPulseFeeds, pulseSlipContext } from '$lib/pulse-feeds.svelte';
   import { perfDayKey, perfWorkspaceId, type SlipKind } from '$lib/month-events';
@@ -397,7 +399,10 @@
     );
   });
 
-  let feed = $derived(
+  // «Ahora no» and the old (ADR-231): what the viewer set aside, and what has
+  // waited more than a month, leave the feed before anything counts it.
+  void ensureSetAside();
+  let fullFeed = $derived(
     buildDeskFeed(
       {
         conversations: (readConversations ? scopedConversations : []) as DeskConvInput[],
@@ -411,7 +416,25 @@
       locale,
     ),
   );
+  let split = $derived(splitWaiting(fullFeed, setAside.items, today));
+  let feed = $derived(split.feed);
   let later = $derived(laterSummary(feed));
+
+  async function setRowAside(item: DeskItem, until: string | null) {
+    try {
+      await putAside(item.id, until);
+    } catch (err) {
+      addToast({ tone: 'danger', title: t('desk.toast_change_failed', locale), message: err instanceof ApiError ? err.message : t('perf.unexpected', locale) });
+      return;
+    }
+    if (!until) return;
+    addToast({
+      tone: 'info',
+      message: t('desk.aside_done', locale, { name: item.subject }),
+      duration: UNDO_MS,
+      action: { label: t('desk.undo', locale), run: () => void setRowAside(item, null) },
+    });
+  }
 
   // Everything that waits, ranked: the pills count it all, the rows draw
   // its head (ADR-202 § 7): none in calm (ADR-203 § 5) nor on a gig day
@@ -982,6 +1005,9 @@
           onaccept={(id) => $patchTask.mutate({ id, patch: { origin: 'manual' } })}
           {deciding}
           ondecide={decide}
+          aside={split.aside}
+          old={split.old}
+          onaside={setRowAside}
         />
       </div>
       {/if}

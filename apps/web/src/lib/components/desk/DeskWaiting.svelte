@@ -29,6 +29,8 @@
   import type { DeskBucket, DeskConcern, DeskItem, DeskRun, Waiting } from '$lib/desk-feed';
   import { waitingDrawsPills, waitingPills, type WaitingKind } from '$lib/hoy';
   import ChatRow from '$lib/components/ChatRow.svelte';
+  import Menu from '$lib/components/Menu.svelte';
+  import { SET_ASIDE_SPANS, plusDays } from '$lib/set-aside';
   import type { ChatContext, ChatLine } from '$lib/chat-row';
 
   interface Props {
@@ -67,6 +69,12 @@
      * words and the last thing said. Null draws the plain subject.
      */
     chat?: (item: DeskItem) => ChatLine | null;
+    /** Set aside by the viewer («Ahora no», ADR-231), soonest back first. */
+    aside?: { item: DeskItem; until: string }[];
+    /** What has waited more than a month (ADR-231), oldest first. */
+    old?: DeskItem[];
+    /** «Ahora no» until a day, or back now with null. Without it, no «ahora no». */
+    onaside?: (item: DeskItem, until: string | null) => void;
   }
 
   let {
@@ -91,7 +99,19 @@
     deciding = null,
     ondecide,
     chat,
+    aside = [],
+    old = [],
+    onaside,
   }: Props = $props();
+
+  let asideOpen = $state(false);
+  let oldOpen = $state(false);
+  const asideSpanWord = (n: number) => t(`desk.aside_span_${n}`, locale);
+  /** «vuelve el 23 nov», «vuelve mañana». */
+  const backWord = (iso: string) =>
+    iso === plusDays(today, 1)
+      ? t('desk.aside_back_tomorrow', locale)
+      : t('desk.aside_back', locale, { day: localeDayMonth(iso, locale) });
 
   /**
    * The chat row's context in Hoy: the verb is already the turn's word
@@ -232,6 +252,18 @@
       {/if}
       <span class="row__when" class:row__when--over={item.overdue}>{whenOf(item)}</span>
       <span class="row__acts">
+        {#if onaside}
+          <!-- «Ahora no» (ADR-231): the row leaves for a few days, only for
+               whoever sets it aside; nothing is deleted. -->
+          <Menu
+            align="end"
+            label={t('desk.aside_aria', locale, { subject: item.subject })}
+            triggerClass="row__aside"
+            items={SET_ASIDE_SPANS.map((n) => ({ label: asideSpanWord(n), onclick: () => onaside(item, plusDays(today, n)) }))}
+          >
+            {#snippet trigger()}{t('desk.aside', locale)}{/snippet}
+          </Menu>
+        {/if}
         {#if item.concern === 'task'}
           <button
             type="button"
@@ -359,6 +391,47 @@
     {#if feedCount > shown.length}
       <button type="button" class="more" onclick={() => showAll(true)}>{t('desk.see_all', locale)} →</button>
     {/if}
+  {/if}
+
+  {#if !loading && !errored && rows > 0 && (aside.length > 0 || old.length > 0)}
+    <!-- The two folds at the foot (ADR-231): what you set aside, and what has
+         waited more than a month. Folded; neither counts in the head. -->
+    <div class="folds">
+      {#if aside.length > 0}
+        <button type="button" class="fold" aria-expanded={asideOpen} data-testid="desk-aside" onclick={() => (asideOpen = !asideOpen)}
+          >{t('desk.aside_fold', locale)} · {aside.length} <span aria-hidden="true">{asideOpen ? '↑' : '↓'}</span></button
+        >
+        {#if asideOpen}
+          <ul class="list list--aside">
+            {#each aside as a (a.item.id)}
+              <li class="row row--away">
+                <span class="row__verb">{a.item.concern === 'task' ? t('desk.concern_task', locale) : t(`desk.verb_${a.item.verbKey}`, locale)}</span>
+                <span class="row__subject">{a.item.subject}</span>
+                <span class="row__when">{backWord(a.until)}</span>
+                <span class="row__acts">
+                  {#if onaside}<button
+                      type="button"
+                      class="row__act btn--secondary btn--xs"
+                      aria-label={t('desk.aside_bring_aria', locale, { subject: a.item.subject })}
+                      onclick={() => onaside(a.item, null)}>{t('desk.aside_bring', locale)}</button
+                    >{/if}
+                </span>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      {/if}
+      {#if old.length > 0}
+        <button type="button" class="fold" aria-expanded={oldOpen} data-testid="desk-old" onclick={() => (oldOpen = !oldOpen)}
+          >{t('desk.old_fold', locale)} · {old.length} <span aria-hidden="true">{oldOpen ? '↑' : '↓'}</span></button
+        >
+        {#if oldOpen}
+          <ul class="list list--old">
+            {#each old as item (item.id)}{@render row(item)}{/each}
+          </ul>
+        {/if}
+      {/if}
+    </div>
   {/if}
 </section>
 
@@ -513,6 +586,70 @@
   }
   .row__remove:hover {
     color: var(--danger);
+  }
+  /* «Ahora no» (ADR-231): a word in the verb's mono, faint; on a mouse it
+     shows with the row, like the ×. Its button is the Menu's. */
+  .row__acts :global(.row__aside) {
+    padding: 0;
+    border: 0;
+    background: none;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--mono-letter-spacing);
+    color: var(--text-faint);
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .row__acts :global(.row__aside:hover),
+  .row__acts :global(.row__aside[aria-expanded='true']) {
+    color: var(--text-color);
+  }
+  @media (hover: hover) {
+    .row__acts :global(.row__aside) {
+      opacity: 0;
+      transition: opacity var(--transition);
+    }
+    .row:hover .row__acts :global(.row__aside),
+    .row:focus-within .row__acts :global(.row__aside) {
+      opacity: 1;
+    }
+  }
+  @media (pointer: coarse) {
+    .row__acts :global(.row__aside) {
+      min-block-size: var(--touch-target);
+    }
+  }
+  .folds {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-xs);
+    margin-block-start: var(--space-s);
+  }
+  .fold {
+    padding: 0;
+    border: 0;
+    background: none;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--mono-letter-spacing);
+    color: var(--text-faint);
+    cursor: pointer;
+  }
+  .fold:hover {
+    color: var(--text-color);
+  }
+  @media (pointer: coarse) {
+    .fold {
+      min-block-size: var(--touch-target);
+    }
+  }
+  .list--aside,
+  .list--old {
+    align-self: stretch;
+  }
+  .row--away .row__subject {
+    color: var(--text-muted);
   }
   .more {
     margin-block-start: var(--space-s);
@@ -679,13 +816,17 @@
       column-gap: var(--space-s);
       row-gap: 0;
     }
-    .row:not(:has(.row__acts > *)) {
+    .row:not(:has(.row__acts > :global(*))) {
       grid-template-areas: 'verb subject when';
     }
-    /* A task's only action is its ×: it stays at the end of the line. */
-    .row--task {
-      grid-template-columns: 4.25rem minmax(0, 1fr) auto auto;
-      grid-template-areas: 'verb subject when acts';
+    /* «Ahora no» and a task's × are small: under the when, at the end, beside
+       the subject's second line rather than on a line of their own (ADR-231).
+       A row with a real button («Liberar») keeps its own line. */
+    .row:has(.row__acts > :global(*)):not(:has(.row__act)) {
+      grid-template-areas: 'verb subject when' 'verb subject acts';
+    }
+    .row:has(.row__acts > :global(*)):not(:has(.row__act)) .row__acts {
+      justify-self: end;
     }
     .row__verb {
       grid-area: verb;

@@ -8579,3 +8579,30 @@ primera cosa útil.
 **Sin cambios de datos.** Sin esquema, API, textos nuevos ni `CACHE_SCHEMA`. No toca el service worker.
 
 **Cómo se revierte.** Revertir el commit.
+
+## [2026-11-20] ADR-231 · «Ahora no» y «Antiguo» en «Te espera» (fase 5 de la revisión TDAH; enmienda ADR-202 § 7)
+
+Encargo `revision-tdah/brief.md`, fase 5 (Marco, 19-11). Una lista que solo crece riñe; una persona con TDAH necesita
+poder decir «hoy no» sin borrar nada.
+
+1. **«Ahora no».** Cada fila de «Te espera» lleva «ahora no» (con el ratón sale al pasar por la fila; en el teléfono
+   está siempre, pequeño, bajo la fecha). Abre tres plazos: hasta mañana, tres días, una semana. La fila se va de la
+   cabeza del bloque, de las pastillas, de la cuenta y de «Ver todo por días», y vuelve sola el día elegido.
+2. **Es de quien aparta.** No se toca la conversación, la tarea ni la factura: para el resto del equipo la fila sigue
+   donde estaba. Por eso no se reutiliza el «no esta vez» de Conversaciones (`not_now_until`), que cierra la relación
+   para todo el espacio. Dato nuevo: `desk_set_aside` (una fila por persona, `{ id de la fila: día en que vuelve }`),
+   solo legible por su dueño y escrita solo por `set_aside_desk_item`. Migración `20261120030000_desk_set_aside`,
+   rollback `build/runbooks/rollback-20261120-desk-set-aside.sql`, RLS en `tests/rls/desk-set-aside.test.ts`.
+3. **«Apartado · N»** al pie, plegado: cada fila dice cuándo vuelve y tiene «Traer ya». Al apartar, el aviso trae
+   «Deshacer».
+4. **«Antiguo · N».** Lo que lleva más de un mes esperando (su día, antes de hoy menos 30) baja a un pliegue al pie y
+   sale de la cuenta y de las «vencidas» de la cabecera. Abierto, son las filas de siempre.
+5. Los dos pliegues no se dibujan en calma ni en día de función (cuando el bloque no dibuja filas).
+
+**Sin la tabla, la página es la de antes**: la lectura falla en silencio y no hay nada apartado; así el código puede
+llegar a producción antes que la migración. No cambia lo que guarda la caché (`CACHE_SCHEMA` igual: lo apartado se lee
+aparte, como lo visto de la ayuda). No toca el service worker.
+
+**Queda para la fase 5b**: lo que falta de la lista de preparación, agrupado por tarea, como fila de «Te espera».
+
+**Cómo se revierte.** Revertir el commit; si la migración se aplicó, el rollback de arriba.

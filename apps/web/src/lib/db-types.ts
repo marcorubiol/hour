@@ -1857,6 +1857,24 @@ export type Database = {
           },
         ]
       }
+      desk_set_aside: {
+        Row: {
+          items: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          items?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          items?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       expense: {
         Row: {
           amount: number
@@ -8525,6 +8543,10 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      set_aside_desk_item: {
+        Args: { p_key: string; p_until: string | null }
+        Returns: Json
       }
       set_audience_consent_text: {
         Args: { p_audience_id: string; p_texts: Json }
