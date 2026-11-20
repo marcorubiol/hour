@@ -99,8 +99,8 @@ export default defineConfig(({ mode }) => {
             type: 'module',
           },
           manifest: {
-            name: 'Hour',
-            short_name: 'Hour',
+            name: 'hour',
+            short_name: 'hour',
             description: 'Gestión de compañías de artes en vivo: todo junto, hora a hora.',
             lang: 'es',
             theme_color: '#f7f5ef',
