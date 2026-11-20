@@ -178,15 +178,37 @@ export default defineConfig(({ mode }) => {
               {
                 urlPattern: ({ request, url }: { request: Request; url: URL }) =>
                   request.mode === 'navigate' && (url.pathname === '/' || url.pathname === '/h' || url.pathname.startsWith('/h/')),
-                // Network-first with a short wait (20-11, 11:14): stale-while-
-                // revalidate opened the page saved last time, whose code was
-                // never downloaded; after another deploy those files were gone
-                // and the open stopped on the skeleton. The current page when
-                // the network answers within 2 s, the saved one past that.
-                handler: 'NetworkFirst',
+                // Stale-while-revalidate again (20-11, 12:04): network-first
+                // cost a blank 3-4 s on every cold open. What broke the first
+                // time (11:14: the saved page named code a later deploy had
+                // removed) is now covered twice: when the fresh page is
+                // saved, its entry code is saved with it (the plugin below),
+                // and theme-init.js reloads once if a module still fails.
+                handler: 'StaleWhileRevalidate',
                 options: {
                   cacheName: 'shell',
-                  networkTimeoutSeconds: 2,
+                  plugins: [
+                    {
+                      // The page just saved for the next open: fetch now the
+                      // code it starts with, into the cache CacheFirst reads.
+                      cacheDidUpdate: async ({ newResponse }: { newResponse: Response }) => {
+                        try {
+                          const html = await newResponse.clone().text();
+                          const urls = Array.from(new Set(html.match(/\/_app\/immutable\/[^"'\s)]+\.(?:js|css)/g) || []));
+                          const cache = await caches.open('app-immutable');
+                          await Promise.all(
+                            urls.map(async (u) => {
+                              if (await cache.match(u)) return;
+                              const r = await fetch(u);
+                              if (r.ok) await cache.put(u, r);
+                            }),
+                          );
+                        } catch {
+                          // A miss here only means the next open fetches it.
+                        }
+                      },
+                    },
+                  ],
                   cacheableResponse: { statuses: [200] },
                 },
               },
