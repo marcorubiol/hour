@@ -3,10 +3,12 @@
   import { QueryClient, QueryClientProvider } from '@tanstack/svelte-query';
   import { browser } from '$app/environment';
   import { onMount, type Snippet } from 'svelte';
+  import { onNavigate } from '$app/navigation';
   import Toast from '$lib/components/Toast.svelte';
   import { bindQueryCache, prewarmDB, registerServiceWorker } from '$lib/offline';
   import { provideTheme } from '$lib/theme.svelte';
   import { isEmbedPath } from '$lib/public-route';
+  import { stylesheetsSettled, trackStylesheets } from '$lib/stylesheets';
 
   interface Props {
     children: Snippet;
@@ -53,6 +55,12 @@
 
   // A wipe (logout, refused session, another user) clears this client too.
   if (browser) bindQueryCache(queryClient);
+
+  // A page never paints before its stylesheets ($lib/stylesheets): tracking
+  // starts here, before any child's onMount can preload code, and every
+  // navigation waits for the stylesheets still on their way.
+  if (browser) trackStylesheets();
+  onNavigate(() => stylesheetsSettled());
 
   // Offline scaffold — register SW + open the IndexedDB schema. Both are
   // idempotent and browser-only; helpers have their own guards (Playwright,
