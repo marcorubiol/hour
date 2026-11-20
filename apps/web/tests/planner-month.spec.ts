@@ -16,6 +16,10 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  */
 
 const SPACE = 's:playwright';
+/** zzz-e2e-collab — the stable fixture project of the playwright workspace. */
+const PROJECT = '019f21d2-7482-77e6-9ad9-27d881cff305';
+/** Today in Madrid: always inside the month on screen. */
+const TODAY = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' });
 
 async function open(page: Page, query = '') {
   await page.goto(`/h/planner?scope=${SPACE}${query}`);
@@ -24,6 +28,29 @@ async function open(page: Page, query = '') {
 
 test.describe('the month (ADR-209)', () => {
   test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL / PW_TEST_PASSWORD.');
+
+  // THE SPEC OWNS ITS CONFIRMED GIG (20-11): the status line counts the month
+  // on screen, and a figure at zero is not said (ADR-229). With no confirmed
+  // gig in the shared fixture that month, the line was empty and three tests
+  // failed on the data, not the code. One confirmed performance today, made
+  // here and removed after.
+  const made: { perf: string | null } = { perf: null };
+  test.beforeAll(async ({ browser }) => {
+    const page = await browser.newPage();
+    const res = await page.request.post('/api/performances', {
+      data: { project_id: PROJECT, performed_at: TODAY, venue_name: 'ZZZ E2E Month', city: 'Girona', country: 'ES', status: 'confirmed' },
+    });
+    expect(res.ok(), `POST /api/performances answered ${res.status()}`).toBe(true);
+    const json = (await res.json()) as { id?: string; performance?: { id?: string } };
+    made.perf = json.performance?.id ?? json.id ?? null;
+    await page.close();
+  });
+  test.afterAll(async ({ browser }) => {
+    if (!made.perf) return;
+    const page = await browser.newPage();
+    await page.request.delete(`/api/performances/${made.perf}`);
+    await page.close();
+  });
 
   // Every test meets the default (null, the Agenda since ADR-211) and leaves it there.
   test.beforeEach(async ({ page }) => forgetPlannerView(page.request));
@@ -238,7 +265,7 @@ test.describe('the month (ADR-209)', () => {
 
   test('a figure at zero is not said, and «Go to today» is not a second «Today» (ADR-229)', async ({ page }) => {
     await open(page, '&view=month');
-    // The playwright space has confirmed gigs: its figure is said…
+    // The spec's own confirmed gig (beforeAll): its figure is said…
     await expect(page.getByTestId('planner-stat-confirmed')).toBeVisible();
     // …and no census figure is ever a zero.
     for (const t of await page.locator('[data-testid^="planner-stat-"]').allTextContents()) {
