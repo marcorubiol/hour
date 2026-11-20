@@ -171,6 +171,22 @@ describe('writes', () => {
     expect(store.peek()!.scope).toBe('w1:owner');
   });
 
+  test('flush persists pending boot queries immediately without waiting for the throttle', async () => {
+    const { store, startQueryCache } = await load();
+    const set = vi.spyOn(store, 'set');
+    const c = client();
+    const handle = startQueryCache(c, () => A);
+    await vi.advanceTimersByTimeAsync(0);
+    warm(c);
+    expect(set).not.toHaveBeenCalled();
+    await handle.flush();
+    expect(set).toHaveBeenCalledTimes(1);
+    expect(store.peek()!.user).toEqual(A);
+    // Advancing past the throttle does not write a duplicate record.
+    await vi.advanceTimersByTimeAsync(1_500);
+    expect(set).toHaveBeenCalledTimes(1);
+  });
+
   test('no user, no write', async () => {
     const { store, writeQueryCache } = await load();
     await writeQueryCache(warm(), null);

@@ -241,7 +241,7 @@ async function hydrateSecondaryEntries(
 export function startQueryCache(
   client: QueryClient,
   currentUser: () => SessionUser | null,
-): { restored: Promise<SessionUser | null>; stop: () => void } {
+): { restored: Promise<SessionUser | null>; flush: () => Promise<void>; stop: () => void } {
   bound = client;
   const startedAt = epoch;
   const restored = readQueryCache().then((record) => {
@@ -260,17 +260,18 @@ export function startQueryCache(
   let bootDirty = false;
   const dirtyEntryHashes = new Set<string>();
 
-  const flush = () => {
+  const flush = (): Promise<void> => {
     if (timer) clearTimeout(timer);
     timer = null;
     const writeBoot = bootDirty;
     const hashes = [...dirtyEntryHashes];
     bootDirty = false;
     dirtyEntryHashes.clear();
-    void flushDirtyQueries(client, currentUser(), { writeBoot, entryHashes: hashes });
+    if (!writeBoot && hashes.length === 0) return Promise.resolve();
+    return flushDirtyQueries(client, currentUser(), { writeBoot, entryHashes: hashes });
   };
   const schedule = () => {
-    timer ??= setTimeout(flush, WRITE_THROTTLE_MS);
+    timer ??= setTimeout(() => void flush(), WRITE_THROTTLE_MS);
   };
 
   const unsubscribe = client.getQueryCache().subscribe((event) => {
@@ -288,16 +289,17 @@ export function startQueryCache(
   // A phone closes the app without warning: write what is pending as the
   // page goes to the background.
   const onHide = () => {
-    if (document.visibilityState === 'hidden' && timer) flush();
+    if (document.visibilityState === 'hidden' && timer) void flush();
   };
   if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onHide);
 
   return {
     restored,
+    flush,
     stop: () => {
       unsubscribe();
       if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onHide);
-      if (timer) flush();
+      if (timer) void flush();
     },
   };
 }

@@ -1,7 +1,7 @@
 import { execSync } from 'node:child_process';
 import { sentrySvelteKit } from '@sentry/sveltekit';
 import { sveltekit } from '@sveltejs/kit/vite';
-import { loadEnv } from 'vite';
+import { loadEnv, type ResolvedConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { defineConfig } from 'vitest/config';
 
@@ -62,7 +62,7 @@ export default defineConfig(({ mode }) => {
       // synthetic re-exports that trip SvelteKit's endpoint export validator.
       !process.env.VITEST && {
         name: 'hour-client-min-chunk-size',
-        configResolved(resolved) {
+        configResolved(resolved: ResolvedConfig) {
           if (resolved.build.ssr) return;
           const out = resolved.build.rollupOptions.output;
           if (Array.isArray(out)) {

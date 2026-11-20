@@ -160,7 +160,13 @@
     // warm TanStack cache instead of firing 11+ separate mobile requests.
     if (!cachedUser && page.url.pathname.startsWith('/h/today')) {
       const todayIso = dayKeyInTz(new Date().toISOString(), viewerTimeZone());
-      await hydrateFromBootstrap(shellQueryClient, todayIso);
+      const hydrated = await hydrateFromBootstrap(shellQueryClient, todayIso);
+      if (hydrated) {
+        // Persist the boot snapshot right away instead of waiting for the 1 s
+        // write throttle: Hoy paints immediately from the bootstrap cache, so
+        // a quick app switch or tab close would otherwise lose it.
+        await Promise.race([deviceCache.flush(), new Promise<void>((r) => setTimeout(r, 150))]);
+      }
     }
     authChecked = true;
   });
