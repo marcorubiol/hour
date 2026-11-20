@@ -8,7 +8,8 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  * E2E — public road sheet links (ADR-047, D6): create a link from the
  * pass's «Compartir» dialog (ADR-222), open it logged-OUT in a fresh context,
  * verify the role-filtered document renders, revoke, verify the link dies.
- * The same component also serves the operator road sheet page.
+ * The same dialog holds the role preview («Ver como», ADR-230); the old operator
+ * page redirects to the pass with `?share=1`.
  * Self-cleaning: the share ends revoked (revocation is an assertion).
  */
 
@@ -42,7 +43,18 @@ test.describe('public road sheet link', () => {
     for (const r of ['venue', 'performer', 'tech_manager']) {
       await expect(dialog.getByTestId(`roadsheet-role-${r}`)).toBeVisible();
     }
-    await expect(dialog.getByTestId('pass-share-sheet')).toHaveAttribute('href', /\/roadsheet$/);
+
+    // «Ver como»: picking a role shows its preview in place of the links, and
+    // «‹ Enlaces» comes back. The page never leaves the pass.
+    await dialog.getByTestId('pass-share-role-venue').click();
+    const preview = dialog.getByTestId('pass-share-preview');
+    await expect(preview).toBeVisible();
+    await expect(preview.getByTestId('pass-share-role-venue').getByRole('radio')).toBeChecked();
+    await expect(dialog.getByTestId('roadsheet-role-venue')).toHaveCount(0);
+    await expect(page).toHaveURL(/\/performance\/zzz-e2e-1(\?|$)/);
+    await dialog.getByTestId('pass-share-links').click();
+    await expect(dialog.getByTestId('pass-share-preview')).toHaveCount(0);
+    await expect(dialog.getByTestId('roadsheet-role-venue')).toBeVisible();
 
     // Create a venue-role link; capture the token from the API response.
     const venueRow = dialog.getByTestId('roadsheet-role-venue');
@@ -90,5 +102,14 @@ test.describe('public road sheet link', () => {
     });
 
     await anonContext.close();
+  });
+
+  test('the old road sheet page lands on the pass with «Compartir» open', async ({ page }) => {
+    await page.goto('/h/playwright/performance/zzz-e2e-1/roadsheet');
+    await waitForLoaded(page);
+    await expect(page).toHaveURL(/\/h\/playwright\/performance\/zzz-e2e-1\?share=1/);
+    await expect(page.locator('dialog[open]').getByTestId('roadsheet-role-venue')).toBeVisible({
+      timeout: 15_000,
+    });
   });
 });

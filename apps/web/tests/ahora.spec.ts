@@ -190,7 +190,7 @@ test.describe('The gig day on Hoy (ADR-146, ADR-202 § 5)', () => {
     const acts = page.getByTestId('desk-acts');
     await expect(acts.locator('a[href^="tel:"]')).toHaveAttribute('href', 'tel:612000000');
     await expect(acts.locator('a[href^="https://maps.apple.com/"]')).toHaveCount(1);
-    await expect(acts.locator('a[href$="/roadsheet"]')).toHaveCount(0);
+    await expect(acts.locator('a[href*="/roadsheet"]')).toHaveCount(0);
     await expect(acts.locator('a')).toHaveCount(2);
     // A gig day, «Te espera» is its pills only (ADR-203 § 9).
     await expect(page.getByTestId('desk-waiting-rows')).toHaveCount(0);
