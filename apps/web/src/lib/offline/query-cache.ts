@@ -3,34 +3,28 @@
  *
  * Every open used to start blank and wait for the network: the frame painted
  * in half a second and the lens two to three later. Now the last-known
- * answers of every read live in IndexedDB; an open hydrates them before the
- * lens mounts, so it paints what it showed last time, and the queries
- * refetch behind it (they are stale: stale-while-revalidate is TanStack's own
- * behaviour once a query has data).
+ * answers of every read live in IndexedDB; an open hydrates Hoy's small boot
+ * set before the lens mounts, so it paints what it showed last time, and the
+ * queries refetch behind it (they are stale: stale-while-revalidate is
+ * TanStack's own behaviour once a query has data).
+ *
+ * Partitioned persistence (2026-11-20):
+ *   - `query_cache` (`'query-client'`): holds metadata (`schema`, `user`,
+ *     `scope`, `savedAt`) plus ONLY Hoy's boot queries so cold-open IDB
+ *     deserialization stays tiny even after warming Planner, Conversations,
+ *     Books and road sheets.
+ *   - `query_entries`: holds every other query keyed by `queryHash`, written
+ *     incrementally (only the queries that changed) and hydrated right after
+ *     Hoy's boot set resolves, without blocking first paint.
  *
  * One record per device, owned by one user. It is only good while all of
  * this holds, and wiped as soon as one does not:
  *   - `schema`: the shape of what is kept (`CACHE_SCHEMA`). A deploy that
- *     does not change it keeps the cache (ADR-158, amending ADR-144 § 3: the
- *     build SHA wiped it on every deploy, and the first open after each one
- *     waited for the whole network again). The frame's error boundary is
- *     the second net: an open that throws while painting restored data
- *     wipes it and reloads (`recoverFromRestoredCrash`).
+ *     does not change it keeps the cache (ADR-158).
  *   - `user`: the session user it was written for. Logout, a dead session
  *     and a login as someone else wipe it (`wipeQueryCache`).
  *   - `scope`: the user's workspaces and role in each, when it was written.
- *     It cannot be checked before the network answers, so it is checked when
- *     it does: a membership or role that changed resets every other query.
  *   - `savedAt`: older than `MAX_AGE_MS`, ignored and wiped.
- *
- * What is never kept: mutations, a query that has not succeeded, and a query
- * that opts out with `meta: { persist: false }`. Auth never goes through
- * TanStack (tokens are module memory in `$lib/session.svelte`), so no token
- * can land here.
- *
- * The record also carries the session user (`sub`, `email`, `name`: what
- * `/api/auth/session` returns, nothing secret), so the frame can paint before
- * the session probe answers.
  */
 
 import { dehydrate, hydrate, type DehydratedState, type Query, type QueryClient } from '@tanstack/svelte-query';
@@ -54,6 +48,34 @@ export const RESTORE_TIMEOUT_MS = 1_500;
  */
 export const CACHE_SCHEMA = 38;
 
+/** Query prefixes needed to paint Hoy immediately on open. Everything else
+ *  lives in `query_entries` and hydrates right behind Hoy. */
+const BOOT_KEY_PREFIXES = new Set([
+  'workspaces',
+  'projects',
+  'lines',
+  'me',
+  'money-access',
+  'conversation-access',
+  'pulse-performances',
+  'pulse-dates',
+  'tasks',
+  'conversations',
+  'conversation-overview',
+  'conversation-tags',
+  'planner-team',
+  'late-notices',
+]);
+
+export function isBootQueryKey(queryKey: readonly unknown[]): boolean {
+  const head = queryKey[0];
+  if (typeof head !== 'string' || !BOOT_KEY_PREFIXES.has(head)) return false;
+  // Keep only the Desk's own conversation read in the boot partition; the
+  // Conversations lens pages/filters stay in `query_entries`.
+  if (head === 'conversations') return queryKey[1] === 'today';
+  return true;
+}
+
 export interface PersistedQueryCache {
   schema: number;
   user: SessionUser;
@@ -62,11 +84,24 @@ export interface PersistedQueryCache {
   state: DehydratedState;
 }
 
+export type DehydratedQuery = DehydratedState['queries'][number];
+
+export interface PersistedQueryEntry {
+  schema: number;
+  userSub: string;
+  savedAt: number;
+  queryHash: string;
+  query: DehydratedQuery;
+}
+
 /** Where the record lives: IndexedDB in the app, a Map in the tests. */
 export interface QueryCacheStore {
   get(): Promise<PersistedQueryCache | undefined>;
   set(record: PersistedQueryCache): Promise<void>;
   clear(): Promise<void>;
+  /** Optional incremental secondary store for non-boot queries. */
+  getEntries?(): Promise<PersistedQueryEntry[]>;
+  putEntries?(entries: PersistedQueryEntry[]): Promise<void>;
 }
 
 /** The workspaces the cached data was read under, with the role in each. Null until known. */
@@ -180,6 +215,24 @@ export async function cachedSessionUser(): Promise<SessionUser | null> {
   return (await readQueryCache())?.user ?? null;
 }
 
+/** Hydrate the secondary `query_entries` store in the background after boot. */
+async function hydrateSecondaryEntries(
+  client: QueryClient,
+  userSub: string,
+  startedAt: number,
+  now = Date.now(),
+): Promise<void> {
+  const s = await defaultStore().catch(() => null);
+  if (!s?.getEntries || epoch !== startedAt) return;
+  const entries = await withTimeout(s.getEntries().catch(() => []), RESTORE_TIMEOUT_MS, []);
+  if (epoch !== startedAt || entries.length === 0) return;
+  const valid = entries
+    .filter((e) => e.schema === CACHE_SCHEMA && e.userSub === userSub && now - e.savedAt < MAX_AGE_MS)
+    .map((e) => e.query);
+  if (valid.length === 0) return;
+  hydrate(client, { mutations: [], queries: valid });
+}
+
 /**
  * Hydrate the client from the device and keep writing it back. Returns the
  * user the restored data belongs to (null when nothing was restored), and a
@@ -198,14 +251,23 @@ export function startQueryCache(
     restoredThisOpen = true;
     // The network may have answered the workspaces before the device did.
     if ((client.getQueryState(['workspaces'])?.dataUpdatedAt ?? 0) > record.savedAt) checkScope(client);
+    // Secondary lenses hydrate right after boot resolves, off the critical path.
+    void hydrateSecondaryEntries(client, record.user.sub, startedAt);
     return record.user;
   });
 
   let timer: ReturnType<typeof setTimeout> | null = null;
+  let bootDirty = false;
+  const dirtyEntryHashes = new Set<string>();
+
   const flush = () => {
     if (timer) clearTimeout(timer);
     timer = null;
-    void writeQueryCache(client, currentUser());
+    const writeBoot = bootDirty;
+    const hashes = [...dirtyEntryHashes];
+    bootDirty = false;
+    dirtyEntryHashes.clear();
+    void flushDirtyQueries(client, currentUser(), { writeBoot, entryHashes: hashes });
   };
   const schedule = () => {
     timer ??= setTimeout(flush, WRITE_THROTTLE_MS);
@@ -216,6 +278,11 @@ export function startQueryCache(
     // going do not.
     if (event.type !== 'updated' || event.action.type !== 'success') return;
     if (event.query.queryKey[0] === 'workspaces') checkScope(client);
+    if (isBootQueryKey(event.query.queryKey)) {
+      bootDirty = true;
+    } else {
+      dirtyEntryHashes.add(event.query.queryHash);
+    }
     schedule();
   });
   // A phone closes the app without warning: write what is pending as the
@@ -249,14 +316,78 @@ function checkScope(client: QueryClient): void {
   if (live !== before) void client.resetQueries({ predicate: (q) => q.queryKey[0] !== 'workspaces' });
 }
 
+/** Write only what changed: boot record when a boot query updated (or no meta
+ *  exists yet), and single entries in `query_entries` for secondary queries. */
+async function flushDirtyQueries(
+  client: QueryClient,
+  user: SessionUser | null,
+  dirty: { writeBoot: boolean; entryHashes: readonly string[] },
+  now = Date.now(),
+): Promise<void> {
+  if (!user) return;
+  const startedAt = epoch;
+  const s = await defaultStore().catch(() => null);
+  if (!s || epoch !== startedAt) return;
+
+  // Stores without `putEntries` (legacy in-memory test mocks) keep single-record behavior.
+  if (!s.putEntries) {
+    await writeQueryCache(client, user, now);
+    return;
+  }
+
+  const hasBootRecord = Boolean(await recordRead?.catch(() => undefined));
+  if (dirty.writeBoot || !hasBootRecord) {
+    const bootState = dehydrate(client, {
+      shouldDehydrateQuery: (q) => shouldPersistQuery(q, now) && isBootQueryKey(q.queryKey),
+      shouldDehydrateMutation: () => false,
+    });
+    const record: PersistedQueryCache = {
+      schema: CACHE_SCHEMA,
+      user: { sub: user.sub, email: user.email, name: user.name },
+      scope: scopeOf(client) ?? '',
+      savedAt: now,
+      state: bootState,
+    };
+    try {
+      await s.set(record);
+    } catch {
+      // Full or private-mode store.
+    }
+    recordRead = Promise.resolve(epoch === startedAt ? record : undefined);
+  }
+
+  if (dirty.entryHashes.length > 0 && epoch === startedAt) {
+    const hashSet = new Set(dirty.entryHashes);
+    const secondary = dehydrate(client, {
+      shouldDehydrateQuery: (q) => shouldPersistQuery(q, now) && !isBootQueryKey(q.queryKey) && hashSet.has(q.queryHash),
+      shouldDehydrateMutation: () => false,
+    });
+    const entries: PersistedQueryEntry[] = secondary.queries.map((query) => ({
+      schema: CACHE_SCHEMA,
+      userSub: user.sub,
+      savedAt: now,
+      queryHash: query.queryHash,
+      query,
+    }));
+    if (entries.length > 0) {
+      try {
+        await s.putEntries(entries);
+      } catch {
+        // Full or private-mode store.
+      }
+    }
+  }
+}
+
 /** Write the client's answers for `user`. No user, no write: a signed-out tab keeps nothing. */
 export async function writeQueryCache(client: QueryClient, user: SessionUser | null, now = Date.now()): Promise<void> {
   if (!user) return;
   const startedAt = epoch;
   const s = await defaultStore().catch(() => null);
   if (!s || epoch !== startedAt) return;
+  const partitioned = Boolean(s.putEntries);
   const state = dehydrate(client, {
-    shouldDehydrateQuery: (q) => shouldPersistQuery(q, now),
+    shouldDehydrateQuery: (q) => shouldPersistQuery(q, now) && (!partitioned || isBootQueryKey(q.queryKey)),
     shouldDehydrateMutation: () => false,
   });
   const record: PersistedQueryCache = {
@@ -268,6 +399,23 @@ export async function writeQueryCache(client: QueryClient, user: SessionUser | n
   };
   try {
     await s.set(record);
+    if (s.putEntries && epoch === startedAt) {
+      const secondary = dehydrate(client, {
+        shouldDehydrateQuery: (q) => shouldPersistQuery(q, now) && !isBootQueryKey(q.queryKey),
+        shouldDehydrateMutation: () => false,
+      });
+      if (secondary.queries.length > 0) {
+        await s.putEntries(
+          secondary.queries.map((query) => ({
+            schema: CACHE_SCHEMA,
+            userSub: user.sub,
+            savedAt: now,
+            queryHash: query.queryHash,
+            query,
+          })),
+        );
+      }
+    }
   } catch {
     // A full or private-mode store: the next open goes to the network.
   }

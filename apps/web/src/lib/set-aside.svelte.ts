@@ -38,6 +38,14 @@ export function ensureSetAside(): Promise<void> {
   return probe;
 }
 
+/** Semilla desde `/api/bootstrap`: evita una segunda lectura `/api/me/set-aside` en el arranque. */
+export function seedSetAside(items: SetAside): void {
+  const read = Object.fromEntries(Object.entries(items ?? {}).filter(([k]) => !touched.has(k)));
+  setAside.items = { ...read, ...setAside.items };
+  setAside.ready = true;
+  probe = Promise.resolve();
+}
+
 /**
  * Aparta la fila `key` hasta `until`, o la trae con `until` nulo. Lanza si la
  * escritura falla, después de devolver la fila a como estaba.

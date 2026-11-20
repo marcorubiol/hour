@@ -54,6 +54,26 @@ export default defineConfig(({ mode }) => {
       __BUILD_STAMP__: JSON.stringify(buildStamp()),
     },
     plugins: [
+      // Consolidate tiny shared client modules (< 12 kB) into fewer chunks:
+      // opening Hoy previously fetched 137 files (81 under 2 kB), amplifying
+      // module-graph resolution overhead on mobile Safari and through the SW.
+      // Client-only via `configResolved`: SvelteKit toggles `build.ssr` inside
+      // its own plugin, and merging chunks into SSR `+server.ts` entries adds
+      // synthetic re-exports that trip SvelteKit's endpoint export validator.
+      !process.env.VITEST && {
+        name: 'hour-client-min-chunk-size',
+        configResolved(resolved) {
+          if (resolved.build.ssr) return;
+          const out = resolved.build.rollupOptions.output;
+          if (Array.isArray(out)) {
+            for (const o of out) o.experimentalMinChunkSize = 12_000;
+          } else if (out) {
+            out.experimentalMinChunkSize = 12_000;
+          } else {
+            resolved.build.rollupOptions.output = { experimentalMinChunkSize: 12_000 };
+          }
+        },
+      },
       !process.env.VITEST &&
         sentrySvelteKit({
           sourceMapsUploadOptions: {
@@ -107,7 +127,7 @@ export default defineConfig(({ mode }) => {
             // The launch screen: the colour of the page and the boot skeleton.
             background_color: '#f7f5ef',
             display: 'standalone',
-            start_url: '/',
+            start_url: '/h/today',
             scope: '/',
             icons: [
               {

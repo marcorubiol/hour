@@ -20,7 +20,7 @@
 
 import type { RequestHandler } from './$types';
 import { extractAccessToken } from '$lib/auth';
-import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
+import { PostgrestError, pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import { json } from '$lib/server/http';
 
@@ -46,6 +46,16 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
 
   try {
     if (projectId !== null) return json({ read_money: await readsMoney(projectId) });
+    // Single-RPC path (migration 20261120230000_perf_rpcs_and_rls): one call
+    // instead of 1 + N. Falls back gracefully if the migration is not yet applied.
+    try {
+      const { data } = await pgPostRpc<boolean>(env, 'money_access_any', jwt, {});
+      return json({ read_money: data[0] === true });
+    } catch (rpcErr) {
+      if (!(rpcErr instanceof PostgrestError && (rpcErr.status === 404 || rpcErr.code === 'PGRST202'))) {
+        throw rpcErr;
+      }
+    }
     const search = new URLSearchParams({ select: 'id', deleted_at: 'is.null', limit: '500' });
     const { data: projects } = await pgGet<{ id: string }>(env, 'project', jwt, { search });
     const any = await Promise.any(

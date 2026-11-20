@@ -274,3 +274,63 @@ describe('newestUnder', () => {
     expect(newestUnder(c, ['nothing'])).toBeUndefined();
   });
 });
+
+describe('partitioned store (boot vs secondary entries)', () => {
+  function partitionedStore() {
+    let record: PersistedQueryCache | undefined;
+    const entries = new Map<string, import('./query-cache').PersistedQueryEntry>();
+    const store: QueryCacheStore & {
+      peek: () => PersistedQueryCache | undefined;
+      peekEntries: () => Map<string, import('./query-cache').PersistedQueryEntry>;
+    } = {
+      get: async () => (record ? structuredClone(record) : undefined),
+      set: async (r) => {
+        record = structuredClone(r);
+      },
+      clear: async () => {
+        record = undefined;
+        entries.clear();
+      },
+      getEntries: async () => [...entries.values()].map((e) => structuredClone(e)),
+      putEntries: async (list) => {
+        for (const e of list) entries.set(e.queryHash, structuredClone(e));
+      },
+      peek: () => record,
+      peekEntries: () => entries,
+    };
+    return store;
+  }
+
+  test('writes only changed secondary entries without rewriting the boot record', async () => {
+    const store = partitionedStore();
+    const setSpy = vi.spyOn(store, 'set');
+    const putSpy = vi.spyOn(store, 'putEntries');
+    const { startQueryCache } = await load(store);
+
+    const c = client();
+    startQueryCache(c, () => A);
+    await vi.advanceTimersByTimeAsync(0);
+
+    // Boot query updates -> writes boot record once.
+    c.setQueryData(['workspaces'], WS);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(setSpy).toHaveBeenCalledTimes(1);
+    expect(putSpy).not.toHaveBeenCalled();
+
+    // Secondary lens query updates -> writes ONLY to query_entries, does NOT rewrite boot record.
+    c.setQueryData(['bolos', 'w1'], { items: [{ id: 'b1' }] });
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(setSpy).toHaveBeenCalledTimes(1);
+    expect(putSpy).toHaveBeenCalledTimes(1);
+    expect(store.peek()!.state.queries.map((q) => q.queryKey[0])).toEqual(['workspaces']);
+    expect(store.peekEntries().size).toBe(1);
+
+    // Restore hydrates boot immediately and secondary entries right behind.
+    const next = await load(store);
+    const c2 = client();
+    expect(await next.startQueryCache(c2, () => A).restored).toEqual(A);
+    expect(c2.getQueryData(['workspaces'])).toEqual(WS);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(c2.getQueryData(['bolos', 'w1'])).toEqual({ items: [{ id: 'b1' }] });
+  });
+});

@@ -14,24 +14,28 @@
  */
 
 import type { RequestHandler } from './$types';
-import { ensureFreshSession, type SessionEnv } from '$lib/server/session';
+import { readValidAccessSession, refreshFreshSession, type SessionEnv } from '$lib/server/session';
 import { allowRequest, clientIp } from '$lib/server/rate-limit';
 import { jsonNoStore } from '$lib/server/http';
 
-// ensureFreshSession hits Supabase's refresh grant when the access cookie is
+// refreshFreshSession hits Supabase's refresh grant when the access cookie is
 // stale, so this endpoint is a refresh-amplification lever for an authed
 // client that withholds the access cookie. Token rotation already bounds it;
 // this per-IP backstop is generous (a WS-flapping tab / shared NAT stays well
-// under) but caps a runaway loop. Matches /api/auth/session and /refresh.
+// under) but caps a runaway loop. Valid cookies skip KV completely.
 const TOKEN_RULE = { limit: 240, windowSec: 300 };
 
 export const GET: RequestHandler = async ({ request, cookies, platform }) => {
   if (!platform?.env) return jsonNoStore({ error: 'platform_unavailable' }, 500);
+  const existing = readValidAccessSession(cookies);
+  if (existing) return jsonNoStore({ token: existing.jwt, expiresAt: existing.expiresAt });
+
   const env = platform.env as unknown as SessionEnv;
-  if (!(await allowRequest(env.RATE_LIMIT, `token:${clientIp(request)}`, TOKEN_RULE))) {
+  const waitUntil = platform.ctx?.waitUntil?.bind(platform.ctx);
+  if (!(await allowRequest(env.RATE_LIMIT, `token:${clientIp(request)}`, TOKEN_RULE, waitUntil))) {
     return jsonNoStore({ error: 'rate_limited' }, 429);
   }
-  const session = await ensureFreshSession(cookies, env);
+  const session = await refreshFreshSession(cookies, env);
   if (!session) return jsonNoStore({ error: 'no_session' }, 401);
   return jsonNoStore({ token: session.jwt, expiresAt: session.expiresAt });
 };

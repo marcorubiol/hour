@@ -35,11 +35,12 @@
   import PresenceBadge from '$lib/components/PresenceBadge.svelte';
   import BrandMark from '$lib/components/BrandMark.svelte';
   import AccountMenu from '$lib/components/shell/AccountMenu.svelte';
-  import ScopeRail from '$lib/components/shell/ScopeRail.svelte';
   import ShellField from '$lib/components/shell/ShellField.svelte';
   import CalmMark from '$lib/components/shell/CalmMark.svelte';
   import ClockFigures from '$lib/components/shell/ClockFigures.svelte';
   import PullRefresh from '$lib/components/shell/PullRefresh.svelte';
+  import { MediaQuery } from 'svelte/reactivity';
+  import { MOBILE_QUERY } from '$lib/breakpoints';
   import { isReservedWorkspaceSlug } from '$lib/reserved-slugs';
   import { appLocale, LOCALE_TAG, setTrade, setWorkspaceTrades, t, tradeOf } from '$lib/i18n';
   import { setSeasonStarts } from '$lib/season-start.svelte';
@@ -70,17 +71,13 @@
     type NavWorkspace,
     type RawLine,
   } from '$lib/nav';
-  import { activeProjectsQueryOptions, allLinesQueryOptions, teamQueryOptions } from '$lib/nav-queries';
+  import { activeProjectsQueryOptions, allLinesQueryOptions, teamQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
   import { accentVarFor } from '$lib/utils/accent';
   import { spaceName } from '$lib/utils/identity';
   import { homeWorkspace, spaceWriteWorkspaces, taskWorkspaces } from '$lib/workspace-role';
-  import {
-    provideNetworkPresence,
-    provideRealtime,
-    type NetworkPresenceStore,
-    type RealtimeHandle,
-  } from '$lib/realtime';
+  import type { NetworkPresenceStore, RealtimeHandle } from '$lib/realtime';
   import { fetchJSON } from '$lib/api';
+  import { hydrateFromBootstrap } from '$lib/bootstrap-client';
   import { useAhoraPreload } from '$lib/ahora-feeds.svelte';
   import { viewerTimeZone } from '$lib/datetime';
   import { dayKeyInTz, plannerEntryView } from '$lib/planner';
@@ -113,10 +110,17 @@
     if (blocked) goto('/', { replaceState: true });
   });
 
+  const phone = new MediaQuery(MOBILE_QUERY, false);
+  const scopeRail = lazy(() => import('$lib/components/shell/ScopeRail.svelte'));
+  $effect(() => {
+    if (!phone.current) void scopeRail.load();
+  });
+
   // The device cache (ADR-144): hydrate the last-known answers before any
   // lens mounts, and keep writing them back while this frame lives. Started
   // here, at init, so the IndexedDB read runs alongside the session probe.
-  const deviceCache = startQueryCache(useQueryClient(), () => session.user);
+  const shellQueryClient = useQueryClient();
+  const deviceCache = startQueryCache(shellQueryClient, () => session.user);
   onDestroy(deviceCache.stop);
 
   let authChecked = $state(false);
@@ -150,6 +154,13 @@
       await wipeQueryCache();
       location.replace(location.href);
       return;
+    }
+    // Cold open or post-schema-bump on Hoy: resolve the initial reads in one
+    // Worker round-trip (`/api/bootstrap`) before mounting the lens so it hits
+    // warm TanStack cache instead of firing 11+ separate mobile requests.
+    if (!cachedUser && page.url.pathname.startsWith('/h/today')) {
+      const todayIso = dayKeyInTz(new Date().toISOString(), viewerTimeZone());
+      await hydrateFromBootstrap(shellQueryClient, todayIso);
     }
     authChecked = true;
   });
@@ -199,11 +210,7 @@
   let rt = $state<RealtimeHandle | null>(null);
   let networkPresence = $state<NetworkPresenceStore | null>(null);
 
-  type WorkspaceLite = { id: string; slug: string; name: string; accent?: string | null; trade?: string | null };
-  const workspacesQuery = createQuery({
-    queryKey: ['workspaces'],
-    queryFn: ({ signal }) => fetchJSON<{ items: WorkspaceLite[] }>('/api/workspaces', signal),
-  });
+  const workspacesQuery = createQuery(workspacesQueryOptions());
 
   let defaultWorkspaceSlug = $derived($workspacesQuery.data?.items[0]?.slug ?? '');
   // The first-day panel (tarea 137): every section draws it instead of
@@ -413,28 +420,38 @@
   // top bar, the same on every page of /h, so it cannot move under the
   // cursor and is never gone. Off a lens it marks the lens you came from.
 
-  // Realtime is cross-origin (wss to supabase.co) and can't ride the
-  // httpOnly cookie — it authenticates via async suppliers backed by
-  // /api/auth/token (fresh token per (re)auth) and the session store
-  // (presence key). Construction stays synchronous: setContext only works
-  // in the sync part of onMount.
-  onMount(() => {
-    if (!env.PUBLIC_SUPABASE_URL || !env.PUBLIC_SUPABASE_ANON_KEY) return;
-    try {
-      rt = provideRealtime(
-        {
-          PUBLIC_SUPABASE_URL: env.PUBLIC_SUPABASE_URL,
-          PUBLIC_SUPABASE_ANON_KEY: env.PUBLIC_SUPABASE_ANON_KEY,
-        },
-        {
-          getToken: getAccessToken,
-          getUserId: () => session.user?.sub ?? null,
-        },
-      );
-      networkPresence = provideNetworkPresence();
-    } catch (e) {
-      console.warn('[realtime] init failed, continuing without presence:', e);
-    }
+  // Realtime is cross-origin (wss to supabase.co) and only drives the online
+  // presence indicator: load `@supabase/realtime-js` and open the socket after
+  // the shell has painted so it neither bloats the initial chunk nor competes
+  // with Hoy's startup data requests for `/api/auth/token` and bandwidth.
+  let disposed = false;
+  $effect(() => {
+    if (!painted || rt || !env.PUBLIC_SUPABASE_URL || !env.PUBLIC_SUPABASE_ANON_KEY) return;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const { createRealtimeClient, NetworkPresenceStore } = await import('$lib/realtime');
+        if (cancelled || disposed) return;
+        const handle = createRealtimeClient(
+          {
+            PUBLIC_SUPABASE_URL: env.PUBLIC_SUPABASE_URL,
+            PUBLIC_SUPABASE_ANON_KEY: env.PUBLIC_SUPABASE_ANON_KEY,
+          },
+          {
+            getToken: getAccessToken,
+            getUserId: () => session.user?.sub ?? null,
+          },
+        );
+        rt = handle;
+        networkPresence = new NetworkPresenceStore(handle);
+      } catch (e) {
+        console.warn('[realtime] init failed, continuing without presence:', e);
+      }
+    }, 1_500);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   });
 
   $effect(() => {
@@ -445,6 +462,7 @@
   });
 
   onDestroy(() => {
+    disposed = true;
     networkPresence?.dispose();
     rt?.dispose();
   });
@@ -703,7 +721,6 @@
   // A dialog of adding closes, from any door: what a space has (Hoy's start
   // list, the empties of the Planner, tarea 137) is read again, so a step
   // crosses itself out wherever the thing was made.
-  const shellQueryClient = useQueryClient();
   let adding = $derived(
     creation.projectOpen ||
       creation.conversationOpen ||
@@ -904,19 +921,21 @@
       </div>
     </header>
 
-    <ScopeRail {clockNow} {clockTime} {inSettings}>
-      {#snippet me()}
-        <AccountMenu
-          {workspaceSlug}
-          {menuWorkspaceSlug}
-          {inSettings}
-          {rememberWorkingScope}
-          direction="up"
-          align="start"
-        />
-        <PresenceBadge count={networkPresence?.count ?? null} />
-      {/snippet}
-    </ScopeRail>
+    {#if !phone.current && scopeRail.component}
+      <scopeRail.component {clockNow} {clockTime} {inSettings}>
+        {#snippet me()}
+          <AccountMenu
+            {workspaceSlug}
+            {menuWorkspaceSlug}
+            {inSettings}
+            {rememberWorkingScope}
+            direction="up"
+            align="start"
+          />
+          <PresenceBadge count={networkPresence?.count ?? null} />
+        {/snippet}
+      </scopeRail.component>
+    {/if}
 
     {#if inSettings}
       <aside class="shell__settings-nav">

@@ -1,4 +1,3 @@
-import en from './en.json';
 import { currentTrade, DEFAULT_TRADE, voiceHere, type Voice } from './trade.svelte';
 
 export {
@@ -26,22 +25,21 @@ export type Locale = (typeof LOCALES)[number];
 export const LOCALE_NAME: Record<Locale, string> = { ca: 'Català', es: 'Español', en: 'English', fr: 'Français' };
 
 /**
- * English is the fallback, so it ships with every page. The other three are
- * one chunk each, fetched when a page needs one (`loadLocale`): a browser
- * used to download and parse all four (583 kB) on every open to speak one.
- * The server and the tests have all four from the start.
+ * Every language is one chunk of its own, fetched when the browser needs it
+ * (`loadLocale`): `keys.test.ts` guarantees key parity across all four
+ * dictionaries, so a phone speaking Spanish/Catalan/French no longer downloads
+ * and parses ~192 kB of English strings as a static fallback on every open.
+ * The server and the tests load all four eagerly.
  */
-const others = import.meta.glob<Dictionary>(['./*.json', '!./en.json'], { import: 'default' });
-const dictionaries: Partial<Record<Locale, Dictionary>> = {
-  en,
-  ...(import.meta.env.SSR || import.meta.env.MODE === 'test'
+const loaders = import.meta.glob<Dictionary>('./*.json', { import: 'default' });
+const dictionaries: Partial<Record<Locale, Dictionary>> =
+  import.meta.env.SSR || import.meta.env.MODE === 'test'
     ? Object.fromEntries(
         Object.entries(
-          import.meta.glob<Dictionary>(['./*.json', '!./en.json'], { import: 'default', eager: true }),
+          import.meta.glob<Dictionary>('./*.json', { import: 'default', eager: true }),
         ).map(([path, dict]) => [path.slice(2, -5), dict]),
       )
-    : {}),
-};
+    : {};
 
 /**
  * Make `locale` answer `t()`. The root layout awaits the session's locale
@@ -49,7 +47,7 @@ const dictionaries: Partial<Record<Locale, Dictionary>> = {
  */
 export async function loadLocale(locale: Locale): Promise<void> {
   if (dictionaries[locale]) return;
-  const load = others[`./${locale}.json`];
+  const load = loaders[`./${locale}.json`];
   if (load) dictionaries[locale] = await load();
 }
 
@@ -75,11 +73,11 @@ export function t(
   params?: Record<string, string | number>,
   voice: Voice = currentTrade(),
 ): string {
-  const dict: Dictionary = dictionaries[locale] ?? en;
-  const fallback: Dictionary = en;
+  const fallback: Dictionary | undefined = dictionaries.en;
+  const dict: Dictionary = dictionaries[locale] ?? fallback ?? {};
   const variant = voice === DEFAULT_TRADE ? undefined : `${key}@${voice}`;
   let out =
-    (variant && dict[variant]) ?? dict[key] ?? (variant && fallback[variant]) ?? fallback[key] ?? key;
+    (variant && dict[variant]) ?? dict[key] ?? (variant && fallback?.[variant]) ?? fallback?.[key] ?? key;
   if (params) {
     for (const [name, value] of Object.entries(params)) {
       out = out.replaceAll(`{${name}}`, String(value));

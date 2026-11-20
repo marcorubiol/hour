@@ -316,35 +316,38 @@ export function clearSessionCookies(cookies: Cookies): void {
   cookies.delete(REFRESH_COOKIE, { path: REFRESH_COOKIE_PATH });
 }
 
-interface FreshSession {
+export interface FreshSession {
   jwt: string;
   expiresAt: number; // epoch ms
   user: SessionUser;
 }
 
 /**
- * Return a valid session from the request cookies, transparently refreshing
- * (and rotating the cookies) when the access token is expired or about to
- * expire. Null = no session; the caller answers 401.
- *
- * Only callable from routes under /api/auth — the refresh cookie's Path
- * doesn't travel anywhere else.
+ * Fast path: read the access cookie if it still has more than 30 s left.
+ * Zero network calls, zero KV calls — callers only hit the rate limiter and
+ * Supabase Auth when this returns null and a refresh is actually needed.
  */
-export async function ensureFreshSession(
+export function readValidAccessSession(cookies: Cookies, now = Date.now()): FreshSession | null {
+  const at = cookies.get(ACCESS_COOKIE);
+  if (!at) return null;
+  const claims = decodeJwtPayload(at);
+  const exp = typeof claims?.exp === 'number' ? claims.exp * 1000 : 0;
+  // 30 s of slack so a token that's about to die doesn't get handed out.
+  if (!claims || exp <= now + 30_000) return null;
+  const user = sessionUserFromClaims(claims);
+  if (!user) return null;
+  return { jwt: at, expiresAt: exp, user };
+}
+
+/**
+ * Refresh the session using the httpOnly refresh cookie, rotating both
+ * cookies on success. Null = no refresh cookie or grant failed.
+ * Only callable from routes under /api/auth.
+ */
+export async function refreshFreshSession(
   cookies: Cookies,
   env: SessionEnv,
 ): Promise<FreshSession | null> {
-  const at = cookies.get(ACCESS_COOKIE);
-  if (at) {
-    const claims = decodeJwtPayload(at);
-    const exp = typeof claims?.exp === 'number' ? claims.exp * 1000 : 0;
-    // 30 s of slack so a token that's about to die doesn't get handed out.
-    if (claims && exp > Date.now() + 30_000) {
-      const user = sessionUserFromClaims(claims);
-      if (user) return { jwt: at, expiresAt: exp, user };
-    }
-  }
-
   const rt = cookies.get(REFRESH_COOKIE);
   if (!rt) return null;
 
@@ -369,4 +372,19 @@ export async function ensureFreshSession(
     expiresAt: Date.now() + result.grant.expires_in * 1000,
     user,
   };
+}
+
+/**
+ * Return a valid session from the request cookies, transparently refreshing
+ * (and rotating the cookies) when the access token is expired or about to
+ * expire. Null = no session; the caller answers 401.
+ *
+ * Only callable from routes under /api/auth — the refresh cookie's Path
+ * doesn't travel anywhere else.
+ */
+export async function ensureFreshSession(
+  cookies: Cookies,
+  env: SessionEnv,
+): Promise<FreshSession | null> {
+  return readValidAccessSession(cookies) ?? (await refreshFreshSession(cookies, env));
 }

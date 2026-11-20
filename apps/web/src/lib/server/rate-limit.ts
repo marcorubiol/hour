@@ -57,12 +57,14 @@ function bucketKey(key: string, rule: RateLimitRule): string {
 
 /**
  * True = request admitted. Fails open on KV errors — availability of the
- * login path outranks precision of the limiter.
+ * login path outranks precision of the limiter. When `waitUntil` is passed,
+ * the counter increment runs off the response critical path.
  */
 export async function allowRequest(
   kv: KVNamespace | undefined,
   key: string,
   rule: RateLimitRule,
+  waitUntil?: (promise: Promise<unknown>) => void,
 ): Promise<boolean> {
   if (!kv) return true;
   try {
@@ -70,9 +72,15 @@ export async function allowRequest(
     const count = parseInt((await kv.get(kvKey)) ?? '0', 10);
     if (count >= rule.limit) return false;
     // Not atomic (KV is last-write-wins) — see module docblock.
-    await kv.put(kvKey, String(count + 1), {
-      expirationTtl: Math.max(60, rule.windowSec * 2),
-    });
+    const write = kv
+      .put(kvKey, String(count + 1), {
+        expirationTtl: Math.max(60, rule.windowSec * 2),
+      })
+      .catch(() => {
+        /* best-effort counter bump */
+      });
+    if (waitUntil) waitUntil(write);
+    else await write;
     return true;
   } catch {
     return true;

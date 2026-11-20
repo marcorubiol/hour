@@ -14,12 +14,12 @@
  */
 
 import { type DBSchema, type IDBPDatabase, openDB } from 'idb';
-import type { PersistedQueryCache, QueryCacheStore } from './query-cache';
+import type { PersistedQueryCache, PersistedQueryEntry, QueryCacheStore } from './query-cache';
 
 export const DB_NAME = 'hour-offline';
-export const DB_VERSION = 2;
+export const DB_VERSION = 3;
 
-/** The one key of `query_cache`: a device holds one user's cache. */
+/** The one key of `query_cache`: a device holds one user's boot cache + meta. */
 const QUERY_CACHE_KEY = 'query-client';
 
 export type WriteQueueMethod = 'POST' | 'PATCH' | 'PUT' | 'DELETE';
@@ -48,6 +48,13 @@ interface HourOfflineDB extends DBSchema {
   query_cache: {
     key: string;
     value: PersistedQueryCache;
+  };
+  /** Secondary per-query entries (Planner, Conversations, Books, records) written
+      incrementally so warm boot only deserializes Hoy's small `query-client`
+      record and background updates never re-serialize the whole cache. */
+  query_entries: {
+    key: string;
+    value: PersistedQueryEntry;
   };
   write_queue: {
     key: number;
@@ -95,7 +102,11 @@ export function getDB(): Promise<IDBPDatabase<HourOfflineDB>> {
           if (names.contains('read_cache')) (db as unknown as IDBDatabase).deleteObjectStore('read_cache');
           db.createObjectStore('query_cache');
         }
-        // Future: `if (oldVersion < 3) { ... }` etc.
+        // v3: secondary per-query store for non-boot lenses so boot only reads
+        // Hoy's queries and non-boot writes update a single entry.
+        if (oldVersion < 3) {
+          db.createObjectStore('query_entries');
+        }
       },
     });
   }
@@ -112,7 +123,18 @@ export function idbQueryCacheStore(): QueryCacheStore {
       await (await getDB()).put('query_cache', record, QUERY_CACHE_KEY);
     },
     clear: async () => {
-      await (await getDB()).clear('query_cache');
+      const db = await getDB();
+      const tx = db.transaction(['query_cache', 'query_entries'], 'readwrite');
+      await Promise.all([tx.objectStore('query_cache').clear(), tx.objectStore('query_entries').clear(), tx.done]);
+    },
+    getEntries: async () => (await getDB()).getAll('query_entries'),
+    putEntries: async (entries) => {
+      if (entries.length === 0) return;
+      const db = await getDB();
+      const tx = db.transaction('query_entries', 'readwrite');
+      const store = tx.objectStore('query_entries');
+      for (const entry of entries) void store.put(entry, entry.queryHash);
+      await tx.done;
     },
   };
 }

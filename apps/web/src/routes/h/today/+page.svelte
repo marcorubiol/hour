@@ -36,9 +36,8 @@
   import DeskDay from '$lib/components/desk/DeskDay.svelte';
   import DeskComing from '$lib/components/desk/DeskComing.svelte';
   import DeskWaiting from '$lib/components/desk/DeskWaiting.svelte';
-  import DeskChanged from '$lib/components/desk/DeskChanged.svelte';
-  import DeskSeason from '$lib/components/desk/DeskSeason.svelte';
   import LateNoticeBand from '$lib/components/desk/LateNoticeBand.svelte';
+  import { mobileReplyRows } from '$lib/mobile-replies';
   import { COMING_COUNT_CAP, COMING_TILES, COMING_TILES_PHONE, comingOpen, comingTiles, nextAfterToday, outsideToday, piecePerformance, scopePulseInput, waitingRowCount } from '$lib/hoy';
   import { MediaQuery } from 'svelte/reactivity';
   import { MOBILE_QUERY, WIDE_QUERY } from '$lib/breakpoints';
@@ -305,8 +304,16 @@
   });
 
   // Phone: Hoy is three blocks; «Ha cambiado» and «La temporada» stay on a
-  // desktop only (ADR-202 § 1 and § 15).
+  // desktop only (ADR-202 § 1 and § 15), so their code loads only off mobile.
   const phone = new MediaQuery(MOBILE_QUERY, false);
+  const deskChangedComp = lazy(() => import('$lib/components/desk/DeskChanged.svelte'));
+  const deskSeasonComp = lazy(() => import('$lib/components/desk/DeskSeason.svelte'));
+  $effect(() => {
+    if (!phone.current) {
+      void deskChangedComp.load();
+      void deskSeasonComp.load();
+    }
+  });
   /** From 64rem the Desk is the pass's grid: the day at the left, the reading column at the right. */
   const wide = new MediaQuery(WIDE_QUERY, false);
   // «Tablón · N nuevos» (plan 2026-10-22 § 3.3): the card's performance's
@@ -365,10 +372,14 @@
   // And only where the space uses the lens (ADR-132): off, its calls, replies,
   // movement and door leave the Desk with it.
   let readConversations = $derived($convAccessQuery.data?.read !== false && lensOn('conversations'));
+  // On a phone «Ha cambiado» and «La temporada» are hidden, so we derive
+  // «te toca» replies directly from the conversations query already fetched
+  // above instead of hitting `/api/conversations/overview` (a second full
+  // scan of conversations + events). Desktop still reads `overviewQuery`.
   const overviewQuery = createQuery(
-    toStore(() => conversationOverviewQueryOptions(filterIds, lineIds, !scopeUnresolved && readConversations)),
+    toStore(() => conversationOverviewQueryOptions(filterIds, lineIds, !scopeUnresolved && readConversations && !phone.current)),
   );
-  let overview = $derived(readConversations ? ($overviewQuery.data ?? null) : null);
+  let overview = $derived(readConversations && !phone.current ? ($overviewQuery.data ?? null) : null);
   // The last mailout, its own read (2026-10-24): a band with other news does
   // not wait for it (it joins them when it lands); one with none stays busy
   // until it answers, never «nothing new» before (`changedBandLoading`).
@@ -393,8 +404,15 @@
         )
       : [],
   );
+  let dueRowsForReplies = $derived(
+    phone.current
+      ? readConversations
+        ? mobileReplyRows(scopedConversations as unknown as ConversationItem[], clockNow)
+        : []
+      : (overview?.due.rows ?? []),
+  );
   let replies = $derived(
-    overviewReplies(overview?.due.rows ?? [], workspaceSlugById, projectNameById, (keys) => otherTagsName(keys, tagNames, locale)),
+    overviewReplies(dueRowsForReplies, workspaceSlugById, projectNameById, (keys) => otherTagsName(keys, tagNames, locale)),
   );
 
   // A document of a deal not yet confirmed is a quote, not a debt (ADR-123):
@@ -467,7 +485,7 @@
       $accessQuery.isPending,
       $overviewQuery.isPending,
     ];
-    return pending[0] || pending[1] || pending[2] || pending[3] || (readConversations && pending[4]);
+    return pending[0] || pending[1] || pending[2] || pending[3] || (readConversations && !phone.current && pending[4]);
   });
   let waitingErrored = $derived($conversationsQuery.isError || $tasksQuery.isError);
 
@@ -575,7 +593,7 @@
   // as it does there. Like the Season, nothing before today counts.
   let season = $derived(seasonWindow(today));
   const seasonBlocksQuery = createQuery(
-    toStore(() => seasonAvailabilityQueryOptions(season.weeks[0][0], season.to, lensOn('planner'))),
+    toStore(() => seasonAvailabilityQueryOptions(season.weeks[0][0], season.to, lensOn('planner') && !phone.current)),
   );
   let seasonBlocks = $derived($seasonBlocksQuery.data?.items ?? []);
   const engine = createPlannerEngine({
@@ -761,10 +779,11 @@
   $effect(() => {
     if (!busy) markHoyContent(restoredFromDevice());
   });
-  // The open's skeleton (app.html, $lib/boot) gives way to the day's blocks
-  // once they have data: from the device cache at once, else from the network.
+  // The open's skeleton (app.html, $lib/boot) gives way as soon as the top
+  // blocks («El día» and «Lo que viene») have data, without waiting on the
+  // slower «Te espera» reads below the fold.
   $effect(() => {
-    if (!busy) bootDone();
+    if (feeds.settled && $workspacesQuery.isSuccess) bootDone();
   });
 
   // ── Header: the piece says the day (ADR-202 § 3, ADR-203 § 1) ─────────
@@ -1086,9 +1105,9 @@
         wide={wide.current}
       />
       </div>
-      {#if drawChanged}
+      {#if drawChanged && deskChangedComp.component}
       <div class="slot slot--changed" data-slot="changed">
-        <DeskChanged
+        <deskChangedComp.component
           {changes}
           loading={changedLoading}
           errored={changedErrored}
@@ -1102,9 +1121,9 @@
         />
       </div>
       {/if}
-      {#if !phone.current && shows('desk', 'season', calm.on)}
+      {#if !phone.current && shows('desk', 'season', calm.on) && deskSeasonComp.component}
         <div class="slot slot--season" data-slot="season">
-          <DeskSeason
+          <deskSeasonComp.component
             planner={lensOn('planner') ? { value: plannerFig, errored: feeds.errored } : null}
             conversations={readConversations ? { value: convFig, errored: $overviewQuery.isError } : null}
             money={readMoney ? { value: moneyFig, errored: $invoicesQuery.isError || $bolosQuery.isError } : null}

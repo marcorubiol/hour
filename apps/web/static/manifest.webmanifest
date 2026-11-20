@@ -2,7 +2,7 @@
   "name": "hour",
   "short_name": "hour",
   "description": "Gestión de compañías de artes en vivo: todo junto, hora a hora.",
-  "start_url": "/",
+  "start_url": "/h/today",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",

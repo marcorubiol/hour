@@ -12,7 +12,7 @@
  * and asks for nothing, as on the record.
  */
 
-import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
+import { PostgrestError, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 
 export interface MissingFacts {
   has_bolo: boolean | null;
@@ -20,6 +20,44 @@ export interface MissingFacts {
 }
 
 const DAY_MS = 86_400_000;
+
+async function fetchRoadsheetCounts(
+  env: SupabaseEnv,
+  jwt: string,
+  near: ReadonlyArray<{ id: string; status: string }>,
+  now: Date,
+): Promise<(number | null)[]> {
+  const confirmedIds = near.filter((r) => r.status === 'confirmed').map((r) => r.id);
+  if (confirmedIds.length === 0) return near.map(() => null);
+
+  // Batched RPC path (migration 20261120230000_perf_rpcs_and_rls): 1 call
+  // instead of N. Falls back gracefully if the migration is not yet applied.
+  try {
+    const { data } = await pgPostRpc<{ performance_id: string; live_count: number }>(
+      env,
+      'list_roadsheet_share_counts',
+      jwt,
+      { p_performance_ids: confirmedIds },
+    );
+    const byId = new Map(data.map((row) => [row.performance_id, Number(row.live_count)]));
+    return near.map((r) => (r.status === 'confirmed' ? (byId.get(r.id) ?? null) : null));
+  } catch (err) {
+    if (!(err instanceof PostgrestError && (err.status === 404 || err.code === 'PGRST202'))) {
+      return near.map(() => null);
+    }
+  }
+
+  return Promise.all(
+    near.map((r) =>
+      r.status !== 'confirmed'
+        ? null
+        : pgPostRpc<{ expires_at: string | null }>(env, 'list_roadsheet_shares', jwt, { p_performance_id: r.id }).then(
+            (s) => s.data.filter((l) => !l.expires_at || Date.parse(l.expires_at) > now.getTime()).length,
+            () => null,
+          ),
+    ),
+  );
+}
 
 export async function fetchMissingFacts(
   env: SupabaseEnv,
@@ -40,16 +78,7 @@ export async function fetchMissingFacts(
     () => new Map<string, boolean>(),
   );
   // Only a confirmed row asks for its links; an expired link opens nothing.
-  const links = Promise.all(
-    near.map((r) =>
-      r.status !== 'confirmed'
-        ? null
-        : pgPostRpc<{ expires_at: string | null }>(env, 'list_roadsheet_shares', jwt, { p_performance_id: r.id }).then(
-            (s) => s.data.filter((l) => !l.expires_at || Date.parse(l.expires_at) > now.getTime()).length,
-            () => null,
-          ),
-    ),
-  );
+  const links = fetchRoadsheetCounts(env, jwt, near, now);
   const [bolo, live] = await Promise.all([bolos, links]);
   near.forEach((r, i) => {
     out[r.id] = { has_bolo: bolo.get(r.id) ?? null, roadsheet_links: live[i] };
