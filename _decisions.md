@@ -8720,3 +8720,26 @@ Encargo `revision-tdah/brief.md`, fase 2, lámina C.
 comprueba que hay un solo ámbar y que en el móvil no hay «＋».
 
 **Cómo se revierte.** Revertir el commit.
+
+## [2026-11-20] ADR-237 · Muchas cosas en un día: hasta tres enteras, desde la cuarta líneas (fase 8 de la revisión TDAH; amplía ADR-207)
+
+Encargo `revision-tdah/brief.md`, fase 8, lámina D, columnas 3 y 4. El corte está en tres (Marco, 19-11:
+«quiero coger tu recomendación en todo»). `DRAWN_WHOLE = 3` en `$lib/hoy`, el mismo número en Hoy y en el Día.
+
+1. **Hoy.** Con más de tres funciones hoy, la pieza cuenta el día: «15 funciones», de la primera a la última hora, y
+   debajo «3 en marcha · 9 ciudades». Dentro de la pieza, «Lo que queda de hoy · N» en líneas: lo que ya pasó se va,
+   y «ver las 15» abre el Día. Amplía el modo de varias funciones de ADR-207 (`manyDay`), no lo duplica.
+2. **«Lo que viene».** Una tarjeta de un día con más de tres cosas dice «15 funciones · 9 ciudades» en vez de dos y
+   «+13», y abre el Día.
+3. **El Día.** Con más de tres funciones, las piezas con su orden del día dejan paso a líneas agrupadas en mañana
+   (antes de las 14h), tarde (antes de las 20h), noche y sin hora, con tres filtros: Todas, Te necesitan y Voy yo.
+   «Te necesitan» es una opción por confirmar o algo por cerrar en sus dos semanas (la regla de ADR-211). «Voy yo» es
+   la lista de quién va o tu «voy». Lo hecho (empezó hace más de dos horas) queda atenuado. Una línea abre su pase.
+   Pura en `$lib/day-lines`.
+
+**Queda para después.** Que la pieza nombre solo las funciones que te necesitan («alguien llega tarde», «3 nuevos» del
+tablón): Hoy no lee todavía esas señales por función. Mientras tanto, lo que queda de hoy va completo, en líneas.
+
+**Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`. Textos en los cuatro idiomas.
+
+**Cómo se revierte.** Revertir el commit.

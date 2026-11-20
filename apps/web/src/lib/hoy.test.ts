@@ -2,6 +2,8 @@ import { addManualThing, readPreparation } from './preparation';
 import { describe, expect, it } from 'vitest';
 import {
   yourStop,
+  manyDay,
+  DRAWN_WHOLE,
   COMING_TILES,
   COMING_TILES_PHONE,
   comingOpen,
@@ -374,5 +376,33 @@ describe('«tu hora»: the first stop of the day when the list names you (ADR-23
     expect(yourStop(perf({ commitments: [{ person_id: 'me', state: 'not_going' }] }), 'me')).toBeNull();
     expect(yourStop(perf(), null)).toBeNull();
     expect(yourStop(perf({ start_at: null, load_in_at: null, soundcheck_at: null }), 'me')).toBeNull();
+  });
+});
+
+describe('many things in a day: from the fourth, lines (ADR-237)', () => {
+  const at = (h: string) => `${TODAY}T${h}:00:00Z`;
+  const day = (performances: PerformanceEvent[], now: string) => dayAgenda({ performances, dates: [], viewerTz: TZ }, TODAY, new Date(now));
+  const four = ['10', '12', '16', '20'].map((h) => perf(`p${h}`, TODAY, mamemi, { start_at: at(h) }));
+
+  it('three are drawn whole: no count', () => {
+    expect(DRAWN_WHOLE).toBe(3);
+    expect(manyDay(day(four.slice(0, 3), at('09')), new Date(at('09')))).toBeNull();
+  });
+
+  it('four: counted, with what is on and only what is left of today', () => {
+    const now = at('13');
+    const m = manyDay(day(four, now), new Date(now))!;
+    expect(m.count).toBe(4);
+    expect(m.on).toBe(1);
+    expect(m.left.map((p) => p.ref.id)).toEqual(['p12', 'p16', 'p20']);
+  });
+
+  it('the tiles of «Coming up» keep everything of the day to count it', () => {
+    const tiles = comingTiles(
+      four.map((p) => ({ day: '2026-11-14', at: p.start_at, ref: { of: 'performance', id: p.id, row: p, tz: null, tentative: false } }) as never),
+      TODAY,
+    );
+    expect(tiles[0].all).toHaveLength(4);
+    expect(tiles[0].items).toHaveLength(2);
   });
 });

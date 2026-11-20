@@ -35,7 +35,7 @@
   import { plannerDayHref } from '$lib/planner';
   import { pulseSlip } from '$lib/pulse-feeds.svelte';
   import type { PulseNext } from '$lib/pulse';
-  import { yourStop, type ComingOpen, type ComingTile, type TileUrgent } from '$lib/hoy';
+  import { DRAWN_WHOLE, yourStop, type ComingOpen, type ComingTile, type TileUrgent } from '$lib/hoy';
   import { accentVarFor } from '$lib/utils/accent';
 
   interface Props {
@@ -141,6 +141,22 @@
     }
     return dayHref(tile);
   }
+  /** «15 funciones · 9 ciudades» for a day of more than three things (ADR-237), else null. */
+  function manyOf(tile: ComingTile): string | null {
+    if (tile.all.length <= DRAWN_WHOLE) return null;
+    const perfs = tile.all.filter((x) => x.ref.of === 'performance');
+    const voices = new Set(perfs.map((x) => tradeFor(perfWorkspaceId(x.ref.row))));
+    const voice: Voice = voices.size === 1 ? [...voices][0] : 'mixed';
+    const cities = new Set(tile.all.map((x) => pulseSlip(x.ref, tile.day, slipCtx).city).filter(Boolean));
+    const others = tile.all.length - perfs.length;
+    return [
+      perfs.length > 0 ? t('desk.shows_n', locale, { n: perfs.length }, voice) : null,
+      others > 0 ? t('desk.coming_more', locale, { n: others }) : null,
+      cities.size > 1 ? t('desk.cities_n', locale, { n: cities.size }) : [...cities][0],
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  }
   /** Does this tile carry the screen's one amber? */
   const amberOn = (tile: ComingTile) => dots && open.urgentDay === tile.day && tile.urgent !== null;
   let farHref = $derived.by(() => {
@@ -164,6 +180,11 @@
       />{/if}<span class:guess={held}>{kindLabel(sl.kind, tradeFor(perfWorkspaceId(item.ref.row)))}{held ? '?' : ''}</span>
     · {#if stopOf(item)}{t('desk.you_at', locale, { time: hour(stopOf(item)!.at, item.ref.tz) })}{:else if item.at}{hour(item.at, item.ref.tz)}{:else}<span class="tile__nohour">{t('planner.no_hour', locale)}</span>{/if}</small
   >
+{/snippet}
+
+{#snippet many(tile: ComingTile)}
+  <!-- More than three (ADR-237): counted, not listed; the tile opens the day. -->
+  <p class="tile__many" data-testid="desk-tile-many">{manyOf(tile)}</p>
 {/snippet}
 
 {#snippet amber(tile: ComingTile)}
@@ -191,6 +212,9 @@
                 <span class="tile__wd">{localeWeekdayShort(tile.day, locale)}</span>
                 <span class="tile__mo">{localeMonthShort(tile.day, locale)}</span>
               </svelte:element>
+              {#if manyOf(tile)}
+                {@render many(tile)}
+              {:else}
               <ul class="tile__things tile__things--rows">
                 {#each tile.items as item (item.ref.of + item.ref.id)}
                   {@const door = pulseSlip(item.ref, tile.day, slipCtx).href ?? href}
@@ -202,6 +226,7 @@
                 {/each}
               </ul>
               {#if tile.more > 0}<span class="tile__more">{t('desk.coming_more', locale, { n: tile.more })}</span>{/if}
+              {/if}
               {@render amber(tile)}
             </div>
           </li>
@@ -221,12 +246,16 @@
                 <span class="tile__wd">{localeWeekdayShort(tile.day, locale)}</span>
                 <span class="tile__mo">{localeMonthShort(tile.day, locale)}</span>
               </span>
+              {#if manyOf(tile)}
+                {@render many(tile)}
+              {:else}
               <ul class="tile__things">
                 {#each tile.items as item (item.ref.of + item.ref.id)}
                   <li class="tile__thing">{@render body(item, tile.day)}</li>
                 {/each}
               </ul>
               {#if tile.more > 0}<span class="tile__more">{t('desk.coming_more', locale, { n: tile.more })}</span>{/if}
+              {/if}
               {@render amber(tile)}
             </svelte:element>
           </li>
@@ -392,6 +421,16 @@
     text-decoration: none;
   }
   .tile--card .tile__things {
+    grid-area: things;
+  }
+  /* A day of many (ADR-237): one line, the size of a place. */
+  .tile__many {
+    margin: 0;
+    font-size: var(--text-m);
+    color: var(--heading-color);
+    overflow-wrap: anywhere;
+  }
+  .tile--card .tile__many {
     grid-area: things;
   }
   .tile--card .tile__more {

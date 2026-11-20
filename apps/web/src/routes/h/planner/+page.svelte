@@ -69,6 +69,8 @@
   import { readPreparation } from '$lib/preparation';
   import { isUrgentMissing, isUrgentThing, manualOpenSoon, missingSoon } from '$lib/record-missing';
   import { agendaWords, daysTo, firstDue } from '$lib/agenda-missing';
+  import { dayLineGroups, hourOfClock, type DayFilter } from '$lib/day-lines';
+  import { DRAWN_WHOLE } from '$lib/hoy';
   import { noteFallback as noteFallbackOf, noteFallbackBody } from '$lib/note';
   import DecisionBand, {
     decisionText,
@@ -1543,6 +1545,8 @@
       timed: boolean;
       project: ProjectLite | null;
       guess: boolean;
+      /** The performance itself, for the Day of many's filters (ADR-237). */
+      perf?: PerformanceEvent;
     }> = [];
     const clockOf = (venueTz: string | null | undefined, wsId: string | undefined) =>
       venueTz || (wsId ? workspaceTzById.get(wsId) : undefined) || viewerTz;
@@ -1560,6 +1564,7 @@
         timed: Boolean(p.start_at),
         project: p.project ?? null,
         guess: performanceSlip(p, slipCtxPage).cert === 'hold' || performanceSlip(p, slipCtxPage).cert === 'proposed',
+        perf: p,
       });
     }
     for (const d of shownDates) {
@@ -1648,6 +1653,35 @@
       clearInterval(iv);
       document.removeEventListener('visibilitychange', bump);
     };
+  });
+  /* THE DAY OF MANY (ADR-237): from the fourth performance, lines. */
+  let dayMany = $derived(dayOrders.filter((o) => o.target === 'performance').length > DRAWN_WHOLE);
+  let dayFilter = $state<DayFilter>('all');
+  let dayLines = $derived.by(() => {
+    if (!dayMany) return [];
+    const nowMs = Date.now();
+    void minuteTick;
+    return dayLineGroups(
+      dayOrders.map((o) => {
+        const clock = o.timed ? dualTime(o.from, o.tz, viewerTz).primary : null;
+        const p = o.perf;
+        return {
+          o,
+          hour: hourOfClock(clock),
+          clock: clock ? hourMark(clock) : null,
+          need: o.guess || (p ? agendaOpen(p).items.length > 0 || agendaOpen(p).noTime : false),
+          mine: Boolean(
+            p &&
+              myPersonId &&
+              ((p.person_ids ?? []).includes(myPersonId) ||
+                (p.commitments ?? []).some((c) => c.person_id === myPersonId && c.state === 'going')),
+          ),
+          // Done: begun more than two hours ago (dimmed, not gone).
+          done: o.timed && Date.parse(o.from) + 2 * 3_600_000 < nowMs,
+        };
+      }),
+      dayFilter,
+    );
   });
   let dayNow = $derived.by(() => {
     void minuteTick;
@@ -3500,6 +3534,38 @@
          the shape; the running order under it says the hours and lets them
          be written, on the day. A name on the lid only when the day holds
          more than one order: with one, the strip above already says whose. -->
+    {#if dayMany}
+      <section class="daylines" data-testid="day-lines" aria-label={t('planner.day_lines_aria', locale)}>
+        <div class="daylines__filters" role="group" aria-label={t('planner.day_filter_aria', locale)}>
+          {#each ['all', 'need', 'mine'] as const as f (f)}
+            <button
+              type="button"
+              class="btn--secondary btn--xs daylines__filter"
+              aria-pressed={dayFilter === f}
+              onclick={() => (dayFilter = f)}>{t(`planner.day_filter_${f}`, locale)}</button
+            >
+          {/each}
+        </div>
+        {#each dayLines as g (g.part)}
+          <h3 class="daylines__part">{t(`planner.day_part_${g.part}`, locale)}</h3>
+          <ul class="daylines__list">
+            {#each g.rows as r (r.o.id)}
+              <li class="daylines__row" class:daylines__row--done={r.done} data-testid="day-line">
+                <svelte:element this={r.o.href ? 'a' : 'span'} href={r.o.href} class="daylines__link">
+                  <span class="daylines__h">{r.clock ?? t('planner.no_hour', locale)}</span>
+                  <span class="daylines__what" class:guess={r.o.guess}
+                    >{r.o.name}{#if r.o.sub && r.o.sub !== r.o.name}<span class="daylines__sub"> · {r.o.sub}</span>{/if}</span
+                  >
+                  <span class="daylines__who">{r.o.project?.name ?? r.o.eyebrow}</span>
+                </svelte:element>
+              </li>
+            {/each}
+          </ul>
+        {:else}
+          <p class="daylines__none">{t('planner.day_filter_none', locale)}</p>
+        {/each}
+      </section>
+    {:else}
     {#each dayOrders as o (o.id)}
       <DayPiece
         href={o.href}
@@ -3530,6 +3596,7 @@
         {/if}
       </DayPiece>
     {/each}
+    {/if}
     <!-- THE ABSENCE IS THE DAY'S FOOTING (Marco, 2026-08-10). Above the
          drawing it floated on its own, far from anything, and Marco could
          not read it: «no acabamos de ver bien el mensaje, quizás ponerlo más
@@ -3975,6 +4042,72 @@
        band, the line belonged to neither and read as floating — which is
        what Marco could not see. Pushed off the drawing and set down almost
        on the NOTES rule, it becomes the band's first line. */
+    /* THE DAY OF MANY (ADR-237): lines, grouped by the part of the day. */
+    .daylines {
+      display: grid;
+      gap: var(--space-xs);
+      margin-block-start: var(--space-m);
+    }
+    .daylines__filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-xs);
+    }
+    .daylines__filter[aria-pressed='true'] {
+      --btn-border-color: var(--text-color);
+      --btn-text-color: var(--text-color);
+    }
+    .daylines__part {
+      margin: var(--space-s) 0 0;
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      font-weight: normal;
+      letter-spacing: var(--mono-letter-spacing-loose);
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .daylines__list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      border-block-start: var(--line-hairline) solid var(--border-color-dark);
+    }
+    .daylines__row {
+      border-block-end: var(--line-hairline) solid var(--border-color);
+    }
+    .daylines__link {
+      display: grid;
+      grid-template-columns: 4rem minmax(0, 1fr) auto;
+      gap: var(--space-s);
+      align-items: baseline;
+      padding-block: var(--space-xs);
+      min-block-size: var(--touch-target);
+      color: inherit;
+      text-decoration: none;
+    }
+    a.daylines__link:hover .daylines__what {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    .daylines__h {
+      font-variant-numeric: tabular-nums;
+      color: var(--text-muted);
+    }
+    .daylines__sub,
+    .daylines__who {
+      color: var(--text-muted);
+    }
+    .daylines__who {
+      font-size: var(--text-s);
+      text-align: end;
+    }
+    .daylines__row--done {
+      opacity: 0.55;
+    }
+    .daylines__none {
+      margin: 0;
+      color: var(--text-muted);
+    }
     .cal__dayaway {
       margin-block: var(--space-l) 0;
       padding-block-end: var(--space-2xs);

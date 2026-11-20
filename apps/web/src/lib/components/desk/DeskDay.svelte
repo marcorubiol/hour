@@ -39,12 +39,13 @@
   import { dualTime, hourMark, localeDayMonth, localeWeekdayShort } from '$lib/datetime';
   import { LOCALE_TAG, t, tradeFor, type Locale, type Voice } from '$lib/i18n';
   import { holdDeadlineLabel } from '$lib/performance';
-  import { dayKeyInTz, statusWord } from '$lib/planner';
+  import { dayKeyInTz, plannerDayHref, statusWord } from '$lib/planner';
   import { momentWordKey, perfWorkspaceId, type DateEvent, type PerformanceEvent, type ProjectLite, type SlipContext, type SlipKind } from '$lib/month-events';
   import { stagePlace } from '$lib/travel-stage';
   import { timedStages, type PulseNext } from '$lib/pulse';
   import type { AgendaPoint, DayAgenda } from '$lib/day-agenda';
-  import { nextWhen, piecePerformance, rowsSayCity, showsDay, yourStop } from '$lib/hoy';
+  import { manyDay, nextWhen, piecePerformance, rowsSayCity, showsDay, yourStop } from '$lib/hoy';
+  import { lensOn } from '$lib/lenses.svelte';
   import { plusDays } from '$lib/set-aside';
   import { countdownParts, freshnessShown, logisticsLines, mapsHref, minutesTo, telHref, venueCall } from '$lib/ahora';
   import { ahoraRoadsheetQuery, roleFor, type AhoraRoadsheet } from '$lib/ahora-feeds.svelte';
@@ -152,6 +153,9 @@
   let doing = $derived(agenda?.headline === 'doing');
   /** Two or more performances today (ADR-207), else null: the focus speaks. */
   let shows = $derived(agenda ? showsDay(agenda) : null);
+  /** More than three (ADR-237): the piece counts the day, the rows are what is left. */
+  let many = $derived(agenda ? manyDay(agenda, now) : null);
+  let dayDoor = $derived(agenda && lensOn('planner') ? plannerDayHref('day', agenda.day) : null);
   /* THE HOUR AT THE SIZE OF THE THING (ADR-202 § 4, ADR-207): whose on the
      left (the project; without one, the venue, else the city), its hour on
      the right; doing something, until when. The word of the moment goes
@@ -194,7 +198,7 @@
   });
   /** «2 funciones», «2 shows». */
   const showsCount = (s: NonNullable<typeof shows>) => t('desk.shows_n', locale, { n: s.shows.length }, showsVoice);
-  let showsWhat = $derived(shows ? (shows.oneProject ? shows.shows[0].ref.row.project!.name : showsCount(shows)) : '');
+  let showsWhat = $derived(shows ? (shows.oneProject && !many ? shows.shows[0].ref.row.project!.name : showsCount(shows)) : '');
   let showsAt = $derived(
     shows ? shows.hours.map((p) => hour(p.at!, p.tz)).join(shows.shows.length > 2 ? ' … ' : ' · ') || t('planner.all_day', locale) : '',
   );
@@ -202,6 +206,15 @@
     const s = shows;
     if (!s || !agenda) return '';
     const cities = new Set(s.shows.map((p) => pulseSlip(p.ref, agenda.day, slipCtx).city).filter(Boolean));
+    if (many) {
+      // «3 en marcha · 9 ciudades» (ADR-237): counted, not listed.
+      return [
+        many.on > 0 ? t('desk.shows_on_n', locale, { n: many.on }) : null,
+        cities.size > 1 ? t('desk.cities_n', locale, { n: cities.size }) : [...cities][0],
+      ]
+        .filter(Boolean)
+        .join(' · ');
+    }
     return [s.oneProject ? showsCount(s) : null, ...cities].filter(Boolean).join(' · ');
   });
   let showsLeft = $derived.by(() => {
@@ -413,9 +426,18 @@
       {/if}
       {#if fresh}<span class="piece__fresh" data-testid="desk-fresh">{fresh}</span>{/if}
 
-      {#if agenda.points.length > 1}
-        <ol class="piece__day" data-testid="desk-agenda">
+      {#if many}
+        <!-- More than three (ADR-237): only what is left of today, in lines;
+             what is done goes. The whole day is the Day's. -->
+        <p class="piece__left-head" data-testid="desk-left-head">
+          <span>{t('desk.left_today', locale, { n: many.left.length })}</span>
+          {#if dayDoor}<a href={dayDoor} data-testid="desk-see-all">{t('desk.see_all_n', locale, { n: many.count })} →</a>{/if}
+        </p>
+      {/if}
+      {#if agenda.points.length > 1 && (!many || many.left.length > 0)}
+        <ol class="piece__day" class:piece__day--many={many} data-testid="desk-agenda">
           {#each agenda.points as p, i (p.key)}
+            {#if !many || !agenda.past[i]}
             {@const href = rowHref(p)}
             {@const w = place(p, rowsCity)}
             <!-- Several projects' shows (ADR-207): a show's own row says whose, not «Show». -->
@@ -433,6 +455,7 @@
                 >
               </svelte:element>
             </li>
+            {/if}
           {/each}
         </ol>
       {/if}
@@ -668,6 +691,19 @@
   }
   a.piece__rowwhat:hover {
     text-decoration: underline;
+  }
+  .piece__left-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--space-xs) var(--space-m);
+    margin: 0;
+    padding-block-start: var(--space-s);
+    border-block-start: var(--line-hairline) solid var(--surface-focus-rule);
+    font-size: var(--text-s);
+  }
+  .piece__left-head + .piece__day--many {
+    border-block-start: 0;
   }
   .piece__links {
     display: flex;
