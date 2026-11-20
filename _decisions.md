@@ -8644,3 +8644,27 @@ aparte, como lo visto de la ayuda). No toca el service worker.
 **Queda para la fase 5b**: lo que falta de la lista de preparación, agrupado por tarea, como fila de «Te espera».
 
 **Cómo se revierte.** Revertir el commit; si la migración se aplicó, el rollback de arriba.
+
+## [2026-11-20] ADR-233 · La pieza es tu día (fase 6 de la revisión TDAH; enmienda ADR-202 § 3 y § 7)
+
+Encargo `revision-tdah/brief.md`, fase 6, lámina D (columnas 1 y 2). Una sola Hoy para todos: lo que cambia es lo que tu
+día tiene para ti, no quién eres.
+
+1. **Tu hora.** Si la lista de quién va te nombra (tu «voy», o el reparto cuando el dato llega), la hora grande es la
+   primera parada del día de esa función, la misma para todos los que van (Marco, 19-11: «la primera parada del día»).
+   La cabecera dice «Estás a las», el titular es esa parada («Montaje») y debajo, dónde y cuánto falta. Solo mientras la
+   pieza está en la función y esa parada no ha llegado: un tren antes sigue siendo el titular, y con varias funciones
+   el titular es el día (ADR-207). Pura en `yourStop` (`$lib/hoy`).
+2. **«estás a las 16h»** en las fichas de «Lo que viene» y en la línea «Lo siguiente» de la pieza hueca, en vez de la
+   hora de la función, cuando la lista te nombra.
+3. **«Mañana · …» dentro de la pieza** cuando ya no queda nada de hoy por delante o lo de hoy no tiene horas: «Mañana ·
+   sales a las 10h hacia Getxo» si mañana empieza con un viaje, si no qué es, dónde y a qué hora.
+4. **Sin nada hoy, una pieza más pequeña** (enmienda ADR-202 § 3, «hoy es siempre la pieza grande»): sigue en su sitio
+   y hueca, pero el titular baja de tamaño para que mande lo que espera.
+5. **En día de función, «Te espera» es una línea** (enmienda ADR-202 § 7): «Te espera · 4 · ver». «ver» la abre con las
+   tres filas de un día normal. En calma no cambia (sigue sin filas).
+
+**Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA` (`/api/me` ya estaba en la caché de la sesión). Textos en
+los cuatro idiomas. Arregla también `desk.spec` («See all»), que no se había actualizado con ADR-229.
+
+**Cómo se revierte.** Revertir el commit.

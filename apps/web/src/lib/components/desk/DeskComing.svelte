@@ -31,11 +31,11 @@
   import { dualTime, hourMark, localeDayMonthNear, localeMonthShort, localeWeekdayShort } from '$lib/datetime';
   import { t, tradeFor, type Locale, type Voice } from '$lib/i18n';
   import { lensOn } from '$lib/lenses.svelte';
-  import { perfWorkspaceId, type SlipContext, type SlipKind } from '$lib/month-events';
+  import { perfWorkspaceId, type PerformanceEvent, type SlipContext, type SlipKind } from '$lib/month-events';
   import { plannerDayHref } from '$lib/planner';
   import { pulseSlip } from '$lib/pulse-feeds.svelte';
   import type { PulseNext } from '$lib/pulse';
-  import type { ComingOpen, ComingTile, TileUrgent } from '$lib/hoy';
+  import { yourStop, type ComingOpen, type ComingTile, type TileUrgent } from '$lib/hoy';
   import { accentVarFor } from '$lib/utils/accent';
 
   interface Props {
@@ -49,6 +49,8 @@
     today: string;
     viewerTz: string;
     slipCtx: SlipContext;
+    /** The viewer's person (`/api/me`): «estás a las» on the tiles (ADR-233). */
+    me?: string | null;
     locale: Locale;
     /** What is open, amber or grey (ADR-227); off in calm (ADR-203 § 5). */
     dots?: boolean;
@@ -65,6 +67,7 @@
     today,
     viewerTz,
     slipCtx,
+    me = null,
     locale,
     dots = true,
     wide = false,
@@ -72,6 +75,8 @@
 
   const kindLabel = (kind: SlipKind, voice?: Voice) => t(`planner.kind_${kind}`, locale, undefined, voice);
   const hour = (iso: string, tz: string | null) => hourMark(dualTime(iso, tz, viewerTz).primary);
+  /** «estás a las 14h» when the list names you (ADR-233): the day's first stop. */
+  const stopOf = (item: PulseNext) => (item.ref.of === 'performance' ? yourStop(item.ref.row as PerformanceEvent, me) : null);
   const dayDiff = (day: string) =>
     Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
   /** Where a thing happens: its city, else its name; a trip, «a Donostia». */
@@ -157,7 +162,7 @@
         name={item.ref.row.project.name}
         initials={item.ref.row.project.initials}
       />{/if}<span class:guess={held}>{kindLabel(sl.kind, tradeFor(perfWorkspaceId(item.ref.row)))}{held ? '?' : ''}</span>
-    · {#if item.at}{hour(item.at, item.ref.tz)}{:else}<span class="tile__nohour">{t('planner.no_hour', locale)}</span>{/if}</small
+    · {#if stopOf(item)}{t('desk.you_at', locale, { time: hour(stopOf(item)!.at, item.ref.tz) })}{:else if item.at}{hour(item.at, item.ref.tz)}{:else}<span class="tile__nohour">{t('planner.no_hour', locale)}</span>{/if}</small
   >
 {/snippet}
 

@@ -53,7 +53,7 @@
   import { useCalm } from '$lib/stores/calm.svelte';
   import { buildLineIndex, buildProjectIndex, resolveScope, workspacesOnScreen, type NavWorkspace, type RawLine } from '$lib/nav';
   import { readPreparation } from '$lib/preparation';
-  import { workspacesQueryOptions, activeProjectsQueryOptions, allLinesQueryOptions } from '$lib/nav-queries';
+  import { workspacesQueryOptions, activeProjectsQueryOptions, allLinesQueryOptions, meQueryOptions } from '$lib/nav-queries';
   import { moneyAccessAnyQueryOptions, scopeBolosQueryOptions } from '$lib/bolo-queries';
   import { conversationAccessQueryOptions } from '$lib/conversation-access';
   import { otherTagsName, scopeTags } from '$lib/conversation-tags';
@@ -262,6 +262,9 @@
   let allTiles = $derived.by(() => comingTiles(upcoming(pulseInput, clockNow, COMING_COUNT_CAP), today, Infinity, listOf));
   let tiles = $derived.by(() => allTiles.slice(0, phone.current ? COMING_TILES_PHONE : COMING_TILES));
   let tilesOpen = $derived(comingOpen(allTiles));
+  // «Tu hora» (ADR-233): whose the viewer is, to know when a list names them.
+  const meQuery = createQuery(meQueryOptions());
+  let me = $derived($meQuery.data?.person_id ?? null);
   let nextThing = $derived(nextAfterToday(coming, today));
   // Nothing within two weeks: one sentence names what comes (ADR-149).
   let farNext = $derived(tiles.length === 0 ? nextThing : null);
@@ -978,6 +981,7 @@
           updatedAt={feeds.updatedAt || null}
           boardNew={nextBoardNew}
           {slipCtx}
+          {me}
           {locale}
         />
       </div>
@@ -1005,6 +1009,7 @@
           onaccept={(id) => $patchTask.mutate({ id, patch: { origin: 'manual' } })}
           {deciding}
           ondecide={decide}
+          folded={!calm.on && scopedPerfs.some((p) => p.status !== 'cancelled' && perfDayKey(p) === today)}
           aside={split.aside}
           old={split.old}
           onaside={setRowAside}
@@ -1023,6 +1028,7 @@
         {today}
         {viewerTz}
         {slipCtx}
+        {me}
         {locale}
         dots={shows('desk', 'coming_missing', calm.on)}
         wide={wide.current}

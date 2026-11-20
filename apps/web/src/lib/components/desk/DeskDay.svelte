@@ -44,7 +44,8 @@
   import { stagePlace } from '$lib/travel-stage';
   import { timedStages, type PulseNext } from '$lib/pulse';
   import type { AgendaPoint, DayAgenda } from '$lib/day-agenda';
-  import { nextWhen, piecePerformance, rowsSayCity, showsDay } from '$lib/hoy';
+  import { nextWhen, piecePerformance, rowsSayCity, showsDay, yourStop } from '$lib/hoy';
+  import { plusDays } from '$lib/set-aside';
   import { countdownParts, freshnessShown, logisticsLines, mapsHref, minutesTo, telHref, venueCall } from '$lib/ahora';
   import { ahoraRoadsheetQuery, roleFor, type AhoraRoadsheet } from '$lib/ahora-feeds.svelte';
   import { teamQueryOptions } from '$lib/nav-queries';
@@ -78,6 +79,8 @@
     slipCtx: SlipContext;
     /** For the road sheet's role (the preloaded cut, ADR-146 § 6). */
     workspaces: readonly NavWorkspace[];
+    /** The viewer's person (`/api/me`): «tu hora» when the list names them (ADR-233). */
+    me?: string | null;
     locale: Locale;
   }
 
@@ -97,6 +100,7 @@
     boardNew = 0,
     slipCtx,
     workspaces,
+    me = null,
     locale,
   }: Props = $props();
 
@@ -274,6 +278,33 @@
   let boardHref = $derived(actionSlip?.href && boardNew > 0 ? `${actionSlip.href}#board` : null);
   let acts = $derived(Boolean(call?.phone || map));
 
+  /* «TU HORA» (ADR-233): the list of who goes names you, so the big hour is the
+     first stop of the day, «Estás a las», until it comes. Not with several
+     shows (the headline is the day's), nor once something is under way. */
+  let stop = $derived(!shows && actionPerf && actionPoint ? yourStop(actionPerf, me) : null);
+  /* Only while the piece is on the performance itself: a train before it
+     stays the headline (it is what you do first). */
+  let onPerf = $derived(Boolean(focus && actionPerf && focus.ref.of === 'performance' && focus.ref.row.id === actionPerf.id));
+  let yours = $derived(stop && onPerf && !doing && Date.parse(stop.at) > now.getTime() ? stop : null);
+  let yoursWord = $derived.by(() => {
+    if (!yours || !actionPerf) return '';
+    return cap(yours.label || (yours.key ? t(momentWordKey(yours.key), locale, undefined, tradeFor(perfWorkspaceId(actionPerf))) : ''));
+  });
+
+  let headEye = $derived(yours ? t('desk.you_at_eye', locale) : eye);
+  let headWhat = $derived(yours ? yoursWord || what : shows ? showsWhat : what);
+  let headAt = $derived(yours && actionPoint ? hour(yours.at, actionPoint.tz) : shows ? showsAt : at);
+  let headSub = $derived(yours && actionPoint ? place(actionPoint) : shows ? showsWhere : where);
+  let headRest = $derived(yours ? inWords(minutesTo(yours.at, now)) : shows ? showsLeft : left);
+
+  /* «Mañana · sales a las 10h hacia Getxo» (ADR-233): inside the piece once
+     nothing of today is still ahead, or today has no hours. */
+  let tomorrowLine = $derived.by(() => {
+    if (!agenda || !next || next.day !== plusDays(today, 1)) return '';
+    const ahead = agenda.next !== null && agenda.points.some((p) => p.at);
+    return ahead ? '' : nextWords(next, true);
+  });
+
   // ── Freshness (ADR-146 § 3): one line, only without a network or with
   //    what is on screen over an hour old.
   let online = $state(typeof navigator === 'undefined' ? true : navigator.onLine);
@@ -303,21 +334,32 @@
 
   // ── The hollow piece: «Hoy, nada en la agenda» and «Lo siguiente: …» (ADR-203 § 2) ──
   /** «mañana, tren a Girona», «martes, función? en Vic», «jue 19 nov, ensayo». */
-  function nextWords(n: PulseNext): string {
+  function nextWords(n: PulseNext, tomorrow = false): string {
     const when = nextWhen(n.day, today, locale);
     const sl = pulseSlip(n.ref, n.day, slipCtx);
     const held = sl.cert === 'hold' || sl.cert === 'proposed' ? '?' : '';
     const to = (p: string) => `${t('planner.slip_to', locale)} ${p}`;
+    /* «Mañana · …» inside the piece (ADR-233) says its hour; the hollow piece
+       draws it on the right. */
+    const said = (what: string, where?: string) => {
+      if (!tomorrow) return where ? t('desk.day_next_at', locale, { when, what, where }) : t('desk.day_next', locale, { when, what });
+      const line = where ? t('desk.tomorrow_at', locale, { what, where }) : t('desk.tomorrow', locale, { what });
+      return n.at ? `${line} · ${hour(n.at, n.ref.tz)}` : line;
+    };
     // A trip says how it goes and where to when it has its legs: «tren a Girona».
     const leg = n.ref.of === 'date' ? timedStages(n.ref.row as DateEvent)[0] : undefined;
     const legTo = leg ? stagePlace(leg.to_city, leg.to_place) : null;
-    if (leg) return t('desk.day_next', locale, { when, what: [`${t(`planner.mode_${leg.mode}`, locale)}${held}`, legTo ? to(legTo) : null].filter(Boolean).join(' ') });
+    if (leg && tomorrow && legTo && leg.depart_at)
+      return t('desk.tomorrow_leaves', locale, { time: hour(leg.depart_at, leg.depart_tz ?? n.ref.tz), to: legTo });
+    if (leg) return said([`${t(`planner.mode_${leg.mode}`, locale)}${held}`, legTo ? to(legTo) : null].filter(Boolean).join(' '));
     const kind = `${kindLabel(sl.kind, tradeFor(perfWorkspaceId(n.ref.row)))}${held}`;
-    if (sl.lead) return t('desk.day_next', locale, { when, what: `${kind} ${to(sl.name)}` });
+    if (sl.lead) return said(`${kind} ${to(sl.name)}`);
     const w = sl.city || sl.name;
-    return w ? t('desk.day_next_at', locale, { when, what: kind, where: w }) : t('desk.day_next', locale, { when, what: kind });
+    return w ? said(kind, w) : said(kind);
   }
   let nextHref = $derived(next ? (pulseSlip(next.ref, next.day, slipCtx).href ?? undefined) : undefined);
+  /** What comes names you: «estás a las 16h» instead of its own hour (ADR-233). */
+  let nextStop = $derived(next && next.ref.of === 'performance' ? yourStop(next.ref.row as PerformanceEvent, me) : null);
 
   /** A row's own address: its record, else the day in the Planner. */
   const rowHref = (p: AgendaPoint) => pulseSlip(p.ref, agenda!.day, slipCtx).href ?? undefined;
@@ -345,19 +387,19 @@
       <span class="piece__sub"><span class="ghost-line" style:inline-size="40%">&nbsp;</span></span>
     </div>
   {:else if agenda && focus}
-    {@const sub = shows ? showsWhere : where}
-    {@const rest = shows ? showsLeft : left}
-    {@const leans = !shows && focus.ref.tentative}
+    {@const sub = headSub}
+    {@const rest = headRest}
+    {@const leans = !shows && !yours && focus.ref.tentative}
     <div class="piece" class:piece--gig={gig} data-testid="desk-next">
-      <span class="piece__eye">{@render mark(eyeProject)}{eye}</span>
+      <span class="piece__eye" data-testid={yours ? 'desk-you-at' : undefined}>{@render mark(yours ? actionPerf?.project : eyeProject)}{headEye}</span>
       <!-- The headline is read again when the minute ticks: polite, never twice a minute.
            An option leans, the headline and the line under it (design-system
            rule 18); with several shows the headline is the day's: only a row leans. -->
       <div class="piece__lead" aria-live="polite" data-testid="desk-next-now">
         <svelte:element this={headHref ? 'a' : 'span'} href={headHref} class="piece__what" class:guess={leans} data-testid="desk-next-what"
-          >{shows ? showsWhat : what}</svelte:element
+          >{headWhat}</svelte:element
         >
-        <span class="piece__at">{shows ? showsAt : at}</span>
+        <span class="piece__at">{headAt}</span>
       </div>
       {#if sub || rest}
         <div class="piece__sub">
@@ -413,6 +455,12 @@
           {#if map}<MapLink class="piece__act" parts={mapParts} changeIn="settings">{t('ahora.map', locale)}</MapLink>{/if}
         </nav>
       {/if}
+
+      {#if tomorrowLine}
+        <p class="piece__tomorrow" data-testid="desk-tomorrow">
+          {#if nextHref}<a href={nextHref}>{tomorrowLine}</a>{:else}{tomorrowLine}{/if}
+        </p>
+      {/if}
     </div>
   {:else}
     <!-- TODAY IS ALWAYS THE BIG PIECE (ADR-202 § 3): hollow, in its place. -->
@@ -423,7 +471,8 @@
         <div class="piece__sub">
           {#if nextHref}<a class="piece__next" href={nextHref}>{t('desk.piece_next', locale, { next: nextWords(next) })}</a
             >{:else}<span>{t('desk.piece_next', locale, { next: nextWords(next) })}</span>{/if}
-          {#if next.at}<span class="piece__left">{hour(next.at, next.ref.tz)}</span>{/if}
+          {#if nextStop}<span class="piece__left">{t('desk.you_at', locale, { time: hour(nextStop.at, next.ref.tz) })}</span
+            >{:else if next.at}<span class="piece__left">{hour(next.at, next.ref.tz)}</span>{/if}
         </div>
       {/if}
     </div>
@@ -519,8 +568,28 @@
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
+  /* NOTHING TODAY, A SMALLER PIECE (ADR-233, amending ADR-202 § 3): still in
+     its place and hollow, but what waits and what comes lead the screen. */
   .piece--hollow .piece__lead {
     color: var(--heading-color);
+    font-size: var(--text-xl);
+  }
+  .piece--hollow {
+    gap: var(--space-xs);
+    padding-block: var(--space-s);
+  }
+  .piece__tomorrow {
+    margin: 0;
+    padding-block-start: var(--space-s);
+    border-block-start: var(--line-hairline) solid color-mix(in oklch, var(--surface-focus-ink) 18%, transparent);
+    font-size: var(--text-s);
+    color: var(--surface-focus-muted);
+  }
+  .piece__tomorrow a {
+    text-decoration: none;
+  }
+  .piece__tomorrow a:hover {
+    text-decoration: underline;
   }
   .piece__sub {
     display: flex;

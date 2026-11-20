@@ -86,3 +86,35 @@ describe('Te espera: «Ahora no» and the old (ADR-232)', () => {
     expect(screen.getByText('Festival de Otoño')).toBeTruthy();
   });
 });
+
+describe('Te espera on a gig day: one line (ADR-233)', () => {
+  afterEach(cleanup);
+  it('says how many and opens to the rows', async () => {
+    const here = item({ id: 'conv-here', subject: 'Teatro Arriaga' });
+    render(DeskWaiting, {
+      waiting: { rows: [here], total: 4, asking: 4, overdue: 0 },
+      rows: 0,
+      folded: true,
+      today: '2026-11-20',
+      feed: [],
+      later: null,
+      loading: false,
+      errored: false,
+      onretry: () => {},
+      locale: 'en',
+      contextPath: () => '',
+      conversationHref: () => null,
+      money: (n: number) => String(n),
+      isGhost: () => false,
+      ontoggle: () => {},
+      onremove: () => {},
+      onaccept: () => {},
+    });
+    const line = screen.getByTestId('desk-waits-line');
+    expect(line.textContent?.replace(/\s+/g, ' ')).toContain('· 4 ·');
+    expect(screen.queryByText('Teatro Arriaga')).toBeNull();
+    await fireEvent.click(screen.getByRole('button', { name: 'see' }));
+    expect(screen.queryByTestId('desk-waits-line')).toBeNull();
+    expect(screen.getByText('Teatro Arriaga')).toBeTruthy();
+  });
+});

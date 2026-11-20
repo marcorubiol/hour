@@ -110,11 +110,17 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
     // The tasks pill counts it (ADR-202 § 7); the short list draws three rows
     // at most, so the task may wait under the pill. Tasks have no list of
     // their own: their pill opens the whole list here, by days.
+    // A gig day folds the block into one line (ADR-233): open it first.
+    await expect(waits.locator('.list, .waits__line').first()).toBeVisible({ timeout: 10_000 });
+    const line = waits.getByTestId('desk-waits-line');
+    if ((await line.count()) > 0) await line.getByRole('button').click();
+    // With three things or fewer all drawn as rows there are no pills
+    // (ADR-229): then «See all by days» is the door.
     const tasksPill = waits.locator('[data-kind="tasks"]');
-    await expect(tasksPill).toBeVisible({ timeout: 10_000 });
+    const door = (await tasksPill.count()) > 0 ? tasksPill : waits.getByRole('button', { name: /See all by day/ });
 
     // One list at a time: the full list replaces the short one, never both.
-    await tasksPill.click();
+    await door.click();
     await expect(waits.getByRole('checkbox', { name: TASK_TODAY })).toHaveCount(1);
     await expect(waits.locator('.bucket--today')).toBeVisible();
     await expect(waits.getByRole('checkbox', { name: TASK_LOOSE })).toHaveCount(1);

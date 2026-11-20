@@ -75,11 +75,13 @@
     old?: DeskItem[];
     /** «Ahora no» until a day, or back now with null. Without it, no «ahora no». */
     onaside?: (item: DeskItem, until: string | null) => void;
+    /** A gig day (ADR-233): the block is one line, «Te espera · 4 · ver», until opened. */
+    folded?: boolean;
   }
 
   let {
     waiting,
-    rows,
+    rows: rowsIn,
     today,
     add,
     composer,
@@ -102,7 +104,13 @@
     aside = [],
     old = [],
     onaside,
+    folded = false,
   }: Props = $props();
+
+  /** Opened on a gig day: the three rows of a normal day. */
+  let unfold = $state(false);
+  let rows = $derived(folded && unfold ? 3 : rowsIn);
+  let line = $derived(folded && !unfold && !loading && !errored && waiting.total > 0);
 
   let asideOpen = $state(false);
   let oldOpen = $state(false);
@@ -303,6 +311,13 @@
 {/snippet}
 
 <section class="dband waits" aria-labelledby="desk-waits-h" aria-busy={loading}>
+  {#if line}
+  <!-- A GIG DAY (ADR-233): the day is the piece; what waits is one line. -->
+  <p class="waits__line" data-testid="desk-waits-line">
+    <span id="desk-waits-h">{t('desk.band_waiting', locale)}</span> · {waiting.total} ·
+    <button type="button" class="waits__open" onclick={() => (unfold = true)}>{t('desk.open_see', locale)}</button>
+  </p>
+  {:else}
   <!-- The region is named by the words alone, not by the count beside them. -->
   <BlockHead
     title={t('desk.band_waiting', locale)}
@@ -432,6 +447,7 @@
         {/if}
       {/if}
     </div>
+  {/if}
   {/if}
 </section>
 
@@ -616,6 +632,26 @@
   }
   @media (pointer: coarse) {
     .row__acts :global(.row__aside) {
+      min-block-size: var(--touch-target);
+    }
+  }
+  .waits__line {
+    margin: 0;
+    font-size: var(--text-s);
+    color: var(--text-muted);
+  }
+  .waits__open {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text-color);
+    font: inherit;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+  @media (pointer: coarse) {
+    .waits__open {
       min-block-size: var(--touch-target);
     }
   }
