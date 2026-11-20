@@ -8774,3 +8774,31 @@ Mes no veía: la línea salía en una y no en la otra, y la barra de vistas salt
 que pide algo primero. Cuesta una línea cuando no hay nada que pedir; a cambio, la barra no salta.
 
 **Cómo se revierte.** Revertir el commit (vuelve el salto).
+
+## [2026-11-20] ADR-240 · La sincronización con Google y Apple Calendar entra, cada persona con su cuenta (decisión de producto; sin código)
+
+Marco, 20-11: «Apuntan en el roadmap la sincronización de Google y Apple Calendar. Estoy seguro que va a entrar.» Su
+idea de la mañana: que los eventos se sincronicen con la cuenta de usuario que dedique cada uno, es decir, cada usuario
+conecta su propia cuenta.
+
+**Contexto.** La investigación (`research/product/16-integration-ecosystem.md` §2, §10) ya pone Google Calendar API v3 con
+OAuth como integración de la fase 1 y Apple Calendar por suscripción `.ics`; `_decisions.md` (precios) dice que Google
+Calendar sync va incluido en STANDARD. Lo que existe hoy es `calendar_share` (ADR-054): un feed `.ics` de solo lectura
+**por espacio**, con token en claro (ADR-047) y sin caducidad. No refleja «lo mío» de una persona que trabaja en varios
+espacios, ni escribe en Google.
+
+**Decisión.**
+1. **Entra en el roadmap** como tarea abierta en `_tasks.md` (Producto — después). Aún sin fase, orden ni estimación.
+2. **El destinatario es la persona, no el espacio.** Cada usuario conecta su propia cuenta (Google) o se suscribe a su
+   propio `.ics` (Apple u otro cliente) y recibe lo que le toca en todos sus espacios. El feed por espacio de ADR-054 se
+   queda para compartir hacia fuera; no se sustituye.
+3. **Google = escribir en su calendario** (API v3, OAuth, alcance mínimo); **Apple = `.ics` de suscripción por usuario**
+   (solo lectura, token revocable y con caducidad). CalDAV de escritura y Outlook, fuera por ahora (la investigación
+   pone Outlook en la fase 2).
+4. **Lo que sale a un calendario externo** sigue la regla de ADR-054: nunca tarifas, notas ni datos de personas.
+5. **Pendiente de decidir antes de construir:** las cinco preguntas de la tarea (consentimiento de Google, alcance,
+   destinatario por función, plan que lo incluye, seguridad y desconexión).
+
+**Sin cambios de código ni de datos.** Solo documentación. Sin esquema, API ni `CACHE_SCHEMA`.
+
+**Cómo se revierte.** Revertir el commit.
