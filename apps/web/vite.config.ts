@@ -178,9 +178,15 @@ export default defineConfig(({ mode }) => {
               {
                 urlPattern: ({ request, url }: { request: Request; url: URL }) =>
                   request.mode === 'navigate' && (url.pathname === '/' || url.pathname === '/h' || url.pathname.startsWith('/h/')),
-                handler: 'StaleWhileRevalidate',
+                // Network-first with a short wait (20-11, 11:14): stale-while-
+                // revalidate opened the page saved last time, whose code was
+                // never downloaded; after another deploy those files were gone
+                // and the open stopped on the skeleton. The current page when
+                // the network answers within 2 s, the saved one past that.
+                handler: 'NetworkFirst',
                 options: {
                   cacheName: 'shell',
+                  networkTimeoutSeconds: 2,
                   cacheableResponse: { statuses: [200] },
                 },
               },
