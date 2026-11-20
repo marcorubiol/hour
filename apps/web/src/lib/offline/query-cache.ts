@@ -87,6 +87,25 @@ export function shouldPersistQuery(query: Query, now = Date.now()): boolean {
   );
 }
 
+/**
+ * The newest answer kept under any key that starts with `prefix`, to show
+ * while a key that changed (a new day) asks the network: what a calendar
+ * does, last known first and the fresh answer behind it (20-11-2026). Hoy's
+ * day feeds are keyed by the date, so the first open of each morning, which
+ * is the open that matters, found nothing under today's key and waited for
+ * the slowest read of the screen. As `placeholderData` it is never written
+ * under the new key nor kept on the device: only the real answer is.
+ */
+export function newestUnder<T>(client: QueryClient, prefix: readonly unknown[]): T | undefined {
+  let best: { at: number; data: T } | undefined;
+  for (const query of client.getQueryCache().findAll({ queryKey: prefix })) {
+    const { data, dataUpdatedAt, status } = query.state;
+    if (status !== 'success' || data === undefined) continue;
+    if (!best || dataUpdatedAt > best.at) best = { at: dataUpdatedAt, data: data as T };
+  }
+  return best?.data;
+}
+
 // ── Module state: one cache per tab ─────────────────────────────────────
 
 let store: QueryCacheStore | null = null;

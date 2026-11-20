@@ -165,6 +165,24 @@ export default defineConfig(({ mode }) => {
                   expiration: { maxEntries: 800, maxAgeSeconds: 30 * 24 * 3600, purgeOnQuotaError: true },
                 },
               },
+              // The app's own shell opens from the device (20-11-2026): `/`
+              // (an empty page that forwards to Hoy) and the /h frame
+              // (client-rendered, the same for everyone). Network-first made
+              // every open wait for a round trip to the Worker, three seconds
+              // on a phone whose radio was asleep, before a single pixel. A
+              // calendar opens with what it had and catches up: the copy
+              // kept is shown and refreshed behind, so a deploy reaches the
+              // next open. Only these two: a public page renders its data on
+              // the server and stays network-first below.
+              {
+                urlPattern: ({ request, url }: { request: Request; url: URL }) =>
+                  request.mode === 'navigate' && (url.pathname === '/' || url.pathname === '/h' || url.pathname.startsWith('/h/')),
+                handler: 'StaleWhileRevalidate',
+                options: {
+                  cacheName: 'shell',
+                  cacheableResponse: { statuses: [200] },
+                },
+              },
               {
                 urlPattern: ({ request }: { request: Request }) =>
                   request.mode === 'navigate',

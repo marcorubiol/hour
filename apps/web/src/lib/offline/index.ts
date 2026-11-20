@@ -19,6 +19,7 @@ export { registerServiceWorker } from './register';
 export {
   bindQueryCache,
   cachedSessionUser,
+  newestUnder,
   claimQueryCache,
   recoverFromRestoredCrash,
   restoredFromDevice,

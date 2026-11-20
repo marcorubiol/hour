@@ -9,10 +9,11 @@
  * login that IS a person. Call it synchronously from component init; `today` is a getter so
  * the keys follow the clock across midnight.
  */
-import { createQuery } from '@tanstack/svelte-query';
+import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 import { page } from '$app/state';
 import { fromStore, toStore } from 'svelte/store';
 import { fetchJSON } from '$lib/api';
+import { newestUnder } from '$lib/offline/query-cache';
 import { bookingModeOf } from '$lib/booking-mode';
 import { dualTime } from '$lib/datetime';
 import { peekHref } from '$lib/peek';
@@ -51,6 +52,7 @@ export function createPulseFeeds(today: () => string) {
   const datesFrom = () =>
     new Date(Date.parse(`${today()}T00:00:00Z`) - 14 * DAY_MS).toISOString().slice(0, 10);
 
+  const client = useQueryClient();
   const me = fromStore(createQuery(meQueryOptions()));
   const ws = fromStore(createQuery(workspacesQueryOptions()));
   const personId = $derived(me.current.data?.person_id ?? null);
@@ -63,6 +65,11 @@ export function createPulseFeeds(today: () => string) {
       toStore(() => ({
         queryKey: ['pulse-performances', today()] as const,
         staleTime: 5 * 60_000,
+        // A new day is a new key: the last answer shows until today's lands
+        // (`newestUnder`); the pulse filters by the clock, so yesterday's
+        // rows already past draw nothing.
+        placeholderData: (prev: { items: PerformanceEvent[] } | undefined) =>
+          prev ?? newestUnder<{ items: PerformanceEvent[] }>(client, ['pulse-performances']),
         queryFn: ({ signal }: { signal: AbortSignal }) =>
           fetchJSON<{ items: PerformanceEvent[] }>(
             `/api/performances?status=any&from=${today()}&limit=200&rosters=1&notice=1&missing=1`,
@@ -76,6 +83,8 @@ export function createPulseFeeds(today: () => string) {
       toStore(() => ({
         queryKey: ['pulse-dates', datesFrom()] as const,
         staleTime: 5 * 60_000,
+        placeholderData: (prev: { items: DateEvent[] } | undefined) =>
+          prev ?? newestUnder<{ items: DateEvent[] }>(client, ['pulse-dates']),
         // With each trip's stages (ADR-146): the pulse, «Lo siguiente» and
         // Ahora name the train at 9h12, not «viaje».
         queryFn: ({ signal }: { signal: AbortSignal }) =>
