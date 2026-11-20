@@ -354,7 +354,7 @@
     const leg = n.ref.of === 'date' ? timedStages(n.ref.row as DateEvent)[0] : undefined;
     const legTo = leg ? stagePlace(leg.to_city, leg.to_place) : null;
     if (leg && tomorrow && legTo && leg.depart_at)
-      return t('desk.tomorrow_leaves', locale, { time: hour(leg.depart_at, leg.depart_tz ?? n.ref.tz), to: legTo });
+      return `${t('desk.tomorrow_leaves', locale, { time: hour(leg.depart_at, leg.depart_tz ?? n.ref.tz), to: legTo })}${held}`;
     if (leg) return said([`${t(`planner.mode_${leg.mode}`, locale)}${held}`, legTo ? to(legTo) : null].filter(Boolean).join(' '));
     const kind = `${kindLabel(sl.kind, tradeFor(perfWorkspaceId(n.ref.row)))}${held}`;
     if (sl.lead) return said(`${kind} ${to(sl.name)}`);
