@@ -158,9 +158,8 @@ test.describe('the month (ADR-209)', () => {
         const where = `${v} at ${width}`;
         await open(page, v);
         // The Agenda may have nothing to say (no count, nothing to decide):
-        // its line is still there, one line tall, so the bar never moves. On
-        // a phone with nothing to ask it is not drawn at all (ADR-231), the
-        // same in every drawing.
+        // its line is still there, one line tall, so the bar never moves, on
+        // a phone too (ADR-239).
         const meta = page.locator('.pstat__line');
         await expect(meta, `status line in ${where}`).toHaveCount(1);
         heights.push(Math.round((await meta.boundingBox())?.height ?? -1));

@@ -8762,3 +8762,15 @@ demasiado estrecho».
 **Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`.
 
 **Cómo se revierte.** Revertir el commit.
+
+## [2026-11-20] ADR-239 · La línea de estado del Planificador vuelve al teléfono (enmienda ADR-231 § 2)
+
+ADR-231 quitó en el teléfono la línea de estado cuando no había nada que decidir ni choques. Pero cada dibujo lee su
+propia ventana (la Agenda y el Tablero, la suya larga; el Mes, su mes), así que la Agenda podía tener un choque que el
+Mes no veía: la línea salía en una y no en la otra, y la barra de vistas saltaba de 193 a 86 px al cambiar
+(`planner-month.spec`, 390 px, contra producción el 20-11). La regla de la casa es que esa barra no se mueve nunca.
+
+**Decisión.** En el teléfono la línea se dibuja siempre, como en el escritorio: una sola línea que se desliza, con lo
+que pide algo primero. Cuesta una línea cuando no hay nada que pedir; a cambio, la barra no salta.
+
+**Cómo se revierte.** Revertir el commit (vuelve el salto).
