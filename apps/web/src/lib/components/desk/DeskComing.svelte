@@ -212,7 +212,7 @@
                 <span class="tile__wd">{localeWeekdayShort(tile.day, locale)}</span>
                 <span class="tile__mo">{localeMonthShort(tile.day, locale)}</span>
               </svelte:element>
-              {#if manyOf(tile)}
+              {#if planner && manyOf(tile)}
                 {@render many(tile)}
               {:else}
               <ul class="tile__things tile__things--rows">
@@ -246,7 +246,7 @@
                 <span class="tile__wd">{localeWeekdayShort(tile.day, locale)}</span>
                 <span class="tile__mo">{localeMonthShort(tile.day, locale)}</span>
               </span>
-              {#if manyOf(tile)}
+              {#if planner && manyOf(tile)}
                 {@render many(tile)}
               {:else}
               <ul class="tile__things">

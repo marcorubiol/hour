@@ -1547,6 +1547,8 @@
       guess: boolean;
       /** The performance itself, for the Day of many's filters (ADR-237). */
       perf?: PerformanceEvent;
+      /** Who said «voy» (ADR-237's «Voy yo»): a performance's or a date's. */
+      commitments?: PerformanceEvent['commitments'];
     }> = [];
     const clockOf = (venueTz: string | null | undefined, wsId: string | undefined) =>
       venueTz || (wsId ? workspaceTzById.get(wsId) : undefined) || viewerTz;
@@ -1565,6 +1567,7 @@
         project: p.project ?? null,
         guess: performanceSlip(p, slipCtxPage).cert === 'hold' || performanceSlip(p, slipCtxPage).cert === 'proposed',
         perf: p,
+        commitments: p.commitments,
       });
     }
     for (const d of shownDates) {
@@ -1591,6 +1594,7 @@
           timed: !d.all_day,
           project: d.project ?? null,
           guess: sl.cert === 'hold' || sl.cert === 'proposed',
+          commitments: d.commitments,
         });
         continue;
       }
@@ -1607,6 +1611,7 @@
         timed: !d.all_day,
         project: d.project ?? null,
         guess: dateSlip(d, slipCtxPage).cert === 'hold' || dateSlip(d, slipCtxPage).cert === 'proposed',
+        commitments: d.commitments,
       });
     }
     return out.sort((a, b) => a.from.localeCompare(b.from));
@@ -1671,10 +1676,9 @@
           clock: clock ? hourMark(clock) : null,
           need: o.guess || (p ? agendaOpen(p).items.length > 0 || agendaOpen(p).noTime : false),
           mine: Boolean(
-            p &&
-              myPersonId &&
-              ((p.person_ids ?? []).includes(myPersonId) ||
-                (p.commitments ?? []).some((c) => c.person_id === myPersonId && c.state === 'going')),
+            myPersonId &&
+              ((p?.person_ids ?? []).includes(myPersonId) ||
+                (o.commitments ?? []).some((c) => c.person_id === myPersonId && c.state === 'going')),
           ),
           // Done: begun more than two hours ago (dimmed, not gone).
           done: o.timed && Date.parse(o.from) + 2 * 3_600_000 < nowMs,
