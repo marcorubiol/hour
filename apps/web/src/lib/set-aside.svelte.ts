@@ -4,15 +4,16 @@
  * traer escriben en la sesión al momento y en la base después; si la
  * escritura falla, la fila vuelve a su sitio y la página lo dice.
  *
- * Sin la tabla (un origen sin `20261120030000`) la lectura falla en silencio
- * y no hay nada apartado: la página es la de antes.
+ * Sin la tabla (un origen sin `20261120030000`) la lectura falla en silencio,
+ * no hay nada apartado y no se ofrece «ahora no»: la página es la de antes.
  *
  * La regla de qué se aparta y qué es antiguo es pura y está en `$lib/set-aside`.
  */
 import { mutateJSON } from '$lib/api';
 import type { SetAside } from '$lib/set-aside';
 
-export const setAside = $state<{ items: SetAside }>({ items: {} });
+/** `ready`: the read answered, so the table is there and «ahora no» can be offered. */
+export const setAside = $state<{ items: SetAside; ready: boolean }>({ items: {}, ready: false });
 
 let probe: Promise<void> | null = null;
 
@@ -22,6 +23,7 @@ async function load(): Promise<void> {
     if (!res.ok) return;
     const body = (await res.json()) as { items?: SetAside };
     setAside.items = { ...(body.items ?? {}), ...setAside.items };
+    setAside.ready = true;
   } catch {
     // Nada apartado: cada fila sigue en su sitio.
   }

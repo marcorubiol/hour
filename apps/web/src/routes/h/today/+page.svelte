@@ -1012,7 +1012,7 @@
           folded={!calm.on && scopedPerfs.some((p) => p.status !== 'cancelled' && perfDayKey(p) === today)}
           aside={split.aside}
           old={split.old}
-          onaside={setRowAside}
+          onaside={setAside.ready ? setRowAside : undefined}
         />
       </div>
       {/if}

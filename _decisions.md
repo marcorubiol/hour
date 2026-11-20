@@ -8651,7 +8651,7 @@ poder decir «hoy no» sin borrar nada.
    sale de la cuenta y de las «vencidas» de la cabecera. Abierto, son las filas de siempre.
 5. Los dos pliegues no se dibujan en calma ni en día de función (cuando el bloque no dibuja filas).
 
-**Sin la tabla, la página es la de antes**: la lectura falla en silencio y no hay nada apartado; así el código puede
+**Sin la tabla, la página es la de antes**: la lectura falla en silencio, no hay nada apartado y no se ofrece «ahora no»; así el código puede
 llegar a producción antes que la migración. No cambia lo que guarda la caché (`CACHE_SCHEMA` igual: lo apartado se lee
 aparte, como lo visto de la ayuda). No toca el service worker.
 
