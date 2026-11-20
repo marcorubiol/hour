@@ -10,8 +10,8 @@
  * final, con la clave de servicio, borra sus invitaciones y sus listas (con sus
  * personas, textos e importaciones), y las bases y exclusiones que dejó; sin
  * ella, cancela y archiva. La faceta Público de la fixture limitada vuelve a
- * nada, su acceso al proyecto como estaba y la política de privacidad del
- * espacio como estaba. Todas las direcciones que podrían ponerse en cola son
+ * nada, su acceso al proyecto al estado fijo (Mínim, sin facetas sueltas) y la
+ * política de privacidad del espacio a ninguna, su valor fijo. Todas las direcciones que podrían ponerse en cola son
  * del simulador de SES (el espacio tiene `mailout_simulator_only`).
  *
  * Lo que necesita la clave de servicio (el alta del formulario, la
@@ -30,10 +30,10 @@ import {
   pgPatch,
   pgPost,
   pgRpc,
-  projectAccess,
   requireEnv,
   requireExternalEnv,
   requireLimitedEnv,
+  resetProjectAccess,
   restoreProjectAccess,
   setFacets,
   type ProjectAccess,
@@ -110,7 +110,6 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: el público y sus invit
   let workspaceId: string;
   let homeProjectId: string;
   let foreignProjectId: string;
-  let privacyBefore: string | null = null;
   let privacyTouched = false;
   let outDomain: string;
   let audDomain: string;
@@ -305,16 +304,10 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: el público y sus invit
     limitedWsMembership = wsm.rows[0].id;
     await setFacets(adminJwt, limitedWsMembership, { audience: null });
 
-    limitedSnapshot = await projectAccess(adminJwt, homeProjectId, limitedUserId);
+    limitedSnapshot = await resetProjectAccess(adminJwt, homeProjectId, limitedUserId);
     await setFacets(adminJwt, limitedSnapshot.membershipId, { converses: 'view' });
 
     // Abrir una lista pide la política de privacidad del espacio.
-    const ws = await pgGet<{ privacy_url: string | null }>(
-      'workspace',
-      adminJwt,
-      new URLSearchParams({ id: `eq.${workspaceId}`, select: 'privacy_url' }),
-    );
-    privacyBefore = ws.rows[0].privacy_url;
     privacyTouched = true;
     await pgPatch(
       'workspace',
@@ -383,14 +376,14 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: el público y sus invit
     for (const id of domains) await step(() => pgRpc('remove_mail_domain', adminJwt, { p_id: id }));
     for (const id of performances) await step(() => pgRpc('delete_performance', adminJwt, { p_performance_id: id }));
     for (const id of Object.values(conv)) await step(() => pgRpc('delete_conversation', adminJwt, { p_conversation_id: id }));
-    // Solo si se llegó a leer: si no, se borraría la política de verdad del espacio.
+    // Vuelve al valor fijo de la fixture: el espacio `playwright` no tiene política.
     if (privacyTouched) {
       await step(() =>
-        pgPatch('workspace', adminJwt, { privacy_url: privacyBefore }, new URLSearchParams({ id: `eq.${workspaceId}` })),
+        pgPatch('workspace', adminJwt, { privacy_url: null }, new URLSearchParams({ id: `eq.${workspaceId}` })),
       );
     }
     if (limitedWsMembership) await step(() => setFacets(adminJwt, limitedWsMembership, { audience: null }));
-    if (limitedSnapshot) await step(() => restoreProjectAccess(adminJwt, homeProjectId, limitedUserId, limitedSnapshot!));
+    if (limitedSnapshot) await step(() => restoreProjectAccess(adminJwt, homeProjectId, limitedUserId));
     if (errors.length) throw errors[0];
   });
 

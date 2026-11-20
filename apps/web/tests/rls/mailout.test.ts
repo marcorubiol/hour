@@ -8,8 +8,8 @@
  * `zzz-rls-foreign-project` (no la tiene). Cada ejecución es dueña de sus filas:
  * conversaciones, dominio y envíos con un sufijo propio; al final cancela los
  * envíos, borra el dominio y las conversaciones y, si hay clave de servicio,
- * las bases y exclusiones que dejó. El acceso de la fixture limitada se
- * restaura como estaba. Todas las direcciones que podrían ponerse en cola son
+ * las bases y exclusiones que dejó. El acceso de la fixture limitada vuelve
+ * a su estado fijo. Todas las direcciones que podrían ponerse en cola son
  * del simulador de SES (el espacio tiene `mailout_simulator_only`).
  *
  * Lo que necesita la clave de servicio (verificar un dominio, la cola, el
@@ -27,10 +27,10 @@ import {
   pgPatch,
   pgPost,
   pgRpc,
-  projectAccess,
   requireEnv,
   requireExternalEnv,
   requireLimitedEnv,
+  resetProjectAccess,
   restoreProjectAccess,
   setFacets,
   type ProjectAccess,
@@ -191,7 +191,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: envío en bloque (ADR-1
     foreignProjectId = projects.rows.find((p) => p.slug === 'zzz-rls-foreign-project')!.id;
     workspaceId = projects.rows.find((p) => p.slug === 'zzz-e2e-collab')!.workspace_id;
 
-    limitedSnapshot = await projectAccess(adminJwt, homeProjectId, limitedUserId);
+    limitedSnapshot = await resetProjectAccess(adminJwt, homeProjectId, limitedUserId);
     await setFacets(adminJwt, limitedSnapshot.membershipId, { converses: 'view' });
 
     await conversation('a', homeProjectId, { email: SIM('a') });
@@ -242,7 +242,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: envío en bloque (ADR-1
       await svc('DELETE', `mail_suppression?workspace_id=eq.${workspaceId}&address=${encodeURIComponent(list)}`);
       await svc('DELETE', `mail_basis?workspace_id=eq.${workspaceId}&address=${encodeURIComponent(list)}`);
     }
-    if (limitedSnapshot) await restoreProjectAccess(adminJwt, homeProjectId, limitedUserId, limitedSnapshot);
+    if (limitedSnapshot) await restoreProjectAccess(adminJwt, homeProjectId, limitedUserId);
   });
 
   test('7 · un admin no verifica un dominio: ni por PATCH ni por la RPC del proveedor', async () => {

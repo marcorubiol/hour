@@ -10,6 +10,7 @@ import {
   pgRpc,
   requireEnv,
   requireLimitedEnv,
+  resetNewConversationsPrivate,
 } from './_helpers';
 
 /**
@@ -43,7 +44,6 @@ describe.skipIf(!envReady())('mail_account and private conversations (ADR-099)',
   let projectId: string;
   let personalId: string | undefined;
   let conversationId: string | undefined;
-  let originalSetting: boolean | undefined;
 
   beforeAll(async () => {
     const env = requireEnv();
@@ -66,9 +66,7 @@ describe.skipIf(!envReady())('mail_account and private conversations (ADR-099)',
   });
 
   afterAll(async () => {
-    if (originalSetting !== undefined) {
-      await pgPatch('workspace', jwt, { new_conversations_private: originalSetting }, new URLSearchParams({ id: `eq.${workspaceId}` }));
-    }
+    if (workspaceId) await resetNewConversationsPrivate(jwt, workspaceId);
     if (personalId) await pgRpc('disconnect_mail_account', jwt, { p_account_id: personalId });
     if (conversationId) {
       await pgPatch('conversation', jwt, { private_to: null }, new URLSearchParams({ id: `eq.${conversationId}` }));
@@ -183,8 +181,7 @@ describe.skipIf(!envReady())('mail_account and private conversations (ADR-099)',
   test('the space setting: only an admin changes it, and new conversations are born private to their creator', async () => {
     const ws = new URLSearchParams({ id: `eq.${workspaceId}`, select: 'new_conversations_private' });
     const r = await pgGet<{ new_conversations_private: boolean }>('workspace', jwt, ws);
-    originalSetting = r.rows[0]?.new_conversations_private;
-    expect(typeof originalSetting).toBe('boolean');
+    expect(typeof r.rows[0]?.new_conversations_private).toBe('boolean');
     if (limitedEnvReady()) {
       const limited = requireLimitedEnv();
       const other = await login(limited.email, limited.password);

@@ -7,9 +7,10 @@ import {
   pgGet,
   pgPatch,
   pgRpc,
-  projectAccess,
   requireEnv,
   requireLimitedEnv,
+  resetNewConversationsPrivate,
+  resetProjectAccess,
   restoreProjectAccess,
   setFacets,
   type ProjectAccess,
@@ -65,7 +66,6 @@ describe.skipIf(!envReady() || !limitedEnvReady())(
     let me: string;
     let workspaceId: string;
     let projectId: string;
-    let originalSetting: boolean | undefined;
     let membership: ProjectAccess | undefined;
     let otherSub: string;
     let conversation: ConversationRow | undefined;
@@ -119,16 +119,9 @@ describe.skipIf(!envReady() || !limitedEnvReady())(
       projectId = p.rows[0]!.id;
       workspaceId = p.rows[0]!.workspace_id;
 
-      const ws = await pgGet<{ new_conversations_private: boolean }>(
-        'workspace',
-        jwt,
-        new URLSearchParams({ id: `eq.${workspaceId}`, select: 'new_conversations_private' }),
-      );
-      originalSetting = ws.rows[0]?.new_conversations_private;
-
       // La otra persona edita dinero en el proyecto (y no ve conversaciones
       // privadas ajenas, como nadie).
-      membership = await projectAccess(jwt, projectId, otherSub);
+      membership = await resetProjectAccess(jwt, projectId, otherSub);
       await setFacets(jwt, membership.membershipId, { diners: 'edit' });
 
       await setSetting(true);
@@ -154,7 +147,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())(
 
     afterAll(async () => {
       // El acceso de la fixture compartida, lo primero (ver money-payer-organization).
-      if (membership) await restoreProjectAccess(jwt, projectId, otherSub, membership);
+      if (membership) await restoreProjectAccess(jwt, projectId, otherSub);
       for (const id of invoices) {
         await pgRpc('delete_invoice', jwt, { p_invoice_id: id }).catch(() => undefined);
       }
@@ -164,7 +157,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())(
           () => undefined,
         );
       }
-      if (originalSetting !== undefined) await setSetting(originalSetting);
+      if (workspaceId) await resetNewConversationsPrivate(jwt, workspaceId);
     });
 
     test('list_money_payer_organizations: the owner sees the organization, another money editor does not', async () => {

@@ -95,7 +95,7 @@ test.describe('el tablón del bolo (ADR-106)', () => {
     }
 
     // Equip en el proyecto: Técnica sí, Diners no (ADR-100 §6, ADR-106 pregunta 2).
-    snapshot = await h.projectAccess(adminJwt, projectId, limitedId);
+    snapshot = await h.resetProjectAccess(adminJwt, projectId, limitedId);
     await h.grantPreset(adminJwt, 'project', projectId, limitedId, 'equip');
   });
 
@@ -104,7 +104,7 @@ test.describe('el tablón del bolo (ADR-106)', () => {
     if (messageId) await h.pgRpc('delete_message', limitedJwt, { p_message_id: messageId });
     for (const p of perfs) await h.pgRpc('delete_performance', adminJwt, { p_performance_id: p.id });
     if (boloId) await h.pgRpc('delete_bolo', adminJwt, { p_bolo_id: boloId });
-    if (snapshot) await h.restoreProjectAccess(adminJwt, projectId, limitedId, snapshot);
+    if (snapshot) await h.restoreProjectAccess(adminJwt, projectId, limitedId);
   });
 
   test('con Equip: Técnica sí, Diners no, y lo escrito sale con su función', async ({ browser }) => {

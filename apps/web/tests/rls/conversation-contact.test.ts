@@ -8,9 +8,9 @@ import {
   pgPatch,
   pgPost,
   pgRpc,
-  projectAccess,
   requireEnv,
   requireLimitedEnv,
+  resetProjectAccess,
   restoreProjectAccess,
   setFacets,
 } from './_helpers';
@@ -352,8 +352,8 @@ describe.skipIf(!envReady())('conversation_contact (ADR-102, fase 1)', () => {
       const otherSub = String(decodeJwt(other).sub);
 
       // Sin permiso (lo que trae el fixture): nada.
-      const membership = await projectAccess(jwt, projectId, otherSub);
-      const restore = () => restoreProjectAccess(jwt, projectId, otherSub, membership);
+      const membership = await resetProjectAccess(jwt, projectId, otherSub);
+      const restore = () => restoreProjectAccess(jwt, projectId, otherSub);
       const setPrivate = (value: string | null) =>
         pgPatch(
           'conversation',

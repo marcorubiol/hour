@@ -124,7 +124,7 @@ test.describe('Conversaciones › Equipo: los hilos del equipo (ADR-116, ADR-134
     await h.pgPatch('conversation', adminJwt, { private_to: null }, new URLSearchParams({ id: `eq.${conversationId}` }));
 
     // Mínim: la limitada escribe en el General del bolo. Para el admin, nuevo.
-    snapshot = await h.projectAccess(adminJwt, projectId, limitedId);
+    snapshot = await h.resetProjectAccess(adminJwt, projectId, limitedId);
     await h.grantPreset(adminJwt, 'project', projectId, limitedId, 'minim');
     await post(adminJwt, 'bolo', boloId, DINERS_BODY, facets.diners);
     await post(limitedJwt, 'bolo', boloId, NEW_BODY);
@@ -138,7 +138,7 @@ test.describe('Conversaciones › Equipo: los hilos del equipo (ADR-116, ADR-134
     if (perf.id) await h.pgRpc('delete_performance', adminJwt, { p_performance_id: perf.id });
     if (boloId) await h.pgRpc('delete_bolo', adminJwt, { p_bolo_id: boloId });
     if (conversationId) await forgetConversationsRpc(h, adminJwt, [conversationId]);
-    if (snapshot) await h.restoreProjectAccess(adminJwt, projectId, limitedId, snapshot);
+    if (snapshot) await h.restoreProjectAccess(adminJwt, projectId, limitedId);
   });
 
   test('lo nuevo arriba, y la fila del bolo abre la función con su tablón', async ({ page }) => {

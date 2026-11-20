@@ -12,7 +12,7 @@
  *
  * En el espacio `playwright` (nunca `muk-cia`), proyecto `zzz-e2e-collab`.
  * Cada ejecución es dueña de su envío y lo borra; el acceso de la fixture
- * limitada se restaura como estaba.
+ * limitada vuelve a su estado fijo.
  */
 
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -23,9 +23,9 @@ import {
   login,
   pgGet,
   pgRpc,
-  projectAccess,
   requireEnv,
   requireLimitedEnv,
+  resetProjectAccess,
   restoreProjectAccess,
   setFacets,
   type ProjectAccess,
@@ -87,7 +87,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: plantilla del correo (A
     workspaceId = projects.rows[0].workspace_id;
     projectName = projects.rows[0].name;
     image = `/m/ws/${workspaceId}/mail/${'a'.repeat(32)}-1200x800.jpg`;
-    limitedSnapshot = await projectAccess(adminJwt, projectId, limitedUserId);
+    limitedSnapshot = await resetProjectAccess(adminJwt, projectId, limitedUserId);
     await setFacets(adminJwt, limitedSnapshot.membershipId, { converses: 'view' });
 
     const m = await pgRpc<{ id: string }>('create_mailout', adminJwt, { p_project_id: projectId });
@@ -98,7 +98,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: plantilla del correo (A
   afterAll(async () => {
     if (mailoutId) await pgRpc('cancel_mailout', adminJwt, { p_id: mailoutId });
     if (SERVICE_KEY && mailoutId) await svc('DELETE', `mailout?id=eq.${mailoutId}`);
-    if (limitedSnapshot) await restoreProjectAccess(adminJwt, projectId, limitedUserId, limitedSnapshot);
+    if (limitedSnapshot) await restoreProjectAccess(adminJwt, projectId, limitedUserId);
   });
 
   async function read(): Promise<MailoutImage> {

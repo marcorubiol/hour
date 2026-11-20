@@ -23,6 +23,7 @@
 
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import {
+  FIXTURE_WORKSPACE_ROLE,
   decodeJwt,
   envReady,
   grantPreset,
@@ -35,8 +36,10 @@ import {
   projectAccess,
   requireEnv,
   requireLimitedEnv,
+  resetProjectAccess,
   restoreProjectAccess,
   setFacets,
+  resetWorkspaceRole,
   type ProjectAccess,
 } from './_helpers';
 
@@ -304,6 +307,14 @@ describe.skipIf(!envReady())('RLS: permisos por facetas', () => {
       });
       expect(inserted.status).toBe(201);
     }
+    // El nombre propio no se queda en la fixture: Comidas vuelve al de Hour.
+    const back = await pgPatch(
+      'workspace_facet_setting',
+      adminJwt,
+      { label: null },
+      new URLSearchParams({ workspace_id: `eq.${workspaceId}`, facet_id: `eq.${standard.comidas}` }),
+    );
+    expect(back.rows).toHaveLength(1);
   });
 
   describe.skipIf(!limitedEnvReady())('fixture limitada', () => {
@@ -316,7 +327,7 @@ describe.skipIf(!envReady())('RLS: permisos por facetas', () => {
 
     async function restoreMembership() {
       if (!membership) return;
-      await restoreProjectAccess(adminJwt, projectId, limitedUserId, membership);
+      await restoreProjectAccess(adminJwt, projectId, limitedUserId);
     }
 
     async function ownProjectFacets(): Promise<MembershipFacetRow[]> {
@@ -354,7 +365,7 @@ describe.skipIf(!envReady())('RLS: permisos por facetas', () => {
       expect(projects.rows).toHaveLength(1);
       projectId = projects.rows[0].id;
 
-      membership = await projectAccess(adminJwt, projectId, limitedUserId);
+      membership = await resetProjectAccess(adminJwt, projectId, limitedUserId);
 
       const ws = await pgGet<{ id: string; workspace_role: string }>(
         'membership',
@@ -368,6 +379,10 @@ describe.skipIf(!envReady())('RLS: permisos por facetas', () => {
       );
       expect(ws.rows).toHaveLength(1);
       workspaceMembership = ws.rows[0];
+      if (workspaceMembership.workspace_role !== FIXTURE_WORKSPACE_ROLE) {
+        await resetWorkspaceRole(adminJwt, workspaceMembership.id);
+        workspaceMembership = { ...workspaceMembership, workspace_role: FIXTURE_WORKSPACE_ROLE };
+      }
 
       const bolos = await pgGet<{ id: string }>(
         'bolo',
@@ -380,10 +395,7 @@ describe.skipIf(!envReady())('RLS: permisos por facetas', () => {
     afterAll(async () => {
       await restoreMembership();
       if (workspaceMembership) {
-        await pgRpc('update_workspace_member_role', adminJwt, {
-          p_membership_id: workspaceMembership.id,
-          p_role: workspaceMembership.workspace_role,
-        });
+        await resetWorkspaceRole(adminJwt, workspaceMembership.id);
       }
     });
 
@@ -544,10 +556,7 @@ describe.skipIf(!envReady())('RLS: permisos por facetas', () => {
         const revoke = await pgRpc('revoke_membership', adminJwt, { p_membership_id: workspaceMembership.id });
         expect(revoke.status, 'la baja del espacio es revoke_workspace_member').toBe(400);
       } finally {
-        await pgRpc('update_workspace_member_role', adminJwt, {
-          p_membership_id: workspaceMembership.id,
-          p_role: workspaceMembership.workspace_role,
-        });
+        await resetWorkspaceRole(adminJwt, workspaceMembership.id);
       }
     });
 

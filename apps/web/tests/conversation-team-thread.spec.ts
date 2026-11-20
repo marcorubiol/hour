@@ -89,7 +89,7 @@ test.describe('el hilo del equipo de una conversación (ADR-106)', () => {
     expect((await share(null)).status).toBeLessThan(300);
 
     // Coordinació en el proyecto: lee y edita Converses.
-    snapshot = await h.projectAccess(adminJwt, projectId, limitedId);
+    snapshot = await h.resetProjectAccess(adminJwt, projectId, limitedId);
     await h.grantPreset(adminJwt, 'project', projectId, limitedId, 'coordinacio');
   });
 
@@ -97,7 +97,7 @@ test.describe('el hilo del equipo de una conversación (ADR-106)', () => {
     if (!h) return;
     if (messageId) await h.pgRpc('delete_message', limitedJwt, { p_message_id: messageId });
     if (conversationId) await forgetConversationsRpc(h, adminJwt, [conversationId]);
-    if (snapshot) await h.restoreProjectAccess(adminJwt, projectId, limitedId, snapshot);
+    if (snapshot) await h.restoreProjectAccess(adminJwt, projectId, limitedId);
   });
 
   test('con Converses: escribe al equipo desde el campo del pie y lo ve en el hilo', async ({ browser }) => {

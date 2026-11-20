@@ -16,7 +16,7 @@
  *   - un hilo sin mensajes vivos no sale; anon no llama.
  *
  * Espacio `playwright`, entre sus dos proyectos. Cada fichero es dueño de sus
- * filas; el acceso de la fixture limitada se restaura como estaba.
+ * filas; el acceso de la fixture limitada vuelve a su estado fijo.
  */
 
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -30,10 +30,10 @@ import {
   pgGet,
   pgPatch,
   pgRpc,
-  projectAccess,
   requireEnv,
   requireExternalEnv,
   requireLimitedEnv,
+  resetProjectAccess,
   restoreProjectAccess,
   standardFacetIds,
   type ProjectAccess,
@@ -237,11 +237,11 @@ describe.skipIf(!envReady())('RLS: «de qué se habla», thread_feed (ADR-116)',
       limitedJwt = await login(limited.email, limited.password);
       limitedJwtRef = limitedJwt;
       limitedUserId = String(decodeJwt(limitedJwt).sub);
-      snapshot = await projectAccess(adminJwt, homeProjectId, limitedUserId);
+      snapshot = await resetProjectAccess(adminJwt, homeProjectId, limitedUserId);
     });
 
     afterAll(async () => {
-      if (snapshot) await restoreProjectAccess(adminJwt, homeProjectId, limitedUserId, snapshot);
+      if (snapshot) await restoreProjectAccess(adminJwt, homeProjectId, limitedUserId);
     });
 
     test('Mínim: el General del bolo, ni Técnica ni Diners ni la conversación ni el bolo ajeno', async () => {
