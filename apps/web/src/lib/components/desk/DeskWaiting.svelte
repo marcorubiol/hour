@@ -456,6 +456,9 @@
 <style>
   /* The columns belong to the list, not to each row: verb, subject, when
      and actions fall in one vertical down the whole list (subgrid). */
+  .waits {
+    container: waits / inline-size;
+  }
   .list {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto auto;
@@ -825,7 +828,10 @@
   /* Phone (Marco, 20-11, ADR-238): the subject takes the whole width beside
      its verb; when, under it, and the actions on a line of their own. With
      the when as a third column the name broke in three narrow lines. */
-  @media (max-width: 47.999rem) {
+  /* Narrow by the block's own width, not the screen's (20-11): on a desktop
+     Hoy puts «Te espera» in a ~380 px column, where the four columns left the
+     subject 0 px wide and the name broke letter by letter. */
+  @container waits (max-width: 40rem) {
     .list {
       display: block;
     }
