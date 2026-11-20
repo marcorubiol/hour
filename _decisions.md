@@ -8557,7 +8557,7 @@ Encargo `revision-tdah/brief.md`, fase 3 (Marco, 19-11).
 
 **Cómo se revierte.** Revertir el commit.
 
-## [2026-11-19] ADR-231 · El Día enseña, el pase escribe (fase 4 de ADR-223; enmienda ADR-090 P3 «las horas se escriben en el día»)
+## [2026-11-19] ADR-233 · El Día enseña, el pase escribe (fase 4 de ADR-223; enmienda ADR-090 P3 «las horas se escriben en el día»)
 
 **Contexto.** Las horas de una función o de un ensayo se escribían en dos sitios: bajo la tira del Día (`RunningOrder`) y en el pase. Con la regla «tocas una cosa, se abre su pase» (ADR-223) el Día pasa a enseñar y el pase a escribir.
 

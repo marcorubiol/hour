@@ -1535,7 +1535,7 @@
       country?: string | null;
       workspaceId?: string | null;
       suggestVenue?: { venueId: string; name: string } | null;
-      /** The pase it opens (ADR-231), the hour it says and the line under it. */
+      /** The pase it opens (ADR-233), the hour it says and the line under it. */
       href: string | null;
       sub: string;
       eyebrow: string;

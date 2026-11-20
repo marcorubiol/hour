@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * The Day's piece (ADR-231, fase 4 de ADR-223; lámina C de la revisión
+   * The Day's piece (ADR-233, fase 4 de ADR-223; lámina C de la revisión
    * TDAH, «Día, propuesta»): each performance and each date the day holds,
    * drawn the way Hoy draws its piece, dark and short: the project's
    * monogram and what it is (with its «?» when it is an option), the name

@@ -113,7 +113,7 @@ async function createFixtureDate(
 
 /**
  * THE DATE OPENS IN ITS VISTAZO (ADR-139 p1): pressing a date shows it, and
- * the pencil on its date (ADR-231: the head has no «Edit» now) opens the
+ * the pencil on its date (ADR-233: the head has no «Edit» now) opens the
  * dialog this file is about. The dialog is the
  * `.dialog` one: the vistazo is a <dialog> of its own, open under it.
  */

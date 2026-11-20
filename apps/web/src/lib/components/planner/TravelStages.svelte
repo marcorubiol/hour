@@ -91,7 +91,7 @@
     suggestVenue?: { venueId: string; name: string } | null;
     /** Whose stages these are, when the day holds more than one list. */
     name?: string | null;
-    /** Draw the stages, write none (the Day shows; the trip's pase writes, ADR-231). */
+    /** Draw the stages, write none (the Day shows; the trip's pase writes, ADR-233). */
     readonly?: boolean;
   }
 
