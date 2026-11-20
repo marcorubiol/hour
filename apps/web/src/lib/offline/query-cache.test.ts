@@ -262,3 +262,15 @@ describe('the frame\'s safety net (ADR-158)', () => {
     expect(reload).not.toHaveBeenCalled();
   });
 });
+
+describe('newestUnder', () => {
+  test("a new day's key shows yesterday's answer until its own lands", async () => {
+    const { newestUnder } = await load();
+    const c = new QueryClient();
+    c.setQueryData(['pulse-performances', '2026-11-18'], { items: ['old'] }, { updatedAt: 1_000 });
+    c.setQueryData(['pulse-performances', '2026-11-19'], { items: ['last'] }, { updatedAt: 2_000 });
+    c.setQueryData(['pulse-dates', '2026-11-05'], { items: ['other'] }, { updatedAt: 3_000 });
+    expect(newestUnder(c, ['pulse-performances'])).toEqual({ items: ['last'] });
+    expect(newestUnder(c, ['nothing'])).toBeUndefined();
+  });
+});
