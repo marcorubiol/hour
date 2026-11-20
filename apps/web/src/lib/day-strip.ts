@@ -20,6 +20,7 @@
 
 import type { PerformanceEvent, DateEvent, SlipKind } from './month-events';
 import { dayMoments, type DayMoment, type MomentKey } from './month-events';
+import { zoneFormatter } from './zone-format';
 
 /** A moment on the track: an hour somebody wrote down. */
 type StripMark = {
@@ -68,12 +69,7 @@ export type StripThread = {
 export function hourOf(iso: string, timeZone: string): number | null {
   const t = new Date(iso);
   if (Number.isNaN(t.getTime())) return null;
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone,
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(t);
+  const parts = zoneFormatter('time', timeZone).formatToParts(t);
   const h = Number(parts.find((p) => p.type === 'hour')?.value);
   const m = Number(parts.find((p) => p.type === 'minute')?.value);
   if (Number.isNaN(h) || Number.isNaN(m)) return null;

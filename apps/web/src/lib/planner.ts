@@ -14,6 +14,7 @@ import type { DateRow } from './date';
 import { decideBy, isHoldStatus, performanceStatusFamily } from './performance';
 import { t, type Locale } from './i18n';
 import { MOBILE_QUERY } from './breakpoints';
+import { zoneDay } from './zone-format';
 
 interface PlannerDay {
   /** ISO date, YYYY-MM-DD. */
@@ -163,12 +164,7 @@ export function isoWeek(iso: string): number {
  * en-CA formats as YYYY-MM-DD natively.
  */
 export function dayKeyInTz(isoTimestamp: string, timeZone: string): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date(isoTimestamp));
+  return zoneDay(new Date(isoTimestamp), timeZone);
 }
 
 /**

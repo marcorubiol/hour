@@ -6,6 +6,7 @@
 
 import * as v from 'valibot';
 import { appLocaleTag } from '$lib/i18n';
+import { zoneDay, zoneFormatter } from '$lib/zone-format';
 
 /**
  * The date-only API contract: "YYYY-MM-DD that is a real calendar day".
@@ -159,16 +160,7 @@ export function localDayISO(now: Date = new Date()): string {
  * en-CA date order + h23 keep the parts locale-stable.
  */
 function wallParts(atMs: number, timeZone: string): Record<string, string> {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(new Date(atMs));
+  const parts = zoneFormatter('parts', timeZone).formatToParts(atMs);
   const bag: Record<string, string> = {};
   for (const p of parts) if (p.type !== 'literal') bag[p.type] = p.value;
   return bag;
@@ -241,22 +233,12 @@ export function instantToWallClock(iso: string | null, timeZone: string): string
 }
 
 export function timeInTz(iso: string, timeZone: string): string {
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone,
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(new Date(iso));
+  return zoneFormatter('time', timeZone).format(new Date(iso));
 }
 
 /** The day (YYYY-MM-DD) an instant falls on in `timeZone`. */
 export function dayInTz(iso: string, timeZone: string): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date(iso));
+  return zoneDay(new Date(iso), timeZone);
 }
 
 /**
@@ -316,26 +298,41 @@ export function dualTime(
 }
 
 /**
+ * One formatter per locale and part for the three below: they run per row of
+ * every list, and building the formatter is the expensive half ($lib/zone-format).
+ */
+const utcPartFormatters = new Map<string, Intl.DateTimeFormat>();
+function utcPartFormatter(locale: string, part: 'month' | 'weekday', width: 'short' | 'long'): Intl.DateTimeFormat {
+  const key = `${locale}|${part}|${width}`;
+  let fmt = utcPartFormatters.get(key);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat(locale, { [part]: width, timeZone: 'UTC' });
+    utcPartFormatters.set(key, fmt);
+  }
+  return fmt;
+}
+
+/**
  * Locale-aware short month for an ISO date ("jul"). Same UTC-anchored
  * contract as dayLabel; the trailing abbreviation dot some locales add
  * ("jul.") is stripped, the weekdayLabels idiom.
  */
 export function localeMonthShort(iso: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { month: 'short', timeZone: 'UTC' })
+  return utcPartFormatter(locale, 'month', 'short')
     .format(new Date(`${iso.slice(0, 10)}T00:00:00Z`))
     .replace(/\.+$/, '');
 }
 
 /** Locale-aware short weekday ("thu", "dj") — same contract as localeMonthShort. */
 export function localeWeekdayShort(iso: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' })
+  return utcPartFormatter(locale, 'weekday', 'short')
     .format(new Date(`${iso.slice(0, 10)}T00:00:00Z`))
     .replace(/\.+$/, '');
 }
 
 /** Locale-aware long weekday ("martes", "dimarts"), same contract. */
 export function localeWeekdayLong(iso: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { weekday: 'long', timeZone: 'UTC' }).format(new Date(`${iso.slice(0, 10)}T00:00:00Z`));
+  return utcPartFormatter(locale, 'weekday', 'long').format(new Date(`${iso.slice(0, 10)}T00:00:00Z`));
 }
 
 /** "17 jul" — bare day number + locale short month; the honest compact date. */
