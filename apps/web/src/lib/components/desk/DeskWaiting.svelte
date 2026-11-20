@@ -75,8 +75,6 @@
     old?: DeskItem[];
     /** «Ahora no» until a day, or back now with null. Without it, no «ahora no». */
     onaside?: (item: DeskItem, until: string | null) => void;
-    /** A gig day (ADR-234): the block is one line, «Te espera · 4 · ver», until opened. */
-    folded?: boolean;
     /** «Te han convocado» (ADR-235): «Voy» or «No puedo», right on the row. */
     onanswer?: (item: DeskItem, state: 'going' | 'not_going') => void;
   }
@@ -106,14 +104,11 @@
     aside = [],
     old = [],
     onaside,
-    folded = false,
     onanswer,
   }: Props = $props();
 
-  /** Opened on a gig day: the three rows of a normal day. */
-  let unfold = $state(false);
-  let rows = $derived(folded && unfold ? 3 : rowsIn);
-  let line = $derived(folded && !unfold && !loading && !errored && waiting.total > 0);
+  /* No fold outside calm (Marco, 20-11, ADR-238): hiding it is calm's job. */
+  let rows = $derived(rowsIn);
 
   let asideOpen = $state(false);
   let oldOpen = $state(false);
@@ -326,13 +321,6 @@
 {/snippet}
 
 <section class="dband waits" aria-labelledby="desk-waits-h" aria-busy={loading}>
-  {#if line}
-  <!-- A GIG DAY (ADR-234): the day is the piece; what waits is one line. -->
-  <p class="waits__line" data-testid="desk-waits-line">
-    <span id="desk-waits-h">{t('desk.band_waiting', locale)}</span> · {waiting.total} ·
-    <button type="button" class="waits__open" onclick={() => (unfold = true)}>{t('desk.open_see', locale)}</button>
-  </p>
-  {:else}
   <!-- The region is named by the words alone, not by the count beside them. -->
   <BlockHead
     title={t('desk.band_waiting', locale)}
@@ -423,7 +411,7 @@
     {/if}
   {/if}
 
-  {#if !loading && !errored && (rows > 0 || (folded && waiting.total === 0)) && (aside.length > 0 || old.length > 0)}
+  {#if !loading && !errored && rows > 0 && (aside.length > 0 || old.length > 0)}
     <!-- The two folds at the foot (ADR-232): what you set aside, and what has
          waited more than a month. Folded; neither counts in the head. -->
     <div class="folds">
@@ -462,7 +450,6 @@
         {/if}
       {/if}
     </div>
-  {/if}
   {/if}
 </section>
 
@@ -647,26 +634,6 @@
   }
   @media (pointer: coarse) {
     .row__acts :global(.row__aside) {
-      min-block-size: var(--touch-target);
-    }
-  }
-  .waits__line {
-    margin: 0;
-    font-size: var(--text-s);
-    color: var(--text-muted);
-  }
-  .waits__open {
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--text-color);
-    font: inherit;
-    text-decoration: underline;
-    text-underline-offset: 3px;
-    cursor: pointer;
-  }
-  @media (pointer: coarse) {
-    .waits__open {
       min-block-size: var(--touch-target);
     }
   }
@@ -855,29 +822,18 @@
 
   /* Phone: the action stays on the right, the context drops under the
      subject instead of disappearing. */
-  /* Phone: when on the subject's line, the context under the subject, and
-     the actions on a line of their own (room for a thumb, the name whole). */
+  /* Phone (Marco, 20-11, ADR-238): the subject takes the whole width beside
+     its verb; when, under it, and the actions on a line of their own. With
+     the when as a third column the name broke in three narrow lines. */
   @media (max-width: 47.999rem) {
     .list {
       display: block;
     }
     .row {
-      grid-template-columns: 4.25rem minmax(0, 1fr) auto;
-      grid-template-areas: 'verb subject when' 'verb acts acts';
+      grid-template-columns: 4.25rem minmax(0, 1fr);
+      grid-template-areas: 'verb subject' 'verb when' 'verb acts';
       column-gap: var(--space-s);
-      row-gap: 0;
-    }
-    .row:not(:has(.row__acts > :global(*))) {
-      grid-template-areas: 'verb subject when';
-    }
-    /* «Ahora no» and a task's × are small: under the when, at the end, beside
-       the subject's second line rather than on a line of their own (ADR-232).
-       A row with a real button («Liberar») keeps its own line. */
-    .row:has(.row__acts > :global(*)):not(:has(.row__act)) {
-      grid-template-areas: 'verb subject when' 'verb subject acts';
-    }
-    .row:has(.row__acts > :global(*)):not(:has(.row__act)) .row__acts {
-      justify-self: end;
+      row-gap: var(--space-2xs);
     }
     .row__verb {
       grid-area: verb;
@@ -887,6 +843,11 @@
     }
     .row__when {
       grid-area: when;
+      justify-self: start;
+      text-align: start;
+    }
+    .row__when:empty {
+      display: none;
     }
     .row__acts {
       grid-area: acts;
@@ -897,6 +858,22 @@
     }
     .run {
       grid-template-columns: 1fr;
+    }
+    /* The pills on a phone are words on a line, «1 reply · 2 tasks», not
+       four quarter-width tiles: one pill alone was a narrow box. */
+    .tallies {
+      display: flex;
+      flex-wrap: wrap;
+    }
+    .tally {
+      flex-direction: row;
+      align-items: baseline;
+      gap: var(--space-2xs);
+      inline-size: auto;
+      padding: var(--space-2xs) var(--space-s);
+    }
+    .tally b {
+      font-size: var(--text-l);
     }
   }
 </style>

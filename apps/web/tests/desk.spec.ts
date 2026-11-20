@@ -110,10 +110,8 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
     // The tasks pill counts it (ADR-202 § 7); the short list draws three rows
     // at most, so the task may wait under the pill. Tasks have no list of
     // their own: their pill opens the whole list here, by days.
-    // A gig day folds the block into one line (ADR-234): open it first.
-    await expect(waits.locator('.list, .waits__line').first()).toBeVisible({ timeout: 10_000 });
-    const line = waits.getByTestId('desk-waits-line');
-    if ((await line.count()) > 0) await line.getByRole('button').click();
+    // No fold outside calm, a gig day included (ADR-238).
+    await expect(waits.locator('.list').first()).toBeVisible({ timeout: 10_000 });
     // With three things or fewer all drawn as rows there are no pills
     // (ADR-229): then «See all by days» is the door.
     const tasksPill = waits.locator('[data-kind="tasks"]');

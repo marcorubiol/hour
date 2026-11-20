@@ -337,8 +337,9 @@ export function waitingDrawsPills(total: number, rows: number): boolean {
  * How many rows «Te espera» draws under its pills: none in calm (ADR-203
  * § 5) nor on a gig day (§ 9), five on a day with nothing, three otherwise.
  */
-export function waitingRowCount(day: { calm: boolean; gig: boolean; empty: boolean }): number {
-  if (day.calm || day.gig) return 0;
+export function waitingRowCount(day: { calm: boolean; empty: boolean }): number {
+  // A gig day draws its rows too (Marco, 20-11, ADR-238): only calm hides them.
+  if (day.calm) return 0;
   return day.empty ? 5 : 3;
 }
 
