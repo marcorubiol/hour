@@ -105,11 +105,25 @@ describe.skipIf(!envReady())('RLS — public road sheet: shared note and company
   afterAll(async () => {
     if (!jwt) return;
     for (const id of shares) await pgRpc('revoke_roadsheet_share', jwt, { p_share_id: id });
-    if (crewId) {
-      await pgPatch('crew_assignment', jwt, { deleted_at: new Date().toISOString() }, new URLSearchParams({ id: `eq.${crewId}` }));
-    }
+    if (crewId) await removeCrew(crewId);
     if (perfId) await pgRpc('delete_performance', jwt, { p_performance_id: perfId });
   });
+
+  /**
+   * Takes the row out with a DELETE. A soft delete by PATCH cannot work here:
+   * `crew_assignment_select` hides rows with `deleted_at`, and Postgres holds
+   * the updated row to the SELECT policy, so the PATCH answers 403.
+   */
+  const removeCrew = async (id: string): Promise<number> => {
+    const { url, anon } = requireEnv();
+    const u = new URL('/rest/v1/crew_assignment', url);
+    u.searchParams.set('id', `eq.${id}`);
+    const res = await fetch(u.toString(), {
+      method: 'DELETE',
+      headers: { apikey: anon, Authorization: `Bearer ${jwt}`, Prefer: 'return=minimal' },
+    });
+    return res.status;
+  };
 
   const read = async (role: string): Promise<Bundle> => {
     const s = await pgRpc<{ id: string; token: string }>('create_roadsheet_share', jwt, {
@@ -195,13 +209,7 @@ describe.skipIf(!envReady())('RLS — public road sheet: shared note and company
   test('venue, the chosen person left the team: back to the company, never a stale person', async () => {
     if (!personId || !crewId) return;
     await choose(personId);
-    const gone = await pgPatch(
-      'crew_assignment',
-      jwt,
-      { deleted_at: new Date().toISOString() },
-      new URLSearchParams({ id: `eq.${crewId}`, select: 'id' }),
-    );
-    expect(gone.status).toBeLessThan(300);
+    expect(await removeCrew(crewId)).toBeLessThan(300);
     const ws = await workspace();
     const b = await read('venue');
     expect(JSON.stringify(b)).not.toContain(CREW_PHONE);
