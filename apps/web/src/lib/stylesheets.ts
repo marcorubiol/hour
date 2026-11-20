@@ -38,8 +38,14 @@ export function trackStylesheets(doc: Document = document): void {
   doc.addEventListener('error', mark, true);
 }
 
-/** A stylesheet still on its way: not marked, and no sheet parsed yet. */
+/**
+ * A stylesheet of ours still on its way: not marked, and no sheet parsed yet.
+ * Only same-origin files count: the web fonts' stylesheet (Google Fonts,
+ * added by theme-init.js without blocking) swaps in on its own and must not
+ * hold a navigation.
+ */
 function pending(link: HTMLLinkElement): boolean {
+  if (new URL(link.href, link.ownerDocument.baseURI).origin !== link.ownerDocument.location.origin) return false;
   return !link.hasAttribute(SETTLED) && link.sheet === null;
 }
 

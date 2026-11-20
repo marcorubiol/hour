@@ -58,10 +58,11 @@
     <link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400..600&family=Inter:wght@400..600&family=JetBrains+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
+    <!-- The Google Fonts stylesheet is added by theme-init.js, not here: a
+         <link rel=stylesheet> in the head holds the first paint, boot skeleton
+         included, until fonts.googleapis.com answers (20-11-2026, Marco: «aún
+         tarda un poco en salir el esqueleto»). Added by script it doesn't
+         block; the fonts swap in (display=swap) as before. -->
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">

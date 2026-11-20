@@ -103,8 +103,9 @@ export default defineConfig(({ mode }) => {
             short_name: 'Hour',
             description: 'Gestión de compañías de artes en vivo: todo junto, hora a hora.',
             lang: 'es',
-            theme_color: '#9d3f70',
-            background_color: '#ffffff',
+            theme_color: '#f7f5ef',
+            // The launch screen: the colour of the page and the boot skeleton.
+            background_color: '#f7f5ef',
             display: 'standalone',
             start_url: '/',
             scope: '/',
