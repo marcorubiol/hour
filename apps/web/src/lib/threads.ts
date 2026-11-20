@@ -16,6 +16,7 @@ import * as v from 'valibot';
 import { hourMark, localeDayMonth, localeMonthShort, localeWeekdayShort, timeInTz } from './datetime';
 import { LOCALE_TAG, t, tradeFor, type Locale, type Voice } from './i18n';
 import type { LateLineData } from './roadsheet-late';
+import { zoneDay } from './zone-format';
 
 /** El tope de la base (`message_body_length`): de 1 a 10.000 tras recortar. */
 export const MESSAGE_MAX = 10_000;
@@ -216,9 +217,7 @@ export function messageWhen(iso: string, locale: Locale, tz: string, now: Date =
 }
 
 function dayInZone(iso: string, tz: string): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(
-    new Date(iso),
-  );
+  return zoneDay(new Date(iso), tz);
 }
 
 // ── forma ───────────────────────────────────────────────────────────────

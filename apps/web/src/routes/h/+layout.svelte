@@ -25,7 +25,7 @@
    */
 
   import { page } from '$app/state';
-  import { afterNavigate, goto, replaceState } from '$app/navigation';
+  import { afterNavigate, goto, preloadCode, replaceState } from '$app/navigation';
   import { noteNavigation } from '$lib/back';
   import { env } from '$env/dynamic/public';
   import type { Snippet } from 'svelte';
@@ -579,6 +579,30 @@
     // Never before the router has its root: see `scopeUrlToWrite`.
     const next = scopeUrlToWrite(url.href, ser, routerReady);
     if (next) replaceState(next, {});
+  });
+
+  // THE OTHER SECTIONS' CODE IS ON THE DEVICE BEFORE THE FIRST TAP. A section's
+  // code used to be asked for when its tab was pressed, and the frame stood
+  // still until all of it arrived (25 files for the Planner): on a phone, the
+  // first change of section after every open waited for the network. Now it
+  // is fetched once the section on screen has painted and a moment has
+  // passed, one section after another so it never crowds the open's own
+  // requests. Code only, no data; the service worker keeps it for next time.
+  $effect(() => {
+    if (!painted) return;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      for (const id of ['desk', 'planner', 'conversations', 'books'] as const) {
+        if (cancelled) return;
+        if (id === untrack(() => routedLens) || !lensOn(id)) continue;
+        // A failure here is only a tab that loads its code when pressed, as before.
+        await preloadCode(lensHref(id)).catch(() => {});
+      }
+    }, 2_500);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   });
 
   // ⌘K — one palette, two doors (ADR-178): the frame's field and ⌘K
