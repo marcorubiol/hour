@@ -211,47 +211,25 @@
           {#if wide}
           {@const manyText = planner ? manyOf(tile) : null}
           {@const single = !manyText && tile.items.length === 1 && tile.more === 0}
-          {@const href = single || manyText ? tileHref(tile) : dayHref(tile)}
+          {@const href = dayHref(tile)}
           <li class="coming__cell">
-            {#if single || manyText}
-              <svelte:element
-                this={href ? 'a' : 'div'}
-                {href}
-                class="tile tile--card"
-                class:tile--door={Boolean(href)}
-                class:tile--urgent={amberOn(tile)}
-                data-testid="desk-tile"
-                data-day={tile.day}
-              >
-                <span class="tile__date">
-                  <span class="tile__n">{Number(tile.day.slice(8, 10))}</span>
-                  <span class="tile__wd">{localeWeekdayShort(tile.day, locale)}</span>
-                  <span class="tile__mo">{localeMonthShort(tile.day, locale)}</span>
-                </span>
-                {#if manyText}
-                  {@render many(tile)}
-                {:else}
-                  <ul class="tile__things">
-                    {#each tile.items as item (item.ref.of + item.ref.id)}
-                      <li class="tile__thing">{@render body(item, tile.day)}</li>
-                    {/each}
-                  </ul>
-                {/if}
-                {@render amber(tile)}
+            <div
+              class="tile tile--card"
+              class:tile--single={single || Boolean(manyText)}
+              class:tile--urgent={amberOn(tile)}
+              data-testid="desk-tile"
+              data-day={tile.day}
+            >
+              <svelte:element this={href ? 'a' : 'span'} {href} class="tile__date">
+                <span class="tile__n">{Number(tile.day.slice(8, 10))}</span>
+                <span class="tile__wd">{localeWeekdayShort(tile.day, locale)}</span>
+                <span class="tile__mo">{localeMonthShort(tile.day, locale)}</span>
               </svelte:element>
-            {:else}
-              <div
-                class="tile tile--card"
-                class:tile--door={Boolean(href)}
-                class:tile--urgent={amberOn(tile)}
-                data-testid="desk-tile"
-                data-day={tile.day}
-              >
-                <svelte:element this={href ? 'a' : 'span'} {href} class="tile__date tile__date--cover">
-                  <span class="tile__n">{Number(tile.day.slice(8, 10))}</span>
-                  <span class="tile__wd">{localeWeekdayShort(tile.day, locale)}</span>
-                  <span class="tile__mo">{localeMonthShort(tile.day, locale)}</span>
+              {#if manyText}
+                <svelte:element this={href ? 'a' : 'div'} {href} class="tile__rowlink tile__rowlink--many">
+                  {@render many(tile)}
                 </svelte:element>
+              {:else}
                 <ul class="tile__things tile__things--rows">
                   {#each tile.items as item (item.ref.of + item.ref.id)}
                     {@const door = pulseSlip(item.ref, tile.day, slipCtx).href ?? href}
@@ -262,10 +240,16 @@
                     </li>
                   {/each}
                 </ul>
-                {#if tile.more > 0}<span class="tile__more">{t('desk.coming_more', locale, { n: tile.more })}</span>{/if}
-                {@render amber(tile)}
-              </div>
-            {/if}
+                {#if tile.more > 0}
+                  {#if href}
+                    <a class="tile__more tile__more--link" {href}>{t('desk.coming_more', locale, { n: tile.more })}</a>
+                  {:else}
+                    <span class="tile__more">{t('desk.coming_more', locale, { n: tile.more })}</span>
+                  {/if}
+                {/if}
+              {/if}
+              {@render amber(tile)}
+            </div>
           </li>
           {:else}
           {@const href = tileHref(tile)}
@@ -385,31 +369,17 @@
     min-inline-size: 0;
     transition:
       background var(--transition),
-      border-color var(--transition),
-      transform var(--transition),
-      box-shadow var(--transition);
-  }
-  .tile--door {
-    cursor: pointer;
+      border-color var(--transition);
   }
   @media (hover: hover) and (pointer: fine) {
-    a.tile:not(.tile--end):hover,
-    .tile--door:hover:not(:has(a.tile__rowlink:hover)) {
+    a.tile:not(.tile--end):hover {
       border-color: var(--border-color-dark);
       background: color-mix(in oklch, var(--bg-ultra-light) 96%, var(--heading-color));
-      transform: translateY(-2px);
-      box-shadow: var(--box-shadow-2);
       text-decoration: none;
     }
-    a.tile:not(.tile--end):active,
-    .tile--door:active:not(:has(a.tile__rowlink:active)) {
-      transform: translateY(0);
-      box-shadow: var(--box-shadow-1);
-    }
-    a.tile--urgent:hover,
-    .tile--urgent.tile--door:hover:not(:has(a.tile__rowlink:hover)) {
+    a.tile--urgent:hover {
       border-color: var(--missing-ink);
-      background: color-mix(in oklch, var(--missing-ink) 5%, var(--bg-ultra-light));
+      background: color-mix(in oklch, var(--missing-ink) 4%, var(--bg-ultra-light));
     }
   }
   /* The screen's one amber (ADR-227): the tile of what falls due first. */
@@ -483,38 +453,35 @@
     font-size: var(--text-xs);
     color: var(--text-muted);
   }
-  /* WIDE (the Desk's 3×2 calendar grid): compact vertical paper card per day,
-     same calendar grammar as the phone strip. The date opens the day, each row
-     opens its own pase, and only the one urgent tile carries amber. */
+  /* WIDE (the Desk's 3×2 calendar grid): calm day container; the date header
+     always opens the day in the Planner and each event row always opens its
+     own sheet (ADR-223), with soft rounded hover surfaces and zero underlines. */
   .tile--card {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1fr auto auto;
     grid-template-areas: 'date' 'things' 'more' 'falta';
-    align-content: start;
+    align-items: stretch;
     gap: var(--space-xs);
     padding: var(--space-s);
   }
   .tile--card .tile__date {
     grid-area: date;
+    padding: var(--space-2xs) var(--space-xs);
+    margin-block: calc(-1 * var(--space-2xs));
+    margin-inline: calc(-1 * var(--space-xs));
+    border-radius: var(--radius-m);
     color: inherit;
     text-decoration: none;
+    transition: background var(--transition);
   }
-  .tile--card a.tile__date--cover::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    border-radius: inherit;
-  }
-  .tile--card a.tile__date--cover:hover,
-  .tile--card a.tile__date--cover:focus-visible {
-    text-decoration: none;
-  }
-  .tile--card a.tile__date--cover:focus-visible {
-    outline: none;
-  }
-  .tile--card a.tile__date--cover:focus-visible::after {
-    outline: var(--focus-width) solid var(--focus-color);
-    outline-offset: var(--focus-offset);
+  @media (hover: hover) and (pointer: fine) {
+    .tile--card a.tile__date:hover {
+      background: color-mix(in oklch, var(--text-color) 5%, transparent);
+      text-decoration: none;
+    }
+    .tile--card a.tile__date:active {
+      background: color-mix(in oklch, var(--text-color) 8%, transparent);
+    }
   }
   .tile--card .tile__things {
     grid-area: things;
@@ -526,12 +493,31 @@
     color: var(--heading-color);
     overflow-wrap: anywhere;
   }
-  .tile--card .tile__many {
+  .tile--card .tile__rowlink--many {
     grid-area: things;
+    align-content: start;
   }
   .tile--card .tile__more {
     grid-area: more;
     align-self: start;
+  }
+  .tile__more--link {
+    justify-self: start;
+    padding: var(--space-2xs) var(--space-xs);
+    margin-block: calc(-1 * var(--space-2xs));
+    margin-inline: calc(-1 * var(--space-xs));
+    border-radius: var(--radius-s);
+    text-decoration: none;
+    transition:
+      background var(--transition),
+      color var(--transition);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .tile__more--link:hover {
+      background: color-mix(in oklch, var(--text-color) 5%, transparent);
+      color: var(--text-color);
+      text-decoration: none;
+    }
   }
   .tile--card .tile__falta {
     grid-area: falta;
@@ -539,11 +525,17 @@
   }
   .tile__things--rows {
     gap: var(--space-xs);
+    align-content: start;
+  }
+  .tile--single .tile__things--rows {
+    align-content: stretch;
+  }
+  .tile--single .tile__row {
+    display: grid;
   }
   .tile__rowlink {
-    position: relative;
-    z-index: 2;
     display: grid;
+    align-content: start;
     gap: var(--space-2xs);
     padding: var(--space-2xs) var(--space-xs);
     margin-block: calc(-1 * var(--space-2xs));
