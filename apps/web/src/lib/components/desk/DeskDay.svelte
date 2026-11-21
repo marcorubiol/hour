@@ -414,7 +414,7 @@
     {@const sub = headSub}
     {@const rest = headRest}
     {@const leans = !shows && focus.ref.tentative}
-    <div class="piece" class:piece--gig={gig} data-testid="desk-next">
+    <div class="piece" class:piece--gig={gig} class:piece--door={Boolean(headHref)} data-testid="desk-next">
       <span class="piece__eye" data-testid={yours ? 'desk-you-at' : undefined}>{@render mark(yours ? actionPerf?.project : eyeProject)}{headEye}</span>
       <!-- The headline is read again when the minute ticks: polite, never twice a minute.
            An option leans, the headline and the line under it (design-system
@@ -547,6 +547,7 @@
   /* THE FILLED PIECE (design-system rules 1 and 2): the one surface of the
      screen with a fill, its own ink; what sits on it reads that ink. */
   .piece {
+    position: relative;
     display: grid;
     gap: var(--space-s);
     padding: var(--space-m);
@@ -556,6 +557,15 @@
     --identity-tint-base: var(--surface-focus);
     --identity-tint: var(--surface-focus-mark-tint);
     --identity-ink-l: var(--surface-focus-mark-ink-l);
+    transition: background var(--transition);
+  }
+  .piece--door {
+    cursor: pointer;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .piece--door:hover {
+      background: color-mix(in oklch, var(--surface-focus) 94%, var(--surface-focus-ink));
+    }
   }
   .piece a {
     color: inherit;
@@ -602,14 +612,29 @@
   .piece__what {
     text-wrap: balance;
   }
-  /* The headline is a door without looking like a link: same ink, an underline only under the finger or the pointer. */
+  /* The whole piece is a door (desktop and mobile): clicking/tapping anywhere
+     on the card opens the headline's pase; nested links and action buttons sit
+     above this overlay so their own targets still win. */
   a.piece__what {
     text-decoration: none;
+  }
+  a.piece__what::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
   }
   a.piece__what:hover,
   a.piece__what:focus-visible {
     text-decoration: underline;
     text-underline-offset: 4px;
+  }
+  a.piece__what:focus-visible {
+    outline: none;
+  }
+  a.piece__what:focus-visible::after {
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: var(--focus-offset);
   }
   .piece__at {
     font-variant-numeric: tabular-nums;
@@ -633,6 +658,8 @@
     color: var(--surface-focus-muted);
   }
   .piece__tomorrow a {
+    position: relative;
+    z-index: 1;
     text-decoration: none;
   }
   .piece__tomorrow a:hover {
@@ -716,6 +743,8 @@
     min-inline-size: 0;
   }
   .piece__rowwhat {
+    position: relative;
+    z-index: 1;
     min-inline-size: 0;
     text-decoration: none;
   }
@@ -741,12 +770,16 @@
     gap: var(--space-s);
   }
   .piece__links {
+    position: relative;
+    z-index: 1;
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-xs) var(--space-m);
     font-size: var(--text-s);
   }
   .piece__acts {
+    position: relative;
+    z-index: 1;
     display: grid;
     grid-auto-flow: column;
     grid-auto-columns: minmax(0, 1fr);

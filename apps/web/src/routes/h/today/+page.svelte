@@ -1075,7 +1075,6 @@
             conversations={readConversations ? { value: convFig, errored: $overviewQuery.isError } : null}
             money={readMoney ? { value: moneyFig, errored: $invoicesQuery.isError || $bolosQuery.isError } : null}
             {seasonLabel}
-            folded={wide.current}
             {locale}
           />
         </div>
