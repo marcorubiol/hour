@@ -1063,7 +1063,7 @@
   <!-- THREE BLOCKS, IN A FIXED ORDER (ADR-202 § 1): the day, what comes,
        what waits. On a wide desktop the pass (with what changed and the
        season under it) at the left, the 3×2 coming-up grid and «Te espera»
-       in the reading column; the grid is the record's (380 + 500, ≤ 1.000 px). -->
+       in the reading column; the grid is the record's (380 + the rest, ≤ 1.120 px). -->
   <div class="desk__grid">
     <div class="desk__col desk__col--pass">
       <div class="slot slot--next" data-slot="day" data-help-step="desk-next">
@@ -1158,10 +1158,10 @@
 
     /* The pass's grid (the same as the record's `.pass-grid`, ADR-218): the
        day's piece at the size of a phone's, then the reading column, aligned
-       left and never wider than 1.000 px. */
+       left and never wider than --pass-grid-max (1.120 px, Marco 21-11). */
     .desk__grid {
       display: grid;
-      grid-template-columns: var(--pass-width) minmax(0, var(--read-width));
+      grid-template-columns: var(--pass-width) minmax(0, 1fr);
       column-gap: var(--pass-gap);
       row-gap: var(--space-l);
       max-inline-size: var(--pass-grid-max);

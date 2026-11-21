@@ -2338,13 +2338,13 @@
     order: 6;
   }
   /* From 900 px of the record's own width: the pass (380 px) at the left,
-     and after 56 px of air the reading column (500 px at most), aligned
-     left under a 1.000 px cap. The same grid as Hoy's (`.desk__grid`): the
+     and after 56 px of air the reading column (the rest), aligned left
+     under a 1.120 px cap (--pass-grid-max). The same grid as Hoy's (`.desk__grid`): the
      width is ruled by the pass and the column, never by the window. */
   @container record (min-width: 56.25rem) {
     .pass-grid {
       display: grid;
-      grid-template-columns: var(--pass-width) minmax(0, var(--read-width));
+      grid-template-columns: var(--pass-width) minmax(0, 1fr);
       column-gap: var(--pass-gap);
       align-items: start;
       max-inline-size: var(--pass-grid-max);

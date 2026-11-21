@@ -338,7 +338,7 @@
   .coming__strip--grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-  @container coming (max-width: 28rem) {
+  @container coming (max-width: 34rem) {
     .coming__strip--grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
