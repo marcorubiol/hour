@@ -432,7 +432,9 @@
   // with Hoy's startup data requests for `/api/auth/token` and bandwidth.
   let disposed = false;
   $effect(() => {
-    if (!painted || rt || !env.PUBLIC_SUPABASE_URL || !env.PUBLIC_SUPABASE_ANON_KEY) return;
+    const url = env.PUBLIC_SUPABASE_URL;
+    const anonKey = env.PUBLIC_SUPABASE_ANON_KEY;
+    if (!painted || rt || !url || !anonKey) return;
     let cancelled = false;
     const timer = setTimeout(async () => {
       try {
@@ -440,8 +442,8 @@
         if (cancelled || disposed) return;
         const handle = createRealtimeClient(
           {
-            PUBLIC_SUPABASE_URL: env.PUBLIC_SUPABASE_URL,
-            PUBLIC_SUPABASE_ANON_KEY: env.PUBLIC_SUPABASE_ANON_KEY,
+            PUBLIC_SUPABASE_URL: url,
+            PUBLIC_SUPABASE_ANON_KEY: anonKey,
           },
           {
             getToken: getAccessToken,
