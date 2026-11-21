@@ -159,15 +159,37 @@
        of words (ADR-167 § 2); the arrow alone centres on the row. */
     align-items: baseline;
     padding-block: var(--space-s);
+    padding-inline: var(--space-xs);
+    margin-inline: calc(-1 * var(--space-xs));
+    border-radius: var(--radius-m);
     color: inherit;
     text-decoration: none;
+    transition:
+      background var(--transition),
+      border-color var(--transition);
   }
   .door + .door {
     border-block-start: var(--line-hairline) solid var(--border-color-light);
   }
-  .door:hover .door__lens {
-    text-decoration: underline;
-    text-underline-offset: 0.2em;
+  @media (hover: hover) and (pointer: fine) {
+    .door:hover {
+      background: color-mix(in oklch, var(--text-color) 4%, transparent);
+      border-block-start-color: transparent;
+      text-decoration: none;
+    }
+    .door:hover + .door {
+      border-block-start-color: transparent;
+    }
+    .door:active {
+      background: color-mix(in oklch, var(--text-color) 7%, transparent);
+    }
+    .door:hover .door__lens {
+      color: var(--heading-color);
+    }
+    .door:hover .door__arrow {
+      transform: translateX(3px);
+      color: var(--text-color);
+    }
   }
   /* ONE LABEL PER BLOCK (ADR-139 § 6): «La temporada» is the block's; a
      door is named by its lens in plain words, the window after it, quieter. */
@@ -210,11 +232,9 @@
     grid-area: arrow;
     align-self: center;
     color: var(--text-faint);
-    transition: transform var(--transition);
-  }
-  .door:hover .door__arrow {
-    transform: translateX(3px);
-    color: var(--text-muted);
+    transition:
+      transform var(--transition),
+      color var(--transition);
   }
   /* A narrow column (the Desk's right one on a tablet): the figure and its
      words no longer share a row, they stack under the lens's name, so each

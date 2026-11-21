@@ -2428,7 +2428,6 @@
   "planner.season_clash_one": "choque",
   "desk.add_task": "Nueva tarea",
   "desk.add_short": "Añadir",
-  "desk.head_today": "Hoy · {day}",
   "desk.title_overdue_one": "1 vencida",
   "desk.title_overdue_many": "{n} vencidas",
   "desk.band_next": "Lo siguiente",

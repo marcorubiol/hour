@@ -148,6 +148,8 @@ export function piecePerformance(a: DayAgenda): AgendaPoint | null {
 /** How far «Coming up» reaches, and how much it draws (ADR-202 § 6). */
 export const COMING_DAYS = 14;
 export const COMING_TILES = 10;
+/** On a wide desktop, a 3×2 calendar grid keeps the urgent line and «Te espera» above the fold. */
+export const COMING_TILES_WIDE = 6;
 /** On a phone, four day tiles and then «Planner →» (ADR-205). */
 export const COMING_TILES_PHONE = 4;
 export const COMING_PER_TILE = 2;
@@ -283,6 +285,38 @@ export function comingOpen(tiles: readonly ComingTile[]): ComingOpen {
   }
   const shows = tiles.reduce((n, tile) => n + tile.openShows, 0);
   return { urgent: best?.urgent ?? null, urgentDay: best?.day ?? null, rest: Math.max(0, shows - (best ? 1 : 0)) };
+}
+
+/**
+ * The tiles drawn on screen, capped at `limit` while guaranteeing the one
+ * urgent day (`urgentDay`, ADR-227) is never clipped off-screen when present.
+ */
+export function visibleComingTiles(
+  allTiles: readonly ComingTile[],
+  limit: number,
+  urgentDay: string | null = null,
+): ComingTile[] {
+  const head = allTiles.slice(0, limit);
+  if (!urgentDay || limit <= 0 || head.some((t) => t.day === urgentDay)) return head;
+  const urgentTile = allTiles.find((t) => t.day === urgentDay);
+  if (!urgentTile) return head;
+  return [...head.slice(0, Math.max(0, limit - 1)), urgentTile];
+}
+
+/** Travel words whose title already says it is a trip/return — never prefix «to » / «a » in front of them. */
+const TRAVEL_WORD_PREFIX = /^(?:viatge|viaje|tornada|vuelta|ida|anada|travel|trip|return|aller|retour|voyage)\b/i;
+
+/**
+ * The title of a thing inside a «Coming up» tile: its city (else its name),
+ * or «to <destination>» for a trip — without awkwardly prepending «to» to a
+ * title that already begins with a travel/return word («to Viatge / Gota»).
+ */
+export function comingPlace(sl: { lead: string | null; name: string; city: string | null }, toWord: string): string {
+  if (!sl.lead) return sl.city || sl.name;
+  const trimmed = sl.name.trim();
+  const alreadyPrefixed = trimmed.toLocaleLowerCase().startsWith(`${toWord.toLocaleLowerCase()} `);
+  if (!trimmed || alreadyPrefixed || TRAVEL_WORD_PREFIX.test(trimmed)) return trimmed;
+  return `${toWord} ${trimmed}`;
 }
 
 /** The first thing after today, however far: what the hollow piece names (ADR-202 § 3). */

@@ -2428,7 +2428,6 @@
   "planner.season_clash_one": "xoc",
   "desk.add_task": "Nova tasca",
   "desk.add_short": "Afegir",
-  "desk.head_today": "Avui · {day}",
   "desk.title_overdue_one": "1 vençuda",
   "desk.title_overdue_many": "{n} vençudes",
   "desk.band_next": "El següent",

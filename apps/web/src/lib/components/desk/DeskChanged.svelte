@@ -171,14 +171,27 @@
     margin: 0;
     padding: 0;
     display: grid;
-    gap: var(--space-s);
+    gap: var(--space-2xs);
   }
   .feed li {
+    position: relative;
     display: grid;
     grid-template-columns: 0.5rem 1fr;
     gap: var(--space-s);
     align-items: baseline;
+    padding: var(--space-xs);
+    margin-inline: calc(-1 * var(--space-xs));
+    border-radius: var(--radius-m);
     font-size: var(--text-s);
+    transition: background var(--transition);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .feed li:has(> .feed__body > a):hover {
+      background: color-mix(in oklch, var(--text-color) 4%, transparent);
+    }
+    .feed li:has(> .feed__body > a):active {
+      background: color-mix(in oklch, var(--text-color) 7%, transparent);
+    }
   }
   .feed__body {
     display: flex;
@@ -191,9 +204,23 @@
     color: inherit;
     text-decoration: none;
   }
-  .feed__body > a:hover {
-    text-decoration: underline;
-    text-underline-offset: 3px;
+  .feed__body > a::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+  }
+  .feed__body > a:hover,
+  .feed__body > a:focus-visible {
+    color: var(--heading-color);
+    text-decoration: none;
+  }
+  .feed__body > a:focus-visible {
+    outline: none;
+  }
+  .feed__body > a:focus-visible::after {
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: var(--focus-offset);
   }
   .feed small {
     font-family: var(--font-mono);

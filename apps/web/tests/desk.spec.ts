@@ -7,7 +7,6 @@
  */
 import { expect, test, type Page } from '@playwright/test';
 import { waitForLoaded } from './loaded';
-import { unfold } from './fold';
 
 const EMAIL = process.env.PW_TEST_EMAIL ?? '';
 const PASSWORD = process.env.PW_TEST_PASSWORD ?? '';
@@ -54,8 +53,8 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
     await expect(main.getByRole('heading', { level: 2, name: /^Today/ })).toBeAttached();
     await expect(page.getByTestId('desk-next').or(page.getByTestId('desk-hollow')).first()).toBeVisible();
     await expect(main.getByRole('heading', { name: /^Coming up/ })).toBeVisible();
-    // «La temporada» folds at the foot on a desktop (ADR-218 § 3).
-    await unfold(page, 'desk-season-fold');
+    // «La temporada» stays open under the Today pass on desktop (never collapsed).
+    await expect(main.getByRole('heading', { name: /^The season/ })).toBeVisible();
     // «Waiting for you» carries Hoy's «+» (ADR-203 § 1): drawn with something
     // in it or for its «+»; with nothing it says so itself.
     await expect(main.getByRole('heading', { name: /^Waiting for you/ })).toBeVisible();

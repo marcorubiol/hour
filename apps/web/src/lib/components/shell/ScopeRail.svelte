@@ -116,10 +116,7 @@
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: start;
     padding-inline: var(--space-xs);
-    /* Same top offset as the header's wordmark, by construction: the
-       BrandMark (size m = --text-xl, line-height 1) centers inside the
-       --header-height band, so its top sits at (band − type)/2. */
-    padding-block-start: calc((var(--header-height) - var(--text-xl)) / 2);
+    padding-block-start: var(--space-s);
   }
   .side-clock__now {
     grid-area: 1 / 1 / 2 / 3;
@@ -141,15 +138,15 @@
     align-items: center;
     gap: var(--space-2xs);
   }
-  /* The rail's HH:MM, under the date's line. One step down the scale from
-     --text-xl: here the clock states the day, it does not head the page.
-     (The phone's clock is the top bar's, in the display face: ADR-202 § 10.) */
+  /* Rule 5 (design-system.md): the clock is the largest display figure
+     outside the filled piece, matching the mobile top bar in Newsreader. */
   .side-clock__time {
-    font-family: var(--font-mono);
-    font-size: var(--text-l);
-    font-weight: 400;
+    font-family: var(--font-display);
+    font-size: var(--display-tile);
+    font-weight: var(--heading-font-weight);
+    font-variant-numeric: tabular-nums;
     line-height: 1;
-    letter-spacing: var(--tracking-xs);
+    letter-spacing: var(--heading-letter-spacing);
     color: var(--heading-color);
   }
   /* One line, always: a locale whose date outgrows the rail is cut, not

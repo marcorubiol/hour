@@ -301,6 +301,9 @@
   let yours = $derived(stop && onPerf && !doing && Date.parse(stop.at) > now.getTime() ? stop : null);
   let yoursWord = $derived.by(() => {
     if (!yours || !actionPerf) return '';
+    // When the earliest stop IS the performance itself (no load-in/soundcheck),
+    // keep the project/venue headline instead of a generic «Show» (ADR-207).
+    if (yours.key === 'start' && !yours.label) return '';
     const w = cap(yours.label || (yours.key ? t(momentWordKey(yours.key), locale, undefined, tradeFor(perfWorkspaceId(actionPerf))) : ''));
     // An option still leans: its «?» stays (design-system rule 18).
     return w && focus?.ref.tentative ? `${w}?` : w;
@@ -310,7 +313,11 @@
   let headWhat = $derived(yours ? yoursWord || what : shows ? showsWhat : what);
   let headAt = $derived(yours && actionPoint ? hour(yours.at, actionPoint.tz) : shows ? showsAt : at);
   let headSub = $derived(
-    yours && actionPoint ? [place(actionPoint), holdLabel(actionPoint)].filter(Boolean).join(' · ') : shows ? showsWhere : where,
+    yours && yoursWord && actionPoint
+      ? [place(actionPoint), holdLabel(actionPoint)].filter(Boolean).join(' · ')
+      : shows
+        ? showsWhere
+        : where,
   );
   let headRest = $derived(yours ? inWords(minutesTo(yours.at, now)) : shows ? showsLeft : left);
 
@@ -407,7 +414,7 @@
     {@const sub = headSub}
     {@const rest = headRest}
     {@const leans = !shows && focus.ref.tentative}
-    <div class="piece" class:piece--gig={gig} data-testid="desk-next">
+    <div class="piece" class:piece--gig={gig} class:piece--door={Boolean(headHref)} data-testid="desk-next">
       <span class="piece__eye" data-testid={yours ? 'desk-you-at' : undefined}>{@render mark(yours ? actionPerf?.project : eyeProject)}{headEye}</span>
       <!-- The headline is read again when the minute ticks: polite, never twice a minute.
            An option leans, the headline and the line under it (design-system
@@ -466,21 +473,34 @@
         </dl>
       {/if}
 
-      {#if boardHref || whoHref}
-        <span class="piece__links">
-          {#if boardHref}<a href={boardHref} data-testid="desk-next-board"
-              >{boardNew === 1 ? t('desk.next_board_one', locale) : t('desk.next_board', locale, { n: boardNew })} →</a
-            >{/if}
-          {#if whoHref}<a href={whoHref}>{t('commitment.who_goes', locale)} →</a>{/if}
-        </span>
-      {/if}
+      {#if boardHref || whoHref || acts}
+        <div class="piece__foot" class:piece__foot--paired={Boolean((boardHref || whoHref) && acts && !(call?.phone && map))}>
+          {#if boardHref || whoHref}
+            <span class="piece__links">
+              {#if boardHref}<a href={boardHref} data-testid="desk-next-board"
+                  >{boardNew === 1 ? t('desk.next_board_one', locale) : t('desk.next_board', locale, { n: boardNew })} →</a
+                >{/if}
+              {#if whoHref}<a href={whoHref}>{t('commitment.who_goes', locale)} →</a>{/if}
+            </span>
+          {/if}
 
-      {#if acts}
-        <!-- At the thumb (design-system rule 13): one row, the whole width, equal parts. -->
-        <nav class="piece__acts" aria-label={t('ahora.actions', locale)} data-testid="desk-acts">
-          {#if call?.phone}<a class="piece__act" href={telHref(call.phone)} aria-label={t('ahora.call_aria', locale, { name: call.name })}>{t('ahora.call', locale)}</a>{/if}
-          {#if map}<MapLink class="piece__act" parts={mapParts} changeIn="settings">{t('ahora.map', locale)}</MapLink>{/if}
-        </nav>
+          {#if acts}
+            <!-- At the thumb on a phone (design-system rule 13): equal parts across the width.
+                 On a desktop, a single action hugs its label instead of stretching 350px wide. -->
+            <nav class="piece__acts" class:piece__acts--single={Boolean(call?.phone) !== Boolean(map)} aria-label={t('ahora.actions', locale)} data-testid="desk-acts">
+              {#if call?.phone}<a class="piece__act" href={telHref(call.phone)} aria-label={t('ahora.call_aria', locale, { name: call.name })}
+                  ><svg class="piece__icon" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"
+                    ><path d="M3.5 2.5h3l1.2 3-1.8 1.2a8 8 0 0 0 3.4 3.4l1.2-1.8 3 1.2v3a1.5 1.5 0 0 1-1.6 1.5A11.5 11.5 0 0 1 2 4.1 1.5 1.5 0 0 1 3.5 2.5Z" /></svg
+                  >{t('ahora.call', locale)}</a
+                >{/if}
+              {#if map}<MapLink class="piece__act" parts={mapParts} changeIn="settings"
+                  ><svg class="piece__icon" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"
+                    ><path d="M8 14s4.5-4.2 4.5-7.8a4.5 4.5 0 1 0-9 0C3.5 9.8 8 14 8 14Z" /><circle cx="8" cy="6.2" r="1.4" /></svg
+                  >{t('ahora.map', locale)}</MapLink
+                >{/if}
+            </nav>
+          {/if}
+        </div>
       {/if}
 
       {#if tomorrowLine}
@@ -527,6 +547,7 @@
   /* THE FILLED PIECE (design-system rules 1 and 2): the one surface of the
      screen with a fill, its own ink; what sits on it reads that ink. */
   .piece {
+    position: relative;
     display: grid;
     gap: var(--space-s);
     padding: var(--space-m);
@@ -536,10 +557,31 @@
     --identity-tint-base: var(--surface-focus);
     --identity-tint: var(--surface-focus-mark-tint);
     --identity-ink-l: var(--surface-focus-mark-ink-l);
+    transition:
+      background var(--transition),
+      transform var(--transition),
+      box-shadow var(--transition);
+  }
+  .piece--door {
+    cursor: pointer;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .piece--door:hover:not(:has(.piece__acts:hover, .piece__links a:hover, a.piece__rowwhat:hover, .piece__tomorrow a:hover, .piece__left-head a:hover)) {
+      background: color-mix(in oklch, var(--surface-focus) 92%, var(--surface-focus-ink));
+      transform: translateY(-2px);
+      box-shadow: var(--box-shadow-3);
+    }
+    .piece--door:active:not(:has(.piece__acts:active, .piece__links a:active, a.piece__rowwhat:active, .piece__tomorrow a:active, .piece__left-head a:active)) {
+      transform: translateY(0);
+      box-shadow: var(--box-shadow-1);
+    }
   }
   .piece a {
     color: inherit;
-    text-underline-offset: 3px;
+    text-decoration: none;
+  }
+  .piece a:hover {
+    text-decoration: none;
   }
   /* The same piece with nothing in it: no fill, its edge (rule 4). */
   .piece--hollow {
@@ -582,14 +624,29 @@
   .piece__what {
     text-wrap: balance;
   }
-  /* The headline is a door without looking like a link: same ink, an underline only under the finger or the pointer. */
+  /* The whole piece is a door (desktop and mobile): clicking/tapping anywhere
+     on the card opens the headline's pase; nested links and action buttons sit
+     above this overlay so their own targets still win. */
   a.piece__what {
     text-decoration: none;
   }
+  a.piece__what::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: inherit;
+  }
   a.piece__what:hover,
   a.piece__what:focus-visible {
-    text-decoration: underline;
-    text-underline-offset: 4px;
+    text-decoration: none;
+  }
+  a.piece__what:focus-visible {
+    outline: none;
+  }
+  a.piece__what:focus-visible::after {
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: var(--focus-offset);
   }
   .piece__at {
     font-variant-numeric: tabular-nums;
@@ -613,10 +670,22 @@
     color: var(--surface-focus-muted);
   }
   .piece__tomorrow a {
+    position: relative;
+    z-index: 2;
+    display: inline-block;
+    padding: var(--space-2xs) var(--space-xs);
+    margin-block: calc(-1 * var(--space-2xs));
+    margin-inline: calc(-1 * var(--space-xs));
+    border-radius: var(--radius-m);
     text-decoration: none;
+    transition:
+      background var(--transition),
+      color var(--transition);
   }
   .piece__tomorrow a:hover {
-    text-decoration: underline;
+    background: var(--surface-focus-act);
+    color: var(--surface-focus-ink);
+    text-decoration: none;
   }
   .piece__sub {
     display: flex;
@@ -630,13 +699,26 @@
     color: var(--text-muted);
   }
   .piece__left {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: var(--mono-letter-spacing);
     white-space: nowrap;
   }
   .piece__next {
+    padding: var(--space-2xs) var(--space-xs);
+    margin-block: calc(-1 * var(--space-2xs));
+    margin-inline: calc(-1 * var(--space-xs));
+    border-radius: var(--radius-m);
     text-decoration: none;
+    transition:
+      background var(--transition),
+      color var(--transition);
   }
   .piece__next:hover {
-    text-decoration: underline;
+    background: color-mix(in oklch, var(--text-color) 4%, transparent);
+    color: var(--heading-color);
+    text-decoration: none;
   }
   .piece__fresh {
     font-size: var(--text-xs);
@@ -660,12 +742,24 @@
     grid-column: 1 / -1;
     grid-template-columns: subgrid;
     align-items: baseline;
+    padding-block: var(--space-2xs);
+    padding-inline: var(--space-xs);
+    margin-inline: calc(-1 * var(--space-xs));
+    border-radius: var(--radius-s);
+    transition: background var(--transition);
   }
   .piece__row--past {
     color: var(--surface-focus-faint);
   }
   .piece__row--on {
     font-weight: 600;
+    background: color-mix(in oklch, var(--surface-focus-ink) 8%, transparent);
+    box-shadow: inset var(--line) 0 0 var(--surface-focus-ink);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .piece__row:has(a.piece__rowwhat:hover) {
+      background: color-mix(in oklch, var(--surface-focus-ink) 12%, transparent);
+    }
   }
   .piece__h,
   .piece__facts dt {
@@ -686,11 +780,13 @@
     min-inline-size: 0;
   }
   .piece__rowwhat {
+    position: relative;
+    z-index: 2;
     min-inline-size: 0;
     text-decoration: none;
   }
   a.piece__rowwhat:hover {
-    text-decoration: underline;
+    text-decoration: none;
   }
   .piece__left-head {
     display: flex;
@@ -702,16 +798,67 @@
     border-block-start: var(--line-hairline) solid var(--surface-focus-rule);
     font-size: var(--text-s);
   }
+  .piece__left-head a {
+    position: relative;
+    z-index: 2;
+    padding: var(--space-2xs) var(--space-xs);
+    margin-block: calc(-1 * var(--space-2xs));
+    margin-inline: calc(-1 * var(--space-xs));
+    border-radius: var(--radius-m);
+    color: var(--surface-focus-muted);
+    text-decoration: none;
+    transition:
+      background var(--transition),
+      color var(--transition);
+  }
+  .piece__left-head a:hover {
+    background: var(--surface-focus-act);
+    color: var(--surface-focus-ink);
+    text-decoration: none;
+  }
   .piece__left-head + .piece__day--many {
     border-block-start: 0;
   }
+  .piece__foot {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-s);
+  }
   .piece__links {
+    position: relative;
+    z-index: 2;
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-xs) var(--space-m);
+    align-items: center;
+    gap: var(--space-xs) var(--space-s);
+    margin-inline-start: calc(-1 * var(--space-xs));
     font-size: var(--text-s);
   }
+  .piece__links a {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2xs);
+    padding: var(--space-2xs) var(--space-xs);
+    border-radius: var(--radius-m);
+    color: var(--surface-focus-muted);
+    text-decoration: none;
+    transition:
+      background var(--transition),
+      color var(--transition);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .piece__links a:hover {
+      background: var(--surface-focus-act);
+      color: var(--surface-focus-ink);
+      text-decoration: none;
+    }
+    .piece__links a:active {
+      background: var(--surface-focus-act-hover);
+    }
+  }
   .piece__acts {
+    position: relative;
+    z-index: 2;
     display: grid;
     grid-auto-flow: column;
     grid-auto-columns: minmax(0, 1fr);
@@ -719,21 +866,42 @@
   }
   /* `:global`: «Mapa» is a MapLink, whose <a> this file does not own. */
   .piece__acts :global(.piece__act) {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: var(--space-xs);
     min-block-size: var(--touch-target);
     padding-block: var(--space-xs);
+    padding-inline: var(--space-m);
     border-radius: var(--radius-l);
     background: var(--surface-focus-act);
     color: inherit;
-    font-size: var(--text-m);
+    font-size: var(--text-s);
     font-weight: 500;
     text-decoration: none;
     white-space: nowrap;
+    transition: background var(--transition);
   }
   .piece__acts :global(.piece__act:hover) {
     background: var(--surface-focus-act-hover);
+  }
+  .piece__icon {
+    flex: none;
+    opacity: 0.85;
+  }
+  /* Desktop: a single action (Map alone, or Call alone) hugs its label and
+     pairs cleanly beside «Who goes →» instead of stretching 350px wide. */
+  @media (min-width: 48rem) {
+    .piece__foot--paired {
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-m);
+    }
+    .piece__acts--single {
+      display: flex;
+      justify-content: flex-end;
+    }
   }
 
   .day__outside {
@@ -745,19 +913,25 @@
   /* A door that reads as the line it was: the muted text, underlined on
      hover, as `.link-arrow` does. */
   .day__outside-door {
-    padding: 0;
+    padding: var(--space-2xs) var(--space-xs);
+    margin-block: calc(-1 * var(--space-2xs));
+    margin-inline: calc(-1 * var(--space-xs));
     border: 0;
+    border-radius: var(--radius-m);
     background: none;
     color: inherit;
     font: inherit;
     text-align: start;
     cursor: pointer;
+    transition:
+      background var(--transition),
+      color var(--transition);
   }
   @media (hover: hover) {
     .day__outside-door:hover {
+      background: color-mix(in oklch, var(--text-color) 4%, transparent);
       color: var(--text-color);
-      text-decoration: underline;
-      text-underline-offset: 3px;
+      text-decoration: none;
     }
   }
 </style>
