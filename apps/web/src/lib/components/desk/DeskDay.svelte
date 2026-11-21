@@ -557,10 +557,7 @@
     --identity-tint-base: var(--surface-focus);
     --identity-tint: var(--surface-focus-mark-tint);
     --identity-ink-l: var(--surface-focus-mark-ink-l);
-    transition:
-      background var(--transition),
-      transform var(--transition),
-      box-shadow var(--transition);
+    transition: background var(--transition);
   }
   .piece--door {
     cursor: pointer;
@@ -568,12 +565,6 @@
   @media (hover: hover) and (pointer: fine) {
     .piece--door:hover:not(:has(.piece__acts:hover, .piece__links a:hover, a.piece__rowwhat:hover, .piece__tomorrow a:hover, .piece__left-head a:hover)) {
       background: color-mix(in oklch, var(--surface-focus) 92%, var(--surface-focus-ink));
-      transform: translateY(-2px);
-      box-shadow: var(--box-shadow-3);
-    }
-    .piece--door:active:not(:has(.piece__acts:active, .piece__links a:active, a.piece__rowwhat:active, .piece__tomorrow a:active, .piece__left-head a:active)) {
-      transform: translateY(0);
-      box-shadow: var(--box-shadow-1);
     }
   }
   .piece a {
@@ -873,7 +864,7 @@
     min-block-size: var(--touch-target);
     padding-block: var(--space-xs);
     padding-inline: var(--space-m);
-    border-radius: var(--radius-l);
+    border-radius: var(--radius);
     background: var(--surface-focus-act);
     color: inherit;
     font-size: var(--text-s);

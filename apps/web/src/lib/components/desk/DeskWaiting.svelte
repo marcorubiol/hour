@@ -28,6 +28,7 @@
   import { t, type Locale } from '$lib/i18n';
   import type { DeskBucket, DeskConcern, DeskItem, DeskRun, Waiting } from '$lib/desk-feed';
   import { waitingDrawsPills, waitingPills, type WaitingKind } from '$lib/hoy';
+  import ChatMonogram from '$lib/components/ChatMonogram.svelte';
   import Menu from '$lib/components/Menu.svelte';
   import { SET_ASIDE_SPANS, plusDays } from '$lib/set-aside';
   import type { ChatContext, ChatLine } from '$lib/chat-row';
@@ -245,6 +246,10 @@
       <span class="row__mark">
         {#if item.concern === 'task'}
           {@render task(item)}
+        {:else if line}
+          <!-- With whom (ADR-176/177 § 3): the chat's monogram, as in
+               Conversaciones; square an organization, round a person. -->
+          <ChatMonogram name={item.subject} shape={line.shape} />
         {:else}
           <span class="row__dot" aria-hidden="true"></span>
         {/if}
@@ -518,7 +523,7 @@
   .row {
     position: relative;
     display: grid;
-    grid-template-columns: 1.25rem minmax(0, 1fr) auto;
+    grid-template-columns: var(--chat-mono) minmax(0, 1fr) auto;
     grid-template-areas: 'mark body tail';
     column-gap: var(--space-s);
     row-gap: var(--space-2xs);
@@ -565,6 +570,10 @@
   }
   .row--has-acts .row__mark {
     align-self: start;
+  }
+  /* The chat's monogram is decoration: a click on it opens the row. */
+  .row--chat .row__mark {
+    pointer-events: none;
   }
   .row__dot {
     inline-size: var(--dot-m);
@@ -889,9 +898,7 @@
     cursor: pointer;
     transition:
       background var(--transition),
-      border-color var(--transition),
-      transform var(--transition),
-      box-shadow var(--transition);
+      border-color var(--transition);
   }
   span.tally {
     cursor: default;
@@ -910,18 +917,6 @@
     background: var(--bg-hover);
     border-color: var(--border-color-light);
     text-decoration: none;
-  }
-  @media (hover: hover) and (pointer: fine) {
-    a.tally:hover,
-    button.tally:hover {
-      transform: translateY(-1px);
-      box-shadow: var(--box-shadow-1);
-    }
-    a.tally:active,
-    button.tally:active {
-      transform: translateY(0);
-      box-shadow: none;
-    }
   }
   @media (pointer: coarse) {
     .tally {
@@ -1013,7 +1008,7 @@
      first and «not now» trailing at the end. */
   @container waits (max-width: 34rem) {
     .row {
-      grid-template-columns: 1.25rem minmax(0, 1fr);
+      grid-template-columns: var(--chat-mono) minmax(0, 1fr);
       grid-template-areas: 'mark body' '. tail';
       align-items: start;
       row-gap: var(--space-xs);
