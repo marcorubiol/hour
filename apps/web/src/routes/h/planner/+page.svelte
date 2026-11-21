@@ -3235,7 +3235,7 @@
             syncUrl();
           }}
         />
-      {:else}<span class="cal__month">{titleMonth}</span> <small class="cal__yr">{titleYm.year}</small>{/if}
+      {:else}<span class="cal__month">{titleMonth}</span> <small class="cal__yr" class:cal__yr--now={titleYm.year === Number(todayIso.slice(0, 4))}>{titleYm.year}</small>{/if}
     {/snippet}
     <!-- Only the Day keeps ‹ › beside its title (CalNav says why). -->
     {#snippet titleAside()}
@@ -3852,6 +3852,14 @@
     font-style: normal;
     letter-spacing: var(--tracking-l);
     color: var(--text-muted);
+  }
+  /* On a phone the year of now goes unsaid (21-11): beside «Who's out» and
+     «Go to today» it fell to a second line, the head grew 28 px and the bar
+     of views jumped between the Agenda and the Month. Another year is said. */
+  @media (max-width: 47.999rem) {
+    .cal__yr--now {
+      display: none;
+    }
   }
   .cal__now {
     padding: var(--space-2xs) var(--space-m);
