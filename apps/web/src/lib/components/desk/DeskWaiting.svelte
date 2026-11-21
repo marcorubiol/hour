@@ -27,7 +27,7 @@
   import { tick } from 'svelte';
   import { t, type Locale } from '$lib/i18n';
   import type { DeskBucket, DeskConcern, DeskItem, DeskRun, Waiting } from '$lib/desk-feed';
-  import { waitingDrawsPills, waitingPills, type WaitingKind } from '$lib/hoy';
+  import { waitingDrawsPills, waitingKind, waitingPills, type WaitingKind } from '$lib/hoy';
   import Menu from '$lib/components/Menu.svelte';
   import { SET_ASIDE_SPANS, plusDays } from '$lib/set-aside';
   import type { ChatContext, ChatLine } from '$lib/chat-row';
@@ -132,13 +132,19 @@
   }
 
   let all = $state(false);
+  let activeKind = $state<WaitingKind | null>(null);
   let headEl = $state<HTMLElement | null>(null);
   /** Swapping the lists removes the button that was pressed: the focus goes to
       the band's heading instead of falling to <body> (móvil #9). */
   async function showAll(on: boolean) {
+    activeKind = null;
     all = on;
     await tick();
     headEl?.focus();
+  }
+  function toggleKind(kind: WaitingKind) {
+    all = false;
+    activeKind = effectiveKind === kind ? null : kind;
   }
   let laterOpen = $state(false);
   const overdueWord = (n: number) => t(n === 1 ? 'desk.title_overdue_one' : 'desk.title_overdue_many', locale, { n });
@@ -152,8 +158,8 @@
     decision: lensOn('planner') ? '/h/planner' : null,
     money: lensOn('books') ? '/h/books' : null,
   });
-  /* Each pill's list (§ 8): «Te toca» for calls and replies, Cuentas for a
-     payment, the Planner for a decision. Tasks: null, the list here. */
+  /* Each pill filters «Te espera» in place; when active, kinds that own a lens
+     offer a quiet link at the foot of the filtered list. */
   let PILL_HREF = $derived<Record<WaitingKind, string | null>>({
     calls: lensOn('conversations') ? '/h/conversations?turno=nuestro' : null,
     replies: lensOn('conversations') ? '/h/conversations?turno=nuestro' : null,
@@ -161,7 +167,20 @@
     money: LENS_HREF.money,
     decisions: LENS_HREF.decision,
   });
+  let PILL_LENS_LABEL = $derived<Record<WaitingKind, string | null>>({
+    calls: t('lens.conversations', locale),
+    replies: t('lens.conversations', locale),
+    tasks: null,
+    money: t('lens.money', locale),
+    decisions: t('lens.planner', locale),
+  });
   let pills = $derived(waitingPills(waiting.rows));
+  let effectiveKind = $derived<WaitingKind | null>(
+    activeKind && pills.some((p) => p.kind === activeKind) ? activeKind : null,
+  );
+  let filteredRows = $derived(
+    effectiveKind ? waiting.rows.filter((i) => waitingKind(i) === effectiveKind) : shown,
+  );
   const pillWord = (kind: WaitingKind, n: number) => t(`desk.pill_${kind}_${n === 1 ? 'one' : 'many'}`, locale);
   const runHref = (run: DeskRun) => run.items[0]?.href ?? LENS_HREF[run.concern];
   const concernLabel = (c: DeskConcern) => t(`desk.concern_${c}`, locale);
@@ -373,21 +392,20 @@
   {#if composer}{@render composer()}{/if}
 
   {#if !loading && !errored && pills.length > 0 && waitingDrawsPills(waiting.total, rows)}
-    <!-- One pill per kind and its figure, calm and gig day included; with
-         three things or fewer all drawn as rows, only the rows (ADR-229). -->
+    <!-- One filter pill per kind and its figure, calm included; clicking any
+         pill filters «Te espera» in place without leaving Hoy. With three
+         things or fewer all drawn as rows, only the rows (ADR-229). -->
     <ul class="tallies" data-testid="desk-pills">
       {#each pills as p (p.kind)}
-        {@const href = PILL_HREF[p.kind]}
         <li>
-          {#if href}
-            <a class="tally" {href} data-kind={p.kind}><b>{p.n}</b> {pillWord(p.kind, p.n)}</a>
-          {:else if p.kind === 'tasks'}
-            <button type="button" class="tally" data-kind={p.kind} aria-pressed={all} onclick={() => showAll(!all)}
-              ><b>{p.n}</b> {pillWord(p.kind, p.n)}</button
-            >
-          {:else}
-            <span class="tally" data-kind={p.kind}><b>{p.n}</b> {pillWord(p.kind, p.n)}</span>
-          {/if}
+          <button
+            type="button"
+            class="tally"
+            data-kind={p.kind}
+            aria-pressed={effectiveKind === p.kind}
+            onclick={() => toggleKind(p.kind)}
+            ><b>{p.n}</b> {pillWord(p.kind, p.n)}</button
+          >
         </li>
       {/each}
     </ul>
@@ -439,11 +457,22 @@
     {#if rows > 0 && feedCount > 0}
       <button type="button" class="more" onclick={() => showAll(true)}>{t('desk.see_all', locale)} →</button>
     {/if}
-  {:else if rows > 0}
+  {:else if effectiveKind || rows > 0}
     <ul class="list" data-testid="desk-waiting-rows">
-      {#each shown as item (item.id)}{@render row(item)}{/each}
+      {#each filteredRows as item (item.id)}{@render row(item)}{/each}
     </ul>
-    {#if feedCount > shown.length}
+    {#if effectiveKind}
+      {@const lensHref = PILL_HREF[effectiveKind]}
+      {@const lensLabel = PILL_LENS_LABEL[effectiveKind]}
+      <div class="waits__foot">
+        <button type="button" class="more" onclick={() => (activeKind = null)}>{t('desk.see_less', locale)}</button>
+        {#if lensHref && lensLabel}
+          <a class="more waits__lens" href={lensHref} data-testid="desk-pill-lens">{lensLabel} →</a>
+        {:else if feedCount > filteredRows.length}
+          <button type="button" class="more" onclick={() => showAll(true)}>{t('desk.see_all', locale)} →</button>
+        {/if}
+      </div>
+    {:else if feedCount > shown.length}
       <button type="button" class="more" onclick={() => showAll(true)}>{t('desk.see_all', locale)} →</button>
     {/if}
   {/if}
@@ -853,6 +882,21 @@
   .more:hover {
     color: var(--text-color);
   }
+  .waits__foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-s);
+    margin-block-start: var(--space-s);
+  }
+  .waits__foot .more {
+    margin-block-start: 0;
+  }
+  .waits__lens,
+  .waits__lens:hover {
+    text-decoration: none;
+  }
 
   /* THE PILLS (design-system rules 2 and 9): sunk into the ground, a figure
      and its word; each its own door. Not named `.pill`: base.css reads any
@@ -891,9 +935,6 @@
       background var(--transition),
       border-color var(--transition);
   }
-  span.tally {
-    cursor: default;
-  }
   .tally b {
     font-family: var(--font-display);
     font-size: var(--text-xl);
@@ -902,11 +943,15 @@
     color: var(--heading-color);
     font-variant-numeric: tabular-nums;
   }
-  a.tally:hover,
-  button.tally:hover,
-  button.tally[aria-pressed='true'] {
+  button.tally:hover {
     background: var(--bg-hover);
     border-color: var(--border-color-light);
+    text-decoration: none;
+  }
+  button.tally[aria-pressed='true'] {
+    background: var(--bg-ultra-light);
+    border-color: var(--heading-color);
+    color: var(--heading-color);
     text-decoration: none;
   }
   @media (pointer: coarse) {

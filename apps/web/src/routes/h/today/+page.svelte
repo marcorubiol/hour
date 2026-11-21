@@ -1027,9 +1027,9 @@
     {/if}
   {/snippet}
 
-  <!-- What changed and the season: under the pass on a wide desktop; on a
-       phone, a tablet and in calm, after «Te espera», so the DOM order (the
-       tab's and the screen reader's) is the order the eye reads (móvil #2). -->
+  <!-- What changed: under the pass on a wide desktop; on a phone, a tablet
+       and in calm, after «Te espera», so the DOM order (the tab's and the
+       screen reader's) is the order the eye reads (móvil #2). -->
   {#snippet sideBlocks()}
       {#if drawChanged && deskChangedComp.component}
       <div class="slot slot--changed" data-slot="changed">
@@ -1047,23 +1047,12 @@
         />
       </div>
       {/if}
-      {#if !phone.current && shows('desk', 'season', calm.on) && deskSeasonComp.component}
-        <div class="slot slot--season" data-slot="season">
-          <deskSeasonComp.component
-            planner={lensOn('planner') ? { value: plannerFig, errored: feeds.errored } : null}
-            conversations={readConversations ? { value: convFig, errored: $overviewQuery.isError } : null}
-            money={readMoney ? { value: moneyFig, errored: $invoicesQuery.isError || $bolosQuery.isError } : null}
-            {seasonLabel}
-            {locale}
-          />
-        </div>
-      {/if}
   {/snippet}
 
   <!-- THREE BLOCKS, IN A FIXED ORDER (ADR-202 § 1): the day, what comes,
-       what waits. On a wide desktop the pass (with what changed and the
-       season under it) at the left, the 3×2 coming-up grid and «Te espera»
-       in the reading column; the grid is the record's (380 + the rest, ≤ 1.120 px). -->
+       what waits. On a wide desktop the sticky pass (with what changed folded
+       under it) sits at the left, the 3×2 coming-up grid and «Te espera» in
+       the reading column; «La temporada» closes below at full grid width. -->
   <div class="desk__grid">
     <div class="desk__col desk__col--pass">
       <div class="slot slot--next" data-slot="day" data-help-step="desk-next">
@@ -1140,6 +1129,19 @@
       {#if !besidePass}{@render sideBlocks()}{/if}
     </div>
   </div>
+
+  {#if !phone.current && shows('desk', 'season', calm.on) && deskSeasonComp.component}
+    <div class="slot slot--season" data-slot="season">
+      <deskSeasonComp.component
+        planner={lensOn('planner') ? { value: plannerFig, errored: feeds.errored } : null}
+        conversations={readConversations ? { value: convFig, errored: $overviewQuery.isError } : null}
+        money={readMoney ? { value: moneyFig, errored: $invoicesQuery.isError || $bolosQuery.isError } : null}
+        {seasonLabel}
+        horizontal={wide.current && !calm.on}
+        {locale}
+      />
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -1184,6 +1186,13 @@
        head keeps the page's width, so the lens switcher does not move. */
     .desk--calm .desk__grid {
       grid-template-columns: minmax(0, 1fr);
+      max-inline-size: var(--calm-measure);
+    }
+    .slot--season {
+      max-inline-size: var(--pass-grid-max);
+      padding-block-start: var(--space-s);
+    }
+    .desk--calm .slot--season {
       max-inline-size: var(--calm-measure);
     }
 

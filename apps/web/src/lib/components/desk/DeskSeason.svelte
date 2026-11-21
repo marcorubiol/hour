@@ -34,10 +34,12 @@
     seasonLabel: string;
     /** On a wide screen the season is a fold at the foot of the reading column, saying what it keeps. */
     folded?: boolean;
+    /** Full-width panoramic band below the desktop grid: doors sit side by side. */
+    horizontal?: boolean;
     locale: Locale;
   }
 
-  let { planner, conversations, money, seasonLabel, folded = false, locale }: Props = $props();
+  let { planner, conversations, money, seasonLabel, folded = false, horizontal = false, locale }: Props = $props();
   let keeps = $derived(
     [
       planner?.value ? t('desk.fold_season_confirmed', locale, { n: planner.value.confirmed }) : null,
@@ -51,7 +53,7 @@
 
 {#snippet doorsBody()}
 
-  <div class="doors">
+  <div class="doors" class:doors--horizontal={horizontal}>
     {#if planner}
     <a class="door" href="/h/planner" data-testid="door-planner">
       <span class="door__lens">{t('lens.planner', locale)}<i>{t('desk.door_planner_window', locale)}</i></span>
@@ -145,6 +147,34 @@
     container: doors / inline-size;
     display: grid;
     grid-template-columns: minmax(5.5rem, max-content) minmax(0, 1fr) auto;
+  }
+  /* Panoramic desktop band below the Hoy grid: one column per lens door, no boxes. */
+  .doors--horizontal {
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: var(--space-m);
+    border-block-start: var(--line-hairline) solid var(--border-color-light);
+    padding-block-start: var(--space-s);
+  }
+  .doors--horizontal .door {
+    grid-column: auto;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'lens arrow' 'n n' 'txt txt';
+    align-content: start;
+    row-gap: var(--space-2xs);
+    column-gap: var(--space-s);
+    padding: var(--space-s);
+    margin-inline: 0;
+    border-radius: var(--radius-m);
+  }
+  .doors--horizontal .door + .door {
+    border-block-start: 0;
+  }
+  .doors--horizontal .door__lens {
+    flex-wrap: wrap;
+    row-gap: 0;
+  }
+  .doors--horizontal .door__arrow {
+    align-self: baseline;
   }
   /* A DOOR IS A ROW, NOT AN OBJECT (ADR-145, fase 2): no box, no ground; a
      hairline between two doors, none under the last (the block's head draws
@@ -242,12 +272,12 @@
      on the right edge. A desktop's doors are wider than this and keep the
      row; so is a phone's, one column the page wide. */
   @container doors (max-width: 20rem) {
-    .door {
+    .doors:not(.doors--horizontal) .door {
       grid-template-columns: minmax(0, 1fr) auto;
       grid-template-areas: 'lens arrow' 'n arrow' 'txt arrow';
       row-gap: var(--space-2xs);
     }
-    .door__lens {
+    .doors:not(.doors--horizontal) .door__lens {
       flex-wrap: wrap;
       column-gap: var(--space-s);
       row-gap: 0;
