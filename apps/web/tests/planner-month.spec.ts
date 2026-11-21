@@ -162,6 +162,16 @@ test.describe('the month (ADR-209)', () => {
         // a phone too (ADR-239).
         const meta = page.locator('.pstat__line');
         await expect(meta, `status line in ${where}`).toHaveCount(1);
+        // On a phone the Month opens scrolled to this week (ADR-231): from
+        // the 8th on, the bar sat under the frame. Measure with the page at
+        // its top, where the law is about where the bar is drawn.
+        await page.evaluate(
+          () =>
+            new Promise<void>((done) => {
+              window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+              requestAnimationFrame(() => done());
+            }),
+        );
         heights.push(Math.round((await meta.boundingBox())?.height ?? -1));
         bars.push(Math.round((await page.locator('.cal__views').boundingBox())?.y ?? -1));
       }
@@ -259,7 +269,10 @@ test.describe('the month (ADR-209)', () => {
     // A tap on a day picks it; the day is drawn under its week.
     const cell = page.locator('.cal__day').nth(10);
     await cell.click({ position: { x: 4, y: 4 } });
-    await expect(page.getByTestId('month-pick')).toBeVisible();
+    // The day picked before folds away under the new one (a 200 ms slide,
+    // PR 55): while it leaves it is still in the DOM, inert. Read the one
+    // that stays.
+    await expect(page.locator('[data-testid="month-pick"]:not([inert])')).toBeVisible();
   });
 
   test('a figure at zero is not said, and «Go to today» is not a second «Today» (ADR-229)', async ({ page }) => {
