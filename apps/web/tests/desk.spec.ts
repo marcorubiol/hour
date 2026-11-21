@@ -111,10 +111,8 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
     // their own: their pill opens the whole list here, by days.
     // No fold outside calm, a gig day included (ADR-238).
     await expect(waits.locator('.list').first()).toBeVisible({ timeout: 10_000 });
-    // With three things or fewer all drawn as rows there are no pills
-    // (ADR-229): then «See all by days» is the door.
-    const tasksPill = waits.locator('[data-kind="tasks"]');
-    const door = (await tasksPill.count()) > 0 ? tasksPill : waits.getByRole('button', { name: /See all by day/ });
+    // «See all by day» swaps in the full list by days (including undated tasks).
+    const door = waits.getByRole('button', { name: /See all by day/ });
 
     // One list at a time: the full list replaces the short one, never both.
     await door.click();
@@ -287,12 +285,24 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
     }
     const pills = page.getByTestId('desk-pills');
     if ((await pills.count()) === 0) return;
+    // Pills filter «Te espera» in place and offer the lens link while active.
     const calls = pills.locator('[data-kind="calls"], [data-kind="replies"]');
-    if ((await calls.count()) > 0) await expect(calls.first()).toHaveAttribute('href', '/h/conversations?turno=nuestro');
+    if ((await calls.count()) > 0) {
+      await calls.first().click();
+      await expect(calls.first()).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.getByTestId('desk-pill-lens')).toHaveAttribute('href', '/h/conversations?turno=nuestro');
+      await calls.first().click();
+      await expect(calls.first()).toHaveAttribute('aria-pressed', 'false');
+    }
     const money = pills.locator('[data-kind="money"]');
-    if ((await money.count()) > 0) await expect(money).toHaveAttribute('href', '/h/books');
-    // Three rows at most a normal day, five a day with nothing, none a gig
-    // day (ADR-202 § 7, ADR-203 § 9).
+    if ((await money.count()) > 0) {
+      await money.click();
+      await expect(money).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.getByTestId('desk-pill-lens')).toHaveAttribute('href', '/h/books');
+      await money.click();
+      await expect(money).toHaveAttribute('aria-pressed', 'false');
+    }
+    // Three rows at most a normal day, five a day with nothing (ADR-202 § 7).
     expect(await page.locator('[data-testid="desk-waiting-rows"] > li').count()).toBeLessThanOrEqual(5);
   });
 

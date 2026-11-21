@@ -119,3 +119,71 @@ describe('Te espera: «Voy / No puedo» (ADR-235)', () => {
     expect(onanswer).toHaveBeenCalledWith(call, 'not_going');
   });
 });
+
+describe('Te espera: in-place filter pills', () => {
+  afterEach(cleanup);
+
+  function setupMixed(rows = 3) {
+    const reply1 = item({ id: 'r1', subject: 'Teatro Arriaga', concern: 'conversation', verbKey: 'reply' });
+    const reply2 = item({ id: 'r2', subject: 'Sala Beckett', concern: 'conversation', verbKey: 'reply' });
+    const task1 = item({ id: 't1', subject: 'Send rider', concern: 'task', verbKey: 'task', taskId: 't1' });
+    const pay1 = item({ id: 'm1', subject: 'Factura Vic', concern: 'money', verbKey: 'collect', amount: 1200, currency: 'EUR' });
+    render(DeskWaiting, {
+      waiting: { rows: [reply1, reply2, task1, pay1], total: 4, asking: 4, overdue: 0 },
+      rows,
+      today: '2026-11-20',
+      feed: [],
+      later: null,
+      loading: false,
+      errored: false,
+      onretry: () => {},
+      locale: 'en',
+      contextPath: () => '',
+      conversationHref: () => null,
+      money: (n: number) => `${n} €`,
+      isGhost: () => false,
+      ontoggle: () => {},
+      onremove: () => {},
+      onaccept: () => {},
+    });
+  }
+
+  it('filters rows in place for every kind and exposes a lens link only while active', async () => {
+    setupMixed(3);
+    // Default ranked view shows first 3 items (pay1 is 4th).
+    expect(screen.getByText('Teatro Arriaga')).toBeTruthy();
+    expect(screen.getByText('Send rider')).toBeTruthy();
+    expect(screen.queryByText('Factura Vic')).toBeNull();
+
+    const moneyPill = screen.getByRole('button', { name: /1 payment/i });
+    expect(moneyPill.getAttribute('aria-pressed')).toBe('false');
+    await fireEvent.click(moneyPill);
+
+    expect(moneyPill.getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByText('Factura Vic')).toBeTruthy();
+    expect(screen.queryByText('Teatro Arriaga')).toBeNull();
+    const lensLink = screen.getByTestId('desk-pill-lens');
+    expect(lensLink.getAttribute('href')).toBe('/h/books');
+
+    // Clicking the active pill again clears the filter and restores the ranked view.
+    await fireEvent.click(moneyPill);
+    expect(moneyPill.getAttribute('aria-pressed')).toBe('false');
+    expect(screen.getByText('Teatro Arriaga')).toBeTruthy();
+    expect(screen.queryByTestId('desk-pill-lens')).toBeNull();
+  });
+
+  it('peeks filtered rows when default rows are hidden in calm mode', async () => {
+    setupMixed(0);
+    expect(screen.queryByText('Teatro Arriaga')).toBeNull();
+
+    const repliesPill = screen.getByRole('button', { name: /2 replies/i });
+    await fireEvent.click(repliesPill);
+    expect(screen.getByText('Teatro Arriaga')).toBeTruthy();
+    expect(screen.getByText('Sala Beckett')).toBeTruthy();
+    expect(screen.queryByText('Send rider')).toBeNull();
+    expect(screen.getByTestId('desk-pill-lens').getAttribute('href')).toBe('/h/conversations?turno=nuestro');
+
+    await fireEvent.click(screen.getByRole('button', { name: 'See less' }));
+    expect(screen.queryByText('Teatro Arriaga')).toBeNull();
+  });
+});
