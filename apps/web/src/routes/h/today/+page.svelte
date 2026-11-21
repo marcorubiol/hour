@@ -38,7 +38,7 @@
   import DeskWaiting from '$lib/components/desk/DeskWaiting.svelte';
   import LateNoticeBand from '$lib/components/desk/LateNoticeBand.svelte';
   import { mobileReplyRows } from '$lib/mobile-replies';
-  import { COMING_COUNT_CAP, COMING_TILES, COMING_TILES_PHONE, comingOpen, comingTiles, nextAfterToday, outsideToday, piecePerformance, scopePulseInput, waitingRowCount } from '$lib/hoy';
+  import { COMING_COUNT_CAP, COMING_TILES, COMING_TILES_PHONE, COMING_TILES_WIDE, comingOpen, comingTiles, nextAfterToday, outsideToday, piecePerformance, scopePulseInput, visibleComingTiles, waitingRowCount } from '$lib/hoy';
   import { MediaQuery } from 'svelte/reactivity';
   import { MOBILE_QUERY, WIDE_QUERY } from '$lib/breakpoints';
   import { goto } from '$app/navigation';
@@ -186,12 +186,6 @@
       save();
     };
   });
-  // The wide head's label: «Hoy · miércoles 18 nov» (drawing S).
-  let headDay = $derived(
-    new Intl.DateTimeFormat(LOCALE_TAG[locale], { weekday: 'long', day: 'numeric', month: 'short', timeZone: viewerTz })
-      .format(clockNow)
-      .replace(/\.+$/, ''),
-  );
   const sinceLabel = new Intl.DateTimeFormat(LOCALE_TAG[locale], {
     weekday: 'short',
     day: 'numeric',
@@ -263,8 +257,14 @@
   // stage), so the walk cannot stop at a day: a wide cap, and `comingTiles`
   // keeps the window. The strip draws ten, four on a phone.
   let allTiles = $derived.by(() => comingTiles(upcoming(pulseInput, clockNow, COMING_COUNT_CAP), today, Infinity, listOf));
-  let tiles = $derived.by(() => allTiles.slice(0, phone.current ? COMING_TILES_PHONE : COMING_TILES));
   let tilesOpen = $derived(comingOpen(allTiles));
+  let tiles = $derived.by(() =>
+    visibleComingTiles(
+      allTiles,
+      phone.current ? COMING_TILES_PHONE : wide.current ? COMING_TILES_WIDE : COMING_TILES,
+      wide.current ? tilesOpen.urgentDay : null,
+    ),
+  );
   // «Tu hora» (ADR-234): whose the viewer is, to know when a list names them.
   const meQuery = createQuery(meQueryOptions());
   let me = $derived($meQuery.data?.person_id ?? null);
@@ -988,18 +988,28 @@
   {/if}
 
   <!-- «+»: a task is an occasional gesture; it lives in the head of «Te
-       espera», where what it makes appears (ADR-203 § 1). Without a space to
-       write one in, no «+». -->
+       espera», where what it makes appears (ADR-203 § 1), on both desktop and
+       mobile. Without a space to write one in, no «+». -->
   {#snippet addTask()}
-    <button
-      type="button"
-      class="lenshead__act desk__add"
-      bind:this={addBtn}
-      aria-label={t('desk.add_task', locale)}
-      title={t('desk.add_task', locale)}
-      aria-expanded={composerOpen}
-      onclick={openComposer}><span aria-hidden="true">+</span></button
-    >
+    {#if wide.current}
+      <button
+        type="button"
+        class="btn--secondary btn--xs desk__addwide"
+        bind:this={addBtn}
+        aria-expanded={composerOpen}
+        onclick={openComposer}><span aria-hidden="true">+</span> {t('desk.add_short', locale)}</button
+      >
+    {:else}
+      <button
+        type="button"
+        class="lenshead__act desk__add"
+        bind:this={addBtn}
+        aria-label={t('desk.add_task', locale)}
+        title={t('desk.add_task', locale)}
+        aria-expanded={composerOpen}
+        onclick={openComposer}><span aria-hidden="true">+</span></button
+      >
+    {/if}
   {/snippet}
   {#snippet composerSlot()}
     {#if composerOpen && taskSpaces.length > 0 && composer.component}
@@ -1016,23 +1026,9 @@
   {/snippet}
 
   <!-- THREE BLOCKS, IN A FIXED ORDER (ADR-202 § 1): the day, what comes,
-       what waits. On a desktop the news and the season's doors stay (§ 15):
-       the news under them, the doors in their own column. -->
-  {#if wide.current && taskSpaces.length > 0}
-    <!-- Wide: the composer is one «+ Añadir» at the top right, on the line of
-         the day's label (drawing S); what it opens sits under that line. -->
-    <div class="desk__head">
-      <p class="eyebrow eyebrow--sub desk__label">{t('desk.head_today', locale, { day: headDay })}</p>
-      <button
-        type="button"
-        class="btn--secondary desk__addwide"
-        bind:this={addBtn}
-        aria-expanded={composerOpen}
-        onclick={openComposer}><span aria-hidden="true">+</span> {t('desk.add_short', locale)}</button
-      >
-    </div>
-    {@render composerSlot()}
-  {/if}
+       what waits. On a wide desktop, the sticky pass + quiet folded lids live
+       at the left; the 3×2 coming-up grid and full-width «Te espera» live in
+       the reading column at the right so every row breathes in one line. -->
   <div class="desk__grid">
     <div class="desk__col desk__col--pass">
       <div class="slot slot--next" data-slot="day" data-help-step="desk-next">
@@ -1055,55 +1051,6 @@
           {me}
           {locale}
         />
-      </div>
-      {#if drawWaits}
-      <div class="slot slot--waits" data-slot="waits" data-help-step="desk-waits">
-        <DeskWaiting
-          {waiting}
-          rows={waitingRows}
-          {today}
-          add={taskSpaces.length > 0 && !wide.current ? addTask : undefined}
-          composer={wide.current ? undefined : composerSlot}
-          {feed}
-          {later}
-          loading={waitingLoading}
-          errored={waitingErrored}
-          onretry={retryFailed}
-          {locale}
-          {contextPath}
-          {conversationHref}
-          chat={deskChat}
-          {money}
-          {isGhost}
-          ontoggle={(id, done) => $patchTask.mutate({ id, patch: { status: done ? 'done' : 'open' } })}
-          onremove={removeWithUndo}
-          onaccept={(id) => $patchTask.mutate({ id, patch: { origin: 'manual' } })}
-          {deciding}
-          ondecide={decide}
-          aside={split.aside}
-          old={split.old}
-          onaside={setAside.ready ? setRowAside : undefined}
-          onanswer={answer}
-        />
-      </div>
-      {/if}
-    </div>
-    <div class="desk__col desk__col--read">
-      <div class="desk__slot" data-slot="coming">
-      <DeskComing
-        {tiles}
-        open={tilesOpen}
-        far={farNext}
-        settled={feeds.settled && !scopeUnresolved}
-        errored={feeds.errored}
-        {today}
-        {viewerTz}
-        {slipCtx}
-        {me}
-        {locale}
-        dots={shows('desk', 'coming_missing', calm.on)}
-        wide={wide.current}
-      />
       </div>
       {#if drawChanged && deskChangedComp.component}
       <div class="slot slot--changed" data-slot="changed">
@@ -1134,6 +1081,55 @@
         </div>
       {/if}
     </div>
+    <div class="desk__col desk__col--read">
+      <div class="desk__slot" data-slot="coming">
+      <DeskComing
+        {tiles}
+        open={tilesOpen}
+        far={farNext}
+        settled={feeds.settled && !scopeUnresolved}
+        errored={feeds.errored}
+        {today}
+        {viewerTz}
+        {slipCtx}
+        {me}
+        {locale}
+        dots={shows('desk', 'coming_missing', calm.on)}
+        wide={wide.current}
+      />
+      </div>
+      {#if drawWaits}
+      <div class="slot slot--waits" data-slot="waits" data-help-step="desk-waits">
+        <DeskWaiting
+          {waiting}
+          rows={waitingRows}
+          {today}
+          add={taskSpaces.length > 0 ? addTask : undefined}
+          composer={composerSlot}
+          {feed}
+          {later}
+          loading={waitingLoading}
+          errored={waitingErrored}
+          onretry={retryFailed}
+          {locale}
+          {contextPath}
+          {conversationHref}
+          chat={deskChat}
+          {money}
+          {isGhost}
+          ontoggle={(id, done) => $patchTask.mutate({ id, patch: { status: done ? 'done' : 'open' } })}
+          onremove={removeWithUndo}
+          onaccept={(id) => $patchTask.mutate({ id, patch: { origin: 'manual' } })}
+          {deciding}
+          ondecide={decide}
+          aside={split.aside}
+          old={split.old}
+          onaside={setAside.ready ? setRowAside : undefined}
+          onanswer={answer}
+        />
+      </div>
+      {/if}
+    </div>
   </div>
 </div>
 
@@ -1147,29 +1143,19 @@
     .desk__composer {
       margin-block-end: var(--space-s);
     }
-    .desk__head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      max-inline-size: var(--pass-grid-max);
-    }
-    .desk__label {
-      margin: 0;
-    }
-    .desk--calm .desk__head,
     .desk--calm .desk__composer {
       max-inline-size: var(--calm-measure);
     }
 
-    /* The pass's grid (the same as the record's `.pass-grid`): the day's piece
-       at the size of a phone's, then the reading column, aligned left and
-       never wider than 1.000 px. */
+    /* Hoy's desktop grid: sticky pass column at the left (--pass-width),
+       wide reading column at the right for the 3×2 coming-up calendar and
+       full-width «Te espera» rows. */
     .desk__grid {
       display: grid;
-      grid-template-columns: var(--pass-width) minmax(0, var(--read-width));
+      grid-template-columns: var(--pass-width) minmax(0, 1fr);
       column-gap: var(--pass-gap);
       row-gap: var(--space-l);
-      max-inline-size: var(--pass-grid-max);
+      max-inline-size: var(--desk-grid-max);
       align-items: start;
     }
     .desk__col {
@@ -1177,6 +1163,12 @@
       flex-direction: column;
       gap: var(--space-l);
       min-inline-size: 0;
+    }
+    @media (min-width: 64rem) {
+      .desk:not(.desk--calm) .desk__col--pass {
+        position: sticky;
+        inset-block-start: calc(var(--header-height) + var(--space-l));
+      }
     }
     /* Calm: one column at a reading measure, from the lens's own left edge
        (the edge never moves between routes, tokens.css `--page-width`). The

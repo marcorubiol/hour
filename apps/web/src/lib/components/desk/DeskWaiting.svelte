@@ -260,15 +260,19 @@
       <span class="row__acts">
         {#if onaside}
           <!-- «Ahora no» (ADR-232): the row leaves for a few days, only for
-               whoever sets it aside; nothing is deleted. -->
-          <Menu
-            align="end"
-            label={t('desk.aside_aria', locale, { subject: item.subject })}
-            triggerClass="row__aside"
-            items={SET_ASIDE_SPANS.map((n) => ({ label: asideSpanWord(n), onclick: () => onaside(item, plusDays(today, n)) }))}
-          >
-            {#snippet trigger()}{t('desk.aside', locale)}{/snippet}
-          </Menu>
+               whoever sets it aside; nothing is deleted. Wrapped in a slot so
+               narrow rows push it after the primary buttons (no invisible gap
+               before «I'm going»). -->
+          <span class="row__aside-slot">
+            <Menu
+              align="end"
+              label={t('desk.aside_aria', locale, { subject: item.subject })}
+              triggerClass="row__aside"
+              items={SET_ASIDE_SPANS.map((n) => ({ label: asideSpanWord(n), onclick: () => onaside(item, plusDays(today, n)) }))}
+            >
+              {#snippet trigger()}{t('desk.aside', locale)}{/snippet}
+            </Menu>
+          </span>
         {/if}
         {#if item.convocation && onanswer}
           <!-- Convoked (ADR-235): the answer is two words, here. -->
@@ -514,6 +518,16 @@
     color: inherit;
     text-decoration: none;
   }
+  /* Flush-align the chat monogram inside Hoy's rows so «Teatre de l'Aurora»
+     starts on the same vertical as the other waiting rows without zig-zagging. */
+  .row__subject :global(.chat--flush) {
+    grid-template-columns: [mono] auto [body] minmax(0, 1fr) [side] auto;
+  }
+  .row__subject :global(.chat--flush .chat__mono) {
+    align-self: start;
+    justify-content: flex-start;
+    padding-block-start: var(--space-2xs);
+  }
   /* WHOLE TEXT IN TWO LINES BEFORE AN ELLIPSIS (ADR-229): «Teatre d…» said
      nothing. The chat row's one-line cut is the list's; here it wraps. */
   .row__subject :global(.chat__name) {
@@ -559,8 +573,13 @@
   }
   .row__acts {
     display: inline-flex;
+    align-items: center;
     gap: var(--space-xs);
     justify-self: end;
+  }
+  .row__aside-slot {
+    display: inline-flex;
+    align-items: center;
   }
   /* The system's outline button (base.css) at its own size, as Cuentas'
      row actions; the quiet one drops its edge. */
@@ -828,10 +847,10 @@
   /* Phone (Marco, 20-11, ADR-238): the subject takes the whole width beside
      its verb; when, under it, and the actions on a line of their own. With
      the when as a third column the name broke in three narrow lines. */
-  /* Narrow by the block's own width, not the screen's (20-11): on a desktop
-     Hoy puts «Te espera» in a ~380 px column, where the four columns left the
-     subject 0 px wide and the name broke letter by letter. */
-  @container waits (max-width: 40rem) {
+  /* Narrow by the block's own width: in the wide right column (1280px+ -> ~35rem+)
+     the four-column editorial table breathes; on tablets and phones (<34rem) the
+     row stacks cleanly with primary buttons flush-left (aside pushed to the end). */
+  @container waits (max-width: 34rem) {
     .list {
       display: block;
     }
@@ -858,6 +877,9 @@
     .row__acts {
       grid-area: acts;
       justify-self: start;
+    }
+    .row__aside-slot {
+      order: 2;
     }
     .row__acts:not(:has(*)) {
       display: none;

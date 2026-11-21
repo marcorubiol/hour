@@ -301,6 +301,9 @@
   let yours = $derived(stop && onPerf && !doing && Date.parse(stop.at) > now.getTime() ? stop : null);
   let yoursWord = $derived.by(() => {
     if (!yours || !actionPerf) return '';
+    // When the earliest stop IS the performance itself (no load-in/soundcheck),
+    // keep the project/venue headline instead of a generic «Show» (ADR-207).
+    if (yours.key === 'start' && !yours.label) return '';
     const w = cap(yours.label || (yours.key ? t(momentWordKey(yours.key), locale, undefined, tradeFor(perfWorkspaceId(actionPerf))) : ''));
     // An option still leans: its «?» stays (design-system rule 18).
     return w && focus?.ref.tentative ? `${w}?` : w;
@@ -310,7 +313,11 @@
   let headWhat = $derived(yours ? yoursWord || what : shows ? showsWhat : what);
   let headAt = $derived(yours && actionPoint ? hour(yours.at, actionPoint.tz) : shows ? showsAt : at);
   let headSub = $derived(
-    yours && actionPoint ? [place(actionPoint), holdLabel(actionPoint)].filter(Boolean).join(' · ') : shows ? showsWhere : where,
+    yours && yoursWord && actionPoint
+      ? [place(actionPoint), holdLabel(actionPoint)].filter(Boolean).join(' · ')
+      : shows
+        ? showsWhere
+        : where,
   );
   let headRest = $derived(yours ? inWords(minutesTo(yours.at, now)) : shows ? showsLeft : left);
 
@@ -466,21 +473,34 @@
         </dl>
       {/if}
 
-      {#if boardHref || whoHref}
-        <span class="piece__links">
-          {#if boardHref}<a href={boardHref} data-testid="desk-next-board"
-              >{boardNew === 1 ? t('desk.next_board_one', locale) : t('desk.next_board', locale, { n: boardNew })} →</a
-            >{/if}
-          {#if whoHref}<a href={whoHref}>{t('commitment.who_goes', locale)} →</a>{/if}
-        </span>
-      {/if}
+      {#if boardHref || whoHref || acts}
+        <div class="piece__foot" class:piece__foot--paired={Boolean((boardHref || whoHref) && acts && !(call?.phone && map))}>
+          {#if boardHref || whoHref}
+            <span class="piece__links">
+              {#if boardHref}<a href={boardHref} data-testid="desk-next-board"
+                  >{boardNew === 1 ? t('desk.next_board_one', locale) : t('desk.next_board', locale, { n: boardNew })} →</a
+                >{/if}
+              {#if whoHref}<a href={whoHref}>{t('commitment.who_goes', locale)} →</a>{/if}
+            </span>
+          {/if}
 
-      {#if acts}
-        <!-- At the thumb (design-system rule 13): one row, the whole width, equal parts. -->
-        <nav class="piece__acts" aria-label={t('ahora.actions', locale)} data-testid="desk-acts">
-          {#if call?.phone}<a class="piece__act" href={telHref(call.phone)} aria-label={t('ahora.call_aria', locale, { name: call.name })}>{t('ahora.call', locale)}</a>{/if}
-          {#if map}<MapLink class="piece__act" parts={mapParts} changeIn="settings">{t('ahora.map', locale)}</MapLink>{/if}
-        </nav>
+          {#if acts}
+            <!-- At the thumb on a phone (design-system rule 13): equal parts across the width.
+                 On a desktop, a single action hugs its label instead of stretching 350px wide. -->
+            <nav class="piece__acts" class:piece__acts--single={Boolean(call?.phone) !== Boolean(map)} aria-label={t('ahora.actions', locale)} data-testid="desk-acts">
+              {#if call?.phone}<a class="piece__act" href={telHref(call.phone)} aria-label={t('ahora.call_aria', locale, { name: call.name })}
+                  ><svg class="piece__icon" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"
+                    ><path d="M3.5 2.5h3l1.2 3-1.8 1.2a8 8 0 0 0 3.4 3.4l1.2-1.8 3 1.2v3a1.5 1.5 0 0 1-1.6 1.5A11.5 11.5 0 0 1 2 4.1 1.5 1.5 0 0 1 3.5 2.5Z" /></svg
+                  >{t('ahora.call', locale)}</a
+                >{/if}
+              {#if map}<MapLink class="piece__act" parts={mapParts} changeIn="settings"
+                  ><svg class="piece__icon" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"
+                    ><path d="M8 14s4.5-4.2 4.5-7.8a4.5 4.5 0 1 0-9 0C3.5 9.8 8 14 8 14Z" /><circle cx="8" cy="6.2" r="1.4" /></svg
+                  >{t('ahora.map', locale)}</MapLink
+                >{/if}
+            </nav>
+          {/if}
+        </div>
       {/if}
 
       {#if tomorrowLine}
@@ -630,6 +650,10 @@
     color: var(--text-muted);
   }
   .piece__left {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: var(--mono-letter-spacing);
     white-space: nowrap;
   }
   .piece__next {
@@ -660,12 +684,18 @@
     grid-column: 1 / -1;
     grid-template-columns: subgrid;
     align-items: baseline;
+    padding-block: var(--space-2xs);
+    padding-inline: var(--space-xs);
+    margin-inline: calc(-1 * var(--space-xs));
+    border-radius: var(--radius-s);
   }
   .piece__row--past {
     color: var(--surface-focus-faint);
   }
   .piece__row--on {
     font-weight: 600;
+    background: color-mix(in oklch, var(--surface-focus-ink) 8%, transparent);
+    box-shadow: inset var(--line) 0 0 var(--surface-focus-ink);
   }
   .piece__h,
   .piece__facts dt {
@@ -705,6 +735,11 @@
   .piece__left-head + .piece__day--many {
     border-block-start: 0;
   }
+  .piece__foot {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-s);
+  }
   .piece__links {
     display: flex;
     flex-wrap: wrap;
@@ -719,21 +754,42 @@
   }
   /* `:global`: «Mapa» is a MapLink, whose <a> this file does not own. */
   .piece__acts :global(.piece__act) {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: var(--space-xs);
     min-block-size: var(--touch-target);
     padding-block: var(--space-xs);
+    padding-inline: var(--space-m);
     border-radius: var(--radius-l);
     background: var(--surface-focus-act);
     color: inherit;
-    font-size: var(--text-m);
+    font-size: var(--text-s);
     font-weight: 500;
     text-decoration: none;
     white-space: nowrap;
+    transition: background var(--transition);
   }
   .piece__acts :global(.piece__act:hover) {
     background: var(--surface-focus-act-hover);
+  }
+  .piece__icon {
+    flex: none;
+    opacity: 0.85;
+  }
+  /* Desktop: a single action (Map alone, or Call alone) hugs its label and
+     pairs cleanly beside «Who goes →» instead of stretching 350px wide. */
+  @media (min-width: 48rem) {
+    .piece__foot--paired {
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-m);
+    }
+    .piece__acts--single {
+      display: flex;
+      justify-content: flex-end;
+    }
   }
 
   .day__outside {

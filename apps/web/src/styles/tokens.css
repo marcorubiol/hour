@@ -496,6 +496,9 @@
     --read-width: 31.25rem;
     --pass-gap: 3.5rem;
     --pass-grid-max: 62.5rem;
+    /* Hoy's desktop grid (sticky pass at the left, 3x2 coming-up + wide waiting column at the right):
+       uses the viewport cleanly inside --page-width without leaving a dead margin at 1440. */
+    --desk-grid-max: 70rem;
     --display-pass: 4.25rem;
     --display-pass-day: 3.5rem;
     --display-pass-show: 1.875rem;
@@ -582,7 +585,7 @@
        included; the vistazo's veil reads it to leave the top bar clear.
        What it holds since tarea 132 sets it: the clock with calm beside it,
        the pulse's label and its line, you and «N en línea». */
-    --rail-width: 14.5rem;
+    --rail-width: 13.5rem;
     --header-height: 0px;
     --scroll-margin: 0px;
     --offset: calc(var(--scroll-margin) + var(--header-height));

@@ -6,7 +6,9 @@ import {
   DRAWN_WHOLE,
   COMING_TILES,
   COMING_TILES_PHONE,
+  COMING_TILES_WIDE,
   comingOpen,
+  comingPlace,
   comingTiles,
   nextAfterToday,
   nextWhen,
@@ -16,6 +18,7 @@ import {
   rowsSayCity,
   scopePulseInput,
   showsDay,
+  visibleComingTiles,
   waitingDrawsPills,
   waitingPills,
   waitingRowCount,
@@ -403,5 +406,24 @@ describe('many things in a day: from the fourth, lines (ADR-237)', () => {
     );
     expect(tiles[0].all).toHaveLength(4);
     expect(tiles[0].items).toHaveLength(2);
+  });
+});
+
+describe('visibleComingTiles and comingPlace (Hoy desktop 3×2)', () => {
+  it('slices to COMING_TILES_WIDE (6) and preserves an urgent day beyond the cap', () => {
+    const tiles = Array.from({ length: 8 }, (_, i) => ({ day: `2026-11-${String(14 + i).padStart(2, '0')}` })) as never[];
+    expect(COMING_TILES_WIDE).toBe(6);
+    expect(visibleComingTiles(tiles, COMING_TILES_WIDE, '2026-11-15').map((t) => t.day)).toHaveLength(6);
+    const withLateUrgent = visibleComingTiles(tiles, COMING_TILES_WIDE, '2026-11-21');
+    expect(withLateUrgent).toHaveLength(6);
+    expect(withLateUrgent.at(-1)?.day).toBe('2026-11-21');
+  });
+
+  it('does not prepend «to» when a travel title already starts with a travel word or the prefix', () => {
+    expect(comingPlace({ lead: 'to', name: 'Donostia', city: null }, 'to')).toBe('to Donostia');
+    expect(comingPlace({ lead: 'to', name: 'Tornada Getxo', city: null }, 'to')).toBe('Tornada Getxo');
+    expect(comingPlace({ lead: 'to', name: 'Viatge / Gota', city: null }, 'to')).toBe('Viatge / Gota');
+    expect(comingPlace({ lead: 'to', name: 'a Bilbao', city: null }, 'a')).toBe('a Bilbao');
+    expect(comingPlace({ lead: null, name: 'Kursaal', city: 'Manresa' }, 'to')).toBe('Manresa');
   });
 });

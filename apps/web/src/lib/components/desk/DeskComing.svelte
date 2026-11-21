@@ -35,7 +35,7 @@
   import { plannerDayHref } from '$lib/planner';
   import { pulseSlip } from '$lib/pulse-feeds.svelte';
   import type { PulseNext } from '$lib/pulse';
-  import { DRAWN_WHOLE, yourStop, type ComingOpen, type ComingTile, type TileUrgent } from '$lib/hoy';
+  import { DRAWN_WHOLE, comingPlace, yourStop, type ComingOpen, type ComingTile, type TileUrgent } from '$lib/hoy';
   import { accentVarFor } from '$lib/utils/accent';
 
   interface Props {
@@ -54,7 +54,7 @@
     locale: Locale;
     /** What is open, amber or grey (ADR-227); off in calm (ADR-203 § 5). */
     dots?: boolean;
-    /** From 64rem (the Desk's two columns): a day per card, each thing a row that opens its own record. */
+    /** From 64rem (the Desk's two columns): a 3×2 calendar grid of day cards. */
     wide?: boolean;
   }
 
@@ -79,10 +79,9 @@
   const stopOf = (item: PulseNext) => (item.ref.of === 'performance' ? yourStop(item.ref.row as PerformanceEvent, me) : null);
   const dayDiff = (day: string) =>
     Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
-  /** Where a thing happens: its city, else its name; a trip, «a Donostia». */
+  /** Where a thing happens: its city, else its name; a trip, «to Donostia» without «to Viatge». */
   function placeOf(item: PulseNext, day: string): string {
-    const sl = pulseSlip(item.ref, day, slipCtx);
-    return sl.lead ? `${t('planner.slip_to', locale)} ${sl.name}` : sl.city || sl.name;
+    return comingPlace(pulseSlip(item.ref, day, slipCtx), t('planner.slip_to', locale));
   }
   /** The tile's own amber words: what, short («Hoja sin enviar»). */
   function urgentShort(u: TileUrgent): string {
@@ -166,10 +165,11 @@
 </script>
 
 <!-- One thing: its place on top; under it, small, the monogram, the kind and
-     the hour, or «sin hora» in grey. -->
+     the hour (omitted when none, avoiding ten repeated «no hour» lines). -->
 {#snippet body(item: PulseNext, day: string)}
   {@const sl = pulseSlip(item.ref, day, slipCtx)}
   {@const held = sl.cert === 'hold' || sl.cert === 'proposed'}
+  {@const stop = stopOf(item)}
   <span class="tile__place">{placeOf(item, day)}</span>
   <small class="tile__meta"
     >{#if item.ref.row.project}<IdentityMark
@@ -177,8 +177,7 @@
         accent={accentVarFor(item.ref.row.project)}
         name={item.ref.row.project.name}
         initials={item.ref.row.project.initials}
-      />{/if}<span class:guess={held}>{kindLabel(sl.kind, tradeFor(perfWorkspaceId(item.ref.row)))}{held ? '?' : ''}</span>
-    · {#if stopOf(item)}{t('desk.you_at', locale, { time: hour(stopOf(item)!.at, item.ref.tz) })}{:else if item.at}{hour(item.at, item.ref.tz)}{:else}<span class="tile__nohour">{t('planner.no_hour', locale)}</span>{/if}</small
+      />{/if}<span class:guess={held}>{kindLabel(sl.kind, tradeFor(perfWorkspaceId(item.ref.row)))}{held ? '?' : ''}</span>{#if stop} · {t('desk.you_at', locale, { time: hour(stop.at, item.ref.tz) })}{:else if item.at} · {hour(item.at, item.ref.tz)}{/if}</small
   >
 {/snippet}
 
@@ -195,13 +194,19 @@
 
 {#if !errored}
   <section class="dband coming" aria-labelledby="desk-coming-h" data-help-step="desk-coming">
-    <div class="coming__head"><BlockHead title={t('desk.band_coming', locale)} titleId="desk-coming-h" /></div>
+    <div class="coming__head">
+      <BlockHead title={t('desk.band_coming', locale)} titleId="desk-coming-h">
+        {#if wide && planner && settled && tiles.length > 0}
+          <a class="block-head__act" href="/h/planner" data-testid="desk-tile-planner">{t('lens.planner', locale)} →</a>
+        {/if}
+      </BlockHead>
+    </div>
     {#if !settled}
-      <ol class="coming__strip" aria-hidden="true">
+      <ol class="coming__strip" class:coming__strip--grid={wide} aria-hidden="true">
         {#each [0, 1, 2] as i (i)}<li class="tile tile--wait"><span class="ghost-line">&nbsp;</span></li>{/each}
       </ol>
     {:else if tiles.length > 0}
-      <ol class="coming__strip" data-testid="desk-coming">
+      <ol class="coming__strip" class:coming__strip--grid={wide} data-testid="desk-coming">
         {#each tiles as tile (tile.day)}
           {#if wide}
           {@const href = dayHref(tile)}
@@ -261,7 +266,7 @@
           </li>
           {/if}
         {/each}
-        {#if planner}
+        {#if planner && !wide}
           <li class="coming__cell">
             <a class="tile tile--end" href="/h/planner" data-testid="desk-tile-planner">{t('lens.planner', locale)} →</a>
           </li>
@@ -299,16 +304,33 @@
 {/if}
 
 <style>
+  .coming {
+    container: coming / inline-size;
+  }
   .coming__head {
     margin-block-end: var(--space-s);
   }
-  /* DESKTOP (§ 6 c): one tile under another, the date on the left. */
+  /* DESKTOP: a 3×2 calendar grid of day cards so the urgent line and
+     «Te espera» stay above the fold; steps down cleanly by container width. */
   .coming__strip {
     display: grid;
     gap: var(--space-xs);
     margin: 0;
     padding: 0;
     list-style: none;
+  }
+  .coming__strip--grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  @container coming (max-width: 34rem) {
+    .coming__strip--grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @container coming (max-width: 20rem) {
+    .coming__strip--grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
   .coming__cell {
     display: grid;
@@ -403,22 +425,24 @@
     font-size: var(--text-xs);
     color: var(--text-muted);
   }
-  .tile__nohour {
-    color: var(--text-faint);
-  }
-  /* WIDE (the Desk's two columns): a card per day; the day's number at the
-     left (it opens the day), each thing a row: the monogram and what it is,
-     and, at the right, the hour and the place. «N por cerrar» at the foot,
-     grey; amber only for what has hurry. */
+  /* WIDE (the Desk's 3×2 calendar grid): compact vertical paper card per day,
+     same calendar grammar as the phone strip. The date opens the day, each row
+     opens its own pase, and only the one urgent tile carries amber. */
   .tile--card {
-    grid-template-columns: 6rem minmax(0, 1fr);
-    grid-template-areas: 'date things' '. more' '. falta';
-    row-gap: var(--space-2xs);
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'date' 'things' 'more' 'falta';
+    align-content: start;
+    gap: var(--space-xs);
+    padding: var(--space-s);
   }
   .tile--card .tile__date {
     grid-area: date;
     color: inherit;
     text-decoration: none;
+  }
+  .tile--card a.tile__date:hover .tile__n {
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
   .tile--card .tile__things {
     grid-area: things;
@@ -439,14 +463,15 @@
   }
   .tile--card .tile__falta {
     grid-area: falta;
+    grid-column: 1 / -1;
   }
   .tile__things--rows {
-    gap: var(--space-2xs);
+    gap: var(--space-xs);
   }
   .tile__rowlink {
     display: grid;
     gap: var(--space-2xs);
-    padding-block: var(--space-2xs);
+    padding-block: 0;
     color: inherit;
     text-decoration: none;
   }
@@ -465,8 +490,11 @@
   /* Under the strip: the one amber line with its verb, and the grey figure
      of the rest with the Agenda's door (ADR-227). */
   .coming__open {
-    display: grid;
-    gap: var(--space-2xs);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-2xs) var(--space-m);
     margin-block-start: var(--space-s);
   }
   .coming__line {
