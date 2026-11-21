@@ -136,6 +136,14 @@ export function idbQueryCacheStore(): QueryCacheStore {
       for (const entry of entries) void store.put(entry, entry.queryHash);
       await tx.done;
     },
+    deleteEntries: async (queryHashes) => {
+      if (queryHashes.length === 0) return;
+      const db = await getDB();
+      const tx = db.transaction('query_entries', 'readwrite');
+      const store = tx.objectStore('query_entries');
+      for (const hash of queryHashes) void store.delete(hash);
+      await tx.done;
+    },
   };
 }
 

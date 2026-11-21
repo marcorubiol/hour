@@ -59,24 +59,37 @@ export function applyBootstrapPayload(
   if (payload.conversations) client.setQueryData(['conversations', 'today'], payload.conversations, opts);
 }
 
+/** Ceiling for `/api/bootstrap` on a cold open: past this we abort and let
+ *  Hoy mount with its own individual queries instead of stalling until
+ *  `BOOT_MAX_MS` blanks the screen. */
+export const BOOTSTRAP_TIMEOUT_MS = 4_500;
+
 let inFlight: Promise<boolean> | null = null;
 
 /**
  * Fetch `/api/bootstrap` once per cold boot and seed the QueryClient.
- * Never throws: if unavailable, individual queries fall back seamlessly.
+ * Never throws: if unavailable or slower than `timeoutMs`, aborts and lets
+ * individual queries fall back seamlessly.
  */
-export function hydrateFromBootstrap(client: QueryClient, today: string): Promise<boolean> {
+export function hydrateFromBootstrap(
+  client: QueryClient,
+  today: string,
+  timeoutMs = BOOTSTRAP_TIMEOUT_MS,
+): Promise<boolean> {
   if (inFlight) return inFlight;
   const datesFrom = bootstrapDatesFrom(today);
   inFlight = (async () => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const qs = new URLSearchParams({ today, dates_from: datesFrom });
-      const payload = await fetchJSON<BootstrapResponse>(`/api/bootstrap?${qs}`);
+      const payload = await fetchJSON<BootstrapResponse>(`/api/bootstrap?${qs}`, controller.signal);
       applyBootstrapPayload(client, payload, { today, datesFrom });
       return true;
     } catch {
       return false;
     } finally {
+      clearTimeout(timer);
       inFlight = null;
     }
   })();

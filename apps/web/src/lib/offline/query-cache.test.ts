@@ -311,6 +311,9 @@ describe('partitioned store (boot vs secondary entries)', () => {
       putEntries: async (list) => {
         for (const e of list) entries.set(e.queryHash, structuredClone(e));
       },
+      deleteEntries: async (hashes) => {
+        for (const h of hashes) entries.delete(h);
+      },
       peek: () => record,
       peekEntries: () => entries,
     };
@@ -348,5 +351,56 @@ describe('partitioned store (boot vs secondary entries)', () => {
     expect(c2.getQueryData(['workspaces'])).toEqual(WS);
     await vi.advanceTimersByTimeAsync(0);
     expect(c2.getQueryData(['bolos', 'w1'])).toEqual({ items: [{ id: 'b1' }] });
+  });
+
+  test('prunes expired, wrong-schema, wrong-user and over-cap entries on read', async () => {
+    const store = partitionedStore();
+    const deleteSpy = vi.spyOn(store, 'deleteEntries');
+    const first = await load(store);
+
+    const c = client();
+    c.setQueryData(['workspaces'], WS);
+    c.setQueryData(['bolos', 'fresh'], { items: ['ok'] });
+    c.setQueryData(['bolos', 'expired'], { items: ['old'] });
+    c.setQueryData(['bolos', 'old-schema'], { items: ['schema'] });
+    c.setQueryData(['bolos', 'other-user'], { items: ['other'] });
+    await first.writeQueryCache(c, A);
+
+    const entries = store.peekEntries();
+    const expired = [...entries.values()].find((e) => e.queryHash.includes('"expired"'))!;
+    const oldSchema = [...entries.values()].find((e) => e.queryHash.includes('"old-schema"'))!;
+    const otherUser = [...entries.values()].find((e) => e.queryHash.includes('"other-user"'))!;
+    expired.savedAt -= first.MAX_AGE_MS + 1;
+    oldSchema.schema = first.CACHE_SCHEMA - 1;
+    otherUser.userSub = B.sub;
+
+    // Exceed MAX_SECONDARY_ENTRIES to verify oldest fresh entries are evicted too.
+    const baseNow = Date.now();
+    const sampleQuery = [...entries.values()].find((e) => e.queryHash.includes('"fresh"'))!.query;
+    for (let i = 0; i < first.MAX_SECONDARY_ENTRIES + 5; i++) {
+      const hash = `["extra",${i}]`;
+      entries.set(hash, {
+        schema: first.CACHE_SCHEMA,
+        userSub: A.sub,
+        savedAt: baseNow - (i + 1) * 1000,
+        queryHash: hash,
+        query: { ...structuredClone(sampleQuery), queryKey: ['extra', i], queryHash: hash },
+      });
+    }
+
+    const next = await load(store);
+    const c2 = client();
+    expect(await next.startQueryCache(c2, () => A).restored).toEqual(A);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(deleteSpy).toHaveBeenCalledTimes(1);
+    expect(store.peekEntries().size).toBe(first.MAX_SECONDARY_ENTRIES);
+    expect(store.peekEntries().has(expired.queryHash)).toBe(false);
+    expect(store.peekEntries().has(oldSchema.queryHash)).toBe(false);
+    expect(store.peekEntries().has(otherUser.queryHash)).toBe(false);
+    expect(c2.getQueryData(['bolos', 'fresh'])).toEqual({ items: ['ok'] });
+    expect(c2.getQueryData(['bolos', 'expired'])).toBeUndefined();
+    expect(c2.getQueryData(['bolos', 'old-schema'])).toBeUndefined();
+    expect(c2.getQueryData(['bolos', 'other-user'])).toBeUndefined();
   });
 });

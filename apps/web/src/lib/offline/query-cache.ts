@@ -36,6 +36,9 @@ export const MAX_AGE_MS = 7 * 24 * 3_600_000;
 export const WRITE_THROTTLE_MS = 1_000;
 /** A device store that does not answer in this long is skipped: the open goes to the network. */
 export const RESTORE_TIMEOUT_MS = 1_500;
+/** Upper bound on secondary entries kept on disk: newest win so `getAll` stays
+ *  bounded even during heavy week-long browsing across many records. */
+export const MAX_SECONDARY_ENTRIES = 150;
 
 /**
  * The version of the shape of what this cache keeps. BUMP IT BY HAND, in the
@@ -102,6 +105,7 @@ export interface QueryCacheStore {
   /** Optional incremental secondary store for non-boot queries. */
   getEntries?(): Promise<PersistedQueryEntry[]>;
   putEntries?(entries: PersistedQueryEntry[]): Promise<void>;
+  deleteEntries?(queryHashes: readonly string[]): Promise<void>;
 }
 
 /** The workspaces the cached data was read under, with the role in each. Null until known. */
@@ -215,7 +219,8 @@ export async function cachedSessionUser(): Promise<SessionUser | null> {
   return (await readQueryCache())?.user ?? null;
 }
 
-/** Hydrate the secondary `query_entries` store in the background after boot. */
+/** Hydrate the secondary `query_entries` store in the background after boot,
+ *  pruning expired, mismatched, and over-cap entries so the store stays bounded. */
 async function hydrateSecondaryEntries(
   client: QueryClient,
   userSub: string,
@@ -226,11 +231,29 @@ async function hydrateSecondaryEntries(
   if (!s?.getEntries || epoch !== startedAt) return;
   const entries = await withTimeout(s.getEntries().catch(() => []), RESTORE_TIMEOUT_MS, []);
   if (epoch !== startedAt || entries.length === 0) return;
-  const valid = entries
-    .filter((e) => e.schema === CACHE_SCHEMA && e.userSub === userSub && now - e.savedAt < MAX_AGE_MS)
-    .map((e) => e.query);
-  if (valid.length === 0) return;
-  hydrate(client, { mutations: [], queries: valid });
+
+  const fresh: PersistedQueryEntry[] = [];
+  const staleHashes: string[] = [];
+  for (const e of entries) {
+    if (e.schema === CACHE_SCHEMA && e.userSub === userSub && now - e.savedAt < MAX_AGE_MS) {
+      fresh.push(e);
+    } else {
+      staleHashes.push(e.queryHash);
+    }
+  }
+
+  if (fresh.length > MAX_SECONDARY_ENTRIES) {
+    fresh.sort((a, b) => b.savedAt - a.savedAt);
+    for (const dropped of fresh.splice(MAX_SECONDARY_ENTRIES)) {
+      staleHashes.push(dropped.queryHash);
+    }
+  }
+
+  if (staleHashes.length > 0 && s.deleteEntries && epoch === startedAt) {
+    void s.deleteEntries(staleHashes).catch(() => {});
+  }
+  if (fresh.length === 0) return;
+  hydrate(client, { mutations: [], queries: fresh.map((e) => e.query) });
 }
 
 /**
