@@ -557,19 +557,31 @@
     --identity-tint-base: var(--surface-focus);
     --identity-tint: var(--surface-focus-mark-tint);
     --identity-ink-l: var(--surface-focus-mark-ink-l);
-    transition: background var(--transition);
+    transition:
+      background var(--transition),
+      transform var(--transition),
+      box-shadow var(--transition);
   }
   .piece--door {
     cursor: pointer;
   }
   @media (hover: hover) and (pointer: fine) {
-    .piece--door:hover {
-      background: color-mix(in oklch, var(--surface-focus) 94%, var(--surface-focus-ink));
+    .piece--door:hover:not(:has(.piece__acts:hover, .piece__links a:hover, a.piece__rowwhat:hover, .piece__tomorrow a:hover, .piece__left-head a:hover)) {
+      background: color-mix(in oklch, var(--surface-focus) 92%, var(--surface-focus-ink));
+      transform: translateY(-2px);
+      box-shadow: var(--box-shadow-3);
+    }
+    .piece--door:active:not(:has(.piece__acts:active, .piece__links a:active, a.piece__rowwhat:active, .piece__tomorrow a:active, .piece__left-head a:active)) {
+      transform: translateY(0);
+      box-shadow: var(--box-shadow-1);
     }
   }
   .piece a {
     color: inherit;
-    text-underline-offset: 3px;
+    text-decoration: none;
+  }
+  .piece a:hover {
+    text-decoration: none;
   }
   /* The same piece with nothing in it: no fill, its edge (rule 4). */
   .piece--hollow {
@@ -622,12 +634,12 @@
     content: '';
     position: absolute;
     inset: 0;
+    z-index: 0;
     border-radius: inherit;
   }
   a.piece__what:hover,
   a.piece__what:focus-visible {
-    text-decoration: underline;
-    text-underline-offset: 4px;
+    text-decoration: none;
   }
   a.piece__what:focus-visible {
     outline: none;
@@ -659,11 +671,21 @@
   }
   .piece__tomorrow a {
     position: relative;
-    z-index: 1;
+    z-index: 2;
+    display: inline-block;
+    padding: var(--space-2xs) var(--space-xs);
+    margin-block: calc(-1 * var(--space-2xs));
+    margin-inline: calc(-1 * var(--space-xs));
+    border-radius: var(--radius-m);
     text-decoration: none;
+    transition:
+      background var(--transition),
+      color var(--transition);
   }
   .piece__tomorrow a:hover {
-    text-decoration: underline;
+    background: var(--surface-focus-act);
+    color: var(--surface-focus-ink);
+    text-decoration: none;
   }
   .piece__sub {
     display: flex;
@@ -684,10 +706,19 @@
     white-space: nowrap;
   }
   .piece__next {
+    padding: var(--space-2xs) var(--space-xs);
+    margin-block: calc(-1 * var(--space-2xs));
+    margin-inline: calc(-1 * var(--space-xs));
+    border-radius: var(--radius-m);
     text-decoration: none;
+    transition:
+      background var(--transition),
+      color var(--transition);
   }
   .piece__next:hover {
-    text-decoration: underline;
+    background: color-mix(in oklch, var(--text-color) 4%, transparent);
+    color: var(--heading-color);
+    text-decoration: none;
   }
   .piece__fresh {
     font-size: var(--text-xs);
@@ -715,6 +746,7 @@
     padding-inline: var(--space-xs);
     margin-inline: calc(-1 * var(--space-xs));
     border-radius: var(--radius-s);
+    transition: background var(--transition);
   }
   .piece__row--past {
     color: var(--surface-focus-faint);
@@ -723,6 +755,11 @@
     font-weight: 600;
     background: color-mix(in oklch, var(--surface-focus-ink) 8%, transparent);
     box-shadow: inset var(--line) 0 0 var(--surface-focus-ink);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .piece__row:has(a.piece__rowwhat:hover) {
+      background: color-mix(in oklch, var(--surface-focus-ink) 12%, transparent);
+    }
   }
   .piece__h,
   .piece__facts dt {
@@ -744,12 +781,12 @@
   }
   .piece__rowwhat {
     position: relative;
-    z-index: 1;
+    z-index: 2;
     min-inline-size: 0;
     text-decoration: none;
   }
   a.piece__rowwhat:hover {
-    text-decoration: underline;
+    text-decoration: none;
   }
   .piece__left-head {
     display: flex;
@@ -761,6 +798,24 @@
     border-block-start: var(--line-hairline) solid var(--surface-focus-rule);
     font-size: var(--text-s);
   }
+  .piece__left-head a {
+    position: relative;
+    z-index: 2;
+    padding: var(--space-2xs) var(--space-xs);
+    margin-block: calc(-1 * var(--space-2xs));
+    margin-inline: calc(-1 * var(--space-xs));
+    border-radius: var(--radius-m);
+    color: var(--surface-focus-muted);
+    text-decoration: none;
+    transition:
+      background var(--transition),
+      color var(--transition);
+  }
+  .piece__left-head a:hover {
+    background: var(--surface-focus-act);
+    color: var(--surface-focus-ink);
+    text-decoration: none;
+  }
   .piece__left-head + .piece__day--many {
     border-block-start: 0;
   }
@@ -771,15 +826,39 @@
   }
   .piece__links {
     position: relative;
-    z-index: 1;
+    z-index: 2;
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-xs) var(--space-m);
+    align-items: center;
+    gap: var(--space-xs) var(--space-s);
+    margin-inline-start: calc(-1 * var(--space-xs));
     font-size: var(--text-s);
+  }
+  .piece__links a {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2xs);
+    padding: var(--space-2xs) var(--space-xs);
+    border-radius: var(--radius-m);
+    color: var(--surface-focus-muted);
+    text-decoration: none;
+    transition:
+      background var(--transition),
+      color var(--transition);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .piece__links a:hover {
+      background: var(--surface-focus-act);
+      color: var(--surface-focus-ink);
+      text-decoration: none;
+    }
+    .piece__links a:active {
+      background: var(--surface-focus-act-hover);
+    }
   }
   .piece__acts {
     position: relative;
-    z-index: 1;
+    z-index: 2;
     display: grid;
     grid-auto-flow: column;
     grid-auto-columns: minmax(0, 1fr);
@@ -834,19 +913,25 @@
   /* A door that reads as the line it was: the muted text, underlined on
      hover, as `.link-arrow` does. */
   .day__outside-door {
-    padding: 0;
+    padding: var(--space-2xs) var(--space-xs);
+    margin-block: calc(-1 * var(--space-2xs));
+    margin-inline: calc(-1 * var(--space-xs));
     border: 0;
+    border-radius: var(--radius-m);
     background: none;
     color: inherit;
     font: inherit;
     text-align: start;
     cursor: pointer;
+    transition:
+      background var(--transition),
+      color var(--transition);
   }
   @media (hover: hover) {
     .day__outside-door:hover {
+      background: color-mix(in oklch, var(--text-color) 4%, transparent);
       color: var(--text-color);
-      text-decoration: underline;
-      text-underline-offset: 3px;
+      text-decoration: none;
     }
   }
 </style>

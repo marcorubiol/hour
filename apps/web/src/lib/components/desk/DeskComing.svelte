@@ -209,31 +209,63 @@
       <ol class="coming__strip" class:coming__strip--grid={wide} data-testid="desk-coming">
         {#each tiles as tile (tile.day)}
           {#if wide}
-          {@const href = dayHref(tile)}
+          {@const manyText = planner ? manyOf(tile) : null}
+          {@const single = !manyText && tile.items.length === 1 && tile.more === 0}
+          {@const href = single || manyText ? tileHref(tile) : dayHref(tile)}
           <li class="coming__cell">
-            <div class="tile tile--card" class:tile--urgent={amberOn(tile)} data-testid="desk-tile" data-day={tile.day}>
-              <svelte:element this={href ? 'a' : 'span'} {href} class="tile__date">
-                <span class="tile__n">{Number(tile.day.slice(8, 10))}</span>
-                <span class="tile__wd">{localeWeekdayShort(tile.day, locale)}</span>
-                <span class="tile__mo">{localeMonthShort(tile.day, locale)}</span>
+            {#if single || manyText}
+              <svelte:element
+                this={href ? 'a' : 'div'}
+                {href}
+                class="tile tile--card"
+                class:tile--door={Boolean(href)}
+                class:tile--urgent={amberOn(tile)}
+                data-testid="desk-tile"
+                data-day={tile.day}
+              >
+                <span class="tile__date">
+                  <span class="tile__n">{Number(tile.day.slice(8, 10))}</span>
+                  <span class="tile__wd">{localeWeekdayShort(tile.day, locale)}</span>
+                  <span class="tile__mo">{localeMonthShort(tile.day, locale)}</span>
+                </span>
+                {#if manyText}
+                  {@render many(tile)}
+                {:else}
+                  <ul class="tile__things">
+                    {#each tile.items as item (item.ref.of + item.ref.id)}
+                      <li class="tile__thing">{@render body(item, tile.day)}</li>
+                    {/each}
+                  </ul>
+                {/if}
+                {@render amber(tile)}
               </svelte:element>
-              {#if planner && manyOf(tile)}
-                {@render many(tile)}
-              {:else}
-              <ul class="tile__things tile__things--rows">
-                {#each tile.items as item (item.ref.of + item.ref.id)}
-                  {@const door = pulseSlip(item.ref, tile.day, slipCtx).href ?? href}
-                  <li class="tile__row">
-                    <svelte:element this={door ? 'a' : 'span'} href={door} class="tile__rowlink" data-testid="desk-tile-row">
-                      {@render body(item, tile.day)}
-                    </svelte:element>
-                  </li>
-                {/each}
-              </ul>
-              {#if tile.more > 0}<span class="tile__more">{t('desk.coming_more', locale, { n: tile.more })}</span>{/if}
-              {/if}
-              {@render amber(tile)}
-            </div>
+            {:else}
+              <div
+                class="tile tile--card"
+                class:tile--door={Boolean(href)}
+                class:tile--urgent={amberOn(tile)}
+                data-testid="desk-tile"
+                data-day={tile.day}
+              >
+                <svelte:element this={href ? 'a' : 'span'} {href} class="tile__date tile__date--cover">
+                  <span class="tile__n">{Number(tile.day.slice(8, 10))}</span>
+                  <span class="tile__wd">{localeWeekdayShort(tile.day, locale)}</span>
+                  <span class="tile__mo">{localeMonthShort(tile.day, locale)}</span>
+                </svelte:element>
+                <ul class="tile__things tile__things--rows">
+                  {#each tile.items as item (item.ref.of + item.ref.id)}
+                    {@const door = pulseSlip(item.ref, tile.day, slipCtx).href ?? href}
+                    <li class="tile__row">
+                      <svelte:element this={door ? 'a' : 'span'} href={door} class="tile__rowlink" data-testid="desk-tile-row">
+                        {@render body(item, tile.day)}
+                      </svelte:element>
+                    </li>
+                  {/each}
+                </ul>
+                {#if tile.more > 0}<span class="tile__more">{t('desk.coming_more', locale, { n: tile.more })}</span>{/if}
+                {@render amber(tile)}
+              </div>
+            {/if}
           </li>
           {:else}
           {@const href = tileHref(tile)}
@@ -339,6 +371,7 @@
   /* THE TILE (design-system rule 2, the middle height): raised paper, a
      fine line, a large radius. */
   .tile {
+    position: relative;
     display: grid;
     grid-template-columns: 6rem minmax(0, 1fr) auto;
     align-items: start;
@@ -350,9 +383,34 @@
     color: var(--text-color);
     text-decoration: none;
     min-inline-size: 0;
+    transition:
+      background var(--transition),
+      border-color var(--transition),
+      transform var(--transition),
+      box-shadow var(--transition);
   }
-  a.tile:hover {
-    border-color: var(--border-color-dark);
+  .tile--door {
+    cursor: pointer;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    a.tile:not(.tile--end):hover,
+    .tile--door:hover:not(:has(a.tile__rowlink:hover)) {
+      border-color: var(--border-color-dark);
+      background: color-mix(in oklch, var(--bg-ultra-light) 96%, var(--heading-color));
+      transform: translateY(-2px);
+      box-shadow: var(--box-shadow-2);
+      text-decoration: none;
+    }
+    a.tile:not(.tile--end):active,
+    .tile--door:active:not(:has(a.tile__rowlink:active)) {
+      transform: translateY(0);
+      box-shadow: var(--box-shadow-1);
+    }
+    a.tile--urgent:hover,
+    .tile--urgent.tile--door:hover:not(:has(a.tile__rowlink:hover)) {
+      border-color: var(--missing-ink);
+      background: color-mix(in oklch, var(--missing-ink) 5%, var(--bg-ultra-light));
+    }
   }
   /* The screen's one amber (ADR-227): the tile of what falls due first. */
   .tile--urgent,
@@ -440,9 +498,23 @@
     color: inherit;
     text-decoration: none;
   }
-  .tile--card a.tile__date:hover .tile__n {
-    text-decoration: underline;
-    text-underline-offset: 3px;
+  .tile--card a.tile__date--cover::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: inherit;
+  }
+  .tile--card a.tile__date--cover:hover,
+  .tile--card a.tile__date--cover:focus-visible {
+    text-decoration: none;
+  }
+  .tile--card a.tile__date--cover:focus-visible {
+    outline: none;
+  }
+  .tile--card a.tile__date--cover:focus-visible::after {
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: var(--focus-offset);
   }
   .tile--card .tile__things {
     grid-area: things;
@@ -469,15 +541,26 @@
     gap: var(--space-xs);
   }
   .tile__rowlink {
+    position: relative;
+    z-index: 2;
     display: grid;
     gap: var(--space-2xs);
-    padding-block: 0;
+    padding: var(--space-2xs) var(--space-xs);
+    margin-block: calc(-1 * var(--space-2xs));
+    margin-inline: calc(-1 * var(--space-xs));
+    border-radius: var(--radius-m);
     color: inherit;
     text-decoration: none;
+    transition: background var(--transition);
   }
-  a.tile__rowlink:hover .tile__place {
-    text-decoration: underline;
-    text-underline-offset: 3px;
+  @media (hover: hover) and (pointer: fine) {
+    a.tile__rowlink:hover {
+      background: color-mix(in oklch, var(--text-color) 5%, transparent);
+      text-decoration: none;
+    }
+    a.tile__rowlink:active {
+      background: color-mix(in oklch, var(--text-color) 8%, transparent);
+    }
   }
   .tile__falta {
     grid-column: 2 / -1;
@@ -512,11 +595,23 @@
   }
   .coming__line a {
     color: inherit;
-    text-decoration: underline;
-    text-underline-offset: 3px;
+    font-weight: 500;
+    padding: var(--space-2xs) var(--space-xs);
+    margin-block: calc(-1 * var(--space-2xs));
+    margin-inline: calc(-1 * var(--space-2xs));
+    border-radius: var(--radius-s);
+    text-decoration: none;
+    transition:
+      background var(--transition),
+      color var(--transition);
   }
   .coming__line a:hover {
-    color: var(--text-color);
+    background: color-mix(in oklch, currentColor 10%, transparent);
+    color: var(--heading-color);
+    text-decoration: none;
+  }
+  .coming__line--urgent a:hover {
+    color: var(--missing-ink);
   }
   /* The end door on a desktop: a low quiet row at the column's foot, the
      voice of a block's action (`.block-head__act`), not a tile. */
@@ -532,6 +627,7 @@
   a.tile--end:hover {
     border-color: transparent;
     color: var(--text-color);
+    text-decoration: none;
   }
   @media (pointer: coarse) {
     .tile--end {
@@ -539,13 +635,21 @@
     }
   }
   .coming__far {
+    display: inline-block;
+    padding: var(--space-2xs) var(--space-xs);
+    margin-block: calc(-1 * var(--space-2xs));
+    margin-inline: calc(-1 * var(--space-xs));
+    border-radius: var(--radius-m);
     color: inherit;
     text-decoration: none;
+    transition:
+      background var(--transition),
+      color var(--transition);
   }
   .coming__far:hover {
+    background: color-mix(in oklch, var(--text-color) 4%, transparent);
     color: var(--text-color);
-    text-decoration: underline;
-    text-underline-offset: 3px;
+    text-decoration: none;
   }
 
   /* THE PHONE (§ 6 b): a strip that slides, tiles of a fixed width, the

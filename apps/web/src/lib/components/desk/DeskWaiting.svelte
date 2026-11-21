@@ -236,6 +236,7 @@
       : [item.convocation ? t('desk.convoked', locale) : null, contextPath(item), item.amount != null ? money(item.amount, item.currency) : null].filter((x): x is string => Boolean(x))}
     <li
       class="row row--{item.concern}"
+      class:row--door={Boolean(href)}
       class:row--over={item.overdue}
       class:row--proposal={item.isProposal}
       class:row--chat={line !== null}
@@ -515,6 +516,7 @@
     border-block-start: var(--line-hairline) solid var(--border-color-light);
   }
   .row {
+    position: relative;
     display: grid;
     grid-template-columns: 1.25rem minmax(0, 1fr) auto;
     grid-template-areas: 'mark body tail';
@@ -526,14 +528,26 @@
     margin-inline: calc(-1 * var(--space-xs));
     border-block-end: var(--line-hairline) solid var(--border-color-light);
     border-radius: var(--radius-m);
-    transition: background var(--transition);
+    transition:
+      background var(--transition),
+      border-color var(--transition);
+  }
+  .row--door {
+    cursor: pointer;
   }
   .row--has-acts {
     align-items: center;
   }
   @media (hover: hover) and (pointer: fine) {
     .row:not(.row--wait):hover {
-      background: color-mix(in oklch, var(--text-color) 3%, transparent);
+      background: color-mix(in oklch, var(--text-color) 4%, transparent);
+      border-block-end-color: transparent;
+    }
+    .row:has(+ .row:not(.row--wait):hover) {
+      border-block-end-color: transparent;
+    }
+    .row--door:active:not(:has(.row__tail :active)) {
+      background: color-mix(in oklch, var(--text-color) 7%, transparent);
     }
   }
   .row--wait {
@@ -541,6 +555,8 @@
   }
   /* Left gutter: checkbox for tasks, quiet semantic dot for everything else. */
   .row__mark {
+    position: relative;
+    z-index: 2;
     grid-area: mark;
     display: flex;
     align-items: center;
@@ -593,9 +609,23 @@
     text-decoration: none;
     overflow-wrap: anywhere;
   }
-  a.row__title:hover {
-    text-decoration: underline;
-    text-underline-offset: 3px;
+  a.row__title::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: inherit;
+  }
+  a.row__title:hover,
+  a.row__title:focus-visible {
+    text-decoration: none;
+  }
+  a.row__title:focus-visible {
+    outline: none;
+  }
+  a.row__title:focus-visible::after {
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: var(--focus-offset);
   }
   label.row__title {
     cursor: pointer;
@@ -664,6 +694,8 @@
      stranded in the middle of the row. On non-action rows, «not now» sits to
      the left of the date so the date lands flush against the right edge. */
   .row__tail {
+    position: relative;
+    z-index: 2;
     grid-area: tail;
     display: inline-flex;
     align-items: center;
@@ -857,7 +889,9 @@
     cursor: pointer;
     transition:
       background var(--transition),
-      border-color var(--transition);
+      border-color var(--transition),
+      transform var(--transition),
+      box-shadow var(--transition);
   }
   span.tally {
     cursor: default;
@@ -875,6 +909,19 @@
   button.tally[aria-pressed='true'] {
     background: var(--bg-hover);
     border-color: var(--border-color-light);
+    text-decoration: none;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    a.tally:hover,
+    button.tally:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--box-shadow-1);
+    }
+    a.tally:active,
+    button.tally:active {
+      transform: translateY(0);
+      box-shadow: none;
+    }
   }
   @media (pointer: coarse) {
     .tally {
@@ -952,8 +999,7 @@
   }
   a.run__label:hover {
     color: var(--text-color);
-    text-decoration: underline;
-    text-underline-offset: 3px;
+    text-decoration: none;
   }
   .run__rows {
     border-block-start: 0;
