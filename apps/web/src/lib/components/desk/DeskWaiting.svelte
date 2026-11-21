@@ -889,9 +889,7 @@
     cursor: pointer;
     transition:
       background var(--transition),
-      border-color var(--transition),
-      transform var(--transition),
-      box-shadow var(--transition);
+      border-color var(--transition);
   }
   span.tally {
     cursor: default;
@@ -910,18 +908,6 @@
     background: var(--bg-hover);
     border-color: var(--border-color-light);
     text-decoration: none;
-  }
-  @media (hover: hover) and (pointer: fine) {
-    a.tally:hover,
-    button.tally:hover {
-      transform: translateY(-1px);
-      box-shadow: var(--box-shadow-1);
-    }
-    a.tally:active,
-    button.tally:active {
-      transform: translateY(0);
-      box-shadow: none;
-    }
   }
   @media (pointer: coarse) {
     .tally {

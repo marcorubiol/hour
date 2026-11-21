@@ -492,13 +492,10 @@
     /* The pass (brief ficha-pase): a ticket of a phone's width that never
        stretches, its hour at 68 px, its day (no hour) at 56, its show at 30. */
     --pass-width: 23.75rem;
-    /* The reading column beside it (500 px at most), the air between them (56) and the whole grid's cap (1.000). */
-    --read-width: 31.25rem;
+    /* The reading column beside it takes the rest, the air between them (56) and the whole grid's cap: 1.120 px
+       (Marco, 21-11: Hoy's wider desktop grid won over 380 + 500; the record follows it). */
     --pass-gap: 3.5rem;
-    --pass-grid-max: 62.5rem;
-    /* Hoy's desktop grid (sticky pass at the left, 3x2 coming-up + wide waiting column at the right):
-       uses the viewport cleanly inside --page-width without leaving a dead margin at 1440. */
-    --desk-grid-max: 70rem;
+    --pass-grid-max: 70rem;
     --display-pass: 4.25rem;
     --display-pass-day: 3.5rem;
     --display-pass-show: 1.875rem;

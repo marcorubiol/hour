@@ -316,6 +316,8 @@
   });
   /** From 64rem the Desk is the pass's grid: the day at the left, the reading column at the right. */
   const wide = new MediaQuery(WIDE_QUERY, false);
+  // What changed and the season sit under the pass only beside it (wide, not calm).
+  let besidePass = $derived(wide.current && !calm.on);
   // «Tablón · N nuevos» (plan 2026-10-22 § 3.3): the card's performance's
   // board, under the record's own key, so opening it costs nothing more.
   // The signal that was missing on the day of the show; no mail, no push.
@@ -1025,33 +1027,10 @@
     {/if}
   {/snippet}
 
-  <!-- THREE BLOCKS, IN A FIXED ORDER (ADR-202 § 1): the day, what comes,
-       what waits. On a wide desktop, the sticky pass + quiet folded lids live
-       at the left; the 3×2 coming-up grid and full-width «Te espera» live in
-       the reading column at the right so every row breathes in one line. -->
-  <div class="desk__grid">
-    <div class="desk__col desk__col--pass">
-      <div class="slot slot--next" data-slot="day" data-help-step="desk-next">
-        <DeskDay
-          {agenda}
-          todayHad={hadToday}
-          next={nextThing}
-          outside={outsideLine}
-          onclearscope={door?.clear}
-          now={clockNow}
-          workspaces={feeds.workspaces}
-          settled={feeds.settled && !scopeUnresolved}
-          errored={feeds.errored}
-          onretry={retryFailed}
-          {today}
-          {viewerTz}
-          updatedAt={feeds.updatedAt || null}
-          boardNew={nextBoardNew}
-          {slipCtx}
-          {me}
-          {locale}
-        />
-      </div>
+  <!-- What changed and the season: under the pass on a wide desktop; on a
+       phone, a tablet and in calm, after «Te espera», so the DOM order (the
+       tab's and the screen reader's) is the order the eye reads (móvil #2). -->
+  {#snippet sideBlocks()}
       {#if drawChanged && deskChangedComp.component}
       <div class="slot slot--changed" data-slot="changed">
         <deskChangedComp.component
@@ -1079,6 +1058,36 @@
           />
         </div>
       {/if}
+  {/snippet}
+
+  <!-- THREE BLOCKS, IN A FIXED ORDER (ADR-202 § 1): the day, what comes,
+       what waits. On a wide desktop the pass (with what changed and the
+       season under it) at the left, the 3×2 coming-up grid and «Te espera»
+       in the reading column; the grid is the record's (380 + the rest, ≤ 1.120 px). -->
+  <div class="desk__grid">
+    <div class="desk__col desk__col--pass">
+      <div class="slot slot--next" data-slot="day" data-help-step="desk-next">
+        <DeskDay
+          {agenda}
+          todayHad={hadToday}
+          next={nextThing}
+          outside={outsideLine}
+          onclearscope={door?.clear}
+          now={clockNow}
+          workspaces={feeds.workspaces}
+          settled={feeds.settled && !scopeUnresolved}
+          errored={feeds.errored}
+          onretry={retryFailed}
+          {today}
+          {viewerTz}
+          updatedAt={feeds.updatedAt || null}
+          boardNew={nextBoardNew}
+          {slipCtx}
+          {me}
+          {locale}
+        />
+      </div>
+      {#if besidePass}{@render sideBlocks()}{/if}
     </div>
     <div class="desk__col desk__col--read">
       <div class="desk__slot" data-slot="coming">
@@ -1128,6 +1137,7 @@
         />
       </div>
       {/if}
+      {#if !besidePass}{@render sideBlocks()}{/if}
     </div>
   </div>
 </div>
@@ -1146,15 +1156,15 @@
       max-inline-size: var(--calm-measure);
     }
 
-    /* Hoy's desktop grid: sticky pass column at the left (--pass-width),
-       wide reading column at the right for the 3×2 coming-up calendar and
-       full-width «Te espera» rows. */
+    /* The pass's grid (the same as the record's `.pass-grid`, ADR-218): the
+       day's piece at the size of a phone's, then the reading column, aligned
+       left and never wider than --pass-grid-max (1.120 px, Marco 21-11). */
     .desk__grid {
       display: grid;
       grid-template-columns: var(--pass-width) minmax(0, 1fr);
       column-gap: var(--pass-gap);
       row-gap: var(--space-l);
-      max-inline-size: var(--desk-grid-max);
+      max-inline-size: var(--pass-grid-max);
       align-items: start;
     }
     .desk__col {
