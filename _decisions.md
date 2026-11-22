@@ -8840,3 +8840,47 @@ sobre fechas de Hour vuelven como propuesta en «Te espera», nunca por edición
    `/api/workspaces`.
 
 **Cómo se revierte.** Revertir el commit; la migración `20261122100000` es aditiva y lleva rollback en cabecera.
+
+## [2026-11-22] ADR-242 · El viaje se ata a su bolo (Fase 1: esquema, guarda y lectura de viajes por función)
+
+Marco, 22-11 («Todo lo que tú recomiendas», sobre el encargo «el viaje se ata a su bolo» y las cuatro recomendaciones
+validadas tras contrastarlo con `main`).
+
+**Contexto.** Hasta ahora un viaje (`date` con `kind = 'travel_day'`) no guardaba a qué bolo sirve: `tripsOfPerformance`
+(`apps/web/src/lib/roadsheet.ts`), `PerformanceRecord.svelte` y `get_public_roadsheet` adivinaban los viajes de la misma
+obra que tocaban el día de la función o la víspera (ADR-166 § 2, ADR-213 § 1), dejando fuera la ida de dos días antes y
+la vuelta del día siguiente. `date.performance_id` existe, pero atar al bolo (y no a la función) refleja el trato entero
+cuando un bolo tiene varias funciones (p. ej. sábado y domingo con una sola ida y una sola vuelta). Además,
+`performance.bolo_id` queda fuera del `GRANT SELECT` de `performance` por ser dato de dinero (`read:money`), y
+`get_public_roadsheet` ya servía `travel` desde `20261102150000` con la regla vieja.
+
+**Decisión (Fase 1 de 3; fases 2 y 3 en serie después del apply).**
+1. **Esquema en `public.date`:** columna `bolo_id uuid NULL REFERENCES public.bolo(id) ON DELETE SET NULL`, `CHECK`
+   `date_bolo_travel_only` (`bolo_id IS NULL OR kind = 'travel_day'`) e índice parcial `date_bolo_idx`
+   (`deleted_at IS NULL AND bolo_id IS NOT NULL`). `date.performance_id` se mantiene sin borrar.
+2. **Guarda en Postgres + permiso de escritura:** trigger `date_guard_bolo` (`private.guard_date_bolo_same_project`,
+   `BEFORE INSERT OR UPDATE OF bolo_id, project_id`) y comprobación espejo en `create_date` y `PATCH /api/dates/[id]`.
+   Atar un viaje a un bolo exige que el bolo esté vivo, pertenezca al mismo proyecto y que quien escribe tenga
+   `read:money` (quien no ve el bolo no puede atar a él). Un único `42501` colapsa inexistente, ajeno y sin permiso
+   (sin oráculo). En `PATCH /api/dates/[id]`, sacar `kind` de `travel_day` limpia `bolo_id = null`.
+3. **`create_date` y `delete_bolo`:** `create_date` añade `p_bolo_id uuid DEFAULT NULL` al final de la firma (DROP por
+   nombre consultando `pg_proc` para no dejar sobrecargas; compatible con el Worker desplegado). `delete_bolo` desata
+   `public.date.bolo_id = NULL` antes del borrado blando.
+4. **Relleno mínimo:** los viajes vivos con `performance_id` cuya función viva apunta a un bolo vivo del mismo proyecto
+   copian ese `bolo_id`. Nada más se rellena ni se adivina (ADR-147).
+5. **Una sola regla compartida de lectura (`private.performance_trips_jsonb`):** viajes de una función = atados a su
+   bolo U atados a su línea sin bolo U (solo si no hay ninguno atado) sugeridos por día y víspera con `bolo_id IS NULL`
+   (nunca roba un viaje atado a otro bolo).
+   - `public.trips_for_performance(uuid)`: RPC `STABLE SECURITY DEFINER` para Fase 2 (pase y hoja interna). Cruza
+     `performance.bolo_id` dentro de Postgres sin abrir `read:money` ni exponer `bolo_id`: con `read:performance`
+     devuelve la unión completa; para invitados de bolo por cadena, solo los atados a su bolo; sin acceso, `[]`.
+   - `public.get_public_roadsheet(text)`: actualizada con `CREATE OR REPLACE` en esta misma migración a la misma regla,
+     solo para `performer` y `tech_manager`, sin `travel_stage.notes` y nunca para `venue`.
+6. **Contratos del Worker en Fase 1:** `DateCreateSchema` y `DatePatchSchema` aceptan `bolo_id`; `DATE_SELECT` y
+   `CACHE_SCHEMA` (40) no cambian hasta la Fase 2.
+
+**Puerta § 34.** Destructiva solo por el `DROP` de `create_date` al cambiar de firma. Requiere backup, staging, plan y
+apply por `production-migrate.yml` con OK expreso de Marco.
+
+**Cómo se revierte.** En base: `build/runbooks/rollback-20261122-date-bolo-link.sql` (probado en local ida y vuelta).
+En código: revertir el commit.

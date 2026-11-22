@@ -1731,6 +1731,7 @@ export type Database = {
       date: {
         Row: {
           all_day: boolean
+          bolo_id: string | null
           city: string | null
           country: string | null
           created_at: string
@@ -1761,6 +1762,7 @@ export type Database = {
         }
         Insert: {
           all_day?: boolean
+          bolo_id?: string | null
           city?: string | null
           country?: string | null
           created_at?: string
@@ -1791,6 +1793,7 @@ export type Database = {
         }
         Update: {
           all_day?: boolean
+          bolo_id?: string | null
           city?: string | null
           country?: string | null
           created_at?: string
@@ -1820,6 +1823,13 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "date_bolo_id_fkey"
+            columns: ["bolo_id"]
+            isOneToOne: false
+            referencedRelation: "bolo"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "date_line_id_fkey"
             columns: ["line_id"]
@@ -6426,6 +6436,7 @@ export type Database = {
       create_date: {
         Args: {
           p_all_day?: boolean
+          p_bolo_id?: string
           p_city?: string
           p_country?: string
           p_destination_city?: string
@@ -6446,6 +6457,7 @@ export type Database = {
         }
         Returns: {
           all_day: boolean
+          bolo_id: string | null
           city: string | null
           country: string | null
           created_at: string
@@ -9169,6 +9181,10 @@ export type Database = {
         Returns: string
       }
       travel_stage_zone: { Args: { p_tz: string }; Returns: string }
+      trips_for_performance: {
+        Args: { p_performance_id: string }
+        Returns: Json
+      }
       undo_organization_merge: { Args: { p_merge_id: string }; Returns: Json }
       undo_person_merge: { Args: { p_merge_id: string }; Returns: Json }
       unsubscribe_audience_subscription: {

@@ -59,6 +59,8 @@ export const DateCreateSchema = v.object({
   status: v.optional(v.picklist(DATE_CREATE_STATUSES)),
   line_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
   performance_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
+  /** ADR-242: the deal this trip serves (travel_day only, DB CHECK `date_bolo_travel_only`). */
+  bolo_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
   travel_direction: v.optional(v.nullable(v.picklist(TRAVEL_DIRECTIONS))),
   /** ADR-089: a trip's two ends. Only a travel day carries them (DB CHECK
       `date_travel_endpoints`). For a trip, `city` is kept equal to the
@@ -117,6 +119,8 @@ export const DatePatchSchema = v.object({
   country: v.optional(v.nullable(countryField)),
   line_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
   performance_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
+  /** ADR-242: the deal this trip serves (travel_day only, DB CHECK `date_bolo_travel_only`). */
+  bolo_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
   travel_direction: v.optional(v.nullable(v.picklist(TRAVEL_DIRECTIONS))),
   /** ADR-089: a trip's two ends. Only a travel day carries them (DB CHECK
       `date_travel_endpoints`). For a trip, `city` is kept equal to the

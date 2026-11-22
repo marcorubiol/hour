@@ -234,6 +234,12 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
       400,
     );
   }
+  if (!isTrip && input.bolo_id) {
+    return json(
+      { error: 'invalid_body', hint: "bolo_id requires kind='travel_day'." },
+      400,
+    );
+  }
   const city = isTrip && input.destination_city !== undefined ? input.destination_city : input.city;
   if (input.label && input.kind !== 'other') {
     return json(
@@ -260,6 +266,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
       p_label: input.label ?? null,
       p_origin_city: isTrip ? (input.origin_city ?? null) : null,
       p_destination_city: isTrip ? (input.destination_city ?? null) : null,
+      ...(input.bolo_id !== undefined ? { p_bolo_id: isTrip ? input.bolo_id : null } : {}),
     });
     if (data.length === 0 || !data[0]) return json({ error: 'create_failed' }, 502);
     return json({ date: data[0] }, 201);

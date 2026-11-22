@@ -129,11 +129,13 @@ export const PATCH: RequestHandler = async ({ request, params, platform, locals 
     const row = found.data[0];
     const effectiveKind = input.kind ?? row.kind;
 
-    // Relink guard — line/performance must belong to the date's project
-    // (create_date enforces the same invariant; updates must hold it).
+    // Relink guard: line, performance and bolo must belong to the date's
+    // project (and for bolo, the caller must see it under bolo_select /
+    // read:money; the DB trigger enforces the same invariant on direct PATCH).
     for (const [field, table] of [
       ['line_id', 'line'],
       ['performance_id', 'performance'],
+      ['bolo_id', 'bolo'],
     ] as const) {
       const value = input[field];
       if (!value) continue;
@@ -152,10 +154,16 @@ export const PATCH: RequestHandler = async ({ request, params, platform, locals 
       }
     }
 
-    // Travel invariant: direction only on travel days.
+    // Travel invariant: direction and bolo_id only on travel days.
     if (input.travel_direction && effectiveKind !== 'travel_day') {
       return json(
         { error: 'invalid_body', hint: "travel_direction requires kind='travel_day'." },
+        400,
+      );
+    }
+    if (input.bolo_id && effectiveKind !== 'travel_day') {
+      return json(
+        { error: 'invalid_body', hint: "bolo_id requires kind='travel_day'." },
         400,
       );
     }
@@ -165,16 +173,15 @@ export const PATCH: RequestHandler = async ({ request, params, platform, locals 
     };
     if (patch.country) patch.country = (patch.country as string).toUpperCase();
 
-    // Kind moved away from travel_day without an explicit direction → clear
-    // it, so the edit doesn't die on the DB CHECK.
+    // Kind moved away from travel_day without an explicit direction or bolo:
+    // clear them, so the edit does not die on the DB CHECKs.
     if (input.kind && input.kind !== 'travel_day' && input.travel_direction === undefined) {
       patch.travel_direction = null;
     }
 
-    // ADR-089: the two ends are a trip's alone (DB CHECK
-    // `date_travel_endpoints`). Leaving travel clears them, like the
-    // direction; on a trip, `city` follows the destination, because the away
-    // bands and every older reader still read `city` as where the trip goes.
+    // ADR-089 + ADR-242: the two ends and bolo_id are a trip's alone (DB CHECKs
+    // `date_travel_endpoints` and `date_bolo_travel_only`). Leaving travel clears
+    // them; on a trip, `city` follows the destination.
     if (effectiveKind !== 'travel_day') {
       if (input.origin_city || input.destination_city) {
         return json(
@@ -185,6 +192,7 @@ export const PATCH: RequestHandler = async ({ request, params, platform, locals 
       if (input.kind && row.kind === 'travel_day') {
         patch.origin_city = null;
         patch.destination_city = null;
+        if (input.bolo_id === undefined) patch.bolo_id = null;
       }
     } else if (input.destination_city !== undefined) {
       patch.city = input.destination_city;
