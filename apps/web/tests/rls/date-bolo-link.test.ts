@@ -258,7 +258,7 @@ describe.skipIf(!envReady())('date ↔ bolo link + trips_for_performance + publi
     const tripId = one(trip.data)!.id;
 
     const del = await pgRpc('delete_bolo', jwt, { p_bolo_id: tmpBoloId });
-    expect(del.status, del.error).toBe(200);
+    expect(del.status, del.error).toBe(204);
 
     const after = await pgGet<DateRow>('date', jwt, new URLSearchParams({ select: 'id,bolo_id', id: `eq.${tripId}` }));
     expect(after.status).toBe(200);
