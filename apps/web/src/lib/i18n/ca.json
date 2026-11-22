@@ -3881,5 +3881,7 @@
   "calendar.proposal_applied": "Canvi aplicat a hour.",
   "calendar.proposal_dismissed": "Canvi descartat; hour restaurarà la seva hora.",
   "desk.verb_reconnect": "Reconnectar",
-  "desk.verb_calendar_proposal": "Calendari"
+  "desk.verb_calendar_proposal": "Calendari",
+  "pass.trips_other_days": "Viatges del bolo",
+  "pass.trip_suggested": "suggerit"
 }

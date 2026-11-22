@@ -3881,5 +3881,7 @@
   "calendar.proposal_applied": "Modification appliquée dans hour.",
   "calendar.proposal_dismissed": "Ignoré ; hour rétablira l'horaire d'origine.",
   "desk.verb_reconnect": "Reconnecter",
-  "desk.verb_calendar_proposal": "Calendrier"
+  "desk.verb_calendar_proposal": "Calendrier",
+  "pass.trips_other_days": "Trajets du contrat",
+  "pass.trip_suggested": "suggéré"
 }

@@ -11,7 +11,7 @@ import { SCHEDULE_SLOT_EMBED } from '$lib/schedule-slot';
 /** Every column the row is read with; a missing one is an error, not a quieter read. */
 export const DATE_SELECT = [
   'id,kind,status,title,starts_at,ends_at,all_day,venue_name,city,country',
-  'project_id,performance_id',
+  'project_id,performance_id,bolo_id',
   'project:project_id(id,slug,name,accent,initials,workspace_id)',
   'venue:venue_id(timezone)',
   'line_id,travel_direction',

@@ -296,6 +296,9 @@
               data-testid={p.of === 'stage' ? 'roadsheet-travel' : 'roadsheet-moment'}
             >
               <span class="ps__at">
+                {#if p.of === 'stage' && time.primaryDay !== sheet.performed_at.slice(0, 10)}
+                  <span class="ps__muted">{dayLabel(time.primaryDay, 'short', LOCALE_TAG[locale])} · </span>
+                {/if}
                 {time.primary}
                 {#if time.secondary}<span class="ps__muted">{t('roadsheet.time_yours', locale, { time: time.secondary })}</span>{/if}
               </span>

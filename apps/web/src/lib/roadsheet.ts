@@ -182,22 +182,31 @@ export type RoadsheetStage = Pick<
   | 'reference'
 >;
 
+/** How a trip came to belong to a performance (ADR-242). */
+export type TripLinkSource = 'bolo' | 'line' | 'suggested';
+
 /**
- * A trip on the sheet (ADR-166). `tz` is the trip's venue zone: the clock of
- * a stage end that names none, as in Ahora. `going` is who said «voy» to it,
- * by name; empty is a company trip, and nobody is guessed (ADR-147).
+ * A trip on the sheet (ADR-166, ADR-242). `tz` is the trip's venue zone: the
+ * clock of a stage end that names none, as in Ahora. `going` is who said «voy»
+ * to it, by name; empty is a company trip, and nobody is guessed (ADR-147).
  */
 export interface RoadsheetTrip {
   id: string;
   title: string | null;
   starts_at: string;
+  ends_at?: string | null;
   all_day: boolean;
+  travel_direction?: string | null;
   origin_city: string | null;
   destination_city: string | null;
   tz: string | null;
   /** The stages with an hour, in time order (`timedStages`). */
   stages: RoadsheetStage[];
   going: string[];
+  status?: string;
+  /** Set on internal reads (`trips_for_performance`, `tripsOfPerformance`):
+      how the trip is linked (`bolo` | `line` | `suggested`). */
+  link_source?: TripLinkSource;
 }
 
 /** A `date` row as the sheet's endpoint reads it, before the cut. */
@@ -209,8 +218,11 @@ export interface TripRow {
   starts_at: string;
   ends_at: string | null;
   all_day: boolean;
+  travel_direction?: string | null;
   origin_city: string | null;
   destination_city: string | null;
+  bolo_id?: string | null;
+  line_id?: string | null;
   venue: { timezone: string | null } | null;
   stages: TravelStageRow[] | null;
   commitments: Array<{ person_id: string; state: string }> | null;
@@ -222,44 +234,66 @@ function tripDay(at: string, allDay: boolean, tz: string): string {
 }
 
 /**
- * WHICH TRIP IS «OF THIS PERFORMANCE» (ADR-166 § 2): a `travel_day` of the
- * same project (the endpoint asks for that), not cancelled, that touches the
- * performance's day or the day before. A trip's days are read on its own
- * venue's clock, else on the performance's (UTC when neither has a zone);
- * an all-day trip keeps its stored days, as the Planner does. Touching: it starts on one of them, or starts
- * before and is still running on the eve. The way home the day after is the
- * next sheet's business, or nobody's.
+ * WHICH TRIP IS «OF THIS PERFORMANCE» (ADR-166 § 2, ADR-242):
+ *   1. Bound to the performance's bolo (`bolo_id === scope.boloId`), regardless
+ *      of date (outbound 2 days before, return the day after all enter).
+ *   2. Bound to the performance's line with no bolo (`line_id === scope.lineId && !bolo_id`).
+ *   3. ONLY when neither (1) nor (2) matches any row: the legacy day + eve
+ *      heuristic over unbound trips (`!bolo_id`), marked `link_source = 'suggested'`.
  *
- * `names` maps a person id to the name the space knows them by; a «voy»
- * without a name in the space is left out rather than shown as an id.
+ * Pure function: mirrors `private.performance_trips_jsonb` in Postgres.
  */
 export function tripsOfPerformance(
   rows: readonly TripRow[],
   performedAt: string,
   zone: string | null,
   names: ReadonlyMap<string, string>,
+  scope?: { boloId?: string | null; lineId?: string | null },
 ): RoadsheetTrip[] {
   const tz = zone || 'UTC';
   const day = performedAt.slice(0, 10);
   const eve = addDaysIso(day, -1);
-  return rows
-    .filter((r) => r.kind === 'travel_day' && r.status !== 'cancelled')
-    .filter((r) => {
-      const own = r.venue?.timezone || tz;
-      const first = tripDay(r.starts_at, r.all_day, own);
-      const end = r.ends_at ? tripDay(r.ends_at, r.all_day, own) : first;
-      const last = end > first ? end : first;
-      return first <= day && last >= eve;
-    })
-    .sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at))
-    .map((r) => ({
+  const boloId = scope?.boloId ?? null;
+  const lineId = scope?.lineId ?? null;
+
+  const live = rows.filter((r) => r.kind === 'travel_day' && r.status !== 'cancelled');
+  const bound: Array<{ row: TripRow; source: TripLinkSource }> = [];
+  for (const r of live) {
+    if (boloId && r.bolo_id === boloId) {
+      bound.push({ row: r, source: 'bolo' });
+    } else if (lineId && r.line_id === lineId && !r.bolo_id) {
+      bound.push({ row: r, source: 'line' });
+    }
+  }
+
+  const picked: Array<{ row: TripRow; source: TripLinkSource }> =
+    bound.length > 0
+      ? bound
+      : live
+          .filter((r) => {
+            if (r.bolo_id) return false;
+            const own = r.venue?.timezone || tz;
+            const first = tripDay(r.starts_at, r.all_day, own);
+            const end = r.ends_at ? tripDay(r.ends_at, r.all_day, own) : first;
+            const last = end > first ? end : first;
+            return first <= day && last >= eve;
+          })
+          .map((row) => ({ row, source: 'suggested' as const }));
+
+  return picked
+    .sort((a, b) => Date.parse(a.row.starts_at) - Date.parse(b.row.starts_at))
+    .map(({ row: r, source }) => ({
       id: r.id,
       title: r.title,
       starts_at: r.starts_at,
+      ends_at: r.ends_at,
       all_day: r.all_day,
+      travel_direction: r.travel_direction ?? null,
       origin_city: r.origin_city,
       destination_city: r.destination_city,
       tz: r.venue?.timezone ?? null,
+      status: r.status,
+      link_source: source,
       stages: [...(r.stages ?? [])]
         .filter((s) => s.depart_at && Number.isFinite(Date.parse(s.depart_at)))
         .sort((a, b) => Date.parse(a.depart_at!) - Date.parse(b.depart_at!))

@@ -41,7 +41,7 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import type { Json } from '$lib/db-types';
   import type { KVObject } from '$lib/kv-lines';
-  import { dayLabel, dayMonth, localDayISO, viewerTimeZone } from '$lib/datetime';
+  import { dayLabel, dayMonth, dayParts, localDayISO, viewerTimeZone } from '$lib/datetime';
   import { LOCALE_TAG, appLocale, tHere, setRecordSpace, tradeFor } from '$lib/i18n';
   import {
     HOLD_NOTICE_DEFAULT,
@@ -81,7 +81,8 @@
   import { passFigure, passWhenWord } from '$lib/pass-read';
   import { logisticsLines, mapsHref, telHref, venueCall } from '$lib/ahora';
   import MapLink from '$lib/components/MapLink.svelte';
-  import { tripStops, type ExtraStop, type TripStage, type TripStop } from '$lib/pass-stops';
+  import { otherDayTrips, tripStops, type ExtraStop, type TripStop } from '$lib/pass-stops';
+  import type { RoadsheetTrip } from '$lib/roadsheet';
   import { dayOf } from '$lib/running-order';
   import { hasJsonContent } from '$lib/components/JsonKV.svelte';
   import {
@@ -1051,34 +1052,38 @@
   let dayTz = $derived(perf?.venue?.timezone ?? workspaceTz ?? viewerTz);
   let dayIso = $derived(perf?.performed_at.slice(0, 10) ?? '');
 
-  // A trip of the same project that day lends its ends as stops, read-only,
-  // with a link to it (Marco's answer 3, 18-11). Same feed as the Planner's.
-  /** The API's window is on UTC days and the stops on the venue's: a day
-      either side, then the stages are kept by the venue's day (tripStops).
-      The limit is the API's own default: a project's three days fit. */
-  const shiftDay = (iso: string, n: number) => {
-    const d = new Date(`${iso}T12:00:00Z`);
-    d.setUTCDate(d.getUTCDate() + n);
-    return d.toISOString().slice(0, 10);
-  };
-  type TripRow = { id: string; kind: string; status: string; stages?: TripStage[] };
+  // ADR-242 + ADR-243: trips serving this performance (bound to its bolo,
+  // bound to its line without a bolo, or suggested by day + eve when none are
+  // bound). Resolved in Postgres so every reader with read:performance sees
+  // bound trips without needing read:money. Same-day departures/arrivals feed
+  // `pass-stops`; other days render in a short line above the stops.
   const tripsQuery = createQuery(
     toStore(() => ({
-      queryKey: ['performance-day-trips', perf?.project?.id ?? '', dayIso] as const,
-      enabled: Boolean(perf?.project?.id && dayIso),
+      queryKey: ['performance-trips', perf?.id ?? ''] as const,
+      enabled: Boolean(perf?.id),
       retry: false,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
-        fetchJSON<{ items: TripRow[] }>(
-          `/api/dates?project_ids=${perf!.project!.id}&from=${shiftDay(dayIso, -1)}&to=${shiftDay(dayIso, 1)}&spans=1&stages=1&limit=200`,
+        fetchJSON<{ items: RoadsheetTrip[] }>(
+          `/api/performances/${encodeURIComponent(perf!.id)}/trips`,
           signal,
         ),
     })),
   );
+  let perfTrips = $derived<RoadsheetTrip[]>($tripsQuery.data?.items ?? []);
   let tripExtras = $derived<TripStop[]>(
-    ($tripsQuery.data?.items ?? [])
-      .filter((d) => d.kind === 'travel_day' && d.status !== 'cancelled')
-      .flatMap((d) => tripStops(d.id, d.stages ?? [], (iso) => dayOf(iso, dayTz) === dayIso)),
+    perfTrips.flatMap((d) => tripStops(d.id, d.stages, (iso) => dayOf(iso, dayTz) === dayIso)),
   );
+  let asideTrips = $derived(dayIso ? otherDayTrips(perfTrips, dayIso, dayOf, dayTz) : []);
+
+  function tripLineLabel(trip: RoadsheetTrip, tripDayIso: string): string {
+    const dir =
+      trip.travel_direction === 'outbound' || trip.travel_direction === 'return' || trip.travel_direction === 'leg'
+        ? t(`create.direction_${trip.travel_direction}`, locale)
+        : t('planner.kind_travel_day', locale);
+    const when = dayParts(tripDayIso, LOCALE_TAG[locale]).short;
+    const route = [trip.origin_city, trip.destination_city].filter(Boolean).join(' → ') || trip.title || '';
+    return [dir, when, route].filter(Boolean).join(' · ');
+  }
 
   let logistics = $derived(logisticsLines(perf?.logistics));
   let hotelLine = $derived(logistics.hotel ?? null);
@@ -1333,6 +1338,20 @@
          address and the contact hung on their stop. One way to write an
          hour in the whole app (ADR-090 P3). -->
     <div id="running-order" data-slot="day">
+      {#if asideTrips.length > 0}
+        <ul class="perf__other-trips" role="list" aria-label={t('pass.trips_other_days', locale)} data-testid="perf-other-trips">
+          {#each asideTrips as item (item.trip.id)}
+            <li class="perf__other-trip">
+              <a class="perf__other-trip-link" href={`/h/planner?peek=date/${item.trip.id}`}>
+                {tripLineLabel(item.trip, item.day)}
+              </a>
+              {#if item.trip.link_source === 'suggested'}
+                <span class="perf__other-trip-hint">{t('pass.trip_suggested', locale)}</span>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+      {/if}
       <RunningOrder
         target="performance"
         id={perf.id}
@@ -1927,6 +1946,35 @@
     }
     .perf__stop-link {
       color: var(--text-muted);
+    }
+
+    /* ADR-243: trips of other days in a quiet line above pass-stops. */
+    .perf__other-trips {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+      margin: 0 0 var(--space-s);
+      padding: 0;
+      list-style: none;
+    }
+    .perf__other-trip {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: var(--space-xs);
+      font-size: var(--text-s);
+      color: var(--text-muted);
+    }
+    .perf__other-trip-link {
+      color: var(--text-color);
+      text-decoration: none;
+    }
+    .perf__other-trip-link:hover {
+      text-decoration: underline;
+    }
+    .perf__other-trip-hint {
+      font-size: var(--text-xs);
+      color: var(--text-faint);
     }
 
     .perf__section {

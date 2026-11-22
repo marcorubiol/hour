@@ -51,9 +51,10 @@ describe('invalidateDateFeeds', () => {
         'planner-agenda-dates',
         'line-dates',
         'desk-dates',
+        'performance-trips',
       ]),
     );
-    expect(keys).toHaveLength(4);
+    expect(keys).toHaveLength(5);
   });
 });
 

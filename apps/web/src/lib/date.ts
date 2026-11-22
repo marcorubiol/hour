@@ -143,6 +143,7 @@ const DATE_FEED_KEYS = [
   ['planner-agenda-dates'],
   ['line-dates'],
   ['desk-dates'],
+  ['performance-trips'],
 ] as const;
 
 /**
