@@ -3864,7 +3864,7 @@
   .cal__now {
     padding: var(--space-2xs) var(--space-m);
     border: var(--line-hairline) solid var(--border-color-dark);
-    border-radius: var(--radius-circle);
+    border-radius: var(--radius);
     background: none;
     color: var(--text-muted);
     font-family: var(--font-sans);
