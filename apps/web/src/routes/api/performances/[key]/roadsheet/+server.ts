@@ -35,24 +35,19 @@ import {
   companyContactFor,
   isRoadsheetRole,
   roadsheetRoleFor,
-  tripsOfPerformance,
   type CastEntry,
   type CompanyContact,
   type PerformanceBundle,
   type RoadsheetMaterial,
   type RoadsheetTrip,
-  type TripRow,
 } from '$lib/roadsheet';
-import { COMMITMENTS_EMBED } from '$lib/people';
 import { roadsheetTeam } from '$lib/roadsheet-late';
-import { addDaysIso } from '$lib/planner';
-import { STAGE_SELECT } from '$lib/travel-stage';
 import {
   fetchPerformanceBundle,
   isUuid,
   type PerformanceBundleResult,
 } from '$lib/server/performance-bundle';
-import { pgGet, type SupabaseEnv } from '$lib/supabase';
+import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { decodeJwtPayload } from '$lib/server/session';
 import { pgErrorResponse } from '$lib/server/errors';
 import { json } from '$lib/server/http';
@@ -172,53 +167,21 @@ async function readCompanyContact(
 }
 
 /**
- * The project's trips around the performance, cut to the day and its eve.
- * The window asked of the database is a day wider on each side, so a zone
- * far from UTC cannot push a trip out before the pure cut sees it.
+ * Trips serving this performance (ADR-166, ADR-242, ADR-243): resolved in
+ * Postgres through `trips_for_performance` so every reader with
+ * `read:performance` (and bolo guests for bolo-bound trips) gets the exact
+ * same rule as `get_public_roadsheet` without needing `read:money`.
  */
 async function readTrips(
   env: SupabaseEnv,
   jwt: string,
   performance: PerformanceBundleResult['performance'],
 ): Promise<RoadsheetTrip[]> {
-  const day = performance.performed_at.slice(0, 10);
-  const from = addDaysIso(day, -2);
-  const search = new URLSearchParams({
-    select: [
-      'id,kind,status,title,starts_at,ends_at,all_day,origin_city,destination_city',
-      'venue:venue_id(timezone)',
-      COMMITMENTS_EMBED,
-      `stages:travel_stage(${STAGE_SELECT})`,
-    ].join(','),
-    'stages.order': 'position.asc',
-    project_id: `eq.${performance.project_id}`,
-    kind: 'eq.travel_day',
-    status: 'neq.cancelled',
-    deleted_at: 'is.null',
-    order: 'starts_at.asc',
-    limit: '50',
+  const { data } = await pgPostRpc<RoadsheetTrip[] | null>(env, 'trips_for_performance', jwt, {
+    p_performance_id: performance.id,
   });
-  search.append('starts_at', `lte.${addDaysIso(day, 1)}T23:59:59.999Z`);
-  search.append('and', `(or(starts_at.gte.${from},ends_at.gte.${from}))`);
-  const { data: rows } = await pgGet<TripRow>(env, 'date', jwt, { search });
-
-  // Who said «voy», by the name the space knows them by (ADR-147).
-  const ids = [
-    ...new Set(rows.flatMap((r) => (r.commitments ?? []).filter((c) => c.state === 'going').map((c) => c.person_id))),
-  ];
-  const names = new Map<string, string>();
-  if (ids.length > 0) {
-    const { data: dossiers } = await pgGet<{ person_id: string; full_name: string }>(env, 'workspace_person', jwt, {
-      search: new URLSearchParams({
-        select: 'person_id,full_name',
-        workspace_id: `eq.${performance.workspace_id}`,
-        person_id: `in.(${ids.join(',')})`,
-        deleted_at: 'is.null',
-      }),
-    });
-    for (const d of dossiers) names.set(d.person_id, d.full_name);
-  }
-  return tripsOfPerformance(rows, performance.performed_at, performance.venue?.timezone ?? null, names);
+  const raw = Array.isArray(data) && data.length === 1 && Array.isArray(data[0]) ? data[0] : data;
+  return Array.isArray(raw) ? (raw as RoadsheetTrip[]) : [];
 }
 
 /** The outbound links of the performance and its line (88), as the public sheet reads them. */

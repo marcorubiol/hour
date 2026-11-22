@@ -3881,5 +3881,7 @@
   "calendar.proposal_applied": "Change applied in hour.",
   "calendar.proposal_dismissed": "Dismissed; hour will restore its original time.",
   "desk.verb_reconnect": "Reconnect",
-  "desk.verb_calendar_proposal": "Calendar"
+  "desk.verb_calendar_proposal": "Calendar",
+  "pass.trips_other_days": "Trips for this deal",
+  "pass.trip_suggested": "suggested"
 }

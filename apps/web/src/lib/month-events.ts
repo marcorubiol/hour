@@ -98,6 +98,8 @@ export type DateEvent = {
   /** The performance this date hangs from (ADR-078 §1, third cascade
       level). Always fetched by the feed; read by the edit dialog. */
   performance_id?: string | null;
+  /** The bolo this trip serves (ADR-242, travel_day only). */
+  bolo_id?: string | null;
   /** ADR-078 columns — absent until the migrations are applied
       (graceful absence: chips render directionless, no away bands). */
   line_id?: string | null;

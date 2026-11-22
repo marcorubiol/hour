@@ -93,6 +93,7 @@ type DateItem = {
   country: string | null;
   project_id: string;
   performance_id: string | null;
+  bolo_id?: string | null;
   project: ProjectLite | null;
   /** Timezone rule: a timed date buckets/renders on its venue's day. */
   venue: { timezone: string | null } | null;

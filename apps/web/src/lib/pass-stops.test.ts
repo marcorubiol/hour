@@ -3,6 +3,7 @@ import {
   DAY_TEMPLATE,
   fillDay,
   hangPlaces,
+  otherDayTrips,
   showInstant,
   templateAt,
   templateClockAt,
@@ -143,5 +144,66 @@ describe('tripStops', () => {
       onDay,
     );
     expect(stops.map((s) => s.kind)).toEqual(['arrive']);
+  });
+});
+
+describe('otherDayTrips (ADR-243)', () => {
+  const dayOfIso = (iso: string) => iso.slice(0, 10);
+
+  test('keeps trips on other days and untimed same-day trips, excludes timed same-day trips', () => {
+    const out = otherDayTrips(
+      [
+        {
+          id: 'out-2d',
+          starts_at: '2026-11-19T08:00:00Z',
+          all_day: false,
+          stages: [
+            {
+              depart_at: '2026-11-19T08:00:00Z',
+              arrive_at: '2026-11-19T09:15:00Z',
+              from_city: 'Barcelona',
+              from_place: null,
+              to_city: 'Bilbao',
+              to_place: null,
+            },
+          ],
+        },
+        {
+          id: 'same-day-timed',
+          starts_at: '2026-11-21T07:00:00Z',
+          all_day: false,
+          stages: [
+            {
+              depart_at: '2026-11-21T07:00:00Z',
+              arrive_at: '2026-11-21T09:00:00Z',
+              from_city: 'Barcelona',
+              from_place: null,
+              to_city: 'Girona',
+              to_place: null,
+            },
+          ],
+        },
+        {
+          id: 'same-day-untimed',
+          starts_at: '2026-11-21T00:00:00Z',
+          all_day: true,
+          stages: [],
+        },
+        {
+          id: 'return-next',
+          starts_at: '2026-11-22T10:00:00Z',
+          all_day: true,
+          stages: [],
+        },
+      ],
+      '2026-11-21',
+      dayOfIso,
+      'Europe/Madrid',
+    );
+    expect(out.map((x) => [x.trip.id, x.day])).toEqual([
+      ['out-2d', '2026-11-19'],
+      ['same-day-untimed', '2026-11-21'],
+      ['return-next', '2026-11-22'],
+    ]);
   });
 });

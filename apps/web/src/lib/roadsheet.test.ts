@@ -379,6 +379,36 @@ describe('tripsOfPerformance: which trip is «of this performance»', () => {
     const [company] = tripsOfPerformance([trip({})], '2026-10-17', null, names);
     expect(company.going).toEqual([]);
   });
+
+  it('ADR-243: bound bolo trips enter outside day+eve, union with line trips without bolo, and fallback never steals another bolo', () => {
+    const out2d = trip({ id: 'out-2d', bolo_id: 'b1', travel_direction: 'outbound', starts_at: '2026-10-15T07:00:00Z', ends_at: null });
+    const back1d = trip({ id: 'back-1d', bolo_id: 'b1', travel_direction: 'return', starts_at: '2026-10-18T11:00:00Z', ends_at: null });
+    const lineLeg = trip({ id: 'line-leg', line_id: 'l1', bolo_id: null, starts_at: '2026-10-14T09:00:00Z', ends_at: null });
+    const looseDay = trip({ id: 'loose-day', bolo_id: null, starts_at: '2026-10-17T08:00:00Z', ends_at: null });
+    const otherBoloDay = trip({ id: 'other-bolo', bolo_id: 'b2', starts_at: '2026-10-17T09:00:00Z', ends_at: null });
+
+    const bound = tripsOfPerformance(
+      [out2d, back1d, lineLeg, looseDay, otherBoloDay],
+      '2026-10-17',
+      'Europe/Madrid',
+      none,
+      { boloId: 'b1', lineId: 'l1' },
+    );
+    expect(bound.map((x) => [x.id, x.link_source])).toEqual([
+      ['line-leg', 'line'],
+      ['out-2d', 'bolo'],
+      ['back-1d', 'bolo'],
+    ]);
+
+    const fallback = tripsOfPerformance(
+      [looseDay, otherBoloDay],
+      '2026-10-17',
+      'Europe/Madrid',
+      none,
+      { boloId: 'b3', lineId: null },
+    );
+    expect(fallback.map((x) => [x.id, x.link_source])).toEqual([['loose-day', 'suggested']]);
+  });
 });
 
 describe('buildRoadsheet: the travel section', () => {

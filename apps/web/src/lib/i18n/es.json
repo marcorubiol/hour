@@ -3881,5 +3881,7 @@
   "calendar.proposal_applied": "Cambio aplicado en hour.",
   "calendar.proposal_dismissed": "Cambio descartado; hour restaurará su hora.",
   "desk.verb_reconnect": "Reconectar",
-  "desk.verb_calendar_proposal": "Calendario"
+  "desk.verb_calendar_proposal": "Calendario",
+  "pass.trips_other_days": "Viajes del bolo",
+  "pass.trip_suggested": "sugerido"
 }

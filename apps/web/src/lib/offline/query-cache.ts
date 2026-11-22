@@ -49,7 +49,7 @@ export const MAX_SECONDARY_ENTRIES = 150;
  * changes screens, styles or texts leaves it alone and the cache survives.
  * When in doubt, bump it: the cost is one slow open per device.
  */
-export const CACHE_SCHEMA = 40;
+export const CACHE_SCHEMA = 41;
 
 /** Query prefixes needed to paint Hoy immediately on open. Everything else
  *  lives in `query_entries` and hydrates right behind Hoy. */

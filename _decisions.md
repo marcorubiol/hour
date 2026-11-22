@@ -8884,3 +8884,33 @@ apply por `production-migrate.yml` con OK expreso de Marco.
 
 **Cómo se revierte.** En base: `build/runbooks/rollback-20261122-date-bolo-link.sql` (probado en local ida y vuelta).
 En código: revertir el commit.
+
+## [2026-11-23] ADR-243 · El viaje se ata a su bolo (Fase 2: lectura en el pase y en la hoja de ruta)
+
+Marco, 22-11 (opción recomendada para la línea corta sobre las paradas y «Hazlo todo»).
+
+**Contexto.** Con la Fase 1 (ADR-242) aplicada en producción (`20261122140000_date_bolo_link.sql`), la base ya expone
+`date.bolo_id`, `public.trips_for_performance(uuid)` y la hoja pública actualizada. Faltaba que el pase de la función,
+la hoja interna y el feed de fechas leyeran esos enlaces.
+
+**Decisión (Fase 2 de 3).**
+1. **`DATE_SELECT` y `CACHE_SCHEMA`:** `DATE_SELECT` (`apps/web/src/lib/server/date-select.ts`) añade `bolo_id`; sube
+   `CACHE_SCHEMA` de 40 a 41 (ADR-158) en el mismo commit. `invalidateDateFeeds` invalida también `['performance-trips']`.
+2. **Lectura unificada por función (`GET /api/performances/:key/trips` y hoja interna):** tanto el pase
+   (`PerformanceRecord.svelte`) como `GET /api/performances/:key/roadsheet` llaman a `trips_for_performance` en
+   Postgres. Así todo el equipo con `read:performance` (y los invitados de bolo para los viajes atados al bolo) ve los
+   viajes del bolo y de la línea sin necesitar `read:money` y con la misma regla exacta que la hoja pública.
+3. **`tripsOfPerformance` sigue pura** (`apps/web/src/lib/roadsheet.ts`): acepta `{ boloId, lineId }` opcionales y
+   aplica la misma unión (bolo U línea sin bolo, y solo si no hay ninguno atado, día y víspera sobre viajes sin bolo
+   marcados como `link_source = 'suggested'`).
+4. **Viajes de otros días en el pase y en la hoja:**
+   - En `pass-stops` siguen solo las salidas y llegadas del propio día de la función (`tripStops`).
+   - Los viajes de otros días (ida de dos días antes, vuelta al día siguiente, o viajes sin tramos horarios) salen en
+     una línea corta encima de las paradas (`otherDayTrips`, formato «Ida · jue 3 dic · Barcelona → Bilbao», abre el
+     viaje en el vistazo), sin naranja ni contadores.
+   - En `PassSheet.svelte` (hoja interna y pública), un tramo cuya salida cae en otro día muestra el día corto junto a
+     la hora.
+
+**Sin migración ni cambios de esquema.**
+
+**Cómo se revierte.** Revertir el commit (la caché del dispositivo se invalida al bajar o subir `CACHE_SCHEMA`).

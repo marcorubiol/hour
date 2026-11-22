@@ -186,9 +186,9 @@ export function showInstant(dayIso: string, h: number, m: number, tz: string): s
   return wallClockToInstant(`${dayIso}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`, tz);
 }
 
-/** A trip's stage, as the page reads it from `/api/dates?stages=1`. */
+/** A trip's stage, as the page reads it from `/api/dates?stages=1` or `/api/performances/:key/trips`. */
 export interface TripStage {
-  id: string;
+  id?: string;
   depart_at: string | null;
   arrive_at: string | null;
   from_city: string | null;
@@ -237,6 +237,37 @@ export function tripStops(
       place: last.to_place || last.to_city,
       tripId,
     });
+  }
+  return out;
+}
+
+export interface PassTripLike {
+  id: string;
+  starts_at: string;
+  all_day: boolean;
+  tz?: string | null;
+  stages: readonly TripStage[];
+}
+
+/**
+ * ADR-243: trips belonging to a performance that do NOT fall cleanly inside
+ * the performance's own day stops (outbound days before, return the next day,
+ * or an untimed trip with no stage on the day). Rendered in a short line above
+ * `pass-stops` so the day itself stays clean.
+ */
+export function otherDayTrips<T extends PassTripLike>(
+  trips: readonly T[],
+  dayIso: string,
+  dayOfFn: (iso: string, tz: string) => string,
+  dayTz: string,
+): Array<{ trip: T; day: string }> {
+  const out: Array<{ trip: T; day: string }> = [];
+  for (const trip of trips) {
+    const ownDay = trip.all_day ? trip.starts_at.slice(0, 10) : dayOfFn(trip.starts_at, trip.tz || dayTz);
+    const onPerfDay = tripStops(trip.id, trip.stages, (iso) => dayOfFn(iso, dayTz) === dayIso);
+    if (ownDay !== dayIso || onPerfDay.length === 0) {
+      out.push({ trip, day: ownDay });
+    }
   }
   return out;
 }
