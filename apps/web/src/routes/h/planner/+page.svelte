@@ -2647,6 +2647,14 @@
     if (ymKey(mesTo) - ymKey(mesFrom) + 1 >= MONTH_SPAN_MAX) return;
     mesTo = addMonths(mesTo.year, mesTo.month, 1);
   }
+  /** The past's door in Month view: prepend one earlier month (sliding the cap if full) and jump to it. */
+  function prependMonth() {
+    const prev = addMonths(mesFrom.year, mesFrom.month, -1);
+    if (ymKey(mesTo) - ymKey(prev) + 1 > MONTH_SPAN_MAX) {
+      mesTo = addMonths(prev.year, prev.month, MONTH_SPAN_MAX - 1);
+    }
+    void showMonth(prev);
+  }
   /** The month that holds the reader's eye: the title, the census, the
       address. Replaces the entry: scrolling is not a new page. */
   function onMonthShown(m: Ym) {
@@ -3665,6 +3673,8 @@
       gapLabel={(n) => `${n} ${t('planner.stat_free', locale)}`}
       gapShortLabel={(n) => t('planner.month_gap_short', locale, { n })}
       onReachEnd={growMonths}
+      onReachStart={prependMonth}
+      earlierLabel={t('planner.agenda_earlier', locale)}
       {onMonthShown}
       openDayWord={t('planner.view_day', locale)}
       performances={shownPerfs}

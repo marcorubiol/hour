@@ -3859,6 +3859,8 @@
   "calendar.status_paused": "Paused · reconnect needed",
   "calendar.connected_toast": "Connected as {email}.",
   "calendar.synced_toast": "Calendar synced.",
+  "calendar.synced_proposals_one": "Synced · 1 change waiting in Today.",
+  "calendar.synced_proposals_many": "Synced · {n} changes waiting in Today.",
   "calendar.sync_error": "Could not sync right now.",
   "calendar.disconnected_toast": "Calendar disconnected and removed from your account.",
   "calendar.busy_summary": "Which calendars count as busy",

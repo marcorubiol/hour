@@ -73,7 +73,10 @@ function extractTextTag(xml: string, tagName: string): string | null {
     'i',
   );
   const m = re.exec(xml);
-  return m ? decodeXmlEntities(m[1].trim()) : null;
+  if (!m) return null;
+  const raw = m[1].trim();
+  const cdata = /^<!\[CDATA\[([\s\S]*?)\]\]>$/.exec(raw);
+  return cdata ? cdata[1].trim() : decodeXmlEntities(raw);
 }
 
 function extractResponses(xml: string): string[] {
