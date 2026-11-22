@@ -9,6 +9,7 @@
    */
   export type SectionId =
     | 'profile'
+    | 'calendar'
     | 'workspaces'
     | 'space'
     | 'lenses'
@@ -30,6 +31,7 @@
 
   export const SECTIONS: Section[] = [
     { id: 'profile', labelKey: 'settings.nav_profile', glyph: '◯' },
+    { id: 'calendar', labelKey: 'settings.nav_calendar', glyph: '◷' },
     { id: 'workspaces', labelKey: 'settings.nav_workspaces', glyph: '▸' },
     { id: 'space', labelKey: 'settings.nav_space', glyph: '¶' },
     { id: 'lenses', labelKey: 'settings.nav_lenses', glyph: '◫' },
@@ -44,7 +46,7 @@
   ];
 
   /** What is the person's own in any space, whatever their role in it. */
-  export const PERSONAL_SECTIONS: readonly SectionId[] = ['profile'];
+  export const PERSONAL_SECTIONS: readonly SectionId[] = ['profile', 'calendar'];
 
   /** What only who manages the space changes: a member would find one line saying so. */
   export const ADMIN_SECTIONS: readonly SectionId[] = ['facet-people'];

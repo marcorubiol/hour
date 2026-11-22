@@ -20,7 +20,7 @@ describe('sectionFrom', () => {
 
   it('privacy and trade are one section', () => {
     expect(SECTIONS.map((s) => s.id)).toEqual([
-      'profile', 'workspaces', 'space', 'lenses', 'tags', 'facets', 'facet-packages', 'facet-people', 'mail',
+      'profile', 'calendar', 'workspaces', 'space', 'lenses', 'tags', 'facets', 'facet-packages', 'facet-people', 'mail',
     ]);
   });
 
@@ -40,6 +40,6 @@ describe('sectionFrom', () => {
     expect(ids(null)).toContain('facet-people');
     expect(ids('member')).not.toContain('facet-people');
     expect(ids('member')).toContain('facet-packages');
-    expect(ids('guest')).toEqual(['profile']);
+    expect(ids('guest')).toEqual(['profile', 'calendar']);
   });
 });

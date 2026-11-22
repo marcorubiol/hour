@@ -57,7 +57,7 @@ describe('GET /api/bootstrap', () => {
     expect(res.headers.get('cache-control')).toBe('no-store');
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.workspaces).toEqual({
-      items: [{ id: 'w1', slug: 'muk', my_role: 'owner', my_preset: null, view_scope: null, planner_view: null }],
+      items: [{ id: 'w1', slug: 'muk', my_role: 'owner', my_preset: null, view_scope: null, planner_view: null, calendar_scope: null }],
     });
     expect(body.projects).toEqual({ items: [{ id: 'p1', preparation: ['a'] }] });
     expect(body.money_access).toEqual({ read_money: true });

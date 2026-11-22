@@ -553,14 +553,14 @@ con boceto antes y después de la 119). Capturas de partida: espacio `playwright
 
 - [ ] **Modo «Ahora», después de la v1** (ADR-146, v1 en producción el 30-10): hotel y aparcamiento estructurados, billetes y rider en PDF, «qué ha cambiado», escribir sin red, aviso 30 min antes de la llamada. Re-evaluar dónde va el botón en el móvil tras usarlo en gira.
 
-- [ ] **Sincronizar con Apple Calendar y Google Calendar, cada persona con su cuenta** (ADR-240, ADR-241; plan y decisiones de Marco del 22-11 en `build/plans/2026-11-22-calendar-sync.md`). Hour escribe «lo mío» en un calendario «Hour» de la cuenta de cada persona y lee de sus otros calendarios solo cuándo está ocupada. Empieza por Apple. Hoy solo existe `calendar_share` (ADR-054). Fases, en serie:
-  - [ ] **0. Prueba técnica** con la cuenta de Marco (la contraseña de app la pone él en su Mac, nunca en git ni en un chat): CalDAV contra iCloud desde un Worker (descubrir, crear calendario, escribir, `sync-collection`, zonas, alarmas). Pedir a Apple el OAuth piloto. Mirar la categoría de verificación de los permisos de Google.
-  - [ ] **1. «Mi calendario» por suscripción:** el conjunto de eventos de una persona cruzando espacios, como función pura, servido como `.ics` personal con token revocable y con caducidad.
-  - [ ] **2. Apple, de Hour al calendario:** conexión, calendario «Hour», crear, actualizar, borrar, reponer, pausa y reconexión, desconectar. Toca permisos: RLS entera y E2E contra el desplegado.
-  - [ ] **3. Vuelve el ocupado:** elegir calendarios, choques en el Día y al convocar, días enteros como «no puedo». Sube `CACHE_SCHEMA` si cambia lo que guarda el dispositivo.
-  - [ ] **4. Cambios como propuesta** en «Te espera», solo para fechas.
-  - [ ] **5. Google:** el segundo adaptador (OAuth propio, `watch`, `syncToken`).
-  - [ ] **Plan de precios:** la investigación pone Google Calendar sync en STANDARD; sigue sin decidir qué ve el plan gratuito.
+- [ ] **Sincronizar con Google Calendar y Apple Calendar, cada persona con su cuenta** (Marco, 2026-11-20 ADR-240; plan aprobado el 2026-11-22 «Sí a todo», ADR-241). Seis fases en serie:
+  - [x] **Fase 0 (prueba técnica CalDAV iCloud en `workerd`):** verificada el 22-11-2026 contra iCloud real (`scripts/caldav-probe/`). Resultados: (1) `workerd` rechaza `MKCALENDAR`, pero **iCloud acepta `MKCOL` extendido (RFC 5689)** (`201 Created`) directamente por `fetch()`; (2) `PROPFIND`, `PUT` (con `TZID` y `VALARM`), `REPORT sync-collection` y `DELETE` funcionan todos nativos en Workers; (3) iCloud devuelve y avanza `sync-token` (`207 OK`), aunque con posible codificación/latencia en `href` → usar `decodeURIComponent(href)` y mantener respaldo por `ETag` (`PROPFIND` Depth: 1). Pendientes administrativos fuera de código: pedir OAuth piloto a Apple y revisar categoría de scopes en Google Cloud Console.
+  - [~] **Fase 1 («Mi calendario» por suscripción `.ics` cruzando espacios):** construida en rama `claude/calendar-sync-f0-f1` (migración `20261122100000_personal_calendar_feed.sql` pendiente de gate § 34, motor puro `$lib/calendar-events.ts`, endpoints `/api/me/calendar-feed`, `/api/me/calendar-scope` y `/api/public/my-calendar/[token]`, `Ajustes › Calendario`, `CACHE_SCHEMA` 39, RLS `tests/rls/personal-calendar-feed.test.ts`).
+  - [ ] **Fase 2 (Apple, de Hour al calendario):** CalDAV de escritura (`calendar_connection`, `calendar_event_link`, cifrado AES-256-GCM con clave propia en Wrangler, cola `pgmq`, pausa/reconexión, desconexión). Depende del resultado de Fase 0 contra iCloud.
+  - [ ] **Fase 3 (vuelve tu ocupado):** `calendar_busy` (sin títulos ni sitios), choques en el Día y al convocar, días enteros como «no puedo».
+  - [ ] **Fase 4 (cambios como propuesta):** fila «Aplicar · Descartar» en «Te espera» para cambios manuales en fechas de Hour (ensayos, viajes; nunca funciones).
+  - [ ] **Fase 5 (Google):** segundo adaptador Calendar API v3 (`calendar.app.created`, freebusy, `calendarlist.readonly`), OAuth propio separado de Buzones, `watch` + `syncToken`.
+  - [ ] **Plan:** ADR de precios pone Google Calendar sync en STANDARD; sigue abierto (no bloquea mientras Hour no cobre).
 
 ## Deuda aceptada / observar en uso
 

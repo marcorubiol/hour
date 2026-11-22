@@ -8803,36 +8803,40 @@ espacios, ni escribe en Google.
 
 **Cómo se revierte.** Revertir el commit.
 
-## [2026-11-22] ADR-241 · Sincronización con el calendario: un calendario «Hour» por persona, CalDAV para Apple, y de vuelta solo lo tuyo (decisión de producto; sin código; enmienda ADR-240 § 3)
+## [2026-11-22] ADR-241 · Sincronización con Apple Calendar y Google Calendar (enmienda ADR-240 § 3)
 
-Marco, 22-11: «quiero que haya sincronización bidireccional con el calendario, tanto de Apple como de Google […]
-comenzar por el de Apple porque es el que yo utilizo». Plan en `build/plans/2026-11-22-calendar-sync.md`; sus cinco
-preguntas, contestadas el mismo día («Sí a todo»).
+Marco, 22-11 («Sí a todo» sobre el plan «Sincronización con Apple Calendar y Google Calendar»).
 
-**Decisión.**
-1. **Bidireccional, no espejo.** Hour escribe «lo mío» (ADR-151, `private.person_is_on_performance`) en un único
-   calendario «Hour» dentro de la cuenta de cada persona. En ese calendario gana Hour: lo editado o borrado allí se
-   repone. En los demás calendarios de la persona Hour solo lee.
-2. **Qué vuelve.** El tiempo ocupado de los calendarios que la persona elija, sin título ni lugar; un día entero cuenta
-   como «no puedo» (`availability_block`), unas horas son un aviso de choque. Después, los cambios hechos en el
-   calendario sobre una fecha de Hour (no una función: ADR-090 P2) llegan como propuesta a «Te espera», con «Aplicar ·
-   Descartar». Sin edición directa.
-3. **Qué sale.** Funciones confirmadas, opciones y convocatorias sin contestar como provisionales, ensayos, residencias,
-   prensa, viajes (un evento por viaje, con sus tramos) y días libres. Por espacio: «Lo mío», «Todo» o «Nada». No salen
-   tareas, seguimientos, dinero, notas, localizadores ni datos de otras personas (ADR-054).
-4. **Protocolo.** Apple por CalDAV contra iCloud con contraseña de app, cifrada en reposo como los buzones (ADR-099) con
-   clave propia. **Enmienda ADR-240 § 3**, que dejaba fuera el CalDAV de escritura. Google por Calendar API v3 con
-   consentimiento propio y el permiso mínimo (`calendar.app.created` para escribir; solo disponibilidad para leer). Un
-   motor con dos adaptadores sobre el `VEvent` de `$lib/ics`. El `.ics` personal de ADR-240 se queda como fase 1.
-5. **El evento.** Título, horas con la zona de la sala, lugar, notas (escaleta, tramos, enlace al pase) y estado. El
-   bloque de una función es la jornada entera, de la citación a la recogida, con la hora de función en el título. Sin
-   invitados ni organizador, sin `RRULE`, sin adjuntos. Avisos: ninguno por defecto, una elección al conectar.
-6. **Avisar solo de lo que rompe.** Una conexión cuya credencial deja de valer queda en pausa con una fila en «Te
-   espera». Desconectar borra el calendario «Hour», la credencial y lo leído.
+**Contexto.** ADR-240 dejó fuera el CalDAV de escritura y las cinco preguntas de alcance abiertas. Tras el diseño de
+protocolo y modelo de eventos, Marco valida el plan entero en seis fases en serie (0 a 5): Hour manda sobre un
+calendario propio «Hour» en la cuenta de la persona y lee ocupado del resto de sus calendarios; los cambios manuales
+sobre fechas de Hour vuelven como propuesta en «Te espera», nunca por edición directa.
 
-**Sin comprobar todavía (fase 0 del plan).** Los verbos de CalDAV desde un Worker contra iCloud, `sync-collection` en
-iCloud y la categoría de verificación de los permisos de Google.
+**Decisión (enmienda ADR-240 § 3 y cierra sus cinco preguntas salvo el plan de precios).**
+1. **Apple entra con CalDAV de escritura** (Fase 2, tras probarlo en Fase 0 desde `workerd` contra iCloud), con
+   contraseña de app cifrada en reposo (AES-256-GCM con clave propia en Wrangler, nunca en navegador ni logs). El
+   `.ics` personal cruzando espacios se queda como Fase 1 y como salida sin credenciales (también para Outlook).
+2. **Regla de conflicto única:** en el calendario «Hour» gana Hour (reemplaza cambios y repone borrados); en los otros
+   calendarios de la persona, Hour solo lee ocupado (sin títulos ni lugares, Fase 3). Los cambios sobre fechas de Hour
+   (ensayos, viajes; nunca funciones) aparecen como propuesta «Aplicar · Descartar» en «Te espera» (Fase 4).
+3. **Qué sale en Fase 1 y posteriores:**
+   - Funciones confirmadas y opciones (`hold`, `hold_1..3`), más funciones en las que la persona está convocada sin
+     contestar («· por contestar», ADR-235), como `TENTATIVE`. Las canceladas y aquellas con «no puedo» (`not_going`)
+     salen fuera.
+   - Bloque de función: jornada entera (de la primera hora de la escaleta a la última, con la hora de función en el
+     título cuando la jornada empieza antes).
+   - Viajes: un evento por viaje de la primera salida a la última llegada, con tramos en la descripción. Días libres:
+     día entero con `TRANSP:TRANSPARENT`.
+   - Avisos (`VALARM`): ninguno por defecto; elección única («la víspera» o «2 h antes»).
+   - Alcance por espacio: sigue `membership.view_scope` (ADR-151: «Lo mío» o «Todo»), con tercera opción «Nada»
+     (`membership.calendar_scope`).
+   - Seguridad (ADR-054): nunca dinero, notas internas, localizadores ni datos de otras personas.
+4. **Google (Fase 5):** Calendar API v3 con OAuth separado del de Buzones (`calendar.app.created` + freebusy +
+   `calendarlist.readonly`), `watch` + `syncToken` y pasada periódica de respaldo en los dos crons existentes.
+5. **Fase 0 y Fase 1 en este corte:** sonda local `workerd` (`scripts/caldav-probe/`) y «Mi calendario» personal por
+   suscripción `.ics` (migración `20261122100000_personal_calendar_feed.sql` pendiente de gate § 34, motor puro
+   compartido `$lib/calendar-events.ts`, rutas `/api/me/calendar-feed`, `/api/me/calendar-scope` y
+   `/api/public/my-calendar/[token]`, y `Ajustes › Calendario`). Sube `CACHE_SCHEMA` a 39 por `calendar_scope` en
+   `/api/workspaces`.
 
-**Sin cambios de código ni de datos.** Solo documentación. Sin esquema, API ni `CACHE_SCHEMA`.
-
-**Cómo se revierte.** Revertir el commit.
+**Cómo se revierte.** Revertir el commit; la migración `20261122100000` es aditiva y lleva rollback en cabecera.
