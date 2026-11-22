@@ -49,7 +49,7 @@
 </script>
 
 <svelte:head>
-  <title>Sentry smoke — Hour</title>
+  <title>Sentry smoke — hour</title>
 </svelte:head>
 
 {#if allowed}

@@ -193,7 +193,7 @@ test.describe('import a WhatsApp chat', () => {
 
       // The same file again: everything is already there.
       const again = await openSheet(page, text);
-      await expect(again.getByTestId('wa-import-known')).toContainText('Already in Hour: 3');
+      await expect(again.getByTestId('wa-import-known')).toContainText('Already in hour: 3');
       await expect(again.getByText('Nothing new')).toBeVisible();
       await expect(again.getByRole('button', { name: 'Import (0)' })).toBeDisabled();
     } finally {

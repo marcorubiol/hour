@@ -85,10 +85,10 @@ test.describe('import contacts from a sheet', () => {
       await dialog.getByRole('button', { name: 'Continue' }).click();
 
       const columns = dialog.getByTestId('contact-import-columns');
-      await expect(columns.getByLabel('«Name» in Hour')).toHaveValue('person_name');
-      await expect(columns.getByLabel('«Organization» in Hour')).toHaveValue('org_name');
-      await expect(columns.getByLabel('«Email» in Hour')).toHaveValue('email');
-      await expect(columns.getByLabel('«Zone» in Hour')).toHaveValue('note');
+      await expect(columns.getByLabel('«Name» in hour')).toHaveValue('person_name');
+      await expect(columns.getByLabel('«Organization» in hour')).toHaveValue('org_name');
+      await expect(columns.getByLabel('«Email» in hour')).toHaveValue('email');
+      await expect(columns.getByLabel('«Zone» in hour')).toHaveValue('note');
       await dialog.getByRole('button', { name: 'Continue' }).click();
 
       const tally = dialog.getByTestId('contact-import-tally');

@@ -14,7 +14,7 @@ const WORDS: Record<CalendarLocale, Record<string, string>> = {
   es: {
     option_suffix: 'opción',
     pending_suffix: 'por contestar',
-    in_hour: 'En Hour: {url}',
+    in_hour: 'En hour: {url}',
     perf_label: 'Función',
     arrives: 'llega {time}',
     kind_load_in: 'carga',
@@ -42,7 +42,7 @@ const WORDS: Record<CalendarLocale, Record<string, string>> = {
   en: {
     option_suffix: 'hold',
     pending_suffix: 'to reply',
-    in_hour: 'In Hour: {url}',
+    in_hour: 'In hour: {url}',
     perf_label: 'Performance',
     arrives: 'arrives {time}',
     kind_load_in: 'load-in',
@@ -70,7 +70,7 @@ const WORDS: Record<CalendarLocale, Record<string, string>> = {
   ca: {
     option_suffix: 'opció',
     pending_suffix: 'per contestar',
-    in_hour: 'A Hour: {url}',
+    in_hour: 'A hour: {url}',
     perf_label: 'Funció',
     arrives: 'arriba {time}',
     kind_load_in: 'càrrega',
@@ -98,7 +98,7 @@ const WORDS: Record<CalendarLocale, Record<string, string>> = {
   fr: {
     option_suffix: 'option',
     pending_suffix: 'à confirmer',
-    in_hour: 'Dans Hour : {url}',
+    in_hour: 'Dans hour : {url}',
     perf_label: 'Représentation',
     arrives: 'arrivée {time}',
     kind_load_in: 'montage',

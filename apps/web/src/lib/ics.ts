@@ -359,12 +359,12 @@ export function buildCalendar(feed: CalendarFeed, now: Date, options: CalendarOp
     origin: options.origin ?? null,
   };
   const dtstamp = toIcsUtc(now.toISOString());
-  const name = feed.workspace ? `${feed.workspace.name}${SEP}Hour` : 'Hour';
+  const name = feed.workspace ? `${feed.workspace.name}${SEP}hour` : 'hour';
 
   const lines: string[] = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Hour//Calendar Feed//EN',
+    'PRODID:-//hour//Calendar Feed//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     `X-WR-CALNAME:${escapeText(name)}`,

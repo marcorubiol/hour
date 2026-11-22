@@ -80,7 +80,7 @@ export const FLOW_TTL_MS = TTL_SEC * 1000;
 export function bounceHtml(path: string): Response {
   const safe = path.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
   return new Response(
-    `<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=${safe}"><title>Hour</title><a href="${safe}">Hour</a>`,
+    `<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=${safe}"><title>hour</title><a href="${safe}">hour</a>`,
     {
       status: 200,
       headers: {

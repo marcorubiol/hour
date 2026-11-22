@@ -5,5 +5,5 @@
  * tab (the old home said «Hour, Sign in» after a login), so every page sets one.
  */
 export function docTitle(...parts: (string | null | undefined)[]): string {
-  return [...parts.map((p) => p?.trim()).filter(Boolean), 'Hour'].join(' · ');
+  return [...parts.map((p) => p?.trim()).filter(Boolean), 'hour'].join(' · ');
 }

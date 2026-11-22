@@ -33,5 +33,5 @@
 </script>
 
 <svelte:head>
-  <title>Hour</title>
+  <title>hour</title>
 </svelte:head>

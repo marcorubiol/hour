@@ -215,7 +215,7 @@ describe('calendar-events (ADR-241 Fase 1)', () => {
     const noAlarm = buildPersonalCalendar(feed({ alarm_mode: 'none', performances: [perf()] }), NOW, {
       locale: 'es',
     });
-    expect(noAlarm).toContain('X-WR-CALNAME:Hour');
+    expect(noAlarm).toContain('X-WR-CALNAME:hour');
     expect(noAlarm).toContain('DTSTART;TZID=Europe/Madrid:20261210T150000');
     expect(noAlarm).toContain('DTEND;TZID=Europe/Madrid:20261210T230000');
     expect(noAlarm).toContain('SEQUENCE:0');
