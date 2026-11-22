@@ -70,12 +70,16 @@
     laterSummary,
     overviewReplies,
     rankWaiting,
+    type DeskCalendarAlertInput,
+    type DeskCalendarProposalInput,
     type DeskConvInput,
     type DeskConvocationInput,
     type DeskDecisionInput,
     type DeskItem,
     type DeskOption,
   } from '$lib/desk-feed';
+  import { homeWorkspace } from '$lib/workspace-role';
+  import { clockText, dayOf } from '$lib/running-order';
   import { dueOption, type Decision } from '$lib/planner';
   import { invalidatePerformanceFeeds } from '$lib/plan-create';
   import {
@@ -426,6 +430,80 @@
     );
   });
 
+  // ADR-241 Fases 2 & 4: paused external calendars + remote date-change proposals in «Te espera».
+  type CalendarWaitingRes = {
+    paused: Array<{ id: string; provider: 'icloud' | 'google'; account_email: string }>;
+    proposals: Array<{
+      id: string;
+      date_id: string;
+      proposed_starts_at: string;
+      proposed_all_day: boolean;
+      date_kind: string;
+      date_title: string | null;
+      workspace_id: string;
+      project_id: string | null;
+      project_name: string | null;
+      workspace_timezone: string | null;
+    }>;
+  };
+  const calendarWaitingQuery = createQuery({
+    queryKey: ['calendar-waiting'] as const,
+    retry: false,
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
+      fetchJSON<CalendarWaitingRes>('/api/calendar/waiting', signal).catch(() => ({ paused: [], proposals: [] })),
+  });
+  let calendarAlerts = $derived.by((): DeskCalendarAlertInput[] => {
+    const paused = $calendarWaitingQuery.data?.paused ?? [];
+    if (paused.length === 0) return [];
+    const home = homeWorkspace(workspaces);
+    const href = home ? `/h/${home.slug}/settings?section=calendar` : '/h/today';
+    return [
+      {
+        id: paused[0].id,
+        subject: t('calendar.paused_waiting', locale),
+        href,
+      },
+    ];
+  });
+  let calendarProposals = $derived.by((): DeskCalendarProposalInput[] => {
+    return ($calendarWaitingQuery.data?.proposals ?? []).map((p) => {
+      const tz = p.workspace_timezone || viewerTz;
+      const day = p.proposed_all_day ? p.proposed_starts_at.slice(0, 10) : dayOf(p.proposed_starts_at, tz);
+      const when = p.proposed_all_day
+        ? localeDayMonth(day, LOCALE_TAG[locale])
+        : `${localeDayMonth(day, LOCALE_TAG[locale])}, ${clockText(p.proposed_starts_at, tz)}`;
+      const title = p.date_title || t(`perf.date_kind_${p.date_kind}`, locale);
+      return {
+        id: p.id,
+        subject: t('calendar.proposal_subject', locale, { title, when }),
+        projectId: p.project_id,
+        projectName: p.project_name ?? '',
+        workspaceId: p.workspace_id,
+        href: plannerDayHref('day', day),
+      };
+    });
+  });
+
+  async function handleCalendarProposal(proposalId: string, action: 'apply' | 'dismiss') {
+    try {
+      await mutateJSON('POST', `/api/calendar/proposals/${proposalId}/${action}`);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['calendar-waiting'] }),
+        invalidatePerformanceFeeds(queryClient),
+      ]);
+      addToast({
+        tone: 'success',
+        message: t(action === 'apply' ? 'calendar.proposal_applied' : 'calendar.proposal_dismissed', locale),
+      });
+    } catch (err) {
+      addToast({
+        tone: 'danger',
+        title: t('desk.toast_change_failed', locale),
+        message: err instanceof ApiError ? err.message : t('perf.unexpected', locale),
+      });
+    }
+  }
+
   // «Ahora no» and the old (ADR-232): what the viewer set aside, and what has
   // waited more than a month, leave the feed before anything counts it.
   void ensureSetAside();
@@ -439,6 +517,8 @@
         replies,
         decisions: lensOn('planner') ? deskDecisions() : [],
         convocations: convocations(),
+        calendarAlerts,
+        calendarProposals,
       },
       clockNow,
       locale,
@@ -1123,6 +1203,7 @@
           old={split.old}
           onaside={setAside.ready ? setRowAside : undefined}
           onanswer={answer}
+          oncalendarproposal={handleCalendarProposal}
         />
       </div>
       {/if}

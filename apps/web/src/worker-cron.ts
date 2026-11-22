@@ -17,8 +17,10 @@ import { runMailSync } from './lib/server/mail/sync';
 import { runMailoutQueue } from './lib/server/mailout/queue';
 import { runDomainRecheck } from './lib/server/mailout/recheck';
 import { serviceRpc } from './lib/server/mailout/db';
+import { runCalendarSync } from './lib/server/calendar/engine';
 import type { MailEnv } from './lib/server/mail/db';
 import type { MailoutEnv } from './lib/server/mailout';
+import type { CalendarSyncEnv } from './lib/server/calendar/types';
 
 export const MAILOUT_CRON = '* * * * *';
 
@@ -38,13 +40,22 @@ function logFailure(kind: string) {
 
 export async function scheduled(
   controller: ScheduledController,
-  env: MailEnv & MailoutEnv,
+  env: MailEnv & MailoutEnv & CalendarSyncEnv,
   ctx: ExecutionContext,
 ): Promise<void> {
   if (controller.cron === MAILOUT_CRON) {
     // Sin clave de servicio no hay cola que vaciar (local, preview).
     if (!env.SUPABASE_SERVICE_ROLE_KEY) return;
     ctx.waitUntil(runMailoutQueue(env).then(() => undefined, logFailure('mailout_queue_failed')));
+    // ADR-241: Hour → calendario al minuto para conexiones marcadas `dirty` (por tandas).
+    if (env.CALENDAR_TOKEN_KEY) {
+      ctx.waitUntil(
+        runCalendarSync(env, { dirtyOnly: true, limit: 3 }).then(
+          () => undefined,
+          logFailure('calendar_dirty_sync_failed'),
+        ),
+      );
+    }
     return;
   }
   if (env.SUPABASE_SERVICE_ROLE_KEY && isAudiencePurgeWindow(controller.scheduledTime)) {
@@ -56,4 +67,13 @@ export async function scheduled(
   }
   ctx.waitUntil(runMailSync(env).then(() => undefined, logFailure('mail_sync_failed')));
   ctx.waitUntil(runDomainRecheck(env).then(() => undefined, logFailure('mail_domain_recheck_failed')));
+  // ADR-241: Calendario → Hour cada 10 minutos (iCloud + respaldo de Google y renovación watch).
+  if (env.SUPABASE_SERVICE_ROLE_KEY && env.CALENDAR_TOKEN_KEY) {
+    ctx.waitUntil(
+      runCalendarSync(env, { dirtyOnly: false, limit: 3 }).then(
+        () => undefined,
+        logFailure('calendar_periodic_sync_failed'),
+      ),
+    );
+  }
 }

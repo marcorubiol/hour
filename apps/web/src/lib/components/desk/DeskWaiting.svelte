@@ -76,6 +76,8 @@
     onaside?: (item: DeskItem, until: string | null) => void;
     /** «Te han convocado» (ADR-235): «Voy» or «No puedo», right on the row. */
     onanswer?: (item: DeskItem, state: 'going' | 'not_going') => void;
+    /** ADR-241 Fase 4: «Aplicar» or «Descartar» a remote calendar edit on a date. */
+    oncalendarproposal?: (proposalId: string, action: 'apply' | 'dismiss') => void;
   }
 
   let {
@@ -104,6 +106,7 @@
     old = [],
     onaside,
     onanswer,
+    oncalendarproposal,
   }: Props = $props();
 
   /* No fold outside calm (Marco, 20-11, ADR-238): hiding it is calm's job. */
@@ -249,7 +252,11 @@
   {:else}
     {@const href = subjectHref(item)}
     {@const line = item.concern === 'conversation' ? (chat?.(item) ?? null) : null}
-    {@const hasInlineActs = Boolean((item.convocation && onanswer) || (item.option && ondecide))}
+    {@const hasInlineActs = Boolean(
+      (item.convocation && onanswer) ||
+        (item.option && ondecide) ||
+        (item.calendarProposal && oncalendarproposal),
+    )}
     {@const ctxParts = line
       ? chatContext(item, line).map((c) => c.text)
       : [item.convocation ? t('desk.convoked', locale) : null, contextPath(item), item.amount != null ? money(item.amount, item.currency) : null].filter((x): x is string => Boolean(x))}
@@ -337,6 +344,19 @@
               type="button"
               class="row__act row__act--quiet btn--secondary btn--xs"
               onclick={() => onanswer(item, 'not_going')}>{t('desk.no_puedo', locale)}</button
+            >
+          {:else if item.calendarProposal && oncalendarproposal}
+            <!-- ADR-241 Fase 4: remote calendar edit on a date → Aplicar · Descartar. -->
+            <button
+              type="button"
+              class="row__act btn--primary btn--xs"
+              data-testid="desk-cal-apply"
+              onclick={() => oncalendarproposal(item.calendarProposal!, 'apply')}>{t('calendar.proposal_apply', locale)}</button
+            ><button
+              type="button"
+              class="row__act row__act--quiet btn--secondary btn--xs"
+              data-testid="desk-cal-dismiss"
+              onclick={() => oncalendarproposal(item.calendarProposal!, 'dismiss')}>{t('calendar.proposal_dismiss', locale)}</button
             >
           {:else if item.concern === 'task'}
             <button

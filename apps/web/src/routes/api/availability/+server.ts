@@ -89,8 +89,59 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   search.set('limit', String(limit));
 
   try {
-    const { data } = await pgGet<AvailabilityItem>(env, 'availability_block', jwt, { search });
-    return json({ items: data });
+    const busyPromise =
+      from && to
+        ? pgPostRpc<{
+            id: string;
+            workspace_id: string;
+            person_id: string;
+            starts_at: string;
+            ends_at: string;
+            all_day: boolean;
+            full_name: string | null;
+            slug: string | null;
+          }>(env, 'get_calendar_busy_in_window', jwt, {
+            p_from: from,
+            p_to: to,
+            ...(workspaceIds.length > 0 ? { p_workspace_ids: workspaceIds } : {}),
+          }).catch(() => ({ data: [] }))
+        : Promise.resolve({ data: [] });
+
+    const [{ data }, busyRes] = await Promise.all([
+      pgGet<AvailabilityItem>(env, 'availability_block', jwt, { search }),
+      busyPromise,
+    ]);
+
+    // ADR-241 Fase 3: external calendar busy times join the availability feed
+    // with zero titles/locations. All-day/multi-day = 'unavailable' (day
+    // blackout); timed (<24h) = 'tentative' (clash warning).
+    const calendarItems: AvailabilityItem[] = busyRes.data.filter(Boolean).map((b) => {
+      const startDay = b.starts_at.slice(0, 10);
+      // Exclusive midnight end for all-day ICS/Google events → subtract 1 ms to get inclusive end day.
+      const endMs = Date.parse(b.ends_at);
+      const inclusiveEndDay = Number.isNaN(endMs)
+        ? startDay
+        : new Date(b.all_day ? Math.max(Date.parse(b.starts_at), endMs - 1) : endMs).toISOString().slice(0, 10);
+      const isFullDay = b.all_day || inclusiveEndDay > startDay;
+      return {
+        id: `calbusy:${b.id}`,
+        workspace_id: b.workspace_id,
+        person_id: b.person_id,
+        starts_on: startDay,
+        ends_on: inclusiveEndDay,
+        certainty: isFullDay ? 'unavailable' : 'tentative',
+        note: null,
+        created_at: b.starts_at,
+        updated_at: b.starts_at,
+        person: b.full_name ? { id: b.person_id, slug: b.slug ?? '', full_name: b.full_name } : null,
+        source: 'calendar',
+        starts_at: b.starts_at,
+        ends_at: b.ends_at,
+        all_day: isFullDay,
+      };
+    });
+
+    return json({ items: [...data, ...calendarItems] });
   } catch (err) {
     return pgErrorResponse(
       err,

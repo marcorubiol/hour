@@ -61,6 +61,12 @@ export type AvailabilityItem = Omit<
   'deleted_at' | 'created_by'
 > & {
   person: { id: string; slug: string; full_name: string } | null;
+  /** ADR-241 Fase 3: `'calendar'` when synthesized from external busy times (read-only, never titles/locations). */
+  source?: 'manual' | 'calendar';
+  /** Timed calendar busy window (only when `source === 'calendar'` and not all-day). */
+  starts_at?: string | null;
+  ends_at?: string | null;
+  all_day?: boolean;
 };
 
 /** PostgREST embed clause matching `AvailabilityItem` — shared by GET and PATCH. */

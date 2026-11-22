@@ -103,6 +103,8 @@ export interface DeskItem {
   option: DeskOption | null;
   /** «Te han convocado» (ADR-234): the performance whose «Voy / No puedo» the row answers. */
   convocation?: string | null;
+  /** ADR-241 Fase 4: calendar date-change proposal id answered with «Aplicar / Descartar». */
+  calendarProposal?: string | null;
 }
 
 export interface DeskRun {
@@ -140,6 +142,25 @@ interface DeskFeedInput {
   decisions?: DeskDecisionInput[];
   /** «Te han convocado» (ADR-234): unanswered calls to the viewer, already scoped. */
   convocations?: DeskConvocationInput[];
+  /** ADR-241 Fase 2: paused external calendar connections needing reconnect. */
+  calendarAlerts?: DeskCalendarAlertInput[];
+  /** ADR-241 Fase 4: remote date edits made in Apple/Google Calendar awaiting Apply / Dismiss. */
+  calendarProposals?: DeskCalendarProposalInput[];
+}
+
+export interface DeskCalendarAlertInput {
+  id: string;
+  subject: string;
+  href: string;
+}
+
+export interface DeskCalendarProposalInput {
+  id: string;
+  subject: string;
+  projectId: string | null;
+  projectName: string;
+  workspaceId: string | null;
+  href: string | null;
 }
 
 export interface DeskDecisionInput {
@@ -549,6 +570,43 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
         verbKey: 'answer',
         href: c.href,
         convocation: c.id,
+      }),
+    );
+  }
+
+  // ── ADR-241 Fase 2: paused calendar connection (one row: «Reconectar»).
+  for (const a of input.calendarAlerts ?? []) {
+    push(
+      todayISO,
+      'decision',
+      0,
+      blankItem({
+        id: `cal-alert-${a.id}`,
+        concern: 'decision',
+        subject: a.subject,
+        projectName: '—',
+        verbKey: 'reconnect',
+        href: a.href,
+      }),
+    );
+  }
+
+  // ── ADR-241 Fase 4: remote date changes proposed from Apple/Google Calendar.
+  for (const p of input.calendarProposals ?? []) {
+    push(
+      todayISO,
+      'decision',
+      0,
+      blankItem({
+        id: `cal-prop-${p.id}`,
+        concern: 'decision',
+        subject: p.subject,
+        projectName: p.projectName || '—',
+        projectId: p.projectId,
+        workspaceId: p.workspaceId,
+        verbKey: 'calendar_proposal',
+        href: p.href,
+        calendarProposal: p.id,
       }),
     );
   }
