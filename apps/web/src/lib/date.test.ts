@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { dateStatusFamily, invalidateDateFeeds, DATE_STATUSES } from './date';
+import * as v from 'valibot';
+import {
+  DateCreateSchema,
+  DatePatchSchema,
+  dateStatusFamily,
+  invalidateDateFeeds,
+  DATE_STATUSES,
+} from './date';
 
 describe('dateStatusFamily', () => {
   it('tentative is a possibility, confirmed/done the solid form', () => {
@@ -47,5 +54,24 @@ describe('invalidateDateFeeds', () => {
       ]),
     );
     expect(keys).toHaveLength(4);
+  });
+});
+
+describe('DateCreateSchema & DatePatchSchema bolo_id (ADR-242)', () => {
+  const PROJECT = '00000000-0000-4000-8000-000000000001';
+  const BOLO = '00000000-0000-4000-8000-000000000002';
+
+  it('accepts a valid uuid, null, or omitted bolo_id on create', () => {
+    const base = { project_id: PROJECT, kind: 'travel_day', starts_at: '2026-12-01T08:00:00Z' };
+    expect(v.safeParse(DateCreateSchema, { ...base, bolo_id: BOLO }).success).toBe(true);
+    expect(v.safeParse(DateCreateSchema, { ...base, bolo_id: null }).success).toBe(true);
+    expect(v.safeParse(DateCreateSchema, base).success).toBe(true);
+    expect(v.safeParse(DateCreateSchema, { ...base, bolo_id: 'not-a-uuid' }).success).toBe(false);
+  });
+
+  it('accepts a valid uuid or null bolo_id on patch and rejects non-uuid strings', () => {
+    expect(v.safeParse(DatePatchSchema, { bolo_id: BOLO }).success).toBe(true);
+    expect(v.safeParse(DatePatchSchema, { bolo_id: null }).success).toBe(true);
+    expect(v.safeParse(DatePatchSchema, { bolo_id: 'bad' }).success).toBe(false);
   });
 });
