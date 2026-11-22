@@ -82,24 +82,60 @@ function buildProbeIcs(uid, sequence) {
 
 async function dav(url, { method, auth, headers = {}, body }) {
   const t0 = Date.now();
-  const res = await fetch(url, {
-    method,
-    headers: {
-      authorization: auth,
-      'user-agent': 'Hour-CalDAV-Probe/0.1',
-      ...headers,
-    },
-    body,
-    redirect: 'follow',
-  });
-  const text = await res.text();
+  let currentUrl = url;
+  const hops = [];
+
+  for (let hop = 0; hop < 6; hop++) {
+    const res = await fetch(currentUrl, {
+      method,
+      headers: {
+        authorization: auth,
+        'user-agent': 'Hour-CalDAV-Probe/0.1',
+        ...headers,
+      },
+      body,
+      redirect: 'manual',
+    });
+
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get('location');
+      if (location) {
+        const nextUrl = new URL(location, currentUrl);
+        const currHost = new URL(currentUrl).hostname;
+        // Re-attach Basic auth only on same host or *.icloud.com shard redirects.
+        const allowed =
+          nextUrl.hostname === currHost ||
+          (nextUrl.protocol === 'https:' && nextUrl.hostname.endsWith('.icloud.com'));
+        if (allowed) {
+          hops.push({ status: res.status, host: nextUrl.hostname });
+          currentUrl = nextUrl.toString();
+          continue;
+        }
+      }
+    }
+
+    const text = await res.text();
+    return {
+      status: res.status,
+      ok: res.ok || res.status === 207,
+      url: currentUrl,
+      etag: res.headers.get('etag'),
+      wwwAuth: res.headers.get('www-authenticate'),
+      hops,
+      ms: Date.now() - t0,
+      text,
+    };
+  }
+
   return {
-    status: res.status,
-    ok: res.ok || res.status === 207,
-    url: res.url || url,
-    etag: res.headers.get('etag'),
+    status: 508,
+    ok: false,
+    url: currentUrl,
+    etag: null,
+    wwwAuth: null,
+    hops,
     ms: Date.now() - t0,
-    text,
+    text: 'too_many_redirects',
   };
 }
 
@@ -121,11 +157,17 @@ export default {
     }
 
     const baseUrl = String(input.baseUrl || 'https://caldav.icloud.com/');
-    const appleId = String(input.appleId || '');
-    const appPassword = String(input.appPassword || '');
+    const appleId = String(input.appleId || '').trim();
+    const appPassword = String(input.appPassword || '').trim();
     if (!appleId || !appPassword) {
       return Response.json({ error: 'missing_credentials' }, { status: 400 });
     }
+
+    const credShape = {
+      matchesAppPasswordPattern: /^[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}$/i.test(appPassword),
+      length: appPassword.length,
+      looksHexEncoded: appPassword.length >= 20 && /^[0-9a-f]+$/i.test(appPassword),
+    };
 
     const auth = basicAuth(appleId, appPassword);
     const steps = [];
@@ -140,6 +182,8 @@ export default {
         status: r.status,
         ok: r.ok,
         ms: r.ms,
+        ...(r.hops?.length ? { hops: r.hops } : {}),
+        ...(!r.ok && r.wwwAuth ? { wwwAuth: r.wwwAuth } : {}),
         ...extra,
       });
     };
@@ -157,7 +201,7 @@ export default {
       const principalHref = extractTagHref(p1.text, 'current-user-principal');
       record('1_propfind_principal', p1, { found: Boolean(principalHref) });
       if (!p1.ok || !principalHref) {
-        return Response.json({ ok: false, failedAt: '1_propfind_principal', steps }, { status: 200 });
+        return Response.json({ ok: false, failedAt: '1_propfind_principal', credShape, steps }, { status: 200 });
       }
       const principalUrl = resolveUrl(p1.url, principalHref);
 

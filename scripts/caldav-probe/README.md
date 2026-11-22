@@ -3,8 +3,8 @@
 Comprueba desde `workerd` (el runtime real de Cloudflare Workers, en local con `wrangler dev`) los dos riesgos abiertos antes de construir la Fase 2:
 
 1. Si `fetch()` en Workers acepta los verbos `PROPFIND`, `MKCALENDAR` (o `MKCOL` extendido RFC 5689), `PUT`, `REPORT` y `DELETE` contra `caldav.icloud.com`.
-   - **Ya verificado en `workerd` local (`--mock`, 22-11-2026):** `workerd` acepta `PROPFIND`, `MKCOL`, `PUT`, `REPORT` y `DELETE`, pero rechaza `MKCALENDAR` (`Invalid HTTP method string: MKCALENDAR`). La sonda prueba `MKCALENDAR` y cae automáticamente a `MKCOL` extendido (RFC 5689).
-2. Si iCloud acepta `MKCOL` extendido para crear el calendario «Hour» y si devuelve/avanza `sync-token` en `REPORT sync-collection` (o si hace falta comparación por `ETag`).
+   - **Verificado en `workerd` contra iCloud real (22-11-2026):** `workerd` rechaza `MKCALENDAR`, pero **iCloud acepta `MKCOL` extendido (RFC 5689, `201 Created`)** junto con `PROPFIND` (`207`), `PUT` con `TZID` + `VALARM` (`201`/`204`, `ETag` cambia), `REPORT sync-collection` (`207`) y `DELETE`.
+2. Si iCloud devuelve/avanza `sync-token` en `REPORT sync-collection`: **sí** (`syncTokenPresent: true`, `syncTokenAdvanced: true`), con respaldo por comparación de `ETag` (`PROPFIND` Depth: 1) y `decodeURIComponent(href)` al emparejar.
 
 La prueba crea un calendario temporal `Hour · prueba fase 0`, escribe un evento con `TZID=Europe/Madrid` y `VALARM` (`-PT2H`), actualiza su `SEQUENCE`, lee el delta y **borra tanto el evento como el calendario temporal** al terminar.
 
