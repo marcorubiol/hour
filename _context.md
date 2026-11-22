@@ -31,12 +31,12 @@ aprueba, el sistema ejecuta y deja auditoría. UI manual e IA leen y escriben lo
 fixtures. Sin billing ni self-service. Modelo ya multi-workspace y multi-account. La beta externa espera a cerrar lo
 de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
-## Producción (verificado 2026-11-19)
+## Producción (verificado 2026-11-22)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`247b0322`**, `dirty:false`, builtAt
-  2026-11-19T12:07Z. Deploys del 19-11 con los PR 13 a 22: el pase corregido y Hoy en escritorio con su rejilla
-  (ADR-217, ADR-218), la ruta `/h/today` (ADR-220), la lista de preparación fases 1 a 4 (ADR-221) y el enlace a la sala
-  desde el pase. `CACHE_SCHEMA` 37. Lo entregado, en `CHANGELOG.md`.
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`ef83e823`**, `dirty:false`, builtAt
+  2026-11-22T22:27Z. Deploys del 22-11 con los PR 61 a 63: sincronización completa con Apple Calendar (CalDAV) y Google
+  Calendar (API v3), suscripción personal `.ics` cruzando espacios, lectura de ocupado sin títulos ni lugares y
+  propuestas de cambios de fecha en «Te espera» (ADR-241, fases 0 a 5). `CACHE_SCHEMA` 40. Lo entregado, en `CHANGELOG.md`.
 - Última suite completa (19-11, contra `247b0322`): E2E de 219 specs, sin rojos que se queden. La pasada se cortó en
   la 198 y se retomó (24/24); `person:47`, `planner-month:125` y `roadsheet-share:17` cayeron y pasaron al repetirlos.
   `--timeout=90000`. RLS entera: 628/629 (19-11); el rojo (`money-v3` o `conversation-feed-list`, distinto cada vez)
@@ -47,7 +47,10 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
   la puerta es el CI de GitHub (`web` y `collab`).
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free con keepalive diario
   (`keepalive.yml`); Pro antes de la beta (`_tasks.md § 9`). Si falla tras días sin uso: `dig <ref>.supabase.co`.
-- **Última migración aplicada: `20261119130000`** (quién cierra una cosa de la lista de preparación; backup
+- **Última migración aplicada: `20261122120000`** (sincronización bidireccional Apple/Google Calendar, ocupado y
+  propuestas en «Te espera», ADR-241 fases 2–5; backup `45076398301`, plan `45076402193`, apply `45076875132`). Antes,
+  el mismo día: `20261122100000` (feed `.ics` personal cruzando espacios y `membership.calendar_scope`, ADR-241 fase 1;
+  backup `45074414355`, plan `45074420723`, apply `45074733633`). Antes: `20261119130000` (quién cierra una cosa de la lista de preparación; backup
   44511459886, plan 44512039115, apply 44518374143, lanzados desde la rama del PR 21). Antes, el mismo día:
   `20261119110000` y `20261119120000` (la lista por proyecto y su estado por función, ADR-221) y `20261119100000`
   (`today` reservada, ADR-220). La anterior: `20261114100000` (149).
