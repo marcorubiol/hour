@@ -3859,6 +3859,8 @@
   "calendar.status_paused": "En pausa · vuelve a conectar",
   "calendar.connected_toast": "Conectado como {email}.",
   "calendar.synced_toast": "Calendario sincronizado.",
+  "calendar.synced_proposals_one": "Sincronizado · 1 cambio por revisar en Hoy.",
+  "calendar.synced_proposals_many": "Sincronizado · {n} cambios por revisar en Hoy.",
   "calendar.sync_error": "No se pudo sincronizar ahora.",
   "calendar.disconnected_toast": "Calendario desconectado y borrado de tu cuenta.",
   "calendar.busy_summary": "Qué calendarios cuentan como ocupado",

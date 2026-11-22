@@ -3859,6 +3859,8 @@
   "calendar.status_paused": "En pausa · torna a connectar",
   "calendar.connected_toast": "Connectat com a {email}.",
   "calendar.synced_toast": "Calendari sincronitzat.",
+  "calendar.synced_proposals_one": "Sincronitzat · 1 canvi per revisar a Avui.",
+  "calendar.synced_proposals_many": "Sincronitzat · {n} canvis per revisar a Avui.",
   "calendar.sync_error": "No s'ha pogut sincronitzar ara.",
   "calendar.disconnected_toast": "Calendari desconnectat i esborrat del teu compte.",
   "calendar.busy_summary": "Quins calendaris compten com a ocupat",

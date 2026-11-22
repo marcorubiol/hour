@@ -211,11 +211,19 @@
 
   const syncConn = createMutation({
     mutationFn: (id: string) =>
-      mutateJSON<{ status?: string; error?: string | null }>('POST', `/api/calendar/connections/${id}/sync`),
+      mutateJSON<{ status?: string; proposals?: number; error?: string | null }>('POST', `/api/calendar/connections/${id}/sync`),
     onSuccess: (r) => {
+      const proposals = r?.proposals ?? 0;
+      const message = r?.error
+        ? t('calendar.sync_error', locale)
+        : proposals === 1
+          ? t('calendar.synced_proposals_one', locale)
+          : proposals > 1
+            ? t('calendar.synced_proposals_many', locale, { n: proposals })
+            : t('calendar.synced_toast', locale);
       addToast({
         tone: r?.error ? 'warning' : 'success',
-        message: r?.error ? t('calendar.sync_error', locale) : t('calendar.synced_toast', locale),
+        message,
       });
       invalidateConnections();
     },

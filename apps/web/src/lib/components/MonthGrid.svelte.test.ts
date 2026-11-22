@@ -140,4 +140,14 @@ describe('MonthGrid — crear en el día de la celda', () => {
     expect(container.querySelector('.cal__new')).toBeNull();
     await fireEvent.dblClick(cellOf(DAY));
   });
+
+  it('shows the earlier-months door when onReachStart is provided and fires it on click', async () => {
+    const onReachStart = vi.fn();
+    const { container } = mount({ onReachStart, earlierLabel: '↑ meses anteriores' });
+    const btn = container.querySelector<HTMLButtonElement>('[data-testid="month-earlier"]');
+    expect(btn).not.toBeNull();
+    expect(btn!.textContent?.trim()).toBe('↑ meses anteriores');
+    await fireEvent.click(btn!);
+    expect(onReachStart).toHaveBeenCalledTimes(1);
+  });
 });

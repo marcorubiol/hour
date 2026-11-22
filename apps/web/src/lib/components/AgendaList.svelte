@@ -800,12 +800,10 @@
     /* «↑ earlier months»: hidden and heightless until the overpull summons
        it or the keyboard focuses it; never display:none. */
     .ag__earlier {
-      max-block-size: 0;
-      padding-block: 0;
-      opacity: 0;
-      overflow: hidden;
-      pointer-events: none;
-      transform: translateY(-0.5rem);
+      display: block;
+      inline-size: 100%;
+      padding-block: var(--space-xs);
+      opacity: 1;
       border: 0;
       background: none;
       text-align: center;
@@ -815,19 +813,11 @@
       text-transform: uppercase;
       color: var(--text-faint);
       cursor: pointer;
-      transition:
-        max-block-size var(--duration-slow) ease,
-        padding-block var(--duration-slow) ease,
-        transform var(--duration-slow) ease,
-        opacity var(--duration-slow);
+      transition: color var(--transition);
     }
     .ag__earlier--in,
     .ag__earlier:focus-visible {
-      max-block-size: 3rem;
-      padding-block: var(--space-s);
-      opacity: 1;
-      transform: none;
-      pointer-events: auto;
+      color: var(--text-color);
     }
     .ag__earlier:hover {
       color: var(--text-color);

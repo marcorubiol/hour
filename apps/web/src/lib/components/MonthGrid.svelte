@@ -72,6 +72,10 @@
     gapShortLabel?: (nights: number) => string;
     /** The paper's foot came into view: the page adds a month. */
     onReachEnd?: () => void;
+    /** Door to the past at the top of the sheet: opens an earlier month. */
+    onReachStart?: () => void;
+    /** Label for the top earlier-months door («↑ meses anteriores»). */
+    earlierLabel?: string;
     /** The month that holds the reader's eye changed (scrolling). */
     onMonthShown?: (m: { year: number; month: number }) => void;
     /** The picked day's door, on a phone: «Día →». */
@@ -156,6 +160,8 @@
     gapLabel = (n: number) => `${n} ${t('planner.stat_free', L)}`,
     gapShortLabel = (n: number) => t('planner.month_gap_short', L, { n }),
     onReachEnd,
+    onReachStart,
+    earlierLabel = t('planner.agenda_earlier', L),
     onMonthShown,
     openDayWord = t('planner.view_day', L),
     performances,
@@ -1148,6 +1154,14 @@
   aria-label={label}
   bind:this={gridEl}
 >
+  {#if onReachStart}
+    <button
+      type="button"
+      class="cal__earlier"
+      data-testid="month-earlier"
+      onclick={onReachStart}>{earlierLabel}</button
+    >
+  {/if}
   <!-- THE WEEKDAY AXIS NEVER GOES. It costs fourteen pixels once for the whole
        sheet, and there is no weekend wash by law — in this trade Saturday is
        the best working day — so without the names you cannot tell which column
@@ -1510,6 +1524,25 @@
       display: flex;
       flex-direction: column;
       transition: opacity var(--transition);
+    }
+    .cal__earlier {
+      display: block;
+      inline-size: 100%;
+      padding-block: var(--space-xs);
+      border: 0;
+      background: none;
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--tracking-l);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      cursor: pointer;
+      transition: color var(--transition);
+    }
+    .cal__earlier:hover,
+    .cal__earlier:focus-visible {
+      color: var(--text-color);
     }
     /* THE SHEET IS CLOSED ON BOTH SIDES (the drawing, 16-11): the column
        rules sit on each day's right edge, so the first column had none on

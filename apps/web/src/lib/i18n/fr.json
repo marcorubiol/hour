@@ -3859,6 +3859,8 @@
   "calendar.status_paused": "En pause · reconnexion requise",
   "calendar.connected_toast": "Connecté en tant que {email}.",
   "calendar.synced_toast": "Calendrier synchronisé.",
+  "calendar.synced_proposals_one": "Synchronisé · 1 changement à valider dans Aujourd’hui.",
+  "calendar.synced_proposals_many": "Synchronisé · {n} changements à valider dans Aujourd’hui.",
   "calendar.sync_error": "Impossible de synchroniser pour l'instant.",
   "calendar.disconnected_toast": "Calendrier déconnecté et supprimé de votre compte.",
   "calendar.busy_summary": "Calendriers qui comptent comme occupé",
