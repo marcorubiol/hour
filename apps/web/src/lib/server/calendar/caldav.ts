@@ -31,7 +31,7 @@ import {
 } from './types';
 
 const ICLOUD_ROOT = 'https://caldav.icloud.com/';
-const HOUR_CALENDAR_NAME = 'Hour';
+const HOUR_CALENDAR_NAME = 'hour';
 const XML_CT = { 'content-type': 'application/xml; charset=utf-8' };
 
 export interface CalDavCredentials {
@@ -215,6 +215,7 @@ export function caldavAdapter(
 
       let hourCalendarId = cached?.hourCalendarId ?? null;
       let hourFound = false;
+      let hourNeedsRename = false;
       const availableCalendars: RemoteCalendar[] = [];
 
       for (const block of extractResponses(list.text)) {
@@ -231,11 +232,29 @@ export function caldavAdapter(
         const name = extractTextTag(block, 'displayname') || '';
         const color = extractTextTag(block, 'calendar-color');
 
-        if ((hourCalendarId && fullUrl === hourCalendarId) || name.trim() === HOUR_CALENDAR_NAME) {
+        if ((hourCalendarId && fullUrl === hourCalendarId) || name.trim().toLowerCase() === HOUR_CALENDAR_NAME) {
           hourCalendarId = fullUrl;
           hourFound = true;
+          if (name.trim() !== HOUR_CALENDAR_NAME) hourNeedsRename = true;
         } else if (name.trim()) {
           availableCalendars.push({ id: fullUrl, name: name.trim(), color });
+        }
+      }
+
+      if (hourFound && hourNeedsRename && hourCalendarId) {
+        // Best-effort PROPPATCH to normalize legacy «Hour» displayname to lowercase «hour».
+        try {
+          await davRequest(fetchFn, hourCalendarId, auth, {
+            method: 'PROPPATCH',
+            headers: XML_CT,
+            body:
+              '<?xml version="1.0" encoding="utf-8"?>' +
+              '<d:propertyupdate xmlns:d="DAV:"><d:set><d:prop>' +
+              `<d:displayname>${HOUR_CALENDAR_NAME}</d:displayname>` +
+              '</d:prop></d:set></d:propertyupdate>',
+          });
+        } catch {
+          // Non-fatal: sync continues even if the server refuses rename.
         }
       }
 

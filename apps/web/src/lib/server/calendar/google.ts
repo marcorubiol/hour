@@ -41,7 +41,7 @@ const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
 const USERINFO_URL = 'https://www.googleapis.com/oauth2/v2/userinfo';
 const API = 'https://www.googleapis.com/calendar/v3';
-const HOUR_CALENDAR_NAME = 'Hour';
+const HOUR_CALENDAR_NAME = 'hour';
 
 export function googleCalendarAuthUrl(opts: {
   clientId: string;
@@ -163,7 +163,7 @@ export function eventToGoogleBody(e: CalendarEvent): Record<string, unknown> {
   };
 
   if (e.url) {
-    body.source = { title: 'Hour', url: e.url };
+    body.source = { title: 'hour', url: e.url };
   }
 
   if (e.startUtc) {
@@ -230,6 +230,7 @@ export function googleCalendarAdapter(
       const availableCalendars: RemoteCalendar[] = [];
       let hourCalendarId = opts.hourCalendarId ?? null;
       let hourExists = false;
+      let hourNeedsRename = false;
 
       try {
         const list = await call<{
@@ -237,9 +238,13 @@ export function googleCalendarAdapter(
         }>('/users/me/calendarList?maxResults=100');
         for (const item of list.items ?? []) {
           if (item.deleted) continue;
-          if ((hourCalendarId && item.id === hourCalendarId) || item.summary === HOUR_CALENDAR_NAME) {
+          if (
+            (hourCalendarId && item.id === hourCalendarId) ||
+            item.summary?.trim().toLowerCase() === HOUR_CALENDAR_NAME
+          ) {
             hourCalendarId = item.id;
             hourExists = true;
+            if (item.summary?.trim() !== HOUR_CALENDAR_NAME) hourNeedsRename = true;
           } else if (item.summary) {
             availableCalendars.push({
               id: item.id,
@@ -251,7 +256,18 @@ export function googleCalendarAdapter(
         }
       } catch (err) {
         if (err instanceof CalendarAuthError) throw err;
-        // If calendarlist.readonly wasn't granted, still verify/create Hour calendar.
+        // If calendarlist.readonly wasn't granted, still verify/create hour calendar.
+      }
+
+      if (hourExists && hourNeedsRename && hourCalendarId) {
+        try {
+          await call(`/calendars/${encodeURIComponent(hourCalendarId)}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ summary: HOUR_CALENDAR_NAME }),
+          });
+        } catch {
+          // Non-fatal: sync continues even if rename fails.
+        }
       }
 
       if (!hourExists) {
@@ -259,7 +275,7 @@ export function googleCalendarAdapter(
           method: 'POST',
           body: JSON.stringify({
             summary: HOUR_CALENDAR_NAME,
-            description: 'Hour · calendario gestionado automáticamente',
+            description: 'hour · calendario gestionado automáticamente',
           }),
         });
         hourCalendarId = created.id;

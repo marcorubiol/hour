@@ -10,7 +10,7 @@
 </script>
 
 <svelte:head>
-  <title>Playground — Hour</title>
+  <title>Playground — hour</title>
 </svelte:head>
 
 {#if dev}

@@ -459,7 +459,7 @@ export function buildSingleEventIcs(
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Hour//Calendar Sync//EN',
+    'PRODID:-//hour//Calendar Sync//EN',
     'CALSCALE:GREGORIAN',
     ...renderVEventLines(event, dtstamp, opts),
     'END:VCALENDAR',
@@ -479,10 +479,10 @@ export function buildPersonalCalendar(
   const lines: string[] = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Hour//Personal Calendar//EN',
+    'PRODID:-//hour//Personal Calendar//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
-    'X-WR-CALNAME:Hour',
+    'X-WR-CALNAME:hour',
     'X-PUBLISHED-TTL:PT1H',
   ];
 

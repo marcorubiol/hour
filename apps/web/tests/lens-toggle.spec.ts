@@ -118,7 +118,7 @@ test.describe('Lenses per space (ADR-132)', () => {
     );
     // The lens draws nothing of its own (no ledger), and the data is still there.
     await expect(page.locator('#mny-ledger')).toHaveCount(0);
-    await expect(page).toHaveTitle(/^Books · Hour$/);
+    await expect(page).toHaveTitle(/^Books · hour$/);
   });
 
   test('Settings turns a lens back on', async ({ page }) => {

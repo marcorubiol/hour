@@ -11,7 +11,7 @@ async function login(page: Page) {
   // ADR-137: sign-in lands on the Desk.
   await page.waitForURL(/\/h\/today\/?$/);
   // The Desk names the tab: the Hall used to keep the login's «Sign in» (ADR-130 § 5).
-  await expect(page).toHaveTitle(/^[^·—]+ · Hour$/);
+  await expect(page).toHaveTitle(/^[^·—]+ · hour$/);
 }
 
 async function sessionCookies(context: BrowserContext) {

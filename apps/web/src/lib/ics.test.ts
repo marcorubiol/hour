@@ -69,8 +69,8 @@ describe('buildCalendar', () => {
     const ics = buildCalendar(baseFeed(), NOW);
     expect(ics.startsWith('BEGIN:VCALENDAR\r\n')).toBe(true);
     expect(ics.endsWith('END:VCALENDAR\r\n')).toBe(true);
-    expect(ics).toContain('X-WR-CALNAME:MüK Cia · Hour');
-    expect(ics).toContain('PRODID:-//Hour//Calendar Feed//EN');
+    expect(ics).toContain('X-WR-CALNAME:MüK Cia · hour');
+    expect(ics).toContain('PRODID:-//hour//Calendar Feed//EN');
   });
 
   it('renders a timed performance with venue location and 2h fallback end', () => {
@@ -258,7 +258,7 @@ describe('legible descriptions (ADR-162)', () => {
       'función 21h',
       'desmontaje 23h',
       'fin 0h30',
-      `En Hour: ${ORIGIN}/h/muk-cia/performance/teatre-x-2026-03-14`,
+      `En hour: ${ORIGIN}/h/muk-cia/performance/teatre-x-2026-03-14`,
     ]);
     expect(ics).toContain(`URL:${ORIGIN}/h/muk-cia/performance/teatre-x-2026-03-14`);
   });
@@ -326,7 +326,7 @@ describe('legible descriptions (ADR-162)', () => {
   it('a performance without slug has no link', () => {
     const ics = buildCalendar(baseFeed({ performances: [perf({ slug: null })] }), NOW, { locale: 'en', origin: ORIGIN });
     expect(ics).not.toContain('URL:');
-    expect(description(ics)).not.toContain('In Hour');
+    expect(description(ics)).not.toContain('In hour');
   });
 
   it('a date says its kind in the language, the hold, and links to its day in the Planner', () => {
@@ -355,7 +355,7 @@ describe('legible descriptions (ADR-162)', () => {
     // 23h30 UTC is already the 11th in Madrid.
     expect(description(ics).split('\n')).toEqual([
       'día de viaje · opción',
-      `En Hour: ${ORIGIN}/h/planner?view=day&d=2026-09-11`,
+      `En hour: ${ORIGIN}/h/planner?view=day&d=2026-09-11`,
     ]);
     expect(ics).not.toMatch(/—/);
   });

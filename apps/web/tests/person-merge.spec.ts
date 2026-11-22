@@ -89,9 +89,9 @@ test.describe('person merge', () => {
       // The preview: what moves (the caller's own note), what is chosen.
       await expect(dlg.getByTestId('merge-moves')).toContainText(`Moves to “${keepName}”: 1 of your notes.`);
       await expect(dlg.getByText(`${dropName} goes`)).toBeVisible();
-      await expect(dlg.getByText(`${dropEmail} stops bringing mail into Hour.`)).toBeVisible();
+      await expect(dlg.getByText(`${dropEmail} stops bringing mail into hour.`)).toBeVisible();
       await dlg.getByRole('radio', { name: dropEmail }).check();
-      await expect(dlg.getByText(`${keepEmail} stops bringing mail into Hour.`)).toBeVisible();
+      await expect(dlg.getByText(`${keepEmail} stops bringing mail into hour.`)).toBeVisible();
       await expect(dlg.getByText('It can be undone for 30 days.')).toBeVisible();
 
       await dlg.getByRole('button', { name: 'Merge', exact: true }).click();

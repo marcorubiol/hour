@@ -7,7 +7,8 @@ import {
   toBase64Url,
 } from './crypto';
 import { expandTimingToBusy, parseIcsTimings } from './ics-parse';
-import { eventToGoogleBody, googleCalendarAuthUrl, hasCalendarScopes } from './google';
+import { eventToGoogleBody, googleCalendarAdapter, googleCalendarAuthUrl, hasCalendarScopes } from './google';
+import { caldavAdapter } from './caldav';
 import { syncConnection, type CalendarEngineDeps } from './engine';
 import {
   CalendarAuthError,
@@ -354,5 +355,61 @@ describe('syncConnection engine (Fases 2, 3, 4)', () => {
     expect(res.status).toBe('paused');
     expect(res.error).toBe('auth_failed');
     expect(mem.getFinish()?.status).toBe('paused');
+  });
+
+  it('auto-renames legacy capitalized «Hour» calendars to lowercase «hour» in CalDAV and Google', async () => {
+    const davMethods: Array<{ method: string; url: string; body: string }> = [];
+    const davFetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = init?.method ?? 'GET';
+      const body = typeof init?.body === 'string' ? init.body : '';
+      davMethods.push({ method, url, body });
+      if (method === 'PROPFIND') {
+        return new Response(
+          `<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+            <d:response><d:href>/123/calendars/hour-abc/</d:href><d:propstat><d:prop>
+              <d:resourcetype><d:collection/><c:calendar/></d:resourcetype>
+              <d:displayname>Hour</d:displayname>
+            </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+          </d:multistatus>`,
+          { status: 207 },
+        );
+      }
+      return new Response('', { status: 207 });
+    });
+
+    const dav = caldavAdapter(davFetch, { appleId: 'a@b.c', appPassword: 'pw' }, {
+      principalUrl: 'https://p01-caldav.icloud.com/123/principal/',
+      calendarHomeUrl: 'https://p01-caldav.icloud.com/123/calendars/',
+      hourCalendarId: 'https://p01-caldav.icloud.com/123/calendars/hour-abc/',
+    });
+    const davRes = await dav.ensureCalendar();
+    expect(davRes.hourCalendarId).toBe('https://p01-caldav.icloud.com/123/calendars/hour-abc/');
+    expect(davMethods.some((m) => m.method === 'PROPPATCH' && m.body.includes('<d:displayname>hour</d:displayname>'))).toBe(true);
+
+    const gCalls: Array<{ method: string; url: string; body: string }> = [];
+    const gFetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = init?.method ?? 'GET';
+      const body = typeof init?.body === 'string' ? init.body : '';
+      gCalls.push({ method, url, body });
+      if (url.includes('oauth2.googleapis.com')) {
+        return new Response(JSON.stringify({ access_token: 'tok', expires_in: 3600 }), { status: 200 });
+      }
+      if (url.includes('/calendarList')) {
+        return new Response(JSON.stringify({ items: [{ id: 'cal-hour-1', summary: 'Hour' }] }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ id: 'cal-hour-1', summary: 'hour' }), { status: 200 });
+    });
+
+    const g = googleCalendarAdapter(gFetch, {
+      clientId: 'cid',
+      clientSecret: 'csec',
+      refreshToken: 'rtok',
+      hourCalendarId: 'cal-hour-1',
+    });
+    const gRes = await g.ensureCalendar();
+    expect(gRes.hourCalendarId).toBe('cal-hour-1');
+    expect(gCalls.some((c) => c.method === 'PATCH' && c.body.includes('"summary":"hour"'))).toBe(true);
   });
 });

@@ -66,7 +66,7 @@ describe('ConversationComposer', () => {
 
     await fireEvent.click(screen.getByTestId('composer-to-team'));
     await settle();
-    expect(reads()).toBe('Laia Puig no lo ve. Se queda en Hour, para el equipo.');
+    expect(reads()).toBe('Laia Puig no lo ve. Se queda en hour, para el equipo.');
     expect(screen.getByTestId('thread-composer').classList.contains('composer--team')).toBe(true);
     expect(screen.getByRole('button', { name: 'Guardar para el equipo' })).toBeTruthy();
 
@@ -128,7 +128,7 @@ describe('ConversationComposer', () => {
     await settle();
     await fireEvent.click(screen.getByTestId('composer-to-team'));
     await settle();
-    expect(reads()).toBe('Laia Puig y Jordi Sastre no lo ven. Se queda en Hour, para el equipo.');
+    expect(reads()).toBe('Laia Puig y Jordi Sastre no lo ven. Se queda en hour, para el equipo.');
     const field = screen.getByRole('textbox');
     expect(field.getAttribute('aria-describedby')).toContain(screen.getByTestId('composer-reads').id);
   });
@@ -137,6 +137,6 @@ describe('ConversationComposer', () => {
     render(Harness, { convId: 'c-nomail', mail: NO_MAIL });
     await settle();
     expect(pressed('composer-to-team')).toBe('true');
-    expect(reads()).toBe('Sin correo: conecta un buzón para escribir. Laia Puig no lo ve. Se queda en Hour, para el equipo.');
+    expect(reads()).toBe('Sin correo: conecta un buzón para escribir. Laia Puig no lo ve. Se queda en hour, para el equipo.');
   });
 });

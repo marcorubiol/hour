@@ -116,7 +116,7 @@ describe('BoloAccess', () => {
     expect(post.url).toBe('/api/bolos/b0000000-0000-4000-8000-000000000001/access');
     expect(post.body).toEqual({ email: 'clara@example.test', preset: 'equip', person_id: 'clara' });
     expect((screen.getByLabelText(/Enlace de invitación/) as HTMLInputElement).value).toBe('http://localhost/invite#tok');
-    expect(screen.getByText(/Hour no envía el correo/)).toBeTruthy();
+    expect(screen.getByText(/hour no envía el correo/)).toBeTruthy();
   });
 
   it('quien no puede invitar no ve el botón ni la propuesta', async () => {
