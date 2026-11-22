@@ -61,6 +61,8 @@ export type NavWorkspace = {
   view_scope?: string | null;
   /** ADR-192 — the Planner drawing the caller opens in here; null = the season overview (`$lib/planner`). */
   planner_view?: string | null;
+  /** ADR-241 — personal calendar scope here (`mine` | `all` | `none`); null follows `view_scope`. */
+  calendar_scope?: string | null;
 };
 
 /** Row shape of GET /api/projects — the shared ['projects', …] cache. */

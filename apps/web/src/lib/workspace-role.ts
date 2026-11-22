@@ -90,9 +90,11 @@ export interface OwnMembership {
   view_scope?: string | null;
   /** ADR-192 — the Planner drawing they open in; absent until its migration is applied. */
   planner_view?: string | null;
+  /** ADR-241 — personal calendar scope (`mine` | `all` | `none`); null follows `view_scope`. */
+  calendar_scope?: string | null;
 }
 
-/** Each workspace with the caller's role, package, «lo mío / todo» and Planner entry in it; null where there is no row to say. */
+/** Each workspace with the caller's role, package, «lo mío / todo», Planner entry and calendar scope; null where there is no row to say. */
 export function withMyRole<T extends { id: string }>(
   items: readonly T[],
   memberships: readonly OwnMembership[],
@@ -101,6 +103,7 @@ export function withMyRole<T extends { id: string }>(
   my_preset: string | null;
   view_scope: string | null;
   planner_view: string | null;
+  calendar_scope: string | null;
 })[] {
   const own = new Map(memberships.map((m) => [m.workspace_id, m]));
   return items.map((w) => {
@@ -111,6 +114,7 @@ export function withMyRole<T extends { id: string }>(
       my_preset: m?.preset ?? null,
       view_scope: m?.view_scope ?? null,
       planner_view: m?.planner_view ?? null,
+      calendar_scope: m?.calendar_scope ?? null,
     };
   });
 }

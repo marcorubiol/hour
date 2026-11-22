@@ -8802,3 +8802,41 @@ espacios, ni escribe en Google.
 **Sin cambios de código ni de datos.** Solo documentación. Sin esquema, API ni `CACHE_SCHEMA`.
 
 **Cómo se revierte.** Revertir el commit.
+
+## [2026-11-22] ADR-241 · Sincronización con Apple Calendar y Google Calendar (enmienda ADR-240 § 3)
+
+Marco, 22-11 («Sí a todo» sobre el plan «Sincronización con Apple Calendar y Google Calendar»).
+
+**Contexto.** ADR-240 dejó fuera el CalDAV de escritura y las cinco preguntas de alcance abiertas. Tras el diseño de
+protocolo y modelo de eventos, Marco valida el plan entero en seis fases en serie (0 a 5): Hour manda sobre un
+calendario propio «Hour» en la cuenta de la persona y lee ocupado del resto de sus calendarios; los cambios manuales
+sobre fechas de Hour vuelven como propuesta en «Te espera», nunca por edición directa.
+
+**Decisión (enmienda ADR-240 § 3 y cierra sus cinco preguntas salvo el plan de precios).**
+1. **Apple entra con CalDAV de escritura** (Fase 2, tras probarlo en Fase 0 desde `workerd` contra iCloud), con
+   contraseña de app cifrada en reposo (AES-256-GCM con clave propia en Wrangler, nunca en navegador ni logs). El
+   `.ics` personal cruzando espacios se queda como Fase 1 y como salida sin credenciales (también para Outlook).
+2. **Regla de conflicto única:** en el calendario «Hour» gana Hour (reemplaza cambios y repone borrados); en los otros
+   calendarios de la persona, Hour solo lee ocupado (sin títulos ni lugares, Fase 3). Los cambios sobre fechas de Hour
+   (ensayos, viajes; nunca funciones) aparecen como propuesta «Aplicar · Descartar» en «Te espera» (Fase 4).
+3. **Qué sale en Fase 1 y posteriores:**
+   - Funciones confirmadas y opciones (`hold`, `hold_1..3`), más funciones en las que la persona está convocada sin
+     contestar («· por contestar», ADR-235), como `TENTATIVE`. Las canceladas y aquellas con «no puedo» (`not_going`)
+     salen fuera.
+   - Bloque de función: jornada entera (de la primera hora de la escaleta a la última, con la hora de función en el
+     título cuando la jornada empieza antes).
+   - Viajes: un evento por viaje de la primera salida a la última llegada, con tramos en la descripción. Días libres:
+     día entero con `TRANSP:TRANSPARENT`.
+   - Avisos (`VALARM`): ninguno por defecto; elección única («la víspera» o «2 h antes»).
+   - Alcance por espacio: sigue `membership.view_scope` (ADR-151: «Lo mío» o «Todo»), con tercera opción «Nada»
+     (`membership.calendar_scope`).
+   - Seguridad (ADR-054): nunca dinero, notas internas, localizadores ni datos de otras personas.
+4. **Google (Fase 5):** Calendar API v3 con OAuth separado del de Buzones (`calendar.app.created` + freebusy +
+   `calendarlist.readonly`), `watch` + `syncToken` y pasada periódica de respaldo en los dos crons existentes.
+5. **Fase 0 y Fase 1 en este corte:** sonda local `workerd` (`scripts/caldav-probe/`) y «Mi calendario» personal por
+   suscripción `.ics` (migración `20261122100000_personal_calendar_feed.sql` pendiente de gate § 34, motor puro
+   compartido `$lib/calendar-events.ts`, rutas `/api/me/calendar-feed`, `/api/me/calendar-scope` y
+   `/api/public/my-calendar/[token]`, y `Ajustes › Calendario`). Sube `CACHE_SCHEMA` a 39 por `calendar_scope` en
+   `/api/workspaces`.
+
+**Cómo se revierte.** Revertir el commit; la migración `20261122100000` es aditiva y lleva rollback en cabecera.

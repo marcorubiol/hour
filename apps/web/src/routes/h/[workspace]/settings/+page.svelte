@@ -25,6 +25,7 @@
   import { type SectionId, offeredSections, sectionFrom } from '$lib/components/SettingsNav.svelte';
   import type { NavWorkspace } from '$lib/nav';
   import ProfileSection from '$lib/components/settings/ProfileSection.svelte';
+  import CalendarSection from '$lib/components/settings/CalendarSection.svelte';
   import WorkspacesSection from '$lib/components/settings/WorkspacesSection.svelte';
   import SpaceSection from '$lib/components/settings/SpaceSection.svelte';
   import LensesSection from '$lib/components/settings/LensesSection.svelte';
@@ -87,6 +88,10 @@
 
   {#if active === 'profile'}
     <ProfileSection {workspaceSlug} />
+  {/if}
+
+  {#if active === 'calendar'}
+    <CalendarSection />
   {/if}
 
   {#if active === 'workspaces'}
