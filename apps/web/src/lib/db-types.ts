@@ -3192,6 +3192,7 @@ export type Database = {
         Row: {
           accepted_at: string | null
           bolo_id: string | null
+          calendar_scope: string | null
           can_edit_meta: boolean
           container_verb: Database["public"]["Enums"]["access_verb"] | null
           created_at: string
@@ -3216,6 +3217,7 @@ export type Database = {
         Insert: {
           accepted_at?: string | null
           bolo_id?: string | null
+          calendar_scope?: string | null
           can_edit_meta?: boolean
           container_verb?: Database["public"]["Enums"]["access_verb"] | null
           created_at?: string
@@ -3240,6 +3242,7 @@ export type Database = {
         Update: {
           accepted_at?: string | null
           bolo_id?: string | null
+          calendar_scope?: string | null
           can_edit_meta?: boolean
           container_verb?: Database["public"]["Enums"]["access_verb"] | null
           created_at?: string
@@ -4790,6 +4793,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_calendar_feed: {
+        Row: {
+          alarm_mode: string
+          created_at: string
+          expires_at: string
+          id: string
+          revoked_at: string | null
+          token: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          alarm_mode?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          revoked_at?: string | null
+          token: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          alarm_mode?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          revoked_at?: string | null
+          token?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       user_profile: {
         Row: {
@@ -8943,6 +8979,30 @@ export type Database = {
       set_my_mail_signature: {
         Args: { p_signature: string; p_workspace_id: string }
         Returns: undefined
+      }
+      create_my_calendar_feed: {
+        Args: { p_alarm_mode?: string }
+        Returns: Database["public"]["Tables"]["user_calendar_feed"]["Row"]
+      }
+      get_my_calendar_feed: {
+        Args: Record<PropertyKey, never>
+        Returns: Database["public"]["Tables"]["user_calendar_feed"]["Row"][]
+      }
+      get_personal_calendar: {
+        Args: { p_token: string }
+        Returns: Json
+      }
+      revoke_my_calendar_feed: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      set_my_calendar_scope: {
+        Args: { p_scope: string | null; p_workspace_id: string }
+        Returns: undefined
+      }
+      update_my_calendar_feed: {
+        Args: { p_alarm_mode: string }
+        Returns: Database["public"]["Tables"]["user_calendar_feed"]["Row"]
       }
       set_my_planner_view: {
         Args: { p_view: string | null; p_workspace_id: string }

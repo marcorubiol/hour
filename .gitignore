@@ -15,6 +15,7 @@ apps/web/dev-dist/
 .env.local
 .env.*.local
 .env.test
+.env.icloud
 .dev.vars
 
 # OS
