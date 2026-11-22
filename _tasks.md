@@ -553,12 +553,14 @@ con boceto antes y después de la 119). Capturas de partida: espacio `playwright
 
 - [ ] **Modo «Ahora», después de la v1** (ADR-146, v1 en producción el 30-10): hotel y aparcamiento estructurados, billetes y rider en PDF, «qué ha cambiado», escribir sin red, aviso 30 min antes de la llamada. Re-evaluar dónde va el botón en el móvil tras usarlo en gira.
 
-- [ ] **Sincronizar con Google Calendar y Apple Calendar, cada persona con su cuenta** (Marco, 2026-11-20: «seguro que va a entrar»; ADR-240). Idea: los eventos de Hour (bolos confirmados, ensayos, viajes, lo que te convocan) se reflejan en el calendario de la persona a la que van dirigidos, no en uno por espacio; cada usuario conecta su propia cuenta y elige qué entra. Investigación: `research/product/16-integration-ecosystem.md` §2 (Google Calendar API v3 + OAuth como fase 1; Apple por suscripción `.ics`). Hoy solo existe `calendar_share` (ADR-054): feed `.ics` de lectura **por espacio**, token en claro (ADR-047) y sin caducidad. Sin diseñar ni estimar; antes de construir, resolver:
-  - [ ] **Google (push, y lectura de disponibilidad si se quiere):** reutilizar el OAuth de Google de Buzones (Ajustes → Buzones) o pedir un consentimiento propio de Calendar con el alcance mínimo; decidir si cuenta para la verificación de la app de Google (ver la tarea de la auditoría CASA, que es de Gmail: Calendar no es un permiso restringido, comprobarlo).
-  - [ ] **Apple:** `.ics` de suscripción **por usuario** (qué te toca a ti en todos tus espacios), con token revocable y caducidad; es de solo lectura y Apple refresca cuando quiere (horas). CalDAV de escritura queda fuera.
-  - [ ] **Quién es el destinatario de un evento:** función/convocatoria enlazada a la persona (ADR-235) y no solo «el bolo del espacio»; qué ve cada uno (sin tarifas, sin notas internas, como en ADR-054).
-  - [ ] **Plan:** el recorte de investigación y ADR de precios dice que Google Calendar sync entra en STANDARD; confirmar con Marco que sigue así y qué ve el plan gratuito (¿solo `.ics`?).
-  - [ ] **Seguridad y datos:** tokens de acceso cifrados, desconectar borra lo creado en el calendario externo, RLS y migración (toca permisos: RLS entera + E2E contra el desplegado).
+- [ ] **Sincronizar con Apple Calendar y Google Calendar, cada persona con su cuenta** (ADR-240, ADR-241; plan y decisiones de Marco del 22-11 en `build/plans/2026-11-22-calendar-sync.md`). Hour escribe «lo mío» en un calendario «Hour» de la cuenta de cada persona y lee de sus otros calendarios solo cuándo está ocupada. Empieza por Apple. Hoy solo existe `calendar_share` (ADR-054). Fases, en serie:
+  - [ ] **0. Prueba técnica** con la cuenta de Marco (la contraseña de app la pone él en su Mac, nunca en git ni en un chat): CalDAV contra iCloud desde un Worker (descubrir, crear calendario, escribir, `sync-collection`, zonas, alarmas). Pedir a Apple el OAuth piloto. Mirar la categoría de verificación de los permisos de Google.
+  - [ ] **1. «Mi calendario» por suscripción:** el conjunto de eventos de una persona cruzando espacios, como función pura, servido como `.ics` personal con token revocable y con caducidad.
+  - [ ] **2. Apple, de Hour al calendario:** conexión, calendario «Hour», crear, actualizar, borrar, reponer, pausa y reconexión, desconectar. Toca permisos: RLS entera y E2E contra el desplegado.
+  - [ ] **3. Vuelve el ocupado:** elegir calendarios, choques en el Día y al convocar, días enteros como «no puedo». Sube `CACHE_SCHEMA` si cambia lo que guarda el dispositivo.
+  - [ ] **4. Cambios como propuesta** en «Te espera», solo para fechas.
+  - [ ] **5. Google:** el segundo adaptador (OAuth propio, `watch`, `syncToken`).
+  - [ ] **Plan de precios:** la investigación pone Google Calendar sync en STANDARD; sigue sin decidir qué ve el plan gratuito.
 
 ## Deuda aceptada / observar en uso
 
