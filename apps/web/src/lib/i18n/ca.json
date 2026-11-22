@@ -3813,8 +3813,6 @@
   "roadsheet.calls_no_phone": "{name} · sense telèfon",
   "roadsheet.calls_not_saved": "No s'ha pogut desar a qui truca la sala",
   "settings.nav_calendar": "Calendari",
-  "ics.option_suffix": "opció",
-  "ics.pending_suffix": "per contestar",
   "calendar.sub": "El teu calendari d'Hour a Apple Calendar, Google Calendar o Outlook, creuant els teus espais.",
   "calendar.subscription_kicker": "El meu calendari",
   "calendar.feed_label": "Subscripció personal (.ics)",

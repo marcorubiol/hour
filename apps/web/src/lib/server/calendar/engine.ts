@@ -25,7 +25,7 @@
  */
 
 import { buildPersonalEvents, eventFingerprint, type CalendarEvent } from '../../calendar-events';
-import { LOCALES, type Locale } from '../../i18n';
+import { CALENDAR_LOCALES, type CalendarLocale } from '../../calendar-clock';
 import { caldavAdapter, type CalDavCredentials } from './caldav';
 import { calendarCredentialAad, decryptCalendarSecret, importCalendarKey } from './crypto';
 import { serviceCalendarDb } from './db';
@@ -65,8 +65,8 @@ export interface CalendarEngineDeps {
   now?: () => Date;
 }
 
-function resolveLocale(raw: string | null | undefined): Locale {
-  return raw && (LOCALES as readonly string[]).includes(raw) ? (raw as Locale) : 'es';
+function resolveLocale(raw: string | null | undefined): CalendarLocale {
+  return raw && (CALENDAR_LOCALES as readonly string[]).includes(raw) ? (raw as CalendarLocale) : 'es';
 }
 
 function eventTimingKey(e: CalendarEvent): { start: string | null; end: string | null; allDay: boolean } {

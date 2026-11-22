@@ -3813,8 +3813,6 @@
   "roadsheet.calls_no_phone": "{name} · sin teléfono",
   "roadsheet.calls_not_saved": "No se pudo guardar a quién llama la sala",
   "settings.nav_calendar": "Calendario",
-  "ics.option_suffix": "opción",
-  "ics.pending_suffix": "por contestar",
   "calendar.sub": "Tu calendario de Hour en Apple Calendar, Google Calendar u Outlook, cruzando tus espacios.",
   "calendar.subscription_kicker": "Mi calendario",
   "calendar.feed_label": "Suscripción personal (.ics)",
