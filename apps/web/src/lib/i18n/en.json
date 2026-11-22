@@ -3813,8 +3813,6 @@
   "roadsheet.calls_no_phone": "{name} · no phone",
   "roadsheet.calls_not_saved": "Could not save who the venue calls",
   "settings.nav_calendar": "Calendar",
-  "ics.option_suffix": "hold",
-  "ics.pending_suffix": "to reply",
   "calendar.sub": "Your Hour calendar in Apple Calendar, Google Calendar or Outlook, across all your spaces.",
   "calendar.subscription_kicker": "My calendar",
   "calendar.feed_label": "Personal subscription (.ics)",

@@ -10,7 +10,7 @@
  * Only relative imports (bundled into worker-cron.ts).
  */
 
-import { wallClockToInstant } from '../../datetime';
+import { wallToUtcIso } from '../../calendar-clock';
 
 export interface ParsedVEventTiming {
   uid: string | null;
@@ -54,7 +54,7 @@ function parseIcsDateValue(params: string, value: string): { iso: string; allDay
   const tzMatch = /TZID=([^;:]+)/i.exec(params);
   if (tzMatch) {
     const tz = tzMatch[1].replace(/^"|"$/g, '');
-    const inst = wallClockToInstant(`${Y}-${M}-${D}T${h}:${min}`, tz);
+    const inst = wallToUtcIso(`${Y}-${M}-${D}T${h}:${min}`, tz);
     if (inst) return { iso: inst, allDay: false };
   }
   const fallback = `${Y}-${M}-${D}T${h}:${min}:${s}.000Z`;
