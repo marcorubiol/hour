@@ -23,6 +23,7 @@
  */
 
 import { getContext, setContext } from 'svelte';
+import type { TravelDirection } from '$lib/date';
 import type { QuickType } from '$lib/quick-add';
 
 const KEY = Symbol('creation');
@@ -40,6 +41,10 @@ export interface EventPreset {
   lineId?: string | null;
   /** The bolo it hangs from, with its venue and city (a bolo's record). */
   boloId?: string | null;
+  /** ADR-244: pre-filled trip direction and endpoints («Añadir ida» / «Añadir vuelta»). */
+  travelDirection?: TravelDirection | null;
+  originCity?: string | null;
+  destinationCity?: string | null;
   /** Typed in ⌘K: the quick add's title. */
   title?: string | null;
 }

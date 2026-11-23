@@ -60,7 +60,7 @@
   import { lensOn } from '$lib/lenses.svelte';
   import { usePins } from '$lib/stores/pins.svelte';
   import { HOLD_NOTICE_DEFAULT } from '$lib/performance';
-  import { TRAVEL_DIRECTIONS, invalidateDateFeeds } from '$lib/date';
+  import { TRAVEL_DIRECTIONS, invalidateDateFeeds, type TravelDirection } from '$lib/date';
   import { spaceName } from '$lib/utils/identity';
   import {
     createAvailability,
@@ -115,9 +115,13 @@
     /** The pinned scope's project (and line), which always wins. */
     presetProjectId?: string | null;
     presetLineId?: string | null;
-    /** The bolo it hangs from (a bolo's «+ función»): proposed over the
-        one-open-bolo guess, and it brings its venue and city. */
+    /** The bolo it hangs from (a bolo's «+ función» or «Añadir ida/vuelta»):
+        proposed over the one-open-bolo guess, and it brings its venue and city. */
     presetBoloId?: string | null;
+    /** ADR-244: pre-filled trip direction and endpoints. */
+    presetTravelDirection?: TravelDirection | null;
+    presetOriginCity?: string | null;
+    presetDestinationCity?: string | null;
     /** Open on this type (the toolbar's «unavailable» door). */
     presetType?: QuickType | null;
     /** Typed in ⌘K: it is the title, over a leftover draft's. */
@@ -137,6 +141,9 @@
     presetProjectId = null,
     presetLineId = null,
     presetBoloId = null,
+    presetTravelDirection = null,
+    presetOriginCity = null,
+    presetDestinationCity = null,
     presetType = null,
     presetTitle = null,
     presetWorkspaceId = null,
@@ -246,12 +253,12 @@
   ]);
   let showAttach = $derived(sk.more.attach && nearPerfs.length > 0);
 
-  // A performance hangs from its deal (ADR-087): the bolos of the project.
+  // A performance or a trip hangs from its deal (ADR-087, ADR-242): the bolos of the project.
   const bolosQuery = createQuery(
-    toStore(() => projectBolosQueryOptions(d.project, open && d.type === 'performance')),
+    toStore(() => projectBolosQueryOptions(d.project, open && (d.type === 'performance' || d.type === 'travel_day'))),
   );
   let bolos = $derived<BoloLite[]>($bolosQuery.data?.items ?? []);
-  let bolosOpts = $derived(boloOptions(bolos, locale, null, voice));
+  let bolosOpts = $derived(boloOptions(bolos, locale, d.bolo || null, voice));
   let showBolo = $derived(sk.more.bolo && bolosOpts.length > 1);
   // A project without bolos: the feed alone cannot tell «none» from «not
   // yours», so only then is money access asked, and only who reads money
@@ -261,7 +268,7 @@
     toStore(() =>
       moneyAccessQueryOptions(
         d.project,
-        open && d.type === 'performance' && $bolosQuery.isSuccess && bolos.length === 0,
+        open && (d.type === 'performance' || d.type === 'travel_day') && $bolosQuery.isSuccess && bolos.length === 0,
       ),
     ),
   );
@@ -331,8 +338,25 @@
       }
       // A bolo's door says which deal: it is proposed again, over a draft's.
       if (presetBoloId) {
-        d.bolo = '';
+        d.bolo = presetType === 'travel_day' ? presetBoloId : '';
         seeded.bolo = '';
+      }
+      // ADR-244: «Añadir ida» / «Añadir vuelta» from a bolo or performance pass
+      // seeds direction and the venue city (destination for outbound, origin for return).
+      if (presetType === 'travel_day' && (presetTravelDirection || presetOriginCity !== null || presetDestinationCity !== null)) {
+        if (presetTravelDirection) {
+          d.direction = presetTravelDirection;
+          touched.direction = true;
+        }
+        if (presetOriginCity !== null) {
+          d.origin = presetOriginCity;
+          touched.origin = true;
+        }
+        if (presetDestinationCity !== null) {
+          d.city = presetDestinationCity;
+          touched.city = true;
+        }
+        seeded.trip = `${d.project}|${d.when.day}`;
       }
       // What was typed to ask for this is written, not deduced: it wins, and
       // it is a draft from now on.
@@ -376,12 +400,18 @@
   });
 
   // A performance: one open bolo is proposed, and brings its venue and city.
+  // A trip: only takes an explicit presetBoloId (never guesses on create).
   $effect(() => {
-    if (!open || d.type !== 'performance' || !d.project || !$bolosQuery.isSuccess) return;
-    if (seeded.bolo === d.project) return;
-    seeded.bolo = d.project;
-    d.bolo = presetBoloId && bolos.some((b) => b.id === presetBoloId) ? presetBoloId : boloDefault(bolos);
-    if (d.bolo) pickBolo(d.bolo);
+    if (!open || (d.type !== 'performance' && d.type !== 'travel_day') || !d.project || !$bolosQuery.isSuccess) return;
+    const key = `${d.type}|${d.project}|${presetBoloId ?? ''}`;
+    if (seeded.bolo === key) return;
+    seeded.bolo = key;
+    if (d.type === 'performance') {
+      d.bolo = presetBoloId && bolos.some((b) => b.id === presetBoloId) ? presetBoloId : boloDefault(bolos);
+      if (d.bolo) pickBolo(d.bolo);
+    } else if (presetBoloId && bolos.some((b) => b.id === presetBoloId)) {
+      d.bolo = presetBoloId;
+    }
   });
 
   function pickBolo(id: string) {
@@ -1024,6 +1054,13 @@
               bind:value={d.direction}
               onchange={() => (touched.direction = true)}
             />
+            {#if showBolo}
+              <Select
+                label={tr('trip.bolo_label')}
+                options={bolosOpts}
+                bind:value={d.bolo}
+              />
+            {/if}
           {:else}
             {#if sk.where === 'place'}
               <Input label={tr('create.venue')} bind:value={d.venue} oninput={() => (touched.venue = true)} />
