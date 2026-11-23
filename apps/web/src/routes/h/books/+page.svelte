@@ -1058,7 +1058,7 @@
             <!-- At zero, no head and no count: the one line in its place keeps
                  the grid square (ADR-154). Loading or failing, as before. -->
             {#if loading || invoicesError || attention.length > 0}
-            <BlockHead title={t('books.attention', locale)} count={loading || invoicesError ? DASH : attention.length}>
+            <BlockHead title={t('books.attention', locale)} display>
               {#if attention.length > ATTENTION_VISIBLE}
                 <button type="button" class="block-head__act" onclick={() => (attentionAll = !attentionAll)}>
                   {attentionAll ? t('books.attention_less', locale) : t('books.attention_all', locale, { n: attention.length })}
@@ -1485,15 +1485,20 @@
     .radar :global(.block-head) { margin-block-end: var(--space-xs); }
     /* One grid for the whole list (rows are subgrids): amounts and buttons
        fall in columns whatever each row's text measures. */
-    .att__list { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; column-gap: var(--space-m); }
-    .att__row { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; padding-block: var(--space-xs); border-block-end: var(--line-hairline) solid var(--border-color-light); }
-    .att__row :global(.btn) { justify-self: stretch; }
+    /* The rows of «Te espera» (Marco, 23-11-2026): each in its soft box, the
+       verb a word at rest that takes its box under the pointer or the focus. */
+    .att__list { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; column-gap: var(--space-m); row-gap: var(--space-2xs); margin: var(--space-s) 0 0; padding: 0; }
+    .att__row { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; padding: var(--space-s); border-radius: var(--radius-m); background: var(--bg-box); transition: background var(--transition); }
+    .att__row:hover, .att__row:focus-within { background: var(--bg-box-hover); }
+    .att__row :global(.btn) { justify-self: end; --btn-border-color: transparent; --btn-background: transparent; text-transform: lowercase; }
+    .att__row:hover :global(.btn), .att__row:focus-within :global(.btn) { --btn-border-color: var(--border-color-light); --btn-background: var(--bg-ultra-light); }
+    @media (hover: none) { .att__row :global(.btn) { --btn-border-color: var(--border-color-light); --btn-background: var(--bg-ultra-light); } }
     .att__what { min-inline-size: 0; display: flex; flex-wrap: wrap; column-gap: var(--space-2xs); align-items: baseline; }
     .att__who { color: var(--text-color); font-weight: 500; text-decoration: none; }
     .att__who:hover { text-decoration: underline; }
     .att__ctx { font-size: var(--text-s); color: var(--text-muted); }
     .att__why { inline-size: 100%; font-size: var(--text-xs); color: var(--text-muted); }
-    .att__row[data-kind='overdue'] .att__why { color: var(--danger); }
+    .att__row[data-kind='overdue'] .att__why { color: var(--warning); }
     /* The red once per block (ADR-139 § 6): the first overdue row carries it;
        the ones under it say how late in ink, the list is already in order. */
     .att__row[data-kind='overdue'] ~ .att__row[data-kind='overdue'] .att__why { color: var(--text-color); }

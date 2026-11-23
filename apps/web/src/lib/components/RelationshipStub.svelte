@@ -72,7 +72,7 @@
   {#if !loading && !errored && items.length === 0}
     <EmptyLine label={t('lens.conversations', locale)} text={t('perf.rel_empty', locale)} />
   {:else}
-    <BlockHead title={t('lens.conversations', locale)} count={loading || errored ? null : total} id="rel-stub-title" />
+    <BlockHead display title={t('lens.conversations', locale)} count={loading || errored ? null : total} id="rel-stub-title" />
   {/if}
 
   {#if loading}

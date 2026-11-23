@@ -191,7 +191,7 @@
   {/if}
 
   {#if visibleProjects.length > 0 || projectsSettled}
-    <div class="home__projects-head"><BlockHead title={t('hall.projects', locale)} /></div>
+    <div class="home__projects-head"><BlockHead display title={t('hall.projects', locale)} /></div>
     <div class="home__projects">
       {#each visibleProjects as unit (unit.id)}
         <article class="pcard pcard--accent" style={`--c: ${unit.accent}`}>

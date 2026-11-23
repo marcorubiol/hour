@@ -231,10 +231,12 @@
     {/if}
   {:else if feed}
     {#if sectioned && split.ours.length > 0}
-      <h3 class="eyebrow eyebrow--sub cfeed__head" data-testid="feed-section" data-section="ours">
-        <span class="cfeed__head-word">{t('chat.section_ours', locale)}</span> · {split.ours.length}
+      <!-- «Our turn» in the pass's voice (Marco, 23-11-2026): the title in the
+           serif, no figure, and each row in its soft box, as in Hoy. -->
+      <h3 class="block-head__title cfeed__head cfeed__head--ours" data-testid="feed-section" data-section="ours">
+        {t('chat.section_ours', locale)}
       </h3>
-      <ul class="crow-list crow-list--chat">
+      <ul class="crow-list crow-list--chat cfeed__ours">
         {#each split.ours as row (feedKey(row))}{@render feedRow(row)}{/each}
       </ul>
       {#if split.rest.length > 0}
@@ -279,8 +281,21 @@
     .cfeed__head:first-child {
       margin-block-start: 0;
     }
-    .cfeed__head-word {
-      color: var(--text-color);
+    .cfeed__head--ours {
+      padding-inline: 0;
+    }
+    .cfeed__ours {
+      display: grid;
+      gap: var(--space-2xs);
+      margin-block-end: var(--space-s);
+    }
+    .cfeed__ours > :global(li) {
+      border-radius: var(--radius-m);
+      background: var(--bg-box);
+      overflow: hidden;
+    }
+    .cfeed__ours > :global(li + li)::before {
+      content: none;
     }
     .cfeed__more {
       margin-block-start: var(--space-s);

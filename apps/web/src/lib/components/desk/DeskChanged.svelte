@@ -158,7 +158,7 @@
       {#if lensChip !== null}<a class="block-head__act" href={chipHref(lensChip, new URLSearchParams())} data-testid="desk-to-conversations" data-chip={lensChip}>{lensLabel} →</a>{/if}
     </Fold>
   {:else}
-  <BlockHead id="desk-changed-h" title={t('desk.changed_since', locale, { when: sinceLabel })}>
+  <BlockHead display id="desk-changed-h" title={t('desk.changed_since', locale, { when: sinceLabel })}>
     {#if lensChip !== null}<a class="block-head__act" href={chipHref(lensChip, new URLSearchParams())} data-testid="desk-to-conversations" data-chip={lensChip}>{lensLabel} →</a>{/if}
   </BlockHead>
   {@render changedBody()}

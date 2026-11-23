@@ -168,7 +168,7 @@
   bind:this={sectionEl}
 >
   <header class="board__head">
-    {#if !sheet}<BlockHead title={t('threads.board', locale)} id="board-title" concept="board" />{/if}
+    {#if !sheet}<BlockHead display title={t('threads.board', locale)} id="board-title" concept="board" />{/if}
     <!-- Ni la sala ni «1 función»: la ficha ya dice dónde (su título) y de
          qué bolo cuelga (sus hechos). Solo cuando el tablón es de varias
          funciones lo dice, y cuáles (ADR-139 p2). -->
