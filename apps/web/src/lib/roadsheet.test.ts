@@ -409,6 +409,36 @@ describe('tripsOfPerformance: which trip is «of this performance»', () => {
     );
     expect(fallback.map((x) => [x.id, x.link_source])).toEqual([['loose-day', 'suggested']]);
   });
+
+  it('ADR-244: a tour trip is of its neighbouring performances only, and does not silence the day suggestion', () => {
+    // Line performances on the 10th, the 17th (this one) and the 30th.
+    const scope = { boloId: null, lineId: 'l1', linePrevDay: '2026-10-10', lineNextDay: '2026-10-30' };
+    const rows = [
+      trip({ id: 'on-prev', line_id: 'l1', starts_at: '2026-10-10T08:00:00Z', ends_at: null }),
+      trip({ id: 'near-prev', line_id: 'l1', starts_at: '2026-10-12T08:00:00Z', ends_at: null }),
+      trip({ id: 'tie', line_id: 'l1', starts_at: '2026-10-23T08:00:00Z', ends_at: '2026-10-24T08:00:00Z' }),
+      trip({ id: 'near-me', line_id: 'l1', starts_at: '2026-10-15T08:00:00Z', ends_at: null }),
+      trip({ id: 'near-next', line_id: 'l1', starts_at: '2026-10-28T08:00:00Z', ends_at: null }),
+      trip({ id: 'loose-eve', starts_at: '2026-10-16T08:00:00Z', ends_at: null }),
+      trip({ id: 'same-line-eve-out', line_id: 'l1', starts_at: '2026-10-11T08:00:00Z', ends_at: null }),
+    ];
+    const got = tripsOfPerformance(rows, '2026-10-17', 'Europe/Madrid', none, scope);
+    expect(got.map((x) => [x.id, x.link_source])).toEqual([
+      ['near-me', 'line'],
+      ['loose-eve', 'suggested'],
+      ['tie', 'line'],
+    ]);
+
+    // First of the line: everything before it is its; last: everything after.
+    const first = tripsOfPerformance(
+      [trip({ id: 'way-before', line_id: 'l1', starts_at: '2026-09-01T08:00:00Z', ends_at: null })],
+      '2026-10-17',
+      'Europe/Madrid',
+      none,
+      { lineId: 'l1', linePrevDay: null, lineNextDay: '2026-10-30' },
+    );
+    expect(first.map((x) => x.id)).toEqual(['way-before']);
+  });
 });
 
 describe('buildRoadsheet: the travel section', () => {

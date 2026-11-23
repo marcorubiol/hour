@@ -166,3 +166,61 @@ export function booksHref(
   const q = params.length ? `?${params.join('&')}` : '';
   return `/h/books${q}${opts.boloId ? `#bolo-${opts.boloId}` : ''}`;
 }
+
+/** Lo que la sugerencia necesita de un bolo (`GET /api/money/bolos`). */
+export type BoloSpan = Pick<BoloLite, 'id' | 'status'> & {
+  first_performed_at: string | null;
+  last_performed_at: string | null;
+};
+
+/** Días que un viaje puede quedar lejos de su bolo para sugerirlo (ADR-245). */
+export const TRIP_BOLO_REACH = 3;
+
+/**
+ * ¿De qué bolo es este viaje? (ADR-245, fase 3 del encargo «el viaje se ata a
+ * su bolo»). Solo SUGIERE: la persona confirma con un toque (ADR-147, nadie se
+ * adivina). Un bolo cancelado no se sugiere.
+ *
+ * - Una ida mira la primera función: el bolo cuya primera función cae el día
+ *   del viaje o hasta `TRIP_BOLO_REACH` días después.
+ * - Una vuelta mira la última: cae el día del viaje o hasta N días antes.
+ * - Sin dirección (o un tramo), cualquiera de las dos dentro de ±N.
+ * Gana la más cercana; un empate entre dos bolos no sugiere nada.
+ *
+ * `trip.day` es el día del viaje (ISO), ya leído con su reloj.
+ */
+export function suggestBoloForTrip(
+  trip: { day: string; direction: string | null },
+  bolos: readonly BoloSpan[],
+): string | null {
+  const at = (iso: string) => Date.parse(`${iso.slice(0, 10)}T00:00:00Z`);
+  const tripAt = at(trip.day);
+  const DAY = 86_400_000;
+  let best: { id: string; dist: number } | null = null;
+  let tie = false;
+  for (const b of bolos) {
+    if (CLOSED.has(b.status)) continue;
+    const candidates: number[] = [];
+    const first = b.first_performed_at ? (at(b.first_performed_at) - tripAt) / DAY : null;
+    const last = b.last_performed_at ? (tripAt - at(b.last_performed_at)) / DAY : null;
+    if (trip.direction === 'outbound') {
+      if (first !== null && first >= 0) candidates.push(first);
+    } else if (trip.direction === 'return') {
+      if (last !== null && last >= 0) candidates.push(last);
+    } else {
+      if (first !== null) candidates.push(Math.abs(first));
+      if (last !== null) candidates.push(Math.abs(last));
+      // Un viaje en medio del bolo (entre su primera y su última función) es suyo.
+      if (first !== null && last !== null && first <= 0 && last <= 0) candidates.push(0);
+    }
+    const dist = candidates.length > 0 ? Math.min(...candidates) : Infinity;
+    if (dist > TRIP_BOLO_REACH) continue;
+    if (!best || dist < best.dist) {
+      best = { id: b.id, dist };
+      tie = false;
+    } else if (dist === best.dist) {
+      tie = true;
+    }
+  }
+  return best && !tie ? best.id : null;
+}

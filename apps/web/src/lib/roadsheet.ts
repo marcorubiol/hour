@@ -52,6 +52,7 @@ import type { ScheduleMoment, TimeslotFields } from './schedule-slot';
 import type { MovedMoment } from './roadsheet-late';
 import { localDayISO } from './datetime';
 import { addDaysIso, dayKeyInTz } from './planner';
+import { daysBetween } from './away';
 import type { TravelStageRow } from './travel-stage';
 
 export const ROADSHEET_ROLES = ['full', 'venue', 'performer', 'tech_manager'] as const;
@@ -237,9 +238,13 @@ function tripDay(at: string, allDay: boolean, tz: string): string {
  * WHICH TRIP IS «OF THIS PERFORMANCE» (ADR-166 § 2, ADR-242):
  *   1. Bound to the performance's bolo (`bolo_id === scope.boloId`), regardless
  *      of date (outbound 2 days before, return the day after all enter).
- *   2. Bound to the performance's line with no bolo (`line_id === scope.lineId && !bolo_id`).
- *   3. ONLY when neither (1) nor (2) matches any row: the legacy day + eve
- *      heuristic over unbound trips (`!bolo_id`), marked `link_source = 'suggested'`.
+ *   2. Bound to the performance's line with no bolo (`line_id === scope.lineId && !bolo_id`),
+ *      only inside the tour's window (ADR-244): between the line's previous and
+ *      next performance (`scope.linePrevDay`, `scope.lineNextDay`, other days
+ *      than this one), and not nearer the neighbour than this one (a tie: both).
+ *   3. ONLY when no row is bound to the bolo: the legacy day + eve heuristic over
+ *      unbound trips (`!bolo_id`) that are not of this same line, marked
+ *      `link_source = 'suggested'`.
  *
  * Pure function: mirrors `private.performance_trips_jsonb` in Postgres.
  */
@@ -248,7 +253,14 @@ export function tripsOfPerformance(
   performedAt: string,
   zone: string | null,
   names: ReadonlyMap<string, string>,
-  scope?: { boloId?: string | null; lineId?: string | null },
+  scope?: {
+    boloId?: string | null;
+    lineId?: string | null;
+    /** The line's nearest live performance day before this one (ADR-244). */
+    linePrevDay?: string | null;
+    /** The line's nearest live performance day after this one (ADR-244). */
+    lineNextDay?: string | null;
+  },
 ): RoadsheetTrip[] {
   const tz = zone || 'UTC';
   const day = performedAt.slice(0, 10);
@@ -256,29 +268,46 @@ export function tripsOfPerformance(
   const boloId = scope?.boloId ?? null;
   const lineId = scope?.lineId ?? null;
 
+  const prev = scope?.linePrevDay ?? null;
+  const next = scope?.lineNextDay ?? null;
+
+  const span = (r: TripRow): { first: string; last: string } => {
+    const own = r.venue?.timezone || tz;
+    const first = tripDay(r.starts_at, r.all_day, own);
+    const end = r.ends_at ? tripDay(r.ends_at, r.all_day, own) : first;
+    return { first, last: end > first ? end : first };
+  };
+  // ADR-244: a tour trip is of its neighbouring performances, not of all.
+  const inTourWindow = (r: TripRow): boolean => {
+    const { first, last } = span(r);
+    if (prev && !(last > prev)) return false;
+    if (next && !(first < next)) return false;
+    if (prev && daysBetween(last, day) > daysBetween(prev, first)) return false;
+    if (next && daysBetween(day, first) > daysBetween(last, next)) return false;
+    return true;
+  };
+
   const live = rows.filter((r) => r.kind === 'travel_day' && r.status !== 'cancelled');
   const bound: Array<{ row: TripRow; source: TripLinkSource }> = [];
   for (const r of live) {
     if (boloId && r.bolo_id === boloId) {
       bound.push({ row: r, source: 'bolo' });
-    } else if (lineId && r.line_id === lineId && !r.bolo_id) {
+    } else if (lineId && r.line_id === lineId && !r.bolo_id && inTourWindow(r)) {
       bound.push({ row: r, source: 'line' });
     }
   }
 
-  const picked: Array<{ row: TripRow; source: TripLinkSource }> =
-    bound.length > 0
-      ? bound
-      : live
-          .filter((r) => {
-            if (r.bolo_id) return false;
-            const own = r.venue?.timezone || tz;
-            const first = tripDay(r.starts_at, r.all_day, own);
-            const end = r.ends_at ? tripDay(r.ends_at, r.all_day, own) : first;
-            const last = end > first ? end : first;
-            return first <= day && last >= eve;
-          })
-          .map((row) => ({ row, source: 'suggested' as const }));
+  const suggested = bound.some((b) => b.source === 'bolo')
+    ? []
+    : live
+        .filter((r) => {
+          if (r.bolo_id) return false;
+          if (lineId && r.line_id === lineId) return false;
+          const { first, last } = span(r);
+          return first <= day && last >= eve;
+        })
+        .map((row) => ({ row, source: 'suggested' as const }));
+  const picked: Array<{ row: TripRow; source: TripLinkSource }> = [...bound, ...suggested];
 
   return picked
     .sort((a, b) => Date.parse(a.row.starts_at) - Date.parse(b.row.starts_at))

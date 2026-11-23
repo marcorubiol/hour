@@ -3885,5 +3885,14 @@
   "desk.verb_reconnect": "Reconectar",
   "desk.verb_calendar_proposal": "Calendario",
   "pass.trips_other_days": "Viajes del bolo",
-  "pass.trip_suggested": "sugerido"
+  "pass.trip_suggested": "sugerido",
+  "trip.bolo_label": "Del bolo",
+  "trip.bolo_pick": "Elegir bolo",
+  "trip.bolo_other": "Otro",
+  "trip.bolo_confirm": "Es de este bolo",
+  "trip.bolo_menu": "{bolo}, cambiar de bolo",
+  "trip.bolo_unbind": "Sin bolo",
+  "trip.add_outbound": "Añadir ida",
+  "trip.add_return": "Añadir vuelta",
+  "trip.added": "Viaje añadido"
 }

@@ -8914,3 +8914,53 @@ la hoja interna y el feed de fechas leyeran esos enlaces.
 **Sin migración ni cambios de esquema.**
 
 **Cómo se revierte.** Revertir el commit (la caché del dispositivo se invalida al bajar o subir `CACHE_SCHEMA`).
+
+## [2026-11-23] ADR-244 · Los viajes de la gira salen solo en las funciones vecinas (enmienda ADR-242 § 5)
+
+Revisión del 23-11 sobre ADR-242 y ADR-243, con el «sí» de Marco al arreglo.
+
+**Contexto.** Con ADR-242, un viaje con `line_id` y sin `bolo_id` salía en **todas** las funciones de su línea, y con
+uno solo se apagaba la sugerencia por día y víspera. En producción había 23 viajes así; en «Gira de otoño 2027», 12
+viajes (de febrero a mayo) aparecían en cada una de sus 36 funciones. `date.line_id` era el marco del viaje
+(ADR-072 § 3), no «sirve a todas las funciones».
+
+**Decisión.**
+1. Un viaje de línea sin bolo es de una función si cae entre la función anterior y la siguiente de la misma línea
+   (días distintos del suyo; vivas y no canceladas) y no está más cerca de la vecina que de ella. Antes de la primera,
+   de la primera; después de la última, de la última; entre dos, de la más cercana; a igual distancia, de las dos.
+2. Solo un viaje atado al **bolo** apaga la sugerencia. Los viajes de la misma línea no se sugieren: los decide la
+   ventana.
+3. Cambia solo `private.performance_trips_jsonb` (migración `20261123100000_line_trips_window.sql`, misma firma), así
+   que el pase, la hoja interna y la pública cambian a la vez. `tripsOfPerformance` la refleja con `linePrevDay` y
+   `lineNextDay`.
+
+Comprobado contra los datos de producción con una copia temporal de la función (solo lectura): en «Gira de otoño
+2027» cada función pasa de 12 viajes a 0-2 (el de la víspera); en «Gira 2026-27» la ida de diciembre queda en la
+función de diciembre y los viajes de febrero en la de febrero.
+
+**Puerta § 34.** No destructiva (sin DROP, sin cambio de firma ni de datos): backup, plan y apply por
+`production-migrate.yml` con OK de Marco. Test RLS `tests/rls/line-trips-window.test.ts`.
+
+**Cómo se revierte.** `build/runbooks/rollback-20261123-line-trips-window.sql` (vuelve la función de `20261122140000`).
+
+## [2026-11-23] ADR-245 · Atar el viaje a su bolo desde el pase (Fase 3 de «el viaje se ata a su bolo»)
+
+Marco, 23-11 («Sí, por favor»), sobre el encargo `/mnt/project-files/viaje-bolo/brief.md` § Fase 3.
+
+**Decisión.**
+1. **En el pase de un viaje** (`DateRecord`), una línea «Del bolo» para quien lee los bolos del proyecto
+   (`read:money`; sin filas, la ficha calla). Si el viaje no está atado y Hour encuentra su bolo, lo nombra con
+   «Es de este bolo» (un toque); siempre hay un menú para elegir otro o dejarlo «Sin bolo».
+2. **La sugerencia** (`suggestBoloForTrip`, `$lib/bolo-pick`, pura): una ida mira la primera función del bolo (el día
+   del viaje o hasta 3 días después); una vuelta, la última (hasta 3 días antes); sin dirección, cualquiera de las dos
+   a ±3 días, y un viaje en medio del bolo es suyo. Gana la más cercana; un empate o un bolo cancelado no sugiere
+   nada. Nunca ata sola (ADR-147).
+3. **En el pase de una función** con bolo, para quien lo lee y edita la función: cada viaje sugerido (también los del
+   mismo día, que siguen en las paradas) lleva «Es de este bolo»; y «Añadir ida» / «Añadir vuelta» mientras el bolo no
+   tenga una. Crean un viaje de día entero, provisional, ya atado al bolo y a la línea de la función, la víspera (ida,
+   con la ciudad de la sala como destino) o el día siguiente (vuelta, como origen), y abren su pase para poner tramos
+   y horas.
+4. Sin esquema ni API nuevos (`POST /api/dates` y `PATCH /api/dates/:id` ya aceptan `bolo_id`); `CACHE_SCHEMA` no
+   cambia. La ficha de función sigue sin elegir función para un viaje (`date.performance_id` queda como estaba).
+
+**Cómo se revierte.** Revertir el commit.

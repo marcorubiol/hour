@@ -48,6 +48,8 @@
   import EditDateDialog from '$lib/components/planner/EditDateDialog.svelte';
   import { TYPE_LABEL_KEYS, type DateTypeKey } from '$lib/quick-add';
   import { addToast } from '$lib/components/Toast.svelte';
+  import { projectBolosQueryOptions } from '$lib/bolo-queries';
+  import { boloLabel, suggestBoloForTrip } from '$lib/bolo-pick';
 
   interface Props {
     id: string;
@@ -124,6 +126,37 @@
   });
 
   let stagesEl: HTMLElement | undefined = $state();
+
+  // ── Del bolo (ADR-245, fase 3 de «el viaje se ata a su bolo») ─────────
+  // Los bolos se leen por la puerta de `read:money`: sin filas no hay nada que
+  // ofrecer y la ficha calla (enmascarado y vacío se ven igual, como en el
+  // selector función↔bolo). Hour sugiere el bolo; la persona lo confirma.
+  const tripBolosQuery = createQuery(
+    toStore(() => projectBolosQueryOptions(row?.project?.id ?? '', isTrip && Boolean(row?.project?.id))),
+  );
+  let tripBolos = $derived(($tripBolosQuery.data?.items ?? []).filter((b) => b.status !== 'cancelled' || b.id === row?.bolo_id));
+  let tripBolo = $derived(row?.bolo_id ? (tripBolos.find((b) => b.id === row!.bolo_id) ?? null) : null);
+  let suggestedBoloId = $derived(
+    isTrip && row && !row.bolo_id && info
+      ? suggestBoloForTrip({ day: info.first, direction: row.travel_direction ?? null }, tripBolos)
+      : null,
+  );
+  let suggestedBolo = $derived(suggestedBoloId ? (tripBolos.find((b) => b.id === suggestedBoloId) ?? null) : null);
+  // A bound bolo that the list does not carry (deleted, past the cap): say
+  // nothing rather than offer a menu that would read «no bolo».
+  let showTripBolo = $derived(isTrip && tripBolos.length > 0 && (!row?.bolo_id || tripBolo !== null));
+
+  const bindBolo = createMutation({
+    mutationFn: (boloId: string | null) =>
+      mutateJSON('PATCH', `/api/dates/${encodeURIComponent(id)}`, { bolo_id: boloId }),
+    onSuccess: () => {
+      invalidateDateFeeds(queryClient);
+      addToast({ tone: 'success', message: t('edit.saved', locale) });
+    },
+    onError: (err) => {
+      addToast({ tone: 'danger', message: err instanceof Error ? err.message : t('perf.unexpected', locale) });
+    },
+  });
 
   function missingItem(m: DateMissing): PassLine {
     switch (m.kind) {
@@ -296,6 +329,64 @@
       </p>
     {/if}
 
+    {#if showTripBolo}
+      <div class="date-record__of" data-slot="bolo" data-testid="trip-bolo">
+        <span class="eyebrow eyebrow--sub">{t('trip.bolo_label', locale)}</span>
+        <span class="date-record__bolo">
+          {#if !tripBolo && suggestedBolo}
+            <span data-testid="trip-bolo-suggested">{boloLabel(suggestedBolo, locale)}</span>
+            <button
+              type="button"
+              class="fact-act"
+              data-testid="trip-bolo-confirm"
+              disabled={$bindBolo.isPending}
+              onclick={() => $bindBolo.mutate(suggestedBolo!.id)}>{t('trip.bolo_confirm', locale)}</button
+            >
+          {/if}
+          <Menu
+            label={tripBolo ? t('trip.bolo_menu', locale, { bolo: boloLabel(tripBolo, locale) }) : t('trip.bolo_pick', locale)}
+            triggerClass="fact-act"
+            triggerAttrs={{ 'data-testid': 'trip-bolo-menu' }}
+          >
+            {#snippet trigger()}{tripBolo
+                ? boloLabel(tripBolo, locale)
+                : suggestedBolo
+                  ? t('trip.bolo_other', locale)
+                  : t('trip.bolo_pick', locale)}<span class="status-caret" aria-hidden="true">▾</span>{/snippet}
+            {#snippet children({ close })}
+              {#each tripBolos as b (b.id)}
+                <li role="none">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    class="menu__item{b.id === row!.bolo_id ? ' menu__item--active' : ''}"
+                    onclick={() => {
+                      close();
+                      if (b.id !== row!.bolo_id) $bindBolo.mutate(b.id);
+                    }}>{boloLabel(b, locale)}</button
+                  >
+                </li>
+              {/each}
+              {#if row!.bolo_id}
+                <li class="menu-separator" role="separator"></li>
+                <li role="none">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    class="menu__item"
+                    onclick={() => {
+                      close();
+                      $bindBolo.mutate(null);
+                    }}>{t('trip.bolo_unbind', locale)}</button
+                  >
+                </li>
+              {/if}
+            {/snippet}
+          </Menu>
+        </span>
+      </div>
+    {/if}
+
     {#if row.project}
       <section class="date-record__section" id="who-goes" data-slot="who" aria-label={t('peek.who_goes', locale)}>
         <WhoGoes
@@ -355,6 +446,12 @@
     }
     .date-record__of .eyebrow {
       min-inline-size: var(--record-label-inline);
+    }
+    .date-record__bolo {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: var(--space-s);
     }
     .date-record__section {
       display: flex;
