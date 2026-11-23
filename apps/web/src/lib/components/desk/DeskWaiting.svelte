@@ -203,7 +203,7 @@
       if (i.dueLabel === 'due' && i.dueDay) return `${t('desk.due_due', locale)} ${day(i.dueDay)}`;
       return i.dueDay ? forDay(i.dueDay) : '';
     }
-    if (i.repliedAt) return t('desk.when_wrote', locale, { when: relativeContactDate(i.repliedAt, locale) });
+    if (i.repliedAt) return relativeContactDate(i.repliedAt, locale);
     // A proposal (revive) is Hour's suggestion, not a deadline: no date.
     if (i.isProposal) return '';
     if (!i.day) return '';
@@ -211,6 +211,40 @@
     return forDay(i.day);
   }
   const subjectHref = (i: DeskItem) => i.href ?? (i.concern === 'conversation' ? conversationHref(i) : null);
+
+  /* The row is a sentence (Marco, 23-11-2026): who and what, around the name,
+     which stays the link. Only the calls with words of their own; a task, a
+     proposal or a calendar row is already its own sentence. */
+  const SAYS = new Set(['reply', 'followup', 'chase', 'check', 'revive', 'remind', 'decide', 'release', 'answer']);
+  function sayOf(i: DeskItem): { before: string; after: string } {
+    if (i.isProposal || !i.verbKey || !SAYS.has(i.verbKey)) return { before: '', after: '' };
+    const amount = i.amount != null ? money(i.amount, i.currency) : '';
+    const [before, after = ''] = t(`desk.say_${i.verbKey}`, locale, { name: '\u0000', amount }).split('\u0000');
+    return { before: before.trim(), after: after.trim() };
+  }
+
+  /* What repeats is one row (Marco, 23-11-2026): several calls to say whether
+     you go are «You're on the list for 3 shows», answered all at once or one
+     by one. */
+  let oneByOne = $state(false);
+  let calls = $derived(waiting.rows.filter((i) => i.convocation));
+  type Entry = { key: string; item: DeskItem | null };
+  function grouped(list: readonly DeskItem[]): Entry[] {
+    if (oneByOne || calls.length < 2 || !onanswer) return list.map((item) => ({ key: item.id, item }));
+    const out: Entry[] = [];
+    let placed = false;
+    for (const item of list) {
+      if (!item.convocation) out.push({ key: item.id, item });
+      else if (!placed) {
+        out.push({ key: 'calls', item: null });
+        placed = true;
+      }
+    }
+    return out;
+  }
+  function goingToAll() {
+    for (const c of calls) onanswer?.(c, 'going');
+  }
 </script>
 
 {#snippet row(item: DeskItem)}
@@ -239,6 +273,7 @@
     </li>
   {:else}
     {@const href = subjectHref(item)}
+    {@const say = sayOf(item)}
     {@const line = item.concern === 'conversation' ? (chat?.(item) ?? null) : null}
     {@const hasInlineActs = Boolean(
       (item.convocation && onanswer) ||
@@ -247,7 +282,7 @@
     )}
     {@const ctxParts = line
       ? chatContext(item, line).map((c) => c.text)
-      : [item.convocation ? t('desk.convoked', locale) : null, contextPath(item), item.amount != null ? money(item.amount, item.currency) : null].filter((x): x is string => Boolean(x))}
+      : [contextPath(item), item.amount != null && !say.before && !say.after ? money(item.amount, item.currency) : null].filter((x): x is string => Boolean(x))}
     <li
       class="row row--{item.concern}"
       class:row--door={Boolean(href)}
@@ -258,11 +293,13 @@
     >
       <div class="row__body" data-testid={line ? 'desk-chat' : undefined}>
         <div class="row__head">
+          {#if say.before}<span class="row__say">{say.before}</span>{/if}
           {#if href}
             <a class="row__title" {href}>{item.subject}</a>
           {:else}
             <span class="row__title">{item.subject}</span>
           {/if}
+          {#if say.after}<span class="row__say">{say.after}</span>{/if}
           {#if line && line.words.length > 0}
             <span class="row__qual">{line.words.join(' · ')}</span>
           {/if}
@@ -398,6 +435,32 @@
   {/if}
 {/snippet}
 
+{#snippet callsRow()}
+  <li class="row row--decision row--has-acts" data-testid="desk-calls">
+    <div class="row__body">
+      <div class="row__head">
+        <span class="row__title">{t('desk.calls_many', locale, { n: calls.length })}</span>
+      </div>
+      <div class="row__meta">
+        {#each calls.slice(0, 3) as c, i (c.id)}
+          {#if i > 0}<span class="row__meta-sep" aria-hidden="true">·</span>{/if}
+          <span>{c.subject}</span>
+        {/each}
+        {#if calls.length > 3}<span class="row__meta-sep" aria-hidden="true">·</span><span>…</span>{/if}
+      </div>
+    </div>
+    <div class="row__tail">
+      <span class="row__acts">
+        <button type="button" class="row__act row__act--quiet btn--secondary btn--xs" onclick={() => (oneByOne = true)}
+          >{t('desk.calls_one_by_one', locale)}</button
+        ><button type="button" class="row__act row__act--main btn--secondary btn--xs" data-testid="desk-voy-all" onclick={goingToAll}
+          >{t('desk.calls_going_all', locale)}</button
+        >
+      </span>
+    </div>
+  </li>
+{/snippet}
+
 {#snippet runs(bucket: DeskBucket)}
   {#each bucket.runs as run (run.concern + run.items[0].id)}
     <div class="run run--{run.concern}">
@@ -470,7 +533,7 @@
     {/if}
   {:else if effectiveKind || rows > 0}
     <ul class="list" data-testid="desk-waiting-rows">
-      {#each filteredRows as item (item.id)}{@render row(item)}{/each}
+      {#each grouped(filteredRows) as e (e.key)}{#if e.item}{@render row(e.item)}{:else}{@render callsRow()}{/if}{/each}
     </ul>
     {#if effectiveKind}
       {@const lensHref = PILL_HREF[effectiveKind]}
@@ -695,6 +758,11 @@
   .row__when--over {
     color: var(--warning);
     font-weight: 500;
+  }
+  .row__say {
+    font-size: var(--text-s);
+    line-height: 1.35;
+    color: var(--text-color);
   }
   .row__verb {
     text-transform: lowercase;

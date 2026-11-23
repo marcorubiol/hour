@@ -414,14 +414,17 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
     );
   }
 
-  // ── Replies waiting for us (ADR-126 «te toca», reason reply): today, the
-  //    most recent first, opening the conversation. They are the call for
-  //    their conversation: its next action is not drawn again.
+  // ── Replies waiting for us (ADR-126 «te toca», reason reply): on the day
+  //    they wrote (Marco, 23-11-2026: an answer ages like everything else, so
+  //    after a month it goes down to «old»), the most recent first, opening
+  //    the conversation. They are the call for their conversation: its next
+  //    action is not drawn again. One from a past day waits now (`waitingDay`).
   const replied = new Set<string>();
   for (const r of input.replies ?? []) {
     replied.add(r.id);
+    const wrote = Number.isNaN(Date.parse(r.at)) ? todayISO : localDayISO(new Date(r.at));
     push(
-      todayISO,
+      wrote > todayISO ? todayISO : wrote,
       'conversation',
       -Date.parse(r.at),
       blankItem({
@@ -704,7 +707,9 @@ export function rankWaiting(feed: readonly DeskBucket[], now: Date, opts: Waitin
     rows: kept.slice(0, limit).map((x) => x.item),
     total: kept.length,
     asking: kept.filter((x) => !x.item.isProposal).length,
-    overdue: kept.filter((x) => x.tier === 0 && !x.item.isProposal).length,
+    // A reply from a past day sits in the past tier but is not late: only
+    // what has a due day that passed counts.
+    overdue: kept.filter((x) => x.tier === 0 && !x.item.isProposal && x.item.overdue).length,
   };
 }
 
