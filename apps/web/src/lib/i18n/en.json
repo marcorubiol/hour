@@ -3885,5 +3885,14 @@
   "desk.verb_reconnect": "Reconnect",
   "desk.verb_calendar_proposal": "Calendar",
   "pass.trips_other_days": "Trips for this deal",
-  "pass.trip_suggested": "suggested"
+  "pass.trip_suggested": "suggested",
+  "trip.bolo_label": "For the deal",
+  "trip.bolo_pick": "Choose deal",
+  "trip.bolo_other": "Another",
+  "trip.bolo_confirm": "It is for this deal",
+  "trip.bolo_menu": "{bolo}, change deal",
+  "trip.bolo_unbind": "No deal",
+  "trip.add_outbound": "Add outbound",
+  "trip.add_return": "Add return",
+  "trip.added": "Trip added"
 }

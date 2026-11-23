@@ -22,7 +22,9 @@
 
   import { docTitle } from '$lib/doc-title';
   import { goto } from '$app/navigation';
-  import { closePeek } from '$lib/peek.svelte';
+  import { closePeek, openPeek } from '$lib/peek.svelte';
+  import { invalidateDateFeeds } from '$lib/date';
+  import { addDaysIso } from '$lib/planner';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
@@ -1073,7 +1075,65 @@
   let tripExtras = $derived<TripStop[]>(
     perfTrips.flatMap((d) => tripStops(d.id, d.stages, (iso) => dayOf(iso, dayTz) === dayIso)),
   );
-  let asideTrips = $derived(dayIso ? otherDayTrips(perfTrips, dayIso, dayOf, dayTz) : []);
+  let asideTrips = $derived.by(() => {
+    if (!dayIso) return [];
+    const other = otherDayTrips(perfTrips, dayIso, dayOf, dayTz);
+    // ADR-245: a suggested trip of the same day also gets a line, so it can be
+    // bound to the bolo with one tap (its stops stay on the day).
+    const listed = new Set(other.map((o) => o.trip.id));
+    const sameDaySuggested = perfTrips
+      .filter((tr) => tr.link_source === 'suggested' && !listed.has(tr.id))
+      .map((trip) => ({ trip, day: dayIso }));
+    return [...other, ...sameDaySuggested].sort((a, b) => Date.parse(a.trip.starts_at) - Date.parse(b.trip.starts_at));
+  });
+
+  // ── Atar y crear viajes desde el pase (ADR-245) ─────────────────────────
+  // Solo quien lee el bolo (read:money) y edita la función: atar exige ver el
+  // bolo (la guarda de la base lo pide) y crear un viaje, editar.
+  let canBindTrips = $derived(canEdit && boloReadable && currentBoloId !== null);
+  let hasBoloOutbound = $derived(perfTrips.some((tr) => tr.link_source === 'bolo' && tr.travel_direction === 'outbound'));
+  let hasBoloReturn = $derived(perfTrips.some((tr) => tr.link_source === 'bolo' && tr.travel_direction === 'return'));
+
+  // The date feeds include ['performance-trips'] (ADR-243).
+  const tripsChanged = () => invalidateDateFeeds(queryClient);
+
+  const bindTripMutation = createMutation({
+    mutationFn: (dateId: string) =>
+      mutateJSON('PATCH', `/api/dates/${encodeURIComponent(dateId)}`, { bolo_id: currentBoloId }),
+    onSuccess: () => {
+      tripsChanged();
+      addToast({ tone: 'success', message: t('edit.saved', locale) });
+    },
+    onError: (err) =>
+      addToast({ tone: 'danger', message: err instanceof Error ? err.message : t('perf.unexpected', locale) }),
+  });
+
+  const addTripMutation = createMutation({
+    mutationFn: (direction: 'outbound' | 'return') => {
+      const city = perf?.venue?.city ?? perf?.city ?? null;
+      // La ida, la víspera; la vuelta, el día siguiente: días enteros, que la
+      // persona ajusta en el pase del viaje con sus tramos.
+      const day = addDaysIso(dayIso, direction === 'outbound' ? -1 : 1);
+      return mutateJSON<{ date: { id: string } }>('POST', '/api/dates', {
+        project_id: perf!.project!.id,
+        kind: 'travel_day',
+        starts_at: `${day}T00:00:00.000Z`,
+        all_day: true,
+        status: 'tentative',
+        travel_direction: direction,
+        bolo_id: currentBoloId,
+        ...(perf?.line?.id ? { line_id: perf.line.id } : {}),
+        ...(direction === 'outbound' ? { destination_city: city } : { origin_city: city }),
+      });
+    },
+    onSuccess: (res) => {
+      tripsChanged();
+      addToast({ tone: 'success', message: t('trip.added', locale) });
+      if (res?.date?.id) openPeek({ kind: 'date', id: res.date.id });
+    },
+    onError: (err) =>
+      addToast({ tone: 'danger', message: err instanceof Error ? err.message : t('perf.unexpected', locale) }),
+  });
 
   function tripLineLabel(trip: RoadsheetTrip, tripDayIso: string): string {
     const dir =
@@ -1338,7 +1398,7 @@
          address and the contact hung on their stop. One way to write an
          hour in the whole app (ADR-090 P3). -->
     <div id="running-order" data-slot="day">
-      {#if asideTrips.length > 0}
+      {#if asideTrips.length > 0 || (canBindTrips && (!hasBoloOutbound || !hasBoloReturn))}
         <ul class="perf__other-trips" role="list" aria-label={t('pass.trips_other_days', locale)} data-testid="perf-other-trips">
           {#each asideTrips as item (item.trip.id)}
             <li class="perf__other-trip">
@@ -1347,9 +1407,40 @@
               </a>
               {#if item.trip.link_source === 'suggested'}
                 <span class="perf__other-trip-hint">{t('pass.trip_suggested', locale)}</span>
+                {#if canBindTrips}
+                  <button
+                    type="button"
+                    class="fact-act"
+                    data-testid="perf-trip-bind"
+                    disabled={$bindTripMutation.isPending}
+                    onclick={() => $bindTripMutation.mutate(item.trip.id)}>{t('trip.bolo_confirm', locale)}</button
+                  >
+                {/if}
               {/if}
             </li>
           {/each}
+          {#if canBindTrips && (!hasBoloOutbound || !hasBoloReturn)}
+            <li class="perf__other-trip perf__other-trip--add">
+              {#if !hasBoloOutbound}
+                <button
+                  type="button"
+                  class="fact-act"
+                  data-testid="perf-trip-add-outbound"
+                  disabled={$addTripMutation.isPending}
+                  onclick={() => $addTripMutation.mutate('outbound')}>{t('trip.add_outbound', locale)}</button
+                >
+              {/if}
+              {#if !hasBoloReturn}
+                <button
+                  type="button"
+                  class="fact-act"
+                  data-testid="perf-trip-add-return"
+                  disabled={$addTripMutation.isPending}
+                  onclick={() => $addTripMutation.mutate('return')}>{t('trip.add_return', locale)}</button
+                >
+              {/if}
+            </li>
+          {/if}
         </ul>
       {/if}
       <RunningOrder

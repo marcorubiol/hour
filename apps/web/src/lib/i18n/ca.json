@@ -3885,5 +3885,14 @@
   "desk.verb_reconnect": "Reconnectar",
   "desk.verb_calendar_proposal": "Calendari",
   "pass.trips_other_days": "Viatges del bolo",
-  "pass.trip_suggested": "suggerit"
+  "pass.trip_suggested": "suggerit",
+  "trip.bolo_label": "Del bolo",
+  "trip.bolo_pick": "Triar bolo",
+  "trip.bolo_other": "Un altre",
+  "trip.bolo_confirm": "És d'aquest bolo",
+  "trip.bolo_menu": "{bolo}, canviar de bolo",
+  "trip.bolo_unbind": "Sense bolo",
+  "trip.add_outbound": "Afegir anada",
+  "trip.add_return": "Afegir tornada",
+  "trip.added": "Viatge afegit"
 }

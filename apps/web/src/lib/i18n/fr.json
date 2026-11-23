@@ -3885,5 +3885,14 @@
   "desk.verb_reconnect": "Reconnecter",
   "desk.verb_calendar_proposal": "Calendrier",
   "pass.trips_other_days": "Trajets du contrat",
-  "pass.trip_suggested": "suggéré"
+  "pass.trip_suggested": "suggéré",
+  "trip.bolo_label": "Du contrat",
+  "trip.bolo_pick": "Choisir un contrat",
+  "trip.bolo_other": "Un autre",
+  "trip.bolo_confirm": "C'est pour ce contrat",
+  "trip.bolo_menu": "{bolo}, changer de contrat",
+  "trip.bolo_unbind": "Sans contrat",
+  "trip.add_outbound": "Ajouter l'aller",
+  "trip.add_return": "Ajouter le retour",
+  "trip.added": "Trajet ajouté"
 }

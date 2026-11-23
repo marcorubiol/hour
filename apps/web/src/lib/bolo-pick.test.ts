@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
+  suggestBoloForTrip,
   boloDefault,
   booksHref,
   scopeShowsProject,
@@ -177,5 +178,40 @@ describe('boloPatch', () => {
     expect(boloPatch(null, 'b1')).toEqual({ bolo_id: 'b1' });
     expect(boloPatch('b1', 'b2')).toEqual({ bolo_id: 'b2' });
     expect(boloPatch('b1', '')).toEqual({ bolo_id: null });
+  });
+});
+
+describe('suggestBoloForTrip (ADR-245)', () => {
+  const b = (id: string, first: string | null, last: string | null, status = 'confirmed') => ({
+    id,
+    status,
+    first_performed_at: first,
+    last_performed_at: last,
+  });
+  const bolos = [b('getxo', '2026-11-22', '2026-11-22'), b('bilbao', '2026-11-28', '2026-11-29')];
+
+  test('an outbound looks forward to the first performance', () => {
+    expect(suggestBoloForTrip({ day: '2026-11-21', direction: 'outbound' }, bolos)).toBe('getxo');
+    expect(suggestBoloForTrip({ day: '2026-11-26', direction: 'outbound' }, bolos)).toBe('bilbao');
+    expect(suggestBoloForTrip({ day: '2026-11-23', direction: 'outbound' }, bolos)).toBe(null);
+  });
+
+  test('a return looks back to the last performance', () => {
+    expect(suggestBoloForTrip({ day: '2026-11-23', direction: 'return' }, bolos)).toBe('getxo');
+    expect(suggestBoloForTrip({ day: '2026-11-30', direction: 'return' }, bolos)).toBe('bilbao');
+    expect(suggestBoloForTrip({ day: '2026-11-21', direction: 'return' }, bolos)).toBe(null);
+  });
+
+  test('without a direction, the nearest within reach; inside the bolo counts as zero', () => {
+    expect(suggestBoloForTrip({ day: '2026-11-24', direction: null }, bolos)).toBe('getxo');
+    expect(suggestBoloForTrip({ day: '2026-11-28', direction: 'leg' }, bolos)).toBe('bilbao');
+    expect(suggestBoloForTrip({ day: '2026-12-10', direction: null }, bolos)).toBe(null);
+  });
+
+  test('a tie or a cancelled bolo suggests nothing', () => {
+    expect(suggestBoloForTrip({ day: '2026-11-25', direction: null }, bolos)).toBe(null);
+    expect(suggestBoloForTrip({ day: '2026-11-21', direction: 'outbound' }, [b('x', '2026-11-22', '2026-11-22', 'cancelled')])).toBe(
+      null,
+    );
   });
 });
