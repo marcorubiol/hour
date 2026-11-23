@@ -54,7 +54,8 @@
   /**
    * The sections the space in the URL offers whoever looks: all of them,
    * except in a space they are a guest of (a bolo invitation), where only
-   * their profile is theirs (`$lib/workspace-role`).
+   * the personal sections are theirs, profile and calendar (`PERSONAL_SECTIONS`,
+   * ADR-241; `$lib/workspace-role`).
    */
   export function offeredSections(workspace: Pick<NavWorkspace, 'my_role'> | null | undefined): Section[] {
     const ids = settingsSectionsFor(workspace, SECTIONS.map((s) => s.id), PERSONAL_SECTIONS);
