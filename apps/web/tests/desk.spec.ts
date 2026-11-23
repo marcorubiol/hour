@@ -116,9 +116,9 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
 
     // One list at a time: the full list replaces the short one, never both.
     await door.click();
-    await expect(waits.getByRole('checkbox', { name: TASK_TODAY })).toHaveCount(1);
+    await expect(waits.getByRole('button', { name: `Done: ${TASK_TODAY}` })).toHaveCount(1);
     await expect(waits.locator('.bucket--today')).toBeVisible();
-    await expect(waits.getByRole('checkbox', { name: TASK_LOOSE })).toHaveCount(1);
+    await expect(waits.getByRole('button', { name: `Done: ${TASK_LOOSE}` })).toHaveCount(1);
     // The swap leaves the focus on the band's heading, not on <body>.
     await expect(waits.getByRole('heading', { name: /^Waiting for you/ })).toBeFocused();
     await waits.getByRole('button', { name: 'See less' }).click();
@@ -177,10 +177,10 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
     await expect(dropRow).toBeVisible();
 
     await addRow.getByRole('button', { name: 'Add' }).click();
-    await expect(waits.getByRole('checkbox', { name: PROPOSAL_ADD })).toBeVisible();
+    await expect(waits.getByRole('button', { name: `Done: ${PROPOSAL_ADD}` })).toBeVisible();
     await dropRow.getByRole('button', { name: 'dismiss' }).click();
     await expect(dropRow).toHaveCount(0);
-    await expect(waits.getByRole('checkbox', { name: PROPOSAL_DROP })).toHaveCount(0);
+    await expect(waits.getByRole('button', { name: `Done: ${PROPOSAL_DROP}` })).toHaveCount(0);
 
     // Persisted: the accepted one is manual; the dismissed one is gone once
     // its «Undo» runs out, and neither is marked done.
@@ -197,7 +197,7 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
 
     await page.reload();
     await waitForLoaded(page);
-    await expect(waits.getByRole('checkbox', { name: PROPOSAL_ADD })).toBeVisible({ timeout: 10_000 });
+    await expect(waits.getByRole('button', { name: `Done: ${PROPOSAL_ADD}` })).toBeVisible({ timeout: 10_000 });
     await expect(waits.locator('li.row--ai', { hasText: PROPOSAL_ADD })).toHaveCount(0);
 
     await sweep(page, wsId);

@@ -1787,6 +1787,8 @@
   "desk.remove_task": "Treu la tasca",
   "desk.remove_task_aria": "Treu la tasca: {title}",
   "desk.remove_aria": "Treu: {subject}",
+  "desk.task_done": "fet",
+  "desk.task_done_aria": "Fet: {subject}",
   "desk.fallback_show": "Funció",
   "desk.fallback_show@music": "Concert",
   "palette.kind_day": "dia",

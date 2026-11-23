@@ -1787,6 +1787,8 @@
   "desk.remove_task": "Remove task",
   "desk.remove_task_aria": "Remove task: {title}",
   "desk.remove_aria": "Remove: {subject}",
+  "desk.task_done": "done",
+  "desk.task_done_aria": "Done: {subject}",
   "desk.fallback_show": "Performance",
   "desk.fallback_show@music": "Show",
   "palette.kind_day": "day",

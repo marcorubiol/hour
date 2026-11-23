@@ -1,5 +1,4 @@
 <script lang="ts">
-  import Checkbox from '../Checkbox.svelte';
   /**
    * «TE ESPERA», Hoy's third block (ADR-202 § 7, ADR-203 § 3, § 5, § 9). On
    * the ground of the page, no box: one pill per kind with its figure, which
@@ -214,25 +213,16 @@
   const subjectHref = (i: DeskItem) => i.href ?? (i.concern === 'conversation' ? conversationHref(i) : null);
 </script>
 
-{#snippet task(item: DeskItem)}
-  <Checkbox
-    id="desk-task-{item.taskId}"
-    checked={item.taskDone}
-    onchange={(e) => item.taskId && ontoggle(item.taskId, (e.currentTarget as HTMLInputElement).checked)}
-  />
-{/snippet}
-
 {#snippet row(item: DeskItem)}
   {@const when = whenOf(item)}
   {#if isGhost(item)}
     <li class="row row--ai row--has-acts">
-      <span class="row__mark"><span class="row__dot" aria-hidden="true"></span></span>
       <div class="row__body">
         <div class="row__head">
           <span class="row__title">{item.subject}</span>
         </div>
         <div class="row__meta">
-          <span class="row__tag">{t('desk.proposed', locale)}</span>
+          <span>{t('desk.proposed', locale)}</span>
           {#if item.reason}<span class="row__meta-sep" aria-hidden="true">·</span><span>{item.reason}</span>{/if}
           {#if when}<span class="row__meta-sep" aria-hidden="true">·</span><span class="row__meta-when">{when}</span>{/if}
         </div>
@@ -266,21 +256,10 @@
       class:row--chat={line !== null}
       class:row--has-acts={hasInlineActs}
     >
-      <span class="row__mark">
-        {#if item.concern === 'task'}
-          {@render task(item)}
-        {:else}
-          <span class="row__dot" aria-hidden="true"></span>
-        {/if}
-      </span>
-
       <div class="row__body" data-testid={line ? 'desk-chat' : undefined}>
         <div class="row__head">
           {#if href}
             <a class="row__title" {href}>{item.subject}</a>
-          {:else if item.concern === 'task'}
-            <!-- The name is the checkbox's label: tapping it ticks, a finger's target the size of the line. -->
-            <label class="row__title" for="desk-task-{item.taskId}">{item.subject}</label>
           {:else}
             <span class="row__title">{item.subject}</span>
           {/if}
@@ -295,17 +274,16 @@
           </p>
         {/if}
 
-        {#if item.concern !== 'task' || ctxParts.length > 0 || (hasInlineActs && when)}
+        {#if ctxParts.length > 0 || when}
+          <!-- Under the sentence, the why: where it belongs and what it is
+               about, in the body's face (no mono verb line, no dot). -->
           <div class="row__meta">
-            {#if item.concern !== 'task'}
-              <span class="row__tag">{t(`desk.verb_${item.verbKey}`, locale)}</span>
-            {/if}
             {#each ctxParts as part, i (i)}
-              {#if item.concern !== 'task' || i > 0}<span class="row__meta-sep" aria-hidden="true">·</span>{/if}
+              {#if i > 0}<span class="row__meta-sep" aria-hidden="true">·</span>{/if}
               <span>{part}</span>
             {/each}
-            {#if hasInlineActs && when}
-              <span class="row__meta-sep" aria-hidden="true">·</span>
+            {#if when}
+              {#if ctxParts.length > 0}<span class="row__meta-sep" aria-hidden="true">·</span>{/if}
               <span class="row__meta-when" class:row__when--over={item.overdue}>{when}</span>
             {/if}
           </div>
@@ -313,9 +291,6 @@
       </div>
 
       <div class="row__tail">
-        {#if !hasInlineActs && when}
-          <span class="row__when" class:row__when--over={item.overdue}>{when}</span>
-        {/if}
         <span class="row__acts">
           {#if onaside}
             <!-- «Ahora no» (ADR-232): the row leaves for a few days, only for
@@ -357,7 +332,15 @@
               onclick={() => oncalendarproposal(item.calendarProposal!, 'dismiss')}>{t('calendar.proposal_dismiss', locale)}</button
             >
           {:else if item.concern === 'task'}
+            <!-- A task ends with its word, «done», like any row ends with its
+                 verb (no checkbox on the left). -->
             <button
+              type="button"
+              class="row__act row__act--main btn--secondary btn--xs"
+              data-testid="desk-task-done"
+              aria-label={t('desk.task_done_aria', locale, { subject: item.subject })}
+              onclick={() => item.taskId && ontoggle(item.taskId, true)}>{t('desk.task_done', locale)}</button
+            ><button
               type="button"
               class="row__remove"
               aria-label={t('desk.remove_aria', locale, { subject: item.subject })}
@@ -372,6 +355,13 @@
               aria-label={t('desk.decision_release_aria', locale, { name: item.subject })}
               disabled={deciding !== null}
               onclick={() => ondecide(item)}>{t('desk.decision_release', locale)}</button
+            >
+          {:else if href && item.verbKey && item.verbKey !== 'calendar_proposal'}
+            <!-- One word when the row opens: what you will do there. The name is
+                 already the link, so the word is the same door for the eye
+                 only (no second stop for the keyboard). -->
+            <a class="row__act row__act--main row__verb btn--secondary btn--xs" {href} tabindex="-1" aria-hidden="true"
+              >{t(`desk.verb_${item.verbKey}`, locale)}</a
             >
           {/if}
         </span>
@@ -510,13 +500,12 @@
           <ul class="list list--aside">
             {#each aside as a (a.item.id)}
               <li class="row row--away row--has-acts">
-                <span class="row__mark"><span class="row__dot" aria-hidden="true"></span></span>
                 <div class="row__body">
                   <div class="row__head">
                     <span class="row__title">{a.item.subject}</span>
                   </div>
                   <div class="row__meta">
-                    <span class="row__tag">{a.item.concern === 'task' ? t('desk.concern_task', locale) : t(`desk.verb_${a.item.verbKey}`, locale)}</span>
+                    <span>{a.item.concern === 'task' ? t('desk.concern_task', locale) : t(`desk.verb_${a.item.verbKey}`, locale)}</span>
                     <span class="row__meta-sep" aria-hidden="true">·</span>
                     <span>{backWord(a.until)}</span>
                   </div>
@@ -571,8 +560,8 @@
   .row {
     position: relative;
     display: grid;
-    grid-template-columns: 1.25rem minmax(0, 1fr) auto;
-    grid-template-areas: 'mark body tail';
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'body tail';
     column-gap: var(--space-s);
     row-gap: var(--space-2xs);
     align-items: start;
@@ -602,39 +591,6 @@
   .row--wait {
     display: block;
   }
-  /* Left gutter: checkbox for tasks, quiet semantic dot for everything else. */
-  .row__mark {
-    position: relative;
-    z-index: 2;
-    grid-area: mark;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-block-size: 1.35em;
-  }
-  .row--has-acts .row__mark {
-    align-self: start;
-  }
-  .row__dot {
-    inline-size: var(--dot-m);
-    block-size: var(--dot-m);
-    border-radius: var(--radius-circle);
-    background: var(--text-faint);
-  }
-  .row--conversation .row__dot {
-    background: var(--brand);
-  }
-  .row--money .row__dot {
-    background: var(--success);
-  }
-  .row--ai .row__dot,
-  .row--proposal .row__dot {
-    background: var(--suggest-ink);
-  }
-  .row--decision .row__dot {
-    background: var(--text-muted);
-  }
-
   /* Center body: unified title + optional 1-line excerpt + quiet metadata line. */
   .row__body {
     grid-area: body;
@@ -676,9 +632,6 @@
     outline: var(--focus-width) solid var(--focus-color);
     outline-offset: var(--focus-offset);
   }
-  label.row__title {
-    cursor: pointer;
-  }
   .row--proposal .row__title,
   .row--ai .row__title {
     font-style: italic;
@@ -713,27 +666,11 @@
     flex-wrap: wrap;
     align-items: baseline;
     column-gap: var(--space-xs);
-    font-family: var(--font-mono);
     font-size: var(--text-xs);
-    letter-spacing: var(--mono-letter-spacing);
-    color: var(--text-faint);
+    color: var(--text-muted);
   }
   .row__meta-sep {
     opacity: 0.6;
-  }
-  .row__tag {
-    text-transform: lowercase;
-    color: var(--text-muted);
-  }
-  .row--conversation .row__tag {
-    color: color-mix(in oklch, var(--brand) 70%, var(--text-muted));
-  }
-  .row--money .row__tag {
-    color: color-mix(in oklch, var(--success) 70%, var(--text-muted));
-  }
-  .row--ai .row__tag,
-  .row--proposal .row__tag {
-    color: var(--suggest-ink);
   }
   .row__meta-when {
     color: var(--text-muted);
@@ -753,21 +690,15 @@
     justify-self: end;
     min-block-size: 1.35em;
   }
-  .row:not(.row--has-acts) .row__acts {
-    order: -1;
-  }
-  .row__when {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    letter-spacing: var(--mono-letter-spacing);
-    color: var(--text-muted);
-    white-space: nowrap;
-  }
-  /* NO RED ON THE ROW (ADR-139 § 6): the block says «3 vencidas» once in its
-     head; overdue stays in crisp ink here. */
+  /* The head no longer says «3 vencidas» (Marco, 23-11-2026): each row says
+     its own, and only the word that is due goes orange, never the row. */
   .row__when--over {
-    color: var(--heading-color);
+    color: var(--warning);
     font-weight: 500;
+  }
+  .row__verb {
+    text-transform: lowercase;
+    text-decoration: none;
   }
   .row__acts {
     display: inline-flex;
@@ -1073,8 +1004,8 @@
      first and «not now» trailing at the end. */
   @container waits (max-width: 34rem) {
     .row {
-      grid-template-columns: 1.25rem minmax(0, 1fr);
-      grid-template-areas: 'mark body' '. tail';
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas: 'body' 'tail';
       align-items: start;
       row-gap: var(--space-xs);
     }
@@ -1089,9 +1020,6 @@
     }
     .row__tail:not(:has(*)) {
       display: none;
-    }
-    .row:not(.row--has-acts) .row__acts {
-      order: 0;
     }
     .row__aside-slot {
       order: 2;

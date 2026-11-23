@@ -99,7 +99,7 @@ test.describe('tasks — Desk feed + line module', () => {
     // An undated task is «anytime»: «Waiting for you» keeps to the week, the
     // whole list by days has it.
     await page.getByRole('button', { name: /^See all by day/ }).click();
-    const row = page.getByRole('checkbox', { name: TASK_FREE });
+    const row = page.getByRole('button', { name: `Done: ${TASK_FREE}` });
     await expect(row).toBeVisible({ timeout: 10_000 });
 
     // Complete it — server-ack the PATCH (the optimistic paint alone proves
@@ -108,8 +108,8 @@ test.describe('tasks — Desk feed + line module', () => {
       page.waitForResponse(
         (r) => /\/api\/tasks\//.test(r.url()) && r.request().method() === 'PATCH',
       ),
-      // The painted box sits over the input (Checkbox); a click on it is the user's.
-      row.click({ force: true }),
+      // Hoy's task rows end with «done» (no checkbox, 23-11-2026).
+      row.click(),
     ]);
     expect(patched.status()).toBe(200);
     await expect(row).not.toBeVisible({ timeout: 10_000 });
