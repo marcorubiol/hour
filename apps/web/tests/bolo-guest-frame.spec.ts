@@ -17,7 +17,8 @@ import { waitForLoaded } from './loaded';
  *     en «Lo que viene»; ni «+» (Nueva tarea) ni Cuentas;
  *   - el Planificador: su función, y ninguna puerta de crear;
  *   - la ficha: el tablón, sin «Editar datos», sin notas que no podría abrir;
- *   - ⌘K: ninguna fila de crear; Ajustes del espacio: solo su perfil.
+ *   - ⌘K: ninguna fila de crear; Ajustes del espacio: solo lo personal (perfil y
+ *     calendario, ADR-241).
  *
  * Autolimpiante: borra su bolo y su función, quita la membresía de bolo y la
  * de espacio (`revoke_workspace_member`) y revoca lo que quede pendiente.
@@ -201,10 +202,13 @@ test.describe('el marco de un guest de un solo bolo (comms carril 2, fase 3)', (
     await expect(palette.getByRole('option', { name: /nueva|nova|new|nouvel/i })).toHaveCount(0);
     await page.keyboard.press('Escape');
 
-    // ── Ajustes de la compañía: solo su perfil ──
+    // ── Ajustes de la compañía: solo lo suyo, su perfil y su calendario ──
+    // (PERSONAL_SECTIONS: el calendario personal es de cada persona, ADR-241).
     await page.goto('/h/playwright/settings?section=lenses');
     const sections = page.locator('.set-nav__item');
-    await expect(sections).toHaveCount(1);
+    await expect(sections).toHaveCount(2);
+    await expect(sections.nth(0)).toHaveAttribute('href', /section=profile/);
+    await expect(sections.nth(1)).toHaveAttribute('href', /section=calendar/);
     await expect(page).toHaveURL(/section=lenses/);
     await expect(page.locator('.set-nav__item.is-active')).toBeVisible();
 
