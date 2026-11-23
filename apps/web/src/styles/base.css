@@ -2204,6 +2204,36 @@
     outline: var(--focus-width) solid var(--focus-color);
     outline-offset: var(--focus-offset);
   }
+  /* The display head (Hoy, Marco 23-11-2026): the pass's serif in its own
+     case, no hairline and no figure; the filter words ride on its line and the
+     action keeps the end. One voice for Hoy's blocks before the rest. */
+  .block-head--display {
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: flex-start;
+    column-gap: var(--space-m);
+    row-gap: var(--space-2xs);
+    min-block-size: 0;
+    padding-block-end: 0;
+    border-block-end: 0;
+  }
+  .block-head__title {
+    font-family: var(--font-display);
+    font-size: var(--text-l);
+    font-weight: 400;
+    line-height: 1.25;
+    letter-spacing: 0;
+    color: var(--heading-color);
+  }
+  .block-head__inline {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    min-inline-size: 0;
+  }
+  .block-head--display > :last-child:not(:first-child):not(.block-head__inline) {
+    margin-inline-start: auto;
+  }
   /* A head with its concept's «i» (ConceptHint): the heading and the «i» stay
      together at the start, the action keeps the end. */
   .block-head__lead {

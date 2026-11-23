@@ -10,6 +10,7 @@ import {
   type DeskInvoiceInput,
 } from './desk-feed';
 import type { TaskItem } from './task';
+import { isOld } from './set-aside';
 
 // Friday 2026-07-17, 10:00 — LOCAL constructor so calendar-day math is
 // deterministic in any test timezone.
@@ -205,7 +206,7 @@ describe('buildDeskFeed — tasks, AI, money', () => {
     expect(feed[0].runs[0].items[0]).toMatchObject({ conversationId: 'c9', workspaceId: 'w1', href: null });
   });
 
-  it('a reply waiting for us sits today, most recent first, and replaces its next-action call', () => {
+  it('a reply waiting for us sits on the day they wrote, and replaces its next-action call', () => {
     const feed = buildDeskFeed(
       {
         conversations: [conv('c1', { next_action_at: actionAt(4) }), conv('c3', { next_action_at: actionAt(4) })],
@@ -220,8 +221,24 @@ describe('buildDeskFeed — tasks, AI, money', () => {
     );
     const rows = feed.flatMap((b) => b.runs).flatMap((r) => r.items);
     expect(rows.map((r) => r.id)).toEqual(['reply-c2', 'reply-c1', 'conv-c3']);
-    expect(rows[0]).toMatchObject({ verbKey: 'reply', href: '/h/w/conversation/c2', day: isoDay(0), overdue: false });
-    expect(rankWaiting(feed, NOW).rows.map((r) => r.id)).toEqual(['reply-c2', 'reply-c1', 'conv-c3']);
+    expect(rows[0]).toMatchObject({ verbKey: 'reply', href: '/h/w/conversation/c2', day: isoDay(-1), overdue: false });
+    expect(rows[1]).toMatchObject({ day: isoDay(-3) });
+    // Both wait now, the longest-waiting first; neither counts as late.
+    const w = rankWaiting(feed, NOW);
+    expect(w.rows.map((r) => r.id)).toEqual(['reply-c1', 'reply-c2', 'conv-c3']);
+    expect(w.overdue).toBe(0);
+  });
+
+  it('a reply from more than a month ago ages into «old» like the rest', () => {
+    const feed = buildDeskFeed(
+      {
+        ...EMPTY,
+        replies: [{ id: 'c1', title: 'Teatre de Salt', projectId: 'p1', projectName: 'MaMeMi', at: `${isoDay(-40)}T09:00:00Z`, href: null }],
+      },
+      NOW,
+      'en',
+    );
+    expect(isOld(feed[0].runs[0].items[0], isoDay(0))).toBe(true);
   });
 
   it('undated open task lands in the anytime tail', () => {

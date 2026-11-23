@@ -24,7 +24,7 @@
 
 {#if current.length > 0}
   <div class="known">
-    <BlockHead title={t('acquaintance.known', locale)} concept="known" />
+    <BlockHead display title={t('acquaintance.known', locale)} concept="known" />
     {#each current as c (c.person_id)}
       <Acquaintance {workspaceId} personId={c.person_id} name={c.person!.full_name} {locale} />
     {/each}

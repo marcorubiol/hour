@@ -82,6 +82,10 @@
     workspaces: readonly NavWorkspace[];
     /** The viewer's person (`/api/me`): «tu hora» when the list names them (ADR-234). */
     me?: string | null;
+    /** The piece's performance calls you and you have not answered (ADR-234):
+        it is answered here, not in «Te espera» (Marco, 23-11-2026). */
+    ask?: boolean;
+    onask?: (state: 'going' | 'not_going') => void;
     locale: Locale;
   }
 
@@ -102,6 +106,8 @@
     slipCtx,
     workspaces,
     me = null,
+    ask = false,
+    onask,
     locale,
   }: Props = $props();
 
@@ -471,6 +477,19 @@
         <dl class="piece__facts" data-testid="desk-facts">
           {#each facts as f (f.k)}<dt>{f.k}</dt><dd>{f.v}</dd>{/each}
         </dl>
+      {/if}
+
+      {#if ask && onask}
+        <!-- «To close · yours», in the pass's words: today's call is answered
+             in the piece it is about. -->
+        <div class="piece__ask" data-testid="desk-day-ask">
+          <span class="piece__ask-k">{t('pass.ready', locale)} · {t('desk.day_ask_yours', locale)}</span>
+          <span class="piece__ask-q">{t('desk.day_ask_q', locale)}</span>
+          <span class="piece__acts piece__ask-acts">
+            <button type="button" class="piece__act" onclick={() => onask('not_going')}>{t('desk.no_puedo', locale)}</button>
+            <button type="button" class="piece__act" data-testid="desk-day-going" onclick={() => onask('going')}>{t('desk.voy', locale)}</button>
+          </span>
+        </div>
       {/if}
 
       {#if boardHref || whoHref || acts}
@@ -872,6 +891,32 @@
     text-decoration: none;
     white-space: nowrap;
     transition: background var(--transition);
+  }
+  .piece__ask {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-2xs) var(--space-s);
+    padding-block-start: var(--space-s);
+    border-block-start: var(--line-hairline) solid var(--surface-focus-rule);
+  }
+  .piece__ask-k {
+    grid-column: 1 / -1;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--mono-letter-spacing);
+    text-transform: uppercase;
+    color: var(--surface-focus-faint);
+  }
+  .piece__ask-q {
+    font-size: var(--text-s);
+  }
+  .piece__ask-acts :global(.piece__act) {
+    border: 0;
+    font-family: inherit;
+    cursor: pointer;
   }
   .piece__acts :global(.piece__act:hover) {
     background: var(--surface-focus-act-hover);

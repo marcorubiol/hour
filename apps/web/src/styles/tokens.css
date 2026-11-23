@@ -187,6 +187,10 @@
     --bg-ultra-dark: var(--neutral-ultra-dark); /* context shift deepest */
 
     --bg-hover: var(--base-semi-dark);          /* interaction feedback */
+    /* The soft box (Hoy, Marco 23-11-2026): a row that asks or a door, a
+       touch of ink on the ground; a little more under the pointer. */
+    --bg-box: color-mix(in oklch, var(--bg), var(--text-color) 2.5%);
+    --bg-box-hover: color-mix(in oklch, var(--bg), var(--text-color) 6%);
     --bg-active: var(--base-dark);              /* pressed / active */
 
     --body-bg-color: var(--bg);

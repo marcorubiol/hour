@@ -199,7 +199,7 @@
   {:else if target === 'performance'}
     <!-- On a performance's page it is one of the record's blocks (ADR-139 § 4);
          in a date's dialog, a small head of its own. -->
-    <BlockHead title={t('commitment.who_goes', locale)} concept="cast" />
+    <BlockHead display title={t('commitment.who_goes', locale)} concept="cast" />
   {:else}
     <h3 class="who__h">{t('commitment.who_goes', locale)}</h3>
   {/if}

@@ -132,7 +132,7 @@
       {@render doorsBody()}
     </Fold>
   {:else}
-  <BlockHead id="desk-season-h" title={t('desk.band_season', locale)} />
+  <BlockHead id="desk-season-h" title={t('desk.band_season', locale)} display={horizontal} />
   {@render doorsBody()}
   {/if}
 </section>
@@ -148,11 +148,12 @@
     display: grid;
     grid-template-columns: minmax(5.5rem, max-content) minmax(0, 1fr) auto;
   }
-  /* Panoramic desktop band below the Hoy grid: one column per lens door, no boxes. */
+  /* Panoramic desktop band below the Hoy grid: one column per lens door,
+     each in the soft box of «Te espera» (Marco, 23-11-2026), so the band
+     weighs what the rest of Hoy weighs instead of floating. */
   .doors--horizontal {
     grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-    gap: var(--space-m);
-    border-block-start: var(--line-hairline) solid var(--border-color-light);
+    gap: var(--space-2xs);
     padding-block-start: var(--space-s);
   }
   .doors--horizontal .door {
@@ -165,9 +166,15 @@
     padding: var(--space-s);
     margin-inline: 0;
     border-radius: var(--radius-m);
+    background: var(--bg-box);
   }
   .doors--horizontal .door + .door {
     border-block-start: 0;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .doors--horizontal .door:hover {
+      background: var(--bg-box-hover);
+    }
   }
   .doors--horizontal .door__lens {
     flex-wrap: wrap;

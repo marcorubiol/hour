@@ -136,7 +136,7 @@
 </script>
 
 <section class="production" aria-label={t('perf.production', locale)}>
-  <BlockHead title={t('perf.production', locale)} />
+  <BlockHead display title={t('perf.production', locale)} />
 
   <div class="production__venue">
     {#if !(venue?.name ?? venueName)}

@@ -599,7 +599,7 @@
     </RecordHead>
 
     <section class="person__section" aria-label={t('conversations.col_contact', locale)}>
-      <BlockHead title={t('conversations.col_contact', locale)} />
+      <BlockHead display title={t('conversations.col_contact', locale)} />
       {#if !file.person.email && !file.person.phone && !file.person.website && file.person.languages.length === 0}
         <EmptyLine text={t('person.no_contact', locale)} />
       {/if}
@@ -636,7 +636,7 @@
 
     <section class="person__section" aria-label={t('lens.conversations', locale)}>
       {#if file.conversations.length > 0}
-        <BlockHead title={t('lens.conversations', locale)} count={file.conversations.length}>
+        <BlockHead display title={t('lens.conversations', locale)} count={file.conversations.length}>
           <button type="button" class="block-head__act" onclick={() => (addOpen = true)}>{t('person.add_to_project', locale)}</button>
         </BlockHead>
         <ul class="person__rows" role="list">
@@ -665,7 +665,7 @@
     </section>
 
     <section class="person__section" aria-label={t('person.notes', locale)}>
-      <BlockHead title={t('person.notes', locale)} />
+      <BlockHead display title={t('person.notes', locale)} />
       <!-- «Lo conozco» y «Mi nota»: las dos cosas tuyas sobre esta persona (ADR-138 § 5). -->
       <Acquaintance workspaceId={contextWorkspaceId} personId={file.person.id} {locale} />
       <div class="person__composer">
@@ -710,7 +710,7 @@
 
     {#if file.cast.length > 0 || file.crew.length > 0}
       <section class="person__section" aria-label={t('person.appearances', locale)}>
-        <BlockHead title={t('person.appearances', locale)} />
+        <BlockHead display title={t('person.appearances', locale)} />
         <ul class="person__rows" role="list">
           {#each file.cast as c (c.id)}
             <li>

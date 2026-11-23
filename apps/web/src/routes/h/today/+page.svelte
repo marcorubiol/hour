@@ -705,6 +705,27 @@
    * «Te han convocado» (ADR-235): the next two weeks' performances whose list
    * of who goes names you, and you have not said «voy» nor «no puedo».
    */
+  /* Today's call on the piece's own performance is answered in the piece
+     (Marco, 23-11-2026), so it leaves «Te espera». */
+  let pieceAsk = $derived.by(() => {
+    if (!me || !cardPerformanceId) return null;
+    const p = scopedPerfs.find((x) => x.id === cardPerformanceId);
+    return p &&
+      p.status !== 'cancelled' &&
+      perfDayKey(p) === today &&
+      (p.person_ids ?? []).includes(me) &&
+      !(p.commitments ?? []).some((c) => c.person_id === me)
+      ? p.id
+      : null;
+  });
+  async function answerPiece(state: 'going' | 'not_going') {
+    if (!pieceAsk || !me) return;
+    try {
+      await setCommitment(queryClient, 'performance', pieceAsk, me, state);
+    } catch (err) {
+      addToast({ tone: 'danger', title: t('desk.toast_change_failed', locale), message: err instanceof ApiError ? err.message : t('perf.unexpected', locale) });
+    }
+  }
   function convocations(): DeskConvocationInput[] {
     if (!me) return [];
     const until = plusDays(today, 14);
@@ -713,6 +734,7 @@
         const day = perfDayKey(p);
         return (
           p.status !== 'cancelled' &&
+          p.id !== pieceAsk &&
           day >= today &&
           day <= until &&
           (p.person_ids ?? []).includes(me!) &&
@@ -1076,7 +1098,7 @@
     {#if wide.current}
       <button
         type="button"
-        class="btn--secondary btn--xs desk__addwide"
+        class="block-head__act desk__addwide"
         bind:this={addBtn}
         aria-expanded={composerOpen}
         onclick={openComposer}><span aria-hidden="true">+</span> {t('desk.add_short', locale)}</button
@@ -1153,6 +1175,8 @@
           boardNew={nextBoardNew}
           {slipCtx}
           {me}
+          ask={pieceAsk !== null}
+          onask={answerPiece}
           {locale}
         />
       </div>

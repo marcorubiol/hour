@@ -33,6 +33,15 @@
     level?: 2 | 3;
     /** The action at the end: a `.block-head__act` link or button. */
     children?: Snippet;
+    /**
+     * The pass's voice (Hoy, 23-11-2026): the title in the display serif, in
+     * its own case, with no hairline under it and no figure beside it. What
+     * the block says about itself (its filter words) goes on the same line,
+     * in `inline`, right after the title.
+     */
+    display?: boolean;
+    /** Words that sit on the title's line, after it (a display head's filter). */
+    inline?: Snippet;
   }
 
   let {
@@ -47,30 +56,33 @@
     concept,
     level = 2,
     children,
+    display = false,
+    inline,
   }: Props = $props();
 </script>
 
 {#snippet words()}
-  {#if titleId}<span id={titleId}>{title}</span>{:else}{title}{/if}{#if count !== null && count !== ''}&nbsp;·
-    <span class="block-head__n" class:block-head__n--alert={alert}>{count}</span>{/if}{#if alertNote}&nbsp;·
+  {#if titleId}<span id={titleId}>{title}</span>{:else}{title}{/if}{#if !display && count !== null && count !== ''}&nbsp;·
+    <span class="block-head__n" class:block-head__n--alert={alert}>{count}</span>{/if}{#if !display && alertNote}&nbsp;·
     <span class="block-head__n block-head__n--alert">{alertNote}</span>{/if}
 {/snippet}
 
 {#snippet heading()}
   <svelte:element
     this={`h${level}`}
-    class="eyebrow eyebrow--sub"
+    class={display ? 'block-head__title' : 'eyebrow eyebrow--sub'}
     {id}
     tabindex={focusable ? -1 : undefined}
     bind:this={el}>{@render words()}</svelte:element
   >
 {/snippet}
 
-<div class="block-head">
+<div class="block-head" class:block-head--display={display}>
   {#if concept}
     <span class="block-head__lead">{@render heading()}<ConceptHint {concept} /></span>
   {:else}
     {@render heading()}
   {/if}
+  {#if inline}<span class="block-head__inline">{@render inline()}</span>{/if}
   {#if children}{@render children()}{/if}
 </div>
