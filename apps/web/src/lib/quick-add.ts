@@ -138,7 +138,7 @@ export function skeletonFor(type: QuickType): Skeleton {
     case 'day_off':
       return { title: 'title', when: date({ hours: false, untilOpen: true }), where: 'none', owner: 'project', more: more() };
     case 'travel_day':
-      return { title: 'title', when: date({ repeat: false }), where: 'trip', owner: 'project', more: more() };
+      return { title: 'title', when: date({ repeat: false }), where: 'trip', owner: 'project', more: more({ attach: false, bolo: true }) };
     case 'unavailable':
       return {
         title: 'note',
@@ -540,6 +540,7 @@ export function dateBody(
     body.travel_direction = d.direction;
     body.origin_city = orNull(d.origin);
     body.destination_city = orNull(d.city);
+    body.bolo_id = d.bolo || null;
   }
   return { series: false, body };
 }

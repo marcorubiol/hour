@@ -8964,3 +8964,19 @@ Marco, 23-11 («Sí, por favor»), sobre el encargo `/mnt/project-files/viaje-bo
    cambia. La ficha de función sigue sin elegir función para un viaje (`date.performance_id` queda como estaba).
 
 **Cómo se revierte.** Revertir el commit.
+
+## [2026-11-23] ADR-246 · El bolo del viaje al crearlo y al editarlo, e ida / vuelta desde la ficha del bolo (cierra ADR-245)
+
+Marco, 23-11 («sí a todo»): portar lo que quedaba de la rama `claude/travel-bolo-write`, una versión anterior y
+paralela de ADR-245, encima de main.
+
+**Decisión.**
+1. **Alta (`CreateEventDialog`, `quick-add.ts`):** un `travel_day` lleva el selector «De qué bolo» en lugar de «Unir a
+   una función». Nunca adivina: solo propone el bolo que llega de la puerta (`presetBoloId`). Se envía `bolo_id`.
+2. **Edición (`EditDateDialog`):** el mismo selector para `travel_day`, solo si se leen los bolos del proyecto. El
+   PATCH lleva `bolo_id` solo si cambió (`boloPatch`), así que quien no lee dinero nunca toca el enlace.
+3. **Ficha del bolo (`BoloRecord`):** «Añadir ida» y «Añadir vuelta» junto a «+ función». Abren el alta del viaje ya
+   atado al bolo, con la víspera de la primera función o el día después de la última, y la ciudad del bolo como
+   destino o como origen (`creation.openEvent` gana `travelDirection`, `originCity` y `destinationCity`).
+
+**Sin migración ni cambio de `CACHE_SCHEMA`.** **Cómo se revierte.** Revertir el commit.

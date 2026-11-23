@@ -43,6 +43,7 @@
   import { usePins } from '$lib/stores/pins.svelte';
   import { projectBolosQueryOptions } from '$lib/bolo-queries';
   import { dayLabel, localDayISO, viewerTimeZone } from '$lib/datetime';
+  import { addDaysIso } from '$lib/planner';
   import { boloHistory, type BoloEvent, type BoloHistoryPayment } from '$lib/bolo-history';
   import { appLocale, tHere, setRecordSpace } from '$lib/i18n';
   import { lensOn } from '$lib/lenses.svelte';
@@ -169,6 +170,30 @@
   const creation = useCreation();
   function addFunction() {
     creation.openEvent({ type: 'performance', projectId, lineId: null, boloId: id });
+  }
+  // ADR-244: «Añadir ida» / «Añadir vuelta» from the bolo record.
+  function addTrip(direction: 'outbound' | 'return') {
+    const city = (bolo?.city ?? '').trim();
+    const first = bolo?.first_performed_at?.slice(0, 10) ?? null;
+    const last = bolo?.last_performed_at?.slice(0, 10) ?? first;
+    const day =
+      direction === 'outbound'
+        ? first
+          ? addDaysIso(first, -1)
+          : null
+        : last
+          ? addDaysIso(last, 1)
+          : null;
+    creation.openEvent({
+      type: 'travel_day',
+      projectId,
+      lineId: null,
+      boloId: id,
+      date: day,
+      travelDirection: direction,
+      originCity: direction === 'return' ? city : '',
+      destinationCity: direction === 'outbound' ? city : '',
+    });
   }
   // «+ Gasto» (ADR-170): the bolo is already chosen. Money is Cuentas'
   // (ADR-043), so it follows that lens; `create_expense` gates on edit:money.
@@ -441,6 +466,12 @@
     <section class="bolo-record__section" aria-label={t('bolo.history', locale)} data-testid="bolo-history">
       <BlockHead title={t('bolo.history', locale)}>
         {#if canAddFunction}
+          <button type="button" class="block-head__act" data-testid="bolo-add-outbound" onclick={() => addTrip('outbound')}
+            >{t('trip.add_outbound', locale)}</button
+          >
+          <button type="button" class="block-head__act" data-testid="bolo-add-return" onclick={() => addTrip('return')}
+            >{t('trip.add_return', locale)}</button
+          >
           <button type="button" class="block-head__act" onclick={addFunction}>{t('books.add_function', locale)}</button>
         {/if}
       </BlockHead>

@@ -44,6 +44,8 @@
   import { dayMonthYear, dualTime, instantToWallClock, wallClockToInstant, viewerTimeZone } from '$lib/datetime';
   import { appLocale, t, voiceFor } from '$lib/i18n';
   import { allLinesQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
+  import { boloOptions, boloPatch, type BoloLite } from '$lib/bolo-pick';
+  import { projectBolosQueryOptions } from '$lib/bolo-queries';
   import {
     DATE_STATUSES,
     TRAVEL_DIRECTIONS,
@@ -77,6 +79,7 @@
   let dLabel = $state('');
   let dLine = $state('');
   let dPerformance = $state('');
+  let dBolo = $state('');
   let dAllDay = $state(false);
   let dDay = $state('');
   let dEndDay = $state('');
@@ -157,6 +160,22 @@
     })),
   ]);
 
+  // ADR-244: for travel_day, choosing a bolo replaces choosing a performance.
+  // Fails silently without read:money so readers without money access never
+  // see the field and never clear an existing link on save.
+  const bolosQuery = createQuery(
+    toStore(() => projectBolosQueryOptions(projectId, open && kind === 'travel_day')),
+  );
+  let projectBolos = $derived<BoloLite[]>($bolosQuery.data?.items ?? []);
+  let originalBoloId = $derived(date?.bolo_id ?? null);
+  let bolosOptions = $derived(boloOptions(projectBolos, locale, originalBoloId, voice));
+  let showBoloSelect = $derived(
+    kind === 'travel_day' &&
+      $bolosQuery.isSuccess &&
+      bolosOptions.length > 1 &&
+      (originalBoloId === null || projectBolos.some((b) => b.id === originalBoloId)),
+  );
+
   const labelsStore = toStore(() => ({
     queryKey: ['date-labels', workspaceId] as const,
     enabled: open && kind === 'other' && Boolean(workspaceId),
@@ -212,6 +231,7 @@
     dLabel = d.label ?? '';
     dLine = d.line_id ?? '';
     dPerformance = d.performance_id ?? '';
+    dBolo = d.bolo_id ?? '';
     dDirection = (TRAVEL_DIRECTIONS as readonly string[]).includes(d.travel_direction ?? '')
       ? (d.travel_direction as TravelDirection)
       : 'outbound';
@@ -314,6 +334,9 @@
       input.travel_direction = dDirection;
       input.origin_city = dOrigin.trim() || null;
       input.destination_city = dCity.trim() || null;
+      if (showBoloSelect) {
+        Object.assign(input, boloPatch(originalBoloId, dBolo));
+      }
     }
     if (kind === 'other') input.label = dLabel.trim() || null;
     // ONE save (ADR-139 p7): who goes is written with the rest, not on its
@@ -375,7 +398,11 @@
         {#if projectLines.length > 0}
           <Select label={tr('create.line')} options={lineOptions} bind:value={dLine} />
         {/if}
-        {#if attachOptions.length > 1}
+        {#if kind === 'travel_day'}
+          {#if showBoloSelect}
+            <Select label={tr('trip.bolo_label')} options={bolosOptions} bind:value={dBolo} />
+          {/if}
+        {:else if attachOptions.length > 1}
           <Select
             label={tr('create.attach')}
             options={attachOptions}

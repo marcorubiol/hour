@@ -1018,6 +1018,9 @@
           ? null
           : createPresets.lineId}
       presetBoloId={creation.event.boloId ?? null}
+      presetTravelDirection={creation.event.travelDirection ?? null}
+      presetOriginCity={creation.event.originCity ?? null}
+      presetDestinationCity={creation.event.destinationCity ?? null}
       presetDate={creation.event.date ?? null}
       presetType={creation.event.type ?? null}
       presetTitle={creation.event.title ?? null}

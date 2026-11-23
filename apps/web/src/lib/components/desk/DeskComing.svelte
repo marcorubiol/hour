@@ -564,16 +564,19 @@
   }
   /* Under the strip: the one amber line with its verb, and the grey figure
      of the rest with the Agenda's door (ADR-227). */
+  /* What a date asks for is a row in the soft box of «Te espera» (Marco,
+     23-11-2026): tinted, no edge; the one that is due is the screen's one
+     orange row. */
   .coming__open {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--space-2xs) var(--space-m);
+    display: grid;
+    gap: var(--space-2xs);
     margin-block-start: var(--space-s);
   }
   .coming__line {
     margin: 0;
+    padding: var(--space-s);
+    border-radius: var(--radius-m);
+    background: var(--bg-box);
     font-size: var(--text-s);
     color: var(--text-muted);
   }
@@ -584,6 +587,7 @@
   }
   .coming__line--urgent {
     color: var(--missing-ink);
+    background: color-mix(in oklch, var(--bg), var(--missing-ink) 7%);
   }
   .coming__line a {
     color: inherit;
