@@ -1788,6 +1788,8 @@
   "desk.remove_aria": "Treu: {subject}",
   "desk.task_done": "fet",
   "desk.task_done_aria": "Fet: {subject}",
+  "desk.day_ask_yours": "teu",
+  "desk.day_ask_q": "Ets a la llista. Hi vas?",
   "desk.say_reply": "{name} t'ha escrit",
   "desk.say_followup": "Tornar a escriure a {name}",
   "desk.say_chase": "{name} no ha contestat",

@@ -1752,6 +1752,8 @@
   "desk.remove_aria": "Retirer : {subject}",
   "desk.task_done": "fait",
   "desk.task_done_aria": "Fait : {subject}",
+  "desk.day_ask_yours": "à toi",
+  "desk.day_ask_q": "Vous êtes sur la liste. Vous y allez ?",
   "desk.say_reply": "{name} vous a écrit",
   "desk.say_followup": "Relancer {name}",
   "desk.say_chase": "{name} n'a pas répondu",

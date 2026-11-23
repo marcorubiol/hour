@@ -1788,6 +1788,8 @@
   "desk.remove_aria": "Quitar: {subject}",
   "desk.task_done": "hecho",
   "desk.task_done_aria": "Hecho: {subject}",
+  "desk.day_ask_yours": "tuyo",
+  "desk.day_ask_q": "Estás en la lista. ¿Vas?",
   "desk.say_reply": "{name} te escribió",
   "desk.say_followup": "Volver a escribir a {name}",
   "desk.say_chase": "{name} no ha contestado",
