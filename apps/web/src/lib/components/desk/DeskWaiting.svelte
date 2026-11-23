@@ -21,7 +21,6 @@
   import { lensOn } from '$lib/lenses.svelte';
   import Button from '$lib/components/Button.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
-  import EmptyLine from '$lib/components/EmptyLine.svelte';
   import { localeDayMonth } from '$lib/datetime';
   import { relativeContactDate } from '$lib/conversation';
   import { tick } from 'svelte';
@@ -150,7 +149,6 @@
     activeKind = effectiveKind === kind ? null : kind;
   }
   let laterOpen = $state(false);
-  const overdueWord = (n: number) => t(n === 1 ? 'desk.title_overdue_one' : 'desk.title_overdue_many', locale, { n });
   let feedCount = $derived(feed.reduce((n, b) => n + b.runs.reduce((m, r) => m + r.items.length, 0), 0));
   let shown = $derived(waiting.rows.slice(0, rows));
 
@@ -241,7 +239,7 @@
       </div>
       <div class="row__tail">
         <span class="row__acts">
-          <button type="button" class="row__act btn--secondary btn--xs" onclick={() => item.taskId && onaccept(item.taskId)}
+          <button type="button" class="row__act row__act--main btn--secondary btn--xs" onclick={() => item.taskId && onaccept(item.taskId)}
             >{t('desk.proposal_add', locale)}</button
           ><button type="button" class="row__act row__act--quiet btn--secondary btn--xs" onclick={() => item.taskId && onremove(item.taskId)}
             >{t('desk.proposal_dismiss', locale)}</button
@@ -337,7 +335,7 @@
             <!-- Convoked (ADR-235): the answer is two words, here. -->
             <button
               type="button"
-              class="row__act btn--primary btn--xs"
+              class="row__act row__act--main btn--secondary btn--xs"
               data-testid="desk-voy"
               onclick={() => onanswer(item, 'going')}>{t('desk.voy', locale)}</button
             ><button
@@ -349,7 +347,7 @@
             <!-- ADR-241 Fase 4: remote calendar edit on a date → Aplicar · Descartar. -->
             <button
               type="button"
-              class="row__act btn--primary btn--xs"
+              class="row__act row__act--main btn--secondary btn--xs"
               data-testid="desk-cal-apply"
               onclick={() => oncalendarproposal(item.calendarProposal!, 'apply')}>{t('calendar.proposal_apply', locale)}</button
             ><button
@@ -370,7 +368,7 @@
                  row's own verb (ADR-167 § 1); «Deshacer» comes in the notice. -->
             <button
               type="button"
-              class="row__act btn--secondary btn--xs"
+              class="row__act row__act--main btn--secondary btn--xs"
               aria-label={t('desk.decision_release_aria', locale, { name: item.subject })}
               disabled={deciding !== null}
               onclick={() => ondecide(item)}>{t('desk.decision_release', locale)}</button
@@ -379,6 +377,34 @@
         </span>
       </div>
     </li>
+  {/if}
+{/snippet}
+
+{#snippet headWords()}
+  {#if !loading && !errored && pills.length > 0 && waitingDrawsPills(waiting.total, rows)}
+    <!-- One word per kind and its figure, calm included; a word filters «Te
+         espera» in place without leaving Hoy. Only kinds that are there: no
+         word at zero. With three things or fewer all drawn as rows, only the
+         rows (ADR-229). -->
+    <span class="kinds" role="group" aria-label={t('desk.band_waiting', locale)} data-testid="desk-pills">
+      {#each pills as p, i (p.kind)}
+        {#if i > 0}<span class="kinds__sep" aria-hidden="true">·</span>{/if}
+        <button
+          type="button"
+          class="kind"
+          class:kind--off={effectiveKind !== null && effectiveKind !== p.kind}
+          data-kind={p.kind}
+          aria-pressed={effectiveKind === p.kind}
+          onclick={() => toggleKind(p.kind)}><b>{p.n}</b> {pillWord(p.kind, p.n)}</button
+        >
+      {/each}
+      {#if effectiveKind}
+        <span class="kinds__sep" aria-hidden="true">·</span>
+        <button type="button" class="kind" onclick={() => (activeKind = null)}>{t('desk.kinds_all', locale)}</button>
+      {/if}
+    </span>
+  {:else if !loading && !errored && waiting.total === 0 && !all}
+    <span class="kinds__none" data-testid="desk-waiting-none">{t('desk.all_quiet', locale)}</span>
   {/if}
 {/snippet}
 
@@ -399,37 +425,13 @@
 
 <section class="dband waits" aria-labelledby="desk-waits-h" aria-busy={loading}>
   <!-- The region is named by the words alone, not by the count beside them. -->
-  <BlockHead
-    title={t('desk.band_waiting', locale)}
-    titleId="desk-waits-h"
-    focusable
-    bind:el={headEl}
-    count={loading || errored || waiting.total === 0 ? null : waiting.total}
-    alertNote={!loading && !errored && waiting.overdue > 0 ? overdueWord(waiting.overdue) : null}
-  >
+  <!-- The pass's voice (Marco, 23-11-2026): the title alone, no figure and no
+       red note (each row says its own «due» in amber); the filter is words on
+       the title's line, and an empty block says so there, once. -->
+  <BlockHead title={t('desk.band_waiting', locale)} titleId="desk-waits-h" focusable display bind:el={headEl} inline={headWords}>
     {#if add}{@render add()}{/if}
   </BlockHead>
   {#if composer}{@render composer()}{/if}
-
-  {#if !loading && !errored && pills.length > 0 && waitingDrawsPills(waiting.total, rows)}
-    <!-- One filter pill per kind and its figure, calm included; clicking any
-         pill filters «Te espera» in place without leaving Hoy. With three
-         things or fewer all drawn as rows, only the rows (ADR-229). -->
-    <ul class="tallies" data-testid="desk-pills">
-      {#each pills as p (p.kind)}
-        <li>
-          <button
-            type="button"
-            class="tally"
-            data-kind={p.kind}
-            aria-pressed={effectiveKind === p.kind}
-            onclick={() => toggleKind(p.kind)}
-            ><b>{p.n}</b> {pillWord(p.kind, p.n)}</button
-          >
-        </li>
-      {/each}
-    </ul>
-  {/if}
 
   {#if loading}
     <ul class="list" aria-hidden="true">
@@ -472,8 +474,7 @@
     </div>
     <button type="button" class="more" onclick={() => showAll(false)}>{t('desk.see_less', locale)}</button>
   {:else if waiting.total === 0}
-    <!-- Nothing this week: the head stays for its «+», and says so once. -->
-    <EmptyLine text={t('desk.all_quiet', locale)} />
+    <!-- Nothing this week: the head says so on its line, once; no prize. -->
     {#if rows > 0 && feedCount > 0}
       <button type="button" class="more" onclick={() => showAll(true)}>{t('desk.see_all', locale)} →</button>
     {/if}
@@ -556,13 +557,16 @@
   .waits {
     container: waits / inline-size;
   }
+  /* Each row in its soft box (Marco, 23-11-2026: «más tranquilo viendo
+     cajas», at half the first tint): a touch of ink on the ground, the
+     button's radius, a breath between boxes and no hairline. */
   .list {
     display: flex;
     flex-direction: column;
+    gap: var(--space-2xs);
     list-style: none;
-    margin: 0;
+    margin: var(--space-s) 0 0;
     padding: 0;
-    border-block-start: var(--line-hairline) solid var(--border-color-light);
   }
   .row {
     position: relative;
@@ -573,13 +577,10 @@
     row-gap: var(--space-2xs);
     align-items: start;
     padding-block: var(--space-s);
-    padding-inline: var(--space-xs);
-    margin-inline: calc(-1 * var(--space-xs));
-    border-block-end: var(--line-hairline) solid var(--border-color-light);
+    padding-inline: var(--space-s);
     border-radius: var(--radius-m);
-    transition:
-      background var(--transition),
-      border-color var(--transition);
+    background: var(--bg-box);
+    transition: background var(--transition);
   }
   .row--door {
     cursor: pointer;
@@ -589,15 +590,14 @@
   }
   @media (hover: hover) and (pointer: fine) {
     .row:not(.row--wait):hover {
-      background: color-mix(in oklch, var(--text-color) 4%, transparent);
-      border-block-end-color: transparent;
-    }
-    .row:has(+ .row:not(.row--wait):hover) {
-      border-block-end-color: transparent;
+      background: var(--bg-box-hover);
     }
     .row--door:active:not(:has(.row__tail :active)) {
-      background: color-mix(in oklch, var(--text-color) 7%, transparent);
+      background: color-mix(in oklch, var(--bg), var(--text-color) 9%);
     }
+  }
+  .row:not(.row--wait):focus-within {
+    background: var(--bg-box-hover);
   }
   .row--wait {
     display: block;
@@ -781,12 +781,32 @@
     display: inline-flex;
     align-items: center;
   }
-  /* The system's outline button (base.css) at its own size, as Cuentas'
-     row actions; the quiet one drops its edge. */
+  /* The verb is a word at rest (Marco, 23-11-2026: «mucho botón»): no edge,
+     no fill; you always read what the row will do. Its box comes where you
+     are: under the pointer, with the keyboard, and on a finger, where two
+     answers need a target. None is ever filled: the filled one is the piece. */
+  .row__act {
+    --btn-border-color: transparent;
+    --btn-border-color-hover: var(--border-color-light);
+    --btn-background: transparent;
+    --btn-background-hover: var(--bg-ultra-light);
+  }
+  .row:hover .row__act--main,
+  .row:focus-within .row__act--main {
+    --btn-border-color: var(--border-color-light);
+    --btn-background: var(--bg-ultra-light);
+  }
+  @media (hover: none) {
+    .row__act--main {
+      --btn-border-color: var(--border-color-light);
+      --btn-background: var(--bg-ultra-light);
+    }
+  }
   .row__act--quiet {
     --btn-border-color: transparent;
+    --btn-border-color-hover: transparent;
     --btn-background-hover: transparent;
-    --btn-text-color: var(--text-faint);
+    --btn-text-color: var(--text-muted);
   }
   .row__remove {
     border: 0;
@@ -918,64 +938,51 @@
     text-decoration: none;
   }
 
-  /* THE PILLS (design-system rules 2 and 9): sunk into the ground, a figure
-     and its word; each its own door. Not named `.pill`: base.css reads any
-     class containing the word as the filter pill. */
-  .tallies {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: var(--space-xs);
-    margin: 0 0 var(--space-m);
+  /* THE FILTER IS WORDS on the head's line (Marco, 23-11-2026), «3
+     conversations · 1 payment · 3 tasks»: only what is there, never a zero;
+     the one pressed is underlined and the others step back. Not named
+     `.pill`: base.css reads any class containing the word as the filter pill. */
+  .kinds {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: var(--space-xs);
+    font-size: var(--text-s);
+    color: var(--text-faint);
+  }
+  .kind {
     padding: 0;
-    list-style: none;
-  }
-  .tallies > li {
-    display: flex;
-    min-inline-size: 0;
-  }
-  /* A tile: the figure in the display serif over its word (drawing S), four
-     to a row; a fifth kind, rare, wraps to a second row. */
-  .tally {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0;
-    inline-size: 100%;
-    padding: var(--space-xs) var(--space-s);
-    border: var(--line-hairline) solid transparent;
-    border-radius: var(--radius-m);
-    background: var(--bg-light);
-    color: var(--text-muted);
+    border: 0;
+    background: none;
     font: inherit;
-    font-size: var(--text-xs);
-    text-align: start;
+    color: var(--text-muted);
     text-decoration: none;
+    text-underline-offset: 0.25em;
     cursor: pointer;
-    transition:
-      background var(--transition),
-      border-color var(--transition);
+    transition: color var(--transition), opacity var(--transition);
   }
-  .tally b {
-    font-family: var(--font-display);
-    font-size: var(--text-xl);
-    font-weight: 400;
-    line-height: 1.2;
-    color: var(--heading-color);
+  .kind b {
+    font-weight: 500;
+    color: var(--text-color);
     font-variant-numeric: tabular-nums;
   }
-  button.tally:hover {
-    background: var(--bg-hover);
-    border-color: var(--border-color-light);
-    text-decoration: none;
+  .kind:hover {
+    color: var(--text-color);
   }
-  button.tally[aria-pressed='true'] {
-    background: var(--bg-ultra-light);
-    border-color: var(--heading-color);
+  .kind[aria-pressed='true'] {
     color: var(--heading-color);
-    text-decoration: none;
+    font-weight: 500;
+    text-decoration: underline;
+  }
+  .kind--off {
+    opacity: 0.55;
+  }
+  .kinds__none {
+    font-size: var(--text-s);
+    color: var(--text-faint);
   }
   @media (pointer: coarse) {
-    .tally {
+    .kind {
       min-block-size: var(--touch-target);
     }
   }
@@ -1039,12 +1046,17 @@
     grid-template-columns: 7rem 1fr;
     align-items: start;
   }
+  /* The day and the kind in the margin speak in the body face (Hoy,
+     23-11-2026): mono capitals stay for nothing in this block. */
+  .bucket__label {
+    font-family: var(--font-sans);
+    font-size: var(--text-s);
+    letter-spacing: 0;
+    text-transform: none;
+  }
   .run__label {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    letter-spacing: var(--mono-letter-spacing-loose);
-    text-transform: uppercase;
-    color: var(--text-faint);
+    font-size: var(--text-s);
+    color: var(--text-muted);
     text-decoration: none;
     padding-block: var(--space-s) 0;
   }
@@ -1054,9 +1066,6 @@
   }
   .run__rows {
     border-block-start: 0;
-  }
-  .run__rows .row:last-child {
-    border-block-end: 0;
   }
 
   /* Narrow (tablets and phones < 34rem): the tail drops neatly below the body
@@ -1089,22 +1098,6 @@
     }
     .run {
       grid-template-columns: 1fr;
-    }
-    /* The pills on a phone are words on a line, «1 reply · 2 tasks», not
-       four quarter-width tiles: one pill alone was a narrow box. */
-    .tallies {
-      display: flex;
-      flex-wrap: wrap;
-    }
-    .tally {
-      flex-direction: row;
-      align-items: baseline;
-      gap: var(--space-2xs);
-      inline-size: auto;
-      padding: var(--space-2xs) var(--space-s);
-    }
-    .tally b {
-      font-size: var(--text-l);
     }
   }
 </style>

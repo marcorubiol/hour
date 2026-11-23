@@ -195,7 +195,7 @@
 {#if !errored}
   <section class="dband coming" aria-labelledby="desk-coming-h" data-help-step="desk-coming">
     <div class="coming__head">
-      <BlockHead title={t('desk.band_coming', locale)} titleId="desk-coming-h">
+      <BlockHead title={t('desk.band_coming', locale)} titleId="desk-coming-h" display>
         {#if wide && planner && settled && tiles.length > 0}
           <a class="block-head__act" href="/h/planner" data-testid="desk-tile-planner">{t('lens.planner', locale)} →</a>
         {/if}

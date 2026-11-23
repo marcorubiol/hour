@@ -1076,7 +1076,7 @@
     {#if wide.current}
       <button
         type="button"
-        class="btn--secondary btn--xs desk__addwide"
+        class="block-head__act desk__addwide"
         bind:this={addBtn}
         aria-expanded={composerOpen}
         onclick={openComposer}><span aria-hidden="true">+</span> {t('desk.add_short', locale)}</button
