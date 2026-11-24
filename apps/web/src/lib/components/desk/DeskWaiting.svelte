@@ -590,7 +590,7 @@
       {/if}
       {#if old.length > 0}
         <button type="button" class="fold" aria-expanded={oldOpen} data-testid="desk-old" onclick={() => (oldOpen = !oldOpen)}
-          >{t('desk.old_fold', locale)} · {old.length} <span aria-hidden="true">{oldOpen ? '↑' : '↓'}</span></button
+          >{t(oldOpen ? 'desk.old_hide' : 'desk.old_show', locale, { n: old.length })}</button
         >
         {#if oldOpen}
           <ul class="list list--old">
@@ -885,14 +885,15 @@
     gap: var(--space-xs);
     margin-block-start: var(--space-s);
   }
+  /* Says what it holds and what a tap does, at the reading voice (ADR-248):
+     «Old · 1 ↓» in mono hid what was under it. */
   .fold {
     padding: 0;
     border: 0;
     background: none;
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    letter-spacing: var(--mono-letter-spacing);
-    color: var(--text-faint);
+    font-family: inherit;
+    font-size: var(--text-s);
+    color: var(--text-muted);
     cursor: pointer;
   }
   .fold:hover {

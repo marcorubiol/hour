@@ -29,11 +29,14 @@
     full?: { href: string; label: string } | null;
     /** What is open: when it changes (the panel followed a link) it starts at the top. */
     contentKey?: string;
+    /** A phone: the panel is the whole screen, so its way out is «‹ Back» at
+        the top left, as on every page, not «Close» (ADR-248). */
+    phone?: boolean;
     onclose: () => void;
     children: Snippet;
   }
 
-  let { open, label, full = null, contentKey = '', onclose, children }: Props = $props();
+  let { open, label, full = null, contentKey = '', phone = false, onclose, children }: Props = $props();
 
   const locale = appLocale();
   let dialogEl: HTMLDialogElement | undefined = $state();
@@ -118,13 +121,20 @@
   onclick={handleClick}
 >
   <div class="peek__panel" bind:this={panelEl} tabindex="-1">
-    <div class="peek__bar">
+    <div class="peek__bar" class:peek__bar--phone={phone}>
+      {#if phone}
+        <button type="button" class="peek__back" aria-keyshortcuts="Escape" data-testid="peek-back" onclick={requestClose}
+          >{t('ui.back', locale)}</button
+        >
+      {/if}
       {#if full}
         <a class="block-head__act" href={full.href} data-peek="off" data-testid="peek-full">{full.label}</a>
       {/if}
-      <button type="button" class="block-head__act" aria-keyshortcuts="Escape" onclick={requestClose}
-        >{t('peek.close', locale)}</button
-      >
+      {#if !phone}
+        <button type="button" class="block-head__act" aria-keyshortcuts="Escape" onclick={requestClose}
+          >{t('peek.close', locale)}</button
+        >
+      {/if}
     </div>
     {#if open}{@render children()}{/if}
   </div>
@@ -192,6 +202,23 @@
       justify-content: flex-end;
       align-items: center;
       gap: var(--space-m);
+    }
+    .peek__bar--phone {
+      justify-content: space-between;
+    }
+    /* «‹ Back», the one way out on a phone: the same words and place as on
+       every record's page (RecordHead). */
+    .peek__back {
+      display: inline-flex;
+      align-items: center;
+      min-block-size: var(--touch-target);
+      padding: 0;
+      border: 0;
+      background: none;
+      color: var(--text-color);
+      font: inherit;
+      font-size: var(--text-m);
+      cursor: pointer;
     }
     @media (max-width: 47.999rem) {
       .peek {

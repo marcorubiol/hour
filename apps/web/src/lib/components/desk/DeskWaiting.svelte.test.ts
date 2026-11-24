@@ -80,10 +80,11 @@ describe('Te espera: «Ahora no» and the old (ADR-232)', () => {
   it('the old fold is closed until opened', async () => {
     setup();
     const fold = screen.getByTestId('desk-old');
-    expect(fold.textContent).toContain('Old · 1');
+    expect(fold.textContent).toContain('Older (1) · show');
     expect(screen.queryByText('Festival de Otoño')).toBeNull();
     await fireEvent.click(fold);
     expect(screen.getByText('Festival de Otoño')).toBeTruthy();
+    expect(fold.textContent).toContain('Older (1) · hide');
   });
 });
 

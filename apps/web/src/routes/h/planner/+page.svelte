@@ -106,6 +106,7 @@
   import DayFoot, { type DayNextVM } from '$lib/components/planner/DayFoot.svelte';
   import { performanceThread, dateThread, stripWindow, hourOf } from '$lib/day-strip';
   import DayBox from '$lib/components/planner/DayBox.svelte';
+  import { hasAppEntryBefore } from '$lib/back';
   import { stagesQuery, type StagesFeed } from '$lib/components/planner/TravelStages.svelte';
   import { ORDERED_DATE_KINDS, type RunningOrderTarget } from '$lib/running-order';
   import Dialog from '$lib/components/Dialog.svelte';
@@ -394,12 +395,14 @@
     // write go through location.href.
     syncUrl('push', from);
   }
-  /** The Day's ×. Opened from a drawing of this page, it is one step back
-      (that drawing, as you left it). Opened from anywhere else (Hoy, ⌘K, a
-      link, a reload), there is no drawing behind it: the Agenda opens at
-      that day, the day among its neighbours. */
+  /** The Day's × (a phone's «‹ Back»). Opened from a drawing of this page, it
+      is one step back (that drawing, as you left it); opened from another
+      screen of the app, back to it. With nothing behind (⌘K, a pasted link,
+      a reload): the Agenda opens at that day, the day among its neighbours. */
   function closeDay() {
-    if ((page.state as { plannerFrom?: PlannerView }).plannerFrom) history.back();
+    // Opened from another screen of the app (Hoy's «Coming up», a pase):
+    // back goes there, not to an Agenda you never saw (ADR-248).
+    if ((page.state as { plannerFrom?: PlannerView }).plannerFrom || hasAppEntryBefore()) history.back();
     else openAgendaAt(selectedDay);
   }
   function openAgendaAt(iso: string) {
@@ -1733,7 +1736,9 @@
           o.target === 'performance'
             ? (dayState(sl) ?? '')
             : [place, city, dayState(sl)].filter((x, i, arr) => Boolean(x) && arr.indexOf(x) === i).join(' · '),
-        band: o.target === 'performance' && p ? { place: venue ?? city ?? '', call: dayCall(p, o.tz) } : null,
+        // Never an empty dark band (ADR-248): with no venue or city written,
+        // the name the slip goes by (the town, as the Agenda says it).
+        band: o.target === 'performance' && p ? { place: venue ?? city ?? o.name ?? '', call: dayCall(p, o.tz) } : null,
         clashes: [...new Set(clashes.filter((c) => c.event_ids?.includes(o.id)).map((c) => c.body))],
         need: o.guess || (p ? agendaOpen(p).items.length > 0 || agendaOpen(p).noTime : false),
         mine: Boolean(

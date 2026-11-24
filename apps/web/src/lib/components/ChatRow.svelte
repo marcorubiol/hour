@@ -341,5 +341,26 @@
     .chat__ctx .is-ink {
       color: var(--text-color);
     }
+
+    /* A PHONE: THE NAME WHOLE (ADR-248). On 390 px the name and «sala ·
+       Girona» shared one line and both were cut. The name takes the line, up
+       to two lines; what it is and where go under it, before the last word. */
+    @media (max-width: 47.999rem) {
+      .chat__name {
+        flex-wrap: wrap;
+        row-gap: 0;
+      }
+      .chat__title {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        white-space: normal;
+        flex-basis: 100%;
+      }
+      .chat__words {
+        flex-shrink: 1;
+      }
+    }
   }
 </style>

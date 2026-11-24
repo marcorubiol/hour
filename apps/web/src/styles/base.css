@@ -1119,7 +1119,7 @@
     --chip-padding-inline: var(--space-s);
     --chip-font-size: var(--text-xs);
     --chip-font-weight: 500;
-    --chip-radius: var(--radius-circle);
+    --chip-radius: var(--radius); /* 6 px, the button's: no pills (Marco, 18-11-2026; ADR-248) */
     --chip-gap: 0.4em;
     --chip-border-color: color-mix(
       in oklch,
@@ -2402,6 +2402,26 @@
     letter-spacing: var(--mono-letter-spacing);
     color: var(--text-faint);
   }
+  /* «‹ Back» on a phone (ADR-248): its own line, first, at the reading size;
+     hidden on a wider screen (the rail and the top bar are there) and inside
+     a vistazo (its bar has the same word). */
+  .record-head__back {
+    display: none;
+  }
+  @media (max-width: 47.999rem) {
+    .record-head__back {
+      display: inline-flex;
+      align-items: center;
+      flex-basis: 100%;
+      min-block-size: var(--touch-target);
+      color: var(--text-color);
+      font-size: var(--text-m);
+      text-decoration: none;
+    }
+    .peek .record-head__back {
+      display: none;
+    }
+  }
   /* The slim head (the pass's page): the address and the verbs, one line. */
   .record-head--slim {
     display: flex;
@@ -2598,6 +2618,22 @@
   .crow-list--chat > li:has(.is-active, .chat:hover)::before,
   .crow-list--chat > li:has(.is-active, .chat:hover) + li::before {
     border-color: transparent;
+  }
+  /* ON A PHONE, A BOX PER CONVERSATION (ADR-248), as «Waiting for you» draws
+     a row of Hoy: the same tint, no line between, a small gap. The list reads
+     as Hoy does («me siento más tranquilo viendo cajas», Marco, 23-11). */
+  @media (max-width: 47.999rem) {
+    .crow-list--chat {
+      display: grid;
+      gap: var(--space-xs);
+    }
+    .crow-list--chat > li + li::before {
+      content: none;
+    }
+    .crow-list--chat .chat:not(.chat--flush) {
+      padding: var(--space-s);
+      background: var(--bg-box);
+    }
   }
   /* Action bar — the floating bar at the foot of a work surface while a
      choice is open: «Escribir a N» over the selection in Conversations,

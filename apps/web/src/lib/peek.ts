@@ -157,9 +157,15 @@ export function peekFromLink(href: URL, here: URL): PeekTarget | null {
  * From a lens, always: that is the point (you stay where you were). From
  * inside a peek, always: the panel follows the link. From a record's page,
  * only what has no page of its own (a date, a bolo): a page links to pages.
+ * On a phone, only those two: everything else opens its page.
  */
-export function peekOpensFrom(t: PeekTarget, herePath: string, insidePeek: boolean): boolean {
-  if (insidePeek) return true;
+export function peekOpensFrom(t: PeekTarget, herePath: string, insidePeek: boolean, phone = false): boolean {
   if (t.kind === 'date' || t.kind === 'bolo') return true;
+  // ON A PHONE A THING WITH A PAGE OPENS ITS PAGE (ADR-248). The vistazo there
+  // took the whole screen anyway, with «Open in full» and «Close» on top: a
+  // second way to see the same pase, and a «Close» that read as «closed». The
+  // page has the same record, and «‹ Back» returns where you were.
+  if (phone) return false;
+  if (insidePeek) return true;
   return isLensPath(herePath);
 }

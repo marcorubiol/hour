@@ -127,18 +127,14 @@
   );
   let showOpen = $derived(dots && settled && tiles.length > 0 && (open.urgent !== null || open.rest > 0));
   let planner = $derived(lensOn('planner'));
-  /** A tile's day in the Planner, else its first thing's record. */
+  /** A tile's day in the Planner, else its first thing's record. On the phone
+      too, with one thing or five: the tile is a date, so it opens the day
+      («tocas una fecha, se abre el día», ADR-248, which ends ADR-223's
+      one-thing exception: it opened that thing's vistazo and the Day was
+      never seen). Inside the day, each box opens its pase. */
   function dayHref(tile: ComingTile): string | undefined {
     if (planner) return plannerDayHref('day', tile.day);
     return pulseSlip(tile.items[0].ref, tile.day, slipCtx).href ?? undefined;
-  }
-  /** A phone tile's door (ADR-223): one thing, its pase; several, the day,
-      the only screen that shows them together. */
-  function tileHref(tile: ComingTile): string | undefined {
-    if (tile.items.length === 1 && tile.more === 0) {
-      return pulseSlip(tile.items[0].ref, tile.day, slipCtx).href ?? dayHref(tile);
-    }
-    return dayHref(tile);
   }
   /** «15 funciones · 9 ciudades» for a day of more than three things (ADR-237), else null. */
   function manyOf(tile: ComingTile): string | null {
@@ -252,7 +248,7 @@
             </div>
           </li>
           {:else}
-          {@const href = tileHref(tile)}
+          {@const href = dayHref(tile)}
           <li class="coming__cell">
             <svelte:element
               this={href ? 'a' : 'div'}
@@ -648,28 +644,16 @@
     text-decoration: none;
   }
 
-  /* THE PHONE (§ 6 b): a strip that slides, tiles of a fixed width, the
-     third one peeking; the strip runs to the screen's edges. */
+  /* THE PHONE (§ 6 b; ADR-248): two tiles a row, all of them in sight. It
+     was a strip that slid sideways with the third tile cut by the screen's
+     edge: on a phone that reads as «something is hidden there». The door to
+     the Planner is the last row, across. */
   @media (max-width: 47.999rem) {
     .coming__strip {
-      display: flex;
-      gap: var(--space-xs);
-      overflow-x: auto;
-      overscroll-behavior-x: contain;
-      scroll-snap-type: x mandatory;
-      margin-inline: calc(-1 * var(--shell-gutter));
-      padding-inline: var(--shell-gutter);
-      scroll-padding-inline: var(--shell-gutter);
-      scrollbar-width: none;
-      /* Each tile as tall as what it says (ADR-227): no empty half. */
-      align-items: flex-start;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
-    .coming__strip::-webkit-scrollbar {
-      display: none;
-    }
-    .coming__cell {
-      flex: 0 0 var(--coming-tile-width);
-      scroll-snap-align: start;
+    .coming__cell:has(.tile--end) {
+      grid-column: 1 / -1;
     }
     .tile {
       grid-template-columns: minmax(0, 1fr);
@@ -680,12 +664,12 @@
     .tile__falta {
       grid-column: 1 / -1;
     }
-    /* On the strip the end door stays a tile: dashed, its word centred. */
+    /* The end door: a slim dashed row, its word centred. */
     .tile--end {
       display: grid;
       place-content: center;
       text-align: center;
-      padding: var(--space-s);
+      padding: var(--space-xs) var(--space-s);
       border-color: var(--border-color-light);
       border-style: dashed;
       font-size: var(--text-m);
