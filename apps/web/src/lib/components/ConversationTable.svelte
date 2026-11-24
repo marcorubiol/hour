@@ -138,7 +138,7 @@
     // Under «Nos toca» the chip says the turn: the row does not repeat it.
     if (r.turn?.word) {
       if (filters.turno !== 'nuestro') out.push({ text: r.turn.word, ink: r.turn.tone === 'ours' || r.turn.tone === 'late' });
-    } else if (r.last.last) out.push({ text: relationLabel(item.relation, locale) });
+    } else if (r.last.last && item.relation !== 'contacted') out.push({ text: relationLabel(item.relation, locale) });
     const tag = (item.tags.length > 0 ? item.tags : [SALES]).find((k) => k !== hideTag);
     if (tag && tagNames && mixed.tag) out.push({ text: keyLabel(tag, tagNames, locale) });
     if (r.bolo) out.push({ text: boloLabel(r.bolo, locale) });
@@ -276,6 +276,15 @@
     line: new Set(items.map((i) => i.line_id ?? '')).size > 1,
   });
 
+  /** The relation, under the name of a row with nothing said yet. «Contacted»
+      is what nearly every row is (Marco's list said it 152 times, ADR-248):
+      the usual says nothing; only what is not usual is said. */
+  function quietRelation(relation: ConversationItem['relation']): string | null {
+    if (relation === 'never') return t('chat.never', locale);
+    if (relation === 'contacted') return null;
+    return relationLabel(relation, locale);
+  }
+
   /** With whom, in words and shape (ADR-177 § 2 y § 3), as `conversation_feed` reads it. */
   function whoOf(item: ConversationItem) {
     return chatWho(item.place ?? { kind: item.organization?.kind, city: item.organization?.city || item.person?.city || null }, locale);
@@ -407,7 +416,7 @@
         unread={item.unread_count ?? 0}
         unreadLabel={item.unread_count ? t(item.unread_count === 1 ? 'threads.unread_one' : 'threads.unread', locale, { n: item.unread_count }) : null}
         lead={r.last.lead}
-        last={r.last.last ?? (item.relation === 'never' ? t('chat.never', locale) : relationLabel(item.relation, locale))}
+        last={r.last.last ?? quietRelation(item.relation)}
         context={chatContext(r)}
         active={activeId === item.id}
         onopen={onopen ? (e) => onopen(item, e) : undefined}
