@@ -1896,6 +1896,7 @@
   "ui.no_connection": "No connection. Try again when the network is back.",
   "ui.failed": "That did not work. Try again in a moment.",
   "ui.back_today": "Back to Today",
+  "ui.back": "‹ Back",
   "space.missing": "This space does not exist, or you cannot see it.",
   "error.title_missing": "This page does not exist.",
   "error.body_missing": "The address leads to nothing in hour, or to something you cannot see.",

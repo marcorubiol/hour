@@ -15,9 +15,10 @@
  * `page.url` changes.
  */
 
-import { pushState, replaceState } from '$app/navigation';
+import { goto, pushState, replaceState } from '$app/navigation';
 import { page } from '$app/state';
-import { PEEK_PARAM, parsePeek, samePeek, withPeek, type PeekTarget } from './peek';
+import { MOBILE_QUERY } from './breakpoints';
+import { PEEK_PARAM, fullHref, parsePeek, samePeek, withPeek, type PeekTarget } from './peek';
 
 type PeekState = App.PageState & { peekDepth?: number };
 
@@ -35,6 +36,14 @@ export function currentPeek(): PeekTarget | null {
 }
 
 export function openPeek(t: PeekTarget): void {
+  // On a phone a thing with a page opens its page (ADR-248, `peekOpensFrom`).
+  if (t.kind !== 'date' && t.kind !== 'bolo' && typeof matchMedia === 'function' && matchMedia(MOBILE_QUERY).matches) {
+    const href = fullHref(t);
+    if (href) {
+      void goto(href);
+      return;
+    }
+  }
   const here = new URL(location.href);
   if (samePeek(parsePeek(here.searchParams.get(PEEK_PARAM)), t)) return;
   pushState(withPeek(here, t), { ...page.state, peekDepth: depthOf(page.state) + 1 });

@@ -103,6 +103,11 @@
     {/each}
     {#if view === 'day'}
       <span class="cal__lens">
+        <!-- On a phone the Day's way out is «‹ Back», top left, as on every
+             page (ADR-248); the × stays for a desktop's row of views. -->
+        <button type="button" class="cal__lens-back" data-testid="day-back" onclick={onCloseDay}
+          >{t('ui.back', locale)}</button
+        >
         <span class="cal__lens-word" aria-current="page">{t('planner.view_day', locale)}</span>
         <button
           type="button"
@@ -239,6 +244,30 @@
     }
     .cal__lens-close:hover {
       color: var(--text-color);
+    }
+    .cal__lens-back {
+      display: none;
+    }
+    @media (max-width: 47.999rem) {
+      .cal__lens {
+        align-items: center;
+        gap: var(--space-m);
+      }
+      .cal__lens-back {
+        display: inline-flex;
+        align-items: center;
+        min-block-size: var(--touch-target);
+        padding: 0;
+        border: 0;
+        background: none;
+        color: var(--text-color);
+        font: inherit;
+        font-size: var(--text-m);
+        cursor: pointer;
+      }
+      .cal__lens-close {
+        display: none;
+      }
     }
 
     /* ── the dial · metadata, and it looks like it ───────────────────── */

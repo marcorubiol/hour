@@ -180,4 +180,11 @@ describe('peekOpensFrom', () => {
   it('inside the panel, every link follows in the panel', () => {
     expect(peekOpensFrom(perf, '/h/muk-cia/project/sirena', true)).toBe(true);
   });
+
+  it('on a phone, a thing with a page opens its page; a date and a bolo still peek (ADR-248)', () => {
+    expect(peekOpensFrom(perf, '/h/today', false, true)).toBe(false);
+    expect(peekOpensFrom(perf, '/h/today', true, true)).toBe(false);
+    expect(peekOpensFrom(date, '/h/today', false, true)).toBe(true);
+    expect(peekOpensFrom(bolo, '/h/planner', false, true)).toBe(true);
+  });
 });

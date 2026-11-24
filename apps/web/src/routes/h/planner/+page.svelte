@@ -106,6 +106,7 @@
   import DayFoot, { type DayNextVM } from '$lib/components/planner/DayFoot.svelte';
   import { performanceThread, dateThread, stripWindow, hourOf } from '$lib/day-strip';
   import DayBox from '$lib/components/planner/DayBox.svelte';
+  import { hasAppEntryBefore } from '$lib/back';
   import { stagesQuery, type StagesFeed } from '$lib/components/planner/TravelStages.svelte';
   import { ORDERED_DATE_KINDS, type RunningOrderTarget } from '$lib/running-order';
   import Dialog from '$lib/components/Dialog.svelte';
@@ -394,12 +395,14 @@
     // write go through location.href.
     syncUrl('push', from);
   }
-  /** The Day's ×. Opened from a drawing of this page, it is one step back
-      (that drawing, as you left it). Opened from anywhere else (Hoy, ⌘K, a
-      link, a reload), there is no drawing behind it: the Agenda opens at
-      that day, the day among its neighbours. */
+  /** The Day's × (a phone's «‹ Back»). Opened from a drawing of this page, it
+      is one step back (that drawing, as you left it); opened from another
+      screen of the app, back to it. With nothing behind (⌘K, a pasted link,
+      a reload): the Agenda opens at that day, the day among its neighbours. */
   function closeDay() {
-    if ((page.state as { plannerFrom?: PlannerView }).plannerFrom) history.back();
+    // Opened from another screen of the app (Hoy's «Coming up», a pase):
+    // back goes there, not to an Agenda you never saw (ADR-248).
+    if ((page.state as { plannerFrom?: PlannerView }).plannerFrom || hasAppEntryBefore()) history.back();
     else openAgendaAt(selectedDay);
   }
   function openAgendaAt(iso: string) {

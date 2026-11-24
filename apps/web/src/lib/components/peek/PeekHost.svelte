@@ -17,6 +17,7 @@
    * router (on <html>), which steps aside on a prevented click.
    */
   import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   import { createQuery } from '@tanstack/svelte-query';
   import { activeProjectsQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
   import { usePins } from '$lib/stores/pins.svelte';
@@ -25,8 +26,11 @@
   import { appLocale, t } from '$lib/i18n';
   import Peek from './Peek.svelte';
   import { lazy } from '$lib/lazy.svelte';
+  import { MediaQuery } from 'svelte/reactivity';
+  import { MOBILE_QUERY } from '$lib/breakpoints';
 
   const locale = appLocale();
+  const phone = new MediaQuery(MOBILE_QUERY, false);
 
   let target = $derived(currentPeek());
   let key = $derived(target ? formatPeek(target) : '');
@@ -44,6 +48,14 @@
   };
   $effect(() => {
     if (target) void records[target.kind].load();
+  });
+  // An address that arrives with a peek of a thing with a page (a link
+  // pasted from a desktop, an old bookmark): on a phone that thing opens its
+  // page, as a tap would (ADR-248).
+  $effect(() => {
+    if (!target || !phone.current || target.kind === 'date' || target.kind === 'bolo') return;
+    const href = fullHref(target);
+    if (href) void goto(href, { replaceState: true });
   });
 
   const KIND_WORD: Record<PeekTarget['kind'], string> = {
@@ -85,7 +97,7 @@
     if (el.closest('[data-peek="off"]')) return;
     const here = new URL(location.href);
     const next = peekFromLink(new URL(el.href, here), here);
-    if (!next || !peekOpensFrom(next, here.pathname, Boolean(el.closest('.peek')))) return;
+    if (!next || !peekOpensFrom(next, here.pathname, Boolean(el.closest('.peek')), phone.current)) return;
     event.preventDefault();
     openPeek(next);
   }
@@ -96,7 +108,7 @@
   });
 </script>
 
-<Peek open={Boolean(target)} {label} {full} contentKey={key} onclose={closePeek}>
+<Peek open={Boolean(target)} {label} {full} phone={phone.current} contentKey={key} onclose={closePeek}>
   {#key key}
     {#if target?.kind === 'date' && records.date.component}
       <records.date.component id={target.id} />

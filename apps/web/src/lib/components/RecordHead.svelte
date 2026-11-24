@@ -47,6 +47,7 @@
   import ConceptHint from '$lib/components/ConceptHint.svelte';
   import type { Crumb } from '$lib/record-crumbs';
   import { t, appLocale } from '$lib/i18n';
+  import { backThroughHistory } from '$lib/back';
 
   interface Props {
     /** Ancestry, then the kind of record as the last, unlinked crumb. */
@@ -75,6 +76,13 @@
 </script>
 
 <header class={slim ? 'record-head record-head--slim' : 'lenshead record-head'}>
+  <!-- «‹ Back» (ADR-248): on a phone every page has its way out in the same
+       place, top left, the same word as the vistazo's. It steps back to where
+       you were; with nothing behind (a pasted link) it goes to Hoy. Drawn on
+       a phone only (base.css) and never inside a vistazo, which has its own. -->
+  <a class="record-head__back" href="/h/today" data-peek="off" data-testid="record-back" onclick={backThroughHistory}
+    >{t('ui.back', locale)}</a
+  >
   {#if crumbs.length > 0}
     <nav class="record-head__crumbs" aria-label={t('shell.breadcrumb', locale)}>
       {#each crumbs as c, i (i)}
