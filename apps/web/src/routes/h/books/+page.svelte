@@ -50,7 +50,7 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import { toastCreated } from '$lib/created';
   import { FormErrors } from '$lib/form-errors.svelte';
-  import { dayLabel, localDayISO } from '$lib/datetime';
+  import { localDayISO, localeDayMonthNear, localeWeekdayShort } from '$lib/datetime';
   import { DASH } from '$lib/glyphs';
   import { categoryLabel, owedToTeam, type ExpenseItem } from '$lib/expense';
   import { seasonAt, seasonLabel, seasonYearOf } from '$lib/season-year';
@@ -124,6 +124,11 @@
   const pins = usePins();
   const locale = appLocale();
   const localeTag = LOCALE_TAG[locale];
+  /** A day as the rest of the app says it («Thu 8 Oct»; the year only when
+      it is not near), not «Thu, 08 Oct 2026» (ADR-248). */
+  function dayLabel(iso: string): string {
+    return `${localeWeekdayShort(iso, localeTag)} ${localeDayMonthNear(iso, localDayISO(), localeTag)}`;
+  }
 
   const accessQuery = createQuery(moneyAccessAnyQueryOptions());
   /** Only an explicit «no» closes the lens; pending or failed, it draws. */
@@ -1084,7 +1089,8 @@
                       <span class="att__ctx">{[item.doc?.number ?? item.bolo.city, item.kind === 'fiscal' || item.kind === 'draft' ? invoiceStatusLabel('draft', locale) : null].filter(Boolean).map((x) => ` · ${x}`).join('')}</span>
                       <span class="att__why">{attentionWhy(item)}</span>
                     </span>
-                    <span class="att__amt">{item.amount === null ? DASH : fmtMoney(item.amount)}{#if item.amount !== null && multiCurrency}&nbsp;{item.currency}{/if}</span>
+                    <!-- No figure, no mark: a lone «–» at the row's end said nothing (ADR-248). -->
+                    <span class="att__amt">{#if item.amount !== null}{fmtMoney(item.amount)}{#if multiCurrency}&nbsp;{item.currency}{/if}{/if}</span>
                     <Button size="xs" variant="secondary" onclick={() => act(item)}>{t(actionKey(item), locale)}</Button>
                   </li>
                 {/each}
@@ -1205,7 +1211,7 @@
                       <td class="book__date">{b.first_performed_at ? dayLabel(b.first_performed_at) : t('books.no_date', locale)}{#if b.function_count > 1}<span class="book__fns">{` · ${t('books.fn_count', locale, { n: b.function_count })}`}</span>{/if}</td>
                       <td class="book__venue">
                         <button type="button" class="book__toggle" aria-expanded={open} aria-controls={`bolo-sheet-${b.id}`} onclick={() => toggleRow(b)}>
-                          {b.venue_name || DASH}{#if b.city}<span class="book__city">{` · ${b.city}`}</span>{/if}
+                          {#if b.venue_name}{b.venue_name}{#if b.city}<span class="book__city">{` · ${b.city}`}</span>{/if}{:else}{b.city || b.project?.name || DASH}{/if}
                         </button>
                       </td>
                       <td class="book__status"><StateBadge label={boloStatusLabel(b.status, locale)} tone={performanceStatusTone(b.status)} /></td>
@@ -1586,7 +1592,11 @@
       .figs__row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .radar { grid-template-columns: 1fr; }
       .att__list { grid-template-columns: minmax(0, 1fr) auto; }
-      .att__row :global(.btn) { grid-column: 1 / -1; justify-self: stretch; }
+      /* The verb at the row's end, under the figure, as «Waiting for you» says
+         it (ADR-248): nine full-width «Set fee» buttons were the loudest
+         thing on the screen. */
+      .att__what { grid-row: span 2; }
+      .att__row :global(.btn) { grid-column: 2; justify-self: end; align-self: end; }
       /* The five filters wrap to a second line rather than run off the edge cut (tarea 131). */
       .book thead { display: none; }
       .book, .book tbody { display: block; }

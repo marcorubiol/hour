@@ -1119,7 +1119,7 @@
     --chip-padding-inline: var(--space-s);
     --chip-font-size: var(--text-xs);
     --chip-font-weight: 500;
-    --chip-radius: var(--radius-circle);
+    --chip-radius: var(--radius); /* 6 px, the button's: no pills (Marco, 18-11-2026; ADR-248) */
     --chip-gap: 0.4em;
     --chip-border-color: color-mix(
       in oklch,
