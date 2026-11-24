@@ -127,18 +127,14 @@
   );
   let showOpen = $derived(dots && settled && tiles.length > 0 && (open.urgent !== null || open.rest > 0));
   let planner = $derived(lensOn('planner'));
-  /** A tile's day in the Planner, else its first thing's record. */
+  /** A tile's day in the Planner, else its first thing's record. On the phone
+      too, with one thing or five: the tile is a date, so it opens the day
+      («tocas una fecha, se abre el día», ADR-248, which ends ADR-223's
+      one-thing exception: it opened that thing's vistazo and the Day was
+      never seen). Inside the day, each box opens its pase. */
   function dayHref(tile: ComingTile): string | undefined {
     if (planner) return plannerDayHref('day', tile.day);
     return pulseSlip(tile.items[0].ref, tile.day, slipCtx).href ?? undefined;
-  }
-  /** A phone tile's door (ADR-223): one thing, its pase; several, the day,
-      the only screen that shows them together. */
-  function tileHref(tile: ComingTile): string | undefined {
-    if (tile.items.length === 1 && tile.more === 0) {
-      return pulseSlip(tile.items[0].ref, tile.day, slipCtx).href ?? dayHref(tile);
-    }
-    return dayHref(tile);
   }
   /** «15 funciones · 9 ciudades» for a day of more than three things (ADR-237), else null. */
   function manyOf(tile: ComingTile): string | null {
@@ -252,7 +248,7 @@
             </div>
           </li>
           {:else}
-          {@const href = tileHref(tile)}
+          {@const href = dayHref(tile)}
           <li class="coming__cell">
             <svelte:element
               this={href ? 'a' : 'div'}

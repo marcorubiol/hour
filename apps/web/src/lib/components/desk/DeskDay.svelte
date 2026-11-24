@@ -256,12 +256,15 @@
   let lines = $derived(logisticsLines(sheet?.logistics));
   // Who goes, by name: the team feed (one cache with the pulse), else the sheet's people.
   const teamQuery = createQuery(toStore(() => teamQueryOptions(workspaces.map((w) => w.id), { enabled: gig })));
-  let going = $derived.by(() => {
-    if (!gig || !actionPerf) return '';
+  // Being on the list is not going (Marco, 23-11): until somebody says «voy»,
+  // the names are «On the list», not «Going» — else the piece says you go and,
+  // two lines down, asks whether you are going (24-11-2026).
+  let going = $derived.by((): { said: boolean; names: string } => {
+    if (!gig || !actionPerf) return { said: false, names: '' };
     const names = new Map(($teamQuery.data?.items ?? []).map((m) => [m.person_id, m.full_name]));
     const said = (actionPerf.commitments ?? []).filter((c) => c.state === 'going').map((c) => names.get(c.person_id)).filter(Boolean);
-    if (said.length > 0) return said.join(' · ');
-    return [...(sheet?.crew ?? []), ...(sheet?.cast ?? [])].map((c) => c.person?.full_name).filter(Boolean).join(' · ');
+    if (said.length > 0) return { said: true, names: said.join(' · ') };
+    return { said: false, names: [...(sheet?.crew ?? []), ...(sheet?.cast ?? [])].map((c) => c.person?.full_name).filter(Boolean).join(' · ') };
   });
   let facts = $derived(
     gig
@@ -269,7 +272,7 @@
           call ? { k: t('ahora.venue', locale), v: [call.name, t(`ahora.contact_${call.by}`, locale)].filter(Boolean).join(', ') } : null,
           lines.load_access ? { k: t('ahora.load_access', locale), v: lines.load_access } : null,
           lines.hotel ? { k: t('ahora.hotel', locale), v: lines.hotel } : null,
-          going ? { k: t('ahora.going', locale), v: going } : null,
+          going.names ? { k: t(going.said ? 'ahora.going' : 'ahora.on_list', locale), v: going.names } : null,
         ].filter((f): f is { k: string; v: string } => f !== null)
       : [],
   );
@@ -480,10 +483,12 @@
       {/if}
 
       {#if ask && onask}
-        <!-- «To close · yours», in the pass's words: today's call is answered
-             in the piece it is about. -->
+        <!-- Today's call is answered in the piece it is about. The question
+             reads across the whole piece and the two answers sit under it,
+             half and half (24-11-2026, Marco: beside the buttons the sentence
+             was squeezed into a narrow column). No «To close · yours» over it:
+             the question says what it is. -->
         <div class="piece__ask" data-testid="desk-day-ask">
-          <span class="piece__ask-k">{t('pass.ready', locale)} · {t('desk.day_ask_yours', locale)}</span>
           <span class="piece__ask-q">{t('desk.day_ask_q', locale)}</span>
           <span class="piece__acts piece__ask-acts">
             <button type="button" class="piece__act" onclick={() => onask('not_going')}>{t('desk.no_puedo', locale)}</button>
@@ -896,22 +901,13 @@
     position: relative;
     z-index: 2;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: var(--space-2xs) var(--space-s);
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-s);
     padding-block-start: var(--space-s);
     border-block-start: var(--line-hairline) solid var(--surface-focus-rule);
   }
-  .piece__ask-k {
-    grid-column: 1 / -1;
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    letter-spacing: var(--mono-letter-spacing);
-    text-transform: uppercase;
-    color: var(--surface-focus-faint);
-  }
   .piece__ask-q {
-    font-size: var(--text-s);
+    font-size: var(--text-m);
   }
   .piece__ask-acts :global(.piece__act) {
     border: 0;

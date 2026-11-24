@@ -28,6 +28,22 @@
     var path = location.pathname;
     if (path === '/' || path === '/h' || path.indexOf('/h/') === 0) root.setAttribute('data-boot', '');
   } catch (e) {}
+})();
+
+// NO ZOOM ON A FIELD IN SAFARI (24-11-2026, Marco: «en la página de login me
+// sigue ampliando Safari»). The fields are 16 px on a touch screen (base.css),
+// yet Safari still zooms in when its own page zoom («aA») is under 100 %, or
+// a field's text lands a hair under 16 px. On iOS only, `maximum-scale=1`
+// stops that zoom on focus; iOS keeps pinch-zoom for the person regardless
+// (it ignores the limit for gestures since iOS 10). Not on Android, where
+// Chrome would honour it and take pinch-zoom away.
+(function () {
+  try {
+    var ua = navigator.userAgent;
+    var ios = /iPhone|iPad|iPod/.test(ua) || (ua.indexOf('Macintosh') > -1 && navigator.maxTouchPoints > 1);
+    var meta = ios ? document.querySelector('meta[name="viewport"]') : null;
+    if (meta && meta.content.indexOf('maximum-scale') === -1) meta.content += ', maximum-scale=1';
+  } catch (e) {}
   // The web fonts, without holding the first paint (app.html says why).
   try {
     var fonts = document.createElement('link');

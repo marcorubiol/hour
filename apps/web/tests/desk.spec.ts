@@ -268,8 +268,8 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
   });
 
   // ADR-223, «tocas una cosa, se abre su pase; tocas una fecha, se abre el día»:
-  // a phone tile with one thing opens its pase, with several the Day; on a
-  // desktop the number opens the Day and each row its pase.
+  // a phone tile is a date and opens the Day, with one thing or several
+  // (ADR-248); on a desktop the number opens the Day and each row its pase.
   test('the tiles open their pase or their day; the pills, their lists (ADR-223, ADR-202 § 8)', async ({ page }) => {
     await page.goto(DESK);
     await waitForLoaded(page);
