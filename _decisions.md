@@ -8998,3 +8998,23 @@ Se borran `DayPiece` y los textos `planner.day_open`, `planner.day_set_hour` y `
 **Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`.
 
 **Cómo se revierte.** Revertir el commit.
+
+## [2026-11-24] ADR-248 · La app en el móvil, con la calidad de Hoy (enmienda ADR-223, ADR-139 p1, ADR-176 y ADR-202 § 6)
+
+**Contexto.** Marco usa Hour a diario en el iPhone y, tras varios intentos, seguían fallando detalles. Repaso a 390 px con su sesión (24-11): al tocar un día de «Coming up» con una sola cosa se abría el vistazo de la función (tarjeta oscura con «Open in full · Close»), no el Día nuevo de ADR-247; «cerrar» decía tres cosas (el botón del vistazo, lo que falta y lo hecho); la pieza de Hoy decía «Going: Marco» y a la vez preguntaba «¿vas?» con la frase estrecha junto a los botones; Safari ampliaba el login; la tercera tarjeta de «Coming up» salía cortada; Conversaciones y Cuentas hablaban otro idioma (filas sin caja, «Contacted» en cada fila, pastillas, «Set fee» a todo el ancho nueve veces, «–» sueltos). Plan aprobado por Marco el 24-11 («hazlo todo»).
+
+**Decisión.**
+1. **Una fecha abre el día.** La tarjeta de «Coming up» en el móvil abre siempre el Día, con una cosa o con varias (fin de la excepción de ADR-223). Dentro, cada caja abre su pase.
+2. **En el móvil no hay vistazo para lo que tiene página.** Función, conversación, persona, organización y sala abren su página (`peekOpensFrom(…, phone)`, `openPeek`, y una dirección con `?peek=` de esas cosas se reescribe a la página). Fecha y bolo, que no tienen página, siguen en vistazo. El escritorio no cambia.
+3. **«‹ Back» es la única salida en el móvil**, arriba a la izquierda: en cada página de registro (`RecordHead`, vuelve por la historia; sin nada detrás, a Hoy), en el vistazo (en vez de «Close») y en el Día (en vez de «×»). El × del Día, también en escritorio, vuelve a la pantalla de la que venías si era de la app.
+4. **Fuera «cerrar» de lo que falta:** «Still to do / Falta», «Done: / Hecho:», «N to do / faltan N», «cosas pendientes».
+5. **Estar en la lista no es ir:** hasta que alguien dice «voy», la pieza nombra «On the list», no «Going». La pregunta va a todo el ancho y los dos botones debajo, sin «To close · yours».
+6. **Nada escondido:** «Coming up» en el móvil, dos tarjetas por fila (fuera `--coming-tile-width`); «Old · 1 ↓» pasa a «Older (1) · show»; la franja oscura de una función en el Día nunca va vacía.
+7. **Conversaciones como Hoy en el móvil:** una caja por conversación (el tinte de «Waiting for you»), el nombre entero hasta dos líneas, y la relación solo cuando no es «Contacted».
+8. **Cuentas:** chips con el radio de botón en toda la app (`--chip-radius: var(--radius)`, 6 px); en «Needs attention» el verbo al final de la fila; sin «–» sin cifra; fechas «Thu 8 Oct».
+9. **Zoom de Safari:** en iOS, `maximum-scale=1` en el viewport (`theme-init.js`); iOS deja pellizcar igualmente. No en Android.
+10. **Guardián:** `tests/mobile-guard.spec.ts` abre las cuatro lentes, el Día y el login a 390 px táctil y falla con un campo de menos de 16 px, una pastilla, un «Close» o algo que pasa del borde. Solo lee.
+
+**Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`.
+
+**Cómo se revierte.** Revertir los commits de la rama; cada fase es un commit.
