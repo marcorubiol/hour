@@ -63,14 +63,15 @@
     performanceSlip,
     perfWorkspaceId,
     dateSlip,
+    dayMoments,
+    momentWordKey,
     type Slip as SlipVM,
   } from '$lib/month-events';
   import AgendaList, { type AgendaDecision, type AgendaMissing, type NoteDraft } from '$lib/components/AgendaList.svelte';
   import { readPreparation } from '$lib/preparation';
   import { isUrgentMissing, isUrgentThing, manualOpenSoon, missingSoon } from '$lib/record-missing';
   import { agendaWords, daysTo, firstDue } from '$lib/agenda-missing';
-  import { dayLineGroups, hourOfClock, type DayFilter } from '$lib/day-lines';
-  import { DRAWN_WHOLE } from '$lib/hoy';
+  import { dayFiltersShown, dayFilterRows, hourOfClock, type DayFilter } from '$lib/day-lines';
   import { noteFallback as noteFallbackOf, noteFallbackBody } from '$lib/note';
   import DecisionBand, {
     decisionText,
@@ -104,9 +105,8 @@
   import DayStrip from '$lib/components/planner/DayStrip.svelte';
   import DayFoot, { type DayNextVM } from '$lib/components/planner/DayFoot.svelte';
   import { performanceThread, dateThread, stripWindow, hourOf } from '$lib/day-strip';
-  import DayPiece from '$lib/components/planner/DayPiece.svelte';
-  import RunningOrder from '$lib/components/RunningOrder.svelte';
-  import TravelStages, { stagesQuery, type StagesFeed } from '$lib/components/planner/TravelStages.svelte';
+  import DayBox from '$lib/components/planner/DayBox.svelte';
+  import { stagesQuery, type StagesFeed } from '$lib/components/planner/TravelStages.svelte';
   import { ORDERED_DATE_KINDS, type RunningOrderTarget } from '$lib/running-order';
   import Dialog from '$lib/components/Dialog.svelte';
   import FeedDialog from '$lib/components/planner/FeedDialog.svelte';
@@ -1574,6 +1574,8 @@
       perf?: PerformanceEvent;
       /** Who said «voy» (ADR-237's «Voy yo»): a performance's or a date's. */
       commitments?: PerformanceEvent['commitments'];
+      /** Its slip: the kind, the state and the city the Day's box says (ADR-247). */
+      slip: SlipVM;
     }> = [];
     const clockOf = (venueTz: string | null | undefined, wsId: string | undefined) =>
       venueTz || (wsId ? workspaceTzById.get(wsId) : undefined) || viewerTz;
@@ -1593,6 +1595,7 @@
         guess: performanceSlip(p, slipCtxPage).cert === 'hold' || performanceSlip(p, slipCtxPage).cert === 'proposed',
         perf: p,
         commitments: p.commitments,
+        slip: performanceSlip(p, slipCtxPage),
       });
     }
     for (const d of shownDates) {
@@ -1620,6 +1623,7 @@
           project: d.project ?? null,
           guess: sl.cert === 'hold' || sl.cert === 'proposed',
           commitments: d.commitments,
+          slip: sl,
         });
         continue;
       }
@@ -1637,9 +1641,12 @@
         project: d.project ?? null,
         guess: dateSlip(d, slipCtxPage).cert === 'hold' || dateSlip(d, slipCtxPage).cert === 'proposed',
         commitments: d.commitments,
+        slip: dateSlip(d, slipCtxPage),
       });
     }
-    return out.sort((a, b) => a.from.localeCompare(b.from));
+    // By hour; what has no hour goes last (ADR-247): «—» implies nothing about
+    // what sits above it.
+    return out.sort((a, b) => Number(!a.timed) - Number(!b.timed) || a.from.localeCompare(b.from));
   });
   /* THE DAY DRAGS ITS MONTH. The feeds are windowed by `ym`, so a Day view
      pointing at 3 August while `ym` still said July fetched a month that does
@@ -1684,34 +1691,63 @@
       document.removeEventListener('visibilitychange', bump);
     };
   });
-  /* THE DAY OF MANY (ADR-237): from the fourth performance, lines. */
-  let dayMany = $derived(dayOrders.filter((o) => o.target === 'performance').length > DRAWN_WHOLE);
+  /* THE DAY IS ALWAYS THE SAME (ADR-247, amending ADR-237): one box per
+     thing, one thing or fifteen. The filters only when the day holds more
+     than one project: «Te necesitan» and «Voy yo» separate what is yours
+     from another show's; with one show there is nothing to separate. */
   let dayFilter = $state<DayFilter>('all');
-  let dayLines = $derived.by(() => {
-    if (!dayMany) return [];
+  /** The hour you have to be there: the first stop, when it comes before the curtain. */
+  function dayCall(p: PerformanceEvent, tz: string): string | null {
+    if (!p.start_at) return null;
+    const timed = dayMoments(p).filter((m) => Boolean(m.at));
+    if (timed.length === 0) return null;
+    const first = timed.reduce((a, b) => (Date.parse(b.at) < Date.parse(a.at) ? b : a));
+    if (Date.parse(first.at) >= Date.parse(p.start_at)) return null;
+    const word =
+      first.label || (first.key ? t(momentWordKey(first.key), locale, undefined, tradeFor(perfWorkspaceId(p))) : '');
+    const hour = hourMark(dualTime(first.at, tz, viewerTz).primary);
+    return word ? `${word} ${hour}` : hour;
+  }
+  /** What is said only when it is not closed: an option, its rank and deadline, a proposal. */
+  function dayState(sl: SlipVM): string | null {
+    return boardSlipState(sl) ?? (sl.cert === 'hold' || sl.cert === 'proposed' ? statusWord(sl.cert) : null);
+  }
+  let dayBoxRows = $derived.by(() => {
     const nowMs = Date.now();
     void minuteTick;
-    return dayLineGroups(
-      dayOrders.map((o) => {
-        const clock = o.timed ? dualTime(o.from, o.tz, viewerTz).primary : null;
-        const p = o.perf;
-        return {
-          o,
-          hour: hourOfClock(clock),
-          clock: clock ? hourMark(clock) : null,
-          need: o.guess || (p ? agendaOpen(p).items.length > 0 || agendaOpen(p).noTime : false),
-          mine: Boolean(
-            myPersonId &&
-              ((p?.person_ids ?? []).includes(myPersonId) ||
-                (o.commitments ?? []).some((c) => c.person_id === myPersonId && c.state === 'going')),
-          ),
-          // Done: begun more than two hours ago (dimmed, not gone).
-          done: o.timed && Date.parse(o.from) + 2 * 3_600_000 < nowMs,
-        };
-      }),
-      dayFilter,
-    );
+    const clashes = clashesByDay?.get(selectedDay) ?? [];
+    return dayOrders.map((o) => {
+      const clock = o.timed ? dualTime(o.from, o.tz, viewerTz).primary : null;
+      const p = o.perf;
+      const sl = o.slip;
+      const kind = `${kindLabel(sl.kind)}${o.guess ? '?' : ''}`;
+      const city = o.target === 'trip' ? null : (sl.city ?? (o.target === 'performance' ? null : o.sub || null));
+      const venue = p ? (p.venue?.name ?? p.venue_name ?? null) : null;
+      const place = o.target === 'performance' ? venue : o.name !== kindLabel(sl.kind) ? o.name : null;
+      return {
+        o,
+        hour: hourOfClock(clock),
+        at: clock ? hourMark(clock) : null,
+        what: o.target === 'performance' && city ? `${kind} · ${city}` : kind,
+        sub:
+          o.target === 'performance'
+            ? (dayState(sl) ?? '')
+            : [place, city, dayState(sl)].filter((x, i, arr) => Boolean(x) && arr.indexOf(x) === i).join(' · '),
+        band: o.target === 'performance' && p ? { place: venue ?? city ?? '', call: dayCall(p, o.tz) } : null,
+        clashes: [...new Set(clashes.filter((c) => c.event_ids?.includes(o.id)).map((c) => c.body))],
+        need: o.guess || (p ? agendaOpen(p).items.length > 0 || agendaOpen(p).noTime : false),
+        mine: Boolean(
+          myPersonId &&
+            ((p?.person_ids ?? []).includes(myPersonId) ||
+              (o.commitments ?? []).some((c) => c.person_id === myPersonId && c.state === 'going')),
+        ),
+        // Done: begun more than two hours ago (dimmed, not gone).
+        done: o.timed && Date.parse(o.from) + 2 * 3_600_000 < nowMs,
+      };
+    });
   });
+  let dayFilters = $derived(dayFiltersShown(dayOrders.map((o) => o.project?.id ?? null)));
+  let dayBoxes = $derived(dayFilterRows(dayBoxRows, dayFilters ? dayFilter : 'all'));
   let dayNow = $derived.by(() => {
     void minuteTick;
     return selectedDay === todayIso ? hourOf(new Date().toISOString(), viewerTz) : null;
@@ -3571,68 +3607,39 @@
          the shape; the running order under it says the hours and lets them
          be written, on the day. A name on the lid only when the day holds
          more than one order: with one, the strip above already says whose. -->
-    {#if dayMany}
-      <section class="daylines" data-testid="day-lines" aria-label={t('planner.day_lines_aria', locale)}>
-        <div class="daylines__filters" role="group" aria-label={t('planner.day_filter_aria', locale)}>
-          {#each ['all', 'need', 'mine'] as const as f (f)}
-            <button
-              type="button"
-              class="btn--secondary btn--xs daylines__filter"
-              aria-pressed={dayFilter === f}
-              onclick={() => (dayFilter = f)}>{t(`planner.day_filter_${f}`, locale)}</button
-            >
-          {/each}
-        </div>
-        {#each dayLines as g (g.part)}
-          <h3 class="daylines__part">{t(`planner.day_part_${g.part}`, locale)}</h3>
-          <ul class="daylines__list">
-            {#each g.rows as r (r.o.id)}
-              <li class="daylines__row" class:daylines__row--done={r.done} data-testid="day-line">
-                <svelte:element this={r.o.href ? 'a' : 'span'} href={r.o.href} class="daylines__link">
-                  <span class="daylines__h">{r.clock ?? t('planner.no_hour', locale)}</span>
-                  <span class="daylines__what" class:guess={r.o.guess}
-                    >{r.o.name}{#if r.o.sub && r.o.sub !== r.o.name}<span class="daylines__sub"> · {r.o.sub}</span>{/if}</span
-                  >
-                  <span class="daylines__who">{r.o.project?.name ?? r.o.eyebrow}</span>
-                </svelte:element>
-              </li>
+    <!-- THE DAY IS ALWAYS THE SAME (ADR-247): one box per thing, by hour,
+         that opens its pase. The detail and the editing live in the pase. -->
+    {#if dayOrders.length > 0}
+      <section class="dayboxes" data-testid="day-boxes" aria-label={t('planner.day_lines_aria', locale)}>
+        {#if dayFilters}
+          <div class="dayboxes__filters" role="group" aria-label={t('planner.day_filter_aria', locale)}>
+            {#each ['all', 'need', 'mine'] as const as f (f)}
+              <button
+                type="button"
+                class="btn--secondary btn--xs dayboxes__filter"
+                aria-pressed={dayFilter === f}
+                onclick={() => (dayFilter = f)}>{t(`planner.day_filter_${f}`, locale)}</button
+              >
             {/each}
-          </ul>
-        {:else}
-          <p class="daylines__none">{t('planner.day_filter_none', locale)}</p>
-        {/each}
-      </section>
-    {:else}
-    {#each dayOrders as o (o.id)}
-      <DayPiece
-        href={o.href}
-        project={o.project}
-        eyebrow={o.eyebrow}
-        what={o.name}
-        at={o.timed ? hourMark(dualTime(o.from, o.tz, viewerTz).primary) : null}
-        noHourWord={t('planner.no_hour', locale)}
-        sub={o.sub}
-        guess={o.guess}
-        setHourLabel={t('planner.day_set_hour', locale)}
-        openLabel={t('planner.day_open', locale)}
-      >
-        {#if o.target === 'trip'}
-          <TravelStages
-            id={o.id}
-            dayIso={selectedDay}
-            tz={o.tz}
-            {locale}
-            origin={o.origin}
-            spaceCountry={o.country}
-            workspaceId={o.workspaceId}
-            suggestVenue={o.suggestVenue}
-            readonly
+          </div>
+        {/if}
+        {#each dayBoxes as r (r.o.id)}
+          <DayBox
+            href={r.o.href}
+            project={r.o.project}
+            what={r.what}
+            at={r.at}
+            noHourWord={t('planner.no_hour', locale)}
+            sub={r.sub}
+            guess={r.o.guess}
+            band={r.band}
+            clashes={r.clashes}
+            done={r.done}
           />
         {:else}
-          <RunningOrder target={o.target} id={o.id} dayIso={selectedDay} tz={o.tz} {viewerTz} {locale} readonly />
-        {/if}
-      </DayPiece>
-    {/each}
+          <p class="dayboxes__none">{t('planner.day_filter_none', locale)}</p>
+        {/each}
+      </section>
     {/if}
     <!-- THE ABSENCE IS THE DAY'S FOOTING (Marco, 2026-08-10). Above the
          drawing it floated on its own, far from anything, and Marco could
@@ -4089,69 +4096,24 @@
        band, the line belonged to neither and read as floating — which is
        what Marco could not see. Pushed off the drawing and set down almost
        on the NOTES rule, it becomes the band's first line. */
-    /* THE DAY OF MANY (ADR-237): lines, grouped by the part of the day. */
-    .daylines {
+    /* THE DAY IS ALWAYS THE SAME (ADR-247): the boxes, 380 px, no wider. */
+    .dayboxes {
       display: grid;
       gap: var(--space-xs);
+      max-inline-size: var(--pass-width);
       margin-block-start: var(--space-m);
     }
-    .daylines__filters {
+    .dayboxes__filters {
       display: flex;
       flex-wrap: wrap;
       gap: var(--space-xs);
+      margin-block-end: var(--space-2xs);
     }
-    .daylines__filter[aria-pressed='true'] {
+    .dayboxes__filter[aria-pressed='true'] {
       --btn-border-color: var(--text-color);
       --btn-text-color: var(--text-color);
     }
-    .daylines__part {
-      margin: var(--space-s) 0 0;
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      font-weight: normal;
-      letter-spacing: var(--mono-letter-spacing-loose);
-      text-transform: uppercase;
-      color: var(--text-muted);
-    }
-    .daylines__list {
-      margin: 0;
-      padding: 0;
-      list-style: none;
-      border-block-start: var(--line-hairline) solid var(--border-color-dark);
-    }
-    .daylines__row {
-      border-block-end: var(--line-hairline) solid var(--border-color);
-    }
-    .daylines__link {
-      display: grid;
-      grid-template-columns: 4rem minmax(0, 1fr) auto;
-      gap: var(--space-s);
-      align-items: baseline;
-      padding-block: var(--space-xs);
-      min-block-size: var(--touch-target);
-      color: inherit;
-      text-decoration: none;
-    }
-    a.daylines__link:hover .daylines__what {
-      text-decoration: underline;
-      text-underline-offset: 3px;
-    }
-    .daylines__h {
-      font-variant-numeric: tabular-nums;
-      color: var(--text-muted);
-    }
-    .daylines__sub,
-    .daylines__who {
-      color: var(--text-muted);
-    }
-    .daylines__who {
-      font-size: var(--text-s);
-      text-align: end;
-    }
-    .daylines__row--done {
-      opacity: 0.55;
-    }
-    .daylines__none {
+    .dayboxes__none {
       margin: 0;
       color: var(--text-muted);
     }

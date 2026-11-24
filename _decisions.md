@@ -8980,3 +8980,21 @@ paralela de ADR-245, encima de main.
    destino o como origen (`creation.openEvent` gana `travelDirection`, `originCity` y `destinationCity`).
 
 **Sin migración ni cambio de `CACHE_SCHEMA`.** **Cómo se revierte.** Revertir el commit.
+
+## [2026-11-24] ADR-247 · El día siempre igual: una caja por cosa, con cabecera en las funciones (enmienda ADR-233 y ADR-237)
+
+**Contexto.** Al abrir un día salían tarjetas oscuras (`DayPiece`) con sus paradas y dos botones, «Poner hora» y «Abrir», que llevaban al pase. Marco (24-11): esa tarjeta es una vista de lectura, y la lectura no debe pedir «abrir para editar». Además el día cambiaba de forma a partir de la cuarta función (líneas por tramos con filtros, ADR-237).
+
+**Decisión.** Lámina `dia-abrir/H-cabecera-recomendada.png`, elegida por Marco el 24-11.
+1. El día es siempre igual, tenga una cosa o quince: la tira y, debajo, una caja blanca con borde por cosa (`DayBox`), por hora y lo que no tiene hora al final. Toda la caja abre su pase; sin `href`, no es enlace. Sin paradas ni botones: el detalle y la edición viven en el pase.
+2. Cada caja: la hora (o «—»), el monograma de la obra, qué es («Función · Vic», «Ensayo?») y, en pequeño, el sitio y solo lo que no está cerrado (opción con su rango y plazo, propuesta, liberada). Nunca «Confirmada» ni el nombre de la compañía junto al monograma.
+3. Una función lleva una franja oscura arriba (lo oscuro es función, como en la tira): la sala a la izquierda y, a la derecha, la primera parada del día cuando va antes de la función («CARGA 16H»), la hora a la que hay que estar, que antes daba la tarjeta.
+4. Un choque se dice también dentro de la caja de cada cosa que toca (la línea de arriba, con su arreglo, se queda).
+5. Los filtros Todas / Te necesitan / Voy yo salen solo cuando el día tiene cosas de más de una obra, no por número. Desaparecen los tramos mañana / tarde / noche.
+6. 380 px (`--pass-width`) y no se estira.
+
+Se borran `DayPiece` y los textos `planner.day_open`, `planner.day_set_hour` y `planner.day_part_*`. La vista de lectura es `PassSheet` (sin «Abrir» ni «Poner hora», ya era así).
+
+**Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`.
+
+**Cómo se revierte.** Revertir el commit.
