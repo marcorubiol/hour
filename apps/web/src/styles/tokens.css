@@ -572,9 +572,6 @@
        width, from the same left edge, so turning calm on never moves it.
        About the width the Desk's left column already had (1.55fr of 1240). */
     --calm-measure: 45rem;
-    /* A day tile of «Coming up» on a phone (ADR-202 § 6): fixed width, so
-       the third one peeks and the strip says it slides. */
-    --coming-tile-width: 37%;
     /* The first-day panel's form (NewSpacePanel, tarea 137): two fields and a
        sentence, as narrow as a dialog. */
     --newspace-measure: 26rem;
@@ -1304,7 +1301,6 @@
     --line-thick: 6px;
     --line-bar: 8px;
     --mark-stroke: 3px;
-    --coming-tile-width: 60%;
     --radius: 18px;
     --radius-xs: 8px;
     --radius-s: 12px;

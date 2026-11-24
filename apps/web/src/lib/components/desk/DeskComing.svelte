@@ -644,28 +644,16 @@
     text-decoration: none;
   }
 
-  /* THE PHONE (§ 6 b): a strip that slides, tiles of a fixed width, the
-     third one peeking; the strip runs to the screen's edges. */
+  /* THE PHONE (§ 6 b; ADR-248): two tiles a row, all of them in sight. It
+     was a strip that slid sideways with the third tile cut by the screen's
+     edge: on a phone that reads as «something is hidden there». The door to
+     the Planner is the last row, across. */
   @media (max-width: 47.999rem) {
     .coming__strip {
-      display: flex;
-      gap: var(--space-xs);
-      overflow-x: auto;
-      overscroll-behavior-x: contain;
-      scroll-snap-type: x mandatory;
-      margin-inline: calc(-1 * var(--shell-gutter));
-      padding-inline: var(--shell-gutter);
-      scroll-padding-inline: var(--shell-gutter);
-      scrollbar-width: none;
-      /* Each tile as tall as what it says (ADR-227): no empty half. */
-      align-items: flex-start;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
-    .coming__strip::-webkit-scrollbar {
-      display: none;
-    }
-    .coming__cell {
-      flex: 0 0 var(--coming-tile-width);
-      scroll-snap-align: start;
+    .coming__cell:has(.tile--end) {
+      grid-column: 1 / -1;
     }
     .tile {
       grid-template-columns: minmax(0, 1fr);
@@ -676,12 +664,12 @@
     .tile__falta {
       grid-column: 1 / -1;
     }
-    /* On the strip the end door stays a tile: dashed, its word centred. */
+    /* The end door: a slim dashed row, its word centred. */
     .tile--end {
       display: grid;
       place-content: center;
       text-align: center;
-      padding: var(--space-s);
+      padding: var(--space-xs) var(--space-s);
       border-color: var(--border-color-light);
       border-style: dashed;
       font-size: var(--text-m);

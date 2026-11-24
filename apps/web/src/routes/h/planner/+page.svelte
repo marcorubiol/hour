@@ -1736,7 +1736,9 @@
           o.target === 'performance'
             ? (dayState(sl) ?? '')
             : [place, city, dayState(sl)].filter((x, i, arr) => Boolean(x) && arr.indexOf(x) === i).join(' · '),
-        band: o.target === 'performance' && p ? { place: venue ?? city ?? '', call: dayCall(p, o.tz) } : null,
+        // Never an empty dark band (ADR-248): with no venue or city written,
+        // the name the slip goes by (the town, as the Agenda says it).
+        band: o.target === 'performance' && p ? { place: venue ?? city ?? o.name ?? '', call: dayCall(p, o.tz) } : null,
         clashes: [...new Set(clashes.filter((c) => c.event_ids?.includes(o.id)).map((c) => c.body))],
         need: o.guess || (p ? agendaOpen(p).items.length > 0 || agendaOpen(p).noTime : false),
         mine: Boolean(
