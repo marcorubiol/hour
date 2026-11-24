@@ -308,7 +308,7 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
 
   // ADR-227: one amber a screen. At most one tile carries it, with the line
   // under the strip that names it and opens its pase; the rest is grey and
-  // opens the Agenda. No per-tile «por cerrar» any more.
+  // opens the Agenda. No per-tile «falta» any more.
   test('«Coming up» has one amber at most, and the rest is one grey line (ADR-227)', async ({ page }) => {
     await page.goto(DESK);
     await waitForLoaded(page);
@@ -320,7 +320,7 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
     }
     const rest = page.getByTestId('desk-coming-open');
     if ((await rest.count()) > 0) {
-      await expect(rest).toContainText(/to close/);
+      await expect(rest).toContainText(/still to do/);
       await expect(rest.locator('a')).toHaveAttribute('href', '/h/planner?view=agenda');
     }
   });
