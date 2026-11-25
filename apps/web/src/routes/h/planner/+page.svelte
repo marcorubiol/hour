@@ -79,7 +79,8 @@
     type DecisionOptionVM,
     type DecisionVM,
   } from '$lib/components/planner/DecisionBand.svelte';
-  import { SvelteSet } from 'svelte/reactivity';
+  import { MediaQuery, SvelteSet } from 'svelte/reactivity';
+  import { MOBILE_QUERY } from '$lib/breakpoints';
   import CarrilsStrip from '$lib/components/planner/CarrilsStrip.svelte';
   import {
     activeDaySet,
@@ -215,6 +216,24 @@
   let ym = $state({ year: now.getFullYear(), month: now.getMonth() + 1 });
   let todayIso = dayKeyInTz(now.toISOString(), viewerTz);
 
+  /* ON A PHONE THERE IS NO DAY SCREEN (ADR-249, Marco 25-11-2026: «¿por qué
+     necesito un Back cuando voy a una fecha?»). A date opens IN PLACE, in the
+     Month under its week and in the Agenda where its row was: the same open
+     day in both. An address that asks for the Day (`?view=day&d=`, Hoy's
+     «Coming up») opens the person's own drawing with that day open. */
+  const phone = new MediaQuery(MOBILE_QUERY, false);
+  const phoneAtStart = typeof matchMedia === 'function' && matchMedia(MOBILE_QUERY).matches;
+  const dayAskedOnPhone = phoneAtStart && new URL(location.href).searchParams.get('view') === 'day';
+  /** The day opened in place on a phone, or null. */
+  let openDay = $state<string | null>(
+    (() => {
+      if (dayAskedOnPhone) return dayIso ?? todayIso;
+      // Back from a pase: the drawing's address still names the open day.
+      const v = new URL(location.href).searchParams.get('view');
+      return phoneAtStart && (v === 'agenda' || v === 'month') ? dayIso : null;
+    })(),
+  );
+
   /* THE MONTH IS CONTINUOUS (ADR-209): `ym` is the month on screen (the
      title, the census, the address), and the paper is a run of months
      around it, `mesFrom` → `mesTo`, that grows as you scroll and never
@@ -271,7 +290,9 @@
   const agendaOpenIso = (() => {
     const params = new URL(location.href).searchParams;
     const raw = params.get('d');
-    return normalizePlannerView(params.get('view')) === 'agenda' && raw && /^\d{4}-\d{2}-\d{2}$/.test(raw)
+    return (normalizePlannerView(params.get('view')) === 'agenda' || dayAskedOnPhone) &&
+      raw &&
+      /^\d{4}-\d{2}-\d{2}$/.test(raw)
       ? raw
       : null;
   })();
@@ -322,9 +343,13 @@
   let view = $state<PlannerView>(
     (() => {
       const urlView = new URL(location.href).searchParams.get('view');
+      // A Day asked for on a phone opens the person's drawing (ADR-249).
+      if (dayAskedOnPhone) return resolvePlannerView(null, cachedEntryView());
       return resolvePlannerView(urlView, urlView ? null : cachedEntryView());
     })(),
   );
+  /** The view is a drawing that can hold an open day, and one is open (ADR-249). */
+  let dayOpenHere = $derived(phone.current && openDay !== null && (view === 'agenda' || view === 'month'));
   // The Board's lane axis (ADR-094, ADR-095 §9) — same persistence chain
   // as the projection: ?lanes= → localStorage → 'scope'. The dial says
   // «by scope | person» now; the entity generation (workspace/project) and
@@ -376,6 +401,9 @@
     if (view === 'agenda' || view === 'board') url.searchParams.delete('ym');
     else url.searchParams.set('ym', `${ym.year}-${String(ym.month).padStart(2, '0')}`);
     if (view === 'day') url.searchParams.set('d', dayIso ?? todayIso);
+    // A day open in place is in the address too, except today (the Month's
+    // own first pick), so a pase opened from it comes back to it.
+    else if (dayOpenHere && openDay !== todayIso) url.searchParams.set('d', openDay!);
     else url.searchParams.delete('d');
     url.searchParams.delete('group');
     if (url.href === location.href) return;
@@ -412,6 +440,30 @@
     }
     setView('agenda');
   }
+  /** A day the drawing does not hold is brought into it (ADR-249). */
+  function holdDay(iso: string) {
+    if (view === 'agenda') {
+      if (iso < agendaFromIso) agendaFromIso = iso;
+      if (iso.slice(0, 7) > agendaToIso.slice(0, 7)) {
+        agendaEnd = { year: Number(iso.slice(0, 4)), month: Number(iso.slice(5, 7)) };
+      }
+    } else if (view === 'month') {
+      const m = { year: Number(iso.slice(0, 4)), month: Number(iso.slice(5, 7)) };
+      if (ymKey(m) < ymKey(mesFrom) || ymKey(m) > ymKey(mesTo)) openMonthsAt(m);
+    }
+  }
+  /** A date was tapped. On a phone it opens (or folds) where it is; on a
+      wider screen it opens the Day, as it always did. */
+  function openDayHere(iso: string) {
+    if (phone.current && (view === 'agenda' || view === 'month')) {
+      openDay = openDay === iso ? null : iso;
+      if (openDay) holdDay(openDay);
+      syncUrl('replace');
+      return;
+    }
+    dayIso = iso;
+    setView('day');
+  }
   function setLaneAxis(g: LaneAxis) {
     if (laneAxis === g) return;
     laneAxis = g;
@@ -434,6 +486,18 @@
     // entry drawing (ADR-192), else the default (the Agenda, ADR-211), even
     // when you arrive from another drawing of this page.
     const doorView = untrack(() => entryView) ?? PLANNER_DEFAULT_VIEW;
+    // A Day asked for on a phone: the person's drawing, that day open in it.
+    if (params.get('view') === 'day' && phone.current) {
+      const rawDay = params.get('d');
+      const want = rawDay && /^\d{4}-\d{2}-\d{2}$/.test(rawDay) ? rawDay : todayIso;
+      const into = untrack(() => entryView) ?? cachedEntryView() ?? PLANNER_DEFAULT_VIEW;
+      view = into === 'board' ? 'agenda' : into;
+      openDay = want;
+      untrack(() => holdDay(want));
+      if (view === 'month') ym = { year: Number(want.slice(0, 4)), month: Number(want.slice(5, 7)) };
+      untrack(() => syncUrl('replace'));
+      return;
+    }
     const nextView = params.has('view') ? normalizePlannerView(params.get('view')) : doorView;
     if (nextView && nextView !== untrack(() => view)) view = nextView;
 
@@ -605,6 +669,8 @@
       failed one only means the next visit opens where it did before. */
   function chooseView(v: PlannerView) {
     entryOwed = false;
+    // Another drawing chosen in the bar starts closed (ADR-249).
+    if (v !== view) openDay = null;
     setView(v);
     const writes = plannerViewWrites(onScreenSpaces, v);
     if (writes.length === 0) return;
@@ -638,7 +704,8 @@
     scopeUnresolved: () => scopeUnresolved,
     filterIds: () => filterIds,
     teamWorkspaceIds: () => ($workspacesQuery.data?.items ?? []).map((w) => w.id),
-    selectedDay: () => dayIso ?? todayIso,
+    selectedDay: () => selectedDay,
+    dayOpen: () => dayOpenHere,
     todayIso,
   });
 
@@ -1436,7 +1503,8 @@
   }
 
   // ── The Loom (Agrupa per Persona — ADR-080 §8) ────────────────────────
-  let selectedDay = $derived(dayIso ?? todayIso);
+  // The Day's day, or (on a phone) the day open in place (ADR-249).
+  let selectedDay = $derived(view === 'day' ? (dayIso ?? todayIso) : (openDay ?? dayIso ?? todayIso));
   /** Same normaliser the month uses — one shape for both primitives. */
   let slipCtxPage = $derived({
     workspaceSlug: defaultWorkspaceSlug,
@@ -1471,7 +1539,7 @@
      its own bar. The same cache entry the list under the strip reads, so a
      stage written there moves its bar here. Only fetched on the Day view. */
   let dayTripIds = $derived(
-    view === 'day'
+    view === 'day' || dayOpenHere
       ? shownDates
           .filter((d) => d.kind === 'travel_day' && dateDayKey(d, viewerTz) === selectedDay)
           .map((d) => d.id)
@@ -3564,6 +3632,107 @@
   />
 
 
+  <!-- THE DAY OPENED IN PLACE (ADR-249): on a phone, the Month (under its
+       week) and the Agenda (where the day's row was) draw the same card. A
+       tinted card without a border, white boxes inside, one line each; the
+       hour strip only when two things or more have an hour. Tapping the
+       date again folds it. -->
+  {#snippet dayOpenCard(iso: string)}
+    <div class="dayopen" data-testid="day-open" data-day={iso}>
+      <div class="dayopen__head">
+        <button
+          type="button"
+          class="dayopen__date"
+          aria-expanded="true"
+          onclick={() => openDayHere(iso)}
+          >{new Date(`${iso}T00:00:00Z`).toLocaleDateString(localeTag, {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+            timeZone: 'UTC',
+          })}</button
+        >
+        {#if canPlan}
+          <button
+            type="button"
+            class="btn--secondary btn--xs dayopen__add"
+            aria-label={t('planner.new_on', locale, { day: dayMonthLong(iso, localeTag) })}
+            onclick={() => openCreate(iso)}>+</button
+          >
+        {/if}
+      </div>
+      {#each dayClashLines as c (c.key)}
+        <p class="cal__clashline dayopen__clash">
+          {c.body}{#each c.fixes as f (f.href)}{' · '}<a class="cal__clashfix" href={f.href}
+              >{t('planner.clash_fix', locale, { name: f.name })} ›</a
+            >{/each}
+        </p>
+      {/each}
+      {#if dayThreads.length >= 2}
+        <DayStrip
+          threads={dayThreads}
+          win={dayWin}
+          now={dayNow}
+          {kindLabel}
+          stateLabel={boardSlipState}
+          stateUrgent={(sl) => Boolean(sl.hold?.expires && sl.hold.expires <= todayIso)}
+          stepLabel={(k) => t(`desk.anchor_${k === 'load_in' ? 'loadin' : k}`, locale)}
+          hourLabel={(h) => {
+            const hh = Math.floor(((h % 24) + 24) % 24);
+            const mm = Math.round((h % 1) * 60);
+            return mm ? `${hh}h${String(mm).padStart(2, '0')}` : `${hh}h`;
+          }}
+          emptyLabel={t('planner.day_empty', locale)}
+          axisLabel={t('planner.day_axis', locale)}
+          noCastWord={(voice) => t('planner.no_cast', locale, undefined, voice)}
+          unplaced={[]}
+          noHourWord={t('planner.no_hour', locale)}
+        />
+      {/if}
+      {#if dayOrders.length > 0}
+        <div class="dayopen__boxes" data-testid="day-boxes">
+          {#each dayBoxRows as r (r.o.id)}
+            <DayBox
+              compact
+              href={r.o.href}
+              project={r.o.project}
+              what={r.what}
+              at={r.at}
+              noHourWord={t('planner.no_hour', locale)}
+              sub={r.sub}
+              guess={r.o.guess}
+              band={r.band}
+              clashes={r.clashes}
+              done={r.done}
+            />
+          {/each}
+        </div>
+      {:else}
+        <p class="dayopen__none">{t('planner.day_empty', locale)}</p>
+      {/if}
+      {#each dayAwayLines as a (a.key)}
+        <p class="away-line dayopen__away" class:away-line--tent={a.tentative}>
+          <span class="away-line__who">{a.who}</span>{a.rest}
+        </p>
+      {/each}
+      <DayFoot
+        notes={dayNotes}
+        canWrite={!dayNotesAbsent}
+        onCreate={createDayNote}
+        onDelete={deleteNote}
+        next={[]}
+        steps={stepVMsByDay.get(iso) ?? []}
+        stepsWord={t('planner.steps', locale)}
+        notesWord={t('planner.agenda_notes', locale)}
+        nextWord={t('planner.day_next', locale)}
+        emptyWord={t('planner.lid_empty', locale)}
+        privateWord={t('planner.note_private', locale)}
+        placeholder={t('planner.note_placeholder', locale)}
+        deleteLabel={t('planner.note_delete', locale)}
+      />
+    </div>
+  {/snippet}
+
   {#if errorMsg}
     <!-- A FAILURE SAYS WHAT FAILED, IN OUR WORDS, AND OFFERS THE WAY BACK
          (diseño M11), in the dashboards' one voice (`.load-fail`, ADR-130 § 3).
@@ -3695,9 +3864,13 @@
       {loading}
       onDayCreate={canPlan ? (iso) => openCreate(iso) : undefined}
       onDateOpen={openDate}
-      onDayOpen={(iso) => {
-        dayIso = iso;
-        setView('day');
+      onDayOpen={openDayHere}
+      dayBody={phone.current ? dayOpenCard : undefined}
+      pick={phone.current ? openDay : null}
+      onPick={(iso) => {
+        if (!phone.current || openDay === iso) return;
+        openDay = iso;
+        syncUrl('replace');
       }}
       blackouts={blackoutVMs}
       aways={awayVMs}
@@ -3758,15 +3931,13 @@
         ? {
             label: t('planner.agenda_beyond', locale, { day: localeDayMonthNear(farNext, todayIso, localeTag) }),
             onGo: () => {
-              dayIso = farNext;
-              setView('day');
+              if (farNext) openDayHere(farNext);
             },
           }
         : undefined}
-      onDayOpen={(iso) => {
-        dayIso = iso;
-        setView('day');
-      }}
+      onDayOpen={openDayHere}
+      openDay={phone.current ? openDay : null}
+      dayBody={phone.current ? dayOpenCard : undefined}
       decideCardLabel={t('planner.dec_card', locale)}
       awayUntilWord={t('planner.away_until', locale)}
       awayLeftWord={t('planner.away_left', locale, { n: '{n}' })}
@@ -4102,6 +4273,47 @@
        what Marco could not see. Pushed off the drawing and set down almost
        on the NOTES rule, it becomes the band's first line. */
     /* THE DAY IS ALWAYS THE SAME (ADR-247): the boxes, 380 px, no wider. */
+    /* THE OPEN DAY (ADR-249): the tinted card of «Waiting for you». */
+    .dayopen {
+      display: grid;
+      gap: var(--space-xs);
+      padding: var(--space-s);
+      border-radius: var(--radius-l);
+      background: var(--bg-box);
+    }
+    .dayopen__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-s);
+    }
+    .dayopen__date {
+      padding: 0;
+      border: 0;
+      background: none;
+      color: var(--text-color);
+      font-family: var(--font-display);
+      font-size: var(--text-l);
+      font-style: italic;
+      text-align: start;
+      cursor: pointer;
+    }
+    .dayopen__add {
+      min-inline-size: var(--touch-target);
+    }
+    .dayopen__boxes {
+      display: grid;
+      gap: var(--space-xs);
+    }
+    .dayopen__none {
+      margin: 0;
+      color: var(--text-muted);
+      font-size: var(--text-s);
+    }
+    .dayopen__clash,
+    .dayopen__away {
+      margin: 0;
+    }
     .dayboxes {
       display: grid;
       gap: var(--space-xs);

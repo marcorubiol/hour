@@ -68,10 +68,14 @@ test.describe('The phone (ADR-248)', () => {
     await expect(tiles.first()).toHaveAttribute('href', /^\/h\/planner\?view=day&d=\d{4}-\d{2}-\d{2}$/);
   });
 
-  test('the Day says «‹ Back», not ×', async ({ page }) => {
-    await page.goto(`/h/planner?view=day&${SCOPE}`);
+  test('a date opens in place: no Day screen and no Back (ADR-249)', async ({ page }) => {
+    const day = new Date().toISOString().slice(0, 10);
+    await page.goto(`/h/planner?view=day&d=${day}&${SCOPE}`);
     await waitForLoaded(page);
-    await expect(page.getByTestId('day-back')).toBeVisible();
+    // The person's own drawing (Agenda or Month), with that day open in it.
+    await expect(page).toHaveURL(/view=(agenda|month)/);
+    await expect(page.getByTestId('day-open').first()).toBeVisible();
+    await expect(page.getByTestId('day-back')).toHaveCount(0);
     expect(await phoneFaults(page)).toEqual([]);
   });
 });

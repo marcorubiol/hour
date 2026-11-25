@@ -21,7 +21,7 @@
    */
   import { createQuery } from '@tanstack/svelte-query';
   import { bookingModeOf } from '$lib/booking-mode';
-  import { untrack } from 'svelte';
+  import { untrack, type Snippet } from 'svelte';
   import { slide } from 'svelte/transition';
   import type { Attachment } from 'svelte/attachments';
   import { isFreeSpace, longPress } from '$lib/cell-create';
@@ -80,6 +80,16 @@
     onMonthShown?: (m: { year: number; month: number }) => void;
     /** The picked day's door, on a phone: «Día →». */
     openDayWord?: string;
+    /**
+     * THE DAY OPENS IN PLACE (ADR-249). On a phone, the picked day under its
+     * week is drawn by the page — the same «open day» the Agenda opens — and
+     * there is no door to a Day screen. `pick` is the day the page wants
+     * open (a date tapped in Hoy); `onPick` hears every pick, the first one
+     * (today) included, and a fold (null).
+     */
+    dayBody?: Snippet<[string]>;
+    pick?: string | null;
+    onPick?: (iso: string | null) => void;
     /** Already scope-filtered rows — the grid only buckets and renders. */
     performances: PerformanceEvent[];
     dates: DateEvent[];
@@ -164,6 +174,9 @@
     earlierLabel = t('planner.agenda_earlier', L),
     onMonthShown,
     openDayWord = t('planner.view_day', L),
+    dayBody,
+    pick: pickWanted = null,
+    onPick,
     performances,
     dates,
     workspaceSlug,
@@ -483,13 +496,29 @@
   let picked = $state<string | null>(null);
   $effect(() => {
     untrack(() => {
-      if (picked === null) picked = todayIso;
+      if (picked === null) {
+        picked = pickWanted ?? todayIso;
+        onPick?.(picked);
+      }
     });
+  });
+  // The page's open day, once it has one, is the picked day: a day asked
+  // for from outside (Hoy, a link) opens here, and a fold there folds here.
+  let wantSeen = false;
+  $effect(() => {
+    const want = pickWanted;
+    if (!onPick) return;
+    if (!wantSeen) {
+      wantSeen = true;
+      if (want === null) return;
+    }
+    if (want !== untrack(() => picked)) picked = want;
   });
   const calmMotion = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const PICK_UNFOLD = { duration: calmMotion ? 0 : 200 };
   function pick(iso: string) {
     picked = picked === iso ? null : iso;
+    onPick?.(picked);
   }
   /** The column of a month's 1st in this week, or -1 (the ink stair). */
   function firstCol(week: readonly { iso: string }[]): number {
@@ -555,7 +584,8 @@
   let openedOnToday = false;
   $effect(() => {
     if (openedOnToday || !narrow || !gridEl) return;
-    const week = gridEl.querySelector<HTMLElement>(`.cal__wk:has([data-day="${todayIso}"])`);
+    // A day asked for (ADR-249) is the week brought up; else today's.
+    const week = gridEl.querySelector<HTMLElement>(`.cal__wk:has([data-day="${pickWanted ?? todayIso}"])`);
     if (!week) return;
     openedOnToday = true;
     const strip = gridEl.querySelector('.cal__wkh')?.getBoundingClientRect().bottom ?? 0;
@@ -1438,6 +1468,11 @@
       {@const iso = picked}
       {@const list = pickedEntries(iso)}
       <!-- The picked day, whole, under its week (ADR-209). -->
+      {#if dayBody}
+      <div class="cal__pick cal__pick--open" data-testid="month-pick" transition:slide={PICK_UNFOLD}>
+        {@render dayBody(iso)}
+      </div>
+      {:else}
       <div class="cal__pick" data-testid="month-pick" transition:slide={PICK_UNFOLD}>
         <h3 class="cal__pick-h">
           {localeWeekdayShort(iso, locale)} {Number(iso.slice(8, 10))} {localeMonthShort(iso, locale)}
@@ -1460,6 +1495,7 @@
           />
         {/each}
       </div>
+      {/if}
     {/if}
   {/each}
   <div class="cal__foot" bind:this={footEl} aria-hidden="true"></div>
@@ -2013,6 +2049,11 @@
       gap: var(--space-2xs);
       padding: var(--space-s) 0;
       border-block-start: var(--line-hairline) solid var(--border-color-light);
+    }
+    /* The open day carries its own card (DayOpen): no rule above it. */
+    .cal__pick--open {
+      padding: var(--space-xs) 0;
+      border-block-start: 0;
     }
     .cal__pick-h {
       display: flex;

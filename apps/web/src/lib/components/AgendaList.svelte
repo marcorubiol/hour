@@ -46,6 +46,7 @@
    * day's steps fold into one line that opens.
    */
   import { createQuery } from '@tanstack/svelte-query';
+  import type { Snippet } from 'svelte';
   import { MediaQuery, SvelteSet } from 'svelte/reactivity';
   import { bookingModeOf } from '$lib/booking-mode';
   import {
@@ -124,6 +125,10 @@
     awayBackWord?: string;
     /** The day's number is a door to that day. */
     onDayOpen?: (isoDate: string) => void;
+    /** THE DAY OPENS IN PLACE (ADR-249): on a phone, the day the page has
+        open is drawn by the page (`dayBody`) where its row was. */
+    openDay?: string | null;
+    dayBody?: Snippet<[string]>;
     /** «to decide» — the margin card's own eyebrow. */
     decideCardLabel?: string;
     /** My post-its (ADR-093), keyed by on_day. */
@@ -188,6 +193,8 @@
     awayLeftOneWord = t('planner.away_left_one', L),
     awayBackWord = t('planner.away_back', L),
     onDayOpen,
+    openDay = null,
+    dayBody,
     decideCardLabel = t('planner.dec_card', L),
     notesByDay,
     stepsByDay,
@@ -581,6 +588,15 @@
           <span>{legText(leg)}</span>
         </svelte:element>
       {/if}
+    {:else if dayBody && it.day === openDay}
+      <section
+        class="ag__day ag__day--open"
+        class:ag__day--week={it.weekTurn}
+        data-day={it.day}
+        data-testid="agenda-day"
+      >
+        {@render dayBody(it.day)}
+      </section>
     {:else}
       {@const day = it.day}
       {@const rows = byDay.rows.get(day) ?? []}
@@ -782,6 +798,12 @@
     .ag > .ag__month,
     .ag > .ag__free {
       grid-column: 1 / -1;
+    }
+    /* The open day spans the list and the margin: it is one card. */
+    .ag > .ag__day--open {
+      grid-column: 1 / -1;
+      display: block;
+      padding-block: var(--space-xs);
     }
     .ag--bare {
       --ag-margin: 0;
