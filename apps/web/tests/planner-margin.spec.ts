@@ -124,10 +124,11 @@ test.describe('el margen del Planner (ADR-138 § 6)', () => {
   test('el Día lo dice en su pie, y la línea abre la conversación', async ({ page }) => {
     test.setTimeout(60_000);
     await open(page, `/h/planner?view=day&d=${day}&scope=s:playwright`);
-    const steps = page.getByTestId('planner-steps');
+    // The Day opens in place, in its card (ADR-251): its foot says it.
+    const steps = page.locator(`[data-testid="day-open"][data-day="${day}"]`).getByTestId('planner-steps');
     await expect(steps).toContainText(VENUE, { timeout: 15_000 });
     await steps.getByRole('link', { name: new RegExp(VENUE) }).click();
-    // It opens in the vistazo over the Day (ADR-139 p1), and the address says which.
+    // It opens in the vistazo over the drawing (ADR-139 p1), and the address says which.
     await expect(page.getByTestId('peek')).toBeVisible({ timeout: 15_000 });
     await expect(page).toHaveURL(new RegExp(`peek=conversation%2F[^&]+%2F${convId}`));
   });

@@ -143,23 +143,20 @@ test.describe('planner laws (ADR-095)', () => {
     expect(words.map((w) => w.trim().toLowerCase())).toEqual(['agenda', 'month', 'board']);
   });
 
-  test('THE DAY IS A LENS: lit while you are in it, and its × goes back to where it was opened', async ({
-    page,
-  }) => {
+  test('A DATE OPENS IN PLACE (ADR-251): no Day screen on a wide screen either', async ({ page }) => {
     await planner(page, 'month');
     await expect(page.locator('.cal__lens')).toHaveCount(0);
-    // A day of the month opens the Day, which lights its word with a ×…
-    await page.locator('button.cal__day-num').first().click();
-    await expect(page).toHaveURL(/view=day/);
-    await expect(page.locator('.cal__lens-word')).toBeVisible();
-    await expect(page.locator('.cal__view--on')).toHaveCount(0);
-    // …and the × is the way back to the Month, as you left it.
-    await page.locator('.cal__lens-close').click();
+    // A day of the month opens under its week, in its card…
+    const num = page.locator('button.cal__day-num').nth(10);
+    await num.click();
+    await expect(page.getByTestId('day-open').first()).toBeVisible();
     await expect(page).toHaveURL(/view=month/);
-    // With no drawing behind it (a link, Hoy, ⌘K), the × opens the Agenda.
+    await expect(page.locator('.cal__lens')).toHaveCount(0);
+    // …and an address that asks for the Day opens a drawing with that day open.
     await planner(page, 'day');
-    await page.keyboard.press('Escape');
-    await expect(page).toHaveURL(/view=agenda/);
+    await expect(page).toHaveURL(/view=(agenda|month)/);
+    await expect(page.getByTestId('day-open').first()).toBeVisible();
+    await expect(page.locator('.cal__lens')).toHaveCount(0);
   });
 
   test('THE HEAD AS DRAWN: «Hoy» at the end of the title row, ‹ › only where scrolling cannot move you', async ({

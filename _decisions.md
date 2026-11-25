@@ -9048,3 +9048,17 @@ Se borran `DayPiece` y los textos `planner.day_open`, `planner.day_set_hour` y `
 **Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`.
 
 **Cómo se revierte.** Revertir el commit.
+
+## [2026-11-25] ADR-251 · También en el escritorio, una fecha se abre en el sitio (amplía ADR-249; enmienda ADR-155)
+
+**Contexto.** Marco, 25-11-2026, tras ver ADR-249 en el móvil: «creo que es tan bueno que debería ser igual también en el escritorio. A lo mejor las tarjetas un poco más estrechas, centradas».
+
+**Decisión.**
+1. No hay pantalla de Día en ningún ancho. Una fecha se abre en el sitio: en el Month bajo su semana y en la Agenda en lugar de su fila, con la misma tarjeta de ADR-249.
+2. En pantallas anchas (≥ 48rem) la tarjeta tiene el ancho de lectura de un móvil (36rem) y va centrada.
+3. Desde el Board, un choque o una decisión, una fecha abre la Agenda con ese día abierto. `?view=day&d=` lleva a la vista de entrada de la persona (el Board se lee como Agenda) con ese día abierto.
+4. El código de la lente Día queda sin uso; se quitará en una limpieza aparte.
+
+**Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`.
+
+**Cómo se revierte.** Revertir el commit.
