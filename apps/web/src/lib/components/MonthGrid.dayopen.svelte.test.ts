@@ -11,6 +11,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import MonthGrid from './MonthGrid.svelte';
 import { monthSpanWeeks } from '$lib/planner';
 
+// jsdom has no Web Animations; the day's unfold (a global slide) needs a stub.
+if (!Element.prototype.animate) {
+  Element.prototype.animate = function () {
+    return { cancel() {}, finished: Promise.resolve(), onfinish: null } as unknown as Animation;
+  };
+}
+
 const body = createRawSnippet((iso: () => string) => ({
   render: () => `<p data-testid="open-body">${iso()}</p>`,
 }));

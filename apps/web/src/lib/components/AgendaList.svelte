@@ -47,6 +47,7 @@
    */
   import { createQuery } from '@tanstack/svelte-query';
   import type { Snippet } from 'svelte';
+  import { slide } from 'svelte/transition';
   import { MediaQuery, SvelteSet } from 'svelte/reactivity';
   import { bookingModeOf } from '$lib/booking-mode';
   import {
@@ -216,6 +217,13 @@
     endBeyond,
     onDateOpen,
   }: Props = $props();
+  /* THE DAY OPENS, IT DOES NOT APPEAR (Marco, 25-11-2026: «que haya un poco
+     de animación cuando se abren y se cierren»): the open day unfolds where
+     its row was and folds back, the Month's own motion. None for a reader
+     who asked for less motion. */
+  const calmMotion = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const DAY_UNFOLD = { duration: calmMotion ? 0 : 220 };
+  const DAY_FOLD = { duration: calmMotion ? 0 : 160 };
 
   const viewerTz = viewerTimeZone();
   const phone = new MediaQuery(MOBILE_QUERY, false);
@@ -594,6 +602,8 @@
         class:ag__day--week={it.weekTurn}
         data-day={it.day}
         data-testid="agenda-day"
+        in:slide={DAY_UNFOLD}
+        out:slide={DAY_FOLD}
       >
         {@render dayBody(it.day)}
       </section>

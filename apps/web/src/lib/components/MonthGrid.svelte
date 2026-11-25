@@ -1472,11 +1472,11 @@
       {@const list = pickedEntries(iso)}
       <!-- The picked day, whole, under its week (ADR-209). -->
       {#if dayBody}
-      <div class="cal__pick cal__pick--open" data-testid="month-pick" transition:slide={PICK_UNFOLD}>
+      <div class="cal__pick cal__pick--open" data-testid="month-pick" transition:slide|global={PICK_UNFOLD}>
         {@render dayBody(iso)}
       </div>
       {:else}
-      <div class="cal__pick" data-testid="month-pick" transition:slide={PICK_UNFOLD}>
+      <div class="cal__pick" data-testid="month-pick" transition:slide|global={PICK_UNFOLD}>
         <h3 class="cal__pick-h">
           {localeWeekdayShort(iso, locale)} {Number(iso.slice(8, 10))} {localeMonthShort(iso, locale)}
           {#if onDayOpen}
