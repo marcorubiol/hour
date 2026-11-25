@@ -94,3 +94,29 @@ describe('MonthGrid — the page folds the open day (ADR-249)', () => {
     await vi.waitFor(() => expect(sel()).toEqual([]));
   });
 });
+
+describe('MonthGrid — el día abierto también en el escritorio (ADR-251)', () => {
+  const realMatch = window.matchMedia;
+  beforeEach(() => {
+    window.matchMedia = ((q: string) => ({
+      matches: false,
+      media: q,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    })) as unknown as typeof window.matchMedia;
+  });
+  afterEach(() => {
+    window.matchMedia = realMatch;
+  });
+
+  it('a date opens under its week on a wide screen too, never a Day screen', async () => {
+    const { container, findAllByTestId, onPick, onDayOpen } = mount({ pick: '2026-11-20' });
+    expect((await findAllByTestId('open-body')).map((e) => e.textContent)).toContain('2026-11-20');
+    const btn = container.querySelector<HTMLElement>('[data-day="2026-11-12"] button.cal__day-num')
+      ?? container.querySelector<HTMLElement>('.cal__num[data-day="2026-11-12"] button')!;
+    await fireEvent.click(btn);
+    expect((await findAllByTestId('open-body')).map((e) => e.textContent)).toContain('2026-11-12');
+    expect(onPick).toHaveBeenLastCalledWith('2026-11-12');
+    expect(onDayOpen).not.toHaveBeenCalled();
+  });
+});

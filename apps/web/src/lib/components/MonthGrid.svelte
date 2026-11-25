@@ -487,6 +487,9 @@
     mq.addEventListener('change', on);
     return () => mq.removeEventListener('change', on);
   });
+  /** A tapped date opens under its week: always on a phone, and at every
+      width when the page draws the open day (ADR-251). */
+  let inPlace = $derived(narrow || Boolean(dayBody));
   /* THE DAY OPENS, IT DOES NOT APPEAR (Marco, 20-11-2026: «que haya un
      poquito de efecto, ahora va a cero»). The picked day unfolds under its
      week and folds back when another week takes it; inside one week the day
@@ -525,7 +528,7 @@
     return week.findIndex((d) => d.iso.endsWith('-01'));
   }
   function openOrPick(iso: string) {
-    if (narrow) pick(iso);
+    if (inPlace) pick(iso);
     else onDayOpen?.(iso);
   }
   function pickedEntries(iso: string) {
@@ -1234,7 +1237,7 @@
             class:cal__day--today={day.iso === todayIso}
             class:cal__day--alt={altMonth(day.iso)}
             class:cal__day--past={day.iso < todayIso}
-            class:cal__day--sel={narrow && picked === day.iso}
+            class:cal__day--sel={inPlace && picked === day.iso}
             data-month-start={day.iso.endsWith('-01') ? day.iso.slice(0, 7) : undefined}
             data-hover={hoverDay === day.iso ? '' : undefined}
             style="grid-row: 1; grid-column: {di + 1}"
@@ -1403,7 +1406,7 @@
         class:cal__day--today={day.iso === todayIso}
         class:cal__day--alt={altMonth(day.iso)}
         class:cal__day--past={day.iso < todayIso}
-        class:cal__day--sel={narrow && picked === day.iso}
+        class:cal__day--sel={inPlace && picked === day.iso}
         style="grid-row: {runRows + 2} / {runLanes + 3}; grid-column: {di + 1}"
         data-day={day.iso}
         onmouseenter={() => (hoverDay = day.iso)}
@@ -1464,7 +1467,7 @@
       </div>
       </div>
     </div>
-    {#if narrow && picked && week.some((d) => d.iso === picked)}
+    {#if inPlace && picked && week.some((d) => d.iso === picked)}
       {@const iso = picked}
       {@const list = pickedEntries(iso)}
       <!-- The picked day, whole, under its week (ADR-209). -->

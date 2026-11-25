@@ -142,6 +142,8 @@ test.describe('Month — create on the cell’s day (ADR-139, después)', () => 
     await expect(more).toBeVisible({ timeout: 15_000 });
     await more.click();
     await expect(page.locator('dialog[open]')).toHaveCount(0);
-    await expect(page).toHaveURL(new RegExp(`view=day.*d=${FULL_DAY}|d=${FULL_DAY}.*view=day`));
+    // The day opens in place under its week (ADR-251), not a Day screen.
+    await expect(page.locator(`[data-testid="day-open"][data-day="${FULL_DAY}"]`)).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`view=month.*d=${FULL_DAY}|d=${FULL_DAY}.*view=month`));
   });
 });
