@@ -9076,3 +9076,13 @@ Se borran `DayPiece` y los textos `planner.day_open`, `planner.day_set_hour` y `
 **Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`.
 
 **Cómo se revierte.** Revertir el commit.
+
+## [2026-11-25] ADR-253 · En Month, el día abierto también a todo el ancho con las notas a la derecha (enmienda ADR-252 § 1)
+
+**Contexto.** Marco, viendo ADR-252 desplegado (25-11-2026): «esta misma vista de que a la derecha están las notas, puede servir el calendario así, podemos hacer que cada día salga en el día completo o casi, cuando estoy en la visualización de mes».
+
+**Decisión.** Desde 48rem, la tarjeta del día abierto en Month es la misma que en la Agenda: el ancho de la semana, con un margen pequeño a cada lado (`--space-s`), el día (cabecera, choques, tira de horas, cajas, ausencias) a la izquierda y notas y pasos a la derecha (20rem). Deja de colgar bajo la columna de su día (ADR-252 § 1): `MonthGrid` ya no da `--pick-col`. En el móvil no cambia nada.
+
+**Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`.
+
+**Cómo se revierte.** Revertir el commit.

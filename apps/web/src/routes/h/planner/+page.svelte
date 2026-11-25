@@ -4314,27 +4314,18 @@
       min-inline-size: 0;
     }
     @media (min-width: 48rem) {
-      /* THE MONTH: the card hangs under ITS day (Marco 25-11: «cada tarjeta
-         debería estar justo debajo de su día»), a phone's reading width,
-         centred on the day's column and held inside the week: a Monday's
-         starts at the left edge, a Sunday's ends at the right. MonthGrid
-         says the column (`--pick-col`, 0 to 6). */
-      :global(.cal__pick--open) .dayopen {
-        --dayopen-w: min(36rem, 100%);
-        inline-size: var(--dayopen-w);
-        margin-inline-start: clamp(
-          0%,
-          calc((var(--pick-col, 3) + 0.5) * 100% / 7 - var(--dayopen-w) / 2),
-          calc(100% - var(--dayopen-w))
-        );
-      }
-      /* THE AGENDA: the whole width, the day's things on the left and its
-         notes and steps on the right (Marco 25-11: «las notas a la derecha y
-         lo de esto a la izquierda para ocupar todo el ancho»). */
-      :global(.ag__day--open) .dayopen {
+      /* ONE CARD IN BOTH DRAWINGS: the whole width, the day's things on the
+         left and its notes and steps on the right (ADR-252 in the Agenda;
+         ADR-253 in the Month too, Marco 25-11: «esta misma vista de que a la
+         derecha están las notas, puede servir el calendario así»). In the
+         Month it sits a little in from the week's edges. */
+      .dayopen {
         grid-template-columns: minmax(0, 1fr) minmax(0, 20rem);
         column-gap: var(--space-l);
         align-items: start;
+      }
+      :global(.cal__pick--open) .dayopen {
+        margin-inline: var(--space-s);
       }
     }
     .dayopen__head {
