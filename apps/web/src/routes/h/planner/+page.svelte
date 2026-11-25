@@ -80,6 +80,7 @@
     type DecisionVM,
   } from '$lib/components/planner/DecisionBand.svelte';
   import { SvelteSet } from 'svelte/reactivity';
+  import { fade } from 'svelte/transition';
   import CarrilsStrip from '$lib/components/planner/CarrilsStrip.svelte';
   import {
     activeDaySet,
@@ -232,6 +233,10 @@
       return v === 'agenda' || v === 'month' ? dayIso : null;
     })(),
   );
+  const DAY_FADE = {
+    duration:
+      typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 180,
+  };
   /** The drawing a day opens in: the Board holds no open day, the Agenda does. */
   const dayDrawing = (v: PlannerView | null | undefined): 'agenda' | 'month' =>
     v === 'month' ? 'month' : 'agenda';
@@ -3647,7 +3652,10 @@
        hour strip only when two things or more have an hour. Tapping the
        date again folds it. -->
   {#snippet dayOpenCard(iso: string)}
-    <div class="dayopen" data-testid="day-open" data-day={iso}>
+    <!-- Another day of the same week changes in the same card: its content
+         fades in, so the change is seen (Marco 25-11: «un poco de animación»). -->
+    {#key iso}
+    <div class="dayopen" data-testid="day-open" data-day={iso} in:fade={DAY_FADE}>
       <div class="dayopen__head">
         <button
           type="button"
@@ -3740,6 +3748,7 @@
         deleteLabel={t('planner.note_delete', locale)}
       />
     </div>
+    {/key}
   {/snippet}
 
   {#if errorMsg}
