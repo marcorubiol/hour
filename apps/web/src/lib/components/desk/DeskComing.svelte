@@ -3,10 +3,12 @@
    * «COMING UP», Hoy's second block (ADR-202 § 6, replaces «Después»): a
    * strip of day tiles. The big number, the weekday and the month beside it,
    * one tile per day with something, two things a tile and «+N»; two weeks
-   * or ten tiles at most, four on a phone (`$lib/hoy` comingTiles, ADR-205),
-   * and a last tile «Planner →». On a phone the strip slides sideways, the third tile peeking; on a
-   * desktop the tiles go one under the other (§ 6 c) and «Planner →» is a
-   * low quiet row at their foot, lighter than any tile with something.
+   * or ten tiles at most (`$lib/hoy` comingTiles, ADR-205). THE PLANNER CARD
+   * (ADR-250): on a phone (2×2) and on a wide desktop (3×2) the grid's last
+   * cell is a card of the same family, white with its line, that opens the
+   * Planner; three day tiles and the card, five and the card. It replaces the
+   * «Planner →» of the block's head. Between the two (one column, ten tiles),
+   * «Planner →» stays a low quiet row at the foot.
    *
    * THE PLACE LEADS (ADR-227): each thing is titled by where it happens
    * («Donostia», «a Donostia» on a trip); the kind and the hour go under it,
@@ -191,11 +193,7 @@
 {#if !errored}
   <section class="dband coming" aria-labelledby="desk-coming-h" data-help-step="desk-coming">
     <div class="coming__head">
-      <BlockHead title={t('desk.band_coming', locale)} titleId="desk-coming-h" display>
-        {#if wide && planner && settled && tiles.length > 0}
-          <a class="block-head__act" href="/h/planner" data-testid="desk-tile-planner">{t('lens.planner', locale)} →</a>
-        {/if}
-      </BlockHead>
+      <BlockHead title={t('desk.band_coming', locale)} titleId="desk-coming-h" display />
     </div>
     {#if !settled}
       <ol class="coming__strip" class:coming__strip--grid={wide} aria-hidden="true">
@@ -278,9 +276,11 @@
           </li>
           {/if}
         {/each}
-        {#if planner && !wide}
+        {#if planner}
           <li class="coming__cell">
-            <a class="tile tile--end" href="/h/planner" data-testid="desk-tile-planner">{t('lens.planner', locale)} →</a>
+            <a class="tile tile--end" class:tile--door={wide} href="/h/planner" data-testid="desk-tile-planner"
+              >{t('lens.planner', locale)} <span aria-hidden="true">→</span></a
+            >
           </li>
         {/if}
       </ol>
@@ -626,6 +626,27 @@
       min-block-size: var(--touch-target);
     }
   }
+  /* THE PLANNER CARD (ADR-250): the grid's last cell, a tile of the same
+     family (white, its fine line, its radius), the word in the middle. On a
+     wide desktop here; on a phone, in its block below. No amber, no count. */
+  .tile.tile--door {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-xs);
+    padding: var(--space-s);
+    border: var(--line-hairline) solid var(--border-color-light);
+    background: var(--bg-ultra-light);
+    font-size: var(--text-m);
+    color: var(--heading-color);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    a.tile.tile--door:hover {
+      border-color: var(--border-color-dark);
+      background: color-mix(in oklch, var(--bg-ultra-light) 96%, var(--heading-color));
+      color: var(--heading-color);
+    }
+  }
   .coming__far {
     display: inline-block;
     padding: var(--space-2xs) var(--space-xs);
@@ -647,13 +668,10 @@
   /* THE PHONE (§ 6 b; ADR-248): two tiles a row, all of them in sight. It
      was a strip that slid sideways with the third tile cut by the screen's
      edge: on a phone that reads as «something is hidden there». The door to
-     the Planner is the last row, across. */
+     the Planner is the grid's last cell, a card like the tiles (ADR-250). */
   @media (max-width: 47.999rem) {
     .coming__strip {
       grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-    .coming__cell:has(.tile--end) {
-      grid-column: 1 / -1;
     }
     .tile {
       grid-template-columns: minmax(0, 1fr);
@@ -664,18 +682,19 @@
     .tile__falta {
       grid-column: 1 / -1;
     }
-    /* The end door: a slim dashed row, its word centred. */
-    .tile--end {
-      display: grid;
-      place-content: center;
-      text-align: center;
-      padding: var(--space-xs) var(--space-s);
-      border-color: var(--border-color-light);
-      border-style: dashed;
+    /* The Planner card (ADR-250): the 2×2's fourth cell, like the tiles. */
+    .tile.tile--end {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-xs);
+      padding: var(--space-s);
+      border: var(--line-hairline) solid var(--border-color-light);
+      background: var(--bg-ultra-light);
       font-size: var(--text-m);
-      color: var(--text-color);
+      color: var(--heading-color);
     }
-    a.tile--end:hover {
+    a.tile.tile--end:hover {
       border-color: var(--border-color-dark);
     }
   }

@@ -7,6 +7,7 @@ import {
   COMING_TILES,
   COMING_TILES_PHONE,
   COMING_TILES_WIDE,
+  comingLimit,
   comingOpen,
   comingPlace,
   comingTiles,
@@ -425,5 +426,14 @@ describe('visibleComingTiles and comingPlace (Hoy desktop 3×2)', () => {
     expect(comingPlace({ lead: 'to', name: 'Viatge / Gota', city: null }, 'to')).toBe('Viatge / Gota');
     expect(comingPlace({ lead: 'to', name: 'a Bilbao', city: null }, 'a')).toBe('a Bilbao');
     expect(comingPlace({ lead: null, name: 'Kursaal', city: 'Manresa' }, 'to')).toBe('Manresa');
+  });
+});
+
+describe('comingLimit (ADR-250)', () => {
+  it('leaves the last cell to the Planner card: three on a phone, five on a wide desktop', () => {
+    expect(comingLimit(COMING_TILES_PHONE, true)).toBe(3);
+    expect(comingLimit(COMING_TILES_WIDE, true)).toBe(5);
+    expect(comingLimit(COMING_TILES, false)).toBe(COMING_TILES);
+    expect(comingLimit(1, true)).toBe(1);
   });
 });

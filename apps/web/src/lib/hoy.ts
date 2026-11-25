@@ -150,8 +150,13 @@ export const COMING_DAYS = 14;
 export const COMING_TILES = 10;
 /** On a wide desktop, a 3×2 calendar grid keeps the urgent line and «Te espera» above the fold. */
 export const COMING_TILES_WIDE = 6;
-/** On a phone, four day tiles and then «Planner →» (ADR-205). */
+/** On a phone, a 2×2 grid: three day tiles and the Planner card (ADR-205, ADR-250). */
 export const COMING_TILES_PHONE = 4;
+/** How many day tiles a grid of `cells` draws: one fewer when its last cell is
+    the Planner card (ADR-250), never below one. */
+export function comingLimit(cells: number, plannerCard: boolean): number {
+  return plannerCard ? Math.max(1, cells - 1) : cells;
+}
 export const COMING_PER_TILE = 2;
 /** How many things the count of what is open reads (ADR-227): the two weeks
     of someone with fifteen companies, not the 40 the strip reads. */

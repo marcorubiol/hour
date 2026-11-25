@@ -9033,3 +9033,18 @@ Se borran `DayPiece` y los textos `planner.day_open`, `planner.day_set_hour` y `
 **Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`. Las notas del día abierto usan la misma consulta que el Día (`planner-day-notes`).
 
 **Cómo se revierte.** Revertir el commit.
+
+## [2026-11-25] ADR-250 · La última casilla de «Coming up» es la tarjeta a Planner (enmienda ADR-205)
+
+**Contexto.** En escritorio ancho «Coming up» es una rejilla de 3×2 y «Planner →» iba como enlace en la cabecera del bloque; con cinco fechas quedaba un hueco al final. En el móvil eran cuatro fichas en 2×2 y «Planner →» como fila discontinua a lo ancho debajo. Marco (25-11-2026): con cinco, una sexta tarjeta que lleve a Planner, «es más bonito»; en el móvil, tres y una cuarta tarjeta a Planner.
+
+**Decisión.**
+1. **La última casilla de la rejilla es la tarjeta a Planner**, con la lente Planner encendida: en el móvil (2×2) tres fichas de día y la tarjeta; en escritorio ancho (3×2) cinco y la tarjeta. Con menos fechas, la tarjeta va justo detrás de la última. `comingLimit` (`$lib/hoy`) resta esa casilla.
+2. **Misma familia que las fichas**: caja blanca, raya fina, el mismo radio; la palabra «Planner →» en el centro. Sin ámbar ni cifra.
+3. **Sustituye al «Planner →» de la cabecera** del bloque en escritorio: una sola puerta, en la rejilla.
+4. Entre móvil y escritorio ancho (una columna, hasta diez fichas) sigue la fila baja y discreta al pie.
+5. Si el día que vence (el ámbar) cae fuera, sigue ocupando la última ficha de día (ADR-227), no la casilla de Planner.
+
+**Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`.
+
+**Cómo se revierte.** Revertir el commit.
